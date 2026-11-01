@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：23/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：24/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 已勾选的 18 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
 > 末尾 §Notes 的「未完成项实况」里逐条写了当前状态与阻塞原因，不以「文件已存在」充数。
@@ -212,8 +212,25 @@
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
   - _AC: 1.4, 1.5_
 
-- [ ] 3.6 建立 UI 诚实性总守卫
+- [x] 3.6 建立 UI 诚实性总守卫
   - `single_*` 无双模式按钮、unreachable 零挂载、blocked 不发 materialize、pending 常显未互通原因；构造 runtime contract drift 反例必须打红。
+  - 产物：`sync/__tests__/entrySyncUiHonesty.spec.ts`（9 例）。分母取 **generated manifest
+    全域**（独立 entry > 100），四条不变量逐条断言，外加「任何形态都不得出现笼统成功文案」。
+  - runtime contract drift 反例：静态 `bidirectional` + `runtime.ready=false` +
+    `reason=CONTRACT_DRIFT` ⇒ 必须 `canClaimBidirectional=false` / 无开关 / `noticeKind=danger`，
+    且原因是后端那句可操作中文（断言不含 `A_B` 式裸枚举码）。
+  - 另加**接线闭合**判据：已接单源的宿主，其 `el-segmented` 的 `v-if` 必须真的绑在
+    `presentation.showModeSwitch` 上 —— 棘轮那条只看 import，看不出「import 了却没用上」。
+  - 🔴 现算到一处与原任务假设不符的事实：manifest 里 **`single_html` / `single_onlyoffice`
+    当下为 0 条**（Phase 1 把迁移中的入口统一落成 `capability=null` + pending 三字段，拒绝
+    继续用组件默认 `single_onlyoffice`），真实出现的只有 `bidirectional` 111 /
+    `unreachable` 1 / `null` 86。四条不变量仍对四种 capability **全测**（它们是 derive 函数的
+    不变量，不该等「恰好有这种 entry」才被走到）。
+  - `blocked 不发 materialize` **刻意不在本文件**：那条必须真发请求才算验证，由
+    `useWorkpaperSyncBridge.spec.ts` 承担（readiness 未过即拒 / readiness 失败 fail visible /
+    readiness 必须早于第一个写请求）；此处不写跨文件文本断言（会被注释骗过）。
+  - 变异：M0 阴性对照 9 passed；M1 漂移时仍宣称双向 4 红 / M2 开关恒显 3 红 / M3 宿主开关
+    去门控 1 红，两份文件按字节恢复。
   - _AC: 1.4, 1.5, 1.7_
 
 ## Phase 4：按当前事实收口逐 entry lane
@@ -391,7 +408,13 @@
   🔴 首轮曾按「只过 registry probe」终裁 16 条，其中 **H9 / I1 / I5** 被 representation 预检证伪
   （冻结 `_GT_SYNC` 坐标未随行位移重冻结，下游 materialize 计划期才 fail closed）⇒ 已撤回 override
   并保持 pending。现算 pending=78。
-- **5.1 / 5.2**：`single_*` 的逐项验证未做。
+- **5.1 / 5.2**：🔴 **当下是结构性空分母，不是「没做」**。现算 manifest
+  `capability_counts = {bidirectional: 111, unreachable: 1}`，`single_html` 与
+  `single_onlyoffice` **各 0 条** —— Phase 1 按 AC 1.3 把迁移中的入口统一落成
+  `capability=null` + pending 三字段（拒绝继续用组件默认 `single_onlyoffice`），所以「逐项
+  验证全部 single_*」要等 pending（86 条）被裁决出 single_* 之后才有对象。
+  已先把**函数级**不变量钉死（3.6 的 ①②对四种 capability 全测，不等数据出现才生效），
+  这样第一条 single_* 落地的那一刻判据就已经在岗。
 - **5.3 / 5.4**：删除的**前置事实已现算成立**（`usePilotBridgeAdapter.ts` 生产 importer 为 0；
   `GtG6OtherBondEcl.vue` 仅被生成的 `components.d.ts` 引用，替代组件在库），阻塞在「与之绑定的
   判据和生成物必须同批改」：前者有 6 处判据断言它存在（`test_task45` / `test_task46` /
