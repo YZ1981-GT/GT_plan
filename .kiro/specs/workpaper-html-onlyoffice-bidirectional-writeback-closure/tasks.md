@@ -2,9 +2,14 @@
 
 ## Overview
 
-> **状态**：24/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：23/49（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
-> 已勾选的 18 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
+> 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
+> requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
+> 闭合性守卫对这类**外部消费方**零覆盖（14 条判据无一会因此打红）。证据与逐脚本普查见
+> `evidence/phase0-spec-doc-consumer-breakage-2026-11-01.md`。总数因此 48 → 49。
+>
+> 已勾选的 23 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
 > 末尾 §Notes 的「未完成项实况」里逐条写了当前状态与阻塞原因，不以「文件已存在」充数。
 >
 > **完成标记规则**：每项必须同时有实际产物、对应测试/检查通过记录和可复核 evidence。
@@ -50,13 +55,37 @@
     后端选集 added 0 / resolved 11、前端 sync added 0 / resolved 0；另记两类采集期崩溃与六个门禁命令结果）。
   - _AC: 1.3, 1.4, 12.1_
 
-- [x] 0.5 锁定 AC → design → task → evidence 引用闭合性
+- [ ] 0.5 锁定 AC → design → task → evidence 引用闭合性
   - 脚本验证 7 条 AC 每条至少由一项任务和一个可执行验收面承接，且不存在未定义 AC 引用。
-  - 同上文件：`test_no_task_cites_an_undefined_ac` / `test_every_registered_ac_is_carried_by_some_task`
+  - 已完成部分：`test_no_task_cites_an_undefined_ac` / `test_every_registered_ac_is_carried_by_some_task`
     / `test_every_registered_ac_has_an_executable_surface_on_disk`（承接面必须**真实存在于磁盘**，
     写了名字不算）/ `test_acceptance_surface_registry_has_no_stale_entries`（登记表不留失效路径）。
-    现算 7 条 AC 全部闭合，48 条任务全部带 `_AC:` 引用。
+    现算 7 条 AC 全部闭合，49 条任务全部带 `_AC:` 引用。
+  - 🔴 **未完成（2026-11-01 退回原因）**：上述 14 条判据只覆盖 spec 三件套**内部**互引
+    （AC ↔ task ↔ property ↔ 磁盘承接面），对「仓库里有脚本把 requirements.md / tasks.md
+    当机器可读契约解析」这条边**零覆盖**。实测本轮重写把 7 个这类消费方打红（普查见
+    `evidence/phase0-spec-doc-consumer-breakage-2026-11-01.md` §2.1），而 14 条判据一条都没红。
+  - 补齐判据：闭合性必须加第四条边「doc → 外部解析器」——枚举仓库内解析这两份文档的脚本，
+    断言每个都能在当前文档形态下跑通（或已显式登记退役并断言它真的退役）。变异证明：
+    把任一 AC 编号改掉 / 把 Phase 标题形态改掉，必须有判据打红。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
+
+- [ ] 0.6 修复被 spec 文档重写打坏的 7 个机器消费方
+  - 范围（逐个点名，普查见 `evidence/phase0-spec-doc-consumer-breakage-2026-11-01.md` §2.1）：
+    `generate_task66_legacy_deletion_plan.py`（cycle→task 映射 0 条）、
+    `generate_workpaper_sync_program_milestones.py`（`wave id must be an integer`）、
+    `check_task68_backend_chain_independent_regression.py` 与
+    `check_task69_frontend_independent_regression.py`（找不到 Task 68 / 任务 69）、
+    `generate_workpaper_ac_coverage_matrix.py`（AC 先于 requirement 标题出现）、
+    `generate_workpaper_word_template_adjudication.py`（AC 7.7 原文形态变了）、
+    `check_task71_mutation_capacity_recovery_gate.py`（找不到 AC 14.10，fail closed）。
+  - 处置口径：**仍从文档现算，禁手抄编号**。任务/AC 只是编号或标题形态变了的，改解析器认新形态；
+    被引用对象在新计划里真的不存在了的（Task 68 / 69 的义务已折进 7.x），retarget 到新任务号
+    或显式登记退役 + 断言它真的退役 —— 不留永红门禁，也不加豁免蒙绿。
+  - 不在范围：2.2 里 5 条预存真实红（resolver matrix digest / task64 popup digest /
+    task63 产物漂移 / task70 capability 未登记 / task72 overlay 裁决了不存在的 writer）各有
+    owner，本 spec 只登记不代修。
+  - _AC: 1.3, 12.1, 12.9_
 ## Phase 1：统一 manifest 与 cycle slice 当前投影
 
 - [x] 1.1 收敛 manifest 的终态与 pending schema
