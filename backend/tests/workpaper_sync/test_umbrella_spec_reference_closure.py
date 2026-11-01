@@ -18,6 +18,7 @@ spec: `workpaper-html-onlyoffice-bidirectional-writeback-closure`
 from __future__ import annotations
 
 import json
+import pathlib
 import re
 from pathlib import Path
 
@@ -220,3 +221,123 @@ def test_completion_count_in_the_header_matches_the_checkboxes() -> None:
     assert int(header.group("done")) == done, (
         f"标题写已完成 {header.group('done')}，实际勾选 {done} 条"
     )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 4. 外部机器消费方闭合（doc → 脚本解析器）
+# ════════════════════════════════════════════════════════════════════════════
+
+#: 已知读 requirements.md / tasks.md / design.md 的脚本。
+#: `status` 取三值：
+#:   * `ok`       —— 在当前文档形态下可运行
+#:   * `retired`  —— 退役（如 generate_task66_legacy_deletion_plan 的整条判为退役）
+#:   * `pending_relink` —— 锚点断开，归某个任务做前置时重接
+#: 🔴 新增读 spec 文档的脚本时必须加到这里，否则改文档时不会有判据打红。
+_SPEC_DOC_CONSUMERS: list[dict[str, str]] = [
+    {
+        "script": "backend/scripts/gen/generate_task66_legacy_deletion_plan.py",
+        "reads": "tasks.md",
+        "status": "retired",
+        "note": "整条判为退役，由 task 5.5 执行账取代",
+    },
+    {
+        "script": "backend/scripts/gen/generate_workpaper_sync_program_milestones.py",
+        "reads": "tasks.md",
+        "status": "ok",
+        "note": "wave 图键名已修、里程碑归属已重映射",
+    },
+    {
+        "script": "backend/scripts/check/check_task68_backend_chain_independent_regression.py",
+        "reads": "tasks.md",
+        "status": "pending_relink",
+        "relink_owner": "7.2",
+        "note": "TASK_NUMBER=68 不在新 tasks.md；解析器假设纯数字任务号",
+    },
+    {
+        "script": "backend/scripts/check/check_task69_frontend_independent_regression.py",
+        "reads": "tasks.md",
+        "status": "pending_relink",
+        "relink_owner": "7.2",
+        "note": "TASK_NUMBER=69 不在新 tasks.md",
+    },
+    {
+        "script": "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py",
+        "reads": "requirements.md",
+        "status": "pending_relink",
+        "relink_owner": "7.1",
+        "note": "依赖 ### Requirement N: 标题结构，active 投影只有扁平 AC",
+    },
+    {
+        "script": "backend/scripts/gen/generate_workpaper_word_template_adjudication.py",
+        "reads": "requirements.md",
+        "status": "pending_relink",
+        "relink_owner": "7.1",
+        "note": "依赖 AC 7.7 原文形态（170 条结构里的一条）",
+    },
+    {
+        "script": "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py",
+        "reads": "requirements.md",
+        "status": "pending_relink",
+        "relink_owner": "7.1",
+        "note": "依赖 AC 14.10 容量门定义",
+    },
+]
+
+
+def test_spec_doc_consumer_registry_is_complete() -> None:
+    """已知消费方清单不为空且每条都有必填字段。"""
+    assert _SPEC_DOC_CONSUMERS, "消费方清单为空 —— 至少有 milestones 是 ok 的"
+    for entry in _SPEC_DOC_CONSUMERS:
+        assert "script" in entry and "reads" in entry and "status" in entry
+
+
+def test_ok_consumers_can_find_their_document() -> None:
+    """status=ok 的消费方必须能找到它读的文档（不是 FileNotFoundError 也不是空）。"""
+    for entry in _SPEC_DOC_CONSUMERS:
+        if entry["status"] != "ok":
+            continue
+        doc = SPEC_DIR / entry["reads"]
+        assert doc.is_file(), (
+            f"{entry['script']} 读 {entry['reads']}，但文件不在 {doc} —— "
+            "status=ok 的消费方不该找不到文档"
+        )
+        assert doc.stat().st_size > 100, f"{doc} 太小（<100 bytes），可能是空壳"
+
+
+def test_pending_relink_consumers_have_relink_owner() -> None:
+    """status=pending_relink 的必须写明由哪个任务做前置重接。"""
+    for entry in _SPEC_DOC_CONSUMERS:
+        if entry["status"] != "pending_relink":
+            continue
+        assert entry.get("relink_owner"), (
+            f"{entry['script']} 标了 pending_relink 但没写 relink_owner —— "
+            "不能留没有 owner 的锚点断开项"
+        )
+
+
+def test_no_unknown_consumer_status() -> None:
+    """status 必须在封闭集合里。"""
+    allowed = {"ok", "retired", "pending_relink"}
+    for entry in _SPEC_DOC_CONSUMERS:
+        assert entry["status"] in allowed, f"{entry['script']} 的 status={entry['status']} 不在 {allowed}"
+
+
+def test_retired_consumers_are_not_in_any_gate() -> None:
+    """退役的消费方不得留在门禁里（与 test_task66_execution_ledger 同族逻辑）。"""
+    for entry in _SPEC_DOC_CONSUMERS:
+        if entry["status"] != "retired":
+            continue
+        script_name = pathlib.Path(entry["script"]).name
+        for gate_rel in (
+            ".github/workflows/ci.yml",
+            ".github/workflows/governance-checks.yml",
+            ".pre-commit-config.yaml",
+            ".git-hooks/pre-commit",
+            ".git-hooks/pre-push",
+        ):
+            gate_path = ROOT / gate_rel
+            if not gate_path.is_file():
+                continue
+            assert script_name not in gate_path.read_text(encoding="utf-8", errors="replace"), (
+                f"退役脚本 {script_name} 仍被 {gate_rel} 引用 —— 会长期全红"
+            )

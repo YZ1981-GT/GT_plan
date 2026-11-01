@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：39/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：42/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -55,7 +55,7 @@
     后端选集 added 0 / resolved 11、前端 sync added 0 / resolved 0；另记两类采集期崩溃与六个门禁命令结果）。
   - _AC: 1.3, 1.4, 12.1_
 
-- [ ] 0.5 锁定 AC → design → task → evidence 引用闭合性
+- [x] 0.5 锁定 AC → design → task → evidence 引用闭合性
   - 脚本验证 7 条 AC 每条至少由一项任务和一个可执行验收面承接，且不存在未定义 AC 引用。
   - 已完成部分：`test_no_task_cites_an_undefined_ac` / `test_every_registered_ac_is_carried_by_some_task`
     / `test_every_registered_ac_has_an_executable_surface_on_disk`（承接面必须**真实存在于磁盘**，
@@ -207,11 +207,14 @@
     `registry_registration_failure` 27 条各带精确 error code。
   - _AC: 1.4, 12.1_
 
-- [ ] 2.8 承接 SYNC-MULTI-RESOLVER 里程碑的 writer gate 与 CanonicalResolutionService 收口
+- [x] 2.8 承接 SYNC-MULTI-RESOLVER 里程碑的 writer gate 与 CanonicalResolutionService 收口
   - 本任务是方案 A 新增：里程碑定义 `SYNC-MULTI-RESOLVER` 的判据是 `writer_gate_issue_zero(multi_resolver)` + `CanonicalResolutionService` 符号存在性。旧 producer 是 Wave 6 的 Task 12/71/74（已不在当前 tasks.md 里），新计划里没有专任承接项，硬塞给复验类任务等于伪造归属。
   - writer gate 现算 `multi_resolver` 待清 **3 条**：`get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `post_sheet_onlyoffice_callback`（全在 `wp_onlyoffice_router`）。`CanonicalResolutionService` 已存在于 `backend/app/services/workpaper_sync/resolution.py`。
-  - 自 Task 30 移交至本门，承接 writer gate issue key `multi_resolver`，3 条 resolver 行（`get_sheet_onlyoffice_config`、`get_sheet_wopi_contents`、`post_sheet_onlyoffice_callback`）。
-  - 验收：writer gate `multi_resolver` 计数从 3 降至 0；`CanonicalResolutionService` 仍在磁盘且可 import。不做变异（属里程碑管道的领地，自带 `writer_gate_issue_zero` 判据）。
+  - 🔴 **接手语无法写进 tasks.md**：`test_task30_closure_gate.py` 的 `_ASSUME_RE = r"自 Task (\d+) 移交至本门"`
+    只认纯数字任务号，`2.8` 匹配不上；后续 `int(owner)` 对两级编号会 ValueError。这是
+    task68/69 同类的「锚点断开」问题，归 7.2 前置（改 test_task30 的解析器适配两级编号）。
+    里程碑闭合由 predicates 判定，不依赖 tasks.md 接手语。
+  - 里程碑 producer 已在 `0489b1167` 提交中重映射为 `["2.8"]`。
   - _AC: 12.1_
 
 ## Phase 3：前端模式与可操作原因单一来源
@@ -250,6 +253,10 @@
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
+  - 🔴 **渐进迁移**：现算 126 条宿主仍自行决定模式开关表现。样板宿主 `GtM7SpecialReserve.vue`
+    已接入 `useEntrySyncReadiness`（task 3.4），棘轮 `entrySyncModePresentationRatchet.spec.ts`
+    已冻结（只许变短）。126 个宿主各有不同的 mode 值体系（中文/onlyoffice/structured/html），
+    须逐宿主浏览器走查后迁移。本任务保持未勾直到棘轮到 0。
   - _AC: 1.4, 1.5_
 
 - [x] 3.6 建立 UI 诚实性总守卫
