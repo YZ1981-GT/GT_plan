@@ -51,3 +51,16 @@
 - [x] 23. R11 预览回执带可自动确认比例 + 映射弹窗 / 合并附注页显示 + 章节级一键 + 用例
 - [x] 24. R14 跨口径转置表对应（读取层 + 判据）+ 用例
 - [x] 25. 回归（候选 worktree vs 远端最新逐节点）+ 三项门禁 `--check` + 浏览器实测 + 单提交推送
+
+## 第三轮：共享环境解阻 + 存量列头漂移（R16~R17）
+
+- [x] 26. R16 解除共享环境两处阻断（`pm_dashboard.py` / `useAiNoteCapture.ts` 对齐远端权威版，不动 git HEAD、不碰别人提交）+ 实测「单文件是否够」+ `/api/health` 的 reload 由 failed 变 ok 验证
+- [x] 27. R16 后端真实端点实测：`/latest` 回执带 `orphan_push_states`、`/run?dry_run` 由 500 恢复 200（第二轮 NameError 修复的运行时证据）
+- [x] 28. R17 存量列头漂移只读报告 `backend/scripts/analyze/report_pushed_note_header_drift.py`（117 张表 → 18 张不一致，按空白/文字/列数分类）
+- [x] 29. R17 判定「存量而非代码缺陷」：前端 12 循环 107 张表逐位现算 0 不一致（临时诊断用完即删）
+- [x] 30. R17 修复脚本 `backend/scripts/fix/fix_pushed_note_header_labels.py`（dry-run 默认 / `--apply --confirm` / 备份）+ 安全门 `reordered_columns()`（dry-run 逐条审查抓到的列序错位风险）+ 判据双向测试 17 例
+- [ ]* 31. 执行存量修复 `--apply --confirm`（10 张表 12 个 label）—— **须用户放行**（含两个真实项目：陕西华氏医药、重庆和平药房）
+- [ ]* 32. 8 张需重新推送的表（7 张列数不同 + 1 张列序错位）—— 须在界面上对相应底稿重新推送；另 2 张「模板无此表名」待查是否孤儿表
+- [x] 33. R18 界面走查（任务 17 的实质）：附注编辑器 199 章节渲染正常、D2 底稿页 14 个页签可打开、公式管理入口可点开；抓到并定位 1 条 500
+- [x] 34. R18 跨会话迁移撞号取证（V227 / V228 两组记账与磁盘文件不符 ⇒ `attachment_lineage.project_id` 与 `formula_sync_item.revision` 永不执行，两个接口恒 500）+ 修复 SQL 与回滚方案（design §8）
+- [ ]* 35. 执行迁移撞号修复（改共享库 schema_version 记账 + 跑 V227/V228）—— **须用户放行**；同批待执行的 V229/V233/V234 需逐条确认（V234 含 UPDATE 改数据）

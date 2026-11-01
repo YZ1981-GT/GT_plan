@@ -262,3 +262,140 @@ console error 4 条，**同一根因且与本轮无关**：
 10. **`Start-Process -WorkingDirectory` 会改变相对路径基准**：`node` 脚本用相对路径找不到自己；
     而脚本放在无 `node_modules` 的 `tmp_` 目录时，ESM 裸包名（`playwright`）也解析不到
     ⇒ 脚本用绝对 `file://` URL 取依赖、调用方传绝对路径。
+
+## 7. 第三轮：共享环境解阻 + 存量列头漂移（R16~R17）
+
+### 7.1 R16 解除共享环境的两处阻断（本轮之外的人造成，但可修）
+
+第二轮如实记录「后端界面实测做不了」，本轮把它修掉了 —— 它**不是不可修**，只是根因在别处。
+
+| 阻断 | 根因 | 处置 |
+|---|---|---|
+| 共享后端热重载自 `05:07` 持续失败（`ImportError: BatchReviewService`） | 主工作区 HEAD 落后远端 9 个提交，磁盘 `pm_dashboard.py` 还引用着远端已删的符号 | 把该文件对齐到远端权威版 |
+| 前端整页 4 条 console error（`useAiNoteCapture.ts` 缺 `NOTE_NAME_MAX_LENGTH`） | 同上，磁盘版缺该导出而远端有 | 同上 |
+
+处置前先**实测**「只换 `pm_dashboard.py` 够不够」（主工作区磁盘另有 112 个后端 `.py` 与远端不一致，
+修一个可能立刻撞下一个）：子进程 `import app.main` 由 FAIL 变 OK ⇒ 单文件修复可行，不必动 HEAD。
+
+🔴 **不动 git HEAD、不碰别人的提交**：主工作区领先远端 1 个提交（别会话 `workpaper-sync-closure`
+18/48 的 32052 行大提交，未推送）、另有 185 项未提交改动。只改这两个 `git status` 为 clean 的文件，
+方向是「磁盘 → 已推送的远端权威版」，不引入新逻辑；原版备份在 `tmp_note_table_closure/unblock_backup/`。
+
+**验证**：`/api/health` 的 `reload.last` 由 `05:07 failed / candidate_start` 变为
+`05:58 ok / primary_ready`（正是修复后 5 分钟）；随后后端真实端点实测：
+`/latest` 回执 keys 含 `orphan_push_states`（值 0，与真库已清零一致）、
+`/run?dry_run` 由**全线 500 恢复为 200**（78 items）—— 这同时是第二轮那个 `NameError` 修复的运行时证据。
+
+### 7.2 R17 存量列头漂移：量化、判定、修复方案
+
+附注表头有两个来源：**模板种子化**（`_tables[].headers` 取自模板，必然对）与**底稿推送**
+（前端 `columns` → `table_data._sub_table_columns`，投影器据此渲染）。R13 证明旧版前端的硬编码
+列头会与模板不一致 ⇒ 推送过的章节就把错列头留在库里。新报告
+`backend/scripts/analyze/report_pushed_note_header_drift.py`（只读）把 D2 的对拍判据铺到全部已推送章节：
+
+| 口径 | 值 |
+|---|---|
+| 已推送章节 / 表 | 71 / 117 |
+| 与模板逐位一致 | 97 |
+| 不一致 | **18**（空白差异 4 / 文字 7 / 列数 7） |
+| 模板里没有该表名 | 2（待查，疑似表名漂移留下的孤儿） |
+| 涉及项目 | 陕西华氏医药 13 张、重庆和平药房 5 张 |
+
+🔴 **关键判定：这 18 张是存量数据问题，不是当前代码缺陷**。用临时诊断把「逐位对拍」判据
+加到前端 12 个循环的 107 张表上现算，**不一致 0** ⇒ 当前前端代码与模板一致（D2 由 R13 修好，
+其余循环本来就对）。这 18 张是旧版代码推送时写进去的，**不会随代码修好而自愈**。
+（诊断用完即删；未覆盖的循环接口不统一，不能由此断言"全部循环都对"。）
+
+### 7.3 修复脚本与它自己的安全门
+
+`backend/scripts/fix/fix_pushed_note_header_labels.py`：逐位把 `label` 改成模板字面值，
+`key` / `group` / `flat` / `format` 与行数据一概不碰；dry-run 默认，`--apply` 需 `--confirm`，写前备份。
+
+🔴 **dry-run 的逐条审查抓到脚本自己的数据错位风险**：陕西华氏 八、57「其他非流动负债」
+推送 `[项目, 期末余额, 期初余额]` vs 模板 `[项目, 年初余额, 期末余额]` —— 这是**列序错位**不是措辞差异，
+只改 label 会把「期末的数」标成「年初余额」，**比不修更糟**。
+据此加安全门 `reordered_columns()`：推送列名在模板里**存在但位置不同**即跳过。
+判据两个方向都测（`test_pushed_note_header_labels_fix.py` 17 例）——
+必须拦的 4 种错位、必须放过的 9 种措辞差异（`账龄→账 龄`、`年初余额→期初余额`、`余额→期末余额` 等，
+它们的共同点是推送名在模板里**不存在**，所以不会错位）。
+
+最终方案（dry-run 现算）：
+
+| 动作 | 张数 | 说明 |
+|---|---|---|
+| 可安全改 label | **10**（12 个 label） | 空白差异与措辞差异 |
+| 跳过·列数不同 | 7 | 结构性差异，须在界面重新推送 |
+| 跳过·列序错位 | **1** | 新安全门拦下 |
+
+🔴 **未执行 `--apply`**：这是写真库（含两个真实项目），按既有约定须用户放行。
+
+### 7.4 第三轮教训
+
+11. **「原因不在本轮」不等于「不能修」**：第二轮把共享后端热重载故障如实归因后就停下了，
+    本轮实测发现**单文件对齐即可解除**，并且它一直在阻断所有会话的后端开发。
+    归因是第一步，归因之后还要问「以我现在的位置能不能安全地修掉」。
+12. **修复脚本的 dry-run 输出要逐条读，不能只看统计数**：八、57 那条在统计里只是
+    `mismatch_text` 的 1/7，看汇总永远发现不了它会造成数据错位 —— 是逐条对照
+    `推送 ['项目','期末余额','期初余额']` 与 `模板 ['项目','年初余额','期末余额']` 才看出顺序颠倒。
+13. **"只改显示文字是安全的"是个需要验证的假设**：当差异是顺序颠倒时，改名就等于篡改数据含义。
+    凡"只改 X 不动 Y"的修复，都要先问"X 和 Y 真的独立吗"。
+14. **把"真库有漂移"直接当成"代码有缺陷"会修错东西**：本轮先拿前端现算证明代码已对（107 张 0 不一致），
+    才敢把 18 张定性为存量 —— 否则会去改已经正确的代码。
+
+## 8. R18 界面走查连带查出的跨会话迁移撞号事故（未修，须用户放行）
+
+界面走查（任务 17）在附注编辑器页抓到 1 条 500：
+`GET /api/projects/{pid}/formula-settings/pending` → `column formula_sync_item.revision does not exist`。
+
+### 8.1 取证
+
+| 迁移号 | 共享库记账的 filename | 磁盘上该号的真实文件 | 后果 |
+|---|---|---|---|
+| **V227** | `V227__project_creation_grants.sql` | `V227__attachment_lineage_project_id.sql` | `attachment_lineage.project_id` 不存在 |
+| **V228** | `V228__project_creation_grant_uscc_checksum.sql` | `V228__formula_sync_item_revision.sql` | `formula_sync_item.revision` 不存在 |
+
+机理：两个会话都取了 V227/V228。批量建项授权会话先执行并记账；公式中枢会话的同号文件
+**因 MigrationRunner 按 version 数字判「是否已应用」而被永久跳过**。后来批量建项会话把自己的
+文件改号成 V233/V234（现在都在待执行清单里），但**没有同步改共享库 V227/V228 行的记账** ——
+memory 铁律里写明要改的那一步漏了。
+
+实测现状：磁盘迁移 233 个（最高 V234）/ 库内已应用 231 个（最高 V232）；
+磁盘无同号文件（所以 `scan_migrations` 的同号检测不会报）；待执行 3 个（V229 / V233 / V234）。
+列存在性现查：`attachment_lineage.project_id` = False、`formula_sync_item.revision` = False、
+`project_creation_grants.uscc_checksum` = False、`financial_report.calc_version` = False
+（后两个属 V234 / V229 正常待执行）。
+
+### 8.2 影响
+
+两个 P0：公式管理「待确认事项」接口恒 500（本轮界面走查实测到，公式管理弹窗因此内容为空）；
+附件溯源按项目查询同样会失败。两者都属 `formula-hub-integrity-closure` spec 的交付物
+（该 spec 的 tasks 标 X1「共享库迁移 + 推送」为待执行）。
+
+### 8.3 修复方案（**本轮未执行**）
+
+```sql
+-- ① 先备份：CREATE TABLE schema_version_bak_20261101 AS SELECT * FROM schema_version;
+-- ② 把记账改成它真正执行过的文件的新号（checksum 不动，与既有约定一致）
+UPDATE schema_version SET version = '233', filename = 'V233__project_creation_grants.sql'
+ WHERE version = '227' AND filename = 'V227__project_creation_grants.sql';
+UPDATE schema_version SET version = '234', filename = 'V234__project_creation_grant_uscc_checksum.sql'
+ WHERE version = '228' AND filename = 'V228__project_creation_grant_uscc_checksum.sql';
+-- ③ V227 / V228 号空出来后跑迁移（全量重启 start-dev，或手动 MigrationRunner().run_pending()）
+-- ④ 回滚：R227 / R228 + 把记账改回
+```
+
+⚠ 放行前要逐条确认同批待执行的 V229 / V233 / V234 —— **V234 含 `UPDATE project_creation_grants
+SET is_deleted = true` 的改数据语句**。
+
+🔴 **不擅自执行的理由**：这是改共享库记账 + schema，按 memory 铁律「先问用户、先备份、写好回退 SQL」；
+且 `run_pending()` 会把全部待执行迁移一起落库，影响面超出本 spec（memory 有「别的会话起容器把
+未放行的迁移落进共享库」的事故先例）。取证脚本 `tmp_note_table_closure/probes/p71_v228_clash.py`。
+
+### 8.4 教训
+
+15. **迁移改号必须同时改共享库记账，否则把别人的迁移永久锁死**：改号后磁盘无同号文件、
+    `scan_migrations` 的同号检测查不出来，`run_pending()` 也不会报错 —— 它只是静默跳过。
+    唯一能发现的判据是「库内 `schema_version.filename` 与磁盘同号文件名不一致」，
+    建议把这条做成启动自检或 CI 检查。
+16. **界面走查的价值正在于查出这类跨模块事故**：接口测试与单测都只覆盖自己的模块，
+    这两个 500 是打开附注编辑器页时顺带发现的；如果只看「我的改动没问题」就不会碰到。
