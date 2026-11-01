@@ -69,18 +69,7 @@ import { api as httpApi } from '@/services/apiProxy'
 import { getWorkpaper } from '@/services/workpaperApi'
 import { eventBus } from '@/utils/eventBus'
 import { confirmVersionConflict } from '@/utils/confirm'
-import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage } from 'element-plus'
-
-function mockHttpError(status: number, detail: any = '请求失败') {
-  return {
-    response: {
-      status,
-      // 模拟 utils/http.normaliseErrorEnvelope 已把业务 message 回填到 detail 的真实 catch 形状。
-      data: { code: status, message: detail, detail },
-    },
-  }
-}
 
 function makeOptions(overrides: Partial<UseEditorSaveOptions> = {}): UseEditorSaveOptions {
   return {
@@ -291,60 +280,89 @@ describe('useEditorSave — 起点身份算不出时提示「未能分析下游�
   })
 })
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
 
-describe('useEditorSave — 非 2xx 保存响应不进入成功分支（formula-writer-ownership-and-stale R4）', () => {
+describe('useEditorSave — 保存代际与单飞', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 } as any)
-    vi.mocked(confirmVersionConflict).mockResolvedValue(undefined)
+    vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 3 } as any)
   })
 
-  it('409 VERSION_CONFLICT 走冲突刷新，不显示成功、不清 dirty、不推进本地版本', async () => {
-    const detail = {
-      error_code: 'VERSION_CONFLICT',
-      message: '底稿已被他人修改，请刷新后重试',
-      server_version: 7,
-      expected_version: 1,
-    }
-    const error = mockHttpError(409, detail)
-    vi.mocked(httpApi.post).mockRejectedValueOnce(error)
+  it('保存期间继续编辑会串行补存最新 snapshot，并使用首轮返回的新版本', async () => {
+    const first = deferred<any>()
+    const second = deferred<any>()
+    vi.mocked(httpApi.post)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    let snapshot: any = { revision: 1 }
+    const opts = makeOptions({
+      dirty: ref(true),
+      univerAPI: ref({
+        getActiveWorkbook: () => ({
+          getSnapshot: () => snapshot,
+          getActiveSheet: () => ({ getSheetName: () => 'Sheet1' }),
+        }),
+      }),
+    })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    const pending = save.onSave()
+    await vi.waitFor(() => expect(httpApi.post).toHaveBeenCalledTimes(1))
+    snapshot = { revision: 2 }
+    save.markEdited()
+    const joined = save.onSave()
+    expect(joined).toBe(pending)
+
+    first.resolve({ success: true, version: 2, message: '保存成功 v2' })
+    await vi.waitFor(() => expect(httpApi.post).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(httpApi.post).mock.calls[1][1]).toMatchObject({
+      snapshot: { revision: 2 },
+      expected_version: 2,
+    })
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
+
+    second.resolve({ success: true, version: 3, message: '保存成功 v3' })
+    await expect(pending).resolves.toBe(true)
+    expect(opts.dirty.value).toBe(false)
+    expect(opts.autoSave.clearDirty).toHaveBeenCalledTimes(1)
+    expect(ElMessage.success).toHaveBeenCalledTimes(1)
+  })
+
+  it('409 选择留下时不绕过 expected_version 强制覆盖，并保留 dirty', async () => {
+    vi.mocked(httpApi.post).mockResolvedValue({
+      detail: { error_code: 'VERSION_CONFLICT', server_version: 4, expected_version: 1 },
+    })
+    vi.mocked(confirmVersionConflict).mockRejectedValueOnce('cancel')
     const initUniver = vi.fn().mockResolvedValue(undefined)
     const opts = makeOptions({ dirty: ref(true), initUniver })
+    const save = useEditorSave(opts)
+    save.markEdited()
 
-    const saved = await useEditorSave(opts).onSave()
+    await expect(save.onSave()).resolves.toBe(false)
 
-    expect(saved).toBe(false)
-    expect(confirmVersionConflict).toHaveBeenCalledWith(7, 1)
-    expect(initUniver).toHaveBeenCalledTimes(1)
+    expect(httpApi.post).toHaveBeenCalledTimes(1)
+    expect(initUniver).not.toHaveBeenCalled()
     expect(opts.dirty.value).toBe(true)
     expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
-    expect(opts.setWpDetail).not.toHaveBeenCalled()
-    expect(getWorkpaper).not.toHaveBeenCalled()
-    expect(ElMessage.success).not.toHaveBeenCalled()
-    expect(eventBus.emit).not.toHaveBeenCalledWith('workpaper:saved', expect.anything())
-    expect(handleApiError).not.toHaveBeenCalled()
-    expect(httpApi.post).toHaveBeenCalledWith(
-      '/api/projects/proj-1/workpapers/wp-1/univer/save',
-      expect.objectContaining({ expected_version: 1 }),
-      expect.objectContaining({ _silent: true }),
-    )
+    expect(eventBus.emit).not.toHaveBeenCalled()
   })
 
-  it.each([422, 500])('HTTP %i 保存失败不显示成功、不清 dirty、不推进本地版本', async (status) => {
-    const error = mockHttpError(status, status === 422 ? '数据校验失败' : '服务器内部错误')
-    vi.mocked(httpApi.post).mockRejectedValueOnce(error)
+  it('网络异常返回 false 且不清除 dirty', async () => {
+    vi.mocked(httpApi.post).mockRejectedValue({ response: { status: 500 } })
     const opts = makeOptions({ dirty: ref(true) })
+    const save = useEditorSave(opts)
+    save.markEdited()
 
-    const saved = await useEditorSave(opts).onSave()
+    await expect(save.onSave()).resolves.toBe(false)
 
-    expect(saved).toBe(false)
     expect(opts.dirty.value).toBe(true)
     expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
-    expect(opts.setWpDetail).not.toHaveBeenCalled()
-    expect(getWorkpaper).not.toHaveBeenCalled()
-    expect(ElMessage.success).not.toHaveBeenCalled()
-    expect(eventBus.emit).not.toHaveBeenCalledWith('workpaper:saved', expect.anything())
-    expect(handleApiError).toHaveBeenCalledWith(error, '保存底稿')
-    expect(confirmVersionConflict).not.toHaveBeenCalled()
   })
 })

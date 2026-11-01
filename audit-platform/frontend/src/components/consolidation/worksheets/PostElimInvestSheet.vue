@@ -21,9 +21,12 @@
         <a class="ws-link" @click="$emit('goto-sheet', 'equity_inv')">投资明细-权益法</a> →
         <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a> →
         <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>。
-        全资子公司抵消后应为0。<b>可编辑覆盖自动值，可增删行</b>。
+        抵消列为<b>已审批分录</b>派生（只读），全资子公司抵消后应为0。<b>可编辑覆盖自动值，可增删行</b>。
       </span>
     </div>
+    <el-alert v-if="elimUnallocated !== 0" v-show="!isFullscreen" type="warning" :closable="false" class="ws-unalloc"
+      :title="`有 ${fmt(elimUnallocated)} 的长期股权投资抵销无法唯一归属到单家子企业，未计入上表逐企业列（已审批分录企业标注不足）`" />
+    <el-alert v-for="(w, i) in elimWarnings" :key="i" v-show="!isFullscreen" type="info" :closable="false" class="ws-unalloc" :title="w" />
 
     <el-table :data="tableRows" border size="small" class="ws-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -90,27 +93,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { splitPersistedProjectionRows } from '@/components/consolidation/composables/consolProjectionDraft'
+import { POST_ELIM_ACCOUNT, type PostEliminationProjection } from '@/services/consolidationApi'
+import { companyElimMap, unallocatedOf, warningsOf } from '@/components/consolidation/composables/consolPostElimView'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
 interface EquitySimRow { seq: string; subject: string; detail: string; total: number|null; values?: (number|null)[]; isStep?: boolean; isComputed?: boolean }
-interface ElimRow { direction: string; subject: string; detail?: string; values?: (number|null)[] }
 
 const props = defineProps<{
   companies: CompanyCol[]
   investmentCost: InvestRow[]       // 成本法投资明细
   investmentEquity: InvestRow[]     // 权益法投资明细
   equitySimDirect: EquitySimRow[]   // 模拟权益法直接持股
-  elimEquity: ElimRow[]             // 合并抵消-权益抵消
+  // 服务端 canonical projection：长投科目（1511）逐企业抵销合计（approved 分录唯一真源）。
+  // 替代此前从未填值的 elimEquity 空骨架；为空时抵销列按 0 展示（缺来源）。
+  projection: PostEliminationProjection | null
+  initialRows?: any[]
 }>()
 
-defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): void; (e: 'goto-sheet', key: string): void }>()
+const emit = defineEmits<{
+  (e: 'save', data: any[]): void
+  (e: 'draft-change', data: any[]): void
+  (e: 'open-formula', key: string): void
+  (e: 'goto-sheet', key: string): void
+}>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
@@ -120,6 +133,10 @@ const selectedRows = ref<any[]>([])
 
 // 手动新增行（用于特殊企业）
 const manualRows = reactive<any[]>([])
+
+function emitDraft() {
+  emit('draft-change', tableRows.value)
+}
 
 function addRow() {
   const newRow = {
@@ -132,9 +149,14 @@ function addRow() {
   if (selectedRows.value.length > 0) {
     const last = selectedRows.value[selectedRows.value.length - 1]
     const idx = manualRows.indexOf(last)
-    if (idx >= 0) { manualRows.splice(idx + 1, 0, newRow); return }
+    if (idx >= 0) {
+      manualRows.splice(idx + 1, 0, newRow)
+      emitDraft()
+      return
+    }
   }
   manualRows.push(newRow)
+  emitDraft()
 }
 
 async function batchDeleteRows() {
@@ -142,16 +164,25 @@ async function batchDeleteRows() {
   try {
     await confirmBatch('删除', selectedRows.value.length)
     const del = new Set(selectedRows.value)
-    // 只能删除手动行
     const remaining = manualRows.filter(r => !del.has(r))
     manualRows.length = 0; manualRows.push(...remaining)
     selectedRows.value = []
+    emitDraft()
   } catch {}
 }
 const n = (v: any) => Number(v) || 0
 
 // 逐家计算（默认自动，支持用户覆盖编辑）
-const overrides = reactive<Record<string, Record<string, number | null>>>({})
+const overrides = reactive<Record<string, Record<string, any>>>({})
+
+function hydratePersistedRows() {
+  const hydrated = splitPersistedProjectionRows(props.companies, props.initialRows)
+  for (const key of Object.keys(overrides)) delete overrides[key]
+  Object.assign(overrides, hydrated.overrides)
+  manualRows.length = 0
+  manualRows.push(...hydrated.manualRows)
+}
+watch([() => props.initialRows, () => props.companies], hydratePersistedRows, { deep: true, immediate: true })
 
 const tableRows = computed(() => {
   const autoRows = props.companies.map((comp, ci) => {
@@ -177,14 +208,12 @@ const tableRows = computed(() => {
     const simOtherEquity = findSimVal('其他权益变动')
     const simTotal = bookNet + simIncomeAdj + simOtherEquity
 
-    // 3. 合并抵消（从抵消分录表取该企业列）
-    const findElimVal = (subject: string, detail?: string) => {
-      const row = props.elimEquity.find(r => r.subject === subject && (!detail || r.detail === detail))
-      return row?.values?.[ci] != null ? n(row.values[ci]) : 0
-    }
-    const elimCost = findElimVal('长期股权投资', '投资成本')
-    const elimIncomeAdj = findElimVal('长期股权投资', '损益调整')
-    const elimOtherEquity = findElimVal('长期股权投资', '其他权益变动')
+    // 3. 合并抵消：服务端 canonical projection 的长投（1511）逐企业抵销合计（approved 分录唯一真源）。
+    //    projection 按科目给合计，不拆「投资成本/损益调整/其他权益变动」明细；明细列不臆造，合计落到 elimCost 列，
+    //    其余两列置 0（拆分需分录明细支持，当前不猜）。elimTotal = 该企业长投抵销合计。
+    const elimCost = elimByCompany.value.get(comp.code || comp.name) ?? 0
+    const elimIncomeAdj = 0
+    const elimOtherEquity = 0
     const elimTotal = elimCost + elimIncomeAdj + elimOtherEquity
 
     // 4. 抵消后 = 模拟后长投 - 合并抵消
@@ -216,7 +245,14 @@ const tableRows = computed(() => {
 function setOverride(companyName: string, field: string, val: number | null) {
   if (!overrides[companyName]) overrides[companyName] = {}
   overrides[companyName][field] = val
+  emitDraft()
 }
+
+// 长投（1511）抵销：企业代码 → 逐企业合计（projection 真源）。按 company_code 取；为空=缺来源，按 0。
+const elimByCompany = computed(() => companyElimMap(props.projection, POST_ELIM_ACCOUNT.longInvest))
+// 无法唯一归属到单家的长投抵销额（展示提示用，不计入逐企业列）
+const elimUnallocated = computed(() => unallocatedOf(props.projection, POST_ELIM_ACCOUNT.longInvest))
+const elimWarnings = computed(() => warningsOf(props.projection, POST_ELIM_ACCOUNT.longInvest))
 
 const { exportData: _exportData } = useExcelIO()
 

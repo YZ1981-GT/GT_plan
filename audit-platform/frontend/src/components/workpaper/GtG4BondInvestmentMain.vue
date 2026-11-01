@@ -48,7 +48,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -145,7 +145,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
       <G4PreparationHandbookDialog
@@ -178,6 +178,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G4_MAIN sync bridge（spec: g4-g6-shared-workbook-three-entry-lanes）──
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -220,7 +221,8 @@ const loadError = ref<string | null>(null)
 const selfLoadData = ref<Record<string, any> | null>(null)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 const formData = useG4BonInvFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const adjustmentRouting = useG4MainAdjustment({
@@ -392,8 +394,10 @@ async function onSheetImported(): Promise<void> {
 async function handleG4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    try {
+      await formData.saveBatch(items)
+    } catch {
+      return
     }
     scheduleAutoSnapshot()
   }
@@ -472,7 +476,7 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(G4_MAIN_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPending()
+    await formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,

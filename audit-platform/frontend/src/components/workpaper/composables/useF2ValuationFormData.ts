@@ -4,11 +4,15 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
 
 export interface ChecklistResponse {
   item_id: string
   conclusion: string | null
   remark: string | null
+  version?: string
+  updated_at?: string
 }
 
 export interface ProjectContext {
@@ -38,13 +42,26 @@ export function useF2ValuationFormData(options: { wpId: Ref<string>; projectId: 
   const projectContext = ref<ProjectContext>({})
   const sheetCache = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  const _pendingItems = new Set<string>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!wpId.value) throw new Error('缺少底稿标识，无法保存')
+      try {
+        await cas.save({ wpId: wpId.value, projectId: projectId.value || undefined, items })
+      } catch (error) {
+        ElMessage.error('保存失败，编辑已保留，请重试')
+        throw error
+      }
+    },
+  })
 
   async function loadResponses(): Promise<void> {
     if (!wpId.value) return
     try {
       const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id && isValuationItemId(r.item_id)) {
@@ -97,24 +114,9 @@ export function useF2ValuationFormData(options: { wpId: Ref<string>; projectId: 
   }
 
   async function _doSave(items: ChecklistResponse[]): Promise<void> {
-    if (!wpId.value || !items.length) return
-    try {
-      const payload: Record<string, unknown> = {
-        items: items.map((item) => ({
-          item_id: item.item_id,
-          conclusion: item.conclusion || null,
-          remark: item.remark || null,
-        })),
-      }
-      // 空字符串会导致后端 UUID 校验 422；缺省时由服务端按底稿解析 project_id
-      if (projectId.value) payload.project_id = projectId.value
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, payload)
-    } catch (err: any) {
-      // HTTP 层对相同 PUT body 去重会 abort 后发请求；不应提示「保存失败」
-      const msg = String(err?.message || '')
-      if (msg === 'canceled' || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
-      ElMessage.error('保存失败')
-    }
+    if (!items.length) return
+    queue.markMany(items.map((item) => item.item_id))
+    await queue.flush()
   }
 
   async function saveItemsFromEvent(items: ChecklistResponse[]): Promise<void> {
@@ -127,27 +129,22 @@ export function useF2ValuationFormData(options: { wpId: Ref<string>; projectId: 
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated = { ...existing, ...data }
     allResponses.value.set(itemId, updated)
-    _pendingItems.add(itemId)
+    queue.mark(itemId)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      _pendingItems.delete(itemId)
-      void _doSave([updated])
+      void queue.flush().catch(() => undefined)
     }, 2000))
   }
 
-  function _flushPending(): void {
+  async function _flushPending(): Promise<void> {
     for (const t of _debounceTimers.values()) clearTimeout(t)
     _debounceTimers.clear()
-    if (_pendingItems.size) {
-      const items = [..._pendingItems].map((id) => allResponses.value.get(id)).filter(Boolean) as ChecklistResponse[]
-      _pendingItems.clear()
-      if (items.length) void _doSave(items)
-    }
+    await queue.flush()
   }
 
-  onScopeDispose(() => { _flushPending() })
+  onScopeDispose(() => { void _flushPending().catch(() => undefined) })
 
   return {
     allResponses,

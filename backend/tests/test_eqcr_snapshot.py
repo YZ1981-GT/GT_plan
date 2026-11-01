@@ -68,7 +68,7 @@ class TestSnapshotServiceUnit:
         from app.services.eqcr_snapshot_service import _build_metadata
 
         meta = _build_metadata([])
-        assert meta["snapshot_version"] == 1
+        assert meta["snapshot_version"] == 2
         assert meta["total_workpapers"] == 0
         assert meta["signed_workpapers"] == 0
 
@@ -336,55 +336,53 @@ class TestSnapshotDataIntegrity:
     """快照数据完整性测试。"""
 
     def test_snapshot_data_structure_schema(self):
-        """验证快照数据结构符合预期 schema。"""
+        """验证当前 v2 快照按分录组冻结明细、来源和复核数据。"""
         snapshot_data = {
             "workpapers": [
-                {"wp_id": "uuid1", "wp_code": "D2-1", "status": "signed", "version": 3, "review_status": "approved", "updated_at": "2026-01-01T00:00:00"},
+                {"wp_id": "uuid1", "wp_code": "D2-1", "status": "signed", "version": 3},
             ],
             "reports": {
-                "balance_sheet": [{"row_code": "BS-001", "row_name": "货币资金", "current_period_amount": 5000000.0, "prior_period_amount": 3000000.0}],
+                "balance_sheet": [{"row_code": "BS-001", "row_name": "货币资金"}],
             },
-            "adjustments": [
-                {"id": "uuid2", "adjustment_type": "aje", "adjustment_no": "AJE-001", "account_code": "1001", "debit_amount": 100000.0, "credit_amount": None, "review_status": "approved", "description": "test"},
-            ],
+            "adjustments": [{
+                "id": "group-1",
+                "entry_group_id": "group-1",
+                "adjustment_type": "aje",
+                "adjustment_no": "AJE-001",
+                "line_items": [
+                    {"line_no": 1, "standard_account_code": "1001", "debit_amount": 100000.0},
+                    {"line_no": 2, "standard_account_code": "6001", "credit_amount": 100000.0},
+                ],
+                "total_debit": 100000.0,
+                "total_credit": 100000.0,
+                "origin": "manual",
+                "source_ref": None,
+                "review_status": "approved",
+                "reviewer_id": "reviewer-1",
+                "reviewed_at": "2026-01-01T00:00:00+00:00",
+            }],
             "vr_results": [
                 {"rule_id": "VR-D4-01", "passed": True, "severity": "blocking"},
             ],
             "metadata": {
-                "snapshot_version": 1,
+                "snapshot_version": 2,
                 "total_workpapers": 1,
                 "signed_workpapers": 1,
             },
         }
 
-        # Validate top-level keys
-        required_keys = {"workpapers", "reports", "adjustments", "vr_results", "metadata"}
-        assert set(snapshot_data.keys()) == required_keys
-
-        # Validate metadata
+        assert set(snapshot_data) == {
+            "workpapers", "reports", "adjustments", "vr_results", "metadata",
+        }
         meta = snapshot_data["metadata"]
-        assert meta["snapshot_version"] == 1
-        assert isinstance(meta["total_workpapers"], int)
-        assert isinstance(meta["signed_workpapers"], int)
+        assert meta["snapshot_version"] == 2
         assert meta["signed_workpapers"] <= meta["total_workpapers"]
 
-        # Validate workpapers structure
-        for wp in snapshot_data["workpapers"]:
-            assert "wp_id" in wp
-            assert "wp_code" in wp
-            assert "status" in wp
-
-        # Validate reports structure
-        for report_type, rows in snapshot_data["reports"].items():
-            assert isinstance(rows, list)
-            for row in rows:
-                assert "row_code" in row
-
-        # Validate adjustments structure
-        for adj in snapshot_data["adjustments"]:
-            assert "id" in adj
-            assert "adjustment_type" in adj
-            assert "review_status" in adj
+        adjustment = snapshot_data["adjustments"][0]
+        assert adjustment["id"] == adjustment["entry_group_id"]
+        assert len(adjustment["line_items"]) == 2
+        assert adjustment["total_debit"] == adjustment["total_credit"]
+        assert {"origin", "source_ref", "review_status", "reviewer_id", "reviewed_at"} <= set(adjustment)
 
     def test_metadata_signed_never_exceeds_total(self):
         """metadata.signed_workpapers 永远 <= total_workpapers。"""

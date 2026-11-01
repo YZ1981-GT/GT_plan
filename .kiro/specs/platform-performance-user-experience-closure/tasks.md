@@ -71,26 +71,31 @@
 
 ## 批 5　请求与保存协调
 
-- [ ] 26. 实现稳定参数序列化与安全 GET single-flight；一个订阅者取消不影响其他订阅者
-- [ ] 27. apiProxy 接入身份 epoch、responseType 和 `_dedupe:false`；高风险 config 保持不共享
-- [ ] 28. 实现 save coordinator：串行、edit epoch、失败保脏、保存中编辑自动 follow-up
-- [ ] 29. Univer 命令暴露单调 edit revision；useEditorSave/autoSave 接入且 `false` 不算成功
-- [ ] 30. 附注 useNotePersist/autoSave 接入；保存期间切章或继续编辑不得覆盖新内容
-- [ ] 31. 验证参数乱序单飞、取消、晚到响应、连续编辑、版本冲突、网络失败和离开确认
+- [x] 26. 实现稳定参数序列化与安全 GET single-flight；一个订阅者取消不影响其他订阅者
+- [x] 27. apiProxy 接入身份 epoch、responseType 和 `_dedupe:false`；高风险 config 保持不共享
+- [x] 28. 实现 save coordinator：串行、edit epoch、失败保脏、保存中编辑自动 follow-up
+- [x] 29. Univer 命令暴露单调 edit revision；useEditorSave/autoSave 接入且 `false` 不算成功
+- [x] 30. 附注 useNotePersist/autoSave 接入；保存期间切章或继续编辑不得覆盖新内容
+- [x] 31. 验证参数乱序单飞、取消、晚到响应、连续编辑、版本冲突、网络失败和离开确认
+  - 证据：保存协调 10 文件 67 passed；HTTP single-flight/retry/保存/TB 相关本轮合计 128 passed。
 
 ## 批 6　正式前端构建
 
-- [ ] 32. 拆分 typecheck/build/verify/preview 命令；CI 去掉重复 vue-tsc，修生产构建阻塞
-- [ ] 33. Vite manifest、preview 代理与异步重组件边界；首次生产构建成功
-- [ ] 34. 建包体预算脚本与实测棘轮，入口不得递归加载 Univer/Office/Excel 重块
-- [ ] 35. 新增前端多阶段 Dockerfile、SPA nginx 配置与 built artifact smoke
-- [ ] 36. stable 模式切到已验证 dist；README 更正 build_exe 状态，不虚构 PyInstaller 交付
+- [x] 32. 拆分 typecheck/build/verify/preview 命令；CI 去掉重复 vue-tsc，修生产构建阻塞
+- [x] 33. Vite manifest、preview 代理与异步重组件边界；首次生产构建成功
+- [x] 34. 建包体预算脚本与实测棘轮，入口不得递归加载 Univer/Office/Excel 重块
+- [x] 35. 新增前端多阶段 Dockerfile、SPA nginx 配置与 built artifact smoke
+- [x] 36. stable 模式切到已验证 dist；README 更正 build_exe 状态，不虚构 PyInstaller 交付
+  - 证据：隔离构建快照 `8b00a7fef08c7d2d18d4`，入口 raw 1852.4 KiB/gzip 530.8 KiB，2483 JS chunks；包体预算与 built smoke 均通过。
 
 ## 批 7　总体验收与收尾
 
-- [ ] 37. 后端/前端相关选集、迁移唯一性、行数门、构建预算和候选树自洽检查
+- [x] 37. 后端/前端相关选集、迁移唯一性、行数门、构建预算和候选树自洽检查
+  - 证据：后端本轮三组选集 43 + 145 + 125 passed；前端性能选集 128 passed；V/R 重号守卫 37 passed；正式候选构建、budget、SPA/API/WOPI smoke 通过。
 - [ ] 38. `127.0.0.1:3030` 浏览器走查首页、项目、Ledger、Univer、附注、SPA深链和动态块，console error为0
+  - 阻塞：本机 PostgreSQL/Docker 未运行，后端连接 `127.0.0.1:5432` 被拒；built artifact smoke 已通过，但不能冒充真实业务 Playwright。
 - [ ] 39. 复测 health、SQL p50/p95、容器、数据库尺寸、浏览器请求/长任务和保存回读，写入本文件
+  - 阻塞：同上，需真实 PG/Redis 和服务现场。
 - [ ] 40. 更新 INDEX/memory 的本轮摘要；只整理 owned files，不提交或推送他人改动
 
 > **2026-10-30 同步勘误（改号）**：本 spec 的 `V221__aux_ledger_active_account_prefix_index.sql` / `R221__rollback_aux_ledger_active_account_prefix_index.sql` 与远端已推送的 V221（`audit_chain_head_and_indexes`）撞号，同步时改为 **V226 / R226**（内容不改、checksum 不变；共享库 schema_version 的 221 行同步改登记为 226）。上文与 design 里的「V221」指现在的 V226；后续如需新迁移，按 `max(磁盘, 共享库) + 1` 取号（当前 ≥ V227）。

@@ -1,5 +1,6 @@
 ﻿/** 比照 useF2DualMode */
 import { ref, onMounted, type Ref } from 'vue'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 export type F2ValRenderMode = 'html' | 'onlyoffice'
 const STORAGE_PREFIX = 'f2-val-dual-mode:'
@@ -31,10 +32,18 @@ export function useF2ValuationDualMode(options: {
   }
 
   async function switchMode(target: F2ValRenderMode): Promise<void> {
+    if (target === currentMode.value) return
     if (target === 'onlyoffice' && !isOoAvailable.value) return
-    currentMode.value = target
-    try { localStorage.setItem(STORAGE_PREFIX + wpId.value, target) } catch { /* ignore */ }
-    if (target === 'html' && reloadAll) await reloadAll()
+    if (target === 'onlyoffice') {
+      await runLegacyOnlyOfficeTransition(async () => {
+        currentMode.value = 'onlyoffice'
+        try { localStorage.setItem(STORAGE_PREFIX + wpId.value, 'onlyoffice') } catch { /* ignore */ }
+      })
+      return
+    }
+    currentMode.value = 'html'
+    try { localStorage.setItem(STORAGE_PREFIX + wpId.value, 'html') } catch { /* ignore */ }
+    if (reloadAll) await reloadAll()
   }
 
   function onModeChange(val: string | number | boolean): void {
@@ -42,14 +51,19 @@ export function useF2ValuationDualMode(options: {
   }
 
   onMounted(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (s === 'html' || s === 'onlyoffice') currentMode.value = s
-    } catch { /* ignore */ }
-    void checkOOHealth()
+    let saved: string | null = null
+    try { saved = localStorage.getItem(STORAGE_PREFIX + wpId.value) } catch { /* ignore */ }
+    // 保持 HTML，健康检查成功后经同一完整屏障恢复在线编辑。
+    void checkOOHealth().then(async (healthy) => {
+      if (healthy && saved === 'onlyoffice') await switchMode('onlyoffice')
+      else if (!healthy) {
+        currentMode.value = 'html'
+        try { localStorage.setItem(STORAGE_PREFIX + wpId.value, 'html') } catch { /* ignore */ }
+      }
+    })
   })
 
-  return { currentMode, isOoAvailable, modeOptions, onModeChange, checkOOHealth }
+  return { currentMode, isOoAvailable, modeOptions, switchMode, onModeChange, checkOOHealth }
 }
 
 export default useF2ValuationDualMode

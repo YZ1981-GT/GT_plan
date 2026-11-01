@@ -34,6 +34,7 @@ from app.models.audit_platform_models import (
     AccountChart,
     AccountDirection,
     ReportLineMapping,
+    TrialBalance,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ async def _load_report_line_mappings(
                 ReportLineMapping.report_type,
                 ReportLineMapping.report_line_code,
                 ReportLineMapping.report_line_name,
+                ReportLineMapping.mapping_sign,
             ).where(
                 ReportLineMapping.project_id == project_id,
                 ReportLineMapping.standard_account_code.in_(account_codes),
@@ -104,12 +106,13 @@ async def _load_report_line_mappings(
         )
     ).all()
     out: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for code, rt, rcode, rname in rows:
+    for code, rt, rcode, rname, mapping_sign in rows:
         out[code].append(
             {
                 "report_type": rt.value if hasattr(rt, "value") else str(rt),
                 "row_code": rcode,
                 "row_name": rname,
+                "mapping_sign": mapping_sign or "add",
             }
         )
     return out
@@ -136,11 +139,82 @@ def _find_workpapers_for_accounts(account_codes: list[str]) -> list[str]:
         return []
 
 
+async def _load_account_names(
+    db: AsyncSession, project_id: UUID, account_codes: list[str],
+) -> dict[str, str]:
+    rows = (await db.execute(sa.select(
+        AccountChart.account_code, AccountChart.account_name,
+    ).where(
+        AccountChart.project_id == project_id,
+        AccountChart.account_code.in_(account_codes),
+        AccountChart.is_deleted == sa.false(),
+    ))).all()
+    out: dict[str, str] = {}
+    for code, name in rows:
+        if code and name:
+            out.setdefault(str(code), str(name))
+    return out
+
+
+async def _load_note_impacts(
+    db: AsyncSession, project_id: UUID, account_names: set[str],
+) -> list[dict[str, Any]]:
+    if not account_names:
+        return []
+    from app.models.account_note_mapping_models import AccountNoteMapping
+    rows = (await db.execute(sa.select(AccountNoteMapping).where(
+        AccountNoteMapping.project_id == project_id,
+        AccountNoteMapping.account_name.in_(sorted(account_names)),
+    ).order_by(AccountNoteMapping.section_id, AccountNoteMapping.row_name))).scalars().all()
+    return [{
+        "section_id": row.section_id,
+        "row_name": row.row_name,
+        "account_name": row.account_name,
+        "mapping_type": row.mapping_type,
+    } for row in rows]
+
+
+async def _load_tb_impacts(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int | None,
+    deltas: dict[str, Decimal],
+    adjustment_type: str,
+) -> list[dict[str, Any]]:
+    if year is None or not deltas:
+        return []
+    rows = (await db.execute(sa.select(TrialBalance).where(
+        TrialBalance.project_id == project_id,
+        TrialBalance.year == year,
+        TrialBalance.standard_account_code.in_(sorted(deltas)),
+        TrialBalance.is_deleted == sa.false(),
+    ).order_by(TrialBalance.company_code, TrialBalance.standard_account_code))).scalars().all()
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        delta = deltas.get(row.standard_account_code, Decimal("0"))
+        aje = Decimal(str(row.aje_adjustment or 0))
+        rje = Decimal(str(row.rje_adjustment or 0))
+        audited = Decimal(str(row.audited_amount or 0))
+        result.append({
+            "company_code": row.company_code,
+            "account_code": row.standard_account_code,
+            "account_name": row.account_name,
+            "adjustment_type": adjustment_type,
+            "current_adjustment": aje if adjustment_type == "aje" else rje,
+            "projected_adjustment": (aje if adjustment_type == "aje" else rje) + delta,
+            "current_audited": audited,
+            "projected_audited": audited + delta,
+            "delta": delta,
+        })
+    return result
+
+
 async def preview_impact(
     db: AsyncSession,
     project_id: UUID,
     line_items: list[dict[str, Any]],
     year: int | None = None,
+    adjustment_type: str = "aje",
 ) -> dict[str, Any]:
     """模拟调整分录影响（不写 DB）。
 
@@ -188,9 +262,13 @@ async def preview_impact(
 
     if not accounts:
         return {
+            "affected_tb_accounts": [],
             "affected_report_rows": [],
             "affected_workpapers": [],
+            "affected_notes": [],
+            "judgment_items": [],
             "unmapped_accounts": [],
+            "direction_unknown_accounts": [],
         }
 
     unique_codes = sorted({c for c, _, _ in accounts})
@@ -199,20 +277,23 @@ async def preview_impact(
     direction_map = await _load_account_directions(db, project_id, unique_codes)
     rlm_map = await _load_report_line_mappings(db, project_id, unique_codes)
 
-    # ── Step 3: 计算每个 (report_type, row_code) 累计 delta ──
-    # key = (report_type, row_code) → {"row_name", "delta"}
+    # ── Step 3: 计算科目与每个 (report_type, row_code) 累计 delta ──
     row_acc: dict[tuple[str, str], dict[str, Any]] = {}
-
-    # 同时收集 unmapped 科目（无 direction 也无 RLM）
+    account_deltas: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     unmapped: list[str] = []
+    direction_unknown: list[str] = []
 
     for code, debit, credit in accounts:
         direction = direction_map.get(code)
-        if direction is None and code not in rlm_map:
-            unmapped.append(code)
+        if direction is None:
+            direction_unknown.append(code)
+            if code not in rlm_map:
+                unmapped.append(code)
             continue
-
         delta = _signed_delta(direction, debit, credit)
+        account_deltas[code] += delta
+        if code not in rlm_map:
+            unmapped.append(code)
         if delta == 0:
             continue
 
@@ -222,7 +303,8 @@ async def preview_impact(
                 key,
                 {"row_name": row["row_name"], "delta": Decimal("0")},
             )
-            slot["delta"] += delta
+            mapping_sign = Decimal("-1") if row.get("mapping_sign") == "subtract" else Decimal("1")
+            slot["delta"] += delta * mapping_sign
 
     affected_report_rows: list[dict[str, Any]] = []
     for (report_type, row_code), slot in sorted(row_acc.items()):
@@ -238,11 +320,40 @@ async def preview_impact(
             }
         )
 
-    # ── Step 4: 受影响底稿（wp_account_mapping.json） ──
     affected_workpapers = _find_workpapers_for_accounts(unique_codes)
+    names = await _load_account_names(db, project_id, unique_codes)
+    affected_notes = await _load_note_impacts(db, project_id, set(names.values()))
+    affected_tb_accounts = await _load_tb_impacts(
+        db, project_id, year, account_deltas, adjustment_type,
+    )
+    report_types = {row["report_type"] for row in affected_report_rows}
+    cash_related = bool(report_types & {"cash_flow", "cashflow"}) or any(
+        code.startswith(("1001", "1002")) for code in unique_codes
+    )
+    tax_related = any(code.startswith(("2221", "6801")) for code in unique_codes)
+    judgment_items = [
+        {
+            "domain": "cash_flow",
+            "label": "现金流量表影响",
+            "status": "needs_judgment",
+            "reason": "涉及现金或现金流映射，请判断经营、投资或筹资活动分类" if cash_related
+            else "仅凭会计科目无法可靠判断是否影响现金流量表",
+        },
+        {
+            "domain": "tax",
+            "label": "税务影响",
+            "status": "needs_judgment",
+            "reason": "涉及税费科目，请判断当期所得税或递延所得税影响" if tax_related
+            else "请判断该调整是否形成当期税务或递延所得税影响",
+        },
+    ]
 
     return {
+        "affected_tb_accounts": affected_tb_accounts,
         "affected_report_rows": affected_report_rows,
         "affected_workpapers": affected_workpapers,
+        "affected_notes": affected_notes,
+        "judgment_items": judgment_items,
         "unmapped_accounts": sorted(set(unmapped)),
+        "direction_unknown_accounts": sorted(set(direction_unknown)),
     }

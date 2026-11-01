@@ -13,6 +13,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * - 免抵退税申报数据（申报外营收入/差异/原因/索引）
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
@@ -170,9 +171,12 @@ function flushSave() {
 }
 // 立即 flush 防抖中的落库（双向回写 flushHtml 用：先把 html 改动落库再 readStoreProjection）
 function flushPendingSave() {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
   flushSave()
 }
+registerPendingFlusher(flushPendingSave)
 function updateAuditNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persistAll() }
 function updateAuditConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persistAll() }
 

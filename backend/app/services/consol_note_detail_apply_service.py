@@ -352,7 +352,6 @@ async def apply_detail_refresh(
         protected=manual | locked,
         existing_rows=existing_rows,
         placeholders=placeholder_rows(template_rows),
-        table=consol_table if template_headers else None,  # 合计只加金额列、比例 / 损失率按本表派生（R2.4）
     )
     new_rows, filled, kept_manual = built.rows, built.filled, built.kept
     lost_protected = remap_protected(data, note_record, manual, locked, built.old_to_new)
@@ -369,6 +368,16 @@ async def apply_detail_refresh(
     note_record.data = data
     note_record.is_stale = False
     note_record.updated_at = datetime.now(timezone.utc)
+    # V243：来源投影
+    from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
+
+    _mode = compute_source_mode(
+        "detail_mapping",
+        manual_cells=manual,
+        locked_cells=locked,
+        previous_source=getattr(note_record, "source_mode", None),
+    )
+    update_source_projection(note_record, _mode, digest=_sd(data))
     await db.flush()
 
     return {

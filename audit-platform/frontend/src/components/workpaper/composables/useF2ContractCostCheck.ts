@@ -5,6 +5,7 @@
  * 按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, type MaybeRefOrGetter, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   counterpartText, legacyIdentity, useVoucherCheckFill, withRowMeta,
@@ -174,6 +175,15 @@ export function useF2ContractCostCheck(opts: {
   )
   const isCoverageLow = computed(() => coverageRatio.value > 0 && coverageRatio.value < 50)
   const issueCount = computed(() => stats.value.abnormalCount)
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

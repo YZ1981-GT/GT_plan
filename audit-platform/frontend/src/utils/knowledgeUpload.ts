@@ -142,6 +142,35 @@ export function entriesFromDataTransfer(dt: DataTransfer | null | undefined): Fs
     .filter((e): e is FsEntryLike => e !== null)
 }
 
+// ─── 上传批次边界 ───────────────────────────────────────────────────────────
+
+export const KNOWLEDGE_UPLOAD_MAX_FILES = 250
+export const KNOWLEDGE_UPLOAD_MAX_FILE_BYTES = 50 * 1024 * 1024
+export const KNOWLEDGE_UPLOAD_MAX_BATCH_BYTES = 250 * 1024 * 1024
+
+export interface KnowledgeUploadPreflight {
+  ok: boolean
+  message: string
+}
+
+/** 前端批次预检；后端仍对每个请求做权威单文件检查。 */
+export function validateKnowledgeUploadBatch(
+  files: ReadonlyArray<Pick<File, 'name' | 'size'>>,
+): KnowledgeUploadPreflight {
+  if (files.length > KNOWLEDGE_UPLOAD_MAX_FILES) {
+    return { ok: false, message: `单批最多上传 ${KNOWLEDGE_UPLOAD_MAX_FILES} 个文件` }
+  }
+  const oversized = files.find((file) => file.size > KNOWLEDGE_UPLOAD_MAX_FILE_BYTES)
+  if (oversized) {
+    return { ok: false, message: `「${oversized.name}」超过单文件 50MB 限制` }
+  }
+  const bytes = files.reduce((sum, file) => sum + Math.max(0, Number(file.size) || 0), 0)
+  if (bytes > KNOWLEDGE_UPLOAD_MAX_BATCH_BYTES) {
+    return { ok: false, message: '单批文件总大小不能超过 250MB' }
+  }
+  return { ok: true, message: '' }
+}
+
 // ─── 单文件上传结果 ─────────────────────────────────────────────────────────
 
 export interface UploadOutcome {

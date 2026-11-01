@@ -119,10 +119,10 @@ class TestRegistryMatchesSource:
         assert "raise FormulaColumnError" in code, "三参取不到不再报错 → 登记表 on_missing 需同步"
         assert "Decimal('0')" in code, "两参取不到不再返 0 → 登记表 on_missing 需同步"
 
-    def test_executor_reads_parsed_data_and_returns_zero(self) -> None:
+    def test_executor_reads_parsed_data_and_raises_on_missing(self) -> None:
         code = _code(EXECUTOR_WP_IMPL)
-        assert "parsed_data" in code and "D('0')" in code
-        assert impl_of(EXECUTOR_WP_IMPL).on_missing.startswith("Decimal('0')")
+        assert "parsed_data" in code and "FormulaEvalError" in code
+        assert impl_of(EXECUTOR_WP_IMPL).on_missing.startswith("FormulaEvalError")
 
     def test_on_missing_registry_matches(self) -> None:
         assert "报错" in impl_of(PREFILL_WP_IMPL).on_missing
@@ -217,9 +217,9 @@ class TestKnownDifferencesRegistered:
 
     def test_all_three_dimensions_registered(self) -> None:
         assert REGISTERED_DIFFERENCE_DIMENSIONS == {
-            "positional_arg_count", "on_missing_return", "data_source", "typed_eval_strictness",
+            "positional_arg_count", "on_missing_return", "data_source",
         }
-        assert len(WP_KNOWN_DIFFERENCES) == 4
+        assert len(WP_KNOWN_DIFFERENCES) == 3
 
     def test_each_difference_has_reason_and_owner(self) -> None:
         for diff in WP_KNOWN_DIFFERENCES:

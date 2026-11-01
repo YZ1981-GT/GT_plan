@@ -55,6 +55,15 @@ def _make_mock_db(
     db.get = AsyncMock(side_effect=mock_get)
     db.flush = AsyncMock()
     db.add = MagicMock()
+    if confirmation is not None and attachment is not None:
+        attachment.project_id = confirmation.project_id
+        if isinstance(attachment.ocr_fields_cache, dict):
+            attachment.ocr_fields_cache.setdefault("requires_human_confirmation", True)
+        if link is None:
+            link = _make_link(confirmation_id=confirmation.id, attachment_id=attachment.id)
+        query_result = MagicMock()
+        query_result.scalar_one_or_none.return_value = link
+        db.execute = AsyncMock(return_value=query_result)
 
     return db
 

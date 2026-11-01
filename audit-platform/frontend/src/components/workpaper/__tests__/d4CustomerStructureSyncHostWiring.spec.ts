@@ -15,7 +15,7 @@
  * 判据落到源码结构：
  *  1. D4TabCustomerStructure.vue 消费 `useD4SyncMode`（禁自建/直连底层桥）。
  *  2. sheetKey 走具名常量 `d49-managed`（不得内联字面量，防漂移）。
- *  3. flushHtml 内 flush 先于 readStoreProjection（防投影旧值 / 顺序守卫）。
+ *  3. flushHtml 内 pending-only flush 先于 readStoreProjection（防投影旧值 / 顺序守卫）。
  *  4. 宿主 GtD4OperatingRevenue.vue 的 isD4DedicatedSyncSheet 含 'D4-9'。
  *  5. fail-visible：消费 composable 导出的 syncStateTag（danger 文案实现在
  *     useD4SyncMode 内聚，不在本组件重复）。
@@ -81,11 +81,11 @@ describe('D4-9 重要客户结构必须消费平台 sync bridge（Req 7.1）', (
     expect(bridgeArgs).not.toMatch(new RegExp(`sheetKey:\\s*['"]${D4_9_SHEET_KEY}['"]`))
   })
 
-  it('flushHtml 内 flush 先于 readStoreProjection（防投影旧值）', () => {
+  it('flushHtml 内 pending-only flush 先于 readStoreProjection（防投影旧值）', () => {
     expect(bridgeArgs).toContain('flushHtml')
-    expect(bridgeArgs).toMatch(/flushSave\s*\(/)
+    expect(bridgeArgs).toMatch(/flushPendingSave\s*\(/)
     expect(bridgeArgs).toMatch(/readStoreProjection\s*\(/)
-    const flushAt = bridgeArgs.indexOf('flushSave')
+    const flushAt = bridgeArgs.indexOf('flushPendingSave')
     const readAt = bridgeArgs.indexOf('readStoreProjection')
     expect(flushAt).toBeGreaterThanOrEqual(0)
     expect(readAt).toBeGreaterThan(flushAt)

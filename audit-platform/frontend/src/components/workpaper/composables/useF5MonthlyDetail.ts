@@ -9,6 +9,7 @@
  *  与 F5-1 联动：品种全年未审/上期未审可供审定表引用
  */
 import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcSubtotal,
@@ -375,6 +376,15 @@ export function useF5MonthlyDetail(options: UseF5MonthlyDetailOptions) {
     allResponses.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: value })
     debounceSave()
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

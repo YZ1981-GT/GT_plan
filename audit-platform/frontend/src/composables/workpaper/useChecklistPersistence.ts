@@ -11,6 +11,7 @@ import {
   isBackgroundMerging,
 } from '@/components/workpaper/sync/backgroundMergeRegistry'
 import { persistenceMetrics } from './usePersistenceMetrics'
+import { createChecklistCasClient } from './checklistCas'
 
 export interface ChecklistResponse {
   item_id: string
@@ -19,13 +20,6 @@ export interface ChecklistResponse {
   wp_ref?: string | null
   version?: string
   updated_at?: string
-}
-
-export interface ChecklistItemPayload {
-  item_id: string
-  remark: string | null
-  conclusion: string | null
-  wp_ref: string | null
 }
 
 export type PersistenceStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict'
@@ -68,15 +62,6 @@ function normalizedItem(itemId: string, source?: Partial<ChecklistResponse>): Ch
   }
 }
 
-function payloadOf(item: ChecklistResponse): ChecklistItemPayload {
-  return {
-    item_id: item.item_id,
-    remark: item.remark ?? null,
-    conclusion: item.conclusion ?? null,
-    wp_ref: item.wp_ref ?? null,
-  }
-}
-
 function sourceItems(source: unknown): unknown[] {
   if (source instanceof Map) return [...source.values()]
   if (Array.isArray(source)) return source
@@ -107,9 +92,14 @@ function versionOf(item: Partial<ChecklistResponse> | undefined): string | undef
 }
 
 function messageOf(error: unknown): string {
-  if (error instanceof Error) return error.message
+  if (error instanceof Error && !(error as any)?.response) return error.message
   const detail = (error as any)?.response?.data?.detail
-  return typeof detail === 'string' ? detail : '保存失败，请重试'
+  if (typeof detail === 'string') return detail
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+    return detail.message
+  }
+  if (error instanceof Error) return error.message
+  return '保存失败，请重试'
 }
 
 function isCanceled(error: unknown): boolean {
@@ -129,6 +119,7 @@ export function useChecklistPersistence(
   const generations = new Map<string, number>()
   const inFlight = new Map<string, Promise<void>>()
   const controllers = new Map<string, AbortController>()
+  const cas = createChecklistCasClient()
 
   function stateOf(itemId: string): PersistenceState {
     let state = states.get(itemId)
@@ -186,16 +177,12 @@ export function useChecklistPersistence(
     const controller = new AbortController()
     controllers.set(itemId, controller)
     try {
-      const body: { items: ChecklistItemPayload[]; project_id?: string } = {
-        items: [payloadOf(snapshot)],
-      }
-      if (projectId?.value) body.project_id = projectId.value
-
-      const result = await api.put<unknown>(
-        `/api/workpapers/${wpId.value}/checklist-responses`,
-        body,
-        { signal: controller.signal, _silent: true } as any,
-      )
+      const result = await cas.save({
+        wpId: wpId.value,
+        projectId: projectId?.value,
+        items: [snapshot],
+        config: { signal: controller.signal, _silent: true } as any,
+      })
       if (generation !== currentGeneration(itemId)) return
 
       const saved = sourceItems(result)[0] as Partial<ChecklistResponse> | undefined
@@ -222,7 +209,8 @@ export function useChecklistPersistence(
       }
     } catch (error) {
       if (generation !== currentGeneration(itemId) || isCanceled(error)) return
-      const status = (error as any)?.response?.status === 409 ? 'conflict' : 'error'
+      const responseStatus = (error as any)?.response?.status
+      const status = responseStatus === 409 || responseStatus === 428 ? 'conflict' : 'error'
       setState(itemId, {
         status,
         serverVersion: versionOf(committed.get(itemId)),
@@ -258,7 +246,9 @@ export function useChecklistPersistence(
 
   function hydrate(source: unknown): void {
     const next = new Map<string, ChecklistResponse>()
-    for (const raw of sourceItems(source)) {
+    const items = sourceItems(source)
+    cas.remember(items)
+    for (const raw of items) {
       if (!raw || typeof raw !== 'object') continue
       const item = raw as Partial<ChecklistResponse>
       if (!item.item_id) continue

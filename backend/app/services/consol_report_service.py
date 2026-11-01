@@ -18,10 +18,14 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from app.services.consol_calc_basis import CalcBasis
 
 from app.models.consolidation_models import (
     Company,
@@ -115,6 +119,7 @@ class ConsolReportService:
         *,
         context: ConsolContext | None = None,
         tree: TreeNode | None = None,
+        basis: "CalcBasis | None" = None,
     ) -> dict[str, list[dict]]:
         """生成合并报表并落库 ``financial_report``（spec consol-elimination-single-source-push §4.5）。
 
@@ -133,7 +138,12 @@ class ConsolReportService:
 
         只 flush 不 commit。Returns ``{report_type: [row_dict]}``。
         """
-        from app.services.consol_calc_basis import MEASURE_CONSOLIDATED, load_calc_basis, node_measures
+        from app.services.consol_calc_basis import (
+            MEASURE_CONSOLIDATED,
+            load_calc_basis,
+            node_measures,
+            validate_calc_basis,
+        )
         from app.services.consol_context_service import validate_context
         from app.services.consol_tree_service import build_tree
         from app.services.consol_report_values import (
@@ -143,19 +153,26 @@ class ConsolReportService:
             resolve_consol_standard,
         )
 
+        from app.services.report_freshness import CALC_VERSION
+
         standard = applicable_standard if applicable_standard in CONSOL_STANDARDS else (
             await resolve_consol_standard(self.db, project_id)
         )
-        rows = await load_report_rows(self.db, standard)
-        resolved_tree = tree
+        rows = await load_report_rows(self.db, standard, project_id)
+        resolved_tree = tree if tree is not None else (basis.tree if basis is not None else None)
         if resolved_tree is None and context is not None:
             resolved_tree = await build_tree(self.db, project_id)
         validate_context(context, project_id, year, tree=resolved_tree)
-        basis = await load_calc_basis(self.db, project_id, year, tree=resolved_tree)
-        if basis is None:
+        resolved_basis = basis
+        if resolved_basis is None:
+            resolved_basis = await load_calc_basis(self.db, project_id, year, tree=resolved_tree)
+        if resolved_basis is None:
             raise ValueError(f"企业树构建失败：找不到合并项目 {project_id}")
+        validate_calc_basis(resolved_basis, project_id, year, tree=resolved_tree)
         values = await report_values(
-            rows, node_measures(basis)[basis.tree.node_key][MEASURE_CONSOLIDATED], categories=basis.categories,
+            rows,
+            node_measures(resolved_basis)[resolved_basis.tree.node_key][MEASURE_CONSOLIDATED],
+            categories=resolved_basis.categories,
         )
         prior = await self._prior_year_amounts(project_id, year)
         # 含已软删的行：唯一索引 (project_id, year, report_type, row_code) 不带 is_deleted 谓词，
@@ -197,15 +214,22 @@ class ConsolReportService:
             record.indent_level = row.indent_level
             record.is_total_row = row.is_total_row
             record.is_stale = False
+            record.calc_version = CALC_VERSION
+            record.calc_error = None
             record.blank_reason = value.reason
             results.setdefault(row.report_type, []).append({
+                "report_type": row.report_type,
+                "row_number": row.row_number,
                 "row_code": row.row_code,
                 "row_name": row.row_name,
+                "indent_level": row.indent_level,
+                "is_total_row": row.is_total_row,
                 "current_period_amount": None if value.amount is None else str(value.amount),
                 "prior_period_amount": None if prior_amount is None else str(prior_amount),
                 "formula_used": row.formula,
                 "source_accounts": source,
                 "blank_reason": value.reason,
+                "prior_blank_reason": None,
                 "has_formula": value.has_formula,
             })
         # 当前口径里已不存在的行次（改了模板类型 / 配置删了行）软删，避免报表页混入另一口径的行
@@ -745,6 +769,7 @@ async def generate_consol_reports_sync(
     *,
     context: ConsolContext | None = None,
     tree: TreeNode | None = None,
+    basis: "CalcBasis | None" = None,
 ) -> dict[str, list[dict]]:
     """生成合并报表（async；口径不传或不是合并口径时按项目模板类型解析）。"""
     service = ConsolReportService(db)
@@ -754,6 +779,7 @@ async def generate_consol_reports_sync(
         applicable_standard,
         context=context,
         tree=tree,
+        basis=basis,
     )
 
 

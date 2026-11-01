@@ -443,27 +443,27 @@ class TestServiceOnlyFlushes:
 
 class TestBatchAiFillSkipsBatchWritten:
     @pytest.mark.asyncio
-    async def test_batch_written_draft_section_not_offered(self, factory, monkeypatch):
-        """Task 30 验收：批量写入后章节是 draft，AI 批填按「空或 draft」取数 ⇒ 只靠 is_local_override 排除。"""
-        from types import SimpleNamespace
-
-        from app.routers.disclosure_notes import batch_ai_fill_notes
-        from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
+    async def test_batch_written_draft_section_not_offered(self, factory):
+        """Task 30 验收：耐久任务建 target 时仍按 is_local_override 排除人工/批量正文。"""
+        from app.routers.ai_task_jobs import AiTaskJobCreate, _note_targets
 
         seed = await _seed(factory)
         async with factory() as db:
             preview = await _preview(db, seed, _sources())
         await _apply(factory, seed, preview, [_sel(_item(preview, "s1"))])
-        offered: list[str] = []
 
-        async def _capture(self, project_id, year, sections, **_kw):
-            offered.extend(s["note_section"] for s in sections)
-            return []
-
-        monkeypatch.setattr(NoteKnowledgeEnricher, "batch_prefill", _capture)
         async with factory() as db:
-            await batch_ai_fill_notes(seed["pid"], YEAR, None, db, SimpleNamespace(id=uuid.uuid4()))
-        assert offered == ["四、会计期间"]
+            targets = await _note_targets(
+                db,
+                seed["pid"],
+                YEAR,
+                AiTaskJobCreate(
+                    task_kind="note_batch_prefill",
+                    year=YEAR,
+                    idempotency_key="filter-test",
+                ),
+            )
+        assert [target.target_key for target in targets] == ["四、会计期间"]
 
 
 class TestGenerateRespectsLocalOverride:

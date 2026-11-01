@@ -41,7 +41,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -130,7 +130,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -186,7 +186,10 @@ const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG13FormData({ wpId: wpIdRef, projectId: projectIdRef })
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+// 过渡期间（HTML→OnlyOffice 的 flush/projection/materialize 未结束）冻结结构化输入：
+// 此刻的编辑既不会进入已读出的 projection，也会被随后的 OO 保存覆盖（spec R1.4）。
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -202,6 +205,7 @@ const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefin
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 // ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
 import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 const _g13TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
 provide('tbSourceCodes', _g13TbSourceCodes)
 
@@ -277,7 +281,9 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(G13_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPending()
+    // 顺序刚性：先把 HTML debounce 真正落库，再 readStoreProjection——
+    // 不 await 会读到未落库的旧投影（spec R1.4）。
+    await formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -315,7 +321,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
 
-  formData.flushPending()
+  void formData.flushPending().catch(() => undefined)
 })
 </script>
 

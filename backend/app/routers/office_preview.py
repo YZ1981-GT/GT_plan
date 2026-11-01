@@ -18,12 +18,10 @@ Validates: requirements.md §三 · AT-2 Office 文件在线预览
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
 from uuid import UUID
 
@@ -36,6 +34,11 @@ from app.core.database import get_db
 from app.deps import get_current_user, PERMISSION_HIERARCHY
 from app.models.core import ProjectUser, User
 from app.services.attachment_service import AttachmentService
+from app.services.libreoffice_pool import (
+    find_soffice_path,
+    get_or_create_preview_pdf,
+    get_queue_depth_header,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,83 +67,19 @@ def _resolve_cache_dir() -> Path:
 
 
 def _find_libreoffice() -> str | None:
-    """检测 LibreOffice 可执行文件路径。
-
-    搜索顺序：
-    1. PATH 中的 ``libreoffice`` / ``soffice``（Linux/Docker 标准位置）
-    2. 环境变量 ``LIBREOFFICE_PATH`` 显式指定（运维覆盖）
-    3. Windows 默认安装目录（winget / 官方 installer 默认）
-    4. macOS 默认安装目录（Homebrew Cask）
-    """
-    for cmd in ("libreoffice", "soffice"):
-        path = shutil.which(cmd)
-        if path:
-            return path
-
-    env_path = os.environ.get("LIBREOFFICE_PATH")
-    if env_path and Path(env_path).exists():
-        return env_path
-
-    # Windows / macOS 默认安装目录 fallback
-    fallback_paths = (
-        r"C:\Program Files\LibreOffice\program\soffice.exe",
-        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-        "/usr/lib/libreoffice/program/soffice",  # 部分 Linux 发行版未挂 PATH
-    )
-    for fb in fallback_paths:
-        if Path(fb).exists():
-            return fb
-
-    return None
+    """兼容旧调用名，实际统一使用 LibreOffice 池的探测结果。"""
+    return find_soffice_path()
 
 
-def _cache_key(attachment_id: UUID, file_path: str, file_size: int) -> str:
-    """缓存 key：attachment_id + file_path + file_size 的 SHA-256（前 16 位）。
-
-    file_size 作为 file_version 简化版（Attachment 表无 version 字段，
-    file_size 变更通常意味着文件被替换）。
-    """
-    raw = f"{attachment_id}|{file_path}|{file_size}".encode()
+def _cache_key(
+    attachment_id: UUID,
+    file_path: str,
+    file_size: int,
+    modified_ns: int,
+) -> str:
+    """缓存 key 纳入真实文件大小和纳秒 mtime，避免同尺寸替换命中旧 PDF。"""
+    raw = f"{attachment_id}|{file_path}|{file_size}|{modified_ns}".encode()
     return hashlib.sha256(raw).hexdigest()[:16]
-
-
-def _convert_office_to_pdf(soffice: str, src_path: Path) -> bytes:
-    """调用 LibreOffice headless 转 PDF，返回 PDF bytes。
-
-    成功返回 bytes；失败抛 HTTPException(500)。
-    """
-    with tempfile.TemporaryDirectory(prefix="office_preview_") as tmpdir:
-        try:
-            proc = subprocess.run(
-                [soffice, "--headless", "--convert-to", "pdf",
-                 "--outdir", tmpdir, str(src_path)],
-                capture_output=True,
-                timeout=LIBREOFFICE_TIMEOUT_SECONDS,
-            )
-        except subprocess.TimeoutExpired:
-            logger.warning("[OFFICE_PREVIEW] LibreOffice timed out for %s", src_path.name)
-            raise HTTPException(
-                status_code=500,
-                detail=f"PDF 转换超时（{LIBREOFFICE_TIMEOUT_SECONDS}s）",
-            )
-
-        if proc.returncode != 0:
-            err = proc.stderr.decode("utf-8", errors="ignore")[:500] if proc.stderr else ""
-            logger.warning(
-                "[OFFICE_PREVIEW] LibreOffice conversion failed (rc=%d): %s",
-                proc.returncode, err,
-            )
-            raise HTTPException(
-                status_code=500,
-                detail=f"PDF 转换失败: {err}" if err else "PDF 转换失败",
-            )
-
-        pdf_path = Path(tmpdir) / f"{src_path.stem}.pdf"
-        if not pdf_path.exists():
-            raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
-
-        return pdf_path.read_bytes()
 
 
 async def _ensure_project_access(
@@ -169,23 +108,7 @@ async def _ensure_project_access(
         raise HTTPException(status_code=403, detail="权限不足")
 
 
-def _resolve_local_path(file_path: str) -> Path | None:
-    """解析附件本地路径（兼容 storage/ 前缀和绝对路径）。
-
-    paperless:// 前缀返回 None（暂不支持 paperless 直转）。
-    """
-    if not file_path or file_path.startswith("paperless://"):
-        return None
-    candidate = Path(file_path)
-    if candidate.exists():
-        return candidate
-    fallback = Path("storage") / file_path.lstrip("/")
-    if fallback.exists():
-        return fallback
-    return None
-
-
-@router.get("/api/attachments/{attachment_id}/preview-pdf")
+@router.get("/api/attachments/{attachment_id:uuid}/preview-pdf")
 async def preview_office_as_pdf(
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -247,35 +170,65 @@ async def preview_office_as_pdf(
             },
         )
 
-    # 2. 解析本地源文件
-    src_path = _resolve_local_path(file_path)
+    # 2. 先读已授权附件当前版本的不可变 blob；无 blob 才走 legacy 项目路径。
+    from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
+    from app.services.attachment_storage_resolver import plan_project_attachment
+
+    try:
+        blob = await AssetBlobService(db).read_current_attachment_blob(
+            attachment_id,
+            project_id=UUID(raw["project_id"]),
+        )
+    except AssetBlobReadRejected as exc:
+        from app.services.attachment_asset_projection import asset_blob_read_authoritative
+
+        logger.warning(
+            "office preview blob rejected: attachment=%s reason=%s",
+            attachment_id,
+            exc.reason,
+        )
+        if raw.get("storage_type") == "asset_blob" or asset_blob_read_authoritative():
+            raise HTTPException(status_code=404, detail="附件源文件不存在") from exc
+        blob = None
+
+    if blob is not None:
+        src_path = blob.canonical_path
+        file_path = f"blob:{blob.content_hash}"
+    else:
+        plan = plan_project_attachment(
+            raw["project_id"], raw.get("storage_type"), file_path,
+        )
+        src_path = plan.canonical_path if plan.kind == "local" else None
     if src_path is None:
         raise HTTPException(
             status_code=404,
             detail="附件源文件不存在或为 Paperless 远程存储（暂不支持远程转 PDF 预览）",
         )
 
-    # 3. 缓存命中检查
+    # 3. 缓存命中检查。完成鉴权与路径解析后立即释放 DB，排队/转换不占连接。
     cache_dir = _resolve_cache_dir()
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    file_size = att.get("file_size") or src_path.stat().st_size
-    key = _cache_key(attachment_id, file_path, file_size)
+    source_stat = await asyncio.to_thread(src_path.stat)
+    file_size = source_stat.st_size
+    key = _cache_key(
+        attachment_id,
+        file_path,
+        file_size,
+        source_stat.st_mtime_ns,
+    )
     cache_path = cache_dir / f"{key}.pdf"
+    await db.close()
 
-    if cache_path.exists():
-        logger.debug("[OFFICE_PREVIEW] cache hit for %s", attachment_id)
-        pdf_bytes = cache_path.read_bytes()
-    else:
-        logger.info(
-            "[OFFICE_PREVIEW] converting %s (size=%d) via LibreOffice",
-            file_name, file_size,
-        )
-        pdf_bytes = _convert_office_to_pdf(soffice, src_path)
-        # 写缓存（写失败不阻断响应）
-        try:
-            cache_path.write_bytes(pdf_bytes)
-        except OSError as e:
-            logger.warning("[OFFICE_PREVIEW] cache write failed: %s", e)
+    logger.info(
+        "[OFFICE_PREVIEW] preview %s (size=%d) via bounded LibreOffice pool",
+        file_name,
+        file_size,
+    )
+    pdf_bytes, cache_status = await get_or_create_preview_pdf(
+        src_path,
+        cache_path,
+        timeout=LIBREOFFICE_TIMEOUT_SECONDS,
+        soffice_path=soffice,
+    )
 
     # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
     from urllib.parse import quote as _quote
@@ -287,7 +240,8 @@ async def preview_office_as_pdf(
         media_type="application/pdf",
         headers={
             "Content-Disposition": _disposition,
-            "X-Preview-Cache": "hit" if cache_path.exists() else "miss",
+            "X-Preview-Cache": cache_status,
+            **get_queue_depth_header(),
         },
     )
 

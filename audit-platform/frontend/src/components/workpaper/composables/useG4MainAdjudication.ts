@@ -10,6 +10,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  *           subscribe g4:adjustment-writeback
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   G4_ACCOUNT_CODE,
   G4_CHANGE_RATE_THRESHOLD,
@@ -679,6 +680,15 @@ export function useG4MainAdjudication(options: UseG4MainAdjudicationOptions) {
     window.removeEventListener('g4:adjustment-writeback', onAdjustmentWriteback)
     window.removeEventListener('g4:adjustment-confirmed', onAdjustmentWriteback)
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   if (getCurrentInstance()) {
     onMounted(attachListeners)

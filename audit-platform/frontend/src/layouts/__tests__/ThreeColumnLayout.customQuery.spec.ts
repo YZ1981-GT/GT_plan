@@ -12,8 +12,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, shallowMount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
 import { parse } from 'vue/compiler-sfc'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -28,7 +27,7 @@ const { route, busOn, stubModule } = vi.hoisted(() => ({
   busOn: [] as Array<[string, (payload?: unknown) => void]>,
   stubModule: async (name: string, props: string[] = []) => {
     const { defineComponent } = await import('vue')
-    return { default: defineComponent({ name, props, emits: ['update:modelValue'], render: () => null }) }
+    return { __esModule: true, default: defineComponent({ name, props, emits: ['update:modelValue'], render: () => null }) }
   },
 }))
 
@@ -36,7 +35,7 @@ const { route, busOn, stubModule } = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ username: 'admin', logout: vi.fn() }) }))
 vi.mock('@/stores/displayPrefs', () => ({
-  useDisplayPrefsStore: () => ({ amountUnit: 'yuan', fontSize: 'md', decimals: 2, unitOptions: [], fontOptions: [] }),
+  useDisplayPrefsStore: () => ({ amountUnit: 'yuan', fontSize: 'md', decimals: 2, unitOptions: [], fontOptions: [], gridEditModeOptions: [], gridEditMode: 'excel' }),
 }))
 vi.mock('@/stores/roleContext', () => ({ useRoleContextStore: () => ({ effectiveRole: 'partner' }) }))
 vi.mock('@/composables/useTheme', () => ({ useTheme: () => ({ isDark: false, toggle: vi.fn() }) }))
@@ -54,10 +53,10 @@ vi.mock('@/utils/eventBus', () => ({
     off: vi.fn(),
   },
 }))
-vi.mock('@/components/formula/FormulaManagerDialog.vue', () => stubModule('FormulaManagerDialog', ['modelValue', 'projectId', 'year', 'scope']))
+vi.mock('@/components/formula/FormulaManagerDialog.vue', () => stubModule('FormulaManagerDialog', ['modelValue', 'projectId', 'year', 'scope', 'openRevision']))
 vi.mock('@/components/formula/GtRefreshScopeDialog.vue', () => stubModule('GtRefreshScopeDialog', ['projectId', 'year']))
 vi.mock('@/components/query/CustomQueryDialog.vue', () => stubModule('CustomQueryDialog',
-  ['modelValue', 'projectId', 'year', 'initialTab', 'initialSource', 'initialNotice', 'entry']))
+  ['modelValue', 'projectId', 'year', 'initialTab', 'initialSource', 'initialNotice', 'openRevision', 'entry']))
 vi.mock('@/components/formula/settings/FormulaPendingSyncDialog.vue', () => stubModule('FormulaPendingSyncDialog', ['projectId']))
 vi.mock('@/components/common/ShortcutHelpDialog.vue', () => stubModule('ShortcutHelpDialog'))
 vi.mock('@/components/ai/DshPanel.vue', () => stubModule('DshPanel'))
@@ -84,7 +83,7 @@ function yearBinding(tag: string): string {
 }
 
 function mountLayout() {
-  return shallowMount(ThreeColumnLayout, { global: { plugins: [ElementPlus], stubs: { 'router-view': true } } })
+  return mount(ThreeColumnLayout, { global: { plugins: [ElementPlus], stubs: { 'router-view': true } } })
 }
 const dialogOf = (w: ReturnType<typeof mountLayout>) => w.findComponent({ name: 'CustomQueryDialog' })
 function dialogState(w: ReturnType<typeof mountLayout>) {
@@ -96,7 +95,7 @@ function dialogState(w: ReturnType<typeof mountLayout>) {
 }
 async function openFromSidebar(w: ReturnType<typeof mountLayout>) {
   await w.find('div.gt-nav-item[title="高级查询"]').trigger('click')
-  await nextTick()
+  await flushPromises()
 }
 function emitOpenEvent(payload?: unknown) {
   const handler = busOn.find(([name]) => name === 'open-custom-query')?.[1]
@@ -166,7 +165,7 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ tab: 'basic', source: 'workpaper:D2|审定表D2-1', project_id: 'p2' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toEqual({
       open: true, projectId: 'p2', year: null, tab: 'basic', source: 'workpaper:D2|审定表D2-1', notice: undefined,
     })
@@ -177,7 +176,7 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ tab: 'basic', source: 'report:balance_sheet', project_id: 'p3' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toMatchObject({ projectId: 'p3', source: 'report_balance_sheet', notice: undefined })
   })
 
@@ -190,7 +189,7 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     await flushPromises()
     // TemplateLibraryMgmt 的 ensureFallbackProject 取项目列表第一项 → WpTemplateDetail → TemplateLibraryButton 放进事件
     emitOpenEvent({ tab: 'basic', source: 'workpaper:E1', project_id: 'p-demo' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toEqual({
       open: true, projectId: '', year: null, tab: 'basic', source: 'workpaper:E1', notice: undefined,
     })
@@ -201,12 +200,12 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ tab: 'basic', source: 'workpaper:E1', project_id: 'p3' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toMatchObject({ open: true, projectId: 'p3', year: null, source: 'workpaper:E1' })
     dialogOf(w).vm.$emit('update:modelValue', false)
-    await nextTick()
+    await flushPromises()
     emitOpenEvent({ tab: 'basic', source: 'workpaper:E1', project_id: 'p-demo' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toMatchObject({ open: true, projectId: 'p3', year: null })
   })
 
@@ -215,8 +214,21 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ tab: 'basic', source: 'note:五-1-1' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toMatchObject({ projectId: '', source: 'disclosure', notice: TEMPLATE_NOTE_NOTICE })
+  })
+
+  it('弹窗保持打开时，相同数据源的新事件仍推进打开代际并采用新页签', async () => {
+    const w = mountLayout()
+    await flushPromises()
+    emitOpenEvent({ tab: 'basic', source: 'report:balance_sheet', project_id: 'p1' })
+    await flushPromises()
+    const firstRevision = Number(dialogOf(w).props('openRevision'))
+
+    emitOpenEvent({ tab: 'advanced', source: 'report:balance_sheet', project_id: 'p1' })
+    await flushPromises()
+    expect(dialogOf(w).props('initialTab')).toBe('advanced')
+    expect(dialogOf(w).props('openRevision')).toBe(firstRevision + 1)
   })
 
   it('关闭即丢弃事件：再从侧栏打开回到路由项目与按页预选', async () => {
@@ -224,10 +236,10 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ tab: 'advanced', source: 'note:五-1-1', project_id: 'p2' })
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toMatchObject({ projectId: 'p2', tab: 'advanced', source: 'disclosure' })
     dialogOf(w).vm.$emit('update:modelValue', false)
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w).open).toBe(false)
     await openFromSidebar(w)
     expect(dialogState(w)).toEqual({
@@ -240,7 +252,7 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent(undefined)
-    await nextTick()
+    await flushPromises()
     expect(dialogState(w)).toMatchObject({ open: true, projectId: 'p1', source: 'adj_aje' })
   })
 })

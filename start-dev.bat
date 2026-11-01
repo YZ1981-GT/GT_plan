@@ -72,17 +72,17 @@ echo    GT Audit Platform - Dev Launcher
 echo  ======================================
 echo.
 
-REM Stable mode builds before stopping the currently working snapshot.
+REM Stable mode verifies an isolated candidate before changing the active snapshot.
 set "VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT%"
 set "VITE_DEV_PORT=%FRONTEND_PORT%"
 if /I "%GT_RUNTIME_MODE%"=="stable" (
-  echo [0/5] Building immutable frontend snapshot...
+  echo [0/5] Building and verifying immutable frontend snapshot...
   call npm --prefix "%FRONTEND_DIR%" run build:verify
   if errorlevel 1 (
-    echo       [ERROR] Stable frontend build failed; existing services were not stopped.
+    echo       [ERROR] Verification failed; previous snapshot and running services are unchanged.
     exit /b 1
   )
-  echo       Done.
+  echo       Verified snapshot selected. Restart stable mode after source changes.
 )
 
 REM --- [1/5] kill old processes -------------------------------

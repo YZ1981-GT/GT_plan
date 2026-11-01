@@ -1,16 +1,43 @@
 /**
  * useF2StocktakeSheet — F2 监盘通用行/字段持久化
  */
-import { ref, watch, onBeforeUnmount, onScopeDispose, type Ref } from 'vue'
+import { ref, watch, onBeforeUnmount, type InjectionKey, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import type { ChecklistResponse } from './useF2StocktakeFormData'
 
-/** 已挂载的字段编辑器 flush 回调（切 OnlyOffice 前统一刷盘） */
-const _fieldFlushers = new Set<() => Promise<void>>()
+export const F2_STOCKTAKE_BUSINESS_READONLY_KEY: InjectionKey<Readonly<Ref<boolean>>> =
+  Symbol('f2-stocktake-business-readonly')
 
-/** 立即落库所有挂载中的监盘字段编辑器（取消 2s debounce） */
-export async function flushAllF2StocktakeFields(): Promise<void> {
-  if (!_fieldFlushers.size) return
-  await Promise.all([..._fieldFlushers].map((fn) => fn()))
+export interface F2StocktakeSaveDetail {
+  items: ChecklistResponse[]
+  resolve?: () => void
+  reject?: (error: unknown) => void
+}
+
+/** 事件监听方必须显式 resolve/reject；超时按失败处理，不能把未落库伪装成成功。 */
+export function dispatchF2StocktakeSave(items: ChecklistResponse[]): Promise<void> {
+  if (!items.length) return Promise.resolve()
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('监盘保存等待超时，请重试'))
+    }, 8000)
+    const finish = (error?: unknown) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      if (error !== undefined) reject(error)
+      else resolve()
+    }
+    const detail: F2StocktakeSaveDetail = {
+      items,
+      resolve: () => finish(),
+      reject: (error) => finish(error),
+    }
+    window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail }))
+  })
 }
 
 function genId(): string {
@@ -84,13 +111,12 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
     if (v != null) auditNote.value = v
   }, { immediate: true })
 
-  function flushSave(): void {
+  function flushSave(): Promise<void> {
     const items = [
       opts.allResponses.value.get(opts.rowsKey),
       opts.allResponses.value.get(opts.noteKey),
     ].filter(Boolean) as ChecklistResponse[]
-    if (!items.length) return
-    window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items } }))
+    return dispatchF2StocktakeSave(items)
   }
 
   async function flushNow(): Promise<void> {
@@ -104,19 +130,14 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
       clearTimeout(debounceTimer)
       debounceTimer = null
     }
-    await new Promise<void>((resolve) => {
-      let settled = false
-      const done = () => { if (!settled) { settled = true; resolve() } }
-      const items = [
-        opts.allResponses.value.get(opts.rowsKey),
-        opts.allResponses.value.get(opts.noteKey),
-      ].filter(Boolean) as ChecklistResponse[]
-      if (!items.length) { resolve(); return }
-      window.dispatchEvent(
-        new CustomEvent('f2-stocktake:save-items', { detail: { items, done } }),
-      )
-      setTimeout(done, 8000)
-    })
+    await flushSave()
+  }
+
+  async function flushPending(): Promise<void> {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    await flushNow()
   }
 
   function persist(): void {
@@ -124,7 +145,10 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
       item_id: opts.rowsKey, conclusion: null, remark: JSON.stringify(rows.value),
     })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 2000)
   }
 
   function updateRow(id: string, patch: Partial<T>): void {
@@ -149,13 +173,21 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
     if (readonly.value) return
     opts.allResponses.value.set(opts.noteKey, { item_id: opts.noteKey, conclusion: null, remark: val })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 2000)
   })
 
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }
+  })
 
-  _fieldFlushers.add(flushNow)
-  onScopeDispose(() => { _fieldFlushers.delete(flushNow) })
+  registerPendingFlusher(flushPending)
 
   /**
    * Task 11: fillActualFromSample — 读 F2-25 抽盘结果，按名称匹配填入 F2-24 实盘数。
@@ -255,20 +287,7 @@ export function useF2StocktakeFields(opts: {
       opts.allResponses.value.get(opts.fieldsKey),
       opts.allResponses.value.get(opts.noteKey),
     ].filter(Boolean) as ChecklistResponse[]
-    if (!items.length) return Promise.resolve()
-    return new Promise((resolve) => {
-      let settled = false
-      const done = () => {
-        if (settled) return
-        settled = true
-        resolve()
-      }
-      window.dispatchEvent(
-        new CustomEvent('f2-stocktake:save-items', { detail: { items, done } }),
-      )
-      // 防止监听方未调用 done 时一直挂起
-      setTimeout(done, 8000)
-    })
+    return dispatchF2StocktakeSave(items)
   }
 
   function persistFields(): void {
@@ -276,7 +295,10 @@ export function useF2StocktakeFields(opts: {
       item_id: opts.fieldsKey, conclusion: null, remark: JSON.stringify(fields.value),
     })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; void flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 2000)
   }
 
   /** 立即刷盘（切到在线编辑前必须调用，否则 2s debounce 未到会同步旧数据） */
@@ -292,6 +314,13 @@ export function useF2StocktakeFields(opts: {
       debounceTimer = null
     }
     await flushSave()
+  }
+
+  async function flushPending(): Promise<void> {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    await flushNow()
   }
 
   function updateField(id: string, val: string): void {
@@ -321,13 +350,21 @@ export function useF2StocktakeFields(opts: {
     if (readonly.value) return
     opts.allResponses.value.set(opts.noteKey, { item_id: opts.noteKey, conclusion: null, remark: val })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; void flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 2000)
   })
 
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); void flushSave() } })
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }
+  })
 
-  _fieldFlushers.add(flushNow)
-  onScopeDispose(() => { _fieldFlushers.delete(flushNow) })
+  registerPendingFlusher(flushPending)
 
   return { fields, auditNote, updateField, applyFields, flushNow }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F4TabAdjustment — F4-3 调整分录
@@ -7,9 +8,10 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * Requirements: 4.1~4.5, 6.1~6.4
  */
 import { inject, toRef, ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal } from '../composables/useF4AccPayFormulaEngine'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useF4FormData'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
@@ -153,7 +155,16 @@ function persist() {
   }, 2000)
 }
 
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
+function flushPendingSave(): void {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  const item = (props.allResponses as Map<string, ChecklistResponse>).get(STORAGE_KEY)
+  if (item) window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+}
+
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 function fmtAmount(v: number): string {
   if (v === 0) return '-'
@@ -248,12 +259,7 @@ onMounted(() => {
           @click="syncToCentral"
           title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
         >同步到集中登记</el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
       <div class="toolbar-right">
         <F4ImportExportToolbar

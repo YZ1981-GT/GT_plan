@@ -57,6 +57,9 @@ class RemoteOCRConfig:
     api_key: str | None
     timeout_seconds: int
     deployment: str = AIDeployment.server.value
+    trust_zone: str = "restricted"
+    client_data_allowed: bool = False
+    mask_policy: str = "strict"
 
     @property
     def is_remote(self) -> bool:
@@ -133,6 +136,9 @@ def resolve_ocr_config_from_model(model: AIModelConfig) -> RemoteOCRConfig:
         api_key=key,
         timeout_seconds=int(timeout),
         deployment=deployment_of(model),
+        trust_zone=str(getattr(model, "trust_zone", "restricted") or "restricted"),
+        client_data_allowed=bool(getattr(model, "client_data_allowed", False)),
+        mask_policy=str(getattr(model, "mask_policy", "strict") or "strict"),
     )
     _auth_headers(config)
     return config
@@ -222,6 +228,35 @@ async def resolve_ocr_route(
                 OCRRouteCandidate(capability, config.deployment, row.model_name, row.id, config)
             )
     return sorted(candidates, key=lambda c: 0 if c.deployment == AIDeployment.local.value else 1)
+
+
+def filter_ocr_route_for_client_data(
+    route: list[OCRRouteCandidate],
+) -> list[OCRRouteCandidate]:
+    """OCR 文件按客户数据处理；受限或未获准的远程候选不得收到文件。"""
+    if not route:
+        return []
+    eligible: list[OCRRouteCandidate] = []
+    blocked: list[str] = []
+    for candidate in route:
+        if candidate.local_engine or candidate.config is None:
+            eligible.append(candidate)
+            continue
+        config = candidate.config
+        if config.trust_zone == "restricted" or not config.client_data_allowed:
+            blocked.append(f"{candidate.label} 未获准处理客户数据")
+            continue
+        if config.trust_zone == "approved_provider" and config.mask_policy != "strict":
+            blocked.append(f"{candidate.label} 未配置严格脱敏")
+            continue
+        eligible.append(candidate)
+    if eligible:
+        return eligible
+    raise RemoteOCRRuntimeError(
+        "route_policy_denied",
+        "没有符合客户数据政策的 OCR 候选" + ("：" + "；".join(blocked) if blocked else ""),
+        kind="request",
+    )
 
 
 def _file_type(filename: str) -> int:

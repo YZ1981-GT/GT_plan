@@ -30,7 +30,7 @@ router = APIRouter(
 @router.get("", response_model=UnifiedLineageResponse)
 async def get_lineage(
     project_id: UUID,
-    object_type: Literal["wp_cell", "report_row", "note_cell", "tb_row", "adjustment"] = Query(
+    object_type: Literal["wp_cell", "report_row", "note_cell", "deliverable_section", "tb_row", "adjustment"] = Query(
         ..., description="对象类型"
     ),
     object_id: str = Query(..., description="对象标识（wp_code / section_number / row_code）"),

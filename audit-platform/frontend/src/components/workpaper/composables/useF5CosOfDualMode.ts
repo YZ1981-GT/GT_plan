@@ -5,6 +5,7 @@
  * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
  */
 import { ref, onMounted, type Ref } from 'vue'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 export type F5RenderMode = 'html' | 'onlyoffice'
 
@@ -29,11 +30,12 @@ export function useF5CosOfDualMode(options: UseF5DualModeOptions) {
     { label: '在线编辑', value: 'onlyoffice' },
   ]
 
-  function loadPersistedMode(): void {
+  function loadPersistedMode(): F5RenderMode | null {
     try {
       const saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+      if (saved === 'html' || saved === 'onlyoffice') return saved
     } catch { /* ignore */ }
+    return null
   }
 
   function persistMode(mode: F5RenderMode): void {
@@ -67,8 +69,10 @@ export function useF5CosOfDualMode(options: UseF5DualModeOptions) {
     if (target === 'onlyoffice' && !isOoAvailable.value) return
 
     if (target === 'onlyoffice') {
-      currentMode.value = 'onlyoffice'
-      persistMode('onlyoffice')
+      await runLegacyOnlyOfficeTransition(async () => {
+        currentMode.value = 'onlyoffice'
+        persistMode('onlyoffice')
+      })
     } else {
       currentMode.value = 'html'
       ooConfig.value = null
@@ -82,8 +86,12 @@ export function useF5CosOfDualMode(options: UseF5DualModeOptions) {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    const saved = loadPersistedMode()
+    // 恢复偏好保持 HTML 起页，健康检查成功后再走完整保存屏障。
+    void checkOOHealth().then(async (healthy) => {
+      if (healthy && saved === 'onlyoffice') await switchMode('onlyoffice')
+      else if (!healthy) persistMode('html')
+    })
   })
 
   return {

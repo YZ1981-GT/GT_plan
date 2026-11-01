@@ -12,6 +12,7 @@
     :model-value="modelValue"
     title="调整分录协作"
     width="720px"
+    style="max-width: calc(100vw - 32px)"
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="onOpen"
   >

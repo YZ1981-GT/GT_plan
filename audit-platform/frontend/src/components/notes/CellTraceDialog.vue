@@ -56,6 +56,24 @@
         </table>
       </template>
     </section>
+    <!-- S5 公式来源信封：显示 calculation_applied 与最终值状态 -->
+    <section v-if="sources?.formula_provenance" class="gt-cell-source gt-cell-source--provenance" data-test="formula-provenance">
+      <div class="gt-cell-source-final">
+        <span class="gt-cell-source-final__label">公式来源信封</span>
+        <el-tag :type="sources.formula_provenance.calculation_applied ? 'success' : 'warning'" size="small">
+          {{ sources.formula_provenance.calculation_applied ? '已采用' : '未采用' }}
+        </el-tag>
+        <span class="gt-cell-source-final__detail">{{ provenanceStateLabel }}</span>
+      </div>
+    </section>
+    <OutputAttachmentLinks
+      v-if="projectId && noteSection"
+      :project-id="projectId"
+      object-type="note_cell"
+      target-type="note_section"
+      :target-ref="noteSection"
+      resource="note"
+    />
     <div v-if="!isSubTableCell" v-loading="loading" class="gt-cell-trace-body">
       <!-- 错误降级：友好提示 -->
       <el-alert
@@ -208,6 +226,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import OutputAttachmentLinks from '@/components/attachment/OutputAttachmentLinks.vue'
 import { fetchCellSources, stepStatus, type CellSourceRef, type CellSourcesResult } from './cellSources'
 
 interface BindingMeta {
@@ -354,6 +373,21 @@ const isSubTableCell = computed(() => !!props.sourceRef?.subTableKey)
 const sources = ref<CellSourcesResult | null>(null)
 const sourcesLoading = ref(false)
 const sourcesError = ref<string | null>(null)
+
+// S5 公式来源信封：最终值状态标签
+const _VALUE_STATE_LABELS: Record<string, string> = {
+  auto: '自动计算并已采用',
+  manual: '人工填写',
+  locked: '已锁定',
+  kept: '保留旧值',
+  pending_confirm: '等待确认',
+  failed: '计算失败',
+}
+const provenanceStateLabel = computed(() => {
+  const prov = sources.value?.formula_provenance
+  if (!prov) return ''
+  return _VALUE_STATE_LABELS[prov.value_state || ''] || prov.value_state || '暂无状态'
+})
 
 function sourcesErrorText(err: any): string {
   const status = err?.response?.status

@@ -6,7 +6,7 @@
  * 公式管理不传年度；页面带上下文打开公式管理时，上下文里的年度优先。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, shallowMount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -21,14 +21,14 @@ const { route, busOn, stubModule } = vi.hoisted(() => ({
   /** 只声明 props 的空组件：三个弹窗与其余重组件不真挂（依赖很重），只看收到的 props */
   stubModule: async (name: string, props: string[] = []) => {
     const { defineComponent } = await import('vue')
-    return { default: defineComponent({ name, props, render: () => null }) }
+    return { __esModule: true, default: defineComponent({ name, props, emits: ['update:modelValue'], render: () => null }) }
   },
 }))
 
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ username: 'admin', logout: vi.fn() }) }))
 vi.mock('@/stores/displayPrefs', () => ({
-  useDisplayPrefsStore: () => ({ amountUnit: 'yuan', fontSize: 'md', decimals: 2, unitOptions: [], fontOptions: [] }),
+  useDisplayPrefsStore: () => ({ amountUnit: 'yuan', fontSize: 'md', decimals: 2, unitOptions: [], fontOptions: [], gridEditModeOptions: [], gridEditMode: 'excel' }),
 }))
 vi.mock('@/stores/roleContext', () => ({ useRoleContextStore: () => ({ effectiveRole: 'partner' }) }))
 vi.mock('@/composables/useTheme', () => ({ useTheme: () => ({ isDark: false, toggle: vi.fn() }) }))
@@ -49,9 +49,9 @@ vi.mock('@/utils/eventBus', () => ({
     off: vi.fn(),
   },
 }))
-vi.mock('@/components/formula/FormulaManagerDialog.vue', () => stubModule('FormulaManagerDialog', ['modelValue', 'projectId', 'year', 'scope']))
+vi.mock('@/components/formula/FormulaManagerDialog.vue', () => stubModule('FormulaManagerDialog', ['modelValue', 'projectId', 'year', 'scope', 'openRevision']))
 vi.mock('@/components/formula/GtRefreshScopeDialog.vue', () => stubModule('GtRefreshScopeDialog', ['projectId', 'year']))
-vi.mock('@/components/query/CustomQueryDialog.vue', () => stubModule('CustomQueryDialog', ['modelValue', 'projectId', 'year']))
+vi.mock('@/components/query/CustomQueryDialog.vue', () => stubModule('CustomQueryDialog', ['modelValue', 'projectId', 'year', 'openRevision']))
 vi.mock('@/components/formula/settings/FormulaPendingSyncDialog.vue', () => stubModule('FormulaPendingSyncDialog', ['projectId']))
 vi.mock('@/components/common/ShortcutHelpDialog.vue', () => stubModule('ShortcutHelpDialog'))
 vi.mock('@/components/ai/DshPanel.vue', () => stubModule('DshPanel'))
@@ -64,14 +64,23 @@ import { useProjectStore } from '@/stores/project'
 const YEAR_CARRIERS = ['FormulaManagerDialog', 'GtRefreshScopeDialog', 'CustomQueryDialog'] as const
 
 function mountLayout() {
-  return shallowMount(ThreeColumnLayout, { global: { plugins: [ElementPlus], stubs: { 'router-view': true } } })
+  return mount(ThreeColumnLayout, { global: { plugins: [ElementPlus], stubs: { 'router-view': true } } })
 }
 
-/** 三个全局弹窗各自收到的年度 */
-function yearsOf(w: ReturnType<typeof mountLayout>) {
+/** 首次打开三个按需组件后，读取三个全局弹窗各自收到的年度。 */
+async function yearsOf(w: ReturnType<typeof mountLayout>) {
+  if (!w.findComponent({ name: 'FormulaManagerDialog' }).exists()) {
+    const open = busOn.find(([name]) => name === 'open-formula-manager')?.[1]
+    expect(open, '布局没订阅 open-formula-manager').toBeTypeOf('function')
+    open!({ projectId: 'p1', scope: 'report' })
+  }
+  if (!w.findComponent({ name: 'CustomQueryDialog' }).exists()) {
+    await w.find('div.gt-nav-item[title="高级查询"]').trigger('click')
+  }
+  await flushPromises()
   return Object.fromEntries(YEAR_CARRIERS.map((name) => {
     const c = w.findComponent({ name })
-    expect(c.exists(), `${name} 没挂在布局上`).toBe(true)
+    expect(c.exists(), `${name} 首次打开后没有挂载`).toBe(true)
     return [name, c.props('year')]
   })) as Record<(typeof YEAR_CARRIERS)[number], unknown>
 }
@@ -84,26 +93,34 @@ beforeEach(() => {
 })
 
 describe('三栏布局全局弹窗的审计年度', () => {
+  it('公式管理、DSH、高级查询初始不挂载，常驻的一键刷新仍立即挂载', () => {
+    const w = mountLayout()
+    expect(w.findComponent({ name: 'FormulaManagerDialog' }).exists()).toBe(false)
+    expect(w.findComponent({ name: 'DshPanel' }).exists()).toBe(false)
+    expect(w.findComponent({ name: 'CustomQueryDialog' }).exists()).toBe(false)
+    expect(w.findComponent({ name: 'GtRefreshScopeDialog' }).exists()).toBe(true)
+  })
+
   it('路由带年度：三个弹窗都按路由年度（store 年度不同也以路由为准）', async () => {
     route.query = { year: '2024' }
     useProjectStore().year = 2023
     const w = mountLayout()
     await flushPromises()
-    expect(yearsOf(w)).toEqual({ FormulaManagerDialog: 2024, GtRefreshScopeDialog: 2024, CustomQueryDialog: 2024 })
+    expect(await yearsOf(w)).toEqual({ FormulaManagerDialog: 2024, GtRefreshScopeDialog: 2024, CustomQueryDialog: 2024 })
   })
 
   it('路由不带年度：取项目 store 的年度', async () => {
     useProjectStore().year = 2023
     const w = mountLayout()
     await flushPromises()
-    expect(yearsOf(w)).toEqual({ FormulaManagerDialog: 2023, GtRefreshScopeDialog: 2023, CustomQueryDialog: 2023 })
+    expect(await yearsOf(w)).toEqual({ FormulaManagerDialog: 2023, GtRefreshScopeDialog: 2023, CustomQueryDialog: 2023 })
   })
 
   it('路由与 store 都没有年度：一键刷新 / 自定义查询收到 null，公式管理不传年度 —— 不再按去年', async () => {
     const w = mountLayout()
     await flushPromises()
     expect(useProjectStore().year).toBeNull()
-    expect(yearsOf(w)).toEqual({ FormulaManagerDialog: undefined, GtRefreshScopeDialog: null, CustomQueryDialog: null })
+    expect(await yearsOf(w)).toEqual({ FormulaManagerDialog: undefined, GtRefreshScopeDialog: null, CustomQueryDialog: null })
   })
 
   it('路由带的年度无效（非数字 / 早于 2001）：当作没带，取 store 年度', async () => {
@@ -111,7 +128,7 @@ describe('三栏布局全局弹窗的审计年度', () => {
     useProjectStore().year = 2023
     const w = mountLayout()
     await flushPromises()
-    expect(yearsOf(w).GtRefreshScopeDialog).toBe(2023)
+    expect((await yearsOf(w)).GtRefreshScopeDialog).toBe(2023)
   })
 
   it('项目信息后到：store 定下年度后弹窗跟着更新；切到没填年度的项目又回到空', async () => {
@@ -120,10 +137,28 @@ describe('三栏布局全局弹窗的审计年度', () => {
     const store = useProjectStore()
     store.year = 2025
     await nextTick()
-    expect(yearsOf(w)).toEqual({ FormulaManagerDialog: 2025, GtRefreshScopeDialog: 2025, CustomQueryDialog: 2025 })
+    expect(await yearsOf(w)).toEqual({ FormulaManagerDialog: 2025, GtRefreshScopeDialog: 2025, CustomQueryDialog: 2025 })
     store.year = null
     await nextTick()
-    expect(yearsOf(w)).toEqual({ FormulaManagerDialog: undefined, GtRefreshScopeDialog: null, CustomQueryDialog: null })
+    expect(await yearsOf(w)).toEqual({ FormulaManagerDialog: undefined, GtRefreshScopeDialog: null, CustomQueryDialog: null })
+  })
+
+  it('异步模块加载期间连续打开采用最新上下文，关闭后仍保持挂载', async () => {
+    const w = mountLayout()
+    await flushPromises()
+    const open = busOn.find(([name]) => name === 'open-formula-manager')?.[1]
+    expect(open).toBeTypeOf('function')
+
+    open!({ projectId: 'p1', year: 2021, scope: 'report' })
+    open!({ projectId: 'p1', year: 2022, scope: 'report' })
+    await flushPromises()
+    const dialog = w.findComponent({ name: 'FormulaManagerDialog' })
+    expect(dialog.props('year')).toBe(2022)
+    expect(dialog.props('openRevision')).toBe(2)
+    dialog.vm.$emit('update:modelValue', false)
+    await nextTick()
+    expect(w.findComponent({ name: 'FormulaManagerDialog' }).exists()).toBe(true)
+    expect(w.findComponent({ name: 'FormulaManagerDialog' }).props('modelValue')).toBe(false)
   })
 
   it('页面带上下文打开公式管理：上下文年度优先；上下文没带年度时用路由 → store', async () => {
@@ -133,10 +168,10 @@ describe('三栏布局全局弹窗的审计年度', () => {
     const open = busOn.find(([name]) => name === 'open-formula-manager')?.[1]
     expect(open, '布局没订阅 open-formula-manager').toBeTypeOf('function')
     open!({ projectId: 'p1', year: 2021, scope: 'report' })
-    await nextTick()
+    await flushPromises()
     expect(w.findComponent({ name: 'FormulaManagerDialog' }).props('year')).toBe(2021)
     open!({ projectId: 'p1', scope: 'report' })
-    await nextTick()
+    await flushPromises()
     expect(w.findComponent({ name: 'FormulaManagerDialog' }).props('year')).toBe(2023)
   })
 })

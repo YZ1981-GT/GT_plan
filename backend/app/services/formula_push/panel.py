@@ -4,7 +4,6 @@ spec: chain-closure-phase2-formula-push-engine · 任务 10 / 12（由 engine.py
 """
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import Any
@@ -17,8 +16,6 @@ from app.services.formula_push.engine import MANUAL, PushActionError, load_push_
 from app.services.formula_push.policy import PolicyError, apply_user_action, values_equal
 from app.services.formula_push.results import RunResult
 from app.services.formula_push.rules import PushRule
-
-logger = logging.getLogger(__name__)
 
 
 def _dedupe(addr_ids: Iterable[str]) -> list[str]:
@@ -61,13 +58,9 @@ async def _checked_targets(
 async def adopt(db, *, project_id: UUID, year: int, addr_ids: Iterable[str], user_id: UUID | None) -> RunResult:
     """采用公式值：重新算出当前公式值写入并转 auto。"""
     wanted, _, _ = await _checked_targets(db, project_id, year, addr_ids)
-    result = await run_and_commit(
+    return await run_and_commit(
         db, project_id=project_id, year=year, trigger=MANUAL, triggered_by=user_id, force_addr_ids=wanted,
     )
-    from app.services.formula_push.note_followup import recalc_pushed_notes
-
-    await recalc_pushed_notes(db, result)  # R4.1
-    return result
 
 
 async def set_locked(
@@ -83,6 +76,14 @@ async def set_locked(
             row.state = apply_user_action(action, policy=rules[row.rule_id].policy, state=row.state)
         except PolicyError as exc:
             raise PushActionError(f"{addr}：{exc}") from exc
+        if row.provenance:
+            from app.services.formula_provenance import FinalValueProvenanceV1
+
+            try:
+                final = FinalValueProvenanceV1.model_validate(row.provenance)
+                row.provenance = final.model_copy(update={"value_state": row.state}).model_dump(mode="json")
+            except Exception:
+                pass  # 历史 / 损坏信封保持原样，下一次推送自然重建。
         row.updated_by = user_id
         row.updated_at = now
     await db.flush()
@@ -163,22 +164,6 @@ async def state_counts(db, *, project_id: UUID, year: int, wp_code: str | None =
     return {str(state): int(n) for state, n in rows}
 
 
-async def orphan_state_count(db, *, project_id: UUID, year: int) -> int:
-    """规则已不存在的附注推送状态行条数（R10）。
-
-    这类行既不再被推送维护（规则没了），又挡着附注预设公式（执行器按 state 判「推送拥有格」就跳过）⇒ 格里的数
-    停在当年推的那个值。只报数，不自动清（清理走 ``backend/scripts/fix/purge_orphan_push_states.py``）。
-    取不到不影响推送 / 面板：返回 0（判定要读规则清单文件，不该因为它出问题就让推送回执 500）。
-    """
-    from app.services.formula_push.orphan_states import count_orphans
-
-    try:
-        return await count_orphans(db, project_id=project_id, year=year)
-    except Exception:  # noqa: BLE001
-        logger.warning("孤儿推送状态统计失败 project=%s year=%s", project_id, year, exc_info=True)
-        return 0
-
-
 async def list_states(
     db, *, project_id: UUID, year: int, state: str | None = None, wp_code: str | None = None,
 ) -> list[FormulaPushState]:
@@ -192,8 +177,16 @@ async def list_states(
     return list((await db.execute(stmt.order_by(FormulaPushState.addr_id))).scalars().all())
 
 
-def state_view(row: FormulaPushState) -> dict[str, Any]:
-    """面板「待处理差异」一行（当前值 / 公式值 / 状态 / 是否有差异）。"""
+def state_view(
+    row: FormulaPushState, *, allowed_project_ids: set[UUID | str] | None = None,
+) -> dict[str, Any]:
+    """面板目标状态；来源信封按当前可见项目脱敏。"""
+    from app.services.formula_provenance import redact_final_provenance
+
+    provenance, inputs_redacted, legacy = redact_final_provenance(
+        row.provenance,
+        allowed_project_ids=allowed_project_ids or {row.project_id},
+    )
     return {
         "addr_id": row.addr_id,
         "rule_id": row.rule_id,
@@ -204,6 +197,10 @@ def state_view(row: FormulaPushState) -> dict[str, Any]:
         "current_value": row.current_value,
         "formula_value": row.last_formula_value,
         "last_pushed_value": row.last_pushed_value,
+        "last_run_id": str(row.last_run_id) if row.last_run_id else None,
+        "provenance": provenance,
+        "provenance_legacy": legacy,
+        "inputs_redacted": inputs_redacted,
         "differs": not values_equal(row.current_value, row.last_formula_value),
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }

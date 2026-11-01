@@ -80,6 +80,15 @@
           </span>
         </div>
 
+        <OutputAttachmentLinks
+          v-if="sectionCode"
+          :project-id="projectId"
+          object-type="deliverable_section"
+          target-type="deliverable_section"
+          :target-ref="`${taskId}:${sectionCode}`"
+          resource="report"
+        />
+
         <!-- 固定链条：交付件 → 附注章节 → 底稿 → 试算表 → 调整分录 -->
         <div class="trace-chain">
           <div v-for="(stage, idx) in stages" :key="stage.key" class="trace-chain__stage">
@@ -130,6 +139,7 @@ import { computed, ref, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useDeliverableLineage } from '@/composables/useDeliverableLineage'
+import OutputAttachmentLinks from '@/components/attachment/OutputAttachmentLinks.vue'
 import type { LinkageContract, LinkageStatus, SourceType } from '@/types/linkageContract'
 
 const props = defineProps<{

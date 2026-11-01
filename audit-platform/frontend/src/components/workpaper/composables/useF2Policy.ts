@@ -3,6 +3,7 @@
  * Spec: .kiro/specs/f2-inventory-main/ Task 10.1
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import type { ChecklistResponse } from './useF2FormData'
 
 export interface F2PolicySection {
@@ -78,6 +79,15 @@ export function useF2Policy(options: {
   )
 
   const changedCount = computed(() => sections.value.filter((s) => s.isChanged === '是').length)
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

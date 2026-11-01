@@ -37,7 +37,7 @@ class SuggestRequest(BaseModel):
 class SuggestResponse(BaseModel):
     """AI 建议响应体"""
     suggestion: str
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 @router.post("/{wp_id}/ai/suggest", response_model=SuggestResponse)
@@ -71,11 +71,12 @@ async def suggest_fill(
         sheet_name=body.sheet_name,
         field_name=body.field_name,
         existing_content=body.existing_content,
+        role=str(getattr(user.role, "value", user.role)),
     )
 
     # 截断到 2000 字符
     suggestion_text = (result.get("text") or "")[:2000]
-    confidence = float(result.get("confidence", 0.6))
+    confidence = result.get("confidence")
 
     # 写入审计轨迹
     try:
@@ -116,7 +117,12 @@ async def analytical_review(
         raise HTTPException(404, "底稿不存在")
     year = await require_project_audit_year(db, wp.project_id, year)
     svc = WpAIService(db)
-    return await svc.analytical_review(wp.project_id, account_code, year)
+    return await svc.analytical_review(
+        wp.project_id,
+        account_code,
+        year,
+        role=str(getattr(user.role, "value", user.role)),
+    )
 
 
 @router.post("/{wp_id}/ai/extract-confirmations")

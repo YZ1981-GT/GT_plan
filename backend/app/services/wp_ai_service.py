@@ -36,7 +36,7 @@ def _default_source_model() -> str:
 def wrap_ai_content(
     value: str | dict,
     source_model: str,
-    confidence: float,
+    confidence: float | None,
     confirmed_by: UUID | None = None,
     confirmed_at: datetime | None = None,
 ) -> dict:
@@ -68,11 +68,13 @@ def wrap_ai_content(
 def wrap_ai_output(
     content: str,
     *,
-    confidence: float = 0.0,
+    confidence: float | None = 0.0,
     source_model: str | None = None,
     target_cell: str | None = None,
     target_field: str | None = None,
     source_prompt_version: str | None = None,
+    prompt_hash: str | None = None,
+    task_code: str | None = None,
 ) -> dict:
     """将 AI 输出包装为统一结构化格式（R3 Sprint 4 Task 21 完整版）。
 
@@ -99,6 +101,8 @@ def wrap_ai_output(
         "type": "ai_generated",
         "source_model": source_model,
         "source_prompt_version": source_prompt_version,
+        "prompt_hash": prompt_hash,
+        "task_code": task_code,
         "generated_at": datetime.now(_tz.utc).isoformat(),
         "confidence": confidence,
         "content": content,
@@ -114,7 +118,7 @@ def wrap_ai_output(
 async def wrap_ai_output_with_log(
     *,
     content: str,
-    confidence: float = 0.0,
+    confidence: float | None = 0.0,
     source_model: str | None = None,
     target_cell: str | None = None,
     target_field: str | None = None,
@@ -254,7 +258,9 @@ class WpAIService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def analytical_review(self, project_id: UUID, account_code: str, year: int) -> dict:
+    async def analytical_review(
+        self, project_id: UUID, account_code: str, year: int, role: str | None = None
+    ) -> dict:
         """分析性复核：变动分析 + LLM 生成分析文本"""
         from app.models.audit_platform_models import TrialBalance
         from app.services.task_center import create_task, update_task, TaskType, TaskStatus
@@ -284,8 +290,8 @@ class WpAIService:
             rate = round(change / prior * 100, 2) if prior != 0 else None
             is_significant = abs(rate or 0) > 20 if rate is not None else abs(change) > 0
 
-            # 调用 LLM 生成分析文本（RAG: 参照上年底稿分析结论）
-            from app.services.llm_client import chat_completion
+            # 调用登记的分析性复核任务（RAG: 参照上年底稿分析结论）
+            from app.services.ai_task_executor import invoke_ai_task
             from app.services.reference_doc_service import ReferenceDocService
 
             context_docs = await ReferenceDocService.load_context(
@@ -295,25 +301,34 @@ class WpAIService:
                 knowledge_keywords=[account_code],
             )
 
-            prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请用一句话分析变动原因。"
-            # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 35）
-            from app.services.export_mask_service import export_mask_service
-            masked_prompt, _mapping = export_mask_service.mask_text(prompt)
-            try:
-                ai_text = await chat_completion([
-                    {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。如有上年分析参照请对比。"},
-                    {"role": "user", "content": masked_prompt},
-                ], context_documents=context_docs if context_docs else None)
-                source_model = "qwen3.5-27b"
-            except Exception:
-                ai_text = f"该科目余额变动 {change:,.2f}，变动率 {rate}%。"
-                source_model = "fallback"
+            prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请描述变动，并把原因标为待核实假设。"
+            invocation = await invoke_ai_task(
+                "workpaper.analytical_review",
+                user_prompt=prompt,
+                context_documents=context_docs or None,
+                role=role,
+            )
+            result = invocation.result
+            if not result.succeeded:
+                update_task(task_id, TaskStatus.failed, error=result.error_code or result.status.value)
+                return {
+                    "account_code": account_code,
+                    "current_balance": current,
+                    "prior_balance": prior,
+                    "change_amount": change,
+                    "change_rate": rate,
+                    "is_significant": is_significant,
+                    "ai_analysis": None,
+                    "error": "AI 服务暂不可用，本次未生成分析文字",
+                    "error_code": result.error_code or result.status.value,
+                    "recommended_procedures": [],
+                    "task_id": task_id,
+                }
 
-            # R3 Sprint 4: AI 输出统一结构化
             ai_analysis_wrapped = wrap_ai_content(
-                value=ai_text,
-                source_model=source_model,
-                confidence=0.8 if source_model != "fallback" else 0.0,
+                value=result.text or "",
+                source_model=result.model_name or "unknown",
+                confidence=None,
             )
 
             update_task(task_id, TaskStatus.success)
@@ -442,30 +457,41 @@ class WpAIService:
         3. wrap_ai_output 包装(便于前端 AiContentConfirmDialog 确认)
         4. 失败时降级 fallback 文本
         """
-        from app.services.export_mask_service import export_mask_service
-        from app.services.llm_client import chat_completion
+        from app.services.ai_task_executor import invoke_ai_task
 
-        masked_user, _ = export_mask_service.mask_text(user_prompt)
-        try:
-            ai_text = await chat_completion([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": masked_user},
-            ])
-            source_model = "qwen3.5-27b"
-            confidence = 0.8
-        except Exception as e:
-            logger.warning("LLM scenario=%s failed: %s", scenario, e)
-            ai_text = f"[{scenario} LLM 调用失败,请人工填写] (错误: {e})"
-            source_model = "fallback"
-            confidence = 0.0
+        invocation = await invoke_ai_task(
+            "workpaper.subject_conclusion_advice",
+            user_prompt=user_prompt,
+            system_addendum=system_prompt,
+        )
+        result = invocation.result
+        if not result.succeeded:
+            logger.warning(
+                "LLM scenario=%s failed code=%s", scenario, result.error_code
+            )
+            return {
+                "type": "ai_error",
+                "content": None,
+                "confidence": None,
+                "source_model": result.model_name,
+                "target_cell": (target or {}).get("cell"),
+                "target_field": scenario,
+                "error": "AI 服务暂不可用，本次未生成底稿文字",
+                "error_code": result.error_code or result.status.value,
+                "task_code": invocation.spec.task_code,
+                "prompt_version": invocation.prompt_version,
+                "prompt_hash": invocation.prompt_hash,
+            }
 
         return wrap_ai_output(
-            content=ai_text,
-            confidence=confidence,
-            source_model=source_model,
+            content=result.text or "",
+            confidence=None,
+            source_model=result.model_name or "unknown",
             target_cell=(target or {}).get("cell"),
             target_field=scenario,
-            source_prompt_version=f"e1_v1_{scenario}",
+            source_prompt_version=invocation.prompt_version,
+            prompt_hash=invocation.prompt_hash,
+            task_code=invocation.spec.task_code,
         )
 
     async def generate_audit_conclusion(
@@ -489,12 +515,12 @@ class WpAIService:
         """
         prompt_cfg = await self._load_llm_prompt(wp_code, "audit_conclusion")
         if prompt_cfg is None:
-            return wrap_ai_output(
-                content=f"[{wp_code} 未配置 audit_conclusion prompt,请先在 wp_template_metadata.llm_prompts 添加]",
-                confidence=0.0,
-                source_model="fallback",
-                target_field="audit_conclusion",
-            )
+            return {
+                "type": "ai_error", "content": None, "confidence": None,
+                "source_model": None, "target_field": "audit_conclusion",
+                "error": f"{wp_code} 未配置 audit_conclusion Prompt",
+                "error_code": "prompt_not_configured",
+            }
 
         user_prompt = prompt_cfg["user_template"].format(
             company_name_masked=company_name or "[company_1]",
@@ -532,12 +558,12 @@ class WpAIService:
         """
         prompt_cfg = await self._load_llm_prompt(wp_code, "variance_analysis")
         if prompt_cfg is None:
-            return wrap_ai_output(
-                content=f"[{wp_code} 未配置 variance_analysis prompt]",
-                confidence=0.0,
-                source_model="fallback",
-                target_field="variance_analysis",
-            )
+            return {
+                "type": "ai_error", "content": None, "confidence": None,
+                "source_model": None, "target_field": "variance_analysis",
+                "error": f"{wp_code} 未配置 variance_analysis Prompt",
+                "error_code": "prompt_not_configured",
+            }
 
         user_prompt = prompt_cfg["user_template"].format(
             company_name_masked=company_name or "[company_1]",
@@ -572,12 +598,12 @@ class WpAIService:
         """
         prompt_cfg = await self._load_llm_prompt(wp_code, "check_conclusion")
         if prompt_cfg is None:
-            return wrap_ai_output(
-                content=f"[{wp_code} 未配置 check_conclusion prompt]",
-                confidence=0.0,
-                source_model="fallback",
-                target_field="check_conclusion",
-            )
+            return {
+                "type": "ai_error", "content": None, "confidence": None,
+                "source_model": None, "target_field": "check_conclusion",
+                "error": f"{wp_code} 未配置 check_conclusion Prompt",
+                "error_code": "prompt_not_configured",
+            }
 
         user_prompt = prompt_cfg["user_template"].format(
             check_type=check_type,
@@ -613,12 +639,12 @@ class WpAIService:
         """
         prompt_cfg = await self._load_llm_prompt(wp_code, "cutoff_conclusion")
         if prompt_cfg is None:
-            return wrap_ai_output(
-                content=f"[{wp_code} 未配置 cutoff_conclusion prompt]",
-                confidence=0.0,
-                source_model="fallback",
-                target_field="cutoff_conclusion",
-            )
+            return {
+                "type": "ai_error", "content": None, "confidence": None,
+                "source_model": None, "target_field": "cutoff_conclusion",
+                "error": f"{wp_code} 未配置 cutoff_conclusion Prompt",
+                "error_code": "prompt_not_configured",
+            }
 
         user_prompt = prompt_cfg["user_template"].format(
             cutoff_date=cutoff_date,
@@ -646,6 +672,7 @@ class WpAIService:
         sheet_name: str,
         field_name: str,
         existing_content: str = "",
+        role: str | None = None,
     ) -> dict:
         """为 D 类段落/QA 或 E 类控制测试的文本字段生成 AI 建议。
 
@@ -660,40 +687,44 @@ class WpAIService:
         # Stub 模式：返回预设建议
         if not app_settings.WP_AI_SERVICE_ENABLED:
             # 不应到达此处（router 层已拦截），但防御性处理
-            return {"text": "", "confidence": 0.0}
+            return {"text": "", "confidence": None, "error_code": "ai_service_disabled"}
 
-        # 尝试调用 LLM
-        try:
-            from app.services.llm_client import chat_completion
+        from app.services.ai_task_executor import invoke_ai_task
 
-            system_prompt = (
-                "你是一名资深审计师助手。根据用户提供的底稿上下文，"
-                "为指定字段生成专业、简洁的填写建议。"
-                "建议应符合中国审计准则要求，语言正式、逻辑清晰。"
-                "如果已有内容，请在其基础上优化或补充。"
-                "输出纯文本，不要 markdown 格式。"
+        system_prompt = (
+            "你是一名审计编制助手。根据用户提供的底稿上下文，"
+            "为指定字段生成供人工复核的措辞建议。"
+            "只能陈述已提供的事实；证据不足时明确列出待补资料，"
+            "不得自行得出‘未发现重大异常’或‘符合准则’结论。"
+            "输出纯文本，不要 markdown 格式。"
+        )
+        user_prompt = (
+            f"底稿 sheet: {sheet_name}\n"
+            f"字段: {field_name}\n"
+            f"已有内容: {existing_content[:1000] if existing_content else '（空）'}\n\n"
+            f"请为该字段生成填写建议（200-500字）。"
+        )
+        invocation = await invoke_ai_task(
+            "workpaper.field_draft",
+            user_prompt=user_prompt,
+            system_addendum=system_prompt,
+            role=role,
+        )
+        result = invocation.result
+        if not result.succeeded:
+            logger.warning(
+                "suggest_field_content LLM failed code=%s", result.error_code
             )
-            user_prompt = (
-                f"底稿 sheet: {sheet_name}\n"
-                f"字段: {field_name}\n"
-                f"已有内容: {existing_content[:1000] if existing_content else '（空）'}\n\n"
-                f"请为该字段生成填写建议（200-500字）。"
-            )
-
-            ai_text = await chat_completion([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ])
-            return {"text": (ai_text or "")[:2000], "confidence": 0.75}
-        except Exception as e:
-            logger.warning("suggest_field_content LLM failed: %s", e)
-            # Fallback: 返回通用建议模板
-            fallback = (
-                f"【AI 建议 - {field_name}】\n"
-                f"经审计，我们对{sheet_name}相关事项执行了以下审计程序：\n"
-                f"1. 获取并审阅了相关文件资料；\n"
-                f"2. 对关键数据进行了核对和分析；\n"
-                f"3. 未发现重大异常情况。\n"
-                f"综上，相关事项符合企业会计准则的规定。"
-            )
-            return {"text": fallback[:2000], "confidence": 0.3}
+            return {
+                "text": "",
+                "confidence": None,
+                "error": "AI 服务暂不可用，本次未生成填写建议",
+                "error_code": result.error_code or result.status.value,
+            }
+        return {
+            "text": (result.text or "")[:2000],
+            "confidence": None,
+            "model": result.model_name,
+            "deployment": result.deployment,
+            "fallback_used": result.fallback_used,
+        }

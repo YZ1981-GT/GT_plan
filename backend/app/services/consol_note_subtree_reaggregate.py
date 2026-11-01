@@ -461,8 +461,7 @@ class _Run:
         amounts: dict[int, dict[int, Decimal]] = {}
         provenance: list[dict[str, Any]] = []
         unplaced: list[dict[str, Any]] = []
-        consol_table = find_table(self.template_type, sid) or {}
-        headers = list(consol_table.get("headers") or [])
+        headers = list((find_table(self.template_type, sid) or {}).get("headers") or [])
         width = max(len(headers), 2)
         entity_data = False
         for child in node.children:
@@ -500,8 +499,7 @@ class _Run:
             amounts.pop(i, None)
         # 「……」占位行没有下级数、也没有手填值就不写；手工 / 锁定格按行名对到新行号（R15）
         built = build_note_rows(skeleton, amounts, width=width, protected=manual | locked,
-                                existing_rows=existing_rows, placeholders=placeholders,
-                                table=consol_table if headers else None)
+                                existing_rows=existing_rows, placeholders=placeholders)
         new_rows, filled, kept = built.rows, built.filled, built.kept
         lost_protected = remap_protected(data, record, manual, locked, built.old_to_new)
         for i, cells in verbatim.items():
@@ -521,6 +519,16 @@ class _Run:
         record.data = data
         record.is_stale = False
         record.updated_at = now
+        # V243：来源投影
+        from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
+
+        _mode = compute_source_mode(
+            "subtree_aggregate",
+            manual_cells=manual,
+            locked_cells=locked,
+            previous_source=getattr(record, "source_mode", None),
+        )
+        update_source_projection(record, _mode, digest=_sd(data))
         await self._snapshot(sid, node, record)
         await self.db.flush()
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={

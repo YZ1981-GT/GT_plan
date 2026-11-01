@@ -135,13 +135,7 @@ async def run_push(
         )
     except engine.PushActionError as exc:
         raise _bad_request(exc) from exc
-    from app.services.formula_push.note_followup import recalc_pushed_notes
-
-    formulas = await recalc_pushed_notes(db, result)  # 推送写了附注 ⇒ 合计 / 账面价值 / 比例跟着算（R4.1）
-    return {**result.summary(), "items": [i.as_dict() for i in result.items],
-            "note_formulas_updated": sum(int((r or {}).get("updated") or 0) for r in formulas.values()),
-            # 规则已不存在的附注推送状态行（R10）：推送不自动清，界面提示用修复脚本
-            "orphan_push_states": await panel.orphan_state_count(db, project_id=project_id, year=body.year)}
+    return {**result.summary(), "items": [i.as_dict() for i in result.items]}
 
 
 @router.get("/latest")
@@ -156,8 +150,6 @@ async def latest(
     return {
         "run": panel.run_view(run, wp_code=wp_code),
         "state_counts": await panel.state_counts(db, project_id=project_id, year=year, wp_code=wp_code),
-        # 规则已不存在、格里还留着推送值的附注单元格（R10）：只报数，清理走修复脚本
-        "orphan_push_states": await panel.orphan_state_count(db, project_id=project_id, year=year),
     }
 
 
@@ -173,7 +165,7 @@ async def states(
     if state is not None and state not in PUSH_STATES:
         raise HTTPException(status_code=400, detail=f"未知状态 {state}（可选：{'、'.join(PUSH_STATES)}）")
     rows = await panel.list_states(db, project_id=project_id, year=year, state=state, wp_code=wp_code)
-    return {"states": [panel.state_view(r) for r in rows]}
+    return {"states": [panel.state_view(r, allowed_project_ids={project_id}) for r in rows]}
 
 
 @router.post("/states/adopt")
@@ -209,7 +201,7 @@ async def lock(
     except engine.PushActionError as exc:
         await db.rollback()
         raise _bad_request(exc) from exc
-    return {"states": [panel.state_view(r) for r in rows]}
+    return {"states": [panel.state_view(r, allowed_project_ids={project_id}) for r in rows]}
 
 
 # ── 运行历史与逐项明细（按 run 批次筛选 skip/failed）──────────────

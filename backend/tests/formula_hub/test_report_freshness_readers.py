@@ -43,6 +43,7 @@ WRITE_API = frozenset({"mark_changed", "mark_statement", "slot_row_codes", "CALC
 #: 经 report_freshness 判过期的读者（文件::限定名 → 用途）
 FRESHNESS_READERS: dict[str, str] = {
     "app/routers/reports.py::get_report": "报表视图：逐行 row_status（含生成时公式与生效公式比较）",
+    "app/routers/reports.py::get_report_row_provenance": "S5 本期最终值来源：同一 row_status 判 stale / legacy",
     "app/routers/reports.py::export_report_excel": "单表 Excel 导出：「说明」列 status_note(row_status)",
     "app/services/deliverable_readiness_service.py::DeliverableReadinessService._check_reports": "F38 交付就绪",
     "app/services/report_export_checks.py::_check_freshness": "F38 导出前检查（过期 / 计算失败 / 留空三条提示）",

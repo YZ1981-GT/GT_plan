@@ -105,14 +105,7 @@
         <span class="chip-wrap"><GtIndexChip value="wp:H2-1" :validate="false" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
         <el-button size="small" circle @click="openReview('H2-3')">💬</el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -326,6 +319,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabAdjustment.vue — H2-3 在建工程调整分录汇总表
@@ -334,7 +328,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH2Adjustment } from '../../composables/useH2Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'

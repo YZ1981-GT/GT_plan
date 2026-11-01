@@ -119,6 +119,20 @@ def view_cell_source(td: dict, table: dict, row_idx: int, col_idx: int) -> tuple
     return source[raw_index], keys[col_idx]
 
 
+def view_cell_mode_explicit(td: dict, table: dict, row_idx: int, col_idx: int) -> bool:
+    """这一格是否显式保存了模式；缺省 auto 与显式 auto 的覆盖语义不同。"""
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    if is_projected_table(table):
+        raw, key = view_cell_source(td, table, row_idx, col_idx)
+        if raw is None or key in raw or not isinstance(raw.get("values"), list):
+            return False
+        modes = raw.get("_cell_modes")
+    else:
+        row = rows[row_idx] if 0 <= row_idx < len(rows) and isinstance(rows[row_idx], dict) else {}
+        modes = row.get("_cell_modes")
+    return isinstance(modes, dict) and str(col_idx) in modes
+
+
 def view_cell_mode(td: dict, table: dict, row_idx: int, col_idx: int) -> str:
     """显示视图一格的单元格模式（``auto`` / ``manual`` / ``locked``），与公式推送同口径。
 
@@ -247,24 +261,7 @@ def table_preset_formulas(table: dict, table_index: int) -> tuple[dict[str, dict
                 continue  # 合计行已按明细之和算
             formulas[key] = _preset(table_index, "book_value", f"cell({r},{gross_col})" + expr_tail.format(r=r),
                                     "账面价值 = 账面余额 − 准备", "preset.book_value")
-    _ratio_presets(table, table_index, rows, formulas, notes)
     return formulas, notes
-
-
-def _ratio_presets(table: dict, table_index: int, rows: list[Any], formulas: dict[str, dict], notes: list[dict]) -> None:
-    """比例 / 损失率（``note_formula_ratios``，与合并拉数后派生同一判定）：分子格为空不算（``requires``）、不写 0。"""
-    from app.services.note_formula_ratios import expression, ratio_plans, ratio_rows
-
-    plans, why = ratio_plans(table, rows)
-    notes.extend({"table_index": table_index, "row": None, "reason": text} for text in why)
-    describe = {"share": "比例 = 本行金额 ÷ 合计行金额 × 100", "rate": "损失率 = 准备 ÷ 账面余额 × 100"}
-    for plan in plans:
-        for r in ratio_rows(rows):
-            key = formula_key(table_index, r, plan.column)
-            if key in formulas:
-                continue
-            formulas[key] = {**_preset(table_index, "ratio", expression(plan, r), describe[plan.kind],
-                                       f"preset.ratio_{plan.kind}"), "requires": [[r, plan.numerator]]}
 
 
 def section_preset_formulas(td: Any) -> tuple[dict[str, dict], list[dict]]:
@@ -392,25 +389,33 @@ def evaluate(expression: Any, rows: list[Any],
         if value is None:
             missing.append(m.group(0))
             return lit(Decimal(0))
+        from app.services.formula_inputs import emit
+        kind = m.group(0).split("(", 1)[0].strip().upper() or "CROSS"
+        emit(kind, m.group(0), value, m.group(0))
         counts["filled"] += 1
         return lit(value)
 
     def summed(m: re.Match[str]) -> str:
         a, b, c = int(m.group(1)), int(m.group(2)), int(m.group(3))
         total = Decimal(0)
+        from app.services.formula_inputs import emit
         for r in range(min(a, b), max(a, b) + 1):
             counts["refs"] += 1
             value = _cell(rows, r, c)
             if value is not None:
+                emit("CELL", f"{r}:{c}", value, f"note-cell:{r}:{c}")
                 total += value
                 counts["filled"] += 1
         return lit(total)
 
     def cell(m: re.Match[str]) -> str:
         counts["refs"] += 1
-        value = _cell(rows, int(m.group(1)), int(m.group(2)))
+        row, col = int(m.group(1)), int(m.group(2))
+        value = _cell(rows, row, col)
         if value is None:
             return lit(Decimal(0))
+        from app.services.formula_inputs import emit
+        emit("CELL", f"{row}:{col}", value, f"note-cell:{row}:{col}")
         counts["filled"] += 1
         return lit(value)
 

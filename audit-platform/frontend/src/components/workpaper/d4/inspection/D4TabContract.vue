@@ -7,7 +7,7 @@
  *
  * Spec: .kiro/specs/d4-12-contract-inspection/
  */
-import { ref, computed, inject, toRef, defineAsyncComponent, type Ref } from 'vue'
+import { ref, computed, inject, toRef, defineAsyncComponent, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useD4ContractInspection,
@@ -22,6 +22,18 @@ import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import D4ContractCard from './D4ContractCard.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { attachments as P_att } from '@/services/apiPaths'
+import {
+  contractKeyString,
+  uploadWorkpaperEvidence,
+} from '@/components/attachment/workpaperEvidence'
+import { invalidateWpEvidenceLinks } from '@/composables/useWpEvidenceLinks'
+import {
+  refreshContractEvidence,
+  type ContractEvidenceAttachment,
+  type ContractEvidenceEntry,
+} from '@/composables/useContractEvidenceIndex'
+import { handleApiError } from '@/utils/errorHandler'
 
 const D4ContractMatrix = defineAsyncComponent(() => import('./D4ContractMatrix.vue'))
 
@@ -143,15 +155,114 @@ async function handleAddContract() {
   } catch { /* cancel */ }
 }
 
-function handleRemoveContract(id: string) {
-  ElMessageBox.confirm('确定删除该合同检查记录？此操作不可撤销。', '删除确认', {
-    type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
-  }).then(() => {
+const CONTRACT_EVIDENCE_SHEET = 'D4-12'
+const contractCellRef = (id: string) => `row:${id}`
+const identityTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const evidenceBusy = ref('')
+
+function itemOf(id: string): ContractInspectionItem | undefined {
+  return contracts.value.find(item => item.id === id)
+}
+
+async function bindContractIdentity(item: ContractInspectionItem): Promise<void> {
+  const key = contractKeyString(item.contractNo, item.counterparty)
+  if (!key || !item.attachmentId) return
+  try {
+    const response = await http.put(
+      P_att.evidenceContractLink(props.projectId, props.wpId),
+      {
+        attachment_id: item.attachmentId,
+        contract_key: key,
+        sheet_name: CONTRACT_EVIDENCE_SHEET,
+        cell_ref: contractCellRef(item.id),
+      },
+      { _silent: true } as any,
+    )
+    const body = response?.data?.data ?? response?.data ?? response
+    const linkId = body?.link?.id || item.evidenceLinkId || ''
+    setAttachment(item.id, item.attachmentId, item.attachmentName || '', linkId)
+    await refreshContractEvidence(props.projectId, props.wpId, [key])
+  } catch (error) {
+    handleApiError(error, '绑定合同证据')
+  }
+}
+
+function scheduleContractIdentity(id: string): void {
+  const previous = identityTimers.get(id)
+  if (previous) clearTimeout(previous)
+  identityTimers.set(id, setTimeout(() => {
+    identityTimers.delete(id)
+    const item = itemOf(id)
+    if (item) void bindContractIdentity(item)
+  }, 400))
+}
+
+function handleFieldUpdate(id: string, field: keyof ContractInspectionItem, value: unknown): void {
+  updateField(id, field, value)
+  if ((field === 'contractNo' || field === 'counterparty') && itemOf(id)?.attachmentId) {
+    scheduleContractIdentity(id)
+  }
+}
+
+function handleCardUpdate(
+  id: string,
+  payload: { field: keyof ContractInspectionItem; value: unknown },
+): void {
+  handleFieldUpdate(id, payload.field, payload.value)
+}
+
+function handleCardReuse(
+  item: ContractInspectionItem,
+  payload: { attachment: ContractEvidenceAttachment; entry: ContractEvidenceEntry },
+): void {
+  void handleReuseEvidence(item, payload.attachment, payload.entry)
+}
+
+async function detachContractEvidence(item: ContractInspectionItem): Promise<void> {
+  if (!item.attachmentId) return
+  if (item.evidenceLinkId) {
+    await http.delete(
+      P_att.evidenceLink(props.projectId, props.wpId, item.evidenceLinkId),
+      { _silent: true } as any,
+    )
+  } else {
+    // 兼容旧 D4 OCR：旧数据是整稿关联，没有 evidenceLinkId。
+    await http.delete(
+      `/api/working-papers/${props.wpId}/attachments/${item.attachmentId}/link`,
+      { _silent: true } as any,
+    )
+  }
+  await invalidateWpEvidenceLinks(props.projectId, props.wpId).catch(() => [])
+  await refreshContractEvidence(
+    props.projectId, props.wpId, [contractKeyString(item.contractNo, item.counterparty)],
+  )
+}
+
+async function handleRemoveAttachment(item: ContractInspectionItem): Promise<void> {
+  try {
+    await detachContractEvidence(item)
+    setAttachment(item.id, '', '', '')
+    setOcrStatus(item.id, 'none')
+    ElMessage.success('已解除本合同记录与附件的关联，原文件仍保留在附件库')
+  } catch (error) {
+    handleApiError(error, '移除合同附件')
+  }
+}
+
+async function handleRemoveContract(id: string) {
+  try {
+    await ElMessageBox.confirm('确定删除该合同检查记录？关联原件会从本记录解除，但不会物理删除。', '删除确认', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
+    })
+    const item = itemOf(id)
+    if (item) await detachContractEvidence(item)
     removeContract(id)
     if (activeTab.value === id && contracts.value.length > 0) {
       activeTab.value = contracts.value[0].id
     }
-  }).catch(() => {})
+  } catch (error: any) {
+    if (error !== 'cancel' && error?.message !== 'cancel') handleApiError(error, '删除合同检查记录')
+  }
 }
 
 // ─── OCR 上传 ────────────────────────────────────────────────────────
@@ -159,30 +270,39 @@ const ocrLoadingId = ref<string | null>(null)
 
 async function handleContractUpload(contractId: string, file: File) {
   if (props.isReadonly) return
+  const item = itemOf(contractId)
+  if (!item) return
   ocrLoadingId.value = contractId
   setOcrStatus(contractId, 'processing')
 
-  const formData = new FormData()
-  formData.append('file', file)
-
   try {
+    // 先经统一证据入口建立稳定行位置；OCR 只读取这个已关联附件，不再另建一份整稿附件。
+    const uploaded = await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file,
+      evidenceType: 'contract',
+      sheetName: CONTRACT_EVIDENCE_SHEET,
+      cellRef: contractCellRef(contractId),
+      contractKey: contractKeyString(item.contractNo, item.counterparty),
+    })
+    const linkId = String((uploaded.evidenceLink as any)?.id || '')
+    setAttachment(contractId, uploaded.attachment.id, file.name, linkId)
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('attachment_id', uploaded.attachment.id)
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
     const data = res.data?.data ?? res.data
-    const { attachment_id, extracted_fields, confidence } = data
-
-    // 保存附件信息
-    setAttachment(contractId, attachment_id, file.name)
-
-    // 弹窗确认OCR结果
+    const { extracted_fields, confidence } = data
     const fieldSummary = Object.entries(extracted_fields || {})
-      .filter(([, v]) => v != null && v !== '')
-      .map(([k, v]) => `${k}: ${v}`)
+      .filter(([, value]) => value != null && value !== '')
+      .map(([key, value]) => `${key}: ${value}`)
       .join('\n')
-
     const confirmMsg = `OCR识别完成（置信度: ${((confidence || 0) * 100).toFixed(0)}%）\n\n提取字段：\n${fieldSummary || '（未提取到有效信息）'}\n\n是否将提取结果填入表单？`
 
     await ElMessageBox.confirm(confirmMsg, 'OCR提取结果', {
@@ -192,16 +312,49 @@ async function handleContractUpload(contractId: string, file: File) {
       type: 'info',
     })
     mergeOcrFields(contractId, extracted_fields as OcrExtractedFields, false)
-    ElMessage.success('OCR结果已填入')
+    const finalItem = itemOf(contractId)
+    if (finalItem) await bindContractIdentity(finalItem)
+    ElMessage.success('OCR结果已填入，合同原件已按合同身份关联')
   } catch (err: any) {
     if (err === 'cancel' || err?.message === 'cancel') {
       setOcrStatus(contractId, 'done')
     } else {
       setOcrStatus(contractId, 'failed')
-      ElMessage.warning('OCR识别失败，请手动填写')
+      handleApiError(err, '合同附件识别')
     }
   } finally {
     ocrLoadingId.value = null
+  }
+}
+
+async function handleReuseEvidence(
+  item: ContractInspectionItem,
+  attachment: ContractEvidenceAttachment,
+  entry: ContractEvidenceEntry,
+): Promise<void> {
+  const key = contractKeyString(item.contractNo, item.counterparty)
+  if (!key) return
+  evidenceBusy.value = attachment.id
+  try {
+    const response = await http.post(
+      P_att.evidenceContractReuse(props.projectId, props.wpId),
+      {
+        contract_key: key,
+        attachment_id: attachment.id,
+        sheet_name: CONTRACT_EVIDENCE_SHEET,
+        cell_ref: contractCellRef(item.id),
+      },
+      { _silent: true } as any,
+    )
+    const body = response?.data?.data ?? response?.data ?? response
+    setAttachment(item.id, attachment.id, attachment.file_name, String(body?.link?.id || ''))
+    await invalidateWpEvidenceLinks(props.projectId, props.wpId).catch(() => [])
+    await refreshContractEvidence(props.projectId, props.wpId, [key])
+    ElMessage.success(`已引用 ${entry.wp_code || '其他底稿'} 的合同原件`)
+  } catch (error) {
+    handleApiError(error, '引用合同证据')
+  } finally {
+    evidenceBusy.value = ''
   }
 }
 
@@ -249,6 +402,11 @@ function fmtAmount(v: number): string {
   if (!v) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+onBeforeUnmount(() => {
+  for (const timer of identityTimers.values()) clearTimeout(timer)
+  identityTimers.clear()
+})
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
@@ -316,9 +474,13 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
             :item="c"
             :is-readonly="isReadonly"
             :ocr-loading="ocrLoadingId === c.id"
-            @update="(field, val) => updateField(c.id, field, val)"
-            @upload="(file) => handleContractUpload(c.id, file)"
-            @remove-attachment="() => { setAttachment(c.id, '', ''); setOcrStatus(c.id, 'none') }"
+            :project-id="projectId"
+            :wp-id="wpId"
+            :evidence-busy="evidenceBusy"
+            @update="handleCardUpdate(c.id, $event)"
+            @upload="handleContractUpload(c.id, $event)"
+            @remove-attachment="handleRemoveAttachment(c)"
+            @reuse-evidence="handleCardReuse(c, $event)"
           />
         </el-tab-pane>
       </el-tabs>

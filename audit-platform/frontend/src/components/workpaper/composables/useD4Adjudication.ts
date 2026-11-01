@@ -18,6 +18,7 @@
  * Requirements: 3.2, 3.4, 3.5
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, isMainRevenueCode, isOtherRevenueCode } from './d4AccountScope'
 import { D4_ADJ_ROWS_SPEC, D4_ADJ_PREFIX } from './d4AdjudicationRows'
@@ -1313,6 +1314,15 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     } catch { /* silent */ }
   }
 
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
+
   onBeforeUnmount(() => {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
@@ -1373,9 +1383,8 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     publishAdjudicated,
     publishing,
 
-    // Sync bridge 接桥用：flush 待存改动（先于 readStoreProjection 读投影，防投影旧值）。
-    // 别名内部 flushSave（走 `d4:save-items` 事件由宿主 formData 落库）。
-    flushPendingSave: flushSave,
+    // Sync bridge 接桥用：只 flush 待存改动（先于 readStoreProjection 读投影，防投影旧值）。
+    flushPendingSave,
   }
 }
 

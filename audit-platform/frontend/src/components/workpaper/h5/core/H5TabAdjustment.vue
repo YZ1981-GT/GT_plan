@@ -8,14 +8,7 @@
         <div class="section-title">
           <span>H5-3 调整分录</span>
           <div class="title-actions">
-            <el-tag
-              v-if="centralStatus?.review_status"
-              size="small"
-              :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-              :title="centralStatus.rejection_reason || ''"
-            >
-              集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-            </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
             <!--
               🔴 H5 不能挂 `CycleImportExportDropdown` —— 详见 H5TabDetail.vue 同位注释。
               h5 真实端点是 `/api/h5/*`（wp_id 在 body/Form），而该组件拼
@@ -153,11 +146,12 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import { ref, computed, inject, onMounted, toRef, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH5Adjustment } from '../../composables/useH5Adjustment'
 import { useH5FormData } from '../../composables/useH5FormData'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { eventBus } from '@/utils/eventBus'
 

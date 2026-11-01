@@ -146,7 +146,7 @@ def register_custom_function(
         token = _nesting_depth.set(depth + 1)
         try:
             result = eng.execute(expr, ctx)
-            if not result.ok:
+            if not result.ok or result.value is None:
                 reason = result.errors[0] if result.errors else f"{name}() 内层求值失败"
                 raise eng.FormulaEvalError(reason)
             trace.append(f"{name}(...) = {result.value} (custom)")

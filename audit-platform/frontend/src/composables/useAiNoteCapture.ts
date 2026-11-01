@@ -18,13 +18,13 @@
  * Validates: Requirements 8.2, 8.5
  * Properties: 21
  */
-import { copyText } from '@/utils/clipboard'
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import type { ChatMessage } from '@/composables/usePlatformAiChat'
 import type { AiHostRef } from '@/composables/useAiHostContext'
 import { readAiChatErrorResponse } from '@/composables/aiChatWireError'
+import { newUuid } from '@/utils/uuid'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,18 +79,7 @@ export interface UseAiNoteCaptureOptions {
 // ---------------------------------------------------------------------------
 
 function newIdempotencyKey(): string {
-  const c = globalThis.crypto as Crypto | undefined
-  if (c && typeof c.randomUUID === 'function') return c.randomUUID()
-  const bytes = new Uint8Array(16)
-  if (c && typeof c.getRandomValues === 'function') {
-    c.getRandomValues(bytes)
-  } else {
-    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256)
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40
-  bytes[8] = (bytes[8] & 0x3f) | 0x80
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  return newUuid()
 }
 
 const SERVER_MESSAGE_ID_RE =
@@ -249,7 +238,7 @@ export function useAiNoteCapture(options: UseAiNoteCaptureOptions) {
     const text = msgs.map((m) => m.text).join('\n\n---\n\n')
 
     try {
-      await copyText(text)
+      await navigator.clipboard.writeText(text)
       ElMessage.success(`已复制 ${msgs.length} 条 AI 回复`)
       return true
     } catch {

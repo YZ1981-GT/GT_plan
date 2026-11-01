@@ -8,6 +8,7 @@
  * 账龄：3年段 / 5年段 / 自定义（表级覆盖 + 项目配置）
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { parseNum, calcSubtotal } from './useG2IntRecFormulaEngine'
 import {
@@ -597,6 +598,15 @@ export function useG2OverdueCheck(options: UseG2OverdueCheckOptions) {
     syncG2AgingPresetToAllSheets(allResponses.value, agingPreset.value, labels, 'G2-6')
     ElMessage.success('已同步账龄口径至 G2-2 / G2-3 / G2-7')
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     for (const { event, handler } of eventListeners) {

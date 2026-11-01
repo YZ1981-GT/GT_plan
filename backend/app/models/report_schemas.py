@@ -433,3 +433,22 @@ class ExportTaskStatusResponse(BaseModel):
 class ExportHistoryResponse(BaseModel):
     """导出历史响应"""
     tasks: list[ExportTaskStatusResponse] = []
+
+
+# ===================================================================
+# S5 来源信封（formula-provenance-envelope）
+# ===================================================================
+
+
+class ReportProvenanceResponse(BaseModel):
+    """报表本期最终值来源信封端点响应。"""
+
+    row_code: str
+    value_slot: Literal["current"] = "current"
+    value: Any = None
+    envelope: dict[str, Any] | None = None
+    run: dict[str, Any] | None = None
+    stale: bool = False
+    legacy: bool = False
+    computed_by_label: str | None = None
+    inputs_redacted: bool = False

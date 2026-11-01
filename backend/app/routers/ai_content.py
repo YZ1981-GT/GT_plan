@@ -46,6 +46,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["AI 内容溯源"])
 
 
+def _record_human_action(action: str) -> None:
+    from app.services.ai_chat.metrics import record_human_action_metric
+    from app.services.llm_metrics import llm_metrics
+
+    llm_metrics.record_human_action(action)
+    record_human_action_metric(action)
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -78,7 +86,11 @@ def _parse_target(target_cell: str | None) -> tuple[str | None, str | None, str 
 
 
 def _serialize(log) -> dict:
-    """将 AiContentLog ORM 对象序列化为 banner / badge 所需的字典。"""
+    """将 legacy 日志或 V238 DraftArtifact 序列化为统一待确认 DTO。"""
+    if getattr(log, "target_locator", None):
+        from app.services.draft_artifact_facade import serialize_artifact
+
+        return serialize_artifact(log)
     instance_type, _target_id, position = _parse_target(log.target_cell)
     return {
         "id": str(log.id),
@@ -314,6 +326,59 @@ async def _confirm_or_revise(
     """
     log = await _load_log_or_404(db, log_id)
 
+    if getattr(log, "target_locator", None):
+        from app.services.draft_artifact_facade import (
+            DraftArtifactConflict,
+            DraftArtifactStale,
+            apply_note_artifact,
+        )
+
+        try:
+            applied = await apply_note_artifact(
+                db, log_id=log_id, user=user, revised_content=revised_content
+            )
+            await db.commit()
+            _record_human_action(
+                "revised" if revised_content is not None else "confirmed"
+            )
+        except DraftArtifactStale as exc:
+            # stale 是一项需要用户看见的治理状态，提交该标记后返回冲突。
+            await db.commit()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except DraftArtifactConflict as exc:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ai_content_log_service.AiContentLogAlreadyProcessedError as exc:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except HTTPException as exc:
+            await db.rollback()
+            if exc.status_code in {403, 423}:
+                reason = "项目已被合并锁定，内容保持待确认" if exc.status_code == 423 \
+                    else "当前用户无编辑权限，内容保持待确认"
+                return {
+                    "id": str(log_id),
+                    "confirm_action": "pending",
+                    "writeback": {"written": False, "skipped": True, "reason": reason},
+                }
+            raise
+        await _note_saved_event(
+            UUID(applied["note_id"]), log.project_id,
+            applied.get("note_year"), applied.get("note_section"),
+        )
+        artifact = applied["artifact"]
+        return {
+            "id": str(log_id),
+            "confirm_action": artifact["confirm_action"],
+            "artifact": artifact,
+            "writeback": {
+                "written": True,
+                "note_section": applied.get("note_section"),
+                "after_version": artifact.get("applied_version"),
+                "after_hash": artifact.get("applied_hash"),
+            },
+        }
+
     # P0 修复：项目鉴权（review 级）
     await assert_project_permission(db, user, log.project_id, "review")
 
@@ -337,6 +402,7 @@ async def _confirm_or_revise(
     if note_id is None:
         # 底稿类：不自动写入。
         await db.commit()
+        _record_human_action("revised" if revised_content is not None else "confirmed")
         result["writeback"] = {
             "written": False,
             "reason": "底稿内容不自动写入，请在底稿页面复制到目标位置",
@@ -357,6 +423,8 @@ async def _confirm_or_revise(
         }
 
     await db.commit()
+    from app.services.llm_metrics import llm_metrics
+    llm_metrics.record_human_action("revised" if revised_content is not None else "confirmed")
 
     # commit 成功后发 NOTE_SECTION_SAVED。失败不回滚已提交内容。
     if writeback.get("written"):
@@ -451,12 +519,62 @@ async def reject_ai_content(
     log = await _load_log_or_404(db, log_id)
     await assert_project_permission(db, user, log.project_id, "review")
     try:
-        log = await ai_content_log_service.reject(
-            db=db, log_id=log_id, user_id=user.id
-        )
+        if getattr(log, "target_locator", None):
+            from app.services.draft_artifact_facade import reject_artifact, serialize_artifact
+
+            log = await reject_artifact(db, log_id=log_id, user=user)
+            artifact = serialize_artifact(log)
+        else:
+            log = await ai_content_log_service.reject(
+                db=db, log_id=log_id, user_id=user.id
+            )
+            artifact = None
         await db.commit()
-        return {"id": str(log.id), "confirm_action": log.confirm_action}
+        _record_human_action("rejected")
+        result = {"id": str(log.id), "confirm_action": log.confirm_action}
+        if artifact is not None:
+            result["artifact"] = artifact
+        return result
     except ai_content_log_service.AiContentLogNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/api/ai-content/{log_id}/undo")
+async def undo_ai_content(
+    log_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """撤销本次 AI 写回；目标版本已变化时拒绝覆盖后续人工修改。"""
+    from app.services.draft_artifact_facade import (
+        DraftArtifactConflict,
+        undo_note_artifact,
+    )
+
+    try:
+        restored = await undo_note_artifact(db, log_id=log_id, user=user)
+        await db.commit()
+        _record_human_action("undone")
+    except ai_content_log_service.AiContentLogNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DraftArtifactConflict as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await _note_saved_event(
+        UUID(restored["note_id"]),
+        UUID(restored["project_id"]),
+        restored.get("note_year"),
+        restored.get("note_section"),
+    )
+    return {
+        "id": str(log_id),
+        "artifact": restored["artifact"],
+        "writeback": {
+            "written": True,
+            "undone": True,
+            "note_section": restored.get("note_section"),
+        },
+    }

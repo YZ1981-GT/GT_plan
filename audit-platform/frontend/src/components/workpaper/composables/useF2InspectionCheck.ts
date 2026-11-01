@@ -5,6 +5,7 @@
  * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type MaybeRefOrGetter, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
 import {
   emptyPurchaseInboundRow,
@@ -209,6 +210,15 @@ function useInspectionSheet<T extends PurchaseInboundRow | MaterialUsageRow>(
     ].filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function persist(): void {
     opts.allResponses.value.set(dataKey, {

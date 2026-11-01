@@ -174,12 +174,11 @@ async def metrics_endpoint():
     """Prometheus /metrics 端点（F16 / Sprint 4.10）。
 
     prometheus_client 未安装时返回占位文本；安装后返回完整指标。
-    暴露 ledger_import_{duration_seconds,jobs_total} + ledger_dataset_count
-    + event_outbox_dlq_depth + ledger_import_health_status 共 5 项。
+    暴露账表导入、AI Chat、LibreOffice、DB pool 与事件循环容量指标。
     """
-    from app.services.ledger_import.metrics import render_metrics
+    from app.services.platform_metrics import render_platform_metrics
 
-    body, content_type = render_metrics()
+    body, content_type = render_platform_metrics()
     return Response(content=body, media_type=content_type)
 
 

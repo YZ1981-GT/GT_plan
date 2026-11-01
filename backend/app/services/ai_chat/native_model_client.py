@@ -45,6 +45,9 @@ class AIServiceModelClient:
         self._db = db
         self._temperature = temperature
         self.served_model: str | None = None
+        # 完整 RouteOutcome 用于持久化 deployment/fallback/attempts；只留模型名会让
+        # 服务器兜底在审计记录里不可见。
+        self.served_route = None
 
     async def resolve_model(self) -> str:
         """路由中排在最前的已启用对话模型（本机优先；无启用记录则回落服务端默认值）。"""
@@ -59,17 +62,23 @@ class AIServiceModelClient:
         self, messages: list[dict[str, str]], *, model: str
     ) -> AsyncIterator[str]:
         from app.services.ai_service import AIService
+        from app.services.ai_task_registry import get_ai_task_spec
         from app.services.llm_route import last_route_outcome
 
         self.served_model = None
+        self.served_route = None
+        spec = get_ai_task_spec("chat.general")
         generator = await AIService(self._db).chat_completion(
             messages=messages,
             model=model,
             stream=True,
             temperature=self._temperature,
+            allowed_trust_zones=frozenset(zone.value for zone in spec.allowed_trust_zones),
+            client_data=True,
         )
         async for chunk in generator:  # type: ignore[union-attr]
             yield chunk
         outcome = last_route_outcome()
         if outcome is not None:
+            self.served_route = outcome
             self.served_model = outcome.model_name

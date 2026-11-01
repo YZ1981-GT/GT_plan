@@ -22,7 +22,7 @@ export interface UseReportExportReturn {
   onExportExcel: () => void
   onExportAllExcel: () => void
   onExportAllUnadjusted: () => void
-  copyReportTable: () => void
+  copyReportTable: () => Promise<void>
   showReportImport: Ref<boolean>
   onReportImported: () => void
 }

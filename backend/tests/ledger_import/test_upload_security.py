@@ -280,3 +280,38 @@ async def test_file_pointer_resets_after_validation(audit_log_calls):
     content = await file.read()
     assert content.startswith(b"PK\x03\x04")
     assert len(content) == len(xlsx_bytes)
+
+
+class _NoUnboundedUpload(UploadFile):
+    def __init__(self, payload: bytes):
+        from starlette.datastructures import Headers
+
+        super().__init__(
+            filename="clean.xlsx",
+            file=io.BytesIO(payload),
+            size=None,
+            headers=Headers({"content-type": MIME_XLSX}),
+        )
+        self.read_sizes: list[int] = []
+
+    async def read(self, size: int = -1) -> bytes:
+        assert size >= 0, "ZIP 安全扫描不得调用 UploadFile.read() 复制完整正文"
+        self.read_sizes.append(size)
+        return await super().read(size)
+
+
+@pytest.mark.asyncio
+async def test_xlsx_security_scan_uses_seekable_spool_without_unbounded_read(
+    audit_log_calls,
+):
+    xlsx_bytes = _build_valid_xlsx_bytes()
+    file = _NoUnboundedUpload(xlsx_bytes)
+
+    await validate_upload_safety(
+        file,
+        user_id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+    )
+
+    assert file.read_sizes == [8192]
+    assert file.file.tell() == 0

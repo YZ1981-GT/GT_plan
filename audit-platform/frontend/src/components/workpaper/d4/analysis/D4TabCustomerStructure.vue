@@ -16,6 +16,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 本期销售总额从D4-7!D26取（跨sheet引用）
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
@@ -55,7 +56,7 @@ const {
   isReadonly: toRef(props, 'isReadonly'),
   views: ['结构化视图'],
   flushHtml: async () => {
-    flushSave()
+    flushPendingSave()
     const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_9_SHEET_KEY }
   },
@@ -269,7 +270,14 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function persist(itemId: string, value: string) { props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: value }); debounceSave() }
 function debounceSave() { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000) }
 function flushSave() { const keys = ['D4-9-audit-process', 'D4-9-data', 'D4-9-note', 'D4-9-conclusion']; const items = keys.map(k => props.allResponses.get(k)).filter(Boolean); window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } })) }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>

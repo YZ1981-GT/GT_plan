@@ -84,8 +84,20 @@ def is_effectively_stale(row: Any, effective_formula: str | None) -> bool:
     return normalize_formula(_get(row, "formula_used")) != normalize_formula(effective_formula)
 
 
-def row_status(row: Any, effective_formula: str | None) -> dict[str, Any]:
-    """逐行读者展示用：``is_stale``（:func:`is_effectively_stale`）+ ``calc_error`` + ``blank_reason``（两者都给）。"""
+def row_status(row: Any, effective_formula: str | None, definition_hash: str | None = None) -> dict[str, Any]:
+    """逐行读者展示用：``is_stale``（:func:`is_effectively_stale`）+ ``calc_error`` + ``blank_reason``（两者都给）。
+
+    ``definition_hash`` 不为 None 时优先比较信封中的 ``definition_hash``（S5 ADR-FPE-06）。
+    """
+    stale = is_effectively_stale(row, effective_formula)
+    if not stale and definition_hash is not None:
+        provenance = _get(row, "provenance")
+        if isinstance(provenance, Mapping):
+            applied = provenance.get("applied_attempt")
+            if isinstance(applied, Mapping):
+                old_hash = applied.get("definition_hash")
+                if old_hash and old_hash != definition_hash:
+                    stale = True
     return {
         "is_stale": is_effectively_stale(row, effective_formula),
         "calc_error": _get(row, "calc_error") or None,
@@ -123,6 +135,33 @@ async def load_effective_formulas(
     configs = await load_effective_report_configs(
         db, standard=standard, project_id=project_id, report_type=report_type)
     return {formula_key(c.report_type, c.row_code): c.formula for c in configs}
+
+
+async def load_effective_formula_state(
+    db: AsyncSession, project_id: UUID, *, report_type: Any = None,
+) -> tuple[dict[FormulaKey, str | None], dict[FormulaKey, str | None]]:
+    """同时返回 (formulas, definition_hashes)；S5 来源信封优先使用 definition_hash 判 stale。"""
+    from app.services.formula_settings.effective_report import load_effective_report_configs
+    from app.services.report_config_service import ReportConfigService
+
+    standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
+    configs = await load_effective_report_configs(
+        db, standard=standard, project_id=project_id, report_type=report_type)
+    formulas: dict[FormulaKey, str | None] = {}
+    hashes: dict[FormulaKey, str | None] = {}
+    for c in configs:
+        fk = formula_key(c.report_type, c.row_code)
+        formulas[fk] = c.formula
+        # exec_hash 由 formula_settings.definitions 提供
+        hashes[fk] = getattr(c, "definition_hash", None)
+    return formulas, hashes
+
+
+def definition_hash_for(
+    hashes: Mapping[FormulaKey, str | None], row: Any,
+) -> str | None:
+    """在 :func:`load_effective_formula_state` 的 hashes 里取 ``row`` 的定义 hash。"""
+    return hashes.get(formula_key(_get(row, "report_type"), _get(row, "row_code")))
 
 
 @dataclass(frozen=True)

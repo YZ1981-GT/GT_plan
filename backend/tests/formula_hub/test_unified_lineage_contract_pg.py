@@ -112,12 +112,12 @@ async def test_tb_row_and_adjustment_have_no_trace_sources_but_keep_exact_attach
         UnifiedLineageResponse.model_validate(result)
 
 
-async def test_missing_note_mapping_is_partial_and_does_not_poison_attachment_source(pg_tx):
-    """缺失 note_wp_mapping 只让 report_trace 失败；保存点回滚后附件子源仍可查询。"""
-    missing = (await pg_tx.execute(text("SELECT to_regclass('note_wp_mapping')"))).scalar_one()
-    assert missing is None, "快照库意外存在 note_wp_mapping，无法验证指定失败场景"
-
-    project_id = await make_project(pg_tx, "lineage_partial")
+async def test_missing_note_mapping_is_normal_not_found_and_does_not_poison_attachment_source(pg_tx):
+    """注册表无章节是可解释的空结果，不再因不存在的旧表使 UnifiedLineage partial。"""
+    project_id = await make_project(pg_tx, "lineage_not_found")
+    project = await pg_tx.get(Project, project_id)
+    assert project is not None
+    project.template_type = "soe"
     attachment_id = await make_attachment(pg_tx, project_id)
     section = "FH-T27-附注"
     link_id = await insert_lineage(
@@ -127,18 +127,15 @@ async def test_missing_note_mapping_is_partial_and_does_not_poison_attachment_so
         target_ref=section,
         project_id=project_id,
     )
+    await pg_tx.flush()
 
     result = await UnifiedLineageService(pg_tx).query_lineage(
         project_id, "note_cell", section, direction="upstream", year=2025,
     )
 
-    assert result["partial"] is True
-    assert len(result["errors"]) == 1, result["errors"]
-    error = result["errors"][0]
-    assert error["source"] == "report_trace"
-    assert error["error_code"] == "LINEAGE_SOURCE_FAILED"
-    assert error["status"] == 500
-    assert "附注报表溯源查询失败" in error["message"]
+    assert result["partial"] is False
+    assert result["errors"] == []
+    assert result["upstream"] == []
     assert {item["id"] for item in result["attachments"]} == {str(link_id)}
-    assert (await pg_tx.execute(text("SELECT 1"))).scalar_one() == 1, "失败子源污染了后续事务"
+    assert (await pg_tx.execute(text("SELECT 1"))).scalar_one() == 1
     UnifiedLineageResponse.model_validate(result)

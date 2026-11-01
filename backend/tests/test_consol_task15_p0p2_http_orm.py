@@ -249,6 +249,7 @@ async def test_refresh_worker_uses_independent_session_and_commits_report_step(t
     with patch("app.services.consol_refresh_job_service.async_session_factory", task15_factory), \
          patch("app.services.consol_refresh_job_service.event_bus.broadcast_raw") as broadcast, \
          patch("app.services.consol_cascade_refresh_service.build_tree", new=fake_tree), \
+         patch("app.services.consol_cascade_refresh_service.load_calc_basis", new=AsyncMock(return_value=object())), \
          patch("app.services.consol_cascade_refresh_service.recalc_full", new=AsyncMock()), \
          patch("app.services.consol_cascade_refresh_service.recalculate_trial", new=AsyncMock()), \
          patch("app.services.consol_cascade_refresh_service.reconcile_worksheet_vs_trial", new=fake_reconcile), \

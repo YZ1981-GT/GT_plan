@@ -17,6 +17,7 @@ import { resolveWorkpaperByCode } from '@/services/resolveWorkpaperByCode'
 import { buildLedgerQuery, type LedgerUrlState } from '@/composables/useLedgerUrlSync'
 import { workpaperEditorRoute } from '@/composables/useWorkpaperNavigation'
 import { isKnownYear } from '@/components/custom-query/queryPayloads'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 import { RESOLVE_FAIL_MSG, reportTypeOfSource } from './querySourceUri'
 
 /** 结果所属的查询：业务视图按数据源键，构建器按白名单表名 */
@@ -139,8 +140,12 @@ export function buildRowDrill(ctx: DrillContext, row: Row | null | undefined): R
     case 'adjustment': {
       const group = str(row.entry_group_id)
       if (!group) return null
-      // ?focus= 在调整大厅定位并高亮该分录（?group= 是打开协作对话框，用于协作通知）
-      return { label: ADJUSTMENT_LABEL, location: { name: 'Adjustments', params: { projectId }, query: withYear(year, { focus: group }) } }
+      // focus 在调整大厅定位并高亮分录组；group 仅用于打开协作对话框。
+      return { label: ADJUSTMENT_LABEL, location: buildAdjustmentRouteTarget(
+        projectId,
+        { kind: 'focus', entryGroupId: group },
+        { year },
+      ) }
     }
     case 'wp_list': {
       // 底稿清单的隐藏列 id 即底稿实例 id：直接打开；没有时按编码解析

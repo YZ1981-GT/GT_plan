@@ -1152,43 +1152,68 @@
   />
 
   <!-- 一键批量 AI 预填充结果面板 -->
-  <el-dialog v-model="batchResultVisible" title="一键 AI 预填充结果" width="640px" append-to-body>
+  <el-dialog v-model="batchResultVisible" title="一键 AI 预填充结果" width="720px" append-to-body>
     <div class="gt-de-batch-summary">
       共 {{ batchResults.length }} 章：
-      <el-tag type="success" size="small">生成 {{ batchGenerated }}</el-tag>
-      <el-tag type="warning" size="small">降级 {{ batchDegraded }}</el-tag>
-      <el-tag type="info" size="small">跳过 {{ batchSkipped }}</el-tag>
-      <span class="gt-de-batch-hint">逐章确认采纳，不会自动写入正文</span>
+      <el-tag type="success" size="small">完成 {{ batchGenerated }}</el-tag>
+      <el-tag type="danger" size="small">失败 {{ batchDegraded }}</el-tag>
+      <el-tag type="info" size="small">取消 {{ batchSkipped }}</el-tag>
+      <span class="gt-de-batch-hint">
+        进度 {{ batchJob?.progress_done || 0 }}/{{ batchJob?.progress_total || 0 }}；逐章送入待确认，不会重新生成
+      </span>
     </div>
     <el-table :data="batchResults" size="small" max-height="420" border style="font-size: 13px">
       <el-table-column label="章节" min-width="160">
-        <template #default="{ row }">{{ batchTitle(row.note_section) }}</template>
+        <template #default="{ row }">{{ batchTitle(row.target_key) }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="90" align="center">
+      <el-table-column label="状态" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'generated' ? 'success' : (row.status === 'degraded' ? 'warning' : 'info')" size="small">
-            {{ row.status === 'generated' ? '已生成' : (row.status === 'degraded' ? '降级' : '跳过') }}
+          <el-tag
+            :type="row.status === 'succeeded' ? 'success' : (row.status === 'failed' ? 'danger' : (row.status === 'cancelled' ? 'info' : 'warning'))"
+            size="small"
+          >
+            {{ row.status === 'succeeded' ? '已生成' : (row.status === 'failed' ? '失败' : (row.status === 'cancelled' ? '已取消' : (row.status === 'retry_wait' ? '等待重试' : '生成中'))) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="草稿预览" min-width="220">
+      <el-table-column label="草稿预览" min-width="250">
         <template #default="{ row }">
-          <span class="gt-de-batch-preview">{{ (row.text || '').slice(0, 60) || '（无草稿）' }}</span>
+          <span class="gt-de-batch-preview">{{ row.result?.text_preview || row.error_message || '（等待生成）' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" align="center">
+      <el-table-column label="操作" width="120" align="center">
         <template #default="{ row }">
+          <el-tag
+            v-if="row.message_id && batchAdoptedMessages.has(row.message_id)"
+            type="success"
+            size="small"
+          >已送待确认</el-tag>
           <el-button
-            v-if="row.status !== 'skipped'"
+            v-else-if="row.status === 'succeeded' && row.message_id"
             size="small"
             link
             type="primary"
-            @click="goAdoptSection(row.note_section)"
-          >去采纳</el-button>
+            @click="goAdoptSection(row)"
+          >送入待确认</el-button>
+          <el-button
+            v-else-if="row.status === 'failed'"
+            size="small"
+            link
+            type="warning"
+            @click="retryBatchItem(row)"
+          >重试</el-button>
+          <span v-else class="gt-de-batch-hint">—</span>
         </template>
       </el-table-column>
     </el-table>
     <template #footer>
+      <el-button
+        v-if="batchJob && !isAiTaskTerminal(batchJob.status)"
+        size="small"
+        type="danger"
+        plain
+        @click="cancelBatchAiFill"
+      >取消任务</el-button>
       <el-button size="small" @click="batchResultVisible = false">关闭</el-button>
     </template>
   </el-dialog>
@@ -1211,6 +1236,7 @@
 
 <script setup lang="ts">
 import { copyRichText, copyText } from '@/utils/clipboard'
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, reactive, defineAsyncComponent, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
@@ -1270,6 +1296,15 @@ import {
   type DisclosureNoteDetail, type NoteValidationFinding,
 } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import {
+  cancelAiTaskJob,
+  createOrResumeAiTaskJob,
+  isAiTaskTerminal,
+  retryAiTaskItem,
+  waitForAiTaskJob,
+  type AiTaskItem,
+  type AiTaskJobSnapshot,
+} from '@/services/aiTaskJobs'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
 import { knowledgePickerVisible } from '@/composables/useKnowledge'
@@ -1397,8 +1432,7 @@ async function onAiContentResolved() {
     } catch {
       return  // 用户选择保留本地改动，不刷新
     }
-    editDirty.value = false
-    autoSave.isDirty.value = false
+    discardCurrentNoteEdits()
   }
   await fetchDetailFresh(section)
 }
@@ -1453,10 +1487,8 @@ function getSectionLock(sectionId: string | undefined) {
   return sectionLocks.value[sectionId] || null
 }
 
-// 编辑锁联动 watch 推迟到 useEditMode 定义之后挂载（避免 TDZ）
-
-// R7-S2-05：后端定时自动保存（2 分钟间隔）；下方 useNotePersist 创建后才绑定保存代际（之前的编辑无代际可推进）
-let markNoteSaveEdited: (() => void) | undefined
+// 编辑锁 watch 推迟到 useEditMode 后；自动保存通过晚绑定接入下方 useNotePersist 的编辑代际。
+let markNoteSaveEdited: (() => void) | undefined, discardNoteSaveEdits: (() => void) | undefined
 const autoSave = useWorkpaperAutoSave(async () => {
   if (!noteEdit.canWriteLocked.value) return false
   return saveCurrentNote({ auto: true })  // 定时保存不打断编辑
@@ -1464,6 +1496,7 @@ const autoSave = useWorkpaperAutoSave(async () => {
   shouldRetry: noteEditShouldRetry,
   onEdited: () => markNoteSaveEdited?.(),
 })
+function discardCurrentNoteEdits() { discardNoteSaveEdits?.(); clearEditDirty(); autoSave.clearDirty() }
 
 // 单位切换 — 使用 projectStore
 const selectedProjectId = ref('')
@@ -1478,7 +1511,7 @@ const yearOptions = computed(() => projectStore.yearOptions)
 // 取数年度路由优先 ⇒ 写路由 ?year（整页按新年度重挂，「没有附注就自动生成」由重挂后的 onMounted 执行）；只带年度：section 等一次性参数已用 replaceState 清掉、route.query 里还在
 async function onYearChange(y: number) {
   if (!(await guardUnsaved())) { selectedYear.value = year.value; return }  // 留下未保存改动：不切
-  clearEditDirty(); autoSave.clearDirty()  // 已确认放弃：push 时更新守卫不再问第二次
+  discardCurrentNoteEdits()  // 已确认放弃：push 时更新守卫不再问第二次
   projectStore.changeYear(y)  // 先改 store：year:changed 落在旧实例上，重挂后的新实例不会亮「数据已更新」
   router.push({ path: route.path, query: { year: String(y) } })
 }
@@ -1742,6 +1775,7 @@ function enterNoteEdit() {
 async function exitNoteEdit(force = false): Promise<boolean> {
   const result = await exitEdit(force)
   if (result && !editMode.value && hasTableDataSnapshot.value) {
+    discardCurrentNoteEdits()
     if (currentNote.value) {
       currentNote.value.table_data = cloneNoteTableValue(tableDataSnapshot.value)
     }
@@ -1864,37 +1898,113 @@ async function onNoteAiFillAdopted() {
   }
 }
 
-// 一键批量 AI 预填充
+// 一键批量 AI 预填充（DB-backed job；页面刷新/响应丢失可恢复）
 const batchAiFillLoading = ref(false)
 const batchResultVisible = ref(false)
-const batchResults = ref<Array<{ note_section: string; status: string; text: string | null; citations: any[] }>>([])
-const batchGenerated = computed(() => batchResults.value.filter(r => r.status === 'generated').length)
-const batchDegraded = computed(() => batchResults.value.filter(r => r.status === 'degraded').length)
-const batchSkipped = computed(() => batchResults.value.filter(r => r.status === 'skipped').length)
-function batchTitle(section: string): string {
+const batchJob = ref<AiTaskJobSnapshot | null>(null)
+const batchResults = computed<AiTaskItem[]>(() => batchJob.value?.items ?? [])
+const batchGenerated = computed(() => batchResults.value.filter(r => r.status === 'succeeded').length)
+const batchDegraded = computed(() => batchResults.value.filter(r => r.status === 'failed').length)
+const batchSkipped = computed(() => batchResults.value.filter(r => r.status === 'cancelled').length)
+const batchAdoptedMessages = reactive(new Set<string>())
+let batchWaitController: AbortController | null = null
+function batchTitle(section: string | null): string {
+  if (!section) return '未命名章节'
   const n = noteList.value.find((x: any) => x.note_section === section)
   return (n as any)?.title || (n as any)?.section_title || (n as any)?.label || section
 }
+function updateBatchJob(snapshot: AiTaskJobSnapshot) {
+  batchJob.value = snapshot
+}
+async function waitBatchJob(snapshot: AiTaskJobSnapshot) {
+  if (isAiTaskTerminal(snapshot.status)) return snapshot
+  batchWaitController?.abort()
+  batchWaitController = new AbortController()
+  return waitForAiTaskJob(
+    projectId.value,
+    snapshot,
+    updateBatchJob,
+    batchWaitController.signal,
+  )
+}
 async function openBatchAiFill() {
   batchAiFillLoading.value = true
+  batchAdoptedMessages.clear()
   try {
-    const res = await http.post(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/batch-ai-fill`,
-      {},
+    const snapshot = await createOrResumeAiTaskJob(
+      projectId.value,
+      `${year.value}:note-batch-prefill`,
+      { task_kind: 'note_batch_prefill', year: year.value },
     )
-    const data = res.data || {}
-    batchResults.value = Array.isArray(data.results) ? data.results : []
+    updateBatchJob(snapshot)
     batchResultVisible.value = true
+    const final = await waitBatchJob(snapshot)
+    updateBatchJob(final)
+    if (final.status === 'succeeded') {
+      ElMessage.success('批量预填充完成，请逐章核对后送入待确认')
+    } else if (final.status === 'partial_failed' || final.status === 'failed') {
+      ElMessage.warning('批量预填充已结束，部分章节需要重试或人工处理')
+    }
   } catch {
-    ElMessage.error('批量预填充失败，请稍后重试')
+    ElMessage.error('批量预填充启动或恢复失败，请稍后重试')
   } finally {
     batchAiFillLoading.value = false
   }
 }
-async function goAdoptSection(section: string) {
-  batchResultVisible.value = false
-  await fetchDetail(section)
-  openNoteAiFill('ai')
+async function cancelBatchAiFill() {
+  const job = batchJob.value
+  if (!job || isAiTaskTerminal(job.status)) return
+  try {
+    updateBatchJob(await cancelAiTaskJob(projectId.value, job.job_id))
+    batchWaitController?.abort()
+    ElMessage.success('已取消未完成的批量预填充')
+  } catch {
+    ElMessage.error('取消失败，请稍后重试')
+  }
+}
+async function retryBatchItem(row: AiTaskItem) {
+  const job = batchJob.value
+  if (!job || row.status !== 'failed') return
+  try {
+    const snapshot = await retryAiTaskItem(projectId.value, job.job_id, row.item_id)
+    updateBatchJob(snapshot)
+    await waitBatchJob(snapshot)
+  } catch {
+    ElMessage.error('重试失败，请稍后再试')
+  }
+}
+async function goAdoptSection(row: AiTaskItem) {
+  const messageId = row.message_id
+  if (!messageId) {
+    ElMessage.warning('该章节尚无可采纳的服务端草稿')
+    return
+  }
+  const request = buildNoteHost({
+    noteId: row.target_id,
+    projectId: projectId.value,
+    year: year.value,
+  })
+  if (!request.available || !request.host) {
+    ElMessage.warning(request.unavailableReason || '无法解析附注目标')
+    return
+  }
+  try {
+    await api.post('/api/ai-chat/adopt', {
+      message_id: messageId,
+      host: {
+        type: request.host.type,
+        id: request.host.id,
+        project_id: request.host.projectId,
+        year: request.host.year,
+      },
+      idempotency_key: newUuid(),
+    })
+    batchAdoptedMessages.add(messageId)
+    eventBus.emit('ai-content:adopted', { projectId: projectId.value })
+    ElMessage.success('已将所见草稿送入待确认，不会重新生成')
+  } catch {
+    ElMessage.error('送入待确认失败，请稍后重试')
+  }
 }
 // 单位切换（侧边栏）
 
@@ -2504,8 +2614,8 @@ async function onNodeClick(node: TreeNode) {
   // 分组节点不加载详情
   if (node.isGroup || !node.data?.note_section) return
   await withLoading(detailLoading, async () => {
+    discardCurrentNoteEdits()
     editMode.value = false
-    editDirty.value = false
     try {
       await fetchDetail(node.data.note_section)
     } catch { currentNote.value = null }
@@ -2751,7 +2861,8 @@ const onValidate = withLoading(validateLoading, async () => {
 })
 
 // ── 保存功能（useNotePersist composable）──
-const { saveLoading, justSaved, markEdited: markPersistEdited, onSave: _rawSave } = useNotePersist({
+const { saveLoading, justSaved, markEdited: markPersistEdited,
+  discardEdits: discardPersistEdits, onSave: _rawSave } = useNotePersist({
   currentNote,
   textContent,
   editMode,
@@ -2767,7 +2878,7 @@ const { saveLoading, justSaved, markEdited: markPersistEdited, onSave: _rawSave 
     }
   },
 })
-markNoteSaveEdited = markPersistEdited
+markNoteSaveEdited = markPersistEdited; discardNoteSaveEdits = () => discardPersistEdits()
 
 // ── Task #11：保存状态指示器与一次保存的收尾（失败 / 保存中切章见 useNoteSaveFlow）──
 /** `auto`：定时自动保存只存不打断 —— 不跳章、不退出编辑、不弹「保存成功」（2026-10-26 浏览器实测：
@@ -2986,6 +3097,7 @@ onContextChange(async () => {
 })
 
 onUnmounted(() => {
+  batchWaitController?.abort()
   requestGuard.uninstall()
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)

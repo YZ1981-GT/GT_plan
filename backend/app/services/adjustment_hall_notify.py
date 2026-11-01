@@ -261,12 +261,17 @@ async def notify_status_change(
                 reasons = "；".join(f"{it.get('adjustment_no')}：{it.get('reason')}" for it in its if it.get("reason"))
                 content += f"驳回原因 —— {reasons}。请修改后重新提交。" if reasons else "请修改后重新提交。"
             elif status == "draft":
-                content += "分录已回到草稿，试算表审定数随之回退。"
+                if any(it.get("tb_update_status") == "committed" for it in its):
+                    content += "分录已回到草稿，试算表调整列与审定数已在同一事务回退。"
+                else:
+                    content += "分录已回到草稿；底稿来源发布数不由集中复核自动改写。"
                 reasons = "；".join(f"{it.get('adjustment_no')}：{it.get('reason')}" for it in its if it.get("reason"))
                 if reasons:
                     content += f"撤回原因 —— {reasons}。"
-            elif any((it.get("origin") or "manual") != "workpaper" for it in its):
-                content += "已计入试算表审定数。"
+            elif any(it.get("tb_update_status") == "committed" for it in its):
+                content += "已在同一复核事务计入试算表审定数，相关报表与附注正在通过耐久事件刷新。"
+            elif any(it.get("tb_update_status") == "awaiting_workpaper_publish" for it in its):
+                content += "集中复核已批准；来源底稿完成显式发布后才计入试算表。"
             sent = await write_notifications(
                 db, [uid], kind, f"你的 {len(its)} 笔调整分录已{verb}", content,
                 build_metadata(project_id, year, its, status=status),
@@ -282,7 +287,7 @@ async def notify_status_change(
                 codes = _listed(wp_codes, "张")
                 sent = await write_notifications(
                     db, [owner], nt.ADJ_APPROVED_IMPACT, f"调整分录已{verb}，涉及你负责的底稿 {codes}",
-                    f"{actor_name} {verb}了 {_listed(nos)}，试算表审定数已重算，涉及底稿 {codes}，请刷新审定表并复核结论。",
+                    f"{actor_name} {verb}了 {_listed(nos)}，试算表调整列与审定数已在同一事务更新，涉及底稿 {codes}；请刷新审定表并复核结论。",
                     build_metadata(project_id, year, its, status=status, affected_wp_codes=wp_codes),
                 )
                 notified += [(u, "owner") for u in sent]

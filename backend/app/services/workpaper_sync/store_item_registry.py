@@ -159,19 +159,19 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
                 base_kind="dict", provider_module="phase5_d4_revenue_detail",
             ),
             DedicatedStoreItem(
-                item_id_const="STORE_ITEM_ID_D48_DICT", merge_fn="merge_d48_from_projection",
+                item_id_const="STORE_ITEM_ID_D48", merge_fn="merge_d48_from_projection",
                 base_kind="list", provider_module="phase5_d4_product_margin_sheet",
             ),
             DedicatedStoreItem(
-                item_id_const="STORE_ITEM_ID_D433_DICT", merge_fn="merge_d433_from_projection",
+                item_id_const="STORE_ITEM_ID_D433", merge_fn="merge_d433_from_projection",
                 base_kind="dict", provider_module="phase5_d4_other_margin_sheet",
             ),
             DedicatedStoreItem(
-                item_id_const="STORE_ITEM_ID_D434_DICT", merge_fn="merge_d434_from_projection",
+                item_id_const="STORE_ITEM_ID_D434", merge_fn="merge_d434_from_projection",
                 base_kind="dict", provider_module="phase5_d4_other_contract_sheet",
             ),
             DedicatedStoreItem(
-                item_id_const="STORE_ITEM_ID_D436_DICT", merge_fn="merge_d436_from_projection",
+                item_id_const="STORE_ITEM_ID_D436", merge_fn="merge_d436_from_projection",
                 base_kind="dict", provider_module="phase5_d4_other_cutoff_sheet",
             ),
         ),

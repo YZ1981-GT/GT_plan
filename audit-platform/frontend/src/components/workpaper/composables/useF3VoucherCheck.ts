@@ -10,6 +10,7 @@
  * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcSubtotal, parseNum } from './useF3FormulaEngine'
 import {
   F3_ROW_ID_PREFIX,
@@ -487,6 +488,15 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
     allResponses.value.set('F3-7-conclusion', { item_id: 'F3-7-conclusion', conclusion: null, remark: val })
     debounceSave()
   })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

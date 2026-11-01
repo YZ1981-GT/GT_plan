@@ -242,9 +242,10 @@ class K1Binding:
             if reason:
                 return [], [TargetSkip(rule.rule_id, workpaper_addr_id(WP_CODE, target.sheet_code, target.item_id), reason)]
             result = execute(rule.source.expression, sources.formula.context_for(rule.source.context_map))
-            if result.errors or result.blocked:
+            if not result.ok or result.value is None:
+                reason = "；".join(result.errors) or ("公式被拦截" if result.blocked else "公式未返回数值")
                 return [], [TargetSkip(rule.rule_id, workpaper_addr_id(WP_CODE, target.sheet_code, target.item_id),
-                                       "公式求值失败：" + "；".join(result.errors))]
+                                       "公式求值失败：" + reason)]
             value: Any = float(result.value)
         elif kind == "derivation":
             if rule.source.name in {"k1_detail_combo_unadj", "k1_detail_combo_baddebt"}:

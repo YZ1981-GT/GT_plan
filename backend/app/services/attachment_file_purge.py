@@ -14,32 +14,41 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 
-async def unlink_unreferenced_files(db: AsyncSession, raw_paths: Iterable[str | None]) -> dict[str, int]:
-    from app.core.config import settings
+async def unlink_unreferenced_files(
+    db: AsyncSession,
+    refs: Iterable["StoredAttachmentRef"],
+) -> dict[str, int]:
+    """删除已提交业务行留下的本地字节；每个引用必须携带原项目作用域。"""
     from app.services.archive_inventory import normalized_path, referenced_local_paths
-    from app.services.attachment_upload_policy import resolve_local_attachment_file
+    from app.services.attachment_storage_resolver import (
+        StoredAttachmentRef,
+        plan_project_attachment,
+    )
 
-    root = Path(settings.ATTACHMENT_LOCAL_STORAGE_ROOT).resolve()
     stats = {"deleted": 0, "kept_referenced": 0, "skipped_outside_root": 0, "failed": 0}
-    for raw in dict.fromkeys(p for p in raw_paths if p):
-        path = resolve_local_attachment_file(raw)
-        if path is None:
+    unique = {
+        (str(ref.project_id), ref.storage_type or "", ref.storage_key or ""): ref
+        for ref in refs
+        if isinstance(ref, StoredAttachmentRef) and ref.storage_key
+    }
+    for ref in unique.values():
+        plan = plan_project_attachment(ref.project_id, ref.storage_type, ref.storage_key)
+        if plan.kind == "remote":
             continue
-        resolved = path.resolve()
-        if not resolved.is_relative_to(root):
+        if plan.kind != "local" or plan.canonical_path is None:
             stats["skipped_outside_root"] += 1
             continue
+        resolved = plan.canonical_path
         try:
-            referenced = await referenced_local_paths(db, name_hint=path.name)
+            referenced = await referenced_local_paths(db, project_id=ref.project_id)
         except Exception:  # noqa: BLE001 — 查不出引用就不删（宁可留孤儿，不误删共用文件）
-            logger.warning("附件文件引用查询失败，保留文件 path=%s", resolved, exc_info=True)
+            logger.warning("附件文件引用查询失败，保留文件", exc_info=True)
             stats["failed"] += 1
             continue
         if normalized_path(resolved) in referenced:
@@ -49,7 +58,7 @@ async def unlink_unreferenced_files(db: AsyncSession, raw_paths: Iterable[str | 
             resolved.unlink()
             stats["deleted"] += 1
         except OSError:
-            logger.warning("附件文件删除失败 path=%s", resolved, exc_info=True)
+            logger.warning("附件文件删除失败", exc_info=True)
             stats["failed"] += 1
     return stats
 

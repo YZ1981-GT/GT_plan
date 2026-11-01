@@ -28,7 +28,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_models import Adjustment, Materiality
+from app.models.audit_platform_models import Materiality
 from app.services.field_override_service import FieldOverrideService
 
 _logger = logging.getLogger(__name__)
@@ -280,61 +280,20 @@ class ProcedureTableService:
         return "na"
 
     async def _count_adjustments(self, project_id: UUID, year: int, adj_type: str) -> int:
-        """按类型统计调整分录数"""
-        if adj_type == "passed":
-            # 未更正错报：review_status 枚举无 'passed' 值（draft/pending_review/
-            # approved/rejected）。"未更正"的语义标记是 V078 的 passed_reason 列
-            # （管理层不予更正原因）非空 → 该调整被 Passed（不予更正）。
-            stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.passed_reason.isnot(None),
-                Adjustment.is_deleted == sa.false(),
-            )
-        else:
-            stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.adjustment_type == adj_type,
-                Adjustment.is_deleted == sa.false(),
-            )
-        result = await self.db.execute(stmt)
-        return result.scalar() or 0
+        """委托共享 helper，按分录组统计业务笔数。"""
+        from app.services.wp_adjustment_helpers import count_adjustments
+
+        return await count_adjustments(self.db, project_id, year, adj_type)
 
     async def _count_adjustments_with_pending(
         self, project_id: UUID, year: int, adj_type: str
     ) -> tuple[int, int, float]:
-        """按类型统计调整分录数，同时返回待审批数 + 借方总金额（万元）"""
-        from app.models.audit_platform_models import AdjustmentEntry
-        total_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.is_deleted == sa.false(),
+        """委托共享 helper；笔数按组，借方金额仍按明细行求和。"""
+        from app.services.wp_adjustment_helpers import count_adjustments_with_pending
+
+        return await count_adjustments_with_pending(
+            self.db, project_id, year, adj_type,
         )
-        pending_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.review_status != "approved",
-            Adjustment.passed_reason.is_(None),
-            Adjustment.is_deleted == sa.false(),
-        )
-        # 借方合计金额（衡量调整影响规模）
-        amount_stmt = sa.select(
-            sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
-        ).join(
-            Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
-        ).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.is_deleted == sa.false(),
-        )
-        total_r = await self.db.execute(total_stmt)
-        pending_r = await self.db.execute(pending_stmt)
-        amount_r = await self.db.execute(amount_stmt)
-        return (total_r.scalar() or 0, pending_r.scalar() or 0, float(amount_r.scalar() or 0))
 
     async def _get_materiality(self, project_id: UUID) -> Decimal:
         stmt = sa.select(Materiality.overall_materiality).where(

@@ -5,6 +5,7 @@
  * 是否无法支付、是否诉讼、支付计划、审定金额、支持性证据、备注。
  */
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { computeF4DetailRow, migrateF4DetailRows } from './useF4Detail'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
@@ -543,6 +544,15 @@ export function useF4LongOutstanding(options: UseF4LongOutstandingOptions) {
     if (row.highlightLevel === 'warning') return 'long-outstanding-warning'
     return ''
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

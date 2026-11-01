@@ -326,6 +326,8 @@ export const consolidation = {
     summary: '/api/consolidation/eliminations/summary/year',
     // 合并抵消分录明细表（spec consol-elimination-single-source-push 需求 1~2）
     treeLines: '/api/consolidation/eliminations/tree-lines',
+    worksheetPreview: '/api/consolidation/eliminations/worksheet-preview',
+    worksheetGenerate: '/api/consolidation/eliminations/worksheet-generate',
     generateFromWorksheet: '/api/consolidation/eliminations/generate-from-worksheet',
     legacySheet: '/api/consolidation/eliminations/legacy-sheet',
     legacySheetConvert: '/api/consolidation/eliminations/legacy-sheet/convert',
@@ -359,6 +361,11 @@ export const consolidation = {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,
     generate: '/api/consolidation/reports/generate',
     balanceCheck: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/balance-check`,
+    artifacts: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/artifacts`,
+    artifactDownload: (pid: string, year: number, artifactId: string) =>
+      `/api/consolidation/reports/${pid}/${year}/artifacts/${artifactId}/download`,
+    workpaper: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/workpaper`,
+    workpaperDownload: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/workpaper/download`,
     // 报表级合并穿透明细：报表行次读时计算（与报表差额表同源），纯数字科目码读已落库明细
     consolBreakdown: (pid: string, year: number, accountCode: string) =>
       `/api/consolidation/report/${pid}/${year}/${accountCode}/consol-breakdown`,
@@ -396,6 +403,12 @@ export const consolidation = {
   refreshAll: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/refresh-all`,
   refreshStatus: (pid: string, year: number, jobId: string) =>
     `/api/consolidation/${pid}/${year}/refresh-status/${jobId}`,
+  // 四张抵销后表 canonical projection（服务端只读真源；自动列来自 approved 分录，batch 3 / ADR-CRW-004）
+  postElimination: (pid: string, year: number) =>
+    `/api/consolidation/post-elimination/${pid}/${year}`,
+  // 七域五态 readiness（服务端只读，不执行重算；batch 5 / ADR-CRW-005 R7）
+  readiness: (pid: string, year: number) =>
+    `/api/consolidation/readiness/${pid}/${year}`,
 } as const
 
 // ─── 合并工作底稿数据 ───────────────────────────────────────────────────────

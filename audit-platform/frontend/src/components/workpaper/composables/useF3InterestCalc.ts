@@ -8,6 +8,7 @@
  * 差异 = 应计利息 - 账面已计利息。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcInterest, calcTermDays, calcSubtotal } from './useF3FormulaEngine'
 import type { UseF3BaseOptions } from './useF3Adjudication'
 import { injectF3Adjustments, type F3InjectAdjustmentRow } from './f3AdjustmentInject'
@@ -288,6 +289,15 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
     injectF3Adjustments(allResponses.value, injectRows, 'interest-accrual')
     return { count: targets.length, total: round2(total) }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

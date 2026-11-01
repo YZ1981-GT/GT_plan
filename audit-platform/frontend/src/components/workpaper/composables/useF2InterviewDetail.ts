@@ -3,6 +3,7 @@
  * 联动：F2-71 访谈汇总、F2-70 工商信息、F2-68 采购额。
  */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   emptyInterviewDetailEntity,
@@ -59,6 +60,15 @@ export function useF2InterviewDetail(opts: {
   const currentId = ref(entities.value[0]?.id || '')
   const searchQuery = ref('')
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

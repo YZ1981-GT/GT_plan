@@ -23,6 +23,10 @@ __all__ = [
     "McpBudget",
     "McpBudgetTracker",
     "McpBudgetExceeded",
+    "distributed_pre_check",
+    "distributed_check_and_consume",
+    "distributed_get_or_create",
+    "distributed_release",
 ]
 
 
@@ -140,3 +144,100 @@ class McpBudgetTracker:
     def get_status(self, run_id: UUID) -> McpBudget | None:
         """查询 run 的当前配额状态。"""
         return self._budgets.get(run_id)
+
+
+# Redis-backed 多 worker 预算。同步方法保留给单进程测试；生产 router 只调用以下异步入口。
+_BUDGET_LUA = """
+local calls = tonumber(redis.call('HGET', KEYS[1], 'calls') or '0')
+local max_calls = tonumber(ARGV[1])
+local response_bytes = tonumber(ARGV[2])
+local max_bytes = tonumber(ARGV[3])
+if calls >= max_calls then return {-1, calls, tonumber(redis.call('HGET', KEYS[1], 'bytes') or '0')} end
+if response_bytes > max_bytes then return {-2, calls, tonumber(redis.call('HGET', KEYS[1], 'bytes') or '0')} end
+calls = redis.call('HINCRBY', KEYS[1], 'calls', 1)
+local bytes = redis.call('HINCRBY', KEYS[1], 'bytes', response_bytes)
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
+return {1, calls, bytes}
+"""
+_PRECHECK_LUA = """
+local calls = tonumber(redis.call('HGET', KEYS[1], 'calls') or '0')
+if calls >= tonumber(ARGV[1]) then return {-1, calls} end
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+return {1, calls}
+"""
+
+
+def _redis_key(run_id: UUID) -> str:
+    return f"ai:mcp:budget:{run_id}"
+
+
+async def _redis_client():
+    try:
+        from app.core.redis import get_redis
+        return await get_redis()
+    except Exception:
+        return None
+
+
+async def distributed_pre_check(tracker: McpBudgetTracker, run_id: UUID) -> None:
+    redis = await _redis_client()
+    if redis is None:
+        tracker.pre_check(run_id)
+        return
+    ttl = max(60, int(getattr(settings, "AI_CHAT_RUN_TIMEOUT_SECONDS", 180)) + 60)
+    result = await redis.eval(
+        _PRECHECK_LUA, 1, _redis_key(run_id),
+        int(settings.AI_MCP_MAX_CALLS_PER_RUN), ttl,
+    )
+    if int(result[0]) == -1:
+        raise McpBudgetExceeded("calls", int(result[1]), int(settings.AI_MCP_MAX_CALLS_PER_RUN))
+
+
+async def distributed_check_and_consume(
+    tracker: McpBudgetTracker, run_id: UUID, *, response_bytes: int = 0
+) -> McpBudget:
+    redis = await _redis_client()
+    if redis is None:
+        return tracker.check_and_consume(run_id, response_bytes=response_bytes)
+    max_calls = int(settings.AI_MCP_MAX_CALLS_PER_RUN)
+    max_bytes = int(settings.AI_MCP_MAX_BYTES_PER_CALL)
+    ttl = max(60, int(getattr(settings, "AI_CHAT_RUN_TIMEOUT_SECONDS", 180)) + 60)
+    result = await redis.eval(
+        _BUDGET_LUA, 1, _redis_key(run_id),
+        max_calls, int(response_bytes), max_bytes, ttl,
+    )
+    code, calls, total_bytes = map(int, result)
+    if code == -1:
+        raise McpBudgetExceeded("calls", calls, max_calls)
+    if code == -2:
+        raise McpBudgetExceeded("bytes_per_call", int(response_bytes), max_bytes)
+    return McpBudget(run_id, max_calls, max_bytes, calls, total_bytes)
+
+
+async def distributed_get_or_create(
+    tracker: McpBudgetTracker, run_id: UUID
+) -> McpBudget:
+    redis = await _redis_client()
+    if redis is None:
+        return tracker.get_or_create(run_id)
+    values = await redis.hmget(_redis_key(run_id), "calls", "bytes")
+    def as_int(value) -> int:
+        if value is None:
+            return 0
+        if isinstance(value, bytes):
+            value = value.decode("ascii", errors="ignore")
+        return int(value or 0)
+    return McpBudget(
+        run_id,
+        int(settings.AI_MCP_MAX_CALLS_PER_RUN),
+        int(settings.AI_MCP_MAX_BYTES_PER_CALL),
+        as_int(values[0]),
+        as_int(values[1]),
+    )
+
+
+async def distributed_release(tracker: McpBudgetTracker, run_id: UUID) -> None:
+    tracker.release(run_id)
+    redis = await _redis_client()
+    if redis is not None:
+        await redis.delete(_redis_key(run_id))

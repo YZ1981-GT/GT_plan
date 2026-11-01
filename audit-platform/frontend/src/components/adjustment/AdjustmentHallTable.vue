@@ -98,6 +98,31 @@
             <el-tag v-else type="info" size="small" effect="plain">手工</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="阶段" width="76">
+          <template #default="{ row }"><el-tag size="small" effect="plain">{{ row.audit_phase === 'preliminary' ? '预审' : '年审' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="最终处理" width="142">
+          <template #default="{ row }">
+            <el-tag :type="treatmentTagType(row)" size="small">
+              {{ treatmentLabel(row) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="重要性 / 风险" width="144">
+          <template #default="{ row }">
+            <div v-if="row.risk" class="gt-adj-risk">
+              <el-tag :type="row.risk.required_level === 'partner' ? 'danger' : 'info'" size="small" effect="plain">
+                {{ row.risk.required_level === 'partner' ? '合伙人终审' : '经理复核' }}
+              </el-tag>
+              <span v-if="row.risk.performance_ratio != null" class="gt-adj-meta">执行重要性 {{ row.risk.performance_ratio }}%</span>
+              <span v-else class="gt-adj-meta">重要性待设置</span>
+              <el-tooltip v-if="row.risk.risk_flags?.length" :content="row.risk.risk_flags.map((f: any) => f.label).join('、')">
+                <span class="gt-adj-risk__flags">⚠ {{ row.risk.risk_flags.length }} 项性质风险</span>
+              </el-tooltip>
+            </div>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="150" fixed="right">
           <template #default="{ row }">
             <div class="gt-adj-status-cell">
@@ -204,12 +229,36 @@ function primaryButtons(row: HallEntry) {
     .map((b) => ({ action: b.action, label: b.label(row), type: b.type }))
 }
 
+function treatmentLabel(row: HallEntry): string {
+  const status = row.treatment?.status || (row.client_booking?.status === 'booked' ? 'client_booked' : '')
+  if (status === 'pending_internal_review') return '待内部复核'
+  if (status === 'awaiting_workpaper_publish') return '待底稿发布'
+  if (status === 'unadjusted_misstatement') return '不予更正'
+  if (status === 'client_booked') return row.treatment?.effective === false ? '已入账·未生效' : '客户已入账'
+  if (status === 'include_in_working_tb') return '纳入工作试算表'
+  return '待形成处理'
+}
+
+function treatmentTagType(row: HallEntry): 'primary' | 'success' | 'warning' | 'info' {
+  const status = row.treatment?.status
+  if (status === 'client_booked') return row.treatment?.effective === false ? 'warning' : 'success'
+  if (status === 'unadjusted_misstatement') return 'warning'
+  if (status === 'include_in_working_tb') return 'primary'
+  return 'info'
+}
+
 function moreItems(row: HallEntry & { origin?: string | null }) {
-  const allowed = rowActions(row, props.perms)
   const items: Array<{ action: string; label: string; divided?: boolean }> = []
-  if (allowed.has('approve') && row.review_status === S.DRAFT) items.push({ action: 'approve', label: '直接通过（不经提交）' })
-  if (allowed.has('convert')) items.push({ action: 'convert', label: '转为未更正错报' })
-  if (row.converted_to_misstatement_id) items.push({ action: 'misstatement', label: '查看已转错报' })
+  if (row.adjustment_type === 'aje' && row.review_status === S.APPROVED && props.perms.edit) {
+    items.push({ action: 'treatment', label: '最终处理与历史' })
+    if (row.treatment?.status === 'client_booked' || row.client_booking?.status === 'booked') {
+      items.push({ action: 'client-booking-revoke', label: '撤销客户已入账' })
+    } else if (row.treatment?.status !== 'unadjusted_misstatement') {
+      items.push({ action: 'client-booking', label: '标记客户已入账' })
+    }
+  }
+  if (row.converted_to_misstatement_id) items.push({ action: 'misstatement', label: '查看未更正错报' })
+  if (props.perms.edit) items.push({ action: 'evidence', label: '调整证据' })
   if (row.origin === 'workpaper') items.push({ action: 'source', label: '打开来源底稿' })
   items.push(
     { action: 'collab', label: '协作补充', divided: items.length > 0 },
@@ -251,6 +300,8 @@ defineExpose({ reveal, clearSelection, toggleFullscreen, isFullscreen })
 .gt-adj-action-cell :deep(.el-button) { margin-left: 0; }
 .gt-adj-action-cell :deep(.el-dropdown) { display: inline-flex; flex: 0 0 auto; }
 .gt-adj-meta { margin-top: 2px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-adj-risk { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.gt-adj-risk__flags { color: var(--gt-color-warning); font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-adj-reject { color: var(--gt-color-coral); font-size: var(--gt-font-size-xs); }
 .gt-adj-ellipsis { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-adj-detail-code { color: var(--gt-color-text-tertiary); }

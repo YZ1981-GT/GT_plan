@@ -126,13 +126,16 @@ async def _tree_ids(client: AsyncClient) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# 1. 用户报告的主链路：新建文件夹 → 上传 → 列表可见 → 预览/下载取回原内容
+# 1. 用户报告的主链路：新建私有文件夹 → 上传 → 列表可见 → 预览/下载取回原内容
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_public_folder_then_upload_then_list_and_preview(client: AsyncClient) -> None:
-    resp = await client.post("/api/knowledge-library/folders", json={"name": "  函证资料  "})
+async def test_create_private_folder_then_upload_then_list_and_preview(client: AsyncClient) -> None:
+    resp = await client.post(
+        "/api/knowledge-library/folders",
+        json={"name": "  函证资料  ", "access_level": "private"},
+    )
     assert resp.status_code == 200, resp.text
     folder_id = resp.json()["id"]
     assert resp.json()["name"] == "函证资料"  # 名称去首尾空白
@@ -235,7 +238,9 @@ async def test_invalid_folder_input_returns_422(client: AsyncClient, payload: di
 
 @pytest.mark.asyncio
 async def test_reupload_same_name_keeps_previous_version_bytes(client: AsyncClient) -> None:
-    folder_id = (await client.post("/api/knowledge-library/folders", json={"name": "版本"})).json()["id"]
+    folder_id = (await client.post(
+        "/api/knowledge-library/folders", json={"name": "版本", "access_level": "private"},
+    )).json()["id"]
 
     first = await client.post(
         f"/api/knowledge-library/folders/{folder_id}/upload",

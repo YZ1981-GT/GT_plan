@@ -19,10 +19,15 @@
       <span>取数来源：
         <a class="ws-link" @click="$emit('goto-sheet', 'net_asset')">净资产表</a>(期末净资产/净利润) →
         <a class="ws-link" @click="$emit('goto-sheet', 'info')">基本信息表</a>(持股比例) →
-        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>(少数股东权益/损益)。
+        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>(少数股东权益抵消为<b>已审批分录</b>派生只读)。
         <b>可编辑覆盖，可增删行</b>。
       </span>
     </div>
+    <el-alert v-if="elimEquityUnallocated !== 0" v-show="!isFullscreen" type="warning" :closable="false" class="ws-unalloc"
+      :title="`有 ${fmt(elimEquityUnallocated)} 的少数股东权益抵销无法唯一归属到单家子企业，未计入上表逐企业列`" />
+    <el-alert v-for="(w, i) in elimEquityWarnings" :key="i" v-show="!isFullscreen" type="info" :closable="false" class="ws-unalloc" :title="w" />
+    <el-alert v-show="!isFullscreen" type="info" :closable="false" class="ws-unalloc"
+      title="少数股东损益的抵消数需由分录明细提供，当前列不自动填充（按净资产×比例计算的少数股东损益仍自动给出）" />
 
     <el-table :data="tableRows" border size="small" class="ws-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -81,12 +86,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { splitPersistedProjectionRows } from '@/components/consolidation/composables/consolProjectionDraft'
+import { POST_ELIM_ACCOUNT, type PostEliminationProjection } from '@/services/consolidationApi'
+import { companyElimMap, unallocatedOf, warningsOf } from '@/components/consolidation/composables/consolPostElimView'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -94,11 +102,18 @@ const props = defineProps<{
   companies: CompanyCol[]
   netAssetData: any[]       // 净资产表数据
   equitySimDirect: any[]    // 模拟权益法
-  elimEquity: any[]         // 合并抵消-权益
-  elimIncome: any[]         // 合并抵消-损益
+  // 服务端 canonical projection：少数股东权益（4501）逐企业抵销合计（approved 分录唯一真源）。
+  // 少数股东损益侧无独立标准科目码，projection 不提供，损益抵消列不臆造（置 0 并提示）。
+  projection: PostEliminationProjection | null
+  initialRows?: any[]
 }>()
 
-defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
+const emit = defineEmits<{
+  (e: 'save', data: any[]): void
+  (e: 'draft-change', data: any[]): void
+  (e: 'goto-sheet', key: string): void
+  (e: 'open-formula', key: string): void
+}>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
@@ -107,24 +122,52 @@ const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 const manualRows = reactive<any[]>([])
 
+function emitDraft() {
+  emit('draft-change', tableRows.value)
+}
+
 function addRow() {
   const nr = { companyName: '', parentRatio: 0, minorityRatio: 0, endNetAsset: 0, minorityEquity: 0, elimMinorityEquity: 0, equityDiff: 0, currentProfit: 0, minorityProfit: 0, elimMinorityProfit: 0, profitDiff: 0, isExcessLoss: false, _manual: true, _editable: true }
   if (selectedRows.value.length > 0) {
     const last = selectedRows.value[selectedRows.value.length - 1]
     const idx = manualRows.indexOf(last)
-    if (idx >= 0) { manualRows.splice(idx + 1, 0, nr); return }
+    if (idx >= 0) {
+      manualRows.splice(idx + 1, 0, nr)
+      emitDraft()
+      return
+    }
   }
   manualRows.push(nr)
+  emitDraft()
 }
 async function batchDeleteRows() {
   if (!selectedRows.value.length) return
-  try { await confirmBatch('删除', selectedRows.value.length)
-    const del = new Set(selectedRows.value); const remaining = manualRows.filter(r => !del.has(r)); manualRows.length = 0; manualRows.push(...remaining); selectedRows.value = []
+  try {
+    await confirmBatch('删除', selectedRows.value.length)
+    const del = new Set(selectedRows.value)
+    const remaining = manualRows.filter(r => !del.has(r))
+    manualRows.length = 0; manualRows.push(...remaining)
+    selectedRows.value = []
+    emitDraft()
   } catch {}
 }
 const n = (v: any) => Number(v) || 0
 
-const overrides = reactive<Record<string, Record<string, number | null>>>({})
+const overrides = reactive<Record<string, Record<string, any>>>({})
+
+function hydratePersistedRows() {
+  const hydrated = splitPersistedProjectionRows(props.companies, props.initialRows)
+  for (const key of Object.keys(overrides)) delete overrides[key]
+  Object.assign(overrides, hydrated.overrides)
+  manualRows.length = 0
+  manualRows.push(...hydrated.manualRows)
+}
+watch([() => props.initialRows, () => props.companies], hydratePersistedRows, { deep: true, immediate: true })
+
+// 少数股东权益（4501）抵销：企业代码 → 逐企业合计（projection 真源）
+const elimEquityByCompany = computed(() => companyElimMap(props.projection, POST_ELIM_ACCOUNT.minorityEquity))
+const elimEquityUnallocated = computed(() => unallocatedOf(props.projection, POST_ELIM_ACCOUNT.minorityEquity))
+const elimEquityWarnings = computed(() => warningsOf(props.projection, POST_ELIM_ACCOUNT.minorityEquity))
 
 const { exportData: _exportData } = useExcelIO()
 
@@ -156,7 +199,7 @@ async function exportData() {
 }
 
 const tableRows = computed(() => {
-  return props.companies.map((comp, ci) => {
+  const automaticRows = props.companies.map((comp, ci) => {
     const parentRatio = comp.ratio
     const minorityRatio = Math.round((100 - parentRatio) * 100) / 100
 
@@ -167,9 +210,8 @@ const tableRows = computed(() => {
     // 少数股东权益 = 期末净资产 × 少数股东比例
     const minorityEquity = Math.round(endNetAsset * minorityRatio) / 100
 
-    // 从抵消分录取少数股东权益
-    const elimEqRow = props.elimEquity.find((r: any) => r.subject === '少数股东权益')
-    const elimMinorityEquity = elimEqRow?.values?.[ci] != null ? n(elimEqRow.values[ci]) : 0
+    // 少数股东权益（4501）抵销：服务端 canonical projection 逐企业合计（approved 分录真源）
+    const elimMinorityEquity = elimEquityByCompany.value.get(comp.code || comp.name) ?? 0
     const equityDiff = minorityEquity - elimMinorityEquity
 
     // 当期净利润（从净资产表取"综合收益总额"或"当期归母净利润"行）
@@ -179,9 +221,8 @@ const tableRows = computed(() => {
     // 少数股东损益 = 当期净利润 × 少数股东比例
     const minorityProfit = Math.round(currentProfit * minorityRatio) / 100
 
-    // 从抵消分录取少数股权损益
-    const elimIncRow = props.elimIncome.find((r: any) => r.subject === '少数股权损益')
-    const elimMinorityProfit = elimIncRow?.values?.[ci] != null ? n(elimIncRow.values[ci]) : 0
+    // 少数股东损益侧无独立标准科目码，canonical projection 不提供 ⇒ 不臆造，置 0（由分录明细另行支持）
+    const elimMinorityProfit = 0
     const profitDiff = minorityProfit - elimMinorityProfit
 
     // 超额亏损判断
@@ -197,6 +238,7 @@ const tableRows = computed(() => {
     for (const k of Object.keys(ov)) { if (ov[k] != null) result[k] = ov[k] }
     return result
   })
+  return [...automaticRows, ...manualRows]
 })
 
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }

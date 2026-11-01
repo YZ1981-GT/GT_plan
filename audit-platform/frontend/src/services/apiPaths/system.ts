@@ -88,6 +88,9 @@ export const knowledgeLibrary = {
   documentOcrRetry: (docId: string) => `/api/knowledge-library/documents/${docId}/ocr-retry`,
   /** 上传到项目知识文件夹（「{项目名}（项目资料）/ A17-3 咨询附件」，项目组可见） */
   projectUpload: (projectId: string) => `/api/knowledge-library/projects/${projectId}/upload`,
+  /** 将当前可读的知识文档版本显式快照为项目证据 */
+  documentPromoteEvidence: (projectId: string, docId: string) =>
+    `/api/knowledge-library/projects/${projectId}/evidence/from-document/${docId}`,
 } as const
 
 // ─── 看板 ───────────────────────────────────────────────────────────────────
@@ -299,6 +302,12 @@ export const attachments = {
     `/api/projects/${pid}/workpapers/${wpId}/evidence/${linkId}`,
   /** 把别的可见底稿上同一凭证的证据引用到本底稿（spec attachment-voucher-evidence-binding） */
   evidenceVoucherReuse: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/voucher-reuse`,
+  /** 批量查询本项目可见底稿上的合同证据 */
+  evidenceContractQuery: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/contract-query`,
+  /** 给本底稿附件位置绑定或改绑合同身份 */
+  evidenceContractLink: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/contract-link`,
+  /** 把他稿同一合同的证据引用到本底稿 */
+  evidenceContractReuse: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/contract-reuse`,
 } as const
 
 /** Office 在线预览健康探测（决定是否展示 iframe） */

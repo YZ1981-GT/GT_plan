@@ -13,6 +13,7 @@
  * Requirements: 13.1-13.8
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcPriceDiffRate,
@@ -233,9 +234,13 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
   // 立即 flush 防抖中的落库（双向回写 flushHtml 用：先落库再 readStoreProjection）。
   // 与 useD4CompletenessCheck.flushPendingSave 同构：清定时器 + 立即派发 d4:save-items。
   function flushPendingSave(): void {
-    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   // 双向回写 reloadHtml 用：从 allResponses 重读 store 行（切回 HTML 后刷新）。
   function reload(): void {

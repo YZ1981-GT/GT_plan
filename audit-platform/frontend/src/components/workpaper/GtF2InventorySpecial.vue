@@ -29,7 +29,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -191,7 +191,7 @@
         <GtGridSheet
           v-else-if="useGridFallback"
           :html-data="props.htmlData || formData.getSheet(currentSheet)"
-          :readonly="isReadonly"
+          :readonly="businessReadonly"
         />
 
         <GtOnlyOfficeSheet
@@ -199,7 +199,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName || ''"
-          :readonly="isReadonly"
+          :readonly="businessReadonly"
           style="height: calc(100vh - 180px)"
         />
       </template>
@@ -249,6 +249,7 @@ const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -270,7 +271,8 @@ const IPO_HTML = [
 ]
 
 const isLoading = ref(true)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 const formData = useF2SpecialFormData({
   wpId: toRef(props, 'wpId'),
@@ -307,7 +309,7 @@ const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
   sheetKey: syncSheetKey, capability: capabilityForEntry(F2S_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPendingSave()
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: F2S_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: syncSheetKey.value }
   },
@@ -394,7 +396,11 @@ provide('reloadWorkpaperData', () => formData.loadAll())
 async function handleF2SpeSaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    await formData.saveItemsFromEvent(items)
+    try {
+      await formData.saveItemsFromEvent(items)
+    } catch {
+      return
+    }
     versionToolbar.scheduleAutoSnapshot()
   }
 }

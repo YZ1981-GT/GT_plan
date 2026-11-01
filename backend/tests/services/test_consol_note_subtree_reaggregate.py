@@ -645,3 +645,58 @@ class TestAggregateWidthFollowsTemplateHeaders:
         # 每行的列数 = 模板表头列数（货币资金：项目 / 期末余额 / 期初余额 = 3）
         for row in root.data["rows"]:
             assert len(row) == 3, f"行 {row} 列数应为 3"
+
+
+@pytest.mark.asyncio
+async def test_explicit_empty_section_ids_is_zero_work_not_all_sections(monkeypatch):
+    from app.services.consol_tree_service import TreeNode
+
+    project_id = uuid.uuid4()
+    tree = TreeNode(
+        project_id=project_id,
+        company_code="G",
+        company_name="集团",
+        parent_company_code=None,
+        ultimate_company_code="G",
+        consol_level=0,
+        node_key="G:consol",
+        role="consol",
+        kind="aggregate",
+    )
+
+    async def resolved_template(*_args, **_kwargs):
+        return "soe"
+
+    async def forbidden(*_args, **_kwargs):
+        raise AssertionError("空 section_ids 不得加载绑定、公式或写入附注")
+
+    monkeypatch.setattr(
+        reaggregate_module,
+        "resolve_note_template_type",
+        resolved_template,
+    )
+    monkeypatch.setattr(
+        reaggregate_module,
+        "consol_note_tables",
+        lambda _template: [{"section_id": _SECTION, "enabled": True}],
+    )
+    monkeypatch.setattr(reaggregate_module._Run, "_load_bindings", forbidden)
+    monkeypatch.setattr(reaggregate_module, "ensure_seeded", forbidden)
+    monkeypatch.setattr(reaggregate_module, "section_formulas_many", forbidden)
+
+    run = await reaggregate_module._Run.prepare(
+        object(),
+        project_id,
+        _YEAR,
+        node_key="G:consol",
+        section_ids=[],
+        template_type=None,
+        tree=tree,
+    )
+    result = run.result()
+
+    assert result["status"] == "skipped"
+    assert result["sections_processed"] == 0
+    assert result["sections_updated"] == 0
+    assert result["results"] == []
+    assert result["failures"] == []

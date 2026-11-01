@@ -1,15 +1,9 @@
-"""LibreOffice 池化管理器 — Semaphore(2) 限流 + UserInstallation 隔离 + 健康探测
+"""LibreOffice 有界异步执行器。
 
-Req 8（P2-12）：6000 并发场景下 LibreOffice 重算路径稳定性保障。
-
-核心能力：
-  - 模块级 asyncio.Semaphore(2) 限制同一时刻最多 2 个 soffice 子进程
-  - Windows pid+tid UserInstallation 隔离避免 user profile 冲突
-  - startup 事件 4 路径探测 + soffice --version 健康检查
-  - 60s 超时 kill + semaphore 释放 + HTTP 504
-  - X-Recompute-Queue-Depth 响应头 + libreoffice_queue_depth metric
-
-Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5
+每个转换使用独立 UUID profile 和输出目录；进程 stdout/stderr 由
+``communicate()`` 同时排空。进程内 semaphore、队列上限和 acquire timeout
+阻止 Web worker 在突发请求下无限创建子进程或协程。多 worker 总容量仍须按
+``worker 数 × LIBREOFFICE_MAX_CONCURRENCY`` 计算，批 E 再外置主机级调度。
 """
 from __future__ import annotations
 
@@ -17,43 +11,116 @@ import asyncio
 import logging
 import os
 import shutil
-import sys
-import threading
+import tempfile
+import time
+import weakref
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Module-level semaphore: max 2 concurrent soffice processes (Req 8.1)
+# Process-local admission control. Deployment capacity must multiply this value
+# by the number of workers; batch E will move host-wide scheduling out of process.
 # ---------------------------------------------------------------------------
-_libreoffice_semaphore = asyncio.Semaphore(2)
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except ValueError:
+        logger.warning("[LIBREOFFICE_POOL] invalid %s; using %d", name, default)
+        return default
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    try:
+        return max(0.1, float(os.getenv(name, str(default))))
+    except ValueError:
+        logger.warning("[LIBREOFFICE_POOL] invalid %s; using %.1f", name, default)
+        return default
+
+
+LIBREOFFICE_MAX_CONCURRENCY = _positive_int_env(
+    "LIBREOFFICE_MAX_CONCURRENCY", 2
+)
+LIBREOFFICE_MAX_QUEUE = _positive_int_env("LIBREOFFICE_MAX_QUEUE", 8)
+LIBREOFFICE_ACQUIRE_TIMEOUT_SECONDS = _positive_float_env(
+    "LIBREOFFICE_ACQUIRE_TIMEOUT_SECONDS", 5.0
+)
+LIBREOFFICE_RETRY_AFTER_SECONDS = _positive_int_env(
+    "LIBREOFFICE_RETRY_AFTER_SECONDS", 10
+)
+LIBREOFFICE_REAP_TIMEOUT_SECONDS = _positive_float_env(
+    "LIBREOFFICE_REAP_TIMEOUT_SECONDS", 5.0
+)
+
+_libreoffice_semaphore = asyncio.Semaphore(LIBREOFFICE_MAX_CONCURRENCY)
+_queue_waiters = 0
+_active_conversions = 0
+_waiter_started: set[float] = set()
+_preview_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+    weakref.WeakValueDictionary()
+)
 
 # ---------------------------------------------------------------------------
-# Prometheus metric (Req 8.5)
+# Prometheus metrics
 # ---------------------------------------------------------------------------
 try:
-    from prometheus_client import Gauge
+    from prometheus_client import Counter, Gauge, Histogram
+
     _PROMETHEUS_AVAILABLE = True
 except ImportError:
     _PROMETHEUS_AVAILABLE = False
 
-    class _GaugeStub:
-        """Nil-op 占位"""
+    class _MetricStub:
+        """可链式调用的空指标，保持无 prometheus_client 环境可运行。"""
+
         def __init__(self, *args, **kwargs):
             pass
+
         def set(self, *args, **kwargs):
             pass
 
-    Gauge = _GaugeStub  # type: ignore[misc,assignment]
+        def inc(self, *args, **kwargs):
+            pass
+
+        def observe(self, *args, **kwargs):
+            pass
+
+        def labels(self, *args, **kwargs):
+            return self
+
+    Counter = Gauge = Histogram = _MetricStub  # type: ignore[misc,assignment]
 
 LIBREOFFICE_QUEUE_DEPTH = Gauge(
     "libreoffice_queue_depth",
-    "Number of tasks waiting for LibreOffice semaphore",
-) if _PROMETHEUS_AVAILABLE else _GaugeStub(
-    "libreoffice_queue_depth", ""
+    "Number of tasks waiting for a process-local LibreOffice slot",
+)
+LIBREOFFICE_ACTIVE = Gauge(
+    "libreoffice_active_processes",
+    "Number of active LibreOffice child processes in this worker",
+)
+LIBREOFFICE_OLDEST_WAIT_SECONDS = Gauge(
+    "libreoffice_oldest_wait_seconds",
+    "Age of the oldest request waiting for a LibreOffice slot",
+)
+LIBREOFFICE_WAIT_SECONDS = Histogram(
+    "libreoffice_queue_wait_seconds",
+    "Time spent waiting for a process-local LibreOffice slot",
+)
+LIBREOFFICE_RUN_SECONDS = Histogram(
+    "libreoffice_run_seconds",
+    "LibreOffice child process execution time",
+    labelnames=("format",),
+)
+LIBREOFFICE_RESULTS = Counter(
+    "libreoffice_conversion_total",
+    "LibreOffice conversion outcomes",
+    labelnames=("result", "format"),
 )
 
 # ---------------------------------------------------------------------------
@@ -107,145 +174,365 @@ def _find_soffice() -> Optional[str]:
     return None
 
 
-def _build_user_installation() -> str:
-    """构建 Windows pid+tid UserInstallation 隔离路径 (Req 8.2)。
-
-    每个调用拼接 -env:UserInstallation=file:///tmp/soffice_<pid>_<tid>
-    避免多子进程共用 user profile 互锁导致启动失败。
-    """
-    pid = os.getpid()
-    tid = threading.get_ident()
-    if sys.platform == "win32":
-        # Windows: use temp directory with forward slashes for file:// URI
-        tmp_base = os.environ.get("TEMP", r"C:\Temp")
-        path = f"{tmp_base}\\soffice_{pid}_{tid}".replace("\\", "/")
-        return f"file:///{path}"
-    else:
-        return f"file:///tmp/soffice_{pid}_{tid}"
+def _build_user_installation(profile_dir: Path) -> str:
+    """为本次 job 的独立 profile 生成规范 file URI。"""
+    return profile_dir.resolve().as_uri()
 
 
 def get_queue_depth() -> int:
-    """获取当前 semaphore 等待队列深度。
-
-    asyncio.Semaphore 内部 _waiters 是等待获取信号量的 Future 列表。
-    """
-    waiters = getattr(_libreoffice_semaphore, "_waiters", None)
-    if waiters is None:
-        return 0
-    return len(waiters)
+    """返回本 worker 正在等待 semaphore 的请求数。"""
+    return _queue_waiters
 
 
-async def convert_with_libreoffice(xlsx_path: Path, timeout: int = 60) -> Path:
-    """使用 LibreOffice headless 重算 xlsx 公式（池化 + 超时 + 隔离）。
+def _refresh_wait_metrics(now: float | None = None) -> None:
+    sampled = time.perf_counter() if now is None else now
+    oldest = max(0.0, sampled - min(_waiter_started)) if _waiter_started else 0.0
+    LIBREOFFICE_QUEUE_DEPTH.set(_queue_waiters)
+    LIBREOFFICE_OLDEST_WAIT_SECONDS.set(oldest)
 
-    Args:
-        xlsx_path: 待重算的 xlsx 文件路径
-        timeout: 超时秒数，默认 60s
 
-    Returns:
-        重算后的 xlsx 文件路径（覆盖原文件）
+def get_capacity_snapshot() -> dict[str, int | float]:
+    """返回可观测的进程内容量状态。"""
+    sampled = time.perf_counter()
+    return {
+        "active": _active_conversions,
+        "waiting": _queue_waiters,
+        "oldest_wait_seconds": (
+            max(0.0, sampled - min(_waiter_started)) if _waiter_started else 0.0
+        ),
+        "concurrency_limit": LIBREOFFICE_MAX_CONCURRENCY,
+        "queue_limit": LIBREOFFICE_MAX_QUEUE,
+    }
 
-    Raises:
-        HTTPException(504): 超时强制 kill
-        HTTPException(503): LibreOffice 不可用
-        HTTPException(500): 转换失败
-    """
-    soffice = _find_soffice()
+
+def _overloaded(reason: str, message: str) -> HTTPException:
+    LIBREOFFICE_RESULTS.labels(result=reason, format="unknown").inc()
+    return HTTPException(
+        status_code=503,
+        detail={"reason": reason, "message": message},
+        headers={"Retry-After": str(LIBREOFFICE_RETRY_AFTER_SECONDS)},
+    )
+
+
+async def _acquire_slot(queue_timeout: float) -> None:
+    """有界等待一个进程内转换槽；超载时给出可重试响应。"""
+    global _active_conversions, _queue_waiters
+
+    if _libreoffice_semaphore.locked() and _queue_waiters >= LIBREOFFICE_MAX_QUEUE:
+        raise _overloaded(
+            "libreoffice_queue_full",
+            "Office 转换队列已满，请稍后重试",
+        )
+
+    wait_started = time.perf_counter()
+    _queue_waiters += 1
+    _waiter_started.add(wait_started)
+    _refresh_wait_metrics(wait_started)
+    acquire_task = asyncio.create_task(_libreoffice_semaphore.acquire())
+    try:
+        await asyncio.wait_for(acquire_task, timeout=queue_timeout)
+    except asyncio.TimeoutError as exc:
+        # 极窄竞态下 acquire 可能已完成；不得泄漏 semaphore permit。
+        if acquire_task.done() and not acquire_task.cancelled():
+            try:
+                if acquire_task.result():
+                    _libreoffice_semaphore.release()
+            except Exception:
+                pass
+        raise _overloaded(
+            "libreoffice_queue_timeout",
+            "Office 转换排队超时，请稍后重试",
+        ) from exc
+    except asyncio.CancelledError:
+        if not acquire_task.done():
+            acquire_task.cancel()
+        acquired = await asyncio.gather(acquire_task, return_exceptions=True)
+        if acquired == [True]:
+            _libreoffice_semaphore.release()
+        raise
+    finally:
+        _queue_waiters = max(0, _queue_waiters - 1)
+        _waiter_started.discard(wait_started)
+        _refresh_wait_metrics()
+        LIBREOFFICE_WAIT_SECONDS.observe(time.perf_counter() - wait_started)
+
+    _active_conversions += 1
+    LIBREOFFICE_ACTIVE.set(_active_conversions)
+
+
+def _release_slot() -> None:
+    global _active_conversions
+    _active_conversions = max(0, _active_conversions - 1)
+    LIBREOFFICE_ACTIVE.set(_active_conversions)
+    _libreoffice_semaphore.release()
+
+
+async def _terminate_and_reap(proc, communicate_task: asyncio.Task) -> None:
+    """终止子进程并排空 PIPE；取消和超时共用。"""
+    if proc.returncode is None:
+        try:
+            proc.kill()
+        except (ProcessLookupError, OSError):
+            pass
+    try:
+        await asyncio.wait_for(
+            asyncio.shield(communicate_task),
+            timeout=LIBREOFFICE_REAP_TIMEOUT_SECONDS,
+        )
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        if not communicate_task.done():
+            communicate_task.cancel()
+        await asyncio.gather(communicate_task, return_exceptions=True)
+    except Exception:
+        # 进程已终止，清理阶段不应覆盖原始超时/取消原因。
+        await asyncio.gather(communicate_task, return_exceptions=True)
+
+
+async def _run_conversion(
+    source_path: Path,
+    *,
+    output_format: str,
+    timeout: float,
+    queue_timeout: float,
+    application_flag: str | None = None,
+    soffice_path: str | None = None,
+) -> bytes:
+    """执行一次隔离转换并返回产物；所有出口都回收进程、槽位和临时目录。"""
+    soffice = soffice_path or _find_soffice()
+    format_name = output_format.split(":", 1)[0].lower()
     if soffice is None:
         raise HTTPException(
             status_code=503,
-            detail="LibreOffice 不可用，无法重算公式",
+            detail={
+                "reason": "libreoffice_unavailable",
+                "message": "服务器未安装 LibreOffice，请下载后查看",
+            },
         )
 
-    # Update queue depth metric before acquiring
-    depth = get_queue_depth()
-    LIBREOFFICE_QUEUE_DEPTH.set(depth)
-
-    async with _libreoffice_semaphore:
-        # Update metric after acquiring (depth should decrease)
-        LIBREOFFICE_QUEUE_DEPTH.set(get_queue_depth())
-
-        user_install = _build_user_installation()
-        import tempfile
-        tmpdir = tempfile.mkdtemp(prefix="lo_pool_")
-        tmpdir_path = Path(tmpdir)
+    await _acquire_slot(queue_timeout)
+    job_root: Path | None = None
+    outcome = "failed"
+    run_started = time.perf_counter()
+    try:
+        job_root = Path(
+            await asyncio.to_thread(
+                tempfile.mkdtemp,
+                prefix=f"lo_job_{uuid4().hex}_",
+            )
+        )
+        profile_dir = job_root / "profile"
+        output_dir = job_root / "output"
+        await asyncio.to_thread(profile_dir.mkdir, parents=True, exist_ok=False)
+        await asyncio.to_thread(output_dir.mkdir, parents=True, exist_ok=False)
+        user_installation = _build_user_installation(profile_dir)
 
         cmd = [
             soffice,
+            f"-env:UserInstallation={user_installation}",
             "--headless",
-            "--calc",
-            "--convert-to", "xlsx",
-            f"-env:UserInstallation={user_install}",
-            "--outdir", str(tmpdir_path),
-            str(xlsx_path),
+            "--nologo",
+            "--nodefault",
+            "--nofirststartwizard",
         ]
-
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        if application_flag:
+            cmd.append(application_flag)
+        cmd.extend(
+            [
+                "--convert-to",
+                output_format,
+                "--outdir",
+                str(output_dir),
+                str(source_path),
+            ]
         )
 
         try:
-            await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
-            # Req 8.4: 60s 超时 kill + HTTP 504
-            proc.kill()
-            await proc.wait()  # ensure process is reaped
-            # Cleanup temp dir
-            try:
-                shutil.rmtree(tmpdir_path, ignore_errors=True)
-            except Exception:
-                pass
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as exc:
+            outcome = "spawn_failed"
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "reason": "libreoffice_start_failed",
+                    "message": "Office 转换服务启动失败，请稍后重试",
+                },
+                headers={"Retry-After": str(LIBREOFFICE_RETRY_AFTER_SECONDS)},
+            ) from exc
+
+        communicate_task = asyncio.create_task(proc.communicate())
+        try:
+            _stdout, stderr_bytes = await asyncio.wait_for(
+                asyncio.shield(communicate_task),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            outcome = "timeout"
+            await _terminate_and_reap(proc, communicate_task)
             raise HTTPException(
                 status_code=504,
                 detail={
-                    "error": "libreoffice_timeout",
+                    "reason": "libreoffice_timeout",
                     "elapsed_seconds": timeout,
-                    "message": f"LibreOffice 重算超时（{timeout}s），子进程已强制终止",
+                    "message": f"Office 转换超时（{timeout:g}s），请稍后重试",
                 },
-            )
+                headers={"Retry-After": str(LIBREOFFICE_RETRY_AFTER_SECONDS)},
+            ) from exc
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            await _terminate_and_reap(proc, communicate_task)
+            raise
 
         if proc.returncode != 0:
-            stderr_bytes = await proc.stderr.read() if proc.stderr else b""
+            outcome = "nonzero_exit"
             err_msg = stderr_bytes.decode("utf-8", errors="ignore")[:500]
             logger.warning(
-                "[LIBREOFFICE_POOL] conversion failed rc=%d: %s",
-                proc.returncode, err_msg,
+                "[LIBREOFFICE_POOL] conversion failed rc=%s: %s",
+                proc.returncode,
+                err_msg,
             )
-            # Cleanup temp dir
-            try:
-                shutil.rmtree(tmpdir_path, ignore_errors=True)
-            except Exception:
-                pass
             raise HTTPException(
                 status_code=500,
-                detail=f"LibreOffice 转换失败: {err_msg}" if err_msg else "LibreOffice 转换失败",
+                detail=(
+                    f"LibreOffice 转换失败: {err_msg}"
+                    if err_msg
+                    else "LibreOffice 转换失败"
+                ),
             )
 
-        # Copy converted file back to original path
-        converted = tmpdir_path / f"{xlsx_path.stem}.xlsx"
-        if not converted.exists():
-            try:
-                shutil.rmtree(tmpdir_path, ignore_errors=True)
-            except Exception:
-                pass
+        converted = output_dir / f"{source_path.stem}.{format_name}"
+        if not await asyncio.to_thread(converted.is_file):
+            outcome = "missing_output"
             raise HTTPException(
                 status_code=500,
                 detail="LibreOffice 转换后文件不存在",
             )
 
-        shutil.copy(converted, xlsx_path)
-        shutil.rmtree(tmpdir_path, ignore_errors=True)
+        payload = await asyncio.to_thread(converted.read_bytes)
+        outcome = "success"
+        return payload
+    finally:
+        LIBREOFFICE_RUN_SECONDS.labels(format=format_name).observe(
+            time.perf_counter() - run_started
+        )
+        LIBREOFFICE_RESULTS.labels(result=outcome, format=format_name).inc()
+        try:
+            if job_root is not None:
+                await asyncio.shield(
+                    asyncio.to_thread(shutil.rmtree, job_root, True)
+                )
+        finally:
+            _release_slot()
 
-        return xlsx_path
+
+async def convert_office_to_pdf_bytes(
+    source_path: Path,
+    *,
+    timeout: float = 90,
+    queue_timeout: float = LIBREOFFICE_ACQUIRE_TIMEOUT_SECONDS,
+    soffice_path: str | None = None,
+) -> bytes:
+    """把 Office 文件转成 PDF；转换在异步子进程中执行。"""
+    return await _run_conversion(
+        source_path,
+        output_format="pdf",
+        timeout=timeout,
+        queue_timeout=queue_timeout,
+        soffice_path=soffice_path,
+    )
+
+
+async def get_or_create_preview_pdf(
+    source_path: Path,
+    cache_path: Path,
+    *,
+    timeout: float = 90,
+    queue_timeout: float = LIBREOFFICE_ACQUIRE_TIMEOUT_SECONDS,
+    soffice_path: str | None = None,
+) -> tuple[bytes, str]:
+    """同缓存键单飞转换，并以临时文件原子发布缓存。"""
+
+    async def _read_cache() -> bytes | None:
+        try:
+            return await asyncio.to_thread(cache_path.read_bytes)
+        except FileNotFoundError:
+            return None
+
+    cached = await _read_cache()
+    if cached is not None:
+        return cached, "hit"
+
+    lock_key = str(cache_path.resolve())
+    lock = _preview_locks.get(lock_key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _preview_locks[lock_key] = lock
+
+    async with lock:
+        cached = await _read_cache()
+        if cached is not None:
+            return cached, "hit"
+
+        payload = await convert_office_to_pdf_bytes(
+            source_path,
+            timeout=timeout,
+            queue_timeout=queue_timeout,
+            soffice_path=soffice_path,
+        )
+
+        def _publish() -> None:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = cache_path.with_name(
+                f".{cache_path.name}.{uuid4().hex}.tmp"
+            )
+            try:
+                temporary.write_bytes(payload)
+                temporary.replace(cache_path)
+            finally:
+                temporary.unlink(missing_ok=True)
+
+        try:
+            await asyncio.to_thread(_publish)
+        except OSError:
+            logger.warning(
+                "[LIBREOFFICE_POOL] preview cache write failed: %s",
+                cache_path,
+                exc_info=True,
+            )
+        return payload, "miss"
+
+
+async def convert_with_libreoffice(
+    xlsx_path: Path,
+    timeout: int = 60,
+    *,
+    queue_timeout: float = LIBREOFFICE_ACQUIRE_TIMEOUT_SECONDS,
+) -> Path:
+    """重算 xlsx，并用原子替换覆盖原文件。"""
+    payload = await _run_conversion(
+        xlsx_path,
+        output_format="xlsx",
+        timeout=timeout,
+        queue_timeout=queue_timeout,
+        application_flag="--calc",
+    )
+    temporary = xlsx_path.with_name(f".{xlsx_path.name}.{uuid4().hex}.tmp")
+    try:
+        await asyncio.to_thread(temporary.write_bytes, payload)
+        await asyncio.to_thread(temporary.replace, xlsx_path)
+    finally:
+        await asyncio.to_thread(temporary.unlink, missing_ok=True)
+    return xlsx_path
 
 
 def get_queue_depth_header() -> dict[str, str]:
-    """如果 semaphore 等待队列 ≥ 10，返回 X-Recompute-Queue-Depth 响应头 (Req 8.5)。"""
+    """有等待者时向响应暴露当前进程内队列深度。"""
     depth = get_queue_depth()
     LIBREOFFICE_QUEUE_DEPTH.set(depth)
-    if depth >= 10:
+    if depth > 0:
         return {"X-Recompute-Queue-Depth": str(depth)}
     return {}
 
@@ -269,6 +556,11 @@ async def startup_health_check() -> None:
 # ---------------------------------------------------------------------------
 # Public API for external modules
 # ---------------------------------------------------------------------------
+def find_soffice_path() -> str | None:
+    """返回统一探测到的 LibreOffice 路径。"""
+    return _find_soffice()
+
+
 def get_semaphore() -> asyncio.Semaphore:
     """获取模块级 semaphore 引用（供测试使用）。"""
     return _libreoffice_semaphore

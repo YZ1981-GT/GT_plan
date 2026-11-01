@@ -10,6 +10,7 @@
  */
 import { newUuid } from '@/utils/uuid'
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { calcAdjustedAmount, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import type { ChecklistResponse } from './useF4FormData'
@@ -733,6 +734,15 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     if (data[CONCLUSION_STORAGE_KEY] != null) auditConclusion.value = data[CONCLUSION_STORAGE_KEY]
     loadRows()
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

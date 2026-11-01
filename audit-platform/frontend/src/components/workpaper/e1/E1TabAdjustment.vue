@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * E1TabAdjustment.vue — E1-5 调整分录汇总
@@ -27,7 +28,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { amountFormatter, amountParser } from '../composables/wpAmountInput'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useRouter } from 'vue-router'
 import { Right } from '@element-plus/icons-vue'
@@ -226,14 +227,7 @@ async function generateAuditConclusion(): Promise<void> {
           <div class="toolbar-right">
             <span class="chip-wrap"><GtIndexChip value="wp:A2" :context-project-id="projectId" /></span>
             <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
-            <el-tag
-              v-if="centralStatus?.review_status"
-              size="small"
-              :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-              :title="centralStatus.rejection_reason || ''"
-            >
-              集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-            </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
             <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
           </div>
         </div>

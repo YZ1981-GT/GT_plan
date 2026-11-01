@@ -8,6 +8,7 @@
  * 回写：1501* → G4-1 原值；1502* → G4-1 减值准备（贷−借）。
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { eventBus } from '@/utils/eventBus'
 import { parseNum } from '@/composables/useG4MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -463,6 +464,15 @@ export function useG4MainAdjustment(options: UseG4MainAdjustmentOptions) {
       eventBus.emit('adjustment:created', { wpCode: 'G4', accountCode: G4_ACCOUNT_CODE, timestamp: Date.now() })
     }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   if (getCurrentInstance()) {
     onBeforeUnmount(() => {

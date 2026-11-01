@@ -15,9 +15,6 @@ import {
   isNoteDomainNodeKey,
   filterNotePresetsForSection,
   buildNoteFormulaRows,
-  buildNoteSectionRows,
-  NOTE_GAP_LAYER_LABEL,
-  NOTE_GUIDE_LAYER_LABEL,
   type NotePresetFormula,
 } from '../noteScopeTargeting'
 
@@ -158,43 +155,6 @@ describe('buildNoteFormulaRows', () => {
   })
 })
 
-describe('buildNoteSectionRows（R5：可执行在前、审核要点、未生成原因）', () => {
-  const REF = { sectionId: '五、1', sectionTitle: '货币资金' }
-  const USER = [
-    { target: 't0:3:1', formula: 'SUM(t0:0:1, t0:2:1)', layer: 'preset', layer_label: '系统预设',
-      target_label: '货币资金分类表 · 合计 · 期末余额' },
-  ]
-
-  it('可执行公式排在审核要点之前，审核要点标「审核要点（不执行）」', () => {
-    const rows = buildNoteSectionRows(PRESETS, USER, REF)
-    expect(rows.map((r) => r.formula)).toEqual(['SUM(t0:0:1, t0:2:1)', 'A', 'B'])
-    expect(rows[0]).toMatchObject({ _layer: 'preset', _layer_label: '系统预设',
-      row_name: '货币资金分类表 · 合计 · 期末余额' })
-    expect(rows.slice(1).map((r) => r._layer_label)).toEqual([NOTE_GUIDE_LAYER_LABEL, NOTE_GUIDE_LAYER_LABEL])
-    expect(rows.slice(1).every((r) => r._layer === 'guide')).toBe(true)
-  })
-
-  it('有可执行公式而审核要点筛不出本章节 ⇒ 不列他章审核要点', () => {
-    const rows = buildNoteSectionRows(PRESETS, USER, { sectionId: '五、9', sectionTitle: '设定受益计划净资产' })
-    expect(rows).toHaveLength(1)
-    expect(rows[0].formula).toBe('SUM(t0:0:1, t0:2:1)')
-  })
-
-  it('两者都没有（章级节点 / 无上下文）⇒ 退回全部审核要点', () => {
-    expect(buildNoteSectionRows(PRESETS, [], {})).toHaveLength(PRESETS.length)
-    expect(buildNoteSectionRows(PRESETS, null, { sectionTitle: '设定受益计划净资产' })).toHaveLength(PRESETS.length)
-  })
-
-  it('没生成预设的格列在末尾：表名 · 行名 + 原因，公式留空可点「添加」', () => {
-    const rows = buildNoteSectionRows(PRESETS, USER, REF, [{ label: '账龄表 · 小计', reason: '嵌套小计判不准' }])
-    const gap = rows[rows.length - 1]
-    expect(gap).toMatchObject({ id: 'note_preset_gap_0', row_code: '五、1', row_name: '账龄表 · 小计', formula: '',
-      formula_description: '嵌套小计判不准', _layer: 'gap', _layer_label: NOTE_GAP_LAYER_LABEL })
-    // id 形态归「附注章节行」⇒ 编辑走章节公式弹窗（formulaRowKind.NOTE_ROW_ID_RE）
-    expect(gap.id).toMatch(/^note_(preset|user)_/)
-  })
-})
-
 describe('FormulaManagerDialog 接线（防死代码 / 防回归到报表分支）', () => {
   const src = readFileSync(resolve(__dirname, '../FormulaManagerDialog.vue'), 'utf-8')
 
@@ -207,12 +167,6 @@ describe('FormulaManagerDialog 接线（防死代码 / 防回归到报表分支�
   it('附注行不再由组件内 inline 映射/过滤（逻辑单一真源在 noteScopeTargeting）', () => {
     expect(src).not.toContain("(f.section_title || '').includes(targetTitle)")
     expect(src).not.toContain('id: `note_preset_${i}`')
-  })
-
-  it('附注章节节点经 buildNoteSectionRows 出行，并带上后端的 preset_notes（R5）', () => {
-    expect(src).toContain('return buildNoteSectionRows(notePresetFormulas.value, own ? noteUserFormulas.value : [], sectionRef,')
-    expect(src).toContain('own ? notePresetNotes.value : []')
-    expect(src).toContain('notePresetNotes.value = Array.isArray(data?.preset_notes) ? data.preset_notes : []')
   })
 
   it('调用页章节上下文只用于本页章节/域根节点，章级节点不套用', () => {

@@ -9,6 +9,7 @@
  * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
 import {
@@ -568,6 +569,15 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
       window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
     }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

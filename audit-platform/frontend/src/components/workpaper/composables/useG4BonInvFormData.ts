@@ -1,6 +1,8 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
 import type { ChecklistResponse } from './useF1FormData'
 
 export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
@@ -8,6 +10,14 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!opts.wpId.value) throw new Error('缺少底稿标识，无法保存')
+      await cas.save({ wpId: opts.wpId.value, projectId: opts.projectId.value, items })
+    },
+  })
   const itemPrefix = 'G4-'
 
   async function loadResponses() {
@@ -15,6 +25,7 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     try {
       const res = await api.get(`/api/workpapers/${opts.wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id?.startsWith(itemPrefix)) {
@@ -46,19 +57,23 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   }
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>) {
+    const timer = _debounceTimers.get(itemId)
+    if (timer) clearTimeout(timer)
+    _debounceTimers.delete(itemId)
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
-    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
-      project_id: opts.projectId.value,
-      items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-    })
+    queue.mark(itemId)
+    await queue.flush()
   }
 
-  /** 批量保存：单次 PUT，避免上年结转等多 item 更新半成功 */
+  /** 批量保存：单次 strict-CAS PUT，避免上年结转等多 item 更新半成功。 */
   async function saveBatch(items: ChecklistResponse[]): Promise<void> {
     if (!items.length) return
     const payload = items.map((item) => {
+      const timer = _debounceTimers.get(item.item_id)
+      if (timer) clearTimeout(timer)
+      _debounceTimers.delete(item.item_id)
       const existing = allResponses.value.get(item.item_id) || {
         item_id: item.item_id,
         conclusion: null,
@@ -66,16 +81,10 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
       }
       const updated = { ...existing, ...item, item_id: item.item_id }
       allResponses.value.set(item.item_id, updated)
-      return {
-        item_id: updated.item_id,
-        conclusion: updated.conclusion,
-        remark: updated.remark,
-      }
+      return updated
     })
-    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
-      project_id: opts.projectId.value,
-      items: payload,
-    })
+    queue.markMany(payload.map((item) => item.item_id))
+    await queue.flush()
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -84,15 +93,25 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     allResponses.value.set(itemId, updated)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
+    queue.mark(itemId)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void queue.flush().catch(() => undefined)
     }, 2000))
   }
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
-  onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
+  async function flushPending(): Promise<void> {
+    for (const timer of _debounceTimers.values()) clearTimeout(timer)
+    _debounceTimers.clear()
+    await queue.flush()
+  }
 
-  return { isLoading, sheetCache, allResponses, loadAll, getSheet, saveImmediate, saveBatch, debouncedSave }
+  onScopeDispose(() => { void flushPending().catch(() => undefined) })
+
+  return {
+    isLoading, sheetCache, allResponses, loadAll, getSheet,
+    saveImmediate, saveBatch, debouncedSave, flushPending,
+  }
 }

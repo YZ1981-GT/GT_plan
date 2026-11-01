@@ -87,7 +87,10 @@ export function pruneSupplierStructureRows(
   rows: SupplierStructureRow[],
 ): SupplierStructureRow[] {
   const filled = rows.filter((row) => !isBlankSupplierStructureRow(row))
-  return filled.length ? filled : [emptySupplierStructureRow()]
+  if (filled.length) return filled
+  // 空表仍保留既有第一行身份。每次挂载重新铸造 id 会触发“迁移”自动保存，
+  // 与用户刚开始的编辑并发后让 strict CAS 返回 409。
+  return rows.length ? [rows[0]] : [emptySupplierStructureRow()]
 }
 
 export function enrichSupplierStructureRows(

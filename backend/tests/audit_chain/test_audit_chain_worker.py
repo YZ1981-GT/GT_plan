@@ -194,3 +194,63 @@ class TestHealthQuarantineCount:
         # 清除缓存避免污染其他测试
         _audit_chain_cache["data"] = None
         _audit_chain_cache["ts"] = 0.0
+
+
+class TestHealthQuarantineState:
+    @pytest.mark.asyncio
+    async def test_redis_failure_reports_unknown_not_zero(self, monkeypatch):
+        from app.api import health as health_mod
+
+        class DownRedis:
+            def scan_iter(self, **_kwargs):
+                raise ConnectionError("redis unavailable")
+
+        health_mod._audit_chain_cache.update(data=None, ts=0.0)
+        monkeypatch.setattr("app.core.redis.redis_client", DownRedis())
+        monkeypatch.setattr(
+            "app.services.audit_chain.forks.scan_forks",
+            AsyncMock(return_value=[]),
+        )
+        result = await health_mod._query_audit_chain_health(AsyncMock())
+        assert result["quarantined_entries"] is None
+        health_mod._audit_chain_cache.update(data=None, ts=0.0)
+
+    @pytest.mark.asyncio
+    async def test_quarantine_makes_health_degraded(self, monkeypatch):
+        import json as _json
+        from types import SimpleNamespace
+        from app.api import health as health_mod
+
+        ctx = SimpleNamespace(db=AsyncMock(), redis=AsyncMock())
+        ctx.redis.ping.return_value = True
+        monkeypatch.setattr(
+            health_mod, "_query_migration_status",
+            AsyncMock(return_value={"applied_count": 1, "failures": []}),
+        )
+        monkeypatch.setattr(
+            health_mod, "_query_schema_drift",
+            AsyncMock(return_value={"count": 0, "critical_count": 0, "items": []}),
+        )
+        monkeypatch.setattr(
+            health_mod, "_query_audit_chain_health",
+            AsyncMock(return_value={
+                "unacknowledged_forks": 0,
+                "quarantined_entries": 2,
+                "checked_at": "now",
+            }),
+        )
+        monkeypatch.setattr(health_mod, "audit_log_failure_state", lambda: {"failed_count": 0})
+        monkeypatch.setattr(health_mod, "reload_status_snapshot", lambda: {})
+        monkeypatch.setattr(health_mod, "startup_report_as_dict", lambda: {})
+        monkeypatch.setattr(health_mod, "get_last_freeze_report", lambda: {})
+        monkeypatch.setattr(health_mod, "_events_replay_info", lambda: {})
+        monkeypatch.setattr(
+            "app.routers.health_redis._get_redis_health_info",
+            AsyncMock(return_value={}),
+        )
+
+        response = await health_mod.health_check(ctx)
+        body = _json.loads(response.body)
+        assert response.status_code == 200
+        assert body["status"] == "degraded"
+        assert body["audit_chain"]["quarantined_entries"] == 2

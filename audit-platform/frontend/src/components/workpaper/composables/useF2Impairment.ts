@@ -2,6 +2,7 @@
  * useF2Impairment — F2-57 合同履约成本减值准备测算
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   debouncedPublishF2SpeDisclosureNote,
@@ -88,6 +89,15 @@ export function useF2Impairment(opts: {
   const impairedCount = computed(() =>
     enrichedProjects.value.filter((r) => r.isImpaired === '是').length,
   )
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

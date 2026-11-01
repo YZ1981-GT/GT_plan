@@ -212,6 +212,24 @@ describe('useTbSummaryPersistence 加载与版本初始化', () => {
 })
 
 describe('useTbSummaryPersistence 自动保存队列', () => {
+  it('queue 只记录行引用，直到 debounce drain 才序列化全表', async () => {
+    vi.useFakeTimers()
+    let reads = 0
+    const row: TbSummaryPersistRow = {
+      row_code: '1',
+      get rcl_dr() { reads += 1; return 7 },
+    }
+    const state = setupController({ rows: [row] })
+    state.controller.prime(CONTEXT_A, 1)
+
+    expect(state.controller.queue()).toBe(true)
+    expect(reads).toBe(0)
+    await vi.advanceTimersByTimeAsync(200)
+
+    expect(reads).toBe(1)
+    expect(state.save).toHaveBeenCalledTimes(1)
+  })
+
   it('200ms 内多次提交只保存最后一份冻结快照', async () => {
     vi.useFakeTimers()
     const state = setupController()

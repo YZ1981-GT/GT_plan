@@ -56,6 +56,7 @@ from app.models.ai_models import (
     ChatEngineName,
     ChatRunStatus,
 )
+from app.services.ai_chat.context_capabilities import context_capability_enabled
 from app.services.ai_chat.contracts import (
     AiChatDenialCode,
     HostRef,
@@ -362,7 +363,7 @@ class EngineCapabilities(BaseModel):
     subagents: bool = Field(..., description="是否支持子 Agent")
     max_context: int = Field(..., gt=0, description="上下文 token 上限")
     structured_output: bool = Field(..., description="是否支持结构化输出")
-    local_only: bool = Field(..., description="是否保证全本地执行")
+    local_only: bool = Field(..., description="是否保证全本地执行（会按模型路由动态收窄）")
     review_mode: bool = Field(..., description="是否支持底稿复核模式")
     attachments: bool = Field(..., description="是否支持会话附件")
 
@@ -380,9 +381,10 @@ CAPABILITIES_BY_ENGINE: dict[ChatEngineName, EngineCapabilities] = {
         subagents=False,
         max_context=32768,
         structured_output=False,
-        local_only=True,
-        review_mode=True,
-        attachments=True,
+        # Native 按任务信任域允许事务所私有服务兜底，因此不能再声明“保证全本地”。
+        local_only=False,
+        review_mode=context_capability_enabled("review_mode"),
+        attachments=context_capability_enabled("attachments"),
     ),
     ChatEngineName.dsh: EngineCapabilities(
         streaming=True,
@@ -391,8 +393,8 @@ CAPABILITIES_BY_ENGINE: dict[ChatEngineName, EngineCapabilities] = {
         max_context=32768,
         structured_output=True,
         local_only=True,
-        review_mode=True,
-        attachments=True,
+        review_mode=context_capability_enabled("review_mode"),
+        attachments=context_capability_enabled("attachments"),
     ),
 }
 
@@ -487,6 +489,11 @@ PRIVILEGED_REQUEST_FIELDS: frozenset[str] = frozenset(
         "ocr_text",
         "attachment_content",
         "attachments",
+        "resources",
+        "blob_id",
+        "attachment_version_id",
+        "content_hash",
+        "storage_key",
         # ④ 消息正文
         "content",
         "message",
@@ -573,6 +580,11 @@ class ChatRunRequest(BaseModel):
         max_length=MAX_ATTACHMENTS_PER_RUN,
         description="会话附件 ID（正文与 OCR 由服务端按 owner/session 授权后读取）",
     )
+    project_attachment_ids: list[UUID] = Field(
+        default_factory=list,
+        max_length=MAX_ATTACHMENTS_PER_RUN,
+        description="本次临时引用的项目附件 ID；版本、blob、hash 与权限由服务端钉住",
+    )
     review_mode: bool = Field(False, description="是否启用底稿复核模式")
     sheet_name: str | None = Field(
         None, max_length=200, description="复核模式的目标 sheet"
@@ -590,6 +602,27 @@ class ChatRunRequest(BaseModel):
                 "客户端只提交稳定 ID 与用户输入。"
             )
         return data
+
+    @model_validator(mode="after")
+    def _limit_and_deduplicate_attachment_ids(self) -> "ChatRunRequest":
+        self.attachment_ids = list(dict.fromkeys(self.attachment_ids))
+        self.project_attachment_ids = list(dict.fromkeys(self.project_attachment_ids))
+        if len(self.attachment_ids) + len(self.project_attachment_ids) > MAX_ATTACHMENTS_PER_RUN:
+            raise ValueError(f"单次对话最多引用 {MAX_ATTACHMENTS_PER_RUN} 个附件")
+        return self
+
+    def context_snapshot(self) -> dict[str, Any]:
+        """持久化恢复所需的最小上下文请求；不含正文、label、权限或项目断言。"""
+        return {
+            "mentions": [
+                {"type": mention.type.value, "id": mention.id}
+                for mention in self.mentions
+            ],
+            "attachment_ids": [str(value) for value in self.attachment_ids],
+            "project_attachment_ids": [str(value) for value in self.project_attachment_ids],
+            "review_mode": self.review_mode,
+            "sheet_name": self.sheet_name,
+        }
 
     def mention_pairs(self) -> Sequence[tuple[ResourceType, str]]:
         """交给授权层逐项复核的最小标识对（不含任何客户端展示字段）。"""

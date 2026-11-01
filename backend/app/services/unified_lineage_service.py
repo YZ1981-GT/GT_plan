@@ -30,7 +30,7 @@ from app.services.wp_trace_service import trace_downstream, trace_upstream
 logger = logging.getLogger(__name__)
 
 # 支持的对象类型
-ObjectType = Literal["wp_cell", "report_row", "note_cell", "tb_row", "adjustment"]
+ObjectType = Literal["wp_cell", "report_row", "note_cell", "deliverable_section", "tb_row", "adjustment"]
 Direction = Literal["both", "upstream", "downstream"]
 _T = TypeVar("_T")
 
@@ -44,6 +44,7 @@ _SOURCE_BY_OBJECT_TYPE: dict[ObjectType, str] = {
 #: 溯源对象类型 → 附件关联的 ``target_type``（ADR-FHIC-13）；不在表中的类型按原值精确匹配（ADR-FHIC-16）
 _ATTACHMENT_TARGET_TYPE: dict[str, str] = {
     "wp_cell": "wp_cell", "report_row": "report_row", "note_cell": "note_section",
+    "deliverable_section": "deliverable_section",
 }
 
 _SOURCE_LABELS = {
@@ -251,47 +252,9 @@ class UnifiedLineageService:
     async def _query_attachments(
         self, project_id: UUID, object_type: ObjectType, object_id: str
     ) -> list[dict[str, Any]]:
-        """查询关联附件（attachment_lineage 表；spec formula-hub-integrity-closure 需求 7.2，ADR-FHIC-13）。
+        """统一附件子源：底稿读权威关系，输出域读 AttachmentLineage。"""
+        from app.services.attachment_trace_service import AttachmentTraceService
 
-        ``project_id`` 列未就绪（迁移 V227 未执行）⇒ 抛 :class:`AttachmentLineageMigrationPending`，不查该表。
-
-        条件：本项目的行（``project_id`` 为空的行对任何项目都不可见）、附件存在且未软删、``target_type`` 按
-        :data:`_ATTACHMENT_TARGET_TYPE` 映射（表外类型按原值）、``target_ref`` 等于 ``object_id`` 或以
-        ``object_id + "!"`` 开头（同一底稿的单元格；``object_id`` 含 ``!`` 时只做等值）。前缀匹配用
-        ``startswith(autoescape=True)``：``%``、``_`` 与转义符按字面匹配，``\\`` 在所用转义符 ``/`` 下本就是普通字符。
-        """
-        attachments: list[dict[str, Any]] = []
-        if not await lineage_project_column_ready(self.db):
-            raise AttachmentLineageMigrationPending()
-        ref_match = AttachmentLineage.target_ref == object_id
-        if "!" not in object_id:
-            ref_match = sa.or_(
-                ref_match, AttachmentLineage.target_ref.startswith(f"{object_id}!", autoescape=True)
-            )
-        result = await self.db.execute(
-            sa.select(
-                AttachmentLineage.id, AttachmentLineage.attachment_id, AttachmentLineage.target_type,
-                AttachmentLineage.target_ref, AttachmentLineage.created_at,
-                Attachment.file_name, Attachment.file_type,
-            )
-            .join(Attachment, Attachment.id == AttachmentLineage.attachment_id)
-            .where(
-                AttachmentLineage.project_id == project_id,
-                AttachmentLineage.target_type == _ATTACHMENT_TARGET_TYPE.get(object_type, object_type),
-                ref_match,
-                Attachment.is_deleted == sa.false(),
-            )
-            .order_by(AttachmentLineage.created_at.desc())
-            .limit(20)
+        return await AttachmentTraceService(self.db).for_object(
+            project_id, object_type, object_id,
         )
-        for row in result.fetchall():
-            attachments.append({
-                "id": str(row.id),
-                "attachment_id": str(row.attachment_id),
-                "target_type": row.target_type,
-                "target_ref": row.target_ref,
-                "file_name": row.file_name,
-                "file_type": row.file_type,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-            })
-        return attachments

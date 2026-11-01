@@ -31,12 +31,23 @@ from app.services.llm_provider_registry import ProviderProfile, provider_profile
 # 可改用下一个候选的错误类别（ADR-ROUTE-003）。
 _FAILOVER_KINDS = frozenset({"unavailable", "config"})
 
-# 最近一次非流式调用上报的 total_tokens（同一请求上下文内可读，供用量统计）。
-_LAST_TOTAL_TOKENS: ContextVar[int | None] = ContextVar("llm_last_total_tokens", default=None)
+# 最近一次非流式调用上报的 token usage（同一请求上下文内可读，供用量统计）。
+@dataclass(frozen=True)
+class LLMUsage:
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+
+
+_LAST_USAGE: ContextVar[LLMUsage] = ContextVar("llm_last_usage", default=LLMUsage())
+
+
+def last_usage() -> LLMUsage:
+    return _LAST_USAGE.get()
 
 
 def last_total_tokens() -> int:
-    return _LAST_TOTAL_TOKENS.get() or 0
+    return _LAST_USAGE.get().total_tokens or 0
 
 
 class LLMRuntimeError(RuntimeError):
@@ -70,6 +81,9 @@ class ResolvedLLMConfig:
     model_id: UUID | None = None
     reasoning_effort: str | None = None
     deployment: str = AIDeployment.server.value
+    trust_zone: str = "restricted"
+    client_data_allowed: bool = False
+    mask_policy: str = "strict"
 
     @property
     def identity(self) -> str:
@@ -91,6 +105,9 @@ class ResolvedLLMConfig:
             "has_api_key": bool(self.api_key),
             "reasoning_effort": self.reasoning_effort,
             "deployment": self.deployment,
+            "trust_zone": self.trust_zone,
+            "client_data_allowed": self.client_data_allowed,
+            "mask_policy": self.mask_policy,
         }
 
 
@@ -140,6 +157,9 @@ def resolve_config_from_model(
         model_id=model.id,
         reasoning_effort=model.reasoning_effort,
         deployment=deployment_of(model),
+        trust_zone=str(getattr(model, "trust_zone", "restricted") or "restricted"),
+        client_data_allowed=bool(getattr(model, "client_data_allowed", False)),
+        mask_policy=str(getattr(model, "mask_policy", "strict") or "strict"),
     )
 
 
@@ -165,6 +185,8 @@ def _environment_config(
     api_key = settings.LLM_API_KEY
     if not api_key or api_key == "not-needed":
         api_key = None
+    deployment = classify_deployment(endpoint_url=endpoint)
+    local = deployment == AIDeployment.local.value
     return ResolvedLLMConfig(
         model_name=(requested_model or default_model).strip(),
         model_type=model_type,
@@ -173,7 +195,10 @@ def _environment_config(
         api_key=api_key,
         profile=profile,
         source="environment",
-        deployment=classify_deployment(endpoint_url=endpoint),
+        deployment=deployment,
+        trust_zone="local_device" if local else "restricted",
+        client_data_allowed=local,
+        mask_policy="role_based" if local else "strict",
     )
 
 
@@ -427,15 +452,28 @@ async def chat_sync(
         config, messages, temperature=temperature, max_tokens=max_tokens,
         stream=False, enable_thinking=enable_thinking,
     )
-    _LAST_TOTAL_TOKENS.set(None)
+    _LAST_USAGE.set(LLMUsage())
     try:
         async with await build_runtime_client(config, timeout=timeout) as client:
             response = await client.post("chat/completions", json=payload)
             _raise_for_status(response, config)
             body = _json_body(response)
             usage = body.get("usage") if isinstance(body, dict) else None
-            if isinstance(usage, dict) and isinstance(usage.get("total_tokens"), int):
-                _LAST_TOTAL_TOKENS.set(usage["total_tokens"])
+            if isinstance(usage, dict):
+                _LAST_USAGE.set(LLMUsage(
+                    prompt_tokens=(
+                        int(usage["prompt_tokens"])
+                        if isinstance(usage.get("prompt_tokens"), int) else None
+                    ),
+                    completion_tokens=(
+                        int(usage["completion_tokens"])
+                        if isinstance(usage.get("completion_tokens"), int) else None
+                    ),
+                    total_tokens=(
+                        int(usage["total_tokens"])
+                        if isinstance(usage.get("total_tokens"), int) else None
+                    ),
+                ))
             choices = body.get("choices") if isinstance(body, dict) else None
             choice = choices[0] if isinstance(choices, list) and choices else {}
             message = choice.get("message", {}) if isinstance(choice, dict) else {}

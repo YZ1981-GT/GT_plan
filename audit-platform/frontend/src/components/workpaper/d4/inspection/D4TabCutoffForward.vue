@@ -8,6 +8,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 自动跨期判断、统计仪表板、AI辅助审计意见
  */
 import { ref, computed, inject, watch, onBeforeUnmount, defineAsyncComponent, toRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { isCrossPeriodForward } from '../../composables/useD4FormulaEngine'
@@ -233,7 +234,13 @@ function flushSave() {
 function updateAuditNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persistAll() }
 function updateAuditConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persistAll() }
 // 双向回写 flushHtml/reloadHtml 用（先落库再 readStoreProjection，主控 §4.1）。
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD417() { loadData(); loadNoteConclusion() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 

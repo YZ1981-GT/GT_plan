@@ -24,7 +24,7 @@ from app.models.consol_scope_confirmation_models import (
     ConsolScopeConfirmationNode,
 )
 from app.models.core import Project
-from app.services.consol_group_tree import GroupTreeResult, build_group_tree
+from app.services.consol_group_tree import MODE_NONE, GroupTreeResult, build_group_tree
 from app.services.consol_tree_service import TreeNode, to_dict
 from app.services.note_section_catalog import normalize_report_scope
 from app.services.project_audit_year import resolve_project_audit_year
@@ -120,7 +120,11 @@ def fingerprint_payload(payload: dict[str, Any]) -> str:
 
 
 async def _load_state(
-    db: AsyncSession, project_id: UUID, *, result: GroupTreeResult | None = None,
+    db: AsyncSession,
+    project_id: UUID,
+    *,
+    result: GroupTreeResult | None = None,
+    tree: TreeNode | None = None,
 ) -> dict[str, Any]:
     project = (await db.execute(sa.select(Project).where(
         Project.id == project_id,
@@ -134,7 +138,18 @@ async def _load_state(
     year = resolve_project_audit_year(project)
     if year is None:
         raise ScopeConfirmationError(422, "SCOPE_YEAR_UNRESOLVED", "项目缺少有效审计年度")
-    if result is None:
+    if result is not None and tree is not None:
+        raise ValueError("result 与 tree 不能同时传入")
+    if tree is not None:
+        if getattr(tree, "project_id", None) != project_id:
+            raise ScopeConfirmationError(409, "SCOPE_TREE_PROJECT_MISMATCH", "企业树根项目与版本目标不一致")
+        result = GroupTreeResult(
+            root=tree,
+            year=year,
+            mode=getattr(tree, "mode", None) or MODE_NONE,
+            diagnostics=[],
+        )
+    elif result is None:
         result = await build_group_tree(db, project_id)
     if result is None or result.root is None:
         raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "合并项目树不存在")
@@ -349,7 +364,12 @@ async def confirm_scope(
 
 
 async def record_scope_version(
-    db: AsyncSession, project_id: UUID, *, recorded_by: UUID | None = None, mode: str = "auto",
+    db: AsyncSession,
+    project_id: UUID,
+    *,
+    recorded_by: UUID | None = None,
+    mode: str = "auto",
+    tree: TreeNode | None = None,
 ) -> dict[str, Any]:
     """推送时自动记录树版本（R1.2 / ADR-CAL-001）；只 flush，事务由调用方提交。
 
@@ -361,7 +381,7 @@ async def record_scope_version(
         raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "项目不存在")
     if normalize_report_scope(project.report_scope) != "consolidated":
         return {"created": False, "skipped": "not_consolidated", "revision": 0}
-    state = await _load_state(db, project_id)
+    state = await _load_state(db, project_id, tree=tree)
     active = state["active"]
     if project.consol_lock is not False:
         return {"created": False, "skipped": "locked", "revision": active.revision if active else 0}

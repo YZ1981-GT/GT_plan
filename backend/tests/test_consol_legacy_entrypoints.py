@@ -99,8 +99,10 @@ class TestEndpoints:
         await generate_consol_reports_sync(db, g_id, Y)
         await db.commit()
         async with legacy_client(admin) as c:
-            report = {r["row_code"]: r for r in (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
-                                                              params={"report_type": "balance_sheet"})).json()}
+            report = {r["row_code"]: r for r in (await c.get(
+                f"/api/consolidation/reports/{gid}/{Y}",
+                params={"report_type": "balance_sheet", "mode": "preview"},
+            )).json()["rows"]}
             resp = await c.post("/api/report-config/drill-down",
                                 json={"project_id": gid, "year": Y, "report_type": "balance_sheet", "row_code": "BS-006"})
             assert resp.status_code == 200, resp.text

@@ -196,6 +196,41 @@ describe('useReportData — onGenerate', () => {
     expect(rows.value).toEqual(fakeRows)
   })
 
+  it('shows stale trial balance warning returned by generation API', async () => {
+    const warning = '试算表是按旧口径算出的，利润表各行的金额和符号可能不对，请先全量重算试算表再生成报表'
+    mockGenerateReports.mockResolvedValue({
+      summary: { total_rows: 30, non_zero_rows: 20 },
+      warnings: [{ type: 'stale_trial_balance', message: warning }],
+    } as any)
+    mockGetReport.mockResolvedValue(makeFakeRows())
+    mockApiGet.mockResolvedValue(null)
+
+    const { onGenerate } = useReportData(createOptions())
+    await onGenerate()
+
+    expect(vi.mocked(ElMessage.warning)).toHaveBeenCalledWith(warning)
+    expect(vi.mocked(ElMessage.success)).toHaveBeenCalled()
+  })
+
+  it('deduplicates generation warnings and ignores malformed entries', async () => {
+    mockGenerateReports.mockResolvedValue({
+      warnings: [
+        { type: 'stale_trial_balance', message: '口径提示' },
+        { type: 'stale_trial_balance', message: '口径提示' },
+        { type: 'other', message: '' },
+        null,
+      ],
+    } as any)
+    mockGetReport.mockResolvedValue([])
+    mockApiGet.mockResolvedValue(null)
+
+    const { onGenerate } = useReportData(createOptions())
+    await onGenerate()
+
+    expect(vi.mocked(ElMessage.warning)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(ElMessage.warning)).toHaveBeenCalledWith('口径提示')
+  })
+
   it('shows generic success message when summary has no rows', async () => {
     mockGenerateReports.mockResolvedValue({})
     mockGetReport.mockResolvedValue([])

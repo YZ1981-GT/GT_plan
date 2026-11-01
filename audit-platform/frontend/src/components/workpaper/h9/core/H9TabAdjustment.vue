@@ -28,14 +28,7 @@
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H9-4" :context-project-id="props.projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -208,6 +201,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabAdjustment.vue — H9-4 调整分录汇总
@@ -225,7 +219,7 @@ import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH9Adjustment } from '../../composables/useH9Adjustment'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { h9Scope } from '../../composables/hCycleAccountScope'

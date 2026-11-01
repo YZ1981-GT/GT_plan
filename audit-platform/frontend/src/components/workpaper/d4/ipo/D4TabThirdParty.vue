@@ -8,6 +8,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双模式 + AI辅助 + 导入导出
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
@@ -120,7 +121,13 @@ function flushSave() {
 function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.value = v; persistAll() }
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
 // 双向回写 flushHtml 用：清防抖 + 立即派发（先落库再 readStoreProjection）。
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 // 双向回写 reloadHtml 用：切回 HTML 后重读。
 function reload() { loadData(); loadNote() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })

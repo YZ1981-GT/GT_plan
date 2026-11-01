@@ -20,18 +20,22 @@ import json
 import logging
 from typing import Any
 from urllib.parse import quote
-from uuid import UUID
+from uuid import UUID, uuid4
 
 # ─── Single-flight: prevent duplicate concurrent exports for same project (#33) ───
 _PROJECT_EXPORT_LOCKS: dict[str, asyncio.Lock] = {}
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import (
+    get_current_user,
+    require_project_access,
+    require_project_access_stream,
+)
 from app.models.base import ProjectStatus
 from app.models.core import Project, ProjectUser, User
 from app.services.bulk_tab.bulk_progress import bulk_progress_service
@@ -57,7 +61,7 @@ router = APIRouter(
 async def get_bulk_progress_stream(
     project_id: UUID,
     task_id: str,
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """SSE 进度流 — 实时推送批量导入/导出进度。
 
@@ -76,9 +80,86 @@ async def get_bulk_progress_stream(
 
     Requirements: 6.1
     """
-    # 验证任务存在
+    # 验证任务存在。进程重启后内存投影为空时，回退到 DB 权威任务并短会话轮询。
     task = bulk_progress_service.get_task(task_id)
     if not task:
+        from app.core.database import async_session
+        from app.services import platform_job_service
+
+        try:
+            durable_id = UUID(task_id)
+            async with async_session() as durable_db:
+                initial = await platform_job_service.get_job_snapshot(
+                    durable_db,
+                    project_id=project_id,
+                    actor_id=current_user.id,
+                    job_id=durable_id,
+                )
+        except (ValueError, platform_job_service.PlatformJobNotFound):
+            raise HTTPException(status_code=404, detail="任务不存在或已过期")
+
+        async def durable_generator():
+            previous: tuple[Any, ...] | None = None
+            snapshot = initial
+            while True:
+                status = str(snapshot.get("status") or "")
+                current = int(snapshot.get("progress_current") or 0)
+                total = int(snapshot.get("progress_total") or 0)
+                message = str(
+                    snapshot.get("progress_message")
+                    or snapshot.get("error_message")
+                    or ""
+                )
+                signature = (status, current, total, message)
+                if signature != previous:
+                    if status == "succeeded":
+                        event_type = "complete"
+                    elif status in {"failed", "cancelled"}:
+                        event_type = "error"
+                    else:
+                        event_type = "progress"
+                    data = json.dumps(
+                        {
+                            "type": event_type,
+                            "current": current,
+                            "total": total,
+                            "message": message,
+                        },
+                        ensure_ascii=False,
+                    )
+                    yield f"event: {event_type}\ndata: {data}\n\n"
+                    previous = signature
+                if status in {"succeeded", "failed", "cancelled"}:
+                    return
+                await asyncio.sleep(1.0)
+                try:
+                    async with async_session() as durable_db:
+                        snapshot = await platform_job_service.get_job_snapshot(
+                            durable_db,
+                            project_id=project_id,
+                            actor_id=current_user.id,
+                            job_id=durable_id,
+                        )
+                except platform_job_service.PlatformJobNotFound:
+                    data = json.dumps(
+                        {"type": "error", "message": "任务不存在或已过期"},
+                        ensure_ascii=False,
+                    )
+                    yield f"event: error\ndata: {data}\n\n"
+                    return
+
+        return StreamingResponse(
+            durable_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    # 旧内存投影也必须按发起人隔离，不能只校项目。
+    if task.user_id != str(current_user.id):
         raise HTTPException(status_code=404, detail="任务不存在或已过期")
 
     # 验证任务属于当前项目
@@ -408,8 +489,8 @@ async def preview_manifest(
 async def bulk_export_templates(
     project_id: UUID,
     body: ExportTemplatesRequest,
-    current_user: User = Depends(require_project_access("readonly")),
-    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access_stream("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> StreamingResponse:
     """批量导出底稿 Tab **模板**为 ZIP（空表结构 + 编制提示）。
 
@@ -469,8 +550,8 @@ async def bulk_export_templates(
 async def bulk_export_data(
     project_id: UUID,
     body: ExportDataRequest,
-    current_user: User = Depends(require_project_access("readonly")),
-    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access_stream("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> StreamingResponse:
     """批量导出底稿 Tab **数据**为 ZIP（含已填写数据快照）。
 
@@ -612,8 +693,8 @@ async def bulk_export_data_async(
 async def bulk_export_download(
     project_id: UUID,
     task_id: str,
-    current_user: User = Depends(require_project_access("readonly")),
-    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access_stream("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> FileResponse:
     """下载已完成的异步导出 ZIP（Req 6.1）。
 
@@ -752,6 +833,11 @@ async def bulk_import_async(
     all_or_nothing: bool = Form(
         default=False, description="all-or-nothing 原子性：任一 sheet 失败则全量回滚（Req 4.2）"
     ),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        description="客户端重试复用同一键；未提供时服务端生成一次性键",
+    ),
     current_user: User = Depends(require_project_access("edit")),
     db: AsyncSession = Depends(get_db),
 ) -> AsyncTaskResponse:
@@ -776,26 +862,92 @@ async def bulk_import_async(
             detail=f"无效的冲突策略: '{strategy}'。可选值: {', '.join(valid_strategies)}",
         )
 
-    try:
-        zip_bytes = await file.read()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"文件读取失败: {e}")
-    if not zip_bytes:
-        raise HTTPException(status_code=400, detail="上传文件为空")
-
+    spool_path = await bulk_async_runner.spool_import_upload(
+        file,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
     atomicity = (
         AtomicityMode.ALL_OR_NOTHING if all_or_nothing else AtomicityMode.PER_SHEET
     )
-    task_id = bulk_async_runner.schedule_import(
-        project_id=project_id,
-        zip_bytes=zip_bytes,
-        strategy=strategy,
-        atomicity=atomicity,
-        user_id=current_user.id,
-        username=current_user.username,
-        role_value=current_user.role.value,
+    from app.services import platform_job_service
+    from app.services.bulk_tab.durable_job_executor import OPERATION
+
+    try:
+        sha256, size = await asyncio.to_thread(
+            bulk_async_runner.hash_spool_file,
+            spool_path,
+        )
+        await platform_job_service.acquire_admission_lock(db)
+        job, created = await platform_job_service.create_or_get_job(
+            db,
+            operation=OPERATION,
+            project_id=project_id,
+            actor_id=current_user.id,
+            idempotency_key=(idempotency_key or "").strip() or str(uuid4()),
+            payload_ref={
+                "spool_path": str(spool_path),
+                "sha256": sha256,
+                "size": size,
+                "strategy": strategy,
+                "atomicity": atomicity.value,
+            },
+            request_payload={
+                "sha256": sha256,
+                "size": size,
+                "strategy": strategy,
+                "atomicity": atomicity.value,
+            },
+            reserved_bytes=size,
+        )
+        if created:
+            await platform_job_service.enforce_active_capacity(
+                db,
+                job,
+                global_limit=bulk_async_runner.BULK_IMPORT_GLOBAL_LIMIT,
+                user_limit=bulk_async_runner.BULK_IMPORT_USER_LIMIT,
+                project_limit=bulk_async_runner.BULK_IMPORT_PROJECT_LIMIT,
+                reserved_bytes_limit=bulk_async_runner.BULK_IMPORT_SPOOL_BUDGET_BYTES,
+            )
+        await db.commit()
+    except platform_job_service.PlatformJobCapacityExceeded as exc:
+        await db.rollback()
+        await bulk_async_runner.cleanup_import_spool(spool_path)
+        raise HTTPException(
+            status_code=429,
+            detail={"reason": "bulk_import_capacity", "message": str(exc)},
+            headers={
+                "Retry-After": str(
+                    bulk_async_runner.BULK_IMPORT_RETRY_AFTER_SECONDS
+                )
+            },
+        ) from exc
+    except platform_job_service.PlatformJobConflict as exc:
+        await db.rollback()
+        await bulk_async_runner.cleanup_import_spool(spool_path)
+        raise HTTPException(
+            status_code=409,
+            detail={"reason": "bulk_import_idempotency_conflict", "message": str(exc)},
+        ) from exc
+    except Exception:
+        await db.rollback()
+        await bulk_async_runner.cleanup_import_spool(spool_path)
+        raise
+
+    if not created:
+        # 幂等重放沿用首个任务的 spool；本次重复上传不留孤儿文件。
+        await bulk_async_runner.cleanup_import_spool(spool_path)
+    else:
+        # 后续容量由 DB active job 统计，释放上传进程的临时 reservation。
+        await bulk_async_runner.release_import_reservation(spool_path)
+    bulk_progress_service.create_task(
+        str(project_id),
+        str(current_user.id),
+        "import",
+        0,
+        task_id=str(job.id),
     )
-    return AsyncTaskResponse(task_id=task_id)
+    return AsyncTaskResponse(task_id=str(job.id))
 
 
 # ---------------------------------------------------------------------------
@@ -808,16 +960,70 @@ async def bulk_import_result(
     project_id: UUID,
     task_id: str,
     current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """查询已完成的异步导入 ImportReport（Req 6.1）。"""
-    task = bulk_progress_service.get_task(task_id)
-    if not task or task.project_id != str(project_id):
-        raise HTTPException(status_code=404, detail="任务不存在或已过期")
-    if task.status == "failed":
-        return {"status": "failed", "error": task.error}
-    if task.status != "complete" or task.result is None:
-        raise HTTPException(status_code=409, detail="导入尚未完成")
-    return {"status": "complete", "report": task.result}
+    """查询耐久导入结果；DB snapshot 是断线/重启后的权威状态。"""
+    from app.services import platform_job_service
+
+    try:
+        job_id = UUID(task_id)
+        snapshot = await platform_job_service.get_job_snapshot(
+            db,
+            project_id=project_id,
+            actor_id=current_user.id,
+            job_id=job_id,
+        )
+    except (ValueError, platform_job_service.PlatformJobNotFound):
+        # 部署切换期兼容尚在旧进程内运行的任务。
+        task = bulk_progress_service.get_task(task_id)
+        if (
+            not task
+            or task.project_id != str(project_id)
+            or task.user_id != str(current_user.id)
+        ):
+            raise HTTPException(status_code=404, detail="任务不存在或已过期")
+        if task.status == "failed":
+            return {"status": "failed", "error": task.error}
+        if task.status != "complete" or task.result is None:
+            raise HTTPException(status_code=409, detail="导入尚未完成")
+        return {"status": "complete", "report": task.result}
+
+    status = snapshot["status"]
+    if status == "succeeded":
+        result_ref = snapshot.get("result_ref") or {}
+        return {"status": "complete", "report": result_ref.get("report") or {}}
+    if status == "failed":
+        return {
+            "status": "failed",
+            "error": snapshot.get("error_message"),
+            "error_code": snapshot.get("error_code"),
+        }
+    if status == "cancelled":
+        return {"status": "cancelled", "error": "任务已取消"}
+    raise HTTPException(status_code=409, detail="导入尚未完成")
+
+
+@router.post("/import/{task_id}/cancel")
+async def cancel_bulk_import(
+    project_id: UUID,
+    task_id: UUID,
+    current_user: User = Depends(require_project_access("edit")),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """请求取消自己的耐久导入；运行中任务在安全边界协作式收口。"""
+    from app.services import platform_job_service
+
+    try:
+        snapshot = await platform_job_service.request_cancel(
+            db,
+            project_id=project_id,
+            actor_id=current_user.id,
+            job_id=task_id,
+        )
+    except platform_job_service.PlatformJobNotFound as exc:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期") from exc
+    await db.commit()
+    return snapshot
 
 
 # ---------------------------------------------------------------------------

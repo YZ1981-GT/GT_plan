@@ -2,6 +2,7 @@
  * useF2CostAllocation — F2-44 生产成本分配
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
 import { readSourceTotals } from './useF2ProductionCostFormulas'
 import {
@@ -38,6 +39,15 @@ export function useF2CostAllocation(opts: {
     ].filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function debounceSave(): void {
     if (debounceTimer) clearTimeout(debounceTimer)

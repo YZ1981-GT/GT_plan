@@ -80,9 +80,12 @@ class TestCompletenessReportStructure:
             "unconfirmed_ocr",
             "orphan_files",
         }
-        # 抽样记录与证据类提示非阻断；文件缺失与原四类阻断
+        # 抽样、普通 OCR 未确认与孤儿文件只提示；文件缺失、证据缺口、未回函及原四类阻断
         blocking = {cat.category for cat in result.categories if cat.is_blocking}
-        assert blocking == {"missing", "unsigned", "unresolved_reviews", "stale", "missing_files"}
+        assert blocking == {
+            "missing", "unsigned", "unresolved_reviews", "stale", "missing_files",
+            "evidence_gaps", "unreplied_confirmations",
+        }
 
     @pytest.mark.asyncio
     async def test_can_proceed_true_when_all_empty(self):

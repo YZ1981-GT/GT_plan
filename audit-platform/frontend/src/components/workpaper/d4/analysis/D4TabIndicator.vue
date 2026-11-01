@@ -10,6 +10,7 @@
  * 四、审计结论
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
@@ -34,7 +35,13 @@ const openReviewDialog = inject<((sectionId: string) => void) | null>('openRevie
 const D4_6_SHEET_KEY = 'd46-managed'
 // flushPendingSave/reload：flushSave / loadIndicators+loadNoteConclusion 是函数声明（提升），
 // 此处引用安全。flushHtml 内先 flush 再 readStoreProjection（防投影旧值，主控 §4.1）。
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD46() { loadIndicators(); loadNoteConclusion(); loadAuditProcess() }
 const {
   syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,

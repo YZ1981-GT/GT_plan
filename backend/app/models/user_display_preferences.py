@@ -1,6 +1,6 @@
 """账号级显示偏好 ORM 模型。
 
-V233（platform-global-display-settings-closure 任务 1A）。
+V240（platform-global-display-settings-closure 任务 1A）。
 独立 typed table，用 DB CHECK + revision CAS 替代 User JSONB 并发覆盖。
 """
 from __future__ import annotations

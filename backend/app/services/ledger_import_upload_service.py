@@ -109,19 +109,17 @@ class LedgerImportUploadService:
                         size += len(chunk)
                         if size > max_bytes:
                             raise HTTPException(status_code=413, detail=f"文件过大，超过 {settings.MAX_UPLOAD_SIZE_MB}MB 限制")
+                        if total_size + size > max_total_bytes:
+                            raise HTTPException(
+                                status_code=413,
+                                detail=(
+                                    "上传总大小超过限制"
+                                    f"（最大 {settings.LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB}MB）"
+                                ),
+                            )
                         target.write(chunk)
 
-                try:
-                    await upload.close()
-                except Exception:
-                    pass
-
                 total_size += size
-                if total_size > max_total_bytes:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"上传总大小超过限制（最大 {settings.LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB}MB）",
-                    )
                 manifest_files.append({
                     "filename": safe_name,
                     "stored_name": stored_name,
@@ -181,6 +179,12 @@ class LedgerImportUploadService:
         except Exception:
             shutil.rmtree(bundle_dir, ignore_errors=True)
             raise
+        finally:
+            for upload in valid_uploads:
+                try:
+                    await upload.close()
+                except Exception:
+                    pass
 
     @classmethod
     def load_manifest(cls, project_id: UUID, upload_token: str) -> dict[str, Any]:

@@ -8,6 +8,7 @@
  * 行身份 = month（ROW_IDENTITY_STORE_KEY_D423）。8 受管列 A/B/C/E/F/G/H/K。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -139,7 +140,13 @@ export function useD4InvoiceCompare(options: UseD4InvoiceCompareOptions) {
   }
 
   // 双向回写 flushHtml 用：清防抖 + 立即派发 d4:save-items（先落库再 readStoreProjection）。
-  function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+  function flushPendingSave() {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+  registerPendingFlusher(flushPendingSave)
   // 双向回写 reloadHtml 用：切回 HTML 后从 allResponses 重读。
   function reload() { loadData(); loadNoteConclusion() }
 

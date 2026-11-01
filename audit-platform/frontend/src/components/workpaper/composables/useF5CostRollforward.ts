@@ -13,6 +13,7 @@
  * HTML 扩展：与 F5-1 审定营业成本校验差异（EventBus）
  */
 import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcAdjustedAmount,
@@ -613,6 +614,15 @@ export function useF5CostRollforward(options: UseF5CostRollforwardOptions) {
     get: () => auditConclusion.value,
     set: (val) => { saveAuditConclusion(val) },
   })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

@@ -7,6 +7,7 @@
  * - wp_code 通过 API 解析为 wp_id
  */
 import { resolveWorkpaperByCode } from '@/services/resolveWorkpaperByCode'
+import { buildAdjustmentRouteHref } from '@/utils/adjustmentRouteTarget'
 import type { LinkageContract } from '@/types/linkageContract'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -53,7 +54,7 @@ export async function resolveLinkageRoute(
       return `/projects/${projectId}/trial-balance?highlight=${target_id}`
 
     case 'adjustment':
-      return `/projects/${projectId}/adjustments?highlight=${target_id}`
+      return buildAdjustmentRouteHref(projectId, { kind: 'focus', entryGroupId: target_id })
 
     case 'ledger':
       return `/projects/${projectId}/ledger?account=${target_id}`

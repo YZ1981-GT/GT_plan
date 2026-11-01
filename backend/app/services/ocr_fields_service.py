@@ -127,8 +127,34 @@ class OcrFieldsService:
                     _ocr_jobs[job_id]["error"] = "附件不存在"
                     return
 
-                # 执行 OCR 识别
-                ocr_text = await self._perform_ocr(attachment.file_path)
+                # 执行 OCR：先按附件所属项目解析存储位置，越界/跨项目/软链接逃逸均不触碰内容。
+                from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
+                from app.services.attachment_asset_projection import asset_blob_read_authoritative
+                from app.services.attachment_service import AttachmentService
+                from app.services.attachment_storage_resolver import plan_project_attachment
+
+                try:
+                    blob = await AssetBlobService(db).read_current_attachment_blob(
+                        attachment.id,
+                        project_id=attachment.project_id,
+                    )
+                except AssetBlobReadRejected:
+                    if attachment.storage_type == "asset_blob" or asset_blob_read_authoritative():
+                        raise FileNotFoundError("附件不可变版本完整性校验失败") from None
+                    blob = None
+                plan = plan_project_attachment(
+                    attachment.project_id, attachment.storage_type, attachment.file_path,
+                )
+                if blob is not None:
+                    ocr_text = await self._perform_ocr(str(blob.canonical_path))
+                elif plan.kind == "local" and plan.canonical_path is not None:
+                    ocr_text = await self._perform_ocr(str(plan.canonical_path))
+                elif plan.kind == "remote" and attachment.paperless_document_id is not None:
+                    ocr_text = await AttachmentService(db).get_paperless_ocr(attachment.paperless_document_id)
+                    if ocr_text is None:
+                        raise RuntimeError("Paperless 未返回识别文本")
+                else:
+                    raise FileNotFoundError("附件原件不存在或不在项目存储范围内")
 
                 # 提取字段
                 fields = await self._extract_fields_from_text(

@@ -6,6 +6,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * 行结构：原值 / 坏账准备 / 净值(=原值−坏账) × 单项/组合
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   G2_ACCOUNT_CODE,
   G2_CHANGE_RATE_THRESHOLD,
@@ -645,6 +646,15 @@ export function useG2Adjudication(options: UseG2AdjudicationOptions) {
     window.addEventListener('g2:calc-cross-ref', handleCalcCrossRef)
     window.addEventListener('g2:adjustment-confirmed', handleAdjustmentConfirmed)
   })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     window.removeEventListener('g2:calc-cross-ref', handleCalcCrossRef)

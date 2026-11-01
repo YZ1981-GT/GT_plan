@@ -1,49 +1,74 @@
-"""合并模块一键级联刷新路由（consol-phase2-orchestration Task 2）
-
-需求 2（A5）：
-- `POST /api/consolidation/{project_id}/{year}/refresh-all` 入队后台 worker 返回 job_id
-  （不在请求线程跑全量重算，R1）。
-- `GET /api/consolidation/{project_id}/{year}/refresh-status/{job_id}` job 状态兜底查询
-  （SSE 断开可查，EH6）。
-
-SSE 进度复用既有 `GET /api/projects/{project_id}/events/stream`（events.py）——
-worker 经 `event_bus.broadcast_raw("consol.refresh.progress", {...})` 推送，
-前端在该 stream 上按 project_id/year 过滤后渲染进度条。SSE 不占 asyncpg pool（R5）。
-
-router_registry 铁律：本 router 必须在 `router_registry/system.py` §6 合并报表组登记，
-否则端点写好也 404。
-"""
-
+"""合并一键刷新兼容路由；V240 起以持久 operation 为真源。"""
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import require_project_access
+from app.core.database import get_db
+from app.deps import check_consol_lock, require_project_access
 from app.models.core import User
-from app.services.consol_refresh_job_service import get_job, schedule_refresh_job
+from app.services.consol_operation_service import (
+    OperationBoundaryError,
+    OperationConflict,
+    get_operation,
+    legacy_refresh_payload,
+    request_operation,
+)
+from app.services.consol_refresh_job_service import get_job
 
 router = APIRouter(prefix="/api/consolidation", tags=["合并一键刷新"])
+
+
+def _raise_request_error(exc: Exception) -> None:
+    if isinstance(exc, OperationBoundaryError):
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    raise HTTPException(
+        status_code=409 if isinstance(exc, OperationConflict) else 400,
+        detail={"code": "OPERATION_CONFLICT", "message": str(exc)},
+    ) from exc
 
 
 @router.post("/{project_id}/{year}/refresh-all")
 async def trigger_refresh_all(
     project_id: UUID,
     year: int,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
-    """一键级联刷新：入队后台 worker，立即返回 job_id（不在请求线程跑，R1）。
+    """兼容入口：立即持久化 queued operation，后台数据库 worker 认领。"""
+    try:
+        requested = await request_operation(
+            db,
+            project_id=project_id,
+            year=year,
+            operation_type="refresh_all",
+            idempotency_key=idempotency_key,
+            trigger_source="manual",
+            triggered_by=getattr(user, "id", None),
+        )
+        await db.commit()
+    except (OperationBoundaryError, OperationConflict, ValueError) as exc:
+        await db.rollback()
+        _raise_request_error(exc)
+    from app.workers.consol_operation_worker import wake
 
-    worker 调 refresh_all(progress_cb=publish_sse) 跑完整 DAG（建树→worksheet→
-    trial→对账→报表→附注），进度经 SSE 推到 `/api/projects/{project_id}/events/stream`。
-    """
-    job = schedule_refresh_job(project_id, year)
+    wake()
+    operation = requested.operation
     return {
-        "job_id": job.job_id,
-        "project_id": job.project_id,
-        "year": job.year,
-        "status": job.status,
+        "job_id": str(operation.id),
+        "operation_id": str(operation.id),
+        "project_id": str(operation.project_id),
+        "year": operation.year,
+        "status": operation.status,
+        "revision": operation.revision,
+        "disposition": requested.disposition,
     }
 
 
@@ -52,10 +77,22 @@ async def get_refresh_status(
     project_id: UUID,
     year: int,
     job_id: str,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    """job 状态兜底查询（SSE 断开可查，EH6）。"""
-    job = get_job(job_id)
-    if job is None or job.project_id != str(project_id) or job.year != year:
+    """先查持久 operation；保留旧进程内 job 作为迁移期只读兼容。"""
+    try:
+        operation_id = UUID(job_id)
+    except ValueError:
+        operation_id = None
+    operation = (
+        await get_operation(db, project_id, year, operation_id)
+        if operation_id is not None
+        else None
+    )
+    if operation is not None:
+        return legacy_refresh_payload(operation)
+    legacy = get_job(job_id)
+    if legacy is None or legacy.project_id != str(project_id) or legacy.year != year:
         raise HTTPException(status_code=404, detail="刷新任务不存在或已过期")
-    return job.to_dict()
+    return legacy.to_dict()

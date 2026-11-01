@@ -20,7 +20,12 @@ vi.mock('vue-router', () => ({
 
 // ─── Mock stores/project ─────────────────────────────────────────────────────
 vi.mock('@/stores/project', () => ({
-  useProjectStore: () => ({ projectId: 'proj-001' }),
+  useProjectStore: () => ({ projectId: 'proj-001', projectStatus: 'execution' }),
+}))
+
+const permissionState = vi.hoisted(() => ({ canEdit: true }))
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({ canDo: () => permissionState.canEdit }),
 }))
 
 // ─── Mock apiProxy ───────────────────────────────────────────────────────────
@@ -72,11 +77,17 @@ const stubs: Record<string, any> = {
   'el-input-number': true,
   GtPageHeader: true,
   GtAmountCell: defineComponent({ props: ['value'], render() { return h('span', { class: 'gt-amount-cell' }, String(this.value ?? '')) } }),
+  ConfirmationAttachmentDrawer: defineComponent({
+    name: 'ConfirmationAttachmentDrawer',
+    props: ['readonly'],
+    template: '<div class="attachment-drawer-stub" :data-readonly="String(readonly)" />',
+  }),
 }
 
 describe('ConfirmationHub — Task 9.3', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    permissionState.canEdit = true
     mockGet.mockResolvedValue({ items: SAMPLE_DATA })
     mockPost.mockResolvedValue({})
     mockDelete.mockResolvedValue({})
@@ -129,6 +140,14 @@ describe('ConfirmationHub — Task 9.3', () => {
       projectId: 'proj-001',
       confirmationId: 'c3',
     }))
+  })
+
+  it('只读角色把 readonly 传给函证附件抽屉', async () => {
+    permissionState.canEdit = false
+    const wrapper = shallowMount(ConfirmationHub, { global: { stubs, directives: { loading: () => {} } } })
+    await flushPromises()
+    expect((wrapper.vm as any).confirmationReadonly).toBe(true)
+    expect(wrapper.get('.attachment-drawer-stub').attributes('data-readonly')).toBe('true')
   })
 
   it('金额列用 GtAmountCell 组件（组件已注册引用）', async () => {

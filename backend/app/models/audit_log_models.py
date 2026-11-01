@@ -11,7 +11,7 @@ Refinement Round 1 — 需求 9：审计日志真实落库 + 不可篡改。
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Index, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -60,4 +60,20 @@ class AuditLogEntry(Base):
         Index("idx_audit_log_entries_action_type", "action_type"),
         Index("idx_audit_log_entries_object", "object_type", "object_id"),
         Index("idx_audit_log_entries_entry_hash", "entry_hash", unique=True),
+    )
+
+
+class AuditChainHead(Base):
+    """每条审计链的事务内权威链尾。"""
+
+    __tablename__ = "audit_chain_head"
+
+    chain_key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    tail_entry_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    tail_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    entry_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

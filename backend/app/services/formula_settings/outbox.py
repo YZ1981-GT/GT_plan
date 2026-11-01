@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from app.models.audit_platform_schemas import EventType
 from app.services.workpaper_sync.outbox import (
     DurableEventOutboxService,
     PendingPublication,
+    PublishReport,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ async def record_changes(
         return publications
 
     # 报表域：先失效反向索引（与 publish_events 同行为）
+    effective_domain = domain
     if domain == "report" or any(ev.get("domain") == "report" for ev in events_list):
         try:
             from app.services.formula_reverse_index import invalidate_reverse_index
@@ -293,11 +295,11 @@ async def _stale_engine_for_formula_change(
     if not row_codes or year is None:
         return
 
-    from app.services.stale_propagation_engine import stale_engine
-
-    for row_code in sorted(set(row_codes)):
-        await stale_engine.on_change(
-            f"REPORT:{row_code}::",
-            project_id,
-            year,
+    try:
+        from app.services.stale_summary_aggregate import mark_downstream_stale
+        await mark_downstream_stale(db, project_id=project_id, year=year, row_codes=row_codes)
+    except Exception as exc:
+        logger.warning(
+            "[formula_settings.outbox] stale_engine 失败 project=%s: %s",
+            project_id, exc,
         )

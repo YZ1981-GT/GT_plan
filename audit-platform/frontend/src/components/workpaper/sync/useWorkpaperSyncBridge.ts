@@ -65,7 +65,7 @@ import {
   type WorkpaperSyncModeMigration,
 } from './workpaperSyncModeStorage'
 import type { WorkpaperSyncCapability } from './workpaperSyncManifest.generated'
-import { flushPendingWrites } from './pendingWrites'
+import { flushPendingWrites, runWithPendingWriteBarrier } from './pendingWrites'
 import {
   SERVER_STORE_FALLBACK_CODES,
   SUBSTRATE_NOT_PUBLISHED_CODE,
@@ -439,7 +439,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     if (WP_BRIDGE_BACKGROUND_MERGE_STATES.includes(state.value)) {
       refuse('bridge_background_merge_in_progress', `${WP_BRIDGE_STATE_TEXT[state.value]}，请等合并完成或在表单顶部提示里处理后再进入在线编辑`)
     }
-    return attemptSwitchToOnlyOffice(true)
+    return runWithPendingWriteBarrier(() => attemptSwitchToOnlyOffice(true))
   }
 
   /**
@@ -465,7 +465,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     let viaServerStore = false
     try {
       // 🔴 R20：子 Tab 私有防抖里的编辑与在途写入先落库，宿主再读 store-projection。
-      //    宿主的 flushHtml 只管它自己那层防抖（见 pendingWrites.ts）；永不 reject。
+      //    任一保存失败都会聚合抛错并停在 HTML，绝不能继续物化旧 store。
       await flushPendingWrites()
       switchTimings.value = switchTimer.mark('writes_flushed')
       ;({ flushed, viaServerStore } = await flushForSwitch())

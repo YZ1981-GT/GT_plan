@@ -18,13 +18,18 @@ APP = Path(__file__).resolve().parents[2] / "app"
 DEFINER = "services/tb_audited_writer.py"
 NAME = "publish_rows"
 
-#: 合法的他域调用方（2026-10-27 现查；远端同此集合，合入后在任务 0 第 6 条重跑）
+#: 合法的他域调用方（2026-11-01 合入远端 4390aaaa3 后现查）
 REGISTERED: frozenset[str] = frozenset({
     "services/event_handlers_cycle_linkage.py",   # 审定表联动：底稿保存后按循环推审定数
     "routers/m9_other_comprehensive_income.py",   # M9 其他综合收益发布
     "routers/n2_taxes_payable.py",                # N2 应交税费发布
     "services/s_transaction_tb_writeback_service.py",  # S 循环交易类回写
     "services/s_estimate_tb_writeback_service.py",     # S 循环估计类回写
+    # 底稿审定数同步发布服务（远端 3cd7352a6 新增，adjustment 模块 A-E 批）：TB 核心写 + 幂等 ack +
+    # durable outbox 同事务，自身经发布门 publish_rows 写入，符合「审定数只经发布门」铁律；生产调用方
+    # 是 routers/wp_html_save.py 的 publish-to-tb 路径（现查 wp_html_save.py:840 import
+    # publish_workpaper_rows），非死模块。本 spec 只登记、不改该模块。
+    "services/tb_publish_service.py",
 })
 
 #: 高级查询的生产代码（包 + 三个 router）

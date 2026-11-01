@@ -8,6 +8,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 行级附件+OCR + AI + 双模式 + 导入导出
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { parseNum, calcSubtotal, calcAnomalyRate, calcCoverageRate } from '../../composables/useD4FormulaEngine'
@@ -80,11 +81,14 @@ function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.va
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
 // 立即 flush 防抖中的落库（双向回写 flushHtml 用：先把 html 改动落库再 readStoreProjection）
 function flushPendingSave() {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
   const keys = ['D4-35-data','D4-35-note','D4-35-conclusion']
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } }))
 }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-35-data','D4-35-note','D4-35-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 // OCR
 async function handleOcrUpload(rowId: string, file: File) {

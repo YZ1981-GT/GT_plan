@@ -223,3 +223,38 @@ describe('Property 13: autoSave 不丢失不变量', () => {
     expect(onEdited).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('保存协调兼容协议', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+
+  it('每次 markDirty/recordEdit 都通知编辑代际，不依赖 dirty 边沿', () => {
+    const onEdited = vi.fn()
+    const autoSave = useWorkpaperAutoSave(
+      vi.fn().mockResolvedValue(undefined),
+      60_000,
+      undefined,
+      { onEdited },
+    )
+
+    autoSave.markDirty()
+    autoSave.markDirty()
+    autoSave.recordEdit()
+
+    expect(onEdited).toHaveBeenCalledTimes(3)
+    expect(autoSave.isDirty.value).toBe(true)
+  })
+
+  it('onSave 显式返回 false 时不清 dirty、不更新时间且不重试', async () => {
+    const saveFn = vi.fn().mockResolvedValue(false)
+    const autoSave = useWorkpaperAutoSave(saveFn, 60_000)
+    autoSave.markDirty()
+
+    await autoSave.doSave()
+
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(autoSave.isDirty.value).toBe(true)
+    expect(autoSave.isSaveFailed.value).toBe(true)
+    expect(autoSave.lastSavedAt.value).toBeNull()
+  })
+})

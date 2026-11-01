@@ -4,6 +4,7 @@
  * 跨表：未审数自 F2-3~F2-13（含 F2-10）；跌价未审自 F2-1；审定=未审+调整
  */
 import { ref, computed, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcSubtotal, calcAuditedEnd, calcNetValue, calcChangeRate, parseNum } from './useF2InvMaiFormulaEngine'
 import { readRowJson, type ChecklistResponse } from './useF2FormData'
 import type { F2DetailRow } from './useF2DetailSheet'
@@ -235,6 +236,15 @@ export function useF2DetailSummary(options: {
   function setItem(key: string, remark: string): void {
     allResponses.value.set(key, { item_id: key, conclusion: null, remark })
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const keys = [ITEM_GROSS_ADJ, ITEM_IMP_ADJ, ITEM_BV_TEXTS, ITEM_MANUAL_UNAUD, ITEM_OBJECTIVE, ITEM_PROCESS, ITEM_NOTE, ITEM_CONCLUSION]

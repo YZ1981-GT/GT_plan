@@ -3,6 +3,7 @@
  * 三维度交叉核对：发货单 × 发票 × 记账凭证
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -174,9 +175,13 @@ export function useD4CompletenessCheck(options: UseD4CompletenessCheckOptions) {
 
   // 立即 flush 防抖中的落库（双向回写 flushHtml 用：先落库再 readStoreProjection）
   function flushPendingSave() {
-    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   function updateAuditNote(val: string) {
     if (isReadonly.value) return

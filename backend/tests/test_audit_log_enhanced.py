@@ -56,10 +56,20 @@ async def db_session() -> AsyncSession:
         yield session
 
 
+def _audit_app():
+    """按生产路径挂载 audit_logs router，隔离无关 router 的导入故障。"""
+    from fastapi import FastAPI
+    from app.routers.audit_logs import router
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    return app
+
+
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession):
     """Create test HTTP client with overridden dependencies."""
-    from app.main import app
+    app = _audit_app()
     from app.core.database import get_db
     from app.core.redis import get_redis
     from app.deps import get_current_user
@@ -359,7 +369,6 @@ class TestWriteBatchAndVerifyChain:
         all_hashes = [r.entry_hash for r in test_rows]
         assert len(set(all_hashes)) == 5
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_verify_chain_passes_for_valid_chain(self, db_session, client):
         """verify-chain 对正确链返回 valid=true。"""
@@ -410,7 +419,6 @@ class TestWriteBatchAndVerifyChain:
         assert data["valid"] is True
         assert data["entries_checked"] == 3
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_verify_chain_detects_tampered_entry(self, db_session, client):
         """篡改一条后 verify-chain 检出断链。"""
@@ -418,37 +426,22 @@ class TestWriteBatchAndVerifyChain:
         from sqlalchemy import update
 
         project_id = str(uuid.uuid4())
+        from app.services.audit_chain.head import append_entry, chain_key_of
 
-        prev_hash = GENESIS_HASH
         entry_ids = []
         for i in range(3):
-            # Use naive datetime to match SQLite round-trip
-            ts = datetime(2024, 3, i + 1)
-            user_id = str(uuid.uuid4())
-            action_type = f"tamper_test_{i}"
-            object_id = str(uuid.uuid4())
-            payload = {"project_id": project_id, "seq": i}
-            payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-
-            entry_hash = worker_compute_hash(
-                ts.isoformat(), user_id, action_type, object_id, payload_json, prev_hash
-            )
-
-            eid = uuid.uuid4()
-            entry_ids.append(eid)
-            entry = AuditLogEntry(
-                id=eid,
-                ts=ts,
-                user_id=uuid.UUID(user_id),
-                action_type=action_type,
+            entry = await append_entry(
+                db_session,
+                chain_key_of(project_id),
+                ts=datetime(2024, 3, i + 1, tzinfo=timezone.utc),
+                user_id=uuid.uuid4(),
+                action_type=f"tamper_test_{i}",
                 object_type="test",
-                object_id=uuid.UUID(object_id),
-                payload=payload,
-                prev_hash=prev_hash,
-                entry_hash=entry_hash,
+                resource_id=uuid.uuid4(),
+                project_id=project_id,
+                payload={"project_id": project_id, "seq": i},
             )
-            db_session.add(entry)
-            prev_hash = entry_hash
+            entry_ids.append(entry.id)
 
         await db_session.commit()
 
@@ -469,10 +462,9 @@ class TestWriteBatchAndVerifyChain:
         data = resp.json()
         if "data" in data:
             data = data["data"]
-        assert data["valid"] is False
+        assert data["valid"] is False, data
         assert "broken_at_entry_id" in data
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_verify_chain_empty_returns_valid(self, client):
         """空链返回 valid=true, entries_checked=0。"""
@@ -502,11 +494,10 @@ class TestVerifyChainAuth:
     - admin 无条件放行 → 200
     """
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_unauthenticated_returns_401(self, db_session):
         """未登录时应返回 401（不传 Authorization header）。"""
-        from app.main import app
+        app = _audit_app()
         from app.core.database import get_db
         from app.core.redis import get_redis
 
@@ -536,11 +527,10 @@ class TestVerifyChainAuth:
         # 或 401（credentials 无效）；任一都应该拒绝访问
         assert resp.status_code in (401, 403)
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_non_admin_without_project_id_forbidden(self, db_session):
         """非 admin 不传 project_id 应返回 403 FORBIDDEN_AUDIT_CHAIN。"""
-        from app.main import app
+        app = _audit_app()
         from app.core.database import get_db
         from app.core.redis import get_redis
         from app.deps import get_current_user
@@ -584,11 +574,10 @@ class TestVerifyChainAuth:
         error_detail = body.get("detail") or body.get("message")
         assert error_detail["error_code"] == "FORBIDDEN_AUDIT_CHAIN"
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_non_admin_no_project_role_forbidden(self, db_session):
         """非 admin 且在项目中无 review/sign_off 能力应返回 403。"""
-        from app.main import app
+        app = _audit_app()
         from app.core.database import get_db
         from app.core.redis import get_redis
         from app.deps import get_current_user
@@ -635,7 +624,6 @@ class TestVerifyChainAuth:
         error_detail = body.get("detail") or body.get("message")
         assert error_detail["error_code"] == "FORBIDDEN_AUDIT_CHAIN"
 
-    @pytest.mark.xfail(reason="verify-chain endpoint not registered in router_registry, returns 404")
     @pytest.mark.asyncio
     async def test_admin_can_query_without_project_id(self, client):
         """admin 可以不传 project_id 查询全局链。"""
@@ -920,9 +908,12 @@ class TestSendAdminNotification:
             })
             return True
 
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         with patch(
             "app.workers.audit_log_writer_worker._send_admin_notification",
             side_effect=fake_send,
+        ), patch(
+            "app.core.redis.redis_client", fake_redis,
         ):
             with patch(
                 "app.core.database.async_session", test_session_factory
@@ -938,8 +929,9 @@ class TestSendAdminNotification:
         )
         call = send_calls[0]
         assert "审计日志" in call["title"]
-        # content 模板须含 retry_count + lost_count 数字
         assert str(MAX_RETRIES) in call["content"]
         assert "5" in call["content"]
         assert call["metadata"]["retry_count"] == MAX_RETRIES
-        assert call["metadata"]["lost_count"] == 5
+        # 失败条目必须被保留而不是计为丢失。
+        assert call["metadata"]["quarantined_count"] == 5
+        assert await fake_redis.llen("audit:log:quarantine:__global__") == 5

@@ -2,7 +2,12 @@
  * F2 监盘 — 字段/行持久化 + F2-21 旧表迁移
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref } from 'vue'
+import { effectScope, ref } from 'vue'
+import {
+  PendingWritesFlushError,
+  flushPendingWrites,
+} from '../../sync/pendingWrites'
+import { useF2StocktakeQuestionnaire } from '../useF2StocktakeQuestionnaire'
 import {
   useF2StocktakeFields,
   useF2StocktakeRows,
@@ -61,6 +66,99 @@ describe('useF2StocktakeFields', () => {
     expect(fields.value.warehouses).toBe('主仓库')
   })
 
+  it('字段 flusher 注册到平台屏障，并等待父保存明确完成', async () => {
+    const allResponses = ref(makeMap({ 'F2-22-fields': '{}', 'F2-22-note': '' }))
+    let detail: { items: ChecklistResponse[]; resolve: () => void } | undefined
+    const handler = (event: Event) => {
+      detail = (event as CustomEvent).detail
+    }
+    window.addEventListener('f2-stocktake:save-items', handler)
+    const scope = effectScope()
+    try {
+      let fields!: ReturnType<typeof useF2StocktakeFields>
+      scope.run(() => {
+        fields = useF2StocktakeFields({
+          fieldsKey: 'F2-22-fields',
+          noteKey: 'F2-22-note',
+          fieldIds: ['entity'],
+          allResponses,
+          isReadonly: ref(false),
+        })
+      })
+      fields.updateField('entity', '屏障内保存')
+      let settled = false
+      const barrier = flushPendingWrites().then(() => { settled = true })
+      await Promise.resolve()
+      expect(detail?.items[0].remark).toContain('屏障内保存')
+      expect(settled).toBe(false)
+      detail?.resolve()
+      await barrier
+      expect(settled).toBe(true)
+    } finally {
+      scope.stop()
+      window.removeEventListener('f2-stocktake:save-items', handler)
+    }
+  })
+
+  it('父保存 reject 会让平台屏障失败，不能由 8 秒超时伪装成功', async () => {
+    const allResponses = ref(makeMap({ 'F2-22-fields': '{}', 'F2-22-note': '' }))
+    const handler = (event: Event) => {
+      ;(event as CustomEvent).detail.reject(new Error('监盘 PUT 失败'))
+    }
+    window.addEventListener('f2-stocktake:save-items', handler)
+    const scope = effectScope()
+    try {
+      let fields!: ReturnType<typeof useF2StocktakeFields>
+      scope.run(() => {
+        fields = useF2StocktakeFields({
+          fieldsKey: 'F2-22-fields',
+          noteKey: 'F2-22-note',
+          fieldIds: ['entity'],
+          allResponses,
+          isReadonly: ref(false),
+        })
+      })
+      fields.updateField('entity', '失败值')
+      await expect(flushPendingWrites()).rejects.toBeInstanceOf(PendingWritesFlushError)
+    } finally {
+      scope.stop()
+      window.removeEventListener('f2-stocktake:save-items', handler)
+    }
+  })
+
+  it('F2-21 过渡只读只冻结输入，不阻止已编辑问卷刷盘', async () => {
+    const allResponses = ref(makeMap({ 'F2-21-fields': '{}', 'F2-21-note': '' }))
+    const interactionReadonly = ref(false)
+    const businessReadonly = ref(false)
+    const saved: ChecklistResponse[][] = []
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      saved.push(detail.items)
+      detail.resolve()
+    }
+    window.addEventListener('f2-stocktake:save-items', handler)
+    const scope = effectScope()
+    try {
+      let questionnaire!: ReturnType<typeof useF2StocktakeQuestionnaire>
+      scope.run(() => {
+        questionnaire = useF2StocktakeQuestionnaire({
+          allResponses,
+          isReadonly: interactionReadonly,
+          businessReadonly,
+        })
+      })
+      questionnaire.updateAnswer('q1', '已编辑')
+      interactionReadonly.value = true
+      await flushPendingWrites()
+      expect(saved).toHaveLength(1)
+      expect(saved[0].find((item) => item.item_id === 'F2-21-fields')?.remark)
+        .toContain('已编辑')
+    } finally {
+      scope.stop()
+      window.removeEventListener('f2-stocktake:save-items', handler)
+    }
+  })
+
   it('updateField 触发 f2-stocktake:save-items', () => {
     const allResponses = ref(makeMap({ 'F2-22-fields': '{}', 'F2-22-note': '' }))
     const handler = vi.fn()
@@ -81,6 +179,38 @@ describe('useF2StocktakeFields', () => {
 })
 
 describe('useF2StocktakeRows', () => {
+  it('F2-25 行 flusher 也进入平台屏障并等待父保存', async () => {
+    const allResponses = ref(makeMap({
+      'F2-25-rows': JSON.stringify([{ id: 'r1', itemName: '旧值' }]),
+      'F2-25-note': '',
+    }))
+    let detail: { items: ChecklistResponse[]; resolve: () => void } | undefined
+    const handler = (event: Event) => { detail = (event as CustomEvent).detail }
+    window.addEventListener('f2-stocktake:save-items', handler)
+    const scope = effectScope()
+    try {
+      let sheet!: ReturnType<typeof useF2StocktakeRows<{ id: string; itemName: string }>>
+      scope.run(() => {
+        sheet = useF2StocktakeRows({
+          rowsKey: 'F2-25-rows',
+          noteKey: 'F2-25-note',
+          allResponses,
+          emptyRow: () => ({ id: 'new', itemName: '' }),
+        })
+      })
+      sheet.updateRow('r1', { itemName: '最新抽盘值' })
+      const barrier = flushPendingWrites()
+      await Promise.resolve()
+      expect(detail?.items.find((item) => item.item_id === 'F2-25-rows')?.remark)
+        .toContain('最新抽盘值')
+      detail?.resolve()
+      await barrier
+    } finally {
+      scope.stop()
+      window.removeEventListener('f2-stocktake:save-items', handler)
+    }
+  })
+
   it('从 remark JSON 加载行', () => {
     const rows = [{ id: 'r1', itemName: '钢材', bookQty: '10' }]
     const allResponses = ref(makeMap({

@@ -142,6 +142,7 @@ async def recalculate_trial(
     *,
     context: "ConsolContext | None" = None,
     tree: "TreeNode | None" = None,
+    basis: "CalcBasis | None" = None,
 ) -> list[ConsolTrial]:
     """重新计算合并试算表（spec consol-tree-three-code-autobuild 任务 7.4）。
 
@@ -155,20 +156,23 @@ async def recalculate_trial(
     合并方式由下级关系推导（ADR-CTREE-004），母分差额分录与合并差额分录各自计入（需求 4.2 / 4.3）。
     只 flush 不 commit。
     """
-    from app.services.consol_calc_basis import load_calc_basis, trial_amounts
+    from app.services.consol_calc_basis import load_calc_basis, trial_amounts, validate_calc_basis
     from app.services.consol_context_service import validate_context
 
-    resolved_tree = tree
+    resolved_tree = tree if tree is not None else (basis.tree if basis is not None else None)
     if resolved_tree is None and context is not None:
         from app.services.consol_tree_service import build_tree
 
         resolved_tree = await build_tree(db, project_id)
     validate_context(context, project_id, year, tree=resolved_tree)
 
-    basis = await load_calc_basis(db, project_id, year, tree=resolved_tree)
-    if basis is None:
+    resolved_basis = basis
+    if resolved_basis is None:
+        resolved_basis = await load_calc_basis(db, project_id, year, tree=resolved_tree)
+    if resolved_basis is None:
         raise ValueError(f"企业树构建失败：找不到合并母项目 {project_id}")
-    amounts = trial_amounts(basis)
+    validate_calc_basis(resolved_basis, project_id, year, tree=resolved_tree)
+    amounts = trial_amounts(resolved_basis)
     computed_at = datetime.now(timezone.utc).isoformat()
     zero = Decimal("0")
 
@@ -186,7 +190,7 @@ async def recalculate_trial(
         }
         trial.is_stale = False  # 重算后清除陈旧标记（P1）
 
-    await sync_trial_rows(db, project_id, year, basis, fill)
+    await sync_trial_rows(db, project_id, year, resolved_basis, fill)
     return await get_trial_balance(db, project_id, year)
 
 

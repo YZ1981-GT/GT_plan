@@ -2,6 +2,7 @@
  * useF2PurchasePrice — F2-61 原材料采购价格分析（对齐致同源模板：四区块矩阵）
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   defaultPurchasePriceSheet,
@@ -39,6 +40,15 @@ export function useF2PurchasePrice(opts: {
   const varianceNote = ref('')
   /** 审计说明2：采购单价与市场价格差异较大原因 */
   const marketNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

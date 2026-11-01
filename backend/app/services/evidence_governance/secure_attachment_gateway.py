@@ -566,7 +566,7 @@ class StorageBoundaryResolver:
         for r in boundary_roots:
             if not r:
                 continue
-            roots.append(Path(os.path.normpath(str(r))).absolute())
+            roots.append(Path(r).resolve(strict=False))
         self._roots: tuple[Path, ...] = tuple(roots)
 
     @property
@@ -574,48 +574,54 @@ class StorageBoundaryResolver:
         return self._roots
 
     def normalize_within_boundary(self, path_value: str | None) -> Path | None:
-        """把 ``path_value`` 规范化到某个 boundary root 内的真实路径（纯路径，无 I/O）。
-
-        返回 ``None`` 表示越界。绝对路径按自身归一；相对路径同时按 CWD 与各 boundary root
-        归一（存储层 ``_write_local_file`` 产出的 key 相对 CWD 已含 boundary 前缀），返回第一个
-        落在 boundary 内的候选；任一含 ``..`` 逃逸出 root 的路径两种解释都不在 boundary 内 → 拒绝。
-        """
+        """把路径按 realpath 规范到某个 boundary root 内；已存在的 symlink/junction 也会展开。"""
         if not path_value:
             return None
         raw = Path(str(path_value))
         candidates: list[Path] = []
         if raw.is_absolute():
-            candidates.append(Path(os.path.normpath(str(raw))).absolute())
+            candidates.append(raw.resolve(strict=False))
         else:
-            # (i) 相对 CWD（真实 _write_local_file 产出的 posix key 相对 CWD，已含 boundary 前缀）
-            candidates.append(Path(os.path.normpath(str(Path.cwd() / raw))).absolute())
-            # (ii) 相对各 boundary root（参考模型风格的纯相对 key）
+            candidates.append((Path.cwd() / raw).resolve(strict=False))
             for root in self._roots:
-                candidates.append(Path(os.path.normpath(str(root / raw))).absolute())
+                candidates.append((root / raw).resolve(strict=False))
         for cand in candidates:
             for root in self._roots:
                 try:
                     cand.relative_to(root)
-                    return cand  # 返回落在 boundary 内的确定候选（读取的正是该受控路径）
+                    return cand
                 except ValueError:
                     continue
         return None
 
-    def resolve_read_plan(self, storage_type: str | None, storage_key: str | None) -> ReadPlan:
-        """把 ``(storage_type, storage_key)`` 解析为读取计划（纯路径运算，零 I/O）。"""
+    def resolve_read_plan(
+        self,
+        storage_type: str | None,
+        storage_key: str | None,
+        *,
+        project_id: uuid.UUID | str | None = None,
+    ) -> ReadPlan:
+        """解析读取计划；提供 project_id 时只允许各 boundary root 下对应项目目录。"""
         key = (storage_key or "").strip()
         if not key:
             return ReadPlan(kind="rejected")
-        # paperless 远程对象 → 委托 AttachmentService（服务凭据），不做本地边界。
         if key.startswith(_PAPERLESS_SCHEME) or (storage_type or "").lower() == _STORAGE_TYPE_PAPERLESS:
             return ReadPlan(kind="remote", remote_locator=key)
-        # 其他 opaque scheme（staged://、quarantine://、evidence:// 等）不是可读本地文件 → 拒绝。
         if _OPAQUE_SCHEME_RE.match(key):
             return ReadPlan(kind="rejected")
-        safe = self.normalize_within_boundary(key)
-        if safe is None:
-            return ReadPlan(kind="rejected")
-        return ReadPlan(kind="local", safe_path=str(safe))
+        if project_id is None:
+            safe = self.normalize_within_boundary(key)
+            return ReadPlan(kind="local", safe_path=str(safe)) if safe is not None else ReadPlan(kind="rejected")
+
+        from app.services.attachment_storage_resolver import plan_project_attachment
+
+        for root in self._roots:
+            scoped = plan_project_attachment(
+                project_id, storage_type, key, root=root, require_file=False,
+            )
+            if scoped.kind == "local" and scoped.canonical_path is not None:
+                return ReadPlan(kind="local", safe_path=str(scoped.canonical_path))
+        return ReadPlan(kind="rejected")
 
     def project_read_locator(self, attachment_id: uuid.UUID | str, storage_key: str | None = None) -> str:
         """C3：对外 opaque locator —— paperless scheme 或受控下载 URL，绝不返回绝对路径。
@@ -706,10 +712,7 @@ class SecureAttachmentGateway:
             if roots is None:
                 from app.core.config import settings
 
-                roots = [
-                    settings.ATTACHMENT_LOCAL_STORAGE_ROOT,
-                    settings.STORAGE_ROOT,
-                ]
+                roots = [settings.ATTACHMENT_LOCAL_STORAGE_ROOT]
             self._storage_boundary = StorageBoundaryResolver(roots)
         self._byte_reader = byte_reader or LocalByteReader()
         self._remote_byte_reader = remote_byte_reader
@@ -1175,12 +1178,34 @@ class SecureAttachmentGateway:
                 version_id=attachment_version_id, availability=_VERSION_STAGED,
             )
 
+        # 永久位置已确定后登记不可变 blob；M1 shadow 失败不影响治理主链，M2 起失败阻断。
+        try:
+            from app.services.attachment_asset_projection import AttachmentAssetProjectionService
+
+            blob = await AttachmentAssetProjectionService(self._db).register_storage_blob_if_enabled(
+                storage_type=finalized.get("storage_type", "local"),
+                storage_key=finalized.get("storage_key") or finalized.get("file_path", ""),
+                content=content,
+                media_type=detected_media_type,
+                actor_user_id=actor.actor_user_id,
+                actor_service_identity_id=actor.actor_service_identity_id,
+            )
+        except Exception:
+            if self._attachment_service is not None:
+                await self._attachment_service.compensate_uploaded_storage(
+                    project_id=project_id,
+                    storage_type=finalized.get("storage_type"),
+                    storage_key=finalized.get("storage_key") or finalized.get("file_path"),
+                )
+            raise
+
         # 短事务：提交 available（version + attachment.state/current + quarantine promoted）。
         await self._promote_available(
             attachment_id=attachment_id,
             attachment_version_id=attachment_version_id,
             quarantine_handle_id=quarantine_handle_id,
             finalized=finalized,
+            blob_id=blob.id if blob is not None else None,
             project_id=project_id,
             audit_year=audit_year,
             actor=actor,
@@ -1442,6 +1467,7 @@ class SecureAttachmentGateway:
         attachment_version_id: uuid.UUID,
         quarantine_handle_id: uuid.UUID,
         finalized: dict[str, str],
+        blob_id: uuid.UUID | None,
         project_id: uuid.UUID,
         audit_year: int | None,
         actor: ActorContext,
@@ -1466,8 +1492,9 @@ class SecureAttachmentGateway:
             if version.availability == _VERSION_AVAILABLE:
                 return {"attachment_id": str(attachment_id), "version_id": str(attachment_version_id)}
 
-            # 只改可变列（availability / config_snapshot）；storage_key/hash/byte_size 不可变。
+            # 只改可变列（availability / config_snapshot；blob_id 只允许 NULL→确定值一次）。
             version.availability = _VERSION_AVAILABLE
+            version.blob_id = blob_id
             version.config_snapshot = {"finalized_storage": dict(finalized)}
             await self._db.flush()
 
@@ -1833,15 +1860,39 @@ class SecureAttachmentGateway:
             if attachment.state != _ATTACHMENT_AVAILABLE or version.availability != _VERSION_AVAILABLE:
                 raise self._read_denied()
 
-            # (c) 边界 containment（纯路径运算，零字节 I/O）。
-            storage_type, storage_key = _effective_storage(version, attachment)
-            plan = self._storage_boundary.resolve_read_plan(storage_type, storage_key)
-            if plan.rejected:
-                # 边界失败 → 在调用字节读取器之前拒绝（C2：open/stat/read 计数为 0）。
-                raise self._read_denied()
+            # (c) blob locator 或 legacy locator 的边界 containment。blob 只在领域 ACL 通过后解析，
+            # 且仍限定在受信的附件/知识存储根内；知道 blob id 不构成读取权限。
+            content: bytes | None = None
+            if version.blob_id is not None:
+                from app.services.asset_blob_service import (
+                    AssetBlobReadRejected,
+                    AssetBlobService,
+                )
 
-            # ---- scope/权限/边界均已通过：字节 I/O 允许 ----
-            content = await self._read_plan_bytes(plan)  # 存储不可用抛 DEPENDENCY_DEGRADED
+                try:
+                    verified_blob = await AssetBlobService(self._db).read_verified(version.blob_id)
+                    content = verified_blob.content
+                except AssetBlobReadRejected as exc:
+                    if exc.reason != "unsupported_storage_type":
+                        if exc.reason == "storage_unavailable":
+                            raise EvidenceGovernanceError(
+                                EvidenceErrorCode.DEPENDENCY_DEGRADED,
+                                "storage unavailable",
+                                retryable=True,
+                            ) from exc
+                        raise self._read_denied() from exc
+
+            if content is None:
+                storage_type, storage_key = _effective_storage(version, attachment)
+                plan = self._storage_boundary.resolve_read_plan(
+                    storage_type, storage_key, project_id=txn.project_id,
+                )
+                if plan.rejected:
+                    # 边界失败 → 在调用字节读取器之前拒绝（C2：open/stat/read 计数为 0）。
+                    raise self._read_denied()
+
+                # ---- scope/权限/边界均已通过：字节 I/O 允许 ----
+                content = await self._read_plan_bytes(plan)  # 存储不可用抛 DEPENDENCY_DEGRADED
 
             # version/hash 完整性校验（内容变化不能通过旧 hash；P5）。
             if verify_integrity and version.content_hash:

@@ -12,6 +12,7 @@
       <template #default="{ row }">
         <el-switch
           :model-value="row.is_enabled"
+          :disabled="isStub(row.plugin_id)"
           @change="(v: string | number | boolean) => togglePlugin(row, !!v)"
           :loading="row._toggling"
           active-text="启用"
@@ -26,7 +27,7 @@
         <el-tooltip :content="isStub(row.plugin_id) ? '该插件正在开发中' : ''" :disabled="!isStub(row.plugin_id)" placement="top">
           <el-button link type="primary" size="small" :disabled="isStub(row.plugin_id)" @click="$emit('execute', row)">执行</el-button>
         </el-tooltip>
-        <el-button link type="primary" size="small" @click="$emit('config', row)">配置</el-button>
+        <el-button link type="primary" size="small" :disabled="isStub(row.plugin_id)" @click="$emit('config', row)">配置</el-button>
       </template>
     </el-table-column>
   </el-table>

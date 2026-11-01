@@ -10,6 +10,7 @@
  * 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { computed, ref, watch, onBeforeUnmount, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal } from './useF5CosOfFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -331,6 +332,15 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
     allResponses.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: value })
     debounceSave()
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

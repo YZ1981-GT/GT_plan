@@ -82,6 +82,8 @@ def register_system_routers(app: FastAPI) -> None:
     # 调整分录复核流转（提交复核 / 撤回提交 / 批量复核 / 复核人）与项目级 Excel 导入 —— 同前缀、路径不重叠
     from app.routers.adjustment_review import router as adj_review_router
     from app.routers.adjustment_import import router as adj_import_router
+    from app.routers.adjustment_client_booking import router as adj_booking_router
+    from app.routers.adjustment_treatment import router as adj_treatment_router
     from app.routers.materiality import router as mat_router
     from app.routers.misstatements import router as mis_router
     from app.routers.events import router as events_router
@@ -90,7 +92,7 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.consistency import router as consistency_router
 
     for r in [drilldown_router, ledger_router, voucher_links_router, tb_router, adj_router, adj_review_router,
-              adj_import_router, mat_router, mis_router, events_router, tb_sync_router,
+              adj_import_router, adj_booking_router, adj_treatment_router, mat_router, mis_router, events_router, tb_sync_router,
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])
 
@@ -120,6 +122,9 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.query_builder import router as qb_router
     from app.routers.consol_refresh import router as crf_router
     from app.routers.consol_push import router as cpush_router
+    from app.routers.consol_operation import router as cop_router
+    from app.routers.consol_post_elimination import router as cpe_router
+    from app.routers.consol_readiness import router as cready_router
     from app.routers.consol_note_formulas import router as cnf_router
     from app.routers.consol_scope_confirmation import router as csc_router
     from app.routers.share_change_events import router as sce_router
@@ -129,13 +134,17 @@ def register_system_routers(app: FastAPI) -> None:
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
               cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
-              crf_router, crb_router, cpush_router, cnf_router, csc_router, sce_router,
+              crf_router, crb_router, cpush_router, cop_router, cpe_router, cready_router, cnf_router, csc_router, sce_router,
               cndt_router]:
         app.include_router(r, tags=["合并报表"])
 
-    # ═══ §7.1 高级查询：退役写入口的 410 兼容桩 ═══
-    # 路由保留只为让旧客户端得到稳定、可诊断的 410；桩无数据库、认证或请求体依赖，
-    # 不会触达 SnapshotWriter、审计或 outbox。实际编辑统一进入来源业务页面。
+    # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══
+    # 🔴 custom_query.py 只 re-export 了 writeback_preview / writeback_confirm 两个**函数**
+    #    （给契约测试直调与 monkeypatch 用），并未 include 伴生模块自己的 APIRouter。
+    #    结果 POST /api/custom-query/writeback-preview|writeback-confirm 从未挂上路由树，
+    #    `WritebackPreviewService`（30KB）+ `WritebackConfirmationGate` 对用户仍是 404 —— 
+    #    与该模块 docstring 自称的「本模块是其唯一生产入口」相矛盾。此处补注册。
+    #    tags 保留 router 自身声明的 ["custom-query"]（不套用「合并报表」）。
     from app.routers.custom_query_writeback import router as cqw_router
     app.include_router(cqw_router)
 

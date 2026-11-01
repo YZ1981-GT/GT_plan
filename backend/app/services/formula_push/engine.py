@@ -36,14 +36,17 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
 from app.services.formula_warnings import collect as collect_formula_warnings, messages as formula_warning_messages
-from app.services.formula_push import note_total_push, note_writer
-from app.services.formula_push.note_events import publish_note_sections
+from app.services.formula_push import note_writer
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
+from app.services.formula_push.persistence import (
+    execute_and_commit as _execute_and_commit,
+    load_states as _load_states,
+    notify_committed,
+    rule_inputs as _rule_inputs,
+    save_states as _save_states,
+)
 from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
 from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value
-from app.services.formula_push.state_store import load_states as _load_states
-from app.services.formula_push.state_store import record_failure as _record_failure
-from app.services.formula_push.state_store import save_states as _save_states
 from app.services.formula_push.rules import (
     TRIGGERS,
     BindingSpec,
@@ -62,8 +65,6 @@ from app.services.formula_runtime.contracts import CanonicalFormulaTarget, Formu
 
 logger = logging.getLogger(__name__)
 
-#: SSE 事件名
-SSE_EVENT = "formula.pushed"
 MANUAL = "manual"
 #: 推送规则有效定义变化后的重推（公式治理内核传播；选规则按「手动」口径，记录保留本值）
 FORMULA_CONFIG_CHANGED = "FORMULA_CONFIG_CHANGED"
@@ -74,9 +75,12 @@ FROZEN_WP_STATUSES: Mapping[str, str] = {
     "review_level1_passed": "一级复核通过", "review_level2_passed": "二级复核通过",
 }
 FROZEN_NOTE_STATUSES: frozenset[str] = frozenset({"confirmed"})
-#: 期间 / 分列字段的中文名与附注写入都在 note_total_push（engine 超行数门，ADR-9 抽出）；这里重新导出兼容既有引用
-PERIOD_LABELS: Mapping[str, str] = note_total_push.PERIOD_LABELS
-SPLIT_FIELD_LABELS: Mapping[str, str] = note_total_push.SPLIT_FIELD_LABELS
+PERIOD_LABELS: Mapping[str, str] = {"end": "期末", "prior": "期初"}
+#: 分「账面余额 / 减值准备 / 账面价值」三列写的字段：旧格式表（按列序存数）只认得出期末 / 期初金额列，这几列不按位置猜
+SPLIT_FIELD_LABELS: Mapping[str, str] = {
+    "end_gross": "期末账面余额", "end_impairment": "期末减值准备", "end_net": "期末账面价值",
+    "prior_gross": "期初账面余额", "prior_impairment": "期初减值准备", "prior_net": "期初账面价值",
+}
 
 
 @dataclass
@@ -93,10 +97,15 @@ class _StateWrite:
     state: str
     record_pushed: bool
     forced: bool
+    definition_identity: Any | None = None
+    inputs: list[Any] = field(default_factory=list)
+    calculation_applied: bool = False
+    calculation_status: str = "succeeded"
 
 
 class PushActionError(ValueError):
     """用户操作不合法（采用 / 锁定的目标不存在、策略不允许等；路由转 400）。"""
+
 
 # ── 规则 / 并发 / 年度 ────────────────────────────────────────────────────────
 
@@ -232,6 +241,7 @@ class _Ctx:
     now: datetime
     states: dict[str, FormulaPushState]
     result: RunResult
+    ruleset_hash: str | None = None
     state_writes: list[_StateWrite] = field(default_factory=list)
 
     def skip(self, rule_id: str, stage: str, domain: str, addr_id: str | None, reason: str) -> None:
@@ -315,6 +325,8 @@ async def _execute(
     from app.services.formula_settings.push_settings import effective_push_rules
 
     rules, rule_issues = await effective_push_rules(db, project_id)
+    from app.services.formula_provenance import push_rule_snapshot, sha256_canonical
+    ruleset_hash = sha256_canonical([push_rule_snapshot(rule) for rule in rules])
     code_of = {r.rule_id: r.wp_code for r in rules}
     for rid, msg in rule_issues:
         if codes is None or code_of.get(rid) in codes:
@@ -359,6 +371,7 @@ async def _execute(
     ctx = _Ctx(
         db=db, project_id=project_id, year=year, triggered_by=triggered_by, force=force,
         now=now, states=await _load_states(db, project_id, year), result=result,
+        ruleset_hash=ruleset_hash,
     )
     if not plan:
         result.add_warning("本项目没有已接入公式推送的底稿（当前接入：" + "、".join(supported_wp_codes()) + "）")
@@ -458,6 +471,8 @@ async def _push_workpaper(
     ctx: _Ctx, *, wp_code: str, binding: Any, rules: tuple[PushRule, ...], paper: _Paper,
     push_note: bool = True,
 ) -> None:
+    from app.services.formula_provenance import push_rule_identity
+
     result = ctx.result
     paper_code = paper.paper_code or wp_code
 
@@ -491,7 +506,9 @@ async def _push_workpaper(
     effective_items: set[str] = set()
     for stage in ("source", "derived"):
         for rule in (r for r in rules if r.stage == stage):
-            targets, skips = binding.workpaper_targets(rule, overlay, sources)
+            from app.services.formula_inputs import collect as collect_formula_inputs
+            with collect_formula_inputs() as rule_inputs:
+                targets, skips = binding.workpaper_targets(rule, overlay, sources)
             for s in skips:
                 ctx.skip(rule.rule_id, stage, "workpaper", _remap(s.addr_id), s.reason)
             for t in targets:
@@ -512,6 +529,9 @@ async def _push_workpaper(
                     note_section=None, formula_value=t.formula_value,
                     current_after=t.formula_value if decision.writes else t.current_value,
                     state=decision.state, record_pushed=decision.record_pushed, forced=addr in ctx.force,
+                    definition_identity=push_rule_identity(rule, ctx.ruleset_hash),
+                    inputs=_rule_inputs(rule, rule_inputs, t.formula_value),
+                    calculation_applied=decision.record_pushed and t.formula_value is not None,
                 )))
     for text in binding.entry_warnings(overlay):
         result.add_warning(text)
@@ -546,7 +566,12 @@ async def _push_workpaper(
     sections: list[str] = []
     if push_note:
         for rule in (r for r in rules if r.stage == "note"):
-            section = await _push_note(ctx, rule=rule, binding=binding, overlay=overlay, sources=sources, paper=paper)
+            from app.services.formula_inputs import collect as collect_formula_inputs
+            write_start = len(ctx.state_writes)
+            with collect_formula_inputs() as note_inputs:
+                section = await _push_note(ctx, rule=rule, binding=binding, overlay=overlay, sources=sources, paper=paper)
+            for state_write in ctx.state_writes[write_start:]:
+                state_write.inputs = _rule_inputs(rule, note_inputs, state_write.formula_value)
             if section:
                 sections.append(section)
     result.workpapers.append({
@@ -702,7 +727,7 @@ async def _push_note(
     data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
     # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
     targets = [
-        note_total_push.find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
+        _find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
         else note_writer.find_row(table.rows, [r["note_label"], r["label"]])
         for r in data_rows
     ]
@@ -752,10 +777,16 @@ async def _push_note(
     fallback_ambiguity: str | None = None
     unresolved_fields: dict[str, str] = {}
     if not any_data_row_matched:
-        # 多汇总行的取舍见 note_total_push.pick_fallback_total（有「减：…准备」行时科目余额写它之前的账面余额合计；
-        # 分段合计表仍不兜底）。spec note-table-structure-formula-pull-closure R12 / ADR-8。
-        total_idx, fallback_ambiguity = note_total_push.pick_fallback_total(table.rows)
-        if fallback_ambiguity:
+        candidates = note_writer.total_row_candidates(table.rows)
+        total_idx = candidates[0] if len(candidates) == 1 else None
+        if len(candidates) > 1:
+            # 多个汇总行：分段合计（「一、账面原值合计 / … / 五、账面价值合计」）或「小计 / 减：减值准备 / 合计」。
+            # 取数只有科目余额，是哪一段由科目决定（主科目余额是原值 / 小计，长期借款审定数是重分类后的合计），
+            # 引擎不知道 ⇒ 不兜底、也不按上方各行重算（上方明细一个都没取到）。2026-10-31 真库：按「最终合计」兜底
+            # 把长期股权投资 / 投资性房地产 / 使用权资产的原值写进了账面价值合计（和平 八、26 账面价值
+            # 176,203,072.87，应为 66,389,073.02）。spec disclosure-note-template-word-realignment Task 34/35。
+            labels = "、".join(note_writer.row_label(table.rows[i]) or "（无名）" for i in candidates)
+            fallback_ambiguity = f"表里有 {len(candidates)} 个合计行（{labels}），不知道科目余额该写哪一行，不兜底"
             skip_total_recalc = True
         if total_idx is not None:
             # 单科目：用唯一数据行（is_total=False）的值
@@ -854,25 +885,81 @@ def _expected_section_title(rule: PushRule, template_type: str | None, table_nam
     return note_writer.template_section_title(template_type, section) or rule.target.table
 
 
+def _find_total_by_label(rows: Any, label: str) -> int | None:
+    """分段合计表：按行名精确、唯一地对上合计行（不做包含匹配）。"""
+    hits = [
+        index for index, row in enumerate(rows)
+        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
+        and note_writer.row_label(row) == label
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
 def _push_note_cell(
     ctx: _Ctx, *, rule: PushRule, section: str, addr: str, table: note_writer.NoteTable,
     row: dict, field_name: str, value: float, paper: _Paper,
 ) -> bool:
-    return note_total_push.push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table, row=row,
-                                          field_name=field_name, value=value, paper=paper, record=_record_note)
+    ok, current, cell_mode = note_writer.read_cell(row, field_name, table.value_keys)
+    if not ok:
+        period = note_writer.NOTE_FIELDS[field_name][1]
+        detail = f"：{table.column_note}" if table.column_note else ""
+        reason = f"附注表缺少「{PERIOD_LABELS[period]}」列{detail}"
+        if field_name in SPLIT_FIELD_LABELS and isinstance(row.get("values"), list):
+            reason = (f"附注表是旧格式（按列序存数），表头只认得出期末 / 期初金额列，找不到唯一的"
+                      f"「{SPLIT_FIELD_LABELS[field_name]}」列，不按位置猜，附注保持原值")
+        ctx.skip(rule.rule_id, "note", "note", addr, reason)
+        return False
+    mode = note_writer.external_mode(table.section_locked, cell_mode)
+    decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
+    if decision.writes:
+        note_writer.write_cell(row, field_name, value, table.value_keys)
+    _record_note(ctx, rule, section, addr, decision, value, current, paper, _note_keep_reason(mode, decision))
+    return decision.writes
+
+
+def _note_keep_reason(mode: str | None, decision: Decision) -> str | None:
+    if not decision.kept:
+        return None
+    return "附注中该单元格被标记为锁定（或整节人工覆盖），保留原值" if mode == "locked" else \
+        "附注中该单元格被标记为人工填写，保留原值"
 
 
 def _push_note_total(
     ctx: _Ctx, *, rule: PushRule, section: str, table_name: str, table: note_writer.NoteTable, paper: _Paper,
 ) -> bool:
-    return note_total_push.push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table,
-                                           paper=paper, record=_record_note, note_addr_id=note_addr_id)
+    """合计 = 合计行之前各行之和（人工行一并计入）；上方各行这一列都没有数则不重算（不写 0）。"""
+    index = note_writer.find_total_row(table.rows)
+    if index is None:
+        return False
+    total_row = table.rows[index]
+    label = note_writer.row_label(total_row) or "合计"
+    wrote = False
+    for field_name in rule.target.fields:
+        _, period = note_writer.NOTE_FIELDS[field_name]
+        ok, current, cell_mode = note_writer.read_cell(total_row, field_name, table.value_keys)
+        if not ok:
+            continue
+        value = note_writer.total_formula(table.rows, index, field_name, table.value_keys)
+        addr = note_addr_id(section, table_name, label, period)
+        if value is None:
+            ctx.skip(rule.rule_id, "note", "note", addr,
+                     f"合计行「{label}」上方各行这一列都没有数，合计不按 0 重算，附注保持原值")
+            continue
+        mode = note_writer.external_mode(table.section_locked, cell_mode)
+        decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
+        if decision.writes:
+            note_writer.write_cell(total_row, field_name, value, table.value_keys)
+            wrote = True
+        _record_note(ctx, rule, section, addr, decision, value, current, paper, _note_keep_reason(mode, decision))
+    return wrote
 
 
 def _record_note(
     ctx: _Ctx, rule: PushRule, section: str, addr: str, decision: Decision,
     value: Any, current: Any, paper: _Paper, reason: str | None,
 ) -> None:
+    from app.services.formula_provenance import push_rule_identity
+
     ctx.result.items.append(PushItem(
         rule.rule_id, "note", "note", addr, decision.action, decision.state,
         formula=value, current=current, reason=reason,
@@ -881,6 +968,8 @@ def _record_note(
         addr_id=addr, rule_id=rule.rule_id, domain="note", wp_id=paper.id, note_section=section,
         formula_value=value, current_after=value if decision.writes else current,
         state=decision.state, record_pushed=decision.record_pushed, forced=addr in ctx.force,
+        definition_identity=push_rule_identity(rule, ctx.ruleset_hash),
+        calculation_applied=decision.record_pushed and value is not None,
     ))
 
 
@@ -900,36 +989,9 @@ async def run_and_commit(
     force_addr_ids: Iterable[str] = (),
 ) -> RunResult:
     """执行并提交；dry_run 只回滚不提交。"""
-    try:
-        result = await run(
-            db, project_id=project_id, year=year, trigger=trigger, triggered_by=triggered_by,
-            wp_id=wp_id, codes=codes, dry_run=dry_run, force_addr_ids=force_addr_ids,
-        )
-        if dry_run:
-            await db.rollback()
-        else:
-            await db.commit()
-    except Exception as exc:
-        await db.rollback()
-        if not dry_run and not isinstance(exc, PushActionError):
-            await _record_failure(db, project_id=project_id, year=year, trigger=trigger,
-                                  triggered_by=triggered_by, error=exc)
-        raise
-    await notify_committed(result)
-    return result
+    return await _execute_and_commit(
+        run, PushActionError, db, project_id=project_id, year=year, trigger=trigger,
+        triggered_by=triggered_by, wp_id=wp_id, codes=codes,
+        dry_run=dry_run, force_addr_ids=force_addr_ids,
+    )
 
-
-async def notify_committed(result: RunResult) -> None:
-    """提交成功后发 SSE 与附注章节事件（dry_run / 无运行记录不发）；调用方须先 commit。"""
-    if not result.dry_run and result.run_id is not None:
-        _broadcast(result)
-        await publish_note_sections(result.project_id, result.year, result.note_sections, result.run_id)
-
-
-def _broadcast(result: RunResult) -> None:
-    try:
-        from app.services.event_bus import event_bus
-
-        event_bus.broadcast_raw(SSE_EVENT, result.summary())
-    except Exception:  # noqa: BLE001 — SSE 是提交后的通知，失败不影响已落库数据
-        logger.warning("formula_push: SSE 广播失败 project=%s", result.project_id, exc_info=True)

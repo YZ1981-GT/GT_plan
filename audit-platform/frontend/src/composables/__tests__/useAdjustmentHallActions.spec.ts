@@ -33,9 +33,9 @@ import {
   withDescriptions, type HallPerms,
 } from '../useAdjustmentHallActions'
 
-const ALL: HallPerms = { writable: true, edit: true, review: true }
-const EDIT_ONLY: HallPerms = { writable: true, edit: true, review: false }
-const REVIEW_ONLY: HallPerms = { writable: true, edit: false, review: true }
+const ALL: HallPerms = { writable: true, create: true, edit: true, submit: true, review: true, approve: true, delete: true, import: true, export: true }
+const EDIT_ONLY: HallPerms = { ...ALL, review: false, approve: false, delete: false }
+const REVIEW_ONLY: HallPerms = { ...ALL, create: false, edit: false, submit: false, delete: false, import: false, review: true, approve: true }
 const row = (status: string, extra: Record<string, unknown> = {}) =>
   ({ entry_group_id: `g-${status}`, adjustment_no: `AJE-${status}`, adjustment_type: 'aje', review_status: status, ...extra })
 const sorted = (s: Set<string>) => [...s].sort()
@@ -47,12 +47,12 @@ beforeEach(() => {
 
 describe('rowActions：状态 × 权限', () => {
   it.each([
-    ['draft', ALL, ['approve', 'delete', 'edit', 'submit']],
-    ['draft', EDIT_ONLY, ['delete', 'edit', 'submit']],
+    ['draft', ALL, ['delete', 'edit', 'submit']],
+    ['draft', EDIT_ONLY, ['edit', 'submit']],
     ['pending_review', ALL, ['approve', 'reject', 'withdraw']],
     ['pending_review', EDIT_ONLY, ['withdraw']],
     ['pending_review', REVIEW_ONLY, ['approve', 'reject']],
-    ['rejected', EDIT_ONLY, ['convert', 'delete', 'edit', 'submit']],
+    ['rejected', EDIT_ONLY, ['edit', 'submit']],
     ['rejected', REVIEW_ONLY, []],
     ['approved', ALL, ['revoke']],
     ['approved', EDIT_ONLY, []],
@@ -64,8 +64,9 @@ describe('rowActions：状态 × 权限', () => {
     expect(rowActions(row('draft'), { ...ALL, writable: false }).size).toBe(0)
   })
 
-  it('底稿来源不能在大厅改明细；已转错报 / 重分类不再出「转错报」', () => {
+  it('底稿来源不能在大厅改明细；内部驳回不自动成为管理层不更正', () => {
     expect(rowActions(row('draft', { origin: 'workpaper' }), ALL).has('edit')).toBe(false)
+    expect(rowActions(row('rejected'), ALL).has('convert')).toBe(false)
     expect(rowActions(row('rejected', { converted_to_misstatement_id: 'm1' }), ALL).has('convert')).toBe(false)
     expect(rowActions(row('rejected', { adjustment_type: 'rje' }), ALL).has('convert')).toBe(false)
   })
@@ -73,7 +74,7 @@ describe('rowActions：状态 × 权限', () => {
   it('splitEligible 按动作拆可做 / 跳过', () => {
     const rows = [row('draft'), row('pending_review'), row('approved')]
     expect(splitEligible(rows, 'submit', ALL)).toMatchObject({ eligible: [rows[0]], skipped: 2 })
-    expect(splitEligible(rows, 'approve', ALL).eligible).toEqual([rows[0], rows[1]])
+    expect(splitEligible(rows, 'approve', ALL).eligible).toEqual([rows[1]])
   })
 })
 
@@ -107,13 +108,26 @@ describe('useAdjustmentHallActions', () => {
     return { actions, onChanged }
   }
 
-  it('单笔通过走批量端点、不弹确认；成功后刷新', async () => {
+  it('单笔通过也二次确认；成功后才调用批量端点并刷新', async () => {
     api.reviewAdjustmentsBatch.mockResolvedValue({ succeeded: [{ entry_group_id: 'g-draft' }], failed: [], notified: [] })
     const { actions, onChanged } = setup()
     expect(await actions.approve([row('draft')])).toBe(true)
-    expect(ui.confirmDangerous).not.toHaveBeenCalled()
+    expect(ui.confirmDangerous).toHaveBeenCalledWith(expect.objectContaining({
+      title: '确认通过调整分录',
+      confirmText: '确认通过',
+      message: expect.stringContaining('1 笔手工分录将在批准事务中计入试算表审定数'),
+    }))
     expect(api.reviewAdjustmentsBatch).toHaveBeenCalledWith('p1', { entry_group_ids: ['g-draft'], status: 'approved' })
     expect(onChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('底稿来源批准说明发布前置且不会重复计入 AJE/RJE', async () => {
+    api.reviewAdjustmentsBatch.mockResolvedValue({ succeeded: [{ entry_group_id: 'g-draft' }], failed: [], notified: [] })
+    const { actions } = setup()
+    expect(await actions.approve([row('draft', { origin: 'workpaper' })])).toBe(true)
+    expect(ui.confirmDangerous).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('允许来源底稿显式发布，不会重复计入 AJE/RJE 列'),
+    }))
   })
 
   it('批量通过先确认，取消则不发请求', async () => {

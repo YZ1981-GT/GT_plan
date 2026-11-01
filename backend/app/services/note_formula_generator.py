@@ -47,9 +47,19 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote
+from app.services.note_formula_provenance import (
+    NoteProvenanceRecorder,
+    as_decimal as _as_decimal,
+    execute_with_run as _execute_with_provenance_run,
+    matches_last_value as _matches_last_value,
+    note_check_outcome as _note_check_outcome,
+    quantize_amount as _quantize_amount,
+    record_formula_last_value as _record_formula_last_value,
+    same_amount as _same_amount,
+    table_available as _table_available,
+)
 
 logger = logging.getLogger(__name__)
-
 
 def generate_formulas_for_table(
     table_template: dict,
@@ -445,7 +455,7 @@ async def _resolve_cross_refs_via_acnr(
     return resolved
 
 
-async def execute_note_formulas(
+async def _execute_note_formulas_body(
     db: AsyncSession,
     project_id: UUID,
     year: int,
@@ -454,6 +464,8 @@ async def execute_note_formulas(
     affected_addr_ids: set[str] | None = None,
     cross_data: dict[str, Any] | None = None,
     regenerate: bool = False,
+    provenance_run_id: UUID | None = None,
+    provenance_computed_by: UUID | None = None,
 ) -> dict[str, Any]:
     """执行附注表格中的自动运算公式，逐表回填（spec note-pull-header-formula-closure R3）。
 
@@ -476,9 +488,10 @@ async def execute_note_formulas(
     from sqlalchemy.orm.attributes import flag_modified
 
     from app.services.formula_push.note_writer import sync_first_table_mirror
+    from app.services.formula_provenance import build_attempt, definition_identity, note_definition_identity, advance_final_value
     from app.services.note_formula_tables import (
         CROSS_REF_RE, evaluate, formula_view, is_projected_table, iter_note_tables, parse_formula_key,
-        section_preset_formulas, table_order, view_cell_mode, write_view_cell,
+        section_preset_formulas, table_order, view_cell_mode, view_cell_mode_explicit, write_view_cell,
     )
 
     note = (await db.execute(
@@ -490,9 +503,10 @@ async def execute_note_formulas(
         )
     )).scalar_one_or_none()
     if not note or not note.table_data:
-        return {"executed": 0, "updated": 0, "results": [], "anomalies": []}
+        return {"executed": 0, "updated": 0, "results": [], "checks": [], "anomalies": []}
 
     td = note.table_data
+    formula_provenance = td.setdefault("_formula_provenance", {}) if provenance_run_id is not None else None
     view = formula_view(td)
     projected = view is not td
     dropped = bool(regenerate and td.get("_formulas"))
@@ -504,6 +518,22 @@ async def execute_note_formulas(
     user_list = td.get("_user_formulas") if isinstance(td.get("_user_formulas"), list) else []
     user_keys = {conv[0] for rec in user_list if (conv := _user_formula_to_def(rec))}
     formulas = _merge_formula_sets(template, td.get("_user_formulas"))
+    effective_note_slots: dict[str, Any] = {}
+    if provenance_run_id is not None and await _table_available(db, "formula_setting"):
+        try:
+            from app.services.formula_settings.effective import effective_slots
+            async with db.begin_nested():
+                effective_note_slots = await effective_slots(db, "note", project_id)
+        except Exception:
+            logger.warning("附注公式来源定义读取失败 section=%s", note_section, exc_info=True)
+    provenance_changed = False
+    provenance_recorder = NoteProvenanceRecorder(
+        formula_provenance,
+        note_section=note_section,
+        effective_slots=effective_note_slots,
+        run_id=provenance_run_id,
+        computed_by=provenance_computed_by,
+    )
 
     need_cross = any(CROSS_REF_RE.search(str(f.get("expression") or "")) for f in formulas.values())
     if need_cross and not cross_data:
@@ -515,9 +545,9 @@ async def execute_note_formulas(
     resolve = (lambda token: _resolve_single_cross_ref(token, cross_data or {})) if need_cross else None
 
     tables = dict(iter_note_tables(view))
-    owned_cells = await _push_owned_cells(db, project_id, year, note_section, td, view)
     by_table: dict[int, dict[tuple[int, int], tuple[str, dict]]] = {}
     exec_results: list[dict] = []
+    checks: list[dict[str, Any]] = []
     for key, fdef in formulas.items():
         parsed = parse_formula_key(key)
         if parsed is None:
@@ -545,47 +575,96 @@ async def execute_note_formulas(
                 exec_results.append({"cell": key, "table_index": t, "type": formula_def.get("type"), "old": None,
                                      "new": None, "status": "skipped", "reason": "目标行超出表格"})
                 continue
-            # 只更新 auto 模式的单元格（Req 17.1）；投影表按来源行的位置化模式判（与推送同口径）
-            if view_cell_mode(td, tables[t], row_idx, col_idx) != "auto":
-                continue
             cell_addr_id = (_note_cell_addr_id(note_section, row_idx, col_idx) if t == 0
                             else f"note:{note_section}!t{t}:{row_idx}:{col_idx}")
             if affected_addr_ids is not None and cell_addr_id not in affected_addr_ids:
                 continue
             ftype = formula_def.get("type")
-            if (formula_def.get("category") or "auto_calc") != "auto_calc":
-                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
-                                     "status": "skipped", "reason": "审核类公式不回填单元格"})
-                continue
-            if _required_blank(formula_def, rows):  # 比例 / 损失率：本行金额为空不算、不写 0（R2.1）
-                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
-                                     "status": "skipped", "reason": "本行金额为空，不算比例"})
-                continue
-            if key not in user_keys and (t, row_idx, col_idx) in owned_cells:
-                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
-                                     "status": "kept_push", "reason": "这一格由公式推送按试算表审定数写入，预设公式不改写"})
-                continue
+            category = str(formula_def.get("category") or "auto_calc")
             expression = formula_def.get("expression", "")
             if ftype not in ("vertical_sum", "horizontal_balance", "book_value") and CROSS_REF_RE.search(str(expression)):
                 resolved_refs = await _resolve_cross_refs_via_acnr(expression, project_id, db)
                 if resolved_refs:
                     formula_def["resolved_refs"] = resolved_refs
-            value, reason = evaluate(expression, rows, resolve)
+            from app.services.formula_inputs import collect as collect_formula_inputs
+            with collect_formula_inputs() as formula_inputs:
+                value, reason = evaluate(expression, rows, resolve)
             executed += 1
             values = row.get("values") if isinstance(row.get("values"), list) else []
             old_value = values[col_idx] if col_idx < len(values) else None
+            cell_mode = view_cell_mode(td, tables[t], row_idx, col_idx)
+            explicit_mode = view_cell_mode_explicit(td, tables[t], row_idx, col_idx)
+
+            if category in {"logic_check", "reasonability"}:
+                check = _note_check_outcome(
+                    key=key, formula_def=formula_def, expected=value, actual=old_value, reason=reason,
+                )
+                checks.append(check)
+                exec_results.append({
+                    "cell": key, "table_index": t, "type": ftype, "old": old_value,
+                    "new": float(value) if value is not None else None,
+                    "status": "skipped", "reason": "审核类公式不回填单元格",
+                })
+                provenance_changed |= provenance_recorder.record(
+                    key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                    value=value, status="succeeded" if value is not None else "failed",
+                    error_code=None if value is not None else "NOTE_CHECK_NO_VALUE",
+                    inputs=formula_inputs, value_state="kept", applied=False,
+                )
+                continue
+
+            if value is not None and (
+                cell_mode in {"manual", "locked"}
+                or (
+                    not is_projected_table(tables[t])
+                    and not explicit_mode
+                    and old_value not in (None, "")
+                    and not _matches_last_value(td, key, old_value, formula_def)
+                )
+            ):
+                state = "locked" if cell_mode == "locked" else "manual"
+                exec_results.append({
+                    "cell": key, "table_index": t, "type": ftype, "old": old_value,
+                    "new": float(value), "status": "skipped_manual",
+                    "reason": "当前值不是本执行器上次写入值，按人工值保留",
+                })
+                provenance_changed |= provenance_recorder.record(
+                    key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                    value=_quantize_amount(value), status="succeeded", error_code=None,
+                    inputs=formula_inputs, value_state=state, applied=False,
+                )
+                continue
             if value is None:
                 exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": old_value, "new": None,
                                      "status": "skipped", "reason": reason})
+                provenance_changed |= provenance_recorder.record(
+                    key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                    value=None, status="failed", error_code="NOTE_FORMULA_NO_VALUE",
+                    inputs=formula_inputs,
+                    value_state=(
+                        "locked" if cell_mode == "locked"
+                        else "manual" if cell_mode == "manual"
+                        else "failed"
+                    ),
+                    applied=False,
+                )
                 continue
-            new_value = float(value)
+            # 求值始终保持 Decimal；JSONB/前端显示是最后一层兼容边界，按分量化后
+            # 再存普通数字，避免把二进制浮点尾差带回持久化数据。
+            quantized_value = _quantize_amount(value)
+            new_value = float(quantized_value)
             on_projection = is_projected_table(tables[t])
-            differs = old_value not in (None, "") and not _same_amount(old_value, new_value)
+            differs = old_value not in (None, "") and not _same_amount(old_value, quantized_value)
             if on_projection and differs and key not in user_keys:
                 # 底稿投影表的数值以底稿为准：预设公式只补空，底稿已有不同值不改写、回报差异（ADR-2）
                 exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": old_value, "new": new_value,
                                      "status": "kept_workpaper",
                                      "reason": f"底稿披露表的值 {old_value} 与预设公式结果 {new_value:.2f} 不一致，保留底稿值"})
+                provenance_changed |= provenance_recorder.record(
+                    key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                    value=quantized_value, status="succeeded", error_code=None,
+                    inputs=formula_inputs, value_state="kept", applied=False,
+                )
                 continue
             formula_def["evaluated_at"] = datetime.now(timezone.utc).isoformat()
             formula_def["addr_id"] = cell_addr_id  # Req 17.5：溯源 / reaggregate 精准刷新同一身份
@@ -594,17 +673,34 @@ async def execute_note_formulas(
             if on_projection and differs:
                 item["overrode_workpaper"] = True  # 用户公式覆盖了底稿披露表的值
             exec_results.append(item)
-            if _same_amount(old_value, new_value):
+            if _same_amount(old_value, quantized_value):
+                _record_formula_last_value(td, key, formula_def, new_value)
+                provenance_changed |= provenance_recorder.record(
+                    key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                    value=quantized_value, status="succeeded", error_code=None,
+                    inputs=formula_inputs, value_state="auto", applied=True,
+                )
                 continue
             if not write_view_cell(td, tables[t], row_idx, col_idx, new_value):
                 exec_results[-1] = {**item, "status": "skipped", "reason": "找不到这一格在底稿披露表里的存储位置，未写入"}
+                provenance_changed |= provenance_recorder.record(
+                    key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                    value=quantized_value, status="succeeded", error_code=None,
+                    inputs=formula_inputs, value_state="failed", applied=False,
+                )
                 continue
+            provenance_changed |= provenance_recorder.record(
+                key=key, formula_def=formula_def, addr_id=cell_addr_id,
+                value=quantized_value, status="succeeded", error_code=None,
+                inputs=formula_inputs, value_state="auto", applied=True,
+            )
+            _record_formula_last_value(td, key, formula_def, new_value)
             updated += 1
             wrote_first = wrote_first or (t == 0 and not on_projection)
 
     if wrote_first:
         sync_first_table_mirror(td)  # 第 1 张表写进 _tables[0] ⇒ 顶层镜像跟着改
-    if updated or dropped or (stored and executed):
+    if updated or dropped or (stored and executed) or provenance_changed:
         note.table_data = td
         flag_modified(note, "table_data")
         await db.flush()
@@ -613,37 +709,8 @@ async def execute_note_formulas(
                  for r in exec_results if r["status"] == "ok" and r["new"] == 0 and r.get("type") == "vertical_sum"]
     anomalies += [{"cell": r["cell"], "table_index": r["table_index"], "kind": "workpaper_differs",
                    "message": r["reason"]} for r in exec_results if r["status"] == "kept_workpaper"]
-    return {"executed": executed, "updated": updated, "results": exec_results, "anomalies": anomalies}
-
-
-def _required_blank(formula_def: dict, rows: list) -> bool:
-    """预设公式声明的必填格（``requires``：比例的分子）有一格为空。"""
-    from app.services.note_formula_tables import _cell
-
-    need = formula_def.get("requires")
-    return isinstance(need, list) and any(
-        isinstance(rc, (list, tuple)) and len(rc) == 2 and _cell(rows, int(rc[0]), int(rc[1])) is None for rc in need)
-
-
-async def _push_owned_cells(db: AsyncSession, project_id: UUID, year: int, section: str, td: Any,
-                            view: Any) -> set[tuple[int, int, int]]:
-    """存储表上推送拥有的格（``note_formula_push_guard``）；查询失败按没有处理（保存点隔离，不让事务中止）。"""
-    from app.services.note_formula_push_guard import push_owned_cells
-
-    try:
-        async with db.begin_nested():
-            return await push_owned_cells(db, project_id=project_id, year=year, section=section, td=td, view=view)
-    except Exception:  # noqa: BLE001 —— 守卫取不到不阻断公式执行
-        logger.warning("附注公式：推送拥有格查询失败 project=%s section=%s", project_id, section, exc_info=True)
-        return set()
-
-
-def _same_amount(old: Any, new: float) -> bool:
-    """值没变（差 ≤ 0.005，与公式推送同一容差）不重写、不算更新。"""
-    from app.services.consol_note_table_totals import to_decimal
-
-    current = to_decimal(old)
-    return current is not None and abs(float(current) - new) <= 0.005
+    return {"executed": executed, "updated": updated, "results": exec_results,
+            "checks": checks, "anomalies": anomalies}
 
 
 # ---------------------------------------------------------------------------
@@ -700,29 +767,24 @@ def _index_prior_dynamic_rows(
         if not label:
             continue
         vals = r.get("values") or []
-        closing = vals[0] if len(vals) > 0 else None
-        opening = vals[1] if len(vals) > 1 else None
-        try:
-            closing_v = float(closing) if closing is not None else None
-        except (TypeError, ValueError):
-            closing_v = None
-        try:
-            opening_v = float(opening) if opening is not None else None
-        except (TypeError, ValueError):
-            opening_v = None
+        closing_v = _as_decimal(vals[0]) if len(vals) > 0 else None
+        opening_v = _as_decimal(vals[1]) if len(vals) > 1 else None
 
         for section_dict in unique_dicts:
             existing = section_dict.get(label)
             if isinstance(existing, dict) and ("closing" in existing or "opening" in existing):
-                # 同 label 多次出现 → 累加
+                # 同 label 多次出现时仅累加实际存在的值；缺失列保持 None，
+                # 不把「没有上年数据」伪装成 0。
                 if closing_v is not None:
-                    existing["closing"] = (existing.get("closing") or 0.0) + closing_v
+                    previous = _as_decimal(existing.get("closing"))
+                    existing["closing"] = (previous or Decimal("0")) + closing_v
                 if opening_v is not None:
-                    existing["opening"] = (existing.get("opening") or 0.0) + opening_v
+                    previous = _as_decimal(existing.get("opening"))
+                    existing["opening"] = (previous or Decimal("0")) + opening_v
             else:
                 section_dict[label] = {
-                    "closing": closing_v if closing_v is not None else 0.0,
-                    "opening": opening_v if opening_v is not None else 0.0,
+                    "closing": closing_v,
+                    "opening": opening_v,
                 }
 
 
@@ -767,8 +829,8 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
             )
         for row_code, current, prior in result.all():
             cross_data["report"][row_code] = {
-                "current": float(current) if current else 0,
-                "prior": float(prior) if prior else 0,
+                "current": _as_decimal(current),
+                "prior": _as_decimal(prior),
             }
     except Exception:
         pass
@@ -790,9 +852,9 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
             )
         for code, audited, unadjusted, opening in result.all():
             cross_data["tb"][code] = {
-                "audited": float(audited) if audited else 0,
-                "unadjusted": float(unadjusted) if unadjusted else 0,
-                "opening": float(opening) if opening else 0,
+                "audited": _as_decimal(audited),
+                "unadjusted": _as_decimal(unadjusted),
+                "opening": _as_decimal(opening),
             }
     except Exception:
         pass
@@ -813,11 +875,13 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
                 continue
             cells = wp.parsed_data.get("cells") or {}
             if cells:
-                cross_data["wp"][wp_code] = {
-                    k: float(v) if v is not None else 0
-                    for k, v in cells.items()
-                    if isinstance(v, (int, float))
-                }
+                converted_cells: dict[str, Decimal] = {}
+                for key, raw_value in cells.items():
+                    value = _as_decimal(raw_value)
+                    if value is not None:
+                        converted_cells[key] = value
+                if converted_cells:
+                    cross_data["wp"][wp_code] = converted_cells
     except Exception:
         pass
 
@@ -859,11 +923,11 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
             if not total_rows:
                 continue
             values = total_rows[-1].get("values") or []
-            closing = float(values[0]) if values and values[0] is not None else None
-            opening = float(values[1]) if len(values) > 1 and values[1] is not None else None
+            closing = _as_decimal(values[0]) if values else None
+            opening = _as_decimal(values[1]) if len(values) > 1 else None
             entry = {
-                "closing": closing if closing is not None else 0.0,
-                "opening": opening if opening is not None else 0.0,
+                "closing": closing,
+                "opening": opening,
             }
             # 同一科目/章节多 key 索引（account_name / section_title / section_number）
             section_title = (prior_note.section_title or "").strip()
@@ -934,8 +998,7 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
                         TbAuxLedger.account_code.in_(list(account_to_name.keys())),
                     ).limit(100000)  # 大数据量保护
                 )
-            # 累计：account_name -> bucket -> total
-            aging_acc: dict[str, dict[str, float]] = {}
+            aging_acc: dict[str, dict[str, Decimal]] = {}
             for code, vdate, deb, cre in ledger_result.all():
                 if vdate is None:
                     continue
@@ -956,10 +1019,15 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
                         break
                 if bucket is None:
                     continue
-                d = float(deb) if deb is not None else 0.0
-                c = float(cre) if cre is not None else 0.0
+                debit = _as_decimal(deb)
+                credit = _as_decimal(cre)
+                if debit is None and credit is None:
+                    continue
+                # 借方 / 贷方一侧为空是账簿的正常形态，按该交易的另一侧计算；
+                # 两侧都为空则视为缺数并跳过，不制造 0 金额数据。
+                delta = (debit or Decimal("0")) - (credit or Decimal("0"))
                 slot = aging_acc.setdefault(name, {})
-                slot[bucket] = slot.get(bucket, 0.0) + (d - c)
+                slot[bucket] = (_as_decimal(slot.get(bucket)) or Decimal("0")) + delta
             cross_data["aging"] = aging_acc
     except Exception:
         pass
@@ -972,7 +1040,7 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float | None:
+def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> Decimal | None:
     """解析单个跨表引用 token，返回数值或 None。
 
     支持：
@@ -1010,10 +1078,10 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             return None
         if "期末" in period or period == "closing":
             val = label_data.get("closing")
-            return float(val) if val is not None else None
+            return _as_decimal(val)
         if "期初" in period or period == "opening":
             val = label_data.get("opening")
-            return float(val) if val is not None else None
+            return _as_decimal(val)
         return None
 
     # ─── Sprint 1.5 Task 1.5.2: PRIOR('account_name','期末'|'期初') ───
@@ -1027,10 +1095,10 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             return None
         if "期末" in period or period == "closing":
             val = prior_data.get("closing")
-            return float(val) if val is not None else None
+            return _as_decimal(val)
         if "期初" in period or period == "opening":
             val = prior_data.get("opening")
-            return float(val) if val is not None else None
+            return _as_decimal(val)
         return None
 
     # ─── Sprint 1.5 Task 1.5.2: AGING('account_name','bucket') ───
@@ -1050,9 +1118,9 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             return None
         val = aging_data.get(bucket)
         if val is None:
-            # 该桶在该科目下无数据（未发生过该龄段挂账）→ 返 0（同 TB 行为：科目存在桶不存在）
-            return 0.0
-        return float(val)
+            # 科目存在但该账龄桶没有值也属于缺数，不能伪装成 0。
+            return None
+        return _as_decimal(val)
 
     # WP('wp_code','sheet','cell_ref')（参数间可有空格：与保存前校验的写法一致）
     m = re.fullmatch(r"\s*WP\(\s*'([^']+)'\s*,\s*'([^']*)'\s*,\s*'([^']+)'\s*\)\s*", s)
@@ -1066,9 +1134,9 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         # 优先匹配 "sheet!cell_ref" 复合 key，再退回单独 cell_ref
         composite = f"{sheet}!{cell_ref}" if sheet else cell_ref
         if composite in wp_data:
-            return float(wp_data[composite])
+            return _as_decimal(wp_data[composite])
         if cell_ref in wp_data:
-            return float(wp_data[cell_ref])
+            return _as_decimal(wp_data[cell_ref])
         return None
 
     # NOTE('章节','行'[,'列'])：按章节 / 行 / 列取数，与严格求值同一套匹配（含两参、参数间空格；spec
@@ -1082,7 +1150,7 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         if table_data is None:
             return None
         value, _reason = _note_cell(table_data, section, m.group(2), m.group(3) or "")
-        return float(value) if value is not None else None
+        return _as_decimal(value)
 
     # REPORT('row_code','period')
     m = re.fullmatch(r"\s*REPORT\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)\s*", s)
@@ -1093,9 +1161,9 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         if report_data is None:
             return None
         if "期末" in period or "current" in period or "本期" in period:
-            return float(report_data.get("current", 0))
+            return _as_decimal(report_data.get("current"))
         if "期初" in period or "prior" in period or "上期" in period:
-            return float(report_data.get("prior", 0))
+            return _as_decimal(report_data.get("prior"))
         return None
 
     # TB('account_code','column')：科目按前缀合计（与报表 / 预载同口径、与保存前校验一致；原先只认精确码，
@@ -1118,8 +1186,11 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         else:
             return None
         hits = [v for code, v in cross_data.get("tb", {}).items() if code and code.startswith(account_code)]
-        # 列名合法但该科目及其下级都不存在 → 0
-        return float(sum(float(v.get(col_key, 0) or 0) for v in hits))
+        # 科目及其下级不存在，或命中的行该列全部缺数，均返回 None；
+        # 只有实际存在的数值才参与汇总。
+        values = [_as_decimal(v.get(col_key)) for v in hits if isinstance(v, dict)]
+        values = [v for v in values if v is not None]
+        return sum(values, Decimal("0")) if values else None
 
     return None
 
@@ -1130,18 +1201,18 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
 
 
 _REGION_AGG_FUNCS = {
-    "sum": lambda xs: sum(xs),
-    "count": lambda xs: float(len(xs)),
+    "sum": lambda xs: sum(xs, Decimal("0")),
+    "count": lambda xs: Decimal(len(xs)),
     "max": lambda xs: max(xs) if xs else None,
     "min": lambda xs: min(xs) if xs else None,
-    "avg": lambda xs: (sum(xs) / len(xs)) if xs else None,
+    "avg": lambda xs: (sum(xs, Decimal("0")) / Decimal(len(xs))) if xs else None,
 }
 
 
 def resolve_region_token(
     token: str,
     table_data: dict | None,
-) -> float | None:
+) -> Decimal | None:
     """解析 REGION('region_name','col_id', agg='sum'|'count'|'max'|'min'|'avg') token.
 
     引用同表内的动态区域 ``_dynamic_regions[name=region_name]`` 在指定 col_id
@@ -1152,8 +1223,8 @@ def resolve_region_token(
         table_data: 含 _dynamic_regions / _columns_meta / rows 的 dict
 
     Returns:
-        聚合值（float），无匹配 region / col / 数据时返 None；
-        agg='count' 始终返非负数（无数据返 0.0）。
+        聚合值（Decimal），无匹配 region / col / 数据时返 None；
+        agg='count' 始终返非负 Decimal（无数据返 Decimal("0")）。
 
     支持 agg：sum / count / max / min / avg；默认 sum。
 
@@ -1222,7 +1293,7 @@ def resolve_region_token(
     if not isinstance(rows, list):
         return None
 
-    nums: list[float] = []
+    nums: list[Decimal] = []
     for i in range(start_idx, min(end_idx + 1, len(rows))):
         r = rows[i]
         if not isinstance(r, dict):
@@ -1235,14 +1306,13 @@ def resolve_region_token(
         v = vals[col_pos]
         if v is None:
             continue
-        try:
-            nums.append(float(v))
-        except (TypeError, ValueError):
-            continue
+        value = _as_decimal(v)
+        if value is not None:
+            nums.append(value)
 
     if agg_raw == "count":
-        # count 始终返非负数；无 dynamic_data 行时返 0
-        return float(len(nums))
+        # count 始终返非负数；无数据返 Decimal("0")
+        return Decimal(len(nums))
 
     if not nums:
         return None
@@ -1251,14 +1321,14 @@ def resolve_region_token(
         result = agg(nums)
     except (TypeError, ValueError, ZeroDivisionError):
         return None
-    return float(result) if result is not None else None
+    return result if result is not None else None
 
 
 def exec_with_region(
     expression: Any,
     cross_data: dict[str, Any],
     table_data: dict | None,
-) -> float | None:
+) -> Decimal | None:
     """REGION-aware 表达式解析：直接迭代 +/- 组合的 REGION + 其他跨表 token.
 
     支持组合：``REGION('A','col_x') + TB('1001','期末') - REGION('B','col_y')``
@@ -1306,7 +1376,7 @@ def exec_with_region(
     if rec_no_space.lstrip("+") != s_no_space.lstrip("+"):
         return None
 
-    total = 0.0
+    total = Decimal("0")
     for sign, token in matches:
         if token.startswith("REGION("):
             val = resolve_region_token(token, table_data)
@@ -1318,7 +1388,7 @@ def exec_with_region(
     return total
 
 
-def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> float | None:
+def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> Decimal | None:
     """执行跨表引用公式（支持多 token 加减组合）。
 
     支持语法：
@@ -1360,7 +1430,7 @@ def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> float | No
     if s_no_space not in (rec_no_space, rec_no_space_alt):
         return None
 
-    total = 0.0
+    total = Decimal("0")
     for sign, token in matches:
         val = _resolve_single_cross_ref(token, cross_data)
         if val is None:
@@ -1372,7 +1442,7 @@ def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> float | No
     return total
 
 
-def _exec_generic(expression: str, rows: list[dict], cross_data: dict[str, Any]) -> float | None:
+def _exec_generic(expression: str, rows: list[dict], cross_data: dict[str, Any]) -> Decimal | None:
     """通用公式执行：支持混合引用（表内+跨表）"""
     import re
 
@@ -1389,7 +1459,7 @@ def _exec_generic(expression: str, rows: list[dict], cross_data: dict[str, Any])
     return None
 
 
-def _exec_vertical_sum(rows: list[dict], expression: str, col_idx: int) -> float | None:
+def _exec_vertical_sum(rows: list[dict], expression: str, col_idx: int) -> Decimal | None:
     """执行纵向求和：SUM(start:end, col)"""
     try:
         # 解析 SUM(0:3, 0)
@@ -1398,121 +1468,80 @@ def _exec_vertical_sum(rows: list[dict], expression: str, col_idx: int) -> float
         range_part = parts[0].strip()
         start, end = [int(x.strip()) for x in range_part.split(":")]
 
-        total = 0.0
+        total = Decimal("0")
+        found = False
         for i in range(start, end + 1):
-            if i < len(rows):
-                values = rows[i].get("values") or []
-                if col_idx < len(values) and values[col_idx] is not None:
-                    total += float(values[col_idx])
-        return total
+            if i < 0 or i >= len(rows) or not isinstance(rows[i], dict):
+                continue
+            values = rows[i].get("values") or []
+            if col_idx < 0 or col_idx >= len(values):
+                continue
+            value = _as_decimal(values[col_idx])
+            if value is not None:
+                total += value
+                found = True
+        return total if found else None
     except Exception:
         return None
 
 
-def _exec_horizontal(rows: list[dict], expression: str) -> float | None:
+def _exec_horizontal(rows: list[dict], expression: str) -> Decimal | None:
     """执行横向公式：cell(row,col) + cell(row,col) - cell(row,col)"""
     try:
         import re
-        result = 0.0
+        result = Decimal("0")
+        found = False
         # 匹配 cell(row,col) 和前面的 +/-
         tokens = re.findall(r'([+-]?)\s*cell\((\d+),(\d+)\)', expression)
         for sign, row_s, col_s in tokens:
             row_idx, col_idx = int(row_s), int(col_s)
-            if row_idx < len(rows):
-                values = rows[row_idx].get("values") or []
-                if col_idx < len(values) and values[col_idx] is not None:
-                    val = float(values[col_idx])
-                    if sign == "-":
-                        result -= val
-                    else:
-                        result += val
-        return result
+            if row_idx < 0 or row_idx >= len(rows) or not isinstance(rows[row_idx], dict):
+                continue
+            values = rows[row_idx].get("values") or []
+            if col_idx < 0 or col_idx >= len(values):
+                continue
+            val = _as_decimal(values[col_idx])
+            if val is None:
+                continue
+            found = True
+            if sign == "-":
+                result -= val
+            else:
+                result += val
+        return result if found else None
     except Exception:
         return None
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# L-4 task 4.1：覆盖率统计
-# ─────────────────────────────────────────────────────────────────────────────
+# 覆盖率实现已从执行器拆出；保留同名重导出兼容既有路由和测试。
+from app.services.note_formula_coverage import (
+    compute_formula_coverage,
+    compute_project_formula_coverage,
+)
 
 
-def compute_formula_coverage(table_data: dict | None) -> dict[str, Any]:
-    """计算单个附注章节的公式覆盖率（全部表）。
-
-    覆盖率 = 有预设公式的金额格 / 全部金额格（不含标签列；比例 / 说明列不计）。预设公式与执行器、公式管理同一套
-    （``note_formula_tables.section_preset_formulas``：按结构生成的合计 / 账面价值 + 明细行取数公式）；原先按
-    ``_check_presets`` 的英文预设名另算一遍（不分段的求和也算「已配置」，spec note-pull-followup-closure R8）。
-
-    Returns: {"total_cells": N, "configured_cells": M, "coverage_pct": X.X}
-    """
-    from app.services.note_formula_tables import (
-        amount_columns, formula_view, iter_note_tables, parse_formula_key, section_preset_formulas,
-    )
-
-    if not table_data or not isinstance(table_data, dict):
-        return {"total_cells": 0, "configured_cells": 0, "coverage_pct": 0.0}
-
-    view = formula_view(table_data)  # 与执行器、编辑器同一份显示视图（底稿来源章节按投影表统计）
-    formulas, _notes = section_preset_formulas(view)
-    targets = {parsed for key in formulas if (parsed := parse_formula_key(key))}
-    total_cells = configured_cells = 0
-    for t, table in iter_note_tables(view):
-        rows = table.get("rows") if isinstance(table.get("rows"), list) else []
-        columns = set(amount_columns(table)) if table.get("headers") and rows else set()
-        total_cells += len(rows) * len(columns)
-        configured_cells += sum(1 for ti, r, c in targets if ti == t and r < len(rows) and c in columns)
-
-    coverage_pct = round(configured_cells * 100 / total_cells, 1) if total_cells else 0.0
-    return {
-        "total_cells": total_cells,
-        "configured_cells": configured_cells,
-        "coverage_pct": coverage_pct,
-    }
-
-
-async def compute_project_formula_coverage(
+async def execute_note_formulas(
     db: AsyncSession,
     project_id: UUID,
     year: int,
+    note_section: str,
+    *,
+    affected_addr_ids: set[str] | None = None,
+    cross_data: dict[str, Any] | None = None,
+    regenerate: bool = False,
+    triggered_by: UUID | None = None,
+    trigger: str = "manual",
 ) -> dict[str, Any]:
-    """项目级附注公式覆盖率统计（聚合所有 DisclosureNote）。
-
-    Returns: {
-        "total_cells": N,
-        "configured_cells": M,
-        "coverage_pct": X.X,
-        "by_section": [{"note_section": "五、1", "total_cells": ..., "configured_cells": ..., "coverage_pct": ...}, ...],
-    }
-    """
-    result = await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.is_deleted == sa.false(),
-        )
+    """按章节 fence 执行，并在调用方事务中写运行记录与来源信封。"""
+    return await _execute_with_provenance_run(
+        _execute_note_formulas_body,
+        db, project_id, year, note_section,
+        affected_addr_ids=affected_addr_ids,
+        cross_data=cross_data,
+        regenerate=regenerate,
+        triggered_by=triggered_by,
+        trigger=trigger,
     )
-    notes = list(result.scalars().all())
 
-    total = 0
-    configured = 0
-    by_section: list[dict[str, Any]] = []
-    for note in notes:
-        td = note.table_data
-        if not td:
-            continue
-        s = compute_formula_coverage(td)
-        total += s["total_cells"]
-        configured += s["configured_cells"]
-        by_section.append({
-            "note_section": note.note_section,
-            **s,
-        })
 
-    coverage_pct = round(configured * 100 / total, 1) if total else 0.0
-    return {
-        "total_cells": total,
-        "configured_cells": configured,
-        "coverage_pct": coverage_pct,
-        "by_section": by_section,
-    }

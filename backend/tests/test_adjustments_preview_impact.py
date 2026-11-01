@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
@@ -32,10 +33,13 @@ from app.models.audit_platform_models import (
     AccountChart,
     AccountDirection,
     AccountSource,
+    Adjustment,
     ReportLineMapping,
     ReportLineMappingType,
     ReportType,
+    TrialBalance,
 )
+from app.models.account_note_mapping_models import AccountNoteMapping
 from app.models.base import Base, UserRole
 from app.models.core import Project, ProjectStatus, ProjectType
 from app.routers.adjustments import router
@@ -61,9 +65,13 @@ TEST_USER = _FakeUser()
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    tables = [
+        Project.__table__, AccountChart.__table__, ReportLineMapping.__table__,
+        TrialBalance.__table__, AccountNoteMapping.__table__, Adjustment.__table__,
+    ]
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.drop_all, tables=tables)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as s:
         yield s
@@ -153,6 +161,20 @@ async def seeded(db_session: AsyncSession):
             report_line_level=1,
             mapping_type=ReportLineMappingType.manual,
             is_confirmed=False,
+        ),
+    ])
+
+    db_session.add_all([
+        TrialBalance(
+            project_id=pid, year=2025, company_code="001",
+            standard_account_code="1122", account_name="应收账款",
+            account_category=AccountCategory.asset, unadjusted_amount=Decimal("1000"),
+            aje_adjustment=Decimal("0"), rje_adjustment=Decimal("0"),
+            wp_adjustment=Decimal("0"), audited_amount=Decimal("1000"),
+        ),
+        AccountNoteMapping(
+            project_id=pid, account_name="应收账款", section_id="五、3",
+            row_name="应收账款", col_index=1, mapping_type="exact",
         ),
     ])
 
@@ -450,3 +472,59 @@ async def test_api_preview_impact_balanced_two_rows(client: AsyncClient, seeded)
     by_key = {(r["report_type"], r["row_code"]): r for r in rows}
     assert Decimal(by_key[("balance_sheet", "BS-005")]["delta"]) == Decimal("60000")
     assert Decimal(by_key[("income_statement", "IS-001")]["delta"]) == Decimal("60000")
+
+
+@pytest.mark.asyncio
+async def test_preview_impact_covers_tb_notes_and_judgment_domains(db_session, seeded):
+    from app.services.adjustment_impact_service import preview_impact
+
+    result = await preview_impact(
+        db_session, seeded,
+        [{"account_code": "1122", "debit": 100, "credit": 0}],
+        year=2025, adjustment_type="aje",
+    )
+    tb = result["affected_tb_accounts"][0]
+    assert tb["current_audited"] == Decimal("1000")
+    assert tb["projected_audited"] == Decimal("1100")
+    assert result["affected_notes"] == [{
+        "section_id": "五、3", "row_name": "应收账款",
+        "account_name": "应收账款", "mapping_type": "exact",
+    }]
+    assert {item["domain"] for item in result["judgment_items"]} == {"cash_flow", "tax"}
+    assert all(item["status"] == "needs_judgment" for item in result["judgment_items"])
+
+
+@pytest.mark.asyncio
+async def test_preview_impact_respects_report_mapping_sign(db_session, seeded):
+    from app.services.adjustment_impact_service import preview_impact
+
+    mapping = (await db_session.execute(sa.select(ReportLineMapping).where(
+        ReportLineMapping.project_id == seeded,
+        ReportLineMapping.report_line_code == "BS-005",
+    ))).scalars().first()
+    mapping.mapping_sign = "subtract"
+    await db_session.flush()
+    result = await preview_impact(
+        db_session, seeded,
+        [{"account_code": "1122", "debit": 100, "credit": 0}], year=2025,
+    )
+    assert result["affected_report_rows"][0]["delta"] == Decimal("-100")
+
+
+@pytest.mark.asyncio
+async def test_preview_impact_never_guesses_missing_account_direction(db_session, seeded):
+    from app.services.adjustment_impact_service import preview_impact
+
+    db_session.add(ReportLineMapping(
+        project_id=seeded, standard_account_code="9998",
+        report_type=ReportType.balance_sheet, report_line_code="BS-X",
+        report_line_name="待判断", report_line_level=1,
+        mapping_type=ReportLineMappingType.manual, is_confirmed=True,
+    ))
+    await db_session.flush()
+    result = await preview_impact(
+        db_session, seeded,
+        [{"account_code": "9998", "debit": 100, "credit": 0}], year=2025,
+    )
+    assert result["affected_report_rows"] == []
+    assert result["direction_unknown_accounts"] == ["9998"]

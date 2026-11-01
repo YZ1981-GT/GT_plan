@@ -4,7 +4,10 @@
  """
  
 from uuid import uuid4
- 
+
+import pytest
+from fastapi import HTTPException
+
 from app.services.ledger_import_application_service import LedgerImportApplicationService
 
 
@@ -211,3 +214,97 @@ async def test_preview_includes_validation_summary(monkeypatch):
     assert payload["validation_summary"]["by_severity"]["error"] == 1
     assert payload["validation_summary"]["by_severity"]["warning"] == 1
     assert payload["upload_token"] == "upload-token"
+
+
+async def test_preview_runs_sync_parser_off_event_loop_and_bounds_rows(monkeypatch):
+    """复杂 Excel 预览不得占住 Web 事件循环，且直接调用也不能请求无界行数。"""
+    import asyncio
+    import threading
+
+    event_loop_thread = threading.get_ident()
+    parser_threads: list[int] = []
+    parser_rows: list[int] = []
+
+    async def _fake_resolve_file_sources(cls, **kwargs):
+        return "upload-token", [("trial-balance.xlsx", b"fake")]
+
+    def _fake_parse(*args, **kwargs):
+        parser_threads.append(threading.get_ident())
+        parser_rows.append(kwargs["preview_rows"])
+        return {"year": 2024, "aux_dimensions": [], "diagnostics": []}
+
+    monkeypatch.setattr(
+        LedgerImportApplicationService,
+        "resolve_file_sources",
+        classmethod(_fake_resolve_file_sources),
+    )
+    monkeypatch.setattr(
+        "app.services.ledger_import_application_service.smart_parse_files",
+        _fake_parse,
+    )
+
+    heartbeat_seen = asyncio.Event()
+
+    async def _heartbeat():
+        await asyncio.sleep(0)
+        heartbeat_seen.set()
+
+    heartbeat = asyncio.create_task(_heartbeat())
+    payload = await LedgerImportApplicationService.preview(
+        project_id=uuid4(),
+        user_id="tester",
+        files=[],
+        preview_rows=10_000,
+    )
+    await heartbeat
+
+    assert heartbeat_seen.is_set()
+    assert parser_threads and parser_threads[0] != event_loop_thread
+    assert parser_rows == [200]
+    assert payload["preview_rows"] == 200
+
+
+def test_preview_budget_enforces_file_count(monkeypatch):
+    monkeypatch.setattr(LedgerImportApplicationService, "PREVIEW_MAX_FILES", 1)
+    with pytest.raises(HTTPException) as exc_info:
+        LedgerImportApplicationService._validate_preview_budget(
+            [("a.csv", b"a"), ("b.csv", b"b")]
+        )
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail["code"] == "LEDGER_PREVIEW_FILE_LIMIT_EXCEEDED"
+
+
+def test_preview_budget_enforces_total_bytes(monkeypatch):
+    monkeypatch.setattr(
+        LedgerImportApplicationService,
+        "PREVIEW_MAX_TOTAL_BYTES",
+        3,
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        LedgerImportApplicationService._validate_preview_budget(
+            [("a.csv", b"1234")]
+        )
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail["code"] == "LEDGER_PREVIEW_SIZE_LIMIT_EXCEEDED"
+
+
+def test_preview_budget_counts_all_workbook_sheets(tmp_path, monkeypatch):
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    workbook.create_sheet("说明")
+    workbook.create_sheet("隐藏表")
+    workbook["隐藏表"].sheet_state = "hidden"
+    source = tmp_path / "many-sheets.xlsx"
+    workbook.save(source)
+    workbook.close()
+    monkeypatch.setattr(LedgerImportApplicationService, "PREVIEW_MAX_SHEETS", 2)
+
+    with pytest.raises(HTTPException) as exc_info:
+        LedgerImportApplicationService._validate_preview_budget(
+            [(source.name, source)]
+        )
+
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail["code"] == "LEDGER_PREVIEW_SHEET_LIMIT_EXCEEDED"
+    assert exc_info.value.detail["actual"] == 3

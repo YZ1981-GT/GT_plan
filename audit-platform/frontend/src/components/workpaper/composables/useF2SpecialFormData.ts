@@ -4,6 +4,8 @@
 import { ref, computed, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
 import { isIpoProject as isCoreIpoProject, type ProjectClassificationTags } from '@/utils/ipoProjectUtils'
 
 export interface ChecklistResponse {
@@ -57,6 +59,14 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   const projectContext = ref<ProjectContext>({})
   const sheetCache = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!wpId.value) throw new Error('缺少底稿标识，无法保存')
+      await cas.save({ wpId: wpId.value, projectId: projectId.value, items })
+    },
+  })
 
   // IPO 专项适用性：核心 business_category 判定优先，随后保留 F2 历史兼容的
   // project_type → template_type → 中文 IPO_CATEGORIES 三级瀑布。
@@ -68,6 +78,7 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
     try {
       const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id && isSpecialItemId(r.item_id)) {
@@ -116,33 +127,24 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   }
 
   async function saveItemsFromEvent(items: ChecklistResponse[]): Promise<void> {
-    if (!wpId.value || !items.length) return
-    for (const item of items) {
-      allResponses.value.set(item.item_id, item)
-    }
-    await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-      project_id: projectId.value,
-      items: items.map((i) => ({
-        item_id: i.item_id,
-        conclusion: i.conclusion,
-        remark: i.remark,
-      })),
-    })
+    if (!items.length) return
+    for (const item of items) allResponses.value.set(item.item_id, item)
+    queue.markMany(items.map((item) => item.item_id))
+    await queue.flush()
   }
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
   }
 
-  /** flush 掉未落库的编辑（供 syncBridge flushHtml 调用）。
-   * F2 special 的 debouncedSave 只有 timer 无 pending 队列（PUT 即发），
-   * 此处只清 timer 即可（与 E1 同款空实现理由）。 */
-  function _flushPending(): void {
+  /** 清本层 timer，并等待 generation-safe 队列保存最新值。 */
+  async function _flushPending(): Promise<void> {
     for (const t of _debounceTimers.values()) clearTimeout(t)
     _debounceTimers.clear()
+    await queue.flush()
   }
 
-  onScopeDispose(() => { _flushPending() })
+  onScopeDispose(() => { void _flushPending().catch(() => undefined) })
 
   return {
     allResponses,

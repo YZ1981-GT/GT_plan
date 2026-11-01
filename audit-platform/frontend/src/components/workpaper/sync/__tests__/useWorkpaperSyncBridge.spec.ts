@@ -31,7 +31,12 @@ import type {
   WorkpaperSyncOperationSnapshot,
   WorkpaperSyncRecoveryCase,
 } from '../workpaperSyncDto'
-import { ref } from 'vue'
+import { effectScope, ref } from 'vue'
+import {
+  PendingWritesFlushError,
+  pendingWriteBarrierActive,
+  registerPendingFlusher,
+} from '../pendingWrites'
 
 const UUID = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
 const DIGEST = (n: number) => String(n).repeat(2).padEnd(64, 'abc123def0'.repeat(7)).slice(0, 64)
@@ -297,6 +302,25 @@ describe('switchToOnlyOffice：消费 pending token，materialize 成功才 moun
     expect(h.bridge.mountCallCount.value).toBe(0)
   })
 
+  it('保存完成后到 materialize 返回前仍冻结结构化输入', async () => {
+    let finishMaterialize!: (descriptor: WorkpaperSyncEditorLaunchDescriptor) => void
+    const materialize = vi.fn(() => new Promise<WorkpaperSyncEditorLaunchDescriptor>((resolve) => {
+      finishMaterialize = resolve
+    }))
+    const h = harness({ materialize })
+
+    const switching = h.bridge.switchToOnlyOffice()
+    expect(pendingWriteBarrierActive.value).toBe(true)
+    await vi.waitFor(() => expect(materialize).toHaveBeenCalledOnce())
+    expect(pendingWriteBarrierActive.value).toBe(true)
+    expect(h.bridge.mode.value).toBe('html')
+
+    finishMaterialize(descriptorFixture())
+    await switching
+    expect(h.bridge.mode.value).toBe('oo')
+    expect(pendingWriteBarrierActive.value).toBe(false)
+  })
+
   it('flush 失败：停留 HTML，pending mutation 与 materialize 调用次数均为 0', async () => {
     const h = harness()
     h.flushHtml.mockRejectedValueOnce(new Error('本地 flush 失败'))
@@ -305,6 +329,42 @@ describe('switchToOnlyOffice：消费 pending token，materialize 成功才 moun
     expect(h.api.materialize).not.toHaveBeenCalled()
     expect(h.bridge.mode.value).toBe('html')
     expect(h.bridge.state.value).toBe('error')
+  })
+
+  it('私有写入失败时零 flushHtml/零物化，恢复后同一桥可重试成功', async () => {
+    const scope = effectScope()
+    let shouldFail = true
+    const flusher = vi.fn(async () => {
+      if (shouldFail) throw new Error('子表保存失败')
+    })
+    scope.run(() => registerPendingFlusher(flusher))
+    try {
+      const h = harness()
+      let rejected: unknown
+      try {
+        await h.bridge.switchToOnlyOffice()
+      } catch (error) {
+        rejected = error
+      }
+      expect(rejected).toBeInstanceOf(PendingWritesFlushError)
+      expect((rejected as PendingWritesFlushError).failures[0]?.error).toMatchObject({
+        message: '子表保存失败',
+      })
+      expect(h.flushHtml).not.toHaveBeenCalled()
+      expect(h.api.createPendingMutation).not.toHaveBeenCalled()
+      expect(h.api.materialize).not.toHaveBeenCalled()
+      expect(h.bridge.mode.value).toBe('html')
+      expect(h.bridge.state.value).toBe('error')
+
+      shouldFail = false
+      await expect(h.bridge.switchToOnlyOffice()).resolves.toMatchObject({ roomId: UUID(21) })
+      expect(flusher).toHaveBeenCalledTimes(2)
+      expect(h.flushHtml).toHaveBeenCalledTimes(1)
+      expect(h.api.createPendingMutation).toHaveBeenCalledTimes(1)
+      expect(h.api.materialize).toHaveBeenCalledTimes(1)
+    } finally {
+      scope.stop()
+    }
   })
 
   it('pending token 过期（409）：停留 HTML 且 mode 不变', async () => {

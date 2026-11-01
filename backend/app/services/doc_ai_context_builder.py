@@ -39,11 +39,13 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.models.core import Project
 from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
@@ -51,10 +53,12 @@ from app.models.report_models import DisclosureNote, FinancialReport
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.ai_chat.contracts import HostType
 from app.services.ai_chat.host_context import AuthorizedHostContext
+from app.services.ai_chat.note_service import knowledge_jump_route
 from app.services.knowledge_access_policy import (
     KnowledgeAccessPolicy,
     KnowledgeAccessSubject,
     KnowledgeResource,
+    KnowledgeRetrievalMode,
 )
 from app.services.knowledge_index_service import KnowledgeIndexService
 from app.services.report_freshness import stale_clause
@@ -122,6 +126,8 @@ class ChatContext:
     project_summary: str                    # 项目摘要
     citations: list[Citation]               # 引用来源（可追溯）
     token_estimate: int                     # token 估算（Task 2 管理预算）
+    # 文件夹宿主等聚合资源的授权后子来源；统一 ContextPlan 用它逐项裁剪和留痕。
+    host_sources: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _to_search_hit(r: dict) -> SearchHit:
@@ -154,6 +160,7 @@ class ContextBuilder:
         self._db = db
         self._knowledge_svc = KnowledgeIndexService(db)
         self._token_budget = token_budget or self._load_token_budget()
+        self._host_sources: list[dict[str, Any]] = []
         # 宿主 → 专属正文 loader（Property 5：唯一映射，无 default 回退到 WorkingPaper）。
         self._doc_loaders: dict[
             HostType, Callable[[AuthorizedHostContext], Awaitable[str]]
@@ -176,6 +183,7 @@ class ContextBuilder:
         query: str,
         user: Any,
         extra_scopes: list[str] | None = None,
+        enforce_budget: bool = True,
     ) -> ChatContext:
         """组装文档级 AI 对话上下文。
 
@@ -184,11 +192,14 @@ class ContextBuilder:
             query: 用户提问
             user: 当前用户（用于知识库权限过滤）
             extra_scopes: 用户自定义额外知识范围（文件夹 ID 列表）
+            enforce_budget: 是否使用本类的兼容预算；统一 Chat Run 传 False，
+                随后由 ContextBudgetPolicy 对宿主、引用、附件和知识做一次统一裁剪
 
         Returns:
             ChatContext 包含文档内容、关联知识、项目摘要、引用来源、token 估算
         """
         # ① 当前文档内容（按宿主类型分派到专属 loader）
+        self._host_sources = []
         doc_excerpt = await self._get_doc_content(host)
 
         # ② semantic_search 关联知识
@@ -206,10 +217,12 @@ class ContextBuilder:
             else ""
         )
 
-        # ④ token 预算管理：chunk + 相关性排序 + 截断（D1 属性）
-        doc_excerpt, knowledge_hits, project_summary = self._enforce_token_budget(
-            doc_excerpt, knowledge_hits, project_summary
-        )
+        # ④ 兼容旧调用方的预算管理。统一 Chat Run 在 ContextPlan 中连同
+        # mention/附件/review 一次裁剪，不能在这里先裁一遍造成双重截断。
+        if enforce_budget:
+            doc_excerpt, knowledge_hits, project_summary = self._enforce_token_budget(
+                doc_excerpt, knowledge_hits, project_summary
+            )
 
         # 构建引用列表（D3：每条 hit 必带可定位 source）
         citations = self._build_citations(knowledge_hits)
@@ -223,6 +236,7 @@ class ContextBuilder:
             project_summary=project_summary,
             citations=citations,
             token_estimate=token_estimate,
+            host_sources=list(self._host_sources),
         )
 
     # -------------------------------------------------------------------------
@@ -478,25 +492,100 @@ class ContextBuilder:
         return content_text
 
     async def _get_knowledge_folder_content(self, host: AuthorizedHostContext) -> str:
-        """获取文件夹下所有文档的内容摘要（文件夹级对话）"""
-        result = await self._db.execute(
-            sa.select(KnowledgeDocument.name, KnowledgeDocument.content_text, KnowledgeDocument.content_summary)
-            .where(
-                KnowledgeDocument.folder_id == UUID(host.resource_id),
-                KnowledgeDocument.is_deleted == sa.false(),
-            )
-            .limit(20)  # 限制文档数量避免超 token
+        """按文档自身权限加载文件夹内容，并以稳定顺序选取最多 20 篇。
+
+        判权查询不读取文档名或正文；只有通过 ``can_retrieve`` 的 ID 才进入第二次内容查询。
+        这样文档级 private/project_group 覆盖不会因用户能打开父文件夹而泄露。
+        """
+        folder_id = UUID(host.resource_id)
+        folder_permission = await KnowledgeAccessPolicy.load_folder_permission(
+            self._db, folder_id
         )
-        rows = result.all()
+        if folder_permission is None:
+            return "[文件夹不存在或无权访问]"
+
+        # 判定主体只需要权威 user id；无需先读取用户展示字段。
+        user = SimpleNamespace(id=host.principal_id)
+        subject = await KnowledgeAccessPolicy.resolve_subject(self._db, user)
+        newer = aliased(KnowledgeDocument)
+        permission_rows = (
+            await self._db.execute(
+                sa.select(
+                    KnowledgeDocument.id,
+                    KnowledgeDocument.access_level,
+                    KnowledgeDocument.project_ids,
+                    KnowledgeDocument.created_by,
+                ).where(
+                    KnowledgeDocument.folder_id == folder_id,
+                    KnowledgeDocument.is_deleted == sa.false(),
+                    ~sa.exists(
+                        sa.select(1).where(
+                            newer.previous_version_id == KnowledgeDocument.id,
+                            newer.is_deleted == sa.false(),
+                        )
+                    ),
+                )
+            )
+        ).all()
+
+        mode = (
+            KnowledgeRetrievalMode.project
+            if host.project_id is not None
+            else KnowledgeRetrievalMode.global_
+        )
+        allowed_ids: list[UUID] = []
+        for row in permission_rows:
+            document = KnowledgeResource.of_row(row[1], row[2], row[3])
+            if KnowledgeAccessPolicy.can_retrieve(
+                mode,
+                subject,
+                host.project_id,
+                document,
+                folder_permission,
+            ):
+                allowed_ids.append(row[0])
+        if not allowed_ids:
+            return "[文件夹下暂无可访问文档]"
+
+        rows = (
+            await self._db.execute(
+                sa.select(
+                    KnowledgeDocument.id,
+                    KnowledgeDocument.name,
+                    KnowledgeDocument.content_text,
+                    KnowledgeDocument.content_summary,
+                    KnowledgeDocument.version,
+                    KnowledgeDocument.updated_at,
+                )
+                .where(KnowledgeDocument.id.in_(allowed_ids))
+                .order_by(
+                    sa.func.lower(KnowledgeDocument.name),
+                    KnowledgeDocument.version.desc(),
+                    KnowledgeDocument.id,
+                )
+                .limit(20)
+            )
+        ).all()
         if not rows:
-            return "[文件夹下暂无文档]"
+            return "[文件夹下暂无可访问文档]"
 
         parts: list[str] = []
-        for name, content_text, content_summary in rows:
-            # 优先用摘要，其次截取 content_text 前 500 字
+        for doc_id, name, content_text, content_summary, version, _updated_at in rows:
             text = content_summary or (content_text[:500] if content_text else "")
-            if text:
-                parts.append(f"【{name}】\n{text}")
+            if not text:
+                continue
+            rendered = f"【{name}】\n{text}"
+            parts.append(rendered)
+            self._host_sources.append(
+                {
+                    "source_type": "knowledge_doc",
+                    "source_id": str(doc_id),
+                    "label": name,
+                    "content": rendered,
+                    "version": str(version or ""),
+                    "jump_route": knowledge_jump_route(doc_id=doc_id, folder_id=folder_id),
+                }
+            )
         return "\n\n".join(parts) if parts else "[文件夹下文档暂无文本内容]"
 
     async def _get_global_knowledge_content(self, host: AuthorizedHostContext) -> str:
@@ -734,6 +823,10 @@ class ContextBuilder:
             period_str = f"，审计期间 {period_start} 至 {period_end}"
 
         return f"项目：{name}，客户：{client_name}{period_str}"
+
+    def build_citations(self, knowledge_hits: list[SearchHit]) -> list[Citation]:
+        """公共 Citation 构造入口，供统一 ContextPlan 在最终裁剪后复用。"""
+        return self._build_citations(knowledge_hits)
 
     def _build_citations(self, knowledge_hits: list[SearchHit]) -> list[Citation]:
         """从 knowledge_hits 构建引用列表（D3：每条必带可定位 source）

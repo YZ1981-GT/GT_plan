@@ -22,7 +22,8 @@ Supported evidence types (Controlled Modules):
  7. report            — 报告 (Report)
  8. ai_content        — AI (AI Content)
  9. deliverable       — 交付件 (Deliverable)
-10. attachment_version — 附件版本 (Attachment Version)
+10. adjustment         — 调整分录组 (Adjustment Group)
+11. attachment_version — 附件版本 (Attachment Version)
 """
 
 from __future__ import annotations
@@ -1113,6 +1114,94 @@ class DeliverableAdapter:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+class AdjustmentAdapter:
+    """Adapter for a complete adjustment group identified by ``entry_group_id``."""
+
+    evidence_type = "adjustment"
+
+    async def resolve(
+        self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession,
+    ) -> ResolvedTarget | None:
+        group_id = _as_uuid(target_id)
+        if group_id is None:
+            return None
+        from app.models.audit_platform_models import Adjustment
+        rows = (await db.execute(sa.select(
+            Adjustment.content_revision, Adjustment.adjustment_no,
+        ).where(
+            Adjustment.entry_group_id == group_id,
+            Adjustment.project_id == project_id,
+            Adjustment.year == audit_year,
+            Adjustment.is_deleted == sa.false(),
+        ))).all()
+        if not rows:
+            return None
+        revisions = {int(row.content_revision or 1) for row in rows}
+        if len(revisions) != 1:
+            return None
+        return ResolvedTarget(
+            target_id=str(group_id), project_id=project_id, audit_year=audit_year,
+            target_version=next(iter(revisions)), display_label=rows[0].adjustment_no,
+        )
+
+    async def can_read(
+        self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession,
+    ) -> bool:
+        if not await _actor_can_access_project(db, actor, project_id):
+            return False
+        group_id = _as_uuid(target_id)
+        if group_id is None:
+            return False
+        from app.models.audit_platform_models import Adjustment
+        return (await db.execute(sa.select(Adjustment.id).where(
+            Adjustment.entry_group_id == group_id,
+            Adjustment.project_id == project_id,
+            Adjustment.is_deleted == sa.false(),
+        ).limit(1))).first() is not None
+
+    async def can_edit(
+        self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession,
+    ) -> bool:
+        return not actor.is_service and await self.can_read(
+            target_id, actor=actor, project_id=project_id, db=db,
+        )
+
+    async def locate(
+        self, target_id: str, *, version: int | None = None, db: AsyncSession,
+    ) -> LocatorInfo | None:
+        group_id = _as_uuid(target_id)
+        if group_id is None:
+            return None
+        from app.models.audit_platform_models import Adjustment
+        row = (await db.execute(sa.select(
+            Adjustment.project_id, Adjustment.year, Adjustment.content_revision,
+        ).where(
+            Adjustment.entry_group_id == group_id,
+            Adjustment.is_deleted == sa.false(),
+        ).limit(1))).first()
+        if row is None:
+            return None
+        return LocatorInfo(
+            target_id=str(group_id), evidence_type=self.evidence_type,
+            version=int(row.content_revision or 1),
+            route=f"/projects/{row.project_id}/adjustments?year={row.year}&focus={group_id}",
+            locator=f"adjustment:{group_id}",
+        )
+
+    async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
+        group_id = _as_uuid(target_id)
+        if group_id is None:
+            return False
+        from app.models.audit_platform_models import Adjustment
+        stmt = sa.select(Adjustment.id).where(
+            Adjustment.entry_group_id == group_id,
+            Adjustment.is_deleted == sa.false(),
+        )
+        if db.get_bind() is not None and db.get_bind().dialect.name == "postgresql":
+            stmt = stmt.with_for_update()
+        return (await db.execute(stmt.limit(1))).first() is not None
+
+
 class AttachmentVersionAdapter:
     """Adapter for attachment versions (attachment_versions via governance model)."""
 
@@ -1223,6 +1312,7 @@ def _build_registry() -> dict[str, EvidenceAdapter]:
         ReportAdapter(),
         AiContentAdapter(),
         DeliverableAdapter(),
+        AdjustmentAdapter(),
         AttachmentVersionAdapter(),
     ]
     return {a.evidence_type: a for a in adapters}
@@ -1266,6 +1356,7 @@ __all__ = [
     "ReportAdapter",
     "AiContentAdapter",
     "DeliverableAdapter",
+    "AdjustmentAdapter",
     "AttachmentVersionAdapter",
     "SUPPORTED_EVIDENCE_TYPES",
     "get_adapter",

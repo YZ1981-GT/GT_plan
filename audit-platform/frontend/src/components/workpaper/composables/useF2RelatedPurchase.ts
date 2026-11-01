@@ -2,6 +2,7 @@
  * useF2RelatedPurchase — F2-52 存货关联采购分析表
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
 import {
   defaultRelatedPurchaseSheet,
@@ -94,6 +95,15 @@ export function useF2RelatedPurchase(options: {
     ].filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function persist(): void {
     if (readonly.value) return

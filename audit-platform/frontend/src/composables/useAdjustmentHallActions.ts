@@ -24,24 +24,45 @@ export interface HallEntry {
   adjustment_no?: string | null
   adjustment_type?: string
   review_status?: string
+  content_revision?: number
   origin?: string | null
   description?: string | null
   line_items?: Array<{ standard_account_code: string; account_name?: string | null; debit_amount: unknown; credit_amount: unknown }>
   converted_to_misstatement_id?: string | null
+  audit_phase?: 'preliminary' | 'final'
+  client_booking?: { status: 'booked' | 'revoked'; effective: boolean; voucher_keys: string[] } | null
+  treatment?: {
+    status: 'pending_internal_review' | 'awaiting_workpaper_publish' | 'include_in_working_tb' | 'client_booked' | 'unadjusted_misstatement'
+    effective: boolean
+    latest_action?: string | null
+    misstatement_id?: string | null
+  } | null
+  risk?: {
+    amount: string | number
+    materiality_configured: boolean
+    overall_ratio?: string | number | null
+    performance_ratio?: string | number | null
+    trivial_ratio?: string | number | null
+    required_level: 'manager' | 'partner'
+    evidence_required: boolean
+    risk_flags: Array<{ code: string; label: string; reason: string }>
+  } | null
 }
 
 export type HallAction = 'edit' | 'submit' | 'withdraw' | 'approve' | 'reject' | 'revoke' | 'delete' | 'convert'
 
 export interface HallPerms {
-  /** 项目可写（未归档 / 有编辑权） */
+  /** 项目本身可写（未归档）；不代表任何具体业务权限。 */
   writable: boolean
-  /** adjustment:edit */
+  create: boolean
   edit: boolean
-  /** adjustment:review */
+  submit: boolean
   review: boolean
+  approve: boolean
+  delete: boolean
+  import: boolean
+  export: boolean
 }
-
-const isAje = (row: HallEntry) => String(row.adjustment_type || '').toLowerCase() === 'aje'
 
 /** 一笔分录在当前权限下可做的动作。底稿来源的分录不在大厅改明细（以来源底稿为准）。 */
 export function rowActions(row: HallEntry, perms: HallPerms): Set<HallAction> {
@@ -50,25 +71,22 @@ export function rowActions(row: HallEntry, perms: HallPerms): Set<HallAction> {
   const fromWorkpaper = row.origin === 'workpaper'
   switch (row.review_status) {
     case 'draft':
-      if (perms.edit) {
-        if (!fromWorkpaper) out.add('edit')
-        out.add('submit').add('delete')
-      }
-      if (perms.review) out.add('approve')
+      if (perms.edit && !fromWorkpaper) out.add('edit')
+      if (perms.submit) out.add('submit')
+      if (perms.delete) out.add('delete')
       break
     case 'pending_review':
-      if (perms.review) out.add('approve').add('reject')
-      if (perms.edit) out.add('withdraw')
+      if (perms.approve) out.add('approve')
+      if (perms.review) out.add('reject')
+      if (perms.submit) out.add('withdraw')
       break
     case 'rejected':
-      if (perms.edit) {
-        if (!fromWorkpaper) out.add('edit')
-        out.add('submit').add('delete')
-        if (isAje(row) && !row.converted_to_misstatement_id) out.add('convert')
-      }
+      if (perms.edit && !fromWorkpaper) out.add('edit')
+      if (perms.submit) out.add('submit')
+      if (perms.delete) out.add('delete')
       break
     case 'approved':
-      if (perms.review) out.add('revoke')
+      if (perms.approve) out.add('revoke')
       break
   }
   return out
@@ -198,14 +216,23 @@ export function useAdjustmentHallActions(opts: {
   }
 
   async function approve(rows: HallEntry[]): Promise<boolean> {
-    if (rows.length > 1) {
-      try {
-        await confirmDangerous({
-          title: '批量通过', confirmText: `通过 ${rows.length} 笔`,
-          message: `确认通过选中的 ${rows.length} 笔调整分录？通过后计入试算表审定数，报表与附注随之更新，并通知编制人。`,
-        })
-      } catch { return false }
-    }
+    const workpaperCount = rows.filter((row) => row.origin === 'workpaper').length
+    const manualCount = rows.length - workpaperCount
+    const scope = rows.length === 1 ? `分录 ${rows[0].adjustment_no || ''}`.trim() : `选中的 ${rows.length} 笔调整分录`
+    const partnerCount = rows.filter((row) => row.risk?.required_level === 'partner').length
+    const evidenceRequired = rows.filter((row) => row.risk?.evidence_required).length
+    const effects: string[] = []
+    if (manualCount) effects.push(`${manualCount} 笔手工分录将在批准事务中计入试算表审定数`)
+    if (workpaperCount) effects.push(`${workpaperCount} 笔底稿来源分录批准后允许来源底稿显式发布，不会重复计入 AJE/RJE 列`)
+    if (partnerCount) effects.push(`${partnerCount} 笔达到执行重要性或命中性质风险，必须由合伙人终审`)
+    if (evidenceRequired) effects.push(`${evidenceRequired} 笔批准前必须已有有效证据引用`)
+    try {
+      await confirmDangerous({
+        title: rows.length === 1 ? '确认通过调整分录' : '批量通过',
+        confirmText: rows.length === 1 ? '确认通过' : `通过 ${rows.length} 笔`,
+        message: `确认通过${scope}？${effects.join('；')}。相关报表与附注将在试算表更新后刷新，并通知编制人。`,
+      })
+    } catch { return false }
     return review(rows, 'approved')
   }
 
@@ -243,7 +270,7 @@ export function useAdjustmentHallActions(opts: {
     await run(`delete:${row.entry_group_id}`, '删除', () => operationHistory.execute({
       description: `删除分录 ${row.adjustment_no || ''}`.trim(),
       execute: async () => {
-        await deleteAdjustment(opts.projectId.value, row.entry_group_id)
+        await deleteAdjustment(opts.projectId.value, row.entry_group_id, row.content_revision)
         await afterChange()
       },
       // 撤销 = 按原编号重建为草稿（原分录是软删，编号已空出）

@@ -7,6 +7,7 @@
 import { useRouter } from 'vue-router'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { workpaperEditorRoute } from '@/composables/useWorkpaperNavigation'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 export interface LinkageItem {
   id: string
@@ -26,7 +27,7 @@ const prefs = useDisplayPrefsStore()
 
 function onItemClick(item: LinkageItem) {
   if (props.type === 'adjustment') {
-    router.push({ path: `/projects/${props.projectId}/adjustments`, query: { highlight: item.id } })
+    router.push(buildAdjustmentRouteTarget(props.projectId, { kind: 'focus', entryGroupId: item.id }))
   } else {
     // 关联底稿带的是底稿 id：直接打开编辑器（原先带 ?wpId= 去列表页，列表页不读，spec wp-deeplink-locate-residual-closure）
     router.push(workpaperEditorRoute(props.projectId, item.id))
@@ -40,9 +41,10 @@ function onItemClick(item: LinkageItem) {
       {{ type === 'adjustment' ? '关联调整分录' : '关联底稿' }}（{{ items.length }}）
     </div>
     <div v-if="items.length === 0" class="linkage-empty">暂无关联</div>
-    <div
+    <button
       v-for="item in items"
       :key="item.id"
+      type="button"
       class="linkage-item"
       @click="onItemClick(item)"
     >
@@ -51,7 +53,7 @@ function onItemClick(item: LinkageItem) {
       <span v-if="item.amount != null" class="linkage-item-amount">
         {{ prefs.fmt(item.amount) }}
       </span>
-    </div>
+    </button>
   </div>
 </template>
 
@@ -79,14 +81,23 @@ function onItemClick(item: LinkageItem) {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 6px 4px;
+  border: 0;
   border-radius: 4px;
+  background: transparent;
   cursor: pointer;
+  font: inherit;
   font-size: var(--gt-font-size-xs);
+  text-align: left;
   transition: background 0.15s;
 }
 .linkage-item:hover {
   background: var(--gt-bg-subtle);
+}
+.linkage-item:focus-visible {
+  outline: 2px solid var(--gt-color-primary);
+  outline-offset: 1px;
 }
 .linkage-item-label {
   color: var(--gt-color-teal);

@@ -82,10 +82,11 @@ async def _good_project(world, tmp_path):
     blank.file_path = ""
     await world.db.flush()
     await world.db.execute(CHECKLIST.insert().values(wp_id=blank.id, item_id="A30-A1-11", conclusion="是"))
+    att_root = Path(settings.ATTACHMENT_LOCAL_STORAGE_ROOT) / str(world.target.id)
     old = await add_attachment(world, world.target, file_name="回函.pdf",
-                               file_path=str(_file(tmp_path, "att/v1.pdf", b"old")))
+                               file_path=str(_file(att_root, "evidence/v1.pdf", b"old")))
     new = await add_attachment(world, world.target, file_name="回函.pdf", previous_version_id=old.id,
-                               file_path=str(_file(tmp_path, "att/v2.pdf", b"new-version")))
+                               file_path=str(_file(att_root, "evidence/v2.pdf", b"new-version")))
     report = await _deliverable(world, status="confirmed", file_path=str(_file(tmp_path, "dl/report.docx", b"docx")))
     await _deliverable(world, status="draft", file_path=str(_file(tmp_path, "dl/draft.docx", b"draft")))
     return wp, blank, old, new, report
@@ -115,7 +116,10 @@ async def test_inventory_verdicts(world, tmp_path):
     pl = await add_attachment(world, world.target, file_name="云端.pdf", file_path="paperless://documents/7",
                               storage_type="paperless")
     pending = await add_attachment(world, world.target, file_name="待检测.pdf", state="pending",
-                                   file_path=str(_file(tmp_path, "att/p.pdf", b"p")))
+                                   file_path=str(_file(
+                                       Path(settings.ATTACHMENT_LOCAL_STORAGE_ROOT) / str(world.target.id),
+                                       "evidence/p.pdf", b"p",
+                                   )))
     await _deliverable(world, status="signed", file_path=str(tmp_path / "no.docx"), doc_type="notes")
     await world.db.flush()
     assert TEMPLATE.is_file()

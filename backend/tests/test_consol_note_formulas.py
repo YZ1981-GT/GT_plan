@@ -470,8 +470,10 @@ class TestEndpoints:
             bd = await c.get(f"{_NS}/breakdown/{gid}/{Y}/五-1-1")
             assert bd.status_code == 200, bd.text
             cells = {(x["row_index"], x["col_index"]): x for x in bd.json()["cells"]}
-            report = {r["row_code"]: r for r in (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
-                                                              params={"report_type": "balance_sheet"})).json()}
+            report = {r["row_code"]: r for r in (await c.get(
+                f"/api/consolidation/reports/{gid}/{Y}",
+                params={"report_type": "balance_sheet", "mode": "preview"},
+            )).json()["rows"]}
             assert D(cells[(4, 1)]["consolidated"]) == D(report["BS-002"]["current_period_amount"]), "与合并报表同一求值"
             ar = cells[(5, 1)]
             assert (ar["individual"], ar["elimination"], ar["consolidated"]) == ("400.00", "-57.00", "343.00")

@@ -132,6 +132,9 @@ class KnowledgeDocument(Base):
         sa.BigInteger, server_default=text("0"), nullable=False
     )
     storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # 文件存储路径
+    blob_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("asset_blobs.id", ondelete="RESTRICT"), nullable=True
+    )
 
     # 内容（小文件直接存文本，大文件存路径）
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # 文本内容（供 RAG 检索）

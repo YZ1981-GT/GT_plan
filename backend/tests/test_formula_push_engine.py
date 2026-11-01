@@ -169,7 +169,14 @@ async def test_first_push_writes_system_and_derived_values_and_holds_unknown_edi
 
     states = await env.states()
     assert states[CASH_OPENING].state == "pending_confirm" and states[CASH_OPENING].last_pushed_value is None
+    assert states[CASH_OPENING].provenance["calculation_applied"] is False
+    assert states[CASH_OPENING].provenance["last_calculation"]["input_count"] >= 1
+    assert {item["kind"] for item in states[CASH_OPENING].provenance["last_calculation"]["inputs"]} == {"FOUR_TABLE"}
+    assert states[CASH_OPENING].provenance["last_calculation"]["definition_ref"]["kind"] == "push_rule"
     assert states[TB_ENDING].last_pushed_value == 606.73 and states[TB_ENDING].state == "auto"
+    assert states[TB_ENDING].provenance["calculation_applied"] is True
+    assert "TB" in {item["kind"] for item in states[TB_ENDING].provenance["last_calculation"]["inputs"]}
+    assert states[TB_ENDING].provenance["applied_attempt"]["run_id"] == str(result.run_id)
     [run] = await env.runs()
     assert (run.status, run.written_count, run.kept_count) == ("succeeded", 20, 2)
     assert run.detail["items"] and run.detail["wp"][0]["status"] == "pushed"
@@ -242,6 +249,8 @@ async def test_locked_target_is_never_overwritten_and_unlock_goes_pending(env):
                                       locked=True, user_id=None)
         await db.commit()
     assert row.state == "locked"
+    assert row.provenance["value_state"] == "locked"
+    assert row.provenance["calculation_applied"] is True
     env.sources = make_sources(cash_opening=999)
     result = await env.push("TRIAL_BALANCE_UPDATED")
     assert by_addr(result)[CASH_OPENING].action == "keep_locked"
@@ -251,6 +260,7 @@ async def test_locked_target_is_never_overwritten_and_unlock_goes_pending(env):
                                       locked=False, user_id=None)
         await db.commit()
     assert row.state == "pending_confirm", "解锁不直接覆盖，下次推送重新判定"
+    assert row.provenance["value_state"] == "pending_confirm"
 
 
 # ── 冻结 / 并发 / 试跑 ─────────────────────────────────────────────────────

@@ -204,3 +204,52 @@ async def test_generate_switches_and_summary(monkeypatch):
     assert (codes(second.changed_rows), codes(second.recomputed_rows), codes(second.failed_rows)) == (
         [], sorted([*changed, *FORMULA_LESS]), failed)
     assert {r["row_code"]: (r["state"], r["error"]) for r in first.failed_rows}[T] == ("not_ready", NOT_READY)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", PATHS)
+async def test_each_report_path_writes_one_queryable_run_and_row_provenance(path):
+    """S5：full / affected / stale 三路各有一个 run，成功行的 run_id 与信封一致。"""
+    import sqlalchemy as sa
+    from app.models.report_models import FinancialReport, ReportGenerationRun
+
+    async with sqlite_world(tag=f"fpe_run_{path}") as world:
+        await run_path(world, path)
+        runs = list((await world.session.execute(
+            sa.select(ReportGenerationRun).where(
+                ReportGenerationRun.project_id == world.project_id,
+                ReportGenerationRun.year == YEAR,
+            )
+        )).scalars().all())
+        assert len(runs) == 1
+        run = runs[0]
+        assert run.trigger == path
+        assert run.status == "partial"  # 夹具含除零 / 引用未就绪失败行
+        rows = list((await world.session.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == world.project_id,
+                FinancialReport.year == YEAR,
+                FinancialReport.run_id == run.id,
+            )
+        )).scalars().all())
+        assert rows, path
+        for row in rows:
+            assert row.provenance["calculation_applied"] is True
+            assert row.provenance["applied_attempt"]["run_id"] == str(run.id)
+            assert row.provenance["last_calculation"]["input_digest"]
+        rows_by_code = {row.row_code: row for row in rows}
+        from app.routers.reports import _row_fields
+        assert _row_fields(rows_by_code[B])["provenance_attempt_id"] == rows_by_code[B].provenance["last_calculation"]["attempt_id"]
+        assert {item["kind"] for item in rows_by_code[B].provenance["last_calculation"]["inputs"]} == {"TB"}
+        assert {item["kind"] for item in rows_by_code[COMPONENTS].provenance["last_calculation"]["inputs"]} == {"ROW", "TB"}
+
+        failed = (await world.session.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == world.project_id,
+                FinancialReport.year == YEAR,
+                FinancialReport.row_code == DIV0,
+            )
+        )).scalar_one()
+        assert failed.run_id is None  # 旧最终值仍属旧运行
+        assert failed.provenance["calculation_applied"] is False
+        assert failed.provenance["last_calculation"]["run_id"] == str(run.id)

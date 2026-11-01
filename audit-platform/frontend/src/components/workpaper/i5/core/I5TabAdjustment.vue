@@ -148,14 +148,7 @@
         <span class="chip-wrap"><GtIndexChip value="wp:I5-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
         <el-button size="small" type="default" link @click="openReview('I5-3')">💬 复核</el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -420,6 +413,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * I5TabAdjustment.vue — I5-3 其他非流动资产调整分录汇总
  * 对齐致同 Excel 列结构；逻辑层 useI5Adjustment
@@ -427,7 +421,7 @@
 import { computed, inject, ref, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI5Adjustment } from '../../composables/useI5Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { extractI5CurrentPortionCandidates } from '../../composables/i5AdjudicationModel'
 import { consumeI5NavHighlight, setI5NavHighlight } from '../../composables/i5NavBridge'

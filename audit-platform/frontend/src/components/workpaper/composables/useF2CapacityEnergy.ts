@@ -2,6 +2,7 @@
  * useF2CapacityEnergy — F2-63 存货产量与产能、能耗分析（四区块状态管理）
  */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   calcEnergyTotals,
@@ -40,6 +41,15 @@ export function useF2CapacityEnergy(opts: {
 
   const sheet = ref<CapacityEnergySheet>(defaultCapacityEnergySheet())
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

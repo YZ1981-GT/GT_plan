@@ -152,8 +152,11 @@ class CompletenessReportResponse(BaseModel):
 
 # missing 和 unsigned 是 blocking（阻断归档）
 # unresolved_reviews 和 stale 是 blocking（阻断归档）
-# missing_files：底稿 / 附件 / 交付件被引用但读不到 ⇒ 打包必失败，阻断（与打包同一份清单）
-BLOCKING_CATEGORIES: set[str] = {"missing", "unsigned", "unresolved_reviews", "stale", "missing_files"}
+# missing_files、证据缺口与未回函阻断；普通 OCR 未确认和孤儿文件只提示。
+BLOCKING_CATEGORIES: set[str] = {
+    "missing", "unsigned", "unresolved_reviews", "stale", "missing_files",
+    "evidence_gaps", "unreplied_confirmations",
+}
 
 #: 类别中文名（与前端 ``constants/archiveLabels.ts`` 同一张表，契约测试比对；归档门禁失败原因用）
 CATEGORY_LABELS: dict[str, str] = {

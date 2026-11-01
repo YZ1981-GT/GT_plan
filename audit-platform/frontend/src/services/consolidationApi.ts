@@ -251,6 +251,11 @@ export interface GenerateFromWorksheetResult {
   deleted_entries: Array<{ origin: string | null; origin_key: string | null; entry_id: string; entry_no: string; review_status: string }>
   warnings: string[]
   groups: GenerateGroupResult[]
+  /** 服务端版本化预览字段；旧版 dry-run 响应可缺省。 */
+  preview_token?: string
+  source_versions?: Record<string, number>
+  source_digest?: string
+  source_summary?: Record<string, unknown>
 }
 
 /** 旧版明细表（consol_worksheet_data['elimination']）自定义行：检测 / 转入结果 */
@@ -917,17 +922,65 @@ export interface MinorityInterestRow {
 }
 
 export interface ConsolReportRow {
+  report_type?: string
+  row_number?: number
   row_code: string
   row_name: string
-  current_period_amount: number
-  prior_period_amount: number
-  is_bold: boolean
-  is_total: boolean
+  current_period_amount: number | string | null
+  prior_period_amount: number | string | null
+  is_bold?: boolean
+  is_total?: boolean
+  is_total_row?: boolean
+  indent_level?: number
+  formula_used?: string | null
+  source_accounts?: string[] | null
+  blank_reason?: string | null
+  prior_blank_reason?: string | null
+  provenance?: Record<string, unknown> | null
+}
+
+export type ConsolReportMode = 'published' | 'preview'
+
+export interface ConsolReportEnvelope {
+  mode: ConsolReportMode
+  published: boolean
+  project_id: string
+  year: number
+  node_key: string
+  report_type: string
+  operation_id: string | null
+  operation_revision: number | null
+  report_run_id: string | null
+  input_digest: string | null
+  row_digest: string | null
+  applicable_standard: string | null
+  download_allowed: boolean
+  rows: ConsolReportRow[]
+  notice: string | null
 }
 
 export interface ConsolReportData {
   rows: ConsolReportRow[]
   report_type: string
+  envelope?: ConsolReportEnvelope
+}
+
+export interface ConsolArtifactInfo {
+  id: string
+  project_id: string
+  year: number
+  operation_id: string | null
+  operation_revision: number | null
+  report_run_id: string
+  node_key: string
+  kind: 'report_excel' | 'consol_workpaper'
+  status: 'generating' | 'ready' | 'failed'
+  file_name: string
+  content_type: string
+  size_bytes: number | null
+  sha256: string | null
+  manifest: Record<string, unknown>
+  error: string | null
 }
 
 export interface YoYAnalysis {
@@ -1062,10 +1115,27 @@ export async function getEliminationTreeLines(projectId: string, year?: number |
   return api.get(P.eliminations.treeLines, { params })
 }
 
+/** 服务端按已保存工作表和版本向量预览 canonical 草稿分录。 */
+export async function previewEliminationsFromWorksheets(
+  projectId: string,
+  body: { year: number; source_sheet_keys: string[]; expected_versions: Record<string, number> },
+  opts: { silent?: boolean } = {},
+): Promise<GenerateFromWorksheetResult> {
+  const config: Record<string, unknown> = {}
+  if (opts.silent) config._silent = true
+  return api.post(`${P.eliminations.worksheetPreview}?project_id=${projectId}`, body, config)
+}
+
+/** 使用预览凭证二次校验版本后生成草稿；客户端不上传 groups。 */
+export async function generateEliminationsFromWorksheets(
+  projectId: string,
+  body: { year: number; source_sheet_keys: string[]; expected_versions: Record<string, number>; preview_token: string },
+): Promise<GenerateFromWorksheetResult> {
+  return api.post(`${P.eliminations.worksheetGenerate}?project_id=${projectId}`, body)
+}
+
 /**
- * 工作底稿来源分组 ⇒ 草稿分录（按来源键幂等 upsert；已提交 / 已审批的不改只报告）。
- * ``origins`` 声明本次负责的来源：其中本次没出现的来源键 ⇒ 草稿软删（某张表本次一组都没算出时须显式列出）。
- * ``dryRun`` 只预演（明细表「待生成」预览），不写库。
+ * 旧版客户端分组接口仅保留 dry-run 兼容；写入已迁移到上面的服务端生成。
  */
 export async function generateEliminationsFromWorksheet(
   projectId: string,
@@ -1172,22 +1242,104 @@ export async function getMinorityInterest(projectId: string, year: number): Prom
   return getMinorityInterestRows(projectId, year)
 }
 
+// ─── 抵销后表 canonical projection（服务端只读真源，batch 3 / ADR-CRW-004）─────
+
+/** 某科目某企业的抵销分解（金额为 sign 归一后净额，字符串精度到分）。 */
+export interface PostElimCompanyShare {
+  company_code: string
+  company_name: string
+  amount: string
+  source_entry_ids: string[]
+}
+
+/** 某科目的权威抵销总额 + 逐企业分解 + 未分配额。 */
+export interface PostElimAccount {
+  account_prefix: string
+  label: string
+  total: string
+  unallocated: string
+  balanced: boolean
+  by_company: PostElimCompanyShare[]
+  warnings: string[]
+}
+
+/** 四张抵销后表的只读 canonical 数据（抵消分录数来自 approved 分录，自动列只读）。 */
+export interface PostEliminationProjection {
+  project_id: string
+  year: number
+  root_node_key: string
+  accounts: Record<string, PostElimAccount>
+  manual_overrides: Record<string, unknown>
+  warnings: string[]
+}
+
+/** 标准科目前缀常量（与后端 ADR-CRW-004 一致）。 */
+export const POST_ELIM_ACCOUNT = {
+  longInvest: '1511',
+  investIncome: '6111',
+  capitalReserve: '4002',
+  minorityEquity: '4501',
+} as const
+
+/**
+ * 四张抵销后表的服务端 canonical projection（只读）。
+ * 抵消分录数不再读旧 `elimEquity/elimIncome` 空骨架，改读此处的 approved 分录派生值。
+ */
+export async function getPostEliminationProjection(
+  projectId: string, year: number, opts: { silent?: boolean } = {},
+): Promise<PostEliminationProjection> {
+  const config: Record<string, unknown> = {}
+  if (opts.silent) config._silent = true
+  return api.get(P.postElimination(projectId, year), config)
+}
+
 // ─── 合并报表 API ─────────────────────────────────────────────────────────────
 
 export async function getConsolReports(projectId: string, year: number): Promise<ConsolReportRow[]> {
-  return api.get(`${P.reports.list(projectId, year)}?report_type=balance_sheet`)
+  const envelope = await api.get(P.reports.list(projectId, year), {
+    params: { report_type: 'balance_sheet', mode: 'published' },
+  }) as ConsolReportEnvelope
+  return Array.isArray(envelope?.rows) ? envelope.rows : []
 }
 
 export async function getConsolReport(
-  projectId: string, reportType: string, period: string, nodeKey?: string | null,
+  projectId: string,
+  reportType: string,
+  period: string,
+  nodeKey?: string | null,
+  mode: ConsolReportMode = 'published',
+  reportRunId?: string | null,
 ): Promise<ConsolReportData> {
   // period 解析不出年度 ⇒ 不请求（原先兜底去年，取的是别的年度的合并报表）
   const year = parseAuditYear(parseInt(period))
   if (year == null) return { rows: [], report_type: reportType }
-  const params: Record<string, string | number> = { report_type: reportType }
+  const params: Record<string, string | number> = { report_type: reportType, mode }
   if (nodeKey) params.node_key = nodeKey
-  const rows = await api.get(`${P.reports.list(projectId, year)}`, { params })
-  return { rows: Array.isArray(rows) ? rows : [], report_type: reportType }
+  if (reportRunId) params.report_run_id = reportRunId
+  const envelope = await api.get(`${P.reports.list(projectId, year)}`, { params }) as ConsolReportEnvelope
+  return {
+    rows: Array.isArray(envelope?.rows) ? envelope.rows : [],
+    report_type: reportType,
+    envelope,
+  }
+}
+
+export async function createConsolArtifact(
+  projectId: string,
+  year: number,
+  reportRunId: string,
+  kind: 'report_excel' | 'consol_workpaper' = 'report_excel',
+): Promise<ConsolArtifactInfo> {
+  return api.post(P.reports.artifacts(projectId, year), {
+    report_run_id: reportRunId,
+    kind,
+  })
+}
+
+export function consolArtifactDownloadUrl(
+  projectId: string, year: number, artifactId: string,
+): string {
+  return P.reports.artifactDownload(projectId, year, artifactId)
 }
 
 export async function saveConsolReport(_projectId: string, _reportType: string, _period: string, data: ConsolReportData): Promise<ConsolReportData> {
@@ -1443,11 +1595,10 @@ export interface MappingRule { id: string; project_id: string; section_id: strin
 export interface SourceGroup { hash: string; section_id: string; source_rows: Array<{ label: string; row_type: string; key: string; occurrence?: number; group?: string; group_occurrence?: number }>; entities: Array<{ node_key: string; project_id: string; company_name: string }>; has_rule: boolean; rule_id: string | null; all_confirmed: boolean }
 export interface StaleEntity { node_key: string; company_name: string; old_hash: string; new_hash: string; status: 'stale' }
 /** 明细映射建议：`auto_confirmable` = 下推行 / 精确 / 别名 / 通用别名 / 历史且有目标行（「⚡ 自动映射」只确认这类） */
-export interface MappingSuggestion { source_label: string; /** 同名行逐个建议时的出现序号（R11） */ source_occurrence?: number; /** 同名行所在分组、可读写法与组内序号（R3） */ source_group?: string; source_group_label?: string; source_group_occurrence?: number; suggested_target: { target_row_id: string; canonical_name: string } | null; confidence: number; match_type: 'exact_id' | 'exact' | 'alias' | 'global_alias' | 'aging_bucket' | 'total_row' | 'total_ignored' | 'previous_year' | 'history' | 'fuzzy' | 'position' | 'manual'; candidates: any[]; auto_confirmable?: boolean; /** 建议忽略的行（模板没有的合计 / 小计行，total_ignored）带 ignore + 原因 */ mapping_action?: 'map' | 'ignore'; ignore_reason?: string }
+export interface MappingSuggestion { source_label: string; /** 同名行逐个建议时的出现序号（R11） */ source_occurrence?: number; /** 同名行所在分组、可读写法与组内序号（R3） */ source_group?: string; source_group_label?: string; source_group_occurrence?: number; suggested_target: { target_row_id: string; canonical_name: string } | null; confidence: number; match_type: 'exact_id' | 'exact' | 'alias' | 'global_alias' | 'previous_year' | 'history' | 'fuzzy' | 'position' | 'manual'; candidates: any[]; auto_confirmable?: boolean }
 /** 一家企业单体附注的来源读取状态（found 已读到 / missing 未生成 / not_applicable 本期无此情形 / no_source 合并特有章节 / unreadable 读不出表） */
-export interface EntitySourceStatus { node_key: string; project_id: string; company_name: string; status: 'found' | 'missing' | 'not_applicable' | 'no_source' | 'unreadable'; reason: string | null; table_name?: string | null; row_count?: number; unmatched_columns?: string[]; ratio_columns?: string[]; /** 并进「合计」行的单体行（「小计」「减：坏账准备」） */ folded_rows?: string[] }
-/** `auto_confirmable_count` / `needs_review_count`：后端按 `is_auto_confirmable` 分的建议行数（R11 弹窗顶部显示比例；与前端 `suggestionStatus` 同口径，不等即口径漂移） */
-export interface DetailRefreshPreview { preview_token: string; project_id: string; section_id: string; year: number; template_version_id: string | null; template_rows: DetailTemplateRow[]; groups: SourceGroup[]; stale_entities: StaleEntity[]; suggestions: MappingSuggestion[]; entity_count: number; group_count: number; stale_count: number; entity_sources?: EntitySourceStatus[]; missing_count?: number; auto_confirmable_count?: number; needs_review_count?: number }
+export interface EntitySourceStatus { node_key: string; project_id: string; company_name: string; status: 'found' | 'missing' | 'not_applicable' | 'no_source' | 'unreadable'; reason: string | null; table_name?: string | null; row_count?: number; unmatched_columns?: string[]; ratio_columns?: string[] }
+export interface DetailRefreshPreview { preview_token: string; project_id: string; section_id: string; year: number; template_version_id: string | null; template_rows: DetailTemplateRow[]; groups: SourceGroup[]; stale_entities: StaleEntity[]; suggestions: MappingSuggestion[]; entity_count: number; group_count: number; stale_count: number; entity_sources?: EntitySourceStatus[]; missing_count?: number }
 export interface ConfirmMappingResult { action: 'confirmed'; rule_id: string; version_number: number; bound_count: number; excluded_count: number }
 export interface ApplyDetailResult { status: 'applied' | 'skipped_locked'; section_id: string; node_key?: string | null; applied_entity_count?: number; filled_count?: number; kept_manual_count?: number; reason?: string; skipped_entities?: Array<{ node_key: string; reason: string }>; unbound_entities?: Array<{ node_key: string; company_name: string }>; out_of_scope_count?: number }
 export interface SuggestTemplateResult { section_id: string; entity_count: number; group_count: number; suggested_rows: Array<DetailTemplateRow & { frequency: number; total_amount: number; entity_total: number; origin?: 'template' | 'source' }>; entity_sources?: EntitySourceStatus[] }

@@ -2,7 +2,7 @@
   <div class="gt-knowledge gt-fade-in">
     <!-- 后台上传进度指示器（横幅下方固定条） -->
     <transition name="el-fade-in">
-      <div v-if="bgUploading || bgUploadJustDone" class="gt-kb-upload-bar">
+      <div v-if="bgUploading || bgUploadJustDone" class="gt-kb-upload-bar" role="status" aria-live="polite">
         <el-progress :percentage="bgUploadProgress" :stroke-width="6" :show-text="false" style="flex: 1" />
         <span class="gt-kb-upload-bar-text">
           <template v-if="bgUploading">
@@ -24,14 +24,14 @@
             <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</span>
           </template>
           <template #right>
-            <el-input v-model="searchKeyword" placeholder="搜索文档..." size="small" clearable style="width: 180px"
+            <el-input v-model="searchKeyword" placeholder="搜索文档..." aria-label="搜索知识库文档" size="small" clearable style="width: 180px"
               @keyup.enter="onSearch" />
             <el-button size="small" @click="onSearch" :loading="searchLoading">搜索</el-button>
             <!-- 写按钮按系统角色门控：readonly / 未知角色一律不展示（后端同口径拒绝，见 canWriteKb） -->
             <el-button v-if="canWriteKb && !treeLoading && !hasPresetFolders" size="small" :loading="initPresetsLoading" @click="onInitPresets">初始化预设文件夹</el-button>
             <el-button v-if="canWriteKb" size="small" @click="onCreateFolder">新建文件夹</el-button>
-            <el-button v-if="canWriteKb" size="small" @click="onUploadDocs">上传文档</el-button>
-            <el-button v-if="canWriteKb" size="small" @click="onUploadFolder">上传文件夹</el-button>
+            <el-button v-if="canWriteKb" size="small" :disabled="bgUploading" @click="onUploadDocs">上传文档</el-button>
+            <el-button v-if="canWriteKb" size="small" :disabled="bgUploading" @click="onUploadFolder">上传文件夹</el-button>
             <el-button size="small" :disabled="!selectedFolder" @click="showDocAiChat = true">💬 AI 对话</el-button>
             <el-button size="small" @click="loadTree" :loading="treeLoading">刷新</el-button>
           </template>
@@ -42,7 +42,7 @@
     <!-- 主体：左树 + 右文档列表 -->
     <el-row :gutter="12" class="gt-kb-body">
       <!-- 左侧：文件夹树 -->
-      <el-col :span="7">
+      <el-col :xs="24" :sm="24" :md="7">
         <div class="gt-kb-panel gt-kb-tree-panel">
           <h4 class="gt-kb-panel-title">目录</h4>
           <el-tree
@@ -64,18 +64,26 @@
                 <span class="gt-kb-doc-count">({{ data.doc_count || 0 }})</span>
                 <!-- 管理权由后端逐节点下发（创建者或系统管理员；系统文件夹仅管理员） -->
                 <span v-if="canWriteKb && data.can_manage" class="gt-kb-tree-actions">
-                  <el-button size="small" link @click.stop="onRenameFolder(data)" title="重命名">✏️</el-button>
-                  <el-button size="small" link @click.stop="onDeleteFolder(data)" title="删除文件夹">🗑️</el-button>
+                  <el-button size="small" link @click.stop="onRenameFolder(data)" title="重命名" :aria-label="`重命名文件夹 ${data.name}`">✏️</el-button>
+                  <el-button size="small" link @click.stop="onDeleteFolder(data)" title="删除文件夹" :aria-label="`删除文件夹 ${data.name}`">🗑️</el-button>
                 </span>
               </div>
             </template>
           </el-tree>
-          <el-empty v-if="!treeLoading && folderTree.length === 0" description="暂无文件夹" :image-size="60" />
+          <el-alert
+            v-if="treeError"
+            type="error"
+            :closable="false"
+            title="目录加载失败，请重试"
+            show-icon
+          />
+          <el-button v-if="treeError" size="small" style="margin-top: 8px" @click="() => loadTree()">重试</el-button>
+          <el-empty v-if="treeLoaded && !treeError && !treeLoading && folderTree.length === 0" description="暂无文件夹" :image-size="60" />
         </div>
       </el-col>
 
       <!-- 右侧：文档列表 + 预览 -->
-      <el-col :span="17">
+      <el-col :xs="24" :sm="24" :md="17">
         <div class="gt-kb-panel gt-kb-doc-panel">
           <div class="gt-kb-doc-header">
             <h4>{{ selectedFolder?.name || '请选择文件夹' }}</h4>
@@ -122,9 +130,10 @@
                 <el-table-column prop="created_at" label="时间" width="90">
                   <template #default="{ row }">{{ row.created_at?.slice(0, 10) || '—' }}</template>
                 </el-table-column>
-                <el-table-column label="操作" width="210" align="center">
+                <el-table-column label="操作" width="320" align="center">
                   <template #default="{ row }">
-                    <el-button size="small" link type="primary" @click.stop="onPreviewDoc(row)">预览</el-button>
+                    <el-button size="small" link type="primary" @click.stop="openPreviewFromButton(row, $event)">预览</el-button>
+                    <el-button v-if="canWriteKb" size="small" link type="primary" @click.stop="onPromoteEvidence(row)">转为项目证据</el-button>
                     <!-- 管理权由后端逐行下发：非创建者（且非系统管理员）看不到改名 / 删除 / 重新识别 -->
                     <template v-if="canWriteKb && row.can_manage">
                       <el-button v-if="row.has_text === false && docHint(row).retryable" size="small" link type="primary"
@@ -135,26 +144,37 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <el-empty v-if="selectedFolder && !docLoading && documents.length === 0" description="暂无文档" :image-size="60" />
+              <div v-if="docError && selectedFolder" class="gt-kb-load-error" role="alert">
+                <span>{{ docError }}</span>
+                <el-button size="small" type="primary" @click="retryDocumentView">重试</el-button>
+              </div>
+              <el-empty v-else-if="selectedFolder && docLoaded && !docLoading && documents.length === 0" description="暂无文档" :image-size="60" />
               <div v-if="!selectedFolder" class="gt-kb-placeholder">
                 <p>← 请从左侧选择一个文件夹查看文档</p>
               </div>
             </div>
 
             <!-- 预览面板 -->
-            <div v-if="previewDoc" class="gt-kb-preview-panel">
+            <div v-if="previewDoc" class="gt-kb-preview-panel" role="region" :aria-label="`预览：${previewDoc.name}`">
               <div class="gt-kb-preview-header">
                 <span class="gt-kb-preview-title">{{ previewDoc.name }}</span>
                 <div>
                   <el-button size="small" link @click="onDownloadDoc(previewDoc)">下载</el-button>
-                  <el-button size="small" link @click="previewDoc = null">关闭</el-button>
+                  <el-button size="small" link @click="closePreview">关闭</el-button>
                 </div>
               </div>
               <div class="gt-kb-preview-body">
+                <div v-if="previewState === 'loading'" class="gt-kb-preview-office" role="status">正在加载预览…</div>
+                <div v-else-if="previewErrorText" class="gt-kb-preview-office" role="alert">
+                  <div style="text-align: center; padding: 40px">
+                    <div>{{ previewErrorText }}</div>
+                    <el-button type="primary" size="small" style="margin-top: 12px" @click="retryPreview">重试</el-button>
+                  </div>
+                </div>
                 <!-- 图片预览 -->
-                <img v-if="isImageFile(previewDoc)" :src="previewUrl" class="gt-kb-preview-img" />
+                <img v-else-if="isImageFile(previewDoc)" :src="previewUrl" :alt="previewDoc.name" class="gt-kb-preview-img" />
                 <!-- PDF 预览 -->
-                <iframe v-else-if="isPdfFile(previewDoc)" :src="previewUrl" class="gt-kb-preview-iframe" />
+                <iframe v-else-if="isPdfFile(previewDoc)" :src="previewUrl" :title="`预览：${previewDoc.name}`" class="gt-kb-preview-iframe" />
                 <!-- Office 文件预览（通过后端转换或提示下载） -->
                 <div v-else-if="isOfficeFile(previewDoc)" class="gt-kb-preview-office">
                   <div style="text-align: center; padding: 40px 20px">
@@ -181,7 +201,7 @@
     </el-row>
 
     <!-- 新建文件夹弹窗 -->
-    <el-dialog v-model="showCreateFolder" title="新建文件夹" width="400px" append-to-body>
+    <el-dialog v-model="showCreateFolder" title="新建文件夹" width="min(400px, calc(100vw - 24px))" append-to-body>
       <el-form ref="folderFormRef" :model="folderFormModel" :rules="folderRules" label-width="80px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="newFolderName" placeholder="文件夹名称" />
@@ -206,12 +226,23 @@
             filterable
             collapse-tags
             collapse-tags-tooltip
+            :loading="folderProjectLoading"
+            :disabled="!!folderProjectError"
             placeholder="选择可访问的项目（须包含你参与的项目）"
             style="width: 100%"
           >
             <el-option v-for="p in folderProjectOptions" :key="p.id" :label="p.label" :value="p.id" />
           </el-select>
         </el-form-item>
+        <el-alert
+          v-if="newFolderAccess === 'project_group' && folderProjectError"
+          type="error"
+          :closable="false"
+          title="项目列表加载失败，请重试"
+          show-icon
+        >
+          <el-button size="small" @click="() => loadFolderProjectOptions(true)">重试</el-button>
+        </el-alert>
       </el-form>
       <template #footer>
         <el-button @click="showCreateFolder = false">取消</el-button>
@@ -220,7 +251,7 @@
     </el-dialog>
 
     <!-- 重命名弹窗 -->
-    <el-dialog v-model="showRename" :title="renameType === 'folder' ? '重命名文件夹' : '重命名文档'" width="400px" append-to-body>
+    <el-dialog v-model="showRename" :title="renameType === 'folder' ? '重命名文件夹' : '重命名文档'" width="min(400px, calc(100vw - 24px))" append-to-body>
       <el-input v-model="renameNewName" placeholder="输入新名称" @keyup.enter="doRename" />
       <template #footer>
         <el-button @click="showRename = false">取消</el-button>
@@ -228,8 +259,61 @@
       </template>
     </el-dialog>
 
+    <!-- 知识版本显式晋升项目证据：只提交目标项目与幂等键，版本/hash/存储位置由后端现读 -->
+    <el-dialog v-model="showPromoteEvidence" title="转为项目证据" width="min(480px, calc(100vw - 24px))" append-to-body>
+      <div class="gt-kb-promote-source">
+        <span>来源文档</span>
+        <strong :title="promoteDocument?.name">{{ promoteDocument?.name || '—' }}</strong>
+      </div>
+      <el-alert
+        v-if="folderProjectError"
+        type="error"
+        :closable="false"
+        title="项目列表加载失败，请重试"
+        show-icon
+      />
+      <el-form label-width="84px" style="margin-top: 16px">
+        <el-form-item label="目标项目" required>
+          <el-select
+            v-model="promoteProjectId"
+            filterable
+            :loading="folderProjectLoading"
+            placeholder="选择要保存证据的项目"
+            aria-label="目标项目"
+            style="width: 100%"
+            @change="onPromoteProjectChange"
+          >
+            <el-option
+              v-for="p in folderProjectOptions"
+              :key="p.id"
+              :label="p.label"
+              :value="p.id"
+              :disabled="p.status === 'archived' || !p.auditYear"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <el-empty
+        v-if="!folderProjectLoading && !folderProjectError && folderProjectsLoaded && folderProjectOptions.length === 0"
+        description="暂无可选项目"
+        :image-size="48"
+      />
+      <template #footer>
+        <el-button v-if="folderProjectError" @click="() => loadFolderProjectOptions(true)">重试加载项目</el-button>
+        <el-button @click="showPromoteEvidence = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="promoteSubmitting"
+          :disabled="!promoteProjectId || folderProjectLoading || !!folderProjectError"
+          @click="() => submitEvidencePromotion()"
+        >
+          确认转为证据
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 上传文档弹窗 -->
-    <el-dialog v-model="showUpload" title="上传文档" width="550px" append-to-body>
+    <el-dialog v-model="showUpload" title="上传文档" width="min(550px, calc(100vw - 24px))" append-to-body :close-on-click-modal="!bgUploading">
       <div style="display: flex; gap: 8px; margin-bottom: 12px">
         <el-radio-group v-model="uploadMode" size="small">
           <el-radio-button value="files">选择文件</el-radio-button>
@@ -241,6 +325,7 @@
         v-if="uploadMode === 'files'"
         drag
         multiple
+        :disabled="bgUploading"
         :auto-upload="false"
         v-model:file-list="uploadFiles"
         :accept="UPLOAD_ACCEPT"
@@ -253,16 +338,20 @@
       </el-upload>
       <!-- 文件夹上传 -->
       <div v-else class="gt-kb-folder-upload">
-        <div
+        <button
+          type="button"
           class="gt-kb-folder-drop"
+          :disabled="bgUploading"
           @click="triggerFolderInput"
+          @keydown.enter.prevent="triggerFolderInput"
+          @keydown.space.prevent="triggerFolderInput"
           @dragover.prevent
           @drop.prevent="onFolderDrop"
         >
           <el-icon style="font-size: 40px /* allow-px: special */; color: var(--gt-color-text-placeholder); margin-bottom: 8px"><FolderOpened /></el-icon>
           <div>点击选择文件夹，或拖拽文件夹到此处</div>
           <div style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); margin-top: 4px">将自动按子文件夹结构创建目录</div>
-        </div>
+        </button>
         <input
           ref="folderInputRef"
           type="file"
@@ -281,8 +370,8 @@
       </div>
       <template #footer>
         <el-button @click="showUpload = false">取消</el-button>
-        <el-button type="primary" @click="doUpload" :loading="uploading"
-          :disabled="uploadMode === 'files' ? uploadFiles.length === 0 : folderFiles.length === 0">
+        <el-button type="primary" @click="doUpload" :loading="bgUploading"
+          :disabled="bgUploading || (uploadMode === 'files' ? uploadFiles.length === 0 : folderFiles.length === 0)">
           上传 ({{ uploadMode === 'files' ? uploadFiles.length : folderFiles.length }} 个文件)
         </el-button>
       </template>
@@ -312,6 +401,7 @@ import {
   isSystemJunkPath,
   noTextHint,
   parseUploadResponse,
+  validateKnowledgeUploadBatch,
   type NoTextHint,
   type UploadFailure,
   type UploadOutcome,
@@ -326,6 +416,8 @@ import { knowledgeLibrary as P_kl, projects as P_proj } from '@/services/apiPath
 import { downloadFile } from '@/utils/http'
 import { getAuthHeaders } from '@/utils/authToken'
 import { handleApiError } from '@/utils/errorHandler'
+import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+import { newUuid } from '@/utils/uuid'
 import { rules } from '@/utils/formRules'
 import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
 import { buildKnowledgeFolderHost } from '@/composables/useAiHostContext'
@@ -387,29 +479,122 @@ const folderTree = ref<any[]>([])
 const documents = ref<any[]>([])
 const selectedFolder = ref<any>(null)
 const treeLoading = ref(false)
+const treeLoaded = ref(false)
+const treeError = ref('')
+let treeLoadSeq = 0
+let treeAbort: AbortController | null = null
 const docLoading = ref(false)
+const docLoaded = ref(false)
+const docError = ref('')
+let docLoadSeq = 0
+let docAbort: AbortController | null = null
 const searchKeyword = ref('')
 const searchLoading = ref(false)
 const _searchResults = ref<any[]>([])
 const showDocAiChat = ref(false)
 const treeRef = ref<any>(null)
-/** 项目组权限的可选项目：标签带年度（同一客户多年度项目的 client_name 相同，不带年度无法区分） */
-const folderProjectOptions = ref<Array<{ id: string; label: string }>>([])
-async function loadFolderProjectOptions() {
-  if (folderProjectOptions.value.length > 0) return
+/** 项目组权限与证据晋升共用的可选项目；错误、空列表和加载中分别呈现。 */
+interface KnowledgeProjectOption {
+  id: string
+  label: string
+  auditYear: number | null
+  status: string
+}
+const folderProjectOptions = ref<KnowledgeProjectOption[]>([])
+const folderProjectLoading = ref(false)
+const folderProjectsLoaded = ref(false)
+const folderProjectError = ref('')
+const PROJECT_OPTIONS_TTL_MS = 60_000
+let folderProjectLoadedAt = 0
+let folderProjectSeq = 0
+let folderProjectInflight: Promise<boolean> | null = null
+function loadFolderProjectOptions(force = false): Promise<boolean> {
+  const fresh = folderProjectsLoaded.value && Date.now() - folderProjectLoadedAt < PROJECT_OPTIONS_TTL_MS
+  if (fresh && !force) return Promise.resolve(!folderProjectError.value)
+  if (folderProjectInflight && !force) return folderProjectInflight
+  const mine = ++folderProjectSeq
+  folderProjectLoading.value = true
+  folderProjectError.value = ''
+  const promise = (async () => {
+    try {
+      const data: any = await api.get(P_proj.list, { _silent: true, _dedupe: false } as any)
+      if (mine !== folderProjectSeq) return false
+      const items: any[] = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : [])
+      if (!Array.isArray(data) && !Array.isArray(data?.items)) throw new Error('项目列表响应格式不正确')
+      folderProjectOptions.value = items.map((p: any) => {
+        const auditYear = Number.isInteger(Number(p.audit_year)) ? Number(p.audit_year) : null
+        const status = String(p.status || '')
+        const name = p.client_name || p.name || p.id
+        const yearLabel = auditYear ? `（${auditYear} 年度）` : '（未设置审计年度）'
+        const statusLabel = status === 'archived' ? '（已归档）' : ''
+        return { id: String(p.id), label: `${name}${yearLabel}${statusLabel}`, auditYear, status }
+      })
+      folderProjectsLoaded.value = true
+      folderProjectLoadedAt = Date.now()
+      return true
+    } catch {
+      if (mine !== folderProjectSeq) return false
+      folderProjectOptions.value = []
+      folderProjectsLoaded.value = false
+      folderProjectError.value = '项目列表加载失败'
+      return false
+    } finally {
+      if (mine === folderProjectSeq) {
+        folderProjectLoading.value = false
+        folderProjectInflight = null
+      }
+    }
+  })()
+  folderProjectInflight = promise
+  return promise
+}
+
+// 知识版本显式晋升为项目证据。失败重试复用同一幂等键；切换来源或目标项目才换键。
+const showPromoteEvidence = ref(false)
+const promoteDocument = ref<any>(null)
+const promoteProjectId = ref('')
+const promoteIntentProjectId = ref('')
+const promoteIntentKey = ref('')
+const promoteSubmitting = ref(false)
+
+function onPromoteEvidence(document: any) {
+  promoteDocument.value = document
+  promoteProjectId.value = ''
+  promoteIntentProjectId.value = ''
+  promoteIntentKey.value = newUuid()
+  showPromoteEvidence.value = true
+  void loadFolderProjectOptions()
+}
+
+function onPromoteProjectChange(projectId: string) {
+  const next = String(projectId || '')
+  if (promoteIntentProjectId.value && promoteIntentProjectId.value !== next) {
+    promoteIntentKey.value = newUuid()
+  }
+  promoteIntentProjectId.value = next
+}
+
+async function submitEvidencePromotion() {
+  const documentId = String(promoteDocument.value?.id || '')
+  const projectId = promoteProjectId.value
+  if (!documentId || !projectId || promoteSubmitting.value) return
+  promoteSubmitting.value = true
   try {
-    const data: any = await api.get(P_proj.list)
-    const items: any[] = Array.isArray(data) ? data : (data?.items ?? [])
-    folderProjectOptions.value = items.map((p: any) => ({
-      id: p.id,
-      label: p.audit_year
-        ? `${p.client_name || p.name}（${p.audit_year} 年度）`
-        : (p.name || p.client_name || p.id),
-    }))
-  } catch {
-    folderProjectOptions.value = []
+    const result: any = await api.post(
+      P_kl.documentPromoteEvidence(projectId, documentId),
+      { idempotency_key: promoteIntentKey.value },
+      { _silent: true } as any,
+    )
+    showPromoteEvidence.value = false
+    ElMessage.success(result?.replayed ? '该知识版本已在项目证据中' : '已转为项目证据')
+  } catch (error: any) {
+    // 保留 key，网络失败或响应丢失后的重试由后端幂等重放原回执。
+    handleApiError(error, '转为项目证据')
+  } finally {
+    promoteSubmitting.value = false
   }
 }
+
 // 新建文件夹
 const showCreateFolder = ref(false)
 const newFolderName = ref('')
@@ -420,6 +605,8 @@ const createFolderLoading = ref(false)
 /** 项目组权限未选项目时禁止提交：后端同样会拒绝（否则建出对所有人不可见的文件夹） */
 const canSubmitFolder = computed(() =>
   !!newFolderName.value.trim()
+  && !folderProjectLoading.value
+  && !folderProjectError.value
   && (newFolderAccess.value !== 'project_group' || newFolderProjectIds.value.length > 0),
 )
 const folderFormRef = ref<FormInstance>()
@@ -431,7 +618,6 @@ const folderRules: FormRules = {
 // 上传
 const showUpload = ref(false)
 const uploadFiles = ref<any[]>([])
-const uploading = ref(false)
 /**
  * 文件选择框的类型过滤（只影响选择框的默认筛选，拖入不受限；后端对任何类型都会保存原文件）。
  * 旧值漏了 `.xlsm`（B 循环模板全是 xlsm）、`.ppt`、`.csv` —— 选择框里直接看不到这些文件。
@@ -464,29 +650,69 @@ const flatFolders = computed(() => {
 })
 
 async function loadTree() {
+  const mine = ++treeLoadSeq
+  treeAbort?.abort()
+  const controller = new AbortController()
+  treeAbort = controller
   treeLoading.value = true
+  treeError.value = ''
   try {
-    const data = await api.get(P_kl.tree)
-    folderTree.value = Array.isArray(data) ? data : (data || [])
-  } catch {
-    folderTree.value = []
+    const data = await api.get(P_kl.tree, {
+      _silent: true, _dedupe: false, signal: controller.signal,
+    } as any)
+    if (mine !== treeLoadSeq) return
+    if (!Array.isArray(data)) throw new Error('知识目录响应格式不正确')
+    folderTree.value = data
+    treeLoaded.value = true
+  } catch (error: any) {
+    if (mine !== treeLoadSeq || controller.signal.aborted) return
+    treeError.value = errorStatus(error) === 403 ? '无权查看知识目录' : '目录加载失败，请检查网络后重试'
   } finally {
-    treeLoading.value = false
+    if (mine === treeLoadSeq) {
+      treeLoading.value = false
+      if (treeAbort === controller) treeAbort = null
+    }
   }
 }
 
 async function onFolderClick(node: any) {
+  const mine = ++docLoadSeq
+  docAbort?.abort()
+  const controller = new AbortController()
+  docAbort = controller
   selectedFolder.value = node
   selectedDocIds.value = []
+  documents.value = []
   docLoading.value = true
+  docLoaded.value = false
+  docError.value = ''
   try {
-    const data = await api.get(P_kl.folderDocuments(node.id))
-    documents.value = Array.isArray(data) ? data : (data || [])
-  } catch {
-    documents.value = []
+    const data = await api.get(P_kl.folderDocuments(node.id), {
+      _silent: true, _dedupe: false, signal: controller.signal,
+    } as any)
+    if (mine !== docLoadSeq || selectedFolder.value?.id !== node.id) return
+    if (!Array.isArray(data)) throw new Error('文档列表响应格式不正确')
+    documents.value = data
+    docLoaded.value = true
+  } catch (error: any) {
+    if (mine !== docLoadSeq || controller.signal.aborted) return
+    const status = errorStatus(error)
+    docError.value = status === 403
+      ? '无权查看该文件夹'
+      : status === 404
+        ? '文件夹不存在或无权访问'
+        : '文档加载失败，请检查网络后重试'
   } finally {
-    docLoading.value = false
+    if (mine === docLoadSeq) {
+      docLoading.value = false
+      if (docAbort === controller) docAbort = null
+    }
   }
+}
+
+function retryDocumentView() {
+  if (selectedFolder.value?.id) void onFolderClick(selectedFolder.value)
+  else if (selectedFolder.value?.isSearch) void onSearch()
 }
 
 // ─── 扫描件后台识别（spec dsh-kb-ocr-local-first-routing Req 5.6 / 5.7） ─────────────
@@ -697,6 +923,10 @@ function ensureUploadTarget(emptyHint: string): boolean {
 }
 
 function onUploadDocs() {
+  if (bgUploading.value) {
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   if (!ensureUploadTarget('请先在左侧选择一个文件夹')) return
   uploadFiles.value = []
   folderFiles.value = []
@@ -707,6 +937,10 @@ function onUploadDocs() {
 }
 
 function onUploadFolder() {
+  if (bgUploading.value) {
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   if (!ensureUploadTarget('请先选择一个目标文件夹')) return
   uploadFiles.value = []
   folderFiles.value = []
@@ -745,11 +979,17 @@ const folderSubDirs = computed(() => {
 })
 
 function triggerFolderInput() {
+  if (bgUploading.value) return
   folderInputRef.value?.click()
 }
 
 function onFolderSelected(e: Event) {
   const input = e.target as HTMLInputElement
+  if (bgUploading.value) {
+    input.value = ''
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   if (input.files) {
     const all = Array.from(input.files)
     // 系统临时文件（~$ 锁文件、.DS_Store 等）不上传：入库后只是一堆无正文的垃圾文档
@@ -761,6 +1001,10 @@ function onFolderSelected(e: Event) {
 }
 
 async function onFolderDrop(e: DragEvent) {
+  if (bgUploading.value) {
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   // 🔴 条目必须在 drop 处理函数的同步部分取出：函数返回后 DataTransferItemList 即失效
   const roots = entriesFromDataTransfer(e.dataTransfer)
   if (!roots.length) return
@@ -774,11 +1018,20 @@ async function onFolderDrop(e: DragEvent) {
 }
 
 async function doUpload() {
+  if (bgUploading.value) {
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   if (!selectedFolder.value?.id) return
   const isFolder = uploadMode.value === 'folder'
   const files = isFolder ? folderFiles.value : uploadFiles.value.map((f: any) => f.raw)
   if (files.length === 0) {
     ElMessage.warning('请先选择要上传的文件')
+    return
+  }
+  const preflight = validateKnowledgeUploadBatch(files)
+  if (!preflight.ok) {
+    ElMessage.warning(preflight.message)
     return
   }
 
@@ -797,6 +1050,10 @@ const bgUploadError = ref(0)
 const bgUploadJustDone = ref(false)
 
 async function startBackgroundUpload(files: File[], targetFolder: any, skipped = 0) {
+  if (bgUploading.value) {
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   bgUploading.value = true
   bgUploadJustDone.value = false
   bgUploadTotal.value = files.length
@@ -912,14 +1169,16 @@ async function startBackgroundUpload(files: File[], targetFolder: any, skipped =
     }
   }
 
-  await processNode(root, targetFolder.id, '')
-
-  bgUploading.value = false
-  bgUploadJustDone.value = true
-  setTimeout(() => { bgUploadJustDone.value = false }, 3000)
-  showUploadSummary(buildUploadSummary({ fileCount: files.length, failures, noText, ocrQueued, folderFailures, skipped }))
-  await loadTree()
-  await refreshDocView()
+  try {
+    await processNode(root, targetFolder.id, '')
+    bgUploadJustDone.value = true
+    setTimeout(() => { bgUploadJustDone.value = false }, 3000)
+    showUploadSummary(buildUploadSummary({ fileCount: files.length, failures, noText, ocrQueued, folderFailures, skipped }))
+    await loadTree()
+    await refreshDocView()
+  } finally {
+    bgUploading.value = false
+  }
 }
 
 /** 上传汇总通知正文样式（内联，理由见 showUploadSummary） */
@@ -1014,7 +1273,7 @@ async function onDeleteDoc(doc: any) {
   try {
     await api.delete(P_kl.documentDetail(doc.id))
     ElMessage.success('已删除')
-    if (previewDoc.value?.id === doc.id) previewDoc.value = null
+    if (previewDoc.value?.id === doc.id) closePreview()
     await loadTree()
     await refreshDocView()
   } catch (e: any) { handleApiError(e, '删除') }
@@ -1030,25 +1289,47 @@ function formatSize(bytes: number): string {
 // 全文搜索
 async function onSearch() {
   if (!searchKeyword.value.trim()) return
+  const mine = ++docLoadSeq
+  docAbort?.abort()
+  const controller = new AbortController()
+  docAbort = controller
   searchLoading.value = true
+  docLoading.value = true
+  docLoaded.value = false
+  docError.value = ''
+  const keyword = searchKeyword.value
+  selectedFolder.value = {
+    name: `搜索结果: "${keyword}"`,
+    isSearch: true,
+    keyword,
+  }
+  documents.value = []
   try {
-    const params: Record<string, string> = { q: searchKeyword.value }
-    // 注入当前底稿上下文做相关性加权
-    if (currentWpContext.value) {
-      params.context = currentWpContext.value
-    }
-    const data = await api.get(P_kl.search, { params })
-    const results = Array.isArray(data) ? data : (data || [])
-    documents.value = results
+    const params: Record<string, string> = { q: keyword }
+    if (currentWpContext.value) params.context = currentWpContext.value
+    const data = await api.get(P_kl.search, {
+      params, _silent: true, _dedupe: false, signal: controller.signal,
+    } as any)
+    if (mine !== docLoadSeq) return
+    if (!Array.isArray(data)) throw new Error('搜索响应格式不正确')
+    documents.value = data
     selectedDocIds.value = []
-    // 搜索视图没有 id：不能作为上传 / 新建子文件夹的目标（canCreateInSelected 为假）
     selectedFolder.value = {
-      name: `搜索结果: "${searchKeyword.value}" (${results.length} 条)`,
+      name: `搜索结果: "${keyword}" (${data.length} 条)`,
       isSearch: true,
-      keyword: searchKeyword.value,
+      keyword,
     }
-  } catch (e: any) { handleApiError(e, '搜索') }
-  finally { searchLoading.value = false }
+    docLoaded.value = true
+  } catch (error: any) {
+    if (mine !== docLoadSeq || controller.signal.aborted) return
+    docError.value = errorStatus(error) === 403 ? '无权搜索知识库' : '搜索失败，请检查网络后重试'
+  } finally {
+    if (mine === docLoadSeq) {
+      searchLoading.value = false
+      docLoading.value = false
+      if (docAbort === controller) docAbort = null
+    }
+  }
 }
 
 /**
@@ -1118,8 +1399,12 @@ async function onBatchDelete() {
 
 // ── 文档预览（右侧面板） ──
 const previewDoc = ref<any>(null)
-const previewUrl = ref('')
 const previewText = ref<string | null>(null)
+type PreviewState = 'idle' | 'loading' | 'ready' | 'forbidden' | 'not_found' | 'failed'
+const textPreviewState = ref<PreviewState>('idle')
+let textPreviewSeq = 0
+let textPreviewAbort: AbortController | null = null
+let previewOpener: HTMLElement | null = null
 
 /** 预览分流认识的扩展名（图片 / PDF / Office / 文本） */
 const PREVIEW_EXTS = new Set([
@@ -1143,7 +1428,8 @@ function docExt(doc: any): string {
 }
 
 function isImageFile(doc: any): boolean {
-  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(docExt(doc))
+  // SVG 属活动内容，按平台策略只下载、不以内联同源/Blob 预览。
+  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(docExt(doc))
 }
 
 function isPdfFile(doc: any): boolean {
@@ -1168,43 +1454,79 @@ function getFileEmoji(doc: any): string {
 }
 
 function onDocRowClick(row: any) {
-  onPreviewDoc(row)
+  void onPreviewDoc(row)
 }
 
-/**
- * 打开右侧预览。
- * @param prefetched 深链流程已调过预览接口时传入其响应，文本类文档不再重复请求
- */
-async function onPreviewDoc(doc: any, prefetched?: any) {
-  previewDoc.value = doc
-  // 清理旧的 blob URL
-  if (previewUrl.value?.startsWith('blob:')) {
-    URL.revokeObjectURL(previewUrl.value)
-  }
-  previewUrl.value = ''
-  previewText.value = null
+const binaryPreviewPath = computed(() => {
+  const doc = previewDoc.value
+  return doc && (isImageFile(doc) || isPdfFile(doc)) ? P_kl.documentDownload(doc.id) : ''
+})
+const { url: previewUrl, state: binaryPreviewState } = useAuthedObjectUrl(binaryPreviewPath, {
+  type: () => isPdfFile(previewDoc.value) ? 'application/pdf' : undefined,
+})
+const previewState = computed<PreviewState>(() => {
+  const doc = previewDoc.value
+  if (!doc) return 'idle'
+  if (isImageFile(doc) || isPdfFile(doc)) return binaryPreviewState.value
+  if (isTextFile(doc)) return textPreviewState.value
+  return 'ready'
+})
+const previewErrorText = computed(() => authedObjectUrlFailureText(previewState.value))
 
-  if (isImageFile(doc) || isPdfFile(doc)) {
-    // 图片和 PDF 通过携带认证头的请求获取 blob，再生成 object URL
-    try {
-      const ext = docExt(doc)
-      const mimeType = isPdfFile(doc) ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : (ext || 'jpeg')}`
-      const response = await api.get(P_kl.documentDownload(doc.id), { responseType: 'blob' })
-      const blob = new Blob([response], { type: mimeType })
-      previewUrl.value = URL.createObjectURL(blob)
-    } catch (e: any) {
-      handleApiError(e, '预览加载')
+async function onPreviewDoc(doc: any, prefetched?: any, opener?: HTMLElement | null) {
+  textPreviewAbort?.abort()
+  textPreviewAbort = null
+  const mine = ++textPreviewSeq
+  previewDoc.value = doc
+  previewOpener = opener ?? null
+  previewText.value = null
+  textPreviewState.value = 'idle'
+
+  if (isImageFile(doc) || isPdfFile(doc)) return
+  if (isTextFile(doc)) {
+    if (prefetched?.id === doc.id) {
+      previewText.value = prefetched?.content || '（空文件）'
+      textPreviewState.value = 'ready'
+      return
     }
-  } else if (isTextFile(doc)) {
-    // 文本文件加载内容
+    const controller = new AbortController()
+    textPreviewAbort = controller
+    textPreviewState.value = 'loading'
     try {
-      const result = prefetched?.id === doc.id ? prefetched : await api.get(P_kl.documentPreview(doc.id))
+      const result = await api.get(P_kl.documentPreview(doc.id), {
+        _silent: true, _dedupe: false, signal: controller.signal,
+      } as any)
+      if (mine !== textPreviewSeq) return
       previewText.value = result?.content || '（空文件）'
-    } catch {
-      previewText.value = '加载失败'
+      textPreviewState.value = 'ready'
+    } catch (error: any) {
+      if (mine !== textPreviewSeq || controller.signal.aborted) return
+      const status = errorStatus(error)
+      textPreviewState.value = status === 403 ? 'forbidden' : status === 404 ? 'not_found' : 'failed'
+    } finally {
+      if (mine === textPreviewSeq && textPreviewAbort === controller) textPreviewAbort = null
     }
   }
-  // Office 文件和其他类型在模板中直接显示下载入口
+}
+
+function openPreviewFromButton(doc: any, event: Event) {
+  void onPreviewDoc(doc, undefined, event.currentTarget as HTMLElement)
+}
+
+function retryPreview() {
+  if (previewDoc.value) void onPreviewDoc(previewDoc.value, undefined, previewOpener)
+}
+
+function closePreview() {
+  textPreviewSeq += 1
+  textPreviewAbort?.abort()
+  textPreviewAbort = null
+  previewDoc.value = null
+  previewText.value = null
+  textPreviewState.value = 'idle'
+  const opener = previewOpener
+  previewOpener = null
+  if (opener) void nextTick(() => opener.focus())
 }
 
 async function onDownloadDoc(doc: any) {
@@ -1251,8 +1573,8 @@ onMounted(async () => {
   await loadTree()
   // 深链（AI 笔记 / @引用跳转）：目录树就绪后再定位，否则节点查不到
   await applyDeepLink()
-  // 首次使用引导
-  if (folderTree.value.length === 0) {
+  // 首次使用引导只在目录请求真实成功且业务上为空时显示；错误不能伪装成首次使用。
+  if (treeLoaded.value && !treeError.value && folderTree.value.length === 0) {
     const { showGuide } = await import('@/composables/useWorkflowGuide')
     await showGuide(
       'knowledge_first_use',
@@ -1275,10 +1597,12 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopOcrPoll()
-  // 清理 blob URL，防止内存泄漏
-  if (previewUrl.value?.startsWith('blob:')) {
-    URL.revokeObjectURL(previewUrl.value)
-  }
+  treeLoadSeq += 1
+  treeAbort?.abort()
+  docLoadSeq += 1
+  docAbort?.abort()
+  textPreviewSeq += 1
+  textPreviewAbort?.abort()
 })
 </script>
 
@@ -1343,18 +1667,28 @@ onBeforeUnmount(() => {
 /* 文件夹上传 */
 .gt-kb-folder-upload { }
 .gt-kb-folder-drop {
+  width: 100%;
+  background: transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 40px 20px; border: 2px dashed var(--gt-color-border-lighter); border-radius: 8px;
   cursor: pointer; transition: border-color 0.2s;
   color: var(--gt-color-text-regular); font-size: var(--gt-font-size-sm);
 }
-.gt-kb-folder-drop:hover { border-color: var(--gt-color-primary); }
+.gt-kb-folder-drop:hover,
+.gt-kb-folder-drop:focus-visible { border-color: var(--gt-color-primary); }
+.gt-kb-folder-drop:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
+.gt-kb-folder-drop:disabled { cursor: not-allowed; opacity: 0.6; }
+.gt-kb-load-error {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 48px 16px; color: var(--gt-color-danger);
+}
 
 /* 树节点操作按钮 */
 .gt-kb-tree-node { display: flex; align-items: center; gap: 4px; width: 100%; }
 .gt-kb-tree-node-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-kb-tree-actions { display: none; margin-left: auto; flex-shrink: 0; }
-.gt-kb-tree-node:hover .gt-kb-tree-actions { display: inline-flex; gap: 2px; }
+.gt-kb-tree-node:hover .gt-kb-tree-actions,
+.gt-kb-tree-node:focus-within .gt-kb-tree-actions { display: inline-flex; gap: 2px; }
 .gt-kb-tree-actions .el-button { padding: 0 2px; font-size: var(--gt-font-size-xs); }
 
 /* 后台上传进度条 */
@@ -1365,4 +1699,34 @@ onBeforeUnmount(() => {
   border: 1px solid var(--gt-color-border-purple); box-shadow: var(--gt-shadow-sm);
 }
 .gt-kb-upload-bar-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); white-space: nowrap; }
+
+.gt-kb-promote-source {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px;
+  color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm);
+}
+.gt-kb-promote-source strong {
+  color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .gt-knowledge { padding: var(--gt-space-3); }
+  .gt-kb-body { row-gap: 12px; }
+  .gt-kb-doc-header { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .gt-kb-doc-header-actions { width: 100%; flex-wrap: wrap; }
+  .gt-kb-doc-body { flex-direction: column; overflow: visible; }
+  .gt-kb-doc-table--narrow { max-width: none; }
+  .gt-kb-preview-panel { width: 100%; min-width: 0; min-height: 320px; }
+}
+
+@media (max-width: 390px) {
+  .gt-knowledge { padding: 8px; }
+  .gt-kb-panel { padding: 10px; }
+  .gt-kb-doc-header-actions :deep(.el-button) { flex: 1 1 100%; margin-left: 0; }
+  .gt-kb-preview-panel { min-height: 280px; }
+  .gt-kb-preview-header { gap: 6px; }
+}
+
+@media (hover: none) {
+  .gt-kb-tree-actions { display: inline-flex; gap: 2px; }
+}
 </style>

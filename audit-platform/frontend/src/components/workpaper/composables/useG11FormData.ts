@@ -4,6 +4,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG11FormData — G11 投资收益底稿数据层
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { G11_ACCOUNT_CODE } from './g11Constants'
@@ -34,7 +35,7 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         const updated = JSON.parse(localStorage.getItem(key) || '') as ChecklistResponse
         if (itemId && updated?.item_id) {
           allResponses.value.set(itemId, updated)
-          void saveImmediate(itemId, updated, 1)
+          void trackPendingWrite(saveImmediate(itemId, updated, 1)).catch(() => undefined)
           localStorage.removeItem(key)
         }
       } catch { /* ignore corrupt draft */ }
@@ -108,6 +109,8 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
       localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
       ElMessage.warning(`G11 数据暂存本地（${itemId}），网络恢复后将自动同步`)
     } catch { /* ignore */ }
+    // 草稿只是本地兜底，未落库必须让调用方与过渡屏障看见
+    throw new Error(`保存未落库，已暂存本地草稿：${itemId}`)
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -118,7 +121,7 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void trackPendingWrite(saveImmediate(itemId, updated)).catch(() => undefined)
     }, 2000))
   }
 
@@ -147,17 +150,22 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   }
 
   /** 卸载前刷出未落盘的 debounce 保存（比照 F2/G9） */
-  function flushPending(): void {
+  async function flushPending(): Promise<void> {
+    const inFlight: Array<Promise<void>> = []
     for (const [itemId, timer] of _debounceTimers.entries()) {
       clearTimeout(timer)
       const resp = allResponses.value.get(itemId)
-      if (resp) void saveImmediate(itemId, resp, 1)
+      if (resp) inFlight.push(saveImmediate(itemId, resp, 1))
     }
     _debounceTimers.clear()
+    // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+    await Promise.all(inFlight)
   }
 
+  registerPendingFlusher(flushPending)
+
   onScopeDispose(() => {
-    flushPending()
+    void flushPending().catch(() => undefined)
   })
 
   return {

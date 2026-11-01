@@ -2025,8 +2025,33 @@ class TestCommitFenceHookWiring:
         i_hook = src.index("fence.after_pointers(")
         i_commit = src.index("latch.commit_once(self._session)")
         assert i_pointer < i_hook < i_commit, (
-            "application/operation timeline 必须与 pointer/outbox 同事务落库（AC 10.11）"
+            "application/operation timeline 与 store 必须和 pointer/outbox 同事务落库（AC 10.11）"
         )
+
+    def test_apply_fence_mirrors_store_before_writing_result(self) -> None:
+        """镜像失败时 application result 尚未写，随后由统一失败事务记 error。"""
+        src = inspect.getsource(OH._ApplyFence.after_pointers)
+        i_mirror = src.index("_mirror_store_backed_in_transaction")
+        i_result = src.index("_write_application_result")
+        assert i_mirror < i_result
+
+        helper = ast.parse(textwrap.dedent(inspect.getsource(
+            OH.OoToHtmlCoordinator._mirror_store_backed_in_transaction
+        )))
+        mirror = next(
+            n for n in ast.walk(helper)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "_mirror_store_backed_if_needed"
+        )
+        keywords = {kw.arg: kw.value for kw in mirror.keywords}
+        assert isinstance(keywords.get("commit"), ast.Constant)
+        assert keywords["commit"].value is False, "hook 内提前 commit 会造成不可回滚的半提交"
+
+    def test_post_commit_phase_no_longer_mirrors_store(self) -> None:
+        src = inspect.getsource(OH.OoToHtmlCoordinator._apply_committed)
+        assert "_mirror_store_backed_if_needed" not in src
+        assert "store_view_with_cleared_fields" not in src
 
     def test_hook_is_optional_so_existing_writers_are_untouched(self) -> None:
         from app.services.workpaper_sync import content_mutation as CM

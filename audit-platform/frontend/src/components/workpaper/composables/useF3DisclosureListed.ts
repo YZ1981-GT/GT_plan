@@ -3,6 +3,7 @@
  * Spec: .kiro/specs/f3-notes-payable/ Task 9.2
  */
 import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal } from './useF3FormulaEngine'
 import { buildF3DisclosureClassRows } from './useF3CrossSheet'
 import type { ChecklistResponse } from './useF3FormData'
@@ -170,6 +171,15 @@ export function useF3DisclosureListed(options: {
     })
     debounceSave()
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   // 作用域销毁时清理（组件卸载与附注页离屏同步都会走到；onBeforeUnmount 在离屏时不注册 ⇒ 窗口监听泄漏）
   onScopeDispose(() => {

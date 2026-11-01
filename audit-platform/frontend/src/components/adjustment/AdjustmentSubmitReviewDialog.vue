@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="提交复核" width="560px" append-to-body :close-on-click-modal="false">
+  <el-dialog v-model="visible" title="提交复核" width="560px" append-to-body :close-on-click-modal="false" style="max-width: calc(100vw - 32px)">
     <div class="gt-adj-submit-list">
       <div class="gt-adj-submit-caption">将以下 {{ entries.length }} 笔分录提交复核（提交后不能修改，可撤回提交）：</div>
       <div v-for="e in entries.slice(0, 8)" :key="e.entry_group_id" class="gt-adj-submit-item">

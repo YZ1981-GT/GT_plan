@@ -163,11 +163,11 @@ async def execute_central(db: AsyncSession, project_id: uuid.UUID, year: int, fo
         missing = await missing_account_codes(db, project_id, year, text, known=presence)
         result = execute(text, ctx)
     absent = [f"{scope_for_year(year)}无科目 {code}" for code in missing]
-    ok = result.ok and not gaps and not absent
+    ok = result.ok and result.value is not None and not gaps and not absent
     errors = [] if ok else _unique([*result.errors, *absent, *gaps]) or [f"求值失败（{result.state}）"]
     state = result.state if not result.ok else ("ok" if ok else "missing")
     return {
-        "value": float(result.value) if ok else None,
+        "value": float(result.value) if ok and result.value is not None else None,
         "ok": ok,
         "state": state,
         "errors": errors,

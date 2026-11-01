@@ -1,5 +1,6 @@
 /** F2-68 重要供应商结构分析双区模型状态管理。 */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   defaultSupplierStructureSheet,
@@ -23,6 +24,15 @@ export function useF2SupplierStructure(opts: {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const sheet = ref<SupplierStructureSheet>(defaultSupplierStructureSheet())
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

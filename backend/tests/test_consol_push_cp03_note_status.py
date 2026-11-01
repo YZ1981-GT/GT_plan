@@ -47,6 +47,7 @@ async def test_note_status_propagates_to_step_and_all_ok(note_status, expected_s
     warnings: list[str] = []
 
     with patch("app.services.consol_push_service._project_name", new=AsyncMock(return_value="测试")), \
+         patch("app.services.consol_push_service._record_tree_version", new=AsyncMock(return_value="")), \
          patch("app.services.consol_push_service._advisory_lock", new=AsyncMock()), \
          patch("app.services.consol_push_service._process_lock") as mock_lock, \
          patch("app.services.consol_worksheet_engine.recalc_full", new=AsyncMock(return_value={"node_count": 1, "account_count": 1})), \

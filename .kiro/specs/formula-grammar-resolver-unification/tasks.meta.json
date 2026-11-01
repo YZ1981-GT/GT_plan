@@ -1,0 +1,149 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "4. 调用方迁移与类型切换（R3，ADR-FGR-03）": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281689
+      },
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457287240
+      },
+      {
+        "executionId": "36a3ebe5-4c84-4caf-9229-c3983d54094a",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793459336557
+      },
+      {
+        "executionId": "36a3ebe5-4c84-4caf-9229-c3983d54094a",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793460004639
+      }
+    ],
+    "5. 附注执行器与单元格求值器 Decimal 化（R4、R9④，ADR-FGR-04，design §5 D3）": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281748
+      },
+      {
+        "executionId": "36a3ebe5-4c84-4caf-9229-c3983d54094a",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793460010102
+      },
+      {
+        "executionId": "36a3ebe5-4c84-4caf-9229-c3983d54094a",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793460688762
+      }
+    ],
+    "6. `REPORT` 期间、缺行与正则降级（R8、R9②③，ADR-FGR-05）": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281799
+      },
+      {
+        "executionId": "36a3ebe5-4c84-4caf-9229-c3983d54094a",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793460694744
+      },
+      {
+        "executionId": "d7587c94-4b76-4f15-9d6d-bef3ca623e24",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793461423307
+      },
+      {
+        "executionId": "2e19e502-4b17-49ad-b016-e371edc15141",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793461770485
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793462137392
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793462694535
+      }
+    ],
+    "7. `typed_eval_strictness` 收敛与三参读取走 ACNR（R7，ADR-FGR-06/07）": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281852
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793462700201
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793463775901
+      }
+    ],
+    "8. 全轨读有效定义与旧保存路径（R5，ADR-FGR-08）": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281893
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793463781127
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793493215403
+      }
+    ],
+    "9. R6 处置（ADR-FGR-09，design §5 D4）": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281933
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793493220365
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793493483451
+      }
+    ],
+    "10. 收尾": [
+      {
+        "executionId": "99dfe7f1-6f2b-4b50-8779-f6d8be53f778",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793457281974
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793493488438
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793493760796
+      },
+      {
+        "executionId": "fe0983dc-6ca4-4c25-9201-905d2bdc7065",
+        "chatSessionId": "sess_5799e988-d228-44b0-b5c9-090e83892413",
+        "timestamp": 1793493765444
+      }
+    ]
+  }
+}

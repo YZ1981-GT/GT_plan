@@ -293,11 +293,11 @@ jobs:
         run: npm ci
         working-directory: audit-platform/frontend
       - name: Type check (vue-tsc)
-        run: npx vue-tsc --noEmit
+        run: npm run typecheck
         working-directory: audit-platform/frontend
       - name: Vitest unit tests (V3 Req 14.2 ＋ 防退化卡点)
         # 0 failed 是硬阈值；本轮 V3 把基线从 14/29 降到 0/0，CI 锁住
-        run: npx vitest run --reporter=default
+        run: npm run test:unit -- --reporter=default
         working-directory: audit-platform/frontend
       - name: API hardcode guard (Vue files)
         run: |
@@ -609,14 +609,20 @@ jobs:
           [ "$fail" -eq 0 ] || exit 1
         working-directory: audit-platform/frontend
 
-      - name: Build
+      - name: Build production artifact
         run: npm run build
+        working-directory: audit-platform/frontend
+      - name: Check bundle budget
+        run: npm run bundle:check
+        working-directory: audit-platform/frontend
+      - name: Smoke built artifact
+        run: npm run smoke:built
         working-directory: audit-platform/frontend
 
 
   # 独立于全量 vue-tsc：当前类型债可能使 frontend-build 在 Vite 前停止，
-  # 但自动声明漂移必须仍然可检测。这里运行与 Vite 相同的插件链，不走
-  # package.json 的 `build`（它会先跑 vue-tsc），并验证输出已被提交。
+  # 但自动声明漂移必须仍然可检测。package.json 的 build 现为纯 Vite 构建，
+  # 本 job 可独立运行同一插件链并验证声明文件已提交。
   frontend-generated-declarations:
     runs-on: ubuntu-latest
     steps:
@@ -630,7 +636,7 @@ jobs:
         run: npm ci
         working-directory: audit-platform/frontend
       - name: Generate Vite declarations and validate build graph
-        run: node --max-old-space-size=16384 node_modules/vite/bin/vite.js build --mode production
+        run: npm run build
         working-directory: audit-platform/frontend
       - name: Verify generated declarations are committed
         run: git diff --exit-code -- src/auto-imports.d.ts src/components.d.ts

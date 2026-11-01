@@ -343,7 +343,7 @@ class SystemMessageAssembler:
             rendered = "\n\n".join(
                 f"【{getattr(h, 'source_name', None) or getattr(h, 'source_type', '知识')}】\n"
                 f"{getattr(h, 'content', '')}"
-                for h in knowledge_hits[:5]
+                for h in knowledge_hits
             )
             data_blocks.append(f"【关联知识】\n{rendered}")
 

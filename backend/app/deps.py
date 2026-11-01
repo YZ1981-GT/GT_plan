@@ -117,6 +117,18 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_stream(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db, scope="function"),
+) -> User:
+    """流式/文件响应专用鉴权，在发送响应体前归还数据库连接。
+
+    与 ``get_current_user`` 使用完全相同的 token、黑名单、SoD 与用户状态校验；仅把
+    数据库依赖生命周期缩短到端点函数返回。响应生成器不得再读取 ORM 懒属性。
+    """
+    return await get_current_user(credentials=credentials, db=db)
+
+
 # ---------------------------------------------------------------------------
 # get_current_user_sse — SSE (EventSource) 鉴权：header 优先 + query token 回退
 # ---------------------------------------------------------------------------
@@ -236,6 +248,28 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     ) -> User:
         return await assert_project_permission(
             db, current_user, project_id, min_permission
+        )
+
+    return dependency
+
+
+def require_project_access_stream(min_permission: str = "readonly") -> Callable:
+    """文件/SSE 响应专用项目门禁，响应体发送前释放鉴权数据库会话。"""
+    _validate_permission_level(
+        min_permission,
+        caller="require_project_access_stream",
+    )
+
+    async def dependency(
+        project_id: UUID,
+        current_user: User = Depends(get_current_user_stream),
+        db: AsyncSession = Depends(get_db, scope="function"),
+    ) -> User:
+        return await assert_project_permission(
+            db,
+            current_user,
+            project_id,
+            min_permission,
         )
 
     return dependency

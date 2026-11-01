@@ -452,6 +452,9 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
     # 现改为：仅当 extra.publish_confirmed 明确为 True 才回写；普通保存直接返回不动 TB。
     if extra.get("publish_confirmed") is not True:
         return
+    # 新同步发布服务已在业务事务内写完 TB；耐久 WORKPAPER_SAVED 只供其他订阅者刷新。
+    if extra.get("tb_write_committed") is True:
+        return
 
     project_id = payload.project_id
     year = payload.year

@@ -25,6 +25,8 @@ class LineageAttachmentRef(BaseModel):
     file_name: str | None = None
     file_type: str | None = None
     created_at: str | None = None
+    source: str | None = None
+    sources: list[str] = Field(default_factory=list)
 
 
 class UnifiedLineageResponse(BaseModel):

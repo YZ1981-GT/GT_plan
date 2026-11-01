@@ -53,7 +53,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_schemas import EventType
+from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.dataset_models import ImportEventConsumption, ImportEventOutbox, OutboxStatus
 from app.services.import_event_outbox_service import ImportEventOutboxService
 
@@ -64,6 +64,8 @@ logger = logging.getLogger(__name__)
 #: ``event_id``；由 :meth:`ImportEventOutboxService.publish_one` 写入，此处只声明常量
 #: 供 consumer 与守卫共用，避免两侧各写一份字面量。
 EVENT_ID_PAYLOAD_KEY = "__event_id"
+#: 完整 typed EventPayload 的版本化 envelope；旧 payload 仍按 extra 兼容读取。
+TYPED_EVENT_PAYLOAD_KEY = "__typed_event_payload_v1"
 
 #: 挂在 ``Session.info`` 上的待发布清单键。用 session 作用域而不是模块级单例：
 #: 一个进程内并发多个请求各有自己的 session，模块级列表会互相串。
@@ -90,7 +92,9 @@ FANOUT_HANDLER_VERSION = 1
 #: 在派发口再加一道会改掉它们的既有行为。Task 16 只对自己拥有的两个事件类型负责。
 GATED_FANOUT_EVENT_TYPES: frozenset[EventType] = frozenset(
     {EventType.WORKPAPER_SAVED, EventType.WORKPAPER_CONTENT_UPDATED,
-     EventType.FORMULA_CONFIG_CHANGED}
+     EventType.FORMULA_CONFIG_CHANGED, EventType.ADJUSTMENT_APPROVED,
+     EventType.ADJUSTMENT_REVIEW_REVOKED, EventType.ADJUSTMENT_CLIENT_BOOKING_CHANGED,
+     EventType.ADJUSTMENT_TREATMENT_CHANGED, EventType.TRIAL_BALANCE_UPDATED}
 )
 
 
@@ -226,6 +230,25 @@ class DurableEventOutboxService:
                 row.id,
             )
         return publication
+
+    @staticmethod
+    async def enqueue_event(
+        db: AsyncSession,
+        event: EventPayload,
+        *,
+        remember: bool = True,
+    ) -> PendingPublication:
+        """同事务保存完整 typed payload，重放不丢顶层身份和合并上下文。"""
+        return await DurableEventOutboxService.enqueue(
+            db,
+            event_type=event.event_type,
+            project_id=event.project_id,
+            year=event.year,
+            payload={
+                TYPED_EVENT_PAYLOAD_KEY: event.model_dump(mode="json"),
+            },
+            remember=remember,
+        )
 
     # ------------------------------------------------------------------
     # 待发布清单（session 作用域）

@@ -64,6 +64,7 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
       loadErrorState: ref(null),
       loadErrorMessage: ref(''),
       dirty: ref(false),
+      editRevision: ref(0),
       initUniver,
       dispose,
     } as any)
@@ -76,8 +77,8 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
     editorOnSave.mockResolvedValue(true)
     vi.mocked(useEditorSave).mockReturnValue({
       saving: ref(false), submitting: ref(false), syncLoading: ref(false),
-      prefillLoading: ref(false), exportingPdf: ref(false),
-      onSave: editorOnSave, onSubmitForReview: vi.fn(),
+      prefillLoading: ref(false), exportingPdf: ref(false), markEdited: vi.fn(),
+      onSave: vi.fn().mockResolvedValue(true), onSubmitForReview: vi.fn(),
       onSyncStructure: vi.fn(), onRefreshPrefill: vi.fn(), onDownload: vi.fn(),
       onExportPdf: vi.fn(), onUpload: vi.fn(),
     } as any)

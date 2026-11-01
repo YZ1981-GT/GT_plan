@@ -19,8 +19,6 @@ import pytest
 _ALLOWED_CONSTRUCTOR_FILES: set[str] = {
     "services/audit_chain/head.py",
     "services/audit_chain/forks.py",
-    "services/audit_log_helper.py",
-    "workers/audit_log_writer_worker.py",
 }
 
 _APP_DIR = Path(__file__).resolve().parents[2] / "app"

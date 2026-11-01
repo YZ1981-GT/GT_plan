@@ -334,6 +334,7 @@ class _Session:
     def __init__(self, stored: dict[str, Any] | None) -> None:
         self.stored = stored
         self.writes: list[tuple[str, dict[str, Any]]] = []
+        self.commit_calls = 0
 
     async def execute(self, stmt: Any, params: dict[str, Any] | None = None) -> _Result:
         sql = str(getattr(stmt, "text", stmt))
@@ -346,7 +347,7 @@ class _Session:
         return _Result(None, rowcount=1)
 
     async def commit(self) -> None:
-        return None
+        self.commit_calls += 1
 
 
 @pytest.mark.parametrize(
@@ -369,6 +370,7 @@ def _mirror(adapter_id: str, session: _Session, projection: Any) -> None:
     asyncio.run(mirror_projection_into_store(
         session, adapter_id=adapter_id, project_id="p", wp_id="w", merged_projection=projection, commit=False,
     ))
+    assert session.commit_calls == 0, "commit=False 时镜像任何分支都不得自行提交"
 
 
 def test_mirror_writes_g1_conclusion_with_all_zones() -> None:

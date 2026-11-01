@@ -222,15 +222,16 @@ class FormulaRuntimeCoordinator:
         project_id: UUID,
         year: int,
         scopes: list[str],
-    ) -> tuple[list[WpFormula], dict[UUID, str]]:
-        """按项目、source_scope 年度、目标 domain 与 workpaper 循环过滤公式。
+    ) -> tuple[list, dict[UUID, str]]:
+        """按有效定义加载公式（本项目 > 全局 > 系统预设，ADR-FGR-08）。
 
         Returns: (selected_formulas, wp_codes: {wp_id: wp_code})
         """
-        result = await self._session.execute(
-            select(WpFormula).where(WpFormula.project_id == project_id)
+        from app.services.formula_settings.wp_effective import effective_project_formulas
+
+        formulas, wp_codes = await effective_project_formulas(
+            self._session, project_id,
         )
-        formulas = list(result.scalars().all())
         if not formulas:
             return [], {}
 
@@ -246,17 +247,7 @@ class FormulaRuntimeCoordinator:
             elif scope in _SCOPE_DOMAIN_MAP:
                 wanted_domains.add(_SCOPE_DOMAIN_MAP[scope])
 
-        wp_ids = {formula.wp_id for formula in formulas if formula.wp_id}
-        wp_codes: dict[UUID, str] = {}
-        if wp_ids:
-            rows = await self._session.execute(
-                select(WorkingPaper.id, WpIndex.wp_code)
-                .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
-                .where(WorkingPaper.id.in_(wp_ids))
-            )
-            wp_codes = {row.id: str(row.wp_code or "") for row in rows}
-
-        selected: list[WpFormula] = []
+        selected: list = []
         for formula in formulas:
             source_scope = formula.source_scope if isinstance(formula.source_scope, dict) else {}
             source_year = source_scope.get("year")
@@ -274,7 +265,7 @@ class FormulaRuntimeCoordinator:
 
     def _build_batch_definitions(
         self,
-        formulas: list[WpFormula],
+        formulas: list,
         project_id: UUID,
         year: int,
     ) -> tuple[list[BatchFormulaDefinition], set[str], dict[str, EngineTarget | None]]:
@@ -339,7 +330,7 @@ class FormulaRuntimeCoordinator:
 
     async def _build_typed_eval_definitions(
         self,
-        formulas: list[WpFormula],
+        formulas: list,
         wp_codes: dict[UUID, str],
     ) -> list[TypedBatchDefinition]:
         """将 WpFormula ORM 列表转为 typed_eval.BatchDefinition。

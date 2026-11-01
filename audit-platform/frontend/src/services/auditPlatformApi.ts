@@ -109,27 +109,44 @@ export interface AccountOption {
   balance?: string | null      // 传年度时附试算表审定数（参考余额）
 }
 
+export interface AdjustmentListQuery {
+  adjustment_type?: string
+  review_status?: string
+  origin?: string
+  search?: string
+  account_code?: string
+  amount_min?: number
+  amount_max?: number
+  created_by?: string
+  reviewer_id?: string
+  audit_phase?: string
+  treatment_status?: string
+  focus_entry_group_id?: string
+  created_from?: string
+  created_to?: string
+  sort_by?: 'adjustment_no' | 'description' | 'created_at' | 'review_status' | 'amount'
+  sort_order?: 'asc' | 'desc'
+  page?: number
+  page_size?: number
+}
+
+export interface AdjustmentListPage {
+  items: any[]
+  total: number
+  page: number
+  page_size: number
+  has_more: boolean
+  status_counts: Record<string, number>
+}
+
 export async function listAdjustments(
   projectId: string, year: number,
-  opts?: { adjustment_type?: string; review_status?: string; origin?: string; page?: number; page_size?: number }
-) {
+  opts?: AdjustmentListQuery,
+): Promise<AdjustmentListPage> {
   const { data } = await http.get(P_adj.list(projectId), {
     params: { year, ...opts },
   })
   return data
-}
-
-/** 取本年度全部分录组：后端每页最多 200，按 has_more 逐页取（原先只取第一页 200 组） */
-export async function listAllAdjustments(projectId: string, year: number): Promise<any[]> {
-  const items: any[] = []
-  for (let page = 1; page <= 50; page += 1) {
-    const res = await listAdjustments(projectId, year, { page, page_size: 200 })
-    const batch: any[] = Array.isArray(res) ? res : (res?.items || [])
-    items.push(...batch)
-    const more = Array.isArray(res) ? false : (res?.has_more ?? batch.length === 200)
-    if (!more || !batch.length) break
-  }
-  return items
 }
 
 /** 底稿调整分录组 → 集中登记（workpaper-adjustment-centralization） */
@@ -158,6 +175,7 @@ export async function getAdjustmentBySourceRef(projectId: string, sourceRef: str
     entry_group_id?: string; adjustment_no?: string; adjustment_type?: string
     review_status?: string; rejection_reason?: string | null; source_wp_code?: string
     collaboration_status?: string | null
+    client_booking?: { status: string; effective: boolean; voucher_keys: string[] } | null
   }
 }
 
@@ -242,14 +260,15 @@ export async function rejectCollaboration(projectId: string, cid: string, reason
 }
 
 export async function updateAdjustment(projectId: string, groupId: string, body: {
-  description?: string; line_items: AdjustmentLineInput[]
+  expected_revision?: number; description?: string; audit_phase?: 'preliminary' | 'final'; line_items: AdjustmentLineInput[]
 }) {
   const { data } = await http.put(P_adj.detail(projectId, groupId), body, ADJ_SILENT)
   return data
 }
 
-export async function deleteAdjustment(projectId: string, groupId: string) {
-  const { data } = await http.delete(P_adj.detail(projectId, groupId), ADJ_SILENT)
+export async function deleteAdjustment(projectId: string, groupId: string, expectedRevision?: number) {
+  const config = { ...ADJ_SILENT, params: expectedRevision ? { expected_revision: expectedRevision } : undefined }
+  const { data } = await http.delete(P_adj.detail(projectId, groupId), config)
   return data
 }
 
@@ -300,6 +319,126 @@ export interface AdjustmentFlowResult {
   failed: Array<{ entry_group_id: string; adjustment_no: string | null; reason: string }>
   notified: Array<{ user_id: string; name: string; kind: string }>
   warning?: string | null
+}
+
+export interface AdjustmentReviewTask {
+  id: string
+  entry_group_id: string
+  year: number
+  status: 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'stale'
+  required_level: 'manager' | 'partner'
+  revision: number
+  group_content_revision: number
+  assigned_reviewer_ids: string[]
+  submitted_by: string
+  submitted_at: string | null
+  submit_note?: string | null
+}
+
+export async function listAdjustmentReviewTasks(
+  projectId: string, year?: number | null, mineOnly = true,
+): Promise<AdjustmentReviewTask[]> {
+  const params: Record<string, string | number | boolean> = { mine_only: mineOnly, status: 'pending' }
+  if (year != null) params.year = year
+  const { data } = await http.get(P_adj.reviewTasks(projectId), { params, _silent: true } as any)
+  return data
+}
+
+export interface AdjustmentClientBookingProjection {
+  status: 'booked' | 'revoked'
+  effective: boolean
+  voucher_keys: string[]
+  booked_dataset_id: string | null
+  created_by: string | null
+  created_at: string | null
+  note?: string | null
+}
+
+export interface AdjustmentBookingCandidate {
+  voucher_key: string
+  label: string
+  voucher_date: string
+  voucher_type: string
+  voucher_no: string
+  company_code: string
+  summary: string
+  distance_days: number
+  matches: Array<Record<string, unknown>>
+}
+
+export interface AdjustmentBookingSuggestion {
+  entry_group_id: string
+  adjustment_no: string
+  description?: string | null
+  audit_phase: string
+  candidates: AdjustmentBookingCandidate[]
+}
+
+export async function listAdjustmentBookingSuggestions(
+  projectId: string, year: number,
+): Promise<AdjustmentBookingSuggestion[]> {
+  const { data } = await http.get(P_adj.clientBookingSuggestions(projectId), {
+    params: { year }, _silent: true,
+  } as any)
+  return data
+}
+
+export async function markAdjustmentClientBooked(
+  projectId: string, groupId: string, body: { year: number; voucher_keys: string[]; note?: string },
+) {
+  const { data } = await http.post(P_adj.clientBooking(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function revokeAdjustmentClientBooking(
+  projectId: string, groupId: string, body: { year: number; reason: string },
+) {
+  const { data } = await http.post(P_adj.clientBookingRevoke(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function getAdjustmentClientBookingHistory(projectId: string, groupId: string, year: number) {
+  const { data } = await http.get(P_adj.clientBookingHistory(projectId, groupId), { params: { year } })
+  return data
+}
+
+export interface AdjustmentTreatmentProjection {
+  status: 'pending_internal_review' | 'awaiting_workpaper_publish' | 'include_in_working_tb' | 'client_booked' | 'unadjusted_misstatement'
+  effective: boolean
+  latest_action: string | null
+  sequence: number | null
+  misstatement_id: string | null
+  client_booking_id: string | null
+  reason?: string | null
+  created_by?: string | null
+  created_at?: string | null
+}
+
+export async function getAdjustmentTreatment(projectId: string, groupId: string, year: number): Promise<AdjustmentTreatmentProjection> {
+  const { data } = await http.get(P_adj.treatment(projectId, groupId), { params: { year }, _silent: true } as any)
+  return data
+}
+
+export async function getAdjustmentTreatmentHistory(projectId: string, groupId: string, year: number) {
+  const { data } = await http.get(P_adj.treatmentHistory(projectId, groupId), { params: { year }, _silent: true } as any)
+  return data
+}
+
+export async function markAdjustmentUnadjusted(projectId: string, groupId: string, body: {
+  year: number; management_reason: string; management_communication_at: string; auditor_evaluation?: string
+}) {
+  const { data } = await http.post(P_adj.treatmentUnadjusted(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function includeAdjustmentInWorkingTb(projectId: string, groupId: string, body: { year: number; reason?: string }) {
+  const { data } = await http.post(P_adj.treatmentInclude(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function withdrawAdjustmentTreatment(projectId: string, groupId: string, body: { year: number; reason: string }) {
+  const { data } = await http.post(P_adj.treatmentWithdraw(projectId, groupId), body, ADJ_SILENT)
+  return data
 }
 
 export async function listAdjustmentReviewers(projectId: string): Promise<AdjustmentReviewer[]> {
@@ -500,6 +639,7 @@ export interface MisstatementItem {
   misstatement_amount: string
   misstatement_type: string
   management_reason: string | null
+  management_communication_at?: string | null
   auditor_evaluation: string | null
   source_wp_code?: string | null
   is_carried_forward: boolean

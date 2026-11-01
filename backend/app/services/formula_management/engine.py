@@ -341,7 +341,7 @@ def _exec_auto_calc(
 
     fr = kernel_execute(formula.expression, ctx)
 
-    if not fr.ok:
+    if not fr.ok or fr.value is None:
         # 求值失败：保留原值，不回填、不写时间戳。
         result.errors.extend(fr.errors or [f"公式求值失败: {formula.expression}"])
         logger.warning(
@@ -380,7 +380,7 @@ def _exec_logic_check(formula: FormulaRecord, ctx: FormulaContext) -> FormulaExe
     result = FormulaExecResult(formula_id=formula.id, formula_type="logic_check")
     fr = kernel_execute(formula.expression, ctx)
 
-    if not fr.ok:
+    if not fr.ok or fr.value is None:
         detail = f"（{'; '.join(fr.errors)}）" if fr.errors else ""
         base = formula.issue_description or formula.expression
         result.issues.append(
@@ -421,7 +421,7 @@ def _exec_reasonability(formula: FormulaRecord, ctx: FormulaContext) -> FormulaE
     result = FormulaExecResult(formula_id=formula.id, formula_type="reasonability")
     fr = kernel_execute(formula.expression, ctx)
 
-    if not fr.ok:
+    if not fr.ok or fr.value is None:
         logger.warning(
             "reasonability 公式无法求值，跳过该提示（不中断）(id=%s expr=%s): %s",
             formula.id,
@@ -655,7 +655,7 @@ def _batch_exec_auto_calc(
     """
     fr = kernel_execute(formula.expression, ctx)
 
-    if not fr.ok:
+    if not fr.ok or fr.value is None:
         result.errors.append({
             "formula_id": formula.id,
             "formula_type": "auto_calc",
@@ -703,7 +703,7 @@ def _batch_exec_logic_check(
     """
     fr = kernel_execute(formula.expression, ctx)
 
-    if not fr.ok:
+    if not fr.ok or fr.value is None:
         detail = f"（{'; '.join(fr.errors)}）" if fr.errors else ""
         base = formula.issue_description or formula.expression
         result.issues.append({
@@ -738,7 +738,7 @@ def _batch_exec_reasonability(
     """
     fr = kernel_execute(formula.expression, ctx)
 
-    if not fr.ok:
+    if not fr.ok or fr.value is None:
         logger.warning(
             "batch reasonability 无法求值，跳过 (id=%s expr=%s): %s",
             formula.id,

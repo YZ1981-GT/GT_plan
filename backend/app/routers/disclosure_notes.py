@@ -1414,7 +1414,7 @@ async def apply_formulas(
 
     try:
         await materialize_quietly(db, project_id, [note_section])  # 全局 / 本项目公式设置（新建附注还没物化）
-        result = await execute_note_formulas(db, project_id, year, note_section, regenerate=regenerate)
+        result = await execute_note_formulas(db, project_id, year, note_section, regenerate=regenerate, triggered_by=current_user.id)
         if result.get("updated"):
             await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                      user_id=current_user.id)
@@ -1601,6 +1601,7 @@ class NoteBatchAiFillRequest(BaseModel):
     """一键批量 AI 预填充请求。"""
 
     doc_filter: list[UUID] | None = None
+    idempotency_key: str | None = None
 
 
 def _citation_to_dict(c) -> dict:
@@ -1730,6 +1731,7 @@ async def _issue_note_draft_message(
     try:
         from app.services import doc_chat_persistence
         from app.services.ai_chat.contracts import HostType
+        from app.services.llm_route import served_model_label
 
         session = await doc_chat_persistence.get_or_create_session(
             db,
@@ -1740,7 +1742,12 @@ async def _issue_note_draft_message(
             audit_year=year,
         )
         msg = await doc_chat_persistence.append_message(
-            db, session, "assistant", text
+            db,
+            session,
+            "assistant",
+            text,
+            context_manifest={"task_code": "note.policy_draft"},
+            model_used=served_model_label(),
         )
         message_id = msg.id
         await db.commit()
@@ -1764,73 +1771,22 @@ async def batch_ai_fill_notes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """一键批量预填充空/草稿章节（**不落库**，逐章结果供前端确认采纳，Req10）。
+    """兼容入口：创建 DB-backed 附注预填任务并立即返回 snapshot。
 
-    行为：查该 project/year 所有"文字为空或 status=draft"且未锁定/无 manual_override（`is_local_override`）
-    的章节，构造 sections 列表调 `NoteKnowledgeEnricher.batch_prefill`（单章 try/except 隔离降级，Property 12）。
-
-    resp: ``{ results:[{note_section, status, text, citations}], generated, degraded, skipped }``
+    每章独立生成稳定 ``generation_id/message_id``；浏览器丢失响应后以同一
+    idempotency_key 重放即可取回原任务，采纳已有 message，不再重新调用模型。
     """
-    from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
+    from app.routers.ai_task_jobs import AiTaskJobCreate, create_job
 
     req = body or NoteBatchAiFillRequest()
-
-    rows = (
-        await db.execute(
-            sa.select(DisclosureNote)
-            .where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.is_deleted == sa.false(),
-                DisclosureNote.is_local_override == sa.false(),
-                sa.or_(
-                    DisclosureNote.text_content.is_(None),
-                    sa.func.length(sa.func.trim(DisclosureNote.text_content)) == 0,
-                    DisclosureNote.status == NoteStatus.draft,
-                ),
-            )
-            .order_by(DisclosureNote.sort_order)
-        )
-    ).scalars().all()
-
-    sections = [
-        {
-            "note_section": n.note_section,
-            "section_title": n.section_title or n.note_section,
-            "account_name": n.account_name or "",
-            "account_code": None,
-            "audit_area": None,
-            "text_content": n.text_content,
-            "is_draft": n.status == NoteStatus.draft,
-            "manual_override": n.is_local_override,
-        }
-        for n in rows
-    ]
-
-    enricher = NoteKnowledgeEnricher(db)
-    raw_results = await enricher.batch_prefill(
+    return await create_job(
         project_id,
-        year,
-        sections,
-        user=current_user,
-        doc_filter=req.doc_filter,
+        AiTaskJobCreate(
+            task_kind="note_batch_prefill",
+            year=year,
+            idempotency_key=req.idempotency_key or str(uuid4()),
+            doc_filter=req.doc_filter or [],
+        ),
+        db,
+        current_user,
     )
-
-    results = [
-        {
-            "note_section": r.get("note_section"),
-            "status": r.get("status"),
-            "text": r.get("text"),
-            "citations": [_citation_to_dict(c) for c in (r.get("citations") or [])],
-        }
-        for r in raw_results
-    ]
-    generated = sum(1 for r in results if r["status"] == "generated")
-    degraded = sum(1 for r in results if r["status"] == "degraded")
-    skipped = sum(1 for r in results if r["status"] == "skipped")
-    return {
-        "results": results,
-        "generated": generated,
-        "degraded": degraded,
-        "skipped": skipped,
-    }

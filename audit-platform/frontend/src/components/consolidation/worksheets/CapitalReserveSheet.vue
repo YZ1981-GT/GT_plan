@@ -16,7 +16,7 @@
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
         <el-button size="small" @click="restoreDefaults">🔄 还原</el-button>
-        <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
+        <el-button size="small" @click="emitSave">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
@@ -132,15 +132,24 @@ interface CapitalReserveRow {
 
 interface AdjItem { description: string; amount: number | null }
 
+interface CapitalReservePayload {
+  rows: CapitalReserveRow[]
+  adjustment_items: AdjItem[]
+  consol_report_amount: number | null
+}
+
 const props = defineProps<{
   companies: CompanyCol[]
   modelValue: CapitalReserveRow[]
   eliminationData?: any // 从合并抵消分录传入的数据
+  initialAdjustmentItems?: AdjItem[]
+  initialConsolReportAmount?: number | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: CapitalReserveRow[]): void
-  (e: 'save', v: CapitalReserveRow[]): void
+  (e: 'save', v: CapitalReservePayload): void
+  (e: 'draft-change', v: CapitalReservePayload): void
   (e: 'open-formula', sheetKey: string): void
 }>()
 
@@ -151,12 +160,28 @@ const sheetRef = ref<HTMLElement | null>(null)
 
 const companies = computed(() => props.companies)
 const tableData = ref<CapitalReserveRow[]>([])
-const consolReportAmount = ref<number | null>(null)
-const adjItems = ref<AdjItem[]>([
+const consolReportAmount = ref<number | null>(props.initialConsolReportAmount ?? null)
+const adjItems = ref<AdjItem[]>(props.initialAdjustmentItems?.map((item) => ({ ...item })) || [
   { description: '', amount: null },
   { description: '', amount: null },
 ])
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
+
+function currentPayload(): CapitalReservePayload {
+  return {
+    rows: tableData.value,
+    adjustment_items: adjItems.value,
+    consol_report_amount: consolReportAmount.value,
+  }
+}
+
+function emitDraft(): void {
+  emit('draft-change', currentPayload())
+}
+
+function emitSave(): void {
+  emit('save', currentPayload())
+}
 
 // 确保每行的 values 数组长度与 companies 一致
 function ensureValues(rows: CapitalReserveRow[]) {
@@ -177,6 +202,16 @@ watch(() => props.modelValue, (v) => {
   ensureValues(tableData.value)
 }, { deep: true })
 
+watch(() => props.initialAdjustmentItems, (items) => {
+  adjItems.value = items?.map((item) => ({ ...item })) || [
+    { description: '', amount: null },
+    { description: '', amount: null },
+  ]
+}, { deep: true })
+watch(() => props.initialConsolReportAmount, (amount) => {
+  consolReportAmount.value = amount ?? null
+})
+
 watch(() => props.companies.length, () => {
   ensureValues(tableData.value)
 })
@@ -191,7 +226,9 @@ watch(tableData, (v) => {
   }
   recalcRows()
   emit('update:modelValue', v)
+  emitDraft()
 }, { deep: true })
+watch([adjItems, consolReportAmount], emitDraft, { deep: true })
 
 // 期末金额行
 const endRow = computed(() => tableData.value.find(r => r.item === '期末金额'))

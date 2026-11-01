@@ -11,7 +11,7 @@ GET 要求本项目 readonly、其余方法 edit；路径与请求体里的函�
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,9 @@ from app.services import confirmation_evidence_service
 from app.services.confirmation_reply_ocr import ReplyOcrFailed, ensure_reply_text
 from app.services.confirmation_scope_gate import confirmation_project_gate
 from app.services.confirmation_types import ConfirmTypeStr
+from app.services.attachment_service import AttachmentService
+from app.services.attachment_upload_policy import UploadRejected
+from app.services.workpaper_evidence_intake import read_upload_limited
 
 router = APIRouter(
     prefix="/projects/{project_id}/confirmations",
@@ -570,6 +573,91 @@ class LinkAttachmentRequest(BaseModel):
     )
 
 
+@router.post("/{confirmation_id}/attachments/upload")
+async def upload_and_link_attachment(
+    project_id: str,
+    confirmation_id: str,
+    file: UploadFile = File(...),
+    role: str = Form(...),
+    paired_outbound_id: str | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """一次请求完成文件存储、函证挂载和留痕；失败补偿本次新写的物理对象。"""
+    pid = uuid.UUID(project_id)
+    cid = uuid.UUID(confirmation_id)
+    paired = uuid.UUID(paired_outbound_id) if paired_outbound_id else None
+    actor_user_id = getattr(user, "id", None)
+    try:
+        confirmation, final_pair = await confirmation_evidence_service.validate_attachment_link_request(
+            db, confirmation_id=cid, role=role, paired_outbound_id=paired,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        raise HTTPException(status_code=404 if "不存在" in message else 400, detail=message) from exc
+    if confirmation.project_id != pid:
+        raise HTTPException(status_code=404, detail="函证记录不存在")
+
+    content = await read_upload_limited(file)
+    service = AttachmentService(db)
+    raw: dict | None = None
+    try:
+        uploaded = await service.upload_attachment_file(
+            project_id=pid,
+            file_name=file.filename or "confirmation.pdf",
+            content=content,
+            metadata={
+                "attachment_type": "confirmation",
+                "reference_type": "confirmation_list",
+                "reference_id": cid,
+            },
+            created_by=actor_user_id,
+        )
+        attachment_id = uuid.UUID(uploaded["id"])
+        raw = await service.get_raw_storage(attachment_id)
+        link = await confirmation_evidence_service.link_attachment(
+            db,
+            confirmation_id=cid,
+            attachment_id=attachment_id,
+            role=role,
+            paired_outbound_id=final_pair,
+            actor_user_id=actor_user_id,
+        )
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        cleanup = None
+        if raw is not None:
+            cleanup = await service.compensate_uploaded_storage(
+                project_id=pid,
+                storage_type=raw.get("storage_type"),
+                storage_key=raw.get("file_path"),
+                paperless_document_id=raw.get("paperless_document_id"),
+            )
+        if isinstance(exc, UploadRejected):
+            raise HTTPException(status_code=422, detail={**exc.as_detail(), "storage_cleanup": cleanup}) from exc
+        if isinstance(exc, ValueError):
+            message = str(exc)
+            raise HTTPException(
+                status_code=404 if "不存在" in message else 400,
+                detail={"message": message, "storage_cleanup": cleanup},
+            ) from exc
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "函证附件上传或挂载失败，已执行存储补偿", "storage_cleanup": cleanup},
+        ) from exc
+
+    return {
+        "link_id": str(link.id),
+        "confirmation_id": str(link.confirmation_id),
+        "attachment_id": str(link.attachment_id),
+        "file_name": uploaded.get("file_name"),
+        "role": link.role,
+        "paired_outbound_attachment_id": str(link.paired_outbound_attachment_id) if link.paired_outbound_attachment_id else None,
+        "match_status": link.match_status,
+    }
+
+
 @router.post("/{confirmation_id}/attachments")
 async def link_attachment(
     project_id: str,
@@ -656,8 +744,8 @@ async def list_attachments(
     """列出某笔函证关联的全部附件（发函件 + 回函件，含角色/配对/OCR状态/文件信息）。"""
     cid = uuid.UUID(confirmation_id)
 
-    items = await confirmation_evidence_service.list_attachments(db, cid)
-    await db.commit()
+    role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
+    items = await confirmation_evidence_service.list_attachments(db, cid, actor_role=role)
     return {"items": items, "total": len(items)}
 
 

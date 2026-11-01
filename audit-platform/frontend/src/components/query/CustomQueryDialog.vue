@@ -344,6 +344,8 @@ const props = defineProps<{
   initialSource?: string
   /** 随初始 source 带来的说明（模板库附注按钮：模板章节号与项目附注编号不同），用户换数据源即清除 */
   initialNotice?: string
+  /** 每次打开请求递增；组件保持挂载时也重新采用入口上下文。 */
+  openRevision?: number
   /** 业务页行级「按此查询明细」的上下文（W6，ADR-AQL-20）：打开时套用并立即执行 */
   entry?: QueryEntryRequest | null
 }>()
@@ -360,8 +362,10 @@ const router = useRouter()
 const { canUseBuilder, builderDisabledReason } = useQueryBuilderAccess()
 
 const activeTab = ref<'basic' | 'advanced'>(props.initialTab || 'basic')
-// 弹窗每次打开都按 initialTab 重置 active
-watch(visible, (v) => { if (v) activeTab.value = props.initialTab || 'basic' })
+// 弹窗每次打开都按 initialTab 重置 active；已打开时的新入口也靠 revision 重置
+watch([visible, () => props.openRevision], ([open]) => {
+  if (open) activeTab.value = props.initialTab || 'basic'
+})
 
 // 项目 / 年度（R10.1 / R10.2，design §4.2）：每次打开都以路由项目为准，非项目页不预选任何项目（原先取项目列表第一项）；
 // 年度依次取 props.year（路由 ?year）→ 所选项目审计年度 → 留空要求选择，不按日历年推算
@@ -398,9 +402,9 @@ async function loadProjectList() {
     if (localYear.value == null) localYear.value = auditYearOf(localProjectId.value)
   } catch { projectOptions.value = [] } finally { projectsLoading.value = false }
 }
-// 弹窗打开时：采用路由上下文、按需加载项目列表与指标树
-watch(visible, (v) => {
-  if (!v) return
+// 弹窗打开时：采用路由上下文、按需加载项目列表与指标树（已打开时的新入口靠 revision 再走一次）
+watch([visible, () => props.openRevision], ([open]) => {
+  if (!open) return
   adoptRouteContext()
   void loadProjectList()
 }, { immediate: true })
@@ -1299,7 +1303,8 @@ loadQueryHistory()
 
 // ─── 入口预选（R10.3 / R10.5）：每次打开都套用 initialSource（原先只在它变化时套用：同一页再开一次、或用户换过源后再开，
 // 预选不生效）；数据源立即选中，树里的高亮与展开等树加载完再做（原先连选中也等树，树取不到时预选整个丢失）──
-watch(() => [visible.value, props.initialSource, props.initialNotice] as const, ([open, source, notice]) => {
+watch(() => [visible.value, props.openRevision, props.initialSource, props.initialNotice] as const,
+  ([open, _revision, source, notice]) => {
   if (!open) { entryNotice.value = null; return }
   entryNotice.value = source && notice ? { source, text: notice } : null
   if (source) revealSource(source)

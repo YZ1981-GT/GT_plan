@@ -9,6 +9,7 @@
  * - pack v2 持久化 + legacy 迁移
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcChangeRate, isChangeRateExceeding } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 
@@ -279,6 +280,15 @@ export function useF2CostComparison(options: {
       persist()
     },
   })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }

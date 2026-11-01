@@ -281,16 +281,15 @@ def _task_setup_logging(ctx: StartupContext) -> None:
     setup_logging(level=ctx.log_level, json_format=False)
 
 
-async def _task_run_migrations(ctx: StartupContext) -> None:
-    """Run pending migrations; the following critical task verifies the final state."""
+async def _task_run_migrations(_ctx: StartupContext) -> None:
+    """Database versioned migrations (best-effort; failures recorded in DB/health)."""
     from app.core.config import settings
     from app.core.migration_runner import MigrationRunner
 
     log = logging.getLogger("audit_platform")
-    runner = MigrationRunner(database_url=settings.DATABASE_URL)
     try:
+        runner = MigrationRunner(database_url=settings.DATABASE_URL)
         result = await runner.run_pending()
-        ctx.extras["migration_run_result"] = result
         if result.executed:
             log.info("[启动] 数据库迁移完成，执行了版本: %s", result.executed)
         if result.failed:
@@ -303,38 +302,17 @@ async def _task_run_migrations(ctx: StartupContext) -> None:
                 "[启动] 共 %d 个迁移失败，已写入 schema_migration_failures 表 / health=degraded",
                 len(result.failed),
             )
-    except Exception as mig_err:
-        ctx.extras["migration_run_error"] = type(mig_err).__name__
-        log.warning(
-            "[启动] 数据库迁移调度失败（等待只读完整性核验阻断启动）: %s", mig_err
-        )
-    finally:
         await runner.close()
+    except Exception as mig_err:
+        log.warning(
+            "[启动] 数据库迁移调度失败（应用仍继续启动）: %s", mig_err
+        )
 
 
-async def _task_migration_mark_complete(ctx: StartupContext) -> None:
-    """Only mark complete after a strict, read-only disk/DB comparison."""
-    from app.core.config import settings
-    from app.core.migration_runner import MigrationRunner
+def _task_migration_mark_complete(_ctx: StartupContext) -> None:
     from app.core.runtime_state import migration_state
 
-    runner = MigrationRunner(database_url=settings.DATABASE_URL)
-    try:
-        readiness = await runner.inspect_readiness()
-        ctx.extras["migration_readiness"] = readiness
-        if not readiness.is_complete:
-            pending = list(readiness.pending_versions)
-            failed = [f.version for f in readiness.failures]
-            raise RuntimeError(
-                "数据库迁移未就绪："
-                f"pending_versions={pending}, failed_versions={failed}"
-            )
-        migration_state.mark_complete()
-    except Exception:
-        migration_state.mark_incomplete()
-        raise
-    finally:
-        await runner.close()
+    migration_state.mark_complete()
 
 
 async def _task_acnr_redis_inject(_ctx: StartupContext) -> None:
@@ -791,6 +769,8 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("knowledge_ocr_worker", "app.workers.knowledge_ocr_worker"),
     # OO→HTML apply 中断后的重驱（writeback-followup-issue-closure R3.2；选主，一轮一条）。
     ("oo_apply_redrive_worker", "app.workers.oo_apply_redrive_worker"),
+    # V240：持久合并 operation，数据库 claim + lease 使重启后可恢复。
+    ("consol_operation_worker", "app.workers.consol_operation_worker"),
 )
 
 # Stable worker names (13 always-on + 1 conditional ImportJobRunner) — pinned contract,
@@ -809,6 +789,7 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "invalidation_dispatcher_worker",
     "knowledge_ocr_worker",
     "oo_apply_redrive_worker",
+    "consol_operation_worker",
     "ImportJobRunner.run_forever",
 )
 

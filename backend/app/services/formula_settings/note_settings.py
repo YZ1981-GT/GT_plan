@@ -180,34 +180,7 @@ async def list_section(db: AsyncSession, project_id: uuid.UUID, year: int, secti
         rec["target_label"] = describe_target(None, rec["target"], catalog)
     loaded = {note_slot(section, t): None for t in presets}
     loaded.update({k: version_token(e) for k, e in eff.items()})
-    return {"formulas": sorted(out.values(), key=target_sort_key), "loaded": loaded, "targets": catalog,
-            "preset_notes": _preset_notes(note, catalog)}
-
-
-def _preset_notes(note: DisclosureNote | None, catalog: list[dict]) -> list[dict[str, str]]:
-    """本章节没有生成预设公式的格与原因（「表名 · 行名：原因」，spec note-table-structure-formula-pull-closure R5.2）。
-
-    与执行器同一份现算（``section_preset_formulas``）：判不准的合计（嵌套 / 纵向变动表 / 「其中」…）、认不准的比例列。
-    """
-    if note is None:
-        return []
-    from app.services.note_formula_tables import formula_view, section_preset_formulas
-
-    try:
-        _formulas, notes = section_preset_formulas(formula_view(note.table_data))
-    except Exception:  # noqa: BLE001 —— 说明取不到不阻断公式列表
-        return []
-    tables = {t["index"]: t for t in catalog}
-    out: list[dict[str, str]] = []
-    for n in notes:
-        table = tables.get(n.get("table_index"))
-        if table is None:
-            continue
-        row = n.get("row")
-        rows = table.get("rows") or []
-        where = f"{table['name']} · {rows[row]}" if isinstance(row, int) and 0 <= row < len(rows) else table["name"]
-        out.append({"label": where, "reason": str(n.get("reason") or "")})
-    return out
+    return {"formulas": sorted(out.values(), key=target_sort_key), "loaded": loaded, "targets": catalog}
 
 
 async def target_problems(db: AsyncSession, project_id: uuid.UUID, year: int, section: str,

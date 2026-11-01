@@ -5,6 +5,7 @@
  * 收敛：原 useG3DivRecFormData（含 writeback）并入本文件为唯一入口。
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
@@ -111,6 +112,8 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
         ElMessage.error('保存失败，请稍后重试')
+        // 过渡屏障须看见失败：吞掉会让 flushHtml 读到未落库的旧投影
+        throw err
       }
     }
   }
@@ -181,7 +184,7 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
       _pendingItems.delete(itemId)
-      void _doSave([updated])
+      void trackPendingWrite(_doSave([updated])).catch(() => undefined)
     }, 500)
     _debounceTimers.set(itemId, timer)
   }
@@ -191,7 +194,7 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
   // 为零消费死代码——TB 回写已改由 useG3Adjudication.publishToTb（显式确认门 → POST publish-to-tb，
   // 科目1131余额口径）承载，故移除此重复定义及其 return export。
 
-  function flushPending(): void {
+  async function flushPending(): Promise<void> {
     for (const timer of _debounceTimers.values()) {
       clearTimeout(timer)
     }
@@ -204,12 +207,15 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
         if (resp) items.push(resp)
       }
       _pendingItems.clear()
-      if (items.length > 0) void _doSave(items)
+      // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+      if (items.length > 0) await _doSave(items)
     }
   }
 
+  registerPendingFlusher(flushPending)
+
   onScopeDispose(() => {
-    flushPending()
+    void flushPending().catch(() => undefined)
   })
 
   return {

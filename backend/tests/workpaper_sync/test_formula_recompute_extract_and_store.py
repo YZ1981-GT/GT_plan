@@ -403,8 +403,10 @@ def test_recomputed_values_do_not_resurrect_template_skeleton_rows() -> None:
 
 
 def test_the_coordinator_mirrors_both_views() -> None:
-    """接线：`_apply_committed` 先补清空视图、再放行重算值，镜像拿到的是最后那一层（AST）。"""
-    fn = ast.parse(textwrap.dedent(inspect.getsource(OoToHtmlCoordinator._apply_committed)))
+    """接线：事务 hook 先补清空视图、再放行重算值，最后以 commit=False 镜像。"""
+    fn = ast.parse(textwrap.dedent(inspect.getsource(
+        OoToHtmlCoordinator._mirror_store_backed_in_transaction
+    )))
     calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
     names = [n.func.id for n in sorted(calls, key=lambda n: (n.lineno, n.col_offset))]
     assert names.index("store_view_with_cleared_fields") < names.index("store_view_with_recomputed_formulas")
@@ -418,3 +420,4 @@ def test_the_coordinator_mirrors_both_views() -> None:
     assert mirror.lineno > recompute.lineno
     kw = {k.arg: k.value for k in mirror.keywords}
     assert isinstance(kw["merged_projection"], ast.Name) and kw["merged_projection"].id == "store_view"
+    assert isinstance(kw["commit"], ast.Constant) and kw["commit"].value is False

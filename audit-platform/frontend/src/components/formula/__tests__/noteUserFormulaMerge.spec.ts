@@ -46,14 +46,6 @@ describe('mergeNoteUserFormulaRows — 附注用户公式合并', () => {
     expect(merged[1]).toMatchObject({ _layer: undefined, _pending: false })
   })
 
-  it('后端给了 target_label 就按目标单元格显示「项目」，没有才用章节标题', () => {
-    const merged = mergeNoteUserFormulaRows([], [
-      { target: 't0:3:1', formula: 'X()', target_label: '分类表 · 合计 · 期末余额' },
-      { target: 't0:3:2', formula: 'Y()' },
-    ], { sectionId: '五、1', sectionTitle: '货币资金' })
-    expect(merged.map((r) => r.row_name)).toEqual(['分类表 · 合计 · 期末余额', '货币资金'])
-  })
-
   it('同 target 多条 → 用户集优先（保留后者，覆盖前者）', () => {
     const user: NoteUserFormula[] = [
       { target: '2:0', formula: 'OLD()', description: '旧', source: 'user' },

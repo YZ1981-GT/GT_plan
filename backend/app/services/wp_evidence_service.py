@@ -220,6 +220,49 @@ class WpEvidenceService:
             return self._to_dict(existing), True
         return self._to_dict(link), False
 
+    async def bind_contract_identity(
+        self,
+        *,
+        wp_id: UUID,
+        attachment_id: UUID,
+        created_by: UUID,
+        contract_key: str,
+        sheet_name: str | None = None,
+        cell_ref: str | None = None,
+        page_ref: str | None = None,
+    ) -> tuple[dict, bool]:
+        """幂等绑定/改绑合同身份。
+
+        先按 ``(wp, attachment, position)`` 查既有行。找到时原地替换 contract_key，
+        清除互斥的 voucher_key，并统一 evidence_type；不存在才新建。这样合同号修订不会
+        留下同一位置的旧合同身份。
+        """
+        existing = (await self.db.execute(
+            sa.select(EvidenceLink).where(
+                EvidenceLink.wp_id == wp_id,
+                EvidenceLink.attachment_id == attachment_id,
+                sa.func.coalesce(EvidenceLink.sheet_name, "") == (sheet_name or ""),
+                sa.func.coalesce(EvidenceLink.cell_ref, "") == (cell_ref or ""),
+            ).order_by(EvidenceLink.created_at, EvidenceLink.id).limit(1)
+        )).scalar_one_or_none()
+        if existing is not None:
+            existing.contract_key = contract_key
+            existing.voucher_key = None
+            existing.evidence_type = "contract"
+            existing.page_ref = page_ref
+            await self.db.flush()
+            return self._to_dict(existing), True
+        return await self.create_contract_link(
+            wp_id=wp_id,
+            attachment_id=attachment_id,
+            created_by=created_by,
+            contract_key=contract_key,
+            sheet_name=sheet_name,
+            cell_ref=cell_ref,
+            page_ref=page_ref,
+            evidence_type="contract",
+        )
+
     async def batch_link(self, *, wp_id: UUID, created_by: UUID, links: list[dict]) -> list[dict]:
         """批量创建证据链接（字段已由调用方校验）。"""
         return [await self.create_link(wp_id=wp_id, created_by=created_by, **item) for item in links]
@@ -247,34 +290,44 @@ class WpEvidenceService:
     # ─── 充分性检查 ───────────────────────────────────────────────────────────
 
     async def check_sufficiency(self, wp_id: UUID) -> dict:
-        """检查证据充分性：必做程序是否都有至少一条证据链接"""
+        """兼容 API：充分性结论来自四态单一来源，旧计数字段仅作展示。"""
+        from app.services.evidence_readiness import EvidenceReadinessService
+
         proc_q = sa.select(WorkpaperProcedure).where(
             WorkpaperProcedure.wp_id == wp_id,
             WorkpaperProcedure.is_mandatory == True,  # noqa: E712
             WorkpaperProcedure.status != "not_applicable",
         )
         procs = (await self.db.execute(proc_q)).scalars().all()
-
-        link_q = sa.select(EvidenceLink.cell_ref).where(EvidenceLink.wp_id == wp_id)
-        link_rows = (await self.db.execute(link_q)).scalars().all()
-        linked_cells = set(link_rows)
-
-        warnings = []
-        for proc in procs:
-            # 如果程序已完成但没有任何证据链接，发出警告
-            if proc.status == "completed" and not linked_cells:
+        total_links = int((await self.db.execute(
+            sa.select(sa.func.count()).select_from(EvidenceLink).where(EvidenceLink.wp_id == wp_id)
+        )).scalar_one() or 0)
+        readiness = await EvidenceReadinessService(self.db).evaluate_workpaper(wp_id)
+        warnings: list[dict] = []
+        if readiness.status == "unknown":
+            warnings.extend(dict(row) for row in readiness.errors)
+        elif readiness.status == "not_ready":
+            for requirement in readiness.requirements:
+                if not requirement.get("satisfied"):
+                    warnings.append({
+                        "type": requirement["type"],
+                        "message": f"缺少{requirement['label']}",
+                    })
+            if "key_evidence_ocr_confirmation" in readiness.missing_types:
                 warnings.append({
-                    "procedure_id": proc.procedure_id,
-                    "description": proc.description,
-                    "message": f"必做程序「{proc.description}」已完成但无附件证据",
+                    "type": "key_evidence_ocr_confirmation",
+                    "message": "关键证据识别结果未人工确认",
                 })
-
         return {
             "wp_id": str(wp_id),
+            "status": readiness.status,
+            "requirements": [dict(row) for row in readiness.requirements],
+            "missing_types": list(readiness.missing_types),
             "total_mandatory": len(procs),
-            "total_links": len(linked_cells),
-            "sufficient": len(warnings) == 0,
+            "total_links": total_links,
+            "sufficient": readiness.status in {"ready", "not_declared"},
             "warnings": warnings,
+            "errors": [dict(row) for row in readiness.errors],
         }
 
     # ─── 内部方法 ─────────────────────────────────────────────────────────────

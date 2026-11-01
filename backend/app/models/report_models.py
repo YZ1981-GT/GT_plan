@@ -244,6 +244,14 @@ class FinancialReport(Base):
     blank_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     calc_version: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # V229；NULL ⇒ 读取侧判过期
     calc_error: Mapped[str | None] = mapped_column(String(500), nullable=True)  # V229：计算失败原因；过期判据见 report_freshness
+    # V242：生成当前值的共享报表运行与来源信封。financial_report 仍是兼容“当前槽位”，
+    # 历史精确行集保存在 report_generation_run.rows_json，避免旧读取方看到历史重复行。
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("report_generation_run.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    provenance: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -254,6 +262,7 @@ class FinancialReport(Base):
             "project_id", "year", "report_type", "row_code",
             unique=True,
         ),
+        Index("ix_financial_report_run_id", "run_id"),
     )
 
 
@@ -798,3 +807,6 @@ class NoteValidationResult(Base):
             "project_id", "year",
         ),
     )
+
+# S5 来源信封：从独立模块 re-export 运行记录（允许 tests 从 report_models 导入）
+from app.models.report_generation_models import ReportGenerationRun  # noqa: F401, E402

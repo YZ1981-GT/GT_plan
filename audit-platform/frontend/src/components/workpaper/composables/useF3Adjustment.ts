@@ -4,6 +4,7 @@
  * 比照 useD4Adjustment
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from './useF3FormulaEngine'
 import type { ChecklistResponse } from './useF3FormData'
@@ -142,6 +143,15 @@ export function useF3Adjustment(options: UseF3BaseOptions) {
       eventBus.emit('adjustment:created', { wpCode: 'F3', timestamp: Date.now() })
     }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

@@ -25,7 +25,12 @@ from app.models.audit_platform_models import AccountCategory, TrialBalance
 from app.models.base import Base, ProjectStatus, ProjectType
 from app.models.core import Project, User
 from app.models.phase16_models import VersionLineStamp
-from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig
+from app.models.report_models import (
+    FinancialReport,
+    FinancialReportType,
+    ReportConfig,
+    ReportGenerationRun,
+)
 from app.services.report_engine import ReportEngine
 from app.services.report_freshness import CALC_VERSION
 from tests.formula_hub._pg_harness import TEST_PROJECT_PREFIX
@@ -105,7 +110,7 @@ async def seed(session: AsyncSession, *, tag: str) -> World:
 
 
 #: 报表生成会读写的表（版本链戳记在生成里写库，缺表会让会话的 flush 失败，故建上）
-_MODELS = (User, Project, ReportConfig, FinancialReport, TrialBalance, VersionLineStamp)
+_MODELS = (User, Project, ReportConfig, ReportGenerationRun, FinancialReport, TrialBalance, VersionLineStamp)
 
 
 @asynccontextmanager
