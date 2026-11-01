@@ -122,6 +122,31 @@ def _parse_json(body_bytes: bytes) -> object:
         return None
 
 
+def _redact_if_display_prefs(
+    method: str,
+    path: str,
+    new_value: object,
+    request: Request,
+) -> object:
+    """显示偏好 PATCH 的审计载荷只保留修订号与变更字段名。
+
+    字号、金额单位、小数位、阈值、固定列和 pageKey 都是用户显示偏好，
+    不进入通用操作日志；``changed_fields`` 由路由在保存成功后写入 request.state。
+    """
+    if method.upper() != "PATCH" or path.rstrip("/") != "/api/users/me/display-preferences":
+        return new_value
+    payload = new_value if isinstance(new_value, dict) else {}
+    body = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    revision = body.get("revision") if isinstance(body, dict) else None
+    changed = getattr(request.state, "audit_changed_fields", [])
+    if not isinstance(changed, (list, tuple, set)):
+        changed = []
+    return {
+        "revision": revision,
+        "changed_fields": sorted({str(field) for field in changed if str(field).strip()}),
+    }
+
+
 async def _write_log(
     user_id: uuid.UUID | None,
     action_type: str,

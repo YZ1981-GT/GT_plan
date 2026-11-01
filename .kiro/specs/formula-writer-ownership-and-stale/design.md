@@ -323,4 +323,4 @@ S4 已完成的代码不在本 spec 中重新设计，但 S3 实施必须完成�
 - `useNoteSaveFlow` 被 DisclosureEditor 引用但文件从未提交：补手工/自动保存差异、失败状态、保存中切章隔离与作用域清理，4 个测试；
 - 附注就绪度原只识别 4 个来源且其余都显示“待刷新”：新增 16 个来源映射，与后端 `StaleSource/STALE_SOURCE_LABELS` 逐成员对拍；刷新提示接入 recomputed / failed / cleared 结果集合。
 
-仍属其他 spec 的启动缺口：父提交已引用未提交的 `batch_project_inventory.py`、`batch_project_template_origin.py`、`group_topology_lock.py`、`project_creation_grant_service.py`、`project_creation_security.py`，且 `pm_dashboard` 依赖未提交版 `pm_service.BatchReviewService`。本轮浏览器只使用 `runtime_overlay.json` 记录 SHA-256 的临时 overlay，不把这些半成品纳入 S3；应由 batch-project spec 连同模型、迁移、测试一起提交。父提交 `audit_log.py` 的 `_redact_if_display_prefs` NameError 同样未纳入本 spec。
+浏览器首次启动时发现的 5 个 batch-project 缺失 service 已由并发提交 `86005b6b6` 连同模型/测试正式补入，未并入 S3 提交。该提交后干净树仍有两处启动断裂，本轮按用户“逐一修复”收口：`cd0a8fe1f` 删除绕过配置驱动复核状态机的 `pm_service.BatchReviewService` 时漏删 `pm_dashboard` 旧重复端点，现移除旧端点后 `app.main` 可干净导入，运行期 `/api/projects/{project_id}/batch-review` 唯一指向 `app.routers.batch_review.batch_review`；`audit_log.py` 调用缺失的 `_redact_if_display_prefs` 导致所有非跳过写请求在审计收尾时报 NameError，现补只保留 revision + changed_fields 的脱敏函数及 3 个测试。全量 route shadow 守卫仍有 14 条父提交预存红，与本轮两处修复无关，未扩散处理。
