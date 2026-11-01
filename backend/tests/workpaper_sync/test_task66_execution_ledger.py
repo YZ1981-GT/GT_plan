@@ -34,7 +34,7 @@ FROZEN_PLAN_PATH = _BACKEND / "data" / "workpaper_sync_task66_legacy_deletion_pl
 #: 🔴 outstanding 棘轮基线。2026-11-01 现算 97（= 125 个 pending_delete path 里 28 个已
 #: landed 出账）。**只许下调**：每删一批就把这个数改小，永远不要为了让守卫变绿而上调。
 #: 上调等于把「可收缩执行账」变成「可膨胀执行账」。
-_OUTSTANDING_RATCHET = 97
+_OUTSTANDING_RATCHET = 96
 
 #: 棘轮基线不得虚高：它必须贴着现算值，不能预留一大截空间（预留空间 = 静默容许回弹）。
 _RATCHET_SLACK_CAP = 5

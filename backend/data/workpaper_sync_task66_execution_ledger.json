@@ -83,13 +83,13 @@
   "unplanned_legacy_paths": [],
   "counters": {
     "plan_paths_total": 126,
-    "state_landed": 28,
-    "state_drifted": 28,
+    "state_landed": 29,
+    "state_drifted": 27,
     "state_intact": 70,
     "pending_delete_paths": 125,
-    "pending_delete_landed": 28,
-    "outstanding_paths": 97,
-    "outstanding_drifted_need_reverdict": 27,
+    "pending_delete_landed": 29,
+    "outstanding_paths": 96,
+    "outstanding_drifted_need_reverdict": 26,
     "unplanned_legacy_paths": 0,
     "live_blocking_points": 1
   },
@@ -2315,9 +2315,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
-      "state": "drifted",
+      "state": "landed",
       "planned_sha256": "dcec0977067e0289aed39cfe688594aba9a4f5d83db4e1ddeed04f598da9dd76",
-      "current_sha256": "cf7420b0ba87cce8aa667c095df037c0cfbd30d21b915fe28cafc49c054d576b",
+      "current_sha256": null,
       "item_count": 2,
       "categories": [
         "legacy_local_storage_key",
@@ -2330,8 +2330,8 @@
         "call_sites_within_file",
         "whole_file"
       ],
-      "still_matches_legacy_name_form": false,
-      "tracked_in_git": true
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncModeStorage.ts",

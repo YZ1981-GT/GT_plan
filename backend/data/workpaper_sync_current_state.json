@@ -10,7 +10,7 @@
     },
     "declared_adapters": 67,
     "delivered_contracts": 91,
-    "entries": 198,
+    "entries": 197,
     "independent": 145,
     "legacy_fake_bidirectional": 59,
     "parent_duplicates": 52,
@@ -2475,26 +2475,6 @@
     {
       "acceptance_state": "unknown",
       "adapter_id": null,
-      "adjudication_state": "terminal",
-      "capability": "unreachable",
-      "capability_target": null,
-      "capability_target_blocked_by": [],
-      "contract_id": null,
-      "document_type": "xlsx",
-      "effective_entry_id": "xlsx/gt-g6-other-bond-ecl",
-      "entry_id": "xlsx/gt-g6-other-bond-ecl",
-      "host_path": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
-      "html_counterpart_verdict": null,
-      "independent_entry": false,
-      "migration_state": "unreachable_pending_delete",
-      "parent_entry_id": null,
-      "provider_module": null,
-      "runtime_readiness": "unknown",
-      "static_registration_blocked_reason": "尚无该 entry 自己的 approved per-entry 生产契约（不在 `DELIVERED_PER_ENTRY_CONTRACTS` 里）—— 逐 entry 发布由 Tasks 46~57 / 62~64 承接；禁止复用别的 entry 的契约"
-    },
-    {
-      "acceptance_state": "unknown",
-      "adapter_id": null,
       "adjudication_state": "pending",
       "capability": null,
       "capability_target": "bidirectional",
@@ -4580,9 +4560,9 @@
       "static_registration_blocked_reason": "entry 尚未完成逐项 capability 裁决（capability=null，stage='step_4_blocked_by_step_3_result_exists'，target='bidirectional'，blockers=['BP-1', 'BP-12', 'BP-2', 'BP-3', 'BP-4', 'BP-5', 'BP-7', 'BP-8']）—— 未裁决入口不得注册 adapter（AC 1.3 / 12.1）"
     }
   ],
-  "manifest_digest": "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50",
-  "overlay_digest": "fb16c4479ab6c78540936a38d268a7f8b7a128acc8f47db72c2ca2c399b90b9e",
-  "report_digest": "c61cddd5645b6e9a2e9e9c3209e22535e62c69c6b15042ac129c8f41a06c10f5",
+  "manifest_digest": "9eee49ef98f06289ac9f4bdeba55282fb353c51c9d34fec6c0c9c13c5a702fd3",
+  "overlay_digest": "345992f4cf445b6503dd40c6dd40945b66b1b95e24d4f1c1af784b5262183e25",
+  "report_digest": "ebd6464d65e43719a958196d329f2644c54f825aabaceeaa3621025708f0390b",
   "runtime_scope": {
     "database_queried": false,
     "meaning": "runtime_readiness/acceptance_state are unknown, not failed or passed",
@@ -4590,7 +4570,7 @@
   },
   "schema_version": "workpaper-sync-current-state:v1",
   "snapshot_date": "2026-11-01",
-  "source_digest": "189cbda5722cd049afc41f61babc0326ef6a1559a259391a8131295eb482b108",
+  "source_digest": "e46d2616970e379ae57debf570cb5e42b5bb889b078100b5e2d4d29016a94ba3",
   "source_review_ref": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/phase0-source-mount-review.json",
   "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "wp_code_adjudication_digest": "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"

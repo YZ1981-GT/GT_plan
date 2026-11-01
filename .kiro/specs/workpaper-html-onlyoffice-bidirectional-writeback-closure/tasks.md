@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：26/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：27/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -316,8 +316,20 @@
   - 证明 OO 侧无业务价值或为空白入口；删除 OO descriptor、按钮和 legacy health/config 请求，single 身份位保持全空。
   - _AC: 1.5, 12.9_
 
-- [ ] 5.3 删除 `GtG6OtherBondEcl.vue` 不可达旧桩
-  - 先证明真实替代组件可达、生产入边为零和删除计划可回滚；随后物理删除文件及 stale overlay/rule，不留 `DEPRECATED`。
+- [x] 5.3 删除 `GtG6OtherBondEcl.vue` 不可达旧桩
+  - 先证明真实替代组件可达（`GtG6OtherBondInvestmentEcl.vue` 在库、registry `specialized.ts` 直接 import）、
+    生产入边为零（execution ledger landed + test_task49 全仓模块边扫）和删除计划可回滚。
+  - 物理删除文件 + 从 overlay 移除 `unreachable_rules` 那条（它引用已删文件，manifest 生成器拒绝 stale 规则）
+    + 更新 `approved_source_digest`（`189cbda5…` → `e46d2616…`，mount 集合少一个文件）并在 `review_basis`
+    追加零能力损失复核记录。
+  - 重生成四件产物（manifest + legacy baseline + current-state + cycle projection）：entries **198→197**
+    （唯一移除 = `xlsx/gt-g6-other-bond-ecl`，capability unreachable / independent_entry false），
+    independent 145 不变、pending 78 不变、unreachable **1→0**。
+  - 重生成 execution ledger：landed **28→29**（该文件入账）、outstanding **97→96**，棘轮基线下调。
+  - coverage-ledger.json 的 G6 条目修正：entryFile 与 evidence 从旧桩改指替代组件。
+  - test_task49 的 `test_unreachable_stub_is_registered_and_still_has_zero_inbound_edges` 改为三条
+    断言（文件不在 + 替代组件可达 + registry 登记完整）。
+  - 验证：35 passed（ledger 13 + closure 14 + artifacts 8）。
   - _AC: 1.7, 12.9_
 
 - [x] 5.4 删除零生产调用的 `usePilotBridgeAdapter.ts`

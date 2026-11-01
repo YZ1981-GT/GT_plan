@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "e18500cddb2ce678c4b81f076d6667d59fee3495fe0b08b0130c45f0f10c573b",
+  "baseline_digest": "1fe55e694f66267fbcf9aecd36102631fc4a546f32a660834a3db8d07e787533",
   "entries": [
     {
       "capability": null,
@@ -4888,37 +4888,6 @@
       }
     },
     {
-      "capability": "unreachable",
-      "document_type": "xlsx",
-      "entry_id": "xlsx/gt-g6-other-bond-ecl",
-      "flags": {
-        "claimed_bidirectional_without_adapter": false,
-        "html_reload_only": false,
-        "missing_adapter": false,
-        "no_durable_forcesave_ack": false,
-        "no_forcesave_command": false,
-        "pending_mode_switch_visible": false,
-        "single_mode_switch_visible": false,
-        "template_only_open": false
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
-      "independent_entry": false,
-      "migration_state": "unreachable_pending_delete",
-      "reason_codes": [],
-      "source_paths": [
-        "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
-        "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
-      ],
-      "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue": "eb140006da028a37d0df2958fac90dd5646fcb54b4703ff33e1a7693f95634f7",
-        "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "3dfa2d92a181145757f367cda7e9cab530ece4afaed96df187894dd5820b8a39"
-      },
-      "ui_characterization": {
-        "evidence": [],
-        "mode_switch_visible": false
-      }
-    },
-    {
       "capability": null,
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-g6-other-bond-investment-ecl",
@@ -9619,12 +9588,12 @@
       }
     }
   ],
-  "manifest_digest": "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50",
+  "manifest_digest": "9eee49ef98f06289ac9f4bdeba55282fb353c51c9d34fec6c0c9c13c5a702fd3",
   "schema_version": 1,
-  "source_digest": "741fbdf771110b5ef652e00d6e05a1ce97ba0d14b8d42afd3afb056c586d7f1a",
+  "source_digest": "f0b320acaf2c80ca50494986e5bd870f55cbf5206ba5737f9b337dbc8128f761",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
-    "entry_count": 198,
+    "entry_count": 197,
     "html_reload_only_count": 15,
     "independent_entry_count": 145,
     "missing_adapter_count": 78,

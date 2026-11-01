@@ -48,39 +48,36 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "9eee49ef98f06289ac9f4bdeba55282fb353c51c9d34fec6c0c9c13c5a702fd3"
 
 export const WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST = "3382b0a961727e5826372683a2db995eff201a2535b886014d4d44f5eee6ae6e"
 
 export const WORKPAPER_SYNC_WP_CODE_ADJUDICATION_DIGEST = "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "6390de60a6a7f895abb09f036b7c94aaf736e66324255e149dffcaf24ceec040"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "1e3ae2713992b4220d8c2b79472cce57d96a2ea44d177a33c99e5bc0ce805bf5"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 225,
+    "GtOnlyOfficeSheet": 224,
     "OnlyOfficeWordDialog": 2,
     "WorkpaperSyncEditorHost": 108,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 111,
-    "unreachable": 1
+    "bidirectional": 111
   },
   "dispatcher_count": 1,
   "editability_counts": {
-    "editable": 197,
-    "unreachable": 1
+    "editable": 197
   },
-  "entry_count": 198,
-  "host_count": 196,
+  "entry_count": 197,
+  "host_count": 195,
   "independent_entry_count": 145,
   "legacy_fake_bidirectional_count": 59,
-  "mount_count": 339,
+  "mount_count": 338,
   "parent_duplicate_count": 52,
   "room_model_counts": {
     "exclusive": 6,
-    "none": 1,
     "shared": 191
   },
   "room_service_state": "room_service_wired",
@@ -89,11 +86,10 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "docx.editable.exclusive.single.room_service_wired.v1": 5,
     "docx.editable.shared.single.room_service_wired.v1": 1,
     "xlsx.editable.shared.none.room_service_wired.v1": 1,
-    "xlsx.editable.shared.single.room_service_wired.v1": 189,
-    "xlsx.unreachable.none.single.room_service_wired.v1": 1
+    "xlsx.editable.shared.single.room_service_wired.v1": 189
   },
   "unadjudicated_count": 78,
-  "unreachable_count": 1
+  "unreachable_count": 0
 } as const
 
 export const WORKPAPER_SYNC_MANIFEST = [
@@ -4722,44 +4718,6 @@ export const WORKPAPER_SYNC_MANIFEST = [
       "wp_code_adjudication_source": "backend/data/workpaper_sync_entry_wp_code_adjudication.json",
       "wp_code_patterns": [
         "G5"
-      ]
-    }
-  },
-  {
-    "adjudicationState": "terminal",
-    "capability": "unreachable",
-    "capabilityTarget": null,
-    "capabilityTargetBlockedBy": [],
-    "capabilityVerdictStage": null,
-    "documentType": "xlsx",
-    "editability": "unreachable",
-    "effectiveEntryId": "xlsx/gt-g6-other-bond-ecl",
-    "entryId": "xlsx/gt-g6-other-bond-ecl",
-    "hasBrowserEvidence": false,
-    "hasContractEvidence": false,
-    "hostPath": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
-    "htmlCounterpartSourceRefs": [],
-    "htmlCounterpartVerdict": null,
-    "independentEntry": false,
-    "migrationState": "unreachable_pending_delete",
-    "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
-    "roomModel": "none",
-    "roomServiceState": "room_service_wired",
-    "scenarioProfileId": "xlsx.unreachable.none.single.room_service_wired.v1",
-    "wpMatch": {
-      "component_types": [],
-      "sheet_expressions": [
-        ":sheet-name=\"props.sheetName || ''\""
-      ],
-      "sheet_literals": [],
-      "source_host": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
-      "wp_code_patterns": [
-        "G6O"
       ]
     }
   },
