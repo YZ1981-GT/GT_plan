@@ -102,11 +102,21 @@ describe('UI 诚实性总守卫 —— 分母是 manifest 全域', () => {
     expect(uncovered, `manifest 出现了本文件未覆盖的 capability：${uncovered}`).toEqual([])
   })
 
-  it('unreachable 在 manifest 里确实存在（AC 1.7 的分母不为空）', () => {
+  it('unreachable 已归零（AC 1.7 达成）且 ② 的判据不依赖它存在', () => {
     const unreachable = WORKPAPER_SYNC_MANIFEST.filter(
       (entry) => entry.capability === 'unreachable',
     )
-    expect(unreachable.length, '没有 unreachable entry ⇒ AC 1.7 的 ② 在空集上恒真').toBe(1)
+    // 🔴 本条原先写 `toBe(1)`（「分母不为空」），那把**过渡态**写成了永久不变量：
+    //    AC 1.7 的要求正是「不可达旧桩 SHALL 删除」，所以归零恰恰是它**达成**的标志。
+    //    task 5.3 删掉 `GtG6OtherBondEcl.vue` 后 unreachable 由 1 → 0，原判据必红 ——
+    //    而唯一的「修法」会是把旧桩加回来，让判据逼生产代码倒退。
+    //
+    //    ② 的真实不变量（unreachable ⇒ 零可用模式、零开关）由下面那条用**合成 readiness**
+    //    直接验 derive 函数，不依赖 manifest 里恰好有这种 entry ⇒ 归零不会让它空转。
+    expect(
+      unreachable.length,
+      'unreachable 又出现了 ⇒ 有新的不可达旧桩，AC 1.7 要求删除而不是登记',
+    ).toBe(0)
   })
 
   it('① single_* 不得长出双模式开关，也不得宣称双向', () => {

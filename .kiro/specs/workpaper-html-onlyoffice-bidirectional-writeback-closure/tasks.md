@@ -253,10 +253,17 @@
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
-  - 🔴 **渐进迁移**：现算 126 条宿主仍自行决定模式开关表现。样板宿主 `GtM7SpecialReserve.vue`
-    已接入 `useEntrySyncReadiness`（task 3.4），棘轮 `entrySyncModePresentationRatchet.spec.ts`
-    已冻结（只许变短）。126 个宿主各有不同的 mode 值体系（中文/onlyoffice/structured/html），
-    须逐宿主浏览器走查后迁移。本任务保持未勾直到棘轮到 0。
+  - 🔴 **渐进迁移，棘轮只减**：现算 **125** 条宿主仍自行决定（本轮 126 → 125）。
+  - **共享切换器已接单源**：`sync/useGRenderModeSwitch.ts` 新增可选 `entrySync` 入参 +
+    暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ 15 个 G 循环宿主只需传入已有的
+    readiness 实例即可完成迁移，不用各写一遍判断。
+  - **已迁移**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
+    （本轮，`v-if="isHtmlSheet && g2EntrySync.presentation.value.showModeSwitch"`）。
+  - 🔴 顺带修 `entrySyncUiHonesty.spec.ts` 一条**把过渡态写成永久不变量**的判据：
+    原 `expect(unreachable.length).toBe(1)`（「分母不为空」）在 task 5.3 删掉 G6 旧桩后必红，
+    而唯一的「修法」会是把旧桩加回来 —— AC 1.7 的要求正是「不可达旧桩 SHALL 删除」，
+    归零恰恰是它**达成**的标志。改为 `toBe(0)` + 写明 ② 的真实不变量由合成 readiness 承担。
+  - 验证：棘轮 4 passed · UI 诚实性 9 passed · presentation 10 passed（共 23）· 两文件 0 diagnostics。
   - _AC: 1.4, 1.5_
 
 - [x] 3.6 建立 UI 诚实性总守卫

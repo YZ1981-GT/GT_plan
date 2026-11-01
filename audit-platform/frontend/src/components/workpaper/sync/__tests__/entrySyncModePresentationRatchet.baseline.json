@@ -52,7 +52,6 @@
   "components/workpaper/GtG13FairValueChanges.vue",
   "components/workpaper/GtG14CreditImpairmentLoss.vue",
   "components/workpaper/GtG1TradingFinancialAssets.vue",
-  "components/workpaper/GtG2InterestReceivable.vue",
   "components/workpaper/GtG3DividendReceivable.vue",
   "components/workpaper/GtG4BondInvestmentEcl.vue",
   "components/workpaper/GtG4BondInvestmentMain.vue",
