@@ -293,7 +293,7 @@ S4 已完成的代码不在本 spec 中重新设计，但 S3 实施必须完成�
 ### 12.2 自动化证据
 
 - 后端：S3、S4 outbox/传播、formula push 核心选集 97 passed；真实 PostgreSQL 回滚用例 1 passed。PG 用例在同一事务内创建 `【测试】S3 stale 状态机回滚` 项目与附注，验证 adjustment 标记、值不变重算清除、formula_settings 失败保留；回滚后独立会话反查项目与附注均为 0。
-- 前端：父提交与候选同口径测试为 `base_failed=4 / candidate_failed=4 / common=4 / candidate_only=0`；新增写请求与 await 宿主守卫 9 passed；收尾运行时修复相关 75 passed；单区域 TypeScript 0 错。
+- 前端：父提交与候选同口径测试为 `base_failed=4 / candidate_failed=4 / common=4 / candidate_only=0`；新增写请求与 await 宿主守卫 9 passed；收尾运行时修复相关 75 passed。初始窄区域 TypeScript 为 0 错；纳入 `useNoteRefresh → noteHeadlessDisclosure → 78 provider` 后现算 148 条/28 个未改文件，与修正测试夹具前同配置比较为 `150 → 148 / added 0 / resolved 2`，本轮改动文件自身 0 错，不把范围外类型债删出扫描面冒充全绿。
 - 构建：Vite production build 完整转换 3804+ 模块并成功产物；构建前依次抓到并修复 `useAiNoteCapture`、D3 凭证证据、`useMountOnFirstOpen`、`useNoteSaveFlow` 四组父提交断裂。
 - 变异：任务 5 的 M1~M5 全红（两处恢复 `s<600`、删除 409 分支、失败后清 dirty、吞表间审核错误），三条阴性对照全绿；每条变异后 SHA-256 字节恢复。区域 tsc 注入 `number = string` 命中 TS2322，未 OOM。
 - pre-commit：gitleaks、文件行数、UTF-8 全通过。首次因 `formula_push/engine.py` 1048 行超过 998 上限而失败，未跳钩子、未抬白名单，按 12.1 拆模块后通过。
