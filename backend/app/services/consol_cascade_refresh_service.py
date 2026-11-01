@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.consol_context import ConsolContext
 from app.services.consol_context_service import build_consol_context, validate_context
+from app.services.consol_calc_basis import CalcBasis, load_calc_basis
 from app.services.consol_reconciliation_service import (
     ReconciliationResult,
     reconcile_worksheet_vs_trial,
@@ -87,6 +88,8 @@ class CascadeRefreshResult:
     errors: list[dict] = field(default_factory=list)
     duration_ms: int = 0
     reconciliation: ReconciliationResult | None = None
+    report_run_id: UUID | None = None
+    report_row_digest: str | None = None
 
 
 async def _rollback_quietly(db: AsyncSession) -> None:
@@ -122,6 +125,9 @@ async def refresh_all(
     *,
     context: ConsolContext | None = None,
     tree: TreeNode | None = None,
+    operation_revision: int | None = None,
+    triggered_by: UUID | None = None,
+    report_trigger: str = "refresh_all",
 ) -> CascadeRefreshResult:
     """合并链路唯一编排入口（A6/C2，ADR-CONSOL-201）。
 
@@ -144,6 +150,7 @@ async def refresh_all(
     root_node_label: str | None = None
     resolved_tree = tree
     resolved_context = context
+    resolved_basis: CalcBasis | None = None
 
     # ---- 步骤 1：build_tree（基础，统计节点数）-------------------------------
     _emit(progress_cb, STEP_TREE, 1, TOTAL_STEPS, None, "running")
@@ -165,6 +172,11 @@ async def refresh_all(
                 tree=resolved_tree,
             )
         if resolved_tree is not None:
+            resolved_basis = await load_calc_basis(
+                db, parent_project_id, year, tree=resolved_tree,
+            )
+            if resolved_basis is None:
+                raise ValueError(f"企业树计算口径装载失败：项目 {parent_project_id}")
             result.nodes_refreshed = 1 + len(get_descendants(resolved_tree))
             # 进度标签用带角色后缀的展示名（如「某集团（合并）」），旧式节点退回企业代码
             root_node_label = getattr(resolved_tree, "display_name", None) or resolved_tree.company_code
@@ -190,6 +202,7 @@ async def refresh_all(
             year,
             context=resolved_context,
             tree=resolved_tree,
+            basis=resolved_basis,
         )
         result.steps_completed.append(STEP_WORKSHEET)
         _emit(progress_cb, STEP_WORKSHEET, 2, TOTAL_STEPS, root_node_label, "completed")
@@ -209,6 +222,7 @@ async def refresh_all(
             year,
             context=resolved_context,
             tree=resolved_tree,
+            basis=resolved_basis,
         )
         # recalculate_trial 只 flush，统一 commit 一次确保 individual_sum /
         # consol_elimination 落库后 report / notes 读到最新合并数。
@@ -237,13 +251,33 @@ async def refresh_all(
     # ---- 步骤 5：report 生成（下游步，Phase 1 A3 后已 async，需 await；失败记录后继续）----
     _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "running")
     try:
-        await generate_consol_reports_sync(
-            db,
-            parent_project_id,
-            year,
-            context=resolved_context,
-            tree=resolved_tree,
-        )
+        # 正式 operation（context.run_id + revision）写不可变 report run；旧调用保持 legacy 当前槽位行为。
+        if resolved_context is not None and resolved_context.run_id is not None and operation_revision is not None:
+            from app.services.consol_report_run_service import materialize_consol_report_run
+
+            report_run = await materialize_consol_report_run(
+                db,
+                parent_project_id,
+                year,
+                operation_id=resolved_context.run_id,
+                operation_revision=operation_revision,
+                trigger=report_trigger,
+                triggered_by=triggered_by,
+                context=resolved_context,
+                tree=resolved_tree,
+                basis=resolved_basis,
+            )
+            result.report_run_id = report_run.run_id
+            result.report_row_digest = report_run.row_digest
+        else:
+            await generate_consol_reports_sync(
+                db,
+                parent_project_id,
+                year,
+                context=resolved_context,
+                tree=resolved_tree,
+                basis=resolved_basis,
+            )
         # 报表 service 只 flush；worker 使用独立 session，必须在报表步骤成功后提交，
         # 否则 session 退出时会回滚已生成的 financial_report 行。
         await db.commit()
@@ -266,6 +300,7 @@ async def refresh_all(
             year,
             context=resolved_context,
             tree=resolved_tree,
+            basis=resolved_basis,
         )
     except Exception as exc:  # noqa: BLE001 - 下游步，继续
         await _rollback_quietly(db)

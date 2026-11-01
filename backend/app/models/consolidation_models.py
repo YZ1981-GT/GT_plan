@@ -208,6 +208,9 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     origin: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # V172：来源内确定性键（同来源同键只对应一笔未删分录，重复生成按此更新草稿）
     origin_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # V241：工作表自动生成草稿所绑定的来源版本向量摘要。
+    source_version: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    source_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_continuous: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     prior_year_entry_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     review_status: Mapped[ReviewStatusEnum] = mapped_column(

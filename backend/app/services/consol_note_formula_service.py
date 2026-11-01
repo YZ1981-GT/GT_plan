@@ -930,70 +930,19 @@ async def _project_template(db: AsyncSession, project_id: UUID, standard: str | 
     return await resolve_note_template_type(db, project_id, standard)
 
 
-async def _active_formulas_many(
-    db: AsyncSession,
-    template_type: str,
-    section_ids: Sequence[str],
-) -> dict[str, list[ConsolNoteFormula]]:
-    sections = list(dict.fromkeys(section_ids))
-    if not sections:
-        return {}
-    rows = (
-        await db.execute(
-            sa.select(ConsolNoteFormula)
-            .where(
-                ConsolNoteFormula.template_type == template_type,
-                ConsolNoteFormula.section_id.in_(sections),
-                ConsolNoteFormula.is_deleted == sa.false(),
-            )
-            .order_by(
-                ConsolNoteFormula.section_id,
-                ConsolNoteFormula.row_index,
-                ConsolNoteFormula.col_index,
-            )
-        )
-    ).scalars().all()
-    grouped: dict[str, list[ConsolNoteFormula]] = {
-        section: [] for section in sections
-    }
-    for row in rows:
-        grouped.setdefault(row.section_id, []).append(row)
-    return grouped
-
-
 async def _active_formulas(db: AsyncSession, template_type: str, section_id: str) -> list[ConsolNoteFormula]:
-    return (await _active_formulas_many(db, template_type, [section_id]))[section_id]
-
-
-async def section_formulas_many(
-    db: AsyncSession,
-    project_id: UUID,
-    template_type: str,
-    section_ids: Sequence[str],
-) -> dict[str, list[Any]]:
-    """多章节有效公式：全局和项目层各一次查询。"""
-    from app.services.formula_settings.consol_note_settings import (
-        effective_formulas_many,
-    )
-
-    global_by_section = await _active_formulas_many(
-        db,
-        template_type,
-        section_ids,
-    )
-    return await effective_formulas_many(db, project_id, global_by_section)
+    return list((await db.execute(sa.select(ConsolNoteFormula).where(
+        ConsolNoteFormula.template_type == template_type,
+        ConsolNoteFormula.section_id == section_id,
+        ConsolNoteFormula.is_deleted == sa.false(),
+    ).order_by(ConsolNoteFormula.row_index, ConsolNoteFormula.col_index))).scalars().all())
 
 
 async def section_formulas(db: AsyncSession, project_id: UUID, template_type: str, section_id: str) -> list[Any]:
     """某章节的有效单元格公式：全局（模板级）被本项目适配覆盖、本项目停用的剔除。"""
-    return (
-        await section_formulas_many(
-            db,
-            project_id,
-            template_type,
-            [section_id],
-        )
-    )[section_id]
+    from app.services.formula_settings.consol_note_settings import effective_formulas
+
+    return await effective_formulas(db, project_id, section_id, await _active_formulas(db, template_type, section_id))
 
 
 # ─────────────────────────────── 写入来源与公式值快照 ───────────────────────────────
@@ -1450,6 +1399,16 @@ async def fill_by_formula(
         record.is_stale = False
         record.updated_at = now
         record.last_formula_value = formula_values
+    # V243：来源投影
+    from app.services.consol_note_source_projection import compute_source_mode, source_digest, update_source_projection
+
+    mode = compute_source_mode(
+        "formula",
+        manual_cells=manual_set,
+        written_cells={(r, c) for r, c, *_ in summary.get("filled", []) if isinstance(r, int)},
+        previous_source=getattr(record, "source_mode", None),
+    )
+    update_source_projection(record, mode, digest=source_digest(data))
     await db.flush()
     return {
         "project_id": str(project_id),

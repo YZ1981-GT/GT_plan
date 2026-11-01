@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import require_project_access
+from app.deps import check_consol_lock, require_project_access
 from app.core.database import get_db
 from app.models.core import User
 from app.models.consolidation_models import EliminationEntryType, ReviewStatusEnum
@@ -17,6 +17,7 @@ from app.models.consolidation_schemas import (
     EliminationReviewAction,
     EliminationSummary,
     GenerateFromWorksheetRequest,
+    ServerWorksheetGenerationRequest,
     LegacySheetConvertRequest,
 )
 from app.services.elimination_service import (
@@ -80,10 +81,12 @@ async def generate_eliminations_from_worksheet(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
-    """合并工作底稿（模拟权益法 / 内部往来 / 内部交易）计算结果 ⇒ 草稿分录（幂等；已提交审批与已审批的不改）。
-
-    ``dry_run=true`` 只返回映射与将要发生的变化（明细表「待生成」预览），不写库。
-    """
+    """旧版客户端分组预览兼容入口；写入已迁移到服务端版本化接口。"""
+    if not body.dry_run:
+        raise HTTPException(
+            status_code=410,
+            detail="旧版客户端分组写入已停用，请重新打开合并工作底稿后生成草稿",
+        )
     from app.services.consol_elimination_sheet_service import SheetError, generate_from_worksheet
 
     try:
@@ -95,6 +98,68 @@ async def generate_eliminations_from_worksheet(
     if not body.dry_run:
         await db.commit()
     return result.to_dict()
+
+
+@router.post("/worksheet-preview")
+async def preview_eliminations_from_server_worksheets(
+    project_id: UUID,
+    body: ServerWorksheetGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+    _lock=Depends(check_consol_lock),
+):
+    """按服务端当前工作表和期望版本预览，不信任浏览器计算结果。"""
+    from app.services.consol_worksheet_generation_service import (
+        WorksheetGenerationError,
+        preview_generation,
+    )
+    try:
+        return await preview_generation(
+            db, project_id=project_id, year=body.year,
+            source_sheet_keys=body.source_sheet_keys,
+            expected_versions=body.expected_versions,
+        )
+    except WorksheetGenerationError as exc:
+        raise HTTPException(
+            status_code=exc.status,
+            detail={"error_code": exc.code, "message": exc.message, "detail": exc.detail},
+        ) from exc
+
+
+@router.post("/worksheet-generate")
+async def generate_eliminations_from_server_worksheets(
+    project_id: UUID,
+    body: ServerWorksheetGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+    _lock=Depends(check_consol_lock),
+):
+    """锁定并复核工作表版本后，服务端重算 canonical groups 并生成草稿。"""
+    if not body.preview_token:
+        raise HTTPException(status_code=428, detail="缺少预览凭证，请先重新预览")
+    from app.services.consol_worksheet_generation_service import (
+        WorksheetGenerationError,
+        generate_from_server_worksheets,
+    )
+    try:
+        result = await generate_from_server_worksheets(
+            db, project_id=project_id, year=body.year,
+            source_sheet_keys=body.source_sheet_keys,
+            expected_versions=body.expected_versions,
+            preview_token=body.preview_token,
+            user_id=user.id,
+        )
+        await db.commit()
+        return result
+    except WorksheetGenerationError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=exc.status,
+            detail={"error_code": exc.code, "message": exc.message, "detail": exc.detail},
+        ) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
 
 @router.get("/legacy-sheet")

@@ -18,7 +18,6 @@ spec: consol-note-header-library-and-node-reaggregate（R3 / design §8）
 """
 from __future__ import annotations
 
-import copy
 import logging
 from collections import Counter
 from dataclasses import dataclass, field
@@ -49,8 +48,10 @@ from app.services.consol_note_detail_apply_service import (
 from app.services.consol_note_detail_source_service import _row_type
 from app.services.consol_note_formula_service import (
     NoteFormulaError,
+    _copy_note_data_record,
     _first_cell,
     _is_embedded_header_row,
+    _note_data_record,
     _row_to_list,
     consol_note_tables,
     ensure_seeded,
@@ -61,7 +62,7 @@ from app.services.consol_note_formula_service import (
     note_cell_values,
     record_write_source,
     resolve_note_template_type,
-    section_formulas_many,
+    section_formulas,
 )
 from app.services.consol_note_detail_suggest import is_placeholder_label
 from app.services.consol_note_table_totals import TOTAL_ROW_TYPES, build_note_rows, to_decimal
@@ -222,7 +223,6 @@ class _Run:
         self.bound_sections: set[str] = set()
         self.mapping: dict[tuple[str, str], str] = {}
         self.formulas: dict[str, list[Any]] = {}
-        self.records: dict[tuple[str, str | None], ConsolNoteData] = {}
         self.view: Any = None
         self.view_error: str | None = None
         self.measures: dict[str, Any] = {}
@@ -245,24 +245,12 @@ class _Run:
         tt = await resolve_note_template_type(db, project_id, template_type)
         all_sections = [str(t["section_id"]) for t in consol_note_tables(tt)
                         if t.get("section_id") and t.get("enabled", True) is not False]
-        selected_sections = (
-            all_sections
-            if section_ids is None
-            else list(dict.fromkeys(str(s) for s in section_ids))
-        )
-        run = cls(db, project_id, year, tree, node, tt, selected_sections)
-        # 显式空数组表示零工作，不能因 Python falsy 误扩成全部章节。
-        if not run.section_ids:
-            return run
+        run = cls(db, project_id, year, tree, node, tt,
+                  list(dict.fromkeys(str(s) for s in section_ids)) if section_ids else all_sections)
         await run._load_bindings()
         await ensure_seeded(db, tt)
-        run.formulas = await section_formulas_many(
-            db,
-            project_id,
-            tt,
-            run.section_ids,
-        )
-        await run._load_records()
+        for sid in run.section_ids:
+            run.formulas[sid] = await section_formulas(db, project_id, tt, sid)
         if any(run.formulas.values()):
             await run._load_view()
         return run
@@ -287,27 +275,6 @@ class _Run:
             ConsolNoteMappingBinding.status,
         ).where(ConsolNoteMappingBinding.project_id == self.project_id))).all():
             self.mapping[(sid, key)] = status
-
-    async def _load_records(self) -> None:
-        """一次预取所选章节与子树节点记录，后序汇总只读内存工作集。"""
-        node_keys = [node.node_key for node in self.order if node.node_key]
-        rows = (
-            await self.db.execute(
-                sa.select(ConsolNoteData).where(
-                    ConsolNoteData.project_id == self.project_id,
-                    ConsolNoteData.year == self.year,
-                    ConsolNoteData.section_id.in_(self.section_ids),
-                    sa.or_(
-                        ConsolNoteData.node_key.in_(node_keys),
-                        ConsolNoteData.node_key.is_(None),
-                    ),
-                )
-            )
-        ).scalars().all()
-        self.records = {
-            (str(record.section_id), record.node_key): record
-            for record in rows
-        }
 
     async def _load_view(self) -> None:
         """差额与公式值快照共用的合并计算口径；装载失败只让这两步不可用，拉数与汇总照常。"""
@@ -345,8 +312,6 @@ class _Run:
                     if outcome.status == _FAILED or outcome.incomplete:
                         self.incomplete[n.node_key] = n
                     outcomes.append(outcome)
-                # 聚合节点只改内存 ORM；每章节统一 flush，保持章节 SAVEPOINT 原子性。
-                await self.db.flush()
         except Exception as exc:  # noqa: BLE001 —— 意外异常整章节回滚，继续下一章节（ADR-RA-003）
             logger.exception("重新汇总章节失败 project=%s section=%s node=%s", self.project_id, section_id,
                              current.node_key if current else None)
@@ -415,9 +380,7 @@ class _Run:
             return skip(exc.message, pending=exc.code in _PENDING_APPLY_CODES)
         if res.get("status") == "skipped_locked":
             return skip("整节锁定，未覆盖")
-        record = self._exact_record(sid, node.node_key)
-        if record is None:
-            record = await self._refresh_exact_record(sid, node.node_key)
+        record = await self._exact_record(sid, node.node_key)
         await self._snapshot(sid, node, record)
         missing = [e.get("reason") for e in res.get("skipped_entities") or [] if e.get("node_key") == node.node_key]
         return _Outcome(sid, node, ACTION_PULL, _PERSISTED,
@@ -442,8 +405,6 @@ class _Run:
             return _Outcome(sid, node, ACTION_ELIM, _FAILED, str(exc))
         if res.get("status") == "skipped_locked":
             return _Outcome(sid, node, ACTION_ELIM, _SKIPPED, "整节锁定，未覆盖")
-        if self._exact_record(sid, node.node_key) is None:
-            await self._refresh_exact_record(sid, node.node_key)
         return _Outcome(sid, node, ACTION_ELIM, _PERSISTED, detail={
             "filled_count": len(res.get("filled") or []),
             "kept_manual_count": res.get("kept_manual_count", 0),
@@ -479,7 +440,8 @@ class _Run:
             return _Outcome(sid, node, ACTION_AGGREGATE, _SKIPPED,
                             f"下级「{_label(broken[0])}」本章没算出，本节点不汇总", incomplete=True)
         is_root = node is self.tree
-        source = self._source_record(sid, node, allow_legacy=is_root)
+        source = await _note_data_record(self.db, self.project_id, self.year, sid,
+                                         node_key=node.node_key, is_root_consol=is_root)
         if source is not None and getattr(source, "cell_state", "auto") == "locked":
             return skip("整节锁定，未覆盖")
         topn = section_topn_limit(self.template_type, sid)
@@ -495,12 +457,11 @@ class _Run:
             index[(key, seen[key])] = i
             seen[key] += 1
 
-        children = self._records(sid, [c.node_key for c in node.children if c.node_key])
+        children = await self._records(sid, [c.node_key for c in node.children if c.node_key])
         amounts: dict[int, dict[int, Decimal]] = {}
         provenance: list[dict[str, Any]] = []
         unplaced: list[dict[str, Any]] = []
-        consol_table = find_table(self.template_type, sid) or {}
-        headers = list(consol_table.get("headers") or [])
+        headers = list((find_table(self.template_type, sid) or {}).get("headers") or [])
         width = max(len(headers), 2)
         entity_data = False
         for child in node.children:
@@ -538,8 +499,7 @@ class _Run:
             amounts.pop(i, None)
         # 「……」占位行没有下级数、也没有手填值就不写；手工 / 锁定格按行名对到新行号（R15）
         built = build_note_rows(skeleton, amounts, width=width, protected=manual | locked,
-                                existing_rows=existing_rows, placeholders=placeholders,
-                                table=consol_table if headers else None)
+                                existing_rows=existing_rows, placeholders=placeholders)
         new_rows, filled, kept = built.rows, built.filled, built.kept
         lost_protected = remap_protected(data, record, manual, locked, built.old_to_new)
         for i, cells in verbatim.items():
@@ -559,7 +519,18 @@ class _Run:
         record.data = data
         record.is_stale = False
         record.updated_at = now
+        # V243：来源投影
+        from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
+
+        _mode = compute_source_mode(
+            "subtree_aggregate",
+            manual_cells=manual,
+            locked_cells=locked,
+            previous_source=getattr(record, "source_mode", None),
+        )
+        update_source_projection(record, _mode, digest=_sd(data))
         await self._snapshot(sid, node, record)
+        await self.db.flush()
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={
             "filled_count": len(filled),
             "kept_manual_count": len(kept),
@@ -574,7 +545,7 @@ class _Run:
         headers, columns = topn_table(self.template_type, sid)
         if columns is None:
             return _Outcome(sid, node, ACTION_AGGREGATE, _SKIPPED, f"前 {limit} 名表认不出期末余额列，无法重排")
-        children = self._records(sid, [c.node_key for c in node.children if c.node_key])
+        children = await self._records(sid, [c.node_key for c in node.children if c.node_key])
         entries: list[Any] = []
         provenance: list[dict[str, Any]] = []
         for child in node.children:
@@ -612,6 +583,7 @@ class _Run:
         for stale_key in ("_detail_provenance", "_detail_entity_count", "_detail_applied_at"):
             record.data.pop(stale_key, None)
         await self._snapshot(sid, node, record)
+        await self.db.flush()
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={
             "filled_count": sum(1 for row in result.rows for cell in row[1:] if str(cell).strip()),
             "kept_manual_count": len(summary["kept"]), "lost_protected": summary["lost_protected"][:50],
@@ -648,73 +620,31 @@ class _Run:
 
     # ── 记录读写 ──
 
-    def _records(self, sid: str, node_keys: list[str]) -> dict[str, ConsolNoteData]:
-        return {
-            key: record
-            for key in node_keys
-            if (record := self.records.get((sid, key))) is not None
-        }
+    async def _records(self, sid: str, node_keys: list[str]) -> dict[str, ConsolNoteData]:
+        if not node_keys:
+            return {}
+        rows = (await self.db.execute(sa.select(ConsolNoteData).where(
+            ConsolNoteData.project_id == self.project_id,
+            ConsolNoteData.year == self.year,
+            ConsolNoteData.section_id == sid,
+            ConsolNoteData.node_key.in_(node_keys),
+        ))).scalars().all()
+        return {r.node_key: r for r in rows}
 
-    def _exact_record(self, sid: str, node_key: str) -> ConsolNoteData | None:
-        return self.records.get((sid, node_key))
-
-    def _source_record(
-        self,
-        sid: str,
-        node: TreeNode,
-        *,
-        allow_legacy: bool,
-    ) -> ConsolNoteData | None:
-        exact = self._exact_record(sid, node.node_key)
-        if exact is not None or not allow_legacy:
-            return exact
-        return self.records.get((sid, None))
-
-    async def _refresh_exact_record(
-        self,
-        sid: str,
-        node_key: str,
-    ) -> ConsolNoteData | None:
-        """叶子/差额 helper 新建记录后只补读该行；后续父节点仍走内存。"""
-        record = (
-            await self.db.execute(
-                sa.select(ConsolNoteData).where(
-                    ConsolNoteData.project_id == self.project_id,
-                    ConsolNoteData.year == self.year,
-                    ConsolNoteData.section_id == sid,
-                    ConsolNoteData.node_key == node_key,
-                )
-            )
-        ).scalar_one_or_none()
-        if record is not None:
-            self.records[(sid, node_key)] = record
-        return record
+    async def _exact_record(self, sid: str, node_key: str) -> ConsolNoteData | None:
+        return (await self._records(sid, [node_key])).get(node_key)
 
     async def _writable_record(self, sid: str, node: TreeNode, source: ConsolNoteData | None) -> ConsolNoteData:
         """写入目标永远是节点专属行；根节点只有项目级兼容行时先复制（保住其中的手工格）。"""
         if source is not None and source.node_key == node.node_key:
             return source
         if source is not None:
-            record = ConsolNoteData(
-                project_id=self.project_id,
-                year=self.year,
-                section_id=sid,
-                node_key=node.node_key,
-                data=(
-                    copy.deepcopy(source.data)
-                    if isinstance(source.data, dict)
-                    else {}
-                ),
-                is_stale=bool(source.is_stale),
-                updated_at=datetime.now(timezone.utc),
-            )
-            self.db.add(record)
-            self.records[(sid, node.node_key)] = record
-            return record
+            return await _copy_note_data_record(self.db, source, project_id=self.project_id, year=self.year,
+                                                section_id=sid, node_key=node.node_key)
         record = ConsolNoteData(project_id=self.project_id, year=self.year, section_id=sid,
                                 node_key=node.node_key, data={}, is_stale=False)
         self.db.add(record)
-        self.records[(sid, node.node_key)] = record
+        await self.db.flush()
         return record
 
     async def _snapshot(self, sid: str, node: TreeNode, record: ConsolNoteData | None) -> None:

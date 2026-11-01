@@ -1,4 +1,4 @@
-"""ConsolNoteData ORM 模型 — 合并附注用户数据存储
+﻿"""ConsolNoteData ORM 模型 — 合并附注用户数据存储
 
 三层一致：V041 迁移（+ V172 is_stale + V182 cell_state）+ 本 ORM + routers/consol_note_sections.py service
 """
@@ -45,6 +45,11 @@ class ConsolNoteData(Base):
     last_formula_run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     # V182：最近一次公式刷新写入的值快照（用于对比 current vs formula）
     last_formula_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V247：来源投影（整章级快速分类，格级所有权仍以 data 内嵌字段为准）
+    source_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    source_operation_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    source_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

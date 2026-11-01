@@ -191,6 +191,34 @@ class CalcBasis:
     leaf_tb_codes: dict[str, set[str]] = field(default_factory=dict)
 
 
+class CalcBasisBoundaryError(ValueError):
+    """调用方注入的计算口径与目标项目、年度或企业树不一致。"""
+
+
+def validate_calc_basis(
+    basis: CalcBasis,
+    project_id: UUID,
+    year: int,
+    *,
+    tree: TreeNode | None = None,
+) -> None:
+    """验证外部复用的 ``CalcBasis`` 没有越过本次计算边界。
+
+    ``CalcBasis`` 自带装载时使用的企业树和年度。编排器可在同一轮的多个阶段复用它，
+    但不得把一个 target 的口径传给另一个 target，也不得配上另一棵树或另一个年度。
+    """
+    if basis.year != year:
+        raise CalcBasisBoundaryError("合并计算口径年度与计算目标不一致")
+    basis_project_id = getattr(basis.tree, "project_id", None)
+    if basis_project_id != project_id:
+        raise CalcBasisBoundaryError("合并计算口径项目与计算目标不一致")
+    if tree is not None:
+        from app.services.consol_context_service import tree_fingerprint
+
+        if tree_fingerprint(basis.tree) != tree_fingerprint(tree):
+            raise CalcBasisBoundaryError("合并计算口径树指纹与当前企业树不一致")
+
+
 class EntryDataError(ValueError):
     """分录明细行无法识别（格式或金额错误）：该分录按孤儿处理，列出原因，不计入。"""
 
@@ -995,6 +1023,7 @@ __all__ = [
     "MEASURE_ELIM_TRADE",
     "MEASURE_INDIVIDUAL",
     "CalcBasis",
+    "CalcBasisBoundaryError",
     "ElimTotals",
     "EntryDataError",
     "EntryLine",
@@ -1034,5 +1063,6 @@ __all__ = [
     "suggest_branch_entity",
     "to_cents",
     "trial_amounts",
+    "validate_calc_basis",
     "worksheet_rows",
 ]

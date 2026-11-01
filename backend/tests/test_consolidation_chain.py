@@ -539,11 +539,12 @@ class TestConsolidationChain:
         # 5b. 查询合并资产负债表
         bs_resp = client.get(
             f"/api/consolidation/reports/{state.project_id}/{AUDIT_YEAR}",
-            params={"report_type": "balance_sheet"},
+            params={"report_type": "balance_sheet", "mode": "preview"},
         )
         if bs_resp.status_code == 200:
             bs_data = _safe_json(bs_resp)
-            rows = bs_data if isinstance(bs_data, list) else (bs_data.get("data", []) if isinstance(bs_data, dict) else [])
+            payload = bs_data.get("data", bs_data) if isinstance(bs_data, dict) else bs_data
+            rows = payload.get("rows", []) if isinstance(payload, dict) else (payload if isinstance(payload, list) else [])
             logger.info("合并资产负债表: %d 行", len(rows) if isinstance(rows, list) else 0)
         elif bs_resp.status_code == 404:
             logger.info("合并资产负债表尚未生成（404）")
@@ -553,11 +554,12 @@ class TestConsolidationChain:
         # 5c. 查询合并利润表
         is_resp = client.get(
             f"/api/consolidation/reports/{state.project_id}/{AUDIT_YEAR}",
-            params={"report_type": "income_statement"},
+            params={"report_type": "income_statement", "mode": "preview"},
         )
         if is_resp.status_code == 200:
             is_data = _safe_json(is_resp)
-            rows = is_data if isinstance(is_data, list) else (is_data.get("data", []) if isinstance(is_data, dict) else [])
+            payload = is_data.get("data", is_data) if isinstance(is_data, dict) else is_data
+            rows = payload.get("rows", []) if isinstance(payload, dict) else (payload if isinstance(payload, list) else [])
             logger.info("合并利润表: %d 行", len(rows) if isinstance(rows, list) else 0)
         elif is_resp.status_code == 404:
             logger.info("合并利润表尚未生成（404）")

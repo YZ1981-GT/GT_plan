@@ -66,6 +66,8 @@ export interface OpenFormulaManagerPayload {
   /** 附注公式入口的当前章节编号与标题。 */
   noteSection?: string
   noteSectionTitle?: string
+  /** 报表/试算入口当前选中的报表类型，用于公式中心定位对应节点。 */
+  initialReportType?: string
   /** 统一公式管理入口的上下文类型与 canonical session。 */
   contextKind?: 'workpaper' | 'scope'
   canonicalLocation?: CanonicalWorkpaperLocation

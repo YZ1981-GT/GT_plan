@@ -365,10 +365,10 @@ class TestPush:
 
         a_id, g_id = group["A"].id, group["G"].id
 
-        async def flaky(session, project_id, year):
+        async def flaky(session, project_id, year, **kwargs):
             if project_id == a_id:
                 raise RuntimeError("试算写入冲突")
-            return await real(session, project_id, year)
+            return await real(session, project_id, year, **kwargs)
 
         with patch("app.services.consol_trial_service.recalculate_trial", new=flaky), \
              patch("app.services.event_bus.event_bus.broadcast_raw") as sse:
@@ -492,15 +492,18 @@ class TestEndpoints:
                 base = (await c.post("/api/consolidation/reports/generate", params={"project_id": gid},
                                      json={"project_id": gid, "year": Y, "applicable_standard": "CAS"})).json()
                 assert base["applicable_standard"] == "soe_consolidated" and "不是合并口径" in base["standard_note"]
-                assert base["blank_counts"] == {"income_statement": 1, "cash_flow_supplement": 1}
-                before = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
-                                      params={"report_type": "balance_sheet"})).json()
+                assert base["operation_id"] and base["status"] == "queued"
+                before_env = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                          params={"report_type": "balance_sheet", "mode": "preview"})).json()
+                assert before_env["published"] is False and before_env["download_allowed"] is False
+                before = before_env["rows"]
                 before_ar = next(r for r in before if r["row_code"] == "BS-006")["current_period_amount"]
                 eid = (await c.post(f"/api/consolidation/eliminations?project_id={gid}", json=_payload(group["G"]))).json()["id"]
                 resp = await c.post(f"/api/consolidation/eliminations/{eid}/review?project_id={gid}", json={"action": "approve"})
                 assert resp.status_code == 200 and resp.json()["review_status"] == "approved"
                 await handle_elimination_approved(published[-1])
-                after = (await c.get(f"/api/consolidation/reports/{gid}/{Y}", params={"report_type": "balance_sheet"})).json()
+                after = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                     params={"report_type": "balance_sheet", "mode": "preview"})).json()["rows"]
                 assert D(next(r for r in after if r["row_code"] == "BS-006")["current_period_amount"]) == D(before_ar) - 50
 
                 project = await db.get(Project, group["G"].id)
@@ -515,7 +518,8 @@ class TestEndpoints:
                 assert revoked.status_code == 200 and revoked.json()["review_status"] == "draft"
                 assert published[-1].event_type.value == "elimination.revoked"
                 await handle_elimination_revoked(published[-1])
-                back = (await c.get(f"/api/consolidation/reports/{gid}/{Y}", params={"report_type": "balance_sheet"})).json()
+                back = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                    params={"report_type": "balance_sheet", "mode": "preview"})).json()["rows"]
                 assert next(r for r in back if r["row_code"] == "BS-006")["current_period_amount"] == before_ar
                 again = await c.post(f"/api/consolidation/eliminations/{eid}/review?project_id={gid}", json={"action": "revoke"})
                 assert again.status_code == 400 and "只有已审批" in again.json()["detail"]
@@ -656,16 +660,23 @@ class TestPriorPeriod:
         await _prior_year_data(db)
         gid = str(group["G"].id)
         async with client_for(_User(UserRole.admin)) as c:
-            rows = (await c.get(f"/api/consolidation/reports/{gid}/{Y}", params={"report_type": "balance_sheet"})).json()
+            rows = (await c.get(
+                f"/api/consolidation/reports/{gid}/{Y}",
+                params={"report_type": "balance_sheet", "mode": "preview"},
+            )).json()["rows"]
             by = {r["row_code"]: r for r in rows}
             assert D(by["BS-002"]["current_period_amount"]) == D("1400")
             assert D(by["BS-002"]["prior_period_amount"]) == D("777") and by["BS-002"]["prior_blank_reason"] is None
-            sub = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
-                               params={"report_type": "balance_sheet", "node_key": "A:consol"})).json()
+            sub = (await c.get(
+                f"/api/consolidation/reports/{gid}/{Y}",
+                params={"report_type": "balance_sheet", "node_key": "A:consol", "mode": "preview"},
+            )).json()["rows"]
             assert sub and all(r["prior_period_amount"] is None for r in sub)
             assert all("上年企业树没有节点" in r["prior_blank_reason"] for r in sub)
-            a_rows = (await c.get(f"/api/consolidation/reports/{group['A'].id}/{Y}",
-                                  params={"report_type": "balance_sheet"})).json()
+            a_rows = (await c.get(
+                f"/api/consolidation/reports/{group['A'].id}/{Y}",
+                params={"report_type": "balance_sheet", "mode": "preview"},
+            )).json()["rows"]
             assert a_rows and all("没有上年项目" in r["prior_blank_reason"] for r in a_rows)
 
 

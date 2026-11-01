@@ -42,6 +42,7 @@ from app.services.consol_calc_basis import (
     records_from_entries,
     load_tree_entries,
     to_cents,
+    validate_calc_basis,
 )
 from app.services.consol_group_tree import KIND_AGGREGATE, KIND_DATA, KIND_ELIM
 from app.services.consol_report_values import (
@@ -394,6 +395,7 @@ async def load_view_context(
     *,
     context: "ConsolContext | None" = None,
     tree: TreeNode | None = None,
+    basis: CalcBasis | None = None,
     include_drafts: bool = False,
 ) -> ViewContext | None:
     """合并项目的计算口径 + 报表配置（按项目口径）；项目不存在或不是合并项目返回 None。
@@ -405,8 +407,8 @@ async def load_view_context(
     from app.services.consol_context_service import validate_context
     from app.services.consol_group_tree import ROLE_CONSOL, build_group_tree
 
-    resolved_tree = tree
-    resolved_year = year
+    resolved_tree = tree if tree is not None else (basis.tree if basis is not None else None)
+    resolved_year = year if year is not None else (basis.year if basis is not None else None)
     if resolved_tree is None:
         result = await build_group_tree(db, project_id)
         if result is None or result.root is None or result.root.role != ROLE_CONSOL:
@@ -420,16 +422,30 @@ async def load_view_context(
     if resolved_year is None:
         return None
     validate_context(context, project_id, resolved_year, tree=resolved_tree)
+    if basis is not None:
+        validate_calc_basis(basis, project_id, resolved_year, tree=resolved_tree)
+
     draft_basis = None
     if include_drafts:
-        basis, draft_basis = await load_calc_basis_pair(db, project_id, resolved_year, tree=resolved_tree)
+        if basis is None:
+            resolved_basis, draft_basis = await load_calc_basis_pair(
+                db, project_id, resolved_year, tree=resolved_tree,
+            )
+        else:
+            resolved_basis = basis
+            draft_basis = await load_calc_basis(
+                db, project_id, resolved_year, tree=resolved_tree, include_drafts=True,
+            )
     else:
-        basis = await load_calc_basis(db, project_id, resolved_year, tree=resolved_tree)
-    if basis is None:
+        resolved_basis = basis
+        if resolved_basis is None:
+            resolved_basis = await load_calc_basis(db, project_id, resolved_year, tree=resolved_tree)
+    if resolved_basis is None:
         return None
+    validate_calc_basis(resolved_basis, project_id, resolved_year, tree=resolved_tree)
     standard = await resolve_consol_standard(db, project_id)
     return ViewContext(
-        basis=basis,
+        basis=resolved_basis,
         rows=await load_report_rows(db, standard),
         standard=standard,
         year=resolved_year,

@@ -270,6 +270,19 @@ class GenerateFromWorksheetRequest(BaseModel):
     dry_run: bool = False
 
 
+class ServerWorksheetGenerationRequest(BaseModel):
+    """服务端按已保存工作表生成草稿；客户端不再上传计算后的 groups。"""
+
+    year: int
+    source_sheet_keys: list[Literal["equity_sim", "internal_arap", "internal_trade"]] = Field(
+        default_factory=lambda: ["equity_sim", "internal_arap", "internal_trade"],
+        min_length=1,
+        max_length=3,
+    )
+    expected_versions: dict[str, int] = Field(default_factory=dict)
+    preview_token: str | None = Field(default=None, max_length=4096)
+
+
 class LegacySheetConvertRequest(BaseModel):
     """旧版明细表自定义行转为草稿分录（需求 1.6）。旧版行没有分录类型：不传按「其他调整」转入，审批前确认。"""
     year: int

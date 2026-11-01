@@ -167,22 +167,10 @@ class TestSeedRules:
             (1, 1): "TB('1606','期末余额')",                                # 毛额行 ⇒ 账面余额
         }
 
-    def test_forward_report_row_is_expanded_by_topological_order(self):
-        """ADR-ISL-01：引用排在后面的行不再算「展开不到科目」；拓扑序先展开 BS-099，再展开 BS-028。"""
+    def test_unexpandable_report_row_skips_measure_columns(self):
+        """报表行公式展开不到科目（引用排在后面的行）⇒ 分不出净额 / 毛额：分组表不种并说明，纯期间列照种。"""
         rows = [ReportRow("balance_sheet", "BS-028", "固定资产", 1, "ROW('BS-099')"),
                 ReportRow("balance_sheet", "BS-099", "x", 2, "TB('1601','期末余额')")]
-        table = {**_BOOK, "section_id": "五-2-1", "parent_section": "固定资产", "title": "固定资产",
-                 "rows": [["合  计"] + [""] * 6]}
-        plan = plan_seed("soe", [table], [], rows)
-        assert [(c.row_index, c.col_index, c.formula) for c in plan.cells] == [(0, 1, "REPORT('BS-028')")]
-        assert plan.skipped == []
-        flat = {**table, "multi_header": None, "headers": ["项  目", "期末余额", "期初余额"], "rows": [["合  计", "", ""]]}
-        assert [(c.row_index, c.col_index) for c in plan_seed("soe", [flat], [], rows).cells] == [(0, 1)]
-
-    def test_cyclic_report_row_still_skips_measure_columns(self):
-        """真正的循环引用仍展开失败：分组表不种并说明，纯期间列照种。"""
-        rows = [ReportRow("balance_sheet", "BS-028", "固定资产", 1, "ROW('BS-099')"),
-                ReportRow("balance_sheet", "BS-099", "x", 2, "ROW('BS-028')")]
         table = {**_BOOK, "section_id": "五-2-1", "parent_section": "固定资产", "title": "固定资产",
                  "rows": [["合  计"] + [""] * 6]}
         plan = plan_seed("soe", [table], [], rows)
@@ -482,8 +470,10 @@ class TestEndpoints:
             bd = await c.get(f"{_NS}/breakdown/{gid}/{Y}/五-1-1")
             assert bd.status_code == 200, bd.text
             cells = {(x["row_index"], x["col_index"]): x for x in bd.json()["cells"]}
-            report = {r["row_code"]: r for r in (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
-                                                              params={"report_type": "balance_sheet"})).json()}
+            report = {r["row_code"]: r for r in (await c.get(
+                f"/api/consolidation/reports/{gid}/{Y}",
+                params={"report_type": "balance_sheet", "mode": "preview"},
+            )).json()["rows"]}
             assert D(cells[(4, 1)]["consolidated"]) == D(report["BS-002"]["current_period_amount"]), "与合并报表同一求值"
             ar = cells[(5, 1)]
             assert (ar["individual"], ar["elimination"], ar["consolidated"]) == ("400.00", "-57.00", "343.00")
