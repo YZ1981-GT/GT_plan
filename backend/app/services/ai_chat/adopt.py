@@ -666,6 +666,7 @@ async def _write_content_log(
                 else str((source.context_manifest or {}).get("task_code") or "chat.general")
             ),
             context_manifest=source.context_manifest,
+            via_adopt=True,
         )
         log_id = ai_log.id
         if ai_log.confirm_action != "pending" or ai_log.writeback_status not in {"pending", "stale"}:

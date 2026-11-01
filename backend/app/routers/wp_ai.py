@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_audit_year, require_wp_edit_permission
 from app.models.core import User
+from app.services.ai_task_executor import actor_role
 from app.services.wp_ai_service import WpAIService
 
 logger = logging.getLogger(__name__)
@@ -65,13 +66,13 @@ async def suggest_fill(
         raise HTTPException(status_code=404, detail="底稿不存在")
 
     # 调用 AI service（stub 模式下返回模板建议）
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     result = await svc.suggest_field_content(
         wp_id=wp_id,
         sheet_name=body.sheet_name,
         field_name=body.field_name,
         existing_content=body.existing_content,
-        role=str(getattr(user.role, "value", user.role)),
+        role=actor_role(user),
     )
 
     # 截断到 2000 字符
@@ -116,12 +117,12 @@ async def analytical_review(
         from fastapi import HTTPException
         raise HTTPException(404, "底稿不存在")
     year = await require_project_audit_year(db, wp.project_id, year)
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     return await svc.analytical_review(
         wp.project_id,
         account_code,
         year,
-        role=str(getattr(user.role, "value", user.role)),
+        role=actor_role(user),
     )
 
 
@@ -140,7 +141,7 @@ async def extract_confirmations(
         from fastapi import HTTPException
         raise HTTPException(404, "底稿不存在")
     year = await require_project_audit_year(db, wp.project_id, year)
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     return await svc.extract_confirmations(wp.project_id, account_code, year)
 
 
@@ -158,7 +159,7 @@ async def check_consistency(
         from fastapi import HTTPException
         raise HTTPException(404, "底稿不存在")
     year = await require_project_audit_year(db, wp.project_id, year)
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     return await svc.check_wp_report_consistency(wp.project_id, year)
 
 
@@ -203,7 +204,7 @@ async def ai_audit_conclusion(
         raise HTTPException(404, "底稿不存在")
     wp, wp_index = res
     ctx = payload.context or {}
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     out = await svc.generate_audit_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
@@ -241,7 +242,7 @@ async def ai_variance_analysis(
         raise HTTPException(404, "底稿不存在")
     wp, wp_index = res
     ctx = payload.context or {}
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     out = await svc.generate_variance_analysis(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
@@ -279,7 +280,7 @@ async def ai_check_conclusion(
     items = ctx.get("items") or []
     passed = sum(1 for i in items if (i or {}).get("verified"))
     total = len(items)
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     out = await svc.generate_check_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
@@ -317,7 +318,7 @@ async def ai_cutoff_conclusion(
     ctx = payload.context or {}
     items = ctx.get("items") or []
     issues = sum(1 for i in items if (i or {}).get("period_correct") is False)
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     out = await svc.generate_cutoff_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
@@ -370,7 +371,7 @@ async def ai_review_questions(
     if not res:
         raise HTTPException(404, "底稿不存在")
     wp, wp_index = res
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     # 复用 audit_conclusion prompt 的 LLM 调用基础设施
     base = await svc.generate_audit_conclusion(
         project_id=wp.project_id,
@@ -422,7 +423,7 @@ async def ai_review_reply(
     if not res:
         raise HTTPException(404, "底稿不存在")
     wp, wp_index = res
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     # 复用 variance_analysis prompt 来生成回复
     base = await svc.generate_variance_analysis(
         project_id=wp.project_id,

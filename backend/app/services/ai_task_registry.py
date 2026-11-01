@@ -25,11 +25,20 @@ class AiTrustZone(str, Enum):
     restricted = "restricted"
 
 
+#: 首批 Prompt 的批准记录；后续版本须写明批准人与适用范围（ADR-LLM-017）
+_BASELINE_APPROVAL = "用户 2026-11-01 批准 spec llm-linkage-audit-practice-closure"
+
+
 @dataclass(frozen=True)
 class PromptVersion:
+    """已发布 Prompt 版本。正文哈希锁在 ``backend/data/ai_prompt_version_lock.json``：
+    已发布版本只能追加新版本号，不能原地修改（``scripts/check/check_ai_prompt_versions.py``）。"""
+
     prompt_id: str
     version: str
     content: str
+    approved_by: str = _BASELINE_APPROVAL
+    applies_to: str = "全部准则 / 全部行业"
 
     @property
     def sha256(self) -> str:
@@ -165,12 +174,22 @@ def _task(
     writeback: str = "pending_only",
     context: str = "host_and_authorized_knowledge",
     tokens: int = 1500,
+    actions: FrozenSet[str] | None = None,
 ) -> AiTaskSpec:
     versions = PROMPT_VERSIONS[prompt]
+    if actions is None:
+        # 动作按输出语义派生（ADR-LLM-008）：复核类只读挑战；只展示不写回的低风险任务是 ask；
+        # 其余形成待确认草稿。adopt/agent 不由任务本身授予。
+        if output == "review_findings":
+            actions = frozenset({"review"})
+        elif writeback == "none" and risk is AiTaskRisk.low:
+            actions = frozenset({"ask"})
+        else:
+            actions = frozenset({"draft"})
     return AiTaskSpec(
         task_code=code,
         risk_class=risk,
-        allowed_actions=frozenset({"ask" if risk is AiTaskRisk.low else "draft"}),
+        allowed_actions=actions,
         allowed_roles=roles,
         allowed_trust_zones=zones,
         mask_policy="strict" if AiTrustZone.approved_provider in zones else "role_based",
@@ -180,7 +199,8 @@ def _task(
         output_schema=output,
         verifier_id=verifier,
         writeback_policy=writeback,
-        timeout_seconds=90,
+        # 外层任务超时按输出上限放宽：本机模型约 10 token/s，另留 60 秒排队与首 token。
+        timeout_seconds=max(90, tokens // 10 + 60),
         max_output_tokens=tokens,
     )
 
@@ -224,6 +244,7 @@ AI_TASK_SPECS: dict[str, AiTaskSpec] = {
     "project.status_summary": _task(
         "project.status_summary", risk=AiTaskRisk.high, roles=_REVIEW_ROLES,
         zones=_LOCAL_OR_FIRM, prompt="project.status_summary", writeback="none", tokens=600,
+        actions=frozenset({"review"}),
     ),
     "workpaper.subject_conclusion_advice": _task(
         "workpaper.subject_conclusion_advice", risk=AiTaskRisk.high, roles=_DRAFT_ROLES,
@@ -282,6 +303,16 @@ def validate_registry() -> None:
             raise RuntimeError(f"Prompt 正文为空：{spec.prompt_id}@{spec.prompt_version}")
         if spec.risk_class is AiTaskRisk.prohibited and spec.writeback_policy != "none":
             raise RuntimeError(f"禁止任务不能配置写回：{code}")
+        if not spec.allowed_actions or not spec.allowed_actions <= {"ask", "draft", "review"}:
+            raise RuntimeError(f"任务动作只能取 ask/draft/review：{code}")
+    for prompt_id, versions in PROMPT_VERSIONS.items():
+        seen: set[str] = set()
+        for item in versions:
+            if item.prompt_id != prompt_id or item.version in seen:
+                raise RuntimeError(f"Prompt 版本登记错误：{prompt_id}@{item.version}")
+            if not item.approved_by.strip() or not item.applies_to.strip():
+                raise RuntimeError(f"Prompt 缺批准人或适用范围：{prompt_id}@{item.version}")
+            seen.add(item.version)
 
 
 validate_registry()

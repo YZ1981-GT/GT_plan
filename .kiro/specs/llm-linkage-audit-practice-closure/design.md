@@ -200,3 +200,79 @@ MCP budget/revocation、批任务锁/进度迁 Redis/DB。候选冷却可继续�
 ## 10. 实施边界与并发保护
 
 当前主工作树有其他会话的大量未提交改动，且重叠 `DisclosureEditor.vue`、`DshPanel.vue`。本 spec 按文件/代码块登记归属，优先改不重叠模块；重叠文件只做最小定点编辑。每批结束在“最新 HEAD + 本批改动”的临时分离头 worktree 验证，不覆盖他人工作区内容。
+
+## 11. 收尾补缺与复盘（2026-11-01）
+
+### 11.1 交付形态
+
+第一批代码（任务 1~15 主体、V236~V239）随并发会话的提交 `a6c1fa93a` 入库并推送，该提交说明是平台性能改动、未打版本标签。收尾补缺单独一个提交，用版本工具推送。任务状态口径见 tasks.md 头部：代码已改但浏览器 / 真实 PG / Redis / 模型未实测的一律 `[ ]*`。
+
+### 11.2 收尾复核抓到的缺口（均已修复并配反向用例）
+
+| # | 缺口 | 修复 |
+|---|---|---|
+| 1 | 签字门禁 `gate_rules_ai_content` 与可用动作 `allowed_actions_service` 读 AI 待确认状态出错时分别 `return None`、“降级放行” | 状态未知即阻断（`AI_CONTENT_STATE_UNKNOWN` / `AI_STATE_UNKNOWN`），只读查询放保存点，失败不污染调用方事务 |
+| 2 | `AiTaskSpec` 的动作、超时、写回策略三个字段没有读取方 | 执行器校验动作并按任务超时（按输出上限放宽）；草稿入口按写回策略拒绝复核输出变正文、只供参考的任务须经对话“采纳”；context recipe 与 output schema 记入 envelope |
+| 3 | Prompt“append-only”只校验版本号不重复，原地改已发布正文无人发现 | 正文哈希锁 + `check_ai_prompt_versions.py`，Prompt 带批准人与适用范围 |
+| 4 | 验证器按字符串比数字（1,000.00 与 1000 不同）、参照文档里的数字也算来源、不核对日期与主体 | Decimal 规范化；日期整体识别（资料年度的年末可推导）；主体核对；事实类叙述只认事实包与派生变动额 / 变动率 |
+| 5 | 变动分析请求里的 `current_data` / `prior_data` 被静默忽略 | 非空即 422，提示事实由服务端加载 |
+| 6 | 单次附注生成没有 `generation_id` | 消息、草稿与回执同一身份 |
+| 7 | `/api/ai-chat/metrics` 零鉴权，经网关 `/api/` 对外可达 | 仅 admin；根路径 `/metrics` 不经网关（网关只代理 `/api/`），留给内网 Prometheus |
+| 8 | 调用债务棘轮不查已偿还条目，删掉的旧调用可原样加回 | 基线须与现算相等，`--shrink` 只减不增 |
+| 9 | 复核疑点只能跳到表 | `表名!C8` / `C8` 经 `workpaper:locate-cell` 定位到格 |
+| 10 | 改写选区含未保存修改时仍调用模型、生成注定 stale 的草稿 | 调用模型前与已保存正文对账；续写记录 `matches_saved` 并提示 |
+| 11 | 前端附注 AI 返回类型缺 `artifact_id`（单区域 vue-tsc 报 4 处 TS2339） | 补齐 DraftArtifact 身份字段类型 |
+| 12 | 两处 `local_only is True` 断言、批量复核同步端点用例与现行实现不符 | 改为现行为断言；批量复核用例改为耐久任务契约（请求内不调模型、同幂等键重发得同一任务与 generation_id） |
+| 13 | 角色 / 动作漏传即放行：`role=None` 跳过角色门禁，`action=None` 跳过动作门禁，而周报、项目摘要、底稿结论建议三条链路本来就没传角色 | 缺角色 / 缺动作一律 `rejected`（`ai_role_missing` / `ai_action_denied`）；`actor_role()` 统一取角色并贯通 `role_ai_features`、`WpAIService`（构造带角色）与 4 个路由；守卫按 AST 要求 13 个生产调用点都显式声明 |
+
+另补：估算成本指标（单价 `GT_AI_TOKEN_UNIT_COST`，未配置时记 0）、可复现 envelope、复核面板角色集合与任务声明逐值一致的守卫、金标 12 条与真实模型 canary 脚本。
+
+### 11.3 验证
+
+环境：PG 5432 / Redis 6379 / 后端 9980 / 前端 3030 全部不可达，Docker 未运行 ⇒ 真实 PG、Redis、浏览器与真实模型一项都没跑，相关任务一律 `[ ]*`。
+
+| 项 | 结果 |
+|---|---|
+| 本 spec 聚焦后端用例（39 文件） | 372 passed / 2 failed —— 两条是 `jsonpath_ng` 未安装的 AL-01，spec 前基线同红 |
+| 前端用例（9 文件） | 69 passed / 1 failed —— `useNoteTemplate.loadNoteMappingPreset`，用 HEAD 版同一文件复跑同红 |
+| 单区域 `vue-tsc` | 0 error；变异证明：`findingLocation.ts` 与 `AiReviewPanel.vue` 各注入一处类型错误后分别报 TS2322，`finally` 逐字节还原 |
+| 行数门禁 | 改动的 56 个代码文件通过；`test_task6_native_engine.py` 以真实行数 1720 首次登记白名单（HEAD 即已超限且从未登记） |
+| Prompt 哈希锁 | `check_ai_prompt_versions.py --check` 12/12 一致；改已发布正文即 exit 2（`compare` 的 changed/removed 用例覆盖） |
+| 调用债务棘轮 | `check_ai_task_call_coverage.py` direct 132/132、prompt 43/43，新增「基线含已偿还条目即红」 |
+| 真实模型 canary | `ai_live_canary.py --dry-run` 通过（6 条 live 用例任务均已登记）；真实模型未跑 |
+
+三方归因（spec 前基线 `53a1a4b83` / HEAD `a6c1fa93a` / 候选树，20 个相关文件 823 用例）：候选树 29 条「spec 前绿 → 现红」中 **26 条经定位是本 spec 第一批真实造成的**，已逐条修完：
+
+- 模型配置 CRUD 改为同事务写哈希链审计（任务 8）⇒ 三份 SQLite 夹具只建了 `ai_model_config`，补建 `audit_log_entries`（20 条）；
+- 远程 OCR 候选新增信任域三字段 ⇒ 替身补字段（4 条）；
+- 本机不可用提示改为点明实际兜底去向 ⇒ 断言按新文案（1 条）；
+- `/api/review-prompts/metrics` 收紧为仅管理员 ⇒ 用例改为「覆盖率登录即可、指标 403、admin 200」（1 条）。
+
+另有 3 条经 `git diff` 定位到同一提交里**其他 spec** 的改动（`require_project_access_stream` 的 SSE 鉴权 1 条、知识库上传改分块 `read(size)` 2 条），记入 §11.4 未代修。
+
+交付形态：收尾期间远端又前移 21 个提交（至 `4390aaaa3` / v1.0.89）。本批改动按「每文件的真实编辑基线」重放到远端头的分离头 worktree（62 个文件，与远端新提交重叠仅 2 个，按 LF 归一后三方合并，`role_ai_features.py` 自动合并、行数白名单两侧都在尾部追加故手工并存），候选树上重跑回归。
+
+🔴 重放后发现远端头**干净检出就起不来**：`adjustment_import.py` 用了 `require_project_permission` 却没导入它 ⇒ `import app.main` 直接 `NameError`，凡经生产注册发请求的用例全部 collection error（CI 的 `pytest -x` 会停在这里）。属调整大厅那一侧的遗漏，但它挡住本批验证与 CI，故在本次提交里补上这一行导入并在此记录。
+
+最终口径以「候选树 vs 干净远端头（同样只补那一行导入）」逐节点对比为准（62 个文件、约 1250 用例）：远端头 111 red → 候选树 60 red，**新增失败 0，修复 51**。修复的 51 条分三类：
+
+1. 本 spec 第一批打红的 12 条 —— 附注 AI 的桩打在已不再走的 `llm_client.chat_completion` 上、信任域字段缺失、兜底文案、指标收紧、`local_only` 声明、底稿字段建议未取角色；
+2. 远端 `audit-log-chain-integrity` 把哈希链头拆成独立表 `audit_chain_head` 后，只建 `audit_log_entries` 的 SQLite 夹具全红（模型配置三份 + `test_ai_content_gate_rule` + 本 spec 的 `test_draft_artifact_facade`），一并补齐建表；
+3. 上面那行缺失的导入 —— 它让所有经生产注册发请求的用例在 collection 阶段就错。
+
+剩余 60 条全部在远端头同样红：PG / Redis 不可达（`WinError 1225`）、`jsonpath_ng` / `pypinyin` 未安装、DSH vendor 目录缺失，以及 §11.4 列的三类他 spec 改动。
+
+### 11.4 范围外发现（未改）
+
+- 根路径 `/metrics`（平台性能 spec）无鉴权，依赖网关不代理；若改为直连部署须加内网身份校验。
+- `useNoteTemplate.loadNoteMappingPreset` 前端用例在 HEAD 即红（函数已改为异步，用例未 await）。
+- `test_deliverable_generation_membership_auth` 的「全链路进度流」期望非成员 403、实得 401：`a6c1fa93a` 把该端点改成 `require_project_access_stream`（SSE 取 query token），权限世界没有对应的 override。属平台性能 spec 的 SSE 鉴权改动，用例需按新依赖改造。
+- 同文件「一键生成全套」5 条在 spec 前基线即红（旧入口已被另一 spec 退役，返回 410 `LEGACY_FULL_DELIVERABLES_RETIRED`）。
+- `test_ai_content_confirm_flow` 的 AL-01 两条因 `jsonpath_ng` 未安装而红，spec 前基线同红。
+- 只有附注有自动写回 adapter；底稿宿主仍人工复制确认。
+
+### 11.5 教训
+
+- 声明式规格字段要同时写“该字段改变行为”的用例；只登记不读取的字段等于没有（第 2 条）。
+- 门禁读不到状态时的默认值决定安全性：吞异常后放行就是假绿（第 1 条）。
+- 并发会话会把本 spec 未提交的文件整体带进它的提交，也会清掉仓库根全部 `tmp_*`（含已 lock 的基线 worktree，回归跑到一半被删）；回归产物要能用脚本重建，结论以重跑为准。

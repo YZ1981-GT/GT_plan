@@ -72,6 +72,7 @@ _REASON_MAP: dict[str, tuple[str, str]] = {
     "STATE_INVALID": ("STATE_INVALID", "当前状态不允许此操作"),
     "PROJECT_ARCHIVED": ("PROJECT_ARCHIVED", "项目已归档，禁止操作"),
     "AI_PENDING": ("AI_PENDING", "存在未确认的 AI 生成内容"),
+    "AI_STATE_UNKNOWN": ("AI_STATE_UNKNOWN", "AI 生成内容的确认状态暂时无法读取，已暂停该操作"),
     "CONFLICT_UNRESOLVED": ("CONFLICT_UNRESOLVED", "存在未调解的跨模块冲突"),
 }
 
@@ -167,7 +168,11 @@ def _check_transition(
         if not guard_results.get(guard_name, True):
             # 映射 guard_name → reason
             if guard_name == "no_pending_ai_content":
-                code, msg = _REASON_MAP["AI_PENDING"]
+                code, msg = _REASON_MAP[
+                    "AI_STATE_UNKNOWN"
+                    if guard_results.get("ai_pending_state_unknown")
+                    else "AI_PENDING"
+                ]
             elif guard_name == "no_unresolved_conflict":
                 code, msg = _REASON_MAP["CONFLICT_UNRESOLVED"]
             elif guard_name == "not_archived":
@@ -204,12 +209,14 @@ async def _evaluate_guards(
                 AiContentLog.confirm_action == "pending",
             )
         )
-        ai_result = await db.execute(ai_stmt)
-        pending_ai = ai_result.scalar() or 0
+        async with db.begin_nested():
+            pending_ai = (await db.execute(ai_stmt)).scalar() or 0
         results["no_pending_ai_content"] = pending_ai == 0
     except Exception as exc:
+        # ADR-LLM-016：待确认状态未知 = 未就绪，不能按“没有 AI 草稿”放行。
         logger.warning("[ALLOWED_ACTIONS] 查询 AI pending 失败: %s", exc)
-        results["no_pending_ai_content"] = True  # 降级放行
+        results["no_pending_ai_content"] = False
+        results["ai_pending_state_unknown"] = True
 
     # no_unresolved_conflict
     try:

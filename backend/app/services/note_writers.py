@@ -56,6 +56,9 @@ NOTE_WRITERS: tuple[NoteWriterSpec, ...] = (
     _w("manual_editor", "app.services.disclosure_engine:DisclosureEngine.update_note", "附注编辑器手工保存", _TABLE + _TEXT, True),
     _w("manual_editor_route", "app.routers.disclosure_notes:update_note._mutate", "附注编辑端点", _TABLE + _TEXT, True),
     _w("ai_adopt", "app.routers.ai_content:_writeback_note", "AI 内容采纳", _TEXT, True),
+    # spec llm-linkage-audit-practice-closure ADR-LLM-016：确认时按基线版本 / before hash 应用预览过的正文，撤销时还原
+    _w("ai_draft_apply", "app.services.draft_artifact_facade:apply_note_artifact", "AI 待确认草稿确认写回", _TEXT, True),
+    _w("ai_draft_undo", "app.services.draft_artifact_facade:undo_note_artifact", "AI 草稿写回撤销", _TEXT, True),
     _w("excel_html", "app.routers.excel_html:save_edits", "Excel HTML 保存", _TABLE, True),
     _w("triple_format", "app.services.triple_format_adapter:DisclosureNoteAdapter.update_note_from_structure", "三格式适配写回", _TABLE, True),
     _w("writeback_text", "app.services.writeback_target_adapters:DisclosureNoteAdapter.write_upstream", "交付件正文回写", _TEXT, True),

@@ -4,6 +4,8 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+
+from app.services.ai_task_executor import actor_role
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -40,7 +42,7 @@ async def weekly_report(
     current_user: User = Depends(require_project_access("edit")),
 ):
     """项目成员：项目周报自动生成（含 LLM 润色）"""
-    return await generate_weekly_report(db, project_id, week_start)
+    return await generate_weekly_report(db, project_id, week_start, role=actor_role(current_user))
 
 
 @router.get("/qc-trend")
@@ -61,4 +63,4 @@ async def project_summary(
     current_user: User = Depends(require_project_access("review")),
 ):
     """项目复核人员：一页纸项目摘要（含 LLM 生成叙述）"""
-    return await generate_project_summary(db, project_id)
+    return await generate_project_summary(db, project_id, role=actor_role(current_user))

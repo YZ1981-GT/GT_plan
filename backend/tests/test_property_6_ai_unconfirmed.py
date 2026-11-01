@@ -47,6 +47,7 @@ import app.models.core  # noqa: E402, F401
 import app.models.audit_log_models  # noqa: E402, F401
 import app.models.v3_refinement_models  # noqa: E402, F401
 import app.models.phase14_models  # noqa: E402, F401  — gate_decisions / trace_events
+import app.models.workpaper_models  # noqa: E402, F401  — working_paper（门禁兼容扫描读取）
 
 from app.models.base import ProjectStatus, ProjectType, UserRole  # noqa: E402
 from app.models.core import Project, User  # noqa: E402
@@ -86,6 +87,7 @@ async def _setup_db_with_user_project() -> tuple[
             Base.metadata.tables["ai_content_log"],
             Base.metadata.tables["gate_decisions"],
             Base.metadata.tables["trace_events"],
+            Base.metadata.tables["working_paper"],
         ]
         await conn.run_sync(Base.metadata.create_all, tables=tables_to_create)
 

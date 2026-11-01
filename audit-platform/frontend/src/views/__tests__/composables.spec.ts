@@ -641,7 +641,7 @@ describe('useNoteAi · 知识库参考文档', () => {
 
   it('续写请求体携带 knowledge_doc_ids，且不再发送 knowledge_context', async () => {
     const { ai, api, msg } = await setup([{ id: 'd1', name: '准则A.md' }])
-    api.noteAiContinueWrite.mockResolvedValue({ appended: '续写片段', knowledge_count: 1 })
+    api.noteAiContinueWrite.mockResolvedValue({ appended: '续写片段', knowledge_count: 1, artifact_id: 'a1' })
     await ai.onPickKnowledge()
     await ai.onAiContinueWrite()
 
@@ -650,25 +650,25 @@ describe('useNoteAi · 知识库参考文档', () => {
     expect(pid).toBe('proj-001')
     expect(body).toEqual({ text: '本公司应收账款', section_number: '五、4', year: 2025, knowledge_doc_ids: ['d1'] })
     expect(body).not.toHaveProperty('knowledge_context')
-    expect(msg.success).toHaveBeenCalledWith('续写完成（参考了 1 篇文档）')
+    expect(msg.success).toHaveBeenCalledWith('续写完成（参考了 1 篇文档），草稿已送入待确认')
   })
 
   it('改写请求体携带 knowledge_doc_ids；部分可用时提示实际篇数', async () => {
     const editor = editorWith('选中的文字', [0, 5])
     const { ai, api, msg } = await setup([{ id: 'd1', name: 'A' }, { id: 'd2', name: 'B' }], editor)
-    api.noteAiRewrite.mockResolvedValue({ original: '选中的文字', rewritten: '改写后', knowledge_count: 1 })
+    api.noteAiRewrite.mockResolvedValue({ original: '选中的文字', rewritten: '改写后', knowledge_count: 1, artifact_id: 'a2' })
     await ai.onPickKnowledge()
     ai.onAiRewriteOpen()
     await ai.onAiRewriteConfirm()
 
     expect(api.noteAiRewrite.mock.calls[0][1]).toMatchObject({ knowledge_doc_ids: ['d1', 'd2'] })
     expect(api.noteAiRewrite.mock.calls[0][1]).not.toHaveProperty('knowledge_context')
-    expect(msg.success).toHaveBeenCalledWith('改写完成（参考了 1/2 篇文档）')
+    expect(msg.success).toHaveBeenCalledWith('改写完成（参考了 1/2 篇文档），草稿已送入待确认')
   })
 
   it('所选文档一篇都没用上时如实警告，而不是报「已参考」', async () => {
     const { ai, api, msg } = await setup([{ id: 'gone', name: '已删除.md' }])
-    api.noteAiContinueWrite.mockResolvedValue({ appended: '片段', knowledge_count: 0 })
+    api.noteAiContinueWrite.mockResolvedValue({ appended: '片段', knowledge_count: 0, artifact_id: 'a3' })
     await ai.onPickKnowledge()
     await ai.onAiContinueWrite()
     expect(msg.warning).toHaveBeenCalledWith(expect.stringContaining('均不可用'))
@@ -677,9 +677,9 @@ describe('useNoteAi · 知识库参考文档', () => {
 
   it('未选文档时发送空 ID 列表，提示不提参考文档', async () => {
     const { ai, api, msg } = await setup([])
-    api.noteAiContinueWrite.mockResolvedValue({ appended: '片段', knowledge_count: 0 })
+    api.noteAiContinueWrite.mockResolvedValue({ appended: '片段', knowledge_count: 0, artifact_id: 'a4' })
     await ai.onAiContinueWrite()
     expect(api.noteAiContinueWrite.mock.calls[0][1].knowledge_doc_ids).toEqual([])
-    expect(msg.success).toHaveBeenCalledWith('续写完成')
+    expect(msg.success).toHaveBeenCalledWith('续写完成，草稿已送入待确认')
   })
 })

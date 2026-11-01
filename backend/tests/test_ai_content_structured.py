@@ -17,6 +17,22 @@ import pytest
 from app.services.wp_ai_service import wrap_ai_output
 
 
+class _Savepoint:
+    """AsyncMock 会话的 begin_nested 替身：AI 内容门禁把只读查询放在保存点里（ADR-LLM-016）。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
+
+def _gate_db() -> AsyncMock:
+    db = AsyncMock()
+    db.begin_nested = MagicMock(return_value=_Savepoint())
+    return db
+
+
 # ── 1. wrap_ai_output 测试 ─────────────────────────────────────
 
 
@@ -193,14 +209,14 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_no_project_id(self, rule):
         """无 project_id 时返回 None"""
-        db = AsyncMock()
+        db = _gate_db()
         result = await rule.check(db, {})
         assert result is None
 
     @pytest.mark.asyncio
     async def test_no_workpapers(self, rule):
         """项目无底稿时返回 None"""
-        db = AsyncMock()
+        db = _gate_db()
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = []
         db.execute = AsyncMock(return_value=mock_result)
@@ -211,7 +227,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_all_confirmed(self, rule):
         """所有 AI 内容已确认时返回 None"""
-        db = AsyncMock()
+        db = _gate_db()
         wp = MagicMock()
         wp.id = uuid.uuid4()
         wp.wp_code = "D-001"
@@ -237,7 +253,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_unconfirmed_with_target_cell_blocks(self, rule):
         """未确认且有 target_cell 的 AI 内容阻断 sign_off"""
-        db = AsyncMock()
+        db = _gate_db()
         wp = MagicMock()
         wp.id = uuid.uuid4()
         wp.wp_code = "D-001"
@@ -266,7 +282,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_unconfirmed_without_target_cell_passes(self, rule):
         """未确认但无 type=ai_generated 标记的内容不阻断"""
-        db = AsyncMock()
+        db = _gate_db()
         wp = MagicMock()
         wp.id = uuid.uuid4()
         wp.wp_code = "D-001"
@@ -292,7 +308,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_multiple_unconfirmed_items(self, rule):
         """多个未确认项正确计数（按底稿数计）"""
-        db = AsyncMock()
+        db = _gate_db()
         wp1 = MagicMock()
         wp1.id = uuid.uuid4()
         wp1.wp_code = "D-001"
@@ -322,7 +338,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_empty_ai_content_list(self, rule):
         """ai_content 为空列表时返回 None"""
-        db = AsyncMock()
+        db = _gate_db()
         wp = MagicMock()
         wp.id = uuid.uuid4()
         wp.wp_code = "D-001"
@@ -337,7 +353,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_no_ai_content_key(self, rule):
         """parsed_data 无 ai_content 键时返回 None"""
-        db = AsyncMock()
+        db = _gate_db()
         wp = MagicMock()
         wp.id = uuid.uuid4()
         wp.wp_code = "D-001"

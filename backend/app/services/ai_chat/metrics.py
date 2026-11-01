@@ -167,6 +167,12 @@ if _PROMETHEUS_AVAILABLE:
         ["action"],
         registry=AI_CHAT_REGISTRY,
     )
+    AI_TASK_ESTIMATED_COST_TOTAL = Counter(
+        "ai_task_estimated_cost_total",
+        "Estimated AI task cost (configured unit price per 1k tokens)",
+        ["task_code", "deployment"],
+        registry=AI_CHAT_REGISTRY,
+    )
 else:
     ACTIVE_RUNS = Gauge()
     QUEUED_RUNS = Gauge()
@@ -184,6 +190,31 @@ else:
     AI_TASK_LATENCY_SECONDS = Histogram()
     AI_TASK_TOKENS_TOTAL = Counter()
     AI_HUMAN_ACTIONS_TOTAL = Counter()
+    AI_TASK_ESTIMATED_COST_TOTAL = Counter()
+
+
+def token_unit_cost(deployment: str | None) -> float:
+    """每千 token 估算单价；``GT_AI_TOKEN_UNIT_COST`` 形如 ``{"local": 0, "server": 0.002}``。
+
+    未配置或配置无效时返回 0（只记 token，不臆造成本）。
+    """
+    import json
+    import os
+
+    raw = os.environ.get("GT_AI_TOKEN_UNIT_COST", "").strip()
+    if not raw:
+        return 0.0
+    try:
+        table = json.loads(raw)
+        value = float(table.get(deployment or "unknown", 0) or 0)
+    except (ValueError, TypeError, AttributeError):
+        return 0.0
+    return value if value > 0 else 0.0
+
+
+def estimate_task_cost(deployment: str | None, prompt_tokens: int | None, completion_tokens: int | None) -> float:
+    tokens = int(prompt_tokens or 0) + int(completion_tokens or 0)
+    return round(tokens / 1000 * token_unit_cost(deployment), 6)
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +304,11 @@ def record_ai_task_metric(
         AI_TASK_TOKENS_TOTAL.labels(task_code=task_code, token_type="prompt").inc(prompt_tokens)
     if completion_tokens:
         AI_TASK_TOKENS_TOTAL.labels(task_code=task_code, token_type="completion").inc(completion_tokens)
+    cost = estimate_task_cost(deployment, prompt_tokens, completion_tokens)
+    if cost > 0:
+        AI_TASK_ESTIMATED_COST_TOTAL.labels(
+            task_code=task_code, deployment=deployment or "unknown"
+        ).inc(cost)
 
 
 def record_human_action_metric(action: str) -> None:
@@ -340,6 +376,7 @@ __all__ = [
     "AI_TASK_LATENCY_SECONDS",
     "AI_TASK_TOKENS_TOTAL",
     "AI_HUMAN_ACTIONS_TOTAL",
+    "AI_TASK_ESTIMATED_COST_TOTAL",
     "set_active_runs",
     "set_queued_runs",
     "observe_queue_wait",
@@ -348,6 +385,8 @@ __all__ = [
     "observe_model_timing",
     "record_ai_task_metric",
     "record_human_action_metric",
+    "estimate_task_cost",
+    "token_unit_cost",
     "observe_cancel_latency",
     "inc_denial",
     "inc_attachment_bytes",

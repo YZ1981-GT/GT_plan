@@ -255,8 +255,10 @@ async def wrap_ai_output_with_log(
 class WpAIService:
     """AI 辅助底稿编制"""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, role: str | None = None):
         self.db = db
+        #: 调用者角色；AI 任务执行器缺角色即拒绝（ADR-LLM-008）
+        self.role = role
 
     async def analytical_review(
         self, project_id: UUID, account_code: str, year: int, role: str | None = None
@@ -304,9 +306,10 @@ class WpAIService:
             prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请描述变动，并把原因标为待核实假设。"
             invocation = await invoke_ai_task(
                 "workpaper.analytical_review",
+                action="draft",
                 user_prompt=prompt,
                 context_documents=context_docs or None,
-                role=role,
+                role=role or self.role,
             )
             result = invocation.result
             if not result.succeeded:
@@ -461,8 +464,10 @@ class WpAIService:
 
         invocation = await invoke_ai_task(
             "workpaper.subject_conclusion_advice",
+            action="draft",
             user_prompt=user_prompt,
             system_addendum=system_prompt,
+            role=self.role,
         )
         result = invocation.result
         if not result.succeeded:
@@ -706,9 +711,10 @@ class WpAIService:
         )
         invocation = await invoke_ai_task(
             "workpaper.field_draft",
+            action="draft",
             user_prompt=user_prompt,
             system_addendum=system_prompt,
-            role=role,
+            role=role or self.role,
         )
         result = invocation.result
         if not result.succeeded:

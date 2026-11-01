@@ -10,6 +10,7 @@ import {
   noteAiRewrite,
   noteAiGeneratePolicy,
   noteAiGenerateAnalysis,
+  type NoteAiResultMeta,
 } from '@/services/commonApi'
 import { useKnowledge } from '@/composables/useKnowledge'
 import { eventBus } from '@/utils/eventBus'
@@ -42,6 +43,9 @@ export interface UseNoteAiReturn {
   clearKnowledgeContext: () => void
   getSelectedText: () => string
 }
+
+/** 生成结果不直接改编辑器，只进待确认（ADR-LLM-014） */
+const PENDING_SUFFIX = '，草稿已送入待确认'
 
 export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
   const { projectId, year, templateType, currentNote, editor } = options
@@ -88,20 +92,30 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
   }
 
   /**
+   * 本机模型不可用、改由事务所服务器模型生成时如实告知（需求 4.4）；
+   * 用户需要知道这次的客户资料离开了本机。
+   */
+  function notifyRoute(res: NoteAiResultMeta): void {
+    if (res.fallback_used || res.deployment === 'server') {
+      ElMessage.info(`本次由事务所服务器模型${res.model ? `（${res.model}）` : ''}生成${res.fallback_used ? '：本机模型暂不可用' : ''}`)
+    }
+  }
+
+  /**
    * 选了参考文档却一篇都没用上（全部不可见 / 已删除 / 无正文）时如实告知；
    * 否则用户会以为 AI 参考了资料。部分可用时说明实际篇数。
    */
-  function reportKnowledgeUsage(used: number | undefined, verb: string): void {
+  function reportKnowledgeUsage(used: number | undefined, verb: string, suffix = ''): void {
     const selected = knowledgeDocIds.value.length
     if (!selected || used === undefined) {
-      ElMessage.success(`${verb}完成`)
+      ElMessage.success(`${verb}完成${suffix}`)
       return
     }
     if (used === 0) {
       ElMessage.warning(`${verb}完成，但所选 ${selected} 篇参考文档均不可用（无权访问、已删除或未提取到正文），本次未参考`)
       return
     }
-    ElMessage.success(used < selected ? `${verb}完成（参考了 ${used}/${selected} 篇文档）` : `${verb}完成（参考了 ${used} 篇文档）`)
+    ElMessage.success(used < selected ? `${verb}完成（参考了 ${used}/${selected} 篇文档）${suffix}` : `${verb}完成（参考了 ${used} 篇文档）${suffix}`)
   }
 
   async function onAiContinueWrite() {
@@ -118,7 +132,9 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
       if (res.error) { ElMessage.warning(res.error); return }
       if (res.appended && res.artifact_id) {
         eventBus.emit('ai-content:adopted', { projectId: projectId.value })
-        reportKnowledgeUsage(res.knowledge_count, '续写草稿已生成并送入待确认')
+        reportKnowledgeUsage(res.knowledge_count, '续写', PENDING_SUFFIX)
+        notifyRoute(res)
+        if (res.warning) ElMessage.warning(res.warning)
       }
     } catch (e: any) {
       handleApiError(e, 'AI续写')
@@ -148,7 +164,8 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
       })
       if (res.error) { ElMessage.warning(res.error); return }
       if (res.rewritten && res.rewritten !== res.original && res.artifact_id) {
-        reportKnowledgeUsage(res.knowledge_count, '改写草稿已生成并送入待确认')
+        reportKnowledgeUsage(res.knowledge_count, '改写', PENDING_SUFFIX)
+        notifyRoute(res)
         eventBus.emit('ai-content:adopted', { projectId: projectId.value })
       }
     } catch (e: any) {
@@ -171,6 +188,7 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
       if (res.generated_text && res.artifact_id) {
         eventBus.emit('ai-content:adopted', { projectId: projectId.value })
         ElMessage.success(`会计政策草稿已生成并送入待确认（参照${res.reference_count}篇文档）`)
+        notifyRoute(res)
       }
     } catch (e: any) {
       handleApiError(e, '生成会计政策')
@@ -190,6 +208,7 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
       if (res.generated_text && res.artifact_id) {
         eventBus.emit('ai-content:adopted', { projectId: projectId.value })
         ElMessage.success('变动分析草稿已生成并送入待确认')
+        notifyRoute(res)
       }
     } catch (e: any) {
       handleApiError(e, '生成变动分析')

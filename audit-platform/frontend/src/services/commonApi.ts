@@ -968,6 +968,12 @@ export async function fetchNoteAutoPull(
 export interface NoteAiResultMeta {
   error?: string
   error_code?: string
+  /** 生成成功但需提醒（如续写基于未保存修改，草稿追加在已保存正文之后） */
+  warning?: string
+  /** 成功生成时签发的待确认草稿身份（ADR-LLM-004 DraftArtifact） */
+  artifact_id?: string
+  message_id?: string
+  generation_id?: string
   model?: string | null
   deployment?: 'local' | 'server' | null
   fallback_used?: boolean

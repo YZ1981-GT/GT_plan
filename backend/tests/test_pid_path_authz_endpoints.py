@@ -306,11 +306,17 @@ async def test_batch_progress_and_export_are_readonly_level(client, downstream):
 
 @pytest.mark.asyncio
 async def test_prompt_diagnostics_need_login_only(client):
-    """提示词覆盖率与调用指标不含项目数据：登录即可（非成员也能看）。"""
+    """提示词覆盖率不含项目数据：登录即可（非成员也能看）。
+
+    调用指标暴露运行容量与模型状态，spec llm-linkage-audit-practice-closure 任务 4（ADR-LLM-010）
+    起收紧为仅管理员；覆盖率是静态词表统计，仍登录即可。"""
     client.as_user(OUTSIDER)
     resp = await client.get("/api/review-prompts/coverage")
     assert resp.status_code == 200, resp.text
     assert resp.json()["total_subjects"] > 0
+    resp = await client.get("/api/review-prompts/metrics")
+    assert resp.status_code == 403, f"调用指标应仅管理员可见，实得 {resp.status_code}"
+    client.as_user(ADMIN)
     resp = await client.get("/api/review-prompts/metrics")
     assert resp.status_code == 200, resp.text
     assert "total_calls" in resp.json()

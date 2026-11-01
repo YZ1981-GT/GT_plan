@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
 
@@ -41,6 +41,30 @@ class NoteFactPack:
             f"本期（{self.year} 年）权威数据：{current}\n"
             f"上期权威数据：{prior}"
         )
+
+    def derived_fact_tokens(self, *, limit: int = 60) -> tuple[str, ...]:
+        """变动额与变动率：本期、上期各数值两两相减 / 相除。
+
+        只交给验证器作为“可由权威事实推导”的数字（ADR-LLM-012），不进入 prompt；
+        模型写出的变动额 / 变动率必须能由事实包里的某一对本期、上期数值算出。
+        """
+        current = _numbers(self.current_data)[:limit]
+        prior = _numbers(self.prior_data)[:limit]
+        steps = (Decimal("0.01"), Decimal("0.1"), Decimal(1))
+        tokens: set[str] = set()
+        for cur in current:
+            for pre in prior:
+                diff = cur - pre
+                for value in (diff, abs(diff)):
+                    tokens.add(str(value))
+                    tokens.update(str(value.quantize(step, rounding=ROUND_HALF_UP)) for step in steps)
+                if pre != 0:
+                    ratio = diff / abs(pre) * 100
+                    for value in (ratio, abs(ratio)):
+                        tokens.update(
+                            f"{value.quantize(step, rounding=ROUND_HALF_UP)}%" for step in steps
+                        )
+        return tuple(sorted(tokens))
 
 
 async def build_note_fact_pack(
@@ -120,6 +144,42 @@ async def build_note_fact_pack(
 def _compact_json(value: Any, limit: int) -> str:
     text = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     return text if len(text) <= limit else text[:limit] + "…[已截断]"
+
+
+def _numbers(value: Any) -> list[Decimal]:
+    """按出现顺序收集去重后的数值；布尔、空串、非数字文本不算。"""
+    found: list[Decimal] = []
+    seen: set[Decimal] = set()
+
+    def _walk(node: Any) -> None:
+        if node is None or isinstance(node, bool):
+            return
+        if isinstance(node, (int, float, Decimal)):
+            number = Decimal(str(node))
+        elif isinstance(node, str):
+            raw = node.strip().replace(",", "").removesuffix("%").strip()
+            if not raw:
+                return
+            try:
+                number = Decimal(raw)
+            except InvalidOperation:
+                return
+        elif isinstance(node, dict):
+            for child in node.values():
+                _walk(child)
+            return
+        elif isinstance(node, (list, tuple, set)):
+            for child in node:
+                _walk(child)
+            return
+        else:
+            return
+        if number.is_finite() and number not in seen:
+            seen.add(number)
+            found.append(number)
+
+    _walk(value)
+    return found
 
 
 def _has_numeric_fact(value: Any) -> bool:

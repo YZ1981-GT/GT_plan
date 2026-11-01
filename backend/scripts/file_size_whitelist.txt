@@ -1821,3 +1821,9 @@ backend/app/routers/reports.py  839
 #     按设计单文件含完整迁移逻辑 + 回滚 + 快照。
 #     spec: income-statement-lower-section-formulas（D3 修复 SQL 别名 bug）
 backend/scripts/migrate/migrate_sign_convention_v2.py  997
+
+# llm-linkage-audit-practice-closure（2026-11-01）：dsh_agent_panel/test_task6_native_engine.py —— 历史大文件
+#   （HEAD 1720 行即已超 800 上限且从未登记，任何改动都会被门禁拒）。本次只把 Native 能力声明断言
+#   local_only 改为 False（需求 4.4：可经事务所服务器兜底），行数未变 ⇒ 以真实行数 1720 登记，只许下调。
+#   拆分方向：按 TestEngineContract / TestNativeSuccessPath+TestCancellation / TestProperty33NoFalseSuccess 拆三份。
+backend/tests/dsh_agent_panel/test_task6_native_engine.py  1720

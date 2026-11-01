@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import check_consol_lock, require_project_access
+from app.deps import check_consol_lock, require_project_access, require_project_permission
 from app.models.core import User
 from app.services.adjustment_import_service import import_rows, preview_import
 from app.services.import_template_service import ImportType, parse_import_data, validate_import_file

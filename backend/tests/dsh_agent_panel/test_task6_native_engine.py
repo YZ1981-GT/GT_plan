@@ -361,7 +361,7 @@ class TestEngineContract:
         """
         caps = asyncio.run(NativeEngine(db=None).capabilities())
         assert caps.streaming is True
-        assert caps.local_only is True
+        assert caps.local_only is False  # 需求 4.4：Native 可经事务所服务器兜底，不得声明全本地
         assert caps.tools is False, "native 没有工具调用实现，不得声明 tools=True"
         assert caps.subagents is False, "native 没有子 Agent 实现"
         identifiers = _code_identifiers(NativeEngine)

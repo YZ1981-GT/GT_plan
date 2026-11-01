@@ -18,6 +18,22 @@ import pytest
 from app.services.wp_ai_service import wrap_ai_output
 
 
+class _Savepoint:
+    """AsyncMock 会话的 begin_nested 替身：门禁把只读查询放在保存点里（ADR-LLM-016）。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
+
+def _mock_db() -> AsyncMock:
+    db = AsyncMock()
+    db.begin_nested = MagicMock(return_value=_Savepoint())
+    return db
+
+
 # ---------------------------------------------------------------------------
 # 场景 1: AI 生成结论 → 采纳 → confirmed_by 有值 → sign_off 通过
 # ---------------------------------------------------------------------------
@@ -55,7 +71,7 @@ class TestAiContentConfirmAcceptFlow:
         from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
-        db = AsyncMock()
+        db = _mock_db()
 
         # 底稿中 AI 内容已全部确认
         user_id = str(uuid.uuid4())
@@ -101,7 +117,7 @@ class TestAiContentUnconfirmedBlocks:
         from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
-        db = AsyncMock()
+        db = _mock_db()
 
         wp = MagicMock()
         wp.id = uuid.uuid4()
@@ -139,7 +155,7 @@ class TestAiContentUnconfirmedBlocks:
         from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
-        db = AsyncMock()
+        db = _mock_db()
 
         wp = MagicMock()
         wp.id = uuid.uuid4()
@@ -281,7 +297,7 @@ class TestAuditLogAL01Detection:
         entry.object_id = uuid.uuid4()
 
         # Mock DB
-        db = AsyncMock()
+        db = _mock_db()
         mock_result = MagicMock()
         mock_scalars = MagicMock()
         mock_scalars.all.return_value = [entry]
@@ -325,7 +341,7 @@ class TestAuditLogAL01Detection:
         entry.payload = {"action_type": "workpaper_modified"}
         entry.object_id = uuid.uuid4()
 
-        db = AsyncMock()
+        db = _mock_db()
         mock_result = MagicMock()
         mock_scalars = MagicMock()
         # 如果查询层面已过滤掉正常时间的条目，则返回空
@@ -364,7 +380,7 @@ class TestEndToEndConfirmFlow:
         assert ai_item["confirmed_by"] is None
 
         # Step 2: 未确认状态 → sign_off 阻断
-        db = AsyncMock()
+        db = _mock_db()
         wp = MagicMock()
         wp.id = uuid.uuid4()
         wp.wp_code = "D-001"

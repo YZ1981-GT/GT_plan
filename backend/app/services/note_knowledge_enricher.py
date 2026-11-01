@@ -321,6 +321,7 @@ class NoteKnowledgeEnricher:
             role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
             invocation = await invoke_ai_task(
                 "note.policy_draft",
+                action="draft",
                 user_prompt=str(user_prompt),
                 system_addendum=str(_GROUNDED_SYSTEM_PROMPT_ZH),
                 role=str(role) if role is not None else None,

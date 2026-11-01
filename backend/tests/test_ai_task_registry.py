@@ -64,7 +64,7 @@ async def test_execution_uses_registered_prompt_and_exposes_audit_envelope() -> 
         new=AsyncMock(return_value=success),
     ) as model:
         invocation = await invoke_ai_task(
-            "note.policy_draft", user_prompt="用户事实", role="auditor"
+            "note.policy_draft", user_prompt="用户事实", role="auditor", action="draft"
         )
     sent = model.await_args.args[0]
     assert sent[0]["content"] == get_prompt("note.policy_draft").content
@@ -91,6 +91,7 @@ async def test_note_fact_verifier_rejects_invented_number() -> None:
             "note.change_analysis",
             user_prompt="本期余额为 100000 元。",
             role="auditor",
+            action="draft",
         )
     assert invocation.result.status is LLMInvocationStatus.invalid_output
     assert invocation.result.text is None
@@ -112,6 +113,7 @@ async def test_professional_boundary_rejects_final_audit_opinion() -> None:
     ):
         invocation = await invoke_ai_task(
             "workpaper.subject_conclusion_advice",
+            action="draft",
             user_prompt="请给出科目结论措辞建议。",
             role="auditor",
         )
@@ -133,6 +135,7 @@ async def test_citation_required_task_without_context_is_not_a_draft() -> None:
     ):
         invocation = await invoke_ai_task(
             "note.completeness_review",
+            action="review",
             user_prompt="检查完整性",
             role="auditor",
             context_documents=[],

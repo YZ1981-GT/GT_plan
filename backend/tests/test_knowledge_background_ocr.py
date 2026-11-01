@@ -534,7 +534,9 @@ async def test_remote_ocr_failure_cools_only_when_candidate_unavailable(monkeypa
 
     reset_route_health()
     config = SimpleNamespace(
-        is_remote=True, deployment="server", identity="paddleocr|https://ai.example/ocr|paddleocrv6"
+        is_remote=True, deployment="server", identity="paddleocr|https://ai.example/ocr|paddleocrv6",
+        # 远程候选按信任域与脱敏策略放行（spec llm-linkage-audit-practice-closure ADR-LLM-009）
+        trust_zone="firm_private", client_data_allowed=True, mask_policy="role_based",
     )
     candidate = remote.OCRRouteCandidate("ocr", "server", "paddleocrv6", config=config)
 
