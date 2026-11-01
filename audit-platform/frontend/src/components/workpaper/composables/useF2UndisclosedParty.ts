@@ -1,5 +1,6 @@
 /** F2-67 识别未披露关联方：人员身份交叉核对状态管理。 */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   emptyUndisclosedPartyRow,
@@ -69,6 +70,15 @@ export function useF2UndisclosedParty(opts: {
     ),
     total: enrichedRows.value.filter((row) => row.name.trim()).length,
   }))
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

@@ -14,6 +14,7 @@
  * ECL 三阶段测算保留在 G2-7。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { parseNum, calcSubtotal } from './useG2IntRecFormulaEngine'
 import {
@@ -595,6 +596,15 @@ export function useG2BadDebtDetail(options: UseG2BadDebtDetailOptions) {
     syncG2AgingPresetToAllSheets(allResponses.value, agingPreset.value, labels, 'G2-3')
     ElMessage.success('已同步账龄口径至 G2-2 / G2-6 / G2-7')
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     for (const { event, handler } of eventListeners) {

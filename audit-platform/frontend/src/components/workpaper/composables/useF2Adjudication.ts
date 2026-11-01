@@ -5,6 +5,7 @@
  * 比照 useD4Adjudication / useF3Adjudication
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
@@ -308,6 +309,15 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     (v) => { conclusion.value = v || '' },
     { immediate: true },
   )
+
+  function flushPendingMetaSave(): void {
+    if (!metaDebounceTimer) return
+    clearTimeout(metaDebounceTimer)
+    metaDebounceTimer = null
+    flushMetaSave()
+  }
+
+  registerPendingFlusher(flushPendingMetaSave)
 
   function flushMetaSave(): void {
     const items = [

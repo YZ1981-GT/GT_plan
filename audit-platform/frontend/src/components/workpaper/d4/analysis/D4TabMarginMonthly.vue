@@ -23,6 +23,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 四、审计结论
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
@@ -59,7 +60,7 @@ const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncS
   isReadonly: toRef(props, 'isReadonly'),
   views: ['结构化视图'],
   flushHtml: async () => {
-    flushSave()
+    flushPendingSave()
     const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd47-managed' }
   },
@@ -430,7 +431,14 @@ function flushSave() {
   const items = keys.map(k => props.allResponses.get(k)).filter(Boolean)
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>

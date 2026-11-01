@@ -2,6 +2,7 @@
  * useF2ContractCost — F2-55 合同履约成本构成明细表
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   debouncedPublishF2SpeDisclosureNote,
@@ -85,6 +86,15 @@ export function useF2ContractCost(opts: {
   const highlightCount = computed(() =>
     enrichedProducts.value.filter((r) => r.highlight).length,
   )
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

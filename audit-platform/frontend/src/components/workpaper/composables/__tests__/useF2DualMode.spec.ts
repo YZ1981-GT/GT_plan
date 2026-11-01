@@ -39,8 +39,8 @@ describe('useF2DualMode', () => {
       },
     })
     mount(Comp)
-    // Restores onlyoffice from localStorage immediately on mount
-    expect(api!.currentMode.value).toBe('onlyoffice')
+    // 恢复偏好不能先挂 OO；健康检查与完整保存屏障结束前始终停在 HTML。
+    expect(api!.currentMode.value).toBe('html')
     await nextTick()
     await new Promise((r) => setTimeout(r, 30))
     // Health failed → fallback to html

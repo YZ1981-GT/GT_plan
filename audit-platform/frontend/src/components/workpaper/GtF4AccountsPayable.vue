@@ -56,7 +56,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -170,7 +170,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName || ''"
-          :readonly="isReadonly"
+          :readonly="businessReadonly"
           style="height: calc(100vh - 180px)"
         />
       </template>
@@ -204,6 +204,7 @@ const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // F4-6 canary 真双向（spec: f4-sync-coverage-and-first-canary）
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -236,7 +237,8 @@ defineEmits<{ (e: 'save'): void; (e: 'completed'): void }>()
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const formData = useF4FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const allResponses = computed(() => formData.allResponses.value)
 const auditYear = computed(() => {
@@ -346,7 +348,7 @@ const syncBridge = useWorkpaperSyncBridge({
   flushHtml: async () => {
     // 🔴 顺序不可换：先 flush 掉 2s debounce 未落库的行，再读 store projection，
     // 否则读到旧快照，切到 OO 侧会用旧值覆盖 HTML 侧刚写的编辑。
-    formData.flushPendingSave()
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -433,7 +435,11 @@ provide('getRowDot', getRowDot)
 async function handleF4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    await formData.saveItemsFromEvent(items)
+    try {
+      await formData.saveItemsFromEvent(items)
+    } catch {
+      return
+    }
     versionToolbar.scheduleAutoSnapshot()
   }
 }

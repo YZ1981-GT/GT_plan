@@ -6,6 +6,7 @@
  * 支持从 F4-2 引用供应商插行、附件 OCR 确认回填、AI 说明/结论。
  */
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { migrateF4DetailRows } from './useF4Detail'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
@@ -667,6 +668,15 @@ export function useF4SupplierFinancing(options: UseF4SupplierFinancingOptions) {
     if (level === 'warning') return 'row-warning'
     return ''
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

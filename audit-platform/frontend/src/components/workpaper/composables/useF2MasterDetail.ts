@@ -2,6 +2,7 @@
  * useF2MasterDetail — F2-70 供应商信息核查 / F2-72 访谈记录
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessageBox } from 'element-plus'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 
@@ -146,6 +147,15 @@ export function useF2MasterDetail(opts: {
     }
     return map
   })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

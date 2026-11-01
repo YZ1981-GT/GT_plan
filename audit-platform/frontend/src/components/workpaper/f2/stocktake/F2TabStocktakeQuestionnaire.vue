@@ -115,11 +115,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, shallowRef, watch } from 'vue'
+import { ref, computed, toRef, shallowRef, watch, inject } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2StocktakeQuestionnaireDialog from './F2StocktakeQuestionnaireDialog.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import { useF2StocktakeQuestionnaire } from '../../composables/useF2StocktakeQuestionnaire'
+import { F2_STOCKTAKE_BUSINESS_READONLY_KEY } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
 import { F21_EVAL_Q22_1_OPTIONS } from './f2StocktakeQuestionnaire'
 import type { ChecklistResponse } from '../../composables/useF2StocktakeFormData'
@@ -133,6 +134,10 @@ const props = defineProps<{
 
 const dialogOpen = ref(false)
 const responsesMap = shallowRef(props.allResponses)
+const businessReadonly = inject(
+  F2_STOCKTAKE_BUSINESS_READONLY_KEY,
+  toRef(props, 'isReadonly'),
+)
 watch(() => props.allResponses, (v) => { responsesMap.value = v })
 
 const {
@@ -150,6 +155,7 @@ const {
 } = useF2StocktakeQuestionnaire({
   allResponses: responsesMap,
   isReadonly: toRef(props, 'isReadonly'),
+  businessReadonly,
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2StocktakeAiGenerate({

@@ -7,6 +7,7 @@
  * 双模式 + AI + 导入导出
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { parseNum, calcGrossMarginRate, calcSubtotal, calcChangeRate } from '../../composables/useD4FormulaEngine'
@@ -120,11 +121,14 @@ function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.va
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
 // 立即 flush（清 debounce + 同步 dispatch），供 sync bridge 切到在线编辑前把 html 侧落库。
 function flushPendingSave() {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
   const keys = ['D4-33-data', 'D4-33-note', 'D4-33-conclusion']
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } }))
 }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-33-data','D4-33-note','D4-33-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 // ─── D4-33 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
 const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag } = useD4SyncMode({

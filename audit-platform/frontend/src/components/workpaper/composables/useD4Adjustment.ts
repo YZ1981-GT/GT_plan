@@ -16,6 +16,7 @@
  * Requirements: 5.1-5.7
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum } from './useD4FormulaEngine'
 import type { ChecklistResponse } from './useD4FormData'
 import { eventBus } from '@/utils/eventBus'
@@ -257,6 +258,15 @@ export function useD4Adjustment(options: UseD4BaseOptions) {
     } catch { /* silent */ }
   }
 
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
+
   // ─── Lifecycle ───────────────────────────────────────────────────────
 
   onBeforeUnmount(() => {
@@ -280,14 +290,13 @@ export function useD4Adjustment(options: UseD4BaseOptions) {
     updateCell,
     publishAdjustment,
     pushToA13,
-    //: 立刻落库待存内容（清掉 debounce timer 后同步 flush）。
+    //: 仅有待存 debounce 时立即落库；无待写时零请求。
     //
     //: 🔴 双向同步接桥必需（spec d4-4-adjustment-summary-bidirectional-writeback Task 11）：
     //:    `debounceSave` 是 **2000ms**，用户改完最后一格就切「在线编辑」时，那次编辑还在
     //:    timer 里。切 OO 前不 flush ⇒ `readStoreProjection` 读到的是**旧** store ⇒
     //:    materialize 按旧值写 xlsx ⇒ 用户看到自己刚填的值在 OO 里不见了（实为没存上）。
-    //:    名字对齐平台其余 composable 的 `flushPendingSave` 惯例；本体是同步函数。
-    flushPendingSave: immediatelySave,
+    flushPendingSave,
   }
 }
 

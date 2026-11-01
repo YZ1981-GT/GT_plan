@@ -4,6 +4,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG8FormData — G8 其他权益工具投资底稿数据层
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -35,7 +36,7 @@ export function useG8FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
         const updated = JSON.parse(localStorage.getItem(key) || '') as ChecklistResponse
         if (itemId && updated?.item_id) {
           allResponses.value.set(itemId, updated)
-          void saveImmediate(itemId, updated, 1)
+          void trackPendingWrite(saveImmediate(itemId, updated, 1)).catch(() => undefined)
           localStorage.removeItem(key)
         }
       } catch { /* ignore */ }
@@ -119,6 +120,8 @@ export function useG8FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     try {
       localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
     } catch { /* ignore */ }
+    // 草稿只是本地兜底，未落库必须让调用方与过渡屏障看见
+    throw new Error(`保存未落库，已暂存本地草稿：${itemId}`)
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -129,7 +132,7 @@ export function useG8FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void trackPendingWrite(saveImmediate(itemId, updated)).catch(() => undefined)
     }, 2000))
   }
 
@@ -162,17 +165,27 @@ export function useG8FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
   // 回写已改由 useG8Adjudication.publishToTb（显式确认门 → POST publish-to-tb）承载，
   // 故移除此重复定义及其 return export。
 
-  function flushPending(): void {
+  async function flushPending(): Promise<void> {
+    const inFlight: Array<Promise<void>> = []
     for (const [itemId, timer] of _debounceTimers) {
       clearTimeout(timer)
       _debounceTimers.delete(itemId)
       const row = allResponses.value.get(itemId)
-      if (row) void saveImmediate(itemId, row)
+      if (row) inFlight.push(saveImmediate(itemId, row))
     }
+    // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+    await Promise.all(inFlight)
   }
 
+  registerPendingFlusher(flushPending)
+
   onScopeDispose(() => {
-    for (const t of _debounceTimers.values()) clearTimeout(t)
+    // 原先只清 timer、不冲刷：导航离开时这些待存编辑被静默丢弃。
+    // flushPending 自身会清 timer，所以这里不必再单独清。
+    void flushPending().catch((err: unknown) => {
+      // 卸载时没有 UI 可提示：至少留下可排查的痕迹，不能让失败的保存彻底无痕消失。
+      console.error('[G8] 卸载时仍有未落库的底稿保存', err)
+    })
   })
 
   return {

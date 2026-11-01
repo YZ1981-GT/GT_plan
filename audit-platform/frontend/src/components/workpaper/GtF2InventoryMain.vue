@@ -25,7 +25,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -212,7 +212,7 @@
         <GtGridSheet
           v-else-if="useGridFallback"
           :html-data="props.htmlData || formData.getSheet(currentSheet)"
-          :readonly="isReadonly"
+          :readonly="businessReadonly"
         />
 
         <GtOnlyOfficeSheet
@@ -220,7 +220,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName || ''"
-          :readonly="isReadonly"
+          :readonly="businessReadonly"
           style="height: calc(100vh - 180px)"
         />
       </template>
@@ -270,6 +270,7 @@ const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // F2 main canary 真双向（spec: f2-sync-coverage-four-entry-lanes）
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -284,7 +285,8 @@ const props = defineProps<{
 }>()
 
 const isLoading = ref(true)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 const sheetNameRef = computed(() => props.sheetName || '')
 
 const formData = useF2FormData({
@@ -376,7 +378,7 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(F2M_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPendingSave()
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId, wpId: props.wpId, entryId: F2M_SYNC_ENTRY_ID,
     })
@@ -473,7 +475,11 @@ provide('getRowDot', getRowDot)
 async function handleF2SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    await formData.saveItemsFromEvent(items)
+    try {
+      await formData.saveItemsFromEvent(items)
+    } catch {
+      return
+    }
     versionToolbar.scheduleAutoSnapshot()
   }
 }

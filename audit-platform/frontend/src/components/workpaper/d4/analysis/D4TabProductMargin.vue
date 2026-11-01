@@ -19,6 +19,7 @@
  * 四、审计结论
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
@@ -397,9 +398,12 @@ function flushSave() {
 }
 // 立即 flush（清 debounce + 同步 dispatch），供 sync bridge 切到在线编辑前把 html 侧落库。
 function flushPendingSave() {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
   flushSave()
 }
+registerPendingFlusher(flushPendingSave)
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
 // ─── D4-8 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────

@@ -1,18 +1,21 @@
 /**
  * 平台待写盘追踪器（spec d2-online-edit-platform-closure R20）。
  *
- * 锁四条：① 登记的防抖 flusher 被调用、scope 停止即注销、scope 外不登记；② 在途写入被等到、
- * 失败的写入不让 flush 整体 reject；③ flusher **同步**发起的追踪写入在同一次 flush 里被等到
- * （这正是 D2 子 Tab → 宿主 d2SaveItems 的形态）；④ H 循环的别名指向同一张注册表。
+ * 锁四条：① 登记的防抖 flusher 被调用、scope 停止即注销、scope 外不登记；② 在途写入被等到，
+ * 失败在全部写入结算后聚合抛出；③ flusher **同步**发起的追踪写入在同一次 flush 里被等到；
+ * ④ H 循环的别名指向同一张注册表。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
 
 import * as H from '../hPendingWrites'
 import {
+  PendingWritesFlushError,
   _pendingWriteCounts,
   flushPendingWrites,
+  pendingWriteBarrierActive,
   registerPendingFlusher,
+  runWithPendingWriteBarrier,
   trackPendingWrite,
 } from '../pendingWrites'
 
@@ -36,7 +39,7 @@ function inScope(fn: () => void): ReturnType<typeof effectScope> {
 
 afterEach(async () => {
   for (const scope of scopes.splice(0)) scope.stop()
-  await flushPendingWrites()
+  await flushPendingWrites().catch(() => undefined)
 })
 
 describe('pendingWrites：防抖 flusher', () => {
@@ -62,7 +65,7 @@ describe('pendingWrites：防抖 flusher', () => {
     expect(flush).not.toHaveBeenCalled()
   })
 
-  it('一个 flusher 抛错不阻断其余 flusher，也不让 flush reject', async () => {
+  it('一个 flusher 抛错不阻断其余 flusher，并在全部结算后聚合报错', async () => {
     const ok = vi.fn()
     inScope(() => {
       registerPendingFlusher(() => {
@@ -70,8 +73,52 @@ describe('pendingWrites：防抖 flusher', () => {
       })
       registerPendingFlusher(ok)
     })
-    await expect(flushPendingWrites()).resolves.toBeUndefined()
+    await expect(flushPendingWrites()).rejects.toMatchObject({
+      name: 'PendingWritesFlushError',
+      failures: [expect.objectContaining({ source: 'flusher' })],
+    })
     expect(ok).toHaveBeenCalledTimes(1)
+  })
+
+  it('flusher 与本轮在途失败一起聚合，且同一错误不重复计数', async () => {
+    const write = deferred()
+    void trackPendingWrite(write.promise).catch(() => undefined)
+    inScope(() => registerPendingFlusher(() => {
+      throw new Error('flusher')
+    }))
+    const barrier = flushPendingWrites()
+    write.reject(new Error('in-flight'))
+    let caught: unknown
+    try {
+      await barrier
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(PendingWritesFlushError)
+    expect((caught as PendingWritesFlushError).failures.map((f) => f.source).sort()).toEqual([
+      'flusher',
+      'in_flight',
+    ])
+    // flusher 仍登记，所以第二轮只报告它；上一轮失败不能污染后续切换。
+    await expect(flushPendingWrites()).rejects.toMatchObject({
+      failures: [expect.objectContaining({ source: 'flusher' })],
+    })
+  })
+
+  it('并发屏障共享同一失败结果，不能由后到调用者绕过', async () => {
+    const write = deferred()
+    inScope(() => registerPendingFlusher(() => {
+      void trackPendingWrite(write.promise).catch(() => undefined)
+    }))
+    const first = flushPendingWrites()
+    const second = flushPendingWrites()
+    const sharesPromise = second === first
+    write.reject(new Error('并发保存失败'))
+    const [a, b] = await Promise.allSettled([first, second])
+    expect(sharesPromise).toBe(true)
+    expect(a.status).toBe('rejected')
+    expect(b.status).toBe('rejected')
+    expect((a as PromiseRejectedResult).reason).toBe((b as PromiseRejectedResult).reason)
   })
 })
 
@@ -92,11 +139,13 @@ describe('pendingWrites：在途写入', () => {
     expect(_pendingWriteCounts().inFlight).toBe(0)
   })
 
-  it('失败的写入不让 flush reject（失败由调用方自己提示）', async () => {
+  it('本轮在途写入失败保留原 rejection，同时让正在等待的保存屏障 fail-visible', async () => {
     const write = deferred()
     const tracked = trackPendingWrite(write.promise)
+    const barrier = flushPendingWrites()
     write.reject(new Error('500'))
     await expect(tracked).rejects.toThrow('500')
+    await expect(barrier).rejects.toBeInstanceOf(PendingWritesFlushError)
     await expect(flushPendingWrites()).resolves.toBeUndefined()
   })
 
@@ -124,5 +173,47 @@ describe('hPendingWrites 是别名，不是第二张注册表', () => {
     expect(H.registerHPendingFlusher).toBe(registerPendingFlusher)
     expect(H.trackHPendingWrite).toBe(trackPendingWrite)
     expect(H._hPendingWriteCounts).toBe(_pendingWriteCounts)
+  })
+})
+
+describe('pendingWrites：完整切换 lease', () => {
+  it('flush 后的投影/配置阶段仍保持 active，完成后才释放', async () => {
+    const transition = deferred<string>()
+    const operation = runWithPendingWriteBarrier(async () => {
+      await flushPendingWrites()
+      return transition.promise
+    })
+
+    expect(pendingWriteBarrierActive.value).toBe(true)
+    await Promise.resolve()
+    expect(pendingWriteBarrierActive.value).toBe(true)
+    transition.resolve('done')
+    await expect(operation).resolves.toBe('done')
+    expect(pendingWriteBarrierActive.value).toBe(false)
+  })
+
+  it('并发与嵌套 lease 由深度计数，先完成的一方不会提前解冻', async () => {
+    const first = deferred()
+    const second = deferred()
+    const a = runWithPendingWriteBarrier(() => first.promise)
+    const b = runWithPendingWriteBarrier(() =>
+      runWithPendingWriteBarrier(() => second.promise),
+    )
+    expect(pendingWriteBarrierActive.value).toBe(true)
+
+    first.resolve()
+    await a
+    expect(pendingWriteBarrierActive.value).toBe(true)
+
+    second.resolve()
+    await b
+    expect(pendingWriteBarrierActive.value).toBe(false)
+  })
+
+  it('过渡失败也在 finally 释放 lease', async () => {
+    await expect(runWithPendingWriteBarrier(async () => {
+      throw new Error('materialize failed')
+    })).rejects.toThrow('materialize failed')
+    expect(pendingWriteBarrierActive.value).toBe(false)
   })
 })

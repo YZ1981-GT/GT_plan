@@ -38,7 +38,7 @@
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
         :project-id="props.projectId"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         @fallback="onOoFallback"
       />
 
@@ -174,6 +174,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // G5-1 Phase 5 D4 canary：D4-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost）；
 // 其余 40+ sheet 仍走 useD4EntryDualMode。
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -256,7 +257,8 @@ const emit = defineEmits<{
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 /**
  * 适用准则：htmlData > runtime context（scaffold 从 render-config 顶层注入）。
@@ -633,9 +635,8 @@ async function selfLoad() {
 async function handleD4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (!Array.isArray(items) || items.length === 0) return
-  // 这是 window 事件的 fire-and-forget handler：saveBatch 内部对 canceled 已不弹 toast
-  // 但仍 rethrow（调用方可能要感知）。切「在线编辑」会 flush→abort 掉这次自动保存的 PUT，
-  // 这里必须吞掉，否则 rethrow 无人接 → 未捕获 Promise rejection（控制台红字 CanceledError）。
+  // window.dispatchEvent 不等待异步 listener。formData 队列已在真实 HTTP 边界登记 pending；
+  // 此处只消费 rejection，避免控制台产生未处理 Promise，保存成功后才排自动快照。
   try {
     await formData.saveBatch(
       items
@@ -645,10 +646,7 @@ async function handleD4SaveItems(e: Event): Promise<void> {
           data: { conclusion: it.conclusion ?? null, remark: it.remark ?? null },
         })),
     )
-  } catch (err: any) {
-    if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError' && err?.message !== 'canceled') {
-      throw err
-    }
+  } catch {
     return
   }
   scheduleAutoSnapshot()

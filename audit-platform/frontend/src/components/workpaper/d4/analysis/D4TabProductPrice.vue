@@ -12,6 +12,7 @@
  */
 import { newUuid } from '@/utils/uuid'
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
@@ -43,7 +44,13 @@ const ABNORMAL_THRESHOLD = 0.1
 // ─── 双模式 sync bridge（批次B 第五张：D4-11 迁 useWorkpaperSyncBridge，sheet_key=d411-managed）──
 //     参照 D4-6/D4-19 接桥范式。flushSave/loadData 等为函数声明（提升），此处引用安全。
 const D4_11_SHEET_KEY = 'd411-managed'
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD411() { loadData(); loadNoteConclusion(); loadAuditProcess() }
 const {
   syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,

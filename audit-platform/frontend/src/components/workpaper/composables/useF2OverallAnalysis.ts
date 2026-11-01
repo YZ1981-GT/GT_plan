@@ -9,6 +9,7 @@
  * 各段审计说明/异常原因 + 总体审计结论
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcSubtotal,
@@ -562,6 +563,15 @@ export function useF2OverallAnalysis(options: {
   const computedTurnoverDays = computed(() => indicatorsByYear.value.y0.days)
 
   // ─── Persist ────────────────────────────────────────────────────────────
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     if (debounceTimer) {

@@ -171,6 +171,7 @@
 import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /** F5TabAdjustment — F5-4 调整分录（借贷平衡校验 + 动态行 + 导入导出） */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from '../composables/useF5CosOfFormulaEngine'
 import { useF5AiGenerate } from '../composables/useF5AiGenerate'
 import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
@@ -323,7 +324,16 @@ function persist() {
     if (item) window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [item] } }))
   }, 2000)
 }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
+function flushPendingSave(): void {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  const item = allResponsesRef.value.get(STORAGE_KEY)
+  if (item) window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [item] } }))
+}
+
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 function fmt(v: number | null | undefined): string { return v == null || v === 0 ? '-' : v.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }
 function openReview() { openReviewDialog?.('F5-4-adjustment') }

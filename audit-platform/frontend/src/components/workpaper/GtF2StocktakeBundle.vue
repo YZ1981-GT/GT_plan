@@ -25,7 +25,7 @@
         :wp-id="props.wpId"
         :project-id="projectId"
         :sheet-name="props.sheetName || activeTab"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -71,9 +71,12 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, type Component } from 'vue'
 import { useRoute } from 'vue-router'
-import { useF2StocktakeFormData, type ChecklistResponse } from './composables/useF2StocktakeFormData'
+import { useF2StocktakeFormData } from './composables/useF2StocktakeFormData'
 import { useF2StocktakeDualMode } from './composables/useF2StocktakeDualMode'
-import { flushAllF2StocktakeFields } from './composables/useF2StocktakeSheet'
+import {
+  F2_STOCKTAKE_BUSINESS_READONLY_KEY,
+  type F2StocktakeSaveDetail,
+} from './composables/useF2StocktakeSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import F2TabStocktakeProcedure from './f2/stocktake/F2TabStocktakeProcedure.vue'
 import F2TabStocktakeQuestionnaire from './f2/stocktake/F2TabStocktakeQuestionnaire.vue'
@@ -86,6 +89,7 @@ import F2TabStocktakeRollforward from './f2/stocktake/F2TabStocktakeRollforward.
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -100,7 +104,9 @@ const props = defineProps<{
 
 const route = useRoute()
 const isLoading = ref(true)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
+provide(F2_STOCKTAKE_BUSINESS_READONLY_KEY, businessReadonly)
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
 
 const formData = useF2StocktakeFormData({
@@ -127,7 +133,7 @@ const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId, wpId: toRef(props, 'wpId'), projectId,
   sheetKey: syncSheetKey, capability: capabilityForEntry(F2T_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPendingSave()
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({ projectId: projectId.value, wpId: props.wpId, entryId: F2T_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: syncSheetKey.value }
   },
@@ -162,11 +168,8 @@ const dualMode = useF2StocktakeDualMode({
   wpId: toRef(props, 'wpId'),
   projectId,
   sheetCode: currentSheet,
-  readonly: isReadonly,
-  flushPending: async () => {
-    // 字段编辑 2s debounce；切 OO 前必须立即落库，否则 plan-sync 读到旧数据
-    await flushAllF2StocktakeFields()
-  },
+  // 过渡 active 只冻结新输入；已发生编辑的同步授权只看真实业务只读。
+  readonly: businessReadonly,
   reloadAll: () => formData.loadAll(),
 })
 
@@ -219,15 +222,18 @@ function tabComponent(id: string): Component {
 }
 
 async function handleSave(e: Event): Promise<void> {
-  const detail = (e as CustomEvent<{ items: ChecklistResponse[]; done?: () => void }>).detail
+  const detail = (e as CustomEvent<F2StocktakeSaveDetail>).detail
   const items = detail?.items
+  if (!Array.isArray(items) || items.length === 0) {
+    detail?.resolve?.()
+    return
+  }
   try {
-    if (Array.isArray(items) && items.length) {
-      await formData.saveItemsFromEvent(items)
-      scheduleAutoSnapshot()
-    }
-  } finally {
-    detail?.done?.()
+    await formData.saveItemsFromEvent(items)
+    scheduleAutoSnapshot()
+    detail.resolve?.()
+  } catch (error) {
+    detail.reject?.(error)
   }
 }
 

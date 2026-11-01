@@ -5,6 +5,7 @@
  */
 import { ref, onMounted, type Ref } from 'vue'
 import http from '@/utils/http'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 export type WorkpaperRenderMode = 'html' | 'onlyoffice'
 
@@ -43,7 +44,9 @@ export function useWorkpaperEntryDualMode(options: {
     if (target === mode.value) return
     if (target === 'onlyoffice' && !ooAvailable.value) return
     if (target === 'onlyoffice') {
-      mode.value = 'onlyoffice'
+      await runLegacyOnlyOfficeTransition(async () => {
+        mode.value = 'onlyoffice'
+      })
     } else {
       mode.value = 'html'
       await reloadAllResponses()

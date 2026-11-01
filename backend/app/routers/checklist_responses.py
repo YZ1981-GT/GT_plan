@@ -23,6 +23,9 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_wp_edit_permission
 from app.models.core import User
 from app.routers._wp_gate import enforce_wp_gate
+from app.services.checklist_response_cas import (
+    lock_and_check_versions as _lock_and_check_versions,
+)
 from app.services.review_rbac_guard import check_rbac, check_sign_lock, extract_base_level
 
 logger = logging.getLogger(__name__)
@@ -61,9 +64,14 @@ class ChecklistResponseOut(BaseModel):
 
 
 class BatchSaveRequest(BaseModel):
-    """批量保存请求体"""
+    """批量保存请求体。
+
+    ``require_if_match`` 是渐进迁移开关：新客户端固定为 True，既有行缺版本时
+    fail-visible 428；旧客户端省略时暂时保留 LWW，待调用面清零后移除兼容。
+    """
     project_id: Optional[uuid.UUID] = None
     items: list[ChecklistResponseItem]
+    require_if_match: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +255,12 @@ async def batch_save_checklist_responses(
                     body.items = kept_items
 
     try:
-        existing_versions = await _lock_and_check_versions(db, wp_id, body.items)
+        existing_versions = await _lock_and_check_versions(
+            db,
+            wp_id,
+            body.items,
+            require_if_match=body.require_if_match,
+        )
         results = await _do_batch_save(
             db,
             wp_id,
@@ -281,7 +294,7 @@ async def batch_save_checklist_responses(
         await db.commit()
     except HTTPException as exc:
         await db.rollback()
-        _save_status = "conflict" if exc.status_code == 409 else "error"
+        _save_status = "conflict" if exc.status_code in (409, 428) else "error"
         _elapsed_ms = (_time.perf_counter() - _save_t0) * 1000
         wp_metrics.observe_save(_elapsed_ms, status=_save_status)
         if not isinstance(exc.detail, dict):
@@ -331,44 +344,6 @@ def _infer_error_item_id(items: list[ChecklistResponseItem], detail: str) -> str
         if item.conclusion is not None and repr(item.conclusion) in detail:
             return item.item_id
     return items[0].item_id if items else None
-
-
-async def _lock_and_check_versions(
-    db: AsyncSession,
-    wp_id: uuid.UUID,
-    items: list[ChecklistResponseItem],
-) -> dict[str, str]:
-    """按稳定顺序锁定现存行，并在任何写入前完成整批冲突预检。"""
-    existing: dict[str, str] = {}
-    for item_id in sorted(item.item_id for item in items):
-        row = (
-            await db.execute(
-                text("""
-                    SELECT updated_at
-                    FROM checklist_responses
-                    WHERE wp_id = :wp_id AND item_id = :item_id
-                    FOR UPDATE
-                """),
-                {"wp_id": str(wp_id), "item_id": item_id},
-            )
-        ).fetchone()
-        if row and row.updated_at:
-            existing[item_id] = _version_of(row.updated_at) or ""
-
-    for item in items:
-        if item.if_match is None:
-            continue
-        server_version = existing.get(item.item_id)
-        if item.if_match != server_version:
-            raise HTTPException(status_code=409, detail={
-                "code": "version_conflict",
-                "item_id": item.item_id,
-                "client_version": item.if_match,
-                "server_version": server_version,
-                "message": "底稿条目已被其他客户端修改",
-                "atomic": True,
-            })
-    return existing
 
 
 async def _publish_checklist_saved(

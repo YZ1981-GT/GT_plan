@@ -43,9 +43,9 @@ describe('D4-7 毛利率分析必须消费平台 sync bridge（动态产品区 +
     expect(src).not.toContain('useWorkpaperSyncBridge(')
     expect(src).not.toContain('ContentMutationService')
   })
-  it('flushHtml 内 flushSave 先于 readStoreProjection', () => {
+  it('flushHtml 内 pending-only flush 先于 readStoreProjection', () => {
     expect(args).toContain('flushHtml')
-    const f = args.indexOf('flushSave'); const r = args.indexOf('readStoreProjection')
+    const f = args.indexOf('flushPendingSave'); const r = args.indexOf('readStoreProjection')
     expect(f).toBeGreaterThanOrEqual(0); expect(r).toBeGreaterThan(f)
   })
   it('sheetKey 锁 d47-managed 身份', () => {

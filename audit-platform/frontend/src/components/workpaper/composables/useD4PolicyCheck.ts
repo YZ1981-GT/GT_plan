@@ -17,6 +17,7 @@
  */
 import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import type { UseD4BaseOptions } from './useD4Adjudication'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -272,12 +273,13 @@ export function useD4PolicyCheck(options: UseD4BaseOptions): PolicyCheckReturn {
 
   /** 切 OO 前强制落盘（与 D4-3 flushPendingSave 同角色）。 */
   function flushPendingSave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

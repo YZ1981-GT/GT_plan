@@ -4,6 +4,7 @@
  * Spec: .kiro/specs/f2-inventory-main/ Task 15.5
  */
 import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal, calcNetValue, calcAuditedEnd } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 import { isF2DisclosureApplicable } from './f2NoteSectionMap'
@@ -622,6 +623,15 @@ export function useF2DisclosureListed(options: {
   function setItem(itemIdKey: string, remark: string): void {
     allResponses.value.set(itemIdKey, { item_id: itemIdKey, conclusion: null, remark })
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const keys = [

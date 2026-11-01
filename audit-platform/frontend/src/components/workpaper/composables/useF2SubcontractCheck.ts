@@ -2,6 +2,7 @@
  * useF2SubcontractCheck — F2-35 委托加工物资核查（三表）
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
 import {
   emptySubBasic,
@@ -102,6 +103,15 @@ export function useF2SubcontractSheet(opts: {
     const items = keys.map((k) => opts.allResponses.value.get(k)).filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function schedulePersist(): void {
     if (debounceTimer) clearTimeout(debounceTimer)

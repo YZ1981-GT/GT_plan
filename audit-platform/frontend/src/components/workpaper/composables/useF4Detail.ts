@@ -9,6 +9,7 @@
  * N:Q 未审账龄合计应等于 M；U:X 审定账龄合计应等于 T。
  */
 import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { getAuthHeaders } from '@/utils/authToken'
 import {
@@ -709,6 +710,15 @@ export function useF4Detail(options: UseF4DetailOptions) {
   }
 
   // ─── 清理 ─────────────────────────────────────────────────────────────────
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

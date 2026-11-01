@@ -10,6 +10,7 @@
  * Requirements: 8.1~8.8
  */
 import { ref, computed, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcAccruedDays,
@@ -616,6 +617,15 @@ export function useG2InterestCalc(options: UseG2InterestCalcOptions) {
       window.dispatchEvent(new CustomEvent('g2:save-items', { detail: { items } }))
     } catch { /* silent */ }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

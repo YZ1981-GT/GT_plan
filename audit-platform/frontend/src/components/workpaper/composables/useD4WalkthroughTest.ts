@@ -10,6 +10,7 @@
  * 按分录指纹去重，行元数据 `_gt` 随事项 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 10）。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum } from './useD4FormulaEngine'
 import { legacyIdentity, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
@@ -875,6 +876,15 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
   }
 
+  function flushPendingSave() {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
+
   /** 立即落库（抽凭回填 / 挂凭导入 / 撤销这类一次性操作，不等防抖） */
   function persistNow() {
     persistAll()
@@ -882,9 +892,7 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     flushSave()
   }
 
-  onBeforeUnmount(() => {
-    if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
-  })
+  onBeforeUnmount(flushPendingSave)
 
   // ─── Return ────────────────────────────────────────────────────────────
 
@@ -905,7 +913,7 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     updateSamplingParams,
     reindexItems,
     loadTransactions,
-    flushSave,  // D4-14 双向回写：sync bridge flushHtml 需先 flush 待存的 debounce 保存再读 store-projection
+    flushSave: flushPendingSave, // 保持父宿主 API；仅有待存 debounce 时写盘并先清 timer
     // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
     onEngineFilled: voucherFill.onEngineFilled,
     onAttachImported: voucherFill.onAttachImported,

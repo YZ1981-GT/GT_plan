@@ -7,6 +7,7 @@
  * 3) 审计说明（5问）+ 审计结论；异常波动提示索引 F2-64
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal, calcChangeRate } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 
@@ -323,6 +324,15 @@ export function useF2ProductionSales(options: {
   const enrichedRows = productViews
   const activeSegment = ref<'production' | 'sales' | 'inventory'>('production')
   const useVirtualScroll = computed(() => pack.value.products.length > 100)
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }

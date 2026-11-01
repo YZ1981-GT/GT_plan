@@ -8,6 +8,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * Requirements: 4.1~4.5, 6.1~6.4
  */
 import { inject, toRef, ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal } from '../composables/useF4AccPayFormulaEngine'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
@@ -154,7 +155,16 @@ function persist() {
   }, 2000)
 }
 
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
+function flushPendingSave(): void {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  const item = (props.allResponses as Map<string, ChecklistResponse>).get(STORAGE_KEY)
+  if (item) window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+}
+
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 function fmtAmount(v: number): string {
   if (v === 0) return '-'

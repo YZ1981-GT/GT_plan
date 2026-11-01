@@ -52,6 +52,25 @@ describe('useF2StocktakeDualMode 只读', () => {
     expect(t.reloadAll).toHaveBeenCalledTimes(1)
   })
 
+  it('结构化写入 Word 失败时保持 HTML，不挂载旧 OO', async () => {
+    const t = setup(false)
+    await flushPromises()
+    post.mockRejectedValueOnce({ response: { data: { detail: '注入同步失败' } } })
+    await t.api().switchMode('onlyoffice')
+    expect(t.api().currentMode.value).toBe('html')
+    expect(warning).toHaveBeenCalledWith('注入同步失败')
+  })
+
+  it('Word 回写结构化失败时保持 OO，不切回旧 HTML', async () => {
+    const t = setup(false)
+    await flushPromises()
+    await t.api().switchMode('onlyoffice')
+    post.mockRejectedValueOnce({ response: { data: { detail: '回写失败' } } })
+    await t.api().switchMode('html')
+    expect(t.api().currentMode.value).toBe('onlyoffice')
+    expect(warning).toHaveBeenCalledWith('回写失败')
+  })
+
   it('可编辑：照旧切过去写 Word、切回写回结构化（阴性对照）', async () => {
     const t = setup(false)
     await flushPromises()

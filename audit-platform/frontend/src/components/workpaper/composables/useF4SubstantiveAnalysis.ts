@@ -6,6 +6,7 @@
  * 2. 期末应付账款前十名：从F4-2按债权人归集并按期末审定数动态排序。
  */
 import { computed, inject, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcChangeAmount, calcChangeRate, calcSubtotal } from './useF4AccPayFormulaEngine'
 import {
   computeF4DetailRow,
@@ -452,6 +453,15 @@ export function useF4SubstantiveAnalysis(options: UseF4SubstantiveAnalysisOption
       window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
     }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

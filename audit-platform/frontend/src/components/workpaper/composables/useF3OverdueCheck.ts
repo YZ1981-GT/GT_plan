@@ -4,6 +4,7 @@
  * 对齐源表15项业务字段，并额外计算期限、逾期天数、未支付金额和风险提示。
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcOverdueDays, calcTermDays, calcSubtotal, parseNum } from './useF3FormulaEngine'
 import {
   F3_ROW_ID_PREFIX,
@@ -325,6 +326,15 @@ export function useF3OverdueCheck(options: UseF3BaseOptions) {
     } catch { /* silent */ }
     return { count: targets.length, total }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

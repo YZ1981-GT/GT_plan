@@ -41,7 +41,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="ooSheetName"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
         @fallback="onOoFallback"
       />
@@ -203,7 +203,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -246,6 +246,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { g2SheetKeyOf, isG2OoWiredRowsSheet } from './sync/g2ManagedSheets'
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -286,7 +287,8 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG2IntRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 // 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
 // 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
 const applicableStandards = useHostApplicableStandards({
@@ -400,7 +402,7 @@ const syncBridge = useWorkpaperSyncBridge({
   //    `all_store_item_ids()` 投影**整个 entry** 的全部受管区），传了会被静默丢弃并让
   //    TS 报 excess property。本 lane 按真实签名传三段。
   flushHtml: async () => {
-    formData.flushPending()
+    await formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -447,8 +449,10 @@ provide('reloadWorkpaperData', () => formData.loadAll())
 async function handleG2SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    try {
+      await formData.saveBatch(items)
+    } catch {
+      return
     }
     scheduleAutoSnapshot()
   }
@@ -481,7 +485,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('g2:save-items', handleG2SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  formData.flushPending()
+  void formData.flushPending().catch(() => undefined)
 })
 </script>
 

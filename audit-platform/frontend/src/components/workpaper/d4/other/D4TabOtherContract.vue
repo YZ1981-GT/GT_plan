@@ -8,6 +8,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双模式 + AI + 导入导出
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { parseNum, calcChangeAmount } from '../../composables/useD4FormulaEngine'
@@ -76,10 +77,14 @@ function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditC
 // 同步 flush：立即派发待存改动（清 debounce），供 bridge.flushHtml 在 readStoreProjection 前落库，
 // 防投影读到旧值（与 D4-20 flushPendingSave 同职责）。
 function flushPendingSave() {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
   const keys = ['D4-34-data','D4-34-note','D4-34-conclusion']
-  window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushPendingSave() } })
+  window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } }))
+}
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 // ─── D4-34 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
 const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag } = useD4SyncMode({

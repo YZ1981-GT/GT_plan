@@ -16,6 +16,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * OCR识别、AI辅助审计意见、统计仪表板
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
@@ -268,7 +269,13 @@ function flushSave() {
 }
 function updateAuditNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persistAll() }
 function updateAuditConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persistAll() }
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
 // ─── 双模式 sync bridge（批次B 第七张：D4-20 迁 useWorkpaperSyncBridge，sheet_key=d420-managed）──

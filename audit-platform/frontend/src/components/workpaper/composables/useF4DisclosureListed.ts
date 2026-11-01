@@ -11,6 +11,7 @@ import {
   computed, onScopeDispose, ref, toValue, watch,
   type ComputedRef, type MaybeRefOrGetter, type Ref,
 } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { parseNum, calcSubtotal, calcOutstandingDays } from './useF4AccPayFormulaEngine'
@@ -471,6 +472,15 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
       isSyncing.value = false
     }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   // 作用域销毁（组件卸载 / 离屏同步结束）时冲刷待保存项
   onScopeDispose(() => {

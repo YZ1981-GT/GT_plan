@@ -8,6 +8,7 @@
  * 4. 审计说明须分析本期较上期增减，变动比例超过 30% 的品种说明主要原因。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
@@ -660,6 +661,15 @@ export function useF5Adjudication(options: UseF5AdjudicationOptions) {
     if (data[NOTE_STORAGE_KEY] !== undefined) auditNote.value = data[NOTE_STORAGE_KEY]
     if (data[CONCLUSION_STORAGE_KEY] !== undefined) auditConclusion.value = data[CONCLUSION_STORAGE_KEY]
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

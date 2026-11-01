@@ -2,7 +2,9 @@
  * useF2StocktakeQuestionnaire — F2-21 v2 问卷持久化
  */
 import { ref, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import type { ChecklistResponse } from './useF2StocktakeFormData'
+import { dispatchF2StocktakeSave } from './useF2StocktakeSheet'
 import {
   emptyQuestionnaire,
   normalizeQuestionnaire,
@@ -21,9 +23,13 @@ const ROWS_KEY = 'F2-21-rows'
 
 export function useF2StocktakeQuestionnaire(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
+  /** 交互只读：业务只读或切换屏障 active，用户输入据此冻结。 */
   isReadonly?: Ref<boolean>
+  /** 业务写权限：切换屏障 active 时仍允许把已发生的编辑刷盘。 */
+  businessReadonly?: Readonly<Ref<boolean>>
 }) {
   const readonly = opts.isReadonly ?? ref(false)
+  const businessReadonly = opts.businessReadonly ?? readonly
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const data = ref<F21QuestionnaireData>(emptyQuestionnaire())
   const auditNote = ref('')
@@ -62,16 +68,23 @@ export function useF2StocktakeQuestionnaire(opts: {
     if (v != null) auditNote.value = v
   })
 
-  function flushSave(): void {
+  async function flushSave(): Promise<void> {
     const items = [
       opts.allResponses.value.get(FIELDS_KEY),
       opts.allResponses.value.get(NOTE_KEY),
-    ].filter(Boolean)
-    if (items.length) {
-      window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items } }))
-    }
+    ].filter(Boolean) as ChecklistResponse[]
+    await dispatchF2StocktakeSave(items)
     dirty.value = false
   }
+
+  async function flushPendingSave(): Promise<void> {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    await saveNow()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function persist(): void {
     if (readonly.value) return
@@ -82,15 +95,21 @@ export function useF2StocktakeQuestionnaire(opts: {
     })
     dirty.value = true
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 800)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 800)
   }
 
-  function saveNow(): void {
+  async function saveNow(): Promise<void> {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null
     }
-    if (readonly.value) return
+    if (businessReadonly.value) {
+      if (dirty.value) throw new Error('当前底稿已只读，问卷编辑尚未保存')
+      return
+    }
     opts.allResponses.value.set(FIELDS_KEY, {
       item_id: FIELDS_KEY,
       conclusion: null,
@@ -101,7 +120,7 @@ export function useF2StocktakeQuestionnaire(opts: {
       conclusion: null,
       remark: auditNote.value,
     })
-    flushSave()
+    await flushSave()
   }
 
   function replaceData(next: F21QuestionnaireData): void {
@@ -164,13 +183,16 @@ export function useF2StocktakeQuestionnaire(opts: {
     if (readonly.value) return
     opts.allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 800)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 800)
   })
 
   onBeforeUnmount(() => {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
-      saveNow()
+      void saveNow().catch(() => undefined)
     }
   })
 

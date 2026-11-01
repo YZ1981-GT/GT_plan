@@ -15,6 +15,7 @@
  * 🔴 初始不预置空占位行（初始行数 0，用户按需新增）；不种子源模板示例行。
  */
 import { ref, computed, watch, onBeforeUnmount, inject, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
@@ -145,15 +146,16 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
     }, DEBOUNCE_MS)
   }
 
-  /** 切模式前 flush：立即落库 debounce 中的编辑（防投影旧值）。 */
+  /** 切模式前 flush：仅立即落库 debounce 中的编辑（防投影旧值）。 */
   function flushPendingSave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     _writeItems()
     _dispatchSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   async function addRow(): Promise<void> {
     if (opts.isReadonly.value) return
@@ -223,12 +225,7 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
     persist()
   }
 
-  onBeforeUnmount(() => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      flushPendingSave()
-    }
-  })
+  onBeforeUnmount(flushPendingSave)
 
   const columns = computed(() => spec.columns)
 

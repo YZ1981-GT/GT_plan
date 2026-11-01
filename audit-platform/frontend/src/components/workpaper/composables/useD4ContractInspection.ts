@@ -7,6 +7,7 @@
  * Spec: .kiro/specs/d4-12-contract-inspection/
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum } from './useD4FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -394,9 +395,13 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
    * 供同步桥 flushHtml 在 readStoreProjection 前调用, 防投影旧值(切 OO 前先落库)。
    */
   async function flushPendingSave(): Promise<void> {
-    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }

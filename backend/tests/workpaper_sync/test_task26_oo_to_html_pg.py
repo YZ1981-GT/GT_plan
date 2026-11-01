@@ -78,6 +78,7 @@ CREATE TABLE working_paper (
 """
 
 ENTRY = "xlsx/gt-d2-accounts-receivable"
+ADAPTER_ID, ATOMIC_STORE_ITEMS = "test.atomic_store", ("task26-atomic-a", "task26-atomic-b")
 PERIOD = "header_block/period_label"
 TOTAL = "header_block/total_amount"
 ROWS = "ar_rows/{row_uuid}/amount"
@@ -476,7 +477,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         ArtifactKind,
         ArtifactState,
         BundleSlot,
-        CloseIntentState,
         ParticipantMode,
         RequestKind,
     )
@@ -740,7 +740,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             }
 
         # ═══ 每个场景一个独立 wp（互不污染 revision / room / pointer）═══════
-        async def _build_entry(tag: str, base_values: dict[str, Any]) -> dict[str, Any]:
+        async def _build_entry(tag: str, base_values: dict[str, Any], adapter_id: str = ENTRY) -> dict[str, Any]:
             wp = uuid.uuid4()
             async with engine.begin() as conn:
                 await conn.exec_driver_sql(
@@ -789,7 +789,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     artifact_id=art_rep.id, artifact_sha256=art_rep.sha256,
                     definition_bundle_id=world["bundle"],
                     authority_model_definition_id=world["authority"],
-                    adapter_id=ENTRY, adapter_build_digest=_d("task26-adapter"),
+                    adapter_id=adapter_id, adapter_build_digest=_d("task26-adapter"),
                     structure_hash=_d(f"task26-structure-{tag}"),
                     identity_inventory_sha256=_d(f"task26-identity-{tag}"),
                     reason="content_commit",
@@ -947,7 +947,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
 
         async def _correlate(
             env: dict[str, Any], entry: dict[str, Any], req: dict[str, Any],
-            inc: dict[str, Any],
+            inc: dict[str, Any], adapter_id: str = ENTRY,
         ) -> uuid.UUID:
             async with Session() as s:
                 repo = WorkpaperSyncRepository(s)
@@ -956,7 +956,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     operation_id=req["operation"],
                     incoming_artifact_id=inc["incoming"],
                     current_revision=0,
-                    adapter_id=ENTRY,
+                    adapter_id=adapter_id,
                     delivery_id=inc["delivery"],
                 )
                 await s.commit()
@@ -1309,7 +1309,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             incoming_values: dict[str, Any],
             quarantine: bool = False,
             contributor_user_ids: list[uuid.UUID] | None = None,
-            second_participant: bool = False,
+            second_participant: bool = False, adapter_id: str = ENTRY,
         ) -> dict[str, Any]:
             """建 entry + room + request + durable incoming + application。
 
@@ -1317,7 +1317,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             独立编辑），从而制造 base ≠ current 的三方局面。这里刻意不走 coordinator ——
             它是被测对象，用它造前置条件会让判据自证。
             """
-            entry = await _build_entry(tag, base_values)
+            entry = await _build_entry(tag, base_values, adapter_id)
             # 🔴 顺序即真实故事：先开 room 并 confirm descriptor（于是 frozen client base
             # = gen1），**再**在服务器侧发布 gen2 当 current。反过来做的话 room 的
             # client-confirmed 基线就等于 current，base 与 current 不可能分叉，
@@ -1354,7 +1354,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                         artifact_sha256=art_cur.sha256,
                         definition_bundle_id=world["bundle"],
                         authority_model_definition_id=world["authority"],
-                        adapter_id=ENTRY, adapter_build_digest=_d("task26-adapter"),
+                        adapter_id=adapter_id, adapter_build_digest=_d("task26-adapter"),
                         structure_hash=_d(f"task26-structure-{tag}-cur"),
                         identity_inventory_sha256=_d(f"task26-identity-{tag}-cur"),
                         reason="content_commit",
@@ -1374,10 +1374,10 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             app_id: uuid.UUID | None = None
             correlate_error: str | None = None
             if not quarantine:
-                app_id = await _correlate(env, entry, req, inc)
+                app_id = await _correlate(env, entry, req, inc, adapter_id)
             else:
                 try:
-                    app_id = await _correlate(env, entry, req, inc)
+                    app_id = await _correlate(env, entry, req, inc, adapter_id)
                 except Exception as exc:  # noqa: BLE001 - 隔离必须在 FK 层就被拒
                     correlate_error = f"{type(exc).__name__}:{getattr(exc, 'error_code', '')}"
             return {
@@ -2551,11 +2551,8 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         except Exception as exc:  # noqa: BLE001
             _phase_failed("pre_apply_failure", exc)
 
-        # ═══ S23：中断的 apply 被重驱候选查询选中（writeback-followup R3.2）══
-        # 采集体住 `task26_redrive_world.py`、判据住 `test_oo_apply_redrive_pg.py`。
         try:
             from tests.workpaper_sync.task26_redrive_world import collect_redrive
-
             snap["scenarios"]["redrive"] = await collect_redrive(SimpleNamespace(
                 Session=Session, project=project, user_a=user_a, contract=contract,
                 entry=ENTRY, period=PERIOD, total=TOTAL, err=_err,
@@ -2564,6 +2561,12 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             ))
         except Exception as exc:  # noqa: BLE001
             _phase_failed("redrive", exc)
+
+        try:
+            from tests.workpaper_sync.task26_store_atomic_world import collect_store_atomic
+            snap["scenarios"]["store_atomic"] = await collect_store_atomic({**globals(), **locals()}, adapter_id=ADAPTER_ID, store_items=ATOMIC_STORE_ITEMS)
+        except Exception as exc:  # noqa: BLE001
+            _phase_failed("store_atomic", exc)
 
         return snap
     finally:
@@ -2631,6 +2634,7 @@ class TestHarness:
             "closed_room",
             "pre_apply_failure",
             "redrive",
+            "store_atomic",
         }
 
 

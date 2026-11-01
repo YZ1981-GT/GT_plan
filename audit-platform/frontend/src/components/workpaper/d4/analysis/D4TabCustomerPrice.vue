@@ -18,6 +18,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  *        M=IF(AND(L=0,H=0),0,IF(AND(L=0,H>0),1,(H-L)/L))
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
@@ -56,7 +57,13 @@ const ABNORMAL_THRESHOLD = 0.2
 // 🔴 必须在任何 immediate watch 之前声明：setup 期 immediate watch 会经 persistData→debounceSave
 //    访问它，留到文件后段（let 处于 TDZ）会抛 ReferenceError 打挂组件（见下方「持久化」段说明）。
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD410() { loadData(); loadNoteConclusion(); loadAuditProcess() }
 const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag, syncHostRef } = useD4SyncMode({
   sheetKey: 'd410-managed',

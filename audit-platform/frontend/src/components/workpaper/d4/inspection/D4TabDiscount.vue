@@ -8,6 +8,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 自动计算折扣比例、OCR识别、AI辅助审计意见
  */
 import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
@@ -181,7 +182,13 @@ function flushSave() {
 }
 function updateAuditNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persistAll() }
 function updateAuditConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persistAll() }
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD419() { loadData(); loadNoteConclusion() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 

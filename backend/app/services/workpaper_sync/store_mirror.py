@@ -28,9 +28,19 @@ import json  # 🔴 模块级：三个 _mirror_* 函数都用 json.loads/dumps�
 #            `_mirror_dedicated_dict_stores` 靠外层类作用域的 import json 可见，搬成独立
 #            模块函数后必须显式在模块级 import（否则该函数内 json.loads 抛 NameError ——
 #            这是抽取时的搬移缺陷，adopt 首次真调即触发 500）。
+from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
+
+
+@dataclass(frozen=True)
+class _ResolvedMirrorTargets:
+    """第一条 store SQL 前冻结的 item 清单；执行期不得写出清单外 item。"""
+
+    all_item_ids: tuple[str, ...]
+    rows_loop_item_ids: tuple[str, ...]
+    dedicated_providers: tuple[tuple[Any, Any, str, Any], ...]
 
 
 # ===== 来自 oo_to_html.py L2571~L2681（_mirror_store_backed_if_needed）=====
@@ -61,13 +71,30 @@ async def mirror_projection_into_store(
     bridge = importlib.import_module(
         f"app.services.workpaper_sync.{plan.provider_module}"
     )
+    targets = _resolve_mirror_targets(adapter_id=adapter_id, plan=plan, bridge=bridge)
+    from app.services.checklist_response_cas import (
+        acquire_checklist_response_write_locks,
+    )
+
+    await acquire_checklist_response_write_locks(
+        session, wp_id, targets.all_item_ids
+    )
     if plan.dual_store_fn:
-        # 多 store item 的整体镜像走 provider 专用门面（D4 的 _mirror_d4_dual_stores 同型）。
+        # 多 store item 先按同一冻结清单加锁，再读取任何 base；顶层最多提交一次。
         await _mirror_dual_stores(
-            session, adapter_id=adapter_id, project_id=project_id, wp_id=wp_id, merged_projection=merged_projection, bridge=bridge, plan=plan, commit=commit
+            session,
+            adapter_id=adapter_id,
+            project_id=project_id,
+            wp_id=wp_id,
+            merged_projection=merged_projection,
+            bridge=bridge,
+            plan=plan,
+            targets=targets,
         )
+        if commit:
+            await session.commit()
         return
-    store_item_id = bridge.STORE_ITEM_ID
+    store_item_id = targets.all_item_ids[0]
     if plan.merge_state_fn:
         merge_kind = "state"
         merge_state_fn = getattr(bridge, plan.merge_state_fn)
@@ -95,8 +122,9 @@ async def mirror_projection_into_store(
             projection=merged_projection, base_state=base_state
         )
         if applied <= 0 and base_state:
-            return
-        payload = json.dumps(merged_payload, ensure_ascii=False)
+            payload: str | None = None
+        else:
+            payload = json.dumps(merged_payload, ensure_ascii=False)
     else:
         base_rows: list = []
         if raw:
@@ -111,62 +139,193 @@ async def mirror_projection_into_store(
         )
         if applied <= 0 and base_rows:
             # 投影相对 store 无字段变化时仍允许跳过写库（避免无意义大 JSON 刷新）
-            return
-        payload = json.dumps(merged_rows, ensure_ascii=False)
-    updated = (
-        await session.execute(
-            sa.text(columns.update_sql),
-            {
-                "val": payload,
-                "wp": str(wp_id),
-                "item": store_item_id,
-            },
-        )
-    ).rowcount
-    if not updated:
-        await session.execute(
-            sa.text(columns.insert_sql),
-            {
-                "pid": str(project_id),
-                "wp": str(wp_id),
-                "item": store_item_id,
-                "val": payload,
-            },
-        )
+            payload = None
+        else:
+            payload = json.dumps(merged_rows, ensure_ascii=False)
+    if payload is not None:
+        updated = (
+            await session.execute(
+                sa.text(columns.update_sql),
+                {
+                    "val": payload,
+                    "wp": str(wp_id),
+                    "item": store_item_id,
+                },
+            )
+        ).rowcount
+        if not updated:
+            await session.execute(
+                sa.text(columns.insert_sql),
+                {
+                    "pid": str(project_id),
+                    "wp": str(wp_id),
+                    "item": store_item_id,
+                    "val": payload,
+                },
+            )
     if commit:
         await session.commit()
 
 
 # ===== 来自 oo_to_html.py L2683~L2764（_mirror_dedicated_dict_stores）=====
+def _resolve_dedicated_store_providers(
+    *, adapter_id: str, plan: Any = None
+) -> tuple[tuple[Any, Any, str, Any], ...]:
+    """在任何 store SQL 前解析 dedicated 声明；配置漂移必须 fail-visible。"""
+    import importlib
+
+    from app.services.workpaper_sync.store_item_specs import (
+        StoreMergePlanNotRegisteredError,
+    )
+    from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
+
+    active_plan = plan or STORE_MERGE_REGISTRY.get(adapter_id)
+    if active_plan is None or not active_plan.dedicated_items:
+        return ()
+
+    resolved: list[tuple[Any, Any, str, Any]] = []
+    for dedicated in active_plan.dedicated_items:
+        try:
+            module = importlib.import_module(
+                f"app.services.workpaper_sync.{dedicated.provider_module}"
+            )
+        except ImportError as exc:
+            raise StoreMergePlanNotRegisteredError(
+                f"adapter {adapter_id!r} 的 dedicated provider "
+                f"{dedicated.provider_module!r} 无法导入"
+            ) from exc
+        missing = [
+            symbol
+            for symbol in (dedicated.item_id_const, dedicated.merge_fn)
+            if not hasattr(module, symbol)
+        ]
+        if missing:
+            raise StoreMergePlanNotRegisteredError(
+                f"adapter {adapter_id!r} 的 dedicated provider "
+                f"{dedicated.provider_module!r} 缺少声明符号 {missing}"
+            )
+        item_id = getattr(module, dedicated.item_id_const)
+        merge_fn = getattr(module, dedicated.merge_fn)
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise StoreMergePlanNotRegisteredError(
+                f"adapter {adapter_id!r} 的 dedicated provider "
+                f"{dedicated.provider_module!r}.{dedicated.item_id_const} 必须是非空字符串"
+            )
+        if not callable(merge_fn):
+            raise StoreMergePlanNotRegisteredError(
+                f"adapter {adapter_id!r} 的 dedicated provider "
+                f"{dedicated.provider_module!r}.{dedicated.merge_fn} 不可调用"
+            )
+        resolved.append((dedicated, module, item_id, merge_fn))
+    return tuple(resolved)
+
+
+def _normalize_declared_item_ids(values: Any, *, source: str) -> tuple[str, ...]:
+    if isinstance(values, str):
+        candidates = (values,)
+    else:
+        try:
+            candidates = tuple(values or ())
+        except TypeError as exc:
+            raise ValueError(f"{source} 必须是 item_id 字符串或可迭代清单") from exc
+    normalized: list[str] = []
+    for value in candidates:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{source} 含空或非字符串 item_id: {value!r}")
+        if value not in normalized:
+            normalized.append(value)
+    return tuple(normalized)
+
+
+def _resolve_mirror_targets(
+    *, adapter_id: str, plan: Any, bridge: Any
+) -> _ResolvedMirrorTargets:
+    """在锁与第一条 store SQL 前冻结本次可能读取/写入的完整 item 集合。"""
+    dedicated = _resolve_dedicated_store_providers(adapter_id=adapter_id, plan=plan)
+    if not plan.dual_store_fn:
+        item_id = getattr(bridge, "STORE_ITEM_ID", None)
+        ids = _normalize_declared_item_ids(item_id, source=f"{adapter_id}.STORE_ITEM_ID")
+        if len(ids) != 1:
+            raise ValueError(f"{adapter_id} 单 store 计划必须恰有一个 item_id")
+        return _ResolvedMirrorTargets(ids, (), dedicated)
+
+    all_ids_fn = getattr(bridge, "all_store_item_ids", None)
+    rows_declared = (
+        all_ids_fn() if callable(all_ids_fn) else getattr(bridge, "STORE_ITEM_IDS", ())
+    )
+    rows = _normalize_declared_item_ids(
+        rows_declared, source=f"{adapter_id}.all_store_item_ids"
+    )
+    candidates: list[str] = list(rows)
+    candidates.extend(
+        _normalize_declared_item_ids(
+            [getattr(item, "item_id", None) for item in getattr(plan, "items", ())],
+            source=f"{adapter_id}.plan.items",
+        )
+    )
+    candidates.extend(item_id for _d, _m, item_id, _fn in dedicated)
+    for name in (
+        "STORE_ITEM_IDS_D45_FIXED",
+        "STORE_ITEM_IDS_D413_FIXED",
+        "STORE_ITEM_IDS_D47_DEDICATED",
+    ):
+        candidates.extend(
+            _normalize_declared_item_ids(
+                getattr(bridge, name, ()), source=f"{adapter_id}.{name}"
+            )
+        )
+    for name in (
+        "STORE_ITEM_ID_D435_DICT",
+        "STORE_ITEM_ID_D49_DICT",
+        "STORE_ITEM_ID_D48_DICT",
+        "STORE_ITEM_ID_D433_DICT",
+        "STORE_ITEM_ID_D434_DICT",
+        "STORE_ITEM_ID_D436_DICT",
+    ):
+        value = getattr(bridge, name, None)
+        if value is not None:
+            candidates.extend(
+                _normalize_declared_item_ids(value, source=f"{adapter_id}.{name}")
+            )
+    all_item_ids = tuple(sorted(set(candidates)))
+    if not all_item_ids:
+        raise ValueError(f"{adapter_id} 多 store 计划没有可锁定的 item_id")
+    return _ResolvedMirrorTargets(all_item_ids, rows, dedicated)
+
+
+def _assert_targets_locked(
+    item_ids: Any, *, targets: _ResolvedMirrorTargets, source: str
+) -> None:
+    actual = set(_normalize_declared_item_ids(item_ids, source=source))
+    missing = sorted(actual - set(targets.all_item_ids))
+    if missing:
+        raise RuntimeError(f"{source} 产出未预锁定的 store item: {missing}")
+
+
 async def _mirror_dedicated_dict_stores(
-    session: Any, *, adapter_id: str, project_id: Any, wp_id: Any, merged_projection: Any, commit: bool = True
+    session: Any,
+    *,
+    adapter_id: str,
+    project_id: Any,
+    wp_id: Any,
+    merged_projection: Any,
+    resolved: tuple[tuple[Any, Any, str, Any], ...],
+    targets: _ResolvedMirrorTargets,
 ) -> None:
     """按注册表 `dedicated_items` 清单逐条镜像 dict/list store（Task 13 收敛）。
 
     取代原 6 段几乎逐字重复的 `hasattr(bridge, ...)` 试探代码。每条的行为与原对应段
     逐字节一致：同一条 SELECT/UPDATE/INSERT SQL、同一个「applied<=0 且已有基线则跳过
     写库」判断（dict 基线用 `is not None`、list 基线用真值判断——D4-8 是全仓唯一 list
-    基线，空列表 `[]` 也应触发跳过，这条差异原样保留，不强行统一）、同一个 per-item commit。
+    基线，空列表 `[]` 也应触发跳过，这条差异原样保留，不强行统一）。provider 声明已在
+    `_mirror_dual_stores` 的任何 SQL 之前解析；缺常量、缺函数或函数不可调用均显式失败。
     """
-    from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
-
-    plan = STORE_MERGE_REGISTRY.get(adapter_id)
-    if plan is None or not plan.dedicated_items:
-        return
-
-    import importlib
-
-    for dedicated in plan.dedicated_items:
-        module = importlib.import_module(
-            f"app.services.workpaper_sync.{dedicated.provider_module}"
-        )
-        if not (hasattr(module, dedicated.merge_fn) and hasattr(module, dedicated.item_id_const)):
-            # 与原 hasattr 试探等价的兜底：provider 未提供该门面则跳过（不是"漏注册"，
-            # 是"注册表登记了但 provider 侧尚未实现"——两者观测面不同，保持跳过而非报错，
-            # 因为原代码本就是 hasattr 试探式的软跳过，不是这次改动引入的新语义）。
-            continue
-        item_id = getattr(module, dedicated.item_id_const)
-        merge_fn = getattr(module, dedicated.merge_fn)
+    _assert_targets_locked(
+        [item_id for _d, _m, item_id, _fn in resolved],
+        targets=targets,
+        source=f"{adapter_id}.dedicated_items",
+    )
+    for dedicated, _module, item_id, merge_fn in resolved:
         raw = (
             await session.execute(
                 sa.text(
@@ -219,20 +378,29 @@ async def _mirror_dedicated_dict_stores(
                     "val": payload,
                 },
             )
-        if commit:
-            await session.commit()
 
 
 # ===== 来自 oo_to_html.py L2766~L3042（_mirror_d4_dual_stores）=====
 async def _mirror_dual_stores(
-    session: Any, *, adapter_id: str, project_id: Any, wp_id: Any, merged_projection: Any, bridge: Any, plan: Any = None, commit: bool = True
+    session: Any,
+    *,
+    adapter_id: str,
+    project_id: Any,
+    wp_id: Any,
+    merged_projection: Any,
+    bridge: Any,
+    plan: Any,
+    targets: _ResolvedMirrorTargets,
 ) -> None:
     """多 store item 整体镜像：按 table 前缀分别 merge 后写回各自 checklist item。
 
     🔴 泛化（spec workpaper-sync-registration-isolation）：`plan.merge_all_fn` 动态取
     bridge 上的 merge 函数名，取代硬编码 `bridge.merge_projection_into_all_d4_stores`。
     D4 行为逐字节不变（`merge_all_fn` 默认值就是 `merge_projection_into_all_d4_stores`）。
+    dedicated provider 的声明在任何 SELECT/UPDATE 前一次性解析；缺符号时整笔镜像失败。
     """
+    dedicated_providers = targets.dedicated_providers
+
     import json
 
     # dict store（D4-9 {current,prior}+totals / D4-33 {bizTypes,months,priorYear} /
@@ -263,9 +431,11 @@ async def _mirror_dual_stores(
     # 🔴 rows 循环的**基础集合**取 provider 单一口径 `all_store_item_ids()`（与出方向
     #    store_projection_response 同源，Requirement 3.1「两方向不得各自维护并集」），
     #    再显式减去上面所有走专用块的 item。老 provider 无该函数则回退 STORE_ITEM_IDS。
-    _all_ids_fn = getattr(bridge, "all_store_item_ids", None)
-    _rows_loop_item_ids = (
-        tuple(_all_ids_fn()) if callable(_all_ids_fn) else tuple(bridge.STORE_ITEM_IDS)
+    _rows_loop_item_ids = targets.rows_loop_item_ids
+    _assert_targets_locked(
+        _rows_loop_item_ids,
+        targets=targets,
+        source=f"{adapter_id}.rows_loop",
     )
     from app.services.workpaper_sync.store_payload_columns import payload_columns_of, read_payload
 
@@ -295,7 +465,9 @@ async def _mirror_dual_stores(
     updates = _merge_all_fn(
         projection=merged_projection, base_by_item=base_by_item
     )
-    wrote_any = False
+    _assert_targets_locked(
+        updates.keys(), targets=targets, source=f"{adapter_id}.{_merge_all_fn_name}"
+    )
     for item_id, (merged_rows, applied, _visited, _touched) in updates.items():
         base_rows = base_by_item.get(item_id) or []
         if applied <= 0 and base_rows:
@@ -323,15 +495,15 @@ async def _mirror_dual_stores(
                     "val": payload,
                 },
             )
-        wrote_any = True
-    if wrote_any:
-        if commit:
-            await session.commit()
-
     # D4-5 固定 item（纯文本 remark）
     if hasattr(bridge, "merge_d45_fixed_from_projection") and hasattr(
         bridge, "STORE_ITEM_IDS_D45_FIXED"
     ):
+        _assert_targets_locked(
+            bridge.STORE_ITEM_IDS_D45_FIXED,
+            targets=targets,
+            source=f"{adapter_id}.STORE_ITEM_IDS_D45_FIXED",
+        )
         base_fixed: dict[str, str | None] = {}
         for item_id in bridge.STORE_ITEM_IDS_D45_FIXED:
             raw = (
@@ -346,6 +518,9 @@ async def _mirror_dual_stores(
             base_fixed[item_id] = raw if isinstance(raw, str) else None
         fixed_updates = bridge.merge_d45_fixed_from_projection(
             projection=merged_projection, base_by_item=base_fixed
+        )
+        _assert_targets_locked(
+            fixed_updates.keys(), targets=targets, source=f"{adapter_id}.merge_d45_fixed"
         )
         for item_id, text in fixed_updates.items():
             updated = (
@@ -375,14 +550,16 @@ async def _mirror_dual_stores(
                         "val": text,
                     },
                 )
-        if fixed_updates:
-            if commit:
-                await session.commit()
 
     # D4-13 固定 item（核对过程/核对结论，纯文本 remark）—— 与 D4-5 固定 item 同构。
     if hasattr(bridge, "merge_d413_fixed_from_projection") and hasattr(
         bridge, "STORE_ITEM_IDS_D413_FIXED"
     ):
+        _assert_targets_locked(
+            bridge.STORE_ITEM_IDS_D413_FIXED,
+            targets=targets,
+            source=f"{adapter_id}.STORE_ITEM_IDS_D413_FIXED",
+        )
         base_fixed_d413: dict[str, str | None] = {}
         for item_id in bridge.STORE_ITEM_IDS_D413_FIXED:
             raw = (
@@ -397,6 +574,11 @@ async def _mirror_dual_stores(
             base_fixed_d413[item_id] = raw if isinstance(raw, str) else None
         fixed_updates_d413 = bridge.merge_d413_fixed_from_projection(
             projection=merged_projection, base_by_item=base_fixed_d413
+        )
+        _assert_targets_locked(
+            fixed_updates_d413.keys(),
+            targets=targets,
+            source=f"{adapter_id}.merge_d413_fixed",
         )
         for item_id, text in fixed_updates_d413.items():
             updated = (
@@ -426,9 +608,6 @@ async def _mirror_dual_stores(
                         "val": text,
                     },
                 )
-        if fixed_updates_d413:
-            if commit:
-                await session.commit()
 
     # D4-35 dict store（{rows, sampling, periodAmount}）：只 merge rows，保留 sampling/periodAmount
     # 🔴 原 6 段几乎逐字重复的 hasattr 试探代码（D4-35/D4-9/D4-8/D4-33/D4-34/D4-36）已收敛
@@ -438,7 +617,15 @@ async def _mirror_dual_stores(
     # 静默尝试（原判据本就是"存在就跑"，收敛后行为等价：注册表里的清单与原 hasattr 目标
     # 逐个对应，零增减）。逐条 SQL 语句与提交时机保持逐字节不变，只把判断入口从运行时
     # hasattr 探测改成注册表登记。
-    await _mirror_dedicated_dict_stores(session, adapter_id=adapter_id, project_id=project_id, wp_id=wp_id, merged_projection=merged_projection, commit=commit)
+    await _mirror_dedicated_dict_stores(
+        session,
+        adapter_id=adapter_id,
+        project_id=project_id,
+        wp_id=wp_id,
+        merged_projection=merged_projection,
+        resolved=dedicated_providers,
+        targets=targets,
+    )
 
     # D4-7 两 store item（D4-7-products 行数组 + D4-7-monthly 标量对象）：同 sheet 1 dynamic + 1 static，
     # 由专用块同时处理两 item（不进 rows 4-tuple 循环）。§一月度静态 cell 随 §二产品 binding 一起被
@@ -446,6 +633,11 @@ async def _mirror_dual_stores(
     if hasattr(bridge, "merge_d47_from_projection") and hasattr(
         bridge, "STORE_ITEM_IDS_D47_DEDICATED"
     ):
+        _assert_targets_locked(
+            bridge.STORE_ITEM_IDS_D47_DEDICATED,
+            targets=targets,
+            source=f"{adapter_id}.STORE_ITEM_IDS_D47_DEDICATED",
+        )
         d47_base: dict = {}
         for item_id in bridge.STORE_ITEM_IDS_D47_DEDICATED:
             raw = (
@@ -461,7 +653,9 @@ async def _mirror_dual_stores(
         d47_updates = bridge.merge_d47_from_projection(
             projection=merged_projection, base_by_item=d47_base
         )
-        d47_wrote = False
+        _assert_targets_locked(
+            d47_updates.keys(), targets=targets, source=f"{adapter_id}.merge_d47"
+        )
         for item_id, (merged_payload, applied) in d47_updates.items():
             # 无投影覆盖且已有基线 → 不写（避免把已有 store 覆空）
             if applied <= 0 and d47_base.get(item_id) is not None:
@@ -490,7 +684,3 @@ async def _mirror_dual_stores(
                         "val": payload,
                     },
                 )
-            d47_wrote = True
-        if d47_wrote:
-            if commit:
-                await session.commit()

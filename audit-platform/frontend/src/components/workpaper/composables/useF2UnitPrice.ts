@@ -2,6 +2,7 @@
  * useF2UnitPrice — F2-62 三层采购单价交叉分析
  */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   defaultUnitPriceSheet,
@@ -37,6 +38,15 @@ export function useF2UnitPrice(opts: {
 
   const sheet = ref<UnitPriceSheet>(defaultUnitPriceSheet())
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

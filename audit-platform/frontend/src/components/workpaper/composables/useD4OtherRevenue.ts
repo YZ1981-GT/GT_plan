@@ -14,6 +14,7 @@
  * Requirements: 4.1-4.7
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcAuditedWithAdj,
@@ -271,12 +272,13 @@ export function useD4OtherRevenue(options: UseD4BaseOptions) {
   }
 
   function flushPendingSave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   function onHostFlushPending(): void {
     flushPendingSave()

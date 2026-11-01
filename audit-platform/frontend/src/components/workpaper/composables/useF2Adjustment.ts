@@ -4,6 +4,7 @@
  * 比照 useD4Adjustment / useG3Adjustment（集中表推送）
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
@@ -160,16 +161,27 @@ export function useF2Adjustment(options: {
 
   function debounceSave(): void {
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; void flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void flushSave().catch(() => undefined)
+    }, 2000)
   }
+
+  function flushPendingSave(): Promise<void> | void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    return flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   async function flushSave(): Promise<void> {
     const item = allResponses.value.get(STORAGE_KEY)
     if (!item) return
     if (saveItems) {
-      try {
-        await saveItems([item])
-      } catch { /* parent/HTTP 失败时仍尝试 window 兜底 */ }
+      await saveItems([item])
+      return
     }
     window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
   }
@@ -299,7 +311,11 @@ export function useF2Adjustment(options: {
 
   if (getCurrentInstance()) {
     onBeforeUnmount(() => {
-      if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; void flushSave() }
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+        void flushSave().catch(() => undefined)
+      }
     })
   }
 

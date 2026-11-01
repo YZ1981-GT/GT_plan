@@ -11,6 +11,7 @@
  * 计息核对字段（面值/利率/起止日等）保留，便于与 G2-5 交叉核对。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcAccruedDays,
@@ -592,6 +593,15 @@ export function useG2Detail(options: UseG2DetailOptions) {
   }
   window.addEventListener('g2:aging-preset-sync', onG2AgingSync)
   eventListeners.push({ event: 'g2:aging-preset-sync', handler: onG2AgingSync })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     for (const { event, handler } of eventListeners) {

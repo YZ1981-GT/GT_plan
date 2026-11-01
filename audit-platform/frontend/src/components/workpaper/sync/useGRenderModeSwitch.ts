@@ -28,9 +28,10 @@
  * 已如实登记）。两条路**不能并进同一个布尔** —— D4-35 / D4-13 踩过「切错桥 + 工具条
  * 叠加」。故 `renderMode` 按当前 sheet 是否受管**分别取源**，与 G7 宿主同构。
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { dualModeHtmlOoOptions, type DualModeSegmentedOption } from '../composables/dualModeLabels'
 import type { WorkpaperSyncBridge } from './useWorkpaperSyncBridge'
+import { runLegacyOnlyOfficeTransition } from './legacyPendingWriteBarrier'
 
 export type GRenderMode = 'html' | 'onlyoffice'
 
@@ -43,6 +44,8 @@ export interface GSyncEditorHostHandle {
 export interface GLegacyDualMode {
   currentMode: Ref<GRenderMode> | { value: GRenderMode }
   onModeChange: (val: string | number | boolean) => void | Promise<void>
+  /** 自动恢复 OO 偏好前重新确认服务可用，避免 mounted 时的健康检查竞态。 */
+  checkOOHealth?: () => Promise<boolean>
 }
 
 export interface GRenderModeSwitchOptions {
@@ -108,15 +111,80 @@ export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRender
   )
 
   const modeOptions = Object.freeze(dualModeHtmlOoOptions())
+  let authorizedLegacyTransitionDepth = 0
+  let restoringLegacyPreference = false
+  let deferredLegacyPreference = false
+
+  async function enterLegacyOnlyOffice(verifyHealth = false): Promise<boolean> {
+    return runLegacyOnlyOfficeTransition(async () => {
+      authorizedLegacyTransitionDepth += 1
+      try {
+        if (verifyHealth && legacy.checkOOHealth && !(await legacy.checkOOHealth())) return
+        await legacy.onModeChange('onlyoffice')
+      } finally {
+        authorizedLegacyTransitionDepth -= 1
+      }
+    })
+  }
+
+  function restoreLegacyPreference(): void {
+    if (restoringLegacyPreference || isManagedSheet.value) {
+      deferredLegacyPreference = true
+      return
+    }
+    restoringLegacyPreference = true
+    deferredLegacyPreference = false
+    switching.value = true
+    void enterLegacyOnlyOffice(true)
+      .catch(() => {
+        legacy.currentMode.value = 'html'
+      })
+      .finally(() => {
+        restoringLegacyPreference = false
+        switching.value = false
+      })
+  }
+
+  // 旧 composable 的 mounted 恢复会直接把 ref 写成 OO，绕过共享点击入口。同步拦回 HTML，
+  // 再经完整屏障恢复；受管 sheet 先记住偏好，切到 legacy sheet 时才恢复，避免隐藏路径物化。
+  watch(
+    () => legacy.currentMode.value,
+    (mode) => {
+      if (mode !== 'onlyoffice' || authorizedLegacyTransitionDepth > 0) return
+      legacy.currentMode.value = 'html'
+      restoreLegacyPreference()
+    },
+    { flush: 'sync' },
+  )
+  watch(
+    () => isManagedSheet.value,
+    (managed) => {
+      if (!managed && deferredLegacyPreference) restoreLegacyPreference()
+    },
+    { flush: 'sync' },
+  )
 
   async function switchRenderMode(rawTarget: string | number | boolean): Promise<void> {
     const target = rawTarget as GRenderMode
     if (target !== 'html' && target !== 'onlyoffice') return
     if (switching.value) return
 
-    // 非受管 sheet：保留 legacy 行为（legacy 自己判重、自己写 localStorage）。
+    // 非受管 sheet：完整 lease 覆盖 flush、legacy config 和最终模式赋值。
     if (!isManagedSheet.value) {
-      await legacy.onModeChange(target)
+      if (target === renderMode.value) return
+      switching.value = true
+      try {
+        if (target === 'onlyoffice') {
+          await enterLegacyOnlyOffice()
+        } else {
+          deferredLegacyPreference = false
+          await legacy.onModeChange('html')
+        }
+      } catch {
+        if (target === 'onlyoffice') legacy.currentMode.value = 'html'
+      } finally {
+        switching.value = false
+      }
       return
     }
     if (target === renderMode.value) return

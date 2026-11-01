@@ -8,6 +8,7 @@
  *  分厂行 = Σ产品；总计行 = Σ分厂
  */
 import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal } from './useF5CosOfFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -487,6 +488,15 @@ export function useF5QuantityRecon(options: UseF5QuantityReconOptions) {
     allResponses.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: value })
     debounceSave()
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

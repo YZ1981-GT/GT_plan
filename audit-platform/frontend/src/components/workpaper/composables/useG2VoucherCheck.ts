@@ -11,6 +11,7 @@
  * （spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcInterest365, calcOverdueDays } from './useG2IntRecFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import {
@@ -877,6 +878,15 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
       window.dispatchEvent(new CustomEvent('g2:save-items', { detail: { items } }))
     } catch { /* silent */ }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   // 仅在组件 setup 内注册生命周期，避免单测/非组件调用告警
   if (getCurrentInstance()) {
