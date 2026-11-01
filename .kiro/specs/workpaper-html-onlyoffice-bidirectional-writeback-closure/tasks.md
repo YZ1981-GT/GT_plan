@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：27/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：28/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -275,8 +275,13 @@
 
 ## Phase 4：按当前事实收口逐 entry lane
 
-- [ ] 4.1 建 residual lane 交接模板和机器清册
+- [x] 4.1 建 residual lane 交接模板和机器清册
   - 每行包含 owner、entry、counterpart、contract/provider、definition/bundle、representation、host、required scenarios、evidence、回滚和解除条件。
+  - 产物：`backend/scripts/gen/generate_residual_lane_ledger.py`（`--check` / `--write`，输出幂等）
+    + `backend/data/workpaper_sync_residual_lane_ledger.json`（145 条 independent entry，
+    按 owner_task 分组：4.2 D/E 9 条 · 4.3 F 8 条 · 4.4 G/H/I 41 条 · 4.5 J/K/L 19 条 ·
+    4.6 M/N 15 条 · 4.7 A/B/C 39 条 · 4.8 S+跨循环 14 条）+ 守卫
+    `backend/tests/workpaper_sync/test_residual_lane_ledger.py`（7 例全绿）。
   - _AC: 12.1, 12.8, 12.9_
 
 - [ ] 4.2 对账并收口 D/E entries
