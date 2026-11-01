@@ -253,14 +253,25 @@
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
-  - 🔴 **渐进迁移，棘轮只减**：现算 **110** 条宿主仍自行决定（126 → 125 → 113 → **110**）。
+  - 🔴 **渐进迁移，棘轮只减**：现算 **102** 条宿主仍自行决定（126 → 125 → 113 → 110 → **102**）。
   - **共享切换器已接单源**：`sync/useGRenderModeSwitch.ts` 新增可选 `entrySync` 入参 +
     暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ G 循环 16 个宿主只需传入已有的
     readiness 实例即可完成迁移，不用各写一遍判断。**这是本任务的杠杆点**：改 1 个 composable
     + 每宿主 3 行，取代 126 份各写一遍判断。
-  - **已迁移 17 个**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
+  - **已迁移 25 个**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
     （第一批）· 第二批 12 个（G1 / G3 / G4-ECL / G4-Main / G4-SPPI / G5 / G6-Main /
-    G6-SPPI / G8 / G9 / G13 / G14）· 第三批 3 个（G10 / G11 / G12）。
+    G6-SPPI / G8 / G9 / G13 / G14）· 第三批 3 个（G10 / G11 / G12）· 第四批 8 个
+    （L1~L8，载体 `composables/useCycleHtmlOoDualMode.ts`）。
+  - **第二个杠杆点 = `useCycleHtmlOoDualMode`**（L 循环共用）：按 `useGRenderModeSwitch`
+    同一模式加可选 `entrySync` + 暴露 `showModeSwitch`。与 G 组三处差别**不可照抄**：
+    ① 宿主的模式 segmented **原本没有 `v-if`** ⇒ 动作是「新增」而非「合取」；
+    ② 没有 `*_SYNC_ENTRY_ID` 常量 ⇒ entry id 取宿主 notice 上的字面量（同值，不新造）；
+    ③ L4 宿主另有一个纯业务 `el-segmented`（债券分支选择器）**不得**被同步能力门控 ⇒
+       迁移脚本按「绑在 `<var>.currentMode.value` 上的那一个」定位，不按「宿主内所有 segmented」。
+    专门核验脚本逐标签对账（`tmp_workpaper_sync_impl/verify_l4_business_seg.py`）：
+    9 个标签全部 `is_mode == gated`，L4 业务分段器 `gated=False` ✓。
+  - 本批未迁 `CycleStandaloneProcedureShell.vue`（同载体但**无固定 entry id** —— 它是跨循环
+    共享壳，entry 随 wp_code 运行时确定）⇒ 留在棘轮里，须另案（给它传运行时 entry id）。
   - 🔴 第三批是**第二批的漏点**：它们同样 import `useGRenderModeSwitch`、`v-if` 同为
     `"isHtmlSheet"`、也有 entry 常量，只因第二批的 TARGETS 是**手列的**而漏掉。教训与下面
     「闭合判据手抄清单」同源 —— 批量迁移的目标集合也该现算（扫载体 import），不该手列。
@@ -286,6 +297,26 @@
   - 磁盘变异证明闭合判据有效：把 `GtG13FairValueChanges.vue` 的 `v-if` 退回 `isHtmlSheet`
     （= import 了单源却不用 = 假接线）⇒ **精确只红那一条**（1 failed / 26 passed），
     其余 16 宿主仍绿；跑完逐字节恢复，sha256 `f6400a6f23ee9bee` 前后一致。
+  - 🔴 **补一条行为判据，封住「共享载体杠杆」的单点失效**（新文件
+    `sync/__tests__/sharedModeSwitchGate.spec.ts`，9 例）：杠杆的另一面是两个载体各有一行
+    `showModeSwitch` 决定 25 个宿主 —— 把那行改成 `return true`，25 个宿主同时退回自行决定，
+    而当时**三条既有判据一条都看不见**（棘轮只看宿主有没有 import；接线闭合只看模板 `v-if`
+    的**文本**；`entrySyncPresentation.spec.ts` 测的是 derive 纯函数，它不知道有没有载体在用它
+    —— 三者全是静态/旁路判据，没有一条真的调用载体看它返回什么）。新判据逐项断言：
+    单源说 false ⇒ false · 说 true ⇒ true · 不传 `entrySync` ⇒ 恒 true（渐进迁移）·
+    单源结论变化时跟着变（是响应式派生不是快照）· 以及**钉住设计决定**：探活失败
+    （`isOoAvailable=false`）但单源说可双向时开关**仍须显示**，可用性只体现在
+    `modeOptions` 的 `disabled` 上 —— 可见性与可用性混在一起会同时产生两种相反的错。
+  - 磁盘变异（`tmp_workpaper_sync_impl/mutate_carriers.py`）：两个载体的 `showModeSwitch`
+    各改成恒 `return true` ⇒ 新判据分别 **2 failed / 1 failed**（打红 ✓），而**既有三条判据
+    49 passed 全绿**（确实看不见 ⇒ 印证这条判据补的是真空白）；两次均逐字节恢复，
+    sha256 `611a941f755d6989` / `63d7d0ef7094a0e7` 前后一致。
+  - 第四批回归与归因：L 循环 12 个既有 spec 跑完，唯一红是 `l2l4DisclosureWiring.spec.ts`
+    的 **18 条**（该文件自己的 docstring 把它们标为「类 B / Wave 7 补」）。按铁律做 A/B
+    逐节点归因（`tmp_workpaper_sync_impl/ab_l2l4.py`，不用 `git stash`：把本轮改过且在该
+    判据读取范围内的 2 个文件临时换成 HEAD 版）：A(HEAD) 18 条 · B(候选) 18 条 ·
+    **added 0 / resolved 0**，且脚本先断言「解析出的节点数 == 摘要 failed 数」（18==18，
+    排除解析静默丢节点），两文件逐字节恢复。⇒ 预存红，与本轮无关。
   - 🔴 顺带修 `entrySyncUiHonesty.spec.ts` 一条**把过渡态写成永久不变量**的判据：
     原 `expect(unreachable.length).toBe(1)`（「分母不为空」）在 task 5.3 删掉 G6 旧桩后必红，
     而唯一的「修法」会是把旧桩加回来 —— AC 1.7 的要求正是「不可达旧桩 SHALL 删除」，
