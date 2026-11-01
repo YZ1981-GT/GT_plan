@@ -276,3 +276,51 @@ S4 已完成的代码不在本 spec 中重新设计，但 S3 实施必须完成�
 ### 11.11 本轮文档修改边界
 
 本次重整只修改 requirements/design/tasks 三件套，未修改生产代码、迁移、INDEX 或 memory。实施阶段允许触碰的生产文件由任务 0 的现算清单生成，禁止根据旧 §1 的文件数量手工扩散。
+
+## 12. 2026-11-01 实施与验收记录
+
+### 12.1 实施结果
+
+任务 0~5 与任务 7 已完成，任务 6 继续依赖 D1，不以默认意见代替拍板：
+
+- `stale_state.py` 成为 `DisclosureNote.is_stale/stale_source` 唯一写入口；标记与清除只 flush，事务由调用方控制；
+- `RefillReport` 区分 requested / changed / recomputed / failed / cleared 与章节级错误；值不变但完整成功也清 stale，公式失败章节从清除集合剔除；
+- `note_writers.py` 冻结 38 个 writer 身份，并由 AST/SQL 守卫覆盖 ORM 赋值、`flag_modified`、SQLAlchemy values、原生 SQL、间接门面与动态 values 盲点；D1 前不执行唯一写方拒绝；
+- TB 继续复用 `useTbSummaryPersistence → consol-worksheet-data` 的现有 CAS 链，不建设第二套持久化；端点测试钉住 `content.rows`、零值、手工 RJE 和 `formula_detached`；
+- 前端 16 个宽放行写请求收紧后，全树 AST 现算 `writes=0 / wide_writes=0`；GET 兼容配置不动；`useEditorSave` 的真实 409 改从错误响应读取，422/500 不再清 dirty 或显示成功；
+- `formula_push/engine.py` 因触发行数门，把状态读取/保存与失败运行记录抽到 `formula_push/state_store.py`，engine 降至 998 行，算法和事务顺序保持不变。
+
+### 12.2 自动化证据
+
+- 后端：S3、S4 outbox/传播、formula push 核心选集 97 passed；真实 PostgreSQL 回滚用例 1 passed。PG 用例在同一事务内创建 `【测试】S3 stale 状态机回滚` 项目与附注，验证 adjustment 标记、值不变重算清除、formula_settings 失败保留；回滚后独立会话反查项目与附注均为 0。
+- 前端：父提交与候选同口径测试为 `base_failed=4 / candidate_failed=4 / common=4 / candidate_only=0`；新增写请求与 await 宿主守卫 9 passed；收尾运行时修复相关 75 passed；单区域 TypeScript 0 错。
+- 构建：Vite production build 完整转换 3804+ 模块并成功产物；构建前依次抓到并修复 `useAiNoteCapture`、D3 凭证证据、`useMountOnFirstOpen`、`useNoteSaveFlow` 四组父提交断裂。
+- 变异：任务 5 的 M1~M5 全红（两处恢复 `s<600`、删除 409 分支、失败后清 dirty、吞表间审核错误），三条阴性对照全绿；每条变异后 SHA-256 字节恢复。区域 tsc 注入 `number = string` 命中 TS2322，未 OOM。
+- pre-commit：gitleaks、文件行数、UTF-8 全通过。首次因 `formula_push/engine.py` 1048 行超过 998 上限而失败，未跳钩子、未抬白名单，按 12.1 拆模块后通过。
+
+### 12.3 浏览器证据
+
+隔离前端/后端端口为 3032/9982，使用 `【UAT】子公司A` 作为测试上下文。所有会写业务数据的请求由 Playwright 拦截，真实后端只用于登录和只读项目上下文；共享库零写。后端状态写语义另由 12.2 的真实 PG 回滚用例覆盖。
+
+浏览器 17/17：
+
+1. 500 写请求不显示成功且只发送一次；429 显示连续催办提示并禁用按钮；
+2. stale 已知来源 `adjustment` 显示“调整分录已变化”，未知来源显示“其他数据变化”，历史 NULL 显示“来源未记录”及“过期（来源未记录）”；
+3. 值不变成功回执显示“已重新计算 1 个章节，数据未变化；已清除 1 个过期标记”，随后 stale 标签消失；
+4. `failed_sections` 非空时不显示“数据已是最新”，章节仍显示过期来源；
+5. TB 从 `content.rows` 读回零值、手工 RJE 12.34 与 `formula_detached` 剪刀标记；
+6. pageerror 0。控制台仅有测试故意注入的 HTTP 500 / 429 两条资源错误。
+
+证据：`tmp_writer_ownership/browser_result.json` 与三张截图。临时目录在收尾后清理，不入库。
+
+### 12.4 验收期发现并修复的父提交断裂
+
+这些缺陷不是 S3 引入，但阻断候选运行与浏览器验收，用户拍板逐一修复：
+
+- `6f4c5a54a` 为剪贴板 HTTP 兼容错误地整文件回退 `useAiNoteCapture.ts`：恢复 `1154b99ca` 的名称/位置确认、扁平请求体、`lastRequest` 与幂等指纹，仅保留正交 `copyText` 改动；21 个契约测试通过；
+- 同提交回退 `useD3VoucherCheck.ts`：恢复 `7954c575d` 的 D3-7 行级证据位置、上传绑定与刷新，仅保留 `newUuid`；26 个测试通过；
+- `useMountOnFirstOpen` 被 TrialBalance/DisclosureEditor 引用但文件从未提交：补“首次打开后永久挂载”实现与 2 个测试；
+- `useNoteSaveFlow` 被 DisclosureEditor 引用但文件从未提交：补手工/自动保存差异、失败状态、保存中切章隔离与作用域清理，4 个测试；
+- 附注就绪度原只识别 4 个来源且其余都显示“待刷新”：新增 16 个来源映射，与后端 `StaleSource/STALE_SOURCE_LABELS` 逐成员对拍；刷新提示接入 recomputed / failed / cleared 结果集合。
+
+仍属其他 spec 的启动缺口：父提交已引用未提交的 `batch_project_inventory.py`、`batch_project_template_origin.py`、`group_topology_lock.py`、`project_creation_grant_service.py`、`project_creation_security.py`，且 `pm_dashboard` 依赖未提交版 `pm_service.BatchReviewService`。本轮浏览器只使用 `runtime_overlay.json` 记录 SHA-256 的临时 overlay，不把这些半成品纳入 S3；应由 batch-project spec 连同模型、迁移、测试一起提交。父提交 `audit_log.py` 的 `_redact_if_display_prefs` NameError 同样未纳入本 spec。

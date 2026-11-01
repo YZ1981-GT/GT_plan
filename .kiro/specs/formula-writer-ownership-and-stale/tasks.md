@@ -58,9 +58,12 @@
 
 ## 第四阶段　回归与收尾
 
-- [ ] 7. 候选树回归、浏览器和文档收尾
+- [x] 7. 候选树回归、浏览器和文档收尾
   - 候选提交树与 HEAD 按测试节点比较；后端单元/PG、前端 vitest、单区域 vue-tsc、磁盘变异全部只允许候选新增红为 0。
   - 浏览器使用【测试】项目：附注已知/未知/未记录来源展示；值不变刷新清 stale 并显示 `recomputed`；失败章节仍过期；试算表手工值/零值/断开标记刷新读回；写请求失败只显示错误。
   - 确认 `formula-settings-durable-outbox` 的只候选红没有被 S3 接线引入；清理 `tmp_writer_ownership/` 前保留必要证据摘要。
   - 最终提交前另行按仓库纪律更新 INDEX/memory；本轮三件套重整不提前修改这两个共享文件。
   - Verify：生产路径调用方、注册、挂载和浏览器均有证据；不得只凭模块级单测标绿。
+  - Evidence（2026-11-01）：后端 S3/S4/formula-push 选集 **97 passed**，真实 PG 回滚 **1 passed**（事务内 `【测试】S3 stale 状态机回滚`，独立会话反查项目/附注均 0）；前端父/候选同口径 **candidate-only red = 0**，新增守卫 9 passed，收尾运行时修复 75 passed，单区域 tsc 0 错，Vite 正式构建 3804+ 模块通过；任务 5 五条磁盘变异全红、三条阴性对照全绿且逐字节恢复。
+  - Browser（隔离端口 3032/9982，`【UAT】子公司A` 测试上下文，所有写请求由 Playwright 拦截、共享库零写）：**17/17**——500 不显示成功且只请求一次、429 业务分流；adjustment/未知/NULL 三态中文；值不变显示 recomputed+cleared 且 stale 标签消失；失败章节仍过期且不显示“数据已是最新”；TB 零值、手工 RJE 12.34、`formula_detached` 刷新读回；pageerror 0。截图与 JSON 在 `tmp_writer_ownership/`。
+  - Runtime note：父提交的 batch-project 代码已 import 5 个未提交 service，且 `pm_dashboard` 依赖未提交版 `pm_service.BatchReviewService`；本次浏览器启动只使用带 SHA-256 清单的临时 overlay，不把另一 spec 半成品并入 S3。验收期另修 6f4c5a54a 的三组整文件回退（AI 笔记目标选择、D3 凭证证据）及两个从未提交的组合式模块（首次挂载、附注保存竞态）；正式构建钉住完整导入链。

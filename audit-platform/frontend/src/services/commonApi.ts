@@ -863,6 +863,13 @@ export interface RefreshFromWorkpapersResult {
   refreshed: number
   total_notes: number
   sections_recomputed: string[]
+  /** 结果集合（formula-writer-ownership-and-stale R2）；旧后端可不返回。 */
+  requested_sections?: string[]
+  changed_sections?: string[]
+  recomputed_sections?: string[]
+  failed_sections?: string[]
+  cleared_sections?: string[]
+  error_details?: Array<{ section: string; stage: string; message: string }>
   text_only_sections: string[]
   errors: string[]
   cells_updated: number
