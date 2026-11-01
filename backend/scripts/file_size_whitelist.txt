@@ -413,7 +413,14 @@ backend/scripts/check/check_task69_frontend_independent_regression.py  2754
 #     补齐并解除 debt）。抬到实测值让门从此刻重新生效；条目即数据、拆分收益为负，理由同
 #     本表顶部第 2 条（门与生成器）。
 backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py  3126
-backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py  4778
+# 2026-11-01 基线上调 4778 → 5018（task 0.6 按内容标记重绑冻结契约）。
+#   拆解：HEAD 已是 **4998** 行（4778 → 4998 的 220 行是别的轮次长出来的、当时没同步基线，
+#   属预存漂移，本轮如实并入）；本轮 **+20** 行 = `require_matches` 绑定块（tasks/design/
+#   requirements 三份各自的形态标记）+ 兄弟模块 sys.path 自举 + 说明。
+#   拆分方向（归本门自身的 lane）：变异 / 容量 / 故障恢复 / retention 四族判据各自抽成
+#   `_task71_<族>.py`，门只留「建报告 → 调四族 → 合并结算」三段编排；
+#   容量数值应移到生产配置 JSON，归档 AC 14.10 / 14.12 只保 provenance。
+backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py  5018
 backend/scripts/check/check_task72_pre_delete_eligibility_gate.py  2690
 backend/scripts/check/mutate_task34_sync_ui_guards.py  933
 backend/scripts/diagnose/mutate_task14_merge_conflict_guards.py  874
