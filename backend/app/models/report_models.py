@@ -11,7 +11,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, SmallInteger, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, SmallInteger, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -206,6 +206,43 @@ class ReportConfigBaseline(Base):
 
 
 # ---------------------------------------------------------------------------
+# ReportGenerationRun 模型（S5：报表来源信封的可查询运行记录）
+# ---------------------------------------------------------------------------
+
+
+class ReportGenerationRun(Base):
+    """一次报表 full / affected / stale 重算的运行记录。"""
+
+    __tablename__ = "report_generation_run"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False,
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    trigger: Mapped[str] = mapped_column(String(40), nullable=False)
+    triggered_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+    )
+    started_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running", server_default=text("'running'"))
+    changed_rows: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default=text("0"))
+    recomputed_rows: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default=text("0"))
+    failed_rows: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default=text("0"))
+    error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    calc_version: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'succeeded', 'partial', 'failed')",
+            name="ck_report_generation_run_status",
+        ),
+        Index("idx_report_generation_run_project_year_started", "project_id", "year", "started_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
 # FinancialReport 模型（生成的报表数据）
 # ---------------------------------------------------------------------------
 
@@ -244,6 +281,11 @@ class FinancialReport(Base):
     blank_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     calc_version: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # V229；NULL ⇒ 读取侧判过期
     calc_error: Mapped[str | None] = mapped_column(String(500), nullable=True)  # V229：计算失败原因；过期判据见 report_freshness
+    # V236：仅指向实际采用当前值的报表运行；失败或未采用尝试不得覆盖它。
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("report_generation_run.id", ondelete="SET NULL"), nullable=True,
+    )
+    provenance: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())

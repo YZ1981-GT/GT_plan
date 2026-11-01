@@ -33,8 +33,10 @@ from app.models.report_models import (
 )
 from app.services.amount_resolver import AmountResolver
 from app.services.formula_warnings import collect as collect_formula_warnings, merge_into as merge_formula_warnings
+from app.services.report_eval_order import order_within_type, plan_for_configs
 from app.services.report_freshness import is_marked_stale
 from app.services.report_row_compute import GenerateSummary, RowScope, compute_row, write_row
+from app.services.report_tb_staleness import stale_trial_balance_warning
 from app.services.tb_leaf_codes import leaf_total, scope_for_year
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,7 @@ from app.services.formula_grammar import (
     WP_PATTERN as _WP_PATTERN,
     PREV_PATTERN as _PREV_PATTERN,
     AUX_PATTERN as _AUX_PATTERN,
+    ADJ_PATTERN as _ADJ_PATTERN,
 )
 
 # Column name mapping: Chinese → TrialBalance field
@@ -622,19 +625,26 @@ class ReportFormulaParser:
         标准码时报表父行漏计。已验证 4 套标准 report_config 无前缀重叠、无 5+ 位子码直接
         引用 → 不会重复计算。resolver 注入路径（合并 ConsolTrialResolver）语义完全不变（R1）。
         """
-        # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
         if self.resolver is not None:
-            return await self.resolver.resolve_tb(account_code, column_name)
+            value = await self.resolver.resolve_tb(account_code, column_name)
+            from app.services.formula_inputs import emit
+            emit("TB", f"{account_code}|{column_name}", value, f"trial_balance:{account_code}", str(self.project_id))
+            return value
 
         rows = await self._get_tb_rows_prefix(account_code)
         if not rows:
+            from app.services.formula_inputs import emit
+            emit("TB", f"{account_code}|{column_name}", Decimal("0"), f"trial_balance:{account_code}", str(self.project_id))
             return Decimal("0")
         reader = self._tb_amount_reader(column_name)
         if reader is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
         amount_of, label = reader
-        return leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
+        value = leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
+        from app.services.formula_inputs import emit
+        emit("TB", f"{account_code}|{label}", value, f"trial_balance:{account_code}", str(self.project_id))
+        return value
 
     def _tb_amount_reader(self, column_name: str):
         """列名 → ``(逐行取数函数, 告警用列名)``；未知列名返回 ``None``。TB / SUM_TB 共用（叶子求和前的单行金额）。
@@ -665,9 +675,11 @@ class ReportFormulaParser:
         区间按标准码字符串比较；区间止码自身的下级（``1499`` 的 ``1499-01``）字典序大于止码，另按前缀并入，
         使「区间内科目及其全部下级」成为宽集合（与 ``formula_preloader._load_tb`` 的区间口径一致），止码的父行不计入。
         """
-        # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
         if self.resolver is not None:
-            return await self.resolver.resolve_sum(code_range, column_name)
+            value = await self.resolver.resolve_sum(code_range, column_name)
+            from app.services.formula_inputs import emit
+            emit("SUM_TB", f"{code_range}|{column_name}", value, f"trial_balance:{code_range}", str(self.project_id))
+            return value
         parts = code_range.split("~")
         if len(parts) != 2:
             logger.warning("Invalid SUM_TB range: %s", code_range)
@@ -695,7 +707,11 @@ class ReportFormulaParser:
         rows = result.scalars().all()
         for row in rows:  # Cache for later use
             self._tb_cache[row.standard_account_code] = row
-        return leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
+        value = leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
+        from app.services.formula_inputs import emit
+        emit("SUM_TB", f"{start_code}~{end_code}|{label}", value,
+             f"trial_balance:{start_code}~{end_code}", str(self.project_id))
+        return value
 
     async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
         """AmountResolver Protocol 公开方法：委托内部 _resolve_tb。"""
@@ -712,11 +728,21 @@ class ReportFormulaParser:
     ) -> FormulaResult:
         """执行公式并保留 ``FormulaResult``，供报表逐行计算（``report_row_compute.compute_row``）判断成功状态。"""
         if not formula or not formula.strip():
-            return FormulaResult()
+            return FormulaResult(value=Decimal("0"))
 
         adj_data = None
         if "ADJ(" in formula:
             adj_data = await self._get_adj_data()
+            from app.services.adjustment_amount_source import normalize_adj_type
+            from app.services.formula_inputs import emit
+            for account_code, raw_type in _ADJ_PATTERN.findall(formula):
+                try:
+                    kind = normalize_adj_type(raw_type)
+                except ValueError:
+                    continue
+                value = adj_data.get(account_code, {}).get(f"{kind}_net", Decimal("0"))
+                emit("ADJ", f"{account_code}|{raw_type}", value,
+                     f"adjustment:{account_code}", str(self.project_id))
 
         return await evaluate_formula_result(
             formula, resolver=self, row_cache=row_cache, adj_data=adj_data,
@@ -726,22 +752,23 @@ class ReportFormulaParser:
         self,
         formula: str | None,
         row_cache: dict[str, Decimal],
-    ) -> Decimal:
-        """解析并执行公式，返回计算结果。"""
+    ) -> Decimal | None:
+        """解析并执行公式，成功返回 Decimal，失败返回 ``None``。"""
         # 保留 Decimal 兼容入口自身的按需预载守卫：不含 ADJ() 的公式不能
         # 触发调整额批量查询。execute_with_status() 使用同一口径供 stale 重算。
         # 期初模式下 ADJ() 记 0（本年调整分录不属于上年末余额）。
         adj_data = None
         if formula and "ADJ(" in formula and not self._use_opening:
             adj_data = await self._get_adj_data()
-        return (
-            await evaluate_formula_result(
-                formula,
-                resolver=self,
-                row_cache=row_cache,
-                adj_data=adj_data,
-            )
-        ).value
+        result = await evaluate_formula_result(
+            formula,
+            resolver=self,
+            row_cache=row_cache,
+            adj_data=adj_data,
+        )
+        if not result.ok or result.value is None:
+            return None
+        return result.value
 
     async def _get_adj_data(self) -> dict[str, dict[str, Decimal]]:
         """惰性批量载入调整额实时汇总（供 ``ADJ()``），按实例缓存。
@@ -846,10 +873,21 @@ async def evaluate_formula_result(
     from app.services.formula_engine import execute as fe_execute, FormulaContext
 
     if not formula or not formula.strip():
-        return FormulaResult()
+        return FormulaResult(value=Decimal("0"))
 
     # ── L2 编排：经 resolver 预载数据 token → 构建 FormulaContext → 委托 L1 内核 ──
     row_values = row_cache or {}
+    from app.services.formula_inputs import emit as emit_formula_input
+
+    for match in _ROW_PATTERN.finditer(formula):
+        row_code = match.group(1)
+        emit_formula_input("ROW", row_code, row_values.get(row_code, Decimal("0")),
+                           f"financial_report:{row_code}", str(getattr(resolver, "project_id", "") or "") or None)
+    for match in _SUM_ROW_PATTERN.finditer(formula):
+        start_code, end_code = match.group(1), match.group(2)
+        total = sum((Decimal(str(value)) for code, value in row_values.items() if start_code <= code <= end_code), Decimal("0"))
+        emit_formula_input("SUM_ROW", f"{start_code}~{end_code}", total,
+                           f"financial_report:{start_code}~{end_code}", str(getattr(resolver, "project_id", "") or "") or None)
 
     # Step 1: 预替换所有数据 token 为 Decimal 值（经 resolver 取数，保持原有取数语义）
     expression = formula
@@ -894,6 +932,8 @@ async def evaluate_formula_result(
                 val = await WPExecutor.execute(resolver.db, resolver.project_id, wc, col)
                 if val is None and strict_context:
                     raise ValueError(f"WP({wc!r}, {col!r}) 无可用上下文数据")
+                if val is not None:
+                    emit_formula_input("WP", f"{wc}|{col}", val, f"workpaper:{wc}", str(resolver.project_id))
                 wp_data[wc][col] = Decimal(str(val)) if val is not None else Decimal("0")
             except Exception as exc:
                 if strict_context:
@@ -916,6 +956,12 @@ async def evaluate_formula_result(
             if strict_context:
                 raise ValueError(f"NOTE 上下文加载失败: {exc}") from exc
             note_data, note_missing = {}, {}
+        from app.services.formula_engine import note_value_key
+        for ref in dict.fromkeys(note_refs):
+            value = note_data.get(ref[0], {}).get(note_value_key(ref[1], ref[2]))
+            if value is not None:
+                emit_formula_input("NOTE", note_token(ref), value,
+                                   f"disclosure_note:{ref[0]}", str(resolver.project_id))
         if note_missing and strict_context:
             raise ValueError("；".join(f"{note_token(ref)}：{why}" for ref, why in note_missing.items()))
 
@@ -948,8 +994,8 @@ async def evaluate_formula(
     row_cache: dict[str, Decimal] | None = None,
     adj_data: dict[str, dict[str, Decimal]] | None = None,
     strict_context: bool = False,
-) -> Decimal:
-    """兼容入口：执行公式并只返回 Decimal 值。"""
+) -> Decimal | None:
+    """兼容入口：成功返回 Decimal，求值失败或缺失返回 ``None``。"""
     result = await evaluate_formula_result(
         formula,
         resolver=resolver,
@@ -957,6 +1003,8 @@ async def evaluate_formula(
         adj_data=adj_data or {},
         strict_context=strict_context,
     )
+    if not result.ok or result.value is None:
+        return None
     return result.value
 
 
@@ -1156,7 +1204,10 @@ class ReportEngine:
 
         # 跨报表共享的依赖缓存（如权益变动表引用利润表 IS-019）：起点只有无公式行（ADR-FHIC-01），
         # 本轮成功的行随算随入、失败的行删除（report_row_compute.compute_row）
-        scope = RowScope.of(c for rows in configs.values() for c in rows)
+        # 表内求值顺序 = 公式依赖拓扑序（ADR-ISL-01）：小计行排在明细行之前时按行号求值必然「引用行未就绪」
+        plan = plan_for_configs(c for rows in configs.values() for c in rows)
+        scope = RowScope.of((c for rows in configs.values() for c in rows), cycles=plan.cycles)
+        eval_positions = plan.positions
         global_row_cache = scope.start_cache()
 
         # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化。
@@ -1191,7 +1242,18 @@ class ReportEngine:
                 prior_resolver=prior_resolver,
                 scope=scope,
                 summary=summary_out,
+                eval_positions=eval_positions,
             )
+            # ADR-ISL-05：利润链全部公式都按试算表取数 ⇒ 试算表口径陈旧时金额与符号都不可信，
+            # 在利润表结果上追加一条提示（只提示，不改数据、不改公式）
+            if report_type is FinancialReportType.income_statement:
+                stale_note = await stale_trial_balance_warning(self.db, project_id, year)
+                if stale_note:
+                    type_coverage["warnings"] = [
+                        *type_coverage.get("warnings", []),
+                        {"type": "stale_trial_balance", "message": stale_note},
+                    ]
+
             results[report_type.value] = report_rows
             coverage_stats[report_type.value] = type_coverage
             if debug and type_debug:
@@ -1341,6 +1403,7 @@ class ReportEngine:
         prior_resolver: Any = None,
         scope: RowScope | None = None,
         summary: GenerateSummary | None = None,
+        eval_positions: dict[str, int] | None = None,
     ) -> tuple[list[dict], dict[str, int], list[dict] | None]:
         """执行每行公式，生成报表数据并写入 financial_report 表。
 
@@ -1376,7 +1439,10 @@ class ReportEngine:
         if row_ref_cache is None:
             row_ref_cache = {}
         if scope is None:
-            scope = RowScope.of(config_rows)
+            own_plan = plan_for_configs(config_rows)
+            scope = RowScope.of(config_rows, cycles=own_plan.cycles)
+            if eval_positions is None:
+                eval_positions = own_plan.positions
             global_row_cache.update(scope.start_cache())
 
         existing_rows = {
@@ -1391,7 +1457,8 @@ class ReportEngine:
             )).scalars().all()
         }
 
-        report_rows = []
+        # 求值顺序是依赖拓扑序，展示顺序必须是行号序 ⇒ 先带行号收集，返回前重排
+        report_rows: list[tuple[int, dict]] = []
         # Task 1.6: 覆盖率统计
         total_rows = 0
         rows_with_data = 0
@@ -1402,7 +1469,7 @@ class ReportEngine:
         # Req 16.5: 公式解析失败行收集（标注失败行，不产出空报表）
         failed_rows: list[dict] = []
 
-        for config in sorted(config_rows, key=lambda r: r.row_number):
+        for config in order_within_type(config_rows, eval_positions):
             total_rows += 1
             # 报表取数统一走公式(report_config.formula)：公式里的 TB('期末余额')
             # 在审定模式取 trial_balance.audited_amount、未审模式取 unadjusted_amount。
@@ -1513,9 +1580,12 @@ class ReportEngine:
                 # 需求 4.3 / 6.4：试算表父子不符、组成行无公式、结果为 0 而科目有余额等告警
                 "warnings": outcome.warnings,
             }
-            report_rows.append(row_dict)
+            report_rows.append((config.row_number, row_dict))
 
         await self.db.flush()
+
+        # 求值走依赖拓扑序（ADR-ISL-01），但返回与缓存一律按行号 —— 报表展示顺序不能被求值顺序改掉
+        report_rows = [row_dict for _, row_dict in sorted(report_rows, key=lambda item: item[0])]
 
         # Task 1.6: 构建覆盖率统计
         coverage_pct = round(rows_with_data / max(total_rows, 1) * 100, 1)
@@ -1749,10 +1819,12 @@ class ReportEngine:
             formula_error: str | None = None
             try:
                 current_amount = await parser_current.execute(cfg.formula, row_values)
+                if current_amount is None:
+                    formula_error = "公式执行未返回数值"
             except Exception as e:
                 # Req 16.5: 记录失败，行仍保留（不产出空报表）
                 formula_error = str(e)
-                current_amount = Decimal("0")
+                current_amount = None
                 logger.warning(
                     "Unadjusted formula execution failed for %s (%s): %s",
                     cfg.row_code, cfg.row_name, e,
@@ -1768,8 +1840,9 @@ class ReportEngine:
                 )
                 prior_amount = None
 
-            row_values[cfg.row_code] = current_amount
-            global_row_cache[cfg.row_code] = current_amount
+            if current_amount is not None:
+                row_values[cfg.row_code] = current_amount
+                global_row_cache[cfg.row_code] = current_amount
 
             # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化
             row_refs_meta, _dangling = await self._resolve_row_refs_via_acnr(
@@ -1779,7 +1852,7 @@ class ReportEngine:
             rows.append({
                 "row_code": cfg.row_code,
                 "row_name": cfg.row_name,
-                "current_period_amount": str(current_amount),
+                "current_period_amount": str(current_amount) if current_amount is not None else None,
                 "prior_period_amount": str(prior_amount) if prior_amount is not None else None,
                 "indent_level": cfg.indent_level,
                 "is_total_row": cfg.is_total_row,
@@ -1961,6 +2034,8 @@ class ReportEngine:
         year: int,
         applicable_standard: str | None = None,
         mode: str = "audited",
+        *,
+        summary_out: GenerateSummary | None = None,
     ) -> dict[str, Any]:
         """重算当前项目年度已标过期（``is_stale = true``）的报表行。
 
@@ -1979,7 +2054,9 @@ class ReportEngine:
             )
 
         configs = await self._load_report_configs(applicable_standard, project_id=project_id)
-        scope = RowScope.of(c for rows in configs.values() for c in rows)
+        plan = plan_for_configs(c for rows in configs.values() for c in rows)
+        scope = RowScope.of((c for rows in configs.values() for c in rows), cycles=plan.cycles)
+        eval_positions = plan.positions
         all_rows = list((await self.db.execute(
             sa.select(FinancialReport)
             .where(
@@ -2002,15 +2079,18 @@ class ReportEngine:
             if mode == "unadjusted":
                 parser._use_unadjusted = True
 
-            for config in sorted(configs.get(report_type, []), key=lambda r: r.row_number):
+            for config in order_within_type(configs.get(report_type, []), eval_positions):
                 key = (report_type, config.row_code)
                 row = stale_by_key.get(key)
                 if row is None:
                     continue
                 handled_keys.add(key)
                 outcome = await compute_row(parser, config, row_cache, mode=mode, scope=scope)
+                before = row.current_period_amount
                 write_row(row, config, outcome, generated_at=now,
                           source_accounts=parser.extract_account_codes(config.formula))
+                if summary_out is not None:
+                    summary_out.record(report_type, config.row_code, before, outcome)
                 item = {"report_type": report_type.value, "row_code": config.row_code}
                 if outcome.ok:
                     recalculated_rows.append(item)
@@ -2051,6 +2131,8 @@ class ReportEngine:
         year: int,
         changed_accounts: list[str] | None = None,
         applicable_standard: str | None = None,
+        *,
+        summary_out: GenerateSummary | None = None,
     ) -> int:
         """增量更新：根据 formula 识别受影响行，只重算受影响行。
 
@@ -2080,7 +2162,7 @@ class ReportEngine:
 
         if not changed_accounts:
             # If no specific accounts, regenerate all
-            await self.generate_all_reports(project_id, year, applicable_standard)
+            await self.generate_all_reports(project_id, year, applicable_standard, summary_out=summary_out)
             return -1  # indicates full regen
 
         configs = await self._load_report_configs(applicable_standard, project_id=project_id)
@@ -2088,7 +2170,9 @@ class ReportEngine:
         affected_codes = report_closure(
             flat, {c.row_code for c in flat if self._is_affected(c.formula, changed_accounts)},
         )
-        scope = RowScope.of(flat)
+        plan = plan_for_configs(flat)
+        scope = RowScope.of(flat, cycles=plan.cycles)
+        eval_positions = plan.positions
         all_rows = (await self.db.execute(
             sa.select(FinancialReport).where(
                 FinancialReport.project_id == project_id,
@@ -2105,7 +2189,7 @@ class ReportEngine:
 
         for report_type in _TYPE_ORDER:
             parser_current = ReportFormulaParser(self.db, project_id, year)
-            for config in sorted(configs.get(report_type, []), key=lambda r: r.row_number):
+            for config in order_within_type(configs.get(report_type, []), eval_positions):
                 if config.row_code not in affected_codes:
                     continue
                 # Req 15.5：先经 ACNR full_resolve 探测本行 ROW() 引用是否悬空，
@@ -2128,8 +2212,11 @@ class ReportEngine:
                 outcome = await compute_row(parser_current, config, row_cache, mode="audited", scope=scope)
                 row = by_key.get((report_type, config.row_code))
                 if row is not None:
+                    before = row.current_period_amount
                     write_row(row, config, outcome, generated_at=now,
                               source_accounts=parser_current.extract_account_codes(config.formula))
+                    if summary_out is not None:
+                        summary_out.record(report_type, config.row_code, before, outcome)
                 regenerated += 1
 
         await self.db.flush()
@@ -2477,3 +2564,9 @@ class ReportEngine:
         rt = report_type if isinstance(report_type, FinancialReportType) else FinancialReportType(report_type)
         bundle = await self._build_unadjusted_bundle(project_id, year, [rt.value])
         return bundle.get(rt.value, [])
+
+
+# S5：三条已有生成路径共用来源运行上下文；安装器独立模块，避免继续膨胀本文件。
+from app.services.report_provenance import install_report_generation_provenance
+
+install_report_generation_provenance(ReportEngine)
