@@ -4560,9 +4560,9 @@
       "static_registration_blocked_reason": "entry 尚未完成逐项 capability 裁决（capability=null，stage='step_4_blocked_by_step_3_result_exists'，target='bidirectional'，blockers=['BP-1', 'BP-12', 'BP-2', 'BP-3', 'BP-4', 'BP-5', 'BP-7', 'BP-8']）—— 未裁决入口不得注册 adapter（AC 1.3 / 12.1）"
     }
   ],
-  "manifest_digest": "42dcabc21a3e9552022b4ad5457581fd6f294719762ce8b888f3d6966d3c55f5",
-  "overlay_digest": "2dd9f8142799f11c055b5560bad00dd923c49f02ae86a57e7b920e1cfd2a1cac",
-  "report_digest": "e79a808bf9e0c19909539def0d35efd754da8571f4506fd2f0d20392f1c488bb",
+  "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
+  "overlay_digest": "580e8b50d01236dccffa210a822d140c70726a4efbbf9e5b14d1576219f65e9d",
+  "report_digest": "b13dc6a857a1e5f5e719ced7d27a7186e29bd5cf9bd91a8ad715a90ddf8e6967",
   "runtime_scope": {
     "database_queried": false,
     "meaning": "runtime_readiness/acceptance_state are unknown, not failed or passed",
@@ -4570,7 +4570,7 @@
   },
   "schema_version": "workpaper-sync-current-state:v1",
   "snapshot_date": "2026-11-01",
-  "source_digest": "24738683b2d244a16745cf5e437a03662dfb4cf35d43a23b699dcf73e754de5f",
+  "source_digest": "919d66ad00b6798dad516a3db1e5807eb1c0889d23ec2b1aa8495edda63962d9",
   "source_review_ref": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/phase3-source-digest-review-2026-11-01-task35-final.json",
   "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "wp_code_adjudication_digest": "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"

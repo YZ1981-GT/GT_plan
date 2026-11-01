@@ -81,8 +81,33 @@ from typing import Any, Callable, Final, Mapping, Sequence
 
 _REPO: Final[Path] = Path(__file__).resolve().parents[3]
 _BACKEND: Final[Path] = _REPO / "backend"
+# 🔴 同目录兄弟模块：CLI 路径下 Python 自动把脚本目录放进 sys.path[0]，但被
+#    `importlib.spec_from_file_location` 加载时**不动 sys.path** ⇒ import 期
+#    ModuleNotFoundError ⇒ 引用本脚本的测试模块连采集都过不去（CI 的 backend-tests 是
+#    `pytest -x`，一个采集错误会停掉整个 job）。故在兄弟 import 之前显式补路径；
+#    CLI 路径下这段是 no-op。判据：backend/tests/test_check_scripts_importable.py
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+if str(_Path(__file__).resolve().parent) not in _sys.path:
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from _spec_dir import resolve_spec_dir  # noqa: E402  归档后 active 优先回退 _archive，见 _spec_dir.py
-_SPEC_DIR: Final[Path] = resolve_spec_dir("workpaper-html-onlyoffice-bidirectional-writeback-closure", require_files=["tasks.md", "design.md"])
+# 🔴 必须按**内容**定位，不能只看「目录里有 tasks.md / design.md」：本门解析 Wave 6
+#    形态（整数任务号 `- [x] 44.` + `### Property N`），而 active 目录 2026-11-01 被重写成
+#    「7 条扁平 AC + 两级任务号」且三件套齐全 ⇒ 只看文件存在的 require_files 会把本门绑到
+#    一份它解析不了的文档上，报出「tasks.md 里找不到 Task 44」这种指错地方的错误。判据：
+#    test_umbrella_spec_reference_closure.py::
+#    test_ok_frozen_consumers_bind_by_content_not_by_hardcoded_path
+_SPEC_DIR: Final[Path] = resolve_spec_dir(
+    "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+    require_files=["tasks.md", "design.md"],
+    require_matches={
+        # 整数任务号（`- [x] 44. 标题`）；active 的两级号 `- [x] 0.1 标题` 不命中 ——
+        # 点号后面紧跟数字而不是空格，这正是两种形态的判别点。
+        "tasks.md": (r"^\s*-\s\[[ x~\-]\]\s+\d+\.\s",),
+        "design.md": (r"^### Property \d+",),
+    },
+)
 _TASKS_MD: Final[Path] = _SPEC_DIR / "tasks.md"
 _DESIGN_MD: Final[Path] = _SPEC_DIR / "design.md"
 _EVIDENCE_DIR: Final[Path] = _SPEC_DIR / "evidence/task44-oo94-excel-pilot-gate"

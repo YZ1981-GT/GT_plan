@@ -48,7 +48,7 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "42dcabc21a3e9552022b4ad5457581fd6f294719762ce8b888f3d6966d3c55f5"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7"
 
 export const WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST = "3382b0a961727e5826372683a2db995eff201a2535b886014d4d44f5eee6ae6e"
 

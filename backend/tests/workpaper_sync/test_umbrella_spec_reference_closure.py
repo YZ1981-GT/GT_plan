@@ -17,6 +17,7 @@ spec: `workpaper-html-onlyoffice-bidirectional-writeback-closure`
 """
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
 import re
@@ -196,16 +197,54 @@ def test_acceptance_surface_registry_has_no_stale_entries() -> None:
 # ════════════════════════════════════════════════════════════════════════════
 
 
+#: 「把归档当完成依据」的措辞特征。只要与 `_archive/` 同行出现，即判为拿别人的审计轨迹
+#: 充本 spec 的状态。
+_ARCHIVED_COMPLETION_CLAIM = re.compile(
+    r"(复选框|已勾选|标绿|完成度|已完成|全绿|✅|\d+\s*/\s*\d+)"
+)
+
+
+def _cites_archive_as_completion(line: str) -> bool:
+    """这一行是「拿归档的完成状态当依据」，还是只是「引用归档里的冻结文档」？
+
+    🔴 原判据是「说明块里出现 `_archive/` 就红」。它把两件不同的事混成一件：
+
+    * **真正要防的**：拿归档 spec 的复选框 / 完成度当本 spec 的完成依据
+      （「归档里 77/77 全绿 ⇒ 本条完成」）—— 那是别人的审计轨迹。
+    * **必须允许的**：引用归档里的**冻结文档快照**作为解析契约。task 0.6 把 Wave 6 形态的
+      消费方按内容标记重绑到归档快照，说明块必须写清楚绑到哪里 —— 那是 trace，不是状态
+      声明；不让写只会逼着把路径描述得含糊，反而更难复核。
+
+    判别用「同一行是否带完成度措辞」，并配双向用例（下面那条判据）。
+    """
+    return "_archive/" in line and bool(_ARCHIVED_COMPLETION_CLAIM.search(line))
+
+
 def test_completed_tasks_do_not_cite_archived_specs_as_evidence() -> None:
     offenders = {
-        row["id"]: [line.strip() for line in row["body"] if "_archive/" in line]
+        row["id"]: [line.strip() for line in row["body"] if _cites_archive_as_completion(line)]
         for row in _tasks()
-        if row["done"] and any("_archive/" in line for line in row["body"])
+        if row["done"] and any(_cites_archive_as_completion(line) for line in row["body"])
     }
     assert not offenders, (
-        f"已勾选任务把归档 spec 当完成依据：{offenders} —— "
+        f"已勾选任务把归档 spec 的完成状态当依据：{offenders} —— "
         "归档 spec 的复选框是别人的审计轨迹，不是本 spec 的状态输入"
     )
+
+
+def test_archive_citation_predicate_is_falsifiable() -> None:
+    """判别谓词两个方向都要对，否则上一条要么恒绿要么误伤 trace。"""
+    claim = "  - 依据：`_archive/17-xxx/<spec>/tasks.md` 已 77/77 全绿 ⇒ 本条完成"
+    assert _cites_archive_as_completion(claim) is True, "拿归档完成度当依据竟未被认出"
+    claim2 = "  - 归档 spec 的复选框显示 `_archive/17-xxx/<spec>` 已完成"
+    assert _cites_archive_as_completion(claim2) is True
+    trace = (
+        "  - 冻结契约绑定：`_archive/17-2026-10-03-verified-batch/<同名目录>` "
+        "（Wave 6 文档形态，按内容标记解析）"
+    )
+    assert _cites_archive_as_completion(trace) is False, "引用冻结文档快照被误伤"
+    plain = "  - 产物：`backend/data/x.json`"
+    assert _cites_archive_as_completion(plain) is False
 
 
 def test_completion_count_in_the_header_matches_the_checkboxes() -> None:
@@ -222,112 +261,243 @@ def test_completion_count_in_the_header_matches_the_checkboxes() -> None:
         f"标题写已完成 {header.group('done')}，实际勾选 {done} 条"
     )
 
-
 # ════════════════════════════════════════════════════════════════════════════
 # 4. 外部机器消费方闭合（doc → 脚本解析器）
 # ════════════════════════════════════════════════════════════════════════════
+#
+# 🔴 这一节的**第一版是一张手写的 7 条清单**，而仓库里真实的消费方按 AST 现算是 **35 个**。
+#    也就是说那张清单覆盖约两成，剩下八成「改文档会打坏谁」完全在视野之外 —— 而 0.5 的
+#    全部目的正是补上「doc → 外部解析器」这条边。手写清单也不可能**发现**新消费方：
+#    加一个脚本不会让任何判据打红。
+#
+#    现在分母**现算**：扫 `backend/{scripts,app,tests}` 的 `.py`，取 AST 里**非 docstring**
+#    的字符串常量，凡同时出现 spec 目录名与三件套文件名之一即判为消费方。用 AST 而不是
+#    文本匹配，是因为注释与 docstring 会正反两向骗过扫描器（本 spec 已为同一形态付过两次
+#    代价）；docstring 显式剔除。
+#
+#    登记表落在 `backend/data/workpaper_sync_spec_doc_consumers.json`：**发现**是机器算的，
+#    **分类与状态**是人工复核字段。分类刻意不自动填 —— 实测启发式会把 `10.1` 一类版本号
+#    当成「旧 AC 编号」，把本文件（读 active）误判成 Wave 6 消费方。
 
-#: 已知读 requirements.md / tasks.md / design.md 的脚本。
-#: `status` 取三值：
-#:   * `ok`       —— 在当前文档形态下可运行
-#:   * `retired`  —— 退役（如 generate_task66_legacy_deletion_plan 的整条判为退役）
-#:   * `pending_relink` —— 锚点断开，归某个任务做前置时重接
-#: 🔴 新增读 spec 文档的脚本时必须加到这里，否则改文档时不会有判据打红。
-_SPEC_DOC_CONSUMERS: list[dict[str, str]] = [
-    {
-        "script": "backend/scripts/gen/generate_task66_legacy_deletion_plan.py",
-        "reads": "tasks.md",
-        "status": "retired",
-        "note": "整条判为退役，由 task 5.5 执行账取代",
-    },
-    {
-        "script": "backend/scripts/gen/generate_workpaper_sync_program_milestones.py",
-        "reads": "tasks.md",
-        "status": "ok",
-        "note": "wave 图键名已修、里程碑归属已重映射",
-    },
-    {
-        "script": "backend/scripts/check/check_task68_backend_chain_independent_regression.py",
-        "reads": "tasks.md",
-        "status": "pending_relink",
-        "relink_owner": "7.2",
-        "note": "TASK_NUMBER=68 不在新 tasks.md；解析器假设纯数字任务号",
-    },
-    {
-        "script": "backend/scripts/check/check_task69_frontend_independent_regression.py",
-        "reads": "tasks.md",
-        "status": "pending_relink",
-        "relink_owner": "7.2",
-        "note": "TASK_NUMBER=69 不在新 tasks.md",
-    },
-    {
-        "script": "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py",
-        "reads": "requirements.md",
-        "status": "pending_relink",
-        "relink_owner": "7.1",
-        "note": "依赖 ### Requirement N: 标题结构，active 投影只有扁平 AC",
-    },
-    {
-        "script": "backend/scripts/gen/generate_workpaper_word_template_adjudication.py",
-        "reads": "requirements.md",
-        "status": "pending_relink",
-        "relink_owner": "7.1",
-        "note": "依赖 AC 7.7 原文形态（170 条结构里的一条）",
-    },
-    {
-        "script": "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py",
-        "reads": "requirements.md",
-        "status": "pending_relink",
-        "relink_owner": "7.1",
-        "note": "依赖 AC 14.10 容量门定义",
-    },
-]
+CONSUMERS_JSON = ROOT / "backend/data/workpaper_sync_spec_doc_consumers.json"
+SPEC_NAME = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+_DOC_NAMES = ("requirements.md", "tasks.md", "design.md")
+_DISCOVERY_ROOTS = ("backend/scripts", "backend/app", "backend/tests")
+_ALLOWED_STATUS = {"ok", "retired", "registered_unreviewed"}
+#: `registered_unreviewed` 只许变少。写下它时现算 26 条。
+_UNREVIEWED_CEILING = 26
 
 
-def test_spec_doc_consumer_registry_is_complete() -> None:
-    """已知消费方清单不为空且每条都有必填字段。"""
-    assert _SPEC_DOC_CONSUMERS, "消费方清单为空 —— 至少有 milestones 是 ok 的"
-    for entry in _SPEC_DOC_CONSUMERS:
-        assert "script" in entry and "reads" in entry and "status" in entry
+def _non_docstring_str_constants(source: str) -> set[str]:
+    """AST 里**非 docstring** 的字符串常量。
+
+    注释天然不进 AST；docstring 是 `Expr(Constant)`，这里显式剔除 —— 否则「某个脚本的
+    文档里提到了 tasks.md」会被算成「它解析 tasks.md」。
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:  # pragma: no cover - 语法错误由别的门负责
+        return set()
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            body = getattr(node, "body", None)
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                docstrings.add(id(body[0].value))
+    return {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+    }
 
 
-def test_ok_consumers_can_find_their_document() -> None:
-    """status=ok 的消费方必须能找到它读的文档（不是 FileNotFoundError 也不是空）。"""
-    for entry in _SPEC_DOC_CONSUMERS:
-        if entry["status"] != "ok":
+def _is_consumer(source: str) -> list[str]:
+    """这份源码解析本 spec 的哪几份文档（空列表 = 不是消费方）。"""
+    consts = _non_docstring_str_constants(source)
+    if not any(SPEC_NAME in value for value in consts):
+        return []
+    docs = {
+        name
+        for name in _DOC_NAMES
+        for value in consts
+        if value == name
+        or value.endswith("/" + name)
+        or (SPEC_NAME in value and value.endswith(name))
+    }
+    return sorted(docs)
+
+
+def _discover_consumers() -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for rel_root in _DISCOVERY_ROOTS:
+        base = ROOT / rel_root
+        if not base.exists():
             continue
-        doc = SPEC_DIR / entry["reads"]
-        assert doc.is_file(), (
-            f"{entry['script']} 读 {entry['reads']}，但文件不在 {doc} —— "
-            "status=ok 的消费方不该找不到文档"
-        )
-        assert doc.stat().st_size > 100, f"{doc} 太小（<100 bytes），可能是空壳"
+        for path in base.rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            docs = _is_consumer(path.read_text(encoding="utf-8", errors="replace"))
+            if docs:
+                found[str(path.relative_to(ROOT)).replace("\\", "/")] = docs
+    return found
 
 
-def test_pending_relink_consumers_have_relink_owner() -> None:
-    """status=pending_relink 的必须写明由哪个任务做前置重接。"""
-    for entry in _SPEC_DOC_CONSUMERS:
-        if entry["status"] != "pending_relink":
+@pytest.fixture(scope="module")
+def registry() -> dict:
+    return json.loads(CONSUMERS_JSON.read_text(encoding="utf-8"))
+
+
+def test_consumer_discovery_is_falsifiable() -> None:
+    """发现谓词必须认出真消费方，且不把「只在文档里提过」算进来。"""
+    real = f'SPEC = "{SPEC_NAME}"\nTASKS = SPEC_DIR / "tasks.md"\n'
+    assert _is_consumer(real) == ["tasks.md"]
+
+    only_docstring = (
+        '"""这个模块跟 ' + SPEC_NAME + ' 的 tasks.md 有关，但它一行都不读。"""\nX = 1\n'
+    )
+    assert _is_consumer(only_docstring) == [], "docstring 里提一句被算成消费方 ⇒ 分母虚高"
+
+    only_comment = f"# 见 {SPEC_NAME} 的 design.md\nY = 2\n"
+    assert _is_consumer(only_comment) == [], "注释被算成消费方 ⇒ 分母虚高"
+
+    other_spec = 'SPEC = "formula-runtime-convergence"\nT = SPEC_DIR / "tasks.md"\n'
+    assert _is_consumer(other_spec) == [], "别的 spec 的消费方不该进本分母"
+
+
+def test_every_discovered_consumer_is_registered(registry: dict) -> None:
+    """现算发现集合必须与登记表**逐条相等**。
+
+    少登记 = 改文档时不知道会打坏谁（0.5 原本的缺口）；多登记 = 登记表里留着已删文件。
+    """
+    discovered = _discover_consumers()
+    assert len(discovered) >= 20, (
+        f"只发现 {len(discovered)} 个消费方 —— 扫描面塌了，本节判据会在小分母上恒绿"
+    )
+    registered = set(registry["consumers"])
+    missing = sorted(set(discovered) - registered)
+    stale = sorted(registered - set(discovered))
+    assert not missing, (
+        "以下文件解析本 spec 的文档却没登记（改文档不会有判据因它们打红）：\n"
+        + "\n".join(f"  {rel} ← {discovered[rel]}" for rel in missing)
+    )
+    assert not stale, f"登记表里有已不再解析本 spec 文档的条目：{stale}"
+
+
+def test_registered_consumers_exist_on_disk(registry: dict) -> None:
+    missing = [rel for rel in registry["consumers"] if not (ROOT / rel).is_file()]
+    assert not missing, f"登记表里有不存在的路径：{missing}"
+
+
+def test_registry_counts_are_recomputed_not_asserted(registry: dict) -> None:
+    """摘要必须与明细逐项相等（摘要从明细算，不是手写）。"""
+    tally: dict[str, int] = {}
+    for row in registry["consumers"].values():
+        tally[row["status"]] = tally.get(row["status"], 0) + 1
+    expected = {"total": len(registry["consumers"]), **{k: tally[k] for k in sorted(tally)}}
+    assert registry["counts"] == expected, f"摘要 {registry['counts']} ≠ 明细现算 {expected}"
+
+
+def test_consumer_status_vocabulary_is_closed(registry: dict) -> None:
+    bad = {
+        rel: row["status"]
+        for rel, row in registry["consumers"].items()
+        if row["status"] not in _ALLOWED_STATUS
+    }
+    assert not bad, f"status 不在封闭集合 {_ALLOWED_STATUS}：{bad}"
+    ownerless = [
+        rel for rel, row in registry["consumers"].items() if not str(row.get("owner_task") or "")
+    ]
+    assert not ownerless, f"以下条目没有 owner_task：{ownerless}"
+
+
+def test_unreviewed_consumers_only_shrink(registry: dict) -> None:
+    """未复核分类的消费方只许变少。
+
+    🔴 这是**过渡量**不是不变量：它写明「还有多少个消费方的解析形态没人逐个看过」。
+       清零的唯一路径是逐个复核改成 `ok` / `retired`，不是把上限抬上去。
+    """
+    unreviewed = sorted(
+        rel
+        for rel, row in registry["consumers"].items()
+        if row["status"] == "registered_unreviewed"
+    )
+    assert len(unreviewed) <= _UNREVIEWED_CEILING, (
+        f"未复核消费方从 {_UNREVIEWED_CEILING} 涨到 {len(unreviewed)}：{unreviewed}"
+    )
+    assert _UNREVIEWED_CEILING - len(unreviewed) <= 5, (
+        f"上限 {_UNREVIEWED_CEILING} 比现算 {len(unreviewed)} 虚高太多 —— 棘轮要跟着收"
+    )
+
+
+def test_ok_frozen_consumers_bind_by_content_not_by_hardcoded_path(registry: dict) -> None:
+    """判 `ok` 的 Wave 6 消费方必须按**内容标记**定位快照，不得写死 active 路径。
+
+    写死 active 的那一版，报的是「tasks.md 里找不到 Task 68」这种**指错地方**的错误：
+    契约没丢，它在归档快照里。
+    """
+    offenders: list[str] = []
+    for rel, row in registry["consumers"].items():
+        if row["status"] != "ok" or row["contract_kind"] != "frozen_wave6":
             continue
-        assert entry.get("relink_owner"), (
-            f"{entry['script']} 标了 pending_relink 但没写 relink_owner —— "
-            "不能留没有 owner 的锚点断开项"
-        )
+        source = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+        if "resolve_spec_dir" not in source or "require_matches" not in source:
+            offenders.append(rel)
+    assert not offenders, (
+        "以下 Wave 6 消费方标了 ok 却没按内容标记绑定快照：\n"
+        + "\n".join(f"  {rel}" for rel in offenders)
+    )
+    ok_frozen = [
+        rel
+        for rel, row in registry["consumers"].items()
+        if row["status"] == "ok" and row["contract_kind"] == "frozen_wave6"
+    ]
+    assert len(ok_frozen) >= 6, f"ok 的 Wave 6 消费方只有 {len(ok_frozen)} 个 ⇒ 判据失锚"
 
 
-def test_no_unknown_consumer_status() -> None:
-    """status 必须在封闭集合里。"""
-    allowed = {"ok", "retired", "pending_relink"}
-    for entry in _SPEC_DOC_CONSUMERS:
-        assert entry["status"] in allowed, f"{entry['script']} 的 status={entry['status']} 不在 {allowed}"
+def test_frozen_contract_snapshot_really_carries_the_legacy_shape() -> None:
+    """冻结快照必须真的含 Wave 6 形态 —— 否则「按内容绑定」绑到的是空气。
+
+    并且 active 投影**不得**含这些锚点：两边都含的话「按内容选快照」就选不出东西，
+    这条判据也就不是在守什么了。
+    """
+    import sys as _sys
+
+    check_dir = str(ROOT / "backend" / "scripts" / "check")
+    if check_dir not in _sys.path:
+        _sys.path.insert(0, check_dir)
+    from _spec_dir import resolve_spec_dir
+
+    frozen = resolve_spec_dir(
+        SPEC_NAME,
+        require_files=["requirements.md", "design.md", "tasks.md"],
+        require_matches={
+            "requirements.md": (r"^### Requirement \d+", r"^7\.7\.", r"^14\.10\."),
+            "design.md": (r"^### Property \d+", r"^## Acceptance Oracle Matrix$"),
+        },
+    )
+    assert "_archive" in frozen.parts, (
+        f"冻结形态竟解析到 {frozen} —— 若 active 已回到 Wave 6 形态，本 spec 的 0.5 / 0.6 "
+        "结论需要重判，不能默默通过"
+    )
+    active_req = REQUIREMENTS.read_text(encoding="utf-8")
+    assert not re.search(r"^### Requirement \d+", active_req, re.MULTILINE), (
+        "active requirements 里出现了 `### Requirement N` 标题 —— 它应该是 7 条扁平 AC 投影"
+    )
 
 
-def test_retired_consumers_are_not_in_any_gate() -> None:
+def test_retired_consumers_are_not_in_any_gate(registry: dict) -> None:
     """退役的消费方不得留在门禁里（与 test_task66_execution_ledger 同族逻辑）。"""
-    for entry in _SPEC_DOC_CONSUMERS:
-        if entry["status"] != "retired":
-            continue
-        script_name = pathlib.Path(entry["script"]).name
+    retired = [rel for rel, row in registry["consumers"].items() if row["status"] == "retired"]
+    assert retired, "一个退役条目都没有 ⇒ 本判据在空集上恒绿（task 5.5 已判 task66 生成器退役）"
+    for rel in retired:
+        script_name = pathlib.Path(rel).name
         for gate_rel in (
             ".github/workflows/ci.yml",
             ".github/workflows/governance-checks.yml",

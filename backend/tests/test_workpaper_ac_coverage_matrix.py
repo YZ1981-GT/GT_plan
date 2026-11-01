@@ -37,6 +37,7 @@ import check_workpaper_ac_coverage_gate as gate  # noqa: E402
 from generate_workpaper_ac_coverage_matrix import (  # noqa: E402
     _MATRIX,
     _OVERLAY,
+    _SPEC_DIR,
     _read_lines,
     _sha256,
     _stable_json,
@@ -52,7 +53,17 @@ from generate_workpaper_ac_coverage_matrix import (  # noqa: E402
     render,
 )
 
-SPEC_DIR = REPO / ".kiro" / "specs" / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+#: 🔴 **从生产生成器取**，不在这里再写一遍路径。
+#
+# 原来这里写死 `.kiro/specs/<name>/`（active）。2026-11-01 该 spec 的 active 目录被重写成
+# 「7 条扁平 AC + 两级任务号」，而本矩阵解析的是 Wave 6 形态（`### Requirement N` +
+# 170 条 AC + `## Acceptance Oracle Matrix` + 整数任务号）；生成器已改为按**内容标记**
+# 定位冻结快照（见 `app/core/spec_docs.resolve_spec_dir`），判据这边若还写死 active，
+# 两侧就各读一份文档 —— 报出的会是「AC 1.3 precedes any requirement heading」这种
+# **伪文档缺陷**，真实原因是判据和生产读的不是同一份契约。
+#
+# 文档定位只能有一个来源：和读取器 `_read_lines` 同理，判据与生产共用生成器的解析结果。
+SPEC_DIR = _SPEC_DIR
 
 
 def _doc(name: str) -> list[str]:

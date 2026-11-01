@@ -84,12 +84,12 @@
   "counters": {
     "plan_paths_total": 126,
     "state_landed": 29,
-    "state_drifted": 28,
-    "state_intact": 69,
+    "state_drifted": 33,
+    "state_intact": 64,
     "pending_delete_paths": 125,
     "pending_delete_landed": 29,
     "outstanding_paths": 96,
-    "outstanding_drifted_need_reverdict": 27,
+    "outstanding_drifted_need_reverdict": 32,
     "unplanned_legacy_paths": 0,
     "live_blocking_points": 1
   },
@@ -296,7 +296,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useD4DualMode.ts",
       "state": "drifted",
       "planned_sha256": "4559eee4321fc8e772ed1b69d1cafe098e0f3f65c5630def371116503a6df993",
-      "current_sha256": "dc6e28b650d15003bd10aa2cb9f3804e65423ce772947305fcb739f65b0830be",
+      "current_sha256": "68d1964a83b3c8ccbda1e0e09b6a7bb44295298cbb83e8a0d0ab41abfc366936",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -404,9 +404,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2DualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "4bc1c002ead2890e385a82b5302a976c311fd9a24f09d65d4398553ffed5f24f",
-      "current_sha256": "4bc1c002ead2890e385a82b5302a976c311fd9a24f09d65d4398553ffed5f24f",
+      "current_sha256": "441b87ed2dda383f28d1af9281e24b033ea7b2e7b977d64ad8d5fc13c3d99ef3",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -478,9 +478,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "04bd6fc30afd6f5c35ec27f6731527a1d119e3bc5ee076c831195b33abaae350",
-      "current_sha256": "04bd6fc30afd6f5c35ec27f6731527a1d119e3bc5ee076c831195b33abaae350",
+      "current_sha256": "c20a1ddbd28b4f85567e64fc146c293dd4f5a8e95264975abe591d0a424701cf",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -500,7 +500,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
       "state": "drifted",
       "planned_sha256": "f483c0a7f4c7452d773ccfd330e3649164c18e6776af3b0384d0e18243ec3dca",
-      "current_sha256": "5b3fad7e0b4506c75e3a9d84768ce12808bad16453d16b268285b8d7a675b6ae",
+      "current_sha256": "50ff1760f4a308ff499fa3e89e0c7d9ab81d80aa44ee7fe6c615170d8bae1b86",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -518,9 +518,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "21e7e3435c32046f99d7d1880b2644103cbba56a0cdb7127655d58a8ee701bb1",
-      "current_sha256": "21e7e3435c32046f99d7d1880b2644103cbba56a0cdb7127655d58a8ee701bb1",
+      "current_sha256": "8eb4e9da2c75bb4cdb38050dcfdf349afaf608e2e0932cc1e62654144a3ce152",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -540,7 +540,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF3DualMode.ts",
       "state": "drifted",
       "planned_sha256": "d35985f813f1f3b0bc74caf5e820728ea357336e3faf9d7067366992845956b7",
-      "current_sha256": "fd15bf9c15ce8881badd81b77df2049f08761b352b42d39b6815f68fa3d7c30a",
+      "current_sha256": "447b80fa0c9a1d54ea2d57885ab73edd61fe0e1e6747de0702928b5702b31cfa",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -578,7 +578,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF4DualMode.ts",
       "state": "drifted",
       "planned_sha256": "4af58dc34ea9e0f418f921d67207750175a69fb0ab1a2f62e88991007dadfc15",
-      "current_sha256": "cd25426efd2c3cfa8f200b43cb9fd6023a7c4e9759786b17eaafb0843fb81d96",
+      "current_sha256": "8af60ff7985f599cf88aedcdc83fcc8618833f983b55f1874e4a0323e54b915f",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -596,9 +596,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF5CosOfDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "9ce2b4e8b79d0520ea3a77114e17c945a42a66326f21b7abd376e65a2dbb71a7",
-      "current_sha256": "9ce2b4e8b79d0520ea3a77114e17c945a42a66326f21b7abd376e65a2dbb71a7",
+      "current_sha256": "d823f0a8a8831af662e0d9278344b6d5a9d2d9b049c3e17b1e5a424a5ea065b4",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -2279,9 +2279,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "caba488fd26cda7456e9437cb2eb28b523a5d06ae692ad06bf790217b36612eb",
-      "current_sha256": "caba488fd26cda7456e9437cb2eb28b523a5d06ae692ad06bf790217b36612eb",
+      "current_sha256": "424ca4edcc994487632d9e56a3a63d0f5f688b32608ec7a7db192e0e0e3c2e20",
       "item_count": 1,
       "categories": [
         "legacy_factory"
