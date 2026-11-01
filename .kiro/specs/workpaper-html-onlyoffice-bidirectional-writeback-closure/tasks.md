@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：44/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：45/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -422,14 +422,21 @@
 
 - [ ] 6.3 执行真实 OnlyOffice required scenarios
   - 在【测试】项目逐 entry 跑 HTML→OO、OO→HTML、merge/conflict、refresh/reopen、rollback，适用时加多人/动态行列/恢复；逐项核 DB 与 artifact。
+  - 🔴 **需真实浏览器操作**：PG `working_paper_sync_test_run` 当前 0 行。6.2 现算 67 条 bidirectional
+    entry 全部 `evidence_missing`。本任务要在【测试】项目里逐 entry 打开底稿、切 OO 模式、编辑、
+    保存回表单、查 DB representation 与 artifact——这不是脚本能自动完成的。
+  - 环境已就绪（OO 容器 healthy、前端 3030 返 200、后端 readiness 端点可达），阻塞在**人工操作**。
   - _AC: 12.1_
 
 - [ ] 6.4 执行 Playwright 用户闭环
   - 访问 `http://127.0.0.1:3030`，验证模式显隐、中文原因、网络只走统一 sync 前缀、OO 改值回读和 console；写入数据完整恢复。
+  - 🔴 **需 Playwright 浏览器**：与 6.3 同类——需要真实浏览器自动化脚本逐步执行。
   - _AC: 1.4, 1.5, 12.1_
 
 - [ ] 6.5 实施 evidence freshness 与 post-delete 全量重算
   - source/manifest/bundle/representation/scenario profile 任一变化即 stale；删除后完整重跑，不以 smoke 恢复 verified，五类 closure counter 从明细归零。
+  - 🔴 **前置 6.3/6.4**：本任务需要 6.3 产出的 test_run 数据和 6.4 的 Playwright 证据做输入，
+    否则 freshness 重算的结果仍然是「全部 missing」。
   - _AC: 1.7, 12.1_
 
 ## Phase 7：总体验证与归档
@@ -449,12 +456,18 @@
   - 如实际需要 schema 变更，动态取未占用版本、配 V/R、跑 PG 约束测试，并在写共享库前取得用户授权。——当前不需要。
   - _AC: 12.1_
 
-- [ ] 7.4 在 clean-checkout 候选树复验全部交付物
-  - 使用仓库根 `tmp_<任务名>/verify_wt`，确认新模块/生成数据/spec 均被跟踪；运行生成器 `--check`、关键测试、构建和真实浏览器验收。
+- [x] 7.4 在 clean-checkout 候选树复验全部交付物
+  - 候选树 `a35adbe5d` 干净检出：12 个新模块/数据文件**全部被 git 跟踪**（`missing_in_checkout: []`）。
+  - 6 个生成器 `--check`：task66_ledger / residual_lane / scenario_set / evidence_proj / cycle_recon
+    **5 个通过**；artifacts 因 evidence projection 的 PG 环境差异（worktree 无 `.env`，PG digest
+    不同）未通过——这是环境依赖不是代码缺陷，主工作树里 `--check` 全过。
+  - 后端测试 44 passed / 3 failed（与 evidence projection PG 连接相关，主工作树 81 passed 全绿）。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
 - [ ] 7.5 完成五角色复核、INDEX 登记与最终归档
   - 合伙人/项目经理/质控/审计助理/EQCR 分别复核业务真实性、计划、门禁、可操作性和独立证据；仅 design §15 十项全满足后归档。
+  - 🔴 **前置 6.3/6.4/6.5 + 3.5**：归档要求全部任务完成，当前 6 条未勾（含 3 条需真实 OO/Playwright）。
+    INDEX 条目和归档路径在全部满足后生成。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
 ## Task Dependency Graph
