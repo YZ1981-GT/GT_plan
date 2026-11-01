@@ -12,6 +12,12 @@
       -->
       <div v-if="showModeSwitch" class="h1-mode-switch-bar">
         <el-segmented v-if="h1FEntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
+        <!--
+          能力披露（spec task 3.5 / AC 1.5）：上面的模式开关一旦被同步能力单源藏起来，
+          这里必须讲清楚「为什么没有在线编辑」+ 可操作的下一步。只隐藏开关不给原因，
+          比显示一个打不开的假开关更糟。entry id 与开关的门用**同一个**表达式。
+        -->
+        <GtEntrySyncCapabilityNotice :entry-id="H1_SYNC_ENTRY_ID" />
         <el-tag size="small" :type="hSync.syncStateTag.value.type">
           {{ hSync.syncStateTag.value.text }}
         </el-tag>
@@ -341,6 +347,7 @@
  * Requirements: 1.2-1.3, 17.1
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'

@@ -205,15 +205,50 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
   //    实际只看过其中一个，另外十几个的假接线它一律看不见。改为**现算**：
   //    「画了 segmented + 自身文本出现单源」即纳入，清单不可能再与代码漂移。
   // 🔴 带 `g` 标志的正则，`.test()` 会累进 `lastIndex`（有状态）⇒ 同一个对象反复 test 会
-  //    交替返回 false。取标签用 `g` 版（配 `.match`），判存在用无标志版。
-  const SEGMENTED_TAG_ALL = /<el-segmented[\s\S]{0,400}?>/g
+  //    交替返回 false。判存在用无标志版；取标签**不能**用正则（见下）。
   const SEGMENTED_TAG_ONE = /<el-segmented[\s\S]{0,400}?>/
+
+  /**
+   * 引号感知地截出 `<el-segmented ...>` 开标签全文。
+   *
+   * 🔴 原来这里用 `/<el-segmented[\s\S]{0,400}?>/g`。它会在**属性值内部的 `>`** 处提前
+   * 截断 —— 模板里常见 `@change="(val: any) => …"`，那个 `=>` 的 `>` 就是截断点。
+   * 现算全仓 349 个 `el-segmented` 标签里有 **26 个**被这样截断，其中 **3 个因此改变判定**：
+   * `GtB60Bundle.vue`（2 处）与 `GtJ1EmployeeCompensation.vue`（1 处）的模式开关被残片
+   * 判成「不是模式开关」⇒ 本判据会放过它们，分桶时还会把这两个宿主误列进「没有模式
+   * 开关、可以豁免」。扫描器的截断不是精度问题，是会造成**错误豁免**的正确性问题。
+   */
+  function segmentedOpenTags(text: string): string[] {
+    const out: string[] = []
+    let i = 0
+    for (;;) {
+      i = text.indexOf('<el-segmented', i)
+      if (i < 0) break
+      let j = i + '<el-segmented'.length
+      let quote: string | null = null
+      while (j < text.length) {
+        const ch = text[j]
+        if (quote) {
+          if (ch === quote) quote = null
+        } else if (ch === '"' || ch === "'") {
+          quote = ch
+        } else if (ch === '>') {
+          j += 1
+          break
+        }
+        j += 1
+      }
+      out.push(text.slice(i, j))
+      i = j
+    }
+    return out
+  }
   const SINGLE_SOURCE = /useEntrySyncReadiness|entrySyncPresentation/
-  /** 与棘轮同一口径：HTML↔OO 模式值字面量，用来把业务分段器排除出去。 */
-  const MODE_VALUE = /['"](?:onlyoffice|online-edit|structured|docx)['"]|value:\s*['"]html['"]/
-  // 🔴 不可写 `/mode/i`：它会命中 `v-model` 里的 "mode"，把纯业务分段器当成模式开关
-  //    （下面那条可伪证用例正是据此把第一版判据打红的）。改认模式开关特有的绑定名。
-  const MODE_BINDING = /currentMode|modeOptions|renderMode|onModeChange|modeToggle/
+  /** HTML↔OO 这一组选项值（含「把标签当值」的 `'HTML'` / `'OnlyOffice'` 写法）。 */
+  const MODE_OPTION_VALUES = new Set([
+    'html', 'onlyoffice', 'oo', 'online-edit', 'structured', 'docx', 'excel',
+    'HTML', 'OnlyOffice',
+  ])
 
   function walkVue(dir: string, out: string[]): string[] {
     for (const name of readdirSync(dir)) {
@@ -225,9 +260,87 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
     return out
   }
 
-  /** 这个 segmented 是模式开关还是业务分段器？用它自己的 options/绑定表达式判。 */
-  function isModeSwitchTag(tag: string): boolean {
-    return MODE_VALUE.test(tag) || MODE_BINDING.test(tag)
+  function attrOf(tag: string, name: string): string | null {
+    const m = new RegExp(`(?:^|\\s)${name}="([^"]*)"`).exec(tag)
+    return m ? m[1] : null
+  }
+
+  /** 把 `:options` 表达式解成「选项值集合」：内联数组 / 同文件常量 / 一层别名。 */
+  function resolveOptionValues(expr: string | null, text: string, depth = 0): Set<string> | null {
+    if (!expr || depth > 2) return null
+    const trimmed = expr.trim()
+    const pick = (body: string): Set<string> => {
+      const withValue = [...body.matchAll(/value:\s*['"]([^'"]+)['"]/g)].map((m) => m[1])
+      if (withValue.length) return new Set(withValue)
+      return new Set([...body.matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]))
+    }
+    if (trimmed.startsWith('[')) return pick(trimmed)
+    const ident = /^([A-Za-z_$][\w$]*)(?:\.value)?$/.exec(trimmed)
+    if (!ident) return null
+    const decl = new RegExp(`const\\s+${ident[1]}\\s*=\\s*`).exec(text)
+    if (!decl) return null
+    const rest = text.slice(decl.index + decl[0].length)
+    if (rest.trimStart().startsWith('[')) {
+      const off = rest.length - rest.trimStart().length
+      let d = 0
+      let k = off
+      let q: string | null = null
+      for (; k < rest.length; k += 1) {
+        const c = rest[k]
+        if (q) {
+          if (c === q) q = null
+        } else if (c === '"' || c === "'" || c === '`') q = c
+        else if (c === '[') d += 1
+        else if (c === ']') {
+          d -= 1
+          if (d === 0) {
+            k += 1
+            break
+          }
+        }
+      }
+      return pick(rest.slice(off, k))
+    }
+    const head = rest.slice(0, 300)
+    // 平台共享的 HTML↔OO 选项工厂
+    if (head.includes('dualModeHtmlOoOptions')) return new Set(['html', 'onlyoffice'])
+    const alias = /^\s*([A-Za-z_$][\w$]*)\s*(?:$|\n|\/\/)/m.exec(head)
+    if (alias && alias[1] !== ident[1]) return resolveOptionValues(alias[1], text, depth + 1)
+    return null
+  }
+
+  /**
+   * 这个 segmented 让用户选的是「HTML ↔ OnlyOffice」还是业务口径？
+   *
+   * 🔴 口径换过两次，两次错法相反，都被真实数据打红：
+   *   v1「整个标签里出现模式值或模式绑定名」⇒ **假阳**：`GtH3InvestmentProperty.vue` 的
+   *      `measurementModel`（成本法 / 公允价值，纯业务）因为外层写了
+   *      `v-if="currentMode === 'html'"` 被判成模式开关 ⇒ 判据会逼着给业务控件套同步门。
+   *   v2「只看标签内的值字面量」⇒ **假阴**：`GtCControlTest.vue` 的 `deviationViewMode`
+   *      （structured↔online-edit = C 循环对 HTML↔OO 的叫法）和 `GtA51CashflowAudit.vue`
+   *      的 `segOpts` 把选项放在常量里，标签内一个模式值都看不到 ⇒ 判据放过真模式开关。
+   *
+   * 现在按**选项语义**判，且只看 `:options`（不看 `v-if` —— 业务控件完全可以用模式做前置
+   * 条件）：选项值能解析出来就按值判；解析不出来再退到「选项标识符里带 mode」。
+   */
+  function isModeSwitchTag(tag: string, text = ''): boolean {
+    const opts = attrOf(tag, ':options')
+    const values = resolveOptionValues(opts, text)
+    if (values) {
+      let hit = 0
+      for (const v of values) if (MODE_OPTION_VALUES.has(v)) hit += 1
+      return hit >= 2
+    }
+    if (opts !== null && /mode/i.test(opts)) return true
+    // 第三级回退：选项值与选项名都问不出时看**模型绑定名**。
+    // 🔴 这里必须写 `/^mode$|Mode$/` 而不是 `/mode/i`：后者会命中 `measurementModel`
+    //    里的 "Mode"（M-o-d-e-l 含 mode），把成本法/公允价值选择器又判成模式开关 ——
+    //    也就是把 v1 的假阳换一种方式请回来。`viewMode` / `currentMode` / `dualMode`
+    //    以 Mode 结尾，`measurementModel` / `depreciationBranch` 不。
+    const model = attrOf(tag, 'v-model') ?? attrOf(tag, ':model-value')
+    if (!model) return false
+    const last = model.replace(/\.value$/, '').split('.').pop() ?? ''
+    return /^mode$|Mode$/.test(last)
   }
 
   const wiredHosts = walkVue(SRC, [])
@@ -246,11 +359,11 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
   it.each(wiredHosts)('%s 的模式开关 v-if 绑在 presentation.showModeSwitch 上', (rel) => {
     const text = readFileSync(join(SRC, rel), 'utf-8')
     expect(text).toMatch(SINGLE_SOURCE)
-    const segmented = text.match(SEGMENTED_TAG_ALL) ?? []
+    const segmented = segmentedOpenTags(text)
     expect(segmented.length, '宿主里找不到 el-segmented ⇒ 判据失锚').toBeGreaterThan(0)
     // 🔴 只要求**模式开关**被门控。同一宿主里的业务分段器（如 L4 的债券分支选择器）
     //    不该被同步能力门控 —— 原先按 `segmented.length` 全量要求会把它们一起误伤。
-    const modeTags = segmented.filter(isModeSwitchTag)
+    const modeTags = segmented.filter((tag) => isModeSwitchTag(tag, text))
     expect(modeTags.length, `算不出模式开关 ⇒ 判据失锚：${segmented[0]?.slice(0, 160)}`)
       .toBeGreaterThan(0)
     const gated = modeTags.filter((tag) => /v-if="[^"]*showModeSwitch[^"]*"/.test(tag))
@@ -266,11 +379,54 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
     expect(/v-if="[^"]*showModeSwitch[^"]*"/.test(real)).toBe(true)
   })
 
-  it('业务分段器判据可伪证：纯业务分段器不得被当成模式开关', () => {
-    const business = '<el-segmented v-model="bondBranch" :options="branchOptions" size="default" />'
-    expect(isModeSwitchTag(business)).toBe(false)
-    const modeSwitch =
-      '<el-segmented :model-value="dual.currentMode.value" :options="dual.modeOptions.value" />'
-    expect(isModeSwitchTag(modeSwitch)).toBe(true)
+  it('业务分段器判据可伪证：四种真实形态都要判对', () => {
+    // ① 纯业务、选项名无 mode
+    expect(
+      isModeSwitchTag('<el-segmented v-model="bondBranch" :options="branchOptions" />'),
+    ).toBe(false)
+    // ② 模式开关、选项名带 mode 但解析不出值（`modeOptions` 多在 composable 里）
+    expect(
+      isModeSwitchTag('<el-segmented :model-value="d.currentMode.value" :options="d.modeOptions.value" />'),
+    ).toBe(true)
+    // ③ 🔴 v1 的假阳：业务控件外层用模式做前置条件，不得因此被当成模式开关
+    const h3Business =
+      '<el-segmented v-if="currentMode === \'html\'" v-model="measurementModel" :options="measurementOptions" />'
+    const h3Text = "const measurementOptions = [{ label: '成本法', value: 'cost' }, { label: '公允价值', value: 'fair_value' }]"
+    expect(isModeSwitchTag(h3Business, h3Text), 'v1 的假阳回来了').toBe(false)
+    // ④ 🔴 v2 的假阴：选项放在常量里，标签内看不到模式值
+    const cctMode = '<el-segmented v-model="deviationViewMode" :options="deviationModeOptions" />'
+    const cctText =
+      "const deviationModeOptions = [{ label: '结构化视图', value: 'structured' }, { label: '在线编辑', value: 'online-edit' }]"
+    expect(isModeSwitchTag(cctMode, cctText), 'v2 的假阴回来了').toBe(true)
+    // ⑤ 一层别名（A51 的 `const segOpts = modeOptions`）
+    const a51 = '<el-segmented v-model="viewMode" :options="segOpts" />'
+    const a51Text =
+      "const modeOptions = [{ label: '结构化', value: 'structured' }, { label: 'Excel', value: 'excel' }]\nconst segOpts = modeOptions\n"
+    expect(isModeSwitchTag(a51, a51Text), '别名链没跟上').toBe(true)
+  })
+
+  // 🔴 钉住标签截取方式：换回 `/<el-segmented[\s\S]{0,400}?>/` 一类正则会在属性值里的
+  //    `>` 处提前截断（`@change="(v) => f(v)"`），残片让模式开关被判成非模式开关 ⇒
+  //    本判据放过它、分桶还会把宿主误列进「可豁免」。这条用例就是防那次回退。
+  it('标签截取必须引号感知（内联箭头函数里的 `>` 不得当成标签结束）', () => {
+    // 属性顺序本就任意：把内联箭头函数放在**最前**，截断就会同时丢掉 `:options` 与
+    // `:model-value`，三级判据全部失去依据 ⇒ 判定从「模式开关」翻成「业务分段器」。
+    const tricky =
+      '<el-segmented\n' +
+      '  @change="(val: string) => dual.onModeChange(val)"\n' +
+      '  :model-value="dual.currentMode.value"\n' +
+      '  :options="dual.modeOptions.value"\n' +
+      '/>\n' +
+      '<p>后面的内容不该被吞进标签</p>'
+    const tags = segmentedOpenTags(tricky)
+    expect(tags.length).toBe(1)
+    expect(tags[0].endsWith('/>'), `截出来的不是完整开标签：${tags[0]}`).toBe(true)
+    expect(tags[0]).toContain('modeOptions')
+    expect(tags[0], '把标签之后的正文也吞进来了').not.toContain('<p>')
+    // 朴素正则在同一输入上会截断，丢掉 `:options` ⇒ 判定随之反转，这正是它的危害
+    const naive = tricky.match(/<el-segmented[\s\S]{0,400}?>/)?.[0] ?? ''
+    expect(naive.includes('modeOptions'), '朴素正则竟没截断 ⇒ 本用例失锚').toBe(false)
+    expect(isModeSwitchTag(tags[0]), '完整标签应判为模式开关').toBe(true)
+    expect(isModeSwitchTag(naive), '残片应判不出来 —— 这就是截断的危害').toBe(false)
   })
 })

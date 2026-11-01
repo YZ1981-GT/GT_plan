@@ -19,7 +19,7 @@
           disabled 在未就绪时会把「在线编辑」锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
           健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
         -->
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h7EntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <!-- 计量模式切换 -->
         <el-segmented
           v-if="currentMode === 'html'"
@@ -388,6 +388,7 @@
  * Requirements: 1.1-1.9, 1.11, 1.13
  */
 import { ref, computed, onMounted, provide, toRef, inject, watch, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
@@ -743,6 +744,17 @@ watch(measurementModel, () => {
 onMounted(() => {
   void selfLoad()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const h7EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H7_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

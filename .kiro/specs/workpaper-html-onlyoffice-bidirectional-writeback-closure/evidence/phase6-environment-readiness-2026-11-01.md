@@ -50,3 +50,29 @@ acceptance」现在能跑但分母为空；6.1 的 required scenario set digest 
 3. 写共享 PG 的三类（25 条 representation-only rehash / 19 条重投影 / 14 条首版）按
    「先【测试】项目、逐条复验、每条记迁移前后 generation 与 content_revision」推进；
    重投影会**推进 content revision**，与 rehash 风险不同，两类不可混批。
+
+## 4. `degraded` 已定位：`schema_drift.critical_count = 6`，且与同步链无关
+
+探针 `tmp_workpaper_sync_impl/probe_drift.py` 直接查 `schema_drift_log`，按
+`CRITICAL_DRIFT_TYPES`（`orm_extra` / `enum_mismatch` / `checksum_drift` —— health 的
+degraded 判定只引用这三类）取明细。6 条逐项如下：
+
+| # | 表 / 迁移 | 列 | 类型 | 归属 |
+|---|---|---|---|---|
+| 1 | `attachment_lineage` | `project_id` | `orm_extra` | 附件系列 spec |
+| 2 | `financial_report` | `calc_error` | `orm_extra` | 公式中枢 spec |
+| 3 | `financial_report` | `calc_version` | `orm_extra` | 公式中枢 spec |
+| 4 | `formula_sync_item` | `revision` | `orm_extra` | 公式设置 spec |
+| 5 | `V227__project_creation_grants.sql` | — | `checksum_drift` | 批量建项授权 spec |
+| 6 | `V228__project_creation_grant_uscc_checksum.sql` | — | `checksum_drift` | 批量建项授权 spec |
+
+**判定：`touches_sync_tables = []`** —— 把 `workpaper_sync_models` 里 29 个 ORM 的
+`__tablename__` 全取出来做交集，6 条 critical 一条都不落在同步链表上。
+
+成因是「`run_migrations` 被 `GT_BOOTSTRAP_DONE=1` 跳过」：并发会话加了 ORM 列与 `V*.sql`，
+开发服务器热重载不跑迁移 ⇒ ORM 有列、DB 没有 ⇒ `orm_extra`。两条 `checksum_drift` 是
+V227 / V228 应用后又被编辑。**全部不属于本 spec**，本 spec 也不新增迁移。
+
+⇒ 结论：6.3 / 6.4 的真实验收**可以照常做**，`degraded` 不会污染归因。但报告里要写明
+这 6 条的存在与归属，否则读者会把 degraded 当成同步链的问题。修它们要分别由那三个
+spec 的负责人全量重启 `start-dev.bat`（或按号补迁移 / 登记 drift ledger），不在本 spec 范围。

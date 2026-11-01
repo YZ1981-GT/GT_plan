@@ -30,8 +30,19 @@ import BASELINE from './entrySyncModePresentationRatchet.baseline.json'
 
 const SRC = resolve(__dirname, '../../../..')
 const SEGMENTED = /<el-segmented\b/
-/** HTML↔OO 模式值字面量（排除纯业务分段器，如附注树筛选、调整分录来源筛选）。 */
-const MODE_VALUE = /['"](?:onlyoffice|online-edit|structured|docx)['"]/
+/**
+ * HTML↔OO 模式值字面量（排除纯业务分段器，如附注树筛选、调整分录来源筛选）。
+ *
+ * 🔴 第一版只认小写枚举 `'onlyoffice' | 'online-edit' | 'structured' | 'docx'`，
+ *    **漏掉了 10 个 S 循环宿主**（`GtS3PolicyChange` / S4 / S5 / S6 / S12 / S13 / S14 /
+ *    S15 / S20 / S21）—— 它们的选项值直接写成**英文标签** `'HTML'` / `'OnlyOffice'`，
+ *    一个小写枚举都不出现 ⇒ 这 10 条债从来没进过分母，棘轮也就从来没提醒过。
+ *    这与本 spec 反复抓到的「把标签当值」（A 轮 AC-41：17 条把中文标签直接当 mode 值）
+ *    是同一形态，只是这次是英文。加上 `'HTML'` / `'OnlyOffice'` / `'oo'` 三个值。
+ *    `'oo'` 来自 `J2TabAdjudication.vue` 的内联选项 `[{label:'OnlyOffice',value:'oo'}]`。
+ */
+const MODE_VALUE =
+  /['"](?:onlyoffice|online-edit|structured|docx|OnlyOffice)['"]|value:\s*['"](?:oo|HTML)['"]/
 const HTML_MODE_VALUE = /value:\s*['"]html['"]|=== ?['"]html['"]/
 const SINGLE_SOURCE = /useEntrySyncReadiness|entrySyncPresentation/
 
@@ -96,6 +107,20 @@ describe('模式开关表现单源棘轮', () => {
     expect(
       MODE_VALUE.test(`<el-segmented v-model="bondBranch" :options="branchOptions" />`),
       '纯业务分段器被当成模式开关 ⇒ 分母虚高',
+    ).toBe(false)
+    // 🔴 label-as-value 形态必须认得出（10 个 S 循环宿主正是这样写的，第一版全漏）
+    expect(
+      MODE_VALUE.test(`const modeOptions = [{ label: 'HTML', value: 'HTML' }, { label: '在线编辑', value: 'OnlyOffice' }]`),
+      "把英文标签直接当 mode 值（'HTML' / 'OnlyOffice'）的宿主必须进分母",
+    ).toBe(true)
+    expect(
+      MODE_VALUE.test(`[{ label: 'HTML', value: 'html' }, { label: 'OnlyOffice', value: 'oo' }]`),
+      "内联 `value: 'oo'` 形态必须进分母",
+    ).toBe(true)
+    // 反例：业务控件里出现「HTML」字样（如导出格式）不得仅因此进分母
+    expect(
+      MODE_VALUE.test(`<el-segmented v-model="exportFmt" :options="['PDF', 'Word']" />`),
+      '业务分段器不得被误纳',
     ).toBe(false)
   })
 

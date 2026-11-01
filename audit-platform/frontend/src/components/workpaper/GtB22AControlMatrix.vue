@@ -14,6 +14,7 @@
  * Tasks: 3.1 ~ 3.13, 4.1
  */
 import { ref, computed, watch, toRef, onMounted, provide } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { useB22AFormData, type ChecklistItem } from './composables/useB22AFormData'
@@ -862,6 +863,17 @@ watch(saving, (isSaving, wasSaving) => {
 watch(deficiencyList, () => {
   emitDeficiencyChange()
 }, { deep: true })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const b22AEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => B22A_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <template>
@@ -894,7 +906,7 @@ watch(deficiencyList, () => {
 
     <!-- 双模式工具栏（B22A canary 真双向 + legacy 降级） -->
     <div class="b22-mode-toolbar">
-      <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="syncBusy" />
+      <el-segmented v-if="b22AEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="renderModeOptions" size="small" :disabled="syncBusy" />
       <GtEntrySyncCapabilityNotice :entry-id="B22A_SYNC_ENTRY_ID" />
       <template v-if="!isSyncEnabled">
         <el-tag v-if="dualMode.checking.value" size="small" type="info">OnlyOffice 检测中…</el-tag>

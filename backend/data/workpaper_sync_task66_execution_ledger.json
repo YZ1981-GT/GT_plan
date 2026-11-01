@@ -84,12 +84,12 @@
   "counters": {
     "plan_paths_total": 126,
     "state_landed": 29,
-    "state_drifted": 27,
-    "state_intact": 70,
+    "state_drifted": 28,
+    "state_intact": 69,
     "pending_delete_paths": 125,
     "pending_delete_landed": 29,
     "outstanding_paths": 96,
-    "outstanding_drifted_need_reverdict": 26,
+    "outstanding_drifted_need_reverdict": 27,
     "unplanned_legacy_paths": 0,
     "live_blocking_points": 1
   },
@@ -98,7 +98,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
       "state": "drifted",
       "planned_sha256": "c85636daca994e7db754ce2daa673000b9694ad4f31bfcd76350e57cb24dc733",
-      "current_sha256": "c5ccc13b1d96fc83b93922d706a781c19630dc707bb8aafb07463913d61f272c",
+      "current_sha256": "18d888edafc7127af6b301349ef32863aff2721f58b0ad59d2134201feafbdd3",
       "item_count": 1,
       "categories": [
         "fail_open_success_message"
@@ -116,7 +116,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
       "state": "drifted",
       "planned_sha256": "bd88f8fe899a3c2e24e562450ae0034e6579dc37ed995305a8727c7fd00d9dad",
-      "current_sha256": "c5a004a733ae9454e43ca7ae0c6eda61a4db889f7bf00d9b032f5b624148d9a4",
+      "current_sha256": "7a0887c49491e4f057525e5e95777f080db724ecf798a43973807d1bd58528ee",
       "item_count": 1,
       "categories": [
         "fail_open_success_message"
@@ -186,9 +186,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useCycleHtmlOoDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "1ff7e77da2ce6373227e96ae7b56a948821719bcd350daebb7aa7c9330698bd7",
-      "current_sha256": "1ff7e77da2ce6373227e96ae7b56a948821719bcd350daebb7aa7c9330698bd7",
+      "current_sha256": "63d7d0ef7094a0e7f29c0bada2b819e036550e71c4f1eed7be7ca4999db9da39",
       "item_count": 1,
       "categories": [
         "legacy_composable"

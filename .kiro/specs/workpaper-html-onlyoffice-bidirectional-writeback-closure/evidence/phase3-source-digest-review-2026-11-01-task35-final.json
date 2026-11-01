@@ -1,0 +1,39 @@
+{
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "owner_task": "3.5",
+  "purpose": "零能力损失复核：task 3.5 批 6/7 宿主接入共享 presentation 门后，source digest 变更不得改变任何 entry 的能力事实。",
+  "method": "按完整 manifest 现 build（放行 digest 门，仅内存）与磁盘 manifest 逐 entry 比 ['capability', 'migration_state', 'adapter_id', 'html_store', 'canonical_resolver', 'independent_entry', 'html_counterpart_verdict', 'effective_entry_id', 'capability_verdict_stage', 'capability_target']，并比 entry 集合、stats 与 per-entry mount 数。",
+  "digest": {
+    "disk_source": "e46d2616970e379ae57debf570cb5e42b5bb889b078100b5e2d4d29016a94ba3",
+    "built_source": "24738683b2d244a16745cf5e437a03662dfb4cf35d43a23b699dcf73e754de5f",
+    "disk_manifest": "9eee49ef98f06289ac9f4bdeba55282fb353c51c9d34fec6c0c9c13c5a702fd3",
+    "built_manifest": "7bf8385b8b0126a31435b6928542f89a322e4b931f5c94f38cb70b939a50d8fe"
+  },
+  "entry_set": {
+    "disk": 197,
+    "built": 197,
+    "only_disk": [],
+    "only_built": []
+  },
+  "stats_diff": {},
+  "changed_entries": {},
+  "mount_count_changes": {},
+  "verdict": "zero_capability_loss",
+  "schema_version": "workpaper-sync-source-review:v1",
+  "reviewed_at": "2026-11-01",
+  "reviewed_by": "workpaper-html-onlyoffice-bidirectional-writeback-closure:task-3.5-final",
+  "generator": "backend/scripts/gen/generate_workpaper_sync_manifest.py::discover_source+build_manifest",
+  "approved_source_digest_before": "e46d2616970e379ae57debf570cb5e42b5bb889b078100b5e2d4d29016a94ba3",
+  "approved_source_digest_after": "24738683b2d244a16745cf5e437a03662dfb4cf35d43a23b699dcf73e754de5f",
+  "decision": "approved",
+  "safety_checks": {
+    "authoritative_templates_modified_for_review": false,
+    "manual_manifest_edits_allowed": false,
+    "rebuilt_manifest_available": true,
+    "rebuild_error": null
+  },
+  "next_actions": [
+    "只通过 generate_workpaper_sync_artifacts.py --write 重建四件生成物",
+    "task66 执行账里新增的 drifted 项需由 owner 重判，不得直接标 landed"
+  ]
+}

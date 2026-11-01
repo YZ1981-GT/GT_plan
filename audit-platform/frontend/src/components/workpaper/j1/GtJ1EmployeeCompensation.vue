@@ -7,8 +7,13 @@
 
     <!-- dual mode bar (only non-index sheets) -->
     <div v-if="!isLoading && isHtmlSheet" class="j1-dual-mode-bar">
-      <!-- BP-10 / AC 1.4：OO 不可用时不显示切换器（原先显示但点了没反应 = 无声失败） -->
-      <el-segmented v-if="dualMode.ooAvailable.value" :model-value="dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'" @change="(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')" :options="['HTML', 'OnlyOffice']" size="small" />
+      <!--
+        BP-10 / AC 1.4：OO 不可用时不显示切换器（原先显示但点了没反应 = 无声失败）。
+        task 3.5 追加：可见性的**第一判据**是 entry 级同步能力单源（静态裁决 + 运行时
+        readiness + 真实验收），`dualMode.ooAvailable` 只是「OO 服务 / 本 sheet 能否拉起」
+        的局部健康，两者是不同层面，必须合取而不是互相顶替。
+      -->
+      <el-segmented v-if="dualMode.ooAvailable.value && j1EntrySync.presentation.value.showModeSwitch" :model-value="dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'" @change="(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')" :options="['HTML', 'OnlyOffice']" size="small" />
       <!-- 能力诚实披露：文案真源在 sync/workpaperEntrySyncNotice.ts，宿主不得内联提示中文；
            已注册 bidirectional 的 entry 由组件自己返 null 不渲染 ⇒ 无需本地条件。 -->
       <GtEntrySyncCapabilityNotice entry-id="xlsx/j1/gt-j1-employee-compensation" />
@@ -114,6 +119,7 @@ import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 import { useWorkpaperEntryDualMode } from '../composables/useWorkpaperEntryDualMode'
 import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import GtEntrySyncCapabilityNotice from '../sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from '../sync/useEntrySyncReadiness'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
 const J1TabIndex = defineAsyncComponent(() => import('./core/J1TabIndex.vue'))
@@ -234,6 +240,19 @@ watch(currentSheet, async (nextSheet, prevSheet) => {
   } catch {
     ElMessage.error('J1 切换底稿时保存失败，数据已保留，可返回后重试')
   }
+})
+
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实，不由本宿主判断。
+ *
+ * entry id 与上方 `GtEntrySyncCapabilityNotice` 用的是**同一条** —— 门与原因必须指同一个
+ * entry，否则用户看到的解释与实际行为对不上。
+ */
+const j1EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/j1/gt-j1-employee-compensation',
 })
 
 onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })

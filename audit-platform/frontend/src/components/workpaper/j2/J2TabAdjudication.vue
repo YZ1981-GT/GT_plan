@@ -15,6 +15,7 @@
  * Spec: .kiro/specs/j2-defined-benefit-plan/
  */
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
+import { useEntrySyncReadiness } from '../sync/useEntrySyncReadiness'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
@@ -382,13 +383,27 @@ const {
 
 onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const SYNC_ENTRY_ID = 'xlsx/j2/gt-j2-defined-benefit-plan'
+const j2AdjEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => SYNC_ENTRY_ID,
+})
+
 </script>
 
 <template>
   <div class="j2-tab-adjudication">
     <!-- 双模式切换 -->
     <div class="mode-bar">
-      <el-segmented v-model="mode" :options="[{ label: 'HTML', value: 'html' }, { label: 'OnlyOffice', value: 'oo' }]" size="small" />
+      <el-segmented v-if="j2AdjEntrySync.presentation.value.showModeSwitch" v-model="mode" :options="[{ label: 'HTML', value: 'html' }, { label: 'OnlyOffice', value: 'oo' }]" size="small" />
+      <!-- 能力披露（AC 1.5）：开关被单源藏起来时必须讲清原因 + 下一步；entry 与门同一条 -->
+      <GtEntrySyncCapabilityNotice :entry-id="SYNC_ENTRY_ID" />
       <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
         <el-icon><Download /></el-icon>带入调整
       </el-button>

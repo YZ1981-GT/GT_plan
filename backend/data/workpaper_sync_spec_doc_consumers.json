@@ -1,0 +1,392 @@
+{
+  "schema_version": "spec-doc-consumers:v1",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "owner_task": "0.5",
+  "description": "把本 spec 三件套当机器可读契约解析的全部文件。分母由 AST 现算发现（非 docstring 字符串常量里同时出现 spec 目录名与三件套文件名），分类与状态是人工复核字段。判据见 backend/tests/workpaper_sync/test_umbrella_spec_reference_closure.py。",
+  "status_vocabulary": {
+    "ok": "已绑定到它真能解析的文档快照，且本轮现算验证过",
+    "retired": "整条退役，必须不在任何门禁 / import 图里",
+    "registered_unreviewed": "已发现并登记，解析形态未逐个复核；只许变少，不许变多"
+  },
+  "counts": {
+    "total": 35,
+    "ok": 8,
+    "registered_unreviewed": 26,
+    "retired": 1
+  },
+  "consumers": {
+    "backend/app/services/workpaper_sync/capacity_profile.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
+    },
+    "backend/scripts/check/check_task44_oo94_excel_pilot_gate.py": {
+      "docs": [
+        "design.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "原已走 resolve_spec_dir；本轮修了 importlib 加载路径下的兄弟 import"
+    },
+    "backend/scripts/check/check_task61_oo94_word_pilot_gate.py": {
+      "docs": [
+        "design.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "原已走 resolve_spec_dir；本轮修了 importlib 加载路径下的兄弟 import"
+    },
+    "backend/scripts/check/check_task68_backend_chain_independent_regression.py": {
+      "docs": [
+        "design.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
+    },
+    "backend/scripts/check/check_task69_frontend_independent_regression.py": {
+      "docs": [
+        "design.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
+    },
+    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": {
+      "docs": [
+        "design.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
+    },
+    "backend/scripts/check/check_task72_pre_delete_eligibility_gate.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/diagnose/mutate_task20_writer_gate_guards.py": {
+      "docs": [
+        "design.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/diagnose/mutate_task7_staged_artifact_boundary_guards.py": {
+      "docs": [
+        "design.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/gen/generate_task60_f2_word_contracts.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/gen/generate_task62_generic_docx_adjudication.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/gen/generate_task64_dedicated_word_chain.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/gen/generate_task66_legacy_deletion_plan.py": {
+      "docs": [
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "frozen_wave6",
+      "status": "retired",
+      "owner_task": "5.5",
+      "note": "整条判为退役，由 task 5.5 执行账取代"
+    },
+    "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
+    },
+    "backend/scripts/gen/generate_workpaper_sync_program_milestones.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/gen/generate_workpaper_task63_subcode_adjudication.py": {
+      "docs": [
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/scripts/gen/generate_workpaper_word_template_adjudication.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
+    },
+    "backend/tests/test_data_file_paths_resolve.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/test_workpaper_staged_artifact_boundary_contract.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_current_state_projection.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_migration_paradigm_contract.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py": {
+      "docs": [
+        "design.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task20_writer_gate.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task32_bridge_state_domain.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task60_f2_word_adapter.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_task61_oo94_word_pilot_gate.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_umbrella_spec_reference_closure.py": {
+      "docs": [
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync_chaos/test_task71_chaos_gate.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    },
+    "backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "unreviewed",
+      "status": "registered_unreviewed",
+      "owner_task": "7.1",
+      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    }
+  }
+}
