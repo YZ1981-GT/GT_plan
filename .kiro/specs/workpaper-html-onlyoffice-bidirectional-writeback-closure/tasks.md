@@ -442,8 +442,9 @@
   - 候选树与同一最新 HEAD 基线按 pytest/vitest 节点集合比较；预存红如实登记，新增失败为零，诊断工具崩溃不得报“0 errors”。
   - _AC: 1.4, 12.1_
 
-- [ ] 7.3 校验数据库 schema 与迁移边界
-  - 证明共享 readiness 无需迁移；如实际需要 schema 变更，动态取未占用版本、配 V/R、跑 PG 约束测试，并在写共享库前取得用户授权。
+- [x] 7.3 校验数据库 schema 与迁移边界
+  - 证明共享 readiness 无需迁移：本 spec 35 个改过的文件里 0 个迁移 / 0 个 ORM 模型变更 / 0 个 sync_models 变更。`needs_migration: false`。
+  - 如实际需要 schema 变更，动态取未占用版本、配 V/R、跑 PG 约束测试，并在写共享库前取得用户授权。——当前不需要。
   - _AC: 12.1_
 
 - [ ] 7.4 在 clean-checkout 候选树复验全部交付物
