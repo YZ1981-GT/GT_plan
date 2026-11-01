@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：30/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：32/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -383,11 +383,19 @@
 
 ## Phase 6：真实 evidence 与 closure
 
-- [ ] 6.1 从 profile/bundle/authority model 生成 required scenario set
+- [x] 6.1 从 profile/bundle/authority model 生成 required scenario set
   - 每个独立 entry 自己生成 digest；不得用代表 entry、同循环或历史 run 替代，download-only/authorization-reject 的实体形状单独校验。
+  - 产物：`backend/scripts/gen/generate_required_scenario_set.py`（`--check` / `--write`）
+    + `backend/data/workpaper_sync_required_scenario_set.json`（145 条 independent entry，
+    11 种唯一 scenario profile，67 条需 browser + contract evidence = bidirectional 独立 entry）。
   - _AC: 12.1_
-- [ ] 6.2 建立 runtime evidence current projection
+- [x] 6.2 建立 runtime evidence current projection
   - 从 PG 的 test run/scenario、entry pointer、bundle、representation、request/delivery/application/operation/timeline 现算 acceptance；不信 overlay 布尔摘要。
+  - 产物：`backend/scripts/gen/generate_runtime_evidence_projection.py`（`--check` / `--write`，
+    PG 不可达时降级——把全部标 missing，因为连不上恰恰证明「没有 evidence」）
+    + `backend/data/workpaper_sync_runtime_evidence_projection.json`。
+  - 现算：PG `connected`、`total_test_runs=0`、`entries_with_runs=0` ⇒ `not_required 78` / `missing 67`。
+    67 条 bidirectional entry 全部缺 runtime evidence——这是 6.3 要产出的。
   - _AC: 12.1_
 
 - [ ] 6.3 执行真实 OnlyOffice required scenarios
