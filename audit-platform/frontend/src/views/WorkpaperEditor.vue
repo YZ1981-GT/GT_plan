@@ -64,6 +64,7 @@
           </el-button>
           <!-- HTML 路径此前无「面板」入口；SidePanel/AttachmentTabPanel 仅挂在 Univer 分支会导致 Drawer_Host 不可达 -->
           <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账</el-button>
+          <QueryDetailEntry kind="workpaper" variant="button" :target="wpDetail" :year="projectYear" label="查明细" />
           <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
             <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
           </el-badge>
@@ -118,6 +119,7 @@
           style="margin-right: 8px"
         >🧭 审计导航图</el-button>
         <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账</el-button>
+        <QueryDetailEntry kind="workpaper" variant="button" :target="wpDetail" :year="projectYear" label="查明细" />
         <WpExportButton
           v-if="wpDetail"
           :project-id="projectId"
@@ -452,6 +454,7 @@ import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 import AuditYearMissingResult from '@/components/common/AuditYearMissingResult.vue'

@@ -1022,12 +1022,8 @@
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxDetail"><span class="gt-ucell-ctx-icon">📊</span> 汇总明细</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>
         <div class="gt-ucell-ctx-divider"></div>
-        <div v-if="tbSumCtxRow?.formula_detached" class="gt-ucell-ctx-item" @click="onTbSumCtxRestoreFormula">
-          <span class="gt-ucell-ctx-icon">🔗</span> 恢复公式
-        </div>
-        <div v-else class="gt-ucell-ctx-item" @click="onTbSumCtxDetachFormula">
-          <span class="gt-ucell-ctx-icon">✂️</span> 断开公式（手动填写）
-        </div>
+        <div v-if="tbSumCtxRow?.formula_detached" class="gt-ucell-ctx-item" @click="onTbSumCtxRestoreFormula"><span class="gt-ucell-ctx-icon">🔗</span> 恢复公式</div>
+        <div v-else class="gt-ucell-ctx-item" @click="onTbSumCtxDetachFormula"><span class="gt-ucell-ctx-icon">✂️</span> 断开公式（手动填写）</div>
       </div>
 
       <el-empty v-if="!tbSummaryRows.length && !tbSummaryLoading" description="点击刷新从科目明细汇总生成" />
@@ -1183,6 +1179,7 @@
     @compare="onTbCtxCompare"
   >
     <div class="gt-ucell-ctx-item" @click="onTbCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看明细</div>
+    <QueryDetailEntry kind="tb_row" variant="ctx" :target="tbCtx.contextMenu.rowData" :year="year" @opened="tbCtx.closeContextMenu()" />
     <div class="gt-ucell-ctx-item" @click="onTbCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看调整分录</div>
@@ -1336,6 +1333,7 @@ import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'

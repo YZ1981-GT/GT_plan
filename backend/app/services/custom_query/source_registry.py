@@ -43,8 +43,7 @@ from app.models.audit_platform_models import (
     TbLedger,
     TrialBalance,
 )
-from app.models.core import Project
-from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig
+from app.models.report_models import FinancialReport, ReportConfig
 from app.models.staff_models import WorkHour
 from app.models.workpaper_models import WorkingPaper, WpIndex
 # 声明类型在 source_types（B5 拆出，本模块登记源与口径）；这里再导出，既有导入不变
@@ -62,7 +61,21 @@ from app.services.custom_query.source_types import (  # noqa: F401
     _blank,
     filtered_by,
 )
+# W6 业务对象筛选键在 entry_filters（本模块加上它们后 856 行、越过 800 行门，按规约抽模块而不是放宽门限）；
+# REPORT_TYPES 与 _invalid_filter 随之移到那里作单一来源，这里反向导入，既有名字不变
+from app.services.custom_query.entry_filters import (  # noqa: F401
+    REPORT_TYPES,
+    account_code_key as _account_code_key,
+    entry_accounts_of,
+    entry_warnings,
+    invalid_filter as _invalid_filter,
+    note_section_resolve as _note_section_resolve,
+    project_template_type,
+    report_row_resolve as _report_row_resolve,
+    wp_code_key as _wp_code_key,
+)
 from app.services.dataset_query import get_active_dataset_id_or_none, get_active_filter
+from app.services.ledger_sampling_service import ledger_line_amount
 from app.services.report_config_service import ReportConfigService
 
 #: 四表无生效数据集时的提示（R1.3）
@@ -138,16 +151,8 @@ async def _workhours_where(ctx: FetchContext) -> list[ColumnElement]:
     return [h.c.project_id == ctx.project_id, sa.extract("year", h.c.work_date) == ctx.year, h.c.is_deleted == sa.false()]
 
 
-def _invalid_filter(key: str, message: str, allowed: list[str]) -> HTTPException:
-    return HTTPException(status_code=400, detail={
-        "error_code": "INVALID_FILTER_VALUE", "message": message, "filter_key": key, "allowed": allowed,
-    })
-
-
 # ── 报表 / 报表行次（任务 17）──
 
-#: 报表类型（financial_report_type 枚举的取值，顺序同枚举声明）
-REPORT_TYPES: tuple[str, ...] = tuple(t.value for t in FinancialReportType)
 #: 通用报表源（``report``）不带报表类型时按资产负债表（与旧取数器相同）
 DEFAULT_REPORT_TYPE = "balance_sheet"
 #: 报表配置的项目副本行写法（``applicable_standard = 'project:{项目 id}'``）
@@ -305,7 +310,13 @@ TRIAL_BALANCE = SourceSpec(
     ),
     hidden=(_id(_TB), _c(_TB, "company_code", "text", conditionable=False)),
     base_where=_trial_balance_where,
-    filter_keys=(FilterKey("account_name", "account_name", "like"), FilterKey("company_code", "company_code", "eq")),
+    filter_keys=(
+        FilterKey("account_name", "account_name", "like"),
+        FilterKey("company_code", "company_code", "eq"),
+        # W6：报表行 / 附注章节 → 本表的标准科目码（ADR-AQL-20）
+        FilterKey("report_row", "standard_account_code", "eq", resolver=_report_row_resolve),
+        FilterKey("note_section", "standard_account_code", "eq", resolver=_note_section_resolve),
+    ),
     default_sort=(("standard_account_code", "asc"),),
     unique_key="id",
 )
@@ -329,7 +340,8 @@ ACCOUNT_BALANCE = SourceSpec(
     hidden=(_id(_BAL), _c(_BAL, "company_code", "text", conditionable=False)),
     base_where=_four_table_where(_BAL),
     filter_keys=(
-        FilterKey("account_code", "account_code", "prefix"),
+        _account_code_key(_BAL),
+        _wp_code_key(_BAL),
         FilterKey("account_name", "account_name", "like"),
         FilterKey("company_code", "company_code", "eq"),
     ),
@@ -357,9 +369,13 @@ LEDGER_ENTRIES = SourceSpec(
         _c(_LED, "accounting_period", "number", conditionable=False),
         _c(_LED, "company_code", "text", conditionable=False),
     ),
+    condition_only=(
+        SourceColumn("line_amount", ledger_line_amount(_LED), "number", sortable=False),
+    ),
     base_where=_four_table_where(_LED),
     filter_keys=(
-        FilterKey("account_code", "account_code", "prefix"),
+        _account_code_key(_LED),
+        _wp_code_key(_LED),
         FilterKey("voucher_no", "voucher_no", "like"),
         FilterKey("summary", "summary", "like"),
         FilterKey("date_from", "voucher_date", "gte"),
@@ -372,12 +388,14 @@ LEDGER_ENTRIES = SourceSpec(
 )
 
 # ── 辅助核算（任务 21；四表口径同 R1：只经 get_active_filter）──
-_AUX_FILTERS = (
-    FilterKey("account_code", "account_code", "prefix"),
-    FilterKey("aux_type", "aux_type", "eq"),
-    FilterKey("aux_code", "aux_code", "eq"),
-    FilterKey("aux_name", "aux_name", "like"),
-)
+def _aux_filters(table: sa.Table) -> tuple[FilterKey, ...]:
+    return (
+        _account_code_key(table),
+        _wp_code_key(table),
+        FilterKey("aux_type", "aux_type", "eq"),
+        FilterKey("aux_code", "aux_code", "eq"),
+        FilterKey("aux_name", "aux_name", "like"),
+    )
 
 AUX_BALANCE = SourceSpec(
     key="aux_balance",
@@ -398,7 +416,7 @@ AUX_BALANCE = SourceSpec(
     ),
     hidden=(_id(_AUX_BAL), _c(_AUX_BAL, "company_code", "text", conditionable=False)),
     base_where=_four_table_where(_AUX_BAL),
-    filter_keys=_AUX_FILTERS,
+    filter_keys=_aux_filters(_AUX_BAL),
     default_sort=(("account_code", "asc"), ("aux_type", "asc"), ("aux_code", "asc")),
     unique_key="id",
     warn=_warn_aux_balance,
@@ -422,15 +440,18 @@ AUX_LEDGER = SourceSpec(
     hidden=(_id(_AUX_LED), _c(_AUX_LED, "company_code", "text", conditionable=False)),
     base_where=_four_table_where(_AUX_LED),
     filter_keys=(
-        *_AUX_FILTERS,
+        *_aux_filters(_AUX_LED),
         FilterKey("voucher_no", "voucher_no", "like"),
         FilterKey("date_from", "voucher_date", "gte"),
         FilterKey("date_to", "voucher_date", "lte"),
     ),
     default_sort=(("voucher_date", "desc"), ("voucher_no", "asc")),
     unique_key="id",
-    # 辅助明细动辄数百万行：至少按科目或辅助类型之一收窄（R5.6，AUX_FILTER_REQUIRED）
-    required_filters=(frozenset({"account_code"}), frozenset({"aux_type"})),
+    # 辅助明细动辄数百万行：至少按科目、辅助类型或底稿编码之一收窄（R5.6，AUX_FILTER_REQUIRED；
+    # 底稿编码也算收窄：它解析出的就是科目前缀集合，W6 底稿入口切到辅助明细时走这一组）
+    required_filters=(
+        frozenset({"account_code"}), frozenset({"aux_type"}), frozenset({"wp_code"}),
+    ),
     warn=_warn_no_active_dataset,
 )
 
@@ -694,7 +715,13 @@ def resolve_source(source: str, filters: Mapping[str, Any] | None = None) -> Res
         return ResolvedSource(key, json_fetcher=JSON_SOURCES[key])
     for prefix, target in JSON_PREFIXES:
         if key.startswith(prefix):
-            return ResolvedSource(key, json_fetcher=target)
+            # 源键决定 sheet（与 ``report_{类型}`` / ``adj_aje`` 同机制）：``_query_worksheet`` 读
+            # ``filters.sheet_key``，此前只有弹窗会设它 ⇒ 任何不设的调用方拿 ``ws_elimination``
+            # 都会静默取到 ``info`` 工作底稿的数据（既不报错也看不出来）
+            sheet_key = key[len(prefix):].strip()
+            if not sheet_key:
+                raise unknown_source(key)
+            return ResolvedSource(key, json_fetcher=target, fixed_filters={"sheet_key": sheet_key})
     if key.startswith(REPORT_SOURCE_PREFIX) and key[len(REPORT_SOURCE_PREFIX):] in REPORT_TYPES:
         # 报表叶子：源键决定报表类型（改造前后端只认 filters.report_type，页面版不带时一律当资产负债表）
         return _sql_source(key, REPORT, report_type=key[len(REPORT_SOURCE_PREFIX):])
@@ -702,10 +729,10 @@ def resolve_source(source: str, filters: Mapping[str, Any] | None = None) -> Res
 
 
 async def ref_context(ctx: FetchContext) -> dict[str, Any]:
-    """注册表源响应的 ``meta.ref_context``：前端按它校验公式引用（ADR-AQL-18）。"""
-    memo = ctx.memo.get("template_type")
-    if memo is None:
-        project = await ctx.db.get(Project, ctx.project_id)
-        memo = "listed" if project is not None and project.template_type == "listed" else "soe"
-        ctx.memo["template_type"] = memo
-    return {"template_type": memo, "year": ctx.year}
+    """注册表源响应的 ``meta.ref_context``：前端按它校验公式引用（ADR-AQL-18）。
+
+    这里只需要 ``template_type``，不能用 ``Session.get(Project, ...)`` 加载整行。整 ORM
+    投影会把与高级查询无关的新列也带进 SQL；共享库迁移稍有滞后时，明细查询本身已经
+    成功，却会在组装 ``meta`` 时因任一新列不存在而整体 500。
+    """
+    return {"template_type": await project_template_type(ctx), "year": ctx.year}

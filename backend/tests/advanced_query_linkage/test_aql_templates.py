@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
+from app.models.audit_platform_models import Materiality
 from app.models.base import UserRole
 from app.models.core import User
 from app.models.custom_query_models import CustomQueryTemplate
@@ -53,7 +54,9 @@ async def _stored(world: AuthzWorld, template_id: uuid.UUID | str) -> CustomQuer
 
 @pytest.fixture
 async def world(monkeypatch: pytest.MonkeyPatch):
-    async with sqlite_world(monkeypatch, extra_tables=(CustomQueryTemplate.__table__,)) as w:
+    async with sqlite_world(
+        monkeypatch, extra_tables=(CustomQueryTemplate.__table__, Materiality.__table__),
+    ) as w:
         yield w
 
 
@@ -240,7 +243,8 @@ async def test_unknown_or_malformed_template_id(world):
     ("config", "status", "code"),
     [({"source": "tb_detail", "filters": ["不是对象"]}, 422, "TEMPLATE_CONFIG_INVALID"),
      ({"source": "tb_detail", "conditions": [{"field": "audited_amount", "op": "gte",
-                                              "value": {"$param": "materiality_performance"}}]}, 400, "TEMPLATE_INVALID")],
+                                              "value": {"$param": "materiality_performance"}}]},
+      400, "CONDITION_VALUE_REQUIRED")],
 )
 async def test_bad_stored_config_is_4xx_not_500(world, config, status, code):
     """库里存了不合格的配置（filters 不是对象 / 条件里还有没取值的参数占位）：执行 4xx 中文原因，不 500、不查数。"""
@@ -249,7 +253,8 @@ async def test_bad_stored_config_is_4xx_not_500(world, config, status, code):
     async with world.client(custom_query.router, user=owner) as client:
         response = await client.post(f"{CQ}/templates/{tpl.id}/execute", json={"project_id": str(X), "year": 2025})
     assert (response.status_code, response.json()["detail"]["error_code"]) == (status, code), response.text
-    assert "模板" in response.json()["detail"]["message"]
+    message = response.json()["detail"]["message"]
+    assert (("模板" in message) if code == "TEMPLATE_CONFIG_INVALID" else ("重要性水平" in message)), repr(message)
 
 
 async def test_target_project_is_checked_before_the_year(world):

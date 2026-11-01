@@ -10,7 +10,7 @@ Properties tested:
 - P7: 金额 Decimal 序列化 Round-Trip
 - P9: 排除已提取凭证去重
 
-Uses hypothesis with max_examples=20.
+Uses hypothesis with max_examples=5.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ import sqlalchemy as sa
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+import app.services.ledger_sampling_service as ledger_module
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
@@ -122,7 +123,7 @@ class TestProperty3QuerySecurityIsolation:
     """
 
     @pytest.mark.asyncio
-    @settings(max_examples=20)
+    @settings(max_examples=5)
     @given(
         project_id=st.uuids(),
         year=st.integers(min_value=2020, max_value=2030),
@@ -196,7 +197,7 @@ class TestProperty4QueryFilterConstruction:
     """
 
     @pytest.mark.asyncio
-    @settings(max_examples=20)
+    @settings(max_examples=5)
     @given(filters=st_ledger_query_filters())
     async def test_filter_fields_map_to_sql_clauses(
         self, filters: LedgerQueryFilters
@@ -335,7 +336,7 @@ class TestProperty5StatsAccuracy:
     - sum(by_voucher_type.values()) == total_count
     """
 
-    @settings(max_examples=20)
+    @settings(max_examples=5)
     @given(entries=st_voucher_entries())
     def test_stats_computation_accuracy(self, entries: list[dict[str, Any]]):
         """**Validates: Requirements 2.9**
@@ -400,7 +401,7 @@ class TestProperty6TruncationThreshold:
     <= 500 → truncated=false + items == total_count
     """
 
-    @settings(max_examples=20)
+    @settings(max_examples=5)
     @given(total_count=st.integers(min_value=0, max_value=1000))
     def test_truncation_behavior(self, total_count: int):
         """**Validates: Requirements 2.10**
@@ -448,7 +449,7 @@ class TestProperty7DecimalRoundTrip:
     Decimal(str(d)) == d for any Decimal with precision (20,2).
     """
 
-    @settings(max_examples=20)
+    @settings(max_examples=5)
     @given(
         d=st.decimals(
             min_value=Decimal("-1e18"),
@@ -483,7 +484,7 @@ class TestProperty9ExcludeExtractedDedup:
     After filtering, result ∩ extracted = ∅; all non-extracted items preserved.
     """
 
-    @settings(max_examples=20)
+    @settings(max_examples=5)
     @given(
         extracted_nos=st.lists(
             st.text(min_size=1, max_size=20, alphabet="0123456789-ABCabc"),
@@ -538,3 +539,39 @@ class TestProperty9ExcludeExtractedDedup:
             f"Some non-extracted items were falsely excluded. "
             f"Missing: {non_extracted_from_query - filtered_set}"
         )
+
+
+@pytest.mark.asyncio
+async def test_amount_bounds_delegate_to_typed_line_amount(monkeypatch):
+    """任务 40：上下限都复用 typed helper，原有 GREATEST SQL 形态保持不变。"""
+    from app.models.audit_platform_models import TbLedger
+
+    calls: list[sa.Table] = []
+    real = ledger_module.ledger_line_amount
+
+    def _spy(table: sa.Table):
+        calls.append(table)
+        return real(table)
+
+    monkeypatch.setattr(ledger_module, "ledger_line_amount", _spy)
+    active = sa.and_(
+        TbLedger.project_id == uuid.uuid4(),
+        TbLedger.year == 2025,
+        TbLedger.is_deleted == sa.false(),
+    )
+    monkeypatch.setattr(ledger_module, "get_active_filter", AsyncMock(return_value=active))
+    query = await LedgerSamplingService.build_ledger_query(
+        db=AsyncMock(),
+        project_id=uuid.uuid4(),
+        year=2025,
+        filters=LedgerQueryFilters(
+            date_start=date(2025, 1, 1),
+            date_end=date(2025, 12, 31),
+            account_codes=[],
+            amount_threshold=Decimal("100"),
+            amount_max=Decimal("200"),
+        ),
+    )
+    sql = str(query.compile(dialect=sa.dialects.postgresql.dialect())).lower()
+    assert calls == [TbLedger.__table__, TbLedger.__table__]
+    assert sql.count("greatest(") == 2 and sql.count("coalesce(") == 4

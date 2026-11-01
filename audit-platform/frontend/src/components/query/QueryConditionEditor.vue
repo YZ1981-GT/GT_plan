@@ -20,6 +20,16 @@
         <el-radio-button value="or">任一满足（OR）</el-radio-button>
       </el-radio-group>
     </div>
+    <el-alert
+      v-for="notice in notices"
+      :key="notice"
+      :title="notice"
+      type="info"
+      :closable="false"
+      show-icon
+      class="gt-qce-notice"
+      data-testid="cq-condition-notice"
+    />
     <div v-if="disabled && disabledReason" class="gt-qce-reason" data-testid="cq-condition-disabled">{{ disabledReason }}</div>
     <div class="gt-qce-rows">
       <div v-for="(cond, idx) in modelValue.conditions" :key="idx" class="gt-qce-row" data-testid="cq-condition-row">
@@ -31,7 +41,7 @@
           class="gt-qce-field"
           :disabled="disabled"
           :aria-label="`第 ${idx + 1} 个条件的字段`"
-          @update:model-value="(v: unknown) => patch(idx, { field: String(v ?? '') })"
+          @update:model-value="(v: unknown) => onFieldChange(idx, String(v ?? ''))"
         >
           <el-option v-for="f in fieldOptions" :key="f.key" :label="f.label" :value="f.key" />
         </el-select>
@@ -42,22 +52,43 @@
           class="gt-qce-op"
           :disabled="disabled"
           :aria-label="`第 ${idx + 1} 个条件的操作符`"
-          @update:model-value="(v: unknown) => patch(idx, { op: String(v ?? 'eq') })"
+          @update:model-value="(v: unknown) => onOperatorChange(idx, String(v ?? 'eq'))"
         >
-          <el-option v-for="op in CONDITION_OPS" :key="op.value" :label="op.label" :value="op.value" />
+          <el-option v-for="op in operatorsFor(cond)" :key="op.value" :label="op.label" :value="op.value" />
+        </el-select>
+        <el-select
+          v-if="cond.op === 'weekday_in'"
+          :model-value="weekdayValue(cond.value)"
+          multiple
+          size="small"
+          class="gt-qce-value"
+          placeholder="选择星期"
+          :disabled="disabled"
+          :aria-label="`第 ${idx + 1} 个条件的星期`"
+          data-testid="cq-condition-weekday"
+          @update:model-value="(v: unknown) => patch(idx, { value: weekdayValue(v) }, true)"
+        >
+          <el-option v-for="day in WEEKDAY_OPTIONS" :key="day.value" :label="day.label" :value="day.value" />
         </el-select>
         <el-input
-          v-if="needsConditionValue(cond.op)"
-          :model-value="cond.value"
+          v-else-if="needsConditionValue(cond.op)"
+          :model-value="textValue(cond.value)"
           size="small"
           class="gt-qce-value"
           :placeholder="cond.op === 'between' ? '起,止' : '值'"
           :disabled="disabled"
           :aria-label="`第 ${idx + 1} 个条件的值`"
           data-testid="cq-condition-value"
-          @update:model-value="(v: unknown) => patch(idx, { value: String(v ?? '') })"
+          @update:model-value="(v: unknown) => patch(idx, { value: String(v ?? '') }, true)"
         />
         <span v-else class="gt-qce-novalue">无需值</span>
+        <el-tag
+          v-if="cond.params?.length"
+          size="small"
+          type="info"
+          effect="plain"
+          data-testid="cq-condition-param"
+        >参数：{{ cond.params.join('、') }}</el-tag>
         <el-button
           size="small"
           link
@@ -84,37 +115,85 @@
 import { computed } from 'vue'
 import { resolveColumnLabel } from './queryColumnLabels'
 import {
-  CONDITION_OPS, needsConditionValue, type ConditionState, type EditorCondition,
+  WEEKDAY_OPTIONS, conditionOpsForDtype, conditionsIncompleteReason, needsConditionValue,
+  type ConditionFieldInput, type ConditionState, type EditorCondition, type QueryFieldDtype,
 } from './queryConditions'
 
 const props = withDefaults(defineProps<{
   modelValue: ConditionState
-  /** 可作条件的字段（列键） */
-  fields: readonly string[]
+  /** 可作条件的字段；旧缓存只有 columns 时可传字符串并按文本处理 */
+  fields: readonly ConditionFieldInput[]
   /** 数据源键（列名按数据源取中文） */
   source?: string
+  /** 参数来源 / 截止窗口等说明 */
+  notices?: readonly string[]
   disabled?: boolean
   /** 禁用原因（如该数据源不支持条件） */
   disabledReason?: string
-}>(), { source: '', disabled: false, disabledReason: '' })
+}>(), { source: '', notices: () => [], disabled: false, disabledReason: '' })
 
 const emit = defineEmits<{ 'update:modelValue': [state: ConditionState] }>()
 
-const fieldOptions = computed(() => props.fields.map((key) => ({
-  key, label: resolveColumnLabel(key, undefined, props.source || undefined),
+const normalizedFields = computed(() => props.fields.map((field) => (
+  typeof field === 'string' ? { key: field, dtype: 'text' as const } : {
+    key: String(field.key),
+    dtype: (['text', 'number', 'date', 'bool'].includes(field.dtype) ? field.dtype : 'text') as QueryFieldDtype,
+  }
+)))
+const fieldOptions = computed(() => normalizedFields.value.map((field) => ({
+  ...field, label: resolveColumnLabel(field.key, undefined, props.source || undefined),
 })))
+const fieldDtypes = computed(() => new Map(normalizedFields.value.map((field) => [field.key, field.dtype])))
+
+function operatorsFor(condition: EditorCondition) {
+  return conditionOpsForDtype(fieldDtypes.value.get(condition.field))
+}
+
+function textValue(value: EditorCondition['value']): string {
+  return Array.isArray(value) ? value.join(',') : String(value ?? '')
+}
+
+function weekdayValue(value: unknown): number[] {
+  if (!Array.isArray(value)) return []
+  return value.map(Number).filter((item) => Number.isInteger(item) && item >= 0 && item <= 6)
+}
+
+const incompleteReason = computed(() => conditionsIncompleteReason(
+  props.modelValue.conditions,
+  (field) => resolveColumnLabel(field, undefined, props.source || undefined),
+))
+
+defineExpose({ incompleteReason })
 
 function emitState(next: Partial<ConditionState>) {
   emit('update:modelValue', { conditions: props.modelValue.conditions, logic: props.modelValue.logic, ...next })
 }
 
-function patch(idx: number, change: Partial<EditorCondition>) {
-  const conditions = props.modelValue.conditions.map((c, i) => (i === idx ? { ...c, ...change } : c))
+function patch(idx: number, change: Partial<EditorCondition>, clearParams = false) {
+  const conditions = props.modelValue.conditions.map((condition, i) => {
+    if (i !== idx) return condition
+    const next = { ...condition, ...change }
+    if (clearParams) delete next.params
+    return next
+  })
   emitState({ conditions })
 }
 
+function onFieldChange(idx: number, field: string) {
+  patch(idx, { field, op: 'eq', value: '' }, true)
+}
+
+function onOperatorChange(idx: number, op: string) {
+  const current = props.modelValue.conditions[idx]
+  const value = op === 'weekday_in' ? [] : !needsConditionValue(op) || Array.isArray(current?.value) ? '' : current.value
+  patch(idx, { op, value }, true)
+}
+
 function add() {
-  emitState({ conditions: [...props.modelValue.conditions, { field: props.fields[0] ?? '', op: 'eq', value: '' }] })
+  emitState({ conditions: [
+    ...props.modelValue.conditions,
+    { field: normalizedFields.value[0]?.key ?? '', op: 'eq', value: '' },
+  ] })
 }
 
 function remove(idx: number) {

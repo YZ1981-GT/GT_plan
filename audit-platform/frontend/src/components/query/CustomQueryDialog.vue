@@ -132,7 +132,12 @@
               </el-dropdown>
               <el-button size="small" aria-label="查询模板" data-testid="cq-templates" title="载入或执行已保存的查询模板"
                 @click="templatesVisible = true">📑 模板</el-button>
-              <el-button size="small" @click="openSaveDialog" :disabled="!selectedSource" title="保存当前选区/条件为查询模板">💾 保存</el-button>
+              <el-tooltip :disabled="!saveBlockedReason" :content="saveBlockedReason" placement="top">
+                <span class="gt-cq-btn-wrap">
+                  <el-button size="small" data-testid="cq-save-template" :disabled="!!saveBlockedReason"
+                    :title="saveBlockedReason" @click="openSaveDialog">💾 保存</el-button>
+                </span>
+              </el-tooltip>
               <el-button size="small" @click="transposed = !transposed">{{ transposed ? '↩ 还原' : '↔ 转置' }}</el-button>
               <el-button size="small" @click="copyResult">📋 复制</el-button>
               <!-- 导出：全部（服务端按当前查询导出全量，R8.1）/ 当前页（前端，次选项 R8.3） -->
@@ -148,6 +153,18 @@
                 </template>
               </el-dropdown>
             </div>
+            <el-collapse v-model="conditionPanels" class="gt-cq-conditions" data-testid="cq-condition-collapse">
+              <el-collapse-item title="条件" name="conditions">
+                <QueryConditionEditor
+                  v-model="conditionState"
+                  :fields="availableConditionFields"
+                  :source="selectedSource"
+                  :notices="conditionNotices"
+                  :disabled="!supportsConditions"
+                  :disabled-reason="conditionsDisabledReason"
+                />
+              </el-collapse-item>
+            </el-collapse>
             <!-- 上下文 chip：让用户随时看到本次查询的项目+年度+源 -->
             <div v-if="hasQueried" class="gt-cq-context-chip">
               <el-tag size="small" effect="plain" round>
@@ -174,9 +191,12 @@
             <!-- 入口带来的说明（R10.5：附注模板落附注目录时提示编号体系不同）；换数据源即清除 -->
             <el-alert v-if="entryNotice" type="info" show-icon :title="entryNotice.text" class="gt-cq-entry-notice"
               data-testid="cq-entry-notice" @close="entryNotice = null" />
-            <!-- 载入 / 执行的模板（R9.3 / R9.4）：弹窗不能编辑的条件与列照样随查询发送并在此写明；关闭即不再使用 -->
-            <el-alert v-if="templateNotice" type="info" show-icon :title="templateNotice" class="gt-cq-entry-notice"
-              data-testid="cq-template-notice" @close="clearTemplateState" />
+            <!-- 载入 / 执行的模板摘要；参数与业务说明在可编辑条件区中展示。 -->
+            <el-alert v-if="templateNotice" type="info" show-icon :closable="false" :title="templateNotice" class="gt-cq-entry-notice"
+              data-testid="cq-template-notice" />
+            <!-- 业务页入口上下文（W6，ADR-AQL-20）：本次从哪个业务对象进来、解析出的科目、切换 / 返回 / 清除 -->
+            <QueryEntryBanner :entry="queryEntry.entry.value" :meta="resultMeta" :can-go-back="queryEntry.canGoBack.value"
+              :depth="queryEntry.depth.value" @switch="onEntrySwitch" @back="onEntryBack" @clear="onEntryClear" />
             <!-- 查询失败：持久显示中文原因与追踪号，不落到「暂无数据」（R11.1） -->
             <QueryErrorAlert v-if="queryError" :error="queryError" />
             <!-- 结果表格 -->
@@ -194,6 +214,9 @@
                   <QueryRowActions :drill="rowLinks.drillOf(row)" :ref-text="rowLinks.refOf(row)"
                     :ref-usable="rowLinks.refUsable(row)" :ref-hint="rowLinks.refHint(row)"
                     @open="rowLinks.openRow(row)" @copy-ref="rowLinks.copyRef(row)" />
+                  <!-- W6：试算表结果行下钻到该科目序时账，可「← 返回上一查询」 -->
+                  <el-button v-if="tbRowDrill(row, queryEntry.entry.value)" link type="primary" size="small"
+                    aria-label="查该科目明细" data-testid="cq-row-drill" @click="onRowDrill(row)">查明细</el-button>
                 </template>
               </el-table-column>
               <el-table-column v-for="col in resultColumns" :key="col" :prop="col" :label="columnLabel(col)" min-width="120"
@@ -264,10 +287,11 @@
     />
     <!-- 💾 保存：三档可见范围，可分享项目与页面版同一来源（AQ-39） -->
     <QueryTemplateSaveDialog v-model="saveDialogVisible" :data-source="selectedSource" :config="templateConfig"
-      :projects="projectOptions" :default-description="templateDescription" />
-    <!-- 📑 模板：与页面版同一个选择组件；「执行」按当前项目经服务端模板执行端点（重新鉴权、可翻页） -->
-    <MyTemplatesDialog v-model="templatesVisible" allow-run :run-blocked-reason="localProjectId ? '' : '请先选择项目'"
-      @load="(_cfg, tpl) => applyTemplate(tpl, false)" @run="(tpl) => applyTemplate(tpl, true)" />
+      :projects="projectOptions" :default-name="saveTemplateDefaultName" :default-description="templateDescription" />
+    <!-- 📑 模板：系统预置与用户模板共用；预置只可载入或另存，用户模板仍可直接执行。 -->
+    <MyTemplatesDialog v-model="templatesVisible" allow-run :project-id="localProjectId" :year="localYear"
+      :run-blocked-reason="localProjectId ? '' : '请先选择项目'"
+      @load="onTemplateLoad" @save-as="onTemplateSaveAs" @run="onTemplateRun" />
   </el-dialog>
 </template>
 
@@ -298,8 +322,15 @@ import QueryResultPager from './QueryResultPager.vue'
 import QueryRowActions from './QueryRowActions.vue'
 import QueryTemplateSaveDialog from './QueryTemplateSaveDialog.vue'
 import MyTemplatesDialog from './MyTemplatesDialog.vue'
-import { toRequestConditions, type ConditionLogic, type RequestCondition } from './queryConditions'
+import QueryConditionEditor from './QueryConditionEditor.vue'
+import {
+  conditionsIncompleteReason, toRequestConditions, toSavedConditions,
+  type ConditionField, type ConditionState,
+} from './queryConditions'
 import { restoreTemplateQuery, type QueryTemplateItem } from './queryTemplateRestore'
+import QueryEntryBanner from './QueryEntryBanner.vue'
+import { tbRowDrill, type QueryEntryRequest, type QueryEntrySwitch } from './queryEntryContext'
+import { useQueryEntry } from '@/composables/useQueryEntry'
 import { customQuery as P_cq } from '@/services/apiPaths'
 
 const props = defineProps<{
@@ -313,6 +344,8 @@ const props = defineProps<{
   initialSource?: string
   /** 随初始 source 带来的说明（模板库附注按钮：模板章节号与项目附注编号不同），用户换数据源即清除 */
   initialNotice?: string
+  /** 业务页行级「按此查询明细」的上下文（W6，ADR-AQL-20）：打开时套用并立即执行 */
+  entry?: QueryEntryRequest | null
 }>()
 const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
 const visible = computed({ get: () => props.modelValue, set: (v) => emit('update:modelValue', v) })
@@ -387,8 +420,39 @@ const resultMeta = ref<Record<string, any> | null>(null)
 const queryError = ref<QueryErrorText | null>(null)
 /** 本次打开带来的说明与它所属的源（initialNotice） */
 const entryNotice = ref<{ source: string; text: string } | null>(null)
+/**
+ * 业务页入口上下文（W6，ADR-AQL-20）：状态机在 `useQueryEntry`，这里只提供「写入弹窗并执行一次」。
+ * 入口自带项目与年度（宿主取数用的那个），不经 `adoptRouteContext`。
+ */
+const queryEntry = useQueryEntry({
+  apply: ({ projectId, year, source }) => {
+    localProjectId.value = projectId
+    if (year !== undefined) localYear.value = year
+    selectedSource.value = source
+    return executeQuery()
+  },
+})
+// 打开弹窗时套用入口并立即执行；关闭时丢弃（下次打开按那次带来的 entry 重新计算）
+watch([visible, () => props.entry], ([open, entry]) => {
+  if (!open) { queryEntry.clear(); return }
+  if (entry) void queryEntry.applyEntry(entry)
+}, { immediate: true })
+
+function onEntrySwitch(item: QueryEntrySwitch) { void queryEntry.switchSource(item) }
+function onEntryBack() { void queryEntry.goBack() }
+function onEntryClear() { queryEntry.clear() }
+function onRowDrill(row: Record<string, unknown>) {
+  const next = tbRowDrill(row as never, queryEntry.entry.value)
+  if (next) void queryEntry.drillDown(next)
+}
+
 const exporting = ref(false)
 const saveDialogVisible = ref(false)
+const saveTemplateDefaultName = ref('')
+/** 弹窗业务视图的可编辑条件；服务端解析出的参数来源标记保留到保存时。 */
+const conditionState = ref<ConditionState>({ conditions: [], logic: 'and' })
+const conditionNotices = ref<string[]>([])
+const conditionPanels = ref<string[]>([])
 // 附注章节当前显示第几张表（meta.tables 多于 1 张时可切换）
 const noteTableIndex = ref(0)
 /** 本次结果所属的查询（操作列的下钻 / 引用、导出全部的筛选与文件名都按它，不按界面当前选择；B10 评审非阻塞 #1） */
@@ -402,10 +466,8 @@ const lastRun = ref<QueryRun>(
   { source: '', projectId: '', year: null, sort: [], filters: {}, projectLabel: '', sourceLabel: '', extra: {} })
 // 📑 模板（R9.3 / R9.4）：与页面版同一个选择组件
 const templatesVisible = ref(false)
-/** 载入的模板里弹窗不能编辑的部分（条件 / 列）：随查询发送并在结果区上方写明；换数据源或关闭提示即清除 */
-const templateQuery = ref<{
-  name: string; source: string; conditions: RequestCondition[]; logic: ConditionLogic; columns: string[]
-} | null>(null)
+/** 弹窗没有返回列选择器，保留模板列；条件改由上方 QueryConditionEditor 作为唯一状态。 */
+const templateQuery = ref<{ name: string; source: string; columns: string[] } | null>(null)
 /** 本次结果来自「执行模板」：翻页仍走模板执行端点；手动查询、排序、换数据源即回到普通查询 */
 const templateRun = ref<{ id: string; name: string } | null>(null)
 // 排序（R2.2）：点表头在数据库内对全量排序、空值在后，回到第 1 页；换数据源即清除（新源未必有该列）
@@ -557,23 +619,45 @@ const STATIC_SOURCES = [
   { key: 'ws_elimination', label: '📑 抵消分录', parentKey: 'worksheet' },
 ]
 
-// 数据源全集：从 indicatorTree 递归扁平化派生（支持 N 层嵌套）
-// 每个叶子带 ancestorKeys（从顶到自己的所有祖先 key 路径），用于按任意层过滤下拉
-const allSources = computed(() => {
-  if (!indicatorTree.value.length) return STATIC_SOURCES.map(s => ({ ...s, ancestorKeys: [s.parentKey] }))
-  const list: { key: string; label: string; parentKey: string; ancestorKeys: string[] }[] = []
+interface DialogSourceOption {
+  key: string
+  label: string
+  parentKey: string
+  ancestorKeys: string[]
+  conditionFields: ConditionField[]
+  supportsConditions: boolean
+}
+
+const CONDITION_DTYPES = new Set(['text', 'number', 'date', 'bool'])
+function conditionFieldsOf(node: any): ConditionField[] {
+  if (!Array.isArray(node?.condition_fields)) {
+    return (Array.isArray(node?.columns) ? node.columns : []).map((key: string) => ({ key, dtype: 'text' as const }))
+  }
+  return node.condition_fields
+    .filter((field: any) => field && typeof field.key === 'string' && CONDITION_DTYPES.has(field.dtype))
+    .map((field: any) => ({ key: String(field.key), dtype: field.dtype as ConditionField['dtype'] }))
+}
+
+// 数据源全集：从 indicatorTree 递归扁平化派生（支持 N 层嵌套）。
+// 每个叶子同时携带条件字段与能力标记，弹窗和页面版使用同一后端指标契约。
+const allSources = computed<DialogSourceOption[]>(() => {
+  if (!indicatorTree.value.length) return STATIC_SOURCES.map(s => ({
+    ...s, ancestorKeys: [s.parentKey], conditionFields: [], supportsConditions: false,
+  }))
+  const list: DialogSourceOption[] = []
   function walk(node: any, ancestors: string[], prefix: string) {
     // 灰度节点跳过（不进入下拉数据源池）
     if (node.disabled) return
     const childList = node.children || []
     const myAncestors = [...ancestors, node.key]
     if (childList.length === 0) {
-      // 叶子
       list.push({
         key: node.key,
         label: prefix ? `${prefix} / ${node.label}` : node.label,
         parentKey: ancestors[0] || node.key,
         ancestorKeys: myAncestors,
+        conditionFields: conditionFieldsOf(node),
+        supportsConditions: node.supports_conditions === true,
       })
       return
     }
@@ -586,10 +670,16 @@ const allSources = computed(() => {
     const icon = cat.icon || ''
     walk(cat, [], icon)
   }
-  return list.length
-    ? list
-    : STATIC_SOURCES.map(s => ({ ...s, ancestorKeys: [s.parentKey] }))
+  return list.length ? list : STATIC_SOURCES.map(s => ({
+    ...s, ancestorKeys: [s.parentKey], conditionFields: [], supportsConditions: false,
+  }))
 })
+
+const selectedSourceOption = computed(() => allSources.value.find((source) => source.key === selectedSource.value))
+const availableConditionFields = computed(() => selectedSourceOption.value?.conditionFields ?? [])
+const supportsConditions = computed(() => selectedSourceOption.value?.supportsConditions ?? true)
+const conditionsDisabledReason = computed(() => supportsConditions.value
+  ? '' : '该数据源不支持条件筛选（附注表格、合并工作底稿、底稿选区按整表返回）')
 
 // 下拉选项：受 clickedCategory 过滤（点击任意层时只显示该节点子树下叶子，未点击 = 显示全部）
 const sourceOptions = computed(() => {
@@ -737,8 +827,11 @@ function resetCategoryFilter() {
 // selectedSource 改变时自动派生 filterReportType 并同步左侧树高亮
 watch(selectedSource, (v) => {
   invalidateQueryResult()
+  conditionState.value = { conditions: [], logic: conditionState.value.logic }
+  conditionNotices.value = []
   if (entryNotice.value && entryNotice.value.source !== v) entryNotice.value = null // 入口说明只属于带来的那个源
-  if (templateQuery.value?.source !== v) clearTemplateState() // 载入的模板条件只属于模板的数据源
+  queryEntry.onSourceChangedByUser(v) // W6：手动换源即清除上下文（筛选键带到不认它的源会 400）
+  if (templateQuery.value?.source !== v) clearTemplateState() // 载入的模板列只属于模板的数据源
   noteTableIndex.value = 0 // 换数据源：附注表格回到第一张
   sortState.value = null // 换数据源：清除排序（新源未必有该列）
   resultTableRef.value?.clearSort?.()
@@ -823,7 +916,7 @@ function reopenSheetPicker() {
   sheetPickerVisible.value = true
 }
 
-/** 💾 保存：三档可见范围的保存对话框（AQ-39；原先 ElMessageBox.prompt 只问名称、固定存私有） */
+/** 💾 保存：参数条件保留 `$param`；执行请求只发解析后的字面值。 */
 const templateConfig = computed<Record<string, unknown>>(() => {
   const config: Record<string, unknown> = {
     project_id: localProjectId.value,
@@ -833,68 +926,105 @@ const templateConfig = computed<Record<string, unknown>>(() => {
   }
   if (sheetCellRange.value) config.cell_range = sheetCellRange.value
   if (sheetPickerCtx.value.sheetName) config.sheet_name = sheetPickerCtx.value.sheetName
-  // 排序随模板保存（后端 config_to_request 把 sort_field / sort_order 译成请求的 sort）；每页行数随模板保存（R9.4）
   if (sortState.value) Object.assign(config, { sort_field: sortState.value.field, sort_order: sortState.value.direction })
   config.page_size = pageSize.value
-  const tq = templateQuery.value // 载入的模板条件 / 列：另存时一并保存，不丢
-  if (tq) Object.assign(config, { conditions: tq.conditions, condition_logic: tq.logic, selected_columns: tq.columns })
+  const conditions = supportsConditions.value ? toSavedConditions(conditionState.value.conditions) : []
+  if (conditions.length) Object.assign(config, { conditions, condition_logic: conditionState.value.logic })
+  const columns = templateQuery.value?.columns ?? []
+  if (columns.length) config.selected_columns = columns
+  // W6：入口上下文的筛选键随模板保存，另存后再执行仍按同一业务对象取数（`CustomQueryTemplateConfig.filters`）
+  const entryKeys = entryFilters(selectedSource.value)
+  if (Object.keys(entryKeys).length) config.filters = entryKeys
   return config
 })
 const templateDescription = computed(() =>
   `${currentSourceLabel.value}${sheetCellRange.value ? ' / ' + sheetCellRange.value : ''}`)
+
+const conditionIncompleteReason = computed(() => supportsConditions.value
+  ? conditionsIncompleteReason(conditionState.value.conditions, (field) => columnLabel(field))
+  : '')
+const saveBlockedReason = computed(() => {
+  if (!selectedSource.value) return '请先选择数据源'
+  return conditionIncompleteReason.value
+})
+
 function openSaveDialog() {
-  if (!selectedSource.value) return
+  if (saveBlockedReason.value) {
+    ElMessage.warning(saveBlockedReason.value)
+    return
+  }
+  saveTemplateDefaultName.value = ''
   saveDialogVisible.value = true
 }
 
-/** 载入 / 执行的模板说明（结果区上方）：执行时写明按模板执行；有弹窗不能编辑的条件 / 列时逐项写明 */
+/** 载入 / 执行的模板摘要；参数 basis、缺值原因与预置说明由条件编辑器逐行展示。 */
 const templateNotice = computed(() => {
   const tq = templateQuery.value
   const name = templateRun.value?.name ?? tq?.name
   if (!name) return ''
   const head = templateRun.value ? `按模板「${name}」执行（服务端按模板重新鉴权，翻页沿用模板）` : `已载入模板「${name}」`
   const parts = [
-    tq?.conditions.length ? `${tq.conditions.length} 条筛选条件（${tq.logic === 'or' ? '满足任一' : '全部满足'}）` : '',
+    conditionState.value.conditions.length ? `${conditionState.value.conditions.length} 条筛选条件（可编辑；${conditionState.value.logic === 'or' ? '满足任一' : '全部满足'}）` : '',
     tq?.columns.length ? `${tq.columns.length} 列` : '',
   ].filter(Boolean)
-  return parts.length ? `${head}：${parts.join('、')}随查询发送（弹窗内不能编辑，可在页面版编辑；关闭本提示即不再使用）` : head
+  return parts.length ? `${head}：${parts.join('、')}` : head
 })
 function clearTemplateState() {
   templateQuery.value = null
   templateRun.value = null
 }
 
-/**
- * 「载入」/「执行」模板（R9.3 / R9.4，queryTemplateRestore）：还原数据源、排序、每页行数、底稿选区与本页筛选；条件与列
- * 弹窗不能编辑，照样随查询发送。执行 = 还原后立即经服务端模板执行端点查第 1 页。项目与年度用弹窗当前的（不取模板里存的）。
- */
-async function applyTemplate(tpl: QueryTemplateItem, run: boolean) {
-  const restored = restoreTemplateQuery(tpl)
+/** 还原 resolved config 到可编辑状态；项目与年度始终使用弹窗当前上下文，载入不会自动查询。 */
+async function applyTemplate(
+  config: Record<string, unknown>, tpl: QueryTemplateItem, notices: string[] = [], run = false,
+): Promise<boolean> {
+  const restored = restoreTemplateQuery({ ...tpl, config })
   if (!restored) {
     ElMessage.warning('模板没有数据源，无法载入')
-    return
+    return false
   }
   invalidateQueryResult()
   clearTemplateState()
+  conditionState.value = { conditions: [], logic: 'and' }
+  conditionNotices.value = []
   selectedSource.value = restored.source
-  await nextTick() // 换数据源的 watch 先清掉排序 / 选区，再还原模板里的
+  await nextTick() // 换数据源的同步 watch 先清状态，再恢复模板内容
   sortState.value = restored.sort
   if (restored.pageSize) pageSize.value = restored.pageSize
   filterText.value = restored.filterText
   sheetCellRange.value = restored.cellRange
   if (restored.cellRange) sheetPickerVisible.value = false
-  const conditions = toRequestConditions(restored.condition.conditions)
-  if (conditions.length || restored.columns.length) {
-    templateQuery.value = {
-      name: tpl.name, source: restored.source, conditions, logic: restored.condition.logic, columns: restored.columns,
-    }
+  conditionState.value = restored.condition
+  conditionNotices.value = [...notices]
+  if (restored.condition.conditions.length || notices.length) conditionPanels.value = ['conditions']
+  if (restored.condition.conditions.length || restored.columns.length) {
+    templateQuery.value = { name: tpl.name, source: restored.source, columns: restored.columns }
   }
   if (!run) {
     ElMessage.success(`已载入模板「${tpl.name}」，点击「▶ 查询」执行`)
-    return
+    return true
   }
   templateRun.value = { id: tpl.id, name: tpl.name }
   await executeQuery(true, true)
+  return true
+}
+
+function onTemplateLoad(config: Record<string, unknown>, tpl: QueryTemplateItem, notices: string[] = []) {
+  void applyTemplate(config, tpl, notices)
+}
+
+function onTemplateRun(tpl: QueryTemplateItem) {
+  void applyTemplate(tpl.config ?? {}, tpl, [], true)
+}
+
+async function onTemplateSaveAs(config: Record<string, unknown>, tpl: QueryTemplateItem, notices: string[] = []) {
+  if (!await applyTemplate(config, tpl, notices)) return
+  if (saveBlockedReason.value) {
+    ElMessage.warning(saveBlockedReason.value)
+    return
+  }
+  saveTemplateDefaultName.value = `${tpl.name}（我的）`
+  saveDialogVisible.value = true
 }
 
 // 操作列：打开权威页面 / 复制引用（底稿单元格列的链接也走这里：新标签打开并定位 ?sheet=&cell=，原先同标签 ?highlight=）
@@ -973,7 +1103,7 @@ const queryBlockedReason = computed(() => {
   if (!selectedSource.value) return '请先选择数据源'
   if (!localProjectId.value) return '请选择项目后查询；未选项目时仅可浏览模板结构'
   if (!isKnownYear(localYear.value)) return '请选择审计年度'
-  return ''
+  return conditionIncompleteReason.value
 })
 const canExport = computed(() => hasQueried.value && !queryError.value && resultColumns.value.length > 0
   && isKnownYear(lastRun.value.year))
@@ -981,8 +1111,14 @@ const noteTables = computed<{ index: number; name: string; row_count: number }[]
   (Array.isArray(resultMeta.value?.tables) ? resultMeta.value!.tables : []))
 
 /** 请求里的旧筛选键（报表类型、合并底稿 sheet、底稿选区、附注第几张表） */
+/** 入口上下文的筛选键：只在数据源仍是它那一个时带上（手动换源会先清除上下文，这里再兜一次） */
+function entryFilters(source: string): Record<string, unknown> {
+  const entry = queryEntry.entry.value
+  return entry && entry.source === source ? { ...entry.filters } : {}
+}
+
 function requestFilters(source: string): Record<string, unknown> {
-  const filters: Record<string, unknown> = {}
+  const filters: Record<string, unknown> = { ...entryFilters(source) }
   // 只给报表叶子带报表类型；报表行次配置（report_lines）也以 report_ 开头，带上即按 report_type='lines' 过滤得 0 行
   if (reportTypeOfSource(source)) filters.report_type = filterReportType.value
   if (source.startsWith('ws_')) filters.sheet_key = source.replace('ws_', '')
@@ -1006,6 +1142,10 @@ async function executeQuery(resetPage = true, viaTemplate = false) {
     ElMessage.warning('未设置审计年度，请选择审计年度后再查询')
     return
   }
+  if (!viaTemplate && conditionIncompleteReason.value) {
+    ElMessage.warning(conditionIncompleteReason.value)
+    return
+  }
   if (resetPage) {
     page.value = 1
     countToken.value = ''
@@ -1016,10 +1156,14 @@ async function executeQuery(resetPage = true, viaTemplate = false) {
   queryError.value = null
   const source = selectedSource.value
   const tq = templateQuery.value
+  const conditions = supportsConditions.value ? toRequestConditions(conditionState.value.conditions) : []
   const run: QueryRun = {
     source, projectId: localProjectId.value, year: localYear.value, sort: sortState.value ? [sortState.value] : [],
     filters: requestFilters(source), projectLabel: currentProjectLabel.value, sourceLabel: currentSourceLabel.value,
-    extra: tq ? { conditions: tq.conditions, condition_logic: tq.logic, ...(tq.columns.length ? { columns: tq.columns } : {}) } : {},
+    extra: {
+      ...(conditions.length ? { conditions, condition_logic: conditionState.value.logic } : {}),
+      ...(tq?.columns.length ? { columns: tq.columns } : {}),
+    },
   }
   const tplRun = templateRun.value
   const offset = (page.value - 1) * pageSize.value
@@ -1203,6 +1347,8 @@ function revealSource(source: string) {
 .gt-cq-sidebar-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 8px; display: flex; align-items: center; }
 .gt-cq-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .gt-cq-filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.gt-cq-conditions { margin-bottom: 8px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; padding: 0 10px; }
+.gt-cq-conditions :deep(.el-collapse-item__content) { padding-bottom: 10px; }
 .gt-cq-context-chip {
   display: flex;
   gap: 6px;

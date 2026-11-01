@@ -26,11 +26,13 @@ export interface QueryEntryContext {
   source?: string
 }
 
-/** `open-custom-query` 事件载荷（模板库按钮、Dashboard 快捷入口） */
+/** `open-custom-query` 事件载荷（模板库按钮、Dashboard 快捷入口、业务页行级入口） */
 export interface OpenCustomQueryPayload {
   tab?: 'basic' | 'advanced'
   source?: string
   project_id?: string
+  /** 业务页行级「按此查询明细」的上下文（W6，ADR-AQL-20；由 `buildQueryEntry` 生成，弹窗按它取数） */
+  entry?: QueryEntryRequest
 }
 
 export interface DialogOpenContext {
@@ -141,4 +143,179 @@ export function resolveDialogOpenContext(input: {
     out.initialSource = fromRoute.source
   }
   return out
+}
+
+/* ── W6 业务页行级「按此查询明细」（任务 46，ADR-AQL-20；design §4.3）──────────────
+ *
+ * 业务对象 → 查询参数的映射只在这里；业务对象 → 科目的解析只在后端 `entry_accounts.py`。
+ * 四个宿主页只挂 `QueryDetailEntry.vue` 并把自己取数用的年度传进来，不自己拼参数。
+ */
+
+export type QueryEntryKind = 'tb_row' | 'report_row' | 'note_section' | 'workpaper'
+/** 筛选值：字符串或字符串数组（`account_code` 支持多值，见后端 R14.2） */
+export type QueryEntryFilters = Record<string, string | string[]>
+
+export interface QueryEntrySwitch {
+  source: string
+  label: string
+  /** 换源时同时换筛选（附注章节 → 相关科目要把 `note_section` 带给试算表）；不给则沿用当前筛选 */
+  filters?: QueryEntryFilters
+}
+
+export interface QueryEntryRequest {
+  kind: QueryEntryKind
+  projectId: string
+  /** 宿主取数用的年度；取不到时不带，交弹窗按 R10.2 解析（不按日历年兜底） */
+  year?: number
+  source: string
+  filters: QueryEntryFilters
+  label: string
+  switches: QueryEntrySwitch[]
+}
+
+export interface QueryEntryRejection {
+  disabledReason: string
+}
+
+export type QueryEntryResult = QueryEntryRequest | QueryEntryRejection
+
+export function isQueryEntryRejected(result: QueryEntryResult): result is QueryEntryRejection {
+  return 'disabledReason' in result
+}
+
+/** 入口不可用的原因（界面置灰时按 title 显示；文案在这里集中，组件不自己拼） */
+export const ENTRY_NO_PROJECT = '请在项目页使用此入口'
+export const ENTRY_TB_TOTAL_ROW = '合计行请在高级查询中按科目查询'
+export const ENTRY_TB_NO_ACCOUNT = '该行没有科目编码'
+export const ENTRY_REPORT_TOTAL_ROW = '合计行没有直接取数的科目，请在报表页查看公式'
+export const ENTRY_REPORT_NO_ROW = '该行没有行次编码'
+export const ENTRY_NOTE_NO_SECTION = '请先选择附注章节'
+export const ENTRY_WP_NO_CODE = '该底稿没有编码'
+export const ENTRY_UNKNOWN_KIND = '不支持的入口类型'
+
+/** 账簿四源：同一筛选可互相切换（当前源也列出，便于切回去；横幅把它显示为已选） */
+const LEDGER_SWITCHES: readonly QueryEntrySwitch[] = [
+  { source: 'ledger_entries', label: '序时账' },
+  { source: 'account_balance', label: '科目余额' },
+  { source: 'aux_balance', label: '辅助余额' },
+  { source: 'aux_ledger', label: '辅助明细' },
+]
+
+const REPORT_TYPE_LABELS: Readonly<Record<string, string>> = {
+  balance_sheet: '资产负债表', income_statement: '利润表', cash_flow_statement: '现金流量表',
+  equity_statement: '所有者权益变动表', cash_flow_supplement: '现金流量表补充资料',
+  impairment_provision: '资产减值准备表',
+}
+
+/** 入口目标：各宿主页把自己那一行 / 当前对象原样传进来（字段按宿主的既有命名读） */
+export interface QueryEntryTarget {
+  year?: number | null
+  // 试算表行（TrialBalance 的 DisplayRow）
+  standard_account_code?: string | null
+  account_name?: string | null
+  _isSubtotal?: boolean
+  _isTotal?: boolean
+  // 报表穿透（useReportDrilldown 的 drilldownData）
+  report_type?: string | null
+  row_code?: string | null
+  row_name?: string | null
+  is_total_row?: boolean
+  project_id?: string | null
+  // 附注章节（DisclosureEditor 的 currentNote）
+  note_section?: string | null
+  section_title?: string | null
+  // 底稿（WorkpaperEditor 的 wpDetail）
+  wp_code?: string | null
+  wp_name?: string | null
+}
+
+function text(value: unknown): string {
+  return value === undefined || value === null ? '' : String(value).trim()
+}
+
+function label(...parts: unknown[]): string {
+  return parts.map(text).filter(Boolean).join(' ')
+}
+
+/**
+ * 业务对象 → 一次查询请求；不可用时返回 `{disabledReason}`（组件据此置灰并显示原因，不发事件）。
+ *
+ * 年度 = `target.year ?? hostYear`（宿主取数用的那个年度，附注编辑器页内切年也跟着变，§16 #7）；
+ * 都取不到就不带，交弹窗按所选项目的审计年度解析。项目只取当前路由。
+ */
+export function buildQueryEntry(
+  kind: QueryEntryKind,
+  target: QueryEntryTarget | null | undefined,
+  route: RouteLike | null | undefined,
+  hostYear?: number | null,
+): QueryEntryResult {
+  const projectId = first(route?.params?.projectId)
+  if (!projectId) return { disabledReason: ENTRY_NO_PROJECT }
+  const year = isKnownYear(target?.year) ? Number(target?.year) : (isKnownYear(hostYear) ? Number(hostYear) : undefined)
+  const base = { kind, projectId, ...(year === undefined ? {} : { year }) }
+
+  if (kind === 'tb_row') {
+    if (!target) return { disabledReason: ENTRY_TB_NO_ACCOUNT }
+    if (target._isSubtotal || target._isTotal) return { disabledReason: ENTRY_TB_TOTAL_ROW }
+    const code = text(target.standard_account_code)
+    if (!code) return { disabledReason: ENTRY_TB_NO_ACCOUNT }
+    return {
+      ...base, source: 'ledger_entries', filters: { account_code: code },
+      label: label('试算表', code, target.account_name), switches: [...LEDGER_SWITCHES],
+    }
+  }
+
+  if (kind === 'report_row') {
+    if (!target) return { disabledReason: ENTRY_REPORT_NO_ROW }
+    if (target.is_total_row) return { disabledReason: ENTRY_REPORT_TOTAL_ROW }
+    const rowCode = text(target.row_code)
+    const reportType = text(target.report_type) || 'balance_sheet'
+    if (!rowCode || !REPORT_TYPE_LABELS[reportType]) return { disabledReason: ENTRY_REPORT_NO_ROW }
+    return {
+      ...base, source: 'tb_detail', filters: { report_row: `${reportType}:${rowCode}` },
+      label: label(REPORT_TYPE_LABELS[reportType], rowCode, target.row_name), switches: [],
+    }
+  }
+
+  if (kind === 'note_section') {
+    const section = text(target?.note_section)
+    if (!section) return { disabledReason: ENTRY_NOTE_NO_SECTION }
+    return {
+      ...base, source: `disclosure_note:${section}`, filters: {},
+      label: label('附注', section, target?.section_title),
+      switches: [
+        { source: `disclosure_note:${section}`, label: '附注表格', filters: {} },
+        { source: 'tb_detail', label: '相关科目（试算表）', filters: { note_section: section } },
+      ],
+    }
+  }
+
+  if (kind === 'workpaper') {
+    const code = text(target?.wp_code)
+    if (!code) return { disabledReason: ENTRY_WP_NO_CODE }
+    return {
+      ...base, source: 'ledger_entries', filters: { wp_code: code },
+      label: label('底稿', code, target?.wp_name), switches: [...LEDGER_SWITCHES],
+    }
+  }
+
+  return { disabledReason: ENTRY_UNKNOWN_KIND }
+}
+
+/**
+ * 结果行「查明细」的下一跳（只对带标准科目码的试算表结果行有效）：该科目的序时账，可返回上一查询。
+ * 返回 null = 该行不提供下钻（没有科目码，或是合计 / 小计行）。
+ */
+export function tbRowDrill(
+  row: QueryEntryTarget | null | undefined,
+  entry: QueryEntryRequest | null | undefined,
+): QueryEntryRequest | null {
+  if (!entry || !row || row._isSubtotal || row._isTotal) return null
+  const code = text(row.standard_account_code)
+  if (!code) return null
+  return {
+    kind: 'tb_row', projectId: entry.projectId, ...(entry.year === undefined ? {} : { year: entry.year }),
+    source: 'ledger_entries', filters: { account_code: code },
+    label: label(code, row.account_name, '序时账'), switches: [...LEDGER_SWITCHES],
+  }
 }

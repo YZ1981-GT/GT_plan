@@ -12,6 +12,7 @@ import http from '@/utils/http'
 import { customQuery as P_cq } from '@/services/apiPaths'
 import { isKnownYear } from '@/components/custom-query/queryPayloads'
 import { indicatorCacheKey, readIndicatorCache, writeIndicatorCache } from './queryIndicatorCache'
+import type { ConditionField, QueryFieldDtype } from './queryConditions'
 
 export interface IndicatorNode {
   key: string
@@ -19,6 +20,7 @@ export interface IndicatorNode {
   icon?: string
   children?: IndicatorNode[]
   columns?: string[] | null
+  condition_fields?: Array<{ key: string; dtype: string }> | null
   supports_conditions?: boolean
   disabled?: boolean
   lazy?: boolean
@@ -109,6 +111,8 @@ export interface IndicatorLeafOption {
   /** 组内路径（中间层名 / 叶子名） */
   label: string
   columns: string[]
+  /** 可作条件的字段（含不返回的 condition_only 计算列） */
+  conditionFields: ConditionField[]
   supportsConditions: boolean
 }
 
@@ -116,6 +120,18 @@ export interface IndicatorOptionGroup {
   key: string
   label: string
   children: IndicatorLeafOption[]
+}
+
+const FIELD_DTYPES = new Set<QueryFieldDtype>(['text', 'number', 'date', 'bool'])
+
+function conditionFieldsOf(node: IndicatorNode): ConditionField[] {
+  if (!Array.isArray(node.condition_fields)) {
+    // 兼容旧指标树缓存 / 旧后端：只有 columns 时按文本字段开放。
+    return (Array.isArray(node.columns) ? node.columns : []).map((key) => ({ key, dtype: 'text' }))
+  }
+  return node.condition_fields
+    .filter((field) => field && typeof field.key === 'string' && FIELD_DTYPES.has(field.dtype as QueryFieldDtype))
+    .map((field) => ({ key: field.key, dtype: field.dtype as QueryFieldDtype }))
 }
 
 /** 把树拍平成「顶层组 → 叶子」两层（页面版 el-select 的分组选项）；不可选（disabled）的叶子不列 */
@@ -130,6 +146,7 @@ export function flattenIndicatorGroups(tree: readonly IndicatorNode[]): Indicato
         leaves.push({
           key: node.key, label: [...path, node.label].join(' / '),
           columns: Array.isArray(node.columns) ? [...node.columns] : [],
+          conditionFields: conditionFieldsOf(node),
           supportsConditions: node.supports_conditions === true,
         })
         return

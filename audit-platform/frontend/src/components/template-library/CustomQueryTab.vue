@@ -109,7 +109,15 @@
           <el-icon style="margin-right: 4px"><Folder /></el-icon>
           我的模板
         </el-button>
-        <el-button size="small" type="primary" plain @click="onSaveTemplate">
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="!!saveBlockedReason"
+          :title="saveBlockedReason"
+          data-testid="cqt-save-template"
+          @click="onSaveTemplate"
+        >
           <el-icon style="margin-right: 4px"><DocumentAdd /></el-icon>
           保存为模板
         </el-button>
@@ -143,8 +151,9 @@
         <div class="gt-cqt-panel">
           <QueryConditionEditor
             v-model="conditionState"
-            :fields="availableColumns"
+            :fields="availableConditionFields"
             :source="formCtx.source"
+            :notices="conditionNotices"
             :disabled="!supportsConditions"
             :disabled-reason="conditionsDisabledReason"
           />
@@ -327,8 +336,9 @@
       </el-col>
     </el-row>
 
-    <!-- 查询模板：与弹窗「📑 模板」同一个选择组件（R9.4）；「载入」还原数据源、条件、列、排序、每页行数 -->
-    <MyTemplatesDialog v-model="templatesDialogVisible" @load="(_cfg, tpl) => onTemplateLoad(tpl)" />
+    <!-- 查询模板：顶部是只读系统预置，下面是用户模板；载入不会自动查询。 -->
+    <MyTemplatesDialog v-model="templatesDialogVisible" :project-id="formCtx.project_id" :year="formCtx.year"
+      @load="onTemplateLoad" @save-as="onTemplateSaveAs" />
 
     <!-- 保存模板：三档可见范围，可分享项目取 template-share-targets（AQ-39，与弹窗 💾 同一组件） -->
     <QueryTemplateSaveDialog
@@ -336,6 +346,7 @@
       :data-source="formCtx.source"
       :config="templateConfig"
       :projects="projectList"
+      :default-name="saveTemplateDefaultName"
     />
 
     <!-- 高级构建器弹窗：access 接口判可用才可打开（R11.6）；把当前项目与年度传给内嵌构建器（R3.5） -->
@@ -376,7 +387,10 @@ import QueryErrorAlert from '@/components/query/QueryErrorAlert.vue'
 import QueryResultPager from '@/components/query/QueryResultPager.vue'
 import QueryRowActions from '@/components/query/QueryRowActions.vue'
 import QueryTemplateSaveDialog from '@/components/query/QueryTemplateSaveDialog.vue'
-import { conditionsIncompleteReason, toRequestConditions, type ConditionState } from '@/components/query/queryConditions'
+import {
+  conditionsIncompleteReason, toRequestConditions, toSavedConditions,
+  type ConditionField, type ConditionState,
+} from '@/components/query/queryConditions'
 import MyTemplatesDialog from '@/components/query/MyTemplatesDialog.vue'
 import { restoreTemplateQuery, type QueryTemplateItem } from '@/components/query/queryTemplateRestore'
 import { describeQueryError, queryErrorToast, type QueryErrorText } from '@/components/query/queryErrorText'
@@ -426,8 +440,12 @@ const formCtx = ref({
 })
 /** 结构化条件与组合逻辑（与模板 config.conditions 同形，R6.1） */
 const conditionState = ref<ConditionState>({ conditions: [], logic: 'and' })
+/** 系统预置解析出的参数 basis、缺值原因与业务说明。 */
+const conditionNotices = ref<string[]>([])
 const selectedColumns = ref<string[]>([])
 const availableColumns = ref<string[]>([])
+/** 条件字段独立于返回列：可包含 line_amount 等 condition_only 计算列。 */
+const availableConditionFields = ref<ConditionField[]>([])
 /** 当前数据源能否带条件（附注表格、合并工作底稿、底稿选区不能，R6.2） */
 const supportsConditions = ref(true)
 // ACNR 选字段：选中 cell 节点的 addr_id 列表（R2.4，作查询字段标识）
@@ -474,6 +492,7 @@ function onOpenBuilder() {
 // 模板
 const templatesDialogVisible = ref(false)
 const saveDialogVisible = ref(false)
+const saveTemplateDefaultName = ref('')
 
 // 结果列下钻（R4.2/R4.4/R4.6/R4.7）：以当前查询上下文 project_id 解析 jump_route
 const { drill } = useAcnrDrill(() => formCtx.value.project_id)
@@ -538,15 +557,22 @@ function invalidateResult() {
 const conditionsDisabledReason = computed(() =>
   supportsConditions.value ? '' : '该数据源不支持条件筛选（附注表格、合并工作底稿、底稿选区按整表返回）')
 
+const conditionIncompleteReason = computed(() => supportsConditions.value
+  ? conditionsIncompleteReason(conditionState.value.conditions, (field) => columnLabel(field))
+  : '')
+
 /** 执行查询不可用的原因（按钮置灰并显示）；可执行时为空串 */
 const executeBlockedReason = computed(() => {
   if (!formCtx.value.source) return '请先选择数据源'
   if (!formCtx.value.project_id) return '请先选择项目'
   if (!isKnownYear(formCtx.value.year)) return '请选择审计年度'
-  if (supportsConditions.value) {
-    return conditionsIncompleteReason(conditionState.value.conditions, (f) => columnLabel(f))
-  }
-  return ''
+  return conditionIncompleteReason.value
+})
+
+/** 保存模板同样 fail-closed：未填写的参数值不能被保存成可误执行的配置。 */
+const saveBlockedReason = computed(() => {
+  if (!formCtx.value.source) return '请先选择数据源'
+  return conditionIncompleteReason.value
 })
 
 const canExport = computed(() => !queryError.value && result.value.rows.length > 0 && !!lastRun.value.payload)
@@ -556,7 +582,7 @@ const templateConfig = computed<Record<string, unknown>>(() => ({
   project_id: formCtx.value.project_id,
   year: formCtx.value.year,
   condition_logic: conditionState.value.logic,
-  conditions: toRequestConditions(conditionState.value.conditions),
+  conditions: toSavedConditions(conditionState.value.conditions),
   selected_columns: selectedColumns.value,
   available_columns: availableColumns.value,
   acnr_targets: acnrFieldIds.value,
@@ -630,10 +656,12 @@ function onSourceChange() {
   invalidateResult()
   // 切换数据源时重置条件、字段与排序（新源未必有该列）
   conditionState.value = { conditions: [], logic: conditionState.value.logic }
+  conditionNotices.value = []
   sortState.value = null
   resultTableRef.value?.clearSort?.()
   const leaf = findLeaf(formCtx.value.source)
   availableColumns.value = leaf ? [...leaf.columns] : []
+  availableConditionFields.value = leaf ? [...leaf.conditionFields] : []
   selectedColumns.value = leaf ? [...leaf.columns] : []
   supportsConditions.value = leaf ? leaf.supportsConditions : true
 }
@@ -783,37 +811,50 @@ async function onExportAll() {
   }
 }
 
-// ─── 模板管理（列表、删除进回收站在共用的 MyTemplatesDialog）───
+// ─── 模板管理（系统预置、用户模板与保存对话框共用）───
 function onSaveTemplate() {
-  if (!formCtx.value.source) {
-    ElMessage.warning('请先选择数据源后再保存')
+  if (saveBlockedReason.value) {
+    ElMessage.warning(saveBlockedReason.value)
     return
   }
+  saveTemplateDefaultName.value = ''
   saveDialogVisible.value = true
 }
 
-/**
- * 「载入」模板（R9.4，queryTemplateRestore）：还原数据源、条件（兼容旧写法）、列、排序、每页行数与单元格取值目标；
- * 项目与年度保持界面当前的（原先套用模板里存的年度，与模板执行「年度取请求年度」不一致，R9.3）。
- */
-function onTemplateLoad(tpl: QueryTemplateItem) {
-  const restored = restoreTemplateQuery(tpl)
-  if (!restored) return
+/** 载入 resolved config；项目与年度保持界面当前值，且绝不自动执行查询。 */
+function onTemplateLoad(
+  config: Record<string, unknown>, tpl: QueryTemplateItem, notices: string[] = [],
+): boolean {
+  const restored = restoreTemplateQuery({ ...tpl, config })
+  if (!restored) return false
   formCtx.value.source = restored.source
   onSourceChange()
   if (restored.availableColumns.length) availableColumns.value = restored.availableColumns
   if (restored.columns.length) selectedColumns.value = restored.columns
   conditionState.value = restored.condition
+  conditionNotices.value = [...notices]
   sortState.value = restored.sort
   if (restored.pageSize) pageSize.value = restored.pageSize
   page.value = 1
   acnrFieldIds.value = restored.acnrTargets
   ElMessage.success(`已载入模板「${tpl.name}」，点击「执行查询」查看结果`)
+  return true
+}
+
+/** 系统预置「另存为我的模板」先载入同一份 resolved config，再打开既有保存对话框。 */
+function onTemplateSaveAs(config: Record<string, unknown>, tpl: QueryTemplateItem, notices: string[] = []) {
+  if (!onTemplateLoad(config, tpl, notices)) return
+  if (saveBlockedReason.value) {
+    ElMessage.warning(saveBlockedReason.value)
+    return
+  }
+  saveTemplateDefaultName.value = `${tpl.name}（我的）`
+  saveDialogVisible.value = true
 }
 
 // 项目或年度变化后旧结果不再属于当前上下文：立即失效，并按新上下文重取指标树。
 watch(() => formCtx.value.source, invalidateResult, { flush: 'sync' })
-watch([conditionState, selectedColumns, acnrFieldIds, sortState, pageSize], invalidateResult,
+watch([conditionState, selectedColumns, acnrFieldIds, sortState], invalidateResult,
   { deep: true, flush: 'sync' })
 watch(() => [formCtx.value.project_id, formCtx.value.year] as const, () => {
   invalidateResult()

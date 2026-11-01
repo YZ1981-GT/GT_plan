@@ -29,4 +29,9 @@ export interface CustomQueryTemplateConfig {
   sort_field?: string | null
   /** 排序方向 */
   sort_order?: 'asc' | 'desc'
+  /**
+   * 旧筛选键（W6，ADR-AQL-20）：从业务页入口进来的查询把 `account_code` / `wp_code` / `report_row` /
+   * `note_section` 存在这里，另存为模板后再执行仍按同一业务对象取数。键由后端注册表登记。
+   */
+  filters?: Record<string, string | string[]>
 }

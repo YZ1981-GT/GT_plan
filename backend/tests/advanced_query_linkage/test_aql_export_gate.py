@@ -38,7 +38,7 @@ from app.deps import get_current_user
 from app.models.audit_platform_models import AccountCategory, Adjustment, AdjustmentType, ReviewStatus, TrialBalance
 from app.models.core import Project, ProjectStatus, ProjectType, UserRole
 from app.routers.query_builder import router as query_builder_router
-from app.services.custom_query import audit_helper, export_gate, paged_fetch
+from app.services.custom_query import audit_helper, export_gate, paged_fetch, query_export
 from app.services.custom_query import export_service as export_module
 from app.services.custom_query.export_service import ExportService, _excel_cell_value, _text_safe_cell, safe_sheet_title
 from app.services.custom_query.query_orchestrator import ColumnMeta
@@ -69,6 +69,32 @@ def _gate_is_empty():
     leaked = export_gate.in_flight_count()
     export_gate._IN_FLIGHT.clear()
     assert leaked == 0, f"本例结束时仍有 {leaked} 个导出名额未释放"
+
+
+@pytest.mark.asyncio
+async def test_project_label_projects_only_the_name_column() -> None:
+    """导出说明不得为取项目名加载整张 projects ORM（迁移滞后时会被无关新列拖成 500）。"""
+    pid = uuid.uuid4()
+
+    class _Result:
+        @staticmethod
+        def one_or_none():
+            return ("【测试】导出项目",)
+
+    class _DB:
+        statement = None
+
+        async def execute(self, statement):
+            self.statement = str(statement)
+            return _Result()
+
+        async def get(self, *_args, **_kwargs):  # pragma: no cover - 走到即是回归
+            raise AssertionError("_project_label 只允许投影 Project.name")
+
+    db = _DB()
+    assert await query_export._project_label(db, pid) == f"【测试】导出项目（{pid}）"
+    assert "projects.name" in db.statement
+    assert "projects.amount_unit" not in db.statement and "projects.client_name" not in db.statement
 
 
 # ─── 导出闸 ───────────────────────────────────────────────────────────────────

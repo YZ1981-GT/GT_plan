@@ -206,11 +206,21 @@ def _uuid(value: Any) -> uuid.UUID | None:
 
 
 async def _report_scope(db, pid) -> str:
+    """项目口径（standalone / consolidated）。
+
+    只投影 ``report_scope`` 一列：不能用 ``Session.get(Project, ...)`` 加载整行——整 ORM 投影会把与高级查询
+    无关的新列也带进 SQL，共享库迁移稍有滞后（现查缺 ``projects.amount_unit``）时，**每个合并项目的附注查询
+    都会 500**。与 ``source_registry.ref_context`` / ``query_export._project_label`` 同一处置。
+    """
     from app.models.core import Project
 
     puid = _uuid(pid)
-    project = await db.get(Project, puid) if puid is not None else None
-    return "consolidated" if project is not None and project.report_scope == "consolidated" else "standalone"
+    if puid is None:
+        return "standalone"
+    scope = (await db.execute(
+        select(Project.report_scope).where(Project.id == puid).limit(1)
+    )).scalar_one_or_none()
+    return "consolidated" if scope == "consolidated" else "standalone"
 
 
 def _template_text(value: Any) -> str | None:
@@ -426,7 +436,10 @@ async def project_note_tree(db, project_id: Any, year: int, *, sections: frozens
             group = groups[head] = {"key": f"note_group_{head}", "label": titles.get(head) or head, "children": []}
         group["children"].append({
             "key": f"disclosure_note:{section}", "label": f"{section} {titles[section]}".strip(),
-            "section_id": section, "columns": [], "supports_conditions": False,
+            "section_id": section, "columns": [], "condition_fields": [], "supports_conditions": False,
         })
-    catalog = {"key": "disclosure", "label": CATALOG_LEAF_LABEL, "columns": [], "supports_conditions": False}
+    catalog = {
+        "key": "disclosure", "label": CATALOG_LEAF_LABEL,
+        "columns": [], "condition_fields": [], "supports_conditions": False,
+    }
     return [catalog, *groups.values()]

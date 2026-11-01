@@ -54,17 +54,23 @@ async def test_consolidated_tree_keeps_consolidated_leaves(monkeypatch) -> None:
 
 @pytest.mark.parametrize("report_scope", ["standalone", "consolidated"])
 async def test_leaf_columns_and_conditions_come_from_the_registry(monkeypatch, report_scope: str) -> None:
-    """SQL 源叶子：列 = 注册表显示列、可带条件；JSON 内存源叶子：列为空、不可带条件（R5.7）。"""
+    """SQL 源叶子：显示列与条件字段分别来自注册表；JSON 内存源均为空。"""
     tree, _ = await _tree(monkeypatch, report_scope)
     checked = 0
     for group in tree.values():
         for leaf in group.get("children") or []:
             spec = sr.resolve_source(leaf["key"]).spec
             if spec is None:
-                assert (leaf["columns"], leaf["supports_conditions"]) == ([], False), leaf["key"]
+                assert (leaf["columns"], leaf["condition_fields"], leaf["supports_conditions"]) == ([], [], False), leaf["key"]
             else:
                 assert (leaf["columns"], leaf["supports_conditions"]) == (spec.display_keys, True), leaf["key"]
+                assert leaf["condition_fields"] == [
+                    {"key": column.key, "dtype": column.dtype} for column in spec.condition_columns
+                ], leaf["key"]
             checked += 1
+    ledger = next(leaf for leaf in tree["trial_balance"]["children"] if leaf["key"] == "ledger_entries")
+    assert {"key": "line_amount", "dtype": "number"} in ledger["condition_fields"]
+    assert "line_amount" not in ledger["columns"]
     assert checked >= 14, "判据空转：叶子数太少"
 
 
@@ -72,6 +78,9 @@ async def test_seed_tree_leaves_are_json_sources(monkeypatch) -> None:
     """合并项目 / 无项目的附注种子树：叶子列为空、不可带条件；分支加载也带 X-Notes-Version。"""
     branch, headers = await _tree(monkeypatch, "consolidated", branch="disclosure", depth=None)
     leaves = [leaf for group in branch for leaf in group.get("children") or []]
-    assert leaves and all((leaf["columns"], leaf["supports_conditions"]) == ([], False) for leaf in leaves)
+    assert leaves and all(
+        (leaf["columns"], leaf["condition_fields"], leaf["supports_conditions"]) == ([], [], False)
+        for leaf in leaves
+    )
     assert headers["X-Notes-Version"] == "v-aql-b6"
-    assert rm._INDICATORS_SCHEMA_VERSION >= 13
+    assert rm._INDICATORS_SCHEMA_VERSION == 15

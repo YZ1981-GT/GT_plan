@@ -33,6 +33,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import StreamingResponse
 
@@ -54,10 +55,11 @@ XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 BEIJING = timezone(timedelta(hours=8), name="北京时间")
 _OP_LABELS = {
     "eq": "等于", "neq": "不等于", "gt": "大于", "gte": "大于等于", "lt": "小于", "lte": "小于等于",
-    "like": "包含", "not_like": "不包含", "in": "属于", "not_in": "不属于", "between": "介于",
-    "is_null": "为空", "is_not_null": "不为空",
+    "like": "包含", "not_like": "不包含", "starts_with": "开头是", "in": "属于", "not_in": "不属于",
+    "between": "介于", "weekday_in": "星期为", "is_null": "为空", "is_not_null": "不为空",
+    "is_blank": "为空或空白",
 }
-_NO_VALUE_OPS = frozenset({"is_null", "is_not_null"})
+_NO_VALUE_OPS = frozenset({"is_null", "is_not_null", "is_blank"})
 _UNSAFE_FILE_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f\x7f]+')
 _MAX_FILE_STEM = 120
 
@@ -175,8 +177,12 @@ async def _project_label(db: Any, project_id: Any) -> str:
         pid = project_id if isinstance(project_id, uuid.UUID) else uuid.UUID(str(project_id))
     except (TypeError, ValueError):
         return str(project_id)
-    project = await db.get(Project, pid)
-    return f"{project.name}（{pid}）" if project is not None else str(pid)
+    # 查询说明只需要名称。不要 ``db.get(Project, ...)`` 加载整 ORM：与导出无关的
+    # Project 新列若尚未迁移，会让已经成功写完的查询文件在补说明时整体 500。
+    row = (
+        await db.execute(select(Project.name).where(Project.id == pid).limit(1))
+    ).one_or_none()
+    return f"{row[0]}（{pid}）" if row is not None else str(pid)
 
 
 def _titled(columns: Sequence[ColumnMeta], headers: Mapping[str, str]) -> list[ColumnMeta]:

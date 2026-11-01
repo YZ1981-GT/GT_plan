@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
@@ -23,6 +24,36 @@ from app.services.ledger_sampling_service import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_CUTOFF_DAYS_BEFORE = 5
+DEFAULT_CUTOFF_DAYS_AFTER = 5
+
+
+@dataclass(frozen=True)
+class CutoffWindow:
+    period_end: date
+    start: date
+    end: date
+
+
+def cutoff_window(
+    year: int,
+    cutoff_date: str | date | None = None,
+    days_before: int = DEFAULT_CUTOFF_DAYS_BEFORE,
+    days_after: int = DEFAULT_CUTOFF_DAYS_AFTER,
+) -> CutoffWindow:
+    """按截止性测试既有规则计算期末日前后窗口。"""
+    period_end = date(year, 12, 31)
+    if cutoff_date:
+        try:
+            period_end = date.fromisoformat(str(cutoff_date)[:10])
+        except (ValueError, TypeError):
+            period_end = date(year, 12, 31)
+    return CutoffWindow(
+        period_end=period_end,
+        start=period_end - timedelta(days=days_before),
+        end=period_end + timedelta(days=days_after),
+    )
+
 
 class CutoffTestService:
     """截止性测试"""
@@ -33,8 +64,8 @@ class CutoffTestService:
         project_id: UUID,
         year: int,
         account_codes: list[str],
-        days_before: int = 5,
-        days_after: int = 5,
+        days_before: int = DEFAULT_CUTOFF_DAYS_BEFORE,
+        days_after: int = DEFAULT_CUTOFF_DAYS_AFTER,
         amount_threshold: float = 10000,
         cutoff_date: str | None = None,
     ) -> dict[str, Any]:
@@ -45,14 +76,15 @@ class CutoffTestService:
         - 科目匹配：前缀 LIKE（``6601%`` 命中 ``6601.01`` / ``660101`` 等子科目），
           与 ``LedgerSamplingService.build_ledger_query`` 口径一致，不再精确匹配漏子科目。
         """
-        period_end = date(year, 12, 31)
-        if cutoff_date:
-            try:
-                period_end = date.fromisoformat(str(cutoff_date)[:10])
-            except (ValueError, TypeError):
-                period_end = date(year, 12, 31)
-        start_date = period_end - timedelta(days=days_before)
-        end_date = period_end + timedelta(days=days_after)
+        window = cutoff_window(
+            year,
+            cutoff_date=cutoff_date,
+            days_before=days_before,
+            days_after=days_after,
+        )
+        period_end = window.period_end
+        start_date = window.start
+        end_date = window.end
 
         valid_codes = [c for c in account_codes if c]
 

@@ -57,7 +57,7 @@ vi.mock('@/utils/eventBus', () => ({
 vi.mock('@/components/formula/FormulaManagerDialog.vue', () => stubModule('FormulaManagerDialog', ['modelValue', 'projectId', 'year', 'scope']))
 vi.mock('@/components/formula/GtRefreshScopeDialog.vue', () => stubModule('GtRefreshScopeDialog', ['projectId', 'year']))
 vi.mock('@/components/query/CustomQueryDialog.vue', () => stubModule('CustomQueryDialog',
-  ['modelValue', 'projectId', 'year', 'initialTab', 'initialSource', 'initialNotice']))
+  ['modelValue', 'projectId', 'year', 'initialTab', 'initialSource', 'initialNotice', 'entry']))
 vi.mock('@/components/formula/settings/FormulaPendingSyncDialog.vue', () => stubModule('FormulaPendingSyncDialog', ['projectId']))
 vi.mock('@/components/common/ShortcutHelpDialog.vue', () => stubModule('ShortcutHelpDialog'))
 vi.mock('@/components/ai/DshPanel.vue', () => stubModule('DshPanel'))
@@ -242,5 +242,40 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
     emitOpenEvent(undefined)
     await nextTick()
     expect(dialogState(w)).toMatchObject({ open: true, projectId: 'p1', source: 'adj_aje' })
+  })
+})
+
+describe('业务页行级入口（W6，ADR-AQL-20；任务 46）', () => {
+  const ENTRY = {
+    kind: 'tb_row' as const, projectId: 'p1', year: 2024, source: 'ledger_entries',
+    filters: { account_code: '1002' }, label: '试算表 1002 银行存款',
+    switches: [{ source: 'ledger_entries', label: '序时账' }],
+  }
+
+  it('事件带的 entry 原样交给弹窗（布局不解释它，映射只在 queryEntryContext）', async () => {
+    setRoute('TrialBalance', 'p1', { year: '2025' })
+    const w = mountLayout()
+    await flushPromises()
+    emitOpenEvent({ entry: ENTRY })
+    await nextTick()
+    expect(dialogOf(w).props('entry')).toEqual(ENTRY)
+    expect(dialogState(w).open).toBe(true)
+  })
+
+  it('侧栏 / 模板库打开时 entry 为 null；关闭再从侧栏打开也不残留上一次的 entry', async () => {
+    setRoute('TrialBalance', 'p1', { year: '2025' })
+    const w = mountLayout()
+    await flushPromises()
+    await openFromSidebar(w)
+    expect(dialogOf(w).props('entry')).toBeNull()
+
+    emitOpenEvent({ entry: ENTRY })
+    await nextTick()
+    expect(dialogOf(w).props('entry')).toEqual(ENTRY)
+
+    dialogOf(w).vm.$emit('update:modelValue', false)
+    await nextTick()
+    await openFromSidebar(w)
+    expect(dialogOf(w).props('entry')).toBeNull()
   })
 })

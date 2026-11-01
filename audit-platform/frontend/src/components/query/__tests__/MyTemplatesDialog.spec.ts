@@ -33,6 +33,20 @@ const MINE = { id: 't1', name: '【测试】大额凭证', data_source: 'ledger_
   config: { conditions: [{ field: 'debit_amount', op: 'gt', value: '100000000' }] }, updated_at: '2026-10-29T01:00:00' }
 const SHARED = { id: 't2', name: '【测试】公开余额', data_source: 'account_balance', scope: 'public', is_owner: false,
   config: { source: 'account_balance' }, updated_at: '2026-10-28T08:00:00+00:00' }
+const PARAM_TEMPLATE = { ...MINE, id: 't-param', name: '【测试】参数模板',
+  config: { source: 'ledger_entries', conditions: [
+    { field: 'line_amount', op: 'gte', value: { $param: 'materiality_performance' } },
+  ] } }
+const PRESET = { id: 'je_large_amount', name: '大额分录', category: '序时账', description: '按重要性查询',
+  data_source: 'ledger_entries', params: ['materiality_performance'], read_only: true }
+const RESOLVED = {
+  id: PRESET.id, name: PRESET.name,
+  config: { source: 'ledger_entries', condition_logic: 'and', conditions: [
+    { field: 'line_amount', op: 'gte', value: '1000000', params: ['materiality_performance'] },
+  ] },
+  params: [{ key: 'materiality_performance', value: '1000000', basis: '本项目 2025 年度实际执行的重要性水平 1,000,000.00 元' }],
+  notes: ['借、贷较大者，与抽凭同口径。'],
+}
 
 let wrapper: VueWrapper<any> | null = null
 async function mountDialog(props: Record<string, unknown> = {}) {
@@ -44,12 +58,19 @@ async function mountDialog(props: Record<string, unknown> = {}) {
   return wrapper
 }
 const items = () => Array.from(document.body.querySelectorAll('[data-testid="mtd-item"]')) as HTMLElement[]
+const presetItems = () => Array.from(document.body.querySelectorAll('[data-testid="mtd-preset-item"]')) as HTMLElement[]
 const button = (row: HTMLElement, id: string) => row.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null
 
 beforeEach(() => {
   sessionStorage.clear()
   authHolder.userId = 'u-1'
-  apiMocks.get.mockReset().mockResolvedValue({ templates: [MINE, SHARED], total: 2 })
+  apiMocks.get.mockReset().mockImplementation((url: string) => {
+    if (url === '/api/custom-query/templates') return Promise.resolve({ templates: [MINE, SHARED], total: 2 })
+    if (url === '/api/custom-query/template-presets') return Promise.resolve({ presets: [PRESET] })
+    if (url === '/api/custom-query/template-presets/je_large_amount/resolve') return Promise.resolve(RESOLVED)
+    if (url === '/api/custom-query/templates/t-param/resolve') return Promise.resolve({ ...RESOLVED, id: 't-param', name: PARAM_TEMPLATE.name })
+    return Promise.resolve({})
+  })
   apiMocks.delete.mockReset().mockResolvedValue(null)
   confirmMock.mockReset().mockResolvedValue('confirm')
   ;(ElMessage as any).success.mockClear()
@@ -148,5 +169,64 @@ describe('删除进回收站（R9.5）', () => {
     await flushPromises()
     expect(apiMocks.delete).not.toHaveBeenCalled()
     expect(items()).toHaveLength(2)
+  })
+})
+
+describe('系统预置与参数模板（W3）', () => {
+  it('系统预置行只显示载入和另存，不显示编辑、删除或执行；载入先 resolve 并组合 notices', async () => {
+    const w = await mountDialog({ projectId: 'p1', year: 2025, allowRun: true })
+    const row = presetItems()[0]
+    expect(row).toBeTruthy()
+    expect(button(row, 'mtd-preset-load')).toBeTruthy()
+    expect(button(row, 'mtd-preset-save-as')).toBeTruthy()
+    expect(button(row, 'mtd-run')).toBeNull()
+    expect(button(row, 'mtd-delete')).toBeNull()
+    expect(row.querySelector('[data-testid="mtd-edit"]')).toBeNull()
+    button(row, 'mtd-preset-load')!.click()
+    await flushPromises()
+    expect(apiMocks.get).toHaveBeenCalledWith('/api/custom-query/template-presets/je_large_amount/resolve',
+      expect.objectContaining({ params: { project_id: 'p1', year: 2025 }, _silent: true }))
+    expect(w.emitted('load')?.[0]).toEqual([
+      RESOLVED.config,
+      expect.objectContaining({ id: PRESET.id, name: PRESET.name, data_source: PRESET.data_source, read_only: true }),
+      ['当前阈值：本项目 2025 年度实际执行的重要性水平 1,000,000.00 元', '借、贷较大者，与抽凭同口径。'],
+    ])
+  })
+
+  it('无项目或年度时系统预置操作禁用，并给出明确中文原因', async () => {
+    await mountDialog({ projectId: '', year: 2025 })
+    expect(button(presetItems()[0], 'mtd-preset-load')!.disabled).toBe(true)
+    expect(wrapper!.vm.resolveBlockedReason).toBe('请先选择项目')
+    wrapper!.unmount()
+    document.body.innerHTML = ''
+    await mountDialog({ projectId: 'p1', year: null })
+    expect(button(presetItems()[0], 'mtd-preset-save-as')!.disabled).toBe(true)
+    expect(wrapper!.vm.resolveBlockedReason).toBe('请先选择审计年度')
+  })
+
+  it('另存系统预置同样先 resolve，并 emit save-as(config, item, notices)', async () => {
+    const w = await mountDialog({ projectId: 'p1', year: 2025 })
+    button(presetItems()[0], 'mtd-preset-save-as')!.click()
+    await flushPromises()
+    expect(w.emitted('save-as')?.[0]).toEqual([
+      RESOLVED.config,
+      expect.objectContaining({ id: PRESET.id, name: PRESET.name }),
+      ['当前阈值：本项目 2025 年度实际执行的重要性水平 1,000,000.00 元', '借、贷较大者，与抽凭同口径。'],
+    ])
+  })
+
+  it('含 $param 的用户模板载入先走用户模板 resolve；普通模板仍本地载入', async () => {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/api/custom-query/templates') return Promise.resolve({ templates: [PARAM_TEMPLATE, MINE], total: 2 })
+      if (url === '/api/custom-query/template-presets') return Promise.resolve({ presets: [] })
+      if (url === '/api/custom-query/templates/t-param/resolve') return Promise.resolve({ ...RESOLVED, id: 't-param' })
+      return Promise.resolve({})
+    })
+    const w = await mountDialog({ projectId: 'p1', year: 2025 })
+    button(items()[0], 'mtd-load')!.click()
+    await flushPromises()
+    expect(apiMocks.get).toHaveBeenCalledWith('/api/custom-query/templates/t-param/resolve',
+      expect.objectContaining({ params: { project_id: 'p1', year: 2025 }, _silent: true }))
+    expect(w.emitted('load')?.[0]?.[0]).toEqual(RESOLVED.config)
   })
 })

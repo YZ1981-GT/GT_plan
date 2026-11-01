@@ -308,7 +308,31 @@ OPERATOR_WHITELIST: set[str] = {
     "in", "not_in",         # IN / NOT IN
     "is_null", "is_not_null",  # IS NULL / IS NOT NULL
     "between",              # BETWEEN（[lo, hi]）
+    "starts_with",          # 字面前缀匹配
+    "weekday_in",           # 日期的星期（0=周日，1..6=周一至周六）
+    "is_blank",             # NULL、空串或纯 ECMAScript trim 空白
 }
+
+#: 高级构建器界面当前能完整编辑的固定 13 项。业务视图与模板可使用上面的三项扩展能力，
+#: 但在构建器补齐相应控件前不得把它们下发到界面（ADR-AQL-03）。此集合必须写成字面量，
+#: 新增后端算子时必须显式决定是否进入构建器界面。
+BUILDER_UI_OPERATORS: frozenset[str] = frozenset({
+    "eq", "neq",
+    "gt", "gte", "lt", "lte",
+    "like", "not_like",
+    "in", "not_in",
+    "is_null", "is_not_null",
+    "between",
+})
+
+
+def _assert_builder_ui_operators_registered() -> None:
+    missing = BUILDER_UI_OPERATORS - OPERATOR_WHITELIST
+    if missing:
+        raise RuntimeError(f"构建器界面登记了后端未注册的算子：{sorted(missing)}")
+
+
+_assert_builder_ui_operators_registered()
 
 
 AGGREGATE_WHITELIST: set[str] = {"count", "sum", "avg", "min", "max"}

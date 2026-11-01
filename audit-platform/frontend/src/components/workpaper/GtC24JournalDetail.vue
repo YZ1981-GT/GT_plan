@@ -620,6 +620,7 @@ import {
   type BenfordTestResult,
   type TrialBalanceRow,
 } from '@/composables/useC24AnalyticsEngine'
+import { VAGUE_KEYWORDS_DEFAULT } from '@/generated/journalEntryRules'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import { useC24ImportExport } from '@/composables/useC24ImportExport'
 import { fmtAmount } from '@/utils/formatters'
@@ -1103,7 +1104,7 @@ const enabledRules = ref<string[]>([
 const ruleParams = ref<RuleParams>({
   nightStartHour: 22, nightEndHour: 6,
   largeAmountThreshold: 1000000, approvalLimit: 500000,
-  roundAmountDigits: 4, vagueKeywordsText: '调整,暂估,其他,冲销',
+  roundAmountDigits: 4, vagueKeywordsText: VAGUE_KEYWORDS_DEFAULT.join(','),
 })
 const anomalyResults = ref<AnomalyResult[]>([])
 const anomalyNotes = ref<AnomalyNote[]>([])

@@ -19,8 +19,8 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 
-const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:3030'
-const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:9980'
+const FRONTEND = process.env.E2E_BASE_URL || 'http://127.0.0.1:3030'
+const BACKEND = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:9980'
 
 // 已知良性异常（非本 spec 崩溃信号）
 const BENIGN_ERROR_PATTERNS = [

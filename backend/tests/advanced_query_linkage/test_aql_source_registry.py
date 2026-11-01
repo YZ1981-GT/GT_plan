@@ -14,7 +14,6 @@ import datetime as dt
 import unicodedata
 import uuid
 from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
@@ -63,7 +62,7 @@ _RENAMED_KEYS = {("report", "indent"): "indent_level", ("report", "is_total"): "
 
 @pytest.mark.parametrize("spec", list(sr.SOURCE_REGISTRY.values()), ids=list(sr.SOURCE_REGISTRY))
 def test_registry_entries_are_real_orm_columns(spec: sr.SourceSpec) -> None:
-    keys = [c.key for c in (*spec.columns, *spec.hidden)]
+    keys = [c.key for c in (*spec.columns, *spec.hidden, *spec.condition_only)]
     assert len(keys) == len(set(keys)), f"{spec.key} 列键重复：{keys}"
     for column in (*spec.columns, *spec.hidden):
         base = sr._base_column(column.expr)
@@ -71,6 +70,9 @@ def test_registry_entries_are_real_orm_columns(spec: sr.SourceSpec) -> None:
         assert Base.metadata.tables.get(base.table.name) is base.table, f"{spec.key}.{column.key} 不在 ORM 元数据里"
         expected_name = _RENAMED_KEYS.get((spec.key, column.key), column.key)
         assert base.name == expected_name, f"{spec.key}.{column.key} 与列名 {base.name} 不一致"
+    for column in spec.condition_only:
+        assert isinstance(column.expr, sa.sql.ColumnElement), f"{spec.key}.{column.key} 不是 SQL 条件表达式"
+        assert column.conditionable and not column.sortable, f"{spec.key}.{column.key} 只能作条件，不得排序"
     filter_keys = {fk.key for fk in spec.filter_keys}
     assert not (set(spec.context_filters) & filter_keys), f"{spec.key} 口径筛选键与通用筛选键重叠"
     for key, _value in spec.fixed_filters:
@@ -82,6 +84,7 @@ def test_registry_entries_are_real_orm_columns(spec: sr.SourceSpec) -> None:
         assert field in sortable and direction in ("asc", "desc"), (spec.key, field, direction)
     assert spec.unique_key in {c.key for c in spec.hidden}, f"{spec.key} 唯一键须是隐藏列"
     assert not ({c.key for c in spec.columns} & {c.key for c in spec.hidden}), f"{spec.key} 显示列与隐藏列重叠"
+    assert not (set(spec.display_keys) & {c.key for c in spec.condition_only}), f"{spec.key} 条件专用列泄漏为显示列"
 
 
 def test_nullable_is_read_from_column_definition() -> None:
@@ -112,7 +115,13 @@ def test_nullable_is_read_from_column_definition() -> None:
     ("disclosure_note:八、1", {}, ("json", ("disclosure", "_query_disclosure_section"), {"section_id": "八、1"}, None)),
     ("disclosure", {}, ("json", ("disclosure", "_query_disclosure_catalog"), {}, None)),
     ("tb_summary", {}, ("json", ("worksheet", "_query_tb_summary"), {}, None)),
-    ("ws_consol_tb", {}, ("json", ("worksheet", "_query_worksheet"), {}, None)),
+    # 任务 38：源键决定 sheet（与 report_{类型} / adj_aje 同机制）。原先这一格期望空 fixed_filters，
+    # 而 `_query_worksheet` 读 `filters.sheet_key` 且只有弹窗会设它 ⇒ 不设的调用方静默取到 `info` 的数据
+    ("ws_consol_tb", {}, ("json", ("worksheet", "_query_worksheet"), {"sheet_key": "consol_tb"}, None)),
+    ("ws_elimination", {}, ("json", ("worksheet", "_query_worksheet"), {"sheet_key": "elimination"}, None)),
+    # 请求自带的 sheet_key 不得盖掉源键（fixed_filters 在 business_fetchers 里后合并）
+    ("ws_info", {"sheet_key": "elimination"},
+     ("json", ("worksheet", "_query_worksheet"), {"sheet_key": "info"}, None)),
     ("report", {}, ("spec", "report", {}, None)),
     ("report_balance_sheet", {}, ("spec", "report", {"report_type": "balance_sheet"}, None)),
     ("report_impairment_provision", {}, ("spec", "report", {"report_type": "impairment_provision"}, None)),
@@ -362,15 +371,18 @@ async def test_adjustment_statement_compares_type_as_text() -> None:
 
 @pytest.mark.parametrize(("kwargs", "code"), [
     ({"filters": {"debit_amount_min": 1}}, "UNKNOWN_FILTER_KEY"),
-    ({"filters": {"account_code": ["1001", "1002"]}}, "INVALID_FILTER_VALUE"),
+    # 任务 45（W6，ADR-AQL-20）起 ``account_code`` 按设计收多值；其余筛选键仍坚持单值
+    ({"filters": {"voucher_no": ["A", "B"]}}, "INVALID_FILTER_VALUE"),
+    ({"filters": {"account_code": []}}, "INVALID_FILTER_VALUE"),
+    ({"filters": {"account_code": [f"{i:04d}" for i in range(51)]}}, "INVALID_FILTER_VALUE"),
     ({"conditions": [{"field": "nope", "op": "eq", "value": 1}]}, "UNKNOWN_CONDITION_FIELD"),
     ({"conditions": [{"field": "id", "op": "eq", "value": 1}]}, "UNKNOWN_CONDITION_FIELD"),
     ({"conditions": [{"field": "summary", "op": "regex", "value": "x"}]}, "OP_NOT_ALLOWED"),
     ({"conditions": [{"field": "account_code", "op": "prefix", "value": "10"}]}, "OP_NOT_ALLOWED"),
     ({"conditions": [{"field": "account_code", "op": "in", "value": [str(i) for i in range(501)]}]}, "INVALID_IN_VALUE"),
     ({"columns": ["account_name", "closing_balance"]}, "UNKNOWN_COLUMN"),
-], ids=["filter-key", "filter-list", "cond-field", "cond-hidden", "cond-op", "cond-internal-op", "cond-in-500",
-        "column"])
+], ids=["filter-key", "filter-list", "filter-empty-codes", "filter-too-many-codes", "cond-field", "cond-hidden",
+        "cond-op", "cond-internal-op", "cond-in-500", "column"])
 async def test_unregistered_inputs_are_400(kwargs: dict, code: str, fixed_active_dataset) -> None:
     # 口径谓词不触库（生效数据集 id 固定）：校验若被跳过，语句照常建出 ⇒ 形态是 DID NOT RAISE，而不是别的报错
     # 不改参数化的 dict（原先 pop 掉 filters：同一会话里再收集到一次时第二次 filters 为空 ⇒ DID NOT RAISE）
@@ -491,15 +503,19 @@ async def test_all_rows_rejects_aggregation_over_cap(ledger_db) -> None:
 
 _COL = TbLedger.__table__.c.account_code
 _NUM = TbLedger.__table__.c.debit_amount
-_VALUES = {"in": ["1001", "1002"], "not_in": ["1001"], "between": ["1001", "1009"], "is_null": None,
-           "is_not_null": None}
+_DATE = TbLedger.__table__.c.voucher_date
+_VALUES = {
+    "in": ["1001", "1002"], "not_in": ["1001"], "between": ["1001", "1009"],
+    "is_null": None, "is_not_null": None, "is_blank": None, "weekday_in": [0, 6],
+}
 
 
 @pytest.mark.parametrize("op", sorted(OPERATOR_WHITELIST))
 def test_portable_filter_equals_builder_filter(op: str) -> None:
+    column = _DATE if op == "weekday_in" else _COL
     value = _VALUES.get(op, "10_1%")
-    portable = build_portable_filter(_COL, op, value).compile(dialect=postgresql.dialect())
-    builder = _build_filter(_COL, op, value).compile(dialect=postgresql.dialect())
+    portable = build_portable_filter(column, op, value).compile(dialect=postgresql.dialect())
+    builder = _build_filter(column, op, value).compile(dialect=postgresql.dialect())
     assert str(portable) == str(builder) and portable.params == builder.params
 
 
@@ -531,6 +547,61 @@ def test_numeric_condition_value_is_coerced_and_bad_value_400() -> None:
     assert _detail(exc)["error_code"] == "INVALID_DECIMAL"
 
 
+@pytest.mark.parametrize(("condition", "message"), [
+    ({"field": "debit_amount", "op": "gte", "value": None}, None),
+    ({"field": "debit_amount", "op": "gte", "value": "  "}, None),
+    ({"field": "debit_amount", "op": "between", "value": ["1", ""]}, None),
+    ({"field": "voucher_date", "op": "weekday_in", "value": []}, None),
+    ({"field": "debit_amount", "op": "gte", "value": {"$param": "materiality_performance"}}, None),
+    ({"field": "debit_amount", "op": "gte", "value": "", "missing_reason": "本项目未设置阈值"},
+     "本项目未设置阈值"),
+], ids=["none", "blank", "between-end", "weekday-empty", "param", "specific-reason"])
+async def test_condition_value_required_is_fail_closed(condition, message, fixed_active_dataset) -> None:
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, _ctx(), conditions=[condition])
+    assert _detail(exc)["error_code"] == "CONDITION_VALUE_REQUIRED"
+    assert _detail(exc)["message"] == (message or f"条件「{condition['field']}」未填写值")
+
+
+async def test_empty_in_and_not_in_keep_defined_semantics(fixed_active_dataset) -> None:
+    stmt, _ = await paged_fetch.build_statement(
+        sr.LEDGER_ENTRIES, _ctx(), conditions=[{"field": "account_code", "op": "in", "value": []}],
+    )
+    sql = _pg(stmt).lower()
+    assert "where false" in sql, "in 空集必须把整个谓词化简为恒假"
+
+    stmt, _ = await paged_fetch.build_statement(
+        sr.LEDGER_ENTRIES, _ctx(), conditions=[{"field": "account_code", "op": "not_in", "value": []}],
+    )
+    sql = _pg(stmt).lower()
+    # SQLAlchemy 会把 true() 与既有 WHERE 合取后优化掉；不能要求 SQL 字面出现 true。
+    assert "where false" not in sql and "not in" not in sql, "not_in 空集必须恒真，不得额外收窄"
+
+
+async def test_line_amount_is_condition_only_and_decimal_bound(fixed_active_dataset) -> None:
+    spec = sr.LEDGER_ENTRIES
+    assert [(column.key, column.dtype) for column in spec.condition_only] == [("line_amount", "number")]
+    assert "line_amount" not in spec.display_keys
+    stmt, display = await paged_fetch.build_statement(
+        spec,
+        _ctx(),
+        conditions=[{"field": "line_amount", "op": "gte", "value": "1000000"}],
+        columns=["voucher_no"],
+    )
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    assert "greatest" in str(compiled).lower()
+    assert Decimal("1000000") in compiled.params.values()
+    assert [column.key for column in display] == ["voucher_no"]
+    assert "line_amount" not in str(compiled).split("FROM", 1)[0]
+
+    with pytest.raises(HTTPException) as selected:
+        await paged_fetch.build_statement(spec, _ctx(), columns=["line_amount"])
+    assert _detail(selected)["error_code"] == "UNKNOWN_COLUMN"
+    with pytest.raises(HTTPException) as sorted_by:
+        paged_fetch._order_by(spec, [{"field": "line_amount", "direction": "desc"}])
+    assert _detail(sorted_by)["error_code"] == "INVALID_SORT_FIELD"
+
+
 async def test_indicator_leaves_of_registry_sources_declare_registry_columns() -> None:
     """指标树叶子声明的列 = 注册表显示列（R5.7；任务 7 起 execute 对未登记列 400，页面版按叶子列发 columns）。"""
     from app.routers import custom_query as router_module
@@ -540,24 +611,44 @@ async def test_indicator_leaves_of_registry_sources_declare_registry_columns() -
     leaves = {leaf["key"]: leaf for group in tree for leaf in group.get("children") or [] if "key" in leaf}
     for key in ("tb_detail", "account_balance", "ledger_entries", "workhours", "report_lines", "adj_aje", "adj_rje", "aux_balance", "aux_ledger",
                 "report_balance_sheet", "report_income_statement", "report_impairment_provision"):
-        assert leaves[key]["columns"] == sr.resolve_source(key).spec.display_keys, key
+        spec = sr.resolve_source(key).spec
+        assert leaves[key]["columns"] == spec.display_keys, key
+        assert leaves[key]["condition_fields"] == [
+            {"key": column.key, "dtype": column.dtype} for column in spec.condition_columns
+        ], key
+    assert {"key": "line_amount", "dtype": "number"} in leaves["ledger_entries"]["condition_fields"]
+    assert "line_amount" not in leaves["ledger_entries"]["columns"]
     assert "entry_number" not in leaves["adj_aje"]["columns"], "旧叶子声明了表里没有的列（页面版按叶子列发 columns ⇒ 400）"
     for kind, canonical in sr.CONSOL_UNIT_KINDS.items():  # 合并单位叶子（_build_consol_units_tree）同一定义
         assert router_module._registry_columns(f"consol_unit:C01:{kind}") == sr.SOURCE_REGISTRY[canonical].display_keys
-    assert router_module._INDICATORS_SCHEMA_VERSION >= 13, "叶子列与树形变了（任务 17 / 18 / 22 / 19 / 20），旧缓存必须失效"
+    assert router_module._INDICATORS_SCHEMA_VERSION == 15, "condition_fields 改变缓存契约，必须从当前 v14 顺延"
 
 
-async def test_ref_context_follows_project_template_type() -> None:
+async def test_ref_context_follows_project_template_type_without_loading_full_project() -> None:
+    class _Result:
+        def __init__(self, template_type):
+            self.template_type = template_type
+
+        def scalar_one_or_none(self):
+            return self.template_type
+
     class _DB:
-        def __init__(self, project):
-            self.project, self.calls = project, 0
+        def __init__(self, template_type):
+            self.template_type, self.calls, self.statements = template_type, 0, []
 
-        async def get(self, model, pk):
+        async def execute(self, statement):
             self.calls += 1
-            return self.project
+            self.statements.append(str(statement))
+            return _Result(self.template_type)
 
-    listed = _DB(SimpleNamespace(template_type="listed"))
+        async def get(self, *_args, **_kwargs):  # pragma: no cover - 走到即说明又加载了整 ORM
+            raise AssertionError("ref_context 只允许投影 Project.template_type，不能加载整项目行")
+
+    listed = _DB("listed")
     ctx = _ctx(listed)
     assert await sr.ref_context(ctx) == {"template_type": "listed", "year": 2025}
     assert await sr.ref_context(ctx) == {"template_type": "listed", "year": 2025} and listed.calls == 1, "同一请求只查一次"
+    statement = listed.statements[0]
+    assert "projects.template_type" in statement
+    assert "projects.amount_unit" not in statement and "projects.client_name" not in statement, "不得投影无关项目列"
     assert await sr.ref_context(_ctx(_DB(None))) == {"template_type": "soe", "year": 2025}

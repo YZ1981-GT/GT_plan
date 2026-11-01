@@ -89,6 +89,8 @@ export function useReportDrilldown(options: UseReportDrilldownOptions): UseRepor
       const result = await getReportDrilldown(projectId.value, year.value, activeTab.value, row.row_code)
       drilldownData.value = {
         ...result,
+        // W6：入口的报表类型 / 年度 / 项目与本次穿透请求同一来源（ADR-AQL-20）
+        report_type: activeTab.value, year: year.value, project_id: projectId.value,
         accounts: result.accounts.map((item: any) => ({
           ...item,
           amount: reportMode.value === 'unadjusted'

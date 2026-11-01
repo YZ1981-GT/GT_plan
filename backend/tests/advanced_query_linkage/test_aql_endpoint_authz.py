@@ -43,7 +43,7 @@ from openpyxl import load_workbook
 from sqlalchemy import Table, select
 
 import app.services.wp_template_init_service as wp_template_init_service
-from app.models.audit_platform_models import AccountCategory, TrialBalance
+from app.models.audit_platform_models import AccountCategory, Materiality, TrialBalance
 from app.services.custom_query.fetchers import workpaper_cells
 from app.models.base import UserRole
 from app.models.core import User
@@ -307,6 +307,25 @@ def _preview_unavailable() -> Expect:
     return Expect(200, check)
 
 
+def _preset_missing_materiality() -> Expect:
+    def check(response: Response, _ctx: Ctx) -> None:
+        data = response.json()
+        params = data.get("params") or []
+        assert len(params) == 1 and params[0]["key"] == "materiality_performance", params
+        assert params[0]["value"] is None
+        reason = str(params[0].get("missing_reason") or "")
+        assert "未设置重要性水平" in reason and "读取失败" not in reason, reason
+    return Expect(200, check)
+
+
+def _resolved_template() -> Expect:
+    def check(response: Response, _ctx: Ctx) -> None:
+        data = response.json()
+        assert data["config"]["source"] == "tb_detail"
+        assert data.get("params") == []
+    return Expect(200, check)
+
+
 def _error_code(status: int, code: str) -> Expect:
     def check(response: Response, ctx: Ctx) -> None:
         detail = response.json().get("detail")
@@ -470,6 +489,21 @@ ROWS: tuple[Row, ...] = (
     Row("29b", "S", (Call("GET", f"{CQ}/cross-sheet-trace",
                           f"{CQ}/cross-sheet-trace?project_id={{X}}&wp_code=D2&sheet_name=审定表&cell_ref=B7"),),
         codes(401, 403, 404, 404, 404, 403, 404, 404), (custom_query.router,), _WP),
+    Row("30", "S", (Call("GET", f"{CQ}/template-presets", f"{CQ}/template-presets"),),
+        codes(401, 200, 200, 200, 200, 200, 200, 200), (custom_query.router,)),
+    Row("31", "S", (Call(
+        "GET", f"{CQ}/template-presets/{{preset_id}}/resolve",
+        f"{CQ}/template-presets/je_large_amount/resolve?project_id={{X}}&year={YEAR}",
+    ),),
+        codes(401, 403, *([_preset_missing_materiality()] * 3), 403,
+              _preset_missing_materiality(), _preset_missing_materiality()),
+        (custom_query.router,), (Materiality.__table__,)),
+    Row("32", "S", (Call(
+        "GET", f"{CQ}/templates/{{template_id}}/resolve",
+        f"{CQ}/templates/{{S}}/resolve?project_id={{X}}&year={YEAR}",
+    ),),
+        codes(401, 403, *([_resolved_template()] * 3), 403, _resolved_template(), _resolved_template()),
+        (custom_query.router,), _TPL, ("templates",)),
     # 循环受限子表：CR（23c / 25c / 26c / 28c）对照 NM（23n，本来就没有可访问项目）
     Row("23c", "S", (Call("GET", f"{QB}/access", f"{QB}/access"),),
         {"CR": _access(True, False, 0, CYCLE_REASON)}, (query_builder.router,), (WpIndex.__table__,)),
@@ -581,7 +615,7 @@ def test_table_rows_match_design_shape() -> None:
     main = [row for row in ROWS if set(row.expect) == set(COLUMNS)]
     numbers = [row.no for row in main]
     key = lambda n: (int(n.rstrip("b")), n)  # noqa: E731
-    expected = sorted([str(n) for n in range(1, 30)] + ["8b", "29b"], key=key)
+    expected = sorted([str(n) for n in range(1, 33)] + ["8b", "29b"], key=key)
     assert sorted(set(numbers), key=key) == expected, numbers
     sub = {row.no: set(row.expect) for row in ROWS if set(row.expect) != set(COLUMNS)}
     assert sub == {"23c": {"CR"}, "25c": {"CR"}, "26c": {"CR"}, "28c": {"CR"}, "23n": {"NM"}}, sub

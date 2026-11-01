@@ -50,7 +50,11 @@ const PID = '5942c12e-65fb-4187-ace3-79d45a90cb53'
 const SKELETON = [
   { key: 'trial_balance', label: '📑 试算平衡表', children: [
     { key: 'ledger_entries', label: '序时账明细', columns: ['voucher_date', 'voucher_no', 'account_code', 'debit_amount', 'summary'],
-      supports_conditions: true },
+      condition_fields: [
+        { key: 'voucher_date', dtype: 'date' }, { key: 'voucher_no', dtype: 'text' },
+        { key: 'account_code', dtype: 'text' }, { key: 'debit_amount', dtype: 'number' },
+        { key: 'summary', dtype: 'text' }, { key: 'line_amount', dtype: 'number' },
+      ], supports_conditions: true },
   ] },
   { key: 'disclosure', label: '📝 附注（国企）', lazy: true, children: [] },
   { key: 'workpaper', label: '📋 底稿', lazy: true, children: [
@@ -77,7 +81,7 @@ function indicatorsResponse(config: any) {
   if (params.branch === 'disclosure') return { data: DISCLOSURE_BRANCH, headers: {} }
   if (params.depth === 1) {
     return { data: JSON.parse(JSON.stringify(SKELETON)),
-      headers: { 'x-indicators-schema-version': '14', 'x-notes-version': 'nv-1' } }
+      headers: { 'x-indicators-schema-version': '15', 'x-notes-version': 'nv-1' } }
   }
   return { data: [], headers: {} }
 }
@@ -166,13 +170,34 @@ describe('结构化条件（R6.1、R6.2）', () => {
     expect(config).not.toHaveProperty('validateStatus')
   })
 
+  it('保存模板恢复 params 占位；执行请求只发当前解析值', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    wrapper.vm.conditionState = {
+      conditions: [{ field: 'line_amount', op: 'gte', value: '1000000', params: ['materiality_performance'] }],
+      logic: 'and',
+    }
+    await flushPromises()
+    expect(wrapper.vm.templateConfig.conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: { $param: 'materiality_performance' } },
+    ])
+    await wrapper.vm.onExecute()
+    expect(executeBodies()[0].conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: '1000000' },
+    ])
+  })
+
   it('条件没填完整：执行不可用并说明原因，不发请求', async () => {
     const wrapper = await mountTab()
     await selectLedger(wrapper)
     wrapper.vm.conditionState = { conditions: [{ field: 'debit_amount', op: 'gt', value: '' }], logic: 'and' }
     await flushPromises()
     expect(wrapper.vm.executeBlockedReason).toBe('条件「借方发生额」未填写值')
+    expect(wrapper.vm.saveBlockedReason).toBe('条件「借方发生额」未填写值')
+    expect(wrapper.find('[data-testid="cqt-save-template"]').attributes('disabled')).toBeDefined()
     await wrapper.vm.onExecute()
+    wrapper.vm.onSaveTemplate()
+    expect(wrapper.vm.saveDialogVisible).toBe(false)
     expect(executeBodies()).toHaveLength(0)
   })
 
@@ -193,7 +218,13 @@ describe('结构化条件（R6.1、R6.2）', () => {
     const wrapper = await mountTab()
     await selectLedger(wrapper)
     const editor = wrapper.findComponent(QueryConditionEditor)
-    expect(editor.props('fields')).toEqual(['voucher_date', 'voucher_no', 'account_code', 'debit_amount', 'summary'])
+    expect(editor.props('fields')).toEqual([
+      { key: 'voucher_date', dtype: 'date' }, { key: 'voucher_no', dtype: 'text' },
+      { key: 'account_code', dtype: 'text' }, { key: 'debit_amount', dtype: 'number' },
+      { key: 'summary', dtype: 'text' }, { key: 'line_amount', dtype: 'number' },
+    ])
+    expect(wrapper.vm.availableColumns).not.toContain('line_amount')
+    expect(wrapper.vm.selectedColumns).not.toContain('line_amount')
     expect(editor.props('source')).toBe('ledger_entries')
     expect(editor.props('disabled')).toBe(false)
     expect(wrapper.vm.columnLabel('debit_amount')).toBe('借方发生额')
@@ -447,5 +478,59 @@ describe('阶段 0：项目上下文与请求代际', () => {
     expect(wrapper.vm.countToken).toBe('')
     expect(wrapper.vm.lastRun.payload).toBeNull()
     expect(wrapper.vm.canExport).toBe(false)
+  })
+})
+
+describe('W3 系统预置载入与另存', () => {
+  const preset = { id: 'je_large_amount', name: '大额分录', data_source: 'ledger_entries', config: null,
+    scope: 'system', is_owner: false, read_only: true }
+  const resolved = { source: 'ledger_entries', condition_logic: 'and',
+    conditions: [{ field: 'line_amount', op: 'gte', value: '1000000', params: ['materiality_performance'] }],
+    selected_columns: ['voucher_no', 'debit_amount'] }
+  const missingReason = '本项目 2025 年度未设置重要性水平，请填写阈值'
+
+  it('共用模板对话框拿当前项目年度；载入 resolved config/notices 后不自动查询', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    const picker = wrapper.findComponent(MyTemplatesDialog)
+    expect(picker.props()).toMatchObject({ projectId: PID, year: 2025 })
+    picker.vm.$emit('load', resolved, preset, ['当前阈值：本项目实际执行的重要性水平'])
+    await flushPromises()
+    expect(executeBodies()).toHaveLength(0)
+    expect(wrapper.vm.conditionState.conditions[0]).toMatchObject({ value: '1000000', params: ['materiality_performance'] })
+    expect(wrapper.vm.conditionNotices).toEqual(['当前阈值：本项目实际执行的重要性水平'])
+    expect(wrapper.findComponent(QueryConditionEditor).props('notices')).toEqual(['当前阈值：本项目实际执行的重要性水平'])
+  })
+
+  it('参数缺值时查询与保存同时禁用并显示具体原因', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    const missing = { ...resolved,
+      conditions: [{ field: 'line_amount', op: 'gte', value: '', params: ['materiality_performance'] }] }
+    wrapper.findComponent(MyTemplatesDialog).vm.$emit('load', missing, preset, [missingReason])
+    await flushPromises()
+    expect(wrapper.vm.executeBlockedReason).toBe('条件「发生额（借贷较大者）」未填写值')
+    expect(wrapper.vm.saveBlockedReason).toBe('条件「发生额（借贷较大者）」未填写值')
+    expect(wrapper.find('[data-testid="cqt-run"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="cqt-save-template"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.findComponent(QueryConditionEditor).props('notices')).toEqual([missingReason])
+  })
+
+  it('另存默认名为“预置名（我的）”，未改参数保存占位、改值后保存字面值', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    wrapper.findComponent(MyTemplatesDialog).vm.$emit('save-as', resolved, preset, ['当前阈值：1,000,000.00 元'])
+    await flushPromises()
+    const save = wrapper.findComponent(QueryTemplateSaveDialog)
+    expect(save.props()).toMatchObject({ modelValue: true, defaultName: '大额分录（我的）' })
+    expect(wrapper.vm.templateConfig.conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: { $param: 'materiality_performance' } },
+    ])
+    wrapper.vm.conditionState = { conditions: [{ field: 'line_amount', op: 'gte', value: '2000000' }], logic: 'and' }
+    await flushPromises()
+    expect(wrapper.vm.templateConfig.conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: '2000000' },
+    ])
+    expect(executeBodies()).toHaveLength(0)
   })
 })

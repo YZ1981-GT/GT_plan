@@ -63,6 +63,15 @@
     "src/components/query/__tests__/MyTemplatesDialog.spec.ts",
     "src/components/query/__tests__/queryTemplateRestore.spec.ts",
     "src/components/query/__tests__/CustomQueryDialog.templates.spec.ts",
+    "src/composables/useQueryEntry.ts",
+    "src/composables/__tests__/useQueryEntry.spec.ts",
+    "src/components/query/QueryEntryBanner.vue",
+    "src/components/query/__tests__/QueryEntryBanner.spec.ts",
+    "src/components/query/__tests__/queryEntryBuild.spec.ts",
+    "src/components/query/QueryDetailEntry.vue",
+    "src/components/query/__tests__/QueryDetailEntry.spec.ts",
+    "src/components/report/ReportDrilldownDialogs.vue",
+    "src/views/composables/useReportDrilldown.ts",
     "src/services/apiPaths/system.ts",
     "src/env.d.ts"
   ]

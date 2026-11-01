@@ -16,6 +16,7 @@ export const QUERY_COLUMN_LABELS: Record<string, string> = {
   // 试算 / 科目余额 / 序时账
   account_code: '科目编码', account_name: '科目名称', standard_account_code: '标准科目编码',
   opening_balance: '期初余额', closing_balance: '期末余额', debit_amount: '借方发生额', credit_amount: '贷方发生额',
+  line_amount: '发生额（借贷较大者）',
   opening_direction: '期初方向', closing_direction: '期末方向',
   // 辅助余额 / 辅助明细（advanced-query-linkage-closure 任务 21 / 22）
   aux_type: '辅助类型', aux_type_name: '辅助类型名称', aux_code: '辅助编码', aux_name: '辅助名称',

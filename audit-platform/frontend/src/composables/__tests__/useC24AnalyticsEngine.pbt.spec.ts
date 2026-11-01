@@ -150,11 +150,15 @@ describe('Feature: c23-c24-journal-entry-testing, Property 2: 借贷平衡完整
         fc.array(arbJournalEntry(), { minLength: 0, maxLength: 30 }),
         (entries) => {
           const result = calcBalanceIntegrity(entries)
-          const expectedDebit = Math.round(entries.reduce((s, e) => s + (e.debit || 0), 0) * 100) / 100
-          const expectedCredit = Math.round(entries.reduce((s, e) => s + (e.credit || 0), 0) * 100) / 100
-          expect(result.debitTotal).toBeCloseTo(expectedDebit, 2)
-          expect(result.creditTotal).toBeCloseTo(expectedCredit, 2)
-          expect(result.balanced).toBe(Math.abs(expectedDebit - expectedCredit) < 0.01)
+          // 生产输入以“每条分录金额精确到分”为契约：先逐行取分再汇总，不能先把
+          // 含亚分浮点尾差的原始值汇总后统一取整（两者在 0.005 附近并不等价）。
+          const expectedDebitCents = entries.reduce((s, e) => s + Math.round((e.debit || 0) * 100), 0)
+          const expectedCreditCents = entries.reduce((s, e) => s + Math.round((e.credit || 0) * 100), 0)
+          const expectedDebit = expectedDebitCents / 100
+          const expectedCredit = expectedCreditCents / 100
+          expect(result.debitTotal).toBe(expectedDebit)
+          expect(result.creditTotal).toBe(expectedCredit)
+          expect(result.balanced).toBe(expectedDebitCents === expectedCreditCents)
         },
       ),
       { numRuns: 100 },

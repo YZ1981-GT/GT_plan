@@ -6,6 +6,8 @@
  * （登出只清 token / user）。W3 的「系统预置」列表另用一个键（任务 43），同一组函数。
  */
 export const TEMPLATE_LIST_CACHE_KEY = 'gt:cqd:my-templates-cache'
+/** 系统预置目录与用户模板分键缓存，互不失效。 */
+export const TEMPLATE_PRESET_CACHE_KEY = 'gt:cqd:presets-cache'
 export const TEMPLATE_LIST_CACHE_TTL_MS = 5 * 60 * 1000
 
 interface CacheEnvelope<T> {

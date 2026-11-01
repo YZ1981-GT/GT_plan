@@ -45,7 +45,12 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, get_visible_project_ids, require_project_access
+from app.deps import (
+    get_current_user,
+    get_visible_project_ids,
+    require_project_access,
+    require_project_audit_year,
+)
 from app.models.core import Project, ProjectUser, User
 from app.models.custom_query_models import CustomQueryTemplate
 # 模板治理三件套在模块级 import：既是「唯一消费方」的落点，也使契约测试可对
@@ -54,6 +59,7 @@ from app.services.custom_query.template_scope_adapter import (
     NormalizedTemplateScope,
     TemplateScopeAdapter,
 )
+from app.services.custom_query import template_presets
 from app.services.custom_query.template_service import TemplateForbiddenError, TemplateInvalidError, template_service
 from app.services.custom_query.pagination import (
     MAX_LIMIT as PAGE_MAX_LIMIT,
@@ -310,7 +316,8 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 #      合并试算平衡表与合并工作底稿组、「科目明细」更名、调整分录叶子 adj_rje、试算组增辅助两叶子、叶子带 supports_conditions
 # v14：底稿组首个叶子「底稿清单」（注册表源 workpaper，骨架里也有）——页面版只加载「骨架 + 附注分支」、底稿组只留它
 #      （ADR-AQL-16，任务 29）；弹窗全量树同样多这一个叶子
-_INDICATORS_SCHEMA_VERSION = 14
+# v15：SQL 源叶子新增带 dtype 的 condition_fields，并包含不返回结果的 condition_only 计算列（任务 40）
+_INDICATORS_SCHEMA_VERSION = 15
 
 
 def _registry_columns(source: str) -> list[str]:
@@ -321,10 +328,19 @@ def _registry_columns(source: str) -> list[str]:
 
 
 def _leaf(key: str, label: str, **extra: Any) -> dict:
-    """指标树叶子：列与 ``supports_conditions`` 由注册表生成（SQL 源 = 显示列 + 可带条件；JSON 内存源 = [] + 不可带条件）。"""
+    """指标树叶子：SQL 源下发显示列与带 dtype 的可条件字段；JSON 源两者都为空。"""
     spec = resolve_source(key).spec
-    return {"key": key, "label": label, "columns": list(spec.display_keys) if spec is not None else [],
-            "supports_conditions": spec is not None, **extra}
+    return {
+        "key": key,
+        "label": label,
+        "columns": list(spec.display_keys) if spec is not None else [],
+        "condition_fields": (
+            [{"key": column.key, "dtype": column.dtype} for column in spec.condition_columns]
+            if spec is not None else []
+        ),
+        "supports_conditions": spec is not None,
+        **extra,
+    }
 
 
 def _notes_kwargs(db: AsyncSession, project_id: str | None, notes: Any) -> dict:
@@ -389,10 +405,11 @@ async def _resolve_project_template_type(db: AsyncSession, project_id: str | Non
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         return "soe"
-    proj = await db.get(Project, proj_uuid)
-    if proj and proj.template_type in _STANDARD_LABEL:
-        return proj.template_type
-    return "soe"
+    # 只投影一列（同 ``source_registry.ref_context``）：整行投影会因共享库缺任一无关新列而整体 500
+    template_type = (await db.execute(
+        select(Project.template_type).where(Project.id == proj_uuid).limit(1)
+    )).scalar_one_or_none()
+    return template_type if template_type in _STANDARD_LABEL else "soe"
 
 
 async def _resolve_project_report_scope(db: AsyncSession, project_id: str | None) -> str:
@@ -403,10 +420,10 @@ async def _resolve_project_report_scope(db: AsyncSession, project_id: str | None
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         return "standalone"
-    proj = await db.get(Project, proj_uuid)
-    if proj and proj.report_scope in ("standalone", "consolidated"):
-        return proj.report_scope
-    return "standalone"
+    scope = (await db.execute(
+        select(Project.report_scope).where(Project.id == proj_uuid).limit(1)
+    )).scalar_one_or_none()
+    return scope if scope in ("standalone", "consolidated") else "standalone"
 
 
 async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> dict | None:
@@ -506,7 +523,10 @@ async def _build_disclosure_tree(
     seed = _load_disclosure_sections(template_type)
     if not seed:
         # 降级：未读到 JSON 时返回单一通用入口
-        return [{"key": "disclosure_note", "label": "附注章节数据（通用）", "columns": [], "supports_conditions": False}]
+        return [{
+            "key": "disclosure_note", "label": "附注章节数据（通用）",
+            "columns": [], "condition_fields": [], "supports_conditions": False,
+        }]
 
     # 按 parent_section 分组（按 parent_seq 排序）
     groups: dict[str, dict] = {}
@@ -527,6 +547,7 @@ async def _build_disclosure_tree(
             "label": f"{section_id} {title}".strip(),
             "section_id": section_id,
             "columns": [],  # JSON 内存源：列随所选表（R5.7）
+            "condition_fields": [],
             "supports_conditions": False,
             "_seq": sec.get("seq", 999),
         })
@@ -1259,6 +1280,28 @@ async def template_share_targets(
     return {"project_ids": await template_share_target_ids(db, current_user)}
 
 
+@router.get("/template-presets")
+async def list_template_presets(_current_user: User = Depends(get_current_user)):
+    return {"presets": template_presets.list_presets()}
+
+
+@router.get("/template-presets/{preset_id}/resolve")
+async def resolve_template_preset(
+    preset_id: str, project_id: str, year: int | None = Query(default=None, ge=2000, le=2100),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=project_id, db=db)
+    resolved_year = await require_project_audit_year(db, project_id, year)
+    try:
+        return await template_presets.resolve(db, preset_id, project_id=project_id, year=resolved_year)
+    except template_presets.PresetNotFoundError:
+        raise HTTPException(status_code=404, detail={
+            "error_code": "TEMPLATE_PRESET_NOT_FOUND", "message": "系统预置模板不存在",
+        }) from None
+
+
 @router.post("/templates", status_code=201)
 async def create_template(
     body: TemplateCreateRequest,
@@ -1301,6 +1344,24 @@ async def create_template(
     return _serialize_template(tpl, current_user.id)
 
 
+@router.get("/templates/{template_id}/resolve")
+async def resolve_user_template(
+    template_id: str, project_id: str, year: int | None = Query(default=None, ge=2000, le=2100),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    tpl = await _load_template(db, template_id)
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=project_id, db=db)
+    resolved_year = await require_project_audit_year(db, project_id, year)
+    try:
+        resolved = await template_presets.resolve_config(db, tpl.config, project_id=project_id, year=resolved_year)
+    except ValueError as exc:
+        raise _template_invalid(TemplateInvalidError(str(exc))) from None
+    return {"config": resolved.config, "params": resolved.params, "notes": resolved.notes}
+
+
 @router.get("/templates/{template_id}")
 async def get_template(
     template_id: str,
@@ -1327,8 +1388,10 @@ async def update_template(
     # 意图，管理员改他人模板会让对方看到与自己意图不符的结果却无从察觉。
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_UPDATE"})
-    try:  # 名称与保存同一口径（去首尾空白后 1~200 字符），不合格 400 中文原因（R9.1）
+    try:  # 名称与参数目录均在任何 ORM 赋值前校验；失败保持 400 且不产生部分更新
         name = template_service.validate_name(body.name) if body.name is not None else None
+        if body.config is not None:
+            template_service.validate_config_params(body.config)
     except TemplateInvalidError as exc:
         raise _template_invalid(exc) from None
 
@@ -1398,7 +1461,6 @@ async def execute_template(
     平台统一文案）→ ``config_to_request``（唯一翻译）→ ``execute_query``。改造前年度取模板里存的值，在别的项目上
     执行会查错年度；模板没存年度时 ``year=0`` 直接 422。
     """
-    from app.deps import require_project_audit_year
     from app.services.custom_query.ownership_guard import ownership_guard
 
     tpl = await _load_template(db, template_id)
@@ -1408,9 +1470,19 @@ async def execute_template(
         raise _template_not_visible() from None
     await ownership_guard.assert_target_accessible(user=current_user, project_id=body.project_id, db=db)
     year = await require_project_audit_year(db, body.project_id, body.year)
-    try:  # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
+    try:
+        resolved = await template_presets.resolve_config(
+            db, tpl.config, project_id=body.project_id, year=year,
+        )
+        missing_param = next((item for item in resolved.params if item.get("value") is None), None)
+        if missing_param is not None:
+            raise HTTPException(status_code=400, detail={
+                "error_code": "CONDITION_VALUE_REQUIRED",
+                "message": missing_param["missing_reason"],
+            })
+        # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
         query_body = QueryRequest(**template_service.config_to_request(
-            tpl.config, project_id=body.project_id, year=year, limit=body.limit, offset=body.offset,
+            resolved.config, project_id=body.project_id, year=year, limit=body.limit, offset=body.offset,
             count_token=body.count_token, fallback_source=tpl.data_source,
         ))
     except ValidationError as exc:

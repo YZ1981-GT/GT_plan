@@ -658,8 +658,13 @@ export const customQuery = {
   export: '/api/custom-query/export',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
+  /** 解析含项目参数占位的用户模板（W3）；只在载入含 `$param` 的模板时调用。 */
+  templateResolve: (id: string) => `/api/custom-query/templates/${id}/resolve`,
   /** 按当前项目执行模板（服务端重新鉴权、可翻页；年度缺省取目标项目审计年度，R9.3） */
   templateExecute: (id: string) => `/api/custom-query/templates/${id}/execute`,
+  /** 系统预置目录与按当前项目、年度解析后的可编辑配置（W3）。 */
+  templatePresets: '/api/custom-query/template-presets',
+  templatePresetResolve: (id: string) => `/api/custom-query/template-presets/${id}/resolve`,
   /** 「保存为模板」里「指定项目共享」可选的项目（与保存时逐项目 edit 鉴权同一口径，AQ-39） */
   templateShareTargets: '/api/custom-query/template-share-targets',
 } as const

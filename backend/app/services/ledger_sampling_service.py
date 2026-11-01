@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.audit_platform_models import TbAuxLedger, TbLedger, WorkpaperExtractionLog
 from app.services.dataset_query import get_active_filter
@@ -407,6 +408,19 @@ class CutoffExtractRequest(BaseModel):
 # ─── Service ──────────────────────────────────────────────────────────────────
 
 
+def ledger_line_amount(table: sa.Table) -> ColumnElement:
+    """序时账单行金额：借方与贷方金额取较大者，并保留原 Numeric 类型。
+
+    ``type_`` 不能省略：该表达式登记为高级查询条件列后，值转换依赖
+    ``python_type``；NullType 会让字符串阈值以 varchar 绑定并在 PG 上报类型错误。
+    """
+    return sa.func.greatest(
+        sa.func.coalesce(table.c.debit_amount, 0),
+        sa.func.coalesce(table.c.credit_amount, 0),
+        type_=table.c.debit_amount.type,
+    )
+
+
 class LedgerSamplingService:
     """通用序时账条件查询服务
 
@@ -470,22 +484,14 @@ class LedgerSamplingService:
         # 金额阈值：GREATEST(COALESCE(debit_amount,0), COALESCE(credit_amount,0)) >= threshold
         if filters.amount_threshold > 0:
             stmt = stmt.where(
-                sa.func.greatest(
-                    sa.func.coalesce(TbLedger.debit_amount, 0),
-                    sa.func.coalesce(TbLedger.credit_amount, 0),
-                )
-                >= filters.amount_threshold
+                ledger_line_amount(TbLedger.__table__) >= filters.amount_threshold
             )
 
         # 金额上限：GREATEST(COALESCE(debit,0), COALESCE(credit,0)) <= amount_max
         # 与 amount_threshold 口径一致（不取绝对值），此前前端传了但后端从不消费。
         if filters.amount_max is not None and filters.amount_max > 0:
             stmt = stmt.where(
-                sa.func.greatest(
-                    sa.func.coalesce(TbLedger.debit_amount, 0),
-                    sa.func.coalesce(TbLedger.credit_amount, 0),
-                )
-                <= filters.amount_max
+                ledger_line_amount(TbLedger.__table__) <= filters.amount_max
             )
 
         # 离散会计月份过滤：EXTRACT(MONTH FROM voucher_date) IN (months)

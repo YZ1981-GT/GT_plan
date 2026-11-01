@@ -12,6 +12,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const mockGet = vi.fn()
 const mockPost = vi.fn()
@@ -59,6 +62,30 @@ import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 import { resetQueryBuilderAccessCache } from '@/composables/useQueryBuilderAccess'
 import { useAuthStore } from '@/stores/auth'
 
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+function pythonFrozensetMembers(name: string): string[] {
+  const source = readFileSync(resolve(
+    HERE, '../../../../../backend/app/services/custom_query/table_whitelist.py',
+  ), 'utf-8')
+  const marker = source.indexOf(`${name}:`)
+  expect(marker).toBeGreaterThanOrEqual(0)
+  const start = source.indexOf('(', marker)
+  let depth = 0
+  let end = -1
+  for (let index = start; index < source.length; index += 1) {
+    if (source[index] === '(') depth += 1
+    else if (source[index] === ')') {
+      depth -= 1
+      if (depth === 0) { end = index + 1; break }
+    }
+  }
+  expect(end).toBeGreaterThan(start)
+  return [...source.slice(start, end).matchAll(/"([a-z_]+)"/g)].map((match) => match[1]).sort()
+}
+
+const BUILDER_UI_OPERATORS = pythonFrozensetMembers('BUILDER_UI_OPERATORS')
+
 const FIXTURE_SCHEMA = {
   tables: [
     {
@@ -75,11 +102,7 @@ const FIXTURE_SCHEMA = {
       fields: ['id', 'project_id', 'adjustment_no', 'description'],
     },
   ],
-  operators: [
-    'eq', 'neq', 'gt', 'gte', 'lt', 'lte',
-    'like', 'not_like', 'in', 'not_in',
-    'is_null', 'is_not_null', 'between',
-  ],
+  operators: BUILDER_UI_OPERATORS,
   aggregates: ['count', 'sum', 'avg', 'min', 'max'],
 }
 
@@ -123,6 +146,44 @@ describe('AdvancedQueryBuilder — schema 加载', () => {
     // 改造前副标题写死「仅 admin / manager / partner 可访问」（漏了项目经理）：现在显示接口给的原因
     expect(wrapper.text()).not.toContain('admin / manager')
     expect(wrapper.find('[data-testid="aqb-subtitle"]').text()).toContain('含任一项目的项目经理')
+  })
+
+  it('构建器按后端字面量 13 项渲染，且每个算子都有非键名标签', async () => {
+    expect(BUILDER_UI_OPERATORS).toHaveLength(13)
+    expect(BUILDER_UI_OPERATORS).not.toContain('starts_with')
+    mockGet.mockResolvedValue(FIXTURE_SCHEMA)
+    const wrapper = mount(AdvancedQueryBuilder, {
+      global: {
+        stubs: {
+          'el-select': { template: '<div><slot /></div>' },
+          'el-option': {
+            props: ['label', 'value'],
+            template: '<i class="operator-option" :data-label="label" :data-value="value" />',
+          },
+          'el-form': { template: '<form><slot /></form>' },
+          'el-form-item': { template: '<div><slot /></div>' },
+          'el-checkbox-group': true,
+          'el-checkbox': true,
+          'el-radio-group': true,
+          'el-radio-button': true,
+          'el-button': { template: '<button><slot /></button>' },
+          'el-input': true,
+          'el-input-number': true,
+          'el-table': true,
+          'el-table-column': true,
+        },
+      },
+    })
+    await flushPromises()
+    const vm: any = wrapper.vm
+    vm.dsl.table = 'trial_balance'
+    vm.addFilter()
+    await flushPromises()
+    const rendered = wrapper.findAll('.operator-option')
+      .map((option) => ({ value: option.attributes('data-value') || '', label: option.attributes('data-label') || '' }))
+      .filter((option) => BUILDER_UI_OPERATORS.includes(option.value))
+    expect(rendered.map((option) => option.value).sort()).toEqual(BUILDER_UI_OPERATORS)
+    expect(rendered.every((option) => option.label && option.label !== option.value)).toBe(true)
   })
 })
 

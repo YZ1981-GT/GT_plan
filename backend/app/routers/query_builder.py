@@ -57,8 +57,8 @@ from app.services.custom_query.execution_guard import (
 )
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
+    BUILDER_UI_OPERATORS,
     JOIN_WHITELIST,
-    OPERATOR_WHITELIST,
     PII_ALLOWED_ROLES,
     TABLE_WHITELIST,
     visible_fields_for_role,
@@ -180,7 +180,7 @@ async def get_schema(
             }
             for name, meta in TABLE_WHITELIST.items()
         ],
-        "operators": sorted(OPERATOR_WHITELIST),
+        "operators": sorted(BUILDER_UI_OPERATORS),
         "aggregates": sorted(AGGREGATE_WHITELIST),
     }
 

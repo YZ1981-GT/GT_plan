@@ -30,6 +30,7 @@ from app.services.custom_query import count_token as count_tokens
 from app.services.custom_query.execution_guard import EXPORT_TIMEOUT_MS, QUERY_TIMEOUT_MS, cancellable_query
 from app.services.custom_query.pagination import FETCH_HARD_CAP, _reject_sort_direction, _reject_sort_field
 from app.services.custom_query.param_sql_builder import ParamSQLBuilder, build_portable_filter
+from app.services.custom_query.entry_filters import entry_accounts_of, entry_warnings
 from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage
 from app.services.custom_query.source_registry import (
     FetchContext,
@@ -57,8 +58,37 @@ def _is_blank(value: Any) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-def _filter_predicates(spec: SourceSpec, filters: Mapping[str, Any]) -> list[Any]:
-    """旧 ``filters`` 字典 → 谓词。空值（None / 空串）视为未填，与旧取数器 ``if filters.get(k)`` 同口径。"""
+#: 这些算子本身不带值（空值不算漏填）
+_NO_VALUE_CONDITION_OPS = frozenset({"is_null", "is_not_null", "is_blank"})
+
+
+def _contains_unresolved_param(value: Any) -> bool:
+    """未解析的 ``{"$param": ...}`` 不得作为普通字面值进入 SQL。"""
+    if isinstance(value, Mapping):
+        return "$param" in value or any(_contains_unresolved_param(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_unresolved_param(v) for v in value)
+    return False
+
+
+def _condition_value_missing(op: str, value: Any) -> bool:
+    if op in _NO_VALUE_CONDITION_OPS:
+        return False
+    if _contains_unresolved_param(value) or _is_blank(value):
+        return True
+    if op == "between" and isinstance(value, (list, tuple)) and len(value) == 2:
+        return any(_is_blank(endpoint) for endpoint in value)
+    if op == "weekday_in" and isinstance(value, (list, tuple)) and not value:
+        return True
+    # ADR-AQL-03：in / not_in 空集合有明确恒假 / 恒真语义，不当作漏填。
+    return False
+
+
+async def _filter_predicates(spec: SourceSpec, ctx: FetchContext, filters: Mapping[str, Any]) -> list[Any]:
+    """旧 ``filters`` 字典 → 谓词。空值（None / 空串）视为未填，与旧取数器 ``if filters.get(k)`` 同口径。
+
+    带 ``resolver`` 的键（W6 业务对象键）自己产生谓词：可以收多值，也可能查库，所以整个函数是异步的。
+    """
     by_key = {fk.key: fk for fk in spec.filter_keys}
     clauses: list[Any] = []
     for key, value in filters.items():
@@ -73,6 +103,9 @@ def _filter_predicates(spec: SourceSpec, filters: Mapping[str, Any]) -> list[Any
                 filter_key=key, allowed=allowed,
             )
         if _is_blank(value):
+            continue
+        if fk.resolver is not None:
+            clauses.append(await fk.resolver(ctx, value))
             continue
         if isinstance(value, (dict, list, tuple, set)):
             raise _bad_request("INVALID_FILTER_VALUE", f"筛选键「{key}」的值必须是单个值", filter_key=key)
@@ -92,8 +125,8 @@ def _filter_predicates(spec: SourceSpec, filters: Mapping[str, Any]) -> list[Any
 
 
 def _condition_where(spec: SourceSpec, conditions: Sequence[Mapping[str, Any]], logic: str) -> Any:
-    """结构化条件（字段、算子、值 + and / or）→ 单个参数化谓词；字段只认可作条件的显示列。"""
-    conditionable = {c.key: c for c in spec.columns if c.conditionable}
+    """结构化条件（字段、算子、值 + and / or）→ 参数化谓词；含条件专用计算列。"""
+    conditionable = {c.key: c for c in spec.condition_columns}
     triples: list[tuple[Any, str, Any]] = []
     for cond in conditions:
         field = str(cond.get("field") or "")
@@ -111,6 +144,10 @@ def _condition_where(spec: SourceSpec, conditions: Sequence[Mapping[str, Any]], 
                 "OP_NOT_ALLOWED", f"条件「{field}」的算子「{op}」不在白名单中",
                 field=field, allowed_ops=sorted(OPERATOR_WHITELIST),
             )
+        if _condition_value_missing(op, value):
+            reason = cond.get("missing_reason")
+            message = reason.strip() if isinstance(reason, str) and reason.strip() else f"条件「{field}」未填写值"
+            raise _bad_request("CONDITION_VALUE_REQUIRED", message, field=field)
         if op in ("in", "not_in") and isinstance(value, (list, tuple)) and len(value) > MAX_IN_VALUES:
             raise _bad_request("INVALID_IN_VALUE", f"条件「{field}」的取值不能超过 {MAX_IN_VALUES} 个", field=field)
         triples.append((column.expr, op, value))
@@ -155,7 +192,7 @@ async def build_statement(
     ):
         raise _bad_request("AUX_FILTER_REQUIRED", "辅助明细请先按科目或辅助类型筛选")
     display, hidden = _select_columns(spec, columns)
-    filter_clauses = _filter_predicates(spec, filters)
+    filter_clauses = await _filter_predicates(spec, ctx, filters)
     condition_clause = _condition_where(spec, conditions, logic)
     where = [*await spec.base_where(ctx), *filter_clauses]
     if condition_clause is not None:
@@ -214,7 +251,15 @@ async def _page_meta(ctx: FetchContext, display: Sequence[SourceColumn]) -> dict
     ``columns`` 仍是字符串数组（N3 不变），前端金额格式化按这里的类型判定（任务 28 / 29：原先按字符串长度猜，
     十亿以上带两位小数的金额不加千分位）。
     """
-    return {"ref_context": await ref_context(ctx), "column_types": {c.key: c.dtype for c in display}}
+    meta: dict[str, Any] = {
+        "ref_context": await ref_context(ctx),
+        "column_types": {c.key: c.dtype for c in display},
+    }
+    # W6（ADR-AQL-20）：业务对象键解析出的科目码，供弹窗横幅显示；没有这类筛选时不出现这个键
+    resolved = entry_accounts_of(ctx)
+    if resolved:
+        meta["entry_accounts"] = resolved
+    return meta
 
 
 def _count_statement(stmt: Select) -> Select:
@@ -270,7 +315,7 @@ async def page(
         stmt, display = await build_statement(spec, ctx, conditions=conditions, logic=logic, columns=columns)
         total, next_count_token, count_reused = await _count_page(ctx, stmt, reuse_token=count_token)
         rows = _rows(await ctx.db.execute(stmt.order_by(*order).limit(limit).offset(offset)))
-        warnings = await spec.warn(ctx) if spec.warn else []
+        warnings = [*(await spec.warn(ctx) if spec.warn else []), *entry_warnings(ctx)]
         meta = await _page_meta(ctx, display)
         meta.update(count_token=next_count_token, count_reused=count_reused)
     return FetchPage(rows=rows, columns=_column_meta(display), total=total, paged=True, meta=meta, warnings=warnings)
@@ -296,7 +341,7 @@ async def all_rows(
                 row_count=total, limit=cap,
             )
         rows = _rows(await ctx.db.execute(stmt.order_by(*_order_by(spec, ()))))
-        warnings = await spec.warn(ctx) if spec.warn else []
+        warnings = [*(await spec.warn(ctx) if spec.warn else []), *entry_warnings(ctx)]
         meta = await _page_meta(ctx, display)
     return FetchPage(rows=rows, columns=_column_meta(display), total=len(rows), paged=False, meta=meta, warnings=warnings)
 
@@ -329,7 +374,7 @@ async def prepare_stream(
     order = _order_by(spec, sort)
     async with cancellable_query(ctx.db, EXPORT_TIMEOUT_MS):
         stmt, display = await build_statement(spec, ctx, conditions=conditions, logic=logic, columns=columns)
-        warnings = await spec.warn(ctx) if spec.warn else []
+        warnings = [*(await spec.warn(ctx) if spec.warn else []), *entry_warnings(ctx)]
     return StreamPlan(spec=spec, ctx=ctx, stmt=stmt, order=order, columns=_column_meta(display), warnings=warnings)
 
 

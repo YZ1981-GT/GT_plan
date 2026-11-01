@@ -4,7 +4,7 @@
  * 覆盖两套入口全链路，断言中文场景全链路不崩：
  *   业务视图查询（CustomQuery.vue / CustomQueryTab.vue，/custom-query，所有角色）
  *   高级构建器（AdvancedQueryBuilder.vue，admin/manager/partner）
- *   链路：选字段（ACNR 地址树）→ 查询 → 分组 → 透视/转置 → 导出 → 下钻（GtIndexChip）→ 回写预览确认
+ *   链路：选字段（ACNR 地址树）→ 查询 → 分组 → 透视/转置 → 导出 → 下钻（GtIndexChip）
  *
  * _Requirements: 2.1, 4.2, 5.2, 6.1, 7.1, 14.1, 14.2_
  *
@@ -23,8 +23,8 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 
-const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:3030'
-const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:9980'
+const FRONTEND = process.env.E2E_BASE_URL || 'http://127.0.0.1:3030'
+const BACKEND = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:9980'
 
 // 已知良性前端异常（非崩溃信号），从「致命异常」判定中剔除
 const BENIGN_ERROR_PATTERNS = [
@@ -249,23 +249,20 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
     expect(fatal, `致命前端异常：\n${fatal.join('\n')}`).toEqual([])
   })
 
-  test('回写预览确认：cell-writeback 端点已接线并做前置校验（R14.1/14.2）', async ({ page }) => {
-    // 回写走后端 snapshot_writer（乐观锁 + 预览/确认窗口 + 无审计不回写）。
-    // UI 未直接暴露回写按钮，此处以 API 冒烟验证回写链路已接线且做前置校验（不崩、不静默写入）：
-    // 缺少 X-File-Opened-At 头 → 400（乐观锁前置校验存在，等价「需先预览再确认」的守卫）。
-    const resp = await page.request.post(`${BACKEND}/api/custom-query/cell-writeback`, {
-      data: {
-        project_id: '00000000-0000-0000-0000-000000000000',
-        wp_code: 'D2',
-        sheet_name: '审定表D2-1',
-        cell_ref: 'B7',
-        new_value: 1,
-        module: 'workpaper',
-      },
-    })
-    // 端点存在且拒绝无预览/无归属的裸写：不得 404/500 崩溃；应为 4xx 校验类响应
-    expect(resp.status(), '回写端点应存在并做前置校验').toBeGreaterThanOrEqual(400)
-    expect(resp.status()).toBeLessThan(500)
+  test('旧写回端点返回稳定 410，不触达请求体或鉴权依赖（阶段 0 安全收口）', async ({ page }) => {
+    const endpoints = [
+      '/api/custom-query/cell-writeback',
+      '/api/custom-query/writeback-preview',
+      '/api/custom-query/writeback-confirm',
+    ]
+    for (const endpoint of endpoints) {
+      const resp = await page.request.post(`${BACKEND}${endpoint}`, { data: { malformed: true } })
+      expect(resp.status(), `${endpoint} 应保留兼容路径并返回 410`).toBe(410)
+      const body = await resp.json()
+      const detail = body?.detail ?? body?.message ?? body?.data ?? body
+      expect(detail?.error_code).toBe('ADVANCED_QUERY_WRITEBACK_RETIRED')
+      expect(String(detail?.message || '')).toContain('高级查询写回已下线')
+    }
   })
 
   test('中文场景全链路：切换两入口后无致命前端异常且视图存活（R2.1/4.2/5.2/6.1/7.1/14.1）', async ({ page }) => {

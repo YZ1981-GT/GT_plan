@@ -566,6 +566,10 @@ export interface ReportDrilldownData {
   row_code: string
   row_name: string
   formula: string
+  /** W6（ADR-AQL-20）：行级「按此查询明细」要的报表类型、年度与项目；年度 = 本次穿透请求用的那一个 */
+  report_type?: string
+  year?: number
+  project_id?: string
   accounts: Array<{
     code: string
     name: string

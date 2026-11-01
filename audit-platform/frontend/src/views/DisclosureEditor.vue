@@ -1066,10 +1066,9 @@
     <div class="gt-ucell-ctx-item" @click="onDeCtxRelatedWp">
       <span class="gt-ucell-ctx-icon">📝</span> 查看相关底稿
     </div>
-    <!-- R9-F5：穿透到序时账 -->
-    <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger">
-      <span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账
-    </div>
+    <!-- R9-F5：穿透到序时账；并列 W6 行级入口（ADR-AQL-20，年度取页面所显示的年度、页内切年随之变） -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger"><span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账</div>
+    <QueryDetailEntry kind="note_section" variant="ctx" :target="currentNote" :year="year" @opened="deCtx.closeContextMenu()" />
     <!-- Sprint 5.7：查看数据来源 -->
     <div class="gt-ucell-ctx-item" @click="onDeCtxViewDataSource">
       <span class="gt-ucell-ctx-icon">🔍</span> 查看数据来源
@@ -1219,6 +1218,7 @@ import { useCellSelection } from '@/composables/useCellSelection'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import GtGridCell from '@/components/grid/GtGridCell.vue'
 import { ElInput, ElInputNumber } from '@/components/grid/adapters'

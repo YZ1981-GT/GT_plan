@@ -216,6 +216,15 @@ def unresolved_params(config: Any) -> list[str]:
     return [name for cond in conditions if isinstance(cond, dict) for name in _param_names(cond.get("value"))]
 
 
+def validate_registered_params(config: Any) -> None:
+    """保存前只允许参数目录中登记的占位名。"""
+    from app.services.custom_query.template_presets import PARAM_NAMES
+
+    unknown = next((name for name in unresolved_params(config) if name not in PARAM_NAMES), None)
+    if unknown is not None:
+        raise TemplateInvalidError(f"模板参数「{unknown}」未登记")
+
+
 def _validate_name(name: Any) -> str:
     """校验名称长度（1–200 字符）；非法 → TemplateInvalidError。
 
@@ -268,6 +277,7 @@ class TemplateService:
         """
         # ── 校验（在任何 db 写入之前，保证不建部分记录）──
         clean_name = _validate_name(name)
+        validate_registered_params(config)
         try:
             normalized = TemplateScopeAdapter.normalize(
                 scope, shared_project_ids, config_project_id=(config or {}).get("project_id")
@@ -371,6 +381,11 @@ class TemplateService:
     def validate_name(name: Any) -> str:
         """模板名称校验（去首尾空白后 1–200 字符），非法 → ``TemplateInvalidError``；更新模板时同一口径。"""
         return _validate_name(name)
+
+    @staticmethod
+    def validate_config_params(config: Any) -> None:
+        """保存与更新共用的参数目录校验。"""
+        validate_registered_params(config)
 
     @staticmethod
     def config_to_request(

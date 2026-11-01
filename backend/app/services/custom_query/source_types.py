@@ -71,6 +71,9 @@ class FilterKey:
     op: FilterOp
     #: 取值归一（如调整类型 AJE / RCL → 枚举小写值）；取值非法时抛 400
     normalize: Callable[[Any], Any] | None = None
+    #: W6 业务对象键（底稿编码、报表行、附注章节、多值科目）：自己查库 / 查映射并返回谓词，
+    #: 不走 ``build_portable_filter``（``op`` 对这些键无意义，只保留作声明）。可以收多值。
+    resolver: Callable[[FetchContext, Any], Awaitable[ColumnElement]] | None = None
 
 
 @dataclass
@@ -140,6 +143,8 @@ class SourceSpec:
     filter_keys: tuple[FilterKey, ...]
     default_sort: tuple[tuple[str, str], ...]
     unique_key: str  # hidden 中的唯一列
+    #: 只可作结构化条件的计算列：不返回、不导出、不可排序，也不进入 ``display_keys``
+    condition_only: tuple[SourceColumn, ...] = ()
     required_filters: tuple[frozenset[str], ...] = ()
     tree_scope: Literal["any", "standalone", "consolidated"] = "any"
     warn: WarnBuilder | None = None
@@ -151,10 +156,17 @@ class SourceSpec:
     fixed_filters: tuple[tuple[str, Any], ...] = ()
 
     def column(self, key: str) -> SourceColumn | None:
-        for col in (*self.columns, *self.hidden):
+        for col in (*self.columns, *self.hidden, *self.condition_only):
             if col.key == key:
                 return col
         return None
+
+    @property
+    def condition_columns(self) -> tuple[SourceColumn, ...]:
+        """可作结构化条件的显示列与条件专用列；隐藏列始终不对用户开放。"""
+        return tuple(c for c in self.columns if c.conditionable) + tuple(
+            c for c in self.condition_only if c.conditionable
+        )
 
     @property
     def display_keys(self) -> list[str]:

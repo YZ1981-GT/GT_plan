@@ -374,6 +374,7 @@
       :initial-tab="customQueryContext.initialTab"
       :initial-source="customQueryContext.initialSource"
       :initial-notice="customQueryContext.initialNotice"
+      :entry="customQueryEvent?.entry ?? null"
     />
 
     <!-- 全局快捷键帮助面板 [R7-S2-12] -->

@@ -56,11 +56,53 @@ def escape_like(value: Any) -> str:
     return str(value).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def blank_predicate(col: Column) -> ColumnElement:
+def _prefix_predicate(col: Column, value: Any) -> ColumnElement:
+    """字面前缀匹配；用户提供的 LIKE 元字符先转义，只追加实现自己的末尾通配符。"""
+    return col.like(f"{escape_like(value)}%", escape=LIKE_ESCAPE)
+
+
+def _weekday_predicate(col: Column, value: Any) -> ColumnElement:
+    """按星期筛日期列；0=周日，1..6=周一至周六，全部值保持绑定参数。"""
+    try:
+        py_type = col.type.python_type
+    except (NotImplementedError, AttributeError):
+        py_type = None
+    if py_type not in (_dt.date, _dt.datetime):
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": "WEEKDAY_FIELD_INVALID", "message": "星期条件只能用于日期字段"},
+        )
+    valid = (
+        isinstance(value, (list, tuple))
+        and 1 <= len(value) <= 7
+        and all(type(item) is int and 0 <= item <= 6 for item in value)
+        and len(set(value)) == len(value)
+    )
+    if not valid:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "INVALID_WEEKDAY_VALUE",
+                "message": "星期条件要求 1 至 7 个不重复的 0 至 6 整数（0 表示周日）",
+            },
+        )
+    return func.extract("dow", col).in_(list(value))
+
+
+def _blank_predicate(col: Column) -> ColumnElement:
     """「为空或空白」：``col IS NULL OR trim(col, :blank_chars) = ''``（PG 16 与 SQLite 同形）。
 
     只含空白的值也算「没有」是有意的（与 C24 规则 13 的 ``!summary || summary.trim() === ''`` 同一判断）。
     """
+    try:
+        py_type = col.type.python_type
+    except (NotImplementedError, AttributeError):
+        py_type = None
+    if py_type is not str:
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": "BLANK_FIELD_INVALID", "message": "「为空或空白」只能用于文本字段"},
+        )
     return or_(col.is_(None), func.trim(col, literal(BLANK_CHARS, String)) == "")
 
 
@@ -223,18 +265,25 @@ def build_filter(col: Column, op: str, value: Any) -> ColumnElement:
         hi = coerce_value(col, value[1])
         return col.between(lo, hi)
 
-    # ── IS NULL / IS NOT NULL（忽略 value）──
+    if op == "weekday_in":
+        return _weekday_predicate(col, value)
+
+    # ── 无值算子（忽略 value）──
     if op == "is_null":
         return col.is_(None)
     if op == "is_not_null":
         return col.isnot(None)
+    if op == "is_blank":
+        return _blank_predicate(col)
 
-    # ── LIKE / NOT LIKE（强制字符串语义，不 coerce）──
+    # ── LIKE / NOT LIKE / 字面前缀（强制字符串语义，不 coerce）──
     # 用户输入里的 % _ \ 按字面匹配（R6.2）：改造前「包含 50%_」会把 % _ 当通配符
     if op == "like":
         return col.like(f"%{escape_like(value)}%", escape=LIKE_ESCAPE)
     if op == "not_like":
         return col.notlike(f"%{escape_like(value)}%", escape=LIKE_ESCAPE)
+    if op == "starts_with":
+        return _prefix_predicate(col, value)
 
     # ── 标量比较：eq / neq / gt / gte / lt / lte ──
     coerced = coerce_value(col, value)
@@ -263,8 +312,9 @@ def build_portable_filter(col: Column, op: str, value: Any, *, allow_internal: b
 
     - ``in`` / ``not_in``：``in_`` / ``notin_``（SQLAlchemy 2.x expanding bindparam，asyncpg 下同样参数化），
       空集合恒假 / 恒真、不报错（R10.3）——构建器端点测试在 SQLite 上真实执行，SQLite 没有 ``ANY``。
-    - ``prefix`` / ``nonempty``：只供注册表旧筛选键（``allow_internal=True``）。``prefix`` = 转义后
-      ``LIKE value || '%'``；``nonempty`` 值为真 = 非「为空或空白」，为假 = 「为空或空白」（:func:`blank_predicate`）。
+    - ``prefix`` / ``nonempty``：只供注册表旧筛选键（``allow_internal=True``）。``prefix`` 与用户
+      ``starts_with`` 共用 :func:`_prefix_predicate`；``nonempty`` 值为真 = 非「为空或空白」，为假 =
+      「为空或空白」，与用户 ``is_blank`` 共用 :func:`_blank_predicate`。
     - 其余算子委托 :func:`build_filter`（含白名单校验：用户条件只认 ``OPERATOR_WHITELIST``）。
     """
     if op in INTERNAL_OPERATORS:
@@ -278,8 +328,8 @@ def build_portable_filter(col: Column, op: str, value: Any, *, allow_internal: b
                 },
             )
         if op == "prefix":
-            return col.like(f"{escape_like(value)}%", escape=LIKE_ESCAPE)
-        blank = blank_predicate(col)
+            return _prefix_predicate(col, value)
+        blank = _blank_predicate(col)
         return not_(blank) if _truthy(value) else blank
     if op in ("in", "not_in"):
         if not isinstance(value, (list, tuple)):

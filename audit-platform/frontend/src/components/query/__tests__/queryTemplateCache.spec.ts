@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   TEMPLATE_LIST_CACHE_KEY,
   TEMPLATE_LIST_CACHE_TTL_MS,
+  TEMPLATE_PRESET_CACHE_KEY,
   invalidateTemplateCache,
   readTemplateCache,
   writeTemplateCache,
@@ -42,9 +43,9 @@ describe('queryTemplateCache', () => {
 
   it('独立键互不影响（W3 系统预置列表用另一个键）', () => {
     writeTemplateCache(ITEMS, { owner: 'u1', now: T0 })
-    writeTemplateCache([{ id: 'je_weekend' }], { owner: 'u1', key: 'gt:cqd:presets-cache', now: T0 })
-    invalidateTemplateCache({ key: 'gt:cqd:presets-cache' })
+    writeTemplateCache([{ id: 'je_weekend' }], { owner: 'u1', key: TEMPLATE_PRESET_CACHE_KEY, now: T0 })
+    invalidateTemplateCache({ key: TEMPLATE_PRESET_CACHE_KEY })
     expect(readTemplateCache({ owner: 'u1', now: T0 + 1 })).toEqual(ITEMS)
-    expect(readTemplateCache({ owner: 'u1', key: 'gt:cqd:presets-cache', now: T0 + 1 })).toBeNull()
+    expect(readTemplateCache({ owner: 'u1', key: TEMPLATE_PRESET_CACHE_KEY, now: T0 + 1 })).toBeNull()
   })
 })

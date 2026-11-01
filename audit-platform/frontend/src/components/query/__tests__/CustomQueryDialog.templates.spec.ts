@@ -45,6 +45,8 @@ vi.mock('element-plus', async () => {
 import ElementPlus from 'element-plus'
 import CustomQueryDialog from '../CustomQueryDialog.vue'
 import MyTemplatesDialog from '../MyTemplatesDialog.vue'
+import QueryConditionEditor from '../QueryConditionEditor.vue'
+import QueryTemplateSaveDialog from '../QueryTemplateSaveDialog.vue'
 
 const TPL = {
   id: 't-big', name: '【测试】大额凭证', data_source: 'ledger_entries', scope: 'private', is_owner: true,
@@ -53,6 +55,20 @@ const TPL = {
     sort_field: 'debit_amount', sort_order: 'desc', page_size: 200 },
   updated_at: '2026-10-29T01:00:00',
 }
+const PRESET_ITEM = {
+  id: 'je_large_amount', name: '大额分录', data_source: 'ledger_entries', config: null,
+  scope: 'system', is_owner: false, read_only: true,
+}
+const PARAM_CONFIG = {
+  source: 'ledger_entries', condition_logic: 'and',
+  conditions: [{ field: 'line_amount', op: 'gte', value: '1000000', params: ['materiality_performance'] }],
+  selected_columns: ['voucher_no', 'debit_amount'],
+}
+const MISSING_CONFIG = {
+  ...PARAM_CONFIG,
+  conditions: [{ field: 'line_amount', op: 'gte', value: '', params: ['materiality_performance'] }],
+}
+const MISSING_REASON = '本项目 2025 年度未设置重要性水平，请填写阈值'
 const RESULT = {
   rows: [{ voucher_no: '0223', debit_amount: 241944666.92 }], columns: ['voucher_no', 'debit_amount'], total: 450, meta: {},
 }
@@ -97,7 +113,9 @@ describe('「📑 模板」（R9.3、R9.4）', () => {
     $('[data-testid="cq-templates"]')!.click()
     await flushPromises()
     const picker = w.findComponent(MyTemplatesDialog)
-    expect(picker.props()).toMatchObject({ modelValue: true, allowRun: true, runBlockedReason: '' })
+    expect(picker.props()).toMatchObject({
+      modelValue: true, allowRun: true, runBlockedReason: '', projectId: 'p1', year: 2025,
+    })
     expect(document.body.querySelectorAll('[data-testid="mtd-item"]')).toHaveLength(1)
   })
 
@@ -157,5 +175,51 @@ describe('「📑 模板」（R9.3、R9.4）', () => {
     await flushPromises()
     expect(w.findComponent(MyTemplatesDialog).props('runBlockedReason')).toBe('请先选择项目')
     expect((document.body.querySelector('[data-testid="mtd-run"]') as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+describe('W3 resolved 模板与可编辑条件', () => {
+  it('载入缺失重要性参数后不自动查询；查询与保存均禁用并显示具体原因', async () => {
+    const w = await mountDialog()
+    const picker = w.findComponent(MyTemplatesDialog)
+    picker.vm.$emit('load', MISSING_CONFIG, PRESET_ITEM, [MISSING_REASON])
+    await flushPromises()
+    expect(posts('/api/custom-query/execute')).toHaveLength(0)
+    expect(w.findComponent(QueryConditionEditor).props('notices')).toEqual([MISSING_REASON])
+    expect(w.vm.conditionState.conditions[0]).toMatchObject({ value: '', params: ['materiality_performance'] })
+    expect(w.vm.queryBlockedReason).toBe('条件「发生额（借贷较大者）」未填写值')
+    expect(w.vm.saveBlockedReason).toBe('条件「发生额（借贷较大者）」未填写值')
+    expect(($('[data-testid="cq-run"]') as HTMLButtonElement).disabled).toBe(true)
+    expect(($('[data-testid="cq-save-template"]') as HTMLButtonElement).disabled).toBe(true)
+    expect(document.body.textContent).toContain(MISSING_REASON)
+  })
+
+  it('保存配置把未改参数还原为 $param；用户改值后保存当前字面值', async () => {
+    const w = await mountDialog()
+    const picker = w.findComponent(MyTemplatesDialog)
+    picker.vm.$emit('load', PARAM_CONFIG, PRESET_ITEM, ['当前阈值：1,000,000.00 元'])
+    await flushPromises()
+    expect(w.vm.templateConfig.conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: { $param: 'materiality_performance' } },
+    ])
+    w.findComponent(QueryConditionEditor).vm.$emit('update:modelValue', {
+      conditions: [{ field: 'line_amount', op: 'gte', value: '2000000' }], logic: 'and',
+    })
+    await flushPromises()
+    expect(w.vm.templateConfig.conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: '2000000' },
+    ])
+  })
+
+  it('系统预置另存先载入但不查询，再以“预置名（我的）”打开既有保存对话框', async () => {
+    const w = await mountDialog()
+    w.findComponent(MyTemplatesDialog).vm.$emit('save-as', PARAM_CONFIG, PRESET_ITEM, ['当前阈值：1,000,000.00 元'])
+    await flushPromises()
+    expect(posts('/api/custom-query/execute')).toHaveLength(0)
+    const save = w.findComponent(QueryTemplateSaveDialog)
+    expect(save.props()).toMatchObject({ modelValue: true, defaultName: '大额分录（我的）', dataSource: 'ledger_entries' })
+    expect(w.vm.templateConfig.conditions).toEqual([
+      { field: 'line_amount', op: 'gte', value: { $param: 'materiality_performance' } },
+    ])
   })
 })

@@ -13,6 +13,7 @@ import type { SSEEventType } from '@/types/sse'
 import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
 import type { WorkpaperCapabilitySnapshot } from '@/shell/formula/workpaperCapabilitySnapshot'
 import type { FormulaManagerSession } from '@/shell/formula/openFormulaManagerCommand'
+import type { QueryEntryRequest } from '@/components/query/queryEntryContext'
 
 // Re-export SSEEventType for convenience
 export type { SSEEventType } from '@/types/sse'
@@ -566,7 +567,10 @@ export type Events = {
   }
 
   // 全局打开自定义查询（Dashboard 快捷操作 / 侧栏 / 模板页 → ThreeColumnLayout 打开弹窗）
-  'open-custom-query': { tab?: 'basic' | 'advanced'; source?: string; project_id?: string } | undefined
+  // entry：业务页行级「按此查询明细」的上下文（W6，ADR-AQL-20；由 queryEntryContext.buildQueryEntry 生成）
+  'open-custom-query': {
+    tab?: 'basic' | 'advanced'; source?: string; project_id?: string; entry?: QueryEntryRequest
+  } | undefined
 
   // 年度切换（R8-S1-04）
   'year:changed': YearChangedPayload
