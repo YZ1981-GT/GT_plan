@@ -187,7 +187,7 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     # 抽凭、挂凭、挂凭回拉生成的行按 current_audit_phase 标阶段；改动只走
     # PUT /api/projects/{id}/audit-phase（经理、合伙人含签字合伙人、admin），写 app_audit_log。
 
-    # V233（platform-global-display-settings-closure 任务 1A）：项目默认金额单位。
+    # V235（platform-global-display-settings-closure 任务 1A）：项目默认金额单位。
     # 正式导出以此为底；「跟随项目」的用户显示偏好读此值。三值枚举，默认元。
     amount_unit: Mapped[str] = mapped_column(
         String(8), nullable=False, server_default=text("'yuan'"),

@@ -13,6 +13,9 @@ if not Path(_env_file).exists() and _root_env.exists():
     _env_file = str(_root_env)
 
 
+DEFAULT_METABASE_EMBEDDING_SECRET = "audit-metabase-secret-key"
+
+
 class Settings(BaseSettings):
     # 数据库
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform"
@@ -23,6 +26,9 @@ class Settings(BaseSettings):
     REDIS_MODE: str = "single"  # "single"（默认） | "sentinel"（HA）
     REDIS_SENTINEL_HOSTS: str = "localhost:26379,localhost:26380,localhost:26381"
     REDIS_SENTINEL_SERVICE: str = "mymaster"
+    # Metabase
+    METABASE_URL: str = "http://localhost:3000"
+    METABASE_EMBEDDING_SECRET: str = DEFAULT_METABASE_EMBEDDING_SECRET
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -483,6 +489,21 @@ class Settings(BaseSettings):
             env = (self.APP_ENV or "").strip().lower()
             if env in ("prod", "production", "staging"):
                 self.ONLYOFFICE_JWT_ENFORCE = True
+        return self
+
+    @model_validator(mode="after")
+    def _reject_default_metabase_secret_in_release(self) -> "Settings":
+        """发布环境必须显式配置非默认的 Metabase 嵌入签名密钥。"""
+        env = (self.APP_ENV or "").strip().lower()
+        secret = (self.METABASE_EMBEDDING_SECRET or "").strip()
+        if env in ("prod", "production", "staging") and secret in {
+            "",
+            DEFAULT_METABASE_EMBEDDING_SECRET,
+        }:
+            raise ValueError(
+                "APP_ENV=production/staging 时必须设置非默认的 "
+                "METABASE_EMBEDDING_SECRET"
+            )
         return self
 
     @property

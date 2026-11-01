@@ -556,23 +556,21 @@ export async function listReviews(wpId: string, status?: string): Promise<Review
 }
 
 export async function addReview(wpId: string, body: {
-  commenter_id: string; comment_text: string; cell_reference?: string
+  comment_text: string; cell_reference?: string
 }): Promise<ReviewComment> {
   const { data } = await http.post(P_wr.list(wpId), body)
   return data
 }
 
 export async function replyReview(wpId: string, reviewId: string, body: {
-  replier_id: string; reply_text: string
+  reply_text: string
 }): Promise<ReviewComment> {
   const { data } = await http.put(P_wr.reply(wpId, reviewId), body)
   return data
 }
 
-export async function resolveReview(wpId: string, reviewId: string, body: {
-  resolved_by: string
-}): Promise<ReviewComment> {
-  const { data } = await http.put(P_wr.resolve(wpId, reviewId), body)
+export async function resolveReview(wpId: string, reviewId: string): Promise<ReviewComment> {
+  const { data } = await http.put(P_wr.resolve(wpId, reviewId), {})
   return data
 }
 

@@ -710,13 +710,19 @@ async function onBatchStatusChange(payload: { action: string; ids: string[] }) {
   } catch { return }
 
   try {
-    const data = await api.post(
-      `/api/projects/${projectId.value}/working-papers/batch-status`,
-      { wp_ids: payload.ids, action: payload.action }
-    ) as any
+    const data = payload.action === 'submit_review'
+      ? await api.post(
+          `/api/projects/${projectId.value}/working-papers/batch-submit`,
+          { wp_ids: payload.ids },
+        ) as any
+      : await api.post(
+          `/api/projects/${projectId.value}/working-papers/batch-status`,
+          { wp_ids: payload.ids, action: payload.action },
+        ) as any
     ElMessage.success(data?.message || `成功${label}`)
-    if (data?.skipped?.length > 0) {
-      ElMessage.warning(`${data.skipped.length} 个底稿被跳过（状态不允许）`)
+    const skipped = data?.skipped_reasons ?? data?.skipped ?? []
+    if (skipped.length > 0) {
+      ElMessage.warning(`${skipped.length} 个底稿被跳过，请查看操作结果`)
     }
     fetchWpIndex()
   } catch (e: any) {

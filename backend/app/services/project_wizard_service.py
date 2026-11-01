@@ -266,6 +266,9 @@ async def create_project(
     # 数据库部分唯一索引仍处理并发竞争。
     audit_year = data.audit_year
     report_scope = data.report_scope or DEFAULT_REPORT_SCOPE
+    from app.services.group_topology_lock import lock_topology_years
+
+    await lock_topology_years(db, [audit_year])
     if not uniqueness_checked:
         is_unique, uniqueness_error = await check_uniqueness(
             company_code, audit_year, report_scope, db
@@ -372,6 +375,23 @@ async def update_step(
     Validates: Requirements 1.3, 1.4, 1.5
     """
     project = await _get_project_or_404(db, project_id)
+
+    if step == WizardStep.basic_info:
+        previous_year_hint = project.audit_year
+        try:
+            next_year_hint = (
+                int(data.get("audit_year"))
+                if data.get("audit_year") is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            next_year_hint = None
+        from app.services.group_topology_lock import lock_topology_years
+
+        await lock_topology_years(db, [previous_year_hint, next_year_hint])
+        await db.refresh(project)
+        if project.audit_year != previous_year_hint:
+            raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
 
     # basic_info 允许在 created / planning 状态下编辑（从项目详情页"编辑"进入）
     allowed_statuses = (

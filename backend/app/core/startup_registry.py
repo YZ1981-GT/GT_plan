@@ -281,15 +281,16 @@ def _task_setup_logging(ctx: StartupContext) -> None:
     setup_logging(level=ctx.log_level, json_format=False)
 
 
-async def _task_run_migrations(_ctx: StartupContext) -> None:
-    """Database versioned migrations (best-effort; failures recorded in DB/health)."""
+async def _task_run_migrations(ctx: StartupContext) -> None:
+    """Run pending migrations; the following critical task verifies the final state."""
     from app.core.config import settings
     from app.core.migration_runner import MigrationRunner
 
     log = logging.getLogger("audit_platform")
+    runner = MigrationRunner(database_url=settings.DATABASE_URL)
     try:
-        runner = MigrationRunner(database_url=settings.DATABASE_URL)
         result = await runner.run_pending()
+        ctx.extras["migration_run_result"] = result
         if result.executed:
             log.info("[启动] 数据库迁移完成，执行了版本: %s", result.executed)
         if result.failed:
@@ -302,17 +303,38 @@ async def _task_run_migrations(_ctx: StartupContext) -> None:
                 "[启动] 共 %d 个迁移失败，已写入 schema_migration_failures 表 / health=degraded",
                 len(result.failed),
             )
-        await runner.close()
     except Exception as mig_err:
+        ctx.extras["migration_run_error"] = type(mig_err).__name__
         log.warning(
-            "[启动] 数据库迁移调度失败（应用仍继续启动）: %s", mig_err
+            "[启动] 数据库迁移调度失败（等待只读完整性核验阻断启动）: %s", mig_err
         )
+    finally:
+        await runner.close()
 
 
-def _task_migration_mark_complete(_ctx: StartupContext) -> None:
+async def _task_migration_mark_complete(ctx: StartupContext) -> None:
+    """Only mark complete after a strict, read-only disk/DB comparison."""
+    from app.core.config import settings
+    from app.core.migration_runner import MigrationRunner
     from app.core.runtime_state import migration_state
 
-    migration_state.mark_complete()
+    runner = MigrationRunner(database_url=settings.DATABASE_URL)
+    try:
+        readiness = await runner.inspect_readiness()
+        ctx.extras["migration_readiness"] = readiness
+        if not readiness.is_complete:
+            pending = list(readiness.pending_versions)
+            failed = [f.version for f in readiness.failures]
+            raise RuntimeError(
+                "数据库迁移未就绪："
+                f"pending_versions={pending}, failed_versions={failed}"
+            )
+        migration_state.mark_complete()
+    except Exception:
+        migration_state.mark_incomplete()
+        raise
+    finally:
+        await runner.close()
 
 
 async def _task_acnr_redis_inject(_ctx: StartupContext) -> None:

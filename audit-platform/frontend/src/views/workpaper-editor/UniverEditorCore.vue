@@ -74,6 +74,7 @@ const univerContainer = ref<HTMLElement | null>(null)
 const wpDetailRef = computed(() => props.wpDetail)
 const projectIdComputed = computed(() => props.projectId)
 const wpIdComputed = computed(() => props.wpId)
+let recordUniverEdit: (() => void) | undefined
 
 const {
   univerAPI,
@@ -90,6 +91,7 @@ const {
   wpId: wpIdComputed,
   wpDetail: wpDetailRef,
   onDetailLoaded: (detail) => emit('update:wpDetail', detail),
+  onEdited: () => recordUniverEdit?.(),
   sheetNavFacade: props.sheetNavFacade,
 })
 
@@ -102,7 +104,9 @@ const autoSave = useWorkpaperAutoSave(async () => {
   if (!ok) {
     ElMessage.warning({ message: '自动保存失败，请手动保存', duration: 5000 })
   }
+  return ok
 }, 60_000)
+recordUniverEdit = autoSave.recordEdit
 
 // ─── 保存/导出逻辑 ──────────────────────────────────────────────────────────
 
@@ -150,13 +154,10 @@ const autoSaveMsg = computed(() => {
   return ''
 })
 
-// ─── dirty 同步到 Shell + autoSave ──────────────────────────────────────────
+// ─── dirty 同步到 Shell（autoSave 代际由 useEditorUniver 的逐命令回调推进） ────────
 
 watch(dirty, (val) => {
   emit('dirty-change', val)
-  if (val) {
-    autoSave.markDirty()
-  }
 })
 
 // ─── saved 事件 → Shell 刷新 wpDetail ───────────────────────────────────────

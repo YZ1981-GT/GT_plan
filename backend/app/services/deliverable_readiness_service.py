@@ -17,7 +17,6 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -26,13 +25,22 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
+from app.services.deliverable_readiness_sources import ReadinessSourceChecks
+from app.services.deliverable_readiness_types import ReadinessBlocker, SourceStatus
 
 logger = logging.getLogger(__name__)
 
 
 # ── 快照 digest 纯函数 ─────────────────────────────────────────────
 
-_SNAPSHOT_SOURCE_KEYS = ("adjustments", "formula_push", "notes", "reports", "tb")
+_SNAPSHOT_SOURCE_KEYS = (
+    "adjustments",
+    "dataset",
+    "formula_push",
+    "notes",
+    "reports",
+    "tb",
+)
 
 
 def build_snapshot_digest(
@@ -54,6 +62,11 @@ def build_snapshot_digest(
                 "available": v.get("available"),
                 "count": v.get("count"),
                 "stale_count": v.get("stale_count", 0),
+                "content_digest": v.get("content_digest") or v.get("detail", {}).get("content_digest"),
+                "version_id": v.get("version_id") or v.get("detail", {}).get("version_id"),
+                "run_id": v.get("run_id") or v.get("detail", {}).get("run_id"),
+                "run_status": v.get("run_status") or v.get("detail", {}).get("run_status"),
+                "source_kind": v.get("source_kind") or v.get("detail", {}).get("source_kind"),
             }
             for k, v in sorted(sources.items())  # 排序确保稳定
             if k in _SNAPSHOT_SOURCE_KEYS
@@ -80,23 +93,6 @@ TRIO_STEP_KEYS: list[dict[str, Any]] = [
 # ── 结果数据类 ─────────────────────────────────────────────────────
 
 @dataclass
-class ReadinessBlocker:
-    """一条硬闸门或软警告。"""
-    code: str
-    message: str
-    evidence: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class SourceStatus:
-    """某一数据源的 readiness 摘要。"""
-    available: bool = False
-    count: int = 0
-    stale_count: int = 0
-    detail: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class TrioStepStatus:
     """正式三件套某步骤的 readiness 状态。"""
     key: str
@@ -115,7 +111,7 @@ class ReadinessResult:
     trio: dict[str, Any] = field(default_factory=dict)
 
 
-class DeliverableReadinessService:
+class DeliverableReadinessService(ReadinessSourceChecks):
     """交付中心 readiness 检查。
 
     ``check(db, project_id, year)`` 真读取 TB、公式推送、调整、
@@ -150,7 +146,21 @@ class DeliverableReadinessService:
                 evidence={"component": "project", "error": str(exc)[:200]},
             ))
 
-        # 2. 试算表（TB）
+        # 2. 当前账套数据集版本。没有 active 数据集可兼容历史项目，但快照必须显式记下 None。
+        try:
+            async with db.begin_nested():
+                dataset_status = await self._check_dataset(db, project_id, year)
+                sources["dataset"] = dataset_status.__dict__
+        except Exception as exc:
+            logger.warning("Dataset readiness check failed: %s", exc)
+            blockers.append(ReadinessBlocker(
+                code="upstream_not_ready",
+                message="当前账套数据集不可查询",
+                evidence={"component": "dataset", "error": str(exc)[:200]},
+            ))
+            sources["dataset"] = SourceStatus().__dict__
+
+        # 3. 试算表（TB）
         try:
             async with db.begin_nested():
                 tb_status = await self._check_trial_balance(db, project_id, year, blockers)
@@ -164,10 +174,16 @@ class DeliverableReadinessService:
             ))
             sources["tb"] = SourceStatus().__dict__
 
-        # 3. 公式推送
+        # 4. 公式推送
         try:
             async with db.begin_nested():
-                fp_status = await self._check_formula_push(db, project_id, year, blockers)
+                fp_status = await self._check_formula_push(
+                    db,
+                    project_id,
+                    year,
+                    blockers,
+                    report_scope=(project.report_scope if project is not None else None),
+                )
                 sources["formula_push"] = fp_status.__dict__
         except Exception as exc:
             logger.warning("Formula push readiness check failed: %s", exc)
@@ -209,7 +225,14 @@ class DeliverableReadinessService:
         # 6. 附注
         try:
             async with db.begin_nested():
-                notes_status = await self._check_notes(db, project_id, year, blockers)
+                notes_status = await self._check_notes(
+                    db,
+                    project_id,
+                    year,
+                    blockers,
+                    report_scope=(project.report_scope if project is not None else None),
+                    template_type=(project.template_type if project is not None else None),
+                )
                 sources["notes"] = notes_status.__dict__
         except Exception as exc:
             logger.warning("Notes readiness check failed: %s", exc)
@@ -307,241 +330,6 @@ class DeliverableReadinessService:
             ))
 
         return project
-
-    async def _check_trial_balance(
-        self,
-        db: AsyncSession,
-        project_id: UUID,
-        year: int,
-        blockers: list[ReadinessBlocker],
-    ) -> SourceStatus:
-        """试算表就绪检查。"""
-        from app.models.audit_platform_models import TrialBalance
-
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(TrialBalance).where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
-                TrialBalance.is_deleted == False,  # noqa: E712
-            )
-        )
-        tb_count = result.scalar_one()
-
-        status = SourceStatus(
-            available=tb_count > 0,
-            count=tb_count,
-        )
-
-        if tb_count == 0:
-            blockers.append(ReadinessBlocker(
-                code="tb_snapshot_missing",
-                message="试算表快照不存在，无法生成审定财务报表",
-                evidence={"project_id": str(project_id), "year": year},
-            ))
-
-        return status
-
-    async def _check_formula_push(
-        self,
-        db: AsyncSession,
-        project_id: UUID,
-        year: int,
-        blockers: list[ReadinessBlocker],
-    ) -> SourceStatus:
-        """公式推送就绪检查 — 需至少一次 succeeded 运行记录。"""
-        try:
-            from app.models.formula_push_models import FormulaPushRun
-        except ImportError:
-            # phase2 模块未在 HEAD — fail-closed
-            blockers.append(ReadinessBlocker(
-                code="upstream_not_ready",
-                message="公式推送引擎模块未就绪（phase2 依赖）",
-                evidence={"component": "formula_push"},
-            ))
-            return SourceStatus()
-
-        try:
-            result = await db.execute(
-                sa.select(sa.func.count()).select_from(FormulaPushRun).where(
-                    FormulaPushRun.project_id == project_id,
-                    FormulaPushRun.year == year,
-                    FormulaPushRun.status == "succeeded",
-                )
-            )
-            success_count = result.scalar_one()
-        except Exception as exc:
-            logger.warning("formula_push query failed: %s", exc)
-            try:
-                await db.rollback()
-            except Exception:
-                pass
-            blockers.append(ReadinessBlocker(
-                code="upstream_not_ready",
-                message="公式推送数据不可查询（phase2 迁移可能未执行）",
-                evidence={"component": "formula_push", "error": str(exc)[:200]},
-            ))
-            return SourceStatus()
-
-        status = SourceStatus(
-            available=success_count > 0,
-            count=success_count,
-        )
-
-        if success_count == 0:
-            blockers.append(ReadinessBlocker(
-                code="upstream_not_ready",
-                message="公式推送未成功运行，下游底稿/附注数据可能不完整",
-                evidence={"component": "formula_push", "project_id": str(project_id), "year": year},
-            ))
-
-        return status
-
-    async def _check_adjustments(
-        self,
-        db: AsyncSession,
-        project_id: UUID,
-        year: int,
-        blockers: list[ReadinessBlocker],
-        warnings: list[ReadinessBlocker],
-    ) -> SourceStatus:
-        """调整分录确认检查 — draft 状态的调整是硬阻断。"""
-        from app.models.audit_platform_models import Adjustment
-
-        # 所有非删除调整分录
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.is_deleted == False,  # noqa: E712
-            )
-        )
-        total_count = result.scalar_one()
-
-        # 未确认（draft / pending_review）的调整
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.is_deleted == False,  # noqa: E712
-                Adjustment.review_status.in_(["draft", "pending_review"]),
-            )
-        )
-        unconfirmed = result.scalar_one()
-
-        status = SourceStatus(
-            available=True,
-            count=total_count,
-            detail={"unconfirmed_count": unconfirmed},
-        )
-
-        if unconfirmed > 0:
-            blockers.append(ReadinessBlocker(
-                code="upstream_not_ready",
-                message=f"有 {unconfirmed} 条调整分录尚未确认（draft/pending_review），出具前需全部确认或删除",
-                evidence={
-                    "component": "adjustments",
-                    "unconfirmed_count": unconfirmed,
-                    "total_count": total_count,
-                },
-            ))
-
-        return status
-
-    async def _check_reports(
-        self,
-        db: AsyncSession,
-        project_id: UUID,
-        year: int,
-        blockers: list[ReadinessBlocker],
-    ) -> SourceStatus:
-        """报表就绪检查 — 存在且无过期行（过期 = report_freshness.stale_clause，含计算版本不是当前版本的存量行）。"""
-        from app.services.report_freshness import count_summary
-
-        counts = await count_summary(db, project_id, year)
-        report_count, stale_count = counts.total, counts.stale
-
-        status = SourceStatus(
-            available=report_count > 0,
-            count=report_count,
-            stale_count=stale_count,
-        )
-
-        if report_count == 0:
-            blockers.append(ReadinessBlocker(
-                code="upstream_not_ready",
-                message="财务报表数据不存在，需先生成报表",
-                evidence={"component": "financial_report", "project_id": str(project_id), "year": year},
-            ))
-        elif stale_count > 0:
-            failed = f"，其中 {counts.calc_error} 行计算失败" if counts.calc_error else ""
-            blockers.append(ReadinessBlocker(
-                code="stale_source",
-                message=(f"有 {stale_count} 条报表行已过期（已标过期或计算版本不是当前版本{failed}），"
-                         "需重新生成报表后再出具"),
-                evidence={
-                    "component": "financial_report",
-                    "stale_count": stale_count,
-                    "total_count": report_count,
-                    "calc_error_count": counts.calc_error,
-                    "blank_count": counts.blank,
-                },
-            ))
-
-        return status
-
-    async def _check_notes(
-        self,
-        db: AsyncSession,
-        project_id: UUID,
-        year: int,
-        blockers: list[ReadinessBlocker],
-    ) -> SourceStatus:
-        """附注就绪检查 — 存在且无 stale。"""
-        from app.models.report_models import DisclosureNote
-
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(DisclosureNote).where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.is_deleted == False,  # noqa: E712
-            )
-        )
-        note_count = result.scalar_one()
-
-        stale_result = await db.execute(
-            sa.select(sa.func.count()).select_from(DisclosureNote).where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.is_deleted == False,  # noqa: E712
-                DisclosureNote.is_stale == True,  # noqa: E712
-            )
-        )
-        stale_count = stale_result.scalar_one()
-
-        status = SourceStatus(
-            available=note_count > 0,
-            count=note_count,
-            stale_count=stale_count,
-        )
-
-        if note_count == 0:
-            blockers.append(ReadinessBlocker(
-                code="upstream_not_ready",
-                message="报表附注不存在，需先准备附注章节",
-                evidence={"component": "disclosure_notes", "project_id": str(project_id), "year": year},
-            ))
-        elif stale_count > 0:
-            blockers.append(ReadinessBlocker(
-                code="stale_source",
-                message=f"有 {stale_count} 个附注章节标记为过期（is_stale），需刷新后再出具",
-                evidence={
-                    "component": "disclosure_notes",
-                    "stale_count": stale_count,
-                    "total_count": note_count,
-                },
-            ))
-
-        return status
 
     async def _check_existing_files(
         self,

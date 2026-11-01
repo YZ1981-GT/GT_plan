@@ -1,58 +1,85 @@
-"""项目创建入口的 actor 级 Redis 固定窗口限流。
-
-限流只减少枚举请求；Redis 故障时 fail-open，但后续精确公司授权仍 fail-closed。
-spec: batch-project-authorization-and-lock-hardening R2
-"""
+"""项目创建入口的 actor 级 Redis 安全限流。"""
 from __future__ import annotations
 
 import logging
-import time
+import os
 from typing import Any
 
 from fastapi import HTTPException
 
-from app.core.config import settings
-
 logger = logging.getLogger(__name__)
-_DEFAULT_LIMIT = 30
-_DEFAULT_WINDOW_SECONDS = 60
+RATE_LIMIT_ERROR_CODE = "PROJECT_CREATION_RATE_LIMITED"
+RATE_LIMIT_WINDOW_SECONDS = 60
 
 
-def _config() -> tuple[int, int]:
-    limit = max(1, int(getattr(settings, "PROJECT_CREATION_RATE_LIMIT_PER_MINUTE", _DEFAULT_LIMIT)))
-    window = max(1, int(getattr(settings, "PROJECT_CREATION_RATE_LIMIT_WINDOW_SECONDS", _DEFAULT_WINDOW_SECONDS)))
-    return limit, window
+def rate_limit_per_minute() -> int:
+    try:
+        return max(1, min(300, int(os.getenv("GT_PROJECT_CREATION_RATE_PER_MINUTE", "30"))))
+    except ValueError:
+        return 30
+
+
+async def _get_redis():
+    from app.core.redis import get_redis
+
+    return await get_redis()
+
+
+async def _audit_limit(actor: Any, entrypoint: str, retry_after: int) -> None:
+    try:
+        from app.services.audit_logger_enhanced import audit_logger
+
+        await audit_logger.log_action(
+            user_id=actor.id,
+            action="project.creation.rate_limited",
+            object_type="project_creation",
+            details={
+                "entrypoint": entrypoint,
+                "retry_after": retry_after,
+                "actor_role": getattr(getattr(actor, "role", None), "value", None),
+            },
+        )
+    except Exception:
+        return
 
 
 async def enforce_creation_rate_limit(actor: Any, *, entrypoint: str) -> None:
-    """累计一个创建类请求；超限抛 429，并返回稳定错误码与 Retry-After。"""
-    actor_id = getattr(actor, "id", None)
-    if actor_id is None:
-        return
-    limit, window = _config()
-    bucket = int(time.time()) // window
-    key = f"rate_limit:project_creation:{actor_id}:{bucket}"
+    """超 actor 固定窗口预算时 429；Redis 故障只跳过限流，不影响授权门。"""
     try:
-        from app.core.redis import redis_client
-
-        count = int(await redis_client.incr(key))
-        if count == 1:
-            await redis_client.expire(key, window + 1)
-        if count <= limit:
+        redis = await _get_redis()
+        if redis is None:
             return
-        ttl = int(await redis_client.ttl(key))
-        retry_after = max(1, ttl if ttl > 0 else window)
-    except Exception:  # noqa: BLE001 — 限流依赖不可用时按设计放行
-        logger.warning("项目创建限流 Redis 不可用，已降级放行：entrypoint=%s", entrypoint)
-        return
-    raise HTTPException(
-        status_code=429,
-        detail={
-            "error_code": "PROJECT_CREATION_RATE_LIMITED",
-            "message": f"项目创建请求过于频繁，请 {retry_after} 秒后重试",
-        },
-        headers={"Retry-After": str(retry_after)},
-    )
+        key = f"security:project_creation:{actor.id}"
+        script = """
+local n = redis.call('INCR', KEYS[1])
+if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+local ttl = redis.call('TTL', KEYS[1])
+return {n, ttl}
+"""
+        count, ttl = await redis.eval(script, 1, key, RATE_LIMIT_WINDOW_SECONDS)
+        limit = rate_limit_per_minute()
+        if int(count) <= limit:
+            return
+        retry_after = max(1, int(ttl))
+        await _audit_limit(actor, entrypoint, retry_after)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error_code": RATE_LIMIT_ERROR_CODE,
+                "message": f"项目创建请求过于频繁，请 {retry_after} 秒后重试",
+                "retry_after": retry_after,
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("项目创建安全限流暂不可用，授权门继续生效：%s", exc)
 
 
-__all__ = ["enforce_creation_rate_limit"]
+__all__ = [
+    "RATE_LIMIT_ERROR_CODE",
+    "RATE_LIMIT_WINDOW_SECONDS",
+    "enforce_creation_rate_limit",
+    "rate_limit_per_minute",
+]

@@ -39,9 +39,18 @@ def register_report_routers(app: FastAPI) -> None:
     # 从 report_config 迁出的两个子路由（同前缀 /api/report-config），紧随其后注册以保持匹配顺序
     from app.routers.tb_detail_formulas import router as tb_detail_router
     from app.routers.report_drill_down import router as drill_down_router
+    # 同前缀、只有字面量段的路由必须**先于**含参数段的路由注册（Starlette 按注册顺序取第一条命中）：
+    # row-note-mapping / candidates 否则被 report_config 的 GET /{config_id} 截走；note_wp_mapping 的 /{pid}/wp-mapping、
+    # note_trim 的 /{pid}/sections… 否则被 disclosure_notes 的 /{pid}/{year}… 截走。守卫 tests/test_route_shadow_guard.py。
+    from app.routers.report_row_note_mapping import router as row_note_router
+    from app.routers.report_config_baseline import router as report_config_baseline_router
 
-    for r in [rc_router, tb_detail_router, drill_down_router, reports_router, cfs_router, dn_router, ar_router,
-              export_router, nt_router, nwm_router, ntr_router, nai_router,
+    app.include_router(row_note_router, tags=["报表与附注"])
+    # §98 report-config-baseline（主模板回填 + 联动）：原在本组之后注册，/candidates 被 /{config_id} 截走
+    app.include_router(report_config_baseline_router, tags=["report-config-baseline"])
+    for r in [rc_router, tb_detail_router, drill_down_router, reports_router, cfs_router,
+              nwm_router, ntr_router, dn_router, ar_router,
+              export_router, nt_router, nai_router,
               rt_router, word_export_router, report_mapping_router]:
         app.include_router(r, tags=["报表与附注"])
 
@@ -115,9 +124,7 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.lineage import router as lineage_router
     app.include_router(lineage_router, tags=["lineage"])
 
-    # ═══ §98. report-config-baseline：主模板回填 + 联动 ═══
-    from app.routers.report_config_baseline import router as report_config_baseline_router
-    app.include_router(report_config_baseline_router, tags=["report-config-baseline"])
+    # ═══ §98. report-config-baseline：主模板回填 + 联动 —— 已移到 §4 先于 report_config 注册 ═══
 
     # ═══ §99. P2-2: 签发一致性清单 ═══
     from app.routers.signoff_checklist import router as signoff_checklist_router

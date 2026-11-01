@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
   // Windows 上 localhost 先解析 ::1 → 连接失败回退，每个代理请求固定 +2s
   const apiTarget = env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
   const devPort = parseInt(env.VITE_DEV_PORT || '3030', 10)
+  const outDir = process.env.GT_FRONTEND_OUT_DIR || 'dist'
   const proxy: Record<string, ProxyOptions> = {
     '/api': {
       target: apiTarget,
@@ -66,6 +67,11 @@ export default defineConfig(({ mode }) => {
         dts: 'src/components.d.ts',
       }),
     ],
+    build: {
+      // build:verify writes to a content-addressed candidate outside dist; regular/Docker builds keep dist.
+      outDir,
+      manifest: true,
+    },
     server: {
       // Windows IPv6 loopback 在部分开发机上会出现“显示 LISTENING 但连接被拒绝”。
       // 显式监听 IPv4 全接口，start-dev / Playwright / transform probe 统一走 127.0.0.1。

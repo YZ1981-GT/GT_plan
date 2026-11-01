@@ -1,12 +1,8 @@
-"""经理按精确 USCC 建项授权 ORM（迁移 V233/V234）。
-
-授权只控制“创建新项目”，不授予既有项目读写权。撤销记录软删除并保留审计字段；
-同一经理、同一企业代码同时最多一条未删除授权。
-"""
+"""精确企业代码的经理建项授权（迁移 V233）。"""
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -16,7 +12,7 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
 class ProjectCreationGrant(Base, SoftDeleteMixin, TimestampMixin):
-    """现场经理对一个精确统一社会信用代码的建项授权。"""
+    """admin 授予 manager 对一个精确 USCC 的项目创建权。"""
 
     __tablename__ = "project_creation_grants"
 
@@ -28,10 +24,9 @@ class ProjectCreationGrant(Base, SoftDeleteMixin, TimestampMixin):
     )
     company_code: Mapped[str] = mapped_column(sa.String(18), nullable=False)
     valid_from: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), nullable=False,
-        default=lambda: datetime.now(timezone.utc), server_default=sa.func.now(),
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    valid_until: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    valid_until: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     version: Mapped[int] = mapped_column(
         sa.Integer, nullable=False, default=1, server_default=sa.text("1")
     )
@@ -40,12 +35,12 @@ class ProjectCreationGrant(Base, SoftDeleteMixin, TimestampMixin):
     )
     reason: Mapped[str] = mapped_column(sa.Text, nullable=False)
     granted_by: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+        PG_UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT")
     )
     revoked_by: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+        PG_UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT")
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
     __table_args__ = (
         sa.CheckConstraint("version >= 1", name="ck_project_creation_grants_version"),
@@ -57,6 +52,9 @@ class ProjectCreationGrant(Base, SoftDeleteMixin, TimestampMixin):
             "length(company_code) = 18 AND company_code = upper(trim(company_code))",
             name="ck_project_creation_grants_code_shape",
         ),
+        # V234 另有 PG 专用约束 ck_project_creation_grants_code_checksum：
+        # 未撤销行须通过 gt_is_valid_uscc（与 uscc_validator 同算法）。依赖 PG 函数，
+        # 不在 ORM 声明，避免 SQLite 测试库建表失败；应用层写入同样先过 validate_uscc。
         sa.Index(
             "uq_project_creation_grants_active",
             "grantee_user_id", "company_code", unique=True,
@@ -67,7 +65,6 @@ class ProjectCreationGrant(Base, SoftDeleteMixin, TimestampMixin):
             "ix_project_creation_grants_grantee_valid",
             "grantee_user_id", "valid_until",
             postgresql_where=sa.text("is_deleted = false"),
-            sqlite_where=sa.text("is_deleted = 0"),
         ),
     )
 

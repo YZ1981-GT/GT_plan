@@ -39,6 +39,8 @@ export interface AutoSaveOptions {
   saveBeaconUrl?: string
   /** beforeunload 同步保存的 body 序列化函数 */
   serializeForBeacon?: () => string | Blob | null
+  /** 每次真实编辑推进时通知持久化协调器。 */
+  onEdited?: () => void
   /**
    * 判断失败后是否应重试。缺省恒真（其他页面行为不变）。
    * 返回 false 时不重试，直接标记失败。
@@ -48,7 +50,7 @@ export interface AutoSaveOptions {
 }
 
 export function useWorkpaperAutoSave(
-  onSave: () => Promise<void>,
+  onSave: () => Promise<boolean | void>,
   intervalMs = 60_000,
   snapshotOpts?: SnapshotOptions,
   autoSaveOpts?: AutoSaveOptions,
@@ -59,6 +61,7 @@ export function useWorkpaperAutoSave(
   const isDirty = ref(false)
   const isSaveFailed = ref(false)
   const editCount = ref(0)
+  const editEpoch = ref(0)
   const currentIntervalMs = ref(intervalMs)
   let timer: ReturnType<typeof setInterval> | null = null
   let snapshotTimer: ReturnType<typeof setInterval> | null = null
@@ -67,15 +70,29 @@ export function useWorkpaperAutoSave(
   const fastIntervalMs = autoSaveOpts?.fastIntervalMs ?? 30_000
   const fastThreshold = autoSaveOpts?.fastTriggerThreshold ?? 10
 
-  /** 标记数据已变更（由编辑器 onChange 调用） */
-  function markDirty() { isDirty.value = true }
-
-  /** 清除脏标记（手动保存成功后调用） */
-  function clearDirty() { isDirty.value = false }
-
-  /** V3 Req 12.3.1: 记录编辑操作，大量编辑时缩短间隔到 30s */
-  function recordEdit() {
+  function advanceEditEpoch() {
+    editEpoch.value++
     isDirty.value = true
+    autoSaveOpts?.onEdited?.()
+  }
+
+  /** 标记数据已变更（由编辑器 onChange 调用）。 */
+  function markDirty() {
+    advanceEditEpoch()
+  }
+
+  /**
+   * 清除脏标记。传入保存起点代际时，仅允许该代回执清理；无参数表示用户显式放弃。
+   */
+  function clearDirty(expectedEpoch?: number): boolean {
+    if (expectedEpoch !== undefined && editEpoch.value !== expectedEpoch) return false
+    isDirty.value = false
+    return true
+  }
+
+  /** V3 Req 12.3.1: 记录编辑操作，大量编辑时缩短间隔到 30s。 */
+  function recordEdit() {
+    advanceEditEpoch()
     editCount.value++
     if (editCount.value >= fastThreshold && currentIntervalMs.value !== fastIntervalMs) {
       currentIntervalMs.value = fastIntervalMs
@@ -83,44 +100,53 @@ export function useWorkpaperAutoSave(
     }
   }
 
-  /** 执行保存（仅在 dirty 且非 saving 时）— V3 Req 12.3.2: 失败立即重试 1 次 */
+  function completeSuccessfulSave(startEpoch: number) {
+    lastSavedAt.value = new Date()
+    if (!clearDirty(startEpoch)) return
+    editCount.value = 0
+    if (currentIntervalMs.value !== intervalMs) {
+      currentIntervalMs.value = intervalMs
+      resetTimer()
+    }
+  }
+
+  function markSaveFailed(error?: unknown) {
+    isSaveFailed.value = true
+    lastError.value = error instanceof Error && error.message
+      ? error.message
+      : '自动保存失败，请手动保存'
+  }
+
+  /** 执行保存（仅在 dirty 且非 saving 时）— V3 Req 12.3.2: 异常立即重试 1 次。 */
   async function doSave() {
     if (!isDirty.value || saving.value) return
+    const startEpoch = editEpoch.value
     saving.value = true
     lastError.value = null
     isSaveFailed.value = false
     try {
-      await onSave()
-      isDirty.value = false
-      lastSavedAt.value = new Date()
-      editCount.value = 0
-      // 保存成功后恢复正常间隔
-      if (currentIntervalMs.value !== intervalMs) {
-        currentIntervalMs.value = intervalMs
-        resetTimer()
+      const saved = await onSave()
+      if (saved === false) {
+        markSaveFailed()
+        return
       }
-    } catch (e: any) {
-      // V3 Req 12.3.2: 立即重试 1 次（shouldRetry 返回 false 时不重试）
+      completeSuccessfulSave(startEpoch)
+    } catch (e: unknown) {
       const retry = autoSaveOpts?.shouldRetry ? autoSaveOpts.shouldRetry(e) : true
       if (!retry) {
-        isSaveFailed.value = true
-        lastError.value = e?.message || '自动保存失败'
-        saving.value = false
+        markSaveFailed(e)
         return
       }
       try {
-        await onSave()
-        isDirty.value = false
-        lastSavedAt.value = new Date()
-        editCount.value = 0
-        isSaveFailed.value = false
-        if (currentIntervalMs.value !== intervalMs) {
-          currentIntervalMs.value = intervalMs
-          resetTimer()
+        const saved = await onSave()
+        if (saved === false) {
+          markSaveFailed()
+          return
         }
-      } catch (retryErr: any) {
-        isSaveFailed.value = true
-        lastError.value = retryErr?.message || '自动保存失败'
+        isSaveFailed.value = false
+        completeSuccessfulSave(startEpoch)
+      } catch (retryError: unknown) {
+        markSaveFailed(retryError)
       }
     } finally {
       saving.value = false
@@ -190,7 +216,7 @@ export function useWorkpaperAutoSave(
   })
 
   return {
-    saving, lastSavedAt, lastError, isDirty, isSaveFailed,
+    saving, lastSavedAt, lastError, isDirty, isSaveFailed, editEpoch,
     markDirty, clearDirty, recordEdit, doSave, doSnapshot,
     /** 当前实际间隔（用于测试验证） */
     currentIntervalMs,

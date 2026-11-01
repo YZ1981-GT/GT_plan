@@ -180,23 +180,44 @@ class WpReviewService:
 
         return ticket
 
+    @staticmethod
+    async def _get_live_review(
+        db: AsyncSession,
+        *,
+        working_paper_id: UUID,
+        review_id: UUID,
+    ) -> ReviewRecord:
+        """按路径底稿和复核记录联合取未删除记录，防止嵌套资源替换。"""
+        result = await db.execute(
+            sa.select(ReviewRecord).where(
+                ReviewRecord.id == review_id,
+                ReviewRecord.working_paper_id == working_paper_id,
+                ReviewRecord.is_deleted == sa.false(),
+            )
+        )
+        record = result.scalar_one_or_none()
+        if record is None:
+            raise ValueError("复核意见不存在")
+        return record
+
     async def reply(
         self,
         db: AsyncSession,
         review_id: UUID,
         replier_id: UUID,
         reply_text: str,
+        *,
+        working_paper_id: UUID,
     ) -> dict:
         """回复复核意见 (open → replied)。
 
         Validates: Requirements 5.3
         """
-        result = await db.execute(
-            sa.select(ReviewRecord).where(ReviewRecord.id == review_id)
+        record = await self._get_live_review(
+            db,
+            working_paper_id=working_paper_id,
+            review_id=review_id,
         )
-        record = result.scalar_one_or_none()
-        if record is None:
-            raise ValueError("复核意见不存在")
 
         if record.status != ReviewCommentStatus.open:
             raise ValueError(
@@ -217,6 +238,7 @@ class WpReviewService:
         review_id: UUID,
         resolved_by: UUID,
         *,
+        working_paper_id: UUID,
         close_reason: str | None = None,
         close_evidence_refs: list[dict] | None = None,
     ) -> dict:
@@ -225,12 +247,11 @@ class WpReviewService:
         Validates: Requirements 5.4
         P1-1.3: 重大复核意见（priority=must_fix）关闭必须填写关闭依据。
         """
-        result = await db.execute(
-            sa.select(ReviewRecord).where(ReviewRecord.id == review_id)
+        record = await self._get_live_review(
+            db,
+            working_paper_id=working_paper_id,
+            review_id=review_id,
         )
-        record = result.scalar_one_or_none()
-        if record is None:
-            raise ValueError("复核意见不存在")
 
         if record.status == ReviewCommentStatus.resolved:
             raise ValueError("复核意见已解决，不可重复操作")

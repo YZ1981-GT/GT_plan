@@ -330,6 +330,9 @@ async def sync_group_links(db: AsyncSession, year: int | None) -> set[UUID]:
     """
     if year is None:
         return set()
+    from app.services.group_topology_lock import lock_topology_years
+
+    await lock_topology_years(db, [year])
     from app.models.consolidation_models import ConsolTrial
     from app.services.consol_group_tree import derive_parent_links, load_year_records
 
@@ -413,6 +416,13 @@ async def reparent_project(
     new_value = _blank_to_none(new_code)
     own_code = _blank_to_none(project.company_code)
     year = resolve_project_audit_year(project)
+    from app.services.group_topology_lock import lock_topology_years
+
+    await lock_topology_years(db, [year])
+    await db.refresh(project)
+    if resolve_project_audit_year(project) != year:
+        raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
+    own_code = _blank_to_none(project.company_code)
     if new_value is not None:
         ok, err = validate_uscc(new_value)
         if not ok:
@@ -483,6 +493,13 @@ async def update_group_relationship(
 
     own_code = _blank_to_none(project.company_code)
     year = resolve_project_audit_year(project)
+    from app.services.group_topology_lock import lock_topology_years
+
+    await lock_topology_years(db, [year])
+    await db.refresh(project)
+    if resolve_project_audit_year(project) != year:
+        raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
+    own_code = _blank_to_none(project.company_code)
     probe = SimpleNamespace(
         company_code=own_code,
         client_name=project.client_name,

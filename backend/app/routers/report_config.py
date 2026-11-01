@@ -19,7 +19,6 @@ from app.core.database import get_db
 from app.deps import (
     assert_project_permission,
     get_current_user,
-    require_project_access,
     require_role,
 )
 from app.models.core import User
@@ -511,33 +510,9 @@ async def execute_formulas_batch(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2026-10-20 迁出、路径不变（自带 /api/report-config 前缀，在 router_registry/report.py §4 紧随本路由注册）：
-#   试算表「科目明细」公式 → ``routers/tb_detail_formulas.py``（spec formula-global-settings-sync，存 formula_setting）
-#   合并报表汇总穿透 → ``routers/report_drill_down.py``（本文件超行数门）
+# 2026-10-20 起迁出、路径不变：
+#   试算表「科目明细」公式 → ``routers/tb_detail_formulas.py``
+#   合并报表汇总穿透 → ``routers/report_drill_down.py``
+# 2026-10-31 起迁出且先于本路由注册：
+#   报表行次 → 附注编号 → ``routers/report_row_note_mapping.py``
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-@router.get("/row-note-mapping")
-async def get_row_note_mapping(
-    applicable_standard: str = Query(..., description="变体标识如 soe_standalone/listed_standalone"),
-    current_user: User = Depends(get_current_user),
-):
-    """返回指定变体的「报表行次→附注章节」映射（含全局连续序号）。
-
-    来源: report_row_note_mapping.json（静态数据，按变体区分）。
-    返回 {row_code: {section_code, section_title, seq}} 。
-    seq 为全报表连续编号（BS→IS→CFS→EQ→CFSS→IMP 顺序），供前端直接显示「五、N」。
-    """
-    from app.services.report_excel_exporter import _load_note_ref_mapping
-
-    all_mappings = _load_note_ref_mapping()
-    variant = all_mappings.get(applicable_standard, {})
-    # 为每个条目加全局连续序号（按 JSON 键出现顺序=BS→IS→CFS→EQ→CFSS→IMP）
-    result = {}
-    seq = 0
-    for row_code, info in variant.items():
-        seq += 1
-        entry = dict(info) if isinstance(info, dict) else {"section_code": str(info)}
-        entry["seq"] = seq
-        result[row_code] = entry
-    return result

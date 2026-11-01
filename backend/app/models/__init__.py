@@ -217,7 +217,7 @@ from app.models.workpaper_sync_models import (  # noqa: F401
     WorkpaperSyncScopeIndex,
     WorkpaperSyncTestRun,
 )
-# V233（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
+# V235（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
 from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
 
 __all__ = [

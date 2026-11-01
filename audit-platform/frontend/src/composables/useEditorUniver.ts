@@ -36,6 +36,8 @@ export interface UseEditorUniverOptions {
   wpDetail: Readonly<Ref<WorkpaperDetail | null>>
   /** 本函数自己取到详情时交回 Shell（UniverEditorCore 转成 `update:wpDetail`）。 */
   onDetailLoaded?: (detail: WorkpaperDetail) => void
+  /** 每一条会改变工作簿的命令都触发，用于推进自动保存编辑代际。 */
+  onEdited?: () => void
   sheetNavFacade: SheetNavFacadeAPI
 }
 
@@ -190,6 +192,7 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
     api.onCommandExecuted((command: any) => {
       if (DIRTY_COMMAND_PATTERNS.some(p => command.id?.includes(p))) {
         dirty.value = true
+        opts.onEdited?.()
       }
       // 监听 sheet 切换/增删，刷新 Sheet 导航
       if (

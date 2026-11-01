@@ -1,15 +1,23 @@
-import { ref, watch, type Ref } from 'vue'
-
 /**
- * 重组件首次打开时才挂载；挂载过一次后保持挂载，保留组件内部状态。
+ * 首次打开才挂载、打开后保持挂载（spec platform-performance-residual-findings-closure R5.3）。
  *
- * 适用于 ``defineAsyncComponent`` 弹窗：宿主可无条件声明弹窗，但在用户第一次打开前
- * 不下载分块、不执行弹窗初始化请求。Vue 作用域会在宿主卸载时自动停止 watcher。
+ * 重弹窗（如公式管理，约 264 KB）在宿主里无条件渲染时，即便是 `defineAsyncComponent`，宿主一挂载就会下载、
+ * 解析并实例化它。用法：
+ *
+ * ```vue
+ * const showFormulaManager = ref(false)
+ * const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
+ * <FormulaManagerDialog v-if="formulaManagerMounted" v-model="showFormulaManager" … />
+ * ```
+ *
+ * 第一次为真后一直为真：关闭只隐藏、不卸载，弹窗内状态（选中节点、已加载的数据）照旧保留。
+ * 回调在渲染前执行（默认 `flush: 'pre'`），弹窗挂载那一刻 `modelValue` 已是 true —— 弹窗须支持「挂载时即打开」
+ * （公式管理见 `FormulaManagerDialogOpenBeforeMount.spec.ts`）。
  */
-export function useMountOnFirstOpen(visible: Readonly<Ref<boolean>>): Readonly<Ref<boolean>> {
-  const mounted = ref(Boolean(visible.value))
-  watch(visible, (value) => {
-    if (value) mounted.value = true
-  })
+import { ref, watch, type Ref, type WatchSource } from 'vue'
+
+export function useMountOnFirstOpen(open: WatchSource<boolean>): Readonly<Ref<boolean>> {
+  const mounted = ref(false)
+  watch(open, (visible) => { if (visible) mounted.value = true }, { immediate: true })
   return mounted
 }

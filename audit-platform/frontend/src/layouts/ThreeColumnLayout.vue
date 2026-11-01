@@ -323,12 +323,17 @@
         </slot>
       </section>
 
-      <!-- AI 助手面板（dsh） -->
-      <DshPanel v-model="showDshPanel" @message-count="onDshMessageCount" />
+      <!-- AI 助手面板（按首次打开加载；失败只占用本区域） -->
+      <DshPanel
+        v-if="showDshPanel"
+        v-model="showDshPanel"
+        @message-count="onDshMessageCount"
+      />
     </div>
 
     <!-- 全局公式管理弹窗 -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       :rows="[]"
       :project-id="formulaContext?.projectId ?? currentProjectId"
@@ -377,7 +382,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -394,13 +399,14 @@ import {
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
   Search,
 } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import FormulaPendingSyncDialog from '@/components/formula/settings/FormulaPendingSyncDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import { resolveDialogOpenContext, type OpenCustomQueryPayload } from '@/components/query/queryEntryContext'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
-import DshPanel from '@/components/ai/DshPanel.vue'
+import DshPanelLoadError from '@/components/ai/DshPanelLoadError.vue'
 import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
 import {
   legacyPayloadToPartialCommand,
@@ -417,6 +423,13 @@ import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type F
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
+
+const DshPanel = defineAsyncComponent({
+  loader: () => import('@/components/ai/DshPanel.vue'),
+  errorComponent: DshPanelLoadError,
+  delay: 0,
+  suspensible: false,
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -596,6 +609,7 @@ const isConsolNotePage = computed(() =>
 )
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
 const formulaOwnerState = ref<FormulaManagerContextOwnerState>({})
 const formulaContext = computed(() => formulaOwnerState.value.active)
 const showCustomQuery = ref(false)

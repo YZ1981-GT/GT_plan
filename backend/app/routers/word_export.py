@@ -406,64 +406,23 @@ async def _require_notes_consistent(db: AsyncSession, project_id: UUID, year: in
     )
 
 
-@router.post("/full-deliverables", response_model=ExportJobResponse)
+@router.post("/full-deliverables")
 async def create_full_deliverables(
     project_id: UUID,
     body: FullDeliverablesRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """一键生成全套交付件：审定报表 → 未审报表 → 附注 → 报告正文（同步执行，复用 export_jobs_v2）。
-
-    - 顺序与 generateGuard 依赖链一致（审定/未审报表 → 附注 → 报告正文）。
-    - 报告正文步骤自动 preview→confirm（无弹窗），OPT 按默认优先级链解析（design §14）。
-    - 单项失败不阻断其余步骤（需求 14.3）：job 最终落 partial_failed。
-    - 完成后 KAM 警告写入 job.payload metadata，前端轮询完成时 Toast。
-
-    进度轮询：``GET /api/projects/{project_id}/word-exports/jobs/{job_id}``。
-
-    附注导出前一致性闸门（与「生成附注」同一判定 ``check_note_consistency``）：会导出附注且未带
-    ``confirm_inconsistent`` 时，附注与底稿不一致 ⇒ 不建任务，409 ``notes_inconsistent`` + 待确认清单；
-    前端弹同一个确认框，用户确认后带 ``confirm_inconsistent=true`` 重发。
-    """
+    """旧全套入口已退役；正式出具只走带 readiness/snapshot 的 trio。"""
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
-    from app.services.full_deliverables_executor import FullDeliverablesExecutor, resolve_full_steps
-    from app.services.export_job_service import ExportJobService
-
-    if "disclosure_notes" in resolve_full_steps(body.steps) and not body.confirm_inconsistent:
-        await _require_notes_consistent(db, project_id, body.year)
-
-    executor = FullDeliverablesExecutor(db)
-    payload = {
-        "year": body.year,
-        "template_variant": body.template_variant,
-        "steps": body.steps,
-        "optional_sections": body.optional_sections,
-        # 留痕：用户知情带不一致导出（闸门放行依据）
-        "confirm_inconsistent": body.confirm_inconsistent,
-    }
-    try:
-        result = await executor.run(
-            project_id=project_id,
-            user_id=current_user.id,
-            payload=payload,
-        )
-        await db.commit()
-    except ValueError as e:
-        # job 级前置校验失败（试算表未就绪等）→ 422
-        await db.rollback()
-        raise HTTPException(status_code=422, detail=str(e)) from e
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"全套生成失败: {str(e)}")
-
-    job = await ExportJobService(db).get_job(result.job_id)
-    if job is None:
-        raise HTTPException(status_code=500, detail="任务创建后无法读取")
-    items = await ExportJobService(db).get_job_items(result.job_id)
-    resp = ExportJobResponse.model_validate(job)
-    resp.items = [ExportJobItemResponse.model_validate(i) for i in items]
-    return resp
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "code": "LEGACY_FULL_DELIVERABLES_RETIRED",
+            "message": "旧一键全套入口已退役，请刷新页面后使用正式三件套",
+            "replacement": f"/api/projects/{project_id}/deliverables/trio?year={body.year}",
+        },
+    )
 
 
 # ------------------------------------------------------------------

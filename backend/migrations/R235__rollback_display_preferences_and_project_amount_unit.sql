@@ -1,4 +1,4 @@
--- R233：回滚 V233（显示偏好表 + 项目金额单位列）
+-- R235：回滚 V235（显示偏好表 + 项目金额单位列）
 -- spec: platform-global-display-settings-closure, 任务 1A, A 组
 -- 必须在任何 DROP 前检查数据安全，有数据时 RAISE EXCEPTION 整单回滚。
 
@@ -21,8 +21,8 @@ BEGIN
 
         IF non_default_count > 0 THEN
             RAISE EXCEPTION
-                'R233: % project(s) have non-default amount_unit; '
-                'cannot safely rollback V233',
+                'R235: % project(s) have non-default amount_unit; '
+                'cannot safely rollback V235',
                 non_default_count;
         END IF;
     END IF;
@@ -34,8 +34,8 @@ BEGIN
 
         IF prefs_count > 0 THEN
             RAISE EXCEPTION
-                'R233: % user_display_preferences row(s) exist; '
-                'cannot safely rollback V233',
+                'R235: % user_display_preferences row(s) exist; '
+                'cannot safely rollback V235',
                 prefs_count;
         END IF;
     END IF;

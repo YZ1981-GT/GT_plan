@@ -795,6 +795,7 @@
 
     <!-- 公式管理弹窗（template-type 必传：否则恒按国企版加载 report_config） -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       :rows="rows"
       :project-id="projectId"
@@ -922,11 +923,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
 import ReportAnalysisPanel from '@/components/workpaper/ReportAnalysisPanel.vue'
@@ -1330,6 +1332,7 @@ const _reportModeLabel = computed(() => {
 
 // Drilldown + Formula Manager (kept in main file for template binding)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
 const showRvGuide = ref(false)
 const rvBalanceExpanded = ref(false)
 const lastReportRefreshAt = ref<Date | null>(null)

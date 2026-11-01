@@ -27,6 +27,7 @@ import logging
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -239,6 +240,14 @@ class StandardUnificationService:
         返回归一化后的新 standard。
         """
         project = await self._get_project(project_id)
+        from app.services.group_topology_lock import lock_topology_years
+        from app.services.project_audit_year import resolve_project_audit_year
+
+        year_hint = year or resolve_project_audit_year(project)
+        await lock_topology_years(self.db, [year_hint])
+        await self.db.refresh(project)
+        if resolve_project_audit_year(project) != year_hint:
+            raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
 
         # 1. 捕获旧状态（在任何变更之前）
         old_standard = self._read_standard(project)

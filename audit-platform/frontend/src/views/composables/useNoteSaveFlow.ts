@@ -1,63 +1,47 @@
-import { getCurrentScope, onScopeDispose, ref, type Ref } from 'vue'
+/**
+ * 附注编辑器一次保存的状态与收尾（spec platform-performance-user-experience-closure 任务 30，从 DisclosureEditor 拆出）。
+ *
+ * - 状态：saving → saved（3 秒后回 idle）/ error。`save` 返回 false 或抛错都算失败，调用方据此保留 dirty、稍后重试。
+ * - 保存期间切了章：旧章节已经持久化，但不能把新章节当成「本次保存成功」去清结构撤销记录或自动跳章 ⇒ 回 idle、不调收尾。
+ */
+import { ref } from 'vue'
 
 export type NoteSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 export interface NoteSaveFlowOptions {
+  /** 当前章节 id：保存开始与完成时各读一次，判断保存期间是否切章 */
   currentNoteId: () => string | undefined
-  save: (options: { keepEditing: boolean }) => Promise<void>
-  onSaved?: (auto: boolean) => void
+  /** 真正的保存（useNotePersist 的 onSave）；false / 抛错 = 失败 */
+  save: (opts: { keepEditing: boolean }) => Promise<boolean>
+  /** 本章保存成功后的收尾；auto = 定时自动保存（只存不打断：不退出编辑、不跳章） */
+  onSaved: (auto: boolean) => void
 }
 
-export interface SaveCurrentNoteOptions {
-  auto?: boolean
-}
-
-/**
- * 附注一次保存的状态与章节竞态边界。
- *
- * 保存期间切换章节时，旧请求可以完成自己的持久化，但不得把新章节标成“已保存”、
- * 调用跳转回调或覆盖新章节的状态。手工保存退出编辑，自动保存保持编辑态。
- */
-export function useNoteSaveFlow(options: NoteSaveFlowOptions): {
-  saveStatus: Ref<NoteSaveStatus>
-  saveCurrentNote: (options?: SaveCurrentNoteOptions) => Promise<boolean>
-} {
+export function useNoteSaveFlow(options: NoteSaveFlowOptions) {
   const saveStatus = ref<NoteSaveStatus>('idle')
-  let resetTimer: ReturnType<typeof setTimeout> | null = null
-  let generation = 0
 
-  function clearResetTimer(): void {
-    if (resetTimer !== null) clearTimeout(resetTimer)
-    resetTimer = null
-  }
-
-  async function saveCurrentNote(request: SaveCurrentNoteOptions = {}): Promise<boolean> {
-    const noteId = options.currentNoteId()
-    if (!noteId) return false
-    const auto = request.auto === true
-    const ownGeneration = ++generation
-    clearResetTimer()
+  async function saveCurrentNote({ auto }: { auto: boolean }): Promise<boolean> {
+    const savingNoteId = options.currentNoteId()
+    if (!savingNoteId) return false
     saveStatus.value = 'saving'
     try {
-      await options.save({ keepEditing: auto })
-      if (ownGeneration !== generation || options.currentNoteId() !== noteId) {
-        if (ownGeneration === generation) saveStatus.value = 'idle'
+      if (!(await options.save({ keepEditing: auto }))) {
+        saveStatus.value = 'error'
+        return false
+      }
+      if (options.currentNoteId() !== savingNoteId) {
+        saveStatus.value = 'idle'
         return true
       }
+      options.onSaved(auto)
       saveStatus.value = 'saved'
-      options.onSaved?.(auto)
-      resetTimer = setTimeout(() => {
-        if (ownGeneration === generation && saveStatus.value === 'saved') saveStatus.value = 'idle'
-      }, 2500)
+      setTimeout(() => { if (saveStatus.value === 'saved') saveStatus.value = 'idle' }, 3000)
       return true
     } catch {
-      if (ownGeneration === generation) {
-        saveStatus.value = options.currentNoteId() === noteId ? 'error' : 'idle'
-      }
+      saveStatus.value = 'error'
       return false
     }
   }
 
-  if (getCurrentScope()) onScopeDispose(clearResetTimer)
   return { saveStatus, saveCurrentNote }
 }

@@ -1,43 +1,39 @@
-"""集团三码拓扑的 PostgreSQL 事务级年度逻辑锁。
-
-同一年度的关系写入必须串行；不同年度可以并行。``None`` 使用独立稳定键，避免旧项目
-因年度为空绕过互斥。事务 commit/rollback 自动释放；SQLite 等测试方言 no-op。
-
-spec: batch-project-authorization-and-lock-hardening R4
-"""
+"""集团三码拓扑的年度事务级逻辑锁。"""
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_LOCK_PREFIX = "group_topology:year:"
-_NULL_YEAR_KEY = "__none__"
+# 两参数 advisory lock 的 namespace；ASCII "GTPL" 对应的稳定正 int4。
+GROUP_TOPOLOGY_LOCK_NAMESPACE = 1_196_701_772
+# 未设置年度也属于一个明确拓扑域；使用业务年度不可能取到的 int4 最小值。
+NULL_AUDIT_YEAR_LOCK_KEY = -2_147_483_648
 
 
-def _lock_keys(years: Iterable[Any]) -> list[str]:
-    normalised: set[int | None] = set()
-    for raw in years:
-        if raw is None or raw == "":
-            normalised.add(None)
-        else:
-            normalised.add(int(raw))
-    ordered = sorted(normalised, key=lambda value: (value is not None, value or 0))
-    return [f"{_LOCK_PREFIX}{_NULL_YEAR_KEY if value is None else value}" for value in ordered]
+def _lock_key(year: int | None) -> int:
+    return NULL_AUDIT_YEAR_LOCK_KEY if year is None else int(year)
 
 
-async def lock_topology_years(db: AsyncSession, years: Iterable[Any]) -> None:
-    """按稳定顺序获取涉及年度的事务级 advisory lock，避免交叉年度死锁。"""
+async def lock_topology_years(db: AsyncSession, years: Iterable[int | None]) -> tuple[int, ...]:
+    """按锁键升序锁住拓扑写域；PG 以专用键覆盖空年度，SQLite 测试 no-op。"""
+    normalized = tuple(sorted({_lock_key(year) for year in years}))
+    if not normalized:
+        return normalized
     bind = db.get_bind()
     if bind is None or bind.dialect.name != "postgresql":
-        return
-    for key in _lock_keys(years):
+        return normalized
+    for year in normalized:
         await db.execute(
-            sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-            {"key": key},
+            sa.text("SELECT pg_advisory_xact_lock(:namespace, :year)"),
+            {"namespace": GROUP_TOPOLOGY_LOCK_NAMESPACE, "year": year},
         )
+    return normalized
 
 
-__all__ = ["lock_topology_years"]
+__all__ = [
+    "GROUP_TOPOLOGY_LOCK_NAMESPACE",
+    "NULL_AUDIT_YEAR_LOCK_KEY",
+    "lock_topology_years",
+]

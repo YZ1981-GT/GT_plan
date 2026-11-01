@@ -758,6 +758,76 @@ async def get_cell_sources(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+# 静态 deleted / formula-health 必须先于 note_section 通配路由注册，否则会被当成章节编号。
+
+@router.get("/{project_id}/{year}/deleted")
+async def list_deleted_sections(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """列出已软删除的附注章节，供恢复使用。"""
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.true(),
+        ).order_by(DisclosureNote.sort_order)
+    )
+    notes = result.scalars().all()
+    return [
+        {"id": str(n.id), "note_section": n.note_section, "section_title": n.section_title}
+        for n in notes
+    ]
+
+@router.get("/{project_id}/{year}/formula-health")
+async def formula_health(
+    project_id: UUID,
+    year: int,
+    template_type: str = "soe",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """附注公式/校验管线健康度诊断（只读，不跑规则、不写库）。
+
+    把"哪些管线真正生效 / 哪些休眠"显性化（P0-B）：附注 binding/inline 规则/report
+    绑定计数 + preset 规则数 + linkage 配置条目 + 三条管线激活标志。
+    """
+    if template_type not in ("soe", "listed"):
+        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
+    engine = NoteValidationEngine(db)
+    health = await engine.diagnose_formula_health(
+        project_id, year, template_type=template_type
+    )
+    # 附加只读诊断（spec disclosure-note-formula-data-population Task 5.1）：
+    # 「有报表↔附注勾稽但无写值 linkage」的章节 —— cells_updated=0 属正确行为
+    # （决策 1：报表↔附注只做校验不做写值），此处只呈现不写入。fail-open。
+    try:
+        from app.services.report_note_linkage import ReportNoteLinkage
+
+        notes = (
+            (
+                await db.execute(
+                    sa.select(DisclosureNote).where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == sa.false(),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        missing = ReportNoteLinkage().diagnose_missing_write_linkage(list(notes))
+        if isinstance(health, dict):
+            health["missing_write_linkage"] = missing
+            health["missing_write_linkage_count"] = len(missing)
+    except Exception as err:  # pragma: no cover — 诊断失败不影响健康度主体
+        logger.warning("formula_health: linkage diagnose failed: %s", err)
+    return health
+
+
 @router.get("/{project_id}/{year}/{note_section}")
 async def get_note_detail(
     project_id: UUID,
@@ -992,28 +1062,6 @@ async def patch_section(
     ).execute(_mutate, _event)
 
 
-@router.get("/{project_id}/{year}/deleted")
-async def list_deleted_sections(
-    project_id: UUID,
-    year: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """列出已软删除的附注章节，供恢复使用。"""
-    result = await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.is_deleted == sa.true(),
-        ).order_by(DisclosureNote.sort_order)
-    )
-    notes = result.scalars().all()
-    return [
-        {"id": str(n.id), "note_section": n.note_section, "section_title": n.section_title}
-        for n in notes
-    ]
-
-
 @router.patch("/{project_id}/{year}/restore/{note_id}")
 async def restore_section(
     project_id: UUID,
@@ -1089,53 +1137,6 @@ async def validate_notes(
         raise HTTPException(status_code=500, detail=f"校验执行失败: {str(e)}")
 
 
-@router.get("/{project_id}/{year}/formula-health")
-async def formula_health(
-    project_id: UUID,
-    year: int,
-    template_type: str = "soe",
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """附注公式/校验管线健康度诊断（只读，不跑规则、不写库）。
-
-    把"哪些管线真正生效 / 哪些休眠"显性化（P0-B）：附注 binding/inline 规则/report
-    绑定计数 + preset 规则数 + linkage 配置条目 + 三条管线激活标志。
-    """
-    if template_type not in ("soe", "listed"):
-        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
-    engine = NoteValidationEngine(db)
-    health = await engine.diagnose_formula_health(
-        project_id, year, template_type=template_type
-    )
-    # 附加只读诊断（spec disclosure-note-formula-data-population Task 5.1）：
-    # 「有报表↔附注勾稽但无写值 linkage」的章节 —— cells_updated=0 属正确行为
-    # （决策 1：报表↔附注只做校验不做写值），此处只呈现不写入。fail-open。
-    try:
-        from app.services.report_note_linkage import ReportNoteLinkage
-
-        notes = (
-            (
-                await db.execute(
-                    sa.select(DisclosureNote).where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.is_deleted == sa.false(),
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        missing = ReportNoteLinkage().diagnose_missing_write_linkage(list(notes))
-        if isinstance(health, dict):
-            health["missing_write_linkage"] = missing
-            health["missing_write_linkage_count"] = len(missing)
-    except Exception as err:  # pragma: no cover — 诊断失败不影响健康度主体
-        logger.warning("formula_health: linkage diagnose failed: %s", err)
-    return health
-
-
 @router.put("/findings/{validation_id}/confirm")
 async def confirm_finding(
     validation_id: UUID,
@@ -1189,20 +1190,23 @@ async def export_word(
 
     proj_row = (
         await db.execute(
-            sa.select(Project.report_scope).where(
+            sa.select(Project.template_type, Project.report_scope).where(
                 Project.id == project_id,
                 Project.is_deleted == sa.false(),
             )
         )
-    ).scalar_one_or_none()
+    ).one_or_none()
+    project_template = proj_row[0] if proj_row else None
+    project_scope = proj_row[1] if proj_row else None
 
     exporter = NoteWordExporter(db)
     try:
         output = await exporter.export(
             project_id,
             year,
+            template_type=project_template or "soe",
             report_scope=normalize_report_scope(
-                proj_row if isinstance(proj_row, str) else None
+                project_scope if isinstance(project_scope, str) else None
             ),
         )
         return StreamingResponse(

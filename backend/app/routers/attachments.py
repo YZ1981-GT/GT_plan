@@ -188,6 +188,34 @@ async def search_attachments(
     return await svc.search(project_id, q)
 
 
+# ── Paperless 健康检查 ──
+# 静态路径必须注册在 ``/api/attachments/{attachment_id}`` 之前：Starlette 按注册顺序取第一条命中，
+# 放在后面时 ``paperless-health`` 会被当成附件 id（恒 422）。守卫 ``tests/test_route_shadow_guard.py``。
+
+@router.get("/api/attachments/paperless-health")
+async def check_paperless_health(current_user: User = Depends(get_current_user)):
+    """检查 Paperless-ngx 服务是否可用"""
+    import os
+    import httpx
+
+    paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
+    paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
+
+    try:
+        async with httpx.AsyncClient(timeout=5, mounts={}, trust_env=False) as client:
+            resp = await client.get(
+                f"{paperless_url}/api/",
+                headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
+            )
+            if resp.status_code == 200:
+                return {"available": True, "url": paperless_url, "message": "Paperless 服务正常"}
+            return {"available": False, "url": paperless_url, "status": resp.status_code, "message": f"Paperless 返回 {resp.status_code}"}
+    except httpx.ConnectError:
+        return {"available": False, "url": paperless_url, "message": "Paperless 服务不可达"}
+    except Exception as e:
+        return {"available": False, "url": paperless_url, "message": str(e)}
+
+
 @router.get("/api/attachments/{attachment_id}")
 async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = _svc(db)
@@ -627,32 +655,6 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
         return StreamingResponse(_preview_stream(), media_type=mime)
 
     return {"previewable": False, "file_name": file_name, "ocr_text": att.get("ocr_text", ""), "download_url": f"/api/attachments/{attachment_id}/download", "message": "文件暂不可预览，请下载查看"}
-
-
-# ── Paperless 健康检查 ──
-
-@router.get("/api/attachments/paperless-health")
-async def check_paperless_health(current_user: User = Depends(get_current_user)):
-    """检查 Paperless-ngx 服务是否可用"""
-    import os
-    import httpx
-
-    paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
-    paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
-
-    try:
-        async with httpx.AsyncClient(timeout=5, mounts={}, trust_env=False) as client:
-            resp = await client.get(
-                f"{paperless_url}/api/",
-                headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
-            )
-            if resp.status_code == 200:
-                return {"available": True, "url": paperless_url, "message": "Paperless 服务正常"}
-            return {"available": False, "url": paperless_url, "status": resp.status_code, "message": f"Paperless 返回 {resp.status_code}"}
-    except httpx.ConnectError:
-        return {"available": False, "url": paperless_url, "message": "Paperless 服务不可达"}
-    except Exception as e:
-        return {"available": False, "url": paperless_url, "message": str(e)}
 
 
 # ── 附件重试 OCR ──

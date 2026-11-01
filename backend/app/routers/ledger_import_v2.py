@@ -19,7 +19,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -340,13 +340,13 @@ async def submit_import(
 # ---------------------------------------------------------------------------
 
 
-async def _sse_generator_with_registry(job_id: UUID):
+async def _sse_generator_with_registry(project_id: UUID, job_id: UUID):
     """Wrap _sse_generator with SSE registry for graceful drain."""
     from app.core.sse_registry import sse_registry
 
     conn = sse_registry.register()
     try:
-        async for chunk in _sse_generator(job_id):
+        async for chunk in _sse_generator(project_id, job_id):
             if conn.is_closed:
                 # Server is draining, stop sending
                 yield f"event: server_draining\ndata: {{}}\n\n"
@@ -356,15 +356,18 @@ async def _sse_generator_with_registry(job_id: UUID):
         sse_registry.unregister(conn)
 
 
-async def _sse_generator(job_id: UUID):
-    """Generate SSE events by polling job status every 2 seconds.
+async def _sse_generator(project_id: UUID, job_id: UUID):
+    """Generate SSE events by polling one project-bound job every 2 seconds.
 
     Uses its own DB session per iteration (request-scoped session
     closes when streaming starts).
     """
     while True:
         async with async_session() as db:
-            stmt = select(ImportJob).where(ImportJob.id == job_id)
+            stmt = select(ImportJob).where(
+                ImportJob.id == job_id,
+                ImportJob.project_id == project_id,
+            )
             result = await db.execute(stmt)
             job = result.scalar_one_or_none()
 
@@ -406,7 +409,7 @@ async def stream_job_progress(
     Registered with sse_registry for graceful drain during rolling updates.
     """
     return StreamingResponse(
-        _sse_generator_with_registry(job_id),
+        _sse_generator_with_registry(project_id, job_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -549,6 +552,14 @@ class TakeoverRequest(BaseModel):
         max_length=500,
     )
 
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("接管原因不能为空")
+        return value
+
 
 @router.post("/jobs/{job_id}/takeover")
 async def takeover_job(
@@ -561,7 +572,7 @@ async def takeover_job(
     """F22 / Sprint 5.10-5.11: 接管导入作业。
 
     前置条件：
-    - 当前用户角色为 PM / admin / partner
+    - 当前用户角色为 manager / admin / partner
     - job 的 heartbeat 已过期（heartbeat_at 为 NULL 或 > 5 分钟前）
 
     动作：
@@ -570,12 +581,12 @@ async def takeover_job(
     """
     from datetime import timezone
 
-    # 权限检查：仅 PM / admin / partner 可接管
-    allowed_roles = {"pm", "admin", "partner"}
+    # 权限检查：仅项目经理 / 管理员 / 合伙人可接管
+    allowed_roles = {"manager", "admin", "partner"}
     if current_user.role.value not in allowed_roles:
         raise HTTPException(
             status_code=403,
-            detail="仅 PM / admin / partner 可接管导入作业",
+            detail="仅项目经理、管理员或合伙人可接管导入作业",
         )
 
     # 查找 job

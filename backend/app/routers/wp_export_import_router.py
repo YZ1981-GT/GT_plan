@@ -7,7 +7,7 @@
 - POST /{wp_id}/import-validate → ValidationReport（仅校验不执行）
 - POST /import-enhanced → ImportResult（完整增强导入流程）
 - POST /import/resolve → ImportResult（冲突解决）
-- GET  /{wp_id}/versions → list[WpVersionArchive]
+- GET  /{wp_id}/version-archives → list[WpVersionArchive]（2026-10-31 由 /versions 改名，见该端点说明）
 
 设计原则：
 - router 层统一 commit（service 只 flush）
@@ -32,14 +32,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import require_project_access
 from app.models.core import User
 from app.models.wp_export_models import WpExportSnapshot, WpVersionArchive
-from app.schemas.wp_export_schemas import (
-    ConflictResolution,
-    ImportResult,
-    ValidationReport,
-)
+from app.schemas.wp_export_schemas import ConflictResolution
 
 logger = logging.getLogger(__name__)
 
@@ -460,24 +456,28 @@ async def import_resolve(
     return result.model_dump(mode="json")
 
 
-@router.get("/{wp_id}/versions")
+@router.get("/{wp_id}/version-archives")
 async def get_version_history(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """查询底稿版本归档历史（WpVersionArchive 列表）"""
+    """查询底稿版本归档历史（WpVersionArchive 列表；底稿侧栏「历史版本」面板）。
+
+    2026-10-31 由 ``/{wp_id}/versions`` 改到 ``/{wp_id}/version-archives``：原路径与 ``version_trail`` 的版本链快照
+    列表同形（参数名不同），本路由先注册、截走了快照列表 ⇒ 版本链抽屉（GtWpVersionTrail）拿到归档列表、恒空。
+    ``/versions`` 整棵子树（创建 / 列表 / 详情 / 对比 / 回滚）归 ``version_trail``。守卫 tests/test_route_shadow_guard.py。
+    """
     from app.routers._wp_gate import enforce_wp_gate
 
     # Wp_Bound_Gate：读取版本归档历史之前完成授权判定（Req 8.15）。read_versions 只读族；
-    # 该 route 与 version_trail 同路径（重复注册，本 handler 实际生效），故在此接入 gate。
     # 同项目未委派统一 External_Not_Found（404）；跨项目由既有 require_project_access 先行拦截。
     await enforce_wp_gate(
         db, current_user,
         entrypoint="workpaper.version_list", action="read_versions", method="GET",
         wp_id=wp_id, project_id=project_id, entry_family="version",
-        route_name="/api/projects/{project_id}/workpapers/{wp_id}/versions",
+        route_name="/api/projects/{project_id}/workpapers/{wp_id}/version-archives",
     )
 
     result = await db.execute(

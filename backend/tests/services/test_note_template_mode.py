@@ -292,9 +292,6 @@ async def test_template_mode_real_template_collision(monkeypatch):
     for b in blocks:
         if not b.section_code.startswith("八、"):
             continue
-        titles = [
-            nwe_mod.__dict__  # placeholder; real check below
-        ]
         # 块内第二段通常是标题
         from docx.oxml.ns import qn as _qn
         from docx.text.paragraph import Paragraph
@@ -325,3 +322,53 @@ async def test_template_mode_real_template_collision(monkeypatch):
     # 模板无 {{section}} 占位时不强行注入；至少确认导出成功 + 标记清理
     assert "##SECTION" not in full, "真实模板残留 SECTION 标记"
     assert len(bio.getvalue()) > 0
+
+
+@pytest.mark.parametrize("mode", ["programmatic", "template"])
+@pytest.mark.asyncio
+async def test_consolidated_export_modes_use_root_adapter(
+    tmp_path, monkeypatch, mode
+):
+    """两条 Word 路径都从根节点适配器取数，不回退 DisclosureNote。"""
+    monkeypatch.setattr(
+        nwe_mod.settings, "DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED", False
+    )
+    _patch_scope(monkeypatch)
+    _patch_index(monkeypatch)
+    if mode == "template":
+        _patch_loader(monkeypatch, _build_tagged_docx(tmp_path))
+
+    note = _make_note(
+        "八、1",
+        "货币资金",
+        table_data={
+            "_tables": [
+                {
+                    "name": "货币资金",
+                    "headers": ["项目", "期末余额"],
+                    "rows": [{"label": "根节点银行存款", "values": [123.0]}],
+                }
+            ]
+        },
+    )
+    load_root = AsyncMock(return_value=[note])
+    monkeypatch.setattr(
+        "app.services.consol_note_export_adapter.load_root_consol_export_notes",
+        load_root,
+    )
+
+    exporter = NoteWordExporter(_make_db([]))
+    exporter._load_notes = AsyncMock(
+        side_effect=AssertionError("合并导出不得读取 DisclosureNote")
+    )
+    output = await exporter.export(
+        uuid4(),
+        2025,
+        template_type="soe",
+        report_scope="consolidated",
+        mode=mode,
+    )
+
+    assert "根节点银行存款" in _extract(output.getvalue())
+    load_root.assert_awaited_once()
+    exporter._load_notes.assert_not_awaited()

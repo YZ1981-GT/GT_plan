@@ -10,7 +10,6 @@ Validates: Requirements F8.1, F8.2, F8.3, F8.4, F8.7
 
 from __future__ import annotations
 
-from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import Project, User
 from app.models.workhour_entry_models import WorkHourEntry
 
@@ -32,9 +31,13 @@ router = APIRouter(
 async def get_budget_compare(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """返回预算 vs 实际对比数据"""
+    """返回预算 vs 实际对比数据
+
+    原先被 workhour_entries 的 ``/workhours/{entry_id}`` 截走、从未可达（只校验登录 + 系统角色）；2026-10-31 改由
+    router_registry 先注册后可达，补项目成员校验（本项目成员或 admin），系统角色仍须 manager / partner / admin。
+    """
     # Permission: manager/partner/admin
     if current_user.role.value not in ("admin", "partner", "manager"):
         raise HTTPException(403, "权限不足：仅 manager+ 可访问")

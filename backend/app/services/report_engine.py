@@ -1138,18 +1138,12 @@ class ReportEngine:
         # 🔴 报表生成前自动 recalc trial_balance，确保基于最新逻辑计算
         # （修复方向符号/前缀继承等 recalc 逻辑修正后存量项目数据不刷新的问题）
         if not skip_recalc:
-            try:
-                from app.services.trial_balance_service import TrialBalanceService
-                tb_svc = TrialBalanceService(self.db)
-                await tb_svc.full_recalc(project_id, year)
-                await self.db.flush()
-            except Exception:
-                # fail-open: recalc 失败不阻断报表生成，用现有 trial_balance 数据继续
-                import logging
-                logging.getLogger("audit_platform").warning(
-                    "报表生成前 recalc 失败 (project=%s, year=%s), 使用现有 trial_balance 数据",
-                    project_id, year,
-                )
+            from app.services.trial_balance_service import TrialBalanceService
+
+            tb_svc = TrialBalanceService(self.db)
+            # 出具上游失败必须阻断：继续使用旧 TB 会把过期数字重新标成 fresh。
+            await tb_svc.full_recalc(project_id, year)
+            await self.db.flush()
 
         configs = await self._load_report_configs(applicable_standard, project_id=project_id)
         results: dict[str, Any] = {}

@@ -17,6 +17,9 @@ class _MigrationState:
     def mark_complete(self):
         self._complete = True
 
+    def mark_incomplete(self):
+        self._complete = False
+
     def is_complete(self) -> bool:
         return self._complete
 

@@ -519,7 +519,10 @@ export async function getTrioItemAttempts(
   projectId: string,
   itemId: string,
 ): Promise<TrioJobAttempt[]> {
-  return api.get<TrioJobAttempt[]>(trioDeliverables.itemAttempts(projectId, itemId))
+  const result = await api.get<{ attempts: TrioJobAttempt[] }>(
+    trioDeliverables.itemAttempts(projectId, itemId),
+  )
+  return result.attempts ?? []
 }
 
 /** 查询三件套就绪状态 */
@@ -530,12 +533,23 @@ export async function checkTrioReadiness(
   return api.get(trioDeliverables.readiness(projectId), { params: { year } })
 }
 
-/** 创建三件套出具任务 */
+/** 创建三件套后的轻量回执；完整详情通过 getTrioJob 读取。 */
+export interface TrioCreateResult {
+  job_id: string
+  status: TrioJob['status']
+  trio_succeeded: number
+  trio_total: number
+  outcomes: Array<{ step: TrioStepKey; succeeded: boolean; error_message: string | null }>
+}
+
+/** 创建三件套出具任务。后端年度是 query 参数，不在请求体。 */
 export async function createTrioJob(
   projectId: string,
   year: number,
-): Promise<TrioJob> {
-  return api.post<TrioJob>(trioDeliverables.create(projectId), { year })
+): Promise<TrioCreateResult> {
+  return api.post<TrioCreateResult>(
+    trioDeliverables.create(projectId), {}, { params: { year }, _silent: true } as any,
+  )
 }
 
 /** 查询三件套 job 详情 */
@@ -559,5 +573,8 @@ export async function getTrioHistory(
   projectId: string,
   year: number,
 ): Promise<TrioJob[]> {
-  return api.get<TrioJob[]>(trioDeliverables.history(projectId), { params: { year } })
+  const result = await api.get<{ jobs: TrioJob[] }>(
+    trioDeliverables.history(projectId), { params: { year } },
+  )
+  return result.jobs ?? []
 }

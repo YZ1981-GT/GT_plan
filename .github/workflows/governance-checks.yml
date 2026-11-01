@@ -6,7 +6,7 @@ name: Governance Checks
 
 on:
   push:
-    branches: [master, main, 'work/**']
+    branches: [master, main, 'work/**', 'spec/**']
   pull_request:
     branches: [master, main]
 

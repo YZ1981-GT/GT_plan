@@ -229,6 +229,19 @@ describe('useEditorUniver — 原生 sheet tab 事件', () => {
     expect(opts.sheetNavFacade.refresh).toHaveBeenCalledTimes(1)
     expect(result.dirty.value).toBe(false)
   })
+
+  it('每一条 dirty 命令都通知编辑代际，即使 dirty 已经为 true', async () => {
+    const onEdited = vi.fn()
+    const result = useEditorUniver(makeOptions({ onEdited }))
+    await result.initUniver()
+
+    const commandHandler = vi.mocked(result.univerAPI.value.onCommandExecuted).mock.calls[0][0]
+    commandHandler({ id: 'sheet.command.set-cell-value' })
+    commandHandler({ id: 'sheet.command.set-cell-value' })
+
+    expect(result.dirty.value).toBe(true)
+    expect(onEdited).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('useEditorUniver — 详情只读、不误判无文件（spec procedure-chain-hardening-and-java-contracts R1）', () => {

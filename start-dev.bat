@@ -77,7 +77,7 @@ set "VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT%"
 set "VITE_DEV_PORT=%FRONTEND_PORT%"
 if /I "%GT_RUNTIME_MODE%"=="stable" (
   echo [0/5] Building immutable frontend snapshot...
-  call npm --prefix "%FRONTEND_DIR%" run build:runtime
+  call npm --prefix "%FRONTEND_DIR%" run build:verify
   if errorlevel 1 (
     echo       [ERROR] Stable frontend build failed; existing services were not stopped.
     exit /b 1
@@ -165,7 +165,7 @@ REM Set variables in the parent environment. Quoted SET syntax prevents trailing
 set "VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT%"
 set "VITE_DEV_PORT=%FRONTEND_PORT%"
 if /I "%GT_RUNTIME_MODE%"=="stable" (
-start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && npm run preview:stable"
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && npm run preview:verified"
 ) else (
 start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && npm run dev -- --host 0.0.0.0 --port %FRONTEND_PORT%"
 )

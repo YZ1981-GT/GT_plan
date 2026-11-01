@@ -30,6 +30,19 @@ from app.middleware.audit_log import audit_log_failure_state
 router = APIRouter(tags=["健康检查"])
 
 
+def migration_blocks_readiness(info: dict) -> bool:
+    """Return whether migration status is unsafe for new traffic."""
+    return (
+        info.get("complete") is False
+        or bool(info.get("pending_versions"))
+        or bool(info.get("failures"))
+    )
+
+
+def critical_schema_drift(info: dict) -> bool:
+    return int(info.get("critical_count") or 0) > 0
+
+
 @router.get("/health")
 async def health_check(
     ctx: ServiceContainer = Depends(get_container),
@@ -42,7 +55,7 @@ async def health_check(
           "status": "healthy" | "unhealthy" | "degraded",
           "services": { "postgres": "ok|unavailable", "redis": "ok|unavailable" },
           "redis": {...},
-          "migration": { "applied_count": 26, "failures": [...] },
+          "migration": { "applied_count": 26, "pending_versions": [], "failures": [] },
           "schema_drift": { "count": 0, "items": [...] },
           "startup": { "status": "complete|not_run", "tasks": [...], "failed": [...], ... },
           "reload": { "mode": "standalone|overlap|never", "primary": true, "last": {...} | null }
@@ -105,8 +118,8 @@ async def health_check(
         status = "unhealthy"
         status_code = 503
     elif (
-        migration_info["failures"]
-        or drift_info["critical_count"] > 0
+        migration_blocks_readiness(migration_info)
+        or critical_schema_drift(drift_info)
         or audit_chain_info["unacknowledged_forks"] > 0
         or reload_degraded
         or int(audit_state.get("failed_count") or 0) > 0
@@ -195,38 +208,41 @@ def _events_replay_info() -> dict:
 
 
 async def _query_migration_status() -> dict:
-    """查询 schema_version + schema_migration_failures。"""
+    """只读核对磁盘迁移、``schema_version`` 与失败记录。"""
     from app.core.database import engine
-    if engine.dialect.name != "postgresql":
-        return {"applied_count": 0, "failures": []}
+    from app.core.migration_runner import MigrationRunner
+
+    runner = MigrationRunner(engine=engine)
     try:
-        async with engine.begin() as conn:
-            applied_row = await conn.execute(text(
-                "SELECT COUNT(*) FROM schema_version"
-            ))
-            applied_count = applied_row.scalar() or 0
-
-            failures: list[dict] = []
-            try:
-                rows = await conn.execute(text(
-                    "SELECT version, filename, error_type, error_message, attempt_count "
-                    "FROM schema_migration_failures ORDER BY attempted_at DESC"
-                ))
-                for r in rows.fetchall():
-                    failures.append({
-                        "version": r[0],
-                        "filename": r[1],
-                        "error_type": r[2],
-                        "error_message": (r[3] or "")[:500],
-                        "attempt_count": r[4],
-                    })
-            except Exception:
-                # 表不存在（V025 未跑），视为无失败
-                pass
-
-            return {"applied_count": applied_count, "failures": failures}
-    except Exception:
-        return {"applied_count": 0, "failures": []}
+        readiness = await runner.inspect_readiness()
+        return {
+            "applied_count": len(readiness.applied_versions),
+            "disk_count": len(readiness.disk_versions),
+            "pending_versions": list(readiness.pending_versions),
+            "failures": [
+                {
+                    "version": failure.version,
+                    "filename": failure.filename,
+                    "error_type": failure.error_type,
+                    "error_message": (failure.error_message or "")[:500],
+                    "attempt_count": failure.attempt_count,
+                }
+                for failure in readiness.failures
+            ],
+            "complete": readiness.is_complete,
+        }
+    except Exception as exc:
+        # 无法读取登记表或失败表时不能把 failures=[] 冒充成“数据库已最新”。
+        return {
+            "applied_count": 0,
+            "disk_count": 0,
+            "pending_versions": [],
+            "failures": [],
+            "complete": False,
+            "check_error": type(exc).__name__,
+        }
+    finally:
+        await runner.close()
 
 
 async def _query_schema_drift() -> dict:
