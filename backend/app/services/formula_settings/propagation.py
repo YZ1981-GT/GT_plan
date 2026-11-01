@@ -289,6 +289,9 @@ async def propagate_push(project_id: uuid.UUID, year: int | None, slot_keys: lis
                                           codes=codes)
         except PushActionError as exc:  # 业务上不可推（如年度不符），与推送事件同口径：不算故障
             return {"skipped": "not_pushable", "reason": str(exc), "wp_codes": codes}
+        from app.services.formula_push.note_followup import recalc_pushed_notes
+
+        await recalc_pushed_notes(db, result)  # 推送写了附注 ⇒ 表内公式跟着算（R4.1）
     return {"wp_codes": codes, "run_id": str(result.run_id) if result.run_id else None,
             "written": result.written_count, "skipped": result.skipped_count}
 

@@ -135,7 +135,11 @@ async def run_push(
         )
     except engine.PushActionError as exc:
         raise _bad_request(exc) from exc
-    return {**result.summary(), "items": [i.as_dict() for i in result.items]}
+    from app.services.formula_push.note_followup import recalc_pushed_notes
+
+    formulas = await recalc_pushed_notes(db, result)  # 推送写了附注 ⇒ 合计 / 账面价值 / 比例跟着算（R4.1）
+    return {**result.summary(), "items": [i.as_dict() for i in result.items],
+            "note_formulas_updated": sum(int((r or {}).get("updated") or 0) for r in formulas.values())}
 
 
 @router.get("/latest")

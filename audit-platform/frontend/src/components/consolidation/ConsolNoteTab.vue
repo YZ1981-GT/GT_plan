@@ -2056,7 +2056,7 @@ async function executeAggregate() {
 }
 
 // ─── 附注数据操作 ────────────────────────────────────────────────────────────
-function copyEntireNoteTable() {
+async function copyEntireNoteTable() {
   const sec = selectedNoteSection.value
   if (!sec?.headers?.length) { ElMessage.warning('无表格数据'); return }
   const headers = sec.headers

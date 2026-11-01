@@ -114,9 +114,9 @@ class TestTotalTerms:
     @pytest.mark.parametrize("rows, why", [
         ([_row("分类为以公允价值计量的金融资产"), _row("其中：债务工具投资"), _row("权益工具投资"),
           _row("指定为以公允价值计量的金融资产"), _total()], "其中"),
-        # 上市「按账龄披露」：「1年以内小计」嵌在「小计」里
-        ([_row("1年以内"), _row("其中：0-X个月"), _total("1年以内小计：", row_type="subtotal"), _row("1至2年"),
-          _total("小  计", row_type="subtotal"), _row("减：坏账准备"), _total()], "嵌套"),
+        # 分项小计在「小计」之后（不是账龄嵌套那种形态）仍判不准；账龄嵌套形态见 test_aging_nested_subtotal_is_judged
+        ([_row("甲"), _total("小  计", row_type="subtotal"), _row("1年以内"), _total("1年以内小计：", row_type="subtotal"),
+          _total()], "嵌套"),
         ([_row("a"), _total(), _row("b"), _total()], "多个合计"),
         # 第一行就是合计、上方没有明细（分段标题式的「（一）…」段首合计按本段明细算，见 test_note_total_terms 段首合计）
         ([_total("合计"), _row("固定资产")], "没有可合计"),
@@ -136,6 +136,34 @@ class TestTotalTerms:
         rows = [_row("甲"), _total("小计", row_type="subtotal"), _row("其中：乙"), _total()]
         plans, reasons = nft.total_terms(rows)
         assert plans == {1: [(0, 1)]} and list(reasons) == [3] and "其中" in reasons[3]
+
+    def test_aging_nested_subtotal_is_judged(self):
+        """上市「按账龄披露」（R1.2）：1年以内小计 = 「1年以内」行（「其中」细分不重复加）；小计 = 1年以内小计 + 其余账龄；
+        合计 = 小计 − 减：坏账准备（底稿源模板 R12 = R8、小计不含细分行）。"""
+        rows = [_row("1年以内"), _row("其中：0-X个月"), _row("X-Y个月"), _total("1年以内小计：", row_type="subtotal"),
+                _row("1至2年"), _row("2至3年"), _total("小  计", row_type="subtotal"), _row("减：坏账准备"), _total()]
+        assert nft.total_terms(rows) == ({3: [(0, 1)], 6: [(3, 1), (4, 1), (5, 1)], 8: [(6, 1), (7, -1)]}, {})
+
+    def test_aging_segments_nested_subtotal_from_workpaper(self):
+        """D2 底稿按账龄段出行（1年以内拆两段、没有「1年以内」行）：1年以内小计 = 两段之和。"""
+        rows = [_row("0-6个月"), _row("6-12个月"), _total("1年以内小计", row_type="subtotal"), _row("1-2年"),
+                _total("小计", row_type="subtotal"), _row("减：坏账准备"), _total()]
+        assert nft.total_terms(rows) == ({2: [(0, 1), (1, 1)], 4: [(2, 1), (3, 1)], 6: [(4, 1), (5, -1)]}, {})
+
+    def test_colon_title_rows_are_not_components(self):
+        """冒号结尾的分段标题（R1.1）：「资产小计」不等于「资产：」；标题下有明细时只加明细。"""
+        assert nft.total_terms([_row("资产："), _total("资产小计", row_type="subtotal"), _row("负债："),
+                                _total("负债小计", row_type="subtotal")]) == ({}, {1: "没有可合计的明细行", 3: "没有可合计的明细行"})
+        plans, reasons = nft.total_terms([_row("单项"), _row("组合："), _row("应收中央企业客户"), _row("应收海外企业客户"),
+                                          _total()])
+        assert plans == {4: [(0, 1), (2, 1), (3, 1)]} and reasons == {}
+
+    @pytest.mark.parametrize("first, last", [("上年年末余额", "期末余额"), ("期初余额", "期末余额"), ("上年年末数", "期末数")])
+    def test_vertical_rollforward_close_row_is_not_a_sum(self, first, last):
+        """纵向变动表（R1.3）：期末 = 期初 + 增 − 减 是审核勾稽，不按全部行之和（原先把转回 / 核销当加项）。"""
+        rows = [_row(first), _row("本期计提"), _row("本期收回或转回"), _row("本期核销"), _total(last)]
+        plans, reasons = nft.total_terms(rows)
+        assert plans == {} and "纵向变动表" in reasons[4]
 
 
 class TestColumns:
@@ -164,7 +192,13 @@ class TestPresets:
         assert formulas["t1:5:0"]["expression"] == "SUM(0:1, 0)"
         assert formulas["t1:5:2"]["expression"] == "SUM(0:1, 2)"
         assert formulas["t1:5:4"]["type"] == "vertical_sum", "合计行的账面价值按明细之和，不另算"
-        assert "t1:5:1" not in formulas and "t1:5:3" not in formulas, "比例 / 损失率不加总"
+        # 比例 / 损失率不加总：按本行派生（R2.1；合计行比例 = 合计 ÷ 合计 = 100、损失率 = 合计坏账 ÷ 合计余额）
+        assert formulas["t1:5:1"]["type"] == formulas["t1:5:3"]["type"] == "ratio"
+        assert formulas["t1:5:1"]["expression"] == "cell(5,0) / cell(5,0) * 100"
+        assert formulas["t1:3:1"]["expression"] == "cell(3,0) / cell(5,0) * 100", "其中明细的比例也以合计为分母"
+        assert formulas["t1:0:3"]["expression"] == "cell(0,2) / cell(0,0) * 100"
+        assert formulas["t1:0:3"]["requires"] == [[0, 2]], "分子为空不算（不写 0）"
+        assert "t1:2:1" not in formulas, "「其中：」标记行没有比例"
         # 账面价值 = 账面余额 − 坏账准备（明细行、其中明细行都算；「其中：」标记行不算）
         assert formulas["t1:0:4"]["expression"] == "cell(0,0) - cell(0,2)"
         assert formulas["t1:3:4"]["expression"] == "cell(3,0) - cell(3,2)"

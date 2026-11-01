@@ -14,6 +14,13 @@
 * 段首合计（spec note-pull-followup-closure R7，先于以上判定）：所有合计都是分段标题式（「一、账面原值合计」）、表的第一行
   就是合计 ⇒ 每个合计 = 它下面到下一个合计之前的本段明细；段内「其中：X」只许是本段第一行（列举本段构成），其余位置的
   「其中」/ 减项 / 加项 / 段内分段标题 ⇒ 该合计判不准。
+* 冒号结尾的分段标题行（「资产：」「组合：」「主营业务：」，行类 ``title``）只是下面几行的标题，不是明细、不进合计
+  （原先「资产小计 = 资产：」；spec note-table-structure-formula-pull-closure R1.1）。
+* 账龄嵌套小计（R1.2）：分项小计（「1年以内小计」）在前、唯一的「小计」在后、至多一个合计在最后 ⇒ 分项小计 = 本组
+  「其中：X」之前的明细（本组没有「其中」时 = 本组明细，「其中」及其后的细分行不重复加）；小计 = 各分项小计 + 其后明细；
+  合计 = 小计 ± 减项 / 加项。与底稿源模板同口径（上市「1年以内小计」= 「1年以内」行、小计不含细分行）。
+* 纵向变动表（R1.3）：第一行是期初类（「期初余额」「上年年末余额」）、合计行是期末类（「期末余额」「期末数」）⇒ 期末 =
+  期初 + 本期增加 − 本期减少，是审核勾稽、不是明细之和，不给构成（原先把转回 / 核销当加项）。
 
 谁在用：附注预设公式（``note_formula_tables``）、生成 / 刷新后的合计回填（``disclosure_engine``）、合并附注拉数 /
 汇总 / 保存回填（``consol_note_table_totals`` / ``consol_note_formula_service``）、旧派生登记（``note_formula_derivation``）、
@@ -26,7 +33,8 @@ from decimal import Decimal
 from typing import Any, Callable, Iterable
 
 __all__ = [
-    "flatten_terms", "label_row_type", "plan_description", "row_kind", "sum_terms", "total_order", "total_terms",
+    "ROLLFORWARD_REASON", "flatten_terms", "label_row_type", "plan_description", "row_kind", "sum_terms",
+    "total_order", "total_terms",
 ]
 
 #: 结构行（占位 / 动态区标记 / 表内子表头）：不参与合计
@@ -36,10 +44,20 @@ _MARKER_RE = re.compile(r"其中[:：]?")
 #: 分段标题：「一、」「（二）」
 _HEADING_RE = re.compile(r"^(?:[一二三四五六七八九十]+、|[（(][一二三四五六七八九十]+[）)])")
 _PLAIN_SUBTOTAL_RE = re.compile(r"小计[:：]?")
+#: 冒号结尾的分段标题（「资产：」「组合：」）；去掉冒号后以小计 / 合计 / 总计结尾的是合计类行，不是标题
+_TITLE_RE = re.compile(r".+[:：]")
+_TOTAL_WORD_RE = re.compile(r"(?:小计|合计|总计)[:：]?$")
+#: 纵向变动表：第一行期初类、合计行期末类（行名去空白与行首序号后整词比较）
+_ROLL_OPEN = frozenset({"期初余额", "期初数", "期初金额", "年初余额", "年初数", "上年年末余额", "上年年末数",
+                        "上期期末余额", "本年年初余额", "本期期初余额"})
+_ROLL_CLOSE = frozenset({"期末余额", "期末数", "期末金额", "年末余额", "年末数", "本期期末余额", "本年年末余额"})
+_LEAD_ENUM_RE = re.compile(r"^(?:[一二三四五六七八九十]+[、.．]|[（(][一二三四五六七八九十\d]+[）)]|\d+[、.．])")
 _NO_DETAIL = "没有可合计的明细行"
 _SUB_DETAIL = "表里有「其中：…」明细行，分不出明细到哪一行为止"
 _MINUS_PLUS = "减项 / 加项不在小计之后"
 _SEGMENT_HEADING = "合计的范围跨了几个分段标题（「一、」「（二）」），合计范围无法自动判定"
+_NESTED = "分项小计与小计并存（嵌套小计），合计范围无法自动判定"
+ROLLFORWARD_REASON = "纵向变动表：期末 = 期初 + 本期增加 − 本期减少，属审核勾稽，不按明细之和自动运算"
 
 
 def _label(row: Any) -> str:
@@ -61,7 +79,8 @@ def label_row_type(label: Any) -> str:
 
 
 def row_kind(row: Any) -> str:
-    """skip（占位 / 动态区标记）/ total / subtotal / marker（「其中：」标记行）/ sub（「其中：X」）/ minus / plus / data。"""
+    """skip（占位 / 动态区标记）/ total / subtotal / marker（「其中：」标记行）/ sub（「其中：X」）/ minus / plus /
+    title（冒号结尾的分段标题「资产：」）/ data。"""
     if not isinstance(row, dict):
         return "skip"
     label = _label(row)
@@ -77,7 +96,73 @@ def row_kind(row: Any) -> str:
         return "minus"
     if label.startswith(("加:", "加：")):
         return "plus"
+    if _TITLE_RE.fullmatch(label) and not _TOTAL_WORD_RE.search(label):
+        return "title"
     return "data"
+
+
+def _roll_key(row: Any) -> str:
+    return _LEAD_ENUM_RE.sub("", _label(row)).rstrip(":：")
+
+
+def _is_rollforward(rows: list[Any], kinds: list[str], total: int) -> bool:
+    """纵向变动表：第一行（跳过占位 / 标题）是期初类、合计行是期末类。"""
+    first = next((i for i, k in enumerate(kinds) if k not in ("skip", "title")), None)
+    return first is not None and first != total and _roll_key(rows[first]) in _ROLL_OPEN \
+        and _roll_key(rows[total]) in _ROLL_CLOSE
+
+
+def _named_block_rows(rows: list[Any], kinds: list[str], idxs: list[int]) -> tuple[list[int] | None, str | None]:
+    """分项小计本组参与合计的行：有「其中：X」⇒ 第一个「其中」之前的明细（之后是它的细分，不重复加）；否则同 ``_top_rows``。"""
+    seq = [i for i in idxs if kinds[i] != "skip"]
+    if any(kinds[i] in ("minus", "plus") for i in seq):
+        return None, _MINUS_PLUS
+    subs = [i for i in seq if kinds[i] == "sub"]
+    if not subs:
+        top, why = _top_rows(kinds, idxs)
+    else:
+        top = [i for i in seq if i < subs[0] and kinds[i] == "data"]
+        why = None if top else _NO_DETAIL
+    if top:
+        issue = _heading_issue(rows, kinds, idxs)
+        if issue:
+            return None, issue
+    return top, why
+
+
+def _nested_terms(rows: list[Any], kinds: list[str], subs: list[int], plain: list[bool],
+                  tots: list[int]) -> tuple[dict[int, list[tuple[int, int]]], dict[int, str]] | None:
+    """账龄嵌套小计：分项小计都在唯一的「小计」之前 ⇒ 逐组判定；不是这种形态返回 None（整表判不准）。"""
+    if plain.count(True) != 1 or not plain[-1]:
+        return None
+    plan_sub = subs[-1]
+    plans: dict[int, list[tuple[int, int]]] = {}
+    reasons: dict[int, str] = {}
+    prev = -1
+    for s in subs[:-1]:
+        top, why = _named_block_rows(rows, kinds, list(range(prev + 1, s)))
+        if top:
+            plans[s] = [(i, 1) for i in top]
+        else:
+            reasons[s] = why or _NO_DETAIL
+        prev = s
+    tail = [i for i in range(prev + 1, plan_sub) if kinds[i] not in ("skip", "title")]
+    if any(kinds[i] != "data" for i in tail):
+        reasons[plan_sub] = "小计与上一个分项小计之间有「其中」 / 减项行，合计范围无法自动判定"
+    elif any(s in reasons for s in subs[:-1]):
+        reasons[plan_sub] = "分项小计判不准，小计范围无法自动判定"
+    else:
+        plans[plan_sub] = [(s, 1) for s in subs[:-1]] + [(i, 1) for i in tail]
+    if tots:
+        t = tots[0]
+        between = [i for i in range(plan_sub + 1, t) if kinds[i] != "skip"]
+        if plan_sub in reasons:
+            reasons[t] = reasons[plan_sub]
+        elif any(kinds[i] not in ("data", "minus", "plus") for i in between):
+            reasons[t] = "最后一个小计与合计之间有「其中」行，合计范围无法自动判定"
+        else:
+            plans[t] = [(plan_sub, 1)] + [(i, -1 if kinds[i] == "minus" else 1) for i in between]
+    return plans, reasons
 
 
 def _top_rows(kinds: list[str], idxs: list[int]) -> tuple[list[int] | None, str | None]:
@@ -172,6 +257,9 @@ def total_terms(rows: list[Any]) -> tuple[dict[int, list[tuple[int, int]]], dict
     reasons: dict[int, str] = {}
     if not totals:
         return plans, reasons
+    if _is_rollforward(rows, kinds, totals[-1]):
+        others = "纵向变动表里的其他合计行，合计范围无法自动判定"
+        return {}, {t: ROLLFORWARD_REASON if t == totals[-1] else others for t in totals}
     head = _segment_head_terms(rows, kinds, totals)
     if head is not None:
         return head
@@ -196,7 +284,10 @@ def total_terms(rows: list[Any]) -> tuple[dict[int, list[tuple[int, int]]], dict
     else:
         plain = [bool(_PLAIN_SUBTOTAL_RE.fullmatch(_label(rows[s]))) for s in subs]
         if any(plain) and not all(plain):
-            whole = "分项小计与小计并存（嵌套小计），合计范围无法自动判定"
+            nested = _nested_terms(rows, kinds, subs, plain, tots)
+            if nested is not None:
+                return nested
+            whole = _NESTED
     groups: list[tuple[int, list[int]]] = []
     heading = False
     if whole is None:

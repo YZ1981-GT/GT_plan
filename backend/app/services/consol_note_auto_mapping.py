@@ -112,6 +112,15 @@ def _mapping_selector(key: tuple) -> dict[str, Any]:
     return {}
 
 
+def _auto_mapping(key: tuple, suggestion: dict[str, Any]) -> dict[str, Any]:
+    """可自动确认的建议 → 映射条目：建议忽略的（模板没有的合计 / 小计行）按忽略，其余映射到建议目标行。"""
+    if suggestion.get("mapping_action") == "ignore":
+        return {"source_label": key[0], "target_row_id": "", "mapping_action": "ignore",
+                "ignore_reason": suggestion.get("ignore_reason") or "自动映射：建议忽略", **_mapping_selector(key)}
+    return {"source_label": key[0], "target_row_id": suggestion["suggested_target"]["target_row_id"],
+            "mapping_action": "map", **_mapping_selector(key)}
+
+
 def _no_source_reason(entity_sources: list[dict[str, Any]] | None) -> str:
     reasons = sorted({str(s.get("reason")) for s in entity_sources or [] if s.get("reason")})
     detail = f"（{reasons[0]}{' 等' if len(reasons) > 1 else ''}）" if reasons else ""
@@ -171,8 +180,7 @@ async def _map_section(
         await confirm_mapping(
             db, project_id=project_id, section_id=section_id, year=year,
             template_version_id=UUID(str(preview["template_version_id"])), source_structure_hash=group["hash"],
-            mappings=[{"source_label": k[0], "target_row_id": s["suggested_target"]["target_row_id"],
-                       "mapping_action": "map", **_mapping_selector(k)} for k, s in picked.items()],
+            mappings=[_auto_mapping(k, s) for k, s in picked.items()],
             entity_node_keys=[{**e, "hash": group["hash"]} for e in group["entities"]],
             excluded_node_keys=excluded or None, confirmed_by=user_id,
         )

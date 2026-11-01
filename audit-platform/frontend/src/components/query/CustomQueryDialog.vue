@@ -1015,7 +1015,7 @@ function onNoteTableChange(index: number) {
   void executeQuery()
 }
 
-function copyResult() {
+async function copyResult() {
   if (!resultRows.value.length) { ElMessage.warning('无数据'); return }
   const headers = resultColumns.value.map(c => columnLabel(c))
   const dataRows = filteredRows.value.map(r => resultColumns.value.map(c => r[c] ?? ''))

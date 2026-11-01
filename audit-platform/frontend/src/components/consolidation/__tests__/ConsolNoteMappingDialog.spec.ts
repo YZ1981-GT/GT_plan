@@ -17,7 +17,8 @@ const api = vi.hoisted(() => ({
   listDetailTemplates: vi.fn(),
 }))
 vi.mock('@/services/consolidationApi', () => api)
-vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() }, ElMessageBox: {} }))
+const box = vi.hoisted(() => ({ confirm: vi.fn() }))
+vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() }, ElMessageBox: box }))
 
 import ConsolNoteMappingDialog from '../ConsolNoteMappingDialog.vue'
 
@@ -137,6 +138,8 @@ describe('ConsolNoteMappingDialog 同名行按分组（R3）', () => {
     for (const fn of Object.values(api)) fn.mockReset()
     api.previewDetailRefresh.mockResolvedValue(groupedPreview())
     api.confirmDetailMapping.mockResolvedValue({})
+    box.confirm.mockReset()
+    box.confirm.mockResolvedValue('confirm')
   })
 
   it('逐行显示所在分组；只能按位置配对的显示「按位置」', async () => {
@@ -155,5 +158,60 @@ describe('ConsolNoteMappingDialog 同名行按分组（R3）', () => {
     expect(body.mappings.map((m: any) => [m.source_label, m.target_row_id, m.source_group, m.source_group_occurrence]))
       .toEqual([['机器设备', 't0', '一、账面原值合计', 0], ['机器设备', 't1', '二、累计折旧合计', 0]])
     expect(body.mappings.every((m: any) => !('source_occurrence' in m))).toBe(true)
+  })
+})
+
+// ─── 待确认建议过目 + 模板没有的合计行建议忽略（spec note-table-structure-formula-pull-closure R6.5 / R6.7）──────
+
+describe('ConsolNoteMappingDialog 确认前过目（R6.7）', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(api)) fn.mockReset()
+    api.previewDetailRefresh.mockResolvedValue(groupedPreview())
+    api.confirmDetailMapping.mockResolvedValue({})
+    box.confirm.mockReset()
+  })
+
+  async function clickConfirm() {
+    const w = await open()
+    await w.findAll('button').find(b => b.text() === '确认映射')!.trigger('click')
+    await flushPromises()
+    return w
+  }
+
+  it('有按位置 / 模糊建议的行：先弹窗列出，确认后才写规则', async () => {
+    box.confirm.mockResolvedValue('confirm')
+    await clickConfirm()
+    expect(box.confirm).toHaveBeenCalledTimes(1)
+    const [message, title] = box.confirm.mock.calls[0]
+    expect(title).toBe('1 行待确认')
+    expect(String(message.children)).toContain('「机器设备」→「一年以上（1）」（按位置）')
+    expect(api.confirmDetailMapping).toHaveBeenCalledTimes(1)
+  })
+
+  it('弹窗里选「返回检查」：不写规则', async () => {
+    box.confirm.mockRejectedValue('cancel')
+    await clickConfirm()
+    expect(api.confirmDetailMapping).not.toHaveBeenCalled()
+  })
+
+  it('全部可自动确认：不弹窗', async () => {
+    api.previewDetailRefresh.mockResolvedValue(preview())
+    await clickConfirm()
+    expect(box.confirm).not.toHaveBeenCalled()
+    expect(api.confirmDetailMapping).toHaveBeenCalledTimes(1)
+  })
+
+  it('模板没有的合计 / 小计行：后端建议忽略 ⇒ 就绪、按忽略带原因提交', async () => {
+    const p = preview()
+    p.suggestions.push({ source_label: '小 计', suggested_target: null, confidence: 1, match_type: 'total_ignored',
+      mapping_action: 'ignore', ignore_reason: '合并模板没有这一行合计 / 小计（合计按本表数据重算）', candidates: [],
+      auto_confirmable: true } as any)
+    api.previewDetailRefresh.mockResolvedValue(p)
+    const w = await clickConfirm()
+    expect(w.text()).toContain('模板无此合计')
+    expect(box.confirm).not.toHaveBeenCalled()
+    const body = api.confirmDetailMapping.mock.calls[0][1]
+    expect(body.mappings.at(-1)).toMatchObject({ source_label: '小 计', mapping_action: 'ignore',
+      ignore_reason: '合并模板没有这一行合计 / 小计（合计按本表数据重算）' })
   })
 })

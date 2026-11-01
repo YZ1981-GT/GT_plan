@@ -57,6 +57,8 @@ class SourceTable:
     status: str = ""
     # 怎么认到的这张表：name 按表名 / structure 按表头结构 / single_table 章节只有一张表
     table_choice: str = ""
+    # 并进「合计」行的单体行（「小计」「减：坏账准备」，consol_note_provision_fold）
+    folded_rows: list[str] = field(default_factory=list)
 
     def to_status(self) -> dict[str, Any]:
         return {
@@ -67,6 +69,7 @@ class SourceTable:
             "row_count": len(self.rows),
             "unmatched_columns": self.unmatched_columns,
             "ratio_columns": self.ratio_columns,
+            "folded_rows": self.folded_rows,
         }
 
 
@@ -257,6 +260,14 @@ def read_source_table(
         extra_match = match_columns(target_keys, extra_keys, vocab)
         if extra_match.col_map:
             rows += _rows_from(tables[extra], [], extra_match.col_map, width)
+    folded: list[str] = []
+    if has_target:  # 单体「小计 / 减：坏账准备 / 合计」→ 合并「合计」行的余额 + 坏账准备列（R6.6）
+        from app.services.consol_note_provision_fold import fold_provision_rows
+
+        rows, folded = fold_provision_rows(rows, target_keys, sorted(match.col_map),
+                                           [_row_label(r) for r in consol_table.get("rows") or []])
+    amount_cols = [k.index for k in target_keys[1:] if k.kind == "amount"]
+    no_amount = bool(rows and amount_cols and not set(amount_cols) & set(match.col_map))
     # 同名行的出现序号（主表 + 行续表连起来数）：映射可按（行名, 序号）取行（spec note-pull-followup-closure R11）
     # 按去首尾空白的行名数（与映射的 source_label、建议的来源行同一个键）
     seen: dict[str, int] = {}
@@ -271,12 +282,16 @@ def read_source_table(
                                                                 [i["row_type"] for i in rows])):
         item["_group"], item["_group_occurrence"] = group, group_occurrence
 
+    name = str(primary.get("name") or "") or None
     return SourceTable(
         rows=rows,
-        table_name=str(primary.get("name") or "") or None,
+        table_name=name,
         matched_columns=sorted(match.col_map),
         unmatched_columns=[target_keys[c].label for c in match.unmatched],
         ratio_columns=[target_keys[c].label for c in match.ratio],
-        reason=None if rows else "单体附注对应表格没有行",
+        # 金额列一列都没对上：行能映射，但拉不到数（原先报「已读到」，合并表整表为空也看不出原因）
+        reason=("单体附注对应表格没有行" if not rows else
+                f"单体表「{name or '主表'}」的金额列与合并表一列都没对上，拉不到数" if no_amount else None),
         table_choice=choice.method,
+        folded_rows=folded,
     )

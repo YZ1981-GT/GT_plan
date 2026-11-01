@@ -1300,7 +1300,7 @@ function copyDrillDownTable() {
       : [r.company_name, r.company_code, r.amount ?? '', `${r.ratio}%`, r.source]
     lines.push(vals.join('\t'))
   }
-  await copyText(lines.join('\n'))
+  void copyText(lines.join('\n'))
   ElMessage.success('已复制到剪贴板（可粘贴到 Excel）')
 }
 

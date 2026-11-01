@@ -70,7 +70,7 @@ export function useCellSelection(rows: Ref<ConfirmationRow[]>) {
       return row ? String((row as any)[cell.colField] ?? '') : ''
     })
     const text = lines.join('\n')
-    await copyText(text)
+    void copyText(text)
     return text
   }
 

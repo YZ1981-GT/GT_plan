@@ -120,7 +120,7 @@ function handleManualEdit(value: string) {
 
 function handleCopy() {
   const text = composedResult.value.text || props.row?.memo_text || ''
-  await copyText(text)
+  void copyText(text)
 }
 </script>
 

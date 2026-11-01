@@ -461,7 +461,8 @@ class _Run:
         amounts: dict[int, dict[int, Decimal]] = {}
         provenance: list[dict[str, Any]] = []
         unplaced: list[dict[str, Any]] = []
-        headers = list((find_table(self.template_type, sid) or {}).get("headers") or [])
+        consol_table = find_table(self.template_type, sid) or {}
+        headers = list(consol_table.get("headers") or [])
         width = max(len(headers), 2)
         entity_data = False
         for child in node.children:
@@ -499,7 +500,8 @@ class _Run:
             amounts.pop(i, None)
         # 「……」占位行没有下级数、也没有手填值就不写；手工 / 锁定格按行名对到新行号（R15）
         built = build_note_rows(skeleton, amounts, width=width, protected=manual | locked,
-                                existing_rows=existing_rows, placeholders=placeholders)
+                                existing_rows=existing_rows, placeholders=placeholders,
+                                table=consol_table if headers else None)
         new_rows, filled, kept = built.rows, built.filled, built.kept
         lost_protected = remap_protected(data, record, manual, locked, built.old_to_new)
         for i, cells in verbatim.items():

@@ -58,9 +58,13 @@ async def _checked_targets(
 async def adopt(db, *, project_id: UUID, year: int, addr_ids: Iterable[str], user_id: UUID | None) -> RunResult:
     """采用公式值：重新算出当前公式值写入并转 auto。"""
     wanted, _, _ = await _checked_targets(db, project_id, year, addr_ids)
-    return await run_and_commit(
+    result = await run_and_commit(
         db, project_id=project_id, year=year, trigger=MANUAL, triggered_by=user_id, force_addr_ids=wanted,
     )
+    from app.services.formula_push.note_followup import recalc_pushed_notes
+
+    await recalc_pushed_notes(db, result)  # R4.1
+    return result
 
 
 async def set_locked(

@@ -169,10 +169,12 @@ export function mergeNoteUserFormulaRows(
   const userRows: NoteFormulaRow[] = []
   let i = 0
   for (const u of byTarget.values()) {
+    // 后端给了「表名 · 行名 · 列名」就按目标单元格显示（同章节多条公式原先都只显示章节标题）
+    const targetLabel = typeof u.target_label === 'string' ? u.target_label.trim() : ''
     userRows.push({
       id: `note_user_${sectionId || sectionTitle || 'x'}_${i}`,
       row_code: sectionId || undefined,
-      row_name: sectionTitle || undefined,
+      row_name: targetLabel || sectionTitle || undefined,
       formula: typeof u.formula === 'string' ? u.formula.trim() : String(u.formula ?? ''),
       formula_category: (u.category as string) || 'auto_calc',
       formula_description: (u.description as string) || '',
@@ -200,7 +202,11 @@ export function buildNoteFormulaRows(
   const list = Array.isArray(presets) ? presets : []
   const scoped = filterNotePresetsForSection(list, ref)
   const source = scoped.length ? scoped : list
-  return source.map((f, i) => ({
+  return source.map(presetRow)
+}
+
+function presetRow(f: NotePresetFormula, i: number): NoteFormulaRow {
+  return {
     id: `note_preset_${i}`,
     row_code: f.note_section,
     row_name: f.section_title,
@@ -208,5 +214,51 @@ export function buildNoteFormulaRows(
     formula_category: f.category,
     formula_description: f.description,
     formula_source: f.source,
+  }
+}
+
+/** 本章节没生成预设公式的格与原因（GET list_note_formulas 的 ``preset_notes``：「表名 · 行名」+ 原因）。 */
+export interface NotePresetNote {
+  label?: string
+  reason?: string
+}
+
+/** 文字版校验预设（note_check_preset_formulas.json）只是审核要点：执行器不跑它们。 */
+export const NOTE_GUIDE_LAYER_LABEL = '审核要点（不执行）'
+export const NOTE_GAP_LAYER_LABEL = '未生成预设'
+
+/**
+ * 附注章节节点 → 公式管理表格行（spec note-table-structure-formula-pull-closure R5）。
+ *
+ * 顺序：可执行公式（有效集：本项目 / 全局 / 系统预设，按目标单元格）→ 审核要点（文字版校验预设，不执行）→
+ * 本章节没生成预设公式的格与原因（判不准的合计 / 比例列等，点「添加公式」进章节公式弹窗手工设）。
+ * 原先审核要点排在前、可执行公式附在后，两类同列「公式」分不清哪条会算。
+ * - 审核要点按章节筛（标题优先，见 filterNotePresetsForSection）；筛不出而本章节有可执行公式 ⇒ 不列审核要点
+ *   （原先退回全部 700 多条他章要点）；两者都没有（章级节点 / 无上下文）⇒ 退回全部审核要点，不给空表。
+ */
+export function buildNoteSectionRows(
+  presets: readonly NotePresetFormula[],
+  userFormulas: readonly NoteUserFormula[] | null | undefined,
+  ref: NoteSectionRef,
+  notes?: readonly NotePresetNote[] | null,
+): NoteFormulaRow[] {
+  const executable = mergeNoteUserFormulaRows([], userFormulas, ref)
+  const list = Array.isArray(presets) ? presets : []
+  const scoped = filterNotePresetsForSection(list, ref)
+  const guides = (scoped.length || executable.length ? scoped : list).map((f, i) => ({
+    ...presetRow(f, i), _layer: 'guide', _layer_label: NOTE_GUIDE_LAYER_LABEL,
   }))
+  const sectionId = (ref.sectionId || '').trim() || undefined
+  const gaps = (Array.isArray(notes) ? notes : []).map((n, i): NoteFormulaRow => ({
+    id: `note_preset_gap_${i}`,
+    row_code: sectionId,
+    row_name: String(n?.label || '').trim() || (ref.sectionTitle || '').trim() || undefined,
+    formula: '',
+    formula_category: '未生成',
+    formula_description: String(n?.reason || ''),
+    formula_source: 'preset_gap',
+    _layer: 'gap',
+    _layer_label: NOTE_GAP_LAYER_LABEL,
+  }))
+  return [...executable, ...guides, ...gaps]
 }

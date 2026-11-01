@@ -855,7 +855,7 @@ async function doExport() {
 function copyCorrelationId() {
   const id = queryError.value?.correlationId
   if (!id) return
-  await copyText(id).then(
+  void copyText(id).then(
     () => { ElMessage.success('已复制追踪号') },
     () => { ElMessage.warning('复制失败，请手动复制') },
   )
@@ -926,7 +926,7 @@ function copyFormulaRef(index: number) {
     ElMessage.warning(refHint(index))
     return
   }
-  await copyText(ref).then(() => {
+  void copyText(ref).then(() => {
     ElMessage.success(`已复制: ${ref}`)
   }).catch(() => {
     ElMessage.warning('复制失败，请手动复制')

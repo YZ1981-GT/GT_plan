@@ -18,12 +18,24 @@ from typing import Any
 _LABEL_WS = str.maketrans("", "", " \t\r\n\u3000")
 #: 账龄 / 期限区间的连接符：「1-2年」「1－2年」「1～2年」「1至2年」是同一行
 _RANGE_RE = re.compile(r"(\d+)[-－—–~～至到](\d+)(?=年|个月|月|天|日)")
+#: 行名里的编制提示「【注意：与会计政策中披露的组合保持一致】」：不是行名（单体附注常把它删掉，合并模板还留着）
+_HINT_RE = re.compile(r"【[^】]*】")
+#: 整行包在方括号里 = Word 模板的可选行（「[本期转销]」），单体附注填了就去掉括号
+_OPTIONAL_RE = re.compile(r"[\[［](.+)[\]］]")
+#: 半角括号统一成全角（模板「土地储备(由房地产开发企业填列）」与单体「土地储备（由房地产开发企业填列）」）
+_PARENS = str.maketrans({"(": "（", ")": "）"})
 
 
 def _label_key(label: Any) -> str:
-    """行名比较键：去全部空白 + 去尾冒号 + 区间连接符统一成「至」（模板「合  计」与来源「合计」、「小计：」与「小计」、
-    合并模板「1至2年」与单体组合计提表「1-2年」是同一行）。"""
-    s = _RANGE_RE.sub(r"\1至\2", str(label or "").translate(_LABEL_WS))
+    """行名比较键：去全部空白 + 去「【…】」编制提示 + 去可选行方括号 + 括号统一全角 + 去尾冒号 + 区间连接符统一成「至」
+    （模板「合  计」与来源「合计」、「小计：」与「小计」、合并模板「1至2年」与单体组合计提表「1-2年」、
+    「按组合计提坏账准备【注意：…】」与「按组合计提坏账准备」、「[本期转销]」与「本期转销」是同一行）。
+    整个行名都是「【…】」时不去。"""
+    raw = str(label or "").translate(_LABEL_WS)
+    s = _HINT_RE.sub("", raw) or raw
+    if optional := _OPTIONAL_RE.fullmatch(s):
+        s = optional.group(1)
+    s = _RANGE_RE.sub(r"\1至\2", s.translate(_PARENS))
     return s.rstrip(":").rstrip("：")
 
 
@@ -78,7 +90,7 @@ def suggest_template_rows(
     0. 集团下推行身份（``_pushed_row_id``，exact_id）
     1. 精确匹配目标 canonical_name
     2. 别名匹配 aliases；2.5 全局别名库
-    3. （原「规则模板库」一级随 V202 规则模板库退役，spec note-pull-followup-closure R16）
+    3. 账龄 / 期限区间包含（``aging_bucket``，``note_aging_buckets``；原「规则模板库」一级随 V202 退役后空出的一级）
     4. 上年同集团项目匹配（previous_year_suggestions，confidence=0.88）
     5. 本项目本章节已确认规则（history，同一行名 → 同一目标行）—— 排在模糊匹配之前：用户确认过的对应
        比字面相似度可靠（原先排在模糊之后，相似度过线的行永远走不到历史规则）
@@ -104,12 +116,14 @@ def suggest_template_rows(
     seen: set[str] = set()
     # V204: 同时收集来源行的 _pushed_row_id（集团下推的行）
     label_to_pushed_rid: dict[str, str] = {}
+    label_row_type: dict[str, str] = {}
     for group in source_groups:
         for sr in group.get("source_rows", []):
             label = sr["label"]
             if label and label not in seen:
                 all_labels.append(label)
                 seen.add(label)
+                label_row_type[label] = str(sr.get("row_type") or "data")
                 # 来源行带 _pushed_row_id = 集团下推的行
                 rid = sr.get("_pushed_row_id") or ""
                 if rid:
@@ -142,6 +156,9 @@ def suggest_template_rows(
         if trid:
             target_by_rid[trid] = tr
 
+    from app.services.note_aging_buckets import containing_bucket
+
+    bucket_names = [tr.get("canonical_name", "") for tr in template_rows]
     suggestions: list[dict[str, Any]] = []
     for label in all_labels:
         key = _label_key(label)
@@ -176,18 +193,18 @@ def suggest_template_rows(
                 label, name_to_target[canonical_key], "global_alias", 0.93,
             ))
             continue
-        # 反向：来源用标准名、模板行用变体名
-        if key in {v for v in global_aliases.values()}:
-            for vk, ck in global_aliases.items():
-                if ck == key and vk in name_to_target:
-                    suggestions.append(_suggestion(
-                        label, name_to_target[vk], "global_alias", 0.93,
-                    ))
-                    break
-            else:
-                pass  # 没找到，继续下一级
-            if suggestions and suggestions[-1].get("match_type") == "global_alias":
-                continue
+        # 反向：来源用标准名、模板行用变体名（原先没找到时看「上一条建议是不是 global_alias」决定跳过，
+        # 上一行按别名配上、这一行反向没配上 ⇒ 这一行整条建议丢失）
+        variant = next((vk for vk, ck in global_aliases.items() if ck == key and vk in name_to_target), None)
+        if variant is not None:
+            suggestions.append(_suggestion(label, name_to_target[variant], "global_alias", 0.93))
+            continue
+
+        # 3. 账龄 / 期限区间整段落在模板唯一一档里（单体「3至4年」「5年以上」→ 合并「3年以上」，多档相加）
+        bucket = containing_bucket(label, bucket_names)
+        if bucket is not None:
+            suggestions.append(_suggestion(label, template_rows[bucket], "aging_bucket", 0.9))
+            continue
 
         # 4. 上年同集团项目匹配（confidence=0.88）
         if label in prev_year_index:
@@ -207,6 +224,18 @@ def suggest_template_rows(
         ) if label in history_index else None
         if history_target is not None:
             suggestions.append(_suggestion(label, history_target, "history", 0.85))
+            continue
+
+        # 6'. 来源的合计 / 小计行不模糊配（原先「小  计」按字面配到「合  计」）：合计行对模板唯一的合计行；
+        #     模板没有的合计 / 小计行忽略 —— 合计按本表数据重算，模板没有这一行就没有要写的数（R6.5）
+        if label_row_type.get(label) in ("total", "subtotal"):
+            totals = [tr for tr in template_rows if tr.get("row_type") == "total"]
+            if label_row_type[label] == "total" and len(totals) == 1:
+                suggestions.append(_suggestion(label, totals[0], "total_row", 0.9))
+            else:
+                suggestions.append({"source_label": label, "suggested_target": None, "confidence": 1.0,
+                                    "match_type": TOTAL_IGNORED, "mapping_action": "ignore",
+                                    "ignore_reason": TOTAL_IGNORED_REASON, "candidates": []})
             continue
 
         # 6. 模糊匹配
@@ -286,9 +315,16 @@ def _split_repeated_labels(
     history_occ = {(str(h.get("source_label", "")).strip(), h["source_occurrence"]): str(h.get("target_row_id", ""))
                    for h in history if isinstance(h.get("source_occurrence"), int) and h.get("target_row_id")}
 
+    aliases = _load_global_aliases()
+
+    def canon(group: str) -> str:
+        """分组键里的行名按通用别名归一：单体「按单项计提减值准备」下的「其中：」与模板「按单项计提坏账准备」下的是同一组。"""
+        return "›".join(aliases.get(part, part) for part in group.split("›"))
+
     def level1(group: str) -> str:
         return group.split("›", 1)[0]
 
+    tpl_canon = [canon(g) for g, _occ in tpl_groups]
     out: list[dict[str, Any]] = []
     for s in suggestions:
         label = s["source_label"]
@@ -301,12 +337,13 @@ def _split_repeated_labels(
         # 按行名对得上模板（精确 / 别名；下推行里没带行身份的那几处按行名对）
         by_name = s["match_type"] if s["match_type"] in ("exact", "alias") else (
             "exact" if s["match_type"] == "exact_id" and same else None)
-        src_count = Counter(g for g, _go, _k, _rid in occs.get(label, []))
+        src_count = Counter(canon(g) for g, _go, _k, _rid in occs.get(label, []))
         for group, group_occ, k, rid in occs.get(label, []):
-            cands = [i for i in same if level1(tpl_groups[i][0]) == level1(group)]
-            tpl_count = Counter(tpl_groups[i][0] for i in cands)
+            cg = canon(group)
+            cands = [i for i in same if level1(tpl_canon[i]) == level1(cg)]
+            tpl_count = Counter(tpl_canon[i] for i in cands)
             # 同一一级分组里模板有几个同名行：完整分组键两边都唯一才算对上（组内只剩顺序可分的不算）
-            exact = [i for i in cands if tpl_groups[i][0] == group and tpl_count[group] == 1 and src_count[group] == 1]
+            exact = [i for i in cands if tpl_canon[i] == cg and tpl_count[cg] == 1 and src_count[cg] == 1]
             hist = by_id.get(history_group.get((label, group, group_occ)) or history_occ.get((label, k), ""))
             confidence = s["confidence"] if by_name == s["match_type"] else 1.0
             if rid and rid in target_by_rid:
@@ -326,13 +363,19 @@ def _split_repeated_labels(
     return out
 
 
-#: 可自动确认的匹配方式：行身份 / 行名 / 别名 / 用户确认过的同名对应。模糊、上年规则、同名行只能按位置配（``position``）
-#: 须人工看一眼。
-AUTO_CONFIRM_MATCH_TYPES = frozenset({"exact_id", "exact", "alias", "global_alias", "history"})
+#: 可自动确认的匹配方式：行身份 / 行名 / 别名 / 账龄区间包含 / 模板唯一合计行 / 用户确认过的同名对应。模糊、上年规则、
+#: 同名行只能按位置配（``position``）须人工看一眼。
+AUTO_CONFIRM_MATCH_TYPES = frozenset({"exact_id", "exact", "alias", "global_alias", "aging_bucket", "total_row", "history"})
+#: 模板没有的来源合计 / 小计行：建议「忽略」（``mapping_action=ignore``），可自动确认
+TOTAL_IGNORED = "total_ignored"
+TOTAL_IGNORED_REASON = "合并模板没有这一行合计 / 小计（合计按本表数据重算）"
 
 
 def is_auto_confirmable(suggestion: dict[str, Any]) -> bool:
-    """建议可不经人工确认直接采用：有目标行且匹配方式属于 ``AUTO_CONFIRM_MATCH_TYPES``（预览与「⚡ 自动映射」共用）。"""
+    """建议可不经人工确认直接采用：有目标行且匹配方式属于 ``AUTO_CONFIRM_MATCH_TYPES``，或模板没有的合计 / 小计行
+    建议忽略（预览与「⚡ 自动映射」共用）。"""
+    if suggestion.get("match_type") == TOTAL_IGNORED:
+        return True
     target = suggestion.get("suggested_target")
     return bool(isinstance(target, dict) and target.get("target_row_id")) \
         and suggestion.get("match_type") in AUTO_CONFIRM_MATCH_TYPES

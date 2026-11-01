@@ -147,8 +147,11 @@ class TestRealTemplates:
                 for target, terms in plans.items():
                     assert kinds[target] in ("total", "subtotal")
                     assert all(0 <= r < len(rows) and r != target for r, _s in terms)
+                    assert all(kinds[r] != "title" for r, _s in terms), (sec["section_number"], target)
                     if kinds[target] == "subtotal":
-                        assert all(kinds[r] == "data" for r, _s in terms), (sec["section_number"], target)
+                        # 小计的构成是明细；账龄嵌套小计（R1.2）的「小计」另含它上方、自己有构成的分项小计
+                        assert all(kinds[r] == "data" or (kinds[r] == "subtotal" and r < target and r in plans)
+                                   for r, _s in terms), (sec["section_number"], target)
                     checked += 1
         assert checked > 200
 

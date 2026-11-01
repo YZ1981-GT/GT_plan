@@ -109,7 +109,7 @@ export interface BatchPlanStatus {
 }
 
 export function newBatchIdempotencyKey(): string {
-  return newUuid()}-${Math.random().toString(16).slice(2)}`
+  return newUuid()
 }
 
 export async function validateBatchProjectFile(

@@ -515,6 +515,7 @@ async def execute_note_formulas(
     resolve = (lambda token: _resolve_single_cross_ref(token, cross_data or {})) if need_cross else None
 
     tables = dict(iter_note_tables(view))
+    owned_cells = await _push_owned_cells(db, project_id, year, note_section, td, view)
     by_table: dict[int, dict[tuple[int, int], tuple[str, dict]]] = {}
     exec_results: list[dict] = []
     for key, fdef in formulas.items():
@@ -555,6 +556,14 @@ async def execute_note_formulas(
             if (formula_def.get("category") or "auto_calc") != "auto_calc":
                 exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
                                      "status": "skipped", "reason": "审核类公式不回填单元格"})
+                continue
+            if _required_blank(formula_def, rows):  # 比例 / 损失率：本行金额为空不算、不写 0（R2.1）
+                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
+                                     "status": "skipped", "reason": "本行金额为空，不算比例"})
+                continue
+            if key not in user_keys and (t, row_idx, col_idx) in owned_cells:
+                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
+                                     "status": "kept_push", "reason": "这一格由公式推送按试算表审定数写入，预设公式不改写"})
                 continue
             expression = formula_def.get("expression", "")
             if ftype not in ("vertical_sum", "horizontal_balance", "book_value") and CROSS_REF_RE.search(str(expression)):
@@ -605,6 +614,28 @@ async def execute_note_formulas(
     anomalies += [{"cell": r["cell"], "table_index": r["table_index"], "kind": "workpaper_differs",
                    "message": r["reason"]} for r in exec_results if r["status"] == "kept_workpaper"]
     return {"executed": executed, "updated": updated, "results": exec_results, "anomalies": anomalies}
+
+
+def _required_blank(formula_def: dict, rows: list) -> bool:
+    """预设公式声明的必填格（``requires``：比例的分子）有一格为空。"""
+    from app.services.note_formula_tables import _cell
+
+    need = formula_def.get("requires")
+    return isinstance(need, list) and any(
+        isinstance(rc, (list, tuple)) and len(rc) == 2 and _cell(rows, int(rc[0]), int(rc[1])) is None for rc in need)
+
+
+async def _push_owned_cells(db: AsyncSession, project_id: UUID, year: int, section: str, td: Any,
+                            view: Any) -> set[tuple[int, int, int]]:
+    """存储表上推送拥有的格（``note_formula_push_guard``）；查询失败按没有处理（保存点隔离，不让事务中止）。"""
+    from app.services.note_formula_push_guard import push_owned_cells
+
+    try:
+        async with db.begin_nested():
+            return await push_owned_cells(db, project_id=project_id, year=year, section=section, td=td, view=view)
+    except Exception:  # noqa: BLE001 —— 守卫取不到不阻断公式执行
+        logger.warning("附注公式：推送拥有格查询失败 project=%s section=%s", project_id, section, exc_info=True)
+        return set()
 
 
 def _same_amount(old: Any, new: float) -> bool:

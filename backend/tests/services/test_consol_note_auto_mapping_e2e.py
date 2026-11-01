@@ -357,7 +357,10 @@ class TestAutoMapIsolation:
 class TestAutoConfirmRule:
 
     def test_auto_confirm_set_is_pinned(self):
-        assert AUTO_CONFIRM_MATCH_TYPES == {"exact_id", "exact", "alias", "global_alias", "history"}
+        # aging_bucket / total_row 由 spec note-table-structure-formula-pull-closure R6.3 / R6.5 加入（区间包含与
+        # 模板唯一合计行都是确定的对应，不必人工看）
+        assert AUTO_CONFIRM_MATCH_TYPES == {"exact_id", "exact", "alias", "global_alias", "aging_bucket",
+                                            "total_row", "history"}
 
     @pytest.mark.parametrize("match_type", sorted(AUTO_CONFIRM_MATCH_TYPES))
     def test_auto_types_with_target(self, match_type):

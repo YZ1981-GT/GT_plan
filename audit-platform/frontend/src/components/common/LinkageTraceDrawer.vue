@@ -263,7 +263,7 @@ function handleCopy(contract: LinkageContract) {
     `状态: ${getStatusLabel(contract.status)}`,
   ].filter(Boolean).join('\n')
 
-  await copyText(text).then(() => {
+  void copyText(text).then(() => {
     ElMessage.success('引用信息已复制')
   }).catch(() => {
     ElMessage.warning('复制失败，请手动复制')

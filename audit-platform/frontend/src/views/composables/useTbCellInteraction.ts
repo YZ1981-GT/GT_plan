@@ -121,7 +121,7 @@ export function useTbCellInteraction(
     }
     if (currentLine.length > 0) lines.push(currentLine.join('\t'))
     const text = lines.join('\n')
-    await copyText(text)
+    void copyText(text)
     return text
   }
 
