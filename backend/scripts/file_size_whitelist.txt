@@ -1833,4 +1833,7 @@ backend/app/services/consistency_gate/_impl.py  2031
 #   拆分方向（属独立任务，不在本轮做）：该文件现在同时承担「源发现 → 事实推导 → overlay 合并
 #   → 投影渲染 → digest 计算」五段。应把**事实推导**（pending 字段、counterpart、
 #   effective_entry_id、wp-code 裁决合并）提到 `workpaper_sync_manifest_facts.py`，生成器只留
-#   「发现 + 渲染 + digest」；tasks.md 1.7「原子生成」是它的自然承接点，届时一并做。
+#   「发现 + 渲染 + digest」。
+#   🔴 勘误（同日）：原文写「tasks.md 1.7 是它的自然承接点，届时一并做」。1.7 已交付
+#   （`generate_workpaper_sync_artifacts.py`：按依赖序编排四件生成物 + 幂等自证），其任务正文
+#   只讲原子生成，**不含**本文件的拆分 —— 抽模块仍是未承接的独立任务，不要再把它挂在 1.7 上。

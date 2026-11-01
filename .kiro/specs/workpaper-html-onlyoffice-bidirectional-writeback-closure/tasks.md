@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：18/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：21/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 已勾选的 18 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
 > 末尾 §Notes 的「未完成项实况」里逐条写了当前状态与阻塞原因，不以「文件已存在」充数。
@@ -26,8 +26,14 @@
     `07f66e91c4d4fc38…` 并绑 `source_review_ref`。
   - _AC: 1.3, 12.1_
 
-- [ ] 0.2 固化本轮真源优先级与历史资料边界
+- [x] 0.2 固化本轮真源优先级与历史资料边界
   - 机器检查当前 requirements 恰等于 paradigm AC 投影；归档 design/tasks 和 master-control 只作引用，不作为状态输入。
+  - 产物：`backend/tests/workpaper_sync/test_umbrella_spec_reference_closure.py`
+    —— AC 集合相等（逐字相等由既有 `test_migration_paradigm_contract.py::TestAcceptanceCriteriaVerbatim`
+    承担，两者合起来才是「恰等于投影」）+ 「已勾选任务不得拿归档 spec 当完成依据」+
+    「标题 N/48 必须与实际勾选数一致」。
+  - 变异：M0 阴性对照不红；M1 未登记 AC 引用 / M2 标题数说谎 / M3 归档当依据 / M4 requirements
+    少一条 AC 四组全红，两份文件按字节恢复。
   - _AC: 1.3, 12.1_
 
 - [x] 0.3 生成带时间戳的 current-state 基线报告
@@ -44,8 +50,12 @@
     后端选集 added 0 / resolved 11、前端 sync added 0 / resolved 0；另记两类采集期崩溃与六个门禁命令结果）。
   - _AC: 1.3, 1.4, 12.1_
 
-- [ ] 0.5 锁定 AC → design → task → evidence 引用闭合性
+- [x] 0.5 锁定 AC → design → task → evidence 引用闭合性
   - 脚本验证 7 条 AC 每条至少由一项任务和一个可执行验收面承接，且不存在未定义 AC 引用。
+  - 同上文件：`test_no_task_cites_an_undefined_ac` / `test_every_registered_ac_is_carried_by_some_task`
+    / `test_every_registered_ac_has_an_executable_surface_on_disk`（承接面必须**真实存在于磁盘**，
+    写了名字不算）/ `test_acceptance_surface_registry_has_no_stale_entries`（登记表不留失效路径）。
+    现算 7 条 AC 全部闭合，48 条任务全部带 `_AC:` 引用。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 ## Phase 1：统一 manifest 与 cycle slice 当前投影
 
@@ -92,8 +102,22 @@
   - 偏离同 1.5。
   - _AC: 1.3, 12.1, 12.8, 12.9_
 
-- [ ] 1.7 原子生成 manifest JSON、frontend TS、cycle slices 和 current-state report
+- [x] 1.7 原子生成 manifest JSON、frontend TS、cycle slices 和 current-state report
   - `--check` 不写盘且任一上游 stale 时全体失败；`--write` 内容相同无 diff，四类摘要全部从 entry 明细重算。
+  - 产物：`backend/scripts/gen/generate_workpaper_sync_artifacts.py` —— 按依赖序
+    （manifest → legacy baseline / current-state / cycle projection）调用四个既有生成器，
+    `--check` 纯只读且**不短路**（一次把全部 stale 点名）、任一件 stale 即 exit 1；
+    `--write` 上游失败则下游 skipped，写完再跑全量 `--check` 自证幂等，不收敛 exit 2。
+    **不复制**任何生成算法（复制一份就又多一个会漂移的真源）。
+  - 守卫：`backend/tests/workpaper_sync/test_sync_artifacts_atomic_host.py`（8 例，含
+    「`--check` 跑完四件产物的内容与 mtime 均不变」、依赖序自检的可伪证反例、两件同时 stale
+    必须都被点名、上游失败下游必须 skipped、写后复检 stale ⇒ exit 2）。
+  - 🔴 **它第一次运行就抓到一处真实 stale**：样板宿主接入 readiness 单源后 source digest
+    由 `07f66e91…` 变 `189cbda5…`，而本会话此前只跑过下游三件的 `--check` ⇒ 四个独立
+    `--check` 全绿也发现不了。已按零能力损失复核批准并重生成（entry 集合 198→198、stats
+    逐项相同、无任何 entry 裁决字段变化），记录见
+    `evidence/phase1-source-digest-review-2026-11-01-m7.json`；新 digest：manifest
+    `31a23eac…` / baseline `e18500cd…`。
   - _AC: 1.3, 12.1_
 
 ## Phase 2：后端 request-time readiness
@@ -306,10 +330,6 @@
 
 ### 已有部分产物、但判据尚未成立
 
-- **0.2 / 0.5**：两条都要「脚本化验证」（requirements 恰等于 paradigm AC 投影；AC → task →
-  可执行验收面的引用闭合）。本轮是人工核对的 7 条 AC，**没有**写检查脚本 ⇒ 不勾。
-- **1.7 原子生成**：现在是四个生成器各有 `--check`（manifest / legacy baseline / current-state /
-  cycle projection），**不是**一条「任一上游 stale 即全体失败」的原子命令。四条 `--check` 当前全过。
 - **2.4**：registry 侧的 typed failure 已能区分五类（现算：`sync_contract_structure_drift` /
   `published_identity_observed_drift` / `published_identity_frozen_child_unusable` /
   `entry_source_fact_unavailable` / `sync_phase5_e1_selection_invalid`），但**尚未逐条核对

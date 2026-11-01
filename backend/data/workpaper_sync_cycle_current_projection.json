@@ -3880,10 +3880,10 @@
     }
   },
   "independent_entry_count": 145,
-  "manifest_digest": "dcde4f2377050e7e5527ff0bc2a7a32913c325339657e25358289139b4c92424",
-  "projection_digest": "aa045510c9584871339b3df80ecaed05e05393c5bd935eadd70068b79c919354",
+  "manifest_digest": "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50",
+  "projection_digest": "03fb53b57c598dce540c7a29c36695dbb33f4f977df22cb1cf02e0fe81839759",
   "schema_version": "workpaper-sync-cycle-current-projection:v1",
   "snapshot_date": "2026-11-01",
-  "source_digest": "07f66e91c4d4fc388c7d2be43eecbe706985bbf1a3cd37b129c262a99d97ce1b",
+  "source_digest": "189cbda5722cd049afc41f61babc0326ef6a1559a259391a8131295eb482b108",
   "wp_code_adjudication_digest": "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"
 }

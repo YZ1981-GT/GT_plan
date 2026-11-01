@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "ef609a1c9b05f3ec3a4cfef813a59202673e7c959065d7c6bff7f48020652252",
+  "baseline_digest": "e18500cddb2ce678c4b81f076d6667d59fee3495fe0b08b0130c45f0f10c573b",
   "entries": [
     {
       "capability": null,
@@ -7740,7 +7740,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue": "8cef71eef03d0e71164973140e8b4bff8aa891e1671c748bb379e5bb9a09ea39",
+        "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue": "8a2f6af23cc7d96da0a493dc82df56000d596ee79abc15f1cb8a15af0ba8b7e7",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "3dfa2d92a181145757f367cda7e9cab530ece4afaed96df187894dd5820b8a39"
       },
       "ui_characterization": {
@@ -7748,13 +7748,13 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
             "kind": "segmented_mode_switch",
-            "line": 30,
+            "line": 37,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
             "kind": "dual_mode_state",
-            "line": 31,
+            "line": 39,
             "snippet": ":model-value=\"dualMode.mode.value\""
           }
         ],
@@ -9619,9 +9619,9 @@
       }
     }
   ],
-  "manifest_digest": "dcde4f2377050e7e5527ff0bc2a7a32913c325339657e25358289139b4c92424",
+  "manifest_digest": "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50",
   "schema_version": 1,
-  "source_digest": "c365b6249256faac277e5c3c6d9d9606f67f6fbbc54d1b21a2a7b3936b6a1492",
+  "source_digest": "741fbdf771110b5ef652e00d6e05a1ce97ba0d14b8d42afd3afb056c586d7f1a",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 198,

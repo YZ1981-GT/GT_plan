@@ -29894,9 +29894,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 13,
-            "endLine": 107,
+            "endLine": 115,
             "startColumn": 11,
-            "startLine": 102
+            "startLine": 110
           },
           "templateNodeOrdinal": 19,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -29946,9 +29946,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 116,
+            "endLine": 124,
             "startColumn": 9,
-            "startLine": 111
+            "startLine": 119
           },
           "templateNodeOrdinal": 20,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -36916,11 +36916,11 @@
       }
     }
   ],
-  "manifest_digest": "dcde4f2377050e7e5527ff0bc2a7a32913c325339657e25358289139b4c92424",
-  "overlay_digest": "2b03f952ae0a12c4e87c14a17dab15a22e3a4d076c2dc66186d42773c6b5c9a4",
+  "manifest_digest": "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50",
+  "overlay_digest": "fb16c4479ab6c78540936a38d268a7f8b7a128acc8f47db72c2ca2c399b90b9e",
   "profile_source_digest": "6390de60a6a7f895abb09f036b7c94aaf736e66324255e149dffcaf24ceec040",
   "schema_version": 1,
-  "source_digest": "07f66e91c4d4fc388c7d2be43eecbe706985bbf1a3cd37b129c262a99d97ce1b",
+  "source_digest": "189cbda5722cd049afc41f61babc0326ef6a1559a259391a8131295eb482b108",
   "stats": {
     "by_component": {
       "GtOnlyOfficeSheet": 225,
