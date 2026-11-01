@@ -18,9 +18,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+
+# 模型 CRUD 在同事务写哈希链审计（spec llm-linkage-audit-practice-closure 任务 8）：
+# SQLite 夹具要建 audit_log_entries，JSONB / UUID 列按 SQLite 等价类型编译。
+SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+if hasattr(SQLiteTypeCompiler, "visit_uuid"):
+    SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
+
 from app.core.config import settings
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider
 from app.routers.ai_models import router
 from app.services import llm_route
@@ -63,6 +72,8 @@ async def session_factory():
     )
     async with engine.begin() as conn:
         await conn.run_sync(AIModelConfig.__table__.create)
+        await conn.run_sync(AuditLogEntry.__table__.create)
+        await conn.run_sync(AuditChainHead.__table__.create)
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
     finally:

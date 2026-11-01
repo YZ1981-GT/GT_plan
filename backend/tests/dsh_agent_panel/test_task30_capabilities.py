@@ -80,7 +80,8 @@ class TestCapabilityEndpointNative:
         assert result.capabilities.tools is False
         assert result.capabilities.subagents is False
         assert result.capabilities.streaming is True
-        assert result.capabilities.local_only is True
+        # 需求 4.4：Native 可经事务所服务器兜底，不得声明“保证全本地”。
+        assert result.capabilities.local_only is False
         assert result.capabilities.review_mode is True
         assert result.capabilities.attachments is True
 

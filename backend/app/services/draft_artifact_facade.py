@@ -112,12 +112,27 @@ async def prepare_note_artifact(
     context_manifest: dict[str, Any] | None = None,
     operation: str = "append",
     replace_fragment: str | None = None,
+    via_adopt: bool = False,
 ) -> AiContentLog:
-    """服务端读取当前附注并形成待确认 diff；不修改附注正文。"""
+    """服务端读取当前附注并形成待确认 diff；不修改附注正文。
+
+    任务声明的 ``writeback_policy`` 在这里生效：复核类输出不能变成正文草稿；
+    只供参考的任务（``none``）只有用户在对话里显式“采纳”（``via_adopt``）才形成草稿。
+    """
     if operation not in {"append", "replace", "replace_fragment"}:
         raise ValueError("附注草稿只支持 append/replace/replace_fragment")
     if not content or not content.strip():
         raise ValueError("AI 草稿为空")
+    from app.services.ai_task_registry import AiTaskNotRegistered, get_ai_task_spec
+
+    try:
+        spec = get_ai_task_spec(task_code)
+    except AiTaskNotRegistered as exc:
+        raise DraftArtifactConflict(f"未登记的 AI 任务不能形成待确认草稿：{task_code}") from exc
+    if spec.writeback_policy == "review_findings_pending":
+        raise DraftArtifactConflict("复核类 AI 输出只能作为复核疑点，不能写入附注正文")
+    if spec.writeback_policy == "none" and not via_adopt:
+        raise DraftArtifactConflict("该 AI 任务只供参考，需在对话中选择“采纳”后才形成待确认草稿")
     note = (await db.execute(sa.select(DisclosureNote).where(
         DisclosureNote.id == note_id,
         DisclosureNote.project_id == project_id,

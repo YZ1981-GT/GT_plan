@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   emit: vi.fn(),
   success: vi.fn(),
   warning: vi.fn(),
+  info: vi.fn(),
 }))
 
 vi.mock('@/services/commonApi', () => ({
@@ -26,6 +27,7 @@ vi.mock('element-plus', () => ({
   ElMessage: {
     success: (...args: any[]) => mocks.success(...args),
     warning: (...args: any[]) => mocks.warning(...args),
+    info: (...args: any[]) => mocks.info(...args),
   },
 }))
 
@@ -84,5 +86,31 @@ describe('useNoteAi DraftArtifact', () => {
     expect(run).not.toHaveBeenCalled()
     expect(insertContent).not.toHaveBeenCalled()
     expect(mocks.emit).toHaveBeenCalledTimes(2)
+  })
+
+  it('续写基于未保存修改时提示草稿追加在已保存正文之后（任务 13）', async () => {
+    mocks.continueWrite.mockResolvedValueOnce({
+      appended: '续写', artifact_id: 'a7', knowledge_count: 0, warning: '编辑器里有未保存修改',
+    })
+    const { api } = make()
+    await api.onAiContinueWrite()
+    expect(mocks.warning).toHaveBeenCalledWith('编辑器里有未保存修改')
+  })
+
+  it('服务器兜底生成时如实提示，本机生成时不提示（需求 4.4）', async () => {
+    mocks.policy.mockResolvedValueOnce({
+      generated_text: '政策', artifact_id: 'a5', reference_count: 0,
+      model: 'qwen-server', deployment: 'server', fallback_used: true,
+    })
+    mocks.analysis.mockResolvedValueOnce({
+      generated_text: '分析', artifact_id: 'a6', model: 'qwen-local', deployment: 'local', fallback_used: false,
+    })
+    const { api } = make()
+    await api.onAiGeneratePolicy()
+    expect(mocks.info).toHaveBeenCalledTimes(1)
+    expect(mocks.info.mock.calls[0][0]).toContain('事务所服务器模型（qwen-server）')
+    expect(mocks.info.mock.calls[0][0]).toContain('本机模型暂不可用')
+    await api.onAiGenerateAnalysis()
+    expect(mocks.info).toHaveBeenCalledTimes(1)
   })
 })

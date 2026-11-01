@@ -20,6 +20,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+
+class _Savepoint:
+    """AsyncMock 会话的 begin_nested 替身：AI 内容门禁把只读查询放在保存点里（ADR-LLM-016）。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
+
+def _gate_db() -> AsyncMock:
+    db = AsyncMock()
+    db.begin_nested = MagicMock(return_value=_Savepoint())
+    return db
+
 from app.services.workpaper_ai_conclusion_prompts import (
     CONCLUSION_PROMPT_TEMPLATE,
     build_conclusion_prompt,
@@ -305,7 +321,7 @@ class TestPendingBlockConfirmAllow:
         from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
-        db = AsyncMock()
+        db = _gate_db()
 
         # 模拟有 pending AI content log
         pending_log = MagicMock()
@@ -331,7 +347,7 @@ class TestPendingBlockConfirmAllow:
         from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
-        db = AsyncMock()
+        db = _gate_db()
 
         # 无 pending 的日志
         with patch(

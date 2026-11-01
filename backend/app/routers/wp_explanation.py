@@ -111,9 +111,10 @@ async def review_content(
     current_user: User = Depends(get_current_user),
 ):
     """AI预审底稿内容"""
+    from app.services.ai_task_executor import actor_role
     from app.services.wp_ai_service import WpAIService
 
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(current_user))
     # 复用已有的 check_wp_report_consistency 并扩展
     issues = []
 

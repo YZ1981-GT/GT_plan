@@ -71,6 +71,8 @@ async def generate_weekly_report(
     db: AsyncSession,
     project_id: UUID,
     week_start: date | None = None,
+    *,
+    role: str | None = None,
 ) -> dict[str, Any]:
     """生成项目周报数据 + LLM润色
 
@@ -144,7 +146,7 @@ async def generate_weekly_report(
     }
 
     # LLM 润色
-    polished = await _llm_polish_report(raw_data)
+    polished = await _llm_polish_report(raw_data, role=role)
 
     return {
         "raw_data": raw_data,
@@ -203,6 +205,8 @@ async def get_qc_trend(
 async def generate_project_summary(
     db: AsyncSession,
     project_id: UUID,
+    *,
+    role: str | None = None,
 ) -> dict[str, Any]:
     """一页纸项目摘要（5分钟了解项目状态）
 
@@ -274,7 +278,7 @@ async def generate_project_summary(
         summary_data["pending_decisions"].append("与管理层沟通未更正错报处理方案")
 
     # LLM 生成摘要文字
-    polished = await _llm_generate_summary(summary_data)
+    polished = await _llm_generate_summary(summary_data, role=role)
     summary_data["narrative"] = polished
 
     return summary_data
@@ -282,7 +286,7 @@ async def generate_project_summary(
 
 # ═══ LLM 辅助函数 ═══
 
-async def _llm_polish_report(raw_data: dict) -> str:
+async def _llm_polish_report(raw_data: dict, *, role: str | None = None) -> str:
     """LLM 润色周报"""
     try:
         from app.services.ai_task_executor import invoke_ai_task
@@ -312,7 +316,9 @@ async def _llm_polish_report(raw_data: dict) -> str:
 
         invocation = await invoke_ai_task(
             "project.weekly_report",
+            action="ask",
             user_prompt=prompt,
+            role=role,
         )
         if not invocation.result.succeeded:
             raise RuntimeError(
@@ -324,7 +330,7 @@ async def _llm_polish_report(raw_data: dict) -> str:
         return f"本周完成{raw_data['completed_this_week']}个底稿，总进度{raw_data['completion_rate']}%，{raw_data['stale_workpapers']}个底稿超期待跟进。"
 
 
-async def _llm_generate_summary(summary_data: dict) -> str:
+async def _llm_generate_summary(summary_data: dict, *, role: str | None = None) -> str:
     """LLM 生成项目摘要"""
     try:
         from app.services.ai_task_executor import invoke_ai_task
@@ -357,7 +363,9 @@ async def _llm_generate_summary(summary_data: dict) -> str:
 
         invocation = await invoke_ai_task(
             "project.status_summary",
+            action="review",
             user_prompt=prompt,
+            role=role,
         )
         if not invocation.result.succeeded:
             raise RuntimeError(

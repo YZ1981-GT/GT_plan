@@ -9,8 +9,10 @@
  * 支持批量复核、单底稿展开、Excel 导出。
  */
 import { computed, ref } from 'vue'
-import { useReviewPanel } from './useReviewPanel'
+import { useReviewPanel, type ReviewFinding, type SheetReviewCard } from './useReviewPanel'
+import { parseFindingLocation } from './findingLocation'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { eventBus } from '@/utils/eventBus'
 
 interface ReviewPanelProps {
   projectId: string
@@ -44,6 +46,25 @@ defineExpose({
 })
 
 const { currentRole } = usePermissionMatrix()
+
+/**
+ * 疑点来源地址：带单元格（`表名!C8` / `C8`）时走平台统一的格定位，表名缺省取该疑点所属的表；
+ * 只有表名时切到该表。定位仍由底稿渲染器按当前用户可见的表解析（任务 10）。
+ */
+function openFindingLocation(sheet: SheetReviewCard, finding: ReviewFinding): void {
+  const location = parseFindingLocation(finding.sheet_location)
+  const sheetName = location.sheetName || sheet.sheetName
+  if (location.cellRef && sheet.wpId) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: sheet.wpId,
+      sheetName,
+      cellRef: location.cellRef,
+      label: finding.category || 'AI 复核疑点',
+    })
+    return
+  }
+  emit('navigate-sheet', sheetName)
+}
 
 /** 筛选：全部 / 仅底稿级 / 仅降级（科目级+通用） */
 const sourceFilter = ref<'all' | 'sheet' | 'fallback'>('all')
@@ -302,7 +323,7 @@ function getPromptSourceTagType(source?: string): string {
                 <span class="finding-item__category">{{ finding.category }}</span>
               </div>
               <div class="finding-item__desc">{{ finding.description }}</div>
-              <div v-if="finding.sheet_location" class="finding-item__location" @click="emit('navigate-sheet', finding.sheet_location)" style="cursor: pointer; color: var(--el-color-primary);">
+              <div v-if="finding.sheet_location" class="finding-item__location" @click="openFindingLocation(sheet, finding)" style="cursor: pointer; color: var(--el-color-primary);">
                 📍 {{ finding.sheet_location }}
               </div>
               <div v-if="finding.suggestion" class="finding-item__suggestion">

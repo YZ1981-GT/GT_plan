@@ -17,7 +17,7 @@ if not hasattr(SQLiteTypeCompiler, "visit_ARRAY"):
     SQLiteTypeCompiler.visit_ARRAY = lambda self, type_, **kw: "TEXT"
 
 from app.models.ai_models import AIChatMessage, AIChatSession
-from app.models.audit_log_models import AuditLogEntry
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry
 from app.models.base import Base, ProjectStatus, UserRole
 from app.models.core import Project, User
 from app.models.report_models import DisclosureNote, NoteStatus
@@ -35,6 +35,8 @@ async def world():
     )
     tables = [
         User.__table__, Project.__table__, AuditLogEntry.__table__,
+        # 哈希链头是独立表（audit-log-chain-integrity）：append_audit_log 在同一会话里写它
+        AuditChainHead.__table__,
         AIChatSession.__table__, AIChatMessage.__table__,
         DisclosureNote.__table__, AiContentLog.__table__,
     ]
@@ -126,7 +128,7 @@ async def test_stale_target_never_receives_old_preview(world) -> None:
     async with factory() as db:
         artifact = await facade.prepare_note_artifact(
             db, project_id=project_id, user_id=user_id, note_id=note_id,
-            content="旧预览", model="fake",
+            content="旧预览", model="fake", task_code="note.policy_draft",
         )
         artifact_id = artifact.id
         await db.commit()
@@ -156,7 +158,7 @@ async def test_undo_refuses_to_overwrite_later_manual_edit(world) -> None:
     async with factory() as db:
         artifact = await facade.prepare_note_artifact(
             db, project_id=project_id, user_id=user_id, note_id=note_id,
-            content="AI 段落", model="fake",
+            content="AI 段落", model="fake", task_code="note.rewrite",
         )
         artifact_id = artifact.id
         user = await db.get(User, user_id)
@@ -171,6 +173,39 @@ async def test_undo_refuses_to_overwrite_later_manual_edit(world) -> None:
         user = await db.get(User, user_id)
         with pytest.raises(facade.DraftArtifactConflict, match="已再次修改"):
             await facade.undo_note_artifact(db, log_id=artifact_id, user=user)
+        await db.rollback()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("task_code", "via_adopt", "error"),
+    [
+        ("chat.general", False, "采纳"),            # 只供参考：未经用户采纳不能成草稿
+        ("review.workpaper", True, "复核疑点"),      # 复核输出永远不能变成正文
+        ("not.registered", True, "未登记"),          # 未登记任务 fail-closed
+    ],
+)
+async def test_writeback_policy_is_enforced(world, task_code, via_adopt, error) -> None:
+    """ADR-LLM-001：任务声明的 writeback_policy 在草稿入口生效，不是摆设字段。"""
+    factory, user_id, project_id, note_id = world
+    async with factory() as db:
+        with pytest.raises(facade.DraftArtifactConflict, match=error):
+            await facade.prepare_note_artifact(
+                db, project_id=project_id, user_id=user_id, note_id=note_id,
+                content="AI 段落", model="fake", task_code=task_code, via_adopt=via_adopt,
+            )
+        await db.rollback()
+
+
+@pytest.mark.asyncio
+async def test_chat_adoption_may_create_pending_artifact(world) -> None:
+    factory, user_id, project_id, note_id = world
+    async with factory() as db:
+        artifact = await facade.prepare_note_artifact(
+            db, project_id=project_id, user_id=user_id, note_id=note_id,
+            content="对话里采纳的段落", model="fake", task_code="chat.general", via_adopt=True,
+        )
+        assert artifact.writeback_status == "pending"
         await db.rollback()
 
 
@@ -216,6 +251,9 @@ async def test_note_ai_success_creates_authoritative_message_and_pending_artifac
     assert artifact.task_code == "note.policy_draft"
     assert artifact.before_content == "原正文"
     assert artifact.writeback_status == "pending"
+    # 单次生成同样签发稳定 generation_id：消息、草稿与回执是同一身份（需求 7.4）
+    assert result["generation_id"] == str(artifact.generation_id)
+    assert message.context_manifest["generation_id"] == result["generation_id"]
 
 
 def test_v239_migration_and_orm_cover_draft_artifact_fields() -> None:

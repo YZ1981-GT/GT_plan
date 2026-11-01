@@ -1255,11 +1255,15 @@ async def get_review_prompt_preview(
     tags=["ai-chat-metrics"],
     include_in_schema=False,  # 内部端点，不需暴露到 OpenAPI
 )
-async def ai_chat_metrics():
-    """暴露 AI Chat Run 相关 Prometheus 指标。
+async def ai_chat_metrics(current_user: User = Depends(get_current_user)):
+    """暴露 AI Chat Run 相关 Prometheus 指标（仅 admin）。
 
     不含 token 正文、完整正文、附件内容或未脱敏上下文（Req 12.7）。
+    本端点在 ``/api/`` 下、经网关对外可达，运行容量与模型状态只给管理员看
+    （spec llm-linkage-audit-practice-closure ADR-LLM-010）；内网 Prometheus 抓取走根路径 ``/metrics``。
     """
+    if getattr(current_user.role, "value", current_user.role) != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可访问 AI 运行指标")
     from starlette.responses import Response as StarletteResponse
 
     from app.services.ai_chat.metrics import render_ai_chat_metrics

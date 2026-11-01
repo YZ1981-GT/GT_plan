@@ -2,7 +2,7 @@
 
 Tests:
 1. POST /api/workpapers/{wp_id}/review — response structure validation
-2. POST /api/projects/{pid}/batch-review — batch call structure
+2. POST /api/projects/{pid}/ai-batch-review — 只建耐久任务（ADR-LLM-015）
 3. GET /api/review-prompts/coverage — coverage report from real filesystem
 4. ai_content persistence logic verification
 
@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.main import app
 from app.models.base import Base, UserRole
 from app.models.core import Project, ProjectStatus, ProjectType, ProjectUser, User
+from app.models.ai_task_job_models import AiTaskItem, AiTaskJob
 from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType, WpStatus
-from app.services.llm_client import LLMInvocationResult, LLMInvocationStatus
 from tests._test_auth_helper import FakeAuthUser, override_auth
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
@@ -57,7 +57,9 @@ MOCK_LLM_RESPONSE = """\
 """
 
 
-_AUTH_TABLES = [t.__table__ for t in (User, Project, ProjectUser, WpIndex, WorkingPaper)]
+_AUTH_TABLES = [
+    t.__table__ for t in (User, Project, ProjectUser, WpIndex, WorkingPaper, AiTaskJob, AiTaskItem)
+]
 
 
 @pytest_asyncio.fixture
@@ -226,115 +228,77 @@ async def test_review_workpaper_without_sheet_name(client):
 
 
 @pytest.mark.asyncio
-async def test_batch_review_response_structure(client):
-    """POST /api/projects/{pid}/batch-review returns BatchReviewReportResponse shape.
+async def test_batch_review_creates_durable_job_without_calling_llm(client):
+    """POST /api/projects/{pid}/ai-batch-review 只建耐久任务（ADR-LLM-015）。
 
-    Validates: Requirement 4.3
+    请求内不调用模型；每张存在的底稿对应一项，带稳定 generation_id 与基线指纹；
+    报告形状由 ``load_review_job_report`` 从任务明细投影（见 test_ai_task_job_service）。
     """
     fake_sheets = [
-        {"wp_id": str(uuid.uuid4()), "wp_code": "D2-1", "sheet_name": "审定表D2-1"},
+        {"wp_id": FAKE_WP_ID, "wp_code": "D2-1", "sheet_name": "审定表D2-1"},
+        # 不属于本项目 / 已删除的底稿不得进入任务明细
         {"wp_id": str(uuid.uuid4()), "wp_code": "D2-2", "sheet_name": "明细表D2-2"},
     ]
-
+    llm = AsyncMock(side_effect=AssertionError("建任务请求内不得调用模型"))
     with (
         patch(
             "app.services.batch_review_service.BatchReviewService._get_sheets_for_prefix",
             new_callable=AsyncMock,
             return_value=fake_sheets,
         ),
-        patch(
-            "app.services.batch_review_service.chat_completion_result",
-            new_callable=AsyncMock,
-            return_value=LLMInvocationResult(
-                status=LLMInvocationStatus.success,
-                text=MOCK_LLM_RESPONSE,
-                model_name="test-model",
-            ),
-        ),
-        patch(
-            "app.services.batch_review_service.BatchReviewService._get_workpaper_content",
-            new_callable=AsyncMock,
-            return_value="底稿内容",
-        ),
-        patch(
-            "app.services.batch_review_service.BatchReviewService.persist_review_results",
-            new_callable=AsyncMock,
-        ),
+        patch("app.services.ai_task_executor.invoke_ai_task", llm),
+        patch("app.workers.ai_task_worker.wake") as wake,
     ):
         resp = await client.post(
-            f"/api/projects/{FAKE_PROJECT_ID}/batch-review",
-            json={"wp_code_prefix": "D2", "year": 2025},
+            f"/api/projects/{FAKE_PROJECT_ID}/ai-batch-review",
+            json={"wp_code_prefix": "D2", "year": 2025, "progress_session_id": "batch-d2"},
+        )
+        again = await client.post(
+            f"/api/projects/{FAKE_PROJECT_ID}/ai-batch-review",
+            json={"wp_code_prefix": "D2", "year": 2025, "progress_session_id": "batch-d2"},
         )
 
-    assert resp.status_code == 200
-    body = resp.json()
-    data = body.get("data", body)
+    assert resp.status_code == 200, resp.text
+    data = resp.json().get("data", resp.json())
+    assert data["task_kind"] == "workpaper_batch_review"
+    assert data["status"] == "queued"
+    assert data["progress_total"] == 1
+    assert [item["target_key"] for item in data["items"]] == ["审定表D2-1"]
+    item = data["items"][0]
+    assert item["target_id"] == FAKE_WP_ID
+    assert item["generation_id"] and item["before_hash"]
+    assert llm.await_count == 0
+    assert wake.called
 
-    # Top-level fields
-    assert "session_id" in data
-    assert "wp_code_prefix" in data
-    assert "project_id" in data
-    assert "results" in data
-    assert "statistics" in data
-    assert "execution" in data
-
-    # Statistics structure: total = passed + failed + error
-    stats = data["statistics"]
-    assert "total_sheets" in stats
-    assert "passed_count" in stats
-    assert "failed_count" in stats
-    assert "error_count" in stats
-    assert "total_findings" in stats
-    assert "findings_by_risk" in stats
-    assert stats["total_sheets"] == stats["passed_count"] + stats["failed_count"] + stats["error_count"]
-
-    # Results list matches sheet count
-    assert len(data["results"]) == len(fake_sheets)
-
-    # Each result has required fields
-    for result in data["results"]:
-        assert "wp_id" in result
-        assert "sheet_name" in result
-        assert "wp_code" in result
-        assert "pass_status" in result
-        assert "findings" in result
-        assert "risk_summary" in result
-        assert "reviewed_at" in result
-        assert "model_used" in result
-        assert "prompt_source" in result
-
-    # Execution metadata
-    execution = data["execution"]
-    assert "start_time" in execution
-    assert "end_time" in execution
-    assert "duration_seconds" in execution
-    assert "model_used" in execution
-    assert execution["duration_seconds"] >= 0
+    # 同一进度会话重复提交 = 同一任务、同一 generation_id（响应丢失可安全重发）
+    assert again.status_code == 200, again.text
+    replay = again.json().get("data", again.json())
+    assert replay["job_id"] == data["job_id"]
+    assert replay["reused"] is True
+    assert replay["items"][0]["generation_id"] == item["generation_id"]
 
 
 @pytest.mark.asyncio
 async def test_batch_review_empty_prefix(client):
-    """Batch review with no sheets returns empty results."""
+    """没有匹配底稿时任务直接终态，不产生明细。"""
     with (
         patch(
             "app.services.batch_review_service.BatchReviewService._get_sheets_for_prefix",
             new_callable=AsyncMock,
             return_value=[],
         ),
-        patch(
-            "app.services.batch_review_service.BatchReviewService.persist_review_results",
-            new_callable=AsyncMock,
-        ),
+        patch("app.workers.ai_task_worker.wake"),
     ):
         resp = await client.post(
-            f"/api/projects/{FAKE_PROJECT_ID}/batch-review",
+            f"/api/projects/{FAKE_PROJECT_ID}/ai-batch-review",
             json={"wp_code_prefix": "Z99", "year": 2025},
         )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     data = resp.json().get("data", resp.json())
-    assert data["results"] == []
-    assert data["statistics"]["total_sheets"] == 0
+    assert data["items"] == []
+    assert data["progress_total"] == 0
+    assert data["status"] == "succeeded"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

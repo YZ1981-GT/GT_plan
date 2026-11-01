@@ -934,6 +934,7 @@ async def _call_llm(
     try:
         invocation = await invoke_ai_task(
             "review.workpaper",
+            action="review",
             user_prompt=user_prompt,
             system_addendum=system_prompt,
             role=role,

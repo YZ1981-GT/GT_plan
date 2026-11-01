@@ -146,6 +146,22 @@ def snapshot() -> dict[str, object]:
     }
 
 
+def encode_baseline(current: dict[str, object]) -> dict[str, object]:
+    """与既有基线同格式：清单按行 zlib+base64，附计数与摘要。"""
+    out: dict[str, object] = {
+        "schema_version": 1,
+        "description": "AI 旧直调与越界 Prompt 债务，只许减少（spec llm-linkage-audit-practice-closure）",
+        "summary": current["summary"],
+    }
+    for field in ("direct_calls", "prompt_debts"):
+        rows = list(current[field])
+        out[f"{field}_count"] = len(rows)
+        out[f"{field}_zlib_b64"] = base64.b64encode(
+            zlib.compress("\n".join(rows).encode("utf-8"), 9)
+        ).decode("ascii")
+    return out
+
+
 def _baseline_rows(baseline: dict[str, object], field: str) -> list[str]:
     plain = baseline.get(field)
     if isinstance(plain, list):
@@ -160,6 +176,10 @@ def _baseline_rows(baseline: dict[str, object], field: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--emit", action="store_true")
+    parser.add_argument(
+        "--shrink", action="store_true",
+        help="债务减少后把基线收窄到现算结果；有任何新增时拒绝写入",
+    )
     args = parser.parse_args()
     current = snapshot()
     if args.emit:
@@ -170,13 +190,25 @@ def main() -> int:
         return 2
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     failures: list[str] = []
+    stale_rows: list[str] = []
     for field in ("direct_calls", "prompt_debts"):
         prior = _baseline_rows(baseline, field)
         added = sorted(set(current[field]) - set(prior))
+        stale = sorted(set(prior) - set(current[field]))
         if added:
             failures.append(f"{field} 新增 {len(added)} 项：\n  " + "\n  ".join(added))
+        if stale:
+            stale_rows.append(f"{field} 已偿还 {len(stale)} 项：\n  " + "\n  ".join(stale))
     if failures:
         print("[FAIL] AI 任务统一入口棘轮回退\n" + "\n".join(failures))
+        return 1
+    if stale_rows and args.shrink:
+        BASELINE.write_text(json.dumps(encode_baseline(current), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print("[PASS] 基线已收窄\n" + "\n".join(stale_rows))
+        return 0
+    if stale_rows:
+        # 已偿还的债务若留在基线里，日后同名旧调用可原样加回而不被发现。
+        print("[FAIL] 基线含已偿还条目，请运行 --shrink 同次收窄\n" + "\n".join(stale_rows))
         return 1
     prior_direct = _baseline_rows(baseline, "direct_calls")
     prior_prompts = _baseline_rows(baseline, "prompt_debts")

@@ -81,7 +81,11 @@ async def db_session():
             Base.metadata.tables["audit_log_entries"],
             Base.metadata.tables["ai_content_log"],
         ]
-        await conn.run_sync(Base.metadata.create_all, tables=tables_to_create)
+        # 哈希链头是独立表（audit-log-chain-integrity）：ai_content_log_service 的审计写入要用
+        await conn.run_sync(
+            Base.metadata.create_all,
+            tables=tables_to_create + [Base.metadata.tables["audit_chain_head"]],
+        )
     factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session

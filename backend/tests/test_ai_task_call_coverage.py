@@ -11,6 +11,21 @@ def test_committed_baseline_covers_current_debt() -> None:
     assert set(guard.scan_prompt_debts()) <= set(guard._baseline_rows(baseline, "prompt_debts"))
 
 
+def test_baseline_has_no_repaid_entries() -> None:
+    """已偿还的债务必须同次从基线删除，否则同名旧调用可原样加回。"""
+    baseline = guard.json.loads(guard.BASELINE.read_text(encoding="utf-8"))
+    assert set(guard._baseline_rows(baseline, "direct_calls")) == set(guard.scan_direct_calls())
+    assert set(guard._baseline_rows(baseline, "prompt_debts")) == set(guard.scan_prompt_debts())
+
+
+def test_encoded_baseline_round_trips() -> None:
+    current = guard.snapshot()
+    encoded = guard.encode_baseline(current)
+    for field in ("direct_calls", "prompt_debts"):
+        assert guard._baseline_rows(encoded, field) == list(current[field])
+        assert encoded[f"{field}_count"] == len(current[field])
+
+
 def test_ast_scanner_detects_real_call_but_ignores_comment(tmp_path: Path, monkeypatch) -> None:
     app = tmp_path / "app"
     app.mkdir()

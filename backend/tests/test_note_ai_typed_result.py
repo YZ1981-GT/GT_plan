@@ -61,6 +61,8 @@ async def test_generate_analysis_missing_facts_never_calls_model() -> None:
 async def test_rewrite_failure_does_not_echo_original_as_generated_result() -> None:
     user = SimpleNamespace(id=uuid4(), role="auditor")
     with patch.object(note_ai, "require_project_audit_year", new=AsyncMock(return_value=2025)), patch.object(
+        note_ai, "_saved_note_text", new=AsyncMock(return_value="已保存：原文。")
+    ), patch.object(
         note_ai, "_load_selected_knowledge", new=AsyncMock(return_value=[])
     ), patch(
         "app.services.reference_doc_service.ReferenceDocService.load_context",
