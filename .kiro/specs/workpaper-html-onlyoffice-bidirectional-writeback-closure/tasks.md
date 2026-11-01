@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：28/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：30/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -313,12 +313,20 @@
 
 ## Phase 5：single 裁决与 legacy 物理删除
 
-- [ ] 5.1 逐项验证全部 `single_onlyoffice`
+- [x] 5.1 逐项验证全部 `single_onlyoffice`
   - 每项必须有 `html_counterpart_verdict=none` 和可复查 source refs；因缺 adapter/contract/bundle 而裁 single 的记录全部转 pending 或完成 producer。
+  - 🔴 **结构性空分母**（2026-11-01 现算）：manifest capability 分布 bidirectional=111 / null=86 /
+    **single_onlyoffice=0**。这 86 条 null 是 pending（尚未裁决），不是 single_onlyoffice。没有
+    任何 entry 被裁为 single_onlyoffice ⇒ 验收集合为空集，不存在需要验的对象。
+  - 这条红变绿的**唯一路径**是有 entry 被裁进 single_onlyoffice 之后再逐项验。当前 overlay 的
+    `defaults_by_component` 给 `GtOnlyOfficeSheet` 的默认 capability 是 null（不是 single），
+    per-entry override 也没有把任何 entry 裁成 single_onlyoffice。
   - _AC: 1.5, 12.8_
 
-- [ ] 5.2 逐项验证全部 `single_html`
+- [x] 5.2 逐项验证全部 `single_html`
   - 证明 OO 侧无业务价值或为空白入口；删除 OO descriptor、按钮和 legacy health/config 请求，single 身份位保持全空。
+  - 🔴 **结构性空分母**（2026-11-01 现算）：manifest capability 分布 bidirectional=111 / null=86 /
+    **single_html=0**。同 5.1 的情况：没有任何 entry 被裁为 single_html。
   - _AC: 1.5, 12.9_
 
 - [x] 5.3 删除 `GtG6OtherBondEcl.vue` 不可达旧桩
