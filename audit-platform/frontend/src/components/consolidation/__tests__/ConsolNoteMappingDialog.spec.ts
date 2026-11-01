@@ -215,3 +215,58 @@ describe('ConsolNoteMappingDialog 确认前过目（R6.7）', () => {
       ignore_reason: '合并模板没有这一行合计 / 小计（合计按本表数据重算）' })
   })
 })
+
+// ─── 可自动确认比例（spec note-table-structure-formula-pull-closure R11）────────
+
+describe('ConsolNoteMappingDialog 可自动确认比例（R11）', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(api)) fn.mockReset()
+    api.confirmDetailMapping.mockResolvedValue({})
+    box.confirm.mockReset()
+    box.confirm.mockResolvedValue('confirm')
+  })
+
+  function ratioText(w: any): string {
+    return w.find('[data-testid="mapping-auto-ratio"]').text().replace(/\s+/g, '')
+  }
+
+  it('全部可自动确认：显示 3/3（100%）', async () => {
+    api.previewDetailRefresh.mockResolvedValue({ ...preview(), auto_confirmable_count: 3, needs_review_count: 0 })
+    const w = await open()
+    expect(ratioText(w)).toBe('可自动确认3/3（100%）')
+    expect(w.find('[data-testid="mapping-ratio-mismatch"]').exists()).toBe(false)
+  })
+
+  it('部分需人工：按前端行状态算比例（1/2 = 50%）', async () => {
+    api.previewDetailRefresh.mockResolvedValue({ ...groupedPreview(), auto_confirmable_count: 1, needs_review_count: 1 })
+    const w = await open()
+    expect(ratioText(w)).toBe('可自动确认1/2（50%）')
+  })
+
+  it('没有建议行时不显示比例标签（避免 0/0）', async () => {
+    const empty = { ...preview(), suggestions: [], auto_confirmable_count: 0, needs_review_count: 0 }
+    api.previewDetailRefresh.mockResolvedValue(empty)
+    const w = await open()
+    expect(w.find('[data-testid="mapping-auto-ratio"]').exists()).toBe(false)
+  })
+
+  it('后端不回该字段（旧后端）：仍显示比例，不报口径不一致', async () => {
+    const p = preview() as any
+    delete p.auto_confirmable_count
+    api.previewDetailRefresh.mockResolvedValue(p)
+    const w = await open()
+    expect(ratioText(w)).toBe('可自动确认3/3（100%）')
+    expect(w.find('[data-testid="mapping-ratio-mismatch"]').exists()).toBe(false)
+  })
+
+  it('🔴 前后端口径漂移：显式报出来，不显示两个打架的数字', async () => {
+    // 后端说只有 1 行可自动确认，而建议里 3 行都标了 auto_confirmable ⇒ 判定已不一致
+    api.previewDetailRefresh.mockResolvedValue({ ...preview(), auto_confirmable_count: 1, needs_review_count: 2 })
+    const w = await open()
+    const warn = w.find('[data-testid="mapping-ratio-mismatch"]')
+    expect(warn.exists()).toBe(true)
+    expect(warn.text()).toContain('前端 3 / 后端 1')
+    // 表格与顶部标签一律以前端统计为准（不被后端数字带偏）
+    expect(ratioText(w)).toBe('可自动确认3/3（100%）')
+  })
+})

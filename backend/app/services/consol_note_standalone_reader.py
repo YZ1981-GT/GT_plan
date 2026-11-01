@@ -41,6 +41,9 @@ from app.services.note_table_header_match import (
 
 __all__ = ["SourceTable", "pick_standalone_table", "read_source_table"]
 
+# ``table_choice`` 取值：name 按表名 / structure 按表头结构 / single_table 章节只有一张表 /
+# transposed 单体与合并行列互换后认到（R14）
+
 
 @dataclass
 class SourceTable:
@@ -55,7 +58,8 @@ class SourceTable:
     # missing（未生成）/ not_applicable（本期无此情形）/ no_source（合并特有章节）/
     # unreadable（有附注但读不出表）；空 = 按 rows 推断
     status: str = ""
-    # 怎么认到的这张表：name 按表名 / structure 按表头结构 / single_table 章节只有一张表
+    # 怎么认到的这张表：name 按表名 / structure 按表头结构 / single_table 章节只有一张表 /
+    # transposed 行列互换后认到（R14）
     table_choice: str = ""
     # 并进「合计」行的单体行（「小计」「减：坏账准备」，consol_note_provision_fold）
     folded_rows: list[str] = field(default_factory=list)
@@ -216,7 +220,74 @@ def read_source_table(
     consol_section_id: str | None = None,
     standalone_section: str | None = None,
 ) -> SourceTable:
-    """读一家企业单体附注章节里与合并章节对应的表，按合并模板列对齐成标准来源行。
+    """读一家企业单体附注章节里与合并章节对应的表（转置口径见 ``_read_transposed``）。
+
+    正常按列语义键认列（``_read_aligned``）；一个金额列都没对上、或连表都没选中时，
+    再判一次单体表是否与合并表行列互换（R14），命中才按转置视图重读。
+    """
+    kwargs: dict[str, Any] = {
+        "table_name": table_name, "title": title, "section_title": section_title,
+        "std": std, "consol_section_id": consol_section_id, "standalone_section": standalone_section,
+    }
+    direct = _read_aligned(table_data, consol_table=consol_table, **kwargs)
+    # 这道前置门是「成功路径零额外开销」，不是正确性判据（`looks_transposed` 已足够严，
+    # 摘掉它结果也不变）⇒ 只能白盒断言（见 tests/test_note_table_transpose.py::TestRetryGates）
+    if not _may_be_transposed(direct) or not isinstance(consol_table, dict):
+        return direct
+    alt = _read_transposed(table_data, consol_table=consol_table, **kwargs)
+    return alt if alt is not None else direct
+
+
+def _may_be_transposed(result: SourceTable) -> bool:
+    """值得试转置：没选中表 / 没有行 / 金额列一列都没对上。"""
+    if result.table_name is None and not result.rows:
+        return True
+    if not result.rows:
+        return True
+    return not result.matched_columns
+
+
+def _read_transposed(
+    table_data: Any, *, consol_table: dict, **kwargs: Any,
+) -> SourceTable | None:
+    """把单体表按行列互换成视图再走同一条认列路径；条件不成立或仍拉不到金额则返回 None。"""
+    from app.services.note_table_transpose import looks_transposed, transpose_view
+
+    std = kwargs.get("std")
+    standalone_section = kwargs.get("standalone_section")
+    tables = _tables_of(table_data, section_number=standalone_section, source_template=std)
+    label_header = (consol_table.get("headers") or [None])[0]
+    for table in tables:
+        if not looks_transposed(consol_table, table):
+            continue
+        view = transpose_view(table, label_header=label_header)
+        if view is None:
+            continue
+        # 视图只有一张表 ⇒ 选表必中它；认列仍按合并模板列语义键（不放宽）
+        alt = _read_aligned({"_tables": [view]}, consol_table=consol_table, **{**kwargs, "table_name": None})
+        # 防御性冗余：`looks_transposed` 命中时这两项恒非空（行名取自原列名、列名逐个对应），
+        # 故本条件改成恒真行为也不变、变异测不到（已登记）。留着是为了将来放宽启用条件时，
+        # 不会用一个更差的结果顶替掉原本说得清的失败原因。
+        if alt.rows and alt.matched_columns:
+            alt.table_name = str(table.get("name") or "") or alt.table_name
+            alt.table_choice = "transposed"
+            alt.reason = None
+            return alt
+    return None
+
+
+def _read_aligned(
+    table_data: Any,
+    *,
+    consol_table: dict | None,
+    table_name: str | None = None,
+    title: str | None = None,
+    section_title: str | None = None,
+    std: str | None = None,
+    consol_section_id: str | None = None,
+    standalone_section: str | None = None,
+) -> SourceTable:
+    """按合并模板列语义键认列读取（原 ``read_source_table`` 本体）。
 
     ``consol_table`` 为合并附注模板表（``find_table``）；缺失时按单体表自身列输出。
     ``section_title`` 为单体章节标题（旧单表格式的表没有名字时用来确认是主表）。

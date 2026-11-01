@@ -6,6 +6,15 @@
     <div style="display:flex;gap:16px;align-items:center;margin-bottom:12px">
       <span style="font-size:14px;font-weight:600">{{ sectionTitle }}</span>
       <el-tag v-if="preview" size="small" type="info">{{ preview.entity_count }} 家企业 · {{ preview.group_count }} 组结构</el-tag>
+      <!-- R11：进来先看到「这一章能自动搞定多少」，决定是否值得现在逐行看 -->
+      <el-tooltip v-if="autoConfirmStat.total" placement="bottom"
+        :content="`可自动确认 ${autoConfirmStat.auto} 行（下推行 / 精确 / 别名 / 账龄区间 / 合计行 / 历史），`
+          + `需人工确认 ${autoConfirmStat.review} 行（模糊 / 上年 / 按位置 / 无建议目标）`">
+        <el-tag size="small" :type="autoConfirmStat.review === 0 ? 'success' : 'warning'"
+          data-testid="mapping-auto-ratio">
+          可自动确认 {{ autoConfirmStat.auto }}/{{ autoConfirmStat.total }}（{{ autoConfirmStat.percent }}%）
+        </el-tag>
+      </el-tooltip>
       <el-tag v-if="preview?.stale_count" size="small" type="warning">{{ preview.stale_count }} 家来源已变化</el-tag>
       <span style="flex:1" />
       <el-button size="small" @click="handleEditTemplate">📝 编辑模板</el-button>
@@ -13,6 +22,12 @@
     </div>
 
     <el-alert v-if="errorMsg" type="error" :title="errorMsg" :closable="false" show-icon style="margin-bottom:10px" />
+
+    <!-- 口径漂移：前后端对同一批建议算出的「可自动确认」行数不等（正常不出现） -->
+    <el-alert v-if="backendMismatch" type="warning" :title="backendMismatch" :closable="false" show-icon
+      data-testid="mapping-ratio-mismatch" style="margin-bottom:10px">
+      表格状态以本页统计为准；请把该提示反馈给开发（前后端自动确认判定已不一致）。
+    </el-alert>
 
     <!-- 子企业单体附注读取情况：没读到的企业不参与映射，部分列没对上的企业该列为空 -->
     <el-alert v-if="sourceIssues.length" type="warning" :closable="false" show-icon style="margin-bottom:10px"
@@ -192,6 +207,35 @@ const sourceIssues = computed(() => (preview.value?.entity_sources || []).filter
   s => s.status !== 'found' || !!s.reason || (s.unmatched_columns || []).length > 0,
 ))
 const hasIgnoredRows = computed(() => mappingRows.value.some(r => r.mapping_action === 'ignore'))
+
+/**
+ * 可自动确认比例（R11）。
+ *
+ * 🔴 分子用**前端 `mappingRows` 自己的 `_status`** 而不是直接显示后端 `auto_confirmable_count`：
+ * 两者本应恒等（`suggestionStatus` 就是读后端的 `auto_confirmable`），但一旦口径漂移，直接显示
+ * 后端数字会和表格里的「就绪 / 待确认」以及底部统计互相矛盾——用户看到两个打架的数字比看不到更糟。
+ * 漂移由 `backendMismatch` 暴露（守卫断言它恒为 null）。
+ */
+const autoConfirmStat = computed(() => {
+  const total = mappingRows.value.length
+  const auto = mappingRows.value.filter(r => r._status === 'ready').length
+  return {
+    total,
+    auto,
+    review: total - auto,
+    percent: total > 0 ? Math.round((auto / total) * 100) : 0,
+  }
+})
+
+/** 前端统计与后端 `auto_confirmable_count` 不一致 ⇒ 口径漂移（正常恒为 null）。 */
+const backendMismatch = computed<string | null>(() => {
+  const backend = preview.value?.auto_confirmable_count
+  if (backend == null || !mappingRows.value.length) return null
+  return backend === autoConfirmStat.value.auto
+    ? null
+    : `可自动确认行数口径不一致：前端 ${autoConfirmStat.value.auto} / 后端 ${backend}`
+})
+
 const readyCount = computed(() => mappingRows.value.filter(r => r._status === 'ready' && r.mapping_action !== 'ignore').length)
 const pendingCount = computed(() => mappingRows.value.filter(r => r._status === 'pending').length)
 const ignoredCount = computed(() => mappingRows.value.filter(r => r.mapping_action === 'ignore').length)

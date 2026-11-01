@@ -36,7 +36,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
 from app.services.formula_warnings import collect as collect_formula_warnings, messages as formula_warning_messages
-from app.services.formula_push import note_writer
+from app.services.formula_push import note_total_push, note_writer
 from app.services.formula_push.note_events import publish_note_sections
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
 from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
@@ -74,12 +74,9 @@ FROZEN_WP_STATUSES: Mapping[str, str] = {
     "review_level1_passed": "一级复核通过", "review_level2_passed": "二级复核通过",
 }
 FROZEN_NOTE_STATUSES: frozenset[str] = frozenset({"confirmed"})
-PERIOD_LABELS: Mapping[str, str] = {"end": "期末", "prior": "期初"}
-#: 分「账面余额 / 减值准备 / 账面价值」三列写的字段：旧格式表（按列序存数）只认得出期末 / 期初金额列，这几列不按位置猜
-SPLIT_FIELD_LABELS: Mapping[str, str] = {
-    "end_gross": "期末账面余额", "end_impairment": "期末减值准备", "end_net": "期末账面价值",
-    "prior_gross": "期初账面余额", "prior_impairment": "期初减值准备", "prior_net": "期初账面价值",
-}
+#: 期间 / 分列字段的中文名与附注写入都在 note_total_push（engine 超行数门，ADR-9 抽出）；这里重新导出兼容既有引用
+PERIOD_LABELS: Mapping[str, str] = note_total_push.PERIOD_LABELS
+SPLIT_FIELD_LABELS: Mapping[str, str] = note_total_push.SPLIT_FIELD_LABELS
 
 
 @dataclass
@@ -705,7 +702,7 @@ async def _push_note(
     data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
     # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
     targets = [
-        _find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
+        note_total_push.find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
         else note_writer.find_row(table.rows, [r["note_label"], r["label"]])
         for r in data_rows
     ]
@@ -755,16 +752,10 @@ async def _push_note(
     fallback_ambiguity: str | None = None
     unresolved_fields: dict[str, str] = {}
     if not any_data_row_matched:
-        candidates = note_writer.total_row_candidates(table.rows)
-        total_idx = candidates[0] if len(candidates) == 1 else None
-        if len(candidates) > 1:
-            # 多个汇总行：分段合计（「一、账面原值合计 / … / 五、账面价值合计」）或「小计 / 减：减值准备 / 合计」。
-            # 取数只有科目余额，是哪一段由科目决定（主科目余额是原值 / 小计，长期借款审定数是重分类后的合计），
-            # 引擎不知道 ⇒ 不兜底、也不按上方各行重算（上方明细一个都没取到）。2026-10-31 真库：按「最终合计」兜底
-            # 把长期股权投资 / 投资性房地产 / 使用权资产的原值写进了账面价值合计（和平 八、26 账面价值
-            # 176,203,072.87，应为 66,389,073.02）。spec disclosure-note-template-word-realignment Task 34/35。
-            labels = "、".join(note_writer.row_label(table.rows[i]) or "（无名）" for i in candidates)
-            fallback_ambiguity = f"表里有 {len(candidates)} 个合计行（{labels}），不知道科目余额该写哪一行，不兜底"
+        # 多汇总行的取舍见 note_total_push.pick_fallback_total（有「减：…准备」行时科目余额写它之前的账面余额合计；
+        # 分段合计表仍不兜底）。spec note-table-structure-formula-pull-closure R12 / ADR-8。
+        total_idx, fallback_ambiguity = note_total_push.pick_fallback_total(table.rows)
+        if fallback_ambiguity:
             skip_total_recalc = True
         if total_idx is not None:
             # 单科目：用唯一数据行（is_total=False）的值
@@ -863,73 +854,19 @@ def _expected_section_title(rule: PushRule, template_type: str | None, table_nam
     return note_writer.template_section_title(template_type, section) or rule.target.table
 
 
-def _find_total_by_label(rows: Any, label: str) -> int | None:
-    """分段合计表：按行名精确、唯一地对上合计行（不做包含匹配）。"""
-    hits = [
-        index for index, row in enumerate(rows)
-        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
-        and note_writer.row_label(row) == label
-    ]
-    return hits[0] if len(hits) == 1 else None
-
-
 def _push_note_cell(
     ctx: _Ctx, *, rule: PushRule, section: str, addr: str, table: note_writer.NoteTable,
     row: dict, field_name: str, value: float, paper: _Paper,
 ) -> bool:
-    ok, current, cell_mode = note_writer.read_cell(row, field_name, table.value_keys)
-    if not ok:
-        period = note_writer.NOTE_FIELDS[field_name][1]
-        detail = f"：{table.column_note}" if table.column_note else ""
-        reason = f"附注表缺少「{PERIOD_LABELS[period]}」列{detail}"
-        if field_name in SPLIT_FIELD_LABELS and isinstance(row.get("values"), list):
-            reason = (f"附注表是旧格式（按列序存数），表头只认得出期末 / 期初金额列，找不到唯一的"
-                      f"「{SPLIT_FIELD_LABELS[field_name]}」列，不按位置猜，附注保持原值")
-        ctx.skip(rule.rule_id, "note", "note", addr, reason)
-        return False
-    mode = note_writer.external_mode(table.section_locked, cell_mode)
-    decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
-    if decision.writes:
-        note_writer.write_cell(row, field_name, value, table.value_keys)
-    _record_note(ctx, rule, section, addr, decision, value, current, paper, _note_keep_reason(mode, decision))
-    return decision.writes
-
-
-def _note_keep_reason(mode: str | None, decision: Decision) -> str | None:
-    if not decision.kept:
-        return None
-    return "附注中该单元格被标记为锁定（或整节人工覆盖），保留原值" if mode == "locked" else \
-        "附注中该单元格被标记为人工填写，保留原值"
+    return note_total_push.push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table, row=row,
+                                          field_name=field_name, value=value, paper=paper, record=_record_note)
 
 
 def _push_note_total(
     ctx: _Ctx, *, rule: PushRule, section: str, table_name: str, table: note_writer.NoteTable, paper: _Paper,
 ) -> bool:
-    """合计 = 合计行之前各行之和（人工行一并计入）；上方各行这一列都没有数则不重算（不写 0）。"""
-    index = note_writer.find_total_row(table.rows)
-    if index is None:
-        return False
-    total_row = table.rows[index]
-    label = note_writer.row_label(total_row) or "合计"
-    wrote = False
-    for field_name in rule.target.fields:
-        _, period = note_writer.NOTE_FIELDS[field_name]
-        ok, current, cell_mode = note_writer.read_cell(total_row, field_name, table.value_keys)
-        if not ok:
-            continue
-        value = note_writer.total_formula(table.rows, index, field_name, table.value_keys)
-        addr = note_addr_id(section, table_name, label, period)
-        if value is None:
-            ctx.skip(rule.rule_id, "note", "note", addr,
-                     f"合计行「{label}」上方各行这一列都没有数，合计不按 0 重算，附注保持原值")
-            continue
-        mode = note_writer.external_mode(table.section_locked, cell_mode)
-        decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
-        if decision.writes:
-            note_writer.write_cell(total_row, field_name, value, table.value_keys)
-            wrote = True
-        _record_note(ctx, rule, section, addr, decision, value, current, paper, _note_keep_reason(mode, decision))
-    return wrote
+    return note_total_push.push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table,
+                                           paper=paper, record=_record_note, note_addr_id=note_addr_id)
 
 
 def _record_note(

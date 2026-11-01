@@ -16,11 +16,42 @@ function limited(lines: string[]): string[] {
   return lines.length > LIST_LIMIT ? [...lines.slice(0, LIST_LIMIT), `……共 ${lines.length} 条`] : lines
 }
 
+const pct = (part: number, whole: number): number => (whole > 0 ? Math.round((part / whole) * 100) : 0)
+
+/**
+ * 覆盖比例（R11）：企业维度与章节维度各一行。
+ *
+ * 口径：企业分母 = 本次自动确认 + 仍待人工确认（`skipped` 章节没读到来源、不计入分母，否则
+ * 比例会被「本来就没数据的章节」拉低、看不出自动映射到底覆盖了多少真实工作量）；
+ * 章节分母 = 真正参与映射的章节（总数 − skipped）。两个分母都为 0 时不输出（避免 0/0）。
+ */
+function coverageLines(s: AutoMapResult['summary']): string[] {
+  const out: string[] = []
+  const entityTotal = s.confirmed_entities + s.pending_entities
+  if (entityTotal > 0) {
+    out.push(`企业覆盖 ${s.confirmed_entities}/${entityTotal}（${pct(s.confirmed_entities, entityTotal)}%）`
+      + (s.pending_entities ? `，${s.pending_entities} 家仍需人工确认` : '，全部自动确认'))
+  }
+  const sectionTotal = s.sections - s.skipped
+  if (sectionTotal > 0) {
+    const rest = [
+      s.partial ? `部分确认 ${s.partial}` : '',
+      s.pending ? `全部待确认 ${s.pending}` : '',
+      s.failed ? `失败 ${s.failed}` : '',
+    ].filter(Boolean)
+    out.push(`章节覆盖 ${s.mapped}/${sectionTotal}（${pct(s.mapped, sectionTotal)}%）`
+      + (rest.length ? `，${rest.join(' / ')}` : ''))
+  }
+  return out
+}
+
 /** 结果文字：确认了几家；哪些企业的哪些行要去「📋 明细映射」确认；失败 / 跳过的章节与原因。`ok` = 没有要用户处理的。 */
 export function autoMapReport(result: AutoMapResult): { ok: boolean; text: string } {
   const s = result.summary
   const lines = [`已确认 ${s.confirmed_entities} 家企业的映射，${s.mapped} 个章节全部确认`
     + (s.templates_created ? `，新建 / 更新明细模板 ${s.templates_created} 个` : '')]
+  // R11：覆盖比例——只报「已确认 N 家」看不出还剩多少要人工处理
+  lines.push(...coverageLines(s))
   const pending = result.sections.flatMap(sec => sec.pending.map(
     p => `${sec.section_id} ${p.company_name || p.node_key}：${p.labels.join('、')}`))
   if (pending.length) lines.push(`以下企业有行对不上，请在「📋 明细映射」确认：`, ...limited(pending))

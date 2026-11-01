@@ -41,3 +41,13 @@
 - [x] 16. 顺带修 HEAD 预存编译失败（18 文件 22 处「await 写在非 async 函数里」+ 5 个 `.ts` 模板字面量被批量替换弄坏）并补门禁 `vueSfcSyntax.spec.ts`（原先 `allowAwaitOutsideFunction` 放过同步函数里的 await，且不扫 `.ts`）
 - [ ]* 17. 浏览器实测（【测试】项目：D2 表头、公式管理、刷新后公式）—— 待前端编译修复推送后在共享环境走查
 - [ ]* 18. 写真库修复（孤儿推送格、D2 旧结构表、和平药房全部刷新）—— 须用户放行
+
+## 第二轮：未做项与改进建议（R9~R14）
+
+- [x] 19. R9 正式修复脚本 `backend/scripts/fix/purge_orphan_push_states.py`（dry-run 默认、`--apply --confirm`、备份 JSON、重跑附注公式）+ 用例
+- [x] 20. R10 推送 run 回报孤儿状态（新模块 `formula_push/orphan_states.py`，panel / 路由回执带上）+ 推送页提示 + 用例
+- [x] 21. R12 账龄表「减：…准备」时按账面余额合计兜底（新 `formula_push/note_total_pick.py`，engine 接线前先抽模块把行数降到门禁内）+ 用例
+- [x] 22. R13 附注权威源对拍守卫（D2 样板：后端 builder vs 前端载荷逐值相等；其余 wp_code 清单只许变短）
+- [x] 23. R11 预览回执带可自动确认比例 + 映射弹窗 / 合并附注页显示 + 章节级一键 + 用例
+- [x] 24. R14 跨口径转置表对应（读取层 + 判据）+ 用例
+- [x] 25. 回归（候选 worktree vs 远端最新逐节点）+ 三项门禁 `--check` + 浏览器实测 + 单提交推送

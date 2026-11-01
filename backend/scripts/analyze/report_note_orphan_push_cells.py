@@ -5,8 +5,8 @@
 没有任何人再维护：推送不碰它（规则没了）、附注预设公式也不碰它（推送拥有格保护按 state 判定），于是格里永远停在
 当年推送的那个数。真库实测 D2 的 ``D2.note.subtable_0 / _1 / _2 / _7 / _10`` 就是这类（规则现在只有 ``D2.note.main``）。
 
-本脚本只报告，不修。输出按项目 / 章节 / 规则列出：留在格里的值、当时推的值、是否仍然相等（相等 ⇒ 这一格的数就是
-那条已删规则留下的）。要清理请人工确认后另走修复脚本。
+判定与修复脚本（``backend/scripts/fix/purge_orphan_push_states.py``）、推送回执共用
+``app.services.formula_push.orphan_states``（设计 ADR-7：只有一份）。本脚本只报告，清理请走修复脚本。
 
 用法：
   python backend/scripts/analyze/report_note_orphan_push_cells.py              # 全部项目
@@ -27,55 +27,26 @@ sys.path.insert(0, str(ROOT))
 import sqlalchemy as sa  # noqa: E402
 
 
-def _known_rule_ids() -> set[str]:
-    from app.services.formula_push.rules import load_rules
-
-    return {r.rule_id for r in load_rules()}
-
-
 async def collect(project_id: str | None) -> dict:
     from app.core.database import async_session
     from app.models.core import Project
+    from app.services.formula_push.orphan_states import known_rule_ids, list_orphans
 
-    known = _known_rule_ids()
     async with async_session() as db:
-        where = [sa.text("domain = 'note'")]
-        params: dict = {}
-        if project_id:
-            where.append(sa.text("project_id = :pid"))
-            params["pid"] = project_id
-        rows = (await db.execute(sa.text(
-            "SELECT s.project_id, s.year, s.note_section, s.rule_id, s.addr_id, s.state, "
-            "       s.last_pushed_value, s.current_value, s.updated_at "
-            "FROM formula_push_state s "
-            f"WHERE {' AND '.join('(' + str(w) + ')' for w in where)} "
-            "ORDER BY s.project_id, s.note_section, s.rule_id, s.addr_id"
-        ), params)).mappings().all()
-        names = {
-            str(pid): name for pid, name in (await db.execute(
-                sa.select(Project.id, Project.name))).all()
-        }
+        known = known_rule_ids()
+        orphans = await list_orphans(db, project_id=project_id)
+        scope = " AND project_id = CAST(:pid AS uuid)" if project_id else ""
+        total_note_rows = (await db.execute(
+            sa.text(f"SELECT count(*) FROM formula_push_state WHERE domain = 'note'{scope}"),
+            {"pid": project_id} if project_id else {},
+        )).scalar_one()
+        names = {str(pid): name for pid, name in (await db.execute(sa.select(Project.id, Project.name))).all()}
 
-    out: list[dict] = []
-    for r in rows:
-        if r["rule_id"] in known:
-            continue
-        pushed, current = r["last_pushed_value"], r["current_value"]
-        out.append({
-            "project_id": str(r["project_id"]),
-            "project_name": names.get(str(r["project_id"]), ""),
-            "year": r["year"],
-            "note_section": r["note_section"],
-            "rule_id": r["rule_id"],
-            "addr_id": r["addr_id"],
-            "state": r["state"],
-            "last_pushed_value": pushed,
-            "current_value": current,
-            # 相等 ⇒ 格里的数就是这条已删规则当年推的（没有人改过，也没有人再维护）
-            "still_pushed_value": pushed is not None and pushed == current,
-            "updated_at": str(r["updated_at"]),
-        })
-    return {"known_rule_count": len(known), "note_state_rows": len(rows), "orphans": out}
+    return {
+        "known_rule_count": len(known),
+        "note_state_rows": int(total_note_rows),
+        "orphans": [{**o.to_dict(), "project_name": names.get(o.project_id, "")} for o in orphans],
+    }
 
 
 def main() -> int:
@@ -102,6 +73,8 @@ def main() -> int:
         print(f"明细已写入 {args.json_path}")
     if not orphans:
         print("没有这类单元格。")
+    else:
+        print("\n清理（会改真库）：python backend/scripts/fix/purge_orphan_push_states.py --apply --confirm")
     return 0
 
 

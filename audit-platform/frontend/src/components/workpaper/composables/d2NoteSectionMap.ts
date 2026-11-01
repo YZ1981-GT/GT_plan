@@ -19,9 +19,14 @@
  *     text_sections「### 按欠款方归集的应收账款和合同资产期末余额前五名单位情况」
  *     → 表名取该章节标题（更可读，避免附注里出现名为「单位名称」的表）。
  *  3. 模板列头里的 HTML 换行 `<br/>`（如「转回或收回<br/>金额」）去掉，文字逐字保留。
- *  4. 模板部分表 headers 省略了标签列（上市组合计提分表 headers 只有 2 个金额列、
- *     上市坏账变动表只有「坏账准备金额」），而行本身带 label（1年以内 / 期初余额…）
- *     → 标签列列头分别取「账龄」「项目」（与国企同类表模板列头一致），金额列逐字照抄。
+ *  4. ~~标签列列头取「账龄」「项目」~~ —— **2026-11-01 撤销**：该偏差源于模板早期 headers
+ *     省略标签列，而 R8.4 批 9b-1/9b-2 按底稿披露表补齐后模板已有标签列列头（字面带半角
+ *     空格：`账 龄` / `项 目` / `项  目`），前端继续用自编列头就与 Word 不一致。现已逐字
+ *     照抄模板，并由 `__tests__/d2NoteSubtableContract.spec.ts`（R13）逐位对拍钉死。
+ *
+ * 🔴 单级表头一律显式标 `flat: true`（上市版原先 9 张表既无 group 也无 flat，后端 seed 路径
+ *    的 `_infer_groups_from_headers` 会按列名前缀反猜出凭空父表头——国企同类表早已标 flat，
+ *    上市版漏标；R13 的 P3 判据已把这一类打红）。
  *
  * 覆盖完整性：以致同源模板 sheet「附注披露信息(上市公司)」（A1:I181）为权威结构真源，
  * 上市固定表 13 张 = 账龄 / 分类披露双期 2 / 单项计提双期 2 / 坏账变动 / 重要转回 /
@@ -169,14 +174,14 @@ const PCT = 'percent' as const
 const TXT = 'text' as const
 
 const AGING_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '账龄', is_label: true },
+  { key: 'label', label: '账 龄', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '上年年末余额', format: AMT },
 ]
 // 🔴 源模板单行表头的表一律标 `flat`（抑制后端 `_infer_groups_from_headers` 前缀推断）。
 // 实测反例：核销表「核销金额 / 核销原因」被反猜出凭空的「核销」父表头。
 const AGING_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '账龄', is_label: true, flat: true },
+  { key: 'label', label: '账 龄', is_label: true, flat: true },
   { key: 'end_amount', label: '期末数', format: AMT },
   { key: 'prior_amount', label: '期初数', format: AMT },
 ]
@@ -226,7 +231,7 @@ const INDIVIDUAL_COLUMNS_LISTED_END: ColumnDef[] = [
   { key: 'basis', label: '计提依据', format: TXT, group: '期末余额' },
 ]
 const INDIVIDUAL_COLUMNS_LISTED_PRIOR: ColumnDef[] = [
-  { key: 'label', label: '名 称', is_label: true },
+  { key: 'label', label: '名 称', is_label: true, flat: true },
   { key: 'book_amount', label: '账面余额', format: AMT },
   { key: 'provision', label: '坏账准备', format: AMT },
   { key: 'loss_rate', label: '预期信用损失率（%）', format: PCT },
@@ -276,7 +281,7 @@ const OTHER_PORTFOLIO_COLUMNS_SOE: ColumnDef[] = [
   { key: 'prior_provision', label: '坏账准备', format: AMT, group: '期初数' },
 ]
 const MOVEMENT_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项 目', is_label: true, flat: true },
   { key: 'amount', label: '坏账准备金额', format: AMT },
 ]
 // 变动表：源模板 r94~r95（类 别 | 期初数 | 本期变动金额{计提, 收回或转回, 转销或核销} | 期末数）
@@ -289,7 +294,7 @@ const MOVEMENT_COLUMNS_SOE: ColumnDef[] = [
   { key: 'end_amount', label: '期末数', format: AMT },
 ]
 const REVERSAL_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '单位名称', is_label: true },
+  { key: 'label', label: '单位名称', is_label: true, flat: true },
   { key: 'reversal_reason', label: '转回原因', format: TXT },
   { key: 'recovery_method', label: '收回方式', format: TXT },
   { key: 'original_basis', label: '原确定坏账准备的依据', format: TXT },
@@ -302,11 +307,12 @@ const REVERSAL_COLUMNS_SOE: ColumnDef[] = [
   { key: 'reason_method', label: '转回或收回原因、方式', format: TXT },
 ]
 const WRITEOFF_AMOUNT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  // 🔴 模板字面是两个半角空格（`项  目`），逐字照抄（R13 对拍守卫钉死）
+  { key: 'label', label: '项  目', is_label: true, flat: true },
   { key: 'amount', label: '核销金额', format: AMT },
 ]
 const WRITEOFF_DETAIL_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '单位名称', is_label: true },
+  { key: 'label', label: '单位名称', is_label: true, flat: true },
   { key: 'nature', label: '应收账款性质', format: TXT },
   { key: 'amount', label: '核销金额', format: AMT },
   { key: 'reason', label: '核销原因', format: TXT },
@@ -322,7 +328,7 @@ const WRITEOFF_DETAIL_COLUMNS_SOE: ColumnDef[] = [
   { key: 'related', label: '是否因关联交易产生', format: TXT },
 ]
 const TOP5_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '单位名称', is_label: true },
+  { key: 'label', label: '单位名称', is_label: true, flat: true },
   { key: 'ar_amount', label: '应收账款期末余额', format: AMT },
   { key: 'contract_asset_amount', label: '合同资产期末余额', format: AMT },
   { key: 'total_amount', label: '应收账款和合同资产期末余额', format: AMT },
@@ -342,7 +348,7 @@ const DERECOGNIZED_COLUMNS_SOE: ColumnDef[] = [
 ]
 // (6) 因金融资产转移而终止确认：源模板 r162
 const DERECOGNIZED_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项  目', is_label: true },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
   { key: 'transfer_method', label: '转移方式', format: TXT },
   { key: 'amount', label: '终止确认金额', format: AMT },
   { key: 'gain_loss', label: '与终止确认相关的利得或损失', format: AMT },
@@ -354,7 +360,7 @@ const CONTINUED_INVOLVEMENT_COLUMNS_SOE: ColumnDef[] = [
 ]
 // (7) 转移应收账款且继续涉入形成的资产、负债：源模板 r174
 const CONTINUED_INVOLVEMENT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项  目', is_label: true },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
   { key: 'transfer_method', label: '资产转移方式', format: TXT },
   { key: 'asset_amount', label: '继续涉入形成的资产金额', format: AMT },
   { key: 'liability_amount', label: '继续涉入形成的负债金额', format: AMT },
@@ -887,27 +893,10 @@ export function buildD2SyncPayload(
       DERECOGNIZED_COLUMNS_SOE,
     )
 
-    // 国企（7）继续涉入：源模板 r130「项 目 | 期末金额」，资产 / 负债分块 + 各自小计
-    const ciSoe = snapshot.continuedInvolvementRows ?? []
-    const soeBlock = (title: string, pick: (r: D2ContinuedInvolvementRowLike) => number) => {
-      const rows = ciSoe.map((r) => ({
-        label: `${str(r.item) || '（未命名）'}${r.transferMethod ? `（${str(r.transferMethod)}）` : ''}`,
-        amount: num(pick(r)),
-      }))
-      return [
-        { label: title, amount: 0, is_section: true },
-        ...rows,
-        { label: `${title}小计`, amount: rows.reduce((s, r) => s + r.amount, 0), is_total: true },
-      ]
-    }
-    put(
-      D2_TABLE_NAMES.soe.continuedInvolvement,
-      [
-        ...soeBlock('继续涉入形成的资产', (r) => r.assetAmount),
-        ...soeBlock('继续涉入形成的负债', (r) => r.liabilityAmount),
-      ],
-      CONTINUED_INVOLVEMENT_COLUMNS_SOE,
-    )
+    // 国企（7）继续涉入统一在第 ⑩ 段推送（见下）。
+    // 🔴 2026-11-01（R13）删除此处的重复实现：它曾用 `is_section` + 「继续涉入形成的资产小计」
+    // 另写一套行结构，但同一表名在第 ⑩ 段被再 put 一次、整段恒被覆盖 ⇒ 死代码。
+    // 全仓无任何消费方引用那两个小计 label；重复 put 由 R13 守卫钉死（同名表只许推一次）。
   } else {
     put(
       D2_TABLE_NAMES.listed.derecognized,

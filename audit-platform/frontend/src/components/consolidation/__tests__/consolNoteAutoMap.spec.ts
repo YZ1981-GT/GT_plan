@@ -163,3 +163,53 @@ describe('接线', () => {
       'runConsolNoteAutoMap(props.projectId, props.year, selectedNoteSection.value?.section_id, autoMapping)')
   })
 })
+
+// ─── 覆盖比例（spec note-table-structure-formula-pull-closure R11）─────────────
+
+describe('autoMapReport 覆盖比例（R11）', () => {
+  it('企业与章节两个维度各报一行比例', () => {
+    const r = autoMapReport(result(
+      [sec({}), sec({ section_id: '五-1-2', status: 'partial' })],
+      { sections: 2, mapped: 1, partial: 1, confirmed_entities: 3, pending_entities: 1 },
+    ))
+    expect(r.text).toContain('企业覆盖 3/4（75%）')
+    expect(r.text).toContain('1 家仍需人工确认')
+    expect(r.text).toContain('章节覆盖 1/2（50%）')
+    expect(r.text).toContain('部分确认 1')
+  })
+
+  it('全部自动确认：企业比例 100% 且写明「全部自动确认」', () => {
+    const r = autoMapReport(result([sec({})], { sections: 1, mapped: 1, confirmed_entities: 2, pending_entities: 0 }))
+    expect(r.text).toContain('企业覆盖 2/2（100%）')
+    expect(r.text).toContain('全部自动确认')
+    expect(r.text).toContain('章节覆盖 1/1（100%）')
+  })
+
+  it('🔴 skipped 章节不进章节分母（没读到来源不该拉低覆盖率）', () => {
+    const r = autoMapReport(result(
+      [sec({}), sec({ section_id: 'x', status: 'skipped', reason: '没读到子企业单体附注' })],
+      { sections: 2, mapped: 1, skipped: 1, confirmed_entities: 1, pending_entities: 0 },
+    ))
+    expect(r.text).toContain('章节覆盖 1/1（100%）')
+    expect(r.text).not.toContain('章节覆盖 1/2')
+  })
+
+  it('两个分母都为 0 时不输出比例行（避免 0/0）', () => {
+    const r = autoMapReport(result(
+      [sec({ status: 'skipped', reason: '没读到子企业单体附注' })],
+      { sections: 1, skipped: 1, confirmed_entities: 0, pending_entities: 0 },
+    ))
+    expect(r.text).not.toContain('企业覆盖')
+    expect(r.text).not.toContain('章节覆盖')
+    expect(r.ok).toBe(false)
+  })
+
+  it('失败章节数进章节行；比例仍按参与映射的章节算', () => {
+    const r = autoMapReport(result(
+      [sec({}), sec({ section_id: 'y', status: 'failed', reason: '模板缺失' })],
+      { sections: 2, mapped: 1, failed: 1, confirmed_entities: 1, pending_entities: 0 },
+    ))
+    expect(r.text).toContain('章节覆盖 1/2（50%）')
+    expect(r.text).toContain('失败 1')
+  })
+})
