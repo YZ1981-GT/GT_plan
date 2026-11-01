@@ -754,18 +754,23 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── K1-9 单 dict item / 同 sheet 双区（专用 merge，保留未受管标量）──
+    #
+    # 🔴 必须走 state 分支。载荷是 dict（`{"tables": {"reversal": [...], "writeoff": [...]}}`），
+    #    而单 store 的 rows 分支解码 base 时是 `if isinstance(parsed, list)` —— dict 基线会留在
+    #    `[]`，于是每次镜像都把既有行与未受管标量整体清空重建（真库 K1-9 当前 0 行，所以这是
+    #    潜伏缺陷：首次使用即损坏）。`merge_k1_from_projection` 返回的正是 state 分支要的
+    #    3 元组 `(merged, applied, visited)`，provider 本来就是按 state 形态写的。
+    #
+    #    原先这里还声明了一条与 `STORE_ITEM_ID` 同指的 `dedicated_items`：它只在
+    #    `_mirror_dual_stores` 里被消费，而本 plan 没有 `dual_store_fn` ⇒ **永不执行**，
+    #    却每次镜像都被 `_resolve_dedicated_store_providers` 校验（镜像现在跑在 `_commit_once`
+    #    内 ⇒ 将来重命名 merge 函数会让整笔业务提交为一个不会被调用的函数回滚）。已删除；
+    #    「`dedicated_items` 蕴含 `dual_store_fn`」由注册表不变量断言钉住。
     "k1.baddebt_reversal_writeoff_check": StoreMergePlan(
         adapter_id="k1.baddebt_reversal_writeoff_check",
         provider_module="phase5_k1_baddebt_reversal_writeoff",
         items=(),
-        dedicated_items=(
-            DedicatedStoreItem(
-                item_id_const="STORE_ITEM_ID",
-                merge_fn="merge_k1_from_projection",
-                base_kind="dict",
-                provider_module="phase5_k1_baddebt_reversal_writeoff",
-            ),
-        ),
+        merge_state_fn="merge_k1_from_projection",
     ),
     # ── K 循环调整分录汇总六条（per-file 中性化同 G7/H9/L1，共用一个函数）──
     "k8.selling_expenses_adjustment": StoreMergePlan(

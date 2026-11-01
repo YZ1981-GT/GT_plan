@@ -5,6 +5,7 @@
  * 收敛：原 useG3DivRecFormData（含 writeback）并入本文件为唯一入口。
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -106,7 +107,7 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
           conclusion: item.conclusion || null,
           remark: item.remark || null,
         })),
-      })
+      }, { _dedupe: false } as AxiosRequestConfig)
       opts.onAfterSave?.()
     } catch (err: any) {
       const msg = err?.message || ''

@@ -17,6 +17,7 @@
  * Requirements: 1.4, 3.3, 7.3
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -291,7 +292,7 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
           conclusion: item.conclusion || null,
           remark: item.remark || null,
         })),
-      })
+      }, { _dedupe: false } as AxiosRequestConfig)
       opts.onAfterSave?.()
     } catch (err: any) {
       const msg = err?.message || ''

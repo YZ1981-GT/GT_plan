@@ -35,6 +35,12 @@ class KnownChecksumDrift:
     current: str
     #: 中文结论：编辑内容是否已在库中生效、由谁补齐、为何不补
     resolution: str
+    #: 该版本号的迁移文件在审阅后**被有意从仓库移除**（内容已合并到别的版本号）。
+    #:
+    #: 这类条目只是历史审计记录：磁盘上没有文件，runner 扫不到它、运行期也不会就它报漂移。
+    #: 离线守卫对它们必须断言「确实不在磁盘上」，而不是沿用「必须在磁盘上」——
+    #: 后者对已移除的条目恒红，而恒红门禁等于没有门禁。
+    file_removed: bool = False
 
 
 KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
@@ -102,14 +108,20 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         "partner-manager-edit-permission spec 替换为 V200__partner_manager_edit_level_backfill.sql："
         "原 consol_note_mapping 相关对象（consol_note_mapping_rule_template/consol_note_mapping_rule/"
         "consol_note_mapping_binding 3 表 + 3 PK 索引）经逐对象核验在 public 全部存在；替换后的"
-        " partner_manager 回填内容由 V201 执行。两份内容的效果均已在库中生效，无需补迁移。",
+        " partner_manager 回填内容由 V201 执行。两份内容的效果均已在库中生效，无需补迁移。"
+        " 2026-11-01 复核：该版本号的文件此后被有意移除（consol-note 内容合并到 V186，见 e7dbc50de），"
+        "磁盘上已无 V200__*，runner 扫不到、运行期不会就它报漂移；本条仅作历史审计记录。",
+        file_removed=True,
     ),
     KnownChecksumDrift(
         "201",
         "a7de9ae311bc753c73a3cd43b397d71a8cdd1db3d97cb4d028a95f28596bc677",
         "eedeb59b41f868a49d7c7c6c94516e0b4ac636babdf5a2291bb5dd1048efc5d9",
         "应用后注释中版本号从 200 改为 201（R200 改为 R201）；SQL 语句体不变。"
-        "project_user_level_backfill 表（7 列）经逐列核验在 public 存在，回填 CTE 幂等。无需补迁移。",
+        "project_user_level_backfill 表（7 列）经逐列核验在 public 存在，回填 CTE 幂等。无需补迁移。"
+        " 2026-11-01 复核：该版本号的文件此后被有意移除（pm-edit spec，见 40882b2b1），"
+        "磁盘上已无 V201__*，runner 扫不到、运行期不会就它报漂移；本条仅作历史审计记录。",
+        file_removed=True,
     ),
     # ── 2026-10-25 本地拉取后新增的 11 条 checksum 漂移 ──────────────
     KnownChecksumDrift(

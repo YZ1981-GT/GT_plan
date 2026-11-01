@@ -44,13 +44,44 @@ export interface PendingWriteFailure {
   readonly error: unknown
 }
 
+/**
+ * 从一条失败里取出能给用户看的原因。
+ *
+ * 只有计数的文案（「有 N 项内容保存失败」）在多失败场景下无法定位，用户只能盲猜；
+ * `failures` 里本来就带着原始异常，这里把它摊成人读得懂的一行。
+ */
+export function describePendingWriteFailure(failure: PendingWriteFailure): string {
+  const error = failure.error as
+    | { response?: { data?: { message?: unknown; detail?: unknown } }; message?: unknown }
+    | string
+    | null
+    | undefined
+  if (typeof error === 'string') return error.trim()
+  const data = (typeof error === 'object' && error?.response?.data) || undefined
+  const fromEnvelope = data?.message ?? (typeof data?.detail === 'string' ? data.detail : undefined)
+  if (typeof fromEnvelope === 'string' && fromEnvelope.trim()) return fromEnvelope.trim()
+  const message = typeof error === 'object' ? error?.message : undefined
+  if (typeof message === 'string' && message.trim()) return message.trim()
+  return '未知错误'
+}
+
 export class PendingWritesFlushError extends Error {
   readonly failures: readonly PendingWriteFailure[]
+  /** 去重后的失败原因（按出现顺序）；界面可直接逐条列出。 */
+  readonly reasons: readonly string[]
 
   constructor(failures: readonly PendingWriteFailure[]) {
-    super(`切换在线编辑前有 ${failures.length} 项内容保存失败，请重试`)
+    const reasons = [...new Set(failures.map(describePendingWriteFailure))]
+    // 文案里最多带 3 条，避免把 ElMessage 撑爆；完整清单在 `reasons` / `failures` 上。
+    const shown = reasons.slice(0, 3).join('；')
+    const more = reasons.length > 3 ? `（另有 ${reasons.length - 3} 类原因）` : ''
+    super(
+      `切换在线编辑前有 ${failures.length} 项内容保存失败，请重试`
+      + (shown ? `：${shown}${more}` : ''),
+    )
     this.name = 'PendingWritesFlushError'
     this.failures = failures
+    this.reasons = reasons
   }
 }
 

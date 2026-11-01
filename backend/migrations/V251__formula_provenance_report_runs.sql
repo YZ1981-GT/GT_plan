@@ -1,4 +1,4 @@
--- V236: 报表最终值来源信封与运行记录（S5 / ADR-FPE-04、05、12、14）。
+-- V251: 报表最终值来源信封与运行记录（S5 / ADR-FPE-04、05、12、14）。
 --
 -- 每次 full / affected / stale 报表计算创建一条 report_generation_run；
 -- financial_report.run_id 仅指向实际采用其计算结果的 run，provenance 保存双层最终值来源。

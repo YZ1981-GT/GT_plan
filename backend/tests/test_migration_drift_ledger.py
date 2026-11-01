@@ -33,12 +33,42 @@ def test_ledger_has_no_duplicate_versions() -> None:
     assert len(versions) == len(set(versions)), versions
 
 
-@pytest.mark.parametrize("entry", KNOWN_CHECKSUM_DRIFTS, ids=lambda k: f"V{k.version}")
+ON_DISK_ENTRIES = [k for k in KNOWN_CHECKSUM_DRIFTS if not k.file_removed]
+REMOVED_ENTRIES = [k for k in KNOWN_CHECKSUM_DRIFTS if k.file_removed]
+
+
+def test_both_ledger_states_have_a_denominator() -> None:
+    """分母保护：两类条目都得非空，否则下面两条参数化会空转变绿。"""
+    assert ON_DISK_ENTRIES, "在册（文件仍在磁盘）的条目塌成空了"
+    assert REMOVED_ENTRIES, "已移除的条目塌成空了"
+    assert len(ON_DISK_ENTRIES) + len(REMOVED_ENTRIES) == len(KNOWN_CHECKSUM_DRIFTS)
+
+
+@pytest.mark.parametrize("entry", ON_DISK_ENTRIES, ids=lambda k: f"V{k.version}")
 def test_entry_current_matches_disk(entry, disk_checksums) -> None:
-    assert entry.version in disk_checksums, f"V{entry.version} 的迁移文件不在磁盘上"
+    assert entry.version in disk_checksums, (
+        f"V{entry.version} 的迁移文件不在磁盘上 —— 若是被有意移除（内容合并到别的版本号），"
+        "请在登记项上标 file_removed=True 并在 resolution 里写明去向"
+    )
     assert disk_checksums[entry.version] == entry.current, (
         f"V{entry.version} 的文件自登记后又变了（或被还原）：先现查真库确认效果、缺则写补齐迁移，"
         f"再更新登记项的 current / resolution；实算 {disk_checksums[entry.version]}"
+    )
+
+
+@pytest.mark.parametrize("entry", REMOVED_ENTRIES, ids=lambda k: f"V{k.version}")
+def test_removed_entry_really_has_no_file_on_disk(entry, disk_checksums) -> None:
+    """`file_removed=True` 必须能被当前源码证伪：文件真回来了就打红，逼迫改回在册状态。
+
+    这类条目只是历史审计记录（runner 扫不到、运行期不会就它报漂移）。原判据「必须在磁盘上」
+    对它们恒红，而恒红门禁等于没有门禁 —— 2026-11-01 修迁移撞号后这两条才第一次真正跑起来。
+    """
+    assert entry.version not in disk_checksums, (
+        f"V{entry.version} 标了 file_removed=True，但磁盘上又有这个版本号的迁移文件了"
+        f"（实算 checksum {disk_checksums.get(entry.version)}）：请去掉该标记并核对 current"
+    )
+    assert "移除" in entry.resolution, (
+        f"V{entry.version} 标了 file_removed=True，resolution 必须写明文件去向"
     )
 
 

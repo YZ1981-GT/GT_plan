@@ -110,8 +110,8 @@ def test_report_trace_source_has_no_legacy_mapping_table_sql():
 
 
 def test_report_provenance_migration_matches_model_surface():
-    migration = (ROOT / "migrations" / "V236__formula_provenance_report_runs.sql").read_text(encoding="utf-8")
-    rollback = (ROOT / "migrations" / "R236__rollback_formula_provenance_report_runs.sql").read_text(encoding="utf-8")
+    migration = (ROOT / "migrations" / "V251__formula_provenance_report_runs.sql").read_text(encoding="utf-8")
+    rollback = (ROOT / "migrations" / "R251__rollback_formula_provenance_report_runs.sql").read_text(encoding="utf-8")
     assert "CREATE TABLE IF NOT EXISTS report_generation_run" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS run_id" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS provenance" in migration

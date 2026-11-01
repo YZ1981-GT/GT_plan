@@ -1,4 +1,4 @@
--- V235：显示偏好表 + 项目默认金额单位列
+-- V250：显示偏好表 + 项目默认金额单位列
 -- spec: platform-global-display-settings-closure, 任务 1A, A 组
 -- 不读取或更新任何四表金额。
 

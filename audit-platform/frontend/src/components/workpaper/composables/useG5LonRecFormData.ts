@@ -1,4 +1,5 @@
 import { ref, onScopeDispose, inject, type InjectionKey, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -69,7 +70,7 @@ export function useG5LonRecFormData(opts: {
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
       items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-    })
+    }, { _dedupe: false } as AxiosRequestConfig)
     opts.onAfterSave?.()
   }
 
@@ -93,7 +94,7 @@ export function useG5LonRecFormData(opts: {
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
       items: payload,
-    })
+    }, { _dedupe: false } as AxiosRequestConfig)
     opts.onAfterSave?.()
   }
 

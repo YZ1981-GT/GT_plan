@@ -4,6 +4,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG12FormData — G12 净敞口套期收益底稿数据层
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -68,7 +69,7 @@ export function useG12FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
           project_id: opts.projectId.value,
           items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-        })
+        }, { _dedupe: false } as AxiosRequestConfig)
         return
       } catch {
         if (i < retries - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i))

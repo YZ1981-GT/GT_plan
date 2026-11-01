@@ -5,6 +5,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * Spec: .kiro/specs/g14-credit-impairment-loss/ Task 4.1
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -67,7 +68,7 @@ export function useG14FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
       items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-    })
+    }, { _dedupe: false } as AxiosRequestConfig)
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {

@@ -223,6 +223,8 @@ function tabComponent(id: string): Component {
 
 async function handleSave(e: Event): Promise<void> {
   const detail = (e as CustomEvent<F2StocktakeSaveDetail>).detail
+  // 必须在第一个 await 之前同步回执：派发方据此区分「没人听」（立即失败）与「在处理」（进超时）。
+  detail?.accept?.()
   const items = detail?.items
   if (!Array.isArray(items) || items.length === 0) {
     detail?.resolve?.()

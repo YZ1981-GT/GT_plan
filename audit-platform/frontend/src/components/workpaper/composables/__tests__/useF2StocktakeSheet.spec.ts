@@ -12,6 +12,8 @@ import {
   useF2StocktakeFields,
   useF2StocktakeRows,
   migrateF21RowsToFields,
+  dispatchF2StocktakeSave,
+  F2_STOCKTAKE_SAVE_TIMEOUT_MS,
 } from '../useF2StocktakeSheet'
 import type { ChecklistResponse } from '../useF2StocktakeFormData'
 
@@ -68,9 +70,11 @@ describe('useF2StocktakeFields', () => {
 
   it('字段 flusher 注册到平台屏障，并等待父保存明确完成', async () => {
     const allResponses = ref(makeMap({ 'F2-22-fields': '{}', 'F2-22-note': '' }))
-    let detail: { items: ChecklistResponse[]; resolve: () => void } | undefined
+    let detail: { items: ChecklistResponse[]; accept?: () => void; resolve: () => void } | undefined
     const handler = (event: Event) => {
       detail = (event as CustomEvent).detail
+      // 真实宿主 handleSave 第一步就同步 accept；不 accept 即「没人听」会立即失败
+      detail?.accept?.()
     }
     window.addEventListener('f2-stocktake:save-items', handler)
     const scope = effectScope()
@@ -184,8 +188,11 @@ describe('useF2StocktakeRows', () => {
       'F2-25-rows': JSON.stringify([{ id: 'r1', itemName: '旧值' }]),
       'F2-25-note': '',
     }))
-    let detail: { items: ChecklistResponse[]; resolve: () => void } | undefined
-    const handler = (event: Event) => { detail = (event as CustomEvent).detail }
+    let detail: { items: ChecklistResponse[]; accept?: () => void; resolve: () => void } | undefined
+    const handler = (event: Event) => {
+      detail = (event as CustomEvent).detail
+      detail?.accept?.()
+    }
     window.addEventListener('f2-stocktake:save-items', handler)
     const scope = effectScope()
     try {
@@ -226,5 +233,72 @@ describe('useF2StocktakeRows', () => {
     expect(loaded.value).toHaveLength(1)
     expect(loaded.value[0].itemName).toBe('钢材')
     expect(auditNote.value).toBe('核对结论')
+  })
+})
+
+// ─── 「没人听」与「在处理」必须分开（design §8 残留 7） ──────────────────────
+describe('dispatchF2StocktakeSave 的 accept 回执', () => {
+  it('没有监听方时立即失败，不等满 8 秒', async () => {
+    vi.useFakeTimers()
+    try {
+      const promise = dispatchF2StocktakeSave([
+        { item_id: 'F2-22-fields', conclusion: null, remark: '{}' },
+      ])
+      // 一个时钟都不推进：没人 accept 就应该已经 reject
+      await expect(promise).rejects.toThrow(/没有组件接收保存请求/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('已 accept 但不应答时，仍按原 8 秒超时失败（这才是「在处理但卡住」）', async () => {
+    vi.useFakeTimers()
+    const handler = (event: Event) => { (event as CustomEvent).detail.accept?.() }
+    window.addEventListener('f2-stocktake:save-items', handler)
+    try {
+      const promise = dispatchF2StocktakeSave([
+        { item_id: 'F2-22-fields', conclusion: null, remark: '{}' },
+      ])
+      const probe = { settled: false, error: undefined as unknown }
+      void promise.then(
+        () => { probe.settled = true },
+        (err) => { probe.settled = true; probe.error = err },
+      )
+      await vi.advanceTimersByTimeAsync(F2_STOCKTAKE_SAVE_TIMEOUT_MS - 100)
+      expect(probe.settled).toBe(false)
+      await vi.advanceTimersByTimeAsync(200)
+      expect(probe.settled).toBe(true)
+      expect(String((probe.error as Error)?.message)).toContain('等待超时')
+    } finally {
+      window.removeEventListener('f2-stocktake:save-items', handler)
+      vi.useRealTimers()
+    }
+  })
+
+  it('accept 后立刻 resolve 的正常路径不受影响', async () => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      detail.accept?.()
+      detail.resolve?.()
+    }
+    window.addEventListener('f2-stocktake:save-items', handler)
+    try {
+      await expect(dispatchF2StocktakeSave([
+        { item_id: 'F2-22-fields', conclusion: null, remark: '{}' },
+      ])).resolves.toBeUndefined()
+    } finally {
+      window.removeEventListener('f2-stocktake:save-items', handler)
+    }
+  })
+
+  it('空清单直接 resolve，不派发事件也不需要 accept', async () => {
+    const handler = vi.fn()
+    window.addEventListener('f2-stocktake:save-items', handler)
+    try {
+      await expect(dispatchF2StocktakeSave([])).resolves.toBeUndefined()
+      expect(handler).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('f2-stocktake:save-items', handler)
+    }
   })
 })

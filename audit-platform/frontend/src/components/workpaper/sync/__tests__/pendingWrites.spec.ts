@@ -217,3 +217,42 @@ describe('pendingWrites：完整切换 lease', () => {
     expect(pendingWriteBarrierActive.value).toBe(false)
   })
 })
+
+// ─── 屏障错误文案必须可定位（design §8 残留 4） ───────────────────────────────
+describe('PendingWritesFlushError 的可定位文案', () => {
+  it('把原始失败原因摊进文案，不只给计数', () => {
+    const error = new PendingWritesFlushError([
+      { source: 'flusher', error: new Error('F2-68 保存失败：409 版本冲突') },
+      { source: 'in_flight', error: { response: { data: { message: '底稿已归档，不能修改' } } } },
+    ])
+    expect(error.message).toContain('有 2 项内容保存失败')
+    expect(error.message).toContain('409 版本冲突')
+    expect(error.message).toContain('底稿已归档，不能修改')
+    expect(error.reasons).toEqual([
+      'F2-68 保存失败：409 版本冲突',
+      '底稿已归档，不能修改',
+    ])
+  })
+
+  it('同类原因去重，超过 3 类时折叠计数（文案不被撑爆）', () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      source: 'in_flight' as const,
+      error: new Error(`原因${i}`),
+    }))
+    const dup = [
+      { source: 'flusher' as const, error: new Error('同一个原因') },
+      { source: 'in_flight' as const, error: new Error('同一个原因') },
+    ]
+    expect(new PendingWritesFlushError(dup).reasons).toEqual(['同一个原因'])
+    const error = new PendingWritesFlushError(many)
+    expect(error.reasons).toHaveLength(5)
+    expect(error.message).toContain('另有 2 类原因')
+  })
+
+  it('取不到任何可读信息时给「未知错误」，不产出空冒号', () => {
+    const error = new PendingWritesFlushError([{ source: 'in_flight', error: null }])
+    expect(error.reasons).toEqual(['未知错误'])
+    expect(error.message).toContain('未知错误')
+    expect(error.message).not.toContain('：：')
+  })
+})

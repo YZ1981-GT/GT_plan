@@ -13,6 +13,7 @@
  * - selfLoad逻辑（render-config?force_component_type=g4-bond-investment-sppi）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -119,7 +120,7 @@ export function useG4SppiFormData(opts: UseG4SppiFormDataOptions) {
           conclusion: item.conclusion || null,
           remark: item.remark || null,
         })),
-      })
+      }, { _dedupe: false } as AxiosRequestConfig)
       opts.onAfterSave?.()
     } catch (err: any) {
       const msg = err?.message || ''

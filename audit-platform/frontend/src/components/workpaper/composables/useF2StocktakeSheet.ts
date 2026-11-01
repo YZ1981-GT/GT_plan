@@ -10,33 +10,52 @@ export const F2_STOCKTAKE_BUSINESS_READONLY_KEY: InjectionKey<Readonly<Ref<boole
 
 export interface F2StocktakeSaveDetail {
   items: ChecklistResponse[]
+  /** 监听方收到即同步调用，表示「这单我接了」。见 `dispatchF2StocktakeSave` 的 accept 语义。 */
+  accept?: () => void
   resolve?: () => void
   reject?: (error: unknown) => void
 }
 
-/** 事件监听方必须显式 resolve/reject；超时按失败处理，不能把未落库伪装成成功。 */
+/** 等待监听方显式 resolve/reject 的超时（毫秒）；只在已被 accept 后才计时。 */
+export const F2_STOCKTAKE_SAVE_TIMEOUT_MS = 8000
+
+/**
+ * 事件监听方必须显式 resolve/reject；超时按失败处理，不能把未落库伪装成成功。
+ *
+ * 🔴 「没人听」与「在处理」必须分开：宿主未渲染时事件无人应答，若一律等满 8 秒才报失败，
+ * 切换路径就白卡 8 秒而且错误文案也说不清原因。`window.dispatchEvent` 对 CustomEvent 是
+ * **同步**的 —— 监听方在 dispatchEvent 返回前就跑完了，所以派发后还没被 `accept()` 就一定
+ * 是没有监听方，可以立即失败。只有已 accept 的才进 8 秒超时（那才是真的「在处理但卡住」）。
+ */
 export function dispatchF2StocktakeSave(items: ChecklistResponse[]): Promise<void> {
   if (!items.length) return Promise.resolve()
   return new Promise<void>((resolve, reject) => {
     let settled = false
-    const timeout = setTimeout(() => {
-      if (settled) return
-      settled = true
-      reject(new Error('监盘保存等待超时，请重试'))
-    }, 8000)
+    let accepted = false
+    let timeout: ReturnType<typeof setTimeout> | null = null
     const finish = (error?: unknown) => {
       if (settled) return
       settled = true
-      clearTimeout(timeout)
+      if (timeout !== null) clearTimeout(timeout)
       if (error !== undefined) reject(error)
       else resolve()
     }
     const detail: F2StocktakeSaveDetail = {
       items,
+      accept: () => { accepted = true },
       resolve: () => finish(),
       reject: (error) => finish(error),
     }
     window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail }))
+    if (settled) return
+    if (!accepted) {
+      finish(new Error('监盘表格未就绪，没有组件接收保存请求，请重新打开该页签后重试'))
+      return
+    }
+    timeout = setTimeout(
+      () => finish(new Error('监盘保存等待超时，请重试')),
+      F2_STOCKTAKE_SAVE_TIMEOUT_MS,
+    )
   })
 }
 

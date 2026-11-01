@@ -1,6 +1,6 @@
 """账号级显示偏好 ORM 模型。
 
-V240（platform-global-display-settings-closure 任务 1A）。
+V250（platform-global-display-settings-closure 任务 1A）。
 独立 typed table，用 DB CHECK + revision CAS 替代 User JSONB 并发覆盖。
 """
 from __future__ import annotations
@@ -122,7 +122,7 @@ class UserDisplayPreferences(Base):
             name="ck_udp_revision_nonneg",
         ),
         # NOTE: `ck_udp_fixed_columns_is_object`（`jsonb_typeof(fixed_columns) = 'object'`）
-        # 只登记在真表的迁移 SQL（V235__display_preferences_and_project_amount_unit.sql
+        # 只登记在真表的迁移 SQL（V250__display_preferences_and_project_amount_unit.sql
         # 第 64~65 行），**不放进 ORM 的 __table_args__**：
         # `jsonb_typeof` 是 PG 专用函数，SQLite 在 CREATE TABLE 校验 CHECK 表达式时
         # 直接报 `no such function: jsonb_typeof` ⇒ 任何

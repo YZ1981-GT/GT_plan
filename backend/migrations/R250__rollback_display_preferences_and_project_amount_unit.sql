@@ -1,4 +1,4 @@
--- R235：回滚 V235（显示偏好表 + 项目金额单位列）
+-- R235：回滚 V250（显示偏好表 + 项目金额单位列）
 -- spec: platform-global-display-settings-closure, 任务 1A, A 组
 -- 必须在任何 DROP 前检查数据安全，有数据时 RAISE EXCEPTION 整单回滚。
 

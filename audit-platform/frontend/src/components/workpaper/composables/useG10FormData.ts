@@ -4,6 +4,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG10FormData — G10 交易性金融负债底稿数据层
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -97,7 +98,7 @@ export function useG10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
           project_id: opts.projectId.value,
           items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-        })
+        }, { _dedupe: false } as AxiosRequestConfig)
         try {
           localStorage.removeItem(draftKey(opts.wpId.value, itemId))
         } catch { /* ignore */ }

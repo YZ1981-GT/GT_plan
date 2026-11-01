@@ -55,7 +55,10 @@ describe('legacy OnlyOffice 完整保存屏障', () => {
     await expect(runLegacyOnlyOfficeTransition(transition)).resolves.toBe(false)
     expect(transition).not.toHaveBeenCalled()
     expect(pendingWriteBarrierActive.value).toBe(false)
-    expect(error).toHaveBeenCalledWith('切换在线编辑前有 1 项内容保存失败，请重试')
+    // 只给计数的文案在多失败场景下无法定位；原因必须摊进文案（design §8 残留 4）
+    expect(error).toHaveBeenCalledWith(
+      '切换在线编辑前有 1 项内容保存失败，请重试：子表保存失败',
+    )
   })
 
   it('配置阶段抛错也释放 active，并把原错误交回调用方处理', async () => {

@@ -51,12 +51,44 @@
     - [x] 8.3.6 守卫：宿主分母由 `useGRenderModeSwitch` 真实 import 反查并与清单双向相等；
           `:readonly` 绑定按标签名判定；两种失败传递形态分别证明；新增 G9/G1 运行时行为测试
 
+- [ ] 9. 三件如实标注项逐一收口（2026-11-01 续做，详见 design §9）
+  - [x] 9.1 第一件根因排查：候选后端起不来 ≠ 没做；定位三个 HEAD 级 P0（均非本 spec 引入）
+        —— `adjustment_import.py:82` 漏 import `require_project_permission`（`app.main` 导入即
+        NameError）· `ThreeColumnLayout.vue` 重复 import `useMountOnFirstOpen`（前端 500）·
+        三组迁移撞号。修完 `app.main` 导入通过（2619 条路由）、候选后端 9981 / 前端 3032 起来
+  - [x] 9.2 迁移撞号按"改未应用的那一侧"处置：删 V233 的 display_preferences 残留 + 配对 R233；
+        display_preferences → V250、formula_provenance → V251；同步改模型版本注释与按文件名
+        钉死的测试。`scan_migrations` 248 个最高 251 无重复，4 条既有撞号守卫由红转绿
+  - [ ] 9.3 共享库 `audit_platform` 应用 V235~V251（**待用户放行**，属共享记账类写操作）；
+        现算只有 `projects.amount_unit`（V250）落在 OO 往返路径上（`GET /api/projects/{id}`
+        恒 500 ⇒ 年度闸门不渲染）。本轮已用 `GT_BOOTSTRAP_DONE=1` 确保未改共享库 schema
+  - [x] 9.4 第二件：D4-8 / D4-33 / D4-34 / D4-36 逐个按**各自真实载荷形态与身份键**的最小
+        非空基线实测——空投影下 `applied=0` 且基线逐字段原样带回；新守卫 17 例，并加
+        "手写基线的键必须等于 merge 自己产出的键"防漂断言（前三版判据全是夹具误报）
+  - [x] 9.5 第三件残留 1：flag 闸门改注册表不变量（每个 dedicated item_id 必须在本 adapter
+        声明的 store item 集合里，现算 7/7）；stale 注释改勘误说明
+  - [x] 9.6 第三件残留 2：K1 载荷是 dict 却接到 rows 分支，该分支 `isinstance(parsed, list)`
+        使 dict 基线留 `[]` ⇒ **每次镜像清空既有行与未受管标量**（真库 0 行，潜伏缺陷）。
+        改 `merge_state_fn="merge_k1_from_projection"` 并删永不执行的 `dedicated_items`；
+        按运行期解析全仓扫 69 个 rows 分支 plan，K1 唯一一例、零无法解析
+  - [x] 9.7 第三件残留 3 / 4 / 6 / 7：`FOR UPDATE` 合并为一条 `ANY(:ids)`（46 item 时
+        92 → 47 次往返）而 advisory lock 保持逐条有序 · 屏障文案摊进真实原因并暴露 `reasons` ·
+        14 个文件 15 处裸 PUT 补 `_dedupe: false` · F2 保存事件加同步 `accept()` 回执
+  - [ ] 9.8 第三件残留 5（14 个 G formData 迁 strict CAS）—— **未做**：R1.3 明文允许 LWW，
+        且已有"只许缩短 + 与 strict 清单互斥"的单向棘轮；属独立一轮的改动面
+  - [x] 9.9 顺带解决两条预存红：`migration_drift_ledger` 的 V200 / V201 条目对应文件已按裁决
+        移除，台账加可伪证的 `file_removed` 并断言"确实不在磁盘上"（原判据对已移除条目恒红）
+  - [x] 9.10 回归与变异（重放树 = 最新远端 + 本轮）：前端 rc=0、后端 488 passed、
+        真实 PG 107 passed、6 条变异逐个 RED 且逐字节恢复；ruff 32 errors 为预存（干净 HEAD 33）
+
 - [ ] 6. 浏览器验收
   - [ ] 6.1 【测试】项目在 HTML 修改后立即切在线编辑，OO 显示新值
   - [ ] 6.2 注入一次保存失败，确认保持 HTML、错误中文可见且零 materialize；恢复后可重试
   - [ ] 6.3 OO 修改后回表单并刷新，HTML / API / 已发布 representation 三方一致；恢复验收数据
+  - [ ] 6.4 后端侧 OO 往返浏览器实测（**被 9.3 阻断**：共享库缺 V250 使项目详情恒 500）
+  - [ ] 6.5 D4-8 / D4-33 / D4-34 / D4-36 四表浏览器必测（同上阻断）
 
 - [ ] 7. 收尾
   - [x] 7.1 语义审查并修复高优先级发现（第一轮 P0/P1 已闭合；第二轮 P1-1~P1-3 见任务 8）
-  - [ ] 7.2 更新 INDEX / memory，干净候选树复跑关键验证
+  - [x] 7.2 更新 INDEX / memory（memory 精简至 299 行），锁定分离头候选树复跑关键验证
   - [ ] 7.3 只提交本 spec 文件与改动块；同步远端后按版本工具推送当前分支

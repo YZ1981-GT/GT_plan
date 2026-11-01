@@ -125,3 +125,112 @@ incoming durable
 - 不把 Univer 纳入 content/application 协议。
 - 不在本轮把 callback apply 改成异步 worker，也不做 room/recovery 历史账面清理。
 - 后续顺序：callback durable 后异步化与生命周期 reaper → adapter/template 覆盖 → Univer 统一 → 6000 人容量验收。
+
+## 9. 三件如实标注项的逐一收口（2026-11-01 续做）
+
+上一轮交付时如实标注了三件未完成/未修的事，用户要求逐一修复。本节记录实际做到了哪一步、
+为什么，以及仍需拍板的部分。
+
+### 9.1 第一件：后端侧没有浏览器证据
+
+原因不是"没做"，而是候选后端起不来。逐层排查后发现**三个 HEAD 级 P0，都不是本 spec 引入的**，
+且它们让整个平台处于起不来的状态：
+
+| 现象 | 根因 | 归属 | 处置 |
+|---|---|---|---|
+| `app.main` 导入即 `NameError` ⇒ 后端整体起不来、CI `pytest -x` 必死 | `adjustment_import.py:82` 用了 `require_project_permission` 却没 import（其余 5 个调整分录路由都 import 了） | `3cd7352a6 WIP: adjustment module A-E batch`（`git blame -L 80,84` 定到行） | 补 import。守卫 `test_router_modules_mounted.py` **本来就能抓到**，当时正红在这一行 —— 是带着红守卫推的 |
+| 前端 `DefaultLayout.vue` 500 ⇒ 整个前端起不来 | `ThreeColumnLayout.vue` 把 `useMountOnFirstOpen` import 了两次，`Identifier has already been declared` | `a6c1fa93a feat(platform-perf)` | 删重复 import |
+| `MigrationRunner` 同号即抛 ⇒ **全平台迁移一条都跑不了**（health `check_error: RuntimeError`、`applied_count: 0`） | 三组迁移撞号：V233 / V235 / V236 | 并发会话 | 见 §9.2 |
+
+修完后：`app.main` 导入通过（2619 条路由）、`test_router_modules_mounted.py` 3 passed、
+候选后端在 9981 起来、候选前端在 3032 服务、`scan_migrations` 248 个迁移最高 251 无重复。
+
+**仍差一步，需要放行**：候选后端连的共享库停在 **V234**，而 HEAD 代码需要 V235~V251。
+现算确认只有一处落在 OO 往返路径上 —— `projects.amount_unit`（V250）缺列使
+`GET /api/projects/{id}` 恒 500，前端的年度闸门因此不渲染页面；
+`checklist-responses` 与 `render-config` 都是 200，`consol_operation` 缺表只影响后台 worker 噪音。
+对 30 GB 的共享开发库应用 17 个迁移属"共享记账类写操作"，按既有纪律须先问。
+启动时已用 `GT_BOOTSTRAP_DONE=1` 跳过迁移，确保本轮排查**没有改动共享库 schema**。
+
+### 9.2 迁移撞号的处置依据
+
+现扫事实：共享库最高已应用 V234（V233 = `V233__project_creation_grants.sql`）；磁盘最高 V249；
+`display_preferences_and_project_amount_unit.sql` 同时存在 V233 与 V235，**两份只差注释里的版本号**
+（纯改号残留），而它自己的 model docstring 已漂到"V240"。
+
+按"撞号时改未应用的那一侧"：
+
+1. 删 `V233__display_preferences_and_project_amount_unit.sql` + 配对的 R233
+   —— V233 已被已应用的 `project_creation_grants` 占用；
+2. V235 保留 `adjustment_review_tasks_and_group_revision`（3 处代码引用），
+   `display_preferences_and_project_amount_unit` → **V250**；
+3. V236 保留 `ai_chat_run_context_request_snapshot`（V/R 同 stem 自洽、测试按文件名钉死），
+   `formula_provenance_report_runs` → **V251**；
+4. 同步改：迁移文件首行注释、`core.py` / `models/__init__.py` / `user_display_preferences.py`
+   的版本注释、按文件名钉死的 `test_formula_provenance_report_schema.py`。
+
+### 9.3 第二件：D4 四个 dedicated item 首次真正接受镜像写入
+
+注册表常量改名让 D4-8 / D4-33 / D4-34 / D4-36 从本轮起第一次真正写入，风险是"开始写就写坏"。
+现已逐个用**各自真实载荷形态与身份键**的最小非空基线实测：空投影下 `applied=0` 且基线逐字段
+原样带回。守卫 `tests/workpaper_sync/test_dedicated_store_merge_is_non_destructive.py`（17 例）。
+
+🔴 判据写到第四版才站得住，前三版全是**夹具造成的误报**，教训固化在该文件 docstring 里：
+
+1. 统一夹具 `{unmanaged, tables:{rows}}` ⇒ 误报 D4-35（它的契约只返回
+   `{rows, sampling, periodAmount}`，正确地忽略了不属于自己的键）；
+2. 行统一用 `{"id": ...}` ⇒ 误报 D1-memo-rows（它声明 `ROW_IDENTITY_KEY = "rowId"`）；
+3. 行不带身份键 ⇒ 误报 D4-34 / D4-36（它们 `if r.get("id")` 过滤无身份行后按 order 重建）。
+
+这正是"口径类判据必须拿真实接口现读"的又一次复现：三次都是我的夹具错，不是代码错。
+所以守卫里加了 `test_handmade_bases_match_the_canonical_shape`（手写基线的键必须等于 merge
+自己产出的键），夹具一漂就打红，而不是变成"测了个不相干的结构"。
+
+### 9.4 第三件：上一轮语义审查记为"范围外"的 7 项残留
+
+清单即下表（上一轮只修了 P1-1~P1-3，见任务 8；其余 7 项当时如实标注为范围外）。
+
+| 项 | 处置 |
+|---|---|
+| 残留 1：`_INCLUDE_D4xx_*` flag 失去闸门 + 注释 stale | 不新增机制，改为注册表不变量：**每个 dedicated item 的 item_id 必须出现在本 adapter 声明的 store item 集合里**（现算 7/7 成立）。flag 翻 False 后 `STORE_ITEM_IDS` 会排除该 item 而 dedicated 照跑 ⇒ 不变量当场打红，不再静默分叉。stale 注释改成勘误说明 |
+| 残留 2：K1 `dedicated_items` 永不执行 | 🔴 排查中发现比原判更重的缺陷：K1 载荷是 dict，却被接到单 store 的 **rows** 分支，而该分支解码 base 时是 `if isinstance(parsed, list)` ⇒ dict 基线留在 `[]`，**每次镜像清空既有行与未受管标量**（真库 K1-9 当前 0 行，属潜伏缺陷，首次使用即损坏）。改 `merge_state_fn="merge_k1_from_projection"` 走 dict 感知的 state 分支（该函数返回的正是 state 分支要的 3 元组，provider 本来就是按 state 形态写的），并删掉永不执行的 `dedicated_items`。触类旁通按**运行期解析**全仓扫 69 个走 rows 分支的 plan，K1 是唯一一例、零无法解析（第一版 AST 探针把 20 个共用函数的 provider 误判成"找不到"） |
+| 残留 3：逐 item 两条锁语句 | `FOR UPDATE` 合并为一条 `item_id = ANY(:ids)`（46 个 item 时 92 → 47 次往返）。**advisory lock 保持逐条有序**：死锁安全完全依赖"两条路径都按 item_id 升序逐个取锁"，单条语句里对集合的函数求值顺序 PG 不保证，合并会把往返换成偶发死锁。守卫断言往返形态与取锁顺序 |
+| 残留 4：屏障文案只有计数 | `PendingWritesFlushError` 把 `failures` 里的原始原因摊进文案（去重、最多 3 类、超出折叠计数），并暴露 `reasons` 供界面逐条列出；axios 信封 / Error / 字符串三种形态都能取到 |
+| 残留 5：14 个 G formData 仍是 LWW | **未做**。R1.3 明文允许，且已有"只许缩短 + 与 strict 清单互斥"的单向棘轮。迁移需要 14 个带草稿/重试/TB 逻辑的 formData 各自维护 `item_id → version`，是独立一轮的改动面 |
+| 残留 6：裸 PUT 未传 `_dedupe: false` | 14 个文件 15 处 PUT 全部补上（与已迁移的 11 个 strict CAS 调用面一致）。此后 `ERR_CANCELED` 回到"只可能来自调用方自己的 signal"，`_doSave` 对 canceled 不重抛才真正安全 |
+| 残留 7：F2 事件无监听方卡满 8 秒 | detail 上加同步 `accept()` 回执。`window.dispatchEvent` 对 CustomEvent 是同步的 ⇒ 派发返回后仍未被 accept 就一定没有监听方，立即失败并给出可操作文案；只有已 accept 的才进 8 秒超时（那才是真的"在处理但卡住"）。宿主 `handleSave` 在第一个 await 之前 accept |
+
+### 9.5 本轮验证
+
+- 后端：`test_store_merge_registry_invariants.py` 9 例、
+  `test_dedicated_store_merge_is_non_destructive.py` 17 例、`test_router_modules_mounted.py` 3 例全绿；
+  真实 PG 并发与镜像原子性 12 passed。
+- 前端：pending / CAS / F2 监盘 / G 支线定向 67 passed（含残留 4、残留 7 的新判据）。
+- 变异：5 条 RED 且逐字节恢复 —— K1 回 rows 分支、K1 加回永不执行的 dedicated 声明、
+  D4-34 不从 base 起步、手写夹具漂移、D4-33 flag 翻 False。
+
+### 9.6 本轮归因：哪些红不是本轮引入
+
+按「见红先在干净 HEAD 上复跑」的纪律逐条归因（干净 HEAD = `4390aaaa3`，同一台机、同一批命令）：
+
+| 现象 | 干净 HEAD | 候选树 | 归属 |
+|---|---|---|---|
+| `tests/test_migration_drift_ledger.py` | **22 条全部 ERROR**（撞号 RuntimeError，守卫完全失明） | 20 passed / 2 failed | 预存。修完撞号后守卫才真正跑起来，于是暴露出 `V200` / `V201` 的 drift 台账条目**对应的迁移文件不在磁盘上**（两边 `migrations/V20[01]*` 都为空）。这与 memory 里登记的「`V201`/`R201` 重复迁移待迁移负责人裁决」是同一件事，交迁移负责人 |
+| 改动过的 7 个 py 文件 ruff | **33 errors** | 32 errors | 预存（本轮少 1 条，没新增） |
+| `test_report_provenance_migration_matches_model_surface` | 在上面那 22 条 ERROR 之外另算 | 失败 → 已修 | **本轮引入**，见 §9.7 |
+
+### 9.7 自己脚本的 bug：同文件多编辑互相覆盖
+
+`fix_migration_collisions.py` 第一版对每条文本编辑都**各自从磁盘读原文**，改完 append 到
+待写清单，最后统一写盘 ⇒ 同一文件的第二条编辑覆盖了第一条，**前面的编辑静默丢失**。
+实际丢了 3 条：`models/__init__.py:225`（V233 → V250）、
+`user_display_preferences.py:3`（V240 → V250）、
+`test_formula_provenance_report_schema.py:113`（V236 → V251，正是上表那条红）。
+
+只有第三条被测试咬出来 —— 另两条是注释，不会让任何测试变红，差点就带着错版本号入库了。
+已改为在**累积结果**上逐条改（`pending: dict[Path, str]`），并补跑一次复核：
+这三个文件里不得再出现旧版本号（现算残留 0）。
+
+教训：批量改写脚本只要允许「同一文件多个靶点」，就必须把中间结果带下去；
+「每条独立读原文 + 最后统一写盘」在单靶点时正确、多靶点时静默丢数据，
+而注释类编辑丢了不会有任何守卫报警。
