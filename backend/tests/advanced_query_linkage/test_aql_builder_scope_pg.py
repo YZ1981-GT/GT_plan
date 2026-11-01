@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import uuid
 from contextlib import asynccontextmanager
-from datetime import date
 from decimal import Decimal
 
 import pytest

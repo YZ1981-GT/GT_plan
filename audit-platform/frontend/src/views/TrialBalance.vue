@@ -1015,9 +1015,7 @@
 
       <!-- 试算平衡表右键菜单 -->
       <div v-if="tbSumCtxVisible" class="gt-tb-sum-ctx" :style="{ left: tbSumCtxX + 'px', top: tbSumCtxY + 'px' }" @contextmenu.prevent>
-        <div class="gt-ucell-ctx-item" @click="onTbSumCtxCopy">
-          <span class="gt-ucell-ctx-icon">📋</span> {{ tbSumPickedRows.length > 1 ? `复制选中 (${tbSumPickedRows.length}行)` : '复制值' }}
-        </div>
+        <div class="gt-ucell-ctx-item" @click="onTbSumCtxCopy"><span class="gt-ucell-ctx-icon">📋</span> {{ tbSumPickedRows.length > 1 ? `复制选中 (${tbSumPickedRows.length}行)` : '复制值' }}</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxFormula"><span class="gt-ucell-ctx-icon">ƒx</span> 查看公式</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxDetail"><span class="gt-ucell-ctx-icon">📊</span> 汇总明细</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>

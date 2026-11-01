@@ -410,7 +410,6 @@ import FormulaPendingSyncDialog from '@/components/formula/settings/FormulaPendi
 import { resolveDialogOpenContext, type OpenCustomQueryPayload } from '@/components/query/queryEntryContext'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import DshPanelLoadError from '@/components/ai/DshPanelLoadError.vue'
-import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
 import {
   legacyPayloadToPartialCommand,

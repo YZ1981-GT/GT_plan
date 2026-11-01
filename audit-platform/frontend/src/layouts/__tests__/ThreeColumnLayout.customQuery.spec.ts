@@ -269,7 +269,9 @@ describe('业务页行级入口（W6，ADR-AQL-20；任务 46）', () => {
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ entry: ENTRY })
-    await nextTick()
+    // 弹窗是 defineAsyncComponent + useMountOnFirstOpen（远端 93402de37 起首次打开才挂载），
+    // 只等 nextTick 拿不到实例 ⇒ 必须 flushPromises 把动态 import 的微任务跑完。
+    await flushPromises()
     expect(dialogOf(w).props('entry')).toEqual(ENTRY)
     expect(dialogState(w).open).toBe(true)
   })
@@ -282,11 +284,11 @@ describe('业务页行级入口（W6，ADR-AQL-20；任务 46）', () => {
     expect(dialogOf(w).props('entry')).toBeNull()
 
     emitOpenEvent({ entry: ENTRY })
-    await nextTick()
+    await flushPromises()
     expect(dialogOf(w).props('entry')).toEqual(ENTRY)
 
     dialogOf(w).vm.$emit('update:modelValue', false)
-    await nextTick()
+    await flushPromises()
     await openFromSidebar(w)
     expect(dialogOf(w).props('entry')).toBeNull()
   })

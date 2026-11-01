@@ -580,20 +580,24 @@ def _parse_cell_ranges(spec: str) -> list[tuple[int, int, int, int]]:
         # 单 cell 'B5'
         m = _re.match(r"^([A-Z]+)(\d+)$", part)
         if m:
-            col = _col_to_idx(m.group(1)); r = int(m.group(2))
+            col = _col_to_idx(m.group(1))
+            r = int(m.group(2))
             out.append((r, col, r, col))
             continue
         # 整列 'A:A' / 'A:C'
         m = _re.match(r"^([A-Z]+):([A-Z]+)$", part)
         if m:
-            c1 = _col_to_idx(m.group(1)); c2 = _col_to_idx(m.group(2))
+            c1 = _col_to_idx(m.group(1))
+            c2 = _col_to_idx(m.group(2))
             out.append((1, min(c1, c2), INTEGER_COL_LIMIT, max(c1, c2)))
             continue
         # 矩形 'A1:C3'
         m = _re.match(r"^([A-Z]+)(\d+):([A-Z]+)(\d+)$", part)
         if m:
-            c1 = _col_to_idx(m.group(1)); r1 = int(m.group(2))
-            c2 = _col_to_idx(m.group(3)); r2 = int(m.group(4))
+            c1 = _col_to_idx(m.group(1))
+            r1 = int(m.group(2))
+            c2 = _col_to_idx(m.group(3))
+            r2 = int(m.group(4))
             out.append((min(r1, r2), min(c1, c2), max(r1, r2), max(c1, c2)))
             continue
     return out

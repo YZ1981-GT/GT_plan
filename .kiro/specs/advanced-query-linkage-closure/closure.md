@@ -205,53 +205,75 @@ W11（改为截断并在文件内写明）的推荐默认值是**不改**。此�
 |---|---|
 | 后端 SQLite 定向（`tests/advanced_query_linkage` + 4 个相关文件） | **602 passed / 0 failed** |
 | 后端真 PG（本 spec 新增 4 个文件：conditions / presets / entry_accounts / consolidated） | **47 passed**（3 + 11 + 11 + 11，另 11 为 entry 的首轮） |
-| 后端真 PG 全目录归因 | 候选 120 failed / 204 passed；干净 HEAD 基线 121 failed / 167 passed；**逐节点新增失败 0、消除 1**（`evidence/pg_attribution.json`） |
+| 后端真 PG 全目录归因 | 候选 120 failed / 204 passed（324 例）；干净基线 121 failed / 167 passed（288 例）；**逐节点新增失败 0、消除 1**。合 v1.0.89 时对基线 `53a1a4b83` 得同一结论（`evidence/pg_attribution.json`），合 v1.0.91 后把 base worktree 切到 `93402de37` 重跑，结论不变（`evidence/pg_attribution2.json`）。解析出的节点数与 pytest 摘要逐项闭合（117+167+4=288、116+204+4=324） |
 | 前端定向 vitest（W3 9 文件 + W6 10 文件，去重后） | W3 **143 passed**；W6 **132 passed**（含新增 `QueryDetailEntry` 9 + `queryEntryPageWiring` 17 + `queryEntryBuild` 24 + `useQueryEntry` 13 + `QueryEntryBanner` 8） |
 | ESLint（本轮改动文件） | **0 error**（21 条既有 `gt-audit` 风格 warning） |
 | `vue-tsc --noEmit -p tsconfig._aql-linkage.json` | **退出码 0** |
 | Ruff（本轮后端改动文件） | **All checks passed** |
-| `check_file_size.py`（本轮 19 个文件，磁盘口径） | **退出码 0** |
-| `tests/scripts/test_hard_cap_ratchet.py` | 3 failed / 15 passed，**与改动前逐条相同**（预存，见下） |
+| `check_file_size.py --staged --files-from -`（本 spec 相对远端的 74 个净改动代码文件） | 剔除 `DisclosureEditor.vue` 后 **退出码 0**；含它则 exit 1（远端 3273 > cap 3170，本 spec 对它净 0 行，见 §十五.4） |
+| `tests/scripts/test_hard_cap_ratchet.py` | 合 v1.0.91 后 1 failed / 17 passed，唯一一条就是上面那个 `DisclosureEditor.vue` 硬上限（远端侧）；原先 ReportView 那两条已随远端修掉 |
+| `check_staged_tree_self_consistency.py` / `check_router_registration.py` | 均 **退出码 0** |
+| 逐个 import `app` 下全部模块 | **3068 / 3068 成功、失败 0**（`evidence/scan_imports2.json`；合 v1.0.89 时为 3066 / 2 失败，见 §十五.2 A） |
+| 全前端重复 import 扫描 | 8678 个 `.vue/.ts/.tsx`，真实重复 **0**（修掉 `ThreeColumnLayout.vue` 后），2 个命中为测试夹具模板字符串内的假阳并充当阳性对照 |
 | 变异（design §10.4 既定编号） | W3 #24 / #25 / #31 + T43、W6 #26 / #27 / #28 / #34 全红；额外 #27b / #34b 全红；**5 条阴性对照全绿**；**15/15 逐字节恢复 sha256 一致** |
 | `gen_journal_entry_rules_ts.py --check` | 退出码 0（输出幂等，按项目既有 `--check` 约定，不用 `--write` + `git diff`） |
 | 共享库残留 | `AQL-W3-%` / `AQL-T40-BLANK-%` 均 **0**；`custom_query_templates` 整表 **0 行**；`materiality` 无 `AQL-%` 注记 |
 
 ### 预存失败（非本 spec，未代改）
-- `test_hard_cap_ratchet.py` 3 条：`ReportView.vue` 实际 1,946 > cap 1,943；`DisclosureEditor.vue` cap 3,170 而实际 3,161（余量 9 > 0），连带 `test_ratchet_detects_artificially_raised_cap`。本 spec 对 ReportView 的改动为 **0 行**（`git diff --stat HEAD` 为空）。
-- `ReportView.filesize-invariant.spec.ts` 2 条：同一条 ReportView 超限。
-- `ThreeColumnLayout.year.spec.ts` 6 条：用 HEAD 版该文件原样复跑**同样 6 条红**（`evidence/tcl_year_attribution.json`，复原后 sha256 一致）。
-- 真 PG 基线 121 条红的两大成因：**41 条**是 `column projects.amount_unit does not exist`（V235 未落共享库），其余主要是 `gold.py` 固定项目 UUID 失效导致的 403 / 空集。
+- `test_hard_cap_ratchet.py`：合 v1.0.89 前是 3 条（`ReportView.vue` 1,946 > cap 1,943；`DisclosureEditor.vue` cap 3,170 而实际 3,161 余量 9 > 0；连带 `test_ratchet_detects_artificially_raised_cap`）。合 v1.0.91 后剩 **1 条**：`DisclosureEditor.vue` 实际 **3,273** > cap 3,170 —— 这条由远端把该文件从 3,161 撑到 3,273 造成，本 spec 对它 `--numstat` 为 4 增 4 删 = **净 0 行**。
+- `ThreeColumnLayout.year.spec.ts` 6 条（合 v1.0.89 前）：用当时 HEAD 版该文件原样复跑**同样 6 条红**（`evidence/tcl_year_attribution.json`，复原后 sha256 一致）。
+- `test_aql_publish_rows_callers.py` 1 条：远端新增第 6 个 `publish_rows` 调用方未登记。在**纯远端** base worktree 单独复跑同红（`evidence/base_publish_guard.log`）；按棘轮契约登记后转绿（§十五.3）。
+- 真 PG 基线 121 条红的两大成因：**41 条**是 `column projects.amount_unit does not exist`（远端 `V235__display_preferences…` 未落共享库 —— 现已直接查库证实：`projects.amount_unit` / `user_display_preferences` / `report_generation_run` / `adjustments.content_revision` 在共享库里都不存在），其余主要是 `gold.py` 固定项目 UUID 失效导致的 403 / 空集。
+- 仓库整体 `ruff check backend/` 有 6000+ 预存违规且仓库**没有任何 ruff 配置文件**（跑的是 ruff 默认 E4/E7/E9/F），CI `backend-lint` 因此长期红。本 spec 只负责「本轮改动文件 ruff 干净」，现为 **All checks passed**。
 
 ---
 
 ## 十二、唯一待用户放行项：任务 37 的浏览器实测
 
-**结论先说：代码已改但未实测，卡点是环境而非代码。**
+**结论先说：代码已改但未实测，卡点是环境而非代码。合并最新远端 `93402de37`（v1.0.91）后卡点升级了
+—— 不再是「差一条迁移」，而是远端树自己就起不来。**
 
 - 候选栈已备好：候选后端 9981（`DATABASE_URL` 指共享库、`REDIS_URL=redis://localhost:6379/9` 独占库、不 reload）
   + 候选前端 3040（`.env.local` 把 `VITE_API_BASE_URL` **在配置文件里定死**为 `http://127.0.0.1:9981`，
   避免只改端口导致写请求落到共享后端 9980）。
-- 🔴 **候选后端起不来且无旁路**：启动编排的 `_task_migration_mark_complete` 是只读完整性核验 + fail-closed，
-  实测 `RuntimeError: 数据库迁移未就绪：pending_versions=['235']`；`GT_BOOTSTRAP_DONE=1` 只跳过
-  「执行迁移」那一步、**不跳过这道核验**，代码里没有任何开关。
-- 现算：候选树磁盘 233 个 `V*.sql`（最高 **V235**），共享库 `schema_version` 已登记 234 条（最高 **V234**），
-  待执行恰好 1 条 = **`V235__display_preferences_and_project_amount_unit.sql`**
-  （新增 `projects.amount_unit` 列 + `user_display_preferences` 表，**有配对 `R235` 回退**）。
-  它属 **`platform-global-display-settings-closure`**、随最新远端 `53a1a4b83` 进来，**不是本 spec 的产物**。
-  主工作区 HEAD（`571026861`）里还没有它；共享开发栈 9980 现仍 healthy（它在 V235 到达前启动，热重载不跑迁移）。
-- 这条缺列正是本 spec 五处 500 的根因，也解释了真 PG 基线里那 41 条红。本 spec 已把相关路径
-  改成最小列投影、**不依赖该列**；但**跑整栈仍要求迁移就绪**。
+- 🔴 **阻断（远端侧，本 spec 未代改）：`backend/migrations` 有 3 组重复版本号** ⇒
+  `MigrationRunner.scan_migrations()` 直接抛
+  `RuntimeError: [Migration] 检测到重复版本号迁移文件（须重编号，否则靠后者被静默跳过）`，
+  配对的 R 文件同样 3 组重复 ⇒ **后端在任何库上都起不来**，与「某条迁移是否落库」无关。
 
-**请用户拍板**：是否把 V235 落到共享库（跨 spec 的共享资源变更，有 R235 可回退）。
-放行后即可起候选栈跑任务 37 的 11 个 Playwright 用例与 W3 / W6 走查；
-在此之前任务 37 保持 `[ ]*`，**不以「代码已改」充当实测**。
+  | 版本号 | 两个文件 | 引入提交 | 共享库是否已应用 |
+  |---|---|---|---|
+  | V233 | `display_preferences_and_project_amount_unit.sql` ｜ `project_creation_grants.sql` | `cd45ec129`（10-31 22:27）｜ `b410cfb0c`（10-31 20:16） | 只有 `project_creation_grants` 已应用（10-30 16:34） |
+  | V235 | `adjustment_review_tasks_and_group_revision.sql` ｜ `display_preferences_and_project_amount_unit.sql` | `3cd7352a6`（11-01 14:58）｜ `bb29a49f6`（11-01 13:11） | 两个都未应用 |
+  | V236 | `ai_chat_run_context_request_snapshot.sql` ｜ `formula_provenance_report_runs.sql` | `a6c1fa93a`（11-01 14:23）｜ `113be0cfa`（11-01 14:22） | 两个都未应用 |
+
+- 现算（本次合并后）：磁盘 **249** 个 `V*.sql`（最高 V249）；共享库 `schema_version` **最高 V234**；
+  `report_generation_run` / `user_display_preferences` / `projects.amount_unit` / `adjustments.content_revision`
+  **在共享库里都不存在** ⇒ 上表「未应用」是直接查库得出的，不是推断。
+  合并前本 spec 候选 `5be63f167` 侧 233 个 V 文件、最高 V235、**零重复** ⇒ 三组撞号全在远端侧。
+- V233 那组是**合并复活**：`V233__display_preferences…` 与 `V235__display_preferences…` 逐行只差注释里的
+  版本号字符串（`-- V233：` vs `-- V235：`，R 文件另差 3 处报错文案），且 `d17a1587a` 已经删过 V233 这份；
+  另一会话在 `.kiro/specs/formula-template-dual-project-pilot/tasks.md:75` 里已写明
+  「共享库权威编号是 V235」。
+- 建议的最小修法（**需用户放行，涉及 3 个他域 spec 的已推送产物**；因三组都未落库，**不需要动
+  `schema_version` 记账**）：① 删 `V233__display_preferences…` + `R233__rollback_display_preferences…`
+  （权威是 V235）② 把到得更晚的 `V235__adjustment_review_tasks_and_group_revision`（+R）改号
+  ③ 把到得更晚的 `V236__ai_chat_run_context_request_snapshot`（+R）改号。
+  新号按铁律取 `max(磁盘 249, 共享库 234) + 1` ⇒ V250 / V251。
+- B 解决后，任务 37 还需要第二步放行：候选栈启动会把共享库从 V234 推到 V251（**约 16 条他域迁移**），
+  属跨 spec 的共享资源变更。
+
+**请用户拍板两件事**：① 是否按上面三条修掉重复迁移号（只改文件名与文件内注释里的版本号，不动库）；
+② 是否允许候选栈把那批他域迁移落到共享库。两条都放行后即可跑任务 37 的 11 个 Playwright 用例与
+W3 / W6 走查；在此之前任务 37 保持 `[ ]*`，**不以「代码已改」充当实测**。
 
 ## 十三、清理
 
 - 本轮临时产物一律在仓库根 `tmp_advanced_query_remaining/`（`tmp_*` 已 gitignore）：
   `probes/`（探针与变异驱动）、`evidence/`（证据 JSON）、`*.log`、`*.cmd`、`*.xml`。
-- 两个锁定的 worktree：`wt`（候选，`53a1a4b83`）与 `base`（归因基线，同一提交）。
-  收尾按 unlock → `cmd /c rmdir` 拆 `eslint-plugin-gt-audit` 联接 → 删目录 → `git worktree prune` 处置。
+- 两个锁定的 worktree：`wt`（候选，已合并到远端 `93402de37`）与 `base`（归因基线，已切到同一远端提交）。
+  收尾按 unlock → `cmd /c rmdir` 拆 `eslint-plugin-gt-audit` 联接 → 删目录 → `git worktree prune` 处置
+  （🔴 联接必须先用 `cmd /c rmdir` 只拆链接，不能 `Remove-Item -Recurse`，否则会顺着联接删真目录）。
 - `wt/audit-platform/frontend/.env.local`（候选栈代理配置，被 `*.env.local` gitignore）随 worktree 一并删除。
 - 上一批次遗留的 `tmp_aql_linkage/` 按 design §12 一并清理（结论都已落到 tasks.md 与本文件）。
 
@@ -270,3 +292,60 @@ W11（改为截断并在文件内写明）的推荐默认值是**不改**。此�
    展平、每章节上限 100 行）；`ws_*` 按「无 sheet 必 0 行」假设（实际当时会静默回落 `info`）。
    两次都是**用例打红后现读实现**才改对 —— 这正是「判据必须拿真数据对账」的价值。
 4. **我自己的探针也写过不一致的过滤**：查合并项目时漏了 `p.is_deleted`，一度把已删除的首汽租车算进来。
+
+## 十五、合并最新远端（`93402de37` / v1.0.91）与由此抓到的远端侧缺陷
+
+本 spec 候选先合 `4390aaaa3`（v1.0.89），期间远端又推进两个提交，故再合 `93402de37`（v1.0.91，自动合并无冲突）。
+合并链：`5be63f167`（本 spec）→ `a81387be1`（合 v1.0.89，4 处冲突手工解）→ `7582ffb01`（合 v1.0.91）。
+
+### 1. 四处冲突的解法（合 v1.0.89 时）
+
+- `CustomQueryDialog.vue`：以**本 spec 版**为基 + 移植远端 `openRevision` 4 处。
+  理由：远端 `a6c1fa93a`（platform-perf）用陈旧副本回退了本 spec 已推送的
+  `countToken`×9 / `queryGeneration`×6 / `invalidateQueryResult`×4，按 lineage 现查后恢复。
+- `ThreeColumnLayout.vue` / `ThreeColumnLayout.customQuery.spec.ts`：以**远端版**为基 + 叠加本 spec 的
+  `:entry` 接线与 `'openRevision', 'entry'` 载荷断言。
+- `.kiro/specs/INDEX.md`：以远端版为基，更新本 spec 行为 46/48，并恢复被 `a6c1fa93a` 丢掉的
+  `advanced-query-safety-and-consistency-closure` 行。现算：与远端 INDEX 的差异恰好 2 行（1 改 1 加），
+  表格行的未转义 pipe 计数多重集与远端逐值相同（各 125 行非 4-pipe，都是文件里本来就有的其他表形状）。
+
+### 2. 远端侧缺陷三条（都不是本 spec 引入）
+
+| # | 缺陷 | 判据与证据 | 处置 |
+|---|---|---|---|
+| A | `backend/app/routers/adjustment_import.py:82` 用 `require_project_permission`，第 15 行没导入它（签名默认值在模块导入期求值 ⇒ NameError） | 逐个 import `app` 下全部模块：v1.0.89 上 **3066 成功 / 2 失败**（`app.main` 与 `app.routers.adjustment_import`，同一行）；同族 6 个 router 都有这一行；`deps.py:336` 确有该函数 | **远端已自行修掉**（v1.0.91 第 15 行已补）。合并后现扫 **3068 / 3068 全部导入成功、失败 0**（`evidence/scan_imports2.json`） |
+| B | `backend/migrations` 3 组重复版本号（V233 / V235 / V236 + 配对 R） | `MigrationRunner.scan_migrations()` 抛 RuntimeError；在**纯远端** base worktree 上单独复跑同样抛；合并前本 spec 侧零重复 | **未代改，待用户放行**（见 §十二） |
+| C | `ThreeColumnLayout.vue` 有**两行一模一样**的 `import { useMountOnFirstOpen } …` ⇒ `vue/compiler-sfc` 报 `Identifier 'useMountOnFirstOpen' has already been declared`，**应用外壳整文件编译不过** | 逐侧现查：本 spec 合并前候选 **1 处**，远端 v1.0.89 与 v1.0.91 **都是 2 处**（行 406 / 412）⇒ 远端合并残留 | **本轮修掉**（删掉靠后那一行，保留与 `defineAsyncComponent` 相邻的那行；1639 → 1638 行） |
+
+C 的发现途径值得记一笔：本 spec 的单区域 `tsconfig._aql-linkage.json` **刻意不含** `ThreeColumnLayout.vue`
+（§十 已说明：含它会拖入 16 条预存类型错），所以 `vue-tsc` 这一侧是绿的；真正打红的是本 spec 的
+`ThreeColumnLayout.customQuery.spec.ts` —— 它**真实挂载**该布局，于是在 collect 阶段就炸。
+这正是「静态类型检查 ≠ 能编译」的一个样本。
+
+**触类旁通**：写了 `probes/scan_duplicate_imports.py` 扫全前端 **8678** 个 `.vue/.ts/.tsx`
+（按顶层 import 语句解析本地绑定名，不做文本匹配），只剩 2 个命中且**都是假阳**
+—— `ieWiringIntegrity.spec.ts` 与 `e1SetupOrder.spec.ts` 里的 import 行位于测试夹具的模板字符串内
+（多个独立夹具各带一份 import，合法）。即「真实重复 import 全仓只有 `ThreeColumnLayout.vue` 这一处」，
+且这 2 个假阳同时充当扫描器的**阳性对照**（证明它确实能发现重复，不是空转）。
+
+### 3. 本 spec 自己的两处问题（合并暴露出来的）
+
+1. `ThreeColumnLayout.customQuery.spec.ts` 新增的 W6 两例用了 `nextTick` 但没导入，且
+   远端已把 `CustomQueryDialog` 改成 `defineAsyncComponent` + `useMountOnFirstOpen(showCustomQuery)`
+   （首次打开才挂载）⇒ 只等 `nextTick` 拿不到实例。改为 `flushPromises()` 并写明原因；
+   该文件 14 例全绿。**此前被 C 的编译失败整体掩盖**（整文件 collect 失败时它报的是 `Test Files 1 failed`
+   而 `Tests 366 passed` —— 用例数全绿、文件数不绿，只看 `Tests` 一行会判成通过）。
+2. `test_aql_publish_rows_callers.py` 的调用方棘轮：远端 `3cd7352a6` 新增了第 6 个合法调用方
+   `services/tb_publish_service.py`（经发布门 `publish_rows` 写入，生产调用方是
+   `routers/wp_html_save.py:840` 的 publish-to-tb 路径，非死模块）⇒ 按棘轮自己的契约登记并写明理由。
+   该红在**纯远端** base worktree 上单独复跑同样为红（`evidence/base_publish_guard.log`），即远端头本就红。
+
+### 4. 为过行数门做的两处压缩（渲染结果不变）
+
+- `TrialBalance.vue`：远端 4718 行 > 门限 `int(4491 × 1.05) = 4715`。本 spec 对它净 −2（压两项右键菜单 + 加入口与 import）
+  后仍 4716，又把同一菜单块里 `onTbSumCtxCopy` 那 3 行压成 1 行（与同块邻居写法一致）⇒ **4714**，过门。
+- `ThreeColumnLayout.vue`：删掉重复 import 后 1638 行，门限 1677，过门。
+- 🔴 **`DisclosureEditor.vue` 过不了，且不是本 spec 能解的**：远端 **3273** 行 > hard cap **3170**；
+  本 spec 对它 `git diff --numstat` 为 **4 增 4 删 = 净 0 行**（远端 3273 → 合并后 3273）。
+  该文件的 cap 属它自己的瘦身预算，处置只有两条（都该由该文件的 owner 定）：继续瘦身到 3170 以内，
+  或按棘轮提示把 cap 重定基为真实值 3273 作为只许变小的棘轮。本 spec **不动它的 cap**，如实登记。

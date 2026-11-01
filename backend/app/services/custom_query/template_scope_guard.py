@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from app.deps import PERMISSION_HIERARCHY, require_project_access
+from app.deps import PERMISSION_HIERARCHY
 from app.models.base import PermissionLevel, ProjectStatus
 from app.models.core import Project, ProjectUser
 from app.models.custom_query_models import CustomQueryTemplate
