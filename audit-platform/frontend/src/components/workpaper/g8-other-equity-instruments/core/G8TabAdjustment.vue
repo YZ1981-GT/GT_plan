@@ -97,14 +97,7 @@
       >
         同步到集中登记
       </el-button>
-      <el-tag
-        v-if="centralStatus?.review_status"
-        size="small"
-        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-        :title="centralStatus.rejection_reason || ''"
-      >
-        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-      </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       <span class="row-count">共 {{ adj.summary.value.rowCount }} 行（AJE {{ adj.summary.value.ajeCount }} / RJE {{ adj.summary.value.rjeCount }}）</span>
       <span v-if="adj.lastSyncMsg.value" class="sync-msg">{{ adj.lastSyncMsg.value }}</span>
     </div>
@@ -288,6 +281,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G8TabAdjustment.vue — G8-3 调整分录汇总
@@ -302,7 +296,7 @@ import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { G8_ADJ_WRITEBACK_ROW_KEY } from '../../composables/g8Constants'
 import { useG8Adjustment, G8_ADJ_ACCOUNT_OPTIONS } from '../../composables/useG8Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { G8_NAV_HIGHLIGHT_ADJ_EVENT } from '../../composables/g8CrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'

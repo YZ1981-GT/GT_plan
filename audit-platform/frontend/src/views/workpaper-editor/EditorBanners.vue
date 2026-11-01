@@ -11,6 +11,8 @@
     {{ editLock?.lockedBy?.value || '其他用户' }} 正在编辑，当前为只读模式（所有保存已禁用）
   </el-alert>
 
+  <ClientBookedAdjustmentsBanner :wp-id="wpId" />
+
   <!-- ═══ 信息性横幅：折叠为摘要行 ═══ -->
   <div v-if="infoBannerCount > 0" class="gt-banner-collapse">
     <div v-if="!bannersExpanded" class="gt-banner-collapse__summary" @click="bannersExpanded = true">
@@ -91,6 +93,7 @@ import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
 import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
+import ClientBookedAdjustmentsBanner from '@/components/adjustment/ClientBookedAdjustmentsBanner.vue'
 
 interface EditingLockAPI {
   locked: { value: boolean }

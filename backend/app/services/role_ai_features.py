@@ -102,9 +102,9 @@ async def generate_weekly_report(
     )
     completed_count = completed_q.scalar() or 0
 
-    # 本周新增调整分录
+    # 本周新增调整分录（按 entry_group_id 计笔，不按借贷行计数）
     adj_q = await db.execute(
-        sa.select(sa.func.count()).select_from(Adjustment).where(
+        sa.select(sa.func.count(sa.distinct(Adjustment.entry_group_id))).where(
             Adjustment.project_id == project_id,
             Adjustment.is_deleted == sa.false(),
             Adjustment.created_at >= ws,
@@ -228,9 +228,9 @@ async def generate_project_summary(
         )
     )).scalar() or 0
 
-    # 调整分录
+    # 调整分录（业务笔数，不按同组借贷行重复计数）
     adj_count = (await db.execute(
-        sa.select(sa.func.count()).select_from(Adjustment).where(
+        sa.select(sa.func.count(sa.distinct(Adjustment.entry_group_id))).where(
             Adjustment.project_id == project_id, Adjustment.is_deleted == sa.false()
         )
     )).scalar() or 0

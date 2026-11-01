@@ -25,14 +25,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button v-if="hasPendingSuggestions" size="small" type="warning" @click="acceptSuggestedAje">
           📥 接收建议AJE ({{ pendingSuggestions.length }})
         </el-button>
@@ -242,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K5TabAdjustment.vue — K5-3 调整分录汇总
  *
@@ -262,7 +256,7 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import {
   K_ADJ_CATEGORY_OPTIONS, followEntryTypeCategory, newKAdjTemplateFields, readKAdjTemplateFields,

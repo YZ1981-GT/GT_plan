@@ -84,7 +84,44 @@ async def _guarded(db: AsyncSession, label: str, project_id: UUID, query, defaul
         return default
 
 
-async def enrich_adjustment_list(db: AsyncSession, project_id: UUID, items: list[dict]) -> None:
+async def _empty_dict() -> dict:
+    return {}
+
+
+async def _client_booking_projection(
+    db: AsyncSession, project_id: UUID, year: int, group_ids: list[UUID],
+) -> dict[str, dict]:
+    from app.services.adjustment_client_booking import booking_projection
+
+    result = await booking_projection(
+        db, project_id=project_id, year=year, group_ids=group_ids,
+    )
+    return {group_id: value.as_dict() for group_id, value in result.items()}
+
+
+async def _treatment_projection(
+    db: AsyncSession, project_id: UUID, year: int, group_ids: list[UUID],
+) -> dict[str, dict]:
+    from app.services.adjustment_treatment_service import treatment_projection
+
+    result = await treatment_projection(
+        db, project_id=project_id, year=year, group_ids=group_ids,
+    )
+    return {group_id: value.as_dict() for group_id, value in result.items()}
+
+
+async def _risk_projection(
+    db: AsyncSession, project_id: UUID, year: int, group_ids: list[UUID],
+) -> dict[str, dict]:
+    from app.services.adjustment_risk_projection import project_adjustment_risks
+    return await project_adjustment_risks(
+        db, project_id=project_id, year=year, group_ids=group_ids,
+    )
+
+
+async def enrich_adjustment_list(
+    db: AsyncSession, project_id: UUID, items: list[dict], *, year: int | None = None,
+) -> None:
     from app.services.adjustment_hall_notify import display_names
 
     group_ids = [g for g in (_as_uuid(it.get("entry_group_id")) for it in items) if g]
@@ -104,6 +141,30 @@ async def enrich_adjustment_list(db: AsyncSession, project_id: UUID, items: list
     sources = await _guarded(db, "来源底稿", project_id, lambda: _source_workpapers(db, wp_ids), None)
     sources_ok = sources is not None
     sources = sources or {}
+    booking_year = year if year is not None else next(
+        (int(it["year"]) for it in items if it.get("year") is not None), None,
+    )
+    bookings = await _guarded(
+        db,
+        "客户已入账",
+        project_id,
+        lambda: _client_booking_projection(db, project_id, booking_year, group_ids) if booking_year is not None else _empty_dict(),
+        {},
+    )
+    treatments = await _guarded(
+        db,
+        "最终处理",
+        project_id,
+        lambda: _treatment_projection(db, project_id, booking_year, group_ids) if booking_year is not None else _empty_dict(),
+        {},
+    )
+    risks = await _guarded(
+        db,
+        "重要性与风险",
+        project_id,
+        lambda: _risk_projection(db, project_id, booking_year, group_ids) if booking_year is not None else _empty_dict(),
+        {},
+    )
 
     for it in items:
         gid = it.get("entry_group_id")
@@ -111,6 +172,9 @@ async def enrich_adjustment_list(db: AsyncSession, project_id: UUID, items: list
         it["creator_name"] = names.get(str(it.get("created_by"))) if it.get("created_by") else None
         it["reviewer_name"] = names.get(str(it.get("reviewer_id"))) if it.get("reviewer_id") else None
         it["converted_to_misstatement_id"] = converted.get(str(gid)) if gid else None
+        it["client_booking"] = bookings.get(str(gid)) if gid else None
+        it["treatment"] = treatments.get(str(gid)) if gid else None
+        it["risk"] = risks.get(str(gid)) if gid else None
         if it.get("origin") == "workpaper":
             wid = (it.get("source_ref") or "").split(":", 1)[0]
             code, deleted = sources.get(wid, ("", True))

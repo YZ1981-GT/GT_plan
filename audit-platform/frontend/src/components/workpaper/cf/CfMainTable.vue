@@ -58,18 +58,29 @@
         </template>
       </el-table-column>
     </el-table>
+    <AdjustmentEntryDialog
+      ref="entryDialogRef"
+      :project-id="projectId"
+      :year="year"
+      :account-options="accountOptions"
+      :accounts-ready="accountsReady"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import AdjustmentEntryDialog from '@/components/adjustment/AdjustmentEntryDialog.vue'
+import { getAccountDropdown, type AccountOption } from '@/services/auditPlatformApi'
 import { apiProxy } from '@/utils/apiProxy'
 
 const props = defineProps<{ projectId: string; year: number }>()
 const loading = ref(false)
 const items = ref<any[]>([])
+const accountOptions = ref<AccountOption[]>([])
+const accountsReady = ref(false)
+const entryDialogRef = ref<InstanceType<typeof AdjustmentEntryDialog> | null>(null)
 
 function sectionLabel(s: string) {
   const map: Record<string, string> = { operating: '经营', investing: '投资', financing: '筹资' }
@@ -87,6 +98,16 @@ async function fetchData() {
   }
 }
 
+async function fetchAccountOptions() {
+  accountsReady.value = false
+  try {
+    accountOptions.value = await getAccountDropdown(props.projectId, undefined, props.year)
+    accountsReady.value = true
+  } catch {
+    accountOptions.value = []
+  }
+}
+
 async function saveExplanation(row: any) {
   if (!row._explanation) return
   await apiProxy.post(`/api/projects/${props.projectId}/cf-verification/${props.year}/explanation`, {
@@ -96,24 +117,18 @@ async function saveExplanation(row: any) {
   })
 }
 
-async function createAdjustment(row: any) {
-  try {
-    const res = await apiProxy.post(`/api/projects/${props.projectId}/cf-verification/${props.year}/create-adjustment`, {
-      item_code: row.row_code,
-      difference: row.difference,
-      description: `CF核查差异调整 ${row.item}`,
-    })
-    if (res.success) {
-      ElMessage.success(`已创建 CF 调整分录 ${res.adjustment_no}`)
-    } else {
-      ElMessage.warning(res.error || '创建失败')
-    }
-  } catch {
-    ElMessage.error('创建调整分录失败')
-  }
+function createAdjustment(row: any) {
+  entryDialogRef.value?.openCreate({
+    description: `现金流量表核查差异：${row.item}（${row.row_code}）`,
+    problems: [
+      `来源：现金流量表核查；差异金额 ${row.difference} 仅供核查。请手工选择完整借贷科目和方向，系统不会自动推断。`,
+    ],
+  })
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await Promise.all([fetchData(), fetchAccountOptions()])
+})
 </script>
 
 <style scoped>

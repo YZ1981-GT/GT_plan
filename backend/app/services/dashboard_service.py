@@ -360,9 +360,9 @@ class DashboardService:
         )).scalar() or 0
         review_completion_rate = round(reviewed_wp / total_wp * 100, 1) if total_wp > 0 else 0
 
-        # adjustment_count — 从 adjustments 表查询活跃数量
+        # adjustment_count 是业务分录笔数；借贷行共享 entry_group_id。
         adj_count = (await self.db.execute(
-            sa.select(sa.func.count()).select_from(Adjustment).where(
+            sa.select(sa.func.count(sa.distinct(Adjustment.entry_group_id))).where(
                 Adjustment.is_deleted == sa.false(),
             )
         )).scalar() or 0

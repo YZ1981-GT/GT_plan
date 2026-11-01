@@ -19,7 +19,7 @@ from __future__ import annotations
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -670,7 +670,9 @@ class AdjustmentCreate(BaseModel):
 
 class AdjustmentUpdate(BaseModel):
     """修改调整分录"""
+    expected_revision: int | None = Field(default=None, ge=1)
     description: str | None = None
+    audit_phase: Literal["preliminary", "final"] | None = None
     line_items: list[AdjustmentLineItem] | None = None
 
 
@@ -695,6 +697,10 @@ class AdjustmentGroupResponse(BaseModel):
     adjustment_type: AdjustmentType
     description: str | None = None
     review_status: ReviewStatus
+    content_revision: int = 1
+    audit_phase: str = "final"
+    external_reference: str | None = None
+    import_batch_id: UUID | None = None
     reviewer_id: UUID | None = None
     reviewed_at: datetime | None = None
     rejection_reason: str | None = None
@@ -784,6 +790,7 @@ class ReviewStatusChange(BaseModel):
     """变更复核状态"""
     status: ReviewStatus
     reason: str | None = None  # rejected 时必填
+    expected_revision: int | None = Field(default=None, ge=1)
 
 
 class AdjustmentSummary(BaseModel):
@@ -812,27 +819,6 @@ class AccountOption(BaseModel):
     level: int = 1
     report_line: str | None = None  # 对应报表行次名称，用于下拉显示
     balance: Decimal | None = None  # 传年度时附试算表审定数（参考余额）
-
-
-class WPAdjustmentDetail(BaseModel):
-    """底稿审定表中的单笔调整明细"""
-    entry_group_id: UUID
-    adjustment_no: str
-    adjustment_type: AdjustmentType
-    description: str | None = None
-    amount: Decimal = Decimal("0")
-
-
-class WPAdjustmentSummary(BaseModel):
-    """底稿审定表数据"""
-    wp_code: str
-    accounts: list[str] = []
-    unadjusted_amount: Decimal = Decimal("0")
-    aje_details: list[WPAdjustmentDetail] = []
-    rje_details: list[WPAdjustmentDetail] = []
-    aje_total: Decimal = Decimal("0")
-    rje_total: Decimal = Decimal("0")
-    audited_amount: Decimal = Decimal("0")
 
 
 # ===================================================================
@@ -949,6 +935,10 @@ class EventType(str, enum.Enum):
     ADJUSTMENT_APPROVED = "adjustment.approved"
     # 调整分录撤回复核 → 与审批通过走同一套下游链路
     ADJUSTMENT_REVIEW_REVOKED = "adjustment.review_revoked"
+    # 客户已入账标记/撤销 → 调整列重算与下游刷新
+    ADJUSTMENT_CLIENT_BOOKING_CHANGED = "adjustment.client_booking_changed"
+    # 最终财务处理（纳入工作试算表 / 不予更正 / 撤销）变化
+    ADJUSTMENT_TREATMENT_CHANGED = "adjustment.treatment_changed"
 
     # Sprint 10: 底稿深度优化事件
     WORKPAPER_AUDITED_CONFIRMED = "workpaper.audited_confirmed"
@@ -1062,6 +1052,7 @@ class MisstatementCreate(BaseModel):
     misstatement_amount: AmountDecimal
     misstatement_type: MisstatementType
     management_reason: str | None = None
+    management_communication_at: datetime | None = None
     auditor_evaluation: str | None = None
     # 溯源：来源底稿编码（如 K9/D4/G8-6），供 A13 错报汇总反查来源底稿。
     # 底稿"推送错报至A13"时携带，写入 unadjusted_misstatements.source_wp_code。
@@ -1078,6 +1069,7 @@ class MisstatementUpdate(BaseModel):
     misstatement_amount: OptionalAmountDecimal = None
     misstatement_type: MisstatementType | None = None
     management_reason: str | None = None
+    management_communication_at: datetime | None = None
     auditor_evaluation: str | None = None
 
 
@@ -1095,6 +1087,7 @@ class MisstatementResponse(BaseModel):
     misstatement_amount: Decimal
     misstatement_type: MisstatementType
     management_reason: str | None = None
+    management_communication_at: datetime | None = None
     auditor_evaluation: str | None = None
     source_wp_code: str | None = None
     source_identity: str | None = None

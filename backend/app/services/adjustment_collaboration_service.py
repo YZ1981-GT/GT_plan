@@ -25,10 +25,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import (
-    Adjustment,
     AdjustmentCollaboration,
     AdjustmentCollaborationEvent,
-    AdjustmentEntry,
     AdjustmentType,
     ReviewStatus,
 )
@@ -38,6 +36,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.services import notification_types as nt
 from app.services.adjustment_service import AdjustmentService
+from app.services.adjustment_group_writer import AdjustmentGroupLine, AdjustmentGroupWriter
 from app.services.adjustment_sync_service import AdjustmentSyncService
 from app.services.notification_service import NotificationService
 
@@ -206,47 +205,44 @@ class AdjustmentCollaborationService:
         if not group:
             raise CollaborationError("GROUP_NOT_FOUND", "分录组不存在")
         head = group[0]
-        for row in group:
-            row.soft_delete()
-        for e in await self._adj._get_entry_rows(collab.entry_group_id):
-            e.soft_delete()
-        await self.db.flush()
+        content_revision = self._adj._group_content_revision(group) + 1
+        old_entries = await self._adj._get_entry_rows(collab.entry_group_id)
+        await AdjustmentGroupWriter(self.db).soft_delete_group(
+            group, old_entries, user_id=actor_id,
+        )
 
-        snapshot: list[dict] = []
-        for idx, (li, code) in enumerate(zip(line_items, resolved), start=1):
-            adj = Adjustment(
-                project_id=project_id,
-                year=head.year,
-                company_code=head.company_code,
-                adjustment_no=head.adjustment_no,
-                adjustment_type=head.adjustment_type,
-                description=head.description,
-                account_code=code,
-                account_name=li.account_name,
-                debit_amount=li.debit_amount,
-                credit_amount=li.credit_amount,
-                entry_group_id=collab.entry_group_id,
-                review_status=head.review_status,
-                origin=getattr(head, "origin", "manual") or "manual",
-                source_ref=head.source_ref,
-                created_by=actor_id,
-            )
-            self.db.add(adj)
-            await self.db.flush()
-            self.db.add(AdjustmentEntry(
-                adjustment_id=adj.id,
-                entry_group_id=collab.entry_group_id,
-                line_no=idx,
-                standard_account_code=code,
-                account_name=li.account_name,
-                report_line_code=li.report_line_code,
-                debit_amount=li.debit_amount or Decimal("0"),
-                credit_amount=li.credit_amount or Decimal("0"),
-            ))
-            snapshot.append({
-                "line_no": idx, "account_code": code, "account_name": li.account_name,
-                "debit": str(li.debit_amount or 0), "credit": str(li.credit_amount or 0),
-            })
+        lines = [AdjustmentGroupLine(
+            standard_account_code=code,
+            account_name=line.account_name,
+            report_line_code=line.report_line_code,
+            debit_amount=line.debit_amount or Decimal("0"),
+            credit_amount=line.credit_amount or Decimal("0"),
+        ) for line, code in zip(line_items, resolved)]
+        await AdjustmentGroupWriter(self.db).write_group(
+            project_id=project_id,
+            year=head.year,
+            company_code=head.company_code,
+            adjustment_no=head.adjustment_no,
+            adjustment_type=head.adjustment_type,
+            description=head.description,
+            entry_group_id=collab.entry_group_id,
+            lines=lines,
+            content_revision=content_revision,
+            audit_phase=head.audit_phase or "final",
+            review_status=head.review_status,
+            origin=getattr(head, "origin", "manual") or "manual",
+            source_ref=head.source_ref,
+            created_by=head.created_by,
+            updated_by=actor_id,
+        )
+
+        snapshot = [{
+            "line_no": index,
+            "account_code": line.standard_account_code,
+            "account_name": line.account_name,
+            "debit": str(line.debit_amount),
+            "credit": str(line.credit_amount),
+        } for index, line in enumerate(lines, start=1)]
 
         collab.status = "contributed"
         await self.db.flush()

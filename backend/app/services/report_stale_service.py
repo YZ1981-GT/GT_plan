@@ -64,6 +64,11 @@ def _load_wp_account_mapping() -> dict[str, list[str]]:
 # ─── Service ─────────────────────────────────────────────────────────────────
 
 
+def account_codes_for_wp_code(wp_code: str) -> list[str]:
+    """底稿编码 → 标准科目码；复用报表 stale 的同一静态映射。"""
+    return list(_load_wp_account_mapping().get(str(wp_code or "").upper(), []))
+
+
 class ReportStaleService:
     """报表 stale 标记服务"""
 

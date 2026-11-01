@@ -6,7 +6,7 @@
  */
 import axios, { type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig, type AxiosError } from 'axios'
 import NProgress from 'nprogress'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
 import { claimClientInstanceId, getClientInstanceId, isClientInstanceSettled } from './clientInstance'
@@ -479,7 +479,11 @@ http.interceptors.response.use(
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
 
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean
+      _retryCount?: number
+      _bookedAdjustmentRetried?: boolean
+    }
     const authStore = useAuthStore()
     const status = error.response?.status
 
@@ -548,6 +552,26 @@ http.interceptors.response.use(
         window.location.href = '/login'
       }
       return Promise.reject(error)
+    }
+
+    // 底稿发布涉及“客户已入账”调整：用户逐组确认移除后，保留原 body/token 重发一次。
+    if (status === 409 && originalRequest && !originalRequest._bookedAdjustmentRetried) {
+      const { addBookedAdjustmentAck, bookedAdjustmentConfirmText, parseBookedAdjustmentAckError } = await import('./bookedAdjustmentPublishRetry')
+      const groups = parseBookedAdjustmentAckError(error.response?.data)
+      if (groups) {
+        try {
+          await ElMessageBox.confirm(
+            bookedAdjustmentConfirmText(groups),
+            '确认底稿未重复计入客户已入账调整',
+            { type: 'warning', confirmButtonText: '已移除，继续发布', cancelButtonText: '取消发布' },
+          )
+        } catch {
+          return Promise.reject(error)
+        }
+        const retry = addBookedAdjustmentAck(originalRequest, groups) as typeof originalRequest
+        retry._bookedAdjustmentRetried = true
+        return http(retry)
+      }
     }
 
     // _silent 模式：调用方自行处理错误，不弹全局 toast

@@ -10,6 +10,7 @@
  *   - gate_alert: 门禁检查告警
  *   - report_finalized: 审计报告终稿
  */
+import { buildAdjustmentRouteHref } from '@/utils/adjustmentRouteTarget'
 
 // ── 通知类型常量 ──────────────────────────────────────────────
 
@@ -173,16 +174,23 @@ export const NOTIFICATION_JUMP_ROUTES: Record<string, (meta: Record<string, any>
   },
 }
 
-/** 调整分录复核类通知 → 调整大厅 + ?focus=分录组&year=年度[&status=筛选]（定位、展开并高亮该分录）。 */
+/** 调整分录复核类通知 → 调整大厅并定位分录组。 */
 function adjFocusRoute(m: Record<string, any>, status?: string): string {
   if (!m.project_id) return ''
-  return `/projects/${m.project_id}/adjustments${buildQuery({ focus: m.object_id, year: m.year, status })}`
+  return buildAdjustmentRouteHref(
+    m.project_id,
+    { kind: 'focus', entryGroupId: String(m.object_id || '') },
+    { year: m.year, status },
+  )
 }
 
-/** 调整分录协作通知 → 集中调整页 + ?group=（Adjustments.vue 消费定位/开协作对话框）。 */
+/** 调整分录协作通知 → 调整大厅并打开该分录组的协作对话框。 */
 function adjCollabRoute(m: Record<string, any>): string {
   if (!m.project_id) return ''
-  return `/projects/${m.project_id}/adjustments${buildQuery({ group: m.object_id })}`
+  return buildAdjustmentRouteHref(
+    m.project_id,
+    { kind: 'collaboration', entryGroupId: String(m.object_id || '') },
+  )
 }
 
 /** 拼接 query（跳过空值），返回 `?a=b&c=d` 或空串。 */

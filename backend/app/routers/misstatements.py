@@ -20,7 +20,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access, require_project_permission
+from app.models.core import User
 from app.models.audit_platform_schemas import (
     MisstatementCreate,
     MisstatementUpdate,
@@ -38,7 +39,7 @@ async def list_misstatements(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """未更正错报列表"""
     svc = UnadjustedMisstatementService(db)
@@ -51,7 +52,7 @@ async def create_misstatement(
     project_id: UUID,
     data: MisstatementCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """创建未更正错报"""
     svc = UnadjustedMisstatementService(db)
@@ -66,7 +67,7 @@ async def create_from_aje(
     group_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """从被拒绝AJE创建未更正错报
 
@@ -100,7 +101,7 @@ async def update_misstatement(
     misstatement_id: UUID,
     data: MisstatementUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """更新未更正错报"""
     svc = UnadjustedMisstatementService(db)
@@ -117,7 +118,7 @@ async def delete_misstatement(
     project_id: UUID,
     misstatement_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """软删除未更正错报"""
     svc = UnadjustedMisstatementService(db)
@@ -134,7 +135,7 @@ async def get_for_representation_letter(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(require_project_access("readonly")),
 ):
     """返回 A16 管理层声明书用的未更正错报摘要文本"""
     from app.services.misstatement_summary_service import MisstatementSummaryService
@@ -149,7 +150,7 @@ async def get_summary(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """汇总视图：按类型分组 + 与重要性水平对比"""
     svc = UnadjustedMisstatementService(db)
@@ -163,7 +164,7 @@ async def recheck_threshold(
     year: int | None = Query(None, description="年度（query 或 body 任选其一）"),
     body: dict | None = Body(None, description="可选 body：{year: int}"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """R8-S2-13：重新评估所有错报 vs 当前重要性阈值
 
@@ -196,7 +197,7 @@ async def mark_as_reversed(
     project_id: UUID,
     misstatement_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """A13 Req 4.3: 将结转错报标记为已转回，从累计中排除。"""
     svc = UnadjustedMisstatementService(db)
@@ -213,7 +214,7 @@ async def generate_communication_draft_endpoint(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """A13 Req 5.1-5.7: 生成管理层沟通函草稿。
 
@@ -233,7 +234,7 @@ async def get_misstatement_related_workpapers(
     project_id: UUID,
     misstatement_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """R10 Spec B / F7：根据错报关联的科目编码反查底稿。
 

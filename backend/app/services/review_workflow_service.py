@@ -507,16 +507,15 @@ class ReviewWorkflowService:
                 val = result.scalar_one_or_none()
                 return f"重要性水平 {val:,.0f} 元" if val else "待设置"
             elif check_type == "adjustment_review_status":
-                from app.models.audit_platform_models import Adjustment
-                stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                    Adjustment.project_id == project_id,
-                    Adjustment.year == year,
-                    Adjustment.review_status == "pending",
-                    Adjustment.is_deleted == sa.false(),
+                from app.services.wp_adjustment_helpers import count_adjustment_groups
+
+                pending = await count_adjustment_groups(
+                    self.db,
+                    project_id,
+                    year,
+                    review_statuses=("pending_review",),
                 )
-                result = await self.db.execute(stmt)
-                pending = result.scalar() or 0
-                return "通过" if pending == 0 else f"待审批{pending}笔"
+                return "通过" if pending == 0 else f"待复核{pending}笔"
             elif check_type == "independence_signing_status":
                 from app.models.review_workflow_models import IndependenceSigningTask
                 stmt = sa.select(
@@ -563,19 +562,11 @@ class ReviewWorkflowService:
                     return "无底稿"
                 return "通过" if reviewed == total else f"已复核{reviewed}/{total}"
             elif check_type == "all_adjustments_approved":
-                from app.models.audit_platform_models import Adjustment
-                # 已处理 = 已批准(approved) 或 已 Passed(不予更正, passed_reason 非空)。
-                # 待处理 = 未批准 且 未 Passed。review_status 枚举无 'passed' 值，
-                # 故 Passed 用 passed_reason IS NULL 判定（避免无效枚举比较报错）。
-                stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                    Adjustment.project_id == project_id,
-                    Adjustment.year == year,
-                    Adjustment.review_status != "approved",
-                    Adjustment.passed_reason.is_(None),
-                    Adjustment.is_deleted == sa.false(),
+                from app.services.wp_adjustment_helpers import count_unresolved_adjustment_groups
+
+                pending = await count_unresolved_adjustment_groups(
+                    self.db, project_id, year,
                 )
-                result = await self.db.execute(stmt)
-                pending = result.scalar() or 0
                 return "通过" if pending == 0 else f"待处理{pending}笔"
             elif check_type == "representation_letter_signed":
                 # A16 管理层声明书签回状态（从 field_overrides 读）
@@ -596,17 +587,12 @@ class ReviewWorkflowService:
             elif check_type == "signoff_readiness":
                 # 聚合签发阻断项：stale + 未复核底稿 + 未批调整 + AI 未确认
                 blockers = []
-                # 1) 未批调整
-                from app.models.audit_platform_models import Adjustment
-                adj_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                    Adjustment.project_id == project_id,
-                    Adjustment.year == year,
-                    Adjustment.review_status != "approved",
-                    Adjustment.passed_reason.is_(None),
-                    Adjustment.is_deleted == sa.false(),
+                # 1) 未批调整（按分录组；组内任一 Passed 标记代表该组已处理）
+                from app.services.wp_adjustment_helpers import count_unresolved_adjustment_groups
+
+                adj_pending = await count_unresolved_adjustment_groups(
+                    self.db, project_id, year,
                 )
-                adj_r = await self.db.execute(adj_stmt)
-                adj_pending = adj_r.scalar() or 0
                 if adj_pending > 0:
                     blockers.append(f"调整{adj_pending}笔待审")
                 # 2) 未复核底稿

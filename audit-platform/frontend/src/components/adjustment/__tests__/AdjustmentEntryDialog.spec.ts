@@ -72,6 +72,8 @@ describe('AdjustmentEntryDialog', () => {
       ],
     })
     expect(w.emitted('saved')?.[0]).toEqual([{ entryGroupId: 'g1', adjustmentNo: 'Z-1', mode: 'create', submit: false }])
+    expect(document.body.textContent).toContain('已保存为草稿 Z-1')
+    expect(document.body.textContent).toContain('草稿不计入试算表，提交复核并批准后才计入审定数')
   })
 
   it('不平衡：不发请求，列出与后端同口径的原因', async () => {
@@ -101,7 +103,9 @@ describe('AdjustmentEntryDialog', () => {
     button('保存').click()
     await flushPromises()
     expect(api.updateAdjustment).toHaveBeenCalledWith('p1', 'g9', {
+      expected_revision: 1,
       description: '原摘要',
+      audit_phase: 'final',
       line_items: [
         { standard_account_code: '6702', account_name: '信用减值损失', debit_amount: 50, credit_amount: 0 },
         { standard_account_code: '1122', account_name: '应收账款', debit_amount: 0, credit_amount: 50, detail_account_code: '112201' },
@@ -147,5 +151,61 @@ describe('AdjustmentEntryDialog', () => {
     vm(w).openCreate()
     await flushPromises()
     expect(document.body.textContent).toContain('本项目还没有标准科目')
+  })
+})
+
+
+describe('AdjustmentEntryDialog 草稿隔离与关闭决策', () => {
+  it('本地草稿 key 包含项目、年度、模式和分录组，并可在同一上下文恢复', async () => {
+    const w = mountDialog()
+    vm(w).openCreate()
+    await flushPromises()
+    const description = document.querySelector<HTMLInputElement>('input[placeholder^="说明调整原因"]')!
+    description.value = '未保存的现金流调整'
+    description.dispatchEvent(new Event('input'))
+    await flushPromises()
+
+    button('取消').click()
+    await flushPromises()
+    button('保存草稿后关闭').click()
+    await flushPromises()
+
+    const key = 'autosave_adjustment_form_p1_2025_create_new'
+    const raw = sessionStorage.getItem(key)
+    expect(raw).toBeTruthy()
+    expect(JSON.parse(raw!).context).toEqual({
+      project_id: 'p1', year: 2025, section: 'adjustment:create:new',
+    })
+
+    vm(w).openCreate()
+    await flushPromises()
+    expect(document.body.textContent).toContain('检测到此新建分录的未保存草稿')
+    button('恢复草稿').click()
+    await flushPromises()
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="说明调整原因"]')?.value)
+      .toBe('未保存的现金流调整')
+  })
+
+  it('编辑草稿按分录组隔离，明确放弃后不留本地草稿', async () => {
+    const w = mountDialog()
+    vm(w).openEdit({
+      entry_group_id: 'g-edit', adjustment_no: 'AJE-008', adjustment_type: 'aje',
+      description: '原摘要', review_status: 'draft', line_items: [
+        { standard_account_code: '6702', account_name: '信用减值损失', debit_amount: 1, credit_amount: 0 },
+        { standard_account_code: '1122', account_name: '应收账款', debit_amount: 0, credit_amount: 1 },
+      ],
+    })
+    await flushPromises()
+    const description = document.querySelector<HTMLInputElement>('input[placeholder^="说明调整原因"]')!
+    description.value = '修改后未保存'
+    description.dispatchEvent(new Event('input'))
+    await flushPromises()
+
+    button('取消').click()
+    await flushPromises()
+    button('放弃并关闭').click()
+    await flushPromises()
+
+    expect(sessionStorage.getItem('autosave_adjustment_form_p1_2025_edit_g-edit')).toBeNull()
   })
 })

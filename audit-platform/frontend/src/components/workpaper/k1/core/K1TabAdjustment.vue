@@ -104,14 +104,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" @click="openReview">💬复核</el-button>
       </div>
       <div class="toolbar-right">
@@ -316,6 +309,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K1TabAdjustment.vue — K1-4 其他应收款调整分录汇总表
  * 对齐 Excel 列结构 + 调整分录模块双向联动 + A13 / K1-1
@@ -327,7 +321,7 @@ import { applyK14NetsToK11 } from '../../composables/k1AdjK11Writeback'
 import { useK1ImportExport } from '../../composables/useK1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 
 const props = defineProps<{
   wpId: string

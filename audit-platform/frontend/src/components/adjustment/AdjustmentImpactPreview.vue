@@ -38,10 +38,40 @@ interface AffectedReportRow {
   delta: string
 }
 
+interface AffectedTbAccount {
+  company_code: string
+  account_code: string
+  account_name?: string
+  adjustment_type: string
+  current_adjustment: string
+  projected_adjustment: string
+  current_audited: string
+  projected_audited: string
+  delta: string
+}
+
+interface AffectedNote {
+  section_id: string
+  row_name: string
+  account_name: string
+  mapping_type: string
+}
+
+interface JudgmentItem {
+  domain: 'cash_flow' | 'tax'
+  label: string
+  status: 'needs_judgment'
+  reason: string
+}
+
 interface PreviewResult {
+  affected_tb_accounts: AffectedTbAccount[]
   affected_report_rows: AffectedReportRow[]
   affected_workpapers: string[]
+  affected_notes: AffectedNote[]
+  judgment_items: JudgmentItem[]
   unmapped_accounts: string[]
+  direction_unknown_accounts: string[]
 }
 
 /** 后端 FinancialReportType → 面向用户的中文名称；兼容历史数据中的权益变动表别名。 */
@@ -64,10 +94,11 @@ const props = withDefaults(
     projectId: string
     lineItems: LineItem[]
     year?: number | null
+    adjustmentType?: 'aje' | 'rje'
     /** debounce 间隔（毫秒），默认 500，便于测试覆写 */
     debounceMs?: number
   }>(),
-  { year: null, debounceMs: 500 },
+  { year: null, adjustmentType: 'aje', debounceMs: 500 },
 )
 
 const result = ref<PreviewResult | null>(null)
@@ -110,6 +141,7 @@ async function fetchPreview() {
   try {
     const payload = {
       year: props.year ?? null,
+      adjustment_type: props.adjustmentType,
       line_items: props.lineItems
         .filter((li) => (li.account_code || li.standard_account_code || '').toString().trim())
         .map((li) => ({
@@ -122,9 +154,13 @@ async function fetchPreview() {
     // 防止旧请求覆盖新响应
     if (seq !== requestSeq) return
     result.value = {
+      affected_tb_accounts: data?.affected_tb_accounts || [],
       affected_report_rows: data?.affected_report_rows || [],
       affected_workpapers: data?.affected_workpapers || [],
+      affected_notes: data?.affected_notes || [],
+      judgment_items: data?.judgment_items || [],
       unmapped_accounts: data?.unmapped_accounts || [],
+      direction_unknown_accounts: data?.direction_unknown_accounts || [],
     }
   } catch (e: any) {
     if (seq !== requestSeq) return
@@ -145,7 +181,7 @@ function scheduleFetch() {
 }
 
 watch(
-  () => [props.lineItems, props.year, props.projectId] as const,
+  () => [props.lineItems, props.year, props.projectId, props.adjustmentType] as const,
   () => {
     // 立即清空旧错误，避免视觉残留
     errorMsg.value = ''
@@ -184,8 +220,11 @@ const isEmpty = computed(
     !loading.value &&
     !errorMsg.value &&
     (!result.value ||
-      ((result.value.affected_report_rows?.length || 0) === 0 &&
+      ((result.value.affected_tb_accounts?.length || 0) === 0 &&
+        (result.value.affected_report_rows?.length || 0) === 0 &&
         (result.value.affected_workpapers?.length || 0) === 0 &&
+        (result.value.affected_notes?.length || 0) === 0 &&
+        (result.value.judgment_items?.length || 0) === 0 &&
         (result.value.unmapped_accounts?.length || 0) === 0)),
 )
 
@@ -219,6 +258,23 @@ defineExpose({
     <div v-else-if="isEmpty" class="gt-aip-empty">未发现受影响的报表行或底稿</div>
 
     <template v-else-if="result">
+      <!-- 受影响试算表科目 -->
+      <div class="gt-aip-section">
+        <div class="gt-aip-section-title">受影响试算表科目 <span class="gt-aip-count">({{ result.affected_tb_accounts.length }})</span></div>
+        <div v-if="result.affected_tb_accounts.length === 0" class="gt-aip-empty-sm">暂无对应年度试算表行</div>
+        <table v-else class="gt-aip-table">
+          <thead><tr><th>科目</th><th class="gt-aip-th-num">当前审定数</th><th class="gt-aip-th-num">预计审定数</th><th class="gt-aip-th-num">变动</th></tr></thead>
+          <tbody>
+            <tr v-for="item in result.affected_tb_accounts" :key="`${item.company_code}-${item.account_code}`">
+              <td><span class="gt-aip-row-code">{{ item.account_code }}</span>{{ item.account_name }}</td>
+              <td class="gt-aip-td-num gt-amt">{{ fmtAmount(item.current_audited) }}</td>
+              <td class="gt-aip-td-num gt-amt">{{ fmtAmount(item.projected_audited) }}</td>
+              <td class="gt-aip-td-num gt-amt" :class="deltaClass(item.delta)">{{ fmtDelta(item.delta) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- 受影响报表行 -->
       <div class="gt-aip-section">
         <div class="gt-aip-section-title">
@@ -274,6 +330,28 @@ defineExpose({
           </el-tag>
         </div>
       </div>
+
+      <div class="gt-aip-section">
+        <div class="gt-aip-section-title">受影响附注位置 <span class="gt-aip-count">({{ result.affected_notes.length }})</span></div>
+        <div v-if="result.affected_notes.length === 0" class="gt-aip-empty-sm">暂无已确认的科目—附注映射</div>
+        <div v-else class="gt-aip-tags">
+          <el-tag v-for="item in result.affected_notes" :key="`${item.section_id}-${item.row_name}`" size="small" type="success" effect="plain">
+            {{ item.section_id }} · {{ item.row_name }}
+          </el-tag>
+        </div>
+      </div>
+
+      <div class="gt-aip-section">
+        <div class="gt-aip-section-title">需专业判断</div>
+        <el-alert v-for="item in result.judgment_items" :key="item.domain" type="warning" :closable="false" show-icon class="gt-aip-judgment">
+          <template #title><strong>{{ item.label }}：待判断</strong></template>
+          {{ item.reason }}
+        </el-alert>
+      </div>
+
+      <el-alert v-if="result.direction_unknown_accounts.length > 0" type="error" :closable="false" show-icon style="margin-top: 8px">
+        <template #title>以下科目缺少借贷方向，系统未猜测金额符号：{{ result.direction_unknown_accounts.join('、') }}</template>
+      </el-alert>
 
       <!-- 未映射科目警告 -->
       <el-alert
@@ -389,6 +467,7 @@ defineExpose({
   color: #c62828; /* 红色 = 减少 */
   font-weight: 600;
 }
+.gt-aip-judgment { margin-bottom: 6px; }
 .gt-aip-warn-hint {
   display: block;
   margin-top: 4px;

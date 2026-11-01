@@ -17,9 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.core import Project, ProjectUser
 from app.models.base import ProjectStatus
 from app.models.audit_platform_models import (
-    AccountMapping, TrialBalance, Adjustment,
+    AccountMapping, TrialBalance, Adjustment, AdjustmentEntry,
     UnadjustedMisstatement,
 )
+from app.services.adjustment_group_writer import AdjustmentGroupLine, AdjustmentGroupWriter
 
 logger = logging.getLogger(__name__)
 
@@ -337,29 +338,51 @@ class ContinuousAuditService:
                 # is_continuous 字段可能还不存在，用 raw SQL 兜底
             )
         )
-        adj_rows = result.scalars().all()
+        adjustment_rows = list(result.scalars().all())
+        grouped: dict[UUID, list[Adjustment]] = {}
+        for row in adjustment_rows:
+            if getattr(row, "is_continuous", False):
+                grouped.setdefault(row.entry_group_id, []).append(row)
+
+        entries_by_group: dict[UUID, list[AdjustmentEntry]] = {}
+        if grouped:
+            entry_rows = (await db.execute(
+                sa.select(AdjustmentEntry).where(
+                    AdjustmentEntry.entry_group_id.in_(list(grouped)),
+                    AdjustmentEntry.is_deleted == sa.false(),
+                ).order_by(AdjustmentEntry.entry_group_id, AdjustmentEntry.line_no)
+            )).scalars().all()
+            for entry in entry_rows:
+                entries_by_group.setdefault(entry.entry_group_id, []).append(entry)
+
         adj_count = 0
-        for adj in adj_rows:
-            # 检查 is_continuous（通过 dict 访问避免 ORM 字段不存在的问题）
-            is_cont = getattr(adj, "is_continuous", False)
-            if not is_cont:
+        writer = AdjustmentGroupWriter(db)
+        for old_group_id, rows in grouped.items():
+            entries = entries_by_group.get(old_group_id, [])
+            if not entries:
+                logger.warning("连续调整分录 %s 缺少规范明细，已跳过而非生成残缺分录", old_group_id)
                 continue
-            new_group_id = uuid.uuid4()
-            new_adj = Adjustment(
+            head = rows[0]
+            await writer.write_group(
                 project_id=new_project.id,
                 year=new_year,
-                company_code=adj.company_code,
-                adjustment_no=adj.adjustment_no,
-                adjustment_type=adj.adjustment_type,
-                description=f"[结转] {adj.description or ''}",
-                account_code=adj.account_code,
-                account_name=adj.account_name,
-                debit_amount=adj.debit_amount,
-                credit_amount=adj.credit_amount,
-                entry_group_id=new_group_id,
-                created_by=adj.created_by,
+                company_code=head.company_code,
+                adjustment_no=head.adjustment_no,
+                adjustment_type=head.adjustment_type,
+                description=f"[结转] {head.description or ''}",
+                entry_group_id=uuid.uuid4(),
+                lines=[AdjustmentGroupLine(
+                    standard_account_code=entry.standard_account_code,
+                    detail_account_code=entry.detail_account_code,
+                    account_name=entry.account_name,
+                    report_line_code=entry.report_line_code,
+                    debit_amount=entry.debit_amount,
+                    credit_amount=entry.credit_amount,
+                ) for entry in entries],
+                content_revision=1,
+                audit_phase=getattr(new_project, "current_audit_phase", "final") or "final",
+                created_by=head.created_by,
             )
-            db.add(new_adj)
             adj_count += 1
         items_copied["adjustments_carried"] = adj_count
 

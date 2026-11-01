@@ -828,13 +828,11 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.DATA_IMPORTED, _mark_workpapers_stale_all)
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _mark_workpapers_stale_all)
     event_bus.subscribe(EventType.LEDGER_DATASET_ROLLED_BACK, _mark_workpapers_stale_all)
-    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _mark_workpapers_stale_by_account)
-    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_workpapers_stale_by_account)
-    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)
-    event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
-    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_workpapers_stale_by_account)
-    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_workpapers_stale_by_account)  # 任务 3.7
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_CLIENT_BOOKING_CHANGED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_TREATMENT_CHANGED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
 
     logger.debug("Phase 9 workpaper event handlers registered")
 
@@ -851,7 +849,7 @@ def register_event_handlers() -> None:
         if cleared:
             logger.debug("Procedure table auto_cache invalidated: %d entries (project=%s)", cleared, pid)
 
-    # 调整分录变更 → A2 adjustment_count_* / A1 misstatement_evaluation
+    # 草稿 CRUD 仍刷新大厅/地址缓存/程序待办，但正式输出 stale 只认批准、撤回与 TB 更新。
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _invalidate_procedure_table_cache)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _invalidate_procedure_table_cache)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _invalidate_procedure_table_cache)
@@ -1057,6 +1055,8 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _notify_adjustment_event_sse)
     event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _notify_adjustment_event_sse)  # 任务 3.7
     event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _notify_adjustment_event_sse)
+    event_bus.subscribe(EventType.ADJUSTMENT_CLIENT_BOOKING_CHANGED, _notify_adjustment_event_sse)
+    event_bus.subscribe(EventType.ADJUSTMENT_TREATMENT_CHANGED, _notify_adjustment_event_sse)
 
     logger.debug("Enterprise Linkage: adjustment SSE push handlers registered")
 
@@ -1235,11 +1235,7 @@ def register_event_handlers() -> None:
                     exc_info=True,
                 )
 
-    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _mark_reports_stale_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_reports_stale_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_reports_stale_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_reports_stale_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_reports_stale_on_adjustment)  # 任务 3.7
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _mark_reports_stale_on_adjustment)
     logger.debug("Sprint 7 Task 7.2: stale cascade handlers registered")
 
@@ -1442,10 +1438,8 @@ def register_event_handlers() -> None:
             except Exception as e:
                 logger.warning("[stale_engine] on_mapping_changed failed for %s: %s", uri, e)
 
-    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _stale_engine_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _stale_engine_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _stale_engine_on_adjustment)
-    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _stale_engine_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _stale_engine_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _stale_engine_on_adjustment)
     event_bus.subscribe(EventType.DATA_IMPORTED, _stale_engine_on_data_imported)
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _stale_engine_on_data_imported)
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _stale_engine_on_workpaper_saved)
@@ -1916,25 +1910,14 @@ def register_event_handlers() -> None:
 
     # adj-formula-repair-and-approval-gate-wiring 任务 3.6:
     # 保留批量提交也标附注 stale 的行为（设计 §四.3），但用独立命名的 handler。
-    async def on_event_adjustment_batch_committed(payload: EventPayload) -> None:
-        """ADJUSTMENT_BATCH_COMMITTED → 全部 DisclosureNote.is_stale=True.
-
-        批量提交意味着一批草稿进入复核流程，附注编制者需要知道
-        「上游有在途变更」。行为保留、命名纠正（不再复用 approved 命名）。
-        """
-        await _mark_disclosure_notes_stale_for_project_year(
-            payload, source_event="ADJUSTMENT_BATCH_COMMITTED",
-        )
-
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, on_event_ledger_activated)
     event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, on_event_workpaper_reviewed)
     event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, on_event_adjustment_approved)
     event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, on_event_adjustment_review_revoked)
-    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_batch_committed)
     logger.debug(
-        "Sprint 2 Task 2.5 + adj-formula-repair: 5 DisclosureNote stale event handlers registered "
+        "调整正式生效链：4 个 DisclosureNote stale handlers registered "
         "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_APPROVED / "
-        "ADJUSTMENT_REVIEW_REVOKED / ADJUSTMENT_BATCH_COMMITTED)"
+        "ADJUSTMENT_REVIEW_REVOKED)"
     )
 
     # ------------------------------------------------------------------
@@ -2223,10 +2206,9 @@ def register_event_handlers() -> None:
                     e,
                 )
 
-    # 订阅调整分录变更事件
-    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _on_upstream_changed_mark_deliverable_stale)
-    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _on_upstream_changed_mark_deliverable_stale)
-    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _on_upstream_changed_mark_deliverable_stale)
+    # 正式交付件只对已生效金额事件或下游正式报表更新过期；草稿 CRUD 不污染交付状态。
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _on_upstream_changed_mark_deliverable_stale)
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _on_upstream_changed_mark_deliverable_stale)
     # 订阅报表更新事件
     event_bus.subscribe(EventType.REPORTS_UPDATED, _on_upstream_changed_mark_deliverable_stale)
     # 订阅附注章节保存事件

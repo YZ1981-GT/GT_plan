@@ -29,8 +29,12 @@
         :type="chipType"
         :effect="chipEffect"
         :class="chipClass"
+        :role="isKeyboardNavigable ? 'button' : undefined"
+        :tabindex="isKeyboardNavigable ? 0 : -1"
         size="small"
         @click.stop="handleClick"
+        @keydown.enter.stop.prevent="handleClick"
+        @keydown.space.stop.prevent="handleClick"
       >
         {{ displayText }}
       </el-tag>
@@ -59,8 +63,12 @@
       :type="chipType"
       :effect="chipEffect"
       :class="chipClass"
+      :role="isKeyboardNavigable ? 'button' : undefined"
+      :tabindex="isKeyboardNavigable ? 0 : -1"
       size="small"
       @click.stop="handleClick"
+      @keydown.enter.stop.prevent="handleClick"
+      @keydown.space.stop.prevent="handleClick"
     >
       {{ displayText }}
     </el-tag>
@@ -75,6 +83,7 @@ import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
 import { useAcnr, type AcnrResolveResult } from '@/services/acnr'
 import { BUNDLE_SHEET_ALIASES } from './bundleSheetAliases'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
@@ -177,21 +186,23 @@ const chipEffect = computed(() => {
   return 'plain'
 })
 
+/** Adj 是模块级业务引用，ACNR 暂无物理地址时仍可按编号进入调整大厅。 */
+const isKeyboardNavigable = computed(() => {
+  if (!parsed.value || props.disabled || isCrossProject.value) return false
+  if (props.preventNavigate) return true
+  if (resolveStatus.value === 'trimmed') return false
+  return resolveStatus.value !== 'not_exists' || parsed.value.ns === 'Adj'
+})
+
 const chipClass = computed(() => {
   const classes = ['gt-index-chip']
-  if (props.disabled) {
-    classes.push('gt-index-chip--disabled')
-    return classes
-  }
-  if (resolveStatus.value === 'exists' && !isCrossProject.value) {
-    classes.push('gt-index-chip--clickable')
-  }
-  if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') {
+  if (isKeyboardNavigable.value) classes.push('gt-index-chip--clickable')
+  if (props.disabled || isCrossProject.value
+    || (resolveStatus.value === 'trimmed')
+    || (resolveStatus.value === 'not_exists' && parsed.value?.ns !== 'Adj')) {
     classes.push('gt-index-chip--disabled')
   }
-  if (resolving.value) {
-    classes.push('gt-index-chip--loading')
-  }
+  if (resolving.value) classes.push('gt-index-chip--loading')
   return classes
 })
 
@@ -369,18 +380,9 @@ async function resolveAndNavigateToWp(wpCode: string, pid: string) {
 }
 
 function handleClick() {
-  if (!parsed.value) return
-  if (props.disabled) return
-  if (isCrossProject.value) return
-  // preventNavigate 模式下跳过存在性检查（弹窗子底稿可能未生成实例）
-  if (!props.preventNavigate) {
-    if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return
-  }
-
+  if (!parsed.value || !isKeyboardNavigable.value) return
   emit('click', parsed.value)
-  if (!props.preventNavigate) {
-    navigateToTarget(parsed.value)
-  }
+  if (!props.preventNavigate) navigateToTarget(parsed.value)
 }
 
 function handleMultiTargetSelect(target: string) {
@@ -461,11 +463,8 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
       break
 
     case 'Adj':
-      // Layer 4: adjustments
-      router.push({
-        path: `/projects/${pid}/adjustments`,
-        query: { id: target },
-      })
+      // 模块级引用按分录组/历史编号定位；旧 id 只在接收方兼容读取。
+      router.push(buildAdjustmentRouteTarget(pid, { kind: 'focus', entryGroupId: target }))
       break
 
     case 'Att':
@@ -573,6 +572,11 @@ watch(refValue, () => {
 
 .gt-index-chip--clickable:hover {
   opacity: 0.8;
+}
+
+.gt-index-chip--clickable:focus-visible {
+  outline: 2px solid var(--gt-color-primary);
+  outline-offset: 2px;
 }
 
 .gt-index-chip--disabled {

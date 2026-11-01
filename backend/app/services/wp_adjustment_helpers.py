@@ -11,94 +11,105 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+async def count_adjustment_groups(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    adjustment_type: str | None = None,
+    review_statuses: tuple[str, ...] | None = None,
+    passed_only: bool = False,
+) -> int:
+    """按 ``entry_group_id`` 统计业务分录组；passed_only 改读正式错报表。"""
+    from app.models.audit_platform_models import Adjustment, UnadjustedMisstatement
+
+    if passed_only:
+        stmt = sa.select(sa.func.count()).select_from(UnadjustedMisstatement).where(
+            UnadjustedMisstatement.project_id == project_id,
+            UnadjustedMisstatement.year == year,
+            UnadjustedMisstatement.is_deleted == sa.false(),
+            UnadjustedMisstatement.prior_year_status != "reversed",
+        )
+        return int((await db.execute(stmt)).scalar() or 0)
+
+    stmt = sa.select(sa.func.count(sa.distinct(Adjustment.entry_group_id))).where(
+        Adjustment.project_id == project_id,
+        Adjustment.year == year,
+        Adjustment.is_deleted == sa.false(),
+    )
+    if adjustment_type is not None:
+        stmt = stmt.where(Adjustment.adjustment_type == adjustment_type)
+    if review_statuses:
+        stmt = stmt.where(Adjustment.review_status.in_(review_statuses))
+    result = await db.execute(stmt)
+    return int(result.scalar() or 0)
+
+
+async def count_unresolved_adjustment_groups(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    adjustment_type: str | None = None,
+) -> int:
+    """统计尚未全组批准的分录组。
+
+    内部驳回与管理层不更正是两个状态轴；正式错报记录不能让未完成内部复核的
+    分录从待处理统计中消失。
+    """
+    from app.models.audit_platform_models import Adjustment, ReviewStatus
+
+    grouped = (
+        sa.select(
+            Adjustment.entry_group_id.label("entry_group_id"),
+            sa.func.min(sa.case(
+                (Adjustment.review_status == ReviewStatus.approved, 1), else_=0,
+            )).label("all_approved"),
+        )
+        .where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.is_deleted == sa.false(),
+        )
+    )
+    if adjustment_type is not None:
+        grouped = grouped.where(Adjustment.adjustment_type == adjustment_type)
+    grouped_sq = grouped.group_by(Adjustment.entry_group_id).subquery()
+    result = await db.execute(
+        sa.select(sa.func.count()).select_from(grouped_sq).where(
+            grouped_sq.c.all_approved == 0,
+        )
+    )
+    return int(result.scalar() or 0)
+
+
 async def count_adjustments(
     db: AsyncSession, project_id: UUID, year: int, adj_type: str
 ) -> int:
-    """按类型统计调整分录数。
-
-    Args:
-        db: 异步数据库会话
-        project_id: 项目 ID
-        year: 审计年度
-        adj_type: 调整类型，可选值为 "aje" | "rje" | "passed"
-            - "aje": 审计调整分录
-            - "rje": 重分类调整分录
-            - "passed": 未更正错报（passed_reason IS NOT NULL）
-
-    Returns:
-        满足条件的调整分录总数
-    """
-    from app.models.audit_platform_models import Adjustment
-
+    """按类型统计调整分录笔数（按 ``entry_group_id`` 去重）。"""
     if adj_type == "passed":
-        # 未更正错报：passed_reason 非空表示管理层不予更正
-        stmt = (
-            sa.select(sa.func.count())
-            .select_from(Adjustment)
-            .where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.passed_reason.isnot(None),
-                Adjustment.is_deleted == sa.false(),
-            )
+        return await count_adjustment_groups(
+            db, project_id, year, passed_only=True,
         )
-    else:
-        stmt = (
-            sa.select(sa.func.count())
-            .select_from(Adjustment)
-            .where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.adjustment_type == adj_type,
-                Adjustment.is_deleted == sa.false(),
-            )
-        )
-    result = await db.execute(stmt)
-    return result.scalar() or 0
+    return await count_adjustment_groups(
+        db, project_id, year, adjustment_type=adj_type,
+    )
 
 
 async def count_adjustments_with_pending(
     db: AsyncSession, project_id: UUID, year: int, adj_type: str
 ) -> tuple[int, int, float]:
-    """按类型统计调整分录：总数、待审批数、借方总金额。
-
-    Args:
-        db: 异步数据库会话
-        project_id: 项目 ID
-        year: 审计年度
-        adj_type: 调整类型，可选值为 "aje" | "rje"
-
-    Returns:
-        三元组 (total, pending, debit_amount):
-            - total: 该类型调整分录总数
-            - pending: 待审批数（review_status != 'approved' 且 passed_reason 为空）
-            - debit_amount: 借方合计金额（float，衡量调整影响规模）
-    """
+    """返回分录组总数、待处理组数与逐明细行借方金额合计。"""
     from app.models.audit_platform_models import Adjustment, AdjustmentEntry
 
-    total_stmt = (
-        sa.select(sa.func.count())
-        .select_from(Adjustment)
-        .where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.is_deleted == sa.false(),
-        )
+    total = await count_adjustment_groups(
+        db, project_id, year, adjustment_type=adj_type,
     )
-    pending_stmt = (
-        sa.select(sa.func.count())
-        .select_from(Adjustment)
-        .where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.review_status != "approved",
-            Adjustment.passed_reason.is_(None),
-            Adjustment.is_deleted == sa.false(),
-        )
+    pending = await count_unresolved_adjustment_groups(
+        db, project_id, year, adjustment_type=adj_type,
     )
-    # 借方合计金额（衡量调整影响规模）
+
+    # 金额是行级可加事实，必须保留 SUM；只排除已软删的两侧明细。
     amount_stmt = (
         sa.select(sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0))
         .join(Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id)
@@ -107,10 +118,8 @@ async def count_adjustments_with_pending(
             Adjustment.year == year,
             Adjustment.adjustment_type == adj_type,
             Adjustment.is_deleted == sa.false(),
+            AdjustmentEntry.is_deleted == sa.false(),
         )
     )
-
-    total_r = await db.execute(total_stmt)
-    pending_r = await db.execute(pending_stmt)
-    amount_r = await db.execute(amount_stmt)
-    return (total_r.scalar() or 0, pending_r.scalar() or 0, float(amount_r.scalar() or 0))
+    amount = (await db.execute(amount_stmt)).scalar() or 0
+    return total, pending, float(amount)

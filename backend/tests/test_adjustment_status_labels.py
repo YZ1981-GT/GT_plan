@@ -14,8 +14,10 @@ import uuid
 
 import pytest
 
+from app.models.audit_platform_models import ReviewStatus
 from app.routers.system_dicts import _DICTS
 from app.services import allowed_actions_service, consol_elimination_sheet_service, elimination_service
+from app.services.adjustment_service import _VALID_TRANSITIONS
 from app.services.state_machines.adjustment_sm import ADJUSTMENT_SM
 
 DICT = {entry["value"]: entry["label"] for entry in _DICTS["adjustment_status"]}
@@ -37,10 +39,27 @@ def test_state_machine_actions_use_review_wording() -> None:
     assert not stale, f"调整分录状态机仍有审批 / 退回措辞：{stale}"
 
 
+def test_state_machine_exactly_matches_current_production_four_state_graph() -> None:
+    """草稿直批/直驳是当前兼容边，后续须与生产复核任务门同批删除。"""
+    assert set(ADJUSTMENT_SM.states) == {status.value for status in ReviewStatus}
+    actual_edges = {(transition.from_, transition.to) for transition in ADJUSTMENT_SM.transitions}
+    production_edges = {
+        (source.value, target.value)
+        for source, targets in _VALID_TRANSITIONS.items()
+        for target in targets
+    }
+    assert actual_edges == production_edges
+    assert "posted" not in ADJUSTMENT_SM.states
+    assert "post" not in ADJUSTMENT_SM.all_actions
+    assert {("draft", "approved"), ("draft", "rejected")} <= actual_edges
+
+
 @pytest.mark.parametrize(("status", "role", "expected_status", "expected_actions"), [
     ("draft", "editor", "草稿", ["提交复核"]),
-    ("pending_review", "manager", "待复核", ["批准", "驳回"]),
-    ("rejected", "manager", "已驳回", ["重新提交"]),
+    ("draft", "manager", "草稿", ["提交复核", "批准", "驳回"]),
+    ("pending_review", "manager", "待复核", ["批准", "驳回", "撤回提交"]),
+    ("rejected", "manager", "已驳回", ["修改为草稿", "重新提交"]),
+    ("approved", "partner", "已批准", ["撤回复核"]),
 ])
 async def test_allowed_actions_panel_shows_dict_wording(
     monkeypatch, status, role, expected_status, expected_actions,

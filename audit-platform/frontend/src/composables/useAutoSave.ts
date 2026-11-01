@@ -241,5 +241,9 @@ export function useAutoSave<T = any>(
     saveDraft,
     /** 手动触发恢复草稿 */
     restoreDraft,
+    /** 当前动态 key/context 下是否存在可恢复草稿 */
+    checkDraft,
+    /** 当前动态 key/context 下草稿保存时间 */
+    getDraftTime,
   }
 }

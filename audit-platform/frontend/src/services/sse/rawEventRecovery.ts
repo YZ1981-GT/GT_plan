@@ -15,6 +15,7 @@ export const RAW_EVENT_REPLAY_DEGRADED = [
   'a13_summary_updated',
   'acnr:invalidate',
   'adjustment:review-changed',
+  'adjustment:client-booking-changed',
   'adjustment:sync-arrived',
   'ai.task.updated',
   'aging-config:changed',
@@ -68,6 +69,7 @@ export interface ProjectTransportRecovered {
 export const RAW_CONSUMER_RECOVERY = {
   'acnr:invalidate': 'on_reconnect_cache_clear',
   'adjustment:review-changed': 'on_reconnect_full_refresh',
+  'adjustment:client-booking-changed': 'on_reconnect_full_refresh',
   'adjustment:sync-arrived': 'on_reconnect_full_refresh',
   'attachment.uploaded': 'on_reconnect_full_refresh',
   'ai.task.updated': 'status_poll',

@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="Excel 导入调整分录" width="980px" append-to-body :close-on-click-modal="false">
+  <el-dialog v-model="visible" title="Excel 导入调整分录" width="980px" append-to-body :close-on-click-modal="false" style="max-width: calc(100vw - 32px)">
     <el-steps :active="step" finish-status="success" simple class="gt-adj-imp-steps">
       <el-step title="选择文件" />
       <el-step title="预检" />

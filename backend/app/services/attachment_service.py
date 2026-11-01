@@ -1087,6 +1087,9 @@ class AttachmentService:
             "created_at": a.created_at.isoformat() if a.created_at else None,
             # AT-3 版本字段
             "version": getattr(a, "version", 1),
+            "current_version_id": (
+                str(a.current_version_id) if getattr(a, "current_version_id", None) else None
+            ),
             "previous_version_id": (
                 str(a.previous_version_id) if getattr(a, "previous_version_id", None) else None
             ),

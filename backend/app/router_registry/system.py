@@ -82,6 +82,8 @@ def register_system_routers(app: FastAPI) -> None:
     # 调整分录复核流转（提交复核 / 撤回提交 / 批量复核 / 复核人）与项目级 Excel 导入 —— 同前缀、路径不重叠
     from app.routers.adjustment_review import router as adj_review_router
     from app.routers.adjustment_import import router as adj_import_router
+    from app.routers.adjustment_client_booking import router as adj_booking_router
+    from app.routers.adjustment_treatment import router as adj_treatment_router
     from app.routers.materiality import router as mat_router
     from app.routers.misstatements import router as mis_router
     from app.routers.events import router as events_router
@@ -90,7 +92,7 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.consistency import router as consistency_router
 
     for r in [drilldown_router, ledger_router, voucher_links_router, tb_router, adj_router, adj_review_router,
-              adj_import_router, mat_router, mis_router, events_router, tb_sync_router,
+              adj_import_router, adj_booking_router, adj_treatment_router, mat_router, mis_router, events_router, tb_sync_router,
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])
 

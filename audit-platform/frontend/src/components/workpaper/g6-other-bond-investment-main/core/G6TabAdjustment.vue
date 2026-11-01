@@ -34,14 +34,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" @click="openReview">💬复核</el-button>
       </div>
     </div>
@@ -242,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabAdjustment.vue — G6-4 调整分录汇总（对齐 Excel 列 + useG6MainAdjustment）
@@ -253,7 +247,7 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { useG6MainAdjustment } from '../../composables/useG6MainAdjustment'
 import { useG6MainImportExport } from '../../composables/useG6MainImportExport'
 import type { G6MainImportableSheet } from '../../composables/useG6MainImportExport'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
