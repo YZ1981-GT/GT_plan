@@ -68,6 +68,7 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:  # pragma: no cover - 老 Python / 非 tty
         pass
 
+from app.core.spec_docs import resolve_spec_dir  # noqa: E402
 from app.services.wp_template_finder import find_template_file  # noqa: E402
 from app.services.workpaper_sync.canonical_paths import (  # noqa: E402
     TEMPLATE_ROOT,
@@ -91,9 +92,16 @@ from app.services.workpaper_sync.word_resolution import (  # noqa: E402
 _OVERRIDES = _BACKEND / "app" / "data" / "wp_code_overrides.json"
 _TEMPLATE_INDEX = TEMPLATE_ROOT / "_index.json"
 _LEDGER = _BACKEND / "data" / "workpaper_word_template_adjudication.json"
+# 🔴 本生成器把 Word lane 的声明数字与 **AC 7.7 原文**交叉锁死。2026-11-01 该 spec 的
+#    active requirements 被重写成 7 条扁平 AC（没有 7.7）⇒ 写死 active 路径会让它报
+#    「AC 7.7 原文形态变了」，而真实原因是这条 AC 在归档快照里。按内容标记选快照。
 _REQUIREMENTS = (
-    _REPO
-    / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md"
+    resolve_spec_dir(
+        "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+        require_files=["requirements.md"],
+        require_matches={"requirements.md": (r"^7\.7\.",)},
+    )
+    / "requirements.md"
 )
 
 SCHEMA_VERSION: Final[str] = "word-template-adjudication:v1"

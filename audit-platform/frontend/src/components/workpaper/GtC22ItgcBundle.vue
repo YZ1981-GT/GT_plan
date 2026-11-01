@@ -24,6 +24,7 @@
  * bundle 顶层 el-tabs 允许（tasks.md Notes）。
  */
 import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import {
@@ -447,6 +448,18 @@ onMounted(async () => {
   const initial = props.sheetName || (route.query.sheet as string | undefined)
   activateSheet(initial)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const SYNC_ENTRY_ID = 'xlsx/gt-c22-itgc-bundle'
+const c22EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => SYNC_ENTRY_ID,
+})
+
 </script>
 
 <template>
@@ -711,7 +724,9 @@ onMounted(async () => {
          🔴 默认 'structured'（保持改造前行为），切 'online-edit' 打开 C21-1 册。 -->
     <div v-else-if="activeSection === 'C21-1'" class="c22-section c22-section--doc">
       <div v-if="showModeToolbar" class="c22-mode-bar">
-        <el-segmented v-model="renderMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="c22EntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="modeOptions" size="small" />
+        <!-- 能力披露（AC 1.5）：开关被单源藏起来时必须讲清原因 + 下一步；entry 与门同一条 -->
+        <GtEntrySyncCapabilityNotice :entry-id="SYNC_ENTRY_ID" />
       </div>
 
       <!-- 在线编辑：C21-1 独立册（sheet 名走 ooSheetName，见 CC-63） -->
@@ -741,7 +756,7 @@ onMounted(async () => {
          （保持改造前「进 tab 直接显示文档」的行为），切 'structured' 显示开发中占位。 -->
     <div v-else class="c22-section c22-section--doc">
       <div v-if="showModeToolbar" class="c22-mode-bar">
-        <el-segmented v-model="renderMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="c22EntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="modeOptions" size="small" />
       </div>
 
       <!-- 在线编辑模式（OO 挂点，须被 mode 门控） -->

@@ -147,15 +147,34 @@ def _stable_json(value: Any, *, indent: int | None = None) -> str:
     )
 
 
+_TEXT_DIGEST_SUFFIXES = {".json", ".md", ".mjs", ".py", ".ts", ".vue"}
+
+
 def _sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
 def _sha256_file(path: Path) -> str:
     try:
-        return _sha256_bytes(path.read_bytes())
+        value = path.read_bytes()
+        if path.suffix.lower() in _TEXT_DIGEST_SUFFIXES:
+            # 归一 Git checkout 的换行，避免 Windows 生成、Linux 校验时误报 stale。
+            value = value.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        return _sha256_bytes(value)
     except FileNotFoundError as exc:
         raise ProgramMilestoneError(f"required input does not exist: {_relative(path)}") from exc
+
+
+def _digest_matches(path: Path, expected: str) -> bool:
+    """接受冻结证据中的历史 CRLF digest，新产物统一记录规范 LF digest。"""
+    value = path.read_bytes()
+    if path.suffix.lower() not in _TEXT_DIGEST_SUFFIXES:
+        return _sha256_bytes(value) == expected
+    canonical = value.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return expected in {
+        _sha256_bytes(canonical),
+        _sha256_bytes(canonical.replace(b"\n", b"\r\n")),
+    }
 
 
 def _relative(path: Path) -> str:
@@ -1444,7 +1463,7 @@ def _validate_host_source_bindings(
             continue
         actual_digest = _record_input(inputs, path)
         _append_source_ref(source_refs, path, actual_digest)
-        if actual_digest != expected_digest:
+        if not _digest_matches(path, expected_digest):
             stale_reasons.append(f"{label}:source_digest_mismatch:{raw_path}")
         text = path.read_text(encoding="utf-8")
         for literal in literals:
@@ -1571,7 +1590,7 @@ def collect_host_path_evidence(
                 continue
             actual_digest = _record_input(inputs, artifact_path)
             _append_source_ref(source_refs, artifact_path, actual_digest)
-            if actual_digest != expected_digest:
+            if not _digest_matches(artifact_path, expected_digest):
                 stale_reasons.append(f"artifact_digest_mismatch:{channel}")
             document = _read_json(artifact_path)
             channels[str(channel)] = document
@@ -1631,7 +1650,7 @@ def collect_host_path_evidence(
                 continue
             actual_digest = _record_input(inputs, source_path)
             _append_source_ref(source_refs, source_path, actual_digest)
-            if actual_digest != expected_digest:
+            if not _digest_matches(source_path, expected_digest):
                 stale_reasons.append(f"source_check_digest_mismatch:{label}")
             try:
                 if label == "secondary_revision_domain":
@@ -2259,7 +2278,7 @@ def evaluate_evidence_bundle(
                 continue
             actual = _record_input(inputs, resolved)
             source_refs.append(_source_ref(_relative(resolved), actual))
-            if actual != digest:
+            if not _digest_matches(resolved, digest):
                 stale_reasons.append(f"artifact_digest_mismatch:{raw_artifact_path}")
                 continue
             valid_artifact_rows += 1

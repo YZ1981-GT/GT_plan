@@ -628,7 +628,8 @@ def room_service_wiring() -> tuple[str, ...]:
     app_root = _BACKEND / "app"
     for dirpath, dirnames, filenames in os.walk(app_root):
         dirnames[:] = [name for name in dirnames if name != "__pycache__"]
-        if "workpaper_sync" in Path(dirpath).as_posix():
+        relative_dir = Path(dirpath).relative_to(app_root)
+        if "workpaper_sync" in relative_dir.parts:
             continue
         for name in sorted(filenames):
             if not name.endswith(".py"):

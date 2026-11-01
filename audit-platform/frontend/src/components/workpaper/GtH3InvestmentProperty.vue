@@ -13,7 +13,7 @@
           （mount 期异步）未就绪时把切换器锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
           健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
         -->
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h3EntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <!-- 计量模式切换 -->
         <el-segmented
           v-if="currentMode === 'html'"
@@ -336,6 +336,7 @@
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9, 1.11, 16.1-16.2, 16.8, 16.10
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -638,6 +639,17 @@ onUnmounted(() => {
   //    宿主先卸载、composable 的 scope 后销毁时顺序不保证。flush 是幂等的。
   void formData.flushPendingSaves()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const h3EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H3_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

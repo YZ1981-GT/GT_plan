@@ -18682,7 +18682,7 @@
   ],
   "facts_digest": "a42eeabd70fa53c207da42a2ca3cc6cdde9f80abcb3c24e55ac50fd9716fe8e6",
   "generated_by": "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py",
-  "matrix_digest": "93939935e32f372f1be300f6e3735a05b648754fb72da7f6e35da648aa82b352",
+  "matrix_digest": "f051e14b6012050c9234a7462ea79e201b72f95d43781a080f12b310609a7e39",
   "oracle_families": [
     {
       "ac_ids": [
@@ -20334,20 +20334,20 @@
   ],
   "schema_version": 1,
   "sources": {
-    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/design.md": {
+    ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/design.md": {
       "bytes": 189241,
       "lines": 1994,
       "sha256": "dfb2ca8607594ab01b4976c4c4c1b3f77538f5b52162c3b65c684d4ff0c81056"
     },
-    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md": {
+    ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md": {
       "bytes": 83056,
       "lines": 392,
       "sha256": "45f57b7b8f8948bf8e4b7acaba861a8850c934d39c41f2b692e983c28fbc5209"
     },
-    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": {
-      "bytes": 216843,
-      "lines": 921,
-      "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
+    ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": {
+      "bytes": 222894,
+      "lines": 987,
+      "sha256": "0986bb83ca0e5dbf43c7586239281f7ef059a35adbc28961c84794f110846039"
     }
   },
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",

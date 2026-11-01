@@ -98,7 +98,27 @@ OWNER_TASK: Final[str] = "71"
 SPEC: Final[str] = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 SCHEMA_VERSION: Final[str] = "task71-mutation-capacity-recovery-retention:v1"
 
-SPEC_DIR: Final[Path] = REPO / ".kiro" / "specs" / SPEC
+# 🔴 同 Task 68/69 门：本门解析 **Wave 6 形态**的三件套（整数任务号 `- [x] 71.` +
+#    24 条 `### Property N` 声明），并经 `capacity_profile` 交叉锁 AC 14.10 / 14.12 原文。
+#    active 目录 2026-11-01 被重写成两级任务号 + 7 条扁平 AC ⇒ 写死 active 会让本门
+#    fail closed 在「找不到 AC 14.10」上，而真实原因是契约在归档快照里。
+# 🔴 兄弟模块 import 同时要补 sys.path（见 test_check_scripts_importable.py）。
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+if str(_Path(__file__).resolve().parent) not in _sys.path:
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+SPEC_DIR: Final[Path] = resolve_spec_dir(
+    SPEC,
+    require_files=["tasks.md", "design.md", "requirements.md"],
+    require_matches={
+        "tasks.md": (rf"^\s*-\s\[[ x~\-]\]\s+{TASK_NUMBER}\.",),
+        "design.md": (r"^### Property \d+",),
+        "requirements.md": (r"^14\.10\.", r"^14\.12\."),
+    },
+)
 TASKS_MD: Final[Path] = SPEC_DIR / "tasks.md"
 DESIGN_MD: Final[Path] = SPEC_DIR / "design.md"
 

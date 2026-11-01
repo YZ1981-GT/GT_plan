@@ -397,7 +397,13 @@ backend/app/services/workpaper_sync/word_sdt_engine.py  1783
 backend/app/services/workpaper_sync/writer_migration.py  937
 
 # ── 门与生成器（条目即数据，见上方第 2 条理由）────────────────────────
-backend/scripts/check/check_task44_oo94_excel_pilot_gate.py  2467
+# 2026-11-01 基线上调 2467 → 2612（task 0.6 按内容标记重绑冻结契约）。
+#   拆解：HEAD 已是 **2587** 行（2467 → 2587 的 120 行是别的轮次长出来的、当时没同步基线，
+#   属预存漂移，本轮如实并入而不是替它背书）；本轮 **+25** 行 = `require_matches` 绑定块 +
+#   兄弟模块 sys.path 自举 + 两段说明为什么不能只看「文件在不在」。
+#   拆分方向（归 pilot 门自身的 lane）：把四个 pilot 的 probe 定义与 evidence schema 抽到
+#   `_task44_pilot_specs.py`，门只留「读清册 → 跑 probe → 比对 evidence」三段编排。
+backend/scripts/check/check_task44_oo94_excel_pilot_gate.py  2612
 backend/scripts/check/check_task61_oo94_word_pilot_gate.py  3048
 backend/scripts/check/check_task68_backend_chain_independent_regression.py  5742
 backend/scripts/check/check_task69_frontend_independent_regression.py  2754
@@ -407,7 +413,14 @@ backend/scripts/check/check_task69_frontend_independent_regression.py  2754
 #     补齐并解除 debt）。抬到实测值让门从此刻重新生效；条目即数据、拆分收益为负，理由同
 #     本表顶部第 2 条（门与生成器）。
 backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py  3126
-backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py  4778
+# 2026-11-01 基线上调 4778 → 5018（task 0.6 按内容标记重绑冻结契约）。
+#   拆解：HEAD 已是 **4998** 行（4778 → 4998 的 220 行是别的轮次长出来的、当时没同步基线，
+#   属预存漂移，本轮如实并入）；本轮 **+20** 行 = `require_matches` 绑定块（tasks/design/
+#   requirements 三份各自的形态标记）+ 兄弟模块 sys.path 自举 + 说明。
+#   拆分方向（归本门自身的 lane）：变异 / 容量 / 故障恢复 / retention 四族判据各自抽成
+#   `_task71_<族>.py`，门只留「建报告 → 调四族 → 合并结算」三段编排；
+#   容量数值应移到生产配置 JSON，归档 AC 14.10 / 14.12 只保 provenance。
+backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py  5018
 backend/scripts/check/check_task72_pre_delete_eligibility_gate.py  2690
 backend/scripts/check/mutate_task34_sync_ui_guards.py  933
 backend/scripts/diagnose/mutate_task14_merge_conflict_guards.py  874
@@ -1870,3 +1883,16 @@ backend/tests/dsh_agent_panel/test_task6_native_engine.py  1720
 #   `useWorkpaperSyncBridge.fixtures.ts`，J（beforeunload / route leave）与 K（localStorage 迁移）
 #   两组移到 `useWorkpaperSyncBridge.leave.spec.ts`；拆前先核对 workpaper_sync_task69_frontend_regression.json 的用例清单。
 audit-platform/frontend/src/components/workpaper/sync/__tests__/useWorkpaperSyncBridge.spec.ts  1524
+# task 3.5（workpaper-html-onlyoffice-bidirectional-writeback-closure）接单源时触到的两个
+# **HEAD 就已远超上限**的历史宿主（入册时 HEAD 分别是 2734 / 2798 行，上限 1500）：
+#   GtB22AControlMatrix.vue  +12 行（readiness 实例 + `v-if="…showModeSwitch"` + 能力披露挂载）
+#   GtB50RiskAssessment.vue  +28 行（同上，另加模式开关的门控注释）
+#   🔴 这两份不是本轮写出来的体量 —— B 循环控制矩阵/风险评估本来就是整表录入型宿主。
+#   本轮改动是**每宿主 3 行量级**的横切接线（全域 137 个宿主同一形态），为这两个历史大文件
+#   做结构拆分不属于 task 3.5 的交付单元，也会把 B 轮 spec 的拆分责任转移到本轮。
+#   以真实行数登记，只许下调；bloat 门（baseline × 1.05）继续守着它们不再长。
+#   拆分方向（归 B 轮 lane）：GtB22A 的 T1/T2/T3 三张检查表各抽成子组件（它们已有独立
+#   item_id 前缀 `B22A-T{n}-item-*`，是天然边界）；GtB50 的风险清单与评分区同理，
+#   并把 `b22aReference.ts` 式的预置参考文本继续留在数据模块里。
+audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue  2746
+audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue  2826

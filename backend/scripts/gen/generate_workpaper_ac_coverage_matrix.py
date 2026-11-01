@@ -46,11 +46,22 @@ from pathlib import Path
 from typing import Any
 
 _REPO = Path(__file__).resolve().parents[3]
-_SPEC_DIR = (
-    _REPO
-    / ".kiro"
-    / "specs"
-    / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+if str(_REPO / "backend") not in sys.path:
+    sys.path.insert(0, str(_REPO / "backend"))
+from app.core.spec_docs import resolve_spec_dir  # noqa: E402
+
+# 🔴 本生成器解析 **Wave 6 形态**的三件套：`### Requirement N` 标题 + 170 条 `N.M.` AC +
+#    `### Property N` + `## Acceptance Oracle Matrix` + 整数任务号。2026-11-01 该 spec 的
+#    active 目录被重写成「7 条扁平 AC + 两级任务号」⇒ 写死 active 路径会让本生成器报
+#    「AC 1.3 precedes any requirement heading」，把「契约在归档快照里」说成「文档格式坏了」。
+#    按内容标记选快照：形态回到 active 会自动改回 active。
+_SPEC_DIR = resolve_spec_dir(
+    "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+    require_files=["requirements.md", "design.md", "tasks.md"],
+    require_matches={
+        "requirements.md": (r"^### Requirement \d+",),
+        "design.md": (r"^### Property \d+", r"^## Acceptance Oracle Matrix$"),
+    },
 )
 _REQUIREMENTS = _SPEC_DIR / "requirements.md"
 _DESIGN = _SPEC_DIR / "design.md"

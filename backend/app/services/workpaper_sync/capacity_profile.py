@@ -38,15 +38,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final, Mapping
 
+from app.core.spec_docs import resolve_spec_dir
 from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.models import SyncDomainError
 
 #: `requirements.md` 的位置（AC 14.10 / 14.12 的真源）。
+#
+# 🔴 必须按**内容**定位，不能写死 active 路径：2026-11-01 该 spec 的 active 三件套被
+#    重写成「7 条扁平 AC」，里面没有 14.10 / 14.12 ⇒ 写死 active 会让本模块的
+#    `assert_profile_matches_requirements()` fail closed 在「找不到 AC 14.10」上，
+#    而真实原因是这两条 AC 的原文在归档快照里。`resolve_spec_dir` 按内容标记选快照：
+#    哪天 active 重新含有这两条，它会自动改回 active。
 REQUIREMENTS_PATH: Final[Path] = (
-    Path(__file__).resolve().parents[4]
-    / ".kiro"
-    / "specs"
-    / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+    resolve_spec_dir(
+        "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+        require_files=["requirements.md"],
+        require_matches={"requirements.md": (r"^14\.10\.", r"^14\.12\.")},
+    )
     / "requirements.md"
 )
 

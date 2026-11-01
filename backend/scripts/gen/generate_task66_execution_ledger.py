@@ -72,8 +72,27 @@ def _rel(path: pathlib.Path) -> str:
     return path.relative_to(_REPO).as_posix()
 
 
+def _normalize_text_bytes(value: bytes) -> bytes:
+    return value.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def _sha256_bytes(value: bytes) -> str:
+    # 调用方均为已跟踪文本。归一 checkout 引入的换行差异，保证 Windows / Linux
+    # 生成同一份执行账。
+    return hashlib.sha256(_normalize_text_bytes(value)).hexdigest()
+
+
 def _sha256(path: pathlib.Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _sha256_variants(path: pathlib.Path) -> set[str]:
+    """兼容冻结计划中历史 CRLF digest，同时让新 digest 使用规范 LF。"""
+    canonical = _normalize_text_bytes(path.read_bytes())
+    return {
+        hashlib.sha256(canonical).hexdigest(),
+        hashlib.sha256(canonical.replace(b"\n", b"\r\n")).hexdigest(),
+    }
 
 
 def _git_tracked(rel_path: str) -> bool:
@@ -136,10 +155,13 @@ def build_path_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
             still_legacy = None
         else:
             current_sha = _sha256(abs_path)
-            if planned_sha and current_sha != planned_sha:
+            if planned_sha and planned_sha not in _sha256_variants(abs_path):
                 state = "drifted"
             else:
                 state = "intact"
+                # 冻结计划可能记录的是历史 CRLF digest。内容只差换行时沿用计划值，
+                # 避免把 64 个未改文件误判为 drifted。
+                current_sha = planned_sha or current_sha
             still_legacy = _still_legacy_composable(abs_path)
         rows.append(
             {
@@ -301,7 +323,7 @@ def build_record() -> dict[str, Any]:
         ),
         "frozen_inputs": {
             "plan_path": _rel(FROZEN_PLAN_PATH),
-            "plan_digest": hashlib.sha256(plan_bytes).hexdigest(),
+            "plan_digest": _sha256_bytes(plan_bytes),
             "plan_commit_declared_in_plan": plan.get("plan_commit"),
             "plan_items_total": plan["counters"]["items_total"],
             "plan_pending_delete_paths_distinct": plan["counters"][

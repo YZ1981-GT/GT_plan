@@ -7,12 +7,12 @@
   "output_is_idempotent": "本产物不含时间戳等每次都变的字段 —— 否则 `--write` + `git diff` 式门禁必然永红，而永红门禁等于没门禁。「什么时候算的」由下面的输入 digest 承担。",
   "frozen_inputs": {
     "plan_path": "backend/data/workpaper_sync_task66_legacy_deletion_plan.json",
-    "plan_digest": "1687a0e5499fa494bb128ed99030189aac53b23a606cf5a98d7ac431cebd9591",
+    "plan_digest": "943ea32b7b990e35b8c5785b9f39cc46fecd336c420798203c6978c7f5aa53f7",
     "plan_commit_declared_in_plan": "d330d7cea6bb112709edce5bf287877df0a5f60c",
     "plan_items_total": 215,
     "plan_pending_delete_paths_distinct": 125,
     "frozen_generator_path": "backend/scripts/gen/generate_task66_legacy_deletion_plan.py",
-    "frozen_generator_digest": "9250eef0948c72f52e933d0784408bd8016b07e34d4f835c3e3be6c053b6cf9e"
+    "frozen_generator_digest": "4c7785cb52f5a9cdf2f1046ea8a99d13be233202e4da768441c11d47284fa53f"
   },
   "frozen_generator_verdict": {
     "verdict": "retired_superseded_by_this_ledger",
@@ -84,12 +84,12 @@
   "counters": {
     "plan_paths_total": 126,
     "state_landed": 29,
-    "state_drifted": 27,
-    "state_intact": 70,
+    "state_drifted": 32,
+    "state_intact": 65,
     "pending_delete_paths": 125,
     "pending_delete_landed": 29,
     "outstanding_paths": 96,
-    "outstanding_drifted_need_reverdict": 26,
+    "outstanding_drifted_need_reverdict": 32,
     "unplanned_legacy_paths": 0,
     "live_blocking_points": 1
   },
@@ -98,7 +98,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
       "state": "drifted",
       "planned_sha256": "c85636daca994e7db754ce2daa673000b9694ad4f31bfcd76350e57cb24dc733",
-      "current_sha256": "c5ccc13b1d96fc83b93922d706a781c19630dc707bb8aafb07463913d61f272c",
+      "current_sha256": "5e77476cdceef699b1f4ac551fe03115daf7274b930e2dbb448ff28bd1445501",
       "item_count": 1,
       "categories": [
         "fail_open_success_message"
@@ -116,7 +116,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
       "state": "drifted",
       "planned_sha256": "bd88f8fe899a3c2e24e562450ae0034e6579dc37ed995305a8727c7fd00d9dad",
-      "current_sha256": "c5a004a733ae9454e43ca7ae0c6eda61a4db889f7bf00d9b032f5b624148d9a4",
+      "current_sha256": "4e62618cb22a17104cf39814d4f8d481e1158595cddc52742f65428481f2fe1b",
       "item_count": 1,
       "categories": [
         "fail_open_success_message"
@@ -134,7 +134,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
       "state": "drifted",
       "planned_sha256": "e3596df7b1335089ce768746c06351f56626f6fc5944876846c2d9d0ef282c18",
-      "current_sha256": "0743eb2bee1bd11d9e71354d5e81d626c773755a005de00e10d4219391b558ac",
+      "current_sha256": "e05ee5d22e8d994075ef3e61ba5cf8fc26c06e4516040388b834b5cb1bb33cb7",
       "item_count": 1,
       "categories": [
         "legacy_state_machine"
@@ -186,9 +186,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useCycleHtmlOoDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "1ff7e77da2ce6373227e96ae7b56a948821719bcd350daebb7aa7c9330698bd7",
-      "current_sha256": "1ff7e77da2ce6373227e96ae7b56a948821719bcd350daebb7aa7c9330698bd7",
+      "current_sha256": "8df68194798b872cb504a7c2c22799cbc8cbcec36a55e09d6961da57403e4bb5",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -206,7 +206,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useD1DualMode.ts",
       "state": "drifted",
       "planned_sha256": "75b660b6bdc97005862e60d82708ba6001c2971e3d48000535dbefe7af23a59f",
-      "current_sha256": "873ac07cd5386492804099f5780c870eb10b92171237ee6af4d30cfc560d9265",
+      "current_sha256": "4df25cd61af73a643873829bf7774bccb6ac47f591276aa45b92365e66011236",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -242,7 +242,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useD2DualMode.ts",
       "state": "drifted",
       "planned_sha256": "0a3b4f29e87332ea98e26c42ab3ab4ae12fd052f850cebd0f369c7ef720c77ea",
-      "current_sha256": "9b8cf78ef9f028fd58ad107774df8307aab287a65564ff716e53631bcf5a5be3",
+      "current_sha256": "73fabd594d46d4fb7c62c7018304f095083cb74df52d501e917f26fd25501f33",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -296,7 +296,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useD4DualMode.ts",
       "state": "drifted",
       "planned_sha256": "4559eee4321fc8e772ed1b69d1cafe098e0f3f65c5630def371116503a6df993",
-      "current_sha256": "dc6e28b650d15003bd10aa2cb9f3804e65423ce772947305fcb739f65b0830be",
+      "current_sha256": "5ee61ebca60dcb6662f59993fab52ddeb4c1f8485b9db4c92ef45a5b11e2a078",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -404,9 +404,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2DualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "4bc1c002ead2890e385a82b5302a976c311fd9a24f09d65d4398553ffed5f24f",
-      "current_sha256": "4bc1c002ead2890e385a82b5302a976c311fd9a24f09d65d4398553ffed5f24f",
+      "current_sha256": "c1a35fae227cefeb225b4200902ee1dd04e18ed4b6c551c5797e5ed3e71e03a9",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -478,9 +478,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "04bd6fc30afd6f5c35ec27f6731527a1d119e3bc5ee076c831195b33abaae350",
-      "current_sha256": "04bd6fc30afd6f5c35ec27f6731527a1d119e3bc5ee076c831195b33abaae350",
+      "current_sha256": "d70e17c9e05d5e5d25433b8537e224b31f896a4d1434add061a35e35633c091b",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -500,7 +500,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
       "state": "drifted",
       "planned_sha256": "f483c0a7f4c7452d773ccfd330e3649164c18e6776af3b0384d0e18243ec3dca",
-      "current_sha256": "5b3fad7e0b4506c75e3a9d84768ce12808bad16453d16b268285b8d7a675b6ae",
+      "current_sha256": "1798d0d851f7a174408f30800b27741560399eb671f0132ac93aeacf25604255",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -518,9 +518,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "21e7e3435c32046f99d7d1880b2644103cbba56a0cdb7127655d58a8ee701bb1",
-      "current_sha256": "21e7e3435c32046f99d7d1880b2644103cbba56a0cdb7127655d58a8ee701bb1",
+      "current_sha256": "35b2e56f124f71691a4bd18d8a00a8afd6365f06b6b7be0299f78f533e2ee3fd",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -540,7 +540,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF3DualMode.ts",
       "state": "drifted",
       "planned_sha256": "d35985f813f1f3b0bc74caf5e820728ea357336e3faf9d7067366992845956b7",
-      "current_sha256": "fd15bf9c15ce8881badd81b77df2049f08761b352b42d39b6815f68fa3d7c30a",
+      "current_sha256": "0a03c26f554b7075da4c732282d50e6a1c0271e2e632e7d2612b3b323440ea4c",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -578,7 +578,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF4DualMode.ts",
       "state": "drifted",
       "planned_sha256": "4af58dc34ea9e0f418f921d67207750175a69fb0ab1a2f62e88991007dadfc15",
-      "current_sha256": "cd25426efd2c3cfa8f200b43cb9fd6023a7c4e9759786b17eaafb0843fb81d96",
+      "current_sha256": "74122145a5070512e41ebf222f537440d83861eb464f79587958ca864d4d003b",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -596,9 +596,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useF5CosOfDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "9ce2b4e8b79d0520ea3a77114e17c945a42a66326f21b7abd376e65a2dbb71a7",
-      "current_sha256": "9ce2b4e8b79d0520ea3a77114e17c945a42a66326f21b7abd376e65a2dbb71a7",
+      "current_sha256": "6cf59c1d8c52ff8f6f10fa163b868be6f42cb8d9aa13eebb70ce11fa1d3762f2",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1066,7 +1066,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useH10DualMode.ts",
       "state": "drifted",
       "planned_sha256": "c787ab4c8293bbc170985b2e8c18850d4ba6b0cc495e22c2e94801dc427bd8c6",
-      "current_sha256": "7bef64bd194a43dcfef59131a189690fef1ee884bae3f32e06d81c4c34c5f2d3",
+      "current_sha256": "66e0b497b9e55a15ef0397cd5fc9742690e407fda49667b3566d45c53aa19b37",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1086,7 +1086,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useH2DualMode.ts",
       "state": "drifted",
       "planned_sha256": "c7fd12cad933c819c362f1b06e5e8f0b8b4503cca39e69fc3774e309705aa94d",
-      "current_sha256": "80eeabd7622f031ae3f72d10a48539e0a433a4d0b7eb59417845bcb395cb53af",
+      "current_sha256": "6a4d2511cf9eab2050ced5cd72f6d824888d3f5915eddd482e288e74acd6a0bd",
       "item_count": 4,
       "categories": [
         "fail_open_success_message",
@@ -1107,7 +1107,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useH3DualMode.ts",
       "state": "drifted",
       "planned_sha256": "271bf6ab3c9a7a6884fe27efdfeaaff9cf41f539426567c61041b495e5cf9705",
-      "current_sha256": "ea53e97101320a317634b81db5164af7147ef4cc281fdc12ac367d5bedeab65e",
+      "current_sha256": "65ee7f774f0bd2f0ffb8040d102f7c013e4953e23c36bb97b35be21100c16da3",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1167,7 +1167,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useH6DualMode.ts",
       "state": "drifted",
       "planned_sha256": "6cb3261c2f6ff399583cfb6e1b23923ece3dd6c789a92eeca50f22ede6617cf8",
-      "current_sha256": "3505d30f3a02ce33a35e6f1b29219244d9504eccd0ba09bc9a6a8eaf01bb5881",
+      "current_sha256": "2eea37f1fa1ae777578d14da61c13fa61b75ba81a455524f948685a2c3ce3e5d",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1403,7 +1403,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useK10DualMode.ts",
       "state": "drifted",
       "planned_sha256": "3f8600c5c4f9cac76d8f4ed7d9bc9a20ccbe4f48dbced5bd0d23d907c91e5961",
-      "current_sha256": "d852fb4315a09112d4eab111023d64bdc71f9cfeeb4de065d4cca16309c622fc",
+      "current_sha256": "1cf7844783dd3b717ed8d1d2584b6616df213ec3edced05fb95a15df7ef7171b",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1423,7 +1423,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useK11DualMode.ts",
       "state": "drifted",
       "planned_sha256": "906e70d8e1f2570291bd5ef6f6d8db440ebe18e6ccc26b8049beeb6a149aefff",
-      "current_sha256": "ba00d2c92b2f77ad828cebcfc9f1376e096bf8912c5d5540eebea42cf8561a23",
+      "current_sha256": "07f2f7b858daa5f80fd7ea71552d309e12355c405b16335ce07476dffc2aba4c",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1443,7 +1443,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useK12DualMode.ts",
       "state": "drifted",
       "planned_sha256": "8dc034cac27fb4e451e2abf284dc87f555b9d99c68ddc3d021f920f01fbc4be5",
-      "current_sha256": "60ad7a81dd0461936f5d44b9fbee720a60a33ab8278412737f0d21a40ec11422",
+      "current_sha256": "ef9549d58f48db58ac60341b4446e4c2e95902cf35d164391cd14216e70d088d",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1463,7 +1463,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useK13DualMode.ts",
       "state": "drifted",
       "planned_sha256": "a7f4474689632ee0d955dcb77384fa1793fc287850c82cffa74eb559155a5ab4",
-      "current_sha256": "a29700b3eea30e134e47c1f44bb8de173d7909dc4b95140b4158f94b82067d41",
+      "current_sha256": "664402d8f4d2ded967201e983be14a2dbafb388762a4c9fc135bff378abaf520",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1623,7 +1623,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useK8DualMode.ts",
       "state": "drifted",
       "planned_sha256": "54ffabc853bee6529414e828dc3314a414d309a315a0cc658c7d0616ba6cad7a",
-      "current_sha256": "bc84f5d00bddf94639614a7c2441f210e6e067d372d495608a4c327edc0ffd1a",
+      "current_sha256": "ae00f56a80034f5c87fc63520aafcb4bed3eb05e3b819b378011f92a682bdde5",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1643,7 +1643,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
       "state": "drifted",
       "planned_sha256": "5690a87da49bc0b50479d3b390e9066efa47c99862c35f68a1d1a44fee4e5e9a",
-      "current_sha256": "a06e01df358bd186395465ee9f7c400b79558ec58032c6b364c7ab44cc70e5a0",
+      "current_sha256": "51cac882a17909e303a38057788e6e0b8bd46fe0362f399fc0c5f9e07eb32eec",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -1823,7 +1823,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
       "state": "drifted",
       "planned_sha256": "cc7dace2869ec0c8950769c88a80a2c968eaeb75a0be4591982b11ed6748521e",
-      "current_sha256": "43f96b012d79a171dbcdf539ee355a9278525a717bb9894345cff50f83508447",
+      "current_sha256": "796422a7acf41a2ac1c0a65d1c4f89c70ae5a37984a32ef4cd94d45042e6a6ce",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -1899,7 +1899,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
       "state": "drifted",
       "planned_sha256": "e63de6f14b8c57616c83f0cfd76470dac5ee6e624295ad902bdf9d5332590dfc",
-      "current_sha256": "d500371a623bf1b1cdc5b0ef334e15707874e177e7af5a9e5c2c5447ae5c23e0",
+      "current_sha256": "9490cc20eda2896c87b23c364e776d268773586a638750cbc1ae6c2fd5fcc1f5",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -1937,7 +1937,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
       "state": "drifted",
       "planned_sha256": "e52d61582386d6b225d2c67a4b3f8628a4d4dbc9588f55060971b06138561d3f",
-      "current_sha256": "bc5b358ec4a0143a2b3a0a73ddb976464927de4d7130cdb43db96f06663a2168",
+      "current_sha256": "435776c6190eebf322f7906c3b1e2773d5dc2418d53f862ade7916c1a5d40a18",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -1975,7 +1975,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
       "state": "drifted",
       "planned_sha256": "a010fc27a39ece58336dc7505c8662415016bf103bf6ba5ecbeb0ded4d1fc4b9",
-      "current_sha256": "a41c312d8045779908904017ae429e2780ae03f172f8c0023f54578a4cc4962f",
+      "current_sha256": "7fa73b3036d2ec6befcdd90e7d09cca89c582de0ebb5a84777f283de5fe9137e",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -2089,7 +2089,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
       "state": "drifted",
       "planned_sha256": "e443d8ea46a226e3fc0a0fe9db5c6cd8c8a4077f2aa46114b25ffe78b5731c75",
-      "current_sha256": "ba7f2c35e7c481f76603d85401bc9564707e58b4508ac6d090c7d04cd1d439b2",
+      "current_sha256": "23c1b017f5167ef13b7013bfd85c43d162abe394794a018564a41c2e509d19a9",
       "item_count": 1,
       "categories": [
         "legacy_composable"
@@ -2183,7 +2183,7 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts",
       "state": "drifted",
       "planned_sha256": "a59b2aea350ff9d3d20859ff7a7c55b9d787c453220780e04a28e9acf82e0018",
-      "current_sha256": "5226119be631b093942ff43a9afc3852cd9d602775a6db3d2e552ffc8ae635a9",
+      "current_sha256": "ed7372059c20494ca3d57aff184a1e0b8addd5a83f8886dba94c1d36ed6e1778",
       "item_count": 2,
       "categories": [
         "legacy_composable",
@@ -2279,9 +2279,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
-      "state": "intact",
+      "state": "drifted",
       "planned_sha256": "caba488fd26cda7456e9437cb2eb28b523a5d06ae692ad06bf790217b36612eb",
-      "current_sha256": "caba488fd26cda7456e9437cb2eb28b523a5d06ae692ad06bf790217b36612eb",
+      "current_sha256": "069a5b232b873c4d97be9c669214b3492da258e0358d5ef5597b5c0937784df4",
       "item_count": 1,
       "categories": [
         "legacy_factory"
@@ -2335,9 +2335,9 @@
     },
     {
       "path": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncModeStorage.ts",
-      "state": "drifted",
+      "state": "intact",
       "planned_sha256": "d5a87d41aa66e7565a8643647f9c5d2079ec0f8fd69feb5a56eb62cd519a521f",
-      "current_sha256": "6fd4093178514c49617d5c88d31b4befa4556fee437cbe08d88ac6de83d3af83",
+      "current_sha256": "d5a87d41aa66e7565a8643647f9c5d2079ec0f8fd69feb5a56eb62cd519a521f",
       "item_count": 1,
       "categories": [
         "legacy_local_storage_key"
@@ -2451,7 +2451,7 @@
       "path": "backend/app/routers/wp_onlyoffice_router.py",
       "state": "drifted",
       "planned_sha256": "400877eca4d3a5fd8880947d69b20099f7ec9de15064f22d72e8b96d3d260101",
-      "current_sha256": "760e69c55651481e78e60c63b9d75bb91894d22d1ea79fd924e0c6c6ad6cbf54",
+      "current_sha256": "887428312683785263d9b0e13e1c24aa2bc581a386416a28d425cfbca4eac13e",
       "item_count": 8,
       "categories": [
         "legacy_endpoint",

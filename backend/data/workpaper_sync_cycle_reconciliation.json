@@ -5,9 +5,9 @@
   "description": "逐循环对账报告：从 residual lane + scenario set + evidence projection 交叉核。",
   "generator": "backend/scripts/gen/generate_cycle_reconciliation.py",
   "input_digests": {
-    "lane": "ad88a7003ebf7f33fd8958fff47b4e999af2f153b88db1b54259321d717951f0",
-    "scenario_set": "f30b5df64d78d87ffc42f589caec659dc614d30e2941f13e6bad6129b262c8b9",
-    "evidence_projection": "9bfaf46d874a75f14cc2e791d76e32d3fd291326b12afd842533262165f18bf0"
+    "lane": "5695dbc1f863db4c5c931cea63a75ea24d64a5a1e25ee4d8bd1fcaf4bd51b97d",
+    "scenario_set": "f11691310c81d9ff05975c3115d24f537c0a4272401f59c842f83f3637dce9e0",
+    "evidence_projection": "9da6f80114854defc8814eb4270145cd475c7b096bc3f48645611fd114b179ff"
   },
   "groups": {
     "4.2": {

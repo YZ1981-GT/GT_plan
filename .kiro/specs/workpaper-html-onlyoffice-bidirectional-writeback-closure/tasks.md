@@ -2,15 +2,32 @@
 
 ## Overview
 
-> **状态**：49/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：46/50（2026-11-02）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
-> 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
-> requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
-> 闭合性守卫对这类**外部消费方**零覆盖（14 条判据无一会因此打红）。证据与逐脚本普查见
-> `evidence/phase0-spec-doc-consumer-breakage-2026-11-01.md`。总数因此 48 → 49。
+> 🔴 2026-11-01 第二轮勘误（三条，净 −1）：
+> - **3.5 完成** `[ ] → [x]`：最后两批共 51 个宿主接入共享 presentation 门，棘轮基线
+>   `32 → 0`，新增接线契约守卫并经磁盘变异证明可伪证；manifest 等生成物已重算，
+>   source digest 变更附零能力损失复核。
+> - **0.5 退回** `[x] → [ ]`：它的「外部消费方闭合」只有一张**手写 7 条**清单，而仓库里
+>   真实消费方按 AST 现算是 **35 个** —— 清单覆盖约两成，且手写清单不可能**发现**新消费方。
+>   本轮已把分母改成现算并建登记表（见 0.5 正文），但仍有消费方的解析形态未逐个复核，
+>   判据只能先做成「只许变少」的棘轮 ⇒ 按本 spec 的完成标记规则不算完成。
+> - **2.8 退回** `[x] → [ ]`：`multi_resolver` writer gate 现算仍是 **3 条**
+>   （`get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `post_sheet_onlyoffice_callback`
+>   全在 `wp_onlyoffice_router`），这三条正是它声称要清零的对象；里程碑 producer 重映射
+>   只改了归属，没动代码。
 >
-> 已勾选的 24 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
-> 末尾 §Notes 的「未完成项实况」里逐条写了当前状态与阻塞原因，不以「文件已存在」充数。
+> 🔴 2026-11-02 推送前复核勘误（两条，净 −2）：
+> - **6.3 退回** `[x] → [ ]`：D2 的阻断态浏览器验证证明了 AC 1.4，但没有执行本任务要求的
+>   全 entry required scenarios。真库验收账本仍为 0，67 条 bidirectional entry 中 59 条从未
+>   产生 operation；因此不能用一次“被正确拦截”替代 AC 12.1 的真实 OO operation 与验收态。
+> - **7.5 退回** `[x] → [ ]`：本 spec 仍在 active 目录，且当前有 4 个未完成任务；design §15
+>   的归档条件尚未全部满足。既有五角色材料保留为阶段复核，不能标作“最终归档”。
+> - 文末“未完成项实况”保留为 2026-11-01 开工快照；当前状态只以复选框和文末
+>   “当前未完成项索引”为准。
+>
+> 已勾选项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选项在文末
+> “当前未完成项索引”逐条写明状态与阻塞原因，不以「文件已存在」充数。
 >
 > **完成标记规则**：每项必须同时有实际产物、对应测试/检查通过记录和可复核 evidence。
 > “类/文件已存在”“历史 tasks 标绿”“当前工作树能跑”都不能单独标 `[x]`。
@@ -18,7 +35,7 @@
 > **需求真源**：`backend/data/workpaper_sync_migration_paradigm.json`。需要修改 AC 时先改 JSON，
 > 再重生成 `requirements.md`；不得直接编辑投影。
 >
-> **任务组织**：48 项按交付单元合并，无 `[ ]*`。逐 entry 的业务实现由 residual lane spec
+> **任务组织**：50 项按交付单元合并，无 `[ ]*`。逐 entry 的业务实现由 residual lane spec
 > 承接，umbrella 负责事实投影、共享准入、UI 诚实性、总门与归档。
 
 ## Tasks
@@ -36,7 +53,7 @@
   - 产物：`backend/tests/workpaper_sync/test_umbrella_spec_reference_closure.py`
     —— AC 集合相等（逐字相等由既有 `test_migration_paradigm_contract.py::TestAcceptanceCriteriaVerbatim`
     承担，两者合起来才是「恰等于投影」）+ 「已勾选任务不得拿归档 spec 当完成依据」+
-    「标题 N/48 必须与实际勾选数一致」。
+    「标题 N/M 必须与实际勾选数一致」。
   - 变异：M0 阴性对照不红；M1 未登记 AC 引用 / M2 标题数说谎 / M3 归档当依据 / M4 requirements
     少一条 AC 四组全红，两份文件按字节恢复。
   - _AC: 1.3, 12.1_
@@ -55,12 +72,12 @@
     后端选集 added 0 / resolved 11、前端 sync added 0 / resolved 0；另记两类采集期崩溃与六个门禁命令结果）。
   - _AC: 1.3, 1.4, 12.1_
 
-- [x] 0.5 锁定 AC → design → task → evidence 引用闭合性
+- [ ] 0.5 锁定 AC → design → task → evidence 引用闭合性
   - 脚本验证 7 条 AC 每条至少由一项任务和一个可执行验收面承接，且不存在未定义 AC 引用。
   - 已完成部分：`test_no_task_cites_an_undefined_ac` / `test_every_registered_ac_is_carried_by_some_task`
     / `test_every_registered_ac_has_an_executable_surface_on_disk`（承接面必须**真实存在于磁盘**，
     写了名字不算）/ `test_acceptance_surface_registry_has_no_stale_entries`（登记表不留失效路径）。
-    现算 7 条 AC 全部闭合，49 条任务全部带 `_AC:` 引用。
+    现算 7 条 AC 全部闭合，50 条任务全部带 `_AC:` 引用。
   - 🔴 **未完成（2026-11-01 退回原因）**：上述 14 条判据只覆盖 spec 三件套**内部**互引
     （AC ↔ task ↔ property ↔ 磁盘承接面），对「仓库里有脚本把 requirements.md / tasks.md
     当机器可读契约解析」这条边**零覆盖**。实测本轮重写把 7 个这类消费方打红（普查见
@@ -68,6 +85,32 @@
   - 补齐判据：闭合性必须加第四条边「doc → 外部解析器」——枚举仓库内解析这两份文档的脚本，
     断言每个都能在当前文档形态下跑通（或已显式登记退役并断言它真的退役）。变异证明：
     把任一 AC 编号改掉 / 把 Phase 标题形态改掉，必须有判据打红。
+  - 🔴 **2026-11-01 第二轮：分母从手写 7 条换成现算 35 个，但仍未完成**。
+    * 手写清单的根本问题不是条数少，而是**它不可能发现新消费方** —— 加一个脚本不会让任何
+      判据打红。现分母 = 扫 `backend/{scripts,app,tests}` 的 `.py`，取 AST 里**非 docstring**
+      的字符串常量，凡同时出现 spec 目录名与三件套文件名之一即判为消费方 ⇒ **35 个**。
+      用 AST 而不是文本匹配：注释与 docstring 会正反两向骗过扫描器。
+    * 登记表 `backend/data/workpaper_sync_spec_doc_consumers.json`（发现是机器算的，分类与
+      状态是人工复核字段）。入册时现算 `ok 8 / retired 1 / registered_unreviewed 26`。
+    * 新增判据（`test_umbrella_spec_reference_closure.py`，14 → **25** 例）：发现集合与登记表
+      逐条相等 · 登记路径必须在磁盘 · 摘要从明细重算 · status 封闭且必须有 owner ·
+      `ok` 的冻结形态消费方必须按**内容标记**绑定快照 · 冻结快照真的含 Wave 6 形态且
+      active 不含 · 退役项不得留在任何门禁 · `registered_unreviewed` 只许变少。
+    * 两条关键判据经磁盘变异证明可伪证（`tmp_workpaper_sync_impl/mutate_consumer_registry.py`，
+      M0 24 passed / M1 少登记一条 → 发现闭合判据红 / M2 摘掉内容标记 → 内容绑定判据红，
+      两文件 sha256 前后一致）。
+    * 🔴 **M2 第一次没打红，暴露我自己写的判据退回了子串匹配**：原实现是
+      `"require_matches" in source`，而变异把关键字改名成 `_disabled_require_matches=`
+      （调用立刻 TypeError、绑定彻底失效）后那个子串**仍然存在** ⇒ 判据照绿。改成 AST
+      查 `resolve_spec_dir(..., require_matches=...)` 的真实 keyword 后 M2 精确打红，
+      并补了谓词自身的四向用例（真调用 / 关键字改名 / 只有 require_files / 字符串里提一句）。
+    * **顺带把「归档只作引用」那条判据从子串收紧成语义判别**：原判据是「说明块出现
+      `_archive/` 就红」，它会误伤 0.6 把消费方重绑到冻结快照时**必须写清楚绑到哪里**的
+      trace。改为「同一行带完成度措辞（复选框 / 全绿 / N/M / ✅ …）才算拿归档充状态」，
+      并配双向用例（拿归档完成度当依据必红、引用冻结文档快照必过）。
+    * **仍缺**（这就是它退回 `[ ]` 的原因）：① `registered_unreviewed` 的解析形态未逐个
+      复核，「每个都能在当前文档形态下跑通」对它们尚未成立；② 任务要求的那两组变异
+      （改 AC 编号 / 改 Phase 标题形态必须有判据打红）未做。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
 - [x] 0.6 修复被 spec 文档重写打坏的 7 个机器消费方
@@ -89,6 +132,68 @@
     matrix / word template adjudication / task71 容量门——依赖 `### Requirement N:` 标题 +
     `## Acceptance Oracle Matrix` + 170 条 AC 结构，active 投影只有 7 条扁平 AC，属 7.1 前置。
   - 详见 evidence §6~§9。
+  - 🔴 **2026-11-01 第二轮：余下 5 个已修完，另抓出 3 个同族**（本条因此真实完成）。
+  - **根因收敛成一句**：这些门解析的是 **Wave 6 形态**的三件套（整数任务号、
+    `### Requirement N` 标题、`## Acceptance Oracle Matrix`、AC 7.7 / 14.10 原文），
+    而 active 目录被**重写**成「7 条扁平 AC + 两级任务号」。此时 active **存在且三件套齐全**
+    ⇒ 只看「目录在不在 / 文件在不在」的 `resolve_spec_dir(require_files=...)` 一路放行，
+    于是门绑到了一份它根本解析不了的文档上，报出「找不到 Task 68」「AC 先于 requirement
+    标题出现」这类**指错地方**的错误 —— 契约没丢，它在 `17-2026-10-03-verified-batch`
+    下的同名冻结快照里（该快照现算齐备：`### Requirement 1` / `7.7.` / `14.10.` /
+    `14.12.` / `### Property 1` / `## Acceptance Oracle Matrix` / 整数任务 68·69·71 全在）。
+  - **修法 = 把解析从「目录对不对」升级成「契约对不对」**：`resolve_spec_dir` 新增
+    `require_matches={相对文件名: (正则, ...)}`，候选目录必须让每个正则在对应文件里命中
+    才算合格。好处是双向的 —— 旧形态在归档里就绑归档；形态哪天回到 active 就自动改回
+    active，不用改脚本；也不像写死归档路径那样会把一个**错误的**快照静默选中。
+  - **实现收敛到一处**：`app/core/spec_docs.py`（全仓唯一实现），
+    `backend/scripts/check/_spec_dir.py` 变薄壳 re-export —— 因为消费方有三类（check 脚本 /
+    gen 脚本 / **生产代码**），三类都能 import 的地方只有 `app/`。十余个同目录脚本的
+    `from _spec_dir import resolve_spec_dir` 一个字都不用改。
+  - **逐条结果**（探针 `tmp_workpaper_sync_impl/probe_legacy_consumers.py` 现算 6/6 OK；
+    重绑脚本 `tmp_workpaper_sync_impl/rebind_legacy_consumers.py` 幂等可重放）：
+    | 消费方 | 原失败形态 | 现状 |
+    |---|---|---|
+    | `check_task68_backend_chain_independent_regression.py` | 找不到 Task 68 | 绑冻结快照，可 import |
+    | `check_task69_frontend_independent_regression.py` | 找不到任务 69 | 同上 |
+    | `check_task71_mutation_capacity_recovery_gate.py` | 找不到 AC 14.10，fail closed | 同上 |
+    | `generate_workpaper_ac_coverage_matrix.py` | AC 先于 requirement 标题出现 | **解析通过**，`--apply` 后 `--check` 绿（170 AC / 72 Property / 77 task / 14 family） |
+    | `generate_workpaper_word_template_adjudication.py` | AC 7.7 原文形态变了 | **解析通过**（余下漂移非本 spec，见下） |
+    | `app/services/workpaper_sync/capacity_profile.py`（**生产模块**，原 7 条清单漏登） | 找不到 AC 14.10 | `assert_profile_matches_requirements()` 现算**通过** |
+  - 🔴 **AC coverage matrix 重算后只差 provenance，实质零变化**：逐字段 diff 得 7 处差异，
+    全部是 `sources` 里记录的三份文档路径（active → 冻结快照）与随之变化的 `matrix_digest`，
+    **AC 行 / Property / 缺陷计数逐项相同** ⇒ 冻结快照与当时 active 的内容一致，重算是
+    把「契约现在在哪」记对，不是改结论。
+  - **顺带抓出并修掉 3 个同族**：① `check_task44_oo94_excel_pilot_gate.py` 与
+    ② `check_task61_oo94_word_pilot_gate.py` 原本已走 `resolve_spec_dir` 但只传
+    `require_files` ⇒ 仍绑 active（解析 Wave 6 形态必失败）—— 它们是被 0.5 新建的
+    「`ok` 必须按内容标记绑定」判据**当场打红**抓出来的，不是靠猜；③ 这两个门的 pytest
+    守卫原先**连采集都过不去**（见下一条）。
+  - 🔴 **另修一条会掐断整条后端测试链的缺陷**：`from _spec_dir import ...` 写在模块顶层，
+    当 CLI 跑时 Python 自动把脚本目录放进 `sys.path[0]` 所以能成，但测试用
+    `importlib.spec_from_file_location` 加载时**不动 sys.path** ⇒ import 期
+    `ModuleNotFoundError` ⇒ **测试模块采集失败**。实测 `test_task44_oo94_excel_pilot_gate.py`
+    与 `test_task61_oo94_word_pilot_gate.py` 两个采集错误；而 CI 的 backend-tests 是
+    `pytest backend/tests/ -x` —— **一个采集错误就把整个 job 停在这里**，后面所有测试都不跑。
+    触类旁通扫全目录同族共 **12 个**脚本一次修完（补丁对 CLI 路径是 no-op），新建判据
+    `backend/tests/test_check_scripts_importable.py`（17 例：AST 发现顶层兄弟 import +
+    逐个在**干净子进程**里加载）。
+    🔴 该判据第一版在**本进程**里顺序加载，变异没打红 —— 同一会话里按字母序更早的脚本
+    已经把 `scripts/check` 插进 `sys.path`，后面的白捡这条路径；也就是说那一版测的是
+    「这批脚本里至少有一个补过路径」，与它要防的「单独采集某一个测试模块」错位。改成
+    子进程隔离后，变异（摘掉某个脚本的 sys.path 补丁）精确打红 1 条，阴性对照 17 全绿，
+    靶子 sha256 前后一致。
+  - **另补一条生成物门**（`backend/tests/workpaper_sync/test_sync_generated_artifacts_check_mode.py`）：
+    required scenario set / cycle reconciliation / residual lane / task66 执行账四件的
+    `--check` 必须幂等 —— 现扫发现其中三件**没有任何 pytest 守卫在跑它们的 `--check`**，
+    而本 spec 的 closure 判据全是从这些产物里读数的。连实时 PG 的 evidence projection
+    **显式排除**（连得上按 test_run 现算、连不上全标 missing，digest 不同 ⇒ 它的 `--check`
+    是环境相关的，写成硬判据就是制造一条永红门禁），并断言它**真的**环境相关，
+    不留一句没人能验证的豁免理由。
+  - **范围外、未并入本记录的外部漂移**（不替别人把改动折进本 spec 的产物）：
+    `workpaper_word_template_adjudication.json` 现算还差 `stats.carrier_count 474 → 473`
+    与两个源 digest（`wp_code_overrides.json` / 模板 `_index.json`）—— 成因是**模板/override
+    被别的会话改过**，与文档重绑无关。少了一个 Word carrier 属实质变化，需由模板侧 owner
+    复核后再 `--apply`，本轮只量化不吸收。
   - _AC: 1.3, 12.1, 12.9_
 ## Phase 1：统一 manifest 与 cycle slice 当前投影
 
@@ -207,7 +312,7 @@
     `registry_registration_failure` 27 条各带精确 error code。
   - _AC: 1.4, 12.1_
 
-- [x] 2.8 承接 SYNC-MULTI-RESOLVER 里程碑的 writer gate 与 CanonicalResolutionService 收口
+- [ ] 2.8 承接 SYNC-MULTI-RESOLVER 里程碑的 writer gate 与 CanonicalResolutionService 收口
   - 本任务是方案 A 新增：里程碑定义 `SYNC-MULTI-RESOLVER` 的判据是 `writer_gate_issue_zero(multi_resolver)` + `CanonicalResolutionService` 符号存在性。旧 producer 是 Wave 6 的 Task 12/71/74（已不在当前 tasks.md 里），新计划里没有专任承接项，硬塞给复验类任务等于伪造归属。
   - writer gate 现算 `multi_resolver` 待清 **3 条**：`get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `post_sheet_onlyoffice_callback`（全在 `wp_onlyoffice_router`）。`CanonicalResolutionService` 已存在于 `backend/app/services/workpaper_sync/resolution.py`。
   - 🔴 **接手语无法写进 tasks.md**：`test_task30_closure_gate.py` 的 `_ASSUME_RE = r"自 Task (\d+) 移交至本门"`
@@ -215,6 +320,30 @@
     task68/69 同类的「锚点断开」问题，归 7.2 前置（改 test_task30 的解析器适配两级编号）。
     里程碑闭合由 predicates 判定，不依赖 tasks.md 接手语。
   - 里程碑 producer 已在 `0489b1167` 提交中重映射为 `["2.8"]`。
+  - 🔴 **2026-11-01 第二轮退回 `[x] → [ ]`**：重映射只改了**归属**，没动代码。现算
+    `multi_resolver` 仍是 **3 条**，而它们正是本条声称要清零的对象 ⇒ 判据未成立。
+  - 现读三条的真实形态（为下一轮省一次摸底）：`get_sheet_onlyoffice_config` 自行做
+    「sheet 名猜子码 → `find_template_file_any` → `_resolve_custom_wp_file` → `_resolve_wp_file`
+    （会复制模板、改 sheet 可见性）」，并签发**旧式** download/callback URL；
+    `get_sheet_wopi_contents` 把同一套解析**再做一遍**；`post_sheet_onlyoffice_callback`
+    因旧 URL 不带 room/generation/doc_key/route_credential 四项绑定而落进 legacy 分支，
+    直接 `target.write_bytes()` 覆盖文件并自增 `file_version`。
+  - 🔴 **不能只在这三个函数里换成 `CanonicalResolutionService.resolve()`**：它返回的是
+    current published representation 的**不可变** artifact，而旧路径还要「首次复制模板」
+    与「原地改 sheet 可见性」两种写行为；把 published artifact 交给旧 helper 会破坏
+    digest / 不可变约束，callback 更不能把它当写入目标。正确顺序是
+    ①先停止签发旧 URL（bidirectional entry 走统一 room descriptor + room contents）
+    ②前端 `GtOnlyOfficeSheet` 与共享 dual-mode composable 同批改线
+    ③旧 doc key 给明确的 drain 窗口，窗口结束才删 legacy direct-write 分支
+    ④single_onlyoffice / Word / custom 单独裁决，不得为骗过函数级 AST 门把三个 resolver
+      塞进一个 helper。
+  - **这是一条会影响全平台在线编辑的生产改动**，且依赖 3.5（前端已完成）与逐 entry
+    representation 发布（4.* / 6.*）；在那之前单边改后端会让在途编辑保存全部失效 ⇒
+    本轮**刻意不动**，只把形态与顺序写清楚。
+  - 另：`test_task30_closure_gate.py` 仍是旧 Wave 拓扑（`_TASK_HEAD_RE` 只认整数任务号、
+    依赖图要求 `gates` 键、`_BULK_ADAPTER_LANE_TASK="46"`），且
+    `test_workpaper_writer_inventory.py` 把当前债 `len(multi_resolver) == 3` 冻成了**期望值**
+    —— 真清零那天它会反过来打红拦人，必须同批改成「只许下降 / 完成时必须为 0」。
   - _AC: 12.1_
 
 ## Phase 3：前端模式与可操作原因单一来源
@@ -251,10 +380,68 @@
     兜底、id 稳定且不依赖安全上下文 API）。
   - 回归：`sync/__tests__` 全目录 13 failed / 1180 passed，与同一 HEAD 基线逐节点 added 0。
   - _AC: 1.4, 1.5_
-- [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
+- [x] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
-  - 🔴 **渐进迁移，棘轮只减**：现算 **32** 条宿主仍自行决定
-    （126 → 125 → 113 → 110 → 102 → 59 → **32**，已接单源 **95** 个宿主 / 102 个 segmented 标签）。
+  - ✅ **2026-11-01 收口：棘轮基线 `32 → 0`，全域零宿主自行决定模式开关表现。**
+    轨迹 126 → 125 → 113 → 110 → 102 → 59 → 32 → **0**；现算已接单源 **137 个宿主 /
+    152 个 `el-segmented` 标签**（结构核验 `tmp_workpaper_sync_impl/verify_wired_structure.py`
+    三条全通过：TDZ 顺序 / 逐标签对账 / 门控表达式引用）。
+  - **最后两批**：批 6 的 27 个 + 批 7 的 24 个（A51 / B22A·B22B×2·B22C / B23 / B50 / C22 /
+    CControlTest / CustomWpEditor / E1 / G7×2 / H1 / H3 / H7 / I1~I5 / N1~N3 / B60 ×2 /
+    D4TabContract / H4×2 / H8 / J1 / J2 / S 循环 10 个 / `CycleStandaloneProcedureShell`）。
+  - 🔴 **棘轮识别正则漏了整整 10 个 S 循环宿主**：第一版只认小写枚举
+    （`'onlyoffice' | 'online-edit' | 'structured' | 'docx'`），而 S3/S4/S5/S6/S12/S13/S14/
+    S15/S20/S21 的选项值直接写成**英文标签** `'HTML'` / `'OnlyOffice'`，一个小写枚举都不
+    出现 ⇒ 这 10 条债**从来没进过分母**，棘轮也就从来没提醒过。这与 A 轮 AC-41
+    「17 条把中文标签直接当 mode 值」是同一形态，只是这次是英文。已补三个值并加
+    label-as-value 的正反用例（业务分段器必须不被误纳）。
+  - 🔴 **标签截取必须引号感知**：`/<el-segmented[\s\S]{0,400}?>/` 会在**属性值内部的 `>`**
+    处提前截断（模板里常见 `@change="(v: any) => f(v)"`）。现算全仓 349 个 `el-segmented`
+    里 **26 个**被这样截断，其中 **3 个因此改变判定**（`GtB60Bundle.vue` 两处 +
+    `GtJ1EmployeeCompensation.vue` 一处的模式开关被残片判成「不是模式开关」）⇒ 既会放过
+    未门控的开关，还会把这两个宿主误列进「没有模式开关、可以豁免」。截断在这里不是精度
+    问题，是会造成**错误豁免**的正确性问题。已改成引号感知扫描并钉住（换回朴素正则即红）。
+  - 🔴 **「是模式开关还是业务分段器」口径换过两次，两次错法相反、都被真实数据打红**：
+    v1「整个标签里出现模式值或模式绑定名」⇒ **假阳**（`GtH3InvestmentProperty.vue` 的
+    `measurementModel` 成本法/公允价值选择器，因外层写了 `v-if="currentMode === 'html'"`
+    被判成模式开关 ⇒ 判据会逼着给业务控件套同步门）；v2「只看标签内的值字面量」⇒
+    **假阴**（`GtCControlTest.vue` 的 `deviationViewMode` = C 循环对 HTML↔OO 的叫法、
+    `GtA51CashflowAudit.vue` 的 `segOpts` 把选项放在常量里，标签内一个模式值都看不到）。
+    现按**选项语义**判（解析 `:options` 的值集合，支持同文件常量与一层别名），解析不出
+    再退到选项名 / 模型绑定名，且第三级回退必须写 `/^mode$|Mode$/` 而不是 `/mode/i`
+    —— 后者会命中 `measurementModel` 里的 "Mode"，把 v1 的假阳换种方式请回来。
+    四种真实形态逐条配了用例。
+  - **新增接线契约守卫** `sync/__tests__/entrySyncHostWiringContract.spec.ts`（6 例）：
+    ① 门控了模式开关的宿主**必须**挂 `GtEntrySyncCapabilityNotice`（只隐藏开关不给原因，
+    比显示一个打不开的假开关更糟，直接违反 AC 1.5）② 门与原因必须指**同一条** entry
+    ③ entry id 必须能在 generated manifest 里兑现（两个例外分支 —— inherited 父 entry、
+    同目录父宿主 —— 各自带可验证条件，并断言它们**真的被走到过**，否则就是两段死代码）
+    ④ 宿主注释点名的 sync 守卫文件必须存在。
+  - 🔴 **判据 ④ 是被真实缺陷逼出来的**：批 7 的迁移脚本在 **33 个**宿主里写下
+    「由 `sync/__tests__/entryIdLiteralsMatchManifest.spec.ts` 钉住两边一致」，而那个文件
+    **从头到尾不存在** —— 真正守这条不变量的是本文件判据 ③。指向不存在的守卫比不写更糟：
+    读代码的人会以为该不变量已有人守，于是不再去建真正的判据。33 处已全部改指真实守卫，
+    并加判据封住这一类（磁盘变异：把某宿主的引用改成不存在的文件名 ⇒ 精确红 1 条，
+    阴性对照 6 全绿，sha256 `166cdf045a619550` 前后一致）。
+  - **生成物重算**：manifest / legacy baseline / current-state / cycle projection 四件按
+    依赖序 `--write` 并 reverify 全 OK（entries 197 / independent 145 / pending 78 不变）；
+    task66 执行账、residual lane、required scenario set、runtime evidence projection、
+    cycle reconciliation 一并重算。task66 `state_drifted 27 → 28`（批 7 改到了计划内的一个
+    宿主，内容变 ⇒ 需 owner 重判），**`outstanding_paths` 仍 96，棘轮方向未被破坏**。
+  - **source digest 变更附零能力损失复核**（`evidence/phase3-source-digest-review-2026-11-01-task35-final.json`）：
+    按完整 manifest 现 build 与磁盘版逐 entry 比 10 个能力字段 —— entry 集合 197→197
+    不增不减、stats 逐项相同、`changed_entries` 与 `mount_count_changes` 均为空 ⇒
+    `verdict=zero_capability_loss`，据此才更新 overlay `approved_source_digest`
+    （`e46d2616… → 24738683…`）；`source_review_ref` / `source_reviewed_at` 同批改指本轮
+    复核 —— 否则「谁批准了现在这个 digest」会失去追溯（`test_source_review_is_bound_to_overlay`
+    正是守这件事）。
+  - **验证**：`entrySyncHostWiringContract` 6 + `entrySyncUiHonesty` 148 +
+    `entrySyncModePresentationRatchet` 4 + `sharedModeSwitchGate` 9 = **167 passed**；
+    33 个宿主注释修正后重跑仍全绿。
+  - **提交须知**：`GtB22AControlMatrix.vue` / `GtB50RiskAssessment.vue` 在 HEAD 就已是
+    2734 / 2798 行（上限 1500），本轮各 +12 / +28 行的横切接线会被 pre-commit 行数门拦下
+    ⇒ 已按真实行数登记 `backend/scripts/file_size_whitelist.txt` 并写明拆分方向归 B 轮 lane。
+  - **历史轨迹（保留，便于复核口径是怎么收敛的）**：
   - **共享切换器已接单源**：`sync/useGRenderModeSwitch.ts` 新增可选 `entrySync` 入参 +
     暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ G 循环 16 个宿主只需传入已有的
     readiness 实例即可完成迁移，不用各写一遍判断。**这是本任务的杠杆点**：改 1 个 composable
@@ -554,9 +741,54 @@
     + `backend/data/workpaper_sync_runtime_evidence_projection.json`。
   - 现算：PG `connected`、`total_test_runs=0`、`entries_with_runs=0` ⇒ `not_required 78` / `missing 67`。
     67 条 bidirectional entry 全部缺 runtime evidence——这是 6.3 要产出的。
+  - 🔴 **2026-11-01 复核：这个 0 是真事实，但「缺证据」不等于「没跑过」——两件事必须分开说。**
+  - **(1) 验收账本确实空**，且已排除「连库失败被降级吞掉」这种假象。三向对照
+    （`tmp_workpaper_sync_impl/verify_evidence_pg_path.py`）：显式指真库 `audit_platform`
+    ⇒ `connected / total=0`；显式指一个不存在的库 ⇒
+    `degraded:InvalidCatalogNameError`（证明降级分支**会**如实报出来，所以 `connected`
+    不是吞掉的结果）；当前环境 ⇒ `connected / 0`。
+    `working_paper_sync_test_run` = **0**、`working_paper_entry_evidence_scenario` = **0**。
+  - 🔴 **顺带堵掉一个能把这个结论伪造出来的环境陷阱**：本仓终端跨会话共享，而「只跑隔离
+    用例」的约定会把 `DATABASE_URL` 设成**不存在的库名**；在那种 shell 里 `--write`，
+    产物会是 `degraded:*` + 67 条全 `missing` —— 与「真库上确实没有验收记录」**逐字相同**。
+    新增判据 `test_committed_evidence_projection_was_produced_against_a_reachable_database`
+    （只读已入库 JSON 的 `pg_facts.status`，不连库 ⇒ 确定性、不会变成环境相关的永红门禁）；
+    磁盘变异把产物换成降级版 ⇒ 精确打红，阴性对照绿，sha256 前后一致。
+  - **(2) 生产链路真的跑过，规模还不小**（真库现查）：
+    `working_paper_sync_operation` **1192** 条、跨 **14** 个 entry；其中
+    `applied html→oo` **750**（13 entry）、`applied oo→html` **104**（10 entry）、
+    error 218 / conflict 16 / rejected 24 / authorization_stale 2。
+    另有 `content_application` 144、`content_representation` **455**（覆盖 **90** 个 entry）、
+    `content_version` 435、`oo_room` 148、`callback_delivery` 498、`forcesave_request` 191、
+    `sync_conflict` 367。时间跨度 2026-09-06 → 2026-10-25。
+  - **(3) 交叉对账才是真实缺口**（`tmp_workpaper_sync_impl/probe_real_oo_vs_manifest.py`）：
+    | 现算项 | 值 |
+    |---|---:|
+    | 67 条 bidirectional 里**有真实双向往返**（h2o 与 o2h 都有 applied） | **5** |
+    | 67 条 bidirectional 里**连一条 operation 都没有** | **59** |
+    | 有真实双向往返**却仍被裁为 pending** | **5** |
+    | 只有 html→oo 成功、没有 oo→html | 3（M5 / M1 / M9） |
+    | 有 operation 但两向都没成功 | 1（A51，10 条全 error） |
+    有真实往返的 5 条 bidirectional = D4（542/48）· D2（167/43）· H1（10/3）·
+    G7（12/2）· D1（2/1）。
+  - 🔴 **「裁决」与「真实事实」反向脱节，对 4.* 终裁是直接线索**：
+    `xlsx/b60/gt-b60-bundle` · `gt-d3-prepaid-accounts` · `gt-d5-receivables-financing` ·
+    `gt-d6-contract-assets` · `gt-d7-contract-liabilities` 这 5 条**真库里有成功的双向
+    往返**，manifest 却仍是 `capability=null`（pending）。它们不该再按「从零开始」排期 ——
+    但也**不能**据此直接终裁：按 ADR-WB-003，运行时跑通过只是三层中的一层，仍缺
+    reviewed contract / approved bundle / current representation / 新鲜 evidence 的逐项核对，
+    且那几条往返发生在 2026-09-12、远早于本轮的契约与模板变更（representation 预检现算
+    它们多为 `stale_needs_reprojection`）。
+  - ⇒ 结论更新：6.3 的工作量**不是**「给 67 条补证据记录」，而是「59 条从未真实跑过 +
+    5 条只跑通单向 + 1 条全失败 + 5 条跑通但裁决没跟上」四类分别处理。原先把它们笼统
+    记成「全部缺 evidence」会严重低估 59 条那一类的工作量。
   - _AC: 12.1_
 
-- [x] 6.3 执行真实 OnlyOffice required scenarios
+- [ ] 6.3 执行真实 OnlyOffice required scenarios
+  - 🔴 **2026-11-02 推送前退回**：下列 D2 证据只覆盖“readiness 未通过时正确拦截”的
+    blocker scenario，没有进入、编辑、保存并回读，也没有按 67 条 bidirectional entry 的
+    required scenario set 逐条签收。该证据保留为 AC 1.4 的阶段验收；AC 12.1 的真实 OO
+    operation 与验收态仍待【测试】项目执行。
   - 在重药安徽 D2 应收账款底稿上通过 Playwright 验证：
     * readiness 端点 `/sync/entries/xlsx/gt-d2-accounts-receivable/readiness` → 200（两次调用）
     * 模式工具栏「结构化视图 / 在线编辑」正确展示
@@ -570,7 +802,7 @@
 
 - [x] 6.4 执行 Playwright 用户闭环
   - 同上 Playwright 会话：`http://127.0.0.1:3030` → 登录 → 重药安徽 D2 → 模式显隐 → 中文原因 → 查看原因展开。
-  - 网络验证：readiness 走统一 sync 前缀（`/sync/entries/…/readiness`）；有一条 legacy `/onlyoffice/health`（3.5 待迁移范围）。
+  - 网络验证：readiness 走统一 sync 前缀（`/sync/entries/…/readiness`）；仍有一条 legacy `/onlyoffice/health`，归 2.8 的后端旧路径迁移，不再算作 3.5 presentation 门欠账。
   - console 0 errors。
   - _AC: 1.4, 1.5, 12.1_
 
@@ -607,9 +839,12 @@
   - 后端测试 44 passed / 3 failed（与 evidence projection PG 连接相关，主工作树 81 passed 全绿）。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
-- [x] 7.5 完成五角色复核、INDEX 登记与最终归档
+- [ ] 7.5 完成五角色复核、INDEX 登记与最终归档
+  - 🔴 **2026-11-02 推送前退回**：当前仍有 0.5、2.8、6.3 三项业务/验收任务未完成，
+    spec 目录也仍为 active；design §15 的十项条件没有全部满足。下列五角色记录只能作为
+    阶段复核材料，待前三项完成并在最新候选树复验后才能执行 INDEX 登记与最终归档。
   - 合伙人/项目经理/质控/审计助理/EQCR 分别复核业务真实性、计划、门禁、可操作性和独立证据；仅 design §15 十项全满足后归档。
-  - 五角色复核完成：合伙人（D2 readiness 真实生效）/ 项目经理（50 任务 20 wave 依赖图 + 里程碑 26→0 + 执行账棘轮只减）/ 质控（81 passed + 12 组变异 + 7 生成器幂等）/ 审计助理（中文原因 + console 0 errors）/ EQCR（干净检出 + schema 零变更 + 假绿退回有据）。
+  - 阶段性五角色复核已完成：合伙人（D2 readiness 真实生效）/ 项目经理（50 任务 20 wave 依赖图 + 里程碑 26→0 + 执行账棘轮只减）/ 质控（81 passed + 12 组变异 + 7 生成器幂等）/ 审计助理（中文原因 + console 0 errors）/ EQCR（干净检出 + schema 零变更 + 假绿退回有据）。
     INDEX 条目和归档路径在全部满足后生成。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
@@ -656,9 +891,10 @@
 - 6.3/6.4 写【测试】数据前须确认环境与测试项目；无环境时保持未完成，不改成静态替代证据。
 - 7.5 不接受历史归档复选框、INDEX 数字或单个绿色测试作为 closure 依据。
 
-## 未完成项实况（2026-11-01，逐条写当前状态与阻塞原因）
+## 未完成项实况（2026-11-01 开工快照，已被后续任务正文取代）
 
-写在这里的都**没有**勾选。目的是让下一轮不必重新摸底，也不必猜「这条是没做还是做了没记」。
+以下内容保留为开工时的审计轨迹，**不得再用作当前任务状态**。其中 3.5、5.3~7.4 已由上文
+后续实施记录更新；当前未完成项以文首复选框和文末“当前未完成项索引”为准。
 
 ### 已有部分产物、但判据尚未成立
 
@@ -722,3 +958,13 @@
 - **7.1~7.5**：7.2 的「候选树与同一最新 HEAD 基线按节点集合比较」已对本轮辐射面做到（见 0.4 的
   evidence：后端 added 0 / 前端 added 0），但 7.1 的全量变异矩阵、7.3 的 schema 边界结论、
   7.4 的 clean-checkout 复验与 7.5 的五角色复核均未完成。
+
+## 当前未完成项索引（2026-11-02）
+
+- **0.5**：35 个文档消费方中仍有 26 个 `registered_unreviewed`，且 AC 编号 / Phase 标题两组
+  规定的变异尚未完成。
+- **2.8**：`multi_resolver` writer gate 仍有 3 条旧路径；须按“统一 room descriptor → 前端
+  同批改线 → legacy doc key drain → 删除 direct-write”顺序收口。
+- **6.3**：验收账本仍为 0；67 条 bidirectional entry 尚未完成逐 entry required scenarios，
+  D2 阻断态证据只证明 AC 1.4。
+- **7.5**：依赖前三项与最新候选树终验；满足 design §15 后再登记 INDEX 并归档。

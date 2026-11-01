@@ -37,7 +37,10 @@ class ProjectionError(RuntimeError):
 
 
 def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+    # Windows 的 Git checkout 可能把文本换成 CRLF；输入摘要描述提交中的 JSON 载荷，
+    # 因此先归一换行，保证 Windows / Linux 结果一致。
+    canonical = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 async def _query_test_runs() -> dict[str, Any]:
