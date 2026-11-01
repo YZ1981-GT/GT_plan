@@ -91,10 +91,10 @@ def test_config_to_request_translates_every_field():
     # 翻页以调用方为准；没有 source 时用模板的 data_source；explicit sort 优先于 sort_field
     paged = TemplateService.config_to_request(
         {"sort": [{"field": "a", "direction": "asc"}], "sort_field": "b", "page_size": 50, "offset": 50},
-        project_id=X, year=2024, limit=100, offset=300, fallback_source="tb_detail",
+        project_id=X, year=2024, limit=100, offset=300, count_token="count-1", fallback_source="tb_detail",
     )
-    assert (paged["source"], paged["limit"], paged["offset"], paged["sort"]) == (
-        "tb_detail", 100, 300, [{"field": "a", "direction": "asc"}])
+    assert (paged["source"], paged["limit"], paged["offset"], paged["sort"], paged["count_token"]) == (
+        "tb_detail", 100, 300, [{"field": "a", "direction": "asc"}], "count-1")
 
 
 def test_config_to_request_carries_acnr_targets():

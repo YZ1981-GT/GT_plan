@@ -4,9 +4,8 @@
  * 弹窗与页面版共用：都带项目与审计年度请求（附注分支按该项目该年度的章节生成），都经 `queryIndicatorCache` 缓存，键含
  * schema（`X-Indicators-Schema-Version`）与附注版本（`X-Notes-Version`）——附注重新生成 / 对齐或切换年度后不再读旧树。
  * 先发 depth=1 骨架拿两个版本头再查缓存，命中即不拉全量。
- * - `full`（弹窗）：全量树（含逐底稿 / 逐 sheet 叶子，供底稿选区器）。
- * - `page`（页面版）：骨架 + 附注分支（`branch=disclosure`），不拉不带项目的全量树（原先页面版每次都拉约 578 KB）；
- *   底稿组只有「底稿清单」叶子（后端骨架自带），sheet 级查询仍从弹窗发起。
+ * - `dialog`（弹窗）：先取骨架，附注 / 底稿分支在用户展开时按需加载。
+ * - `page`（页面版）：骨架 + 附注分支；底稿组只留清单。
  * 两种树形缓存键不同（`variant`），互不命中。请求失败原样抛出，由调用方决定兜底。
  */
 import http from '@/utils/http'
@@ -26,7 +25,7 @@ export interface IndicatorNode {
   [extra: string]: unknown
 }
 
-export type IndicatorTreeShape = 'full' | 'page'
+export type IndicatorTreeShape = 'page' | 'dialog'
 
 export interface LoadIndicatorOptions {
   projectId?: string | null
@@ -64,19 +63,21 @@ export async function loadIndicatorTree(opts: LoadIndicatorOptions): Promise<Ind
   try {
     probe = await http.get(P_cq.indicators, { params: { ...params, depth: 1 }, _silent: true } as any)
   } catch (e) {
-    if (opts.shape === 'page') throw e // 页面版的骨架就是这次请求，拿不到无从拼树
+    // 两种生产形态都依赖骨架；交给宿主显示错误或构建明确的静态降级树。
+    throw e
   }
   const schema = header(probe, SCHEMA_HEADER)
   const key = schema ? indicatorCacheKey({
     schema, projectId: opts.projectId, year: opts.year, notesVersion: header(probe, NOTES_HEADER),
-    variant: opts.shape === 'page' ? 'page' : null,
+    variant: opts.shape,
   }) : null
   const cached = key ? readIndicatorCache<IndicatorNode[]>(key) : null
   if (cached) return cached
 
   let tree: IndicatorNode[]
-  if (opts.shape === 'full') {
-    tree = treeOf((await http.get(P_cq.indicators, { params, _silent: true } as any)).data)
+  if (opts.shape === 'dialog') {
+    // 弹窗先拿骨架，附注 / 底稿重分支由用户展开时再取。
+    tree = treeOf(probe?.data)
   } else {
     tree = treeOf(probe?.data)
     const group = tree.find((n) => n.key === PAGE_BRANCH)
@@ -88,6 +89,18 @@ export async function loadIndicatorTree(opts: LoadIndicatorOptions): Promise<Ind
   }
   if (key) writeIndicatorCache(key, tree)
   return tree
+}
+
+/** 弹窗展开重分支时按需取子节点。 */
+export async function loadIndicatorBranch(
+  opts: Pick<LoadIndicatorOptions, 'projectId' | 'year'>,
+  branch: 'disclosure' | 'workpaper',
+): Promise<IndicatorNode[]> {
+  const response = await http.get(P_cq.indicators, {
+    params: { ...baseParams({ ...opts, shape: 'dialog' }), branch },
+    _silent: true,
+  } as any)
+  return treeOf(response.data)
 }
 
 /** 页面版下拉的一个选项（叶子） */

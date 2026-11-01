@@ -9,13 +9,12 @@ before and after the fix to confirm no regressions.
 Preservation = when NOT isBugCondition(X), the behavior must remain identical.
 """
 
-import json
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from hypothesis import example, given, settings, HealthCheck, assume
+from hypothesis import example, given, settings, HealthCheck
 from hypothesis import strategies as st
 
 
@@ -308,11 +307,8 @@ async def test_cell_writeback_optimistic_lock_conflict(wp_code):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("module", ["tb", "adj", "report"])
-async def test_removed_writeback_modules_rejected_with_422(module, monkeypatch):
-    """Property 2e: cell-writeback 的 module=tb / adj / report → 422（真发 HTTP 请求），写入方零调用。
-
-    **Validates: Requirements 3.7**（advanced-query-linkage-closure R4.1）
-    """
+async def test_retired_cell_writeback_returns_410_without_calling_writer(module, monkeypatch):
+    """HTTP 写入口整体退役：请求体是否合法都只返回稳定 410，写入方零调用。"""
     from httpx import ASGITransport, AsyncClient
 
     from app.core.database import get_db
@@ -349,10 +345,9 @@ async def test_removed_writeback_modules_rejected_with_422(module, monkeypatch):
             "/api/custom-query/cell-writeback", json=body, headers={"X-File-Opened-At": "2024-01-01T00:00:00Z"},
         )
 
-    assert response.status_code == 422, response.text
-    errors = response.json()["detail"]
-    assert any(err.get("loc", [None])[-1] == "module" for err in errors), errors
-    assert calls == [], f"module={module} 被拒收前不应调用写入方：{calls}"
+    assert response.status_code == 410, response.text
+    assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
+    assert calls == [], f"退役端点不应调用写入方：{calls}"
 
 
 # ---------------------------------------------------------------------------

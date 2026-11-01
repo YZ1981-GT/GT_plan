@@ -78,6 +78,8 @@ class BuilderScope:
     dataset_predicates: Mapping[str, ColumnElement] = field(default_factory=dict)
     #: 本次因循环范围排除的项目数（warning 与 access 接口的 reason 共用）
     excluded_cycle_scoped: int = 0
+    #: admin / partner 全项目范围的活项目集合摘要；用于缓存与 COUNT 凭证失效。
+    live_project_signature: str | None = None
 
     @property
     def is_all_projects(self) -> bool:
@@ -143,6 +145,16 @@ async def _live_project_ids(db: AsyncSession, project_ids: Iterable[Any]) -> fro
     return frozenset(pid for pid in (_to_uuid(r[0]) for r in rows.all()) if pid is not None)
 
 
+async def _all_live_project_ids(db: AsyncSession) -> frozenset[UUID]:
+    rows = await db.execute(select(Project.id).where(Project.is_deleted == false()).order_by(Project.id))
+    return frozenset(pid for pid in (_to_uuid(row[0]) for row in rows.all()) if pid is not None)
+
+
+def _ids_signature(project_ids: Iterable[UUID]) -> str:
+    joined = ",".join(sorted(str(pid) for pid in project_ids))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:32]
+
+
 async def _dataset_predicates(
     db: AsyncSession, tables: Iterable[str], project_ids: frozenset[UUID] | None, year: int | None
 ) -> dict[str, ColumnElement]:
@@ -186,6 +198,7 @@ async def resolve_builder_scope(
     warnings = [_unscoped_warning(t) for t in unscoped]
     cache = cycle_cache or CycleScopeCache(user, db)
     excluded = 0
+    live_project_signature: str | None = None
 
     requested: UUID | None = None
     if requested_project_id:
@@ -208,6 +221,9 @@ async def resolve_builder_scope(
         if accessible is None:
             warnings.append(ALL_PROJECTS_WARNING)
             project_ids = None
+            live_project_signature = (
+                _ids_signature(await _all_live_project_ids(db)) if db is not None else "unknown"
+            )
         else:
             live = await _live_project_ids(db, accessible)
             # 对本人设有循环范围的项目排除出作用域（fail-closed）：构建器按表取数，无法与试算表页同口径按循环过滤
@@ -226,6 +242,7 @@ async def resolve_builder_scope(
         requested_project_id=requested,
         dataset_predicates=await _dataset_predicates(db, tables, project_ids, year),
         excluded_cycle_scoped=excluded,
+        live_project_signature=live_project_signature,
     )
 
 
@@ -293,6 +310,5 @@ def scope_signature(scope: BuilderScope) -> str:
     的用户对同一 DSL 会命中同一条缓存，等于跨作用域泄漏。
     """
     if scope.is_all_projects:
-        return "all"
-    joined = ",".join(sorted(str(pid) for pid in (scope.project_ids or ())))
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:32]
+        return f"all:{scope.live_project_signature or 'unknown'}"
+    return _ids_signature(scope.project_ids or ())

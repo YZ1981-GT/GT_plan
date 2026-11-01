@@ -53,7 +53,6 @@ from app.models.custom_query_models import CustomQueryTemplate
 from app.services.custom_query.template_scope_adapter import (
     NormalizedTemplateScope,
     TemplateScopeAdapter,
-    TemplateScopeValidationError,
 )
 from app.services.custom_query.template_service import TemplateForbiddenError, TemplateInvalidError, template_service
 from app.services.custom_query.pagination import (
@@ -684,7 +683,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
 
     if registry_data:
         # Build from DB registry
-        map_by_code: dict[str, dict] = {r["wp_code"]: r for r in registry_data}
         primaries: list[dict] = []
         for r in registry_data:
             sheets_list = r.get("sheets") or []
@@ -700,7 +698,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
         # Fallback to JSON files
         mapping = _load_wp_mapping()
         sheet_map = _load_step_sheet_mapping()
-        map_by_code = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
 
         primaries = []
         seen: set[str] = set()
@@ -1070,6 +1067,7 @@ class TemplateExecuteRequest(BaseModel):
 
     project_id: str
     year: int | None = Field(default=None, ge=2000, le=2100)
+    count_token: str | None = Field(default=None, max_length=2048)
     limit: int | None = Field(default=None, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
     offset: int | None = Field(default=None, ge=0)
 
@@ -1212,13 +1210,14 @@ async def _assert_writeback_authorized(
 # 此处 re-export，保持契约测试对 router_module.writeback_preview /
 # _normalize_template_scope 等的直调与 monkeypatch 不变。
 # ─────────────────────────────────────────────────────────────────────────────
-from app.routers.custom_query_writeback import (  # noqa: E402
+from app.routers.custom_query_writeback import (  # noqa: E402, F401
     WritebackConfirmRequest,
     WritebackPreviewRequest,
     WritebackTargetSpec,
     _to_writeback_targets,
     writeback_confirm,
     writeback_preview,
+    writeback_retired_error,
 )
 from app.services.custom_query.template_scope_guard import (  # noqa: E402
     _assert_template_visible,
@@ -1412,7 +1411,7 @@ async def execute_template(
     try:  # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
         query_body = QueryRequest(**template_service.config_to_request(
             tpl.config, project_id=body.project_id, year=year, limit=body.limit, offset=body.offset,
-            fallback_source=tpl.data_source,
+            count_token=body.count_token, fallback_source=tpl.data_source,
         ))
     except ValidationError as exc:
         raise template_config_rejected(exc) from None
@@ -1469,7 +1468,12 @@ class CellWritebackRequest(BaseModel):
         return self
 
 
-@router.post("/cell-writeback")
+@router.post("/cell-writeback", status_code=410)
+async def cell_writeback_gone():
+    """高级查询不再提供写入口；保留路径让旧客户端得到可诊断的 410。"""
+    raise writeback_retired_error()
+
+
 async def cell_writeback(
     body: CellWritebackRequest,
     response: Response,

@@ -94,13 +94,16 @@ def test_order_by_puts_nulls_last_only_on_nullable_columns_then_unique_keys() ->
     order = _pg(stmt).split("ORDER BY", 1)[1]
     assert order.strip().startswith(
         "tb_ledger.debit_amount DESC NULLS LAST, tb_ledger.voucher_date ASC, tb_ledger.id ASC"), order
-    # JOIN 时末尾再追加目标表主键；分组 / 聚合时不追加
+    # JOIN 明细末尾追加各表主键。
     stmt, _ = _build_select(QueryDSL(table="working_paper", joins=[{"table": "wp_index", "type": "left"}],
                                      fields=["working_paper.status"]))
     assert _pg(stmt).split("ORDER BY", 1)[1].strip().startswith("working_paper.id ASC, wp_index.id ASC")
+    # 分组结果补完整分组键，保证 offset 翻页稳定；不追加明细主键。
     stmt, _ = _build_select(QueryDSL(table="trial_balance", fields=["account_category"], group_by=["account_category"],
                                      aggregates=[{"func": "count", "field": "*", "alias": "n"}]))
-    assert "ORDER BY" not in _pg(stmt)
+    order = _pg(stmt).split("ORDER BY", 1)[1]
+    assert order.strip().startswith("trial_balance.account_category ASC"), order
+    assert "trial_balance.id" not in order
 
 
 def test_build_count_counts_the_same_statement_without_paging() -> None:

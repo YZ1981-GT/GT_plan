@@ -117,18 +117,17 @@ describe('入口说明（R10.5，AQ-38）', () => {
   })
 })
 
-describe('「导出全部」按本次查询的快照（B10 评审非阻塞 #1）', () => {
-  it('查询后换了数据源但没重新查询：导出的数据源、筛选与文件名仍是上一次查询的', async () => {
+describe('查询定义变化使旧结果失效', () => {
+  it('查询后换数据源但没重新查询：旧结果不可继续导出', async () => {
     const w = await mountDialog({ initialSource: 'report_income_statement' })
     await w.vm.executeQuery()
     await flushPromises()
+    expect(w.vm.canExport).toBe(true)
     w.vm.selectedSource = 'tb_detail'
     await flushPromises()
+    expect(w.vm.canExport).toBe(false)
+    expect(w.vm.hasQueried).toBe(false)
     await w.vm.exportAll()
-    expect(downloadMock).toHaveBeenCalledTimes(1)
-    const body = downloadMock.mock.calls[0][1].data
-    expect(body).toMatchObject({ source: 'report_income_statement', filters: { report_type: 'income_statement' } })
-    expect(body.file_name).toContain('利润表')
-    expect(body.file_name).not.toContain('试算')
+    expect(downloadMock).not.toHaveBeenCalled()
   })
 })

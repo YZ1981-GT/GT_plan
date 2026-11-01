@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
 from sqlalchemy import Column, Select, and_, asc, desc, func, select
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -38,13 +38,11 @@ from app.services.custom_query.param_sql_builder import (
     coerce_value as _psb_coerce_value,
 )
 
-_psb_build_where = _ParamSQLBuilder.build_where
 from app.services.custom_query.strict_model import AcnrTargetList, StrictRequestModel
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
     JOIN_WHITELIST,
     ONE_TO_MANY_WARNING,
-    OPERATOR_WHITELIST,
     TABLE_WHITELIST,
     enforce_complexity_budget,
     enforce_join_business_key,
@@ -52,41 +50,70 @@ from app.services.custom_query.table_whitelist import (
     enforce_query_plan,
 )
 
+_psb_build_where = _ParamSQLBuilder.build_where
+
 if TYPE_CHECKING:  # 仅类型标注需要，避免运行时循环导入
     from app.services.custom_query.builder_scope import BuilderScope
 
 logger = logging.getLogger(__name__)
 
-class FilterCond(BaseModel):
+MAX_FIELDS = 60
+MAX_FILTERS = 20
+MAX_ORDER_BY = 5
+MAX_JOINS = 3
+MAX_AGGREGATES = 10
+MAX_GROUP_BY = 5
+MAX_OFFSET = 100_000
+
+
+class FilterCond(StrictRequestModel):
     field: str = Field(..., min_length=1, max_length=100)
     op: str = Field(..., min_length=1, max_length=20)
     # value 类型由后端按 op 解释（in/not_in 接受 list；is_null/is_not_null 忽略；between 接受 [lo, hi]）
     value: Any | None = None
 
 
-class OrderBy(BaseModel):
+class OrderBy(StrictRequestModel):
     field: str = Field(..., min_length=1, max_length=100)
     direction: Literal["asc", "desc"] = "asc"
+
+
+class JoinSpec(StrictRequestModel):
+    table: str = Field(..., min_length=1, max_length=64)
+    type: Literal["inner", "left"] = "inner"
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+
+class AggregateSpec(StrictRequestModel):
+    func: str = Field(..., min_length=1, max_length=16)
+    field: str = Field(default="", max_length=100)
+    alias: str | None = Field(default=None, min_length=1, max_length=100)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        value = getattr(self, key, default)
+        return default if value is None else value
 
 
 class QueryDSL(StrictRequestModel):
     """构建器请求（未声明的键 ⇒ 422 并点名，acnr-foundation-defect-closure T14）。"""
 
     table: str = Field(..., min_length=1, max_length=64)
-    fields: list[str] = Field(default_factory=list)
-    filters: list[FilterCond] = Field(default_factory=list)
+    fields: list[str] = Field(default_factory=list, max_length=MAX_FIELDS)
+    filters: list[FilterCond] = Field(default_factory=list, max_length=MAX_FILTERS)
     filter_logic: Literal["and", "or"] = "and"
-    group_by: list[str] = Field(default_factory=list)
-    aggregates: list[dict[str, str]] = Field(default_factory=list)
+    group_by: list[str] = Field(default_factory=list, max_length=MAX_GROUP_BY)
+    aggregates: list[AggregateSpec] = Field(default_factory=list, max_length=MAX_AGGREGATES)
     # aggregates 元素：{"func": "sum", "field": "audited_amount", "alias": "total"}
-    order_by: list[OrderBy] = Field(default_factory=list)
+    order_by: list[OrderBy] = Field(default_factory=list, max_length=MAX_ORDER_BY)
     limit: int = Field(default=100, ge=1, le=1000)
-    offset: int = Field(default=0, ge=0)
+    offset: int = Field(default=0, ge=0, le=MAX_OFFSET)
     # 服务端签发的精确 COUNT 复用凭证；只影响计数执行，不改变查询范围。
     count_token: str | None = Field(default=None, max_length=2048)
     # S-3 v2 新增：JOIN 关联（声明式白名单，不接受用户传 ON）
     # joins 元素：{"table": "wp_index", "type": "inner"|"left"}
-    joins: list[dict[str, str]] = Field(default_factory=list)
+    joins: list[JoinSpec] = Field(default_factory=list, max_length=MAX_JOINS)
     # 限定项目与审计年度（advanced-query-linkage-closure 任务 9，AQ-18；本 spec 先加，acnr 复用）：指定的项目经
     # OwnershipGuard 校验（不可访问 / 已删除 ⇒ 403 且不执行），年度注入到计划中每张有 year 列的表
     project_id: UUID | None = None
@@ -193,6 +220,50 @@ def _build_filter(col: Column, op: str, value: Any) -> ColumnElement:
     return _psb_build_filter(col, op, value)
 
 
+def _invalid_shape(message: str, **details: Any) -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={"error_code": "INVALID_QUERY_SHAPE", "message": message, **details},
+    )
+
+
+def _aggregate_alias(agg: AggregateSpec) -> str:
+    alias = agg.alias or f"{agg.func.lower()}_{agg.field.replace('.', '_')}"
+    if not alias or len(alias) > 100:
+        raise _invalid_shape("聚合结果别名必须为 1 到 100 个字符", alias=alias)
+    return alias
+
+
+def _validate_query_shape(dsl: QueryDSL) -> None:
+    """拒绝会导致静默覆盖、非法 GROUP BY 或重复 JOIN 的查询形状。"""
+    duplicate_joins = sorted({j.table for j in dsl.joins if sum(x.table == j.table for x in dsl.joins) > 1})
+    if duplicate_joins:
+        raise _invalid_shape("同一关联表不能重复添加", tables=duplicate_joins)
+
+    duplicate_groups = sorted({f for f in dsl.group_by if dsl.group_by.count(f) > 1})
+    if duplicate_groups:
+        raise _invalid_shape("分组字段不能重复", fields=duplicate_groups)
+
+    grouped = set(dsl.group_by)
+    if dsl.group_by:
+        missing = [f for f in dsl.fields if f not in grouped]
+        if missing:
+            raise _invalid_shape("分组查询的普通返回字段必须全部加入 GROUP BY", fields=missing)
+        invalid_order = [item.field for item in dsl.order_by if item.field not in grouped]
+        if invalid_order:
+            raise _invalid_shape("分组查询只能按 GROUP BY 字段排序", fields=invalid_order)
+    elif dsl.aggregates and dsl.fields:
+        raise _invalid_shape("未分组的聚合查询不能同时返回普通字段", fields=list(dsl.fields))
+    elif dsl.aggregates and dsl.order_by:
+        raise _invalid_shape("未分组的聚合查询不能按明细字段排序", fields=[item.field for item in dsl.order_by])
+
+    ordinary_outputs = list(dsl.fields) or (list(dsl.group_by) if dsl.group_by else [])
+    output_names = [*ordinary_outputs, *(_aggregate_alias(agg) for agg in dsl.aggregates)]
+    duplicates = sorted({name for name in output_names if output_names.count(name) > 1})
+    if duplicates:
+        raise _invalid_shape("返回字段或聚合别名重复，会覆盖结果列", fields=duplicates)
+
+
 def _build_select(
     dsl: QueryDSL,
     *,
@@ -210,6 +281,7 @@ def _build_select(
     table_meta = _resolve_table(dsl.table)
     model = table_meta["model"]
     notes = warnings if warnings is not None else []
+    _validate_query_shape(dsl)
 
     # ── 复杂度预算（R6.2 / R6.3）──
     enforce_complexity_budget(
@@ -287,13 +359,14 @@ def _build_select(
     select_cols: list[ColumnElement] = []
     column_names: list[str] = []
 
-    if dsl.fields:
-        for f in dsl.fields:
+    projection_fields = list(dsl.fields) or (list(dsl.group_by) if dsl.group_by else [])
+    if projection_fields:
+        for f in projection_fields:
             col = _resolve_field_ref(dsl.table, f, join_tables)
             select_cols.append(col)
             column_names.append(f)
     elif dsl.aggregates:
-        # 纯聚合查询：不要求 fields，但若有 group_by 则前端应同时把它放入 fields
+        # 纯聚合查询：不要求普通返回字段。
         pass
     else:
         # 无 fields 默认**业务列集**（R7.1）：改造前是全字段，而前端 dsl.fields=[]
@@ -317,7 +390,7 @@ def _build_select(
     for agg in dsl.aggregates:
         agg_func = agg.get("func", "").lower()
         agg_field = agg.get("field", "")
-        agg_alias = agg.get("alias") or f"{agg_func}_{agg_field.replace('.', '_')}"
+        agg_alias = _aggregate_alias(agg)
         if agg_func not in AGGREGATE_WHITELIST:
             raise HTTPException(
                 status_code=400,
@@ -400,7 +473,16 @@ def _build_select(
         col = _resolve_field_ref(dsl.table, ob.field, join_tables)
         term = asc(col) if ob.direction == "asc" else desc(col)
         order_cols.append(term.nulls_last() if getattr(col, "nullable", False) else term)
-    if not dsl.group_by and not dsl.aggregates:
+    ordered_fields = {ob.field for ob in dsl.order_by}
+    if dsl.group_by:
+        # 聚合结果的唯一身份是完整分组键；显式排序后补齐缺少的分组列，offset 翻页稳定。
+        for field in dsl.group_by:
+            if field in ordered_fields:
+                continue
+            col = _resolve_field_ref(dsl.table, field, join_tables)
+            term = asc(col)
+            order_cols.append(term.nulls_last() if getattr(col, "nullable", False) else term)
+    elif not dsl.aggregates:
         for tie_model in (model, *(TABLE_WHITELIST[t]["model"] for t, _, _ in join_specs)):
             tie_col = getattr(tie_model, "id", None)
             if tie_col is not None:

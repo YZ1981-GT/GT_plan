@@ -172,7 +172,7 @@
 
         <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树；面板与 acnr_targets 归 acnr D1，用户裁决 Q0，本 spec 不改） -->
         <div class="gt-cqt-panel" style="margin-top: 12px">
-          <CustomQueryFieldPicker v-model="acnrFieldIds" />
+          <CustomQueryFieldPicker v-model="acnrFieldIds" :project-id="formCtx.project_id || null" />
           <div v-if="!formCtx.project_id" class="gt-cqt-empty-tip" data-testid="acnr-no-project">{{ BUSINESS_NO_PROJECT_HINT }}</div>
         </div>
 
@@ -415,6 +415,7 @@ interface ProjectItem {
 // ─── 状态 ───
 /** 数据源下拉：指标树（骨架 + 附注分支）拍平成「顶层组 → 叶子」 */
 const indicatorTree = ref<IndicatorOptionGroup[]>([])
+let indicatorGeneration = 0
 const projectList = ref<ProjectItem[]>([])
 
 const formCtx = ref({
@@ -435,6 +436,7 @@ const result = ref<QueryResult>({ rows: [], columns: [], total: 0 })
 const queryError = ref<QueryErrorText | null>(null)
 const countToken = ref('')
 const executing = ref(false)
+let queryGeneration = 0
 const exporting = ref(false)
 /** 0 行时的空态说明（含实际使用的年度，便于自查年度是否选错） */
 const emptyHint = ref('')
@@ -521,6 +523,18 @@ const rowLinks = useQueryRowLinks({
   tableIndex: () => Number(result.value.meta?.table_index ?? 0) || 0,
 })
 
+function invalidateResult() {
+  queryGeneration += 1
+  result.value = { rows: [], columns: [], total: 0 }
+  countToken.value = ''
+  queryError.value = null
+  emptyHint.value = ''
+  page.value = 1
+  lastRun.value = { source: '', projectId: '', year: null, payload: null }
+  rowLinks.reset()
+  executing.value = false
+}
+
 const conditionsDisabledReason = computed(() =>
   supportsConditions.value ? '' : '该数据源不支持条件筛选（附注表格、合并工作底稿、底稿选区按整表返回）')
 
@@ -555,10 +569,12 @@ const templateConfig = computed<Record<string, unknown>>(() => ({
 // 指标树（ADR-AQL-16）：带项目与年度加载「骨架 + 附注分支」并拍平（缓存键含附注版本，与弹窗同一缓存模块；
 // 原先每次挂载都拉不带项目的全量树约 578 KB）。底稿组只有「底稿清单」，sheet 级查询从弹窗发起。
 async function loadIndicators() {
+  const generation = ++indicatorGeneration
   try {
     const tree = await loadIndicatorTree({
       projectId: formCtx.value.project_id || null, year: formCtx.value.year, shape: 'page',
     })
+    if (generation !== indicatorGeneration) return
     indicatorTree.value = flattenIndicatorGroups(tree)
     // 数据源换了树形（如换项目后附注章节不同）：已选源不在新树里就清空（树为空时不动，可能只是暂时取不到）
     if (indicatorTree.value.length && formCtx.value.source && !findLeaf(formCtx.value.source)) {
@@ -566,6 +582,7 @@ async function loadIndicators() {
       onSourceChange()
     }
   } catch (e: any) {
+    if (generation !== indicatorGeneration) return
     handleApiError(e, '加载查询指标库')
   }
 }
@@ -610,6 +627,7 @@ function onProjectChange(projectId: string) {
 }
 
 function onSourceChange() {
+  invalidateResult()
   // 切换数据源时重置条件、字段与排序（新源未必有该列）
   conditionState.value = { conditions: [], logic: conditionState.value.logic }
   sortState.value = null
@@ -661,6 +679,7 @@ async function onExecute(keepPage = false) {
     countToken.value = ''
   }
   executing.value = true
+  const generation = ++queryGeneration
   queryError.value = null
   if (keepPage) {
     // 翻页：保留 total（分页条据此渲染），只清当前页行
@@ -685,6 +704,7 @@ async function onExecute(keepPage = false) {
     const requestInput: BusinessQueryInput = keepPage && countToken.value ? { ...input, countToken: countToken.value } : input
     // 请求体唯一构造处（T16 契约：execute 调用点的请求体必须直接是 buildBusinessPayload 调用）
     const data = await api.post<QueryResult>(P_cq.execute, buildBusinessPayload(requestInput, targets), { _silent: true } as any)
+    if (generation !== queryGeneration) return
     if (data) {
       result.value = data
       if (data.count_token) countToken.value = data.count_token
@@ -702,12 +722,13 @@ async function onExecute(keepPage = false) {
       }
     }
   } catch (e: unknown) {
+    if (generation !== queryGeneration) return
     // 调用方自管错误（_silent）：结果区持久显示后端中文原因与追踪号，确定性错误不自动重试（R11.1）
     result.value = { rows: [], columns: [], total: 0 }
     rowLinks.reset()
     queryError.value = describeQueryError(e)
   } finally {
-    executing.value = false
+    if (generation === queryGeneration) executing.value = false
   }
 }
 
@@ -790,13 +811,14 @@ function onTemplateLoad(tpl: QueryTemplateItem) {
   ElMessage.success(`已载入模板「${tpl.name}」，点击「执行查询」查看结果`)
 }
 
-// 项目变化时清除结果；项目或年度变化时按新上下文重新取指标树（附注分支随项目年度变）
-watch(() => formCtx.value.project_id, () => {
-  result.value = { rows: [], columns: [], total: 0 }
-  queryError.value = null
-  rowLinks.reset()
-})
-watch(() => [formCtx.value.project_id, formCtx.value.year] as const, () => { void loadIndicators() })
+// 项目或年度变化后旧结果不再属于当前上下文：立即失效，并按新上下文重取指标树。
+watch(() => formCtx.value.source, invalidateResult, { flush: 'sync' })
+watch([conditionState, selectedColumns, acnrFieldIds, sortState, pageSize], invalidateResult,
+  { deep: true, flush: 'sync' })
+watch(() => [formCtx.value.project_id, formCtx.value.year] as const, () => {
+  invalidateResult()
+  void loadIndicators()
+}, { flush: 'sync' })
 
 onMounted(() => {
   loadIndicators()

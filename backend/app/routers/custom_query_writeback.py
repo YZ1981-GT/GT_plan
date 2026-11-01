@@ -16,22 +16,42 @@ _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, get_visible_project_ids, require_project_access
-from app.models.core import ProjectUser, User
+from app.deps import get_current_user
+from app.models.core import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
+
+WRITEBACK_RETIRED_DETAIL = {
+    "error_code": "ADVANCED_QUERY_WRITEBACK_RETIRED",
+    "message": "高级查询写回已下线，请在来源业务页面完成编辑或发布",
+    "replacement": "使用查询结果的“打开”进入底稿、附注、调整分录或报表页面",
+}
+
+
+def writeback_retired_error() -> HTTPException:
+    """统一的 410 契约；退役桩不得声明数据库、认证或请求体依赖。"""
+    return HTTPException(status_code=410, detail=WRITEBACK_RETIRED_DETAIL)
+
+
+@router.post("/writeback-preview", status_code=410)
+async def writeback_preview_gone():
+    raise writeback_retired_error()
+
+
+@router.post("/writeback-confirm", status_code=410)
+async def writeback_confirm_gone():
+    raise writeback_retired_error()
+
 
 class WritebackTargetSpec(BaseModel):
     """单个回写目标（preview / confirm 共用）。"""
@@ -168,7 +188,6 @@ def _to_writeback_targets(
     return built
 
 
-@router.post("/writeback-preview")
 async def writeback_preview(
     body: WritebackPreviewRequest,
     db: AsyncSession = Depends(get_db),
@@ -220,7 +239,6 @@ async def writeback_preview(
     return preview.to_dict()
 
 
-@router.post("/writeback-confirm")
 async def writeback_confirm(
     body: WritebackConfirmRequest,
     request: Request,

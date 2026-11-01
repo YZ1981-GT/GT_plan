@@ -50,6 +50,7 @@ from app.services.custom_query.addressing_service import (
     ResolvedTarget,
     addressing_service,
 )
+from app.services.custom_query.cycle_scope import CycleScopeCache
 from app.services.custom_query.ownership_guard import OwnershipGuard, ownership_guard
 from app.services.custom_query.pagination import (
     apply_pagination,
@@ -235,6 +236,8 @@ class QueryRequest:
     #: 只有注册表 SQL 源支持，内存源带条件即 400 CONDITIONS_UNSUPPORTED
     conditions: list[dict] = field(default_factory=list)
     condition_logic: str = "and"
+    # 编排器为缓存身份解析循环范围时创建；取数层复用，避免同一请求重复查 4~5 次权限链。
+    cycle_scope_cache: Any | None = field(default=None, repr=False, compare=False)
 
     def cache_def(self) -> dict:
         """稳定序列化的查询定义（用于缓存键，design Data Models §4）。
@@ -420,7 +423,7 @@ class QueryOrchestrator:
         resolved = await self._resolve_targets(req, db)
 
         # ── step3: cache（键隔离 project_id + scope_sig R12.5）──
-        scope_sig = self._scope_signature(user, req)
+        scope_sig = await self._scope_signature(user, req, db)
         key = self._cache.cache_key(req.cache_def(), str(req.project_id), scope_sig)
 
         executed = {"ran": False}
@@ -599,11 +602,9 @@ class QueryOrchestrator:
             from app.services.custom_query.grouping_engine import (  # type: ignore
                 GroupingEngine,
             )
-        except ImportError:
-            warnings.append(
-                "grouping_engine 尚未就绪（task 9.1）：已跳过分组步（集成钩子）"
-            )
-            return rows, columns
+        except ImportError as exc:
+            logger.exception("grouping_engine 未能加载")
+            raise self._transform_error("分组") from exc
 
         try:
             engine = GroupingEngine()
@@ -620,10 +621,9 @@ class QueryOrchestrator:
             return list(new_rows), list(new_cols)
         except HTTPException:
             raise  # 分组校验类错误（INVALID_GROUP_DIM/AGG_TYPE_MISMATCH）上抛
-        except Exception as exc:  # noqa: BLE001 — 集成钩子容错，不使编排崩溃
-            logger.warning("grouping_engine 接线调用失败（集成钩子）: %s", exc)
-            warnings.append("分组步接线异常，已跳过（集成钩子）")
-            return rows, columns
+        except Exception as exc:  # noqa: BLE001 — 变换语义不能降级成原始明细
+            logger.exception("grouping_engine 执行失败")
+            raise self._transform_error("分组") from exc
 
     def _apply_pivot(
         self,
@@ -637,11 +637,9 @@ class QueryOrchestrator:
             from app.services.custom_query.pivot_engine import (  # type: ignore
                 PivotEngine,
             )
-        except ImportError:
-            warnings.append(
-                "pivot_engine 尚未就绪（task 10.x）：已跳过透视步（集成钩子）"
-            )
-            return rows, columns
+        except ImportError as exc:
+            logger.exception("pivot_engine 未能加载")
+            raise self._transform_error("透视") from exc
 
         try:
             engine = PivotEngine()
@@ -657,10 +655,9 @@ class QueryOrchestrator:
             return self._grid_to_rows_columns(grid, req.pivot)
         except HTTPException:
             raise  # 透视校验类错误（PIVOT_COL_LIMIT）上抛
-        except Exception as exc:  # noqa: BLE001 — 集成钩子容错
-            logger.warning("pivot_engine 接线调用失败（集成钩子）: %s", exc)
-            warnings.append("透视步接线异常，已跳过（集成钩子）")
-            return rows, columns
+        except Exception as exc:  # noqa: BLE001 — 变换语义不能降级成原始明细
+            logger.exception("pivot_engine 执行失败")
+            raise self._transform_error("透视") from exc
 
     # ── 辅助 ─────────────────────────────────────────────────────────────
     @staticmethod
@@ -713,14 +710,32 @@ class QueryOrchestrator:
         return rows, columns
 
     @staticmethod
-    def _scope_signature(user: Any, req: QueryRequest) -> str:
-        """当前用户可访问范围的稳定签名（缓存键隔离 R12.5）。
+    def _transform_error(step: str) -> HTTPException:
+        """变换失败不得悄悄返回另一种数据语义。内部异常只写日志。"""
+        return HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "QUERY_TRANSFORM_FAILED",
+                "message": f"查询{step}失败，未返回未经{step}的明细；请调整条件后重试",
+                "step": step,
+            },
+        )
 
-        最小实现：以 user.id + entry 组合作签名，保证不同用户/入口不复用缓存。
-        更细粒度的可访问项目集合签名由 QueryCache 键中的 project_id 与本签名共同隔离。
+    @staticmethod
+    async def _scope_signature(user: Any, req: QueryRequest, db: AsyncSession) -> str:
+        """用户、入口和当前循环范围的稳定缓存身份。
+
+        业务视图会按循环范围过滤试算表、调整分录与附注。范围若不入缓存键，管理员
+        收窄某人的循环后，该用户在 TTL 内仍可能命中原来的更宽结果。
         """
         user_id = getattr(user, "id", None)
-        return f"{user_id}:{req.entry}"
+        if req.entry != ENTRY_BUSINESS or user is None or db is None:
+            return f"{user_id}:{req.entry}"
+        scope_cache = CycleScopeCache(user, db)
+        req.cycle_scope_cache = scope_cache
+        cycles = await scope_cache.cycles(req.project_id)
+        cycle_sig = "*" if cycles is None else ",".join(sorted({str(v) for v in cycles}))
+        return f"{user_id}:{req.entry}:cycles={cycle_sig}"
 
 
 # 模块级单例（与同包 addressing_service / ownership_guard / query_cache 一致）

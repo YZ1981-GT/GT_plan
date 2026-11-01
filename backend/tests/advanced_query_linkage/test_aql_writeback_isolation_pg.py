@@ -26,33 +26,29 @@ import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 import app.core.redis as core_redis
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
-from app.models.consol_note_data_models import ConsolNoteData
 from app.models.core import User
 from app.routers import custom_query, custom_query_writeback
 from app.services.custom_query import addressing_service as addressing_module
 from app.services.custom_query.addressing_service import AddressingService, ResolvedTarget
 from app.services.custom_query.snapshot_writer import (
     SnapshotWriter,
-    WritebackConflict,
     WritebackTargetNotFound,
     snapshot_writer,
 )
-from app.services.custom_query.snapshot_writer_modules import NoteOwnershipMismatch, NoteRecordNotFound
-from app.services.custom_query.writeback_preview import WritebackPreviewService
+from app.services.custom_query.snapshot_writer_modules import NoteRecordNotFound
 from tests.advanced_query_linkage.gold import UA, UB, UP
 from tests.authz_world import build_app, pg_engine
 
 pytestmark = pytest.mark.pg_only
 CQ = "/api/custom-query"
 FUTURE = datetime.now(timezone.utc) + timedelta(days=1)  # 乐观锁不会碰巧给出 409
-OPENED_AT = {"X-File-Opened-At": FUTURE.isoformat()}
 WRITER = SimpleNamespace(id=uuid.uuid4(), username="aql-b4-writer")
 _WP_FINGERPRINT = "SELECT md5(row_to_json(w)::text) FROM working_paper w WHERE w.id = :id"
 _NOTE_FINGERPRINT = "SELECT md5(row_to_json(c)::text) FROM consol_note_data c WHERE c.id = :id"
@@ -213,92 +209,44 @@ def _other_project_target(wp_id: uuid.UUID, wp_code: str) -> dict:
     }]}
 
 
-async def test_preview_marks_other_project_target_unlocatable(client, gold, gate_spies) -> None:
+async def test_preview_endpoint_is_retired_without_touching_targets(client, gold, gate_spies) -> None:
     wp_id, wp_code = await _foreign_workpaper(gold)
     before = await gold.scalar(_WP_FINGERPRINT, id=wp_id)
-    preview = await client.post(f"{CQ}/writeback-preview", json=_other_project_target(wp_id, wp_code))
-    assert preview.status_code == 200, preview.text[:800]
-    data = preview.json()
-    assert [(it["found"], it["error"], it["addr_id"], it["old_value"]) for it in data["items"]] == [
-        (False, "target_not_in_project", None, None)], data["items"]
-    assert data["enter_confirmation"] is False
-    assert data["notice"] == "有 1 个目标无法定位，请修正后重新预览"
-    assert gate_spies["resolved"] == [], f"他项目目标不应进入地址解析：{gate_spies['resolved']}"
+    response = await client.post(f"{CQ}/writeback-preview", json=_other_project_target(wp_id, wp_code))
+    assert response.status_code == 410, response.text[:800]
+    assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
+    assert gate_spies == {"resolved": [], "written": []}
     assert await gold.scalar(_WP_FINGERPRINT, id=wp_id) == before
 
 
-async def test_confirm_with_other_project_target_is_409_and_writes_nothing(client, gold, gate_spies) -> None:
+async def test_confirm_endpoint_is_retired_without_writing(client, gold, gate_spies) -> None:
     wp_id, wp_code = await _foreign_workpaper(gold)
     before = await gold.scalar(_WP_FINGERPRINT, id=wp_id)
-    confirm = await client.post(f"{CQ}/writeback-confirm", json=_other_project_target(wp_id, wp_code),
-                                headers=OPENED_AT)
-    assert confirm.status_code == 409, f"他项目目标的确认应 409 且不写入：实得 {confirm.status_code} {confirm.text[:500]}"
-    assert confirm.json()["detail"]["error_code"] == "WRITEBACK_CONFLICT"
-    assert gate_spies["written"] == [], f"预览门之后不应调用写入方：{gate_spies['written']}"
+    response = await client.post(f"{CQ}/writeback-confirm", json=_other_project_target(wp_id, wp_code))
+    assert response.status_code == 410, response.text[:800]
+    assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
+    assert gate_spies == {"resolved": [], "written": []}
     assert await gold.scalar(_WP_FINGERPRINT, id=wp_id) == before
 
 
 # ─── 写入收窄（R4.1）：module=tb 422，试算行不变 ─────────────────────────────
 
 
-async def test_tb_module_is_rejected_and_trial_balance_rows_unchanged(client, gold) -> None:
+async def test_cell_writeback_endpoint_is_retired_and_trial_balance_rows_unchanged(client, gold) -> None:
     before = await gold.rows(_TB_FINGERPRINT, pid=UB)
-    tb_rows = await gold.rows("SELECT id FROM trial_balance WHERE project_id = :pid ORDER BY id LIMIT 1", pid=UB)
-    record = str(tb_rows[0][0]) if tb_rows else str(uuid.uuid4())
-    response = await client.post(f"{CQ}/cell-writeback", headers=OPENED_AT, json={
-        "project_id": str(UB), "wp_code": record, "sheet_name": "tb_detail", "cell_ref": "G2", "new_value": 1,
-        "module": "tb",
-    })
-    assert response.status_code == 422, response.text[:800]
-    assert any(err.get("loc", [None])[-1] == "module" for err in response.json()["detail"])
+    response = await client.post(f"{CQ}/cell-writeback", json={"malformed": True})
+    assert response.status_code == 410, response.text[:800]
+    assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
     assert await gold.rows(_TB_FINGERPRINT, pid=UB) == before
 
 
-# ─── writeback-confirm：写入方异常同口径映射、整批回滚（design §3.7；变异 B4-d）──────
+# ─── 退役桩不消费请求体 ────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("error", "status", "code"), [
-    (WritebackTargetNotFound("wp"), 404, "WRITEBACK_TARGET_NOT_FOUND"),
-    (NoteRecordNotFound("rec"), 404, "NOTE_RECORD_NOT_FOUND"),
-    (NoteOwnershipMismatch("year", 2025, 2024), 403, "NOTE_OWNERSHIP_MISMATCH"),
-    (WritebackConflict(FUTURE, "someone"), 409, "WRITEBACK_CONFLICT"),
-], ids=["target-not-found", "note-not-found", "note-mismatch", "conflict"])
-async def test_confirm_maps_writer_errors_and_rolls_back_the_whole_batch(
-    client, pg_rollback_session, gold, monkeypatch, error, status, code,
-) -> None:
-    """两个目标都过预览门（归属核对替换为恒真——本例被测的是确认端点的写入循环），写入方第一次真写一行
-    【UAT】合成集团母公司的 consol_note_data（回滚事务内），第二次抛异常 ⇒ 映射为对应状态码，且第一次写入被回滚。"""
-    note_id = (await _foreign_note(gold))[0]
-    calls: list[str] = []
-
-    async def _in_project(db, target, project_id):
-        return True
-
-    async def _resolve(self, raw, *, project_id=None, db=None, timeout_s=5.0):
-        return ResolvedTarget(raw=raw, found=True, addr_id=f"ADDR/{raw}")
-
-    async def _write(self, **kwargs):
-        calls.append(kwargs["cell_ref"])
-        if len(calls) == 1:
-            await kwargs["db"].execute(
-                text("UPDATE consol_note_data SET is_stale = NOT is_stale WHERE id = :id"), {"id": note_id})
-            return {"success": True}
-        raise error
-
-    monkeypatch.setattr(WritebackPreviewService, "_target_in_project", staticmethod(_in_project))
-    monkeypatch.setattr(AddressingService, "resolve_target", _resolve)
-    monkeypatch.setattr(SnapshotWriter, "write_cell", _write)
-    stale_before = (await pg_rollback_session.execute(
-        select(ConsolNoteData.is_stale).where(ConsolNoteData.id == note_id))).scalar_one()
-    targets = [{"module": "workpaper", "wp_id": str(uuid.uuid4()), "wp_code": "ZZ", "sheet_name": "S",
-                "cell_ref": cell, "new_value": 1} for cell in ("A1", "B1")]
-
-    response = await client.post(f"{CQ}/writeback-confirm", headers=OPENED_AT,
-                                 json={"project_id": str(UA), "targets": targets})
-    assert response.status_code == status, response.text[:800]
-    assert response.json()["detail"]["error_code"] == code
-    assert calls == ["A1", "B1"]
-    stale_after = (await pg_rollback_session.execute(
-        select(ConsolNoteData.is_stale).where(ConsolNoteData.id == note_id).execution_options(populate_existing=True),
-    )).scalar_one()
-    assert stale_after == stale_before, "第二个目标失败后第一个目标的写入应被回滚（一个都不写）"
+async def test_retired_confirm_ignores_large_or_invalid_payload(client) -> None:
+    response = await client.post(f"{CQ}/writeback-confirm", json={
+        "project_id": "not-a-uuid",
+        "targets": [{"unexpected": "value"}] * 10_001,
+    })
+    assert response.status_code == 410, response.text[:800]
+    assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"

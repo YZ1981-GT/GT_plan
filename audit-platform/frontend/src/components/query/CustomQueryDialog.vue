@@ -54,6 +54,7 @@
               highlight-current
               :expand-on-click-node="false"
               :default-expanded-keys="[]"
+              @node-expand="onIndicatorExpand"
               @node-click="onIndicatorClick"
             >
               <template #default="{ data }">
@@ -289,7 +290,7 @@ import {
 import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import { describeQueryError, queryErrorToast, type QueryErrorText } from './queryErrorText'
 import { columnTypesOf, formatQueryCell, isAmountCell } from './queryCellFormat'
-import { loadIndicatorTree } from './queryIndicatorLoader'
+import { loadIndicatorBranch, loadIndicatorTree } from './queryIndicatorLoader'
 import { buildExportBody, exportAllQueryRows } from './queryServerExport'
 import { useQueryRowLinks } from './useQueryRowLinks'
 import QueryErrorAlert from './QueryErrorAlert.vue'
@@ -380,6 +381,8 @@ const selectedSource = ref('report_balance_sheet')
 const page = ref(1)
 const pageSize = ref(100)
 const resultTotal = ref(0)
+const countToken = ref('')
+let queryGeneration = 0
 const resultMeta = ref<Record<string, any> | null>(null)
 const queryError = ref<QueryErrorText | null>(null)
 /** 本次打开带来的说明与它所属的源（initialNotice） */
@@ -458,6 +461,7 @@ const filterReportType = ref('balance_sheet')
 const resultRows = ref<any[]>([])
 const resultColumns = ref<string[]>([])
 const indicatorTree = ref<any[]>([])
+let indicatorGeneration = 0
 const treeRef = ref<any>(null)
 // 是否已发起过查询（用于显示上下文 chip 与友好空态）
 const hasQueried = ref(false)
@@ -534,22 +538,10 @@ const currentCategoryLabel = computed(() => {
 
 // 空态文案：根据是否已查询给不同提示
 const emptyText = computed(() => {
-  if (!hasQueried.value) return '请选择数据源后点击「▶ 查询」（项目可选，未选时仅展示模板结构）'
-  if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) return '该数据源需先选择项目'
-  return localProjectId.value
-    ? `当前项目「${currentProjectLabel.value}」${localYear.value} 年度暂无该数据源记录`
-    : '模板浏览模式（未选项目）：仅显示报表/附注/底稿模板结构，不含项目实际值'
+  if (!hasQueried.value) return '未选项目时可浏览模板结构；选择项目和数据源后点击「▶ 查询」'
+  if (!localProjectId.value) return '请先选择项目后查询'
+  return `当前项目「${currentProjectLabel.value}」${localYear.value} 年度暂无该数据源记录`
 })
-
-/** 判定 source 是否必须传 project_id（试算/账簿/底稿等业务数据必须，报表/附注/调整等模板可缺省） */
-function _sourceRequiresProject(s: string): boolean {
-  // 模板可浏览的源（无项目时返回模板默认）
-  const TEMPLATE_OK_PREFIXES = ['report_', 'disclosure_note:', 'report_lines']
-  const TEMPLATE_OK = ['report', 'disclosure', 'disclosure_note', 'report_lines']
-  if (TEMPLATE_OK.includes(s)) return false
-  if (TEMPLATE_OK_PREFIXES.some(p => s.startsWith(p))) return false
-  return true  // 其他源（试算/账簿/底稿单元格/合并单位等）必须传 project_id
-}
 
 // 静态预设数据源（树未加载时的兜底 + 用于补全树里没有的旧 key）
 const STATIC_SOURCES = [
@@ -666,7 +658,41 @@ function findTopCategoryOf(targetKey: string): string | null {
   return null
 }
 
-function onIndicatorClick(data: any) {
+const branchLoads = new Map<string, Promise<void>>()
+
+function onIndicatorExpand(data: any): Promise<void> {
+  if (!data?.lazy || (data.key !== 'disclosure' && data.key !== 'workpaper')) return Promise.resolve()
+  const generation = indicatorGeneration
+  const key = `${generation}:${data.key}`
+  const existing = branchLoads.get(key)
+  if (existing) return existing
+  const task = (async () => {
+    try {
+      const children = await loadIndicatorBranch(
+        { projectId: localProjectId.value || null, year: localYear.value }, data.key,
+      )
+      if (generation !== indicatorGeneration) return
+      const fixed = data.key === 'workpaper'
+        ? (data.children || []).filter((child: any) => child.key === 'workpaper')
+        : []
+      data.children = [...fixed, ...children]
+      data.lazy = false
+      indicatorTree.value = [...indicatorTree.value]
+    } catch {
+      if (generation === indicatorGeneration) ElMessage.warning(`加载${data.label || '数据源'}失败，请重试`)
+    } finally {
+      branchLoads.delete(key)
+    }
+  })()
+  branchLoads.set(key, task)
+  return task
+}
+
+async function onIndicatorClick(data: any) {
+  if (data?.lazy) {
+    await onIndicatorExpand(data)
+    if (data.lazy) return
+  }
   // 灰度节点不可选中
   if (data.disabled) {
     ElMessage.info('该底稿在当前项目中已裁剪，无法查询')
@@ -710,6 +736,7 @@ function resetCategoryFilter() {
 
 // selectedSource 改变时自动派生 filterReportType 并同步左侧树高亮
 watch(selectedSource, (v) => {
+  invalidateQueryResult()
   if (entryNotice.value && entryNotice.value.source !== v) entryNotice.value = null // 入口说明只属于带来的那个源
   if (templateQuery.value?.source !== v) clearTemplateState() // 载入的模板条件只属于模板的数据源
   noteTableIndex.value = 0 // 换数据源：附注表格回到第一张
@@ -735,7 +762,7 @@ watch(selectedSource, (v) => {
     // 切到非 sheet 选项时清空 range 上下文
     sheetCellRange.value = ''
   }
-})
+}, { flush: 'sync' })
 
 async function onSheetRangeConfirm(payload: { wp_code: string; sheet_name?: string; range: string }) {
   sheetCellRange.value = payload.range
@@ -847,6 +874,7 @@ async function applyTemplate(tpl: QueryTemplateItem, run: boolean) {
     ElMessage.warning('模板没有数据源，无法载入')
     return
   }
+  invalidateQueryResult()
   clearTemplateState()
   selectedSource.value = restored.source
   await nextTick() // 换数据源的 watch 先清掉排序 / 选区，再还原模板里的
@@ -878,6 +906,23 @@ const rowLinks = useQueryRowLinks({
   templateType: () => resultMeta.value?.ref_context?.template_type ?? null,
   tableIndex: () => noteTableIndex.value,
 })
+
+function invalidateQueryResult() {
+  queryGeneration += 1
+  countToken.value = ''
+  resultRows.value = []
+  resultColumns.value = []
+  resultTotal.value = 0
+  resultMeta.value = null
+  objectColumnTypes.value = {}
+  queryError.value = null
+  hasQueried.value = false
+  loading.value = false
+  lastRun.value = {
+    source: '', projectId: '', year: null, sort: [], filters: {}, projectLabel: '', sourceLabel: '', extra: {},
+  }
+  rowLinks.reset()
+}
 
 // ─── 右键菜单：跳模板溯源 (Req 14 AC 2) ─────────────────────────────────────
 const ctxMenuVisible = ref(false)
@@ -926,7 +971,7 @@ async function onTraceToTemplate() {
 /** 查询不可用的原因（按钮置灰并提示）；可查询时为空串 */
 const queryBlockedReason = computed(() => {
   if (!selectedSource.value) return '请先选择数据源'
-  if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) return '该数据源需先选择项目'
+  if (!localProjectId.value) return '请选择项目后查询；未选项目时仅可浏览模板结构'
   if (!isKnownYear(localYear.value)) return '请选择审计年度'
   return ''
 })
@@ -952,8 +997,8 @@ function requestFilters(source: string): Record<string, unknown> {
  */
 async function executeQuery(resetPage = true, viaTemplate = false) {
   if (resetPage && !viaTemplate) templateRun.value = null
-  if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) {
-    ElMessage.warning('该数据源需先选择项目（模板浏览模式仅支持报表/附注/底稿模板）')
+  if (!localProjectId.value) {
+    ElMessage.warning('请选择项目后再查询；未选项目时仅可浏览模板结构')
     return
   }
   // 查询端点 year 必填：年度只取路由 / 项目审计年度，都没有就要求选择（不用日历年、不静默查别的年度）
@@ -961,7 +1006,11 @@ async function executeQuery(resetPage = true, viaTemplate = false) {
     ElMessage.warning('未设置审计年度，请选择审计年度后再查询')
     return
   }
-  if (resetPage) page.value = 1
+  if (resetPage) {
+    page.value = 1
+    countToken.value = ''
+  }
+  const generation = ++queryGeneration
   hasQueried.value = true
   loading.value = true
   queryError.value = null
@@ -980,12 +1029,15 @@ async function executeQuery(resetPage = true, viaTemplate = false) {
     const data = tplRun
       ? await api.post(P_cq.templateExecute(tplRun.id), {
         project_id: run.projectId, year: run.year, limit: pageSize.value, offset,
+        ...(!resetPage && countToken.value ? { count_token: countToken.value } : {}),
       }, { _silent: true } as any) as any
       : await api.post('/api/custom-query/execute', buildBusinessPayload({
         projectId: run.projectId, year: run.year, source, filters: run.filters, ...run.extra,
         ...(run.sort.length ? { sort: run.sort } : {}),
+        ...(!resetPage && countToken.value ? { countToken: countToken.value } : {}),
         limit: pageSize.value, offset,
       }), { _silent: true } as any) as any
+    if (generation !== queryGeneration) return
     const cols: unknown[] = Array.isArray(data?.columns) ? data.columns : []
     resultRows.value = Array.isArray(data?.rows) ? data.rows : []
     resultColumns.value = cols.length
@@ -994,18 +1046,22 @@ async function executeQuery(resetPage = true, viaTemplate = false) {
     objectColumnTypes.value = Object.fromEntries(cols.filter((c: any) => c && typeof c === 'object' && c.key && c.dtype)
       .map((c: any) => [String(c.key), String(c.dtype)]))
     resultTotal.value = typeof data?.total === 'number' ? data.total : resultRows.value.length
+    if (typeof data?.count_token === 'string' && data.count_token) countToken.value = data.count_token
     resultMeta.value = data?.meta && typeof data.meta === 'object' ? data.meta : null
     lastRun.value = run
     pushQueryHistory()
     void rowLinks.validateRefs(resultRows.value)
   } catch (err: unknown) {
+    if (generation !== queryGeneration) return
     resultRows.value = []
     resultColumns.value = []
     resultTotal.value = 0
     resultMeta.value = null
     rowLinks.reset()
     queryError.value = describeQueryError(err)
-  } finally { loading.value = false }
+  } finally {
+    if (generation === queryGeneration) loading.value = false
+  }
 }
 
 function onPageChange() { void executeQuery(false) }
@@ -1071,9 +1127,12 @@ async function exportAll() {
 
 // 指标树：带项目与审计年度加载（附注分支按该项目该年度章节），缓存键含附注版本（queryIndicatorCache，R10.4）
 async function loadIndicators(pid: string | undefined) {
+  const generation = ++indicatorGeneration
   try {
-    indicatorTree.value = await loadIndicatorTree({ projectId: pid, year: localYear.value, shape: 'full' })
+    const tree = await loadIndicatorTree({ projectId: pid, year: localYear.value, shape: 'dialog' })
+    if (generation === indicatorGeneration) indicatorTree.value = tree
   } catch {
+    if (generation !== indicatorGeneration) return
     // 兜底：用 STATIC_SOURCES 重建一棵简易树（按 parentKey 分组）
     const grouped: Record<string, any[]> = {}
     for (const s of STATIC_SOURCES) {
@@ -1083,10 +1142,14 @@ async function loadIndicators(pid: string | undefined) {
   }
 }
 
-// 弹窗打开、项目或年度变了 → 重新取树（命中缓存时只发一次骨架探测）
-watch([visible, localProjectId, localYear], ([open]) => {
+// 首次打开加载；项目或年度变化先让旧结果失效，再按新上下文重取树。
+watch(visible, (open) => {
   if (open) void loadIndicators(localProjectId.value || undefined)
 }, { immediate: true })
+watch([localProjectId, localYear], () => {
+  invalidateQueryResult()
+  if (visible.value) void loadIndicators(localProjectId.value || undefined)
+}, { flush: 'sync' })
 // 加载查询历史（localStorage 持久）
 loadQueryHistory()
 

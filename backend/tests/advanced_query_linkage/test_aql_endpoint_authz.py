@@ -31,7 +31,6 @@ import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -57,7 +56,6 @@ X, Y = TARGET_PROJECT_ID, OTHER_PROJECT_ID
 YEAR = 2025
 COLUMNS = ("anon", "A", "R", "E", "PM", "SM", "P", "AD")
 RECONCILED_ROUTERS: tuple[APIRouter, ...] = (custom_query.router, custom_query_writeback.router, query_builder.router)
-OPENED_AT = {"X-File-Opened-At": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()}
 CYCLE_REASON = "您可访问的项目均设有审计循环范围，请在业务视图中查询"
 NO_PROJECT_REASON = "您当前没有可访问的项目"
 
@@ -309,14 +307,6 @@ def _preview_unavailable() -> Expect:
     return Expect(200, check)
 
 
-def _preview_blocked() -> Expect:
-    def check(response: Response, ctx: Ctx) -> None:
-        data = response.json()
-        assert data["enter_confirmation"] is False, data
-        assert [item["error"] for item in data["items"]] == ["target_not_in_project"], data["items"]
-    return Expect(200, check)
-
-
 def _error_code(status: int, code: str) -> Expect:
     def check(response: Response, ctx: Ctx) -> None:
         detail = response.json().get("detail")
@@ -367,9 +357,9 @@ def _body(value: Any) -> Callable[[Ctx], Any]:
     return lambda ctx: value
 
 
-def _writeback_targets(ctx: Ctx) -> dict[str, Any]:
+def _writeback_targets(_ctx: Ctx) -> dict[str, Any]:
     return {"project_id": str(X), "targets": [{
-        "module": "workpaper", "wp_id": ctx.ids["WP_Y"], "wp_code": "E1", "sheet_name": "审定表", "cell_ref": "B7",
+        "module": "workpaper", "wp_id": str(Y), "wp_code": "E1", "sheet_name": "审定表", "cell_ref": "B7",
         "new_value": 1,
     }]}
 
@@ -427,21 +417,19 @@ ROWS: tuple[Row, ...] = (
         codes(401, 403, 403, 403, 200, 403, 403, 200), (recycle_bin.router,), _TPL, ("templates",), ("pm_deletes_s",)),
     Row("16", "P", (Call("DELETE", "/api/recycle-bin/{item_type}/{item_id}", "/api/recycle-bin/custom_query_template/{S}"),),
         codes(401, 403, 403, 403, 200, 403, 403, 200), (recycle_bin.router,), _TPL, ("templates",), ("pm_deletes_s",)),
+    # 阶段 0：高级查询写入口统一退役。410 桩无认证、数据库或请求体依赖，所有身份得到同一契约。
     Row("17", "S", (Call("POST", f"{CQ}/cell-writeback", f"{CQ}/cell-writeback", _body({
         "project_id": str(X), "wp_code": "D2", "sheet_name": "审定表", "cell_ref": "B7", "new_value": 1,
-        "module": "tb"}), OPENED_AT),),
-        codes(401, 422, 422, 422, 422, 422, 422, 422), (custom_query.router,)),
-    Row("18", "P", (Call("POST", f"{CQ}/cell-writeback", f"{CQ}/cell-writeback", _body({
-        "project_id": str(X), "wp_code": "E1", "sheet_name": "审定表", "cell_ref": "B7", "new_value": 1,
-        "module": "workpaper"}), OPENED_AT),),
-        codes(401, 403, 403, 404, 404, 403, 404, 404), (custom_query.router,), _WP, ("wp_y",)),
-    Row("19", "P", (Call("POST", f"{CQ}/writeback-preview", f"{CQ}/writeback-preview", _writeback_targets),),
-        codes(401, 403, 403, _preview_blocked(), _preview_blocked(), 403, _preview_blocked(), _preview_blocked()),
-        (custom_query.router, custom_query_writeback.router), _WP, ("wp_y",)),
-    Row("20", "P", (Call("POST", f"{CQ}/writeback-confirm", f"{CQ}/writeback-confirm", _writeback_targets, OPENED_AT),),
-        codes(401, 403, 403, *([_error_code(409, "WRITEBACK_CONFLICT")] * 2), 403,
-              *([_error_code(409, "WRITEBACK_CONFLICT")] * 2)),
-        (custom_query.router, custom_query_writeback.router), _WP, ("wp_y",)),
+        "module": "workpaper"})),),
+        codes(*([_error_code(410, "ADVANCED_QUERY_WRITEBACK_RETIRED")] * 8)), (custom_query.router,)),
+    Row("18", "S", (Call("POST", f"{CQ}/cell-writeback", f"{CQ}/cell-writeback", _body({"malformed": True})),),
+        codes(*([_error_code(410, "ADVANCED_QUERY_WRITEBACK_RETIRED")] * 8)), (custom_query.router,)),
+    Row("19", "S", (Call("POST", f"{CQ}/writeback-preview", f"{CQ}/writeback-preview", _writeback_targets),),
+        codes(*([_error_code(410, "ADVANCED_QUERY_WRITEBACK_RETIRED")] * 8)),
+        (custom_query_writeback.router,)),
+    Row("20", "S", (Call("POST", f"{CQ}/writeback-confirm", f"{CQ}/writeback-confirm", _writeback_targets),),
+        codes(*([_error_code(410, "ADVANCED_QUERY_WRITEBACK_RETIRED")] * 8)),
+        (custom_query_writeback.router,)),
     Row("21", "S", (Call("GET", f"{CQ}/index-health", f"{CQ}/index-health"),),
         codes(401, 200, 200, 200, 200, 200, 200, 200), (custom_query.router,)),
     Row("22", "S", (Call("GET", f"{CQ}/address-resolve", f"{CQ}/address-resolve?uri=workpaper:A1"),),
