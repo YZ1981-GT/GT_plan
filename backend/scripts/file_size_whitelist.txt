@@ -1804,3 +1804,7 @@ backend/tests/services/test_note_conversion_section_mapping_production.py  975
 #   拆分方向：16 个检查方法按循环分组（A/B 基础、D4 收入、E1 现金流、F~N 三角勾稽）各成模块，
 #   本文件只留 ConsistencyGate 编排与 run_all_checks。
 backend/app/services/consistency_gate/_impl.py  2031
+
+# S10 假绿修复：删除 7 个 xfail 后端点测试恢复为正常用例，937 行
+# 拆分方向：verify-chain 端点测试拆到 tests/audit_chain/test_verify_chain_endpoint.py
+backend/tests/test_audit_log_enhanced.py  937

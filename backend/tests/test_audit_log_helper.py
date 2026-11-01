@@ -49,6 +49,7 @@ async def db_session() -> AsyncSession:
         tables_to_create = [
             Base.metadata.tables["users"],
             Base.metadata.tables["audit_log_entries"],
+            Base.metadata.tables["audit_chain_head"],
         ]
         await conn.run_sync(
             Base.metadata.create_all, tables=tables_to_create
@@ -170,6 +171,14 @@ class TestAppendAuditLog:
         entry2 = result2.scalar_one()
 
         assert entry2.prev_hash == entry1.entry_hash
+        assert entry1.payload["_hash_v"] == 2
+        assert entry2.payload["_hash_v"] == 2
+
+        from app.services.audit_chain.verify import verify_chain
+
+        verified = await verify_chain(db_session, project_id=str(project_id))
+        assert verified.valid is True, verified.problems
+        assert verified.legacy_unverifiable == 0
 
     @pytest.mark.asyncio
     async def test_project_id_none(self, db_session: AsyncSession):
@@ -499,5 +508,6 @@ class TestEventTypeValidation:
             "ai_chat_adopt_requested",
             "ai_chat_attachment_cleanup",
             "ai_chat_tool_lifecycle",
+            "gate_acknowledgement",
         }
         assert set(EVENT_TYPE_SCHEMAS.keys()) == expected_types

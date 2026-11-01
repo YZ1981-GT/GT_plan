@@ -40,7 +40,7 @@ def _db_url(dbname: str) -> str:
     return f"{parts[0]}/{dbname}"
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture
 async def pg_engine():
     """在共享 PG 上创建一次性库，测试结束后删除。"""
     admin_engine = create_async_engine(
@@ -120,10 +120,6 @@ class TestPGConcurrency:
                 await db.commit()
                 return entry.id, entry.entry_hash, entry.prev_hash
 
-        id_a, hash_a, prev_a = await asyncio.gather(
-            writer("A"), writer("B")
-        ).__await__() if False else (None, None, None)
-
         # 并发执行
         results = await asyncio.gather(writer("A"), writer("B"))
         (id_a, hash_a, prev_a) = results[0]
@@ -171,7 +167,7 @@ class TestPGBypass:
         await pg_session.execute(text(
             "INSERT INTO audit_log_entries "
             "(id, ts, action_type, object_type, payload, prev_hash, entry_hash) "
-            "VALUES (:id, :ts, :at, :ot, :p::jsonb, :ph, :eh)"
+            "VALUES (:id, :ts, :at, :ot, CAST(:p AS jsonb), :ph, :eh)"
         ), {
             "id": str(uuid.uuid4()), "ts": ts, "at": "bypass", "ot": "test",
             "p": '{"project_id":"' + pid + '","_hash_v":2,"_resource_id":""}',
@@ -211,6 +207,18 @@ class TestPGFork:
             )
             await db.commit()
 
+        # 安全内核先写一个正常后继；旁路写再制造第二个后继。
+        async with factory() as db:
+            await append_entry(
+                db,
+                chain_key,
+                action_type="normal_branch",
+                object_type="test",
+                project_id=pid,
+                payload={"project_id": pid},
+            )
+            await db.commit()
+
         # 直接插入另一条也以 e1 为前驱 — 制造分叉
         async with factory() as db:
             ts = datetime.now(timezone.utc)
@@ -224,7 +232,7 @@ class TestPGFork:
             await db.execute(text(
                 "INSERT INTO audit_log_entries "
                 "(id, ts, action_type, object_type, payload, prev_hash, entry_hash) "
-                "VALUES (:id, :ts, :at, :ot, :p::jsonb, :ph, :eh)"
+                "VALUES (:id, :ts, :at, :ot, CAST(:p AS jsonb), :ph, :eh)"
             ), {
                 "id": str(uuid.uuid4()), "ts": ts, "at": "fork_branch",
                 "ot": "test",
@@ -264,7 +272,18 @@ class TestPGFork:
             )
             await db.commit()
             e1_hash = e1.entry_hash
-            e1_id = e1.id
+
+        # 先通过安全内核写一条正常后继，再旁路插入第二个后继。
+        async with factory() as db:
+            await append_entry(
+                db,
+                chain_key,
+                action_type="normal_branch",
+                object_type="test",
+                project_id=pid,
+                payload={"project_id": pid},
+            )
+            await db.commit()
 
         # 制造分叉
         async with factory() as db:
@@ -280,7 +299,7 @@ class TestPGFork:
             await db.execute(text(
                 "INSERT INTO audit_log_entries "
                 "(id, ts, action_type, object_type, payload, prev_hash, entry_hash) "
-                "VALUES (:id, :ts, :at, :ot, :p::jsonb, :ph, :eh)"
+                "VALUES (:id, :ts, :at, :ot, CAST(:p AS jsonb), :ph, :eh)"
             ), {
                 "id": str(fork_id), "ts": ts, "at": "fork", "ot": "test",
                 "p": '{"project_id":"' + pid + '","_hash_v":2,"_resource_id":""}',
@@ -373,3 +392,8 @@ class TestPGJsonbRoundTrip:
         assert row.payload.get("_hash_v") == 2
         # amount 应该是规范化后的字符串
         assert row.payload.get("amount") == "100000000000000000000"
+
+        from app.services.audit_chain.verify import verify_chain
+
+        verified = await verify_chain(pg_session, project_id=pid)
+        assert verified.valid is True, verified.problems

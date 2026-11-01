@@ -4,7 +4,7 @@
 自动维护 hash_chain（复用 V007 引入的哈希链逻辑）。
 
 调用方：deps.py / time_machine_service / conflict_resolution_service / consol_audit_helper / ...
-内部：复用既有 hash_chain 逻辑（audit_log_writer_worker._compute_entry_hash）
+内部：统一调用 ``audit_chain.head.append_entry``，不再自行读取链尾或计算哈希。
 
 9 种 event_type schema（存储在 details JSONB 中）：
 - archived_exception_access: 归档项目例外通道触发
@@ -20,16 +20,26 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
-from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_log_models import AuditLogEntry
+from app.services.audit_chain.canonical import (
+    GENESIS_HASH,
+    hash_v1 as _compute_entry_hash,
+)
+from app.services.audit_chain.head import append_entry, chain_key_of
+
+__all__ = [
+    "AuditLogPayload",
+    "EVENT_TYPE_SCHEMAS",
+    "EventType",
+    "GENESIS_HASH",
+    "_compute_entry_hash",
+    "append_audit_log",
+    "validate_event_type_details",
+]
 
 # --------------------------------------------------------------------------
 # 类型定义
@@ -105,90 +115,8 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
     "gate_acknowledgement": {"check_name"},
 }
 
-# 创世哈希（与 audit_log_writer_worker 保持一致）
-GENESIS_HASH = "0" * 64
-
-
-# --------------------------------------------------------------------------
-# 内部工具函数
-# --------------------------------------------------------------------------
-
-
-def _compute_entry_hash(
-    ts: str,
-    user_id: str,
-    action_type: str,
-    object_id: str | None,
-    payload_json: str,
-    prev_hash: str,
-) -> str:
-    """计算审计日志条目哈希（与 audit_log_writer_worker 保持一致）。
-
-    entry_hash = sha256(ts|user_id|action_type|object_id|payload_json|prev_hash)
-    """
-    raw = f"{ts}|{user_id or ''}|{action_type}|{object_id or ''}|{payload_json}|{prev_hash}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-
-async def _get_prev_hash(db: AsyncSession, project_id: str | None) -> str:
-    """获取指定 project_id 链的最新 entry_hash 作为新条目的 prev_hash。
-
-    每个 project_id 独立链；project_id 为 None 时使用全局链。
-    兼容 SQLite 测试环境。
-    """
-    try:
-        from app.core.config import settings
-
-        is_postgres = settings.DATABASE_URL.startswith("postgresql")
-    except Exception:
-        is_postgres = False
-
-    try:
-        if project_id:
-            if is_postgres:
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(AuditLogEntry.payload["project_id"].astext == project_id)
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-            else:
-                # SQLite fallback: 使用 json_extract
-                from sqlalchemy import text
-
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(text("json_extract(payload, '$.project_id') = :pid"))
-                    .params(pid=project_id)
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-        else:
-            if is_postgres:
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(
-                        AuditLogEntry.payload["project_id"].astext.is_(None)
-                        | ~AuditLogEntry.payload.has_key("project_id")
-                    )
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-            else:
-                from sqlalchemy import text
-
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(text("json_extract(payload, '$.project_id') IS NULL"))
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
-        return row if row else GENESIS_HASH
-    except Exception:
-        return GENESIS_HASH
+# ``_compute_entry_hash`` 与 ``GENESIS_HASH`` 为旧调用方保留兼容导出；
+# 实现来自 audit_chain.canonical，不再维护第二份哈希算法。
 
 
 def validate_event_type_details(details: dict) -> None:
@@ -229,63 +157,26 @@ async def append_audit_log(db: AsyncSession, payload: AuditLogPayload) -> uuid.U
     异常:
         ValueError: details 中 event_type 对应的必需字段缺失
     """
-    # 校验 event_type schema
-    details = payload.get("details") or {}
+    details = dict(payload.get("details") or {})
     validate_event_type_details(details)
 
-    now = datetime.now(timezone.utc)
-    ts_str = now.isoformat()
-    user_id_str = str(payload["user_id"]) if payload.get("user_id") else ""
-    project_id_str = str(payload["project_id"]) if payload.get("project_id") else None
-    resource_id_str = payload.get("resource_id") or ""
-
-    # 构建 payload JSONB 内容（注入 project_id 以便后续按项目查询）
-    log_payload: dict[str, Any] = {**details}
-    if project_id_str:
-        log_payload["project_id"] = project_id_str
-
-    payload_json = json.dumps(log_payload, sort_keys=True, ensure_ascii=False, default=str)
-
-    # 获取链上最新 hash
-    prev_hash = await _get_prev_hash(db, project_id_str)
-
-    # 计算 entry_hash
-    entry_hash = _compute_entry_hash(
-        ts_str,
-        user_id_str,
-        payload["action"],
-        resource_id_str,
-        payload_json,
-        prev_hash,
-    )
-
-    # 构建 ORM 对象
-    entry_id = uuid.uuid4()
-
-    # object_id 是 UUID 列；resource_id 可能是非 UUID 字符串（如 row_code）
-    # 非 UUID 时 object_id 设 None，但 resource_id_str 仍参与 hash 计算保证完整性
+    project_id = payload.get("project_id")
+    project_text = str(project_id) if project_id else None
+    year_raw = details.get("year", details.get("_year"))
     try:
-        object_id_val = uuid.UUID(resource_id_str) if resource_id_str else None
-    except (ValueError, AttributeError):
-        object_id_val = None
+        year = int(year_raw) if year_raw not in (None, "") else None
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"审计日志 year 无效: {year_raw!r}") from exc
 
-    log_entry = AuditLogEntry(
-        id=entry_id,
-        ts=now,
-        user_id=payload["user_id"] if payload.get("user_id") else None,
-        session_id=None,
+    entry = await append_entry(
+        db,
+        chain_key_of(project_text),
+        user_id=payload.get("user_id"),
         action_type=payload["action"],
         object_type=payload["resource_type"],
-        object_id=object_id_val,
-        payload=log_payload,
-        ip=None,
-        ua=None,
-        trace_id=None,
-        prev_hash=prev_hash,
-        entry_hash=entry_hash,
+        resource_id=payload.get("resource_id"),
+        project_id=project_text,
+        year=year,
+        payload=details,
     )
-
-    db.add(log_entry)
-    await db.flush()
-
-    return entry_id
+    return entry.id

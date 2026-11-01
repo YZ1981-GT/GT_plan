@@ -108,6 +108,7 @@ async def health_check(
         migration_info["failures"]
         or drift_info["critical_count"] > 0
         or audit_chain_info["unacknowledged_forks"] > 0
+        or (audit_chain_info["quarantined_entries"] or 0) > 0
         or reload_degraded
         or int(audit_state.get("failed_count") or 0) > 0
     ):
@@ -164,9 +165,18 @@ async def _query_audit_chain_health(db) -> dict:
     except Exception:
         unack = 0
 
+    try:
+        from app.core.redis import redis_client
+        from app.services.audit_chain.worker import quarantine_count
+
+        quarantined: int | None = await quarantine_count(redis_client)
+    except Exception:
+        # Redis 不可达时不能把未知说成 0；按 ADR-ALC-10 返回 null。
+        quarantined = None
+
     result = {
         "unacknowledged_forks": unack,
-        "quarantined_entries": 0,  # batch A 硬编码，batch B 加真实隔离区
+        "quarantined_entries": quarantined,
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     _audit_chain_cache["data"] = result
