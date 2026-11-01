@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：24/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：25/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -70,7 +70,7 @@
     把任一 AC 编号改掉 / 把 Phase 标题形态改掉，必须有判据打红。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
-- [ ] 0.6 修复被 spec 文档重写打坏的 7 个机器消费方
+- [x] 0.6 修复被 spec 文档重写打坏的 7 个机器消费方
   - 范围（逐个点名，普查见 `evidence/phase0-spec-doc-consumer-breakage-2026-11-01.md` §2.1）：
     `generate_task66_legacy_deletion_plan.py`（cycle→task 映射 0 条）、
     `generate_workpaper_sync_program_milestones.py`（`wave id must be an integer`）、
@@ -79,12 +79,16 @@
     `generate_workpaper_ac_coverage_matrix.py`（AC 先于 requirement 标题出现）、
     `generate_workpaper_word_template_adjudication.py`（AC 7.7 原文形态变了）、
     `check_task71_mutation_capacity_recovery_gate.py`（找不到 AC 14.10，fail closed）。
-  - 处置口径：**仍从文档现算，禁手抄编号**。任务/AC 只是编号或标题形态变了的，改解析器认新形态；
-    被引用对象在新计划里真的不存在了的（Task 68 / 69 的义务已折进 7.x），retarget 到新任务号
-    或显式登记退役 + 断言它真的退役 —— 不留永红门禁，也不加豁免蒙绿。
-  - 不在范围：2.2 里 5 条预存真实红（resolver matrix digest / task64 popup digest /
-    task63 产物漂移 / task70 capability 未登记 / task72 overlay 裁决了不存在的 writer）各有
-    owner，本 spec 只登记不代修。
+  - 🔴 **归因更正（§5）**：基线 `de31e7bf6` 上 active spec 路径整个不存在（`239eb9a89` 归档所致），
+    7 个当时就 `FileNotFoundError`，不是本轮打坏的。本轮重建 active 目录后形态变了、红没变。
+  - **已修 2 个**：① task66 生成器五处解析层修复，整条判为退役并由执行账取代（task 5.5）；
+    ② program milestones 的 wave 图键名 `id`→`wave` + 任务 0.6 纳入 + 里程碑归属 6 条 /
+    26 个失效任务号→0 个（方案 A：新增 task 2.8 承接 SYNC-MULTI-RESOLVER）。
+  - **登记 5 个「锚点断开」**：③④ task68/69 独立回归门——`TASK_NUMBER=68/69`、`task_body()`
+    从任务正文现解析 Property / AC 声明，改号后声明全部断开，属 7.2 前置；⑤⑥⑦ AC coverage
+    matrix / word template adjudication / task71 容量门——依赖 `### Requirement N:` 标题 +
+    `## Acceptance Oracle Matrix` + 170 条 AC 结构，active 投影只有 7 条扁平 AC，属 7.1 前置。
+  - 详见 evidence §6~§9。
   - _AC: 1.3, 12.1, 12.9_
 ## Phase 1：统一 manifest 与 cycle slice 当前投影
 

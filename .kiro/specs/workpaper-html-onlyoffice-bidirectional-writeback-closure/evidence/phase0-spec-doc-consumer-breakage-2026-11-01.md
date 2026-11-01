@@ -248,3 +248,76 @@ wave，否则 `0.5 → 0.6` 会触发 same-wave non-earlier 规则）、显式�
   本 spec 只登记阻塞。
 
 未经拍板不动这份 reviewed 文件。
+
+## 8. 消费方 #3/#4：task68 / task69 独立回归门 —— 登记为「锚点断开、7.2 实施时重接」
+
+### 8.1 根因
+
+`check_task68_backend_chain_independent_regression.py` 的 `TASK_NUMBER = 68`，
+`task_body()` 按 `^\s*-\s\[[ x~\-]\]\s+68\.` 在 tasks.md 里搜——新计划没有编号 68 的任务。
+task69 同理（`TASK_NUMBER = 69`）。
+
+### 8.2 为什么不机械改成 7.2
+
+这两个脚本不只读任务号——它们读**任务正文**，从中现解析 Property / Requirement 声明，
+并据此双向锁死判据。旧 Task 68 的正文包含：
+
+* `Property 1 / 2 / 3 / …`（声明了哪些 Property 必须在回归范围内）
+* `AC 5.12`（backend chain 必须真库独立校验，禁 fail-open）
+* `preexisting_failures`（5061 条冻结基线，含预存红的测试路径与 passed/failed 计数）
+
+把 `TASK_NUMBER` 改成 `7.2` 后，它会去读 7.2 的正文，而 7.2 的正文和旧 Task 68 **完全不同**
+（7.2 是「完成后端与前端辐射面回归」，没有这些声明）⇒ 所有锚点都解析不到 ⇒ 5900 行的
+判据全部空跑或抛错 ⇒ 不是「修好」是「换了一种坏法」。
+
+### 8.3 处置
+
+**登记为「锚点断开、7.2 实施时重接」**：
+* 不改它们的 `TASK_NUMBER`（改了只会把「找不到任务 68」换成「找到 7.2 但解析出 0 个 Property」
+  这种更隐蔽的坏法）。
+* 不删它们（它们的判据——后端全链回归 / 前端独立回归——本身没过时，5900 行的 schema 校验 +
+  preexisting failure 基线 + 变异容量门是有价值的资产）。
+* 在做 7.2 时，要么把 7.2 的正文写到它们期望的形态（包含 Property / AC 声明），要么把它们的
+  解析改为从 design.md 或独立声明文件读（而不是从 tasks.md 的任务正文行里抠）。
+  **那时候再一起改 `TASK_NUMBER`**。
+
+在 0.6 的判据里标为「已定位根因 + 已登记处置路径 + 不在 0.6 范围内修（属 7.2 的前置）」。
+
+## 9. 消费方 #5/#6/#7：requirements.md 三个 AC 解析消费方 —— 同类处置
+
+### 9.1 根因（三个共同）
+
+active requirements.md 只有 7 行扁平 AC（paradigm JSON 投影），没有 `### Requirement N:`
+标题、没有 `## Acceptance Oracle Matrix` 表、没有 `### Property N`。这些结构只存在于**归档版**
+（170 条）。三个消费方都深度依赖这些结构：
+
+| 脚本 | 依赖的结构 | 报错 |
+|---|---|---|
+| `generate_workpaper_ac_coverage_matrix.py` | `### Requirement N:` 标题 + `N.M.` AC 行 + `_Requirements:` 任务标注 + `## Acceptance Oracle Matrix` + `### Property N` | `AC 1.3 at L22 precedes any requirement heading` |
+| `generate_workpaper_word_template_adjudication.py` | 按 AC 编号抠声明数字 | `AC 7.7 原文形态变了` |
+| `check_task71_mutation_capacity_recovery_gate.py` | 按 AC 编号读容量门定义 | `找不到 AC 14.10` |
+
+### 9.2 处置
+
+与 task68/69 同类：**active 文档里不存在这些解析锚点，不是编号变了而是结构不在。**
+
+机械修法不存在：把归档版的 170 条塞回 active 会污染本轮真源（paradigm JSON 只有 7 条 AC，
+`TestAcceptanceCriteriaVerbatim` 逐字比对，多一条就打红）。改解析器读归档件也不合理——
+那样等于让 active spec 的门禁锚在一份冻结的历史文档上。
+
+正确路径是 Phase 7 做 7.1（「完成结构、单元、属性与变异验证」）时把需要的结构性声明从
+归档件迁入 design.md 或独立声明文件，并把这三个解析器的锚点重接。在那之前它们的状态是
+「锚点断开」—— 和基线上（active spec 整个不存在）的 `FileNotFoundError` **同一类**，
+只是换了一层皮。
+
+与 §8 合并，0.6 的 7 个消费方全部定位完毕：
+
+| # | 脚本 | 状态 | 何时/如何收口 |
+|---|---|---|---|
+| 1 | `generate_task66_legacy_deletion_plan.py` | ✅ 五处解析层已修，整条判为退役并由执行账取代（5.5） | 已完成 |
+| 2 | `generate_workpaper_sync_program_milestones.py` | ✅ wave 图键名 + 任务 0.6 纳入 + 里程碑归属重映射 26→0 | 已完成 |
+| 3 | `check_task68_backend_chain_independent_regression.py` | 登记为「锚点断开」 | 7.2 实施时重接 `TASK_NUMBER` + 重写任务正文声明 |
+| 4 | `check_task69_frontend_independent_regression.py` | 登记为「锚点断开」 | 同上 |
+| 5 | `generate_workpaper_ac_coverage_matrix.py` | 登记为「锚点断开」 | 7.1 实施时把结构性声明迁入 design.md 并重接解析器 |
+| 6 | `generate_workpaper_word_template_adjudication.py` | 同上 | 同上 |
+| 7 | `check_task71_mutation_capacity_recovery_gate.py` | 同上 | 同上 |
