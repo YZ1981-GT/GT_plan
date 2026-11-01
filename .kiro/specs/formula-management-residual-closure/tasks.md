@@ -42,3 +42,14 @@
 - Vite production build 最终通过。首轮发现并修复 HEAD 既有的 `ThreeColumnLayout` 重复导入构建阻断。
 - 独立 Playwright 临时页验证：真实 `FormulaInput`、初始非法公式即时红线与中文原因、保存禁用、历史 503 显式错误与重试；`consoleErrors=0`、`pageErrors=0`。证据：`tmp_formula_manager_direct/browser/formula-residual-editor.png`、`formula-residual-history.png`。
 - 共享服务当时未运行；磁盘 V249、共享库只读查询最高 V236。为避免未经授权执行 V237~V249，本轮没有启动 `start-dev.bat`，没有写共享库或真实项目。
+## 推送与基线归因（2026-11-01）
+
+- 推送：单 commit `84be89d2d55c8c70e0a2c3c8a12922ab59a4fbea`（22 文件 +449 −340），标签 `v1.0.92`（附注标签 `d266635`）。`git ls-remote` 核对远端 `spec/disclosure-note-doc-upload-and-batch-fill` 与本地 HEAD 同值。pre-commit 三门（gitleaks / 行数 / UTF-8）与 pre-push 版本门全过。
+- 远端在本轮回归期间推进两次，各自逐路径确认重叠面后变基，而非整文件拷贝：`4390aaaa3` → `e4755bc7b`（66 文件，与本批仅 `INDEX.md` 重叠）→ `93402de37`（只改 `memory.md`，与本批重叠）。
+- `memory.md` 的 300 行上限处置：远端 `93402de37` 已把该文件填到 299 行，本批原占 3 行即超限。git 三方合并的自动结果是删掉文件头 3 个空行（含 `## 用户偏好` 标题前的空行）来凑数——那是改他人刚推的格式，且标题前无空行在部分 markdown 解析器下不被识别为标题。改为沿用文件内既有写法（`### 标题（进度）—— 正文` 同一行），以远端版为底插入 1 行，最终 300 行、BOM 保留、远端 299 行逐行零缺失。
+- 暂存树自洽门：首跑报 `Filename too long`，根因是 `check_staged_tree_self_consistency.py` 用 `tempfile.mkdtemp()` 落在 `C:\Users\<用户>\AppData\Local\Temp\`（前缀 46 字符），与仓库最长已跟踪路径 209 字符相加超 Windows 260 限制。现算后改用仓库根短目录（预算：父目录 ≤25 字符）重跑，**真正跑满**：物化 26152 文件、2 道门 exit 0、无非预期 SKIP。
+- 预存失败归因（本批新增 0）：`test_multi_standard_notes.py` 的 `1 failed + 6 errors` 在**基线 worktree**（远端头 `e4755bc7b`，不含本批）复跑后逐节点完全一致（`1 failed, 62 passed, 6 errors`）。失败 `test_all_cycle_prefixes_present` 是 `Missing cycle prefix: Q`（读 `gt_coding_service` 与 `gt_template_library.json`，两者不在本批 diff 内）；6 个 error 是 fixture 建表阶段 `attachment_versions.blob_id` 外键找不到 `asset_blobs`。
+- 行数门全仓模式报 73 个超限/膨胀，经逐条核对本批 22 文件无一在列；pre-commit 的暂存文件模式（权威判据）通过。
+- 主工作区处置：**未强行前移分支 ref**。现算依据——`git merge --ff-only` 被拒（HEAD 未变、无破坏）；强行前移需更新 276 个文件，且会把并发会话正在改的 `backend/app/routers/adjustment_import.py`（远端 `e4755bc7b` 也改过）变成「反向脏」，并可能破坏并发会话**已暂存**的 6 组迁移重命名（V233/V235/V236 → V250/V251/V252）。改为只消除回退风险：本批 22 路径已逐一对齐推送版（`git diff` 规范化口径现算，残余差异仅 `components.d.ts`）。
+- `components.d.ts` 刻意取主工作区那一侧：它相对主 HEAD 是 10 insertions + 1 deletion，1 个删除正是本批的 `FormulaParamPicker`（已生效），10 个新增是并发会话的新组件（`AdjustmentCentralStatusTag` / `ConsolReadinessBar` / `DshPanelLoadError` / `ReportProvenanceTooltip` 等）。推送版基线更旧、不含这 10 条，写入会吞掉他人改动——按铁律「生成文件不取并集：取一侧或让生成器重建」取更新的那一侧。
+- 比对口径教训：首版对齐探针用裸 SHA-256 比工作树与 blob，18 个文件**全报 DIFF**，实为工作树 CRLF 与 blob LF 的规范化差异。改用 `git hash-object --path` / `git diff` 的 git 自身口径后，16 个代码文件其实早已逐字节一致、真正需要对齐的只有 2 个。
