@@ -11,7 +11,7 @@
         锁死切换器、点击被吞（D4 bug ③）。健康门禁在 `useHSyncMode.switchMode` 里 await 兜底。
       -->
       <div v-if="showModeSwitch" class="h1-mode-switch-bar">
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h1FEntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <el-tag size="small" :type="hSync.syncStateTag.value.type">
           {{ hSync.syncStateTag.value.text }}
         </el-tag>
@@ -341,6 +341,7 @@
  * Requirements: 1.2-1.3, 17.1
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -788,6 +789,21 @@ onUnmounted(() => {
   //    H9/H8/H6/H10 同源缺陷已修，这是同一条）。
   void flushPendingSaves()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const h1FEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H1_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

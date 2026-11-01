@@ -253,7 +253,8 @@
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
-  - 🔴 **渐进迁移，棘轮只减**：现算 **102** 条宿主仍自行决定（126 → 125 → 113 → 110 → **102**）。
+  - 🔴 **渐进迁移，棘轮只减**：现算 **59** 条宿主仍自行决定
+    （126 → 125 → 113 → 110 → 102 → **59**，已迁 **68** 个）。
   - **共享切换器已接单源**：`sync/useGRenderModeSwitch.ts` 新增可选 `entrySync` 入参 +
     暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ G 循环 16 个宿主只需传入已有的
     readiness 实例即可完成迁移，不用各写一遍判断。**这是本任务的杠杆点**：改 1 个 composable
@@ -272,6 +273,47 @@
     9 个标签全部 `is_mode == gated`，L4 业务分段器 `gated=False` ✓。
   - 本批未迁 `CycleStandaloneProcedureShell.vue`（同载体但**无固定 entry id** —— 它是跨循环
     共享壳，entry 随 wp_code 运行时确定）⇒ 留在棘轮里，须另案（给它传运行时 entry id）。
+  - **第五批 = 43 个 inline 宿主**（A/D/G/H/K/M/N/J 八个循环，**无共享载体可改**）：
+    readiness 实例直接建在宿主里，`v-if` 直接读它（合取 8 / 新增 35）。棘轮 102 → **59**。
+    目标集合**现算**分桶得出（`tmp_workpaper_sync_impl/probe_inline.py`）：54 条 inline 中
+    **43 可机械化**（恰 1 个模式 segmented + 有 entry id + 有 `props.projectId/wpId`），
+    另 3 条多模式开关、3 条无模式 segmented（候选豁免）、6 条无 entry id ⇒ 各自另案。
+  - 🔴 **插入锚点选 `<script setup>` 末尾，是为了避开一类静态门看不见的运行时崩溃**：
+    `useEntrySyncReadiness` 内部 `watch(..., { immediate: true })` 在 setup 期**立即**读三个
+    getter ⇒ 实例若插在 `props` 声明之前，`props` 落在 TDZ、一打开页面就 ReferenceError，
+    而 `get_diagnostics` / vue-tsc 全绿。现算 43/43 都有唯一 `</script>`，而 `defineProps`
+    有两种形态（plain_generic 26 / withDefaults 17）且语句跨多行含嵌套泛型 —— 解析它的语句
+    边界远比用 script 末尾容易出错。模板在 setup 完成后才求值，故声明在末尾对模板无影响。
+  - 第五批三条结构核验（都是诊断看不见的，`tmp_workpaper_sync_impl/verify_batch5.py`）：
+    ① TDZ 顺序（readiness 必在 `props` 之后）② 逐标签对账（**49 个** `el-segmented`：模式开关
+    必被门控、业务分段器必未被门控）③ 门控表达式引用的局部名必须是本文件真实声明的那个
+    —— 三条全部通过；另全量 `get_diagnostics` 0 错（import 相对路径因此同时得证）。
+  - 🔴 **用户可见影响已逐条量化**（`probe_capability_impact.py`，这是本批最关键的诚实性问题）：
+    接单源后 `capability` 非 bidirectional 的 entry 不再显示模式开关。43 条里
+    **22 条 bidirectional**（开关照常显示）+ **21 条 `capability=null` / pending**（开关隐藏）；
+    而这 21 条**全部**已挂 `GtEntrySyncCapabilityNotice` ⇒ **0 个宿主无声失去开关**，
+    用户看到的是「两侧数据未互通」+ 可操作原因，正是 AC 1.5 要的形态。
+  - 🔴 **A/B 归因抓到一条真实新增失败并据此修正了一条「断言旧的不诚实行为」的用例**：
+    57 个 spec（现算选集 = 凡 import 或读取这 43 个宿主源码的）跑 A/B 逐节点对比，首轮
+    **added 1** —— `GtA111SubsequentEventsInquiry.spec.ts > mode switch > renders segmented
+    control`（原断言「开关恒显示」）。查 generated manifest：该 entry 是 `capability: null` /
+    `pending` / blockedBy BP-1~BP-9，**两侧尚未形成已验收的双向链路** ⇒ 此时摆出双选开关正是
+    本 spec 要治的「仅能打开 OO 却呈现成双向」。故**不是删断言**，而是改成断言正确行为的两面：
+    pending ⇒ 开关不显示**且**能力披露组件在位（「隐藏开关却不给原因，比显示假开关更糟」）；
+    单源裁决可双向 ⇒ 开关显示（防上一条成为恒假判据）。
+  - 🔴 写这条正例时踩到一个会让判据**假红**的坑：`mountComponent` 不传 `projectId` 时，
+    `useEntrySyncReadiness` 走「身份不全」早退分支、**根本不调** readiness 接口 ⇒ spy 永不触发，
+    判据以「单源说可双向却不显示」的形态失败。已补 `projectId` 入参 + 断言
+    `expect(spy).toHaveBeenCalled()`（否则本例测不到任何东西）。
+  - 同组还有一条**在 HEAD 就是红的**用例（`OO health check disable > when OO healthy, both
+    modes available`，A/B 两树同红、`expected +0 to be 2`，与同步能力无关，是该 stub 取不到
+    按钮）。它的**主题**已被本任务改掉（模式可用性不再由 OO 探活决定），留着就是一条永红判据
+    （永红 = 没人看 = 等于没门禁）⇒ 按新口径重写为「单源裁决可双向时两个选项都在」，并改为
+    核对 `modeOptions` 数据本身而非 stub 怎么渲染按钮（原断言正是栽在这上面）。
+    **已写明它非本轮弄红**，重写属顺带清理而非认领别人的红。
+  - 第五批 A/B 终态：A(HEAD) 10 条失败 · B(候选) **8** 条 · **added 0** · resolved 2 ——
+    resolved 的 2 条正是上面两个新用例（在 HEAD 宿主未门控时**失败**、在候选树通过），
+    这是「判据真的能检出行为变化、不是恒绿」最直接的证据。`GtA111` 单文件 **19/19 全绿**。
   - 🔴 第三批是**第二批的漏点**：它们同样 import `useGRenderModeSwitch`、`v-if` 同为
     `"isHtmlSheet"`、也有 entry 常量，只因第二批的 TARGETS 是**手列的**而漏掉。教训与下面
     「闭合判据手抄清单」同源 —— 批量迁移的目标集合也该现算（扫载体 import），不该手列。

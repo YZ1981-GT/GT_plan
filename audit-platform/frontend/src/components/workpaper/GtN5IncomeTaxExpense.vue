@@ -4,6 +4,7 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'N5' && currentSheet !== '底稿目录'" class="n5-income-tax-expense-toolbar">
         <el-segmented
+          v-if="n5IEntrySync.presentation.value.showModeSwitch"
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
@@ -214,6 +215,7 @@
  * Requirements: 1.1, 1.2, 1.3, 1.6, 1.7, 1.8, 1.9, 1.11
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage } from 'element-plus'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -456,6 +458,21 @@ function onDeferredTaxUpdate(): void {
   // N1/N3递延税变动 → 刷新N5-8递延核对数据
   selfLoad()
 }
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const n5IEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-n5-income-tax-expense',
+})
+
 </script>
 
 <style scoped>

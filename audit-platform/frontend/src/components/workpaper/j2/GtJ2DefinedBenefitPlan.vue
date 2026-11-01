@@ -9,6 +9,7 @@
       <!-- 双模式工具栏（目录页不显示） -->
       <div v-if="showModeToolbar" class="j2-mode-toolbar">
         <el-segmented
+          v-if="j2DEntrySync.presentation.value.showModeSwitch"
           v-model="renderMode"
           :options="renderModeOptions"
           size="small"
@@ -132,6 +133,7 @@
  * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)
  */
 import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent, inject, provide, toRef, watch } from 'vue'
+import { useEntrySyncReadiness } from '../sync/useEntrySyncReadiness'
 import { ElMessage } from 'element-plus'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 import {
@@ -388,6 +390,21 @@ onMounted(async () => {
   await selfLoad()
   isLoading.value = false
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const j2DEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => J2_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

@@ -6,7 +6,7 @@
 <template>
   <div class="gt-a38" v-loading="loading">
     <div class="gt-a38__header">
-      <el-segmented v-model="activeMode" :options="modeOptions" size="default" />
+      <el-segmented v-if="a38GEntrySync.presentation.value.showModeSwitch" v-model="activeMode" :options="modeOptions" size="default" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a38-goodwill-impairment" />
       <div class="gt-a38__xref">
         <span class="gt-a38__xref-label">单体层核对：</span>
@@ -236,6 +236,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from './shared/WpAmountInput.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ref, computed, toRef, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
@@ -373,6 +374,21 @@ onMounted(load)
 onBeforeUnmount(flushSave)
 
 defineExpose({ activeMode, reload: load, flushSave })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const a38GEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-a38-goodwill-impairment',
+})
+
 </script>
 
 <style scoped>

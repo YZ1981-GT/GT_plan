@@ -8,7 +8,7 @@
           disabled 在未就绪时会把「在线编辑」锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
           健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
         -->
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h10AEntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag size="small" :type="hSync.syncStateTag.value.type">
           {{ hSync.syncStateTag.value.text }}
@@ -185,6 +185,7 @@
  * 科目 6115 损益类；EventBus: disposal:completed(H6) / substantive:adjudicated(6115)
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject} from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useH10FormData } from './composables/useH10FormData'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from './sync/workpaperSyncApi'
@@ -379,6 +380,21 @@ onBeforeUnmount(() => {
   window.removeEventListener('disposal:completed', handleDisposalCompleted)
   window.removeEventListener('disposal:source-updated', handleSourceDisposalUpdated)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const h10AEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H10_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>
