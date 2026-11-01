@@ -732,6 +732,47 @@
     + `backend/data/workpaper_sync_runtime_evidence_projection.json`。
   - 现算：PG `connected`、`total_test_runs=0`、`entries_with_runs=0` ⇒ `not_required 78` / `missing 67`。
     67 条 bidirectional entry 全部缺 runtime evidence——这是 6.3 要产出的。
+  - 🔴 **2026-11-01 复核：这个 0 是真事实，但「缺证据」不等于「没跑过」——两件事必须分开说。**
+  - **(1) 验收账本确实空**，且已排除「连库失败被降级吞掉」这种假象。三向对照
+    （`tmp_workpaper_sync_impl/verify_evidence_pg_path.py`）：显式指真库 `audit_platform`
+    ⇒ `connected / total=0`；显式指一个不存在的库 ⇒
+    `degraded:InvalidCatalogNameError`（证明降级分支**会**如实报出来，所以 `connected`
+    不是吞掉的结果）；当前环境 ⇒ `connected / 0`。
+    `working_paper_sync_test_run` = **0**、`working_paper_entry_evidence_scenario` = **0**。
+  - 🔴 **顺带堵掉一个能把这个结论伪造出来的环境陷阱**：本仓终端跨会话共享，而「只跑隔离
+    用例」的约定会把 `DATABASE_URL` 设成**不存在的库名**；在那种 shell 里 `--write`，
+    产物会是 `degraded:*` + 67 条全 `missing` —— 与「真库上确实没有验收记录」**逐字相同**。
+    新增判据 `test_committed_evidence_projection_was_produced_against_a_reachable_database`
+    （只读已入库 JSON 的 `pg_facts.status`，不连库 ⇒ 确定性、不会变成环境相关的永红门禁）；
+    磁盘变异把产物换成降级版 ⇒ 精确打红，阴性对照绿，sha256 前后一致。
+  - **(2) 生产链路真的跑过，规模还不小**（真库现查）：
+    `working_paper_sync_operation` **1192** 条、跨 **14** 个 entry；其中
+    `applied html→oo` **750**（13 entry）、`applied oo→html` **104**（10 entry）、
+    error 218 / conflict 16 / rejected 24 / authorization_stale 2。
+    另有 `content_application` 144、`content_representation` **455**（覆盖 **90** 个 entry）、
+    `content_version` 435、`oo_room` 148、`callback_delivery` 498、`forcesave_request` 191、
+    `sync_conflict` 367。时间跨度 2026-09-06 → 2026-10-25。
+  - **(3) 交叉对账才是真实缺口**（`tmp_workpaper_sync_impl/probe_real_oo_vs_manifest.py`）：
+    | 现算项 | 值 |
+    |---|---:|
+    | 67 条 bidirectional 里**有真实双向往返**（h2o 与 o2h 都有 applied） | **5** |
+    | 67 条 bidirectional 里**连一条 operation 都没有** | **59** |
+    | 有真实双向往返**却仍被裁为 pending** | **5** |
+    | 只有 html→oo 成功、没有 oo→html | 3（M5 / M1 / M9） |
+    | 有 operation 但两向都没成功 | 1（A51，10 条全 error） |
+    有真实往返的 5 条 bidirectional = D4（542/48）· D2（167/43）· H1（10/3）·
+    G7（12/2）· D1（2/1）。
+  - 🔴 **「裁决」与「真实事实」反向脱节，对 4.* 终裁是直接线索**：
+    `xlsx/b60/gt-b60-bundle` · `gt-d3-prepaid-accounts` · `gt-d5-receivables-financing` ·
+    `gt-d6-contract-assets` · `gt-d7-contract-liabilities` 这 5 条**真库里有成功的双向
+    往返**，manifest 却仍是 `capability=null`（pending）。它们不该再按「从零开始」排期 ——
+    但也**不能**据此直接终裁：按 ADR-WB-003，运行时跑通过只是三层中的一层，仍缺
+    reviewed contract / approved bundle / current representation / 新鲜 evidence 的逐项核对，
+    且那几条往返发生在 2026-09-12、远早于本轮的契约与模板变更（representation 预检现算
+    它们多为 `stale_needs_reprojection`）。
+  - ⇒ 结论更新：6.3 的工作量**不是**「给 67 条补证据记录」，而是「59 条从未真实跑过 +
+    5 条只跑通单向 + 1 条全失败 + 5 条跑通但裁决没跟上」四类分别处理。原先把它们笼统
+    记成「全部缺 evidence」会严重低估 59 条那一类的工作量。
   - _AC: 12.1_
 
 - [x] 6.3 执行真实 OnlyOffice required scenarios

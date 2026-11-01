@@ -21,6 +21,7 @@ task 4.1 / 6.1 / 6.2 产出了四件生成物，但其中**三件没有任何 py
 """
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import subprocess
@@ -78,6 +79,34 @@ def test_environment_dependent_generator_is_really_environment_dependent() -> No
     )
     assert "missing" in source, (
         "找不到「连不上就全标 missing」的降级分支 —— 排除理由的前提不成立"
+    )
+
+
+def test_committed_evidence_projection_was_produced_against_a_reachable_database() -> None:
+    """入库的 runtime evidence 投影不得是**连不上库**时降级产出的那一份。
+
+    🔴 这条是被一次真实的环境陷阱逼出来的：本仓的终端是跨会话共享的，而「只跑隔离用例」
+    的约定会把 `DATABASE_URL` 设成一个**不存在的库名**。在那种 shell 里跑
+    `generate_runtime_evidence_projection.py --write`，生成器会如实记下
+    `pg_facts.status = "degraded:InvalidCatalogNameError"` 并把 67 条 entry 全标 `missing`
+    —— 内容与「真库上确实一条验收记录都没有」**逐字相同**。
+
+    也就是说：如果没有这条判据，「0 条证据」这个结论可以被一个环境变量伪造出来，而且
+    看不出区别。本 spec 的 closure 判据正是从这份产物里读数的，所以必须钉住它的来源。
+
+    判据只读已入库 JSON 的 `pg_facts.status`，不连库 ⇒ 确定性，不会变成一条环境相关的
+    永红门禁（那正是上面把 evidence projection 排除在 `--check` 硬判据之外的理由）。
+    """
+    path = BACKEND / "data" / "workpaper_sync_runtime_evidence_projection.json"
+    facts = json.loads(path.read_text(encoding="utf-8")).get("pg_facts") or {}
+    status = str(facts.get("status") or "")
+    assert status, f"{path.name} 缺 pg_facts.status —— 无法判断它是在什么环境下产出的"
+    assert not status.startswith("degraded"), (
+        f"入库的 evidence 投影是降级产出的（status={status}）—— 它的 `missing` 分布反映的是"
+        "「连不上库」而不是「库里没有验收记录」。请在能连到共享库的环境重跑 --write 后再提交。"
+    )
+    assert status != "not_postgresql", (
+        f"入库的 evidence 投影产自非 PostgreSQL 环境（status={status}）—— 同上，不可采信"
     )
 
 
