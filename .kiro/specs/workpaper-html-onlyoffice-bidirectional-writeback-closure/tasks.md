@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：25/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：26/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -320,8 +320,18 @@
   - 先证明真实替代组件可达、生产入边为零和删除计划可回滚；随后物理删除文件及 stale overlay/rule，不留 `DEPRECATED`。
   - _AC: 1.7, 12.9_
 
-- [ ] 5.4 删除零生产调用的 `usePilotBridgeAdapter.ts`
-  - 以 AST 确认生产调用为零，旧测试改为断言空壳不存在且 B60/D2/G7/H1 真桥仍可达；禁止保留兼容墓碑。
+- [x] 5.4 删除零生产调用的 `usePilotBridgeAdapter.ts`
+  - 以 AST 确认生产调用为零（execution ledger 现算 `_adapter_consumer_hosts()` = []），旧测试改为断言空壳不存在且 B60/D2/G7/H1 真桥仍可达；禁止保留兼容墓碑。
+  - **同一笔完成全部改动**（CI `pytest -x` 半截即停）：删 `usePilotBridgeAdapter.ts` + 改 test_task45
+    （`TestPilotAdapterFieldContract` 整类 + 三个辅助函数 → `TestPilotAdapterDeletedAndNoResidue`
+    三条；`test_pilot_bridge_adapter_exists` / `_does_not_call_config_endpoint` → `_deleted` / `_no_production_residue`；
+    `test_bridge_adapter_uses_unified_storage_key` / `test_no_legacy_storage_prefixes_in_adapter` /
+    `test_adapter_exposes_entry_id_parameter` / `test_adapter_is_documented_as_transitional` → 单条 `test_bridge_adapter_is_deleted`；
+    Property 48 的两条 toast / switching 判据 → 断言文件已删）+ test_task46/48/49 各一条
+    `test_bridge_adapter_supports_entry_id` → `assert not is_file()` + 前端
+    `bridgeMaterializeDriven.spec.ts` 改 `existsSync → false`。
+  - 后端 34 passed；前端 4 failed / 7 passed（与基线逐条相同，added 0 / resolved 0，预存失败，
+    与本次删除无关）。
   - _AC: 1.4, 1.7_
 
 - [x] 5.5 把 Task 66 删除计划升级为可收缩执行账

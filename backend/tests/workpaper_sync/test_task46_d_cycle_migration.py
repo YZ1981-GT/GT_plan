@@ -1765,8 +1765,7 @@ class TestSourceCodeStructure:
 
     def test_bridge_adapter_supports_entry_id(self) -> None:
         adapter = SYNC_DIR / "usePilotBridgeAdapter.ts"
-        assert adapter.is_file(), "usePilotBridgeAdapter.ts 必须存在（Task 45 产物）"
-        assert "entryId" in adapter.read_text(encoding="utf-8")
+        assert not adapter.is_file(), "usePilotBridgeAdapter.ts 不应存在 —— Task 5.4 已删"
 
     def test_pilot_deletion_plan_marks_d2(self) -> None:
         """Task 45 的 pilot deletion plan 必须存在且含 D2 —— 缺文件打红，不 skip。"""

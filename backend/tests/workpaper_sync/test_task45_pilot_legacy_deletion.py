@@ -74,27 +74,24 @@ class TestProperty47LegacyDeleted:
             "不留 DEPRECATED/fallback 注释"
         )
 
-    def test_pilot_bridge_adapter_exists(self) -> None:
-        """替代品 usePilotBridgeAdapter.ts 必须存在。"""
+    def test_pilot_bridge_adapter_deleted(self) -> None:
+        """Task 5.4 已物理删除 usePilotBridgeAdapter.ts，不允许复活。"""
         adapter = _SYNC / "usePilotBridgeAdapter.ts"
-        assert adapter.exists(), "usePilotBridgeAdapter.ts 不存在"
+        assert not adapter.exists(), "usePilotBridgeAdapter.ts 不应存在 —— Task 5.4 已删"
 
-    def test_pilot_bridge_adapter_does_not_call_config_endpoint(self) -> None:
-        """adapter 不得调用 legacy onlyoffice-config 端点（注释中提及不算调用）。"""
-        adapter = _SYNC / "usePilotBridgeAdapter.ts"
-        source = adapter.read_text(encoding="utf-8")
-        # Strip single-line and block comments before checking
+    def test_pilot_bridge_adapter_no_production_residue(self) -> None:
+        """已删 adapter 不得有残留的非注释 import。"""
         import re
-        stripped = re.sub(r'//.*$', '', source, flags=re.MULTILINE)
-        stripped = re.sub(r'/\*.*?\*/', '', stripped, flags=re.DOTALL)
-        assert "onlyoffice-config" not in stripped, (
-            "usePilotBridgeAdapter 在非注释代码中调用 onlyoffice-config —— "
-            "这是 legacy 路径，必须由 bridge 的 materialize 协议完成"
-        )
-        assert "/api/workpapers/onlyoffice/health" not in stripped, (
-            "usePilotBridgeAdapter 在非注释代码中调用 OO health 端点 —— "
-            "健康检查由 bridge 内部管理"
-        )
+        needle = "usePilotBridgeAdapter"
+        for host in self.PILOT_HOSTS:
+            if not host.is_file():
+                continue
+            source = host.read_text(encoding="utf-8")
+            stripped = re.sub(r'/\*.*?\*/', '', source, flags=re.DOTALL)
+            stripped = re.sub(r'//.*$', '', stripped, flags=re.MULTILINE)
+            assert needle not in stripped, (
+                f"{host.name} 仍在非注释代码中引用已删的 {needle}"
+            )
 
     PILOT_HOSTS = [
         _FRONTEND / "GtG7LongTermEquityMain.vue",
@@ -245,25 +242,10 @@ class TestProperty48NoLegacySuccessMessages:
     SUCCESS_TOAST_MARKERS = ("ElMessage", "ElNotification", "message.success", "拉取成功")
 
     def test_adapter_has_no_success_toast(self) -> None:
-        """adapter 的**代码**里不得包含 ElMessage / ElNotification 成功提示。
-
-        🔴 本条原先在**未剥注释**的全文上判，与同文件
-        `test_pilot_bridge_adapter_does_not_call_config_endpoint`（先剥注释再判）口径不一致，
-        后果是「在注释里说明这个缺陷」也被当成缺陷：本适配器 `isOoAvailable` 硬编码
-        `ref(true)` 导致宿主那面「OnlyOffice 拉取成功」的 tag 无条件亮起，把这句写进
-        docstring 警告后人时，判据就红了 —— 逼人删掉真话。
-
-        改为剥注释后再判。力度没降：真要弹 toast 必须写在代码里，一写就被抓
-        （下条 `test_marker_in_code_is_still_caught` 用变异样本证明这一点）。
-        """
-        code = TestProperty47LegacyDeleted._code_only(
-            self.PILOT_ADAPTER.read_text(encoding="utf-8")
+        """adapter 已删（Task 5.4）——原先检查 toast 标记的判据已随删除退役。"""
+        assert not self.PILOT_ADAPTER.exists(), (
+            "usePilotBridgeAdapter.ts 不应存在 —— Task 5.4 已删"
         )
-        for pattern in self.SUCCESS_TOAST_MARKERS:
-            assert pattern not in code, (
-                f"usePilotBridgeAdapter 的代码里包含 {pattern!r} —— "
-                "成功文案必须由 bridge feedback 管理（Property 48）"
-            )
 
     def test_marker_in_code_is_still_caught(self) -> None:
         """反向自检：剥注释不得变成逃逸通道 —— 写在代码里的 toast 必须仍被抓到。"""
@@ -275,10 +257,10 @@ class TestProperty48NoLegacySuccessMessages:
             assert marker in strip(in_code), f"{marker!r} 写在代码里却被剥掉了 —— 判据失效"
 
     def test_adapter_has_no_switching_success_message(self) -> None:
-        """适配器不得在切换后显示独立成功消息。"""
-        source = self.PILOT_ADAPTER.read_text(encoding="utf-8")
-        assert "切换成功" not in source
-        assert "在线编辑模式成功" not in source
+        """adapter 已删（Task 5.4）——原先检查切换成功消息的判据已随删除退役。"""
+        assert not self.PILOT_ADAPTER.exists(), (
+            "usePilotBridgeAdapter.ts 不应存在 —— Task 5.4 已删"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -423,33 +405,10 @@ class TestMigrationParadigmFreeze:
     4. 成功/失败文案由 bridge feedback 管理
     """
 
-    def test_bridge_adapter_uses_unified_storage_key(self) -> None:
-        """adapter 必须使用统一 localStorage 前缀。"""
-        source = (_SYNC / "usePilotBridgeAdapter.ts").read_text(encoding="utf-8")
-        assert "workpaper-sync-mode:" in source, (
-            "usePilotBridgeAdapter 未使用统一 localStorage 前缀 workpaper-sync-mode:"
-        )
-
-    def test_no_legacy_storage_prefixes_in_adapter(self) -> None:
-        """adapter 不得使用旧 localStorage 前缀。"""
-        source = (_SYNC / "usePilotBridgeAdapter.ts").read_text(encoding="utf-8")
-        for prefix in ("b60-dual-mode:", "h1-dual-mode:", "g7-main-mode-", "wp-entry-dual-mode:"):
-            assert prefix not in source, (
-                f"usePilotBridgeAdapter 使用旧 localStorage 前缀 {prefix!r}"
-            )
-
-    def test_adapter_exposes_entry_id_parameter(self) -> None:
-        """adapter 接口必须接受 entryId 参数（source-backed manifest 的稳定入口）。"""
-        source = (_SYNC / "usePilotBridgeAdapter.ts").read_text(encoding="utf-8")
-        assert "entryId" in source, (
-            "usePilotBridgeAdapter 缺少 entryId 参数 —— 宿主必须传 manifest 稳定入口"
-        )
-
-    def test_adapter_is_documented_as_transitional(self) -> None:
-        """adapter 必须注明是过渡层，Wave 5 后删除。"""
-        source = (_SYNC / "usePilotBridgeAdapter.ts").read_text(encoding="utf-8")
-        assert "过渡" in source or "transitional" in source.lower() or "Task 45" in source, (
-            "usePilotBridgeAdapter 未注明过渡性质"
+    def test_bridge_adapter_is_deleted(self) -> None:
+        """Task 5.4 已删 adapter —— 以下原先逐项校验 adapter 内容的判据已退役。"""
+        assert not (_SYNC / "usePilotBridgeAdapter.ts").exists(), (
+            "usePilotBridgeAdapter.ts 不应存在 —— Task 5.4 已删"
         )
 
     def test_deletion_plan_has_post_delete_actions(self, deletion_plan: dict) -> None:
@@ -518,149 +477,46 @@ def _strip_ts_comments(src: str) -> str:
     return src
 
 
-def _adapter_interface_fields() -> set[str]:
-    """从 `export interface PilotBridgeAdapter { ... }` 抽出成员名（真源）。"""
-    src = (_SYNC / "usePilotBridgeAdapter.ts").read_text(encoding="utf-8")
-    m = re.search(r"export\s+interface\s+PilotBridgeAdapter\s*\{", src)
-    assert m, "找不到 PilotBridgeAdapter 接口声明 —— adapter 契约无从校验"
-    body = _strip_ts_comments(_brace_block(src, m.start()))
-    fields = set(re.findall(r"^\s*([A-Za-z_$][\w$]*)\s*[?:]", body, flags=re.M))
-    assert fields, "PilotBridgeAdapter 接口字段抽取为空 —— 抽取器失效"
-    return fields
+class TestPilotAdapterDeletedAndNoResidue:
+    """Task 5.4：`usePilotBridgeAdapter.ts` 已物理删除，且无残留消费方。
 
-
-def _adapter_field_accesses(source: str) -> set[str]:
-    """抽出某宿主源码里对 adapter 返回值取用的字段名（实例访问 + 解构）。"""
-    src = _strip_ts_comments(source)
-    used: set[str] = set()
-
-    # 形式 A：const <名> = usePilotBridgeAdapter({...})  →  扫 <名>.<字段>
-    for name in re.findall(r"const\s+([A-Za-z_$][\w$]*)\s*=\s*usePilotBridgeAdapter\s*\(", src):
-        used |= set(re.findall(rf"\b{re.escape(name)}\.([A-Za-z_$][\w$]*)", src))
-
-    # 形式 B：const { a, b } = usePilotBridgeAdapter({...})
-    for m in re.finditer(r"const\s*\{", src):
-        try:
-            body = _brace_block(src, m.start())
-        except (AssertionError, ValueError):
-            continue
-        tail = src[src.index("}", m.start()) :]
-        if not re.match(r"\}\s*=\s*usePilotBridgeAdapter\s*\(", tail):
-            continue
-        for part in body.split(","):
-            key = part.split(":")[0].strip()
-            if re.fullmatch(r"[A-Za-z_$][\w$]*", key):
-                used.add(key)
-    return used
-
-
-def _adapter_consumer_hosts() -> list[pathlib.Path]:
-    """扫出所有实例化 adapter 的宿主（不写死清单，Wave 5 新增宿主自动纳入）。"""
-    hosts: list[pathlib.Path] = []
-    for path in _FRONTEND.rglob("*.vue"):
-        if "__tests__" in path.parts:
-            continue
-        try:
-            source = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        if "usePilotBridgeAdapter(" in _strip_ts_comments(source):
-            hosts.append(path)
-    return sorted(hosts)
-
-
-class TestPilotAdapterFieldContract:
-    """
-    **Validates: Requirements 11.1, 11.5**
-
-    宿主从 `usePilotBridgeAdapter` 取用的每个字段都必须在
-    `PilotBridgeAdapter` 接口里真实存在。
+    原来的 ``TestPilotAdapterFieldContract``（含 ``_adapter_interface_fields`` /
+    ``_adapter_field_accesses`` / ``_adapter_consumer_hosts`` 三个辅助函数）全部随
+    adapter 文件一并删除——它们整类都在校验 adapter 的字段契约，adapter 不在了它们
+    就是空转恒绿。删除清单见 spec ``evidence/phase5-pre-delete-eligibility-2026-11-01.md``。
     """
 
-    def test_scan_surface_is_zero_or_self_consistent(self) -> None:
-        """扫描面自检（双向）：adapter 生产消费方要么归零、要么抽取器真能抽出字段。
+    _ADAPTER = _SYNC / "usePilotBridgeAdapter.ts"
 
-        🔴 原判据是 `len(hosts) >= 4`（「Task 45 至少迁了四类 pilot，扫描器可能失效」）。
-        那把**过渡态的现状**写成了永久不变量：四个 pilot 每迁完一个这条就更靠近红，
-        迁完全部必红 —— 而全零恰恰是 `usePilotBridgeAdapter.ts` 自述的删除条件达成。
-        照原样留着，唯一的「修法」是把宿主退回 adapter，让判据逼生产代码倒退。
-
-        本条要守的真正东西是「抽取器不许空转恒绿」。两侧都锁：
-
-        * **归零** ⇒ 断言 adapter 文件仍在（删文件是独立一笔，见该文件的删除条件），
-          抽取器有效性由本类 `test_judgment_catches_wrong_field_names` 的三个**内置样本**
-          证明 —— 它不依赖生产面非空，所以归零不会让本类整体空转。
-        * **非零** ⇒ 抽取器必须真能从这些宿主抽出字段（>0），否则就是扫描器失效。
-        """
-        hosts = _adapter_consumer_hosts()
-        if not hosts:
-            assert (_SYNC / "usePilotBridgeAdapter.ts").is_file(), (
-                "adapter 生产消费方已归零且文件也删了 —— 本类整类都在校验 adapter 的字段"
-                "契约，请随文件一并删除（连同 test_task46/48/49 的 "
-                "test_bridge_adapter_supports_entry_id）"
-            )
-            return
-        total = sum(len(_adapter_field_accesses(h.read_text(encoding="utf-8"))) for h in hosts)
-        assert total > 0, (
-            f"扫到 {len(hosts)} 个 adapter 宿主但字段访问抽取总数为 0 —— 抽取器失效，判据恒绿"
+    def test_adapter_file_is_deleted(self) -> None:
+        """文件必须不在盘上——不允许保留「DEPRECATED 注释 + 空壳」。"""
+        assert not self._ADAPTER.exists(), (
+            f"usePilotBridgeAdapter.ts 仍在盘上：{self._ADAPTER} —— Task 5.4 要求物理删除"
         )
 
-    @pytest.mark.parametrize(
-        "host", _adapter_consumer_hosts(), ids=lambda p: p.name
-    )
-    def test_host_only_uses_declared_adapter_fields(self, host: pathlib.Path) -> None:
-        """宿主不得取用接口未声明的字段（运行时 undefined，四层验证全绿）。"""
-        truth = _adapter_interface_fields()
-        used = _adapter_field_accesses(host.read_text(encoding="utf-8"))
-        unknown = sorted(used - truth)
-        assert not unknown, (
-            f"{host.name} 取用了 PilotBridgeAdapter 未声明的字段 {unknown}。\n"
-            f"接口真源字段：{sorted(truth)}\n"
-            "这类写法运行时得到 undefined —— 取 `.value` 直接整页崩「页面渲染出错」，"
-            "当函数调用则抛 `is not a function`，而 Volar/vitest/Vite 三层全绿。\n"
-            "常见错配：ooAvailable→isOoAvailable / mode→currentMode / "
-            "checking→switching / checkOOHealth→已废除（健康探测归 bridge）"
+    def test_no_production_import_residue(self) -> None:
+        """不得有任何生产文件（非测试）仍然 import 已删的 adapter。"""
+        needle = "usePilotBridgeAdapter"
+        offenders: list[str] = []
+        for path in _FRONTEND.rglob("*.vue"):
+            if "__tests__" in path.parts:
+                continue
+            try:
+                source = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            # 剥注释后判
+            stripped = re.sub(r"/\*[\s\S]*?\*/", "", source)
+            stripped = re.sub(r"(?<!:)//[^\n]*", "", stripped)
+            if needle in stripped:
+                offenders.append(str(path.relative_to(_FRONTEND.parent.parent)))
+        assert offenders == [], (
+            f"这些生产文件仍 import 已删的 usePilotBridgeAdapter：{offenders}"
         )
 
-    def test_judgment_catches_wrong_field_names(self) -> None:
-        """反向自检：故意写错的字段必须被抽出并判为未声明（判据不恒真）。"""
-        truth = _adapter_interface_fields()
-
-        bad_instance = """
-        const dualMode = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
-        const opts = { disabled: !dualMode.ooAvailable.value }
-        void dualMode.checkOOHealth()
-        """
-        used = _adapter_field_accesses(bad_instance)
-        assert {"ooAvailable", "checkOOHealth"} <= used, "实例式字段访问抽取失效"
-        assert {"ooAvailable", "checkOOHealth"} <= (used - truth), (
-            "错误字段未被判为未声明 —— 判据失效"
-        )
-
-        bad_destructure = """
-        const { currentMode, ooAvailable } = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
-        """
-        used2 = _adapter_field_accesses(bad_destructure)
-        assert "ooAvailable" in used2 - truth, "解构式字段访问抽取失效"
-
-        good = """
-        const dual = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
-        const a = dual.currentMode.value
-        const b = dual.isOoAvailable.value
-        const c = dual.switching.value
-        """
-        assert not (_adapter_field_accesses(good) - truth), (
-            "正确字段被误判为未声明 —— 判据过严，会对合法宿主假红"
-        )
-
-    def test_comment_only_mention_does_not_count(self) -> None:
-        """注释里提到旧字段名不算取用（否则修复时写的说明注释会把判据打红）。"""
-        truth = _adapter_interface_fields()
-        source = """
-        const dual = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
-        // 🔴 真源是 isOoAvailable，写 dual.ooAvailable 会整页崩
-        const b = dual.isOoAvailable.value
-        """
-        assert not (_adapter_field_accesses(source) - truth), (
-            "注释中的旧字段名被当成真取用 —— 会让带说明注释的正确代码假红"
-        )
+    def test_real_bridge_pilots_still_reachable(self) -> None:
+        """删 adapter 后 B60 / D2 / G7 / H1 真桥仍可达（不因删除而丢路径）。"""
+        for name in ("GtB60Bundle.vue", "GtD2AccountsReceivable.vue",
+                     "GtG7LongTermEquityMain.vue", "GtH1FixedAssets.vue"):
+            hits = list(_FRONTEND.rglob(name))
+            assert hits, f"真桥宿主 {name} 不可达 —— 删 adapter 连带丢了别的东西"

@@ -27,7 +27,7 @@
  *   · 清单里某个**已经修好** ⇒ 也打红，要求从清单删掉（否则清单会退化成永久豁免）。
  */
 import { describe, it, expect } from 'vitest'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const WP = resolve(__dirname, '..', '..')
@@ -285,13 +285,9 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
     expect(hollow).not.toContain('k8/core/K8TabAdjustment.vue')
   })
 
-  it('🔴 usePilotBridgeAdapter 不得被当成驱动方（它 docstring 提到但实现零 API）', () => {
-    // 🔴 task 5.4 的删除**尚未执行**：它要在同一笔里删文件 + 改 6 处断言它存在的判据
-    //    （test_task45 整类字段契约 + test_task46/48/49 各一条 + 本条）。半截状态会让
-    //    CI 的 `pytest -x` 停在第一条红上，所以本条暂时保持「读文件并断言它不是驱动方」。
-    //    删除清单见 spec 的 evidence/phase5-pre-delete-eligibility-2026-11-01.md。
-    const adapter = stripComments(read(resolve(SYNC, 'usePilotBridgeAdapter.ts')))
-    expect(DRIVE_RE.test(adapter)).toBe(false)
+  it('🔴 usePilotBridgeAdapter 已删除（Task 5.4），不得复活且不得被当成驱动方', () => {
+    const adapterPath = resolve(SYNC, 'usePilotBridgeAdapter.ts')
+    expect(existsSync(adapterPath)).toBe(false)
     expect(drivingWrappers().has('usePilotBridgeAdapter')).toBe(false)
   })
 
