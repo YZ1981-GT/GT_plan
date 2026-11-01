@@ -852,7 +852,7 @@ async function doExport() {
   }
 }
 
-function copyCorrelationId() {
+async function copyCorrelationId() {
   const id = queryError.value?.correlationId
   if (!id) return
   await copyText(id).then(
@@ -919,7 +919,7 @@ function refHint(index: number): string {
 }
 
 /** 复制公式引用：只复制经地址库校验通过的引用 */
-function copyFormulaRef(index: number) {
+async function copyFormulaRef(index: number) {
   const ref = refOf(index)
   if (!ref) return
   if (!refUsable(index)) {

@@ -335,7 +335,7 @@ export function useCellSelection() {
    * - HTML 格式兼容 Excel/Word 粘贴
    * 表格内核接管时按显示文字复制（与 Ctrl+C 同口径）
    */
-  function copySelectedValues() {
+  async function copySelectedValues() {
     if (gridMode()) {
       void currentKernel()?.copySelectionToClipboard()
       return

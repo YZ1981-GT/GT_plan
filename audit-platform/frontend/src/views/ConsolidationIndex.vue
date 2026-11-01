@@ -1288,7 +1288,7 @@ function drillDownSummary({ columns, data }: any) {
   return sums
 }
 
-function copyDrillDownTable() {
+async function copyDrillDownTable() {
   const rows = currentDrillDownRows.value
   if (!rows.length) { ElMessage.warning('无数据可复制'); return }
   const isLeaf = drillDownLevel.value === 'leaf'

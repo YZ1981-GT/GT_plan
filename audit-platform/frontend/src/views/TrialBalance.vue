@@ -2937,7 +2937,7 @@ function onTbSumTrace(row: any) {
   }, 200)
 }
 
-function onTbSumCtxCopy() {
+async function onTbSumCtxCopy() {
   tbSumCtxVisible.value = false
   // 多行复制
   const picked = tbSumPickedRows.value
@@ -3098,7 +3098,7 @@ const tableMaxHeight = computed(() => {
   return 'calc(100vh - 320px)'
 })
 
-function copyTbTable() {
+async function copyTbTable() {
   const data = tbViewMode.value === 'summary' ? tbSummaryRows.value : groupedRows.value
   if (!data?.length) { ElMessage.warning('无数据可复制'); return }
   let headers: string[], dataRows: any[][]

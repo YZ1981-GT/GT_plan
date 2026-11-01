@@ -3027,7 +3027,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
 const { isFullscreen: deFullscreen, toggleFullscreen: toggleDeFullscreen } = useFullscreen()
 
-function copyNoteTable() {
+async function copyNoteTable() {
   const table = activeTableData.value
   if (!table?.rows?.length) { ElMessage.warning('当前章节无表格数据'); return }
   const headers = table.headers || []

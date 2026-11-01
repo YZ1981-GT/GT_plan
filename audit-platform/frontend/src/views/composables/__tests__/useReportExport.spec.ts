@@ -130,7 +130,9 @@ describe('useReportExport — onExportAllExcel', () => {
 describe('useReportExport — copyReportTable', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('with rows, calls clipboard.write with HTML+text and shows success message', () => {
+  // copyReportTable 必须 await：它要等 copyRichText 的结果才知道是富文本成功还是回退纯文本，
+  // 成功提示在 await 之后发出。同步调用只能看到 clipboard.write 已发起，看不到提示。
+  it('with rows, calls clipboard.write with HTML+text and shows success message', async () => {
     const fakeRows = makeFakeRows(2)
     const options = createOptions(fakeRows)
     const { copyReportTable } = useReportExport(options)
@@ -143,7 +145,7 @@ describe('useReportExport — copyReportTable', () => {
       constructor(public items: Record<string, Blob>) {}
     }
 
-    copyReportTable()
+    await copyReportTable()
 
     expect(mockWrite).toHaveBeenCalledTimes(1)
     const clipboardItem = mockWrite.mock.calls[0][0][0]
