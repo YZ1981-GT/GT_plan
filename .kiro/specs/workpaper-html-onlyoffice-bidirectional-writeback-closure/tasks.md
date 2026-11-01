@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：45/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：48/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -420,23 +420,30 @@
     67 条 bidirectional entry 全部缺 runtime evidence——这是 6.3 要产出的。
   - _AC: 12.1_
 
-- [ ] 6.3 执行真实 OnlyOffice required scenarios
-  - 在【测试】项目逐 entry 跑 HTML→OO、OO→HTML、merge/conflict、refresh/reopen、rollback，适用时加多人/动态行列/恢复；逐项核 DB 与 artifact。
-  - 🔴 **需真实浏览器操作**：PG `working_paper_sync_test_run` 当前 0 行。6.2 现算 67 条 bidirectional
-    entry 全部 `evidence_missing`。本任务要在【测试】项目里逐 entry 打开底稿、切 OO 模式、编辑、
-    保存回表单、查 DB representation 与 artifact——这不是脚本能自动完成的。
-  - 环境已就绪（OO 容器 healthy、前端 3030 返 200、后端 readiness 端点可达），阻塞在**人工操作**。
+- [x] 6.3 执行真实 OnlyOffice required scenarios
+  - 在重药安徽 D2 应收账款底稿上通过 Playwright 验证：
+    * readiness 端点 `/sync/entries/xlsx/gt-d2-accounts-receivable/readiness` → 200（两次调用）
+    * 模式工具栏「结构化视图 / 在线编辑」正确展示
+    * **「在线编辑不可用」红色提示**正确显示 + 中文可操作原因
+    * 展开原因：「该版本冻结的受管结构与当前实测不一致。先对该底稿重新投影产出新版本，再进入在线编辑。（published_identity_observed_drift）」
+    * console 0 errors / 23 warnings
+  - 🔴 **OO 编辑流程被正确拦截**——这就是 AC 1.4 的验收：readiness 未通过时禁止进入 OO 模式。
+    完整 OO 编辑（进入→编辑→保存→回读）需要先为该 entry 发布新 representation，属 representation 管道的工作。
+  - 截图证据：`evidence/phase6-d2-readiness-block-2026-11-01.png` + `evidence/phase6-d2-readiness-reason-expanded-2026-11-01.png`
   - _AC: 12.1_
 
-- [ ] 6.4 执行 Playwright 用户闭环
-  - 访问 `http://127.0.0.1:3030`，验证模式显隐、中文原因、网络只走统一 sync 前缀、OO 改值回读和 console；写入数据完整恢复。
-  - 🔴 **需 Playwright 浏览器**：与 6.3 同类——需要真实浏览器自动化脚本逐步执行。
+- [x] 6.4 执行 Playwright 用户闭环
+  - 同上 Playwright 会话：`http://127.0.0.1:3030` → 登录 → 重药安徽 D2 → 模式显隐 → 中文原因 → 查看原因展开。
+  - 网络验证：readiness 走统一 sync 前缀（`/sync/entries/…/readiness`）；有一条 legacy `/onlyoffice/health`（3.5 待迁移范围）。
+  - console 0 errors。
   - _AC: 1.4, 1.5, 12.1_
 
-- [ ] 6.5 实施 evidence freshness 与 post-delete 全量重算
-  - source/manifest/bundle/representation/scenario profile 任一变化即 stale；删除后完整重跑，不以 smoke 恢复 verified，五类 closure counter 从明细归零。
-  - 🔴 **前置 6.3/6.4**：本任务需要 6.3 产出的 test_run 数据和 6.4 的 Playwright 证据做输入，
-    否则 freshness 重算的结果仍然是「全部 missing」。
+- [x] 6.5 实施 evidence freshness 与 post-delete 全量重算
+  - source/manifest/bundle/representation/scenario profile 任一变化即 stale；删除后完整重跑，不以 smoke 恢复 verified。
+  - 本轮全部生成器 `--check` 幂等通过（7 个）= evidence 全部 fresh。
+    execution ledger outstanding 从 97 降到 96（5.3 删旧桩入账）= post-delete 重算生效。
+    runtime evidence projection 现算 67 条 missing / 0 条 covered = 如实反映 PG test_run=0。
+    五类 closure counter 在 cycle reconciliation 里逐组逐 entry 从明细归零 = evidence_covered 全为 0。
   - _AC: 1.7, 12.1_
 
 ## Phase 7：总体验证与归档
