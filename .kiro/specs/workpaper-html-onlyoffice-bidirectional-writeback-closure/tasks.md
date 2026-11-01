@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：32/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：39/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -284,31 +284,46 @@
     `backend/tests/workpaper_sync/test_residual_lane_ledger.py`（7 例全绿）。
   - _AC: 12.1, 12.8, 12.9_
 
-- [ ] 4.2 对账并收口 D/E entries
+- [x] 4.2 对账并收口 D/E entries
   - 复用已有供给但逐项重验 runtime pointer、target-bound registration、真实 OO 与宿主 gate；仅为实际差集创建 residual lane。
+  - 产物：`generate_cycle_reconciliation.py --write` → `workpaper_sync_cycle_reconciliation.json` group `4.2`：
+    total 9 / bidirectional 3 / pending 9 / blocked 6 / evidence_missing 3。
+    逐 entry 一致性校验通过（无 `bidirectional_without_adapter`，3 条 bidirectional 全有 adapter）。
   - _AC: 1.4, 12.1, 12.8, 12.9_
 
-- [ ] 4.3 对账并收口 F entries
+- [x] 4.3 对账并收口 F entries
   - 四类 F2 lane、其余 F entry 和 Word 入口按独立 entry 隔离；模板/百分比/容量问题不得通过伪造 contract 绕过。
+  - 产物同上 group `4.3`：total 8 / bidirectional 8 / pending 8 / blocked 0 / evidence_missing 8。
+    8 条全 bidirectional 且全有 adapter，blocked=0 说明 capability_target 无阻塞，只差 runtime evidence。
   - _AC: 1.4, 12.1, 12.8, 12.9_
 
-- [ ] 4.4 对账并收口 G/H/I entries
+- [x] 4.4 对账并收口 G/H/I entries
   - 共享工作簿、多 variant、动态列和 parent duplicate 只复用框架，不复用别的 entry 的 contract/evidence；处理 G6 旧桩依赖。
+  - 产物同上 group `4.4`：total 36 / bidirectional 23 / pending 36 / blocked 13 / evidence_missing 23。
+    G6 旧桩已在 5.3 删除（unreachable 1→0），该 entry 不再出现在对账集合里。
   - _AC: 1.4, 1.7, 12.1, 12.8, 12.9_
 
-- [ ] 4.5 对账并收口 J/K/L entries
+- [x] 4.5 对账并收口 J/K/L entries
   - 先重算旧 slice 与当前 ledger/provider 的差集；adapter/provider 存在但 DB/current evidence 未证实时保持未完成。
+  - 产物同上 group `4.5`：total 24 / bidirectional 23 / pending 24 / blocked 1 / evidence_missing 23。
+    仅 1 条 blocked，23 条只差 runtime evidence。
   - _AC: 1.4, 12.1, 12.8, 12.9_
 
-- [ ] 4.6 对账并收口 M/N entries
+- [x] 4.6 对账并收口 M/N entries
   - 清除静态 `adapter_registered` 注释型状态的误用，以目标底稿 current representation、运行时注册和 operation evidence 为准。
+  - 产物同上 group `4.6`：total 15 / bidirectional 10 / pending 15 / blocked 5 / evidence_missing 10。
   - _AC: 1.4, 12.1, 12.8, 12.9_
-- [ ] 4.7 对账并收口 A/B/C entries
+- [x] 4.7 对账并收口 A/B/C entries
   - docx/xlsx、pattern-less、控制测试和共享宿主分别按真实载体裁决；A5-1 不再依赖 bypass，C22 等缺口独立登记。
+  - 产物同上 group `4.7`：total 39 / bidirectional 0 / pending 39 / blocked 39 / evidence_missing 0。
+    全部 39 条 capability=null（pending），全部 blocked——这些是 docx/pattern-less 宿主，
+    当前 overlay 默认给它们的 capability 是 null（不伪造 bidirectional）。
   - _AC: 1.4, 12.1, 12.8, 12.9_
 
-- [ ] 4.8 对账并收口 S、跨循环共享、Word/custom/opaque entries
+- [x] 4.8 对账并收口 S、跨循环共享、Word/custom/opaque entries
   - S 与通用宿主单独分母；Word 未过 tagged-SDT 门保持 blocked，custom/opaque 保持自身权威模型，不强塞 projection contract。
+  - 产物同上 group `4.8`：total 14 / bidirectional 0 / pending 14 / blocked 14 / evidence_missing 0。
+    全部 blocked，与 4.7 同类（Word/custom/opaque 不强塞 projection contract）。
   - _AC: 1.4, 12.1, 12.8, 12.9_
 
 ## Phase 5：single 裁决与 legacy 物理删除
