@@ -342,6 +342,8 @@ describe('useNoteRefresh 重算结果集合提示（formula-writer-ownership-and
   it('值不变但重算成功：明确显示 recomputed 与 stale 已清除', async () => {
     const api = setupOutcome()
     vi.mocked(refreshDisclosureSection).mockResolvedValue({
+      refreshed: 1,
+      total_notes: 1,
       cells_updated: 0,
       sections_recomputed: ['八、5'],
       recomputed_sections: ['八、5'],
@@ -360,6 +362,8 @@ describe('useNoteRefresh 重算结果集合提示（formula-writer-ownership-and
   it('failed_sections 非空但旧 errors 为空：仍显示失败，不冒充重算成功', async () => {
     const api = setupOutcome()
     vi.mocked(refreshDisclosureSection).mockResolvedValue({
+      refreshed: 1,
+      total_notes: 1,
       cells_updated: 0,
       sections_recomputed: [],
       recomputed_sections: [],
