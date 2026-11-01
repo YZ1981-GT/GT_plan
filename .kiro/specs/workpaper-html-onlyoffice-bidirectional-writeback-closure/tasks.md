@@ -253,12 +253,21 @@
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
-  - 🔴 **渐进迁移，棘轮只减**：现算 **125** 条宿主仍自行决定（本轮 126 → 125）。
+  - 🔴 **渐进迁移，棘轮只减**：现算 **113** 条宿主仍自行决定（126 → 125 → **113**）。
   - **共享切换器已接单源**：`sync/useGRenderModeSwitch.ts` 新增可选 `entrySync` 入参 +
-    暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ 15 个 G 循环宿主只需传入已有的
-    readiness 实例即可完成迁移，不用各写一遍判断。
-  - **已迁移**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
-    （本轮，`v-if="isHtmlSheet && g2EntrySync.presentation.value.showModeSwitch"`）。
+    暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ G 循环 16 个宿主只需传入已有的
+    readiness 实例即可完成迁移，不用各写一遍判断。**这是本任务的杠杆点**：改 1 个 composable
+    + 每宿主 3 行，取代 126 份各写一遍判断。
+  - **已迁移 14 个**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
+    （第一批）· 第二批 12 个 G 循环宿主（G1 / G3 / G4-ECL / G4-Main / G4-SPPI / G5 /
+    G6-Main / G6-SPPI / G8 / G9 / G13 / G14）。
+  - 第二批可机械批量化的依据：现算 16 个宿主的 `el-segmented` 的 `v-if` **逐字相同**
+    （全部 `"isHtmlSheet"`）⇒ 三处改动（import / readiness 实例 / `v-if` 合取）可脚本生成；
+    entry id 取**宿主已有的**常量或它 notice 上的字面量，不新造标识符。
+  - 棘轮收缩用**现算**而非手抄清单：扫「是否 import `useEntrySyncReadiness`」逐条判定
+    （`tmp_workpaper_sync_impl/shrink_baseline2.py`），避免清单与代码各自漂移。
+  - 第二批验证链：12 文件 `get_diagnostics` **0 错** → 棘轮**先打红**（12 条已接单源却仍在基线
+    ⇒ 判据有效）→ 收缩基线 125→113 → 重跑 **23 passed**（棘轮 4 + UI 诚实性 9 + presentation 10）。
   - 🔴 顺带修 `entrySyncUiHonesty.spec.ts` 一条**把过渡态写成永久不变量**的判据：
     原 `expect(unreachable.length).toBe(1)`（「分母不为空」）在 task 5.3 删掉 G6 旧桩后必红，
     而唯一的「修法」会是把旧桩加回来 —— AC 1.7 的要求正是「不可达旧桩 SHALL 删除」，
@@ -533,14 +542,18 @@
 
 ### 已有部分产物、但判据尚未成立
 
-- **3.5 全宿主迁移**：现算 **126** 条宿主仍自行决定模式开关表现（其中 101 条已挂能力披露 notice）。
-  本轮只把样板宿主 `GtM7SpecialReserve.vue` 接到单源，并把余量冻结成只许变短的棘轮
-  `sync/__tests__/entrySyncModePresentationRatchet.spec.ts`（+ `.baseline.json`）。
+- **3.5 全宿主迁移**：起点 **126** 条宿主自行决定模式开关表现（其中 101 条已挂能力披露 notice），
+  现算余 **113** 条。已迁 14 个（样板 `GtM7SpecialReserve.vue` + G 循环 13 个），余量冻结成只许
+  变短的棘轮 `sync/__tests__/entrySyncModePresentationRatchet.spec.ts`（+ `.baseline.json`）。
   🔴 口径教训：按常量名（`modeOptions` 一类）数出来是 85，漏 41 条 —— 样板宿主的常量叫
   `modeToggleOptions`。现口径 = 「画了 `el-segmented` + 有 HTML↔OO 模式值字面量 + 未导入单源」；
   另有 201 个 `el-segmented` 文件是纯业务分段器，已排除。
-  逐宿主改线必须配真实浏览器走查（各域 mode 值体系不同：`'onlyoffice'` / `'structured'` /
-  `'online-edit'` / `'docx'` / 中文标签直接当值），不能批量替换。
+  🔴 **「不能批量替换」须按组重判，不是全域结论**：原记录按「各域 mode 值体系不同
+  （`'onlyoffice'` / `'structured'` / `'online-edit'` / `'docx'` / 中文标签直接当值）」判定必须
+  逐宿主手改。实测 G 循环 16 个宿主**共用** `useGRenderModeSwitch` 且 `v-if` 逐字相同，批量化
+  完全成立（第二批 12 个一次改完、0 diagnostics、棘轮红→绿）。正确口径 = **先按共享
+  composable 分组**，同组内形态一致就批量化；只有「宿主各写一遍判断」的那些才必须手改。
+  余 113 条的分组现算见 `tmp_workpaper_sync_impl/probe_ratchet_hosts.py`。
 
 ### 需要写共享 PG 才能推进（本轮一律未执行 `--apply`）
 

@@ -18,7 +18,7 @@
           顺带修掉 `:options="dualMode.modeOptions"` 漏 `.value`（把 ComputedRef 当数组传）。
         -->
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && g5EntrySync.presentation.value.showModeSwitch"
           :model-value="renderMode"
           :options="syncModeOptions"
           size="small"
@@ -222,6 +222,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G5 sync bridge（spec: g5-nested-sections-and-template-defects · Task 12）──
 import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -473,6 +474,17 @@ const {
   legacy: dualMode,
   isManagedSheet: isG5SyncManagedSheet,
   editorHostRef: syncEditorHostRef,
+})
+
+/**
+ * 同步能力单源（spec task 3.5 / AC 1.4）：开关可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），不再由宿主的 `isHtmlSheet` 独自决定。
+ * `isHtmlSheet` 保留为 sheet 级附加条件（这张 sheet 本身是不是 HTML 可渲染的）。
+ */
+const g5EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => G5_SYNC_ENTRY_ID,
 })
 
 const isOoMode = computed(
