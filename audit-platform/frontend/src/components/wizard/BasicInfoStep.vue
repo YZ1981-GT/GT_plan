@@ -232,7 +232,6 @@
             >
               <el-option v-for="person in partnerOptions" :key="person.id" :label="person.username" :value="person.id">
                 <span>{{ person.username }}</span>
-                <span class="gt-staff-option-detail">{{ person.email }}</span>
               </el-option>
             </el-select>
           </el-form-item>
@@ -252,7 +251,6 @@
             >
               <el-option v-for="person in managerOptions" :key="person.id" :label="person.username" :value="person.id">
                 <span>{{ person.username }}</span>
-                <span class="gt-staff-option-detail">{{ person.email }}</span>
               </el-option>
             </el-select>
           </el-form-item>
