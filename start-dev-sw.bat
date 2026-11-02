@@ -87,7 +87,7 @@ set "BACKEND_RELOAD_ARGS=--reload"
 if "%GT_BACKEND_NO_RELOAD%"=="1" set "BACKEND_RELOAD_ARGS="
 set "SW_DB_URL=postgresql+asyncpg://postgres:postgres@localhost:%SW_PG_PORT%/%SW_PG_DB%"
 set "SW_REDIS_URL=redis://localhost:%SW_REDIS_PORT%/0"
-start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && set DATABASE_URL=%SW_DB_URL% && set REDIS_URL=%SW_REDIS_URL% && set ONLYOFFICE_URL=http://localhost:%SW_OFFICE_PORT% && set ONLYOFFICE_CALLBACK_BASE=http://host.docker.internal:%BACKEND_PORT% && set WOPI_BASE_URL=http://host.docker.internal:%BACKEND_PORT%/wopi && set CORS_ORIGINS=http://localhost:%FRONTEND_PORT%,http://127.0.0.1:%FRONTEND_PORT% && "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% %BACKEND_RELOAD_ARGS% --log-level warning"
+start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && set DATABASE_URL=%SW_DB_URL%&& set REDIS_URL=%SW_REDIS_URL%&& set ONLYOFFICE_URL=http://localhost:%SW_OFFICE_PORT%&& set ONLYOFFICE_CALLBACK_BASE=http://host.docker.internal:%BACKEND_PORT%&& set WOPI_BASE_URL=http://host.docker.internal:%BACKEND_PORT%/wopi&& set CORS_ORIGINS=http://localhost:%FRONTEND_PORT%,http://127.0.0.1:%FRONTEND_PORT%&& "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% %BACKEND_RELOAD_ARGS% --log-level warning"
 
 REM --- [3/4] wait for backend ---------------------------------
 echo [3/4] Waiting for backend health ...
@@ -104,7 +104,7 @@ if defined BE_OK echo       Backend is up.
 
 REM --- [4/4] start frontend -----------------------------------
 echo [4/4] Starting frontend on :%FRONTEND_PORT% ...
-start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && set VITE_HOST=0.0.0.0 && npm run dev"
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT%&& set VITE_DEV_PORT=%FRONTEND_PORT%&& set VITE_HOST=0.0.0.0&& npm run dev"
 
 echo.
 echo  ======================================
