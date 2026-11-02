@@ -187,7 +187,6 @@ function toggleCheck(id: string, checked: boolean) {
 
 function selectProject(project: any) {
   selectedId.value = project.id
-  localStorage.setItem('gt-last-project-id', project.id)
   emit('select', project)
 }
 
@@ -222,15 +221,6 @@ async function loadProjects() {
   try {
     const data = await api.get(P.projects.list)
     projects.value = data ?? []
-    // 自动恢复上次选中的项目（用最新数据，修复从向导跳回后旧数据残留）
-    const lastId = selectedId.value || localStorage.getItem('gt-last-project-id')
-    if (lastId) {
-      const fresh = projects.value.find((p: any) => p.id === lastId)
-      if (fresh) {
-        selectedId.value = fresh.id
-        emit('select', fresh)
-      }
-    }
   } catch { /* ignore */ }
   finally { loading.value = false }
 }

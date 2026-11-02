@@ -76,7 +76,7 @@
     </template>
 
     <template #detail>
-      <!-- 三栏浏览模式：右侧显示项目详情 -->
+      <!-- 三栏浏览模式：右侧显示项目详情；未选中项目时 DetailProjectPanel 内部 v-if="project" 渲染空壳（默认不展示右侧内容） -->
       <DetailProjectPanel v-if="isBrowseMode && !fourCol" :project="selectedProject" />
       <!-- 四栏浏览模式：右侧显示选中目录项的内容 -->
       <FourColumnContent
