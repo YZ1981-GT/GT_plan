@@ -185,9 +185,19 @@ function toggleCheck(id: string, checked: boolean) {
   }
 }
 
+/**
+ * 点击项目节点 = 进入该项目。
+ *
+ * 🔴 原先只做「选中 + emit」：右栏换成 DetailProjectPanel，路由仍停在 /projects。
+ *    现改为导航到项目入口页 ProjectEntry（落地页「请从左侧选择要进入的环节」），
+ *    由左侧项目子菜单继续分流到各环节。
+ *    emit('select') 必须保留 —— DefaultLayout 用它维护 selectedProject，
+ *    四栏目录与侧栏隐藏判断都读这个值，去掉会连带破坏四栏模式。
+ */
 function selectProject(project: any) {
   selectedId.value = project.id
   emit('select', project)
+  router.push({ name: 'ProjectEntry', params: { projectId: project.id } })
 }
 
 function editProject(project: any) {

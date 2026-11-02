@@ -582,6 +582,10 @@ export type Events = {
   'catalog:note-select': CatalogNoteSelectPayload
   'note:section-changed': NoteSectionChangedPayload
 
+  // 左侧项目菜单 → 已打开的报表页原地切页签（「审定报表」/「报表分析」同属 ReportView）。
+  // 不走 URL：路由 query 变化会让 DefaultLayout 按 fullPath 整页重建、丢失页面状态。
+  'report:switch-tab': { projectId: string; tab: string }
+
   // C2~C15 控制测试结论联动（c-control-test-refresh Task 5.1）
   'control:test-concluded': ControlTestConcludedPayload
 

@@ -11,6 +11,14 @@ export const workpapersRoutes: RouteRecordRaw[] = [
           component: () => import(/* webpackPrefetch: true */ '@/views/WorkpaperList.vue'),
         },
 {
+          // 税审底稿（项目侧栏「税审底稿」）：目录在布局层二级栏，`?sheet=` 指定当前表。
+          // 🔴 与上面的 WorkpaperList（财报审计底稿）是两套底稿，不要合并。
+          path: 'projects/:projectId/tax-workpapers',
+          name: 'TaxWorkpapers',
+          component: () => import('@/views/TaxWorkpaperPage.vue'),
+          meta: { permission: 'project:view' },
+        },
+{
           path: 'projects/:projectId/workpapers/:wpId/edit',
           name: 'WorkpaperEditor',
           component: () => import('@/views/WorkpaperEditor.vue'),

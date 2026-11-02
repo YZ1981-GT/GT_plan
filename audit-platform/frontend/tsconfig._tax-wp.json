@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig._project-entry.json",
+  "include": [
+    "src/constants/projectStages.ts",
+    "src/constants/taxWorkpaperIndex.ts",
+    "src/components/layout/TaxWorkpaperSubnav.vue",
+    "src/views/TaxWorkpaperPage.vue",
+    "src/constants/taxWorkpaperGrids.ts",
+    "src/components/workpaper/TaxWorkpaperGrid.vue",
+    "src/views/TaxReturnPage.vue",
+    "src/env.d.ts"
+  ]
+}

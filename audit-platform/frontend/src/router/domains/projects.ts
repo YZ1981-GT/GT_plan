@@ -1,5 +1,4 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 
 /**
  * Router domain: projects
@@ -9,7 +8,9 @@ export const projectsRoutes: RouteRecordRaw[] = [
 {
           path: 'projects',
           name: 'Projects',
-          component: () => import('@/views/Projects.vue'),
+          // 税审 demo：项目列表改为全宽卡片页（无左侧栏 / 中间栏 / 右侧详情）。
+          // 原三栏浏览视图 Projects.vue 仍由 /projects/full 承载。
+          component: () => import('@/views/ProjectListHome.vue'),
         },
 {
           path: 'projects/full',
@@ -212,18 +213,14 @@ export const projectsRoutes: RouteRecordRaw[] = [
           meta: { permission: 'project:view' },
         },
 {
-          // 项目入口路由：partner/admin 默认跳转到仪表盘，其他角色跳转到试算表
+          // 项目入口路由：落在「选环节」页，由用户从左侧项目子菜单进入具体环节。
+          // 🔴 原先是按角色 redirect（partner/admin → 合伙人仪表盘，其余 → 试算表）：
+          //    那样进入项目直接落到某个环节里，用户看不到环节清单，也无法回到总览。
+          //    改成实体组件后，redirect 不再生效，`useAuthStore` 在本文件也不再被引用。
           path: 'projects/:projectId/entry',
           name: 'ProjectEntry',
-          redirect: (to) => {
-            const authStore = useAuthStore()
-            const role = authStore.user?.role
-            const projectId = to.params.projectId as string
-            if (role === 'partner' || role === 'admin') {
-              return { name: 'PartnerProjectDashboard', params: { projectId } }
-            }
-            return { name: 'TrialBalance', params: { projectId } }
-          },
+          component: () => import('@/views/ProjectEntryHome.vue'),
+          meta: { permission: 'project:view' },
         },
 {
           path: 'projects/:projectId/review-conversations',

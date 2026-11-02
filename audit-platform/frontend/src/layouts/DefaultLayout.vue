@@ -2,7 +2,7 @@
   <ThreeColumnLayout
     :hide-middle="hideMiddle"
     :catalog-title="catalogTitle"
-    :hide-sidebar="isBrowseMode && !fourCol && !!selectedProject"
+    :hide-sidebar="route.path === '/projects' || (isBrowseMode && !fourCol && !!selectedProject)"
     @nav-change="onNavChange"
     @view-change="onViewChange"
     @open-global-search="showGlobalSearch = true"
@@ -294,7 +294,8 @@ const catalogTitle = computed(() => {
 // 浏览模式：首页/项目列表/其他一级模块（非具体项目子页面和新建向导）
 // 全宽模式路径（不显示中间栏项目列表）
 const FULLWIDTH_PATHS = [
-  '/', '/projects/new', '/projects/full', '/recycle-bin', '/forum', '/private-storage',
+  // '/projects'：税审 demo 项目列表全宽卡片页（ProjectListHome），侧栏一并隐藏
+  '/', '/projects', '/projects/new', '/projects/full', '/recycle-bin', '/forum', '/private-storage',
   '/knowledge', '/consolidation', '/attachments', '/confirmation',
   '/archive', '/work-hours',
   '/template-library', '/custom-query',

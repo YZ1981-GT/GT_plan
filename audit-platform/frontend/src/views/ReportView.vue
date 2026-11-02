@@ -783,10 +783,17 @@
 
     <!-- 报表分析（A2-1/A2-2 单体报表试算） -->
     <div v-if="activeTab === 'report_analysis'" class="gt-rv-report-analysis">
+      <!-- 🔴 必须等审计年度到位再挂载：ReportAnalysisPanel 在 setup 里一次性读 props.year
+           （`const year = props.year ?? null`，非响应式），子页签挂载即发请求。
+           从左侧菜单直达本页签时，年度往往还在异步解析 ⇒ 先挂载会恒带 null，
+           实测四个接口都请求成 /api/workpapers/{pid}/null/...（422）。 -->
       <ReportAnalysisPanel
+        v-if="year"
         :project-id="projectId"
         :year="year"
       />
+      <el-empty v-else-if="!yearResolved" description="正在读取审计年度…" :image-size="60" />
+      <el-empty v-else description="项目未设置审计年度，无法进行报表分析" :image-size="60" />
     </div>
 
     </div><!-- /gt-rv-table-area -->
@@ -970,6 +977,8 @@ import { useReportMapping } from './composables/useReportMapping'
 import { useReportCellActions } from './composables/useReportCellActions'
 import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
 import { buildReportHost } from '@/composables/useAiHostContext'
+import { eventBus } from '@/utils/eventBus'
+import { reportActiveTab } from '@/composables/reportActiveTab'
 
 const route = useRoute()
 const router = useRouter()
@@ -1114,7 +1123,26 @@ const showDocAiChat = ref(false)
 
 const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
-const activeTab = ref('balance_sheet')
+/**
+ * 页签与 URL `?tab=` 双向同步 —— 让左侧菜单「报表分析」能直达本页的 report_analysis 页签。
+ *
+ * 🔴 只认白名单里的页签名：URL 上的任意字符串（拼错 / 旧链接）落回资产负债表，
+ *    不让 el-tabs 停在一个不存在的 pane 上（那样整页空白、也没有任何页签高亮）。
+ *    白名单须与模板里 <el-tab-pane name> 逐个一致。
+ */
+const REPORT_TAB_NAMES = [
+  'balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement',
+  'cash_flow_supplement', 'impairment_provision', 'cross_check', 'multi_year_compare', 'report_analysis',
+] as const
+type ReportTabName = typeof REPORT_TAB_NAMES[number]
+const DEFAULT_REPORT_TAB: ReportTabName = 'balance_sheet'
+
+function tabFromQuery(q: unknown): ReportTabName {
+  const v = Array.isArray(q) ? q[0] : q
+  return (REPORT_TAB_NAMES as readonly string[]).includes(String(v)) ? (v as ReportTabName) : DEFAULT_REPORT_TAB
+}
+
+const activeTab = ref<string>(tabFromQuery(route.query.tab))
 const reportMode = ref<'audited' | 'unadjusted' | 'compare'>('audited')
 
 // ─── useReportData composable ───────────────────────────────────────────────
@@ -1464,23 +1492,69 @@ const {
 } = cellActions
 
 
+/**
+ * 审计年度是否已解析完（无论结果是否为 null）。
+ * 用来区分「还在取」与「项目没填审计年度」—— 两者 year 都是 null，
+ * 不区分的话后者会让「报表分析」页签永远停在「正在读取…」。
+ */
+const yearResolved = ref(false)
+
 async function _ensureProjectYearWrapper() {
   if (routeYear.value !== null) {
     projectYear.value = null
+    yearResolved.value = true
     return
   }
-  // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
-  await ensureProjectYear()
-  // Sync main-file-owned state from composable results
-  projectYear.value = reportData._fetchedAuditYear.value
-  selectedYear.value = projectYear.value ?? null
-  selectedTemplateType.value = templateType.value
+  try {
+    // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
+    await ensureProjectYear()
+    // Sync main-file-owned state from composable results
+    projectYear.value = reportData._fetchedAuditYear.value
+    selectedYear.value = projectYear.value ?? null
+    selectedTemplateType.value = templateType.value
+  } finally {
+    // 失败也算「解析完」：否则报表分析页签会永远显示「正在读取」
+    yearResolved.value = true
+  }
 }
 
 function onTabChange() {
   if (activeTab.value === 'cross_check' || activeTab.value === 'multi_year_compare' || activeTab.value === 'report_analysis') return
   fetchReport()
 }
+
+/**
+ * 页内切到指定页签（左侧菜单「审定报表」/「报表分析」在本页已打开时调用）。
+ *
+ * 🔴 为什么不靠 URL：DefaultLayout 的 <component :key="viewRoute.fullPath"> 让**任何 query 变化**
+ *    都整页重建（筛选、滚动、展开状态全丢 + 一次滑动动画）。所以：
+ *    - 进入本页时读一次 `?tab=`（见 activeTab 初值）；
+ *    - 用户点页签**不回写** URL；
+ *    - 已在本页再点菜单时，菜单发事件过来、本函数原地切页签（不重建）。
+ */
+function switchToTab(tab: unknown) {
+  const next = tabFromQuery(tab)
+  if (next === activeTab.value) return
+  activeTab.value = next
+  onTabChange()
+}
+
+function onReportTabEvent(p: { projectId?: string; tab?: string }) {
+  // 只响应本项目：多窗口 / 项目切换途中的残留事件不应切走当前页签
+  if (p?.projectId && p.projectId !== projectId.value) return
+  switchToTab(p?.tab)
+}
+eventBus.on('report:switch-tab', onReportTabEvent)
+
+// 把实际所在页签公布给左侧菜单（高亮用，见 composables/reportActiveTab.ts）。
+// 页内点页签不改 URL，只能靠这里同步，否则菜单高亮会停在进入时的那一项。
+watch(activeTab, (t) => { reportActiveTab.value = t }, { immediate: true })
+
+onUnmounted(() => {
+  eventBus.off('report:switch-tab', onReportTabEvent)
+  // 只在值仍是本实例写的时才清：整页重建时新实例可能先写入，旧实例卸载不能把它冲成 null
+  if (reportActiveTab.value === activeTab.value) reportActiveTab.value = null
+})
 
 const _onSyncUnadjusted = withLoading(syncLoading, async () => {
   await recalcTrialBalance(projectId.value, year.value)

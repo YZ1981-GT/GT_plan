@@ -189,7 +189,23 @@
           </el-tooltip>
         </template>
 
-        <el-dropdown trigger="click">
+        <!-- 已进入项目：顶栏右侧给「项目列表」「退出登录」两个明按钮（税审 demo 样式）。
+             用户名改纯文本展示（不再是头像下拉）—— 下拉里原本只有「退出登录」一项，
+             既然已提成明按钮，下拉就没有内容可放了。
+             🔴 未进入项目时保留原头像下拉：项目列表页本身没有「返回项目列表」的去处。 -->
+        <template v-if="currentProjectId">
+          <span class="gt-topbar-user-text">{{ authStore.username }}</span>
+          <el-button size="small" @click="router.push('/projects')">项目列表</el-button>
+          <el-button size="small" @click="handleLogout">退出登录</el-button>
+        </template>
+        <!-- 项目列表页（全宽卡片页、无左侧栏）：同样用纯文本用户名 + 明按钮。
+             左侧栏隐藏后「账号权限」没有入口了 ⇒ 管理员在顶栏补一个按钮。 -->
+        <template v-else-if="route.path === '/projects'">
+          <span class="gt-topbar-user-text">{{ authStore.username }}</span>
+          <el-button v-if="authStore.user?.role === 'admin'" size="small" @click="router.push('/settings/users')">账号权限</el-button>
+          <el-button size="small" @click="handleLogout">退出登录</el-button>
+        </template>
+        <el-dropdown v-else trigger="click">
           <div class="gt-user-info">
             <el-avatar :size="30" class="gt-avatar">
               {{ (authStore.username || 'U').charAt(0).toUpperCase() }}
@@ -208,15 +224,55 @@
       </div>
     </header>
 
+    <!-- 项目信息条：仅在项目上下文内显示（项目名 + 审核年度 + 三个角色） -->
+    <ProjectEntryBar :project-id="currentProjectId" />
+
     <!-- 级联 degraded 状态横幅 [enterprise-linkage 4.8] -->
     <DegradedBanner />
 
     <!-- 三栏主体 -->
     <div class="gt-body">
       <!-- 左侧栏：1级功能导航 -->
-      <aside v-show="!hideSidebar" class="gt-sidebar" :style="{ width: sidebarCollapsed ? '56px' : sidebarWidth + 'px' }" role="navigation">
-        <nav class="gt-nav">
-          <template v-for="item in navItems" :key="item.key">
+      <!-- 项目内用固定窄栏（环节标签自动折行），不参与折叠与拖拽宽度 -->
+      <aside
+        v-show="!hideSidebar"
+        class="gt-sidebar"
+        :class="{ 'gt-sidebar--project': inProjectContext }"
+        :style="inProjectContext ? undefined : { width: sidebarCollapsed ? '56px' : sidebarWidth + 'px' }"
+        role="navigation"
+      >
+        <nav class="gt-nav" :class="{ 'gt-nav--project': inProjectContext }">
+          <!-- 进入项目后侧栏只剩环节清单（分组标题 + 图标条目）；
+               1 级菜单（项目 / 账号权限）与「收起」在项目内一并隐藏 ——
+               返回项目列表走顶栏的「项目列表」按钮。
+               条目与分组来自 `@/constants/projectStages`（单一真源）。 -->
+          <template v-if="inProjectContext">
+            <template v-for="group in PROJECT_STAGE_GROUPS" :key="group.key">
+              <div class="gt-nav-group-title">{{ group.title }}</div>
+              <el-tooltip
+                v-for="item in group.items"
+                :key="item.key"
+                :content="item.pendingReason || ''"
+                :disabled="!item.pending"
+                placement="right"
+              >
+                <div
+                  class="gt-nav-item gt-nav-item--stage"
+                  :class="{
+                    'gt-nav-item--active': activeProjectSubNav === item.key,
+                    'gt-nav-item--pending': item.pending,
+                  }"
+                  @click="onProjectStageClick(item)"
+                  :title="item.pending ? '' : item.label"
+                >
+                  <el-icon :size="17"><component :is="item.icon" /></el-icon>
+                  <span class="gt-nav-stage-label">{{ item.label }}</span>
+                  <span v-if="item.key === TAX_WORKPAPER_STAGE_KEY" class="gt-nav-stage-caret">{{ taxWpSubnavOpen ? '▾' : '▸' }}</span>
+                </div>
+              </el-tooltip>
+            </template>
+          </template>
+          <template v-else v-for="item in navItems" :key="item.key">
             <div
               class="gt-nav-item"
               :class="{ 'gt-nav-item--active': activeNav === item.key }"
@@ -231,21 +287,6 @@
                   <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
                   <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">📌 即将上线</span>
                 </span>
-              </transition>
-            </div>
-
-            <!-- 项目子菜单：仅在已进入某个项目时显示（需要 projectId 拼路径） -->
-            <div
-              v-for="sub in (item.key === 'projects' ? projectSubNavItems : [])"
-              :key="sub.key"
-              class="gt-nav-item gt-nav-item--sub"
-              :class="{ 'gt-nav-item--active': activeProjectSubNav === sub.key }"
-              @click="onProjectSubNavClick(sub)"
-              :title="sub.label"
-            >
-              <el-icon :size="16"><component :is="sub.icon" /></el-icon>
-              <transition name="gt-fade">
-                <span v-if="!sidebarCollapsed" class="gt-nav-label gt-nav-label--sub">{{ sub.label }}</span>
               </transition>
             </div>
           </template>
@@ -269,8 +310,8 @@
               </transition>
             </div>
           </template>
-          <!-- 收起 -->
-          <div class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
+          <!-- 收起（项目内隐藏：环节清单是固定宽度窄栏，不提供折叠） -->
+          <div v-if="!inProjectContext" class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
             <el-icon :size="20"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">收起</span>
@@ -279,10 +320,14 @@
         </nav>
       </aside>
 
+      <!-- 税审底稿二级栏「底稿目录」：与一级栏并排（CITAR ProjectShell 版式），只在税审底稿展开时出现 -->
+      <TaxWorkpaperSubnav v-if="inProjectContext && !hideSidebar && taxWpSubnavOpen" />
+
       <!-- 左侧拖拽分隔线（始终显示，用于调整左侧栏宽度） -->
       <!-- 左拖拽分隔线：侧栏隐藏时一并隐藏，否则会留下一条无对应栏位的竖线 -->
+      <!-- 项目内侧栏是固定宽度，拖拽线一并隐藏（否则拖了没反应） -->
       <div
-        v-if="!sidebarCollapsed && !hideSidebar"
+        v-if="!sidebarCollapsed && !hideSidebar && !inProjectContext"
         class="gt-resizer"
         @mousedown="startResize('left', $event)"
       />
@@ -402,7 +447,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, provide, type Component } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -414,8 +459,11 @@ import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
-  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
-  Search, Upload, Edit, Notebook, TrendCharts, CopyDocument,
+  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Loading,
+  Search,
+  // 原项目子菜单的 6 个图标（Upload / Grid / Edit / Notebook / TrendCharts / Document）
+  // 与「查账窗口」的 CopyDocument 已不再引用：项目内侧栏改纯文字环节清单。
+  // Grid 仍保留 —— 四栏切换按钮在用。
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
@@ -435,10 +483,16 @@ import {
 } from '@/shell/formula/formulaManagerContextOwner'
 import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
 import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type FourColSwitchPayload } from '@/utils/eventBus'
+import { reportActiveTab } from '@/composables/reportActiveTab'
 import { operationHistory } from '@/utils/operationHistory'
 import { openLedgerWindow } from '@/utils/openLedgerWindow'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
+import ProjectEntryBar from '@/components/layout/ProjectEntryBar.vue'
+import TaxWorkpaperSubnav from '@/components/layout/TaxWorkpaperSubnav.vue'
+import {
+  PROJECT_STAGES, PROJECT_STAGE_GROUPS, TAX_WORKPAPER_STAGE_KEY, type ProjectStage,
+} from '@/constants/projectStages'
 
 const route = useRoute()
 const router = useRouter()
@@ -483,34 +537,6 @@ const props = defineProps<{
 const roleStore = useRoleContextStore()
 
 /**
- * 项目下的子菜单（税审取数链顺序）。
- * 仅在已进入某个项目（路由含 projectId）时才渲染 —— 项目列表页没有可拼的 ID，整组自动隐藏。
- *
- * 两类条目：
- * - 带 `subPath`：站内路由，拼成 `/projects/{当前项目ID}{subPath}`
- * - 带 `action`：非路由动作（查账窗口是 window.open 打开的独立窗口，不是本布局内的页面）
- */
-type ProjectSubNavEntry = {
-  key: string
-  label: string
-  icon: Component
-  subPath?: string
-  action?: 'ledger-window'
-}
-
-const PROJECT_SUB_NAV: ProjectSubNavEntry[] = [
-  { key: 'sub-ledger-import', label: '账套导入', icon: Upload, subPath: '/ledger-import' },
-  { key: 'sub-trial-balance', label: '试算平衡表(未审)', icon: Grid, subPath: '/trial-balance' },
-  { key: 'sub-adjustments', label: '审计调整分录', icon: Edit, subPath: '/adjustments' },
-  { key: 'sub-workpapers', label: '税务底稿', icon: Notebook, subPath: '/workpapers' },
-  { key: 'sub-reports', label: '科目余额表&报表(已审)', icon: TrendCharts, subPath: '/reports' },
-  { key: 'sub-disclosure-notes', label: '鉴证报告', icon: Document, subPath: '/disclosure-notes' },
-  // 独立查账窗口（multi-window-ledger-workbench）：window.open 到 /ledger-workbench/:projectId，
-  // 窗口名按 projectId 固定 ⇒ 重复点击聚焦已有窗口而非重复开窗。
-  { key: 'sub-ledger-window', label: '查账窗口', icon: CopyDocument, action: 'ledger-window' },
-]
-
-/**
  * 左侧 1 级导航。
  * 税审 demo 只保留「项目」与「账号权限」两项，其余（仪表盘/人员档案/工时/看板/
  * 合并/函证/归档/附件/模板库/全局公式/知识库/私人库/AI 模型）已移除。
@@ -539,41 +565,75 @@ const navItems = computed(() =>
 )
 
 /**
- * 项目子菜单：仅在路由含 projectId 时可用（否则无法拼出目标路径）。
- * 返回已拼好绝对路径的数组，模板直接渲染。
+ * 是否在项目上下文内（路由带 projectId）。
+ * 为真时：左侧栏只显示环节清单（固定窄栏）、顶栏右侧换成「项目列表 / 退出登录」。
  */
-const projectSubNavItems = computed(() => {
-  // 直接读 route.params 而不复用下方的 currentProjectId：
-  // 后者声明在本文件更靠后的位置，跨前后引用虽因 computed 惰性求值可用，但很脆弱。
-  const pid = (route.params.projectId as string) || ''
-  if (!pid) return []
-  return PROJECT_SUB_NAV.map(item => ({
-    ...item,
-    // 动作型条目（查账窗口）没有站内路径，path 置空串 ⇒ 不参与高亮匹配
-    path: item.subPath ? `/projects/${pid}${item.subPath}` : '',
-  }))
+const inProjectContext = computed(() => !!(route.params.projectId as string))
+
+/**
+ * 当前命中的环节 key（空串 = 未命中）。
+ *
+ * 🔴 按**路由名**匹配，不按路径前缀。
+ *    原先用 `path.startsWith(item.path)`：`/trial-balance` 是 `/t...` 这类更长路径的
+ *    前缀时会多命中；而现在两个条目可以指向同一路由（如报表页与报表内页签），
+ *    路径前缀法无法区分。路由名是 vue-router 给的唯一标识，稳得多。
+ */
+const activeProjectSubNav = computed(() => {
+  const current = route.name
+  if (!current) return ''
+  const sameRoute = PROJECT_STAGES.filter(s => s.routeName && s.routeName === current)
+  // 同一路由挂了多个条目（「审定报表」与「报表分析」都是 Reports）时按页签区分 ——
+  // 否则两项会同时高亮。页签取值：报表页已挂载时用它公布的**实际**页签（页内点页签不改 URL，
+  // URL 上的 tab 会过期），未挂载才退回 URL。
+  const tabNow = current === 'Reports' && reportActiveTab.value != null
+    ? reportActiveTab.value
+    : String(route.query.tab ?? '')
+  const exact = sameRoute.find(s => s.query && Object.entries(s.query).every(
+    ([k, v]) => (k === 'tab' ? tabNow : String(route.query[k] ?? '')) === v,
+  ))
+  return (exact || sameRoute.find(s => !s.query))?.key || ''
 })
 
 /**
- * 当前命中的子菜单 key（按路径前缀匹配，空串表示未命中）。
- * 动作型条目 path 为空串，必须排除 —— 否则 `startsWith('')` 恒为真会把它误判成命中。
+ * 税审底稿二级栏是否展开。进入税审底稿页即展开、离开即收起
+ * （切到其他环节后内容区才能用满宽度）；在本页内再点环节只切换显隐。
  */
-const activeProjectSubNav = computed(() => {
-  const p = route.path
-  return projectSubNavItems.value.find(item => item.path && p.startsWith(item.path))?.key || ''
-})
+const taxWpSubnavOpen = ref(false)
+const taxWpRouteName = PROJECT_STAGES.find(s => s.key === TAX_WORKPAPER_STAGE_KEY)?.routeName
+watch(() => route.name, (name, prev) => {
+  const onPage = !!taxWpRouteName && name === taxWpRouteName
+  if (onPage !== (!!taxWpRouteName && prev === taxWpRouteName)) taxWpSubnavOpen.value = onPage
+}, { immediate: true })
 
-/** 子菜单点击：路由型带上当前年度（与 DetailProjectPanel 的 goTo 口径一致）；动作型另走分支 */
-function onProjectSubNavClick(item: { key: string; path: string; action?: 'ledger-window' }) {
+/**
+ * 环节点击：跳到该环节的具名路由，带上当前年度
+ * （与 DetailProjectPanel 的 goTo 口径一致，漏传会让目标页退回自然年）。
+ *
+ * pending 条目（无 routeName）不跳转 —— 它们没有页面，跳过去就是白屏。
+ */
+function onProjectStageClick(item: ProjectStage) {
+  if (item.pending || !item.routeName) return
+  const pid = (route.params.projectId as string) || ''
+  if (!pid) return
+  // 已在税审底稿页再点「税审底稿」：只收起 / 展开二级栏，不重新跳转（CITAR 同口径）
+  if (item.key === TAX_WORKPAPER_STAGE_KEY && route.name === item.routeName) {
+    taxWpSubnavOpen.value = !taxWpSubnavOpen.value
+    return
+  }
   const year = route.query.year ? String(route.query.year) : undefined
+  const query: Record<string, string> = { ...(year ? { year } : {}), ...(item.query || {}) }
 
-  if (item.action === 'ledger-window') {
-    openLedgerWindow((route.params.projectId as string) || '', year ? Number(year) : undefined)
+  // 已停在报表页时点「审定报表」/「报表分析」：只是换页签 —— 原地切，不重新导航。
+  // 🔴 不能改 URL：DefaultLayout 按 fullPath 给页面组件加 key，改 query（哪怕 replace）
+  //    都会整页重建、筛选与滚动全丢。只发事件，由 ReportView 自己切页签；
+  //    菜单高亮读 ReportView 公布的实际页签（reportActiveTab），不依赖 URL。
+  //    空 tab ⇒ ReportView 回落到默认页签（资产负债表）＝「审定报表」。
+  if (item.routeName === 'Reports' && route.name === 'Reports') {
+    eventBus.emit('report:switch-tab', { projectId: pid, tab: item.query?.tab ?? '' })
     return
   }
 
-  if (!item.path) return
-  router.push({ path: item.path, query: year ? { year } : {} })
+  router.push({ name: item.routeName, params: { projectId: pid }, query })
 }
 
 const activeNav = computed(() => {
@@ -1289,6 +1349,17 @@ onUnmounted(() => {
   font-size: var(--gt-font-size-sm);
   border: none;
 }
+/* 项目内顶栏的用户名纯文本（无头像下拉） */
+.gt-topbar-user-text {
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-secondary, #606266);
+  margin-right: var(--gt-space-2);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .gt-username {
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
@@ -1357,6 +1428,80 @@ onUnmounted(() => {
   color: var(--gt-color-primary);
 }
 .gt-nav-label--sub { font-weight: 400; }
+
+/* ── 项目内侧栏：固定窄栏 + 纯文字环节清单（标签过长自动折行） ── */
+/* 🔴 选择器必须带 .gt-three-col 前缀且 width 带 !important —— 两者缺一不可：
+   下方响应式断点 max-width 1440px 有一条给 1 级图标导航用的规则，
+   把 .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar 的宽度钉成
+   56px !important。它是「2 类 + :not」，比单类选择器特异度更高
+   ⇒ 只加 important 仍然输（实测环节清单被压成 56px、中文标签逐字折行）。
+   ⚠ 本注释内禁写花括号（理由见下方 .gt-nav-item--stage 处注释）。 */
+.gt-three-col .gt-sidebar--project {
+  width: 190px !important;
+  background: var(--gt-color-bg-white, #fff);
+  overflow-y: auto;
+}
+.gt-nav--project { padding: var(--gt-space-2) 0 var(--gt-space-4); }
+
+/* 分组标题（灰色小字，不可点） */
+.gt-nav-group-title {
+  padding: 14px 16px 6px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary, #909399);
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+.gt-nav-group-title:first-child { padding-top: 6px; }
+
+/* 🔴 justify-content 必须显式写 flex-start，且选择器带 .gt-three-col 前缀：
+   下方响应式断点 max-width 1440px 给 .gt-sidebar .gt-nav-item 设了
+   justify-content:center（1 级栏压成 56px 图标条时居中用）。
+   不覆盖的话 ≤1440px 窗口下图标+文字会被整体推到栏中间
+   （实测图标 x=55，而分组标题 x=0），与截图的左对齐不符。
+   ⚠ CSS 注释里禁写右花括号 —— 注释不能嵌套，那个符号会提前闭合注释，
+     余下文字漏成非法 CSS 并静默吃掉紧随其后的整条规则（本处实测踩过：
+     选中态与 pending 灰字全部失效，且控制台无任何报错）。 */
+.gt-three-col .gt-sidebar--project .gt-nav-item--stage {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 9px 16px;
+  margin: 0;
+  border-radius: 0;
+  white-space: nowrap;
+  line-height: 1.4;
+  color: var(--gt-color-text, #303133);
+  font-size: var(--gt-font-size-sm);
+}
+.gt-three-col .gt-sidebar--project .gt-nav-item--stage:hover {
+  background: var(--gt-color-primary-bg, #f4f0fa);
+}
+/* 选中态：浅紫底 + 主色文字（不是 1 级菜单那种深紫实底反白） */
+.gt-three-col .gt-sidebar--project .gt-nav-item--stage.gt-nav-item--active {
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  color: var(--gt-color-primary, #4b2d77) !important;
+  font-weight: 600;
+  box-shadow: none;
+}
+/* 尚无页面的条目：灰掉且不响应 hover（点击由 onProjectStageClick 早退兜住）。
+   🔴 选择器层数必须 ≥ 上面那条 .gt-nav-item--stage 规则，否则它的 color 会压过本条
+   （实测 pending 字色曾恒为正文色，看不出不可点）。 */
+.gt-three-col .gt-sidebar--project .gt-nav-item--pending {
+  color: var(--gt-color-text-tertiary, #c0c4cc);
+  cursor: not-allowed;
+}
+.gt-three-col .gt-sidebar--project .gt-nav-item--pending:hover {
+  background: transparent;
+}
+.gt-nav-stage-label { word-break: keep-all; }
+/* 有二级栏的环节（税审底稿）右侧展开标记 */
+.gt-nav-stage-caret {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a79bb5;
+}
 
 /* 侧栏收起时子菜单只剩图标，取消缩进与竖线 */
 .gt-three-col--collapsed .gt-nav-item--sub {

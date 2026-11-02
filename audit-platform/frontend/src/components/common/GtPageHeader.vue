@@ -31,6 +31,8 @@
         @click="onBack"
       >← 返回</el-button>
       <span v-if="icon && variant === 'banner'" class="gt-page-header__icon">{{ icon }}</span>
+      <!-- prefix 插槽：标题前的小标记（如章节编号徽标）。可选，不传则不渲染任何节点 -->
+      <slot name="prefix" />
       <h2 class="gt-page-header__title">{{ title }}</h2>
       <!-- 默认插槽：放 GtInfoBar -->
       <slot />
