@@ -103,6 +103,7 @@ interface ProjectItem {
   project_type?: string | null
   audit_period_start?: string | null
   audit_period_end?: string | null
+  created_at?: string | null
   children?: ProjectItem[]
 }
 

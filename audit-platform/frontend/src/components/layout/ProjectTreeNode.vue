@@ -26,8 +26,8 @@
         @click.stop
       />
 
-      <!-- 状态色条 -->
-      <div class="gt-node-status" :class="'gt-status--' + (node.status || 'created')" />
+      <!-- 左侧紫色竖条（对齐截图样式） -->
+      <div class="gt-node-status" />
 
       <!-- 内容区 -->
       <div class="gt-node-body" @click="$emit('select', node)">
@@ -36,6 +36,7 @@
           <el-icon v-if="node.report_scope === 'consolidated'" :size="13" style="color: var(--gt-color-primary); margin-right: 4px"><FolderOpened /></el-icon>
           {{ node.short_name || node.client_name || '未命名项目' }}
           <el-tag v-if="projectTypeLabel" size="small" class="gt-node-type-tag">{{ projectTypeLabel }}</el-tag>
+          <span class="gt-node-date">{{ formattedCreatedAt }}</span>
         </div>
         <div class="gt-node-meta">
           <span class="gt-node-meta-info">
@@ -101,6 +102,7 @@ interface ProjectNode {
   audit_year?: number | null
   audit_period_start?: string | null
   audit_period_end?: string | null
+  created_at?: string | null
   children?: ProjectNode[]
 }
 
@@ -142,6 +144,16 @@ const attestationPeriod = computed(() => {
   if (start && end) return `${start} ~ ${end}`
   const year = props.node.audit_year
   return year ? `${year} 年度` : ''
+})
+
+/** 创建时间（截图样式：2026-10-09 11:03）。无数据/非法时不显示。 */
+const formattedCreatedAt = computed(() => {
+  const d = props.node.created_at
+  if (!d) return ''
+  const date = new Date(d)
+  if (isNaN(date.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}`
 })
 </script>
 
@@ -193,12 +205,7 @@ const attestationPeriod = computed(() => {
 
 .gt-node-check { flex-shrink: 0; margin: 0 2px; }
 
-.gt-node-status { width: 3px; flex-shrink: 0; align-self: stretch; border-radius: 2px; margin: 4px 2px; }
-.gt-status--created { background: var(--gt-color-text-tertiary); }
-.gt-status--planning { background: linear-gradient(180deg, #FFC23D, #e6a817); }
-.gt-status--execution { background: var(--gt-gradient-primary); }
-.gt-status--completion { background: linear-gradient(180deg, #28A745, #1e8a38); }
-.gt-status--archived { background: var(--gt-color-border); }
+.gt-node-status { width: 3px; flex-shrink: 0; align-self: stretch; border-radius: 2px; margin: 4px 2px; background: var(--gt-color-primary); }
 
 .gt-node-body { padding: 3px 6px; flex: 1; min-width: 0; }
 .gt-node-title {
@@ -232,6 +239,17 @@ const attestationPeriod = computed(() => {
   flex-shrink: 0;
   transform: scale(0.9);
   transform-origin: left center;
+}
+
+/* 创建时间（标题行右侧，灰色小字） */
+.gt-node-date {
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: var(--gt-font-size-xs);
+  font-weight: 400;
+  color: var(--gt-color-text-tertiary);
 }
 
 /* 元信息行：客户名称 + 鉴证期间 */
