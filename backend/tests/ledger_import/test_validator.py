@@ -114,7 +114,8 @@ class TestL1KeyColumnDateInvalid:
 
     def test_voucher_date_valid_formats(self):
         """多种合法日期格式都应通过。"""
-        valid_dates = ["2025-01-15", "2025/01/15", "20250115", "2025-01-15 10:30:00"]
+        valid_dates = ["2025-01-15", "2025/01/15", "20250115", "2025-01-15 10:30:00",
+                       "2025.01.01", "2025/01/15 10:30:00"]
         for d in valid_dates:
             rows = [{"voucher_date": d, "voucher_no": "记-001",
                      "account_code": "1001", "debit_amount": "100", "credit_amount": "0"}]
@@ -129,6 +130,23 @@ class TestL1KeyColumnDateInvalid:
         findings, _ = validate_l1(rows, "ledger", column_mapping={})
         date_errors = [f for f in findings if "DATE" in f.code]
         assert len(date_errors) == 0
+
+    def test_validator_accepts_every_date_converter_accepts(self):
+        """校验与入库同口径：入库转换能解析的日期，校验不得判 DATE_INVALID_KEY。
+
+        回归：校验曾自带一份格式清单、漏了 YYYY.MM.DD，点号日期的序时账
+        （14107 行）整批阻断、数据未激活，而入库转换本身能解析。
+        """
+        from app.services.ledger_import.converter import parse_date_val
+
+        samples = ["2025.01.01", "2025.12.31", "2025-01-15", "2025/01/15", "20250115",
+                   "2025-01-15 10:30:00", "2025/01/15 10:30:00", "45678"]
+        for d in samples:
+            assert parse_date_val(d) is not None, d
+            rows = [{"voucher_date": d, "voucher_no": "记-001",
+                     "account_code": "1001", "debit_amount": "100", "credit_amount": "0"}]
+            findings, _ = validate_l1(rows, "ledger", column_mapping={})
+            assert not [f for f in findings if f.code == "DATE_INVALID_KEY"], d
 
 
 # ---------------------------------------------------------------------------
