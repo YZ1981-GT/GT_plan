@@ -910,8 +910,8 @@ class DisclosureEngine:
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
         # 🔴 只取 `wizard_state`（加主键），不做全列 ORM 投影：ORM 声明的列可以领先于库
-        #    （现算共享库缺 `projects.amount_unit`，远端迁移 V250 未落库），全列 SELECT 会
-        #    `UndefinedColumnError` ⇒ 本函数整体失败，而调用方的 fail-open 只会把它变成
+        #    （2026-11-01 实测共享库缺 `projects.amount_unit`、V250 未落库；11-03 他人迁库后已有，
+        #    机理仍在），全列 SELECT 会 `UndefinedColumnError` ⇒ 本函数整体失败，而调用方的 fail-open 只会把它变成
         #    「静默退化 + 事务 aborted」。`load_only` 保留 ORM 实体，下面对 `wizard_state`
         #    的回写与 flush 行为不变（UPDATE 只写该列）。
         result = await self.db.execute(

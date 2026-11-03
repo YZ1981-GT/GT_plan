@@ -39,7 +39,7 @@ class NoteTrimService:
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
         # 只取 `wizard_state`（加主键）：全列 ORM 投影在「ORM 比库新一列」时会整体失败
-        # （现算共享库缺 `projects.amount_unit`）。`load_only` 保留实体，下面的回写不变。
+        # （2026-11-01 实测共享库缺 `projects.amount_unit`）。`load_only` 保留实体，下面的回写不变。
         result = await self.db.execute(
             sa.select(Project)
             .options(orm.load_only(Project.wizard_state))
