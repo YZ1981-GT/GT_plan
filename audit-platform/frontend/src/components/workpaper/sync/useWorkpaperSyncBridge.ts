@@ -57,6 +57,7 @@ import {
 } from './workpaperSyncDto'
 import * as syncApi from './workpaperSyncApi'
 import type { WorkpaperSyncEntryScope } from './workpaperSyncApi'
+import { isFirstPublicationPending } from './entrySyncPresentation'
 import {
   migrateWorkpaperSyncMode,
   persistWorkpaperSyncMode,
@@ -462,7 +463,12 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         } catch (error) {
           return fail('readiness', error)
         }
-        if (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo')) {
+        // 尚无首版 ⇒ 放行：attempt 内 materialize 报 substrate_not_published 后由
+        // retryAfterFirstPublication 发首版并整链重走（只重走一次）。其余「未就绪」照旧拒绝。
+        if (
+          !isFirstPublicationPending(readiness)
+          && (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo'))
+        ) {
           const reason = readiness.reason
           refuse(
             'bridge_runtime_not_ready',
@@ -541,6 +547,10 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       pendingKey = receipt.idempotencyKey
       pendingMutationToken.value = token
     } catch (error) {
+      // 尚无首版时 adapter 注册不上，服务端在 pending-mutations 这一步就回报
+      // substrate_not_published（还到不了 materialize）⇒ 同样发一次首版后整链重走。
+      const retried = await retryAfterFirstPublication(error, allowFirstPublication)
+      if (retried !== null) return retried
       return failIdentityOrSync('pending_mutation', error)
     }
     apply('pending_mutation_created')

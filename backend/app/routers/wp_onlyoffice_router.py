@@ -29,6 +29,7 @@ from app.deps import authorize_wp_read, get_current_user
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.services.wp_visibility import editor_security as _editor_security
+from app.services.workpaper_sync.room_launch import sheet_bookmark_ref
 from app.services.wp_visibility.denial import (
     EXTERNAL_NOT_FOUND_DETAIL,
     ExternalNotFound,
@@ -842,7 +843,12 @@ async def get_sheet_onlyoffice_config(
             **(
                 {}
                 if whole_workbook or document_type != "cell"
-                else {"actionLink": {"action": {"type": "bookmark", "data": sheet_name}}}
+                # 表格编辑器按单元格引用跳转：裸表名不跳，须 `'表名'!A1`（见 sheet_bookmark_ref）
+                else {
+                    "actionLink": {
+                        "action": {"type": "bookmark", "data": sheet_bookmark_ref(sheet_name)}
+                    }
+                }
             ),
             "user": {
                 "id": str(current_user.id),

@@ -381,7 +381,7 @@ def build_signed_launch_config(
     # 去找一个不存在的书签。
     if str(document_type or "") == "xlsx" and str(target_sheet or "").strip():
         editor["actionLink"] = {
-            "action": {"type": "bookmark", "data": str(target_sheet).strip()}
+            "action": {"type": "bookmark", "data": sheet_bookmark_ref(target_sheet)}
         }
 
     # 只保留 OO 认识的顶层键（generation / write_fence_epoch 已在 descriptor 顶层）
@@ -405,6 +405,23 @@ def build_signed_launch_config(
 # ═══════════════════════════════════════════════════════════════════════════
 # 打开即定位：(entry, sheet_key) → 工作簿内的物理 sheet 名
 # ═══════════════════════════════════════════════════════════════════════════
+
+
+def sheet_bookmark_ref(sheet_name: str) -> str:
+    """把工作表名转成表格编辑器 `actionLink` 能跳转的引用：``'表名'!A1``。
+
+    表格编辑器把 `actionLink.action.data` 交给 `asc_findCell`，它按**单元格引用**解析。
+    2026-11-03 真库实测（OO 9.4，D4 整册 47 张，起点 D4-1，目标 D4-3）：
+
+    * 裸表名 `其他业务收入明细表D4-3` → 不跳（停在 D4-1）—— 原实现就是这么写的，
+      所以「打开 D4-2 / D4-3 都停在 D4-1」；
+    * `其他业务收入明细表D4-3!A1`（不带引号）→ 不跳；
+    * `'其他业务收入明细表D4-3'!A1` → 跳到 D4-3。
+
+    表名里的单引号按 Excel 规则写成两个（``O'Brien`` → ``'O''Brien'!A1``）。
+    """
+    name = str(sheet_name or "").strip().replace("'", "''")
+    return f"'{name}'!A1"
 
 
 def resolve_launch_target_sheet(*, contract: Any, sheet_key: str) -> str:
@@ -458,6 +475,7 @@ __all__ = [
     "build_contents_url",
     "build_signed_launch_config",
     "resolve_launch_target_sheet",
+    "sheet_bookmark_ref",
     "resolve_room_contents",
     "sign_room_contents_token",
     "verify_room_contents_token",

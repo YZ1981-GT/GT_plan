@@ -51,6 +51,21 @@ function notice(
   return { ...base, noticeKind: kind, noticeLabel: label, noticeSummary: summary, noticeReason: detail }
 }
 
+/**
+ * 「尚无首版、但可在首次进入在线编辑时自动发布」。
+ *
+ * 首版只在首次进入在线编辑时由桥按需发布（`ensureFirstPublication`，spec
+ * d2-online-edit-platform-closure R7）。此时 `runtime.ready` 如实为 false，但不能据此藏起入口、
+ * 也不能在桥里拒绝 —— 否则首版永远发不出来。页面展示与桥的放行共用这一个判据。
+ */
+export function isFirstPublicationPending(readiness: EntrySyncReadiness | null): boolean {
+  return readiness !== null
+    && readiness.capability === 'bidirectional'
+    && readiness.allowed_modes.includes('oo')
+    && !readiness.runtime.ready
+    && readiness.reason?.code === 'REPRESENTATION_MISSING'
+}
+
 export function deriveEntrySyncPresentation(
   readiness: EntrySyncReadiness | null,
   loadState: EntrySyncLoadState,
@@ -108,6 +123,22 @@ export function deriveEntrySyncPresentation(
       { ...base, showModeSwitch: false },
       'warning', '两侧数据未互通',
       '结构化视图与在线编辑尚未形成已验收的双向链路', readiness.reason,
+    )
+  }
+  if (isFirstPublicationPending(readiness)) {
+    // 入口照常开放；点「在线编辑」时桥先发首版再打开编辑器。尚未发布 ⇒ 不宣称已验收双向。
+    return notice(
+      {
+        ...base,
+        showHtml: true,
+        showOnlyOffice: true,
+        showModeSwitch: true,
+        canSwitchToHtml: true,
+        canSwitchToOnlyOffice: true,
+        canClaimBidirectional: false,
+      },
+      'info', '首次在线编辑',
+      '进入在线编辑时将自动发布首版', readiness.reason,
     )
   }
   if (!readiness.runtime.ready) {

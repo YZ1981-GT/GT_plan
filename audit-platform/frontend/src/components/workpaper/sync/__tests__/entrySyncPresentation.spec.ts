@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EntrySyncReadiness } from '../workpaperSyncApi'
-import { deriveEntrySyncPresentation } from '../entrySyncPresentation'
+import { deriveEntrySyncPresentation, isFirstPublicationPending } from '../entrySyncPresentation'
 
 function value(patch: Partial<EntrySyncReadiness> = {}): EntrySyncReadiness {
   return {
@@ -106,5 +106,46 @@ describe('revalidating：已有裁决可展示、运行时仍在核验', () => {
       capability: 'unreachable', allowed_modes: [], can_claim_bidirectional: false,
     }), 'revalidating')
     expect(got).toMatchObject({ showHtml: false, showOnlyOffice: false, showModeSwitch: false })
+  })
+})
+
+describe('尚无首版：入口开放，首次进入在线编辑时自动发布首版', () => {
+  const noFirstVersion = (patch: Partial<EntrySyncReadiness> = {}) => value({
+    can_claim_bidirectional: false,
+    runtime: { ...value().runtime, ready: false },
+    acceptance: { state: 'missing', stale: false, run_id: null, required_scenario_set_digest: null },
+    reason: {
+      code: 'REPRESENTATION_MISSING',
+      message: '当前底稿尚未发布在线编辑版本。',
+      next_action: '首次进入在线编辑时会自动发布首版。',
+    },
+    ...patch,
+  })
+
+  it('显示切换、可进入在线编辑，但不宣称已验收双向', () => {
+    const got = deriveEntrySyncPresentation(noFirstVersion(), 'ready')
+    expect(got).toMatchObject({
+      showOnlyOffice: true, showModeSwitch: true, canSwitchToOnlyOffice: true,
+      canClaimBidirectional: false, noticeKind: 'info',
+    })
+    expect(got.noticeLabel).not.toBe('在线编辑不可用')
+  })
+
+  it('判据只认这一个原因码：其余未就绪原因照旧不可用', () => {
+    const other = noFirstVersion({
+      reason: { code: 'ADAPTER_NOT_READY', message: 'adapter 未就绪', next_action: '' },
+    })
+    expect(isFirstPublicationPending(other)).toBe(false)
+    expect(deriveEntrySyncPresentation(other, 'ready')).toMatchObject({
+      showOnlyOffice: false, canSwitchToOnlyOffice: false, noticeLabel: '在线编辑不可用',
+    })
+  })
+
+  it('后端没放行 oo 时不开放（判据不越过后端的 allowed_modes）', () => {
+    expect(isFirstPublicationPending(noFirstVersion({ allowed_modes: ['html'] }))).toBe(false)
+  })
+
+  it('非 bidirectional 不适用', () => {
+    expect(isFirstPublicationPending(noFirstVersion({ capability: 'single_html' }))).toBe(false)
   })
 })

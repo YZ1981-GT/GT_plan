@@ -329,6 +329,21 @@
         v-model="showDshPanel"
         @message-count="onDshMessageCount"
       />
+      <!-- 面板按需加载（首次打开才下载 DshPanel）：加载前由这里占位右侧「AI」竖条，
+           外观与 DshPanel 折叠态触发按钮一致；加载后由 DshPanel 自己的触发按钮接管。 -->
+      <div v-else class="gt-dsh-dock">
+        <button
+          class="gt-dsh-dock-trigger"
+          type="button"
+          aria-label="打开 AI 助手"
+          :aria-expanded="false"
+          aria-controls="dsh-panel-region"
+          @click="showDshPanel = true"
+        >
+          <el-icon :size="20"><ChatDotSquare /></el-icon>
+          <span class="gt-dsh-dock-text">AI</span>
+        </button>
+      </div>
     </div>
 
     <!-- 全局公式管理弹窗 -->
@@ -1218,6 +1233,49 @@ onUnmounted(() => {
   30%, 70% { opacity: 1; }
 }
 .gt-dsh-badge :deep(.el-badge__content) { top: 2px; right: 4px; }
+
+/* AI 面板加载前的右侧「AI」竖条（与 DshPanel .dsh-panel / .dsh-panel-trigger 同一外观） */
+.gt-dsh-dock {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  height: 100%;
+  z-index: 10;
+}
+.gt-dsh-dock-trigger {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  background: var(--el-color-primary, #4b2d77);
+  color: #fff;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  transition: padding 0.2s, background 0.2s;
+  writing-mode: vertical-rl;
+  user-select: none;
+  font-family: inherit;
+}
+.gt-dsh-dock-trigger:hover,
+.gt-dsh-dock-trigger:focus-visible {
+  padding: 12px 10px;
+  background: var(--el-color-primary-dark-2, #3d2460);
+}
+.gt-dsh-dock-text {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gt-dsh-dock-trigger { transition: none; }
+}
 .gt-theme-toggle {
   font-size: 16px;
 }

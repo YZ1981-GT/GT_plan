@@ -234,3 +234,102 @@ describe('触发码与端点都钉在生成的契约上（后端改名即红）'
     expect(WP_SYNC_REJECTION_STATUS.room_not_writable).toBe(409)
   })
 })
+
+/**
+ * 带 readiness 预检的完整链路。上面的用例都不注入 `readEntrySyncReadiness`，预检被跳过 ——
+ * 正是这个盲区让「尚无首版 ⇒ 预检拒绝 ⇒ 首版永远发不出来」的死锁漏过了测试。
+ */
+describe('readiness 报尚无首版 ⇒ 预检放行，按需首版后进入编辑器', () => {
+  function readiness(code: string, ready = false) {
+    return {
+      entry_id: SCOPE.entryId,
+      effective_entry_id: SCOPE.entryId,
+      capability: 'bidirectional' as const,
+      adjudication_state: 'terminal' as const,
+      allowed_modes: ['html', 'oo'] as const,
+      can_claim_bidirectional: false,
+      runtime: { ready },
+      acceptance: { state: 'missing', stale: false, run_id: null, required_scenario_set_digest: null },
+      reason: { code, message: '原因', next_action: '下一步' },
+    }
+  }
+
+  it('REPRESENTATION_MISSING：不拒绝，首版恰一次，最终进 oo_loading', async () => {
+    let h!: ReturnType<typeof harness>
+    const ensureFirstPublication = vi.fn(async () => {
+      h.bumpRevision()
+      return { status: 'published' as const, representationId: UUID(24), representationGeneration: 1, contentRevision: 1 }
+    })
+    const materialize = vi.fn().mockRejectedValueOnce(NOT_PUBLISHED()).mockResolvedValueOnce(descriptor())
+    const readEntrySyncReadiness = vi.fn(async () => readiness('REPRESENTATION_MISSING'))
+    h = harness({ materialize, ensureFirstPublication, readEntrySyncReadiness })
+
+    const received = await h.bridge.switchToOnlyOffice()
+
+    expect(received.roomId).toBe(UUID(21))
+    expect(readEntrySyncReadiness).toHaveBeenCalledTimes(1)
+    expect(ensureFirstPublication).toHaveBeenCalledTimes(1)
+    expect(h.bridge.state.value).toBe('oo_loading')
+  })
+
+  it('其余未就绪原因照旧拒绝：零写请求、不发首版', async () => {
+    const ensureFirstPublication = vi.fn()
+    const materialize = vi.fn()
+    const readEntrySyncReadiness = vi.fn(async () => readiness('ADAPTER_NOT_READY'))
+    const h = harness({ materialize, ensureFirstPublication, readEntrySyncReadiness })
+
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toMatchObject({ code: 'bridge_runtime_not_ready' })
+    expect(h.api.createPendingMutation).not.toHaveBeenCalled()
+    expect(materialize).not.toHaveBeenCalled()
+    expect(ensureFirstPublication).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * 尚无首版时 adapter 注册不上，服务端在 **pending-mutations** 这一步就回报
+ * substrate_not_published（还到不了 materialize）。原先只有 materialize 失败才触发首版 ⇒
+ * 这一步的失败直接落 error，首版永远发不出来。
+ */
+describe('pending-mutations 报 substrate_not_published ⇒ 同样发一次首版并整链重走', () => {
+  it('首版恰一次，第二轮 pending 用新 revision，最终进 oo_loading', async () => {
+    let h!: ReturnType<typeof harness>
+    const ensureFirstPublication = vi.fn(async () => {
+      h.bumpRevision()
+      return { status: 'published' as const, representationId: UUID(24), representationGeneration: 1, contentRevision: 1 }
+    })
+    let pendingCalls = 0
+    const createPendingMutation = vi.fn(async (_scope: unknown, body: { expectedRevision: number }) => {
+      pendingCalls += 1
+      if (pendingCalls === 1) throw NOT_PUBLISHED()
+      return {
+        pendingMutationToken: `tok-${body.expectedRevision}`,
+        expectedRevision: body.expectedRevision,
+        payloadSha256: DIGEST,
+        expiresAt: '2026-10-10T00:05:00Z',
+        idempotencyKey: `idem-${body.expectedRevision}`,
+      }
+    })
+    const materialize = vi.fn(async () => descriptor())
+    h = harness({ createPendingMutation, materialize, ensureFirstPublication })
+
+    const received = await h.bridge.switchToOnlyOffice()
+
+    expect(received.roomId).toBe(UUID(21))
+    expect(ensureFirstPublication).toHaveBeenCalledTimes(1)
+    expect(createPendingMutation).toHaveBeenCalledTimes(2)
+    expect(createPendingMutation.mock.calls[1][1].expectedRevision).toBe(1)
+    expect(materialize).toHaveBeenCalledTimes(1)
+    expect(h.bridge.state.value).toBe('oo_loading')
+  })
+
+  it('pending-mutations 的其它失败不触发首版', async () => {
+    const ensureFirstPublication = vi.fn()
+    const createPendingMutation = vi.fn(async () => {
+      throw wireError(409, 'pending_mutation_token_expired', 'token 过期')
+    })
+    const h = harness({ createPendingMutation, ensureFirstPublication })
+
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toBeTruthy()
+    expect(ensureFirstPublication).not.toHaveBeenCalled()
+  })
+})

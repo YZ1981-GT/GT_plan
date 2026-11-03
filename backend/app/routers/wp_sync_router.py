@@ -885,7 +885,12 @@ async def _registration_state_fingerprint(svc: _SyncServices) -> str:
     ).hexdigest()
 
 
-async def _registration(svc: _SyncServices, scope: GuardedScope):
+async def _registration(
+    svc: _SyncServices,
+    scope: GuardedScope,
+    *,
+    translate_unpublished: bool = False,
+):
     """按 entry 解析唯一 adapter + approved bundle；未注册即 422（fail visible）。
 
     🔴 不写 `try: ... except: return None` 兜底：registry 的逐 entry 注册由
@@ -912,6 +917,23 @@ async def _registration(svc: _SyncServices, scope: GuardedScope):
             wp_id=scope.wp_id,
         )
     except (RegistryError, SyncDomainError) as exc:
+        if translate_unpublished and await _target_unpublished(svc, scope, exc):
+            # 🔴 首版破环：entry 级注册要靠「某张可见底稿已有首版」冻结定义；全库一张都没有
+            # （或唯一那张在已删项目上）时 adapter 注册不上，请求在这里 422，前端的按需首版
+            # （只认 `materialize_substrate_not_published`）永远触发不了 ⇒ 死锁。
+            # 目标底稿自己还没有首版时，按「尚无已发布底稿」回报，让桥调 first-publication
+            # （它刻意不走注册，按 approved bundle 现算）后整链重走。
+            # 只在在线编辑的写入口启用；目标底稿已有首版时注册失败照旧原样回报。
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error_code": "materialize_substrate_not_published",
+                    "message": (
+                        f"entry {scope.entry_id!r} 在这张底稿上还没有已发布版本，"
+                        "首次进入在线编辑需先发布首版"
+                    ),
+                },
+            ) from exc
         raise HTTPException(
             status_code=422,
             detail={
@@ -919,6 +941,20 @@ async def _registration(svc: _SyncServices, scope: GuardedScope):
                 "message": str(exc),
             },
         ) from exc
+
+
+async def _target_unpublished(
+    svc: _SyncServices, scope: GuardedScope, exc: BaseException
+) -> bool:
+    """注册失败是否只因「目标底稿尚无首版」：adapter 未注册 + 目标底稿无 current pointer。"""
+    from app.services.workpaper_sync.adapters.registry import AdapterNotRegisteredError
+
+    if not isinstance(exc, AdapterNotRegisteredError):
+        return False
+    existing = await current_publication(
+        svc.session, wp_id=scope.wp_id, entry_id=scope.entry_id
+    )
+    return existing is None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1049,8 +1085,10 @@ async def ensure_first_publication(
 ) -> dict[str, Any]:
     """该 (wp, entry) 尚无 published representation 时**按需发布首版**；已有则原样返回。
 
-    spec d2-online-edit-platform-closure R7。前端在 materialize 返回
-    `materialize_substrate_not_published` 时调一次，成功后重走 flush → materialize。
+    spec d2-online-edit-platform-closure R7。前端在 pending-mutations / materialize /
+    materialize-from-store 返回 `materialize_substrate_not_published` 时调一次，成功后重走
+    flush → materialize。目标底稿尚无首版、adapter 又注册不上时，这三个入口也回报同一个码
+    （见 `_registration(translate_unpublished=True)`），否则首版永远触发不了。
 
     🔴 刻意**不**走 `_registration`：registry 的注册要靠某张底稿已有的 representation
     冻结定义，而本端点正是「还没有 representation」时的破环点 —— 准入、定义与 adapter
@@ -1309,7 +1347,8 @@ async def materialize_from_store(
     from app.services.workpaper_sync import store_materialize as SM
     from app.services.workpaper_sync.room_launch import resolve_launch_target_sheet
 
-    registration = await _registration(svc, scope)
+    # 在线编辑入口：目标底稿尚无首版时回报 substrate_not_published（见 _registration）。
+    registration = await _registration(svc, scope, translate_unpublished=True)
     sheet_key = str(payload.get("sheet_key") or "")
     try:
         with timing_scope("html_to_oo_from_store", wp=wp_id, entry=scope.entry_id):
@@ -1531,7 +1570,8 @@ async def _materialize_request(
     declared = payload.get("entry_id")
     if declared is not None and str(declared) != scope.entry_id:
         raise _not_found()
-    registration = await _registration(svc, scope)
+    # 在线编辑入口：目标底稿尚无首版时回报 substrate_not_published（见 _registration）。
+    registration = await _registration(svc, scope, translate_unpublished=True)
     contract = registration.contract
     if contract is None:
         raise HTTPException(

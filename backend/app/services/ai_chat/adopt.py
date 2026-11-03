@@ -331,7 +331,10 @@ async def load_authoritative_message(
             .join(AIChatSession, AIChatSession.id == AIChatMessage.session_id)
             .outerjoin(AIChatRun, AIChatRun.id == AIChatMessage.run_id)
             .where(AIChatMessage.id == message_id)
-            .with_for_update()
+            # 只锁消息与会话两行：PostgreSQL 不允许对 LEFT JOIN 可空侧（ai_chat_runs）加
+            # FOR UPDATE（"FOR UPDATE cannot be applied to the nullable side of an outer join"），
+            # 不带 of= 时整句报错 ⇒ 每次采纳都 500。SQLite 忽略 FOR UPDATE，单测测不出。
+            .with_for_update(of=[AIChatMessage, AIChatSession])
         )
     ).first()
     if row is None:
