@@ -290,23 +290,32 @@ def _check_prior(report_data: dict[str, list[dict]]) -> list[str]:
     return out
 
 
+_SAMPLE_LIMIT = 5
+
+
+def _reason_samples(rows: list[dict], field: str) -> str:
+    """前 ``_SAMPLE_LIMIT`` 行「行次 行名：原因」；多于此数时末尾加「……」（调用方多取一行用于判断）。"""
+    shown = "；".join(f"{r['row_code']} {r.get('row_name') or ''}".strip() + f"：{r[field]}"
+                     for r in rows[:_SAMPLE_LIMIT])
+    return shown + ("……" if len(rows) > _SAMPLE_LIMIT else "")
+
+
 async def _check_freshness(db, project_id: UUID, year: int) -> list[str]:
     from app.models.report_models import FinancialReport, ReportConfig
     from app.services.report_config_service import ReportConfigService
+    from app.services.report_freshness import blank_clause, calc_error_clause, count_summary, list_rows
 
     out: list[str] = []
-    stale = (
-        await db.execute(
-            sa.select(sa.func.count()).select_from(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == sa.false(),
-                FinancialReport.is_stale == sa.true(),
-            )
-        )
-    ).scalar_one()
-    if stale:
-        out.append(f"报表有 {stale} 行已过期（上游数据已变更）：请先在报表模块重新生成报表。")
+    counts = await count_summary(db, project_id, year)
+    if counts.stale:
+        out.append(f"报表有 {counts.stale} 行已过期（上游数据或公式已变更，或为旧版本计算结果）："
+                   "请先在报表模块重新生成报表。")
+    if counts.calc_error:
+        rows = await list_rows(db, project_id, year, calc_error_clause(), limit=_SAMPLE_LIMIT + 1)
+        out.append(f"报表有 {counts.calc_error} 行计算失败（保留旧值）：{_reason_samples(rows, 'calc_error')}")
+    if counts.blank:
+        rows = await list_rows(db, project_id, year, blank_clause(), limit=_SAMPLE_LIMIT + 1)
+        out.append(f"报表有 {counts.blank} 行按口径留空：{_reason_samples(rows, 'blank_reason')}")
 
     standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
     codes = set(

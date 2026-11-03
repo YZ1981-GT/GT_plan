@@ -1,0 +1,75 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "0. 现状复核": [
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793287734992
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793287743356
+      }
+    ],
+    "1. 作用范围只含合并项目（R1，ADR-CNS-01）": [
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793287735235
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793288022890
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793289009182
+      }
+    ],
+    "2. 全局写只给 admin，前后端同一能力字段（R2，ADR-CNS-02）": [
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793287735312
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793289013739
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793290048894
+      }
+    ],
+    "3. 非 admin 的本项目适配入口（ADR-CNS-03 方案 B，仅 D2 选 B 时做；选 A 则本任务标「不做」并写明依据）": [
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793287735417
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793290053123
+      }
+    ],
+    "4. 回归、浏览器实测与收尾": [
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793287735471
+      },
+      {
+        "executionId": "559fa399-0ef0-4d9a-9ea1-f7d174ed6640",
+        "chatSessionId": "sess_f1e1dd5e-af4a-4fdd-b6c1-a4bab2a84618",
+        "timestamp": 1793290100956
+      }
+    ]
+  }
+}

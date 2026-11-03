@@ -13,6 +13,7 @@
     <!-- 顶部：模式切换 -->
     <div class="gt-a112-dual-checklist__header">
       <el-segmented
+        v-if="a112DEntrySync.presentation.value.showModeSwitch"
         v-model="activeMode"
         :options="modeOptions"
         size="default"
@@ -296,6 +297,7 @@
  * - 管理 checklistData / responses / loading 等全局状态
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, toRef, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
@@ -759,6 +761,21 @@ defineExpose({
   reload: loadRenderConfig,
   flushPendingSave,
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const a112DEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-a112-dual-checklist',
+})
+
 </script>
 
 <style scoped>

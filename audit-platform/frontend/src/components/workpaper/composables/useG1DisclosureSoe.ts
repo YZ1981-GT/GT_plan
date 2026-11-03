@@ -7,7 +7,7 @@
  * - 从 G1-1（G1-1-rows）自动取 carrying 审定数
  * - 发布 disclosure:note-text-updated；支持 sync-from-workpaper 写入附注模块
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { parseNum } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import { G1_ACCOUNT_CODE } from './g1NoteSectionMap'
@@ -275,9 +275,11 @@ export function useG1DisclosureSoe(opts: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', onAdjudicated)
-    // 首次进入：若无持久化明细则尝试从审定表灌数
+  /**
+   * 首次进入的初始化（Tab 挂载与附注页离屏同步共用，spec note-pull-followup-closure R1）：
+   * 若无持久化明细则尝试从审定表灌数，否则只回填审定勾稽值。
+   */
+  function initFromResponses() {
     const hasSaved = !!parseSoePersisted(allResponses.value.get(ITEM_ROWS)?.remark)
     if (!hasSaved) refreshFromAdjudication(true)
     else {
@@ -287,11 +289,20 @@ export function useG1DisclosureSoe(opts: {
       adjudicatedAmount.value = t.endAmount + (amounts.derivative?.endAmount ?? 0)
       adjudicatedPrior.value = t.priorAmount + (amounts.derivative?.priorAmount ?? 0)
     }
-  })
+  }
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', onAdjudicated)
-  })
+  // 离屏实例化（effectScope 里、没有组件实例）不挂生命周期钩子、不监听审定事件：初始化由离屏同步
+  // 自己调 initFromResponses。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', onAdjudicated)
+      initFromResponses()
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', onAdjudicated)
+    })
+  }
 
   return {
     tradingRows,
@@ -309,6 +320,7 @@ export function useG1DisclosureSoe(opts: {
     removeDerivativeRow,
     updateDerivativeField,
     refreshFromAdjudication,
+    initFromResponses,
     getSyncSnapshot,
     persistRows,
   }

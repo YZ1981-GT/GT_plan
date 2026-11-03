@@ -24,10 +24,12 @@
  * 「每个标签页各自一条连接」的原行为。
  */
 
+import type { ProjectTransportRecovered } from './rawEventRecovery'
+
 /** 领导标签页转给其他标签页的消息。 */
 export type ProjectStreamShareMessage =
-  | { kind: 'event'; event: string; data: unknown }
-  | { kind: 'reconnected' }
+  | { kind: 'event'; event: string; data: unknown; id?: string }
+  | { kind: 'reconnected'; recovered: ProjectTransportRecovered; lastEventId: string | null }
   | { kind: 'degraded' }
 
 export interface ProjectStreamShareHandlers {

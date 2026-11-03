@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 /**
  * F3 行身份铸造 —— 「铸新但不回写」的单点修复（四处共用）。
  *
@@ -47,12 +48,9 @@ export const F3_ROW_ID_PREFIX = {
   detail: 'f3d',
 } as const
 
-/** 铸一个稳定行身份。优先 `crypto.randomUUID()`，不可用时退时间戳+随机。 */
+/** 铸一个稳定行身份。优先 `newUuid()`，不可用时退时间戳+随机。 */
 export function mintF3RowId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return `${prefix}-${newUuid()}`
 }
 
 /**

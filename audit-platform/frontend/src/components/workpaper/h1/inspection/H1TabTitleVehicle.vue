@@ -230,15 +230,16 @@
             <span v-else>{{ row.remark }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="56" align="center" fixed="right">
+        <el-table-column label="OCR" width="80" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button
+            <el-button v-if="!isReadonly"
               link
               size="small"
               :loading="ocrLoadingId === row.rowId"
               title="上传行驶证/登记证书扫描件 OCR 预填"
               @click="handleOcr(row)"
             >📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
@@ -308,6 +309,8 @@ import {
 } from '../../composables/useH1TitleCheck'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -318,6 +321,9 @@ const props = defineProps<{
   periodEnd?: string
   htmlData?: any
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H1-17'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
@@ -468,6 +474,7 @@ async function handleOcr(row: VehicleRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
     ocrLoadingId.value = row.rowId
     try {
       const res = await http.post(
@@ -475,6 +482,7 @@ async function handleOcr(row: VehicleRow) {
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const data = res.data?.data ?? res.data
       const fields = { ...(data?.extracted_fields || {}) }
       if (data?.attachment_id) fields.attachment_id = data.attachment_id

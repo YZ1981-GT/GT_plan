@@ -151,11 +151,12 @@ describe('d2NoteSectionMap', () => {
     ])
   })
 
+  // 标签列头字面带半角空格（`账 龄`）= 模板 headers[0] 原字（R13 对拍）
   it('上市账龄列头用期末余额/上年年末余额，国企用期末数/期初数', () => {
     const listed = buildD2SyncPayload('listed', 'wp-1', null, snap())
-    expect(listed.columns[D2_TABLE_NAMES.listed.aging].map((c) => c.label)).toEqual(['账龄', '期末余额', '上年年末余额'])
+    expect(listed.columns[D2_TABLE_NAMES.listed.aging].map((c) => c.label)).toEqual(['账 龄', '期末余额', '上年年末余额'])
     const soe = buildD2SyncPayload('soe', 'wp-2', null, snap())
-    expect(soe.columns[D2_TABLE_NAMES.soe.aging].map((c) => c.label)).toEqual(['账龄', '期末数', '期初数'])
+    expect(soe.columns[D2_TABLE_NAMES.soe.aging].map((c) => c.label)).toEqual(['账 龄', '期末数', '期初数'])
   })
 
   it('上市坏账准备变动表纵向 7 行（上年年末→期末，源模板 r117~r123）', () => {
@@ -167,7 +168,7 @@ describe('d2NoteSectionMap', () => {
     ])
     expect(rows[0]).toMatchObject({ amount: 100 })
     expect(rows[6]).toMatchObject({ amount: 130, is_total: true })
-    expect(p.columns[D2_TABLE_NAMES.listed.movement].map((c) => c.label)).toEqual(['项目', '坏账准备金额'])
+    expect(p.columns[D2_TABLE_NAMES.listed.movement].map((c) => c.label)).toEqual(['项 目', '坏账准备金额'])
   })
 
   it('国企变动表 6 列且「本期变动金额」跨三子列分组（源模板 r94~r95）', () => {

@@ -32,6 +32,7 @@ import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { mAccountCodeOf, mPublishBlockReason, pickMTbSourceCodes, useMTbSource } from './mCycleAccountScope'
 import type { TbSourceCodes } from './shared/tbSourceCodes'
+import { readM8FieldValue } from './mEquityDisclosureForm'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -182,18 +183,7 @@ export function useM8FormData(options: UseM8FormDataOptions) {
    * @returns 存储的值（conclusion 字段）
    */
   function getField(sheet: string, field: string): any {
-    const itemId = `${ITEM_PREFIX}${sheet}-${field}`
-    const resp = allResponses.value.get(itemId)
-    if (!resp) return null
-    // 尝试 JSON 解析（支持存储对象/数组）
-    if (resp.conclusion) {
-      try {
-        return JSON.parse(resp.conclusion)
-      } catch {
-        return resp.conclusion
-      }
-    }
-    return null
+    return readM8FieldValue(allResponses.value.get(`${ITEM_PREFIX}${sheet}-${field}`))
   }
 
   /**

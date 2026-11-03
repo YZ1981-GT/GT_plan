@@ -146,18 +146,28 @@ _NO_BINDING_ROW_TYPES: set[str] = {"header_label"}
 
 def _load_wp_section_index(
     wp_path: Path,
+    *,
+    section_field: str = "note_section",
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[str]]]:
-    """加载 wp_account_mapping.json，按 note_section 聚合.
+    """加载 wp_account_mapping.json，按指定 note_section 字段聚合.
+
+    Args:
+        wp_path: 映射表路径
+        section_field: 索引字段名 —— 'note_section_soe' / 'note_section_listed' / 'note_section'（兼容旧格式）
 
     Returns:
         (section_to_mappings, section_to_account_codes_union)
+
+    🔴 改造（spec formula-fetch-followup-defect-closure 3.6）：不再用旧 note_section 单值按上市编号索引全部模板，
+    而是按 note_section_soe / note_section_listed 分别索引对应准则的模板，消除多族共用同一编号的问题。
+    每个底稿条目只按自身的 account_codes 绑定到对应章节，不再把 section 下多个底稿的科目并集灌给所有行。
     """
     payload = json.loads(wp_path.read_text(encoding="utf-8"))
     mappings = payload.get("mappings", [])
 
     by_section: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for m in mappings:
-        sec = m.get("note_section")
+        sec = m.get(section_field) or m.get("note_section")  # 退回旧字段兼容
         if sec:
             by_section[sec].append(m)
 
@@ -533,13 +543,15 @@ def _write_report(
 
 
 def main() -> int:
-    by_section, codes_union = _load_wp_section_index(WP_MAPPING)
+    # 🔴 改造：SOE 和 Listed 各自用准则分列的 note_section 字段索引（不再共用旧 note_section）
+    soe_by_section, soe_codes_union = _load_wp_section_index(WP_MAPPING, section_field="note_section_soe")
+    listed_by_section, listed_codes_union = _load_wp_section_index(WP_MAPPING, section_field="note_section_listed")
 
     soe_bindings, soe_stats = _process_template(
-        SOE_TEMPLATE, by_section, codes_union
+        SOE_TEMPLATE, soe_by_section, soe_codes_union
     )
     listed_bindings, listed_stats = _process_template(
-        LISTED_TEMPLATE, by_section, codes_union
+        LISTED_TEMPLATE, listed_by_section, listed_codes_union
     )
 
     # 合并两个模板的 binding（key=section_number）；若同 section_number

@@ -21,6 +21,7 @@
                 <span class="dot" aria-hidden="true" />
                 <span class="where">{{ DEPLOYMENT_LABEL[slot.candidate.deployment] }}</span>
                 <span class="name">{{ candidateName(slot.candidate) }}</span>
+                <span class="policy">{{ candidatePolicyText(slot.candidate) }}</span>
                 <span class="reason">{{ statusText(slot.candidate) }}</span>
               </span>
               <span v-else class="route-candidate empty">
@@ -42,7 +43,7 @@ import type { AIRoute } from '@/services/aiModelApi'
 import { fmtDateTime } from '@/utils/formatters'
 import {
   DEPLOYMENT_LABELS as DEPLOYMENT_LABEL,
-  candidateName, chainOf, effectiveClass, effectiveText, emptyText, statusText,
+  candidateName, candidatePolicyText, chainOf, effectiveClass, effectiveText, emptyText, statusText,
 } from './modelRouteView'
 
 withDefaults(defineProps<{
@@ -76,6 +77,11 @@ withDefaults(defineProps<{
 }
 .route-candidate .where { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); }
 .route-candidate .name { font-weight: 500; color: var(--gt-color-text); white-space: nowrap; }
+.route-candidate .policy {
+  color: var(--gt-color-primary, #6b3fa0);
+  font-size: var(--gt-font-size-xs);
+  white-space: nowrap;
+}
 .route-candidate .reason {
   overflow: hidden; max-width: 360px; color: var(--gt-color-text-secondary);
   font-size: var(--gt-font-size-xs); text-overflow: ellipsis; white-space: nowrap;

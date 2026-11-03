@@ -33,6 +33,17 @@ EXPORT_TIMEOUT_MS = 120_000
 _QUERY_CANCELED_SQLSTATE = "57014"
 
 
+def query_guard_unavailable_error() -> HTTPException:
+    """数据库查询保护未能启用；宁可拒绝，也不在无限预算下继续。"""
+    return HTTPException(
+        status_code=503,
+        detail={
+            "error_code": "QUERY_GUARD_UNAVAILABLE",
+            "message": "查询保护暂不可用，本次查询已中止，请稍后重试",
+        },
+    )
+
+
 @asynccontextmanager
 async def statement_timeout(
     db: AsyncSession, timeout_ms: int = QUERY_TIMEOUT_MS
@@ -46,30 +57,31 @@ async def statement_timeout(
     非 PG 后端（如测试用 SQLite）不识别该语句，此时降级为无超时并记 debug ——
     但**不吞** PG 上的失败，那属于必须暴露的配置问题。
     """
-    started_tx = False
     try:
-        if not db.in_transaction():
-            await db.begin()
-            started_tx = True
-    except Exception as exc:  # noqa: BLE001 — 事务状态探测失败不阻断查询
-        logger.debug("statement_timeout 事务探测失败，跳过超时设置: %s", exc)
+        bind = db.get_bind()
+        dialect_name = str(bind.dialect.name).lower()
+    except Exception as exc:  # noqa: BLE001 — 方言未知时不能证明查询保护已生效
+        logger.exception("statement_timeout 无法识别数据库方言")
+        raise query_guard_unavailable_error() from exc
+
+    if dialect_name not in {"postgres", "postgresql"}:
+        # SQLite 等测试方言没有 SET LOCAL；明确识别后才允许跳过。
         yield
         return
 
     try:
-        await db.execute(
-            text(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
-        )
-    except Exception as exc:  # noqa: BLE001
-        # 方言不支持（SQLite 等）→ 无超时执行；PG 上若出现应在日志里看到
-        logger.debug("statement_timeout 设置失败（方言可能不支持）: %s", exc)
-
-    try:
-        yield
-    finally:
-        if started_tx:
-            # 本上下文只读，不提交；由调用方决定事务归属
+        if not db.in_transaction():
+            await db.begin()
+        await db.execute(text(f"SET LOCAL statement_timeout = {int(timeout_ms)}"))
+    except Exception as exc:  # noqa: BLE001 — PG 上设置失败会留下 aborted 事务
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001 — 不掩盖查询保护失败
             pass
+        logger.exception("statement_timeout 在 PostgreSQL 上设置失败")
+        raise query_guard_unavailable_error() from exc
+
+    yield
 
 
 def is_query_canceled(exc: BaseException) -> bool:

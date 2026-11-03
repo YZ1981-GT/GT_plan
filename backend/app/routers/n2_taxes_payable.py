@@ -24,19 +24,20 @@ import logging
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
-from uuid import uuid4
+from uuid import UUID
 
-import aiofiles
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import authorize_wp_edit, get_current_user
+from app.deps import authorize_wp_edit, authorize_wp_read, get_current_user
 from app.models.core import User
+from app.routers._wp_gate import enforce_wp_gate
+from app.services.attachment_ocr_writeback import parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.project_audit_year import fetch_project_audit_year
 from app.services.tb_audited_writer import publish_rows
@@ -45,6 +46,13 @@ from app.services.unified_ocr_service import UnifiedOCRService
 from app.routers.wp_render_strategies._x3_adjustment_import_export import (
     X3_SHEET_SPECS,
     attach_shape_a_routes,
+)
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+    record_ocr_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,6 +88,57 @@ attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 # AI超时（秒）
 _AI_TIMEOUT = 30.0
+
+
+def _parse_n2_wp_id(raw: str) -> UUID:
+    """N2 路径底稿 ID 统一按不可枚举资源处理。"""
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问") from exc
+
+
+async def _authorize_n2_io(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    wp_id: str,
+    write: bool,
+    route_name: str,
+) -> tuple[UUID, UUID]:
+    """在读取文件或底稿正文前同时完成项目权限和精确 checklist 门禁。"""
+    wp_uuid = _parse_n2_wp_id(wp_id)
+    project_id = await (
+        authorize_wp_edit(db, current_user, wp_uuid)
+        if write
+        else authorize_wp_read(db, current_user, wp_uuid)
+    )
+    await enforce_wp_gate(
+        db,
+        current_user,
+        entrypoint="workpaper.checklist_save" if write else "workpaper.checklist_read",
+        action="save_checklist" if write else "read_checklist",
+        method="POST" if write else "GET",
+        wp_id=wp_uuid,
+        project_id=project_id,
+        entry_family="checklist",
+        route_name=route_name,
+    )
+    return wp_uuid, project_id
+
+
+async def _n2_wp_code(db: AsyncSession, wp_id: UUID) -> str | None:
+    row = (
+        await db.execute(
+            sa.text(
+                "SELECT wi.wp_code FROM working_paper wp "
+                "LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                "WHERE wp.id = :wp_id AND wp.is_deleted = false"
+            ),
+            {"wp_id": str(wp_id)},
+        )
+    ).fetchone()
+    return str(row.wp_code) if row and row.wp_code else None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -143,10 +202,17 @@ async def n2_export_template(
     """
     from app.services.n2_taxes_payable_service import export_template
 
+    wp_uuid, _project_id = await _authorize_n2_io(
+        db,
+        current_user,
+        wp_id=wp_id,
+        write=False,
+        route_name="/api/n2-taxes-payable/{wp_id}/export-template",
+    )
     if sheet and sheet not in SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(SUPPORTED_SHEETS)}")
 
-    buffer = await export_template(wp_id, db, sheet=sheet)
+    buffer = await export_template(str(wp_uuid), db, sheet=sheet)
     filename = f"N2应交税费_{sheet or '全部'}_模板.xlsx"
     return StreamingResponse(
         buffer,
@@ -176,10 +242,17 @@ async def n2_export_data(
     """
     from app.services.n2_taxes_payable_service import export_data
 
+    wp_uuid, _project_id = await _authorize_n2_io(
+        db,
+        current_user,
+        wp_id=wp_id,
+        write=False,
+        route_name="/api/n2-taxes-payable/{wp_id}/export-data",
+    )
     if sheet and sheet not in SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(SUPPORTED_SHEETS)}")
 
-    buffer = await export_data(wp_id, db, sheet=sheet)
+    buffer = await export_data(str(wp_uuid), db, sheet=sheet)
     filename = f"N2应交税费_{sheet or '全部'}_数据.xlsx"
     return StreamingResponse(
         buffer,
@@ -209,12 +282,20 @@ async def n2_import_data(
     验证：文件扩展名(.xlsx/.xls)、列头匹配
 
     Returns:
-        { imported_count: int, message: str, warning?: str }
+        { imported_count: int, message: str, warnings: list[str] }
 
     Requirements: 3.4
     """
+    from app.routers.checklist_responses import _publish_checklist_saved
     from app.services.n2_taxes_payable_service import import_data
 
+    wp_uuid, project_id = await _authorize_n2_io(
+        db,
+        current_user,
+        wp_id=wp_id,
+        write=True,
+        route_name="/api/n2-taxes-payable/{wp_id}/import-data",
+    )
     if sheet and sheet not in SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(SUPPORTED_SHEETS)}")
 
@@ -226,11 +307,33 @@ async def n2_import_data(
 
     content = await file.read()
     try:
-        result = await import_data(wp_id, content, db, sheet=sheet)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+        result = await import_data(
+            str(wp_uuid),
+            content,
+            db,
+            sheet=sheet,
+            project_id=project_id,
+            updated_by=current_user.id,
+        )
+        wp_code = await _n2_wp_code(db, wp_uuid)
+        year = await fetch_project_audit_year(db, project_id)
+        await db.commit()
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
-    await db.commit()
+    item_ids = list(result.pop("_item_ids", []))
+    await _publish_checklist_saved(
+        project_id=project_id,
+        wp_id=wp_uuid,
+        wp_code=wp_code,
+        year=year,
+        item_ids=item_ids,
+        user_id=current_user.id,
+    )
     return result
 
 
@@ -274,9 +377,9 @@ _SECTION_PROMPTS: dict[str, str] = {
         "四级累进税率档次适用正确性、速算扣除系数使用合规性。"
     ),
     "overall-opinion": (
-        "请生成N2应交税费的整体审计意见，综合审定表各税种余额分析、"
-        "各测算表验证结果、明细表核对情况、税收政策合规检查结论，"
-        "形成对科目2221列报与披露的总体结论。"
+        "请提供N2应交税费的科目结论措辞建议，综合审定表各税种余额分析、"
+        "各测算表验证结果、明细表核对情况和税收政策合规检查，"
+        "列明科目2221列报与披露的判断因素、证据缺口和建议程序；不得形成最终审计意见。"
     ),
 }
 
@@ -298,7 +401,7 @@ async def n2_ai_assist(
     - surtax-conclusion: 其他税费测算结论
     - property-tax-conclusion: 房产税测算结论
     - lvt-conclusion: 土地增值税测算结论
-    - overall-opinion: 整体审计意见
+    - overall-opinion: 科目结论措辞建议（不形成最终审计意见）
 
     Requirements: 3.4
     """
@@ -434,6 +537,8 @@ _EMPTY_FIELDS = {k: (0 if k in ("debitAmount", "creditAmount") else "") for k in
 async def n2_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> N2VoucherOcrResponse:
@@ -447,17 +552,16 @@ async def n2_contract_ocr(
     allowed = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，支持: {', '.join(allowed)}")
 
-    attachment_id = str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "vouchers"
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
-
-    content = await file.read()
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    wp_uuid = parse_workpaper_id(wp_id)
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=True,
+        user=current_user, native_type="voucher", native_prefix="N2", options=options,
+    )
+    attachment_id = str(src.attachment_id)
+    file_path = src.path
 
     # OCR识别
     ocr_text = ""
@@ -466,22 +570,22 @@ async def n2_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:  # noqa: BLE001
         logger.warning("N2 voucher OCR failed: %s", e)
-        return N2VoucherOcrResponse(
+        return await record_ocr_response(db, wp_uuid, src, N2VoucherOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
             extracted_fields=dict(_EMPTY_FIELDS),
             summary="",
             confidence=0,
-        )
+        ))
 
     if not ocr_text.strip():
-        return N2VoucherOcrResponse(
+        return await record_ocr_response(db, wp_uuid, src, N2VoucherOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
             extracted_fields=dict(_EMPTY_FIELDS),
             summary="",
             confidence=0,
-        )
+        ))
 
     # LLM结构化提取
     extracted = dict(_EMPTY_FIELDS)
@@ -520,13 +624,13 @@ async def n2_contract_ocr(
     filled = sum(1 for k, v in extracted.items() if v and v != "" and v != 0)
     confidence = round(filled / max(len(_VOUCHER_FIELDS), 1), 2)
 
-    return N2VoucherOcrResponse(
+    return await record_ocr_response(db, wp_uuid, src, N2VoucherOcrResponse(
         attachment_id=attachment_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
         summary=summary,
         confidence=confidence,
-    )
+    ))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -535,11 +639,14 @@ async def n2_contract_ocr(
 
 
 async def _load_project_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
-    """从 wp_id 加载项目上下文信息供 AI 生成使用。"""
+    """从 wp_id 加载项目上下文信息供 AI 生成使用。
+
+    不给「行业」：平台没有项目级行业来源，原先把质控分类码当行业写进提示词（「行业：A1」；
+    spec trim-followup-residual-findings-closure R1.4）。``_build_ai_user_prompt`` 无值时不出该行。
+    """
     result = await db.execute(
         sa.text("""
-            SELECT p.name AS client_name, p.audit_year,
-                   p.business_category AS industry
+            SELECT p.name AS client_name, p.audit_year
             FROM working_paper wp
             JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
@@ -552,7 +659,6 @@ async def _load_project_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     return {
         "client_name": row.client_name or "",
         "audit_year": str(row.audit_year or ""),
-        "industry": row.industry or "",
     }
 
 

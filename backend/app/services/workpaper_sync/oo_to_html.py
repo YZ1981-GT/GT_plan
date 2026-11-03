@@ -149,6 +149,7 @@ from app.services.workpaper_sync.content_mutation import (
     ContentCommitPlan,
     ContentCommitReceipt,
     ContentMutationService,
+    StagedCommit,
     projection_canonical_digest,
 )
 from app.services.workpaper_sync.contracts import SyncContract
@@ -1712,6 +1713,9 @@ class _ApplyFence:
         await self._c._fence_before_write(self._s, current_revision=current_revision)
 
     async def after_pointers(self, facts: CommitTransactionFacts) -> None:
+        # Store 镜像必须先于 application/operation result，且与 content/pointer/outbox
+        # 共用 _commit_once 的唯一事务。镜像失败时 result_facts 尚未设置，统一 rollback。
+        await self._c._mirror_store_backed_in_transaction(self._s)
         await self._c._write_application_result(self._s, facts)
 
 
@@ -2533,7 +2537,7 @@ class OoToHtmlCoordinator:
         返回 :class:`StagedCommit`（正常路径）或 :class:`ContentCommitReceipt`
         （幂等重放命中时）。
         """
-        from app.services.workpaper_sync.content_mutation import _ReplayHit, StagedCommit
+        from app.services.workpaper_sync.content_mutation import _ReplayHit
 
         app = await self._lock_application(state.frozen.application_id)
         await self._walk_application(
@@ -2619,15 +2623,13 @@ class OoToHtmlCoordinator:
         merged: Any,
         prepared: "StagedCommit | ContentCommitReceipt",
     ) -> OoToHtmlOutcome:
-        """锁内阶段：commit_staged（fence + DB 事务）+ mirror + baseline。
+        """锁内阶段：commit_staged（含事务内 store 镜像）+ baseline。
 
         🔴 如果在 _prepare_and_stage 与本方法之间有并行 apply 推进了 content_revision，
         ``commit_staged`` 内部的 CAS 会抛 :class:`RevisionConflictError`——
         CPU 产物被浪费，但不产生错误结果。caller (apply_durable_incoming) 把它当
         OoToHtmlError 处理，走 _record_post_durable_failure。
         """
-        from app.services.workpaper_sync.content_mutation import StagedCommit
-
         # 幂等重放命中路径：直接用 receipt，跳过 commit_staged。
         if isinstance(prepared, ContentCommitReceipt):
             receipt = prepared
@@ -2637,18 +2639,6 @@ class OoToHtmlCoordinator:
             receipt = await self._content.commit_staged(prepared, fence=fence)
 
         state.journal.record(ApplyStage.business_committed, str(receipt.content_version_id))
-
-        # Store-backed entry：content_version 已前进，但 HTML 宿主仍读 checklist_responses。
-        # 不镜像则 §9.6 DOM 永远看不到 OO 受管格回写（G4-0d D2 / G4-1 H1 实证）。
-        # R17：OO 清空的格在 merged 里是「键缺失」而 store 镜像只遍历存在的键 ⇒ 交给镜像的是
-        # 补了显式 null 的**视图**（发布的 projection 不变），否则清空丢失、并被下次 HTML 冲刷回滚。
-        store_view, _cleared = store_view_with_cleared_fields(
-            merged, merge=state.merge, contract=state.contract
-        )
-        # 采纳的 OO 重算公式值同样进 store（spec oo-formula-recompute-not-tamper R3），否则 D2-1 等
-        # 读 store 的下游一直拿旧的期末余额 / 期末未审 / 期末审定。
-        store_view, _recomputed = store_view_with_recomputed_formulas(store_view, merge=state.merge)
-        await self._mirror_store_backed_if_needed(state, merged_projection=store_view)
 
         await self._assert_incoming_untouched(state)
         await self._settle_baseline(state, receipt=receipt)
@@ -2665,8 +2655,30 @@ class OoToHtmlCoordinator:
             next_forcesave_allowed=not receipt.requires_client_refresh,
         )
 
+    async def _mirror_store_backed_in_transaction(self, state: _ApplyState) -> None:
+        """在 content commit hook 内构造 HTML store 视图并镜像，禁止自行提交。
+
+        顺序固定为显式清空视图 → 可信公式重算视图。发布 projection 保持不变；
+        这里只改结构化 HTML 宿主读取的 store。异常由 ``_commit_once`` 回滚整笔业务事务。
+        """
+        merged = state.merged_projection
+        assert merged is not None, "store 镜像前必须已有 settled projection"
+        store_view, _cleared = store_view_with_cleared_fields(
+            merged, merge=state.merge, contract=state.contract
+        )
+        store_view, _recomputed = store_view_with_recomputed_formulas(
+            store_view, merge=state.merge
+        )
+        await self._mirror_store_backed_if_needed(
+            state, merged_projection=store_view, commit=False
+        )
+
     async def _mirror_store_backed_if_needed(
-        self, state: _ApplyState, *, merged_projection: Any
+        self,
+        state: _ApplyState,
+        *,
+        merged_projection: Any,
+        commit: bool = True,
     ) -> None:
         """Store-backed pilot：把 merged projection 镜像进 checklist_responses。
 
@@ -2683,6 +2695,7 @@ class OoToHtmlCoordinator:
             project_id=state.frozen.project_id,
             wp_id=state.frozen.wp_id,
             merged_projection=merged_projection,
+            commit=commit,
         )
 
     async def _mirror_d2_store_if_needed(

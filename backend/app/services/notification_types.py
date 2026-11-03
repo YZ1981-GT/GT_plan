@@ -65,6 +65,26 @@ ADJ_COLLAB_NOTIFICATION_TYPES = [
     ADJ_COLLAB_REJECTED,
 ]
 
+# ── adjustment-hall-entry-review-closure：调整分录复核流转与影响提醒 ──
+# 跳转由 metadata.project_id + object_id(entry_group_id) + year 驱动（大厅 ?focus= 定位分录）。
+ADJ_REVIEW_SUBMITTED = "adjustment.review_submitted"
+ADJ_REVIEW_APPROVED = "adjustment.review_approved"
+ADJ_REVIEW_REJECTED = "adjustment.review_rejected"
+ADJ_REVIEW_REVOKED = "adjustment.review_revoked"
+# 手工来源分录通过 / 撤回复核会改试算表 → 提醒受影响科目对应底稿的负责人
+ADJ_APPROVED_IMPACT = "adjustment.approved_impact"
+# 底稿同步新分录到达（原为路由里的字面量，未登记）
+ADJ_SYNC_ARRIVED = "adjustment_sync_arrived"
+
+ADJ_HALL_NOTIFICATION_TYPES = [
+    ADJ_REVIEW_SUBMITTED,
+    ADJ_REVIEW_APPROVED,
+    ADJ_REVIEW_REJECTED,
+    ADJ_REVIEW_REVOKED,
+    ADJ_APPROVED_IMPACT,
+    ADJ_SYNC_ARRIVED,
+]
+
 # 程序行任务通知类型集合（供前后端同步契约测试校验一致性）。
 PROCEDURE_TASK_NOTIFICATION_TYPES = [
     PROCEDURE_TASK_ASSIGNED,
@@ -202,6 +222,8 @@ ALL_NOTIFICATION_TYPES = [
     ADJ_COLLAB_CONTRIBUTED,
     ADJ_COLLAB_CONFIRMED,
     ADJ_COLLAB_REJECTED,
+    # adjustment-hall-entry-review-closure
+    *ADJ_HALL_NOTIFICATION_TYPES,
 ]
 
 

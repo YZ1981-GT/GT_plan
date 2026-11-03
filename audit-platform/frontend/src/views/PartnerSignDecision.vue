@@ -215,15 +215,18 @@ import { ref, computed, onMounted } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import { getSignReadinessV2, signDocument } from '@/services/signatureApi'
+import { requestConfirmationToken } from '@/utils/passwordConfirm'
 import { api } from '@/services/apiProxy'
 import { REPORT_STATUS } from '@/constants/statusEnum'
 import { confirmSignature, confirmSign } from '@/utils/confirm'
 import { feedback } from '@/utils/feedback'
 import { handleApiError } from '@/utils/errorHandler'
+import { checkReasonOf, checkStatusLabel, checkStatusOf } from '@/utils/consistencyCheckStatus'
 import { fmtAmount as fmtAmt } from '@/utils/formatters'
 import { useAuthStore } from '@/stores/auth'
 // Spec A R3：项目状态摘要区块（5 个指标卡片）
@@ -268,7 +271,7 @@ const {
 
 // 一致性 5 项数据（独立调 chain consistency-check）
 const consistencyChecks = ref<any[]>([])
-const consistencyPassed = computed(() => consistencyChecks.value.filter((c: any) => c.passed).length)
+const consistencyPassed = computed(() => consistencyChecks.value.filter((c: any) => checkStatusOf(c) === 'passed').length)
 const consistencyTotal = computed(() => consistencyChecks.value.length)
 const staleSummaryReady = computed(() => wpStale.value.total > 0 || consistencyTotal.value > 0)
 
@@ -283,7 +286,12 @@ const riskSummary = ref<RiskSummaryData | null>(null)
 const riskLoading = ref(false)
 const signing = ref(false)
 
-const headerTitle = computed(() => `签字决策 — ${clientName.value || '项目'} ${year.value} 年度`)
+const headerTitle = computed(() => `签字决策 — ${clientName.value || '项目'}${year.value != null ? ` ${year.value} 年度` : ''}`)
+
+/** 跳转其他页：年度为空不带 year（原先 String(null) 带成 year=null），目标页按项目审计年度口径 */
+function yearQuery(): Record<string, string> {
+  return year.value == null ? {} : { year: String(year.value) }
+}
 
 const canSign = computed(() => {
   if (!riskSummary.value) return false
@@ -327,6 +335,7 @@ async function loadReadiness() {
 }
 
 async function loadReport() {
+  if (year.value == null) { reportHtml.value = ''; return }
   reportLoading.value = true
   try {
     const data: any = await api.get(P.auditReport.get(projectId.value, year.value))
@@ -371,10 +380,14 @@ function onBack() { router.push(`/dashboard/partner`) }
 function onViewHistory() { router.push('/extension/signatures') }
 function onPrint() { window.print() }
 function onReturnToReview() {
-  router.push({ name: 'AuditReport', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+  router.push({ name: 'AuditReport', params: { projectId: projectId.value }, query: yearQuery() })
 }
 
 async function onSign() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   if (!canSign.value) {
     ElMessage.warning('存在阻塞项，无法签字')
     return
@@ -410,6 +423,8 @@ async function onSign() {
       ElMessage.warning('用户未登录')
       return
     }
+    const confirmationToken = await requestConfirmationToken('签字确认')
+    if (!confirmationToken) return
     await signDocument({
       object_type: 'audit_report',
       object_id: reportData.id,
@@ -418,7 +433,7 @@ async function onSign() {
       project_id: projectId.value,
       required_role: 'signing_partner',
       required_order: 3,
-    })
+    }, confirmationToken)
     feedback.success(`✍️ 已签字 · ${clientName.value} ${year.value} 年度审计报告`)
     // 刷新状态
     await Promise.all([loadReadiness(), loadReport()])
@@ -431,6 +446,7 @@ async function onSign() {
 
 // Spec A R3：加载一致性 5 项 + 跳转动作
 async function loadConsistencyChecks() {
+  if (year.value == null) return
   try {
     const data: any = await api.get(
       `/api/projects/${projectId.value}/workflow/consistency-check?year=${year.value}`,
@@ -441,16 +457,16 @@ async function loadConsistencyChecks() {
 }
 
 function goToWpList() {
-  router.push({ name: 'WorkpaperList', params: { projectId: projectId.value }, query: { year: String(year.value), filter: 'stale' } })
+  router.push({ name: 'WorkpaperList', params: { projectId: projectId.value }, query: { ...yearQuery(), filter: 'stale' } })
 }
 function goToReportView() {
-  router.push({ name: 'ReportView', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+  router.push({ name: 'ReportView', params: { projectId: projectId.value }, query: yearQuery() })
 }
 function goToNotes() {
-  router.push({ name: 'DisclosureEditor', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+  router.push({ name: 'DisclosureEditor', params: { projectId: projectId.value }, query: yearQuery() })
 }
 function goToMisstatements() {
-  router.push({ name: 'Misstatements', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+  router.push({ name: 'Misstatements', params: { projectId: projectId.value }, query: yearQuery() })
 }
 function onChecklistJump(route: string) {
   router.push(route)
@@ -460,9 +476,12 @@ function onShowConsistency() {
     ElMessage.info('一致性检查暂无数据')
     return
   }
-  const lines = consistencyChecks.value.map((c: any) =>
-    `${c.passed ? '✓' : '✗'} ${c.check_name}: ${c.details?.message || ''}`
-  ).join('\n')
+  // 五态（需求 16.5）：非通过项写状态标签与原因，不再只分 ✓ / ✗
+  const lines = consistencyChecks.value.map((c: any) => {
+    const ok = checkStatusOf(c) === 'passed'
+    const why = ok ? (typeof c.details === 'string' ? c.details : '') : checkReasonOf(c)
+    return `${ok ? '✓' : '✗'} ${c.check_name}【${checkStatusLabel(c)}】${why ? `：${why}` : ''}`
+  }).join('\n')
   ElMessage({
     message: lines,
     type: 'info',

@@ -18,14 +18,8 @@
 -->
 <script lang="ts">
 import { defineComponent, h } from 'vue'
-import {
-  ElInput,
-  ElInputNumber,
-  ElSelect,
-  ElOption,
-  ElCheckbox,
-  ElDatePicker,
-} from 'element-plus'
+import { ElOption } from 'element-plus'
+import { ElInput, ElInputNumber, ElSelect, ElCheckbox, ElDatePicker } from '@/components/grid/adapters'
 import { formatAmount } from '@/utils/formatAmount'
 import { isLabelField, formatPercent } from './cnoteHelpers'
 import type { ColumnDefWithKey, RowData } from '../GtCNoteTable.types'

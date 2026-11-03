@@ -23,20 +23,54 @@ import { registerServiceWorker } from './composables/useOfflineCache'
 import vTabWheel from './directives/vTabWheel'
 import { installCrossWpEventBridge } from './utils/crossWpEventBridge'
 import { clearOnUpgrade } from './utils/aiChatCacheCleanup'
+import { gridPlugin } from './components/grid/plugin'
+import http from './utils/http'
+import { installPushKeptNotice } from './utils/disclosureSyncPushNotice'
+import { startSessionHandoff } from './utils/crossWindowAuth'
+import { advanceRequestIdentityEpoch } from './services/requestIdentityEpoch'
+import { claimClientInstanceId } from './utils/clientInstance'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
 // 必须在任何组件挂载前安装，确保所有生产者/消费者互通。
 installCrossWpEventBridge()
 
+// 底稿披露同步：公式推送写过的格保持试算表审定数时提示一次（spec note-pull-followup-closure R3）
+installPushKeptNotice(http)
+
 // Task 10: 首次升级时清理遗留 AI 聊天敏感缓存（doc_ai_chat_*）
 clearOnUpgrade()
+
+// 多窗口：认领本标签页的窗口编号（「复制标签页」沿用了原标签页的编号时换新号，编辑锁才能区分两个窗口）
+// spec: workpaper-multi-window-lock-gaps R1；取锁前 useEditingLock 会等认领结果，这里不阻塞挂载
+void claimClientInstanceId()
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(VueQueryPlugin, { queryClient })
+
+// 多窗口：新窗口启动时若 sessionStorage 无 token，通过 BroadcastChannel 向已有窗口请求会话
+// spec: multi-window-ledger-workbench Phase 2 Task 12
+// 场景：用户手动在地址栏输入独立查账 URL，浏览器新建标签页没有 opener 复制的 sessionStorage
+// 🔴 必须在 app.use(router) 之前发起：路由守卫判「未登录」前等它结束（原先并行，首个导航先被送去登录页）
+startSessionHandoff(async (session) => {
+  // 新窗口取得的是另一逻辑会话的起点，先作废本页可能已有的匿名/旧订阅者。
+  advanceRequestIdentityEpoch()
+  sessionStorage.setItem('token', session.token)
+  sessionStorage.setItem('refreshToken', session.refreshToken)
+  if (session.user) sessionStorage.setItem('user', JSON.stringify(session.user))
+  // Pinia store 在 app.use(createPinia()) 后可用，手动同步
+  const { useAuthStore } = await import('./stores/auth')
+  const authStore = useAuthStore()
+  authStore.token = session.token
+  authStore.refreshToken = session.refreshToken
+  authStore.user = session.user
+})
+
 app.use(router)
+// 表格按 Excel 方式选中 / 编辑（spec excel-style-table-editing）
+app.use(gridPlugin)
 
 // 注册全局指令
 app.directive('permission', vPermission)
@@ -64,31 +98,6 @@ router.onError((error) => {
 
 // 性能监控
 initWebVitals()
-
-// 多窗口：新窗口启动时若 sessionStorage 无 token，通过 BroadcastChannel 向已有窗口请求会话
-// spec: multi-window-ledger-workbench Phase 2 Task 12
-// 场景：用户手动在地址栏输入独立查账 URL，浏览器新建标签页没有 opener 复制的 sessionStorage
-import { requestSession } from './utils/crossWindowAuth'
-;(async () => {
-  try {
-    if (!sessionStorage.getItem('token')) {
-      const session = await requestSession()
-      if (session) {
-        sessionStorage.setItem('token', session.token)
-        sessionStorage.setItem('refreshToken', session.refreshToken)
-        if (session.user) sessionStorage.setItem('user', JSON.stringify(session.user))
-        // Pinia store 在 app.use(createPinia()) 后可用，手动同步
-        const { useAuthStore } = await import('./stores/auth')
-        const authStore = useAuthStore()
-        authStore.token = session.token
-        authStore.refreshToken = session.refreshToken
-        authStore.user = session.user
-      }
-    }
-  } catch {
-    // BroadcastChannel 不可用或超时 → 路由守卫会跳登录页，不阻塞启动
-  }
-})()
 
 // 离线缓存 Service Worker 注册（Phase 8 Task 5.2）
 registerServiceWorker()

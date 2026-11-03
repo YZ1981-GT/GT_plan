@@ -354,6 +354,30 @@ async def test_trace_cell_binding_not_found(monkeypatch):
     assert out["binding_id"] == "五、1 货币资金.未知行.closing_balance"
 
 
+@pytest.mark.asyncio
+async def test_trace_cell_second_table_uses_its_rows_and_template_bindings(monkeypatch):
+    """第 n 张表：按 ``_tables[n]`` 取行、按模板第 n 张表的 binding 反查（原先只看第 1 张；spec
+    note-chain-followup-optimizations R2）；越界的表序号如实报。"""
+    eng = _make_engine()
+    meta = {"0": {"semantic": "closing_balance", "binding_id": "五、1.库存现金.closing_balance"}}
+    note = _make_note(rows=[{"label": "首表行", "values": [1.0]}])
+    note.table_data["_tables"] = [
+        {"name": "首表", "rows": [{"label": "首表行", "values": [1.0]}]},
+        {"name": "次表", "rows": [{"label": "库存现金", "values": [42.0], "_cell_meta": meta}]},
+    ]
+    _patch_note_query(eng, note)
+    second = _trial_balance_binding(["1009"])["tables"][0]
+    _patch_loader(monkeypatch, {"tables": [{"rows": {}}, second]})
+
+    out = await eng.trace_cell(note.id, 0, 0, table_index=1)
+    assert out["computed_value"] == 42.0 and out["row_label"] == "库存现金"
+    assert out["binding"]["account_codes"] == ["1009"]
+    first = await eng.trace_cell(note.id, 0, 0)
+    assert first["error"] == "no_binding" and first["computed_value"] == 1.0, "默认仍是第 1 张表"
+    missing = await eng.trace_cell(note.id, 0, 0, table_index=5)
+    assert missing["error"] == "cell_index_out_of_range" and missing["axis"] == "table"
+
+
 # ===========================================================================
 # 8. _expand_formula 7 source 全覆盖（纯静态字符串生成，无需 db）
 # ===========================================================================

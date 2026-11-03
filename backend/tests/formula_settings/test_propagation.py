@@ -239,7 +239,7 @@ async def test_event_without_year_is_backfilled_and_reaches_consol_note_refill(m
     monkeypatch.setattr(cnfs, "fill_note_sections", fake_fill)
     async with make_db() as factory:
         async with factory() as db:
-            pid = await add_project(db, "合并附注传播")  # audit_year=2025
+            pid = await add_project(db, "合并附注传播", report_scope="consolidated")  # audit_year=2025
             await db.commit()
         bus = event_bus_module.EventBus(debounce_ms=0)
         bus._redis_available = False  # 不往本机共享 Redis Stream 写测试事件

@@ -55,7 +55,9 @@ D3-4 双区共用一份 `FIELD_SPECS_D304`（两区同一份单级表头，只�
 文件` 落在单列 I（`I15:I16` 只跨行不跨列），故区① I 是独立字段、区② 无独立 I 字段。
 
 **核对内容 J..N（5 子列）**：两区叶子行 J-N 分别是数字 1/2/3/4/5（`核对内容` 组下的 5 个抽查
-勾选子列），逐列声明为 `check1`..`check5` 五个字段（editable text，勾选标记如 √）。
+勾选子列），列键 `check1`..`check5`，json 键是前端 `checkItems/0`..`/4`（布尔数组；spec
+oo-writeback-template-parity-closure R3 批 B2：原写 `check1`..`check5` 文本、日期 `voucherDate`、对方明细
+`counterSubAccount`、索引 `indexNo`，前端存 `date` / `counterDetailAccount` / `indexRef`，四类键一个都不通）。
 
 ═══ 数据行区间内无任何公式（区① 17-26 / 区② 31-38）═══
 
@@ -131,20 +133,20 @@ UUID_COL_POST: Final[str] = "S"
 #: 数据行区间(17-26)内逐行无公式 ⇒ 全部 editable，不传 formula_columns。
 FIELD_SPECS_CURRENT: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("customer_name", "A", "editable", "text", "customerName", "客户名称", ""),
-    ("voucher_date", "B", "editable", "text", "voucherDate", "日期", f"B{HEADER_GROUP_ROW_CURRENT}"),
+    ("voucher_date", "B", "editable", "text", "date", "日期", f"B{HEADER_GROUP_ROW_CURRENT}"),
     ("voucher_no", "C", "editable", "text", "voucherNo", "凭证编号", f"B{HEADER_GROUP_ROW_CURRENT}"),
     ("business_content", "D", "editable", "text", "businessContent", "业务内容", f"B{HEADER_GROUP_ROW_CURRENT}"),
     ("counter_account", "E", "editable", "text", "counterAccount", "对方科目", f"B{HEADER_GROUP_ROW_CURRENT}"),
-    ("counter_sub_account", "F", "editable", "text", "counterSubAccount", "对方明细科目", f"B{HEADER_GROUP_ROW_CURRENT}"),
+    ("counter_sub_account", "F", "editable", "text", "counterDetailAccount", "对方明细科目", f"B{HEADER_GROUP_ROW_CURRENT}"),
     ("debit_amount", "G", "editable", "amount", "debitAmount", "借方金额", f"B{HEADER_GROUP_ROW_CURRENT}"),
     ("credit_amount", "H", "editable", "amount", "creditAmount", "贷方金额", f"B{HEADER_GROUP_ROW_CURRENT}"),
     ("supporting_doc", "I", "editable", "text", "supportingDoc", "支持性文件", ""),
-    ("check1", "J", "editable", "text", "check1", "核对内容1", f"J{HEADER_GROUP_ROW_CURRENT}"),
-    ("check2", "K", "editable", "text", "check2", "核对内容2", f"J{HEADER_GROUP_ROW_CURRENT}"),
-    ("check3", "L", "editable", "text", "check3", "核对内容3", f"J{HEADER_GROUP_ROW_CURRENT}"),
-    ("check4", "M", "editable", "text", "check4", "核对内容4", f"J{HEADER_GROUP_ROW_CURRENT}"),
-    ("check5", "N", "editable", "text", "check5", "核对内容5", f"J{HEADER_GROUP_ROW_CURRENT}"),
-    ("index_no", "O", "editable", "text", "indexNo", "索引号", ""),
+    ("check1", "J", "editable", "boolean", "checkItems/0", "核对内容1", f"J{HEADER_GROUP_ROW_CURRENT}"),
+    ("check2", "K", "editable", "boolean", "checkItems/1", "核对内容2", f"J{HEADER_GROUP_ROW_CURRENT}"),
+    ("check3", "L", "editable", "boolean", "checkItems/2", "核对内容3", f"J{HEADER_GROUP_ROW_CURRENT}"),
+    ("check4", "M", "editable", "boolean", "checkItems/3", "核对内容4", f"J{HEADER_GROUP_ROW_CURRENT}"),
+    ("check5", "N", "editable", "boolean", "checkItems/4", "核对内容5", f"J{HEADER_GROUP_ROW_CURRENT}"),
+    ("index_no", "O", "editable", "text", "indexRef", "索引号", ""),
     ("is_abnormal", "P", "editable", "text", "isAbnormal", "是否异常", ""),
     ("remark", "Q", "editable", "text", "remark", "备注说明", ""),
 )
@@ -156,20 +158,20 @@ FIELD_SPECS_CURRENT: Final[tuple[tuple[str, str, str, str, str, str, str], ...]]
 #: 数据行区间(31-38)内逐行无公式 ⇒ 全部 editable，不传 formula_columns。
 FIELD_SPECS_POST: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("customer_name", "A", "editable", "text", "customerName", "客户名称", ""),
-    ("voucher_date", "B", "editable", "text", "voucherDate", "日期", f"B{HEADER_GROUP_ROW_POST}"),
+    ("voucher_date", "B", "editable", "text", "date", "日期", f"B{HEADER_GROUP_ROW_POST}"),
     ("voucher_no", "C", "editable", "text", "voucherNo", "凭证编号", f"B{HEADER_GROUP_ROW_POST}"),
     ("business_content", "D", "editable", "text", "businessContent", "业务内容", f"B{HEADER_GROUP_ROW_POST}"),
     ("counter_account", "E", "editable", "text", "counterAccount", "对方科目", f"B{HEADER_GROUP_ROW_POST}"),
-    ("counter_sub_account", "F", "editable", "text", "counterSubAccount", "对方明细科目", f"B{HEADER_GROUP_ROW_POST}"),
+    ("counter_sub_account", "F", "editable", "text", "counterDetailAccount", "对方明细科目", f"B{HEADER_GROUP_ROW_POST}"),
     ("credit_amount", "G", "editable", "amount", "creditAmount", "贷方金额", f"B{HEADER_GROUP_ROW_POST}"),
     # 🔴 支持性文件 = H:I 合并单列，值写主列 H；I 不声明为独立字段（合并块语义）。
     ("supporting_doc", "H", "editable", "text", "supportingDoc", "支持性文件", ""),
-    ("check1", "J", "editable", "text", "check1", "核对内容1", f"J{HEADER_GROUP_ROW_POST}"),
-    ("check2", "K", "editable", "text", "check2", "核对内容2", f"J{HEADER_GROUP_ROW_POST}"),
-    ("check3", "L", "editable", "text", "check3", "核对内容3", f"J{HEADER_GROUP_ROW_POST}"),
-    ("check4", "M", "editable", "text", "check4", "核对内容4", f"J{HEADER_GROUP_ROW_POST}"),
-    ("check5", "N", "editable", "text", "check5", "核对内容5", f"J{HEADER_GROUP_ROW_POST}"),
-    ("index_no", "O", "editable", "text", "indexNo", "索引号", ""),
+    ("check1", "J", "editable", "boolean", "checkItems/0", "核对内容1", f"J{HEADER_GROUP_ROW_POST}"),
+    ("check2", "K", "editable", "boolean", "checkItems/1", "核对内容2", f"J{HEADER_GROUP_ROW_POST}"),
+    ("check3", "L", "editable", "boolean", "checkItems/2", "核对内容3", f"J{HEADER_GROUP_ROW_POST}"),
+    ("check4", "M", "editable", "boolean", "checkItems/3", "核对内容4", f"J{HEADER_GROUP_ROW_POST}"),
+    ("check5", "N", "editable", "boolean", "checkItems/4", "核对内容5", f"J{HEADER_GROUP_ROW_POST}"),
+    ("index_no", "O", "editable", "text", "indexRef", "索引号", ""),
     ("is_abnormal", "P", "editable", "text", "isAbnormal", "是否异常", ""),
     ("remark", "Q", "editable", "text", "remark", "备注说明", ""),
 )
@@ -213,6 +215,9 @@ def _base_spec(
         store_kind=StoreKind.rows,
         field_specs=field_specs,
         footer_marker=FOOTER_MARKER_D307,
+        # 核对内容 J..N = 前端 checkItems[0..4]（布尔）；OO 侧新增行先建 5 项数组，未勾在 Excel 里留空
+        row_array_defaults=(("checkItems", 5, False),),
+        boolean_unchecked_as_blank=True,
         # 🔴 两区合计行都真有 SUM 公式（区① G27+H27 / 区② G39）⇒ True。
         footer_carries_total_formula=True,
         error_label=f"D3-7 预收账款检查表（{section}）",

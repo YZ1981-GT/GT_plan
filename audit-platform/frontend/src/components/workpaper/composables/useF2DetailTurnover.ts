@@ -9,6 +9,7 @@
  *
  * 持久化仍走 F2-5-rows（行上带 groupKey + category），供 F2-2 汇总兼容。
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -164,7 +165,7 @@ function groupDef(key: F2TurnoverGroupKey): F2TurnoverGroupDef {
 
 /** BP-7 修复：稳定行身份生成器。 */
 function generateF2RowId(): string {
-  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `f2-${newUuid()}`
 }
 
 function emptyRow(id: string, groupKey: F2TurnoverGroupKey, segments: AgingSegment[]): F2TurnoverRow {

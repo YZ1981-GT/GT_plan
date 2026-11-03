@@ -7,8 +7,8 @@
  *
  * 持久化键：H3-14-contract-rows（兼容读取旧键 H3-14-rental-rows）
  */
+import { fetchTrialBalanceRows, tbRowsUnder, tbNumber, type TrialBalanceRow } from '@/services/trialBalanceRows'
 import { ref, computed, watch, type Ref } from 'vue'
-import { api } from '@/services/apiProxy'
 import type { ChecklistItem } from './useH3FormData'
 import { calcSubtotal } from './useH3FormulaEngine'
 import {
@@ -163,13 +163,15 @@ export function buildRentalDisplayRows(rows: RentalContractRow[]): RentalDisplay
   return result
 }
 
-/** 从 TB 行解析 6051 本期贷方净额（收入发生额） */
-export function parseTb6051Amount(hit: any): number {
+/**
+ * 从试算表行取 6051 本期收入发生额：审定数优先，没有则未审数。
+ * 损益类试算表金额是单边发生额（收入即贷方）；端点没有 credit_amount / debit_amount（原先这条分支恒 0）。
+ */
+export function parseTb6051Amount(
+  hit: Pick<TrialBalanceRow, 'audited_amount' | 'unadjusted_amount'> | null | undefined,
+): number {
   if (!hit) return 0
-  if (hit.audited_amount != null && hit.audited_amount !== '') return Number(hit.audited_amount) || 0
-  const credit = Number(hit.credit_amount ?? hit.period_credit ?? 0)
-  const debit = Number(hit.debit_amount ?? hit.period_debit ?? 0)
-  return credit - debit
+  return tbNumber(hit.audited_amount) ?? tbNumber(hit.unadjusted_amount) ?? 0
 }
 
 /** 会计年度内租期重叠月数（按日历月近似，0~12） */
@@ -633,15 +635,10 @@ export function useH3RentalIncome(params: {
         tb6051Amount.value = null
         return
       }
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_6051 },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(ACCOUNT_6051),
-      )
-      tb6051Amount.value = hit ? parseTb6051Amount(hit) : null
+      const { rows } = await fetchTrialBalanceRows(projectId.value, { accountPrefix: ACCOUNT_6051 })
+      // 科目及其明细之和（原先只取第一行）；一行都没有 ⇒ null（「待取数」）
+      const family = tbRowsUnder(rows, ACCOUNT_6051)
+      tb6051Amount.value = family.length ? family.reduce((sum, r) => sum + parseTb6051Amount(r), 0) : null
     } catch {
       tb6051Amount.value = null
     } finally {

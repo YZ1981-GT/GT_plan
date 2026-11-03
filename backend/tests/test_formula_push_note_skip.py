@@ -271,60 +271,9 @@ def test_has_obscured_data_skip_underscore_keys():
 # ═══════════════════════════════════════════════════════════════════════════════
 # Task 4: 单科目合计行兜底（engine 层集成测试）
 # Task 5: 章节号动态定位（engine 层集成测试）
-# Task 2: 首次推送标记 _source
 #
-# 这三个需要 mock DB + engine._push_note，用较重的 fixture。
-# 下面先对改动的纯函数/局部逻辑做轻量断言。
+# source semantics 由下方直接调用 engine._push_note 的回归验证；不再复制生产分支。
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestSourceMarkedAfterFirstPush:
-    """Task 2.2 · 需求 1.4：首次推送后 _source 由 None → 'workpaper'；
-    第二次推送走正常路径不再触发旧格式兜底。
-    """
-
-    def test_source_marked_after_first_push(self):
-        """推送前 _source=None → 模拟推送标记 → _source='workpaper'；
-        第二次 locate_table 仍正常返回（走 WORKPAPER_SOURCES 路径）。
-        """
-        # ── 阶段 1：_source=None，旧格式兜底可定位 ──
-        table_data = {
-            "_source": None,
-            "rows": [
-                {"label": "信用借款", "values": [1000, 800]},
-                {"label": "合计", "values": [1000, 800], "is_total": True},
-            ],
-        }
-        table_before, reason_before = locate_table(table_data, "短期借款")
-        assert table_before is not None, "_source=None 应走旧格式兜底"
-        assert reason_before is None
-
-        # ── 阶段 2：模拟 engine._push_note 的标记逻辑（engine.py L735-736） ──
-        if table_data.get("_source") is None:
-            table_data["_source"] = "workpaper"
-        assert table_data["_source"] == "workpaper"
-
-        # ── 阶段 3：第二次推送，_source='workpaper' 走正常路径 ──
-        # 给 table_data 加上 sub_table_data 模拟引擎骨架构建后的状态
-        table_data["sub_table_data"] = {
-            "短期借款": [
-                {"label": "信用借款", "values": [1000, 800]},
-                {"label": "合计", "values": [1000, 800], "is_total": True},
-            ],
-        }
-        table_after, reason_after = locate_table(table_data, "短期借款")
-        assert table_after is not None, "_source='workpaper' 应走正常子表路径"
-        assert reason_after is None
-        # 第二次走子表路径，rows 应来自 sub_table_data（非旧格式兜底）
-        assert len(table_after.rows) == 2
-
-    def test_source_none_marked_only_once(self):
-        """_source 已为 'workpaper' 时标记逻辑不再修改。"""
-        table_data = {"_source": "workpaper", "sub_table_data": {"X": [{"label": "a"}]}}
-        # 模拟标记逻辑
-        if table_data.get("_source") is None:
-            table_data["_source"] = "workpaper"
-        assert table_data["_source"] == "workpaper"  # 不变
 
 
 class TestFindTotalRowForFallback:
@@ -974,7 +923,7 @@ class TestSectionDynamicLookupOnMismatch:
 #   - 需求 2.3: 单科目合计行兜底（is_single=True → source_row 取首个数据行）
 #   - 需求 2.4: 多科目合计行兜底（is_single=False → source_row 取 is_total 行）
 #   - skip_total_recalc=True 时 _push_note_total 不被调用
-#   - 需求 1.4: _source=None → 首次写入后标记 "workpaper"
+#   - ADR-NRG-007: 原生旧格式写入保持 `_source`，动作来源只记 ORM
 #   - 需求 3.1: 章节号动态定位（按 section_title 反查唯一命中）
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1305,27 +1254,34 @@ class TestPushNoteEngineIntegration:
             "_push_note_total 应被调用 1 次（正常合计重算路径）"
         )
 
-    # ── Test 4: _source=None → 首次写入后标记 "workpaper" ─────────────
+    # ── Test 4: 原生旧格式写入保持 source semantics ────────────────────
 
-    def test_push_note_source_marked_after_write(self):
-        """需求 1.4：_source=None 的附注首次被推送后，table_data._source
-        自动设为 "workpaper"。
+    def test_push_note_preserves_legacy_source_after_write(self):
+        """ADR-NRG-007：公式推送修改原生旧格式时保持显式 ``_source=None``。
+
+        最近动作仍由 ORM ``last_sync_source=formula_push`` 表达，JSON 不生成
+        底稿披露同步指纹。
         """
-        # 旧格式附注：只有顶层 rows，_source=None
-        old_rows = [
-            {"label": "信用借款", "end_amount": 1000, "prior_amount": 800, "is_total": False},
-            {"label": "合计", "end_amount": 1000, "prior_amount": 800, "is_total": True, "row_type": "total"},
-        ]
+        legacy_table = {
+            "name": "短期借款",
+            "headers": ["项目", "期末余额", "期初余额"],
+            "rows": [
+                {"label": "信用借款", "values": [1000, 800]},
+                {"label": "合计", "values": [1000, 800], "is_total": True, "row_type": "total"},
+            ],
+        }
         table_data = {
             "_source": None,
-            "rows": old_rows,
+            "_tables": [copy.deepcopy(legacy_table)],
+            "name": legacy_table["name"],
+            "headers": copy.deepcopy(legacy_table["headers"]),
+            "rows": copy.deepcopy(legacy_table["rows"]),
         }
         note = _make_note_mock(section_title="短期借款", table_data=table_data)
         db = _setup_db_for_single_note(note)
         ctx = _make_ctx(db=db)
         paper = _make_paper()
 
-        # binding: 单科目，note_rows 的 note_label 不匹配任何行 → 走兜底
         note_rows = [
             {"note_label": "短期借款", "label": "短期借款",
              "ending": 1500, "ending_resolved": True, "opening": 900, "opening_resolved": True,
@@ -1342,18 +1298,12 @@ class TestPushNoteEngineIntegration:
                                        overlay={}, sources=sources, paper=paper)
             )
 
-        # ── 断言 ──
         assert section is not None, "应有写入（兜底路径）"
-        # _source 被标记为 "workpaper"（engine.py L735-736）
-        assert note.table_data.get("_source") == "workpaper", (
-            f"首次推送后 _source 应为 'workpaper'，实际: {note.table_data.get('_source')!r}"
-        )
-        # 同步指纹被写入
-        assert note.table_data.get("_last_sync_wp_id") == str(_PAPER_ID)
-        assert note.table_data.get("_last_sync_at") is not None
-        # ORM 属性被更新
+        assert "_source" in note.table_data and note.table_data["_source"] is None
+        assert not {"_last_sync_wp_id", "_last_sync_sheet", "_last_sync_at"} & note.table_data.keys()
         assert note.is_stale is False
         assert note.last_sync_source == "formula_push"
+        assert note.last_sync_wp_id == paper.id
 
     # ── Test 5: 章节号动态定位唯一命中 ──────────────────────────────
 
@@ -1930,3 +1880,227 @@ class TestDeferredSkipSingleAccount:
         assert len(skipped_row_miss) == 0, (
             "兜底成功后不应有 action=skipped 的行匹配失败记录"
         )
+
+
+class TestFinalTotalFallback:
+    """取数行对不上任何明细行时，科目余额只在「恰好一个汇总行」时兜底写合计。
+
+    2026-10-31 真库复盘（spec disclosure-note-template-word-realignment Task 34/35）：v1.0.56 改成「多个汇总行时写
+    最终合计」，结果把长期股权投资 / 投资性房地产 / 使用权资产主科目的余额（= 原值 / 小计）写进了「合计 / 账面价值
+    合计」（和平 八、26 账面价值写成 176,203,072.87，报表是 66,389,073.02）；而长期借款的审定数又是重分类后的合计。
+    哪一段由科目决定、引擎不知道 ⇒ 多个汇总行一律不兜底、不重算，逐格说明原因。
+    """
+
+    @staticmethod
+    def _run(rows: list[dict], table: str = "应交税费", label: str = "应交税费"):
+        note = _make_note_mock(table_data=_sub_table_data(table, rows, source="workpaper"))
+        ctx = _make_ctx(db=_setup_db_for_single_note(note))
+        written_labels: list[str] = []
+
+        def _capture(_ctx, *, row, **_kwargs):
+            written_labels.append(row["label"])
+            return True
+
+        binding = _make_binding([{
+            "note_label": label, "label": label,
+            "ending": 175, "ending_resolved": True, "opening": 270, "opening_resolved": True,
+            "is_total": False, "is_memo": False,
+        }], account_prefixes=("2221",))
+        with patch.object(engine_mod, "_push_note_cell", side_effect=_capture), \
+                patch.object(engine_mod, "_push_note_total", return_value=False) as recompute:
+            section = asyncio.run(engine_mod._push_note(
+                ctx, rule=_make_rule(), binding=binding, overlay={}, sources=_make_sources(), paper=_make_paper(),
+            ))
+        return section, written_labels, recompute, ctx
+
+    def test_subtotal_and_final_total_together_is_not_guessed(self):
+        rows = [
+            {"label": "税种甲", "end_amount": 1, "prior_amount": 2},
+            {"label": "小计", "end_amount": 1, "prior_amount": 2, "is_total": True, "row_type": "subtotal"},
+            {"label": "合计", "end_amount": 1, "prior_amount": 2, "is_total": True, "row_type": "total"},
+        ]
+        section, written, recompute, ctx = self._run(rows)
+        assert section is None and written == []
+        assert recompute.call_count == 0  # 上方明细一个都没取到，不按上方各行重算出 0
+        skips = [it for it in ctx.result.items if it.action == "skipped"]
+        assert len(skips) == 2 and all("2 个合计行（小计、合计）" in it.reason and "不兜底" in it.reason
+                                       for it in skips)
+        assert not [it for it in ctx.result.items if it.action == "fallback_to_total"]
+
+    def test_block_totals_are_not_guessed(self):
+        """和平 八、21 / 八、26 形态：五段分段合计，主科目余额是原值，最终合计是账面价值。"""
+        labels = ["一、账面原值合计", "1、房屋、建筑物", "二、累计折旧合计", "1、房屋、建筑物", "五、账面价值合计"]
+        rows = [{"label": lab, "end_amount": None, "prior_amount": None,
+                 **({"is_total": True, "row_type": "total"} if "合计" in lab else {})} for lab in labels]
+        section, written, recompute, ctx = self._run(rows)
+        assert section is None and written == [] and recompute.call_count == 0
+        skips = [it for it in ctx.result.items if it.action == "skipped"]
+        assert len(skips) == 2 and all("3 个合计行（一、账面原值合计、二、累计折旧合计、五、账面价值合计）" in it.reason
+                                       for it in skips)
+
+    @staticmethod
+    def _run_rows(rows: list[dict], source_row: dict):
+        note = _make_note_mock(table_data=_sub_table_data("应交税费", rows, source="workpaper"))
+        ctx = _make_ctx(db=_setup_db_for_single_note(note))
+        written: list[tuple[str, str]] = []
+
+        def _capture(_ctx, *, row, field_name, **_kwargs):
+            written.append((row["label"], field_name))
+            return True
+
+        binding = _make_binding([source_row], account_prefixes=("2221",))
+        with patch.object(engine_mod, "_push_note_cell", side_effect=_capture), \
+                patch.object(engine_mod, "_push_note_total", return_value=False):
+            asyncio.run(engine_mod._push_note(
+                ctx, rule=_make_rule(), binding=binding, overlay={}, sources=_make_sources(), paper=_make_paper(),
+            ))
+        return written, {it.addr_id.rsplit(".", 1)[-1]: (it.action, it.reason) for it in ctx.result.items}
+
+    _NO_PRIOR = {"note_label": "应交税费", "label": "应交税费", "ending": 175, "ending_resolved": True,
+                 "opening": 0.0, "opening_resolved": False, "is_total": False, "is_memo": False,
+                 "opening_reason": "损益类上期发生额取上年试算表：没有上年项目"}
+
+    def test_unresolved_field_in_fallback_is_skipped_with_its_reason(self):
+        """兜底写合计时某一期取不到（损益类上期没有上年数据）：该期如实记跳过、带原因，不冒充「按合计兜底」。"""
+        rows = [{"label": "税种甲", "end_amount": None, "prior_amount": None},
+                {"label": "合计", "end_amount": None, "prior_amount": None, "is_total": True, "row_type": "total"}]
+        written, items = self._run_rows(rows, self._NO_PRIOR)
+        assert written == [("合计", "end_amount")]
+        assert items["end"][0] == "fallback_to_total"
+        assert items["prior"][0] == "skipped" and "没有上年项目" in items["prior"][1]
+
+    def test_matched_row_unresolved_field_uses_row_reason(self):
+        rows = [{"label": "应交税费", "end_amount": None, "prior_amount": None},
+                {"label": "合计", "end_amount": None, "prior_amount": None, "is_total": True, "row_type": "total"}]
+        written, items = self._run_rows(rows, self._NO_PRIOR)
+        assert written == [("应交税费", "end_amount")]
+        assert items["prior"] == ("skipped", "损益类上期发生额取上年试算表：没有上年项目")
+
+    def test_single_total_row_still_falls_back(self):
+        rows = [
+            {"label": "税种甲", "end_amount": 1, "prior_amount": 2},
+            {"label": "合计", "end_amount": 1, "prior_amount": 2, "is_total": True, "row_type": "total"},
+        ]
+        section, written, recompute, ctx = self._run(rows)
+        assert section == "五、22" and written == ["合计", "合计"]
+        assert recompute.call_count == 0
+        assert [it.action for it in ctx.result.items] == ["fallback_to_total", "fallback_to_total"]
+
+
+class TestTotalRecomputeNeedsANumber:
+    """合计按上方各行重算：这一列上方一个数都没有 ⇒ 不重算、不写 0，合计保持原值并说明原因。
+
+    2026-10-31 真库（spec disclosure-note-template-word-realignment Task 34/35）：三个项目 八、9 其他应收款、八、42
+    其他应付款 主表合计都被推成 [0, 0] —— 取数行对上了明细行，但取不到值或被人工标记挡住，明细全空，按「缺值按 0」
+    重算出 0。走真实 ``_push_note_cell`` / ``_push_note_total``（不打桩）。
+    """
+
+    _ROW = {"note_label": "税种甲", "label": "税种甲", "ending": 175, "ending_resolved": True,
+            "opening": 0.0, "opening_resolved": False, "is_total": False, "is_memo": False,
+            "opening_reason": "损益类上期发生额取上年试算表：没有上年项目"}
+
+    @classmethod
+    def _run(cls, rows: list[dict]):
+        note = _make_note_mock(table_data=_sub_table_data("应交税费", rows, source="workpaper"))
+        ctx = _make_ctx(db=_setup_db_for_single_note(note))
+        binding = _make_binding([dict(cls._ROW)], account_prefixes=("2221",))
+        section = asyncio.run(engine_mod._push_note(
+            ctx, rule=_make_rule(), binding=binding, overlay={}, sources=_make_sources(), paper=_make_paper(),
+        ))
+        items = {it.addr_id: (it.action, it.reason) for it in ctx.result.items}
+        return section, note.table_data["sub_table_data"]["应交税费"], items
+
+    def test_empty_column_keeps_total_and_says_why(self):
+        rows = [{"label": "税种甲", "end_amount": None, "prior_amount": None},
+                {"label": "税种乙", "end_amount": None, "prior_amount": ""},
+                {"label": "合计", "end_amount": None, "prior_amount": 999, "is_total": True, "row_type": "total"}]
+        section, out, items = self._run(rows)
+        assert section == "五、22"
+        assert out[0]["end_amount"] == 175 and out[2]["end_amount"] == 175, "期末上方有数 ⇒ 照常重算"
+        assert out[2]["prior_amount"] == 999, "期初上方全空 ⇒ 不重算成 0"
+        action, reason = items["note://五、22/应交税费/合计.prior"]
+        assert action == "skipped" and "上方各行这一列都没有数" in reason
+        assert items["note://五、22/应交税费/税种甲.prior"] == ("skipped", self._ROW["opening_reason"])
+
+    def test_explicit_zero_counts_as_a_number(self):
+        rows = [{"label": "税种甲", "end_amount": None, "prior_amount": None},
+                {"label": "税种乙", "end_amount": None, "prior_amount": 0},
+                {"label": "合计", "end_amount": None, "prior_amount": 999, "is_total": True, "row_type": "total"}]
+        _section, out, items = self._run(rows)
+        assert out[2]["prior_amount"] == 0, "填了 0 算有数：合计照常重算"
+        assert items["note://五、22/应交税费/合计.prior"][0] == "write"
+
+
+class TestExpectedSectionTitle:
+    """主表规则的章节标题校验名：按准则声明表名的规则取种子章节标题（2026-10-31 真库：国企 八、64 / 八、12 / 八、5
+    三条规则恒「不是…章节」跳过，原因里印的准则表名与章节名一模一样）。spec disclosure-note-template-word-realignment
+    Task 34/35。"""
+
+    @staticmethod
+    def _rule(rule_id: str):
+        from app.services.formula_push.engine import load_push_rules
+
+        return next(r for r in load_push_rules() if r.rule_id == rule_id)
+
+    @pytest.mark.parametrize("rule_id, template_type, expected", [
+        ("D4.note.main", "soe", "营业收入、营业成本"),
+        ("D4.note.main", "listed", "营业收入和营业成本"),
+        ("K6.note.main", "soe", "持有待售资产"),
+        ("K6.note.main", "listed", "持有待售资产和持有待售负债"),
+        ("D2.note.main", "soe", "应收账款"),
+        ("D2.note.main", "listed", "应收账款"),
+        ("D1.note.main", "soe", "应收票据"),
+        # 没声明 table_by_template：主表名即章节名，照旧
+        ("K1.note.main", "soe", "其他应收款"),
+        ("N1.note.main", "soe", "递延所得税资产"),
+        ("G2.note.main", "soe", "应收利息"),
+    ], ids=["D4-soe", "D4-listed", "K6-soe", "K6-listed", "D2-soe", "D2-listed", "D1-soe", "K1-soe", "N1-soe",
+            "G2-soe"])
+    def test_expected_title(self, rule_id: str, template_type: str, expected: str):
+        rule = self._rule(rule_id)
+        table_name = rule.target.resolve_table(template_type) or rule.target.table
+        assert engine_mod._expected_section_title(rule, template_type, table_name) == expected
+
+    def test_missing_seed_section_falls_back_to_generic_table(self):
+        rule = _make_rule(table="营业收入和营业成本", sections={"soe": "八、999"},
+                          table_by_template=(("soe", "营业收入、营业成本"),))
+        assert engine_mod._expected_section_title(rule, "soe", "营业收入、营业成本") == "营业收入和营业成本"
+
+    def test_soe_revenue_section_passes_title_check(self):
+        """国企 八、64 章节标题「营业收入、营业成本」：D4 形态的规则不再按上市表名判「不是…章节」。"""
+        rows = [{"label": "主营业务", "end_amount": None, "prior_amount": None},
+                {"label": "合计", "end_amount": None, "prior_amount": None, "is_total": True, "row_type": "total"}]
+        note = _make_note_mock(note_section="八、64", section_title="营业收入、营业成本",
+                               table_data=_sub_table_data("营业收入、营业成本", rows, source="workpaper"))
+        ctx = _make_ctx(db=_setup_db_for_single_note(note))
+        rule = _make_rule(table="营业收入和营业成本", sections={"listed": "五、62", "soe": "八、64"},
+                          table_by_template=(("listed", "营业收入和营业成本"), ("soe", "营业收入、营业成本")))
+        binding = _make_binding([{"note_label": "主营业务", "label": "主营业务", "ending": 10, "ending_resolved": True,
+                                  "opening": 8, "opening_resolved": True, "is_total": False, "is_memo": False}],
+                                account_prefixes=("6001",))
+        section = asyncio.run(engine_mod._push_note(
+            ctx, rule=rule, binding=binding, overlay={}, sources=_make_sources("soe"), paper=_make_paper(),
+        ))
+        assert section == "八、64", [(i.addr_id, i.action, i.reason) for i in ctx.result.items]
+        assert not [i for i in ctx.result.items if "章节" in (i.reason or "")]
+        out = note.table_data["sub_table_data"]["营业收入、营业成本"]
+        assert out[0]["end_amount"] == 10 and out[1]["end_amount"] == 10
+
+    def test_wrong_chapter_still_rejected_and_message_names_expected_title(self):
+        """D2 形态（主表名「（1）按账龄披露应收账款」、章节「应收账款」）：章节不对照旧跳过，原因写校验用的章节名。"""
+        note = _make_note_mock(note_section="八、5", section_title="其他收益",
+                               table_data=_sub_table_data("（1）按账龄披露应收账款", [], source="workpaper"))
+        db = _setup_db_for_single_note(note)
+        fallback = MagicMock()
+        fallback.scalars.return_value.all.return_value = []
+        primary = db.execute.return_value
+        db.execute.side_effect = [primary, fallback]
+        ctx = _make_ctx(db=db)
+        rule = _make_rule(table="按账龄披露", sections={"soe": "八、5"},
+                          table_by_template=(("soe", "（1）按账龄披露应收账款"),))
+        section = asyncio.run(engine_mod._push_note(
+            ctx, rule=rule, binding=_make_binding([]), overlay={}, sources=_make_sources("soe"), paper=_make_paper(),
+        ))
+        assert section is None
+        reasons = [i.reason for i in ctx.result.items if i.action == "skipped"]
+        assert reasons == ["附注 八、5 是「其他收益」章节，不是「应收账款」，未推送"]

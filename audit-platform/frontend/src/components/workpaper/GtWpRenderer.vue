@@ -52,6 +52,9 @@
 
       <template v-else>
       <WorkpaperBackgroundMergeBanner :wp-id="wpId" />
+      <VoucherSurvivalBanner
+        :project-id="runtimeProjectId" :workpaper-id="wpId" :year="preparationYear" :readonly="effectiveReadonly"
+      />
       <el-alert
         v-if="schemaFallbackBanner"
         type="info"
@@ -132,6 +135,7 @@
         v-if="componentType !== 'a1-dashboard'"
         :fullscreen="isWpFullscreen"
         :wp-id="wpId"
+        :readonly="effectiveReadonly"
         @export-template="onExportTemplate"
         @export-data="onExportData"
         @import-data="onImportData"
@@ -358,7 +362,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { ref, computed, toRef, onMounted, onUnmounted, watch, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Switch, Setting, Refresh } from '@element-plus/icons-vue'
@@ -371,7 +375,9 @@ import {
   type WpComponentType,
 } from '@/composables/useWpRenderer'
 import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
-import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
+import { useRendererCellLocate } from '@/composables/useRendererCellLocate'
+import { catalogTextAnchor } from '@/generated/catalogTextAnchors'
+import { entryGroupOfHighlight, locateAdjustmentEntryGroup } from '@/composables/adjustmentEntryGroupLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
@@ -408,6 +414,7 @@ import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 import WorkpaperBackgroundMergeBanner from '@/components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue'
+import VoucherSurvivalBanner from '@/components/workpaper/voucher-sampling/VoucherSurvivalBanner.vue'
 import { isBackgroundMerging } from '@/components/workpaper/sync/backgroundMergeRegistry'
 
 // ─── Types ───
@@ -894,7 +901,7 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
 /**
  * 公式校验/注册表用年度：只认本底稿所属项目的年度。
  *
- * `useProjectStore().year` 是可切换的 UI 年度且初始化为当前年 - 1；它不是
+ * `useProjectStore().year` 是可切换的 UI 年度（原先初值去年，现为 null 直到取到项目年度）；它不是
  * 项目 `audit_year`，缺年度项目若用它兜底就会静默按 2025 读取调整/试算表。
  * render-config 的 `audit_year` 是后端项目年度权威值，父 Shell 的 auditYear
  * 仅在配置尚未带该字段时作为同一项目的回退；缺失时必须保持 null。
@@ -922,6 +929,7 @@ const runtime = useWorkpaperScaffold({
   wpId: wpIdRef,
   projectId: runtimeProjectId,
   wpCode: runtimeWpCode,
+  // 项目没填审计年度为 null（不按今年兜底；运行时上下文按 number | null | undefined 声明）
   year: preparationYear,
   readonly: effectiveReadonly,
   onJumpToSection: onChildNavigateSheet,
@@ -931,55 +939,38 @@ const runtime = useWorkpaperScaffold({
 })
 
 // 外层编辑器的版本按钮委托给 Runtime Boundary，避免同一 HTML 底稿挂载第二个版本 Host。
-defineExpose({ openVersionHistory: runtime.version.openVersionHistory })
+// renderConfig / loading 给外壳侧栏 decision_trace 与编制说明闸门读（外壳不再自带一份 render-config，spec platform-perf-hotspots R4）。
+defineExpose({ openVersionHistory: runtime.version.openVersionHistory, renderConfig, loading })
 
 /** componentType → 图标（sheet tab 显示），委托给 registry */
 function getSheetIcon(ct: string): string {
   return registryGetSheetIcon(ct)
 }
 
-// ─── wp-locate-foundation Task 3.1: 监听 workpaper:locate-cell 事件 ───
-const { locateCell } = useCellLocate()
+// ─── 定位：workpaper:locate-cell 事件与深链初始属性（spec wp-deeplink-cell-locate-closure） ───
+// 渲染配置未到时排队；先问当前组件的 locateCell 钩子，再在本渲染器根元素内找；找不到提示一次。
+const rendererLocate = useRendererCellLocate({
+  wpId: () => props.wpId,
+  ready: () => !!renderConfig.value,
+  resolveSheet: (locator) => resolveRenderSheet(visibleSheets.value, locator),
+  activeSheet: () => activeSheet.value,
+  selectSheet: (name) => { selectSheet(name) },
+  root: () => containerRef.value,
+  component: () => activeComponentRef.value,
+  wpCode: () => renderConfig.value?.wp_code ?? '',
+  componentType: () => componentType.value,
+  textAnchor: catalogTextAnchor,
+  entryGroup: locateAdjustmentEntryGroup,
+})
 
 function onLocateCell(payload: WorkpaperLocateCellPayload) {
-  if (payload.wpId !== props.wpId || !renderConfig.value) return
-
-  const requestedSheet = payload.sheetName
-  const resolvedSheet = requestedSheet
-    ? resolveRenderSheet(visibleSheets.value, requestedSheet)
-    : activeSheet.value
-  const canonicalSheetName = resolvedSheet?.sheet_name ?? activeSheetName.value
-  const target: LocateTarget = {
-    wp_code: payload.wpCode || '',
-    wp_id: payload.wpId,
-    sheet_name: canonicalSheetName,
-    cell_ref: payload.cellRef || null,
-    component_type: payload.componentType || resolvedSheet?.componentType || componentType.value || null,
-    value: payload.value || null,
-    label: payload.label || null,
-  }
-
-  if (requestedSheet && !resolvedSheet) {
-    ElMessage.info('已打开底稿但未能定位到目标位置（可能已变更）')
-    return
-  }
-
-  const needSwitchSheet = Boolean(
-    resolvedSheet && resolvedSheet.sheet_name !== activeSheetName.value,
-  )
-  if (needSwitchSheet) selectSheet(resolvedSheet!.sheet_name)
-
-  nextTick(() => {
-    const success = locateCell(target)
-    if (!success) {
-      ElMessage.info(
-        needSwitchSheet
-          ? '已切换到目标 sheet，但未能精确定位到目标位置'
-          : '已打开底稿但未能定位到目标位置（可能已变更）',
-      )
-    }
-  })
+  rendererLocate.request(payload)
 }
+
+// 深链 ?cell= 与调整分录页跳来源底稿的 ?highlight=<source_ref>（本底稿的分录组，spec wp-deeplink-locate-residual-closure）
+watch(() => [props.initialSheet, props.initialCell, entryGroupOfHighlight(route?.query?.highlight, props.wpId)] as const, ([sheetName, cellRef, entryGroup]) => {
+  if (cellRef || entryGroup) rendererLocate.request({ wpId: props.wpId, sheetName: sheetName || null, cellRef: cellRef || null, entryGroup })
+}, { immediate: true })
 
 /** 行名映射确认后重刷本底稿（用新映射重算受影响行）。 */
 function onRowNameAlignmentConfirmed(payload: { wpId: string; sheetCode: string }) {
@@ -1123,6 +1114,12 @@ function onExportData() {
   }
 }
 function onImportData() {
+  // 只读（编辑锁在别的窗口 / 别人手里等）不转给子组件：子组件的导入直接调后端导入接口写库
+  // （spec workpaper-multi-window-lock-gaps R2.1；工具栏按钮已禁用，这里再拦一次）
+  if (effectiveReadonly.value) {
+    ElMessage.warning('当前为只读，不能导入')
+    return
+  }
   // 如果子组件暴露了 handleImportClick / handleImport 方法，委托给它
   const child = activeComponentRef.value
   if (child && typeof child.handleImportClick === 'function') {

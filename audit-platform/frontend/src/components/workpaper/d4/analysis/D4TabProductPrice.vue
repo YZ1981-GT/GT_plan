@@ -10,7 +10,9 @@
  *          /差异原因分析/同期市场价格来源(索引号)/备注
  * 三、审计说明  四、审计结论
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
@@ -42,7 +44,13 @@ const ABNORMAL_THRESHOLD = 0.1
 // ─── 双模式 sync bridge（批次B 第五张：D4-11 迁 useWorkpaperSyncBridge，sheet_key=d411-managed）──
 //     参照 D4-6/D4-19 接桥范式。flushSave/loadData 等为函数声明（提升），此处引用安全。
 const D4_11_SHEET_KEY = 'd411-managed'
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD411() { loadData(); loadNoteConclusion(); loadAuditProcess() }
 const {
   syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
@@ -91,8 +99,7 @@ const rows = ref<PriceRow[]>([])
 
 /** 生成稳定行身份（优先 crypto.randomUUID，回退时间+随机）。 */
 function genRowId(): string {
-  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID() } catch { /* */ }
-  return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 /** 历史无 rowId 行一次性补齐（不丢手工值，双向回写身份前提，同 D4-9 backfill）。 */
 function backfillRowIds(list: PriceRow[]): boolean {

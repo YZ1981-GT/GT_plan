@@ -22,6 +22,7 @@
  */
 
 import type { AcnrCellEntry } from '@/services/acnr/useAcnr'
+import { isListedCell } from '@/services/acnr/cellListing'
 
 /** 左栏三种模式。current-sheet 为默认；global-browse 为显式按钮；fail-closed 为缺身份兜底。 */
 export type LeftPanelMode = 'current-sheet' | 'global-browse' | 'fail-closed'
@@ -117,10 +118,10 @@ export function buildCurrentSheetAnchorNodes(
   for (const c of cells) {
     const addrId = (c?.addr_id || '').trim()
     if (!addrId) continue
-    if (c?.deprecated) continue
+    if (!isListedCell(c)) continue
     if (seen.has(addrId)) continue
     seen.add(addrId)
-    const label = (c.semantic_label || c.cell_address || addrId) as string
+    const label = (c.cell_label || c.cell_address || addrId) as string
     nodes.push({
       key: `anchor_${addrId}`,
       label,

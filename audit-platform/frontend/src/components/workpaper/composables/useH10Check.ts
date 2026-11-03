@@ -4,6 +4,10 @@
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { H10_COMPLIANCE_OPTIONS } from './h10Constants'
 import type { ChecklistResponse } from './useF1FormData'
+import {
+  legacyIdentity, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
 
 export type H10ComplianceValue = 'compliant' | 'non_compliant' | 'not_applicable' | ''
 
@@ -71,7 +75,7 @@ function parseRows(json: string | null | undefined): H10CheckRow[] {
   if (!json) return []
   try {
     const arr = JSON.parse(json)
-    return Array.isArray(arr) ? arr.map((r, i) => normalizeRow(r, i + 1)) : []
+    return Array.isArray(arr) ? arr.map((r, i) => withRowMeta(normalizeRow(r, i + 1), r)) : []
   } catch {
     return []
   }
@@ -94,18 +98,67 @@ function sampleAssetName(s: any): string {
   ).slice(0, 80)
 }
 
+/** 凭证索引「日期/凭证号」拆回两段（旧行没有 `_gt` 时按凭证号 + 日期认同一分录） */
+export function splitVoucherRef(ref: string): { no: string; date: string } {
+  const s = String(ref ?? '').trim()
+  const i = s.indexOf('/')
+  return i >= 0 ? { date: s.slice(0, i), no: s.slice(i + 1) } : { date: '', no: s }
+}
+
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：任一合规判断，或改过备注 */
+export function hasH10CheckContent(row: H10CheckRow): boolean {
+  return CHECK_FIELDS.some((f) => row[f] !== '')
+    || (String(row.remark ?? '').trim() !== '' && row.remark !== '抽凭标记异常')
+}
+
+/**
+ * 共享回填函数的待写入项 → 检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：样本各成一行、不挂明细。
+ * 原实现按顺序把第 i 个样本填进第 i 个还没挂凭证的明细行，凭证与资产对不上
+ */
+export function mapPreparedToH10CheckRow(item: PreparedItem): H10CheckRow {
+  const s = item.sample as PreparedItem['sample'] & { abnormal?: boolean; checkResult?: string }
+  return normalizeRow({
+    detailRowId: '',
+    assetName: sampleAssetName(s),
+    voucherRef: voucherLabel(s),
+    remark: s.abnormal || s.checkResult === 'ERR' ? '抽凭标记异常' : '',
+  }, 0)
+}
+
 export function useH10Check(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
+  /** 项目（共享回填函数按它取审计阶段） */
+  projectId?: Ref<string> | ComputedRef<string>
 }) {
   const rows = ref<H10CheckRow[]>([])
   const detailPopulation = ref(0)
   const sampledVoucherCount = ref(0)
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<H10CheckRow>({
+    projectId: () => opts.projectId?.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => mapPreparedToH10CheckRow(item),
+    persist: () => { persist(); syncSampleMeta() },
+    hasUserContent: hasH10CheckContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    // 旧行（没有 `_gt`）没有金额：按凭证索引里的凭证号 + 日期认
+    legacy: (r) => {
+      const { no, date } = splitVoucherRef(r.voucherRef)
+      return legacyIdentity({ voucherNo: no, voucherDate: date, amount: 0 })
+    },
+    readonly: () => opts.isReadonly.value,
+  })
+
   watch(
     () => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (json) => { rows.value = parseRows(json) },
+    (json) => {
+      rows.value = parseRows(json)
+      voucherFill.markLoaded()
+    },
     { immediate: true },
   )
 
@@ -161,7 +214,13 @@ export function useH10Check(opts: {
   )
 
   function persist(): void {
-    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
+    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(rows.value)) })
+  }
+
+  /** 抽凭 / 挂凭导入 / 撤销之后：已挂凭证索引的行数落到抽样元数据 */
+  function syncSampleMeta(): void {
+    sampledVoucherCount.value = rows.value.filter((r) => !!r.voucherRef).length
+    persistSampleMeta()
   }
 
   function persistSampleMeta(): void {
@@ -195,7 +254,9 @@ export function useH10Check(opts: {
 
   function updateRow(id: string, patch: Partial<H10CheckRow>): void {
     if (opts.isReadonly.value) return
-    rows.value = rows.value.map((r) => (r.id === id ? normalizeRow({ ...r, ...patch }, r.seq) : r))
+    const current = rows.value.find((r) => r.id === id)
+    if (current && voucherFill.isRowLocked(current)) return
+    rows.value = rows.value.map((r) => (r.id === id ? withRowMeta(normalizeRow({ ...r, ...patch }, r.seq), r) : r))
     persist()
   }
 
@@ -213,43 +274,6 @@ export function useH10Check(opts: {
     return !isNonCompliant(row)
   }
 
-  /**
-   * 抽凭引擎回填：优先按凭证号更新已有空凭证行，否则追加检查行。
-   * @returns 写入行数
-   */
-  function fillFromSampledVouchers(samples: any[]): number {
-    if (opts.isReadonly.value || !Array.isArray(samples) || !samples.length) return 0
-    let n = 0
-    const next = [...rows.value]
-    for (const s of samples) {
-      const vref = voucherLabel(s)
-      const name = sampleAssetName(s)
-      const emptyIdx = next.findIndex((r) => !r.voucherRef)
-      if (emptyIdx >= 0) {
-        const prev = next[emptyIdx]
-        next[emptyIdx] = normalizeRow({
-          ...prev,
-          assetName: prev.assetName || name,
-          voucherRef: vref || prev.voucherRef,
-          remark: prev.remark || (s.abnormal || s.checkResult === 'ERR' ? '抽凭标记异常' : ''),
-        }, prev.seq)
-      } else {
-        next.push(normalizeRow({
-          detailRowId: '',
-          assetName: name,
-          voucherRef: vref,
-          remark: s.abnormal || s.checkResult === 'ERR' ? '抽凭标记异常' : '',
-        }, next.length + 1))
-      }
-      n++
-    }
-    rows.value = next.map((r, i) => ({ ...r, seq: i + 1 }))
-    sampledVoucherCount.value = rows.value.filter((r) => !!r.voucherRef).length
-    persist()
-    persistSampleMeta()
-    return n
-  }
-
   return {
     rows,
     nonCompliantRows,
@@ -259,7 +283,12 @@ export function useH10Check(opts: {
     complianceOptions,
     updateRow,
     linkToDetail,
-    fillFromSampledVouchers,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     sampleRatio,
     sampleRatioLow,
     detailPopulation,

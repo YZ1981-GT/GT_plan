@@ -491,13 +491,18 @@ export function buildH3SyncPayload(opts: H3SyncPayloadOptions): H3SyncFromWorkpa
   const isCost = measurementModel === 'cost'
 
   if (isCost) {
-    const rows = variant === 'listed'
-      ? buildListedCostRows(opts.costOriginalRows, opts.costDepRows, opts.costImpairRows)
-      : buildSoeCostRows(opts.costOriginalRows, opts.costDepRows, opts.costImpairRows)
-    sub_table_data[names.cost] = rows
-    columns[names.cost] = allColumns[names.cost]
-    removed.push(names.fair)
-  } else {
+    const hasCostSource = opts.costOriginalRows !== undefined
+      || opts.costDepRows !== undefined
+      || opts.costImpairRows !== undefined
+    if (hasCostSource) {
+      const rows = variant === 'listed'
+        ? buildListedCostRows(opts.costOriginalRows, opts.costDepRows, opts.costImpairRows)
+        : buildSoeCostRows(opts.costOriginalRows, opts.costDepRows, opts.costImpairRows)
+      sub_table_data[names.cost] = rows
+      columns[names.cost] = allColumns[names.cost]
+      removed.push(names.fair)
+    }
+  } else if (opts.fairChangeRows !== undefined) {
     const rows = variant === 'listed'
       ? buildListedFairRows(opts.fairChangeRows)
       : buildSoeFairRows(opts.fairChangeRows)
@@ -506,13 +511,15 @@ export function buildH3SyncPayload(opts: H3SyncPayloadOptions): H3SyncFromWorkpa
     removed.push(names.cost)
   }
 
-  // 未办妥产权证书：条件表（有行才推；无行清理避免残留过时明细）
-  const titleRows = buildTitleRows(opts.titleRows, variant === 'soe')
-  if (titleRows.length) {
-    sub_table_data[names.title] = titleRows
-    columns[names.title] = allColumns[names.title]
-  } else {
-    removed.push(names.title)
+  // 未办妥产权证书：undefined = 没有来源（保持附注原值）；显式空数组 = 已确认无行（清理旧表）。
+  if (opts.titleRows !== undefined) {
+    const titleRows = buildTitleRows(opts.titleRows, variant === 'soe')
+    if (titleRows.length) {
+      sub_table_data[names.title] = titleRows
+      columns[names.title] = allColumns[names.title]
+    } else {
+      removed.push(names.title)
+    }
   }
 
   const noteTexts = buildNoteTexts(sectionTexts)

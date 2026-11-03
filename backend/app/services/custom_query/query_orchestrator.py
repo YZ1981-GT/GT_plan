@@ -40,11 +40,17 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.custom_query.acnr_target_values import (
+    complete_year,
+    read_acnr_target_values,
+    resolve_acnr_targets,
+)
 from app.services.custom_query.addressing_service import (
     AddressingService,
     ResolvedTarget,
     addressing_service,
 )
+from app.services.custom_query.cycle_scope import CycleScopeCache
 from app.services.custom_query.ownership_guard import OwnershipGuard, ownership_guard
 from app.services.custom_query.pagination import (
     apply_pagination,
@@ -224,6 +230,14 @@ class QueryRequest:
     sort: list[dict] = field(default_factory=list)
     limit: int = DEFAULT_PAGE_SIZE
     offset: int = 0
+    #: 服务端精确 COUNT 凭证；仅用于跳过同一查询后续页的重复计数。
+    count_token: str | None = None
+    #: 结构化条件 [{"field", "op", "value"}] 与组合逻辑（advanced-query-linkage-closure R6.1）；
+    #: 只有注册表 SQL 源支持，内存源带条件即 400 CONDITIONS_UNSUPPORTED
+    conditions: list[dict] = field(default_factory=list)
+    condition_logic: str = "and"
+    # 编排器为缓存身份解析循环范围时创建；取数层复用，避免同一请求重复查 4~5 次权限链。
+    cycle_scope_cache: Any | None = field(default=None, repr=False, compare=False)
 
     def cache_def(self) -> dict:
         """稳定序列化的查询定义（用于缓存键，design Data Models §4）。
@@ -246,7 +260,28 @@ class QueryRequest:
             "sort": [dict(s) for s in self.sort],
             "limit": self.limit,
             "offset": self.offset,
+            # 条件必须进键：否则「借方 > 1 亿」与不带条件的查询会命中同一缓存条目
+            "conditions": [dict(c) for c in self.conditions],
+            "condition_logic": self.condition_logic,
         }
+
+
+@dataclass
+class FetchPage:
+    """取数层的返回（advanced-query-linkage-closure ADR-AQL-06，design §3.3）。
+
+    - ``paged=True``：注册表 SQL 源已在数据库内完成计数、排序与分页——``rows`` 就是这一页、``total`` 是全量
+      COUNT，编排器跳过 step5~7（内存分组 / 透视 / 排序切片）。
+    - ``paged=False``：行集完整（内存源、或带分组 / 透视的 SQL 源全量），编排器照常在内存里处理。
+    旧取数器返回的 ``(rows, columns)`` 元组仍走内存路径（既有编排器测试不改）。
+    """
+
+    rows: list[dict]
+    columns: list["ColumnMeta"]
+    total: int
+    paged: bool
+    meta: dict = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -263,6 +298,10 @@ class QueryResult:
     #: router 调用，故此缺陷此前不可见。
     limit: int = 0
     offset: int = 0
+    #: 取数层给的附加信息（如 ``ref_context``、附注 ``tables``）；没有内容时响应里整键省略（N3）
+    meta: dict = field(default_factory=dict)
+    #: acnr_targets 逐格取值块（acnr-foundation-defect-closure T15）：每次执行现读、不进缓存（不在 to_payload 里）
+    acnr_results: Optional[dict] = None
 
     def to_payload(self) -> dict:
         """转为 JSON 可序列化 dict（供 QueryCache 存储）。"""
@@ -273,6 +312,7 @@ class QueryResult:
             "warnings": self.warnings,
             "limit": self.limit,
             "offset": self.offset,
+            "meta": self.meta,
         }
 
     @classmethod
@@ -301,13 +341,14 @@ class QueryResult:
             warnings=list(payload.get("warnings", [])),
             limit=int(payload.get("limit", 0)),
             offset=int(payload.get("offset", 0)),
+            meta=dict(payload.get("meta") or {}),
         )
 
 
-# 取数回调签名：给定 (req, resolved_targets, db) → (rows, columns)
+# 取数回调签名：给定 (req, resolved_targets, db) → (rows, columns) 或 FetchPage
 RowFetcher = Callable[
     [QueryRequest, list[ResolvedTarget], AsyncSession],
-    Awaitable[tuple[list[dict], list[ColumnMeta]]],
+    Awaitable["tuple[list[dict], list[ColumnMeta]] | FetchPage"],
 ]
 
 
@@ -347,8 +388,9 @@ class QueryOrchestrator:
         """执行统一查询编排链，返回 QueryResult。
 
         step1 Ownership_Check：任何数据读写前强制项目归属校验（R9.5）；
-        step2 resolve：业务视图目标经 AddressingService 统一寻址（R1.6），
-              任一不可解析 → TARGET_UNRESOLVABLE 全有或全无、不部分执行；
+        step2 resolve：业务视图 acnr_targets 经 ``resolve_acnr_targets`` 逐项分类（acnr T15），
+              任一不接受 → 422 ACNR_TARGETS_REJECTED / 503 RESOLVE_UNAVAILABLE，全有或全无、不部分执行；
+              单元格取值在 step3 缓存读取之后现读（不进缓存）；
         step3 cache：以查询定义 + project_id + scope_sig 为键短 TTL 缓存；
         step4 (sql | cell-fetch)：按 entry 分派取数（集成钩子）；
         step5 group：多维度分组（GroupingEngine，惰性接线）；
@@ -381,7 +423,7 @@ class QueryOrchestrator:
         resolved = await self._resolve_targets(req, db)
 
         # ── step3: cache（键隔离 project_id + scope_sig R12.5）──
-        scope_sig = self._scope_signature(user, req)
+        scope_sig = await self._scope_signature(user, req, db)
         key = self._cache.cache_key(req.cache_def(), str(req.project_id), scope_sig)
 
         executed = {"ran": False}
@@ -392,33 +434,33 @@ class QueryOrchestrator:
             return result.to_payload()
 
         payload = await self._cache.get_or_compute(key, _compute, ttl=ttl)
-        return QueryResult.from_payload(payload, cache_hit=not executed["ran"])
+        result = QueryResult.from_payload(payload, cache_hit=not executed["ran"])
+        # 单元格取值在缓存读取之后（无论命中）现读，不进缓存（acnr design §2.3）
+        result.acnr_results = await read_acnr_target_values(
+            resolved, project_id=req.project_id, year=req.year, db=db)
+        return result
+
+    async def resolve_targets(self, req: QueryRequest, db: AsyncSession) -> list[ResolvedTarget]:
+        """step2 的公开入口：服务端导出与 execute 同一目标解析（任一不接受 → 422 / 503，advanced-query-linkage-closure §3.5）。"""
+        return await self._resolve_targets(req, db)
 
     # ── step2 内部：目标解析 ──────────────────────────────────────────────
     async def _resolve_targets(
         self, req: QueryRequest, db: AsyncSession
     ) -> list[ResolvedTarget]:
-        """业务视图入口统一寻址；白名单构建器入口不走 cell 寻址。
+        """业务视图入口的 acnr_targets：经 ``resolve_acnr_targets`` 逐项解析与分类（acnr-foundation-defect-closure T15）。
 
-        任一目标 ``found=False`` → 归集无法解析清单、整体不执行、不返回部分结果
-        （R1.4 TARGET_UNRESOLVABLE）。
+        全有或全无：任一项不是 L1 底稿单元格 → 422 ``ACNR_TARGETS_REJECTED`` + 逐项 issues；解析服务不可用 / 整批
+        超时 → 503 ``RESOLVE_UNAVAILABLE``；都不取数。年度缺省（None 或 ≤ 0）按项目审计年度补齐，补不出 422
+        ``YEAR_REQUIRED``。白名单构建器入口不走这里（见 ``acnr_target_values.plan_builder_targets``）。
         """
         if req.entry != ENTRY_BUSINESS or not req.targets:
             return []
 
-        resolved = await self._addressing.resolve_many(
-            req.targets, project_id=req.project_id, db=db
+        resolved = await resolve_acnr_targets(
+            req.targets, project_id=req.project_id, db=db, addressing=self._addressing
         )
-        unresolved = [t.raw for t in resolved if not t.found]
-        if unresolved:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "TARGET_UNRESOLVABLE",
-                    "message": "存在无法解析为有效 addr_id 的查询目标，已中止查询",
-                    "unresolved": unresolved,
-                },
-            )
+        req.year = await complete_year(db, req.project_id, req.year)
         return resolved
 
     # ── step4–7 内部：取数 → 分组 → 透视 → 序列化 ───────────────────────────
@@ -431,9 +473,28 @@ class QueryOrchestrator:
         db: AsyncSession,
     ) -> QueryResult:
         warnings: list[str] = []
+        meta: dict = {}
 
         # step4: (sql | cell-fetch) — 按 entry 分派取数（集成钩子）
-        rows, columns = await self._fetch_rows(req, resolved, db, warnings)
+        fetched = await self._fetch_rows(req, resolved, db, warnings)
+        if isinstance(fetched, FetchPage):
+            warnings.extend(fetched.warnings)
+            meta = dict(fetched.meta)
+            if fetched.paged:
+                # 数据库已完成计数 / 排序 / 分页（ADR-AQL-06）：跳过 step5~7，total 原样
+                return QueryResult(
+                    columns=self._finalize_columns(list(fetched.columns), collapsed=False),
+                    rows=list(fetched.rows),
+                    total=int(fetched.total),
+                    limit=req.limit,
+                    offset=req.offset,
+                    cache_hit=False,
+                    warnings=warnings,
+                    meta=meta,
+                )
+            rows, columns = list(fetched.rows), list(fetched.columns)
+        else:
+            rows, columns = fetched
 
         # 跨项目聚合仅保留可访问项目行（R9.6）——防御式，仅当行携带 project_id
         if rows and any("project_id" in r for r in rows):
@@ -470,6 +531,7 @@ class QueryOrchestrator:
             offset=paged.offset,
             cache_hit=False,
             warnings=warnings,
+            meta=meta,
         )
 
     def _finalize_columns(
@@ -506,7 +568,7 @@ class QueryOrchestrator:
         resolved: list[ResolvedTarget],
         db: AsyncSession,
         warnings: list[str],
-    ) -> tuple[list[dict], list[ColumnMeta]]:
+    ) -> "tuple[list[dict], list[ColumnMeta]] | FetchPage":
         """按 entry 分派取数。
 
         - ``business`` → cell-fetch（业务 cell 级取数集成钩子）。
@@ -540,11 +602,9 @@ class QueryOrchestrator:
             from app.services.custom_query.grouping_engine import (  # type: ignore
                 GroupingEngine,
             )
-        except ImportError:
-            warnings.append(
-                "grouping_engine 尚未就绪（task 9.1）：已跳过分组步（集成钩子）"
-            )
-            return rows, columns
+        except ImportError as exc:
+            logger.exception("grouping_engine 未能加载")
+            raise self._transform_error("分组") from exc
 
         try:
             engine = GroupingEngine()
@@ -561,10 +621,9 @@ class QueryOrchestrator:
             return list(new_rows), list(new_cols)
         except HTTPException:
             raise  # 分组校验类错误（INVALID_GROUP_DIM/AGG_TYPE_MISMATCH）上抛
-        except Exception as exc:  # noqa: BLE001 — 集成钩子容错，不使编排崩溃
-            logger.warning("grouping_engine 接线调用失败（集成钩子）: %s", exc)
-            warnings.append("分组步接线异常，已跳过（集成钩子）")
-            return rows, columns
+        except Exception as exc:  # noqa: BLE001 — 变换语义不能降级成原始明细
+            logger.exception("grouping_engine 执行失败")
+            raise self._transform_error("分组") from exc
 
     def _apply_pivot(
         self,
@@ -578,11 +637,9 @@ class QueryOrchestrator:
             from app.services.custom_query.pivot_engine import (  # type: ignore
                 PivotEngine,
             )
-        except ImportError:
-            warnings.append(
-                "pivot_engine 尚未就绪（task 10.x）：已跳过透视步（集成钩子）"
-            )
-            return rows, columns
+        except ImportError as exc:
+            logger.exception("pivot_engine 未能加载")
+            raise self._transform_error("透视") from exc
 
         try:
             engine = PivotEngine()
@@ -598,10 +655,9 @@ class QueryOrchestrator:
             return self._grid_to_rows_columns(grid, req.pivot)
         except HTTPException:
             raise  # 透视校验类错误（PIVOT_COL_LIMIT）上抛
-        except Exception as exc:  # noqa: BLE001 — 集成钩子容错
-            logger.warning("pivot_engine 接线调用失败（集成钩子）: %s", exc)
-            warnings.append("透视步接线异常，已跳过（集成钩子）")
-            return rows, columns
+        except Exception as exc:  # noqa: BLE001 — 变换语义不能降级成原始明细
+            logger.exception("pivot_engine 执行失败")
+            raise self._transform_error("透视") from exc
 
     # ── 辅助 ─────────────────────────────────────────────────────────────
     @staticmethod
@@ -654,14 +710,32 @@ class QueryOrchestrator:
         return rows, columns
 
     @staticmethod
-    def _scope_signature(user: Any, req: QueryRequest) -> str:
-        """当前用户可访问范围的稳定签名（缓存键隔离 R12.5）。
+    def _transform_error(step: str) -> HTTPException:
+        """变换失败不得悄悄返回另一种数据语义。内部异常只写日志。"""
+        return HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "QUERY_TRANSFORM_FAILED",
+                "message": f"查询{step}失败，未返回未经{step}的明细；请调整条件后重试",
+                "step": step,
+            },
+        )
 
-        最小实现：以 user.id + entry 组合作签名，保证不同用户/入口不复用缓存。
-        更细粒度的可访问项目集合签名由 QueryCache 键中的 project_id 与本签名共同隔离。
+    @staticmethod
+    async def _scope_signature(user: Any, req: QueryRequest, db: AsyncSession) -> str:
+        """用户、入口和当前循环范围的稳定缓存身份。
+
+        业务视图会按循环范围过滤试算表、调整分录与附注。范围若不入缓存键，管理员
+        收窄某人的循环后，该用户在 TTL 内仍可能命中原来的更宽结果。
         """
         user_id = getattr(user, "id", None)
-        return f"{user_id}:{req.entry}"
+        if req.entry != ENTRY_BUSINESS or user is None or db is None:
+            return f"{user_id}:{req.entry}"
+        scope_cache = CycleScopeCache(user, db)
+        req.cycle_scope_cache = scope_cache
+        cycles = await scope_cache.cycles(req.project_id)
+        cycle_sig = "*" if cycles is None else ",".join(sorted({str(v) for v in cycles}))
+        return f"{user_id}:{req.entry}:cycles={cycle_sig}"
 
 
 # 模块级单例（与同包 addressing_service / ownership_guard / query_cache 一致）

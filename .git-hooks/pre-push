@@ -4,12 +4,19 @@
 #
 # 检查项：
 # 0. push 前工作树完整性硬门（所有模式）
+# 0b. 版本标记硬门（所有模式，分离头 worktree 推送也查）：推送新提交时，最新提交上必须有随本次
+#     推送的附注标签 vX.Y.Z，说明里写「主要变动：」—— 规则和打标签工具都在 .git-hooks/push_version.py
 # 1. 分支命名规约（main / spec/ / work/ / fix/ / release/）
 # 2. multi 模式禁止直推 main
 # 3. 6 维核查（multi 严格 / single 仅警告）
 # 4. 暂存树/HEAD 自洽
 
 set -e
+
+# git 从标准输入传本次推送的引用清单（每行：本地引用 本地sha 远端引用 远端sha），先整段读出来给
+# 版本标记门用；后面的检查脚本都不读标准输入。
+PUSH_REFS="$(cat)"
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # 0. 交付防丢硬门：push 时工作树必须完全干净。
 #
@@ -27,23 +34,42 @@ if [ -n "$WORKTREE_STATUS" ]; then
     exit 1
 fi
 
-# 找 Python 路径（Windows + Linux 兼容）
+# 找 Python 路径（Windows + Linux 兼容；临时 worktree 里没有 .venv 时用主工作树的）
+MAIN_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo .git)")"
 if [ -f ".venv/Scripts/python.exe" ]; then
     PYTHON=".venv/Scripts/python.exe"
 elif [ -f ".venv/bin/python" ]; then
     PYTHON=".venv/bin/python"
+elif [ -f "$MAIN_ROOT/.venv/Scripts/python.exe" ]; then
+    PYTHON="$MAIN_ROOT/.venv/Scripts/python.exe"
+elif [ -f "$MAIN_ROOT/.venv/bin/python" ]; then
+    PYTHON="$MAIN_ROOT/.venv/bin/python"
 elif command -v python > /dev/null; then
     PYTHON="python"
 else
-    echo "[pre-push] ⚠️ 未找到 Python，跳过检查"
-    exit 0
+    echo "[pre-push] ❌ 未找到 Python，无法校验版本标签，拒绝 push"
+    exit 1
+fi
+
+# 0b. 版本标记硬门（2026-10-27 用户要求：推送时要标记版本号和变动的主要内容）
+#
+# 放在下面的「分离头跳过」之前：并发会话大多在临时分离头 worktree 里推送，跳过就等于没有这道门。
+# 校验逻辑在 push_version.py（install.ps1 把它和本钩子一起复制进 .git/hooks/），同一个文件也是
+# 打标签 + 推送的工具：python .git-hooks/push_version.py push -c "主要变动一" -c "主要变动二"
+if [ ! -f "$HOOK_DIR/push_version.py" ]; then
+    echo "[pre-push] ❌ 缺少 $HOOK_DIR/push_version.py（钩子没装全），拒绝 push"
+    echo "          在仓库根执行：powershell -ExecutionPolicy Bypass -File .git-hooks/install.ps1"
+    exit 1
+fi
+if ! printf '%s\n' "$PUSH_REFS" | PYTHONIOENCODING=utf-8 "$PYTHON" "$HOOK_DIR/push_version.py" check-push "$1" "$2"; then
+    exit 1
 fi
 
 GIT_MODE="${GIT_MODE:-single}"
 BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 
 if [ -z "$BRANCH" ]; then
-    echo "[pre-push] 无法获取分支名（detached HEAD？），跳过"
+    echo "[pre-push] 无法获取分支名（detached HEAD？），跳过其余检查"
     exit 0
 fi
 

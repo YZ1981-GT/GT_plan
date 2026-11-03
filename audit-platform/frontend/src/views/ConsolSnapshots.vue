@@ -25,12 +25,17 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listSnapshots, createSnapshot } from '@/services/commonApi'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const snapshots = ref<any[]>([])
+// 审计年度按项目取（原先不传 ⇒ 服务层缺省 2025，快照恒建在 2025 年度）；取不到即提示去填、不创建
+const { requireAuditYear } = useProjectAuditYear(projectId)
 async function fetch() { if (projectId.value) snapshots.value = await listSnapshots(projectId.value) }
 async function onCreate() {
-  await createSnapshot(projectId.value)
+  const year = await requireAuditYear('创建快照')
+  if (year == null) return
+  await createSnapshot(projectId.value, year)
   ElMessage.success('快照已创建')
   await fetch()
 }

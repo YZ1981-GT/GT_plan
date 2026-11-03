@@ -105,7 +105,7 @@ describe('Feature: g13-fair-value-changes, Property 6: parseNum健壮性', () =>
 })
 
 describe('Feature: g13-fair-value-changes, Property 7: 成本+累计FV=公允价值', () => {
-  it('isBsFvReconciled ↔ |cost+cum−fv|≤0.01；isPlReconciled ↔ |计入损益−审定|≤0.01', () => {
+  it('isBsFvReconciled ↔ |cost+cum−fv|≤0.01；isPlReconciled ↔ 计入损益与审定按分相等（模板 K=J=D）', () => {
     fc.assert(
       fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), (cost, cum) => {
         const fv = calcFairValueFromParts(cost, cum)

@@ -21,6 +21,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { getWpIndex } from '@/services/workpaperApi'
 import { api } from '@/services/apiProxy'
+import { buildBundleAssigneeMap, type BundleAssignee } from '../shared/bundleAssignee'
 
 // ─── Types (exported for testability & cross-module reuse) ───
 
@@ -95,6 +96,8 @@ export interface UseS34BundleStateOptions {
 export interface UseS34BundleStateReturn {
   /** S34-x wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
+  /** S34-x wp_code → 负责人展示信息（只读索引 JOIN 结果） */
+  assignedToMap: ComputedRef<Record<string, BundleAssignee>>
   /** S34-0 核查清单结构化数据 */
   checklist: Ref<S34ChecklistItem[]>
   /** wpIdMap 有值的 wp_code 列表（适用底稿编码） */
@@ -271,11 +274,14 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
   const loading = ref(false)
   /** S34-x → wp_id 内部状态 */
   const wpIdMapState = ref<Record<string, string>>({})
+  /** S34-x → 负责人展示信息 */
+  const assignedToMapState = ref<Record<string, BundleAssignee>>({})
   /** S34 核查清单（从 API 加载） */
   const checklist = ref<S34ChecklistItem[]>([])
 
   // ─── wpIdMap（Task 4.1, Req 8.1, 8.3）───
   const wpIdMap = computed<Record<string, string>>(() => wpIdMapState.value)
+  const assignedToMap = computed<Record<string, BundleAssignee>>(() => assignedToMapState.value)
 
   // ─── applicableCodes（Task 4.1, Req 9.1）───
   const applicableCodes = computed<string[]>(() =>
@@ -306,14 +312,17 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
   async function loadWpIndex(): Promise<void> {
     if (!projectId.value) {
       wpIdMapState.value = {}
+      assignedToMapState.value = {}
       return
     }
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
       wpIdMapState.value = buildWpIdMap(items)
+      assignedToMapState.value = buildBundleAssigneeMap(items)
     } catch {
       wpIdMapState.value = {}
+      assignedToMapState.value = {}
     } finally {
       loading.value = false
     }
@@ -352,6 +361,7 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
 
   return {
     wpIdMap,
+    assignedToMap,
     checklist,
     applicableCodes,
     completionMap,

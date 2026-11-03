@@ -239,6 +239,51 @@ def cleanup_csv(csv_prefix: Path):
             f.unlink()
 
 
+def evaluate_results(stats: dict) -> dict:
+    """统一判定；任一目标阶段无真实用户/请求样本必须 FAIL。"""
+    total = stats.get("total") or {}
+    stages = stats.get("stages") or []
+    by_users = {int(stage.get("users", 0)): stage for stage in stages}
+    evidence_errors: list[str] = []
+    for expected in STAGES:
+        users = expected["users"]
+        stage = by_users.get(users)
+        if stage is None:
+            evidence_errors.append(f"缺少 {users} 用户阶段")
+            continue
+        actual_users = int(stage.get("user_count_actual", 0) or 0)
+        requests = int(stage.get("requests", 0) or 0)
+        if actual_users < int(users * 0.9):
+            evidence_errors.append(
+                f"{users} 用户阶段实际并发仅 {actual_users}，低于 90%"
+            )
+        if requests <= 0:
+            evidence_errors.append(f"{users} 用户阶段请求样本为 0")
+    if int(total.get("requests", 0) or 0) <= 0:
+        evidence_errors.append("全程聚合请求样本为 0")
+
+    stage_6000 = by_users.get(6000) or {}
+    requests_6000 = int(stage_6000.get("requests", 0) or 0)
+    failures_6000 = int(stage_6000.get("failures", 0) or 0)
+    p95_6000 = float(stage_6000.get("p95", 0) or 0)
+    error_rate_6000 = (
+        failures_6000 / requests_6000 * 100 if requests_6000 > 0 else float("inf")
+    )
+    samples_pass = not evidence_errors
+    p95_pass = samples_pass and p95_6000 <= TARGET_P95_MS
+    error_pass = samples_pass and error_rate_6000 < TARGET_ERROR_RATE
+    return {
+        "samples_pass": samples_pass,
+        "evidence_errors": evidence_errors,
+        "stage_6000": stage_6000,
+        "p95_6000": p95_6000,
+        "error_rate_6000": error_rate_6000,
+        "p95_pass": p95_pass,
+        "error_pass": error_pass,
+        "overall_pass": p95_pass and error_pass,
+    }
+
+
 def generate_final_report(stats: dict, args) -> str:
     """基于统计数据生成最终压测报告。"""
 
@@ -252,18 +297,16 @@ def generate_final_report(stats: dict, args) -> str:
     total_failures = total.get("failures", 0)
     error_rate = (total_failures / total_requests * 100) if total_requests > 0 else 0
 
-    # 6000 用户阶段数据
-    stage_6000 = stages[-1] if stages else {}
-    p95_6000 = stage_6000.get("p95", 0)
-    error_rate_6000 = (
-        (stage_6000.get("failures", 0) / stage_6000.get("requests", 1) * 100)
-        if stage_6000.get("requests", 0) > 0 else 0
-    )
-
-    # 达标判定
-    p95_pass = p95_6000 <= TARGET_P95_MS
-    error_pass = error_rate < TARGET_ERROR_RATE
-    overall_pass = p95_pass and error_pass
+    # 判定统一走证据门：任何阶段零样本/未达到目标并发均不得以 0ms 假绿。
+    evaluation = evaluate_results(stats)
+    stage_6000 = evaluation["stage_6000"]
+    p95_6000 = evaluation["p95_6000"]
+    error_rate_6000 = evaluation["error_rate_6000"]
+    samples_pass = evaluation["samples_pass"]
+    evidence_errors = evaluation["evidence_errors"]
+    p95_pass = evaluation["p95_pass"]
+    error_pass = evaluation["error_pass"]
+    overall_pass = evaluation["overall_pass"]
 
     # 各阶段表格
     def stage_row(s: dict) -> str:
@@ -272,7 +315,11 @@ def generate_final_report(stats: dict, args) -> str:
         fails = s.get("failures", 0)
         rps = s.get("rps", 0)
         err = (fails / reqs * 100) if reqs > 0 else 0
-        return f"| Stage {STAGES[[st['users'] for st in STAGES].index(users) + 1] if users in [st['users'] for st in STAGES] else '?'} | {users} | {reqs} | {fails} | {rps:.1f} | {err:.3f}% |"
+        label = next(
+            (stage["label"] for stage in STAGES if stage["users"] == users),
+            "Stage ?",
+        )
+        return f"| {label} | {users} | {reqs} | {fails} | {rps:.1f} | {err:.3f}% |"
 
     stage_rows = "\n".join(stage_row(s) for s in stages) if stages else "| [无数据] | — | — | — | — | — |"
 
@@ -286,7 +333,7 @@ def generate_final_report(stats: dict, args) -> str:
         reqs = s.get("requests", 0)
         fails = s.get("failures", 0)
         err = (fails / reqs * 100) if reqs > 0 else 0
-        p95_ok = "✅" if p95 <= TARGET_P95_MS else "❌"
+        p95_ok = "✅" if reqs > 0 and p95 <= TARGET_P95_MS else "❌"
         return f"""### Stage {idx + 1} — {users} 用户
 
 | 指标 | 值 |
@@ -330,6 +377,8 @@ def generate_final_report(stats: dict, args) -> str:
     verdict = "PASS ✅" if overall_pass else "FAIL ❌"
     p95_verdict = "✅ PASS" if p95_pass else "❌ FAIL"
     error_verdict = "✅ PASS" if error_pass else "❌ FAIL"
+    samples_verdict = "✅ PASS" if samples_pass else "❌ FAIL"
+    evidence_detail = "；".join(evidence_errors) if evidence_errors else "所有阶段均有真实样本"
 
     report = f"""# 最终压测报告 — 6000 用户目标验证
 
@@ -343,7 +392,7 @@ def generate_final_report(stats: dict, args) -> str:
 | 最大并发用户数 | 6000 |
 | 梯度阶段 | 100 → 500 → 1000 → 3000 → 6000 |
 | 总运行时长 | ~{ESTIMATED_TOTAL_SECONDS/60:.0f} 分钟（含加压 + 稳定负载） |
-| 测试脚本 | `tests/load/locustfile.py` (StepLoadShape) |
+| 测试脚本 | `tests/load/locustfile.py`（UUID 场景池 + 账号池 + 写环境硬闸门） |
 | 优化版本 | 3.4 优化后（连接池/索引/Redis 缓存） |
 
 ## 压测场景
@@ -352,9 +401,9 @@ def generate_final_report(stats: dict, args) -> str:
 |------|------|------|
 | 登录 | 1 | POST /api/auth/login |
 | 查询试算表 | 3 | GET /api/projects/{{pid}}/trial-balance |
-| 查询底稿列表 | 2 | GET /api/projects/{{pid}}/workpapers |
-| 编辑保存底稿 | 1 | GET + PUT /api/projects/{{pid}}/workpapers/{{wid}} |
-| 穿透查询 | 2 | GET /api/projects/{{pid}}/drilldown?account_code=1001 |
+| 查询底稿列表 | 2 | GET /api/projects/{{pid}}/working-papers |
+| 编辑保存底稿 | 1 | GET /working-papers/{{wid}} + PUT /parsed-data（仅可销毁环境） |
+| 穿透查询 | 2 | GET /api/projects/{{pid}}/ledger/window/{{account_code}} |
 
 ---
 
@@ -423,8 +472,9 @@ def generate_final_report(stats: dict, args) -> str:
 
 | 指标 | 目标 | 实测值 (6000 用户) | 达标 |
 |------|------|-------------------|------|
+| **样本完整性** | **5 个阶段达到 ≥90% 目标并发且请求数 > 0** | **{evidence_detail}** | **{samples_verdict}** |
 | **P95 响应时间** | **≤ 2000ms** | **{p95_6000:.0f}ms** | **{p95_verdict}** |
-| **错误率** | **< 0.1%** | **{error_rate:.3f}%** | **{error_verdict}** |
+| **错误率** | **< 0.1%** | **{error_rate_6000:.3f}%** | **{error_verdict}** |
 | P99 响应时间 | ≤ 5000ms | {total.get('p99', 0):.0f}ms | {'✅' if total.get('p99', 0) <= 5000 else '❌'} |
 | RPS (6000 用户) | ≥ 500 | {total.get('rps', 0):.1f} | {'✅' if total.get('rps', 0) >= 500 else '❌'} |
 
@@ -435,6 +485,7 @@ def generate_final_report(stats: dict, args) -> str:
 │                                                         │
 │   最终结果:  {verdict:<42}│
 │                                                         │
+│   样本完整:       {samples_verdict:<36}│
 │   P95 ≤ 2s:     {p95_verdict:<38}│
 │   错误率 < 0.1%: {error_verdict:<38}│
 │                                                         │
@@ -443,8 +494,8 @@ def generate_final_report(stats: dict, args) -> str:
 
 ### 判定规则
 
-- **PASS**: P95 ≤ 2000ms **且** 错误率 < 0.1%（两项同时满足）
-- **FAIL**: 任一指标未达标
+- **PASS**: 所有目标阶段有真实样本、P95 ≤ 2000ms、6000 阶段错误率 < 0.1%
+- **FAIL**: 任一阶段无样本/未达到 90% 目标并发，或任一性能指标未达标
 - 如 FAIL → 继续优化 → 重测（循环直到 PASS）
 
 ---
@@ -519,13 +570,13 @@ def main():
         total_failures = total.get("failures", 0)
         error_rate = (total_failures / total_requests * 100) if total_requests > 0 else 0
 
-        # 6000 用户阶段
-        stage_6000 = stages[-1] if stages else {}
-        p95_6000 = stage_6000.get("p95", 0)
-
-        p95_pass = p95_6000 <= TARGET_P95_MS
-        error_pass = error_rate < TARGET_ERROR_RATE
-        overall_pass = p95_pass and error_pass
+        evaluation = evaluate_results(stats)
+        p95_6000 = evaluation["p95_6000"]
+        error_rate_6000 = evaluation["error_rate_6000"]
+        samples_pass = evaluation["samples_pass"]
+        p95_pass = evaluation["p95_pass"]
+        error_pass = evaluation["error_pass"]
+        overall_pass = evaluation["overall_pass"]
 
         print()
         print("┌─────────────────────────────────────────────┐")
@@ -541,6 +592,7 @@ def main():
         print("├─────────────────────────────────────────────┤")
         print(f"│  P95 (6000):  {p95_6000:<28.0f}ms │")
         print(f"│  目标:        ≤ {TARGET_P95_MS}ms                        │")
+        print(f"│  样本完整:    {'✅ PASS' if samples_pass else '❌ FAIL':<29} │")
         print(f"│  P95 达标:    {'✅ PASS' if p95_pass else '❌ FAIL':<29} │")
         print(f"│  错误率达标:  {'✅ PASS' if error_pass else '❌ FAIL':<29} │")
         print("├─────────────────────────────────────────────┤")
@@ -551,14 +603,18 @@ def main():
         if not overall_pass:
             print()
             print("[ACTION] 未达标！建议:")
-            if not p95_pass:
+            if not samples_pass:
+                for issue in evaluation["evidence_errors"]:
+                    print(f"  - 样本无效：{issue}")
+            if not p95_pass and samples_pass:
                 print(f"  - P95 ({p95_6000:.0f}ms) 超过目标 ({TARGET_P95_MS}ms)")
                 print("  - 检查慢查询 / 增加缓存 / 优化连接池")
-            if not error_pass:
-                print(f"  - 错误率 ({error_rate:.3f}%) 超过目标 ({TARGET_ERROR_RATE}%)")
+            if not error_pass and samples_pass:
+                print(f"  - 6000 阶段错误率 ({error_rate_6000:.3f}%) 超过目标 ({TARGET_ERROR_RATE}%)")
                 print("  - 检查连接超时 / 增加 Worker 数 / 排查 5xx 错误")
             print()
             print("  优化后重新执行: python tests/load/run_final.py")
+        return 0 if overall_pass else 2
     else:
         print()
         print("[WARN] 未获取到统计数据，请检查:")
@@ -569,7 +625,8 @@ def main():
         print()
         print("[INFO] 报告模板保留为占位状态，待实际执行后填充。")
         print(f"[INFO] 模板位置: {DEFAULT_OUTPUT}")
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -212,25 +212,14 @@ class TestAddrIdGlobalUniqueness:
     ):
         """应用 overrides 后唯一性仍然成立。
 
-        Property: catalog_addr_ids ∪ override_addr_ids 仍全局唯一
+        overrides 只改已有条目的字段（生成器 Step 6 按 addr_id 匹配、不新增条目；design §5.4）。
+        Property: override 的 addr_id 互不重复、全部是目录已有条目 ⇒ 应用后 addr_id 集合不变、仍全局唯一。
+        （段六 T07 更正：旧版把 override 的 addr_id 当成「新增条目」并入后查重，override 一旦非空就必然误报。）
         """
         overrides = overrides_data.get("overrides", [])
-
-        # 收集 overrides 中新增的 addr_id（如果有）
-        override_addr_ids: list[str] = []
-        for ovr in overrides:
-            if "addr_id" in ovr:
-                override_addr_ids.append(ovr["addr_id"])
-
-        # 合并后检查唯一性
-        combined = all_addr_ids + override_addr_ids
-        seen: set[str] = set()
-        duplicates: list[str] = []
-        for addr_id in combined:
-            if addr_id in seen:
-                duplicates.append(addr_id)
-            seen.add(addr_id)
-
-        assert len(duplicates) == 0, (
-            f"应用 overrides 后发现重复 addr_id: {duplicates[:10]}"
-        )
+        override_addr_ids = [ovr["addr_id"] for ovr in overrides if "addr_id" in ovr]
+        dup = sorted({a for a in override_addr_ids if override_addr_ids.count(a) > 1})
+        assert not dup, f"overrides 内 addr_id 重复: {dup[:10]}"
+        unknown = sorted(set(override_addr_ids) - set(all_addr_ids))
+        assert not unknown, f"override 指向目录中不存在的 addr_id（会被生成器静默忽略）: {unknown[:10]}"
+        assert len(all_addr_ids) == len(set(all_addr_ids)), "目录 addr_id 本身不唯一"

@@ -3,8 +3,8 @@
  * 对齐 Excel：构成分析 / 同行指标 / 人均同期 / 人均同行 / 结构化说明
  * 兼容 Spec Req4：开发支出项目波动分析（旧 I2-5-rows 数组）
  */
+import { fetchTrialBalanceRows, tbRowsUnder, tbNumber, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import http from '@/utils/http'
 import {
   calcAssetEndBalance,
   calcChangeRate,
@@ -180,23 +180,13 @@ export function useI2Analysis(params: {
   async function fetchRevenueFromTb(projectId: string): Promise<{ ok: boolean; message: string }> {
     if (!projectId) return { ok: false, message: '缺少项目ID，无法从 TB 取数' }
     try {
-      const res = await http.get(`/api/projects/${projectId}/trial-balance`, {
-        params: { account_prefix: '6001' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+      // 上期 = 上年同科目审定数（includePrior；端点原先没有 prior_* 字段，上期恒 0）
+      const { rows } = await fetchTrialBalanceRows(projectId, { accountPrefix: '6001', includePrior: true })
+      const family = tbRowsUnder(rows, '6001')
+      const hit = family.length > 0
       let current = 0
-      let prior = 0
-      let hit = false
-      for (const item of list) {
-        const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (!code.startsWith('6001')) continue
-        hit = true
-        current += Number(item.audited_amount ?? item.unadjusted_amount ?? item.current_amount ?? 0) || 0
-        prior += Number(
-          item.prior_amount ?? item.prior_audited_amount ?? item.prior_period_amount ?? item.last_year_amount ?? 0,
-        ) || 0
-      }
+      for (const item of family) current += tbNumber(item.audited_amount) ?? tbNumber(item.unadjusted_amount) ?? 0
+      let prior = tbSumUnder(family, '6001', 'prior_audited_amount') ?? 0
       if (!hit) return { ok: false, message: '未从 TB 取得 6001 主营业务收入数据，请检查试算平衡表' }
       // 主营业务收入为贷方性质，TB 未审/审定数通常已为正数余额；此处取绝对值防止符号方向差异
       current = Math.abs(current)

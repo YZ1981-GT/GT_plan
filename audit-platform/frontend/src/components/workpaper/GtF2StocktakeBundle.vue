@@ -3,7 +3,7 @@
     <div v-if="isLoading" class="loading"><el-skeleton :rows="6" animated /></div>
     <template v-else>
       <div class="toolbar">
-        <el-segmented v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="syncBusy"
+        <el-segmented v-if="f2SEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="syncBusy"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="syncBusy" size="small" type="info">同步中…</el-tag>
@@ -25,7 +25,7 @@
         :wp-id="props.wpId"
         :project-id="projectId"
         :sheet-name="props.sheetName || activeTab"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -70,10 +70,14 @@
  * GtF2StocktakeBundle — F2 存货监盘 HTML 入口 (F2-21A + F2-21~26)
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, type Component } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useRoute } from 'vue-router'
-import { useF2StocktakeFormData, type ChecklistResponse } from './composables/useF2StocktakeFormData'
+import { useF2StocktakeFormData } from './composables/useF2StocktakeFormData'
 import { useF2StocktakeDualMode } from './composables/useF2StocktakeDualMode'
-import { flushAllF2StocktakeFields } from './composables/useF2StocktakeSheet'
+import {
+  F2_STOCKTAKE_BUSINESS_READONLY_KEY,
+  type F2StocktakeSaveDetail,
+} from './composables/useF2StocktakeSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import F2TabStocktakeProcedure from './f2/stocktake/F2TabStocktakeProcedure.vue'
 import F2TabStocktakeQuestionnaire from './f2/stocktake/F2TabStocktakeQuestionnaire.vue'
@@ -86,6 +90,7 @@ import F2TabStocktakeRollforward from './f2/stocktake/F2TabStocktakeRollforward.
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -100,7 +105,9 @@ const props = defineProps<{
 
 const route = useRoute()
 const isLoading = ref(true)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
+provide(F2_STOCKTAKE_BUSINESS_READONLY_KEY, businessReadonly)
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
 
 const formData = useF2StocktakeFormData({
@@ -127,7 +134,7 @@ const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId, wpId: toRef(props, 'wpId'), projectId,
   sheetKey: syncSheetKey, capability: capabilityForEntry(F2T_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPendingSave()
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({ projectId: projectId.value, wpId: props.wpId, entryId: F2T_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: syncSheetKey.value }
   },
@@ -162,10 +169,8 @@ const dualMode = useF2StocktakeDualMode({
   wpId: toRef(props, 'wpId'),
   projectId,
   sheetCode: currentSheet,
-  flushPending: async () => {
-    // 字段编辑 2s debounce；切 OO 前必须立即落库，否则 plan-sync 读到旧数据
-    await flushAllF2StocktakeFields()
-  },
+  // 过渡 active 只冻结新输入；已发生编辑的同步授权只看真实业务只读。
+  readonly: businessReadonly,
   reloadAll: () => formData.loadAll(),
 })
 
@@ -218,15 +223,20 @@ function tabComponent(id: string): Component {
 }
 
 async function handleSave(e: Event): Promise<void> {
-  const detail = (e as CustomEvent<{ items: ChecklistResponse[]; done?: () => void }>).detail
+  const detail = (e as CustomEvent<F2StocktakeSaveDetail>).detail
+  // 必须在第一个 await 之前同步回执：派发方据此区分「没人听」（立即失败）与「在处理」（进超时）。
+  detail?.accept?.()
   const items = detail?.items
+  if (!Array.isArray(items) || items.length === 0) {
+    detail?.resolve?.()
+    return
+  }
   try {
-    if (Array.isArray(items) && items.length) {
-      await formData.saveItemsFromEvent(items)
-      scheduleAutoSnapshot()
-    }
-  } finally {
-    detail?.done?.()
+    await formData.saveItemsFromEvent(items)
+    scheduleAutoSnapshot()
+    detail.resolve?.()
+  } catch (error) {
+    detail.reject?.(error)
   }
 }
 
@@ -238,6 +248,21 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('f2-stocktake:save-items', handleSave)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const f2SEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => F2T_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

@@ -4,7 +4,7 @@
  * 结构对齐 Excel：种类/项目 | 期末 | 上年年末/期初 + 合计行
  * 带入：G9-2 工具种类/指定优先，否则 G9-1 标签分项；无分项时残差进「其他」
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   G9_ACCOUNT_CODE,
@@ -259,14 +259,18 @@ export function useG9Disclosure(opts: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', onAdjudicated)
-    pullLatestAdjudicated(false)
-    publishNoteUpdate()
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', onAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定事件、不广播说明
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', onAdjudicated)
+      pullLatestAdjudicated(false)
+      publishNoteUpdate()
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', onAdjudicated)
+    })
+  }
 
   return {
     title,

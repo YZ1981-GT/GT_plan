@@ -128,7 +128,6 @@ import { ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { normalizeImpairmentCategory } from '../../composables/useK11Adjudication'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useK11AiGenerate } from '../../composables/useK11AiGenerate'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -138,9 +137,17 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { K11_NOTE_SECTION, buildK11SyncPayload } from '../../composables/k11NoteSectionMap'
+import {
+  K11_DISCLOSURE_ITEM_KEYS,
+  applyK11AutoFill,
+  k11DisclosureSyncRows,
+  loadK11DisclosureState,
+  type K11DisclosureTabRow,
+} from '../../composables/k11DisclosureTabState'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const ABNORMAL_THRESHOLD = 0.3
+const ITEM_KEYS = K11_DISCLOSURE_ITEM_KEYS.listed
 
 const props = defineProps<{
   wpId: string
@@ -166,137 +173,26 @@ function jumpToNote(target: DisclosureVariant): void {
 }
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
+// 披露行、18 项默认分类、读回与自动取数与附注页离屏同步共用（k11DisclosureTabState，spec note-pull-followup-closure R1）
 
-interface DisclosureRow {
-  id: string
-  category: string
-  currentProvision: number
-  currentReversal: number
-  priorAmount: number
-  remark: string
-  isTotal?: boolean
-  noReversal?: boolean
-}
+type DisclosureRow = K11DisclosureTabRow
 
 const disclosureRows = ref<DisclosureRow[]>([])
 const narrativeText = ref('')
 const hasAutoData = ref(false)
 
-// ─── 默认行（按资产类别分类 — 上市公司） ────────────────────────────────────
-
-// P1 对齐源模板 18 项 canonical 分类（仅无 K11-1 数据时的回退；有数据时 buildRowsFromK11 优先）
-const DEFAULT_CATEGORIES_LISTED = [
-  { name: '合同资产减值损失', noReversal: false },
-  { name: '存货跌价损失', noReversal: false },
-  { name: '合同取得成本减值损失', noReversal: false },
-  { name: '合同履约成本减值损失', noReversal: false },
-  { name: '持有待售资产减值损失', noReversal: false },
-  { name: '其他权益工具投资减值损失', noReversal: false },
-  { name: '其他非流动金融资产减值损失', noReversal: false },
-  { name: '长期股权投资减值损失', noReversal: false },
-  { name: '投资性房地产减值损失', noReversal: false },
-  { name: '固定资产减值损失', noReversal: false },
-  { name: '工程物资减值损失', noReversal: false },
-  { name: '在建工程减值损失', noReversal: false },
-  { name: '生产性生物资产减值损失', noReversal: false },
-  { name: '油气资产减值损失', noReversal: false },
-  { name: '使用权资产减值损失', noReversal: false },
-  { name: '无形资产减值损失', noReversal: false },
-  { name: '商誉减值损失', noReversal: true },
-  { name: '其他', noReversal: false },
-]
-
-function initDefaultRows(): void {
-  disclosureRows.value = DEFAULT_CATEGORIES_LISTED.map((item, idx) => ({
-    id: newRowIdentity('row'),
-    category: item.name,
-    currentProvision: 0,
-    currentReversal: 0,
-    priorAmount: 0,
-    remark: '',
-    noReversal: item.noReversal,
-  }))
-}
-
-// ─── 加载已保存数据 ──────────────────────────────────────────────────────────
+// ─── 加载已保存数据（已保存行 → K11-1 审定表行 → 默认分类） ──────────────────
 
 function loadSavedData(): void {
-  const saved = props.allResponses.get('K11-disclosure-listed-rows')
-  let loaded = false
-  if (saved?.remark) {
-    try {
-      const parsed = JSON.parse(saved.remark)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        disclosureRows.value = parsed
-        loaded = true
-      }
-    } catch { /* fallthrough */ }
-  }
-  if (!loaded) {
-    // 无手工保存 → 优先按 K11-1 审定表行动态构建（避免硬编码类别与审定表不一致），否则回退默认
-    const fromK11 = buildRowsFromK11()
-    if (fromK11.length > 0) disclosureRows.value = fromK11
-    else initDefaultRows()
-  }
-
-  const savedNarrative = props.allResponses.get('K11-disclosure-listed-narrative')
-  if (savedNarrative?.remark) {
-    narrativeText.value = savedNarrative.remark
-  }
+  const saved = loadK11DisclosureState(props.allResponses, 'listed', () => newRowIdentity('row'))
+  disclosureRows.value = saved.rows
+  if (saved.narrative != null) narrativeText.value = saved.narrative
 }
 
-/** 按 K11-1 审定表行动态构建披露行（对齐源模板"附注引用审定表"设计） */
-function buildRowsFromK11(): DisclosureRow[] {
-  const item = props.allResponses.get('K11-1-rows')
-  const raw = item?.remark ?? item?.conclusion
-  if (!raw) return []
-  try {
-    const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (!Array.isArray(arr)) return []
-    return arr
-      .filter((r: any) => r && r.projectName)
-      .map((r: any, idx: number) => {
-        const audited = Number(
-          r.audited ?? (Number(r.currentOccurrence || 0) + Number(r.aje || 0) + Number(r.rje || 0)),
-        )
-        return {
-          id: newRowIdentity('row'),
-          category: String(r.projectName),
-          currentProvision: audited,
-          currentReversal: 0,
-          priorAmount: Number(r.priorAudited ?? r.priorOccurrence ?? 0),
-          remark: '',
-          noReversal: String(r.projectName).includes('商誉'),
-        }
-      })
-  } catch {
-    return []
-  }
-}
-
-// ─── 自动取数（从K11-1审定表） ────────────────────────────────────────────────
+// ─── 自动取数（从K11-1审定表，按归一化资产类别名匹配） ───────────────────────
 
 function applyAutoFill(): void {
-  const adjData = props.allResponses.get('K11-1-audited-by-category')
-  const raw = adjData?.remark ?? adjData?.conclusion
-  if (!raw) return
-  try {
-    const data = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (data && typeof data === 'object') {
-      let matched = 0
-      for (const row of disclosureRows.value) {
-        // 按归一化资产类别名匹配（"存货跌价损失"↔"存货跌价准备"）
-        const src = data[normalizeImpairmentCategory(row.category)]
-        if (src) {
-          row.currentProvision = Number(src.currentProvision ?? src.provision ?? src.occurrence ?? 0)
-          row.currentReversal = Number(src.currentReversal ?? src.reversal ?? 0)
-          row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
-          matched++
-        }
-      }
-      if (matched > 0) hasAutoData.value = true
-    }
-  } catch { /* silent */ }
+  if (applyK11AutoFill(disclosureRows.value, props.allResponses) > 0) hasAutoData.value = true
 }
 
 // ─── 字段更新 + 持久化 ──────────────────────────────────────────────────────
@@ -311,11 +207,11 @@ function updateField(id: string, field: string, value: any): void {
 }
 
 function persistRows(): void {
-  emit('save', 'K11-disclosure-listed-rows', { remark: JSON.stringify(disclosureRows.value) })
+  emit('save', ITEM_KEYS.rows, { remark: JSON.stringify(disclosureRows.value) })
 }
 
 function handleNarrativeSave(): void {
-  emit('save', 'K11-disclosure-listed-narrative', { remark: narrativeText.value })
+  emit('save', ITEM_KEYS.narrative, { remark: narrativeText.value })
   // 联动附注：带 accountCode/projectId/sectionIds，DisclosureEditor 的 useNoteRefresh 据此精准刷新对应附注节
   eventBus.emit('disclosure:note-text-updated' as any, {
     wpCode: 'K11',
@@ -330,11 +226,7 @@ function handleNarrativeSave(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-    const payload = buildK11SyncPayload('listed', props.wpId || '',
-    disclosureRows.value
-      .filter(r => !r.isTotal)
-      .map(r => ({ project: r.category, currentAmount: r.currentProvision - r.currentReversal, priorAmount: r.priorAmount })),
-    narrativeText.value)
+  const payload = buildK11SyncPayload('listed', props.wpId || '', k11DisclosureSyncRows(disclosureRows.value), narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {

@@ -27,14 +27,31 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.audit_platform_models import AccountCategory, TrialBalance
-from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
 from app.routers.query_builder import router as query_builder_router, _EXPORT_FETCH_SIZE
+from app.services.custom_query import audit_helper
+from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 PROJECT_ID = uuid.uuid4()
 USER_ID = uuid.uuid4()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _audits():
+    """审计写入换成只记录（advanced-query-linkage-closure 任务 26 起导出记审计 ``custom_query.export``）：真实写入经
+    ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。
+    模块级（不是函数级）：hypothesis 用例不接受函数级夹具。"""
+    recorded: list[dict] = []
+
+    async def _record(**kwargs):
+        recorded.append(kwargs)
+        return True
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(audit_helper, "_log_unthrottled", _record)
+        yield recorded
 
 
 class _FakeUser:
@@ -48,10 +65,12 @@ class _FakeUser:
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    # 只建构建器白名单表及其外键闭包（AQ-32，与 test_query_builder_endpoint.py 同一夹具）：建全部 ORM 表时，
+    # 任一无关模型带 PG 专用 server_default，本文件全部用例都会在 setup 阶段报错（见 builder_tables 模块说明）
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(create_builder_schema)
+        await assert_only_builder_tables(conn)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
@@ -107,8 +126,8 @@ async def _seed_many_rows(db: AsyncSession, count: int) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-async def test_streaming_export_basic(db_session: AsyncSession):
-    """流式导出返回有效 xlsx，表头+数据行完整。"""
+async def test_streaming_export_basic(db_session: AsyncSession, _audits: list[dict]):
+    """流式导出返回有效 xlsx，表头+数据行完整；审计经替身记录（没有写到共享 Redis）。"""
     await _seed_many_rows(db_session, 5)
     app = _make_app(db_session)
     payload = {
@@ -116,10 +135,12 @@ async def test_streaming_export_basic(db_session: AsyncSession):
         "fields": ["standard_account_code", "account_name", "audited_amount"],
         "limit": 100,
     }
+    before = len(_audits)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
         resp = await ac.post("/api/query/export-excel", json=payload)
 
     assert resp.status_code == 200
+    assert [a["action"] for a in _audits[before:]] == ["custom_query.export"]
     assert "spreadsheetml" in resp.headers["content-type"]
 
     import openpyxl
@@ -164,7 +185,11 @@ async def test_streaming_export_exceeds_fetch_size(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_streaming_export_empty_result(db_session: AsyncSession):
-    """空结果集仍返回有效 xlsx（仅表头）。"""
+    """空结果集仍返回有效 xlsx（表头 + 空提示行）。
+
+    advanced-query-linkage-closure 任务 26 起构建器导出改走 ``export_service.stream_xlsx``（与业务视图同一路径），
+    空结果按 advanced-query-module R7.5 写一行「（查询结果为空）」，不再只有表头（旧断言固化的是 router 自写 Workbook 的形态）。
+    """
     # 只建 project 不建 trial_balance
     db_session.add(Project(
         id=PROJECT_ID,
@@ -193,7 +218,7 @@ async def test_streaming_export_empty_result(db_session: AsyncSession):
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     assert rows[0] == ("standard_account_code",)
-    assert len(rows) == 1  # 仅表头
+    assert rows[1:] == [("（查询结果为空）",)]  # 表头 + 空提示行，没有数据行
 
 
 @pytest.mark.asyncio
@@ -271,8 +296,8 @@ async def test_pbt_streaming_export_equivalence(count, fields):
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(create_builder_schema)
+        await assert_only_builder_tables(conn)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with factory() as session:
@@ -349,8 +374,11 @@ async def test_pbt_streaming_export_equivalence(count, fields):
         # 表头一致
         assert excel_rows[0] == tuple(fields), f"Header mismatch: {excel_rows[0]} vs {fields}"
 
-        # 数据行数一致
+        # 数据行数一致（空结果：stream_xlsx 写一行空提示，见 test_streaming_export_empty_result）
         data_rows = excel_rows[1:]
+        if not expected_rows:
+            assert [tuple(v for v in r if v is not None) for r in data_rows] == [("（查询结果为空）",)], data_rows
+            data_rows = []
         assert len(data_rows) == len(expected_rows), (
             f"Row count mismatch: excel={len(data_rows)} vs execute={len(expected_rows)}"
         )

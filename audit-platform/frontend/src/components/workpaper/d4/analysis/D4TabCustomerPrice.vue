@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { newUuid } from '@/utils/uuid'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabCustomerPrice — D4-10 重要客户销售价格分析
@@ -17,6 +18,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  *        M=IF(AND(L=0,H=0),0,IF(AND(L=0,H>0),1,(H-L)/L))
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
@@ -55,7 +57,13 @@ const ABNORMAL_THRESHOLD = 0.2
 // 🔴 必须在任何 immediate watch 之前声明：setup 期 immediate watch 会经 persistData→debounceSave
 //    访问它，留到文件后段（let 处于 TDZ）会抛 ReferenceError 打挂组件（见下方「持久化」段说明）。
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
-function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
 function reloadD410() { loadData(); loadNoteConclusion(); loadAuditProcess() }
 const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag, syncHostRef } = useD4SyncMode({
   sheetKey: 'd410-managed',
@@ -104,8 +112,7 @@ const TOTAL_AMOUNT_FORMULA_REF = D4_10_TOTAL_AMOUNT_PRESET
 
 /** 生成稳定行身份（优先 crypto.randomUUID，回退时间+随机）。 */
 function genRowId(): string {
-  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID() } catch { /* */ }
-  return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 /** 历史无 rowId 行一次性补齐（不丢手工值，双向回写身份前提，同 D4-9 backfill）。 */
 function backfillRowIds(list: PriceRow[]): boolean {

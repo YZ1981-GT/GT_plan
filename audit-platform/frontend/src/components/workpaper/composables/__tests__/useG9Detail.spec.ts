@@ -65,8 +65,8 @@ describe('C-4 ① 12 条模板公式逐条', () => {
   it('J = H+I（期初审定公允价值 —— 三分量恒等式）', () => {
     expect(r.openingAuditedFairValue).toBe(128)
   })
-  it('L = E+K（期初报表数）', () => {
-    expect(r.openingReported).toBe(110)
+  it('L = J+K（期初报表数 = 期初审定公允价值 + 期初重分类）', () => {
+    expect(r.openingReported).toBe(118)
   })
   it('P = C+M（期末成本）', () => {
     expect(r.closingCost).toBe(140)
@@ -86,8 +86,8 @@ describe('C-4 ① 12 条模板公式逐条', () => {
   it('W = U+V（期末审定公允价值 —— 三分量恒等式）', () => {
     expect(r.closingAuditedFairValue).toBe(171)
   })
-  it('Y = R+X（期末报表数）', () => {
-    expect(r.closingReported).toBe(153)
+  it('Y = W+X（期末报表数 = 期末审定公允价值 + 期末重分类）', () => {
+    expect(r.closingReported).toBe(156)
   })
 })
 
@@ -113,6 +113,15 @@ describe('C-4 ② 未审线：P/Q 从期初**未审**推，不从审定数推', 
     const r = row({ openingCost: 100, periodCost: 10, closingAdjCost: 7 })
     expect(r.closingCost).toBe(110)
     expect(r.closingAuditedCost).toBe(117)
+  })
+
+  it('报表数从审定数起算：账项调整进入 L / Y（模板 L=J+K、Y=W+X）', () => {
+    const r = row({
+      openingCost: 100, openingAdjCost: 5, openingReclass: -10,
+      periodCost: 10, closingAdjCost: 7, closingReclass: -3,
+    })
+    expect(r.openingReported).toBe(95)   // J=105 + K=-10；原式 E+K 得 90，漏了账项调整 5
+    expect(r.closingReported).toBe(114)  // W=117 + X=-3；原式 R+X 得 107，漏了账项调整 7
   })
 })
 

@@ -2800,7 +2800,7 @@
         "version": {
           "status": "covered",
           "evidence": [
-            "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue:useWorkpaperVersionToolbar"
+            "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue:useWorkpaperVersionToolbar"
           ],
           "exemption": null
         },
@@ -2831,7 +2831,7 @@
         }
       },
       "componentType": "g6-other-bond-investment-main",
-      "entryFile": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue"
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue"
     },
     "G7": {
       "capabilities": {

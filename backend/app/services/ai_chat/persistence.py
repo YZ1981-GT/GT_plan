@@ -331,6 +331,7 @@ async def append_message(
     model_used: str | None = None,
     tokens_used: int | None = None,
     latency_ms: int | None = None,
+    message_id: UUID | None = None,
 ) -> AIChatMessage:
     """追加一条消息并同步会话计数 / ``last_message_at``。
 
@@ -338,6 +339,7 @@ async def append_message(
     ``content_hash`` 由服务端计算 —— 采纳/转存以它校验正文未被客户端篡改。
     """
     msg = AIChatMessage(
+        id=message_id or uuid4(),
         session_id=session.id,
         role=role if isinstance(role, ChatRole) else ChatRole(role),
         message_text=text,
@@ -450,6 +452,7 @@ async def upsert_run(
     engine: str | ChatEngineName = ChatEngineName.native,
     request_id: UUID | None = None,
     capability_snapshot: dict[str, Any] | None = None,
+    context_request_snapshot: dict[str, Any] | None = None,
 ) -> tuple[AIChatRun, bool]:
     """按 ``(actor_id, session_id, idempotency_key)`` 原子 upsert run。
 
@@ -479,6 +482,7 @@ async def upsert_run(
         "engine": eng,
         "status": ChatRunStatus.queued.value,
         "capability_snapshot": capability_snapshot,
+        "context_request_snapshot": context_request_snapshot,
         "retry_count": 0,
     }
 

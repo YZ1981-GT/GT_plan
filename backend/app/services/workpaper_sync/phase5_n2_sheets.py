@@ -38,28 +38,30 @@ TABLE_NAME: Final[str] = f"GT_{TEMPLATE_ID}_ROWS"
 AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
 FOOTER_MARKER: Final[str] = "合计"
 FOOTER_SEARCH_COLUMN: Final[str] = "A"
-STORE_ITEM_ID: Final[str] = "N2-2-rows"
+STORE_ITEM_ID: Final[str] = "N2-2-detail-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "id"
+PAYLOAD_COLUMN: Final[str] = "conclusion"
+PAYLOAD_COLUMN_MODE: Final[str] = "conclusion_only"
 HTML_ONLY_ROW_KEYS: Final[tuple[str, ...]] = ()
 
 MANAGED_FIELD_SPECS_7: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("tax_name", "A", "editable", "text", "taxName", "项目", ""),
+    ("tax_name", "A", "editable", "text", "taxType", "项目", ""),
     ("tax_rate", "B", "editable", "text", "taxRate", "税率或税收优惠", ""),
-    ("prior_opening", "C", "editable", "amount", "priorOpening", "期初数", "C8"),
-    ("prior_accrued", "D", "editable", "amount", "priorAccrued", "本期应交数", "C8"),
-    ("prior_paid", "E", "editable", "amount", "priorPaid", "本期已交数", "C8"),
-    ("prior_closing", "F", "formula", "amount", "priorClosing", "期末数", "C8"),
-    ("adj_aje", "G", "editable", "amount", "adjAje", "账项调整", "G8"),
-    ("adj_rje", "H", "editable", "amount", "adjRje", "重分类调整", "G8"),
-    ("aje_accrued", "I", "editable", "amount", "ajeAccrued", "本期应交", "I8"),
+    ("prior_opening", "C", "editable", "amount", "unadjBegin", "期初数", "C8"),
+    ("prior_accrued", "D", "editable", "amount", "unadjPayable", "本期应交数", "C8"),
+    ("prior_paid", "E", "editable", "amount", "unadjPaid", "本期已交数", "C8"),
+    ("prior_closing", "F", "formula", "amount", "unadjEnd", "期末数", "C8"),
+    ("adj_aje", "G", "editable", "amount", "beginAdjust", "账项调整", "G8"),
+    ("adj_rje", "H", "editable", "amount", "beginRje", "重分类调整", "G8"),
+    ("aje_accrued", "I", "editable", "amount", "ajePayable", "本期应交", "I8"),
     ("aje_paid", "J", "editable", "amount", "ajePaid", "本期已交", "I8"),
-    ("rje_accrued", "K", "editable", "amount", "rjeAccrued", "本期应交", "K8"),
+    ("rje_accrued", "K", "editable", "amount", "rjePayable", "本期应交", "K8"),
     ("rje_paid", "L", "editable", "amount", "rjePaid", "本期已交", "K8"),
-    ("audited_opening", "M", "formula", "amount", "auditedOpening", "期初数", "M8"),
-    ("audited_accrued", "N", "formula", "amount", "auditedAccrued", "本期应交数", "M8"),
-    ("audited_paid", "O", "formula", "amount", "auditedPaid", "本期已交数", "M8"),
-    ("audited_closing", "P", "formula", "amount", "auditedClosing", "期末数", "M8"),
+    ("audited_opening", "M", "formula", "amount", "audBegin", "期初数", "M8"),
+    ("audited_accrued", "N", "formula", "amount", "audPayable", "本期应交数", "M8"),
+    ("audited_paid", "O", "formula", "amount", "audPaid", "本期已交数", "M8"),
+    ("audited_closing", "P", "formula", "amount", "audEnd", "期末数", "M8"),
     ("remark", "Q", "editable", "text", "remark", "备注", ""),
 )
 FORMULA_TEMPLATES: Final[Mapping[str, str]] = {
@@ -87,7 +89,7 @@ SPEC_N22: Final[RowTableSheetSpec] = RowTableSheetSpec(
 MANAGED_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = tuple(
     row[:6] for row in _engine_managed_field_specs(SPEC_N22))
 FORMULA_MASK: Final[tuple[str, ...]] = SPEC_N22.formula_mask
-_HTML_STORE_NOTE: Final[str] = "N2-2 明细表存成 N2-2-rows 的 conclusion（JSON 数组）。15行固定税种。"
+_HTML_STORE_NOTE: Final[str] = "N2-2 明细表存成 N2-2-detail-rows 的 conclusion（JSON 数组）。15行固定税种。"
 _REVIEWED_BASIS: Final[str] = (
     "openpyxl 逐格实测 N2 应交税费.xlsx 的 应交税费明细表N2-2：两级表头 R8/R9，"
     "17列 A-Q，数据区 R10-R24（15行），5公式列 F/M/N/O/P。R25 合计 SUM。"

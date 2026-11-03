@@ -118,6 +118,7 @@ import type { useL3FormData } from '@/components/workpaper/composables/useL3Form
 import { useL3Disclosure, type L3DisclosureRow, type L3CurrentPortionRow } from '@/components/workpaper/composables/useL3Disclosure'
 import { eventBus } from '@/utils/eventBus'
 import { buildL3SyncPayload } from '../../composables/l3NoteSectionMap'
+import { buildL3SoeBatchBody, buildL3SyncOptions } from '../../composables/l3DisclosureSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
@@ -160,20 +161,15 @@ async function syncToDisclosureNotes() {
   if (props.isReadonly || !props.projectId) return
   syncing.value = true
   try {
-    // 国企推两节（八、49 长期借款 + 八、45 一年内到期的长期借款），一次事务
-    const items = buildL3SyncPayload({
-      variant: 'soe',
-      classificationRows: classificationRows.value,
-      currentPortionRows: currentPortionRows.value,
-      rateRange,
-      propertyNote: '',
-      conclusion: conclusion.value,
-    })
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`, {
-      wp_id: props.wpId,
-      current_standard: 'soe_standalone',
-      items: items.map(item => ({ sheet_name: 'L3-note-soe', ...item })),
-    })
+    // 国企推两节（八、49 长期借款 + 八、45 一年内到期的长期借款），一次事务；
+    // 入参 / 请求体与附注页离屏同步共用（l3DisclosureSync，spec note-pull-followup-closure R1）
+    const items = buildL3SyncPayload(buildL3SyncOptions('soe', {
+      classificationRows, currentPortionRows, rateRange, conclusion,
+    }))
+    await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
+      buildL3SoeBatchBody(props.wpId, items),
+    )
     const sectionIds = items.map(item => item.section_id)
     ElMessage.success(`已同步到附注（${sectionIds.join('、')}）`)
     eventBus.emit('disclosure:note-text-updated' as any, {

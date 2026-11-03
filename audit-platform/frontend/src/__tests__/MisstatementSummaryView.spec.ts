@@ -9,11 +9,14 @@ import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import MisstatementSummaryView from '@/components/workpaper/MisstatementSummaryView.vue'
 
+// 年度来源可按用例改（默认 2025；「项目没填审计年度」用例把两处都清空）
+const yearSource = vi.hoisted(() => ({ query: '2025' as string | undefined, store: 2025 as number | null }))
+
 // Mock vue-router
 vi.mock('vue-router', () => ({
   useRoute: () => ({
     params: { projectId: 'test-project-id' },
-    query: { year: '2025' },
+    query: { year: yearSource.query },
   }),
   useRouter: () => ({
     push: vi.fn(),
@@ -23,7 +26,7 @@ vi.mock('vue-router', () => ({
 // Mock project store
 vi.mock('@/stores/project', () => ({
   useProjectStore: () => ({
-    year: 2025,
+    year: yearSource.store,
   }),
 }))
 
@@ -49,13 +52,15 @@ describe('MisstatementSummaryView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
+    yearSource.query = '2025'
+    yearSource.store = 2025
   })
 
   const globalStubs = {
     global: {
       stubs: {
         'el-alert': { template: '<div class="el-alert"><slot /><slot name="title" /></div>', props: ['type', 'closable'] },
-        'el-empty': { template: '<div class="el-empty"><slot name="description" /></div>', props: ['description'] },
+        'el-empty': { template: '<div class="el-empty">{{ description }}<slot name="description" /></div>', props: ['description'] },
         'el-descriptions': { template: '<div class="el-descriptions"><slot /></div>', props: ['column', 'border', 'size', 'title'] },
         'el-descriptions-item': { template: '<div class="el-descriptions-item"><slot /></div>', props: ['label'] },
         'el-badge': { template: '<div class="el-badge"><slot /></div>', props: ['value', 'type'] },
@@ -98,6 +103,22 @@ describe('MisstatementSummaryView', () => {
     expect(wrapper.find('.el-empty').exists()).toBe(true)
     // Table should NOT be rendered when no data
     expect(wrapper.find('.wp-html-table').exists()).toBe(false)
+  })
+
+  // post-push-residual-defect-closure R2：原先把 null 拼进路径（/api/workpapers/<pid>/null/…），
+  // 静默失败后还显示「本项目暂无未更正错报」
+  it('项目没填审计年度：不发请求，提示去填年度，不显示「暂无未更正错报」', async () => {
+    yearSource.query = undefined
+    yearSource.store = null
+    const wrapper = mount(MisstatementSummaryView, {
+      props: { wpId: 'wp-123' },
+      ...globalStubs,
+    })
+    await flushPromises()
+    expect(mockGet).not.toHaveBeenCalled()
+    const empties = wrapper.findAll('.el-empty').map((w) => w.text())
+    expect(empties).toEqual(['未设置审计年度，请先在项目基本信息中填写'])
+    expect(wrapper.find('.misstatement-summary__empty').exists()).toBe(false)
   })
 
   it('renders table with data when misstatements exist', async () => {

@@ -144,10 +144,10 @@ class SkipReason(str, Enum):
     #: 不是它的同义词。
     item_unresolvable = "item_unresolvable"
 
-    #: G3 / G4 / G5 / G6 四家的 store 门面全部 re-export 自 `phase5_g9_store_facade`，
+    #: G3 / G4 / G5 / G6 四家的 store 门面曾全部 re-export 自 `phase5_g9_store_facade`，
     #: 而该模块的 `specs_for` 惰性取的是 **G9** 主模块 ⇒ 门面被借给了别的 entry。
-    #: Task 1.2 §(6) 登记为**跨 spec 工单**，本 spec 不修（它落在 OO 镜像共用路径上，
-    #: 属 Requirement 2 的保护区）。
+    #: Task 1.2 §(6) 登记为跨 spec 工单，已由 oo-writeback-template-parity-closure R3 批 B3 修好
+    #: （门面按 provider 绑定；真实数据里本成员现算 0 条，判据由合成「借别家」门面对照守住）。
     #:
     #: 🔴 既不是 `absent` 也不是形态使然 —— 这 4 条的 R3 替代路径成立，工单修好即可
     #: 转入可枚举。写成 `absent` 会让它作为**缺陷**的可见性消失。

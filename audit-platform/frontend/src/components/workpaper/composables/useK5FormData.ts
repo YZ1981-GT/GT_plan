@@ -17,6 +17,7 @@
  * 科目：2801 预计负债（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+计提-转销（与资产类方向相反）
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { computed, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -163,11 +164,7 @@ export function useK5FormData(params: {
 
     const codes = k5QueryCodes(tbSourceCodes.value)
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: codes[0], year: year.value },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { year: year.value, accountPrefix: codes })).rows
 
       let unadjusted = 0
       let audited = 0

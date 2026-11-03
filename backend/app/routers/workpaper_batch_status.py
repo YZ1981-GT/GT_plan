@@ -16,9 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import User
-from app.models.workpaper_models import WorkingPaper, WpFileStatus
+from app.models.workpaper_models import WorkingPaper
 from app.services.version_trail_service import VersionTrailService
 
 logger = logging.getLogger(__name__)
@@ -28,25 +28,20 @@ router = APIRouter(
     tags=["底稿批量操作"],
 )
 
-# 状态转换规则
+# 兼容的编制生命周期动作；提交复核已迁到 /working-papers/batch-submit。
 _TRANSITIONS: dict[str, dict[str, str]] = {
-    "submit_review": {
-        "draft": "in_review",
-    },
     "return_to_draft": {
-        "in_review": "draft",
+        "edit_complete": "draft",
     },
     "mark_complete": {
-        "in_review": "completed",
-        "draft": "completed",
+        "draft": "edit_complete",
+        "revision_required": "edit_complete",
     },
 }
 
-# 操作→最低权限
 _ACTION_PERMISSIONS: dict[str, str] = {
-    "submit_review": "edit",       # auditor+
-    "return_to_draft": "review",   # manager+
-    "mark_complete": "review",     # manager+
+    "return_to_draft": "edit",
+    "mark_complete": "edit",
 }
 
 
@@ -68,23 +63,25 @@ async def batch_status_change(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """批量变更底稿状态
-
-    - submit_review: draft → in_review（auditor+）
-    - return_to_draft: in_review → draft（manager+）
-    - mark_complete: in_review/draft → completed（manager+）
-
-    不允许的转换跳过（记入 skipped 列表），不回滚成功项。
-    """
+    """兼容的批量编制状态操作；提交复核必须走统一门禁入口。"""
+    if body.action == "submit_review":
+        raise HTTPException(
+            status_code=410,
+            detail={
+                "code": "LEGACY_BATCH_REVIEW_RETIRED",
+                "message": "旧批量提交入口已退役，请刷新页面后重试",
+                "replacement": f"/api/projects/{project_id}/working-papers/batch-submit",
+            },
+        )
     if body.action not in _TRANSITIONS:
         raise HTTPException(status_code=400, detail=f"不支持的操作: {body.action}")
 
     if not body.wp_ids:
         raise HTTPException(status_code=400, detail="wp_ids 不能为空")
 
-    # 权限检查
-    min_perm = _ACTION_PERMISSIONS.get(body.action, "review")
-    # 简化权限检查：通过 require_project_access 已在路由层保证
+    # 操作级项目权限；路径里有 project_id 不等于已隔离。
+    min_perm = _ACTION_PERMISSIONS[body.action]
+    await assert_project_permission(db, current_user, project_id, min_perm)
 
     allowed_transitions = _TRANSITIONS[body.action]
     success_count = 0
@@ -128,8 +125,12 @@ async def batch_status_change(
             description=f"状态变更: {current_status} → {new_status}",
         )
 
-        # 执行状态变更
-        wp.status = WpFileStatus(new_status)
+        # 执行状态变更：复用单笔状态机（含退回修改完成后 review_status 归一）。
+        from app.services.working_paper_service import WorkingPaperService
+
+        await WorkingPaperService().update_status(
+            db=db, wp_id=wp_id, new_status=new_status, project_id=project_id,
+        )
         wp.updated_by = current_user.id
         success_count += 1
 

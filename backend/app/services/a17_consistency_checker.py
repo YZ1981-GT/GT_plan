@@ -67,15 +67,19 @@ def _content_is_empty(content: str | None) -> bool:
 
 
 def is_a_class_or_listed(business_category: Optional[str]) -> bool:
-    """A 类业务前缀或中文「上市公司」别名。"""
+    """A 类（经 project_classification 单一解释：登记码 A / A1~A8）或中文「上市公司」别名。
+
+    原先按首字母 ``startswith("A")``：未登记值（如 ``ABC``）也算 A 类，与后端其余判定不一致
+    （spec trim-followup-residual-findings-closure R3）。
+    """
     if not business_category:
         return False
     cat = business_category.strip()
     if cat in _LISTED_ALIASES:
         return True
-    if cat.upper().startswith("A"):
-        return True
-    return False
+    from app.services.project_classification import resolve
+
+    return resolve(cat).category_group == "A"
 
 
 def check_consistency(

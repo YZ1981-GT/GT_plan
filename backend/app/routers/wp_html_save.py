@@ -41,6 +41,7 @@ mutation，由 Task 25 的 coordinator 调 `ContentMutationService.commit(...)` 
 from __future__ import annotations
 
 import logging
+from decimal import InvalidOperation
 from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import UUID
@@ -641,6 +642,10 @@ class PublishToTbRequest(BaseModel):
         None,
         description="幂等键（可选）。同一确认重复提交须带同一 token，服务端据此保证只生效一次。",
     )
+    booked_adjustments_ack: list[UUID] = Field(
+        default_factory=list,
+        description="用户已确认未再计入本底稿的客户已入账分录组 id",
+    )
 
 
 class PublishToTbResponse(BaseModel):
@@ -649,6 +654,9 @@ class PublishToTbResponse(BaseModel):
     wp_code: str
     publish_token: str
     message: str
+    updated_accounts: list[str] = Field(default_factory=list)
+    related_adjustment_groups: list[str] = Field(default_factory=list)
+    duplicate: bool = False
 
 
 def _canonical_token_amount(value: Any) -> str | None:
@@ -704,8 +712,6 @@ async def publish_determination_to_tb(
     from uuid import uuid4
 
     from app.deps import authorize_wp_edit, check_consol_lock
-    from app.models.audit_platform_schemas import EventPayload, EventType
-    from app.services.event_bus import event_bus
     from app.services.wp_account_package_resolver import extract_determination_wp_code
     from app.services.wp_audit_sheet_tb_service import fetch_audit_sheet_tb_values
 
@@ -776,6 +782,42 @@ async def publish_determination_to_tb(
     if not year:
         raise HTTPException(400, "项目未设置审计年度，无法定位 trial_balance")
 
+    # 客户已入账的 AJE 可能仍残留在底稿本地调整列。发布前必须逐组确认已从本底稿剔除。
+    from app.services.adjustment_client_booking import effective_booking_impacts_for_accounts
+
+    booking_impacts = await effective_booking_impacts_for_accounts(
+        db,
+        project_id=project_id,
+        year=year,
+        account_codes=[row["account_code"] for row in writeback_rows],
+    )
+    acknowledged = {str(value) for value in body.booked_adjustments_ack}
+    unacknowledged = [
+        item for item in booking_impacts if item["entry_group_id"] not in acknowledged
+    ]
+    if unacknowledged:
+        raise HTTPException(status_code=409, detail={
+            "error_code": "BOOKED_ADJUSTMENTS_UNACKED",
+            "message": "本底稿涉及客户已入账的调整，请确认审定表和本地调整列已移除后再发布",
+            "groups": unacknowledged,
+        })
+
+    if booking_impacts:
+        from app.models.core import Log
+
+        db.add(Log(
+            action_type="workpaper_client_booking_acknowledged",
+            object_type="working_paper",
+            object_id=wp_id,
+            new_value={
+                "project_id": str(project_id), "year": year, "wp_code": det_code,
+                "entry_group_ids": sorted(acknowledged),
+                "account_codes": [row["account_code"] for row in writeback_rows],
+            },
+            user_id=current_user.id,
+        ))
+        await db.flush()
+
     # ④ 幂等 token：显式传入时原样透传；否则绑定规范化发布行和发布前目标状态。
     if body.publish_token:
         token = body.publish_token
@@ -794,31 +836,49 @@ async def publish_determination_to_tb(
             current_audited_amounts=current_audited_amounts,
         )
 
-    # ⑤ 发布**带确认信号**的 WORKPAPER_SAVED → handler 回写 TB（服务端再校验发布者权限 + 幂等）
-    await event_bus.publish(EventPayload(
-        event_type=EventType.WORKPAPER_SAVED,
-        project_id=project_id,
-        year=year,
-        extra={
-            "wp_code": det_code,
-            "trigger": "audit_determination_publish",
-            "parsed_data": {"rows": writeback_rows},
-            "publish_confirmed": True,
-            "confirmed_by": str(current_user.id),
-            "publish_token": token,
-            # 语义标注（仅路径② writeback_rows 携带）：科目 → balance/occurrence，供审计/日志区分。
-            # handler 不消费该字段，故不影响回写口径。
-            **({"amount_kinds": amount_kinds} if amount_kinds else {}),
-        },
-    ))
+    # ⑤ 核心 TB 写与幂等 ack 同事务；下游刷新以 durable outbox 提交后投递。
+    from app.services.tb_publish_service import TbPublishError, publish_workpaper_rows
+    from app.services.workpaper_sync.outbox import DurableEventOutboxService
 
+    try:
+        publish_result = await publish_workpaper_rows(
+            db,
+            project_id=project_id,
+            year=year,
+            wp_id=wp_id,
+            wp_code=det_code,
+            rows=writeback_rows,
+            publish_token=token,
+            confirmed_by=current_user.id,
+            amount_kinds=amount_kinds,
+        )
+        await db.commit()
+    except TbPublishError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.code, "message": str(exc), "detail": exc.detail},
+        ) from exc
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await DurableEventOutboxService.publish_pending(db)
     logger.info(
-        "[publish-to-tb] %s 发布 %d 行审定数到 TB project=%s by=%s token=%s",
-        det_code, len(writeback_rows), project_id, current_user.id, token,
+        "[publish-to-tb] %s 已同步发布 %d 行到 TB project=%s by=%s token=%s duplicate=%s",
+        det_code, publish_result.report.updated_count, project_id, current_user.id, token,
+        publish_result.duplicate,
     )
     return PublishToTbResponse(
         published=True,
         wp_code=det_code,
         publish_token=token,
-        message=f"已发布 {len(writeback_rows)} 个科目的审定数到试算表",
+        updated_accounts=list(publish_result.report.updated_account_codes),
+        related_adjustment_groups=list(publish_result.related_adjustment_groups),
+        duplicate=publish_result.duplicate,
+        message=(
+            "该发布请求已处理过，试算表保持不变"
+            if publish_result.duplicate
+            else f"已发布 {publish_result.report.updated_count} 个科目的审定数到试算表"
+        ),
     )

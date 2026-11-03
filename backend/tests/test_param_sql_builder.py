@@ -13,22 +13,27 @@ Validates: Requirements 10.1, 10.2, 10.3
 
 from __future__ import annotations
 
+import ast
 import datetime as dt
 import decimal
+import inspect
 import uuid
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import Column, Date, DateTime, Integer, Numeric, String, Uuid
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import UserDefinedType
 
+from app.models.audit_platform_models import TbLedger
 from app.services.custom_query.param_sql_builder import (
     ParamSQLBuilder,
     build_filter,
+    build_portable_filter,
     coerce_value,
 )
+from app.services.ledger_sampling_service import ledger_line_amount
 
 
 class _Base(DeclarativeBase):
@@ -218,3 +223,84 @@ def test_build_where_and():
 
 def test_build_where_empty_returns_none():
     assert ParamSQLBuilder.build_where([]) is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# W3 条件能力（advanced-query-linkage-closure 任务 40）
+# ─────────────────────────────────────────────────────────────────────────────
+def test_starts_with_escapes_like_metacharacters_and_binds_value():
+    compiled = build_filter(_Row.code, "starts_with", "50%_").compile(
+        dialect=postgresql.dialect()
+    )
+    assert "50%_" not in str(compiled)
+    assert "LIKE" in str(compiled).upper()
+    assert list(compiled.params.values()) == ["50\\%\\_%"]
+
+
+def test_internal_prefix_and_starts_with_share_the_same_predicate():
+    public = build_filter(_Row.code, "starts_with", "10_").compile(
+        dialect=postgresql.dialect()
+    )
+    internal = build_portable_filter(
+        _Row.code, "prefix", "10_", allow_internal=True
+    ).compile(dialect=postgresql.dialect())
+    assert str(public) == str(internal)
+    assert public.params == internal.params
+
+
+def test_weekday_in_is_parameterized_and_rejects_text_column():
+    compiled = build_filter(_Row.day, "weekday_in", [0, 6]).compile(
+        dialect=postgresql.dialect()
+    )
+    assert "EXTRACT(dow FROM" in str(compiled)
+    assert "0" not in str(compiled) and "6" not in str(compiled)
+    assert list(compiled.params.values()) == [[0, 6]]
+
+    with pytest.raises(HTTPException) as exc:
+        build_filter(_Row.code, "weekday_in", [0, 6])
+    assert exc.value.detail["error_code"] == "WEEKDAY_FIELD_INVALID"
+
+
+@pytest.mark.parametrize("value", [[], [0, 0], [-1], [7], [True], "0,6"])
+def test_weekday_in_rejects_invalid_values(value):
+    with pytest.raises(HTTPException) as exc:
+        build_filter(_Row.day, "weekday_in", value)
+    assert exc.value.detail["error_code"] == "INVALID_WEEKDAY_VALUE"
+
+
+def test_is_blank_compiles_for_text_and_rejects_numeric_column():
+    for dialect in (postgresql.dialect(), sqlite.dialect()):
+        sql = str(build_filter(_Row.code, "is_blank", None).compile(dialect=dialect)).lower()
+        assert "is null" in sql and "trim(" in sql
+
+    with pytest.raises(HTTPException) as exc:
+        build_filter(_Row.amount, "is_blank", None)
+    assert exc.value.detail["error_code"] == "BLANK_FIELD_INVALID"
+
+
+def test_is_blank_and_internal_nonempty_call_one_blank_predicate():
+    for function in (build_filter, build_portable_filter):
+        tree = ast.parse(inspect.getsource(function))
+        calls = [
+            node.func.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        ]
+        assert "_blank_predicate" in calls
+    assert "blank_predicate" not in {
+        node.func.id
+        for function in (build_filter, build_portable_filter)
+        for node in ast.walk(ast.parse(inspect.getsource(function)))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+
+
+def test_ledger_line_amount_preserves_numeric_type_for_string_threshold():
+    amount = ledger_line_amount(TbLedger.__table__)
+    assert amount.type is TbLedger.__table__.c.debit_amount.type
+    assert coerce_value(amount, "1000000") == decimal.Decimal("1000000")
+    compiled = build_filter(amount, "gte", "1000000").compile(
+        dialect=postgresql.dialect()
+    )
+    assert "greatest" in str(compiled).lower()
+    assert decimal.Decimal("1000000") in compiled.params.values()

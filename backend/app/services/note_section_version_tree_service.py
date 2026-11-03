@@ -17,7 +17,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 
-__all__ = ["NoteSectionVersionTreeService", "VersionNode", "VersionTree"]
+__all__ = ["NoteSectionVersionTreeService", "VersionNode", "VersionTree", "create_version_node"]
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +123,24 @@ class VersionTree:
             "branches": self.get_branches(),
             "is_valid_dag": self.validate_dag(),
         }
+
+
+def create_version_node(
+    section_id: str,
+    project_id: uuid.UUID,
+    user_id: str,
+    import_source: str = "offline_import",
+) -> dict[str, Any]:
+    """构造离线导入的章节版本节点载荷（C.0.14），由调用方决定是否持久化。"""
+    return {
+        "section_id": section_id,
+        "project_id": str(project_id),
+        "branch": "main",
+        "label": f"离线导入 ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')})",
+        "created_by": user_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": import_source,
+    }
 
 
 # ---------------------------------------------------------------------------

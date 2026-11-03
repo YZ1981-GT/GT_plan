@@ -73,15 +73,15 @@ export interface L6DetailRow {
   rjeCarryFwd: number
   /** 返还RJE（R列） */
   rjeRefund: number
-  /** 审定期初（S列） */
+  /** 审定期初（模板 P 列 = 期初 + 期初AJE + 期初RJE） */
   auditedBegin: number
-  /** 审定拨入（T列） */
+  /** 审定拨入（模板 Q 列 = 本期拨入 + 拨入AJE + 拨入RJE） */
   auditedCredit: number
-  /** 审定结转（U列） */
+  /** 审定结转（模板 R 列 = 本期结转 + 结转AJE + 结转RJE） */
   auditedCarryFwd: number
-  /** 审定返还（V列） */
+  /** 审定返还（模板 S 列 = 本期返还 + 返还AJE + 返还RJE） */
   auditedRefund: number
-  /** 审定期末（W列，公式=S+T-U-V） */
+  /** 审定期末（模板 T 列 = 审定期初 + 审定拨入 − 审定结转 − 审定返还） */
   auditedEnd: number
   /** 底稿索引（X列） */
   docRef: string
@@ -91,6 +91,43 @@ export interface L6DetailRow {
   completionStatus: string
   /** 备注（AA列） */
   remark: string
+}
+
+/** L6-2 明细表的 store item（整表一条 JSON 数组）。 */
+export const L6_DETAIL_ROWS_ITEM_ID = 'L6-L6-2-rows'
+
+/**
+ * L6-2 行公式（对齐模板 明细表L6-2）：G=C+D−E−F；P=C+H+I；Q=D+J+M；R=E+K+N；S=F+L+O；T=P+Q−R−S。
+ *
+ * 审定四列 P~S 原先是手填，账项 / 重分类调整进不了审定；现与 OO 侧按同一组公式重算。
+ */
+export function recalcL6DetailRow(row: L6DetailRow): L6DetailRow {
+  const n = (v: unknown): number => Number(v) || 0
+  const auditedBegin = n(row.beginBalance) + n(row.ajeBegin) + n(row.rjeBegin)
+  const auditedCredit = n(row.creditIn) + n(row.ajeCredit) + n(row.rjeCredit)
+  const auditedCarryFwd = n(row.carryForward) + n(row.ajeCarryFwd) + n(row.rjeCarryFwd)
+  const auditedRefund = n(row.refund) + n(row.ajeRefund) + n(row.rjeRefund)
+  return {
+    ...row,
+    endBalance: calcDetailEndBalance(n(row.beginBalance), n(row.creditIn), n(row.carryForward), n(row.refund)),
+    auditedBegin,
+    auditedCredit,
+    auditedCarryFwd,
+    auditedRefund,
+    auditedEnd: calcDetailEndBalance(auditedBegin, auditedCredit, auditedCarryFwd, auditedRefund),
+  }
+}
+
+/** 从 store 读 L6-2 明细行并按模板公式重算（两张附注取审定数区用）。 */
+export function readL6DetailRows(responses: Map<string, { remark?: string | null }>): L6DetailRow[] {
+  const raw = responses.get(L6_DETAIL_ROWS_ITEM_ID)?.remark
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map((r) => recalcL6DetailRow(r as L6DetailRow)) : []
+  } catch {
+    return []
+  }
 }
 
 /** 区段Tab类型：3区段 */
@@ -150,19 +187,9 @@ export function useL6Detail(
 
   // ─── 2. 计算属性：负债类期末余额 ─────────────────────────────────────────
 
-  /** 各行期末余额自动计算（负债类：期初+拨入-结转-返还） */
+  /** 各行按模板公式重算（未审期末 G、审定 P~S 与审定期末 T） */
   const computedRows: ComputedRef<L6DetailRow[]> = computed(() => {
-    return detailRows.value.map(row => {
-      // 未审期末 = 期初 + 拨入(贷方) - 结转(借方) - 返还(借方)
-      const endBalance = calcDetailEndBalance(row.beginBalance, row.creditIn, row.carryForward, row.refund)
-      // 审定期末 = 审定期初 + 审定拨入 - 审定结转 - 审定返还
-      const auditedEnd = calcDetailEndBalance(row.auditedBegin, row.auditedCredit, row.auditedCarryFwd, row.auditedRefund)
-      return {
-        ...row,
-        endBalance,
-        auditedEnd,
-      }
-    })
+    return detailRows.value.map(row => recalcL6DetailRow(row))
   })
 
   /** 期末余额合计（供L6-1交叉验证） */
@@ -272,13 +299,8 @@ export function useL6Detail(
     const row = detailRows.value[index] as any
     row[field] = value
 
-    // 如果是金额字段，重算期末余额
-    if (['beginBalance', 'creditIn', 'carryForward', 'refund'].includes(field)) {
-      row.endBalance = calcDetailEndBalance(row.beginBalance, row.creditIn, row.carryForward, row.refund)
-    }
-    if (['auditedBegin', 'auditedCredit', 'auditedCarryFwd', 'auditedRefund'].includes(field)) {
-      row.auditedEnd = calcDetailEndBalance(row.auditedBegin, row.auditedCredit, row.auditedCarryFwd, row.auditedRefund)
-    }
+    // 未审金额或账项 / 重分类调整变了 ⇒ 按模板重算 G 与 P~T
+    Object.assign(row, recalcL6DetailRow(row))
 
     _triggerSave(index)
   }
@@ -296,12 +318,8 @@ export function useL6Detail(
       })
     }
     // 保存行完整数据（🔴 修复：序列化整行而非字段子集，此前仅存 key/project/endBalance/auditedEnd → 刷新丢失其余字段）
-    debouncedSave('L6-L6-2-rows', {
-      remark: JSON.stringify(detailRows.value.map((r, i) => ({
-        ...r,
-        endBalance: computedRows.value[i]?.endBalance ?? r.endBalance ?? 0,
-        auditedEnd: computedRows.value[i]?.auditedEnd ?? r.auditedEnd ?? 0,
-      }))),
+    debouncedSave(L6_DETAIL_ROWS_ITEM_ID, {
+      remark: JSON.stringify(detailRows.value.map(recalcL6DetailRow)),
     })
   }
 
@@ -312,12 +330,8 @@ export function useL6Detail(
         remark: String(row.endBalance),
       })
     })
-    debouncedSave('L6-L6-2-rows', {
-      remark: JSON.stringify(detailRows.value.map((r, i) => ({
-        ...r,
-        endBalance: computedRows.value[i]?.endBalance ?? r.endBalance ?? 0,
-        auditedEnd: computedRows.value[i]?.auditedEnd ?? r.auditedEnd ?? 0,
-      }))),
+    debouncedSave(L6_DETAIL_ROWS_ITEM_ID, {
+      remark: JSON.stringify(detailRows.value.map(recalcL6DetailRow)),
     })
   }
 

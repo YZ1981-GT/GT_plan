@@ -1,704 +1,283 @@
-"""R1 Task 13 集成测试：ArchiveOrchestrator 服务
+"""ArchiveOrchestrator 编排测试（refinement-round1 需求 5；spec attachment-archive-and-a-class-evidence 需求 2 改造）
 
-覆盖需求 5 验收标准：
-1. happy path：所有步骤成功 → status=succeeded
-2. gate 失败 → status=failed, failed_section='gate'
-3. wp_storage 失败 → failed_section='wp_storage'
-4. retry 从 last_succeeded_section 下一步开始
-5. get_job 返回正确字段
+覆盖：
+1. 全部成功 ⇒ succeeded、项目与底稿锁定、manifest_hash / output_url / 完整性记录写入
+2. gate / package / push_to_cloud 任一步失败 ⇒ failed、失败步骤与问题清单落进度、项目不锁
+3. 重试从第一个未成功的步骤继续（已成功的不重跑）；推送用打包步骤留下的包，包被改动 ⇒ 失败
+4. section_progress 真实落库（换会话重新读）
+5. get_job 字段
 
-Validates: Requirements 5 (refinement-round1-review-closure)
+改造前：wp_storage 步失败只返回 ``{"error"}``、编排照样成功；保留期与哈希持久化失败不阻断；不改项目状态；
+section_progress 原地改 JSONB 从未落库 —— 旧用例全在 mock 上断言内存对象，测不出这些。
 """
 
 from __future__ import annotations
 
+import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import app.models.core  # noqa: F401
-import app.models.audit_platform_models  # noqa: F401
-import app.models.archive_models  # noqa: F401
-from app.models.base import Base
+import app.models  # noqa: F401
 from app.models.archive_models import ArchiveJob
+from app.models.base import Base
+from app.models.core import Project
+from app.models.phase16_models import EvidenceHashCheck
+from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.archive_orchestrator import ArchiveOrchestrator
+from app.services.archive_package_builder import ArchivePackageError, PackageResult
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
 FAKE_USER_ID = uuid.uuid4()
-FAKE_PROJECT_ID = uuid.uuid4()
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncSession:
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+async def factory():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False, poolclass=sa.pool.StaticPool)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with factory() as session:
-        yield session
+    yield async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     await engine.dispose()
 
 
-# ---------------------------------------------------------------------------
-# Helpers: mock patches for the archive steps
-# ---------------------------------------------------------------------------
+@pytest_asyncio.fixture
+async def db_session(factory) -> AsyncSession:
+    async with factory() as session:
+        yield session
 
 
-def _mock_gate_allow():
-    """Mock gate_engine.evaluate to return allow."""
-    from dataclasses import dataclass, field
-
-    @dataclass
-    class FakeResult:
-        decision: str = "allow"
-        hit_rules: list = field(default_factory=list)
-        trace_id: str = "test-trace"
-
-    mock = AsyncMock(return_value=FakeResult())
-    return mock
-
-
-def _mock_gate_block():
-    """Mock gate_engine.evaluate to return block."""
-    from dataclasses import dataclass, field
-
-    @dataclass
-    class FakeHit:
-        rule_code: str = "TEST_RULE"
-        error_code: str = "TEST_ERROR"
-        severity: str = "blocking"
-        message: str = "Test blocking reason"
-        location: dict = field(default_factory=dict)
-        suggested_action: str = ""
-
-    @dataclass
-    class FakeResult:
-        decision: str = "block"
-        hit_rules: list = field(default_factory=lambda: [FakeHit()])
-        trace_id: str = "test-trace"
-
-    mock = AsyncMock(return_value=FakeResult())
-    return mock
+@pytest_asyncio.fixture
+async def project(db_session) -> Project:
+    p = Project(id=uuid.uuid4(), name="编排测试项目", client_name="编排测试客户", status="execution",
+                audit_period_end=date(2025, 12, 31))
+    db_session.add(p)
+    await db_session.flush()
+    idx = WpIndex(project_id=p.id, wp_code="D2-1", wp_name="审定表")
+    db_session.add(idx)
+    await db_session.flush()
+    source = list(WorkingPaper.__table__.c.source_type.type.enum_class)[0]
+    db_session.add(WorkingPaper(project_id=p.id, wp_index_id=idx.id, file_path="", source_type=source))
+    await db_session.commit()
+    return p
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+GATE = "app.services.archive_gate.archive_gate_problems"
 
 
-@pytest.mark.asyncio
-async def test_orchestrate_happy_path(db_session: AsyncSession):
-    """所有步骤成功 → status=succeeded, last_succeeded_section 为最后一步。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+def _gate(verdict: str = "allow"):
+    """门禁替身（组合判据另有专测 attachment_archive_evidence/test_archive_gate.py）。"""
+    return AsyncMock(return_value=[] if verdict == "allow" else ["完整性自检｜未签字底稿｜Test blocking reason"])
+
+
+def _fake_package(tmp_path, calls: list):
+    async def build(db, project_id, job_id):
+        calls.append(job_id)
+        path = tmp_path / f"{job_id}.zip"
+        path.write_bytes(b"PK-fake-" + str(job_id).encode())
+        return PackageResult(path=path, sha256=hashlib.sha256(path.read_bytes()).hexdigest(), size=path.stat().st_size,
+                             manifest_hash="m" * 64, counts={"workpaper_data": 1}, skipped=1)
+    return build
+
+
+def _patches(tmp_path, calls, *, gate="allow", push=None):
+    ps = [
+        patch(GATE, new=_gate(gate)),
+        patch("app.services.archive_package_builder.build_archive_package", new=_fake_package(tmp_path, calls)),
+        patch("app.services.archive_orchestrator.ArchiveOrchestrator._notify_project_members", new_callable=AsyncMock),
+    ]
+    if push is not None:
+        ps.append(patch("app.services.cloud_storage_service.CloudStorageService.upload_archive_package", new=push))
+    return ps
+
+
+class _Many:
+    def __init__(self, ps):
+        self.ps = ps
+
+    def __enter__(self):
+        for p in self.ps:
+            p.__enter__()
+
+    def __exit__(self, *exc):
+        for p in reversed(self.ps):
+            p.__exit__(*exc)
+
+
+async def _wp_statuses(db, project_id):
+    rows = (await db.execute(sa.select(WorkingPaper.status).where(WorkingPaper.project_id == project_id))).scalars()
+    return {getattr(s, "value", s) for s in rows}
+
+
+async def test_happy_path_locks_project_and_records_package(db_session, project, tmp_path, factory):
+    calls: list = []
+    with _Many(_patches(tmp_path, calls)):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id, initiated_by=FAKE_USER_ID)
         await db_session.commit()
+    assert (job.status, job.failed_section, job.failed_reason) == ("succeeded", None, None)
+    assert job.last_succeeded_section == "lock"
+    assert job.manifest_hash == "m" * 64
+    assert job.output_url == f"/api/projects/{project.id}/archive/jobs/{job.id}/package"
+    # 换会话读：进度、锁定、完整性记录都真实落库
+    async with factory() as s2:
+        fresh = await s2.get(ArchiveJob, job.id)
+        assert list(fresh.section_progress) == ["gate", "package", "lock"]
+        assert fresh.section_progress["package"]["sha256"] == hashlib.sha256((tmp_path / f"{job.id}.zip").read_bytes()).hexdigest()
+        assert fresh.section_progress["lock"]["workpapers_locked"] == 1
+        p = await s2.get(Project, project.id)
+        assert getattr(p.status, "value", p.status) == "archived"
+        assert p.archived_at is not None and p.retention_until is not None
+        assert await _wp_statuses(s2, project.id) == {"archived"}
+        checks = (await s2.execute(sa.select(EvidenceHashCheck).where(EvidenceHashCheck.export_id == str(job.id)))).scalars().all()
+        assert [c.file_path for c in checks] == [fresh.section_progress["package"]["path"]]
 
-    assert job.status == "succeeded"
-    assert job.failed_section is None
-    assert job.failed_reason is None
-    assert job.last_succeeded_section == "wp_storage"
-    assert job.finished_at is not None
-    assert job.started_at is not None
 
-
-@pytest.mark.asyncio
-async def test_orchestrate_with_push_to_cloud(db_session: AsyncSession):
-    """push_to_cloud=True 时执行 push_to_cloud 步骤。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.private_storage_service.ProjectArchiveService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"pushed": True},
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=True,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+async def test_gate_failure_does_not_lock(db_session, project, tmp_path):
+    calls: list = []
+    with _Many(_patches(tmp_path, calls, gate="block")):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id)
         await db_session.commit()
+    assert (job.status, job.failed_section) == ("failed", "gate")
+    assert job.failed_reason.startswith("归档门禁未通过：1 项阻断") and "Test blocking reason" in job.failed_reason
+    assert job.section_progress["gate"]["problems"] == ["完整性自检｜未签字底稿｜Test blocking reason"]
+    assert calls == []
+    await db_session.refresh(project)
+    assert getattr(project.status, "value", project.status) == "execution"
 
-    assert job.status == "succeeded"
-    assert job.last_succeeded_section == "push_to_cloud"
 
+async def test_package_failure_records_problems_and_does_not_lock(db_session, project, tmp_path):
+    async def broken(db, project_id, job_id):
+        raise ArchivePackageError(["底稿文件｜D2-1 审定表｜底稿文件不存在（路径已配置但磁盘上找不到）", "附件｜回函.pdf｜附件文件不存在"])
 
-@pytest.mark.asyncio
-async def test_orchestrate_gate_failure(db_session: AsyncSession):
-    """gate 阻断 → status=failed, failed_section='gate'。"""
-    with patch(
-        "app.services.gate_engine.gate_engine.evaluate",
-        new=_mock_gate_block(),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+    with _Many(_patches(tmp_path, [])), patch("app.services.archive_package_builder.build_archive_package", new=broken):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id)
         await db_session.commit()
+    assert (job.status, job.failed_section, job.last_succeeded_section) == ("failed", "package", "gate")
+    assert job.failed_reason.startswith("归档包有 2 项读不到")
+    assert job.section_progress["package"]["status"] == "failed"
+    assert len(job.section_progress["package"]["problems"]) == 2
+    assert job.manifest_hash is None and job.output_url is None
+    await db_session.refresh(project)
+    assert getattr(project.status, "value", project.status) == "execution"
+    assert await _wp_statuses(db_session, project.id) != {"archived"}
 
-    assert job.status == "failed"
-    assert job.failed_section == "gate"
-    assert "blocked" in job.failed_reason.lower()
-    assert job.finished_at is not None
 
-
-@pytest.mark.asyncio
-async def test_orchestrate_wp_storage_failure(db_session: AsyncSession):
-    """wp_storage 步骤失败 → failed_section='wp_storage'。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("Storage write error"),
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+async def test_push_failure_then_retry_resumes_without_repackaging(db_session, project, tmp_path):
+    calls: list = []
+    push = AsyncMock(side_effect=RuntimeError("SFTP 连接被拒绝"))
+    with _Many(_patches(tmp_path, calls, push=push)):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id, push_to_cloud=True)
         await db_session.commit()
+    assert (job.status, job.failed_section) == ("failed", "push_to_cloud")
+    assert "SFTP 连接被拒绝" in job.failed_reason
+    await db_session.refresh(project)
+    assert getattr(project.status, "value", project.status) == "execution"
 
-    assert job.status == "failed"
-    assert job.failed_section == "wp_storage"
-    assert "Storage write error" in job.failed_reason
-    assert job.last_succeeded_section == "gate"
-
-
-@pytest.mark.asyncio
-async def test_retry_from_last_succeeded_section(db_session: AsyncSession):
-    """retry 从 last_succeeded_section 下一步开始。"""
-    # 先创建一个失败的 job（gate 成功，wp_storage 失败）
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("Temporary failure"),
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+    gate = _gate()
+    ok_push = AsyncMock(return_value={"status": "success", "method": "local", "remote_key": "k"})
+    with patch(GATE, new=gate), \
+            patch("app.services.archive_package_builder.build_archive_package", new=_fake_package(tmp_path, calls)), \
+            patch("app.services.cloud_storage_service.CloudStorageService.upload_archive_package", new=ok_push), \
+            patch("app.services.archive_orchestrator.ArchiveOrchestrator._notify_project_members", new_callable=AsyncMock):
+        retried = await ArchiveOrchestrator(db_session).retry(job_id=job.id)
         await db_session.commit()
+    assert retried.status == "succeeded" and retried.failed_section is None
+    assert gate.call_count == 0 and len(calls) == 1  # gate / package 不重跑
+    pushed_path = ok_push.call_args.args[3]
+    assert str(pushed_path.resolve()) == retried.section_progress["package"]["path"]
+    assert retried.section_progress["push_to_cloud"]["remote_key"] == "k"
 
-    assert job.status == "failed"
-    assert job.last_succeeded_section == "gate"
 
-    # 重试：wp_storage 这次成功
-    with patch(
-        "app.services.wp_storage_service.WpStorageService.archive_project",
-        new_callable=AsyncMock,
-        return_value={"archived": True},
-    ):
-        orchestrator2 = ArchiveOrchestrator(db_session)
-        retried_job = await orchestrator2.retry(
-            job_id=job.id,
-            initiated_by=FAKE_USER_ID,
-        )
+async def test_push_refuses_tampered_package(db_session, project, tmp_path):
+    calls: list = []
+    push = AsyncMock(side_effect=RuntimeError("down"))
+    with _Many(_patches(tmp_path, calls, push=push)):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id, push_to_cloud=True)
         await db_session.commit()
+    (tmp_path / f"{job.id}.zip").write_bytes(b"tampered")
+    ok_push = AsyncMock(return_value={"status": "success"})
+    with patch("app.services.cloud_storage_service.CloudStorageService.upload_archive_package", new=ok_push):
+        retried = await ArchiveOrchestrator(db_session).retry(job_id=job.id)
+    assert (retried.status, retried.failed_section) == ("failed", "push_to_cloud")
+    assert retried.failed_reason == "归档包文件不存在或已被改动，请重新归档"
+    assert ok_push.call_count == 0
 
-    assert retried_job.status == "succeeded"
-    assert retried_job.last_succeeded_section == "wp_storage"
-    assert retried_job.failed_section is None
-    assert retried_job.failed_reason is None
+
+async def test_lock_failure_when_project_missing(db_session, tmp_path):
+    with _Many(_patches(tmp_path, [])):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=uuid.uuid4())
+    assert (job.status, job.failed_section, job.failed_reason) == ("failed", "lock", "项目不存在，无法锁定")
 
 
-@pytest.mark.asyncio
-async def test_retry_invalid_status(db_session: AsyncSession):
-    """retry 对非 failed 状态的 job 应抛出 ValueError。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+async def test_retry_invalid_status(db_session, project, tmp_path):
+    with _Many(_patches(tmp_path, [])):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id)
         await db_session.commit()
-
-    assert job.status == "succeeded"
-
-    orchestrator2 = ArchiveOrchestrator(db_session)
     with pytest.raises(ValueError, match="cannot retry"):
-        await orchestrator2.retry(job_id=job.id, initiated_by=FAKE_USER_ID)
+        await ArchiveOrchestrator(db_session).retry(job_id=job.id)
 
 
-@pytest.mark.asyncio
-async def test_get_job(db_session: AsyncSession):
-    """get_job 返回正确字段。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
+async def test_get_job_fields_and_not_found(db_session, project, tmp_path):
+    with _Many(_patches(tmp_path, [])):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id, initiated_by=FAKE_USER_ID)
         await db_session.commit()
-
-    orchestrator2 = ArchiveOrchestrator(db_session)
-    result = await orchestrator2.get_job(job.id)
-
-    assert result is not None
+    result = await ArchiveOrchestrator(db_session).get_job(job.id)
     assert result["id"] == str(job.id)
-    assert result["project_id"] == str(FAKE_PROJECT_ID)
-    assert result["scope"] == "final"
-    assert result["status"] == "succeeded"
-    assert result["push_to_cloud"] is False
-    assert result["purge_local"] is False
-    assert result["last_succeeded_section"] == "wp_storage"
-    assert result["failed_section"] is None
-    assert result["failed_reason"] is None
-    assert result["started_at"] is not None
-    assert result["finished_at"] is not None
+    assert result["project_id"] == str(project.id)
+    assert (result["status"], result["scope"], result["push_to_cloud"], result["purge_local"]) == (
+        "succeeded", "final", False, False)
+    assert result["last_succeeded_section"] == "lock"
+    assert result["output_url"].endswith(f"/archive/jobs/{job.id}/package")
     assert result["initiated_by"] == str(FAKE_USER_ID)
+    assert await ArchiveOrchestrator(db_session).get_job(uuid.uuid4()) is None
 
 
-@pytest.mark.asyncio
-async def test_get_job_not_found(db_session: AsyncSession):
-    """get_job 对不存在的 job 返回 None。"""
-    orchestrator = ArchiveOrchestrator(db_session)
-    result = await orchestrator.get_job(uuid.uuid4())
-    assert result is None
-
-
-# ---------------------------------------------------------------------------
-# Task 16: 归档完整性记录 tests
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_orchestrate_success_persists_manifest_hash(db_session: AsyncSession):
-    """Task 16: orchestrate 成功后 manifest_hash 非空（各章节 SHA-256 拼接再哈希）。"""
-    fake_section_content = [
-        ("00-项目封面.pdf", b"fake cover pdf content"),
-        ("01-签字流水.pdf", b"fake signature ledger content"),
-        ("99-审计日志.jsonl", None),  # None 应被跳过
-    ]
-
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.archive_section_registry.generate_all",
-            new_callable=AsyncMock,
-            return_value=fake_section_content,
-        ),
-        patch(
-            "app.services.export_integrity_service.export_integrity_service.persist_checks",
-            new_callable=AsyncMock,
-        ) as mock_persist,
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
-    assert job.status == "succeeded"
-    assert job.manifest_hash is not None
-    assert len(job.manifest_hash) == 64  # SHA-256 hex digest
-
-    # persist_checks 应被调用一次
-    mock_persist.assert_called_once()
-    call_args = mock_persist.call_args
-    # export_id 应为 job.id 的字符串
-    assert call_args.kwargs["export_id"] == str(job.id)
-    # file_checks 应包含 2 个条目（None 被跳过）
-    assert len(call_args.kwargs["file_checks"]) == 2
-    assert call_args.kwargs["file_checks"][0]["file_path"] == "00-项目封面.pdf"
-    assert call_args.kwargs["file_checks"][1]["file_path"] == "01-签字流水.pdf"
-
-
-@pytest.mark.asyncio
-async def test_orchestrate_integrity_failure_does_not_block(db_session: AsyncSession):
-    """Task 16: persist_hash_checks 失败不阻断归档（status 仍为 succeeded）。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.archive_section_registry.generate_all",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("Section generation failed"),
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
-    # 归档仍然成功（integrity 失败不阻断）
-    assert job.status == "succeeded"
-    # manifest_hash 为 None（因为 integrity 步骤失败了）
-    assert job.manifest_hash is None
-
-
-@pytest.mark.asyncio
-async def test_retry_success_persists_manifest_hash(db_session: AsyncSession):
-    """Task 16: retry 成功后也调 persist_hash_checks，manifest_hash 非空。"""
-    # 先创建一个失败的 job
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("Temporary failure"),
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
-    assert job.status == "failed"
-    assert job.manifest_hash is None
-
-    # 重试成功
-    fake_section_content = [
-        ("00-项目封面.pdf", b"cover content"),
-        ("01-签字流水.pdf", b"ledger content"),
-    ]
-
-    with (
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.archive_section_registry.generate_all",
-            new_callable=AsyncMock,
-            return_value=fake_section_content,
-        ),
-        patch(
-            "app.services.export_integrity_service.export_integrity_service.persist_checks",
-            new_callable=AsyncMock,
-        ) as mock_persist,
-    ):
-        orchestrator2 = ArchiveOrchestrator(db_session)
-        retried_job = await orchestrator2.retry(
-            job_id=job.id,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
-    assert retried_job.status == "succeeded"
-    assert retried_job.manifest_hash is not None
-    assert len(retried_job.manifest_hash) == 64
-    mock_persist.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_manifest_hash_deterministic(db_session: AsyncSession):
-    """Task 16: 相同内容产生相同 manifest_hash（确定性）。"""
-    import hashlib
-
-    content_a = b"cover pdf bytes"
-    content_b = b"ledger pdf bytes"
-
-    fake_sections = [
-        ("00-项目封面.pdf", content_a),
-        ("01-签字流水.pdf", content_b),
-    ]
-
-    # 手动计算期望的 manifest_hash
-    hash_a = hashlib.sha256(content_a).hexdigest()
-    hash_b = hashlib.sha256(content_b).hexdigest()
-    expected_manifest = hashlib.sha256((hash_a + hash_b).encode("utf-8")).hexdigest()
-
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.archive_section_registry.generate_all",
-            new_callable=AsyncMock,
-            return_value=fake_sections,
-        ),
-        patch(
-            "app.services.export_integrity_service.export_integrity_service.persist_checks",
-            new_callable=AsyncMock,
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
-    assert job.manifest_hash == expected_manifest
-
-
-# ---------------------------------------------------------------------------
-# Batch 2-1: section_progress tests (R1 Bug Fix 5 retrospective)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_orchestrate_writes_section_progress_on_each_step(db_session: AsyncSession):
-    """Fix 5: orchestrate 成功后 section_progress 每个 section 都有 succeeded/finished_at。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.private_storage_service.ProjectArchiveService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"pushed": True},
-        ),
-        patch(
-            "app.services.data_lifecycle_service.DataLifecycleService.archive_project_data",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=True,
-            purge_local=True,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
-    assert job.status == "succeeded"
-    assert job.section_progress is not None
-    # 应包含 4 个 section
-    for section in ["gate", "wp_storage", "push_to_cloud", "purge_local"]:
-        assert section in job.section_progress, f"section_progress missing {section}"
-        sp = job.section_progress[section]
-        assert sp.get("status") == "succeeded"
-        assert sp.get("finished_at") is not None
-
-
-@pytest.mark.asyncio
-async def test_retry_skips_succeeded_sections_via_section_progress(db_session: AsyncSession):
-    """Fix 5: retry 对已 succeeded 的 section 不再重跑（以 section_progress 为权威）。"""
-    # 构造一个 failed job：section_progress 显示 gate 已成功，wp_storage 未 succeeded
+async def test_retry_skips_succeeded_sections_via_progress(db_session, project, tmp_path):
     now_iso = datetime.now(timezone.utc).isoformat()
     job = ArchiveJob(
-        id=uuid.uuid4(),
-        project_id=FAKE_PROJECT_ID,
-        scope="final",
-        status="failed",
-        push_to_cloud=False,
-        purge_local=False,
-        last_succeeded_section="gate",
-        failed_section="wp_storage",
-        failed_reason="old failure",
-        section_progress={
-            "gate": {"status": "succeeded", "finished_at": now_iso},
-        },
+        id=uuid.uuid4(), project_id=project.id, scope="final", status="failed", push_to_cloud=False,
+        purge_local=False, failed_section="package", failed_reason="old",
+        section_progress={"gate": {"status": "succeeded", "finished_at": now_iso}},
         started_at=datetime.now(timezone.utc),
-        initiated_by=FAKE_USER_ID,
     )
     db_session.add(job)
-    await db_session.flush()
     await db_session.commit()
-
-    # retry：gate 若被错误重跑则 mock_gate 会被调用
-    mock_gate = _mock_gate_allow()
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=mock_gate,
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-        patch(
-            "app.services.archive_orchestrator.ArchiveOrchestrator._persist_integrity_hashes",
-            new_callable=AsyncMock,
-        ),
-        patch(
-            "app.services.archive_orchestrator.ArchiveOrchestrator._set_project_retention",
-            new_callable=AsyncMock,
-        ),
-        patch(
-            "app.services.archive_orchestrator.ArchiveOrchestrator._notify_project_members",
-            new_callable=AsyncMock,
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        retried_job = await orchestrator.retry(
-            job_id=job.id,
-            initiated_by=FAKE_USER_ID,
-        )
+    calls: list = []
+    gate = _gate()
+    with patch(GATE, new=gate), \
+            patch("app.services.archive_package_builder.build_archive_package", new=_fake_package(tmp_path, calls)), \
+            patch("app.services.archive_orchestrator.ArchiveOrchestrator._notify_project_members", new_callable=AsyncMock):
+        retried = await ArchiveOrchestrator(db_session).retry(job_id=job.id)
         await db_session.commit()
-
-    # 断言 gate step 的 mock 未被调用（已跳过）
-    assert mock_gate.call_count == 0, (
-        f"gate step should have been skipped but was called {mock_gate.call_count} times"
-    )
-    assert retried_job.status == "succeeded"
-    assert retried_job.section_progress.get("wp_storage", {}).get("status") == "succeeded"
+    assert gate.call_count == 0 and calls == [job.id]
+    assert retried.status == "succeeded"
+    assert list(retried.section_progress) == ["gate", "package", "lock"]
 
 
-@pytest.mark.asyncio
-async def test_section_progress_and_last_succeeded_consistent(db_session: AsyncSession):
-    """Fix 5: orchestrate 成功后 section_progress 和 last_succeeded_section 都更新，一致。"""
-    with (
-        patch(
-            "app.services.gate_engine.gate_engine.evaluate",
-            new=_mock_gate_allow(),
-        ),
-        patch(
-            "app.services.wp_storage_service.WpStorageService.archive_project",
-            new_callable=AsyncMock,
-            return_value={"archived": True},
-        ),
-    ):
-        orchestrator = ArchiveOrchestrator(db_session)
-        job = await orchestrator.orchestrate(
-            project_id=FAKE_PROJECT_ID,
-            scope="final",
-            push_to_cloud=False,
-            purge_local=False,
-            initiated_by=FAKE_USER_ID,
-        )
-        await db_session.commit()
-
+async def test_purge_local_runs_after_lock(db_session, project, tmp_path):
+    order: list[str] = []
+    purge = AsyncMock(side_effect=lambda pid: order.append("purge") or {"archived": True})
+    with _Many(_patches(tmp_path, [])), \
+            patch("app.services.data_lifecycle_service.DataLifecycleService.archive_project_data", new=purge):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=project.id, purge_local=True)
     assert job.status == "succeeded"
-    # section_progress 包含所有执行的 step
-    assert set(job.section_progress.keys()) == {"gate", "wp_storage"}
-    # last_succeeded_section 等于最后一个 section
-    assert job.last_succeeded_section == "wp_storage"
-    # 最后一个 section 在 section_progress 中也为 succeeded
-    assert job.section_progress[job.last_succeeded_section]["status"] == "succeeded"
+    assert list(job.section_progress) == ["gate", "package", "lock", "purge_local"]
+    assert order == ["purge"]
+
+
+async def test_push_without_audit_year_fails_instead_of_guessing(db_session, tmp_path):
+    """审计年度解析不出 ⇒ 推送失败如实报错（不按今年 / 写死 2025 建云端目录，audit-year-calendar-fallback-ratchet）。"""
+    bare = Project(id=uuid.uuid4(), name="无年度项目", client_name="客户", status="execution")
+    db_session.add(bare)
+    await db_session.commit()
+    push = AsyncMock(return_value={"status": "success"})
+    with _Many(_patches(tmp_path, [], push=push)):
+        job = await ArchiveOrchestrator(db_session).orchestrate(project_id=bare.id, push_to_cloud=True)
+    assert (job.status, job.failed_section) == ("failed", "push_to_cloud")
+    assert "未设置审计年度" in job.failed_reason
+    assert push.call_count == 0

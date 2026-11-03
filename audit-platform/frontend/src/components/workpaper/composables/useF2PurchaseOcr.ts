@@ -8,6 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { InspectionCheckRow } from './useF2InspectionCheckFormulas'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
+import { refreshRowEvidence, rowEvidenceCell, rowVoucherKey } from '@/components/attachment/rowEvidence'
 
 export interface F2PurchaseOcrFields {
   purchaseOrderNo?: string
@@ -18,6 +19,9 @@ export interface F2PurchaseOcrFields {
   itemName?: string
 }
 
+/** 识别附件挂到本行（F2-33 + `row:{行 id}`），表格 📎 旁与逐笔核对弹窗里的小眼睛按同一位置读取 */
+export const F2_PURCHASE_EVIDENCE_SHEET = 'F2-33'
+
 export function useF2PurchaseOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
@@ -25,18 +29,24 @@ export function useF2PurchaseOcr(wpId: Ref<string>, projectId?: Ref<string>) {
     rowId: string,
     file: File,
     updateRow: (id: string, patch: Partial<InspectionCheckRow>) => void,
+    /** 凭证检查行：带了就按凭证身份挂（spec attachment-voucher-evidence-binding） */
+    row?: unknown,
   ): Promise<void> {
     ocrLoadingId.value = rowId
     try {
       const { form } = await buildLinkedOcrFormData(file, {
         projectId: projectId?.value,
         wpId: wpId.value,
+        evidenceSheet: F2_PURCHASE_EVIDENCE_SHEET,
+        evidenceCell: rowEvidenceCell(rowId),
+        voucherKey: rowVoucherKey(row),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2/contract-ocr`,
         form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as F2PurchaseOcrFields
       const confidence = data?.confidence ?? 0

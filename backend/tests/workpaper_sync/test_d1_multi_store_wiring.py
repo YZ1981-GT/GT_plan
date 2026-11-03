@@ -289,24 +289,32 @@ def test_dict_form_item_is_wired_through_dedicated_path(contract, synthetic_payl
     assert len(merged.get("commercialRows") or []) == 2
 
 
-def test_mutation_without_projection_slice_rows_bleed_across_regions(
+def test_without_projection_slice_rows_still_stay_in_their_region(
     contract, synthetic_payloads, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """🔴 变异反证：去掉 `_projection_slice_for` 的切片 ⇒ 别区的行必须串进本区。
+    """去掉 `_projection_slice_for` 的切片，别区的行也不再串进本区 —— 框架层已按表前缀过滤。
 
-    这条钉住的是 2026-09-28 真跑时抓到的缺陷：框架层
-    `merge_projection_into_store_rows` 遍历整份 projection、只按 `field_id` 过滤，
-    而不同区列名重名（`note_type`/`bill_amount` 等）⇒ 不切片就会把别区行全吞进来。
-    实测不切片时 `D1-cat-rows` 合出 16 行（应为 2）。
+    历史：2026-09-28 真跑抓到框架层 `merge_projection_into_store_rows` 遍历整份 projection、
+    只按 `field_id` 过滤，不同区列名重名（`note_type`/`bill_amount` 等）⇒ 不切片时
+    `D1-cat-rows` 合出 16 行（应为 2），D1 因此自带切片，本条当时是「去掉切片必须膨胀」的变异反证。
+    2026-10-27（spec oo-writeback-template-parity-closure R3）普查发现单 item 回写路径另有 8 家
+    同病，改在框架层只合本表前缀的键（守卫 `test_store_merge_table_isolation.py`，含去掉过滤的
+    磁盘变异）。本条改为钉住「切片去掉也不串」；D1 的切片保留作纵深防御。
 
-    没有这条，将来有人"简化"掉切片时不会有任何判据变红（往返等值判据只查
-    原始行是否还在，不查是否多出别人的行）。
+    合成数据「列名跨区重名」这个前提必须仍成立，否则本条失去覆盖面。
     """
-    # 🔴 2026-09-28 抽伴生模块后 patch 对象跟着真源走：实现已从 entry 模块搬到
-    #    `phase5_d1_combined_store`。patch 宿主属性会 `AttributeError` ——
-    #    那是**正确的红**（它说明变异没打在真正被调用的那份代码上），
-    #    不能靠 `raising=False` 把它糊过去，否则本条变异反证就恒绿了。
+    # 🔴 patch 对象跟着真源走（实现在伴生模块 `phase5_d1_combined_store`）；patch 错对象会
+    #    `AttributeError`，那是正确的红，不能靠 `raising=False` 糊过去。
     from app.services.workpaper_sync import phase5_d1_combined_store as _combined
+
+    column_tables: dict[str, set[str]] = {}
+    for sheet in contract.canonical_payload["sheets"]:
+        for table in sheet["tables"]:
+            for f in table["fields"]:
+                if f.get("column_key"):
+                    column_tables.setdefault(f["column_key"], set()).add(table["table_key"])
+    shared = {ck for ck, tables in column_tables.items() if len(tables) > 1}
+    assert {"note_type", "bill_amount"} <= shared, "前提不成立：合成契约里已没有跨区重名的列"
 
     monkeypatch.setattr(
         _combined, "_projection_slice_for", lambda proj, _table_key: proj
@@ -318,7 +326,4 @@ def test_mutation_without_projection_slice_rows_bleed_across_regions(
         for item_id, (rows, *_rest) in updates.items()
         if len(rows) > 2
     }
-    assert bloated, (
-        "去掉切片后行数竟然没膨胀 —— 要么框架层已自带前缀过滤（那切片可删，"
-        "但要先改本判据），要么合成数据的列名恰好不重名（那本判据失去覆盖面）"
-    )
+    assert bloated == {}, f"去掉切片后别区的行串进来了（框架层表前缀过滤失效？）：{bloated}"

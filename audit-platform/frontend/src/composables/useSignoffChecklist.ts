@@ -85,7 +85,8 @@ export function useSignoffChecklist(projectId: string) {
   // ─── 方法 ────────────────────────────────────────────────────────
 
   /** 获取签发一致性清单 */
-  async function fetchChecklist(year?: number) {
+  /** year 不传 / 项目没填为 null ⇒ 不带 year，由后端按项目审计年度取 */
+  async function fetchChecklist(year?: number | null) {
     loading.value = true
     error.value = null
     warningConfirmations.value.clear()

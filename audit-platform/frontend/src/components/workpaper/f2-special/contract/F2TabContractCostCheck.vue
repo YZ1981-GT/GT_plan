@@ -107,12 +107,12 @@
       >
         <GtVoucherSamplingEngine
           :account-code="samplingGate.accountCode.value"
-          phase="final"
           default-method="random"
           :workpaper-id="wpId"
           :project-id="projectId"
           :year="auditYear"
           @filled="handleSamplingFilled"
+          @undo-request="chk.onUndoRequest"
         />
       </el-collapse-item>
     </el-collapse>
@@ -154,7 +154,7 @@
       </div>
 
       <div class="table-scroll">
-        <table class="matrix-table">
+        <GtGridTable class="matrix-table">
           <thead>
             <tr>
               <th rowspan="2" class="sticky col-project">项目名称</th>
@@ -167,6 +167,7 @@
               <th rowspan="2" class="col-idx">索引号</th>
               <th rowspan="2" class="col-flag">是否<br>异常</th>
               <th rowspan="2" class="col-issue">异常说明</th>
+              <th rowspan="2" class="col-src">来源</th>
               <th rowspan="2" class="col-act" />
             </tr>
             <tr>
@@ -193,7 +194,7 @@
             <tr
               v-for="row in chk.enrichedSamples.value"
               :key="row.id"
-              :class="{ 'row-warn': row.hasIssue }"
+              :class="[{ 'row-warn': row.hasIssue }, chk.voucherRowClass({ row })]"
             >
               <td class="sticky col-project">
                 <el-input v-if="!isReadonly" :model-value="row.projectName" size="small"
@@ -318,8 +319,13 @@
                   @update:model-value="(v: string) => chk.updateSample(row.id, { issueDesc: v })" />
                 <span v-else class="text-left">{{ row.issueDesc || '—' }}</span>
               </td>
+              <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+              <td class="col-src">
+                <VoucherRowMetaCell :row="row" :locked="chk.isVoucherRowLocked(row)" :project-id="projectId ?? ''" :year="auditYear" />
+              </td>
               <td class="col-act">
                 <el-button link type="primary" size="small" @click="openCheckDialog(row)">核对</el-button>
+                <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
                 <el-button v-if="!isReadonly" link type="danger" size="small" @click="chk.removeSample(row.id)">删</el-button>
               </td>
             </tr>
@@ -331,9 +337,10 @@
               <td colspan="14" />
               <td class="auto calc abn-yes">{{ fmt(chk.stats.value.incorrectAmount) }}</td>
               <td />
+              <td />
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </div>
 
@@ -397,6 +404,7 @@
       v-model="checkDialogVisible"
       :row="checkDialogRow"
       :wp-id="wpId"
+      :project-id="projectId"
       :readonly="isReadonly"
       @save="saveCheckedSample"
     />
@@ -418,13 +426,17 @@ import {
   type ContractCostCheckSample,
 } from '../../composables/useF2ContractCostCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
-import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
 import F2ContractCostCheckDialog from './F2ContractCostCheckDialog.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { F2_SPE_EVIDENCE_SHEET } from '../../composables/useF2SpecialContractOcr'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
@@ -434,11 +446,12 @@ import {
   f2ContractCostQueryCodes,
 } from '../../composables/f2ContractCostAccountScope'
 import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string
   projectId?: string
-  auditYear?: number
+  auditYear?: number | null
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -446,6 +459,7 @@ const props = defineProps<{
 const chk = useF2ContractCostCheck({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+  projectId: () => props.projectId,
 })
 
 /**
@@ -551,6 +565,7 @@ async function runAi(section: F2SpeAiSection): Promise<void> {
   else saveAuditConclusion(text)
 }
 onMounted(() => {
+  void chk.voucherFillReady()
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
@@ -572,11 +587,11 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly),
 })
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }) {
+/** 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示 */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  chk.fillFromSampling(payload.samples, payload.fillMode)
+  void persistMethodology(payload?.methodology)
+  await chk.onEngineFilled(payload)
 }
 
 function fmt(v: number): string {

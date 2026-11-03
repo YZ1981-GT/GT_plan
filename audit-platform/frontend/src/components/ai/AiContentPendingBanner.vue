@@ -24,7 +24,18 @@
     refresh(): Promise<void>  父组件可调用主动刷新计数（如保存底稿后）
 -->
 <template>
-  <div v-if="pendingCount > 0" class="gt-ai-pending-banner">
+  <el-alert
+    v-if="loadError"
+    class="gt-ai-pending-error"
+    type="error"
+    :closable="false"
+    show-icon
+    title="AI 待确认状态暂不可用，当前不能判定为零条"
+  >
+    <span>AI 待确认状态暂不可用，当前不能判定为零条</span>
+    <el-button size="small" text @click="load">重试</el-button>
+  </el-alert>
+  <div v-if="!loadError && pendingCount > 0" class="gt-ai-pending-banner">
     <span class="gt-ai-pending-banner__icon">🤖</span>
     <span class="gt-ai-pending-banner__text">
       该项目尚有 <strong>{{ pendingCount }}</strong> 段 AI 生成内容待确认
@@ -68,7 +79,9 @@
         <div class="gt-aip-card__meta">
           <el-tag size="small" type="warning" effect="plain">AI 生成</el-tag>
           <span v-if="item.instance_type" class="gt-aip-card__where">{{ instanceLabel(item.instance_type) }}</span>
-          <code v-if="item.target_cell" class="gt-aip-card__cell">{{ item.target_cell }}</code>
+          <span v-if="item.target_label" class="gt-aip-card__where">{{ item.target_label }}</span>
+          <code v-else-if="item.target_cell" class="gt-aip-card__cell">{{ item.target_cell }}</code>
+          <span v-if="item.target_position" class="gt-aip-card__dim">目标 {{ item.target_position }}</span>
           <span class="gt-aip-card__spacer"></span>
           <span v-if="item.model" class="gt-aip-card__dim">模型 {{ item.model }}</span>
           <span v-if="item.confidence != null" class="gt-aip-card__dim">置信度 {{ pct(item.confidence) }}</span>
@@ -76,9 +89,33 @@
 
         <div class="gt-aip-card__time" v-if="item.generated_at">生成于 {{ fmtTime(item.generated_at) }}</div>
 
-        <div class="gt-aip-card__content">{{ item.content || '（无内容）' }}</div>
+        <el-alert
+          v-if="item.is_stale || item.writeback_status === 'stale'"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="item.stale_reason || '目标内容已经变化，请重新生成后再确认'"
+          class="gt-aip-card__stale"
+        />
 
-        <div v-if="revisingId === item.id" class="gt-aip-card__revise">
+        <div v-if="item.proposed_content != null" class="gt-aip-card__diff">
+          <div class="gt-aip-card__diff-col">
+            <span class="gt-aip-card__diff-title">当前版本</span>
+            <div class="gt-aip-card__content">{{ item.before_content || '（空）' }}</div>
+          </div>
+          <div class="gt-aip-card__diff-col gt-aip-card__diff-col--proposed">
+            <span class="gt-aip-card__diff-title">应用后预览</span>
+            <div class="gt-aip-card__content">{{ item.proposed_content || '（空）' }}</div>
+          </div>
+        </div>
+        <div v-else class="gt-aip-card__content">{{ item.content || '（无内容）' }}</div>
+
+        <div v-if="item.writeback_status === 'applied'" class="gt-aip-card__actions">
+          <el-button size="small" type="warning" plain :loading="actingId === item.id" @click="undo(item)">
+            撤销本次写入
+          </el-button>
+        </div>
+        <div v-else-if="revisingId === item.id" class="gt-aip-card__revise">
           <el-input
             v-model="reviseText"
             type="textarea"
@@ -94,10 +131,23 @@
         </div>
 
         <div v-else class="gt-aip-card__actions">
-          <el-button size="small" type="success" plain :loading="actingId === item.id" @click="act(item, 'confirm')">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="item.is_stale || item.writeback_status === 'stale'"
+            :loading="actingId === item.id"
+            @click="act(item, 'confirm')"
+          >
             ✅ 确认
           </el-button>
-          <el-button size="small" type="warning" plain @click="startRevise(item)">✏️ 修订</el-button>
+          <el-button
+            size="small"
+            type="warning"
+            plain
+            :disabled="item.is_stale || item.writeback_status === 'stale'"
+            @click="startRevise(item)"
+          >✏️ 修订</el-button>
           <el-button size="small" type="danger" plain :loading="actingId === item.id" @click="act(item, 'reject')">
             ❌ 拒绝
           </el-button>
@@ -108,19 +158,30 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { copyText } from '@/utils/clipboard'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { eventBus } from '@/utils/eventBus'
 
 interface PendingAiItem {
   id: string
   instance_type?: string | null
   target_cell?: string | null
+  target_label?: string | null
+  target_position?: string | null
   model?: string | null
   confidence?: number | null
   generated_at?: string | null
   content?: string | null
+  before_content?: string | null
+  proposed_content?: string | null
+  writeback_status?: 'pending' | 'applied' | 'rejected' | 'stale' | 'manual_copy' | 'undone'
+  artifact_version?: number
+  is_stale?: boolean
+  stale_reason?: string | null
+  can_undo?: boolean
 }
 
 const props = defineProps<{
@@ -136,6 +197,7 @@ const pendingCount = ref(0)
 const items = ref<PendingAiItem[]>([])
 const drawerVisible = ref(false)
 const listLoading = ref(false)
+const loadError = ref(false)
 const actingId = ref('')
 const revisingId = ref('')
 const reviseText = ref('')
@@ -175,9 +237,11 @@ async function load() {
   if (!props.projectId) {
     pendingCount.value = 0
     items.value = []
+    loadError.value = false
     return
   }
   listLoading.value = true
+  loadError.value = false
   try {
     const data: any = await api.get(`/api/projects/${props.projectId}/ai-content/pending`, { _silent: true } as any)
     // 兼容多种返回形态：{items: [...], count: N} 或 [...] 或 { pending: N }
@@ -198,9 +262,10 @@ async function load() {
       pendingCount.value = 0
     }
   } catch {
-    // 端点不可用时静默降级（banner 不显示）
+    // 治理状态读失败不能伪装成“0 条”；保留未知态并给用户重试入口。
     items.value = []
     pendingCount.value = 0
+    loadError.value = true
   } finally {
     listLoading.value = false
   }
@@ -252,7 +317,11 @@ async function act(item: PendingAiItem, action: 'confirm' | 'reject') {
       ElMessage.success('AI 内容已拒绝')
       afterResolved(item.id)
     } else if (_handleConfirmResult(resp, 'AI 内容已确认')) {
-      afterResolved(item.id)
+      if (resp?.artifact?.can_undo) {
+        afterApplied(item.id, resp.artifact)
+      } else {
+        afterResolved(item.id)
+      }
     }
     // 确认未生效（保持 pending）时不移出列表、不发 resolved
   } catch (e) {
@@ -273,7 +342,11 @@ async function submitRevise(item: PendingAiItem) {
     const resp: any = await api.post(`/api/ai-content/${item.id}/revise`, { revised_content: text })
     if (_handleConfirmResult(resp, 'AI 内容已修订')) {
       cancelRevise()
-      afterResolved(item.id)
+      if (resp?.artifact?.can_undo) {
+        afterApplied(item.id, resp.artifact)
+      } else {
+        afterResolved(item.id)
+      }
     }
   } catch (e) {
     handleApiError(e, '修订 AI 内容')
@@ -282,9 +355,30 @@ async function submitRevise(item: PendingAiItem) {
   }
 }
 
+async function undo(item: PendingAiItem) {
+  actingId.value = item.id
+  try {
+    await api.post(`/api/ai-content/${item.id}/undo`)
+    ElMessage.success('已撤销本次 AI 写入')
+    items.value = items.value.filter(i => i.id !== item.id)
+    emit('resolved')
+  } catch (e) {
+    handleApiError(e, '撤销 AI 写入')
+  } finally {
+    actingId.value = ''
+  }
+}
+
+function afterApplied(id: string, artifact: PendingAiItem) {
+  const index = items.value.findIndex(item => item.id === id)
+  if (index >= 0) items.value[index] = { ...items.value[index], ...artifact }
+  pendingCount.value = Math.max(0, pendingCount.value - 1)
+  emit('resolved')
+}
+
 async function copyContent(item: { content?: string }) {
   try {
-    await navigator.clipboard.writeText(item.content || '')
+    await copyText(item.content || '')
     ElMessage.success('已复制 AI 内容到剪贴板')
   } catch {
     ElMessage.warning('复制失败，请手动复制')
@@ -295,10 +389,18 @@ function afterResolved(id: string) {
   items.value = items.value.filter(i => i.id !== id)
   pendingCount.value = Math.max(0, pendingCount.value - 1)
   emit('resolved')
-  if (pendingCount.value === 0) drawerVisible.value = false
+  if (pendingCount.value === 0 && items.value.length === 0) drawerVisible.value = false
 }
 
-onMounted(load)
+function onContentAdopted(payload: { projectId?: string }) {
+  if (!payload?.projectId || payload.projectId === props.projectId) void load()
+}
+
+onMounted(() => {
+  void load()
+  eventBus.on('ai-content:adopted', onContentAdopted)
+})
+onUnmounted(() => eventBus.off('ai-content:adopted', onContentAdopted))
 
 watch(() => props.projectId, load)
 
@@ -306,6 +408,7 @@ defineExpose({ refresh: load })
 </script>
 
 <style scoped>
+.gt-ai-pending-error { margin-bottom: 8px; }
 .gt-ai-pending-banner {
   display: flex;
   align-items: center;
@@ -418,6 +521,33 @@ defineExpose({ refresh: load })
   overflow-y: auto;
 }
 
+.gt-aip-card__stale {
+  margin: 8px 0;
+}
+
+.gt-aip-card__diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.gt-aip-card__diff-col {
+  min-width: 0;
+}
+
+.gt-aip-card__diff-col--proposed .gt-aip-card__content {
+  background: rgba(103, 194, 58, 0.08);
+  border-color: rgba(103, 194, 58, 0.45);
+}
+
+.gt-aip-card__diff-title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--gt-color-text-secondary, #606266);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .gt-aip-card__actions {
   display: flex;
   gap: 8px;
@@ -432,5 +562,11 @@ defineExpose({ refresh: load })
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .gt-aip-card__diff {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

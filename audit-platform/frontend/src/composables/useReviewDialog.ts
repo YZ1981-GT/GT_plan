@@ -5,6 +5,7 @@
  *
  * @see .kiro/specs/audit-review-dialog/design.md
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -204,7 +205,7 @@ export function useReviewDialog(props: GtReviewDialogProps) {
 
   async function sendMessage(content: string): Promise<void> {
     if (!content.trim() || !threadId.value) return
-    const tempId = crypto.randomUUID()
+    const tempId = newUuid()
     const targetUsers = recipients.value.filter((u) => selectedTargetUserIds.value.includes(u.user_id))
     const targetUserNameText = targetUsers.map((u) => u.user_name).join('、')
     const isMultiTarget = targetUsers.length > 1

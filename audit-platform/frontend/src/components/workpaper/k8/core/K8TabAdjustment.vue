@@ -36,14 +36,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" @click="openReviewDialog?.('K8-3-adjustment')">💬 复核</el-button>
       </div>
     </div>
@@ -159,6 +152,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K8TabAdjustment.vue — K8-3 调整分录汇总
  *
@@ -177,7 +171,7 @@ import { useKAdjustmentSync, K_ONLINE_EDIT_LABEL } from '../../composables/kAdju
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { Ref } from 'vue'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'

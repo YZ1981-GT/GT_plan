@@ -17,6 +17,8 @@ export function useChecklistApplicability(options: {
   markPending: (itemId: string) => void
   /** 触发自动保存（主组件 scheduleSave） */
   scheduleSave: () => void
+  /** 全部章节编号：确认时没改过的章节按「适用」一并落库 */
+  sectionIds?: () => string[]
 }) {
   // ─── State ───
   const sectionApplicability = ref<Record<string, boolean>>({})
@@ -42,6 +44,12 @@ export function useChecklistApplicability(options: {
 
   function confirmApplicability() {
     showApplicabilityDialog.value = false
+    if (options.readonly()) return
+    // 没改过的章节按「适用」一并落库：原先只存改过的 ⇒ 直接确认「全部适用」什么都不存，每次打开都再弹
+    // （spec attachment-archive-and-a-class-evidence 走查实测，A30 归档检查表）
+    for (const sectionId of options.sectionIds?.() || []) {
+      if (!(sectionId in sectionApplicability.value)) sectionApplicability.value[sectionId] = true
+    }
     // Mark all applicability changes as pending
     for (const sectionId of Object.keys(sectionApplicability.value)) {
       options.markPending(`TOC-${sectionId}`)

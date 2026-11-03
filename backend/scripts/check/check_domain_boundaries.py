@@ -13,6 +13,7 @@ Usage::
 
     python backend/scripts/check/check_domain_boundaries.py
     python backend/scripts/check/check_domain_boundaries.py --write-baseline
+    python backend/scripts/check/check_domain_boundaries.py --shrink-only
     python backend/scripts/check/check_domain_boundaries.py --root /tmp/synth --manifest ... --baseline ...
 
 Debt shrink prints a hint to refresh the baseline; new identities fail closed.
@@ -46,6 +47,7 @@ FRONTEND_SRC_REL = "audit-platform/frontend/src"
 KIND_UNOWNED = "unowned"
 KIND_FORBIDDEN = "forbidden_edge"
 KIND_CYCLE = "cycle"
+KIND_AMBIGUOUS_OWNER = "ambiguous_owner"
 
 EXCLUDE_DIR_NAMES = {
     "__pycache__",
@@ -68,7 +70,14 @@ EXCLUDE_FILE_SUFFIXES = (
     ".test.tsx",
     ".stories.ts",
     ".stories.vue",
+    ".d.ts",
+    ".generated.py",
+    ".generated.ts",
+    ".generated.tsx",
+    ".generated.js",
+    ".generated.jsx",
 )
+GENERATED_DIR_NAMES = {"generated"}
 PRODUCTION_SUFFIXES = {".py", ".ts", ".tsx", ".vue", ".js", ".jsx", ".mjs"}
 
 # Frontend import forms (aligned with check_frontend_dangling_reference_gate style).
@@ -162,21 +171,30 @@ def load_manifest(path: Path) -> dict[str, DomainSpec]:
     return domains
 
 
-def resolve_domain(rel_path: str, domains: dict[str, DomainSpec]) -> str | None:
+def resolve_domain_candidates(rel_path: str, domains: dict[str, DomainSpec]) -> tuple[str, ...]:
+    """返回最高 specificity 的全部 domain；并列 owner 必须由调用方 fail closed。"""
     rel = rel_path.replace("\\", "/")
-    best: tuple[tuple[int, int, int], str] | None = None
+    matches: list[tuple[tuple[int, int, int], str]] = []
     for name, spec in domains.items():
         for pattern in spec.paths:
             if fnmatch.fnmatch(rel, pattern):
-                score = _pattern_specificity(pattern)
-                if best is None or score > best[0]:
-                    best = (score, name)
-    return None if best is None else best[1]
+                matches.append((_pattern_specificity(pattern), name))
+    if not matches:
+        return ()
+    best = max(score for score, _name in matches)
+    return tuple(sorted({name for score, name in matches if score == best}))
+
+
+def resolve_domain(rel_path: str, domains: dict[str, DomainSpec]) -> str | None:
+    candidates = resolve_domain_candidates(rel_path, domains)
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _is_excluded(rel_path: str) -> bool:
     parts = rel_path.replace("\\", "/").split("/")
     if any(part in EXCLUDE_DIR_NAMES for part in parts):
+        return True
+    if any(part.casefold() in GENERATED_DIR_NAMES for part in parts[:-1]):
         return True
     name = parts[-1] if parts else ""
     lower = name.lower()
@@ -214,14 +232,21 @@ def extract_python_imports(source: str) -> set[str]:
                 if alias.name:
                     mods.add(alias.name)
         elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                base = ("." * node.level) + (node.module or "")
+            else:
+                base = node.module or ""
             if node.module:
                 mods.add(node.module)
-                # from app.services.foo import bar  - also record submodule if relative depth 0
-            # relative imports: from .foo import bar
             if node.level and node.module:
-                mods.add(("." * node.level) + node.module)
+                mods.add(base)
             elif node.level and not node.module:
-                mods.add("." * node.level)
+                mods.add(base)
+            # alias 可能是子模块；普通符号会由 resolver 回退到原模块并经 set 去重。
+            for alias in node.names:
+                if alias.name and alias.name != "*":
+                    separator = "" if base.endswith(".") else "."
+                    mods.add(f"{base}{separator}{alias.name}")
     return mods
 
 
@@ -334,7 +359,18 @@ def collect_edges(
 
     for path in prod_files:
         rel = normalize_repo_path(path, root)
-        domain = resolve_domain(rel, domains)
+        candidates = resolve_domain_candidates(rel, domains)
+        if len(candidates) > 1:
+            owners = ",".join(candidates)
+            unowned.append(
+                Violation(
+                    identity=f"{KIND_AMBIGUOUS_OWNER}:{rel}:{owners}",
+                    kind=KIND_AMBIGUOUS_OWNER,
+                    detail=f"production module has multiple equally specific owners ({owners}): {rel}",
+                )
+            )
+            continue
+        domain = candidates[0] if candidates else None
         if domain is None:
             unowned.append(
                 Violation(
@@ -504,6 +540,21 @@ def save_baseline(path: Path, violations: Sequence[Violation]) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def shrink_baseline(path: Path, violations: Sequence[Violation]) -> tuple[int, int, int]:
+    """只删除已消失 identity，绝不把当前新增债务写进 baseline。
+
+    返回 ``(old_count, kept_count, ignored_new_count)``。
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"cannot shrink missing baseline: {path}")
+    old_ids = load_baseline(path)
+    kept = [violation for violation in violations if violation.identity in old_ids]
+    current_ids = {violation.identity for violation in violations}
+    ignored_new = len(current_ids - old_ids)
+    save_baseline(path, kept)
+    return len(old_ids), len(kept), ignored_new
+
+
 def evaluate(
     root: Path,
     domains: dict[str, DomainSpec],
@@ -530,12 +581,37 @@ def run_check(
     manifest_path: Path,
     baseline_path: Path,
     write_baseline: bool = False,
+    shrink_only: bool = False,
     files: Sequence[Path] | None = None,
 ) -> int:
     domains = load_manifest(manifest_path)
     all_v, _edges, _map = collect_edges(root, domains, files=files)
 
+    if write_baseline and shrink_only:
+        raise ValueError("write_baseline 与 shrink_only 不能同时启用")
+
+    if shrink_only:
+        try:
+            old_count, kept_count, ignored_new = shrink_baseline(baseline_path, all_v)
+        except FileNotFoundError as exc:
+            print(f"FAIL: {exc}")
+            return 1
+        print(
+            f"Shrank baseline ({old_count} -> {kept_count}; "
+            f"ignored {ignored_new} current new identities) -> {baseline_path}"
+        )
+        return 0
+
     if write_baseline:
+        if baseline_path.is_file():
+            baseline_ids = load_baseline(baseline_path)
+            new_v = [violation for violation in all_v if violation.identity not in baseline_ids]
+            if new_v:
+                print(
+                    f"FAIL: refusing --write-baseline because {len(new_v)} current identities "
+                    "are new; adjudicate them or use --shrink-only to remove resolved debt only"
+                )
+                return 1
         save_baseline(baseline_path, all_v)
         print(f"Wrote baseline ({len(all_v)} identities) -> {baseline_path}")
         return 0
@@ -553,7 +629,7 @@ def run_check(
     if resolved_ids:
         print(
             f"HINT: domain-boundary debt shrank by {len(resolved_ids)}; "
-            f"update {normalize_repo_path(baseline_path, root)} with --write-baseline"
+            f"update {normalize_repo_path(baseline_path, root)} with --shrink-only"
         )
         for identity in resolved_ids[:20]:
             print(f"  - resolved: {identity}")
@@ -577,10 +653,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=REPO_ROOT, help="Repository root")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
-    parser.add_argument(
+    baseline_mode = parser.add_mutually_exclusive_group()
+    baseline_mode.add_argument(
         "--write-baseline",
         action="store_true",
-        help="Rewrite exact debt baseline from current violations (exit 0)",
+        help="Rewrite baseline only when there are no new identities",
+    )
+    baseline_mode.add_argument(
+        "--shrink-only",
+        action="store_true",
+        help="Remove resolved identities without absorbing current new debt",
     )
     args = parser.parse_args(argv)
     return run_check(
@@ -588,6 +670,7 @@ def main(argv: list[str] | None = None) -> int:
         manifest_path=args.manifest.resolve(),
         baseline_path=args.baseline.resolve(),
         write_baseline=args.write_baseline,
+        shrink_only=args.shrink_only,
     )
 
 

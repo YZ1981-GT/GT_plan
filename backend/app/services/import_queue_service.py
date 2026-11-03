@@ -665,7 +665,7 @@ class ImportQueueService:
                 pass
 
             ImportJobRunner.request_cancel(job_id)
-            ImportQueueService.release_lock(project_id)
+            await ImportQueueService.release_lock_async(project_id)
 
             batch_id_raw = (job.options or {}).get("queue_batch_id")
             if batch_id_raw:
@@ -765,7 +765,7 @@ class ImportQueueService:
             year=year,
             record_count=record_count,
         )
-        ImportQueueService.release_lock(project_id)
+        await ImportQueueService.release_lock_async(project_id)
 
     @staticmethod
     async def fail_job(
@@ -779,7 +779,7 @@ class ImportQueueService:
     ):
         # 先释放内存锁
         ImportQueueService.update_progress(project_id, -1, message, result=result)
-        ImportQueueService.release_lock(project_id)
+        await ImportQueueService.release_lock_async(project_id)
 
         # rollback 当前事务（可能已 abort）
         try:

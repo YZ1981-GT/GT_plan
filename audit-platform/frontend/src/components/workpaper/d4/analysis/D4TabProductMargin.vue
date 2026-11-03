@@ -19,6 +19,7 @@
  * 四、审计结论
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
@@ -33,6 +34,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId: string
@@ -396,9 +398,12 @@ function flushSave() {
 }
 // 立即 flush（清 debounce + 同步 dispatch），供 sync bridge 切到在线编辑前把 html 侧落库。
 function flushPendingSave() {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
   flushSave()
 }
+registerPendingFlusher(flushPendingSave)
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
 // ─── D4-8 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
@@ -489,7 +494,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
       <!-- 月度明细表 -->
       <div class="monthly-table-wrap">
-        <table class="monthly-table" border="1" cellpadding="0" cellspacing="0">
+        <GtGridTable class="monthly-table" border="1" cellpadding="0" cellspacing="0">
           <thead>
             <tr>
               <th rowspan="2" class="col-month">月份</th>
@@ -664,14 +669,14 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
               <td class="cell-computed" :class="{ 'val-exceed': Math.abs(totals.chgMargin) > 0.05 }"><span class="has-formula">{{ fmtPercent(totals.chgMargin) }}</span></td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
 
 
       <!-- 同行业对比 -->
       <div class="industry-section">
         <h5 class="sub-title">同行业对比</h5>
-        <table class="industry-table" border="1" cellpadding="0" cellspacing="0">
+        <GtGridTable class="industry-table" border="1" cellpadding="0" cellspacing="0">
           <thead>
             <tr>
               <th class="col-name">企业/水平</th>
@@ -718,7 +723,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
               <td class="cell-computed"><span class="has-formula">{{ fmtPercent(totals.curMargin) }}</span></td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 

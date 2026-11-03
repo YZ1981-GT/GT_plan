@@ -886,7 +886,11 @@ async def test_incremental_regeneration_clears_only_affected_rows(
     }
     assert count > 0
     assert rows["BS-002"].is_stale is False
-    assert rows["BS-010"].is_stale is False
+    # BS-010（合计）在 ROW 闭包里、被重算，但它引用的 BS-003 未受影响且仍过期 ⇒ 不能拿过期值当输入：本行计算失败、
+    # 保持过期并写明原因（spec formula-hub-integrity-closure 需求 5 / 任务 17 false-fresh；原断言「合计行清过期」
+    # 钉的正是用过期输入算出「新鲜」合计的缺陷）
+    assert rows["BS-010"].is_stale is True
+    assert rows["BS-010"].calc_error and "BS-003" in rows["BS-010"].calc_error, rows["BS-010"].calc_error
     assert rows["BS-003"].is_stale is True
 
 

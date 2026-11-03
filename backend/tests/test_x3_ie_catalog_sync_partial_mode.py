@@ -100,8 +100,9 @@ _KNOWN_ORPHANS: frozenset[str] = frozenset({
     "N4-2", "N4-3",
 })
 
-#: 裁决 2 的红规模基线（D 1 · G 14 · H 4）—— 只许下调，成分只许是 D/G/H
-_RED_SCALE_BASELINE = 19
+#: 裁决 2 的红规模基线（原 D 1 · G 14 · H 4 = 19）—— 只许下调，成分只许是 D/G/H。
+#: acnr-foundation-defect-closure T07 把这 19 处外科补丁迁回生成器输入后现算为 0，基线随之下调。
+_RED_SCALE_BASELINE = 0
 _RED_SCALE_CYCLES: frozenset[str] = frozenset({"D", "G", "H"})
 
 #: Step 3 必须逐字段比对的字段集 —— **由本文件持有**，不是从脚本现读。
@@ -535,7 +536,9 @@ def test_real_run_reports_lmn_without_producing_any_error(
     assert set(reported) == set(_X3_CYCLES), f"L/M/N 未被汇报：{out!r}"
     tagged = [m for m in _marker_lines(err) if re.match(r"✗\s*\[[LMN]\]", m)]
     assert tagged == [], f"部分登记循环产生了 error（Step 4 疑似在跑）：{tagged}"
-    assert code == 1, "裁决 2：该脚本当前应仍是红（本任务不负责修绿）"
+    # 裁决 2 的 D/G/H 红（19 条）已由 acnr-foundation-defect-closure T07 修绿（manifest 改已核验前缀 + overrides 登记）：
+    # 退出码与 ✗ 行一致——有 ✗ 行才是红
+    assert code == (1 if _marker_lines(err) else 0), f"退出码 {code} 与 ✗ 行 {_marker_lines(err)} 不一致"
 
 
 def test_real_uncovered_count_agrees_three_ways(
@@ -587,6 +590,8 @@ def test_real_red_scale_does_not_grow_and_stays_dgh(
     _, _, err = _run_real(capsys)
     markers = _marker_lines(err)
     declared = _declared_count(err)
+    if not markers and declared is None:
+        return  # 已修绿（无 FAIL 表头、无 ✗ 行）：规模 0 ≤ 基线，成分为空
     assert declared == len(markers), (
         f"表头自报 {declared} 与 ✗ 行数 {len(markers)} 不一致 —— 下游解析口径会漂"
     )

@@ -33,6 +33,7 @@ from app.models.audit_platform_models import AccountCategory, TrialBalance  # no
 from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole, UserRole  # noqa: E402
 from app.models.core import Project, ProjectUser, User  # noqa: E402
 from app.models.procedure_models import ProcedureInstance  # noqa: E402
+from app.models.wp_generation_models import WorkpaperGenerationItem, WorkpaperGenerationOperation  # noqa: E402
 from app.models.workpaper_models import WorkingPaper, WpIndex  # noqa: E402
 from app.routers import wp_template  # noqa: E402
 from app.services import wp_parsed_data_service, wp_template_init_service  # noqa: E402
@@ -43,7 +44,8 @@ pytestmark = pytest.mark.asyncio
 
 #: 生成端点要求本项目 edit 级成员（project_users）并读取粗裁结果（procedure_instances，读不到即 503）
 _TABLES = [User.__table__, Project.__table__, ProjectUser.__table__, ProcedureInstance.__table__,
-           TrialBalance.__table__, WpIndex.__table__, WorkingPaper.__table__]
+           TrialBalance.__table__, WorkpaperGenerationOperation.__table__, WorkpaperGenerationItem.__table__,
+           WpIndex.__table__, WorkingPaper.__table__]
 _URL = "/api/projects/{pid}/working-papers/generate-from-codes"
 
 #: E1 主文件（E1-1至E1-11）与另两个常规程序文件（E1-14至15 / E1-18至23）各取一个页签；IPO 文件（E1-26至32）只在
@@ -206,6 +208,19 @@ async def test_generate_twice_skips_existing(world):
     assert len(await _papers(world["db"], world["with_tb"])) == 1
 
 
+async def test_operation_id_keeps_per_item_semantics_and_replays(world):
+    operation_id = str(uuid.uuid4())
+    payload = {"wp_codes": ["ZZ9", "E1"], "year": 2025, "operation_id": operation_id}
+    first = await world["http"].post(_URL.format(pid=world["with_tb"]), json=payload)
+    second = await world["http"].post(_URL.format(pid=world["with_tb"]), json=payload)
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json()
+    assert first.json()["created_codes"] == ["ZZ9", "E1"]
+    assert first.json()["blank_codes"] == ["ZZ9"]
+    assert first.json()["skipped"] == 0 and first.json()["operation_id"] == operation_id
+    assert len(await _papers(world["db"], world["with_tb"])) == 2
+
+
 async def test_generate_without_trial_balance_is_rejected(world):
     r = await world["http"].post(_URL.format(pid=world["without_tb"]), json={"wp_codes": ["E1"], "year": 2025})
     assert r.status_code == 422
@@ -260,13 +275,22 @@ async def test_header_fill_exception_is_reported_in_receipt(world, monkeypatch):
     assert "模拟" not in body["message"], "异常原文只进日志"
 
 
-async def test_external_link_template_header_is_reported(world):
-    """D2-5 的表头格全是外部链接（=[4]底稿目录!$A$2），填不进去 ⇒ 回执写明原因，不再静默。"""
+async def test_external_link_template_header_is_filled(world):
+    """D2-5 的表头格原是外部链接（=[4]底稿目录!$A$2）：procedure-chain-followup-closure 5.3 时填不进去，只能在回执里
+    写明原因；spec post-push-residual-defect-closure R3 起按缓存值归类改成本册引用 / 静态标签 ⇒ 表头填上本项目值，
+    回执不再报（仍有填不上的外部标签引用时照报，见 test_wp_header_fill.test_unresolvable_external_header_is_still_reported）。"""
     body = await _generate(world, "with_tb", ["D2-5"])
-    assert body["created_codes"] == ["D2-5"]
-    [failure] = body["header_failures"]
-    assert failure["wp_code"] == "D2-5" and "外部链接" in failure["reason"]
-    assert "表头未填上" in body["message"]
+    assert body["created_codes"] == ["D2-5"] and body["failures"] == []
+    assert body["header_failures"] == [] and "表头未填上" not in body["message"]
+    [(_c, _n, file_path, _p, _id)] = await _papers(world["db"], world["with_tb"])
+    wb = openpyxl.load_workbook(file_path, data_only=True)  # 按缓存值读（与 HTML 渲染同口径）
+    try:
+        ws = wb.active
+        header = [str(c.value) for row in ws.iter_rows(min_row=1, max_row=10, max_col=12) for c in row
+                  if c.value is not None]
+    finally:
+        wb.close()
+    assert any("【测试】按编码生成_有试算表" in v for v in header), header
 
 
 async def test_template_without_header_is_not_resaved(world):

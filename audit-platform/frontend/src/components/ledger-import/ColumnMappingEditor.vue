@@ -34,7 +34,7 @@
           <span class="section-icon">🔴</span>
           <span class="section-title">关键列（必填）</span>
           <el-tag type="danger" size="small">
-            {{ keyMappings.filter(m => m.mappedField).length }}/{{ keyMappings.length }} 已映射
+            {{ keyMappings.filter((m: MappingRow) => m.mappedField).length }}/{{ keyMappings.length }} 已映射
           </el-tag>
         </div>
         <!-- 关键列缺失警告 -->
@@ -46,7 +46,7 @@
           style="margin-bottom: 12px"
         >
           <template #title>
-            <span>缺失关键列：{{ missingKeyColumns.map(m => m.column_header).join('、') }}。请为这些列选择标准字段后才能确认导入。</span>
+            <span>缺失关键列：{{ missingKeyColumns.map((m: MappingRow) => m.column_header).join('、') }}。请为这些列选择标准字段后才能确认导入。</span>
           </template>
         </el-alert>
         <div class="mapping-rows">
@@ -99,7 +99,7 @@
             <span class="section-icon">🟡</span>
             <span class="section-title">次关键列（推荐）</span>
             <el-tag type="warning" size="small" style="margin-left: 8px">
-              {{ recommendedMappings.filter(m => m.mappedField).length }}/{{ recommendedMappings.length }} 已映射
+              {{ recommendedMappings.filter((m: MappingRow) => m.mappedField).length }}/{{ recommendedMappings.length }} 已映射
             </el-tag>
           </template>
           <div class="mapping-rows">

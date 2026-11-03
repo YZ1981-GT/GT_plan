@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.n2_detail_model import N2_DETAIL_ITEM_ID, n2_detail_audited_end
 from app.services.cycle_review_context import (
     _REGISTRY,
     _fmt,
@@ -59,18 +60,33 @@ def test_num_from_map_prefers_remark_then_conclusion():
 
 def test_sum_rows_field_from_conclusion():
     by_id = {
-        "N2-2-rows": {
-            "conclusion": '[{"endBalance": 100}, {"endBalance": 50}]',
+        N2_DETAIL_ITEM_ID: {
+            "conclusion": '[{"unadjBegin":100,"beginAdjust":20,"beginRje":5},'
+                          '{"unadjBegin":50,"unadjPayable":10,"unadjPaid":4}]',
             "remark": None,
         }
     }
-    total, has = _sum_rows_field(by_id, "N2-2-rows", "endBalance", "conclusion")
+    total, has = _sum_rows_field(
+        by_id,
+        N2_DETAIL_ITEM_ID,
+        "",
+        "conclusion",
+        n2_detail_audited_end,
+    )
     assert has is True
-    assert total == 150.0
+    assert total == 181.0
+
+
+def test_n2_reconciliation_registry_uses_frontend_store_contract():
+    cfg = _REGISTRY["N2"]
+    assert cfg.detail_rows_key == N2_DETAIL_ITEM_ID
+    assert cfg.detail_rows_store == "conclusion"
+    assert cfg.detail_rows_field is None
+    assert cfg.detail_rows_value is n2_detail_audited_end
 
 
 def test_sum_rows_field_missing_or_invalid():
-    total, has = _sum_rows_field({}, "N2-2-rows", "endBalance", "conclusion")
+    total, has = _sum_rows_field({}, N2_DETAIL_ITEM_ID, "", "conclusion", n2_detail_audited_end)
     assert (total, has) == (0.0, False)
 
     by_id = {"N3-2-rows": {"conclusion": "not-json", "remark": None}}
@@ -110,7 +126,7 @@ def test_registry_covers_target_cycle(cycle):
     assert cfg.audited_total_keys, f"{cycle} 缺少审定合计键"
     # 明细来源二选一：合计键 或 行求和
     has_detail_source = bool(cfg.detail_total_keys) or bool(
-        cfg.detail_rows_key and cfg.detail_rows_field
+        cfg.detail_rows_key and (cfg.detail_rows_field or cfg.detail_rows_value)
     )
     # N5 例外：所得税费用无单一明细合计，通过 N5-4/N5-8 回填审定，勾稽走 TB
     if cycle != "N5":

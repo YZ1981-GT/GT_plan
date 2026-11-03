@@ -176,7 +176,7 @@ def test_f1_presets_include_new_cells() -> None:
 
     joined = "\n".join(str(e.expression or "") for e in _f1_preset_entries())
     assert "TB('1231-04','期末余额')" in joined
-    assert "TB_SUM('1401~1499','期末余额')" in joined
+    assert "SUM_TB('1401~1499','期末余额')" in joined
     assert "WP('F1','明细表F1-2'" in joined
     # 反向钉子：宽口径坏账 / 误把 1401 当存货，都不得进公式管理
     assert "TB('1231'," not in joined

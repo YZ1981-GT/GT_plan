@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""G14-2 列同构判据 —— 固定行集 + 布尔校验列 + 模板缺陷台账。
+"""G14-2 列同构判据 —— 固定行集 + 布尔校验列 + 模板缺陷修复留痕。
 
 spec: `g-cycle-single-region-detail-lanes` · Task 10 / C-9
 　　　设计依据 `evidence/task8-c6-remaining-eight-template-logic.md` §4
@@ -8,7 +8,7 @@ spec: `g-cycle-single-region-detail-lanes` · Task 10 / C-9
   ① `header_text` 逐列 == **模板逐格实测**
   ② `json_key` 集合/顺序 == **前端行接口前 13 字段**（双向相等）
   ③ 🔴 固定行集：provider 与前端的行名表双向锁，且**恰 9 行**
-  ④ 🔴 `K=G+H` 模板缺陷台账 + `L` 布尔校验列（裁决 G1R-H4）
+  ④ `K=G-H`（模板原 `=G+H` 已修，登记留痕）+ `L` 布尔校验列（裁决 G1R-H4）
   ⑤ 单区几何 / footer L20 例外 / `rowKey` 行身份
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ from app.services.workpaper_sync.phase5_g14_02_detail import (  # noqa: E402
     MANAGED_SHEET_G1402,
     SPEC_G1402,
     STORE_ITEM_ID_G1402,
-    TEMPLATE_ROW_DEFECTS_G1402,
+    TEMPLATE_DEFECT_K_G1402,
     TEMPLATE_ROW_LABELS_G1402,
 )
 from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
@@ -293,7 +293,7 @@ class TestFormulaColumnsAndTemplateDefect:
 
     @pytest.mark.parametrize("col", sorted(FORMULA_TEMPLATES_G1402))
     def test_formula_template_renders_to_every_data_row(self, col: str, ws) -> None:
-        """🔴 `formula_templates` **逐字记模板原式**（含 K 的缺陷）⇒ 逐格可比。"""
+        """🔴 `formula_templates` **逐字记模板式**（K 为修后的 `=G-H`）⇒ 逐格可比。"""
         from openpyxl.utils import column_index_from_string
 
         ci = column_index_from_string(col)
@@ -308,25 +308,21 @@ class TestFormulaColumnsAndTemplateDefect:
         """`J=F+G-H-I` 的 `-H` 是「转回填正数」的依据 —— 它是对的那一式。"""
         assert FORMULA_TEMPLATES_G1402["J"] == "=F{r}+G{r}-H{r}-I{r}"
 
-    def test_k_column_template_defect_is_recorded_not_silently_fixed(self) -> None:
-        """🔴 模板 `K=G+H` 与同表 `J` 的 `-H` 矛盾 ⇒ 缺陷台账记下来，声明**不许**改成 `=G-H`。
+    def test_k_column_template_defect_is_fixed_and_recorded(self) -> None:
+        """模板原 `K=G+H` 与同表 `J` 的 `-H` 矛盾 ⇒ 第三批已改模板为 `=G-H`，原式登记留痕。"""
+        assert FORMULA_TEMPLATES_G1402["K"] == "=G{r}-H{r}"
+        rec = TEMPLATE_DEFECT_K_G1402
+        assert rec["was"] == "=G{r}+H{r}"
+        assert rec["expected"] == FORMULA_TEMPLATES_G1402["K"]
+        assert rec["handling"] == "template_fixed"
+        assert rec["cells"] == [f"{MANAGED_SHEET_G1402}!K{r}" for r in _DATA_ROWS]
+        assert "转回" in str(rec["root_cause"])
 
-        改成 `=G-H` 会让 `test_formula_template_renders_to_every_data_row` 必红
-        （判据逐格比对模板）。会计正确口径由**前端** `calcNetImpairmentLoss` 承担。
-        """
-        assert FORMULA_TEMPLATES_G1402["K"] == "=G{r}+H{r}"
-        by_col = {c: (rows, note) for c, rows, note in TEMPLATE_ROW_DEFECTS_G1402}
-        assert sorted(by_col) == ["K"], f"缺陷台账应只有 K 一列，实得 {sorted(by_col)}"
-        rows, note = by_col["K"]
-        assert rows == _DATA_ROWS, "K 的缺陷覆盖全部数据行"
-        assert "=G{r}-H{r}" in note, "台账须写出会计正确口径"
-        assert "转回" in note
-
-    def test_k_defect_still_present_in_template_cell_by_cell(self, ws) -> None:
-        """逐格复核缺陷仍在 —— 模板一旦被修成 `=G-H`，这里会红并提示同步更新台账。"""
+    def test_k_is_provision_minus_reversal_in_template_cell_by_cell(self, ws) -> None:
+        """逐格复核模板已修：K 全部是 `=G-H`，原缺陷 `=G+H` 一格不剩。"""
         for r in _DATA_ROWS:
             got = str(ws[f"K{r}"].value or "")
-            assert got == f"=G{r}+H{r}", f"K{r} 实得 {got!r}（模板被修过？请同步台账）"
+            assert got == f"=G{r}-H{r}", f"K{r} 实得 {got!r}（回到了原缺陷 =G+H？）"
 
     def test_frontend_computes_profit_loss_as_provision_minus_reversal(self) -> None:
         """前端按会计正确口径算 —— `calcNetImpairmentLoss` 必须是「计提 − 转回」。"""

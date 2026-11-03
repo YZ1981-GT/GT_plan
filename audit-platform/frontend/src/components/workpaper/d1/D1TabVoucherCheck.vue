@@ -26,7 +26,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  *
  * Requirements: 10.1-10.4, 11.1-11.4, 12.1-12.6, 13.1-13.5, 14.1-14.5, 18.1-18.4, 18.7
  */
-import { ref, inject, toRef, computed, defineAsyncComponent, type Ref } from 'vue'
+import { ref, inject, toRef, computed, defineAsyncComponent, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -62,7 +62,12 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
+import { combineRowClass, type EngineFilledPayload } from '../composables/shared/voucherCheckFill'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import { dSlotQueryCodes } from '../composables/dCycleAccountScope'
+import WpCommitInput from '../shared/WpCommitInput.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = dCycleScope('D1')?.queryCodes().join(',') ?? ''
@@ -86,6 +91,10 @@ const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../voucher-sampling/GtVoucherSamplingEngine.vue'),
 )
 
+/** 识别附件挂到本行（行级证据；抽样凭证行同时挂到该凭证），📎 旁的小眼睛按同一位置读取（只读也能看） */
+const EVIDENCE_SHEET = 'D1-13'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
+
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const injectedDisplayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
@@ -106,7 +115,12 @@ const {
   addVouchingRow,
   removeVouchingRow,
   updateVouchingRow,
-  fillFromSampledVouchers,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
   checkedCount,
   checkedAmountTotal,
   vouchingAmountTotal,
@@ -142,7 +156,8 @@ const {
 // 🔴 2026-09-28：13 → 19（补 6 个 Excel 列：凭证日期 B / 对方明细科目 F / 贷方金额 H /
 //    核对内容4 M / 核对内容5 N / 是否异常 P；`supportDoc`(I) 并入已有「支持性文件」列不另计）。
 //    这个数只喂 `useWorkpaperWideTable` 算表高，不参与业务逻辑。
-const columnCount = ref(19)
+// 2026-10-27：+1「来源」列（阶段 / 来源 / 配对，voucher-identity-writeback 任务 10）
+const columnCount = ref(20)
 const vouchingRowCount = computed(() => vouchingRows.value.length)
 const browseRows = computed(() => vouchingRows.value)
 const browseRowCount = computed(() => browseRows.value.length)
@@ -183,22 +198,18 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, D1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: { samples?: any[] }): void {
-  const samples = payload?.samples ?? []
-  const added = fillFromSampledVouchers(samples)
+/** 抽凭引擎回填：按分录指纹去重、替换只动本阶段抽凭行（共享回填函数，提示由它按实际行数给） */
+async function onSampleFilled(payload: EngineFilledPayload): Promise<void> {
   samplingVisible.value = false
-  if (added > 0) {
-    ElMessage.success(`已从抽凭引擎回填 ${added} 笔样本到凭证核对明细`)
-  } else {
-    ElMessage.info('未新增样本（可能已存在或未选取）')
-  }
+  await onEngineFilled(payload)
 }
+onMounted(() => { void voucherFillReady() })
 
 const virtualColumns = computed<VirtualColumn[]>(() => [
   virtualTextCol('noteType', '票据类型', 130),
@@ -242,6 +253,9 @@ function fmtPercent(val: number): string {
 }
 
 // ─── Row Class for Exception ──────────────────────────────────────────────────
+
+/** 例外行样式 + 年审阶段预审行只读样式 */
+const vouchingRowClassName = combineRowClass((arg: { row: VouchingRow }) => getVouchingRowClass(arg), voucherRowClass)
 
 function getVouchingRowClass({ row }: { row: VouchingRow }): string {
   const isException = row.existenceCheck === '未核实'
@@ -389,12 +403,14 @@ async function onUploadOcr(row: VouchingRow, file: File) {
   updateVouchingRow(row.id, 'attachmentName', file.name)
   const fd = new FormData()
   fd.append('file', file)
+  rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
   try {
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       fd,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const data = res.data?.data ?? res.data ?? {}
     const extracted = (data.extracted_fields || {}) as Record<string, any>
     ocrExtracted.value.set(row.id, extracted)
@@ -537,7 +553,7 @@ const SAMPLING_METHOD_TEXTS = [
       <div class="population-area">
         <div class="population-field full-width">
           <label>测试总体</label>
-          <el-input
+          <WpCommitInput
             :model-value="population.testPopulation"
             placeholder="如：应收票据借方/贷方发生额所有凭证"
             :disabled="isReadonly"
@@ -547,7 +563,7 @@ const SAMPLING_METHOD_TEXTS = [
 
         <div class="population-field full-width">
           <label>特定样本范围</label>
-          <el-input
+          <WpCommitInput
             :model-value="population.specificItemScope"
             placeholder="如：大额、关联方/关联交易、异常款项等"
             :disabled="isReadonly"
@@ -558,7 +574,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 抽样总体描述 -->
         <div class="population-field full-width">
           <label>抽样总体</label>
-          <el-input
+          <WpCommitInput
             type="textarea"
             :rows="2"
             :model-value="population.populationDesc"
@@ -610,7 +626,7 @@ const SAMPLING_METHOD_TEXTS = [
           <div class="population-field">
             <label>抽样方法</label>
             <div class="sampling-method-input">
-              <el-input
+              <WpCommitInput
                 :model-value="population.samplingMethod"
                 size="small"
                 placeholder="随机选样/系统选样/货币单元抽样/随意选样"
@@ -664,7 +680,7 @@ const SAMPLING_METHOD_TEXTS = [
           :key="sample.id"
           class="specific-sample-row"
         >
-          <el-input
+          <WpCommitInput
             :model-value="sample.description"
             size="small"
             placeholder="项目描述"
@@ -681,7 +697,7 @@ const SAMPLING_METHOD_TEXTS = [
             style="width: 130px"
             @change="(v: number) => updateSpecificSample(sample.id, 'amount', v || 0)"
           />
-          <el-input
+          <WpCommitInput
             :model-value="sample.reason"
             size="small"
             placeholder="抽出原因"
@@ -741,7 +757,7 @@ const SAMPLING_METHOD_TEXTS = [
       <!-- ═══ 抽凭引擎 Dialog（P0-4 联动，科目 1121 应收票据）═══ -->
       <el-dialog
         v-model="samplingVisible"
-        title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 应收票据）"
+        :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 应收票据）`"
         width="90%"
         top="5vh"
         :close-on-click-modal="false"
@@ -750,11 +766,11 @@ const SAMPLING_METHOD_TEXTS = [
         <GtVoucherSamplingEngine
           v-if="samplingVisible && wpId && projectId"
           :account-code="samplingAccountCode"
-          phase="final"
           :workpaper-id="wpId"
           :project-id="projectId"
           :year="samplingYear"
           @filled="onSampleFilled"
+          @undo-request="onUndoRequest"
         />
       </el-dialog>
 
@@ -784,7 +800,7 @@ const SAMPLING_METHOD_TEXTS = [
         :data="vouchingRows"
         border
         size="small"
-        :row-class-name="getVouchingRowClass"
+        :row-class-name="vouchingRowClassName"
         :max-height="tableMaxHeight"
         class="vouching-table"
         style="width: 100%"
@@ -793,6 +809,13 @@ const SAMPLING_METHOD_TEXTS = [
         <el-table-column label="序号" width="55" align="center">
           <template #default="{ row }: { row: VouchingRow }">
             <span>{{ row.seq }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }: { row: VouchingRow }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
           </template>
         </el-table-column>
 
@@ -838,7 +861,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 票据号码 -->
         <el-table-column label="票据号码" min-width="140">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.noteNo"
               size="small"
               placeholder="票据号码"
@@ -851,7 +874,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 出票人 -->
         <el-table-column label="出票人" min-width="100">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.drawer"
               size="small"
               placeholder="出票人"
@@ -864,7 +887,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 承兑人 -->
         <el-table-column label="承兑人" min-width="100">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.acceptor"
               size="small"
               placeholder="承兑人"
@@ -877,7 +900,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 🔴 2026-09-28 补 Excel F 列「对方明细科目」 -->
         <el-table-column label="对方明细科目" min-width="120">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.counterDetail"
               size="small"
               placeholder="对方明细科目"
@@ -993,7 +1016,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 🔴 2026-09-28 补 Excel M 列「核对内容4」 -->
         <el-table-column label="核对内容4" width="120">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.check4"
               size="small"
               placeholder="—"
@@ -1006,7 +1029,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 🔴 2026-09-28 补 Excel N 列「核对内容5」 -->
         <el-table-column label="核对内容5" width="120">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.check5"
               size="small"
               placeholder="—"
@@ -1024,7 +1047,7 @@ const SAMPLING_METHOD_TEXTS = [
               而此前本列只有附件/OCR 控件（绑 attachmentName/ocrStatus）⇒ I 列 HTML 侧填不了。
               放同一格而不另开一列：一个 Excel 列对应一个视觉列，避免出现两个「支持性文件」。
             -->
-            <el-input
+            <WpCommitInput
               :model-value="row.supportDoc"
               size="small"
               placeholder="支持性文件说明"
@@ -1045,6 +1068,7 @@ const SAMPLING_METHOD_TEXTS = [
                 {{ getOcrStatusLabel(row.ocrStatus) }}
               </el-tag>
               <span class="attach-name" :title="row.attachmentName || ''">{{ row.attachmentName || '未上传附件' }}</span>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
               <div class="attach-actions">
                 <el-button size="small" text :disabled="isReadonly || row.ocrStatus !== 'done'" @click="onApplyOcr(row, 'empty-only')">回填空字段</el-button>
                 <el-button size="small" text :disabled="isReadonly || row.ocrStatus !== 'done'" @click="onApplyOcr(row, 'override-all')">覆盖回填</el-button>
@@ -1057,7 +1081,7 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 备注 -->
         <el-table-column label="备注" min-width="120">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input
+            <WpCommitInput
               :model-value="row.remark"
               size="small"
               placeholder="备注"
@@ -1071,7 +1095,7 @@ const SAMPLING_METHOD_TEXTS = [
         <el-table-column label="索引号" width="130">
           <template #default="{ row }: { row: VouchingRow }">
             <div class="index-cell">
-              <el-input
+              <WpCommitInput
                 :model-value="row.indexRef"
                 size="small"
                 placeholder="索引号"
@@ -1215,7 +1239,7 @@ const SAMPLING_METHOD_TEXTS = [
       <!-- ═══════════════════ 审计说明 ═══════════════════ -->
       <div class="section-title">审计说明</div>
       <div class="note-section">
-        <el-input
+        <WpCommitInput
           type="textarea"
           :rows="4"
           :model-value="auditNote"
@@ -1240,7 +1264,7 @@ const SAMPLING_METHOD_TEXTS = [
       <!-- ═══════════════════ 审计结论 ═══════════════════ -->
       <div class="section-title">审计结论</div>
       <div class="note-section">
-        <el-input
+        <WpCommitInput
           type="textarea"
           :rows="4"
           :model-value="auditConclusion"

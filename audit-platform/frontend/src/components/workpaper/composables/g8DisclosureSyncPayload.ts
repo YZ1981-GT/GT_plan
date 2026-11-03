@@ -20,6 +20,7 @@
  */
 import type { ColumnDef } from './disclosureColumnDefs'
 import { defineColumns } from './disclosureColumnDefs'
+import type { G8DiscListedOciRow, G8DiscSoeDetailRow } from './g8SchemaRows'
 import {
   G8_DETAIL_SUBTABLE,
   G8_DISCLOSURE_SHEET_NAME,
@@ -114,6 +115,43 @@ export interface G8SyncSnapshot {
   /** 指定为 FVOCI 的原因（叙事，进 _note_texts） */
   designationText: string
   noteText: string
+}
+
+/** `useG8Disclosure` 返回值里同步快照要用的几项（披露 Tab 与附注页离屏同步共用） */
+export interface G8DisclosureSyncSource {
+  readonly store: { readonly value: { readonly balanceRows: readonly G8BalanceSyncRow[] } }
+  readonly ociRows: { readonly value: readonly G8DiscListedOciRow[] }
+  readonly detailRows: { readonly value: readonly G8DiscSoeDetailRow[] }
+  readonly designationText: { readonly value: string }
+  readonly noteText: { readonly value: string }
+}
+
+/**
+ * 逐项目明细行：上市取 OCI 变动表，国企取期末明细表（合计行由载荷侧重算，故剔除）。
+ * 由 `G8TabDisclosureBase` 的 `syncDetailRows` 原样抽出（spec note-pull-followup-closure R1）。
+ */
+export function g8SyncDetailRows(variant: G8DisclosureVariant, disc: G8DisclosureSyncSource): G8DetailSyncRow[] {
+  const src = variant === 'listed' ? disc.ociRows.value : disc.detailRows.value
+  return src
+    .filter((r: any) => !r.isTotal)
+    .map((r: any) => ({
+      label: r.label,
+      ociPeriod: r.ociPeriod,
+      ociCumulative: r.ociCumulative,
+      dividend: r.dividend,
+      transferAmount: variant === 'listed' ? r.transferToRE : r.transferAmt,
+      transferReason: variant === 'listed' ? r.derecogReason : r.transferReason,
+    }))
+}
+
+/** 披露 Tab 的同步快照（由 `G8TabDisclosureBase.syncToDisclosureNotes` 原样抽出，Tab 与离屏同步共用） */
+export function g8DisclosureSyncSnapshot(variant: G8DisclosureVariant, disc: G8DisclosureSyncSource): G8SyncSnapshot {
+  return {
+    balanceRows: disc.store.value.balanceRows,
+    detailRows: g8SyncDetailRows(variant, disc),
+    designationText: disc.designationText.value,
+    noteText: disc.noteText.value,
+  }
 }
 
 export interface G8SyncFromWorkpaperPayload {

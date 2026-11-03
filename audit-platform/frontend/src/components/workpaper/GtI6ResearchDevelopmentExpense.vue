@@ -7,7 +7,7 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'I6'" class="i6-header-toolbar">
         <el-segmented
-          v-if="dualMode.isOoAvailable.value"
+          v-if="dualMode.isOoAvailable.value && i6REntrySync.presentation.value.showModeSwitch"
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
@@ -187,6 +187,8 @@
  * Spec: .kiro/specs/i6-research-development-expense/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -325,26 +327,12 @@ async function saveResponse(_sheetCode: string, data: Record<string, any>): Prom
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
-      params: { account_prefix: '6604', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u6602 = 0, a6602 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('6604')) {
-        const debit = Number(item.borrowing_amount ?? item.period_debit ?? item.debit_amount ?? 0)
-        const credit = Number(item.lending_amount ?? item.period_credit ?? item.credit_amount ?? 0)
-        const net = item.unadjusted_amount != null && item.unadjusted_amount !== ''
-          ? Number(item.unadjusted_amount)
-          : (debit - credit)
-        u6602 += Number.isFinite(net) ? net : 0
-        a6602 += Number(item.audited_amount ?? 0)
-      }
+    // 经试算表唯一入口取数（年度为空时后端按项目审计年度取）；损益类未审数即本期发生额
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '6604' })
+    tbData.value = {
+      unadjusted6602: tbSumUnder(rows, '6604', 'unadjusted_amount') ?? 0,
+      audited6602: tbSumUnder(rows, '6604', 'audited_amount') ?? 0,
     }
-    tbData.value = { unadjusted6602: u6602, audited6602: a6602 }
   } catch {
     // TB取数失败静默处理
   }
@@ -407,6 +395,21 @@ onMounted(() => {
   void selfLoad()
   void _loadTbData()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const i6REntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-i6-research-development-expense',
+})
+
 </script>
 
 <style scoped>

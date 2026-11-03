@@ -23,7 +23,6 @@ from app.services.workpaper_sync.contracts import (
     contract_path_for,
     load_contract,
 )
-from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import (
     DescriptorFacts,
     RoomFacts,
@@ -63,6 +62,8 @@ from app.services.workpaper_sync.phase5_n3_sheets import (  # noqa: F401,E402
     MANAGED_LAST_COL,
     MANAGED_SHEET,
     PHASE5_WAVE,
+    PAYLOAD_COLUMN,
+    PAYLOAD_COLUMN_MODE,
     ROW_IDENTITY_STORE_KEY,
     ROWS_TABLE_KEY,
     SHEET_KEY,

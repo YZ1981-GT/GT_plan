@@ -592,19 +592,11 @@ class TestSQLiteDialectFallback:
 
         assert gin_created is True
 
-    def test_jsonb_server_default_no_pg_cast(self):
-        """JSONB server_default 不带 PG cast（双方言兼容）。
-
-        正确：text("'{}'")
-        错误：text("'{}'::jsonb")  ← SQLite 不识别
-        """
-        # 验证 consolidation_breakdown 字段的 server_default 不含 ::jsonb
-        correct_default = "'{}'"
-        wrong_default = "'{}'::jsonb"
-
-        # 正确的 default 不含 PG cast
-        assert "::jsonb" not in correct_default
-        assert "::jsonb" in wrong_default
+    # 原 test_jsonb_server_default_no_pg_cast 已删除（2026-10-31）：
+    # 它只比较两个本地字符串字面量（`"::jsonb" not in "'{}'"`），对真实 ORM 模型零断言
+    # ⇒ 恒绿。该约定的**真实**守卫是全模型遍历的两份专用用例，不要在本文件里再写第三份：
+    #   - backend/tests/test_orm_server_default_dialect_neutral.py
+    #   - backend/tests/test_model_server_default_portability.py
 
     def test_set_rls_context_sqlite_skip(self):
         """set_rls_context 在 SQLite 下应跳过（PG set_config 不可用）。"""

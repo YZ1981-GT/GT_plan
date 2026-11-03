@@ -18,7 +18,7 @@ import datetime as dt
 import decimal
 import uuid
 
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from sqlalchemy import Column, Date, DateTime, Integer, Numeric, String, Uuid
 from sqlalchemy.dialects import postgresql
@@ -109,12 +109,16 @@ def test_p17_scalar_injection_value_bound_not_in_sql(payload, op):
 
 @settings(max_examples=5)
 @given(payload=_injection_strategy)
+# advanced-query-linkage-closure B2 起 like 先把 ``\ % _`` 转义为字面字符（``ESCAPE '\'``）：绑定值是转义后的
+# payload，原断言「绑定值含原 payload」遇到含 ``_`` / ``%`` 的负载必误报（hypothesis 在 B3 全量回归里抽到本例）
+@example(payload="') UNION SELECT * FROM staff_members --")
 def test_p17_like_injection_value_bound_not_in_sql(payload):
     clause = build_filter(_Row.code, "like", payload)
     sql, params = _compile(clause)
-    # LIKE 把 payload 包进 %...% 后仍作为绑定参数，原文本不出现在 SQL 中
+    # LIKE 把转义后的 payload 包进 %...% 后作为绑定参数，原文本不出现在 SQL 中
     assert payload not in sql
-    assert any(payload in str(v) for v in params.values())
+    escaped = payload.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    assert f"%{escaped}%" in params.values()
     assert "LIKE" in sql.upper()
 
 
@@ -135,6 +139,10 @@ _set_strategy = st.one_of(
 # ─────────────────────────────────────────────────────────────────────────────
 @settings(max_examples=5)
 @given(values=_set_strategy, op=st.sampled_from(["in", "not_in"]))
+# 短值与 SQL 文本子串相撞的固定样例（advanced-query-linkage-closure B2 实跑撞到 ['1']）：逐值
+# `v not in sql` 会把 '1' / '(' 与占位符名 `param_1`、`ANY (` 误判为泄露，改为整句结构比对后必须通过
+@example(values=["1"], op="in")
+@example(values=["(", "a"], op="not_in")
 def test_p18_in_set_form_and_empty_boundary(values, op):
     # 空集合不抛错（R10.3）——直接构造成功
     clause = build_filter(_Row.code, op, values)
@@ -155,10 +163,9 @@ def test_p18_in_set_form_and_empty_boundary(values, op):
         else:
             assert "!= ALL (" in upper
         assert " IN (" not in upper
-        # 集合中每个字符串值都作为字面参数绑定，不出现在 SQL 文本
-        for v in values:
-            if isinstance(v, str) and v:
-                assert v not in sql
+        # 集合中的值都作为字面参数绑定、不进 SQL 文本：SQL 文本与任一其他非空集合编译出的逐字相同
+        # （逐值 `v not in sql` 对 '1'、'(' 这类短值必误报——它们本就是 `param_1`、`ANY (` 的子串）
+        assert sql == _compile(build_filter(_Row.code, op, ["\u2603"]))[0]
         # 绑定参数即为原集合（list 形态）
         bound = [p for p in params.values() if isinstance(p, list)]
         assert bound and bound[0] == list(values)

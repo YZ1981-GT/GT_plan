@@ -254,6 +254,8 @@ class TestCoordinatorSeesUserFormulas:
 
         加了过滤 ⇒ `formula_source='custom'` 的用户公式被排除在 mutation plan 外，
         收敛就白做了。
+        ADR-FGR-08 改为经 effective_project_formulas 读有效定义，不再直接查 WpFormula；
+        用户公式仍可见（effective_cell_formulas 读项目层 WpFormula 不过滤 formula_source）。
         """
         tree = ast.parse(_COORD.read_text(encoding="utf-8"))
         fn = next(
@@ -271,13 +273,16 @@ class TestCoordinatorSeesUserFormulas:
         assert "formula_source" not in attrs | names, (
             "_load_formulas 出现 formula_source 过滤 —— 用户公式会被排除在求值外"
         )
-        assert any(
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "select"
-            and any(isinstance(arg, ast.Name) and arg.id == "WpFormula" for arg in node.args)
-            for node in ast.walk(fn)
-        ), "_load_formulas 不再查 WpFormula"
+        # ADR-FGR-08：coordinator 改经 effective_project_formulas（三层有效定义）
+        calls = set()
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                calls.add(node.func.attr)
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                calls.add(node.func.id)
+        assert "effective_project_formulas" in calls, (
+            "_load_formulas 既不查 WpFormula 也不调 effective_project_formulas"
+        )
 
 
 # ─────────────────── Property 11：cell_key 往返无损 ───────────────────

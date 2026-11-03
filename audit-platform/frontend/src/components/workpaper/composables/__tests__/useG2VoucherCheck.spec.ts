@@ -1,5 +1,6 @@
 /**
- * useG2VoucherCheck — 抽样计划 / 检查比例 / 五项核对 / 抽凭分配
+ * useG2VoucherCheck — 抽样计划 / 检查比例 / 五项核对
+ * （抽凭按借贷分配改经共享回填函数，见 g2VoucherFill.spec；spec voucher-identity-writeback-and-audit-phase 任务 11）
  */
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
@@ -10,7 +11,6 @@ import {
   G2_EXPANSION_FACTORS,
   suggestSampleSizeByExpansion,
 } from '../useG2VoucherCheck'
-import type { SampledVoucher } from '../useSamplingAlgorithms'
 
 function makeVc() {
   const allResponses = ref(new Map<string, any>())
@@ -86,53 +86,6 @@ describe('useG2VoucherCheck 抽样与核对', () => {
     // 测算 = 10000*3.65/100*365/365 = 365，差异 265
     expect(vc.debitRows.value[0].calculatedInterest).toBeCloseTo(365)
     expect(vc.debitRows.value[0].isAbnormal).toBe(true)
-  })
-
-  it('抽凭样本按借贷分配', () => {
-    const vc = makeVc()
-    const samples: SampledVoucher[] = [
-      {
-        voucherNo: '记-1',
-        voucherDate: '2025-01-01',
-        summary: '计提利息',
-        debitAmount: '5000',
-        creditAmount: null,
-        accountCode: '1132',
-        accountName: '应收利息',
-        counterpartAccount: '6101',
-        voucherType: null,
-        accountingPeriod: null,
-        checkResult: '',
-        abnormal: false,
-        remark: '',
-        selected: true,
-        phase: 'final',
-        editTrail: [],
-      },
-      {
-        voucherNo: '记-2',
-        voucherDate: '2025-02-01',
-        summary: '收到利息',
-        debitAmount: null,
-        creditAmount: '3000',
-        accountCode: '1132',
-        accountName: '应收利息',
-        counterpartAccount: '1002',
-        voucherType: null,
-        accountingPeriod: null,
-        checkResult: '',
-        abnormal: false,
-        remark: '',
-        selected: true,
-        phase: 'final',
-        editTrail: [],
-      },
-    ]
-    vc.applySamplingResults(samples, 'append')
-    expect(vc.debitRows.value).toHaveLength(1)
-    expect(vc.debitRows.value[0].amount).toBe(5000)
-    expect(vc.creditRows.value).toHaveLength(1)
-    expect(vc.creditRows.value[0].amount).toBe(3000)
   })
 
   it('从 G2-2 带入总体', () => {

@@ -37,7 +37,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
 import app.services.deliverable_note_consistency as note_consistency
-import app.services.llm_client as llm_client
+import app.services.ai_task_executor as ai_task_executor
+import app.services.note_ai_fact_pack as note_ai_fact_pack
 from app.models.base import PermissionLevel, ProjectUserRole
 from app.models.chain_execution import ChainExecution
 from app.models.phase13_models import WordExportTask
@@ -46,13 +47,14 @@ from app.routers import (
     chain_workflow, deliverable, deliverable_lineage, disclosure_notes, note_ai, note_export, word_export,
 )
 from app.services.assignment_service import EQCR_ROLE_ALIASES, ROLE_MAP, map_assignment_role
-from app.services.consistency_gate import ConsistencyGate
+from app.services.consistency_gate import ConsistencyGate, ConsistencyResult
 from app.services.data_health_monitor import DataHealthMonitor
 from app.services.deliverable_refresh_service import DeliverableRefreshService
 from app.services.deliverable_writeback_service import DeliverableWritebackService
 from app.services.eqcr_resolver import is_project_eqcr
 from app.services.export_job_service import ExportJobService
 from app.services.export_package_service import ExportPackageService
+from app.services.llm_client import LLMInvocationResult, LLMInvocationStatus
 from app.services.full_deliverables_executor import FullDeliverablesExecutor
 from app.services.note_trim_sort_service import NoteTrimSortService
 from app.services.note_word_exporter import NoteWordExporter
@@ -115,6 +117,18 @@ async def world(monkeypatch: pytest.MonkeyPatch):
         yield w
 
 
+#: 附注 AI 端点经 AiTaskExecutor 调模型、成功后签发待确认草稿（spec llm-linkage-audit-practice-closure）：
+#: 模型桩打在执行器的模型调用上，草稿签发单独计数；变动分析先由服务端构建事实包（不收客户端数值）。
+_MODEL_OK = LLMInvocationResult(
+    status=LLMInvocationStatus.success, text="生成的文本", model_name="fake-model", deployment="local",
+)
+_FACT_PACK = note_ai_fact_pack.NoteFactPack(
+    note_id=uuid.UUID(int=1), note_section="五、1", section_title="货币资金", account_name="货币资金",
+    year=2025, current_data={"期末": 100}, prior_data={"期末": 80}, source_refs=(),
+)
+_DRAFT_ISSUED = {"message_id": "m-1", "artifact_id": "a-1", "generation_id": "g-1"}
+
+
 def _stub_business(world: AuthzWorld) -> dict[str, ServiceStub]:
     """业务层全部打桩计数（键 = 桩名）：用来证明「被拦下的请求没碰业务」「放行的请求恰好调到该调的」。"""
     job = SimpleNamespace(
@@ -134,12 +148,16 @@ def _stub_business(world: AuthzWorld) -> dict[str, ServiceStub]:
         "run_full_deliverables": (FullDeliverablesExecutor, "run", SimpleNamespace(job_id=JOB)),
         "export_note_word": (NoteWordExporter, "export", io.BytesIO(b"PK\x03\x04 docx")),
         "export_package": (ExportPackageService, "export_package", io.BytesIO(b"PK\x03\x04 zip")),
-        "run_all_checks": (ConsistencyGate, "run_all_checks", SimpleNamespace(overall="pass", checks=[])),
+        # 真结果类型：一致性检查端点要读 status_counts()（五态计数，spec formula-hub-integrity-closure 任务 39），
+        # SimpleNamespace 桩没有这个方法 ⇒ 放行的身份全部 500
+        "run_all_checks": (ConsistencyGate, "run_all_checks", ConsistencyResult(overall="pass", checks=[])),
         "calculate_health_score": (DataHealthMonitor, "calculate_health_score", SimpleNamespace(score=100, checks=[])),
         "sync_report_to_notes": (ReportNoteSyncService, "sync_report_to_notes", {"synced": 0}),
         "trim_and_sort": (NoteTrimSortService, "trim_and_sort", {"trimmed": 0}),
         "load_context": (ReferenceDocService, "load_context", []),
-        "chat_completion": (llm_client, "chat_completion", "生成的文本"),
+        "chat_completion": (ai_task_executor, "chat_completion_result", _MODEL_OK),
+        "note_fact_pack": (note_ai_fact_pack, "build_note_fact_pack", _FACT_PACK),
+        "persist_note_draft": (note_ai, "_persist_note_draft", _DRAFT_ISSUED),
         "create_task": (tasks, "create_task", task),
         "update_status": (tasks, "update_status", task),
         "get_history": (tasks, "get_history", []),
@@ -224,9 +242,9 @@ _VIEW = [  # 查看 / AI 预览：readonly 及以上
     # 这三个端点不再按固定 2025 取上年附注 / 知识库：年度取请求里的，缺省取项目审计年度，都没有 ⇒ 422（权限世界的
     # 目标项目没填年度）。这里与前端一样显式带年度；缺年度的行为见 test_note_ai_without_year_is_422_after_membership
     ("AI 生成会计政策", "post", f"{_N}/ai/generate-policy", {"section_number": "五、1", "year": 2025},
-     {"load_context": 1, "chat_completion": 1}),
+     {"load_context": 1, "chat_completion": 1, "persist_note_draft": 1}),
     ("AI 生成变动分析", "post", f"{_N}/ai/generate-analysis", {"section_number": "五、1", "year": 2025},
-     {"load_context": 1, "chat_completion": 1}),
+     {"note_fact_pack": 1, "load_context": 1, "chat_completion": 1, "persist_note_draft": 1}),
     ("AI 披露完整性检查", "post", f"{_N}/ai/check-completeness?year=2025", None,
      {"load_context": 1, "chat_completion": 1}),
     ("AI 表述规范检查", "post", f"{_N}/ai/check-expression?section_number=x", None, {}),  # 端点本身不调业务

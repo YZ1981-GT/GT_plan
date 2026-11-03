@@ -9,6 +9,8 @@ import { ElMessage } from 'element-plus'
 import { useWorkpaperRegistry, type RegistryEntry } from './useWorkpaperRegistry'
 import { api } from '@/services/apiProxy'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { isAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,13 @@ const A16_VIRTUAL_RE = /^A16-[1-7]$/
 
 // ─── Route resolvers by render_type ──────────────────────────────────────────
 
+/** 底稿编辑器路由的唯一构造处（下方各 render_type 分支与短链页 `/workpapers/:wpId` 共用）。 */
+export function workpaperEditorRoute(
+  projectId: string, wpId: string, query?: Record<string, string>,
+): { name: string; params: Record<string, string>; query?: Record<string, string> } {
+  return query ? { name: 'WorkpaperEditor', params: { projectId, wpId }, query } : { name: 'WorkpaperEditor', params: { projectId, wpId } }
+}
+
 function resolveRoute(
   wpCode: string,
   entry: RegistryEntry,
@@ -44,7 +53,7 @@ function resolveRoute(
   if (rt === 'html_procedure' || rt === 'html_review') {
     // HTML 程序表/复核表 → 底稿编辑器（后续由编辑器按 render_type 切换渲染）
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
@@ -59,21 +68,21 @@ function resolveRoute(
     }
     // fallback
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
 
   if (rt === 'univer' || rt === 'word_template') {
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
 
   if (rt === 'readonly_reference' || rt === 'signing') {
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
@@ -87,7 +96,8 @@ function resolveRoute(
 export function useWorkpaperNavigation() {
   const router = useRouter()
   const registry = useWorkpaperRegistry()
-  const acnr = useAcnr()
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效（导航无项目入参，取路由/store 当前项目）。
+  const acnr = useAcnr(useCurrentProjectId())
 
   /**
    * 解析索引号字符串为可点击链接数组
@@ -147,9 +157,13 @@ export function useWorkpaperNavigation() {
     // found=false 或任何异常 → 静默回退现有 registry.lookup + index-resolve API 路径（无回归）。
     // 注意：A16-1~7 虚拟码已在上方处理并 return，不会走到此处（Req 13.4 行为不变）。
     try {
-      const acnrResult = await acnr.resolveIndex(`wp:${wpCode}`)
+      const acnrResult = await acnr.resolveIndex(`wp:${wpCode}`, projectId)
       if (acnrResult.found && acnrResult.jump_route) {
         router.push(acnrResult.jump_route)
+        return
+      }
+      if (isAcnrRegistryFailure(acnrResult)) {
+        ElMessage.error(acnrResult.reason || '地址目录版本不可用，请联系管理员处理')
         return
       }
     } catch {

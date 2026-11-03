@@ -68,15 +68,6 @@ import app.models.gt_coding_models  # noqa: E402, F401
 import app.models.t_account_models  # noqa: E402, F401
 import app.models.attachment_models  # noqa: E402, F401
 
-# Stub for 'workpapers' table referenced by AI models FK
-import sqlalchemy as _sa
-
-
-class _WorkpaperStub(Base):
-    __tablename__ = "workpapers"
-    __table_args__ = {"extend_existing": True}
-    id = _sa.Column(_sa.Uuid, primary_key=True)
-
 
 # ---------------------------------------------------------------------------
 # pytest marker 注册

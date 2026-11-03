@@ -1,5 +1,6 @@
 /**
  * useG5VoucherCheck — G5-12 凭证检查 composable 单测
+ * （抽凭回填去重改经共享回填函数，见 g5VoucherFill.spec；spec voucher-identity-writeback-and-audit-phase 任务 11）
  */
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
@@ -48,16 +49,6 @@ describe('useG5VoucherCheck', () => {
     expect(vc.occurrenceRows.value[0].checks[0]).toBe(true)
     expect(vc.occurrenceRows.value[0].checks[2]).toBe(false)
     expect(vc.occurrenceRows.value[0].abnormal).toBe(true)
-  })
-
-  it('抽凭回填去重凭证号', () => {
-    const vc = useG5VoucherCheck()
-    vc.fillFromSamples('occurrence', [
-      { voucherNo: 'A1', summary: '一', debitAmount: 1 },
-      { voucherNo: 'A1', summary: '重复', debitAmount: 2 },
-      { voucherNo: 'A2', summary: '二', creditAmount: 3 },
-    ])
-    expect(vc.occurrenceRows.value).toHaveLength(2)
   })
 
   it('从 G5-2 行汇总账面发生额', () => {

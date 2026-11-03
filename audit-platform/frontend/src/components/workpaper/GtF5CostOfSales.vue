@@ -15,7 +15,7 @@
 
       <div class="f5-cost-of-sales-toolbar">
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && f5CEntrySync.presentation.value.showModeSwitch"
           v-model="renderMode"
           :options="dualMode.modeOptions"
           size="small"
@@ -46,7 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -149,7 +149,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -168,6 +168,7 @@
  * EventBus：监听 f5:save-items 持久化 + substantive:adjudicated(6401) 供 F5-7 校验区消费
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { pickF5TbSourceCodes } from './composables/f5AccountScope'
 import { useF5CosSalFormData } from './composables/useF5CosSalFormData'
 import { useF5CosOfDualMode } from './composables/useF5CosOfDualMode'
@@ -181,6 +182,7 @@ const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // F5-8 canary 真双向（spec: f5-sync-coverage-and-first-canary）
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -207,7 +209,8 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useF5CosSalFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 const auditYear = computed<number | null>(() => {
   const ctx = (formData.projectContext.value || {}) as Record<string, any>
@@ -297,7 +300,7 @@ const syncBridge = useWorkpaperSyncBridge({
   flushHtml: async () => {
     // 🔴 顺序不可换：先 flush 掉 2s debounce 未落库的编辑，再读 store projection，
     // 否则读到旧快照，切到 OO 侧会用旧值覆盖 HTML 侧刚写的编辑。
-    formData.flushPendingSave()
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -379,8 +382,10 @@ provide('getRowDot', getRowDot)
 async function handleF5SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    try {
+      await formData.saveBatch(items)
+    } catch {
+      return
     }
     versionToolbar.scheduleAutoSnapshot()
   }
@@ -431,6 +436,21 @@ onBeforeUnmount(() => {
   window.removeEventListener('f5:save-items', handleF5SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const f5CEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => F5_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

@@ -15,6 +15,7 @@
 import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { getWpIndex } from '@/services/workpaperApi'
 import {
   useChecklistPersistence,
@@ -95,10 +96,7 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlDa
     try {
       const year = await resolveAuditYear()
       if (year == null) return
-      const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { year },
-      })
-      const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
+      const { rows: tbData } = await fetchTrialBalanceRows(projectId.value, { year, accountPrefix: ['1122', '1231'] })
       tbReference.value = {
         grossAudited: pickTbAudited(tbData, '1122'),
         provisionAudited: pickTbAudited(tbData, '1231-02'),

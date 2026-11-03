@@ -1,0 +1,75 @@
+{
+ "with_year": {
+  "all_passed": false,
+  "blocking_failed": 1,
+  "by_cycle": [
+   {
+    "blocking_failed": 1,
+    "cycle": "D",
+    "failed_rules": [
+     {
+      "details": "主营 90.00 + 其他 0.00 ≠ 100.00",
+      "rule_id": "D4勾稽:营业收入合计=主营+其他",
+      "rule_name": "D4勾稽:营业收入合计=主营+其他"
+     }
+    ]
+   }
+  ],
+  "not_passed_checks": [
+   {
+    "branch_id": "",
+    "check_name": "D4勾稽:营业收入合计=主营+其他",
+    "reason": "差额 10.00",
+    "severity": "blocking",
+    "status": "failed"
+   },
+   {
+    "branch_id": "e1.cfs_missing",
+    "check_name": "E1勾稽:现金流量表",
+    "reason": "现金流量表尚未生成",
+    "severity": "blocking",
+    "status": "not_executed"
+   },
+   {
+    "branch_id": "f.trimmed",
+    "check_name": "F 三角勾稽",
+    "reason": "底稿已裁剪",
+    "severity": "warning",
+    "status": "not_applicable"
+   },
+   {
+    "branch_id": "g.exception",
+    "check_name": "G 三角勾稽",
+    "reason": "检查异常：RuntimeError：boom",
+    "severity": "warning",
+    "status": "error"
+   }
+  ],
+  "reason": null,
+  "status_counts": {
+   "error": 1,
+   "failed": 1,
+   "not_applicable": 1,
+   "not_executed": 1,
+   "passed": 1
+  },
+  "total_rules": 5,
+  "unavailable": false
+ },
+ "without_year": {
+  "all_passed": false,
+  "blocking_failed": 0,
+  "by_cycle": [],
+  "not_passed_checks": [],
+  "reason": "项目未设置审计年度，未运行一致性检查",
+  "status_counts": {
+   "error": 0,
+   "failed": 0,
+   "not_applicable": 0,
+   "not_executed": 0,
+   "passed": 0
+  },
+  "total_rules": 0,
+  "unavailable": true
+ }
+}

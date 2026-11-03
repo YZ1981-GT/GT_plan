@@ -15,7 +15,6 @@ export {
 
 export {
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
-  consolNoteReuse,
   cfsWorksheet, disclosureNotes, auditReport, exportTask, reportFormatTemplates,
   reportReview, noteLocks, noteGroupTemplate, noteCustomSections,
   consolidation, consolWorksheetData,
@@ -54,7 +53,7 @@ export {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, acnr, customQuery, systemDicts, adminLogs,
+  addressRegistry, acnr, customQuery, queryBuilder, systemDicts, adminLogs,
   officePreview,
   departments, sysRoles, sysUserRoles, userProjectRoleTree,
 } from './system'
@@ -99,7 +98,7 @@ import {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, acnr, customQuery, systemDicts, adminLogs,
+  addressRegistry, acnr, customQuery, queryBuilder, systemDicts, adminLogs,
   officePreview,
   departments, sysRoles, sysUserRoles, userProjectRoleTree,
 } from './system'
@@ -127,7 +126,7 @@ export const API = {
   presence, linkage, linkageBus, conflictGuard, chainWorkflow, projectConfig,
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
-  customQuery, systemDicts, adminLogs,
+  customQuery, queryBuilder, systemDicts, adminLogs,
   officePreview, acnr, workpaperLeads,
   departments, sysRoles, sysUserRoles, userProjectRoleTree,
   formulaSettings, projectFormulaSettings, formulaTemplates, projectFormulaTemplates,

@@ -410,6 +410,7 @@
 </template>
 
 <script setup lang="ts">
+import { newUuid } from '@/utils/uuid'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { extractG7AiText } from '../../composables/g7AiText'
 /**
@@ -553,7 +554,7 @@ function hydrateRows(raw: unknown): boolean {
       ...createEmptyRow(i + 1, rawRow.investeeName || ''),
       ...rawRow,
       seq: i + 1,
-      id: rawRow.id || crypto.randomUUID(),
+      id: rawRow.id || newUuid(),
       priorCumulative: parseNum(rawRow.priorCumulative),
       allocationManual: !!rawRow.allocationManual,
       currentChangeManual: !!rawRow.currentChangeManual,
@@ -610,7 +611,7 @@ function recalcRow(row: UnrecognizedLossRow): void {
 
 function createEmptyRow(seq: number, investeeName: string): UnrecognizedLossRow {
   return {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq,
     investeeName,
     investmentBookValue: 0,

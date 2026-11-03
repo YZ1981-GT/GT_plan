@@ -58,10 +58,19 @@ class TestProperty3DualZoneRedBaseline:
     """Property 3 红基线：四组双区尚未接入，当前契约只有已接明细。"""
 
     def test_d6_current_managed_region_count(self) -> None:
-        """D6 现状 11 table（d62 1 + d63 1 + d65 1 + d68 1 + d66 2 + d69 2 + d61-adj 3 sections）。"""
+        """D6 现状 12 table（d62 1 + d63 2 + d65 1 + d68 1 + d66 2 + d69 2 + d61-adj 3 sections）。
+
+        d63 自 spec oo-writeback-template-parity-closure R3 起双区（按单项评估 / 信用风险组合）。
+        """
         c = d6_contract()
         count = _table_count(c)
-        assert count == 11, f"D6 应为 11 table，实得 {count}"
+        assert count == 12, f"D6 应为 12 table，实得 {count}"
+
+    def test_d6_3_dual_zone_tables(self) -> None:
+        """D6-3 两区各一张表（单项 R13-16 在前、组合 R18-21 在后；行区间由 instrumentation 承载）。"""
+        c = d6_contract()
+        sheet = next(s for s in c.sheets if s.sheet_key == "d63-managed")
+        assert [t.table_key for t in sheet.tables] == ["impairment_single_rows", "impairment_group_rows"]
 
     def test_d7_current_managed_region_count(self) -> None:
         """D7 现状 9 table（d72 1 + d75 1 + d76 1 + d74 2 + d77 2 + d71-adj 2 sections）。"""

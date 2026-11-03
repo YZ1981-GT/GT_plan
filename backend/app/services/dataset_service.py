@@ -25,12 +25,12 @@ from app.models.dataset_models import (
 )
 from app.models.audit_platform_models import (
     AccountChart,
+    DirectionOverride,
     TbAuxBalance,
     TbAuxLedger,
     TbBalance,
     TbLedger,
 )
-
 
 class DatasetIntegrityError(Exception):
     """F27 / Sprint 6.5: activate 前 integrity check 失败。
@@ -98,6 +98,9 @@ class DatasetService:
         ac = AccountChart.__table__
         result = await db.execute(sa.delete(ac).where(ac.c.dataset_id == dataset_id))
         deleted[ac.name] = result.rowcount
+        overrides = DirectionOverride.__table__
+        result = await db.execute(sa.delete(overrides).where(overrides.c.dataset_id == dataset_id))
+        deleted[overrides.name] = result.rowcount
         return deleted
 
     @staticmethod
@@ -139,6 +142,7 @@ class DatasetService:
         *,
         ip_address: str | None = None,
         reason: str | None = None,
+        expected_active_dataset_id: UUID | None = None,
     ) -> LedgerDataset:
         """激活数据集：旧 active → superseded，新 staged → active
 
@@ -168,6 +172,17 @@ class DatasetService:
             return dataset
         if dataset.status != DatasetStatus.staged:
             raise ValueError(f"Dataset {dataset_id} is not staged (current: {dataset.status})")
+
+        if expected_active_dataset_id is not None:
+            from app.services.ledger_dataset_merge import assert_base_is_active
+
+            await assert_base_is_active(
+                db,
+                project_id=dataset.project_id,
+                year=dataset.year,
+                base_dataset_id=expected_active_dataset_id,
+                lock=True,
+            )
 
         # F27 / Sprint 6.4: 激活前 integrity check —— 核对 staged 物理行数
         # 与 record_summary 的预期一致。不一致 = 可能的静默数据损失，必须阻断。

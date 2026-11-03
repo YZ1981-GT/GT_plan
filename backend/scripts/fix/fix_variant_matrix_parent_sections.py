@@ -26,7 +26,7 @@ Requirements: 8.1, 10.4 / design Property 19
 母公司章命中两处：listed「十六、投资收益（注：以」、soe「十二、现金流量表补充资」。
 下游按 ``section_number`` 精确定位，故必须原样保留截断值。
 
-标题别名（唯一一条，带实证依据）
+标题别名（与 / 和两种母公司章写法，指向同一矩阵科目）
 --------------------------------
 母公司章子节标题「营业收入与营业成本」在 variant_matrix 里的科目名是
 「营业收入、营业成本」（顿号）。依据：源 docx 该子节标题写
@@ -74,9 +74,10 @@ CHAPTER_TITLES: dict[str, set[str]] = {
 
 # 子节 section_title -> variant_matrix 的 section_title（仅列不相等者）
 SECTION_TITLE_ALIASES: dict[str, str] = {
-    # 依据：源 docx「营业收入和营业成本（披露格式参考附注五、62）」，
-    # 而 ying_ye_shou_ru_ying_ye_cheng_ben.variants.listed_standalone == 「五、62」
+    # 依据：源 docx「营业收入和营业成本（披露格式参考附注五、62）」；历史种子写「与」。
+    # 两种标题都对应 ying_ye_shou_ru_ying_ye_cheng_ben.variants.listed_standalone == 「五、62」。
     "营业收入与营业成本": "营业收入、营业成本",
+    "营业收入和营业成本": "营业收入、营业成本",
 }
 
 VARIANT_KEYS = (

@@ -1,0 +1,1038 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 快照库与真 PG 测试基座（需求 17.4，ADR-FHIC-25）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030571143
+      },
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030584278
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793031010535
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793033273693
+      }
+    ],
+    "2. Runtime 冻结闸门与刷新三段式（需求 1.1、3.6，ADR-FHIC-07，D8）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030572658
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793033290010
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793036178015
+      }
+    ],
+    "3. 附件溯源迁移（可空列 + 回填）、列未就绪 503 与孤儿修复工具（需求 7.1，ADR-FHIC-13，D9，X1）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030572737
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793036182333
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793039253106
+      }
+    ],
+    "4. 附件端点分级与溯源查询隔离（需求 7.2、7.3，ADR-FHIC-13）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030572805
+      },
+      {
+        "executionId": "19045de2-3786-45ef-8770-2ed8d66bb987",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793039257583
+      },
+      {
+        "executionId": "1f878442-af30-4e2f-8085-ae48010512b4",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793059600026
+      },
+      {
+        "executionId": "1f878442-af30-4e2f-8085-ae48010512b4",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793063224717
+      }
+    ],
+    "5. 发布记录可见性 + 端点权限配方表骨架（需求 7.4、17.2，ADR-FHIC-20）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030572892
+      },
+      {
+        "executionId": "1f878442-af30-4e2f-8085-ae48010512b4",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793063237004
+      },
+      {
+        "executionId": "c9b66ad4-a1a0-47d8-a0f8-4934fd99a887",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793068872980
+      },
+      {
+        "executionId": "c9b66ad4-a1a0-47d8-a0f8-4934fd99a887",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793068921710
+      }
+    ],
+    "6. 待确认事项原子修订号（需求 8.1~8.3，ADR-FHIC-11，D10）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030572953
+      },
+      {
+        "executionId": "c9b66ad4-a1a0-47d8-a0f8-4934fd99a887",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793068926581
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793074186287
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793075673249
+      }
+    ],
+    "7. 冲突决策键加 domain（需求 8.4，ADR-FHIC-11）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573009
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793075678409
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793081008779
+      }
+    ],
+    "8. L1 失败语义、内置参数个数表、舍入、AST 预算（需求 2.3、2.6、2.9、12.3 末句，ADR-FHIC-01/02，D4）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573063
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793081013784
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793086209866
+      }
+    ],
+    "9. 试算表叶子口径与告警收集（需求 4.1~4.3，ADR-FHIC-03）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573104
+      },
+      {
+        "executionId": "461576c9-1c4e-4e3d-bdc4-e0c6d5bc1ba6",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793086214474
+      },
+      {
+        "executionId": "feb5b720-6610-4794-b785-af995d8f243f",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793090720154
+      },
+      {
+        "executionId": "feb5b720-6610-4794-b785-af995d8f243f",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793092760641
+      }
+    ],
+    "10. 推送叶子取数真库守卫（需求 4.4）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573172
+      },
+      {
+        "executionId": "feb5b720-6610-4794-b785-af995d8f243f",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793092769427
+      },
+      {
+        "executionId": "feb5b720-6610-4794-b785-af995d8f243f",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793093920597
+      }
+    ],
+    "11. 「未审数」规范列（需求 2.1 未审部分、2.8，ADR-FHIC-18）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573210
+      },
+      {
+        "executionId": "feb5b720-6610-4794-b785-af995d8f243f",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793093935907
+      },
+      {
+        "executionId": "27752016-5de4-4cc3-a9e4-ccbe16e3398b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793095200703
+      },
+      {
+        "executionId": "7459b078-cf51-4855-b40c-fd52ff2d3cfa",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793098371402
+      },
+      {
+        "executionId": "2d181df8-af04-4df8-9df1-a334c9c368ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793098434107
+      },
+      {
+        "executionId": "2d181df8-af04-4df8-9df1-a334c9c368ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793101381370
+      }
+    ],
+    "12. 中央执行合同与预检分类（需求 2.1、2.2、2.4、2.10、4.3 中央部分，ADR-FHIC-19）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573252
+      },
+      {
+        "executionId": "2d181df8-af04-4df8-9df1-a334c9c368ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793101397126
+      },
+      {
+        "executionId": "f3d79189-234e-4d3d-aa66-c3ef498a4782",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793110141678
+      },
+      {
+        "executionId": "f3d79189-234e-4d3d-aa66-c3ef498a4782",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793112759300
+      }
+    ],
+    "13. 执行预算与报表配置执行端点搬迁（需求 2.5、2.7、12.3，ADR-FHIC-19）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573293
+      },
+      {
+        "executionId": "f3d79189-234e-4d3d-aa66-c3ef498a4782",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793112771417
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793118912386
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793120272545
+      }
+    ],
+    "14. 报表计算版本与读取侧新鲜度（需求 5.1 读取部分、5.5，ADR-FHIC-04，D13）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573341
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793120299962
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793127985656
+      }
+    ],
+    "15. 定义写入出口同事务标过期（需求 5.1 写入部分，ADR-FHIC-04）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573396
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793127998064
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793132488660
+      }
+    ],
+    "16. 报表三路统一逐行计算与依赖缓存（需求 5.2、5.3、6.4、4.3 报表部分，ADR-FHIC-05）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573439
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793132511818
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793138387072
+      }
+    ],
+    "17. 报表 false-fresh 真库守卫与独立金标准（需求 5.4，ADR-FHIC-24）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573526
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793138395387
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793146233011
+      }
+    ],
+    "18. 利润表归属行种子、生成器约束与合计行 / 行引用守卫（需求 6.1~6.5，ADR-FHIC-23，D3、D14）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573571
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793146269054
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793155116050
+      }
+    ],
+    "19. 存量归属行升级工具与真库状态守卫（需求 6.6，ADR-FHIC-23，X2）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573612
+      },
+      {
+        "executionId": "a5baed8c-050d-48b6-97d8-7d0892423085",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793155209244
+      },
+      {
+        "executionId": "7e0badbf-5dff-46eb-a314-54415e7523d2",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793159632388
+      },
+      {
+        "executionId": "7e0badbf-5dff-46eb-a314-54415e7523d2",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793161429569
+      }
+    ],
+    "20. Draft Refresh 结果聚合、report 范围与幂等（需求 3.1~3.5、3.9，ADR-FHIC-08）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573657
+      },
+      {
+        "executionId": "7e0badbf-5dff-46eb-a314-54415e7523d2",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793161561663
+      },
+      {
+        "executionId": "3006de2e-d6c5-4ab4-930e-d63fbf5dfaac",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793162269105
+      },
+      {
+        "executionId": "89e6d045-a5e1-4886-b2bc-c1e43795adc2",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793172342160
+      },
+      {
+        "executionId": "3050cc0b-da0b-44d9-98d7-2a4a02538a69",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793185752711
+      },
+      {
+        "executionId": "1797ce68-1db1-40ef-a2fe-e01176600451",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793189718001
+      },
+      {
+        "executionId": "c807c083-d59d-4cb2-9828-a5dfbeed22b9",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793191926728
+      },
+      {
+        "executionId": "c807c083-d59d-4cb2-9828-a5dfbeed22b9",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793196300981
+      }
+    ],
+    "21. 预设库归一与刷新结果前端（需求 3.7、3.8，ADR-FHIC-21）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573696
+      },
+      {
+        "executionId": "c807c083-d59d-4cb2-9828-a5dfbeed22b9",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793196615532
+      },
+      {
+        "executionId": "6fd392be-d414-45c1-92de-d1038cb55e03",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793198279345
+      },
+      {
+        "executionId": "6fd392be-d414-45c1-92de-d1038cb55e03",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793200335921
+      }
+    ],
+    "22. 依赖解析认双引号（需求 14.3）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573741
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793200582780
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793201066673
+      }
+    ],
+    "23. 共享 WP 单元格读取函数与契约测试（需求 1.6、1.9，ADR-FHIC-06 第 1、2、7 点，design §8.2）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573786
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793201095487
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793203049782
+      }
+    ],
+    "24. Runtime adapter 真形状与写入目标校验（需求 1.8，ADR-FHIC-06 第 6、8 点）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573835
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793203057766
+      }
+    ],
+    "25. Runtime 稳定身份依赖图、严格外部取值与 29 行重放（需求 1.3、1.4、1.7、1.10，ADR-FHIC-06 第 3~5、7、9 点）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573876
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793203954153
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793205733594
+      }
+    ],
+    "26. 四方一致、预览接 typed_eval 与 Runtime 解冻（需求 1.2、1.5）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573920
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793205739874
+      },
+      {
+        "executionId": "0f02c3ab-287e-47be-9e70-1bb8ddff62e5",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793207103908
+      }
+    ],
+    "27. UnifiedLineage 签名与部分错误可见（需求 9.1~9.3，ADR-FHIC-16）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030573959
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207169813
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207181644
+      },
+      {
+        "executionId": "cdd9c1c3-494d-4c9a-b5b9-8352edc00252",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793228647791
+      }
+    ],
+    "28. 公式时间轴真实字段与「不可用」标记（需求 10.1~10.3，ADR-FHIC-16）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574006
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207169986
+      },
+      {
+        "executionId": "cdd9c1c3-494d-4c9a-b5b9-8352edc00252",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793229997714
+      }
+    ],
+    "29. 公式审计日志按年度与「人工补记」（需求 11.1~11.3，ADR-FHIC-12）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574087
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207170162
+      },
+      {
+        "executionId": "cdd9c1c3-494d-4c9a-b5b9-8352edc00252",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793231493182
+      },
+      {
+        "executionId": "12335bd7-27da-48ee-b85e-ac17c38a5e28",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793231736288
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793232615511
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793233286517
+      }
+    ],
+    "30. 服务端按域统一校验与常量零除数检查（需求 12.1、12.2，ADR-FHIC-09）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574126
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207170433
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793233333523
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793234360035
+      }
+    ],
+    "31. 历史回滚取服务端快照（需求 13.1~13.3，ADR-FHIC-10）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574168
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207170678
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793234368742
+      }
+    ],
+    "32. 删除强制 CAS（需求 13.4、13.5，ADR-FHIC-11）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574205
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207170889
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793235124587
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793236329943
+      }
+    ],
+    "33. 自定义函数注册签名与递归 fail-closed（需求 14.1、14.2，ADR-FHIC-17）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574252
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207171071
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793236335884
+      }
+    ],
+    "34. 预设对话框只读默认与应用范围禁用提示（需求 15.1、15.2）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574294
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207171228
+      },
+      {
+        "executionId": "a4e6c431-8632-48e0-ad83-b2df574806ee",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793236898480
+      },
+      {
+        "executionId": "7092a841-f4f2-43a9-b13b-cef45abfbc26",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793253205432
+      },
+      {
+        "executionId": "7092a841-f4f2-43a9-b13b-cef45abfbc26",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793253590402
+      }
+    ],
+    "35. 公式管理写请求按状态码判成功（需求 15.3）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574338
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207171420
+      },
+      {
+        "executionId": "7092a841-f4f2-43a9-b13b-cef45abfbc26",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793253596088
+      },
+      {
+        "executionId": "7092a841-f4f2-43a9-b13b-cef45abfbc26",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793254390989
+      }
+    ],
+    "36. tb_detail 止血与 wired 由读取入口派生（需求 15.4，ADR-FHIC-22，D7）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574388
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207171688
+      },
+      {
+        "executionId": "7092a841-f4f2-43a9-b13b-cef45abfbc26",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793254392859
+      },
+      {
+        "executionId": "7092a841-f4f2-43a9-b13b-cef45abfbc26",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793255674393
+      }
+    ],
+    "37. 门禁五态模型、取数探测、保存点包装与分支清单（需求 16.2，ADR-FHIC-14 第 1~4 点）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574455
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207171951
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793256315040
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793257470191
+      }
+    ],
+    "38. 试算平衡口径、门禁分支夹具与逐分支变异（需求 16.1~16.3，ADR-FHIC-15，D1）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574498
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207172157
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793257478153
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793258413438
+      }
+    ],
+    "39. 门禁消费方统一判定、设置项与影响预览（需求 16.4~16.6，ADR-FHIC-14 第 5、6 点，D2，X4）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574543
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207172351
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793258420140
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793260017511
+      }
+    ],
+    "40. 端点权限配方表补齐与软删守卫（需求 17.2、17.3）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574590
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207172577
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793260022952
+      },
+      {
+        "executionId": "a93a262b-5edc-46f7-a43a-306749800356",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793261047352
+      }
+    ],
+    "PG 预检：`_tmp_formula_hub/probes/pg_preflight.py`（断言共享库 `audit_platform` 可连、测试用 `DATABASE_URL` 指向库名以 `fh_snap_` 开头的快照库且 dialect=postgresql、Redis 15 号库可用），输出贴此": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574634
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207172855
+      },
+      {
+        "executionId": "9fbed57f-298c-4850-9b81-ad2c5d44e46b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793261157736
+      }
+    ],
+    "快照库迁移预演（X1 证据）：最终 tree 的代码重建快照并 `migrate`，executed / failed 与附件孤儿计数贴此": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574671
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207173044
+      },
+      {
+        "executionId": "9fbed57f-298c-4850-9b81-ad2c5d44e46b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793261319274
+      }
+    ],
+    "真 PG 全集：`_tmp_formula_hub/probes/run_pg_suite.py`（ADR-25 第 2 点的子进程环境，运行 `pytest tests/formula_hub tests/test_wp_cell_reader_contract.py -m pg_only -q -p no:playwright --junitxml=<_tmp_formula_hub/logs/…>`，cwd = worktree `backend`）；记录 selected / passed / skipped，skipped 必须为 0": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574717
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207173231
+      },
+      {
+        "executionId": "9fbed57f-298c-4850-9b81-ad2c5d44e46b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793261552003
+      }
+    ],
+    "变异表（需求 17.1）：下表 40 行全部填写（打红测试 + 恢复 sha256）；`_tmp_formula_hub/probes/count_mutation_rows.py` 输出 `40/40 已填`": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574759
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207173389
+      },
+      {
+        "executionId": "9fbed57f-298c-4850-9b81-ad2c5d44e46b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793261885149
+      }
+    ],
+    "全量回归：worktree 检出最终 tree，跑 `tests/formula_hub` 全部、`tests/test_wp_cell_reader_contract.py`、按 import 选集的既有后端测试与相关 vitest，均 `0 failed`；全量 pytest 的预存失败在基线 worktree 复现后登记": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574830
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207173577
+      },
+      {
+        "executionId": "9fbed57f-298c-4850-9b81-ad2c5d44e46b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793262514469
+      }
+    ],
+    "行数门：`d:\\GT_plan\\.venv\\Scripts\\python.exe scripts/check/check_file_size.py`（cwd = worktree `backend`）exit 0；按实测下调 `formula_engine.py` / `report_engine.py` / `_impl.py` 基线": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574870
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207173741
+      },
+      {
+        "executionId": "9fbed57f-298c-4850-9b81-ad2c5d44e46b",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793264024061
+      }
+    ],
+    "审计写入语义未改（需求 11.3）：`git diff --stat <基线提交>..HEAD -- backend/app/services/audit_log_helper.py backend/app/workers/audit_log_writer_worker.py backend/app/routers/audit_logs.py` 为空": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574909
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207173943
+      }
+    ],
+    "性能 ABBA（requirements §3）：基线 / 实施两个 worktree 预热后交替，结果与环境贴此": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574952
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207174284
+      }
+    ],
+    "门禁影响预览（需求 16.6）：任务 39 的只读清单摘要（活项目数 / 已运行数 / 未运行（无年度）数 / enforce 下会被卡住的项目数 / 按检查项计数 / 基线与候选导出包判定差分数及口径修正逐项）贴此": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030574987
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207174474
+      }
+    ],
+    "浏览器实测（【测试】项目，chrome-devtools）：中央调试 / 报表试算失败原因；全局刷新各 status 文案；待确认弹窗陈旧决策；回滚按钮只在可回滚条目；删除冲突提示；门禁五态标签与只提示文案；附件溯源只见本项目；刷新或查库确认写入能读回；截图放 `_tmp_formula_hub/screenshots/`，用完停 about:blank。前置：开发服跑主工作树代码与共享库，新代码依赖迁移 V{n}~V{n+2}（X1）；在快照库另起一套后端会连带启动后台 worker（OO 回写重驱等）读写共享 storage，不采用 ⇒ 本项保持 `[ ]`，写明「代码已改但未浏览器实测：依赖决策项 X1」，同一路径由 TestClient 用例覆盖": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030575034
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207174688
+      },
+      {
+        "executionId": "29eeb3fb-1650-43cc-a16f-4ed0da8a52a2",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793268216433
+      }
+    ],
+    "交接（需求 17.5）：design §8.1 的 S1~S10 各建 `.kiro/specs/<名>/requirements.md`（负责范围、依赖、触发条件；S10 抄入 §8.1 的设计输入）并登记 INDEX；design 增补节登记对 `formula-global-settings-sync`（P0-6、S5、wired）、`formula-governance-coverage-closure`（L1 期间 / 列名 → S1）、`formula-execution-path-convergence`（三路）的承接勘误；最终报告列出 §8.2「需 ACNR spec 同步采用」清单与决策项 X1~X5（各附证据）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030575073
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207174860
+      }
+    ],
+    "索引与记忆：更新 `.kiro/specs/INDEX.md` 本行进度（Python bytes 最小改动，校验 4 个未转义 pipe、纯 CRLF）、`memory.md` 任务状态（≤300 行）": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030575140
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207175024
+      }
+    ],
+    "单个提交（design §10.5）：fetch 同步、必要时 cherry-pick 到最新远端头并重跑验收；单个提交的 tree == 验收 tree，写到 `refs/wip/formula-hub/final`；不推送（推送随 X1，先迁移后推送）；最终报告给出 X1 的执行步骤与该提交 sha": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030575188
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207175271
+      }
+    ],
+    "清理：结果已摘入本文件后删除 `refs/wip/formula-hub/` 下除 `final` 外的引用、unlock + 删除两个 worktree + `git worktree prune`、`snapshot_db.py drop`（`pg_database` 无 `fh_snap_%`）、Redis 15 号库 `FLUSHDB`、删除 `_tmp_formula_hub/`；`Test-Path _tmp_formula_hub` 为 False": [
+      {
+        "executionId": "0be12354-95f8-401c-af9f-a19b954a7d5d",
+        "chatSessionId": "sess_dae8217b-77f5-4489-a564-67be2ddd5901",
+        "timestamp": 1793030575227
+      },
+      {
+        "executionId": "04cb3d8d-d057-4013-8837-2d3cb9004d70",
+        "chatSessionId": "sess_e10efcba-e4a6-455b-8892-022e8056fb2d",
+        "timestamp": 1793207175410
+      }
+    ]
+  }
+}

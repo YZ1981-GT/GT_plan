@@ -1,4 +1,4 @@
-"""公式推送引擎存储三层一致：V169 DDL == ORM == policy 常量（+ SQLite 往返）。
+"""公式推送引擎存储三层一致：V169 + S5 V237 DDL == ORM == policy 常量。
 
 spec: chain-closure-phase2-formula-push-engine · 任务 4 · 需求 2.6 / 3.2
 
@@ -37,8 +37,11 @@ MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
 V169 = MIGRATIONS / "V169__formula_push_engine.sql"
 R169 = MIGRATIONS / "R169__rollback_formula_push_engine.sql"
 
-_CONSTRAINT_HEADS = {"constraint", "primary", "unique", "foreign", "check", "exclude", "key"}
+# V237：S5 来源信封迁移（V169 的 state/run 基线不回写历史迁移文件）
+V237 = MIGRATIONS / "V237__formula_push_provenance.sql"
+R237 = MIGRATIONS / "R237__rollback_formula_push_provenance.sql"
 
+_CONSTRAINT_HEADS = {"constraint", "primary", "unique", "foreign", "check", "exclude", "key"}
 
 def _strip_line_comments(sql: str) -> str:
     return re.sub(r"--[^\n]*", "", sql)
@@ -76,7 +79,7 @@ def _segments(body: str) -> list[str]:
 
 
 def _ddl_columns(table: str) -> dict[str, bool]:
-    """列名 → 是否 NOT NULL（PRIMARY KEY 视为 NOT NULL）。"""
+    """列名 → 是否 NOT NULL（V169 基线 + S5 V237 增量列）。"""
     cols: dict[str, bool] = {}
     for seg in _segments(_create_body(table)):
         head = re.match(r'"?([A-Za-z_][A-Za-z0-9_]*)"?', seg)
@@ -84,6 +87,10 @@ def _ddl_columns(table: str) -> dict[str, bool]:
             continue
         upper = seg.upper()
         cols[head.group(1)] = "NOT NULL" in upper or "PRIMARY KEY" in upper
+    if table == "formula_push_state":
+        assert V237.is_file(), "V237 缺失：ORM provenance 列没有迁移"
+        if re.search(r"formula_push_state\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+provenance\s+JSONB\s+NULL", V237.read_text(encoding="utf-8"), re.IGNORECASE):
+            cols["provenance"] = False
     return cols
 
 
@@ -131,7 +138,7 @@ def test_extractor_is_not_vacuous():
     run_cols = _ddl_columns("formula_push_run")
     state_cols = _ddl_columns("formula_push_state")
     assert {"id", "project_id", "trigger_source", "status", "detail", "finished_at"} <= set(run_cols)
-    assert {"addr_id", "last_pushed_value", "state", "last_run_id", "updated_by"} <= set(state_cols)
+    assert {"addr_id", "last_pushed_value", "state", "last_run_id", "updated_by", "provenance"} <= set(state_cols)
     lowered = {c.lower() for c in (*run_cols, *state_cols)}
     assert not (_CONSTRAINT_HEADS & lowered), "约束关键字被当成列名"
     assert run_cols["project_id"] is True and state_cols["wp_id"] is False
@@ -229,3 +236,10 @@ def test_sqlite_orm_roundtrip():
     assert out["defaults"] == ("auto", "running", 0, {})
     assert out["bad_state"] == "rejected", "state CHECK 未生效"
     assert out["duplicate"] == "rejected", "(project, year, addr_id) 唯一约束未生效"
+
+
+def test_v237_r237_provenance_pair():
+    assert V237.is_file() and R237.is_file()
+    assert "formula_push_state" in V237.read_text(encoding="utf-8")
+    assert "provenance" in V237.read_text(encoding="utf-8")
+    assert "DROP COLUMN IF EXISTS provenance" in R237.read_text(encoding="utf-8")

@@ -37,6 +37,8 @@ class SheetRenderConfig(_StrictWireModel):
     cross_refs: list[CrossRefItem]
     sheet_type: str | None = None
     field_sources: dict[str, Any] | None = None
+    # 只在 ``share_html_data=1`` 时出现：html_data 的其余键在顶层 shared_html_data[ref]。
+    html_data_ref: str | None = None
 
 
 class RenderPermissions(_StrictWireModel):
@@ -86,3 +88,6 @@ class RenderConfigResponse(_StrictWireModel):
 
     # reserved：render planner 七阶段拆分后由 finalize 阶段下发。
     decision_trace: list[RenderDecisionWire] = Field(default_factory=list)
+
+    # 只在 ``share_html_data=1`` 时出现：同组页签共享的 html_data（键为 html_data_ref）。
+    shared_html_data: dict[str, dict[str, Any]] | None = None

@@ -3,6 +3,7 @@
  * Phase 8 Task 9.3
  */
 import { eventBus } from '@/utils/eventBus'
+import { commitAllGridEdits, isGridSink, isInsideGridEditor } from '@/components/grid/GridKernel'
 
 export interface ShortcutEntry {
   key: string
@@ -14,14 +15,27 @@ export interface ShortcutEntry {
 /**
  * 检查当前焦点是否在输入框/文本域/可编辑元素内
  * 用于在输入框中忽略全局快捷键（Escape 除外）
+ *
+ * 表格的焦点承接框（透明 textarea，spec excel-style-table-editing ADR-4）不算输入框：
+ * 选中单元格时 Ctrl+S / Ctrl+E / F5 等全局快捷键照常生效。
  */
 export function isInputFocused(event: KeyboardEvent): boolean {
-  const target = event.target as HTMLElement
-  return (
-    target.tagName === 'INPUT' ||
-    target.tagName === 'TEXTAREA' ||
-    target.contentEditable === 'true'
-  )
+  return isTextEntryTarget(event.target)
+}
+
+/**
+ * 键盘事件目标是不是文字输入处（输入框 / 文本域 / 可编辑区）。页面自己的快捷键（Backspace 返回、Ctrl+K 搜索、
+ * Ctrl+Z 撤销结构改动等）判「在输入框里不拦截」时用它：表格承接框不算输入框，选中单元格时页面快捷键照常。
+ */
+export function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement) || isGridSink(target)) return false
+  // isContentEditable 认继承的可编辑区；jsdom 不实现它，contentEditable === 'true' 兜底（与改造前的判定一致）
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || !!target.isContentEditable || target.contentEditable === 'true'
+}
+
+/** 单元格编辑中按 Ctrl+S：先提交这一格，再按保存快捷键处理（R8.2）。 */
+function isGridEditorSave(event: KeyboardEvent): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's' && isInsideGridEditor(event.target)
 }
 
 class ShortcutManager {
@@ -38,8 +52,12 @@ class ShortcutManager {
 
   handleKeydown(event: KeyboardEvent) {
     if (!this.enabled) return
-    // 在输入框/文本域/可编辑元素里忽略快捷键（Escape 除外）
-    if (isInputFocused(event) && event.key !== 'Escape') return
+    if (isGridEditorSave(event)) {
+      commitAllGridEdits()
+    } else if (isInputFocused(event) && event.key !== 'Escape') {
+      // 在输入框/文本域/可编辑元素里忽略快捷键（Escape 除外）
+      return
+    }
     const key = this.getShortcutKey(event)
     const entry = this.shortcuts.get(key)
     if (entry) {

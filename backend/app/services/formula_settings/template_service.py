@@ -33,11 +33,13 @@ from app.services.formula_settings.definitions import (
 )
 from app.services.formula_settings.domain_stores import validate_definition
 from app.services.formula_settings.effective import effective_slots
-from app.services.formula_settings.errors import FormulaSettingError
+from app.services.formula_settings.errors import DomainNotApplicable, FormulaSettingError, NotFound
 from app.services.formula_settings.projects import VALID_STANDARDS
 from app.services.formula_settings.publish import preview_global, publish_global, publish_to_dict
 from app.services.formula_settings.stores import get_store
-from app.services.formula_settings.template_access import SHARE_LABELS, Viewer, check_share_scope
+from app.services.formula_settings.template_access import (
+    SHARE_LABELS, Viewer, check_share_scope, hidden_subscriber_projects,
+)
 from app.services.formula_settings.templates import template_rows
 
 SOURCES = ("project", "global", "manual")
@@ -163,7 +165,9 @@ async def create_template(db: AsyncSession, *, viewer: Viewer, name: str, descri
             from app.services.formula_settings.projects import scope_of
 
             applicable_scope = scope_of("report", project.template_type, project.report_scope)
-    entries = await _collect(db, source=source, domains=list(dict.fromkeys(domains)),
+    template_domains = list(dict.fromkeys(domains))
+    validate_applicable_scope(template_domains, applicable_scope)
+    entries = await _collect(db, source=source, domains=template_domains,
                              applicable_scope=applicable_scope, source_project_id=source_project_id,
                              slot_keys=slot_keys, items=items)
     entries = {d: s for d, s in entries.items() if s}
@@ -219,11 +223,23 @@ async def update_meta(db: AsyncSession, tpl: FormulaTemplate, *, viewer: Viewer,
         scope = changes.get("share_scope", tpl.share_scope)
         owner = changes.get("owner_project_id", tpl.owner_project_id)
         check_share_scope(scope, owner, admin=viewer.admin)
+        if scope != tpl.share_scope or owner != tpl.owner_project_id:
+            hidden = await hidden_subscriber_projects(
+                db, tpl, share_scope=scope, owner_project_id=owner,
+            )
+            if hidden:
+                raise FormulaSettingError(
+                    "共享范围收窄后已有订阅项目无法继续查看模板，请先处理这些订阅",
+                    code="FORMULA_TEMPLATE_SCOPE_NARROWED", status_code=409,
+                    detail={"projects": hidden},
+                )
         tpl.share_scope, tpl.owner_project_id = scope, owner if scope in ("team", "group") else None
     if "applicable_scope" in changes and (changes["applicable_scope"] or "") != tpl.applicable_scope:
+        new_scope = changes["applicable_scope"] or ""
+        validate_applicable_scope(list(tpl.domains or []), new_scope)
         if await active_subscriptions(db, tpl.id):
             raise FormulaSettingError("已有项目订阅该模板，不能修改适用准则", status_code=409)
-        tpl.applicable_scope = changes["applicable_scope"] or ""
+        tpl.applicable_scope = new_scope
     tpl.updated_by, tpl.updated_at = viewer.user.id, _now()
     await db.flush()
     await audit_global(db, user_id=viewer.user.id, domain=",".join(tpl.domains or []), scope=tpl.applicable_scope,
@@ -380,3 +396,81 @@ async def promote(db: AsyncSession, tpl: FormulaTemplate, *, viewer: Viewer, dom
 
 def normalized_equal(domain: str, a: Mapping | None, b: Mapping | None) -> bool:
     return normalize(domain, a) == normalize(domain, b)
+
+
+def validate_applicable_scope(domains: list[str] | tuple[str, ...], applicable_scope: str | None) -> None:
+    """校验模板声明的适用范围能为每个域解析出全局作用范围。"""
+    scope = (applicable_scope or "").strip()
+    for domain in dict.fromkeys(domains):
+        spec = get_spec(domain)
+        if spec.scope_kind != "any" and global_scope(domain, scope) is None:
+            raise DomainNotApplicable(
+                f"{spec.label} 不适用于 {scope or '通用'}",
+                detail={"domain": domain, "applicable_scope": scope},
+            )
+
+
+async def _version_row(db: AsyncSession, template_id: uuid.UUID, version: int) -> FormulaTemplateVersion:
+    row = await db.scalar(sa.select(FormulaTemplateVersion).where(
+        FormulaTemplateVersion.template_id == template_id,
+        FormulaTemplateVersion.version == version,
+    ))
+    if row is None:
+        raise NotFound("公式模板版本不存在")
+    return row
+
+
+def _version_labels(*snapshots: Mapping[str, Any]) -> dict[tuple[str, str], str]:
+    labels: dict[tuple[str, str], str] = {}
+    for snapshot in snapshots:
+        for item in snapshot.get("_change_set", []) if isinstance(snapshot, Mapping) else []:
+            if not isinstance(item, Mapping):
+                continue
+            domain, slot = str(item.get("domain") or ""), str(item.get("slot_key") or "")
+            if domain and slot and item.get("label"):
+                labels[(domain, slot)] = str(item["label"])
+    return labels
+
+
+async def template_diff(db: AsyncSession, tpl: FormulaTemplate, *, from_version: int,
+                        to_version: int | None = None) -> dict[str, Any]:
+    """比较两个不可变快照；定义比较与同步内核共用 normalize。"""
+    target_version = tpl.version if to_version is None else to_version
+    source = await _version_row(db, tpl.id, from_version)
+    target = await _version_row(db, tpl.id, target_version)
+    old_snapshot = dict(source.snapshot or {})
+    new_snapshot = dict(target.snapshot or {})
+    old_change_set = list(source.change_set or [])
+    new_change_set = list(target.change_set or [])
+    labels = _version_labels({"_change_set": old_change_set}, {"_change_set": new_change_set})
+    changes: list[dict[str, Any]] = []
+    for domain in sorted(set(old_snapshot) | set(new_snapshot)):
+        old_slots = dict(old_snapshot.get(domain) or {})
+        new_slots = dict(new_snapshot.get(domain) or {})
+        for slot_key in sorted(set(old_slots) | set(new_slots)):
+            old = old_slots.get(slot_key)
+            new = new_slots.get(slot_key)
+            if old is not None and new is not None:
+                if normalize(domain, old) == normalize(domain, new):
+                    continue
+                kind = "changed"
+            elif old is None and new is not None:
+                kind = "added"
+            else:
+                kind = "removed"
+            changes.append({
+                "domain": domain, "slot_key": slot_key,
+                "label": labels.get((domain, slot_key), slot_key),
+                "old": old, "new": new, "kind": kind,
+            })
+    return {"template_id": str(tpl.id), "from_version": from_version,
+            "to_version": target_version, "changes": changes}
+
+
+async def rollback_changes(db: AsyncSession, tpl: FormulaTemplate, target_version: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if target_version == tpl.version:
+        raise FormulaSettingError("目标版本已是当前版本", code="FORMULA_TEMPLATE_ROLLBACK_CURRENT", status_code=422)
+    diff = await template_diff(db, tpl, from_version=tpl.version, to_version=target_version)
+    changes = [{"domain": row["domain"], "slot_key": row["slot_key"], "definition": row["new"]}
+               for row in diff["changes"]]
+    return diff, changes

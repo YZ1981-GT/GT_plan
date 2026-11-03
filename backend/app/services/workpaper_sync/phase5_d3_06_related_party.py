@@ -95,16 +95,20 @@ UUID_COL_D306: Final[str] = "K"
 #: 10 个受管字段（7 元组，末位 group_header_cell 为 "" —— 单级表头无分组）。
 #: 顺序即 Excel 列序 A→J；表头文本与 R11 逐字相等（实测）。
 #: F 列模板内逐行有真公式 ⇒ formula；其余 9 列无公式 ⇒ editable。
+#: 🔴 json 键逐字取前端 `useD3RelatedParty.RelatedPartyRow`（spec oo-writeback-template-parity-closure R3）：
+#:    原写 relatedPartyName / openingBalance / debitAmount / creditAmount / closingBalance / agingInfo …，
+#:    前端存 partyName / priorBalance / debit / credit / endBalance / agingDescription … ⇒ 整表不通。
+#:    列键语义本就对，不改。
 FIELD_SPECS_D306: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("related_party_name", "A", "editable", "text", "relatedPartyName", "关联方名称", ""),
-    ("related_relationship", "B", "editable", "text", "relatedRelationship", "关联关系", ""),
-    ("opening_balance", "C", "editable", "amount", "openingBalance", "期初余额", ""),
-    ("debit_amount", "D", "editable", "amount", "debitAmount", "借方发生", ""),
-    ("credit_amount", "E", "editable", "amount", "creditAmount", "贷方发生", ""),
-    ("closing_balance", "F", "formula", "amount", "closingBalance", "期末余额", ""),
-    ("aging_info", "G", "editable", "text", "agingInfo", "发生时间及账龄", ""),
-    ("transaction_reason", "H", "editable", "text", "transactionReason", "发生原因（款项性质）", ""),
-    ("index_no", "I", "editable", "text", "indexNo", "索引号", ""),
+    ("related_party_name", "A", "editable", "text", "partyName", "关联方名称", ""),
+    ("related_relationship", "B", "editable", "text", "relationship", "关联关系", ""),
+    ("opening_balance", "C", "editable", "amount", "priorBalance", "期初余额", ""),
+    ("debit_amount", "D", "editable", "amount", "debit", "借方发生", ""),
+    ("credit_amount", "E", "editable", "amount", "credit", "贷方发生", ""),
+    ("closing_balance", "F", "formula", "amount", "endBalance", "期末余额", ""),
+    ("aging_info", "G", "editable", "text", "agingDescription", "发生时间及账龄", ""),
+    ("transaction_reason", "H", "editable", "text", "natureDescription", "发生原因（款项性质）", ""),
+    ("index_no", "I", "editable", "text", "indexRef", "索引号", ""),
     ("remark", "J", "editable", "text", "remark", "备注", ""),
 )
 

@@ -18,7 +18,7 @@
           现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
         -->
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && g4EntrySync.presentation.value.showModeSwitch"
           :model-value="renderMode"
           :options="syncModeOptions"
           size="small"
@@ -48,7 +48,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -145,7 +145,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
       <G4PreparationHandbookDialog
@@ -177,7 +177,9 @@ import http from '@/utils/http'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G4_MAIN sync bridge（spec: g4-g6-shared-workbook-three-entry-lanes）──
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -220,7 +222,8 @@ const loadError = ref<string | null>(null)
 const selfLoadData = ref<Record<string, any> | null>(null)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 const formData = useG4BonInvFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const adjustmentRouting = useG4MainAdjustment({
@@ -392,8 +395,10 @@ async function onSheetImported(): Promise<void> {
 async function handleG4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    try {
+      await formData.saveBatch(items)
+    } catch {
+      return
     }
     scheduleAutoSnapshot()
   }
@@ -472,7 +477,7 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(G4_MAIN_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPending()
+    await formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -497,6 +502,17 @@ const {
   legacy: dualMode,
   isManagedSheet: isG4MainSyncManagedSheet,
   editorHostRef: syncEditorHostRef,
+})
+
+/**
+ * 同步能力单源（spec task 3.5 / AC 1.4）：开关可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），不再由宿主的 `isHtmlSheet` 独自决定。
+ * `isHtmlSheet` 保留为 sheet 级附加条件（这张 sheet 本身是不是 HTML 可渲染的）。
+ */
+const g4EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => G4_MAIN_SYNC_ENTRY_ID,
 })
 
 const isOoMode = computed(

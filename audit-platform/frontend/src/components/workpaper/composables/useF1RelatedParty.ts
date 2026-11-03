@@ -5,6 +5,7 @@
  * 账龄|款项性质|期后到货|索引|备注
  * 期末 = 期初 + 借方 − 贷方（借方科目）
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcRelatedPartyEndBalance } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -89,7 +90,7 @@ const ITEM_ID_CONCLUSION = 'F1-rp-conclusion'
 // ─── Pure helpers ────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 export function recalcRelatedPartyRow(row: RelatedPartyRow): RelatedPartyRow {

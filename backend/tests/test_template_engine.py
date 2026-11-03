@@ -268,21 +268,18 @@ async def test_delete_template_nonexistent(db_session):
 
 @pytest.mark.asyncio
 async def test_seed_builtin_template_sets(db_session):
-    """6.4: seed 6 built-in template sets"""
+    """6.4: 内置模板集只有「标准年审」（编码取自 wp_account_mapping.json；原测试仍按早已删掉的 6 个占位集断言）"""
     engine = TemplateEngine()
     created = await engine.seed_builtin_template_sets(db=db_session)
     await db_session.commit()
 
-    assert len(created) == 6
+    assert [d["set_name"] for d in BUILTIN_TEMPLATE_SETS] == ["标准年审"]
+    assert len(created) == 1
 
     sets = await engine.get_template_sets(db=db_session)
-    set_names = {s.set_name for s in sets}
-    assert "标准年审" in set_names
-    assert "精简版" in set_names
-    assert "上市公司" in set_names
-    assert "IPO" in set_names
-    assert "国企附注" in set_names
-    assert "上市附注" in set_names
+    assert {s.set_name for s in sets} == {"标准年审"}
+    assert sets[0].template_codes == BUILTIN_TEMPLATE_SETS[0]["template_codes"]
+    assert len(sets[0].template_codes) > 200  # 完整编码表，不是兜底 stub
 
 
 @pytest.mark.asyncio
@@ -406,6 +403,18 @@ async def test_generate_workpapers_nonexistent_set(db_session, seeded_db):
             db=db_session,
             project_id=FAKE_PROJECT_ID,
             template_set_id=uuid.uuid4(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_generate_workpapers_soft_deleted_set_is_missing(db_session, seeded_db):
+    engine = TemplateEngine()
+    ts = await engine.create_template_set(db=db_session, set_name="待删除模板集", template_codes=["X1"])
+    ts.is_deleted = True
+    await db_session.flush()
+    with pytest.raises(ValueError, match="模板集不存在"):
+        await engine.generate_project_workpapers(
+            db=db_session, project_id=FAKE_PROJECT_ID, template_set_id=ts.id,
         )
 
 
@@ -618,12 +627,37 @@ async def test_api_delete_template_requires_admin(db_session: AsyncSession, seed
 
 @pytest.mark.asyncio
 async def test_api_seed_template_sets(client: AsyncClient):
-    """POST /api/template-sets/seed"""
+    """POST /api/template-sets/seed（admin）"""
     resp = await client.post("/api/template-sets/seed")
     assert resp.status_code == 200
     data = resp.json()
     result = data.get("data", data)
-    assert result["count"] == 6
+    assert result["count"] == len(BUILTIN_TEMPLATE_SETS) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["auditor", "manager", "qc", "readonly"])
+async def test_api_seed_template_sets_requires_admin_or_partner(db_session: AsyncSession, seeded_db, role):
+    """内置模板集是全局数据：原先任何登录用户（含只读账号）打开生成弹窗都会写它 ⇒ 只许 admin / partner。"""
+    import sqlalchemy as sa
+
+    from app.main import app
+    from tests._test_auth_helper import FakeAuthUser, override_auth
+
+    async with override_auth(app, db_session=db_session, user=FakeAuthUser(role=role)) as c:
+        resp = await c.post("/api/template-sets/seed")
+    assert resp.status_code == 403
+    assert (await db_session.execute(sa.select(sa.func.count()).select_from(WpTemplateSet))).scalar_one() == 0
+
+
+@pytest.mark.asyncio
+async def test_api_seed_template_sets_allows_partner(db_session: AsyncSession, seeded_db):
+    from app.main import app
+    from tests._test_auth_helper import FakeAuthUser, override_auth
+
+    async with override_auth(app, db_session=db_session, user=FakeAuthUser(role="partner")) as c:
+        resp = await c.post("/api/template-sets/seed")
+    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -634,7 +668,7 @@ async def test_api_list_template_sets(client: AsyncClient):
     assert resp.status_code == 200
     data = resp.json()
     results = data.get("data", data)
-    assert len(results) >= 6
+    assert [r["set_name"] for r in results] == ["标准年审"]
 
 
 @pytest.mark.asyncio

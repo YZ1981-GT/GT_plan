@@ -39,10 +39,10 @@ spec: soe-listed-note-conversion-correctness / Requirements 5.1~5.5
 docx 章号是 Word 自动编号，段落文本**不含**「十二、」⇒ 定位章节必须按
 ``paragraph.style.name == 'Heading N'``，用章号正则会 0 命中。
 
-🔴 **listed 母公司章标题实测为「公司财务报表主要项目注释」（无「母」字）**，
-而 ``note_template_listed.json`` 写的是「母公司财务报表主要项目注释」
-（spec ``parent-company-note-chapter-and-sourcing`` 已裁决保留 JSON 现值）
-⇒ 禁止对必须**同时登记两种写法**，否则改一侧另一侧漏防。
+🔴 **listed 母公司章标题实测为「公司财务报表主要项目注释」（无「母」字）**。
+``note_template_listed.json`` 原写「母公司财务报表主要项目注释」（spec ``parent-company-note-chapter-and-sourcing``
+曾裁决保留），用户 2026-10-17 拍板按 Word 改为无「母」字（spec ``disclosure-note-template-word-realignment``
+Task 32）；存量项目与旧导出里仍可能是旧写法 ⇒ 禁止对**同时登记两种写法**，否则改一侧另一侧漏防。
 """
 from __future__ import annotations
 
@@ -56,6 +56,7 @@ __all__ = [
     "normalize_for_match",
     "match_section",
     "resolve_alias_counterpart",
+    "resolve_alias_counterparts",
 ]
 
 _WHITESPACE = " \t\r\n\u3000\u00a0\u2002\u2003\u2009"
@@ -121,6 +122,36 @@ SECTION_TITLE_ALIASES: Final[tuple[AliasPair, ...]] = (
             "两侧措辞差异大于禁止匹配对的标题差异，任何阈值法都无法既救回本对又拦住禁止对"
         ),
     ),
+    # ↓ 2026-10-17（disclosure-note-template-word-realignment Task 32）：种子章名 / 节名按四版 Word 改后，
+    #   原来同名配对的几处变成措辞差异，逐字核对四份源 docx（2026.01 版，单体 / 合并各两份，见 note_word_tree）后登记
+    AliasPair(
+        soe_title="公司（企业）基本情况",
+        listed_title="公司基本情况",
+        evidence="源 docx Heading 1：soe「公司（企业）基本情况」/ listed「公司基本情况」；差异 = 括注「（企业）」",
+    ),
+    AliasPair(
+        soe_title="关联方关系及其交易",
+        listed_title="关联方及关联交易",
+        evidence="源 docx Heading 1：soe「关联方关系及其交易」/ listed「关联方及关联交易」；差异 = 措辞",
+    ),
+    AliasPair(
+        soe_title="营业收入与营业成本",
+        listed_title="营业收入和营业成本",
+        evidence=(
+            "合并版源 docx 母公司章：soe Heading 3「营业收入与营业成本」/ listed Heading 2「营业收入和营业成本"
+            "（披露格式参考附注五、62）」（括注是提示）；差异 = 与/和。上市项目注释章「五、62」同名，"
+            "桥接按章类别选母公司章那一节（note_section_pairing）"
+        ),
+    ),
+    AliasPair(
+        soe_title="股份支付",
+        listed_title="股份支付及权益工具",
+        evidence=(
+            "源 docx 会计政策章：soe Heading 3「股份支付」/ listed Heading 2「股份支付及权益工具」，两节首段同为"
+            "「股份支付的种类 / 本公司股份支付分为以权益结算的股份支付和以现金结算的股份支付」；差异 = 措辞。"
+            "国企项目注释章「八、83 股份支付」与上市「十二 股份支付」章同名，按章类别不会桥到会计政策章"
+        ),
+    ),
 )
 
 
@@ -139,9 +170,8 @@ FORBIDDEN_MATCH_PAIRS: Final[tuple[tuple[str, str, str], ...]] = (
     (
         "财务报表主要项目注释",
         "母公司财务报表主要项目注释",
-        "同上一条，但用 note_template_listed.json 里的现值写法（带「母」字）。"
-        "spec parent-company-note-chapter-and-sourcing 已裁决保留 JSON 现值 ⇒ "
-        "两种写法都要登记，否则改一侧另一侧漏防。",
+        "同上一条，但用 note_template_listed.json 的旧写法（带「母」字；2026-10-17 种子已按 Word 去掉「母」字，"
+        "存量项目与旧导出里仍有）⇒ 两种写法都要登记，否则改一侧另一侧漏防。",
     ),
 )
 
@@ -230,3 +260,23 @@ def resolve_alias_counterpart(title: str | None, target_side: str) -> str | None
         if target_side == "soe" and key == listed_k:
             return pair.soe_title
     return None
+
+
+def resolve_alias_counterparts(title: str | None, target_side: str) -> tuple[str, ...]:
+    """某标题在对侧的**全部**别名写法（按清单顺序）。
+
+    上市「营业收入和营业成本」在国企有两种写法：项目注释章「营业收入、营业成本」、母公司章「营业收入与营业成本」
+    ⇒ :func:`resolve_alias_counterpart` 只给第一个会让母公司章那一节桥不上；别名桥接
+    （``note_section_pairing.bridge_alias_pairs``）按章类别在全部写法里选。
+    """
+    if target_side not in ("soe", "listed"):
+        return ()
+    key = normalize_for_match(title)
+    if not key:
+        return ()
+    out: list[str] = []
+    for pair in SECTION_TITLE_ALIASES:
+        own, other = (pair.soe_title, pair.listed_title) if target_side == "listed" else (pair.listed_title, pair.soe_title)
+        if key == normalize_for_match(own) and other not in out:
+            out.append(other)
+    return tuple(out)

@@ -28,21 +28,17 @@ def _normalize_text(value: object) -> str:
 def business_category_flags(
     business_category: str | None,
     template_type: str | None,
+    scenario: str | None = None,
 ) -> dict[str, bool]:
-    """根据项目业务分类和模板类型生成适用性 flags。
+    """模板 ``applicable_when.business_category`` 判定用的 ``biz_<标签>`` flags。
 
-    业务分类可能为空或带大小写/外围空白；分类采用既有的关键字包含语义。
-    ``template_type='listed'`` 是独立的上市模板信号，因而即使业务分类为空或为
-    ``C``，也必须令 ``biz_listed`` 为真。
+    由 ``project_classification.resolve`` 单一计算（spec trim-generation-plan-followup-optimizations R4）：
+    标签来自专项场景、参考标准里语义等价的细分类（A1 / A7 上市、A2 IPO、A3 重组、A4 再融资、B1 新三板）与
+    ``template_type='listed'``。原先按分类列子串判断（分类列里残留 ``IPO`` 才命中），场景列从不参与。
     """
-    category = _normalize_text(business_category)
-    template = _normalize_text(template_type)
-    return {
-        "biz_ipo": "ipo" in category,
-        "biz_listed": "listed" in category or template == "listed",
-        "biz_neeq": "neeq" in category,
-        "biz_refinancing": "refinancing" in category,
-    }
+    from app.services.project_classification import resolve
+
+    return resolve(business_category, scenario, template_type).flags()
 
 
 def applicable_when_hit(

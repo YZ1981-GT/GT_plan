@@ -5,8 +5,9 @@ Starlette 的 ``GZipMiddleware`` 在事件循环线程上同步压缩响应体�
 事件循环照常运转。行为与上游逐项一致（同样的判据、同样的头），只换了大块的压缩位置：
 
 - 上游会压的每一段（首段或后续段、整段或流式）只要 ≥ :data:`OFFLOAD_MIN_BYTES` 就在工作线程里压；
-  🔴 内层每个 ``BaseHTTPMiddleware`` 都把响应改成流式（数据段 ``more_body=True`` + 末尾空段），
-  所以生产栈里大响应体到这里都是「流式首段」，只接管整段响应等于没接管（实测仍停 0.37 s）；
+  整段和流式都要接管：内层中间件原来都是 ``BaseHTTPMiddleware``，会把每个响应改成流式（数据段
+  ``more_body=True`` + 末尾空段），那时大响应体到这里全是「流式首段」；改成纯 ASGI 之后（spec
+  backend-startup-and-request-overhead R3.1）普通响应到这里是整段，``StreamingResponse`` 仍是流式；
 - 小段、已带 ``Content-Encoding`` 或被排除的类型照上游原逻辑；
 - 预先算好的结果只在上游随后对**同一个 body 对象、同一个 more_body** 调用 ``apply_compression``
   时交出；对不上（上游实现变了）直接报错，不会交错位的数据。

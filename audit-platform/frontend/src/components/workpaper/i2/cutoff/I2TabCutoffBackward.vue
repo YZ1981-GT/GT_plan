@@ -148,6 +148,9 @@
         direction="backward"
         :rows="backwardBeforeRows"
         :is-readonly="isReadonly"
+        :is-row-locked="isVoucherRowLocked"
+        :project-id="projectId"
+        :year="currentYear"
         show-extended
         @update="onUpdate"
         @remove="onRemove"
@@ -165,6 +168,9 @@
         direction="backward"
         :rows="backwardAfterRows"
         :is-readonly="isReadonly"
+        :is-row-locked="isVoucherRowLocked"
+        :project-id="projectId"
+        :year="currentYear"
         show-extended
         @update="onUpdate"
         @remove="onRemove"
@@ -180,6 +186,9 @@
         direction="backward"
         :rows="backwardUnsortedRows"
         :is-readonly="isReadonly"
+        :is-row-locked="isVoucherRowLocked"
+        :project-id="projectId"
+        :year="currentYear"
         show-extended
         @update="onUpdate"
         @remove="onRemove"
@@ -214,15 +223,15 @@
       @applied="saveAuditNote"
     />
 
-    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（1717 开发支出 · I2-14）" width="720px" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`抽凭引擎（${samplingAccountCode} 开发支出 · I2-14）`" width="720px" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog"
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -239,11 +248,11 @@
 
     <el-card shadow="never" class="audit-note-card">
       <template #header><span>四、审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }" placeholder="记录样本选取依据、检查范围、发现的跨期事项及处理..." @change="saveAuditNote" />
+      <WpCommitInput type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }" placeholder="记录样本选取依据、检查范围、发现的跨期事项及处理..." @change="saveAuditNote" />
     </el-card>
     <el-card shadow="never" class="audit-conclusion-card">
       <template #header><span>五、审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }" placeholder="基于测试结果，判断开发支出截止认定是否恰当..." @change="saveAuditConclusion" />
+      <WpCommitInput type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }" placeholder="基于测试结果，判断开发支出截止认定是否恰当..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="guidance-details">
@@ -260,6 +269,7 @@
 
 <script setup lang="ts">
 import { inject, toRef, ref, watch, computed, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -285,6 +295,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
  */
 import { i2GrossQueryCodes } from '@/components/workpaper/composables/i2AccountScope'
 import type { TbSourceCodes } from '@/components/workpaper/composables/shared/tbSourceCodes'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 /** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 1704；逗号拼接供引擎 split） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -338,6 +349,10 @@ const {
   persistCompletion,
   syncCriteriaToPeer,
   flushAutoSave,
+  onEngineFilled,
+  onUndoRequest,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useI2Cutoff({
   allResponses: toRef(props, 'allResponses'),
   saveResponses: props.saveResponse,
@@ -388,6 +403,7 @@ watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
 onMounted(() => {
   hydrateAudit()
   void fetchHint()
+  void voucherFillReady()
 })
 onBeforeUnmount(() => { void flushAutoSave() })
 
@@ -452,16 +468,12 @@ function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: Fi
   showCutoffPanel.value = false
   ElMessage.success(`截止模块已填入 ${payload.samples.length} 笔（单据日期请查原件后补填）`)
 }
-function handleVoucherFilled(payload: any) {
-  const vouchers = payload?.samples ?? []
-  importExtractedVouchers('backward', vouchers.map((v: any) => ({
-    voucher_date: v.voucherDate ?? v.voucher_date,
-    voucher_no: v.voucherNo ?? v.voucher_no,
-    summary: v.summary,
-    amount: Number(v.debitAmount ?? v.debit_amount ?? 0),
-  })), { fillDocumentDate: false })
-  showSamplingDialog.value = false
-  if (vouchers.length) ElMessage.success(`抽凭已填入 ${vouchers.length} 笔`)
+/** 抽凭回填走共享函数：一个样本一行（记账日期、凭证号、金额、摘要），按分录指纹去重；单据日期查原件后补填 */
+async function handleVoucherFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology(payload?.methodology)
+  const out = await onEngineFilled('backward', payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 async function handleDraftAje() {
   await draftAjeFromCrossPeriod('backward')

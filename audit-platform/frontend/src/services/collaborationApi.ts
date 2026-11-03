@@ -2,6 +2,7 @@
  * 协作与质控 API 服务层
  */
 import http from '@/utils/http'
+import { invalidateProjectListQuery } from '@/services/projectListQuery'
 import {
   auth, notifications, projects, users, reviews, sync, auditLogs,
   projectMgmt, archive, subsequentEvents, pbc, confirmations,
@@ -33,9 +34,21 @@ export const notificationApi = {
 export const projectApi = {
   list: () => http.get(projects.list),
   get: (id: string) => http.get(projects.detail(id)),
-  create: (data: any) => http.post(projects.list, data),
-  update: (id: string, data: any) => http.put(projects.detail(id), data),
-  delete: (id: string) => http.delete(projects.detail(id)),
+  create: async (data: any) => {
+    const response = await http.post(projects.list, data)
+    invalidateProjectListQuery()
+    return response
+  },
+  update: async (id: string, data: any) => {
+    const response = await http.put(projects.detail(id), data)
+    invalidateProjectListQuery()
+    return response
+  },
+  delete: async (id: string) => {
+    const response = await http.delete(projects.detail(id))
+    invalidateProjectListQuery()
+    return response
+  },
 }
 
 export const userApi = {

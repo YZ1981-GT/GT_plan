@@ -197,9 +197,9 @@
       </el-table-column>
 
       <!-- 抽凭 + OCR列 -->
-      <el-table-column label="📎" width="90" align="center">
+      <el-table-column label="📎" width="110" align="center">
         <template #default="{ row }">
-          <el-button size="small" link @click="handleVoucherSampling(row)" title="行级抽凭">📋</el-button>
+          <el-button size="small" link @click="handleVoucherSampling(row)" title="行级抽凭">📋{{ vouchersOf(row.rowId).length || '' }}</el-button>
           <el-upload
             :show-file-list="false"
             :before-upload="(file: any) => handleOcrUpload(row, file)"
@@ -208,6 +208,7 @@
           >
             <el-button size="small" link title="OCR识别">📎</el-button>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
         </template>
       </el-table-column>
 
@@ -218,6 +219,19 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 行级抽凭明细（共享回填函数：一个对方科目一行，挂到往来对象行；年审阶段预审行只读） -->
+    <K3RowVoucherTable
+      :rows="rowVouchers"
+      :is-readonly="isReadonly"
+      :is-row-locked="isRowVoucherLocked"
+      :row-class-name="rowVoucherClass"
+      :project-id="props.projectId"
+      :year="year"
+      :target-ids="rowVoucherTargetIds"
+      @change="persistRowVouchers"
+      @remove="removeVoucher"
+    />
 
     <!-- 不合规红色摘要 -->
     <el-alert
@@ -271,9 +285,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="year"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -285,6 +299,7 @@
  * Spec: .kiro/specs/k3-other-payables/ | Task: 4.5
  * Requirements: 6.1-6.3, 6.5
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -301,11 +316,16 @@ import http from '@/utils/http'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { k3QueryCodes } from '../../composables/k3AccountScope'
+import K3RowVoucherTable from './K3RowVoucherTable.vue'
+import { useK3RowVoucherFill } from '../../composables/k3RowVoucherFill'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -321,6 +341,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K3-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -350,6 +373,21 @@ const {
   initRelatedPartyFromDetail,
   saveAll,
 } = useK3Checks({ allResponses: allResponsesRef as any, saveResponse: saveResponseFn })
+
+// ─── 行级抽凭明细（共享回填函数）：行上「📋」抽到的、挂凭导入的凭证挂到往来对象行 ─────────────
+const {
+  rows: rowVouchers, persist: persistRowVouchers, onEngineFilled, onAttachImported, onUndoRequest,
+  rowClass: rowVoucherClass, isRowLocked: isRowVoucherLocked, ready: rowVoucherFillReady, vouchersOf, removeVoucher,
+} = useK3RowVoucherFill({
+  sheet: 'K3-6',
+  allResponses: () => props.allResponses,
+  save: (itemId, payload) => saveResponseFn(itemId, payload),
+  projectId: () => props.projectId,
+  readonly: () => props.isReadonly,
+  targets: () => relatedPartyRows.value.map((r) => ({ rowId: r.rowId, counterparty: r.counterparty })),
+})
+onMounted(() => { void rowVoucherFillReady() })
+const rowVoucherTargetIds = computed(() => relatedPartyRows.value.map(r => r.rowId))
 
 // ─── 审计说明 ────────────────────────────────────────────────────────────────
 
@@ -460,7 +498,7 @@ const K3_ACCOUNT_PREFIXES = computed(() => k3QueryCodes(_injectedTbSrc?.value ??
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -468,25 +506,29 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K3_ACCOUNT_PREFIXES.value,
+      props.projectId, year.value, props.wpId, K3_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any): void {
-  if (currentSamplingRow.value && payload?.voucherNo) {
-    currentSamplingRow.value.remark = currentSamplingRow.value.remark
-      ? `${currentSamplingRow.value.remark} [凭证:${payload.voucherNo}]`
-      : `[凭证:${payload.voucherNo}]`
-    persistRows()
-  }
-  showSamplingDialog.value = false
+/**
+ * 行上「📋」抽凭回填：样本挂到发起抽凭的往来对象行，记进行级抽凭明细（按分录指纹去重，填完由共享函数保存并提示
+ * 填入几行）。原实现读 `payload.voucherNo`（载荷是 `{ samples, … }`）⇒ 抽凭与挂凭导入都是空操作。
+ */
+async function onSampleFilled(payload: EngineFilledPayload): Promise<void> {
+  const target = currentSamplingRow.value
+  const out = await onEngineFilled(payload, target ? { rowId: target.rowId, counterparty: target.counterparty } : null)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ─── OCR ─────────────────────────────────────────────────────────────────────
@@ -495,11 +537,15 @@ async function handleOcrUpload(row: K3RelatedPartyRow, file: File): Promise<bool
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
 
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    // 识别端点按底稿挂载（原写 `/api/d4/contract-ocr` 缺底稿 id，后端无此路由 ⇒ 恒 404）；回执正文字段是 ocr_text
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    const ocrResult = res.data?.data?.text || res.data?.text || ''
+    rowEv.refresh()
+    const data = res.data?.data ?? res.data
+    const ocrResult: string = data?.ocr_text || ''
 
     if (!ocrResult) {
       ElMessage.warning('OCR未识别出内容')

@@ -46,6 +46,8 @@ class ReviewInboxService:
             WorkingPaper.review_status.in_([
                 WpReviewStatus.pending_level1,
                 WpReviewStatus.pending_level2,
+                WpReviewStatus.pending_level3,
+                WpReviewStatus.pending_level4,
             ]),
         ]
         if project_id:
@@ -121,75 +123,9 @@ class ReviewInboxService:
 
 
 # ---------------------------------------------------------------------------
-# 2. 批量复核操作
+# 2. 批量复核操作 —— 2026-10-31 删除（唯一调用方 pm_dashboard.batch_review 从未可达，且绕过复核状态机；
+#    见 routers/pm_dashboard.py §2 说明）
 # ---------------------------------------------------------------------------
-
-class BatchReviewService:
-    """批量通过 / 批量退回底稿"""
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
-
-    async def batch_review(
-        self,
-        project_id: uuid.UUID,
-        wp_ids: list[uuid.UUID],
-        action: str,  # "approve" | "reject"
-        reviewer_id: uuid.UUID,
-        comment: str = "",
-    ) -> dict[str, Any]:
-        """
-        批量操作：
-        - approve: pending_level1 → level1_passed, pending_level2 → level2_passed
-        - reject:  pending_level1 → level1_rejected, pending_level2 → level2_rejected
-        """
-        q = (
-            select(WorkingPaper)
-            .where(
-                WorkingPaper.id.in_(wp_ids),
-                WorkingPaper.project_id == project_id,
-                WorkingPaper.is_deleted == False,
-                WorkingPaper.reviewer == reviewer_id,
-            )
-        )
-        result = (await self.db.execute(q)).scalars().all()
-
-        succeeded, skipped = [], []
-        for wp in result:
-            rs = wp.review_status
-            if action == "approve":
-                if rs == WpReviewStatus.pending_level1:
-                    wp.review_status = WpReviewStatus.level1_passed
-                    wp.status = WpFileStatus.review_passed
-                elif rs == WpReviewStatus.pending_level2:
-                    wp.review_status = WpReviewStatus.level2_passed
-                    wp.status = WpFileStatus.review_passed
-                else:
-                    skipped.append(str(wp.id))
-                    continue
-            elif action == "reject":
-                if rs == WpReviewStatus.pending_level1:
-                    wp.review_status = WpReviewStatus.level1_rejected
-                    wp.status = WpFileStatus.revision_required
-                elif rs == WpReviewStatus.pending_level2:
-                    wp.review_status = WpReviewStatus.level2_rejected
-                    wp.status = WpFileStatus.revision_required
-                else:
-                    skipped.append(str(wp.id))
-                    continue
-            else:
-                skipped.append(str(wp.id))
-                continue
-
-            wp.updated_at = datetime.now(timezone.utc)
-            succeeded.append(str(wp.id))
-
-        return {
-            "succeeded": succeeded,
-            "skipped": skipped,
-            "succeeded_count": len(succeeded),
-            "skipped_count": len(skipped),
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +234,9 @@ def _classify_status(status: WpFileStatus | None, review_status: WpReviewStatus 
         return "passed"
     if review_status in (
         WpReviewStatus.pending_level1, WpReviewStatus.pending_level2,
+        WpReviewStatus.pending_level3, WpReviewStatus.pending_level4,
         WpReviewStatus.level1_in_progress, WpReviewStatus.level2_in_progress,
+        WpReviewStatus.level3_in_progress, WpReviewStatus.level4_in_progress,
     ):
         return "pending_review"
     if status in (WpFileStatus.draft, WpFileStatus.edit_complete, WpFileStatus.under_review, WpFileStatus.revision_required):

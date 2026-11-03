@@ -64,6 +64,7 @@
           </el-button>
           <!-- HTML 路径此前无「面板」入口；SidePanel/AttachmentTabPanel 仅挂在 Univer 分支会导致 Drawer_Host 不可达 -->
           <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账</el-button>
+          <QueryDetailEntry kind="workpaper" variant="button" :target="wpDetail" :year="projectYear" label="查明细" />
           <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
             <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
           </el-badge>
@@ -76,7 +77,9 @@
         v-if="useHtmlRenderer && projectYear != null"
         :wp-id="wpId"
         :audit-year="projectYear"
+        :readonly="editLock.forcedReadonly.value || isArchived || !canEdit"
         :initial-sheet="initialSheetFromQuery"
+        :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
         @save-success="onChildSaved"
         @saved-notify="onChildSaved"
         @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
@@ -116,6 +119,7 @@
           style="margin-right: 8px"
         >🧭 审计导航图</el-button>
         <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账</el-button>
+        <QueryDetailEntry kind="workpaper" variant="button" :target="wpDetail" :year="projectYear" label="查明细" />
         <WpExportButton
           v-if="wpDetail"
           :project-id="projectId"
@@ -241,8 +245,8 @@
     <UniverEditorCore
       v-if="modeResolved"
       ref="univerEditorCoreRef"
-      :project-id="projectId"
-      :wp-id="wpId"
+      :project-id="projectId" :project-year="projectYear"
+      :wp-id="wpId" :initial-sheet="initialSheetFromQuery" :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
       :wp-detail="wpDetail!"
       :can-edit="effectiveCanEdit"
       :sheet-nav-facade="sheetNavFacade"
@@ -279,7 +283,7 @@
     <!-- 编制说明面板内容（trigger/placement 由 shell 拥有；G-RAIL adapter） -->
     <template #guidance-panel>
       <WpGuidancePanel
-        v-if="wpDetail && projectYear != null"
+        v-if="wpDetail && projectYear != null && guidanceContextReady"
         shell-owned
         :wp-id="wpId"
         :wp-code="wpDetail.wp_code || ''"
@@ -383,7 +387,7 @@
       :wp-id="wpId"
       :year="projectYear"
       :wp-code="wpDetail?.wp_code"
-      :decision-trace="renderConfig?.decision_trace ?? null"
+      :decision-trace="sidePanelDecisionTrace"
       @finecheck-update="fineCheckFailCount = $event"
     />
   </el-drawer>
@@ -402,7 +406,7 @@
  *
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
-import { ref, computed, provide, onMounted, onUnmounted, nextTick, watch, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, watch, inject, defineAsyncComponent } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -417,7 +421,6 @@ import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
 import {
   resolveUniverSheetContext,
-  useWpRenderer,
   type RenderConfig,
   type SheetRenderConfig,
   type WorkpaperSheetContext,
@@ -451,6 +454,7 @@ import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 import AuditYearMissingResult from '@/components/common/AuditYearMissingResult.vue'
@@ -466,11 +470,12 @@ import { Clock } from '@element-plus/icons-vue'
 import { openLedgerWindow } from '@/utils/openLedgerWindow'
 import { useWorkpaperProjectMeta } from './workpaper-editor/useWorkpaperProjectMeta'
 import { useShellCapability } from './workpaper-editor/useShellCapability'
+import { useEditorRendererFacts, type UniverCatalogFacts } from './workpaper-editor/useEditorRendererFacts'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
 const router = useRouter()
-const { canEdit } = useAuditContext()
+const { canEdit, isArchived } = useAuditContext()
 
 // ─── 全局复核对话 provider（驱动右侧面板 + GtWpReviewRail + 子组件 inject） ──
 const { isOpen: reviewPanelOpen, activationParams: reviewActivation, openReviewDialog: openReview, closeReviewDialog: closeReview } = useReviewDialogProvider()
@@ -492,7 +497,6 @@ function onShellCloseReview(): void {
 }
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
-const { renderConfig } = useWpRenderer(wpId, { silent: true }) // 只给侧栏 decision_trace，失败不弹全局提示（R10）
 // 深链 ?sheet= 初始激活底稿页签（无 ?cell= 的纯 Tab 导航，如附注→披露表跳转）。
 // GtWpRenderer 仅 initialSheet + locate-cell 事件切页；此前未接线导致纯 ?sheet= 被忽略回退底稿目录。
 const initialSheetFromQuery = computed<string | undefined>(() => {
@@ -628,7 +632,7 @@ const sheetNavFacade = useSheetNavFacade(univerAPIRef, wpDetail, cycleType, scen
 const sheetNavActiveId = sheetNavFacade.activeSheetId
 const univerRenderSheets = ref<SheetRenderConfig[]>([])
 const univerSheetIdentityReady = ref(false)
-const univerWpCode = ref<string | null>(null)
+const univerCatalog = ref<UniverCatalogFacts | null>(null)
 /** Univer/OnlyOffice host shares the same revision-owner contract as HTML Task 11. */
 const univerContextEmitter = createHtmlStableContextEmitter()
 let univerIdentityRequestId = 0
@@ -638,7 +642,7 @@ async function loadUniverSheetIdentityCatalog(): Promise<void> {
   const requestId = ++univerIdentityRequestId
   const requestedWpId = wpId.value
   univerRenderSheets.value = []
-  univerWpCode.value = null
+  univerCatalog.value = null
   univerSheetIdentityReady.value = false
   if (!requestedWpId || useHtmlRenderer.value) return
   try {
@@ -647,12 +651,12 @@ async function loadUniverSheetIdentityCatalog(): Promise<void> {
     )
     if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
     univerRenderSheets.value = Array.isArray(config?.sheets) ? config.sheets : []
-    univerWpCode.value = config?.wp_code ?? null
+    univerCatalog.value = { wpCode: config?.wp_code ?? null, decisionTrace: config?.decision_trace ?? null }
   } catch {
     if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
     // 目录不可用时仍允许以真实 engine name 请求，后端 guidance membership 继续 fail-closed。
     univerRenderSheets.value = []
-    univerWpCode.value = null
+    univerCatalog.value = null
   } finally {
     if (requestId === univerIdentityRequestId && requestedWpId === wpId.value) {
       univerSheetIdentityReady.value = true
@@ -678,7 +682,7 @@ const { cycleDialogs, fCycle, iCycle, gCycle, kCycle, lCycle, mCycle, nCycle } =
   wpId,
   sheetNavActiveId,
   sheetNavFacade,
-  cycleType,
+  cycleType, projectYear,
 })
 
 // ─── 编辑锁 ─────────────────────────────────────────────────────────────────
@@ -687,8 +691,7 @@ const editLock = useEditingLock({
   enabled: canEdit, // 只读身份不取锁（取锁被拒会留拒绝记录、还可能把要编辑的人挤成只读，R2）
 })
 
-// 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
-// spec: multi-window-ledger-workbench Phase 3 Task 18
+// 多窗口门禁（spec: multi-window-ledger-workbench Phase 3 Task 18）：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
 const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
 
 // ─── 前置状态横幅 ────────────────────────────────────────────────────────────
@@ -708,7 +711,8 @@ const wpRefresh = useWorkpaperRefresh({
   projectId: () => projectId.value,
   wpId: () => wpId.value,
   onRefresh: async () => {
-    if (manualRefreshing.value) return
+    // 只读（无编辑权 / 编辑锁在别的窗口）不重建模板文件：这是写操作，后端会 423（workpaper-multi-window-lock-gaps R3.5）
+    if (manualRefreshing.value || !effectiveCanEdit.value) return
     manualRefreshing.value = true
     try {
       await httpApi.post(
@@ -853,7 +857,7 @@ function updateUniverSheetContext(sheetId: string) {
     sheetNavFacade.flatSheets.value,
     sheetId,
     univerRenderSheets.value,
-    wpDetail.value?.wp_code || univerWpCode.value || null,
+    wpDetail.value?.wp_code || univerCatalog.value?.wpCode || null,
   )
   if (!context) return
   // Univer native/custom/locate converge here — same revision owner as HTML emitter contract.
@@ -977,6 +981,7 @@ const activeSheetContext = ref<WorkpaperSheetContext>({
 /** Task 12 shell bridge — live capability snapshot（useShellCapability）。 */
 const { shellOwnerEpoch, shellCapabilityEpoch, shellError, shellCapabilitySnapshot } =
   useShellCapability({ wpId, projectId, activeSheetContext })
+const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext })
 
 const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
   if (!wpDetail.value || projectYear.value == null) return null // 未设置审计年度：页面不渲染底稿，没有可定位的年度
@@ -1155,9 +1160,9 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 
-// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）；年度 = 本底稿所属项目的审计年度，没有就不带（查账窗口按项目审计年度取）
 function onOpenLedgerWindow() {
-  openLedgerWindow(projectId.value, projectStore.year)
+  openLedgerWindow(projectId.value, projectYear.value ?? undefined)
 }
 
 function goBack() {
@@ -1207,12 +1212,8 @@ onMounted(() => {
     }
 
     await loadUniverSheetIdentityCatalog()
-    if (componentType.value === 'univer' || !componentType.value) {
-      // UniverEditorCore 内部处理 initUniver
-      loading.value = false
-    } else {
-      loading.value = false
-    }
+    // UniverEditorCore 内部处理 initUniver；深链 ?sheet= / ?cell= 经其 initial-sheet / initial-cell 在 Univer 就绪后执行
+    loading.value = false
   })()
 
   // 加载程序步骤映射
@@ -1223,24 +1224,6 @@ onMounted(() => {
 
   // 加载复核对话线程列表
   loadReviewThreadList()
-
-  // wp-locate-foundation Task 4.2: 读 route.query.sheet / cell → 触发定位
-  // 使用 nextTick + 短延迟确保 GtWpRenderer 已挂载
-  // 注意：仅 queryCell 存在时触发 locate-cell（定位单元格）。
-  // 单独 querySheet 无 cell 时，是 Tab 导航请求，由 bundle 组件内部 watcher 处理。
-  const querySheet = route.query.sheet as string | undefined
-  const queryCell = route.query.cell as string | undefined
-  if (queryCell) {
-    nextTick(() => {
-      setTimeout(() => {
-        eventBus.emit('workpaper:locate-cell', {
-          wpId: wpId.value,
-          sheetName: querySheet || undefined,
-          cellRef: queryCell || '',
-        })
-      }, 300)
-    })
-  }
 
   // 浏览器关闭/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)

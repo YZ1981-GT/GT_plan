@@ -44,8 +44,9 @@ instrumentation 时才会被检出——Task 6/7/8/9 的判据全部用 monkeypa
    3 个**列组**（列组不能插入，只能占位映射）。D3-4 是"前端 N 行 → 模板预画 4/3 **行**占位"的
    行数问题，本质不同——行表引擎的 row-shift 机制正是为后者设计（`_grow_managed_table_ref`）。
 
-⇒ 声明两个标准 `RowTableSheetSpec`（`binding_kind` 用默认值 `excel_table`），`row_identity_key
-='rowId'`（UUID 动态行，同 D3-6/D1-4 前两区）。
+⇒ 声明两个标准 `RowTableSheetSpec`（`binding_kind` 用默认值 `excel_table`）。行身份键原写
+`'rowId'`（照抄 D3-6/D1-4），前端与导入实际只写 `rowKey` ⇒ 2026-10-27 改为 `rowKey`（见
+`ROW_IDENTITY_KEY_D304`）；段②表头与列也改按 R20（见 `FIELD_SPECS_D304_CREDIT`）。
 
 ═══ 🔴 sheet_key 共享（不照抄 design.md 旧骨架的两个不同 sheet_key）═══
 
@@ -169,14 +170,29 @@ MANAGED_LAST_COL_D304: Final[str] = "D"
 UUID_COL_DEBIT: Final[str] = "J"
 UUID_COL_CREDIT: Final[str] = "K"
 
-#: 4 个受管字段（7 元组，末位 group_header_cell 为 "" —— 单级表头无分组）。
-#: 顺序即 Excel 列序 A→D；表头文本与 R10 逐字相等（实测：项目/金额/数据来源/备注）。
-#: 两区字段结构完全同构（同一份表头，只是数据行区间不同），共用同一份 field_specs。
+#: 🔴 行身份键取前端实际存的 `rowKey`（spec oo-writeback-template-parity-closure R3 任务 9.4c）：
+#:    `useD3Analysis.AnalysisRow` 与导入 `_parse_d3_4_row` 都只写 rowKey（导入时缺省取项目名），原声明 `rowId`
+#:    ⇒ 接通后每一行都按「缺少稳定行身份」fail-closed。
+ROW_IDENTITY_KEY_D304: Final[str] = "rowKey"
+
+#: 段①借方：4 个受管字段（7 元组，单级表头无分组）。表头与 R10 逐字相等（项目/金额/数据来源/备注）。
 FIELD_SPECS_D304: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("label", "A", "editable", "text", "label", "项目", ""),
     ("amount", "B", "editable", "amount", "amount", "金额", ""),
     ("source", "C", "editable", "text", "source", "数据来源", ""),
     ("remark", "D", "editable", "text", "remark", "备注", ""),
+)
+
+#: 段②贷方：表头是 R20（A20 空，B 金额 / C 数据来源 / D 与对方科目核对 / E 说明），与段①不同构。
+#: 🔴 原两段共用段①的字段 ⇒ D「与对方科目核对」接成了备注、E「说明」没管（同 D7-4 贷方区）。
+#:    前端贷方行补 `counterCheck`（模板有、前端没有的列前端补上，spec R3.1），备注 `remark` 接 E 说明。
+HEADER_ROW_D304_CREDIT: Final[int] = 20
+FIELD_SPECS_D304_CREDIT: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
+    ("label", "A", "editable", "text", "label", "项目", ""),
+    ("amount", "B", "editable", "amount", "amount", "金额", ""),
+    ("source", "C", "editable", "text", "source", "数据来源", ""),
+    ("counter_check", "D", "editable", "text", "counterCheck", "与对方科目核对", ""),
+    ("remark", "E", "editable", "text", "remark", "说明", ""),
 )
 
 
@@ -191,10 +207,12 @@ def _base_spec(
     footer_marker: str,
     footer_carries_total_formula: bool,
     uuid_col: str,
+    header_row: int,
+    field_specs: tuple[tuple[str, str, str, str, str, str, str], ...],
 ) -> RowTableSheetSpec:
-    """两区共用骨架，只差几何/键/身份列/footer 公式性质（同 `phase5_d1_04_bad_debt._base_spec`
-    手法，不复制两份字段声明）。本表数据行本身无公式列（差异/说明在 footer 行，不在数据行区间
-    内），故不传 `formula_columns`（默认空 tuple，`formula_mask` property 现算为空）。
+    """两区共用骨架，只差几何/键/身份列/footer 公式性质/表头（同 `phase5_d1_04_bad_debt._base_spec`
+    手法）。本表数据行本身无公式列（差异/说明在 footer 行，不在数据行区间内），故不传
+    `formula_columns`（默认空 tuple，`formula_mask` property 现算为空）。
     """
     return RowTableSheetSpec(
         managed_sheet=MANAGED_SHEET_D304,
@@ -206,12 +224,12 @@ def _base_spec(
         first_data_row=first_data_row,
         last_data_row=last_data_row,
         footer_row=footer_row,
-        header_row=HEADER_ROW_D304,
+        header_row=header_row,
         store_item_id=store_item_id,
         empty_payload="[]",
-        row_identity_key="rowId",
+        row_identity_key=ROW_IDENTITY_KEY_D304,
         store_kind=StoreKind.rows,
-        field_specs=FIELD_SPECS_D304,
+        field_specs=field_specs,
         footer_marker=footer_marker,
         footer_carries_total_formula=footer_carries_total_formula,
         error_label=f"D3-4 预收账款分析表（{section}）",
@@ -232,6 +250,8 @@ SPEC_D304_DEBIT: Final[RowTableSheetSpec] = _base_spec(
     footer_marker=FOOTER_MARKER_DEBIT,
     footer_carries_total_formula=True,
     uuid_col=UUID_COL_DEBIT,
+    header_row=HEADER_ROW_D304,
+    field_specs=FIELD_SPECS_D304,
 )
 
 #: 段②：贷方发生额分析（数据行 22-23，UUID 列 K，footer=差异合理性分析 R25）。
@@ -249,6 +269,8 @@ SPEC_D304_CREDIT: Final[RowTableSheetSpec] = _base_spec(
     footer_marker=FOOTER_MARKER_CREDIT,
     footer_carries_total_formula=False,
     uuid_col=UUID_COL_CREDIT,
+    header_row=HEADER_ROW_D304_CREDIT,
+    field_specs=FIELD_SPECS_D304_CREDIT,
 )
 
 #: 双区清单（顺序即 Excel 行序：段①在段②之上）。

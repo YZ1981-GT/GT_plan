@@ -5,6 +5,7 @@
  * 检查账龄、定价政策、交易性质和期后付款 → 评价披露与未识别关联方风险。
  */
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcConcentration, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { computeF4DetailRow, migrateF4DetailRows } from './useF4Detail'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
@@ -58,7 +59,7 @@ export interface RelatedPartyAPRow {
   riskLevel: 'none' | 'warning' | 'danger'
 }
 
-interface StoredRelatedPartyRow {
+export interface StoredRelatedPartyRow {
   rowId: string
   seq: number
   sourceRowId: string
@@ -271,7 +272,7 @@ function isBlankRow(row: StoredRelatedPartyRow): boolean {
     && !row.postPaymentAmount && !row.indexNo && !row.remark && !row.sourceRowId
 }
 
-function computeRow(
+export function computeRow(
   stored: StoredRelatedPartyRow,
   totalClosing: number,
   source?: F4RelatedPartyCandidate,
@@ -558,6 +559,15 @@ export function useF4RelatedParty(options: UseF4RelatedPartyOptions) {
     if (row.riskLevel === 'warning') return 'related-risk-warning'
     return ''
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

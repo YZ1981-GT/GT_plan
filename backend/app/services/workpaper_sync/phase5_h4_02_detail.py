@@ -186,10 +186,13 @@ FIELD_SPECS_H402: Final[
     ("begin_amount", "G", "editable", "amount", "beginAmount", "金额", "E10"),
     ("increase_qty", "H", "editable", "amount", "increaseQty", "数量", "H10"),
     ("increase_unit_price", "I", "formula", "amount", "increaseUnitPrice", "单价", "H10"),
-    ("increase_subtotal", "J", "editable", "amount", "increaseSubtotal", "金额", "H10"),
+    # 🔴 J / M 模板是录入格，前端由子项推出（J = 采购 + 其他增加，M = 领用 + 退回 + 报废 + 其他减少，子项模板
+    #    没有、只在 HTML 侧）⇒ auto_source（HTML 侧带出，OO 改了报受保护冲突；spec oo-writeback-template-parity-closure
+    #    R3 批 B，原 editable 时对拍守卫登记「前端改写录入值」两条例外）
+    ("increase_subtotal", "J", "auto_source", "amount", "increaseSubtotal", "金额", "H10"),
     ("decrease_qty", "K", "editable", "amount", "decreaseQty", "数量", "K10"),
     ("decrease_unit_price", "L", "formula", "amount", "decreaseUnitPrice", "单价", "K10"),
-    ("decrease_total", "M", "editable", "amount", "decreaseTotal", "金额", "K10"),
+    ("decrease_total", "M", "auto_source", "amount", "decreaseTotal", "金额", "K10"),
     ("end_qty", "N", "formula", "amount", "endQty", "数量", "N10"),
     ("end_unit_price", "O", "formula", "amount", "endUnitPrice", "单价", "N10"),
     ("end_amount", "P", "formula", "amount", "endAmount", "金额", "N10"),

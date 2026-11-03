@@ -57,6 +57,8 @@
             <span class="ocr-picker__filename">{{ att.file_name }}</span>
             <el-tag size="small" type="success" effect="light" class="ocr-picker__tag">可OCR</el-tag>
           </el-checkbox>
+          <!-- 勾选前可先看原件（放在复选框外，点小眼睛不改变勾选） -->
+          <AttachmentEyeButton :attachment-id="att.id" :file-name="att.file_name" />
         </div>
       </el-checkbox-group>
     </div>
@@ -79,6 +81,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { useOcrAttachmentCache, truncateOcrText } from '@/composables/useOcrAttachmentCache'
 
 // ─── Props / Emits ────────────────────────────────────────────────────────────
@@ -206,6 +209,9 @@ function handleCancel(): void {
   overflow-y: auto;
 }
 .ocr-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 0;
   border-bottom: 1px solid #f0f0f0;
 }

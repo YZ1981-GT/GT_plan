@@ -161,8 +161,10 @@ class TestTheViewCarriesTheClear:
 
 class TestTheCoordinatorUsesTheView:
     def test_mirror_receives_the_view_not_the_raw_merged(self) -> None:
-        """接线：`_apply_committed` 把视图交给镜像（AST，注释/docstring 骗不过）。"""
-        fn = ast.parse(textwrap.dedent(inspect.getsource(OoToHtmlCoordinator._apply_committed)))
+        """接线：事务 hook helper 把清空视图交给镜像，并显式禁止内部提交。"""
+        fn = ast.parse(textwrap.dedent(inspect.getsource(
+            OoToHtmlCoordinator._mirror_store_backed_in_transaction
+        )))
         view_calls = [
             n for n in ast.walk(fn)
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
@@ -180,3 +182,5 @@ class TestTheCoordinatorUsesTheView:
         assert kw["merged_projection"].id == "store_view", (
             "镜像拿到的必须是视图，不是 merged 本身"
         )
+        assert isinstance(kw.get("commit"), ast.Constant)
+        assert kw["commit"].value is False, "事务 hook 内镜像严禁自行 commit"

@@ -305,6 +305,9 @@ def compute_diff_from_templates(
 ) -> dict[str, Any]:
     """Compute diff between SOE and Listed section lists by section_title matching.
 
+    同名节按章类别一一配对（:func:`app.services.note_section_pairing.pair_template_sections`）；
+    独有桶条目带 ``pairing_group``（章行 / 会计政策 / 项目注释 / 母公司章，其余不带）。
+
     Args:
         soe_sections: List of SOE template section dicts
         listed_sections: List of Listed template section dicts
@@ -313,22 +316,16 @@ def compute_diff_from_templates(
         Dict with common_sections, soe_only_sections, listed_only_sections,
         format_diff_sections
     """
-    soe_by_title = _build_title_index(soe_sections)
-    listed_by_title = _build_title_index(listed_sections)
+    from app.services.note_section_pairing import pair_template_sections
 
-    soe_titles = set(soe_by_title.keys())
-    listed_titles = set(listed_by_title.keys())
-
-    common_titles = sorted(soe_titles & listed_titles)
-    soe_only_titles = sorted(soe_titles - listed_titles)
-    listed_only_titles = sorted(listed_titles - soe_titles)
+    # 同名节按章类别配对，每个节恰好进一个桶（原「每个标题只取第一个节」会让第二个起的同名节不进任何桶，
+    # 见 note_section_pairing 模块说明）
+    pairs, soe_rest, listed_rest = pair_template_sections(soe_sections, listed_sections)
 
     common_sections: list[dict[str, Any]] = []
     format_diff_sections: list[dict[str, Any]] = []
 
-    for title in common_titles:
-        soe_s = soe_by_title[title]
-        listed_s = listed_by_title[title]
+    for title, soe_s, listed_s in pairs:
         common_sections.append({
             "section_title": title,
             "soe_section_id": soe_s.get("section_id", ""),
@@ -346,14 +343,15 @@ def compute_diff_from_templates(
                 "field_mapping": diff.get("field_mapping"),
             })
 
-    soe_only_sections = [
-        {"section_id": soe_by_title[t].get("section_id", ""), "title": t}
-        for t in soe_only_titles
-    ]
-    listed_only_sections = [
-        {"section_id": listed_by_title[t].get("section_id", ""), "title": t}
-        for t in listed_only_titles
-    ]
+    def _only(entries: list[tuple[str, dict[str, Any], str | None]]) -> list[dict[str, Any]]:
+        # pairing_group：转换侧别名桥接按它挑同类章的目标（上市「营业收入和营业成本」项目注释章 / 母公司章各一节）
+        return [
+            {"section_id": s.get("section_id", ""), "title": t, **({"pairing_group": g} if g else {})}
+            for t, s, g in entries
+        ]
+
+    soe_only_sections = _only(soe_rest)
+    listed_only_sections = _only(listed_rest)
 
     return {
         "version": "1.0.0",
@@ -867,18 +865,6 @@ def classify_section_mapping(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-
-def _build_title_index(sections: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Build section_title -> first section dict."""
-    index: dict[str, dict[str, Any]] = {}
-    for s in sections:
-        if not isinstance(s, dict):
-            continue
-        title = s.get("section_title", "")
-        if title and title not in index:
-            index[title] = s
-    return index
 
 
 def _compute_from_template_files() -> dict[str, Any]:

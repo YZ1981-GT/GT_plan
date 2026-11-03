@@ -304,6 +304,8 @@ class TestAdoptUsesServerAuthoritativeBody:
         assert set(AdoptRequest.model_fields) == {
             "message_id",
             "host",
+            # spec ai-chat-adopt-and-note-target-picker R2.1：另选目标时的来源会话宿主
+            "source_host",
             "target_cell",
             "target_field",
             "idempotency_key",

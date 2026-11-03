@@ -3,6 +3,7 @@
  * Spec: .kiro/specs/f3-notes-payable/ Task 5.1
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcCreditBalance,
@@ -347,6 +348,15 @@ export function useF3Detail(options: UseF3BaseOptions) {
   function rowClassName({ row }: { row: F3NoteDetailRow }): string {
     return row.overdueDays > 0 ? 'overdue-row' : ''
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

@@ -31,13 +31,15 @@ PROJECT_AUDIT_YEAR_SQL = sa.text(
     ") FROM projects WHERE id = :pid"
 )
 
+# 列 1 是原值（不再 COALESCE 成 'C'）：未填写要让 project_classification 判成 defaulted；
+# 调用方原有的 ``or "C"`` 照旧兜底。列 2 / 3 供 project_classification.resolve（R4）。
 PROJECT_AUDIT_YEAR_BIZ_SQL = sa.text(
     "SELECT COALESCE("
     "  audit_year, "
     "  EXTRACT(YEAR FROM audit_period_end)::int, "
     "  EXTRACT(YEAR FROM audit_period_start)::int"
     "), "
-    "COALESCE(business_category, 'C') "
+    "business_category, scenario, template_type "
     "FROM projects WHERE id = :pid"
 )
 
@@ -100,7 +102,14 @@ async def fetch_project_audit_year(
     db: AsyncSession,
     project_id: UUID | str,
 ) -> int | None:
-    """异步查询项目审计年度（SQL COALESCE 路径）。"""
+    """异步查询项目审计年度；PG 用 COALESCE SQL，其他方言复用 ORM 五级解析。"""
+    if db.get_bind().dialect.name != "postgresql":
+        try:
+            pid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        project = await db.get(Project, pid)
+        return resolve_project_audit_year(project) if project is not None else None
     row = (await db.execute(PROJECT_AUDIT_YEAR_SQL, {"pid": str(project_id)})).first()
     if not row or row[0] is None:
         return None

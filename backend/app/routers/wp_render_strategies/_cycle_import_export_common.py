@@ -566,7 +566,9 @@ def parse_upload_xlsx(
     *,
     header_aliases: dict[str, list[str]] | None = None,
     require_all_headers: bool = True,
+    optional_headers: tuple[str, ...] = (),
 ) -> tuple[list[str], list[tuple]]:
+    """`optional_headers`：后加的列，旧版导出文件没有 —— 缺了照常导入（该列取空），其余列仍须齐。"""
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
@@ -578,7 +580,7 @@ def parse_upload_xlsx(
     ]
     actual = apply_header_aliases(actual, header_aliases)
     if require_all_headers:
-        missing = [h for h in expected_headers if h not in actual]
+        missing = [h for h in expected_headers if h not in actual and h not in optional_headers]
         if missing:
             wb.close()
             raise ValueError(f"缺少列: {', '.join(missing)}")
@@ -878,6 +880,7 @@ def create_cycle_import_export_router(
                 out["warnings"] = [f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped)}"]
             return out
 
+        optional = tuple(sp.get("optional_headers") or ())
         try:
             actual, raw = parse_upload_xlsx(
                 content,
@@ -885,6 +888,7 @@ def create_cycle_import_export_router(
                 header_row=hr,
                 header_aliases=sp.get("header_aliases"),
                 require_all_headers=not bool(sp.get("allow_missing_headers")),
+                optional_headers=optional,
             )
         except ValueError as e:
             return {"ok": False, "errors": [str(e)], "imported_count": 0}
@@ -892,13 +896,15 @@ def create_cycle_import_export_router(
             raise HTTPException(400, "无法解析xlsx文件")
         keys = sp["field_keys"]
         expected = list(sp["headers"])
+        # 旧版文件缺的后加列不写键（写成空串会盖掉前端按缺键给的缺省，如「类别」按分录类型）
+        absent = {k for hd, k in zip(expected, keys) if hd in optional and hd not in actual}
         rows, truncated = import_rows_generic(
             raw,
             actual,
             keys,
-            parse_fn=lambda r, h: parse_row_by_headers(
-                r, h, keys, expected_headers=expected,
-            ),
+            parse_fn=lambda r, h: {
+                k: v for k, v in parse_row_by_headers(r, h, keys, expected_headers=expected).items() if k not in absent
+            },
         )
         item_id = sp.get("item_id", f"{sheet}-rows")
         field = sp.get("storage_field", storage_field)

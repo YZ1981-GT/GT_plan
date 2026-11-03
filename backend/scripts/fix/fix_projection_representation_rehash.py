@@ -265,6 +265,20 @@ async def _current_representation(
     }
 
 
+#: 「artifact 真的不在磁盘上」的唯一标记前缀。
+#:
+#: 🔴 为什么要这个标记：`_recompute_from_artifact` 返回 `None` 有两种**完全不同**的成因
+#:    —— ① 文件真的不在磁盘（存储层 / orphan GC 问题）② 文件可读，但契约声明的结构与
+#:    artifact 不符（契约扩张 ⇒ 重投影输入）。原实现把两者一律结算成
+#:    `blocked_artifact_missing`，并附上「先核对 working_paper_artifact.relative_path」
+#:    的解除建议 —— 对成因 ② 来说这条建议指错了人（文件就在那儿）。真库实测 15 条
+#:    `blocked_artifact_missing` 的诊断里同时含 `ContractDriftError`，说明它们走的是 ②。
+#:    成因 ② 原先只对 `xlsx/gt-d4-operating-revenue` 一条硬编码放行，其余同形态 entry
+#:    继续被错分类。
+#:    spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
+_ARTIFACT_MISSING_PREFIX: Final[str] = "artifact 文件不存在: "
+
+
 def _artifact_path(relative_path: str) -> Path:
     """Resolve DB artifact paths without duplicating the backend root."""
     path = Path(relative_path)
@@ -290,7 +304,7 @@ def _recompute_from_artifact(
 
     path = _artifact_path(relative_path)
     if not path.is_file():
-        return (None, f"artifact 文件不存在: {path}")
+        return (None, f"{_ARTIFACT_MISSING_PREFIX}{path}")
     try:
         contract = load_contract(contract_id)
         specs_fn = getattr(provider, "instrumentation_specs", None)
@@ -338,7 +352,7 @@ def _gtsync_structure_drift(
 
     path = _BACKEND_ROOT / relative_path
     if not path.is_file():
-        return (None, None, f"artifact 文件不存在: {path}")
+        return (None, None, f"{_ARTIFACT_MISSING_PREFIX}{path}")
 
     try:
         data = path.read_bytes()
@@ -724,15 +738,14 @@ async def _process_entry(
         provider=provider,
     )
     if recomputed is None:
-        # A readable legacy artifact can legitimately fail the new D4-29 physical
-        # anchor contract. That is reprojection input, not a missing-file failure.
-        if err and entry_id == "xlsx/gt-d4-operating-revenue" and (
-            "D4-29" in err or "definedName" in err or "结构漂移" in err
-        ):
+        # 🔴 按**失败成因**分流，不按 entry_id 硬编码（见 `_ARTIFACT_MISSING_PREFIX`）：
+        #    artifact 可读但契约声明的结构与它不符 ⇒ 这是重投影输入（契约扩张），
+        #    不是「文件不见了」。只有标记前缀命中才算真缺文件。
+        if err and not err.startswith(_ARTIFACT_MISSING_PREFIX):
             out.stages.append("stale_confirmed")
             out.state = "stale_needs_reprojection"
             out.diagnosis = (
-                f"旧 artifact 可读取但不满足当前 D4-29 物理锚契约: {err}"
+                f"artifact 可读取但不满足当前物理锚 / 契约声明结构: {err}"
                 " ⇒ 使用当前全部 store 重投影生成新 representation"
             )
         else:
@@ -753,6 +766,15 @@ async def _process_entry(
             entry_id=entry_id,
         )
         if drift_err is not None:
+            if not drift_err.startswith(_ARTIFACT_MISSING_PREFIX):
+                # 同上：坐标维读不出也要分「文件缺」与「结构/契约不符」两种成因。
+                out.stages.append("stale_confirmed")
+                out.state = "stale_needs_reprojection"
+                out.diagnosis = (
+                    f"artifact 可读取但冻结坐标维无法观测: {drift_err}"
+                    " ⇒ 重投影产新 content version"
+                )
+                return out
             out.state = "blocked_artifact_missing"
             out.error_code = "artifact_unreadable"
             out.diagnosis = f"{drift_err} · {_STATE_UNBLOCK_OWNER[out.state]}"

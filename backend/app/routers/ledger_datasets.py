@@ -375,7 +375,7 @@ async def cancel_import_job(
         await db.commit()
         ImportJobRunner.request_cancel(job.id)
         if existing_status in (JobStatus.pending, JobStatus.queued):
-            ImportQueueService.release_lock(project_id)
+            await ImportQueueService.release_lock_async(project_id)
             batch_id_raw = (job.options or {}).get("queue_batch_id")
             if batch_id_raw:
                 await ImportQueueService.fail_job(

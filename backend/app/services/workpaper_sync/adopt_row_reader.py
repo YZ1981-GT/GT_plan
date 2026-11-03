@@ -143,12 +143,17 @@ def _facade_accepts_item(fn: Any) -> bool:
 
 
 def _facade_module_name(fn: Any) -> str:
-    """门面的**定义**模块名。
+    """门面的**定义**模块名；绑定式门面取它**绑定的 provider** 模块。
 
-    🔴 用 `__module__` 而不是「provider 模块名」：G3/G4/G5/G6 四家的门面全部 re-export 自
+    🔴 用 `__module__` 而不是「provider 模块名」：原先 G3/G4/G5/G6 四家的门面 re-export 自
     `phase5_g9_store_facade`（design §4.1b(6) 以 `__module__` 现算确认），
     `getattr(provider, "iter_store_rows")` 拿到的是**别家**的函数。
+    批 B3（spec oo-writeback-template-parity-closure R3）起多区门面是 `SectionStoreFacade` 的绑定方法，
+    `__module__` 恒为实现模块 ⇒ 判「借没借别家」看它绑定的 provider（`__self__.provider_module`）。
     """
+    bound_to = getattr(getattr(fn, "__self__", None), "provider_module", None)
+    if isinstance(bound_to, str) and bound_to:
+        return f"app.services.workpaper_sync.{bound_to}"
     return str(getattr(fn, "__module__", "") or "")
 
 
@@ -392,7 +397,7 @@ class RowReaderResolution:
     * **已裁决的跳过**：`reader` 为空、`skip_reason` 非空 ⇒ 调用方按它登记 `skipped_items`；
     * 🔴 **未裁决形态**：两者都为空、`detail` 必非空，见 :attr:`is_unruled_shape`。
       它**不是**「无行」，调用方不得当零行处理。Task 3.4 时现算恰 1 例；Task 3.7 接上 R3 后
-      顶层现算 **0 例**（棘轮基线已清成空集），但**① 级仍会产出它**（G1 的门面没被修好）
+      顶层现算 **0 例**（棘轮基线已清成空集）；批 B3 修好 G1 门面后 ① 级现算也是 0 例
       ⇒ 形态本身保留，它是「门面路给不出结论」的载体。
     """
 
@@ -436,7 +441,7 @@ class RowReaderResolution:
 
     @property
     def is_unruled_shape(self) -> bool:
-        """门面路给不出结论的形态。**① 级现算恰 1 例 / 顶层（三级）现算 0 例**。
+        """门面路给不出结论的形态。**① 级与顶层现算都是 0 例**（批 B3 前 ① 级恰 1 例：G1）。
 
         🔴 Task 3.7 更新：下面整段仍然成立，但它描述的是 **① 级**（:func:`_diagnose_via_facade`）
         的结论。ADR-AOS-005 采纳 R3 后，这 1 例被第 ② 级接住 ⇒ `diagnose_row_reader` 的顶层结论
@@ -444,7 +449,8 @@ class RowReaderResolution:
         「①新增 `SkipReason.section_coverage_incomplete`」那条出路**已被否决**（ADR §6：它把一个
         可修的能力缺口写成永久豁免），故 `SkipReason` 封闭域**六成员不变**。
 
-        以下为 Task 3.4 的原始归因（保留，因为门面那条缺陷本身**没被修**）：
+        以下为 Task 3.4 的原始归因（保留作历史；门面那条缺陷已由 spec oo-writeback-template-parity-closure
+        R3 批 B3 修好：门面按 provider 绑定、三区逐段穿线 ⇒ ① 级也全覆盖）：
 
         `g1.trading_financial_assets_detail / G1-2-rows`。
 
@@ -478,7 +484,8 @@ def _diagnose_via_facade(*, provider: Any, store_item_id: str) -> RowReaderResol
 
     🔴 它**不是**公开入口 —— 公开入口是 :func:`diagnose_row_reader`，后者在本函数给不出
     reader 时接第 ② 级（R3）。直接调本函数会拿到「只有门面路」的结论，那正是 Task 3.7 之前的
-    行为（`G1-2-rows` 判未裁决形态、G3/G4/G5/G6 判 `row_reader_bound_to_other_entry`）。
+    行为（`G1-2-rows` 判未裁决形态、G3/G4/G5/G6 判 `row_reader_bound_to_other_entry`；批 B3 起这几条在
+    本级也可枚举）。
     """
     # ── L2 ────────────────────────────────────────────────────────────────
     facade = _facade_of(provider)

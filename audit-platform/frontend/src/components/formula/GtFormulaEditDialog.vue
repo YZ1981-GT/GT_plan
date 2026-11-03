@@ -190,6 +190,7 @@
 import { ref, computed, reactive, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 import FormulaRefPicker from './FormulaRefPicker.vue'
 import { useFormulaSource, type FormulaSource } from './useFormulaSource'
 
@@ -253,7 +254,8 @@ const emit = defineEmits<{
   'restore-preset': [cellKey: string]
 }>()
 
-const acnr = useAcnr()
+// D9（需求 11.1）：按当前项目订阅 ACNR 失效（组件无项目入参，取路由/store 当前项目）。
+const acnr = useAcnr(useCurrentProjectId())
 const sourceApi = useFormulaSource()
 
 const visible = computed({

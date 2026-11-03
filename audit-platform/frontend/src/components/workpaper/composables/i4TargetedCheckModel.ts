@@ -431,7 +431,7 @@ function _parseI42Rows(raw: unknown): any[] {
  * 减少优先 unadjOtherDecrease / currentDecrease；
  * 无滚动字段时回退按 occurDate 年份代理 originalAmount。
  */
-export function extractI4PeriodMovement(raw: unknown, asOfYear?: number): I4PeriodMovement {
+export function extractI4PeriodMovement(raw: unknown, asOfYear?: number | null): I4PeriodMovement {
   const rows = _parseI42Rows(raw)
   let debitTotal = 0
   let creditTotal = 0
@@ -457,7 +457,8 @@ export function extractI4PeriodMovement(raw: unknown, asOfYear?: number): I4Peri
       continue
     }
     const y = _yearOf(_str(r?.occurDate || r?.date))
-    if (asOfYear == null || y === asOfYear) {
+    // 审计年度未知（项目没填）：按年份判本期无从谈起 ⇒ 不计入本期借方（原先 null 当「不过滤」全部计入）
+    if (asOfYear != null && y === asOfYear) {
       debitTotal += original
     }
   }

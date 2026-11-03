@@ -2,6 +2,7 @@
  * useF2BioAssetSheet — F2-13 消耗性生物资产明细
  * 对齐 Excel：（一）原值收发存+库龄 ·（二）跌价准备 ·（三）净值
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import {
@@ -94,7 +95,7 @@ function emptyAging(segments: AgingSegment[]): AgingData {
 
 /** BP-7 修复：稳定行身份生成器。 */
 function generateF2RowId(): string {
-  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `f2-${newUuid()}`
 }
 
 function emptyRow(id: string, segments: AgingSegment[]): BioAssetRow {

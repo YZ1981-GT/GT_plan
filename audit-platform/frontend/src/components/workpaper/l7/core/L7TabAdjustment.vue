@@ -22,7 +22,7 @@
           保存并发布
         </el-button>
         <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
-        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -154,6 +154,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * L7TabAdjustment — L7-3 调整分录（借贷平衡+EventBus）
  *
@@ -165,7 +166,7 @@ import { computed, inject, onMounted, watch, toRef, type Ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { useL7Adjustment, type L7AdjustmentEntry } from '../../composables/useL7Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
@@ -214,6 +215,7 @@ const {
   wpId: toRef(props, 'wpId') as Ref<string>,
   wpCode: 'L7',
   itemId: () => `L7-adj-${activeType.value}`,
+  entryType: activeType,
   buildLineItems: () =>
     filteredEntries.value.map((e: any) => ({
       account_name: e.accountName,

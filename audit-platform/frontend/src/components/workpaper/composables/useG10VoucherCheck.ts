@@ -1,5 +1,9 @@
 /**
  * useG10VoucherCheck — G10-7 凭证检查（贷方侧，6项核对 + 双表口径）
+ *
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：本期发生额 / 期后两个口径
+ * 各算一张表（「替换本阶段抽凭行」只动当前口径），一个对方科目一行（后端配对），按分录指纹去重，
+ * 行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -31,6 +35,10 @@ import {
 } from './g10VoucherConstants'
 import { G10_ACCOUNT_CODE, G10_ACCOUNT_NAME } from './g10Constants'
 import type { ChecklistResponse } from './useF1FormData'
+import {
+  counterpartText, metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 import { api } from '@/services/apiProxy'
 
 export type G10VoucherTab = 'basic' | 'check' | 'conclusion'
@@ -202,13 +210,35 @@ export function buildG10VoucherSamplingMemo(input: {
   return lines.join('\n')
 }
 
+/** 共享回填函数的待写入项 → G10-7 凭证检查行（口径由所进的表定）：金额在样本自己的借贷栏，对方科目取后端配对 */
+export function mapPreparedToG10VoucherRow(item: PreparedItem, scope: G10VoucherPeriodScope, seq: number): G10VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  return enrichG10VoucherRow({
+    periodScope: scope,
+    voucherDate: s.voucherDate ?? '',
+    voucherNo: s.voucherNo ?? '',
+    businessContent: s.summary ?? '',
+    counterAccount: counterpartText(item),
+    debitAmount: parseNum(item.debitAmount),
+    creditAmount: parseNum(item.creditAmount),
+    source: '抽凭',
+  }, seq)
+}
+
+/** 行上已填附件、支持性文件、索引、异常说明或备注，或有核对项标了不通过（替换与撤销抽凭时据此先确认） */
+export function hasG10VoucherContent(r: G10VoucherCheckRow): boolean {
+  return [r.attachment, r.supportingDocDesc, r.indexNo, r.abnormalDesc, r.remark].some((v) => String(v ?? '').trim() !== '')
+    || [r.check1OriginalComplete, r.check2Authorization, r.check3Accounting, r.check4InitialCost, r.check5Interest,
+      r.check6FairValueCorrect].some((v) => v === false)
+}
+
 function parseRows(json: string | null | undefined): G10VoucherCheckRow[] {
   if (!json) return []
   try {
     const parsed = JSON.parse(json)
-    if (Array.isArray(parsed)) return parsed.map((r, i) => enrichG10VoucherRow(r, i + 1))
+    if (Array.isArray(parsed)) return parsed.map((r, i) => withRowMeta(enrichG10VoucherRow(r, i + 1), r))
     const rows = Array.isArray(parsed?.rows) ? parsed.rows : []
-    return rows.map((r, i) => enrichG10VoucherRow(r, i + 1))
+    return rows.map((r, i) => withRowMeta(enrichG10VoucherRow(r, i + 1), r))
   } catch {
     return []
   }
@@ -231,9 +261,35 @@ export function useG10VoucherCheck(opts: {
   const aiLoading = ref(false)
   const procedureMarking = ref(false)
 
+  /** 已在某个口径的分录（按指纹）：再次回填 / 挂凭导入仍进那个口径 */
+  function scopeHolding(lfp: string | null): G10VoucherPeriodScope | null {
+    if (!lfp) return null
+    return rows.value.find((r) => metaOf(r)?.lfp === lfp)?.periodScope ?? null
+  }
+  /** 两个口径各算一张表：共享回填函数按表替换，「替换本阶段抽凭行」只动当前口径 */
+  const scopeTable = (scope: G10VoucherPeriodScope) => computed<G10VoucherCheckRow[]>({
+    get: () => rows.value.filter((r) => r.periodScope === scope),
+    set: (list) => { rows.value = [...rows.value.filter((r) => r.periodScope !== scope), ...list] },
+  })
+  const scopeTables = { current: scopeTable('current'), subsequent: scopeTable('subsequent') }
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<G10VoucherCheckRow>({
+    projectId: () => opts.projectId?.value,
+    tables: scopeTables,
+    tableOf: (item) => scopeHolding(item.meta.lfp),
+    mapSampleToRow: (item, key) => mapPreparedToG10VoucherRow(item, key as G10VoucherPeriodScope, rows.value.length + 1),
+    persist: () => persist(),
+    hasUserContent: hasG10VoucherContent,
+    afterChange: () => { rows.value.forEach((r, i) => { r.seq = i + 1 }) },
+    readonly: () => opts.isReadonly.value,
+  })
+
   watch(
     () => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (json) => { rows.value = parseRows(json) },
+    (json) => {
+      rows.value = parseRows(json)
+      voucherFill.markLoaded()
+    },
     { immediate: true },
   )
   watch(
@@ -274,8 +330,13 @@ export function useG10VoucherCheck(opts: {
   }
 
   function persist(): void {
+    // 年审阶段预审行按读入版本写回（两个口径各一张表）
+    const guarded = [
+      ...voucherFill.guardPersist(scopeTables.current.value, 'current'),
+      ...voucherFill.guardPersist(scopeTables.subsequent.value, 'subsequent'),
+    ]
     opts.debouncedSave(ITEM_ID_ROWS, {
-      remark: JSON.stringify({ version: ROWS_VERSION, rows: rows.value }),
+      remark: JSON.stringify({ version: ROWS_VERSION, rows: guarded }),
     })
   }
 
@@ -346,7 +407,9 @@ export function useG10VoucherCheck(opts: {
 
   function updateRow(id: string, patch: Partial<G10VoucherCheckRow>): void {
     if (opts.isReadonly.value) return
-    rows.value = rows.value.map((r) => (r.id === id ? recalcG10VoucherAbnormal(enrichG10VoucherRow({ ...r, ...patch }, r.seq)) : r))
+    const current = rows.value.find((r) => r.id === id)
+    if (current && voucherFill.isRowLocked(current)) return
+    rows.value = rows.value.map((r) => (r.id === id ? withRowMeta(recalcG10VoucherAbnormal(enrichG10VoucherRow({ ...r, ...patch }, r.seq)), r) : r))
     persist()
   }
 
@@ -358,6 +421,8 @@ export function useG10VoucherCheck(opts: {
 
   function removeRow(id: string): void {
     if (opts.isReadonly.value) return
+    const current = rows.value.find((r) => r.id === id)
+    if (current && voucherFill.isRowLocked(current)) return
     rows.value = rows.value.filter((r) => r.id !== id).map((r, i) => ({ ...r, seq: i + 1 }))
     persist()
   }
@@ -374,8 +439,18 @@ export function useG10VoucherCheck(opts: {
     persist()
   }
 
+  /** 抽凭引擎回填进当前口径：一个对方科目一行，按分录指纹去重；「替换本阶段抽凭行」只删当前口径本阶段抽凭填入的行 */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload, { tables: [activeScope.value] })
+  }
+
+  /** 从序时账挂入导入当前口径：幂等追加（已在另一口径的分录留在原处） */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples, { tables: [activeScope.value] })
+  }
+
   function loadRows(data: G10VoucherCheckRow[]): void {
-    rows.value = data.map((r, i) => enrichG10VoucherRow(r, i + 1))
+    rows.value = data.map((r, i) => withRowMeta(enrichG10VoucherRow(r, i + 1), r))
     persist()
   }
 
@@ -517,6 +592,13 @@ export function useG10VoucherCheck(opts: {
     removeRow,
     mergeSample,
     loadRows,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     reloadFromStore,
     setActiveRowIndex,
     setPeriodScope,

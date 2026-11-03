@@ -204,9 +204,10 @@
             <span v-else>{{ row.indexRef }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="52" align="center" fixed="right">
+        <el-table-column label="OCR" width="76" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link size="small" :loading="ocrLoadingId === row.rowId" title="上传合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <el-button v-if="!isReadonly" link size="small" :loading="ocrLoadingId === row.rowId" title="上传合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
@@ -284,9 +285,10 @@
             <span v-else>{{ row.remark }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="52" align="center" fixed="right">
+        <el-table-column label="OCR" width="76" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link size="small" :loading="ocrLoadingId === row.rowId" title="上传合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <el-button v-if="!isReadonly" link size="small" :loading="ocrLoadingId === row.rowId" title="上传合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
@@ -401,9 +403,10 @@
             <span v-else>{{ row.indexRef }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="52" align="center" fixed="right">
+        <el-table-column label="OCR" width="76" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link size="small" :loading="ocrLoadingId === row.rowId" title="上传合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <el-button v-if="!isReadonly" link size="small" :loading="ocrLoadingId === row.rowId" title="上传合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
@@ -469,7 +472,8 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双表+无偿调拨 / H1-7·8带入 / 入账差异 / 占比 / H10勾稽 / 无交易 / 导入导出 / A7跳转
  */
 import { ref, computed, inject, toRef, onMounted, defineComponent, h } from 'vue'
-import { ElMessage, ElMessageBox, ElSelect, ElOption } from 'element-plus'
+import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
+import { ElSelect } from '@/components/grid/adapters'
 import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH1LeaseCheck,
@@ -483,6 +487,8 @@ import { useH1ImportExport } from '../../composables/useH1ImportExport'
 import { pullH10DetailRowsForH1 } from '../../composables/h1RelatedH10Pull'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const RELATION_OPTS = ['母公司', '子公司', '联营企业', '合营企业', '关键管理人', '其他关联方']
 
@@ -563,6 +569,9 @@ const AnomalyCell = defineComponent({
 })
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H1-18'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
@@ -865,6 +874,7 @@ async function handleOcr(row: RelatedPartyRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
     ocrLoadingId.value = row.rowId
     try {
       const res = await http.post(
@@ -872,6 +882,7 @@ async function handleOcr(row: RelatedPartyRow) {
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const data = res.data?.data ?? res.data
       const fields = { ...(data?.extracted_fields || {}) }
       if (data?.attachment_id) fields.attachment_id = data.attachment_id

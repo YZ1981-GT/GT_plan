@@ -217,7 +217,7 @@ class TestRegistration:
         wl_l = [m for m in R._ALLOWED_PROVIDER_MODULES if ".phase5_l" in m and "_cycle_common" not in m]
         ledger_l = [r for r in DELIVERED_PER_ENTRY_CONTRACTS if re.match(r"l\d", str(r["contract_id"]))]
         assert len(wl_l) == len(ledger_l), (len(wl_l), len(ledger_l))
-        assert len(wl_l) == 6, f"L 域应 6 条（L1/L2/L3/L4/L6/L7），实得 {len(wl_l)}"
+        assert len(wl_l) == 8, f"L 域应 8 条（L1~L8），实得 {len(wl_l)}"
 
     def test_wp_code_adjudication_targets_the_whole_workbook_code(self) -> None:
         doc = json.loads(

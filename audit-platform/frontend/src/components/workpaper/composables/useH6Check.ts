@@ -24,6 +24,11 @@ import {
   isClearingOverOneYear,
   defaultH6PeriodEnd,
 } from './useH6FormulaEngine'
+import {
+  counterpartText, sideTableOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetLegacyKey, sampleOf, type AssetSample } from './assetVoucherFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -314,11 +319,24 @@ export function mapOcrToH6CheckFields(fields: Record<string, any>): Partial<H6Ch
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：类别、折旧减值、清理费用、结转、原因与批准、索引、核对勾选等 */
+export function hasH6CheckContent(r: H6CheckRow): boolean {
+  return [r.linkedDetailRowId, r.category, r.clearingReason, r.approvedBy, r.indexRef, r.refH1Code, r.refH10Code,
+    r.attachmentUrl].some(v => String(v ?? '').trim() !== '')
+    || [r.accumulatedDepreciation, r.impairment, r.clearingExpense, r.toNonOperating].some(v => Number(v) !== 0)
+    || (r.checks ?? []).some(Boolean)
+}
+
+/** 旧行（没有 `_gt`）身份：凭证号 + 日期 + 借方原值或贷方结转额（原实现按借贷方向写进不同的列） */
+const h6Legacy = (r: H6CheckRow) => assetLegacyKey(r.voucherNo, r.date, r.originalCost || r.toDisposalGain)
+
 export function useH6Check(params: {
   wpId: Ref<string>
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
+  /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+  isReadonly?: Ref<boolean>
 }) {
   const { allResponses, onSave } = params
 
@@ -465,7 +483,8 @@ export function useH6Check(params: {
 
   function load(): void {
     const data = _getItemRaw(ROWS_KEY)
-    rows.value = Array.isArray(data) ? data.map(_normalizeRow) : []
+    rows.value = Array.isArray(data) ? data.map((r: any) => withRowMeta(_normalizeRow(r), r)) : []
+    voucherFill.markLoaded()
 
     const reasons = _getItemRaw(REASONS_KEY)
     if (reasons && typeof reasons === 'object') {
@@ -498,6 +517,46 @@ export function useH6Check(params: {
       }
     }
   }
+
+  /**
+   * 共享回填函数的待写入项 → 检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：一个样本一行，
+   * 对方科目「编码 名称」按后端配对（多个用「/」，配不上「多科目」）；按分录自己的借贷栏写列 —— 借方（转入清理）
+   * 记原值与期末余额，贷方（结转损益）记清理收入与转处置收益、期末余额 0；红字带符号照记
+   * （原实现只认正数，借方红字一列都不写）
+   */
+  function _rowFromPrepared(item: PreparedItem): H6CheckRow {
+    const s = sampleOf(item) as AssetSample & Record<string, unknown>
+    const name = s.summary || s.assetName || s.debtorName || s.businessContent || s.accountName || '抽凭样本'
+    const row = _normalizeRow({ assetName: String(name).slice(0, 80) })
+    row.voucherNo = String(s.voucherNo ?? '')
+    row.date = String(s.voucherDate ?? '')
+    row.counterpartAccount = counterpartText(item)
+    if (sideTableOf(item) === 'credit') {
+      const credit = _num(item.creditAmount)
+      row.clearingIncome = credit
+      row.toDisposalGain = credit
+      row.endingBalance = 0
+    } else {
+      const debit = _num(item.debitAmount ?? item.creditAmount)
+      row.originalCost = debit
+      row.endingBalance = debit
+    }
+    if (s.abnormal || s.checkResult === 'ERR') row.isAbnormal = true
+    recalcH6CheckRow(row)
+    return row
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行，对方科目按配对拼接）
+  const voucherFill = useVoucherCheckFill<H6CheckRow>({
+    projectId: () => params.projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => _persistRows(),
+    hasUserContent: hasH6CheckContent,
+    legacy: h6Legacy,
+    readonly: () => params.isReadonly?.value === true,
+  })
 
   watch(allResponses, () => load(), { immediate: true })
 
@@ -608,7 +667,7 @@ export function useH6Check(params: {
     if (!onSave) return
     onSave(
       ROWS_KEY,
-      rows.value.map((r) => ({
+      voucherFill.guardPersist(rows.value).map((r) => withRowMeta({
         rowId: r.rowId,
         linkedDetailRowId: r.linkedDetailRowId,
         date: r.date,
@@ -641,7 +700,7 @@ export function useH6Check(params: {
         isAbnormal: r.isAbnormal,
         attachmentUrl: r.attachmentUrl,
         remark: r.remark,
-      })),
+      }, r)),
     )
   }
 
@@ -693,14 +752,14 @@ export function useH6Check(params: {
 
   function deleteRow(rowId: string): void {
     const idx = rows.value.findIndex((r) => r.rowId === rowId)
-    if (idx === -1) return
+    if (idx === -1 || voucherFill.isRowLocked(rows.value[idx])) return
     rows.value.splice(idx, 1)
     _persistRows()
   }
 
   function updateCell(rowId: string, field: string, value: any): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
 
     if (field === 'checks' && Array.isArray(value)) {
       row.checks = [0, 1, 2, 3, 4].map((i) => Boolean(value[i]))
@@ -777,6 +836,7 @@ export function useH6Check(params: {
     let added = 0
     for (const d of detailRows) {
       const existing = rows.value.find((r) => r.linkedDetailRowId === d.rowId)
+      if (existing && voucherFill.isRowLocked(existing)) continue // 年审阶段预审行只读
       if (existing) {
         existing.assetName = d.assetName || existing.assetName
         if (d.originalCost != null) existing.originalCost = _num(d.originalCost)
@@ -847,42 +907,9 @@ export function useH6Check(params: {
     return added
   }
 
-  /** 抽凭引擎回填（增强：借贷方向、对方科目、摘要） */
-  function fillFromSampledVouchers(samples: any[]): number {
-    let n = 0
-    for (const s of samples) {
-      const name =
-        s.summary || s.assetName || s.debtorName || s.businessContent || s.accountName || '抽凭样本'
-      addRow(String(name).slice(0, 80))
-      const last = rows.value[rows.value.length - 1]
-      if (!last) continue
-      if (s.voucherNo || s.voucher_no) last.voucherNo = s.voucherNo || s.voucher_no
-      if (s.date || s.voucherDate) last.date = s.date || s.voucherDate
-      if (s.counterpartAccount) last.counterpartAccount = s.counterpartAccountName ? `${s.counterpartAccount} ${s.counterpartAccountName}` : s.counterpartAccount
-      const debit = _num(s.debitAmount ?? s.debit)
-      const credit = _num(s.creditAmount ?? s.credit)
-      // 1606 借方多为转入清理（近似原值/净值），贷方多为结转损益
-      if (debit > 0 && credit <= 0) {
-        last.originalCost = debit
-        last.endingBalance = debit
-      } else if (credit > 0) {
-        last.clearingIncome = last.clearingIncome || credit
-        last.toDisposalGain = credit
-        last.endingBalance = 0
-      } else if (_num(s.amount) > 0) {
-        last.originalCost = _num(s.amount)
-      }
-      if (s.abnormal || s.checkResult === 'ERR') last.isAbnormal = true
-      recalcH6CheckRow(last)
-      n++
-    }
-    if (n > 0) _persistRows()
-    return n
-  }
-
   function applyOcrFields(rowId: string, fields: Record<string, any>): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     const patch = mapOcrToH6CheckFields(fields)
     Object.assign(row, patch)
     recalcH6CheckRow(row)
@@ -947,7 +974,12 @@ export function useH6Check(params: {
     deleteRow,
     updateCell,
     syncFromDetailRows,
-    fillFromSampledVouchers,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     applyOcrFields,
     applyLocalDraftNote,
     applyLocalDraftConclusion,

@@ -121,12 +121,13 @@ describe('ConsolWorksheetTabs 基本信息表按企业树带出（R4）', () => 
     ])
   })
 
-  it('企业树先到、已保存数据后到也得到同一结果（对齐幂等）', async () => {
+  it('企业树先到时保持加载骨架，已保存数据到达后再一次性展示对齐结果', async () => {
     let resolveData!: (v: unknown) => void
     worksheetApi.loadAllWorksheetData.mockImplementationOnce(() => new Promise((r) => { resolveData = r }))
     const wrapper = mountTabs()
     await flushPromises()
-    expect(wrapper.findComponent(InfoStub).props('modelValue').map((r: any) => r.company_code)).toEqual(['A', 'B'])
+    expect(wrapper.find('[data-testid="cw-loading-skeleton"]').exists()).toBe(true)
+    expect(wrapper.findComponent(InfoStub).exists()).toBe(false)
     resolveData({ status: 'loaded', data: { info: { rows: SAVED_INFO } }, versions: { info: 3 } })
     await flushPromises()
     expect(wrapper.findComponent(InfoStub).props('modelValue').map((r: any) => r.company_code)).toEqual(['A', 'B', 'Z'])

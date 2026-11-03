@@ -60,7 +60,8 @@ import DisclosureSyncCoveragePanel from '../disclosure/DisclosureSyncCoveragePan
 
 const props = defineProps<{
   projectId?: string
-  year?: number
+  /** 审计年度；项目没填为 null ⇒ 不请求同步状态（与未传同） */
+  year?: number | null
   wpCode?: string
   sheetName?: string
 }>()

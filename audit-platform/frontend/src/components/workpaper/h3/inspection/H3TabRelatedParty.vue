@@ -207,6 +207,7 @@
           >
             📎OCR
           </el-button>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           <el-button
             type="danger"
             link
@@ -275,6 +276,8 @@ import { useH3ImportExport } from '../../composables/useH3ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -283,6 +286,9 @@ const props = defineProps<{
   isReadonly: boolean
   measurementModel?: 'cost' | 'fair_value'
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H3-13'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -359,11 +365,14 @@ async function handleContractOcr(row: any, index: number) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      // 按行 id 挂（不按序号：删行后序号会前移，附件会错位到下一行）
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
       const res = await http.post(
         `/api/workpapers/${props.wpId}/h3/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
+      rowEv.refresh()
       loading.close()
       const data = res.data?.data ?? res.data
       const f = data?.extracted_fields ?? {}

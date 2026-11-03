@@ -108,7 +108,7 @@ ADAPTER_ID: Final[str] = "g8.other_equity_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G8O"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G8 其他权益工具投资.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；99,458 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；438,994 B）
 TEMPLATE_SHA256: Final[str] = (
     "3c291eac04625534a64c150ef19b38d533ed438ab0210d68aee5675c6257b60b"
 )

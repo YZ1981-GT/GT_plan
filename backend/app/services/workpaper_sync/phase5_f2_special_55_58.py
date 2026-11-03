@@ -3,7 +3,8 @@
 
 spec: f2-sync-coverage-four-entry-lanes · Task 23
 
-store 形态：dict + 子数组（F2-55/57/58 `products`；F2-56 `samples`）。
+store 形态：dict + 子数组（F2-57 / F2-58 `projects`；F2-55 `products`；F2-56 `samples`，
+行数组键登记在 `phase5_f2_inventory_special._ROWS_KEY_BY_STORE_ITEM`）。
 canary = F2-57（dict 最简，单级表头，无 FC-10）。
 """
 from __future__ import annotations
@@ -23,23 +24,37 @@ ROW_IDENTITY_KEY: Final[str] = "id"
 # F2-57 合同履约成本减值准备测算表（canary）
 # ═══════════════════════════════════════════════════════════════════════════
 # 几何：27r×N，表头 R5（单级），数据 R6-17，footer A18
-# store: F2-57-rows → dict {products:[...]}
+# store: F2-57-rows → dict {projects:[...]}，id 形如 f2imp-…
+#
+# 🔴 字段键逐字取前端 `useF2ContractCostImpairmentFormulas.ContractCostImpairmentProject`
+#    （spec oo-writeback-template-parity-closure R3）。原声明照另一种版式写（C 合同收入 / D 合同成本 /
+#    F~K 期初·增加·期末账面与审定），与模板 R5 表头整体错位：I 列「是否发生减值」是「是 / 否」判断式，
+#    却被当成 `auditOpen` 金额。五个公式列逐字记模板原式；前端 `enrichImpairmentProject` 同口径现算、
+#    不落库（formula 字段只读）。模板 L 列右侧无列，前端「备注」只在 HTML 侧。
 
 _FIELD_SPECS_F257: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("project_code", "A", "editable", "text",   "projectCode",  "项目编码", ""),
-    ("project_name", "B", "editable", "text",   "projectName",  "项目名称", ""),
-    ("revenue",      "C", "editable", "amount", "revenue",      "合同收入", ""),
-    ("cost",         "D", "editable", "amount", "cost",         "合同成本", ""),
-    ("diff",         "E", "formula",  "amount", "diff",         "差额",     ""),
-    ("book_open",    "F", "editable", "amount", "bookOpen",     "期初账面", ""),
-    ("book_inc",     "G", "editable", "amount", "bookInc",      "本期增加", ""),
-    ("book_close",   "H", "formula",  "amount", "bookClose",    "期末账面", ""),
-    ("audit_open",   "I", "formula",  "amount", "auditOpen",    "审定期初", ""),
-    ("audit_inc",    "J", "formula",  "amount", "auditInc",     "审定增加", ""),
-    ("audit_close",  "K", "editable", "amount", "auditClose",   "审定期末", ""),
-    ("adj_amt",      "L", "formula",  "amount", "adjAmt",       "调整金额", ""),
-    ("remark",       "M", "editable", "text",   "remark",       "备注",     ""),
+    ("project_code",               "A", "editable", "text",   "projectCode",              "项目编码", ""),
+    ("project_name",               "B", "editable", "text",   "projectName",              "项目名称", ""),
+    ("book_balance",               "C", "editable", "amount", "bookBalance",              "账面余额", ""),
+    ("accumulated_provision",      "D", "editable", "amount", "accumulatedProvision",     "已计提减值准备", ""),
+    ("book_value",                 "E", "formula",  "amount", "bookValue",                "账面价值", ""),
+    ("remaining_consideration",    "F", "editable", "amount", "remainingConsideration",   "转让与该资产相关的商品预期能够取得的剩余对价", ""),
+    ("estimated_future_costs",     "G", "editable", "amount", "estimatedFutureCosts",     "转让该相关商品估计将要发生的成本", ""),
+    ("net_realizable_value",       "H", "formula",  "amount", "netRealizableValue",       "预期取得转让对价净额", ""),
+    ("is_impaired",                "I", "formula",  "text",   "isImpaired",               "是否发生减值", ""),
+    ("measured_provision",         "J", "formula",  "amount", "measuredProvision",        "测算减值准备计提或转回金额", ""),
+    ("company_recorded_provision", "K", "editable", "amount", "companyRecordedProvision", "企业账面记录的减值准备金额", ""),
+    ("difference",                 "L", "formula",  "amount", "difference",               "差异金额", ""),
 )
+
+#: 模板 R6 逐格原式（R6~R17 同形）
+_FORMULA_TEMPLATES_F257: Final[dict[str, str]] = {
+    "E": "=C{r}-D{r}",
+    "H": "=F{r}-G{r}",
+    "I": '=IF(E{r}>H{r},"是","否")',
+    "J": "=IF(H{r}>E{r},IF((H{r}-E{r})>D{r},-D{r},-(H{r}-E{r})),E{r}-H{r})",
+    "L": "=J{r}-K{r}",
+}
 
 SPEC_F257: Final[RowTableSheetSpec] = RowTableSheetSpec(
     managed_sheet="合同履约成本减值准备测算表F2-57",
@@ -58,7 +73,7 @@ SPEC_F257: Final[RowTableSheetSpec] = RowTableSheetSpec(
     store_kind=StoreKind.dict,
     field_specs=_FIELD_SPECS_F257,
     formula_columns=("E", "H", "I", "J", "L"),
-    formula_templates={},
+    formula_templates=_FORMULA_TEMPLATES_F257,
     footer_marker="合计",
     error_label="F2-57 合同履约成本减值准备测算表",
 )
@@ -68,7 +83,7 @@ SPEC_F257: Final[RowTableSheetSpec] = RowTableSheetSpec(
 # F2-58 亏损合同预计损失测算表
 # ═══════════════════════════════════════════════════════════════════════════
 # 几何：25r×O，表头 R5（R6 公式说明行），数据 R7-20，footer A21
-# store: F2-58-rows → dict {products:[...]}
+# store: F2-58-rows → dict {projects:[...]}（灰度关；字段名未按前端核对）
 # FC-10 不命中（completionRate 存 0~1 与模板一致）
 
 _FIELD_SPECS_F258: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (

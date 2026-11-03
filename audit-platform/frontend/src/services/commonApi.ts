@@ -3,6 +3,7 @@
  * 规则：所有页面必须通过 API 服务层调用，不允许直接拼 URL
  */
 import http from '@/utils/http'
+import { invalidateProjectListQuery, listProjectsShared } from '@/services/projectListQuery'
 import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
   procedureRowTasks as P_prt, workpaperLeads as P_leads,
@@ -25,8 +26,7 @@ import {
 // ── 项目 ──
 
 export async function listProjects(params?: Record<string, any>): Promise<any[]> {
-  const { data } = await http.get(P_proj.list, { params })
-  return Array.isArray(data) ? data : data?.items || []
+  return listProjectsShared(params)
 }
 
 export async function listProjectsWithProgress(): Promise<any[]> {
@@ -846,12 +846,13 @@ export async function getDashboardAvailableStaff(maxHours: number): Promise<any>
 
 // ── 一致性检查 ──
 
-export async function runConsistencyCheck(projectId: string, year = 2025): Promise<any> {
+// 年度必传：原先缺省 2025，一致性看板两处调用都没传 ⇒ 任何项目都按 2025 年度校验 / 读结果
+export async function runConsistencyCheck(projectId: string, year: number): Promise<any> {
   const { data } = await http.post(P_proj.consistencyCheck.run(projectId), null, { params: { year } })
   return data
 }
 
-export async function getConsistencyCheck(projectId: string, year = 2025): Promise<any> {
+export async function getConsistencyCheck(projectId: string, year: number): Promise<any> {
   const { data } = await http.get(P_proj.consistencyCheck.get(projectId), { params: { year } })
   return data
 }
@@ -862,6 +863,13 @@ export interface RefreshFromWorkpapersResult {
   refreshed: number
   total_notes: number
   sections_recomputed: string[]
+  /** 结果集合（formula-writer-ownership-and-stale R2）；旧后端可不返回。 */
+  requested_sections?: string[]
+  changed_sections?: string[]
+  recomputed_sections?: string[]
+  failed_sections?: string[]
+  cleared_sections?: string[]
+  error_details?: Array<{ section: string; stage: string; message: string }>
   text_only_sections: string[]
   errors: string[]
   cells_updated: number
@@ -957,16 +965,30 @@ export async function fetchNoteAutoPull(
 
 // ── 附注 LLM 辅助 ──
 
+export interface NoteAiResultMeta {
+  error?: string
+  error_code?: string
+  /** 生成成功但需提醒（如续写基于未保存修改，草稿追加在已保存正文之后） */
+  warning?: string
+  /** 成功生成时签发的待确认草稿身份（ADR-LLM-004 DraftArtifact） */
+  artifact_id?: string
+  message_id?: string
+  generation_id?: string
+  model?: string | null
+  deployment?: 'local' | 'server' | null
+  fallback_used?: boolean
+}
+
 export async function noteAiGeneratePolicy(projectId: string, params: {
   section_number: string; template_type?: string; industry?: string; year?: number
-}): Promise<{ generated_text: string; reference_count: number }> {
+}): Promise<NoteAiResultMeta & { generated_text: string | null; reference_count: number }> {
   const { data } = await http.post(P_dn.ai.generatePolicy(projectId), params)
   return data
 }
 
 export async function noteAiGenerateAnalysis(projectId: string, params: {
-  section_number: string; current_data?: Record<string, any>; prior_data?: Record<string, any>; year?: number
-}): Promise<{ generated_text: string; reference_count: number }> {
+  section_number: string; year?: number
+}): Promise<NoteAiResultMeta & { generated_text: string | null; reference_count: number }> {
   const { data } = await http.post(P_dn.ai.generateAnalysis(projectId), params)
   return data
 }
@@ -978,14 +1000,14 @@ export async function noteAiGenerateAnalysis(projectId: string, params: {
  */
 export async function noteAiRewrite(projectId: string, params: {
   text: string; instruction?: string; section_number?: string; year?: number; knowledge_doc_ids?: string[]
-}): Promise<{ original: string; rewritten: string; error?: string; knowledge_count?: number }> {
+}): Promise<NoteAiResultMeta & { original: string; rewritten: string | null; knowledge_count?: number }> {
   const { data } = await http.post(P_dn.ai.rewrite(projectId), params)
   return data
 }
 
 export async function noteAiContinueWrite(projectId: string, params: {
   text: string; section_number?: string; year?: number; knowledge_doc_ids?: string[]
-}): Promise<{ result: string; appended: string; error?: string; knowledge_count?: number }> {
+}): Promise<NoteAiResultMeta & { result: string; appended: string; knowledge_count?: number }> {
   const { data } = await http.post(P_dn.ai.complete(projectId), params)
   return data
 }
@@ -1147,16 +1169,19 @@ export async function listRecycleBinItems(params?: Record<string, any>): Promise
 // 请求带 _silent，免得全局拦截器先弹一次、同一原因提示两遍
 export async function restoreRecycleBinItem(itemId: string): Promise<any> {
   const { data } = await http.post(P_rb.restore(itemId), null, { _silent: true } as any)
+  if (itemId.startsWith('project/')) invalidateProjectListQuery()
   return data
 }
 
 export async function permanentDeleteItem(itemId: string): Promise<any> {
   const { data } = await http.delete(P_rb.delete(itemId), { _silent: true } as any)
+  if (itemId.startsWith('project/')) invalidateProjectListQuery()
   return data
 }
 
 export async function emptyRecycleBin(): Promise<any> {
   const { data } = await http.post(P_rb.empty, null, { _silent: true } as any)
+  invalidateProjectListQuery()
   return data
 }
 
@@ -1644,10 +1669,6 @@ export async function getAttachmentWorkpapers(attachmentId: string): Promise<any
   return Array.isArray(data) ? data : []
 }
 
-export async function linkAttachment(attachmentId: string, wpId: string): Promise<void> {
-  await http.post(P_pr.linkAttachment, { attachment_id: attachmentId, wp_id: wpId })
-}
-
 export async function getPendingAIContent(projectId: string, workpaperId?: string): Promise<any[]> {
   const params: Record<string, string> = {}
   if (workpaperId) params.workpaper_id = workpaperId
@@ -1829,7 +1850,8 @@ export async function listSnapshots(projectId: string): Promise<any[]> {
   return Array.isArray(data) ? data : []
 }
 
-export async function createSnapshot(projectId: string, year: number = 2025): Promise<void> {
+// 年度必传：原先缺省 2025，合并快照页调用没传 ⇒ 快照恒建在 2025 年度
+export async function createSnapshot(projectId: string, year: number): Promise<void> {
   await http.post(`${P_consol.snapshots(projectId)}?year=${year}`)
 }
 
@@ -2077,19 +2099,19 @@ export async function enhanceColumnMapping(projectId: string, headers: string[],
   return data
 }
 
-export async function getImportQualityCheck(projectId: string, year = 2025): Promise<{
+export async function getImportQualityCheck(projectId: string, year: number): Promise<{
   score: number; grade: string; findings: any[]; summary: string
 }> {
   const { data } = await http.get(P_ii.qualityCheck(projectId), { params: { year } })
   return data
 }
 
-export async function prepareIncrementalImport(projectId: string, mode: string, period?: string, year = 2025): Promise<any> {
+export async function prepareIncrementalImport(projectId: string, mode: string, period: string | undefined, year: number): Promise<any> {
   const { data } = await http.post(P_ii.prepareIncremental(projectId), { mode, period }, { params: { year } })
   return data
 }
 
-export async function getImportOverview(projectId: string, year = 2025): Promise<any> {
+export async function getImportOverview(projectId: string, year: number): Promise<any> {
   const { data } = await http.get(P_ii.overview(projectId), { params: { year } })
   return data
 }

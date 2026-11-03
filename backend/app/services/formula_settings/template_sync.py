@@ -42,11 +42,13 @@ from app.services.formula_settings.engine import (
 )
 from app.services.formula_settings.errors import FormulaSettingError, NotFound, VersionConflict, VersionRequired
 from app.services.formula_settings.project_ops import require_project
-from app.services.formula_settings.projects import ProjectInfo, get_project
+from app.services.formula_settings.projects import ProjectInfo, list_projects
 from app.services.formula_settings.stores import SlotRecord, get_store
 from app.services.formula_settings.sync import ProjectChoice
 from app.services.formula_settings.template_service import global_scope
-from app.services.formula_settings.templates import active_subscription, subscribed_definitions, template_rows
+from app.services.formula_settings.templates import (
+    active_subscription, snapshot_definitions, subscribed_definitions, template_rows,
+)
 
 
 def _now() -> datetime:
@@ -80,29 +82,32 @@ def _result(domain_items: dict[str, list[PlanItem]], projects: list[ProjectInfo]
             outcomes: Mapping[str, ApplyOutcome] | None = None) -> dict[str, Any]:
     items = [it for its in domain_items.values() for it in its]
     return {"summary": summarize(items, projects, outcomes),
-            "items": [{**it.to_dict(d), "domain": d} for d, its in domain_items.items() for it in its
+            "items": [it.to_dict() for its in domain_items.values() for it in its
                       if not (it.category and it.category.value == "inherit" and not it.materialize)]}
 
 
 async def _apply(db: AsyncSession, domain_items: dict[str, list[PlanItem]], decisions: Decisions, *,
                  publish_id: uuid.UUID | None, user_id: uuid.UUID | None, action: str,
                  source: str) -> tuple[dict[str, ApplyOutcome], list[dict[str, Any]]]:
+    """逐域落地。``outcomes`` 按域分组再合并：键 = 决策键（带域），两个域的同名公式位互不覆盖（需求 8.4）。"""
     outcomes: dict[str, ApplyOutcome] = {}
     events: list[dict[str, Any]] = []
     for domain, items in domain_items.items():
         store = get_store(domain)
         audits: dict[uuid.UUID, list[dict]] = {}
+        domain_outcomes: dict[str, ApplyOutcome] = {}
         for it in items:
             out = await apply_effect(db, store, it, decide_item(domain, it, decisions), publish_id=publish_id,
                                      user_id=user_id)
-            outcomes[it.key] = out
+            domain_outcomes[it.key] = out
             if out.audit is not None:
                 audits.setdefault(it.project.id, []).append(out.audit)
+        outcomes.update(domain_outcomes)
         for pid, entries in audits.items():
             await audit_project(db, user_id=user_id, project_id=pid, domain=domain, action=action, source=source,
                                 changes=entries, publish_id=publish_id)
         events += [{"project_id": str(pid), "domain": domain, "slot_keys": slots}
-                   for pid, slots in changed_slots(items, {k: outcomes[k] for k in (i.key for i in items)}).items()]
+                   for pid, slots in changed_slots(items, domain_outcomes).items()]
     return outcomes, events
 
 
@@ -129,13 +134,13 @@ async def _subscribe_plan(db: AsyncSession, project_id: uuid.UUID, tpl: FormulaT
     items = []
     for slot, row in sorted((await template_rows(db, tpl.id, domain)).items()):
         up, lo = upstream.get(slot), local.get(slot)
-        item = PlanItem(project=project, slot_key=slot, label=row.slot_label or slot,
+        item = PlanItem(domain=domain, project=project, slot_key=slot, label=row.slot_label or slot,
                         old_up=up.definition if up else None, old_version=up.version if up else None,
                         old_origin=_origin(up), new_up=dict(row.definition or {}), new_version=tpl.version,
                         new_origin="template", local=lo, structure=dict((row.definition or {}).get("_structure")
                                                                         or {}),
                         new_template_id=tpl.id, materialize=True)
-        item.classify(domain)
+        item.classify()
         items.append(item)
     return project, items
 
@@ -196,12 +201,12 @@ async def _unsubscribe_plan(db: AsyncSession, project_id: uuid.UUID, domain: str
     items = []
     for slot, lo in sorted(rows.items()):
         up = upstream.get(slot)
-        item = PlanItem(project=project, slot_key=slot, label=lo.label or slot,
+        item = PlanItem(domain=domain, project=project, slot_key=slot, label=lo.label or slot,
                         old_up=tdefs.get(slot, lo.base_definition), old_version=tver, old_origin="template",
                         new_up=up.definition if up else None, new_version=up.version if up else None,
                         new_origin=_origin(up), local=lo, structure=dict(lo.structure or {}),
                         old_template_id=sub.template_id, retire_same=True)
-        item.classify(domain)
+        item.classify()
         items.append(item)
     return sub, project, store, upstream, rows, items
 
@@ -302,33 +307,53 @@ async def _publish_plan(db: AsyncSession, tpl: FormulaTemplate, raw: list[Mappin
         FormulaTemplateSubscription.domain.in_(list(effective) or [""])))).scalars().all()
     domain_items: dict[str, list[PlanItem]] = {}
     projects: dict[uuid.UUID, ProjectInfo] = {}
-    for sub in subs:
-        project = await get_project(db, sub.domain, sub.project_id)
-        if project is None:
-            continue
-        projects[project.id] = project
-        store = get_store(sub.domain)
-        upstream = await upstream_records(db, store, project.scope)
-        local = await store.list_project(db, sub.project_id)
-        old_defs, old_ver = await subscribed_definitions(db, sub)
-        for slot, new in sorted(effective[sub.domain].items()):
-            up, lo, old_t = upstream.get(slot), local.get(slot), old_defs.get(slot)
-            row = current[sub.domain].get(slot)
-            label = (row.slot_label if row else None) or slot
-            item = PlanItem(
-                project=project, slot_key=slot, label=label,
-                old_up=old_t if old_t is not None else (up.definition if up else None),
-                old_version=old_ver if old_t is not None else (up.version if up else None),
-                old_origin="template" if old_t is not None else _origin(up),
-                new_up=new if new is not None else (up.definition if up else None),
-                new_version=tpl.version + 1 if new is not None else (up.version if up else None),
-                new_origin="template" if new is not None else _origin(up), local=lo,
-                structure=dict((new or {}).get("_structure") or (lo.structure if lo else {}) or {}),
-                old_template_id=tpl.id if old_t is not None else None,
-                new_template_id=tpl.id if new is not None else None,
-                materialize=new is not None, retire_same=new is None)
-            item.classify(sub.domain)
-            domain_items.setdefault(sub.domain, []).append(item)
+    for domain, domain_effective in effective.items():
+        domain_subs = [s for s in subs if s.domain == domain]
+        project_ids = [s.project_id for s in domain_subs]
+        project_by_id = {p.id: p for p in await list_projects(db, domain, ids=project_ids)}
+        store = get_store(domain)
+        local_by_project = await store.list_project_many(db, list(project_by_id))
+        upstream_by_scope: dict[str | None, dict[str, SlotRecord]] = {}
+        pinned_by_version: dict[tuple[int, str], dict[str, dict]] = {}
+        for sub in domain_subs:
+            project = project_by_id.get(sub.project_id)
+            if project is None:
+                continue
+            projects[project.id] = project
+            if project.scope not in upstream_by_scope:
+                upstream_by_scope[project.scope] = await upstream_records(db, store, project.scope)
+            upstream = upstream_by_scope[project.scope]
+            local = local_by_project.get(sub.project_id, {})
+            old_defs: dict[str, dict] | None = None
+            old_version = tpl.version
+            if sub.pinned:
+                cache_key = (sub.template_version, domain)
+                if cache_key not in pinned_by_version:
+                    pinned_by_version[cache_key] = await snapshot_definitions(
+                        db, tpl.id, sub.template_version, domain,
+                    )
+                old_defs = pinned_by_version[cache_key]
+                old_version = sub.template_version
+            for slot, new in sorted(domain_effective.items()):
+                up, lo = upstream.get(slot), local.get(slot)
+                row = current[domain].get(slot)
+                old_t = old_defs.get(slot) if old_defs is not None else (
+                    dict(row.definition or {}) if row is not None else None)
+                label = (row.slot_label if row else None) or slot
+                item = PlanItem(
+                    domain=sub.domain, project=project, slot_key=slot, label=label,
+                    old_up=old_t if old_t is not None else (up.definition if up else None),
+                    old_version=old_version if old_t is not None else (up.version if up else None),
+                    old_origin="template" if old_t is not None else _origin(up),
+                    new_up=new if new is not None else (up.definition if up else None),
+                    new_version=tpl.version + 1 if new is not None else (up.version if up else None),
+                    new_origin="template" if new is not None else _origin(up), local=lo,
+                    structure=dict((new or {}).get("_structure") or (lo.structure if lo else {}) or {}),
+                    old_template_id=tpl.id if old_t is not None else None,
+                    new_template_id=tpl.id if new is not None else None,
+                    materialize=new is not None, retire_same=new is None)
+                item.classify()
+                domain_items.setdefault(sub.domain, []).append(item)
     return effective, current, list(subs), list(projects.values()), domain_items
 
 
@@ -357,13 +382,19 @@ def _change_rows(effective, current) -> list[dict[str, Any]]:
 async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: list[Mapping[str, Any]],
                            expected_version: int | None, user_id: uuid.UUID | None,
                            decisions: Decisions | None = None, request_id: str | None = None,
-                           note: str | None = None) -> dict[str, Any]:
+                           note: str | None = None, publish_source: str = "template_publish",
+                           item_action: str = "template_sync",
+                           audit_action: str = "formula.template_published",
+                           audit_details: Mapping[str, Any] | None = None) -> dict[str, Any]:
     await _lock_template(db, tpl.id)
     if request_id:
         replay = (await db.execute(sa.select(FormulaPublish).where(FormulaPublish.request_id == request_id))
                   ).scalars().first()
         if replay is not None:
-            return {"publish_id": str(replay.id), "idempotent": True, "summary": replay.summary, "events": []}
+            return {"publish_id": str(replay.id), "idempotent": True,
+                    "template_id": str(replay.template_id) if replay.template_id else str(tpl.id),
+                    "version": (replay.summary or {}).get("template_version"),
+                    "summary": replay.summary, "events": []}
     await db.refresh(tpl)
     _check_version(tpl, expected_version)
     effective, current, subs, projects, domain_items = await _publish_plan(db, tpl, changes)
@@ -377,7 +408,7 @@ async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: l
     rows = await _write_rows(db, tpl, effective, current, user_id)
     change_rows = _change_rows(effective, current)
     outcomes, events = await _apply(db, domain_items, decisions, publish_id=publish_id, user_id=user_id,
-                                    action="template_sync", source="template_publish")
+                                    action=item_action, source=publish_source)
     tpl.version, tpl.updated_by, tpl.updated_at = new_version, user_id, _now()
     db.add(FormulaTemplateVersion(id=uuid.uuid4(), template_id=tpl.id, version=new_version, note=note,
                                   published_by=user_id, change_set=change_rows,
@@ -390,19 +421,24 @@ async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: l
         elif not frozen:
             sub.template_version, sub.pinned = new_version, False
     summary = _result(domain_items, projects, outcomes)["summary"]
+    summary_record = {**summary, "template_version": new_version}
     record_domain = next(iter(effective)) if len(effective) == 1 else "template"  # 列 32 字符：多域记 template
     db.add(FormulaPublish(id=publish_id, domain=record_domain, scope=tpl.applicable_scope or "",
-                          target="template", template_id=tpl.id, source="template_publish", request_id=request_id,
-                          status="published", change_set=change_rows, summary=summary, note=note,
+                          target="template", template_id=tpl.id, source=publish_source, request_id=request_id,
+                          status="published", change_set=change_rows, summary=summary_record, note=note,
                           published_by=user_id))
     await db.flush()
+    details = {
+        "template_id": str(tpl.id), "version": new_version, "publish_id": str(publish_id),
+        "changes": [change_entry(c["domain"], c["slot_key"], c["old"], c["new"])
+                    for c in change_rows], "counts": summary["counts"],
+    }
+    if audit_details:
+        details.update(dict(audit_details))
     await audit_global(db, user_id=user_id, domain=",".join(sorted(effective)), scope=tpl.applicable_scope or "",
-                       action="formula.template_published", resource_id=tpl.id, details={
-                           "template_id": str(tpl.id), "version": new_version, "publish_id": str(publish_id),
-                           "changes": [change_entry(c["domain"], c["slot_key"], c["old"], c["new"])
-                                       for c in change_rows], "counts": summary["counts"]})
-    return {"publish_id": str(publish_id), "idempotent": False, "template_id": str(tpl.id), "version": new_version,
-            "summary": summary, "events": events}
+                       action=audit_action, resource_id=tpl.id, details=details)
+    return {"publish_id": str(publish_id), "idempotent": False, "template_id": str(tpl.id),
+            "version": new_version, "summary": summary_record, "events": events}
 
 
 async def _write_rows(db: AsyncSession, tpl: FormulaTemplate, effective, current,

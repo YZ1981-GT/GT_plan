@@ -76,7 +76,8 @@ tasks.md 按「类 I 去范围」写「删 ~29」。本轮按值普查真消费�
 
 * **17 个有生产代码消费方**（删了要同时改 5 个兄弟表 composable 的数据源，那是另一条 lane
   的作业面）：`securityCode`(g1CrossHelpers/useG1FairValueTest/useG1IncomeCalc/useG1Inventory)
-  · `investType`(useG1IncomeCalc/useG1Adjudication/G1TabDetail) · `market`(useG1Inventory)
+  · `acctClass`(useG1Adjudication/G1TabDetail，另有 useG1Classification / g13SourceDetailPull 读原始载荷)
+  · `market`(useG1Inventory)
   · `soldQuantity`(useG1IncomeCalc) · `closingQuantity`(G1TabDetail)
   · `unitFairValue`/`quoteDate`(useG1FairValueTest) · `fairValueSource`(useG1FairValueTest/G1TabDetail)
   · `fairValueChange`(G1TabDetail) · `realizedGain`(useG1IncomeCalc/G1TabDetail)
@@ -90,6 +91,14 @@ tasks.md 按「类 I 去范围」写「删 ~29」。本轮按值普查真消费�
   `boughtQuantity` `disposalProceeds` `disposalCost` `fvChangeInPL` `aje` `rje` `pledged`
 
 ⇒ 与 G13「工具明细整体不受管 ⇒ 21 字段一个都不用删」同一条道理：**不受管 ≠ 必须删**。
+
+═══ 🔴 五：A 列「类别」绑 `investType`，区归属 `acctClass` 不受管（spec oo-writeback-template-parity-closure R3 批 B3）═══
+
+模板 A 列「类别」在数据行预填「债务工具投资」一类 —— 是**投资品种**（前端 `investType`）；区归属由行所在的区
+（区标题 R11 / R18 / R25）表达。原先 A 列绑的是区归属字段 `acctClass`：区②③ 接通后，OO 侧在 A 列填「债务工具
+投资」（或新增行填任何文字），回写就把 `acctClass` 改成那段文字 ⇒ 行落到三区之外（出方向三区都投不出它，前端
+按未知分类单独成组）。改绑后区归属只由所在区决定：已有行不被改，OO 侧新增行由引擎补本区的值（与 G3 / G5 / G9
+同口径：区字段都不受管）。OO 侧 A 列显示前端的投资品种代码（与 G2 / G4 / G6 的 A 列「投资种类」同口径）。
 """
 from __future__ import annotations
 
@@ -181,7 +190,7 @@ BOOLEAN_COLUMNS_G102: Final[tuple[str, ...]] = ("Z", "AA")
 #: 前端行接口里**不是模板列**的字段（29 个，都不受管）。见模块头「四」。
 FRONTEND_ONLY_FIELDS_G102: Final[tuple[str, ...]] = (
     "id", "seq",
-    "securityCode", "investType", "market", "acquisitionDate", "initialCost",
+    "acctClass", "securityCode", "market", "acquisitionDate", "initialCost",
     "originalCurrency", "exchangeRate",
     "openingQuantity", "boughtQuantity", "soldQuantity", "closingQuantity",
     "unitFairValue", "fairValueSource", "fairValueChange", "quoteDate",
@@ -197,7 +206,10 @@ FRONTEND_ONLY_FIELD_OWNERS_G102: Final[dict[str, tuple[str, ...]]] = {
         "g1CrossHelpers.ts", "useG1FairValueTest.ts", "useG1IncomeCalc.ts",
         "useG1Inventory.ts",
     ),
-    "investType": ("useG1IncomeCalc.ts", "useG1Adjudication.ts", "G1TabDetail.vue"),
+    #: 区归属（不受管，见模块头「五」）；后两个不 import 行接口、直接读 G1-2-rows 原始载荷
+    "acctClass": (
+        "useG1Adjudication.ts", "G1TabDetail.vue", "useG1Classification.ts", "g13SourceDetailPull.ts",
+    ),
     "market": ("useG1Inventory.ts",),
     "soldQuantity": ("useG1IncomeCalc.ts",),
     "closingQuantity": ("G1TabDetail.vue",),
@@ -236,7 +248,8 @@ REMOVABLE_FRONTEND_FIELDS_G102: Final[tuple[str, ...]] = (
 FIELD_SPECS_G102: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
-    ("acct_class", "A", "editable", "text", "acctClass", "类别", ""),
+    #: 🔴 A 列「类别」= 投资品种（不是区归属 acctClass，见模块头「五」）
+    ("invest_type", "A", "editable", "text", "investType", "类别", ""),
     (
         "security_name", "B", "editable", "text", "securityName",
         "投资项目【按明细项目列示，如证券名称或被投资单位名称】", "",

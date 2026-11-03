@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeSheetName, resolveSheetNameByDeepLink } from '../normalizeSheetName'
+import { ADJUSTMENT_SHEET_ALIAS, normalizeSheetName, resolveSheetNameByDeepLink } from '../normalizeSheetName'
 
 describe('normalizeSheetName', () => {
   it('全角括号→半角：上市公司', () => {
@@ -87,6 +87,19 @@ describe('resolveSheetNameByDeepLink（?sheet= 深链解析）', () => {
     const sheets = ['附注披露信息(上市公司)', '合同资产附注披露信息（上市公司）']
     expect(resolveSheetNameByDeepLink(sheets, '附注披露信息（上市公司）'))
       .toBe('附注披露信息(上市公司)')
+  })
+
+  it('别名 @adjustment：名称（归一后）含「调整分录」的唯一一张表；没有或不唯一 ⇒ null（spec wp-deeplink-locate-residual-closure）', () => {
+    const L1 = ['底稿目录', ' 短期借款实质性程序表L1A', '审定表L1-1', '调整分录汇总L1-3', '短期借款明细表L1-2']
+    expect(resolveSheetNameByDeepLink(L1, ADJUSTMENT_SHEET_ALIAS)).toBe('调整分录汇总L1-3')
+    expect(resolveSheetNameByDeepLink(['应付利息调整分录汇总L2-3', '审定表L2-1'], ADJUSTMENT_SHEET_ALIAS)).toBe('应付利息调整分录汇总L2-3')
+    // 只含「调整」不算（F5-8 重大调整核查表、N5-5 纳税调整明细表）
+    expect(resolveSheetNameByDeepLink(['调整分录汇总F5-4', '重大调整核查表F5-8'], ADJUSTMENT_SHEET_ALIAS)).toBe('调整分录汇总F5-4')
+    expect(resolveSheetNameByDeepLink(['纳税调整明细表N5-5', '审定表N5-1'], ADJUSTMENT_SHEET_ALIAS)).toBeNull()
+    expect(resolveSheetNameByDeepLink(['调整分录汇总A', '调整分录汇总B'], ADJUSTMENT_SHEET_ALIAS)).toBeNull()
+    // 别名不按字面去匹配（不会命中名为 @adjustment 的表以外的东西），也不影响普通编码解析
+    expect(resolveSheetNameByDeepLink(L1, 'L1-3')).toBe('调整分录汇总L1-3')
+    expect(ADJUSTMENT_SHEET_ALIAS).toBe('@adjustment')
   })
 
   it('未命中返回 null（调用方据此回退首个 sheet）', () => {

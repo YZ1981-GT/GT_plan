@@ -1,0 +1,49 @@
+{
+  "_说明": "后端赋给跳转路由的 /workpapers/ 形态（插值写成 {…}），由 test_frontend_route_shapes_fixture.py 守不过期；前端 backendRouteShapes.contract.spec.ts 逐个 router.resolve。",
+  "source_shapes": [
+    {
+      "file": "routers/linkage_resolve.py",
+      "shape": "/projects/{…}/workpapers/{…}"
+    },
+    {
+      "file": "services/acnr/loaders/from_classification.py",
+      "shape": "/workpapers/{wp_id}?sheet={…}"
+    },
+    {
+      "file": "services/acnr/resolver.py",
+      "shape": "/workpapers/{…}?sheet={…}"
+    },
+    {
+      "file": "services/ai_chat/mention_service.py",
+      "shape": "/workpapers/{…}"
+    },
+    {
+      "file": "services/custom_query/acnr_target_values.py",
+      "shape": "/workpapers/{…}"
+    },
+    {
+      "file": "services/evidence_governance/typed_adapters.py",
+      "shape": "/workpapers/{…}"
+    },
+    {
+      "file": "services/linkage_contract_builder.py",
+      "shape": "/projects/{…}/workpapers/{…}"
+    },
+    {
+      "file": "services/linkage_facade_service.py",
+      "shape": "/projects/{…}/workpapers/{…}"
+    },
+    {
+      "file": "services/role_workbench_facade.py",
+      "shape": "/projects/{…}/workpapers"
+    },
+    {
+      "file": "services/role_workbench_facade.py",
+      "shape": "/projects/{…}/workpapers/{…}/edit"
+    },
+    {
+      "file": "services/signoff_checklist_service.py",
+      "shape": "/projects/{…}/workpapers/{…}/edit"
+    }
+  ]
+}

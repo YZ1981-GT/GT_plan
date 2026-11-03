@@ -143,12 +143,27 @@ class MigrationFile:
 
 @dataclass
 class FailureRecord:
-    """单次迁移失败的记录（运行时返回值）。"""
+    """迁移失败记录；``attempt_count`` 仅只读状态查询时有值。"""
 
     version: str
     filename: str
     error_type: str
     error_message: str
+    attempt_count: int | None = None
+
+
+@dataclass(frozen=True)
+class MigrationReadiness:
+    """磁盘迁移与数据库登记的只读核对结果。"""
+
+    disk_versions: tuple[str, ...]
+    applied_versions: tuple[str, ...]
+    pending_versions: tuple[str, ...]
+    failures: tuple[FailureRecord, ...]
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.pending_versions and not self.failures
 
 
 @dataclass
@@ -254,6 +269,24 @@ class MigrationRunner:
     # ------------------------------------------------------------------
     # 公开 API
     # ------------------------------------------------------------------
+
+    async def inspect_readiness(self) -> MigrationReadiness:
+        """只读核对磁盘迁移、``schema_version`` 与失败记录。
+
+        本方法不创建表、不执行迁移，也不清理失败记录。启动初始 worker 与
+        ``GT_BOOTSTRAP_DONE`` 热重载 worker 共用它，无法证明数据库已追平时由
+        调用方 fail-closed。
+        """
+        migrations = self.scan_migrations()
+        applied = await self.get_applied_versions()
+        failures = await self.get_failures(strict=True)
+        pending = tuple(m.version for m in migrations if m.version not in applied)
+        return MigrationReadiness(
+            disk_versions=tuple(m.version for m in migrations),
+            applied_versions=tuple(sorted(applied, key=int)),
+            pending_versions=pending,
+            failures=tuple(failures),
+        )
 
     async def run_pending(self) -> RunPendingResult:
         """执行所有未应用的迁移，返回 RunPendingResult(executed, failed)。
@@ -442,6 +475,24 @@ class MigrationRunner:
                     path=f,
                     checksum=checksum,
                 ))
+
+        _by_version: dict[str, list[str]] = {}
+        for migration in result:
+            _by_version.setdefault(migration.version, []).append(migration.filename)
+        duplicates = {
+            version: names
+            for version, names in _by_version.items()
+            if len(names) > 1
+        }
+        if duplicates:
+            detail = "; ".join(
+                f"R{version}: {sorted(names)}"
+                for version, names in sorted(duplicates.items())
+            )
+            raise RuntimeError(
+                "[Migration] 检测到重复版本号回滚文件（须与 V 迁移一一配对）："
+                f"{detail}"
+            )
 
         # 按版本号数值排序
         result.sort(key=lambda x: int(x.version))
@@ -839,22 +890,28 @@ class MigrationRunner:
                 {"version": version},
             )
 
-    async def get_failures(self) -> list[FailureRecord]:
-        """查询当前所有失败记录（health endpoint 使用）。"""
+    async def get_failures(self, *, strict: bool = False) -> list[FailureRecord]:
+        """查询当前所有失败记录。
+
+        ``strict=True`` 用于启动就绪核验：失败表不存在或不可读时不得伪装成
+        ``[]``。默认保留旧的宽容行为，兼容迁移运行器的早期调用方与 SQLite 测试。
+        """
         async with self._engine.begin() as conn:
             try:
                 rows = await conn.execute(text(
-                    "SELECT version, filename, error_type, error_message "
+                    "SELECT version, filename, error_type, error_message, attempt_count "
                     "FROM schema_migration_failures ORDER BY attempted_at DESC"
                 ))
                 return [
                     FailureRecord(
                         version=r[0], filename=r[1],
-                        error_type=r[2], error_message=r[3],
+                        error_type=r[2], error_message=r[3], attempt_count=r[4],
                     )
                     for r in rows.fetchall()
                 ]
             except Exception:
+                if strict:
+                    raise
                 # 表不存在（早期启动 / 测试环境未跑 ensure_failure_table）
                 return []
 

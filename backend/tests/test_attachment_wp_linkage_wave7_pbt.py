@@ -23,6 +23,7 @@ from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.base import Base
 from app.models.confirmation_models import Confirmation, ConfirmationAttachmentLink
 from app.models.core import Project, ProjectStatus, ProjectType, User
+from app.models.wp_optimization_models import EvidenceLink
 from app.services.attachment_ocr_writeback import writeback_ocr_to_linked_attachment
 from app.services.attachment_service import AttachmentService
 from app.services.process_record_service import AttachmentLinkService
@@ -42,6 +43,7 @@ _CORE_TABLES = [
     Project.__table__,
     Attachment.__table__,
     AttachmentWorkingPaper.__table__,
+    EvidenceLink.__table__,
     Confirmation.__table__,
     ConfirmationAttachmentLink.__table__,
 ]
@@ -449,13 +451,13 @@ class TestProperty8CompatFailOpen:
         async def fake_execute(stmt, *a, **kw):
             call_n["n"] += 1
             result = MagicMock()
-            if call_n["n"] == 1:
-                result.all.return_value = []
-                return result
-            if call_n["n"] == 2:
-                result.scalars.return_value.all.return_value = []
-                return result
-            raise RuntimeError("conf fail")
+            if call_n["n"] == 3:  # 1 整稿关联 / 2 reference / 3 函证（只有这一步 fail-open）
+                raise RuntimeError("conf fail")
+            # 其余查询（含之后的证据链接、wp 元数据）返回空：证据链接不 fail-open（spec attachment-evidence-intake）
+            result.all.return_value = []
+            result.first.return_value = None
+            result.scalars.return_value.all.return_value = []
+            return result
 
         boom_db.execute = AsyncMock(side_effect=fake_execute)
         with patch.object(boom_svc, "_resolve_wp_code", AsyncMock(return_value=None)):
@@ -467,3 +469,4 @@ class TestProperty8CompatFailOpen:
 
         assert "items" in result
         assert result["items"] == []
+        assert call_n["n"] >= 4  # 函证失败后证据链接照常查询

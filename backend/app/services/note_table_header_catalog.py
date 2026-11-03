@@ -34,9 +34,11 @@ from app.services.note_table_header_match import choose_unit, takes_amount
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 LIBRARY_PATH = DATA_DIR / "note_table_header_library.json"
+CORRESPONDENCE_PATH = DATA_DIR / "note_table_header_correspondence.json"
 STDS = ("soe", "listed")
 
-__all__ = ["LIBRARY_PATH", "build_catalog", "check_catalog", "render_catalog", "standalone_sections"]
+__all__ = ["CORRESPONDENCE_PATH", "LIBRARY_PATH", "build_catalog", "check_catalog", "render_catalog",
+           "standalone_sections"]
 
 
 def _load(name: str) -> Any:
@@ -242,6 +244,8 @@ def _correspondence(std: str, standalone: dict[str, list[dict]]) -> list[dict]:
                 ] if match else [],
                 "unmatched": [target[c].label for c in match.unmatched] if match else [],
             })
+            if choice.score_reason:
+                item["score_reason"] = choice.score_reason
             out.append(item)
     return out
 
@@ -324,27 +328,40 @@ def _rows(items: list, indent: str) -> str:
 
 
 def render_catalog(catalog: dict[str, Any]) -> str:
-    """每张表 / 每条对应 / 每条异常一行；顶层与统计缩进两格。"""
+    """每张表 / 每条异常一行；顶层与统计缩进两格。correspondence 拆到独立文件。"""
     head = {k: catalog[k] for k in ("version", "_source", "_doc", "vocabulary_sha1", "stats")}
     text = json.dumps(head, ensure_ascii=False, indent=2)[:-2]  # 去掉末尾「\n}」
     parts = [text + ","]
     parts.append('  "variants": {\n' + ",\n".join(
         f'    {_line(name)}: {_rows(entries, "      ")}' for name, entries in catalog["variants"].items()
     ) + "\n  },")
-    parts.append('  "correspondence": {\n' + ",\n".join(
-        f'    {_line(std)}: {_rows(items, "      ")}' for std, items in catalog["correspondence"].items()
-    ) + "\n  },")
     parts.append(f'  "anomalies": {_rows(catalog["anomalies"], "    ")}')
     return "\n".join(parts) + "\n}\n"
+
+
+def render_correspondence(catalog: dict[str, Any]) -> str:
+    """逐列对应明细（从主库拆出的独立文件），每条一行。"""
+    parts = ["{\n" + ",\n".join(
+        f'  {_line(std)}: {_rows(items, "    ")}' for std, items in catalog["correspondence"].items()
+    ) + "\n}"]
+    return "\n".join(parts) + "\n"
 
 
 def check_catalog() -> list[str]:
     """入库目录与按当前词表 / 种子生成的结果逐字节比对；一致返回空列表，否则返回差异摘要。"""
     import difflib
 
-    expected = render_catalog(build_catalog())
-    actual = LIBRARY_PATH.read_text(encoding="utf-8") if LIBRARY_PATH.exists() else ""
-    if expected == actual:
-        return []
-    diff = difflib.unified_diff(actual.splitlines(), expected.splitlines(), "入库", "生成", n=0, lineterm="")
-    return [line[:300] for line in list(diff)[:60]] or ["内容不同"]
+    catalog = build_catalog()
+    diffs: list[str] = []
+
+    for path, render_fn, label in [
+        (LIBRARY_PATH, render_catalog, "主库"),
+        (CORRESPONDENCE_PATH, render_correspondence, "对应表"),
+    ]:
+        expected = render_fn(catalog)
+        actual = path.read_text(encoding="utf-8") if path.exists() else ""
+        if expected != actual:
+            diff = difflib.unified_diff(actual.splitlines(), expected.splitlines(), f"{label}入库", f"{label}生成",
+                                        n=0, lineterm="")
+            diffs.extend(f"[{label}] {line[:300]}" for line in list(diff)[:30])
+    return diffs or []

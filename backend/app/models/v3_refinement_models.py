@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, text
+from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -72,6 +72,49 @@ class AiContentLog(Base, TimestampMixin):
         Boolean, server_default=text("false"), nullable=False
     )
     stale_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # V239 DraftArtifact facade：继续复用本表作为唯一待确认状态机。
+    generation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    task_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ai_chat_message.id", ondelete="RESTRICT"), nullable=True
+    )
+    prompt_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    context_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    target_locator: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    baseline_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    before_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    before_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proposed_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    preview_diff: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    artifact_version: Mapped[int] = mapped_column(
+        server_default=text("0"), nullable=False
+    )
+    writeback_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'pending'"), nullable=False
+    )
+    applied_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    applied_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    writeback_receipt: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    undone_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    undone_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_ai_content_log_generation", "generation_id", unique=True,
+            postgresql_where=text("generation_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_ai_content_log_source_target",
+            "source_message_id", "target_cell", unique=True,
+            postgresql_where=text("source_message_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_ai_content_log_pending_artifact",
+            "project_id", "writeback_status", "generated_at",
+        ),
+    )
 
 
 class CrossModuleConflict(Base, TimestampMixin):

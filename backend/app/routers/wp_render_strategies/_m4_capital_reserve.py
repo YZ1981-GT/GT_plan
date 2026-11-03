@@ -147,25 +147,24 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     前端 GtM4CapitalReserve 为自加载组件（各子组件独立拉取 checklist_responses）。
     """
     # ─── 读取 checklist_responses 快照 ─────────────────────────────────
+    # 原先读 RenderContext 没有的 ``workpaper_id``、查表里没有的 evidence / status 列 ⇒ 快照恒空、公式校验从不跑
+    # （spec trim-followup-residual-findings-closure）。保存点隔离：读失败不让事务停在 aborted、连累后面的取数。
     responses_snapshot: dict[str, Any] = {}
     adjudicated_amount: float | None = None
     try:
-        rows = (
-            await ctx.db.execute(
-                sa.text(
-                    "SELECT item_id, conclusion, evidence, status "
-                    "FROM checklist_responses "
-                    "WHERE wp_id = :wid"
-                ),
-                {"wid": str(ctx.workpaper_id)},
-            )
-        ).fetchall()
+        async with ctx.db.begin_nested():
+            rows = (
+                await ctx.db.execute(
+                    sa.text(
+                        "SELECT item_id, conclusion, remark "
+                        "FROM checklist_responses "
+                        "WHERE wp_id = :wid"
+                    ),
+                    {"wid": str(ctx.wp_id)},
+                )
+            ).fetchall()
         for r in rows:
-            responses_snapshot[r.item_id] = {
-                "conclusion": r.conclusion,
-                "evidence": r.evidence,
-                "status": r.status,
-            }
+            responses_snapshot[r.item_id] = {"conclusion": r.conclusion, "remark": r.remark}
         # 提取审定数
         if _ADJUDICATED_ITEM_ID in responses_snapshot:
             raw_adj = responses_snapshot[_ADJUDICATED_ITEM_ID].get("conclusion")

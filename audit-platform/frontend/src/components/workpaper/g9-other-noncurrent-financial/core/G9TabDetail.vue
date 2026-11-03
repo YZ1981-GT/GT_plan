@@ -195,7 +195,7 @@
         </el-table-column>
         <el-table-column label="期初报表数" width="118" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="模板 L 列 =E+K">{{ fmt(row.openingReported) }}</span>
+            <span class="formula-cell" title="模板 L 列 =J+K（期初审定公允价值 + 期初重分类）">{{ fmt(row.openingReported) }}</span>
           </template>
         </el-table-column>
       </template>
@@ -293,7 +293,7 @@
         </el-table-column>
         <el-table-column label="期末报表数" width="118" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="模板 Y 列 =R+X">{{ fmt(row.closingReported) }}</span>
+            <span class="formula-cell" title="模板 Y 列 =W+X（期末审定公允价值 + 期末重分类）">{{ fmt(row.closingReported) }}</span>
           </template>
         </el-table-column>
       </template>

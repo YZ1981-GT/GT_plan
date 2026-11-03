@@ -8,6 +8,7 @@
  *  合计行：仅汇总总成本及总成本变动额/率（数量、单价列不汇总）
  */
 import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcChangeAmount } from './useF5CosOfFormulaEngine'
 import {
   F5_ROW_ID_PREFIX,
@@ -317,6 +318,15 @@ export function useF5Comparison(options: UseF5ComparisonOptions) {
     allResponses.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: value })
     debounceSave()
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

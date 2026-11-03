@@ -9,7 +9,7 @@
  * Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { OpenReviewsData, ReviewItem } from '@/composables/useDashboardData'
 
 // ─── Mock vue-router ─────────────────────────────────────────────────────────
@@ -20,6 +20,16 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
   useRoute: () => ({ params: { projectId: 'proj-001' } }),
 }))
+
+// 点击打开底稿编辑器：按编码取本项目底稿实例（spec wp-deeplink-locate-coverage-closure 需求 3）
+const { resolveMock, warnMock } = vi.hoisted(() => ({ resolveMock: vi.fn(), warnMock: vi.fn() }))
+vi.mock('@/services/resolveWorkpaperByCode', () => ({ resolveWorkpaperByCode: resolveMock }))
+vi.mock('element-plus', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ElMessage: { warning: warnMock, error: vi.fn(), info: vi.fn(), success: vi.fn() },
+}))
+const WP_D2 = '3f2b1c0d-9e8f-4a7b-8c6d-5e4f3a2b1c0d'
+const WP_K1 = '7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d'
 
 // ─── Import component under test ────────────────────────────────────────────
 
@@ -104,6 +114,8 @@ function mountComponent(openReviews: OpenReviewsData | null = createOpenReviewsD
 
 beforeEach(() => {
   mockPush.mockReset()
+  resolveMock.mockReset()
+  warnMock.mockReset()
 })
 
 describe('ReviewOpinionList — 排序正确性', () => {
@@ -149,54 +161,59 @@ describe('ReviewOpinionList — 排序正确性', () => {
   })
 })
 
+// 原先跳底稿列表页并带 highlight / sheet / cell：列表页不读 sheet / cell，定位丢失。现在打开该底稿编辑器并带 ?sheet=&cell=。
 describe('ReviewOpinionList — 点击跳转', () => {
-  it('点击列表项跳转到对应底稿（含 sheet + cell）', async () => {
+  it('点击列表项打开对应底稿编辑器并定位（sheet 级编码没有独立底稿时回落父底稿）', async () => {
+    resolveMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ wpId: WP_D2 })
     const wrapper = mountComponent()
     const items = wrapper.findAll('.review-item')
 
     await items[0].trigger('click')
+    await flushPromises()
 
+    expect(resolveMock.mock.calls.map((c) => c.slice(0, 2))).toEqual([['proj-001', 'D2-1'], ['proj-001', 'D2']])
     expect(mockPush).toHaveBeenCalledWith({
-      name: 'WorkpaperList',
-      params: { projectId: 'proj-001' },
-      query: {
-        highlight: 'D2-1',
-        sheet: '审定表D2-1',
-        cell: 'C15',
-      },
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: WP_D2 },
+      query: { sheet: '审定表D2-1', cell: 'C15' },
     })
+    expect(warnMock).not.toHaveBeenCalled()
   })
 
-  it('点击无 sheet/cell 的列表项仅传 highlight', async () => {
+  it('点击无 sheet/cell 的列表项：回落父底稿时以原编码作 sheet', async () => {
+    resolveMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ wpId: WP_D2 })
     const wrapper = mountComponent()
     const items = wrapper.findAll('.review-item')
 
     await items[1].trigger('click') // r2: F2-1, no sheet/cell
+    await flushPromises()
 
     expect(mockPush).toHaveBeenCalledWith({
-      name: 'WorkpaperList',
-      params: { projectId: 'proj-001' },
-      query: {
-        highlight: 'F2-1',
-      },
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: WP_D2 },
+      query: { sheet: 'F2-1' },
     })
   })
 
-  it('点击不同列表项传递正确的 wp_code', async () => {
+  it('点击不同列表项按各自 wp_code 取底稿；本项目没有时提示原因、不跳转', async () => {
+    resolveMock.mockResolvedValueOnce({ wpId: WP_K1 })
     const wrapper = mountComponent()
     const items = wrapper.findAll('.review-item')
 
-    await items[2].trigger('click') // r3: K1-2
-
+    await items[2].trigger('click') // r3: K1-2（本项目有独立底稿）
+    await flushPromises()
     expect(mockPush).toHaveBeenCalledWith({
-      name: 'WorkpaperList',
-      params: { projectId: 'proj-001' },
-      query: {
-        highlight: 'K1-2',
-        sheet: '明细表K1-2',
-        cell: 'B20',
-      },
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: WP_K1 },
+      query: { sheet: '明细表K1-2', cell: 'B20' },
     })
+
+    mockPush.mockReset()
+    resolveMock.mockResolvedValue(null)
+    await items[3].trigger('click') // r4: E1-3
+    await flushPromises()
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(warnMock).toHaveBeenCalledWith('本项目未找到底稿 E1-3（可能尚未生成）')
   })
 })
 

@@ -3,11 +3,15 @@
 能力域 D — global-refinement-v5-closure：
 完整 CRUD + 状态机推进端点。
 router 统一 commit（项目铁律）。
+
+鉴权：路由级 ``confirmation_project_gate``（spec attachment-security-baseline 需求 2.1、2.2）——
+GET 要求本项目 readonly、其余方法 edit；路径与请求体里的函证 / 附件 / 挂载记录 / 底稿须属于路径项目。
+回填结论与撤回终态另要求系统角色为经理及以上（``_MANAGER_PLUS_ROLES``）。
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,15 +19,28 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_role
 from app.services import confirmation_service
 from app.services import confirmation_evidence_service
+from app.services.confirmation_reply_ocr import ReplyOcrFailed, ensure_reply_text
+from app.services.confirmation_scope_gate import confirmation_project_gate
+from app.services.confirmation_types import ConfirmTypeStr
+from app.services.attachment_service import AttachmentService
+from app.services.attachment_upload_policy import UploadRejected
+from app.services.workpaper_evidence_intake import read_upload_limited
 
-router = APIRouter(prefix="/projects/{project_id}/confirmations", tags=["函证管理"])
+router = APIRouter(
+    prefix="/projects/{project_id}/confirmations",
+    tags=["函证管理"],
+    dependencies=[Depends(confirmation_project_gate)],
+)
+
+# 现场经理及以上（撤回终态 / 改结论）；signing_partner 不是系统角色取值，保留只为兼容旧数据
+_MANAGER_PLUS_ROLES = ["admin", "manager", "partner", "signing_partner"]
 
 
 # ─── Request / Response schemas ────────────────────────────────────────────
 
 
 class ConfirmationCreate(BaseModel):
-    confirm_type: str = Field(..., description="函证类型: receivable/payable/bank/loan")
+    confirm_type: ConfirmTypeStr = Field(..., description="函证类型: receivable/payable/bank/loan/legal/other")
     counterparty: str = Field(..., description="函证对象名称")
     wp_id: str | None = None
     account_code: str | None = None
@@ -34,7 +51,7 @@ class ConfirmationCreate(BaseModel):
 
 
 class ConfirmationUpdate(BaseModel):
-    confirm_type: str | None = None
+    confirm_type: ConfirmTypeStr | None = None
     counterparty: str | None = None
     wp_id: str | None = None
     account_code: str | None = None
@@ -156,11 +173,8 @@ async def assign_match(
 
     注意：本路由须在 ``/{confirmation_id}`` 之前注册，避免路径冲突。
 
-    权限：编辑权（运行时按角色守卫）
+    权限：本项目 edit；回函件、函证、配对发函件须属于本项目（路由级门）
     """
-    from app.deps import require_role as _require_role
-    _ASSIGN_ROLES = ["admin", "manager", "partner", "signing_partner", "field_staff"]
-    # 运行时角色检查（不能在 Depends 层因为路由已提前注册到此位置）
     aid = uuid.UUID(attachment_id)
     cid = uuid.UUID(body.confirmation_id)
     paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
@@ -375,7 +389,7 @@ async def reverse_confirmation(
 
 class BatchSyncItem(BaseModel):
     """单条函证同步请求"""
-    confirm_type: str
+    confirm_type: ConfirmTypeStr
     counterparty: str
     wp_id: str | None = None
     account_code: str | None = None
@@ -538,12 +552,7 @@ async def batch_sync_confirmations(
 
 
 # ─── M2 附件链端点（confirmation-attachment-ocr-linkage）──────────────────────
-
-# 编辑权：沿用平台既有编辑角色集
-_EDIT_ROLES = ["admin", "manager", "partner", "signing_partner", "field_staff"]
-
-# 现场经理及以上（撤回终态/改结论）
-_MANAGER_PLUS_ROLES = ["admin", "manager", "partner", "signing_partner"]
+# 挂载 / 解绑 / 识别比对 / 自动匹配：本项目 edit 即可（路由级门）。原先的角色集不含审计员，审计员一律 403。
 
 
 class ApplyReplyRequest(BaseModel):
@@ -564,13 +573,98 @@ class LinkAttachmentRequest(BaseModel):
     )
 
 
+@router.post("/{confirmation_id}/attachments/upload")
+async def upload_and_link_attachment(
+    project_id: str,
+    confirmation_id: str,
+    file: UploadFile = File(...),
+    role: str = Form(...),
+    paired_outbound_id: str | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """一次请求完成文件存储、函证挂载和留痕；失败补偿本次新写的物理对象。"""
+    pid = uuid.UUID(project_id)
+    cid = uuid.UUID(confirmation_id)
+    paired = uuid.UUID(paired_outbound_id) if paired_outbound_id else None
+    actor_user_id = getattr(user, "id", None)
+    try:
+        confirmation, final_pair = await confirmation_evidence_service.validate_attachment_link_request(
+            db, confirmation_id=cid, role=role, paired_outbound_id=paired,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        raise HTTPException(status_code=404 if "不存在" in message else 400, detail=message) from exc
+    if confirmation.project_id != pid:
+        raise HTTPException(status_code=404, detail="函证记录不存在")
+
+    content = await read_upload_limited(file)
+    service = AttachmentService(db)
+    raw: dict | None = None
+    try:
+        uploaded = await service.upload_attachment_file(
+            project_id=pid,
+            file_name=file.filename or "confirmation.pdf",
+            content=content,
+            metadata={
+                "attachment_type": "confirmation",
+                "reference_type": "confirmation_list",
+                "reference_id": cid,
+            },
+            created_by=actor_user_id,
+        )
+        attachment_id = uuid.UUID(uploaded["id"])
+        raw = await service.get_raw_storage(attachment_id)
+        link = await confirmation_evidence_service.link_attachment(
+            db,
+            confirmation_id=cid,
+            attachment_id=attachment_id,
+            role=role,
+            paired_outbound_id=final_pair,
+            actor_user_id=actor_user_id,
+        )
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        cleanup = None
+        if raw is not None:
+            cleanup = await service.compensate_uploaded_storage(
+                project_id=pid,
+                storage_type=raw.get("storage_type"),
+                storage_key=raw.get("file_path"),
+                paperless_document_id=raw.get("paperless_document_id"),
+            )
+        if isinstance(exc, UploadRejected):
+            raise HTTPException(status_code=422, detail={**exc.as_detail(), "storage_cleanup": cleanup}) from exc
+        if isinstance(exc, ValueError):
+            message = str(exc)
+            raise HTTPException(
+                status_code=404 if "不存在" in message else 400,
+                detail={"message": message, "storage_cleanup": cleanup},
+            ) from exc
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "函证附件上传或挂载失败，已执行存储补偿", "storage_cleanup": cleanup},
+        ) from exc
+
+    return {
+        "link_id": str(link.id),
+        "confirmation_id": str(link.confirmation_id),
+        "attachment_id": str(link.attachment_id),
+        "file_name": uploaded.get("file_name"),
+        "role": link.role,
+        "paired_outbound_attachment_id": str(link.paired_outbound_attachment_id) if link.paired_outbound_attachment_id else None,
+        "match_status": link.match_status,
+    }
+
+
 @router.post("/{confirmation_id}/attachments")
 async def link_attachment(
     project_id: str,
     confirmation_id: str,
     body: LinkAttachmentRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """挂附件到函证记录。
 
@@ -582,7 +676,7 @@ async def link_attachment(
     paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
     actor_user_id = getattr(user, "id", None)
 
-    # 权限校验在 require_role（置于 try 外），业务校验在 service
+    # 权限与对象归属在路由级门（confirmation_project_gate），业务校验在 service
     try:
         link = await confirmation_evidence_service.link_attachment(
             db,
@@ -618,7 +712,7 @@ async def unlink_attachment(
     confirmation_id: str,
     link_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """解绑附件（清 reference/删 link，不物理删附件，留痕）。"""
     lid = uuid.UUID(link_id)
@@ -650,8 +744,8 @@ async def list_attachments(
     """列出某笔函证关联的全部附件（发函件 + 回函件，含角色/配对/OCR状态/文件信息）。"""
     cid = uuid.UUID(confirmation_id)
 
-    items = await confirmation_evidence_service.list_attachments(db, cid)
-    await db.commit()
+    role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
+    items = await confirmation_evidence_service.list_attachments(db, cid, actor_role=role)
     return {"items": items, "total": len(items)}
 
 
@@ -663,24 +757,26 @@ async def extract_and_compare(
     project_id: str,
     attachment_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """OCR 识别回函件 + 与所属函证 book_amount 比对。
 
-    - 调 extract_confirmation_reply（算法不改）抽取回函金额/日期/主体
-    - 比对：|diff| ≤ 0.01 → matched，否则 discrepancy，任一缺失 → low_confidence
-    - 主体名称不符 → counterparty_mismatch 预警
+    - 回函件没有识别全文时先识别原件并写回（ensure_reply_text），失败如实报错、不出比对结论
+    - 比对：|diff| ≤ 0.01 → matched，否则 discrepancy，任一缺失 → low_confidence；主体不符 → counterparty_mismatch
     - 结果仅写 attachment.ocr_fields_cache（governed=False），不落库 confirmations
 
-    权限：编辑权
+    权限：本项目 edit；回函件须属于本项目（路由级门）
     """
-    # 权限校验置于 try 外（require_role 已完成），下面是业务逻辑
     aid = uuid.UUID(attachment_id)
 
     try:
+        await ensure_reply_text(db, aid)
         result = await confirmation_evidence_service.extract_and_compare(
             db, attachment_id=aid
         )
+    except ReplyOcrFailed as e:
+        await db.commit()  # 「识别失败」状态留下，抽屉据此提示
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except ValueError as e:
         msg = str(e)
         if "不存在" in msg:
@@ -751,7 +847,7 @@ async def auto_match(
     project_id: str,
     body: AutoMatchRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """批量/单件自动匹配回函件到函证记录。
 

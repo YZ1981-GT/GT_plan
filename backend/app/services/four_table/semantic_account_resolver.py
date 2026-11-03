@@ -315,6 +315,30 @@ class SemanticAccountResult:
         }
 
 
+def has_resolved_tb_rows(
+    accounts: SemanticAccountResult,
+    tb_rows,
+    slot_keys: tuple[str, ...] | None = None,
+) -> bool:
+    """语义槽的原始码前缀是否在本次 active ``tb_balance`` 查询中实际命中行。
+
+    ``ResolvedSlot.found`` 只表示解析器产出了可查询的码。科目表不可用时，裸 fallback 也会
+    ``found=True``，不能据此告诉用户“试算表已找到科目”。本函数检查实际行，金额全为 0 仍算存在；
+    前缀沿用共享件的点号边界，避免 ``1631`` 误命中 ``16310``。
+    """
+    from .leaf_aggregation import filter_by_prefixes, to_leaf_rows
+
+    wanted = set(slot_keys) if slot_keys is not None else set(accounts.slots)
+    prefixes = [
+        code
+        for key, slot in accounts.slots.items()
+        if key in wanted
+        for code in slot.codes
+        if code
+    ]
+    return bool(filter_by_prefixes(to_leaf_rows(tb_rows), prefixes))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 纯函数（无 DB，可独立单测）
 # ─────────────────────────────────────────────────────────────────────────────
@@ -653,8 +677,10 @@ async def resolve_semantic_accounts(
     并在 ``resolved_from`` / ``chart_available`` 标注实际来源。
 
     Returns:
-        :class:`SemanticAccountResult`。本项目确实没有某科目时该槽 ``found`` 为 ``False``
-        且 ``codes`` 为空 —— **调用方必须据此显示「本项目无此科目」而不是取 0**。
+        :class:`SemanticAccountResult`。科目表可用且本项目确实没有某科目时，该槽 ``found=False``
+        且 ``codes`` 为空。科目表不可用时，声明过 fallback 的槽会保留可查询码并 ``found=True``；
+        这只表示“有查询落点”，调用方判断 TB 是否真的存在科目必须检查实际数据行（见
+        :func:`has_resolved_tb_rows`），不能把 ``slot.found`` 当存在证据。
     """
     chart = await fetch_project_chart(ctx)
     chart_available = bool(chart)
@@ -833,6 +859,7 @@ __all__ = [
     "extract_formula_codes",
     "fetch_project_chart",
     "find_legacy_candidates",
+    "has_resolved_tb_rows",
     "is_top_level_code",
     "match_slot_in_chart",
     "normalize_account_name",

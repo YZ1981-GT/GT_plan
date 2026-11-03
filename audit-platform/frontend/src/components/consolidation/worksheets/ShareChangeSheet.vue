@@ -188,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -218,6 +218,7 @@ const props = defineProps<{
 
 const _emit = defineEmits<{
   (e: 'save', data: any): void
+  (e: 'draft-change', data: any): void
   (e: 'open-formula', key: string): void
 }>()
 
@@ -519,11 +520,15 @@ const allData = computed(() => companyData.map((cd, i) => ({
 // #3: Debounced auto-save — 防止切 tab 丢数据
 let _autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 watch([companyData, indirectSimData], () => {
+  _emit('draft-change', allData.value)
   if (_autoSaveTimer) clearTimeout(_autoSaveTimer)
   _autoSaveTimer = setTimeout(() => {
     _emit('save', allData.value)
   }, 5000) // 5s debounce：用户停止编辑后自动保存
 }, { deep: true })
+onUnmounted(() => {
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer)
+})
 
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
 

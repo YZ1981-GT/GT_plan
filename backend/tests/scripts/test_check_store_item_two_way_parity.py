@@ -127,7 +127,11 @@ def test_stale_baseline_entry_is_reported(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_baseline_is_exactly_thirteen_with_owning_lanes() -> None:
-    """基线恰 13 条（2026-09-28：D1 接通后从 14 变短，棘轮只许往这个方向走）。"""
+    """基线恰 13 条（棘轮只许往变短的方向走）。
+
+    2026-09-28 D1 接通后 14 → 13；8edf1d45a 加 F2/F4 parity 棘轮后 15；2026-10-28 G4 / G6 接通后 13
+    （spec oo-writeback-template-parity-closure R3 批 B3）。
+    """
     mod = _load_module()
     assert len(mod.KNOWN_UNWIRED) == 13, (
         f"基线应恰 13 条，实得 {len(mod.KNOWN_UNWIRED)}：{sorted(mod.KNOWN_UNWIRED)}。"
@@ -136,6 +140,8 @@ def test_baseline_is_exactly_thirteen_with_owning_lanes() -> None:
     assert "d1.notes_receivable_detail" not in mod.KNOWN_UNWIRED, (
         "D1 已于 2026-09-28 接通（声明 18 / 两方向各可见 18），不得回填进基线"
     )
+    for wired in ("g4.bond_main", "g6.other_bond_main"):
+        assert wired not in mod.KNOWN_UNWIRED, f"{wired} 已于 2026-10-28 接通（批 B3），不得回填进基线"
     for adapter_id, reason in mod.KNOWN_UNWIRED.items():
         assert "归属 lane" in reason, f"{adapter_id} 未写归属 lane"
 

@@ -3,14 +3,183 @@
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { refreshDisclosureFromWorkpapers, refreshDisclosureSection } from '@/services/commonApi'
 import { useNoteRefresh } from '../useNoteRefresh'
+import { pullFromWorkpapers, type NotePullResult } from '../noteWorkpaperPull'
+import { runHeadlessDisclosure } from '../noteHeadlessDisclosure'
 
 vi.mock('@/services/commonApi', () => ({
   refreshDisclosureFromWorkpapers: vi.fn(async () => ({ cells_updated: 0 })),
+  refreshDisclosureSection: vi.fn(async () => ({ cells_updated: 0 })),
 }))
 vi.mock('@/utils/errorHandler', () => ({
   handleApiError: vi.fn(),
 }))
+vi.mock('element-plus', () => ({ ElMessage: vi.fn() }))
+// 提示文案用真实 describeWorkpaperPull，只替换请求
+vi.mock('../noteWorkpaperPull', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../noteWorkpaperPull')>()),
+  pullFromWorkpapers: vi.fn(),
+}))
+vi.mock('../noteHeadlessDisclosure', () => ({
+  runHeadlessDisclosure: vi.fn(async () => ({ outcomes: [], pending: [] })),
+}))
+
+function pullResult(overrides: Partial<NotePullResult> = {}): NotePullResult {
+  return {
+    synced: 1,
+    skipped: 0,
+    skipped_never_synced: 0,
+    variant: 'soe',
+    applicable_standards: ['soe_standalone', 'soe', 'standalone'],
+    push: { ran: true, error: null, wp_codes: ['D2'], written: 3, kept: 1, skipped: 0, run_id: 'r1', warnings: [] },
+    sections: [{
+      section: '八、5', wp_codes: ['D2'], wp_ids: { D2: 'wp-d2' }, push_wp_codes: ['D2'], unsupported_wp_codes: [],
+      exists: true, synced_before: true, manual_values: 0, written: 3, unchanged: 0, kept: 1, skipped: 0, reasons: [],
+    }],
+    ...overrides,
+  }
+}
+
+describe('useNoteRefresh 刷新先从底稿取数（spec note-pull-header-formula-closure R2）', () => {
+  beforeEach(() => {
+    vi.mocked(pullFromWorkpapers).mockReset()
+    vi.mocked(runHeadlessDisclosure).mockReset()
+    vi.mocked(runHeadlessDisclosure).mockResolvedValue({ outcomes: [], pending: [] })
+    vi.mocked(refreshDisclosureSection).mockReset()
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({ cells_updated: 0 } as any)
+    vi.mocked(refreshDisclosureFromWorkpapers).mockReset()
+    vi.mocked(refreshDisclosureFromWorkpapers).mockResolvedValue({ cells_updated: 0 } as any)
+    vi.mocked(ElMessage).mockReset()
+  })
+
+  function setup(section = '八、5') {
+    const order: string[] = []
+    const fetchDetail = vi.fn(async (s: string) => { order.push(`detail:${s}`) })
+    const fetchTree = vi.fn(async () => { order.push('tree') })
+    const api = useNoteRefresh({
+      projectId: ref('p1'),
+      year: ref(2025),
+      currentNote: ref<{ note_section: string } | null>({ note_section: section }),
+      fetchDetail,
+      fetchTree,
+      staleRecalc: vi.fn(async () => undefined),
+    })
+    return { api, order, fetchDetail, fetchTree }
+  }
+
+  it('当前章节刷新：prepare → 离屏同步 → push → 按模板与表内公式重算 → 重载目录和详情', async () => {
+    const { api, order } = setup()
+    const pulled = pullResult()
+    vi.mocked(pullFromWorkpapers).mockImplementation(async (...args) => { order.push(`pull:${args[3]}:${args[2]}`); return { result: pulled, error: null } })
+    vi.mocked(runHeadlessDisclosure).mockImplementation(async (pull) => {
+      order.push('headless')
+      expect(pull).toBe(pulled)
+      return { outcomes: [{ wpCode: 'D2', section: '八、5', status: 'synced', rows: 6 }], pending: [] }
+    })
+    vi.mocked(refreshDisclosureSection).mockImplementation(async (...args: any[]) => { order.push(`section:${args[2]}`); return { cells_updated: 0 } as any })
+
+    await api.onRefreshFromWP()
+
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(1, 'p1', 2025, '八、5', 'prepare')
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(2, 'p1', 2025, '八、5', 'push')
+    // 单章节刷新：底稿写的其他章节不在本次范围（spec note-pull-followup-closure R1）
+    expect(runHeadlessDisclosure).toHaveBeenCalledWith(pulled, { projectId: 'p1', year: 2025, allSections: false })
+    expect(order).toEqual(['pull:prepare:八、5', 'headless', 'pull:push:八、5', 'section:八、5', 'tree', 'detail:八、5'])
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('success')
+    expect(msg.message).toContain('公式推送按审定数写入 3 格（八、5）')
+    expect(msg.message).toContain('保留人工 / 锁定 1 格')
+    expect(msg.message).toContain('已从底稿披露表同步：D2→八、5（6 行）')
+    expect(api.refreshLoading.value).toBe(false)
+  })
+
+  it('取数失败不阻断按模板重算，提示为警告并写明原因', async () => {
+    const { api } = setup()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: null, error: '从底稿取数失败：权限不足' })
+
+    await api.onRefreshFromWP()
+
+    expect(runHeadlessDisclosure).not.toHaveBeenCalled()
+    expect(refreshDisclosureSection).toHaveBeenCalledWith('p1', 2025, '八、5')
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('warning')
+    expect(msg.message).toContain('从底稿取数失败：权限不足')
+  })
+
+  it('预设公式与底稿值不一致：提示为警告并写明保留底稿值的格数（spec note-chain-followup-optimizations ADR-2）', async () => {
+    const { api } = setup()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: pullResult(), error: null })
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({ cells_updated: 0, formula_differs: 2 } as any)
+
+    await api.onRefreshFromWP()
+
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('warning')
+    expect(msg.message).toContain('2 个单元格的底稿披露表数值与预设公式结果不一致，已保留底稿值')
+    // 差异提示与取数结果并入同一条
+    expect(msg.message).toContain('公式推送按审定数写入 3 格（八、5）')
+    expect(msg.duration).toBeGreaterThanOrEqual(6000)
+  })
+
+  it('无差异时不出现差异提示，取数成功按成功提示', async () => {
+    const { api } = setup()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: pullResult(), error: null })
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({ cells_updated: 0, formula_differs: 0 } as any)
+
+    await api.onRefreshFromWP()
+
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('success')
+    expect(msg.message).not.toContain('预设公式结果不一致')
+  })
+
+  it('离屏同步抛错按失败记入提示，后续刷新照常', async () => {
+    const { api } = setup()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: pullResult({ push: { ran: true, error: null, wp_codes: ['D2'], written: 0, kept: 0, skipped: 0, run_id: 'r1', warnings: [] } }), error: null })
+    vi.mocked(runHeadlessDisclosure).mockRejectedValue(new Error('账龄配置读取失败'))
+
+    await api.onRefreshFromWP()
+
+    expect(refreshDisclosureSection).toHaveBeenCalledTimes(1)
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('warning')
+    expect(msg.message).toContain('底稿披露表同步失败')
+    expect(msg.message).toContain('账龄配置读取失败')
+  })
+
+  it('全部刷新：prepare → 全部 headless → push → 项目级重算，未接入 provider 的底稿写进提示', async () => {
+    const { api, order } = setup()
+    vi.mocked(pullFromWorkpapers).mockImplementation(async (...args) => { order.push(`pull:${args[3]}:${args[2]}`); return { result: pullResult(), error: null } })
+    vi.mocked(runHeadlessDisclosure).mockResolvedValue({ outcomes: [], pending: ['E1', 'F2'] })
+    vi.mocked(refreshDisclosureFromWorkpapers).mockImplementation(async () => { order.push('all'); return { cells_updated: 0 } as any })
+
+    await api.onRefreshAll()
+
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(1, 'p1', 2025, null, 'prepare')
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(2, 'p1', 2025, null, 'push')
+    expect(vi.mocked(runHeadlessDisclosure).mock.calls[0][1]).toEqual({ projectId: 'p1', year: 2025, allSections: true })
+    expect(order).toEqual(['pull:prepare:null', 'pull:push:null', 'all', 'tree', 'detail:八、5'])
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.message).toContain('底稿 E1、F2 的明细表需在底稿附注披露页保存一次后同步')
+    expect(api.refreshAllLoading.value).toBe(false)
+  })
+
+  it('未选章节时不发任何请求', async () => {
+    const api = useNoteRefresh({
+      projectId: ref('p1'),
+      year: ref(2025),
+      currentNote: ref(null),
+      fetchDetail: vi.fn(async () => undefined),
+      fetchTree: vi.fn(async () => undefined),
+      staleRecalc: vi.fn(async () => undefined),
+    })
+    await api.onRefreshFromWP()
+    expect(pullFromWorkpapers).not.toHaveBeenCalled()
+    expect(refreshDisclosureSection).not.toHaveBeenCalled()
+  })
+})
 
 describe('useNoteRefresh disclosure:note-text-updated', () => {
   beforeEach(() => {
@@ -149,5 +318,66 @@ describe('useNoteRefresh disclosure:note-text-updated', () => {
     })
     await vi.advanceTimersByTimeAsync(500)
     expect(fetchDetail).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('useNoteRefresh 重算结果集合提示（formula-writer-ownership-and-stale R2）', () => {
+  function setupOutcome() {
+    vi.mocked(pullFromWorkpapers).mockReset()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: null, error: null })
+    vi.mocked(runHeadlessDisclosure).mockReset()
+    vi.mocked(refreshDisclosureSection).mockReset()
+    vi.mocked(ElMessage).mockReset()
+    return useNoteRefresh({
+      projectId: ref('p1'),
+      year: ref(2025),
+      currentNote: ref({ note_section: '八、5' }),
+      fetchDetail: vi.fn(async () => undefined),
+      fetchTree: vi.fn(async () => undefined),
+      staleRecalc: vi.fn(async () => undefined),
+    })
+  }
+
+  it('值不变但重算成功：明确显示 recomputed 与 stale 已清除', async () => {
+    const api = setupOutcome()
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({
+      refreshed: 1,
+      total_notes: 1,
+      cells_updated: 0,
+      sections_recomputed: ['八、5'],
+      recomputed_sections: ['八、5'],
+      changed_sections: [],
+      failed_sections: [],
+      cleared_sections: ['八、5'],
+      text_only_sections: [],
+      errors: [],
+    })
+    await api.onRefreshFromWP()
+    const message = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(message.type).toBe('success')
+    expect(message.message).toBe('已重新计算 1 个章节，数据未变化；已清除 1 个过期标记')
+  })
+
+  it('failed_sections 非空但旧 errors 为空：仍显示失败，不冒充重算成功', async () => {
+    const api = setupOutcome()
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({
+      refreshed: 1,
+      total_notes: 1,
+      cells_updated: 0,
+      sections_recomputed: [],
+      recomputed_sections: [],
+      changed_sections: [],
+      failed_sections: ['八、5'],
+      cleared_sections: [],
+      text_only_sections: [],
+      errors: [],
+    })
+    await api.onRefreshFromWP()
+    const message = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(message.type).toBe('warning')
+    expect(message.message).toContain('1 个章节取数失败')
+    expect(message.message).toContain('八、5 计算失败')
+    expect(message.message).not.toContain('数据已是最新')
   })
 })

@@ -49,14 +49,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" @click="openReview">💬复核</el-button>
       </div>
     </div>
@@ -252,6 +245,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabAdjustment.vue — G4-3 调整分录汇总
@@ -270,7 +264,7 @@ import { ref, computed, inject, onMounted, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useG4MainAdjustment } from '../../composables/useG4MainAdjustment'
 import { useG4MainImportExport } from '../../composables/useG4MainImportExport'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G4AuditTextCards from '../G4AuditTextCards.vue'

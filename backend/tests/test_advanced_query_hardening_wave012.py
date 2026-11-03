@@ -14,6 +14,8 @@ from pydantic import ValidationError
 from app.routers.custom_query import QueryRequest as ApiQueryRequest
 from app.services.query_cache import build_canonical_query_identity
 from app.services.custom_query.execute_compatibility import ExecuteCompatibilityAdapter
+from app.services.acnr.resolver import ResolveResult
+from app.services.custom_query.addressing_service import ResolvedTarget
 from app.services.custom_query.query_orchestrator import (
     Agg,
     ColumnMeta,
@@ -493,9 +495,9 @@ async def test_p6_adapter_is_single_core_and_new_fields_are_lossless(
 async def test_acnr_resolution_failure_remains_4xx_and_never_fetches():
     calls = {"fetch": 0}
 
-    class Unresolved:
-        async def resolve_many(self, targets, *, project_id, db):
-            return [SimpleNamespace(raw=targets[0], found=False, addr_id=None)]
+    class Unresolved:  # acnr-foundation-defect-closure T15：逐项 resolve_target，原 400 TARGET_UNRESOLVABLE 改 422
+        async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+            return ResolvedTarget(raw=raw, found=False, error="unresolvable", result=ResolveResult(found=False))
 
     async def fetcher(req, resolved, db):
         calls["fetch"] += 1
@@ -509,9 +511,9 @@ async def test_acnr_resolution_failure_remains_4xx_and_never_fetches():
             QueryRequest(entry="business", project_id="p1", source="report", targets=["bad-target"]),
             user=SimpleNamespace(id="u1"), db=None,
         )
-    assert exc.value.status_code == 400
-    assert exc.value.detail["error_code"] == "TARGET_UNRESOLVABLE"
-    assert calls["fetch"] == 0
+    assert (exc.value.status_code, exc.value.detail["error_code"]) == (422, "ACNR_TARGETS_REJECTED")
+    assert [(i["ref"], i["error_code"]) for i in exc.value.detail["issues"]] == [("bad-target", "unresolvable")]
+    assert calls["fetch"] == 0  # 取数 0 次保留
 
 
 @pytest.mark.asyncio
@@ -658,14 +660,22 @@ class TestReadonlyGateConvergence:
 
     @pytest.mark.asyncio
     async def test_template_execute_inaccessible_target_project_403(self, monkeypatch):
-        """模板执行使用无权项目 → 403（模板执行复用 execute_query 主链路）。"""
+        """模板执行使用无权项目 → 403。
+
+        advanced-query-linkage-closure 任务 24：目标项目归属在端点函数体内先于年度解析校验（``ownership_guard``），
+        403 来自那里（execute_query 主链路的同一判定仍在，见下面替换的 adapter）。越权审计的写入换成记录桩：
+        真实写入会经本机 Redis 进共享库的审计表（任务 26 查到过测试假用户的审计泄漏）。
+        """
         import app.routers.custom_query as router_module
+        from app.services.audit_logger_enhanced import audit_logger
         from app.services.custom_query.execute_compatibility import ExecuteCompatibilityAdapter
         from app.services.custom_query.template_service import template_service as ts_inst
 
         async def reject_adapter(self, body, *, user, db):
             raise HTTPException(status_code=403, detail={"error_code": "FORBIDDEN_PROJECT", "message": "无权访问该项目数据"})
 
+        audited = AsyncMock()
+        monkeypatch.setitem(vars(audit_logger), "log_action", audited)
         monkeypatch.setattr(ExecuteCompatibilityAdapter, "execute", reject_adapter)
         monkeypatch.setattr("app.services.gin_index_monitor.is_index_building", lambda: False)
 
@@ -682,10 +692,9 @@ class TestReadonlyGateConvergence:
         async def pass_exec(tpl, *, user, db):
             return None
 
-        monkeypatch.setattr(ts_inst, "assert_executable", pass_exec)
+        monkeypatch.setitem(vars(ts_inst), "assert_executable", pass_exec)
 
-        # The template execute delegates to execute_query which goes through the adapter
-        # which will raise 403 on the target project
+        # 目标项目归属先于年度解析与取数校验：无权项目 → 403 FORBIDDEN_PROJECT，并记一条越权审计
         with pytest.raises(HTTPException) as exc:
             await router_module.execute_template(
                 template_id="00000000-0000-0000-0000-000000000001",
@@ -695,10 +704,13 @@ class TestReadonlyGateConvergence:
                 current_user=SimpleNamespace(id="u1"),
             )
         assert exc.value.status_code == 403
+        assert exc.value.detail["error_code"] == "FORBIDDEN_PROJECT"
+        assert audited.await_count == 1
 
     @pytest.mark.asyncio
-    async def test_multi_target_one_inaccessible_rejects_all_not_partial(self):
-        """acnr_targets 引用多项目时，任一项目不可访问 → 整体 403，不返回部分结果。"""
+    async def test_multi_target_one_inaccessible_rejects_all_not_partial(self, monkeypatch):
+        """acnr_targets 引用多项目时，任一项目不可访问 → 整体 403，不返回部分结果（acnr T15：替身补 L1_cell 结果，取值换桩）。"""
+        monkeypatch.setattr("app.services.custom_query.query_orchestrator.read_acnr_target_values", AsyncMock())
         fetch_calls = {"count": 0}
 
         class MultiProjectGuard:
@@ -714,12 +726,9 @@ class TestReadonlyGateConvergence:
                 return [r for r in rows if r.get("project_id") != "p2"]
 
         class MultiProjectAddressing:
-            """解析多目标，每个目标关联不同项目。"""
-            async def resolve_many(self, targets, *, project_id, db):
-                return [
-                    SimpleNamespace(raw=t, found=True, addr_id=f"WP/{t}", project_id=project_id)
-                    for t in targets
-                ]
+            async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+                res = ResolveResult(found=True, addr_id=f"WP/{raw}", entry_type="cell", source_layer="L1_cell")
+                return ResolvedTarget(raw=raw, found=True, addr_id=res.addr_id, entry_type="cell", result=res)
 
         async def fetcher(req, resolved, db):
             fetch_calls["count"] += 1
@@ -735,7 +744,7 @@ class TestReadonlyGateConvergence:
         )
 
         req = QueryRequest(
-            entry="business", project_id="p1", source="trial_balance",
+            entry="business", project_id="p1", source="trial_balance", year=2025,
             targets=["target_a", "target_b"],
         )
         result = await orch.execute(req, user=SimpleNamespace(id="u1"), db=None)
@@ -786,22 +795,46 @@ class TestReadonlyGateConvergence:
 
 
 @pytest.mark.asyncio
-async def test_legacy_fetcher_requests_untruncated_source_rows(monkeypatch):
+async def test_legacy_fetcher_routes_sql_sources_to_database_paging(monkeypatch):
+    """旧用例替身 router 的 ``_query_trial_balance``，固化「取数层不截断、编排器内存切片」的内部形态。
+
+    advanced-query-linkage-closure 任务 7 把试算表切到注册表（COUNT / ORDER BY / LIMIT / OFFSET 在数据库内）后该
+    取数器已删除；改为替换注册表的**下一层** ``paged_fetch.page``：收到的是试算表定义与请求的 limit / offset，
+    返回的 FetchPage 原样交给编排器。任务 17 / 18 把报表行次（及报表、调整分录）也切到注册表后，router 里不再有
+    取数器：原后半段替身 ``_query_report_lines``、断言其收到 ``limit=None``，固化的是已删除的内部形态，改为断言
+    报表行次同样交给 ``paged_fetch.page``。
+    """
+    import uuid as _uuid
+
     import app.routers.custom_query as router_module
+    from app.services.custom_query import paged_fetch, source_registry
+    from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage
 
     seen = {}
 
-    async def trial_balance(db, pid, year, filters, limit):
-        seen["limit"] = limit
-        return {"rows": [{"id": index} for index in range(8)], "columns": ["id"], "total": 8}
+    async def page(spec, ctx, **kwargs):
+        seen.update(spec=spec, ctx=ctx, **kwargs)
+        return FetchPage(rows=[{"id": index} for index in range(8)], columns=[ColumnMeta(key="id", title="id")],
+                         total=1234, paged=True)
 
-    monkeypatch.setattr(router_module, "_query_trial_balance", trial_balance)
-    rows, columns = await router_module._legacy_business_fetcher(
-        QueryRequest(entry="business", project_id="p1", year=2025, source="trial_balance"),
+    monkeypatch.setattr(paged_fetch, "page", page)
+    fetched = await router_module._legacy_business_fetcher(
+        QueryRequest(entry="business", project_id=str(_uuid.uuid4()), year=2025, source="trial_balance",
+                     limit=8, offset=16),
         [], object(),
     )
-    assert seen["limit"] is None
-    assert len(rows) == 8 and columns[0].key == "id"
+    assert seen["spec"] is source_registry.TRIAL_BALANCE and (seen["limit"], seen["offset"]) == (8, 16)
+    assert fetched.paged and fetched.total == 1234 and len(fetched.rows) == 8
+
+    seen.clear()
+    lines = await router_module._legacy_business_fetcher(
+        QueryRequest(entry="business", project_id=str(_uuid.uuid4()), year=2025, source="report_lines",
+                     limit=50, offset=0),
+        [], object(),
+    )
+    assert seen["spec"] is source_registry.REPORT_LINES and (seen["limit"], seen["offset"]) == (50, 0)
+    assert lines.paged and lines.total == 1234
+    assert not hasattr(router_module, "_query_report_lines"), "报表行次取数器已随任务 17 删除"
 
 
 # ─── Wave1 Task 1.4: 加固 writeback preview/confirm 权限 ─────────────────────
@@ -835,7 +868,7 @@ class TestWritebackPreviewConfirmPermissions:
             return await original_generate(*args, **kwargs)
 
         monkeypatch.setattr(router_module, "get_visible_project_ids", mock_get_visible_ids)
-        monkeypatch.setattr(writeback_preview_service, "generate", track_generate)
+        monkeypatch.setitem(vars(writeback_preview_service), "generate", track_generate)  # 撤销时删键，不在单例上留实例属性
 
         body = SimpleNamespace(
             project_id="00000000-0000-0000-0000-000000000001",
@@ -880,7 +913,7 @@ class TestWritebackPreviewConfirmPermissions:
 
         monkeypatch.setattr(router_module, "get_visible_project_ids", mock_get_visible_ids)
         monkeypatch.setattr(ownership_guard, "assert_target_accessible", mock_assert_accessible)
-        monkeypatch.setattr(snapshot_writer, "write_cell", mock_write_cell)
+        monkeypatch.setitem(vars(snapshot_writer), "write_cell", mock_write_cell)  # 撤销时删键，不在单例上留实例属性
 
         body = SimpleNamespace(
             project_id="00000000-0000-0000-0000-000000000001",

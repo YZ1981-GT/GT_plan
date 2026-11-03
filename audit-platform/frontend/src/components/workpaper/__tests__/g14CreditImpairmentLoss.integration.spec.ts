@@ -229,7 +229,7 @@ describe('G14 集成 — useG14Detail 持久化', () => {
     expect(Object.keys(payload[0])).not.toContain('profitLoss')
   })
 
-  it('旧版负数转回自动迁移为正数', async () => {
+  it('负数转回按录入值计算、载入时不改号（与模板 J=F+G-H-I、K=G-H 同；原先取绝对值，OO 侧录入会被改掉）', async () => {
     const { useG14Detail } = await import('../composables/useG14Detail')
     const allResponses = ref(new Map([
       ['G14-detail-rows', {
@@ -249,9 +249,9 @@ describe('G14 集成 — useG14Detail 持久化', () => {
       debouncedSave: () => {},
     })
     const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
-    expect(ar?.currentReversal).toBe(20)
-    expect(ar?.profitLoss).toBe(80)
-    expect(ar?.closingProvision).toBe(570)
+    expect(ar?.currentReversal).toBe(-20)
+    expect(ar?.profitLoss).toBe(120)
+    expect(ar?.closingProvision).toBe(610)
   })
 
   it('回填未审（期末余额由模板公式恒算，不再有「推算期末」按钮）', async () => {

@@ -1530,8 +1530,8 @@
     },
     {
       "section_number": "五、其他调整事项【包括同一控制下企业合并和清产核资】",
-      "section_title": "其他调整事项【包括同一控制下企业合并和清产核资】",
-      "account_name": "其他调整事项【包括同一控制下企业合并和清产核资】",
+      "section_title": "其他调整事项",
+      "account_name": "其他调整事项",
       "content_type": "text",
       "tables": [],
       "text_sections": [
@@ -1546,7 +1546,11 @@
       "parent_section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
       "sort_index": 3,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "title_hint": "包括同一控制下企业合并和清产核资",
+      "legacy_titles": [
+        "其他调整事项【包括同一控制下企业合并和清产核资】"
+      ]
     },
     {
       "section_number": "五、对期初所有者权益的累积影响",
@@ -18738,8 +18742,8 @@
     },
     {
       "section_number": "八、70",
-      "section_title": "投资收益【下表中不适用的项目，删除】",
-      "account_name": "投资收益【下表中不适用的项目，删除】",
+      "section_title": "投资收益",
+      "account_name": "投资收益",
       "content_type": "mixed",
       "tables": [
         {
@@ -18868,7 +18872,11 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "g-cycle-extraction-mapping-and-disclosure-alignment",
-      "_aligned_at": "2026-08-03 13:44:03"
+      "_aligned_at": "2026-08-03 13:44:03",
+      "title_hint": "下表中不适用的项目，删除",
+      "legacy_titles": [
+        "投资收益【下表中不适用的项目，删除】"
+      ]
     },
     {
       "section_number": "八、71",
@@ -19106,7 +19114,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "g-cycle-extraction-mapping-and-disclosure-alignment",
-      "_aligned_at": "2026-08-03 13:44:03"
+      "_aligned_at": "2026-08-03 13:44:03",
+      "title_hint": "损失以“—”号填列"
     },
     {
       "section_number": "八、74",
@@ -19229,7 +19238,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "k-cycle-disclosure-alignment/pl",
-      "_aligned_at": "2026-07-30 17:58:57"
+      "_aligned_at": "2026-07-30 17:58:57",
+      "title_hint": "损失以“—”号填列"
     },
     {
       "section_number": "八、75",
@@ -19339,7 +19349,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "h9-h10-remaining-disclosure-alignment",
-      "_aligned_at": "2026-07-31 21:09:50"
+      "_aligned_at": "2026-07-31 21:09:50",
+      "title_hint": "损失以“-”号填列"
     },
     {
       "section_number": "八、76",
@@ -20178,7 +20189,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 21:15:55"
+      "_aligned_at": "2026-08-07 21:15:55",
+      "title_hint": "仅限于上市公司和证监会已经明确复函企业同意发行股票的拟上市公司披露"
     },
     {
       "section_number": "八、81",
@@ -20385,7 +20397,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:07:15"
+      "_aligned_at": "2026-08-09 11:07:15",
+      "title_hint": "可选择披露"
     },
     {
       "section_number": "八、82",

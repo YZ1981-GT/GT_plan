@@ -147,8 +147,14 @@
       <div class="methodology-context-inner">
         对本期发生的应付股利（利润）增减变动，检查支持性文件，确定会计处理是否正确。借方=实际支付（减少义务），贷方=宣告分配（增加义务）。
       </div>
-      <el-table :data="occurrenceRows" border size="small" :max-height="420" class="voucher-table" :row-class-name="abnormalRowClass">
+      <el-table :data="occurrenceRows" border size="small" :max-height="420" class="voucher-table" :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="year" />
+          </template>
+        </el-table-column>
         <el-table-column label="日期" width="110">
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" /><span v-else>{{ row.date || '-' }}</span></template>
         </el-table-column>
@@ -275,8 +281,8 @@
     </details>
 
     <!-- 抽凭引擎弹窗 -->
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 应付股利(2232)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" phase="current" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 应付股利(${samplingAccountCode})`" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" @undo-request="onUndoRequest" />
     </el-dialog>
   </div>
 </template>
@@ -290,10 +296,13 @@
  * 源模板无"期后"段——仅本期发生额检查+检查比例（与K4-4同级）。
  * 抽凭引擎 account-code=2232, phase=current。
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, computed, inject, onMounted, onUnmounted, reactive, defineAsyncComponent, type Ref } from 'vue'
 import { MagicStick, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { useM1FormData } from '../../composables/useM1FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
@@ -353,8 +362,13 @@ const {
   checkRatios, lowRatioWarnings, abnormalRows,
   occurrenceDebitChecked, occurrenceCreditChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
-  fillFromSamples, serialize,
-} = useK1VoucherCheck({ allResponses: formData.allResponses, itemId: ITEM_ID })
+  serialize,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass: lockedRowClass, isVoucherRowLocked,
+  voucherFillReady,
+} = useK1VoucherCheck({
+  projectId: () => props.projectId, readonly: () => isReadonly.value, persist: () => persist(),
+  allResponses: formData.allResponses, itemId: ITEM_ID })
+onMounted(() => { void voucherFillReady() })
 
 // ─── 检查比例（源模板M1-6仅本期借方/本期贷方两行，无期末余额行） ─────────────
 
@@ -479,7 +493,7 @@ const M1_ACCOUNT_PREFIXES = computed(() => m1QueryCodes(_injectedTbSrc?.value ??
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -487,21 +501,25 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, M1_ACCOUNT_PREFIXES.value,
+      props.projectId, year.value, props.wpId, M1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[] }) {
-  fillFromSamples('occurrence', payload?.samples ?? [])
-  samplingVisible.value = false
-  persist()
+/** 抽凭引擎回填（共享回填函数：一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行） */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 // ─── Persistence ────────────────────────────────────────────────────────────
@@ -530,6 +548,8 @@ function fmtAmt(val: number | null | undefined): string {
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string {
   return row.abnormal ? 'abnormal-row' : ''
 }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(abnormalRowClass, lockedRowClass)
 
 async function handleAiGenerate() {
   if (isReadonly.value) return

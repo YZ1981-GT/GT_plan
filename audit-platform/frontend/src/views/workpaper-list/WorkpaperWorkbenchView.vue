@@ -54,8 +54,8 @@
               style="width: 80px; margin-left: 8px"
             />
           </div>
-          <div v-show="expandedCycleGroups[group.code]" class="gt-wpb-cycle-group__body">
-            <template v-for="node in buildTree(group.items)" :key="node.row.id">
+          <div v-if="expandedCycleGroups[group.code]" class="gt-wpb-cycle-group__body">
+            <template v-for="node in group.tree" :key="node.row.id">
               <!-- 父底稿行（有子项时可折叠） -->
               <div
                 class="gt-wpb-cycle-item"
@@ -66,7 +66,7 @@
                   :model-value="isWpSelected(node.row.id)"
                   class="gt-wpb-cycle-item__checkbox"
                   @click.stop
-                  @change="(val) => toggleWpSelection(node.row.id, !!val)"
+                  @change="onWpSelectionChange(node.row.id, $event)"
                 />
                 <span class="gt-wpb-cycle-item__toggle" @click.stop="node.children.length ? toggleParentWp(node.row.wp_code) : undefined">
                   {{ node.children.length ? (expandedParentWps[node.row.wp_code] ? '▾' : '▸') : '' }}
@@ -401,6 +401,7 @@
           <el-tag v-if="ctx.filterStale?.value" size="small" type="warning" effect="light" round closable @close="ctx.filterStale.value = false">仅看待重算</el-tag>
         </div>
         <el-table
+          ref="listTableRef" highlight-current-row
           :data="listPaged"
           style="width: 100%"
           max-height="calc(100vh - 300px)"
@@ -446,12 +447,16 @@
  * 从 WorkpaperList.vue 抽取 list/workbench/guide 三个 viewMode 的模板和私有逻辑
  * Requirements: 2.5, 3.5, 4.6, 5.1, 5.2
  */
-import { inject, ref, computed, reactive, nextTick } from 'vue'
+import { inject, ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { WP_LIST_CONTEXT_KEY } from '@/composables/useWorkpaperListContext'
 import type { WpChildProps, WpChildEmits, MutatePayload } from '@/composables/useWorkpaperListContext'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
 import { downloadWorkpaper } from '@/services/workpaperApi'
+import { indexFirstBy } from '@/utils/indexFirstBy'
+import { buildWorkpaperTree } from './workpaperTree'
+import { useWorkpaperListLocateInView } from './useWorkpaperListLocate'
+import { UNASSIGNED_FILTER } from './workpaperListEntryQuery'
 import GtRowActions from '@/components/common/GtRowActions.vue'
 import WpStaleTag from '@/components/workpaper/WpStaleTag.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
@@ -504,6 +509,10 @@ function toggleWpSelection(wpId: string, checked: boolean) {
     selectedWpIdsLocal.value = selectedWpIdsLocal.value.filter(id => id !== wpId)
   }
   emit('wp-selection-change', [...selectedWpIdsLocal.value])
+}
+
+function onWpSelectionChange(wpId: string, value: string | number | boolean | undefined) {
+  toggleWpSelection(wpId, Boolean(value))
 }
 
 function onTableSelectionChange(rows: any[]) {
@@ -560,12 +569,15 @@ const STATUS_LABELS: Record<string, { label: string; type: string }> = {
 }
 
 // ─── 工作台 computed ─────────────────────────────────────────────────────────────
+/** wp_index.id → 索引项（原先每行 find 一遍，929 × 929；同 id 取第一个，与 find 一致。spec platform-perf-hotspots R7） */
+const wpIndexById = computed(() => indexFirstBy(ctx.wpIndex.value, (i: WpIndexItem) => i.id))
+
 const filteredWpList = computed<WorkpaperDetail[]>(() => {
   return ctx.wpList.value.filter((w: WorkpaperDetail) => {
-    const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const idx = wpIndexById.value.get(w.wp_index_id)
     if (ctx.filterCycle.value && !idx?.wp_code?.startsWith(ctx.filterCycle.value)) return false
     if (ctx.filterStatus.value && w.status !== ctx.filterStatus.value) return false
-    if (ctx.filterAssignee.value && w.assigned_to !== ctx.filterAssignee.value) return false
+    if (ctx.filterAssignee.value === UNASSIGNED_FILTER ? !!w.assigned_to : ctx.filterAssignee.value && w.assigned_to !== ctx.filterAssignee.value) return false
     // 仅看待重算（?filter=stale / 筛选栏勾选）
     if (ctx.filterStale?.value && w.prefill_stale !== true) return false
     if (ctx.searchKeyword.value) {
@@ -579,7 +591,7 @@ const filteredWpList = computed<WorkpaperDetail[]>(() => {
 const cycleSummary = computed(() => {
   const groups: Record<string, { total: number; completed: number }> = {}
   for (const w of ctx.wpList.value) {
-    const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const idx = wpIndexById.value.get(w.wp_index_id)
     const code = idx?.wp_code || ''
     const cycleKey = code[0] || '?'
     if (!groups[cycleKey]) groups[cycleKey] = { total: 0, completed: 0 }
@@ -599,14 +611,14 @@ const workbenchTableData = computed(() => {
   return filteredWpList.value
     .filter((w: WorkpaperDetail) => {
       if (workbenchCycleFilter.value.length) {
-        const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+        const idx = wpIndexById.value.get(w.wp_index_id)
         const code = idx?.wp_code || ''
         if (!workbenchCycleFilter.value.some(c => code.startsWith(c))) return false
       }
       return true
     })
     .map((w: WorkpaperDetail) => {
-      const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+      const idx = wpIndexById.value.get(w.wp_index_id)
       const code = idx?.wp_code || ''
       const cycleKey = code[0] || '?'
       const statusInfo = STATUS_LABELS[w.status] || { label: w.status, type: 'info' }
@@ -653,6 +665,10 @@ function selectListCycle(code: string) {
   wbPage.value = 1
 }
 
+// 入口定位（?highlight= / ?wp_code= / ?search=；手册视图点底稿也走它。spec wp-deeplink-locate-residual-closure 需求 2.1）
+const { locateCode, table: listTableRef } = useWorkpaperListLocateInView(ctx, (w) => wpIndexById.value.get(w.wp_index_id)?.wp_code || '', {
+  rows: workbenchTableData, cycleRows: listTableData, page: wbPage, pageSize: wbPageSize, selectCycle: (c) => { listSelectedCycle.value = c } })
+
 // ─── 按循环分组目录数据 ────────────────────────────────────────────────────────
 const expandedCycleGroups = reactive<Record<string, boolean>>({})
 
@@ -667,60 +683,8 @@ function toggleParentWp(code: string) {
   expandedParentWps[code] = !expandedParentWps[code]
 }
 
-interface TreeNode {
-  row: typeof workbenchTableData.value[number]
-  children: typeof workbenchTableData.value
-}
-
-/**
- * 将扁平列表构建为父-子树结构。
- * 规则：若存在编码 X（如 A1）且有其他编码以 X- 开头（如 A1-11），
- * 则 X- 开头的条目折叠到 X 下面作为 children。
- */
-function buildTree(items: typeof workbenchTableData.value): TreeNode[] {
-  // 找出所有"父"编码：该编码有至少一个以 `code-` 开头的兄弟
-  const codes = items.map(i => i.wp_code)
-  const parentCodes = new Set<string>()
-  for (const code of codes) {
-    // 检查是否有其他条目以此 code + '-' 开头
-    if (codes.some(c => c !== code && c.startsWith(code + '-'))) {
-      parentCodes.add(code)
-    }
-  }
-
-  // 将子条目归入其最具体的父
-  const childOf = new Map<string, string>() // childCode → parentCode
-  for (const item of items) {
-    // 找到最长匹配的 parent（如 A17 优先于 A1）
-    let bestParent = ''
-    for (const p of parentCodes) {
-      if (item.wp_code.startsWith(p + '-') && p.length > bestParent.length) {
-        bestParent = p
-      }
-    }
-    if (bestParent) childOf.set(item.wp_code, bestParent)
-  }
-
-  const result: TreeNode[] = []
-  const childMap = new Map<string, typeof items>()
-
-  for (const item of items) {
-    const parent = childOf.get(item.wp_code)
-    if (parent) {
-      if (!childMap.has(parent)) childMap.set(parent, [])
-      childMap.get(parent)!.push(item)
-    } else {
-      result.push({ row: item, children: [] })
-    }
-  }
-
-  // 挂载 children
-  for (const node of result) {
-    node.children = childMap.get(node.row.wp_code) || []
-  }
-
-  return result
-}
+// 树算法在 `workpaperTree.ts`：Set + 按连字符向前找最近真实父，避免每次渲染 O(n²) 扫描。
+// 这里不留第二份实现，oracle 测试用冻结的旧算法逐项对拍。
 
 const groupedWorkbenchData = computed(() => {
   const data = workbenchTableData.value
@@ -740,6 +704,7 @@ const groupedWorkbenchData = computed(() => {
         name: cycleNameMap[code] || code,
         color: cycleColor(code),
         items,
+        tree: buildWorkpaperTree(items),
         doneCount,
         percent: items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0,
       }
@@ -1105,10 +1070,7 @@ function guideGoBack() {
 function onGuideWpClick(wpCode: string) {
   ctx.viewMode.value = 'list'
   guideBreadcrumb.value = ['体系总览']
-  nextTick(() => {
-    const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.wp_code === wpCode)
-    if (idx) ctx.selectedWpId.value = idx.id
-  })
+  locateCode(wpCode)
 }
 </script>
 

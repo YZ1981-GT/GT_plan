@@ -42,6 +42,8 @@ from app.services.project_audit_year import (
     PROJECT_AUDIT_YEAR_BIZ_SQL,
     PROJECT_AUDIT_YEAR_SQL,
 )
+from app.services.project_classification import ProjectClassification
+from app.services.project_classification import resolve as resolve_classification
 from app.services.wp_account_package_resolver import resolve_package_sheets
 from app.services.wp_classification_service import (
     ClassificationNotFoundError,
@@ -130,6 +132,8 @@ class CommonRenderFacts:
     project_year: int | None
     business_category: str
     template_path: str | None
+    # 项目分类 / 场景单一解释（R4）；与 wp_render_config 主路径同一结果
+    project_classification: ProjectClassification | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -492,6 +496,7 @@ async def load_common_render_facts(
 
     project_year: int | None = None
     business_category = "C"
+    raw_category = scenario = template_type = None
     try:
         project = (
             await db.execute(
@@ -502,6 +507,7 @@ async def load_common_render_facts(
         if project:
             project_year = project[0]
             business_category = project[1] or "C"
+            raw_category, scenario, template_type = project[1], project[2], project[3]
     except Exception as exc:  # noqa: BLE001 — 忠实保留旧 fail-open
         logger.warning(
             "查询项目年度/业务类别失败 pid=%s: %s",
@@ -514,6 +520,7 @@ async def load_common_render_facts(
         cross_ref_items=cross_ref_items,
         project_year=project_year,
         business_category=business_category,
+        project_classification=resolve_classification(raw_category, scenario, template_type),
         template_path=template_path_resolver(
             subject.working_paper,
             subject.wp_code,
@@ -948,6 +955,7 @@ async def materialize_sheet(
                 getattr(classification, "source_files", []) or []
             ),
             user_id=subject.user_id,
+            project_classification=facts.project_classification,
         )
         try:
             result = await renderer(context)

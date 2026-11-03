@@ -129,13 +129,19 @@ export const useRoleContextStore = defineStore('roleContext', {
       }
     },
 
-    /** 登录后一次性加载所有上下文 */
+    /**
+     * 登录后加载首屏真正要用的角色上下文（只有 `/me`）。
+     *
+     * 🔴 原来并发拉 3 个端点（`/me`、`/me/nav`、`/me/homepage`），而现算全仓没有任何组件读
+     * `navItems` / `homepageContent`：所有 `navItems` 命中都是各底稿 / 布局组件自己的局部常量，
+     * `homepageContent` 只在本 store 内部出现（state / action / reset）。两条请求的结果没人消费，
+     * 却挡在首屏关键路径上（`DefaultLayout` 是唯一调用方且 `await` 它）。
+     * 两个 action 保留为**按需调用**：将来真有消费者时自己取，不回到首屏并发。
+     * 判据见 `stores/__tests__/roleContextInitialize.spec.ts`
+     * （spec runtime-performance-and-reload-hardening-followup R6.2）。
+     */
     async initialize() {
-      await Promise.all([
-        this.loadGlobalContext(),
-        this.loadNavItems(),
-        this.loadHomepageContent(),
-      ])
+      await this.loadGlobalContext()
     },
 
     reset() {

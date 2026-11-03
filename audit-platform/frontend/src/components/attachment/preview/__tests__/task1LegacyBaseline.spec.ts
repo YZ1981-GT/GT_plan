@@ -72,12 +72,15 @@ vi.mock('@/utils/http', () => ({
 }))
 
 vi.mock('@vue-office/docx', () => ({
+  __esModule: true,
   default: { name: 'VueOfficeDocx', template: '<div class="vue-office-docx" />', props: ['src'] },
 }))
 vi.mock('@vue-office/excel', () => ({
+  __esModule: true,
   default: { name: 'VueOfficeExcel', template: '<div class="vue-office-excel" />', props: ['src'] },
 }))
 vi.mock('@vue-office/pdf', () => ({
+  __esModule: true,
   default: { name: 'VueOfficePdf', template: '<div class="vue-office-pdf" />', props: ['src'] },
 }))
 
@@ -217,6 +220,7 @@ describe('Task1/14 Drawer_Host matrix', () => {
   it.each(drawerMatrix.cases)(
     'name=$name type_hint=$type_hint → $branch',
     async ({ name, type_hint, branch, previewSrcKind }) => {
+      vi.mocked(api.get).mockClear() // 只看本例的取数请求（保留实现）
       const wrapper = mount(AttachmentPreviewDrawer, {
         global: { stubs: drawerStubs },
         props: {
@@ -237,13 +241,16 @@ describe('Task1/14 Drawer_Host matrix', () => {
       } else if (branch === 'office' || branch === 'pdf') {
         const iframe = wrapper.find('iframe')
         expect(iframe.exists()).toBe(true)
-        if (previewSrcKind === 'preview-pdf') {
-          expect(iframe.attributes('src')).toBe('/api/attachments/att-drawer-1/preview-pdf')
-        } else {
-          expect(iframe.attributes('src')).toBe('/api/attachments/att-drawer-1/preview')
-        }
+        // 2026-10-27（spec attachment-security-baseline 任务 12）：原断言 src 等于 /api 路径，
+        // 钉住的是缺陷（iframe 原生加载带不上 Bearer 头，恒 401）。现断言同一路由经已鉴权请求取数、
+        // iframe 用 blob: 地址。
+        const expected = previewSrcKind === 'preview-pdf'
+          ? '/api/attachments/att-drawer-1/preview-pdf'
+          : '/api/attachments/att-drawer-1/preview'
+        expect(api.get).toHaveBeenCalledWith(expected, expect.objectContaining({ responseType: 'blob' }))
+        expect(iframe.attributes('src')).toMatch(/^blob:/)
       } else if (branch === 'image') {
-        expect(wrapper.find('img').exists()).toBe(true)
+        expect(wrapper.find('img').attributes('src')).toMatch(/^blob:/)
       } else {
         expect(wrapper.find('.el-empty').exists()).toBe(true)
       }
@@ -253,14 +260,15 @@ describe('Task1/14 Drawer_Host matrix', () => {
 })
 
 describe('Task13/14 AttachmentTabPanel 接线', () => {
-  it('源码把 file_type 写入 type_hint，并传递 OCR', () => {
+  it('源码经统一构造把 file_type 与 OCR 交给预览（spec attachment-inline-preview ADR-AIP-02）', () => {
+    // 原先 `type_hint: att.file_type` 直传：file_type 是分类词 image / word，预览按 MIME 判图片 ⇒ 图片判不出。
+    // 现在由 toAttachmentPreview 按扩展名给 MIME（判型见 attachmentPreviewTarget.spec.ts）。
     const src = readFileSync(
       resolve(__dirname, '../../../workpaper/AttachmentTabPanel.vue'),
       'utf8',
     )
-    expect(src).toMatch(/type_hint:\s*att\.file_type/)
-    expect(src).toMatch(/ocr_status:\s*att\.ocr_status/)
-    expect(src).toMatch(/ocr_text:\s*att\.ocr_text/)
+    expect(src).toMatch(/toAttachmentPreview\(\{[\s\S]*?file_type:\s*att\.file_type[\s\S]*?ocr_status:\s*att\.ocr_status[\s\S]*?ocr_text:\s*att\.ocr_text[\s\S]*?\}\)/)
+    expect(src).not.toMatch(/type_hint:\s*att\.file_type/)
     expect(src).not.toMatch(/mime_type:\s*att\.file_type/)
   })
 

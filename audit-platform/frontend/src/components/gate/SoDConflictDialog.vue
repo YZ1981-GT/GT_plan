@@ -32,6 +32,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
@@ -58,7 +59,7 @@ function handleClose() {
 
 async function copyTrace() {
   try {
-    await navigator.clipboard.writeText(props.traceId)
+    await copyText(props.traceId)
     ElMessage.success('trace_id 已复制')
   } catch {
     ElMessage.warning('复制失败')

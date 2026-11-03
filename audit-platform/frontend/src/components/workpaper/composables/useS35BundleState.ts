@@ -18,6 +18,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { getWpIndex } from '@/services/workpaperApi'
 import { api } from '@/services/apiProxy'
+import { buildBundleAssigneeMap, type BundleAssignee } from '../shared/bundleAssignee'
 
 // ─── Types (exported for testability & cross-module reuse) ───
 
@@ -47,6 +48,8 @@ export interface UseS35BundleStateOptions {
 export interface UseS35BundleStateReturn {
   /** S35-x（含子表）wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
+  /** S35-x（含子表）wp_code → 负责人展示信息（只读索引 JOIN 结果） */
+  assignedToMap: ComputedRef<Record<string, BundleAssignee>>
   /** 仅显示 wpIdMap 中有 wp_id 的 Tab */
   visibleTabs: ComputedRef<TabDef[]>
   /** 各底稿完成状态（Task 3.2） */
@@ -192,11 +195,14 @@ export function useS35BundleState(options: UseS35BundleStateOptions): UseS35Bund
   const loading = ref(false)
   /** S35-x（含子表）→ wp_id 内部状态 */
   const wpIdMapState = ref<Record<string, string>>({})
+  /** S35-x（含子表）→ 负责人展示信息 */
+  const assignedToMapState = ref<Record<string, BundleAssignee>>({})
   /** S35-x → checklist-responses 原始数据缓存 */
   const responsesCache = ref<Record<string, ChecklistResponse[]>>({})
 
   // ─── wpIdMap（Task 3.1, Req 6.1）───
   const wpIdMap = computed<Record<string, string>>(() => wpIdMapState.value)
+  const assignedToMap = computed<Record<string, BundleAssignee>>(() => assignedToMapState.value)
 
   // ─── visibleTabs（Task 3.1, Req 6.2）───
   const visibleTabs = computed<TabDef[]>(() =>
@@ -225,14 +231,17 @@ export function useS35BundleState(options: UseS35BundleStateOptions): UseS35Bund
   async function loadWpIndex(): Promise<void> {
     if (!projectId.value) {
       wpIdMapState.value = {}
+      assignedToMapState.value = {}
       return
     }
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
       wpIdMapState.value = buildS35WpIdMap(items)
+      assignedToMapState.value = buildBundleAssigneeMap(items)
     } catch {
       wpIdMapState.value = {}
+      assignedToMapState.value = {}
     } finally {
       loading.value = false
     }
@@ -294,6 +303,7 @@ export function useS35BundleState(options: UseS35BundleStateOptions): UseS35Bund
 
   return {
     wpIdMap,
+    assignedToMap,
     visibleTabs,
     completionMap,
     progressSummary,

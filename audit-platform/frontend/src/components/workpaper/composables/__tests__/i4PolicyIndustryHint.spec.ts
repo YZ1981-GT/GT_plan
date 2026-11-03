@@ -67,4 +67,11 @@ describe('recommendPeerIndustry', () => {
     expect(h.id).toBe('manufacturing')
     expect(h.confidence).toBe('low')
   })
+
+  it('不把质控业务分类码当行业文本', () => {
+    // business_category 是分类码（A1 / B / C …）；即便其中出现关键词也不参与推荐
+    const h = recommendPeerIndustry({ projectContext: { business_category: '零售' } })
+    expect(h.id).toBe('manufacturing')
+    expect(h.confidence).toBe('low')
+  })
 })

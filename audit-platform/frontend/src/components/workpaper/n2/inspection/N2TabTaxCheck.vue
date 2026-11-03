@@ -135,8 +135,14 @@
           </div>
         </div>
       </template>
-      <el-table :data="occurrenceRows" border size="small" :max-height="460" class="voucher-table" :row-class-name="abnormalRowClass">
+      <el-table :data="occurrenceRows" border size="small" :max-height="460" class="voucher-table" :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
         <el-table-column label="税种/项目" min-width="130" fixed>
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
         </el-table-column>
@@ -253,15 +259,15 @@
     </details>
 
     <!-- 抽凭引擎 -->
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 应交税费(2221)" width="90%" top="5vh" destroy-on-close>
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 应交税费(${samplingAccountCode})`" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible && samplingYear != null"
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSamplesFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -279,6 +285,8 @@ import { ref, reactive, computed, inject, onMounted, watch, defineAsyncComponent
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { useN2FormData } from '../../composables/useN2FormData'
 
 /**
@@ -344,8 +352,13 @@ const {
   checkRatios, abnormalRows,
   occurrenceDebitChecked, occurrenceCreditChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
-  fillFromSamples, serialize,
-} = useK1VoucherCheck({ allResponses: formData.allResponses as any, itemId: ITEM_ID })
+  serialize,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass: lockedRowClass, isVoucherRowLocked,
+  voucherFillReady,
+} = useK1VoucherCheck({
+  projectId: () => props.projectId, readonly: () => isReadonly.value, persist: () => persist(),
+  allResponses: formData.allResponses as any, itemId: ITEM_ID })
+onMounted(() => { void voucherFillReady() })
 
 // N2-11 检查比例仅本期借方/本期贷方（过滤期末余额行 — 应交税费往来性质）
 const n2CheckRatios = computed(() => checkRatios.value.filter(r => r.direction !== '期末余额'))
@@ -436,17 +449,16 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, year, props.wpId, N2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[] }) {
-  fillFromSamples('occurrence', payload?.samples ?? [])
-  samplingVisible.value = false
-  persist()
-  ElMessage.success(`已回填 ${(payload?.samples ?? []).length} 笔抽样凭证`)
+/** 抽凭引擎回填（共享回填函数：一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行） */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 // ─── 持久化 ──────────────────────────────────────────────────────────────────
@@ -552,6 +564,8 @@ function fmtAmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(abnormalRowClass, lockedRowClass)
 
 // ─── 数据恢复 ────────────────────────────────────────────────────────────────
 

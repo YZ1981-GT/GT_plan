@@ -52,6 +52,7 @@ per-user active 上限由 Task 5 / Task 12 在其之上叠加。若要提高对�
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import time
 from collections.abc import AsyncIterator, Sequence
@@ -187,6 +188,7 @@ def build_native_messages(
     context: Any,
     history: Sequence[Any] = (),
     review_prompt: str | None = None,
+    system_message: str | None = None,
 ) -> list[dict[str, str]]:
     """装配模型消息：**恰好一条** system + 历史 + 当前用户消息。
 
@@ -196,15 +198,17 @@ def build_native_messages(
     任何绕过 AIService 的调用方（例如直连 ``llm_client``）都会把两条 system 原样发给
     vLLM。这里在装配处就只产出一条，AIService 的合并成为第二道防线。
     """
-    parts: list[str] = [NATIVE_SYSTEM_POLICY.strip()]
+    parts: list[str] = [
+        system_message.strip() if system_message else NATIVE_SYSTEM_POLICY.strip()
+    ]
 
-    if review_prompt:
+    if review_prompt and not system_message:
         parts.append("【底稿复核要求】\n" + review_prompt.strip())
 
     data_blocks: list[str] = []
-    project_summary = getattr(context, "project_summary", "") or ""
-    doc_excerpt = getattr(context, "doc_excerpt", "") or ""
-    knowledge_hits = list(getattr(context, "knowledge_hits", []) or [])
+    project_summary = "" if system_message else (getattr(context, "project_summary", "") or "")
+    doc_excerpt = "" if system_message else (getattr(context, "doc_excerpt", "") or "")
+    knowledge_hits = [] if system_message else list(getattr(context, "knowledge_hits", []) or [])
     if project_summary:
         data_blocks.append(f"【项目信息】\n{project_summary}")
     if doc_excerpt:
@@ -351,13 +355,14 @@ class NativeEngine:
         try:
             await self._abort_if_cancelled(cancel, "run 开始前")
 
-            # ① 上下文（fail-closed：异常 → context_build_failed，不空上下文继续调模型）
-            context = await self._build_context(request)
+            # ① 上下文（宿主、知识、引用、附件和复核提示词共用一个可信计划）
+            plan = await self._build_context_plan(request)
+            context = plan.context
             await self._abort_if_cancelled(cancel, "上下文构建后")
 
-            citations = _citation_payloads(getattr(context, "citations", []) or [])
+            citations = [dict(c) for c in plan.citations]
             outcome.citations = citations
-            outcome.context_manifest = _manifest(request, context, citations)
+            outcome.context_manifest = dict(plan.manifest)
 
             # 🔴 负载键名（``manifest`` / ``citations``）由 Task 5 coordinator 的读取处
             #    决定（``payload.get("manifest")`` / ``payload.get("citations")``）。
@@ -381,7 +386,10 @@ class NativeEngine:
             # ② 历史（只取 completed，且排除本 run 刚落库的 user message）
             history = await self._load_history(request)
             messages = build_native_messages(
-                query=request.query, context=context, history=history
+                query=request.query,
+                context=context,
+                history=history,
+                system_message=plan.system_message,
             )
 
             # ③ 模型流
@@ -399,6 +407,29 @@ class NativeEngine:
             outcome.usage = _usage(
                 messages, outcome.text, model=outcome.model, reported=None
             )
+            outcome.usage.update({
+                "ttft_ms": outcome.ttft_ms,
+                "generation_ms": outcome.generation_ms,
+                "tokens_per_second": (
+                    round(
+                        float(outcome.usage.get("completion_tokens") or 0)
+                        / (outcome.generation_ms / 1000),
+                        3,
+                    )
+                    if outcome.generation_ms and outcome.generation_ms > 0 else None
+                ),
+            })
+            served_route = getattr(self._model, "served_route", None)
+            if served_route is not None:
+                outcome.usage.update(
+                    {
+                        "model": served_route.model_name,
+                        "model_id": str(served_route.model_id) if served_route.model_id else None,
+                        "deployment": served_route.deployment,
+                        "fallback_used": bool(served_route.fallback_used),
+                        "attempts": list(served_route.attempts),
+                    }
+                )
             yield build_terminal_intent(
                 request,
                 self._events,
@@ -406,6 +437,9 @@ class NativeEngine:
                 payload={
                     "usage": dict(outcome.usage),
                     "model": outcome.model,
+                    "deployment": outcome.usage.get("deployment"),
+                    "fallback_used": outcome.usage.get("fallback_used", False),
+                    "attempts": outcome.usage.get("attempts", []),
                     "latency_ms": outcome.latency_ms,
                     "delta_count": outcome.delta_count,
                 },
@@ -438,6 +472,32 @@ class NativeEngine:
     # ------------------------------------------------------------------
     # 分步
     # ------------------------------------------------------------------
+    async def _build_context_plan(self, request: AuthorizedChatRunRequest) -> Any:
+        """构造服务端可信 ContextPlan；失败必须终止，不降级为空上下文。"""
+        try:
+            from app.services.ai_chat.context_plan import build_context_plan
+
+            principal = await self._resolve_principal(request)
+            request = dataclasses.replace(request, principal=principal)
+            return await build_context_plan(
+                self._db,
+                request=request,
+                context_builder=self._context_builder,
+            )
+        except EngineFailure:
+            raise
+        except Exception as exc:
+            logger.error(
+                "run %s ContextBuilder/ContextPlan 构建失败：%s: %s",
+                request.run_id,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            raise EngineFailure(
+                ChatErrorCode.context_build_failed, f"{type(exc).__name__}: {exc}"
+            ) from exc
+
     async def _build_context(self, request: AuthorizedChatRunRequest) -> Any:
         """构建上下文。任何异常 → ``context_build_failed``，并记 **ERROR**。
 
@@ -562,6 +622,8 @@ class NativeEngine:
         async with _llm_semaphore:
             await self._abort_if_cancelled(cancel, "取得模型并发许可后")
             stream = self._model.stream_chat(messages, model=model_name)
+            model_started = time.monotonic()
+            first_chunk_at: float | None = None
             try:
                 async with asyncio.timeout(deadline.seconds):
                     async for chunk in stream:
@@ -574,6 +636,10 @@ class NativeEngine:
                         await self._abort_if_cancelled(cancel, "模型流进行中")
                         if not chunk:
                             continue
+                        now = time.monotonic()
+                        if first_chunk_at is None:
+                            first_chunk_at = now
+                            outcome.ttft_ms = max(0, int((now - model_started) * 1000))
                         outcome.text += chunk
                         outcome.delta_count += 1
                         yield build_event(
@@ -614,6 +680,8 @@ class NativeEngine:
                 if closer is not None:
                     await closer()
 
+        if first_chunk_at is not None:
+            outcome.generation_ms = max(1, int((time.monotonic() - first_chunk_at) * 1000))
         # 本机不可用时路由会改用服务器：消息留痕记实际回答的模型（ADR-ROUTE-008）。
         served = getattr(self._model, "served_model", None)
         if isinstance(served, str) and served:

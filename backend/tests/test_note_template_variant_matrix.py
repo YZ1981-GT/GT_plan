@@ -17,6 +17,7 @@ VARIANT_KEYS = ["soe_standalone", "soe_consolidated", "listed_standalone", "list
 # 典型科目 key（smoke test 样本，不穷举）
 EXPECTED_ACCOUNT_KEYS = [
     "huo_bi_zi_jin",  # 货币资金
+    "tou_zi_shou_yi",  # Phase 8：国企八、70 + 上市五、69 同一 canonical account
 ]
 
 
@@ -101,3 +102,20 @@ class TestVariantLookup:
             assert consol.strip(), "合并版 section_id 不能为空"
         else:
             assert consol.get("section_id", "").strip()
+
+
+class TestInvestmentIncomeCanonicalIdentity:
+    def test_prompt_slug_is_merged_into_one_four_variant_account(self, matrix_entries):
+        rows = [e for e in matrix_entries if e.get("account_key") == "tou_zi_shou_yi"]
+        assert len(rows) == 1
+        assert rows[0]["section_title"] == "投资收益"
+        assert rows[0]["variants"] == {
+            "soe_standalone": "八、70",
+            "soe_consolidated": "八、70",
+            "listed_standalone": "五、69",
+            "listed_consolidated": "五、69",
+        }
+        assert not any(
+            e.get("account_key") == "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d"
+            for e in matrix_entries
+        )

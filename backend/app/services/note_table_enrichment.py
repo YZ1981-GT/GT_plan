@@ -56,11 +56,21 @@ def _load_template_tables_index(
 # ─── 模板结构回填（表名 + headers + values + multi_header + _column_groups）─
 
 
-def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
+def _values_width(tbl: dict) -> int:
+    return max((len(r.get("values") or []) for r in tbl.get("rows") or [] if isinstance(r, dict)
+                and isinstance(r.get("values"), list)), default=0)
+
+
+def _align_table_to_template(tbl: dict, tpl_tbl: dict, *, by_position: bool = False) -> None:
     """把单个 _tables 项对齐到模板结构（不写库，只改内存中的 dict）。
 
     回填内容：name / headers / multi_header / _column_groups。
     当模板列数 > 数据列数时，同时扩展 rows[].values / _cell_meta / _cell_modes。
+
+    同一张表的依据（spec note-table-structure-formula-pull-closure R3.2）：首列表头一致（或互为前缀）；按位置配上的
+    （表名对不上模板）另须列数相同。表名等于自己首列表头的旧表（「泄漏名」：「账  龄」「债务人名称」）不再单独放行 ——
+    原先它们按位置换上别的表的表名与表头，库里的数显示在错的列下（存量 11 表旧结构实测）。没有表头的旧表：表名与模板
+    同名、或按位置且列数相同时才补表头。
     """
     tpl_name = str(tpl_tbl.get("name") or "").strip()
     tpl_headers: list[str] = tpl_tbl.get("headers") or []
@@ -68,16 +78,16 @@ def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
 
     data_headers: list[str] = tbl.get("headers") or []
     data_h0 = str(data_headers[0]).strip() if data_headers else ""
-    current_name = str(tbl.get("name") or "").strip()
 
-    # 交叉校验：首列标签去空白后一致（或互为前缀），才认为是同一张表
     norm_dh0 = _norm_label(data_h0)
     norm_th0 = _norm_label(tpl_h0)
-    norm_name = _norm_label(current_name)
-    h0_match = (norm_dh0 == norm_th0
-                or norm_name == norm_dh0
-                or (norm_dh0 and norm_th0 and (norm_dh0.startswith(norm_th0) or norm_th0.startswith(norm_dh0))))
-    if not h0_match:
+    if data_headers:
+        h0_match = (norm_dh0 == norm_th0
+                    or (norm_dh0 and norm_th0 and (norm_dh0.startswith(norm_th0) or norm_th0.startswith(norm_dh0))))
+        if not h0_match or (by_position and len(data_headers) != len(tpl_headers)):
+            return
+    elif not tpl_headers or _values_width(tbl) > len(tpl_headers) - 1 or (
+            by_position and _values_width(tbl) != len(tpl_headers) - 1):
         return
 
     # 1. 回填表名
@@ -182,14 +192,16 @@ def carry_template_table_names(
         if j is not None:
             assigned[i] = j
             used.add(j)
+    by_position: set[int] = set()
     for i, tbl in enumerate(tables):
         if isinstance(tbl, dict) and i not in assigned and i < len(tpl_tables) and i not in used:
             assigned[i] = i
             used.add(i)
+            by_position.add(i)
     for i, j in assigned.items():
         tpl_tbl = tpl_tables[j]
         if isinstance(tpl_tbl, dict):
-            _align_table_to_template(tables[i], tpl_tbl)
+            _align_table_to_template(tables[i], tpl_tbl, by_position=i in by_position)
 
 
 # ─── dict 格式 rows 的 _row_types 推导 ──────────────────────────────────────
@@ -277,3 +289,13 @@ def enrich_note_table_data(
             infer_row_types_from_dict_rows(table_data)
     except Exception:
         logger.warning("note_table_enrichment: column_groups/row_types failed section=%s", section_number, exc_info=True)
+
+    # 3. 期间层布局（spec note-pull-header-formula-closure R4 / ADR-3）：底稿按期间并列 / 最上层统一期间的表，
+    #    显示与导出还原（``_display_layout``），存储不动
+    try:
+        from app.services.note_period_layout import attach_display_layout
+
+        std = getattr(source_template, "value", source_template)
+        attach_display_layout(table_data, str(std) if std else None, section_number)
+    except Exception:
+        logger.warning("note_table_enrichment: period layout failed section=%s", section_number, exc_info=True)

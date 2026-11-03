@@ -74,7 +74,7 @@
             >
               从 {{ linkedIncrease.source || 'H4-2' }} 带入本期增加
             </el-button>
-            <el-button size="small" type="primary" :disabled="isReadonly" @click="showSampling = true">
+            <el-button size="small" type="primary" :disabled="isReadonly" @click="openSampling">
               抽凭引擎
             </el-button>
             <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
@@ -145,7 +145,7 @@
 
       <div class="specific-sample" v-if="!isReadonly || samplingParams.specificSampleNote">
         <span class="param-label">特定样本：</span>
-        <el-input
+        <WpCommitInput
           v-if="!isReadonly"
           :model-value="samplingParams.specificSampleNote"
           size="small"
@@ -191,6 +191,11 @@
         :row-class-name="rowClassName"
       >
         <el-table-column prop="seq" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <el-table-column label="工程物资" align="center">
           <el-table-column label="类别" min-width="90">
@@ -271,6 +276,7 @@
                 title="上传合同/发票/入库单 OCR 填入"
                 @click="handleOcr(row)"
               >OCR</el-button>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
             </div>
           </template>
         </el-table-column>
@@ -371,7 +377,8 @@
 
         <el-table-column label="抽凭" width="55" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="onRowSample(row)">抽凭</el-button>
+            <el-button size="small" type="primary" link :disabled="isReadonly || rowHasVoucher(row)"
+              :title="rowHasVoucher(row) ? '本行已关联凭证' : '抽凭填入本行'" @click="onRowSample(row)">抽凭</el-button>
           </template>
         </el-table-column>
 
@@ -473,7 +480,7 @@
 
     <el-dialog
       v-model="showSampling"
-      title="抽凭引擎（科目 ${samplingAccountCode} 工程物资-增加）"
+      :title="`抽凭引擎（科目 ${samplingAccountCode} 工程物资-增加）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -483,22 +490,23 @@
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="year"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabAdditionCheck.vue — H4-4 增加检查表
  * 对齐致同：目标 → 样本选取 → 测试（记账凭证 + 核对1–5）
  * → 检查比例 → 说明/结论；平台增强三方差异 + 关联方预埋
  */
-import { computed, inject, toRef, ref, type Ref } from 'vue'
+import { computed, inject, toRef, ref, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import {
@@ -512,6 +520,8 @@ import {
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
@@ -528,6 +538,9 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -541,6 +554,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H4-4'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -574,14 +590,21 @@ const {
   draftNote,
   draftConclusion,
   pushAjeDraftToH43,
-  applyVoucherSamples,
   mergeOcrResult,
   rowClassName,
   load,
+  onEngineFilled,
+  onEngineFilledIntoRow,
+  onAttachImported,
+  onUndoRequest,
+  isVoucherRowLocked,
+  voucherFillReady,
+  rowHasVoucher,
 } = useH4AdditionCheck({
   wpId,
   projectId,
   allResponses: allResponsesRef as any,
+  isReadonly,
   onSave: (itemId: string, value: any) => {
     const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
     props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
@@ -598,6 +621,14 @@ const importExport = useH4ImportExport({
 const showSampling = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const samplingRowId = ref<string | null>(null)
+
+onMounted(() => { void voucherFillReady() })
+
+/** 工具栏「抽凭引擎」：整表抽凭（清掉上次逐行抽凭没用完的目标行） */
+function openSampling() {
+  samplingRowId.value = null
+  showSampling.value = true
+}
 
 const coverageTagType = computed(() => {
   if (samplingParams.value.populationAmount <= 0) return 'info'
@@ -676,26 +707,30 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H4_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: unknown) {
+/** 抽凭回填走共享函数：整表抽凭一个样本一行，逐行抽凭第一笔写进所选行；按分录指纹去重，填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const n = applyVoucherSamples(payload, samplingRowId.value)
+  void persistMethodology(payload?.methodology)
+  const rowId = samplingRowId.value
+  const out = rowId ? await onEngineFilledIntoRow(payload, rowId) : await onEngineFilled(payload)
+  if (out.cancelled) return
   samplingRowId.value = null
   showSampling.value = false
-  if (n > 0) ElMessage.success(`已回填 ${n} 笔抽凭（业务内容/对方科目已映射）`)
-  else ElMessage.info('未获取到抽凭样本')
 }
 
 async function handleOcr(row: H4AdditionCheckRow) {
@@ -707,12 +742,14 @@ async function handleOcr(row: H4AdditionCheckRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const { fields, confidence } = extractOcrFields(res.data)
       const { patch, previewLines } = mapOcrToAdditionPatch(fields)
       if (!previewLines.length && !Object.keys(patch).length) {

@@ -200,13 +200,20 @@ def _project_row() -> MagicMock:
     return row
 
 
+def _no_push_states() -> MagicMock:
+    """公式推送状态查询（spec note-pull-followup-closure R3：更新已有章节时查推送写过的格）：没有推送过。"""
+    res = MagicMock()
+    res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    return res
+
+
 def _make_db(note: DisclosureNote) -> MagicMock:
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[_project_row(), _scalar_result(note)])
+    db.execute = AsyncMock(side_effect=[_project_row(), _scalar_result(note), _no_push_states()])
     return db
 
 

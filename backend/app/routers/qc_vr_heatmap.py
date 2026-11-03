@@ -14,9 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_audit_year
+from app.deps import require_project_access, require_project_audit_year
 from app.models.core import User
-from app.services.consistency_gate import ConsistencyGate
+from app.services.consistency_gate import ConsistencyGate, check_status, five_state_counts, not_passed_checks
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ _CYCLE_CHECK_MAP: dict[str, list[str]] = {
 async def get_vr_heatmap(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """QC 风险热力图 — 按循环×severity 聚合 VR 检查结果
 
@@ -54,13 +54,17 @@ async def get_vr_heatmap(
     gate = ConsistencyGate(db)
 
     # 获取项目审计年度（统一项目年度解析，缺失时明确返回 422）
+    # 2026-10-29 整合：ADR-FHIC-14 要求「年度为空 ⇒ 422」，与 audit-year-calendar-fallback-ratchet
+    # 已落地的共享 helper require_project_audit_year 同义（它在年度缺失时抛 422），取共享 helper 不另写内联分支。
     year = await require_project_audit_year(db, project_id)
 
     matrix = []
     total = {"blocking": 0, "warning": 0, "info": 0}
+    total_status = five_state_counts([])
 
     for cycle, methods in _CYCLE_CHECK_MAP.items():
         row = {"cycle": cycle, "blocking": 0, "warning": 0, "info": 0}
+        cycle_checks: list = []
         for method_name in methods:
             method = getattr(gate, method_name, None)
             if not method:
@@ -69,8 +73,10 @@ async def get_vr_heatmap(
                 checks = await method(project_id, year)
                 if not isinstance(checks, list):
                     checks = [checks]
+                cycle_checks.extend(checks)
                 for check in checks:
-                    if not check.passed:
+                    # 严重级计数保持「失败」含义（ADR-FHIC-14 第 5 点展示行）：未执行 / 不适用 / 异常另计五态
+                    if check_status(check) == "failed":
                         sev = check.severity or "warning"
                         if sev in row:
                             row[sev] += 1
@@ -79,6 +85,10 @@ async def get_vr_heatmap(
                 logger.warning("VR heatmap: %s failed for cycle %s: %s", method_name, cycle, e)
                 continue
 
+        row["status_counts"] = five_state_counts(cycle_checks)
+        row["not_passed_checks"] = not_passed_checks(cycle_checks)
+        for state, n in row["status_counts"].items():
+            total_status[state] += n
         matrix.append(row)
 
-    return {"matrix": matrix, "total": total}
+    return {"matrix": matrix, "total": total, "status_counts": total_status}

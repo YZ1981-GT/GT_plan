@@ -125,7 +125,8 @@ describe('enrichDetailRow 双桶滚动', () => {
     expect(r.adjusted).toBe(100)
   })
 
-  it('旧数据仅有 openingFairValue 时可反推累计 FV', () => {
+  it('累计 FV 为 0 时不按陈旧的期初公允价值反推（模板 E=C+D，D 是录入列）', () => {
+    // 原实现：改了成本、D 仍是 0 时按旧 E 把 D 反推成 20，E 卡在 100、改成本无效
     const r = baseRow({
       openingCost: 80,
       openingCumulativeFv: 0,
@@ -133,8 +134,22 @@ describe('enrichDetailRow 双桶滚动', () => {
       periodCostChange: 0,
       periodFvChange: 0,
     })
-    expect(r.openingCumulativeFv).toBe(20)
-    expect(r.openingFairValue).toBe(100)
+    expect(r.openingCumulativeFv).toBe(0)
+    expect(r.openingFairValue).toBe(80)
+  })
+
+  it('本期公允变动为 0 时不用市价倒推（模板 N 是录入列，市价只进验算列）', () => {
+    const r = baseRow({
+      openingCost: 100,
+      openingCumulativeFv: 0,
+      periodCostChange: 0,
+      periodFvChange: 0,
+      openingQuantity: 60,
+      unitFairValue: 2,
+    })
+    expect(r.periodFvChange).toBe(0)
+    expect(r.closingFairValue).toBe(100) // R=P+Q=100+0
+    expect(r.rollForwardDiff).toBe(-20) // 双桶合计 100 − 市价 60×2
   })
 })
 
@@ -179,6 +194,19 @@ describe('useG1Detail', () => {
     expect(detail.subtotalsByAcct.value).toHaveLength(2)
     expect(detail.grandTotal.value.auditedClosingFvTotal).toBe(160)
     expect(detail.gatesReady.value).toBe(false)
+  })
+
+  it('旧载荷缺累计 FV 字段时，载入按期初公允价值补一次（migratePartial）', () => {
+    const allResponses = ref(
+      new Map<string, ChecklistResponse>([
+        ['G1-2-rows', { conclusion: JSON.stringify([
+          { id: '1', seq: 1, securityName: 'A', openingCost: 80, openingFairValue: 100 },
+        ]) } as ChecklistResponse],
+      ]),
+    )
+    const detail = useG1Detail({ allResponses, debouncedSave: () => {}, isReadonly: ref(false) })
+    expect(detail.rows.value[0].openingCumulativeFv).toBe(20)
+    expect(detail.rows.value[0].openingFairValue).toBe(100)
   })
 
   it('编制闸门完成后 gatesReady 为 true', () => {

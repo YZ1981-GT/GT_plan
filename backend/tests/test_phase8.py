@@ -196,10 +196,13 @@ class TestFormulaEngineTimeout:
         """正常执行返回正确结构"""
         engine = FormulaEngine()
 
-        # Mock db to return empty result (no TB data = formula evaluates to 0)
+        # Mock db：试算表有 1001 一行（审定 100）。中央执行合同（ADR-FHIC-19）下试算表无该科目 = state missing、error 非空，
+        # 原用例按「无数据求值为 0、error 为 None」写，靠的是 mock 让缺科目 EXISTS 探测读成「没探测」
+        row = MagicMock(standard_account_code="1001", audited_amount=Decimal("100"), opening_balance=Decimal("0"),
+                        unadjusted_amount=Decimal("100"), aje_adjustment=Decimal("0"), rje_adjustment=Decimal("0"))
         db = AsyncMock()
         mock_result = MagicMock()
-        mock_result.fetchall.return_value = []
+        mock_result.scalars.return_value.all.return_value = [row]
         db.execute = AsyncMock(return_value=mock_result)
 
         result = await engine.execute(
@@ -212,7 +215,8 @@ class TestFormulaEngineTimeout:
 
         assert "value" in result
         assert "error" in result
-        assert result["error"] is None
+        assert result["error"] is None, result
+        assert result["value"] == 100.0
 
 
 # ---------------------------------------------------------------------------

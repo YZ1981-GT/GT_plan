@@ -90,11 +90,9 @@ async def test_property_a16_7_always_required(business_category: str | None) -> 
     project_id = uuid.uuid4()
     db = AsyncMock()
 
-    # Mock business_category query result
-    biz_row = MagicMock()
-    biz_row.__getitem__ = lambda self, i: business_category if i == 0 else None
+    # Mock 项目分类查询（business_category, scenario, template_type）；任意文本按 resolve 宽松解释
     biz_result = MagicMock()
-    biz_result.first.return_value = biz_row
+    biz_result.first.return_value = (business_category, "normal", None)
 
     # Mock wp_index query - no existing workpapers
     wp_result = MagicMock()

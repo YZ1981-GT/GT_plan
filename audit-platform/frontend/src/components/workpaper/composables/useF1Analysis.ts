@@ -7,6 +7,7 @@
  * 3. 贷方发生额分析（转销路径拆分）
  * 4. 大额供应商期末余额分析（勾稽 F1-2）
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
@@ -118,7 +119,7 @@ export const NATURE_TO_ANALYSIS: Record<string, AnalysisNatureKey> = {
 // ─── Pure helpers ────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `ms-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `ms-${newUuid()}`
 }
 
 export function emptyPeriodPair(): { current: number; prior: number } {

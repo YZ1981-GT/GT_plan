@@ -15,11 +15,12 @@ import time
 from typing import Optional
 
 from redis.asyncio import Redis
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import settings
+from app.middleware._asgi import request_path
 
 # LLM 相关路径前缀（匹配需要限流的端点）
 _LLM_PATH_PREFIXES = (
@@ -85,7 +86,7 @@ def _ai_chat_rate_limit_key(user_id: str) -> str:
     return f"rate_limit:ai_chat:{user_id}"
 
 
-class LLMRateLimitMiddleware(BaseHTTPMiddleware):
+class LLMRateLimitMiddleware:
     """LLM / AI Chat 端点限流中间件
 
     - 对 LLM 相关端点使用 LLM 池（每用户 LLM_RATE_LIMIT_PER_MINUTE 次/分钟）
@@ -93,29 +94,42 @@ class LLMRateLimitMiddleware(BaseHTTPMiddleware):
     - 基于 JWT 中的 user_id 限流
     - Redis 不可用时降级放行
     - AI Chat 限流返回 429 + remaining/reset/retry_after（Req 13.6）
+
+    纯 ASGI（spec backend-startup-and-request-overhead R3.1），判定与原版相同。
     """
 
     _redis_ok: bool = True
     _redis_check_time: float = 0.0
     _REDIS_CHECK_INTERVAL = 30.0  # Redis 可用性缓存 30 秒
 
-    async def dispatch(self, request: Request, call_next):
-        # 只对 POST/PUT 方法限流
-        if request.method not in ("POST", "PUT"):
-            return await call_next(request)
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
 
-        path = request.url.path
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        response = await self._limited_response(scope, receive) if scope["type"] == "http" else None
+        if response is None:
+            await self.app(scope, receive, send)
+        else:
+            await response(scope, receive, send)
+
+    async def _limited_response(self, scope: Scope, receive: Receive) -> JSONResponse | None:
+        """超限时返回 429 响应；否则 None（放行）。"""
+        # 只对 POST/PUT 方法限流
+        if scope["method"] not in ("POST", "PUT"):
+            return None
+
+        path = request_path(scope)
         is_ai_chat = _is_ai_chat_endpoint(path)
         is_llm = _is_llm_endpoint(path) if not is_ai_chat else False
 
         if not is_ai_chat and not is_llm:
-            return await call_next(request)
+            return None
 
         # 提取用户 ID（从 Authorization header 解码）
-        user_id = await self._extract_user_id(request)
+        user_id = await self._extract_user_id(Request(scope, receive))
         if not user_id:
             # 无法识别用户时放行（认证中间件会拦截）
-            return await call_next(request)
+            return None
 
         # Redis 限流检查
         redis = await self._get_redis()
@@ -153,7 +167,7 @@ class LLMRateLimitMiddleware(BaseHTTPMiddleware):
                         headers={"Retry-After": str(retry_after)},
                     )
 
-        return await call_next(request)
+        return None
 
     async def _check_rate_limit(self, redis: Redis, user_id: str) -> tuple[bool, int]:
         """令牌桶检查，返回 (是否允许, 需等待秒数)"""

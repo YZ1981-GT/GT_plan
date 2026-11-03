@@ -574,10 +574,23 @@ async def test_d1_listed_entries_push_does_not_touch_soe(env_listed):
 # ── 骨架构建测试（Task 4） ───────────────────────────────────────────────
 
 
+async def _seed_skeleton_d1(env) -> None:
+    """骨架用例的最小 D1 数据：只有银行承兑汇票余额（没有坏账快照 ⇒ 坏账准备 / 账面价值取不到）。
+
+    🔴 原来这几条用例不种 D1 数据也「建出了骨架」，靠的是合计按「缺值按 0」重算、往空骨架合计写了六个 0（假零）；
+    合计上方全空不再重算后（spec disclosure-note-template-word-realignment Task 34/35），没有数可写就不落骨架，
+    见 test_d1_no_data_does_not_persist_empty_skeleton。
+    """
+    await _seed_d1_entries(env, cat_rows=[
+        _make_cat_row("fixed-bank", "银行承兑汇票", prior_unadj=500000, cur_increase=300000),
+    ], bd_rows=[])
+
+
 @pytest.mark.asyncio
 async def test_d1_listed_builds_skeleton_when_table_missing(env_listed):
     """附注章节存在、有 sub_table_data 但缺目标表时，引擎建骨架。"""
     await env_listed.seed_entries(base_entries())
+    await _seed_skeleton_d1(env_listed)
     # 种一个有其他子表但缺「应收票据」的附注章节
     await env_listed.add_note("五、4", {
         "_source": "workpaper",
@@ -593,12 +606,35 @@ async def test_d1_listed_builds_skeleton_when_table_missing(env_listed):
     rows = sub["应收票据"]
     labels = [r["label"] for r in rows]
     assert labels == ["银行承兑汇票", "商业承兑汇票", "合计"]
+    assert rows[0]["end_balance"] == 800000 and rows[2]["end_balance"] == 800000
+
+
+@pytest.mark.asyncio
+async def test_d1_no_data_does_not_persist_empty_skeleton(env_listed):
+    """缺表、但 D1 没有任何数据：骨架只在内存里建，没有一格可写 ⇒ 附注不动，合计不写 0，逐格说明原因。"""
+    await env_listed.seed_entries(base_entries())
+    original = {
+        "_source": "workpaper",
+        "sub_table_data": {"期末已质押的应收票据": [{"label": "合计", "is_total": True}]},
+        "_sub_table_columns": {"期末已质押的应收票据": [{"key": "label", "is_label": True}]},
+    }
+    await env_listed.add_note("五、4", original, title="应收票据")
+
+    result = await env_listed.push(codes=["D1"])
+
+    note = await env_listed.note("五、4")
+    assert note.table_data == original and note.last_sync_source is None
+    assert "五、4" not in result.note_sections
+    total_skips = [i for i in result.items if i.rule_id == "D1.note.main" and i.action == "skipped"
+                   and "上方各行这一列都没有数" in (i.reason or "")]
+    assert len(total_skips) == 6, [(i.addr_id, i.action, i.reason) for i in result.items if i.rule_id == "D1.note.main"]
 
 
 @pytest.mark.asyncio
 async def test_d1_soe_builds_skeleton_with_variant_table_name(env_soe):
     """国企项目：缺表时骨架用「应收票据分类」（soe 变体表名）。"""
     await env_soe.seed_entries(base_entries())
+    await _seed_skeleton_d1(env_soe)
     await env_soe.add_note("八、4", {
         "_source": "workpaper",
         "sub_table_data": {"期末已质押的应收票据": [{"label": "合计", "is_total": True}]},
@@ -687,6 +723,7 @@ async def test_d1_skeleton_then_six_fields_written(env_listed):
 async def test_d1_skeleton_columns_include_six_fields(env_listed):
     """骨架构建后 _sub_table_columns 包含六字段列定义。"""
     await env_listed.seed_entries(base_entries())
+    await _seed_skeleton_d1(env_listed)
 
     # 附注章节有其他子表但缺「应收票据」
     await env_listed.add_note("五、4", {
@@ -745,11 +782,15 @@ async def test_resolve_table_picks_variant(env_listed):
 
 @pytest.mark.asyncio
 async def test_d1_sync_fingerprint_correct(env_listed):
-    """推送写入后 _last_sync_wp_id / last_sync_source / last_sync_at 正确。"""
+    """推送写入后 last_sync_source / last_sync_wp_id / last_sync_at（ORM 列）记推送；表格里的同步指纹不写。
+
+    指纹（``table_data._last_sync_wp_id`` / ``_last_sync_at``）只表示「底稿披露表同步过」（spec note-pull-followup-closure
+    R3.2）：推送写了它，推送过的章节在取数结果里就成了 ``synced_before=True``，离屏同步「已有人工填写不覆盖」失效。
+    """
     await env_listed.seed_entries(base_entries())
     await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
 
-    result = await env_listed.push(codes=["D1"])
+    await env_listed.push(codes=["D1"])
 
     note = await env_listed.note("五、4")
 
@@ -758,63 +799,33 @@ async def test_d1_sync_fingerprint_correct(env_listed):
     assert note.last_sync_wp_id == env_listed.d1_wp_id
     assert note.last_sync_at is not None
 
-    # JSON 内指纹
-    assert note.table_data["_last_sync_wp_id"] == str(env_listed.d1_wp_id)
-    assert "_last_sync_at" in note.table_data
+    # JSON 内指纹不写
+    assert "_last_sync_wp_id" not in note.table_data
+    assert "_last_sync_at" not in note.table_data
 
 
 @pytest.mark.asyncio
-async def test_push_then_pull_no_duplicate_sync(env_listed):
-    """端到端：推送写入附注后，pull-from-workpapers 识别已同步、不重复拉取。
+async def test_push_does_not_make_section_count_as_synced(env_listed):
+    """端到端：推送写入附注后，取数结果的章节状态 ``synced_before`` 仍为 False（生产函数，不手抄端点判定）。
 
-    在同一 SQLite ORM 环境先推送 D1→五、4，再模拟 pull 端点判定逻辑：
-    - 推送后的五、4 带 ``_last_sync_wp_id`` → pull 走 synced 路径
-    - 推送前的八、1（从未同步）→ pull 走 skipped_never_synced 路径
+    原用例断言「推送过的章节被 pull 识别为已同步」—— 那正是 F4 缺陷：附注页「刷新」先跑推送，推送写了指纹，
+    同一请求里的章节状态就说「同步过」，离屏同步随后覆盖人工填写的格（spec note-pull-followup-closure R3.2）。
     """
+    from app.services.note_workpaper_pull_service import _mark_synced_sections
+
     await env_listed.seed_entries(base_entries())
     await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
-    # 追加一个从未同步的章节（无 _last_sync_wp_id）
-    await env_listed.add_note("八、1", {"rows": [{"label": "测试行"}], "headers": ["项目"]}, title="货币资金")
+    await env_listed.add_note("八、1", {"rows": [{"label": "测试行"}], "headers": ["项目"],
+                                        "_last_sync_wp_id": "底稿同步过"}, title="货币资金")
 
-    # ── 推送 D1 ──
     await env_listed.push(codes=["D1"])
+    assert (await env_listed.note("五、4")).last_sync_source == "formula_push", "推送确实写了五、4"
 
-    # ── 模拟 pull-from-workpapers 端点的核心判定 ──
-    # 端点逻辑（disclosure_notes.py pull_from_workpapers）:
-    #   td = note.table_data
-    #   if not td.get("_last_sync_wp_id"):
-    #       skipped_never_synced += 1
-    #       continue
-    #   td["_source"] = "workpaper"; td["_last_sync_at"] = ...; synced += 1
-
-    synced = 0
-    skipped_never_synced = 0
-
-    note_pushed = await env_listed.note("五、4")
-    td_pushed = note_pushed.table_data or {}
-    if not td_pushed.get("_last_sync_wp_id"):
-        skipped_never_synced += 1
-    else:
-        synced += 1
-
-    note_never = await env_listed.note("八、1")
-    td_never = note_never.table_data or {}
-    if not td_never.get("_last_sync_wp_id"):
-        skipped_never_synced += 1
-    else:
-        synced += 1
-
-    # 推送过的章节被识别为 synced
-    assert synced == 1, f"推送后的章节应被 pull 识别为已同步，实际 synced={synced}"
-    # 从未同步的章节被跳过
-    assert skipped_never_synced == 1, f"从未同步的章节应被跳过，实际 skipped={skipped_never_synced}"
-
-    # 进一步确认：推送后的 table_data 包含完整指纹
-    assert td_pushed["_last_sync_wp_id"] == str(env_listed.d1_wp_id)
-    assert "_last_sync_at" in td_pushed
-    # 从未同步的 table_data 无指纹
-    assert "_last_sync_wp_id" not in td_never
-    assert "_last_sync_at" not in td_never
+    async with env_listed.factory() as db:
+        out = await _mark_synced_sections(db, env_listed.pid, YEAR, ["五、4", "八、1"])
+    assert out["states"]["五、4"]["synced_before"] is False, "推送过 ≠ 底稿披露同步过"
+    assert out["states"]["八、1"]["synced_before"] is True
+    assert (out["synced"], out["skipped_never_synced"]) == (1, 1)
 
 
 @pytest.mark.asyncio
@@ -1064,9 +1075,10 @@ async def test_shared_chapter_multi_code_tables_no_overwrite(env_shared_chapter)
     assert h4_rows["合计"]["end_amount"] == 888000, "工程物资合计行不受 H2 推送影响"
     assert h4_rows["合计"]["prior_amount"] == 666000
 
-    # 同步指纹只记录 H2 底稿
-    assert note.table_data.get("_last_sync_wp_id") == str(e.h2_wp_id)
+    # 推送来源只记录 H2 底稿（ORM 列）；表格里的同步指纹推送不写（spec note-pull-followup-closure R3.2）
+    assert "_last_sync_wp_id" not in note.table_data
     assert note.last_sync_source == "formula_push"
+    assert note.last_sync_wp_id == e.h2_wp_id
 
 
 @pytest.mark.asyncio
@@ -1480,16 +1492,17 @@ def test_d1_note_rows_with_aje_rje():
 
     bank = rows[0]
     # 分类：priorAudited = 500000+10000+5000 = 515000
-    # currentUnadjusted = 515000+300000-0 = 815000
-    # currentAudited = 815000+20000+10000 = 845000
+    # currentUnadjusted = 期初**未审** 500000+300000-0 = 800000（模板 D1-2 H = B + F − G，与前端
+    # readD1CategoryAmounts 同口径；原判据钉的是期初审定起算的 815000 —— spec oo-writeback-template-parity-closure R2）
+    # currentAudited = 800000+20000+10000 = 830000
     assert bank["prior_balance"] == 515000.0
-    assert bank["end_balance"] == 845000.0
+    assert bank["end_balance"] == 830000.0
     # 坏账：priorAudited = 30000+2000+1000 = 33000
     # currentAudited = 50000+3000+1500 = 54500
     assert bank["prior_provision"] == 33000.0
     assert bank["end_provision"] == 54500.0
     # 账面价值
-    assert bank["end_book_value"] == 845000.0 - 54500.0
+    assert bank["end_book_value"] == 830000.0 - 54500.0
     assert bank["prior_book_value"] == 515000.0 - 33000.0
 
 
@@ -1579,16 +1592,21 @@ def test_d4_note_rows_pl_dual_code():
     d4_rule = next(r for r in rules if r.rule_id == "D4.note.main")
     assert d4_rule.target.sections == {"listed": "五、62", "soe": "八、64"}
 
+    from app.services.formula_push.sources import PriorPlSnapshot
+
     binding = TierAAnchorBinding(wp_code="D4", account_prefixes=("6001", "6051"))
-    binding._last_tb_data = {
-        "6001": {"本期发生额": Decimal("900000"), "年初余额": Decimal("700000")},
-        "6051": {"本期发生额": Decimal("600000"), "年初余额": Decimal("500000")},
+    binding._last_tb_data = {  # 本年年初余额（损益类真库恒 0）不是上期，这里故意给非 0 值证明没被读
+        "6001": {"本期发生额": Decimal("900000"), "年初余额": Decimal("1")},
+        "6051": {"本期发生额": Decimal("600000"), "年初余额": Decimal("1")},
     }
+    binding._last_prior_pl = PriorPlSnapshot({
+        "6001": {"本期发生额": Decimal("700000")}, "6051": {"本期发生额": Decimal("500000")},
+    })
     rows = binding.note_rows({}, "listed", d4_rule)
 
     # 双科目 → 2 行数据 + 1 行合计 = 3 行
     assert len(rows) == 3
-    # 损益类：ending 取「本期发生额」
+    # 损益类：ending 取「本期发生额」，上期取上年试算表发生额
     assert rows[0]["ending"] == 900000.0
     assert rows[0]["opening"] == 700000.0
     assert rows[1]["ending"] == 600000.0
@@ -1596,7 +1614,12 @@ def test_d4_note_rows_pl_dual_code():
     # 合计行
     assert rows[2]["is_total"] is True
     assert rows[2]["ending"] == 1500000.0
-    assert rows[2]["opening"] == 1200000.0
+    assert rows[2]["opening"] == 1200000.0 and rows[2]["opening_resolved"] is True
+    # 上年数据取不到 ⇒ 各行与合计行的上期都不出值（不推 0）
+    binding._last_prior_pl = PriorPlSnapshot(None, "损益类上期发生额取上年试算表：没有上年项目")
+    rows = binding.note_rows({}, "listed", d4_rule)
+    assert [r["opening_resolved"] for r in rows] == [False, False, False]
+    assert all("没有上年项目" in r["opening_reason"] for r in rows)
 
 
 def test_d5_has_no_account_and_no_rules():

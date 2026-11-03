@@ -1,0 +1,15 @@
+{
+  "contract": "workpaper-file-materialization.schema.json",
+  "description": "存量文件分类共享用例（只列不依赖本机文件系统的几类：路径都不存在）。存在的文件：在模板目录内 ⇒ template，在本底稿存储位置等允许范围内 ⇒ own_file，越界 ⇒ rejected。placeholder 判据：去首尾空白后匹配 ^\\.?[\\\\/]?storage[\\\\/]+projects[\\\\/]+[0-9a-fA-F-]{32,36}[\\\\/]+workpapers[\\\\/]+（文件不存在时）。",
+  "classify": [
+    [null, "empty"],
+    ["", "empty"],
+    ["   ", "empty"],
+    ["storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/D2.xlsx", "placeholder"],
+    ["./storage/projects/0ec33ac93de54e65b3bff9dccd7b2a49/workpapers/D2.xlsx", "placeholder"],
+    ["storage\\projects\\0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49\\workpapers\\D2.xlsx", "placeholder"],
+    ["/tmp/abcd1234.xlsx", "missing"],
+    ["wp_storage/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111.xlsx", "missing"]
+  ],
+  "fixable": ["empty", "placeholder", "template"]
+}

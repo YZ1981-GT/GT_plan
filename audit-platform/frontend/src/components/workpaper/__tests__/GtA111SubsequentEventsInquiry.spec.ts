@@ -223,21 +223,128 @@ describe('GtA111SubsequentEventsInquiry.vue', () => {
       expect(wrapper.find('.oo-stub').exists()).toBe(false)
     })
 
-    it('renders segmented control', async () => {
+    // 🔴 原来这里是 `expect(找到 el-segmented).toBe(true)` —— 断言「模式开关恒显示」。
+    //    spec workpaper-html-onlyoffice-bidirectional-writeback-closure（task 3.5 / AC 1.4、1.5）
+    //    把开关可见性改由 entry 级同步能力**单源**决定后，这条断言就成了「断言旧的不诚实行为」：
+    //    本 entry（`xlsx/gt-a111-subsequent-events-inquiry`）在 generated manifest 里是
+    //    `capability: null` / `adjudicationState: 'pending'` / blockedBy BP-1~BP-9，
+    //    也就是**两侧尚未形成已验收的双向链路** —— 此时摆出「结构化视图 / 在线编辑」双选开关，
+    //    正是该 spec 要治的「仅能打开 OO 却呈现成双向」。
+    //    所以不是删掉断言，而是改成断言**正确行为的两面**。
+    it('未裁决为双向时不显示模式开关（而是显示未互通原因）', async () => {
       const wrapper = await mountComponent()
-      expect(wrapper.find('.el-segmented-stub').exists()).toBe(true)
+      expect(
+        wrapper.find('.el-segmented-stub').exists(),
+        '本 entry 仍是 pending，摆出双选开关即「按目标态展示」',
+      ).toBe(false)
+      // 开关不是无声消失：能力披露组件必须在位，把原因讲清楚
+      expect(
+        wrapper.findComponent({ name: 'GtEntrySyncCapabilityNotice' }).exists(),
+        '隐藏开关却不给原因，比显示一个假开关更糟',
+      ).toBe(true)
+    })
+
+    // 🔴 本例必须传 `projectId`：`useEntrySyncReadiness` 在三个身份任一为空时走「缺身份」
+    //    早退分支（直接用 generated manifest 的静态裁决），**根本不会调** readiness 接口 ——
+    //    不传 projectId 时 spy 永不触发，这条判据就会以「单源说可双向却不显示」的形态假红。
+    it('单源裁决为可双向时显示模式开关（判据不是恒假）', async () => {
+      const api = await import('../sync/workpaperSyncApi')
+      const spy = vi.spyOn(api, 'readEntrySyncReadiness').mockResolvedValue({
+        entry_id: 'xlsx/gt-a111-subsequent-events-inquiry',
+        effective_entry_id: 'xlsx/gt-a111-subsequent-events-inquiry',
+        capability: 'bidirectional',
+        adjudication_state: 'terminal',
+        allowed_modes: ['html', 'oo'],
+        can_claim_bidirectional: true,
+        runtime: {
+          ready: true,
+          adapter_id: 'a111',
+          authority_model: 'store',
+          definition_bundle_id: 'b1',
+          definition_bundle_sha256: 'x',
+          typed_slots_complete: true,
+          typed_slots: [],
+          representation_id: 'r1',
+          representation_generation: 1,
+        },
+        acceptance: {
+          state: 'passed',
+          stale: false,
+          run_id: 'run-1',
+          required_scenario_set_digest: 'd',
+        },
+        reason: null,
+      } as Awaited<ReturnType<typeof api.readEntrySyncReadiness>>)
+      try {
+        const wrapper = await mountComponent({ projectId: 'proj-a111' })
+        await new Promise((r) => setTimeout(r, 0))
+        await wrapper.vm.$nextTick()
+        expect(spy, 'readiness 接口未被调用 ⇒ 身份不全走了早退分支，本例测不到东西').toHaveBeenCalled()
+        expect(
+          wrapper.find('.el-segmented-stub').exists(),
+          '单源说可双向却仍不显示开关 ⇒ 上一条就是恒假判据',
+        ).toBe(true)
+      } finally {
+        spy.mockRestore()
+      }
     })
   })
 
-  // ─── OO Health Check Disable ───
-
-  describe('OO health check disable', () => {
-    it('when OO healthy, both modes available', async () => {
-      const wrapper = await mountComponent()
-      const buttons = wrapper.findAll('.el-segmented-stub button')
-      expect(buttons.length).toBe(2)
-      expect(buttons[0].text()).toBe('结构化视图')
-      expect(buttons[1].text()).toBe('在线编辑')
+  // ─── 模式可用性 ───
+  //
+  // 🔴 这一组原名「OO Health Check Disable」，断言「OO 健康 ⇒ 两种模式都可用」，取数方式是
+  //    `findAll('.el-segmented-stub button')` 期望 2 个按钮。
+  //    两件事必须分开说清楚：
+  //    ① **它在本轮之前就是红的**（A/B 逐节点归因：同一断言在 HEAD 与候选树都失败，
+  //       `expected +0 to be 2`）—— 原因与同步能力无关，是这个 stub 下取不到按钮；
+  //       所以不是本轮 task 3.5 弄红的。
+  //    ② 但它的**主题**已经被 task 3.5 改掉了：模式是否可用不再由 OO 探活决定，而由 entry
+  //       级同步能力单源决定（本 entry 是 pending ⇒ 开关根本不出现，这组断言永远不可能成立）。
+  //    留着就是一条永红判据（永红 = 没人看 = 等于没有门禁），故按新口径重写：
+  //    单源裁决为可双向时，两个模式选项都在。
+  describe('模式可用性由同步能力单源决定（原 OO health check 组）', () => {
+    it('单源裁决为可双向时，结构化视图与在线编辑两个选项都在', async () => {
+      const api = await import('../sync/workpaperSyncApi')
+      const spy = vi.spyOn(api, 'readEntrySyncReadiness').mockResolvedValue({
+        entry_id: 'xlsx/gt-a111-subsequent-events-inquiry',
+        effective_entry_id: 'xlsx/gt-a111-subsequent-events-inquiry',
+        capability: 'bidirectional',
+        adjudication_state: 'terminal',
+        allowed_modes: ['html', 'oo'],
+        can_claim_bidirectional: true,
+        runtime: {
+          ready: true,
+          adapter_id: 'a111',
+          authority_model: 'store',
+          definition_bundle_id: 'b1',
+          definition_bundle_sha256: 'x',
+          typed_slots_complete: true,
+          typed_slots: [],
+          representation_id: 'r1',
+          representation_generation: 1,
+        },
+        acceptance: {
+          state: 'passed',
+          stale: false,
+          run_id: 'run-1',
+          required_scenario_set_digest: 'd',
+        },
+        reason: null,
+      } as Awaited<ReturnType<typeof api.readEntrySyncReadiness>>)
+      try {
+        const wrapper = await mountComponent({ projectId: 'proj-a111' })
+        await new Promise((r) => setTimeout(r, 0))
+        await wrapper.vm.$nextTick()
+        const segmented = wrapper.find('.el-segmented-stub')
+        expect(segmented.exists(), '单源说可双向，开关却没出现').toBe(true)
+        const labels = (wrapper.vm as unknown as { modeOptions?: Array<{ label?: string }> })
+          .modeOptions
+        // 不依赖 stub 怎么渲染按钮（原断言正是栽在这上面）：直接核对选项数据本身
+        expect(Array.isArray(labels) ? labels.length : 0, '模式选项不是两项').toBe(2)
+        expect((labels ?? []).map((o) => o.label)).toEqual(['结构化视图', '在线编辑'])
+      } finally {
+        spy.mockRestore()
+      }
     })
   })
 

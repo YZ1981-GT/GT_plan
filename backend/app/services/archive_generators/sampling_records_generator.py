@@ -113,6 +113,7 @@ async def _generate(project_id: UUID, db: AsyncSession) -> bytes:
             "抽样框版本、随机种子、偏差、推断错报、错报上限、结论）。已撤销的抽凭批次",
             "不在此列示。",
         ]
+        lines += await _sample_evidence_lines(project_id, db)  # 只有挂凭、没有抽凭批次时也列
         return "\n".join(lines).encode("utf-8")
 
     lines.append(f"抽样批次总数: {len(rows)}")
@@ -192,7 +193,41 @@ async def _generate(project_id: UUID, db: AsyncSession) -> bytes:
             lines.append(f"  · {msg}")
         lines.append("")
 
+    lines += await _sample_evidence_lines(project_id, db)
     return "\n".join(lines).encode("utf-8")
+
+
+async def _sample_evidence_lines(project_id: UUID, db: AsyncSession) -> list[str]:
+    """抽凭样本证据（spec attachment-voucher-evidence-binding 需求 6.1）：按底稿列登记样本、证据文件与缺证据样本。
+
+    样本 = 未撤销的抽凭批次与挂凭登记（同一凭证只算一笔）；证据 = 本底稿上带凭证键的证据链接。读取失败只在本节写明，
+    不让整章变成占位说明（批次记录照常输出）。
+    """
+    from app.services.voucher_evidence import project_sample_evidence
+
+    try:
+        async with db.begin_nested():
+            wps = await project_sample_evidence(db, project_id)
+    except Exception:  # noqa: BLE001 — 本节失败不影响批次记录
+        logger.warning("抽凭样本证据读取失败 project=%s", project_id, exc_info=True)
+        return ["─" * 60, "抽凭样本证据：读取失败，本归档包未列示。请重新生成归档包。", ""]
+    if not wps:
+        return []
+    lines = ["─" * 60, "抽凭样本证据（文件在包内「40-附件」目录，文件名以附件编号前 8 位开头）", ""]
+    for wp in wps:
+        samples = wp["samples"]
+        missing = [s for s in samples if not s["files"]]
+        lines.append(f"{wp['wp_code'] or '底稿编码未知'} {wp['wp_name']}：登记样本 {len(samples)} 笔，"
+                     f"已取得证据 {len(samples) - len(missing)} 笔，缺证据 {len(missing)} 笔")
+        for s in samples:
+            if s["files"]:
+                files = "；".join(f"{f['id'][:8]} {f['file_name']}" for f in s["files"])
+                lines.append(f"  {s['label']}：{files}")
+        if missing:
+            lines.append("  缺证据样本：")
+            lines.extend(f"    {s['label']}{'（' + s['reason'] + '）' if s.get('reason') else ''}" for s in missing)
+        lines.append("")
+    return lines
 
 
 #: 归档章节前缀。**06 而非 05** —— 05 已被「AI 贡献明细」占用，而

@@ -11,7 +11,13 @@
         锁死切换器、点击被吞（D4 bug ③）。健康门禁在 `useHSyncMode.switchMode` 里 await 兜底。
       -->
       <div v-if="showModeSwitch" class="h1-mode-switch-bar">
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h1FEntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
+        <!--
+          能力披露（spec task 3.5 / AC 1.5）：上面的模式开关一旦被同步能力单源藏起来，
+          这里必须讲清楚「为什么没有在线编辑」+ 可操作的下一步。只隐藏开关不给原因，
+          比显示一个打不开的假开关更糟。entry id 与开关的门用**同一个**表达式。
+        -->
+        <GtEntrySyncCapabilityNotice :entry-id="H1_SYNC_ENTRY_ID" />
         <el-tag size="small" :type="hSync.syncStateTag.value.type">
           {{ hSync.syncStateTag.value.text }}
         </el-tag>
@@ -341,6 +347,8 @@
  * Requirements: 1.2-1.3, 17.1
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -358,6 +366,7 @@ import {
   mergeSeedRows,
   type H1FourTablePrefill,
 } from './composables/h1FourTablePrefill'
+import { resolveH1ProjectContext } from './composables/h1ProjectContext'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
@@ -543,14 +552,9 @@ const h1PeriodEnd = computed(() => {
  * 附注披露口径（权威变体源 = projects.template_type / report_scope，由 render project_context 注入）。
  * 上市披露表只能同步上市章节（五、22）、国企只能同步国企章节（八、22），不可混用。
  */
-const projectTemplateType = computed(() => {
-  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
-  return String(ctx.template_type ?? '')
-})
-const projectReportScope = computed(() => {
-  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
-  return String(ctx.report_scope ?? '')
-})
+const h1ProjectContext = computed(() => resolveH1ProjectContext(props.htmlData))
+const projectTemplateType = computed(() => h1ProjectContext.value.templateType)
+const projectReportScope = computed(() => h1ProjectContext.value.reportScope)
 
 // ─── 四表取数（灰度 H1_FOUR_TABLE_EXTRACTION_ENABLED，关闭时载荷不存在）────────
 /** 后端 render 注入的四表取数载荷（明细/序时账增减/对方科目可用性） */
@@ -792,6 +796,21 @@ onUnmounted(() => {
   //    H9/H8/H6/H10 同源缺陷已修，这是同一条）。
   void flushPendingSaves()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const h1FEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H1_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

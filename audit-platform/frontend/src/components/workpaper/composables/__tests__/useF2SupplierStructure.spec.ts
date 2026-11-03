@@ -24,10 +24,15 @@ describe('F2-68 重要供应商结构公式', () => {
   })
 
   it('裁剪多余空行但至少保留一行', () => {
-    expect(pruneSupplierStructureRows([
+    const first = row({ id: 'stable-blank' })
+    const pruned = pruneSupplierStructureRows([
+      first,
       emptySupplierStructureRow(),
-      emptySupplierStructureRow(),
-    ])).toHaveLength(1)
+    ])
+    expect(pruned).toHaveLength(1)
+    expect(pruned[0].id).toBe('stable-blank')
+    expect(migrateSupplierStructureSheet({ currentRows: pruned, priorRows: pruned }))
+      .toEqual({ currentRows: pruned, priorRows: pruned })
   })
 
   it('自动计算占比和排名', () => {

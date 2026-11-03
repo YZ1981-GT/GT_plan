@@ -10,6 +10,8 @@
  *
  * Requirements: 8.1-8.2
  */
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
 import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -203,12 +205,14 @@ async function runAccountListOcr(file: File): Promise<boolean> {
   try {
     const form = new FormData()
     form.append('file', file)
-    if (ocrAttachmentId.value) form.append('attachment_id', ocrAttachmentId.value)
+    // 每次都是新选的文件：不带上一次的附件编号（带了后端按编号复用上次识别结果，新文件被忽略）
+    appendRowEvidence(form, 'E1-10')
     const { data } = await http.post(
       `/api/workpapers/${props.wpId}/e1/account-list-ocr`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     )
+    refreshRowEvidence(props.projectId, props.wpId)
     const fields = data?.extracted_fields || {}
     if (!fields.accounts?.length) {
       ElMessage.warning('OCR 完成，未识别到账户行')
@@ -283,6 +287,7 @@ function getRowClass({ row }: { row: AccountListRow }): string {
             账户清单 OCR
           </el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" sheet-key="E1-10" />
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -543,6 +548,7 @@ function getRowClass({ row }: { row: AccountListRow }): string {
     <!-- OCR 确认对话框 -->
     <E1AccountListOcrConfirmDialog
       v-model="ocrVisible"
+      :attachment-id="ocrAttachmentId"
       :fields="ocrFields"
       :confidence="ocrConfidence"
       :ocr-preview="ocrPreview"

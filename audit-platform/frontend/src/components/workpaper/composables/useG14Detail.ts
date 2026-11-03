@@ -16,26 +16,25 @@
  * |---|---|---|
  * | D | `=B+C` | 审定数 = 未审 + 调整 |
  * | J | `=F+G-H-I` | 期末余额 = 期初 + 计提 − 转回 − 转销 |
- * | K | `=G+H` | 🔴 见下 |
+ * | K | `=G-H` | 计入损益 = 计提 − 转回（模板原为 `=G+H`，已修） |
  * | L | `=D=K` | 布尔核对：审定数 == 计入损益 |
  *
- * ═══ 🔴 模板 `K=G+H` 是缺陷，本模块按 `G−H` 算 ═══
+ * ═══ `K`：模板原为 `=G+H`，已按会计口径修为 `=G-H` ═══
  *
- * `J=F+G-H-I` 要求 `H`「本期转回」填**正数**（转回减少准备）。同一张表里 `K=G+H` 却把
+ * `J=F+G-H-I` 要求 `H`「本期转回」填**正数**（转回减少准备）。模板原先的 `K=G+H` 却把
  * 转回当成**增加**损益 —— 两式对 `H` 的符号约定互相矛盾，必有一错。
  *
  * 判定「`K` 错」的三条依据：
  * 1. 会计口径：信用减值损失（损益）= 本期计提 − 本期转回，转回冲减损益；
  * 2. `J` 的形式与准则口径「期初 + 计提 − 转回 − 转销 = 期末」逐字一致，它是对的；
- * 3. 平台早已裁定「转回填正数」—— `useG14FormulaEngine.migrateReversalToPositive`
- *    专门把历史负数统一成正数。
+ * 3. 平台早已裁定「转回填正数」（表头与填报说明）。录入值按原样计算、载入时不改号：
+ *    原先载入时把负数转回取绝对值，OO 侧填的负数会被表单悄悄改正，两侧算出的 J / K 不同
+ *    （真库 G14-2 无数据，没有需要迁移的历史负数）。
  *
- * ⇒ 本模块 `profitLoss = calcNetImpairmentLoss(计提, 转回) = 计提 − 转回`。
- * 与 G8 的模板缺陷同族处置：`K` 在模板每行都有公式 ⇒ 后端仍判 `mode=formula`
- * （OO 侧改不了），但 Excel 侧显示模板算的值、平台侧显示本模块算的值，**有转回时两者
- * 相差 2×转回**。这个差异是如实登记的欠账（见 spec evidence `task10-c9-g14-rootfix.md`
- * §2.2），不是本模块的 bug：修模板要么改字节（禁止）、要么走覆盖层（框架层尚无该机制）。
- * 模板自己的 `L=D=K` 核对列会在有转回时显示不平 —— 用户看得见，不是静默错。
+ * ⇒ 本模块 `profitLoss = calcNetImpairmentLoss(计提, 转回) = 计提 − 转回`。spec
+ * `oo-writeback-template-parity-closure` 第三批已把权威模板改为 `K=G-H`：`K` 在模板每行
+ * 都有公式 ⇒ 后端判 `mode=formula`，Excel 侧与本模块同口径，模板自带的 `L=D=K` 核对列
+ * 在审定数等于计入损益时即平。
  *
  * ═══ 🔴 行集必须逐项等于模板 9 行 ═══
  *
@@ -54,7 +53,6 @@ import {
   calcSubtotal,
   isRollForwardBalanced,
   isReconciled,
-  migrateReversalToPositive,
   calcVariance,
 } from './useG14FormulaEngine'
 import {
@@ -95,7 +93,7 @@ export interface G14DetailRow {
   currentWriteoff: number
   /** J 对应科目-减值准备 / 期末余额　**【公式】** `=F+G-H-I` */
   closingProvision: number
-  /** K 对应科目-减值准备 / 计入损益　**【公式】** `=G-H`（🔴 模板写的是 `=G+H`，见模块头） */
+  /** K 对应科目-减值准备 / 计入损益　**【公式】** `=G-H` */
   profitLoss: number
   /** L 核对　**【公式·布尔】** `=D=K` */
   reconciled: boolean
@@ -159,7 +157,7 @@ function createDefaultRows(tb: G14ProvisionTbResult = {}): G14DetailRow[] {
  * 「录入期末」的空间。改造前前端把它当录入列、另设 `closingComputed` 推算列并校验两者
  * 一致 —— 那是双源。期末余额的对账对象是**试算余额**（`tbClosing`），不是自己的推算值。
  */
-function enrichRow(
+export function enrichRow(
   raw: Partial<G14DetailRow> & { rowKey: string },
   tbClosing: number | null = null,
 ): G14DetailRow {
@@ -168,14 +166,12 @@ function enrichRow(
   const currentAdjustment = parseNum(raw.currentAdjustment)
   const openingProvision = parseNum(raw.openingProvision)
   const currentProvision = parseNum(raw.currentProvision)
-  // 🔴 先 parseNum 再迁移：`migrateReversalToPositive(reversal: number)` 收窄类型，
-  //    而 `raw` 是 Partial ⇒ 直接传会是 `number | undefined`（既存类型错，本轮新建的
-  //    窄配置 tsconfig._g14.json 首次把它暴露出来）。
-  const currentReversal = migrateReversalToPositive(parseNum(raw.currentReversal))
+  // 转回按录入值计算（与模板 J / K 同）；「填正数」是填报口径，不在载入时改号
+  const currentReversal = parseNum(raw.currentReversal)
   const currentWriteoff = parseNum(raw.currentWriteoff)
   // D = B+C
   const currentAudited = calcAdjustedAmount(currentUnadjusted, currentAdjustment)
-  // 🔴 K = G−H（模板写的是 =G+H，是缺陷，见模块头三条依据）
+  // K = G−H（与模板同式）
   const profitLoss = calcNetImpairmentLoss(currentProvision, currentReversal)
   // J = F+G−H−I（模板**不含**「其他变动」项 ⇒ 第五参传 0）
   const closingProvision = calcProvisionRollForward(

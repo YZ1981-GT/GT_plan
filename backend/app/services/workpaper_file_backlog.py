@@ -56,6 +56,11 @@ class BacklogRow:
     referenced: Path | None  # 解析到的文件（own_file / template）
     own_existing: Path | None  # 本底稿存储位置已有的文件（懒加载落过）
 
+    def to_payload(self) -> dict:
+        """契约 workpaper-file-materialization.schema.json 的一行。"""
+        return {"wp_id": str(self.wp_id), "project_id": str(self.project_id), "wp_code": self.wp_code,
+                "file_path": self.file_path, "category": self.category, "fixable": self.category in FIXABLE}
+
 
 def own_storage_file(project_id: UUID, wp_id: UUID) -> Path | None:
     """本底稿存储位置（wp_storage/{项目}/{底稿 id}.*）已有的文件；不建目录。"""

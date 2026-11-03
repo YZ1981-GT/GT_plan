@@ -2,8 +2,8 @@
  * FormulaPendingSyncDialog —— 项目待确认弹窗（spec formula-global-settings-sync，R5 / design §13）
  *
  * 守护：进入项目自动弹一次（同会话同项目不再弹，角标常驻）；切项目时上一个项目晚到的响应不覆盖；
- * 逐条 / 批量决策提交（带上游版本，手工修改带定义）；事项已被新发布更新（409 STALE）时刷新重确认；
- * 只读成员（403）给出明确提示。
+ * 逐条 / 批量决策提交（带列表给出的修订号 revision，手工修改带定义；spec formula-hub-integrity-closure 需求 8.3）；
+ * 事项已被新发布覆盖（409）或缺修订号（428）时重新拉取，修订号变了的事项清掉原选择；只读成员（403）给出明确提示。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
@@ -34,7 +34,7 @@ function item(id: string, over: Record<string, unknown> = {}) {
     reason: 'conflict', reason_label: '冲突', upstream_origin: 'global', upstream_origin_label: '全局设置',
     upstream_template_id: null, base_definition: { formula: 'A' }, upstream_definition: { formula: 'B' },
     upstream_deleted: false, local_definition: { formula: 'C', formula_category: 'auto_calc' },
-    base_formula: 'A', upstream_formula: 'B', local_formula: 'C', upstream_version: 5, publish_id: 'pub',
+    base_formula: 'A', upstream_formula: 'B', local_formula: 'C', upstream_version: 5, revision: 3, publish_id: 'pub',
     created_at: null, updated_at: null, ...over,
   }
 }
@@ -104,7 +104,11 @@ describe('进入项目自动弹出：同会话同项目只弹一次', () => {
 })
 
 describe('处理待确认', () => {
-  it('逐条选择后提交：带上游版本；手工修改带合并后的定义；成功后刷新并发出 resolved', async () => {
+  it('逐条选择后提交：带列表给出的修订号（不再带上游版本）；手工修改带合并后的定义；成功后刷新并发出 resolved', async () => {
+    api.pending.mockResolvedValue({
+      project_id: 'p1', count: 2,
+      items: [item('1', { upstream_version: null, upstream_origin: 'project' }), item('2', { revision: 7 })],
+    })
     const w = mountDialog('p1')
     await flushPromises()
     const [a, b] = w.vm.items
@@ -116,8 +120,8 @@ describe('处理待确认', () => {
     await flushPromises()
 
     expect(api.resolve).toHaveBeenCalledWith('p1', [
-      { item_id: '1', choice: 'keep', upstream_version: 5 },
-      { item_id: '2', choice: 'custom', upstream_version: 5, custom_definition: { formula: 'D', formula_category: 'auto_calc' } },
+      { item_id: '1', choice: 'keep', revision: 3 },
+      { item_id: '2', choice: 'custom', revision: 7, custom_definition: { formula: 'D', formula_category: 'auto_calc' } },
     ])
     expect(w.emitted('resolved')?.[0]).toEqual([['report']])
     expect(w.vm.visible).toBe(false)
@@ -157,17 +161,48 @@ describe('处理待确认', () => {
     w.unmount()
   })
 
-  it('事项已被新的发布更新（409 STALE）→ 提示并刷新列表', async () => {
+  it('修订号已变（409）→ 提示并重新拉取；变了的事项清掉原选择，再提交带新修订号，没变的保留选择', async () => {
     api.resolve.mockRejectedValueOnce({
-      response: { status: 409, data: { detail: { error_code: 'FORMULA_SYNC_ITEM_STALE', message: '已更新' } } },
+      response: { status: 409, data: { detail: { error_code: 'FORMULA_SYNC_ITEM_STALE', message: '已更新', revision: 4 } } },
     })
     const w = mountDialog('p1')
     await flushPromises()
     w.vm.setAll('adopt')
     const callsBefore = api.pending.mock.calls.length
+    // 重新拉取时：事项 1 已被新的发布覆盖（修订号 3 → 4、新定义换了），事项 2 没变
+    api.pending.mockResolvedValue({
+      project_id: 'p1', count: 2, items: [item('1', { revision: 4, upstream_formula: 'B2' }), item('2')],
+    })
     await w.vm.onSubmit()
     await flushPromises()
-    expect(msg.warning).toHaveBeenCalledWith('有事项已被新的发布更新，已刷新列表，请重新确认')
+    expect(msg.warning).toHaveBeenCalledWith('有事项已被新的发布更新或已被处理，已刷新列表，请重新确认')
+    expect(api.pending.mock.calls.length).toBe(callsBefore + 1)
+    expect(w.vm.choices['1']).toBeUndefined() // 旧修订号上的「采用新定义」作废，须看过新定义再选
+    expect(w.vm.choices['2']).toBe('adopt')
+    expect(w.vm.chosenCount).toBe(1)
+
+    w.vm.setChoice(w.vm.items[0], 'keep')
+    await w.vm.onSubmit()
+    await flushPromises()
+    expect(api.resolve).toHaveBeenCalledTimes(2)
+    expect(api.resolve.mock.calls[1][1]).toEqual([
+      { item_id: '1', choice: 'keep', revision: 4 },
+      { item_id: '2', choice: 'adopt', revision: 3 },
+    ])
+    w.unmount()
+  })
+
+  it('缺修订号（428）→ 提示并重新拉取', async () => {
+    api.resolve.mockRejectedValueOnce({
+      response: { status: 428, data: { detail: { error_code: 'FORMULA_VERSION_REQUIRED', message: '缺修订号' } } },
+    })
+    const w = mountDialog('p1')
+    await flushPromises()
+    w.vm.setAll('keep')
+    const callsBefore = api.pending.mock.calls.length
+    await w.vm.onSubmit()
+    await flushPromises()
+    expect(msg.warning).toHaveBeenCalledWith('缺少修订号，已刷新列表，请重新确认')
     expect(api.pending.mock.calls.length).toBe(callsBefore + 1)
     w.unmount()
   })

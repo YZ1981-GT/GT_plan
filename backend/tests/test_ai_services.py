@@ -140,44 +140,7 @@ class TestWorkpaperFillService:
         assert result is not None
 
 
-class TestContractAnalysisService:
-    """测试合同分析服务"""
-
-    def test_service_initialization(self):
-        """测试服务初始化"""
-        from app.services.contract_analysis_service import ContractAnalysisService
-
-        db = AsyncMock()
-        service = ContractAnalysisService(db)
-        assert service.db is db
-
-    def test_build_analysis_prompt(self):
-        """测试分析提示词构建"""
-        from app.services.contract_analysis_service import ContractAnalysisService
-
-        db = AsyncMock()
-        service = ContractAnalysisService(db)
-        prompt = service._build_analysis_prompt("采购合同内容...", "采购合同", "risk")
-        assert isinstance(prompt, str)
-        assert len(prompt) > 0
-
-    def test_parse_analysis_items(self):
-        """测试解析分析结果"""
-        from app.services.contract_analysis_service import ContractAnalysisService
-
-        db = AsyncMock()
-        service = ContractAnalysisService(db)
-        items = service._parse_analysis_items("1. 违约金过低\n2. 付款期限不明", "risk")
-        assert isinstance(items, list)
-
-    def test_extract_summary(self):
-        """测试摘要提取"""
-        from app.services.contract_analysis_service import ContractAnalysisService
-
-        db = AsyncMock()
-        service = ContractAnalysisService(db)
-        summary = service._extract_summary("这是一份采购合同，总金额100万元。")
-        assert isinstance(summary, str)
+# TestContractAnalysisService — 已随 contract_analysis_service.py 在 V231 + Spec F FEAT-001 一并删除。
 
 
 class TestKnowledgeIndexService:
@@ -234,16 +197,7 @@ class TestAIIntegration:
         assert mock_result["success"] is True
         assert "text" in mock_result
 
-    def test_full_contract_analysis_pipeline(self):
-        """测试完整合同分析流程"""
-        from app.services.contract_analysis_service import ContractAnalysisService
-
-        db = AsyncMock()
-        service = ContractAnalysisService(db)
-        prompt = service._build_analysis_prompt("采购合同内容", "采购合同", "risk")
-        assert isinstance(prompt, str)
-        items = service._parse_analysis_items("1. 违约金过低", "risk")
-        assert isinstance(items, list)
+    # test_full_contract_analysis_pipeline — 已随 contract_analysis_service.py 在 V231 + Spec F FEAT-001 一并删除。
 
 
 if __name__ == "__main__":

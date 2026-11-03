@@ -114,6 +114,8 @@
             <!-- formula-global-settings-sync：全局设置 / 保存为模板 / 订阅模板（取代旧共享配置「公式审核配置」） -->
             <FormulaSettingsToolbar ref="settingsToolbarRef" :project-id="projectId" :domain="settingsDomain"
               :default-scope="settingsScope" :can-edit-global="canEditGlobal" :can-edit-project="!formulaReadOnly"
+              :initial-template-id="initialTemplateId" :initial-template-action="initialTemplateAction"
+              :initial-template-domain="initialTemplateDomain"
               @navigate="visible = false"
               @changed="onFormulaSettingsChanged" />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
@@ -314,19 +316,8 @@
           <el-table-column prop="row_name" label="项目" min-width="180" show-overflow-tooltip />
           <el-table-column label="公式" min-width="260">
             <template #default="{ row }">
-              <div v-if="editingId === row.id" style="display: flex; flex-direction: column; gap: 2px;">
-                <!-- formula-management-ux-improvements A3：语法高亮输入 + 实时校验 -->
-                <FormulaInput v-model="editFormula" :project-id="projectId" :report-rows="formulaInputReportRows" :wp-codes="formulaInputWpCodes" />
-                <!-- formula-management-ux-improvements A4：快捷按钮改为参数选择器 -->
-                <div style="display: flex; gap: 2px; flex-wrap: wrap;">
-                  <FormulaParamPicker mode="tb" :tb-items="paramPickerTbItems" @select="onParamPickerSelect" />
-                  <FormulaParamPicker mode="wp" :wp-items="paramPickerWpItems" @select="onParamPickerSelect" />
-                  <FormulaParamPicker mode="note" :note-items="paramPickerNoteItems" @select="onParamPickerSelect" />
-                  <FormulaParamPicker mode="row" :row-items="paramPickerRowItems" @select="onParamPickerSelect" />
-                </div>
-              </div>
-              <!-- Task 1.4：只读投影行禁双击/点击进入编辑（dblclick/click 不绑 startEdit）。 -->
-              <code v-else-if="row.formula && isReadonlyProjectionRow(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); word-break: break-all;" :title="'只读取数/溯源说明'">{{ row.formula }}</code>
+              <!-- 只读投影行禁双击/点击进入编辑；其余公式统一打开 FormulaEditDialog。 -->
+              <code v-if="row.formula && isReadonlyProjectionRow(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); word-break: break-all;" :title="'只读取数/溯源说明'">{{ row.formula }}</code>
               <code v-else-if="row.formula" @dblclick="startEdit(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); word-break: break-all; cursor: pointer;" :title="'双击编辑公式'">{{ row.formula }}</code>
               <span v-else-if="isReadonlyProjectionRow(row)" style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
               <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed var(--gt-color-border-light); padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
@@ -349,27 +340,22 @@
           </el-table-column>
           <el-table-column label="分类" width="110" align="center">
             <template #default="{ row }">
-              <el-select v-if="editingId === row.id" v-model="editCategory" size="small" style="width: 95px">
-                <el-option label="自动运算" value="auto_calc" />
-                <el-option label="逻辑审核" value="logic_check" />
-                <el-option label="合理性" value="reasonability" />
-              </el-select>
-              <el-tag v-else :type="(categoryTagType(row.formula_category)) || undefined" size="small">
+              <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">
                 {{ categoryLabel(row.formula_category) }}
               </el-tag>
             </template>
           </el-table-column>
           <el-table-column label="说明" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input v-if="editingId === row.id" v-model="editDescription" size="small" />
-              <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ row.formula_description || '' }}</span>
+              <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ row.formula_description || '' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="计算值" width="110" align="right">
             <template #default="{ row }">
-              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length" placement="left" :show-after="300">
+              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length || formulaFailureReason(formulaResults[row.row_code || row.id])" placement="left" :show-after="300">
                 <template #content>
                   <div style="max-width:400px;font-size: var(--gt-font-size-xs);line-height:1.6">
+                    <div v-if="formulaFailureReason(formulaResults[row.row_code || row.id])" data-testid="formula-result-error">失败原因：{{ formulaFailureReason(formulaResults[row.row_code || row.id]) }}</div>
                     <div v-for="(t, ti) in formulaResults[row.row_code || row.id]?.trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
                       <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
                       <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
@@ -377,7 +363,7 @@
                   </div>
                 </template>
                 <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-primary);font-weight:600;cursor:help">
-                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '-' }}
+                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '—' }}
                 </span>
               </el-tooltip>
               <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-placeholder)">—</span>
@@ -402,7 +388,7 @@
           </el-table-column>
           <el-table-column label="操作" width="120" align="center">
             <template #default="{ row }">
-              <el-button v-if="canRestoreRow(row) && editingId !== row.id" size="small" link @click.stop="onRestoreGlobal(row)">恢复全局</el-button>
+              <el-button v-if="canRestoreRow(row)" size="small" link @click.stop="onRestoreGlobal(row)">恢复全局</el-button>
               <!-- Task 1.4 / ADR-FMC-02：surfaced/extraction 只读投影 —— 不渲染「编辑」按钮，
                    仅标「只读」，避免把后端 readonly:true 的说明投影当成可编辑权威公式。 -->
               <el-tooltip v-if="isReadonlyProjectionRow(row)" content="取数/溯源说明投影，只读不可编辑" placement="top">
@@ -411,8 +397,7 @@
               <el-tooltip v-else-if="_isRowOwnedByPush(row)" content="此单元格由系统公式推送维护，不可编辑" placement="top">
                 <el-button size="small" link disabled>编辑</el-button>
               </el-tooltip>
-              <el-button v-else-if="editingId !== row.id" size="small" link type="primary" @click.stop="startEdit(row)">编辑</el-button>
-              <el-button v-else size="small" link @click.stop="saveEdit(row)" style="color: var(--gt-color-success);">保存</el-button>
+              <el-button v-else size="small" link type="primary" @click.stop="startEdit(row)">编辑</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -476,11 +461,12 @@
     <!-- 公式编辑弹窗 -->
     <FormulaEditDialog
       v-model="showFormulaEdit"
-      :row="editingRow"
+      :row="editingRow" :prefill="editPrefill"
       :source-rows="currentRows"
       :applicable-standard="`${fmTemplateType}_standalone`"
       :project-id="props.projectId"
       :year="props.year"
+      :wp-code="props.wpCode"
       @dirty-change="onFormulaDraftDirtyChange"
       @save="onFormulaEditSave"
     />
@@ -537,8 +523,6 @@ import {
 import { fmtAmount } from '@/utils/formatters'
 import { isOwnedKey } from '@/generated/formulaPushOwnedKeys'
 import FormulaEditDialog from './FormulaEditDialog.vue'
-import FormulaInput from './FormulaInput.vue'
-import FormulaParamPicker from './FormulaParamPicker.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
 import FormulaTimelinePanel from './FormulaTimelinePanel.vue'
 import FormulaPushPanel from './FormulaPushPanel.vue'
@@ -560,13 +544,13 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
-import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
+import { wpCodeNaturalCompare, sortSheetsForGroup, groupHeaderLabel } from '@/services/acnr/sheetDisplayName'
 import {
   useFormulaScopeCatalog,
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
   type FormulaScope,
 } from '@/composables/useFormulaScopeCatalog'
-import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NoteUserFormula } from './noteScopeTargeting'
+import { noteSectionToNodeKey, buildNoteFormulaRows, buildNoteSectionRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NotePresetNote, type NoteUserFormula } from './noteScopeTargeting'
 // Task 4.1 / ADR-FMC-04：弹窗附注节点改调 list_note_formulas（含用户编辑集 _user_formulas）。
 import { noteFormula as P_nf } from '@/services/apiPaths/formula'
 import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
@@ -665,6 +649,9 @@ const props = withDefaults(defineProps<{
   capabilitySnapshot?: WorkpaperCapabilitySnapshot
   formulaSession?: FormulaManagerSession
   readOnly?: boolean
+  initialTemplateId?: string
+  initialTemplateAction?: 'subscribe'
+  initialTemplateDomain?: string
 }>(), {
   scope: 'report',
   readOnly: false,
@@ -687,6 +674,9 @@ const visible = computed({
 })
 
 const formulaReadOnly = computed(() => props.readOnly === true)
+const initialTemplateId = computed(() => props.initialTemplateId)
+const initialTemplateAction = computed(() => props.initialTemplateAction)
+const initialTemplateDomain = computed(() => props.initialTemplateDomain)
 
 type FormulaMutationGate = SaveDraftDecision | { allow: true; location?: undefined }
 
@@ -1514,7 +1504,7 @@ async function exitGlobalBrowse() {
 async function loadAcnrTree() {
   if (acnrTreeLoaded.value) return
   try {
-    const acnr = useAcnr()
+    const acnr = useAcnr(() => props.projectId)
     acnrSheets.value = await acnr.listSheets()
     acnrTreeLoaded.value = true
   } catch (e) {
@@ -1523,7 +1513,7 @@ async function loadAcnrTree() {
 }
 
 /** 从 ACNR sheet 列表按域构建 wp 子树（cycle → parent → sheet）；
- *  显示名/排序/序号消歧统一走单一真源 composeSheetLabelsForGroup（sheetDisplayName.ts） */
+ *  显示名读目录 display_label（后端 display.py 单一来源），这里只排序（sortSheetsForGroup，T30） */
 function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
   // 过滤掉 sheet_code === parent_wp_code 的幻影条目（catalog 中"底稿自身作为子 sheet"的占位，
   // 如 D1 parent 下有 sheet_code='D1' 与 sheet_code='D1-1' 重复，前者是冗余占位应排除）
@@ -1547,8 +1537,7 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
     const parentNodes = [...byParent.entries()]
       .sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))
       .map(([parentCode, parentSheets]) => {
-        const subjectAbbr = parentSheets.find(s => s.account_name)?.account_name || ''
-        const children = composeSheetLabelsForGroup(parentSheets).map(({ entry, label }) => ({
+        const children = sortSheetsForGroup(parentSheets).map(({ entry, label }) => ({
           key: `wp_${entry.sheet_code?.replace(/-/g, '_')?.toLowerCase() || entry.addr_id}`,
           label,
           icon: '',
@@ -1559,7 +1548,7 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
         return {
           key: `wp_${parentCode.toLowerCase()}`,
           // 父节点也带科目简称：如「D2 应收账款」，避免裸编码难辨识
-          label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+          label: groupHeaderLabel(parentCode, parentSheets),
           icon: '',
           children,
           _wpCode: parentCode,
@@ -1644,7 +1633,7 @@ const treeData = computed(() => {
       key: 'aux', label: DOMAIN_TREE_META.aux.label, icon: DOMAIN_TREE_META.aux.icon,
       children: auxSheets.map(s => ({
         key: `aux_${s.sheet_code || s.addr_id}`,
-        label: s.sheet_name || s.sheet_code || s.addr_id,
+        label: s.display_label || s.sheet_code || s.addr_id,
         icon: '',
         _addrId: s.addr_id,
       })),
@@ -1740,8 +1729,25 @@ const allRowsMap = ref<Record<string, any[]>>({})
 const loadingData = ref(false)
 const showFormulaImport = ref(false)
 
+type FormulaExecutionResult = {
+  value: number | null
+  trace: any[]
+  error?: string | null
+  errors?: string[]
+  ok?: boolean
+}
+
+/** 失败结果统一取 error / errors，避免只读其中一个字段而吞掉原因。 */
+function formulaFailureReason(result: Partial<FormulaExecutionResult> | null | undefined): string | null {
+  if (!result) return null
+  if (result.error) return result.error
+  const errors = (result.errors || []).filter(Boolean)
+  if (errors.length) return errors.join('；')
+  return result.ok === false ? '公式执行失败' : null
+}
+
 // 公式执行结果缓存（独立于行数据，确保响应式）
-const formulaResults = ref<Record<string, { value: number | null; trace: any[] }>>({})
+const formulaResults = ref<Record<string, FormulaExecutionResult>>({})
 
 const notePresetFormulas = ref<any[]>([])
 
@@ -1749,6 +1755,10 @@ const notePresetFormulas = ref<any[]>([])
 // 含 table_data._user_formulas）。按 section 缓存最近一次加载结果，避免切节点时串章。
 const noteUserFormulas = ref<NoteUserFormula[]>([])
 const noteUserFormulasSection = ref<string>('')
+/** 同一次加载的「本章节没生成预设公式的格与原因」（list_note_formulas 的 preset_notes） */
+const notePresetNotes = ref<NotePresetNote[]>([])
+/** 附注公式加载错误（R19.3 三态：loading/error/data） */
+const noteUserFormulasError = ref<string>('')
 
 /**
  * Task 4.1 / ADR-FMC-04：加载指定附注章节的用户编辑集公式（list_note_formulas）。
@@ -1772,20 +1782,26 @@ async function fetchNoteUserFormulas(sid: string, force = false): Promise<void> 
   if (!props.projectId || !props.year || !sid) {
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
+    notePresetNotes.value = []
+    noteUserFormulasError.value = ''
     return
   }
   if (!force && noteUserFormulasSection.value === sid && noteUserFormulas.value.length) return
+  noteUserFormulasError.value = ''
   try {
-    const data = await api.get<{ formulas?: NoteUserFormula[] }>(
+    const data = await api.get<{ formulas?: NoteUserFormula[]; preset_notes?: NotePresetNote[] }>(
       P_nf.list(props.projectId, Number(props.year), sid),
       { validateStatus: (s: number) => s < 600 },
     )
     noteUserFormulas.value = Array.isArray(data?.formulas) ? data.formulas : []
+    notePresetNotes.value = Array.isArray(data?.preset_notes) ? data.preset_notes : []
     noteUserFormulasSection.value = sid
-  } catch {
-    // 用户集加载失败不阻断：保持预设行可见
+  } catch (err: any) {
+    // R19.3：加载失败显示错误，不清空后伪装为"没有公式"
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
+    notePresetNotes.value = []
+    noteUserFormulasError.value = err?.response?.data?.detail?.message || err?.message || '附注公式加载失败'
   }
 }
 
@@ -2124,7 +2140,7 @@ async function loadWpFormulas(wpCode: string, sheetCode: string) {
         formula_description: b.semantic || '', formula_source: 'Tier B 溯源',
       })
     }
-    // 防御：任何缺 id 的只读行补稳定 id，避免 editingId(null)===row.id(null) 误触发编辑输入框（公式列变空）
+    // 防御：任何缺 id 的只读行补稳定 id，避免表格选择与结果映射共享空身份
     if (isCurrent()) wpFormulaRows.value = rows.map((r, i) => (r.id == null ? { ...r, id: `wpf-${i}` } : r))
   } catch {
     if (isCurrent()) wpFormulaError.value = '底稿公式加载失败，请检查权限或网络后重新打开。'
@@ -2324,7 +2340,6 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     activeCategory.value = 'all'
     uriSearchQuery.value = ''
     selectedRows.value = []
-    editingId.value = null
     wpFormulaRows.value = []
     wpFormulaError.value = ''
     wpSheetLocateMiss.value = ''
@@ -2595,24 +2610,14 @@ const currentRows = computed(() => {
     const rt = activeReportType.value
     return allRowsMap.value[rt] || []
   }
-  // 附注节点：显示该章节的预设公式（含用户编辑集，Task 4.1 / ADR-FMC-04）
-  if (isNoteDomainNodeKey(selectedNodeKey.value) && (notePresetFormulas.value.length || noteUserFormulas.value.length)) {
-    const { sectionId: targetSectionId, sectionTitle: targetTitle } = resolveNoteSectionRef(selectedNodeKey.value)
-    // 章节命中 → 只列本章节公式；章级节点/无上下文 → 列全部（规则见 noteScopeTargeting）
-    const presetRows = buildNoteFormulaRows(notePresetFormulas.value, {
-      sectionId: targetSectionId,
-      sectionTitle: targetTitle,
-    })
-    // Task 4.1 / ADR-FMC-04：并入用户编辑集公式（list_note_formulas），用户集优先/去重。
+  // 附注节点：本章节可执行公式在前、审核要点在后、末尾列没生成预设的原因（R19）
+  if (isNoteDomainNodeKey(selectedNodeKey.value)
+    && (notePresetFormulas.value.length || noteUserFormulas.value.length || notePresetNotes.value.length)) {
+    const sectionRef = resolveNoteSectionRef(selectedNodeKey.value)
     // 仅当当前已加载的用户集属于本章节时并入，避免切章时把上一章的用户公式串过来。
-    const userForSection =
-      noteUserFormulasSection.value && noteUserFormulasSection.value === targetSectionId
-        ? noteUserFormulas.value
-        : []
-    return mergeNoteUserFormulaRows(presetRows, userForSection, {
-      sectionId: targetSectionId,
-      sectionTitle: targetTitle,
-    })
+    const own = !!noteUserFormulasSection.value && noteUserFormulasSection.value === sectionRef.sectionId
+    return buildNoteSectionRows(notePresetFormulas.value, own ? noteUserFormulas.value : [], sectionRef,
+      own ? notePresetNotes.value : [])
   }
   // 合并报表节点：显示对应表样的行结构
   if (selectedNodeKey.value.startsWith('consol_')) {
@@ -2834,7 +2839,7 @@ const healthDesc = computed(() => {
 
 // ── 智能公式建议（复盘修复 #9）──────────────────────────────────────────────
 /** 系统预设中有公式、但当前行无公式的那些行 = 建议列表。
- * _upstream 来自 reportEffectiveRows 的全局/预设定义快照。 */
+ * `_upstream` 是 reportEffectiveRows 提供的全局/预设定义对象；比较摘要另存 `_upstream_snapshot`。 */
 const showSuggestions = ref(false)
 const formulaSuggestions = computed(() => {
   const rows = currentRows.value
@@ -2853,14 +2858,13 @@ const formulaSuggestions = computed(() => {
   }))
 })
 
-function onApplySuggestion(s: { row_code: string; formula: string; id?: string }) {
+function onApplySuggestion(s: { row_code: string; formula: string; formula_type?: string; id?: string }) {
   const row = currentRows.value.find((r: any) => r.row_code === s.row_code)
   if (!row) return
   // 打开编辑弹窗，预填建议公式（走统一编辑+保存链路，不直接写入避免绕过校验）
   editingRow.value = row
-  editFormula.value = s.formula
-  editCategory.value = s.formula_type || 'auto_calc'
-  editDescription.value = ''
+  // 预填交给弹窗（原先写进行内编辑的三个缓冲，弹窗不读 ⇒ 打开总是空的；spec excel-style-table-editing 5.5 发现）
+  editPrefill.value = { formula: s.formula, category: s.formula_type || 'auto_calc' }
   showFormulaEdit.value = true
   ElMessage.info(`已预填建议公式到编辑弹窗，确认后保存`)
 }
@@ -2945,72 +2949,18 @@ function onBatchClearFormula() {
 }
 
 // ── 编辑 ──
-const editingId = ref<string | null>(null)
+const applying = ref(false)
+// 兼容既有编程式调用与测试；模板已不再使用旧行内编辑，真实入口统一走 FormulaEditDialog。
 const editFormula = ref('')
 const editCategory = ref('auto_calc')
 const editDescription = ref('')
-const applying = ref(false)
-
-// formula-management-ux-improvements A4/A5：参数选择器的数据源
-const paramPickerTbItems = computed(() => {
-  const store = addrStore
-  const addrs = store.tbAddresses || []
-  return addrs.map((a: any) => ({ code: a.code || a.account_code || '', name: a.name || a.account_name || a.label || '' }))
-})
-const paramPickerWpItems = computed(() => {
-  // 从当前行列表提取已知底稿
-  const seen = new Set<string>()
-  const items: Array<{ wpCode: string; label: string }> = []
-  for (const r of currentRows.value) {
-    const wc = r.wp_code || props.wpCode || ''
-    if (wc && !seen.has(wc)) {
-      seen.add(wc)
-      items.push({ wpCode: wc, label: wc })
-    }
-  }
-  return items
-})
-const paramPickerNoteItems = computed(() => {
-  // 从附注树提取章节
-  const items: Array<{ section: string; title: string }> = []
-  function walk(nodes: any[]) {
-    for (const n of nodes) {
-      if (n.section || n.note_section) {
-        items.push({ section: n.section || n.note_section, title: n.label || n.title || '' })
-      }
-      if (n.children?.length) walk(n.children)
-    }
-  }
-  walk(noteTreeChildren.value)
-  return items
-})
-const paramPickerRowItems = computed(() =>
-  currentRows.value
-    .filter((r: any) => r.row_code)
-    .map((r: any) => ({ rowCode: r.row_code, rowName: r.row_name || '' })),
-)
-// formula-input-param-completion Task 4：给 FormulaInput 传入报表行次和底稿编码
-const formulaInputReportRows = computed(() =>
-  currentRows.value
-    .filter((r: any) => r.row_code)
-    .map((r: any) => ({ row_code: r.row_code as string, row_name: (r.row_name || '') as string })),
-)
-const formulaInputWpCodes = computed(() => {
-  const seen = new Set<string>()
-  for (const r of currentRows.value) {
-    const wc = (r as any).wp_code || props.wpCode || ''
-    if (wc && !seen.has(wc)) seen.add(wc)
-  }
-  return [...seen]
-})
-
-function onParamPickerSelect(formulaText: string) {
-  editFormula.value += formulaText
-}
 
 // 公式编辑弹窗
 const showFormulaEdit = ref(false)
 const editingRow = ref<any>(null)
+/** 「建议公式」预填（只在打开弹窗那一次用，弹窗关闭即清空） */
+const editPrefill = ref<{ formula: string; category?: string; description?: string } | null>(null)
+watch(showFormulaEdit, (open) => { if (!open) editPrefill.value = null })
 
 function startEdit(row: any) {
   // Task 1.4 / ADR-FMC-02：只读投影（surfaced/Tier B）不可进入编辑态（纵深防御：
@@ -3092,15 +3042,16 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
             formula: data.formula,
             formula_category: data.category,
             formula_description: data.description,
-          }, { validateStatus: (s: number) => s < 600 })
+          }, { _silent: true } as any)
           if (saved?.id) Object.assign(row, { id: saved.id, formula_version: saved.formula_version })
           row._isNew = false
           showFormulaEdit.value = false
           ElMessage.success('新公式已保存')
           emit('saved')
           await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
-        } catch {
-          ElMessage.warning('公式已添加到列表，保存到后端失败')
+        } catch (e) {
+          // 需求 15.3：非 2xx 不弹成功，按状态码显示中文提示
+          showFormulaError(e, '新公式保存失败')
         }
       }
     }
@@ -3171,11 +3122,14 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
     () => { showFormulaEdit.value = false })
 }
 
+/** 旧编程式行内保存适配：不再由模板调用，只委托统一保存链以保持外部调用兼容。 */
 async function saveEdit(row: any) {
-  // 兼容行内编辑（保留）
   if (!row.id || !guardFormulaMutation(row.definition_version != null)) return
-  await saveReportRowDraft(row, { formula: editFormula.value || null, formula_category: editCategory.value, formula_description: editDescription.value },
-    () => { editingId.value = null })
+  await saveReportRowDraft(row, {
+    formula: editFormula.value || null,
+    formula_category: editCategory.value,
+    formula_description: editDescription.value,
+  }, () => undefined)
 }
 
 /** 单行保存：先存草稿副本，成功才回写到行（失败不留「界面已改、库里没有」）；本项目保存后问应用范围（R7.1）。 */
@@ -3220,6 +3174,28 @@ async function onApplyFormulas() {
     return
   }
 
+  // 附注节点必须执行章节公式端点；通用 report 批执行只返回弹窗缓存，无法写入 disclosure_notes。
+  if (isNoteDomainNodeKey(selectedNodeKey.value)) {
+    const target = noteEditTarget.value
+    if (!target) {
+      ElMessage.warning('请先在左侧选择具体的附注章节')
+      return
+    }
+    applying.value = true
+    try {
+      const result: any = await api.post(P_nf.apply(props.projectId, props.year, target.note_section))
+      const updated = Number(result?.updated ?? result?.cells_updated ?? 0)
+      ElMessage.success(updated > 0 ? `已应用本章节公式，更新 ${updated} 个单元格` : '本章节公式计算完成，数据已是最新')
+      await loadNoteUserFormulas(target.note_section, true)
+      emit('applied')
+    } catch (e: any) {
+      handleApiError(e, '附注公式执行失败')
+    } finally {
+      applying.value = false
+    }
+    return
+  }
+
   // 收集当前节点所有带公式的行
   const formulaRows = currentRows.value.filter((r: any) => r.formula && r.formula_category === 'auto_calc')
   if (!formulaRows.length) {
@@ -3238,21 +3214,26 @@ async function onApplyFormulas() {
       project_id: props.projectId,
       year: props.year,
       formulas,
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
 
     const result = data
     const results = result?.results || []
 
-    // 统计执行结果
-    const successCount = results.filter((r: any) => r.value != null && !r.error).length
-    const errorCount = results.filter((r: any) => r.error).length
+    // 统计执行结果。失败原因优先取 error，其次合并 errors[]，避免失败值被当成空成功。
+    const failureReason = (r: any) => formulaFailureReason(r)
+    const successCount = results.filter((r: any) => r.value != null && !failureReason(r)).length
+    const errorCount = results.filter((r: any) => Boolean(failureReason(r))).length
 
     // 将计算结果写入响应式缓存
     for (const r of results) {
       if (r.row_code) {
+        const error = failureReason(r)
         formulaResults.value[r.row_code] = {
-          value: r.value != null && !r.error ? r.value : null,
+          value: r.value != null && !error ? r.value : null,
           trace: r.trace || [],
+          error,
+          errors: Array.isArray(r.errors) ? r.errors : [],
+          ok: r.ok,
         }
       }
     }
@@ -3261,7 +3242,8 @@ async function onApplyFormulas() {
     // （原「回写报表配置」写的是报表配置上不存在的金额列，从未落库；该后端接口已删除）
 
     if (errorCount > 0) {
-      ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败`)
+      const failedRows = results.filter((r: any) => failureReason(r)).map((r: any) => r.row_code).join('、')
+      ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败（${failedRows}），失败原因见计算值提示`)
     } else {
       ElMessage.success(`已执行 ${successCount} 条自动运算公式`)
     }
@@ -3357,6 +3339,10 @@ const canEditGlobal = ref(false)
 const projectReportScope = ref('')
 /** 当前节点对应的公式域 */
 const settingsDomain = computed(() => {
+  if (activeCategory.value === 'formula_push') return 'push'
+  if (props.scope === 'workpaper') return 'wp'
+  if (props.scope === 'note') return 'note'
+  if (props.scope === 'consol_note') return 'consol_note'
   const k = selectedNodeKey.value
   if (k === 'tb_detail') return 'tb_detail'
   if (k.startsWith('cross_')) return 'cross_check'
@@ -3458,7 +3444,7 @@ async function onSaveAllFormulas() {
           formula: row.formula,
           formula_category: row.formula_category,
           formula_description: row.formula_description,
-        }, { validateStatus: (s: number) => s < 600 })
+        }, { _silent: true } as any)
         row._isNew = false
         saved++
       } else if (row.id && dispatch === 'wp') {
@@ -3474,7 +3460,7 @@ async function onSaveAllFormulas() {
           category: row.formula_category,
           description: row.formula_description,
           expected_version: row.definition_version ?? undefined,
-        }, { validateStatus: (s: number) => s < 600 })
+        }, { _silent: true } as any)
         const savedRowVersion = savedDefinitionVersion(savedRow)
         if (savedRowVersion != null) row.definition_version = savedRowVersion
         const rowNotice = wpFormulaSaveNotice(savedRow)
@@ -3513,18 +3499,9 @@ async function onSaveAllFormulas() {
  * `resolveSaveYear` 口径——缺可解析年份时跳过传播，**不** fallback 到系统当前年（需求 10.2）。
  */
 async function propagateFormulaStale(location?: CanonicalWorkpaperLocation) {
-  const projectId = location?.projectId || props.projectId
-  const year = resolveSaveYear(location?.fiscalYear ?? props.year)
-  if (!projectId || year == null) return  // 缺项目/年份则跳过（不以系统年顶替）
-  try {
-    await api.post(linkageBus.impact, {
-      source_uri: `FORMULA:${selectedNodeKey.value}::config_changed`,
-      project_id: projectId,
-      year,
-    }, { validateStatus: (s: number) => s < 600 })
-  } catch {
-    // stale propagation failure is non-blocking
-  }
+  // S4 ADR-SDO-05：传播已由后端 outbox 投递完成，前端不再重复发送。
+  // 保留函数签名避免 8 处调用方改动，但不再发请求。
+  void location
 }
 
 // ── 公式看板 ──

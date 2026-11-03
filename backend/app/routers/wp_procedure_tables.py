@@ -34,12 +34,19 @@ router = APIRouter(
 
 
 # ─── P1: 批量获取端点（减少前端 N 次请求） ───────────────────────────
+async def _project_category(db: AsyncSession, project_id: UUID) -> str:
+    """程序表适用性按项目自身的质控业务分类（R4：不再接受客户端 query 覆盖，旧调用方多传的参数被忽略）。"""
+    from app.services.project_classification import load_project_classification
+
+    classification = await load_project_classification(db, project_id)
+    return classification.category_code or classification.category_group
+
+
 @router.get("/batch")
 async def get_procedure_tables_batch(
     project_id: UUID,
     codes: str = Query(description="逗号分隔的表编码，如 A1,A2,A3"),
     year: int | None = Query(None),
-    business_category: str = Query(default="C"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """批量获取多个程序表数据（一次请求返回多表）"""
@@ -50,6 +57,7 @@ async def get_procedure_tables_batch(
     if invalid:
         raise HTTPException(400, f"未知程序表编码: {', '.join(invalid)}")
 
+    business_category = await _project_category(db, project_id)
     svc = ProcedureTableService(db)
     results = {}
     for code in code_list:
@@ -62,13 +70,13 @@ async def get_procedure_table(
     project_id: UUID,
     table_code: str,
     year: int | None = Query(None),
-    business_category: str = Query(default="C"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """获取指定程序表的完整数据（模板 + 自动值 + 用户覆盖）"""
     year = await require_project_audit_year(db, project_id, year)
     svc = ProcedureTableService(db)
-    return await svc.get_procedure_table(project_id, year, table_code, business_category)
+    return await svc.get_procedure_table(
+        project_id, year, table_code, await _project_category(db, project_id))
 
 
 # ─── P0: 自定义程序行持久化（用户新增的程序不丢失） ─────────────────────

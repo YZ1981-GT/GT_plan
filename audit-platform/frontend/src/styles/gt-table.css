@@ -136,3 +136,9 @@
 .gt-compact-table .el-input__wrapper { padding: 0 6px !important; min-height: 22px !important; }
 .gt-compact-table .el-input-number .el-input__inner,
 .gt-compact-table .el-input__inner { height: 20px !important; line-height: 20px !important; }
+
+/* 凭证检查行：年审阶段的预审行只读（spec voucher-identity-writeback-and-audit-phase 需求 6.3）。
+ * 点不进编辑控件；保存时 guardPersist 用读入时的版本写回兜底（防绕过）。
+ * 「来源」列只读展示，里面「多科目」看整张凭证的入口仍可点。 */
+.gt-row-locked td { pointer-events: none; opacity: .75; }
+.gt-row-locked td .gt-voucher-row-meta-cell { pointer-events: auto; }

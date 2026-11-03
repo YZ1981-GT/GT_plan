@@ -3,7 +3,7 @@
 Validates: Requirements 9.2
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CycleProgressItem(BaseModel):
@@ -33,13 +33,32 @@ class CycleVRStat(BaseModel):
     failed_rules: list[FailedRuleItem]
 
 
+class CheckStatusItem(BaseModel):
+    """非通过检查项的五态与原因（需求 16.5）"""
+
+    check_name: str
+    status: str  # failed / not_executed / not_applicable / error
+    reason: str = ""
+    branch_id: str = ""
+    severity: str = ""
+
+
 class VRSummaryData(BaseModel):
-    """验证规则汇总数据"""
+    """验证规则汇总数据
+
+    ``blocking_failed`` / ``by_cycle`` 保持「失败」含义；未执行 / 不适用 / 检查异常记在 ``status_counts`` 与
+    ``not_passed_checks``（ADR-FHIC-14 第 5 点展示行）。``all_passed`` 只在每项都通过时为真（与 consistency-check 同口径，
+    需求 16.5）。
+    """
 
     total_rules: int
     blocking_failed: int
     all_passed: bool
     by_cycle: list[CycleVRStat]
+    unavailable: bool = False
+    reason: str | None = None
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    not_passed_checks: list[CheckStatusItem] = Field(default_factory=list)
 
 
 class ReviewItem(BaseModel):

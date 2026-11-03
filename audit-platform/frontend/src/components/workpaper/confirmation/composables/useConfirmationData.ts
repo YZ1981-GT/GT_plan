@@ -23,6 +23,7 @@ import type {
   ConfirmationCoverageMetrics,
 } from '../confirmationTypes'
 import { isConfirmationInFlight } from '../coordination/emitConfirmationCompleted'
+import { isRepliedTrue } from '../replyStatus'
 
 // ─── ID 生成工具（不依赖 uuid 库） ──────────────────────────────────────────
 
@@ -268,7 +269,7 @@ export function useConfirmationData(props: UseConfirmationDataProps): UseConfirm
       }
 
       group.total_count++
-      if (row.is_replied) group.replied_count++
+      if (isRepliedTrue(row)) group.replied_count++ // '否' 是真值：不能裸判（需求 1.6）
       if (row.match_status === '相符') group.matched_count++
       group.total_amount += row.amount ?? 0
 
@@ -290,7 +291,7 @@ export function useConfirmationData(props: UseConfirmationDataProps): UseConfirm
     // 已发函笔数：复用在途语义（send_date/is_replied/match_status/confirmation_method 任一）
     const sentRows = rows.value.filter(isConfirmationInFlight)
     const sentCount = sentRows.length
-    const repliedCount = rows.value.filter((r) => r.is_replied).length
+    const repliedCount = rows.value.filter((r) => isRepliedTrue(r)).length
     // 发函总额 = 已发函行账面金额之和
     const sentAmount = sentRows.reduce((sum, r) => sum + (r.amount ?? 0), 0)
     // 已确认金额（回函确认 + 替代确认）

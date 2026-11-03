@@ -26,7 +26,7 @@
       <!-- 目录页(currentSheet==='K1')不显示 AI复核/双模式工具栏（无复核对象+不需双模式） -->
       <div v-if="isHtmlSheet && currentSheet !== 'K1' && !isSyncManagedSheet" class="k1-header-toolbar">
         <el-segmented
-          v-if="dualMode.isOoAvailable.value"
+          v-if="dualMode.isOoAvailable.value && k1OEntrySync.presentation.value.showModeSwitch"
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
@@ -267,6 +267,8 @@
  * Spec: .kiro/specs/k1-other-receivables/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows, tbNumber } from '@/services/trialBalanceRows'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, provide, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -594,26 +596,22 @@ async function _loadTbData(): Promise<void> {
 
   if (!props.projectId) return
 
-  /** 拉某科目前缀的试算平衡表行 → 归一为 `TbCodedAmountRow[]` */
-  async function _fetchTbRows(prefix: string) {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: prefix, year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data)
-      ? (res?.data?.data ?? res?.data)
-      : []
-    return list.map((item) => ({
-      code: String(item.standard_account_code ?? item.account_code ?? ''),
-      unadjusted: Number(item.unadjusted_amount ?? 0),
-      audited: Number(item.audited_amount ?? 0),
+  /** 拉一组科目码（按各码根前缀，后端筛）的试算平衡表行 → 归一为 `TbCodedAmountRow[]` */
+  async function _fetchTbRows(codes: readonly string[]) {
+    // 原先只传首码的根（`codes[0].split('-')[0]`）：后端现按前缀真筛，其余码的行会被筛掉
+    const prefixes = codes.map((c) => c.split('-')[0])
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: prefixes })
+    return rows.map((item) => ({
+      code: item.standard_account_code,
+      unadjusted: tbNumber(item.unadjusted_amount) ?? 0,
+      audited: tbNumber(item.audited_amount) ?? 0,
     }))
   }
 
   // 原值：口径取自 render 溯源（缺省 1221）；只累加叶子（最长前缀）防父子双计
   try {
     const codes = k1GrossQueryCodes(tbSourceCodes.value)
-    const rows = await _fetchTbRows(codes[0].split('-')[0])
+    const rows = await _fetchTbRows(codes)
     const sum = sumLongestPrefixOnly(rows, codes)
     tbData.value.unadjusted1221 = sum.unadjusted
     tbData.value.audited1221 = sum.audited
@@ -626,7 +624,7 @@ async function _loadTbData(): Promise<void> {
   // 且 trial_balance 里父码 1231 与子码 1231-0x 并存会双计。
   try {
     const codes = k1ProvisionQueryCodes(tbSourceCodes.value)
-    const rows = await _fetchTbRows(codes[0].split('-')[0])
+    const rows = await _fetchTbRows(codes)
     const sum = sumLongestPrefixOnly(rows, codes)
     tbData.value.unadjustedBadDebt = Math.abs(sum.unadjusted)
     tbData.value.auditedBadDebt = Math.abs(sum.audited)
@@ -674,6 +672,21 @@ onMounted(() => {
   void selfLoad()
   void _loadTbData()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const k1OEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-k1-other-receivables',
+})
+
 </script>
 
 <style scoped>

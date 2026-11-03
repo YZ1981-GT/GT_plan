@@ -32,6 +32,11 @@ import {
   parseTitleRows,
   type TraceTitleLink,
 } from './h3AdditionTitleLink'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, type AssetSample } from './assetVoucherFill'
 
 export type {
   H3AdditionCostRow,
@@ -99,6 +104,18 @@ function _flattenFairRow(row: H3AdditionFairRow): Record<string, unknown> {
   }
 }
 
+type H3AdditionRow = H3AdditionCostRow | H3AdditionFairRow
+
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：类别 / 变动类型、支持性文件、核对勾选、证据、结论等 */
+export function hasH3AdditionContent(r: H3AdditionRow): boolean {
+  const x = r as unknown as Record<string, unknown>
+  return [r.category, r.changeType, r.supportingDocs, r.indexRef, r.conclusion, x.appraisalBasis]
+    .some(v => String(v ?? '').trim() !== '')
+    || Object.values(r.checks ?? {}).some(Boolean)
+    || [x.accDep, x.impairment, x.fairValueChange].some(v => Number(v ?? 0) !== 0)
+    || [r.contract, r.invoice, r.appraisal, r.titleCert, x.approvalDoc].some(Boolean)
+}
+
 export function useH3AdditionCheck(params: {
   allResponses: Ref<Map<string, ChecklistItem>> | ComputedRef<Map<string, ChecklistItem>>
   wpId: Ref<string>
@@ -111,11 +128,11 @@ export function useH3AdditionCheck(params: {
   const { allResponses, getValue, setValue, saveImmediate, measurementModel } = params
 
   function _persistCostRows(): void {
-    setValue(ITEM_COST, costRows.value.map(_flattenCostRow))
+    setValue(ITEM_COST, (voucherFill.guardPersist(costRows.value, 'cost') as H3AdditionCostRow[]).map(_flattenCostRow))
   }
 
   function _persistFairRows(): void {
-    setValue(ITEM_FAIR, fairRows.value.map(_flattenFairRow))
+    setValue(ITEM_FAIR, (voucherFill.guardPersist(fairRows.value, 'fair_value') as H3AdditionFairRow[]).map(_flattenFairRow))
   }
 
   const costRows = ref<H3AdditionCostRow[]>([])
@@ -168,9 +185,10 @@ export function useH3AdditionCheck(params: {
 
   function loadRows(): void {
     const rawCost = getValue(ITEM_COST)
-    costRows.value = Array.isArray(rawCost) ? rawCost.map((r, i) => normalizeCostRow(r, i)) : []
+    costRows.value = Array.isArray(rawCost) ? rawCost.map((r, i) => withRowMeta(normalizeCostRow(r, i), r)) : []
     const rawFair = getValue(ITEM_FAIR)
-    fairRows.value = Array.isArray(rawFair) ? rawFair.map((r, i) => normalizeFairRow(r, i)) : []
+    fairRows.value = Array.isArray(rawFair) ? rawFair.map((r, i) => withRowMeta(normalizeFairRow(r, i), r)) : []
+    voucherFill.markLoaded()
     const rawTraceCost = getValue(ITEM_TRACE_COST)
     traceRowsCost.value = Array.isArray(rawTraceCost) ? rawTraceCost.map((r, i) => normalizeTraceRow(r, i)) : []
     const rawTraceFair = getValue(ITEM_TRACE_FAIR)
@@ -239,6 +257,43 @@ export function useH3AdditionCheck(params: {
       : calcSubtotal(fairRows.value.map((r) => r.plImpact)),
   )
 
+  /**
+   * 共享回填函数的待写入项 → 当前计量模式的增减检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：
+   * 一个样本一行，对方科目按后端配对用「/」拼接；金额取样本自己那一栏（增加在借方），红字带符号照记
+   */
+  function _rowFromPrepared(item: PreparedItem, tableKey: string): H3AdditionRow {
+    const s = item.sample as AssetSample & { counterpartName?: string | null; debtorName?: string | null }
+    const base = {
+      assetName: s.counterpartName ?? s.debtorName ?? '',
+      date: s.voucherDate ?? '',
+      voucherNo: s.voucherNo ?? '',
+      isAbnormal: s.abnormal ? 'Y' : 'N',
+      remark: s.selectionReason ?? '来源:抽凭',
+    }
+    const amount = assetAmount(item, 'debit')
+    if (tableKey === 'fair_value') {
+      const row = normalizeFairRow({ ...base, creditAccount: item.counterpartAccount, fairValue: amount })
+      row.endBalance = amount
+      return row
+    }
+    const row = normalizeCostRow({ ...base, creditAccount: counterpartText(item), originalCost: amount })
+    row.netValue = calcCostNetValue(row)
+    return row
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（两张表，回填进当前计量模式那张）
+  const voucherFill = useVoucherCheckFill<H3AdditionRow>({
+    projectId: () => params.projectId.value,
+    tables: { cost: costRows as Ref<H3AdditionRow[]>, fair_value: fairRows as Ref<H3AdditionRow[]> },
+    policy: 'join',
+    mapSampleToRow: (item, key) => _rowFromPrepared(item, key),
+    persist: () => { _persistCostRows(); _persistFairRows() },
+    hasUserContent: hasH3AdditionContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    // 旧行（没有 `_gt`）：凭证号 + 日期 + 原值 / 公允价值（原实现按凭证号去重）
+    legacy: r => assetLegacyKey(r.voucherNo, r.date, 'originalCost' in r ? r.originalCost : r.fairValue),
+  })
+
   function addRow(): void {
     if (mode.value === 'cost') {
       costRows.value.push(normalizeCostRow({ seq: costRows.value.length + 1 }))
@@ -250,6 +305,8 @@ export function useH3AdditionCheck(params: {
   }
 
   function removeRow(rowId: string): void {
+    const target = activeRows.value.find((r) => r.rowId === rowId)
+    if (target && voucherFill.isRowLocked(target)) return
     if (mode.value === 'cost') {
       costRows.value = costRows.value.filter((r) => r.rowId !== rowId)
       costRows.value.forEach((r, i) => { r.seq = i + 1 })
@@ -264,7 +321,7 @@ export function useH3AdditionCheck(params: {
   function updateCell(index: number, field: string, value: any): void {
     if (mode.value === 'cost') {
       const row = costRows.value[index]
-      if (!row) return
+      if (!row || voucherFill.isRowLocked(row)) return
       if (field.startsWith('checks.')) {
         const key = field.split('.')[1] as keyof H3VerificationChecks
         row.checks[key] = Boolean(value)
@@ -277,7 +334,7 @@ export function useH3AdditionCheck(params: {
       _persistCostRows()
     } else {
       const row = fairRows.value[index]
-      if (!row) return
+      if (!row || voucherFill.isRowLocked(row)) return
       if (field.startsWith('checks.')) {
         const key = field.split('.')[1] as keyof H3VerificationChecks
         row.checks[key] = Boolean(value)
@@ -289,62 +346,6 @@ export function useH3AdditionCheck(params: {
       }
       _persistFairRows()
     }
-  }
-
-  /**
-   * 抽凭引擎回填：把 GtVoucherSamplingEngine 的样本映射为当前计量模式的增减检查行。
-   * 增加方对资产科目=借方；按凭证号去重追加，返回新增行数。
-   */
-  function fillFromSampledVouchers(samples: any[]): number {
-    if (!Array.isArray(samples) || !samples.length) return 0
-    if (mode.value === 'cost') {
-      const existing = new Set(costRows.value.map((r) => r.voucherNo).filter(Boolean))
-      let added = 0
-      for (const s of samples) {
-        const vno = String(s.voucherNo ?? '')
-        if (vno && existing.has(vno)) continue
-        const amt = _num(s.debitAmount) || _num(s.creditAmount)
-        const row = normalizeCostRow({
-          seq: costRows.value.length + 1,
-          assetName: s.counterpartName ?? s.debtorName ?? '',
-          date: s.voucherDate ?? '',
-          voucherNo: vno,
-          creditAccount: s.counterpartAccountName ? `${s.counterpartAccount ?? ''} ${s.counterpartAccountName}` : (s.counterpartAccount ?? ''),
-          originalCost: amt,
-          isAbnormal: s.abnormal ? 'Y' : 'N',
-          remark: s.selectionReason ?? '来源:抽凭',
-        }, costRows.value.length)
-        row.netValue = calcCostNetValue(row)
-        costRows.value.push(row)
-        if (vno) existing.add(vno)
-        added++
-      }
-      if (added) _persistCostRows()
-      return added
-    }
-    const existing = new Set(fairRows.value.map((r) => r.voucherNo).filter(Boolean))
-    let added = 0
-    for (const s of samples) {
-      const vno = String(s.voucherNo ?? '')
-      if (vno && existing.has(vno)) continue
-      const amt = _num(s.debitAmount) || _num(s.creditAmount)
-      const row = normalizeFairRow({
-        seq: fairRows.value.length + 1,
-        assetName: s.counterpartName ?? s.debtorName ?? '',
-        date: s.voucherDate ?? '',
-        voucherNo: vno,
-        creditAccount: s.counterpartAccount ?? '',
-        fairValue: amt,
-        isAbnormal: s.abnormal ? 'Y' : 'N',
-        remark: s.selectionReason ?? '来源:抽凭',
-      }, fairRows.value.length)
-      row.endBalance = amt
-      fairRows.value.push(row)
-      if (vno) existing.add(vno)
-      added++
-    }
-    if (added) _persistFairRows()
-    return added
   }
 
   function updateSamplingParams(patch: Partial<H3SamplingParams>): void {
@@ -504,9 +505,9 @@ export function useH3AdditionCheck(params: {
     return linked.source !== '' && linked.increaseAmount > 0 && Math.abs(pop - linked.increaseAmount) > 1
   }
 
+  /** 行样式：异常 + 年审阶段预审行只读 */
   function rowClassName({ row }: { row: H3AdditionCostRow | H3AdditionFairRow }): string {
-    if (row.isAbnormal === 'Y') return 'row-anomaly'
-    return ''
+    return [row.isAbnormal === 'Y' ? 'row-anomaly' : '', voucherFill.rowClass({ row })].filter(Boolean).join(' ')
   }
 
   watch(allResponses, () => loadRows(), { immediate: true })
@@ -537,7 +538,13 @@ export function useH3AdditionCheck(params: {
     addRow,
     removeRow,
     updateCell,
-    fillFromSampledVouchers,
+    /** 抽凭引擎回填：进当前计量模式那张表，按分录指纹去重（原实现按凭证号去重，同号的另一条分录被丢掉） */
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload, { tables: [mode.value] }),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples, { tables: [mode.value] }),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     addTraceRow,
     removeTraceRow,
     updateTraceCell,

@@ -10,7 +10,7 @@
  * - 工具栏：导出模板/导出数据/导入数据（SHEET_CODE='D1-8'）
  * - (一)已贴现尚未到期票据检查表：16 列 el-table（discountRows + discountTotal 合计行）
  * - (二)已背书尚未到期票据检查表：16 列 el-table（endorseRows + endorseTotal 合计行）
- *   两表结构一致，由同一 COLS ColDesc 数组 + tableConfigs 驱动渲染
+ *   两表由 DISCOUNT_COLS / ENDORSE_COLS（F/K/L/M 四列按模板不同）+ tableConfigs 驱动渲染
  *   - 会计处理是否正确==='否' 的行红色背景（row-class-name）
  *   - 动态行 ✕ 删除按钮 / "添加行" / "从备查簿导入"（D1-7）
  *   - 合计行 summary 只读加粗
@@ -104,7 +104,7 @@ interface ColDesc {
   options?: string[]
 }
 
-const COLS: ColDesc[] = [
+const DISCOUNT_COLS: ColDesc[] = [
   { field: 'noteType', label: '票据种类', width: 150, type: 'select', options: NOTE_TYPE_OPTIONS },
   { field: 'receivedDate', label: '收到日期', width: 140, type: 'date' },
   { field: 'issuer', label: '出票人', width: 120, type: 'text' },
@@ -123,14 +123,29 @@ const COLS: ColDesc[] = [
   { field: 'indexRef', label: '索引号', width: 160, type: 'index' },
 ]
 
-const virtualColumns = computed<VirtualColumn[]>(() =>
-  COLS.map((col) => {
+/**
+ * 背书表（模板 D1-8（二））F / K / L / M 四列与贴现表不同：前手 / 背书转让单位 / 背书转让日期 / 说明。
+ * 原两表共用贴现表列，背书表录不了这 4 列（契约早已按模板声明，两个方向都不通）。
+ * spec oo-writeback-template-parity-closure R3 批 B2b。
+ */
+const ENDORSE_SWAP: Partial<Record<keyof EndorsementRow, ColDesc>> = {
+  accruedInterest: { field: 'endorser', label: '前手', width: 120, type: 'text' },
+  discountBank: { field: 'endorsedTo', label: '背书转让单位', width: 140, type: 'text' },
+  discountAmount: { field: 'endorsedDate', label: '背书转让日期', width: 140, type: 'date' },
+  discountInterest: { field: 'description', label: '说明', width: 160, type: 'text' },
+}
+const ENDORSE_COLS: ColDesc[] = DISCOUNT_COLS.map((c) => ENDORSE_SWAP[c.field] ?? c)
+
+function toVirtualColumns(cols: ColDesc[]): VirtualColumn[] {
+  return cols.map((col) => {
     const key = String(col.field)
     if (col.type === 'number') return virtualNumCol(key, col.label, col.width, displayPrefs.fmtAmount)
     if (col.type === 'select') return virtualSelectCol(key, col.label, col.width)
     return virtualTextCol(key, col.label, col.width)
-  }),
-)
+  })
+}
+const virtualColumns = computed<VirtualColumn[]>(() => toVirtualColumns(DISCOUNT_COLS))
+const endorseVirtualColumns = computed<VirtualColumn[]>(() => toVirtualColumns(ENDORSE_COLS))
 
 const tabBrowseRows = computed(() => {
   const n = Math.max(discountRows.value.length, endorseRows.value.length)
@@ -162,7 +177,7 @@ function sectionBrowseRowCount(data: EndorsementRow[]): number {
 
 type TableKey = 'discount' | 'endorse'
 
-const columnCount = ref(COLS.length)
+const columnCount = ref(DISCOUNT_COLS.length)
 const discountRowCount = computed(() => discountRows.value.length)
 const endorseRowCount = computed(() => endorseRows.value.length)
 const discountTableLayout = useWorkpaperWideTable({ rowCount: discountRowCount, columnCount })
@@ -180,6 +195,8 @@ const tableConfigs = computed(() => [
   {
     key: 'discount' as TableKey,
     title: '（一）已贴现尚未到期票据检查表',
+    cols: DISCOUNT_COLS,
+    vcols: virtualColumns.value,
     data: [...discountRows.value, discountTotal.value],
     add: addDiscountRow,
     remove: removeDiscountRow,
@@ -189,6 +206,8 @@ const tableConfigs = computed(() => [
   {
     key: 'endorse' as TableKey,
     title: '（二）已背书尚未到期票据检查表',
+    cols: ENDORSE_COLS,
+    vcols: endorseVirtualColumns.value,
     data: [...endorseRows.value, endorseTotal.value],
     add: addEndorseRow,
     remove: removeEndorseRow,
@@ -354,7 +373,7 @@ const GUIDANCE_TEXTS = [
         </div>
         <el-table-v2
           v-if="useVirtualScroll && browseMode"
-          :columns="virtualColumns"
+          :columns="cfg.vcols"
           :data="sectionBrowseRows(cfg.data)"
           :width="tableWidth"
           :height="tableHeight"
@@ -375,7 +394,7 @@ const GUIDANCE_TEXTS = [
           @cell-contextmenu="onCellContextMenu"
         >
           <el-table-column
-            v-for="col in COLS"
+            v-for="col in cfg.cols"
             :key="col.field"
             :label="col.label"
             :width="col.width"

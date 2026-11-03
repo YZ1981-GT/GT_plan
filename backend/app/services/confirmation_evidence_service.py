@@ -28,6 +28,48 @@ from app.models.confirmation_models import (
 from app.services.attachment_service import AttachmentService
 
 
+MANAGER_PLUS_ROLES = frozenset({"admin", "manager", "partner", "signing_partner"})
+
+
+def role_can_apply_reply(role: Any) -> bool:
+    value = getattr(role, "value", role)
+    return str(value or "") in MANAGER_PLUS_ROLES
+
+
+async def validate_attachment_link_request(
+    db: AsyncSession,
+    *,
+    confirmation_id: uuid.UUID,
+    role: str,
+    paired_outbound_id: uuid.UUID | None = None,
+) -> tuple[Confirmation, uuid.UUID | None]:
+    """在写文件前验证函证、角色和回函配对，返回最终配对附件。"""
+    if role not in ("outbound", "inbound"):
+        raise ValueError(f"附件角色必须是 outbound 或 inbound，收到: {role}")
+    confirmation = await db.get(Confirmation, confirmation_id)
+    if confirmation is None:
+        raise ValueError(f"函证记录不存在: {confirmation_id}")
+    if role == "outbound":
+        return confirmation, None
+
+    outbound_links = list((await db.execute(
+        select(ConfirmationAttachmentLink).where(
+            ConfirmationAttachmentLink.confirmation_id == confirmation_id,
+            ConfirmationAttachmentLink.role == "outbound",
+        )
+    )).scalars().all())
+    if not outbound_links:
+        raise ValueError("无发函件不得单独挂回函件")
+    if len(outbound_links) == 1:
+        return confirmation, outbound_links[0].attachment_id
+    if paired_outbound_id is None:
+        raise ValueError("有多份发函件时须指定配对发函件")
+    valid = {link.attachment_id for link in outbound_links}
+    if paired_outbound_id not in valid:
+        raise ValueError(f"指定的配对发函件 {paired_outbound_id} 不属于该函证的发函件")
+    return confirmation, paired_outbound_id
+
+
 # ---------------------------------------------------------------------------
 # link_attachment
 # ---------------------------------------------------------------------------
@@ -51,47 +93,17 @@ async def link_attachment(
       3. 多份 outbound → 要求指定 paired_outbound_id
       4. 验证 paired_outbound_id 指向同函证的 outbound 附件
     """
-    if role not in ("outbound", "inbound"):
-        raise ValueError(f"附件角色必须是 outbound 或 inbound，收到: {role}")
-
-    # 获取函证记录（需要 project_id 供 action_log）
-    confirmation = await db.get(Confirmation, confirmation_id)
-    if confirmation is None:
-        raise ValueError(f"函证记录不存在: {confirmation_id}")
-
-    final_paired_outbound_id: uuid.UUID | None = None
-
-    if role == "inbound":
-        # 查询该函证已有的 outbound 附件
-        outbound_q = select(ConfirmationAttachmentLink).where(
-            and_(
-                ConfirmationAttachmentLink.confirmation_id == confirmation_id,
-                ConfirmationAttachmentLink.role == "outbound",
-            )
-        )
-        result = await db.execute(outbound_q)
-        outbound_links = result.scalars().all()
-
-        if not outbound_links:
-            raise ValueError("无发函件不得单独挂回函件")
-
-        if len(outbound_links) == 1:
-            # 单份发函件 → 自动配对
-            final_paired_outbound_id = outbound_links[0].attachment_id
-        else:
-            # 多份发函件 → 必须指定
-            if paired_outbound_id is None:
-                raise ValueError("有多份发函件时须指定配对发函件")
-            # 验证 paired_outbound_id 指向同函证的 outbound 附件
-            valid_outbound_att_ids = {link.attachment_id for link in outbound_links}
-            if paired_outbound_id not in valid_outbound_att_ids:
-                raise ValueError(
-                    f"指定的配对发函件 {paired_outbound_id} 不属于该函证的发函件"
-                )
-            final_paired_outbound_id = paired_outbound_id
-    else:
-        # outbound: paired_outbound_id 无意义，置 None
-        final_paired_outbound_id = None
+    confirmation, final_paired_outbound_id = await validate_attachment_link_request(
+        db,
+        confirmation_id=confirmation_id,
+        role=role,
+        paired_outbound_id=paired_outbound_id,
+    )
+    attachment = await db.get(Attachment, attachment_id)
+    if attachment is None:
+        raise ValueError(f"附件不存在: {attachment_id}")
+    if attachment.project_id != confirmation.project_id:
+        raise ValueError("附件与函证不属于同一项目")
 
     # 创建 link 记录
     link = ConfirmationAttachmentLink(
@@ -175,8 +187,10 @@ async def unlink_attachment(
 async def list_attachments(
     db: AsyncSession,
     confirmation_id: uuid.UUID,
+    *,
+    actor_role: Any = None,
 ) -> list[dict[str, Any]]:
-    """返回该函证的全部附件（含角色/配对/OCR 状态/文件信息）。"""
+    """返回函证附件，并给出服务端回填能力与可恢复 OCR 比对状态。"""
     q = (
         select(
             ConfirmationAttachmentLink.id.label("link_id"),
@@ -188,6 +202,7 @@ async def list_attachments(
             Attachment.file_name,
             Attachment.created_at.label("upload_time"),
             Attachment.ocr_status,
+            Attachment.ocr_fields_cache,
         )
         .join(
             Attachment,
@@ -199,8 +214,30 @@ async def list_attachments(
     result = await db.execute(q)
     rows = result.all()
 
-    return [
-        {
+    can_role_apply = role_can_apply_reply(actor_role)
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        cache = dict(row.ocr_fields_cache) if isinstance(row.ocr_fields_cache, dict) else None
+        compare = cache if cache and cache.get("requires_human_confirmation") is True else None
+        if row.role != "inbound":
+            can_apply = False
+            reason = "只有回函件可以确认回填"
+        elif not can_role_apply:
+            can_apply = False
+            reason = "确认回填需现场经理及以上权限"
+        elif compare is None:
+            can_apply = False
+            reason = "请先完成识别比对"
+        else:
+            can_apply = True
+            reason = None
+        verdict = str((compare or {}).get("match_verdict") or "")
+        defaults = None if compare is None else {
+            "confirmed_amount": compare.get("reply_amount"),
+            "reply_date": compare.get("reply_date"),
+            "target_status": "matched" if verdict == "matched" else "discrepancy",
+        }
+        items.append({
             "link_id": str(row.link_id),
             "attachment_id": str(row.attachment_id),
             "role": row.role,
@@ -210,9 +247,12 @@ async def list_attachments(
             "upload_time": row.upload_time.isoformat() if row.upload_time else None,
             "ocr_status": row.ocr_status,
             "link_created_at": row.link_created_at.isoformat() if row.link_created_at else None,
-        }
-        for row in rows
-    ]
+            "can_apply_reply": can_apply,
+            "apply_reply_block_reason": reason,
+            "ocr_compare": compare,
+            "backfill_defaults": defaults,
+        })
+    return items
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +338,8 @@ async def extract_and_compare(
 
     # ── Step 2: 查找所属函证（经 confirmation_attachment_link） ──
     link_q = select(ConfirmationAttachmentLink).where(
-        ConfirmationAttachmentLink.attachment_id == attachment_id
+        ConfirmationAttachmentLink.attachment_id == attachment_id,
+        ConfirmationAttachmentLink.role == "inbound",
     )
     link_result = await db.execute(link_q)
     link = link_result.scalar_one_or_none()
@@ -885,11 +926,22 @@ async def apply_reply(
             f"target_status 必须为 {_VALID_TERMINAL_STATUSES}，收到: {target_status}"
         )
 
-    # ── Step 3: 加载 OCR 原值（从 attachment.ocr_fields_cache） ──
-    ocr_original: dict[str, Any] | None = None
+    # ── Step 3: 附件必须是本函证的回函件，且已经完成识别比对 ──
+    link = (await db.execute(
+        select(ConfirmationAttachmentLink).where(
+            ConfirmationAttachmentLink.confirmation_id == confirmation_id,
+            ConfirmationAttachmentLink.attachment_id == attachment_id,
+            ConfirmationAttachmentLink.role == "inbound",
+        ).limit(1)
+    )).scalar_one_or_none()
+    if link is None:
+        raise ValueError("附件不是本函证的回函件")
     attachment = await db.get(Attachment, attachment_id)
-    if attachment is not None and attachment.ocr_fields_cache:
-        ocr_original = dict(attachment.ocr_fields_cache)
+    if attachment is None or attachment.project_id != confirmation.project_id:
+        raise ValueError("附件不存在或与函证不属于同一项目")
+    ocr_original = dict(attachment.ocr_fields_cache) if isinstance(attachment.ocr_fields_cache, dict) else None
+    if not ocr_original or ocr_original.get("requires_human_confirmation") is not True:
+        raise ValueError("请先完成该回函件的识别比对")
 
     # ── Step 4: 计算 diff_amount = book_amount − confirmed_amount ──
     book_amount = confirmation.book_amount

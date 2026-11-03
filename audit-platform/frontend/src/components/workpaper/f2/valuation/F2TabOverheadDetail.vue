@@ -41,7 +41,7 @@
     </div>
 
     <div class="table-scroll">
-      <table class="matrix-table">
+      <GtGridTable class="matrix-table">
         <thead>
           <tr>
             <th rowspan="2" class="col-item">项目</th>
@@ -101,7 +101,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <el-card shadow="never" class="conclusion-card">
@@ -176,6 +176,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

@@ -218,25 +218,19 @@ const GUIDANCE_TEXTS = [
           <span v-else>{{ row.relationType || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="交易类型" width="120">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.transactionType" size="small" placeholder="如销售商品" @change="(v: string) => updateCell(row.rowId, 'transactionType', v)" />
-          <span v-else>{{ row.transactionType || '-' }}</span>
-        </template>
-      </el-table-column>
       <el-table-column label="期初余额" width="120" align="right">
         <template #default="{ row }">
           <WpAmountInput v-if="!isReadonly" :model-value="row.priorBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorBalance', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.priorBalance) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="本期借方" width="120" align="right">
+      <el-table-column label="借方发生" width="120" align="right">
         <template #default="{ row }">
           <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="本期贷方" width="120" align="right">
+      <el-table-column label="贷方发生" width="120" align="right">
         <template #default="{ row }">
           <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.creditAmount) }}</span>
@@ -249,7 +243,7 @@ const GUIDANCE_TEXTS = [
           </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="坏账准备" width="110" align="right">
+      <el-table-column label="减：坏账准备" width="110" align="right">
         <template #default="{ row }">
           <WpAmountInput v-if="!isReadonly" :model-value="row.badDebtProvision" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'badDebtProvision', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.badDebtProvision) }}</span>
@@ -260,6 +254,31 @@ const GUIDANCE_TEXTS = [
           <el-tooltip content="= 期末余额 - 坏账准备（自动计算）" placement="top">
             <span class="formula-cell">{{ displayPrefs.fmtAmount(row.bookValue) }}</span>
           </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="发生时间及账龄" width="140">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.agingPeriod" size="small" placeholder="如 2024 年 / 1-2 年" @change="(v: string) => updateCell(row.rowId, 'agingPeriod', v)" />
+          <span v-else>{{ row.agingPeriod || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="发生原因（款项性质）" width="150">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.transactionType" size="small" placeholder="如销售商品" @change="(v: string) => updateCell(row.rowId, 'transactionType', v)" />
+          <span v-else>{{ row.transactionType || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="期后回款" width="120" align="right">
+        <template #default="{ row }">
+          <WpAmountInput v-if="!isReadonly" :model-value="row.postPayment" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'postPayment', v || 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.postPayment) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="索引号" width="130">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="如 D2-2" @change="(v: string) => updateCell(row.rowId, 'indexRef', v)" />
+          <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
+          <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="公允交易" width="110" align="center">

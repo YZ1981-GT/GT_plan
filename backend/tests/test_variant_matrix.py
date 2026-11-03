@@ -325,7 +325,8 @@ def test_catalog_resolves_soe_legacy_to_canonical() -> None:
 #   `git show HEAD:` 的语义是「相对上一次提交未变」—— 一旦本次改动被提交，
 #   该判据就退化成「相对最近一次提交未变」，无法再钉住「Task 10 之前的取值」。
 #   而冻结快照是**永久基线**（不依赖 git 可用性、不随提交漂移），
-#   任何后续会话若要改这 102 个取值，必须显式修改基线并写明理由。
+#   任意后续会话若要改这 101 个取值，必须显式修改基线并写明理由；
+#   Phase 8 唯一的例外是将历史两条投资收益账户收敛为短 stable key。
 #   ⚠️ 接缝登记：并发 spec `soe-listed-note-conversion-correctness` 的
 #   Task 12/13 计划填充其中 35 条 null。届时该 spec 需连带更新本基线并留证。
 # --------------------------------------------------------------------------- #
@@ -337,7 +338,7 @@ PARENT_SIDES = ("listed", "soe")
 
 # 冻结基线：account_key -> [soe_standalone, soe_consolidated,
 #                          listed_standalone, listed_consolidated, legacy_aliases]
-# 取自 Task 10 落地前的 note_template_variant_matrix.json（git HEAD）。
+# 取自 Phase 8 投资收益 canonical 合并后的 note_template_variant_matrix.json。
 _BASELINE_ORDER = (
     "soe_standalone",
     "soe_consolidated",
@@ -415,7 +416,6 @@ _VARIANTS_BASELINE_JSON = """
     "yan_fa_fei_yong": ["八、67","八、67","五、66","五、66",{}],
     "cai_wu_fei_yong": ["八、68","八、68","五、67","五、67",{}],
     "qi_ta_shou_yi": ["八、69","八、69","五、68","五、68",{}],
-    "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d": ["八、70","八、70",null,null,{}],
     "jing_chang_kou_tao_qi_shou_yi": ["八、71","八、71","五、70","五、70",{}],
     "gong_yun_jia_zhi_bian_dong_shou_yi": ["八、72","八、72","五、75","五、75",{}],
     "xin_yong_jian_zhi_sun_shi": ["八、73","八、73","五、76","五、76",{}],
@@ -445,7 +445,7 @@ _VARIANTS_BASELINE_JSON = """
     "qi_ta_zong_he_shou_yi": [null,null,"五、57","五、57",{}],
     "yi_ban_feng_xian_zhun_bei": ["八、94","八、94","五、60","五、60",{}],
     "shui_jin_ji_fu_jia": [null,null,"五、63","五、63",{}],
-    "tou_zi_shou_yi": [null,null,"五、69","五、69",{}],
+    "tou_zi_shou_yi": ["八、70","八、70","五、69","五、69",{}],
     "xian_jin_liu_liang_biao_bu_chong_zi_liao": [null,null,"五、71","五、71",{}],
     "gu_dong_quan_yi_bian_dong_biao_xiang_mu_zhu": [null,null,"五、72","五、72",{}]
 }
@@ -525,9 +525,9 @@ def expected_parent_accounts(
 
 
 def test_parent_sections_baseline_covers_all_accounts(matrix: dict) -> None:
-    """冻结基线必须与当前 102 个 account_key 完全对齐（防基线失效空转）."""
+    """冻结基线必须与当前 101 个 account_key 完全对齐（防基线失效空转）."""
     keys = [a["account_key"] for a in matrix["accounts"]]
-    assert len(keys) == 102, f"account count changed: {len(keys)}"
+    assert len(keys) == 101, f"account count changed: {len(keys)}"
     assert set(keys) == set(VARIANTS_BASELINE), (
         f"baseline out of sync: only-in-matrix={sorted(set(keys) - set(VARIANTS_BASELINE))} "
         f"only-in-baseline={sorted(set(VARIANTS_BASELINE) - set(keys))}"
@@ -535,7 +535,7 @@ def test_parent_sections_baseline_covers_all_accounts(matrix: dict) -> None:
 
 
 def test_parent_sections_additive_variants_unchanged(matrix: dict) -> None:
-    """Property 19 / R10.4：102 个 account 的 variants 与 legacy_aliases 逐字不变.
+    """Property 19 / R10.4：101 个 account 的 variants 与 legacy_aliases 逐字不变.
 
     双重比对：`==` 结构相等 + `json.dumps(sort_keys=True)` 规范化字符串相等。
     """
@@ -692,7 +692,7 @@ def test_parent_sections_serializer_round_trips(fix_script) -> None:
 # --------------------------------------------------------------------------- #
 # Task 10 追加断言（与上方同 Task 的守卫**不重复**，只补它没覆盖的四件事）
 #
-# 上方守卫已覆盖：102 科目 variants/legacy_aliases 冻结基线、字段作用域正反双向、
+# 上方守卫已覆盖：101 科目 variants/legacy_aliases 冻结基线、字段作用域正反双向、
 # 取值可在模板定位、两版不对称、脚本 build_plan 0 欠账、序列化 round-trip。
 # 下面补的是：
 #   A. 冻结字面锚点 —— 上方的期望值是从「脚本常量 + 模板」派生的，若两者一起
@@ -733,15 +733,6 @@ T10_EXPECTED_PARENT_SECTIONS: dict[str, dict[str, str]] = {
 
 # B. 母公司侧有落点、但该侧合并章 variants 为 null 的科目 → 逐条登记裁决理由
 T10_PARENT_SIDE_WITHOUT_MERGED: dict[str, str] = {
-    "tou_zi_shou_yi": (
-        "投资收益在矩阵里被拆成两个科目：本科目（listed 五、69）与 "
-        "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d（soe 八、70）。成因是 "
-        "build_variant_matrix.normalize_title 只剥【】符号不剥括注文本，"
-        "「投资收益【下表中不适用的项目，删除】」与「投资收益」归一后不相等 ⇒ "
-        "两者未配对（既有矩阵缺陷；本 spec 不改 variants 故不修）。soe 母公司章"
-        "子节标题是无编者注的「投资收益」，按 section_title 精确匹配落到本科目，"
-        "因此本科目 soe 侧有母公司落点而 soe 合并侧为 null。"
-    ),
     "xian_jin_liu_liang_biao_bu_chong_zi_liao": (
         "soe 合并章（八）实测无「现金流量表补充资料」子节（只有 八、81 现金流量表"
         "项目注释 与 八、91 合并现金流量表相关事项）⇒ variants.soe_* 为 null；"
@@ -775,7 +766,7 @@ def test_t10_expected_parent_sections_frozen_anchor(
 
 
 def test_t10_parent_side_without_merged_side_is_registered(matrix: dict) -> None:
-    """B：`parent_company_sections` 与 `variants` 相互独立，两个例外逐条登记理由."""
+    """B：`parent_company_sections` 与 `variants` 相互独立，剩余例外逐条登记理由."""
     actual = {
         a["account_key"]
         for a in matrix["accounts"]

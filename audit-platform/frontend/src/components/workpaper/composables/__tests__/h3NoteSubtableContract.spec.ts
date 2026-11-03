@@ -83,12 +83,16 @@ describe('H3 披露结构专属守卫', () => {
   })
 
   it('计量模式互斥：只推选中模式的表，另一模式进 _removed_table_keys', () => {
-    const cost = buildH3SyncPayload({ variant: 'soe', measurementModel: 'cost', ...CTX })
+    const cost = buildH3SyncPayload({
+      variant: 'soe', measurementModel: 'cost', costOriginalRows: [], ...CTX,
+    })
     expect(Object.keys(cost.sub_table_data)).toContain(H3_SOE_SUBTABLE.cost)
     expect(Object.keys(cost.sub_table_data)).not.toContain(H3_SOE_SUBTABLE.fair)
     expect(cost.sub_table_data._removed_table_keys).toContain(H3_SOE_SUBTABLE.fair)
 
-    const fair = buildH3SyncPayload({ variant: 'soe', measurementModel: 'fair_value', ...CTX })
+    const fair = buildH3SyncPayload({
+      variant: 'soe', measurementModel: 'fair_value', fairChangeRows: [], ...CTX,
+    })
     expect(Object.keys(fair.sub_table_data)).toContain(H3_SOE_SUBTABLE.fair)
     expect(fair.sub_table_data._removed_table_keys).toContain(H3_SOE_SUBTABLE.cost)
   })
@@ -119,7 +123,9 @@ describe('H3 披露结构专属守卫', () => {
   })
 
   it('未办妥产权证书为条件表：无行时不推空表且进 removed', () => {
-    const p = buildH3SyncPayload({ variant: 'soe', measurementModel: 'cost', ...CTX })
+    const p = buildH3SyncPayload({
+      variant: 'soe', measurementModel: 'cost', costOriginalRows: [], titleRows: [], ...CTX,
+    })
     expect(Object.keys(p.sub_table_data)).not.toContain(H3_SOE_SUBTABLE.title)
     expect(p.sub_table_data._removed_table_keys).toContain(H3_SOE_SUBTABLE.title)
 

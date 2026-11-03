@@ -35,11 +35,19 @@ def _load_reference() -> dict[str, Any]:
         return json.load(f)
 
 
+def template_mappings() -> list[dict[str, Any]]:
+    """映射表全部模板条目（与标准年审模板集同一份；只读，调用方不得原地修改）。"""
+    return _load_mapping()
+
+
 def get_category_prefix(category: str) -> str:
-    """提取主分类前缀：'A3' → 'A', 'B1' → 'B', 'C' → 'C'"""
-    if not category:
-        return "C"
-    return category[0].upper()
+    """主分类组别：'A3' → 'A'，'B1' → 'B'，'C' → 'C'；空值 / 未登记值（含旧场景值 'IPO'）→ 'C'。
+
+    与 ``project_classification.resolve`` 同一判定（原先直接取首字母，'IPO' 会被当成「I 类」）。
+    """
+    from app.services.project_classification import resolve
+
+    return resolve(category).category_group
 
 
 def _excluded_entry(code: str, prefix: str) -> str | None:

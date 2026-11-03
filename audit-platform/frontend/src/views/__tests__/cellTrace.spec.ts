@@ -4,10 +4,16 @@
  * Spec:   .kiro/specs/global-refinement-v5-closure/ Tasks 11.3, 12.3
  *
  * Property 1: 溯源请求载荷完整性（fast-check）
- * 单测: 空来源提示 / 有来源展示 / GET 失败处理 / locate-cell emit
+ * 单测: 空来源提示 / 有来源展示 / GET 失败处理 / 点来源节点打开底稿编辑器（调用生产 useReportTrace）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { computed, ref } from 'vue'
 import * as fc from 'fast-check'
+
+const { pushMock, resolveMock } = vi.hoisted(() => ({ pushMock: vi.fn(), resolveMock: vi.fn() }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushMock }) }))
+vi.mock('@/services/resolveWorkpaperByCode', () => ({ resolveWorkpaperByCode: resolveMock }))
+const WP_E1 = '8c8cd491-2d21-48ce-9622-e2d9bca0d499'
 
 // ─── Mock apiProxy ───────────────────────────────────────────────────────────
 const mockGet = vi.fn()
@@ -35,6 +41,8 @@ vi.mock('element-plus', () => ({
   ElButton: { name: 'ElButton', template: '<button><slot/></button>' },
   ElEmpty: { name: 'ElEmpty', template: '<div class="el-empty"/>' },
 }))
+
+import { useReportTrace } from '../composables/useReportTrace'
 
 // ── Helper: 构造 lineage 请求参数（模拟组件内部逻辑）──
 function buildLineageParams(ctx: { objectType: string; objectId: string; cellRef?: string }) {
@@ -132,15 +140,30 @@ describe('溯源接线单测 — Task 12.3', () => {
     expect(mockHandleApiError).toHaveBeenCalledWith(err, '数字溯源')
   })
 
-  it('点击来源节点 → eventBus.emit workpaper:locate-cell', () => {
-    // 模拟点击来源节点逻辑
-    const node = { wpId: 'wp-001', sheetName: 'Sheet1', cellRef: 'B5' }
-    mockEmit('workpaper:locate-cell', { wpId: node.wpId, sheetName: node.sheetName, cellRef: node.cellRef })
-
-    expect(mockEmit).toHaveBeenCalledWith('workpaper:locate-cell', {
-      wpId: 'wp-001',
-      sheetName: 'Sheet1',
-      cellRef: 'B5',
+  // 原用例在测试里自己发事件再断言发了（不经生产代码），且记的是错误行为：溯源弹窗所在页面没有渲染器，
+  // `workpaper:locate-cell` 事件无人接收、还把编码当 wpId。改为调用生产的 useReportTrace（spec wp-deeplink-locate-coverage-closure 需求 3）。
+  it('点击来源节点 → 关闭弹窗，按编码打开该底稿编辑器并带 ?sheet=&cell=，不再发定位事件', async () => {
+    resolveMock.mockResolvedValueOnce({ wpId: WP_E1 })
+    const trace = useReportTrace({
+      projectId: computed(() => 'proj-001'),
+      year: computed(() => 2025),
+      activeTab: ref('balance_sheet'),
+      activeTabLabel: computed(() => '资产负债表'),
+      consistencyResult: ref(null),
+      fetchReport: vi.fn(),
+      rvCtx: { closeContextMenu: vi.fn(), contextMenu: { rowData: null } } as any,
     })
+    trace.rvTraceDialogVisible.value = true
+
+    await trace.onRvTraceLocate({ wp_code: 'E1', sheet_name: '分析程序E1-14', cell_ref: 'C34' })
+
+    expect(trace.rvTraceDialogVisible.value).toBe(false)
+    expect(resolveMock).toHaveBeenCalledWith('proj-001', 'E1', true)
+    expect(pushMock).toHaveBeenCalledWith({
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: WP_E1 },
+      query: { sheet: '分析程序E1-14', cell: 'C34' },
+    })
+    expect(mockEmit).not.toHaveBeenCalledWith('workpaper:locate-cell', expect.anything())
   })
 })

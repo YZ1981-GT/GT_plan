@@ -28,9 +28,10 @@
  * 已如实登记）。两条路**不能并进同一个布尔** —— D4-35 / D4-13 踩过「切错桥 + 工具条
  * 叠加」。故 `renderMode` 按当前 sheet 是否受管**分别取源**，与 G7 宿主同构。
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { dualModeHtmlOoOptions, type DualModeSegmentedOption } from '../composables/dualModeLabels'
 import type { WorkpaperSyncBridge } from './useWorkpaperSyncBridge'
+import { runLegacyOnlyOfficeTransition } from './legacyPendingWriteBarrier'
 
 export type GRenderMode = 'html' | 'onlyoffice'
 
@@ -43,6 +44,8 @@ export interface GSyncEditorHostHandle {
 export interface GLegacyDualMode {
   currentMode: Ref<GRenderMode> | { value: GRenderMode }
   onModeChange: (val: string | number | boolean) => void | Promise<void>
+  /** 自动恢复 OO 偏好前重新确认服务可用，避免 mounted 时的健康检查竞态。 */
+  checkOOHealth?: () => Promise<boolean>
 }
 
 export interface GRenderModeSwitchOptions {
@@ -63,11 +66,31 @@ export interface GRenderModeSwitchOptions {
    * xlsx 会少掉最后那批编辑且无任何提示。宿主的 flush 已经是同步的就不用传。
    */
   readonly flushBeforeSwitch?: () => void | Promise<void>
+  /**
+   * 同步能力单源（`useEntrySyncReadiness()` 的返回值）。
+   *
+   * 传了它，`showModeSwitch` 就由**单源**决定（静态裁决 + 运行时 readiness 三层事实），
+   * 宿主不再自行判断「这条 entry 能不能双向」。不传则 `showModeSwitch` 恒 `true`
+   * （保持改线前行为，供尚未接单源的宿主渐进迁移）。
+   *
+   * spec workpaper-html-onlyoffice-bidirectional-writeback-closure task 3.5 / AC 1.4：
+   * 「能不能双向」是 entry 级事实，不是宿主的局部判断。
+   */
+  readonly entrySync?: {
+    readonly presentation: { readonly value: { readonly showModeSwitch: boolean } }
+  }
 }
 
 export interface GRenderModeSwitch {
   /** 当前渲染模式：受管 sheet 以**桥**为真源，非受管 sheet 读 legacy。 */
   readonly renderMode: ComputedRef<GRenderMode>
+  /**
+   * 模式开关该不该出现 —— 来自同步能力**单源**（传了 `entrySync` 才生效）。
+   *
+   * 宿主把它和自己的 sheet 级条件合取：`v-if="isHtmlSheet && showModeSwitch"`。
+   * 没传 `entrySync` 时恒 `true`，等价于改线前的行为。
+   */
+  readonly showModeSwitch: ComputedRef<boolean>
   /**
    * 切换器选项。
    *
@@ -96,7 +119,7 @@ export interface GRenderModeSwitch {
  * | ④ | 回 HTML 且 dirty | `editorHost.forceSave()` | 慢（用户没先保存，允许） |
  */
 export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRenderModeSwitch {
-  const { bridge, legacy, isManagedSheet, editorHostRef, flushBeforeSwitch } = options
+  const { bridge, legacy, isManagedSheet, editorHostRef, flushBeforeSwitch, entrySync } = options
   const switching = ref(false)
 
   const renderMode = computed<GRenderMode>(() =>
@@ -108,15 +131,92 @@ export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRender
   )
 
   const modeOptions = Object.freeze(dualModeHtmlOoOptions())
+  let authorizedLegacyTransitionDepth = 0
+  let restoringLegacyPreference = false
+  let deferredLegacyPreference = false
+
+  async function enterLegacyOnlyOffice(verifyHealth = false): Promise<boolean> {
+    return runLegacyOnlyOfficeTransition(async () => {
+      authorizedLegacyTransitionDepth += 1
+      try {
+        if (verifyHealth && legacy.checkOOHealth && !(await legacy.checkOOHealth())) return
+        await legacy.onModeChange('onlyoffice')
+      } finally {
+        authorizedLegacyTransitionDepth -= 1
+      }
+    })
+  }
+
+  function restoreLegacyPreference(): void {
+    if (restoringLegacyPreference || isManagedSheet.value) {
+      deferredLegacyPreference = true
+      return
+    }
+    restoringLegacyPreference = true
+    deferredLegacyPreference = false
+    switching.value = true
+    void enterLegacyOnlyOffice(true)
+      .catch(() => {
+        legacy.currentMode.value = 'html'
+      })
+      .finally(() => {
+        restoringLegacyPreference = false
+        switching.value = false
+      })
+  }
+
+  // 旧 composable 的 mounted 恢复会直接把 ref 写成 OO，绕过共享点击入口。同步拦回 HTML，
+  // 再经完整屏障恢复；受管 sheet 先记住偏好，切到 legacy sheet 时才恢复，避免隐藏路径物化。
+  watch(
+    () => legacy.currentMode.value,
+    (mode) => {
+      if (mode !== 'onlyoffice' || authorizedLegacyTransitionDepth > 0) return
+      legacy.currentMode.value = 'html'
+      restoreLegacyPreference()
+    },
+    { flush: 'sync' },
+  )
+  watch(
+    () => isManagedSheet.value,
+    (managed) => {
+      if (!managed && deferredLegacyPreference) restoreLegacyPreference()
+    },
+    { flush: 'sync' },
+  )
+
+  /**
+   * 开关可见性 —— 单源优先，没接单源时保持改线前行为（恒显示）。
+   *
+   * 🔴 不在这里判 `canSwitchToOnlyOffice`：`modeOptions` 刻意不带 `disabled`
+   * （见该字段的注释，D4 bug ③），门禁在 `switchRenderMode` 里 await 兜底。
+   * 本计算只管「这条 entry 到底该不该露出模式开关」这一件事。
+   */
+  const showModeSwitch = computed(() => {
+    if (!entrySync) return true
+    return entrySync.presentation.value.showModeSwitch
+  })
 
   async function switchRenderMode(rawTarget: string | number | boolean): Promise<void> {
     const target = rawTarget as GRenderMode
     if (target !== 'html' && target !== 'onlyoffice') return
     if (switching.value) return
 
-    // 非受管 sheet：保留 legacy 行为（legacy 自己判重、自己写 localStorage）。
+    // 非受管 sheet：完整 lease 覆盖 flush、legacy config 和最终模式赋值。
     if (!isManagedSheet.value) {
-      await legacy.onModeChange(target)
+      if (target === renderMode.value) return
+      switching.value = true
+      try {
+        if (target === 'onlyoffice') {
+          await enterLegacyOnlyOffice()
+        } else {
+          deferredLegacyPreference = false
+          await legacy.onModeChange('html')
+        }
+      } catch {
+        if (target === 'onlyoffice') legacy.currentMode.value = 'html'
+      } finally {
+        switching.value = false
+      }
       return
     }
     if (target === renderMode.value) return
@@ -146,5 +246,5 @@ export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRender
     }
   }
 
-  return { renderMode, modeOptions, switching, switchRenderMode }
+  return { renderMode, showModeSwitch, modeOptions, switching, switchRenderMode }
 }

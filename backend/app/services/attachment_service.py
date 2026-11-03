@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import logging
 import os
-
-logger = logging.getLogger(__name__)
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -27,6 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.services.attachment_locator import project_attachment_locator
+from app.services.attachment_ocr_text import OCR_PREVIEW_CHARS, ocr_summary
+
+logger = logging.getLogger(__name__)
 
 
 class AttachmentService:
@@ -59,12 +60,25 @@ class AttachmentService:
         project_id: UUID,
         data: dict[str, Any],
         created_by: UUID | None = None,
+        *,
+        version_chain: bool = True,
     ) -> dict:
         """创建附件记录（AT-3：同名自动建版本链）
 
         同 (project_id, reference_id, reference_type, file_name) 第二次调用时
         新行 version=N+1，previous_version_id 指向当前最新版本。
+        ``version_chain=False``（底稿证据入口）：新证据一律是新附件，恒为版本 1、不发替换信号
+        （spec attachment-evidence-intake ADR-AEI-03）。
+
+        ``attachment_type`` 必须在登记表内（spec attachment-security-baseline 需求 1.1）；
+        有 ``created_by`` 时写 actor 列，``audit_year`` 未给时取项目审计年度（需求 1.5）。
         """
+        from app.services.attachment_upload_policy import validate_attachment_type
+
+        attachment_type = validate_attachment_type(data.get("attachment_type"))
+        audit_year = data.get("audit_year")
+        if audit_year is None:
+            audit_year = await self._lookup_audit_year(project_id)
         paperless_document_id = data.get("paperless_document_id")
         storage_type = data.get("storage_type")
         if not storage_type:
@@ -85,7 +99,7 @@ class AttachmentService:
             file_name=data["file_name"],
             reference_id=ref_id,
             reference_type=data.get("reference_type"),
-        )
+        ) if version_chain else (1, None)
 
         attachment = Attachment(
             project_id=project_id,
@@ -93,7 +107,7 @@ class AttachmentService:
             file_path=file_path,
             file_type=data.get("file_type") or self._guess_file_type(data["file_name"]),
             file_size=data.get("file_size", 0),
-            attachment_type=data.get("attachment_type", "general"),
+            attachment_type=attachment_type,
             reference_id=ref_id,
             reference_type=data.get("reference_type"),
             storage_type=storage_type,
@@ -103,6 +117,9 @@ class AttachmentService:
             created_by=created_by,
             version=version,
             previous_version_id=prev_id,
+            audit_year=audit_year,
+            actor_type="user" if created_by is not None else None,
+            actor_user_id=created_by,
         )
         self.db.add(attachment)
         await self.db.flush()
@@ -125,9 +142,20 @@ class AttachmentService:
         content: bytes,
         metadata: dict[str, Any] | None = None,
         created_by: UUID | None = None,
+        *,
+        version_chain: bool = True,
     ) -> dict:
-        """上传附件，优先存储到 Paperless-ngx，失败时回退到本地存储"""
-        metadata = metadata or {}
+        """上传附件，优先存储到 Paperless-ngx，失败时回退到本地存储
+
+        落盘前先过上传策略（附件类型、扩展名、恶意内容；spec attachment-security-baseline
+        需求 1.1–1.4），不通过抛 ``UploadRejected``，不写任何文件、不建行。
+        """
+        from app.services.attachment_upload_policy import validate_upload
+
+        metadata = dict(metadata or {})
+        metadata["attachment_type"] = await validate_upload(
+            file_name, metadata.get("attachment_type"), content,
+        )
         temp_path = self._write_temp_file(file_name, content)
 
         # 创建异步任务跟踪
@@ -158,23 +186,27 @@ class AttachmentService:
                         await asyncio.sleep(delay)
 
                 if paperless_document_id is not None:
-                    update_task(task_id, TaskStatus.success, result={"paperless_id": paperless_document_id})
-                    return await self.create_attachment(
-                        project_id,
-                        {
-                            "file_name": file_name,
-                            "file_path": self._paperless_uri(paperless_document_id),
-                            "file_type": metadata.get("file_type") or self._guess_file_type(file_name),
-                            "file_size": len(content),
-                            "attachment_type": metadata.get("attachment_type", "general"),
-                            "reference_id": metadata.get("reference_id"),
-                            "reference_type": metadata.get("reference_type"),
-                            "storage_type": "paperless",
-                            "paperless_document_id": paperless_document_id,
-                            "ocr_status": metadata.get("ocr_status", "processing"),
-                        },
+                    data = {
+                        "file_name": file_name,
+                        "file_path": self._paperless_uri(paperless_document_id),
+                        "file_type": metadata.get("file_type") or self._guess_file_type(file_name),
+                        "file_size": len(content),
+                        "attachment_type": metadata.get("attachment_type", "general"),
+                        "reference_id": metadata.get("reference_id"),
+                        "reference_type": metadata.get("reference_type"),
+                        "storage_type": "paperless",
+                        "paperless_document_id": paperless_document_id,
+                        "ocr_status": metadata.get("ocr_status", "processing"),
+                    }
+                    result = await self._create_uploaded_with_asset_projection(
+                        project_id=project_id,
+                        data=data,
+                        content=content,
                         created_by=created_by,
+                        version_chain=version_chain,
                     )
+                    update_task(task_id, TaskStatus.success, result={"paperless_id": paperless_document_id})
+                    return result
                 if not self.fallback_to_local:
                     raise RuntimeError("Paperless-ngx 上传失败，且未启用本地回退存储")
 
@@ -184,24 +216,67 @@ class AttachmentService:
                 content=content,
                 attachment_type=metadata.get("attachment_type", "general"),
             )
-            update_task(task_id, TaskStatus.success, result={"storage": "local", "path": local_path})
-            return await self.create_attachment(
-                project_id,
-                {
-                    "file_name": file_name,
-                    "file_path": local_path,
-                    "file_type": metadata.get("file_type") or self._guess_file_type(file_name),
-                    "file_size": len(content),
-                    "attachment_type": metadata.get("attachment_type", "general"),
-                    "reference_id": metadata.get("reference_id"),
-                    "reference_type": metadata.get("reference_type"),
-                    "storage_type": "local",
-                    "ocr_status": metadata.get("ocr_status", "pending"),
-                },
+            data = {
+                "file_name": file_name,
+                "file_path": local_path,
+                "file_type": metadata.get("file_type") or self._guess_file_type(file_name),
+                "file_size": len(content),
+                "attachment_type": metadata.get("attachment_type", "general"),
+                "reference_id": metadata.get("reference_id"),
+                "reference_type": metadata.get("reference_type"),
+                "storage_type": "local",
+                "ocr_status": metadata.get("ocr_status", "pending"),
+            }
+            result = await self._create_uploaded_with_asset_projection(
+                project_id=project_id,
+                data=data,
+                content=content,
                 created_by=created_by,
+                version_chain=version_chain,
             )
+            update_task(task_id, TaskStatus.success, result={"storage": "local", "path": local_path})
+            return result
+        except Exception as exc:
+            update_task(task_id, TaskStatus.failed, error=str(exc))
+            raise
         finally:
             temp_path.unlink(missing_ok=True)
+
+    async def _create_uploaded_with_asset_projection(
+        self,
+        *,
+        project_id: UUID,
+        data: dict[str, Any],
+        content: bytes,
+        created_by: UUID | None,
+        version_chain: bool,
+    ) -> dict:
+        """创建 legacy 兼容行并按阶段投影不可变版本；失败补偿本次物理对象。"""
+        try:
+            result = await self.create_attachment(
+                project_id,
+                data,
+                created_by=created_by,
+                version_chain=version_chain,
+            )
+            from app.services.attachment_asset_projection import AttachmentAssetProjectionService
+            from app.services.safe_file_ingress import sniff_media_type
+
+            await AttachmentAssetProjectionService(self.db).project_if_enabled(
+                legacy_attachment_id=UUID(result["id"]),
+                content=content,
+                media_type=sniff_media_type(content[:4096]),
+                actor_user_id=created_by,
+            )
+            return result
+        except Exception:
+            await self.compensate_uploaded_storage(
+                project_id=project_id,
+                storage_type=data.get("storage_type"),
+                storage_key=data.get("file_path"),
+                paperless_document_id=data.get("paperless_document_id"),
+            )
+            raise
 
     async def list_attachments(
         self,
@@ -211,35 +286,93 @@ class AttachmentService:
         attachment_type: str | None = None,
         reference_type: str | None = None,
         reference_id: UUID | None = None,
-    ) -> list[dict]:
-        """附件列表"""
-        stmt = (
-            sa.select(Attachment)
-            .where(Attachment.project_id == project_id, Attachment.is_deleted == sa.false())
-            .order_by(Attachment.created_at.desc())
-        )
+        *,
+        q: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> list[dict] | dict[str, Any]:
+        """附件列表；显式分页时返回 page envelope，旧调用不传分页仍返回数组。"""
+        conditions: list[Any] = [
+            Attachment.project_id == project_id,
+            Attachment.is_deleted == sa.false(),
+        ]
         if file_type:
             normalized_file_type = file_type.lower()
-            file_type_aliases = {
+            aliases = {
                 "word": ["word", "doc", "docx"],
                 "excel": ["excel", "xls", "xlsx", "csv"],
                 "image": ["image", "jpg", "jpeg", "png", "gif", "bmp", "webp"],
+                "text": ["text", "txt", "md", "csv"],
+                "archive": ["archive", "zip", "rar", "7z"],
+                "email": ["email", "eml", "msg"],
+                "ppt": ["ppt", "pptx"],
+                "ofd": ["ofd", "dwg", "dxf"],
             }
-            if normalized_file_type in file_type_aliases:
-                stmt = stmt.where(Attachment.file_type.in_(file_type_aliases[normalized_file_type]))
-            else:
-                stmt = stmt.where(Attachment.file_type == normalized_file_type)
+            conditions.append(
+                Attachment.file_type.in_(aliases[normalized_file_type])
+                if normalized_file_type in aliases
+                else Attachment.file_type == normalized_file_type
+            )
         if ocr_status:
-            stmt = stmt.where(Attachment.ocr_status == ocr_status)
+            conditions.append(Attachment.ocr_status == ocr_status)
         if attachment_type:
-            stmt = stmt.where(Attachment.attachment_type == attachment_type)
+            conditions.append(Attachment.attachment_type == attachment_type)
         if reference_type:
-            stmt = stmt.where(Attachment.reference_type == reference_type)
+            conditions.append(Attachment.reference_type == reference_type)
         if reference_id:
-            stmt = stmt.where(Attachment.reference_id == reference_id)
+            conditions.append(Attachment.reference_id == reference_id)
+        if q and q.strip():
+            term = f"%{q.strip()}%"
+            conditions.append(sa.or_(
+                Attachment.file_name.ilike(term),
+                Attachment.ocr_text.ilike(term),
+            ))
 
-        result = await self.db.execute(stmt)
-        return [self._to_dict(a) for a in result.scalars().all()]
+        stmt = (
+            sa.select(Attachment)
+            .where(*conditions)
+            .order_by(Attachment.created_at.desc(), Attachment.id.desc())
+        )
+        from app.services.attachment_wp_view import annotate_linked_wp_count
+
+        if page is None and page_size is None:
+            rows = list((await self.db.execute(stmt)).scalars().all())
+            return await annotate_linked_wp_count(self.db, [self._to_dict(row) for row in rows])
+
+        safe_page = max(1, int(page or 1))
+        safe_size = min(200, max(1, int(page_size or 50)))
+        total = int((await self.db.execute(
+            sa.select(sa.func.count()).select_from(Attachment).where(*conditions)
+        )).scalar_one())
+        rows = list((await self.db.execute(
+            stmt.offset((safe_page - 1) * safe_size).limit(safe_size)
+        )).scalars().all())
+        items = await annotate_linked_wp_count(self.db, [self._to_dict(row) for row in rows])
+
+        from app.models.attachment_models import AttachmentWorkingPaper
+        from app.models.wp_optimization_models import EvidenceLink
+
+        linked = sa.or_(
+            sa.exists(sa.select(1).where(AttachmentWorkingPaper.attachment_id == Attachment.id)),
+            sa.exists(sa.select(1).where(EvidenceLink.attachment_id == Attachment.id)),
+            sa.and_(Attachment.reference_type == "working_paper", Attachment.reference_id.is_not(None)),
+        )
+        summary = (await self.db.execute(sa.select(
+            sa.func.coalesce(sa.func.sum(Attachment.file_size), 0),
+            sa.func.coalesce(sa.func.sum(sa.case((Attachment.ocr_status == "completed", 1), else_=0)), 0),
+            sa.func.coalesce(sa.func.sum(sa.case((linked, 1), else_=0)), 0),
+        ).where(*conditions))).one()
+        return {
+            "items": items,
+            "total": total,
+            "page": safe_page,
+            "page_size": safe_size,
+            "summary": {
+                "total_size": int(summary[0] or 0),
+                "ocr_completed": int(summary[1] or 0),
+                "linked_count": int(summary[2] or 0),
+            },
+        }
 
     async def get_attachment(self, attachment_id: UUID) -> dict | None:
         """附件详情（对外序列化：file_path 已投影为 opaque locator，见 _to_dict）"""
@@ -398,154 +531,14 @@ class AttachmentService:
         return link
 
     async def get_wp_attachments(self, wp_id: UUID) -> dict:
-        """获取底稿关联附件的统一反查视图（envelope）。
+        """底稿关联附件的统一反查视图（组装见 ``attachment_wp_view.build_wp_attachment_view``）。
 
-        权威链表 ∪ reference 关联 ∪ 函证只读（best-effort），按 attachment.id 去重；
-        多来源合并 ``sources``，主 ``source`` 优先级：
-        associated > referenced > confirmation。
-
-        返回 ``{ "items": [ ... ] }``；行内保留既有 ``_to_dict`` 字段，并 additive
-        ``source`` / ``sources`` / ``association_type``（仅链表有值；其余来源为 null）。
-
-        spec: attachment-workpaper-linkage-convergence Task 2.2 / 3.1
+        整稿关联 ∪ reference ∪ 函证 ∪ 本底稿证据链接，按附件去重；返回 ``{"items": [...]}`` 及可选的
+        ``evidence_requirements`` / ``stale_info``（spec attachment-evidence-intake 需求 4.1）。
         """
-        by_id: dict[str, dict] = {}
+        from app.services.attachment_wp_view import build_wp_attachment_view
 
-        # 1) 权威链表
-        link_stmt = (
-            sa.select(Attachment, AttachmentWorkingPaper.association_type)
-            .join(
-                AttachmentWorkingPaper,
-                AttachmentWorkingPaper.attachment_id == Attachment.id,
-            )
-            .where(
-                AttachmentWorkingPaper.wp_id == wp_id,
-                Attachment.is_deleted == sa.false(),
-            )
-        )
-        link_rows = (await self.db.execute(link_stmt)).all()
-        for att, assoc_type in link_rows:
-            row = self._to_dict(att)
-            row["source"] = "associated"
-            row["sources"] = ["associated"]
-            row["association_type"] = assoc_type
-            by_id[row["id"]] = row
-
-        # 2) reference 关联（兼容路径）
-        ref_stmt = (
-            sa.select(Attachment)
-            .where(
-                Attachment.reference_type == "working_paper",
-                Attachment.reference_id == wp_id,
-                Attachment.is_deleted == sa.false(),
-            )
-        )
-        ref_atts = (await self.db.execute(ref_stmt)).scalars().all()
-        for att in ref_atts:
-            aid = str(att.id)
-            existing = by_id.get(aid)
-            if existing is not None:
-                if "referenced" not in existing["sources"]:
-                    existing["sources"].append("referenced")
-                continue
-            row = self._to_dict(att)
-            row["source"] = "referenced"
-            row["sources"] = ["referenced"]
-            row["association_type"] = None
-            by_id[aid] = row
-
-        # 3) 函证只读纳入（wp → confirmations → confirmation_attachment_link）
-        # fail-open：异常跳过，仍返回链表 + reference
-        try:
-            from app.models.confirmation_models import (
-                Confirmation,
-                ConfirmationAttachmentLink,
-            )
-
-            conf_stmt = (
-                sa.select(Attachment)
-                .join(
-                    ConfirmationAttachmentLink,
-                    ConfirmationAttachmentLink.attachment_id == Attachment.id,
-                )
-                .join(
-                    Confirmation,
-                    Confirmation.id == ConfirmationAttachmentLink.confirmation_id,
-                )
-                .where(
-                    Confirmation.wp_id == wp_id,
-                    Attachment.is_deleted == sa.false(),
-                )
-            )
-            conf_atts = (await self.db.execute(conf_stmt)).scalars().unique().all()
-            for att in conf_atts:
-                aid = str(att.id)
-                existing = by_id.get(aid)
-                if existing is not None:
-                    if "confirmation" not in existing["sources"]:
-                        existing["sources"].append("confirmation")
-                    continue
-                row = self._to_dict(att)
-                row["source"] = "confirmation"
-                row["sources"] = ["confirmation"]
-                row["association_type"] = None
-                by_id[aid] = row
-        except Exception:
-            from app.services.attachment_wp_fail_open import log_awp_fail_open
-
-            log_awp_fail_open(
-                "awp_confirmation_lookup_fail_open",
-                wp_id=wp_id,
-            )
-
-        items = list(by_id.values())
-        result: dict = {"items": items}
-
-        # 一次取 wp 元数据，供证据声明 + stale 共用（减一次 WorkingPaper 往返）
-        wp_meta = await self._resolve_wp_meta(wp_id)
-
-        # Req4：证据类型声明（无声明不附加键；失败 fail-open）
-        try:
-            from app.services.workpaper_evidence_requirements import (
-                build_evidence_requirements,
-            )
-
-            ev_req = build_evidence_requirements(
-                wp_meta.get("wp_code") if wp_meta else None,
-                items,
-            )
-            if ev_req is not None:
-                result["evidence_requirements"] = ev_req
-        except Exception:
-            from app.services.attachment_wp_fail_open import log_awp_fail_open
-
-            log_awp_fail_open(
-                "awp_evidence_requirements_fail_open",
-                wp_id=wp_id,
-            )
-
-        # Req6：stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
-        try:
-            from app.services.workpaper_attachment_stale import build_stale_info
-
-            att_ids = [str(it.get("id")) for it in items if it.get("id")]
-            stale = await build_stale_info(
-                self.db,
-                wp_id=wp_id,
-                attachment_ids=att_ids,
-                wp_meta=wp_meta,
-            )
-            if stale is not None:
-                result["stale_info"] = stale
-        except Exception:
-            from app.services.attachment_wp_fail_open import log_awp_fail_open
-
-            log_awp_fail_open(
-                "awp_stale_fail_open",
-                wp_id=wp_id,
-            )
-
-        return result
+        return await build_wp_attachment_view(self, wp_id)
 
     async def _resolve_wp_meta(self, wp_id: UUID) -> dict | None:
         """一次查出 wp_code / project_id / prefill_stale / audit_year；失败 None。"""
@@ -589,12 +582,16 @@ class AttachmentService:
         """解除附件与底稿的关联（权威链表硬删 + 同步清空 matching reference）。
 
         - 删除 ``attachment_working_paper`` 中 (attachment_id, wp_id) 链行（若无则跳过）。
+        - 同时删除该附件在本底稿的证据链接（「解除与本底稿的关联」= 全部解除，
+          spec attachment-evidence-intake 需求 4.2）。
         - 若该附件 ``reference_type=='working_paper'`` 且 ``reference_id==wp_id``，置空。
         - 不删附件本身；不改函证 ``confirmation_attachment_link``。
         - 幂等：无关联时仍返回 ok（no-op 200）。
 
         spec: attachment-workpaper-linkage-convergence Task 4.1 / Property 5
         """
+        from app.services.wp_evidence_service import WpEvidenceService
+
         del_result = await self.db.execute(
             sa.delete(AttachmentWorkingPaper).where(
                 AttachmentWorkingPaper.attachment_id == attachment_id,
@@ -602,6 +599,7 @@ class AttachmentService:
             )
         )
         link_removed = int(del_result.rowcount or 0)
+        evidence_removed = await WpEvidenceService(self.db).delete_links_for_attachment(wp_id, attachment_id)
 
         ref_cleared = False
         att = (
@@ -625,6 +623,7 @@ class AttachmentService:
         return {
             "ok": True,
             "link_removed": link_removed,
+            "evidence_links_removed": evidence_removed,
             "reference_cleared": ref_cleared,
         }
 
@@ -914,6 +913,17 @@ class AttachmentService:
     # 辅助
     # ------------------------------------------------------------------
 
+    async def _lookup_audit_year(self, project_id: UUID) -> int | None:
+        """项目审计年度；取不到返回 None（列可空）。查询放在保存点里，失败不污染调用方事务。"""
+        try:
+            from app.services.project_audit_year import fetch_project_audit_year
+
+            async with self.db.begin_nested():
+                return await fetch_project_audit_year(self.db, project_id)
+        except Exception:
+            logger.debug("attachment audit_year lookup skipped: project=%s", project_id, exc_info=True)
+            return None
+
     def _paperless_uri(self, document_id: int) -> str:
         return f"paperless://documents/{document_id}"
 
@@ -945,8 +955,13 @@ class AttachmentService:
         content: bytes,
         attachment_type: str,
     ) -> str:
+        from app.services.attachment_upload_policy import ensure_within_root, validate_attachment_type
+
         safe_name = Path(file_name).name or "attachment.bin"
+        # 纵深防御（需求 1.2）：入口已校验类型，这里再按登记表校验并确认 resolve 后仍在存储根内。
+        attachment_type = validate_attachment_type(attachment_type)
         target_dir = self.local_storage_root / str(project_id) / attachment_type
+        ensure_within_root(target_dir, self.local_storage_root)
         target_dir.mkdir(parents=True, exist_ok=True)
 
         stem = Path(safe_name).stem
@@ -959,6 +974,58 @@ class AttachmentService:
 
         target_path.write_bytes(content)
         return target_path.as_posix()
+
+    async def compensate_uploaded_storage(
+        self,
+        *,
+        project_id: UUID,
+        storage_type: str | None,
+        storage_key: str | None,
+        paperless_document_id: int | None = None,
+    ) -> dict[str, int]:
+        """数据库事务失败后补偿本次新写的物理对象；不触碰其他项目或越界路径。"""
+        stats = {"deleted": 0, "remote_deleted": 0, "failed": 0}
+        if (storage_type or "").lower() == "paperless" or str(storage_key or "").startswith("paperless://"):
+            doc_id = paperless_document_id
+            if doc_id is None:
+                try:
+                    doc_id = int(str(storage_key or "").rstrip("/").split("/")[-1])
+                except (TypeError, ValueError):
+                    stats["failed"] += 1
+                    return stats
+            if not self.paperless_enabled():
+                stats["failed"] += 1
+                return stats
+            try:
+                import httpx
+
+                async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT, mounts={}, trust_env=False) as client:
+                    response = await client.delete(
+                        f"{self.paperless_url}/api/documents/{doc_id}/",
+                        headers={"Authorization": f"Token {self.paperless_token}"},
+                    )
+                if response.status_code in (200, 202, 204, 404):
+                    stats["remote_deleted"] += 1
+                else:
+                    stats["failed"] += 1
+            except Exception:
+                logger.warning("Paperless 上传补偿失败 document=%s", doc_id, exc_info=True)
+                stats["failed"] += 1
+            return stats
+
+        from app.services.attachment_storage_resolver import plan_project_attachment
+
+        plan = plan_project_attachment(project_id, storage_type, storage_key)
+        if plan.kind != "local" or plan.canonical_path is None:
+            stats["failed"] += 1
+            return stats
+        try:
+            plan.canonical_path.unlink(missing_ok=True)
+            stats["deleted"] += 1
+        except OSError:
+            logger.warning("附件上传补偿删除失败", exc_info=True)
+            stats["failed"] += 1
+        return stats
 
     async def _search_db(self, project_id: UUID, query: str) -> list[dict]:
         kw = f"%{query}%"
@@ -1005,16 +1072,24 @@ class AttachmentService:
             "file_type": a.file_type,
             "file_size": a.file_size,
             "attachment_type": a.attachment_type,
+            "is_key_evidence": bool(getattr(a, "is_key_evidence", False)),
             "reference_id": str(a.reference_id) if a.reference_id else None,
             "reference_type": a.reference_type,
             "storage_type": a.storage_type,
+            "state": getattr(a, "state", "available"),
             "paperless_document_id": a.paperless_document_id,
             "ocr_status": a.ocr_status,
-            "ocr_text": a.ocr_text[:200] if a.ocr_text else None,  # 截断预览
+            # 预览（兼容旧消费者）；全文与确认走 ocr-text / ocr-confirm（spec attachment-security-baseline 需求 3.4）
+            "ocr_text": a.ocr_text[:OCR_PREVIEW_CHARS] if a.ocr_text else None,
+            **ocr_summary(a),
             "is_deleted": a.is_deleted,
+            "created_by": str(a.created_by) if a.created_by else None,
             "created_at": a.created_at.isoformat() if a.created_at else None,
             # AT-3 版本字段
             "version": getattr(a, "version", 1),
+            "current_version_id": (
+                str(a.current_version_id) if getattr(a, "current_version_id", None) else None
+            ),
             "previous_version_id": (
                 str(a.previous_version_id) if getattr(a, "previous_version_id", None) else None
             ),

@@ -46,6 +46,7 @@ import type { SheetContentType } from '@/types/workpaperSemanticContract'
 import type { WpComponentType } from '@/types/componentCapabilities.generated'
 import type { RenderConfig, SheetRenderConfig } from '@/types/renderConfig'
 import { projectSheetUid } from './sheetUidProjection'
+import { expandSharedHtmlData } from './renderConfigSharedHtml'
 
 export type { WpComponentType } from '@/types/componentCapabilities.generated'
 export type {
@@ -230,18 +231,9 @@ function _detectSheetTypeByName(name: string): SheetContentType | null {
   return null
 }
 
-/** 只取附带信息的调用方（壳的侧栏 decision_trace）传 `silent`：失败不弹全局提示（spec procedure-chain-hardening-and-java-contracts R10）。 */
-export interface WpRendererOptions {
-  silent?: boolean
-}
-
-/**
- * 带配置的 GET 不再走 apiProxy 的在途共享，同 URL 并发时会撞上 http 的 GET 去重（后发取消先发），
- * 与 GtWpRenderer 自己那一发互相取消 ⇒ silent 这一发同时关掉去重。
- */
-const SILENT_AUX_GET = { _silent: true, _dedupe: false } as any
-
-export function useWpRenderer(wpId: Ref<string>, options: WpRendererOptions = {}) {
+// 原 `silent` 选项只给编辑器外壳那一份 render-config（侧栏 decision_trace）用；外壳改读 GtWpRenderer 的配置后
+// 已无调用方，随之删除（spec platform-perf-hotspots R4）。
+export function useWpRenderer(wpId: Ref<string>) {
   const renderConfig = ref<RenderConfig | null>(null)
   const loading = ref(true)
   const error = ref<Error | null>(null)
@@ -267,10 +259,9 @@ export function useWpRenderer(wpId: Ref<string>, options: WpRendererOptions = {}
     loading.value = true
     error.value = null
     try {
-      const res = await api.get<RenderConfig>(
-        `/api/workpapers/${id}/render-config`, options.silent ? SILENT_AUX_GET : undefined,
-      )
-      renderConfig.value = res
+      // share_html_data 写在 URL 里而不是 params：带 config 的 GET 不走 apiProxy 在途共享（spec platform-perf-hotspots R1）
+      const res = await api.get<RenderConfig>(`/api/workpapers/${id}/render-config?share_html_data=1`)
+      renderConfig.value = expandSharedHtmlData(res)
     } catch (e) {
       error.value = e as Error
       renderConfig.value = null

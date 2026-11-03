@@ -204,7 +204,7 @@
       <!-- 抽凭列 -->
       <el-table-column label="抽凭" width="60" align="center">
         <template #default="{ row }">
-          <el-button size="small" link @click="handleVoucherSampling(row)">📋</el-button>
+          <el-button size="small" link title="行级抽凭" @click="handleVoucherSampling(row)">📋{{ vouchersOf(row.rowId).length || '' }}</el-button>
         </template>
       </el-table-column>
 
@@ -215,6 +215,19 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 行级抽凭明细（共享回填函数：一个对方科目一行，挂到往来对象行；年审阶段预审行只读） -->
+    <K3RowVoucherTable
+      :rows="rowVouchers"
+      :is-readonly="isReadonly"
+      :is-row-locked="isRowVoucherLocked"
+      :row-class-name="rowVoucherClass"
+      :project-id="props.projectId"
+      :year="year"
+      :target-ids="rowVoucherTargetIds"
+      @change="persistRowVouchers"
+      @remove="removeVoucher"
+    />
 
     <!-- 审计说明 -->
     <el-card shadow="never" style="margin-top:12px; margin-bottom:12px">
@@ -255,9 +268,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="year"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -269,6 +282,7 @@
  * Spec: .kiro/specs/k3-other-payables/ | Task: 4.4
  * Requirements: 5.1-5.4
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -283,6 +297,9 @@ import http from '@/utils/http'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { k3QueryCodes } from '../../composables/k3AccountScope'
+import K3RowVoucherTable from './K3RowVoucherTable.vue'
+import { useK3RowVoucherFill } from '../../composables/k3RowVoucherFill'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -334,6 +351,21 @@ const {
   initLongOutstandingFromDetail,
   saveAll,
 } = useK3Checks({ allResponses: allResponsesRef as any, saveResponse })
+
+// ─── 行级抽凭明细（共享回填函数）：行上「📋」抽到的、挂凭导入的凭证挂到往来对象行 ─────────────
+const {
+  rows: rowVouchers, persist: persistRowVouchers, onEngineFilled, onAttachImported, onUndoRequest,
+  rowClass: rowVoucherClass, isRowLocked: isRowVoucherLocked, ready: rowVoucherFillReady, vouchersOf, removeVoucher,
+} = useK3RowVoucherFill({
+  sheet: 'K3-5',
+  allResponses: () => props.allResponses,
+  save: (itemId, payload) => saveResponse(itemId, payload),
+  projectId: () => props.projectId,
+  readonly: () => props.isReadonly,
+  targets: () => longOutstandingRows.value.map((r) => ({ rowId: r.rowId, counterparty: r.counterparty })),
+})
+onMounted(() => { void rowVoucherFillReady() })
+const rowVoucherTargetIds = computed(() => longOutstandingRows.value.map(r => r.rowId))
 
 // ─── 审计说明 ────────────────────────────────────────────────────────────────
 
@@ -467,7 +499,7 @@ const K3_ACCOUNT_PREFIXES = computed(() => k3QueryCodes(_injectedTbSrc?.value ??
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -475,23 +507,29 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K3_ACCOUNT_PREFIXES.value,
+      props.projectId, year.value, props.wpId, K3_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any): void {
-  if (currentSamplingRow.value && payload?.voucherNo) {
-    currentSamplingRow.value.voucherRef = payload.voucherNo
-    persistRows()
-  }
-  showSamplingDialog.value = false
+/**
+ * 行上「📋」抽凭回填：样本挂到发起抽凭的往来对象行，记进行级抽凭明细（按分录指纹去重，填完由共享函数保存并提示
+ * 填入几行）。原实现读 `payload.voucherNo`（载荷是 `{ samples, … }`）⇒ 抽凭与挂凭导入都是空操作。
+ */
+async function onSampleFilled(payload: EngineFilledPayload): Promise<void> {
+  const target = currentSamplingRow.value
+  const out = await onEngineFilled(payload, target ? { rowId: target.rowId, counterparty: target.counterparty } : null)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ─── UI Helpers ──────────────────────────────────────────────────────────────

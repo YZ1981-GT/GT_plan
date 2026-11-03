@@ -266,8 +266,10 @@ class TestHtmlAlignment:
         assert "newRowIdentity('l82det')" in ts
         # 旧随机运行时前缀不再用于新增行
         assert "l8-detail-${Date.now()}" not in ts
-        # 保存时派生行被剔除出 store
-        assert "rowsForStore(detailRows.value)" in ts
+        # 保存时派生行被剔除出 store；存的是算好的行（占比 R 列是 auto_source，不落库 OO 侧恒 0，
+        # spec oo-writeback-template-parity-closure 第三批）
+        assert "rowsForStore(computedRows.value)" in ts
+        assert "rowsForStore(detailRows.value)" not in ts
 
         vue = DETAIL_VUE.read_text("utf-8")
         # 默认行走 createL8DefaultRows（GTROW 骨架），不再位置化自铸

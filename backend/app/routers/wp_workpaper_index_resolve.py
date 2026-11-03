@@ -136,7 +136,9 @@ async def _check_trimmed_status(
     """检查底稿裁剪状态。"""
     from sqlalchemy import select
     from app.models.procedure_models import ProcedureInstance
+    from app.services.procedure_identity import normalize_wp_code
 
+    wp_code = normalize_wp_code(wp_code) or ""
     try:
         stmt = select(ProcedureInstance).where(
             ProcedureInstance.project_id == project_id,

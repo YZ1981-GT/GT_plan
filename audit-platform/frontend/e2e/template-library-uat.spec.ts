@@ -1,5 +1,10 @@
 /**
  * UAT — template-library-coordination spec
+ *
+ * ⚠️ 本地专用，不纳入 CI（formula-e2e-ci-gate ADR-FEC-03）。
+ * 原因：写死陕西华氏项目 ID，断言依赖全局模板库现有数据。
+ * CI 覆盖由 e2e/formula-hub/ 目录下的规格承担。
+ *
  * 验证 10 个 UAT 项（自动化版本）：
  *   1. 侧栏点击进入 + 8 Tab 可切换
  *   2. 底稿模板 Tab 树形 + 搜索/筛选

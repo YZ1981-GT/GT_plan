@@ -15,7 +15,7 @@
           { label: '金额单位', value: noteUnitSuffix },
         ]"
         @unit-change="onProjectChange"
-        @year-change="(v: number) => { selectedYear = v; onYearChange() }"
+        @year-change="(v: number) => { selectedYear = v; onYearChange(v) }"
         @template-change="handleTemplateChange"
       />
       <template #actions>
@@ -558,133 +558,70 @@
                 @cell-contextmenu="onDeCellContextMenu">
                 <!-- 序号列：显式标记 auto_index 或表名含"前五名/前十名"时自动显示 -->
                 <el-table-column v-if="showAutoIndex" label="序号" type="index" width="50" align="center" />
-                <!-- ━━━ 两级分组表头渲染（有 _column_groups 时） ━━━ -->
-                <template v-if="activeTableColumns">
-                  <template v-for="(col, ci) in activeTableColumns" :key="ci">
-                    <!-- 独立列（无分组） -->
-                    <el-table-column v-if="col.type === 'flat'"
-                      :label="col.label"
-                      :min-width="col.headerIdx === 0 ? 160 : 120"
-                      :align="col.headerIdx === 0 ? 'left' : 'right'" resizable>
-                      <template #default="{ row, $index }">
-                        <template v-if="col.headerIdx === 0">
-                          <template v-if="editMode && !row.is_total">
-                            <el-input v-if="isActiveCellEditing($index, -1)"
-                              v-model="row.label" size="small" style="width: 100%; height: 22px"
-                              @change="onLabelChange($index, $event)"
-                              @blur="onActiveCellBlur($event, $index, -1)"
-                              @keydown="onActiveCellKeydown($event, $index, -1)" />
-                            <span v-else class="gt-cell-editable" :class="{ 'total-label': row.is_total }">{{ row.label || '' }}</span>
-                          </template>
-                          <span v-else :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
+                <!-- ━━━ 列树（任意层表头；单元格模板只此一份，spec note-pull-header-formula-closure R4） ━━━ -->
+                <NoteTableColumnNode v-for="(node, ni) in activeTableColumns" :key="`${activeTableTab}-${ni}-${node.label}`" :node="node">
+                  <template #cell="{ row, $index, headerIdx, label }">
+                    <template v-if="headerIdx === 0">
+                      <GtGridCell
+                        :editable="editMode && !row.is_total && !isPushedFixedRow(row)"
+                        :value="row.label"
+                        :text="row.label || ''"
+                      >
+                        <template #display>
+                          <span v-if="editMode && !row.is_total && !isPushedFixedRow(row)"
+                            class="gt-cell-editable gt-cell-editable--label"
+                            :aria-label="`${label || '项目'} 行${$index + 1}：${row.label || '空'}`">
+                            {{ row.label || '' }}
+                          </span>
+                          <span v-else :class="{ 'total-label': row.is_total }">{{ row.label || '' }}</span>
                         </template>
-                        <template v-else>
-                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, col.headerIdx - 1) === 'auto', 'gt-cell-resolve-failed': isCellResolveFailed(row, col.headerIdx - 1) }">
-                            <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, col.headerIdx - 1)"
-                              v-model="row.values[col.headerIdx - 1]" :controls="false" :precision="2"
-                              size="small" style="width: 100%; height: 22px"
-                              @change="onCellValueChange($index, col.headerIdx - 1, $event)"
-                              @blur="onActiveCellBlur($event, $index, col.headerIdx - 1)"
-                              @keydown="onActiveCellKeydown($event, $index, col.headerIdx - 1)" />
-                            <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
-                              role="gridcell"
-                              tabindex="0"
-                              :aria-label="`${col.label || '列'} 行${$index + 1}：${getCellValue(row, col.headerIdx - 1) ?? '空'}`">
-                              <GtAmountCell :value="getCellValue(row, col.headerIdx - 1)" :unit="noteUnit" />
-                            </span>
-                            <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
-                              <GtAmountCell :value="getCellValue(row, col.headerIdx - 1)" :unit="noteUnit" />
-                            </span>
-                          </div>
-                        </template>
-                      </template>
-                    </el-table-column>
-                    <!-- 分组列（嵌套 el-table-column 实现两级表头合并） -->
-                    <el-table-column v-else-if="col.type === 'grouped'"
-                      :label="col.group" align="center">
-                      <el-table-column v-for="child in col.children" :key="child.headerIdx"
-                        :label="child.label" :min-width="120" align="right" resizable>
-                        <template #default="{ row, $index }">
-                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, child.headerIdx - 1) === 'auto', 'gt-cell-resolve-failed': isCellResolveFailed(row, child.headerIdx - 1) }">
-                            <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, child.headerIdx - 1)"
-                              v-model="row.values[child.headerIdx - 1]" :controls="false" :precision="2"
-                              size="small" style="width: 100%; height: 22px"
-                              @change="onCellValueChange($index, child.headerIdx - 1, $event)"
-                              @blur="onActiveCellBlur($event, $index, child.headerIdx - 1)"
-                              @keydown="onActiveCellKeydown($event, $index, child.headerIdx - 1)" />
-                            <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
-                              role="gridcell"
-                              tabindex="0"
-                              :aria-label="`${child.label || '列'} 行${$index + 1}：${getCellValue(row, child.headerIdx - 1) ?? '空'}`">
-                              <GtAmountCell :value="getCellValue(row, child.headerIdx - 1)" :unit="noteUnit" />
-                            </span>
-                            <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
-                              <GtAmountCell :value="getCellValue(row, child.headerIdx - 1)" :unit="noteUnit" />
-                            </span>
-                          </div>
-                        </template>
-                      </el-table-column>
-                    </el-table-column>
-                  </template>
-                </template>
-                <!-- ━━━ 原扁平表头渲染（无分组，零回归兼容） ━━━ -->
-                <template v-else>
-                <el-table-column v-for="(h, hiRaw) in (activeTableData.headers || [])" :key="hiRaw"
-                  :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'" resizable>
-                  <template #default="{ row, $index }">
-                    <template v-if="Number(hiRaw) === 0">
-                      <template v-if="editMode && !row.is_total">
-                        <el-input v-if="isActiveCellEditing($index, -1)"
-                          v-model="row.label" size="small" style="width: 100%; height: 22px"
-                          :aria-label="`${(activeTableData.headers || [])[0] || '项目'} 行${$index + 1} 编辑`"
-                          @change="onLabelChange($index, $event)"
-                          @blur="onActiveCellBlur($event, $index, -1)"
-                          @keydown="onActiveCellKeydown($event, $index, -1)" />
-                        <span v-else class="gt-cell-editable" :class="{ 'total-label': row.is_total }"
-                          role="gridcell" tabindex="0"
-                          :aria-label="`${(activeTableData.headers || [])[0] || '项目'} 行${$index + 1}：${row.label || '空'}`">
-                          {{ row.label || '' }}
-                        </span>
-                      </template>
-                      <span v-else :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
+                        <ElInput
+                          :model-value="row.label" size="small" style="width: 100%; height: 22px"
+                          :aria-label="`${label || '项目'} 行${$index + 1} 编辑`"
+                          @change="onLabelChange($index, $event)" />
+                      </GtGridCell>
+                      <NotePushedRowMark :row="row" :editable="editMode" @toggle="onPushedOptionalToggle($index, $event)" />
                     </template>
                     <template v-else>
                       <el-tooltip
-                        :disabled="!getCellValidationError($index, Number(hiRaw) - 1)"
-                        :content="getCellValidationError($index, Number(hiRaw) - 1)"
-                        placement="top"
-                        effect="dark"
+                        :disabled="!getCellValidationError($index, headerIdx - 1)"
+                        :content="getCellValidationError($index, headerIdx - 1)"
+                        placement="bottom"
+                        effect="dark" :trigger-keys="[]"
                       >
-                      <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, Number(hiRaw))">
-                      <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, Number(hiRaw) - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, Number(hiRaw) - 1), 'gt-cell-resolve-failed': isCellResolveFailed(row, Number(hiRaw) - 1) }">
-                        <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, Number(hiRaw) - 1)"
-                          v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
-                          size="small" style="width: 100%; height: 22px"
-                          :aria-label="`${(activeTableData.headers || [])[Number(hiRaw)] || '列'} 行${$index + 1} 编辑`"
-                          @change="onCellValueChange($index, Number(hiRaw) - 1, $event)"
-                          @blur="onActiveCellBlur($event, $index, Number(hiRaw) - 1)"
-                          @keydown="onActiveCellKeydown($event, $index, Number(hiRaw) - 1)" />
-                        <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
-                          role="gridcell"
-                          tabindex="0"
-                          :aria-label="`${(activeTableData.headers || [])[Number(hiRaw)] || '列'} 行${$index + 1}：${getCellValue(row, Number(hiRaw) - 1) ?? '空'}`">
-                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" :unit="noteUnit" />
-                        </span>
-                        <span v-else-if="row.is_total" :class="['gt-amt', { 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }]">
-                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" :unit="noteUnit" />
-                        </span>
-                        <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
-                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" :unit="noteUnit" />
-                        </span>
-                        <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, Number(hiRaw) - 1, $event)">📊</span>
-                        <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
+                      <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, headerIdx - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, headerIdx - 1), 'gt-cell-resolve-failed': isCellResolveFailed(row, headerIdx - 1) }">
+                        <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, headerIdx)">
+                        <GtGridCell
+                          :editable="editMode && !row.is_total"
+                          :value="getCellValue(row, headerIdx - 1)"
+                          kind="number"
+                        >
+                          <template #display>
+                            <span v-if="editMode && !row.is_total" class="gt-cell-editable"
+                              :aria-label="`${label || '列'} 行${$index + 1}：${getCellValue(row, headerIdx - 1) ?? '空'}`">
+                              <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
+                            </span>
+                            <span v-else :class="['gt-amt', { 'total-val': row.is_total, 'gt-formula-mismatch': row.is_total && isFormulaMismatch(row, headerIdx - 1) }]">
+                              <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
+                            </span>
+                          </template>
+                          <ElInputNumber
+                            :model-value="getCellValue(row, headerIdx - 1)" :controls="false" :precision="2"
+                            size="small" style="width: 100%; height: 22px"
+                            :aria-label="`${label || '列'} 行${$index + 1} 编辑`"
+                            @change="onCellValueChange($index, headerIdx - 1, $event)" />
+                        </GtGridCell>
+                        </CommentTooltip>
+                        <span v-if="getCellMode(row, headerIdx - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, headerIdx - 1, $event)">📊</span>
+                        <span v-else-if="getCellMode(row, headerIdx - 1) === 'manual'" class="gt-cell-manual"
+                          :class="{ 'gt-cell-trace-trigger': editMode }" data-testid="note-cell-manual"
+                          :title="editMode ? '人工改过（推送 / 公式 / 刷新不覆盖），点击恢复自动' : '人工改过：推送 / 公式 / 刷新不覆盖'"
+                          @click.stop="editMode && onRestoreCellAuto($index, headerIdx - 1)">✏️</span>
                       </div>
-                      </CommentTooltip>
                       </el-tooltip>
                     </template>
                   </template>
-                </el-table-column>
-                </template>
+                </NoteTableColumnNode>
               </el-table>
               <div v-else-if="activeTableData?.headers?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); padding: 10px; text-align: center; border: 1px dashed var(--gt-color-border-purple); border-radius: 6px;">
                 该表格暂无数据行（可在编辑模式下添加）
@@ -694,8 +631,8 @@
             <!-- 表格结构编辑工具栏 (Req 38.1-38.6) — 置于表格下方、富文本上方 -->
             <div v-if="editMode && (currentNote.content_type === 'table' || currentNote.content_type === 'mixed')" class="gt-de-structure-toolbar">
               <el-button-group size="small">
-                <el-button @click="onStructureAddRow" :disabled="structureEditDisabled" :title="structureEditDisabled ? structureEditDisabledReason : '在末尾新增行'">➕ 行</el-button>
-                <el-button @click="onStructureDeleteRow" :disabled="structureEditDisabled || !canDeleteRow" title="删除最后一行（合计行除外）">➖ 行</el-button>
+                <el-button @click="onStructureAddRow" :disabled="structureEditDisabled" :title="structureEditDisabled ? structureEditDisabledReason : '在明细末尾新增行（合计 / 小计行之前）'">➕ 行</el-button>
+                <el-button @click="onStructureDeleteRow" :disabled="structureEditDisabled || !canDeleteRow" title="删除最后一个明细行（合计 / 小计、减项与「其中：」行除外）">➖ 行</el-button>
                 <el-button @click="onStructureAddColumn" :disabled="structureEditDisabled" :title="structureEditDisabled ? structureEditDisabledReason : '新增列'">➕ 列</el-button>
                 <el-button @click="onStructureDeleteColumn" :disabled="structureEditDisabled || !canDeleteColumn" title="删除最后一列">➖ 列</el-button>
               </el-button-group>
@@ -911,6 +848,7 @@
     <!-- scope + 当前章节必须传：否则 rows（附注行）会被弹窗的报表启发式误判，
          默认停在「报表 > 资产负债表」而不是本页章节 -->
     <FormulaManagerDialog
+      v-if="noteFormulaManagerMounted"
       v-model="showNoteFormulaManager"
       :rows="currentNoteFormulaRows"
       :project-id="projectId"
@@ -1128,10 +1066,9 @@
     <div class="gt-ucell-ctx-item" @click="onDeCtxRelatedWp">
       <span class="gt-ucell-ctx-icon">📝</span> 查看相关底稿
     </div>
-    <!-- R9-F5：穿透到序时账 -->
-    <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger">
-      <span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账
-    </div>
+    <!-- R9-F5：穿透到序时账；并列 W6 行级入口（ADR-AQL-20，年度取页面所显示的年度、页内切年随之变） -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger"><span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账</div>
+    <QueryDetailEntry kind="note_section" variant="ctx" :target="currentNote" :year="year" @opened="deCtx.closeContextMenu()" />
     <!-- Sprint 5.7：查看数据来源 -->
     <div class="gt-ucell-ctx-item" @click="onDeCtxViewDataSource">
       <span class="gt-ucell-ctx-icon">🔍</span> 查看数据来源
@@ -1169,6 +1106,8 @@
     :note-id="cellTraceCtx.noteId"
     :row-idx="cellTraceCtx.rowIdx"
     :col-idx="cellTraceCtx.colIdx"
+    :table-index="cellTraceCtx.tableIndex" :source-ref="cellTraceCtx.sourceRef"
+    :project-id="projectId" :year="year" :note-section="currentNote?.note_section || ''"
     @penetrate-to-tb="onCellTracePenetrateTb"
   />
 
@@ -1213,43 +1152,68 @@
   />
 
   <!-- 一键批量 AI 预填充结果面板 -->
-  <el-dialog v-model="batchResultVisible" title="一键 AI 预填充结果" width="640px" append-to-body>
+  <el-dialog v-model="batchResultVisible" title="一键 AI 预填充结果" width="720px" append-to-body>
     <div class="gt-de-batch-summary">
       共 {{ batchResults.length }} 章：
-      <el-tag type="success" size="small">生成 {{ batchGenerated }}</el-tag>
-      <el-tag type="warning" size="small">降级 {{ batchDegraded }}</el-tag>
-      <el-tag type="info" size="small">跳过 {{ batchSkipped }}</el-tag>
-      <span class="gt-de-batch-hint">逐章确认采纳，不会自动写入正文</span>
+      <el-tag type="success" size="small">完成 {{ batchGenerated }}</el-tag>
+      <el-tag type="danger" size="small">失败 {{ batchDegraded }}</el-tag>
+      <el-tag type="info" size="small">取消 {{ batchSkipped }}</el-tag>
+      <span class="gt-de-batch-hint">
+        进度 {{ batchJob?.progress_done || 0 }}/{{ batchJob?.progress_total || 0 }}；逐章送入待确认，不会重新生成
+      </span>
     </div>
     <el-table :data="batchResults" size="small" max-height="420" border style="font-size: 13px">
       <el-table-column label="章节" min-width="160">
-        <template #default="{ row }">{{ batchTitle(row.note_section) }}</template>
+        <template #default="{ row }">{{ batchTitle(row.target_key) }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="90" align="center">
+      <el-table-column label="状态" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'generated' ? 'success' : (row.status === 'degraded' ? 'warning' : 'info')" size="small">
-            {{ row.status === 'generated' ? '已生成' : (row.status === 'degraded' ? '降级' : '跳过') }}
+          <el-tag
+            :type="row.status === 'succeeded' ? 'success' : (row.status === 'failed' ? 'danger' : (row.status === 'cancelled' ? 'info' : 'warning'))"
+            size="small"
+          >
+            {{ row.status === 'succeeded' ? '已生成' : (row.status === 'failed' ? '失败' : (row.status === 'cancelled' ? '已取消' : (row.status === 'retry_wait' ? '等待重试' : '生成中'))) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="草稿预览" min-width="220">
+      <el-table-column label="草稿预览" min-width="250">
         <template #default="{ row }">
-          <span class="gt-de-batch-preview">{{ (row.text || '').slice(0, 60) || '（无草稿）' }}</span>
+          <span class="gt-de-batch-preview">{{ row.result?.text_preview || row.error_message || '（等待生成）' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" align="center">
+      <el-table-column label="操作" width="120" align="center">
         <template #default="{ row }">
+          <el-tag
+            v-if="row.message_id && batchAdoptedMessages.has(row.message_id)"
+            type="success"
+            size="small"
+          >已送待确认</el-tag>
           <el-button
-            v-if="row.status !== 'skipped'"
+            v-else-if="row.status === 'succeeded' && row.message_id"
             size="small"
             link
             type="primary"
-            @click="goAdoptSection(row.note_section)"
-          >去采纳</el-button>
+            @click="goAdoptSection(row)"
+          >送入待确认</el-button>
+          <el-button
+            v-else-if="row.status === 'failed'"
+            size="small"
+            link
+            type="warning"
+            @click="retryBatchItem(row)"
+          >重试</el-button>
+          <span v-else class="gt-de-batch-hint">—</span>
         </template>
       </el-table-column>
     </el-table>
     <template #footer>
+      <el-button
+        v-if="batchJob && !isAiTaskTerminal(batchJob.status)"
+        size="small"
+        type="danger"
+        plain
+        @click="cancelBatchAiFill"
+      >取消任务</el-button>
       <el-button size="small" @click="batchResultVisible = false">关闭</el-button>
     </template>
   </el-dialog>
@@ -1271,20 +1235,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
+import { copyRichText, copyText } from '@/utils/clipboard'
+import { newUuid } from '@/utils/uuid'
+import { ref, computed, reactive, defineAsyncComponent, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
 import * as P from '@/services/apiPaths'
-import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
+import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import TraceSourcePopover from '@/components/common/TraceSourcePopover.vue'
 import CellTraceDialog from '@/components/notes/CellTraceDialog.vue'
+import NoteTableColumnNode from '@/components/notes/NoteTableColumnNode.vue'
+import NotePushedRowMark from '@/components/notes/NotePushedRowMark.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -1301,7 +1272,8 @@ import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { InfoFilled, Close, ArrowDown, ArrowRight, Loading } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
@@ -1324,6 +1296,15 @@ import {
   type DisclosureNoteDetail, type NoteValidationFinding,
 } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import {
+  cancelAiTaskJob,
+  createOrResumeAiTaskJob,
+  isAiTaskTerminal,
+  retryAiTaskItem,
+  waitForAiTaskJob,
+  type AiTaskItem,
+  type AiTaskJobSnapshot,
+} from '@/services/aiTaskJobs'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
 import { knowledgePickerVisible } from '@/composables/useKnowledge'
@@ -1337,8 +1318,10 @@ import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { handleApiError } from '@/utils/errorHandler'
-import { useNoteTableStructure, type TableData } from '@/composables/useNoteTableStructure'
+import { isPushedFixedRow, structureRowTargets, useNoteTableStructure, type TableData } from '@/composables/useNoteTableStructure'
+import { columnTotalUpdates, totalMismatch } from '@/views/composables/noteTotalTerms'
 import { resolveNoteStructureEditState } from '@/views/composables/noteStructureEditing'
+import { readAutoAdvance, writeAutoAdvance } from '@/views/composables/noteEditorPrefs'
 import NoteOfflineExportDialog from '@/components/notes/NoteOfflineExportDialog.vue'
 import NoteOfflineImportDialog from '@/components/notes/NoteOfflineImportDialog.vue'
 import NoteTemplateSwitch from '@/components/notes/NoteTemplateSwitch.vue'
@@ -1355,6 +1338,7 @@ import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
 import { useNoteDetail } from '@/views/composables/useNoteDetail'
 import { createNoteDetailPrefetch } from '@/views/composables/noteDetailPrefetch'
 import { useNotePersist } from '@/views/composables/useNotePersist'
+import { useNoteSaveFlow } from '@/views/composables/useNoteSaveFlow'
 import { useNoteEditPermission, createNoteEditRequestGuard, isNoteEditGuardError, noteEditShouldRetry } from '@/views/composables/noteEdit'
 import { WRITE_ENTRIES } from '@/views/composables/noteEdit/noteEditWriteEntries'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
@@ -1362,7 +1346,9 @@ import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclos
 import { projectSubTablesClient, deriveLegacyTableHeaders } from '@/components/workpaper/composables/disclosureColumnDefs'
 import {
   applyProjectedCell,
+  applyProjectedCellAuto,
   applyProjectedLabel,
+  applyProjectedRowFlag,
   cloneNoteTableValue,
   prepareNoteTableData,
   readExportDisabledSubTables,
@@ -1446,16 +1432,15 @@ async function onAiContentResolved() {
     } catch {
       return  // 用户选择保留本地改动，不刷新
     }
-    editDirty.value = false
-    autoSave.isDirty.value = false
+    discardCurrentNoteEdits()
   }
   await fetchDetailFresh(section)
 }
 
-const year = computed(() => {
-  const qy = Number(route.query.year)
-  return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
-})
+// 年度：路由 → 项目 store（原口径、同步读，信息栏切年度后立即生效）；路由壳 DisclosureEditorRoute 只在年度定下来后挂本页，传入的年度只作离开项目那一刻的兜底（6.5）
+const props = defineProps<{ auditYear: number }>()
+const year = computed(() => { const qy = Number(route.query.year); return (Number.isFinite(qy) && qy > 2000 ? qy : null) ?? projectStore.year ?? props.auditYear })
+//（原先 store 初值去年 ⇒ 没填年度的项目也按去年取附注；现由路由壳拦在页外）
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
 const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchTree())
@@ -1502,15 +1487,16 @@ function getSectionLock(sectionId: string | undefined) {
   return sectionLocks.value[sectionId] || null
 }
 
-// 编辑锁联动 watch 推迟到 useEditMode 定义之后挂载（避免 TDZ）
-
-// R7-S2-05：后端定时自动保存（2 分钟间隔）
+// 编辑锁 watch 推迟到 useEditMode 后；自动保存通过晚绑定接入下方 useNotePersist 的编辑代际。
+let markNoteSaveEdited: (() => void) | undefined, discardNoteSaveEdits: (() => void) | undefined
 const autoSave = useWorkpaperAutoSave(async () => {
-  if (!noteEdit.canWriteLocked.value) return  // 不可写时跳过
-  await onSave()
+  if (!noteEdit.canWriteLocked.value) return false
+  return saveCurrentNote({ auto: true })  // 定时保存不打断编辑
 }, 120_000, undefined, {
   shouldRetry: noteEditShouldRetry,
+  onEdited: () => markNoteSaveEdited?.(),
 })
+function discardCurrentNoteEdits() { discardNoteSaveEdits?.(); clearEditDirty(); autoSave.clearDirty() }
 
 // 单位切换 — 使用 projectStore
 const selectedProjectId = ref('')
@@ -1522,13 +1508,12 @@ function onProjectChange(newId: string) {
 // 年度切换
 const selectedYear = ref<number | null>(null)
 const yearOptions = computed(() => projectStore.yearOptions)
-function onYearChange() {
-  projectStore.changeYear(selectedYear.value)
-  fetchTree().then(async () => {
-    await noteEdit.ready()  // 切年度后等判定结论
-    if (noteList.value.length === 0 && noteEdit.canWrite.value) onGenerate()
-  })
-  currentNote.value = null
+// 取数年度路由优先 ⇒ 写路由 ?year（整页按新年度重挂，「没有附注就自动生成」由重挂后的 onMounted 执行）；只带年度：section 等一次性参数已用 replaceState 清掉、route.query 里还在
+async function onYearChange(y: number) {
+  if (!(await guardUnsaved())) { selectedYear.value = year.value; return }  // 留下未保存改动：不切
+  discardCurrentNoteEdits()  // 已确认放弃：push 时更新守卫不再问第二次
+  projectStore.changeYear(y)  // 先改 store：year:changed 落在旧实例上，重挂后的新实例不会亮「数据已更新」
+  router.push({ path: route.path, query: { year: String(y) } })
 }
 
 // templateType 提前声明：useNoteTemplate + useNoteTree 均依赖它
@@ -1748,6 +1733,7 @@ function onScopeChange(scope: 'standalone' | 'consolidated' | 'both') {
 const validateLoading = ref(false)
 const detailLoading = ref(false)
 const showNoteFormulaManager = ref(false)
+const noteFormulaManagerMounted = useMountOnFirstOpen(showNoteFormulaManager)  // 首次打开才下载 / 挂载公式管理
 // 附注模块使用手册（工具栏右侧入口）
 const showNoteHandbook = ref(false)
 // 附注联动复盘 P0-1：就绪度看板（未从底稿同步 / 无数据 / 校验问题）
@@ -1789,6 +1775,7 @@ function enterNoteEdit() {
 async function exitNoteEdit(force = false): Promise<boolean> {
   const result = await exitEdit(force)
   if (result && !editMode.value && hasTableDataSnapshot.value) {
+    discardCurrentNoteEdits()
     if (currentNote.value) {
       currentNote.value.table_data = cloneNoteTableValue(tableDataSnapshot.value)
     }
@@ -1797,77 +1784,7 @@ async function exitNoteEdit(force = false): Promise<boolean> {
   }
   return result
 }
-// ─── 单元格激活编辑（仅活跃单元格渲染 input，其余保持轻量 span）──────────────────
-const activeCellEdit = ref<{ rowIndex: number; colIndex: number } | null>(null)
-
-function isActiveCellEditing(rowIndex: number, colIndex: number): boolean {
-  if (!activeCellEdit.value) return false
-  return activeCellEdit.value.rowIndex === rowIndex && activeCellEdit.value.colIndex === colIndex
-}
-
-function activateCell(rowIndex: number, colIndex: number) {
-  if (!editMode.value) return
-  activeCellEdit.value = { rowIndex, colIndex }
-  // 用 nextTick 自动聚焦 input
-  nextTick(() => {
-    const input = document.querySelector('.gt-de-note-table .el-input-number input') as HTMLInputElement | null
-    input?.focus()
-    input?.select()
-  })
-}
-
-function deactivateCell() {
-  activeCellEdit.value = null
-}
-
-function onActiveCellBlur(event: FocusEvent, rowIndex: number, colIndex: number) {
-  // 如果焦点移到了同表格内另一个元素（如用户点击另一单元格），不 deactivate
-  // — onDeCellClick 会自行调用 activateCell 切换到新单元格
-  const related = event.relatedTarget as HTMLElement | null
-  if (related?.closest('.gt-de-note-table')) return
-  // 焦点移出表格范围，deactivate
-  if (activeCellEdit.value?.rowIndex === rowIndex && activeCellEdit.value?.colIndex === colIndex) {
-    deactivateCell()
-  }
-}
-
-function onActiveCellKeydown(event: KeyboardEvent, rowIndex: number, colIndex: number) {
-  const headers = activeTableData.value?.headers || []
-  const rows = activeTableData.value?.rows || []
-  const maxCol = headers.length - 2  // 减去 label 列
-  const maxRow = rows.length - 1
-
-  if (event.key === 'Tab') {
-    event.preventDefault()
-    const nextCol = event.shiftKey ? colIndex - 1 : colIndex + 1
-    if (nextCol >= -1 && nextCol <= maxCol) {
-      if (!rows[rowIndex]?.is_total) {
-        activateCell(rowIndex, nextCol)
-      }
-    } else if (!event.shiftKey && nextCol > maxCol) {
-      // 下一行 label 列
-      for (let r = rowIndex + 1; r <= maxRow; r++) {
-        if (!rows[r]?.is_total) { activateCell(r, -1); break }
-      }
-    } else if (event.shiftKey && nextCol < -1) {
-      // 上一行末列
-      for (let r = rowIndex - 1; r >= 0; r--) {
-        if (!rows[r]?.is_total) { activateCell(r, maxCol); break }
-      }
-    }
-  } else if (event.key === 'Enter') {
-    event.preventDefault()
-    // 下一行同列
-    for (let r = rowIndex + 1; r <= maxRow; r++) {
-      if (!rows[r]?.is_total) { activateCell(r, colIndex); break }
-    }
-  } else if (event.key === 'Escape') {
-    deactivateCell()
-  }
-}
-
-// 退出编辑时清除活跃单元格
-watch(() => editMode.value, (editing) => { if (!editing) deactivateCell() })
+// 单元格选中 / 双击 / F2 / 直接输入 / Tab / Enter / Esc 统一由 GtGridCell + GridKernel 处理。
 
 // 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
 watch(() => editMode.value, async (editing) => {
@@ -1981,37 +1898,113 @@ async function onNoteAiFillAdopted() {
   }
 }
 
-// 一键批量 AI 预填充
+// 一键批量 AI 预填充（DB-backed job；页面刷新/响应丢失可恢复）
 const batchAiFillLoading = ref(false)
 const batchResultVisible = ref(false)
-const batchResults = ref<Array<{ note_section: string; status: string; text: string | null; citations: any[] }>>([])
-const batchGenerated = computed(() => batchResults.value.filter(r => r.status === 'generated').length)
-const batchDegraded = computed(() => batchResults.value.filter(r => r.status === 'degraded').length)
-const batchSkipped = computed(() => batchResults.value.filter(r => r.status === 'skipped').length)
-function batchTitle(section: string): string {
+const batchJob = ref<AiTaskJobSnapshot | null>(null)
+const batchResults = computed<AiTaskItem[]>(() => batchJob.value?.items ?? [])
+const batchGenerated = computed(() => batchResults.value.filter(r => r.status === 'succeeded').length)
+const batchDegraded = computed(() => batchResults.value.filter(r => r.status === 'failed').length)
+const batchSkipped = computed(() => batchResults.value.filter(r => r.status === 'cancelled').length)
+const batchAdoptedMessages = reactive(new Set<string>())
+let batchWaitController: AbortController | null = null
+function batchTitle(section: string | null): string {
+  if (!section) return '未命名章节'
   const n = noteList.value.find((x: any) => x.note_section === section)
   return (n as any)?.title || (n as any)?.section_title || (n as any)?.label || section
 }
+function updateBatchJob(snapshot: AiTaskJobSnapshot) {
+  batchJob.value = snapshot
+}
+async function waitBatchJob(snapshot: AiTaskJobSnapshot) {
+  if (isAiTaskTerminal(snapshot.status)) return snapshot
+  batchWaitController?.abort()
+  batchWaitController = new AbortController()
+  return waitForAiTaskJob(
+    projectId.value,
+    snapshot,
+    updateBatchJob,
+    batchWaitController.signal,
+  )
+}
 async function openBatchAiFill() {
   batchAiFillLoading.value = true
+  batchAdoptedMessages.clear()
   try {
-    const res = await http.post(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/batch-ai-fill`,
-      {},
+    const snapshot = await createOrResumeAiTaskJob(
+      projectId.value,
+      `${year.value}:note-batch-prefill`,
+      { task_kind: 'note_batch_prefill', year: year.value },
     )
-    const data = res.data || {}
-    batchResults.value = Array.isArray(data.results) ? data.results : []
+    updateBatchJob(snapshot)
     batchResultVisible.value = true
+    const final = await waitBatchJob(snapshot)
+    updateBatchJob(final)
+    if (final.status === 'succeeded') {
+      ElMessage.success('批量预填充完成，请逐章核对后送入待确认')
+    } else if (final.status === 'partial_failed' || final.status === 'failed') {
+      ElMessage.warning('批量预填充已结束，部分章节需要重试或人工处理')
+    }
   } catch {
-    ElMessage.error('批量预填充失败，请稍后重试')
+    ElMessage.error('批量预填充启动或恢复失败，请稍后重试')
   } finally {
     batchAiFillLoading.value = false
   }
 }
-async function goAdoptSection(section: string) {
-  batchResultVisible.value = false
-  await fetchDetail(section)
-  openNoteAiFill('ai')
+async function cancelBatchAiFill() {
+  const job = batchJob.value
+  if (!job || isAiTaskTerminal(job.status)) return
+  try {
+    updateBatchJob(await cancelAiTaskJob(projectId.value, job.job_id))
+    batchWaitController?.abort()
+    ElMessage.success('已取消未完成的批量预填充')
+  } catch {
+    ElMessage.error('取消失败，请稍后重试')
+  }
+}
+async function retryBatchItem(row: AiTaskItem) {
+  const job = batchJob.value
+  if (!job || row.status !== 'failed') return
+  try {
+    const snapshot = await retryAiTaskItem(projectId.value, job.job_id, row.item_id)
+    updateBatchJob(snapshot)
+    await waitBatchJob(snapshot)
+  } catch {
+    ElMessage.error('重试失败，请稍后再试')
+  }
+}
+async function goAdoptSection(row: AiTaskItem) {
+  const messageId = row.message_id
+  if (!messageId) {
+    ElMessage.warning('该章节尚无可采纳的服务端草稿')
+    return
+  }
+  const request = buildNoteHost({
+    noteId: row.target_id,
+    projectId: projectId.value,
+    year: year.value,
+  })
+  if (!request.available || !request.host) {
+    ElMessage.warning(request.unavailableReason || '无法解析附注目标')
+    return
+  }
+  try {
+    await api.post('/api/ai-chat/adopt', {
+      message_id: messageId,
+      host: {
+        type: request.host.type,
+        id: request.host.id,
+        project_id: request.host.projectId,
+        year: request.host.year,
+      },
+      idempotency_key: newUuid(),
+    })
+    batchAdoptedMessages.add(messageId)
+    eventBus.emit('ai-content:adopted', { projectId: projectId.value })
+    ElMessage.success('已将所见草稿送入待确认，不会重新生成')
+  } catch {
+    ElMessage.error('送入待确认失败，请稍后重试')
+  }
 }
 // 单位切换（侧边栏）
 
@@ -2098,12 +2091,10 @@ const exportEnabledTables = computed({
 watch(() => currentNote.value?.note_section, () => {
   activeTableTab.value = '0'
   noteTableStructure.clearHistory()
-  deactivateCell()
   syncBannerDismissed.value = false
 })
 
-// 切换多表 Tab 时清除活跃单元格（防坐标错位）
-watch(activeTableTab, () => { deactivateCell() })
+// 切换多表 Tab 时由旧行卸载 / 新行挂载让 GridKernel 自动收起编辑器与重建坐标。
 
 // ─── 附注表格结构编辑 (Req 38.1-38.6) ─────────────────────────────────────
 const structureEditState = computed(() => resolveNoteStructureEditState(
@@ -2220,7 +2211,21 @@ function onLabelChange(rowIndex: number, newValue: string) {
   }
 }
 
-function commitProjectedCellValue(table: any, rowIndex: number, colIndex: number, value: unknown): boolean {
+/** 集团下推的可选行勾「本企业不适用」（R14）：写 `_pushed_optional_active`，合并拉数不取这一行。 */
+function onPushedOptionalToggle(rowIndex: number, active: boolean) {
+  if (!currentNote.value || !activeTableData.value) return
+  try {
+    currentNote.value.table_data = applyProjectedRowFlag(
+      currentNote.value.table_data, activeTableData.value, rowIndex, '_pushed_optional_active', active)
+    markEditDirty()
+    autoSave.markDirty()
+  } catch (error) {
+    if (error instanceof NoteTableWritebackError) ElMessage.error(error.message)
+  }
+}
+
+function commitProjectedCellValue(table: any, rowIndex: number, colIndex: number, value: unknown,
+  options: { markManual?: boolean } = {}): boolean {
   if (!currentNote.value) return false
   try {
     currentNote.value.table_data = applyProjectedCell(
@@ -2229,6 +2234,7 @@ function commitProjectedCellValue(table: any, rowIndex: number, colIndex: number
       rowIndex,
       colIndex,
       value,
+      options,
     )
     return true
   } catch (error) {
@@ -2237,25 +2243,30 @@ function commitProjectedCellValue(table: any, rowIndex: number, colIndex: number
   }
 }
 
+/** 人工格（✏️）恢复自动（R5）：下次推送 / 公式 / 刷新按自动取数写入。 */
+function onRestoreCellAuto(rowIndex: number, colIndex: number) {
+  if (!currentNote.value || !activeTableData.value) return
+  try {
+    currentNote.value.table_data = applyProjectedCellAuto(currentNote.value.table_data, activeTableData.value, rowIndex, colIndex)
+    markEditDirty()
+    autoSave.markDirty()
+    ElMessage.success('已恢复自动：下次推送 / 公式 / 刷新按自动取数写入')
+  } catch (error) {
+    if (error instanceof NoteTableWritebackError) ElMessage.error(error.message)
+  }
+}
+
 function onCellValueChange(rowIndex: number, colIndex: number, newValue: number | null | undefined) {
   const table = activeTableData.value
   if (!table || !currentNote.value) return
   markEditDirty()
   autoSave.markDirty()
-  if (!commitProjectedCellValue(table, rowIndex, colIndex, newValue)) return
+  // 用户改的这一格标人工（推送 / 公式 / 刷新不覆盖，R5）；下面的合计、横向公式是派生写入，不标
+  if (!commitProjectedCellValue(table, rowIndex, colIndex, newValue, { markManual: true })) return
 
-  // 纵向合计：仅在当前显示表内计算，再按合计行自己的源坐标写回。
-  const refreshed = activeTableData.value
-  const rows = refreshed?.rows || []
-  const totalRowIndex = rows.findIndex((row: any) => row.is_total)
-  if (totalRowIndex >= 0) {
-    const sum = rows.reduce((total: number, row: any) => {
-      if (row.is_total) return total
-      const value = Number(row.values?.[colIndex])
-      return total + (Number.isFinite(value) ? value : 0)
-    }, 0)
-    const totalValue = sum
-    commitProjectedCellValue(refreshed, totalRowIndex, colIndex, totalValue)
+  // 纵向合计：当前显示表内按合计构成（noteTotalTerms，与后端同一判定）算，先小计后合计，按各自源坐标写回。
+  for (const { row, value } of columnTotalUpdates(activeTableData.value, colIndex)) {
+    commitProjectedCellValue(activeTableData.value, row, colIndex, value)
   }
 
   // 横向公式：没有合计行时也必须执行；只提交实际变更的结果。
@@ -2287,24 +2298,17 @@ function recalcHorizontalFormula(rowIndex: number) {
   values[values.length - 1] = ending
 }
 
+/** 合计格与合计构成算出的数不一致（判不准的合计不标） */
 function isFormulaMismatch(row: any, colIdx: number): boolean {
-  if (!row?.is_total) return false
-  const rows = activeTableData.value?.rows
-  if (!Array.isArray(rows)) return false
-  let expected = 0
-  for (const candidate of rows) {
-    if (candidate?.is_total) continue
-    const vals = Array.isArray(candidate?.values) ? candidate.values : []
-    expected += parseFloat(vals[colIdx]) || 0
-  }
-  const actual = parseFloat((Array.isArray(row.values) ? row.values : [])[colIdx]) || 0
-  return Math.abs(expected - actual) > 0.01
+  const table = activeTableData.value
+  return !!row?.is_total && totalMismatch(table, (table?.rows || []).indexOf(row), colIdx)
 }
 
 // ── 刷新功能（useNoteRefresh composable）──
 const {
   refreshLoading, refreshAllLoading, syncError,
   onRefreshFromWP, onRefreshAll, onManualRefresh, onStaleRecalc,
+  syncFromWorkpaperDisclosures,
   showRefreshResultMessage, onWorkpaperSaved, onDisclosureNoteTextUpdated,
 } = useNoteRefresh({
   projectId,
@@ -2323,7 +2327,7 @@ const { showSyncHint, dismissSyncHint, noteProgress } =
 
 // ─── 附注→披露表跳转（useNoteDisclosureJumpActions composable）──────────────
 import { useNoteDisclosureJumpActions } from '@/views/composables/useNoteDisclosureJumpActions'
-const { resolveInstance: acnrResolveInstance } = useAcnr()
+const { resolveInstance: acnrResolveInstance } = useAcnr(() => projectId.value)
 const {
   jumpingDisclosure, disclosureJumpTarget,
   jumpToLastSyncWorkpaper, jumpToDisclosureSheet,
@@ -2610,8 +2614,8 @@ async function onNodeClick(node: TreeNode) {
   // 分组节点不加载详情
   if (node.isGroup || !node.data?.note_section) return
   await withLoading(detailLoading, async () => {
+    discardCurrentNoteEdits()
     editMode.value = false
-    editDirty.value = false
     try {
       await fetchDetail(node.data.note_section)
     } catch { currentNote.value = null }
@@ -2801,13 +2805,17 @@ async function onGenerate() {
   if (!ok) return
   await withLoading(genLoading, async () => {
     try {
-      // 生成前先触发底稿→附注同步标记（确保已同步的章节不被生成覆盖）
-      try {
-        await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/pull-from-workpapers`, null, { _silent: true } as any)
-      } catch { /* fail-open */ }
+      // 首次生成也先用同一完整链：prepare → headless → 审定主表推送；生成后再做 binding 与表内公式。
+      const pulled = await syncFromWorkpaperDisclosures(null)
       await generateDisclosureNotes(projectId.value, year.value, templateType.value)
-      ElMessage.success('附注生成完成')
+      const refreshed = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+      invalidateDetailCache()
       await fetchTree()
+      if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
+      ElMessage.success('附注生成并刷新完成')
+      if (pulled.lines.length || refreshed.cells_updated || refreshed.errors?.length) {
+        showRefreshResultMessage(refreshed, pulled)
+      }
     } catch (e: any) {
       const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || ''
       if (msg) ElMessage.warning('附注生成：' + msg)
@@ -2853,7 +2861,8 @@ const onValidate = withLoading(validateLoading, async () => {
 })
 
 // ── 保存功能（useNotePersist composable）──
-const { saveLoading, justSaved, onSave: _rawSave } = useNotePersist({
+const { saveLoading, justSaved, markEdited: markPersistEdited,
+  discardEdits: discardPersistEdits, onSave: _rawSave } = useNotePersist({
   currentNote,
   textContent,
   editMode,
@@ -2869,36 +2878,31 @@ const { saveLoading, justSaved, onSave: _rawSave } = useNotePersist({
     }
   },
 })
+markNoteSaveEdited = markPersistEdited; discardNoteSaveEdits = () => discardPersistEdits()
 
-// ── Task #11：保存状态指示器 ──
-const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+// ── Task #11：保存状态指示器与一次保存的收尾（失败 / 保存中切章见 useNoteSaveFlow）──
+/** `auto`：定时自动保存只存不打断 —— 不跳章、不退出编辑、不弹「保存成功」（2026-10-26 浏览器实测：
+ * 填完一格，计时器保存后页面跳到下一章节；不跳章后编辑态又被收起，正在填的格子消失）。 */
+const { saveStatus, saveCurrentNote } = useNoteSaveFlow({
+  currentNoteId: () => currentNote.value?.id,
+  save: (opts) => _rawSave(opts),
+  onSaved: (auto) => {
+    // 保存后表格换成了保存的副本：旧的结构撤销记录指向旧对象，留着撤销会改一份看不见的表。
+    noteTableStructure.clearHistory()
+    // ── Task #12：手工保存成功后自动跳到下一未编制章节 ──
+    const next = !auto && autoAdvance.value ? findNextIncompleteSection() : null
+    if (next) setTimeout(async () => { await fetchDetail(next); await locateTreeNode(next) }, 500)
+  },
+})
 
-async function onSave() {
-  saveStatus.value = 'saving'
-  try {
-    await _rawSave()
-    saveStatus.value = 'saved'
-    setTimeout(() => { if (saveStatus.value === 'saved') saveStatus.value = 'idle' }, 3000)
-    // ── Task #12：保存成功后自动跳到下一未编制章节 ──
-    if (autoAdvance.value) {
-      const next = findNextIncompleteSection()
-      if (next) {
-        setTimeout(async () => {
-          await fetchDetail(next)
-          await locateTreeNode(next)
-        }, 500)
-      }
-    }
-  } catch {
-    saveStatus.value = 'error'
-  }
-}
+/** 手工保存（按钮 / Ctrl+S）：保存后退出编辑，按开关跳到下一未编制章节 */
+function onSave() { return saveCurrentNote({ auto: false }) }
 
 // ── Task #12：自动滚到下一未编制章节 ──
-const autoAdvance = ref(localStorage.getItem('gt_note_auto_advance') !== 'false')
+const autoAdvance = ref(readAutoAdvance(localStorage))  // 默认关闭（R19）
 function toggleAutoAdvance(val: boolean) {
   autoAdvance.value = val
-  localStorage.setItem('gt_note_auto_advance', String(val))
+  writeAutoAdvance(localStorage, val)
 }
 function findNextIncompleteSection(): string | null {
   const list = noteList.value || []
@@ -2930,9 +2934,7 @@ function onShortcutSave() {
 // ─── 表格结构编辑操作 (Req 38.1-38.6) ─────────────────────────────────────
 const canDeleteRow = computed(() => {
   const table = structureEditState.value.table
-  if (!table) return false
-  // Must have at least one non-total row to delete
-  return table.rows.some((r: any) => !r.is_total) && table.rows.filter((r: any) => !r.is_total).length > 1
+  return !!table && structureRowTargets(table.rows).deleteAt >= 0
 })
 
 const canDeleteColumn = computed(() => {
@@ -2949,22 +2951,14 @@ function warnStructureEditUnavailable() {
 function onStructureAddRow() {
   const table = structureEditState.value.table
   if (!table) { warnStructureEditUnavailable(); return }
-  // Insert before the last total row, or at end
-  const totalIdx = table.rows.findIndex((r: any) => r.is_total)
-  const insertIdx = totalIdx >= 0 ? totalIdx : table.rows.length
-  noteTableStructure.addRow(insertIdx)
+  noteTableStructure.addRow(structureRowTargets(table.rows).insertAt)
 }
 
 function onStructureDeleteRow() {
   const table = structureEditState.value.table
   if (!table) { warnStructureEditUnavailable(); return }
-  // Delete the last non-total row
-  for (let i = table.rows.length - 1; i >= 0; i--) {
-    if (!table.rows[i].is_total) {
-      noteTableStructure.deleteRow(i)
-      return
-    }
-  }
+  const at = structureRowTargets(table.rows).deleteAt
+  if (at >= 0) noteTableStructure.deleteRow(at)
 }
 
 function onStructureAddColumn() {
@@ -2984,19 +2978,35 @@ function onStructureDeleteColumn() {
 }
 
 async function onRestoreTemplateStructure() {
-  const table = structureEditState.value.table
+  const { table, index } = structureEditState.value
   if (!table) { warnStructureEditUnavailable(); return }
   if (!currentNote.value) return
   const section = currentNote.value.note_section
+  // 按当前表的表名 / 序号取模板里的同一张表（原先恒取章节第一张表，后面的表会被换成第一张的行与列）
+  const tableName = String(table.name || '').trim()
   try {
-    const res = await api.get(P.disclosureNotes.templateStructure(projectId.value, year.value, section))
+    await ElMessageBox.confirm(
+      `将把${tableName ? `「${tableName}」` : '当前表'}恢复为模板默认的行与列：已填金额按列保留，模板里没有的行会去掉（可点「撤销」还原）。确认？`,
+      '恢复模板结构', { type: 'warning', confirmButtonText: '恢复', cancelButtonText: '取消' },
+    )
+  } catch { return }
+  try {
+    const params: Record<string, string | number> = {}
+    if (tableName) params.table_name = tableName
+    if (index != null) params.table_index = index
+    // 静默：404（模板里没有这张表）是预期结果，由下方给出说明，不再叠一条全局提示
+    const res = await api.get(P.disclosureNotes.templateStructure(projectId.value, year.value, section), { params, _silent: true } as any)
     if (res && res.headers && res.rows) {
       noteTableStructure.restoreTemplateStructure(res as TableData)
       ElMessage.success('已恢复为模板默认结构')
     } else {
-      ElMessage.warning('未找到该章节的模板结构')
+      ElMessage.warning('未找到该表的模板结构')
     }
   } catch (e: any) {
+    if (e?.response?.status === 404) {
+      ElMessage.warning(`模板里没有${tableName ? `「${tableName}」` : '当前表'}（可能是自加的表或改过表名），无法恢复模板结构`)
+      return
+    }
     handleApiError(e, '恢复模板结构')
   }
 }
@@ -3087,6 +3097,7 @@ onContextChange(async () => {
 })
 
 onUnmounted(() => {
+  batchWaitController?.abort()
   requestGuard.uninstall()
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
@@ -3110,16 +3121,13 @@ function _onWindowContextMenuFallback(event: MouseEvent) {
   _closeTreeContextMenu()
 }
 
-// R8-S2-14：未保存拦截
-onBeforeRouteLeave(async (_to, _from, next) => {
-  if (!editDirty.value && !autoSave.isDirty.value) { next(); return }
-  try {
-    await confirmLeave('附注')
-    next()
-  } catch {
-    next(false)
-  }
-})
+// R8-S2-14：未保存拦截。换项目 / 改 query 是同一路由的「更新」、不触发离开守卫，但本页按 fullPath 整页重挂，改动同样会丢
+async function guardUnsaved(): Promise<boolean> {
+  if (!editDirty.value && !autoSave.isDirty.value) return true
+  try { await confirmLeave('附注'); return true } catch { return false }
+}
+onBeforeRouteLeave(() => guardUnsaved())
+onBeforeRouteUpdate(() => guardUnsaved())
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (editDirty.value || autoSave.isDirty.value) {
@@ -3131,7 +3139,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
 const { isFullscreen: deFullscreen, toggleFullscreen: toggleDeFullscreen } = useFullscreen()
 
-function copyNoteTable() {
+async function copyNoteTable() {
   const table = activeTableData.value
   if (!table?.rows?.length) { ElMessage.warning('当前章节无表格数据'); return }
   const headers = table.headers || []
@@ -3139,9 +3147,9 @@ function copyNoteTable() {
   const text = [headers.join('\t'), ...rows.map((r: any) => [r.label ?? '', ...(r.values || [])].join('\t'))].join('\n')
   const html = `<table border="1"><tr>${headers.map((h: string) => `<th>${h}</th>`).join('')}</tr>${rows.map((r: any) => `<tr><td>${r.label ?? ''}</td>${(r.values || []).map((v: any) => `<td>${v ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
   try {
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    await copyRichText(html, text)
     ElMessage.success(`已复制 ${rows.length} 行，可粘贴到 Word/Excel`)
-  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
+  } catch { await copyText(text); ElMessage.success('已复制') }
 }
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
@@ -3191,8 +3199,8 @@ const {
   deCellClassName, onDeCellClick, onDeCellContextMenu,
   onDeCtxCopy, onDeCtxFormula, onDeCtxTrustScore, onDeCtxSum, onDeCtxCompare,
 } = useNoteTableInteraction({
-  activeTableData, currentNote, editMode, showNoteFormulaManager,
-  deCtx: deCtx as any, deComments, activateCell, fmtAmount,
+  activeTableData, currentNote, showNoteFormulaManager,
+  deCtx: deCtx as any, deComments, fmtAmount,
 })
 
 /** 行级 CSS class：消费后端 _row_types 实现合计/小计/header 行样式（对齐合并附注） */

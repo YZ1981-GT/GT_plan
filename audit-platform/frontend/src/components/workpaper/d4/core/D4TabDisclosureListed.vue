@@ -32,10 +32,12 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useD4Disclosure } from '../../composables/useD4Disclosure'
 import { useD4DisclosureAi } from '../../composables/useD4DisclosureAi'
 import { buildD4SyncPayload, D4_NOTE_SECTION, type D4DisclosureSnapshot } from '../../composables/d4NoteSectionMap'
+// 快照 /（6）行读取与另一版 Tab、附注页离屏同步共用（spec note-pull-followup-closure R1）
+import { buildD4DisclosureSnapshot, d4Section6Key, readD4Section6Rows } from '../../composables/d4DisclosureSnapshot'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
-import { parseNum } from '../../composables/useD4FormulaEngine'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_MAIN_COST_STANDARD, D4_OTHER_COST_STANDARD } from '../../composables/d4AccountScope'
 import {
@@ -49,7 +51,6 @@ import {
 import {
   D4_SEGMENT_ROWS,
   D4_SEGMENT_INPUT_ROW_KEYS,
-  deriveSegmentCell,
   segmentRowAcrossCategories,
 } from '../../composables/d4RevenueSegmentColumns'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
@@ -123,6 +124,14 @@ const wpIdRef = computed(() => props.wpId) as any
 const projectIdRef = computed(() => props.projectId) as any
 const isReadonlyRef = computed(() => props.isReadonly) as any
 
+const d4 = useD4Disclosure({
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  variant: 'listed',
+  saveBatch,
+  isReadonly: isReadonlyRef,
+})
 const {
   crossSheetRevenue, crossSheetCost,
   isRefreshing, lastRefreshTime, refreshFromTb,
@@ -131,37 +140,23 @@ const {
   section3Rows, section3Total, addSection3Row, removeSection3Row, updateSection3,
   section4Rows, section4Total, addSection4Row, removeSection4Row, updateSection4,
   // 列转置专用
-  section4Categories, section4Cells, section4RowDefs,
+  section4Categories, section4RowDefs,
   getSection4Cell, updateSection4Cell,
   addSection4Category, removeSection4Category, renameSection4Category,
   section4RowTotal, section4ColTotal,
   noteTexts, updateNote,
-} = useD4Disclosure({
-  allResponses: allResponsesRef,
-  wpId: wpIdRef,
-  projectId: projectIdRef,
-  variant: 'listed',
-  saveBatch,
-  isReadonly: isReadonlyRef,
-})
+} = d4
 
 // ─── 列转置行集（Task 31：真源 = d4RevenueSegmentColumns.D4_SEGMENT_ROWS）───
 // 🔴 不再用 `D4_TRANSPOSE_CHECK_ITEMS`（只 3 项，丢了父行/可扩行/合计行，且
 //    「时点/时段」在源模板各出现两次、字符串数组无法表达归属）。
 
 // ─── （6）剩余履约义务结构化表 ─────────────────────────────────────────────────
-const SECTION6_KEY = 'D4-disc-listed-section6-rows'
+const SECTION6_KEY = d4Section6Key('listed')
 const obligationYearKeys = computed(() => getObligationYearKeys(auditYear.value))
 const obligationColumns = computed(() => buildD4ObligationColumns(auditYear.value))
 
-const section6Rows = computed<D4ObligationRow[]>(() => {
-  const raw = props.allResponses?.get(SECTION6_KEY)
-  if (raw && typeof raw === 'string') {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  if (Array.isArray(raw)) return raw
-  return []
-})
+const section6Rows = computed<D4ObligationRow[]>(() => readD4Section6Rows(props.allResponses, 'listed'))
 
 function persistSection6(rows: D4ObligationRow[]): void {
   saveBatch([{ item_id: SECTION6_KEY, conclusion: JSON.stringify(rows) }])
@@ -305,45 +300,15 @@ function jumpToNote(target: DisclosureVariant): void {
 }
 
 function buildSnapshot(): D4DisclosureSnapshot {
-  return {
-    revenueRows: section1Data.value.map((r: any) => ({
-      label: r.category,
-      currentRevenue: r.currentRevenue, currentCost: r.currentCost,
-      priorRevenue: r.priorRevenue, priorCost: r.priorCost,
-    })),
-    revenueTotal: {
-      label: section1Total.value.category,
-      currentRevenue: section1Total.value.currentRevenue, currentCost: section1Total.value.currentCost,
-      priorRevenue: section1Total.value.priorRevenue, priorCost: section1Total.value.priorCost,
-    },
-    industryRows: section2Rows.value.map((r: any) => ({
-      label: r.category, currentRevenue: parseNum(r.currentAmount), currentCost: parseNum(r.priorAmount),
-    })),
-    regionRows: section3Rows.value.map((r: any) => ({
-      label: r.name, currentRevenue: parseNum(r.amount), currentCost: parseNum(r.proportion),
-    })),
-    // Task 31: 行集与源模板逐行对齐（9 行，含两个派生小计 + 空可扩行 + 合计行）；
-    // 🔴 不再产出 `total_revenue`/`total_cost` —— 源模板没有横向合计列。
-    timingRows: D4_SEGMENT_ROWS.map((rowDef) => {
-      const row: Record<string, string | number | null> = { label: rowDef.label }
-      for (const cat of section4Categories.value) {
-        row[`${cat.key}_revenue`] = deriveSegmentCell(
-          section4Cells.value, cat.key, rowDef.key, 'revenue',
-        )
-        row[`${cat.key}_cost`] = deriveSegmentCell(
-          section4Cells.value, cat.key, rowDef.key, 'cost',
-        )
-      }
-      if (rowDef.kind === 'total' || rowDef.kind === 'subtotal') row.is_total = true
-      return row
-    }),
-    timingCategories: section4Categories.value.map((c: any) => ({ key: c.key, label: c.label })),
-    notes: { ...noteTexts.value },
-  }
+  return buildD4DisclosureSnapshot(d4, { section6Rows: section6Rows.value, auditYear: auditYear.value })
 }
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   isSyncing.value = true
   try {
     const payload = buildD4SyncPayload(VARIANT, props.wpId || '', null, buildSnapshot())
@@ -375,9 +340,15 @@ const noteCheckState = ref<{ status: 'idle' | 'loading' | 'ok' | 'diff' | 'missi
 
 async function checkNoteConsistency(silent = false): Promise<void> {
   if (!props.projectId) return
+  const year = auditYear.value
+  if (year == null) {
+    noteCheckState.value = { status: 'error', message: MISSING_AUDIT_YEAR_MESSAGE }
+    if (!silent) ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   noteCheckState.value = { status: 'loading', message: '正在读取附注现存数据…' }
   try {
-    const detail = await getDisclosureNoteDetail(props.projectId, auditYear.value, D4_NOTE_SECTION[VARIANT])
+    const detail = await getDisclosureNoteDetail(props.projectId, year, D4_NOTE_SECTION[VARIANT])
     const td = detail?.table_data
     const tables: any[] = Array.isArray(td?._tables) ? td._tables : []
     const candidates = tables.length > 0 ? tables : (Array.isArray(td?.rows) ? [{ rows: td.rows }] : [])

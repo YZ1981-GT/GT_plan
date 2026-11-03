@@ -3,7 +3,8 @@
  * 对齐源模板「附注披露信息（国企）」与 F2SoeSyncSnapshot
  * Spec: .kiro/specs/f2-inventory-main/ Task 15.6
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum, calcSubtotal, calcNetValue, calcAuditedEnd } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 import { isF2DisclosureApplicable } from './f2NoteSectionMap'
@@ -410,6 +411,15 @@ export function useF2DisclosureSoe(options: {
     allResponses.value.set(itemIdKey, { item_id: itemIdKey, conclusion: null, remark })
   }
 
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
+
   function flushSave(): void {
     const keys = [
       ITEM_S1_OVERRIDES, ITEM_S2_OVERRIDES, ITEM_S5_DR,
@@ -543,7 +553,8 @@ export function useF2DisclosureSoe(options: {
     }
   }
 
-  onBeforeUnmount(() => {
+  // 作用域销毁时清理（组件卸载与附注页离屏同步都会走到；onBeforeUnmount 在离屏时不注册 ⇒ 窗口监听泄漏）
+  onScopeDispose(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
     if (dataUpdatedTimer) clearTimeout(dataUpdatedTimer)
     for (const { event, handler } of eventListeners) window.removeEventListener(event, handler)

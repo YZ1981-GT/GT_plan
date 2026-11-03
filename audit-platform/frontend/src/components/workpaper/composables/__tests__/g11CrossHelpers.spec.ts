@@ -110,7 +110,11 @@ describe('g11CrossHelpers', () => {
 })
 
 describe('g11TbResolve', () => {
-  it('g11TbRowPlAmount 取贷−借', () => {
-    expect(g11TbRowPlAmount({ credit_amount: 100, debit_amount: 30 })).toBe(70)
+  it('g11TbRowPlAmount 取试算表未审数（损益类单边发生额），不用贷 − 借', () => {
+    expect(g11TbRowPlAmount({ standard_account_code: '6111', unadjusted_amount: '70' })).toBe(70)
+    // 端点不回借 / 贷字段；就算给了也不参与（含结转分录时两侧相等，差额恒 0）
+    expect(g11TbRowPlAmount({ standard_account_code: '6111', unadjusted_amount: '70', credit_amount: 100, debit_amount: 100 } as any)).toBe(70)
+    expect(g11TbRowPlAmount({ standard_account_code: '6111', unadjusted_amount: null })).toBe(0)
+    expect(g11TbRowPlAmount(null)).toBe(0)
   })
 })

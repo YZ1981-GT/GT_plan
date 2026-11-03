@@ -9,6 +9,7 @@
  * 视图：收发存 | 库龄 | 完整（宽表；默认收发存，避免统一改分段 Tab 后丢失勾稽感）
  * 库龄：与 F2-5 同口径（THREE_YEAR / FIVE_YEAR / CUSTOM + 旧 flat 字段迁移）
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -108,7 +109,7 @@ const LEGACY_AGING = [
 
 /** BP-7 修复：稳定行身份生成器（同 F1 generateRowId 写法）。 */
 function generateF2RowId(): string {
-  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `f2-${newUuid()}`
 }
 
 function dataKey(sheetCode: string): string {
@@ -142,7 +143,7 @@ function labelsToCustomSegments(labels: string[]): AgingSegment[] {
   }))
 }
 
-function emptyRow(id: string, segments: AgingSegment[]): F2DetailRow {
+export function emptyRow(id: string, segments: AgingSegment[]): F2DetailRow {
   return {
     id,
     itemCode: '',
@@ -189,7 +190,13 @@ function migrateAging(raw: Partial<F2DetailRow>, segments: AgingSegment[]): Agin
   return remapAgingData(base, segments)
 }
 
-function enrichRow(r: F2DetailRow, hasQuantity: boolean, segments: AgingSegment[]): F2DetailRow {
+/** 模板单价式 `IF(数量=0,0,金额/数量)`（F2-3~F2-8 逐表核过）⇒ 数量为 0 记 0，不是空。 */
+function templateUnitPrice(amount: number, qty: number): number {
+  const q = Number(qty) || 0
+  return q === 0 ? 0 : (Number(amount) || 0) / q
+}
+
+export function enrichRow(r: F2DetailRow, hasQuantity: boolean, segments: AgingSegment[]): F2DetailRow {
   const closingQty = hasQuantity
     ? calcEndBalance(r.openingQty, r.increaseQty, r.decreaseQty)
     : 0
@@ -207,10 +214,10 @@ function enrichRow(r: F2DetailRow, hasQuantity: boolean, segments: AgingSegment[
     postPeriodQty,
     postPeriodAmt,
     postPeriodUnitPrice: hasQuantity ? calcUnitPrice(postPeriodAmt, postPeriodQty) : '',
-    openingUnitPrice: hasQuantity ? calcUnitPrice(r.openingAmt, r.openingQty) : '',
-    increaseUnitPrice: hasQuantity ? calcUnitPrice(r.increaseAmt, r.increaseQty) : '',
-    decreaseUnitPrice: hasQuantity ? calcUnitPrice(r.decreaseAmt, r.decreaseQty) : '',
-    unitPrice: hasQuantity ? calcUnitPrice(closingAmt, closingQty) : calcUnitPrice(closingAmt, 1),
+    openingUnitPrice: hasQuantity ? templateUnitPrice(r.openingAmt, r.openingQty) : '',
+    increaseUnitPrice: hasQuantity ? templateUnitPrice(r.increaseAmt, r.increaseQty) : '',
+    decreaseUnitPrice: hasQuantity ? templateUnitPrice(r.decreaseAmt, r.decreaseQty) : '',
+    unitPrice: hasQuantity ? templateUnitPrice(closingAmt, closingQty) : calcUnitPrice(closingAmt, 1),
     aging,
     agingTotal,
     agingLt1: Number(aging.within1 ?? 0),

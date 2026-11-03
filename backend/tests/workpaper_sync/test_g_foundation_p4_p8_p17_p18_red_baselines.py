@@ -841,8 +841,8 @@ class TestGfP18TbPublishGateGap:
         | family | trial-balance 代码/全文 | writeback 代码/全文 | 裁决 |
         |---|---|---|---|
         | G1 | **0**/2 | 1/5 | 两处 `trial-balance` **全在注释**（JSDoc L481-487 记录 `g1:writeback-trial-balance` dispatch 已被 `tb-writeback-explicit-publish-gate` Task 12 移除）⇒ 死代码记录，非活路径 |
-        | G4-main | 1/1 | 2/3 | 代码里确有引用（`fetchTrialBalance` 读 TB 的那条），但**只读不写** |
-        | G6-main | 1/1 | 2/2 | 同 G4：只读 TB 做核对，无写入 |
+        | G4-main | 1/1 → **0**/0 | 2/3 | 原有引用（`fetchTrialBalance` 读 TB）**只读不写**；2026-10-27 `post-push-residual-defect-closure` R1 改走试算表唯一入口 `trialBalanceRows.ts` ⇒ 本文件不再有端点字面量（读路径仍在） |
+        | G6-main | 1/1 → **0**/2 | 2/2 | 同 G4；原先请求的是后端没有的 `/api/trial-balance/query`（恒 404 被吞、TB 核对数恒空），全文 2 处是记录旧端点的注释 |
 
         🔴 `writeback` 小写在代码里的那 1~2 处**不是 TB 回写** ——
         是「G1-3/G4-3/G6-4 调整分录净额回写到审定表行 store」（`lastWritebackNet` /
@@ -851,8 +851,8 @@ class TestGfP18TbPublishGateGap:
         """
         expect = {
             "useG1Adjudication.ts": (0, 1),
-            "useG4MainAdjudication.ts": (1, 2),
-            "useG6MainAdjudication.ts": (1, 2),
+            "useG4MainAdjudication.ts": (0, 2),
+            "useG6MainAdjudication.ts": (0, 2),
         }
         got = {}
         for n in expect:

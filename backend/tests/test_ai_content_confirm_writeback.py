@@ -249,6 +249,63 @@ class TestConfirmWritesNote:
         assert await _note_text(db_session, note_id) == before
 
     @pytest.mark.asyncio
+    async def test_confirm_publishes_note_section_saved(self, db_session, world, monkeypatch):
+        """写回提交后发 NOTE_SECTION_SAVED，载荷与附注编辑端点同形（订阅方读 extra.section_code）。
+
+        原写法 ``event_type="NOTE_SECTION_SAVED"`` 是枚举名不是取值、``source_id`` / ``detail`` 不是载荷字段，
+        构造即抛 ValidationError 被 except 吞掉 ⇒ 下游（stale / 交付件 / 合并附注）从未收到通知。
+        """
+        from app.models.audit_platform_schemas import EventType
+        from app.services import event_bus as event_bus_module
+
+        published = []
+
+        async def _capture(self, payload):
+            published.append(payload)
+
+        # 在类上替换：实例上 setattr 撤销时会把原方法写成实例属性，挡住之后的类级替换
+        monkeypatch.setattr(type(event_bus_module.event_bus), "publish", _capture)
+
+        note = world["note"]
+        log = await _pending(db_session, world["project"].id, target_cell=f"note:{note.id}")
+        async with _client(db_session, world["editor"]) as c:
+            resp = await c.post(f"/api/ai-content/{log.id}/confirm")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["writeback"]["written"] is True
+        assert len(published) == 1, published
+        payload = published[0]
+        assert payload.event_type == EventType.NOTE_SECTION_SAVED
+        assert payload.project_id == world["project"].id
+        assert payload.year == 2025
+        assert payload.extra.get("section_code") == "八、1"
+
+    @pytest.mark.asyncio
+    async def test_note_in_other_project_is_not_written(self, db_session, world):
+        """target_cell 指向别的项目的附注 ⇒ 不写（权限与合并锁只按日志所属项目判过）。"""
+        from app.models.base import ProjectStatus
+        from app.models.core import Project
+        from app.models.report_models import DisclosureNote
+
+        other = Project(name=f"他项目_{uuid.uuid4().hex[:6]}", client_name="客户乙",
+                        status=ProjectStatus.execution, audit_year=2025)
+        db_session.add(other)
+        await db_session.flush()
+        foreign = DisclosureNote(
+            project_id=other.id, year=2025, note_section="八、1",
+            section_title="货币资金", section_id=f"sec_{uuid.uuid4().hex[:8]}",
+            text_content="他项目正文。", table_data={"rows": []},
+        )
+        db_session.add(foreign)
+        await db_session.commit()
+
+        log = await _pending(db_session, world["project"].id, target_cell=f"note:{foreign.id}")
+        async with _client(db_session, world["editor"]) as c:
+            resp = await c.post(f"/api/ai-content/{log.id}/confirm")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["writeback"]["written"] is False
+        assert await _note_text(db_session, foreign.id) == "他项目正文。"
+
+    @pytest.mark.asyncio
     async def test_workpaper_target_not_auto_written(self, db_session, world):
         """底稿类 target_cell 确认 → 状态 confirmed 但不自动写（缺陷 5）。"""
         log = await _pending(db_session, world["project"].id,

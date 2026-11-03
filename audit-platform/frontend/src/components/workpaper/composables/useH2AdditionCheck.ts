@@ -17,6 +17,11 @@ import {
   evaluateAdditionEvidenceGaps,
   mergeEvidenceGapRowsToH23,
 } from './h2EvidenceGapPush'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf } from './assetVoucherFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +61,8 @@ export interface H2AdditionRow {
   name: string
   /** 日期 */
   date: string
+  /** 凭证号（抽凭 / 挂凭回填；原实现把凭证号写进合同编号，证据缺口判断把它当成已查合同） */
+  voucherNo: string
   /** 摘要 */
   summary: string
   /** 金额 */
@@ -123,6 +130,7 @@ function emptyRow(seq: number): H2AdditionRow {
     seq,
     name: '',
     date: '',
+    voucherNo: '',
     summary: '',
     amount: 0,
     additionMethod: '',
@@ -161,6 +169,7 @@ function normalizeRow(r: any, i: number): H2AdditionRow {
     seq: r.seq ?? (i + 1),
     name: r.name ?? '',
     date: r.date ?? '',
+    voucherNo: r.voucherNo ?? '',
     summary: r.summary ?? '',
     amount: Number(r.amount) || 0,
     additionMethod: method,
@@ -230,6 +239,16 @@ const CONCLUSION_KEY = 'H2-8-audit-conclusion'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：增加方式、证据、确认项、关联方、结论等 */
+export function hasH2AdditionContent(r: H2AdditionRow): boolean {
+  return [r.additionMethod, r.category, r.contractNo, r.progressDoc, r.materialDoc, r.invoiceNo, r.acceptanceDoc,
+    r.paymentRef, r.paymentDate, r.supplier, r.relatedPartyName, r.relationship, r.capitalizable, r.measurementConfirmed,
+    r.progressConfirmed, r.approvalDoc, r.qualityProof, r.attachmentPath, r.ocrResult, r.auditConclusion, r.indexRef]
+    .some(v => String(v ?? '').trim() !== '')
+    || Number(r.invoiceAmount) !== 0 || Number(r.paymentAmount) !== 0
+    || r.isRelatedParty === '是' || r.samplingStatus === '已检查' || r.samplingStatus === '已确认'
+}
+
 export function useH2AdditionCheck(options: {
   wpId: Ref<string>
   projectId: Ref<string>
@@ -270,10 +289,11 @@ export function useH2AdditionCheck(options: {
   function initFromAllResponses(): void {
     const data = _getJson(ROWS_KEY)
     if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map((r: any, i: number) => normalizeRow(r, i))
+      rows.value = data.map((r: any, i: number) => withRowMeta(normalizeRow(r, i), r))
     } else {
       rows.value = []
     }
+    voucherFill.markLoaded()
 
     const params = _getJson(PARAMS_KEY)
     if (params && typeof params === 'object') {
@@ -289,6 +309,35 @@ export function useH2AdditionCheck(options: {
     auditNote.value = _getString(NOTE_KEY)
     auditConclusion.value = _getString(CONCLUSION_KEY)
   }
+
+  /**
+   * 共享回填函数的待写入项 → 增加检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：一个样本一行，
+   * 金额取样本自己那一栏（增加在借方），红字带符号照记；凭证号写凭证号列
+   */
+  function _rowFromPrepared(item: PreparedItem): H2AdditionRow {
+    const s = sampleOf(item)
+    const row = emptyRow(0)
+    row.name = s.summary || ''
+    row.date = s.voucherDate || ''
+    row.voucherNo = s.voucherNo || ''
+    row.amount = assetAmount(item, 'debit')
+    row.samplingStatus = '待检查'
+    return row
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<H2AdditionRow>({
+    projectId: () => options.projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => _persist(),
+    hasUserContent: hasH2AdditionContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    // 旧行（没有 `_gt`）：原实现把凭证号写在合同编号里
+    legacy: r => assetLegacyKey(r.voucherNo || r.contractNo, r.date, r.amount),
+    readonly: () => options.isReadonly.value,
+  })
 
   watch(options.allResponses, () => initFromAllResponses(), { immediate: true })
 
@@ -352,6 +401,7 @@ export function useH2AdditionCheck(options: {
   function removeRow(rowId: string): void {
     if (options.isReadonly.value) return
     const idx = rows.value.findIndex(r => r.rowId === rowId)
+    if (idx !== -1 && voucherFill.isRowLocked(rows.value[idx])) return
     if (idx !== -1) {
       rows.value.splice(idx, 1)
       rows.value.forEach((r, i) => { r.seq = i + 1 })
@@ -362,7 +412,7 @@ export function useH2AdditionCheck(options: {
   function updateCell(rowId: string, field: string, value: any): void {
     if (options.isReadonly.value) return
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     if (field === 'additionMethod') {
       applyEvidenceForMethod(row, (value ?? '') as H2AdditionMethod)
       _persist()
@@ -386,7 +436,7 @@ export function useH2AdditionCheck(options: {
   function mergeOcrResult(rowId: string, ocrData: Record<string, any>): void {
     if (options.isReadonly.value) return
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     if (ocrData.amount != null) row.amount = Number(ocrData.amount) || row.amount
     if (ocrData.invoiceNo) row.invoiceNo = ocrData.invoiceNo
     if (ocrData.invoiceAmount != null) row.invoiceAmount = Number(ocrData.invoiceAmount) || row.invoiceAmount
@@ -400,7 +450,7 @@ export function useH2AdditionCheck(options: {
   function fillSamplingResults(samples: Array<{ rowId: string; status: string }>): void {
     for (const s of samples) {
       const row = rows.value.find(r => r.rowId === s.rowId)
-      if (row) row.samplingStatus = s.status as any
+      if (row && !voucherFill.isRowLocked(row)) row.samplingStatus = s.status as any
     }
     _persist()
   }
@@ -452,6 +502,7 @@ export function useH2AdditionCheck(options: {
         seq: seq++,
         marker: H28_EVIDENCE_GAP_MARKER,
       })
+      if (voucherFill.isRowLocked(row)) return built // 年审阶段预审行只读：照推说明行，不改行
       if (!row.auditConclusion || row.auditConclusion === '无异常') {
         row.auditConclusion = '存疑'
       }
@@ -471,8 +522,8 @@ export function useH2AdditionCheck(options: {
 
   function _persist(): void {
     if (!options.onSave) return
-    options.onSave(ROWS_KEY, rows.value.map(r => ({
-      rowId: r.rowId, seq: r.seq, name: r.name, date: r.date,
+    options.onSave(ROWS_KEY, voucherFill.guardPersist(rows.value).map(r => withRowMeta({
+      rowId: r.rowId, seq: r.seq, name: r.name, date: r.date, voucherNo: r.voucherNo,
       summary: r.summary, amount: r.amount, additionMethod: r.additionMethod, category: r.category,
       contractNo: r.contractNo, progressDoc: r.progressDoc, materialDoc: r.materialDoc,
       invoiceNo: r.invoiceNo, invoiceAmount: r.invoiceAmount,
@@ -485,7 +536,7 @@ export function useH2AdditionCheck(options: {
       attachmentPath: r.attachmentPath, ocrResult: r.ocrResult,
       auditConclusion: r.auditConclusion, indexRef: r.indexRef,
       samplingStatus: r.samplingStatus, remark: r.remark,
-    })))
+    }, r)))
   }
 
   // ─── Return ────────────────────────────────────────────────────────────────
@@ -498,6 +549,12 @@ export function useH2AdditionCheck(options: {
     mergeOcrResult, fillSamplingResults, updateSamplingParams,
     saveNote, saveConclusion, pushEvidenceGapsToH23, initFromAllResponses,
     applyEvidenceForMethod,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

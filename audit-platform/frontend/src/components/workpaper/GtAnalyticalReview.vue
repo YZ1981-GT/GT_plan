@@ -16,6 +16,7 @@
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/services/apiProxy'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 // ─── Types ───
 interface SheetRow {
@@ -569,7 +570,7 @@ onBeforeUnmount(() => {
           <span class="sheet-index">{{ currentSheet.index }}</span>
         </div>
         <div class="gt-analytical-review__table-wrap">
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th class="col-name">项目</th>
@@ -614,7 +615,7 @@ onBeforeUnmount(() => {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </div>
       </template>
 
@@ -625,7 +626,7 @@ onBeforeUnmount(() => {
           <span class="sheet-index">{{ currentSheet.index }}</span>
         </div>
         <div class="gt-analytical-review__table-wrap">
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th class="col-name">项目</th>
@@ -672,7 +673,7 @@ onBeforeUnmount(() => {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </div>
       </template>
 
@@ -733,7 +734,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="gt-analytical-review__table-wrap">
           <div class="gt-ar-subsection-title">可比公司</div>
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th>代号</th>
@@ -768,10 +769,10 @@ onBeforeUnmount(() => {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <div class="gt-ar-subsection-title">主要财务数据</div>
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th rowspan="2">指标</th>
@@ -807,10 +808,10 @@ onBeforeUnmount(() => {
                 </template>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <div class="gt-ar-subsection-title">对比分析表</div>
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th rowspan="2">指标</th>
@@ -846,7 +847,7 @@ onBeforeUnmount(() => {
                 </template>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <div class="gt-ar-subsection-title">数据来源标注</div>
           <el-input
@@ -867,7 +868,7 @@ onBeforeUnmount(() => {
         <div class="gt-analytical-review__table-wrap">
           <!-- 参数区 -->
           <div class="gt-ar-subsection-title">基本参数</div>
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th>参数</th>
@@ -926,7 +927,7 @@ onBeforeUnmount(() => {
                 <td class="gt-ar-hint">无优先股填 0</td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <!-- 股本变动明细 -->
           <div class="gt-ar-subsection-title">
@@ -935,7 +936,7 @@ onBeforeUnmount(() => {
               + 新增行
             </el-button>
           </div>
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th>日期</th>
@@ -997,11 +998,11 @@ onBeforeUnmount(() => {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <!-- 稀释因素 -->
           <div class="gt-ar-subsection-title">稀释因素</div>
-          <table class="gt-ar-table gt-compact-table">
+          <GtGridTable class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
                 <th>项目</th>
@@ -1040,7 +1041,7 @@ onBeforeUnmount(() => {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <!-- 计算结果 -->
           <div class="gt-ar-subsection-title">计算结果</div>

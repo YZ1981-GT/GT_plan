@@ -27,7 +27,10 @@ export interface AnalysisRow {
   label: string
   amount: number
   source: string
+  /** 借方区 = 备注（模板 D 列）；贷方区 = 说明（模板 E 列） */
   remark: string
+  /** 与对方科目核对（仅贷方区，模板「（三）贷方发生额分析」D 列） */
+  counterCheck?: string
 }
 
 export interface Top5DebtorRow {

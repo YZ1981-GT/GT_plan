@@ -16,6 +16,7 @@
  *
  * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 8.4, 8.5
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -181,7 +182,7 @@ function recalcNoteTypeRow(row: BadDebtNoteTypeRow): BadDebtNoteTypeRow {
  * 重算行内公式字段（与模板 D1-4 同口径：E = B + C + D、K = B + SUM(F:G) − SUM(H:J)、N = K + L + M）。
  * 期末未审从**期初未审**滚动（模板 B 列），期初调整只进期初审定。
  */
-function recalcRow(row: BadDebtRow): BadDebtRow {
+export function recalcRow(row: BadDebtRow): BadDebtRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
   const currentUnadjusted = calcBadDebtEndBalance(
     row.priorUnadjusted,
@@ -202,10 +203,7 @@ function recalcRow(row: BadDebtRow): BadDebtRow {
 
 /** 生成动态子行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `sub-${crypto.randomUUID()}`
-  }
-  return `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `sub-${newUuid()}`
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

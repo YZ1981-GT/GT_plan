@@ -162,27 +162,29 @@ class TestResolverExamples:
 
     async def test_multiple_candidates_rejected(self, session):
         """Req 4.9：同 procedure_code 的两个实例落到不同 wp_index → multi_candidate。"""
-        from app.models.procedure_models import ProcedureInstance
-
         proj = await mk_project(session)
         await mk_wp_index(session, proj.id, wp_code="X-1")
         await mk_wp_index(session, proj.id, wp_code="X-2")
-        # 两个同 procedure_code 的实例，分别绑不同底稿 wp_code
-        await mk_procedure_instance(session, proj.id, wp_code="X-1")
-        await mk_procedure_instance(session, proj.id, wp_code="X-2")
-        # 归一为同一 procedure_code "DUP" → 该来源产生两个不同 wp_index 候选
-        await session.execute(
-            sa.update(ProcedureInstance)
-            .where(ProcedureInstance.project_id == proj.id)
-            .values(procedure_code="DUP")
-        )
-        await session.flush()
+        # active 唯一约束按项目+循环：跨循环同 procedure_code 仍合法；不传 audit_cycle 时来源必须拒绝多候选。
+        await mk_procedure_instance(session, proj.id, audit_cycle="D", procedure_code="DUP", wp_code="X-1")
+        await mk_procedure_instance(session, proj.id, audit_cycle="E", procedure_code="DUP", wp_code="X-2")
         res = await ProcedureWpResolver(session).resolve(
             ProcedureBindingSources(project_id=proj.id, procedure_code="DUP")
         )
         assert res.ok is False
         assert res.reason is BindingRejectReason.multi_candidate
         assert res.audit_reason == "binding_conflict"
+
+    async def test_procedure_identity_inputs_are_normalized(self, session):
+        proj = await mk_project(session)
+        wi = await mk_wp_index(session, proj.id, wp_code="X-1")
+        await mk_procedure_instance(
+            session, proj.id, audit_cycle="D", procedure_code="CUSTOM-1", wp_code="X-1",
+        )
+        res = await ProcedureWpResolver(session).resolve(
+            ProcedureBindingSources(project_id=proj.id, procedure_code=" custom-1 ", audit_cycle=" d ")
+        )
+        assert res.ok is True and res.wp_index_id == wi.id
 
     async def test_sheet_name_only_rejected_global(self, session):
         """Req 4.5：仅提供 sheet_name（页面级，无 identity 源）→ sheet_only，禁止全局推断。"""

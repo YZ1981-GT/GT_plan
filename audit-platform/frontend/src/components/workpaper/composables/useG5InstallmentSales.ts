@@ -12,6 +12,7 @@
  *
  * 期末汇总勾稽对齐 Excel「有融资性质的销售形成的长期应收款」模板。
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import {
   parseNum,
@@ -157,7 +158,7 @@ function normalizeInitial(raw: any): InstallmentInitialData {
 
 function createEmptyPeriod(periodNo: number): InstallmentPeriod {
   return {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     periodNo,
     collectionDate: '',
     openingReceivable: 0,
@@ -360,7 +361,7 @@ export function useG5InstallmentSales() {
     })
     if (!value?.trim()) return
     const g: InstallmentSalesGroup = {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       projectName: value.trim(),
       initial: emptyInitial(),
       periods: [createEmptyPeriod(1)],
@@ -420,7 +421,7 @@ export function useG5InstallmentSales() {
       const name = String(r.debtorName || r.contractNo || '').trim() || `分期销售-${added + 1}`
       if (existing.has(name)) continue
       const g: InstallmentSalesGroup = {
-        id: crypto.randomUUID(),
+        id: newUuid(),
         projectName: name,
         initial: emptyInitial(),
         periods: [createEmptyPeriod(1)],
@@ -459,12 +460,12 @@ export function useG5InstallmentSales() {
     if (!data) return
     if (Array.isArray(data.groups)) {
       groups.value = data.groups.map((g: any) => ({
-        id: g.id || crypto.randomUUID(),
+        id: g.id || newUuid(),
         projectName: g.projectName || '',
         initial: normalizeInitial(g.initial),
         periods: Array.isArray(g.periods)
           ? g.periods.map((p: any, idx: number) => ({
-              id: p.id || crypto.randomUUID(),
+              id: p.id || newUuid(),
               periodNo: p.periodNo ?? idx + 1,
               collectionDate: String(p.collectionDate ?? ''),
               openingReceivable: parseNum(p.openingReceivable),

@@ -2,6 +2,7 @@
  * useF2ValuationMonthlySheet — F2-38/39/40 多产品×月度计价测试基座
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
 import type { SamplingParams } from './useF2ValuationTestFormulas'
 import {
@@ -110,6 +111,15 @@ export function useF2ValuationMonthlySheet(
     ].filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function persist(): void {
     if (readonly.value) return

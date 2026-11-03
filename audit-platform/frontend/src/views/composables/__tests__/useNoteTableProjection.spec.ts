@@ -190,13 +190,15 @@ describe('useNoteTableProjection — 三层兜底顺序即优先级', () => {
   })
 })
 
-describe('useNoteTableProjection — activeTableColumns 的 null 语义', () => {
-  it('🔴 无 _column_groups ⇒ 返回 null（表示"走扁平列逻辑"，不是"无列"）', () => {
+describe('useNoteTableProjection — activeTableColumns 列树（任意层表头）', () => {
+  it('无分组 ⇒ 全是叶子（平表头），坐标即表头下标', () => {
     const { activeTableColumns } = mount({ table_data: { _tables: [mainTable()] } })
-    expect(activeTableColumns.value).toBeNull()
+    expect(activeTableColumns.value).toEqual(
+      mainTable().headers.map((label: string, headerIdx: number) => ({ label, headerIdx })),
+    )
   })
 
-  it('无表头 ⇒ 返回空数组（与 null 语义不同，模板据此分支）', () => {
+  it('无表头 ⇒ 空数组', () => {
     const { activeTableColumns } = mount({
       table_data: { _tables: [{ name: 'x', headers: [], rows: [] }] },
     })
@@ -211,15 +213,11 @@ describe('useNoteTableProjection — activeTableColumns 的 null 语义', () => 
       _column_groups: [{ group: '变动', start: 1, span: 2 }],
     }
     const { activeTableColumns } = mount({ table_data: { _tables: [table] } })
-    const cols = activeTableColumns.value!
-    expect(cols).toHaveLength(3)
-    expect(cols[0]).toEqual({ type: 'flat', headerIdx: 0, label: '项目' })
-    expect(cols[1]).toEqual({
-      type: 'grouped',
-      group: '变动',
-      children: [{ headerIdx: 1, label: '期初' }, { headerIdx: 2, label: '本期增' }],
-    })
-    expect(cols[2]).toEqual({ type: 'flat', headerIdx: 3, label: '期末' })
+    expect(activeTableColumns.value).toEqual([
+      { label: '项目', headerIdx: 0 },
+      { label: '变动', children: [{ label: '期初', headerIdx: 1 }, { label: '本期增', headerIdx: 2 }] },
+      { label: '期末', headerIdx: 3 },
+    ])
   })
 })
 
@@ -265,5 +263,74 @@ describe('useNoteTableProjection — activeTableTab 切换', () => {
     expect(activeTableData.value.name).toBe('另一张')
     activeTableTab.value = '99'
     expect(activeTableData.value.name).toBe('按项目分类披露')
+  })
+})
+
+// spec note-pull-header-formula-closure R4 / ADR-3：期间层只在显示还原（后端读时增强挂 _display_layout）
+describe('useNoteTableProjection — 期间层（期间并列 / 最上层期间）', () => {
+  const part = (name: string, vals: number[], layout: any) => ({
+    name,
+    headers: ['类别', '金额', '比例', '账面价值'],
+    _column_groups: [{ group: '账面余额', start: 1, span: 2 }],
+    rows: [{ label: '按单项', values: vals }, { label: '合计', values: vals, is_total: true }],
+    _display_layout: layout,
+  })
+  const END = (vals = [100, 10, 90]) => part('（2）分类', vals, { mode: 'side_by_side', group: '（2）分类', order: 0, period: '期末数' })
+  const BEGIN = (vals = [80, 8, 72]) => part('（2）分类（续：期初数）', vals, { mode: 'side_by_side', group: '（2）分类', order: 1, period: '期初数' })
+
+  it('同组两张表横向合成一张：数据列外包各自期间，编辑坐标仍指向各自的源表', () => {
+    const { currentNoteTables, activeTableColumns, resolveProjectedTableIndex } = mount({
+      table_data: { _tables: [END(), BEGIN()] },
+    })
+    expect(currentNoteTables.value).toHaveLength(1)
+    const table = currentNoteTables.value[0]
+    expect(table.headers).toEqual(['类别', '金额', '比例', '账面价值', '金额', '比例', '账面价值'])
+    expect(table.rows[0].values).toEqual([100, 10, 90, 80, 8, 72])
+    expect(table._sourceCellRefs[0][3]).toMatchObject({ row: { tableIndex: 1, rowIndex: 0 }, column: { tableIndex: 1, valueIndex: 0 } })
+    expect(resolveProjectedTableIndex(1)).toBe(0)
+    expect(activeTableColumns.value).toEqual([
+      { label: '类别', headerIdx: 0 },
+      { label: '期末数', children: [
+        { label: '账面余额', children: [{ label: '金额', headerIdx: 1 }, { label: '比例', headerIdx: 2 }] },
+        { label: '账面价值', headerIdx: 3 },
+      ] },
+      { label: '期初数', children: [
+        { label: '账面余额', children: [{ label: '金额', headerIdx: 4 }, { label: '比例', headerIdx: 5 }] },
+        { label: '账面价值', headerIdx: 6 },
+      ] },
+    ])
+  })
+
+  it('合成表里改期初列，保存时写回第 2 张源表', async () => {
+    const { prepareNoteTableData } = await import('../noteTableWriteback')
+    const td = { _tables: [END(), BEGIN()] }
+    const { currentNoteTables } = mount({ table_data: td })
+    const merged = currentNoteTables.value[0]
+    merged.rows[0].values[3] = 81
+    merged.rows[0].values[0] = 101
+    const out: any = prepareNoteTableData(td, [merged])
+    expect(out._tables[1].rows[0].values[0]).toBe(81)
+    expect(out._tables[0].rows[0].values[0]).toBe(101)
+    expect(out._tables[0].rows[0].values, '期末表不多出期初的列').toHaveLength(3)
+  })
+
+  it('行名不一致不合成（不猜），源数据不被改写', () => {
+    const begin = BEGIN()
+    begin.rows[0].label = '按组合'
+    const src = [END(), begin]
+    const snapshot = JSON.stringify(src)
+    const { currentNoteTables } = mount({ table_data: { _tables: src } })
+    expect(currentNoteTables.value.map((t: any) => t.name)).toEqual(['（2）分类', '（2）分类（续：期初数）'])
+    expect(JSON.stringify(src)).toBe(snapshot)
+  })
+
+  it('最上层期间：数据列外包期间（标签列在外）', () => {
+    const t = { name: '组合计提项目', headers: ['账龄', '应收账款', '坏账准备'], rows: [],
+      _display_layout: { mode: 'top', period: '期末数' } }
+    const { activeTableColumns } = mount({ table_data: { _tables: [t] } })
+    expect(activeTableColumns.value).toEqual([
+      { label: '账龄', headerIdx: 0 },
+      { label: '期末数', children: [{ label: '应收账款', headerIdx: 1 }, { label: '坏账准备', headerIdx: 2 }] },
+    ])
   })
 })

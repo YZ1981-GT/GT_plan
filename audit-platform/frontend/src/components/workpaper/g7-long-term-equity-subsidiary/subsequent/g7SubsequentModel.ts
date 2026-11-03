@@ -6,6 +6,7 @@
  * 3、处置子公司权益但不丧失控制权（个别确认损益 + 合并调权益）
  */
 
+import { newUuid } from '@/utils/uuid'
 import {
   calcConsiderationTotal,
   calcCostMethodIncome,
@@ -114,10 +115,7 @@ export interface G7SubsequentIssue {
 }
 
 function uid(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${newUuid()}`
 }
 
 export function nullableNumber(value: unknown): number | null {

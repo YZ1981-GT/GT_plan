@@ -23,6 +23,8 @@ from app.services.business_category_service import (
     get_template_list_with_applicability,
 )
 from app.services.procedure_scope_retention import TrimScopeUnavailable, load_trimmed_scope
+from app.services.project_classification import project_classification
+from app.services.project_classification import resolve as resolve_classification
 
 router = APIRouter(prefix="/api/workpapers/template-list")
 
@@ -42,9 +44,9 @@ async def get_template_list(
         await db.execute(select(Project).where(Project.id == project_id))
     ).scalar_one_or_none()
 
-    category = "C"
-    if project and hasattr(project, "business_category"):
-        category = project.business_category or "C"
+    # 质控业务分类单一解释（R4）：未填写 / 未登记值（含旧场景值 IPO）按 C 类，原先 IPO 被当成「I 类」
+    classification = project_classification(project) if project is not None else resolve_classification(None)
+    category = classification.category_code or classification.category_group
 
     try:
         scope = await load_trimmed_scope(db, project_id)

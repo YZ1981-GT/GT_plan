@@ -98,6 +98,21 @@ def _load_note_template(template_type: str) -> list[dict]:
     return sections
 
 
+def template_section_title(template_type: str | None, section_number: str | None) -> str | None:
+    """附注模板（种子）里该章节号的章节标题；模板类型 / 章节不存在返回 None。"""
+    if not template_type or not section_number:
+        return None
+    try:
+        sections = _load_note_template(template_type)
+    except (OSError, json.JSONDecodeError):
+        return None
+    for sec in sections:
+        if sec.get("section_number") == section_number:
+            title = str(sec.get("section_title") or "").strip()
+            return title or None
+    return None
+
+
 def _find_template_table(
     template_type: str, section_number: str, table_name: str,
 ) -> dict | None:
@@ -343,13 +358,33 @@ def legacy_value_keys(table: Mapping[str, Any]) -> tuple[list[str], str | None]:
     return keys, note
 
 
-def _pick_table(tables: list, name: str) -> int:
-    """规则表名与某张表同名（去空白比）就推那张；否则首表（= 顶层镜像那张，原兜底写的就是它）。"""
+def _find_table(tables: list, name: str) -> int | None:
+    """与规则表名同名（去空白比）的那张表的序号；没有返回 None。"""
     want = _norm_header(name)
     for index, table in enumerate(tables):
         if want and isinstance(table, dict) and _norm_header(table.get("name")) == want:
             return index
-    return 0
+    return None
+
+
+def _pick_table(tables: list, name: str) -> int:
+    """规则表名与某张表同名（去空白比）就推那张；否则首表（= 顶层镜像那张，原兜底写的就是它）。主表规则用。"""
+    index = _find_table(tables, name)
+    return 0 if index is None else index
+
+
+def has_table(table_data: Any, table: str) -> bool:
+    """章节里有没有这张表：``sub_table_data`` 的键（精确，与 ``locate_table`` 同口径）、``_tables[].name``（去空白比）；
+    旧单表格式看顶层 ``name``。子表规则据此判断章节是否就是目标（spec note-pull-followup-closure R2.3）。"""
+    if not isinstance(table_data, dict) or not str(table or "").strip():
+        return False
+    sub = table_data.get("sub_table_data")
+    if isinstance(sub, dict) and sub:
+        return table in sub
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        return _find_table(tables, table) is not None
+    return bool(table_data.get("rows")) and _norm_header(table_data.get("name")) == _norm_header(table)
 
 
 def sync_first_table_mirror(table_data: dict) -> None:
@@ -366,13 +401,15 @@ def sync_first_table_mirror(table_data: dict) -> None:
         table_data["rows"] = copy.deepcopy(first)
 
 
-def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | None]:
+def locate_table(table_data: Any, table: str, *, exact: bool = False) -> tuple[NoteTable | None, str | None]:
     """定位附注表；返回 (表, None) 或 (None, 中文跳过原因)。
 
     分级判断（spec: formula-push-note-skip-reduction · 需求 1.1–1.3）：
     - ``_source`` 明确非底稿 → 跳过
     - ``sub_table_data`` 存在且含目标子表 → 按子表定位
     - 无 ``sub_table_data`` 但有顶层 ``rows`` → 旧格式兜底
+
+    ``exact``（子表规则）：旧格式也只认同名表，不回退首表（spec note-pull-followup-closure R2.3）。
     """
     if not isinstance(table_data, dict) or not table_data:
         return None, "附注章节尚无表格数据"
@@ -401,7 +438,10 @@ def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | N
     locked = detect_manual_override(table_data)
     tables = table_data.get("_tables")
     if isinstance(tables, list) and tables:
-        target = tables[_pick_table(tables, table)]
+        index = _find_table(tables, table) if exact else _pick_table(tables, table)
+        if index is None:
+            return None, f"附注中没有「{table}」表"
+        target = tables[index]
         rows = target.get("rows") if isinstance(target, dict) else None
         if not (isinstance(rows, list) and rows):
             return None, "附注章节无可定位的表格数据"
@@ -409,6 +449,8 @@ def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | N
         return NoteTable(rows=rows, value_keys=keys, section_locked=locked, column_note=note), None
     rows = table_data.get("rows")
     if isinstance(rows, list) and rows:
+        if exact and _norm_header(table_data.get("name")) != _norm_header(table):
+            return None, f"附注中没有「{table}」表"
         keys, note = legacy_value_keys(table_data)
         return NoteTable(rows=rows, value_keys=keys, section_locked=locked, column_note=note), None
 
@@ -530,11 +572,29 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
     return None
 
 
+def total_row_candidates(rows: Sequence[Any]) -> list[int]:
+    """表里全部汇总行（``is_total`` 或 ``row_type=total``）的下标，按出现顺序。"""
+    return [
+        index for index, row in enumerate(rows)
+        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
+    ]
+
+
 def find_total_row(rows: Sequence[Any]) -> int | None:
-    for index, row in enumerate(rows):
-        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total"):
+    """找整表最终合计，优先级：明确 ``row_type=total`` / 标签「合计、总计」> 其他 is_total。
+
+    一张表可同时有分段「小计」和末尾「合计」。合计按上方各行重算时要的是最终合计；倒序优先最终合计，只有小计时
+    仍返回最后一个可用汇总行。🔴 「取数行对不上任何明细行、把科目余额兜底写进合计」不能用它挑行：有多个汇总行时
+    科目余额是哪一段（原值合计还是账面价值合计、小计还是减去减值后的合计）由科目决定，引擎不知道，见
+    ``engine._push_note`` 的兜底分支（只在恰好一个汇总行时兜底）。
+    """
+    candidates = total_row_candidates(rows)
+    for index in reversed(candidates):
+        row = rows[index]
+        label = row_label(row).replace(" ", "")
+        if row.get("row_type") == "total" or label in {"合计", "总计"}:
             return index
-    return None
+    return candidates[-1] if candidates else None
 
 
 def _is_f3(row: Any, field: str) -> bool:
@@ -576,16 +636,24 @@ def external_mode(section_locked: bool, cell_mode: str | None) -> str | None:
     return None
 
 
-def total_formula(rows: Sequence[Any], total_index: int, field: str, value_keys: list[str]) -> float:
-    """合计 = 合计行之前各非合计行该列之和（缺值按 0；「其中：」行在合计之后，天然不计）。"""
+def total_formula(rows: Sequence[Any], total_index: int, field: str, value_keys: list[str]) -> float | None:
+    """合计 = 合计行之前各非合计行该列之和（缺值按 0；「其中：」行在合计之后，天然不计）。
+
+    上方各行这一列一个数都没有 ⇒ 返回 ``None``：合计是「不知道」，不是 0（填了 0 的格算有数）。原来全空也按 0 求和，
+    推送把空表的合计写成 0（2026-10-31 真库：三个项目 八、9 其他应收款、八、42 其他应付款 主表合计都是 [0, 0]）。
+    spec disclosure-note-template-word-realignment Task 34/35。
+    """
     total = 0.0
+    has_number = False
     for row in rows[:total_index]:
         if not isinstance(row, dict) or row.get("is_total"):
             continue
         ok, current, _ = read_cell(row, field, value_keys)
         number = read_number(current) if ok else None
-        total = total + (number if number is not None else 0.0)
-    return total
+        if number is not None:
+            total = total + number
+            has_number = True
+    return total if has_number else None
 
 
 def has_obscured_data(table_data: dict, table_name: str) -> str | None:

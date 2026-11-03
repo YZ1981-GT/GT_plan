@@ -75,6 +75,9 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   projectId: string
   defaultDomain?: string
+  initialTemplateId?: string
+  initialTemplateAction?: 'subscribe'
+  initialTemplateDomain?: string
 }>(), { defaultDomain: 'report' })
 
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; changed: [domain: string] }>()
@@ -131,7 +134,7 @@ async function loadAll() {
 
 watch(() => props.modelValue, async (open) => {
   if (!open) return
-  domain.value = props.defaultDomain
+  domain.value = props.initialTemplateDomain || props.defaultDomain
   unsubscribeMode.value = 'keep'
   // 域清单与模板清单并行取（loadAll 同步进入加载态）：原先等域清单回来才开始加载，期间列表空着、
   // 露出「没有可订阅的模板」（R5 走查：公式管理中心还在加载时打开订阅，几秒内都是这句）
@@ -139,6 +142,10 @@ watch(() => props.modelValue, async (open) => {
     .then((data) => { domainOptions.value = (data?.domains || []).filter((d) => d.wired) })
     .catch(() => { /* 域清单拿不到时只显示当前域 */ })
   await Promise.all([domainsReq, loadAll()])
+  if (props.initialTemplateAction === 'subscribe' && props.initialTemplateId && !current.value) {
+    const target = templates.value.find((t) => t.id === props.initialTemplateId)
+    if (target) await onSubscribePreview(target)
+  }
 }, { immediate: true })
 
 watch(domain, () => { if (props.modelValue) void loadAll() })

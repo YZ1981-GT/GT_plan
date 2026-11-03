@@ -53,6 +53,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj } from '@/services/apiPaths'
 import { eventBus } from '@/utils/eventBus'
 import type { StandardChangePayload, FourColSwitchPayload } from '@/utils/eventBus'
 
@@ -78,10 +79,20 @@ function onSwitchFourCol(payload: FourColSwitchPayload) {
   }
 }
 
-onMounted(() => {
-  loadData()
+/** 附注章节按项目口径（template_type）取：四栏目录挂载晚于合并页读项目信息，错过那次准则广播 */
+async function loadProjectStandard() {
+  if (!_projectId.value) return
+  try {
+    const p: any = await api.get(P_proj.detail(_projectId.value), { validateStatus: (s: number) => s < 600 })
+    if (p?.template_type === 'listed' || p?.template_type === 'soe') standard.value = p.template_type
+  } catch { /* 取不到按国企版 */ }
+}
+
+onMounted(async () => {
   eventBus.on('standard-change', onStandardChanged)
   eventBus.on('four-col-switch', onSwitchFourCol)
+  await loadProjectStandard()
+  loadData()
 })
 
 onUnmounted(() => {

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 import app.models  # noqa: E402, F401  全量注册（外键引用的表要在 metadata 里）
-from app.models.audit_log_models import AuditLogEntry  # noqa: E402
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry  # noqa: E402
 from app.models.base import Base, PermissionLevel, ProjectStatus  # noqa: E402
 from app.models.core import Project, ProjectUser, User  # noqa: E402
 from app.models.formula_setting_models import (  # noqa: E402
@@ -25,7 +25,8 @@ from app.models.formula_setting_models import (  # noqa: E402
 from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig  # noqa: E402
 
 MODELS = [User, Project, ProjectUser, ReportConfig, FinancialReport, FormulaSetting, FormulaSyncItem, FormulaPublish,
-          FormulaTemplate, FormulaTemplateVersion, FormulaTemplateSubscription, AuditLogEntry]
+          FormulaTemplate, FormulaTemplateVersion, FormulaTemplateSubscription, AuditLogEntry,
+          AuditChainHead]
 STD = "soe_standalone"
 BS = FinancialReportType.balance_sheet
 

@@ -130,12 +130,25 @@ def _assert_contract_criterion_number_agrees() -> None:
         LaneUndecidedError,
         assert_projection_lane,
     )
+    from app.services.workpaper_sync.entry_profile import manifest_entries_by_id
 
     if not DELIVERED_PER_ENTRY_CONTRACTS:  # pragma: no cover — 登记表恒非空
         raise FirstPublicationError(
             "DELIVERED_PER_ENTRY_CONTRACTS 为空 —— 判据编号锁失去分母"
         )
-    entry_id = str(DELIVERED_PER_ENTRY_CONTRACTS[0]["entry_id"])
+    entries = manifest_entries_by_id()
+    eligible = [
+        row
+        for row in DELIVERED_PER_ENTRY_CONTRACTS
+        if (entry := entries.get(str(row["entry_id"]))) is not None
+        and entry.get("independent_entry")
+        and entry.get("capability") == "bidirectional"
+    ]
+    if not eligible:  # pragma: no cover — 至少一个 production projection entry
+        raise FirstPublicationError(
+            "没有已终裁 bidirectional 的交付契约可用于判据编号锁"
+        )
+    entry_id = str(eligible[0]["entry_id"])
 
     original = contracts_module.load_contract
 

@@ -83,10 +83,10 @@ _SECTION_PROMPTS: dict[str, str] = {
         "是否存在需要核销的已确认无法收回款项。"
     ),
     "overall-opinion": (
-        "请生成K1-1审定表底部的审计综合意见，综合评价其他应收款科目整体的存在性、"
+        "请提供K1-1审定表底部的科目结论措辞建议，综合评价其他应收款科目整体的存在性、"
         "完整性、计价和分摊（坏账准备充分性）、权利和义务、列报与披露的恰当性。"
         "说明是否发现需要调整的重大事项，审定数与未审数的主要差异原因，"
-        "对报表层面影响的结论。"
+        "列明对报表层面潜在影响的判断因素、证据缺口和建议程序；不得形成最终审计意见。"
     ),
     "writeoff-eval": (
         "请生成K1-9坏账准备转回（收回）、核销检查表的审计说明，"
@@ -169,7 +169,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

@@ -74,7 +74,10 @@ async def _seed_case(session, *, formula_id: uuid.UUID, sheet: str, cell: str, e
         id=wp_id, project_id=project_id, wp_index_id=wp_index_id,
         file_path="/tmp/formula-runtime.xlsx", source_type=WpSourceType.template,
         status=WpFileStatus.draft, review_status=WpReviewStatus.not_submitted,
-        is_deleted=False, parsed_data={},
+        # 目标工作表须已存在：formula-hub-integrity-closure 需求 1.8 起 Runtime 任何路径不新建工作表，
+        # 目标表不存在 ⇒ 计划阶段 blocked（原夹具 parsed_data={} 会让本文件前两条用例
+        # 一条被 blocked、一条在业务写入之前就失败而空转通过）
+        is_deleted=False, parsed_data={"html_data": {sheet: {"cells": {}}}},
     ))
     await session.flush()
     session.add(WpFormula(

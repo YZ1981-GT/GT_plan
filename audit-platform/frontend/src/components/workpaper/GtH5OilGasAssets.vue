@@ -4,14 +4,15 @@
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 行业适用性守卫：非 oil_gas/mining 行业 -->
-    <el-empty
-      v-else-if="!isApplicable"
-      description="本底稿仅适用于石油天然气/采矿行业项目"
-      :image-size="120"
-    />
-
     <template v-else>
+      <!-- 试算表里找不到油气资产科目时提示（不阻断；原按「行业」整页拦截，平台没有行业来源） -->
+      <WpAccountAbsenceHint
+        :project-id="props.projectId"
+        cycle="H"
+        account-name="油气资产"
+        usual-scope="油气资产（CAS 27 石油天然气开采）通常只在油气开采企业核算"
+        :accounts-found="accountsFound"
+      />
       <!--
         🔴 切换器改 `v-model` 且**不再带 `:disabled`**：原 `modeOptions` 里
         `disabled: !isOoAvailable.value` 在健康检查（mount 期异步）未就绪时把「在线编辑」
@@ -19,7 +20,7 @@
         `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
       -->
       <div v-if="showHtmlToolbar && currentSheet !== 'H5'" class="h5-header-toolbar">
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h5OEntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h5-oil-gas-assets" />
         <span class="h5-oo-tag" :class="`h5-oo-tag--${hSync.syncStateTag.value.type}`">
           {{ hSync.syncStateTag.value.text }}
@@ -285,6 +286,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :save-response="persistResponse"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -310,19 +312,23 @@
  * sheetName prop v-if 分发到全部21个子组件，无内部 el-tabs。
  * 外层 GtWpRenderer 通过底稿目录行(chips)控制当前 sheet。
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
- * 行业守卫: applicable_when industry IN ['oil_gas','mining']。
+ * 科目提示: 渲染返回 accounts_found=false 时顶部提示（不阻断，WpAccountAbsenceHint）；不按行业拦截
+ *   （平台没有项目级行业来源，spec trim-followup-residual-findings-closure R1）。
  * useVersionTrail: autoSnapshot on save。
  *
  * Spec: .kiro/specs/h5-oil-gas-assets/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9, 1.11
  */
 import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import WpAccountAbsenceHint from './shared/WpAccountAbsenceHint.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
+import { useH5FormData } from './composables/useH5FormData'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -389,24 +395,28 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 const _h5TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
 provide('tbSourceCodes', _h5TbSourceCodes)
 
-// ─── 行业适用性守卫 ──────────────────────────────────────────────────────────
-const projectContext = inject<any>('projectContext', null)
-const isApplicable = ref(true)
-
-function checkIndustryApplicability() {
-  if (!projectContext?.value && !projectContext) return // 无context默认放行
-  const ctx = projectContext?.value || projectContext
-  const industry = ctx?.industry || ctx?.project?.industry || ''
-  if (industry && !['oil_gas', 'mining'].includes(industry)) {
-    isApplicable.value = false
-  }
-}
+// ─── 科目提示（渲染返回 accounts_found；自加载时从 render-config 取） ──────────
+const selfLoadedAccountsFound = ref<boolean | null>(null)
+const accountsFound = computed<boolean | null>(() =>
+  typeof props.htmlData?.accounts_found === 'boolean' ? props.htmlData.accounts_found : selfLoadedAccountsFound.value)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
+const h5FormData = useH5FormData({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  allResponses,
+})
+
+/** H5 国企披露文字的唯一保存 adapter：同一 Map 乐观更新，再走现有 checklist PUT。 */
+async function persistResponse(itemId: string, value: any): Promise<void> {
+  if (isReadonly.value) return
+  await h5FormData.saveResponse(itemId, value)
+}
+
 const depletionBranch = ref<'noImpair' | 'withImpair'>('noImpair')
 
 // ─── 双模式切换（统一接桥，替代宿主内联的第二份实现）──────────────────────────
@@ -504,6 +514,9 @@ async function selfLoad(): Promise<void> {
         for (const sheet of data.sheets) {
           _mergeResponses(map, sheet.html_data?.allResponses)
           _mergeResponses(map, sheet.html_data?.responses_snapshot)
+          if (typeof sheet.html_data?.accounts_found === 'boolean') {
+            selfLoadedAccountsFound.value = sheet.html_data.accounts_found
+          }
         }
         allResponses.value = map
       }
@@ -528,9 +541,23 @@ provide('h5OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
-  checkIndustryApplicability()
   void selfLoad()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const h5OEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H5_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

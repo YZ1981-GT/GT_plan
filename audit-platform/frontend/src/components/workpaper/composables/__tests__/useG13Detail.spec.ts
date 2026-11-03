@@ -192,5 +192,8 @@ describe('G13 formula — 对应科目恒等式', () => {
     expect(isBsFvReconciled(100, 30, 140)).toBe(false)
     expect(isPlReconciled(30, 30)).toBe(true)
     expect(isPlReconciled(30, 25)).toBe(false)
+    // 按分相等：浮点尾差算平，差一分不平（原 |差|≤0.01 在 0.00999… 时判平）
+    expect(isPlReconciled(0.1 + 0.2, 0.3)).toBe(true)
+    expect(isPlReconciled(-239135.95, -239135.95999999996)).toBe(false)
   })
 })

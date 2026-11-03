@@ -787,9 +787,13 @@ class TestTraceCellRegression:
             new=AsyncMock(return_value=trace_result),
         ) as trace_mock:
             result = _run(notes_router.trace_cell(NOTE_ID, 0, 1, db, _user()))
+            _run(notes_router.trace_cell(NOTE_ID, 2, 0, db, _user(), table_index=3))
 
         assert result == trace_result
-        trace_mock.assert_awaited_once_with(NOTE_ID, 0, 1)
+        # 表序号原样传给引擎（原先只看第 1 张表；spec note-chain-followup-optimizations R2）
+        assert trace_mock.await_args_list[0].args == (NOTE_ID, 0, 1)
+        assert trace_mock.await_args_list[0].kwargs == {"table_index": 0}
+        assert trace_mock.await_args_list[1].kwargs == {"table_index": 3}
 
     def test_trace_cell_note_not_found_returns_error_dict(self):
         """note_id 不存在时返回 200 + error 字段（非 HTTPException，前端友好降级）。"""

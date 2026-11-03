@@ -3,14 +3,14 @@
 **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6**
 
 This test encodes the EXPECTED behavior after fix:
-  - execute/batch-execute with invisible project_id → 403
+  - execute with invisible project_id → 403（batch-execute 已删除：advanced-query-linkage-closure 任务 6）
   - cell-writeback without edit permission → 403
   - workpaper lookup must filter by project_id (no cross-project hit)
 
 On UNFIXED code, these tests MUST FAIL — confirming the bugs exist.
 
 Bug Condition:
-  §5.12: execute/batch-execute have no project_id ∈ get_visible_project_ids check
+  §5.12: execute (and the since-deleted batch-execute) had no project_id ∈ get_visible_project_ids check
   §5.13: cell-writeback has zero auth for workpaper module, wp lookup ignores project_id
 """
 
@@ -122,65 +122,6 @@ async def test_execute_rejects_invisible_project(
         f"User role={role}, project_id={invisible_project_id}. "
         f"The endpoint has no project visibility check — any logged-in user "
         f"can query any project's data (IDOR read)."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Property 1b: IDOR on batch-execute — no visibility check exists
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-@settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
-@given(
-    invisible_project_id=st_project_id,
-    role=st_non_admin_role,
-)
-async def test_batch_execute_rejects_invisible_project(
-    invisible_project_id, role
-):
-    """Property 1b: Bug Condition — batch-execute with invisible project_id must return 403.
-
-    For any (user, project_id) where project_id NOT IN get_visible_project_ids(user),
-    batch_execute SHALL return 403 before executing any wp_code sub-query.
-
-    **Validates: Requirements 1.2**
-
-    EXPECTED: This test FAILS on unfixed code.
-    """
-    from fastapi import HTTPException
-    from app.routers.custom_query import batch_execute
-
-    user = _make_user(role=role)
-
-    body = MagicMock()
-    body.project_id = invisible_project_id
-    body.wp_codes = ["D2-1"]
-    body.year = 2024
-    body.filters = {}
-    body.sheet_name = None
-    body.cell_range = None
-
-    response = MagicMock()
-    response.headers = {}
-
-    db = AsyncMock()
-    mock_exec_result = MagicMock()
-    mock_exec_result.all.return_value = []  # user sees no projects
-    db.execute.return_value = mock_exec_result
-
-    with patch("app.services.gin_index_monitor.is_index_building", return_value=False):
-        try:
-            result = await batch_execute(body=body, response=response, db=db, current_user=user)
-            got_403 = False
-        except HTTPException as e:
-            got_403 = (e.status_code == 403)
-            if not got_403:
-                raise
-
-    assert got_403, (
-        f"BUG CONFIRMED: batch_execute did NOT return 403 for invisible project! "
-        f"User role={role}, project_id={invisible_project_id}. "
-        f"The endpoint has no project visibility check (IDOR read)."
     )
 
 

@@ -16,6 +16,11 @@ import {
   collectDecreaseEvidenceGaps,
   mergeEvidenceGapRowsToH23,
 } from './h2EvidenceGapPush'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf } from './assetVoucherFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -274,6 +279,17 @@ function _migrateLegacyFields(r: any): Partial<H2DecreaseRow> {
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：审批、验收、盖章、函证、关联方、结论等 */
+export function hasH2DecreaseContent(r: H2DecreaseRow): boolean {
+  return [r.approvalRef, r.isApproved, r.acceptanceDate, r.stampEngineering, r.stampContractor, r.stampSupervisor,
+    r.otherEvidence, r.queryNo, r.relatedPartyName, r.relationship, r.auditConclusion, r.indexRef]
+    .some(v => String(v ?? '').trim() !== '')
+    || [r.transferInterestCap, r.otherDecreaseAmount, r.otherInterestCap, r.acceptanceAmount, r.disposalIncome]
+      .some(v => Number(v) !== 0)
+    || r.isProvisional === '是' || r.isRelatedParty === '是' || r.isAbnormal === '是'
+    || r.samplingStatus === '已检查' || r.samplingStatus === '已确认'
+}
+
 export function useH2DecreaseCheck(options: {
   wpId: Ref<string>
   projectId: Ref<string>
@@ -363,7 +379,9 @@ export function useH2DecreaseCheck(options: {
 
   function initFromAllResponses(): void {
     const data = _getJson(ROWS_KEY)
-    rows.value = Array.isArray(data) && data.length > 0 ? data.map(_normalizeRow) : []
+    rows.value = Array.isArray(data) && data.length > 0
+      ? data.map((r: any, i: number) => withRowMeta(_normalizeRow(r, i), r)) : []
+    voucherFill.markLoaded()
 
     const params = _getJson(PARAMS_KEY)
     if (params && typeof params === 'object') {
@@ -383,6 +401,36 @@ export function useH2DecreaseCheck(options: {
     auditNote.value = _getString(NOTE_KEY)
     auditConclusion.value = _getString(CONCLUSION_KEY)
   }
+
+  /**
+   * 共享回填函数的待写入项 → 减少检查行（任务 12）：一个样本一行，金额取样本自己那一栏（减少在贷方），
+   * 红字带符号照记；默认记入转入固定资产，用户可改到其他减少
+   */
+  function _rowFromPrepared(item: PreparedItem): H2DecreaseRow {
+    const s = sampleOf(item)
+    const row = _normalizeRow({}, 0)
+    row.name = s.summary || ''
+    row.decreaseDate = s.voucherDate || ''
+    row.voucherNo = s.voucherNo || ''
+    row.transferToFaAmount = assetAmount(item, 'credit')
+    row.decreaseType = '转入固定资产'
+    row.samplingStatus = '待检查'
+    return row
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<H2DecreaseRow>({
+    projectId: () => options.projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => _persist(),
+    hasUserContent: hasH2DecreaseContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    // 旧行（没有 `_gt`）：凭证号 + 减少日期 + 减少金额（转固 + 其他）
+    legacy: r => assetLegacyKey(r.voucherNo, r.decreaseDate, _rowDecreaseTotal(r)),
+    readonly: () => options.isReadonly.value,
+  })
 
   watch(options.allResponses, () => initFromAllResponses(), { immediate: true })
 
@@ -497,6 +545,7 @@ export function useH2DecreaseCheck(options: {
   function removeRow(rowId: string): void {
     if (options.isReadonly.value) return
     const idx = rows.value.findIndex(r => r.rowId === rowId)
+    if (idx !== -1 && voucherFill.isRowLocked(rows.value[idx])) return
     if (idx !== -1) {
       rows.value.splice(idx, 1)
       rows.value.forEach((r, i) => { r.seq = i + 1 })
@@ -507,7 +556,7 @@ export function useH2DecreaseCheck(options: {
   function updateCell(rowId: string, field: string, value: any): void {
     if (options.isReadonly.value) return
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
 
     const numFields = [
       'transferToFaAmount', 'transferInterestCap',
@@ -531,7 +580,7 @@ export function useH2DecreaseCheck(options: {
   function fillSamplingResults(samples: Array<{ rowId: string; status: string }>): void {
     for (const s of samples) {
       const row = rows.value.find(r => r.rowId === s.rowId)
-      if (row) row.samplingStatus = s.status as H2DecreaseRow['samplingStatus']
+      if (row && !voucherFill.isRowLocked(row)) row.samplingStatus = s.status as H2DecreaseRow['samplingStatus']
     }
     samplingParams.value.sampleSize = rows.value.length
     options.onSave?.(PARAMS_KEY, {
@@ -613,6 +662,7 @@ export function useH2DecreaseCheck(options: {
       })
       newRows.push(...pair)
       seq += pair.length
+      if (voucherFill.isRowLocked(row)) continue // 年审阶段预审行只读：照推草稿，不改行
       if (!row.auditConclusion || row.auditConclusion === '无异常') {
         row.auditConclusion = '需调整'
       }
@@ -662,6 +712,7 @@ export function useH2DecreaseCheck(options: {
         seq: seq++,
         marker: H29_EVIDENCE_GAP_MARKER,
       })
+      if (voucherFill.isRowLocked(row)) return built // 年审阶段预审行只读：照推说明行，不改行
       if (!row.auditConclusion || row.auditConclusion === '无异常') {
         row.auditConclusion = '存疑'
       }
@@ -685,7 +736,7 @@ export function useH2DecreaseCheck(options: {
     let n = 0
     for (const row of rows.value) {
       const f = rowFlagsMap.value.get(row.rowId)
-      if (!f) continue
+      if (!f || voucherFill.isRowLocked(row)) continue
       if (f.hasAcceptanceDiff || f.provisionalNeedsSettlement || f.missingApproval) {
         if (row.isAbnormal !== '是') {
           row.isAbnormal = '是'
@@ -712,7 +763,7 @@ export function useH2DecreaseCheck(options: {
 
   function _persist(): void {
     if (!options.onSave) return
-    options.onSave(ROWS_KEY, rows.value.map(r => ({
+    options.onSave(ROWS_KEY, voucherFill.guardPersist(rows.value).map(r => withRowMeta({
       rowId: r.rowId,
       seq: r.seq,
       name: r.name,
@@ -745,7 +796,7 @@ export function useH2DecreaseCheck(options: {
       indexRef: r.indexRef,
       samplingStatus: r.samplingStatus,
       remark: r.remark,
-    })))
+    }, r)))
     samplingParams.value.sampleSize = rows.value.length
     options.onSave?.(PARAMS_KEY, {
       ...samplingParams.value,
@@ -797,6 +848,12 @@ export function useH2DecreaseCheck(options: {
     saveNote,
     saveConclusion,
     initFromAllResponses,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

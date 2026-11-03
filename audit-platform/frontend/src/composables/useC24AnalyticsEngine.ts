@@ -5,6 +5,8 @@
  * 供 GtC24JournalDetail 组件直接调用，公式列只读。
  */
 
+import { SPECIAL_EVENT_KEYWORDS } from '@/generated/journalEntryRules'
+
 // ─── 类型定义 ───────────────────────────────────────────────
 
 export interface JournalEntry {
@@ -353,9 +355,8 @@ export function screenAnomalies(entries: JournalEntry[], rules: AnomalyRules): A
 
     // 规则11: 与特殊事件有关（关键词匹配 — 使用 vagueKeywords 的超集）
     // 特殊事件关键词: 关联交易/收购/合并/重组/诉讼/处置
-    const specialEventKeywords = ['关联交易', '收购', '合并', '重组', '诉讼', '处置', '清算', '破产']
     if (entry.summary) {
-      for (const kw of specialEventKeywords) {
+      for (const kw of SPECIAL_EVENT_KEYWORDS) {
         if (entry.summary.includes(kw)) {
           reasons.push('与特殊事件有关')
           break

@@ -27,6 +27,8 @@ import { DEFAULT_CHAPTER_DEFINITIONS } from './constants/defaultChapterDefinitio
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../sync/workpaperSyncApi'
 import { capabilityForEntry } from '../sync/workpaperSyncCapability'
+import { useEntrySyncReadiness } from '../sync/useEntrySyncReadiness'
+import GtEntrySyncCapabilityNotice from '../sync/GtEntrySyncCapabilityNotice.vue'
 import WorkpaperSyncEditorHost from '../sync/WorkpaperSyncEditorHost.vue'
 import { B60_STRUCTURED_CODES } from './constants/subSheetSchemas'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
@@ -190,6 +192,28 @@ const B601_SHEET_KEY = 'b601-managed'
  * 全有文件）。绑错 wpId 会打开错的 OO 文档。
  */
 const b601WpId = computed(() => wpIdMap.value['B60-1'] ?? '')
+
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：两个模式开关的可见性都来自 entry 级三层事实，不由本宿主判断。
+ *
+ * 🔴 **两个实例、同一个 entry、不同 wpId**：manifest 里本宿主只有一条 entry
+ * （`xlsx/b60/gt-b60-bundle`；另一条 `…/gt-b60-docx-pane` 的 hostPath 是 `GtB60DocxPane.vue`），
+ * 但 B60-1 是**另一张底稿**（`wpIdMap['B60-1']`，见上方注释）。readiness 的作用域是
+ * (projectId, wpId, entryId) 三元组 ⇒ 主区与 B60-1 区必须各算一次，不能共用一个实例，
+ * 否则 B60-1 的开关会按主底稿的运行时状态显隐。
+ */
+const b60MainEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => B60_SYNC_ENTRY_ID,
+})
+const b601EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => b601WpId.value,
+  entryId: () => B60_SYNC_ENTRY_ID,
+})
+
 const hourBudgetPanelRef = ref<{
   flushPendingSave: () => Promise<void>
   reload: () => Promise<void>
@@ -483,10 +507,16 @@ onMounted(async () => {
             <!-- Mode switcher（切在线编辑前预拉 config「拉取成功」才切换） -->
             <div class="gt-b60-bundle__mode-bar">
               <el-segmented
+                v-if="b60MainEntrySync.presentation.value.showModeSwitch"
                 :model-value="mainMode"
                 :options="mainModeOptions"
                 @change="(v: any) => switchMainMode(v as 'html' | 'onlyoffice')"
               />
+              <!--
+                能力披露（AC 1.5）：开关被单源藏起来时，必须讲清为什么 + 可操作的下一步。
+                与开关的门用同一条 entry。
+              -->
+              <GtEntrySyncCapabilityNotice :entry-id="B60_SYNC_ENTRY_ID" />
               <el-tag :type="mainOoStatus.type" size="small" effect="light">
                 {{ mainOoStatus.text }}
               </el-tag>
@@ -533,12 +563,15 @@ onMounted(async () => {
                   锁死且点击被彻底吞掉（D4 已实证）。门禁在 switchB601Mode 里 await 兜底。
                 -->
                 <el-segmented
+                  v-if="b601EntrySync.presentation.value.showModeSwitch"
                   :model-value="b601Mode"
                   :options="b601ModeOptions"
                   :disabled="syncBusy || syncSwitching"
                   size="small"
                   @change="(v: any) => switchB601Mode(v as 'html' | 'onlyoffice')"
                 />
+                <!-- 同上：B60-1 这块的原因也要讲（它是另一张底稿，readiness 另算） -->
+                <GtEntrySyncCapabilityNotice :entry-id="B60_SYNC_ENTRY_ID" :wp-id="b601WpId" />
                 <el-tag v-if="syncSwitching" type="info" size="small" effect="light">切换中…</el-tag>
                 <el-button size="small" @click="emit('navigate-sheet', 'B60-1')">
                   在主页面打开 →

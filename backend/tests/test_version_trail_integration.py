@@ -52,6 +52,13 @@ def _make_user(role: str = "manager"):
     return user
 
 
+def _plain_request():
+    """回滚端点要读请求头里的窗口编号（编辑锁，spec workpaper-multi-window-lock-gaps R3.2）；这里不带。"""
+    from starlette.requests import Request
+
+    return Request({"type": "http", "method": "POST", "path": "/", "headers": [], "query_string": b""})
+
+
 def _sample_responses(count: int = 3) -> list[dict]:
     """Generate sample checklist_responses rows."""
     return [
@@ -446,6 +453,7 @@ class TestRollbackPermission:
                 pid=pid,
                 wp_id=wp_id,
                 vid=vid,
+                request=_plain_request(),
                 db=db,
                 current_user=user,
             )
@@ -484,7 +492,9 @@ class TestRollbackPermission:
         db.commit = AsyncMock()
 
         rollback_id = uuid.uuid4()
-        with patch("app.services.version_trail_service.WorkpaperSnapshot") as MockSnap:
+        # 编辑锁判定另有专测（test_wp_edit_lock_scope_guard）；这里只测角色门，放行锁校验
+        with patch("app.routers._wp_gate.enforce_edit_lock_for_content_write", new_callable=AsyncMock), \
+                patch("app.services.version_trail_service.WorkpaperSnapshot") as MockSnap:
             mock_rb = MagicMock()
             mock_rb.id = rollback_id
             mock_rb.snapshot_type = "rollback"
@@ -500,6 +510,7 @@ class TestRollbackPermission:
                 pid=pid,
                 wp_id=wp_id,
                 vid=vid,
+                request=_plain_request(),
                 db=db,
                 current_user=user,
             )
@@ -519,6 +530,7 @@ class TestRollbackPermission:
                 pid=uuid.uuid4(),
                 wp_id=uuid.uuid4(),
                 vid=uuid.uuid4(),
+                request=_plain_request(),
                 db=db,
                 current_user=user,
             )

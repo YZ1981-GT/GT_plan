@@ -20,10 +20,9 @@
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>上市公司其他权益工具附注披露（47×19）：</strong>
-        按CAS37《金融工具列报》要求，分项列示各权益工具（永续债/优先股等）的发行条款、分类依据、期初/本期变动/期末余额。
-        数据自动从M10-1审定表拉取（subscribe 'substantive:adjudicated' 事件刷新）。
-        表内分为：①工具基本信息 ②权益工具变动明细 ③利息/股息信息。
+        <strong>上市公司其他权益工具变动披露：</strong>
+        本页维护各权益工具期初、本期增加、本期减少和期末的数量及账面价值。
+        每行三组数量均已录入后才同步；基本情况和持有者信息由附注端维护，本页不会用空表覆盖。
       </div>
     </div>
 
@@ -44,7 +43,14 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="期初余额" width="140" align="right">
+        <el-table-column label="期初数量" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!row._isTotal && !isReadonly" :model-value="row.beginQty" :controls="false"
+              @change="(val: number | undefined) => updateInstrumentRow($index, 'beginQty', val ?? null)" />
+            <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.beginQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初账面价值" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
               <WpAmountInput
@@ -56,10 +62,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="本期发行" width="140" align="right">
+        <el-table-column label="本期增加数量" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!row._isTotal && !isReadonly" :model-value="row.increaseQty" :controls="false"
+              @change="(val: number | undefined) => updateInstrumentRow($index, 'increaseQty', val ?? null)" />
+            <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.increaseQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加账面价值" width="140" align="right">
           <template #header>
             <el-tooltip content="贷方增加：发行/转入（权益类贷方）" placement="top">
-              <span class="formula-col-header">本期发行</span>
+              <span class="formula-col-header">本期增加账面价值</span>
             </el-tooltip>
           </template>
           <template #default="{ row, $index }">
@@ -73,10 +86,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="本期赎回/转换" width="140" align="right">
+        <el-table-column label="本期减少数量" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!row._isTotal && !isReadonly" :model-value="row.decreaseQty" :controls="false"
+              @change="(val: number | undefined) => updateInstrumentRow($index, 'decreaseQty', val ?? null)" />
+            <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.decreaseQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少账面价值" width="140" align="right">
           <template #header>
             <el-tooltip content="借方减少：赎回/转换/注销（权益类借方）" placement="top">
-              <span class="formula-col-header">本期赎回/转换</span>
+              <span class="formula-col-header">本期减少账面价值</span>
             </el-tooltip>
           </template>
           <template #default="{ row, $index }">
@@ -90,7 +110,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="应付利息/股息" width="140" align="right">
+        <el-table-column label="应付利息/股息（仅底稿）" width="160" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
               <WpAmountInput
@@ -102,10 +122,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="期末余额" width="140" align="right">
+        <el-table-column label="期末数量" width="120" align="right">
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.endQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末账面价值" width="140" align="right">
           <template #header>
             <el-tooltip content="期末=期初+本期发行-本期赎回（权益类贷方）" placement="top">
-              <span class="formula-col-header">期末余额</span>
+              <span class="formula-col-header">期末账面价值</span>
             </el-tooltip>
           </template>
           <template #default="{ row }">
@@ -179,8 +204,8 @@
     <details class="m10-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>数据优先从M10-1审定表自动拉取（审定数=期末余额）</li>
-        <li>订阅 'substantive:adjudicated' 事件自动刷新</li>
+        <li>数量与账面价值逐项保存，完整行修改后自动同步附注</li>
+        <li>审定事件会重新读取已保存数据，不会保留已删除的旧值</li>
         <li>上市公司需按CAS37详细披露分类依据和关键条款</li>
         <li>期末 = 期初 + 本期发行 - 本期赎回/转换（权益类贷方）</li>
         <li>需分别列示永续债、优先股等各类权益工具的变动情况</li>
@@ -206,16 +231,25 @@
  * - 条款摘要/利息分配/其他披露textarea sections
  * - AI辅助 per section title
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM10FormData } from '../../composables/useM10FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
-import { calcEquityEndBalance } from '../../composables/useM10FormulaEngine'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM10ListedSyncPayload, type M10BasicRow, type M10MovementRow, type M10HoldersRow } from '../../composables/m10NoteSectionMap'
+import {
+  buildM10DisclosurePayload,
+  createM10Rows,
+  m10DisplayRows,
+  m10MovementItemId,
+  m10NoteText,
+  restoreM10Rows,
+  type M10DisplayRow,
+  type M10LocalField,
+  type M10UiRow,
+} from '../../composables/m10DisclosureForm'
 import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -245,62 +279,24 @@ const formData = useM10FormData({
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 
 async function syncToDisclosureNotes(): Promise<void> {
-  // M10 Listed Tab 当前只有一张变动表（暂无基本情况表/持有者信息表独立录入）
-  // 将变动表数据映射到三表载荷
-  const movementRows: M10MovementRow[] = dataRows.value.map((r: any) => ({
-    label: r.item || '',
-    beginQty: 0,  // UI 暂无数量维度
-    beginValue: Number(r.beginBalance) || 0,
-    increaseQty: 0,
-    increaseValue: Number(r.issuance) || 0,
-    decreaseQty: 0,
-    decreaseValue: Number(r.redemption) || 0,
-  }))
-  // 基本情况表（空载荷，待 Tab 增强后填充）
-  const basicRows: M10BasicRow[] = movementRows.map((r) => ({
-    label: r.label,
-    issueTime: '',
-    classification: '',
-    dividendRate: '',
-    issuePrice: 0,
-    quantity: 0,
-    amount: r.beginValue,
-    maturity: '',
-    conversionTerms: '',
-    conversionStatus: '',
-  }))
-  // 持有者信息表（空载荷）
-  const holdersRows: M10HoldersRow[] = []
-  const noteText = [termsSummary.value, distributionNote.value, otherDisclosure.value].filter(Boolean).join('\n\n')
-  const payload = buildM10ListedSyncPayload(props.wpId, basicRows, movementRows, holdersRows, noteText || undefined)
-  if (!payload) return
+  const payload = buildM10DisclosurePayload({
+    wpId: props.wpId,
+    variant: 'listed',
+    rows: dataRows.value,
+    noteText: m10NoteText(formData.allResponses.value, 'listed'),
+  })
+  if (!payload || props.isReadonly) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface InstrumentRow {
-  item: string
-  beginBalance: number
-  issuance: number
-  redemption: number
-  interestDividend: number
-  endBalance: number
-  _isTotal?: boolean
-}
 
-const dataRows = ref<InstrumentRow[]>([
-  { item: '永续债 — 第一期', beginBalance: 0, issuance: 0, redemption: 0, interestDividend: 0, endBalance: 0 },
-  { item: '永续债 — 第二期', beginBalance: 0, issuance: 0, redemption: 0, interestDividend: 0, endBalance: 0 },
-  { item: '永续债 — 第三期', beginBalance: 0, issuance: 0, redemption: 0, interestDividend: 0, endBalance: 0 },
-  { item: '优先股 — A系列', beginBalance: 0, issuance: 0, redemption: 0, interestDividend: 0, endBalance: 0 },
-  { item: '优先股 — B系列', beginBalance: 0, issuance: 0, redemption: 0, interestDividend: 0, endBalance: 0 },
-  { item: '其他权益工具', beginBalance: 0, issuance: 0, redemption: 0, interestDividend: 0, endBalance: 0 },
-])
+const dataRows = ref<M10UiRow[]>(createM10Rows('listed'))
 
 const termsSummary = ref('')
 const distributionNote = ref('')
@@ -308,55 +304,42 @@ const otherDisclosure = ref('')
 
 // ─── 合计行 + 计算 ──────────────────────────────────────────────────────────
 
-const instrumentRows = computed<InstrumentRow[]>(() => {
-  const rows: InstrumentRow[] = dataRows.value.map(r => ({
-    ...r,
-    endBalance: calcEquityEndBalance(r.beginBalance, r.issuance, r.redemption),
-  }))
-  // 合计行
-  const totalBegin = rows.reduce((s, r) => s + r.beginBalance, 0)
-  const totalIssuance = rows.reduce((s, r) => s + r.issuance, 0)
-  const totalRedemption = rows.reduce((s, r) => s + r.redemption, 0)
-  const totalInterest = rows.reduce((s, r) => s + r.interestDividend, 0)
-  rows.push({
-    item: '合计',
-    beginBalance: totalBegin,
-    issuance: totalIssuance,
-    redemption: totalRedemption,
-    interestDividend: totalInterest,
-    endBalance: calcEquityEndBalance(totalBegin, totalIssuance, totalRedemption),
-    _isTotal: true,
-  })
-  return rows
-})
+const instrumentRows = computed<M10DisplayRow[]>(() => m10DisplayRows(dataRows.value))
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function updateInstrumentRow(index: number, field: 'beginBalance' | 'issuance' | 'redemption' | 'interestDividend', val: number): void {
-  if (index >= 0 && index < dataRows.value.length) {
-    dataRows.value[index][field] = val
-    formData.debouncedSave(`M10-disclosure-listed-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
-  }
+function updateInstrumentRow(index: number, field: M10LocalField, val: number | null): void {
+  if (props.isReadonly) return
+  const row = dataRows.value[index]
+  if (!row) return
+  const parsed = val === null ? null : Number(val)
+  row[field] = parsed !== null && Number.isFinite(parsed) ? parsed : null
+  formData.debouncedSave(m10MovementItemId('listed', row.key, field), {
+    remark: row[field] === null ? null : String(row[field]),
+  })
+  if (field !== 'interestDividend') autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
-function getRowClassName({ row }: { row: InstrumentRow; rowIndex: number }): string {
+function getRowClassName({ row }: { row: M10DisplayRow; rowIndex: number }): string {
   return row._isTotal ? 'total-row' : ''
 }
 
 function handleTermsSummaryChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M10-disclosure-listed-terms-summary', { remark: termsSummary.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleDistributionNoteChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M10-disclosure-listed-distribution-note', { remark: distributionNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleOtherDisclosureChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M10-disclosure-listed-other-disclosure', { remark: otherDisclosure.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
@@ -407,20 +390,11 @@ function fmtAmount(val: number): string {
 // ─── 数据恢复 ────────────────────────────────────────────────────────────────
 
 function restoreData(): void {
-  for (let i = 0; i < dataRows.value.length; i++) {
-    for (const field of ['beginBalance', 'issuance', 'redemption', 'interestDividend'] as const) {
-      const resp = formData.allResponses.value.get(`M10-disclosure-listed-${i}-${field}`)
-      if (resp?.remark) {
-        dataRows.value[i][field] = Number(resp.remark) || 0
-      }
-    }
-  }
-  const termsResp = formData.allResponses.value.get('M10-disclosure-listed-terms-summary')
-  if (termsResp?.remark) termsSummary.value = termsResp.remark
-  const distResp = formData.allResponses.value.get('M10-disclosure-listed-distribution-note')
-  if (distResp?.remark) distributionNote.value = distResp.remark
-  const otherResp = formData.allResponses.value.get('M10-disclosure-listed-other-disclosure')
-  if (otherResp?.remark) otherDisclosure.value = otherResp.remark
+  const responses = formData.allResponses.value
+  dataRows.value = restoreM10Rows(responses, 'listed')
+  termsSummary.value = responses.get('M10-disclosure-listed-terms-summary')?.remark || ''
+  distributionNote.value = responses.get('M10-disclosure-listed-distribution-note')?.remark || ''
+  otherDisclosure.value = responses.get('M10-disclosure-listed-other-disclosure')?.remark || ''
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
@@ -440,6 +414,7 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

@@ -11,6 +11,7 @@
  * - selfLoad逻辑（render-config?force_component_type=h4-engineering-materials）
  * - TB自动取数 unadjusted_amount → 审定表未审数（1605）
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -369,11 +370,7 @@ export function useH4FormData(params: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '160' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '160' })).rows
 
       let unadjusted1605 = 0
       let audited1605 = 0

@@ -1,14 +1,13 @@
 """Phase 1 测试：附注从披露表刷新服务。
 
 覆盖：
-- refresh_note_section：有数据 → refreshed / 无数据 → stale_marked / 不存在 → not_found
-- refresh_note_from_disclosure：单底稿多章节
-- refresh_all_notes：全量
-- handle_workpaper_saved：事件 handler fail-soft
-- 事件注册：handler 已注册到 WORKPAPER_SAVED
+- refresh_note_section（只读）：已同步 → synced / 未同步 → not_synced（不标待更新）/ 不存在 → not_found
+- handle_workpaper_saved：只读诊断，参数缺失按原因返回
+- 事件注册：**不再**订阅 WORKPAPER_SAVED（spec note-pull-header-formula-closure R1；判据见
+  ``test_disclosure_builders_not_wired.py``）
 - 路由注册：refresh-from-disclosure 端点存在
 
-spec: note-data-from-disclosure-table Phase 1 Task 5
+spec: note-data-from-disclosure-table Phase 1 Task 5（2026-10-26 改为只读状态）
 """
 from __future__ import annotations
 
@@ -114,10 +113,11 @@ def _make_fake_note(*, has_sub_data: bool, section: str = "八、5"):
 
 @pytest.mark.asyncio
 async def test_refresh_section_with_data():
-    """有 sub_table_data → refreshed，stale 清除。"""
+    """已从披露表同步（有 sub_table_data + 底稿来源）→ synced，只读：不改 stale、不改表格。"""
     from app.services.note_disclosure_refresh_service import refresh_note_section
 
     note = _make_fake_note(has_sub_data=True)
+    before = dict(note.table_data)
     db = AsyncMock()
     db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=note)))
     db.flush = AsyncMock()
@@ -126,17 +126,16 @@ async def test_refresh_section_with_data():
         db, PID, YEAR, wp_code="D2", section_id="八、5",
     )
 
-    assert result.status == "refreshed"
+    assert result.status == "synced"
     assert result.rows_count == 3
-    assert note.is_stale is False
-    assert note.stale_source is None
-    assert note.table_data["_source"] == "workpaper"
-    assert "_last_refresh_at" in note.table_data
+    assert note.is_stale is True and note.stale_source == "test", "只读：不清 stale"
+    assert note.table_data == before, "只读：不改表格"
+    db.flush.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_refresh_section_no_data():
-    """无 sub_table_data → stale_marked。"""
+    """从未由底稿同步（数据来自模板取数 / 公式推送）→ not_synced，不标「披露表数据为空」待更新。"""
     from app.services.note_disclosure_refresh_service import refresh_note_section
 
     note = _make_fake_note(has_sub_data=False)
@@ -148,9 +147,24 @@ async def test_refresh_section_no_data():
         db, PID, YEAR, wp_code="D2", section_id="八、5",
     )
 
-    assert result.status == "stale_marked"
-    assert note.is_stale is True
-    assert note.stale_source == "disclosure_refresh_no_data"
+    assert result.status == "not_synced"
+    assert "D2" in result.message and "披露页保存一次" in result.message
+    assert note.stale_source == "test", "不写 disclosure_refresh_no_data"
+    db.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_refresh_section_template_rows_without_fingerprint_is_not_synced():
+    """有 sub_table_data 但既无同步指纹、来源也不是底稿（旧模板数据）→ not_synced。"""
+    from app.services.note_disclosure_refresh_service import refresh_note_section
+
+    note = _make_fake_note(has_sub_data=True)
+    note.table_data["_source"] = "template"
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=note)))
+
+    result = await refresh_note_section(db, PID, YEAR, wp_code="D2", section_id="八、5")
+    assert result.status == "not_synced"
 
 
 @pytest.mark.asyncio
@@ -210,14 +224,17 @@ async def test_handler_no_year():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_handler_registered_in_cycle_linkage():
-    """handle_workpaper_saved 必须在 register_cycle_linkage_handlers 中注册。"""
+def test_handler_not_subscribed_to_workpaper_saved():
+    """底稿保存不再订阅附注刷新 handler（它曾先跑后端 builder 写错数、再清 / 标 stale）。AST 判据，注释不算。"""
+    import ast
     import inspect
+    import textwrap
+
     from app.services import event_handlers_cycle_linkage as linkage
 
-    src = inspect.getsource(linkage.register_cycle_linkage_handlers)
-    assert "handle_workpaper_saved" in src, "handler 未注册到 cycle linkage"
-    assert "note_disclosure_refresh_service" in src, "import 路径不对"
+    tree = ast.parse(textwrap.dedent(inspect.getsource(linkage.register_cycle_linkage_handlers)))
+    modules = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    assert "app.services.note_disclosure_refresh_service" not in modules
 
 
 # ══════════════════════════════════════════════════════════════════════════════

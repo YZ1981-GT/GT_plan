@@ -1,5 +1,6 @@
 /** F2-69 供应商核查清单状态管理。 */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   emptySupplierChecklistRow,
@@ -22,6 +23,15 @@ export function useF2SupplierChecklist(opts: {
   const rows = ref<SupplierChecklistRow[]>([emptySupplierChecklistRow()])
   const searchQuery = ref('')
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

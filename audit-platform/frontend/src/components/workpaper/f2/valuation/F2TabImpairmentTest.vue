@@ -142,7 +142,7 @@
     </div>
 
     <div class="table-scroll">
-      <table class="matrix-table">
+      <GtGridTable class="matrix-table">
         <thead>
           <tr>
             <th rowspan="2" class="col-cat">存货类别</th>
@@ -314,10 +314,12 @@
                 :auto-upload="false"
                 accept=".pdf,.png,.jpg,.jpeg"
                 :disabled="ocrLoadingId === row.id"
+                style="display:inline-block"
                 @change="(uf: any) => handleOcrUpload(row.id, uf?.raw)"
               >
                 <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
               </el-upload>
+              <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_IMPAIRMENT_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
               <el-button v-if="!isReadonly" link type="danger" size="small" @click="imp.removeProduct(row.id)">删</el-button>
             </td>
           </tr>
@@ -336,7 +338,7 @@
             <td colspan="2" />
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <div class="section-label">四、审计说明（按类别汇总）</div>
@@ -413,7 +415,9 @@
 import { ref, computed, onMounted, watch, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF2ImpairmentTest } from '../../composables/useF2ImpairmentTest'
-import { useF2ImpairmentOcr } from '../../composables/useF2ImpairmentOcr'
+import { F2_IMPAIRMENT_EVIDENCE_SHEET, useF2ImpairmentOcr } from '../../composables/useF2ImpairmentOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   F2_47_OBJECTIVES,
@@ -426,6 +430,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

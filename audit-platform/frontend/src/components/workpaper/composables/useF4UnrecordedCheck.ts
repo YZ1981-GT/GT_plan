@@ -6,6 +6,7 @@
  * 4. 期后付款反查；5. 期后增加额反查。
  */
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
 import type { F4ImportableSheet } from './useF4ImportExport'
@@ -684,6 +685,15 @@ export function useF4UnrecordedCheck(options: UseF4UnrecordedCheckOptions) {
     if (row.riskLevel === 'warning') return 'unrecorded-risk-warning'
     return ''
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

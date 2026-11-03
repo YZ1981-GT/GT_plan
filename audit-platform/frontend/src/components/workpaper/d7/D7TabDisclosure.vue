@@ -211,8 +211,9 @@ import {
   D7_NOTE_SECTION,
   D7_NOTE_TEXT_SECTIONS,
   D7_QUALITATIVE_TITLES,
-  type D7DisclosureSnapshot,
 } from '../composables/d7NoteSectionMap'
+// 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import { buildD7DisclosureSnapshot } from '../composables/d7DisclosureSnapshot'
 import { useDisclosureNoteAi } from '../composables/useDisclosureNoteAi'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD7FormData'
@@ -368,45 +369,17 @@ function jumpToNote(target: DisclosureVariant): void {
   if (route) router.push(route)
 }
 
-function findSection(sections: DisclosureSection[], key: string): DisclosureSection | undefined {
-  return (sections || []).find((s) => s.sectionKey === key)
-}
-
-function toSnapRow(r: DisclosureRow) {
-  return { label: r.label, current: r.current, prior: r.prior, reason: (r as any).reason }
-}
-
-const EMPTY_TOTAL = { label: '合计', current: 0, prior: 0 }
-
 /** 底稿披露表 → 附注单向推送（当前 activeVariant 对应上市/国企）。 */
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   const variant = activeVariant.value as DisclosureVariant
   try {
-    let snapshot: D7DisclosureSnapshot
-    if (variant === 'soe') {
-      const main = findSection(soeSections.value, 'soe-1')
-      const change = findSection(soeSections.value, 'soe-2')
-      snapshot = {
-        mainRows: (main?.rows ?? []).map(toSnapRow),
-        mainTotal: main?.totalRow ? toSnapRow(main.totalRow) : { ...EMPTY_TOTAL },
-        changeRows: (change?.rows ?? []).map(toSnapRow),
-        notes: { ...noteTexts.value },
-      }
-    } else {
-      const main = findSection(listedSections.value, 'listed-1')
-      const longTerm = findSection(listedSections.value, 'listed-2')
-      const change = findSection(listedSections.value, 'listed-3')
-      snapshot = {
-        mainRows: (main?.rows ?? []).map(toSnapRow),
-        mainTotal: main?.totalRow ? toSnapRow(main.totalRow) : { ...EMPTY_TOTAL },
-        longTermRows: (longTerm?.rows ?? []).map(toSnapRow),
-        longTermTotal: longTerm?.totalRow ? toSnapRow(longTerm.totalRow) : { ...EMPTY_TOTAL },
-        changeRows: (change?.rows ?? []).map(toSnapRow),
-        notes: { ...noteTexts.value },
-      }
-    }
+    const snapshot = buildD7DisclosureSnapshot(variant, {
+      listedSections: listedSections.value,
+      soeSections: soeSections.value,
+      noteTexts: noteTexts.value,
+    })
     const payload = buildD7SyncPayload(variant, props.wpId || '', null, snapshot)
     const result: any = await http.post(
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,

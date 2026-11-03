@@ -9,22 +9,33 @@
   <el-button size="small" data-testid="fm-global-settings" @click="openGlobalSettings">⚙ 全局设置</el-button>
   <template v-if="projectId">
     <el-button size="small" data-testid="fm-template-save" @click="showSave = true">📑 保存为模板</el-button>
-    <el-button size="small" data-testid="fm-template-subscribe" @click="showSubscribe = true">🔗 订阅模板</el-button>
+    <el-button v-if="canEditProject" size="small" data-testid="fm-template-subscribe" @click="showSubscribe = true">🔗 订阅模板</el-button>
     <!-- spec formula-governance-coverage-closure R4：本项目公式包（导出本项目适配 / 导入为本项目适配） -->
     <FormulaImportExportDropdown mode="package" :project-id="projectId" :can-edit-project="canEditProject"
       @package-applied="onPackageApplied" />
   </template>
   <FormulaTemplateSaveDialog v-model="showSave" :project-id="projectId" :default-domain="domain"
-    :default-scope="defaultScope" />
+    :default-scope="defaultScope" :can-edit-project="canEditProject" />
   <FormulaTemplateSubscribeDialog v-model="showSubscribe" :project-id="projectId" :default-domain="domain"
+    :initial-template-id="initialTemplateId" :initial-template-action="initialTemplateAction"
+    :initial-template-domain="initialTemplateDomain"
     @changed="(d: string) => emit('changed', d)" />
   <FormulaApplyScopeDialog v-model="apply.visible" :project-id="projectId" :domain="apply.domain"
     :slot-keys="apply.slotKeys" :can-edit-global="canEditGlobal" @done="() => emit('changed', apply.domain)" />
 </template>
 
+<script lang="ts">
+/**
+ * 支持「应用范围」的域白名单（单一来源）——域不在列表内点应用范围按钮时禁用并提示。
+ * 生产调用方只有 report / tb_detail / cross_check 三个域调 askApplyScope。
+ */
+export const APPLY_SCOPE_DOMAINS: ReadonlyArray<string> = ['report', 'tb_detail', 'cross_check'] as const
+</script>
+
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import FormulaTemplateSaveDialog from './FormulaTemplateSaveDialog.vue'
 import FormulaTemplateSubscribeDialog from './FormulaTemplateSubscribeDialog.vue'
 import FormulaApplyScopeDialog from './FormulaApplyScopeDialog.vue'
@@ -42,6 +53,10 @@ const props = withDefaults(defineProps<{
   canEditGlobal?: boolean
   /** 当前账号能否改本项目公式（导入公式包用；宿主的只读态取反） */
   canEditProject?: boolean
+  /** 模板详情深链自动打开订阅弹窗。 */
+  initialTemplateId?: string
+  initialTemplateAction?: 'subscribe'
+  initialTemplateDomain?: string
 }>(), { projectId: '', domain: 'report', defaultScope: '', canEditGlobal: false, canEditProject: false })
 
 const emit = defineEmits<{ navigate: []; changed: [domain: string] }>()
@@ -50,6 +65,11 @@ const router = useRouter()
 const showSave = ref(false)
 const showSubscribe = ref(false)
 const apply = reactive({ visible: false, domain: 'report', slotKeys: [] as string[] })
+
+watch(() => [props.initialTemplateId, props.initialTemplateAction, props.canEditProject] as const,
+  ([templateId, action, canEdit]) => {
+    if (templateId && action === 'subscribe' && canEdit) showSubscribe.value = true
+  }, { immediate: true })
 
 function openGlobalSettings() {
   emit('navigate')
@@ -67,6 +87,10 @@ function onPackageApplied(domains: string[]) {
 /** 本项目保存成功后调用：选择仅本项目 / 设为全局（或提交候选）/ 应用到指定项目。 */
 function askApplyScope(domain: string, slotKeys: string[]) {
   if (!props.projectId || !slotKeys.length) return
+  if (!APPLY_SCOPE_DOMAINS.includes(domain)) {
+    ElMessage.warning('该域暂不支持按范围应用')
+    return
+  }
   apply.domain = domain
   apply.slotKeys = [...slotKeys]
   apply.visible = true

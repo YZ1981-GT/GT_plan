@@ -1,31 +1,25 @@
 /**
- * ACNR sheet 显示名组建 — 单一真源
+ * ACNR sheet 显示名 — 前端只排序、不拼名（spec acnr-foundation-defect-closure T30，design §13.2~13.3）
  *
- * 供公式管理树（FormulaManagerDialog.buildWpDomainTree）、公式选址器 /
- * 高级查询选字段（useAcnr.buildAddressTree）等所有从 /api/acnr/entries 建树的
- * 消费者统一调用，保证全平台 sheet 显示名一致。
+ * sheet / cell 的显示名由后端 `services/acnr/display.py` 统一计算、生成器写进目录的 `display_label`
+ * （cell 另有 `cell_label`），`/api/acnr/entries`、`/anchors`、resolve 原样返回；前端三棵树
+ * （公式选址器 / 高级查询选字段 `useAcnr.buildAddressTree`、公式管理树 `FormulaManagerDialog.buildWpDomainTree`、
+ * 公式编辑数据源树 `FormulaEditDialog`）只按编码自然序排列并读 `display_label`，不再自己拼名。
  *
- * 组名规则（优先级）：
- *   mapped_sheet_name（wp_account_mapping 策管名 / classification 真名 / prefill 兜底，后端 list_sheets 注入）
- *   → cleanSheetLabelName(sheet_name)（去末尾冗余编码）
- *   → 纯编码占位则置空（仅显示编码，不渲染「编码 编码」）
- * 再补「科目简称·」前缀区分跨循环通用名（如「附注披露信息」）；
- * 最后对同一父组内仍重名者追加序号（1）（2）（各源均无 distinct 名的报告文档类）。
+ * 树的父节点标题「{父级码} {科目简称}」不是某个 addr_id 的显示名，留在本文件 `groupHeaderLabel`。
  */
 
-export interface SheetNameInput {
+export interface SheetLabelInput {
   sheet_code?: string
-  sheet_name?: string
-  account_name?: string
-  mapped_sheet_name?: string
   addr_id?: string
+  display_label?: string
+  /** 科目简称（取父底稿）— 后端 list_sheets 注入；只供 groupHeaderLabel 用 */
+  account_name?: string
 }
 
-export interface ComposedSheetLabel<T extends SheetNameInput> {
+export interface SortedSheetLabel<T extends SheetLabelInput> {
   entry: T
-  /** 名称部分（不含编码前缀，已含科目简称/序号消歧） */
-  name: string
-  /** 完整标签：`{sheet_code} {name}`，纯编码占位时仅 `{sheet_code}` */
+  /** 目录统一显示名（`display_label`；缺字段时退回编码） */
   label: string
 }
 
@@ -52,57 +46,16 @@ export function wpCodeNaturalCompare(a: string, b: string): number {
   return pa.rest.localeCompare(pb.rest)
 }
 
-/**
- * 清洗 sheet 名称：去掉末尾冗余的底稿编码后缀（如「审定表D1-1」→「审定表」、
- * 「附注披露信息(上市公司）D2-1」→「附注披露信息(上市公司）」）。
- * 保留「（修订前）」等业务注解（其结尾非编码不会被误删）。
- */
-export function cleanSheetLabelName(name: string): string {
-  if (!name) return ''
-  const cleaned = name.replace(/\s*[A-Za-z]+\d+(?:-\d+)?[A-Za-z]?$/, '').trim()
-  return cleaned || name
-}
-
-/**
- * 组建一个父组内全部 sheet 的显示名（含自然排序 + 科目简称前缀 + 同名序号消歧）。
- * 返回按编码自然序排列的结果数组。
- */
-export function composeSheetLabelsForGroup<T extends SheetNameInput>(
-  group: T[],
-): Array<ComposedSheetLabel<T>> {
-  // 科目简称（父底稿维度，全组一致）
-  const subjectAbbr = group.find((s) => s.account_name)?.account_name || ''
-
-  // pass 1：算每张 sheet 的显示名
-  const withNames = group
+/** 一组 sheet 按编码自然序排列，标签取目录 `display_label`（缺字段退回 sheet_code / addr_id）。 */
+export function sortSheetsForGroup<T extends SheetLabelInput>(group: T[]): Array<SortedSheetLabel<T>> {
+  return group
     .slice()
     .sort((a, b) => wpCodeNaturalCompare(a.sheet_code || '', b.sheet_code || ''))
-    .map((entry) => {
-      const code = entry.sheet_code || ''
-      const mapped = (entry.mapped_sheet_name || '').trim()
-      const cleanName = cleanSheetLabelName(entry.sheet_name || '')
-      let name = mapped || cleanName
-      // 纯编码占位（各源均无真实名，如 K14~K18）：置空，仅显示编码
-      if (name === code) name = ''
-      if (subjectAbbr && name && !name.includes(subjectAbbr)) {
-        name = `${subjectAbbr}·${name}`
-      }
-      return { entry, name }
-    })
+    .map((entry) => ({ entry, label: entry.display_label || entry.sheet_code || entry.addr_id || '' }))
+}
 
-  // pass 2：同组内显示名重复者追加序号（1）（2）（报告文档封面与首表同名等）
-  const counts: Record<string, number> = {}
-  for (const w of withNames) {
-    if (w.name) counts[w.name] = (counts[w.name] || 0) + 1
-  }
-  const seen: Record<string, number> = {}
-  return withNames.map(({ entry, name }) => {
-    let n = name
-    if (n && counts[n] > 1) {
-      seen[n] = (seen[n] || 0) + 1
-      n = `${n}（${seen[n]}）`
-    }
-    const code = entry.sheet_code || ''
-    return { entry, name: n, label: n ? `${code} ${n}` : code }
-  })
+/** 树的父节点标题：「{父级码} {科目简称}」（组内首个有简称的 sheet），无简称只显示父级码。 */
+export function groupHeaderLabel(parentCode: string, group: SheetLabelInput[]): string {
+  const subjectAbbr = group.find((s) => s.account_name)?.account_name || ''
+  return subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode
 }

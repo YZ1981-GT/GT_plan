@@ -610,6 +610,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
+import { useAdaptivePoll } from '@/composables/useAdaptivePoll'
+import { eventBus } from '@/utils/eventBus'
 import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading, Guide,
@@ -619,6 +621,7 @@ import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, attachments as P_att, accountChart as P_ac, adjustments as P_adj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { creationDeniedMessage } from '@/services/projectCreationGrantApi'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import PlatformUserGuideDialog from '@/components/layout/PlatformUserGuideDialog.vue'
@@ -1009,7 +1012,10 @@ async function onCreateNextYear() {
   if (!props.project) return
   try {
     await confirmDangerous('确定要基于「' + props.project.name + '」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。', '创建下年项目')
-    const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`)
+    // 经理建项授权被拒（403）显示后端给出的原因，代替通用的「权限不足」
+    const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`, undefined, {
+      _forbiddenHandler: (error: unknown) => ElMessage.error(creationDeniedMessage(error)),
+    } as any)
     const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
     // EQCR skip notification (Requirements 11.4)
@@ -1019,7 +1025,7 @@ async function onCreateNextYear() {
     }
     router.push(`/projects/new?projectId=${result.new_project_id}`)
   } catch (err: any) {
-    if (err !== 'cancel') {
+    if (err !== 'cancel' && err?.response?.status !== 403) {
       handleApiError(err, '创建')
     }
   }
@@ -1257,7 +1263,6 @@ interface ImportStatusInfo {
   eta: string
 }
 const importStatus = ref<ImportStatusInfo | null>(null)
-let importPollTimer: ReturnType<typeof setInterval> | null = null
 
 const IMPORT_PHASE_LABEL: Record<string, string> = {
   bootstrap: '启动', parsing: '解析', validating: '校验',
@@ -1288,9 +1293,10 @@ const importPhaseTagType = computed<'success' | 'warning' | 'info' | 'danger' | 
   return 'info'
 })
 
-async function pollImportStatus() {
+/** 查一次导入状态；返回「是否有进行中的导入」（决定下一轮 5 秒还是 30 秒，R17） */
+async function pollImportStatus(): Promise<boolean> {
   const pid = props.project?.id
-  if (!pid) { importStatus.value = null; return }
+  if (!pid) { importStatus.value = null; return false }
   try {
     const data: any = await api.get(
       `/api/projects/${pid}/ledger-import/active-job`,
@@ -1305,28 +1311,30 @@ async function pollImportStatus() {
         ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
         : ''
       importStatus.value = { progress: pct, phase, message: msg, eta: etaText }
-    } else {
-      importStatus.value = null
+      return true
     }
+    importStatus.value = null
   } catch {
     importStatus.value = null
   }
+  return false
 }
 
-function startImportPoll() {
-  stopImportPoll()
-  pollImportStatus()
-  importPollTimer = setInterval(pollImportStatus, 5000)
+// R17：有进行中的导入每 5 秒、没有每 30 秒（原先固定每 5 秒）；页面隐藏暂停（原先这里不暂停）
+const importPoll = useAdaptivePoll(pollImportStatus)
+function onImportSubmitted(e: { projectId: string }) {
+  if (e.projectId === props.project?.id) importPoll.poke()
 }
-function stopImportPoll() {
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-}
+eventBus.on('ledger-import:submitted', onImportSubmitted)
 
 watch(() => props.project?.id, (newId) => {
-  if (newId) { startImportPoll() } else { stopImportPoll(); importStatus.value = null }
+  if (newId) { importPoll.start() } else { importPoll.stop(); importStatus.value = null }
 }, { immediate: true })
 
-onUnmounted(() => { stopImportPoll() })
+onUnmounted(() => {
+  importPoll.dispose()
+  eventBus.off('ledger-import:submitted', onImportSubmitted)
+})
 </script>
 
 <style scoped>

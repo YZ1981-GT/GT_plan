@@ -110,13 +110,7 @@ async def b14_ai_generate(
     kb_docs = await _load_knowledge_base_docs(db, project_id, chapter_title)
 
     # 5. 构造 prompt
-    system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
-        chapter_title=chapter_title,
-        client_name=project_context.get("client_name", ""),
-        industry=project_context.get("industry", ""),
-        audit_period=project_context.get("audit_period", ""),
-        firm_name=project_context.get("firm_name", "致同会计师事务所（特殊普通合伙）"),
-    )
+    system_prompt = _render_system_prompt(chapter_title, project_context)
 
     user_prompt = _build_user_prompt(
         chapter_title=chapter_title,
@@ -162,8 +156,26 @@ async def b14_ai_generate(
 
 # ─── 辅助函数 ────────────────────────────────────────────────────────────────
 
+def _render_system_prompt(chapter_title: str, project_context: dict) -> str:
+    """填 system prompt；没有值的「所属行业」行整行去掉（不给模型一个空栏或假值让它复述）。"""
+    prompt = _SYSTEM_PROMPT_TEMPLATE.format(
+        chapter_title=chapter_title,
+        client_name=project_context.get("client_name", ""),
+        industry=project_context.get("industry", ""),
+        audit_period=project_context.get("audit_period", ""),
+        firm_name=project_context.get("firm_name", "致同会计师事务所（特殊普通合伙）"),
+    )
+    if not str(project_context.get("industry") or "").strip():
+        prompt = "\n".join(line for line in prompt.split("\n") if line.strip() != "- 所属行业：")
+    return prompt
+
+
 async def _load_project_context(db: AsyncSession, project_id: UUID) -> dict:
-    """从 projects 表加载项目上下文."""
+    """从 projects 表加载项目上下文。
+
+    ``industry`` 恒为空：平台没有项目级行业来源。原先填的是质控分类码（A1 / C …），
+    会让提示词写成「所属行业：A1」（spec trim-followup-residual-findings-closure R1.4）。
+    """
     context = {
         "client_name": "",
         "industry": "",
@@ -173,7 +185,7 @@ async def _load_project_context(db: AsyncSession, project_id: UUID) -> dict:
     try:
         result = await db.execute(
             sa_text(
-                "SELECT client_name, audit_year, business_category "
+                "SELECT client_name, audit_year "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(project_id)},
@@ -183,7 +195,6 @@ async def _load_project_context(db: AsyncSession, project_id: UUID) -> dict:
             context["client_name"] = row.client_name or ""
             if row.audit_year:
                 context["audit_period"] = f"{row.audit_year}年度"
-            context["industry"] = row.business_category or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("B1-4 AI project context 查询失败: %s", e)
     return context

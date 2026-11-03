@@ -102,16 +102,20 @@ class ExportPackageService:
         company_short = get_company_short_name(project)
 
         # Run consistency check
-        from app.services.consistency_gate import ConsistencyGate
+        from app.services.consistency_gate import ConsistencyGate, gate_decision
 
         gate = ConsistencyGate(self.db)
         consistency_result = await gate.run_all_checks(project_id, year)
 
+        decision = gate_decision(consistency_result, consumer="export_package")
+
         warnings_text = None
-        if consistency_result.has_blocking_failures:
+        if decision.blocks or consistency_result.has_blocking_failures:
             if not force_export:
                 raise ConsistencyCheckError(
-                    "一致性检查未通过，无法导出",
+                    # enforce：统一判定的提示；observe：按改造前口径拒绝，提示也用改造前原文
+                    # （decision.summary 此时是「…（当前为只提示模式）」，而这里确实拒绝了，需求 16.4）
+                    decision.summary if decision.blocks else "一致性检查未通过，无法导出",
                     checks=[
                         {"check_name": c.check_name, "passed": c.passed, "details": c.details, "severity": c.severity}
                         for c in consistency_result.checks

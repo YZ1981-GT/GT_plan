@@ -24,6 +24,7 @@ import { ElMessage } from 'element-plus'
 import { api as httpApi } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import type { CycleDialogsAPI } from './useCycleDialogs'
 import type { SheetNavFacadeAPI } from './useSheetNavFacade'
 
@@ -72,6 +73,7 @@ export interface FCycleEditorAPI {
  * @param wpId - 当前底稿 ID
  * @param sheetNav - Sheet 导航 facade（用于 activeSheetId）
  * @param cycleDialogs - 统一弹窗管理（委托 visible/trigger/onApplied）
+ * @param projectYear - 项目审计年度（计价抽样按它取序时账；项目没填为 null）
  */
 export function useFCycleEditor(
   wpDetail: Ref<{ wp_code?: string | null } | null>,
@@ -79,6 +81,7 @@ export function useFCycleEditor(
   wpId: Ref<string>,
   sheetNav: SheetNavFacadeAPI,
   cycleDialogs: CycleDialogsAPI,
+  projectYear?: Readonly<Ref<number | null>>,
 ): FCycleEditorAPI {
   // ─── Dialogs（委托 useCycleDialogs 已有的 F 循环弹窗） ─────────────────────────
   const dialogs: FCycleDialogs = {
@@ -103,9 +106,14 @@ export function useFCycleEditor(
    * 调用后端 API 执行加权平均抽样，写回当前 sheet
    */
   async function onTriggerValuationSample() {
+    // 按项目审计年度抽样（原先恒用今年 ⇒ 2025 年度项目在 2026 年抽的是 2026 的序时账）
+    const year = projectYear?.value ?? null
+    if (year == null) {
+      ElMessage.warning(`${MISSING_AUDIT_YEAR_MESSAGE}（本次抽样未执行）`)
+      return
+    }
     cycleDialogs.valuation.loading.value = true
     try {
-      const year = new Date().getFullYear()
       const activeSheet = sheetNav.activeSheetId.value || ''
       const resp: any = await httpApi.post(
         `/api/projects/${projectId.value}/workpapers/${wpId.value}/f2/valuation-sample`,

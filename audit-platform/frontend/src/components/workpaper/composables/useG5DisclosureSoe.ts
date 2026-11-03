@@ -4,7 +4,7 @@
  * 共享上市逻辑：性质 / 坏账概况 / 单项 / 组合账龄 / 取数勾稽 / 组合政策一致性
  * 国企专有：终止确认、继续涉入、坏账方法说明红区；账龄块支持「……」动态插段
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import type { ChecklistResponse } from './useF1FormData'
 import { G5_ACCOUNT_CODE } from './g5Constants'
 import { parseG5AdjStore } from './g5AdjudicationItems'
@@ -591,12 +591,16 @@ export function useG5DisclosureSoe(opts: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不监听审定事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+  }
 
   return {
     state,

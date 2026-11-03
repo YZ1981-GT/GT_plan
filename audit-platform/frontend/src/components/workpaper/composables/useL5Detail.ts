@@ -162,6 +162,30 @@ export function createL5DetailRow(
   }
 }
 
+/**
+ * L5-2 受管区行公式（对齐模板 明细表L5-2，三个受管区逐行同式）：
+ * E=B−C+D；L=B+F+G；M=C+H+J；N=D+I+K；O=L−M+N；R=L−P；S=O−Q。
+ *
+ * 审定四列与披露两列原先只声明不计算（恒 0）；载入、渲染、编辑、保存都经它。
+ */
+export function recalcL5DetailRow(row: L5DetailRow): L5DetailRow {
+  const n = (v: unknown): number => Number(v) || 0
+  const auditedBeginning = n(row.beginning) + n(row.priorAdjustment) + n(row.priorReclass)
+  const auditedDebit = n(row.periodRepayment) + n(row.ajeDebit) + n(row.rjeDebit)
+  const auditedCredit = n(row.periodIncrease) + n(row.ajeCredit) + n(row.rjeCredit)
+  const auditedEnding = auditedBeginning - auditedDebit + auditedCredit
+  return {
+    ...row,
+    endBalance: calcLiabilityEndBalance(n(row.beginning), n(row.periodIncrease), n(row.periodRepayment)),
+    auditedBeginning,
+    auditedDebit,
+    auditedCredit,
+    auditedEnding,
+    disclosureBeginning: auditedBeginning - n(row.minusPriorDue),
+    disclosureEnding: auditedEnding - n(row.minusEndDue),
+  }
+}
+
 /** 区段Tab类型：3区段 */
 export type L5DetailSegment = 'unadjusted' | 'adjustment' | 'audited'
 
@@ -212,11 +236,11 @@ export function useL5Detail(
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         // 🔴 历史行补铸：缺 key 的补铸稳定身份、已有优先保留；缺 section 的落默认区（售后租回）。
-        detailRows.value = parsed.map((row: Partial<L5DetailRow>) => ({
+        detailRows.value = parsed.map((row: Partial<L5DetailRow>) => recalcL5DetailRow({
           ...row,
           key: (typeof row.key === 'string' && row.key.trim()) ? row.key : newRowIdentity('l52det'),
           section: (row.section as L5DetailSection) || L5_SECTION_SALE_LEASEBACK,
-        })) as L5DetailRow[]
+        } as L5DetailRow))
       }
     } catch { /* ignore */ }
   }
@@ -236,13 +260,9 @@ export function useL5Detail(
 
   // ─── 2. 计算属性：负债类期末余额 ─────────────────────────────────────────
 
-  /** 各行期末余额自动计算（负债类：期初+贷方-借方） */
+  /** 各行按模板公式重算（期末未审 / 审定四列 / 披露两列） */
   const computedRows: ComputedRef<L5DetailRow[]> = computed(() => {
-    return detailRows.value.map(row => ({
-      ...row,
-      // 负债类：期末 = 期初 + 本期增加(贷方) - 本期偿还(借方)
-      endBalance: calcLiabilityEndBalance(row.beginning, row.periodIncrease, row.periodRepayment),
-    }))
+    return detailRows.value.map(row => recalcL5DetailRow(row))
   })
 
   /** 期末余额合计（供L5-1交叉验证） */
@@ -303,10 +323,8 @@ export function useL5Detail(
     const row = detailRows.value[index] as any
     row[field] = value
 
-    // 如果是金额字段，重算期末余额
-    if (['beginning', 'periodIncrease', 'periodRepayment'].includes(field)) {
-      row.endBalance = calcLiabilityEndBalance(row.beginning, row.periodIncrease, row.periodRepayment)
-    }
+    // 金额（含调整与一年内到期扣减）变了 ⇒ 按模板重算公式列
+    Object.assign(row, recalcL5DetailRow(row))
 
     _triggerSave(index)
   }
@@ -314,11 +332,8 @@ export function useL5Detail(
   // ─── 4. 保存触发 ──────────────────────────────────────────────────────
 
   function _triggerSave(_rowIndex?: number): void {
-    // 序列化完整行数据（含所有字段）+ 保证 endBalance 新鲜，供持久化+CrossSheet勾稽
-    const payload = detailRows.value.map(r => ({
-      ...r,
-      endBalance: calcLiabilityEndBalance(r.beginning, r.periodIncrease, r.periodRepayment),
-    }))
+    // 序列化完整行数据（含所有字段）+ 保证公式列新鲜，供持久化+CrossSheet勾稽
+    const payload = detailRows.value.map(recalcL5DetailRow)
     debouncedSave(ITEM_ROWS, { remark: JSON.stringify(payload) } as Partial<ChecklistResponse>)
   }
 

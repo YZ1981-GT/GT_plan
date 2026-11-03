@@ -104,6 +104,7 @@ class ContextManifestEntry:
     reason: str = ""  # trimmed/denied/unavailable 的原因
     version: str = ""  # 数据版本/fingerprint（地址坐标 stale 检测用）
     stale: bool = False  # 是否为过期数据
+    jump_route: str = ""  # 站内深链；目标页仍须重新鉴权
 
     def as_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -121,6 +122,8 @@ class ContextManifestEntry:
             d["version"] = self.version
         if self.stale:
             d["stale"] = True
+        if self.jump_route:
+            d["jump_route"] = self.jump_route
         return d
 
 

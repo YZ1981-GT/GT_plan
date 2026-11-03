@@ -1,9 +1,12 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG13FormData — G13 公允价值变动收益底稿数据层
  * Spec: .kiro/specs/g13-fair-value-changes/ Task 4.1
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { G13_ACCOUNT_CODE } from './g13Constants'
@@ -65,7 +68,7 @@ export function useG13FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
       items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-    })
+    }, { _dedupe: false } as AxiosRequestConfig)
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -76,7 +79,12 @@ export function useG13FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void trackPendingWrite(saveImmediate(itemId, updated)).catch((err: unknown) => {
+        // 这家没有重试、没有本地草稿：静默就等于编辑丢了且用户不知道。
+        // 屏障仍从 trackPendingWrite 得到失败，这里只负责让用户看见。
+        ElMessage.error('保存失败，请检查网络后重试')
+        console.error('[G13] 底稿保存未落库', err)
+      })
     }, 2000))
   }
 
@@ -87,18 +95,9 @@ export function useG13FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G13_ACCOUNT_CODE  },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G13_ACCOUNT_CODE),
-      )
-      if (!hit) return null
-      const debit = Number(hit.debit_amount ?? hit.period_debit ?? 0)
-      const credit = Number(hit.credit_amount ?? hit.period_credit ?? 0)
-      return credit - debit
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year, accountPrefix: G13_ACCOUNT_CODE })
+      // 本期发生额 = 试算表未审数（单边口径，与报表同）；原先读端点没有的借 / 贷字段算差额，恒 0
+      return tbSumUnder(list, G13_ACCOUNT_CODE, 'unadjusted_amount')
     } catch {
       return null
     }
@@ -113,17 +112,27 @@ export function useG13FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     return sheetCache.value[name] ?? { rows: [] }
   }
 
-  function flushPending(): void {
+  async function flushPending(): Promise<void> {
+    const inFlight: Array<Promise<void>> = []
     for (const [itemId, timer] of _debounceTimers.entries()) {
       clearTimeout(timer)
       _debounceTimers.delete(itemId)
       const data = allResponses.value.get(itemId)
-      if (data) void saveImmediate(itemId, data)
+      if (data) inFlight.push(saveImmediate(itemId, data))
     }
+    // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+    await Promise.all(inFlight)
   }
 
+  registerPendingFlusher(flushPending)
+
   onScopeDispose(() => {
-    for (const t of _debounceTimers.values()) clearTimeout(t)
+    // 原先只清 timer、不冲刷：导航离开时这些待存编辑被静默丢弃。
+    // flushPending 自身会清 timer，所以这里不必再单独清。
+    void flushPending().catch((err: unknown) => {
+      // 卸载时没有 UI 可提示：至少留下可排查的痕迹，不能让失败的保存彻底无痕消失。
+      console.error('[G13] 卸载时仍有未落库的底稿保存', err)
+    })
   })
 
   return {

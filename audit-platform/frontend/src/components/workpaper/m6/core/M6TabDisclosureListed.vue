@@ -71,6 +71,17 @@
             <span v-else>{{ fmtAmount(row.priorPeriod) }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="提取或分配比例" min-width="140">
+          <template #default="{ row, $index }">
+            <el-input
+              v-if="!isReadonly && !row.isFormula"
+              :model-value="row.ratio"
+              placeholder="如 10%"
+              @change="(val: string) => updateMovementRow($index, 'ratio', val)"
+            />
+            <span v-else>{{ row.ratio || '—' }}</span>
+          </template>
+        </el-table-column>
       </el-table>
     </el-card>
 
@@ -164,7 +175,7 @@
  * - 说明文本区（会计政策变更/差错更正/利润分配方案/子公司盈余公积）
  * - inject openReviewDialog
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
@@ -192,27 +203,31 @@ const aiLoading = ref('')
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM6SyncPayload, type M6DisclosureRow } from '../../composables/m6NoteSectionMap'
+import {
+  createM6ListedRows,
+  m6NoteText,
+  m6WireRows,
+  recalcM6ListedRows,
+  restoreM6ListedRows,
+  type M6ListedRow,
+} from '../../composables/m6DisclosureForm'
+import { buildM6SyncPayload } from '../../composables/m6NoteSectionMap'
 import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M6DisclosureRow[] = movementRows.value
-    .filter((r) => !r.isFormula || r.key === 'end-retained')
-    .map((r) => ({
-      label: r.item.trim(),
-      current: r.currentPeriod,
-      prior: r.priorPeriod,
-      ratio: '',
-    }))
-  const noteText = policyChangeNote.value || ''
-  const payload = buildM6SyncPayload(props.wpId, 'listed', rows, noteText)
-  if (!payload) return
+  const payload = buildM6SyncPayload(
+    props.wpId,
+    'listed',
+    m6WireRows('listed', movementRows.value),
+    m6NoteText(formData.allResponses.value, 'listed'),
+  )
+  if (!payload || props.isReadonly) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -223,33 +238,7 @@ const formData = useM6FormData({
 
 // ─── Movement Table Rows ─────────────────────────────────────────────────────
 
-interface MovementRow {
-  item: string
-  currentPeriod: number
-  priorPeriod: number
-  isFormula: boolean
-  isSubtotal: boolean
-  formulaDesc?: string
-  key: string
-}
-
-const movementRows = ref<MovementRow[]>([
-  { item: '一、调整前上期期末未分配利润', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'prior-end-before-adj' },
-  { item: '  加：会计政策变更调整', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'policy-change-adj' },
-  { item: '  加：前期差错更正调整', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'error-correction-adj' },
-  { item: '  加：其他调整', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'other-adj' },
-  { item: '二、调整后期初未分配利润', currentPeriod: 0, priorPeriod: 0, isFormula: true, isSubtotal: true, formulaDesc: '= 上期末 + 会计政策变更 + 差错更正 + 其他调整', key: 'begin-after-adj' },
-  { item: '  加：本期净利润', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'net-profit' },
-  { item: '  加：其他综合收益转入', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'oci-transfer' },
-  { item: '三、可供分配利润', currentPeriod: 0, priorPeriod: 0, isFormula: true, isSubtotal: true, formulaDesc: '= 调整后期初 + 本期净利润 + 其他综合收益转入', key: 'distributable' },
-  { item: '  减：提取法定盈余公积', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'statutory-surplus' },
-  { item: '  减：提取任意盈余公积', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'discretionary-surplus' },
-  { item: '  减：应付普通股现金股利', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'cash-dividend' },
-  { item: '  减：转作股本的普通股股利', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'stock-dividend' },
-  { item: '  减：其他', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'other-deduction' },
-  { item: '四、期末未分配利润', currentPeriod: 0, priorPeriod: 0, isFormula: true, isSubtotal: true, formulaDesc: '= 可供分配利润 - 法定盈余 - 任意盈余 - 现金股利 - 转股股利 - 其他', key: 'end-retained' },
-  { item: '  其中：子公司盈余公积转入', currentPeriod: 0, priorPeriod: 0, isFormula: false, isSubtotal: false, key: 'subsidiary-surplus-in' },
-])
+const movementRows = ref<M6ListedRow[]>(createM6ListedRows())
 
 // ─── Text Notes ──────────────────────────────────────────────────────────────
 
@@ -260,78 +249,35 @@ const subsidiaryNote = ref('')
 // ─── Formula Calculations ────────────────────────────────────────────────────
 
 function recalcFormulas() {
-  const rows = movementRows.value
-  const getVal = (key: string, field: 'currentPeriod' | 'priorPeriod') => {
-    const row = rows.find(r => r.key === key)
-    return row ? row[field] : 0
-  }
-
-  // 二、调整后期初 = 上期末 + 政策变更 + 差错更正 + 其他调整
-  const beginAfterAdj = rows.find(r => r.key === 'begin-after-adj')
-  if (beginAfterAdj) {
-    beginAfterAdj.currentPeriod = getVal('prior-end-before-adj', 'currentPeriod')
-      + getVal('policy-change-adj', 'currentPeriod')
-      + getVal('error-correction-adj', 'currentPeriod')
-      + getVal('other-adj', 'currentPeriod')
-    beginAfterAdj.priorPeriod = getVal('prior-end-before-adj', 'priorPeriod')
-      + getVal('policy-change-adj', 'priorPeriod')
-      + getVal('error-correction-adj', 'priorPeriod')
-      + getVal('other-adj', 'priorPeriod')
-  }
-
-  // 三、可供分配利润 = 调整后期初 + 净利润 + OCI转入
-  const distributable = rows.find(r => r.key === 'distributable')
-  if (distributable && beginAfterAdj) {
-    distributable.currentPeriod = beginAfterAdj.currentPeriod
-      + getVal('net-profit', 'currentPeriod')
-      + getVal('oci-transfer', 'currentPeriod')
-    distributable.priorPeriod = beginAfterAdj.priorPeriod
-      + getVal('net-profit', 'priorPeriod')
-      + getVal('oci-transfer', 'priorPeriod')
-  }
-
-  // 四、期末未分配利润 = 可供分配 - 法定 - 任意 - 现金股利 - 转股股利 - 其他
-  const endRetained = rows.find(r => r.key === 'end-retained')
-  if (endRetained && distributable) {
-    endRetained.currentPeriod = distributable.currentPeriod
-      - getVal('statutory-surplus', 'currentPeriod')
-      - getVal('discretionary-surplus', 'currentPeriod')
-      - getVal('cash-dividend', 'currentPeriod')
-      - getVal('stock-dividend', 'currentPeriod')
-      - getVal('other-deduction', 'currentPeriod')
-    endRetained.priorPeriod = distributable.priorPeriod
-      - getVal('statutory-surplus', 'priorPeriod')
-      - getVal('discretionary-surplus', 'priorPeriod')
-      - getVal('cash-dividend', 'priorPeriod')
-      - getVal('stock-dividend', 'priorPeriod')
-      - getVal('other-deduction', 'priorPeriod')
-  }
+  movementRows.value = recalcM6ListedRows(movementRows.value)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function updateMovementRow(index: number, field: 'currentPeriod' | 'priorPeriod', val: number) {
+function updateMovementRow(index: number, field: 'currentPeriod' | 'priorPeriod' | 'ratio', val: number | string) {
   if (index >= 0 && index < movementRows.value.length) {
-    movementRows.value[index][field] = val
+    const row = movementRows.value[index]
+    if (field === 'ratio') row.ratio = String(val)
+    else row[field] = Number(val) || 0
     recalcFormulas()
-    formData.debouncedSave(`M6-disclosure-listed-${movementRows.value[index].key}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    formData.debouncedSave(`M6-disclosure-listed-${row.key}-${field}`, { remark: String(val) })
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handlePolicyChangeNoteChange() {
   formData.debouncedSave('M6-disclosure-listed-policy-change', { remark: policyChangeNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleDistributionPlanNoteChange() {
   formData.debouncedSave('M6-disclosure-listed-distribution-plan', { remark: distributionPlanNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleSubsidiaryNoteChange() {
   formData.debouncedSave('M6-disclosure-listed-subsidiary', { remark: subsidiaryNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function _endRetained(field: 'currentPeriod' | 'priorPeriod'): number {
@@ -389,23 +335,10 @@ function fmtAmount(val: number): string {
 
 function restoreData(): void {
   const responses = formData.allResponses.value
-  for (const row of movementRows.value) {
-    if (row.isFormula) continue
-    const currentResp = responses.get(`M6-disclosure-listed-${row.key}-currentPeriod`)
-    const priorResp = responses.get(`M6-disclosure-listed-${row.key}-priorPeriod`)
-    if (currentResp?.remark) row.currentPeriod = Number(currentResp.remark) || 0
-    if (priorResp?.remark) row.priorPeriod = Number(priorResp.remark) || 0
-  }
-  recalcFormulas()
-
-  const policyResp = responses.get('M6-disclosure-listed-policy-change')
-  if (policyResp?.remark) policyChangeNote.value = policyResp.remark
-
-  const planResp = responses.get('M6-disclosure-listed-distribution-plan')
-  if (planResp?.remark) distributionPlanNote.value = planResp.remark
-
-  const subResp = responses.get('M6-disclosure-listed-subsidiary')
-  if (subResp?.remark) subsidiaryNote.value = subResp.remark
+  movementRows.value = restoreM6ListedRows(responses)
+  policyChangeNote.value = responses.get('M6-disclosure-listed-policy-change')?.remark || ''
+  distributionPlanNote.value = responses.get('M6-disclosure-listed-distribution-plan')?.remark || ''
+  subsidiaryNote.value = responses.get('M6-disclosure-listed-subsidiary')?.remark || ''
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
@@ -425,6 +358,8 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

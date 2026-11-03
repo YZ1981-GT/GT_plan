@@ -76,7 +76,7 @@ _SECTION_PROMPTS: dict[str, str] = {
         "③败诉可能性级别判断（很可能/可能/极小可能）"
         "④预计损失金额（基于可能性级别和计量方法）"
         "⑤是否需确认预计负债（很可能→确认；可能→披露；极小可能→不处理）"
-        "⑥对审计意见的影响及后续程序建议。"
+        "⑥对报表列报的潜在影响及后续程序建议（只列判断因素，不形成最终审计意见）。"
         "确保符合CAS13或有事项判断框架。"
     ),
     "warranty-conclusion": (
@@ -109,13 +109,13 @@ _SECTION_PROMPTS: dict[str, str] = {
         "注意：不应披露可能损害企业利益的信息（如败诉预期金额）。"
     ),
     "overall-opinion": (
-        "请生成K5-1审定表底部的审计综合意见。综合评价预计负债科目整体的"
+        "请提供K5-1审定表底部的科目结论措辞建议。综合评价预计负债科目整体的"
         "完整性（是否存在少计预计负债）、存在性（确认条件是否仍满足）、"
         "计价和分摊（最佳估计数计量方法是否恰当）、分类（流动vs非流动）、"
         "列报与披露的恰当性（CAS13或有事项披露）。"
         "说明是否发现需要调整的重大事项，审定数与未审数的主要差异原因。"
         "重点评价：或有事项三级判断的合理性、最佳估计数计量的充分性、"
-        "律师函证据的支持力度、产品质保/弃置费用测算的准确性。"
+        "律师函证据的支持力度、产品质保/弃置费用测算的准确性；列明证据缺口和建议程序，不得形成最终审计意见。"
     ),
 }
 
@@ -157,7 +157,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

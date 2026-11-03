@@ -222,8 +222,9 @@ async def wopi_put_file(
         except PermissionError as e:
             return JSONResponse(status_code=409, content={"message": str(e)})
     else:
+        # settings 用模块级导入：这里再 import 会让整个函数的 settings 变成局部变量，
+        # 上面写授权被拒那支读 settings 时恒抛 UnboundLocalError（spec excel-style-table-editing 5.4 触类旁通）
         from pathlib import Path
-        from app.core.config import settings
         poc_dir = Path(settings.STORAGE_ROOT) / "poc"
         poc_dir.mkdir(parents=True, exist_ok=True)
         (poc_dir / file_id).write_bytes(body)

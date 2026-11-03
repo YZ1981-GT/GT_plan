@@ -303,8 +303,11 @@ async def apply_overwrite_deletions(
     store_payloads: Mapping[str, Any],
     plan_inputs: Any,
     plan: OverwritePlan,
+    columns: Any = None,
 ) -> AppliedOverwrite:
     """应用删除侧（ADR-AOS-001 的后置 prune）+ 观测幽灵行 + 回喂重算计划。
+
+    :param columns: 载荷列口径（与快照 / 回写镜像同一口径，`store_payload_columns`）；缺省 remark（原行为）。
 
     🔴 **调用点必须在 `mirror_projection_into_store(..., commit=False)` 之后**（模块 docstring
     第一节给了实证理由：前置会让幽灵行门全面生效 ⇒ 覆盖变成大面积静默少写）。
@@ -324,9 +327,12 @@ async def apply_overwrite_deletions(
         compute_plan_for_adopt,
     )
 
+    from app.services.workpaper_sync.store_payload_columns import REMARK_ONLY
+
+    cols = columns or REMARK_ONLY
     row_keys = _row_keys_of(baseline)
     readers: Mapping[str, RowReader] = plan_inputs.row_readers
-    merged = await _snapshot_store(session, wp_id=wp_id, item_ids=plan_inputs.item_ids)
+    merged = await _snapshot_store(session, wp_id=wp_id, item_ids=plan_inputs.item_ids, columns=cols)
 
     post_merge_ids: dict[str, Mapping[str | None, frozenset[str]]] = {}
     rows_deleted_by_item: dict[str, tuple[str, ...]] = {}
@@ -345,7 +351,8 @@ async def apply_overwrite_deletions(
         rows_deleted_by_item[item_id] = deleted
         written = (
             await session.execute(
-                sa.text(_UPDATE_REMARK),
+                # remark 口径即 `_UPDATE_REMARK` 原文（`PayloadColumns.update_sql` 逐字相同）
+                sa.text(_UPDATE_REMARK if cols is REMARK_ONLY else cols.update_sql),
                 {
                     "val": json.dumps(pruned, ensure_ascii=False),
                     "wp": str(wp_id),

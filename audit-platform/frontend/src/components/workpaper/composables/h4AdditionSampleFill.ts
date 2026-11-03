@@ -1,44 +1,15 @@
 /**
  * H4-4 抽凭回填 / OCR → 支持性文件 字段映射
  *
- * 抽凭：业务内容 ← summary；对方科目/明细 ← counterpartAccount（可拆分）
+ * 抽凭：共享回填函数的待写入项 → 行补丁（mapPreparedToAdditionPatch；对方科目按后端配对，不在前端拼）
  * OCR：支持性文件 ← 合同/发票/入库单等单据号拼接；并回填供应商、发票金额等
  */
 
 import type { H4AdditionCheckRow } from './h4AdditionCheckModel'
+import type { PreparedItem } from './shared/voucherCheckFill'
+import { assetAmount, sampleOf } from './assetVoucherFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-/** 抽凭引擎 SampledVoucher 及历史兼容字段 */
-export interface H4VoucherSampleLike {
-  voucherNo?: string | null
-  voucher_no?: string | null
-  voucherDate?: string | null
-  voucher_date?: string | null
-  date?: string | null
-  entryDate?: string | null
-  summary?: string | null
-  abstract?: string | null
-  description?: string | null
-  /** 对方科目（抽凭引擎标准字段） */
-  counterpartAccount?: string | null
-  counterpart_account?: string | null
-  oppositeAccount?: string | null
-  /** 对方明细 */
-  counterpartDetail?: string | null
-  oppositeDetail?: string | null
-  detailAccount?: string | null
-  accountName?: string | null
-  accountCode?: string | null
-  debitAmount?: string | number | null
-  creditAmount?: string | number | null
-  amount?: string | number | null
-  debit?: string | number | null
-  credit?: string | number | null
-  abnormal?: boolean | null
-  selectionReason?: string | null
-  remark?: string | null
-}
 
 /** 可回填到 H4-4 行的补丁（均为可选） */
 export type H4AdditionSamplePatch = Partial<Pick<
@@ -97,20 +68,6 @@ function _pickNum(obj: Record<string, unknown>, keys: string[]): number {
   return 0
 }
 
-/**
- * 拆分对方科目：
- * 「应付账款/某某供应商」「应付账款-某某」→ account + detail
- */
-export function splitCounterpartAccount(raw: string): { account: string; detail: string } {
-  const s = _str(raw)
-  if (!s) return { account: '', detail: '' }
-  const parts = s.split(/[/／\-—|｜]/).map(p => p.trim()).filter(Boolean)
-  if (parts.length >= 2) {
-    return { account: parts[0], detail: parts.slice(1).join('/') }
-  }
-  return { account: s, detail: '' }
-}
-
 /** 合并支持性文件片段，去重 */
 export function mergeSupportingDocs(existing: string, addition: string): string {
   const a = _str(existing)
@@ -127,99 +84,36 @@ export function mergeSupportingDocs(existing: string, addition: string): string 
   return merged.join(' / ')
 }
 
-/** 借方优先（增加检查），否则取绝对值 amount */
-export function resolveAdditionDebitAmount(sample: H4VoucherSampleLike): number {
-  const debit = _num(sample.debitAmount ?? sample.debit)
-  if (debit !== 0) return Math.abs(debit)
-  const amt = _num(sample.amount)
-  if (amt !== 0) return Math.abs(amt)
-  const credit = _num(sample.creditAmount ?? sample.credit)
-  return credit !== 0 ? Math.abs(credit) : 0
-}
-
-export function resolveVoucherDate(sample: H4VoucherSampleLike): string {
-  return _str(sample.voucherDate ?? sample.voucher_date ?? sample.date ?? sample.entryDate)
-}
-
-export function resolveBusinessContent(sample: H4VoucherSampleLike): string {
-  return _str(sample.summary ?? sample.abstract ?? sample.description)
-}
-
-export function resolveOppositeRaw(sample: H4VoucherSampleLike): string {
-  // 多科目时从 voucherEntries 拼接完整对方科目
-  const entries = (sample as any).voucherEntries as Array<{ account_code: string; account_name: string; debit_amount: string | null; credit_amount: string | null }> | undefined
-  const cpAccount = _str(sample.counterpartAccount ?? sample.counterpart_account ?? sample.oppositeAccount)
-  if (((sample as any).isMultiAccount || cpAccount === '多科目') && entries?.length) {
-    const sDebit = Number((sample as any).debitAmount ?? (sample as any).amount ?? 0)
-    const counterEntries = entries.filter(e =>
-      sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-    )
-    const toShow = counterEntries.length > 0 ? counterEntries : entries
-    return toShow.map(e => `${e.account_code} ${e.account_name}`.trim()).join('/')
-  }
-  return cpAccount
-}
-
 // ─── 抽凭映射 ────────────────────────────────────────────────────────────────
 
 /**
- * 将单笔抽凭样本映射为 H4-4 行补丁。
- * - 业务内容 ← 摘要（不再误写入支持性文件）
- * - 对方科目/明细 ← counterpartAccount（可拆分）
- * - 借方金额 ← debitAmount 优先
+ * 共享回填函数的待写入项 → H4-4 行补丁（spec voucher-identity-writeback-and-audit-phase 任务 12）：
+ * - 业务内容 ← 摘要（不写进支持性文件），物资名称缺省取摘要；
+ * - 对方科目 ← 后端配对的科目编码（多个用「/」，配不上「多科目」），对方明细 ← 科目名称；
+ * - 借方金额 ← 样本自己那一栏的金额，红字带符号照记（原实现取绝对值，且金额不为正就不写）。
+ * 原实现在前端按 voucherEntries 自己拼多科目凭证的对方科目，已删除（配对只在后端做）。
  */
-export function mapVoucherSampleToAdditionPatch(sample: H4VoucherSampleLike): H4AdditionSamplePatch {
-  const patch: H4AdditionSamplePatch = {}
-
-  const voucherNo = _str(sample.voucherNo ?? sample.voucher_no)
+export function mapPreparedToAdditionPatch(item: PreparedItem): H4AdditionSamplePatch {
+  const s = sampleOf(item)
+  const patch: H4AdditionSamplePatch = { voucherResult: '已抽凭' }
+  const voucherNo = _str(s.voucherNo)
   if (voucherNo) patch.voucherNo = voucherNo
-
-  const voucherDate = resolveVoucherDate(sample)
+  const voucherDate = _str(s.voucherDate)
   if (voucherDate) patch.voucherDate = voucherDate
-
-  const businessContent = resolveBusinessContent(sample)
-  if (businessContent) {
-    patch.businessContent = businessContent
-    // 名称空时可用摘要作默认物资名（调用方按需覆盖）
-    patch.name = businessContent.slice(0, 40)
+  const content = _str(s.summary)
+  if (content) {
+    patch.businessContent = content
+    patch.name = content.slice(0, 40)
   }
-
-  const oppositeRaw = resolveOppositeRaw(sample)
-  if (oppositeRaw) {
-    const { account, detail } = splitCounterpartAccount(oppositeRaw)
-    if (account) patch.oppositeAccount = account
-    if (detail) patch.oppositeDetail = detail
-  } else {
-    // 无对方科目时，不把本科目 accountName 当作对方
-    const detailOnly = _str(sample.counterpartDetail ?? sample.oppositeDetail ?? sample.detailAccount)
-    if (detailOnly) patch.oppositeDetail = detailOnly
-  }
-
-  const amount = resolveAdditionDebitAmount(sample)
-  if (amount > 0) patch.amount = amount
-
-  if (sample.abnormal === true) patch.isAbnormal = '是'
-
-  const reason = _str(sample.selectionReason ?? sample.remark)
+  if (item.counterpartAccount) patch.oppositeAccount = item.counterpartAccount
+  const name = item.counterpartAccountName
+  if (name && name !== item.counterpartAccount) patch.oppositeDetail = name
+  const amount = assetAmount(item, 'debit')
+  if (amount !== 0) patch.amount = amount
+  if (s.abnormal === true) patch.isAbnormal = '是'
+  const reason = _str(s.selectionReason ?? s.remark)
   if (reason) patch.remark = reason
-
-  patch.voucherResult = '已抽凭'
-
   return patch
-}
-
-/**
- * 规范化抽凭引擎 emit 载荷：支持 `{ samples }` / 裸数组 / `{ rows }`
- */
-export function normalizeFilledSamples(payload: unknown): H4VoucherSampleLike[] {
-  if (payload == null) return []
-  if (Array.isArray(payload)) return payload as H4VoucherSampleLike[]
-  if (typeof payload === 'object') {
-    const o = payload as Record<string, unknown>
-    if (Array.isArray(o.samples)) return o.samples as H4VoucherSampleLike[]
-    if (Array.isArray(o.rows)) return o.rows as H4VoucherSampleLike[]
-  }
-  return []
 }
 
 /**

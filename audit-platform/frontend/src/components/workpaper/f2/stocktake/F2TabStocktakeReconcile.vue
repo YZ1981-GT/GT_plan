@@ -244,13 +244,14 @@
               <el-button v-if="!isReadonly" link type="danger" size="small" @click="bsSheet.removeRow(row.id)">删</el-button>
             </template>
           </el-table-column>
-          <el-table-column v-if="wpId && !isReadonly" label="OCR" width="50" align="center">
+          <el-table-column v-if="wpId" label="OCR" width="74" align="center">
             <template #default="{ row }">
-              <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
+              <el-upload v-if="!isReadonly" style="display:inline-block" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
                 :disabled="ocrLoadingId === row.id"
                 @change="(f: any) => onOcrBs(row.id, f?.raw)">
                 <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="'F2-24'" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
         </el-table>
@@ -389,13 +390,14 @@
               <el-button v-if="!isReadonly" link type="danger" size="small" @click="countSheet.removeRow(row.id)">删</el-button>
             </template>
           </el-table-column>
-          <el-table-column v-if="wpId && !isReadonly" label="OCR" width="50" align="center">
+          <el-table-column v-if="wpId" label="OCR" width="74" align="center">
             <template #default="{ row }">
-              <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
+              <el-upload v-if="!isReadonly" style="display:inline-block" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
                 :disabled="ocrLoadingId === row.id"
                 @change="(f: any) => onOcrCount(row.id, f?.raw)">
                 <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="'F2-24'" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
         </el-table>
@@ -465,6 +467,8 @@
 </template>
 
 <script setup lang="ts">
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'

@@ -126,7 +126,7 @@
 
     <!-- ─── 问答矩阵（手写 table，避免 el-table 单元格 radio 渲染冲突） ─── -->
     <div class="gt-dfq__matrix-wrap">
-      <table class="gt-dfq__matrix" v-if="combinations.length > 0">
+      <GtGridTable class="gt-dfq__matrix" v-if="combinations.length > 0">
         <colgroup>
           <col class="gt-dfq__col-label" />
           <col v-for="(_c, idx) in combinations" :key="`col-${idx}`" class="gt-dfq__col-comb" />
@@ -269,7 +269,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
 
       <!-- 空态 -->
       <el-empty
@@ -306,6 +306,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import type { DFormSchema, DFormData, FieldChangePayload } from './GtDForm.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

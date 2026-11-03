@@ -38,6 +38,18 @@ async def db_session() -> AsyncSession:
         yield session
 
 
+@pytest.fixture(autouse=True)
+def _isolate_custom_functions():
+    """自定义函数注册表自 spec formula-hub-integrity-closure 任务 33（ADR-FHIC-17）起是模块级单一注册表，
+    不再挂在 FormulaEngine 实例上 ⇒ 每个用例结束注销它新注册的函数，免得用例之间互相看见（原 list 用例数到 3）。"""
+    from app.services.formula_custom_functions import get_custom_registry, unregister_custom_function
+
+    before = set(get_custom_registry())
+    yield
+    for name in set(get_custom_registry()) - before:
+        unregister_custom_function(name)
+
+
 @pytest_asyncio.fixture
 async def seeded_db(db_session: AsyncSession):
     user = User(id=FAKE_USER_ID, username="tester", email="t@t.com",

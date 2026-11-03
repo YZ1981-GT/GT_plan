@@ -73,6 +73,7 @@ import http from '@/utils/http'
 import { useFraudRiskData } from './composables/useFraudRiskData'
 import { useFraudSignalCollector } from '../coordination/useFraudSignalCollector'
 import { filterSummaryRows, fetchWorkpaperHtmlRows, fetchConfirmationSummaryRows } from '../coordination/importFromSummary'
+import { isRepliedTrue } from '../replyStatus'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import { eventBus } from '@/utils/eventBus'
 // 真源在 confirmation/composables/（本文件在 confirmation/fraudRisk/，故为 '../composables/'）
@@ -251,7 +252,7 @@ async function handleAutoFill() {
     }
     if (sumRes && sumRes.rows.length > 0) {
       const sent = sumRes.rows.length
-      const replied = sumRes.rows.filter(r => r.is_replied).length
+      const replied = sumRes.rows.filter(r => isRepliedTrue(r)).length // '否' 是真值不能裸判
       const rate = sent > 0 ? (replied / sent) * 100 : 100
       if (rate < 50) {
         collector.addD01LowReplyRate(rate)

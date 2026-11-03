@@ -24,11 +24,13 @@ from app.models.base import Base, TimestampMixin
 
 
 class ConfirmationType(str, enum.Enum):
-    """函证类型"""
+    """函证类型（合法值与中文名的单一来源，见 services/confirmation_types.py）"""
     receivable = "receivable"   # 应收
     payable = "payable"         # 应付
     bank = "bank"               # 银行
     loan = "loan"               # 借款
+    legal = "legal"             # 律师（A12-1 律师询证函；spec attachment-confirmation-evidence-loop 需求 5）
+    other = "other"             # 其他
 
 
 class ConfirmationStatus(str, enum.Enum):

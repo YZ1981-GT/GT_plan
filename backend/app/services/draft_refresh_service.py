@@ -29,13 +29,12 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -61,6 +60,10 @@ from app.services.formula_runtime.contracts import (
     FormulaMutation,
     RestoredMutation,
 )
+from app.services.formula_management.refresh_outcome import ScopeOutcome, derive_outcome
+
+if TYPE_CHECKING:
+    from app.models.audit_platform_schemas import EventPayload
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +203,11 @@ class RefreshResult:
         blocking: 前置校验阻断项（``status='blocked'`` 时非空）。
         stale_marked_count: 生成初稿后经既有 ``prefill_stale`` 机制标为过时的底稿数
             （Req 25.5，复用 recalc/stale 通道触发受影响单元过时刷新，不自建）。
+        applied_count / recomputed_count / draft_marked_count / outcome / post_commit_events: 由 Draft Refresh 结果
+            聚合（``formula_management.refresh_outcome``，需求 3.2 / 3.3）写回 —— 金额变化数、仅重算数、Draft 标记数、
+            状态表派生的整体结果（未经聚合为 ``None``）、提交成功后才投递的事件（不进 ``to_dict``）。
+        failures / warnings / rollback_available: 编排器汇总写回（报表范围失败行、告警、报表范围执行过即 ``False``）；
+            ``to_dict`` 另给 ``failed_count = len(failures)``；未经汇总时与路由原默认值相同（空 / 空 / ``True`` / 0）。
     """
 
     tb_snapshot_hash: str
@@ -213,20 +221,36 @@ class RefreshResult:
     snapshotted_units: list[str] = field(default_factory=list)
     blocking: list[dict] = field(default_factory=list)
     stale_marked_count: int = 0
+    applied_count: int = 0
+    recomputed_count: int = 0
+    draft_marked_count: int = 0
+    outcome: str | None = None
+    post_commit_events: list[EventPayload] = field(default_factory=list, repr=False, compare=False)
+    failures: list[dict] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    rollback_available: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "tb_snapshot_hash": self.tb_snapshot_hash,
             "scope": self.scope,
             "status": self.status,
+            "outcome": self.outcome,
             "refresh_id": str(self.refresh_id) if self.refresh_id else None,
             "idempotent": self.idempotent,
             "affected_count": self.affected_count,
+            "applied_count": self.applied_count,
+            "recomputed_count": self.recomputed_count,
+            "draft_marked_count": self.draft_marked_count,
             "refreshed_units": list(self.refreshed_units),
             "skipped_human_edited": list(self.skipped_human_edited),
             "snapshotted_units": list(self.snapshotted_units),
             "blocking": [dict(b) for b in self.blocking],
             "stale_marked_count": self.stale_marked_count,
+            "failures": [dict(f) for f in self.failures],
+            "failed_count": len(self.failures),
+            "warnings": list(self.warnings),
+            "rollback_available": self.rollback_available,
         }
 
 
@@ -651,6 +675,8 @@ class DraftRefreshService:
         extra_units: Sequence[RefreshUnit] = (),
         confirm_overwrite: bool = False,
         preset_index: dict[str, list] | None = None,
+        idempotency_checked: bool = False,
+        idempotency_key: str | None = None,
     ) -> tuple[RefreshResult, PresetApplication]:
         """一键刷新 / 底稿生成时按 page_key 套用预设库为初稿公式后编排刷新（Req 22.4, 22.6）。
 
@@ -664,6 +690,7 @@ class DraftRefreshService:
             page_keys: 需按预设库套用的目标页面。
             extra_units: 上游引擎产出的非预设初稿单元（与预设单元合并编排）。
             preset_index: 可选预设索引复用（见 :meth:`build_preset_draft_units`）。
+            idempotency_checked / idempotency_key: 原样透传 :meth:`refresh`。
 
         Returns:
             (RefreshResult, PresetApplication)：刷新结果 + 预设套用明细。
@@ -679,6 +706,8 @@ class DraftRefreshService:
             scope=scope,
             units=all_units,
             confirm_overwrite=confirm_overwrite,
+            idempotency_checked=idempotency_checked,
+            idempotency_key=idempotency_key,
         )
 
         # 在刷新审计明细追加预设套用统计（presetted/pending 页面），进度可见（Req 22.6）。
@@ -708,6 +737,8 @@ class DraftRefreshService:
         scope: str | Sequence[str],
         units: Sequence[RefreshUnit] = (),
         confirm_overwrite: bool = False,
+        idempotency_checked: bool = False,
+        idempotency_key: str | None = None,
     ) -> RefreshResult:
         """幂等编排：precheck → 幂等短路 → diff/snapshot → 打 Draft → 审计留痕（Req 3/4）。
 
@@ -736,9 +767,13 @@ class DraftRefreshService:
             scope: 刷新范围（单值或多值，归一化为审计 scope 键）。
             units: 上游生成器产出的初稿单元集合（生成归各引擎任务，此处仅编排）。
             confirm_overwrite: 是否确认覆盖人工编辑单元；``False`` 时仅刷新非人工编辑单元。
+            idempotency_checked: 调用方已在取锁后判定幂等（编排器，ADR-FHIC-08）⇒ 跳过本方法的幂等短路；默认 False。
+            idempotency_key: 写入审计 ``idempotency_key`` 列（编排器传计划指纹）；默认 None，与改动前相同。
 
         Returns:
-            RefreshResult：含幂等标识、受影响数、跳过/快照单元清单。
+            RefreshResult：含幂等标识、受影响数、跳过/快照单元清单。本路径只打 Draft 标记（需求 3.3）⇒ ``draft_marked_count``
+            = 刷新单元数、``applied_count = recomputed_count = affected_count = 0``；``outcome`` 按需求 3.2 状态表派生
+            （draft_marked / no_effect），``status`` 仍为 ``success``（派生的响应 status 由编排器写回）。
         """
         scope_key = self._scope_key(scope)
         snapshot_hash = await self._compute_tb_snapshot_hash(db, project_id, year)
@@ -753,19 +788,22 @@ class DraftRefreshService:
                 blocking=[i.to_dict() for i in precheck.blocking],
             )
 
-        # ── 幂等短路：相同 hash + scope 的成功记录 → 返回上次结果标识（Req 3.1）──
-        prior = await self._find_idempotent_hit(
+        # ── 幂等短路：相同 hash + scope 的成功记录 → 返回上次结果标识（Req 3.1）；调用方已判定则跳过 ──
+        prior = None if idempotency_checked else await self._find_idempotent_hit(
             db, project_id=project_id, year=year,
             scope_key=scope_key, snapshot_hash=snapshot_hash,
         )
         if prior is not None:
+            outcome, counts = self._replayed_outcome(prior, legacy_field="draft_marked_count")
             return RefreshResult(
                 tb_snapshot_hash=snapshot_hash,
                 scope=scope_key,
                 status="idempotent_hit",
                 refresh_id=prior.id,
                 idempotent=True,
-                affected_count=prior.affected_count,
+                affected_count=counts["applied_count"] + counts["recomputed_count"],
+                outcome=outcome,
+                **counts,
             )
 
         # ── ② 覆盖排除：未确认覆盖 → 排除范围内 human_edited 单元（Req 4.4）──
@@ -789,6 +827,7 @@ class DraftRefreshService:
             affected_count=0,
             result_status="success",
             detail={},
+            idempotency_key=idempotency_key,
         )
         db.add(audit)
         await db.flush()  # 取得 audit.id，供 snapshot/marker 外键关联
@@ -844,22 +883,23 @@ class DraftRefreshService:
                 marker.updated_at = now
             refreshed.append(unit.unit_scope)
 
-        # ── ⑥ 生成初稿后触发受影响单元过时刷新（Req 25.5）──
-        # 复用既有 prefill_stale + /trial-balance/recalc 机制（不自建）：把受影响底稿标
-        # prefill_stale=True，使下游经既有 recalc/stale 通道反映"初稿已由四表库未审数重生成、
-        # 需重算对齐"。仅在实际生成初稿（refreshed 非空）时触发。
-        stale_marked = 0
-        if refreshed:
-            stale_marked = await self.trigger_recalc(db, project_id=project_id)
+        # ── ⑥ 过时刷新门槛（Req 25.5 → 需求 3.4）：本路径只打 Draft 标记、不改业务值，金额变化恒为 0 ⇒
+        # 不触发（改造前按 refreshed 非空触发，marker-only 也把全项目底稿标 prefill_stale）。──
+        applied = recomputed = 0
+        stale_marked = await self._recalc_if_changed(db, project_id=project_id, value_changes=applied)
+        outcome, _status, outcome_detail = self._settle(
+            scope_key, "all_or_nothing", applied=applied, recomputed=recomputed, draft_marked=len(refreshed),
+        )
 
         # ── ⑤ 回填审计受影响数 + 明细（append-only，仅补本行统计字段）──
-        audit.affected_count = len(refreshed)
+        audit.affected_count = applied + recomputed
         audit.detail = {
             "refreshed_units": refreshed,
             "skipped_human_edited": skipped,
             "snapshotted_units": snapshotted,
             "confirm_overwrite": confirm_overwrite,
             "stale_marked_count": stale_marked,
+            **outcome_detail,
         }
         await db.flush()
 
@@ -869,11 +909,15 @@ class DraftRefreshService:
             status="success",
             refresh_id=audit.id,
             idempotent=False,
-            affected_count=len(refreshed),
+            affected_count=applied + recomputed,
             refreshed_units=refreshed,
             skipped_human_edited=skipped,
             snapshotted_units=snapshotted,
             stale_marked_count=stale_marked,
+            applied_count=applied,
+            recomputed_count=recomputed,
+            draft_marked_count=len(refreshed),
+            outcome=outcome,
         )
 
     async def trigger_recalc(
@@ -883,7 +927,7 @@ class DraftRefreshService:
         project_id: UUID,
         account_codes: Sequence[str] | None = None,
     ) -> int:
-        """一键刷新生成初稿后，触发受影响单元的过时刷新（Req 25.5）。
+        """一键刷新生成初稿后，触发受影响单元的过时刷新（Req 25.5；两条刷新路径只经 :meth:`_recalc_if_changed` 在金额变化 > 0 时调）。
 
         **复用既有过时/重算机制，不自建并行追踪**：直接调用 ``prefill_engine.mark_stale``
         （数据导入 / 调整分录变更等既有事件链使用的同一 helper）把受影响底稿标
@@ -929,6 +973,39 @@ class DraftRefreshService:
                 exc,
             )
             return 0
+
+    async def _recalc_if_changed(self, db: AsyncSession, *, project_id: UUID, value_changes: int) -> int:
+        """过时刷新门槛（需求 3.4；两条路径共用此一处）：金额变化 > 0 才 :meth:`trigger_recalc`，否则返回 0。"""
+        if value_changes <= 0:
+            return 0
+        return await self.trigger_recalc(db, project_id=project_id)
+
+    @staticmethod
+    def _settle(
+        scope: str, transaction_mode: str, *, applied: int = 0, recomputed: int = 0, draft_marked: int = 0,
+        failures: Sequence[dict] = (),
+    ) -> tuple[str, str, dict[str, Any]]:
+        """按需求 3.2 状态表派生 ``(outcome, status)``，并给出审计 ``detail`` 里供幂等重放的 outcome 与四个计数（需求 3.3：
+        ``draft_marked`` 只计仅打 Draft 标记的单元，金额变化单元自带的标记不计；``affected_count = applied + recomputed``）。
+        """
+        outcome, status = derive_outcome([ScopeOutcome(
+            scope, value_changes=applied, recomputed=recomputed, draft_marked=draft_marked, failures=list(failures),
+        )], transaction_mode)
+        return outcome, status, {
+            "outcome": outcome, "affected_count": applied + recomputed, "applied_count": applied,
+            "recomputed_count": recomputed, "draft_marked_count": draft_marked,
+        }
+
+    @staticmethod
+    def _replayed_outcome(prior: DraftRefreshAudit, *, legacy_field: str) -> tuple[str | None, dict[str, int]]:
+        """幂等命中：从首次运行审计的 ``detail`` 读回 outcome 与 applied / recomputed / draft_marked 三个计数。缺键（改造前
+        的记录）按旧口径兜底：``affected_count`` 列原来记的那一项归到 ``legacy_field``（``refresh()`` 记的是 Draft 标记数、
+        ``execute_refresh`` 记的是成功 apply 数），其余计数取 0，``outcome`` 取 None。
+        """
+        detail = prior.detail if isinstance(prior.detail, dict) else {}
+        legacy = {"applied_count": 0, "recomputed_count": 0, "draft_marked_count": 0}
+        legacy[legacy_field] = int(prior.affected_count or 0)
+        return detail.get("outcome"), {key: int(detail.get(key, fallback) or 0) for key, fallback in legacy.items()}
 
     async def mark_human_edited(
         self,
@@ -1427,6 +1504,8 @@ class DraftRefreshService:
         formula_definition_revision: str = "",
         preset_revision: str = "",
         acnr_registry_version: str = "",
+        idempotency_checked: bool = False,
+        recomputed_count: int = 0,
     ) -> ExecutionResult:
         """事务编排：fingerprint → advisory lock → snapshot → apply → audit → outbox。
 
@@ -1451,9 +1530,12 @@ class DraftRefreshService:
             formula_definition_revision: 公式定义 hash。
             preset_revision: 预设版本。
             acnr_registry_version: ACNR 版本。
+            idempotency_checked: 调用方已在取锁后判定幂等（编排器，ADR-FHIC-08）⇒ 跳过本方法的幂等检查（含进行中判定）。
+            recomputed_count: 调用方下发前剔除的仅重算数（规范化后 before == after，需求 3.2），计入 affected_count。
 
         Returns:
-            ExecutionResult。
+            ExecutionResult：``applied_count`` = 成功 apply 数（金额变化数），``outcome`` / ``status`` 按需求 3.2 状态表与
+            事务模式派生；失败（整体回滚）时三个计数都记 0。
         """
         import uuid as uuid_mod
 
@@ -1475,9 +1557,9 @@ class DraftRefreshService:
         # ── 2. Advisory lock ──
         await self._acquire_advisory_lock(db, project_id, year, fingerprint)
 
-        # ── 3. Idempotency check ──
+        # ── 3. Idempotency check（调用方已判定则跳过）──
         try:
-            prior = await self._check_idempotency(
+            prior = None if idempotency_checked else await self._check_idempotency(
                 db, project_id=project_id, year=year, fingerprint=fingerprint,
             )
         except ValueError as exc:
@@ -1492,11 +1574,13 @@ class DraftRefreshService:
 
         if prior is not None:
             prior_detail = prior.detail if isinstance(prior.detail, dict) else {}
+            outcome, counts = self._replayed_outcome(prior, legacy_field="applied_count")
             return ExecutionResult(
                 run_id=prior.id,
                 status="idempotent_hit",
-                applied_count=prior.affected_count,
                 skipped_count=len(prior_detail.get("skipped_human_edited", [])),
+                outcome=outcome,
+                **counts,
             )
 
         mutation_list = list(mutations)
@@ -1558,14 +1642,20 @@ class DraftRefreshService:
         await db.flush()
 
         if not mutation_list and not preset_marker_scopes:
+            # 无可写 mutation、无 Draft 标记：调用方剔除的仅重算 > 0 ⇒ recomputed，三者都为 0 才 no_effect
+            outcome, status, outcome_detail = self._settle(scope_key, transaction_mode, recomputed=recomputed_count)
             audit.result_status = "success"
+            audit.affected_count = recomputed_count
+            audit.detail = {**(audit.detail or {}), **outcome_detail}
             await db.flush()
             return ExecutionResult(
                 run_id=run_id,
-                status="no_effect",
+                status=status,
                 applied_count=0,
                 skipped_count=len(skipped_human_edited),
                 rollback_available=False,
+                outcome=outcome,
+                recomputed_count=recomputed_count,
             )
 
         # ── 5. Group mutations by domain ──
@@ -1585,6 +1675,7 @@ class DraftRefreshService:
                 adapters=adapters,
                 audit=audit,
                 skipped_count=len(skipped_human_edited),
+                recomputed_count=recomputed_count,
             )
         else:
             result = await self._execute_partial_success(
@@ -1598,6 +1689,7 @@ class DraftRefreshService:
                 audit=audit,
                 scopes=scopes,
                 skipped_count=len(skipped_human_edited),
+                recomputed_count=recomputed_count,
             )
 
         return result
@@ -1795,10 +1887,12 @@ class DraftRefreshService:
         adapters: dict[str, DomainMutationAdapter],
         audit: DraftRefreshAudit,
         skipped_count: int,
+        recomputed_count: int = 0,
     ) -> ExecutionResult:
         """All-or-nothing：业务值、治理标记、快照、公式状态和 outbox 同一 savepoint。"""
         all_applied: list[AppliedMutation] = []
         marker_scopes: list[str] = []
+        runtime_marker_scopes: set[str] = set()
         formula_ids: list[str] = []
         try:
             nested = db.begin_nested()
@@ -1883,22 +1977,32 @@ class DraftRefreshService:
                 "error": f"apply_failed:{type(exc).__name__}:{exc}",
                 "mutations_count": sum(len(v) for v in mutations_by_domain.values()),
             }
+            # 任一失败 ⇒ failed、整批回滚：没有结果生效，三个计数都记 0（recomputed 入参不计入）
+            outcome, status, outcome_detail = self._settle(audit.scope, "all_or_nothing", failures=[failure])
             audit.result_status = "failed"
             audit.failure_detail = {"failures": [failure]}
             audit.affected_count = 0
-            audit.detail = {**(audit.detail or {}), "formula_ids": [], "draft_marker_scopes": []}
+            audit.detail = {
+                **(audit.detail or {}), "formula_ids": [], "draft_marker_scopes": [], **outcome_detail,
+            }
             await db.flush()
             return ExecutionResult(
                 run_id=run_id,
-                status="failed",
+                status=status,
                 skipped_count=skipped_count,
                 failures=[failure],
                 rollback_available=False,
+                outcome=outcome,
             )
 
-        stale_marked = await self.trigger_recalc(db, project_id=project_id) if marker_scopes else 0
+        applied = len(all_applied)
+        draft_marked = len([scope for scope in marker_scopes if scope not in runtime_marker_scopes])
+        outcome, status, outcome_detail = self._settle(
+            audit.scope, "all_or_nothing", applied=applied, recomputed=recomputed_count, draft_marked=draft_marked,
+        )
+        stale_marked = await self._recalc_if_changed(db, project_id=project_id, value_changes=applied)
         audit.result_status = "success"
-        audit.affected_count = len(all_applied)
+        audit.affected_count = applied + recomputed_count
         audit.detail = {
             **(audit.detail or {}),
             "formula_ids": formula_ids,
@@ -1907,15 +2011,19 @@ class DraftRefreshService:
             ],
             "draft_marker_scopes": marker_scopes,
             "stale_marked_count": stale_marked,
+            **outcome_detail,
         }
         await db.flush()
         return ExecutionResult(
             run_id=run_id,
-            status="success",
-            applied_count=len(all_applied),
+            status=status,
+            applied_count=applied,
             skipped_count=skipped_count,
             applied=all_applied,
             rollback_available=bool(all_applied or marker_scopes),
+            outcome=outcome,
+            recomputed_count=recomputed_count,
+            draft_marked_count=draft_marked,
         )
 
     async def _execute_partial_success(
@@ -1931,6 +2039,7 @@ class DraftRefreshService:
         audit: DraftRefreshAudit,
         scopes: Sequence[str],
         skipped_count: int,
+        recomputed_count: int = 0,
     ) -> ExecutionResult:
         """Partial-success：每个 domain 独立 savepoint，preset marker 也独立结算。"""
         all_applied: list[AppliedMutation] = []
@@ -2033,25 +2142,29 @@ class DraftRefreshService:
 
         marker_scopes = list(dict.fromkeys(marker_scopes))
         has_success = bool(all_applied or marker_scopes)
-        if has_success and all_failures:
-            result_status = "partial_success"
-        elif has_success:
-            result_status = "success"
-        else:
-            result_status = "failed"
+        applied = len(all_applied)
+        runtime_applied_scopes = {self._runtime_unit_scope(m) for m in successful_mutations}
+        draft_marked = len([scope for scope in marker_scopes if scope not in runtime_applied_scopes])
+        outcome, status, outcome_detail = self._settle(
+            audit.scope, "partial_success", applied=applied, recomputed=recomputed_count,
+            draft_marked=draft_marked, failures=all_failures,
+        )
+        # 审计 result_status 沿用原词表（success / partial_success / failed），整体结果记在 detail.outcome
+        result_status = {"partial": "partial_success", "failed": "failed"}.get(outcome, "success")
 
         formula_ids = sorted({
             str(m.source_formula_id) for m in successful_mutations if m.source_formula_id
         })
-        stale_marked = await self.trigger_recalc(db, project_id=project_id) if marker_scopes else 0
+        stale_marked = await self._recalc_if_changed(db, project_id=project_id, value_changes=applied)
         audit.result_status = result_status
-        audit.affected_count = len(all_applied)
+        audit.affected_count = applied + recomputed_count
         audit.failure_detail = {"failures": all_failures} if all_failures else None
         audit.detail = {
             **(audit.detail or {}),
             "formula_ids": formula_ids,
             "draft_marker_scopes": marker_scopes,
             "stale_marked_count": stale_marked,
+            **outcome_detail,
         }
         await db.flush()
         await self._write_runtime_hash_audit(
@@ -2081,13 +2194,16 @@ class DraftRefreshService:
 
         return ExecutionResult(
             run_id=run_id,
-            status=result_status,
-            applied_count=len(all_applied),
+            status=status,
+            applied_count=applied,
             failed_count=len(all_failures),
             skipped_count=skipped_count,
             applied=all_applied,
             failures=all_failures,
             rollback_available=has_success,
+            outcome=outcome,
+            recomputed_count=recomputed_count,
+            draft_marked_count=draft_marked,
         )
 
     async def _restore_runtime_governance(

@@ -104,6 +104,7 @@ export const forum = {
 
 export const events = {
   stream: (pid: string) => `/api/projects/${pid}/events/stream`,
+  since: (pid: string) => `/api/projects/${pid}/events/since`,
 } as const
 
 // ─── Presence（在线感知） ────────────────────────────────────────────────────

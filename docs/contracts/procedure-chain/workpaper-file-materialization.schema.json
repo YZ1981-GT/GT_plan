@@ -1,0 +1,77 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/workpaper-file-materialization.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/wp_generate_file.py（materialize_workpaper_file）、workpaper_file_backlog.py（classify / summarize）、scripts/fix/report_workpaper_file_backlog.py",
+  "title": "WorkpaperFileMaterialization（底稿文件落盘与存量分类）",
+  "description": "每份底稿有自己的文件：{STORAGE_DIR}/{project_id}/{wp_id}{.xlsx|.xlsm|.docx|.doc}（STORAGE_DIR = backend/wp_storage）。生成时按模板目录解析（多文件合并 + 场景裁剪）复制到该位置；找不到模板建空白册（第 1~2 行写编号 / 名称，第 8 行写提示），from_template=false、计入回执 blank_codes。落文件之后失败 ⇒ 删掉该文件。顶层 = 一份在用底稿的存量分类（只读扫描的一行）；$defs 给落盘结果与 dry-run 报告汇总。",
+  "type": "object",
+  "required": ["wp_id", "project_id", "wp_code", "file_path", "category", "fixable"],
+  "additionalProperties": false,
+  "properties": {
+    "wp_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "wp_code": { "type": "string" },
+    "file_path": { "type": ["string", "null"] },
+    "category": { "$ref": "#/$defs/category" },
+    "fixable": { "description": "category ∈ {empty, placeholder, template}：可补落自己的文件（需用户放行）。", "type": "boolean" }
+  },
+  "$defs": {
+    "category": {
+      "description": "own_file 本底稿自己的文件 / empty 没有文件路径 / placeholder 旧占位路径 storage/projects/{项目}/workpapers/…（文件不存在）/ template 指向共享模板目录 / missing 配置了路径但找不到（只报告）/ rejected 路径越界（只报告）。",
+      "enum": ["own_file", "empty", "placeholder", "template", "missing", "rejected"]
+    },
+    "generated": {
+      "type": "object",
+      "required": ["path", "from_template"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "pattern": "[\\\\/][0-9a-f-]{36}[\\\\/][0-9a-f-]{36}\\.(xlsx|xlsm|docx|doc)$" },
+        "from_template": { "type": "boolean" }
+      }
+    },
+    "backlogSummary": {
+      "description": "dry-run 报告汇总（summarize）。",
+      "type": "object",
+      "required": ["total", "totals", "labels", "fixable", "fixable_rebind_only", "skip_sub_workpapers", "by_project", "samples"],
+      "properties": {
+        "total": { "$ref": "common.schema.json#/$defs/count" },
+        "totals": {
+          "type": "object",
+          "required": ["own_file", "empty", "placeholder", "template", "missing", "rejected"],
+          "additionalProperties": false,
+          "properties": {
+            "own_file": { "$ref": "common.schema.json#/$defs/count" },
+            "empty": { "$ref": "common.schema.json#/$defs/count" },
+            "placeholder": { "$ref": "common.schema.json#/$defs/count" },
+            "template": { "$ref": "common.schema.json#/$defs/count" },
+            "missing": { "$ref": "common.schema.json#/$defs/count" },
+            "rejected": { "$ref": "common.schema.json#/$defs/count" }
+          }
+        },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "fixable": { "$ref": "common.schema.json#/$defs/count" },
+        "fixable_rebind_only": { "description": "存储位置已有懒加载落过的文件、只需回写路径的份数。", "$ref": "common.schema.json#/$defs/count" },
+        "skip_sub_workpapers": { "type": "object", "additionalProperties": { "$ref": "common.schema.json#/$defs/count" } },
+        "by_project": {
+          "type": "object",
+          "additionalProperties": { "type": "object", "additionalProperties": { "$ref": "common.schema.json#/$defs/count" } }
+        },
+        "samples": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "required": ["project_id", "wp_code", "file_path"],
+              "properties": {
+                "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+                "wp_code": { "type": "string" },
+                "file_path": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

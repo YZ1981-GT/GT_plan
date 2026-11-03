@@ -57,8 +57,8 @@ ADR_EXPECTED_SKIP_BEFORE_R3 = 104
 #: design §4.1b (4) 现算「有 R3 替代路径」的条数（预期值，同上）。
 ADR_EXPECTED_R3_RESCUED = 42
 
-#: ADR §2(b) 勘误后的 4 条（**不是** `G4-2-rows` / `G6-2-rows`）。
-BOUND_TO_G9 = (
+#: ADR §2(b) 勘误后的 4 条（**不是** `G4-2-rows` / `G6-2-rows`）—— 门面曾借自 G9，批 B3 起按本 provider 绑定。
+FORMERLY_BOUND_TO_G9 = (
     ("g3.dividend_receivable_detail", "G3-2-detail-rows"),
     ("g4.bond_main", "G4-7-items"),
     ("g5.long_term_receivable_detail", "G5-2-rows"),
@@ -234,7 +234,8 @@ class TestR3SolvesG1SectionCoverage:
             provider=_mod("phase5_g1_trading_financial_assets"), store_item_id=self.ITEM
         )
         assert res.is_enumerable, res.detail
-        assert isinstance(res.reader, EngineRowReader)
+        # 批 B3 起门面也全覆盖三段 ⇒ 两路都可用：门面优先 + 逐次对账（原先门面只覆盖 1/3、只能走 R3）
+        assert isinstance(res.reader, ReconcilingRowReader)
         payload = _synthetic_payload(self.ITEM)
         got = list(res.reader.iter_rows(payload))
         assert [res.reader.section_of(row) for _identity, row in got] == values
@@ -242,33 +243,32 @@ class TestR3SolvesG1SectionCoverage:
         assert set(res.covered_sections) == set(values)
         assert len(res.declared_scopes) == 3
 
-    def test_detail_records_that_the_facade_path_was_the_one_that_failed(self) -> None:
-        """降级必须**可读**：顶层 detail 要说明是门面路不行才走的 R3。"""
+    def test_detail_records_that_both_paths_are_reconciled(self) -> None:
+        """结论必须**可读**：顶层 detail 说明两路都可用、在对账（原先说明的是门面路不行才走 R3）。"""
         res = diagnose_row_reader(
             provider=_mod("phase5_g1_trading_financial_assets"), store_item_id=self.ITEM
         )
-        assert "R3" in res.detail and "门面" in res.detail
+        assert "都可用" in res.detail and "对账" in res.detail
 
 
-class TestR3TakesOverBoundFacades:
-    """ADR §2(b)：门面 re-export 自 `phase5_g9_store_facade` 的 4 条转为可枚举。"""
+class TestFormerlyBorrowedFacadesAreBoundToOwnProvider:
+    """ADR §2(b) 的 4 条：门面曾 re-export 自 `phase5_g9_store_facade`（由 R3 兜住）；批 B3 在门面侧修好。"""
 
-    @pytest.mark.parametrize(("adapter_id", "item_id"), BOUND_TO_G9)
-    def test_facade_level_is_still_bound_to_other_entry(
-        self, adapter_id: str, item_id: str
-    ) -> None:
-        """反证：① 级那条真缺陷**没被洗掉**（工单仍在，只是被兜住了）。"""
+    @pytest.mark.parametrize(("adapter_id", "item_id"), FORMERLY_BOUND_TO_G9)
+    def test_facade_level_is_bound_to_its_own_provider(self, adapter_id: str, item_id: str) -> None:
+        """正面钉子：① 级可枚举、门面绑定的就是本 provider（不再借别家）。"""
         from app.services.workpaper_sync.store_projection_response import (
             resolve_store_projection_provider,
         )
 
         provider = resolve_store_projection_provider(adapter_id)
         facade = _diagnose_via_facade(provider=provider, store_item_id=item_id)
-        assert facade.skip_reason is SkipReason.row_reader_bound_to_other_entry
-        assert facade.facade_module.endswith("phase5_g9_store_facade")
+        assert facade.is_enumerable, facade.detail
+        assert facade.skip_reason is None
+        assert facade.facade_module == provider.__name__
 
-    @pytest.mark.parametrize(("adapter_id", "item_id"), BOUND_TO_G9)
-    def test_top_level_is_enumerable_via_engine(self, adapter_id: str, item_id: str) -> None:
+    @pytest.mark.parametrize(("adapter_id", "item_id"), FORMERLY_BOUND_TO_G9)
+    def test_top_level_reconciles_both_paths(self, adapter_id: str, item_id: str) -> None:
         from app.services.workpaper_sync.store_projection_response import (
             resolve_store_projection_provider,
         )
@@ -276,7 +276,7 @@ class TestR3TakesOverBoundFacades:
         provider = resolve_store_projection_provider(adapter_id)
         res = diagnose_row_reader(provider=provider, store_item_id=item_id)
         assert res.is_enumerable, res.detail
-        assert isinstance(res.reader, EngineRowReader)
+        assert isinstance(res.reader, ReconcilingRowReader)
         assert res.skip_reason is None
         # 真枚举一遍：声明的每个分区都必须被 yield
         got = list(res.reader.iter_rows(_synthetic_payload(item_id)))
@@ -319,10 +319,17 @@ class TestPerSectionDedup:
         assert len(got) == 2 * len(payload) == 4
         assert [identity for identity, _row in got] == ["a", "b", "a", "b"]
 
-    def test_sectioned_item_keeps_every_section(self) -> None:
-        """反向：有分区字段时去重**不得**把段合并掉（G5 的 12 段必须全留）。"""
-        raw = global_spec_index()["G5-2-rows"]
-        assert len(dedup_specs(raw, store_item_id="G5-2-rows")) == len(raw) == 12
+    @pytest.mark.parametrize("item_id", ("G9-detail-rows", "G1-2-rows"))
+    def test_sectioned_item_keeps_every_section(self, item_id: str) -> None:
+        """反向：有分区字段时去重**不得**把段合并掉（三段必须全留）。
+
+        原用 G5 的 12 段：2026-10-08 起 G5 只受管主区 s1r1（其余 11 区不进双向同步）⇒ 改用 G9 / G1 的三段。
+        """
+        raw = global_spec_index()[item_id]
+        sections = {s.row_section_value for s in raw}
+        assert len(sections) == 3, sections
+        kept = dedup_specs(raw, store_item_id=item_id)
+        assert {s.row_section_value for s in kept} == sections and len(kept) == len(sections)
 
     def test_mixed_section_field_declaration_fails_visible(self) -> None:
         """结构性零的变异证明：现算 0 例「部分声明分区字段」，stub 造一例必须打红。"""
@@ -489,8 +496,9 @@ class TestSkipCensusRecount:
         #    （item 得到门面而彻底离开跳过清单 ⇒ 变小；新增 R3 路径 ⇒ 变大），
         #    写成等值就是本轮要根治的那个缺陷。守恒由上面那条棘轮兼顾。
         assert len(from_skip) <= ADR_EXPECTED_SKIP_BEFORE_R3, len(from_skip)
-        # ② 另一桶恰是 G1 那一条（来自未裁决形态，不属那 104）
-        assert from_unruled == ["G1-2-rows"], from_unruled
+        # ② 另一桶原先恰是 G1 那一条（来自未裁决形态，不属那 104）；批 B3 修好 G1 门面后 G1 两路都可用、
+        #    不再只靠 R3 ⇒ 这一桶为空（G3/G4/G5/G6 同理离开「只靠 R3」，被救回的一桶随之少 4）
+        assert from_unruled == [], from_unruled
 
     def test_the_ratchet_can_actually_go_red(self) -> None:
         """🔴 棘轮必须配变异反证 —— 一个永远不会红的棘轮等于没有守卫。
@@ -567,13 +575,20 @@ class TestTopLevelUnruledRatchetIsEmpty:
         assert self.BASELINE == frozenset()
         assert not (self.BASELINE - census["unruled"])
 
-    def test_facade_level_still_produces_one_unruled_case(self) -> None:
-        """🔴 空集不是「判据失效」：① 级单独看现算仍恰 1 例（G1），证明扫描器还在工作。"""
-        facade_unruled = {
-            item
-            for item in ("G1-2-rows",)
-            if _diagnose_via_facade(
-                provider=_mod("phase5_g1_trading_financial_assets"), store_item_id=item
-            ).is_unruled_shape
-        }
-        assert facade_unruled == {"G1-2-rows"}
+    def test_facade_level_unruled_is_empty_and_the_scanner_still_works(self) -> None:
+        """🔴 空集不是「判据失效」：批 B3 前 ① 级恰 1 例（G1 门面只覆盖 1/3），现在 G1 ① 级也可枚举；
+        只 yield 区① 的合成门面（= 当年的真实形态）必须仍判未裁决形态，证明扫描器还在工作。"""
+        from app.services.workpaper_sync.phase5_row_table_sheet import iter_store_rows as engine_iter
+
+        g1 = _mod("phase5_g1_trading_financial_assets")
+        assert not _diagnose_via_facade(provider=g1, store_item_id="G1-2-rows").is_unruled_shape
+        first = g1.managed_row_table_specs()[0]
+
+        def first_section_only(payload: Any, *, store_item_id: str | None = None):
+            yield from engine_iter(first, payload)
+
+        partial = SimpleNamespace(
+            __name__=g1.__name__, iter_store_rows=first_section_only,
+            managed_row_table_specs=g1.managed_row_table_specs,
+        )
+        assert _diagnose_via_facade(provider=partial, store_item_id="G1-2-rows").is_unruled_shape

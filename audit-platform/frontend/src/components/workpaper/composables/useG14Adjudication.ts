@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG14Adjudication — G14-1 审定表（本期自 G14-2 同步，上期独立录入）
@@ -269,22 +270,10 @@ export function useG14Adjudication(options: UseG14AdjudicationOptions) {
     }
     tbLoading.value = true
     try {
-      const res = await api.get(`/api/projects/${options.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G14_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const rows = res?.data ?? res
-      const list = Array.isArray(rows) ? rows : rows?.items ?? []
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G14_ACCOUNT_CODE),
-      )
-      if (hit) {
-        const debit = parseNum(hit.debit_amount)
-        const credit = parseNum(hit.credit_amount)
-        // 损益类 6702：本期发生额 = 借方 − 贷方（与后端 _fetch_tb_pl_amount 一致）
-        const amount = (hit.debit_amount != null || hit.credit_amount != null)
-          ? (debit - credit)
-          : parseNum(hit.unadjusted_amount ?? hit.current_amount ?? hit.debit_amount)
+      const { rows: list } = await fetchTrialBalanceRows(options.projectId.value, { year: _year, accountPrefix: G14_ACCOUNT_CODE })
+      // 损益类 6702：本期发生额 = 试算表未审数（单边口径，与报表同；端点没有借 / 贷发生额字段）
+      const amount = tbSumUnder(list, G14_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount != null) {
         updateTrialBalance(amount)
         tbFetchStatus.value = 'found'
         if (manual) ElMessage.success(`已从试算表取数 6702：${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`)

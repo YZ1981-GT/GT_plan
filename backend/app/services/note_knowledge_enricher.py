@@ -1,7 +1,7 @@
 """附注知识库 RAG 增强编排层 (NoteKnowledgeEnricher).
 
 把知识库 RAG 检索接入附注 AI 正文生成——加法式、可开关、fail-open 的薄编排层：
-    检索 (semantic_search, scope='knowledge_doc') → 拼参照上下文 → chat_completion 起草叙述 → 附 Citation
+    检索 (semantic_search, scope='knowledge_doc') → 拼参照上下文 → AiTaskExecutor 起草叙述 → 附 Citation
 
 核心铁律：
 - **不新建检索实现**：复用 `KnowledgeIndexService.semantic_search`（pgvector+BM25+ilike 三级降级+权限过滤+enrich）。
@@ -23,7 +23,6 @@ from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from app.core.config import settings
-from app.services.llm_client import chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +285,7 @@ class NoteKnowledgeEnricher:
     ) -> GroundedDraft:
         """检索 → 生成 Grounded_Draft。
 
-        - `reference_only=True`：只返回检索片段供人工引用，**不调用 llm_client.chat_completion**
+        - `reference_only=True`：只返回检索片段供人工引用，**不调用模型任务执行器**
           （text=None, degraded=True, Req4.5/Property 13）。
         - 无命中 → fail-open：text=None, degraded=True（caller 退回通用路径）。
         - 生成用 Narrative_Only system prompt（Req9/Property 14）；中文（Req1.7/Property 16）。
@@ -315,21 +314,32 @@ class NoteKnowledgeEnricher:
             return GroundedDraft(text=None, citations=[], degraded=True)
 
         try:
+            from app.services.ai_task_executor import invoke_ai_task
+
             base_context = self._build_base_context(section_title, account_name)
             user_prompt = self.build_grounded_user_prompt(base_context, citations, self._char_budget)
-            # context 传 LLM 前值转字符串
-            messages = [
-                {"role": "system", "content": str(_GROUNDED_SYSTEM_PROMPT_ZH)},
-                {"role": "user", "content": str(user_prompt)},
-            ]
-            text = await chat_completion(messages, temperature=0.3, max_tokens=1500)
+            role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
+            invocation = await invoke_ai_task(
+                "note.policy_draft",
+                action="draft",
+                user_prompt=str(user_prompt),
+                system_addendum=str(_GROUNDED_SYSTEM_PROMPT_ZH),
+                role=str(role) if role is not None else None,
+                temperature=0.3,
+            )
+            if not invocation.result.succeeded:
+                logger.warning(
+                    "附注 RAG 生成调用失败 code=%s",
+                    invocation.result.error_code,
+                )
+                return GroundedDraft(text=None, citations=citations, degraded=True)
+            text = invocation.result.text
         except Exception as e:  # LLM 失败 fail-open
             logger.warning("附注 RAG 生成调用失败，fail-open：%s", e)
             return GroundedDraft(text=None, citations=citations, degraded=True)
 
         text_str = str(text or "").strip()
-        # chat_completion 失败时返回占位串（"[...]" / "⚠️..."），视为降级
-        if not text_str or text_str.startswith("[") or text_str.startswith("⚠️"):
+        if not text_str:
             return GroundedDraft(text=None, citations=citations, degraded=True)
 
         return GroundedDraft(text=text_str, citations=citations, degraded=False)

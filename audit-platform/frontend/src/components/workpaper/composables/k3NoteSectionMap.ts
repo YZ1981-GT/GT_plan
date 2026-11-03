@@ -56,6 +56,12 @@ export const K3_SOE_SUBTABLE = {
 } as const
 
 /** 模板改名前的旧表名（表头首格泄漏 / md 消歧产物），须从附注侧清理 */
+/** K3 只拥有其他应付款按性质及其账龄明细；共享主表由服务端派生。 */
+export const K3_TABLE_SCOPE = {
+  listed: [K3_LISTED_SUBTABLE.byNature, K3_LISTED_SUBTABLE.agingOver1y],
+  soe: [K3_SOE_SUBTABLE.byNature, K3_SOE_SUBTABLE.agingOver1y],
+} as const
+
 export const K3_LEGACY_OBSOLETE_TABLES = {
   listed: ['项  目'] as readonly string[],
   soe: ['其他应付款（表6）'] as readonly string[],
@@ -244,16 +250,6 @@ function twoPeriodRows(rows: readonly K3DisclosureRow[]): Array<Record<string, u
   ]
 }
 
-function sumEnd(rows: Array<Record<string, unknown>>): number {
-  const total = rows.find(r => r.is_total)
-  return num(total?.end_amount)
-}
-
-function sumPrior(rows: Array<Record<string, unknown>>): number {
-  const total = rows.find(r => r.is_total)
-  return num(total?.prior_amount)
-}
-
 function resolveCurrentStandard(variant: K3DisclosureVariant): string {
   return variant === 'listed' ? 'listed_standalone' : 'soe_standalone'
 }
@@ -261,10 +257,9 @@ function resolveCurrentStandard(variant: K3DisclosureVariant): string {
 /**
  * 构建同步载荷。
  *
- * - 主表三行由分表合计派生（应付利息 / 应付股利 / 其他应付款 = 按款项性质列示合计），
- *   与源模板 `=B17`/`=C17` 的取数关系一致。
- * - 逾期利息 / 超1年未付股利 / 账龄超1年 三张是**条件表**：无行则不推，
- *   表名进 `_removed_table_keys`（源模板「不存在的项目请删除」）。
+ * - K3 只发送按款项性质表及其账龄超一年条件表；不发送、不删除 L2/M1 的表。
+ * - 共享主表由后端在三家明细浅合并后确定性重建，避免同步顺序决定结果。
+ * - 账龄超一年表无行时进入 `_removed_table_keys`，删除范围仍限 K3 owner。
  */
 export function buildK3SyncPayload(
   variant: K3DisclosureVariant,
@@ -273,62 +268,19 @@ export function buildK3SyncPayload(
 ): K3SyncPayload {
   const isListed = variant === 'listed'
   const T = isListed ? K3_LISTED_SUBTABLE : K3_SOE_SUBTABLE
-  const columns = isListed ? buildK3ListedColumns() : buildK3SoeColumns()
+  const allColumns = isListed ? buildK3ListedColumns() : buildK3SoeColumns()
+  const columns: Record<string, ColumnDef[]> = Object.fromEntries(
+    K3_TABLE_SCOPE[variant].map((name) => [name, allColumns[name]]),
+  )
 
   const byNatureRows = twoPeriodRows(snapshot.byNature ?? [])
-  const interestRows = twoPeriodRows(snapshot.interest ?? [])
-  const dividendRows = twoPeriodRows(snapshot.dividend ?? [])
-
-  const summaryLabels = K3_SUMMARY_ROWS[variant]
-  const summaryRows: Array<Record<string, unknown>> = [
-    { label: summaryLabels[0], end_amount: sumEnd(interestRows), prior_amount: sumPrior(interestRows) },
-    { label: summaryLabels[1], end_amount: sumEnd(dividendRows), prior_amount: sumPrior(dividendRows) },
-    { label: summaryLabels[2], end_amount: sumEnd(byNatureRows), prior_amount: sumPrior(byNatureRows) },
-  ]
-  summaryRows.push({
-    label: K3_TOTAL_LABEL,
-    end_amount: summaryRows.reduce((s, r) => s + num(r.end_amount), 0),
-    prior_amount: summaryRows.reduce((s, r) => s + num(r.prior_amount), 0),
-    is_total: true,
-  })
 
   const sub: Record<string, unknown> = {
-    [T.summary]: summaryRows,
     [T.byNature]: byNatureRows,
   }
 
   const removed: string[] = [...K3_LEGACY_OBSOLETE_TABLES[variant]]
 
-  // 🔴 应付利息 / 逾期利息：写权已由 spec l-cycle-…completion 裁决 A 收敛到 L2。
-  // K3 不再推送这两张子表，也不把它们放进 _removed_table_keys（写权移交 ≠ 删表）。
-  // 主表「应付利息」汇总行仍读 L2 的聚合结果。
-  // 旧代码（已删）：if ((snapshot.interest ?? []).length > 0) sub[T.interest] = interestRows
-  delete columns[T.interest]
-  delete columns[T.interestOverdue]
-
-  // 应付股利：仍由 K3 推送
-  if ((snapshot.dividend ?? []).length > 0) {
-    sub[T.dividend] = dividendRows
-  } else {
-    delete columns[T.dividend]
-  }
-
-  if (isListed) {
-    const listedT = K3_LISTED_SUBTABLE
-    const overdueDividendRows = (snapshot.dividendOverdue ?? []).filter(
-      r => String(r?.shareholder ?? '').trim() || num(r?.amount),
-    )
-    if (overdueDividendRows.length > 0) {
-      sub[listedT.dividendOverdue] = overdueDividendRows.map(r => ({
-        label: String(r.shareholder ?? '').trim(),
-        dividend_amount: num(r.amount),
-        unpaid_reason: r.reason ?? '',
-      }))
-    } else {
-      removed.push(listedT.dividendOverdue)
-      delete columns[listedT.dividendOverdue]
-    }
-  }
 
   const agingRows = (snapshot.agingOver1y ?? []).filter(
     r => String(r?.name ?? '').trim() || num(r?.endAmount),

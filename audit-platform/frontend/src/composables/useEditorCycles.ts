@@ -49,6 +49,8 @@ export interface EditorCyclesContext {
   sheetNavFacade: SheetNavFacadeAPI
   /** 循环类型 flags（cycleDialogs 的 trigger 依赖） */
   cycleType: CycleTypeFlags
+  /** 项目审计年度（F2 计价抽样按它取序时账；项目没填为 null） */
+  projectYear?: Readonly<Ref<number | null>>
 }
 
 export interface EditorCyclesAPI {
@@ -87,6 +89,7 @@ export function useEditorCycles(ctx: EditorCyclesContext): EditorCyclesAPI {
     ctx.wpId,
     ctx.sheetNavFacade,
     cycleDialogs,
+    ctx.projectYear,
   )
   const iCycle = useICycleEditor(ctx.wpDetail, ctx.sheetNavFacade, cycleDialogs)
   const gCycle = useGCycleEditor(ctx.wpDetail, ctx.sheetNavFacade, cycleDialogs)

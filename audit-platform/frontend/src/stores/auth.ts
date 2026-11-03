@@ -3,6 +3,7 @@ import axios from 'axios'
 import http from '@/utils/http'
 import { API } from '@/services/apiPaths'
 import { clearOnLogout } from '@/utils/aiChatCacheCleanup'
+import { advanceRequestIdentityEpoch } from '@/services/requestIdentityEpoch'
 import {
   broadcastTokenUpdate,
   broadcastLogout,
@@ -72,6 +73,8 @@ export const useAuthStore = defineStore('auth', {
     async login(username: string, password: string) {
       const { data } = await authHttp.post('/api/auth/login', { username, password })
       const payload = data.data ?? data
+      // 登录成功才切换逻辑身份；正常 refresh 不走这里。
+      advanceRequestIdentityEpoch()
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token
       this.user = payload.user ?? null
@@ -87,6 +90,8 @@ export const useAuthStore = defineStore('auth', {
       //    401 ⇒ 再登出再跳转……无限整页重载（2026-09-30 实测 137 轮，每轮 12 个 401）。
       const refreshToken = this.refreshToken
       const accessToken = this.token
+      // 必须在 token/user 对外可见地清空前推进：旧身份的 api.get 订阅者立即作废。
+      advanceRequestIdentityEpoch()
       this.token = null
       this.refreshToken = null
       this.user = null
@@ -164,6 +169,8 @@ if (typeof window !== 'undefined') {
           sessionStorage.setItem('refreshToken', refreshToken)
         },
         onLogout: () => {
+          // Broadcast logout 是明确会话边界；token-updated 则是同一会话轮换，不能推进。
+          advanceRequestIdentityEpoch()
           authStore.token = null
           authStore.refreshToken = null
           authStore.user = null

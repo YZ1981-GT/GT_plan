@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.confirmation_reply_flag import is_unreplied_summary_row
 
 from ._cycle_import_export_common import safe_float, safe_str, workbook_to_response
 
@@ -334,9 +335,7 @@ async def unreplied_entities(
     # 4. 过滤未回函项目（match_status === '未回函' 或 is_replied === false）
     unreplied: list[dict[str, Any]] = []
     for r in rows:
-        match_status = r.get("match_status", "")
-        is_replied = r.get("is_replied")
-        if match_status == "未回函" or (is_replied is False and match_status != "相符"):
+        if is_unreplied_summary_row(r):  # 明细面板写的「否」也算明确未回函（需求 1.6）
             unreplied.append({
                 "entity_name": r.get("entity_name", ""),
                 "confirm_index": r.get("confirm_index", ""),

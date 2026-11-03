@@ -76,6 +76,14 @@ async def set_locked(
             row.state = apply_user_action(action, policy=rules[row.rule_id].policy, state=row.state)
         except PolicyError as exc:
             raise PushActionError(f"{addr}：{exc}") from exc
+        if row.provenance:
+            from app.services.formula_provenance import FinalValueProvenanceV1
+
+            try:
+                final = FinalValueProvenanceV1.model_validate(row.provenance)
+                row.provenance = final.model_copy(update={"value_state": row.state}).model_dump(mode="json")
+            except Exception:
+                pass  # 历史 / 损坏信封保持原样，下一次推送自然重建。
         row.updated_by = user_id
         row.updated_at = now
     await db.flush()
@@ -169,8 +177,16 @@ async def list_states(
     return list((await db.execute(stmt.order_by(FormulaPushState.addr_id))).scalars().all())
 
 
-def state_view(row: FormulaPushState) -> dict[str, Any]:
-    """面板「待处理差异」一行（当前值 / 公式值 / 状态 / 是否有差异）。"""
+def state_view(
+    row: FormulaPushState, *, allowed_project_ids: set[UUID | str] | None = None,
+) -> dict[str, Any]:
+    """面板目标状态；来源信封按当前可见项目脱敏。"""
+    from app.services.formula_provenance import redact_final_provenance
+
+    provenance, inputs_redacted, legacy = redact_final_provenance(
+        row.provenance,
+        allowed_project_ids=allowed_project_ids or {row.project_id},
+    )
     return {
         "addr_id": row.addr_id,
         "rule_id": row.rule_id,
@@ -181,6 +197,10 @@ def state_view(row: FormulaPushState) -> dict[str, Any]:
         "current_value": row.current_value,
         "formula_value": row.last_formula_value,
         "last_pushed_value": row.last_pushed_value,
+        "last_run_id": str(row.last_run_id) if row.last_run_id else None,
+        "provenance": provenance,
+        "provenance_legacy": legacy,
+        "inputs_redacted": inputs_redacted,
         "differs": not values_equal(row.current_value, row.last_formula_value),
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }

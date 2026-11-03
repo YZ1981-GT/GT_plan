@@ -363,7 +363,7 @@ class TestVerifyUnmanagedRegionsAccumulatesAcrossMultipleInsertions:
         # 派生行数超过模板占位（段①仅 3 行）⇒ 必然触发结构性插行。
         derived_rows = [
             {
-                "rowId": f"debit-p{i}", "label": f"借方派生{i}", "amount": 100.0 + i,
+                "rowKey": f"debit-p{i}", "label": f"借方派生{i}", "amount": 100.0 + i,
                 "source": "tb", "remark": "",
             }
             for i in range(6)
@@ -451,13 +451,14 @@ class TestVerifyUnmanagedRegionsAccumulatesAcrossMultipleInsertions:
 
         # 两区都超模板占位行数 ⇒ 两趟都要插行（累积归一化的复现前提）。
         upper_rows = [
-            {"rowId": f"debit-p{i}", "label": f"借方派生{i}", "amount": 100.0 + i,
+            {"rowKey": f"debit-p{i}", "label": f"借方派生{i}", "amount": 100.0 + i,
              "source": "tb", "remark": ""}
             for i in range(5)
         ]
+        # 段②贷方行带「与对方科目核对」（模板 D 列）+ 说明（E 列）—— 两列都在受管区内。
         lower_rows = [
-            {"rowId": f"credit-q{i}", "label": f"贷方派生{i}", "amount": 200.0 + i,
-             "source": "tb", "remark": ""}
+            {"rowKey": f"credit-q{i}", "label": f"贷方派生{i}", "amount": 200.0 + i,
+             "source": "tb", "counterCheck": "已核对", "remark": ""}
             for i in range(5)
         ]
         proj_upper = build_store_projection(UPPER, upper_rows, contract=contract_with_d304)
@@ -703,7 +704,7 @@ class TestGtSyncFooterRowReFrozenAfterD34DebitInsertion:
 
         n = 5  # 段①插 5 行
         rows = [
-            {"rowId": f"debit-{i}", "label": f"借方{i}", "amount": 100.0 + i,
+            {"rowKey": f"debit-{i}", "label": f"借方{i}", "amount": 100.0 + i,
              "source": "tb", "remark": ""}
             for i in range(n)
         ]

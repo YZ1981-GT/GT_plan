@@ -2,11 +2,9 @@
 
 spec: soe-listed-note-conversion-correctness / Task 12·13
 
-本模块**只登记裁决结论**，不改数据、不含 IO。补记动作本身要等
-spec ``parent-company-note-chapter-and-sourcing``（下称 A）的 Task 10 收口
-—— A 也要改 ``note_template_variant_matrix.json``（增母公司维度），且其
-Requirement 10.4 明确「其余 100 个非母公司科目取值不变」，与本 spec 要改的
-35 条 null 正面撞车。两侧同时改同一 JSON 必互相回退。
+本轮（2026-10-30）由 ``disclosure-note-template-word-realignment`` Phase 8 收口了历史上
+被编制提示拆成两个 account_key 的「投资收益」：正式生成器把旧长 key 规范为
+``tou_zi_shou_yi``，四个变体合一；两侧历史 null 条目保留为 FALSE_NULL 留证。
 
 ------------------------------------------------------------------------------
 三态定义
@@ -61,8 +59,8 @@ __all__ = [
 
 NullVerdict = Literal["FALSE_NULL", "CROSS_GRAIN", "TRUE_NULL"]
 
-#: 补记动作的阻塞方 —— 见模块 docstring。
-BLOCKED_BY_SPEC: Final = "parent-company-note-chapter-and-sourcing"
+#: 历史兼容字段：原阻塞已由 Phase 8 解决；测试据此阻止说明倒退成“仍待处理”。
+BLOCKED_BY_SPEC: Final = "resolved:disclosure-note-template-word-realignment-phase8"
 
 
 @dataclass(frozen=True)
@@ -167,21 +165,12 @@ LISTED_NULL_AUDIT: Final[tuple[NullAuditEntry, ...]] = (
         "⇒ 需业务确认「soe 八、83 的 3 张表分别对应 listed 哪几个子节」后再补。",
     ),
     _e(
-        "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d",
-        "投资收益【下表中不适用的项目，删除】",
-        "CROSS_GRAIN",
-        None,
-        "🔴 2026-08-07 由 FALSE_NULL 改判（补记会造成撞码）。listed 合并章确有"
-        "「五、69 投资收益」(2 表)，落点本身没问题；**但矩阵把同一科目拆成了两条** —— "
-        "本条（soe 八、70 / listed null）与 `tou_zi_shou_yi`（listed 五、69 / soe null）"
-        "指的是同一个「投资收益」。成因是 `build_variant_matrix.normalize_title` 只剥"
-        "【】符号不剥括注文本，「投资收益【下表中不适用的项目，删除】」与「投资收益」"
-        "归一后不相等 ⇒ 两者未配对（A spec 的 T10_PARENT_SIDE_WITHOUT_MERGED 已登记"
-        "同一事实）。若两条各自补齐另一侧，两者的 variants 会**逐字相同** ⇒ 同一变体下"
-        "两个 account_key 共用一个 section_code（实测由 0 组重复变 4 组），"
-        "下游按 code 反查 account 出现二义性 —— 比留 null 更坏。"
-        "⇒ 正确修法是先合并这两条 account（属 variant_matrix 生成器缺陷，"
-        "不在本 spec 范围），合并后再补记。",
+        "tou_zi_shou_yi",
+        "投资收益",
+        "FALSE_NULL",
+        "五、69",
+        "2026-10-30 Phase 8 将标题尾部编制提示移入 title_hint，并在正式矩阵生成器中把历史长 key "
+        "canonicalize 为 tou_zi_shou_yi；同一科目不再拆成两条，listed 落点五、69 已安全并入四变体。",
     ),
     # ── CROSS_GRAIN：有落点但粒度不同，需人工确认对应关系 ────────────────
     _e(
@@ -320,19 +309,10 @@ SOE_NULL_AUDIT: Final[tuple[NullAuditEntry, ...]] = (
     _e(
         "tou_zi_shou_yi",
         "投资收益",
-        "CROSS_GRAIN",
-        None,
-        "🔴 2026-08-07 由 FALSE_NULL 改判（Task 12 落盘前的撞码实证）。"
-        "soe 合并章确有「投资收益【下表中不适用的项目，删除】」(八、70, 1 表)，"
-        "但那一节**已被 `tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d` 认领**"
-        "（其 `variants.soe_*` 就是 `八、70`）⇒ 补 `八、70` 会让两个 account_key "
-        "在 soe 两变体上撞码（实测补记前重复码 0 组、补记后 4 组）。"
-        "根因是矩阵把同一科目拆成两条：`build_variant_matrix.normalize_title` "
-        "只剥【】符号不剥括注文本，「投资收益【下表中不适用的项目，删除】」与"
-        "「投资收益」归一后不相等故未配对（A spec 的 "
-        "`T10_PARENT_SIDE_WITHOUT_MERGED` 已登记同一事实）。"
-        "⇒ 正确处置是先合并这两条 account（属矩阵生成器的活，不在本 spec 范围），"
-        "而非往其中一条补对方已占用的章节号。",
+        "FALSE_NULL",
+        "八、70",
+        "2026-10-30 Phase 8 将国企标题中的编制提示移入 title_hint，并把历史长 key 合并到 "
+        "tou_zi_shou_yi；soe 落点八、70 与 listed 五、69 现在由同一 canonical account 唯一承载。",
     ),
     _e(
         "xian_jin_liu_liang_biao_bu_chong_zi_liao",

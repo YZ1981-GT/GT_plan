@@ -174,17 +174,26 @@
           <el-button link type="danger" size="small" @click="emit('remove', row.rowId)">删</el-button>
         </template>
       </el-table-column>
-      <el-table-column v-if="showOcr && !isReadonly" label="OCR" width="48" align="center">
+      <el-table-column v-if="showOcr" label="OCR" width="72" align="center">
         <template #default="{ row }">
           <el-upload
+            v-if="!isReadonly"
             :show-file-list="false"
             :auto-upload="false"
             accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
             :disabled="ocrLoadingId === row.rowId"
+            style="display:inline-block"
             @change="(f: any) => emit('ocr', row.rowId, f?.raw)"
           >
             <el-button link size="small" :loading="ocrLoadingId === row.rowId">📎</el-button>
           </el-upload>
+          <RowEvidenceEye
+            v-if="wpId"
+            :project-id="projectId"
+            :wp-id="wpId"
+            :sheet-key="H1_STOCKTAKE_EVIDENCE_SHEET"
+            :cell-ref="rowEvidenceCell(row.rowId)"
+          />
         </template>
       </el-table-column>
     </el-table>
@@ -199,6 +208,9 @@ import {
   calcRowDiffs,
   type StocktakeCheckRow,
 } from '../../composables/h1StocktakeCheckModel'
+import { H1_STOCKTAKE_EVIDENCE_SHEET } from '../../composables/useH1StocktakeOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 const props = withDefaults(defineProps<{
   rows: StocktakeCheckRow[]
@@ -206,10 +218,15 @@ const props = withDefaults(defineProps<{
   emptyText?: string
   showOcr?: boolean
   ocrLoadingId?: string | null
+  /** 行内识别附件的小眼睛用（不传 wpId 则不显示） */
+  wpId?: string
+  projectId?: string
 }>(), {
   emptyText: '暂无明细',
   showOcr: false,
   ocrLoadingId: null,
+  wpId: '',
+  projectId: '',
 })
 
 const emit = defineEmits<{

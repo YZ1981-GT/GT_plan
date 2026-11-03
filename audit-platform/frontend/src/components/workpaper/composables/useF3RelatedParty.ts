@@ -4,6 +4,7 @@
  * 期末余额 = 期初余额 + 贷方发生 - 借方发生。
  */
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcConcentration, calcSubtotal, parseNum } from './useF3FormulaEngine'
 import {
   F3_ROW_ID_PREFIX,
@@ -277,6 +278,15 @@ export function useF3RelatedParty(options: UseF3BaseOptions) {
   function rowClassName({ row }: { row: F3RelatedPartyNoteRow }): string {
     return row.riskFlags.length > 0 ? 'related-risk' : ''
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }

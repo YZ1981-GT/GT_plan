@@ -13,17 +13,36 @@ Refinement Round 1 — 需求 9：审计日志真实落库 + 不可篡改。
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
 import socket
-import uuid
-from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.audit_chain.canonical import (
+    GENESIS_HASH,
+    hash_v1 as _compute_entry_hash,
+)
+from app.services.audit_chain.worker import (
+    QUARANTINE_PREFIX,
+    quarantine_entries_by_chain,
+    replay_quarantine,
+    write_batch,
+)
+
+__all__ = [
+    "AUDIT_LOG_QUEUE_KEY",
+    "AUDIT_LOG_RETRY_QUEUE_KEY",
+    "BATCH_SIZE",
+    "GENESIS_HASH",
+    "MAX_RETRIES",
+    "QUARANTINE_PREFIX",
+    "_compute_entry_hash",
+    "_replay_quarantine",
+    "_write_batch",
+    "run",
+]
 
 logger = logging.getLogger("audit_log_writer")
 
@@ -34,23 +53,6 @@ MAX_RETRIES = 3  # 最大重试次数
 # Redis queue keys
 AUDIT_LOG_QUEUE_KEY = "audit:log:queue"
 AUDIT_LOG_RETRY_QUEUE_KEY = "audit:log:retry"
-
-# 创世哈希
-GENESIS_HASH = "0" * 64
-
-
-def _compute_entry_hash(
-    ts: str,
-    user_id: str,
-    action_type: str,
-    object_id: str | None,
-    payload_json: str,
-    prev_hash: str,
-) -> str:
-    """计算审计日志条目哈希。"""
-    raw = f"{ts}|{user_id or ''}|{action_type}|{object_id or ''}|{payload_json}|{prev_hash}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
 
 def _mask_payload(payload: dict) -> dict:
     """尝试脱敏 payload，mask_log_payload 不存在则跳过。"""
@@ -70,65 +72,6 @@ def _mask_payload(payload: dict) -> dict:
         return payload
 
 
-async def _get_prev_hash(db, project_id: str | None) -> str:
-    """获取指定 project_id 的最新一条 entry_hash，作为新条目的 prev_hash。
-
-    跨项目不链：每个 project_id 独立链。
-    project_id 为 None 时使用全局链（payload 无 project_id 的系统级日志）。
-    """
-    from sqlalchemy import select, desc, text, cast, String
-    from app.models.audit_log_models import AuditLogEntry
-
-    try:
-        if project_id:
-            # 通过 payload->>'project_id' 过滤（JSONB 查询）
-            # SQLite 不支持 JSONB 操作符，用 json_extract 降级
-            from app.core.config import settings
-            if settings.DATABASE_URL.startswith("postgresql"):
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(AuditLogEntry.payload["project_id"].astext == project_id)
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-            else:
-                # SQLite fallback: json_extract
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(text(f"json_extract(payload, '$.project_id') = :pid"))
-                    .params(pid=project_id)
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-        else:
-            # 全局链（无 project_id 的条目）
-            from app.core.config import settings
-            if settings.DATABASE_URL.startswith("postgresql"):
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(
-                        AuditLogEntry.payload["project_id"].astext.is_(None)
-                        | ~AuditLogEntry.payload.has_key("project_id")
-                    )
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-            else:
-                stmt = (
-                    select(AuditLogEntry.entry_hash)
-                    .where(text("json_extract(payload, '$.project_id') IS NULL"))
-                    .order_by(desc(AuditLogEntry.ts))
-                    .limit(1)
-                )
-
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
-        return row if row else GENESIS_HASH
-    except Exception as e:
-        logger.warning("[audit_log_writer] _get_prev_hash error: %s", e)
-        return GENESIS_HASH
-
-
 async def _get_session_factory():
     """获取 async_session 工厂（便于测试 patch）。"""
     from app.core.database import async_session
@@ -136,107 +79,29 @@ async def _get_session_factory():
 
 
 async def _write_batch(entries: list[dict]) -> int:
-    """批量写入一批日志条目到数据库。
-
-    按 project_id 分组，顺序计算哈希链。
-    返回成功写入的条数。
-
-    R1 Bug Fix 3: 多 worker 副本并发写同一 project_id 时，两个 worker 可能
-    同时读到相同 prev_hash、各自计算出不同 entry_hash，导致链断。
-    解决：写入前按 project_id 取 PG advisory transaction lock（自动在 commit/
-    rollback 时释放），将同一 project_id 的写入强制串行化。
-    - PostgreSQL：pg_advisory_xact_lock(bigint)，lock_id = hash(project_id) 限定在
-      signed bigint 范围内。
-    - SQLite（测试环境）：跳过 advisory lock，依赖单进程测试隔离。
-    注意：advisory lock 只能保证同一 PG 实例上的多 worker 串行；跨实例需要
-    配合"生产环境审计 writer 单副本部署"运维约束（见 backend/app/workers/README.md）。
-    """
-    from app.models.audit_log_models import AuditLogEntry
-    from app.core.config import settings
-    from sqlalchemy import text as sa_text
-
-    async_session = await _get_session_factory()
-
+    """逐链独立提交；失败链原样进入隔离区。"""
     if not entries:
         return 0
+    session_factory = await _get_session_factory()
+    from app.core.redis import redis_client
 
-    # 按 project_id 分组
-    groups: dict[str | None, list[dict]] = defaultdict(list)
-    for entry in entries:
-        pid = entry.get("project_id")
-        groups[pid].append(entry)
+    return await write_batch(
+        entries,
+        session_factory=session_factory,
+        redis_client=redis_client,
+        mask_payload=_mask_payload,
+    )
 
-    is_postgres = settings.DATABASE_URL.startswith("postgresql")
 
-    written = 0
+async def _replay_quarantine() -> int:
+    """尝试重放每条隔离链，提交成功后才出列。"""
+    session_factory = await _get_session_factory()
+    from app.core.redis import redis_client
 
-    async with async_session() as db:
-        try:
-            for project_id, group_entries in groups.items():
-                # --- R1 Bug Fix 3: PG advisory lock 保证同项目串行写入 ---
-                if is_postgres:
-                    # lock_id 使用稳定哈希 + bigint signed 范围
-                    lock_key = str(project_id) if project_id else "__global__"
-                    lock_id = hash(lock_key) & 0x7FFFFFFFFFFFFFFF
-                    try:
-                        await db.execute(
-                            sa_text("SELECT pg_advisory_xact_lock(:lock_id)"),
-                            {"lock_id": lock_id},
-                        )
-                    except Exception as lock_err:
-                        logger.warning(
-                            "[audit_log_writer] advisory lock failed, falling back to lock-free: %s",
-                            lock_err,
-                        )
-
-                # 获取该 project_id 链的最新 prev_hash
-                prev_hash = await _get_prev_hash(db, project_id)
-
-                for entry in group_entries:
-                    # 脱敏 payload
-                    payload = _mask_payload(entry.get("payload", {}))
-                    # 注入 project_id 到 payload 以便后续查询
-                    if project_id:
-                        payload["project_id"] = project_id
-
-                    payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
-
-                    ts_str = entry.get("ts", datetime.now(timezone.utc).isoformat())
-                    user_id_str = entry.get("user_id") or ""
-                    action_type = entry.get("action_type", "unknown")
-                    object_id_str = entry.get("object_id") or ""
-
-                    entry_hash = _compute_entry_hash(
-                        ts_str, user_id_str, action_type, object_id_str, payload_json, prev_hash
-                    )
-
-                    # 构建 ORM 对象
-                    log_entry = AuditLogEntry(
-                        id=uuid.uuid4(),
-                        ts=datetime.fromisoformat(ts_str) if ts_str else datetime.now(timezone.utc),
-                        user_id=uuid.UUID(entry["user_id"]) if entry.get("user_id") else None,
-                        session_id=entry.get("session_id"),
-                        action_type=action_type,
-                        object_type=entry.get("object_type", "unknown"),
-                        object_id=uuid.UUID(entry["object_id"]) if entry.get("object_id") else None,
-                        payload=payload,
-                        ip=entry.get("ip"),
-                        ua=entry.get("ua"),
-                        trace_id=entry.get("trace_id"),
-                        prev_hash=prev_hash,
-                        entry_hash=entry_hash,
-                    )
-                    db.add(log_entry)
-                    prev_hash = entry_hash
-                    written += 1
-
-            await db.commit()
-        except Exception as e:
-            await db.rollback()
-            logger.error("[audit_log_writer] batch write failed: %s", e)
-            raise
-
-    return written
+    return await replay_quarantine(
+        session_factory=session_factory,
+        redis_client=redis_client,
+    )
 
 
 async def _send_admin_notification(
@@ -298,64 +163,66 @@ async def _send_admin_notification(
         return False
 
 
+async def _fallback_preserve(entries: list[dict], retry_count: int) -> None:
+    """Redis 不可用时把失败项放回进程队列，不静默丢弃。"""
+    from app.services.audit_logger_enhanced import audit_logger
+
+    queue = audit_logger._get_fallback_queue()
+    for entry in entries:
+        await queue.put({**entry, "_retry_count": retry_count})
+
+
 async def _handle_write_failure(entries: list[dict], retry_count: int = 0):
-    """处理写入失败：进重试队列，3 次失败触发告警 + 管理员通知。"""
-    if retry_count >= MAX_RETRIES:
-        logger.error(
-            "[audit_log_writer] AUDIT_LOG_WRITE_FAILED: %d entries lost after %d retries",
-            len(entries), MAX_RETRIES,
-        )
-        # Batch 2-12: 触发告警通知（持久化通知 + logger.critical 兜底）
-        logger.critical(
-            "ALERT [AUDIT_LOG_WRITE_FAILED]: %d audit log entries could not be persisted",
-            len(entries),
-        )
-        # Batch 3-8: 调用方开 session，复用到 _send_admin_notification，避免开两个 session
-        try:
-            from app.core.database import async_session
-
-            async with async_session() as db:
-                try:
-                    await _send_admin_notification(
-                        db,
-                        title="审计日志写入失败告警",
-                        content=(
-                            f"审计日志 writer 连续 {MAX_RETRIES} 次写入失败，"
-                            f"{len(entries)} 条日志条目可能丢失，请立即检查 Redis 队列与数据库连接。"
-                        ),
-                        metadata={
-                            "retry_count": MAX_RETRIES,
-                            "lost_count": len(entries),
-                            "alert_type": "AUDIT_LOG_WRITE_FAILED",
-                        },
-                    )
-                    await db.commit()
-                except Exception as exc:
-                    await db.rollback()
-                    logger.warning(
-                        "[audit_log_writer] _send_admin_notification raised: %s", exc
-                    )
-        except Exception as exc:
-            logger.warning(
-                "[audit_log_writer] open session for admin notification failed: %s",
-                exc,
-            )
-        return
-
-    # 推入重试队列
+    """非链类批量失败先重试，达到上限后转隔离区而非丢弃。"""
+    terminal = retry_count >= MAX_RETRIES
     try:
         from app.core.redis import redis_client
-        for entry in entries:
-            entry_with_retry = {**entry, "_retry_count": retry_count + 1}
-            await redis_client.lpush(
-                AUDIT_LOG_RETRY_QUEUE_KEY,
-                json.dumps(entry_with_retry, ensure_ascii=False, default=str),
-            )
-    except Exception:
-        # Redis 也不可用，只能记日志
+
+        if terminal:
+            await quarantine_entries_by_chain(redis_client, entries)
+        else:
+            for entry in entries:
+                entry_with_retry = {**entry, "_retry_count": retry_count + 1}
+                await redis_client.lpush(
+                    AUDIT_LOG_RETRY_QUEUE_KEY,
+                    json.dumps(entry_with_retry, ensure_ascii=False, default=str),
+                )
+            return
+    except Exception as exc:
         logger.error(
-            "[audit_log_writer] Cannot push to retry queue, %d entries lost", len(entries)
+            "[audit_log_writer] Redis unavailable; preserving %d entries in fallback queue: %s",
+            len(entries),
+            exc,
         )
+        await _fallback_preserve(entries, retry_count)
+        if not terminal:
+            return
+
+    logger.critical(
+        "ALERT [AUDIT_LOG_WRITE_FAILED]: %d entries preserved after %d retries",
+        len(entries),
+        MAX_RETRIES,
+    )
+    try:
+        from app.core.database import async_session
+
+        async with async_session() as db:
+            await _send_admin_notification(
+                db,
+                title="审计日志写入失败告警",
+                content=(
+                    f"审计日志 writer 连续 {MAX_RETRIES} 次写入失败，"
+                    f"{len(entries)} 条日志已保留在隔离区或降级队列，请立即处理。"
+                ),
+                metadata={
+                    "retry_count": MAX_RETRIES,
+                    "quarantined_count": len(entries),
+                    "alert_type": "AUDIT_LOG_WRITE_FAILED",
+                },
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("[audit_log_writer] admin notification failed: %s", exc)
 
 
 async def _consume_from_redis(redis_client) -> list[dict]:
@@ -420,8 +287,10 @@ async def run(stop_event: asyncio.Event) -> None:
         worker_id,
     )
 
+    rounds = 0
     while not stop_event.is_set():
         try:
+            rounds += 1
             # 等待间隔或 stop_event
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=INTERVAL_SECONDS)
@@ -446,6 +315,15 @@ async def run(stop_event: asyncio.Event) -> None:
             except Exception:
                 # Redis 不可用，从降级队列消费
                 entries = await _consume_from_fallback_queue()
+
+            # 约每分钟尝试一次隔离区；没有主队列数据时也必须执行。
+            if rounds % 30 == 0:
+                replayed = await _replay_quarantine()
+                if replayed:
+                    logger.info(
+                        "[audit_log_writer] replayed %d quarantined entries",
+                        replayed,
+                    )
 
             if not entries:
                 continue

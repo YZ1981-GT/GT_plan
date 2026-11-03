@@ -343,14 +343,17 @@ class TestAuditAndArchive:
         result = apply_import(xlsx_bytes, sections, {"s1": ConflictResolution.OVERWRITE})
         assert "action" in result.audit_entry
         assert result.audit_entry["action"] == "note_offline_import"
-        assert result.audit_entry["retention_days"] == 30
-        assert result.audit_entry["rollback_available"] is True
+        # 原始导入文件不归档，回执如实声明「不保留、不可自动回滚」；
+        # 恢复靠写库同事务落下的版本树快照（见 note_offline_import_governance）。
+        assert result.audit_entry["retention_days"] == 0
+        assert result.audit_entry["rollback_available"] is False
 
     def test_archive_record(self):
         result = ImportResult(success=True, sections_imported=3)
         record = build_archive_record(b"test", uuid4(), "user1", result)
         assert record["file_size"] == 4
-        assert record["rollback_available"] is True
+        assert record["rollback_available"] is False
+        assert record["expires_at"] is None
         assert len(record["file_hash"]) == 64
 
 

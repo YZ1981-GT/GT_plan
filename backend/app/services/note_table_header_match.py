@@ -302,6 +302,7 @@ class UnitChoice:
     reason: str | None = None
     match: ColumnMatch | None = None
     member_keys: list[list[ColumnKey]] = field(default_factory=list)
+    score_reason: str | None = None  # 选表决策说明（复盘建议 #5：可解释性）
 
 
 def _unit(index: int, links: dict[int, ContinuationLink]) -> tuple[list[int], list[int]]:
@@ -410,10 +411,28 @@ def _score(
     direct = int(bool(m.col_map) and all(pos == 0 for pos, _c in m.col_map.values()))
     specific_strong = sum(1 for c, r in m.rules.items() if r in STRONG_RULES and c in specific)
     gap = abs(len(choice.member_keys[0]) - width) if choice.member_keys else width
-    return (
-        specific_strong, m.strong_count, len(m.col_map), m.aux_matched, direct, -gap,
-        int(_data_cells(tables, choice) > 0), -len(choice.members),
-    )
+    has_data = int(_data_cells(tables, choice) > 0)
+    score = (specific_strong, m.strong_count, len(m.col_map), m.aux_matched, direct, -gap, has_data,
+             -len(choice.members))
+    # 生成可读的决策说明（复盘建议 #5）
+    parts: list[str] = []
+    if specific_strong:
+        parts.append(f"具体列强命中{specific_strong}")
+    if m.strong_count:
+        parts.append(f"强命中{m.strong_count}列")
+    if m.col_map:
+        parts.append(f"共对上{len(m.col_map)}列")
+    if m.aux_matched:
+        parts.append(f"辅助列一致{m.aux_matched}")
+    if direct:
+        parts.append("全在主表")
+    parts.append(f"列数差{abs(gap)}")
+    if has_data:
+        parts.append("有数")
+    if len(choice.members) > 1:
+        parts.append(f"{len(choice.members)}表组合")
+    choice.score_reason = "、".join(parts) if parts else "无评分依据"
+    return score
 
 
 def _name_hits(cands: Sequence[tuple[int, Any]], want: Any, vocab: Vocabulary) -> list[int]:

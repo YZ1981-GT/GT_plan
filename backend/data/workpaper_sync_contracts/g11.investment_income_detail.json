@@ -49,7 +49,7 @@
               "header_source_ref": "源xlsx!明细分析表G11-2!A9",
               "header_text": "序号",
               "json_pointer": "/rows/{row_uuid}/seq",
-              "mode": "editable",
+              "mode": "auto_source",
               "source_ref": "源xlsx!明细分析表G11-2!A10",
               "stable_field_key": "g11_detail_rows/{row_uuid}/seq_no",
               "store_item_id": "G11-detail-rows",

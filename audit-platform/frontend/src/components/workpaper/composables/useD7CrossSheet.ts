@@ -20,6 +20,7 @@ import {
 } from './useD7FormulaEngine'
 import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import type { ChecklistResponse } from './useD7FormData'
+import { postTransferAmount } from './useD7VoucherCheck'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -228,11 +229,11 @@ export function useD7CrossSheet(options: UseD7CrossSheetOptions) {
     return { natureRows, natureTotals, nonCurrentDeduction, contractLiabilityTotal }
   })
 
-  // ─── D7-7 → D7-2 期后结转贷方合计 ─────────────────────────────────────
+  // ─── D7-7 → D7-2 期后结转合计（区② 借方；旧行的 creditAmount 经 postTransferAmount 兼容） ───
 
   const voucherPostTransferTotal: ComputedRef<number> = computed(() => {
     const rows = safeParseJsonArray(getRemark(allResponses.value, 'D7-7-post-rows'))
-    return calcSubtotal(rows.map((r: any) => parseNum(r.creditAmount)))
+    return calcSubtotal(rows.map((r: any) => postTransferAmount(r)))
   })
 
   // ─── 交叉验证：性质合计 vs 账龄合计（segment-driven） ───────────────────

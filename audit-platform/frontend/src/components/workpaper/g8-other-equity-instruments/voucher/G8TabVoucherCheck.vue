@@ -28,7 +28,7 @@
       <div class="params-grid">
         <div class="param-item">
           <span class="param-label">测试总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.testPopulation"
             size="small"
             :disabled="isReadonly"
@@ -38,7 +38,7 @@
         </div>
         <div class="param-item">
           <span class="param-label">特定样本</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.specificSamples"
             size="small"
             :disabled="isReadonly"
@@ -48,7 +48,7 @@
         </div>
         <div class="param-item">
           <span class="param-label">抽样总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.samplingPopulation"
             size="small"
             :disabled="isReadonly"
@@ -333,10 +333,16 @@
       border stripe size="small"
       style="font-size:13px;margin-top:8px"
       highlight-current-row
-      :row-class-name="rowClassName"
+      :row-class-name="voucherRowClassName"
       @current-change="onRowChange"
     >
       <el-table-column prop="seq" label="#" width="44" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="engineYear" />
+        </template>
+      </el-table-column>
       <template v-if="vc.activeTab.value === 'basic'">
         <el-table-column label="日期" width="108">
           <template #default="{ row }">
@@ -408,10 +414,11 @@
             <span v-else>—</span>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="56" align="center">
+        <el-table-column label="📎" width="84" align="center">
           <template #default="{ row }">
             <el-button v-if="!isReadonly" size="small" link @click="uploadOcr(row)">OCR</el-button>
             <span v-else>{{ row.attachment || '—' }}</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
       </template>
@@ -679,12 +686,12 @@
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
         :account-code="G8_SAMPLING_ACCOUNT_CODE"
-        phase="final"
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="engineYear"
         @filled="onSampleFilled"
+        @undo-request="vc.onUndoRequest"
       />
     </el-dialog>
 
@@ -700,14 +707,19 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, ref, watch, toRef, h, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
 import type { Column } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../../voucher-sampling/PostFillAiReviewDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8VoucherCheck, type G8VoucherRow, type G8CheckState, formatG8CheckState,
@@ -737,11 +749,11 @@ import {
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import type { GCycleCutoffFilledDetail } from '../../composables/gCycleCutoffFill'
 import { GCYCLE_CUTOFF_EVENT } from '../../composables/gCycleCutoffFill'
-import type { SampledVoucher, SamplingMethod, Phase } from '../../composables/useSamplingAlgorithms'
-import type { FillMode } from '../../composables/useCutoffAutoSampling'
+import type { SampledVoucher, SamplingMethod } from '../../composables/useSamplingAlgorithms'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -753,6 +765,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G8-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
@@ -880,6 +895,10 @@ const virtualColumns = computed<Column<any>[]>(() => {
   if (vc.activeTab.value === 'basic') {
     return [
       { key: 'seq', title: '#', dataKey: 'seq', width: 44, align: 'center' },
+      { key: 'gtMeta', title: '来源', dataKey: 'source', width: 150,
+        cellRenderer: ({ rowData }: { rowData: G8VoucherRow }) => h(VoucherRowMetaCell, {
+          row: rowData, locked: vc.isVoucherRowLocked(rowData), projectId: props.projectId, year: engineYear.value,
+        }) },
       { key: 'voucherNo', title: '凭证号', dataKey: 'voucherNo', width: 100 },
       { key: 'businessContent', title: '业务内容', dataKey: 'businessContent', width: 200 },
       { key: 'debitAmount', title: '借方', dataKey: 'debitAmount', width: 100, align: 'right',
@@ -920,6 +939,9 @@ function onRowChange(row: G8VoucherRow | undefined) {
   const idx = vc.rows.value.findIndex((r) => r.rowId === row.rowId)
   if (idx >= 0) vc.setActiveRowIndex(idx)
 }
+
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(rowClassName, vc.voucherRowClass)
 
 function rowClassName({ row }: { row: G8VoucherRow }) {
   return row.isAbnormal ? 'abnormal-row' : ''
@@ -969,35 +991,33 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (engineYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, engineYear.value, props.wpId, G8_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await vc.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: {
-  samples: SampledVoucher[]
-  phase: Phase
-  fillMode: FillMode
-  method?: SamplingMethod
-}) {
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。原实现按凭证号去重，已删除。
+ */
+async function onSampleFilled(payload: EngineFilledPayload<SampledVoucher> & { method?: SamplingMethod; methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
+  void persistMethodology(payload?.methodology)
   if (props.isReadonly) return
-  const n = vc.fillFromSampling(payload.samples ?? [], payload.fillMode ?? 'append', payload.method)
+  const out = await vc.onEngineFilled(payload)
+  if (out.cancelled) return
   showSampling.value = false
-  if (n > 0) {
-    ElMessage.success(`已回填 ${n} 条抽凭样本（来源=抽凭）`)
-    triggerPostFillReview(payload.samples ?? [])
-  } else {
-    ElMessage.info('未回填任何样本（可能已存在相同凭证号）')
-  }
+  if (out.added > 0) triggerPostFillReview(payload.samples ?? [])
 }
 
 function triggerPostFillReview(samples: SampledVoucher[]) {
@@ -1043,6 +1063,7 @@ async function uploadOcr(row: G8VoucherRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
       let res
       try {
         res = await http.post(
@@ -1057,6 +1078,7 @@ async function uploadOcr(row: G8VoucherRow) {
           { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
         )
       }
+      rowEv.refresh()
       const { fields, confidence } = extractG8OcrPayload(res.data)
       if (!Object.keys(fields).length) {
         ElMessage.info('OCR 完成，未识别到可填充字段')
@@ -1123,6 +1145,7 @@ function onCutoffFilled(e: Event) {
 }
 
 onMounted(() => {
+  void vc.voucherFillReady()
   window.addEventListener(GCYCLE_CUTOFF_EVENT.g8, onCutoffFilled as EventListener)
 })
 onBeforeUnmount(() => {

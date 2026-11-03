@@ -19,10 +19,10 @@ from __future__ import annotations
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.audit_platform_models import (
     AccountCategory,
@@ -95,7 +95,11 @@ class BasicInfoSchema(BaseModel):
     company_code: str = Field(min_length=18, max_length=18)  # 企业代码（统一社会信用代码，18位必填）
     short_name: str = Field(min_length=1, max_length=100)  # 项目简称（必填）
     template_type: str | None = None  # 附注模板类型：soe（国企版）/ listed（上市版）
-    company_subtype: str | None = None  # 企业子类型：type_a/type_b/type_c/type_d（audit-report-template-integration 需求 1.5）
+    company_subtype: str | None = None  # 报告模板类型：type_a/type_b/type_c/type_d（audit-report-template-integration 需求 1.5）
+    # 质控业务分类 / 专项场景（trim-generation-plan-followup-optimizations R4）：只在请求里出现时写回项目
+    # （旧客户端不发就不动库里的值）；分类只收参考标准登记码，场景只收登记值，其他值 422。
+    business_category: str | None = None  # A / A1~A8、B / B1~B6、C；null 或空串 = 未填写
+    scenario: str | None = None  # normal / ipo / listed / refinancing / transfer / restructure / fraud_response
     custom_template_id: str | None = None
     custom_template_name: str | None = None
     custom_template_version: str | None = None
@@ -111,6 +115,20 @@ class BasicInfoSchema(BaseModel):
     ultimate_company_code: str | None = None  # 最终控制方代码（统一社会信用代码，可空）
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
+
+    @field_validator("business_category", mode="before")
+    @classmethod
+    def _registered_category(cls, value: Any) -> str | None:
+        from app.services.project_classification import normalize_category
+
+        return normalize_category(value)
+
+    @field_validator("scenario", mode="before")
+    @classmethod
+    def _registered_scenario(cls, value: Any) -> str | None:
+        from app.services.project_classification import normalize_scenario
+
+        return None if value is None else normalize_scenario(value)
 
 
 class TeamMemberAssignment(BaseModel):
@@ -171,6 +189,11 @@ class ProjectCreateResponse(BaseModel):
     template_type: str | None = None
     # audit-report-template-integration 需求 1.5/14.2：企业子类型 type_a/b/c/d 读写往返
     company_subtype: str | None = None
+    # 质控业务分类 / 专项场景（R4）：返回 project_classification 解释后的值 —— 迁移前残留在分类列的
+    # IPO / refinancing 显示为「分类未填写 + 对应场景」，回填表单再保存即写成规范值
+    business_category: str | None = None
+    scenario: str = "normal"
+    project_classification: dict[str, Any] | None = None
     report_scope: str | None = None
     # 集团架构（consol-tree-three-code-autobuild 需求 1.6）：详情回填与树视图用
     parent_company_name: str | None = None
@@ -187,6 +210,9 @@ class ProjectCreateResponse(BaseModel):
     created_at: datetime
     # 本次请求产生的说明（仅创建/保存时非空），如「已从同企业的合并项目带入集团关系」
     notices: list[str] = []
+    # V212 当前审计阶段与预审截止日（改动走 PUT /api/projects/{id}/audit-phase）
+    current_audit_phase: str = "final"
+    interim_cutoff_date: date | None = None
 
 
 # ===================================================================
@@ -366,14 +392,27 @@ class ReportLineMappingConfirm(BaseModel):
 
 
 class ReferenceCopyRequest(BaseModel):
-    """集团参照复制请求"""
-    source_company_code: str
+    """集团参照复制请求：``source_project_id``（选定的来源项目）与 ``source_company_code``（来源企业名称）二选一。
+
+    试算表「参照其他单位」下拉选的是项目 id，原先却塞进 ``source_company_code`` 去比客户名称 —— 恒比不上，
+    于是每次都落到「随便找一个其他项目」（spec consol-autotree-residual-closure R2.3）。
+    """
+    source_company_code: str | None = None
+    source_project_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> "ReferenceCopyRequest":
+        has_name = bool((self.source_company_code or "").strip())
+        if has_name == (self.source_project_id is not None):
+            raise ValueError("来源项目与来源企业名称须且只能给一个")
+        return self
 
 
 class ReferenceCopyResult(BaseModel):
-    """集团参照复制结果"""
+    """集团参照复制结果；``source_found=False`` = 没有找到可参照的来源项目（一条未复制）。"""
     copied_count: int
     unmatched_accounts: list[str] = []
+    source_found: bool = True
 
 
 class ReportLine(BaseModel):
@@ -624,12 +663,16 @@ class AdjustmentCreate(BaseModel):
     year: int
     company_code: str = "default"
     description: str | None = None
+    # 自定义编号（可选）：不填自动编号；填写时同项目同年度不得与未删除分录组重复
+    adjustment_no: str | None = None
     line_items: list[AdjustmentLineItem] = Field(min_length=1)
 
 
 class AdjustmentUpdate(BaseModel):
     """修改调整分录"""
+    expected_revision: int | None = Field(default=None, ge=1)
     description: str | None = None
+    audit_phase: Literal["preliminary", "final"] | None = None
     line_items: list[AdjustmentLineItem] | None = None
 
 
@@ -654,6 +697,10 @@ class AdjustmentGroupResponse(BaseModel):
     adjustment_type: AdjustmentType
     description: str | None = None
     review_status: ReviewStatus
+    content_revision: int = 1
+    audit_phase: str = "final"
+    external_reference: str | None = None
+    import_batch_id: UUID | None = None
     reviewer_id: UUID | None = None
     reviewed_at: datetime | None = None
     rejection_reason: str | None = None
@@ -743,6 +790,7 @@ class ReviewStatusChange(BaseModel):
     """变更复核状态"""
     status: ReviewStatus
     reason: str | None = None  # rejected 时必填
+    expected_revision: int | None = Field(default=None, ge=1)
 
 
 class AdjustmentSummary(BaseModel):
@@ -770,27 +818,7 @@ class AccountOption(BaseModel):
     name: str
     level: int = 1
     report_line: str | None = None  # 对应报表行次名称，用于下拉显示
-
-
-class WPAdjustmentDetail(BaseModel):
-    """底稿审定表中的单笔调整明细"""
-    entry_group_id: UUID
-    adjustment_no: str
-    adjustment_type: AdjustmentType
-    description: str | None = None
-    amount: Decimal = Decimal("0")
-
-
-class WPAdjustmentSummary(BaseModel):
-    """底稿审定表数据"""
-    wp_code: str
-    accounts: list[str] = []
-    unadjusted_amount: Decimal = Decimal("0")
-    aje_details: list[WPAdjustmentDetail] = []
-    rje_details: list[WPAdjustmentDetail] = []
-    aje_total: Decimal = Decimal("0")
-    rje_total: Decimal = Decimal("0")
-    audited_amount: Decimal = Decimal("0")
+    balance: Decimal | None = None  # 传年度时附试算表审定数（参考余额）
 
 
 # ===================================================================
@@ -907,6 +935,10 @@ class EventType(str, enum.Enum):
     ADJUSTMENT_APPROVED = "adjustment.approved"
     # 调整分录撤回复核 → 与审批通过走同一套下游链路
     ADJUSTMENT_REVIEW_REVOKED = "adjustment.review_revoked"
+    # 客户已入账标记/撤销 → 调整列重算与下游刷新
+    ADJUSTMENT_CLIENT_BOOKING_CHANGED = "adjustment.client_booking_changed"
+    # 最终财务处理（纳入工作试算表 / 不予更正 / 撤销）变化
+    ADJUSTMENT_TREATMENT_CHANGED = "adjustment.treatment_changed"
 
     # Sprint 10: 底稿深度优化事件
     WORKPAPER_AUDITED_CONFIRMED = "workpaper.audited_confirmed"
@@ -965,11 +997,8 @@ class EventType(str, enum.Enum):
     # cross-workpaper-dispatch-persistence: D0-1 跨底稿分发事件
     DISPATCH_CREATED = "dispatch.created"
     DISPATCH_REVOKED = "dispatch.revoked"
-
-    # consol-note-mapping-reuse-and-reference-push Phase 4:
-    # 子企业附注值变化 → 合并侧 stale 通知
-    # payload: {consol_project_id, section_id, entity_node_key, entity_project_id, new_fingerprint}
-    CONSOL_NOTE_VALUE_CHANGED = "consol_note.value_changed"
+    # （CONSOL_NOTE_VALUE_CHANGED 从未有发布方 / 订阅方，随 V202 值确认退役删除；子企业附注保存 → 合并侧待更新走
+    #  NOTE_SECTION_SAVED + consol.note_stale SSE，spec note-pull-followup-closure R16）
 
 
 class EventPayload(BaseModel):
@@ -1023,6 +1052,7 @@ class MisstatementCreate(BaseModel):
     misstatement_amount: AmountDecimal
     misstatement_type: MisstatementType
     management_reason: str | None = None
+    management_communication_at: datetime | None = None
     auditor_evaluation: str | None = None
     # 溯源：来源底稿编码（如 K9/D4/G8-6），供 A13 错报汇总反查来源底稿。
     # 底稿"推送错报至A13"时携带，写入 unadjusted_misstatements.source_wp_code。
@@ -1039,6 +1069,7 @@ class MisstatementUpdate(BaseModel):
     misstatement_amount: OptionalAmountDecimal = None
     misstatement_type: MisstatementType | None = None
     management_reason: str | None = None
+    management_communication_at: datetime | None = None
     auditor_evaluation: str | None = None
 
 
@@ -1056,6 +1087,7 @@ class MisstatementResponse(BaseModel):
     misstatement_amount: Decimal
     misstatement_type: MisstatementType
     management_reason: str | None = None
+    management_communication_at: datetime | None = None
     auditor_evaluation: str | None = None
     source_wp_code: str | None = None
     source_identity: str | None = None

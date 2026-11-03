@@ -189,7 +189,9 @@ def test_d6_2_export_import_round_trip(rows: list[dict]) -> None:
         expected_prior_audited = float(original["priorUnadjusted"]) + float(original["priorAje"]) + float(original["priorRje"])
         assert abs(imported["priorAudited"] - expected_prior_audited) < 1e-6
 
-        expected_end_unadj = expected_prior_audited + float(original["debitAmount"]) - float(original["creditAmount"])
+        # 期末未审从**期初未审**起算（模板 D6-2 Q = G + O − P；
+        # spec oo-writeback-template-parity-closure R2 —— 原判据钉的是期初审定起算的旧口径）
+        expected_end_unadj = float(original["priorUnadjusted"]) + float(original["debitAmount"]) - float(original["creditAmount"])
         assert abs(imported["endUnadjusted"] - expected_end_unadj) < 1e-6
 
         expected_end_audited = expected_end_unadj + float(original["endAje"]) + float(original["endRje"])
@@ -234,8 +236,10 @@ def test_d6_3_export_import_round_trip(rows: list[dict]) -> None:
         expected_prior_audited = float(original["priorUnadjusted"]) + float(original["priorAje"]) + float(original["priorRje"])
         assert abs(imported["priorAudited"] - expected_prior_audited) < 1e-6
 
+        # 期末未审从**期初未审**起算（模板 D6-3 K = B + SUM(F:G) − SUM(H:J)；
+        # spec oo-writeback-template-parity-closure R2 —— 原判据钉的是期初审定起算的旧口径）
         expected_end_unadj = (
-            expected_prior_audited
+            float(original["priorUnadjusted"])
             + float(original["provision"])
             + float(original["otherIncrease"])
             - float(original["reversal"])

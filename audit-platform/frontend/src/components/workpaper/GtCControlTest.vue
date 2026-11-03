@@ -28,7 +28,9 @@
 
         <!-- 双模式切换 (结构化视图 ↔ 在线编辑) -->
         <div class="cct-mode-bar">
-          <el-segmented v-model="deviationViewMode" :options="deviationModeOptions" size="small" />
+          <el-segmented v-if="cctEntrySync.presentation.value.showModeSwitch" v-model="deviationViewMode" :options="deviationModeOptions" size="small" />
+          <!-- 能力披露（AC 1.5）：开关被单源藏起来时必须讲清原因 + 下一步；entry 与门同一条 -->
+          <GtEntrySyncCapabilityNotice :entry-id="SYNC_ENTRY_ID" />
         </div>
 
         <!-- 结构化视图 -->
@@ -490,6 +492,7 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { InfoFilled, Plus, WarningFilled, MagicStick, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
@@ -1265,8 +1268,9 @@ async function doOcrForAttach(index: number, rawFile: File): Promise<void> {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
-    const fields = (res?.data?.data ?? res?.data)?.extracted_fields || {}
-    const text = fields.full_text || fields.summary || fields.content || Object.values(fields).join('\n') || ''
+    const data = res?.data?.data ?? res?.data
+    // 原文在 ocr_text；extracted_fields 是合同字段（编号 / 对方 / 金额…），原先把它们拼起来当原文交给 AI
+    const text = data?.ocr_text || data?.extracted_fields?.full_text || ''
     // 确保 editOcrTexts 与 editAttachments 索引对齐
     while (editOcrTexts.value.length <= index) editOcrTexts.value.push('')
     editOcrTexts.value[index] = String(text).slice(0, 2000) // 截断防过长
@@ -1382,6 +1386,18 @@ onBeforeUnmount(() => {
   flushPendingSaves()
   eventBus.off('attachment:uploaded', onAttachmentUploaded)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const SYNC_ENTRY_ID = 'xlsx/gt-c-control-test'
+const cctEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

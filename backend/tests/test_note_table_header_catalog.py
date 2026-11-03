@@ -14,6 +14,7 @@ from app.services.note_table_header_catalog import (
     check_catalog,
     render_catalog,
 )
+from app.services.note_table_header_library import _override_table_key, load_vocabulary, table_identity
 
 
 @pytest.fixture(scope="module")
@@ -123,9 +124,21 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 #:   「合并表标题 ↔ 单体表名」对照（gen_consol_standalone_note_mapping._TITLE_ALIASES：合并 Word 提示句 / 「期末本公司…」
 #:   说法认回单体表）：国企 0.9306→0.9418、对上 617→631、none 14→11（五-18-8 超额亏损表补上；五-54-4 单体是三组列合表，
 #:   如实不对）；上市 0.9339→0.9375、对上 819→825、none 25→23。
+#: 2026-10-26 note-pull-header-formula-closure 浏览器实测（自动映射后映射弹窗报「未对上的列」）：上市 五-5-6~10 组合计提表
+#:   单体按底稿 D2 写「期末余额/应收账款」、合并按 Word 写「期末余额/账面余额」→ 词表同义计量词；五-30-2 合并
+#:   「…上年年末互抵金额」↔ 单体「…期初互抵金额」（期间词在计量词中间）→ 计量词别名：上市 0.9375→0.9500、对上 825→836。
+#: 2026-10-29 note-chain-followup-optimizations R4 逐条核对「未对上的列」（词表按表覆盖 + 两条长词别名，ADR-5）：国企
+#:   五-31-2「互抵后的递延所得税资产或负债」= 抵销后余额（+2；「互抵金额」两列单体没有）、五-51-2 单体只列金额即账面价值
+#:   （+4；数量列单体没有）、十一-合营企业「持股比例/直接 · 间接」是比例不加总（取数列 670→668）：0.9418→0.9536、对上 631→637；
+#:   上市 五-23-3 带勾稽字母的纯期间列（+2）、五-28-4 单期商誉减值（+1）、五-57-2「减：税后归属于少数股东」（+1）、五-13-2
+#:   「[佣金支出]」占位括号（+1）、十七-境内外两张单期表（+4）、十七-每股收益不加总（取数列 880→878）：0.9500→0.9624、
+#:   对上 836→845；none 不变。收入 ↔ 主营业务收入（国企 五-64-3、上市 五-62-3）语义待用户定，未改。
+#: 2026-10-31 note-table-structure-formula-pull-closure R1.4「账龄 / 期末账龄」列改判说明列（写的是「1-2年」，不是金额）：
+#:   这几列原先两边都算金额列且互相「对上」，改判后同时离开分子分母（国企取数列 668→665、对上 637→634；上市 878→876、
+#:   845→843）⇒ 比例 0.9536→0.9534 / 0.9624→0.9623 是口径变化，不是少对上了金额列；none 不变。
 _RATCHET = {
-    "soe": {"coverage": 0.9418, "matched": 631, "none": 11},
-    "listed": {"coverage": 0.9375, "matched": 825, "none": 23},
+    "soe": {"coverage": 0.9534, "matched": 634, "none": 11},
+    "listed": {"coverage": 0.9623, "matched": 843, "none": 23},
 }
 
 
@@ -173,6 +186,69 @@ def test_correspondence_ratchet(catalog, std):
     assert stats["coverage"] >= _RATCHET[std]["coverage"]
     assert stats["matched_columns"] >= _RATCHET[std]["matched"]
     assert stats["by_via"].get("none", 0) <= _RATCHET[std]["none"]
+
+
+def test_listed_portfolio_tables_take_carrying_amount_via_synonym(catalog):
+    """上市 五-5-6~10 组合计提表：合并「期末余额/账面余额」↔ 单体（底稿）「期末余额/应收账款」按同义计量词对上，
+    坏账准备照旧精确；五-30-2 上年年末互抵金额按别名对上单体期初互抵金额（2026-10-26）。"""
+    items = {i["consol"]: i for i in catalog["correspondence"]["listed"]}
+    for n in range(6, 11):
+        item = items[f"五-5-{n}"]
+        table = f"五、5#{n - 1}"
+        assert item["standalone"] == table and item["unmatched"] == [], item
+        assert item["columns"] == [[1, table, 1, "synonym"], [2, table, 2, "exact"], [4, table, 4, "synonym"],
+                                   [5, table, 5, "exact"]], item
+    item = items["五-30-2"]
+    assert item["unmatched"] == [] and [3, "五、30#1", 3, "exact"] in item["columns"], item
+
+
+def test_r4_overrides_and_aliases_correspond(catalog):
+    """note-chain-followup-optimizations R4：逐条核对未对上的列后，按表覆盖 / 长词别名修好的对应（ADR-5）。"""
+    items = {(std, i["consol"]): i for std in ("soe", "listed") for i in catalog["correspondence"][std]}
+    # 国企 五-31-2：单体「报告期末 / 报告年初互抵后的递延所得税资产或负债」按别名对上抵销后余额；「互抵金额」两列单体没有
+    item = items[("soe", "五-31-2")]
+    assert item["columns"] == [[2, "八、31#1", 1, "exact"], [4, "八、31#1", 3, "exact"]], item
+    assert item["unmatched"] == ["期末/递延所得税资产和负债互抵金额", "期初/递延所得税资产和负债互抵金额"], item
+    # 国企 五-51-2：单体只列金额（= 账面价值），数量列单体没有
+    item = items[("soe", "五-51-2")]
+    assert item["columns"] == [[c, "八、51#1", c // 2, "exact"] for c in (2, 4, 6, 8)], item
+    assert item["unmatched"] == ["期初余额/数量", "本期增加/数量", "本期减少/数量", "期末余额/数量"], item
+    # 上市：带勾稽字母的纯期间列、「减：」勾稽式、Word 占位方括号 —— 逐列全对上
+    for sid in ("五-23-3", "五-57-2", "五-13-2"):
+        item = items[("listed", sid)]
+        assert item["unmatched"] == [] and item["matched"] == item["amount_columns"], (sid, item)
+    assert {(1, 1), (8, 8)} <= {(c, s) for c, _t, s, _r in items[("listed", "五-23-3")]["columns"]}
+    assert [4, "五、57#1", 6, "exact"] in items[("listed", "五-57-2")]["columns"]
+    assert items[("listed", "五-13-2")]["columns"] == [[1, "五、13#1", 1, "exact"], [3, "五、13#1", 2, "exact"]]
+    # 单体只有一期：商誉减值金额 = 本期；业绩承诺四列与上期减值单体没有
+    assert items[("listed", "五-28-4")]["columns"] == [[7, "五、28#3", 2, "exact"]]
+    for n in (1, 2):
+        table = f"十七、境内外会计准则下会计数据差异#{n - 1}"
+        item = items[("listed", f"十七-境内外会计准则下会计数据差异-{n}")]
+        assert item["columns"] == [[1, table, 1, "exact"], [3, table, 2, "exact"]], item
+        assert item["unmatched"] == ["净利润/上期发生额", "净资产/上年年末余额"], item
+
+
+def test_r4_ratio_overrides_leave_amount_columns(catalog):
+    """持股比例（直接 / 间接）与每股收益是比例 / 每股金额，不跨企业相加：移出取数列，不再报「未对上」。"""
+    items = {(std, i["consol"]): i for std in ("soe", "listed") for i in catalog["correspondence"][std]}
+    for std, sid, cols in (("soe", "十一-本公司的合营企业-1", (4, 5)), ("listed", "十七-净资产收益率和每股收益-1", (2, 3))):
+        assert items[(std, sid)]["amount_columns"] == 0 and items[(std, sid)]["unmatched"] == [], sid
+        entry = _by_id(catalog, f"{std}_consolidated")[sid]
+        assert all(entry["columns"][c][1].endswith("|ratio") for c in cols), entry["columns"]
+
+
+def test_column_overrides_hit_existing_columns(catalog):
+    """词表逐表覆盖每条都命中现存表的数据列：表改名 / 删表后覆盖会静默失效，覆盖行名列（第 0 列）也不允许。"""
+    vocab = load_vocabulary()
+    assert vocab.column_overrides  # 判据抽不到值时不许空转
+    hit: set[tuple[str, str, int]] = set()
+    for variant, entries in catalog["variants"].items():
+        consol = variant.endswith("_consolidated")
+        for e in entries:
+            prefix = _override_table_key(*table_identity(variant, e["id"] if consol else f"{e['section']}#{e['name']}"))
+            hit.update((*prefix, c) for c in range(1, len(e["columns"])) if (*prefix, c) in vocab.column_overrides)
+    assert set(vocab.column_overrides) - hit == set()
 
 
 def test_committed_file_location():

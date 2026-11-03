@@ -163,34 +163,53 @@ class TestNoFallbackCall:
 
 
 class TestGeneratorMustBeConsumed:
-    """design §4.1b L4：抛错发生在**首次迭代**，只调不消费会把真缺陷全判通过。"""
+    """design §4.1b L4：抛错发生在**首次迭代**，只调不消费会把真缺陷全判通过。
+
+    批 B3（spec oo-writeback-template-parity-closure R3）起 G3 的门面按本 provider 绑定、不再借 G9，真实数据里
+    已无「消费才抛」的门面 ⇒ 用**合成**的借别家门面守这条纪律：G3 的 provider 外壳 + 绑到 G9 的
+    `SectionStoreFacade`（= 批 B3 前的真实形态）。
+    """
 
     ITEM = "G3-2-detail-rows"
 
-    def test_calling_without_consuming_raises_nothing(self) -> None:
+    def _borrowed(self) -> Any:
+        from app.services.workpaper_sync.phase5_section_store_facade import SectionStoreFacade
+
         g3 = _mod(_G3)
-        g3.iter_store_rows([], store_item_id=self.ITEM)  # 不抛即证明惰性
+        return SimpleNamespace(
+            __name__=g3.__name__,
+            iter_store_rows=SectionStoreFacade("phase5_g9_other_noncurrent").iter_store_rows,
+            managed_row_table_specs=g3.managed_row_table_specs,
+        )
+
+    def test_calling_without_consuming_raises_nothing(self) -> None:
+        _mod(_G3).iter_store_rows([], store_item_id=self.ITEM)  # 不抛即证明惰性
+        self._borrowed().iter_store_rows([], store_item_id=self.ITEM)
 
     def test_consuming_raises_and_resolution_records_the_real_cause(self) -> None:
-        """🔴 判据落在**第 ① 级**（`_diagnose_via_facade`）。
+        """🔴 判据落在**第 ① 级**（`_diagnose_via_facade`）：借别家的门面必须消费生成器才看得见它坏。
 
-        Task 3.7 起 `diagnose_row_reader` 是三级编排：G3 的门面仍然坏着（本测试守的就是
-        「必须消费生成器才看得见它坏」），但 R3 兜住了它 ⇒ 顶层结论变成可枚举。把判据改成
-        「顶层可枚举」会让「必须消费」这条纪律失去守卫，故改判在 ① 级；顶层的转正由
-        `TestR3TakesOverBoundFacades` 单独断言。
+        顶层（三级编排）由 R3 兜住 ⇒ 可枚举，但 ① 级的成因必须原样带进 detail。
         """
-        g3 = _mod(_G3)
+        borrowed = self._borrowed()
         with pytest.raises(Exception):
-            list(g3.iter_store_rows([], store_item_id=self.ITEM))
-        res = _diagnose_via_facade(provider=g3, store_item_id=self.ITEM)
+            list(borrowed.iter_store_rows([], store_item_id=self.ITEM))
+        res = _diagnose_via_facade(provider=borrowed, store_item_id=self.ITEM)
         assert not res.is_enumerable
-        # 门面 re-export 自 phase5_g9_store_facade ⇒ 比 item_unresolvable 更精确的那一个
+        # 门面绑在 G9 上 ⇒ 比 item_unresolvable 更精确的那一个
         assert res.skip_reason is SkipReason.row_reader_bound_to_other_entry
-        assert res.facade_module.endswith("phase5_g9_store_facade")
-        # 三级编排把 ① 级的成因原样带进 detail（不得把「门面坏了」这件事洗掉）
-        top = diagnose_row_reader(provider=g3, store_item_id=self.ITEM)
+        assert res.facade_module.endswith("phase5_g9_other_noncurrent")
+        top = diagnose_row_reader(provider=borrowed, store_item_id=self.ITEM)
         assert SkipReason.row_reader_bound_to_other_entry.value in top.detail
-        assert top.facade_module.endswith("phase5_g9_store_facade")
+        assert top.facade_module.endswith("phase5_g9_other_noncurrent")
+
+    def test_real_g3_facade_is_bound_to_its_own_provider(self) -> None:
+        """批 B3 正面钉子：真实 G3 门面消费不抛、① 级可枚举、绑定的就是 G3 自己。"""
+        g3 = _mod(_G3)
+        assert list(g3.iter_store_rows([], store_item_id=self.ITEM)) == []
+        res = _diagnose_via_facade(provider=g3, store_item_id=self.ITEM)
+        assert res.is_enumerable, res.detail
+        assert res.facade_module == g3.__name__
 
 
 class TestUnreadablePayloadFailsVisible:
@@ -247,7 +266,11 @@ class TestSectionComesFromDeclaration:
         )
 
     def test_section_field_name_is_not_the_literal_section_for_every_item(self) -> None:
-        """反证「硬编码 `'section'` 也能过」：G5 声明的是 `sectionKey`，且有 12 段。"""
+        """反证「硬编码 `'section'` 也能过」：G5 声明的是 `sectionKey`。
+
+        原写「且有 12 段」：2026-10-08 起 G5 只受管主区 s1r1（12 区共用 UUID 列，其余 11 区不进双向同步，见
+        provider `managed_row_table_specs`）⇒ 声明面现算 1 段，段数改为现读。
+        """
         specs = [
             s
             for s in _mod(_G5).managed_row_table_specs()
@@ -255,13 +278,13 @@ class TestSectionComesFromDeclaration:
         ]
         fields = {s.row_section_field for s in specs}
         assert fields == {"sectionKey"} and "section" not in fields
-        # ① 级：门面借给了 G9 ⇒ 门面路不可枚举（Task 3.7 后这条事实不变，只是不再是终态）
+        # ① 级：批 B3 起门面按本 provider 绑定 ⇒ 门面路就可枚举（原先借给 G9、只能靠 R3 兜住）
         facade = _diagnose_via_facade(provider=_mod(_G5), store_item_id="G5-2-rows")
-        assert facade.skip_reason is SkipReason.row_reader_bound_to_other_entry
-        # 顶层：R3 兜住 ⇒ 12 段全在，且**声明层**仍被如实读出
+        assert facade.is_enumerable, facade.detail
+        # 顶层：声明的每一段都在，且**声明层**被如实读出
         res = diagnose_row_reader(provider=_mod(_G5), store_item_id="G5-2-rows")
         assert res.is_enumerable, res.detail
-        assert len(res.declared_scopes) == 12
+        assert len(res.declared_scopes) == len(specs) >= 1
         assert {section for _table, section in res.declared_scopes} == {
             s.row_section_value for s in specs
         }
@@ -421,8 +444,8 @@ class TestUnruledShapeRatchet:
 
     🔴 **Task 3.7（ADR-AOS-005）把基线清成空集** —— R3 按 spec 逐条枚举，G1 的三段都能寻址。
     这不是「放宽判据凑空集」：`test_baseline_is_empty_because_r3_really_covers_g1` 用**实测**
-    证明三段身份都被 yield，且 `test_facade_alone_still_only_covers_one_third` 证明 ① 级那条
-    缺陷**依然存在**（只是被第 ② 级兜住了，没有被洗掉）。
+    证明三段身份都被 yield；批 B3 起 ① 级的门面也修好了（`test_facade_now_covers_all_three_sections`：
+    门面全覆盖三段，只 yield 区① 的合成门面仍判未裁决形态）。
     """
 
     BASELINE: frozenset[tuple[str, str]] = frozenset()
@@ -469,14 +492,31 @@ class TestUnruledShapeRatchet:
             f"基线条目已不再是未裁决形态 {sorted(self.BASELINE - unruled)}，请移除"
         )
 
-    def test_facade_alone_still_only_covers_one_third(self) -> None:
-        """🔴 ① 级那条缺陷**依然存在** —— 基线清空不是因为门面被修好了。
+    def test_facade_now_covers_all_three_sections(self) -> None:
+        """批 B3 正面钉子：G1 门面按 provider 绑定、三区逐段穿线 ⇒ ① 级就全覆盖（原先只覆盖 1/3）。
 
-        （若哪天门面真被修好，本测试会打红 ⇒ 那时该把它改成正面断言并登记。）
+        「门面只覆盖部分分区」的判据由合成门面守住：只 yield 区① 的替身（= 批 B3 前 G1 的真实形态）
+        必须仍判未裁决形态，并点名漏掉的两区。
         """
-        res = _diagnose_via_facade(provider=_mod(_G1), store_item_id="G1-2-rows")
-        assert res.is_unruled_shape
-        assert "g1_2_rows_r2" in res.detail and "g1_2_rows_r3" in res.detail
+        from app.services.workpaper_sync.phase5_row_table_sheet import iter_store_rows as engine_iter
+
+        g1 = _mod(_G1)
+        res = _diagnose_via_facade(provider=g1, store_item_id="G1-2-rows")
+        assert res.is_enumerable, res.detail
+        assert set(res.covered_sections) == {"trading", "classified_fvpl", "designated_fvpl"}
+        first = g1.managed_row_table_specs()[0]
+
+        def first_section_only(payload: Any, *, store_item_id: str | None = None):
+            yield from engine_iter(first, payload)
+
+        partial = SimpleNamespace(
+            __name__=g1.__name__,
+            iter_store_rows=first_section_only,
+            managed_row_table_specs=g1.managed_row_table_specs,
+        )
+        res_partial = _diagnose_via_facade(provider=partial, store_item_id="G1-2-rows")
+        assert res_partial.is_unruled_shape
+        assert "g1_2_rows_r2" in res_partial.detail and "g1_2_rows_r3" in res_partial.detail
         # 变异对照：同型的 G9（多段门面）在 ① 级就必须**不是**未裁决形态
         facade_g9 = _diagnose_via_facade(provider=_mod(_G9), store_item_id="G9-detail-rows")
         assert facade_g9.is_enumerable

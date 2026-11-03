@@ -7,7 +7,11 @@
  * 3. GtIndexChip 类（a-program-console / b-index）：scrollIntoView + 闪烁动画
  * 4. 通用 fallback（h-static-doc / d-form-* / 未知类型）：scrollIntoView 最近匹配
  * 5. univer：委托 UniverEditorCore.onLocateCell（此处仅返回 true）
- * 6. 高亮幂等 + 3s CSS transition 淡出
+ * 6. 高亮幂等 + 3s 淡出（样式在 styles/global.css）
+ *
+ * 查找范围：调用方传 `root` 时只在 root 内找（GtWpRenderer 传自己的根元素，避免命中侧栏 / 其他表格）；
+ * 不传时沿用整个 document。不再按单元格行号猜「第 N 个表格行」——模板行号与网页表格行没有对应关系，
+ * 猜中的是别的行（spec wp-deeplink-cell-locate-closure 需求 2.2）。
  *
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2
  *
@@ -39,6 +43,11 @@ export interface LocateTarget {
   component_type?: string | null
   value?: string | null
   label?: string | null
+}
+
+/** 定位选项：root = 查找范围（缺省整个 document） */
+export interface LocateOptions {
+  root?: ParentNode | null
 }
 
 // ─── componentType 分组 ────────────────────────────────────────────────────────
@@ -114,6 +123,14 @@ function applyHighlight(el: Element, className: string, targetKey: string): bool
   return true
 }
 
+/**
+ * 滚到可见并高亮任意元素（组件自己的定位钩子用；与 locateCell 共用幂等与 3s 淡出）。
+ */
+export function highlightElement(el: Element, targetKey: string, className: string = GT_LOCATE_HIGHLIGHT_CLASS): boolean {
+  el.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  return applyHighlight(el, className, targetKey)
+}
+
 // ─── 定位策略 ─────────────────────────────────────────────────────────────────
 
 /**
@@ -121,40 +138,24 @@ function applyHighlight(el: Element, className: string, targetKey: string): bool
  * 适用：c-note-table / d-form-table / e-control-test
  * 逻辑：找到目标行 → scrollIntoView → 添加高亮 class → 3s 后移除
  */
-function locateElTable(target: LocateTarget, targetKey: string): boolean {
-  // 策略 1：通过 data-cell-ref 属性查找行
+function locateElTable(target: LocateTarget, targetKey: string, root: ParentNode): boolean {
   const cellRef = target.cell_ref
   const value = target.value
 
   let targetRow: Element | null = null
 
+  // 策略 1：通过 data-cell-ref 属性查找行
   if (cellRef) {
-    // 尝试通过 data-cell-ref 属性定位
-    targetRow = document.querySelector(
-      `.el-table [data-cell-ref="${cellRef}"]`
-    )
+    targetRow = root.querySelector(`.el-table [data-cell-ref="${cellRef}"]`)
     // 如果找到的是 cell，向上找到 row
     if (targetRow && !targetRow.classList.contains('el-table__row')) {
       targetRow = targetRow.closest('.el-table__row')
     }
   }
 
-  // 策略 2：通过 data-row-index 或内容匹配
-  if (!targetRow && cellRef) {
-    // 从 cell_ref 提取行号（如 "B5" → row 5）
-    const rowMatch = cellRef.match(/\d+/)
-    if (rowMatch) {
-      const rowIndex = parseInt(rowMatch[0], 10) - 1 // 0-based
-      const rows = document.querySelectorAll('.el-table__body .el-table__row')
-      if (rowIndex >= 0 && rowIndex < rows.length) {
-        targetRow = rows[rowIndex]
-      }
-    }
-  }
-
-  // 策略 3：通过 value 内容匹配
+  // 策略 2：通过 value 内容匹配
   if (!targetRow && value) {
-    const rows = document.querySelectorAll('.el-table__body .el-table__row')
+    const rows = root.querySelectorAll('.el-table__body .el-table__row')
     for (const row of rows) {
       if (row.textContent?.includes(value)) {
         targetRow = row
@@ -164,12 +165,7 @@ function locateElTable(target: LocateTarget, targetKey: string): boolean {
   }
 
   if (!targetRow) return false
-
-  // 滚动到目标行
-  targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-  // 添加高亮
-  return applyHighlight(targetRow, GT_LOCATE_HIGHLIGHT_CLASS, targetKey)
+  return highlightElement(targetRow, targetKey)
 }
 
 /**
@@ -177,7 +173,7 @@ function locateElTable(target: LocateTarget, targetKey: string): boolean {
  * 适用：a-program-console / b-index
  * 逻辑：querySelector 目标 chip → scrollIntoView → 闪烁动画 → 3s 淡出
  */
-function locateChip(target: LocateTarget, targetKey: string): boolean {
+function locateChip(target: LocateTarget, targetKey: string, root: ParentNode): boolean {
   const value = target.value
   const cellRef = target.cell_ref
 
@@ -185,19 +181,17 @@ function locateChip(target: LocateTarget, targetKey: string): boolean {
 
   // 策略 1：通过 data-wp-code + data-cell-ref 属性查找
   if (cellRef) {
-    chipEl = document.querySelector(
-      `[data-wp-code="${target.wp_code}"][data-cell-ref="${cellRef}"]`
-    )
+    chipEl = root.querySelector(`[data-wp-code="${target.wp_code}"][data-cell-ref="${cellRef}"]`)
   }
 
   // 策略 2：通过 data-wp-code 查找
   if (!chipEl) {
-    chipEl = document.querySelector(`[data-wp-code="${target.wp_code}"]`)
+    chipEl = root.querySelector(`[data-wp-code="${target.wp_code}"]`)
   }
 
   // 策略 3：通过 value 内容匹配 GtIndexChip
   if (!chipEl && value) {
-    const chips = document.querySelectorAll('.gt-index-chip')
+    const chips = root.querySelectorAll('.gt-index-chip')
     for (const chip of chips) {
       if (chip.textContent?.includes(value)) {
         chipEl = chip
@@ -207,12 +201,7 @@ function locateChip(target: LocateTarget, targetKey: string): boolean {
   }
 
   if (!chipEl) return false
-
-  // 滚动到目标 chip
-  chipEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-  // 添加闪烁动画
-  return applyHighlight(chipEl, GT_LOCATE_BLINK_CLASS, targetKey)
+  return highlightElement(chipEl, targetKey, GT_LOCATE_BLINK_CLASS)
 }
 
 /**
@@ -220,7 +209,7 @@ function locateChip(target: LocateTarget, targetKey: string): boolean {
  * 适用：h-static-doc / d-form-paragraph / d-form-qa / d-form-confirmation / d-form-review / 未知类型
  * 逻辑：scrollIntoView 最近匹配元素
  */
-function locateFallback(target: LocateTarget, targetKey: string): boolean {
+function locateFallback(target: LocateTarget, targetKey: string, root: ParentNode): boolean {
   const value = target.value
   const cellRef = target.cell_ref
 
@@ -228,13 +217,13 @@ function locateFallback(target: LocateTarget, targetKey: string): boolean {
 
   // 策略 1：通过 data-cell-ref 属性查找
   if (cellRef) {
-    matchEl = document.querySelector(`[data-cell-ref="${cellRef}"]`)
+    matchEl = root.querySelector(`[data-cell-ref="${cellRef}"]`)
   }
 
   // 策略 2：通过 value 内容匹配
   if (!matchEl && value) {
     // 在当前渲染区域查找包含目标值的元素
-    const candidates = document.querySelectorAll(
+    const candidates = root.querySelectorAll(
       '.gt-wp-renderer [data-field], .gt-wp-renderer td, .gt-wp-renderer .el-form-item'
     )
     for (const el of candidates) {
@@ -247,7 +236,7 @@ function locateFallback(target: LocateTarget, targetKey: string): boolean {
 
   // 策略 3：通过 label 匹配
   if (!matchEl && target.label) {
-    const candidates = document.querySelectorAll(
+    const candidates = root.querySelectorAll(
       '.gt-wp-renderer label, .gt-wp-renderer .el-form-item__label, .gt-wp-renderer th'
     )
     for (const el of candidates) {
@@ -259,12 +248,7 @@ function locateFallback(target: LocateTarget, targetKey: string): boolean {
   }
 
   if (!matchEl) return false
-
-  // 滚动到目标元素
-  matchEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-  // 添加高亮
-  return applyHighlight(matchEl, GT_LOCATE_HIGHLIGHT_CLASS, targetKey)
+  return highlightElement(matchEl, targetKey)
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -273,11 +257,13 @@ export function useCellLocate() {
   /**
    * 定位到目标单元格
    * @param target 定位坐标
+   * @param options root = 查找范围（缺省整个 document）
    * @returns 是否成功定位
    */
-  function locateCell(target: LocateTarget): boolean {
+  function locateCell(target: LocateTarget, options: LocateOptions = {}): boolean {
     const componentType = target.component_type
     const targetKey = buildLocateKey(target)
+    const root: ParentNode = options.root ?? document
 
     // univer 类型：委托给 UniverEditorCore.onLocateCell
     // 实际委托在 GtWpRenderer 层完成，此处仅返回 true 表示支持
@@ -285,22 +271,20 @@ export function useCellLocate() {
       return true
     }
 
-    // 使用 nextTick 确保 DOM 已更新后再执行定位
-    // 但 locateCell 本身是同步返回，DOM 操作在当前 tick 执行
-    // 如果 DOM 尚未渲染，调用方应在 nextTick 后调用 locateCell
+    // 如果 DOM 尚未渲染，调用方应在 nextTick 后调用 locateCell（GtWpRenderer 经 useRendererCellLocate 重试）
 
     // el-table 类定位策略
     if (componentType && EL_TABLE_TYPES.has(componentType)) {
-      return locateElTable(target, targetKey)
+      return locateElTable(target, targetKey, root)
     }
 
     // GtIndexChip 类定位策略
     if (componentType && CHIP_TYPES.has(componentType)) {
-      return locateChip(target, targetKey)
+      return locateChip(target, targetKey, root)
     }
 
     // 通用 fallback 策略（已知 fallback 类型 + 未知类型）
-    return locateFallback(target, targetKey)
+    return locateFallback(target, targetKey, root)
   }
 
   return { locateCell }

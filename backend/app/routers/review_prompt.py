@@ -1,7 +1,7 @@
 """底稿级复核提示词 HTTP 端点
 
 POST /api/workpapers/{wp_id}/review        — 单底稿 AI 复核
-POST /api/projects/{pid}/batch-review      — 批量复核
+POST /api/projects/{pid}/ai-batch-review  — 批量复核
 GET  /api/projects/{pid}/review-export     — 导出 Excel 复核报告
 GET  /api/review-prompts/coverage          — 提示词覆盖率统计
 
@@ -9,7 +9,6 @@ Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 7.1, 7.2, 7.3, 7.4, 10.3
 """
 from __future__ import annotations
 
-import asyncio
 import io
 import logging
 import uuid
@@ -18,12 +17,16 @@ from typing import Optional
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session
+from app.core.database import async_session, get_db
+from app.deps import assert_project_permission, authorize_wp_read, get_current_user, require_role
+from app.models.core import User
+from app.services.ai_review_verdict import resolve_ai_review_verdict
 from app.services.batch_review_service import BatchReviewService
 from app.services.llm_response_parser import LlmResponseParser, ReviewFinding
 from app.services.review_prompt_service import ReviewPromptService
@@ -40,16 +43,6 @@ _review_metrics: dict[str, list] = {
     "calls": [],  # List of {timestamp, duration_ms, success, parse_success, token_count_approx}
 }
 _METRICS_MAX_HISTORY = 1000  # Keep last 1000 calls
-
-# ---------------------------------------------------------------------------
-# 并发控制 & 进度追踪
-# ---------------------------------------------------------------------------
-
-# 每项目批量复核锁（防止并发重复执行）
-_batch_locks: dict[str, asyncio.Lock] = {}
-
-# 批量复核进度追踪 (per session_id)
-_batch_progress: dict[str, dict] = {}
 
 # ---------------------------------------------------------------------------
 # Pydantic 模型
@@ -83,7 +76,10 @@ class SheetInfo(BaseModel):
 class ReviewResponse(BaseModel):
     """单底稿复核响应"""
     findings: list[ReviewFindingResponse]
+    deterministic_checks: list[dict] = Field(default_factory=list)
+    # 兼容旧前端；仅表示 AI 输出可解析且未触发旧风险阈值，不代表人工复核通过。
     overall_pass: bool
+    review_status: str = "manual_review_required"
     risk_summary: dict[str, int]  # {"high": n, "medium": n, "low": n}
     sheet_info: SheetInfo
 
@@ -170,7 +166,12 @@ class BatchReviewReportResponse(BaseModel):
 
 
 @router.post("/api/workpapers/{wp_id}/review", response_model=ReviewResponse)
-async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
+async def review_workpaper(
+    wp_id: UUID,
+    body: ReviewRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """单底稿 AI 复核
 
     - 有 sheet_name 时：用 ReviewPromptService 匹配 sheet-level prompt
@@ -183,8 +184,13 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     4. LlmResponseParser.parse → 结构化结果
     5. 返回 ReviewResponse
 
+    鉴权：底稿所属项目 review 级（与批量复核同级），先于读底稿、调模型（原先无任何鉴权，
+    spec project-pid-path-authz-coverage）。底稿不存在 404、非成员 403。
+
     Requirements: 3.1, 3.2, 3.3, 3.4
     """
+    wp_project_id = await authorize_wp_read(db, current_user, wp_id)
+    await assert_project_permission(db, current_user, wp_project_id, "review")
     sheet_name = body.sheet_name if body else None
 
     # 1. 查底稿信息（wp_code）
@@ -201,8 +207,18 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     from app.services.cycle_review_context import (
         append_reconciliation_to_user_prompt,
         build_review_reconciliation_context,
+        build_review_reconciliation_findings,
     )
     recon_context = await build_review_reconciliation_context(str(wp_id), wp_code)
+    deterministic_checks = await build_review_reconciliation_findings(str(wp_id), wp_code)
+    deterministic_blocking_failures = sum(
+        1 for check in deterministic_checks
+        if check.get("severity") == "blocking" and check.get("passed") is False
+    )
+    deterministic_unknown = any(
+        check.get("severity") == "blocking" and check.get("passed") is None
+        for check in deterministic_checks
+    )
 
     # 4. 构建 LLM 消息并调用
     system_prompt = (
@@ -231,16 +247,43 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     if recon_context:
         user_prompt = append_reconciliation_to_user_prompt(user_prompt, recon_context)
 
-    raw_response = await _call_llm(system_prompt, user_prompt)
-
-    # 5. 解析 LLM 响应
-    parse_result = LlmResponseParser.parse(raw_response)
-
-    # 6. 计算总体通过状态和风险汇总
-    overall_pass_str = LlmResponseParser.determine_pass_status(
-        parse_result.findings, sheet_name=sheet_name
+    role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
+    invocation = await _call_llm(
+        system_prompt, user_prompt, str(role) if role is not None else None
     )
-    overall_pass = overall_pass_str == "pass"
+    # 兼容既有测试/扩展对 `_call_llm` 的字符串替身；生产实现始终返回 typed 结果。
+    if isinstance(invocation, str):
+        from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
+        from app.services.llm_client import LLMInvocationResult, LLMInvocationStatus
+
+        invocation = LLMInvocationResult(
+            status=(
+                LLMInvocationStatus.unavailable
+                if is_llm_fail_soft_placeholder(invocation)
+                else LLMInvocationStatus.success
+            ),
+            text=None if is_llm_fail_soft_placeholder(invocation) else invocation,
+            error_code=("legacy_fail_soft" if is_llm_fail_soft_placeholder(invocation) else None),
+            error_message=(invocation if is_llm_fail_soft_placeholder(invocation) else None),
+        )
+    raw_response = invocation.text or ""
+
+    # 5. 解析 LLM 响应；typed 调用失败不得被 parser 解释成普通 finding。
+    if invocation.succeeded:
+        parse_result = LlmResponseParser.parse(raw_response)
+    else:
+        parse_result = LlmResponseParser._degrade_to_unknown(
+            invocation.error_message or "AI 复核服务不可用"
+        )
+
+    # 6. AI 只提供疑点，不产生业务“通过”。
+    verdict = resolve_ai_review_verdict(
+        parse_success=parse_result.parse_success and not deterministic_unknown,
+        findings=parse_result.findings,
+        deterministic_blocking_failures=deterministic_blocking_failures,
+    )
+    overall_pass = verdict.business_pass
+    review_status = verdict.status.value
 
     risk_summary = {"high": 0, "medium": 0, "low": 0}
     for f in parse_result.findings:
@@ -262,18 +305,19 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
                 wp_id=str(wp_id),
                 sheet_name=sheet_name or wp_code,
                 wp_code=wp_code,
-                pass_status="pass" if overall_pass else "fail",
+                pass_status=review_status,
                 findings=parse_result.findings,
                 risk_summary=risk_summary,
                 reviewed_at=datetime.now(timezone.utc).isoformat(),
-                model_used="(single)",
+                model_used=invocation.model_name or "unknown",
                 prompt_source=prompt_result.source_level,
+                deterministic_checks=deterministic_checks,
             )
             stats = BatchStatistics(
                 total_sheets=1,
-                passed_count=1 if overall_pass else 0,
-                failed_count=0 if overall_pass else 1,
-                error_count=0,
+                passed_count=0,
+                failed_count=1 if review_status == "ai_findings_present" else 0,
+                error_count=1 if review_status == "manual_review_required" else 0,
                 total_findings=len(parse_result.findings),
                 findings_by_risk=risk_summary,
             )
@@ -303,7 +347,9 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
 
     return ReviewResponse(
         findings=findings_response,
+        deterministic_checks=deterministic_checks,
         overall_pass=overall_pass,
+        review_status=review_status,
         risk_summary=risk_summary,
         sheet_info=SheetInfo(
             wp_id=str(wp_id),
@@ -315,8 +361,8 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
 
 
 @router.get("/api/review-prompts/coverage", response_model=CoverageReportResponse)
-async def get_review_prompt_coverage():
-    """获取提示词覆盖率统计
+async def get_review_prompt_coverage(current_user: User = Depends(get_current_user)):
+    """获取提示词覆盖率统计（全局只读诊断，不含项目数据：须登录）
 
     委托 ReviewPromptService.get_coverage 返回覆盖率报告。
 
@@ -334,8 +380,8 @@ async def get_review_prompt_coverage():
 
 
 @router.get("/api/review-prompts/metrics")
-async def get_review_metrics():
-    """LLM 复核调用监控指标"""
+async def get_review_metrics(current_user: User = Depends(require_role(["admin"]))):
+    """LLM 复核运行指标（仅管理员，不返回项目正文）。"""
     calls = _review_metrics["calls"]
     if not calls:
         return {
@@ -365,11 +411,34 @@ async def get_review_metrics():
     }
 
 
+async def _set_finding_status(db: AsyncSession, finding_id: str, status: str) -> int:
+    """写复核发现的 ``data_sources.finding_status``（PG jsonb_set），返回命中行数。"""
+    result = await db.execute(
+        text(
+            "UPDATE ai_content SET "
+            "data_sources = jsonb_set("
+            "COALESCE(data_sources::jsonb, '{}'::jsonb), "
+            "'{finding_status}', CAST(:status_val AS JSONB)) "
+            "WHERE id = :finding_id AND content_type = 'review_finding'"
+        ),
+        {"finding_id": finding_id, "status_val": f'"{status}"'},
+    )
+    return result.rowcount
+
+
 @router.patch("/api/review-findings/{finding_id}/status")
-async def update_finding_status(finding_id: str, body: FindingStatusUpdate):
+async def update_finding_status(
+    finding_id: str,
+    body: FindingStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """更新单条复核发现的状态
 
     允许值: pending（待处理）, resolved（已整改）, ignored（已忽略）, not_applicable（不适用）
+
+    鉴权：该发现所属项目 review 级（原先无任何鉴权，可改任意项目的复核记录，
+    spec project-pid-path-authz-coverage）；发现不存在 404。
     """
     valid_statuses = {"pending", "resolved", "ignored", "not_applicable"}
     if body.status not in valid_statuses:
@@ -378,21 +447,27 @@ async def update_finding_status(finding_id: str, body: FindingStatusUpdate):
             detail=f"无效状态，允许值: {', '.join(valid_statuses)}",
         )
 
-    async with async_session() as db:
-        result = await db.execute(
-            text(
-                "UPDATE ai_content SET "
-                "data_sources = jsonb_set("
-                "COALESCE(data_sources::jsonb, '{}'::jsonb), "
-                "'{finding_status}', CAST(:status_val AS JSONB)) "
-                "WHERE id = :finding_id AND content_type = 'review_finding'"
-            ),
-            {"finding_id": finding_id, "status_val": f'"{body.status}"'},
-        )
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Finding 不存在")
-        await db.commit()
+    from app.models.ai_models import AIContent, AIContentType
 
+    try:
+        finding_uuid = UUID(finding_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Finding 不存在")
+    project_id = (
+        await db.execute(
+            select(AIContent.project_id).where(
+                AIContent.id == finding_uuid,
+                AIContent.content_type == AIContentType.review_finding,
+            )
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="Finding 不存在")
+    await assert_project_permission(db, current_user, project_id, "review")
+
+    if await _set_finding_status(db, finding_id, body.status) == 0:
+        raise HTTPException(status_code=404, detail="Finding 不存在")
+    await db.commit()
     return {"id": finding_id, "status": body.status}
 
 
@@ -402,109 +477,69 @@ async def update_finding_status(finding_id: str, body: FindingStatusUpdate):
 
 
 @router.get("/api/projects/{pid}/batch-review-progress")
-async def get_batch_review_progress(pid: UUID, session_id: str = Query(...)):
-    """获取批量复核进度"""
-    progress = _batch_progress.get(session_id)
-    if not progress:
-        return {"status": "not_found", "current": 0, "total": 0, "current_sheet": ""}
-    return progress
+async def get_batch_review_progress(
+    pid: UUID,
+    session_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """兼容旧轮询：从 DB-backed job snapshot 投影进度。"""
+    await assert_project_permission(db, current_user, pid, "readonly")
+    from app.models.ai_task_job_models import AiTaskJob
+    from app.services.ai_task_job_service import get_job_snapshot
 
-
-@router.post(
-    "/api/projects/{pid}/batch-review",
-    response_model=BatchReviewReportResponse,
-)
-async def batch_review(pid: UUID, body: BatchReviewRequest):
-    """批量复核端点
-
-    接收 wp_code_prefix 和 year，委托 BatchReviewService 执行批量复核。
-    逐份调用 LLM 复核，容错续行，汇总结果。
-
-    Requirements: 4.1
-    """
-    # 并发锁：同一项目不允许同时执行批量复核
-    lock_key = str(pid)
-    if lock_key not in _batch_locks:
-        _batch_locks[lock_key] = asyncio.Lock()
-
-    if _batch_locks[lock_key].locked():
-        raise HTTPException(status_code=409, detail="该项目正在复核中，请稍后再试")
-
-    async with _batch_locks[lock_key]:
-        service = BatchReviewService()
-        session_id_for_progress = body.progress_session_id or str(uuid.uuid4())
-        _batch_progress[session_id_for_progress] = {
-            "status": "running",
-            "current": 0,
-            "total": 0,
-            "current_sheet": "准备中...",
-        }
-
-        def _update_progress(current: int, total: int, current_sheet: str):
-            _batch_progress[session_id_for_progress] = {
-                "status": "running",
-                "current": current,
-                "total": total,
-                "current_sheet": current_sheet,
-            }
-
+    job = (await db.execute(select(AiTaskJob).where(
+        AiTaskJob.project_id == pid,
+        AiTaskJob.actor_id == current_user.id,
+        AiTaskJob.task_kind == "workpaper_batch_review",
+        AiTaskJob.idempotency_key == session_id,
+    ).order_by(AiTaskJob.created_at.desc()).limit(1))).scalar_one_or_none()
+    if job is None:
         try:
-            report = await service.execute_batch(
-                project_id=str(pid),
-                wp_code_prefix=body.wp_code_prefix,
-                year=body.year,
-                progress_callback=_update_progress,
-            )
-        finally:
-            _batch_progress.pop(session_id_for_progress, None)
+            job_id = UUID(session_id)
+        except ValueError:
+            return {"status": "not_found", "current": 0, "total": 0, "current_sheet": ""}
+        job = (await db.execute(select(AiTaskJob).where(
+            AiTaskJob.id == job_id,
+            AiTaskJob.project_id == pid,
+        ))).scalar_one_or_none()
+    if job is None:
+        return {"status": "not_found", "current": 0, "total": 0, "current_sheet": ""}
+    snapshot = await get_job_snapshot(db, project_id=pid, job_id=job.id)
+    active = next(
+        (item for item in snapshot["items"] if item["status"] in {"running", "retry_wait"}),
+        None,
+    )
+    return {
+        "status": snapshot["status"],
+        "current": snapshot["progress_done"],
+        "total": snapshot["progress_total"],
+        "current_sheet": active["target_key"] if active else "",
+        "job_id": snapshot["job_id"],
+    }
 
-    # 将 dataclass 结果转为 Pydantic 响应
-    results_response = [
-        BatchResultResponse(
-            wp_id=r.wp_id,
-            sheet_name=r.sheet_name,
-            wp_code=r.wp_code,
-            pass_status=r.pass_status,
-            findings=[
-                BatchFindingResponse(
-                    id=f.id,
-                    description=f.description,
-                    risk_level=f.risk_level,
-                    pass_status=f.pass_status,
-                    category=f.category,
-                    sheet_location=f.sheet_location,
-                    suggestion=f.suggestion,
-                )
-                for f in r.findings
-            ],
-            risk_summary=r.risk_summary,
-            reviewed_at=r.reviewed_at,
-            model_used=r.model_used,
-            prompt_source=r.prompt_source,
-            error_message=r.error_message,
-        )
-        for r in report.results
-    ]
 
-    return BatchReviewReportResponse(
-        session_id=report.session_id,
-        wp_code_prefix=report.wp_code_prefix,
-        project_id=report.project_id,
-        results=results_response,
-        statistics=BatchStatisticsResponse(
-            total_sheets=report.statistics.total_sheets,
-            passed_count=report.statistics.passed_count,
-            failed_count=report.statistics.failed_count,
-            error_count=report.statistics.error_count,
-            total_findings=report.statistics.total_findings,
-            findings_by_risk=report.statistics.findings_by_risk,
+@router.post("/api/projects/{pid}/ai-batch-review")
+async def batch_review(
+    pid: UUID,
+    body: BatchReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """兼容入口：创建 DB-backed 底稿复核任务并立即返回 snapshot。"""
+    await assert_project_permission(db, current_user, pid, "review")
+    from app.routers.ai_task_jobs import AiTaskJobCreate, create_job
+
+    return await create_job(
+        pid,
+        AiTaskJobCreate(
+            task_kind="workpaper_batch_review",
+            year=body.year,
+            idempotency_key=body.progress_session_id or str(uuid.uuid4()),
+            wp_code_prefix=body.wp_code_prefix,
         ),
-        execution=ExecutionMetadataResponse(
-            start_time=report.execution.start_time,
-            end_time=report.execution.end_time,
-            duration_seconds=report.execution.duration_seconds,
-            model_used=report.execution.model_used,
-        ),
+        db,
+        current_user,
     )
 
 
@@ -518,8 +553,10 @@ async def export_review_report(
     pid: UUID,
     wp_code_prefix: str = Query(..., description="底稿编码前缀，如 D2"),
     session_id: Optional[str] = Query(None, description="复核会话 ID（可选）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """导出复核结果为 Excel — 从已持久化的数据库结果读取，不重跑 LLM
+    """导出复核结果为 Excel — 从已持久化的数据库结果读取，不重跑 LLM（项目只读级；原先无任何鉴权）
 
     生成 Excel workbook，每张底稿一个 worksheet + 首页汇总。
     列：序号/检查项/风险等级/是否通过/问题描述/涉及底稿定位/整改建议/负责人/状态
@@ -527,6 +564,7 @@ async def export_review_report(
 
     Requirements: 7.1, 7.2, 7.3, 7.4
     """
+    await assert_project_permission(db, current_user, pid, "readonly")
     # 优先从数据库读取已持久化的复核结果
     report = await _load_review_report_from_db(str(pid), wp_code_prefix, session_id)
 
@@ -690,7 +728,8 @@ async def _load_review_report_from_db(
     )
 
     async with async_session() as db:
-        # 如果没有传 session_id，从 checklist_responses 获取最近的 session
+        # 如果没有传 session_id，先兼容旧 checklist 索引；没有旧索引时从
+        # DB-backed AI task job 找同前缀最近一次任务，页面刷新后仍可导出。
         if not session_id:
             cr_result = await db.execute(
                 text(
@@ -702,14 +741,49 @@ async def _load_review_report_from_db(
                 {"project_id": project_id, "pattern": f"{wp_code_prefix}-review-session-%"},
             )
             cr_row = cr_result.first()
-            if not cr_row:
-                return None
-            session_meta = _json.loads(cr_row[0]) if isinstance(cr_row[0], str) else cr_row[0]
-            session_id = session_meta.get("session_id")
+            if cr_row:
+                session_meta = _json.loads(cr_row[0]) if isinstance(cr_row[0], str) else cr_row[0]
+                session_id = session_meta.get("session_id")
             if not session_id:
-                return None
+                from app.models.ai_task_job_models import AiTaskJob
 
-        # 加载该 session 所有 findings
+                candidates = list((await db.execute(
+                    select(AiTaskJob).where(
+                        AiTaskJob.project_id == UUID(project_id),
+                        AiTaskJob.task_kind == "workpaper_batch_review",
+                    ).order_by(AiTaskJob.created_at.desc()).limit(20)
+                )).scalars().all())
+                latest = next(
+                    (
+                        job for job in candidates
+                        if str((job.request_payload or {}).get("wp_code_prefix") or "")
+                        == wp_code_prefix
+                    ),
+                    None,
+                )
+                if latest is None:
+                    return None
+                session_id = str(latest.id)
+
+        # 新链以 job snapshot 为权威，包含“AI 未发现新增疑点”和失败项；不能只按
+        # ai_content finding 行重建，否则合法空 findings 会被误判成“没有跑过”。
+        try:
+            durable_job_id = UUID(session_id)
+        except (TypeError, ValueError):
+            durable_job_id = None
+        if durable_job_id is not None:
+            from app.services.ai_task_review_report import load_review_job_report
+
+            durable = await load_review_job_report(
+                db,
+                project_id=UUID(project_id),
+                wp_code_prefix=wp_code_prefix,
+                job_id=durable_job_id,
+            )
+            if durable is not None:
+                return durable
+
+        # 加载旧链该 session 所有 findings
         result = await db.execute(
             text(
                 "SELECT workpaper_id, content_text, data_sources, created_at "
@@ -846,37 +920,45 @@ async def _get_workpaper_content(wp_id: UUID, sheet_name: str | None) -> str:
     return await load_workpaper_review_content(wp_id, sheet_name)
 
 
-async def _call_llm(system_prompt: str, user_prompt: str) -> str:
-    """调用 LLM chat_completion 获取复核结果"""
+async def _call_llm(
+    system_prompt: str, user_prompt: str, role: str | None = None
+):
+    """调用登记的高风险复核任务；失败不返回可解析的占位正文。"""
     import time as _time
-    start = _time.monotonic()
-    success = False
-    try:
-        from app.services.llm_client import chat_completion
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        result = await chat_completion(
-            messages=messages,
+    from app.services.ai_task_executor import invoke_ai_task
+    from app.services.llm_client import LLMInvocationResult, LLMInvocationStatus
+
+    start = _time.monotonic()
+    result: LLMInvocationResult
+    try:
+        invocation = await invoke_ai_task(
+            "review.workpaper",
+            action="review",
+            user_prompt=user_prompt,
+            system_addendum=system_prompt,
+            role=role,
             temperature=0.1,
-            max_tokens=3000,
         )
-        success = True
-        return result if isinstance(result, str) else ""
-    except Exception as e:
-        logger.error("LLM call failed: %s", e)
-        return f"[AI 复核暂时不可用: {e}]"
+        result = invocation.result
+        return result
+    except Exception as exc:
+        logger.error("LLM call failed: %s", exc)
+        result = LLMInvocationResult(
+            status=LLMInvocationStatus.unavailable,
+            error_code="internal_error",
+            error_message="AI 复核服务不可用",
+        )
+        return result
     finally:
         duration_ms = (_time.monotonic() - start) * 1000
+        current = locals().get("result")
         _review_metrics["calls"].append({
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "duration_ms": round(duration_ms, 1),
-            "success": success,
-            "parse_success": None,  # Will be updated after parse
-            "token_count_approx": len(user_prompt) // 2,  # Rough approximation
+            "success": bool(current and current.succeeded),
+            "parse_success": None,
+            "token_count_approx": len(user_prompt) // 2,
         })
-        # Trim to max history
         if len(_review_metrics["calls"]) > _METRICS_MAX_HISTORY:
             _review_metrics["calls"] = _review_metrics["calls"][-_METRICS_MAX_HISTORY:]

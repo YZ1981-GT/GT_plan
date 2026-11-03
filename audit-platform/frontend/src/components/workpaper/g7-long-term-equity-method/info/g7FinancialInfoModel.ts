@@ -2,6 +2,7 @@
  * G7-5 被投资单位财务信息 — 纯函数模型
  * 变动额/率、分组 hydrate、异常变动与关键项目完整性校验。
  */
+import { newUuid } from '@/utils/uuid'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 const moneyCalc = useDecimalCalc({ dp: 2 })
@@ -51,10 +52,7 @@ export const KEY_FINANCIAL_REPORT_PATTERNS = [
 ] as const
 
 function uid(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${newUuid()}`
 }
 
 export function parseFinancialAmount(value: unknown): number {

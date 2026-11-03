@@ -132,7 +132,7 @@
       </template>
 
       <div class="grid-table-wrapper">
-        <table class="cap-grid-table">
+        <GtGridTable class="cap-grid-table">
           <thead>
             <tr>
               <th class="category-col">成本类目</th>
@@ -207,7 +207,7 @@
               <td class="ratio-col">—</td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </el-card>
 
@@ -261,6 +261,7 @@ import {
 import { useSEstimateImportExport } from '../composables/useSEstimateImportExport'
 import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 import { fmtAmount } from '@/utils/formatters'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 

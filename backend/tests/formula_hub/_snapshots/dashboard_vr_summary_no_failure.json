@@ -1,0 +1,90 @@
+{
+ "all_passed": {
+  "all_passed": true,
+  "blocking_failed": 0,
+  "by_cycle": [],
+  "not_passed_checks": [],
+  "reason": null,
+  "status_counts": {
+   "error": 0,
+   "failed": 0,
+   "not_applicable": 0,
+   "not_executed": 0,
+   "passed": 2
+  },
+  "total_rules": 2,
+  "unavailable": false
+ },
+ "error": {
+  "all_passed": false,
+  "blocking_failed": 0,
+  "by_cycle": [],
+  "not_passed_checks": [
+   {
+    "branch_id": "g.exception",
+    "check_name": "G 三角勾稽",
+    "reason": "检查异常：RuntimeError：boom",
+    "severity": "warning",
+    "status": "error"
+   }
+  ],
+  "reason": null,
+  "status_counts": {
+   "error": 1,
+   "failed": 0,
+   "not_applicable": 0,
+   "not_executed": 0,
+   "passed": 1
+  },
+  "total_rules": 2,
+  "unavailable": false
+ },
+ "not_applicable": {
+  "all_passed": false,
+  "blocking_failed": 0,
+  "by_cycle": [],
+  "not_passed_checks": [
+   {
+    "branch_id": "f.trimmed",
+    "check_name": "F 三角勾稽",
+    "reason": "底稿已裁剪",
+    "severity": "warning",
+    "status": "not_applicable"
+   }
+  ],
+  "reason": null,
+  "status_counts": {
+   "error": 0,
+   "failed": 0,
+   "not_applicable": 1,
+   "not_executed": 0,
+   "passed": 1
+  },
+  "total_rules": 2,
+  "unavailable": false
+ },
+ "not_executed": {
+  "all_passed": false,
+  "blocking_failed": 0,
+  "by_cycle": [],
+  "not_passed_checks": [
+   {
+    "branch_id": "e1.cfs_missing",
+    "check_name": "E1勾稽:现金流量表",
+    "reason": "现金流量表尚未生成",
+    "severity": "blocking",
+    "status": "not_executed"
+   }
+  ],
+  "reason": null,
+  "status_counts": {
+   "error": 0,
+   "failed": 0,
+   "not_applicable": 0,
+   "not_executed": 1,
+   "passed": 1
+  },
+  "total_rules": 2,
+  "unavailable": false
+ }
+}

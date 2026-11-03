@@ -48,7 +48,7 @@ def captured_logs(monkeypatch):
         calls.append(kwargs)
         return kwargs
 
-    monkeypatch.setattr(audit_helper.audit_logger, "log_action", _fake_log_action)
+    monkeypatch.setitem(vars(audit_helper.audit_logger), "log_action", _fake_log_action)
     return calls
 
 
@@ -130,7 +130,7 @@ class TestRecordWriteback:
         async def _boom(**kwargs):
             raise RuntimeError("queue down")
 
-        monkeypatch.setattr(audit_helper.audit_logger, "log_action", _boom)
+        monkeypatch.setitem(vars(audit_helper.audit_logger), "log_action", _boom)
         ok = await record_writeback(user_id="u", addr_ids="a", old_value=1, new_value=2)
         assert ok is False
 
@@ -210,12 +210,16 @@ class TestRecordQueryExecution:
 
     @pytest.mark.asyncio
     async def test_query_execution_custom_action_label(self, fake_redis, captured_logs):
-        """Batch execution logs a different action label but still throttles."""
+        """A caller-supplied action label is what gets logged, while throttling still applies.
+
+        (The original caller of a custom label, ``custom_query.batch_execute``, was deleted in
+        advanced-query-linkage-closure task 6; the parameter itself is kept and tested here.)
+        """
         await record_query_execution(
-            redis=fake_redis, user_id="user-1", source="batch:D2,D3",
-            filters={}, details={"total": 2}, action="custom_query.batch_execute",
+            redis=fake_redis, user_id="user-1", source="workpaper:D2",
+            filters={}, details={"total": 2}, action="custom_query.template_execute",
         )
-        assert captured_logs[0]["action"] == "custom_query.batch_execute"
+        assert captured_logs[0]["action"] == "custom_query.template_execute"
 
     @pytest.mark.asyncio
     async def test_different_source_not_throttled(self, fake_redis, captured_logs):

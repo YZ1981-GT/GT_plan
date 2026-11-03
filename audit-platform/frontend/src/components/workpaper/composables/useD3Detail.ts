@@ -19,6 +19,7 @@
  * Requirements: 4.1-4.12, 5.1-5.7, 6.1-6.5, 18.4
  * Aging Config Requirements: 5.1, 5.2, 5.3, 5.4
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -84,7 +85,7 @@ const ITEM_ID_TB_AMOUNT = 'D3-adj-trial-balance-amount'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 /** 安全解析 JSON 数组（使用动态 segments 进行迁移） */

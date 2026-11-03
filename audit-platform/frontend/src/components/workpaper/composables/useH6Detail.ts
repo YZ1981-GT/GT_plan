@@ -247,6 +247,47 @@ export function seedBalanceFromNetBook(
   }
 }
 
+/** store 行 → 表单行（加载后重算公式列）。纯函数，不碰 store。 */
+export function normalizeH6DetailRow(raw: any, idx: number): H6DetailRow {
+  const cost = Number(raw.originalCost) || 0
+  const dep = Number(raw.accumulatedDepreciation ?? raw.accDepreciation ?? raw.accDep) || 0
+  const impair = Number(raw.impairmentProvision ?? raw.impairment) || 0
+  const income = Number(raw.disposalIncome) || 0
+  const expenses = Number(raw.disposalExpenses) || 0
+  const tax = Number(raw.taxAmount ?? raw.tax) || 0
+  const status = H6_DETAIL_STATUS_OPTIONS.includes(raw.status) ? raw.status : '清理中'
+
+  const netBookValue = calcNetBookValue(cost, dep, impair)
+  const gainLoss = calcDisposalGainLoss(income, netBookValue, expenses, tax)
+  const bal = seedBalanceFromNetBook(netBookValue, status, raw)
+  const formulas = applyH62BalanceFormulas(bal)
+
+  return {
+    rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    seq: raw.seq ?? idx + 1,
+    assetName: raw.assetName ?? '',
+    originalCost: cost,
+    accumulatedDepreciation: dep,
+    impairmentProvision: impair,
+    netBookValue,
+    disposalReason: raw.disposalReason ?? '',
+    startDate: raw.startDate ?? '',
+    disposalIncome: income,
+    disposalExpenses: expenses,
+    taxAmount: tax,
+    gainLoss,
+    transferAccount: raw.transferAccount ?? '',
+    completionDate: raw.completionDate ?? '',
+    status,
+    refH1Code: raw.refH1Code ?? raw.h1Reference ?? '',
+    refH10Code: raw.refH10Code ?? raw.h10Reference ?? '',
+    ...bal,
+    ...formulas,
+    overOneYearProgress: raw.overOneYearProgress ?? '',
+    remarks: raw.remarks ?? '',
+  }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useH6Detail(params: {
@@ -275,45 +316,9 @@ export function useH6Detail(params: {
     try { return JSON.parse(raw) } catch { return raw }
   }
 
-  /** 规范化行（加载后重算公式列） */
+  /** 规范化行（模块级纯函数 normalizeH6DetailRow；这里留函数声明，提升） */
   function _normalizeRow(raw: any, idx: number): H6DetailRow {
-    const cost = Number(raw.originalCost) || 0
-    const dep = Number(raw.accumulatedDepreciation ?? raw.accDepreciation ?? raw.accDep) || 0
-    const impair = Number(raw.impairmentProvision ?? raw.impairment) || 0
-    const income = Number(raw.disposalIncome) || 0
-    const expenses = Number(raw.disposalExpenses) || 0
-    const tax = Number(raw.taxAmount ?? raw.tax) || 0
-    const status = H6_DETAIL_STATUS_OPTIONS.includes(raw.status) ? raw.status : '清理中'
-
-    const netBookValue = calcNetBookValue(cost, dep, impair)
-    const gainLoss = calcDisposalGainLoss(income, netBookValue, expenses, tax)
-    const bal = seedBalanceFromNetBook(netBookValue, status, raw)
-    const formulas = applyH62BalanceFormulas(bal)
-
-    return {
-      rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      seq: raw.seq ?? idx + 1,
-      assetName: raw.assetName ?? '',
-      originalCost: cost,
-      accumulatedDepreciation: dep,
-      impairmentProvision: impair,
-      netBookValue,
-      disposalReason: raw.disposalReason ?? '',
-      startDate: raw.startDate ?? '',
-      disposalIncome: income,
-      disposalExpenses: expenses,
-      taxAmount: tax,
-      gainLoss,
-      transferAccount: raw.transferAccount ?? '',
-      completionDate: raw.completionDate ?? '',
-      status,
-      refH1Code: raw.refH1Code ?? raw.h1Reference ?? '',
-      refH10Code: raw.refH10Code ?? raw.h10Reference ?? '',
-      ...bal,
-      ...formulas,
-      overOneYearProgress: raw.overOneYearProgress ?? '',
-      remarks: raw.remarks ?? '',
-    }
+    return normalizeH6DetailRow(raw, idx)
   }
 
   function load(): void {

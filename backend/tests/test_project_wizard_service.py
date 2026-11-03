@@ -389,3 +389,30 @@ class TestConfirmProject:
             await svc.confirm_project(project.id, db_session)
         assert exc_info.value.status_code == 400
         assert "planning" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("template_type", "report_scope"),
+        [("listed", "consolidated"), ("listed", "standalone"), ("soe", "consolidated")],
+    )
+    async def test_confirm_keeps_wizard_standard(
+        self, db_session: AsyncSession, template_type: str, report_scope: str
+    ):
+        """确认后准则与向导填的一致：原先一确认就被改成国企单户（spec consol-autotree-residual-closure R6）。"""
+        from app.services import project_wizard_service as svc
+
+        project = await svc.create_project(
+            _make_basic_info(template_type=template_type, report_scope=report_scope), db_session
+        )
+        await db_session.commit()
+
+        confirmed = await svc.confirm_project(project.id, db_session)
+
+        assert (confirmed.template_type, confirmed.report_scope) == (template_type, report_scope)
+        assert confirmed.applicable_standard_v2 == {
+            "entity_type": template_type,
+            "scope": report_scope,
+            "stage": "normal",
+        }
+        data = confirmed.wizard_state["steps"]["basic_info"]["data"]
+        assert (data["template_type"], data["report_scope"]) == (template_type, report_scope)

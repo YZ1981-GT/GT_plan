@@ -91,13 +91,13 @@ class TestOfflineRoundTripUAT:
         matched = [d for d in diffs if d.match_status == MatchStatus.MATCHED]
         assert len(matched) == 60
 
-        # Step 5: 应用导入（全部 keep — 完整 round-trip 应无变化）
+        # Step 5: 同一文件覆盖导回不产生实际变化，回执必须为 0（不能拿计划章节数冒充写入数）
         decisions = {
             f"section_{i}": ConflictResolution.OVERWRITE for i in range(60)
         }
         result = apply_import(xlsx_bytes, sections, decisions)
         assert result.success is True
-        assert result.sections_imported == 60
+        assert result.sections_imported == 0 and result.tables_written == 0
 
     def test_modified_sections_diff_detected(self):
         """成员修改部分章节 → diff 应正确检测出修改."""
@@ -188,12 +188,11 @@ class TestOfflineRoundTripUAT:
         original = [_make_realistic_section("s1", "Test", n_rows=3)]
 
         modified = [_make_realistic_section("s1", "Test", n_rows=3)]
-        # Modify two cells in modified
-        modified[0]["table_data"]["rows"][0]["cells"][1] = 999.0
-        modified[0]["table_data"]["rows"][1]["cells"][1] = 888.0
+        # 修改第 0 行第 1 个 value（cell key 0:1；标签列不计入 value 索引）
+        modified[0]["table_data"]["rows"][0]["values"][1] = 999.0
+        modified[0]["table_data"]["rows"][0]["cells"][2] = 999.0
         modified_xlsx, _ = export_sections_to_xlsx(modified)
 
-        # Apply MERGE: only import cell 0:1 (not 1:1)
         result = apply_import(
             modified_xlsx,
             original,
@@ -203,3 +202,4 @@ class TestOfflineRoundTripUAT:
         assert result.success is True
         assert result.sections_imported == 1
         assert result.conflicts == 1
+        assert result.applied_sections["s1"]["rows"][0]["values"][1] == 999.0

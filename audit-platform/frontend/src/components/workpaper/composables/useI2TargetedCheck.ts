@@ -2,7 +2,7 @@
  * useI2TargetedCheck — I2-12 开（研）发支出针对性检查表
  * 样本选取 + 凭证核对 1~5 + 检查比例（可联动 I2-2 本期资本化增加）
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import {
   type I2TargetedCheckRow,
   type I2TargetedSampleMeta,
@@ -25,6 +25,11 @@ import {
   hasFailedCheck,
   I2_12_DEFAULT_COVERAGE_THRESHOLD,
 } from './i2TargetedCheckModel'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillOutcome, type FillSample, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { hasTargetedCheckContent, preparedAsSample } from './assetVoucherFill'
 
 export {
   type I2TargetedCheckRow,
@@ -97,6 +102,9 @@ export function useI2TargetedCheck(
   allResponses: Ref<Map<string, any>> | (() => Map<string, any>),
   options?: {
     saveResponse?: (sheetCode: string, data: Record<string, any>) => Promise<void>
+    projectId?: MaybeRefOrGetter<string | null | undefined>
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: MaybeRefOrGetter<boolean | undefined>
   },
 ) {
   const getMap = typeof allResponses === 'function'
@@ -111,7 +119,8 @@ export function useI2TargetedCheck(
 
   function load() {
     const map = getMap()
-    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(normalizeI2TargetedRow)
+    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(r => withRowMeta(normalizeI2TargetedRow(r), r))
+    voucherFill.markLoaded()
 
     sampleMeta.value = normalizeI2TargetedSampleMeta(_parseObject(map.get(STORAGE_SAMPLE)))
 
@@ -132,6 +141,37 @@ export function useI2TargetedCheck(
       const linked = extractI2CapIncreaseTotal(map.get(I22_ROWS))
       if (linked > 0) sampleMeta.value.populationAmount = linked
     }
+  }
+
+  /** 回填期间先不保存：回填后还要记抽样说明，改完一并保存一次（`onEngineFilled`） */
+  let holdPersist = false
+  /**
+   * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（凭证检查表，一行一个对方科目）。改完整页保存
+   * （与「保存」同一次写入）：父组件存一项就改一项 allResponses、本函数的 watch 随即整页重读，只存行会把未保存的
+   * 抽样说明读回旧值。原实现回填只改内存（不点保存就丢），按「日期 + 凭证号」去重（同一凭证的其他分录被丢掉）
+   */
+  const voucherFill = useVoucherCheckFill<I2TargetedCheckRow>({
+    projectId: () => toValue(options?.projectId),
+    tables: rows,
+    mapSampleToRow: item => mapSampledToI2TargetedRow(preparedAsSample(item)),
+    persist: () => (holdPersist ? undefined : persistAll()),
+    hasUserContent: hasTargetedCheckContent,
+    readonly: () => toValue(options?.isReadonly) === true,
+  })
+
+  /** 抽凭引擎回填：`onFilled` 收到底稿实际填入的行数（记抽样说明），之后整页保存一次 */
+  async function onEngineFilled(payload: EngineFilledPayload, onFilled?: (added: number) => void): Promise<FillOutcome> {
+    holdPersist = true
+    let out: FillOutcome
+    try {
+      out = await voucherFill.onEngineFilled(payload)
+    } finally {
+      holdPersist = false
+    }
+    if (out.cancelled) return out
+    onFilled?.(out.added)
+    await persistAll()
+    return out
   }
 
   watch(() => {
@@ -177,38 +217,17 @@ export function useI2TargetedCheck(
   }
 
   function removeRow(rowId: string) {
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    rows.value = rows.value.filter((r) => r.rowId !== rowId || voucherFill.isRowLocked(r))
   }
 
   function updateRow(rowId: string, field: keyof I2TargetedCheckRow, value: string | number | boolean) {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     if ((field === 'check1' || field === 'check2' || field === 'check3' || field === 'check4' || field === 'check5')
       && value === '×' && !isAbnormalFlag(row.isAbnormal)) {
       row.isAbnormal = '是'
     }
-  }
-
-  /** 抽凭引擎回填 */
-  function fillFromSampledVouchers(samples: any[]): number {
-    if (!Array.isArray(samples) || !samples.length) return 0
-    const existing = new Set(
-      rows.value.map((r) => `${r.voucherDate}|${r.voucherNo}`).filter((k) => k !== '|'),
-    )
-    let n = 0
-    for (const s of samples) {
-      const mapped = mapSampledToI2TargetedRow(s)
-      const key = `${mapped.voucherDate}|${mapped.voucherNo}`
-      if (key !== '|' && existing.has(key)) continue
-      rows.value.push(mapped)
-      if (key !== '|') existing.add(key)
-      n++
-    }
-    if (n > 0 && !sampleMeta.value.sampleSize) {
-      sampleMeta.value.sampleSize = rows.value.length
-    }
-    return n
   }
 
   function setPopulationAmount(amount: number, manual: boolean) {
@@ -253,7 +272,7 @@ export function useI2TargetedCheck(
       sampleMeta.value.sampleSize = rows.value.length
     }
     await options.saveResponse('I2-12', {
-      [STORAGE_ROWS]: JSON.stringify(rows.value),
+      [STORAGE_ROWS]: JSON.stringify(voucherFill.guardPersist(rows.value)),
       [STORAGE_SAMPLE]: JSON.stringify(sampleMeta.value),
       [STORAGE_RISK]: JSON.stringify(riskFocus.value),
       [STORAGE_NOTE]: auditNote.value,
@@ -290,7 +309,6 @@ export function useI2TargetedCheck(
     addRow,
     removeRow,
     updateRow,
-    fillFromSampledVouchers,
     setPopulationAmount,
     syncPopulationFromI22,
     appendAdjDraftsToNote,
@@ -299,6 +317,12 @@ export function useI2TargetedCheck(
     saveNote,
     saveConclusion,
     load,
+    onEngineFilled,
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

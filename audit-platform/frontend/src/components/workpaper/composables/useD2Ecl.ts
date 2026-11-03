@@ -93,7 +93,7 @@ function generateRowId(): string {
   return `ecl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function createEmptySingleRow(): EclSingleRow {
+export function createEmptySingleRow(): EclSingleRow {
   return {
     rowId: generateRowId(),
     debtorName: '',
@@ -135,7 +135,7 @@ function createDefaultMigrationMatrix(): MigrationRateRow[] {
 }
 
 /** 重算单行ECL公式 */
-function recalcSingleRow(row: EclSingleRow): EclSingleRow {
+export function recalcSingleRow(row: EclSingleRow): EclSingleRow {
   row.shouldProvision = calculateProvision(row.auditedBalance, row.expectedLossRate)
   row.difference = calculateDifference(row.actualBalance, row.shouldProvision)
   return row

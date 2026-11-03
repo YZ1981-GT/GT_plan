@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import FinancialReportType, ReportConfig
+from app.services.formula_settings.definitions import same_exec
 
 FORMULA_FIELDS = ("formula", "aje_formula", "rje_formula", "formula_category",
                   "formula_description", "formula_source")
@@ -58,17 +59,29 @@ async def load_effective_report_configs(
         return q
 
     base_rows = list((await db.execute(_q(standard))).scalars().all())
+    base_layer = "project" if standard.startswith("project:") else "global"
     if project_id is None or standard.startswith("project:"):
-        return sorted(base_rows, key=_sort_key)
+        return sorted(
+            (_with_effective_metadata(_copy(row), source=row, layer=base_layer) for row in base_rows),
+            key=_sort_key,
+        )
     project_rows = list((await db.execute(_q(project_standard(project_id)))).scalars().all())
     if not project_rows:
-        return sorted(base_rows, key=_sort_key)
-    merged: dict[tuple, ReportConfig] = {(r.report_type, r.row_code): r for r in base_rows}
+        return sorted(
+            (_with_effective_metadata(_copy(row), source=row, layer="global") for row in base_rows),
+            key=_sort_key,
+        )
+    merged: dict[tuple, ReportConfig] = {
+        (row.report_type, row.row_code): _with_effective_metadata(_copy(row), source=row, layer="global")
+        for row in base_rows
+    }
     for p in project_rows:
         key = (p.report_type, p.row_code)
         g = merged.get(key)
         if g is None:
-            merged[key] = p  # 本项目独有行
+            merged[key] = _with_effective_metadata(
+                _copy(p), source=p, layer=_effective_layer(p, None),
+            )
             continue
         eff = _copy(g)
         for f in FORMULA_FIELDS:
@@ -77,7 +90,9 @@ async def load_effective_report_configs(
         eff.applicable_standard = p.applicable_standard
         eff.base_origin = p.base_origin
         eff.pinned = p.pinned
-        merged[key] = eff
+        merged[key] = _with_effective_metadata(
+            eff, source=p, layer=_effective_layer(p, g),
+        )
     return sorted(merged.values(), key=_sort_key)
 
 
@@ -86,3 +101,40 @@ def group_by_type(rows: list[ReportConfig]) -> dict[FinancialReportType, list[Re
     for r in rows:
         out.setdefault(r.report_type, []).append(r)
     return out
+
+
+# S5：有效报表配置是未挂会话的结构视图，仍须保留公式实际来源，
+# 供 provenance identity 生成器读取，禁止从合并后的字段猜来源层。
+def _execution_definition(row: ReportConfig) -> dict[str, object]:
+    return {
+        "formula": row.formula,
+        "aje_formula": row.aje_formula,
+        "rje_formula": row.rje_formula,
+        "formula_category": row.formula_category,
+    }
+
+
+def _effective_layer(project_row: ReportConfig | None, base_row: ReportConfig | None) -> str:
+    if project_row is None:
+        return "global"
+    if project_row.pinned:
+        return "pinned"
+    if project_row.base_origin == "template" and same_exec(
+        "report", _execution_definition(project_row), project_row.base_definition,
+    ):
+        return "template"
+    if base_row is not None and same_exec(
+        "report", _execution_definition(project_row), _execution_definition(base_row),
+    ):
+        return "global"
+    return "project"
+
+
+def _with_effective_metadata(
+    effective: ReportConfig, *, source: ReportConfig, layer: str,
+) -> ReportConfig:
+    """附加非映射执行元数据；对象是 detached copy，不会写回 report_config。"""
+    effective.effective_source_id = source.id
+    effective.effective_definition_version = source.formula_version
+    effective.effective_definition_layer = layer
+    return effective

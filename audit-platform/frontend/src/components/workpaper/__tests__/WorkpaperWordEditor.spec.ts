@@ -97,6 +97,11 @@ const globalStubs = {
 
 import WorkpaperWordEditor from '../WorkpaperWordEditor.vue'
 
+/** 推荐版本接口的真实形状（wp_editor_router.get_a16_recommended_version；后端 always_required 恒含 A16-7） */
+function recommendation(code: string, alwaysRequired: string[] = ['A16-7']) {
+  return { recommended_code: code, recommended_label: code, all_versions: [], always_required: alwaysRequired }
+}
+
 function createWrapper(props: any = {}) {
   return mount(WorkpaperWordEditor, {
     props: {
@@ -117,7 +122,7 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
     // Default: project info returns basic data, no recommendation
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/a16/recommended-version')) {
-        return Promise.resolve({ main: { code: 'A16-3', label: 'IPO申报' }, supplement: null })
+        return Promise.resolve(recommendation('A16-3'))
       }
       if (url.includes('/projects/')) {
         return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31', audit_year: '2025' })
@@ -229,31 +234,68 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
       expect(toggle.exists()).toBe(true)
     })
 
-    it('补充区默认禁用时显示提示文案', async () => {
-      // No supplement recommendation
-      mockApiGet.mockImplementation((url: string) => {
-        if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+    it('用户关过补充声明：再次打开仍关闭（字段覆盖 enabled 优先于 always_required），显示提示文案', async () => {
+      mockApiGet.mockImplementation((url: string, config?: any) => {
+        if (url.includes('/a16/recommended-version')) return Promise.resolve(recommendation('A16-1'))
+        if (url.includes('/field-overrides')) {
+          return Promise.resolve(config?.params?.scope === 'word_template:A16:A16-7' ? { enabled: { value: 'false' } } : {})
         }
-        if (url.includes('/projects/')) {
-          return Promise.resolve({ client_name: '测试公司' })
-        }
+        if (url.includes('/projects/')) return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
         return Promise.resolve(null)
       })
 
       const wrapper = createWrapper()
       await flushPromises()
 
+      expect((wrapper.vm as any).supplementEnabled).toBe(false)
       const hint = wrapper.find('.gt-wp-word-editor__supplement-hint')
       expect(hint.exists()).toBe(true)
       expect(hint.text()).toContain('关联交易')
+      // 读的是补充声明自己的字段覆盖（与主版本 selected_version 不同 scope），年度取项目审计年度
+      expect(mockApiGet).toHaveBeenCalledWith('/api/workpapers/field-overrides', expect.objectContaining({
+        params: expect.objectContaining({ year: 2025, scope: 'word_template:A16:A16-7' }),
+      }))
+    })
+
+    it('没有记录时按 always_required：含 A16-7 打开、不含则关闭', async () => {
+      for (const [alwaysRequired, expected] of [[['A16-7'], true], [[], false]] as const) {
+        mockApiGet.mockImplementation((url: string) => {
+          if (url.includes('/a16/recommended-version')) return Promise.resolve(recommendation('A16-1', [...alwaysRequired]))
+          if (url.includes('/field-overrides')) return Promise.resolve({})
+          if (url.includes('/projects/')) return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
+          return Promise.resolve(null)
+        })
+        const wrapper = createWrapper()
+        await flushPromises()
+        expect((wrapper.vm as any).supplementEnabled).toBe(expected)
+        wrapper.unmount()
+      }
+    })
+
+    it('旧响应形状 { main, supplement } 不再生效（去重后已无来源）', async () => {
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/a16/recommended-version')) {
+          return Promise.resolve({ main: { code: 'A16-3', label: 'IPO申报' }, supplement: { code: 'A16-7' } })
+        }
+        if (url.includes('/projects/')) return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
+        if (url.includes('/field-overrides')) return Promise.resolve({})
+        return Promise.resolve(null)
+      })
+
+      const wrapper = createWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      expect(vm.recommendedCode).toBe('')
+      expect(vm.supplementEnabled).toBe(false)
+      expect(wrapper.findAll('.el-radio-button').some((el) => el.text().includes('推荐'))).toBe(false)
     })
 
     it('补充区启用后显示独立操作栏', async () => {
       // Supplement is recommended
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: { code: 'A16-7' } })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -280,7 +322,7 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
     it('toggle 切换持久化 field_overrides enabled', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
@@ -311,7 +353,7 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
     it('项目未设置审计年度：不写 field_overrides（后端 year 必填），提示先填年度', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -336,7 +378,7 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
     it('A16-7 签回 scope 独立于主版本', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: { code: 'A16-7' } })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -401,7 +443,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
     it('切换版本时 POST field_overrides 持久化 selected_version', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
@@ -447,7 +489,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
     it('加载时优先使用持久化的 selected_version（覆盖推荐）', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-3', label: 'IPO申报' }, supplement: null })
+          return Promise.resolve(recommendation('A16-3'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
@@ -486,7 +528,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
 
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-3' }, supplement: null })
+          return Promise.resolve(recommendation('A16-3'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -528,7 +570,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
       let callCount = 0
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/file-info')) {
           callCount++
@@ -568,7 +610,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
     it('版本 A 的 signed 不继承到版本 B', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-2' }, supplement: null })
+          return Promise.resolve(recommendation('A16-2'))
         }
         if (url.includes('/file-info')) {
           if (url.includes('version=A16-2')) {
@@ -611,7 +653,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
     it('sign_status API 调用使用正确的 per-version scope', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -676,7 +718,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
     vi.clearAllMocks()
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/a16/recommended-version')) {
-        return Promise.resolve({ main: { code: 'A16-1', label: '一般财报' }, supplement: null })
+        return Promise.resolve(recommendation('A16-1'))
       }
       if (url.includes('/projects/')) {
         return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31' })
@@ -760,7 +802,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
       // Enable supplement
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: { code: 'A16-7' } })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -813,7 +855,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
           return Promise.resolve({ healthy: false })
         }
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -963,7 +1005,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
       // Enable supplement
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/a16/recommended-version')) {
-          return Promise.resolve({ main: { code: 'A16-1' }, supplement: { code: 'A16-7' } })
+          return Promise.resolve(recommendation('A16-1'))
         }
         if (url.includes('/projects/')) {
           return Promise.resolve({ client_name: '测试公司' })
@@ -1025,7 +1067,7 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
     vi.clearAllMocks()
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/a16/recommended-version')) {
-        return Promise.resolve({ main: { code: 'A16-1', label: '一般财报' }, supplement: { code: 'A16-7' } })
+        return Promise.resolve(recommendation('A16-1'))
       }
       if (url.includes('/projects/')) {
         return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31', audit_year: '2025' })
@@ -1086,7 +1128,7 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
   it('无审计报告日期时降级使用 audit_period_end', async () => {
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/a16/recommended-version')) {
-        return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+        return Promise.resolve(recommendation('A16-1'))
       }
       if (url.includes('/projects/')) {
         return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31' })
@@ -1254,7 +1296,7 @@ describe('Feature: word-template-dual-mode, Property 13: dual-mode scope', () =>
     // Mock all API calls to avoid network errors
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/a16/recommended-version')) {
-        return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+        return Promise.resolve(recommendation('A16-1'))
       }
       if (url.includes('/projects/')) {
         return Promise.resolve({ client_name: '测试', audit_period_end: '2025-12-31', audit_year: '2025' })
@@ -1361,7 +1403,7 @@ describe('WorkpaperWordEditor — dual-mode unit tests', () => {
     ;(window as any).DocsAPI = undefined
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/a16/recommended-version')) {
-        return Promise.resolve({ main: { code: 'A8-1' }, supplement: null })
+        return Promise.resolve(recommendation('A8-1'))
       }
       if (url.includes('/projects/')) {
         return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31', audit_year: '2025' })

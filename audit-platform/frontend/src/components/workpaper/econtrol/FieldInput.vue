@@ -8,7 +8,8 @@
 
 <script lang="ts">
 import { defineComponent, h } from 'vue'
-import { ElInput, ElInputNumber, ElSelect, ElOption } from 'element-plus'
+import { ElOption } from 'element-plus'
+import { ElInput, ElInputNumber, ElSelect } from '@/components/grid/adapters'
 import type { FieldDef } from '../GtEControlTest.types'
 
 export default defineComponent({

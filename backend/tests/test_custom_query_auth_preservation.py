@@ -9,13 +9,12 @@ before and after the fix to confirm no regressions.
 Preservation = when NOT isBugCondition(X), the behavior must remain identical.
 """
 
-import json
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from hypothesis import given, settings, HealthCheck, assume
+from hypothesis import example, given, settings, HealthCheck
 from hypothesis import strategies as st
 
 
@@ -51,6 +50,9 @@ def _mock_db_for_admin(project_id: str):
     # admin path in get_visible_project_ids queries Project.id → .all() returns project list
     mock_exec_result = MagicMock()
     mock_exec_result.all.return_value = [(uuid.UUID(project_id),)]
+    # 报表源（advanced-query-linkage-closure 任务 17）的提示查询取单行（行数, 过期行数）并解包；MagicMock 默认
+    # 迭代为空、解包即 ValueError——给「未生成报表」的结果，让本用例照旧只验证鉴权保持
+    mock_exec_result.one.return_value = (0, 0)
     db.execute.return_value = mock_exec_result
     # OwnershipGuard.assert_target_accessible 成功路径会调用 set_rls_context(db, pid)，
     # 后者读取 db.get_bind().dialect.name。真实 AsyncSession.get_bind() 是同步返回；
@@ -72,6 +74,8 @@ def _mock_db_for_admin(project_id: str):
     project_id=st_project_id,
     source=st_source,
 )
+# 报表源固定必跑（任务 17 起它走注册表、多一条提示查询），不靠随机抽样碰上
+@example(project_id=str(uuid.UUID(int=1)), source="report")
 async def test_admin_execute_returns_result(project_id, source):
     """Property 2a: Preservation — admin user on any project returns query results.
 
@@ -122,6 +126,7 @@ async def test_admin_execute_returns_result(project_id, source):
     project_id=st_project_id,
     source=st_source,
 )
+@example(project_id=str(uuid.UUID(int=1)), source="report")
 async def test_partner_execute_returns_result(project_id, source):
     """Property 2b: Preservation — partner user on any project returns query results.
 
@@ -295,57 +300,96 @@ async def test_cell_writeback_optimistic_lock_conflict(wp_code):
 
 
 # ---------------------------------------------------------------------------
-# Property 2e: tb module non-audited_amount WritebackPermissionDenied (3.7)
+# Property 2e: tb / adj / report 写回已删除 → 请求模型 422，写入方不被调用
+# （advanced-query-linkage-closure 任务 13，ADR-AQL-02。原用例断言「tb 模块写非 G 列 → 403」，
+#  而 tb 写入实现绕开了 TB 发布门、已删除；保留的契约是：这三个模块在请求层即被拒收）
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_tb_non_audited_amount_permission_denied():
-    """Property 2e: Preservation — tb module non-audited_amount column returns 403.
+@pytest.mark.parametrize("module", ["tb", "adj", "report"])
+async def test_retired_cell_writeback_returns_410_without_calling_writer(module, monkeypatch):
+    """HTTP 写入口整体退役：请求体是否合法都只返回稳定 410，写入方零调用。"""
+    from httpx import ASGITransport, AsyncClient
 
-    The existing WritebackPermissionDenied for non-audited_amount columns
-    in tb module must continue to work.
+    from app.core.database import get_db
+    from app.deps import get_current_user
+    from app.routers import custom_query
+    from app.services.custom_query.snapshot_writer import SnapshotWriter
+    from tests.authz_world import build_app
 
-    **Validates: Requirements 3.7**
+    calls: list[dict] = []
 
-    EXPECTED: This test PASSES on both unfixed and fixed code.
-    """
-    from fastapi import HTTPException
-    from app.routers.custom_query import cell_writeback
-    from app.services.custom_query.snapshot_writer import WritebackPermissionDenied
+    async def _spy(self, **kwargs):
+        calls.append(kwargs)
+        return {"success": True, "updated_at": None, "old_value": None}
 
+    # 在类上替换（单例实例上替换，撤销时会把原方法写成实例属性，挡住之后的类级替换）
+    monkeypatch.setattr(SnapshotWriter, "write_cell", _spy)
+    api = build_app(custom_query.router)
     user = _make_user(role="admin")
-    project_id = str(uuid.uuid4())
 
+    async def _user():
+        return user
+
+    async def _db():
+        yield AsyncMock()
+
+    api.dependency_overrides[get_current_user] = _user
+    api.dependency_overrides[get_db] = _db
+    body = {
+        "project_id": str(uuid.uuid4()), "wp_code": "TB-001", "sheet_name": "试算表", "cell_ref": "G2",
+        "new_value": 999.99, "module": module,
+    }
+    async with AsyncClient(transport=ASGITransport(app=api), base_url="http://aql-b4") as client:
+        response = await client.post(
+            "/api/custom-query/cell-writeback", json=body, headers={"X-File-Opened-At": "2024-01-01T00:00:00Z"},
+        )
+
+    assert response.status_code == 410, response.text
+    assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
+    assert calls == [], f"退役端点不应调用写入方：{calls}"
+
+
+# ---------------------------------------------------------------------------
+# Property 2f: 目标不在请求项目 → 404 WRITEBACK_TARGET_NOT_FOUND（advanced-query-linkage-closure 任务 14，R4.2）
+# 两条来路同一错误码：router 按 (wp_code, 请求项目) 查不到底稿；写入方取行带项目条件查不到（WritebackTargetNotFound）
+# ---------------------------------------------------------------------------
+
+def _writeback_body(project_id: str):
     body = MagicMock()
-    body.wp_code = "TB-001"
-    body.sheet_name = "试算表"
-    body.cell_ref = "C5"  # non-audited_amount column
-    body.new_value = 999.99
-    body.module = "tb"
-    body.project_id = project_id
+    body.wp_code, body.sheet_name, body.cell_ref, body.new_value = "D2", "审定表", "B7", 1
+    body.module, body.project_id = "workpaper", project_id
+    body.note_record_id = body.note_section_id = body.note_year = body.note_node_key = None
+    return body
 
-    response = MagicMock()
-    response.headers = {}
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["router_lookup", "writer_lookup"])
+async def test_cell_writeback_target_not_in_project_maps_to_404(source):
+    from fastapi import HTTPException
+
+    from app.routers.custom_query import cell_writeback
+    from app.services.custom_query.snapshot_writer import WritebackTargetNotFound
+
+    project_id = str(uuid.uuid4())
     request = MagicMock()
     request.headers = {"X-File-Opened-At": "2024-01-01T00:00:00Z"}
-
-    # db mock: admin visibility check passes
+    visibility = MagicMock()
+    visibility.all.return_value = [(uuid.UUID(project_id),)]
+    lookup = MagicMock()
+    lookup.first.return_value = None if source == "router_lookup" else (uuid.uuid4(),)
     db = AsyncMock()
-    visibility_result = MagicMock()
-    visibility_result.all.return_value = [(uuid.UUID(project_id),)]
-    db.execute.return_value = visibility_result
-
-    # Mock snapshot_writer to raise WritebackPermissionDenied
-    perm_denied = WritebackPermissionDenied("Only audited_amount column is writable in tb module")
+    db.execute.side_effect = [visibility, lookup]
 
     with patch("app.services.custom_query.snapshot_writer.snapshot_writer") as mock_sw:
-        mock_sw.write_cell = AsyncMock(side_effect=perm_denied)
-
+        mock_sw.write_cell = AsyncMock(side_effect=WritebackTargetNotFound("wp"))
         with pytest.raises(HTTPException) as exc_info:
-            await cell_writeback(
-                body=body, response=response, request=request, db=db, current_user=user
-            )
+            await cell_writeback(body=_writeback_body(project_id), response=MagicMock(headers={}), request=request,
+                                 db=db, current_user=_make_user(role="admin"))
 
-        assert exc_info.value.status_code == 403, (
-            f"WritebackPermissionDenied should map to 403. Got: {exc_info.value.status_code}"
-        )
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == {"error_code": "WRITEBACK_TARGET_NOT_FOUND", "message": "目标不存在或不属于本项目"}
+    if source == "writer_lookup":
+        db.rollback.assert_awaited()
+    else:
+        mock_sw.write_cell.assert_not_called()

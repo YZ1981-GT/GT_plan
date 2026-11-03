@@ -49,6 +49,8 @@
       <div class="gt-rv-dd-section">
         <span class="gt-rv-dd-label">公式：</span>
         <code>{{ drilldownData.formula }}</code>
+        <!-- W6（ADR-AQL-20）：按本报表行的取数科目查试算表明细，结果行可再下钻到序时账 -->
+        <QueryDetailEntry kind="report_row" variant="button" :target="drilldownData" :year="drilldownData.year ?? null" label="按此查询明细" />
       </div>
       <el-table :data="drilldownData.accounts" border size="small" style="margin-top: 12px">
         <el-table-column prop="code" label="科目编码" width="120" />
@@ -138,6 +140,7 @@
 
 <script setup lang="ts">
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import type { ReportDrilldownData } from '@/services/auditPlatformApi'
 import type { LineCompositionData } from '@/views/composables/useReportCellActions'
 

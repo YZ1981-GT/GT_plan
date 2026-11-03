@@ -1,23 +1,25 @@
 """A16 智能模板选择 — 纯逻辑，无 DB 访问.
 
-根据 business_category 关键词推荐 A16 声明书版本。
+按项目分类 / 专项场景（``project_classification`` 单一解释）推荐 A16 声明书版本。
+原先按 ``business_category`` 自由文本找关键词（IPO / 上市 / 新三板 / 企业债）；分类列只放质控分类码后，
+同样的含义来自适用性标签（场景 + A1/A2/A7/B1 等细分类 + 上市公司报表模板）与 B2（债券发行）细分类。
 """
 
 from __future__ import annotations
+
+from app.services.project_classification import ProjectClassification, resolve
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 A16_CATEGORY_MAP: dict[str, str] = {
-    "IPO": "A16-3",
-    "上市": "A16-2",
+    "ipo": "A16-3",
     "listed": "A16-2",
-    "新三板": "A16-5",
-    "企业债": "A16-6",
-    "债券": "A16-6",
+    "neeq": "A16-5",
+    "B2": "A16-6",
 }
-"""keyword → recommended A16 version code."""
+"""适用性标签（或细分类码 B2 债券发行）→ 推荐的 A16 版本；按键顺序优先。"""
 
 A16_DEFAULT = "A16-1"
 """当 business_category 为空或无匹配关键词时的默认版本。"""
@@ -53,20 +55,19 @@ A16_LABELS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def recommend_a16_version(business_category: str | None) -> str:
-    """根据 business_category 推荐 A16 变体 wp_code。
+def recommend_a16_version(project: ProjectClassification | str | None) -> str:
+    """推荐 A16 变体 wp_code。``project`` 是项目分类（推荐）或分类列原值（按 ``resolve`` 解释）。
 
     匹配规则（按 A16_CATEGORY_MAP 键顺序优先）：
-    - 含 "IPO" → A16-3
-    - 含 "上市" 或 "listed" → A16-2
-    - 含 "新三板" → A16-5
-    - 含 "企业债" 或 "债券" → A16-6
-    - 其他（含 None/空串）→ A16-1
+    - IPO（场景 ipo / 细分类 A2 / 迁移前残留的分类值 IPO）→ A16-3
+    - 上市（场景 listed / 细分类 A1、A7 / 上市公司报表模板）→ A16-2
+    - 新三板（场景 transfer / 细分类 B1）→ A16-5
+    - 细分类 B2（债券发行）→ A16-6
+    - 其他（含未填写）→ A16-1
     """
-    if not business_category:
-        return A16_DEFAULT
-    for keyword, version in A16_CATEGORY_MAP.items():
-        if keyword in business_category:
+    classification = project if isinstance(project, ProjectClassification) else resolve(project)
+    for key, version in A16_CATEGORY_MAP.items():
+        if classification.has_tag(key) or classification.category_code == key:
             return version
     return A16_DEFAULT
 

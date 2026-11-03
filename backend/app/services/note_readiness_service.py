@@ -56,32 +56,186 @@ def _load_registry_entries() -> tuple[dict[str, Any], ...]:
         return ()
 
 
+def registry_sections(entry: dict[str, Any], variant: str) -> tuple[str, ...]:
+    """返回注册项在某准则下的全部章节，主章节在前，复数章节稳定去重。
+
+    ``listed_sections`` / ``soe_sections`` 是同一底稿额外写入的章节（如 G1 衍生金融资产、
+    G10 衍生金融负债）。所有注册表消费者必须经本函数取章节，避免单章刷新、stale 与
+    跳转状态只认主章节。
+    """
+    values: list[str] = []
+    primary = entry.get(variant)
+    if isinstance(primary, str) and primary.strip():
+        values.append(primary.strip())
+    nested = entry.get(f"{variant}_sections")
+    if isinstance(nested, dict):
+        for value in nested.values():
+            if isinstance(value, str) and value.strip():
+                values.append(value.strip())
+    return tuple(dict.fromkeys(values))
+
+
 def section_workpaper_map() -> dict[str, list[str]]:
-    """``note_section → [wp_code]``（listed 与 soe 章节各自成键，可一对多）。"""
+    """``note_section → [wp_code]``（主章节与复数章节同等纳入，可一对多）。"""
     out: dict[str, list[str]] = {}
     for e in _load_registry_entries():
         code = str(e.get("wp_code") or "").strip()
         if not code:
             continue
-        for key in ("listed", "soe"):
-            sec = e.get(key)
-            if isinstance(sec, str) and sec.strip():
-                out.setdefault(sec.strip(), [])
-                if code not in out[sec.strip()]:
-                    out[sec.strip()].append(code)
+        for variant in ("listed", "soe"):
+            for sec in registry_sections(e, variant):
+                out.setdefault(sec, [])
+                if code not in out[sec]:
+                    out[sec].append(code)
     return out
 
 
 def section_sheet_map() -> dict[str, str]:
-    """``note_section → 底稿披露 sheet 真实 tab 名``（缺失则不登记，供跳转带 ?sheet=）。"""
+    """``note_section → 底稿披露 sheet``；复数章节沿用该准则的同一披露 sheet。"""
     out: dict[str, str] = {}
     for e in _load_registry_entries():
-        for sec_key, sheet_key in (("listed", "sheet_listed"), ("soe", "sheet_soe")):
-            sec = e.get(sec_key)
+        for variant, sheet_key in (("listed", "sheet_listed"), ("soe", "sheet_soe")):
             sheet = e.get(sheet_key)
-            if isinstance(sec, str) and sec.strip() and isinstance(sheet, str) and sheet.strip():
-                out.setdefault(sec.strip(), sheet.strip())
+            if not isinstance(sheet, str) or not sheet.strip():
+                continue
+            for sec in registry_sections(e, variant):
+                out.setdefault(sec, sheet.strip())
     return out
+
+
+# ---------------------------------------------------------------------------
+# S5 R2：统一映射访问器（ADR-FPE-10）
+# ---------------------------------------------------------------------------
+
+
+class NoteRegistryUnavailable(Exception):
+    """注册表文件不可读或校验失败。"""
+
+
+class ProjectNoteMappingInvalid(Exception):
+    """项目 wizard_state 中的自定义映射格式非法或指向非法条目。"""
+
+
+def _strict_registry_entries() -> tuple[dict[str, Any], ...]:
+    """可被 monkeypatch 的注册表读取入口（供测试替换）。"""
+    return _load_registry_entries()
+
+
+class _SectionResolution:
+    """``resolve_section_workpapers`` 的结果对象。"""
+
+    __slots__ = ("status", "wp_codes", "account_mappings", "error_code")
+
+    def __init__(
+        self,
+        status: str,
+        wp_codes: tuple[str, ...] = (),
+        account_mappings: list[dict[str, Any]] | None = None,
+        error_code: str | None = None,
+    ):
+        self.status = status
+        self.wp_codes = wp_codes
+        self.account_mappings = account_mappings or []
+        self.error_code = error_code
+
+
+async def resolve_section_workpapers(
+    db: AsyncSession, project_id: UUID, section: str,
+) -> _SectionResolution:
+    """按统一访问器取得章节→底稿映射。
+
+    解析顺序：
+    1. 项目 ``wizard_state.note_wp_mapping`` 自定义映射优先；
+    2. 没有自定义映射时，按项目模板类型从注册表读取；
+    3. 保留一章节对应多个 ``wp_code``；
+    4. 通过 ``NoteAccountMappingService`` 读取真实报表行 / 章节 / 底稿。
+    """
+    from app.models.core import Project
+
+    project = (await db.execute(
+        sa.select(Project).where(Project.id == project_id)
+    )).scalar_one_or_none()
+    if project is None:
+        return _SectionResolution("not_found")
+
+    template_type = getattr(project, "template_type", "soe") or "soe"
+    wizard = getattr(project, "wizard_state", None) or {}
+
+    # 1. 项目自定义映射
+    custom = wizard.get("note_wp_mapping") or {}
+    if section in custom:
+        custom_codes = custom[section]
+        if not isinstance(custom_codes, list) or not all(isinstance(c, str) for c in custom_codes):
+            raise ProjectNoteMappingInvalid(
+                f"项目自定义映射 '{section}' 格式非法：{custom_codes!r}"
+            )
+        # 校验自定义映射指向的 wp_code 在注册表中存在
+        known_codes = {str(e.get("wp_code", "")).strip() for e in _strict_registry_entries()}
+        for code in custom_codes:
+            if code not in known_codes:
+                raise ProjectNoteMappingInvalid(
+                    f"项目自定义映射 '{section}' 指向非法底稿编码 '{code}'"
+                )
+        return await _resolve_with_account_mappings(
+            db, template_type, section, tuple(custom_codes),
+        )
+
+    # 2. 注册表映射
+    try:
+        entries = _strict_registry_entries()
+    except Exception as err:
+        raise NoteRegistryUnavailable(str(err)) from err
+
+    if not entries:
+        raise NoteRegistryUnavailable("注册表为空或不可读")
+
+    wp_codes: list[str] = []
+    for entry in entries:
+        code = str(entry.get("wp_code") or "").strip()
+        if not code:
+            continue
+        for variant in ("listed", "soe"):
+            if variant != template_type:
+                continue
+            for sec in registry_sections(entry, variant):
+                if sec == section and code not in wp_codes:
+                    wp_codes.append(code)
+
+    if not wp_codes:
+        return _SectionResolution("not_found")
+
+    return await _resolve_with_account_mappings(
+        db, template_type, section, tuple(wp_codes),
+    )
+
+
+async def _resolve_with_account_mappings(
+    db: AsyncSession,
+    template_type: str,
+    section: str,
+    wp_codes: tuple[str, ...],
+) -> _SectionResolution:
+    """内部：取得底稿后再取报表行映射。"""
+    from app.services.note_account_mapping_service import NoteAccountMappingService
+
+    mapping_service = NoteAccountMappingService(db)
+    try:
+        raw_mappings = await mapping_service.get_mapping_for_section(template_type, section)
+    except Exception:
+        raw_mappings = []
+
+    account_mappings = [
+        {
+            "report_row_code": getattr(m, "report_row_code", None),
+            "note_section_code": getattr(m, "note_section_code", None),
+            "table_index": getattr(m, "table_index", None),
+            "validation_role": getattr(m, "validation_role", None),
+            "wp_code": getattr(m, "wp_code", None),
+            "fetch_mode": getattr(m, "fetch_mode", None),
+        }
+        for m in (raw_mappings or [])
+    ]
+    return _SectionResolution("mapped", wp_codes, account_mappings)
 
 
 # ---------------------------------------------------------------------------

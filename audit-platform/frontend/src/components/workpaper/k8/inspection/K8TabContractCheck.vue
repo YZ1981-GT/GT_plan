@@ -44,21 +44,27 @@
     <!-- ═══ 合同摊销核对表格 ═══ -->
     <el-table :data="rows" border size="small" style="width:100%;font-size:13px" max-height="480" :row-class-name="rowClassName">
       <el-table-column type="index" label="#" width="42" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="currentYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="项目" min-width="110" fixed>
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.projectName" size="small" placeholder="如 律师费" @change="(v: string) => updateCell(row.rowKey, 'projectName', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.projectName" size="small" placeholder="如 律师费" @change="(v: string) => updateCell(row.rowKey, 'projectName', v)" />
           <span v-else>{{ row.projectName || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="对方单位" min-width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateCell(row.rowKey, 'counterparty', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateCell(row.rowKey, 'counterparty', v)" />
           <span v-else>{{ row.counterparty || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="合同内容" min-width="130">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.contractContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractContent', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.contractContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractContent', v)" />
           <span v-else>{{ row.contractContent || '-' }}</span>
         </template>
       </el-table-column>
@@ -70,13 +76,13 @@
       </el-table-column>
       <el-table-column label="实际开票方" min-width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.invoiceParty" size="small" @change="(v: string) => updateCell(row.rowKey, 'invoiceParty', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.invoiceParty" size="small" @change="(v: string) => updateCell(row.rowKey, 'invoiceParty', v)" />
           <span v-else>{{ row.invoiceParty || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="支付条件" min-width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.paymentTerm" size="small" @change="(v: string) => updateCell(row.rowKey, 'paymentTerm', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.paymentTerm" size="small" @change="(v: string) => updateCell(row.rowKey, 'paymentTerm', v)" />
           <span v-else>{{ row.paymentTerm || '-' }}</span>
         </template>
       </el-table-column>
@@ -129,26 +135,27 @@
       </el-table-column>
       <el-table-column label="合同索引" min-width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.contractIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractIndex', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.contractIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractIndex', v)" />
           <span v-else>{{ row.contractIndex || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="凭证索引" min-width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherIndex', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.voucherIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherIndex', v)" />
           <span v-else>{{ row.voucherIndex || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="审计结论" min-width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.conclusion" size="small" @change="(v: string) => updateCell(row.rowKey, 'conclusion', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.conclusion" size="small" @change="(v: string) => updateCell(row.rowKey, 'conclusion', v)" />
           <span v-else>{{ row.conclusion || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="📎" width="70" align="center">
+      <el-table-column label="📎" width="84" align="center">
         <template #default="{ row }">
           <el-button link size="small" :disabled="isReadonly" @click="handleOcrUpload(row.rowKey)">📎</el-button>
           <span v-if="row.ocrAttachment" class="ocr-indicator">✓</span>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowKey)" />
         </template>
       </el-table-column>
       <el-table-column v-if="!isReadonly" label="操作" width="88" align="center" fixed="right">
@@ -179,9 +186,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -233,10 +240,13 @@
  * 源模板 K8-5 为合同费用摊销核对表（合同总月份/本期应计月份/应计损益 vs 已计/差异）。
  * 复用 useK8ContractAmortization（纯摊销计算）。
  */
-import { ref, toRef, inject, computed, defineAsyncComponent } from 'vue'
+import { ref, toRef, inject, computed, defineAsyncComponent, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK8ContractAmortization, type K8AmortRow } from '@/components/workpaper/composables/useK8ContractAmortization'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
+import { combineRowClass, type EngineFilledPayload } from '@/components/workpaper/composables/shared/voucherCheckFill'
 import { useK8AiGenerate } from '@/components/workpaper/composables/useK8AiGenerate'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
@@ -249,6 +259,8 @@ import type { Ref } from 'vue'
  */
 import { k8QueryCodes } from '../../composables/k8AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -267,6 +279,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K8-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
@@ -289,6 +304,7 @@ const {
   updateCell,
   setAmortPeriod,
   saveConclusion,
+  onEngineFilled, onUndoRequest, voucherRowClass, isVoucherRowLocked, voucherFillReady,
 } = useK8ContractAmortization({
   allResponses: toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>,
   projectId: toRef(props, 'projectId'),
@@ -383,9 +399,12 @@ function pushDiffToK83(): void {
 }
 
 // ═══ UI Helpers ═══
-function rowClassName({ row }: { row: K8AmortRow }): string {
+function diffRowClass({ row }: { row: K8AmortRow }): string {
   return Math.abs(row.diff) > 1 ? 'diff-row' : ''
 }
+/** 差异行样式 + 年审阶段预审行只读样式 */
+const rowClassName = combineRowClass(diffRowClass, voucherRowClass)
+onMounted(() => { void voucherFillReady() })
 
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || Math.abs(v) < 0.005) return '-'
@@ -394,13 +413,10 @@ function fmtAmt(v: number | null | undefined): string {
 
 // ═══ 抽凭引擎 ═══
 const showSamplingDialog = ref(false)
-function handleVoucherFilled(payload: any): void {
-  const vouchers = payload?.samples ?? []
-  for (const v of vouchers) {
-    addRow(v.summary || v.voucherNo || '抽凭样本')
-  }
-  showSamplingDialog.value = false
-  if (vouchers.length) ElMessage.success(`已填入${vouchers.length}笔凭证样本`)
+/** 抽凭引擎回填：共享回填函数一笔样本一个合同行，按分录指纹去重，填完由它保存并提示填入几行 */
+async function handleVoucherFilled(payload: EngineFilledPayload): Promise<void> {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ═══ 行级OCR ═══
@@ -417,25 +433,30 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
   const file = input.files?.[0]
   if (!file) return
   input.value = ''
+  const rowKey = currentOcrRowKey
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowKey), rows.value.find((r: K8AmortRow) => r.rowKey === rowKey))
     ElMessage.info('正在OCR识别...')
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    const ocrText = res.data?.data?.text || res.data?.text || ''
-    if (!ocrText) { ElMessage.warning('OCR未识别到文字内容'); return }
+    rowEv.refresh()
+    // 回执正文字段是 ocr_text（原读 text，恒读不到 ⇒ 每次都提示「未识别到文字」）
+    const data = res.data?.data ?? res.data
+    const ocrText: string = data?.ocr_text || ''
+    if (!ocrText) { ElMessage.warning('附件已上传，但OCR未识别到文字内容'); return }
     await ElMessageBox.confirm(
       `OCR识别结果：\n\n${ocrText.slice(0, 500)}${ocrText.length > 500 ? '...' : ''}`,
       'OCR识别确认',
       { confirmButtonText: '填入合同内容', cancelButtonText: '取消', type: 'info' },
     )
-    const row = rows.value.find((r: K8AmortRow) => r.rowKey === currentOcrRowKey)
+    const row = rows.value.find((r: K8AmortRow) => r.rowKey === rowKey)
     if (row) {
       const merged = row.contractContent ? `${row.contractContent}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
-      updateCell(currentOcrRowKey, 'contractContent', merged)
-      updateCell(currentOcrRowKey, 'ocrAttachment', file.name)
+      updateCell(rowKey, 'contractContent', merged)
+      updateCell(rowKey, 'ocrAttachment', file.name)
       ElMessage.success('OCR内容已填入合同内容')
     }
   } catch (err: any) {

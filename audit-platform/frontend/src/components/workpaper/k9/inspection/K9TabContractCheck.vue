@@ -116,15 +116,18 @@
           <span v-else>{{ row.evidence || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isReadonly" label="附件OCR" width="72" align="center">
+      <el-table-column label="附件OCR" width="84" align="center">
         <template #default="{ row }">
           <el-upload
+            v-if="!isReadonly"
             :show-file-list="false"
             :before-upload="(f: File) => handleContractOcr(row, f)"
             accept=".pdf,.jpg,.jpeg,.png"
+            style="display:inline-block"
           >
             <el-button link size="small" type="primary" :loading="ocrLoadingKey === row.rowKey">📎</el-button>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowKey)" />
         </template>
       </el-table-column>
       <el-table-column v-if="!isReadonly" label="" width="55" align="center">
@@ -189,6 +192,8 @@ import { useK9Checks } from '@/components/workpaper/composables/useK9Checks'
 import { generateK9AiText } from '@/components/workpaper/composables/useK9AiText'
 import type { Ref } from 'vue'
 import type { K9ContractCheckRow } from '@/components/workpaper/composables/useK9Checks'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -196,6 +201,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（只读也能看）（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K9-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
@@ -269,9 +277,11 @@ async function handleContractOcr(row: K9ContractCheckRow, file: File): Promise<b
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowKey))
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }, _silent: true,
     } as any)
+    rowEv.refresh()
     const data = res.data?.data ?? res.data
     const fields: Record<string, any> = data?.extracted_fields || {}
     const name = String(fields.contractName ?? fields.counterparty ?? '').trim()

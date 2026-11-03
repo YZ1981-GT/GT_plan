@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG8Adjudication — G8-1 审定表（借方/单分组公允价值/账项调整）
@@ -388,19 +389,10 @@ export function useG8Adjudication(opts: {
     if (_year == null) return
     if (!opts.projectId.value) return
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G8_ACCOUNT_CODE  },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G8_ACCOUNT_CODE),
-      )
-      if (hit) {
-        const debit = parseNum(hit.debit_amount ?? hit.period_debit)
-        const credit = parseNum(hit.credit_amount ?? hit.period_credit)
-        updateTrialBalance(debit - credit)
-      }
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year, accountPrefix: G8_ACCOUNT_CODE })
+      // 1503 其他权益工具投资是资产类：试算平衡表数取期末未审数（原先拿端点没有的借 / 贷发生额算差额，恒 0）
+      const amount = tbSumUnder(list, G8_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount != null) updateTrialBalance(amount)
     } catch { /* optional */ }
   }
 

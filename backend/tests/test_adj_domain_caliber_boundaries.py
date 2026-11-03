@@ -32,6 +32,7 @@ Phase 1 首轮交付后复盘，发现 4 处欠账：
 from __future__ import annotations
 
 import inspect
+import re
 import uuid
 from decimal import Decimal
 
@@ -288,30 +289,34 @@ def test_execute_formula_accepts_and_forwards_adj_map():
 
 
 def test_formula_engine_execute_loads_adj_data():
-    """🔴 `FormulaEngine.execute`（底稿用户自定义公式）必须取调整额。
+    """🔴 `FormulaEngine.execute`（`/api/formula/execute`，底稿用户自定义公式）必须取调整额。
 
-    这是 `from_simple_map(adj_map=...)` 的**唯一生产调用链**。不取的话
-    底稿里写 `ADJ()` 或 `TB(...,'AJE调整')` 恒 0 且无提示。
+    不取的话 `ADJ()` 恒 0 且无提示。
 
-    🔴 判据按**调用链**而非「源码含 adj_net_batch」——取数逻辑已抽到伴生模块
-    `tb_formula_context.load_adj_map_if_needed`（`formula_engine` 是 L1 内核，
-    不该内联 L2 取数）。首版按源码字面判，抽取后立刻误判成"未取数"。
+    🔴 判据按**调用链**而非「源码含 adj_net_batch」—— spec formula-hub-integrity-closure 任务 12（ADR-FHIC-19）起
+    `FormulaEngine.execute` 薄转发中央执行合同，取数统一走预载层：`execute_central` →
+    `preload(…, adj_exclude_origins=frozenset())` → `_load_adj(…, exclude_origins)` → `adj_net_batch`。
+    任务 12 改写：原判据要求 `FormulaEngine.execute` 方法体自己调 `tb_formula_context.load_adj_map_if_needed`、
+    把 `adj_map=adj_map` 传给 `execute_formula` / `from_simple_map` —— 钉住的是自拼上下文那条旧实现（同一处
+    `tb_map` 全列取 `unadjusted_amount` ⇒「审定数」取到未审数，失败恒 `error=None`），把口径改对就打红，旧断言
+    固化了该缺陷。调整额的口径（矩阵第 2 行）与取数源（`adj_net_batch`）不变，判据随调用链改写。
     """
+    from app.services import formula_central_execute, formula_preloader
     from app.services.formula_engine import FormulaEngine
 
-    src = inspect.getsource(FormulaEngine.execute)
-    assert "load_adj_map_if_needed" in src, "未调 L2 取数口 ⇒ 该路径 ADJ() 恒 0"
-    assert "adj_map=adj_map" in src, "取了但没传给 execute_formula"
+    assert "execute_central" in inspect.getsource(FormulaEngine.execute), "未转发中央执行合同"
+    central_src = inspect.getsource(formula_central_execute.execute_central)
     # 口径必须是第 2 行（底稿呈现：不排除 origin）
-    assert "exclude_origins=frozenset()" in src, (
+    assert re.search(r"await\s+preload\([^)]*\badj_exclude_origins=frozenset\(\)", central_src), (
         "底稿用户自定义公式应用矩阵第 2 行口径（不排除 origin），"
         "与 prefill_engine 对齐；用第 4 行会让同一底稿两种 ADJ 得不同的数"
     )
-    # 且那个取数口真的走 adj_net_batch（一路查到底，不止看直接调用）
-    from app.services.tb_formula_context import load_adj_map_if_needed
-
-    loader_src = inspect.getsource(load_adj_map_if_needed)
+    # 口径参数一路传到取数口，且取数口真的走 adj_net_batch（一路查到底，不止看直接调用）
+    preload_src = inspect.getsource(formula_preloader.preload)
+    assert re.search(r"_load_adj\([^)]*\badj_exclude_origins\b", preload_src), "preload 未把口径传给 _load_adj"
+    loader_src = inspect.getsource(formula_preloader._load_adj)
     assert "adj_net_batch" in loader_src, "取数口未走 adj_net_batch 单一真源"
+    assert "exclude_origins=exclude_origins" in loader_src, "取数口丢了口径参数"
 
 
 def test_formula_engine_execute_only_loads_when_needed():

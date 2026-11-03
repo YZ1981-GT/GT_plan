@@ -98,7 +98,10 @@ def test_e104_is_dynamic_row_table() -> None:
     assert E104.SPEC_E104.binding_kind is BindingKind.excel_table
     assert E104.SPEC_E104.uuid_col == "R"
     assert E104.SPEC_E104.row_identity_key == "id"  # E1 侧统一用 id
-    assert E104.SPEC_E104.formula_mask == ("H10:H16", "I10:I16", "K10:K16", "L10:L16")
+    # N = M − K（期末账面余额与银行查询余额的差异；M~Q 自 spec oo-writeback-template-parity-closure R3 受管）
+    assert E104.SPEC_E104.formula_mask == ("H10:H16", "I10:I16", "K10:K16", "L10:L16", "N10:N16")
+    # A 序号是前端按位置编的 auto_source，不能作幽灵行锚点（OO 侧新增行的序号不回写）⇒ 锚点取 B 开户银行
+    assert E104.SPEC_E104.ghost_row_anchor_index == 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════

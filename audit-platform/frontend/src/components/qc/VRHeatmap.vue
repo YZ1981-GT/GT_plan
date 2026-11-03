@@ -46,22 +46,46 @@
       <span class="sev-warning">{{ total.warning }} 警告</span> /
       <span class="sev-info">{{ total.info }} 提示</span>
     </div>
+    <!-- 格子只数「失败」；未执行 / 检查异常 / 不适用另计条数（需求 16.5，后端每行带 status_counts） -->
+    <div class="gt-heatmap-status-total" v-if="otherStateTotals.length">
+      另有：<span v-for="s in otherStateTotals" :key="s.status" class="gt-heatmap-status-count">
+        {{ s.label }} {{ s.count }} 项
+      </span>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { checkStatusLabel, type GateCheckStatus } from '@/utils/consistencyCheckStatus'
+
 interface HeatmapRow {
   cycle: string
   blocking: number
   warning: number
   info: number
+  /** 本循环检查项的五态计数（passed / failed / not_executed / not_applicable / error） */
+  status_counts?: Record<string, number>
 }
 
-defineProps<{
+const props = defineProps<{
   matrix: HeatmapRow[]
   total: { blocking: number; warning: number; info: number } | null
   loading?: boolean
 }>()
+
+const OTHER_STATES: GateCheckStatus[] = ['not_executed', 'error', 'not_applicable']
+
+/** 各循环「失败」以外三种非通过状态的合计，只列有的 */
+const otherStateTotals = computed(() =>
+  OTHER_STATES
+    .map(status => ({
+      status,
+      label: checkStatusLabel({ status }),
+      count: props.matrix.reduce((n, row) => n + (row.status_counts?.[status] ?? 0), 0),
+    }))
+    .filter(s => s.count > 0),
+)
 
 defineEmits<{
   'cell-click': [payload: { cycle: string; severity: string }]
@@ -129,6 +153,13 @@ function colorScale(severity: string, count: number): string {
   font-size: 13px;
   color: #666;
 }
+
+.gt-heatmap-status-total {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #666;
+}
+.gt-heatmap-status-count + .gt-heatmap-status-count { margin-left: 12px; }
 
 .sev-blocking { color: #c62828; }
 .sev-warning { color: #e65100; }

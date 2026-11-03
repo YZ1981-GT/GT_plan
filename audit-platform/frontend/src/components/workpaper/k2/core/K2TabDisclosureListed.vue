@@ -343,15 +343,14 @@ import http from '@/utils/http'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import {
-  K2_CARBON_ROWS,
   K2_CONTRACT_COST_FORMULA_ROW,
   K2_CONTRACT_COST_ROWS,
-  K2_DEFAULT_CONTRACT_COST_CATEGORIES,
-  K2_LISTED_MAIN_ROWS,
+  K2_LISTED_TEXT_SEGMENTS,
   K2_NOTE_SECTION,
   K2_TOTAL_ROW_LABEL,
   buildK2SyncPayload,
   type K2DisclosureSnapshot,
+  type K2ListedTextKey,
 } from '../../composables/k2NoteSectionMap'
 import {
   checkK2Consistency,
@@ -360,6 +359,12 @@ import {
   recalcContractCost,
 } from '../../composables/useK2DisclosureEngine'
 import { K2_ACCOUNT_NAME, K2_GROSS_FALLBACK_STANDARD } from '../../composables/k2AccountScope'
+import {
+  buildK2ListedDisclosureSnapshot,
+  createK2ListedDisclosureState,
+  loadK2ListedDisclosureState,
+  type K2ListedDisclosureState,
+} from '../../composables/k2DisclosureTabState'
 
 /**
  * 科目口径取单一真源（报表行 `BS-014` → 实证 `TB('1901')`）。
@@ -380,71 +385,19 @@ const emit = defineEmits<{ save: [itemId: string, value: any] }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
-// ═══ 数据模型 ═══
-interface MainRow {
-  label: string
-  endAmount: number
-  priorAmount: number
-  /** 模板固定行（行名不可改、不可删） */
-  fixed: boolean
-}
+// ═══ 数据模型（初值 / 读回 / 同步快照与附注页离屏同步共用 k2DisclosureTabState）═══
+type TextKey = K2ListedTextKey
 
-type TextKey = 'significant' | 'contractCost' | 'carbon'
-
-const mainRows = reactive<MainRow[]>(
-  K2_LISTED_MAIN_ROWS.map(label => ({ label, endAmount: 0, priorAmount: 0, fixed: true })),
-)
-
-const contractCost = reactive({
-  enabled: false,
-  categories: [...K2_DEFAULT_CONTRACT_COST_CATEGORIES] as string[],
-  cells: recalcContractCost([], K2_DEFAULT_CONTRACT_COST_CATEGORIES.length),
-})
-
-const carbon = reactive({
-  enabled: false,
-  rows: K2_CARBON_ROWS.map(label => ({ label, currentAmount: 0, priorAmount: 0 })),
-})
-
-const texts = reactive<Record<TextKey, string>>({
-  significant: '',
-  contractCost: '',
-  carbon: '',
-})
+const initialState = createK2ListedDisclosureState()
+const mainRows = reactive(initialState.mainRows)
+const contractCost = reactive(initialState.contractCost)
+const carbon = reactive(initialState.carbon)
+const texts = reactive(initialState.texts)
+const formState: K2ListedDisclosureState = { mainRows, contractCost, carbon, texts }
 
 const checkExpanded = ref(false)
 
-/** 文本段定义 —— requirement 逐字取自 note_template_listed.json §五、13 text_sections */
-const textSegments: Array<{ key: TextKey; title: string; requirement: string; placeholder: string }> = [
-  {
-    key: 'significant',
-    title: '金额较大的其他流动资产说明',
-    requirement:
-      '（金额较大的其他流动资产，应说明其内容、性质）【提示：进项税额，根据应交税费-应交增值税科目借方余额分析填列；'
-      + '多交或预缴的增值税额，根据应交税费-未交增值税科目以及应交税费-预交增值税科目借方余额分析填列。'
-      + '上述重分类事项，如属于其他非流动资产的，应在其他非流动资产科目列示。】',
-    placeholder: '按①表金额较大的项目，逐项说明其内容与性质',
-  },
-  {
-    key: 'contractCost',
-    title: '合同取得成本判断与摊销方法说明',
-    requirement:
-      '披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、'
-      + '按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。'
-      + '摊销期限未超过一年的合同取得成本于其发生时计入当期损益。',
-    placeholder: '说明资本化判断依据、摊销方法与摊销期间，以及本期摊销及减值损失金额',
-  },
-  {
-    key: 'carbon',
-    title: '碳排放权相关信息说明',
-    requirement:
-      '披露与碳排放权相关的信息，包括：①与碳排放权交易相关的信息（参与减排机制的特征、碳排放战略、节能减排措施等）；'
-      + '②碳排放配额的具体来源（配额取得方式、取得年度、用途、结转原因等）；'
-      + '③节能减排或超额排放情况（免费分配取得的碳排放配额与同期实际排放量有关数据的对比情况、原因等）；'
-      + '④碳排放配额变动情况按③表格式披露。',
-    placeholder: '按①②③四项要求分别说明',
-  },
-]
+const textSegments = K2_LISTED_TEXT_SEGMENTS
 
 // ═══ 派生 ═══
 const mainTotalRow = computed(() => ({
@@ -636,87 +589,13 @@ function persistTexts(): void {
   persist('K2-disc-listed-texts', { ...texts })
 }
 
-function parseSaved(itemId: string): any {
-  const saved = props.allResponses.get(itemId)
-  const raw = saved?.remark ?? saved?.value ?? null
-  if (!raw) return null
-  if (typeof raw !== 'string') return raw
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
-}
-
 function loadSavedData(): void {
-  const savedMain = parseSaved('K2-disc-listed-main')
-  if (Array.isArray(savedMain) && savedMain.length) {
-    mainRows.splice(0, mainRows.length, ...savedMain.map((r: any) => ({
-      label: String(r?.label ?? ''),
-      endAmount: Number(r?.endAmount) || 0,
-      priorAmount: Number(r?.priorAmount) || 0,
-      fixed: K2_LISTED_MAIN_ROWS.includes(String(r?.label ?? '')),
-    })))
-  }
-
-  const savedCc = parseSaved('K2-disc-listed-contract-cost')
-  if (savedCc && typeof savedCc === 'object') {
-    contractCost.enabled = !!savedCc.enabled
-    const cats = Array.isArray(savedCc.categories)
-      ? savedCc.categories.map((c: any) => String(c ?? '').trim()).filter(Boolean)
-      : []
-    contractCost.categories = cats.length ? cats : [...K2_DEFAULT_CONTRACT_COST_CATEGORIES]
-    contractCost.cells = recalcContractCost(
-      Array.isArray(savedCc.cells) ? savedCc.cells : [],
-      contractCost.categories.length,
-    )
-  }
-
-  const savedCarbon = parseSaved('K2-disc-listed-carbon')
-  if (savedCarbon && typeof savedCarbon === 'object') {
-    carbon.enabled = !!savedCarbon.enabled
-    const byLabel = new Map(
-      (Array.isArray(savedCarbon.rows) ? savedCarbon.rows : []).map((r: any) => [String(r?.label ?? ''), r]),
-    )
-    carbon.rows = K2_CARBON_ROWS.map(label => {
-      const hit: any = byLabel.get(label)
-      return {
-        label,
-        currentAmount: Number(hit?.currentAmount) || 0,
-        priorAmount: Number(hit?.priorAmount) || 0,
-      }
-    })
-  }
-
-  const savedTexts = parseSaved('K2-disc-listed-texts')
-  if (savedTexts && typeof savedTexts === 'object') {
-    for (const key of ['significant', 'contractCost', 'carbon'] as TextKey[]) {
-      texts[key] = String(savedTexts[key] ?? '')
-    }
-  }
+  loadK2ListedDisclosureState(props.allResponses, formState)
 }
 
 // ═══ 同步到附注 ═══
 function buildSnapshot(): K2DisclosureSnapshot {
-  return {
-    mainRows: mainRows.map(r => ({
-      label: r.label,
-      endAmount: r.endAmount,
-      priorAmount: r.priorAmount,
-    })),
-    contractCost: {
-      enabled: contractCost.enabled,
-      categories: [...contractCost.categories],
-      cells: contractCost.cells.map(r => [...r]),
-    },
-    carbon: {
-      enabled: carbon.enabled,
-      rows: carbon.rows.map(r => ({ ...r })),
-    },
-    texts: textSegments
-      .filter(seg => texts[seg.key].trim())
-      .map(seg => ({ section: `k2-${seg.key}`, title: seg.title, text: texts[seg.key] })),
-  }
+  return buildK2ListedDisclosureSnapshot(formState)
 }
 
 async function syncToDisclosureNotes(): Promise<void> {

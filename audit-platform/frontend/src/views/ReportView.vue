@@ -90,6 +90,8 @@
       <!-- 归档横幅 -->
       <ArchivedBanner />
       <ConsolLockedBanner />
+      <!-- 项目没填审计年度：报表按年度生成 / 取数，不按今年兜底 -->
+      <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
 
       <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
       <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
@@ -547,7 +549,7 @@
           :eq-cell-val="eqCellVal"
           :is-consolidated="isConsolidated"
           @cell-click="onRvCellClick"
-          @cell-dblclick="onRvCellDblClick"
+          @cell-dblclick="onRvCellDblClick" editable @cell-edit="onRvCellEdit"
           @cell-contextmenu="onRvCellContextMenu"
         />
       </div>
@@ -569,7 +571,7 @@
         :eq-cell-val="eqCellVal"
         :is-consolidated="isConsolidated"
         @cell-click="onRvCellClick"
-        @cell-dblclick="onRvCellDblClick"
+        @cell-dblclick="onRvCellDblClick" :editable="reportMode !== 'unadjusted'" @cell-edit="onRvCellEdit"
         @cell-contextmenu="onRvCellContextMenu"
       />
     </div>
@@ -586,7 +588,7 @@
         :font-size="displayPrefs.fontConfig.tableFont"
         :imp-row-class-name="impRowClassName"
         @cell-click="onRvCellClick"
-        @cell-dblclick="onRvCellDblClick"
+        @cell-dblclick="onRvCellDblClick" :editable="reportMode !== 'unadjusted'" @cell-edit="onRvCellEdit"
         @cell-contextmenu="onRvCellContextMenu"
       />
     </div>
@@ -631,7 +633,13 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="top" :show-after="500" :disabled="!row.row_code">
+            <ReportProvenanceTooltip
+              :project-id="projectId"
+              :year="year"
+              :report-type="activeTab"
+              :row-code="row.row_code || ''"
+              :formula="row.formula"
+            >
               <GtAmountCell
                 :value="row.current_period_amount"
                 :prior-value="row.prior_period_amount"
@@ -639,7 +647,7 @@
                 :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
                 @click="onLineComposition(row)"
               />
-            </el-tooltip>
+            </ReportProvenanceTooltip>
           </template>
         </template>
       </el-table-column>
@@ -652,12 +660,12 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="top" :show-after="500" :disabled="!row.row_code">
-              <GtAmountCell
+            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="bottom" :show-after="500" :disabled="!row.row_code">
+              <span><GtAmountCell
                 :value="row.prior_period_amount"
                 :clickable="false"
                 :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)"
-              />
+              /></span>
             </el-tooltip>
           </template>
         </template>
@@ -793,10 +801,11 @@
 
     <!-- 公式管理弹窗（template-type 必传：否则恒按国企版加载 report_config） -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       :rows="rows"
       :project-id="projectId"
-      :year="year"
+      :year="year ?? undefined"
       scope="report"
       :template-type="selectedTemplateType"
       @saved="fetchReport"
@@ -920,10 +929,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
 import ReportAnalysisPanel from '@/components/workpaper/ReportAnalysisPanel.vue'
@@ -938,6 +949,7 @@ import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import ReportProvenanceTooltip from '@/components/report/ReportProvenanceTooltip.vue'
 import GtEmpty from '@/components/common/GtEmpty.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'
@@ -962,14 +974,14 @@ import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useReportColumns } from './composables/useReportColumns'
-import http from '@/utils/http'
 import { useReportCrossCheck } from './composables/useReportCrossCheck'
-import { useReportData } from './composables/useReportData'
+import { fetchNoteSectionsWithData, useReportData } from './composables/useReportData'
 import { useReportExport } from './composables/useReportExport'
 import { useReportMapping } from './composables/useReportMapping'
 import { useReportCellActions } from './composables/useReportCellActions'
 import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
 import { buildReportHost } from '@/composables/useAiHostContext'
+import { useReportRouteFocus } from '@/composables/useReportRouteFocus'
 
 const route = useRoute()
 const router = useRouter()
@@ -1073,11 +1085,10 @@ function goBack() {
   router.push(`/projects`)
 }
 
-const routeYear = computed(() => {
-  const value = Number(route.query.year)
-  return Number.isFinite(value) && value > 2000 ? value : null
-})
+const { routeYear, initialTab, attach: attachRouteFocus } = useReportRouteFocus(route) // ?year / ?tab / ?highlight 深链（R7.1）
 const projectYear = ref<number | null>(null)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 const _templateTypeLabel = computed(() => reportData.templateType.value === 'listed' ? '上市版' : '国企版')
 const scopeLabel = computed(() => reportData.reportScope.value === 'consolidated' ? '合并' : '单体')
 
@@ -1114,7 +1125,7 @@ const showDocAiChat = ref(false)
 
 const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
-const activeTab = ref('balance_sheet')
+const activeTab = ref<string>(initialTab)
 const reportMode = ref<'audited' | 'unadjusted' | 'compare'>('audited')
 
 // ─── useReportData composable ───────────────────────────────────────────────
@@ -1246,30 +1257,10 @@ async function loadRowNoteMapping() {
   } catch { /* fail-open: 动态映射加载失败回退硬编码 */ }
 }
 
-// 加载附注各章节是否有内容（best-effort，不阻塞报表渲染）
+// 加载附注各章节是否有内容（best-effort，不阻塞报表渲染；取数在 useReportData，项目没填审计年度不请求）
 async function loadNoteHasData() {
-  try {
-    const { data } = await http.get(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/notes-tree`,
-      { _silent: true } as any
-    )
-    const sections = data?.data || data || []
-    const set = new Set<string>()
-    for (const node of (Array.isArray(sections) ? sections : [])) {
-      if (node.has_data && node.note_section) {
-        set.add(node.note_section)
-      }
-      // 子节点
-      if (Array.isArray(node.children)) {
-        for (const child of node.children) {
-          if (child.has_data && child.note_section) {
-            set.add(child.note_section)
-          }
-        }
-      }
-    }
-    noteHasDataSections.value = set
-  } catch { /* fail-open: 拿不到附注数据不影响报表渲染 */ }
+  const set = await fetchNoteSectionsWithData(projectId.value, year.value)
+  if (set) noteHasDataSections.value = set
 }
 // 报表行数据加载后 best-effort 拉附注就绪状态 + 动态映射
 watch(rows, (newRows) => {
@@ -1348,6 +1339,7 @@ const _reportModeLabel = computed(() => {
 
 // Drilldown + Formula Manager (kept in main file for template binding)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
 const showRvGuide = ref(false)
 const rvBalanceExpanded = ref(false)
 const lastReportRefreshAt = ref<Date | null>(null)
@@ -1447,7 +1439,7 @@ const {
   onRvCtxViewFormulaSource,
   onCellDetailNavigate,
   onRvCellClick,
-  onRvCellDblClick,
+  onRvCellDblClick, onRvCellEdit,
   onRvCellContextMenu,
   onRvCtxCopy,
   onRvCtxDrillDown,
@@ -1465,16 +1457,20 @@ const {
 
 
 async function _ensureProjectYearWrapper() {
-  if (routeYear.value !== null) {
-    projectYear.value = null
-    return
+  try {
+    if (routeYear.value !== null) {
+      projectYear.value = null
+      return
+    }
+    // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
+    await ensureProjectYear()
+    // Sync main-file-owned state from composable results
+    projectYear.value = reportData._fetchedAuditYear.value
+    selectedYear.value = projectYear.value ?? null
+    selectedTemplateType.value = templateType.value
+  } finally {
+    yearResolved.value = true
   }
-  // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
-  await ensureProjectYear()
-  // Sync main-file-owned state from composable results
-  projectYear.value = reportData._fetchedAuditYear.value
-  selectedYear.value = projectYear.value ?? null
-  selectedTemplateType.value = templateType.value
 }
 
 function onTabChange() {
@@ -1483,7 +1479,12 @@ function onTabChange() {
 }
 
 const _onSyncUnadjusted = withLoading(syncLoading, async () => {
-  await recalcTrialBalance(projectId.value, year.value)
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  await recalcTrialBalance(projectId.value, y)
   await fetchReport()
   ElMessage.success('未审数已按四表账套科目重新同步')
 })
@@ -1535,6 +1536,7 @@ const rvTableRef = ref<any>(null)
 const eqTableRef = ref<any>(null)
 const impTableRef = ref<any>(null)
 const compareTableRef = ref<any>(null)
+attachRouteFocus({ activeTab, reportMode, rows, compareRows, rvTableRef, compareTableRef, loading })
 
 // 通用取值函数（适配所有报表类型）
 function getAnyCellValue(rowIdx: number, colIdx: number): any {
@@ -1551,6 +1553,8 @@ function getAnyCellValue(rowIdx: number, colIdx: number): any {
 }
 
 rvCtx.setupTableDrag(rvTableRef, getAnyCellValue)
+// 表格按 Excel 方式工作时，权益表 / 减值表 / 对比表的选区同样进右键菜单与状态栏（spec excel-style-table-editing 5.1）
+rvCtx.followTables(() => [eqTableRef.value?.tableRef, impTableRef.value?.tableRef, compareTableRef.value])
 
 // 权益表/减值表/对比表的拖拽支持（tab/mode 切换后动态绑定）
 watch([activeTab, () => reportMode.value], () => {

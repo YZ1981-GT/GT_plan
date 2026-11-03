@@ -12,21 +12,23 @@ const sse = vi.hoisted(() => {
   class Conn {
     static all: Conn[] = []
     closed = false
-    messageHandler: ((data: unknown, event?: string) => void) | null = null
+    messageHandler: ((data: unknown, event?: string, id?: string) => void) | null = null
     openHandler: (() => void) | null = null
     errorHandler: ((e: unknown) => void) | null = null
-    constructor(public url: string, public opts: unknown) {
+    lastId: string | undefined
+    constructor(public url: string, public opts: any) {
+      this.lastId = opts?.lastEventId
       Conn.all.push(this)
     }
-    onMessage(h: (data: unknown, event?: string) => void) { this.messageHandler = h }
+    onMessage(h: (data: unknown, event?: string, id?: string) => void) { this.messageHandler = h }
     onOpen(h: () => void) { this.openHandler = h }
     onError(h: (e: unknown) => void) { this.errorHandler = h }
     onDraining() {}
     close() { this.closed = true }
     get isConnected() { return !this.closed }
-    get lastEventId() { return undefined }
+    get lastEventId() { return this.lastId }
   }
-  return { Conn, user: { id: 'u-1' } }
+  return { Conn, user: { id: 'u-1' }, apiGet: vi.fn() }
 })
 
 vi.mock('@/utils/sse', () => ({
@@ -34,6 +36,9 @@ vi.mock('@/utils/sse', () => ({
 }))
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({ userId: sse.user.id }),
+}))
+vi.mock('@/services/apiProxy', () => ({
+  api: { get: (...args: unknown[]) => sse.apiGet(...args) },
 }))
 
 // ── 内存版 Web Locks（只实现本模块用到的 ifAvailable / signal / 回调 promise 决定持有时长）
@@ -119,6 +124,8 @@ const PID = '00000000-0000-0000-0000-000000000001'
 
 beforeEach(() => {
   sse.Conn.all = []
+  sse.apiGet.mockReset()
+  sse.apiGet.mockResolvedValue([])
   FakeChannel.open = []
   Object.defineProperty(globalThis.navigator, 'locks', { value: new FakeLocks(), configurable: true })
   vi.stubGlobal('BroadcastChannel', FakeChannel)
@@ -171,6 +178,40 @@ describe('同用户同项目：多个标签页只建一条连接', () => {
     expect(reconnectB).toHaveBeenCalledTimes(1)
     takeoverConn.messageHandler?.('x', 'e')
     expect(seenB).toEqual(['x'])
+  })
+
+  it('领导转发 typed id，跟随接手时从同一 id 补拉后才通知恢复', async () => {
+    const tabA = await openTab()
+    const subA = tabA.subscribeProjectEvent(PID, 'e', () => {})
+    await flush()
+    const tabB = await openTab()
+    const seenB: string[] = []
+    const reconnectB = vi.fn(() => seenB.push('reconnected'))
+    tabB.subscribeProjectEvent(PID, 'e', (data: any) => seenB.push(data.marker), { onReconnect: reconnectB })
+    await flush()
+
+    const leader = sse.Conn.all[0]
+    leader.openHandler?.()
+    leader.lastId = '100-0'
+    leader.messageHandler?.({ marker: '100' }, 'e', '100-0')
+    await flush()
+    expect(seenB).toEqual(['100'])
+
+    subA.close()
+    await flush()
+    const takeover = sse.Conn.all[1]
+    expect(takeover.opts.lastEventId).toBe('100-0')
+    sse.apiGet.mockResolvedValueOnce([
+      { event_id: '101-0', event_type: 'e', project_id: PID, extra: null, marker: '101' },
+    ])
+    takeover.openHandler?.()
+    await vi.waitFor(() => expect(reconnectB).toHaveBeenCalledTimes(1))
+    expect(sse.apiGet).toHaveBeenCalledWith(
+      `/api/projects/${PID}/events/since`,
+      expect.objectContaining({ params: { last_event_id: '100-0' } }),
+    )
+    // replay 投影的业务字段保持在对象中；恢复 hook 严格在 replay 之后。
+    expect(seenB.at(-1)).toBe('reconnected')
   })
 
   it('领导断线重连 / 降级都同步到跟随的标签页', async () => {

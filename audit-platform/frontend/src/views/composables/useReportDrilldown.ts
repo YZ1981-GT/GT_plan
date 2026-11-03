@@ -9,6 +9,7 @@ import {
   type ReportRow, type ReportDrilldownData,
 } from '@/services/auditPlatformApi'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import type { useCellSelection } from '@/composables/useCellSelection'
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
@@ -29,7 +30,8 @@ export interface LineCompositionData {
 
 export interface UseReportDrilldownOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null ⇒ 穿透 / 反查附注提示去填年度、不发请求 */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   reportMode: Ref<string>
   activeTabLabel: ComputedRef<string>
@@ -76,6 +78,10 @@ export function useReportDrilldown(options: UseReportDrilldownOptions): UseRepor
 
   async function onDrilldown(row: ReportRow) {
     if (!row.row_code || row.is_total_row) return
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     drilldownVisible.value = true
     drilldownLoading.value = true
     drilldownData.value = null
@@ -83,6 +89,8 @@ export function useReportDrilldown(options: UseReportDrilldownOptions): UseRepor
       const result = await getReportDrilldown(projectId.value, year.value, activeTab.value, row.row_code)
       drilldownData.value = {
         ...result,
+        // W6：入口的报表类型 / 年度 / 项目与本次穿透请求同一来源（ADR-AQL-20）
+        report_type: activeTab.value, year: year.value, project_id: projectId.value,
         accounts: result.accounts.map((item: any) => ({
           ...item,
           amount: reportMode.value === 'unadjusted'
@@ -146,6 +154,10 @@ export function useReportDrilldown(options: UseReportDrilldownOptions): UseRepor
       ElMessage.info('该行无 row_code，无法反查附注引用')
       return
     }
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     noteRefsRowCode.value = row.row_code
     noteRefsRowName.value = row.row_name || ''
     noteRefsList.value = []
@@ -168,7 +180,8 @@ export function useReportDrilldown(options: UseReportDrilldownOptions): UseRepor
       query: {
         section: ref.note_section,
         table_index: String(ref.table_index ?? 0),
-        year: String(year.value),
+        // 年度为空不带（原先 String(null) 带成 year=null）
+        ...(year.value != null ? { year: String(year.value) } : {}),
       },
     })
   }

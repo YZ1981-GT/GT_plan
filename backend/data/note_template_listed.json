@@ -391,7 +391,8 @@
       "parent_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
       "sort_index": 9,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "title_hint": "注：若如无外币报表，只保留外币业务"
     },
     {
       "section_number": "三、金融工具",
@@ -1492,8 +1493,8 @@
     },
     {
       "section_number": "三、收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）",
-      "section_title": "收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）",
-      "account_name": "收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）",
+      "section_title": "收入",
+      "account_name": "收入",
       "content_type": "text",
       "tables": [],
       "text_sections": [
@@ -1511,7 +1512,11 @@
       "parent_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
       "sort_index": 29,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "title_hint": "应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点",
+      "legacy_titles": [
+        "收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）"
+      ]
     },
     {
       "section_number": "三、合同成本",
@@ -4747,7 +4752,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "d-cycle-extraction-chain-completion",
-      "_aligned_at": "2026-10-24 19:21:14"
+      "_aligned_at": "2026-10-24 19:21:14",
+      "title_hint": "以下不适用的，请删除；账龄可根据企业的分组进行修改"
     },
     {
       "section_number": "五、6",
@@ -20251,7 +20257,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_m_equity_structure",
-      "_aligned_at": "2026-08-02 15:45:58"
+      "_aligned_at": "2026-08-02 15:45:58",
+      "title_hint": "单位：万股"
     },
     {
       "section_number": "五、54",
@@ -22113,7 +22120,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "k-cycle-disclosure-alignment/pl",
-      "_aligned_at": "2026-07-30 17:58:57"
+      "_aligned_at": "2026-07-30 17:58:57",
+      "title_hint": "按费用性质列示"
     },
     {
       "section_number": "五、65",
@@ -22183,7 +22191,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "k-cycle-disclosure-alignment/pl",
-      "_aligned_at": "2026-07-30 17:58:57"
+      "_aligned_at": "2026-07-30 17:58:57",
+      "title_hint": "按费用性质列示"
     },
     {
       "section_number": "五、66",
@@ -22269,7 +22278,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:08:41"
+      "_aligned_at": "2026-08-09 11:08:41",
+      "title_hint": "按费用性质列示"
     },
     {
       "section_number": "五、67",
@@ -22379,7 +22389,8 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure",
-      "_aligned_at": "2026-07-31 09:54:24"
+      "_aligned_at": "2026-07-31 09:54:24",
+      "title_hint": "按费用性质列示"
     },
     {
       "section_number": "五、68",
@@ -23003,7 +23014,8 @@
       "_aligned_at": "2026-08-03 13:44:03",
       "legacy_section_numbers": [
         "三、信用减值损失"
-      ]
+      ],
+      "title_hint": "损失以“—”号填列"
     },
     {
       "section_number": "五、77",
@@ -23137,7 +23149,8 @@
       "_aligned_at": "2026-07-30 17:58:57",
       "legacy_section_numbers": [
         "三、资产减值损失（损"
-      ]
+      ],
+      "title_hint": "损失以“—”号填列"
     },
     {
       "section_number": "五、78",
@@ -23315,7 +23328,8 @@
       "_aligned_at": "2026-07-31 21:09:50",
       "legacy_section_numbers": [
         "三、资产处置收益（损"
-      ]
+      ],
+      "title_hint": "损失以“-”填列"
     },
     {
       "section_number": "五、79",
@@ -32553,8 +32567,8 @@
     },
     {
       "section_number": "十四、资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
-      "section_title": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
-      "account_name": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
+      "section_title": "资产负债表日后利润分配情况",
+      "account_name": "资产负债表日后利润分配情况",
       "content_type": "mixed",
       "tables": [
         {
@@ -32585,7 +32599,11 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-07 16:58:18",
+      "title_hint": "只写现金分配，若仅有转增，则不写",
+      "legacy_titles": [
+        "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）"
+      ]
     },
     {
       "section_number": "十四、重要销售退回",
@@ -33817,8 +33835,8 @@
     {
       "section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "section_number": "十六",
-      "section_title": "母公司财务报表主要项目注释",
-      "account_name": "母公司财务报表主要项目注释",
+      "section_title": "公司财务报表主要项目注释",
+      "account_name": "公司财务报表主要项目注释",
       "content_type": "text",
       "scope": "consolidated_only",
       "level": 1,
@@ -33833,7 +33851,10 @@
       "wide_table_presets": [],
       "sort_order": 1599,
       "_aligned_by": "fix_note_parent_company_chapter.py",
-      "_aligned_at": "2026-10-24 20:06:17"
+      "_aligned_at": "2026-10-24 20:06:17",
+      "legacy_titles": [
+        "母公司财务报表主要项目注释"
+      ]
     },
     {
       "section_number": "十六、应收票据",
@@ -34721,7 +34742,8 @@
         "名  称",
         "项  目",
         "单位名称"
-      ]
+      ],
+      "title_hint": "披露格式参考附注五、4"
     },
     {
       "section_number": "十六、应收账款",
@@ -36064,7 +36086,8 @@
         "名  称",
         "单位名称",
         "项  目"
-      ]
+      ],
+      "title_hint": "披露格式参考附注五、5"
     },
     {
       "section_number": "十六、其他应收款",
@@ -37545,7 +37568,8 @@
         "类  别",
         "坏账准备",
         "单位名称"
-      ]
+      ],
+      "title_hint": "披露格式参考附注五、8"
     },
     {
       "section_number": "十六、长期股权投资",
@@ -37891,8 +37915,8 @@
     },
     {
       "section_number": "十六、营业收入与营业成本",
-      "section_title": "营业收入与营业成本",
-      "account_name": "营业收入与营业成本",
+      "section_title": "营业收入和营业成本",
+      "account_name": "营业收入和营业成本",
       "content_type": "mixed",
       "scope": "consolidated_only",
       "sort_order": 1604,
@@ -38399,6 +38423,10 @@
         "主要产品类型（或行业）",
         "主要经营地区",
         "年  度"
+      ],
+      "title_hint": "披露格式参考附注五、62",
+      "legacy_titles": [
+        "营业收入与营业成本"
       ]
     },
     {

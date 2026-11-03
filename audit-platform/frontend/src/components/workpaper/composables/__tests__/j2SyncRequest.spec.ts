@@ -71,11 +71,23 @@ describe('toJ2SyncRequest：构建器产物 → 端点契约', () => {
 
 describe('J2 两个披露 Tab 的接线（源码级）', () => {
   const read = (f: string) => readFileSync(resolve(__dirname, '../../j2', f), 'utf-8')
-  it.each(['J2TabDisclosureListed.vue', 'J2TabDisclosureSoe.vue'])('%s 经 apiProxy + toJ2SyncRequest 发请求', (f) => {
+  // 请求体由 j2DisclosureTabState.syncRequests 组装（= toJ2SyncRequest(buildJ2…SyncPayload(快照))，与附注页离屏同步共用）
+  it.each([
+    ['J2TabDisclosureListed.vue', 'listedState'],
+    ['J2TabDisclosureSoe.vue', 'soeState'],
+  ])('%s 经 apiProxy 发 syncRequests 组装的请求体', (f, state) => {
     const src = read(f)
     expect(src).toContain("import { api } from '@/services/apiProxy'")
-    expect(src).toMatch(/api\.post\(\s*`\/api\/projects\/\$\{props\.projectId\}\/disclosure-notes\/sync-from-workpaper`,\s*toJ2SyncRequest\(/)
+    expect(src).toContain(`= ${state}.syncRequests(props.wpId, auditYear.value)`)
+    expect(src).toMatch(/api\.post\(`\/api\/projects\/\$\{props\.projectId\}\/disclosure-notes\/sync-from-workpaper`, main\)/)
     expect(src).not.toMatch(/import\(\s*['"]axios['"]\s*\)/)
     expect(src).not.toMatch(/\.\.\.payload\b/)
+  })
+
+  it('syncRequests 在共用模块里经 toJ2SyncRequest 组装（两版各一处，上市净资产再一处）', () => {
+    const state = readFileSync(resolve(__dirname, '../j2DisclosureTabState.ts'), 'utf-8')
+    expect(state.match(/toJ2SyncRequest\((?:payload|netAssetPayload),/g)).toHaveLength(3)
+    expect(state).toContain("toJ2SyncRequest(payload, { wpId, currentStandard: 'listed_standalone', year })")
+    expect(state).toContain("toJ2SyncRequest(payload, { wpId, currentStandard: 'soe_standalone', year })")
   })
 })

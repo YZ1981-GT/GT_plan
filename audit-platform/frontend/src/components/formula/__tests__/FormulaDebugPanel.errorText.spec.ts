@@ -57,6 +57,18 @@ describe('公式调试面板的错误显示', () => {
     expect(state(w).result.value).toBe('9182572.99')
     w.unmount()
   })
+
+  // post-push-residual-defect-closure R2：项目没填审计年度 ⇒ 不请求、面板里写明原因（原先按钮点了没反应）
+  it('审计年度为空：不请求，面板写明去填年度', async () => {
+    const w = shallowMount(FormulaDebugPanel, {
+      props: { formula: "NOTE('五、1','合计','期末')", projectId: 'p1', year: null },
+      global: { plugins: [ElementPlus] },
+    })
+    await state(w).onRun()
+    expect(post).not.toHaveBeenCalled()
+    expect(state(w).result.errors).toEqual(['未设置审计年度，请先在项目基本信息中填写'])
+    w.unmount()
+  })
 })
 
 describe.each([

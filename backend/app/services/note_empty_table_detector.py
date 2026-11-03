@@ -15,8 +15,11 @@
 **判定规则**（design.md Property 8）：
 
 1. 行标签**不参与**判断 —— 模板骨架恒有标签（「原材料」「在产品」…），若算进去则永不为空
-2. 合计行不参与判断 —— 合计是派生值，本身不代表业务发生
-3. 段标题行 / 假表头行不参与判断（`row_type` 为 `section` / `header_label`）
+2. 合计 / 小计行（`is_total` 或 `row_type` ∈ total / subtotal）只看数：金额列（没有列定义时任意列）有非零数
+   ⇒ 非空；文字（「—」「不适用」）不算。公式推送找不到明细行时把审定数写在合计行（合计行兜底），而合计重算
+   在构成全空时不写 —— 合计有数说明有业务（spec note-pull-header-formula-closure R5；原规则「合计行一律不看」
+   让这些表在编辑器显示「本期无此情形」、Word 导出整表省略）
+3. 段标题行 / 假表头行 / 可扩位行不参与判断（`row_type` 为 `section` / `header_label` / `expandable`）
 4. 数值列（`format == "amount"`）：`None` / 空串 / `0` 视为空
 5. 其余列按文本：`strip()` 后为空视为空
 6. 任一非空 → 表非空；全空（含无行）→ 空表
@@ -33,17 +36,22 @@ __all__ = [
     "empty_table_names",
     "AMOUNT_FORMATS",
     "SKIP_ROW_TYPES",
+    "TOTAL_ROW_TYPES",
+    "is_total_row",
+    "total_row_has_amount",
 ]
 
 # 视为"数值列"的 format 值：空值与 0 都算空
 AMOUNT_FORMATS = frozenset({"amount", "percent", "number"})
 
-# 不参与空表判定的行类型（派生行 / 结构行 / 可扩位行）
+# 不参与空表判定的结构行（段标题 / 假表头 / 可扩位行）
 # `expandable` = 源模板留的可扩位（`……` / `可无限量添加行`），零可见内容。
 # spec: note-template-columns-and-legacy-snapshot-closure Property 33
-SKIP_ROW_TYPES = frozenset(
-    {"total", "subtotal", "section", "header_label", "expandable"}
-)
+SKIP_ROW_TYPES = frozenset({"section", "header_label", "expandable"})
+
+# 合计 / 小计行：只看数（金额列 / 无列定义时任意列），非零 ⇒ 表非空；文字不算
+# spec: note-pull-header-formula-closure R5（前端 disclosureEmptyTable.TOTAL_ROW_TYPES 交叉锁死）
+TOTAL_ROW_TYPES = frozenset({"total", "subtotal"})
 
 # 数值零容差：附注金额保留 2 位小数，绝对值小于半分即视为零
 _ZERO_EPS = 0.005
@@ -72,9 +80,45 @@ def _is_amount_col(d: dict[str, Any]) -> bool:
 
 
 def _skip_row(row: dict[str, Any]) -> bool:
-    if row.get("is_total"):
-        return True
     return str(row.get("row_type") or "") in SKIP_ROW_TYPES
+
+
+def is_total_row(row: Any) -> bool:
+    """合计 / 小计行（``is_total`` 或 ``row_type`` ∈ total / subtotal）。"""
+    return isinstance(row, dict) and (
+        bool(row.get("is_total")) or str(row.get("row_type") or "") in TOTAL_ROW_TYPES
+    )
+
+
+def _number_is_blank(v: Any) -> bool:
+    """合计行只看数：不是数（含「—」「不适用」）/ 绝对值小于半分 ⇒ 空。"""
+    if v is None or isinstance(v, bool):
+        return True
+    if isinstance(v, (int, float)):
+        return abs(float(v)) < _ZERO_EPS
+    cleaned = str(v).strip().replace(",", "").replace("，", "").replace(" ", "")
+    if cleaned.startswith("(") and cleaned.endswith(")"):
+        cleaned = "-" + cleaned[1:-1]
+    try:
+        return abs(float(cleaned)) < _ZERO_EPS
+    except (TypeError, ValueError):
+        return True
+
+
+def _total_values_blank(values: list[Any], vdefs: list[dict[str, Any]]) -> bool:
+    for j, v in enumerate(values):
+        col = vdefs[j] if j < len(vdefs) else None
+        if col is not None and not _is_amount_col(col):
+            continue  # 合计行的文本 / 说明列不看
+        if not _number_is_blank(v):
+            return False
+    return True
+
+
+def total_row_has_amount(row: Any, columns: Any = None) -> bool:
+    """合计 / 小计行在金额列（没有列定义时任意列）有非零数。"""
+    values = row.get("values") if isinstance(row, dict) else None
+    return is_total_row(row) and isinstance(values, list) and not _total_values_blank(values, _value_defs(columns))
 
 
 def _amount_is_blank(v: Any) -> bool:
@@ -133,6 +177,10 @@ def is_empty_table(rows: Any, columns: Any = None) -> bool:
             continue
         values = row.get("values")
         if not isinstance(values, list):
+            continue
+        if is_total_row(row):
+            if not _total_values_blank(values, vdefs):
+                return False
             continue
         for j, v in enumerate(values):
             col = vdefs[j] if j < len(vdefs) else None

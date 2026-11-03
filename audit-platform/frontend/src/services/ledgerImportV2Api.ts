@@ -17,6 +17,7 @@ export interface SubmitBody {
   incremental?: boolean
   overlap_strategy?: 'skip' | 'overwrite'
   file_periods?: number[] | null
+  balance_carry_confirmed?: boolean
 }
 
 export interface DiagnosticsResult {
@@ -63,8 +64,8 @@ export const ledgerImportV2Api = {
     api.post(`${BASE(pid)}/jobs/${jobId}/resume`),
 
   /** 接管导入（heartbeat 超时后其他成员接管） */
-  takeover: (pid: string, jobId: string) =>
-    api.post(`${BASE(pid)}/jobs/${jobId}/takeover`),
+  takeover: (pid: string, jobId: string, reason: string) =>
+    api.post(`${BASE(pid)}/jobs/${jobId}/takeover`, { reason }),
 
   /** 获取诊断详情 */
   diagnostics: (pid: string, jobId: string) =>

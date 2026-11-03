@@ -1,0 +1,2530 @@
+{
+  "schema_version": "task66-execution-ledger:v1",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "owner_task": "5.5",
+  "description": "Task 66 冻结删除计划的可收缩执行账：三态现算（landed/drifted/intact）、失效项自动出账、计划外 legacy 打红、outstanding 棘轮只减。",
+  "generator": "backend/scripts/gen/generate_task66_execution_ledger.py",
+  "output_is_idempotent": "本产物不含时间戳等每次都变的字段 —— 否则 `--write` + `git diff` 式门禁必然永红，而永红门禁等于没门禁。「什么时候算的」由下面的输入 digest 承担。",
+  "frozen_inputs": {
+    "plan_path": "backend/data/workpaper_sync_task66_legacy_deletion_plan.json",
+    "plan_digest": "943ea32b7b990e35b8c5785b9f39cc46fecd336c420798203c6978c7f5aa53f7",
+    "plan_commit_declared_in_plan": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+    "plan_items_total": 215,
+    "plan_pending_delete_paths_distinct": 125,
+    "frozen_generator_path": "backend/scripts/gen/generate_task66_legacy_deletion_plan.py",
+    "frozen_generator_digest": "4c7785cb52f5a9cdf2f1046ea8a99d13be233202e4da768441c11d47284fa53f"
+  },
+  "frozen_generator_verdict": {
+    "verdict": "retired_superseded_by_this_ledger",
+    "why": "它的 owner 校验把 Wave-6 任务号（66/71/72…）对当前 tasks.md 比对，而那些号嵌在多个已冻结数据文件里；全部复活等于手抄一张 legacy→current 映射表，且写下后无从证明其正确。计划本身是历史记录（plan_commit 已钉）。",
+    "not_a_permanently_red_gate": "退役后它的 `--check` 不得留在任何门禁里。要断言的是「冻结产物真的没再变」，由 frozen_inputs.plan_digest 承担。",
+    "parser_fixes_kept": "该文件里 _TASK_LINE / cycle_owner_tasks / tasks_md_task_ids / _word_lane_owner_task / resolve_current_deletion_executor 的修复保留并被本生成器复用 —— 它们本身是真缺陷（含两处静默错）。"
+  },
+  "state_vocabulary": {
+    "landed": "计划里的 path 已不在盘上 ⇒ 删除确已发生，自动出账（失效项自动移除）",
+    "drifted": "path 还在但内容已变 ⇒ 计划里的裁决不再可信，必须由 owner 重判",
+    "intact": "path 在且内容与计划一致 ⇒ 计划仍然适用，计入 outstanding"
+  },
+  "blocking_points": [
+    {
+      "id": "BP-66-1",
+      "title": "替代面未被任何生产宿主消费（无消费 bridge）",
+      "release_condition": "宿主真去 import/渲染 `WorkpaperSyncEditorHost` 并由 DOM/network 顺序守卫把关",
+      "measured": {
+        "anchor": "WorkpaperSyncEditorHost",
+        "production_importer_count": 116,
+        "production_importers": [
+          "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerStructure.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabIndicator.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabMarginMonthly.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductMargin.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductPrice.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjudication.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjustment.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCompleteness.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabContract.vue",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffBackward.vue"
+        ]
+      },
+      "still_blocking": false
+    },
+    {
+      "id": "BP-66-2",
+      "title": "替代面自身未入库 ⇒ rollback 隔离门 blocked",
+      "release_condition": "替代面全部入库后重跑本生成器，门自动转 open",
+      "measured": {
+        "replacement_surface_total": 22,
+        "replacement_surface_untracked": 0,
+        "untracked_sample": []
+      },
+      "still_blocking": false
+    },
+    {
+      "id": "BP-66-3",
+      "title": "required scenario 只能给出探针集合（authority model 未定）",
+      "release_condition": "approved bundle + published representation 落地后由 Task 70 按真 authority model 重推并刷新 evidence",
+      "measured": {
+        "recomputed": false,
+        "owner_task_in_plan": "70"
+      },
+      "still_blocking": true
+    }
+  ],
+  "live_blocking_point_ids": [
+    "BP-66-3"
+  ],
+  "eligibility": {
+    "rule": "outstanding 项要进物理删除，必须 live_blocking_point_ids 为空。只要还有一条 BP 现算成立，就不存在 eligible_now —— 这不是豁免，是前置未满足。",
+    "eligible_now_paths": [],
+    "eligible_now_count": 0
+  },
+  "unplanned_legacy_paths": [],
+  "counters": {
+    "plan_paths_total": 126,
+    "state_landed": 29,
+    "state_drifted": 32,
+    "state_intact": 65,
+    "pending_delete_paths": 125,
+    "pending_delete_landed": 29,
+    "outstanding_paths": 96,
+    "outstanding_drifted_need_reverdict": 32,
+    "unplanned_legacy_paths": 0,
+    "live_blocking_points": 1
+  },
+  "paths": [
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+      "state": "drifted",
+      "planned_sha256": "c85636daca994e7db754ce2daa673000b9694ad4f31bfcd76350e57cb24dc733",
+      "current_sha256": "5e77476cdceef699b1f4ac551fe03115daf7274b930e2dbb448ff28bd1445501",
+      "item_count": 1,
+      "categories": [
+        "fail_open_success_message"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
+      "state": "drifted",
+      "planned_sha256": "bd88f8fe899a3c2e24e562450ae0034e6579dc37ed995305a8727c7fd00d9dad",
+      "current_sha256": "4e62618cb22a17104cf39814d4f8d481e1158595cddc52742f65428481f2fe1b",
+      "item_count": 1,
+      "categories": [
+        "fail_open_success_message"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+      "state": "drifted",
+      "planned_sha256": "e3596df7b1335089ce768746c06351f56626f6fc5944876846c2d9d0ef282c18",
+      "current_sha256": "e05ee5d22e8d994075ef3e61ba5cf8fc26c06e4516040388b834b5cb1bb33cb7",
+      "item_count": 1,
+      "categories": [
+        "legacy_state_machine"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/OnlyOfficeWordDialog.vue",
+      "state": "intact",
+      "planned_sha256": "af7a5ef9f506b5d28b90b4a835d3118c14090b05f6713412bac674831998451c",
+      "current_sha256": "af7a5ef9f506b5d28b90b4a835d3118c14090b05f6713412bac674831998451c",
+      "item_count": 1,
+      "categories": [
+        "legacy_state_machine"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/factories/createDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "28f46511974eaf171559fb2f8ebf2167dc6268ac90f53d44b5ae1813073fba47",
+      "current_sha256": "28f46511974eaf171559fb2f8ebf2167dc6268ac90f53d44b5ae1813073fba47",
+      "item_count": 1,
+      "categories": [
+        "legacy_factory"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useCycleHtmlOoDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "1ff7e77da2ce6373227e96ae7b56a948821719bcd350daebb7aa7c9330698bd7",
+      "current_sha256": "8df68194798b872cb504a7c2c22799cbc8cbcec36a55e09d6961da57403e4bb5",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD1DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "75b660b6bdc97005862e60d82708ba6001c2971e3d48000535dbefe7af23a59f",
+      "current_sha256": "4df25cd61af73a643873829bf7774bccb6ac47f591276aa45b92365e66011236",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD1EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "f65f892a31b6228d6cf616dc1df0f17293d159eaf41601c40bb7c31564ee7778",
+      "current_sha256": "f65f892a31b6228d6cf616dc1df0f17293d159eaf41601c40bb7c31564ee7778",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD2DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "0a3b4f29e87332ea98e26c42ab3ab4ae12fd052f850cebd0f369c7ef720c77ea",
+      "current_sha256": "73fabd594d46d4fb7c62c7018304f095083cb74df52d501e917f26fd25501f33",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD3DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "2d5255d33ad3bb997b74e5dcd7b742aa2aa8c20097a06cfc6d1cb59a1acce2fe",
+      "current_sha256": "2d5255d33ad3bb997b74e5dcd7b742aa2aa8c20097a06cfc6d1cb59a1acce2fe",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD3EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "4db65e28981da9e61c1edc2f2f3b736b39af29c0653f3abe89b706077eae574c",
+      "current_sha256": "4db65e28981da9e61c1edc2f2f3b736b39af29c0653f3abe89b706077eae574c",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD4DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "4559eee4321fc8e772ed1b69d1cafe098e0f3f65c5630def371116503a6df993",
+      "current_sha256": "5ee61ebca60dcb6662f59993fab52ddeb4c1f8485b9db4c92ef45a5b11e2a078",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD4EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "09472b1d7637ddfe677c5ac52e923d6d5c82f2d3f985def2cd0ff8c701f63962",
+      "current_sha256": "09472b1d7637ddfe677c5ac52e923d6d5c82f2d3f985def2cd0ff8c701f63962",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD5EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "fe41a68586d263ec3ea022cdc387007ac78579753b66058a82b00b48e3b9cb54",
+      "current_sha256": "fe41a68586d263ec3ea022cdc387007ac78579753b66058a82b00b48e3b9cb54",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD6EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "65ab180a030c306382a5b6c8591f1d17332c1d6284fd0647b848a54156d5c960",
+      "current_sha256": "65ab180a030c306382a5b6c8591f1d17332c1d6284fd0647b848a54156d5c960",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useD7EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "4a8fdf2cc421842a595df8a0728763dac75faa19defa36fad21ef692d3114fc5",
+      "current_sha256": "4a8fdf2cc421842a595df8a0728763dac75faa19defa36fad21ef692d3114fc5",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF1DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "c4eac8d86d396bf2ff41e17282a3e57f6d136a577f15ac08c5f3a172af0bb21c",
+      "current_sha256": "c4eac8d86d396bf2ff41e17282a3e57f6d136a577f15ac08c5f3a172af0bb21c",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "4bc1c002ead2890e385a82b5302a976c311fd9a24f09d65d4398553ffed5f24f",
+      "current_sha256": "c1a35fae227cefeb225b4200902ee1dd04e18ed4b6c551c5797e5ed3e71e03a9",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2InvMaiDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "bc497a57a994f0ed8668f7cc97401d1db53dccedf6875561258837aca6cac20f",
+      "current_sha256": "bc497a57a994f0ed8668f7cc97401d1db53dccedf6875561258837aca6cac20f",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2InvSpeDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "bc67cc007a2659afb598ed99001fbe1a1450bcce7c9e614b50e1c254afa6e805",
+      "current_sha256": "bc67cc007a2659afb598ed99001fbe1a1450bcce7c9e614b50e1c254afa6e805",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2InvValDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "9efbedd51b3dd574229b1b6d9616be63b3eed8aab557cae6ba8e3e52f3c6091d",
+      "current_sha256": "9efbedd51b3dd574229b1b6d9616be63b3eed8aab557cae6ba8e3e52f3c6091d",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "04bd6fc30afd6f5c35ec27f6731527a1d119e3bc5ee076c831195b33abaae350",
+      "current_sha256": "d70e17c9e05d5e5d25433b8537e224b31f896a4d1434add061a35e35633c091b",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "f483c0a7f4c7452d773ccfd330e3649164c18e6776af3b0384d0e18243ec3dca",
+      "current_sha256": "1798d0d851f7a174408f30800b27741560399eb671f0132ac93aeacf25604255",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "21e7e3435c32046f99d7d1880b2644103cbba56a0cdb7127655d58a8ee701bb1",
+      "current_sha256": "35b2e56f124f71691a4bd18d8a00a8afd6365f06b6b7be0299f78f533e2ee3fd",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF3DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "d35985f813f1f3b0bc74caf5e820728ea357336e3faf9d7067366992845956b7",
+      "current_sha256": "0a03c26f554b7075da4c732282d50e6a1c0271e2e632e7d2612b3b323440ea4c",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF3NotPayDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "12949404eea3687cd4472ff634526fd9ed6060c23869a68507e127fd82c1d635",
+      "current_sha256": "12949404eea3687cd4472ff634526fd9ed6060c23869a68507e127fd82c1d635",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF4DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "4af58dc34ea9e0f418f921d67207750175a69fb0ab1a2f62e88991007dadfc15",
+      "current_sha256": "74122145a5070512e41ebf222f537440d83861eb464f79587958ca864d4d003b",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useF5CosOfDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "9ce2b4e8b79d0520ea3a77114e17c945a42a66326f21b7abd376e65a2dbb71a7",
+      "current_sha256": "6cf59c1d8c52ff8f6f10fa163b868be6f42cb8d9aa13eebb70ce11fa1d3762f2",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG10DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "58b401fcb1ebc619f53d42caa735d79220310b40ec7c1ee1540e78531e875b06",
+      "current_sha256": "58b401fcb1ebc619f53d42caa735d79220310b40ec7c1ee1540e78531e875b06",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG11DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "ae0ed7e755e7b9923fc90c8031014653c5e53e9fc62c808ae134ab3b9cd4eb33",
+      "current_sha256": "ae0ed7e755e7b9923fc90c8031014653c5e53e9fc62c808ae134ab3b9cd4eb33",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG12DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "cd272817d214af035d95d28fb7f3f19bb533cc9786185ff773d3929ab2665101",
+      "current_sha256": "cd272817d214af035d95d28fb7f3f19bb533cc9786185ff773d3929ab2665101",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG13DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "dc4f7cd4a4f9ff6a8a228b9eb2555bfcb083a5e8e3e0bd8d26a42b0c510308db",
+      "current_sha256": "dc4f7cd4a4f9ff6a8a228b9eb2555bfcb083a5e8e3e0bd8d26a42b0c510308db",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG14DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "0d554d16ec3dbda78643177d90ee7cd8ba33f143f1145b160d85eeb7e6a5eeb8",
+      "current_sha256": "0d554d16ec3dbda78643177d90ee7cd8ba33f143f1145b160d85eeb7e6a5eeb8",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "73ecd3ef09fd7cb7c79ad5c66f624e13d97e31729b8fe74f4cfbd86ebbaa5443",
+      "current_sha256": "73ecd3ef09fd7cb7c79ad5c66f624e13d97e31729b8fe74f4cfbd86ebbaa5443",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG1TraFinDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "a030791bc660723d54a430cb5d31090651bc2619ef6f6a0d296de7d3ac1536b6",
+      "current_sha256": "a030791bc660723d54a430cb5d31090651bc2619ef6f6a0d296de7d3ac1536b6",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG2DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "69ff98dd5e6bb87df0d3ae65e1ba217033127798c2909d973f99375732924412",
+      "current_sha256": "69ff98dd5e6bb87df0d3ae65e1ba217033127798c2909d973f99375732924412",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG3DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "2a9c37f470811e8b272182a89a79091c0fa6603b4453c8468d80dc31651ea373",
+      "current_sha256": "2a9c37f470811e8b272182a89a79091c0fa6603b4453c8468d80dc31651ea373",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG4BonInvDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "bb3fe241f4f842accadb82141ae2570d324b6bd6e0577498dab17fd602d3aa24",
+      "current_sha256": "bb3fe241f4f842accadb82141ae2570d324b6bd6e0577498dab17fd602d3aa24",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG4EclDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "406474cda584cb3dc94a0ec13bc318939a1bf6f67f5598dd58599af30636ad3f",
+      "current_sha256": "406474cda584cb3dc94a0ec13bc318939a1bf6f67f5598dd58599af30636ad3f",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG4MainDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "fd16f2e4524bda9f7b5dca78d7fa0c27ea030eabb7d2d7d3e25735167136e5b6",
+      "current_sha256": "fd16f2e4524bda9f7b5dca78d7fa0c27ea030eabb7d2d7d3e25735167136e5b6",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG5DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "5e9f622f8582a8496a3d70e301347714ac42219edc9c9f55dfb5a12ff6337a98",
+      "current_sha256": "5e9f622f8582a8496a3d70e301347714ac42219edc9c9f55dfb5a12ff6337a98",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG5LonTerDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "af4b2b47089c007d64fd50f189ce85554ca08fcaaa1cb6956738bc5dd02876b1",
+      "current_sha256": "af4b2b47089c007d64fd50f189ce85554ca08fcaaa1cb6956738bc5dd02876b1",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG6EclDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "ba3d71a70d21c5852ab4b872abab67c858fc595c2de9257e83b43e56eaa047ec",
+      "current_sha256": "ba3d71a70d21c5852ab4b872abab67c858fc595c2de9257e83b43e56eaa047ec",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG6MainDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "880c946259ea2270f1047c8ca527bd6a95256954cb713e9e7873c204244ded9e",
+      "current_sha256": "880c946259ea2270f1047c8ca527bd6a95256954cb713e9e7873c204244ded9e",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG6OthBonDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "c336013f9950a3c679de98900494a9223648af6d2b8b0747a23878b36362b959",
+      "current_sha256": "c336013f9950a3c679de98900494a9223648af6d2b8b0747a23878b36362b959",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG6SppiDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "fdc1aa5998c078aed0e6c372dbb3cf5b809b53425c7038c49cb85e8c4fd5c6a4",
+      "current_sha256": "fdc1aa5998c078aed0e6c372dbb3cf5b809b53425c7038c49cb85e8c4fd5c6a4",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG7EquityMethodDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "a632dc10d1dddaf3debe3c75631a5663fa8769c2e71cea96ce8fe103318f0c85",
+      "current_sha256": "a632dc10d1dddaf3debe3c75631a5663fa8769c2e71cea96ce8fe103318f0c85",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts",
+      "state": "landed",
+      "planned_sha256": "b8e60abc47b2c6984337bd2b869098bf0b876de9dd22623fe4dd21f462a7c8da",
+      "current_sha256": null,
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG7SubDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "190ec21beaffdb7ab9238cd95845602b2c37b25acf826229cfbbfdd85daec795",
+      "current_sha256": "190ec21beaffdb7ab9238cd95845602b2c37b25acf826229cfbbfdd85daec795",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG8DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "fc4628540ec9dc6e0f682f39dea9525e2ecee5b3c60f7d175cf37f55e60a746c",
+      "current_sha256": "fc4628540ec9dc6e0f682f39dea9525e2ecee5b3c60f7d175cf37f55e60a746c",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useG9DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "ac642b86723df015d069252a2ec266b1723bf6c0c6f9f950945a9c262a0f2d6e",
+      "current_sha256": "ac642b86723df015d069252a2ec266b1723bf6c0c6f9f950945a9c262a0f2d6e",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH10DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "c787ab4c8293bbc170985b2e8c18850d4ba6b0cc495e22c2e94801dc427bd8c6",
+      "current_sha256": "66e0b497b9e55a15ef0397cd5fc9742690e407fda49667b3566d45c53aa19b37",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH2DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "c7fd12cad933c819c362f1b06e5e8f0b8b4503cca39e69fc3774e309705aa94d",
+      "current_sha256": "6a4d2511cf9eab2050ced5cd72f6d824888d3f5915eddd482e288e74acd6a0bd",
+      "item_count": 4,
+      "categories": [
+        "fail_open_success_message",
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH3DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "271bf6ab3c9a7a6884fe27efdfeaaff9cf41f539426567c61041b495e5cf9705",
+      "current_sha256": "65ee7f774f0bd2f0ffb8040d102f7c013e4953e23c36bb97b35be21100c16da3",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH4DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "993196c556c42b81a972ed15c176464a0de546a6bdbf10493dfdacd28cd8f60f",
+      "current_sha256": "993196c556c42b81a972ed15c176464a0de546a6bdbf10493dfdacd28cd8f60f",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH5DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "46a5d854715f25fc5ea9bd671ab5a218ad6c4b655a3632015c8a5d7285b8afbc",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH6DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "6cb3261c2f6ff399583cfb6e1b23923ece3dd6c789a92eeca50f22ede6617cf8",
+      "current_sha256": "2eea37f1fa1ae777578d14da61c13fa61b75ba81a455524f948685a2c3ce3e5d",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH7DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "072d51bf80442000531ac02524467caaf97f01639c3d8d008c45d3989708020e",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH8DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "169194ae0eecc650c1067b2c246a9183bd0c358d4a093e31aa69a309c4a6c6df",
+      "current_sha256": "169194ae0eecc650c1067b2c246a9183bd0c358d4a093e31aa69a309c4a6c6df",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useH9DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "b39b51e444c24231dcc560ede3e4e779eac94f994d66bdb225c70395d4c4ae48",
+      "current_sha256": "b39b51e444c24231dcc560ede3e4e779eac94f994d66bdb225c70395d4c4ae48",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useI1DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "7913f7bd8119b773a02b36dd1a0ee5c75e6b17144ea20515c7b13ae8e077bd84",
+      "current_sha256": "7913f7bd8119b773a02b36dd1a0ee5c75e6b17144ea20515c7b13ae8e077bd84",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useI2DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "169c704b28e649f0f36e77155642841b46f192d3fed19237e38b420df81e304f",
+      "current_sha256": "169c704b28e649f0f36e77155642841b46f192d3fed19237e38b420df81e304f",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useI3DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "df46a853174ec045ba4edefb65a6ccc798368367d7ce1a46fcb05a946e8c6f99",
+      "current_sha256": "df46a853174ec045ba4edefb65a6ccc798368367d7ce1a46fcb05a946e8c6f99",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useI4DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "6e5e77e1f837b10ec0530fd6c93d1493874ad5fa78cee8df0954e9372ec21b74",
+      "current_sha256": "6e5e77e1f837b10ec0530fd6c93d1493874ad5fa78cee8df0954e9372ec21b74",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useI5DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "1252399af23074fd3b1a6bda852a20ce53fd999f38f0443374e76ccfa472b9cc",
+      "current_sha256": "1252399af23074fd3b1a6bda852a20ce53fd999f38f0443374e76ccfa472b9cc",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useI6DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "7761109732074854153975bc38357f7601586e532bb8098816f307a188a2e501",
+      "current_sha256": "7761109732074854153975bc38357f7601586e532bb8098816f307a188a2e501",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts",
+      "state": "landed",
+      "planned_sha256": "51b02b4e246387b3d978b619cd9297cd4a483aface65fab5f8bcc24cd8a0d439",
+      "current_sha256": null,
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts",
+      "state": "landed",
+      "planned_sha256": "1a014eccb6fbc190eeaab8744893fd5b27b43359720f8c5118ca000b4e3abfe2",
+      "current_sha256": null,
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK10DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "3f8600c5c4f9cac76d8f4ed7d9bc9a20ccbe4f48dbced5bd0d23d907c91e5961",
+      "current_sha256": "1cf7844783dd3b717ed8d1d2584b6616df213ec3edced05fb95a15df7ef7171b",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK11DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "906e70d8e1f2570291bd5ef6f6d8db440ebe18e6ccc26b8049beeb6a149aefff",
+      "current_sha256": "07f2f7b858daa5f80fd7ea71552d309e12355c405b16335ce07476dffc2aba4c",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK12DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "8dc034cac27fb4e451e2abf284dc87f555b9d99c68ddc3d021f920f01fbc4be5",
+      "current_sha256": "ef9549d58f48db58ac60341b4446e4c2e95902cf35d164391cd14216e70d088d",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK13DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "a7f4474689632ee0d955dcb77384fa1793fc287850c82cffa74eb559155a5ab4",
+      "current_sha256": "664402d8f4d2ded967201e983be14a2dbafb388762a4c9fc135bff378abaf520",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "898c0ed450369957fa19e5d32c2043d0f5d6c169bd08bba3f82f377e6550e8dd",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK2DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "12fefeb1c562fac59dd055259307623e02929e8ded000d9d3ee556d47ea99fe7",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK3DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "3f0d19eb0a9817cb946e25cc804b32486b10987d9c0786394f372a38e415c5b9",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK4DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "ad28f2fa64aa9f1822b91a3f9eacaf7c990ccbc6730cfb096f8265a2cf7125ff",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK5DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "9e075691c0dc8e41e4df439c0de851f8d4d4b7b9b53735d6fa91cc2bebc30e90",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK6DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "2658200f9bff9ea3c90a6c052d06ba4f87c3f220192b2b4f330febe58944cf59",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK7DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "a6faa04aaebd41dcc3212f3aaf6746a7979ce712aa288df938cd6d2ae3cd6497",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK8DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "54ffabc853bee6529414e828dc3314a414d309a315a0cc658c7d0616ba6cad7a",
+      "current_sha256": "ae00f56a80034f5c87fc63520aafcb4bed3eb05e3b819b378011f92a682bdde5",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "5690a87da49bc0b50479d3b390e9066efa47c99862c35f68a1d1a44fee4e5e9a",
+      "current_sha256": "51cac882a17909e303a38057788e6e0b8bd46fe0362f399fc0c5f9e07eb32eec",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL2DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "0e75ed2def8bf80dc488b4c06aa9e962e7e50fceb37b148c0c3ef861f08f2d09",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL3DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "c9b3d6fd6f3b472865bec3cd9bc46032466ff8220596c0318e1f82778b5a9009",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL4DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "aeb408aca4a44fc101c1a14fc1c944755a5b1cead733d1c847bbb1ec821c83aa",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "9eb7821e70ab63dcb502db54c2f08c0d8c66f86576514e6035d4c987cf17a34c",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "4f5d2beafd7c4a06b2e27418d3e51484bea25d40256ab2b70cee0ac90e40486e",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "c19e005852cec38bdb373d2e9b87884ae0199c0e41ee611df90a3b5e9090194b",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useL8DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "8d1cc2e7ce3152374dfe826c3178d98ffe2ff54dcffd1cdfaa648504ee7821b2",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "9739719c8f9f745258b73f2177632ddfe982f1a1956a9890d03cf5e63fb75b96",
+      "current_sha256": "9739719c8f9f745258b73f2177632ddfe982f1a1956a9890d03cf5e63fb75b96",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "cc7dace2869ec0c8950769c88a80a2c968eaeb75a0be4591982b11ed6748521e",
+      "current_sha256": "796422a7acf41a2ac1c0a65d1c4f89c70ae5a37984a32ef4cd94d45042e6a6ce",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "2b731833a28cd8e224082449709ba3d901309f8de4ddfcbf946580f3636461e7",
+      "current_sha256": "2b731833a28cd8e224082449709ba3d901309f8de4ddfcbf946580f3636461e7",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "694246e0752d304a6b026354fa818c828680a334b65fbe82a939825e931f1f65",
+      "current_sha256": "694246e0752d304a6b026354fa818c828680a334b65fbe82a939825e931f1f65",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "2f5692db2b9bb256d4761e604c21c9da08856cd0b22d7732cb6991751534c96e",
+      "current_sha256": "2f5692db2b9bb256d4761e604c21c9da08856cd0b22d7732cb6991751534c96e",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "e63de6f14b8c57616c83f0cfd76470dac5ee6e624295ad902bdf9d5332590dfc",
+      "current_sha256": "9490cc20eda2896c87b23c364e776d268773586a638750cbc1ae6c2fd5fcc1f5",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "7f629c5e6a2c8ddd46cb6319362dcd448789988740ddaadf3003961ae67da6be",
+      "current_sha256": "7f629c5e6a2c8ddd46cb6319362dcd448789988740ddaadf3003961ae67da6be",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "e52d61582386d6b225d2c67a4b3f8628a4d4dbc9588f55060971b06138561d3f",
+      "current_sha256": "435776c6190eebf322f7906c3b1e2773d5dc2418d53f862ade7916c1a5d40a18",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "2ec537edae2687fe5b635a380a2ea45f8e20e093851960ced9b947fdac2493a9",
+      "current_sha256": "2ec537edae2687fe5b635a380a2ea45f8e20e093851960ced9b947fdac2493a9",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "a010fc27a39ece58336dc7505c8662415016bf103bf6ba5ecbeb0ded4d1fc4b9",
+      "current_sha256": "7fa73b3036d2ec6befcdd90e7d09cca89c582de0ebb5a84777f283de5fe9137e",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "7be70c6c8721476c25e54c96dec7a4c80fd38bb170ba8c3ea86cb7d57584519e",
+      "current_sha256": "7be70c6c8721476c25e54c96dec7a4c80fd38bb170ba8c3ea86cb7d57584519e",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "b7068bb66efc577a41dadd49cb6d078450cabc448a9c9769ef6376e4ee852bcf",
+      "current_sha256": "b7068bb66efc577a41dadd49cb6d078450cabc448a9c9769ef6376e4ee852bcf",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "b614da4f555a22318848e8146c56ae1c61904f0543a6771817c067fcd8525742",
+      "current_sha256": "b614da4f555a22318848e8146c56ae1c61904f0543a6771817c067fcd8525742",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "addb504d3041e7968494038c6846711e11534a2a25c14a0f3702ffcda6132dfa",
+      "current_sha256": "addb504d3041e7968494038c6846711e11534a2a25c14a0f3702ffcda6132dfa",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "4ec96f5cc4f3903784a36dba4269c36e546dda072b1de88b02d4522c939433be",
+      "current_sha256": "4ec96f5cc4f3903784a36dba4269c36e546dda072b1de88b02d4522c939433be",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "e443d8ea46a226e3fc0a0fe9db5c6cd8c8a4077f2aa46114b25ffe78b5731c75",
+      "current_sha256": "23c1b017f5167ef13b7013bfd85c43d162abe394794a018564a41c2e509d19a9",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "29762f40229591f091a34fe0e6c412826f9f799d9db0bb8bb7465536ff4b108d",
+      "current_sha256": "29762f40229591f091a34fe0e6c412826f9f799d9db0bb8bb7465536ff4b108d",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "e01f9df782ba4602668602221c96375781ac5476deccd95f51e525feeb96cf90",
+      "current_sha256": "e01f9df782ba4602668602221c96375781ac5476deccd95f51e525feeb96cf90",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "9d4e2e415044fb28498f6ae456a7772234dfc3b13d8e5cb7a67b3f05b0d33abb",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+      "state": "landed",
+      "planned_sha256": "796da755a2d1debf9103aba11f72299dba80265cf62b3a755ecbd2059b757e5c",
+      "current_sha256": null,
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "a59b2aea350ff9d3d20859ff7a7c55b9d787c453220780e04a28e9acf82e0018",
+      "current_sha256": "ed7372059c20494ca3d57aff184a1e0b8addd5a83f8886dba94c1d36ed6e1778",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts",
+      "state": "intact",
+      "planned_sha256": "4cdc90fe10115a017d60af448d0d7dd80d6b1a131c964664bcf28f41d4eb8059",
+      "current_sha256": "4cdc90fe10115a017d60af448d0d7dd80d6b1a131c964664bcf28f41d4eb8059",
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "bbcb04281f214e1b33a8b2c16257ebf799696493c6742fc62e247d9a741e8a0e",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "faa27c900013271a6affc38b404afdeb8db88ab781a6fd1e8917d9fb46d8fc75",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "424ccb7c0d0ff7d648aa442bd0cd595cdd8a495344829592ae9f018521d34364",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+      "state": "drifted",
+      "planned_sha256": "caba488fd26cda7456e9437cb2eb28b523a5d06ae692ad06bf790217b36612eb",
+      "current_sha256": "069a5b232b873c4d97be9c669214b3492da258e0358d5ef5597b5c0937784df4",
+      "item_count": 1,
+      "categories": [
+        "legacy_factory"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useWpDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "95bb9f63e398c9d6d752605b06584672350d9e3a990d2649b6e0418f59713a48",
+      "current_sha256": "95bb9f63e398c9d6d752605b06584672350d9e3a990d2649b6e0418f59713a48",
+      "item_count": 1,
+      "categories": [
+        "legacy_factory"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+      "state": "landed",
+      "planned_sha256": "dcec0977067e0289aed39cfe688594aba9a4f5d83db4e1ddeed04f598da9dd76",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_local_storage_key",
+        "legacy_state_machine"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncModeStorage.ts",
+      "state": "intact",
+      "planned_sha256": "d5a87d41aa66e7565a8643647f9c5d2079ec0f8fd69feb5a56eb62cd519a521f",
+      "current_sha256": "d5a87d41aa66e7565a8643647f9c5d2079ec0f8fd69feb5a56eb62cd519a521f",
+      "item_count": 1,
+      "categories": [
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "replacement"
+      ],
+      "deletion_units": [
+        "none"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/composables/useG4SppiDualMode.ts",
+      "state": "intact",
+      "planned_sha256": "bc062792c63b1e6450f879baa8dc3fc29600084f3f77888aea99b5da474587cc",
+      "current_sha256": "bc062792c63b1e6450f879baa8dc3fc29600084f3f77888aea99b5da474587cc",
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": true,
+      "tracked_in_git": true
+    },
+    {
+      "path": "audit-platform/frontend/src/composables/useL1DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "92486fdb5eb794d77b31444c9467f105338bb34fe29e228b60ac1453aba538c3",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/composables/useL3DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "969ba33c8b336bbf542e40923b5fb8b7ad9e587d9c10cea7e2430dd59ca4840b",
+      "current_sha256": null,
+      "item_count": 2,
+      "categories": [
+        "legacy_composable",
+        "legacy_local_storage_key"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/composables/workpaper/j2/useJ2DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "46138e8c3fddf165f4c4386c2979baf339d671ca3d7121fc1bf203d7adf8dab8",
+      "current_sha256": null,
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts",
+      "state": "landed",
+      "planned_sha256": "594716084a77130470b27b178d0192647553bf458ae266ff42e765d3df9cad5c",
+      "current_sha256": null,
+      "item_count": 1,
+      "categories": [
+        "legacy_composable"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "whole_file"
+      ],
+      "still_matches_legacy_name_form": null,
+      "tracked_in_git": false
+    },
+    {
+      "path": "backend/app/routers/wp_onlyoffice_router.py",
+      "state": "drifted",
+      "planned_sha256": "400877eca4d3a5fd8880947d69b20099f7ec9de15064f22d72e8b96d3d260101",
+      "current_sha256": "887428312683785263d9b0e13e1c24aa2bc581a386416a28d425cfbca4eac13e",
+      "item_count": 8,
+      "categories": [
+        "legacy_endpoint",
+        "paragraph_index_fallback"
+      ],
+      "dispositions": [
+        "pending_delete",
+        "preserved_until_replacement_lands"
+      ],
+      "deletion_units": [
+        "call_sites_within_file",
+        "none"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "state": "intact",
+      "planned_sha256": "8f46a48078ef02cc0789e3dbab24e16ec1aede95f1f2f5f54c035aec61487021",
+      "current_sha256": "8f46a48078ef02cc0789e3dbab24e16ec1aede95f1f2f5f54c035aec61487021",
+      "item_count": 2,
+      "categories": [
+        "legacy_endpoint"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "route_within_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "state": "intact",
+      "planned_sha256": "0be537f20474e95f0711e5a61ed9976a2e06e4fa65ec7bb520e20f649500ee18",
+      "current_sha256": "0be537f20474e95f0711e5a61ed9976a2e06e4fa65ec7bb520e20f649500ee18",
+      "item_count": 2,
+      "categories": [
+        "legacy_endpoint"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "route_within_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    },
+    {
+      "path": "backend/app/services/wp_docx_template_parser.py",
+      "state": "intact",
+      "planned_sha256": "bce2bcff253735f5cb3aa937eeb9943e46f8a8b6ab8780f6c4b771e50764b5b5",
+      "current_sha256": "bce2bcff253735f5cb3aa937eeb9943e46f8a8b6ab8780f6c4b771e50764b5b5",
+      "item_count": 1,
+      "categories": [
+        "paragraph_index_fallback"
+      ],
+      "dispositions": [
+        "pending_delete"
+      ],
+      "deletion_units": [
+        "call_sites_within_file"
+      ],
+      "still_matches_legacy_name_form": false,
+      "tracked_in_git": true
+    }
+  ],
+  "requirements_covered": [
+    "1.7",
+    "12.9"
+  ]
+}

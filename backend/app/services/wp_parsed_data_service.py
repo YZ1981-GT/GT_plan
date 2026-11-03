@@ -23,6 +23,87 @@ from app.models.workpaper_models import WorkingPaper
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# TargetSheet — resolve_target_sheet 的返回值（ADR-FHIC-06 第 6 点）
+# ---------------------------------------------------------------------------
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class TargetSheet:
+    """resolve_target_sheet 的返回值。
+
+    state:
+        ``"found"`` — 唯一命中；
+        ``"blocked_not_found"`` — 目标工作表不存在；
+        ``"blocked_ambiguous"`` — 目标工作表名有歧义。
+    sheet_name: 真实 sheet 名（仅 found 时有值）。
+    candidates: 所有匹配的 sheet 名列表。
+    """
+
+    state: str  # "found" | "blocked_not_found" | "blocked_ambiguous"
+    sheet_name: str | None
+    candidates: list[str]
+
+
+def _normalize_sheet_key(key: str) -> str:
+    """将 sheet key 归一化：去首尾空白、统一全角转半角后小写。
+
+    简化版 normalize_sheet_key，仅用于 resolve_target_sheet 内部匹配。
+    """
+    return key.strip().lower()
+
+
+def resolve_target_sheet(
+    parsed_data: dict | None,
+    stable_sheet_key: str,
+) -> TargetSheet:
+    """在 html_data 中找 normalize_sheet_key(key) == stable_sheet_key 的真实表名。
+
+    0 个 ⇒ blocked「目标工作表不存在」；
+    多个 ⇒ blocked「目标工作表名有歧义」。
+    """
+    if not parsed_data or not isinstance(parsed_data, dict):
+        return TargetSheet(
+            state="blocked_not_found",
+            sheet_name=None,
+            candidates=[],
+        )
+
+    html_data = parsed_data.get("html_data")
+    if not isinstance(html_data, dict):
+        return TargetSheet(
+            state="blocked_not_found",
+            sheet_name=None,
+            candidates=[],
+        )
+
+    target_norm = _normalize_sheet_key(stable_sheet_key)
+    candidates: list[str] = []
+    for name in html_data.keys():
+        if _normalize_sheet_key(name) == target_norm:
+            candidates.append(name)
+
+    if len(candidates) == 0:
+        return TargetSheet(
+            state="blocked_not_found",
+            sheet_name=None,
+            candidates=[],
+        )
+    if len(candidates) > 1:
+        return TargetSheet(
+            state="blocked_ambiguous",
+            sheet_name=None,
+            candidates=candidates,
+        )
+    return TargetSheet(
+        state="found",
+        sheet_name=candidates[0],
+        candidates=candidates,
+    )
+
+
 def _cell_ref_to_rc(cell_ref: str) -> tuple[int, int]:
     """单元格引用 → (row, col)，均为 1-based；解析失败返回 (0, 0)。
 
@@ -52,13 +133,22 @@ def write_cell_to_parsed_data(
     sheet_name: str,
     cell_ref: str,
     value: Any,
+    require_existing_sheet: bool = False,
 ) -> None:
-    """将求值结果写入 parsed_data.html_data[sheet].cells[cell]（保留 dict 结构）。"""
+    """将求值结果写入 parsed_data.html_data[sheet].cells[cell]（保留 dict 结构）。
+
+    当 require_existing_sheet=True 且目标工作表不存在时抛 ValueError（双重防线）。
+    """
     cell_up = cell_ref.strip().upper()
     parsed = dict(wp.parsed_data or {})
     html_data = parsed.get("html_data")
     if not isinstance(html_data, dict):
         html_data = {}
+
+    # ADR-FHIC-06 第 6 点：require_existing_sheet 双重防线
+    if require_existing_sheet and sheet_name not in html_data:
+        raise ValueError(f"目标工作表不存在: {sheet_name!r}")
+
     sheet_data = html_data.get(sheet_name)
     if not isinstance(sheet_data, dict):
         sheet_data = {}

@@ -88,11 +88,12 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Location, Top, Bottom, Document, Paperclip } from '@element-plus/icons-vue'
-import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { apiProxy } from '@/utils/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 
 interface LineageNode {
   wp_code: string
@@ -137,7 +138,7 @@ const loading = ref(false)
 const lineageData = ref<LineageData | null>(null)
 
 const route = useRoute()
-const { locateCell } = useCellLocate()
+const router = useRouter()
 
 watch(() => props.modelValue, (val) => {
   visible.value = val
@@ -175,23 +176,27 @@ async function fetchLineage() {
   }
 }
 
-function handleNodeClick(node: LineageNode) {
-  if (!node?.wp_code) return
-
-  const target: LocateTarget = {
-    wp_code: node.wp_code,
-    wp_id: node.wp_id ?? undefined,
-    sheet_name: node.sheet_name ?? undefined,
-    cell_ref: node.cell_ref ?? undefined,
-    component_type: node.component_type ?? undefined,
-    value: node.value ?? undefined,
-    label: node.label ?? undefined,
+/**
+ * 节点定位（spec wp-deeplink-locate-coverage-closure 需求 3.2）：节点就是当前打开的底稿（`wp_id` 相同；没带 `wp_id` 时
+ * 编码与「当前对象」相同）⇒ 交渲染器定位（找不到由渲染器提示）；其余 ⇒ 打开该底稿编辑器并带 ?sheet=&cell=。
+ * 原先只在当前页面找、找不到却提示「定位到 X」。
+ */
+async function handleNodeClick(node: LineageNode) {
+  if (!node?.wp_code && !node?.wp_id) return
+  const currentWpId = String(route.params.wpId || '')
+  const sameWp = node.wp_id ? node.wp_id === currentWpId : !!node.wp_code && node.wp_code === lineageData.value?.current?.wp_code
+  if (currentWpId && sameWp) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: currentWpId, sheetName: node.sheet_name || undefined, cellRef: node.cell_ref || '',
+    })
+    return
   }
-
-  const success = locateCell(target)
-  if (!success) {
-    ElMessage.info(`定位到 ${node.wp_code}${node.cell_ref ? ' ' + node.cell_ref : ''}`)
-  }
+  const reason = await openWorkpaperCell(router, {
+    projectId: String(route.params.projectId || ''), wpId: node.wp_id, wpCode: node.wp_code,
+    sheet: node.sheet_name, cell: node.cell_ref,
+  })
+  if (reason) ElMessage.warning(reason)
+  else visible.value = false
 }
 
 function handleAttachmentClick(att: AttachmentRef) {

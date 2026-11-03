@@ -1,5 +1,6 @@
 /** F2-66 关联方采购市场价核查分组矩阵状态管理。 */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   defaultRelatedPartyMarketSheet,
@@ -25,6 +26,15 @@ export function useF2RelatedPartyMarket(opts: {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const sheet = ref<RelatedPartyMarketSheet>(defaultRelatedPartyMarketSheet())
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [opts.allResponses.value.get(ROWS_KEY), opts.allResponses.value.get(NOTE_KEY)].filter(Boolean)

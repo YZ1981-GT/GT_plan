@@ -611,3 +611,30 @@ class TestRollForward:
         assert L.rollforward_columns({"headers": ["项目", "期初余额", "本期增加", "本期减少", "期末余额", "期末数"]}) is None
         assert L.rollforward_columns(find_table("soe", "五-1-1")) is None
         assert L.rollforward_columns({"headers": []}) is None
+
+
+# ── 词表 schema 校验（复盘建议 #2） ──────────────────────────────────────────
+
+
+class TestVocabularySchemaValidation:
+    """_build_vocabulary 的三条运行时校验。"""
+
+    def test_period_word_cross_category_raises(self):
+        """同一个词不能同时出现在两个期间类别里。"""
+        with pytest.raises(ValueError, match="同时出现在"):
+            _vocab_with(period_words={"end": ["期末", "重复词"], "prior": ["期初", "重复词"]})
+
+    def test_movement_overlaps_period_raises(self):
+        """变动词不能同时是期间词。"""
+        with pytest.raises(ValueError, match="movement_words 与 period_words 重叠"):
+            _vocab_with(movement_words={"increase": ["期末"], "decrease": [], "movement": []})
+
+    def test_prefix_unknown_period_raises(self):
+        """period_prefixes / period_suffixes 里的期间类别必须已知。"""
+        with pytest.raises(ValueError, match="期间类别"):
+            _vocab_with(period_prefixes=[["本期", "cur"], ["上期", "unknown_period"]])
+
+    def test_real_vocabulary_passes(self):
+        """当前词表在校验下能正常加载（不误报）。"""
+        vocab = L.load_vocabulary()
+        assert vocab.digest  # 加载成功

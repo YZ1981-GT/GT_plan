@@ -37,7 +37,6 @@ function baseProps(over: Record<string, unknown> = {}) {
     vouchers: [voucher()],
     coverageStats: null,
     fillMode: 'append',
-    isFillModeRestricted: true,
     selectedCount: 1,
     selectedDebitTotal: 0,
     selectedCreditTotal: 22421.5,

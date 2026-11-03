@@ -15,6 +15,7 @@
  *
  * Requirements: 10.1-10.9
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcRelatedPartyEndBalance } from './useD3FormulaEngine'
 import type { ChecklistResponse } from './useD3FormData'
@@ -54,20 +55,21 @@ const ITEM_ID_CONCLUSION = 'D3-rp-conclusion'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 function safeParseRows(jsonStr: string | null | undefined): RelatedPartyRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed.map(normalizeRow) : []
+    return Array.isArray(parsed) ? parsed.map(normalizeD3RelatedPartyRow) : []
   } catch {
     return []
   }
 }
 
-function normalizeRow(raw: any): RelatedPartyRow {
+/** 存库行 → 算好期末余额的一行（载入与对拍守卫共用；模板 F = C + E − D） */
+export function normalizeD3RelatedPartyRow(raw: any): RelatedPartyRow {
   const prior = parseNum(raw.priorBalance)
   const debit = parseNum(raw.debit)
   const credit = parseNum(raw.credit)

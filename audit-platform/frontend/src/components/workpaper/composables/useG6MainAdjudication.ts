@@ -35,6 +35,8 @@ import {
   calcAdjustedBookValue,
 } from '@/composables/useG6MainFormulaEngine'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows, tbRowsUnder } from '@/services/trialBalanceRows'
+import { pickTbAmount } from './workpaperAuditYear'
 import type { ChecklistResponse } from './useF1FormData'
 import { dispatchG6SaveItems } from './g6CrossHelpers'
 
@@ -671,20 +673,11 @@ export function useG6MainAdjudication(options: UseG6MainAdjudicationOptions) {
     if (!projectId.value) return
     if (trialBalanceAmount.value !== 0) return
     try {
-      const res = await api.get('/api/trial-balance/query', {
-        params: { project_id: projectId.value, account_code: G6_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const items = res?.data?.items ?? res?.data ?? res?.items ?? []
-      if (Array.isArray(items) && items.length > 0) {
-        const sum = items.reduce(
-          (acc: number, it: any) => acc + parseNum(it.audited_amount ?? it.unadjusted_amount),
-          0,
-        )
-        setTrialBalance(sum)
-      } else if (typeof res?.data === 'number') {
-        setTrialBalance(res.data)
-      }
+      // 经试算表唯一入口（年度缺省由后端按项目审计年度取，逐行审定优先、其次未审）；
+      // 原先请求后端没有的 `/api/trial-balance/query` ⇒ 恒 404 被吞，TB 核对数恒空
+      const { rows } = await fetchTrialBalanceRows(projectId.value, { accountPrefix: G6_ACCOUNT_CODE })
+      const family = tbRowsUnder(rows, G6_ACCOUNT_CODE)
+      if (family.length > 0) setTrialBalance(family.reduce((acc, r) => acc + pickTbAmount(r), 0))
     } catch {
       console.warn('[useG6MainAdjudication] fetchTrialBalance failed')
     }

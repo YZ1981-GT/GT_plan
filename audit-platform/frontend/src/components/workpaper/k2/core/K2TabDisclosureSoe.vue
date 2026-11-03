@@ -194,12 +194,16 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import {
   K2_NOTE_SECTION,
-  K2_SOE_MAIN_ROWS,
   K2_TOTAL_ROW_LABEL,
   buildK2SyncPayload,
 } from '../../composables/k2NoteSectionMap'
 import { checkK2Consistency, k2ConsistencySummary } from '../../composables/useK2DisclosureEngine'
 import { K2_ACCOUNT_NAME, K2_GROSS_FALLBACK_STANDARD } from '../../composables/k2AccountScope'
+import {
+  buildK2SoeDisclosureSnapshot,
+  k2SoeDefaultMainRows,
+  loadK2SoeDisclosureState,
+} from '../../composables/k2DisclosureTabState'
 
 /**
  * 科目口径取单一真源（报表行 `BS-014` → 实证 `TB('1901')`）。
@@ -226,16 +230,8 @@ const emit = defineEmits<{ save: [itemId: string, value: any] }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
-interface MainRow {
-  label: string
-  endAmount: number
-  priorAmount: number
-  fixed: boolean
-}
-
-const mainRows = reactive<MainRow[]>(
-  K2_SOE_MAIN_ROWS.map(label => ({ label, endAmount: 0, priorAmount: 0, fixed: true })),
-)
+// 初值 / 读回 / 同步快照与附注页离屏同步共用 k2DisclosureTabState
+const mainRows = reactive(k2SoeDefaultMainRows())
 
 const noteText = ref('')
 const checkExpanded = ref(false)
@@ -326,45 +322,15 @@ function persistText(): void {
   persist('K2-disc-soe-text', { text: noteText.value })
 }
 
-function parseSaved(itemId: string): any {
-  const saved = props.allResponses.get(itemId)
-  const raw = saved?.remark ?? saved?.value ?? null
-  if (!raw) return null
-  if (typeof raw !== 'string') return raw
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
-}
-
 function loadSavedData(): void {
-  const savedMain = parseSaved('K2-disc-soe-main')
-  if (Array.isArray(savedMain) && savedMain.length) {
-    mainRows.splice(0, mainRows.length, ...savedMain.map((r: any) => ({
-      label: String(r?.label ?? ''),
-      endAmount: Number(r?.endAmount) || 0,
-      priorAmount: Number(r?.priorAmount) || 0,
-      fixed: K2_SOE_MAIN_ROWS.includes(String(r?.label ?? '')),
-    })))
-  }
-  const savedText = parseSaved('K2-disc-soe-text')
-  if (savedText && typeof savedText === 'object') noteText.value = String(savedText.text ?? '')
+  const savedText = loadK2SoeDisclosureState(props.allResponses, mainRows)
+  if (savedText != null) noteText.value = savedText
 }
 
 // ═══ 同步到附注 ═══
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK2SyncPayload('soe', props.wpId || '', {
-    mainRows: mainRows.map(r => ({
-      label: r.label,
-      endAmount: r.endAmount,
-      priorAmount: r.priorAmount,
-    })),
-    texts: noteText.value.trim()
-      ? [{ section: 'k2-soe-note', title: '其他流动资产说明', text: noteText.value }]
-      : [],
-  })
+  const payload = buildK2SyncPayload('soe', props.wpId || '', buildK2SoeDisclosureSnapshot(mainRows, noteText.value))
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {

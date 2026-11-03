@@ -1,18 +1,78 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
+/**
+ * 表格单元格编辑器适配（spec excel-style-table-editing ADR-1）：模板里的这几个组件解析到
+ * `@/components/grid/adapters` 的同名导出（类型声明为原组件类型）。表格外透传原组件；
+ * 表体单元格里平时只渲染文本，双击 / F2 / 直接输入才挂原组件。名单与 adapters.ts 的
+ * GRID_ADAPTED_COMPONENTS 一致（守卫 gridAdapterResolver.spec.ts 核对）。
+ */
+export const GRID_ADAPTED_COMPONENTS = ['ElInput', 'ElInputNumber', 'ElSelect', 'ElDatePicker', 'ElCheckbox', 'ElSwitch', 'ElRadioGroup']
+export function GridCellAdapterResolver() {
+  return {
+    type: 'component' as const,
+    resolve: (name: string) => (GRID_ADAPTED_COMPONENTS.includes(name) ? { name, from: '@/components/grid/adapters' } : undefined),
+  }
+}
+
+export function heavyFeatureChunk(id: string): string | undefined {
+  const moduleId = id.replace(/\\/g, '/')
+  if (!moduleId.includes('/node_modules/')) return undefined
+
+  // 先固定全站共享运行时。Vue 与 Element Plus 必须放在同一个 vendor-core；
+  // 拆成 core/ui 会形成 Element Plus → Vue 与自动组件注册 → Element Plus 的循环 chunk。
+  // 若只给重功能命名，Rollup 又会把公共运行时吸进 heavy-*，首屏为取得 Vue
+  // 反而静态加载整个 Univer/Office 重块。
+  if (/\/node_modules\/(?:vue|vue-router|pinia)\//.test(moduleId)
+    || moduleId.includes('/node_modules/@vue/')
+    || moduleId.includes('/node_modules/element-plus/')
+    || moduleId.includes('/node_modules/@element-plus/')) return 'vendor-core'
+
+  if (moduleId.includes('/@univerjs/')) return 'heavy-univer'
+  if (moduleId.includes('/@vue-office/') || moduleId.includes('/pdfjs-dist/') || moduleId.includes('/mammoth/')) {
+    return 'heavy-office'
+  }
+  if (/\/node_modules\/(?:xlsx|xlsx-js-style|exceljs)\//.test(moduleId)) return 'heavy-excel'
+  return undefined
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   // 用 127.0.0.1 而非 localhost：后端 uvicorn 仅监听 IPv4（0.0.0.0），
   // Windows 上 localhost 先解析 ::1 → 连接失败回退，每个代理请求固定 +2s
-  const apiTarget = env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
-  const devPort = parseInt(env.VITE_DEV_PORT || '3030', 10)
+  const apiTarget = process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
+  const devPort = parseInt(process.env.VITE_DEV_PORT || env.VITE_DEV_PORT || '3030', 10)
+  const outDir = process.env.GT_FRONTEND_OUT_DIR || 'dist'
+  const proxy: Record<string, ProxyOptions> = {
+    '/api': {
+      target: apiTarget,
+      changeOrigin: true,
+      // FastAPI trailing-slash 307 must stay behind the frontend origin.
+      configure: (server) => {
+        server.on('proxyRes', (proxyRes) => {
+          const location = proxyRes.headers['location']
+          if (location && location.startsWith(apiTarget)) {
+            proxyRes.headers['location'] = location.replace(apiTarget, '')
+          }
+        })
+      },
+    },
+    '/wopi': {
+      target: apiTarget,
+      changeOrigin: true,
+    },
+  }
 
   return {
+    // 依赖预构建缓存放前端根目录 .vite/（.gitignore 已忽略），不放 node_modules/.vite：
+    // 临时 worktree 常以联接（junction）共用 node_modules，删 worktree 时顺着联接把 .vite/deps 一起删掉，
+    // 开发服务器内存里的依赖还能用、懒加载分块（如 @univerjs/engine-render 的 en-gb）就 504 Outdated Optimize Dep。
+    // spec post-push-residual-defect-closure R5
+    cacheDir: '.vite',
     plugins: [
       vue(),
       // 不在 AutoImport 中挂 ElementPlusResolver：
@@ -23,10 +83,25 @@ export default defineConfig(({ mode }) => {
         dts: 'src/auto-imports.d.ts',
       }),
       Components({
-        resolvers: [ElementPlusResolver({ importStyle: false })],
+        // 先于 ElementPlusResolver：第一个返回结果的解析器生效
+        resolvers: [GridCellAdapterResolver(), ElementPlusResolver({ importStyle: false })],
         dts: 'src/components.d.ts',
       }),
     ],
+    build: {
+      // manifest 是包体预算、built smoke 和 verified snapshot 的共同事实源。
+      outDir,
+      manifest: true,
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: heavyFeatureChunk,
+          // 只把命中的包本身放进指定 chunk；否则 Rollup 会递归吸入 lodash 等共享依赖，
+          // 入口为取得一个共享函数又反向静态加载整个 heavy-univer。
+          onlyExplicitManualChunks: true,
+        },
+      },
+    },
     server: {
       // Windows IPv6 loopback 在部分开发机上会出现“显示 LISTENING 但连接被拒绝”。
       // 显式监听 IPv4 全接口，start-dev / Playwright / transform probe 统一走 127.0.0.1。
@@ -40,26 +115,15 @@ export default defineConfig(({ mode }) => {
       //    3030 还是后端 CORS_ORIGINS 白名单里的固定值，漂移端口属于约定被破坏。
       //    改成 true 后端口冲突会明确失败并打印占用信息，失败可见 > 静默降级。
       strictPort: true,
-      proxy: {
-        '/api': {
-          target: apiTarget,
-          changeOrigin: true,
-          // 修复 FastAPI trailing-slash 307 重定向绕过代理导致 CORS 的问题：
-          // 拦截后端返回的 Location header 中的绝对 URL，重写为相对路径
-          configure: (proxy) => {
-            proxy.on('proxyRes', (proxyRes) => {
-              const location = proxyRes.headers['location']
-              if (location && location.startsWith(apiTarget)) {
-                proxyRes.headers['location'] = location.replace(apiTarget, '')
-              }
-            })
-          },
-        },
-        '/wopi': {
-          target: apiTarget,
-          changeOrigin: true,
-        },
-      },
+      proxy,
+    },
+    // Stable runtime serves the immutable production snapshot while retaining
+    // the same-origin API/WOPI contract used by the development server.
+    preview: {
+      host: '0.0.0.0',
+      port: devPort,
+      strictPort: true,
+      proxy,
     },
     resolve: {
       alias: {

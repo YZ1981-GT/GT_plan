@@ -7,6 +7,7 @@
 import type { BusinessModeRow, QAMatrix } from '../composables/useD1BusinessMode'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   basisRows: BusinessModeRow[]
@@ -132,7 +133,7 @@ function isEmptyResults(results: string[]): boolean {
     <div class="section-title">（二）应收票据分类判断</div>
     <p class="qa-intro">了解并观察被审计单位贴现或背书的实际情况及未来预期</p>
     <div class="table-scroll">
-      <table class="qa-matrix">
+      <GtGridTable class="qa-matrix">
         <thead>
           <tr>
             <th class="qa-question-col">问题</th>
@@ -190,7 +191,7 @@ function isEmptyResults(results: string[]): boolean {
             <td class="qa-remark-col" />
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
     <div v-if="isEmptyResults(businessModeResults)" class="matrix-empty-hint">
       请完成分类判断矩阵全部问答后，系统将自动判定业务模式与列报项目。

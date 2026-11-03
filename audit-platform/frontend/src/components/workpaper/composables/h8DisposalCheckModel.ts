@@ -6,6 +6,7 @@
  * 平台增强：终止损益 = 负债余额 − 净值（CAS21）；H9 同步终止；提前退租违约金
  */
 
+import { withRowMeta } from './shared/voucherCheckFill'
 import { calcSubtotal } from './useH8FormulaEngine'
 import { calcTerminationGainLoss } from './useH8CAS21Engine'
 
@@ -475,7 +476,8 @@ export function mergeSeededDisposalRows(
       out.push(s)
       continue
     }
-    const merged: H8DisposalCheckRow = {
+    // 合并行以带入行为底：原行的行元数据 `_gt` 要带过来（否则抽凭行再抽一次就重复，spec voucher-identity 任务 12）
+    const merged: H8DisposalCheckRow = withRowMeta({
       ...s,
       rowId: prev.rowId,
       checks: { ...prev.checks },
@@ -491,7 +493,7 @@ export function mergeSeededDisposalRows(
       remark: prev.remark || s.remark,
       indexRef: prev.indexRef || s.indexRef,
       reductionMethod: prev.reductionMethod || s.reductionMethod,
-    }
+    }, prev)
     recalcDisposalRow(merged)
     out.push(merged)
   }

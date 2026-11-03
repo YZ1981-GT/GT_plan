@@ -28,7 +28,7 @@
         <slot name="nav-notifications" />
 
         <!-- 显示设置 Aa -->
-        <el-popover placement="bottom" :width="240" trigger="click" :teleported="true">
+        <el-popover placement="bottom" :width="300" trigger="click" :teleported="true">
           <template #reference>
             <div class="gt-topbar-btn" title="显示设置">
               <span class="gt-topbar-text-icon">Aa</span>
@@ -72,6 +72,14 @@
                 <el-radio-button :value="0.5">50%</el-radio-button>
               </el-radio-group>
             </div>
+            <!-- 表格编辑方式（spec excel-style-table-editing R1） -->
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">表格编辑</span>
+              <el-radio-group :model-value="displayPrefs.gridEditMode" size="small" data-testid="grid-edit-mode" @change="(v: any) => displayPrefs.setGridEditMode(v)">
+                <el-radio-button v-for="opt in displayPrefs.gridEditModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-hint">{{ gridEditModeHint }}</div>
           </div>
         </el-popover>
 
@@ -227,7 +235,7 @@
             </transition>
           </div>
           <!-- 高级查询（弹窗触发，非路由） -->
-          <div class="gt-nav-item" @click="showCustomQuery = true" title="高级查询">
+          <div class="gt-nav-item" @click="openCustomQueryFromSidebar" title="高级查询">
             <el-icon :size="20"><Search /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
@@ -316,15 +324,20 @@
       </section>
 
       <!-- AI 助手面板（dsh） -->
-      <DshPanel v-model="showDshPanel" @message-count="onDshMessageCount" />
+      <DshPanel
+        v-if="dshPanelMounted"
+        v-model="showDshPanel"
+        @message-count="onDshMessageCount"
+      />
     </div>
 
     <!-- 全局公式管理弹窗 -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       :rows="[]"
       :project-id="formulaContext?.projectId ?? currentProjectId"
-      :year="formulaContext?.year ?? currentYear"
+      :year="formulaContext?.year ?? currentYear ?? undefined"
       :scope="formulaContext?.scope ?? 'report'"
       :wp-id="formulaContext?.wpId"
       :wp-code="formulaContext?.wpCode"
@@ -338,6 +351,10 @@
       :capability-snapshot="formulaContext?.capabilitySnapshot"
       :formula-session="formulaContext?.formulaSession"
       :read-only="formulaContext?.readOnly ?? false"
+      :initial-template-id="formulaContext?.templateId"
+      :initial-template-action="formulaContext?.templateAction"
+      :initial-template-domain="formulaContext?.templateDomain"
+      :open-revision="formulaOpenRevision"
       @session-change="onFormulaSessionChange"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
@@ -352,11 +369,15 @@
 
     <!-- 全局自定义查询弹窗 -->
     <CustomQueryDialog
+      v-if="customQueryMounted"
       v-model="showCustomQuery"
-      :project-id="currentProjectId"
-      :year="currentYear"
-      :initial-tab="customQueryInitialTab"
-      :initial-source="customQueryInitialSource"
+      :project-id="customQueryContext.projectId"
+      :year="customQueryYear"
+      :initial-tab="customQueryContext.initialTab"
+      :initial-source="customQueryContext.initialSource"
+      :initial-notice="customQueryContext.initialNotice"
+      :open-revision="customQueryOpenRevision"
+      :entry="customQueryEvent?.entry ?? null"
     />
 
     <!-- 全局快捷键帮助面板 [R7-S2-12] -->
@@ -365,11 +386,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useRoleContextStore } from '@/stores/roleContext'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 import { useTheme } from '@/composables/useTheme'
 import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -380,12 +403,13 @@ import {
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
   Search,
 } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import FormulaPendingSyncDialog from '@/components/formula/settings/FormulaPendingSyncDialog.vue'
-import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
+import { resolveDialogOpenContext, type OpenCustomQueryPayload } from '@/components/query/queryEntryContext'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
-import DshPanel from '@/components/ai/DshPanel.vue'
+import DshPanelLoadError from '@/components/ai/DshPanelLoadError.vue'
 import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
 import {
   legacyPayloadToPartialCommand,
@@ -397,15 +421,26 @@ import {
   type FormulaManagerContextOwnerState,
 } from '@/shell/formula/formulaManagerContextOwner'
 import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
+import { useAdaptivePoll } from '@/composables/useAdaptivePoll'
 import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type FourColSwitchPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
 
+// 这些组件只在用户首次打开时下载和挂载；挂载后保留实例，避免关闭再开丢局部状态。
+const CustomQueryDialog = defineAsyncComponent(() => import('@/components/query/CustomQueryDialog.vue'))
+const DshPanel = defineAsyncComponent({
+  loader: () => import('@/components/ai/DshPanel.vue'),
+  errorComponent: DshPanelLoadError,
+  delay: 0,
+  suspensible: false,
+})
+
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
+const gridEditModeHint = computed(() => displayPrefs.gridEditModeOptions.find((o) => o.value === displayPrefs.gridEditMode)?.hint ?? '')
 const { isDark, toggle: toggleTheme } = useTheme()
 
 /** formula-toolbar Task 5 — primary outlet owner epoch (bumped on workpaper route change). */
@@ -552,6 +587,7 @@ const sidebarWidth = ref(220)
 const middleWidth = ref(340)
 const middleCollapsed = ref(false)
 const showDshPanel = ref(false)
+const dshPanelMounted = useMountOnFirstOpen(showDshPanel)
 const dshUnreadCount = ref(0)
 
 const dshAssistBridge: DshAssistBridge = {
@@ -579,14 +615,31 @@ const isConsolNotePage = computed(() =>
 )
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
+const formulaOpenRevision = ref(0)
 const formulaOwnerState = ref<FormulaManagerContextOwnerState>({})
 const formulaContext = computed(() => formulaOwnerState.value.active)
 const showCustomQuery = ref(false)
-const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
-const customQueryInitialSource = ref<string | undefined>(undefined)
+const customQueryMounted = useMountOnFirstOpen(showCustomQuery)
+const customQueryOpenRevision = ref(0)
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
-const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+// 全局弹窗（公式管理 / 一键刷新 / 自定义查询）的年度：路由 → 项目 store；都没有为 null（原先兜底去年）
+const currentYear = computed<number | null>(() => {
+  const routeYear = parseAuditYear(route.query.year)
+  if (routeYear != null) return routeYear
+  try {
+    return useProjectStore().year
+  } catch {
+    return null // 无 pinia 上下文
+  }
+})
+// 高级查询弹窗本次打开的上下文（queryEntryContext 一处映射，关闭即丢弃事件）；年度只给弹窗（currentYear 及公式管理 / 一键刷新的绑定不动）：
+// 弹窗项目是路由项目时取页面年度，事件带来别的项目时留空 ⇒ 弹窗取该项目审计年度
+const customQueryEvent = ref<OpenCustomQueryPayload | null>(null)
+const customQueryContext = computed(() => resolveDialogOpenContext({ route, eventPayload: customQueryEvent.value }))
+const customQueryYear = computed(() => (customQueryContext.value.projectId === currentProjectId.value ? currentYear.value : null))
+watch(showCustomQuery, (open) => { if (!open) customQueryEvent.value = null })
 
 // 四栏模式由 props 或用户切换控制
 watch(() => props.fourColumn, (v) => {
@@ -710,10 +763,9 @@ interface BgImportStatus {
   tooltip: string        // 鼠标悬停完整信息
 }
 const bgImportStatus = ref<BgImportStatus | null>(null)
-let importPollTimer: ReturnType<typeof setInterval> | null = null
 /** 当前被追踪的 projectId（独立于路由，支持跨项目保留导入指示） */
 const trackedProjectId = ref<string | null>(null)
-/** 连续轮询错误计数——连续 6 次错误自动释放追踪（30s = 6 × 5s 轮询间隔） */
+/** 连续轮询错误计数——追踪中连续 6 次错误自动释放追踪（30s = 6 × 5s 进行中轮询间隔） */
 let pollErrorCount = 0
 const MAX_POLL_ERRORS = 6
 
@@ -753,12 +805,13 @@ const phaseColor = computed(() => {
   return PHASE_COLORS[bgImportStatus.value.phase] || '#409eff'
 })
 
-async function pollImportQueue() {
+/** 查一次导入状态；返回「是否有进行中的导入」（决定下一轮 5 秒还是 30 秒，R17） */
+async function pollImportQueue(): Promise<boolean> {
   // 优先追踪 trackedProjectId；若无则回退到当前路由项目
   const trackId = trackedProjectId.value || (route.params.projectId as string)
   if (!trackId) {
     bgImportStatus.value = null
-    return
+    return false
   }
   try {
     const statusData: any = await api.get(
@@ -794,6 +847,7 @@ async function pollImportQueue() {
       if (!trackedProjectId.value) {
         trackedProjectId.value = trackId
       }
+      return true
     } else if (bgImportStatus.value) {
       const prev = bgImportStatus.value
       bgImportStatus.value = null
@@ -824,16 +878,22 @@ async function pollImportQueue() {
       // 追踪中的项目已无 job（外部取消或其他原因），释放追踪
       trackedProjectId.value = null
     }
+    return false
   } catch {
-    // P2-1.2: 连续 3 次错误自动释放追踪，避免后端不可达时永久卡死
+    // P2-1.2: 连续 6 次错误自动释放追踪，避免后端不可达时永久卡死
     pollErrorCount++
     if (pollErrorCount >= MAX_POLL_ERRORS) {
       bgImportStatus.value = null
       trackedProjectId.value = null
       pollErrorCount = 0
     }
+    // 追踪中按进行中的节奏重试（30 秒内释放或恢复），没在追踪按空闲节奏
+    return !!trackedProjectId.value
   }
 }
+
+// R17：有进行中的导入每 5 秒、没有每 30 秒（原先固定每 5 秒）；页面隐藏暂停、可见时立即查
+const importPoll = useAdaptivePoll(pollImportQueue)
 
 function navigateToImport() {
   const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
@@ -857,32 +917,14 @@ function navigateToImport() {
   }
 }
 
-watch(() => route.params.projectId, (newId) => {
-  // 路由项目变化时：不清 bgImportStatus（跨项目保留追踪）；
-  // 首次进入路由时主动触发一次轮询
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  if (newId && !trackedProjectId.value) {
-    // 当前没在追踪其他项目 → 轮询新项目
-    pollImportQueue()
-  } else if (trackedProjectId.value) {
-    // 继续追踪旧项目，不切换
-    pollImportQueue()
-  }
-  importPollTimer = setInterval(pollImportQueue, 5000)  // 5s 轮询比 10s 更实时
+watch(() => route.params.projectId, () => {
+  // 路由项目变化时：不清 bgImportStatus（跨项目保留追踪）；立即查一次（追踪中查追踪项目，否则查当前路由项目）
+  importPoll.start()
 }, { immediate: true })
 
-// 页面隐藏时暂停轮询（标签页切走或浏览器后台）节省请求
-function onVisibilityChange() {
-  if (document.hidden) {
-    if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  } else {
-    if (!importPollTimer && (trackedProjectId.value || route.params.projectId)) {
-      pollImportQueue()
-      importPollTimer = setInterval(pollImportQueue, 5000)
-    }
-  }
-}
-document.addEventListener('visibilitychange', onVisibilityChange)
+// 刚提交导入：立即查一次，不等空闲轮询的 30 秒
+function onImportSubmitted() { importPoll.poke() }
+eventBus.on('ledger-import:submitted', onImportSubmitted)
 
 async function handleLogout() {
   await authStore.logout()
@@ -937,9 +979,38 @@ watch(() => route.params.projectId, (newId) => {
   connectSSE(newId as string || '')
 }, { immediate: true })
 
+function templateFormulaScope(domain: string): OpenFormulaManagerPayload['scope'] {
+  if (domain === 'note') return 'note'
+  if (domain === 'consol_note') return 'consol_note'
+  if (domain === 'tb_detail') return 'tb'
+  if (domain === 'wp') return 'workpaper'
+  return 'report'
+}
+
+/** 模板详情「到项目中订阅」深链：支持正常跳转和刷新后直达。 */
+function openTemplateSubscribeFromQuery() {
+  const templateId = route.query.formulaTemplateId
+  const action = route.query.formulaAction
+  const domain = route.query.formulaDomain
+  const projectId = route.params.projectId
+  if (typeof templateId !== 'string' || action !== 'subscribe' || typeof projectId !== 'string') return
+  const templateDomain = typeof domain === 'string' ? domain : 'report'
+  eventBus.emit('open-formula-manager', {
+    projectId, scope: templateFormulaScope(templateDomain), templateId,
+    templateAction: 'subscribe', templateDomain,
+  })
+}
+
+watch(() => [route.params.projectId, route.query.formulaTemplateId, route.query.formulaAction,
+  route.query.formulaDomain] as const, openTemplateSubscribeFromQuery)
+
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
-  formulaOwnerState.value = receiveFormulaManagerOpen(formulaOwnerState.value, payload)
+  const nextOwner = receiveFormulaManagerOpen(formulaOwnerState.value, payload)
+  formulaOwnerState.value = nextOwner
+  // dirty 会话只登记 pending，不驱动活动弹窗重置；其余每次打开都推进代际，
+  // 即使 project/year 相同、只变 scope/章节/nodeKey，也会让真实弹窗重新定位。
+  if (!nextOwner.pending) formulaOpenRevision.value += 1
   sessionStorage.removeItem('gt-formula-target-node')
   // EventBus 只负责适配；dirty 会话由唯一 owner 固定完整上下文，nodeKey 仅为迁移元数据。
   const meta = legacyPayloadToPartialCommand(payload ?? {})
@@ -950,17 +1021,29 @@ function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
 }
 
 function onFormulaSessionChange(session: FormulaManagerSession) {
-  formulaOwnerState.value = receiveFormulaManagerSession(formulaOwnerState.value, session)
+  const pending = formulaOwnerState.value.pending
+  const nextOwner = receiveFormulaManagerSession(formulaOwnerState.value, session)
+  formulaOwnerState.value = nextOwner
+  if (pending && !nextOwner.pending && nextOwner.active === pending) {
+    formulaOpenRevision.value += 1
+  }
 }
 
 watch(showFormulaManager, (open) => {
   if (!open) formulaOwnerState.value = {}
 })
 
-/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发） */
-function onOpenCustomQueryEvent(payload?: { tab?: 'basic' | 'advanced'; source?: string; project_id?: string }) {
-  customQueryInitialTab.value = payload?.tab || 'basic'
-  customQueryInitialSource.value = payload?.source || undefined
+/** 从侧栏打开时也推进代际：弹窗已打开时再次点击仍重新采用当前路由上下文。 */
+function openCustomQueryFromSidebar() {
+  customQueryEvent.value = null
+  customQueryOpenRevision.value += 1
+  showCustomQuery.value = true
+}
+
+/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发）；项目、年度、页签与预选源经 resolveDialogOpenContext */
+function onOpenCustomQueryEvent(payload?: OpenCustomQueryPayload) {
+  customQueryEvent.value = payload ?? null
+  customQueryOpenRevision.value += 1
   showCustomQuery.value = true
 }
 
@@ -1000,6 +1083,7 @@ onMounted(() => {
   checkConsolidatedProjects()
   document.addEventListener('keydown', onKeydown)
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
+  openTemplateSubscribeFromQuery()
   eventBus.on('open-custom-query', onOpenCustomQueryEvent)
   eventBus.on('four-col-switch', onSwitchFourCol)
   eventBus.on('shortcut:undo', onShortcutUndo)
@@ -1012,13 +1096,13 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
-  document.removeEventListener('visibilitychange', onVisibilityChange)
+  eventBus.off('ledger-import:submitted', onImportSubmitted)
+  importPoll.dispose()
   eventBus.off('open-formula-manager', onOpenFormulaEvent)
   eventBus.off('open-custom-query', onOpenCustomQueryEvent)
   eventBus.off('four-col-switch', onSwitchFourCol)
   eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
   // 关闭 SSE 订阅
   if (sseSub) { sseSub.close(); sseSub = null }
 })
@@ -1525,6 +1609,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.gt-dp-hint {
+  margin-top: -6px;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.5;
+  color: var(--gt-color-text-tertiary);
 }
 .gt-dp-label {
   font-size: var(--gt-font-size-xs);

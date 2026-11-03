@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG9Adjudication — G9-1 审定表：分组行 / 试算勾稽 / AJE+RJE 公式
@@ -377,11 +378,7 @@ export function useG9Adjudication(opts: {
     if (_year == null) return false
     if (!opts.projectId.value) return false
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year })
       const hit = resolveG9TbRow(list)
       if (hit) {
         tbFetchStatus.value = 'found'

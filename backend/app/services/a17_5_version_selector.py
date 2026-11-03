@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
-from app.services.business_category_service import get_category_prefix
+from app.services.project_classification import resolve
 
 _logger = logging.getLogger(__name__)
 
@@ -57,13 +57,15 @@ def _determine_applicability(
     business_category: str | None,
     scenario: str | None,
 ) -> list[dict]:
-    """纯逻辑：根据业务分类和场景判定各版本适用性。
+    """纯逻辑：根据业务分类和场景判定各版本适用性（``project_classification`` 单一解释）。
 
     返回列表，每项含 wp_code / title / description / applicable / mandatory。
     """
-    prefix = get_category_prefix(business_category or "")
-    cat = (business_category or "").upper()
-    scn = (scenario or "").lower()
+    classification = resolve(business_category, scenario)
+    prefix = classification.category_group
+    cat = classification.category_code or ""
+    scn = classification.scenario
+    is_ipo = classification.is_ipo  # 细分类 A2 或场景 ipo（含迁移前残留的分类值 IPO）
 
     results: list[dict] = []
     for ver in _A17_5_VERSIONS:
@@ -85,8 +87,8 @@ def _determine_applicability(
 
         elif code == "A17-5-3":
             # IPO 特别程序：A2 或 scenario='ipo'
-            applicable = cat == "A2" or scn == "ipo"
-            mandatory = cat == "A2" or scn == "ipo"
+            applicable = is_ipo
+            mandatory = is_ipo
 
         elif code == "A17-5-4":
             # 新三板特别程序：B1

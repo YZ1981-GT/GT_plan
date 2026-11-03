@@ -506,6 +506,9 @@ class TestProjectContextAttachWpId:
         with patch(
             "app.services.acnr.resolver.resolve_instance",
             return_value=mock_result,
+        ), patch(
+            "app.services.acnr.resolver.get_locked_version",
+            new=AsyncMock(return_value=None),
         ):
             result = await full_resolve(
                 addr_id="D2/D2-2/E100",
@@ -542,102 +545,52 @@ class TestMultiSyntaxConvergence:
 
 
 class TestVersionLockedResolution:
-    """R19.5: 归档项目按锁定 registry_version 解析。"""
+    """R19.5: 归档项目只从落库锁读取 registry_version。"""
 
     @pytest.mark.asyncio
-    async def test_archived_project_same_version_resolves_normally(self):
-        """归档项目 locked_version == 当前 catalog 版本 → 正常解析。"""
-        from app.services.acnr.immutability import (
-            record_project_registry_version,
-            clear_all_project_versions,
-        )
+    async def test_project_without_db_marks_lock_unchecked(self, monkeypatch):
+        async def _must_not_run(*_args):
+            raise AssertionError("db 为空时不得查询落库锁")
 
-        project_id = str(uuid4())
-        # 锁定版本与当前 catalog 版本一致
-        record_project_registry_version(project_id, "2026.1.0-test")
-
-        try:
-            result = await full_resolve(
-                addr_id="D2/D2-2/E100",
-                project_id=project_id,
-            )
-
-            assert result.found is True
-            assert result.addr_id == "D2/D2-2/E100"
-            assert result.entry_type == "cell"
-        finally:
-            clear_all_project_versions()
+        monkeypatch.setattr("app.services.acnr.resolver.get_locked_version", _must_not_run)
+        result = await full_resolve(addr_id="D2/D2-2/E100", project_id=str(uuid4()))
+        assert result.found is True
+        assert result.version_lock_checked is False
 
     @pytest.mark.asyncio
-    async def test_archived_project_different_version_logs_warning_and_resolves(self):
-        """归档项目 locked_version != 当前版本 → 记录告警并抛出 VersionNotFoundError (Req-9.3)。
+    async def test_locked_same_version_resolves_normally(self, monkeypatch):
+        from app.services.acnr.catalog import get_catalog
 
-        Req-9.3: 版本缺失返回明确治理错误。
-        Req-12.5: 主动告警 (version_mismatch)。
-        """
-        from app.services.acnr.immutability import (
-            record_project_registry_version,
-            clear_all_project_versions,
+        async def _locked(_db, _project_id):
+            return get_catalog().registry_version
+
+        monkeypatch.setattr("app.services.acnr.resolver.get_locked_version", _locked)
+        result = await full_resolve(
+            addr_id="D2/D2-2/E100", project_id=str(uuid4()), db=object()
         )
+        assert result.found is True
+        assert result.version_lock_checked is True
+
+    @pytest.mark.asyncio
+    async def test_locked_missing_version_raises(self, monkeypatch):
         from app.services.acnr.resolver import VersionNotFoundError
 
-        project_id = str(uuid4())
-        # 锁定版本与当前不同（模拟 catalog 升级后的旧归档项目）
-        record_project_registry_version(project_id, "2025.3.0-archived")
+        async def _locked(_db, _project_id):
+            return "20250301000000"
 
-        try:
-            with pytest.raises(VersionNotFoundError) as exc_info:
-                await full_resolve(
-                    addr_id="D2/D2-2/E100",
-                    project_id=project_id,
-                )
-
-            # Req-9.3: 确认版本信息
-            assert exc_info.value.version == "2025.3.0-archived"
-
-        finally:
-            clear_all_project_versions()
-
-    @pytest.mark.asyncio
-    async def test_non_archived_project_no_version_check(self):
-        """非归档项目（无锁定版本）→ 不触发版本检查逻辑。"""
-        from app.services.acnr.immutability import clear_all_project_versions
-
-        project_id = str(uuid4())
-        # 不记录任何 registry_version
-
-        clear_all_project_versions()
-
-        with patch(
-            "app.services.acnr.resolver.logger"
-        ) as mock_logger:
-            result = await full_resolve(
-                addr_id="D2/D2-2/E100",
-                project_id=project_id,
+        monkeypatch.setattr("app.services.acnr.resolver.get_locked_version", _locked)
+        with pytest.raises(VersionNotFoundError) as exc_info:
+            await full_resolve(
+                addr_id="D2/D2-2/E100", project_id=str(uuid4()), db=object()
             )
-
-            assert result.found is True
-            # 无版本锁定 → 无 warning
-            mock_logger.warning.assert_not_called()
+        assert exc_info.value.version == "20250301000000"
 
     @pytest.mark.asyncio
-    async def test_no_project_id_no_version_check(self):
-        """无 project_id → 不触发版本检查。"""
-        from app.services.acnr.immutability import (
-            record_project_registry_version,
-            clear_all_project_versions,
-        )
+    async def test_no_project_id_does_not_check_lock(self, monkeypatch):
+        async def _must_not_run(*_args):
+            raise AssertionError("没有 project_id 时不得查询锁")
 
-        # 即使全局有归档记录，无 project_id 时不检查
-        record_project_registry_version("some-other-project", "2025.1.0")
-
-        try:
-            with patch(
-                "app.services.acnr.resolver.logger"
-            ) as mock_logger:
-                result = await full_resolve(addr_id="D2/D2-2/E100")
-
-                assert result.found is True
-                mock_logger.warning.assert_not_called()
-        finally:
-            clear_all_project_versions()
+        monkeypatch.setattr("app.services.acnr.resolver.get_locked_version", _must_not_run)
+        result = await full_resolve(addr_id="D2/D2-2/E100")
+        assert result.found is True
+        assert result.version_lock_checked is None

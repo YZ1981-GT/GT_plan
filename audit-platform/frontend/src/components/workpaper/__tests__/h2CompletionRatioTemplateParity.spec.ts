@@ -36,4 +36,17 @@ describe('H2-2 D 列与模板同口径', () => {
     const [row] = normalizeH2DetailRows([{ rowId: 'r2', name: '待立项', budget: 0, cipBegin: 100 }])
     expect(row.completionRate).toBe(0)
   })
+
+  it('期初调整为 0 是合法录入：不按存库的期初审定反推（模板 Z = J + S）', () => {
+    // OO 侧把期初调整清成 0，存库的 beginAudited 还是上一版公式缓存值 1,200
+    const [row] = normalizeH2DetailRows([{ rowId: 'r3', name: '仓库', cipBegin: 1_000, adjustBegin: 0, beginAudited: 1_200 }])
+    expect(row.adjustBegin).toBe(0)
+    expect(row.beginAudited).toBe(1_000)
+  })
+
+  it('只有旧行（根本没有 adjustBegin 键）才按期初审定反推调整额', () => {
+    const [row] = normalizeH2DetailRows([{ rowId: 'r4', name: '旧行', cipBegin: 1_000, beginAudited: 1_200 }])
+    expect(row.adjustBegin).toBe(200)
+    expect(row.beginAudited).toBe(1_200)
+  })
 })

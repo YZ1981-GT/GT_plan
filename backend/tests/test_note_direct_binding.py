@@ -103,17 +103,20 @@ class TestNoteRows:
         assert r["ending_resolved"] is True
 
     def test_single_code_income_statement(self):
-        """损益类科目：ending=本期发生额, opening=年初余额。"""
+        """损益类科目：ending=本期发生额, opening=上年试算表发生额（本年年初余额不是上期）。"""
+        from app.services.formula_push.sources import PriorPlSnapshot
+
         binding = NoteDirectBinding("K8", ("6601",), "销售费用", is_income=True)
         binding._last_tb_data = _make_tb_data({
             "6601": {"期末余额": 500000.0, "年初余额": 400000.0, "本期发生额": 100000.0},
         })
+        binding._last_prior_pl = PriorPlSnapshot(_make_tb_data({"6601": {"本期发生额": 80000.0}}))
         rule = SimpleNamespace(rule_id="K8.note.main", target=SimpleNamespace(domain="note"))
         rows = binding.note_rows({}, "listed", rule)
         assert len(rows) == 1
         r = rows[0]
         assert r["ending"] == 100000.0  # 本期发生额，非期末余额
-        assert r["opening"] == 400000.0  # 年初余额
+        assert r["opening"] == 80000.0  # 上年发生额，非本年年初余额
 
     def test_multi_code_with_total(self):
         """多科目（F2 存货）：每码一行 + 合计行。"""

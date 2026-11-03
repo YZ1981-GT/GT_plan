@@ -34,72 +34,89 @@ class AIContentMustBeConfirmedRule(GateRule):
             return None
 
         try:
-            # ── V3 Req 6.3：先查 ai_content_log 表（新机制，统一字段级溯源）──
-            # 优先级高于 parsed_data 扫描：6.2 起 wrap_ai_output_with_log
-            # 强制写入 ai_content_log，pending 即应阻断 sign_off。
-            from app.services import ai_content_log_service
-
-            pending_logs = await ai_content_log_service.list_pending_by_project(
-                db=db, project_id=project_id, limit=5
+            # 只读查询放进保存点：失败时回滚到保存点，PG 上调用方事务不会停在 aborted。
+            async with db.begin_nested():
+                return await self._check_pending(db, project_id)
+        except Exception as e:
+            # ADR-LLM-016：治理状态未知视为未就绪（fail-closed），不能当作“没有未确认内容”。
+            logger.error(f"[R3-AI-UNCONFIRMED] check error: {e}")
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code="AI_CONTENT_STATE_UNKNOWN",
+                severity=self.severity,
+                message="AI 生成内容的确认状态暂时无法读取，已暂停签字",
+                location={
+                    "project_id": str(project_id),
+                    "section": "ai_content",
+                    "via": "state_unavailable",
+                },
+                suggested_action="请稍后重试；若持续出现请联系管理员检查 AI 内容记录",
             )
-            if pending_logs:
-                pending_count = await ai_content_log_service.count_pending_by_project(
-                    db=db, project_id=project_id
-                )
-                return GateRuleHit(
-                    rule_code=self.rule_code,
-                    error_code=self.error_code,
-                    severity=self.severity,
-                    message=(
-                        f"存在 {pending_count} 段未确认的 AI 生成内容（ai_content_log）"
-                    ),
-                    location={
-                        "project_id": str(project_id),
-                        "section": "ai_content",
-                        "via": "ai_content_log",
-                        "pending_count": pending_count,
-                        "sample_log_ids": [str(log.id) for log in pending_logs],
-                    },
-                    suggested_action="请在 AI 内容审核面板逐一确认或拒绝后再签字",
-                )
 
-            # ── 既有：扫描 parsed_data（保留旧路径，向后兼容历史底稿）──
-            from app.models.workpaper_models import WorkingPaper
+    async def _check_pending(self, db: AsyncSession, project_id) -> Optional[GateRuleHit]:
+        # ── V3 Req 6.3：先查 ai_content_log 表（新机制，统一字段级溯源）──
+        # 优先级高于 parsed_data 扫描：6.2 起 wrap_ai_output_with_log
+        # 强制写入 ai_content_log，pending 即应阻断 sign_off。
+        from app.services import ai_content_log_service
 
-            stmt = select(WorkingPaper).where(
-                WorkingPaper.project_id == project_id,
-                WorkingPaper.is_deleted == False,  # noqa: E712
-                WorkingPaper.parsed_data.isnot(None),
+        pending_logs = await ai_content_log_service.list_pending_by_project(
+            db=db, project_id=project_id, limit=5
+        )
+        if pending_logs:
+            pending_count = await ai_content_log_service.count_pending_by_project(
+                db=db, project_id=project_id
             )
-            result = await db.execute(stmt)
-            workpapers = result.scalars().all()
-
-            unconfirmed_wps: list[str] = []
-
-            for wp in workpapers:
-                if self._has_unconfirmed_ai_content(wp.parsed_data):
-                    unconfirmed_wps.append(str(wp.id))
-
-            if not unconfirmed_wps:
-                return None
-
             return GateRuleHit(
                 rule_code=self.rule_code,
                 error_code=self.error_code,
                 severity=self.severity,
-                message="存在未确认的AI生成内容",
+                message=(
+                    f"存在 {pending_count} 段未确认的 AI 生成内容（ai_content_log）"
+                ),
                 location={
                     "project_id": str(project_id),
                     "section": "ai_content",
-                    "via": "parsed_data",
-                    "unconfirmed_wp_count": len(unconfirmed_wps),
-                    "sample_wp_ids": unconfirmed_wps[:5],
+                    "via": "ai_content_log",
+                    "pending_count": pending_count,
+                    "sample_log_ids": [str(log.id) for log in pending_logs],
                 },
-                suggested_action="请逐一确认或拒绝底稿中的 AI 生成内容后再签字",
+                suggested_action="请在 AI 内容审核面板逐一确认或拒绝后再签字",
             )
-        except Exception as e:
-            logger.error(f"[R3-AI-UNCONFIRMED] check error: {e}")
+
+        # ── 既有：扫描 parsed_data（保留旧路径，向后兼容历史底稿）──
+        from app.models.workpaper_models import WorkingPaper
+
+        stmt = select(WorkingPaper).where(
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+            WorkingPaper.parsed_data.isnot(None),
+        )
+        result = await db.execute(stmt)
+        workpapers = result.scalars().all()
+
+        unconfirmed_wps: list[str] = []
+
+        for wp in workpapers:
+            if self._has_unconfirmed_ai_content(wp.parsed_data):
+                unconfirmed_wps.append(str(wp.id))
+
+        if not unconfirmed_wps:
             return None
+
+        return GateRuleHit(
+            rule_code=self.rule_code,
+            error_code=self.error_code,
+            severity=self.severity,
+            message="存在未确认的AI生成内容",
+            location={
+                "project_id": str(project_id),
+                "section": "ai_content",
+                "via": "parsed_data",
+                "unconfirmed_wp_count": len(unconfirmed_wps),
+                "sample_wp_ids": unconfirmed_wps[:5],
+            },
+            suggested_action="请逐一确认或拒绝底稿中的 AI 生成内容后再签字",
+        )
 
     def _has_unconfirmed_ai_content(self, parsed_data: dict) -> bool:
         """递归检查 parsed_data 中是否存在未确认的 AI 生成内容。

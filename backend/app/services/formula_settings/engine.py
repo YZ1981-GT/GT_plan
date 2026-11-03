@@ -1,7 +1,10 @@
 """「上游变化」执行器：把同步内核的效果落到存储、待确认事项与审计（design §4 / §6）。
 
-全局发布、模板发布新版本、订阅、退订共用：调用方先算好每个（项目, 公式位）的
+全局发布、模板发布新版本、订阅、退订共用：调用方先算好每个（域, 项目, 公式位）的
 旧上游 / 新上游 / 本项目状态（:class:`PlanItem`），这里统一分类、决策、写入。
+
+冲突决策键 = ``{域}|{项目 id}|{公式位}``（spec formula-hub-integrity-closure 需求 8.4，ADR-FHIC-11）：
+与库内身份（项目 + 域 + 公式位）一致，两个域的同名公式位各自决策；旧两段键 ``{项目 id}|{公式位}`` 仍识别。
 """
 from __future__ import annotations
 
@@ -13,7 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.formula_settings.audit import change_entry
-from app.services.formula_settings.definitions import display_formula, same_exec
+from app.services.formula_settings.definitions import DOMAINS, display_formula, same_exec
 from app.services.formula_settings.pending import close_pending, upsert_pending
 from app.services.formula_settings.projects import ProjectInfo
 from app.services.formula_settings.stores import DomainStore, SlotRecord
@@ -30,6 +33,31 @@ from app.services.formula_settings.sync import (
 
 #: 全局发布时，本项目行来自订阅模板（模板层优先）——不受本次全局变化影响
 TEMPLATE_SKIPPED = "template"
+
+#: 决策键首段可取的域；旧两段键的首段是项目 id，不在其中
+KNOWN_DOMAINS: frozenset[str] = frozenset(DOMAINS)
+
+
+# ── 冲突决策键 ────────────────────────────────────────────────────────────────
+
+
+def decision_key(domain: str, project_id: uuid.UUID | str, slot_key: str) -> str:
+    """``{域}|{项目 id}|{公式位}``。公式位可含 ``|``（底稿、附注、合并附注），解析一律 ``split('|', 2)``。"""
+    return f"{domain}|{project_id}|{slot_key}"
+
+
+def parse_decision_key(key: str) -> tuple[str | None, str, str] | None:
+    """决策键 → ``(域, 项目 id, 公式位)``。
+
+    首段是已知域 ⇒ 三段键，``split('|', 2)``；否则是旧两段键 ``{项目 id}|{公式位}``，域为 ``None``
+    （ADR-FHIC-11：按「当前域, 首段, 余下」使用 —— 由查找方代入当前域）。缺项目或公式位返回 ``None``：
+    与任何条目都对不上，按默认处理（与旧版对不上的键被忽略一致）。
+    """
+    head, sep, rest = key.partition("|")
+    if head in KNOWN_DOMAINS:
+        parts = key.split("|", 2)
+        return (parts[0], parts[1], parts[2]) if len(parts) == 3 and parts[1] and parts[2] else None
+    return (None, head, rest) if sep and head and rest else None
 
 
 # ── 锁 ────────────────────────────────────────────────────────────────────────
@@ -61,6 +89,8 @@ async def lock_project(db: AsyncSession, domain: str, project_id: uuid.UUID) -> 
 
 @dataclass
 class PlanItem:
+    #: 公式位所在的域：决策键与 ``outcomes`` 的键都带它（同一项目两个域的同名公式位是两件事）
+    domain: str
     project: ProjectInfo
     slot_key: str
     label: str
@@ -85,19 +115,21 @@ class PlanItem:
 
     @property
     def key(self) -> str:
-        return f"{self.project.id}|{self.slot_key}"
+        """冲突决策键（预览条目的 ``key``，前端原样回传），也是 ``outcomes`` 的键。"""
+        return decision_key(self.domain, self.project.id, self.slot_key)
 
-    def classify(self, domain: str) -> Category:
-        self.category = classify(domain, new_upstream=self.new_up,
+    def classify(self) -> Category:
+        self.category = classify(self.domain, new_upstream=self.new_up,
                                  local=self.local.local_state() if self.local else None,
                                  frozen=self.project.frozen)
         return self.category
 
-    def to_dict(self, domain: str) -> dict[str, Any]:
-        lo = self.local
+    def to_dict(self) -> dict[str, Any]:
+        domain, lo = self.domain, self.local
         cat = self.skipped or (self.category.value if self.category else "")
         return {
             "key": self.key,
+            "domain": domain,
             "project_id": str(self.project.id),
             "project_name": self.project.name,
             "project_status": self.project.status,
@@ -128,17 +160,34 @@ def _plain(definition: Mapping[str, Any] | None) -> dict | None:
 
 @dataclass
 class Decisions:
-    """管理员（或项目成员）对计划的决策：项目级「应用 / 暂缓」+ 冲突级「采用 / 保留 / 交项目确认」。"""
+    """管理员（或项目成员）对计划的决策：项目级「应用 / 暂缓」+ 冲突级「采用 / 保留 / 交项目确认」。
+
+    ``conflict_choices`` 的键 = 预览条目的 ``key``（三段 ``{域}|{项目}|{公式位}``）；旧两段键 ``{项目}|{公式位}``
+    仍识别，对当前域生效。构造时按 :func:`parse_decision_key` 建索引，之后不要再改 ``conflict_choices``。
+    """
 
     project_choices: dict[str, ProjectChoice] = field(default_factory=dict)
     conflict_choices: dict[str, ConflictChoice] = field(default_factory=dict)
     default_conflict: ConflictChoice = ConflictChoice.ASK
+    _by_slot: dict[tuple[str, str, str], ConflictChoice] = field(init=False, repr=False, compare=False,
+                                                                 default_factory=dict)
+    _legacy: dict[tuple[str, str], ConflictChoice] = field(init=False, repr=False, compare=False,
+                                                           default_factory=dict)
 
     def __post_init__(self) -> None:
         # 内核按枚举身份判断（``is``）：传进来的字符串一律转成枚举，免得「keep」被当成采用
         self.project_choices = {str(k): ProjectChoice(v) for k, v in self.project_choices.items()}
         self.conflict_choices = {str(k): ConflictChoice(v) for k, v in self.conflict_choices.items()}
         self.default_conflict = ConflictChoice(self.default_conflict)
+        for raw, choice in self.conflict_choices.items():
+            parsed = parse_decision_key(raw)
+            if parsed is None:
+                continue
+            domain, pid, slot = parsed
+            if domain is None:
+                self._legacy[(pid, slot)] = choice
+            else:
+                self._by_slot[(domain, pid, slot)] = choice
 
     @classmethod
     def parse(cls, raw: Mapping[str, Any] | None) -> "Decisions":
@@ -152,8 +201,16 @@ class Decisions:
     def project(self, project_id: uuid.UUID) -> ProjectChoice:
         return self.project_choices.get(str(project_id), ProjectChoice.APPLY)
 
+    def conflict_for(self, domain: str, project_id: uuid.UUID | str, slot_key: str) -> ConflictChoice:
+        """先查三段键，再查旧两段键（对当前域生效），都没有用默认。"""
+        pid = str(project_id)
+        choice = self._by_slot.get((domain, pid, slot_key))
+        if choice is None:
+            choice = self._legacy.get((pid, slot_key))
+        return self.default_conflict if choice is None else choice
+
     def conflict(self, item: PlanItem) -> ConflictChoice:
-        return self.conflict_choices.get(item.key, self.default_conflict)
+        return self.conflict_for(item.domain, item.project.id, item.slot_key)
 
 
 # ── 落地 ──────────────────────────────────────────────────────────────────────
@@ -248,6 +305,7 @@ def empty_counts() -> dict[str, int]:
 
 def summarize(items: Iterable[PlanItem], projects: Iterable[ProjectInfo],
               outcomes: Mapping[str, ApplyOutcome] | None = None) -> dict[str, Any]:
+    """计数与逐项目摘要；``outcomes`` 以 :attr:`PlanItem.key` 为键（带域，多域条目的待确认数各算各的）。"""
     counts = empty_counts()
     per: dict[uuid.UUID, dict[str, Any]] = {}
     for p in projects:

@@ -1,0 +1,93 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/delegation-apply.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_delegation_service.py（apply）、procedure_operation_preview.py（consume_and_apply）、procedure_delegation_scope.py（enforce_scope）、wp_visibility/delegation_guard.py；接口：POST /api/projects/{pid}/procedure-delegations/apply",
+  "title": "DelegationApply（程序行委派应用）",
+  "description": "一次消费预览凭证（行锁 + 逐项校验：已消费 / 不匹配 / 过期 / 请求被篡改 / 成员变化 ⇒ 409 零写；同一 request_id 重试返回上次结果、不再执行）。目标任务版本自预览后变化 ⇒ 409。默认整批原子：任一冲突 ⇒ 409 delegation_conflict 零写；best_effort ⇒ 每任务保存点、逐任务结果。被委派人看不到目标循环 ⇒ 400 row_delegation_rejected / out_of_scope 零写（凭证不消费）；带 expand_scope + scope_reason ⇒ 同事务只把缺少的循环写进 project_users.scope_cycles 并递增可见性策略版本。同人重复分配为 no-op（不递增版本、不写历史）。顶层 = 响应；请求与错误见 $defs。",
+  "type": "object",
+  "required": [
+    "delegation_batch_id", "applied", "unchanged", "failed", "conflict", "terminal",
+    "skipped_assigned", "trimmed_excluded", "scope_expanded", "best_effort", "per_task"
+  ],
+  "properties": {
+    "delegation_batch_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "applied": { "$ref": "common.schema.json#/$defs/count" },
+    "unchanged": { "$ref": "common.schema.json#/$defs/count" },
+    "failed": { "$ref": "common.schema.json#/$defs/count" },
+    "conflict": { "$ref": "common.schema.json#/$defs/count" },
+    "terminal": { "$ref": "common.schema.json#/$defs/count" },
+    "skipped_assigned": { "$ref": "common.schema.json#/$defs/count" },
+    "trimmed_excluded": { "$ref": "common.schema.json#/$defs/count" },
+    "scope_expanded": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "staff_id", "cycles"],
+        "properties": {
+          "role": { "enum": ["assignee", "reviewer"] },
+          "staff_id": { "$ref": "common.schema.json#/$defs/uuid" },
+          "cycles": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/cycle" } }
+        }
+      }
+    },
+    "best_effort": { "type": "boolean" },
+    "per_task": {
+      "description": "只有 best_effort=true 时给出，否则 null。",
+      "anyOf": [{ "type": "array", "items": { "$ref": "#/$defs/perTask" } }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "request": {
+      "description": "预览请求的全部字段 + 下列字段。expand_scope / scope_reason 不进预览哈希（同一凭证可带理由重试）。",
+      "allOf": [{ "$ref": "delegation-preview.schema.json#/$defs/request" }],
+      "required": ["preview_id", "request_id"],
+      "properties": {
+        "preview_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "expand_scope": { "type": "boolean" },
+        "scope_reason": { "type": ["string", "null"], "maxLength": 500 }
+      }
+    },
+    "perTask": {
+      "type": "object",
+      "required": ["task_id", "action", "status"],
+      "properties": {
+        "task_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "action": { "enum": ["assign", "reassign", "reviewer_update"] },
+        "status": { "enum": ["applied", "unchanged", "failed"] },
+        "assignment_version": { "$ref": "common.schema.json#/$defs/count" },
+        "lock_version": { "$ref": "common.schema.json#/$defs/count" },
+        "error": {}
+      }
+    },
+    "rejectReason": {
+      "description": "委派拒绝原因 → HTTP：trimmed / recycled 409，trim_scope_unavailable 503，其余 400。",
+      "enum": [
+        "binding_conflict", "mapping_invalid", "out_of_scope", "scope_reason_missing", "clear_target_missing",
+        "task_not_found", "instance_not_found", "invalid_request", "trimmed", "recycled",
+        "trim_scope_unavailable", "not_project_member"
+      ]
+    },
+    "rejection": {
+      "description": "error = row_delegation_rejected（程序行委派）/ lead_delegation_rejected（底稿主编委派）；跨循环被拒时 cycles = 缺少的循环，并带 scope_gaps。",
+      "type": "object",
+      "required": ["error", "reason", "message", "cycles"],
+      "properties": {
+        "error": { "enum": ["row_delegation_rejected", "lead_delegation_rejected"] },
+        "reason": { "$ref": "#/$defs/rejectReason" },
+        "message": { "type": "string" },
+        "cycles": { "type": "array", "items": { "type": "string" } },
+        "scope_gaps": { "type": "array", "items": { "$ref": "delegation-preview.schema.json#/$defs/scopeGap" } }
+      }
+    },
+    "conflictError": {
+      "description": "409：默认原子模式下存在已被他人分配的目标任务。",
+      "type": "object",
+      "required": ["error", "message", "conflict_task_ids"],
+      "properties": {
+        "error": { "const": "delegation_conflict" },
+        "message": { "type": "string" },
+        "conflict_task_ids": { "$ref": "common.schema.json#/$defs/uuidList" }
+      }
+    }
+  }
+}

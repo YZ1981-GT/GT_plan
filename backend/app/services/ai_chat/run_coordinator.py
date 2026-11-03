@@ -114,6 +114,7 @@ from app.services.ai_chat.metrics import (
     inc_run_status,
     observe_queue_wait,
     observe_run_latency,
+    observe_model_timing,
     inc_tokens,
     observe_cancel_latency,
     set_active_runs,
@@ -430,6 +431,8 @@ class RunExecution:
     engine: ChatEngineName
     capabilities: EngineCapabilities
     retry_count: int = 0
+    #: 消息相关事件与最终历史行共用的服务端签发 ID。
+    assistant_message_id: UUID = field(default_factory=uuid4)
     #: 进程内入队时刻（monotonic），用于度量队列等待时间（Req 12.8）
     queued_at_mono: float = field(default_factory=time.monotonic)
 
@@ -953,6 +956,7 @@ class ChatRunCoordinator:
                                 session=session_obj,
                                 run_id=run_id,
                                 text="".join(text_parts),
+                                message_id=execution.assistant_message_id,
                             )
                             if draft is None:
                                 break  # 终态已落定（Property 7）
@@ -1031,7 +1035,7 @@ class ChatRunCoordinator:
                             run_id=run_id,
                             event_type=ChatEventType.citation,
                             payload=dict(raw.payload),
-                            message_id=draft_id or raw.message_id,
+                            message_id=draft_id or raw.message_id or execution.assistant_message_id,
                         )
                         if event is None:
                             break
@@ -1053,6 +1057,15 @@ class ChatRunCoordinator:
 
                     if etype in TERMINAL_EVENT_TYPES:
                         terminal_seen = True
+                        terminal_usage = dict(raw.payload.get("usage") or usage)
+                        # Engine 已知道实际服务模型及路由结果。终态持久化必须消费这些
+                        # 服务端字段，不能继续把首选模型或 None 写进消息元数据。
+                        for key in ("deployment", "fallback_used", "attempts"):
+                            if key in raw.payload and key not in terminal_usage:
+                                terminal_usage[key] = raw.payload[key]
+                        terminal_model = raw.payload.get("model") or terminal_usage.get("model") or model_used
+                        if terminal_model:
+                            terminal_usage.setdefault("model", terminal_model)
                         await self._finish_from_engine(
                             svc,
                             db,
@@ -1061,8 +1074,8 @@ class ChatRunCoordinator:
                             raw,
                             text="".join(text_parts),
                             draft_id=draft_id,
-                            usage=dict(raw.payload.get("usage") or usage),
-                            model_used=model_used,
+                            usage=terminal_usage,
+                            model_used=str(terminal_model) if terminal_model else None,
                             citations=citations,
                             context_manifest=context_manifest,
                             started=started,
@@ -1115,6 +1128,7 @@ class ChatRunCoordinator:
                 citations=citations,
                 context_manifest=context_manifest,
                 started=started,
+                assistant_message_id=execution.assistant_message_id,
                 execution_engine=execution.engine.value,
             )
         else:
@@ -1174,6 +1188,7 @@ class ChatRunCoordinator:
                 citations=citations,
                 context_manifest=context_manifest,
                 started=started,
+                assistant_message_id=execution.assistant_message_id,
                 execution_engine=execution.engine.value,
             )
             return
@@ -1199,6 +1214,7 @@ class ChatRunCoordinator:
         citations: Any,
         context_manifest: Any,
         started: float,
+        assistant_message_id: UUID | None = None,
         execution_engine: str | None = None,
     ) -> bool:
         """返回 CAS 是否胜出。落空即说明已被 error/cancelled 抢先（Property 7）。"""
@@ -1209,14 +1225,17 @@ class ChatRunCoordinator:
             usage=usage or None,
             latency_ms=_elapsed_ms(started),
             model_used=model_used,
+            tokens_used=_extract_tokens(usage),
             citations=citations,
             context_manifest=context_manifest,
             draft_message_id=draft_id,
+            assistant_message_id=assistant_message_id,
         )
         if event is None:
             # 终态已被抢先：草稿绝不能停在 draft（历史里会挂一条永不定稿的消息）。
             await self._settle_draft(svc, draft_id, run_id, ChatMessageStatus.failed)
         await db.commit()
+        await self._revoke_mcp_run(run_id)
         if event is not None:
             await self._stream.publish(event)
             # 🔴 哈希链审计：run done（Req 12.6）
@@ -1233,6 +1252,19 @@ class ChatRunCoordinator:
                     execution_engine or "native",
                     prompt_tokens=usage.get("prompt_tokens", 0),
                     completion_tokens=usage.get("completion_tokens", 0),
+                )
+                observe_model_timing(
+                    execution_engine or "native",
+                    deployment=usage.get("deployment"),
+                    fallback_used=bool(usage.get("fallback_used", False)),
+                    ttft_seconds=(
+                        float(usage["ttft_ms"]) / 1000
+                        if isinstance(usage.get("ttft_ms"), (int, float)) else None
+                    ),
+                    tokens_per_second=(
+                        float(usage["tokens_per_second"])
+                        if isinstance(usage.get("tokens_per_second"), (int, float)) else None
+                    ),
                 )
         return event is not None
 
@@ -1254,6 +1286,7 @@ class ChatRunCoordinator:
             detail=detail,
         )
         await db.commit()
+        await self._revoke_mcp_run(run_id)
         if event is not None:
             await self._stream.publish(event)
             # 🔴 哈希链审计：run error（Req 12.6）
@@ -1273,6 +1306,7 @@ class ChatRunCoordinator:
             run_id=run_id, latency_ms=_elapsed_ms(started)
         )
         await db.commit()
+        await self._revoke_mcp_run(run_id)
         if event is not None:
             await self._stream.publish(event)
             # 🔴 哈希链审计：run cancelled（Req 12.6）
@@ -1283,6 +1317,17 @@ class ChatRunCoordinator:
             inc_run_status(execution_engine or "native", "cancelled")
             observe_run_latency(execution_engine or "native", "cancelled", time.monotonic() - started)
             observe_cancel_latency(time.monotonic() - started)
+
+    async def _revoke_mcp_run(self, run_id: UUID) -> None:
+        """终态后跨 worker 撤销该 run 的全部 MCP token。"""
+        try:
+            from app.services.ai_chat.mcp_token import (
+                mcp_token_service,
+                revoke_run_distributed,
+            )
+            await revoke_run_distributed(mcp_token_service, run_id)
+        except Exception:
+            logger.warning("[ai-chat] MCP run 撤销失败 run=%s", run_id, exc_info=True)
 
     async def _audit_terminal(
         self,
@@ -1362,6 +1407,11 @@ class ChatRunCoordinator:
             raise ExternalNotFound()
 
         status = ChatRunStatus(row.status)
+        from app.services.ai_chat.mcp_token import (
+            mcp_token_service,
+            revoke_run_distributed,
+        )
+        await revoke_run_distributed(mcp_token_service, run_id)
         if status in (
             ChatRunStatus.done,
             ChatRunStatus.error,
@@ -1578,6 +1628,7 @@ class ChatRunCoordinator:
                     AIChatRun.engine,
                     AIChatRun.status,
                     AIChatRun.retry_count,
+                    AIChatRun.context_request_snapshot,
                 ).where(AIChatRun.id == run_id)
             )
         ).first()
@@ -1591,6 +1642,18 @@ class ChatRunCoordinator:
                 .limit(1)
             )
         ).scalar_one_or_none()
+        assistant_message_id = (
+            await db.execute(
+                sa.select(AIChatMessage.id)
+                .where(
+                    AIChatMessage.run_id == run_id,
+                    AIChatMessage.role == "assistant",
+                    AIChatMessage.status == ChatMessageStatus.draft.value,
+                )
+                .order_by(AIChatMessage.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none() or uuid4()
         if not query:
             logger.warning("[ai-chat] run %s 无 user message，无法重排", run_id)
             return None
@@ -1606,11 +1669,17 @@ class ChatRunCoordinator:
             request_id=str(row.request_id),
         )
         engine = ChatEngineName(row.engine)
+        context_snapshot = (
+            row.context_request_snapshot
+            if isinstance(row.context_request_snapshot, dict)
+            else {}
+        )
         request = ChatRunRequest.model_validate(
             {
                 "host": {"type": host.resource_type.value, "id": host.resource_id},
                 "query": query,
                 "idempotency_key": str(uuid4()),
+                **context_snapshot,
             }
         )
         return RunExecution(
@@ -1623,6 +1692,7 @@ class ChatRunCoordinator:
             engine=engine,
             capabilities=capabilities_for(engine),
             retry_count=int(row.retry_count or 0),
+            assistant_message_id=assistant_message_id,
         )
 
 

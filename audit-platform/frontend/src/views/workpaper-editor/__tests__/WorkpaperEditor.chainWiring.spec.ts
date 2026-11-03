@@ -51,8 +51,24 @@ describe('WorkpaperEditor 接线', () => {
     expect(SCRIPT).not.toContain('fetchWorkpaperCapabilitySnapshot')
   })
 
-  it('壳的辅助请求失败不弹全局提示：侧栏渲染配置 / Univer 目录（R10）', () => {
-    expect(SCRIPT).toContain('useWpRenderer(wpId, { silent: true })')
+  it('壳的辅助请求失败不弹全局提示：Univer 目录（R10）', () => {
     expect(SCRIPT).toContain('`/api/workpapers/${requestedWpId}/render-config`, { _silent: true, _dedupe: false } as any,')
+  })
+
+  it('壳不再自带一份 render-config：侧栏 decision_trace 读 GtWpRenderer / Univer 目录（spec platform-perf-hotspots R4）', () => {
+    expect(SCRIPT).not.toContain('useWpRenderer(')
+    // 两项事实的取法在 useEditorRendererFacts（行为用例见 useEditorRendererFacts.spec.ts），壳只负责接线
+    expect(SCRIPT).toContain('const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext })')
+    // Univer 目录请求顺带记下 decision_trace（原先壳为此单独再取一份 render-config）
+    expect(SCRIPT).toContain('univerCatalog.value = { wpCode: config?.wp_code ?? null, decisionTrace: config?.decision_trace ?? null }')
+    const sidePanel = findElement(descriptor.template!.ast, 'WorkpaperSidePanel')
+    const trace = sidePanel.props.find((p: any) => p.type === 7 && p.name === 'bind' && p.arg?.content === 'decision-trace')
+    expect(trace?.exp?.content).toBe('sidePanelDecisionTrace')
+  })
+
+  it('编制说明面板等页签上下文就绪再挂（R4：原先按空上下文先请求一次）', () => {
+    const panel = findElement(descriptor.template!.ast, 'WpGuidancePanel')
+    const vIf = panel.props.find((p: any) => p.type === 7 && p.name === 'if')
+    expect(vIf?.exp?.content).toBe('wpDetail && projectYear != null && guidanceContextReady')
   })
 })

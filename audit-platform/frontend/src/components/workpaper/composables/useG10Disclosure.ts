@@ -5,7 +5,7 @@
  * - 上市：变动表(期初/增加/减少/期末) + 指定明细 + 信用风险拆分 + 衍生负债
  * - 国企：余额表(期末/期初) + 信用风险拆分
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { G10_ACCOUNT_CODE } from './g10Constants'
 import {
@@ -33,7 +33,7 @@ import {
   g10MaturityDiffPlaceholder,
 } from './g10SchemaRows'
 import { parseNum, calcSubtotal } from './useG10FormulaEngine'
-import { useWorkpaperAuditYear } from './workpaperAuditYear'
+import { resolveAuditYearNumber, useWorkpaperAuditYear } from './workpaperAuditYear'
 import type { ChecklistResponse } from './useF1FormData'
 import {
   buildG10DisclosureCrossChecks,
@@ -118,8 +118,15 @@ export function useG10Disclosure(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
+  /**
+   * 审计年度。缺省取 Runtime Boundary 注入的项目年度（`useWorkpaperAuditYear`）；附注页离屏同步在 effectScope 里实例化
+   * （没有组件实例，inject 不到）时由调用方显式传入（spec note-pull-followup-closure R1）。
+   */
+  auditYear?: Ref<number | null>
 }) {
-  const auditYear = useWorkpaperAuditYear()
+  const auditYear = opts.auditYear
+    ? computed(() => resolveAuditYearNumber(opts.auditYear))
+    : useWorkpaperAuditYear()
   const listedStore = ref<G10DiscListedStore>(defaultG10ListedDiscStore())
   const soeStore = ref<G10DiscSoeStore>(defaultG10SoeDiscStore())
   const adjudicatedAmount = ref<number | null>(null)
@@ -730,17 +737,21 @@ export function useG10Disclosure(opts: {
     loadStore()
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', onAdjudicated)
-    window.addEventListener('g10:detail-to-adjudication', onDetailToAdjudication)
-    window.addEventListener('g10:disclosure-pulled', onDisclosurePulled)
-    pullLatestAdjudicated(false)
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', onAdjudicated)
-    window.removeEventListener('g10:detail-to-adjudication', onDetailToAdjudication)
-    window.removeEventListener('g10:disclosure-pulled', onDisclosurePulled)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅窗口事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', onAdjudicated)
+      window.addEventListener('g10:detail-to-adjudication', onDetailToAdjudication)
+      window.addEventListener('g10:disclosure-pulled', onDisclosurePulled)
+      pullLatestAdjudicated(false)
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', onAdjudicated)
+      window.removeEventListener('g10:detail-to-adjudication', onDetailToAdjudication)
+      window.removeEventListener('g10:disclosure-pulled', onDisclosurePulled)
+    })
+  }
 
   const designatedDetailRows = computed(() => {
     const entries = Object.entries(listedStore.value.designatedDetail)

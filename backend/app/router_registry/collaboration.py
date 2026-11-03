@@ -98,9 +98,11 @@ def register_collaboration_routers(app: FastAPI) -> None:
               procedure_delivery_router, procedure_review_router]:
         app.include_router(r, tags=["团队与看板"])
 
-    # 角色AI辅助
+    # 角色 AI 辅助与耐久 AI 批任务
     from app.routers.role_ai_features import router as rai_router
+    from app.routers.ai_task_jobs import router as ai_task_jobs_router
     app.include_router(rai_router, tags=["团队与看板"])
+    app.include_router(ai_task_jobs_router, tags=["AI批任务"])
 
     # ═══ §9. Phase 14: 门禁引擎与治理 ═══
     from app.routers.gate import router as gate_router
@@ -109,6 +111,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
 
     for r in [gate_router, trace_router, sod_router]:
         app.include_router(r, prefix="/api", tags=["门禁与治理"])
+
+    # S2 ADR-CCN-06: 门禁逐项确认留痕（路径已含 /api 前缀，不重复加）
+    from app.routers.gate_acknowledgements import router as gate_ack_router
+    app.include_router(gate_ack_router, tags=["门禁与治理"])
 
     # ═══ §10. Phase 15: 任务树与事件编排 ═══
     from app.routers.task_tree import router as task_tree_router
@@ -315,21 +321,25 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.vr_coverage import router as vr_coverage_router
     app.include_router(vr_coverage_router, tags=["qc-vr-coverage"])
 
-    # ═══ §111. Phase 7 F7: 工时填报 CRUD ═══
-    from app.routers.workhour_entries import router as workhour_entries_router
-    app.include_router(workhour_entries_router, tags=["workhours-entries"])
+    # ═══ §112 / §114 先于 §111 注册 ═══
+    # 预算对比 /workhours/budget-vs-actual、审批 /workhours/approval 与 §111 的 /workhours/{entry_id} 同前缀，
+    # 后注册会被当成条目 id 截走（恒 422）。守卫 tests/test_route_shadow_guard.py。
 
     # ═══ §112. Phase 7 F8: 工时预算对比 ═══
     from app.routers.workhour_budget import router as workhour_budget_router
     app.include_router(workhour_budget_router, tags=["workhours-budget"])
 
-    # ═══ §113. Phase 7 F9: 复核分派推荐 ═══
-    from app.routers.review_recommend import router as review_recommend_router
-    app.include_router(review_recommend_router, tags=["review-recommend"])
-
     # ═══ §114. Phase 7 F10: 工时审批关联 ═══
     from app.routers.workhour_approval import router as workhour_approval_router
     app.include_router(workhour_approval_router, tags=["workhours-approval"])
+
+    # ═══ §111. Phase 7 F7: 工时填报 CRUD ═══
+    from app.routers.workhour_entries import router as workhour_entries_router
+    app.include_router(workhour_entries_router, tags=["workhours-entries"])
+
+    # ═══ §113. Phase 7 F9: 复核分派推荐 ═══
+    from app.routers.review_recommend import router as review_recommend_router
+    app.include_router(review_recommend_router, tags=["review-recommend"])
 
     # ═══ §115. Phase 7 F12: 多项目紧急度评分 ═══
     from app.routers.partner_urgency import router as partner_urgency_router

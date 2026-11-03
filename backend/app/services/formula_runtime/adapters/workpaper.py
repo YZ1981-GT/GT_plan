@@ -325,6 +325,7 @@ class WorkpaperMutationAdapter:
                     sheet_name=sheet_name,
                     cell_ref=cell_ref,
                     value=format_cell_display_value(mutation.after_value),
+                    require_existing_sheet=True,
                 )
                 wp.updated_at = now
                 await self._session.flush()

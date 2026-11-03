@@ -51,6 +51,19 @@ def _mock_db_session(*, ownership_exists: bool = True) -> AsyncMock:
 
 
 class TestRuntimeRegistrationFullResolveHit:
+    @pytest.fixture(autouse=True)
+    def _unlocked_project(self, monkeypatch):
+        """本类的项目都未锁定目录版本（T18：`full_resolve` 带项目 + 会话时查落库的锁）。
+
+        `_mock_db_session` 的 `execute().first()` 是 MagicMock，T18 之后会被 `get_locked_version`
+        当成「锁定到某版本」去加载快照而抛 `VersionNotFoundError`。这里关心的是 L3 运行时命中，
+        与版本锁无关，所以把锁读取打桩成「未锁定」，与 test_full_resolve 等受影响测试同一做法。
+        """
+        async def _unlocked(_db, _project_id):
+            return None
+
+        monkeypatch.setattr("app.services.acnr.resolver.get_locked_version", _unlocked)
+
     @pytest.mark.asyncio
     async def test_custom_flat_register_then_full_resolve_hits_l3(self):
         """custom_flat 登记后，full_resolve(WP 3 参) 命中同一 addr_id + L3 源层。"""

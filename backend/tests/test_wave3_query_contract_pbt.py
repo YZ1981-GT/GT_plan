@@ -39,7 +39,8 @@ def test_p7_project_scope_requires_nonempty_and_deduplicates(project_ids) -> Non
 
 
 def test_p7_project_scope_rejects_empty_project_list() -> None:
-    with pytest.raises(TemplateScopeValidationError, match="at least one"):
+    # 报错文案自 advanced-query-linkage-closure 任务 24（R9.1）起为中文，界面直接显示
+    with pytest.raises(TemplateScopeValidationError, match="指定项目共享至少需要一个项目"):
         TemplateScopeAdapter.normalize("project", [])
     assert normalize_scope(" global ") == "public"
 

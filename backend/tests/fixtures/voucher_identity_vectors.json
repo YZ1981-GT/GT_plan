@@ -1,0 +1,40 @@
+{
+ "_doc": "凭证身份跨语言样例：backend/app/services/voucher_identity.py 与 audit-platform/frontend/src/utils/voucherIdentity.ts 读同一份，输出逐字相同（spec voucher-identity-writeback-and-audit-phase 需求 1.4）。",
+ "lines": [
+  {"name": "贷方蓝字", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-01-07", "voucher_type": "ZZ", "voucher_no": "0003", "account_code": "6001.14.02", "debit_amount": null, "credit_amount": "61835.93", "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-01-07\",\"ZZ\",\"0003\"]", "side": "C", "amount": "61835.93", "lfp": "[\"2025\",\"001\",\"2025-01-07\",\"ZZ\",\"0003\",\"6001.14.02\",\"C\",\"61835.93\",0]"}},
+  {"name": "同日同号另一凭证字", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-01-07", "voucher_type": "FY", "voucher_no": "0003", "account_code": "1221.11", "debit_amount": "100000.00", "credit_amount": null, "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-01-07\",\"FY\",\"0003\"]", "side": "D", "amount": "100000.00", "lfp": "[\"2025\",\"001\",\"2025-01-07\",\"FY\",\"0003\",\"1221.11\",\"D\",\"100000.00\",0]"}},
+  {"name": "凭证字为空", "input": {"year": "2025", "company_code": "001", "voucher_date": "2025-06-23", "voucher_type": null, "voucher_no": "0046", "account_code": "1002", "debit_amount": "1", "credit_amount": "0", "occ": 2},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-06-23\",\"\",\"0046\"]", "side": "D", "amount": "1.00", "lfp": "[\"2025\",\"001\",\"2025-06-23\",\"\",\"0046\",\"1002\",\"D\",\"1.00\",2]"}},
+  {"name": "红字借方仍是借方", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-01-03", "voucher_type": "主账簿", "voucher_no": "0001", "account_code": "1122.02", "debit_amount": "-11610.00", "credit_amount": null, "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-01-03\",\"主账簿\",\"0001\"]", "side": "D", "amount": "-11610.00", "lfp": "[\"2025\",\"001\",\"2025-01-03\",\"主账簿\",\"0001\",\"1122.02\",\"D\",\"-11610.00\",0]"}},
+  {"name": "借贷双填为不明，金额取借方", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-01-01", "voucher_type": "ZJGJ", "voucher_no": "0001", "account_code": "1002", "debit_amount": "1303769.25", "credit_amount": "1303769.25", "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-01-01\",\"ZJGJ\",\"0001\"]", "side": "X", "amount": "1303769.25", "lfp": "[\"2025\",\"001\",\"2025-01-01\",\"ZJGJ\",\"0001\",\"1002\",\"X\",\"1303769.25\",0]"}},
+  {"name": "两栏都为零为不明", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-02-01", "voucher_type": "记", "voucher_no": "12", "account_code": "6602", "debit_amount": "0", "credit_amount": "0.00", "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-02-01\",\"记\",\"12\"]", "side": "X", "amount": "0.00", "lfp": "[\"2025\",\"001\",\"2025-02-01\",\"记\",\"12\",\"6602\",\"X\",\"0.00\",0]"}},
+  {"name": "四舍五入按十进制（2.675 → 2.68）", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-03-31", "voucher_type": "记", "voucher_no": "7", "account_code": "2221", "debit_amount": null, "credit_amount": "2.675", "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-03-31\",\"记\",\"7\"]", "side": "C", "amount": "2.68", "lfp": "[\"2025\",\"001\",\"2025-03-31\",\"记\",\"7\",\"2221\",\"C\",\"2.68\",0]"}},
+  {"name": "负数五入远离零", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-03-31", "voucher_type": "记", "voucher_no": "7", "account_code": "2221", "debit_amount": "-0.005", "credit_amount": null, "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-03-31\",\"记\",\"7\"]", "side": "D", "amount": "-0.01", "lfp": "[\"2025\",\"001\",\"2025-03-31\",\"记\",\"7\",\"2221\",\"D\",\"-0.01\",0]"}},
+  {"name": "去首尾空白、日期截取到日", "input": {"year": 2025, "company_code": " 001 ", "voucher_date": "2025-12-31T00:00:00", "voucher_type": " 转 ", "voucher_no": " 0099 ", "account_code": " 1122 ", "debit_amount": "500", "credit_amount": "", "occ": 1},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-12-31\",\"转\",\"0099\"]", "side": "D", "amount": "500.00", "lfp": "[\"2025\",\"001\",\"2025-12-31\",\"转\",\"0099\",\"1122\",\"D\",\"500.00\",1]"}},
+  {"name": "全角空格、不换行空格与控制字符按 Python str.strip 口径去掉", "input": {"year": 2025, "company_code": "001", "voucher_date": "2025-04-30", "voucher_type": "\u3000转\u001f", "voucher_no": "\u00a00008", "account_code": "1122", "debit_amount": null, "credit_amount": " 12.5 ", "occ": 0},
+   "expect": {"vk": "[\"2025\",\"001\",\"2025-04-30\",\"转\",\"0008\"]", "side": "C", "amount": "12.50", "lfp": "[\"2025\",\"001\",\"2025-04-30\",\"转\",\"0008\",\"1122\",\"C\",\"12.50\",0]"}},
+  {"name": "BOM 不算空白，两边都保留（JS trim 会去掉它，前端不能用 trim）", "input": {"year": 2025, "company_code": "\ufeff001", "voucher_date": "2025-04-30", "voucher_type": "转", "voucher_no": "0009", "account_code": "1122", "debit_amount": "1", "credit_amount": null, "occ": 0},
+   "expect": {"vk": "[\"2025\",\"\ufeff001\",\"2025-04-30\",\"转\",\"0009\"]", "side": "D", "amount": "1.00", "lfp": "[\"2025\",\"\ufeff001\",\"2025-04-30\",\"转\",\"0009\",\"1122\",\"D\",\"1.00\",0]"}}
+ ],
+ "groups": [
+  {"name": "两条同科目同借贷栏同金额的分录按摘要（Unicode 码位序）编号，摘要不进指纹",
+   "lines": [
+    {"id": "b", "year": 2025, "company_code": "001", "voucher_date": "2025-01-20", "voucher_type": "FY", "voucher_no": "0012", "account_code": "2211", "debit_amount": "3680.00", "credit_amount": null, "summary": "付款2"},
+    {"id": "a", "year": 2025, "company_code": "001", "voucher_date": "2025-01-20", "voucher_type": "FY", "voucher_no": "0012", "account_code": "2211", "debit_amount": "3680.00", "credit_amount": null, "summary": "付款1"},
+    {"id": "c", "year": 2025, "company_code": "001", "voucher_date": "2025-01-20", "voucher_type": "FY", "voucher_no": "0012", "account_code": "2211", "debit_amount": null, "credit_amount": "3680.00", "summary": "付款1"}
+   ],
+   "expect": [
+    "[\"2025\",\"001\",\"2025-01-20\",\"FY\",\"0012\",\"2211\",\"D\",\"3680.00\",1]",
+    "[\"2025\",\"001\",\"2025-01-20\",\"FY\",\"0012\",\"2211\",\"D\",\"3680.00\",0]",
+    "[\"2025\",\"001\",\"2025-01-20\",\"FY\",\"0012\",\"2211\",\"C\",\"3680.00\",0]"
+   ]}
+ ]
+}

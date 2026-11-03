@@ -133,8 +133,8 @@ const props = withDefaults(defineProps<{
   scopeLabel?: string
   /** 当前选中的单位 ID */
   unitValue?: string
-  /** 当前选中的年度 */
-  yearValue?: number
+  /** 当前选中的年度；项目没填审计年度为 null（选择器显示为空，等用户选） */
+  yearValue?: number | null
   /** 当前选中的模板 */
   templateValue?: string
   /** 模板选项列表（覆盖 dictStore 默认值） */

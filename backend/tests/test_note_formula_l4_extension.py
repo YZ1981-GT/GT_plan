@@ -317,10 +317,11 @@ def test_coverage_partial_when_no_account_codes():
         "_check_presets": ["balance", "sub_item"],
     }
     stats = compute_formula_coverage(template)
-    # 3 行 × 2 列 = 6 cells；明细第 0 行 2 + 合计行 2 = 4 配置
+    # 3 行 × 2 列 = 6 cells；只有明细第 0 行 2 格有公式。合计判不准（「减：坏账准备」夹在明细中间、不在小计之后），
+    # 与执行器同一套预设（spec note-pull-followup-closure R8）—— 旧口径按 _check_presets 不分段求和、把减项当加项，记 4 格
     assert stats["total_cells"] == 6
-    assert stats["configured_cells"] == 4
-    assert stats["coverage_pct"] == round(4 * 100 / 6, 1)
+    assert stats["configured_cells"] == 2
+    assert stats["coverage_pct"] == round(2 * 100 / 6, 1)
 
 
 def test_coverage_target_meets_80pct_typical_seed():

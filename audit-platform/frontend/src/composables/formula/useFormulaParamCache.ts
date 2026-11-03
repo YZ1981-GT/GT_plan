@@ -2,6 +2,7 @@
  * 公式参数值补全——动态数据缓存（科目列表 / 底稿编码列表）。
  * spec: formula-input-param-completion · Task 2
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import api from '@/services/apiProxy'
 import type { CandidateItem } from './formulaParamCandidates'
 
@@ -28,13 +29,11 @@ export async function loadAccountCodes(projectId: string): Promise<CandidateItem
 
   const promise = (async () => {
     try {
-      const data = await api.get(`/api/projects/${projectId}/trial-balance`, {
-        params: { limit: 2000 },
-      }) as any
-      const rows = Array.isArray(data) ? data : (data?.items || [])
+      // 年度省略 ⇒ 后端按项目审计年度取（原先不带年度恒 422、候选为空）
+      const { rows } = await fetchTrialBalanceRows(projectId)
       const items: CandidateItem[] = rows
-        .filter((r: any) => r.standard_account_code)
-        .map((r: any) => ({
+        .filter((r) => r.standard_account_code)
+        .map((r) => ({
           value: r.standard_account_code,
           label: `${r.standard_account_code} - ${r.account_name || ''}`.trim(),
         }))

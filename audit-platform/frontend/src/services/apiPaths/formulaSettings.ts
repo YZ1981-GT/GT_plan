@@ -49,6 +49,11 @@ export const formulaTemplates = {
   list: '/api/formula-templates',
   /** GET 详情；PUT 改名 / 共享范围；DELETE 删除（有订阅时 409） */
   detail: (id: string) => `/api/formula-templates/${id}`,
+  /** GET 两个模板版本的规范化差异 */
+  diff: (id: string) => `/api/formula-templates/${id}/diff`,
+  /** POST 回滚预览 / 回滚到历史快照（生成新版本） */
+  rollbackPreview: (id: string) => `/api/formula-templates/${id}/rollback-preview`,
+  rollback: (id: string) => `/api/formula-templates/${id}/rollback`,
   /** GET 版本历史 */
   versions: (id: string) => `/api/formula-templates/${id}/versions`,
   /** GET 订阅项目（所有者 / admin） */

@@ -4,15 +4,19 @@ import { describe, expect, it } from 'vitest'
 
 const root = resolve(process.cwd(), 'src/components/workpaper')
 const read = (rel: string) => readFileSync(resolve(root, rel), 'utf8')
-const keyValues = (source: string) => {
-  const body = source.match(/const KEY\s*=\s*\{([^}]*)\}/)?.[1] ?? ''
+const keyValues = (source: string, name = 'KEY') => {
+  const body = source.match(new RegExp(`const ${name}\\s*=\\s*\\{([^}]*)\\}`))?.[1] ?? ''
   return [...body.matchAll(/:\s*'([^']+)'/g)].map(m => m[1])
 }
 
 describe('J2/J3 disclosure 键 owner 边界', () => {
   it('J2 两个披露 Tab 分别拥有 11/9 个语义键，namespace 不交叉', () => {
-    const listed = keyValues(read('j2/J2TabDisclosureListed.vue'))
-    const soe = keyValues(read('j2/J2TabDisclosureSoe.vue'))
+    // 键的唯一真源 = j2DisclosureTabState（Tab 与附注页离屏同步共用，spec note-pull-followup-closure R1）；Tab 直接引用它
+    const state = read('composables/j2DisclosureTabState.ts')
+    const listed = keyValues(state, 'J2_LISTED_KEY')
+    const soe = keyValues(state, 'J2_SOE_KEY')
+    expect(read('j2/J2TabDisclosureListed.vue')).toMatch(/const KEY = J2_LISTED_KEY\b/)
+    expect(read('j2/J2TabDisclosureSoe.vue')).toMatch(/const KEY = J2_SOE_KEY\b/)
     expect(listed).toHaveLength(11)
     expect(soe).toHaveLength(9)
     expect(listed.every(k => k.startsWith('J2-listed-'))).toBe(true)

@@ -65,19 +65,17 @@ def test_validate_roll_forward_balanced() -> None:
     assert svc.validate_roll_forward_rows(rows) == []
 
 
-def test_validate_roll_forward_migrates_legacy_signed_reversal() -> None:
-    # 旧数据转回=-5 → 迁移为正数 5；100+30-5-2=123
-    rows = [
-        {
-            "rowKey": "ar",
-            "openingProvision": 100,
-            "currentProvision": 30,
-            "currentReversal": -5,
-            "currentWriteoff": 2,
-            "closingProvision": 123,
-        }
-    ]
-    assert svc.validate_roll_forward_rows(rows) == []
+def test_validate_roll_forward_takes_reversal_as_entered() -> None:
+    # 转回按录入值计算（与模板 J=F+G-H-I、前端同口径），不再取绝对值：100+30-(-5)-2=133
+    row = {
+        "rowKey": "ar",
+        "openingProvision": 100,
+        "currentProvision": 30,
+        "currentReversal": -5,
+        "currentWriteoff": 2,
+    }
+    assert svc.validate_roll_forward_rows([{**row, "closingProvision": 133}]) == []
+    assert len(svc.validate_roll_forward_rows([{**row, "closingProvision": 123}])) == 1
 
 
 def test_validate_roll_forward_unbalanced() -> None:

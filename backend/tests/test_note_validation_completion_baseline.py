@@ -45,9 +45,9 @@ def _rule(rtype: ValidationType, section: str = "五、1") -> ValidationRule:
 
 
 class TestExecutorContract:
-    def test_executors_cover_all_11_types(self):
+    def test_executors_cover_all_12_types(self):
         assert set(EXECUTORS.keys()) == set(ValidationType)
-        assert len(EXECUTORS) == 11
+        assert len(EXECUTORS) == 12  # 2026-10-27 +「期间衔接」（spec note-pull-followup-closure R8）
 
     def test_validation_type_values_unchanged(self):
         assert ValidationType.BALANCE.value == "余额"

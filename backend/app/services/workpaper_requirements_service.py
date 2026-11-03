@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.procedure_models import ProcedureInstance
 from app.models.workpaper_models import WorkingPaper, WpIndex
+from app.services.procedure_identity import normalize_cycle, normalize_wp_code
 from app.services.wp_manual_service import get_operation_manual
 
 logger = logging.getLogger(__name__)
@@ -138,6 +139,8 @@ async def _get_related_procedures(
     2. 其次通过 ProcedureInstance.wp_code 匹配
     3. 最后通过 audit_cycle 匹配同循环的所有程序
     """
+    wp_code = normalize_wp_code(wp_code)
+    audit_cycle = normalize_cycle(audit_cycle) if audit_cycle and audit_cycle.strip() else None
     # 策略 1: 通过 wp_id 精确匹配
     result = await db.execute(
         sa.select(ProcedureInstance)
@@ -210,7 +213,7 @@ async def _get_prior_year_summary(
         return None
 
     prior_project_id = row[0]
-    wp_code = wp_info.get("wp_code")
+    wp_code = normalize_wp_code(wp_info.get("wp_code"))
     if not wp_code:
         return None
 

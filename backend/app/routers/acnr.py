@@ -13,12 +13,15 @@ from dataclasses import asdict
 from typing import Optional
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import assert_project_permission, get_current_user, require_role
+from app.models.core import Project, User
+from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.acnr.auth import check_project_access, verify_wp_binding
 from app.services.acnr.catalog import (
     get_catalog,
@@ -26,7 +29,14 @@ from app.services.acnr.catalog import (
     list_sheets,
     lookup,
 )
-from app.services.acnr.resolver import full_resolve, resolve_instance
+from app.services.acnr.limits import ACNR_BATCH_LIMIT
+from app.services.acnr.resolver import (
+    VersionInvalidError,
+    VersionNotFoundError,
+    full_resolve,
+    resolve_instance,
+)
+from app.services.acnr.project_registry_lock import RegistryLockError
 from app.services.acnr.overlay import (
     apply_project_overlay,
     remove_project_overlay,
@@ -72,6 +82,15 @@ class AcnrResolveResponse(BaseModel):
     #: 非底稿域是否按项目数据核过存在（R5.1）；``reason`` = 判不存在 / 无法确认的原因
     verified: Optional[bool] = None
     reason: Optional[str] = None
+    #: 统一显示名（T29/T30 由后端 display 单一来源给出）
+    display_label: Optional[str] = None
+    #: 下一步该怎么办（中文，界面直接显示；外部命名空间等不可定位场景必填，T31）
+    next_step: Optional[str] = None
+    #: 多义 / 禁止别名时需要补的上下文字段名
+    required_context: Optional[list] = None
+    #: 命中停用条目（design §3.3）及其替代地址
+    deprecated: Optional[bool] = None
+    replaced_by: Optional[str] = None
 
 router = APIRouter(prefix="/api/acnr", tags=["ACNR-地址坐标名称注册中心"])
 
@@ -212,11 +231,11 @@ async def acnr_resolve_batch(
 
     Requirements: Req-15.3, Req-15.4
     """
-    # 防滥用：限制 items ≤ 50
-    if len(body.items) > 50:
+    # 防滥用：限制 items ≤ ACNR_BATCH_LIMIT（与 acnr_targets 共用，services/acnr/limits.py）
+    if len(body.items) > ACNR_BATCH_LIMIT:
         raise HTTPException(
             status_code=422,
-            detail="items 数量不得超过 50",
+            detail=f"items 数量不得超过 {ACNR_BATCH_LIMIT}",
         )
 
     if len(body.items) == 0:
@@ -253,6 +272,8 @@ async def acnr_resolve_batch(
                 response.pop("wp_id", None)
                 response.pop("jump_route", None)
             results.append({k: v for k, v in response.items() if v is not None})
+        except (RegistryLockError, VersionInvalidError, VersionNotFoundError):
+            raise
         except Exception:
             results.append({"found": False, "error": "resolve_error"})
 
@@ -305,10 +326,12 @@ async def acnr_resolve_get(
 async def acnr_entries(
     cycle: str | None = Query(None, description="循环码过滤，如 D"),
     import_export_only: bool = Query(False, description="仅返回启用 import_export 的 sheet"),
+    include_deprecated: bool = Query(False, description="是否列出已停用的 sheet（默认不列）"),
     _user=Depends(get_current_user),
 ):
-    """列出 sheet 目录条目（支持按 cycle / import_export 过滤）。"""
-    return list_sheets(cycle=cycle, import_export_only=import_export_only)
+    """列出 sheet 目录条目（支持按 cycle / import_export 过滤；停用条目默认不列，design §3.3）。"""
+    return list_sheets(cycle=cycle, import_export_only=import_export_only,
+                       include_deprecated=include_deprecated)
 
 
 @router.get("/anchors")
@@ -393,6 +416,44 @@ async def acnr_resolve_instance(
         response["wp_index_id"] = str(result.wp_index_id)
 
     return response
+
+
+@router.get("/workpapers/{wp_id}/locate")
+async def acnr_locate_workpaper(
+    wp_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """短链 ``/workpapers/{wp_id}`` 的定位：底稿 id → 所属项目（T16 / RV7.5-01）。
+
+    ACNR 跳转路由是 ``/workpapers/{wp_id}?sheet=…``（目录模板 / resolver 缺省 / acnr_targets 回落父底稿），前端只有
+    ``/projects/{pid}/workpapers/{wp_id}/edit``，短链页凭本端点查出项目后重定向。键是 ``working_paper.id``，
+    不是 ``wp_index.id``（传后者 = 不存在 404）。先查行、再按所属项目做 readonly 鉴权（非成员 403），
+    鉴权通过后才区分回收站（410 + 中文原因）：项目整体移入回收站时底稿行本身不标删，须另看项目（RV7.6-01）。
+    """
+    row = (await db.execute(
+        sa.select(
+            WorkingPaper.project_id,
+            WorkingPaper.is_deleted,
+            WpIndex.wp_code,
+            Project.is_deleted.label("project_is_deleted"),
+        )
+        .join(Project, Project.id == WorkingPaper.project_id)
+        .outerjoin(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+        .where(WorkingPaper.id == wp_id)
+    )).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail={"error_code": "WORKPAPER_NOT_FOUND", "message": "底稿不存在"})
+    await assert_project_permission(db, current_user, row.project_id, "readonly")
+    if row.project_is_deleted:
+        raise HTTPException(status_code=410, detail={
+            "error_code": "PROJECT_IN_RECYCLE_BIN", "message": "底稿所属项目已移入回收站",
+            "project_id": str(row.project_id)})
+    if row.is_deleted:
+        raise HTTPException(status_code=410, detail={
+            "error_code": "WORKPAPER_IN_RECYCLE_BIN", "message": "底稿已移入回收站",
+            "project_id": str(row.project_id)})
+    return {"wp_id": str(wp_id), "project_id": str(row.project_id), "wp_code": row.wp_code}
 
 
 @router.get("/coverage")
@@ -514,7 +575,12 @@ async def acnr_metrics(
             "by_type": {"fallback": N, "auth_reject": N, ...},
             "recent": [AlertEvent, ...]
         },
-        "recent_records": [ResolveMetricRecord, ...]
+        "recent_records": [ResolveMetricRecord, ...],
+        "counters": {   # T26，键恒在（含义见 services/acnr/metrics.py 模块文档）
+            "version_lock_hit": N, "version_lock_snapshot_missing": N, "version_lock_unchecked": N,
+            "deprecated_ref_saved": N,
+            "acnr_targets_rejected": {"<拒绝码>": N, ...}, "stale_start_unresolved": {"<原因码>": N, ...}
+        }
     }
 
     Requirements: Req-12.4

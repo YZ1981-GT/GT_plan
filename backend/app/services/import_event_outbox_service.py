@@ -69,16 +69,29 @@ class ImportEventOutboxService:
 
         spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 16
         """
-        from app.services.workpaper_sync.outbox import DurableEventOutboxService
-
-        event_extra = dict(item.payload or {})
-        event_extra.setdefault("__event_id", str(item.id))
-        payload = EventPayload(
-            event_type=EventType(item.event_type),
-            project_id=item.project_id,
-            year=item.year,
-            extra=event_extra,
+        from app.services.workpaper_sync.outbox import (
+            DurableEventOutboxService,
+            TYPED_EVENT_PAYLOAD_KEY,
         )
+
+        stored_payload = dict(item.payload or {})
+        typed = stored_payload.get(TYPED_EVENT_PAYLOAD_KEY)
+        if typed is not None:
+            payload = EventPayload.model_validate(typed)
+            if payload.event_type.value != item.event_type or payload.project_id != item.project_id or payload.year != item.year:
+                raise ValueError("耐久事件 envelope 与 outbox 路由字段不一致")
+            event_extra = dict(payload.extra or {})
+            event_extra.setdefault("__event_id", str(item.id))
+            payload = payload.model_copy(update={"extra": event_extra})
+        else:
+            event_extra = stored_payload
+            event_extra.setdefault("__event_id", str(item.id))
+            payload = EventPayload(
+                event_type=EventType(item.event_type),
+                project_id=item.project_id,
+                year=item.year,
+                extra=event_extra,
+            )
         gated = DurableEventOutboxService.is_fanout_gated(item.event_type)
         if gated and not await DurableEventOutboxService.begin_fanout(
             db, event_id=item.id, project_id=item.project_id, year=item.year
@@ -90,7 +103,24 @@ class ImportEventOutboxService:
             )
             return False
         try:
-            await event_bus.publish_immediate(payload)
+            # S4 ADR-SDO-02：公式变更事件直接调传播处理器，不经事件总线（总线会吞异常）
+            if item.event_type == EventType.FORMULA_CONFIG_CHANGED.value:
+                from app.services.formula_settings.outbox import deliver as formula_deliver, ORIGIN as FORMULA_ORIGIN
+                origin = event_extra.get("origin", "")
+                if origin == FORMULA_ORIGIN:
+                    from app.services.workpaper_sync.outbox import PendingPublication
+                    pub = PendingPublication(
+                        outbox_id=item.id,
+                        event_type=EventType.FORMULA_CONFIG_CHANGED,
+                        project_id=item.project_id,
+                        year=item.year,
+                    )
+                    await formula_deliver(db, pub)
+                else:
+                    # 旧路径（非 outbox 入队的公式事件）仍走事件总线
+                    await event_bus.publish_immediate(payload)
+            else:
+                await event_bus.publish_immediate(payload)
         except Exception:
             if gated:
                 await DurableEventOutboxService.abort_fanout(db, event_id=item.id)

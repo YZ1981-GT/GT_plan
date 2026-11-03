@@ -143,7 +143,8 @@ export function buildNoteJumpRoute(
   projectId: string,
   wpCode: string,
   variant: DisclosureVariant,
-  year?: number,
+  /** 审计年度；项目没填为 null ⇒ 路由不带 year（附注页按项目口径） */
+  year?: number | null,
 ): RouteLocationRaw | null {
   const section = resolveNoteSectionForDisclosure(wpCode, variant)
   if (!projectId || !section) return null

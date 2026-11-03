@@ -10,7 +10,11 @@ import {
 } from '../composables/useF4VoucherCheck'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import { itemCellRef } from '@/components/attachment/workpaperEvidence'
 import type { F4ImportableSheet } from '../composables/useF4ImportExport'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 const SCROLL_THRESHOLD = 50
 const TABLE_MAX_HEIGHT = 480
@@ -22,6 +26,10 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses?: Map<string, any>
+  /** 年审阶段的预审行只读（父组件的共享回填函数判定）：来源列加「只读」、行置灰点不进 */
+  isRowLocked?: (row: F4VoucherCheckRow) => boolean
+  /** 审计年度（来源列「多科目」看整张凭证用） */
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -42,6 +50,11 @@ const evidenceLabel = computed(() =>
 const sheet = computed<F4ImportableSheet>(() =>
   props.section === 'debit' ? 'F4-8-debit' : 'F4-8-credit',
 )
+
+/** 年审阶段预审行只读样式 */
+function rowClassName({ row }: { row: F4VoucherCheckRow }): string {
+  return props.isRowLocked?.(row) ? 'gt-row-locked' : ''
+}
 
 function fmt(v: number): string {
   return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -146,12 +159,13 @@ async function generateSectionNoteAi(): Promise<void> {
         show-summary
         :summary-method="summaryMethod"
         :max-height="useScroll ? TABLE_MAX_HEIGHT : undefined"
+        :row-class-name="rowClassName"
         class="voucher-table"
       >
         <el-table-column type="index" label="序号" width="58" fixed="left" />
         <el-table-column label="供应商名称" min-width="140" fixed="left">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.supplierName"
               size="small"
@@ -160,9 +174,15 @@ async function generateSectionNoteAi(): Promise<void> {
             <span v-else>{{ row.supplierName }}</span>
           </template>
         </el-table-column>
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="!!isRowLocked?.(row)" :project-id="projectId" :year="year ?? 0" />
+          </template>
+        </el-table-column>
         <el-table-column label="凭证日期" width="120">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.voucherDate"
               size="small"
@@ -174,7 +194,7 @@ async function generateSectionNoteAi(): Promise<void> {
         </el-table-column>
         <el-table-column label="凭证编号" width="120">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.voucherNo"
               size="small"
@@ -185,7 +205,7 @@ async function generateSectionNoteAi(): Promise<void> {
         </el-table-column>
         <el-table-column label="业务内容" min-width="140">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.businessContent"
               size="small"
@@ -196,7 +216,7 @@ async function generateSectionNoteAi(): Promise<void> {
         </el-table-column>
         <el-table-column label="对方科目" width="110">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.counterAccount"
               size="small"
@@ -267,9 +287,11 @@ async function generateSectionNoteAi(): Promise<void> {
             <el-tag size="small" :type="evidenceStatus(row).type">{{ evidenceStatus(row).label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="145" fixed="right">
+        <el-table-column label="操作" width="169" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="emit('open-check', row.rowId)">单据核对</el-button>
+            <!-- 本笔附件（与单据核对弹窗 ⑤ 同一位置）的小眼睛 -->
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="`F4-8-${section}`" :cell-ref="itemCellRef(row.attSlot)" />
             <el-button
               link
               type="danger"
@@ -296,7 +318,7 @@ async function generateSectionNoteAi(): Promise<void> {
           >🤖 AI生成</el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="sectionNote"
         type="textarea"
         :autosize="{ minRows: 2, maxRows: 6 }"

@@ -10,6 +10,8 @@ import {
 } from '../composables/useF3InterestCalc'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import { buildLinkedOcrFormData } from '../composables/ocrAttachmentLinkage'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -23,6 +25,8 @@ const props = defineProps<{
 
 const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const EVIDENCE_SHEET = 'F3-4'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 function onImported() { reloadWorkpaperData?.() }
 
 function fmt(v: number): string {
@@ -110,15 +114,19 @@ async function handleNoteOcr(rowId: string, file: File) {
   ocrLoadingId.value = rowId
 
   try {
+    // 票据影像挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview）
     const { form } = await buildLinkedOcrFormData(file, {
       projectId: props.projectId,
       wpId: props.wpId,
+      evidenceSheet: EVIDENCE_SHEET,
+      evidenceCell: rowEvidenceCell(rowId),
     })
     const res = await http.post(
       `/api/workpapers/${props.wpId}/f3/contract-ocr`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const data = res.data?.data ?? res.data
     const { extracted_fields: fields, confidence } = data
 
@@ -256,12 +264,13 @@ function summaryMethod({ columns }: { columns: any[]; data: F3InterestCalcRow[] 
       <el-table-column prop="note" label="说明" min-width="150">
         <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.note" size="small" @change="(v: string) => updateCell(row.rowId, 'note', v)" /><span v-else>{{ row.note }}</span></template>
       </el-table-column>
-      <el-table-column label="📎" width="45" align="center">
+      <el-table-column label="📎" width="68" align="center">
         <template #default="{ row }">
           <el-upload :show-file-list="false" :auto-upload="false" :disabled="isReadonly || ocrLoadingId === row.rowId"
             @change="(f: any) => handleNoteOcr(row.rowId, f.raw || f)">
             <el-button link size="small" :loading="ocrLoadingId === row.rowId">📎</el-button>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="55"><template #default="{ row }"><el-button link type="danger" size="small" :disabled="isReadonly" @click="removeRow(row.rowId)">删</el-button></template></el-table-column>

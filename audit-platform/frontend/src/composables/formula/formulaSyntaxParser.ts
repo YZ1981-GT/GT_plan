@@ -1,18 +1,23 @@
 /**
  * 公式语法解析器（纯函数）。
  *
- * spec: formula-management-ux-improvements · A 批 · Task A1
- * spec: formula-settings-wiring-closure · Task 11（函数列表与元数对齐 formula_grammar）
+ * spec: formula-grammar-resolver-unification · S1 ADR-FGR-01
  *
- * 支持 16 种平台公式函数（与 formula_grammar.FORMULA_ARITY / formula_engine._REGISTRY 对齐）：
- * - 取数：TB / SUM_TB / ROW / SUM_ROW / REPORT / WP / NOTE / ADJ / AUX / PREV / PRIOR
- * - 数学：ABS / ROUND / MAX / MIN / IF
- * + 数学运算符（+ - * / %）+ 数字常量 + 括号。
+ * 函数表、参数范围、运算符均从生成文件 ``formulaFunctionCatalog.ts`` 读取，
+ * 按调用方传入的引擎（l1 / note / cell）取对应子集。
  *
  * 两个入口：
- * - `tokenize(expr)` → 着色用 token 数组
- * - `validate(expr)` → 语法校验结果（errors + 提取到的函数调用列表）
+ * - `tokenize(expr, engine?)` → 着色用 token 数组
+ * - `validate(expr, engine?)` → 语法校验结果（errors + 提取到的函数调用列表）
  */
+
+import type { FormulaEngine } from '@/generated/formulaFunctionCatalog'
+import {
+  FUNCTION_NAMES_BY_ENGINE,
+  ARITY_BY_ENGINE,
+  OPERATORS_BY_ENGINE,
+  FUNCTION_HINTS_BY_ENGINE,
+} from '@/generated/formulaFunctionCatalog'
 
 // ── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -44,54 +49,23 @@ export interface ValidationResult {
   functions: FunctionCall[]
 }
 
-// ── 常量 ────────────────────────────────────────────────────────────────────
+// ── 默认引擎 ────────────────────────────────────────────────────────────────
 
-/**
- * 平台已知公式函数。
- *
- * 与后端 `formula_engine._REGISTRY`（20 函数）对齐：
- * - 取数：TB / SUM_TB / ROW / SUM_ROW / REPORT / WP / NOTE / ADJ / AUX / PREV(=PRIOR)
- * - 底稿取数：LEDGER / LEDGER_DETAIL / TB_AUX / COUNT_LEDGER / PLACEHOLDER
- * - 数学：ABS / ROUND / MAX / MIN / IF
- */
-const KNOWN_FUNCTIONS = new Set([
-  'TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
-  'ADJ', 'AUX', 'PREV', 'PRIOR',
-  'LEDGER', 'LEDGER_DETAIL', 'TB_AUX', 'COUNT_LEDGER', 'PLACEHOLDER',
-  'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
+const DEFAULT_ENGINE: FormulaEngine = 'l1'
+
+/** 所有引擎的函数名并集（tokenize 着色用，不区分引擎时使用）。 */
+const ALL_FUNCTION_NAMES = new Set([
+  ...FUNCTION_NAMES_BY_ENGINE.l1,
+  ...FUNCTION_NAMES_BY_ENGINE.note,
+  ...FUNCTION_NAMES_BY_ENGINE.cell,
 ])
-
-/** 各函数的参数数量范围 [min, max]（与 formula_engine._REGISTRY 对齐） */
-const FUNCTION_ARITY: Record<string, [number, number]> = {
-  TB: [2, 2],
-  SUM_TB: [2, 2],
-  WP: [2, 3],
-  NOTE: [2, 3],
-  ROW: [1, 1],
-  SUM_ROW: [2, 2],
-  REPORT: [2, 2],
-  ADJ: [1, 2],
-  AUX: [2, 3],
-  PREV: [2, 3],
-  PRIOR: [2, 3],
-  LEDGER: [3, 3],
-  LEDGER_DETAIL: [3, 3],
-  TB_AUX: [3, 3],
-  // COUNT_LEDGER('科目'[,'范围'])：与后端 _REGISTRY 一致（原写成 3 参「科目, 方向, 范围」，后端按第二参取期间，3 参恒取不到）
-  COUNT_LEDGER: [1, 2],
-  PLACEHOLDER: [0, 0],
-  ABS: [1, 1],
-  ROUND: [2, 2],
-  MAX: [2, 2],
-  MIN: [2, 2],
-  IF: [3, 3],
-}
-
-const OPERATORS = new Set(['+', '-', '*', '/', '%', '=', '<', '>', '!'])
 
 // ── tokenize ────────────────────────────────────────────────────────────────
 
-export function tokenize(expr: string): ParseToken[] {
+export function tokenize(expr: string, engine?: FormulaEngine): ParseToken[] {
+  const funcNames = engine ? FUNCTION_NAMES_BY_ENGINE[engine] : ALL_FUNCTION_NAMES
+  const operators = engine ? OPERATORS_BY_ENGINE[engine] : OPERATORS_BY_ENGINE.l1
+
   const tokens: ParseToken[] = []
   let i = 0
   const len = expr.length
@@ -120,7 +94,6 @@ export function tokenize(expr: string): ParseToken[] {
         i++ // 跳过结尾引号
         tokens.push({ type: 'string', value: expr.slice(start, i), start, end: i })
       } else {
-        // 未闭合引号
         tokens.push({ type: 'string', value: expr.slice(start, i), start, end: i, error: '未闭合的引号' })
       }
       continue
@@ -139,10 +112,27 @@ export function tokenize(expr: string): ParseToken[] {
       const start = i
       while (i < len && /[A-Z_0-9]/.test(expr[i])) i++
       const name = expr.slice(start, i)
-      if (KNOWN_FUNCTIONS.has(name)) {
+      if (funcNames.has(name)) {
         tokens.push({ type: 'function', value: name, start, end: i })
+      } else if (ALL_FUNCTION_NAMES.has(name)) {
+        // 函数存在但不属于当前引擎——给出改用提示
+        const hint = _crossEngineHint(name, engine)
+        tokens.push({ type: 'unknown', value: name, start, end: i, error: hint })
       } else {
         tokens.push({ type: 'unknown', value: name, start, end: i, error: `未知函数 "${name}"` })
+      }
+      continue
+    }
+
+    // 小写字母开头的标识符（附注域的 cell 函数）
+    if (/[a-z]/.test(ch) && funcNames.has('cell')) {
+      const start = i
+      while (i < len && /[a-z_0-9]/i.test(expr[i])) i++
+      const name = expr.slice(start, i)
+      if (funcNames.has(name)) {
+        tokens.push({ type: 'function', value: name, start, end: i })
+      } else {
+        tokens.push({ type: 'unknown', value: name, start, end: i, error: `未知标识符 "${name}"` })
       }
       continue
     }
@@ -161,8 +151,15 @@ export function tokenize(expr: string): ParseToken[] {
       continue
     }
 
+    // 冒号（附注域 SUM 函数用 start:end 语法）
+    if (ch === ':') {
+      tokens.push({ type: 'operator', value: ch, start: i, end: i + 1 })
+      i++
+      continue
+    }
+
     // 运算符
-    if (OPERATORS.has(ch)) {
+    if (operators.has(ch)) {
       const start = i
       // 处理 >=, <=, != 双字符运算符
       if (i + 1 < len && expr[i + 1] === '=' && (ch === '<' || ch === '>' || ch === '!')) {
@@ -191,7 +188,7 @@ export function tokenize(expr: string): ParseToken[] {
 
 // ── validate ────────────────────────────────────────────────────────────────
 
-export function validate(expr: string): ValidationResult {
+export function validate(expr: string, engine: FormulaEngine = DEFAULT_ENGINE): ValidationResult {
   const errors: ValidationError[] = []
   const functions: FunctionCall[] = []
 
@@ -199,7 +196,9 @@ export function validate(expr: string): ValidationResult {
     return { valid: true, errors: [], functions: [] }
   }
 
-  const tokens = tokenize(expr)
+  const tokens = tokenize(expr, engine)
+  const arity = ARITY_BY_ENGINE[engine]
+  const funcNames = FUNCTION_NAMES_BY_ENGINE[engine]
 
   // 1. 收集 token 级错误
   for (const t of tokens) {
@@ -239,7 +238,6 @@ export function validate(expr: string): ValidationResult {
       const args: string[] = []
       let currentArg = ''
       let depth = 0
-      let argStart = next.end
       let closeParen = -1
       for (let j = idx + 2; j < nonWs.length; j++) {
         const a = nonWs[j]
@@ -265,12 +263,14 @@ export function validate(expr: string): ValidationResult {
       const fc: FunctionCall = { name: t.value, args, start: t.start, end: closeParen > 0 ? closeParen : t.end }
       functions.push(fc)
 
-      // 参数数量校验
-      const arity = FUNCTION_ARITY[t.value]
-      if (arity) {
-        const [min, max] = arity
-        if (args.length < min || args.length > max) {
-          const expected = min === max ? `${min}` : `${min}~${max}`
+      // 参数数量校验（从目录读取）
+      const bounds = arity[t.value]
+      if (bounds) {
+        const [min, max] = bounds
+        if (args.length < min || (max !== null && args.length > max)) {
+          const expected = max === null
+            ? `至少 ${min}`
+            : min === max ? `${min}` : `${min}~${max}`
           errors.push({
             start: t.start,
             end: closeParen > 0 ? closeParen : t.end,
@@ -290,8 +290,9 @@ export function validate(expr: string): ValidationResult {
  * 判断光标在哪个函数的哪个参数位置。
  * 返回 null 表示不在任何函数参数中。
  */
-export function cursorContext(expr: string, cursor: number): { funcName: string; argIndex: number } | null {
-  // 从光标位置往前找最近的未闭合的 FUNC(
+export function cursorContext(expr: string, cursor: number, engine?: FormulaEngine): { funcName: string; argIndex: number } | null {
+  const funcNames = engine ? FUNCTION_NAMES_BY_ENGINE[engine] : ALL_FUNCTION_NAMES
+
   let depth = 0
   let argIndex = 0
   for (let i = cursor - 1; i >= 0; i--) {
@@ -299,13 +300,12 @@ export function cursorContext(expr: string, cursor: number): { funcName: string;
     if (ch === ')') depth++
     else if (ch === '(') {
       if (depth === 0) {
-        // 找到未闭合的左括号，往前取函数名
         let nameEnd = i
         let nameStart = i - 1
         while (nameStart >= 0 && /[A-Z_0-9]/.test(expr[nameStart])) nameStart--
         nameStart++
         const name = expr.slice(nameStart, nameEnd)
-        if (KNOWN_FUNCTIONS.has(name)) {
+        if (funcNames.has(name)) {
           return { funcName: name, argIndex }
         }
         return null
@@ -318,29 +318,32 @@ export function cursorContext(expr: string, cursor: number): { funcName: string;
   return null
 }
 
-/** 获取已知函数列表（供补全用） */
-export function knownFunctions(): Array<{ name: string; minArgs: number; maxArgs: number; description: string }> {
-  return [
-    { name: 'TB', minArgs: 2, maxArgs: 2, description: "试算表取数 TB('科目代码','字段')" },
-    { name: 'SUM_TB', minArgs: 2, maxArgs: 2, description: "范围科目求和 SUM_TB('起始~结束','字段')" },
-    { name: 'WP', minArgs: 2, maxArgs: 3, description: "底稿取数 WP('底稿','字段') 或 WP('底稿','sheet','坐标')" },
-    { name: 'NOTE', minArgs: 2, maxArgs: 3, description: "附注取数 NOTE('章节','字段','子字段')" },
-    { name: 'ROW', minArgs: 1, maxArgs: 1, description: "行次引用 ROW('行次')" },
-    { name: 'REPORT', minArgs: 2, maxArgs: 2, description: "报表取数 REPORT('行次','字段')" },
-    { name: 'SUM_ROW', minArgs: 2, maxArgs: 2, description: "区间行次求和 SUM_ROW('起始行','结束行')" },
-    { name: 'ADJ', minArgs: 1, maxArgs: 2, description: "调整分录取数 ADJ('科目','类型')" },
-    { name: 'AUX', minArgs: 2, maxArgs: 3, description: "辅助余额取数 AUX('科目','维度','字段')" },
-    { name: 'PREV', minArgs: 2, maxArgs: 3, description: "上期数取数 PREV('科目','字段')" },
-    { name: 'PRIOR', minArgs: 2, maxArgs: 3, description: "上期数（PREV 别名）PRIOR('科目','字段')" },
-    { name: 'LEDGER', minArgs: 3, maxArgs: 3, description: "序时账取数 LEDGER('科目','方向','范围')" },
-    { name: 'LEDGER_DETAIL', minArgs: 3, maxArgs: 3, description: "序时账明细 LEDGER_DETAIL('科目','月份','阈值')" },
-    { name: 'TB_AUX', minArgs: 3, maxArgs: 3, description: "辅助维度汇总 TB_AUX('科目','维度','列名')" },
-    { name: 'COUNT_LEDGER', minArgs: 1, maxArgs: 2, description: "序时账笔数 COUNT_LEDGER('科目','范围')" },
-    { name: 'PLACEHOLDER', minArgs: 0, maxArgs: 0, description: "预留占位 PLACEHOLDER()" },
-    { name: 'ABS', minArgs: 1, maxArgs: 1, description: "绝对值 ABS(值)" },
-    { name: 'ROUND', minArgs: 2, maxArgs: 2, description: "四舍五入 ROUND(值, 位数)" },
-    { name: 'MAX', minArgs: 2, maxArgs: 2, description: "最大值 MAX(值1, 值2)" },
-    { name: 'MIN', minArgs: 2, maxArgs: 2, description: "最小值 MIN(值1, 值2)" },
-    { name: 'IF', minArgs: 3, maxArgs: 3, description: "条件 IF(条件, 真值, 假值)" },
-  ]
+/** 获取当前引擎的函数提示列表（供补全用，从目录生成文件读取）。 */
+export function knownFunctions(engine: FormulaEngine = DEFAULT_ENGINE): Array<{ name: string; minArgs: number; maxArgs: number | null; description: string }> {
+  return [...FUNCTION_HINTS_BY_ENGINE[engine]]
+}
+
+// ── 跨引擎提示 ─────────────────────────────────────────────────────────────
+
+function _crossEngineHint(name: string, engine?: FormulaEngine): string {
+  if (!engine) return `未知函数 "${name}"`
+
+  // PRIOR 在 L1 下给出改用 PREV 的提示
+  if (name === 'PRIOR' && engine === 'l1') {
+    return 'PRIOR 是附注公式函数，报表/底稿公式请用 PREV'
+  }
+  // PREV 在附注域给出改用 PRIOR 的提示
+  if (name === 'PREV' && engine === 'note') {
+    return 'PREV 是报表公式函数，附注公式请用 PRIOR'
+  }
+
+  // 通用提示
+  const engines: string[] = []
+  for (const [eng, names] of Object.entries(FUNCTION_NAMES_BY_ENGINE)) {
+    if ((names as ReadonlySet<string>).has(name)) engines.push(eng)
+  }
+  if (engines.length > 0) {
+    return `${name} 不支持当前引擎（${engine}），仅在 ${engines.join('/')} 下可用`
+  }
+  return `未知函数 "${name}"`
 }

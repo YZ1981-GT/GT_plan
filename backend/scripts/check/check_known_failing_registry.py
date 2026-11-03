@@ -161,12 +161,8 @@ KNOWN_FAILING: dict[str, tuple[str, str, str]] = {
         "首位位置参数是 store_item_id 的 provider 现算 [] ≠ ['f1']（5cb7ebe70 统一了 f1 签名）",
     ),
     # ── 冻结计数被别 lane 的提交改变 ───────────────────────────────────────
-    "tests/scripts/test_check_store_item_two_way_parity.py"
-    "::test_baseline_is_exactly_thirteen_with_owning_lanes": (
-        "workpaper-sync-store-item-parity",
-        "5914e315b",
-        "8edf1d45a 加 F2/F4 parity 棘轮后 KNOWN_UNWIRED 现为 15 条，自测仍断言 == 13",
-    ),
+    #    （test_baseline_is_exactly_thirteen_with_owning_lanes 已出列：2026-10-28 G4 / G6 接通后
+    #     KNOWN_UNWIRED 15 → 13，spec oo-writeback-template-parity-closure R3 批 B3）
     "tests/workpaper_sync/test_task57_abcs_and_shared_migration.py"
     "::TestFormDifferences::test_ad1_scope_arithmetic_closes": (
         "abcs-cycle-sync-migration",

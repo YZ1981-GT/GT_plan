@@ -135,6 +135,8 @@ class TestSnapshotWriterOrchestratorIntegration:
                     cell_ref="B7",
                     new_value=200.0,
                     opened_at=now,
+                    # 取行带请求项目（advanced-query-linkage-closure 任务 14，R4.2）：缺项目即 ValueError
+                    project_id=project_id,
                 )
 
         assert result["success"] is True
@@ -215,6 +217,7 @@ class TestSnapshotWriterOrchestratorIntegration:
                     cell_ref="B7",
                     new_value=200.0,
                     opened_at=now,
+                    project_id=project_id,  # 取行带请求项目（任务 14，R4.2）
                 )
 
         assert result["success"] is True, "数据已写回，不应因联动失败而报失败"
@@ -307,7 +310,9 @@ class TestRouterSurfacesDownstreamWarnings:
                 "warnings": ["下游联动未触发：底稿 ORM 实例不可用"],
             }
 
-        monkeypatch.setattr(sw_mod.snapshot_writer, "write_cell", _write_cell)
+        # 单例的桩用 setitem(vars(单例))：撤销时删键。setattr 撤销时会把类上的方法写回成实例属性，
+        # 挡住后续用例的类级替换（advanced-query-linkage-closure B6 / B8，test_aql_writeback_isolation_pg 的守卫会点名）
+        monkeypatch.setitem(vars(sw_mod.snapshot_writer), "write_cell", _write_cell)
 
         body = router_mod.CellWritebackRequest(
             project_id=project_id,
@@ -361,7 +366,7 @@ class TestRouterSurfacesDownstreamWarnings:
                 "audit_logged": True,
             }
 
-        monkeypatch.setattr(sw_mod.snapshot_writer, "write_cell", _write_cell)
+        monkeypatch.setitem(vars(sw_mod.snapshot_writer), "write_cell", _write_cell)  # 撤销时删键，见上一例
 
         body = router_mod.CellWritebackRequest(
             project_id=project_id,

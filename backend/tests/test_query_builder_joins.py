@@ -45,14 +45,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.audit_platform_models import (
-    AccountChart,
     AccountCategory,
+    AccountChart,
+    AccountSource,
     TrialBalance,
 )
-from app.models.base import Base
-from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
+from app.models.core import Project, ProjectStatus, ProjectType, UserRole
 from app.models.workpaper_models import WpIndex
 from app.routers.query_builder import router as query_builder_router
+from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -72,10 +73,12 @@ class _FakeUser:
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    # 只建构建器白名单表及其外键闭包（AQ-32）：建全部 ORM 表时，任一无关模型带 PG 专用 server_default，
+    # 本文件全部用例都会在 setup 阶段报错（见 builder_tables 模块说明）
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(create_builder_schema)
+        await assert_only_builder_tables(conn)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
@@ -161,25 +164,27 @@ async def _seed_data(db: AsyncSession) -> None:
             audited_amount=Decimal("50000"),
         ),
     ])
-    # 3 条 account_chart，与上面 3 条 trial_balance 的科目码一一对应。
-    # 这是**含业务键**的 JOIN 目标（standard_account_code ↔ account_code），
-    # INNER JOIN 得 1:1 的 3 行，而非笛卡尔积。
+    # account_chart：与上面 3 条 trial_balance 的科目码一一对应的标准科目（source=standard），另有同码的客户科目
+    # （source=client，与真实项目一样一个项目两套行）。这是**含业务键**的 JOIN 目标（standard_account_code ↔
+    # account_code），登记的目标条件只认标准科目 ⇒ INNER JOIN 得 1:1 的 3 行，而非 3×2=6 行（AQ-19：华氏试算表
+    # LEFT JOIN 科目表曾 100 行变 200 行）。
     db.add_all([
         AccountChart(
             id=uuid.uuid4(),
             project_id=PROJECT_ID,
             account_code=code,
-            account_name=name,
+            account_name=f"{name}（{source.value}）",
             direction=direction,
             level=1,
             category=category,
-            source="manual",
+            source=source,
         )
         for code, name, direction, category in (
-            ("1001", "库存现金", "debit", "资产"),
-            ("1002", "银行存款", "debit", "资产"),
-            ("6001", "主营业务收入", "credit", "收入"),
+            ("1001", "库存现金", "debit", "asset"),
+            ("1002", "银行存款", "debit", "asset"),
+            ("6001", "主营业务收入", "credit", "revenue"),
         )
+        for source in (AccountSource.standard, AccountSource.client)
     ])
     await db.flush()
 
@@ -207,6 +212,11 @@ async def test_schema_includes_joins(db_session):
     # account_chart 关联应包含 (project_id, project_id) + (standard_account_code, account_code)
     ac_join = next(j for j in tables["trial_balance"]["joins"] if j["target_table"] == "account_chart")
     assert len(ac_join["on"]) == 2
+    # 每条关联都下发基数（R3.4）：科目表是多对一，报表行次映射是一对多
+    rlm_join = next(j for j in tables["trial_balance"]["joins"] if j["target_table"] == "report_line_mapping")
+    assert (ac_join["cardinality"], rlm_join["cardinality"]) == ("many_to_one", "one_to_many")
+    # 报表行次映射 → 报表配置的登记已删除（同一行次码在各准则与项目副本各有一行）
+    assert "report_config" not in {j["target_table"] for j in tables["report_line_mapping"]["joins"]}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -239,10 +249,11 @@ async def test_inner_join_trial_balance_account_chart(db_session):
         )
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    # 3 条 TB ⋈ 3 条 account_chart（按科目码）= 3 行，**不是** 3×3=9 的笛卡尔积
+    # 3 条 TB ⋈ 标准科目（按科目码）= 3 行：不是 3×3=9 的笛卡尔积，也不因同码的客户科目翻倍成 6 行
     assert data["total"] == 3
     for r in data["rows"]:
         assert r["account_chart.direction"] in ("debit", "credit")
+        assert r["account_chart.account_name"].endswith("（standard）"), r
 
 
 @pytest.mark.asyncio
@@ -306,9 +317,9 @@ async def test_join_filter_on_joined_table(db_session):
         )
     assert resp.status_code == 200
     rows = resp.json()["rows"]
-    # 仅匹配 1002 的科目：1 行
+    # 仅匹配 1002 的标准科目：1 行
     assert len(rows) == 1
-    assert rows[0]["account_chart.account_name"] == "银行存款"
+    assert rows[0]["account_chart.account_name"] == "银行存款（standard）"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -348,6 +359,26 @@ async def test_left_join_returns_null_for_unmatched(db_session):
     # 目标表字段全为 None
     for r in rows:
         assert r["report_line_mapping.report_line_name"] is None
+    # 一对多关联在结果里提示（R3.4）
+    assert any("该关联为一对多，结果行数可能多于基表行数" in w for w in resp.json()["warnings"])
+
+
+@pytest.mark.asyncio
+async def test_report_line_mapping_to_report_config_is_no_longer_registered(db_session):
+    """「报表行次映射 → 报表配置」登记已删除（ADR-AQL-09）：同一行次码在各准则与项目副本各有一行（一对多），
+    准则随项目而定写不成常量条件，行名已在 report_line_mapping.report_line_name。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.post(
+            "/api/query/execute",
+            json={
+                "table": "report_line_mapping",
+                "joins": [{"table": "report_config", "type": "left"}],
+                "fields": ["report_line_mapping.report_line_code"],
+            },
+        )
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error_code"] == "JOIN_NOT_REGISTERED"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -373,7 +404,7 @@ async def test_unregistered_join_returns_400(db_session):
 
 
 @pytest.mark.asyncio
-async def test_invalid_join_type_returns_400(db_session):
+async def test_invalid_join_type_is_rejected_by_strict_request_model(db_session):
     app = _make_app(db_session)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
         resp = await ac.post(
@@ -384,8 +415,9 @@ async def test_invalid_join_type_returns_400(db_session):
                 "fields": ["trial_balance.id"],
             },
         )
-    assert resp.status_code == 400
-    assert resp.json()["detail"]["error_code"] == "JOIN_TYPE_NOT_ALLOWED"
+    assert resp.status_code == 422
+    errors = resp.json()["detail"]
+    assert any(item.get("loc", [None])[-1] == "type" for item in errors), errors
 
 
 @pytest.mark.asyncio

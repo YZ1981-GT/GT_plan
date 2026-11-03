@@ -4,10 +4,19 @@
  * Feature: review-prompt-sheet-level-split
  * Requirements: 6.1, 6.4
  */
-import { ref, reactive } from 'vue'
+import { ref, reactive, onScopeDispose } from 'vue'
 import http from '@/utils/http'
 import { downloadFile } from '@/utils/http'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import {
+  cancelAiTaskJob,
+  createOrResumeAiTaskJob,
+  isAiTaskTerminal,
+  waitForAiTaskJob,
+  type AiTaskItem,
+  type AiTaskJobSnapshot,
+} from '@/services/aiTaskJobs'
 
 export interface ReviewFinding {
   id: string
@@ -22,10 +31,17 @@ export interface ReviewFinding {
 export interface SheetReviewCard {
   sheetName: string
   wpId: string
-  passStatus: 'pass' | 'fail' | 'pending' | 'review_error' | 'manual_review_required'
+  passStatus: 'pass' | 'fail' | 'pending' | 'review_error' | 'manual_review_required' | 'ai_no_new_findings' | 'ai_findings_present' | 'deterministic_failure'
   findingCount: number
   riskDistribution: { high: number; medium: number; low: number }
   findings: ReviewFinding[]
+  systemChecks: Array<{
+    code: string
+    passed: boolean | null
+    message: string
+    severity: string
+    check_type: string
+  }>
   promptSource?: 'sheet' | 'subject' | 'base'
 }
 
@@ -57,6 +73,7 @@ export interface BatchReviewResult {
     model_used: string
     prompt_source: string
     error_message: string | null
+    deterministic_checks?: SheetReviewCard['systemChecks']
   }>
   statistics: {
     total_sheets: number
@@ -76,7 +93,9 @@ export interface BatchReviewResult {
 
 export interface SingleReviewResult {
   findings: ReviewFinding[]
+  deterministic_checks?: SheetReviewCard['systemChecks']
   overall_pass: boolean
+  review_status: 'manual_review_required' | 'ai_no_new_findings' | 'ai_findings_present' | 'deterministic_failure'
   risk_summary: Record<string, number>
   sheet_info: {
     wp_id: string
@@ -100,6 +119,30 @@ function mapResultToCard(
       low: r.risk_summary?.low ?? 0,
     },
     findings: r.findings,
+    systemChecks: r.deterministic_checks ?? [],
+    promptSource: r.prompt_source as SheetReviewCard['promptSource'],
+  }
+}
+
+function mapJobItemToCard(item: AiTaskItem): SheetReviewCard | null {
+  const r = item.result
+  if (!r) return null
+  const sheetName = String(r.sheet_name || item.target_key || '底稿')
+  const findings = Array.isArray(r.findings) ? r.findings as ReviewFinding[] : []
+  return {
+    sheetName,
+    wpId: String(r.wp_id || item.target_id),
+    passStatus: String(r.review_status || 'manual_review_required') as SheetReviewCard['passStatus'],
+    findingCount: findings.length,
+    riskDistribution: {
+      high: Number(r.risk_summary?.high || 0),
+      medium: Number(r.risk_summary?.medium || 0),
+      low: Number(r.risk_summary?.low || 0),
+    },
+    findings,
+    systemChecks: Array.isArray(r.deterministic_checks)
+      ? r.deterministic_checks as SheetReviewCard['systemChecks']
+      : [],
     promptSource: r.prompt_source as SheetReviewCard['promptSource'],
   }
 }
@@ -109,9 +152,7 @@ function mapSingleToCard(
   sheetName: string,
   data: SingleReviewResult,
 ): SheetReviewCard {
-  const passStatus = data.overall_pass
-    ? 'pass'
-    : 'fail'
+  const passStatus = data.review_status || 'manual_review_required'
   return {
     sheetName: sheetName,
     wpId: wpId,
@@ -123,6 +164,7 @@ function mapSingleToCard(
       low: data.risk_summary?.low ?? 0,
     },
     findings: data.findings,
+    systemChecks: data.deterministic_checks ?? [],
     promptSource: data.sheet_info.prompt_source,
   }
 }
@@ -136,7 +178,8 @@ function upsertSheetCard(cards: SheetReviewCard[], card: SheetReviewCard): void 
   }
 }
 
-export function useReviewPanel(projectId: string, wpCodePrefix: string, year: number) {
+/** year：审计年度；项目没填为 null ⇒ 批量复核提示去填年度、不发请求（不按今年兜底） */
+export function useReviewPanel(projectId: string, wpCodePrefix: string, year: number | null) {
   const sheets = ref<SheetReviewCard[]>([])
   const isReviewing = ref(false)
   const progress = reactive<ReviewProgress>({
@@ -145,13 +188,32 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
     currentSheet: '',
   })
   const expandedSheet = ref<string | null>(null)
+  const batchJob = ref<AiTaskJobSnapshot | null>(null)
+  let batchController: AbortController | null = null
+
+  function applyBatchSnapshot(snapshot: AiTaskJobSnapshot): void {
+    batchJob.value = snapshot
+    progress.current = snapshot.progress_done
+    progress.total = snapshot.progress_total
+    const active = snapshot.items.find((item) =>
+      item.status === 'running' || item.status === 'retry_wait' || item.status === 'queued',
+    )
+    progress.currentSheet = active?.target_key || (isAiTaskTerminal(snapshot.status) ? '完成' : '准备中...')
+    sheets.value = snapshot.items
+      .map(mapJobItemToCard)
+      .filter((card): card is SheetReviewCard => card !== null)
+  }
 
   /**
    * 触发批量复核
    */
-  async function startBatchReview(): Promise<BatchReviewResult | null> {
+  async function startBatchReview(): Promise<AiTaskJobSnapshot | null> {
     if (isReviewing.value) {
       ElMessage.warning('复核正在进行中，请稍候')
+      return null
+    }
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
       return null
     }
 
@@ -159,54 +221,54 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
     progress.current = 0
     progress.total = 0
     progress.currentSheet = '准备中...'
-
-    let progressTimer: ReturnType<typeof setInterval> | null = null
-    const sessionIdForProgress = crypto.randomUUID?.() || `${Date.now()}`
-
-    progressTimer = setInterval(async () => {
-      try {
-        const { data: prog } = await http.get(
-          `/api/projects/${projectId}/batch-review-progress`,
-          { params: { session_id: sessionIdForProgress } },
-        )
-        if (prog && prog.status === 'running') {
-          progress.current = prog.current
-          progress.total = prog.total
-          progress.currentSheet = prog.current_sheet || ''
-        }
-      } catch {
-        // 轮询失败不阻断
-      }
-    }, 1500)
-
     try {
-      const { data } = await http.post<BatchReviewResult>(
-        `/api/projects/${projectId}/batch-review`,
+      const snapshot = await createOrResumeAiTaskJob(
+        projectId,
+        `${year}:${wpCodePrefix}:batch-review`,
         {
-          wp_code_prefix: wpCodePrefix,
+          task_kind: 'workpaper_batch_review',
           year,
-          progress_session_id: sessionIdForProgress,
+          wp_code_prefix: wpCodePrefix,
         },
       )
-
-      if (data) {
-        sheets.value = data.results.map(mapResultToCard)
-        progress.current = data.statistics.total_sheets
-        progress.total = data.statistics.total_sheets
-        progress.currentSheet = '完成'
-        ElMessage.success(`批量复核完成：${data.statistics.passed_count} 通过 / ${data.statistics.failed_count} 未通过`)
+      applyBatchSnapshot(snapshot)
+      batchController?.abort()
+      batchController = new AbortController()
+      const final = await waitForAiTaskJob(
+        projectId,
+        snapshot,
+        applyBatchSnapshot,
+        batchController.signal,
+      )
+      applyBatchSnapshot(final)
+      const findingSheets = final.items.filter((item) =>
+        item.result?.review_status === 'ai_findings_present'
+        || item.result?.review_status === 'deterministic_failure',
+      ).length
+      if (final.status === 'succeeded') {
+        ElMessage.success(`批量 AI 复核完成：${findingSheets} 张有待核实疑点；全部仍待人工复核`)
+      } else if (final.status !== 'cancelled') {
+        ElMessage.warning(`批量复核已结束：${final.failed_count} 张需人工处理`)
       }
-
-      return data
+      return final
     } catch (err: any) {
-      ElMessage.error(err?.response?.data?.detail || '批量复核失败，请稍后重试')
+      ElMessage.error(err?.response?.data?.detail || '批量复核启动或恢复失败，请稍后重试')
       return null
     } finally {
-      if (progressTimer) {
-        clearInterval(progressTimer)
-        progressTimer = null
-      }
       isReviewing.value = false
+    }
+  }
+
+  async function cancelBatchReview(): Promise<void> {
+    const job = batchJob.value
+    if (!job || isAiTaskTerminal(job.status)) return
+    try {
+      applyBatchSnapshot(await cancelAiTaskJob(projectId, job.job_id))
+      batchController?.abort()
+      isReviewing.value = false
+      ElMessage.success('已取消未完成的批量复核')
+    } catch {
+      ElMessage.error('取消批量复核失败')
     }
   }
 
@@ -251,7 +313,14 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
           : data.sheet_info.prompt_source === 'subject'
             ? '科目级(降级)'
             : '通用模板(降级)'
-        ElMessage.success(`本页复核完成（${srcLabel}）：${data.overall_pass ? '通过' : '未通过'}`)
+        const statusLabel = data.review_status === 'ai_no_new_findings'
+          ? 'AI 未发现新增疑点，待人工复核'
+          : data.review_status === 'ai_findings_present'
+            ? 'AI 提出待核实疑点'
+            : data.review_status === 'deterministic_failure'
+              ? '系统检查未通过'
+              : '需人工复核'
+        ElMessage.success(`本页 AI 复核完成（${srcLabel}）：${statusLabel}`)
       }
       return data
     } finally {
@@ -268,7 +337,10 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
       await downloadFile(
         `/api/projects/${projectId}/review-export`,
         {
-          params: { wp_code_prefix: wpCodePrefix },
+          params: {
+            wp_code_prefix: wpCodePrefix,
+            ...(batchJob.value?.job_id ? { session_id: batchJob.value.job_id } : {}),
+          },
           fileName: `${wpCodePrefix}复核报告.xlsx`,
         },
       )
@@ -306,12 +378,16 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
     }
   }
 
+  onScopeDispose(() => batchController?.abort())
+
   return {
     sheets,
     isReviewing,
     progress,
     expandedSheet,
+    batchJob,
     startBatchReview,
+    cancelBatchReview,
     reviewSingleSheet,
     reviewCurrentSheet,
     exportReviewExcel,

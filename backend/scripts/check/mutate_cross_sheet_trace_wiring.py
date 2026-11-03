@@ -18,6 +18,16 @@ from __future__ import annotations
 import argparse
 import sys
 
+# 🔴 同目录兄弟模块：CLI 路径下 Python 自动把脚本目录放进 sys.path[0]，但被
+#    `importlib.spec_from_file_location` 加载时**不动 sys.path** ⇒ import 期
+#    ModuleNotFoundError ⇒ 引用本脚本的测试模块连采集都过不去（CI 的 backend-tests 是
+#    `pytest -x`，一个采集错误会停掉整个 job）。故在兄弟 import 之前显式补路径；
+#    CLI 路径下这段是 no-op。判据：backend/tests/test_check_scripts_importable.py
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+if str(_Path(__file__).resolve().parent) not in _sys.path:
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from mutate_common import Mutation, check_group_anchors, run_group
 
 GUARD = "backend/tests/test_cross_sheet_trace_wiring.py"
@@ -35,6 +45,7 @@ TRACE_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
         parsed_data,
         sheet_name,
         cell_ref,
+        parent_wp_code=wp_code,
         project_id=project_id,
         db=db,
         max_depth=max_depth,
@@ -115,10 +126,10 @@ TRACE_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
         Mutation(
             "T06",
             ORCH,
-            "        addr_id=resolved.addr_id if resolved.found else None,",
-            "        addr_id=None,  # 变异：解析结果不合并回链",
-            "test_orchestrator_merges_addr_id_from_async_resolution",
-            "orchestrator 解析出 addr_id 却不合并回链（接线成空操作）",
+            "        addr_id=match.addr_id if match.ok else None,",
+            "        addr_id=None,  # 变异：身份判定结果不合并回链",
+            "test_orchestrator_merges_canonical_identity",
+            "orchestrator 判出规范 addr_id 却不合并回链（接线成空操作）",
         ),
         ORCH_GUARD,
     ),

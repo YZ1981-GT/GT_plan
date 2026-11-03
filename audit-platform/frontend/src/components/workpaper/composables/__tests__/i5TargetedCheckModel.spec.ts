@@ -147,6 +147,16 @@ describe('i5TargetedCheckModel', () => {
     expect(mv.source).toBe('I5-2')
   })
 
+  // post-push-residual-defect-closure R2：原先 null 当「不过滤」，把往年原值也算成本期借方
+  it('审计年度未知（项目没填）：发生日年份代理不计入本期借方', () => {
+    const mv = extractI5PeriodMovement([
+      { name: '旧项目', originalAmount: 800, incurredDate: '2026-05-01' },
+      { name: '往年项目', originalAmount: 300, incurredDate: '2024-01-01' },
+    ], null)
+    expect(mv.debitTotal).toBe(0)
+    expect(mv.originalTotal).toBe(1100)
+  })
+
   it('兼容旧段落型 radio+textarea 拼装的迁移对象（分类/期限/可回收性）', () => {
     const rf = normalizeI5TargetedRiskFocus({
       classificationItems: '应重分类到长期待摊费用：异常',

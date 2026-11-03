@@ -188,6 +188,29 @@ async def record_cross_sheet_trace(
     )
 
 
+# ─── 导出审计（不节流，advanced-query-linkage-closure R8.4）─────────────────────
+
+#: 业务视图与构建器的「导出全部」共用的审计动作名
+ACTION_EXPORT = "custom_query.export"
+
+
+async def record_export(
+    *,
+    user_id: UUID | str,
+    project_id: UUID | str | None,
+    details: dict[str, Any],
+) -> bool:
+    """每次导出记一条审计（操作者、项目、数据源、行数，R8.4；**不节流**）。审计失败只记 WARNING，不影响下载。"""
+    return await _log_unthrottled(
+        user_id=user_id,
+        action=ACTION_EXPORT,
+        object_type="custom_query",
+        object_id=None,
+        project_id=project_id,
+        details={"operation": ACTION_EXPORT, "occurred_at": _utc_second_timestamp(), **details},
+    )
+
+
 # ─── 查询执行审计（60s 窗口节流，R14.4）──────────────────────────────────────
 
 
@@ -209,8 +232,8 @@ async def record_query_execution(
 
     节流判定复用 ``audit_throttle.should_record``（Redis SET NX EX；Redis 不可用时
     降级为全部记录）。节流键的动作名固定用非敏感的 ``custom_query.execute``（确保
-    参与节流），落库审计的动作类型标签由 ``action`` 决定（如批量执行传
-    ``custom_query.batch_execute``）。
+    参与节流），落库审计的动作类型标签由 ``action`` 决定（缺省 ``custom_query.execute``；
+    批量执行端点 ``custom_query.batch_execute`` 已随 advanced-query-linkage-closure 任务 6 删除）。
 
     Args:
         redis:    Redis 客户端（None → should_record 降级为全部记录）。
@@ -255,6 +278,10 @@ async def record_query_execution(
 # ─────────────────────────────────────────────────────────────────────────────
 #: 查询被时间预算掐断
 ACTION_QUERY_TIMEOUT = "custom_query.timeout"
+#: 查询保护未能在数据库侧启用
+ACTION_QUERY_GUARD_UNAVAILABLE = "custom_query.guard_unavailable"
+#: 查询变换失败，未返回降级明细
+ACTION_QUERY_TRANSFORM_FAILED = "custom_query.transform_failed"
 #: 查询因复杂度预算被拒（JOIN 条数 / 分组维度 / 聚合个数超限）
 ACTION_QUERY_BUDGET_DENIED = "custom_query.budget_denied"
 #: 查询因 PII 字段无权被拒
@@ -264,8 +291,12 @@ ACTION_PII_DENIED = "custom_query.pii_denied"
 #: ``advanced_query.ownership_denied``，不在此表内（避免同一事件记两条）。
 REJECTION_ACTION_BY_ERROR_CODE: dict[str, str] = {
     "QUERY_TIMEOUT": ACTION_QUERY_TIMEOUT,
+    "QUERY_GUARD_UNAVAILABLE": ACTION_QUERY_GUARD_UNAVAILABLE,
+    "QUERY_TRANSFORM_FAILED": ACTION_QUERY_TRANSFORM_FAILED,
     "COMPLEXITY_BUDGET_EXCEEDED": ACTION_QUERY_BUDGET_DENIED,
     "PII_FIELD_FORBIDDEN": ACTION_PII_DENIED,
+    # 构建器人员表角色门（advanced-query-linkage-closure 任务 9）：与 PII 列越权同一处置（走权限申请）
+    "TABLE_ROLE_FORBIDDEN": ACTION_PII_DENIED,
 }
 
 

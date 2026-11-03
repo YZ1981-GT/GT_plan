@@ -216,7 +216,9 @@ export function parseL1PledgeRowsFromMap(items: Array<{ item_id?: string; remark
 
 export async function fetchL1PledgeSeeds(projectId: string): Promise<{ seeds: L1PledgeSeed[]; message: string }> {
   if (!projectId) return { seeds: [], message: '无项目上下文，无法加载 L1' }
-  const { resolveInstance } = useAcnr()
+  // D9（需求 11.4）：普通 async 函数内调用，无 effect scope ⇒ 不订阅 SSE；传 projectId
+  // 仅作 resolve 缺省项目（本处 resolveInstance 显式传参）。
+  const { resolveInstance } = useAcnr(projectId)
   try {
     const inst = await resolveInstance(projectId, 'L1', 'L1-8')
     const wpId = inst?.found ? inst.wp_id : undefined

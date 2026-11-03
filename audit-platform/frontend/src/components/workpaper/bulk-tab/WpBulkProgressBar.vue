@@ -82,10 +82,10 @@ function startSubscription(taskId: string) {
     current.value = Number(data.current ?? 0)
     total.value = Number(data.total ?? total.value)
     message.value = data.message ?? ''
-    if (data.status === 'completed') {
+    if (data.type === 'complete' || data.status === 'completed') {
       status.value = 'completed'
       emit('complete')
-    } else if (data.status === 'failed' || data.error) {
+    } else if (data.type === 'error' || data.status === 'failed' || data.error) {
       status.value = 'failed'
       message.value = data.error || data.message || '处理失败'
       emit('error', message.value)

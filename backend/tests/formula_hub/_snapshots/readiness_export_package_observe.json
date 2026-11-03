@@ -1,0 +1,168 @@
+{
+ "checks": [
+  {
+   "detail": "全部通过",
+   "id": "review_complete",
+   "label": "所有底稿复核通过",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "qc_passed",
+   "label": "所有底稿 QC 自检通过",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "no_open_issues",
+   "label": "无未解决的复核意见",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "adj_approved",
+   "label": "调整分录全部审批",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "misstatement_evaluated",
+   "label": "未更正错报已评价",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "report_generated",
+   "label": "审计报告已生成",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "kam_confirmed",
+   "label": "关键审计事项已确认",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "independence",
+   "label": "独立性确认已签署",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "subsequent_events",
+   "label": "期后事项审阅已完成",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "going_concern",
+   "label": "持续经营评价已完成",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "mgmt_representation",
+   "label": "管理层声明书已获取",
+   "passed": true
+  },
+  {
+   "detail": "全部通过",
+   "id": "index_complete",
+   "label": "底稿按索引编号排列",
+   "passed": true
+  }
+ ],
+ "gate_decision": "warn",
+ "groups": [
+  {
+   "findings": [],
+   "id": "review_complete",
+   "name": "所有底稿复核通过",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "qc_passed",
+   "name": "所有底稿 QC 自检通过",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "no_open_issues",
+   "name": "无未解决的复核意见",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "adj_approved",
+   "name": "调整分录全部审批",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "misstatement_evaluated",
+   "name": "未更正错报已评价",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "report_generated",
+   "name": "审计报告已生成",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "kam_confirmed",
+   "name": "关键审计事项已确认",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "independence",
+   "name": "独立性确认已签署",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "subsequent_events",
+   "name": "期后事项审阅已完成",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "going_concern",
+   "name": "持续经营评价已完成",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "mgmt_representation",
+   "name": "管理层声明书已获取",
+   "status": "pass"
+  },
+  {
+   "findings": [],
+   "id": "index_complete",
+   "name": "底稿按索引编号排列",
+   "status": "pass"
+  },
+  {
+   "findings": [
+    {
+     "action_hint": "请关注未通过的检查项",
+     "error_code": "CONSISTENCY_CHECK_FAILED",
+     "message": "一致性检查有 N 项未通过或未执行（当前为只提示模式）",
+     "rule_code": "CHAIN-CONSISTENCY",
+     "severity": "warning"
+    }
+   ],
+   "id": "misc",
+   "name": "其他门禁规则",
+   "status": "warning"
+  }
+ ],
+ "passed_count": 12,
+ "ready": true,
+ "total_checks": 12
+}

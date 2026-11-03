@@ -622,8 +622,9 @@ import {
   buildD6SimpleMainRows,
   D6_NOTE_SECTION,
   D6_NOTE_TEXT_SECTIONS,
-  type D6DisclosureSnapshot,
 } from '../composables/d6NoteSectionMap'
+// 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import { buildD6DisclosureSnapshot, findD6Section } from '../composables/d6DisclosureSnapshot'
 import { useDisclosureNoteAi } from '../composables/useDisclosureNoteAi'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD6FormData'
@@ -834,13 +835,9 @@ const { aiLoadingSection, runAi, openReview } = useDisclosureNoteAi({
 
 /** 简化式主表行：与同步载荷共用同一纯函数（禁止两处各算一遍）。 */
 const simpleMainRows = computed(() => {
-  const cls = findSection(listedSections.value, 'listed-1')
+  const cls = findD6Section(listedSections.value, 'listed-1')
   return buildD6SimpleMainRows((cls.rows ?? []) as any[])
 })
-
-function findSection(sections: any[], key: string): any {
-  return (sections || []).find((s) => s.sectionKey === key) || { rows: [] }
-}
 
 /** 底稿披露表 → 附注单向推送（当前 displayVariant 对应上市/国企）。 */
 async function syncToDisclosureNotes(): Promise<void> {
@@ -848,69 +845,16 @@ async function syncToDisclosureNotes(): Promise<void> {
   isSyncing.value = true
   const variant = displayVariant.value as DisclosureVariant
   try {
-    let snapshot: D6DisclosureSnapshot
-    if (variant === 'soe') {
-      const cls = findSection(soeSections.value, 'soe-1')
-      const imp = findSection(soeSections.value, 'soe-2')
-      snapshot = {
-        classRows: (cls.rows ?? []).map((r: any) => ({
-          label: r.label,
-          endBookBalance: r.endBookBalance, endImpairment: r.endImpairment, endBookValue: r.endBookValue,
-          priorBookBalance: r.priorBookBalance, priorImpairment: r.priorImpairment, priorBookValue: r.priorBookValue,
-        })),
-        soeImpairmentRows: (imp.rows ?? []).map((r: any) => ({
-          label: r.label, priorBalance: r.priorBalance, provision: r.provision,
-          reversal: r.reversal, writeOff: r.writeOff, endBalance: r.endBalance, reason: r.reason,
-        })),
-        majorChangeRows: majorChangeRows.value.map((r: any) => ({ label: r.label, amount: r.amount, reason: r.reason })),
-        notes: { ...noteTexts.value },
-      }
-    } else {
-      const cls = findSection(listedSections.value, 'listed-1')
-      const prov = findSection(listedSections.value, 'listed-2')
-      const single = findSection(listedSections.value, 'listed-3')
-      const change = findSection(listedSections.value, 'listed-5')
-      snapshot = {
-        classRows: (cls.rows ?? []).map((r: any) => ({
-          label: r.label,
-          endBookBalance: r.endBookBalance, endImpairment: r.endImpairment, endBookValue: r.endBookValue,
-          priorBookBalance: r.priorBookBalance, priorImpairment: r.priorImpairment, priorBookValue: r.priorBookValue,
-        })),
-        mainFormat: mainFormat.value,
-        majorChangeRows: majorChangeRows.value.map((r: any) => ({ label: r.label, amount: r.amount, reason: r.reason })),
-        // 🔴 字段名必须与 `D6ImpairmentProvisionRowLike` 一致（旧代码写的是
-        // endBalance/endPercentage/endAmount/endLossRate → 载荷侧读不到，静默推 0）
-        impairmentProvisionRows: (prov.rows ?? []).map((r: any) => ({
-          label: r.label,
-          balance: r.endBalance,
-          ratio: r.endPercentage,
-          provision: r.endAmount,
-          lossRate: r.endLossRate,
-        })),
-        impairmentProvisionPriorRows: impairmentPriorRows.value.map((r: any) => ({
-          label: r.label, balance: r.balance, ratio: r.ratio,
-          provision: r.provision, lossRate: r.lossRate,
-        })),
-        singleItems: (single.rows ?? []).map((r: any) => ({
-          label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate, reason: r.reason,
-        })),
-        singleItemsPrior: singlePriorRows.value.map((r: any) => ({
-          label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate, reason: r.reason,
-        })),
-        groups: groupedDetails.value.map((g: any) => ({
-          groupName: g.groupName,
-          rows: (g.rows ?? []).map((r: any) => ({
-            label: r.label,
-            balance: r.balance, provision: r.provision, lossRate: r.lossRate,
-            priorBalance: r.priorBalance, priorProvision: r.priorProvision, priorLossRate: r.priorLossRate,
-          })),
-        })),
-        changeRows: (change.rows ?? []).map((r: any) => ({
-          label: r.label, provision: r.provision, reversal: r.reversal, writeOff: r.writeOff, reason: r.reason,
-        })),
-        notes: { ...noteTexts.value },
-      }
-    }
+    const snapshot = buildD6DisclosureSnapshot(variant, {
+      listedSections: listedSections.value,
+      soeSections: soeSections.value,
+      majorChangeRows: majorChangeRows.value,
+      mainFormat: mainFormat.value,
+      impairmentPriorRows: impairmentPriorRows.value,
+      singlePriorRows: singlePriorRows.value,
+      groupedDetails: groupedDetails.value,
+      noteTexts: noteTexts.value,
+    })
     const payload = buildD6SyncPayload(variant, props.wpId || '', null, snapshot)
     const result: any = await http.post(
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,

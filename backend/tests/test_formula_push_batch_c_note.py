@@ -246,8 +246,8 @@ async def test_k1_note_push_writes_end_and_prior_amount(env):
     assert rows["合计"]["end_amount"] == 80
     assert rows["合计"]["prior_amount"] == 270000
 
-    # 同步指纹
-    assert note.table_data["_last_sync_wp_id"] == str(env.k1_wp_id)
+    # 推送来源记 ORM 列；表格里的同步指纹推送不写（只表示底稿披露同步过，spec note-pull-followup-closure R3.2）
+    assert "_last_sync_wp_id" not in note.table_data
     assert note.last_sync_source == "formula_push"
     assert note.last_sync_wp_id == env.k1_wp_id
 
@@ -287,8 +287,8 @@ async def test_i3_note_push_writes_end_and_prior_from_tb(env):
     assert rows["合计"]["end_amount"] == 800000
     assert rows["合计"]["prior_amount"] == 600000
 
-    # 同步指纹
-    assert note.table_data["_last_sync_wp_id"] == str(env.i3_wp_id)
+    # 推送来源记 ORM 列；表格里的同步指纹推送不写（spec note-pull-followup-closure R3.2）
+    assert "_last_sync_wp_id" not in note.table_data
     assert note.last_sync_source == "formula_push"
     assert note.last_sync_wp_id == env.i3_wp_id
 

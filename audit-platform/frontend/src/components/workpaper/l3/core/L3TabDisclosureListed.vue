@@ -114,6 +114,7 @@ import type { useL3FormData } from '@/components/workpaper/composables/useL3Form
 import { useL3Disclosure, type L3DisclosureRow, type L3CurrentPortionRow } from '@/components/workpaper/composables/useL3Disclosure'
 import { eventBus } from '@/utils/eventBus'
 import { buildL3SyncPayload } from '../../composables/l3NoteSectionMap'
+import { buildL3ListedSyncBody, buildL3SyncOptions } from '../../composables/l3DisclosureSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
@@ -155,21 +156,15 @@ async function syncToDisclosureNotes() {
   if (props.isReadonly || !props.projectId) return
   syncing.value = true
   try {
-    // 上市只推 五、45（一年内到期的长期借款在共用的 五、43，不推，见 l3NoteSectionMap 头注释）
-    const [item] = buildL3SyncPayload({
-      variant: 'listed',
-      classificationRows: classificationRows.value,
-      currentPortionRows: currentPortionRows.value,
-      rateRange,
-      propertyNote: propertyNote.value,
-      conclusion: conclusion.value,
-    })
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-      wp_id: props.wpId,
-      sheet_name: 'L3-note-listed',
-      current_standard: 'listed_standalone',
-      ...item,
-    })
+    // 上市只推 五、45（一年内到期的长期借款在共用的 五、43，不推，见 l3NoteSectionMap 头注释）；
+    // 入参 / 请求体与附注页离屏同步共用（l3DisclosureSync，spec note-pull-followup-closure R1）
+    const [item] = buildL3SyncPayload(buildL3SyncOptions('listed', {
+      classificationRows, currentPortionRows, rateRange, propertyNote, conclusion,
+    }))
+    await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      buildL3ListedSyncBody(props.wpId, item),
+    )
     ElMessage.success(`已同步到附注（${item.section_id}）`)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'L3', accountCode: '2501', projectId: props.projectId,

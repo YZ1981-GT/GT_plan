@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper
 from app.services.a16_version_service import recommend_main_version, recommend_supplement
@@ -41,18 +41,14 @@ async def get_checklist_template_bundle(
     _user: User = Depends(get_current_user),
 ):
     """Bundle Tab 嵌入核对表 — 按 wp_code 取模板 + wp_id 取填写数据."""
-    from app.services.checklist_docx_parser import get_checklist_template
-    from app.services.checklist_xlsx_parser import get_checklist_xlsx_template, is_xlsx_checklist
+    from app.services.checklist_template_loader import load_checklist_template
 
     wp = await db.get(WorkingPaper, wp_id)
     if not wp or wp.project_id != project_id:
         raise HTTPException(404, "底稿不存在")
 
     try:
-        if is_xlsx_checklist(wp_code):
-            template_data = await get_checklist_xlsx_template(wp_code)
-        else:
-            template_data = await get_checklist_template(wp_code)
+        template_data = await load_checklist_template(wp_code)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
 
@@ -267,3 +263,45 @@ async def check_export_incomplete(
         if remark:
             issues.extend(check_incomplete_text(str(remark)))
     return {"incomplete": issues, "count": len(issues)}
+
+
+@router.get("/{project_id}/workpapers/{wp_id}/archive-checklist/suggestions")
+async def get_archive_checklist_suggestions(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_project_access("readonly")),
+):
+    """A30 电子底稿归档检查表「按项目底稿建议」（spec attachment-archive-and-a-class-evidence 需求 8.2）。
+
+    项目里有该编码的未删除底稿 ⇒「是」，否则「否」；只给建议，填写与保存仍走核对表现有保存（前端只填空项）。
+    """
+    from app.models.workpaper_models import WpIndex
+    from app.services.checklist_index_parser import (
+        checklist_item_codes,
+        get_index_checklist_template,
+        is_index_checklist,
+        normalize_code,
+    )
+
+    row = (await db.execute(
+        sa.select(WorkingPaper.project_id, WorkingPaper.is_deleted, WpIndex.wp_code)
+        .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+        .where(WorkingPaper.id == wp_id)
+    )).first()
+    if row is None or row.project_id != project_id or row.is_deleted:
+        raise HTTPException(404, "底稿不存在")
+    if not is_index_checklist(row.wp_code):
+        raise HTTPException(404, "该底稿没有归档检查建议")
+    try:
+        template = await get_index_checklist_template(row.wp_code)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e)) from e
+    present = {normalize_code(code) for code in (await db.execute(
+        sa.select(WpIndex.wp_code).join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false())
+    )).scalars().all()}
+    codes = checklist_item_codes(template)
+    suggestions = {item_id: ("是" if code in present else "否") for item_id, code in codes.items()}
+    return {"suggestions": suggestions, "total": len(codes),
+            "present": sum(1 for v in suggestions.values() if v == "是")}

@@ -15,7 +15,7 @@ Validates: Requirements 4.1-4.11, 5.1-5.5
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -457,101 +457,32 @@ async def pull_from_workpapers(
     project_id: UUID,
     year: int,
     note_section: str | None = None,
+    phase: Literal["all", "prepare", "push"] = Query(
+        "all", description="prepare=只准备离屏上下文；push=披露明细写入后推审定主表；all=兼容旧一步式调用",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
-    """附注主动从底稿拉取最新数据（刷新/生成时调用）。
+    """附注从底稿取数（「🔄 刷新 / 🔁 全部刷新 / 📝 生成附注」前调用；spec note-pull-header-formula-closure R2）。
 
-    对有底稿映射（registry）的章节：
-    - 表格确由底稿同步过（`table_data._last_sync_wp_id` 存在）：刷新 `_last_sync_at` +
-      确保 refill 跳过表格（底稿是这些章节表格的唯一真源）
-    - 从未同步过：**不改动**，仍由模板取数刷新（计入 `skipped_never_synced`）
+    按项目准则（国企 / 上市）找到章节对应的底稿，执行公式推送：试算表审定数（过完调整分录）→ 底稿披露项 → 附注
+    主表（规则 = 公式管理「📤 公式推送」页的有效规则；人工 / 锁定格保留，已确认附注不改写）。已由底稿同步过的章节补
+    ``_source=workpaper``。传 ``note_section`` 只处理该章节，不传处理本准则全部有底稿映射的章节。
 
-    如果传 note_section：只处理该章节（单页刷新）；不传：处理全部有映射的章节（全部刷新）。
-
-    返回 { synced: int, skipped: int, skipped_never_synced: int }
+    返回 ``{synced, skipped, skipped_never_synced, push: {ran, error, written, kept, skipped, warnings},
+    sections: [{section, wp_codes, written, kept, skipped, reasons}]}``。
     """
-    from datetime import datetime, timezone
+    from app.services.note_workpaper_pull_service import pull_sections
 
-    # Project 此前漏导入 —— 下面 db.get(Project, ...) 一调即 NameError → 该端点自写成
-    # 起就是 500，从未成功执行过（ruff F821 可查，但本文件此前未纳入 lint 门禁）。
-    from app.models.core import Project
-    from app.services.note_readiness_service import _load_registry_entries
-
-    # 确定项目变体
-    project = await db.get(Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-    variant = project.template_type or "soe"  # listed/soe
-
-    # 从 registry 获取有映射的章节
-    entries = _load_registry_entries()
-    target_sections: list[str] = []
-    if note_section:
-        target_sections = [note_section]
-    else:
-        for e in entries:
-            sec = e.get(variant) or e.get("listed") or e.get("soe")
-            if isinstance(sec, str) and sec.strip():
-                target_sections.append(sec.strip())
-
-    if not target_sections:
-        return {"synced": 0, "skipped": 0, "message": "无底稿映射章节"}
-
-    now = datetime.now(timezone.utc)
-    synced = 0
-    skipped = 0
-    skipped_never_synced = 0
-
-    for section in target_sections:
-        # 查该章节是否存在
-        note = (
-            await db.execute(
-                sa.select(DisclosureNote).where(
-                    DisclosureNote.project_id == project_id,
-                    DisclosureNote.year == year,
-                    DisclosureNote.note_section == section,
-                    DisclosureNote.is_deleted == False,
-                )
-            )
-        ).scalar_one_or_none()
-
-        if not note:
-            skipped += 1
-            continue
-
-        # 更新 table_data：标记 _source=workpaper + 刷新 _last_sync_at
-        td = note.table_data or {}
-        if not isinstance(td, dict):
-            td = {}
-
-        # 🔴 只标记「表格内容确实来自底稿同步」的章节。
-        #    判据 = table_data 带同步指纹 `_last_sync_wp_id`（sync_from_workpaper /
-        #    sync_from_html 写表格时必写；仅写列 last_sync_wp_id 的「被人工覆盖拦截」
-        #    路径不改表格，不算）。
-        #    修复前从未同步的章节也被打上 `_source=workpaper` ⇒ 模板刷新（refill /
-        #    update_note_values）从此永久跳过它 —— 而它的数据本来就来自模板取数，
-        #    底稿侧根本没有要保护的内容。本端点在附注生成 / 刷新前**每次**都调，
-        #    且 HEAD 之前一直 500 未生效过，不修则一上线就批量扩大死区。
-        if not td.get("_last_sync_wp_id"):
-            skipped_never_synced += 1
-            continue
-
-        td["_source"] = "workpaper"
-        td["_last_sync_at"] = now.isoformat()
-        note.table_data = td
-        # 强制 ORM 脏标记（JSONB 就地改不触发）
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(note, "table_data")
-        synced += 1
-
+    try:
+        result = await pull_sections(
+            db, project_id, year, sections=[note_section] if note_section else None,
+            user_id=current_user.id, phase=phase,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     await db.commit()
-    return {
-        "synced": synced,
-        "skipped": skipped,
-        # 从未由底稿同步过的章节保持原样（仍由模板取数刷新）
-        "skipped_never_synced": skipped_never_synced,
-    }
+    return result
 
 
 @router.post("/{project_id}/{year}/refresh-from-disclosure")
@@ -560,16 +491,16 @@ async def refresh_from_disclosure(
     year: int,
     wp_code: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """从披露表（disclosure builder）刷新附注数据。
+    """底稿披露表 → 附注的同步状态（只读）。
 
-    - 传 wp_code：只刷新该科目对应的附注章节（单科目）
-    - 不传：刷新全部有映射的章节（全量）
+    - 传 wp_code：该底稿对应章节；不传：全部有映射的章节
+    - 按项目 template_type 只看本准则（国企 / 上市）的章节
 
-    按项目 template_type 自动过滤准则变体（listed/soe），只刷新匹配的章节。
-
-    spec: note-data-from-disclosure-table Phase 1 Task 4
+    逐章节回 ``synced``（已从披露表同步，行数 + 时间）/ ``not_synced``（尚未同步：数据来自模板取数或公式推送）/
+    ``not_found``。2026-10-26 起不再先跑后端 builder 写附注：builder 与前端披露 Tab 不是同一口径（D2 账龄期末恒 0、
+    标准 builder 只产出一张两行表），写进去的是错数（spec note-pull-header-formula-closure R1）。
     """
     from app.models.core import Project
     from app.services.note_disclosure_refresh_service import (
@@ -577,39 +508,11 @@ async def refresh_from_disclosure(
         refresh_note_from_disclosure,
     )
 
-    # 取项目准则变体，只刷新匹配的章节（国企项目不去查上市章节，反之亦然）
     project = await db.get(Project, project_id)
     variant = (project.template_type if project else None) or None
-
-    # 先用 builder 从 checklist_responses 构建 sub_table_data（如果该科目有 builder）
-    from app.services.disclosure_payload_builder_service import build_and_sync, get_builder
-
     if wp_code:
-        if get_builder(wp_code) is not None:
-            try:
-                await build_and_sync(db, project_id, year, wp_code, triggered_by=current_user.id)
-                await db.flush()
-            except Exception as e:
-                logger.warning("build_and_sync failed for %s: %s", wp_code, e)
-                await db.rollback()
-        result = await refresh_note_from_disclosure(db, project_id, year, wp_code, variant=variant)
-    else:
-        # 全量：逐科目 build 再统一 refresh
-        from app.services.note_disclosure_refresh_service import all_wp_codes
-        for code in all_wp_codes():
-            if get_builder(code) is not None:
-                try:
-                    await build_and_sync(db, project_id, year, code, triggered_by=current_user.id)
-                    await db.flush()
-                except Exception as e:
-                    logger.warning("build_and_sync failed for %s: %s", code, e)
-                    try:
-                        await db.rollback()
-                    except Exception:
-                        pass
-        result = await refresh_all_notes(db, project_id, year, variant=variant)
-
-    return result
+        return await refresh_note_from_disclosure(db, project_id, year, wp_code, variant=variant)
+    return await refresh_all_notes(db, project_id, year, variant=variant)
 
 
 @router.get("/{project_id}/{year}/wp-sync-status")
@@ -633,7 +536,7 @@ async def get_wp_sync_status(
         ]}
     """
     from app.services.note_content_utils import note_has_data
-    from app.services.note_readiness_service import _load_registry_entries
+    from app.services.note_readiness_service import _load_registry_entries, registry_sections
 
     code = (wp_code or "").strip().upper()
     entry = next(
@@ -643,11 +546,11 @@ async def get_wp_sync_status(
     if entry is None:
         return {"wp_code": code, "variants": []}
 
-    sections = {
-        v: entry.get(v)
-        for v in ("listed", "soe")
-        if isinstance(entry.get(v), str) and entry.get(v)
-    }
+    sections = [
+        (variant, section)
+        for variant in ("listed", "soe")
+        for section in registry_sections(entry, variant)
+    ]
     if not sections:
         return {"wp_code": code, "variants": []}
 
@@ -658,7 +561,7 @@ async def get_wp_sync_status(
                     DisclosureNote.project_id == project_id,
                     DisclosureNote.year == year,
                     DisclosureNote.is_deleted == sa.false(),
-                    DisclosureNote.note_section.in_(list(sections.values())),
+                    DisclosureNote.note_section.in_([section for _variant, section in sections]),
                 )
             )
         )
@@ -668,7 +571,7 @@ async def get_wp_sync_status(
     by_section = {n.note_section: n for n in notes}
 
     variants = []
-    for variant, section in sections.items():
+    for variant, section in sections:
         n = by_section.get(section)
         variants.append(
             {
@@ -722,6 +625,7 @@ async def trace_cell(
     col_idx: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    table_index: int = 0,
 ):
     """单元格溯源：返回 binding 元数据 + 公式展开 + 命中数据行采样.
 
@@ -771,7 +675,7 @@ async def trace_cell(
     )
 
     engine = DisclosureEngine(db)
-    return await engine.trace_cell(note_id, row_idx, col_idx)
+    return await engine.trace_cell(note_id, row_idx, col_idx, table_index=table_index)
 
 
 @router.get("/{project_id}/{year}/section-numbers")
@@ -829,6 +733,99 @@ async def get_prior_year_note(
     engine = DisclosureEngine(db)
     data = await engine.get_prior_year_data(project_id, year, note_section)
     return data or {"year": year - 1, "table_data": None, "text_content": None}
+
+
+@router.get("/{project_id}/{year}/{note_section}/cell-sources")
+async def get_cell_sources(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    row: int = Query(..., ge=0, description="行（投影表为底稿子表的来源行号）"),
+    col: int = Query(0, ge=0, description="数据列（不含标签列）"),
+    table_index: int = Query(0, ge=0, description="存储表序号（投影表按 sub_table_key 定位）"),
+    sub_table_key: str | None = Query(None, max_length=200),
+    value_key: str | None = Query(None, max_length=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """单元格最终来源诊断（只读，spec note-chain-followup-optimizations R2）：最终来源、逐层说明与冲突。"""
+    from app.services.note_cell_sources import diagnose_cell
+
+    try:
+        return await diagnose_cell(db, project_id, year, note_section, table_index=table_index, row=row, col=col,
+                                   sub_table_key=sub_table_key, value_key=value_key)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# 静态 deleted / formula-health 必须先于 note_section 通配路由注册，否则会被当成章节编号。
+
+@router.get("/{project_id}/{year}/deleted")
+async def list_deleted_sections(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """列出已软删除的附注章节，供恢复使用。"""
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.true(),
+        ).order_by(DisclosureNote.sort_order)
+    )
+    notes = result.scalars().all()
+    return [
+        {"id": str(n.id), "note_section": n.note_section, "section_title": n.section_title}
+        for n in notes
+    ]
+
+@router.get("/{project_id}/{year}/formula-health")
+async def formula_health(
+    project_id: UUID,
+    year: int,
+    template_type: str = "soe",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """附注公式/校验管线健康度诊断（只读，不跑规则、不写库）。
+
+    把"哪些管线真正生效 / 哪些休眠"显性化（P0-B）：附注 binding/inline 规则/report
+    绑定计数 + preset 规则数 + linkage 配置条目 + 三条管线激活标志。
+    """
+    if template_type not in ("soe", "listed"):
+        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
+    engine = NoteValidationEngine(db)
+    health = await engine.diagnose_formula_health(
+        project_id, year, template_type=template_type
+    )
+    # 附加只读诊断（spec disclosure-note-formula-data-population Task 5.1）：
+    # 「有报表↔附注勾稽但无写值 linkage」的章节 —— cells_updated=0 属正确行为
+    # （决策 1：报表↔附注只做校验不做写值），此处只呈现不写入。fail-open。
+    try:
+        from app.services.report_note_linkage import ReportNoteLinkage
+
+        notes = (
+            (
+                await db.execute(
+                    sa.select(DisclosureNote).where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == sa.false(),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        missing = ReportNoteLinkage().diagnose_missing_write_linkage(list(notes))
+        if isinstance(health, dict):
+            health["missing_write_linkage"] = missing
+            health["missing_write_linkage_count"] = len(missing)
+    except Exception as err:  # pragma: no cover — 诊断失败不影响健康度主体
+        logger.warning("formula_health: linkage diagnose failed: %s", err)
+    return health
 
 
 @router.get("/{project_id}/{year}/{note_section}")
@@ -1065,28 +1062,6 @@ async def patch_section(
     ).execute(_mutate, _event)
 
 
-@router.get("/{project_id}/{year}/deleted")
-async def list_deleted_sections(
-    project_id: UUID,
-    year: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """列出已软删除的附注章节，供恢复使用。"""
-    result = await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.is_deleted == sa.true(),
-        ).order_by(DisclosureNote.sort_order)
-    )
-    notes = result.scalars().all()
-    return [
-        {"id": str(n.id), "note_section": n.note_section, "section_title": n.section_title}
-        for n in notes
-    ]
-
-
 @router.patch("/{project_id}/{year}/restore/{note_id}")
 async def restore_section(
     project_id: UUID,
@@ -1162,53 +1137,6 @@ async def validate_notes(
         raise HTTPException(status_code=500, detail=f"校验执行失败: {str(e)}")
 
 
-@router.get("/{project_id}/{year}/formula-health")
-async def formula_health(
-    project_id: UUID,
-    year: int,
-    template_type: str = "soe",
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """附注公式/校验管线健康度诊断（只读，不跑规则、不写库）。
-
-    把"哪些管线真正生效 / 哪些休眠"显性化（P0-B）：附注 binding/inline 规则/report
-    绑定计数 + preset 规则数 + linkage 配置条目 + 三条管线激活标志。
-    """
-    if template_type not in ("soe", "listed"):
-        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
-    engine = NoteValidationEngine(db)
-    health = await engine.diagnose_formula_health(
-        project_id, year, template_type=template_type
-    )
-    # 附加只读诊断（spec disclosure-note-formula-data-population Task 5.1）：
-    # 「有报表↔附注勾稽但无写值 linkage」的章节 —— cells_updated=0 属正确行为
-    # （决策 1：报表↔附注只做校验不做写值），此处只呈现不写入。fail-open。
-    try:
-        from app.services.report_note_linkage import ReportNoteLinkage
-
-        notes = (
-            (
-                await db.execute(
-                    sa.select(DisclosureNote).where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.is_deleted == sa.false(),
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        missing = ReportNoteLinkage().diagnose_missing_write_linkage(list(notes))
-        if isinstance(health, dict):
-            health["missing_write_linkage"] = missing
-            health["missing_write_linkage_count"] = len(missing)
-    except Exception as err:  # pragma: no cover — 诊断失败不影响健康度主体
-        logger.warning("formula_health: linkage diagnose failed: %s", err)
-    return health
-
-
 @router.put("/findings/{validation_id}/confirm")
 async def confirm_finding(
     validation_id: UUID,
@@ -1262,20 +1190,23 @@ async def export_word(
 
     proj_row = (
         await db.execute(
-            sa.select(Project.report_scope).where(
+            sa.select(Project.template_type, Project.report_scope).where(
                 Project.id == project_id,
                 Project.is_deleted == sa.false(),
             )
         )
-    ).scalar_one_or_none()
+    ).one_or_none()
+    project_template = proj_row[0] if proj_row else None
+    project_scope = proj_row[1] if proj_row else None
 
     exporter = NoteWordExporter(db)
     try:
         output = await exporter.export(
             project_id,
             year,
+            template_type=project_template or "soe",
             report_scope=normalize_report_scope(
-                proj_row if isinstance(proj_row, str) else None
+                project_scope if isinstance(project_scope, str) else None
             ),
         )
         return StreamingResponse(
@@ -1333,22 +1264,24 @@ async def get_template_structure(
     project_id: UUID,
     year: int,
     note_section: str,
+    table_name: str | None = Query(None, max_length=200, description="当前表的表名（多表章节按它找模板里的同一张表）"),
+    table_index: int | None = Query(None, ge=0, description="当前表在章节里的序号（当前表没有表名时用）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取附注章节的原始模板表格结构（用于"恢复模板结构"操作）。
+    """获取附注章节某张表的原始模板结构（用于"恢复模板结构"操作）。
 
-    从附注模板种子数据中获取该章节的默认表格结构（headers + rows），
-    不包含项目实际数据，仅返回模板定义的列名和行标签。
+    从附注模板种子数据中取当前表对应的模板表（表头、逐列定义、行标签与行类型），不含项目实际数据；
+    多表章节找不到同一张表时 404，不拿章节第一张表顶。
     Requirements: 38.5, 38.6
     """
     engine = DisclosureEngine(db)
-    template = await engine.get_template_structure(project_id, year, note_section)
+    template = await engine.get_template_structure(
+        project_id, year, note_section, table_name=table_name, table_index=table_index,
+    )
     if template is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"未找到章节 {note_section} 的模板结构"
-        )
+        target = f"中「{table_name}」" if table_name else ""
+        raise HTTPException(status_code=404, detail=f"未找到章节 {note_section}{target}的模板结构")
     return template
 
 
@@ -1467,20 +1400,21 @@ async def apply_formulas(
     project_id: UUID,
     year: int,
     note_section: str,
+    regenerate: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
-    """执行附注表格中的自动运算公式，回填计算结果。
+    """执行附注表格中的自动运算公式（逐表），回填计算结果。
 
-    只更新 mode=auto 的单元格，manual 单元格不受影响。
-    公式从 check_presets 自动生成（纵向合计/横向平衡/账面价值）。
+    只更新 mode=auto 的单元格，manual / locked 单元格不受影响。预设公式按每张表当前结构现算（合计 = 明细之和、
+    账面价值 = 余额 − 准备）；``regenerate=true`` 丢掉章节里存过的旧公式改用现算预设（公式弹窗「重新生成」）。
     """
     from app.services.formula_settings.note_settings import materialize_quietly
     from app.services.note_formula_generator import execute_note_formulas
 
     try:
         await materialize_quietly(db, project_id, [note_section])  # 全局 / 本项目公式设置（新建附注还没物化）
-        result = await execute_note_formulas(db, project_id, year, note_section)
+        result = await execute_note_formulas(db, project_id, year, note_section, regenerate=regenerate, triggered_by=current_user.id)
         if result.get("updated"):
             await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                      user_id=current_user.id)
@@ -1556,11 +1490,15 @@ async def upsert_note_formulas(
     """
     from app.services.formula_settings import note_settings
     from app.services.formula_settings.errors import FormulaSettingError
-    from app.services.formula_settings.propagation import publish_events
+    from app.services.formula_settings.outbox import record_changes, publish_pending
 
     formulas = body.get("formulas")
     if not isinstance(formulas, list):
         raise HTTPException(status_code=400, detail="formulas 必须是列表")
+    targets = await note_settings.target_problems(db, project_id, year, note_section, formulas)
+    if targets:  # 没选目标的公式原先被当空行丢掉、仍回「已保存」（spec note-pull-header-formula-closure F7）
+        raise HTTPException(status_code=422, detail={
+            "error_code": "FORMULA_TARGET_INVALID", "message": "公式目标单元格无效，未保存", "issues": targets})
 
     # 跨表引用保存前校验（与报表 / 底稿公式保存同一 helper、同一 422 契约；spec formula-fetch-followup-defect-closure R5.3）。
     # 原先附注公式保存不校验，悬空引用照常入库，执行时取不到数也不报
@@ -1575,8 +1513,9 @@ async def upsert_note_formulas(
                                                   loaded=body.get("loaded"), user_id=current_user.id)
         await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                  user_id=current_user.id)
+        await record_changes(db, events=result.get("events") or [], domain="note", source="project_edit")
         await db.commit()
-        await publish_events(result.get("events") or [], domain="note", source="project_edit")
+        await publish_pending(db)
         saved = result["formulas"]
         return {"formulas": saved, "saved_count": len(saved), "loaded": result.get("loaded") or {}}
     except ValueError as e:
@@ -1662,6 +1601,7 @@ class NoteBatchAiFillRequest(BaseModel):
     """一键批量 AI 预填充请求。"""
 
     doc_filter: list[UUID] | None = None
+    idempotency_key: str | None = None
 
 
 def _citation_to_dict(c) -> dict:
@@ -1791,6 +1731,7 @@ async def _issue_note_draft_message(
     try:
         from app.services import doc_chat_persistence
         from app.services.ai_chat.contracts import HostType
+        from app.services.llm_route import served_model_label
 
         session = await doc_chat_persistence.get_or_create_session(
             db,
@@ -1801,7 +1742,12 @@ async def _issue_note_draft_message(
             audit_year=year,
         )
         msg = await doc_chat_persistence.append_message(
-            db, session, "assistant", text
+            db,
+            session,
+            "assistant",
+            text,
+            context_manifest={"task_code": "note.policy_draft"},
+            model_used=served_model_label(),
         )
         message_id = msg.id
         await db.commit()
@@ -1825,73 +1771,22 @@ async def batch_ai_fill_notes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """一键批量预填充空/草稿章节（**不落库**，逐章结果供前端确认采纳，Req10）。
+    """兼容入口：创建 DB-backed 附注预填任务并立即返回 snapshot。
 
-    行为：查该 project/year 所有"文字为空或 status=draft"且未锁定/无 manual_override（`is_local_override`）
-    的章节，构造 sections 列表调 `NoteKnowledgeEnricher.batch_prefill`（单章 try/except 隔离降级，Property 12）。
-
-    resp: ``{ results:[{note_section, status, text, citations}], generated, degraded, skipped }``
+    每章独立生成稳定 ``generation_id/message_id``；浏览器丢失响应后以同一
+    idempotency_key 重放即可取回原任务，采纳已有 message，不再重新调用模型。
     """
-    from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
+    from app.routers.ai_task_jobs import AiTaskJobCreate, create_job
 
     req = body or NoteBatchAiFillRequest()
-
-    rows = (
-        await db.execute(
-            sa.select(DisclosureNote)
-            .where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.is_deleted == sa.false(),
-                DisclosureNote.is_local_override == sa.false(),
-                sa.or_(
-                    DisclosureNote.text_content.is_(None),
-                    sa.func.length(sa.func.trim(DisclosureNote.text_content)) == 0,
-                    DisclosureNote.status == NoteStatus.draft,
-                ),
-            )
-            .order_by(DisclosureNote.sort_order)
-        )
-    ).scalars().all()
-
-    sections = [
-        {
-            "note_section": n.note_section,
-            "section_title": n.section_title or n.note_section,
-            "account_name": n.account_name or "",
-            "account_code": None,
-            "audit_area": None,
-            "text_content": n.text_content,
-            "is_draft": n.status == NoteStatus.draft,
-            "manual_override": n.is_local_override,
-        }
-        for n in rows
-    ]
-
-    enricher = NoteKnowledgeEnricher(db)
-    raw_results = await enricher.batch_prefill(
+    return await create_job(
         project_id,
-        year,
-        sections,
-        user=current_user,
-        doc_filter=req.doc_filter,
+        AiTaskJobCreate(
+            task_kind="note_batch_prefill",
+            year=year,
+            idempotency_key=req.idempotency_key or str(uuid4()),
+            doc_filter=req.doc_filter or [],
+        ),
+        db,
+        current_user,
     )
-
-    results = [
-        {
-            "note_section": r.get("note_section"),
-            "status": r.get("status"),
-            "text": r.get("text"),
-            "citations": [_citation_to_dict(c) for c in (r.get("citations") or [])],
-        }
-        for r in raw_results
-    ]
-    generated = sum(1 for r in results if r["status"] == "generated")
-    degraded = sum(1 for r in results if r["status"] == "degraded")
-    skipped = sum(1 for r in results if r["status"] == "skipped")
-    return {
-        "results": results,
-        "generated": generated,
-        "degraded": degraded,
-        "skipped": skipped,
-    }

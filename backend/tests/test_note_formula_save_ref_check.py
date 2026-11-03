@@ -79,7 +79,7 @@ async def env():
 async def test_dangling_cross_table_ref_is_422_and_nothing_saved(env):
     body = {"formulas": [
         {"target": "1:1", "formula": "TB('1001','期末余额') + cell(0,1)"},           # 存在（表内引用不校验）
-        {"target": "1:2", "formula": "TB('9999','期末余额')"},                        # 科目不存在
+        {"target": "1:0", "formula": "TB('9999','期末余额')"},                        # 科目不存在
         {"target": "0:1", "formula": "NOTE('五、1','银行存款','期末余额')"},           # 行不存在
         {"target": "0:2", "formula": ""},                                             # 空行跳过
     ]}
@@ -89,8 +89,27 @@ async def test_dangling_cross_table_ref_is_422_and_nothing_saved(env):
     detail = resp.json()["detail"]
     assert (detail["error_code"], detail["message"]) == ("FORMULA_DANGLING_REFS", "公式含悬空引用，拒绝保存")
     assert [(i["target"], i["ref"]) for i in detail["issues"]] == [
-        ("1:2", "TB('9999','期末余额')"), ("0:1", "NOTE('五、1','银行存款','期末余额')")]
+        ("1:0", "TB('9999','期末余额')"), ("0:1", "NOTE('五、1','银行存款','期末余额')")]
     assert all(i["message"] for i in detail["issues"]), "每条都写明原因"
+    save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_formula_without_valid_target_is_422_not_silently_dropped(env):
+    """原先没选目标的公式被当空行丢掉、仍回 200「已保存」（spec note-pull-header-formula-closure F7）。"""
+    body = {"formulas": [
+        {"target": "", "formula": "SUM(0:0, 0)"},          # 新增公式没选目标
+        {"target": "合计行", "formula": "cell(0,0)"},       # 不是单元格
+        {"target": "1:5", "formula": "cell(0,0)"},          # 超出表格（2 行 × 2 列）
+        {"target": "1:0", "formula": "cell(0,0)"},          # 正常
+    ]}
+    with patch.object(note_settings, "save_section", new=AsyncMock()) as save:
+        resp = await env["client"].put(env["url"], json=body)
+    assert resp.status_code == 422, resp.text
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "FORMULA_TARGET_INVALID"
+    assert [i["target"] for i in detail["issues"]] == ["第 1 条", "合计行", "1:5"]
+    assert "没有选择目标" in detail["issues"][0]["message"] and "2 行 × 2 列" in detail["issues"][2]["message"]
     save.assert_not_awaited()
 
 

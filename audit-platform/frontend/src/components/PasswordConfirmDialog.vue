@@ -112,9 +112,10 @@ async function handleSubmit() {
   errorMessage.value = ''
 
   try {
+    // _silent：错误在对话框内提示，不弹全局 toast（spec attachment-archive-and-a-class-evidence 需求 4.2）
     const resp = await http.post('/api/auth/verify-password', {
       password: password.value,
-    })
+    }, { _silent: true } as any)
 
     const token = resp.data.confirmation_token
     emit('confirmed', token)
@@ -135,8 +136,8 @@ async function handleSubmit() {
         lockRemainingText.value = '30 分钟'
       }
       errorMessage.value = ''
-    } else if (status === 401) {
-      // 密码错误
+    } else if (status === 403) {
+      // 密码错误（后端 403 + PASSWORD_INVALID；不用 401：401 会被拦截器当会话过期，刷新重发后登出）
       const detail = data?.detail
       if (typeof detail === 'object') {
         attemptsRemaining.value = detail.attempts_remaining ?? null

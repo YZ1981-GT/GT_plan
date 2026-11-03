@@ -4,7 +4,9 @@
 import { ref, computed, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { isIpoProject as isCoreIpoProject } from '@/utils/ipoProjectUtils'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
+import { isIpoProject as isCoreIpoProject, type ProjectClassificationTags } from '@/utils/ipoProjectUtils'
 
 export interface ChecklistResponse {
   item_id: string
@@ -14,6 +16,8 @@ export interface ChecklistResponse {
 
 export interface ProjectContext {
   business_category?: string
+  /** R4：项目详情下发的后端分类 / 场景单一解释；有则优先于 business_category 判定 */
+  project_classification?: ProjectClassificationTags | null
   project_type?: string
   template_type?: string
   applicable_standards?: string[]
@@ -25,11 +29,11 @@ export const IPO_CATEGORIES = ['IPO', '上市公司年审', '新三板', '重大
 /**
  * F2 IPO 专项兼容判定。
  *
- * 第一层复用核心 business_category 判定；其余层保留 F2 历史兼容字段，
- * 最后一层必须继续按中文 IPO_CATEGORIES 精确匹配，不能用统一关键词替代。
+ * 第一层复用核心判定（后端 project_classification 优先，没有时退回 business_category）；其余层保留 F2
+ * 历史兼容字段，最后一层必须继续按中文 IPO_CATEGORIES 精确匹配，不能用统一关键词替代。
  */
 export function isF2IpoProject(ctx: ProjectContext): boolean {
-  if (isCoreIpoProject(ctx.business_category ?? '')) return true
+  if (isCoreIpoProject(ctx.project_classification ?? ctx.business_category ?? '')) return true
   if (ctx.project_type === 'ipo') return true
   if (ctx.template_type === 'listed') return true
   return IPO_CATEGORIES.includes(ctx.business_category as typeof IPO_CATEGORIES[number])
@@ -55,6 +59,14 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   const projectContext = ref<ProjectContext>({})
   const sheetCache = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!wpId.value) throw new Error('缺少底稿标识，无法保存')
+      await cas.save({ wpId: wpId.value, projectId: projectId.value, items })
+    },
+  })
 
   // IPO 专项适用性：核心 business_category 判定优先，随后保留 F2 历史兼容的
   // project_type → template_type → 中文 IPO_CATEGORIES 三级瀑布。
@@ -66,6 +78,7 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
     try {
       const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id && isSpecialItemId(r.item_id)) {
@@ -114,33 +127,24 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   }
 
   async function saveItemsFromEvent(items: ChecklistResponse[]): Promise<void> {
-    if (!wpId.value || !items.length) return
-    for (const item of items) {
-      allResponses.value.set(item.item_id, item)
-    }
-    await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-      project_id: projectId.value,
-      items: items.map((i) => ({
-        item_id: i.item_id,
-        conclusion: i.conclusion,
-        remark: i.remark,
-      })),
-    })
+    if (!items.length) return
+    for (const item of items) allResponses.value.set(item.item_id, item)
+    queue.markMany(items.map((item) => item.item_id))
+    await queue.flush()
   }
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
   }
 
-  /** flush 掉未落库的编辑（供 syncBridge flushHtml 调用）。
-   * F2 special 的 debouncedSave 只有 timer 无 pending 队列（PUT 即发），
-   * 此处只清 timer 即可（与 E1 同款空实现理由）。 */
-  function _flushPending(): void {
+  /** 清本层 timer，并等待 generation-safe 队列保存最新值。 */
+  async function _flushPending(): Promise<void> {
     for (const t of _debounceTimers.values()) clearTimeout(t)
     _debounceTimers.clear()
+    await queue.flush()
   }
 
-  onScopeDispose(() => { _flushPending() })
+  onScopeDispose(() => { void _flushPending().catch(() => undefined) })
 
   return {
     allResponses,

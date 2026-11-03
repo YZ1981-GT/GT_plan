@@ -9,7 +9,7 @@
  *   3. 签名区：致同 + 合伙人 + 日期 + 工具栏
  *
  * 数据存储：checklist_responses（item_id: A18-2-001~004 + A18-2-header）
- * debounce 1500ms 自动保存。
+ * 用户改动后 debounce 1500ms 自动保存；打开底稿（读已存内容、表头带出、取建议）不保存。
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -50,8 +50,12 @@ const topicDataMap = ref<Record<string, TopicData>>({})
 const headerData = ref<HeaderData>({ regulator: '', companyName: '', auditYear: '', partnerName: '' })
 const loading = ref(false)
 const saving = ref(false)
+/** 「准则提示」折叠面板展开项（模板 v-model 原先绑的是未声明的变量，Vue 每次渲染告警） */
+const collapseActive = ref<string[]>([])
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+/** 已与后端一致的保存内容（JSON）：挂载流程结束时记下，保存成功后更新；为 null 时不自动保存 */
+let baseline: string | null = null
 
 // ─── Issue hints (P1) ───
 const issueHints = ref<{ topic: string; count: number; titles: string[] }[]>([])
@@ -60,7 +64,7 @@ const a8Suggestion = ref<{ suggested_radio: string | null; a8_status: Record<str
 // ─── Load suggestions (P1: issue_hints + A8) ───
 async function loadSuggestions() {
   try {
-    const res = await api.get(`/projects/${props.projectId}/a18/suggestions`)
+    const res = await api.get(`/api/projects/${props.projectId}/a18/suggestions`)
     const data = res?.data ?? res
     if (data?.issue_hints) {
       const hints = data.issue_hints
@@ -99,11 +103,11 @@ async function loadTopicDefinitions() {
   }
 }
 
-// ─── Load saved data ───
-async function loadSavedData() {
-  loading.value = true
+// ─── Load saved data（加载遮罩由挂载流程统一管；返回是否读到） ───
+async function loadSavedData(): Promise<boolean> {
   try {
-    const res = await api.get(`/projects/${props.projectId}/working-papers/${props.wpId}/checklist-responses`)
+    // 读写都走底稿检查表接口（原先路径少 /api、形状也不对：读到首页 HTML ⇒ 已填内容从不加载，保存恒失败）
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
     const items: { item_id: string; conclusion: string; remark: string }[] = Array.isArray(res) ? res : (res?.data ?? [])
     for (const item of items) {
       if (item.item_id === 'A18-2-header') {
@@ -127,45 +131,48 @@ async function loadSavedData() {
         }
       }
     }
+    return true
   } catch (e) {
     console.error('[A18] Load failed:', e)
-  } finally {
-    loading.value = false
+    return false
   }
 }
 
 // ─── Save with debounce ───
 function debouncedSave() {
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => doSave(), 1500)
+  saveTimer = setTimeout(() => { saveTimer = null; doSave() }, 1500)
+}
+
+/** 保存内容：表头 + 有数据的议题（比较「有没有改动」也用它） */
+function buildPayload(): { item_id: string; conclusion: string | null; remark: string }[] {
+  const payload: { item_id: string; conclusion: string | null; remark: string }[] = [
+    { item_id: 'A18-2-header', conclusion: 'done', remark: JSON.stringify(headerData.value) },
+  ]
+  for (const topic of topics.value) {
+    const d = topicDataMap.value[topic.id]
+    if (!d) continue
+    const seq = topic.id.replace('topic_', '')
+    payload.push({
+      item_id: `A18-2-${seq}`,
+      // 未选适用性存 null（后端 A18-2 只收 Y / N / done / pending，空串 422 会让整批保存失败）
+      conclusion: d.applicable || null,
+      remark: JSON.stringify({ content: d.content, radioChoice: d.radioChoice, wpRefs: d.wpRefs }),
+    })
+  }
+  return payload
 }
 
 async function doSave() {
   saving.value = true
   saveStatus.value = 'saving'
   try {
-    const payload: { item_id: string; conclusion: string; remark: string }[] = []
-    // Header
-    payload.push({
-      item_id: 'A18-2-header',
-      conclusion: 'done',
-      remark: JSON.stringify(headerData.value),
-    })
-    // Topics
-    for (const topic of topics.value) {
-      const d = topicDataMap.value[topic.id]
-      if (!d) continue
-      const seq = topic.id.replace('topic_', '')
-      payload.push({
-        item_id: `A18-2-${seq}`,
-        conclusion: d.applicable || '',
-        remark: JSON.stringify({ content: d.content, radioChoice: d.radioChoice, wpRefs: d.wpRefs }),
-      })
-    }
-    await api.put(
-      `/projects/${props.projectId}/working-papers/${props.wpId}/checklist-responses`,
-      payload,
-    )
+    const payload = buildPayload()
+    const sent = JSON.stringify(payload)
+    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, { project_id: props.projectId, items: payload })
+    baseline = sent
+    // 保存途中又改（含改回原值）：以刚落库的内容为准再比一次
+    if (JSON.stringify(buildPayload()) !== baseline) debouncedSave()
     saveStatus.value = 'saved'
     emit('save')
     setTimeout(() => { if (saveStatus.value === 'saved') saveStatus.value = 'idle' }, 2000)
@@ -180,17 +187,18 @@ async function doSave() {
 // ─── Auto-fill header (Task 8) ───
 async function autoFillHeader() {
   try {
-    const project = await api.get(`/projects/${props.projectId}`)
+    const project = await api.get(`/api/projects/${props.projectId}`)
     const p = project?.data ?? project
     headerData.value.companyName = p.client_name || p.name || ''
-    if (p.audit_period_end) {
-      headerData.value.auditYear = new Date(p.audit_period_end).getFullYear().toString()
-    }
-    // Partner name from project assignments
+    // 项目详情给的是 audit_year（没有 audit_period_end 字段）
+    const year = p.audit_year ?? (p.audit_period_end ? new Date(p.audit_period_end).getFullYear() : null)
+    if (year) headerData.value.auditYear = String(year)
+    // Partner name from project assignments（表头是「签字合伙人」：先取签字合伙人，没有再取合伙人）
     try {
-      const assignments = await api.get(`/projects/${props.projectId}/assignments`)
+      const assignments = await api.get(`/api/projects/${props.projectId}/assignments`)
       const list = Array.isArray(assignments) ? assignments : (assignments?.data ?? [])
-      const partner = list.find((a: any) => a.role === 'partner' || a.role === '合伙人')
+      const partner = list.find((a: any) => a.role === 'signing_partner')
+        || list.find((a: any) => a.role === 'partner' || a.role === '合伙人')
       if (partner) headerData.value.partnerName = partner.staff_name || partner.name || ''
     } catch { /* non-critical */ }
   } catch (e) {
@@ -199,23 +207,22 @@ async function autoFillHeader() {
 }
 
 // ─── Export Word (P1) ───
+// 分发端点（wp_export_word）：先查未填议题、再导出 A18-2 专用的沟通函。原先路径少了 /api 前缀（请求落到前端
+// 页面本身，下载到的是首页 HTML），且读的是 has_incomplete / count —— 统一检查契约是 complete / missing_fields。
 async function exportWord() {
   try {
-    const check = await api.get(
-      `/projects/${props.projectId}/working-papers/${props.wpId}/export-word/check-incomplete`,
-    )
+    const base = `/api/projects/${props.projectId}/working-papers/${props.wpId}/export-word`
+    const check = await api.get(`${base}/check-incomplete`)
     const incomplete = check?.data ?? check
-    if (incomplete?.has_incomplete) {
+    const missing: string[] = Array.isArray(incomplete?.missing_fields) ? incomplete.missing_fields : []
+    if (incomplete?.complete === false && missing.length > 0) {
       await ElMessageBox.confirm(
-        `存在 ${incomplete.count} 项未完成内容，继续导出可能包含占位符。确认导出？`,
+        `存在 ${missing.length} 项未完成内容（${missing.join('、')}），继续导出可能包含占位符。确认导出？`,
         '未完成项提示',
         { confirmButtonText: '继续导出', cancelButtonText: '返回完善', type: 'warning' },
       )
     }
-    const blob = await api.get(
-      `/projects/${props.projectId}/working-papers/${props.wpId}/export-word`,
-      { responseType: 'blob' },
-    )
+    const blob = await api.get(base, { responseType: 'blob' })
     const url = URL.createObjectURL(blob as unknown as Blob)
     const a = document.createElement('a')
     a.href = url
@@ -242,21 +249,35 @@ function addWpRef(topicId: string) {
 }
 
 // ─── Lifecycle ───
+// 挂载流程全程遮罩、不接受输入；结束时记下基线，此后只有用户改动才保存（原先读已存内容、表头带出都会触发 1.5 秒后保存）。
+// 读已存内容失败不记基线：否则一改动就会用带出值覆盖已存表头（PUT 按 item_id 整行覆盖）。
 onMounted(async () => {
-  await loadTopicDefinitions()
-  await loadSavedData()
-  // Auto-fill header if empty
-  if (!headerData.value.companyName) await autoFillHeader()
+  loading.value = true
+  let loaded = false
+  try {
+    await loadTopicDefinitions()
+    loaded = await loadSavedData()
+    // Auto-fill header if empty（只填显示；没保存过时导出照旧取项目信息）
+    if (!headerData.value.companyName) await autoFillHeader()
+  } finally {
+    loading.value = false
+  }
+  if (loaded) baseline = JSON.stringify(buildPayload())
+  else ElMessage.error('读取已填内容失败，本页不自动保存，请刷新重试')
   // Load P1 suggestions (non-blocking)
   loadSuggestions()
 })
 
 onBeforeUnmount(() => {
-  if (saveTimer) { clearTimeout(saveTimer); doSave() }
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; doSave() }
 })
 
-// Watch for changes to trigger debounced save
-watch([topicDataMap, headerData], () => debouncedSave(), { deep: true })
+// 改动才保存：与基线相同（挂载流程写入的数据、改了又改回）不保存，并撤掉待发的那次
+watch([topicDataMap, headerData], () => {
+  if (baseline === null) return
+  if (JSON.stringify(buildPayload()) !== baseline) debouncedSave()
+  else if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+}, { deep: true })
 </script>
 
 <template>

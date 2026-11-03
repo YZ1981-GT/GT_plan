@@ -162,6 +162,10 @@ import {
   K3_INTEREST_ROWS,
   buildK3SyncPayload,
 } from '../../composables/k3NoteSectionMap'
+import {
+  buildK3OwnerSnapshot,
+  restoreK3DisclosureSections,
+} from '../../composables/k3DisclosureTabState'
 
 const K3_ACCOUNT_CODE = '2241'
 
@@ -328,7 +332,7 @@ function applyAutoFill(): void {
 function getResponseNumber(key: string): number {
   const item = props.allResponses.get(key)
   if (!item) return 0
-  const val = item.value ?? item
+  const val = item.remark ?? item.conclusion ?? item.value ?? item
   return typeof val === 'number' ? val : parseFloat(val) || 0
 }
 
@@ -384,9 +388,13 @@ function publishNoteText(): void {
     .join('\n\n')
   try {
     eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'K3',
       accountCode: K3_ACCOUNT_CODE,
       section: 'soe',
       text: allText,
+      projectId: props.projectId,
+      sectionIds: ['八、42'],
+      timestamp: Date.now(),
     })
   } catch { /* silent */ }
 }
@@ -456,55 +464,24 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   // 🔴 只推附注有落点的段：`nature` → 按款项性质列示、`long-term` → 账龄超 1 年重要款项。
   // 「按账龄分析」「期末重要其他应付款明细」是底稿侧审计分析，附注 §八、42 无对应表。
-  const sectionRows = (id: string) =>
-    (sections.find(s => s.id === id)?.rows ?? []).filter((r: any) => !r.isFormula)
-  const narrative = sections.filter(s => s.textContent).map(s => s.textContent).join('\n\n')
-  const twoPeriod = (id: string) =>
-    sectionRows(id).map((r: any) => ({
-      project: r.item || '',
-      endAmount: r.endBalance ?? 0,
-      priorAmount: r.beginBalance ?? 0,
-    }))
-  const payload = buildK3SyncPayload('soe', props.wpId || '', {
-    byNature: twoPeriod('nature'),
-    interest: twoPeriod('interest'),
-    dividend: twoPeriod('dividend'),
-    interestOverdue: sectionRows('interest-overdue').map((r: any) => ({
-      unit: r.item || '',
-      amount: r.endBalance ?? 0,
-      reason: r.remark || '',
-    })),
-    agingOver1y: sectionRows('long-term').map((r: any) => ({
-      name: r.item || '',
-      endAmount: r.endBalance ?? 0,
-      reason: r.remark || '',
-    })),
-    narrativeText: narrative,
-  })
+  const payload = buildK3SyncPayload(
+    'soe',
+    props.wpId || '',
+    buildK3OwnerSnapshot('soe', sections),
+  )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
-    eventBus.emit('disclosure:note-text-updated' as any, {
+    eventBus.emit('disclosure:note-text-updated', {
       wpCode: 'K3', variant: 'soe', accountCode: '2241',
       projectId: props.projectId, sectionIds: ['八、42'],
+      timestamp: Date.now(),
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }
 }
 
 function loadSavedData(): void {
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i]
-    const saved = props.allResponses.get(`K3-disc-soe-${section.id}`)
-    // checklist_responses 格式: {item_id, conclusion, remark}
-    const raw = saved?.remark ?? saved?.value ?? null
-    if (raw) {
-      try {
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-        if (parsed.rows?.length) section.rows = parsed.rows
-        if (parsed.textContent) section.textContent = parsed.textContent
-      } catch { /* ignore */ }
-    }
-  }
+  restoreK3DisclosureSections('soe', props.allResponses, sections)
 }
 
 // ═══ 复核 ═══

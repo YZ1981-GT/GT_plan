@@ -97,6 +97,7 @@
           <WpTemplateTab
             v-if="activeTab === 'wp-template'"
             :project-id="currentProjectId"
+            :initial-search="wpInitialSearch"
             @select="onWpTemplateSelect"
           />
         </el-tab-pane>
@@ -197,7 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Folder, DataAnalysis, Document, Reading, Grid, Tickets, Refresh, Upload, Clock, CollectionTag, Search } from '@element-plus/icons-vue'
 import TemplateLibraryManualDialog from '@/components/template-library/TemplateLibraryManualDialog.vue'
@@ -236,7 +237,17 @@ async function ensureFallbackProject() {
   }
 }
 
-const activeTab = ref<'wp-template' | 'formula' | 'audit-report' | 'note-template' | 'gt-coding' | 'report-config' | 'enum-dict' | 'custom-query'>('wp-template')
+type TabName = 'wp-template' | 'formula' | 'audit-report' | 'note-template' | 'gt-coding' | 'report-config' | 'enum-dict' | 'custom-query'
+const TAB_NAMES: readonly TabName[] = ['wp-template', 'formula', 'audit-report', 'note-template', 'gt-coding', 'report-config', 'enum-dict', 'custom-query']
+/** 路由 ?tab 是本页页签名时取它（高级查询「跳模板溯源」带来，ADR-AQL-17），否则 null */
+function routeTab(): TabName | null {
+  const tab = String(route.query.tab ?? '')
+  return (TAB_NAMES as readonly string[]).includes(tab) ? tab as TabName : null
+}
+const activeTab = ref<TabName>(routeTab() ?? 'wp-template')
+watch(() => route.query.tab, () => { const tab = routeTab(); if (tab) activeTab.value = tab }) // 已在本页时再次跳入
+/** 跳模板溯源带来的底稿编码：底稿模板页签按它搜索并标出 */
+const wpInitialSearch = computed(() => (typeof route.query.wp_code === 'string' ? route.query.wp_code : ''))
 
 // ─── 顶部统计摘要状态 ───
 const summaryLoading = ref(false)

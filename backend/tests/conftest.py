@@ -103,13 +103,6 @@ import app.models.v3_refinement_models  # noqa: E402, F401  — V3 收官增强�
 import app.models.share_change_event_models  # noqa: E402, F401  — 动态股比变动事件
 import app.models.consol_note_mapping_models  # noqa: E402, F401  — V186 合并附注明细模板与映射
 
-# Stub for 'workpapers' table referenced by AI models FK
-import sqlalchemy as _sa
-class _WorkpaperStub(Base):
-    __tablename__ = "workpapers"
-    __table_args__ = {"extend_existing": True}
-    id = _sa.Column(_sa.Uuid, primary_key=True)
-
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 if hasattr(SQLiteTypeCompiler, "visit_uuid"):
     SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
@@ -174,10 +167,20 @@ def _is_evidence_governance_file(path_str: str) -> bool:
 
 def pytest_collection_modifyitems(config, items):
     """Skip pg_only tests when DATABASE_URL is not PostgreSQL, and tag the
-    evidence-governance aggregation suite (Task 8.3)."""
+    evidence-governance aggregation suite (Task 8.3).
+
+    spec procedure-chain-hardening-and-java-contracts R20：PG 判定认 ``postgres://``（原先只认含 ``postgresql`` 的地址）；
+    设 ``GT_REQUIRE_PG=1`` 时地址不是 PG 而收集到了 pg_only 用例 ⇒ ``UsageError``，不再静默跳过。
+    """
+    from tests._pg_url import is_pg_url, pg_requirement_error
+
     db_url = os.getenv("DATABASE_URL", "sqlite")
+    error = pg_requirement_error(db_url, os.getenv("GT_REQUIRE_PG"),
+                                 [item.nodeid for item in items if "pg_only" in item.keywords])
+    if error:
+        raise pytest.UsageError(error)
     skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
-    tag_pg = "postgresql" not in db_url
+    tag_pg = not is_pg_url(db_url)
     for item in items:
         if tag_pg and "pg_only" in item.keywords:
             item.add_marker(skip_pg)

@@ -18,6 +18,7 @@ import { ref, computed, watch } from 'vue'
 import { useA111FormData } from './composables/useA111FormData'
 import { useA111Signing, SIGN_SLOTS } from './composables/useA111Signing'
 import { useAuthStore } from '@/stores/auth'
+import { categoryGroupOfCode } from '@/types/projectClassification'
 
 // ─── Props / Emits (Task 3.1) ────────────────────────────────────────────────
 
@@ -128,8 +129,9 @@ function handleMgmtSign(itemId: string) {
 function isSlotNA(slotId: string): boolean {
   const slot = SIGN_SLOTS.find(s => s.id === slotId)
   if (!slot) return false
-  const cat = businessCategory.value as 'A' | 'B' | 'C'
-  if (!cat) return false
+  if (!businessCategory.value) return false
+  // 与 requiredSlots 同口径：细分类码（旧预填的 A1 等）先归组别
+  const cat = categoryGroupOfCode(businessCategory.value)
   // Not in requiredFor AND not optional → NA
   if (!slot.requiredFor.includes(cat) && !slot.optional) return true
   // optional slots for B/C: also NA

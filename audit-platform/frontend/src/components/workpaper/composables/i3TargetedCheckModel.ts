@@ -386,7 +386,7 @@ function _parseI32Rows(raw: unknown): any[] {
  * 优先 costIncrease（原值本期增加=借方）/ currentImpairment|impIncrease（贷方）；
  * 无滚动字段时回退并购日年份代理。
  */
-export function extractI3PeriodMovement(raw: unknown, asOfYear?: number): I3PeriodMovement {
+export function extractI3PeriodMovement(raw: unknown, asOfYear?: number | null): I3PeriodMovement {
   const rows = _parseI32Rows(raw)
   let debitTotal = 0
   let creditTotal = 0
@@ -413,7 +413,9 @@ export function extractI3PeriodMovement(raw: unknown, asOfYear?: number): I3Peri
     // 旧代理：按并购日年份 + currentImpairment
     creditTotal += _num(r?.currentImpairment)
     const y = _yearOf(_str(r?.mergerDate || r?.acquisitionDate))
-    if (asOfYear == null || y === asOfYear) {
+    // 审计年度未知（项目没填）：按并购日年份判本期无从谈起 ⇒ 不计入本期借方
+    // （原先 null 当「不过滤」，把全部商誉原值都算成本期新增）
+    if (asOfYear != null && y === asOfYear) {
       debitTotal += original
     }
   }

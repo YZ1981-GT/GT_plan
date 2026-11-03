@@ -49,15 +49,26 @@ _FRONTEND_TARGET = (
     / "sync"
     / "workpaperSyncManifest.generated.ts"
 )
+_CYCLE_SLICE_GLOB = "workpaper_sync_*_cycle_manifest_slice.json"
+_WP_CODE_ADJUDICATION = _REPO / "backend" / "data" / "workpaper_sync_entry_wp_code_adjudication.json"
 _WORKPAPER_PREFIX = "audit-platform/frontend/src/components/workpaper/"
 _CAPABILITIES = {"bidirectional", "single_html", "single_onlyoffice", "unreachable"}
+_PENDING_VERDICT_FIELDS = (
+    "capability_verdict_stage",
+    "capability_target",
+    "capability_target_blocked_by",
+)
 _REQUIRED_ENTRY_FIELDS = {
     "entry_id",
+    "effective_entry_id",
     "mounts",
     "parent_entry_id",
     "wp_match",
     "document_type",
     "html_store",
+    "html_counterpart_verdict",
+    "html_counterpart_source_refs",
+    "adjudication_state",
     "canonical_resolver",
     "adapter_id",
     "capability",
@@ -103,6 +114,279 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ManifestGenerationError(f"JSON root must be an object: {path}")
     return value
+
+
+def _load_slice_adjudications() -> tuple[dict[str, dict[str, Any]], str]:
+    """加载逐循环 slice 已复核的 counterpart/pending 事实。
+
+    slice 只提供调查事实，不覆盖 overlay 的终态 capability。历史 slice 的 capability
+    大多为 ``null``，这正是本轮要保留的诚实 pending 状态；把它们当成默认
+    ``single_onlyoffice`` 会重开 AC 12.8 的循环论证。
+    """
+    facts: dict[str, dict[str, Any]] = {}
+    source_payload: list[dict[str, Any]] = []
+    paths = sorted((_REPO / "backend" / "data").glob(_CYCLE_SLICE_GLOB))
+    if not paths:
+        raise ManifestGenerationError("no workpaper sync cycle manifest slices found")
+    for path in paths:
+        document = _read_json(path)
+        entries = document.get("independent_entries")
+        if not isinstance(entries, list):
+            raise ManifestGenerationError(f"slice has no independent_entries array: {path}")
+        for raw in entries:
+            if not isinstance(raw, dict):
+                raise ManifestGenerationError(f"slice entry must be an object: {path}")
+            entry_id = str(raw.get("entry_id") or "").strip()
+            if not entry_id:
+                raise ManifestGenerationError(f"slice entry has no entry_id: {path}")
+            verdict = raw.get("html_counterpart_verdict")
+            if verdict not in {None, "exists", "none"}:
+                raise ManifestGenerationError(
+                    f"slice {path.name} entry {entry_id}: invalid html counterpart verdict {verdict!r}"
+                )
+            refs = raw.get("html_counterpart_source_refs") or []
+            if not isinstance(refs, list) or any(not isinstance(item, str) for item in refs):
+                raise ManifestGenerationError(
+                    f"slice {path.name} entry {entry_id}: html counterpart refs must be strings"
+                )
+            fact = {
+                "entry_id": entry_id,
+                "source_slice": path.name,
+                "html_counterpart_verdict": verdict,
+                "html_counterpart_source_refs": list(refs),
+                "capability_verdict_stage": raw.get("capability_verdict_stage"),
+                "capability_target": raw.get("capability_target"),
+                "capability_target_blocked_by": list(
+                    raw.get("capability_target_blocked_by") or []
+                ),
+            }
+            previous = facts.get(entry_id)
+            if previous is not None and previous != fact:
+                raise ManifestGenerationError(
+                    f"entry {entry_id} has conflicting adjudication facts in "
+                    f"{previous['source_slice']} and {path.name}"
+                )
+            facts[entry_id] = fact
+            source_payload.append(fact)
+    digest = _sha256_bytes(_stable_json(source_payload).encode("utf-8"))
+    return facts, digest
+
+
+def _load_wp_code_adjudications() -> tuple[dict[str, list[str]], str]:
+    document = _read_json(_WP_CODE_ADJUDICATION)
+    rows = document.get("adjudications")
+    if not isinstance(rows, list) or not rows:
+        raise ManifestGenerationError("wp_code adjudication denominator is empty")
+    by_entry: dict[str, list[str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ManifestGenerationError("wp_code adjudication row must be an object")
+        entry_id = str(row.get("entry_id") or "").strip()
+        wp_codes = row.get("wp_codes")
+        if not entry_id or not isinstance(wp_codes, list) or not wp_codes:
+            raise ManifestGenerationError(
+                f"invalid wp_code adjudication row for entry {entry_id!r}"
+            )
+        codes = [str(code).strip() for code in wp_codes]
+        if any(not code or not code.isascii() for code in codes):
+            raise ManifestGenerationError(
+                f"entry {entry_id}: adjudicated wp_codes must be non-empty ASCII values"
+            )
+        if entry_id in by_entry:
+            raise ManifestGenerationError(f"duplicate wp_code adjudication: {entry_id}")
+        by_entry[entry_id] = codes
+    return by_entry, _sha256_bytes(_stable_json(rows).encode("utf-8"))
+
+
+def _pending_adjudication(
+    *,
+    entry_id: str,
+    source_file: str,
+    reviewed_value: dict[str, Any],
+    slice_fact: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """把未逐 entry 终裁的组件默认值转换成受约束 pending。"""
+    html_store = reviewed_value.get("html_store")
+    verdict = None if slice_fact is None else slice_fact.get("html_counterpart_verdict")
+    refs = [] if slice_fact is None else list(
+        slice_fact.get("html_counterpart_source_refs") or []
+    )
+    if verdict is None and html_store not in {None, "", "unresolved"}:
+        verdict = "exists"
+        refs = [source_file]
+    if verdict is not None and not refs:
+        refs = [source_file]
+
+    target = None if slice_fact is None else slice_fact.get("capability_target")
+    if target not in _CAPABILITIES:
+        if verdict == "exists":
+            target = "bidirectional"
+        elif verdict == "none":
+            target = "single_onlyoffice"
+        else:
+            raw_target = reviewed_value.get("capability")
+            target = raw_target if raw_target in _CAPABILITIES else "bidirectional"
+
+    blockers = [] if slice_fact is None else list(
+        slice_fact.get("capability_target_blocked_by") or []
+    )
+    if not blockers:
+        blockers = [
+            "html_counterpart_investigation"
+            if verdict is None
+            else "per_entry_definition_runtime_and_evidence"
+        ]
+    stage = None if slice_fact is None else slice_fact.get("capability_verdict_stage")
+    if not isinstance(stage, str) or not stage.strip():
+        stage = "counterpart_pending" if verdict is None else "definition_producer_pending"
+    return {
+        "capability": None,
+        "adjudication_state": "pending",
+        "html_counterpart_verdict": verdict,
+        "html_counterpart_source_refs": refs,
+        "capability_verdict_stage": stage,
+        "capability_target": target,
+        "capability_target_blocked_by": blockers,
+        "adjudication_source": None if slice_fact is None else slice_fact["source_slice"],
+    }
+
+
+def _terminal_adjudication(
+    *, source_file: str, reviewed_value: dict[str, Any], slice_fact: dict[str, Any] | None
+) -> dict[str, Any]:
+    capability = reviewed_value.get("capability")
+    verdict = None if slice_fact is None else slice_fact.get("html_counterpart_verdict")
+    refs = [] if slice_fact is None else list(
+        slice_fact.get("html_counterpart_source_refs") or []
+    )
+    if capability in {"bidirectional", "single_html"} and verdict is None:
+        verdict = "exists"
+        refs = [source_file]
+    if verdict is not None and not refs:
+        refs = [source_file]
+    if capability == "bidirectional" and verdict != "exists":
+        raise ManifestGenerationError(
+            f"{source_file}: bidirectional entry must have an HTML counterpart"
+        )
+    if capability == "single_onlyoffice" and verdict != "none":
+        raise ManifestGenerationError(
+            f"{source_file}: single_onlyoffice requires html_counterpart_verdict='none'"
+        )
+    return {
+        "capability": capability,
+        "adjudication_state": "terminal",
+        "html_counterpart_verdict": verdict,
+        "html_counterpart_source_refs": refs,
+        "adjudication_source": "reviewed_overlay",
+    }
+
+
+def _append_supplemental_entries(
+    entries: list[dict[str, Any]], rules: list[dict[str, Any]]
+) -> None:
+    """加入一个物理宿主承载多个逻辑工作簿时的 reviewed 独立 entry。
+
+    supplemental entry **不复制物理 mount**，因此源码挂载集合仍一对一；它必须指向
+    已存在的宿主 entry 取得 source-backed profile，并保持 pending，直到自己的
+    descriptor/bridge 真接线。该机制取代历史上直接手改 generated manifest 的做法。
+    """
+    by_id = {entry["entry_id"]: entry for entry in entries}
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise ManifestGenerationError("overlay.supplemental_entries must contain objects")
+        entry_id = str(rule.get("entry_id") or "").strip()
+        host_path = str(rule.get("host_path") or "").strip()
+        profile_from = str(rule.get("profile_from_entry_id") or "").strip()
+        if not entry_id or entry_id in by_id:
+            raise ManifestGenerationError(
+                f"invalid or duplicate supplemental entry_id: {entry_id!r}"
+            )
+        if not host_path or not (_REPO / host_path).is_file():
+            raise ManifestGenerationError(
+                f"supplemental entry {entry_id}: host_path does not exist: {host_path!r}"
+            )
+        base = by_id.get(profile_from)
+        if base is None or not base.get("independent_entry"):
+            raise ManifestGenerationError(
+                f"supplemental entry {entry_id}: profile source {profile_from!r} "
+                "must be an existing independent entry"
+            )
+        document_type = str(rule.get("document_type") or "")
+        if document_type not in {"xlsx", "docx"} or document_type != base["document_type"]:
+            raise ManifestGenerationError(
+                f"supplemental entry {entry_id}: document type must match profile source"
+            )
+        target = rule.get("capability_target")
+        blockers = rule.get("capability_target_blocked_by")
+        if target not in _CAPABILITIES or not isinstance(blockers, list) or not blockers:
+            raise ManifestGenerationError(
+                f"supplemental entry {entry_id}: target and non-empty blockers are required"
+            )
+        reason = str(rule.get("reason") or "").strip()
+        if not reason:
+            raise ManifestGenerationError(
+                f"supplemental entry {entry_id}: reviewed reason is required"
+            )
+        scenario = copy.deepcopy(base["scenario_profile"])
+        scenario["mount_count"] = 0
+        scenario["mount_cardinality"] = "none"
+        scenario["profile_id"] = (
+            f"{document_type}.{base['editability']}.{base['room_model']}.none."
+            f"{scenario['room_service_state']}.v1"
+        )
+        entry = {
+            "entry_id": entry_id,
+            "effective_entry_id": entry_id,
+            "host_path": host_path,
+            "mounts": [],
+            "independent_entry": True,
+            "parent_entry_id": None,
+            "wp_match": {
+                "wp_code_patterns": list(rule.get("wp_code_patterns") or []),
+                "component_types": [],
+                "sheet_literals": [],
+                "sheet_expressions": [],
+                "source_host": host_path,
+            },
+            "document_type": document_type,
+            "mount_components": [],
+            "sync_editor_host_mounted": False,
+            "html_store": copy.deepcopy(rule.get("html_store")),
+            "html_counterpart_verdict": "exists",
+            "html_counterpart_source_refs": [host_path],
+            "adjudication_state": "pending",
+            "adjudication_source": "reviewed_overlay.supplemental_entries",
+            "capability_verdict_stage": "host_binding_pending",
+            "capability_target": target,
+            "capability_target_blocked_by": list(blockers),
+            "canonical_resolver": copy.deepcopy(rule.get("canonical_resolver")),
+            "adapter_id": None,
+            "capability": None,
+            "migration_state": "provider_ready_host_pending",
+            "evidence": {
+                "review_status": "supplemental_entry_reviewed",
+                "contract_test": None,
+                "browser_case": None,
+                "legacy_reasons": ["dedicated_host_binding_missing", "missing_adapter"],
+                "review_reason": reason,
+            },
+            "editability": base["editability"],
+            "room_model": base["room_model"],
+            "scenario_profile": scenario,
+            "profile_source": {
+                "kind": "supplemental_entry",
+                "profile_from_entry_id": profile_from,
+                "host_path": host_path,
+                "reason": reason,
+            },
+        }
+        missing = _REQUIRED_ENTRY_FIELDS - entry.keys()
+        if missing:
+            raise ManifestGenerationError(
+                f"supplemental entry {entry_id} misses fields: {sorted(missing)}"
+            )
+        entries.append(entry)
+        by_id[entry_id] = entry
 
 
 def discover_source() -> dict[str, Any]:
@@ -416,6 +700,8 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
     defaults = overlay.get("defaults_by_component")
     if not isinstance(defaults, dict):
         raise ManifestGenerationError("overlay.defaults_by_component must be an object")
+    slice_adjudications, adjudication_source_digest = _load_slice_adjudications()
+    wp_code_adjudications, wp_code_adjudication_digest = _load_wp_code_adjudications()
     parent_rules = overlay.get("parent_rules") or []
     unreachable_rules = overlay.get("unreachable_rules") or []
     overrides = overlay.get("overrides") or []
@@ -433,6 +719,11 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         not isinstance(item, dict) for item in sync_host_entry_rules
     ):
         raise ManifestGenerationError("overlay.sync_host_entry_rules must be an array of objects")
+    supplemental_entries = overlay.get("supplemental_entries") or []
+    if not isinstance(supplemental_entries, list) or any(
+        not isinstance(item, dict) for item in supplemental_entries
+    ):
+        raise ManifestGenerationError("overlay.supplemental_entries must be an array of objects")
     sync_rule_hits = _resolve_deferred_document_types(discovery, sync_host_entry_rules)
 
     entries: list[dict[str, Any]] = []
@@ -472,11 +763,13 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             for index, item in enumerate(overrides)
             if _matches(item, file=source_file, component=component)
         ]
+        capability_was_reviewed = False
         if len(matching_overrides) > 1:
             raise ManifestGenerationError(f"overrides overlap for {entry_id}")
         if matching_overrides:
             index, override = matching_overrides[0]
             matched_rule_ids[("overrides", index)] += 1
+            capability_was_reviewed = "capability" in override
             value = _merge_override(value, override)
 
         independent = True
@@ -530,9 +823,68 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             value["migration_state"] = "unreachable_pending_delete"
             value.setdefault("evidence", {})["unreachable_reason"] = unreachable_rule.get("reason")
 
+        slice_fact = slice_adjudications.get(entry_id)
+        if unreachable_rule:
+            value.update(
+                _terminal_adjudication(
+                    source_file=source_file,
+                    reviewed_value=value,
+                    slice_fact=slice_fact,
+                )
+            )
+        elif not independent:
+            # parent duplicate 的真实能力由父 entry 决定；本地不独立裁决、不注册。
+            value.update(
+                {
+                    "capability": None,
+                    "adjudication_state": "inherited",
+                    "html_counterpart_verdict": None,
+                    "html_counterpart_source_refs": [],
+                    "adjudication_source": "parent_entry",
+                }
+            )
+        elif capability_was_reviewed and (
+            value.get("capability") != "bidirectional" or bool(value.get("adapter_id"))
+        ):
+            value.update(
+                _terminal_adjudication(
+                    source_file=source_file,
+                    reviewed_value=value,
+                    slice_fact=slice_fact,
+                )
+            )
+        else:
+            value.update(
+                _pending_adjudication(
+                    entry_id=entry_id,
+                    source_file=source_file,
+                    reviewed_value=value,
+                    slice_fact=slice_fact,
+                )
+            )
+            # 未终裁 entry 不得借组件默认值挂 adapter（AC 12.1 / AP-5）。
+            value["adapter_id"] = None
+
         capability = value.get("capability")
-        if capability not in _CAPABILITIES:
+        if capability is not None and capability not in _CAPABILITIES:
             raise ManifestGenerationError(f"invalid capability for {entry_id}: {capability!r}")
+        if capability is None and independent:
+            missing_pending = [
+                field for field in _PENDING_VERDICT_FIELDS if not value.get(field)
+            ]
+            if missing_pending:
+                raise ManifestGenerationError(
+                    f"pending entry {entry_id} misses verdict fields: {missing_pending}"
+                )
+            if value["capability_target"] not in _CAPABILITIES:
+                raise ManifestGenerationError(
+                    f"pending entry {entry_id} has invalid target "
+                    f"{value['capability_target']!r}"
+                )
+            if not isinstance(value["capability_target_blocked_by"], list):
+                raise ManifestGenerationError(
+                    f"pending entry {entry_id} blockers must be a non-empty list"
+                )
 
         # 🔴 卡点：WorkpaperSyncEditorHost 的独立 entry 必须有 override 或 parent/unreachable
         # 裁决，不得只靠 defaults_by_component 的 bidirectional 蒙混。
@@ -548,13 +900,21 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         if not isinstance(evidence, dict) or not evidence.get("review_status"):
             raise ManifestGenerationError(f"entry evidence is not reviewed: {entry_id}")
 
+        wp_match = _source_match(group, component)
+        if independent and entry_id in wp_code_adjudications:
+            wp_match["wp_code_patterns"] = list(wp_code_adjudications[entry_id])
+            wp_match["wp_code_adjudication_source"] = str(
+                _WP_CODE_ADJUDICATION.relative_to(_REPO)
+            ).replace("\\", "/")
+
         entry = {
             "entry_id": entry_id,
+            "effective_entry_id": parent_entry_id or entry_id,
             "host_path": source_file,
             "mounts": copy.deepcopy(group),
             "independent_entry": independent,
             "parent_entry_id": parent_entry_id,
-            "wp_match": _source_match(group, component),
+            "wp_match": wp_match,
             "document_type": document_type,
             # 该 entry 实际出现过的组件集合 + 是否已挂真双向载体。
             # 🔴 这两个字段让「该宿主已接同步载体」首次成为清册里的可查事实 ——
@@ -562,12 +922,19 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             "mount_components": mount_components,
             "sync_editor_host_mounted": "WorkpaperSyncEditorHost" in mount_components,
             "html_store": value.get("html_store"),
+            "html_counterpart_verdict": value.get("html_counterpart_verdict"),
+            "html_counterpart_source_refs": value.get("html_counterpart_source_refs") or [],
+            "adjudication_state": value.get("adjudication_state"),
+            "adjudication_source": value.get("adjudication_source"),
             "canonical_resolver": value.get("canonical_resolver"),
             "adapter_id": value.get("adapter_id"),
             "capability": capability,
             "migration_state": value.get("migration_state"),
             "evidence": evidence,
         }
+        if capability is None and value.get("adjudication_state") == "pending":
+            for field in _PENDING_VERDICT_FIELDS:
+                entry[field] = copy.deepcopy(value[field])
         # Requirement 1.2: derive editability / room_model / scenario_profile from source
         # facts only. The derivation signature carries no business adjudication field, so
         # capability stays an independent cross-check (RG-15) instead of a tautology.
@@ -606,6 +973,8 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         if missing:
             raise ManifestGenerationError(f"entry {entry_id} misses fields: {sorted(missing)}")
         entries.append(entry)
+
+    _append_supplemental_entries(entries, supplemental_entries)
 
     # `sync_host_entry_rules` 的命中数在 L3 解析阶段就记下了（它发生在分组之前）
     for index in range(len(sync_host_entry_rules)):
@@ -660,6 +1029,43 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             raise ManifestGenerationError(f"parent entry is not independent: {parent_id}")
         if parent["document_type"] != entry["document_type"]:
             raise ManifestGenerationError(f"parent document type mismatch: {entry['entry_id']}")
+        entry["effective_entry_id"] = parent_id
+        entry["capability"] = parent["capability"]
+        entry["html_counterpart_verdict"] = parent["html_counterpart_verdict"]
+        entry["html_counterpart_source_refs"] = list(
+            parent["html_counterpart_source_refs"]
+        )
+        entry["adjudication_state"] = "inherited"
+        entry["adjudication_source"] = parent_id
+        for field in _PENDING_VERDICT_FIELDS:
+            entry.pop(field, None)
+        if parent["capability"] is None:
+            entry["capability_verdict_stage"] = "inherited_parent_pending"
+            entry["capability_target"] = parent["capability_target"]
+            entry["capability_target_blocked_by"] = list(
+                parent["capability_target_blocked_by"]
+            )
+
+    for entry in entries:
+        capability = entry["capability"]
+        if capability is None:
+            if entry["independent_entry"] and entry["adjudication_state"] != "pending":
+                raise ManifestGenerationError(
+                    f"independent entry {entry['entry_id']} has null capability without pending state"
+                )
+            continue
+        if capability == "single_onlyoffice" and entry["html_counterpart_verdict"] != "none":
+            raise ManifestGenerationError(
+                f"entry {entry['entry_id']}: single_onlyoffice requires no HTML counterpart"
+            )
+        if capability == "bidirectional" and entry["html_counterpart_verdict"] != "exists":
+            raise ManifestGenerationError(
+                f"entry {entry['entry_id']}: bidirectional requires an HTML counterpart"
+            )
+        if entry["independent_entry"] and capability == "bidirectional" and not entry["adapter_id"]:
+            raise ManifestGenerationError(
+                f"entry {entry['entry_id']}: reviewed bidirectional entry has no adapter_id"
+            )
 
     physical_mounts = discovery["mounts"]
     source_mount_ids = {item["mountId"] for item in physical_mounts}
@@ -676,7 +1082,9 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             f"extra={sorted(manifest_mount_ids - source_mount_ids)}"
         )
 
-    capability_counts = Counter(entry["capability"] for entry in entries)
+    capability_counts = Counter(
+        entry["capability"] for entry in entries if entry["capability"] is not None
+    )
     editability_counts = Counter(entry["editability"] for entry in entries)
     room_model_counts = Counter(entry["room_model"] for entry in entries)
     profile_counts = Counter(entry["scenario_profile"]["profile_id"] for entry in entries)
@@ -696,7 +1104,9 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         "parent_duplicate_count": sum(entry["parent_entry_id"] is not None for entry in entries),
         "unreachable_count": capability_counts["unreachable"],
         "unadjudicated_count": sum(
-            entry["html_store"] == "unresolved" for entry in entries if entry["independent_entry"]
+            entry["capability"] is None
+            for entry in entries
+            if entry["independent_entry"]
         ),
         "legacy_fake_bidirectional_count": sum(
             entry["migration_state"] == "legacy_fake_bidirectional" for entry in entries
@@ -711,6 +1121,8 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "source_digest": discovery["sourceDigest"],
+        "adjudication_source_digest": adjudication_source_digest,
+        "wp_code_adjudication_digest": wp_code_adjudication_digest,
         "overlay_digest": _sha256_bytes(_stable_json(overlay).encode("utf-8")),
         # Requirement 1.2 / design: the source-backed profile fields AND their provenance
         # digest both participate in `manifest_digest`. `source_digest` stays the reviewed
@@ -769,9 +1181,16 @@ def render_frontend(manifest: dict[str, Any]) -> str:
         projection.append(
             {
                 "entryId": entry["entry_id"],
+                "effectiveEntryId": entry["effective_entry_id"],
                 "hostPath": entry["host_path"],
                 "documentType": entry["document_type"],
                 "capability": entry["capability"],
+                "adjudicationState": entry["adjudication_state"],
+                "capabilityVerdictStage": entry.get("capability_verdict_stage"),
+                "capabilityTarget": entry.get("capability_target"),
+                "capabilityTargetBlockedBy": entry.get("capability_target_blocked_by") or [],
+                "htmlCounterpartVerdict": entry["html_counterpart_verdict"],
+                "htmlCounterpartSourceRefs": entry["html_counterpart_source_refs"],
                 "migrationState": entry["migration_state"],
                 "independentEntry": entry["independent_entry"],
                 "parentEntryId": entry["parent_entry_id"],
@@ -811,7 +1230,14 @@ export interface WorkpaperSyncManifestEntry {{
   entryId: string
   hostPath: string
   documentType: 'xlsx' | 'docx'
-  capability: WorkpaperSyncCapability
+  capability: WorkpaperSyncCapability | null
+  adjudicationState: 'terminal' | 'pending' | 'inherited'
+  capabilityVerdictStage: string | null
+  capabilityTarget: WorkpaperSyncCapability | null
+  capabilityTargetBlockedBy: string[]
+  htmlCounterpartVerdict: 'exists' | 'none' | null
+  htmlCounterpartSourceRefs: string[]
+  effectiveEntryId: string
   migrationState: string
   independentEntry: boolean
   parentEntryId: string | null
@@ -821,6 +1247,7 @@ export interface WorkpaperSyncManifestEntry {{
     sheet_literals: string[]
     sheet_expressions: string[]
     source_host: string
+    wp_code_adjudication_source?: string
   }}
   editability: WorkpaperSyncEditability
   roomModel: WorkpaperSyncRoomModel
@@ -832,6 +1259,10 @@ export interface WorkpaperSyncManifestEntry {{
 }}
 
 export const WORKPAPER_SYNC_MANIFEST_DIGEST = {_ts_string(manifest['manifest_digest'])}
+
+export const WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST = {_ts_string(manifest['adjudication_source_digest'])}
+
+export const WORKPAPER_SYNC_WP_CODE_ADJUDICATION_DIGEST = {_ts_string(manifest['wp_code_adjudication_digest'])}
 
 export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = {_ts_string(manifest['profile_source_digest'])}
 

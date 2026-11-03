@@ -142,12 +142,12 @@ async def render(ctx: RenderContext) -> dict | None:
     elif high_client_risk:
         risk_alert = "存在高风险客户评价项，须进一步评估并履行审批程序。"
 
-    # ─── 项目上下文预填（客户名 + 行业）───
+    # ─── 项目上下文预填（客户名）───
+    # 「所属行业」不预填：平台没有项目级行业来源，原先把质控分类码（A1 / C …）预填进行业栏
+    # （spec trim-followup-residual-findings-closure R1.4），由编制人在表内填写。
     project_context = await _load_project_context(project_id, db)
     if not values.get("basic-client_name", {}).get("value") and project_context.get("client_name"):
         values.setdefault("basic-client_name", {})["value"] = project_context["client_name"]
-    if not values.get("basic-industry", {}).get("value") and project_context.get("industry"):
-        values.setdefault("basic-industry", {})["value"] = project_context["industry"]
 
     # ─── 跨表联动：读同工作簿 B1-1/B1-2 总体风险结论（b1risk-overall-conclusion）───
     risk_assessment_conclusion = await _load_risk_conclusion(ctx.wp_id, db)
@@ -189,11 +189,12 @@ async def _load_risk_conclusion(wp_id, db) -> str | None:
 
 
 async def _load_project_context(project_id, db) -> dict:
+    # industry 恒为空：平台没有项目级行业来源（质控分类码不是行业）
     project_context: dict = {"client_name": "", "audit_period": "", "industry": ""}
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year, business_category FROM projects WHERE id = :pid"
+                "SELECT client_name, audit_year FROM projects WHERE id = :pid"
             ),
             {"pid": str(project_id)},
         )
@@ -202,7 +203,6 @@ async def _load_project_context(project_id, db) -> dict:
             project_context["client_name"] = proj_row.client_name or ""
             if proj_row.audit_year:
                 project_context["audit_period"] = f"{proj_row.audit_year}年度"
-            project_context["industry"] = proj_row.business_category or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("B1-3 业务评价表 project context 查询失败: %s", e)
     return project_context

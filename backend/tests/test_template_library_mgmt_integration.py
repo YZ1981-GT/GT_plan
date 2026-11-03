@@ -78,14 +78,6 @@ import app.models.phase16_models  # noqa: E402, F401
 import app.models.archive_models  # noqa: E402, F401
 import app.models.knowledge_models  # noqa: E402, F401
 
-import sqlalchemy as _sa  # noqa: E402
-
-# Stub for 'workpapers' table referenced by AI models FK
-class _WorkpaperStub(Base):
-    __tablename__ = "workpapers"
-    __table_args__ = {"extend_existing": True}
-    id = _sa.Column(_sa.Uuid, primary_key=True)
-
 
 # ---------------------------------------------------------------------------
 # 模块级测试引擎（与邻居 test_eqcr_gate_approve.py 对齐）

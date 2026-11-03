@@ -9,7 +9,7 @@
           现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
         -->
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && g8EntrySync.presentation.value.showModeSwitch"
           :model-value="renderMode"
           :options="syncModeOptions"
           size="small"
@@ -39,7 +39,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -172,7 +172,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
     </template>
@@ -196,6 +196,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G8 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
 import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -227,7 +228,10 @@ const props = defineProps<{
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const formData = useG8FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+// 过渡期间（HTML→OnlyOffice 的 flush/projection/materialize 未结束）冻结结构化输入：
+// 此刻的编辑既不会进入已读出的 projection，也会被随后的 OO 保存覆盖（spec R1.4）。
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
@@ -249,6 +253,7 @@ const auditYear = computed(() => {
 
 // ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
 import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 const _g8TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
 provide('tbSourceCodes', _g8TbSourceCodes)
 
@@ -320,7 +325,9 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(G8_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    formData.flushPending()
+    // 顺序刚性：先把 HTML debounce 真正落库，再 readStoreProjection——
+    // 不 await 会读到未落库的旧投影（spec R1.4）。
+    await formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -347,6 +354,17 @@ const {
   editorHostRef: syncEditorHostRef,
 })
 
+/**
+ * 同步能力单源（spec task 3.5 / AC 1.4）：开关可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），不再由宿主的 `isHtmlSheet` 独自决定。
+ * `isHtmlSheet` 保留为 sheet 级附加条件（这张 sheet 本身是不是 HTML 可渲染的）。
+ */
+const g8EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => G8_SYNC_ENTRY_ID,
+})
+
 const isOoMode = computed(
   () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
 )
@@ -359,7 +377,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('g8:save-items', handleG8SaveItems)
-  formData.flushPending()
+  void formData.flushPending().catch(() => undefined)
 })
 </script>
 

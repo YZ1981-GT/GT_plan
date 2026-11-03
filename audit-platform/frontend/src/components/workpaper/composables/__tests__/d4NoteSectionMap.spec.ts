@@ -141,6 +141,23 @@ describe('d4NoteSectionMap', () => {
     expect(oblRows[0]).toMatchObject({ label: 'A合同预计将确认的收入', year_2026: 500, year_2027: 300, total: 800 })
   })
 
+  it('（6）义务表表头随审计年度派生（2024 项目 → 2025年 / 2026年，不再恒为 2026 / 2027）', () => {
+    const snap = { ...snapshot(), auditYear: 2024, section6Rows: [{ label: 'B合同', year_2025: 70, year_2026: 30 }] }
+    const p = buildD4SyncPayload('listed', 'wp-1', null, snap)
+    const oblCols = p.columns['与剩余履约义务有关的信息']
+    expect(oblCols.map((c) => c.label)).toEqual(['年度', '2025年', '2026年', '合计'])
+    expect((p.sub_table_data['与剩余履约义务有关的信息'] as any[])[0]).toMatchObject({ year_2025: 70, year_2026: 30, total: 100 })
+  })
+
+  // post-push-residual-defect-closure R2：原先 `snapshot.auditYear ?? 2025`，两张披露页又都没传年度 ⇒ 表头恒按 2025 派生
+  it('审计年度未知：不推（6）义务表（年度列无从派生），其余子表照推', () => {
+    const p = buildD4SyncPayload('listed', 'wp-1', null, { ...snapshot(), auditYear: null })
+    const dataKeys = Object.keys(p.sub_table_data).filter(k => !k.startsWith('_'))
+    expect(dataKeys).not.toContain('与剩余履约义务有关的信息')
+    expect(p.columns['与剩余履约义务有关的信息']).toBeUndefined()
+    expect(dataKeys).toContain('营业收入和营业成本')
+  })
+
   it('listed（8）试运行销售收入两级 group（Req 6.4）', () => {
     const p = buildD4SyncPayload('listed', 'wp-1', null, snapshot())
     const trCols = p.columns['试运行销售收入']

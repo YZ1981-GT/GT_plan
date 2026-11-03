@@ -553,34 +553,35 @@ async def update_user_formulas(
 
     # ── 底稿公式变更走哈希链 formula.changed 留痕（需求 8.4 / Q5）──
     if updated > 0 or deleted > 0:
-        try:
-            from app.services.audit_log_helper import append_audit_log
+        # ── 底稿公式修改走哈希链留痕（mandatory — ADR-ALC-07）──
+        from app.services.audit_log_helper import append_audit_log
+        from app.services.project_audit_year import resolve_project_audit_year_for_request
 
-            for cell_key, formula in payload.formulas.items():
-                old_formula = _old_formulas.get(cell_key, "")
-                # 跳过无实际变更的条目
-                if formula == old_formula:
-                    continue
-                action = "delete" if not formula else "update"
-                await append_audit_log(db, {
-                    "user_id": user.id if hasattr(user, "id") else None,
-                    "project_id": wp.project_id,
-                    "action": "formula.changed",
-                    "resource_type": "workpaper",
-                    "resource_id": cell_key,
-                    "details": {
-                        "event_type": "formula_changed",
-                        "module": "workpaper",
-                        "row_code": cell_key,
-                        "action": action,
-                        "old_formula": old_formula,
-                        "new_formula": formula,
-                        "result_value": "",
-                    },
-                })
-        except Exception as e:
-            # 审计写入失败仅 warning，不影响公式保存
-            logger.warning("底稿公式审计留痕写入失败: %s", e)
+        # 历史页按年度过滤（需求 11.1）：载荷带项目审计年度，否则这些条目查不到
+        audit_year = await resolve_project_audit_year_for_request(db, wp.project_id)
+        for cell_key, formula in payload.formulas.items():
+            old_formula = _old_formulas.get(cell_key, "")
+            # 跳过无实际变更的条目
+            if formula == old_formula:
+                continue
+            action = "delete" if not formula else "update"
+            await append_audit_log(db, {
+                "user_id": user.id if hasattr(user, "id") else None,
+                "project_id": wp.project_id,
+                "action": "formula.changed",
+                "resource_type": "workpaper",
+                "resource_id": cell_key,
+                "details": {
+                    "event_type": "formula_changed",
+                    "module": "workpaper",
+                    "row_code": cell_key,
+                    "action": action,
+                    "old_formula": old_formula,
+                    "new_formula": formula,
+                    "result_value": "",
+                    **({"year": str(audit_year)} if audit_year is not None else {}),
+                },
+            })
 
     await db.commit()
 
@@ -638,28 +639,29 @@ async def restore_preset_formula(
         removed.setdefault("formula", row.expression)
         await db.delete(row)
 
-    # ── 底稿公式恢复预设走哈希链 formula.changed 留痕 ──
-    try:
-        from app.services.audit_log_helper import append_audit_log
+    # ── 底稿公式恢复预设走哈希链留痕（mandatory — ADR-ALC-07）──
+    from app.services.audit_log_helper import append_audit_log
+    from app.services.project_audit_year import resolve_project_audit_year_for_request
 
-        await append_audit_log(db, {
-            "user_id": _user.id if hasattr(_user, "id") else None,
-            "project_id": wp.project_id,
-            "action": "formula.changed",
-            "resource_type": "workpaper",
-            "resource_id": cell_key,
-            "details": {
-                "event_type": "formula_changed",
-                "module": "workpaper",
-                "row_code": cell_key,
-                "action": "restore_preset",
-                "old_formula": removed.get("formula", ""),
-                "new_formula": removed.get("original_preset", ""),
-                "result_value": "",
-            },
-        })
-    except Exception as e:
-        logger.warning("底稿公式审计留痕写入失败: %s", e)
+    # 历史页按年度过滤（需求 11.1）：载荷带项目审计年度，否则这条恢复预设查不到
+    audit_year = await resolve_project_audit_year_for_request(db, wp.project_id)
+    await append_audit_log(db, {
+        "user_id": _user.id if hasattr(_user, "id") else None,
+        "project_id": wp.project_id,
+        "action": "formula.changed",
+        "resource_type": "workpaper",
+        "resource_id": cell_key,
+        "details": {
+            "event_type": "formula_changed",
+            "module": "workpaper",
+            "row_code": cell_key,
+            "action": "restore_preset",
+            "old_formula": removed.get("formula", ""),
+            "new_formula": removed.get("original_preset", ""),
+            "result_value": "",
+            **({"year": str(audit_year)} if audit_year is not None else {}),
+        },
+    })
 
     await db.commit()
 

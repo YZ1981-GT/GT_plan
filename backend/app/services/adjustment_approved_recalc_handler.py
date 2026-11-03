@@ -22,6 +22,11 @@ async def _handle_adjustment_review_event(
     event_label: str,
 ) -> None:
     """执行审批/撤回共用的调整列和审定数重算。"""
+    extra = getattr(event, "extra", None) or {}
+    if extra.get("tb_recalc_committed") is True:
+        logger.debug("%s: TB 已在复核事务内更新，跳过兼容重算", event_label)
+        return
+
     project_id = getattr(event, "project_id", None)
     year = getattr(event, "year", None)
     account_codes = getattr(event, "account_codes", None)

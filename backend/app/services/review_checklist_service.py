@@ -56,26 +56,36 @@ def list_all_templates() -> list[dict]:
 
 
 async def get_review_context(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
-    """推导 auto_na 条件（review-context API 数据源）。"""
+    """推导 auto_na 条件（review-context API 数据源）。
+
+    ``project_classification`` 是质控分类单一解释（前端组别标签读它，不再取 business_category 首字母，
+    spec trim-followup-residual-findings-closure R3）。
+    """
+    # 质控业务分类单一解释（R4）：未填写 / 未登记值（含旧场景值 IPO）按 C 类
+    from app.services.project_classification import resolve
+
     row = (
         await db.execute(
             sa.select(
                 Project.business_category,
                 Project.audit_type,
                 Project.is_large_soe,
+                Project.scenario,
+                Project.template_type,
             ).where(Project.id == project_id, Project.is_deleted == sa.false())
         )
     ).first()
     if not row:
         return {
             "business_category": "C",
+            "project_classification": resolve(None).as_dict(),
             "audit_type": "financial",
             "is_large_soe": False,
             "has_component_auditor": False,
             "has_it_audit": False,
         }
 
-    bc, audit_type, is_soe = row
+    bc, audit_type, is_soe, scenario, template_type = row
     pid = str(project_id)
 
     has_component = (
@@ -104,8 +114,10 @@ async def get_review_context(db: AsyncSession, project_id: UUID) -> dict[str, An
         )
     ).scalar() or False
 
+    classification = resolve(bc, scenario, template_type)
     return {
-        "business_category": bc or "C",
+        "business_category": classification.category_code or classification.category_group,
+        "project_classification": classification.as_dict(),
         "audit_type": audit_type or "financial",
         "is_large_soe": bool(is_soe),
         "has_component_auditor": bool(has_component),

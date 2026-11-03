@@ -27,6 +27,7 @@ from app.services.ledger_sampling_service import (
     _aux_match_key,
     enrich_items_with_aux_party,
 )
+from app.services.voucher_identity import VoucherKey
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _ROUTER = _BACKEND / "app" / "routers" / "voucher_sampling.py"
@@ -99,29 +100,40 @@ def test_reverse_selfcheck_strip_comments_really_strips():
 # ─── 2. 匹配键语义 ───────────────────────────────────────────────────────────
 
 
+def _vk(no: str = "V1", vdate: date | str = date(2025, 1, 1), vtype: str = "FY") -> VoucherKey:
+    return VoucherKey.of(year=2025, company_code="001", voucher_date=vdate, voucher_type=vtype, voucher_no=no)
+
+
 def test_amount_normalized_to_two_decimals():
     """12.1 与 12.10 必须归一为同一键（两表 numeric 精度声明可能不同）。"""
-    a = _aux_match_key("V1", date(2025, 1, 1), "2203", Decimal("12.1"), None)
-    b = _aux_match_key("V1", date(2025, 1, 1), "2203", Decimal("12.10"), None)
+    a = _aux_match_key(_vk(), "2203", Decimal("12.1"), None)
+    b = _aux_match_key(_vk(), "2203", Decimal("12.10"), None)
     assert a == b
 
 
 def test_none_amount_distinct_from_zero():
     """None（该方向无金额）与 0.00 不是一回事，不能归并。"""
-    k_none = _aux_match_key("V1", date(2025, 1, 1), "2203", None, Decimal("5"))
-    k_zero = _aux_match_key("V1", date(2025, 1, 1), "2203", Decimal("0"), Decimal("5"))
+    k_none = _aux_match_key(_vk(), "2203", None, Decimal("5"))
+    k_zero = _aux_match_key(_vk(), "2203", Decimal("0"), Decimal("5"))
     assert k_none != k_zero
 
 
-def test_key_trims_and_handles_missing_date():
-    k1 = _aux_match_key(" V1 ", None, " 2203 ", None, None)
-    assert k1[0] == "V1" and k1[1] == "" and k1[2] == "2203"
+def test_key_trims_account_and_voucher_fields():
+    k1 = _aux_match_key(_vk(no=" V1 "), " 2203 ", None, None)
+    assert k1[0] == _vk() and k1[1] == "2203"
+
+
+def test_key_distinguishes_voucher_type_and_date():
+    """凭证身份 spec 任务 5：同号不同凭证字、同号不同日是不同凭证，往来单位不得互相带出。"""
+    base = _aux_match_key(_vk(), "2203", Decimal("1"), None)
+    assert base != _aux_match_key(_vk(vtype="ZZ"), "2203", Decimal("1"), None)
+    assert base != _aux_match_key(_vk(vdate="2025-02-01"), "2203", Decimal("1"), None)
 
 
 def test_key_is_hashable_and_stable():
-    k = _aux_match_key("V1", date(2025, 1, 1), "2203", Decimal("1"), None)
+    k = _aux_match_key(_vk(), "2203", Decimal("1"), None)
     assert {k: 1}[k] == 1
-    assert k == _aux_match_key("V1", date(2025, 1, 1), "2203", Decimal("1.00"), None)
+    assert k == _aux_match_key(_vk(vdate="2025-01-01"), "2203", Decimal("1.00"), None)
 
 
 # ─── 3. fail-open 契约 ───────────────────────────────────────────────────────
@@ -174,18 +186,32 @@ def test_aux_party_types_are_counterparty_dimensions_only():
         )
 
 
-def test_service_declares_typed_columns_for_uuid_comparison():
-    """🔴 sa.table() 的列必须带类型声明。
+def _enrich_body(src: str) -> str:
+    m = re.search(r"(?m)^async def enrich_items_with_aux_party\(", src)
+    if not m:
+        return ""
+    rest = src[m.end():]
+    nxt = re.search(r"(?m)^(?:async\s+)?def\s|^class\s", rest)
+    return rest[: nxt.start()] if nxt else rest
 
-    裸 `sa.column("project_id")` 无类型 → asyncpg 按 VARCHAR 传参 →
-    PG 报 `operator does not exist: uuid = character varying`，整个补全被
-    fail-open 吞成 WARNING（2026-08-04 真实库实测踩过；替身 session 查不出）。
+
+def test_service_reads_aux_ledger_through_typed_orm_table():
+    """🔴 查询列必须带类型：裸 `sa.column("project_id")` 无类型 → asyncpg 按 VARCHAR 传参 →
+    PG 报 `operator does not exist: uuid = character varying`，整个补全被 fail-open 吞成
+    WARNING（2026-08-04 真实库实测踩过；替身 session 查不出）。
+
+    凭证身份 spec 任务 5 起改读 ORM 表 `TbAuxLedger.__table__`（列类型来自模型），经
+    get_active_filter 只读当前账套、按凭证键取行；不得退回手写的无类型 `sa.table("tb_aux_ledger", ...)`。
     """
     src = _strip_comments(_SERVICE.read_text(encoding="utf-8"))
-    i = src.find("tb_aux_ledger")
-    assert i > 0, "未找到 tb_aux_ledger 表声明"
-    block = src[i : i + 1200]
-    assert re.search(r'sa\.column\(\s*"project_id"\s*,\s*(?:sa\.)?\w*UUID', block) or \
-        re.search(r'sa\.column\(\s*"project_id"\s*,[^)]+\)', block), (
-        "project_id 列必须带类型声明（否则 asyncpg 按 VARCHAR 传参，PG 拒绝 uuid 比较）"
-    )
+    body = _enrich_body(src)
+    assert body, "抽不到 enrich_items_with_aux_party 函数体 → 断言会空转"
+    assert "TbAuxLedger.__table__" in body
+    assert "get_active_filter(" in body and "voucher_keys_in(" in body
+    assert not re.search(r'sa\.table\(\s*"tb_aux_ledger"', src), "退回了手写的无类型表声明"
+
+
+def test_reverse_selfcheck_untyped_table_is_detected():
+    stub = 'aux = sa.table("tb_aux_ledger", sa.column("project_id"))\n'
+    assert re.search(r'sa\.table\(\s*"tb_aux_ledger"', stub)
+    assert _enrich_body("async def other():\n    pass\n") == ""

@@ -104,14 +104,7 @@
       >
         同步到集中登记
       </el-button>
-      <el-tag
-        v-if="centralStatus?.review_status"
-        size="small"
-        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-        :title="centralStatus.rejection_reason || ''"
-      >
-        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-      </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       <el-button size="small" type="success" plain :disabled="isReadonly || !adj.isBalanced.value" @click="adj.syncToAdjudication()">
         同步至审定表
       </el-button>
@@ -297,11 +290,12 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG12Adjustment } from '../../composables/useG12Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useG12HedgeDetail } from '../../composables/useG12HedgeDetail'
 import { G12_ADJ_FS_ITEMS, G12_ADJ_NOTE_ITEMS, G12_ADJ_CATEGORY_OPTIONS } from '../../composables/g12AdjStorage'

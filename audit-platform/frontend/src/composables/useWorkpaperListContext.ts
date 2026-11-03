@@ -50,7 +50,8 @@ export interface WpListContextData {
   treeData: Ref<TreeNode[]>
   loading: Ref<boolean>
   projectId: ComputedRef<string>
-  currentYear: ComputedRef<number>
+  /** 审计年度；项目没填为 null（不按今年兜底） */
+  currentYear: ComputedRef<number | null>
   projectName: Ref<string>
   viewMode: Ref<string>
 
@@ -69,6 +70,12 @@ export interface WpListContextData {
 
   // ── 选中 ──
   selectedWpId: Ref<string>
+
+  // ── 入口定位（`?highlight=` / `?wp_code=` / `?search=`，spec wp-deeplink-locate-residual-closure 需求 2.1） ──
+  /** 要定位的底稿编码；seq 每次进入递增，列表视图按 seq 只执行一次 */
+  locateTarget?: Ref<{ code: string; seq: number } | null>
+  /** 列表至少取到过一次（定位判「没有」之前要等它） */
+  listLoaded?: Ref<boolean>
 
   // ── 进度 ──
   totalProgress: ComputedRef<ProgressInfo>
@@ -135,7 +142,8 @@ export function createMockContext(overrides: Partial<WpListContext> = {}): WpLis
     treeData: ref<TreeNode[]>([]),
     loading: ref(false),
     projectId: computed(() => ''),
-    currentYear: computed(() => new Date().getFullYear() - 1),
+    // 测试桩默认没有年度（与「项目没填审计年度」同态）；要年度的用例在 overrides 里给
+    currentYear: computed<number | null>(() => null),
     projectName: ref(''),
     viewMode: ref('workbench'),
     searchKeyword: ref(''),

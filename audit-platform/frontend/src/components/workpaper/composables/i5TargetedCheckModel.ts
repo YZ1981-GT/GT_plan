@@ -575,7 +575,7 @@ function _parseI52Rows(raw: unknown): any[] {
  * 优先 increase（本期增加=借方）/ decrease（本期减少=贷方）；
  * 无滚动字段时回退按 incurredDate 年份代理 originalAmount。
  */
-export function extractI5PeriodMovement(raw: unknown, asOfYear?: number): I5PeriodMovement {
+export function extractI5PeriodMovement(raw: unknown, asOfYear?: number | null): I5PeriodMovement {
   const rows = _parseI52Rows(raw)
   let debitTotal = 0
   let creditTotal = 0
@@ -596,7 +596,8 @@ export function extractI5PeriodMovement(raw: unknown, asOfYear?: number): I5Peri
     }
     // 旧代理：按发生日年份
     const y = _yearOf(_str(r?.incurredDate || r?.occurDate || r?.date))
-    if (asOfYear == null || y === asOfYear) {
+    // 审计年度未知（项目没填）：按年份判本期无从谈起 ⇒ 不计入本期借方（原先 null 当「不过滤」全部计入）
+    if (asOfYear != null && y === asOfYear) {
       debitTotal += original
     }
   }
@@ -703,14 +704,15 @@ export interface I5TargetedAdjDraft {
 
 export interface I5TargetedAdjDraftContext {
   detailRows?: any[]
-  auditYear?: number
+  /** 审计年度；项目没填为 null ⇒ 无一年内到期重分类候选 */
+  auditYear?: number | null
 }
 
 /** check5 失败且 I5-2 显示一年内到期 → 重分类草稿 */
 export function isI5CurrentPortionForProject(
   projectName: string,
   detailRows: any[],
-  auditYear?: number,
+  auditYear?: number | null,
 ): boolean {
   const pn = _normText(projectName)
   if (!pn || !detailRows?.length) return false

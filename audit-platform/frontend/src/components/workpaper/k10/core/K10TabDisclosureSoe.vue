@@ -139,7 +139,7 @@
  * - variant='soe'
  * - AI辅助按钮
  */
-import { ref, computed, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
@@ -150,6 +150,15 @@ import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK10SyncPayload } from '../../composables/k10NoteSectionMap'
+import {
+  buildK10DisclosureSnapshot,
+  K10_DISCLOSURE_CATEGORIES,
+  K10_DISCLOSURE_DYN_PREFIX,
+  k10DefaultDisclosureRows,
+  k10DynamicDisclosureRows,
+  loadK10DisclosureState,
+  type K10SoeFormRow,
+} from '../../composables/k10DisclosureSnapshot'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -177,26 +186,14 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   // 🔴 行模型字段是 `category`，旧载荷读 `project` → 曾把标签推成空串；
   // 附注按底稿 3 列（R8.4 批 9b-2）：「是否为政府补助」点选只决定合计后「其中：政府补助」结构行的金额
-  const detail = disclosureRows.value.map(r => ({
-    project: r.category,
-    currentAmount: r.currentAmount,
-    priorAmount: r.priorAmount,
-  }))
-  const govGrantRow = disclosureRows.value
-    .filter(r => r.isGovGrant === '是')
-    .reduce(
-      (acc, r) => ({
-        currentAmount: acc.currentAmount + (Number(r.currentAmount) || 0),
-        priorAmount: acc.priorAmount + (Number(r.priorAmount) || 0),
-      }),
-      { currentAmount: 0, priorAmount: 0 },
-    )
+  // （快照与离屏同步共用 buildK10DisclosureSnapshot）
+  const snapshot = buildK10DisclosureSnapshot('soe', disclosureRows.value)
   const payload = buildK10SyncPayload(
     'soe',
     props.wpId || '',
-    detail,
+    snapshot.rows,
     narrativeText.value,
-    govGrantRow,
+    snapshot.govGrantRow,
   )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
@@ -213,92 +210,33 @@ async function syncToDisclosureNotes(): Promise<void> {
 const ABNORMAL_THRESHOLD = 0.5
 
 /** 国企版来源分类（简洁版） */
-const CATEGORIES = [
-  '政府补助',
-  '即征即退',
-  '财政贴息',
-  '研发补助',
-  '稳岗补贴',
-  '其他补贴收入',
-  '个税手续费返还',
-]
+const CATEGORIES = K10_DISCLOSURE_CATEGORIES.soe
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  category: string
-  currentAmount: number
-  priorAmount: number
-  /** 「是否为政府补助」点选：汇总成附注「其中：政府补助」行（不是附注列） */
-  isGovGrant: string
-  remark: string
-}
+/** 「是否为政府补助」点选：汇总成附注「其中：政府补助」行（不是附注列） */
+type DisclosureRow = K10SoeFormRow
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-/** 固定分类中语义上即政府补助的项目，作为第 4 列默认值（可人工改选） */
-const GOV_GRANT_DEFAULT = new Set(['政府补助', '即征即退', '财政贴息', '研发补助', '稳岗补贴'])
-
-const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({
-    category: c,
-    currentAmount: 0,
-    priorAmount: 0,
-    isGovGrant: GOV_GRANT_DEFAULT.has(c) ? '是' : '否',
-    remark: '',
-  }))
-)
+/** 固定分类行（语义上即政府补助的分类默认「是」，可人工改选） */
+const disclosureRows = ref<DisclosureRow[]>(k10DefaultDisclosureRows('soe'))
 const narrativeText = ref('')
 
-// ─── Load saved data ─────────────────────────────────────────────────────────
+// ─── Load saved data（固定分类行 + 动态行 + 说明；与离屏同步共用 k10DisclosureSnapshot） ──
 
 function loadSavedData(): void {
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const key = `K10-disc-soe-row-${i}`
-    const saved = props.allResponses.get(key)
-    if (saved) {
-      try {
-        const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-        if (parsed) {
-          disclosureRows.value[i] = {
-            category: CATEGORIES[i],
-            currentAmount: Number(parsed.currentAmount || 0),
-            priorAmount: Number(parsed.priorAmount || 0),
-            isGovGrant: parsed.isGovGrant
-              || (GOV_GRANT_DEFAULT.has(CATEGORIES[i]) ? '是' : '否'),
-            remark: parsed.remark || '',
-          }
-        }
-      } catch { /* ignore */ }
-    }
-  }
-  loadDynamicRows()
-  const narrativeSaved = props.allResponses.get('K10-disclosure-soe-narrative')
-  if (narrativeSaved) {
-    narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
-  }
+  const state = loadK10DisclosureState(props.allResponses, 'soe')
+  disclosureRows.value = state.rows
+  narrativeText.value = state.narrativeText
 }
 
-const DYN_PREFIX = 'K10-disc-soe-dyn-'
+const DYN_PREFIX = K10_DISCLOSURE_DYN_PREFIX.soe
 
 /** 加载动态追加行（K10-1 中不在固定 CATEGORIES 的来源） */
 function loadDynamicRows(): void {
   disclosureRows.value = disclosureRows.value.slice(0, CATEGORIES.length)
-  for (const [key, saved] of props.allResponses) {
-    if (!key.startsWith(DYN_PREFIX)) continue
-    try {
-      const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-      if (parsed && parsed.category) {
-        disclosureRows.value.push({
-          category: parsed.category,
-          currentAmount: Number(parsed.currentAmount || 0),
-          priorAmount: Number(parsed.priorAmount || 0),
-          isGovGrant: parsed.isGovGrant || '否',
-          remark: parsed.remark || '',
-        })
-      }
-    } catch { /* ignore */ }
-  }
+  disclosureRows.value.push(...k10DynamicDisclosureRows(props.allResponses, 'soe'))
 }
 
 // ─── Auto-fill from K10-1（读 K10-1-rows JSON，按来源名称匹配） ───────────────

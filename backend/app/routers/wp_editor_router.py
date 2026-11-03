@@ -825,12 +825,16 @@ async def export_workpaper_pdf(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出底稿为 PDF（使用 LibreOffice headless 转换）— 需求 16"""
-    import shutil
-    import subprocess
-    import tempfile
     from pathlib import Path
     from urllib.parse import quote
+
     from fastapi import Response
+
+    from app.services.libreoffice_pool import (
+        convert_office_to_pdf_bytes,
+        find_soffice_path,
+        get_queue_depth_header,
+    )
 
     # 1. 查底稿 + 校验文件存在
     result = await db.execute(
@@ -848,38 +852,26 @@ async def export_workpaper_pdf(
     if not fp.exists():
         raise HTTPException(status_code=404, detail=f"底稿文件不存在: {fp}")
 
-    # 2. LibreOffice 可用性检查
-    soffice = shutil.which("libreoffice") or shutil.which("soffice")
+    # 2. 统一走有界异步执行器，不阻塞事件循环。
+    soffice = find_soffice_path()
     if soffice is None:
         raise HTTPException(
-            status_code=500,
-            detail="LibreOffice 不可用，无法转换为 PDF。请在服务器安装 libreoffice 或 soffice。",
+            status_code=503,
+            detail={
+                "reason": "libreoffice_unavailable",
+                "message": "LibreOffice 不可用，无法转换为 PDF",
+            },
         )
 
-    # 3. 使用临时目录作为输出目录（LibreOffice 不支持指定输出文件名，只支持 --outdir）
-    with tempfile.TemporaryDirectory(prefix="wp_pdf_") as tmpdir:
-        try:
-            proc = subprocess.run(
-                [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmpdir, str(fp)],
-                capture_output=True,
-                timeout=60,
-            )
-        except subprocess.TimeoutExpired:
-            raise HTTPException(status_code=500, detail="PDF 转换超时（60s）")
-        if proc.returncode != 0:
-            raise HTTPException(
-                status_code=500,
-                detail=f"PDF 转换失败: {proc.stderr.decode('utf-8', errors='ignore')[:500]}",
-            )
-
-        pdf_path = Path(tmpdir) / f"{fp.stem}.pdf"
-        if not pdf_path.exists():
-            raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
-
-        pdf_bytes = pdf_path.read_bytes()
-
-    # 4. 构造文件名（中文用 RFC 5987 编码）
     display_name = f"{wp.wp_code or 'workpaper'}_{wp.wp_name or ''}.pdf".strip()
+    await db.close()
+    pdf_bytes = await convert_office_to_pdf_bytes(
+        fp,
+        timeout=60,
+        soffice_path=soffice,
+    )
+
+    # 3. 构造文件名（中文用 RFC 5987 编码）
     ascii_name = display_name.encode("ascii", "ignore").decode() or "workpaper.pdf"
     utf8_name = quote(display_name, safe="")
     disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
@@ -887,7 +879,10 @@ async def export_workpaper_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": disposition},
+        headers={
+            "Content-Disposition": disposition,
+            **get_queue_depth_header(),
+        },
     )
 
 
@@ -1092,10 +1087,11 @@ async def get_a16_recommended_version(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ):
-    """根据项目 business_category 推荐 A16 声明书版本。
+    """根据项目质控分类 / 专项场景推荐 A16 声明书版本。
 
     返回推荐版本、所有变体列表（含项目中是否已创建）、始终必需列表。
     """
+    from app.services.project_classification import load_project_classification
     from app.services.template_selector import (
         A16_ALL_VERSIONS,
         A16_ALWAYS_REQUIRED,
@@ -1104,15 +1100,11 @@ async def get_a16_recommended_version(
         recommend_a16_version,
     )
 
-    # 1. 查询项目 business_category
-    row = (await db.execute(
-        sa.text("SELECT business_category FROM projects WHERE id = :pid"),
-        {"pid": str(project_id)},
-    )).first()
-    business_category: str | None = row[0] if row else None
+    # 1. 项目分类 / 场景（单一解释，R4）
+    classification = await load_project_classification(db, project_id)
 
     # 2. 推荐版本
-    recommended_code = recommend_a16_version(business_category)
+    recommended_code = recommend_a16_version(classification)
     recommended_label = get_a16_label(recommended_code)
 
     # 3. 查询项目中已存在的 A16-x 底稿

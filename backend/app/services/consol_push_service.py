@@ -27,11 +27,16 @@ import uuid
 import weakref
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
+    from app.services.consol_calc_basis import CalcBasis
+    from app.services.consol_tree_service import TreeNode
 
 from app.models.consol_push_models import ConsolPushRun
 
@@ -74,32 +79,54 @@ _MAX_DEPTH = 32
 
 
 async def push_targets(db: AsyncSession, project_id: UUID) -> list[UUID]:
-    """``[本项目] + 上层合并项目``（自下而上）。
+    """``[本项目] + 上层合并项目``（自下而上），整条父链只发一条查询。
 
-    沿 ``parent_project_id`` 派生链接走（与三码推导一致，由 ``sync_group_links`` 维护；ADR-CTREE-001），
-    只收合并项目；遇环、已删项目即停。
+    递归项保留所有未删除的中间父项目，最终投影才筛合并口径，因此非合并中间父不会截断
+    上溯。路径列防环，深度 0 是本项目，最多纳入 32 层父项目。
     """
     from app.models.core import Project
 
-    targets: list[UUID] = [project_id]
-    seen = {project_id}
-    cur = project_id
-    for _ in range(_MAX_DEPTH):
-        parent = (await db.execute(
-            sa.select(Project.parent_project_id).where(Project.id == cur, Project.is_deleted == sa.false())
-        )).scalar_one_or_none()
-        if parent is None or parent in seen:
-            break
-        scope = (await db.execute(
-            sa.select(Project.report_scope).where(Project.id == parent, Project.is_deleted == sa.false())
-        )).first()
-        if scope is None:
-            break
-        seen.add(parent)
-        if (scope[0] or "").strip().lower() == "consolidated":
-            targets.append(parent)
-        cur = parent
-    return targets
+    projects = Project.__table__
+    root_token = sa.cast(
+        sa.literal("|") + sa.cast(projects.c.id, sa.String()) + sa.literal("|"),
+        sa.Text(),
+    )
+    ancestors = sa.select(
+        projects.c.id.label("id"),
+        projects.c.parent_project_id.label("parent_project_id"),
+        projects.c.report_scope.label("report_scope"),
+        sa.literal(0).label("depth"),
+        root_token.label("path"),
+    ).where(
+        projects.c.id == sa.bindparam("root_project_id"),
+        projects.c.is_deleted == sa.false(),
+    ).cte("consol_push_ancestors", recursive=True)
+
+    parent = projects.alias("consol_push_parent")
+    parent_token = sa.literal("|") + sa.cast(parent.c.id, sa.String()) + sa.literal("|")
+    next_path = sa.cast(ancestors.c.path + sa.cast(parent_token, sa.Text()), sa.Text())
+    ancestors = ancestors.union_all(
+        sa.select(
+            parent.c.id,
+            parent.c.parent_project_id,
+            parent.c.report_scope,
+            (ancestors.c.depth + 1).label("depth"),
+            next_path.label("path"),
+        ).select_from(
+            ancestors.join(parent, parent.c.id == ancestors.c.parent_project_id)
+        ).where(
+            parent.c.is_deleted == sa.false(),
+            ancestors.c.depth < _MAX_DEPTH,
+            ~ancestors.c.path.like(sa.literal("%") + parent_token + sa.literal("%")),
+        )
+    )
+    normalized_scope = sa.func.lower(sa.func.trim(sa.func.coalesce(ancestors.c.report_scope, "")))
+    stmt = (
+        sa.select(ancestors.c.id)
+        .where(sa.or_(ancestors.c.depth == 0, normalized_scope == "consolidated"))
+        .order_by(ancestors.c.depth.asc())
+    )
+    return list((await db.execute(stmt, {"root_project_id": project_id})).scalars().all())
 
 
 async def locked_targets(db: AsyncSession, project_ids: list[UUID]) -> list[str]:
@@ -154,16 +181,22 @@ class PushResult:
     pushed_projects: list[str] = field(default_factory=list)
     steps: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    operation_id: UUID | None = None
+    report_run_ids: dict[str, str] = field(default_factory=dict)
+    report_row_digests: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
             "run_id": str(self.run_id),
+            "operation_id": str(self.operation_id) if self.operation_id else None,
             "project_id": str(self.project_id),
             "year": self.year,
             "status": self.status,
             "pushed_projects": list(self.pushed_projects),
             "steps": list(self.steps),
             "warnings": list(self.warnings),
+            "report_run_ids": dict(self.report_run_ids),
+            "report_row_digests": dict(self.report_row_digests),
         }
 
 
@@ -188,7 +221,13 @@ async def _mark_notes_stale(db: AsyncSession, project_id: UUID, year: int) -> in
 
 
 async def _refresh_notes(
-    db: AsyncSession, project_id: UUID, year: int, *, context=None, tree=None,
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+    basis: "CalcBasis | None" = None,
 ) -> dict:
     """标记 stale → 真正刷新附注 → 返回分口径统计。
 
@@ -203,6 +242,12 @@ async def _refresh_notes(
         resolve_note_template_type,
     )
     from app.services.consol_tree_service import build_tree, iter_nodes
+    from app.services.consol_calc_basis import validate_calc_basis
+
+    resolved_tree = tree if tree is not None else (basis.tree if basis is not None else None)
+    if basis is not None:
+        # 注入口径的身份错误必须在写 stale 标记前失败，不能先污染目标项目。
+        validate_calc_basis(basis, project_id, year, tree=resolved_tree)
 
     # ── 1. 标记 stale ──
     stale_count = await _mark_notes_stale(db, project_id, year)
@@ -235,7 +280,8 @@ async def _refresh_notes(
         return stats
 
     # ── 3. 构建企业树 ──
-    resolved_tree = tree if tree is not None else await build_tree(db, project_id)
+    if resolved_tree is None:
+        resolved_tree = await build_tree(db, project_id)
     if resolved_tree is None:
         logger.info("合并推送附注刷新跳过：无企业树，project=%s", project_id)
         return stats
@@ -248,7 +294,14 @@ async def _refresh_notes(
             from app.services.consol_context_service import build_consol_context
             resolved_context = await build_consol_context(db, project_id, year, tree=resolved_tree)
         from app.services.consol_report_view_service import load_view_context
-        view_ctx = await load_view_context(db, project_id, year, context=resolved_context, tree=resolved_tree)
+        view_ctx = await load_view_context(
+            db,
+            project_id,
+            year,
+            context=resolved_context,
+            tree=resolved_tree,
+            basis=basis,
+        )
     except Exception as exc:
         logger.warning("合并推送附注刷新上下文构建失败（降级只标 stale）：%s", exc)
         return stats
@@ -313,17 +366,31 @@ async def _refresh_notes(
 
 
 async def refresh_notes_exclusive(
-    db: AsyncSession, project_id: UUID, year: int, *, context=None, tree=None,
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+    basis: "CalcBasis | None" = None,
 ) -> dict:
     """与推送同一附注刷新（``_refresh_notes``），持推送同一把锁（进程锁 + 事务级咨询锁）：
     与合并推送、「🔄 重新汇总」互斥。给合并「一键刷新」（``consol_cascade_refresh_service``）用。"""
     async with _process_lock("target", project_id, year):
         await _advisory_lock(db, project_id, year)
-        return await _refresh_notes(db, project_id, year, context=context, tree=tree)
+        return await _refresh_notes(
+            db, project_id, year, context=context, tree=tree, basis=basis,
+        )
 
 
 async def _record_tree_version(
-    db: AsyncSession, project_id: UUID, user_id: UUID | None, name: str, warnings: list[str],
+    db: AsyncSession,
+    project_id: UUID,
+    user_id: UUID | None,
+    name: str,
+    warnings: list[str],
+    *,
+    tree: "TreeNode | None" = None,
 ) -> str:
     """推送前自动记录企业树版本（spec consol-autotree-linkage-closure R1.2）；返回步骤明细前缀。
 
@@ -333,7 +400,9 @@ async def _record_tree_version(
 
     try:
         async with db.begin_nested():
-            info = await record_scope_version(db, project_id, recorded_by=user_id, mode="auto")
+            info = await record_scope_version(
+                db, project_id, recorded_by=user_id, mode="auto", tree=tree,
+            )
     except Exception as exc:  # noqa: BLE001 —— 失败留痕，不阻断推送
         logger.warning("合并推送记录树版本失败：项目=%s：%s", project_id, exc)
         warnings.append(f"「{name}」企业树版本记录失败：{exc}")
@@ -345,8 +414,23 @@ async def _record_tree_version(
     return f"树版本第 {info['revision']} 版{'（本次自动记录）' if info.get('created') else ''}；"
 
 
-async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[dict], warnings: list[str],
-                    *, context=None, tree=None, user_id: UUID | None = None) -> bool:
+async def _push_one(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    steps: list[dict],
+    warnings: list[str],
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+    basis: "CalcBasis | None" = None,
+    user_id: UUID | None = None,
+    operation_revision: int | None = None,
+    report_trigger: str = "push",
+    report_version_vector: dict[str, Any] | None = None,
+    report_run_ids: dict[str, str] | None = None,
+    report_row_digests: dict[str, str] | None = None,
+) -> bool:
     """推送一个合并项目的四步；返回是否全部成功。每步独立事务，失败回滚该步并留痕。"""
     from app.services.consol_report_service import ConsolReportService
     from app.services.consol_trial_service import recalculate_trial
@@ -361,18 +445,46 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         })
 
     async def worksheet() -> str:
-        version = await _record_tree_version(db, project_id, user_id, name, warnings)
-        result = await recalc_full(db, project_id, year)
+        version = await _record_tree_version(
+            db, project_id, user_id, name, warnings, tree=tree,
+        )
+        result = await recalc_full(
+            db, project_id, year, context=context, tree=tree, basis=basis,
+        )
         orphans = result.get("orphan_entries") or []
         if orphans:
             warnings.append(f"「{name}」有 {len(orphans)} 笔已审批分录找不到归属节点，未计入合并")
         return f"{version}节点 {result.get('node_count', 0)} 个，科目 {result.get('account_count', 0)} 个"
 
     async def trial() -> str:
-        return f"试算 {len(await recalculate_trial(db, project_id, year))} 行"
+        return f"试算 {len(await recalculate_trial(db, project_id, year, context=context, tree=tree, basis=basis))} 行"
 
     async def report() -> str:
-        results = await ConsolReportService(db).generate_consol_reports(project_id, year)
+        if context is not None and context.run_id is not None and operation_revision is not None:
+            from app.services.consol_report_run_service import materialize_consol_report_run
+
+            report_run = await materialize_consol_report_run(
+                db,
+                project_id,
+                year,
+                operation_id=context.run_id,
+                operation_revision=operation_revision,
+                trigger=report_trigger,
+                triggered_by=user_id,
+                context=context,
+                tree=tree,
+                basis=basis,
+                input_version_vector=report_version_vector,
+            )
+            results = report_run.rows
+            if report_run_ids is not None:
+                report_run_ids[str(project_id)] = str(report_run.run_id)
+            if report_row_digests is not None:
+                report_row_digests[str(project_id)] = report_run.row_digest
+        else:
+            results = await ConsolReportService(db).generate_consol_reports(
+                project_id, year, context=context, tree=tree, basis=basis,
+            )
         blank = sum(1 for rows in results.values() for r in rows if r.get("blank_reason"))
         total = sum(len(rows) for rows in results.values())
         if blank:
@@ -380,7 +492,9 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         return f"报表 {len(results)} 张 {total} 行" + (f"，留空 {blank} 行" if blank else "")
 
     async def notes() -> str:
-        stats = await _refresh_notes(db, project_id, year, context=context, tree=tree)
+        stats = await _refresh_notes(
+            db, project_id, year, context=context, tree=tree, basis=basis,
+        )
         parts = []
         stale = stats.get("stale_marked", 0)
         sections = stats.get("distinct_section_count", 0)
@@ -459,54 +573,125 @@ async def push(
     *,
     trigger: str = TRIGGER_MANUAL,
     user_id: UUID | None = None,
+    operation_id: UUID | None = None,
+    operation_revision: int | None = None,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> PushResult:
-    """执行一次推送（design §八）。本函数逐步 commit 调用方传入的会话。"""
+    """执行一次推送；``operation_id``/预构建上下文为 V240 追加兼容参数。"""
     if trigger not in TRIGGERS:
         raise ValueError(f"未知的推送触发来源：{trigger}")
     run_id = uuid.uuid4()
     # 开始时间显式到微秒：库默认值在 SQLite 只到秒，同一秒内的多次推送按时间排序会不确定
-    db.add(ConsolPushRun(id=run_id, project_id=project_id, year=year, trigger_source=trigger,
-                         triggered_by=user_id, status="running", steps=[], warnings=[],
-                         started_at=datetime.now(timezone.utc)))
+    db.add(ConsolPushRun(
+        id=run_id,
+        operation_id=operation_id,
+        project_id=project_id,
+        year=year,
+        trigger_source=trigger,
+        triggered_by=user_id,
+        status="running",
+        steps=[],
+        warnings=[],
+        started_at=datetime.now(timezone.utc),
+    ))
     await db.commit()
     steps: list[dict] = []
     warnings: list[str] = []
     pushed: list[str] = []
+    report_run_ids: dict[str, str] = {}
+    report_row_digests: dict[str, str] = {}
     failed_projects = 0
     aborted = False
 
-    # 为 source 项目建一次上下文，每个 target 派生自己的上下文
-    from app.services.consol_context_service import build_consol_context
+    # 同一 run 的上下文种子只承载 run 身份；每个 target 各自解析 tree/context/basis。
+    from app.schemas.consol_context import ConsolContext
+    from app.services.consol_calc_basis import load_calc_basis, validate_calc_basis
+    from app.services.consol_context_service import (
+        build_consol_context,
+        build_target_consol_context,
+        validate_context,
+    )
     from app.services.consol_tree_service import build_tree
 
-    source_context = None
-    source_tree = None
-    try:
-        source_tree = await build_tree(db, project_id)
-        if source_tree is not None:
-            source_context = await build_consol_context(db, project_id, year, tree=source_tree)
-    except Exception as exc:  # noqa: BLE001 — context 构建失败不阻断推送
-        logger.warning("合并推送 source context 构建失败（降级无 context）：%s", exc)
+    source_context = context
+    source_tree = tree
+    context_seed = context or ConsolContext(run_id=operation_id, project_id=project_id, year=year)
 
     try:
         for target in await push_targets(db, project_id):
-            # 每个 target 重新解析树和上下文
-            target_context = None
-            target_tree = None
-            if source_context is not None:
-                try:
-                    from app.services.consol_context_service import build_target_consol_context
-
+            try:
+                # 变量只活在本轮 target 内，禁止跨目标复用树或计算口径。
+                if target == project_id:
+                    target_tree = source_tree if source_tree is not None else await build_tree(db, target)
+                    if target_tree is None:
+                        raise ValueError(f"企业树构建失败：找不到合并项目 {target}")
+                    target_context = source_context
+                    if target_context is None:
+                        target_context = await build_consol_context(
+                            db, target, year, tree=target_tree, seed=context_seed,
+                        )
+                    source_context = target_context
+                    source_tree = target_tree
+                else:
                     target_tree = await build_tree(db, target)
+                    if target_tree is None:
+                        raise ValueError(f"企业树构建失败：找不到合并项目 {target}")
                     target_context = await build_target_consol_context(
-                        db, source_context, target, year, tree=target_tree,
+                        db, source_context or context_seed, target, year, tree=target_tree,
                     )
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("合并推送 target=%s context 构建失败（降级无 context）：%s", target, exc)
+                validate_context(target_context, target, year, tree=target_tree)
+                target_basis = await load_calc_basis(db, target, year, tree=target_tree)
+                if target_basis is None:
+                    raise ValueError(f"企业树计算口径装载失败：项目 {target}")
+                validate_calc_basis(target_basis, target, year, tree=target_tree)
+                from app.services.consol_version_vector import build_version_vector
+
+                target_report_vector = await build_version_vector(
+                    db,
+                    context=target_context,
+                    tree=target_tree,
+                )
+            except Exception as exc:  # noqa: BLE001 —— 当前 target 失败不阻断更上层 target
+                await db.rollback()
+                name = await _project_name(db, target)
+                detail = f"{type(exc).__name__}: {exc}"
+                steps.append({
+                    "project_id": str(target),
+                    "project_name": name,
+                    "step": STEP_WORKSHEET,
+                    "step_label": STEP_LABELS[STEP_WORKSHEET],
+                    "status": "failed",
+                    "detail": detail,
+                })
+                for later in STEP_ORDER[1:]:
+                    steps.append({
+                        "project_id": str(target),
+                        "project_name": name,
+                        "step": later,
+                        "step_label": STEP_LABELS[later],
+                        "status": "skipped",
+                        "detail": "合并计算运行时构建失败，跳过",
+                    })
+                warnings.append(f"「{name}」合并计算运行时构建失败：{exc}")
+                failed_projects += 1
+                continue
 
             if not await _push_one(
-                db, target, year, steps, warnings,
-                context=target_context, tree=target_tree, user_id=user_id,
+                db,
+                target,
+                year,
+                steps,
+                warnings,
+                context=target_context,
+                tree=target_tree,
+                basis=target_basis,
+                user_id=user_id,
+                operation_revision=operation_revision,
+                report_trigger=trigger,
+                report_version_vector=target_report_vector.model_dump(mode="json"),
+                report_run_ids=report_run_ids,
+                report_row_digests=report_row_digests,
             ):
                 failed_projects += 1
             # 报表已写入（哪怕附注标记失败）⇒ 该项目的页面需要刷新
@@ -525,7 +710,12 @@ async def push(
     else:
         status = "succeeded"
     await _finish_run(db, run_id, status, steps, warnings)
-    result = PushResult(run_id, project_id, year, status, pushed, steps, warnings)
+    result = PushResult(
+        run_id, project_id, year, status, pushed, steps, warnings,
+        operation_id=operation_id,
+        report_run_ids=report_run_ids,
+        report_row_digests=report_row_digests,
+    )
     _broadcast(SSE_FAILED if status == "failed" else SSE_PUSHED, result, trigger)
     return result
 
@@ -536,8 +726,11 @@ def _broadcast(event: str, result: PushResult, trigger: str) -> None:
 
         payload = {
             "project_id": str(result.project_id), "year": result.year, "run_id": str(result.run_id),
+            "operation_id": str(result.operation_id) if result.operation_id else None,
             "status": result.status, "trigger": trigger, "trigger_label": TRIGGER_LABELS.get(trigger, trigger),
             "pushed_projects": list(result.pushed_projects), "warnings": list(result.warnings[:10]),
+            "report_run_ids": dict(result.report_run_ids),
+            "report_row_digests": dict(result.report_row_digests),
         }
         event_bus.broadcast_raw(event, payload)
         # 上层合并项目的页面也要刷新（它们的数也变了）；SSE 按 project_id 过滤，所以逐个项目发
@@ -588,18 +781,31 @@ def request_push(
     return task
 
 
-async def _run_queued(project_id: UUID, year: int, key: tuple[str, int]) -> PushResult | None:
+async def _run_queued(project_id: UUID, year: int, key: tuple[str, int]):
     started = False
     try:
         async with _process_lock("run", project_id, year):
             started = True
             trigger, user_id = _QUEUED.pop(key, (TRIGGER_MANUAL, None))
             from app.core.database import async_session
+            from app.services.consol_operation_service import request_operation
+            from app.workers.consol_operation_worker import wake
 
             async with async_session() as db:
-                return await push(db, project_id, year, trigger=trigger, user_id=user_id)
-    except Exception:  # noqa: BLE001 —— 后台任务异常不外抛（push 内部已留痕；这里兜底记日志）
-        logger.exception("后台合并推送失败：项目=%s 年度=%s", project_id, year)
+                requested = await request_operation(
+                    db,
+                    project_id=project_id,
+                    year=year,
+                    operation_type="push",
+                    idempotency_key=f"legacy-push:{uuid.uuid4().hex}",
+                    trigger_source=trigger,
+                    triggered_by=user_id,
+                )
+                await db.commit()
+            wake()
+            return requested.operation
+    except Exception:  # noqa: BLE001 —— 事件已提交时不能向上反抛；入队失败留日志
+        logger.exception("后台合并 operation 入队失败：项目=%s 年度=%s", project_id, year)
         return None
     finally:
         if not started:
@@ -611,9 +817,12 @@ def pending_count() -> int:
 
 
 async def wait_for_pushes() -> None:
-    """等待全部后台推送结束（测试与优雅停机用）。"""
+    """等待本进程入队完成并 drain 持久 operation（测试与优雅停机兼容）。"""
     while _TASKS:
         await asyncio.gather(*list(_TASKS), return_exceptions=True)
+    from app.workers.consol_operation_worker import wait_for_operations
+
+    await wait_for_operations()
 
 
 # ─────────────────────────────── 查询 ───────────────────────────────
@@ -622,6 +831,7 @@ async def wait_for_pushes() -> None:
 def run_to_dict(run: ConsolPushRun) -> dict:
     return {
         "id": str(run.id),
+        "operation_id": str(run.operation_id) if run.operation_id else None,
         "project_id": str(run.project_id),
         "year": run.year,
         "trigger_source": run.trigger_source,

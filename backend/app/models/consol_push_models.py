@@ -41,6 +41,10 @@ class ConsolPushRun(Base):
     __tablename__ = "consol_push_run"
 
     id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # V240：来源持久 operation；旧 run 记录保持兼容。
+    operation_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("consol_operation.id", ondelete="SET NULL"), nullable=True
+    )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
@@ -67,6 +71,11 @@ class ConsolPushRun(Base):
     __table_args__ = (
         CheckConstraint(_in_list("status", PUSH_RUN_STATUSES), name="ck_consol_push_run_status"),
         Index("idx_consol_push_run_project_year", "project_id", "year", "started_at"),
+        Index(
+            "ix_consol_push_run_operation", "operation_id",
+            postgresql_where=text("operation_id IS NOT NULL"),
+            sqlite_where=text("operation_id IS NOT NULL"),
+        ),
     )
 
 

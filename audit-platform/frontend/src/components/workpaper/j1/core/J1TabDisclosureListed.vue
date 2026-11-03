@@ -209,11 +209,12 @@ import { eventBus } from '@/utils/eventBus'
 import { useAuditContext } from '@/composables/useAuditContext'
 import {
   buildJ1SyncPayload,
+  j1DisclosureSnapshotOf,
   j1NoteKeys,
   J1_LISTED_NOTE_FIELDS,
   J1_NOTE_SECTION,
-  type J1DisclosureSnapshot,
 } from '../../composables/j1NoteSectionMap'
+import { J1_DISCLOSURE_DEFAULTS } from '@/composables/workpaper/j1/j1DisclosureDefaults'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import {
   useJ1DisclosureSections,
@@ -245,42 +246,6 @@ const { year: auditYear } = useAuditContext()
 
 const selectedRow = ref<DRow | null>(null)
 
-// ── 汇总表固定行（合计行由 composable computed 生成，历史实现恒为 0） ─────
-const DEFAULT_SUMMARY: DRow[] = [
-  { id: 's-1', label: '短期薪酬', category: 'summary', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 's-2', label: '离职后福利-设定提存计划', category: 'summary', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 's-3', label: '辞退福利', category: 'summary', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 's-4', label: '一年内到期的其他福利', category: 'summary', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-]
-
-// ── （1）短期薪酬明细 ──────────────────────────────────────
-const DEFAULT_SHORT_TERM: DRow[] = ([
-  { id: 'st-1', label: '工资、奖金、津贴和补贴', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-2', label: '职工福利费', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-3', label: '社会保险费', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-4', label: '其中：1. 医疗保险费', category: 'short_term', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-5', label: '2. 工伤保险费', category: 'short_term', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-6', label: '3. 生育保险费', category: 'short_term', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-7', label: '住房公积金', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-8', label: '工会经费和职工教育经费', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-9', label: '短期带薪缺勤', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-10', label: '短期利润分享计划', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-11', label: '非货币性福利', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'st-12', label: '其他短期薪酬', category: 'short_term', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-]) as DRow[]
-
-// ── （2）设定提存计划 ──────────────────────────────────────
-const DEFAULT_POST: DRow[] = ([
-  { id: 'pe-1', label: '离职后福利', category: 'post_employment', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-2', label: '其中：1. 基本养老保险费', category: 'post_employment', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-3', label: '2. 失业保险费', category: 'post_employment', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-4', label: '3. 企业年金缴费', category: 'post_employment', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-5', label: '4. 其他', category: 'post_employment', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-6', label: '其他长期职工福利（不适用的删除）', category: 'post_employment', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-7', label: '其中：1. xxx', category: 'post_employment', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { id: 'pe-8', label: '2. 其他', category: 'post_employment', indent: 1, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-]) as DRow[]
-
 // ── 数据 + 持久化（共享 composable：hydrate / 防抖落库 / 合计 computed） ──
 /** 说明文本域定义（单一真源在 `j1NoteSectionMap`，与推给附注的 `_note_texts` 同源） */
 const NOTE_FIELDS = J1_LISTED_NOTE_FIELDS
@@ -303,7 +268,8 @@ const {
   shortTermDerivedIds, postEmploymentDerivedIds, syncParentSums,
 } = useJ1DisclosureSections({
   variant: 'listed',
-  defaults: { summary: DEFAULT_SUMMARY, shortTerm: DEFAULT_SHORT_TERM, postEmployment: DEFAULT_POST },
+  // 默认骨架行（与附注页离屏同步共用一份）
+  defaults: J1_DISCLOSURE_DEFAULTS.listed,
   allResponses: allResponsesRef,
   saveImmediate: (items) => (props.saveImmediate ?? defaultSave)(items),
   isReadonly: computed(() => isReadonly) as Ref<boolean>,
@@ -379,17 +345,12 @@ async function syncToDisclosureNotes() {
   if (isReadonly) return
   syncLoading.value = true
   try {
-    const snapshot: J1DisclosureSnapshot = {
-      summary: summaryData.value,
-      shortTerm: shortTermData.value,
-      postEmployment: postEmploymentData.value,
-      notes: notes.value as Record<string, string>,
-    }
     const { body } = buildJ1SyncPayload({
       variant: 'listed',
       wpId: props.wpId,
       year: auditYear.value,
-      snapshot,
+      // 与附注页离屏同步同一个快照函数（spec note-pull-followup-closure R1）
+      snapshot: j1DisclosureSnapshotOf({ summaryData, shortTermData, postEmploymentData, notes }),
     })
     const http = (await import('@/utils/http')).default
     await http.post(

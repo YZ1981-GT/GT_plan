@@ -55,6 +55,8 @@ export interface WpIndexItem {
   audit_cycle: string | null
   status: string | null
   assigned_to: string | null
+  assigned_to_name?: string | null
+  assigned_to_username?: string | null
   reviewer: string | null
 }
 
@@ -351,47 +353,52 @@ export async function listMyLeadWorkpapers(
   return normalizeEnvelope(data, page, pageSize)
 }
 
+/** 全部可见底稿的过滤参数（与分页端点同口径，不含分页 / 排序）。 */
+export type WpAllFilters = Pick<WpListParams, 'audit_cycle' | 'index_status' | 'file_status' | 'assigned_to'>
+
+const listAllInflight = new Map<string, Promise<any[]>>()
+
 /**
- * Legacy 底稿列表（返回扁平数组）。
+ * 全部可见底稿（一次取完，spec platform-perf-hotspots R5）：与分页端点同一鉴权 / 可见性 / 过滤 / 项结构，
+ * 原始项含未生成行（``wp_generated=false``），排序 wp_code 升序，与分页端点逐页拼接逐条相等。
+ * 原先各页面按 100 条一页串行拉（重药安徽 10 页约 2.5 秒）。
  *
- * 服务端已把 ``/working-papers`` 升级为分页 envelope（Task 8），此函数对 envelope 与旧数组
- * 两种形态都兼容：envelope → 抽取 ``items``；数组 → 直接映射。新代码请改用
- * ``listWorkpapersPaged`` 消费完整分页/stats。
+ * 同项目 + 同过滤的并发调用共享在途请求（同 URL 同参数的 GET 会被 utils/http 去重取消先发的那一发）；
+ * 每个调用方拿到各自的数组与浅拷贝项，互不串改。
+ */
+export async function listWorkpapersAll(projectId: string, filters: WpAllFilters = {}): Promise<any[]> {
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([, v]) => v != null && v !== '').sort(([a], [b]) => a.localeCompare(b)),
+  ) as Record<string, string>
+  const key = `${projectId}?${new URLSearchParams(params).toString()}`
+  let pending = listAllInflight.get(key)
+  if (!pending) {
+    pending = http.get(P_wp.listAll(projectId), { params })
+      .then(({ data }) => (Array.isArray(data?.items) ? data.items : []))
+      .finally(() => listAllInflight.delete(key))
+    listAllInflight.set(key, pending)
+  }
+  return (await pending).map((item: any) => ({ ...item }))
+}
+
+/**
+ * 底稿列表（扁平数组，只含已生成的底稿）：基于 ``listWorkpapersAll`` 一次取完。
+ * 新代码要分页 / stats 请用 ``listWorkpapersPaged``。
  */
 export async function listWorkpapers(
   projectId: string,
   opts?: { audit_cycle?: string; status?: string; assigned_to?: string }
 ): Promise<WorkpaperDetail[]> {
   // legacy `status` 查询参数映射到 index_status（Req 12.6：legacy source → target）。
-  const baseParams: Record<string, any> = { ...(opts || {}) }
-  if (baseParams.status != null) {
-    baseParams.index_status = baseParams.status
-    delete baseParams.status
-  }
-  const PAGE_SIZE = 100 // 服务端上限
-  const collected: any[] = []
-  let page = 1
-  // 服务端分页 envelope 上限 100/页：逐页拉取直至覆盖去重全集（保留 legacy「返回全部可见项」语义）。
-  // 旧数组形态（未升级环境）第一次即返回全部，循环自然终止。
-  for (;;) {
-    const { data } = await http.get(P_wp.list(projectId), {
-      params: { ...baseParams, page, page_size: PAGE_SIZE },
-    })
-    if (Array.isArray(data)) {
-      collected.push(...data)
-      break
-    }
-    const items = Array.isArray(data?.items) ? data.items : []
-    collected.push(...items)
-    const total = Number.isFinite(data?.total) ? Number(data.total) : collected.length
-    if (items.length === 0 || collected.length >= total || page > 200) break
-    page += 1
-  }
-  // legacy 消费者（Shell/试算表）期望「已生成的真实底稿」。分页 envelope 会含 nullable wp
+  const items = await listWorkpapersAll(projectId, {
+    audit_cycle: opts?.audit_cycle,
+    assigned_to: opts?.assigned_to,
+    index_status: opts?.status,
+  })
+  // legacy 消费者（Shell/试算表）期望「已生成的真实底稿」。全量清单含 nullable wp
   // （wp_generated=false，底稿尚未生成的可见 wp_index 行）——这些没有具体 WorkingPaper，
   // 过滤掉以保持 legacy 语义；wp_index 层信息由 getWpIndex 单独提供。
-  const realized = collected.filter((it) => it?.wp_generated !== false)
-  return realized.map(normalizeWorkpaper)
+  return items.filter((it) => it?.wp_generated !== false).map(normalizeWorkpaper)
 }
 
 /** 取底稿详情（每次独立请求；保存后刷新等要拿到最新版本号的场景用它）。 */
@@ -429,6 +436,32 @@ export function getWorkpaperSettled(projectId: string, wpId: string): Promise<Wo
 
 export async function downloadWorkpaper(projectId: string, wpId: string) {
   return downloadFile(P_wp.download(projectId, wpId))
+}
+
+export interface WorkpaperPackExportTask {
+  task_id: string
+  total: number
+  status: 'pending' | 'running' | 'complete' | 'failed'
+}
+
+export interface WorkpaperPackExportStatus extends WorkpaperPackExportTask {
+  done: number
+  percent: number
+  error?: string | null
+  download_url?: string | null
+}
+
+/** 提交异步 ZIP 任务；压缩和文件读取在后端线程中完成。 */
+export async function startWorkpaperPackExport(projectId: string, wpIds: string[]): Promise<WorkpaperPackExportTask> {
+  return apiProxy.post(`/api/projects/${projectId}/working-papers/batch-export-async`, { wp_ids: wpIds })
+}
+
+/** SSE 丢失或重连时的权威状态恢复入口。 */
+export async function getWorkpaperPackExportStatus(taskId: string): Promise<WorkpaperPackExportStatus> {
+  return apiProxy.get(`/api/exports/${taskId}/status`, {
+    _background: true,
+    _silent: true,
+  } as any)
 }
 
 export async function downloadWorkpaperPack(projectId: string, wpIds?: string[], includePrefill: boolean = true) {
@@ -496,7 +529,7 @@ export async function assignWorkpaper(projectId: string, wpId: string, body: {
   return data
 }
 
-export async function prefillWorkpaper(projectId: string, wpId: string, year: number = 2025) {
+export async function prefillWorkpaper(projectId: string, wpId: string, year: number) {
   const { data } = await http.post(
     P_wp.prefill(projectId, wpId),
     null,
@@ -549,23 +582,21 @@ export async function listReviews(wpId: string, status?: string): Promise<Review
 }
 
 export async function addReview(wpId: string, body: {
-  commenter_id: string; comment_text: string; cell_reference?: string
+  comment_text: string; cell_reference?: string
 }): Promise<ReviewComment> {
   const { data } = await http.post(P_wr.list(wpId), body)
   return data
 }
 
 export async function replyReview(wpId: string, reviewId: string, body: {
-  replier_id: string; reply_text: string
+  reply_text: string
 }): Promise<ReviewComment> {
   const { data } = await http.put(P_wr.reply(wpId, reviewId), body)
   return data
 }
 
-export async function resolveReview(wpId: string, reviewId: string, body: {
-  resolved_by: string
-}): Promise<ReviewComment> {
-  const { data } = await http.put(P_wr.resolve(wpId, reviewId), body)
+export async function resolveReview(wpId: string, reviewId: string): Promise<ReviewComment> {
+  const { data } = await http.put(P_wr.resolve(wpId, reviewId), {})
   return data
 }
 

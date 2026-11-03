@@ -125,9 +125,12 @@ describe('R10.3：只读态禁用配置与回填入口', () => {
     expect(ENGINE).toMatch(/readonly\?:\s*boolean/)
   })
 
+  // 引擎表里只有本次抽出的样本（都是项目当前阶段）；「年审阶段预审行只读」改在宿主底稿行上做
+  // （shared/voucherCheckFill 的 rowClass / guardPersist，voucher-identity-writeback-and-audit-phase 任务 9）
+  const CAN_EDIT_ROW = /function canEditRow\(_?row: SampledVoucher\): boolean \{\s*return !props\.readonly\s*\}/
+
   it('行可编辑判定合并只读态（canEditRow）', () => {
-    expect(ENGINE).toMatch(/function canEditRow\(row: SampledVoucher\): boolean \{/)
-    expect(ENGINE).toMatch(/return !props\.readonly && isRowEditable\(row\)/)
+    expect(ENGINE).toMatch(CAN_EDIT_ROW)
   })
 
   it('模板一律走 canEditRow，不再直接用 isRowEditable', () => {
@@ -152,10 +155,8 @@ describe('R10.3：只读态禁用配置与回填入口', () => {
   })
 
   it('反向自检：canEditRow 若丢掉 readonly 判定即打红', () => {
-    const mutated = ENGINE.replace(
-      'return !props.readonly && isRowEditable(row)',
-      'return isRowEditable(row)',
-    )
-    expect(mutated).not.toMatch(/return !props\.readonly && isRowEditable\(row\)/)
+    const mutated = ENGINE.replace(/(function canEditRow\(_?row: SampledVoucher\): boolean \{\s*)return !props\.readonly/, '$1return true')
+    expect(mutated).not.toBe(ENGINE)
+    expect(mutated).not.toMatch(CAN_EDIT_ROW)
   })
 })

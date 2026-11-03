@@ -18,14 +18,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-dropdown trigger="click" size="small" @command="handleIECommand">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -173,6 +166,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K2TabAdjustment.vue — K2-3 调整分录汇总
  *
@@ -191,7 +185,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { k2AccountCode } from '../../composables/k2AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
@@ -333,7 +327,10 @@ function loadFromResponses(): void {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(parsed)) {
+      // `...e` 留着行里本表不显示的键：模板的 类别 / 报表项目 / 科目名称 / 附注项目 / 索引 / 备注 在 OO 侧填了
+      // 会存进行里，K2 分录行（借方科目 / 贷方科目分列）与模板单科目行不同构、待裁（R2），不留就在下一次保存被擦掉
       entries.value = parsed.map((e: any, idx: number) => ({
+        ...e,
         id: e.id || `entry-${++nextId}`,
         seq: idx + 1,
         entryType: e.entryType || 'AJE',

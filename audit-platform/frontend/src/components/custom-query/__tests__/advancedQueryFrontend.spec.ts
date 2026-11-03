@@ -255,8 +255,19 @@ describe('结果列下钻 useAcnrDrill — resolveIndex 拿 jump_route 跳转 (R
 // ════════════════════════════════════════════════════════════════════════════
 // R11.6 — 高级构建器入口禁用态
 // ════════════════════════════════════════════════════════════════════════════
+// advanced-query-linkage-closure 任务 30（AQ-21，ADR-AQL-08）：入口判据改由后端 GET /api/query/access 给出，前端不再
+// 按系统角色判定——下面两例改为驱动该接口，并故意让前端角色与接口结论相反，证明角色不再参与判定。
+const BUILDER_FORBIDDEN = '高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用'
+
 describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
-  async function mountTab() {
+  async function mountTab(access?: unknown) {
+    if (access !== undefined) {
+      const { resetQueryBuilderAccessCache } = await import('@/composables/useQueryBuilderAccess')
+      const { useAuthStore } = await import('@/stores/auth')
+      resetQueryBuilderAccessCache()
+      useAuthStore().token = 'tok'
+      apiMocks.get.mockImplementation((url: string) => Promise.resolve(String(url) === '/api/query/access' ? access : []))
+    }
     const CustomQueryTab = (await import('@/components/template-library/CustomQueryTab.vue')).default
     const wrapper = shallowMount(CustomQueryTab, {
       global: {
@@ -270,21 +281,25 @@ describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
     return wrapper
   }
 
-  it('非 admin/manager/partner 角色 → canUseBuilder=false，onOpenBuilder 不打开构建器', async () => {
-    roleHolder.value = 'auditor'
-    const wrapper = await mountTab()
+  it('接口判无权 → canUseBuilder=false，onOpenBuilder 不打开构建器，原因取接口文案（含合伙人）', async () => {
+    roleHolder.value = 'admin' // 前端角色是 admin 也不放行：判据只在接口
+    const wrapper = await mountTab({ allowed: false, basis: null, reason: BUILDER_FORBIDDEN, all_projects: false, accessible_project_count: 0 })
     expect(wrapper.vm.canUseBuilder).toBe(false)
     // 双保险：即便被绕过点击也不打开
     wrapper.vm.onOpenBuilder()
     expect(wrapper.vm.builderDialogVisible).toBe(false)
     // 有原因提示文案
     expect(wrapper.vm.builderDisabledReason).toContain('管理员')
+    expect(wrapper.vm.builderDisabledReason).toContain('合伙人')
   })
 
-  it('admin/manager/partner 角色 → canUseBuilder=true 且可打开构建器', async () => {
-    for (const role of ['admin', 'manager', 'partner']) {
-      roleHolder.value = role
-      const wrapper = await mountTab()
+  it('接口判可用（系统角色，或系统角色为 auditor 的项目经理）→ canUseBuilder=true 且可打开构建器', async () => {
+    roleHolder.value = 'auditor' // 改造前前端按角色挡住的现场项目经理（AQ-21）
+    for (const access of [
+      { allowed: true, basis: 'system_role', reason: null, all_projects: true, accessible_project_count: null },
+      { allowed: true, basis: 'project_manager', reason: null, all_projects: false, accessible_project_count: 1 },
+    ]) {
+      const wrapper = await mountTab(access)
       expect(wrapper.vm.canUseBuilder).toBe(true)
       wrapper.vm.onOpenBuilder()
       expect(wrapper.vm.builderDialogVisible).toBe(true)
@@ -326,10 +341,15 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     return wrapper
   }
 
-  it('初始年度不是日历当年（审计做上一年度，当年在四表里没有数据）', async () => {
+  // advanced-query-linkage-closure 任务 29（R10.2）：原先这里断言初始年度 =「今年 − 1」——那条兜底本身就是猜年度
+  // （猜错即静默查别的年度），旧断言固化的是被修掉的行为。现在没选项目 / 项目没有审计年度时年度留空、执行不可用。
+  it('初始年度为空（不按日历年推算），执行查询不可用并提示选择年度', async () => {
     const wrapper = await mountTabWithProjects([])
-    expect(wrapper.vm.formCtx.year).not.toBe(new Date().getFullYear())
-    expect(wrapper.vm.formCtx.year).toBe(new Date().getFullYear() - 1)
+    expect(wrapper.vm.formCtx.year).toBeNull()
+    wrapper.vm.formCtx.project_id = 'p-any'
+    wrapper.vm.formCtx.source = 'tb_detail'
+    await flushPromises()
+    expect(wrapper.vm.executeBlockedReason).toBe('请选择审计年度')
   })
 
   it('选中项目后年度跟随该项目的 audit_year', async () => {
@@ -344,12 +364,20 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     expect(wrapper.vm.formCtx.year).toBe(2023)
   })
 
-  it('项目没有 audit_year 时退回「当年 - 1」，不退回日历当年', async () => {
+  it('项目没有 audit_year 时年度留空（不退回「今年 − 1」，也不粘住上一个项目的年度），且不发查询', async () => {
     const wrapper = await mountTabWithProjects([
-      { id: 'p-null', name: '无年度项目', audit_year: null, can_edit: true },
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025 },
+      { id: 'p-null', name: '无年度项目', audit_year: null },
     ])
+    wrapper.vm.onProjectChange('p-2025')
+    expect(wrapper.vm.formCtx.year).toBe(2025)
+    wrapper.vm.formCtx.project_id = 'p-null'
     wrapper.vm.onProjectChange('p-null')
-    expect(wrapper.vm.formCtx.year).toBe(new Date().getFullYear() - 1)
+    expect(wrapper.vm.formCtx.year).toBeNull()
+    wrapper.vm.formCtx.source = 'tb_detail'
+    apiMocks.post.mockClear()
+    await wrapper.vm.onExecute()
+    expect(apiMocks.post.mock.calls.filter(([url]: any[]) => String(url).includes('execute'))).toHaveLength(0)
   })
 
   it('列表加载完成时会把已选项目的年度对齐（模板恢复场景）', async () => {
@@ -384,6 +412,7 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
     ])
     wrapper.vm.formCtx.project_id = 'p-2025'
+    wrapper.vm.onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
     wrapper.vm.formCtx.source = 'tb_detail'
     apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
     await wrapper.vm.onExecute()
@@ -394,6 +423,29 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     await wrapper.vm.onExecute()
     await flushPromises()
     expect(wrapper.vm.emptyHint).toBe('')
+  })
+
+  it('报表行次配置不带 report_type，报表叶子才带（advanced-query-linkage-closure 任务 17）', async () => {
+    // 改造前两处都按 startsWith('report_') 派生：report_lines ⇒ report_type='lines'，后端按不存在的报表类型过滤得 0 行
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
+    ])
+    wrapper.vm.formCtx.project_id = 'p-2025'
+    wrapper.vm.onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
+    apiMocks.post.mockClear()
+    apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
+    for (const source of ['report_lines', 'report_income_statement']) {
+      wrapper.vm.formCtx.source = source
+      await wrapper.vm.onExecute()
+      await flushPromises()
+    }
+    const bodies = apiMocks.post.mock.calls
+      .filter(([url]: any[]) => String(url).includes('execute'))
+      .map(([, body]: any[]) => body)
+    expect(bodies.map((b: any) => b.source)).toEqual(['report_lines', 'report_income_statement'])
+    expect(bodies[0].filters).not.toHaveProperty('report_type')
+    expect(bodies[1].filters.report_type).toBe('income_statement')
+    apiMocks.post.mockResolvedValue({})
   })
 })
 

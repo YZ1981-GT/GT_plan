@@ -40,6 +40,7 @@
     :rv-trace-dialog-visible="rvTraceDialogVisible"
     :rv-trace-loading="rvTraceLoading"
     :rv-trace-result="rvTraceResult"
+    :project-id="projectId"
     :parse-trace-locations="parseTraceLocations"
     @update:show-audit-dialog="$emit('update:showAuditDialog', $event)"
     @update:audit-tab="$emit('update:auditTab', $event)"
@@ -135,7 +136,9 @@ const props = defineProps<{
   // Cell trace (lineage)
   rvTraceDialogVisible: boolean
   rvTraceLoading: boolean
-  rvTraceResult: { upstream: any[]; downstream: any[] } | null
+  rvTraceResult: {
+    upstream: any[]; downstream: any[]; attachments: any[]; objectId: string; projectId: string
+  } | null
 
   // Mapping
   showMappingDialog: boolean
@@ -153,8 +156,8 @@ const props = defineProps<{
   consolBreakdownVisible: boolean
   consolBreakdownAccountCode: string
   projectId: string
-  year: number
-
+  /** 审计年度；项目没填为 null（合并穿透弹窗里写明去填年度） */
+  year: number | null
   // Formula detail
   showCellFormulaDetail: boolean
   cellDetailWpCode: string

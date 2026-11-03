@@ -33,6 +33,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.formula_engine import FormulaContext, aux_ref_key
+from app.services.tb_leaf_codes import leaf_total, scope_for_year
 from app.services.formula_ref_preload import (
     PREV3_RE,
     PREV_RE,
@@ -124,9 +125,22 @@ def _safe_decimal(val: Any) -> Decimal:
         return Decimal("0")
 
 
+#: ``_load_tb`` 存储列（规范列名 → ``trial_balance`` 字段），每列各自叶子求和；「本期发生额」由期末、年初两列的叶子合计相减得出
+_TB_STORED_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("期末余额", "audited_amount"),
+    ("年初余额", "opening_balance"),
+    ("未审数", "unadjusted_amount"),  # ADR-FHIC-18：规范列（原经别名取「期末余额」，拿到的是审定数）
+    ("AJE调整", "aje_adjustment"),
+    ("RJE调整", "rje_adjustment"),
+)
+
+
 async def _load_tb(db: AsyncSession, project_id: uuid.UUID, year: int,
-                   codes: set[str], *, with_occurrence: bool = False) -> dict[str, dict[str, Decimal]]:
-    """从 trial_balance 批量取科目数据（前缀聚合口径）。
+                   codes: set[str], *, with_occurrence: bool = False,
+                   presence: dict[str, bool] | None = None) -> dict[str, dict[str, Decimal]]:
+    """从 trial_balance 批量取科目数据（按前缀 / 区间取宽集合，只累加叶子行，ADR-FHIC-03）。
+
+    ``presence`` 传入时逐个取数码记「本次读到的试算表行里有没有匹配的行」（中央执行据此判缺科目，不再另查一次库）。
 
     ``'起~止'`` 形态（SUM_TB 的区间）按区间聚合，存在区间本身这个键下（L1 ``_sum_tb_value`` 优先用它）；原先当科目前缀，
     一条也匹配不到 ⇒ 区间求和恒 0。发生额（本期借方 / 本期贷方）``trial_balance`` 没有这两列，原先 ``getattr`` 恒取到 0；
@@ -153,23 +167,24 @@ async def _load_tb(db: AsyncSession, project_id: uuid.UUID, year: int,
         hits = [t for t in plain if code.startswith(t)]
         return hits + [r for r, (start, end) in ranges.items() if start and start <= code[:len(start)] <= end]
 
-    # 按前缀聚合（与 ReportFormulaParser._get_tb_rows_prefix 同口径）
-    out: dict[str, dict[str, Decimal]] = {}
+    # 每个取数码（前缀 / 区间）先取宽集合，再只累加叶子（与 ReportFormulaParser 同口径，ADR-FHIC-03）：
+    # 父子并存（1231 与 1231-01）时父行不计入，父行与叶子合计不符经 tb_leaf_codes 告警
+    members: dict[str, list[Any]] = {}
     for row in rows:
         code = row.standard_account_code
         if not code:
             continue
-        columns = {
-            "期末余额": _safe_decimal(row.audited_amount),
-            "年初余额": _safe_decimal(row.opening_balance),
-            "本期发生额": _safe_decimal(row.audited_amount) - _safe_decimal(row.opening_balance),
-            "AJE调整": _safe_decimal(row.aje_adjustment),
-            "RJE调整": _safe_decimal(row.rje_adjustment),
-        }
         for target_code in _targets(code):
-            entry = out.setdefault(target_code, {})
-            for standard, val in columns.items():
-                entry[standard] = entry.get(standard, Decimal("0")) + val
+            members.setdefault(target_code, []).append(row)
+    if presence is not None:
+        presence.update((c, c in members) for c in codes)
+    scope = scope_for_year(year)
+    out: dict[str, dict[str, Decimal]] = {}
+    for target_code, wide in members.items():
+        sums = {standard: leaf_total(wide, lambda r, a=attr: _safe_decimal(getattr(r, a)), column=standard, scope=scope)
+                for standard, attr in _TB_STORED_COLUMNS}
+        # 存储列原样放入；派生列由叶子合计相减（父子不符已由「期末余额」「年初余额」各自告警）
+        out[target_code] = {**sums, "本期发生额": sums["期末余额"] - sums["年初余额"]}
     if with_occurrence:
         from app.services.four_table.occurrence_by_standard_code import (
             CREDIT_KEY,
@@ -511,6 +526,7 @@ async def preload(
     adj_exclude_origins: frozenset[str] = frozenset(),
     row_cache: dict[str, Decimal] | None = None,
     gaps: list[str] | None = None,
+    tb_presence: dict[str, bool] | None = None,
 ) -> FormulaContext:
     """批量扫描公式文本 → 一次性查 DB → 构建 FormulaContext。
 
@@ -520,6 +536,7 @@ async def preload(
         row_cache: 已计算的行次缓存（供 ROW/SUM_ROW/REPORT 引用）；不传且公式引用了报表行 ⇒ 读本年度报表本期金额
         gaps: 传入列表时记取数缺口（报表未生成、辅助核算取不到、调整分录取数失败、附注单元格取不到），供严格调用方报错；
             不传 = 非严格（缺数按 0，L1 内核行为）
+        tb_presence: 传入时填「本年度试算表取数码 → 读到的行里有没有匹配的行」（只含本次读了试算表的码）
 
     原有 ``template_type`` 参数已删：只用于附注旧取法的「底稿 → 附注章节」映射；NOTE 第一参就是本项目附注的
     章节编号，按编号直接取，不需要口径（spec formula-fetch-followup-defect-closure 7.2）。
@@ -528,7 +545,8 @@ async def preload(
 
     # 批量查 DB（各数据源独立，失败不互相拖累）
     with_occurrence = _mentions_occurrence(formulas)
-    tb_data = await _load_tb(db, project_id, year, refs["tb_codes"], with_occurrence=with_occurrence)
+    tb_data = await _load_tb(db, project_id, year, refs["tb_codes"], with_occurrence=with_occurrence,
+                             presence=tb_presence)
     adj_data = await _load_adj(db, project_id, year, refs["adj_codes"], adj_exclude_origins, gaps)
     aux_data = await _load_aux(db, project_id, year, refs["aux_specs"], gaps)
     if row_cache is None and refs["report_refs"]:

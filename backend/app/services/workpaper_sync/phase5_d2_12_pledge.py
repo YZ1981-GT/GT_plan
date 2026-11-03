@@ -58,9 +58,13 @@ FOOTER_MARKER: Final[str] = "合计"
 ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 
 #: 质押区字段（9 列，全 editable，无公式）。
+#: 🔴 B「期末余额」原与 C「质押金额」同接 ``pledgeAmount``（两列一个键：HTML → OO 期末余额恒等于质押
+#:    金额，OO 侧两格改得不一样时回写互相覆盖）⇒ 改接前端新增的 ``endBalance``；F 质押条件 / H 质押协议
+#:    前端随本批补列（spec oo-writeback-template-parity-closure R3 批 B2b，守卫
+#:    ``test_contract_no_duplicate_field_binding``）。
 PLEDGE_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
     ("debtor_name", "A", "editable", "text", "debtorName", "客户名称"),
-    ("end_balance", "B", "editable", "amount", "pledgeAmount", "期末余额"),
+    ("end_balance", "B", "editable", "amount", "endBalance", "期末余额"),
     ("pledge_amount", "C", "editable", "amount", "pledgeAmount", "质押金额"),
     ("pledgee", "D", "editable", "text", "pledgee", "质权人"),
     ("pledge_reason", "E", "editable", "text", "pledgePurpose", "质押原因"),
@@ -170,7 +174,8 @@ def compute_mapping_digest() -> str:
     ).hexdigest()
 
 
-_FROZEN_MAPPING_DIGEST: Final[str] = "097318c59fa157545f396fecda281faa6c1d983c20ab43b592553dd5efb2d0d5"
+#: 2026-10-28 批 B2b：B 期末余额改接 endBalance（原与 C 同接 pledgeAmount，097318c5…）。
+_FROZEN_MAPPING_DIGEST: Final[str] = "5a146f1d3fe8d7f4085722a727611148f3584bc0fea40ab654d97c9e111ddb2d"
 
 
 def assert_mapping_digest_d212() -> str:

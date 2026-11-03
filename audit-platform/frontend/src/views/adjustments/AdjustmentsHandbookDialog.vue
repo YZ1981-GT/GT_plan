@@ -43,7 +43,7 @@ function close() {
       :closable="false"
       show-icon
       class="mb12"
-      title="一句话：本模块集中登记全项目审计调整(AJE)与重分类(RJE)——手工录入或从底稿汇聚 → 借贷平衡后提交 → 自动/批量重算试算表审定数与报表 → 合伙人复核。"
+      title="一句话：分录先保存草稿并提交复核；手工分录批准后在同一事务计入试算表，底稿来源分录批准后由来源审定表显式发布，随后联动报表与附注。"
     />
     <div class="guide-body prose" v-html="handbookHtml" />
     <template #footer>

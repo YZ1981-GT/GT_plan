@@ -23,6 +23,7 @@
  *
  * Requirements: 4.1-4.6, 5.1-5.5, 6.1-6.5, 15.2, 15.6, 15.8
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -92,10 +93,7 @@ const SELECT_FIELDS: Array<keyof RelatedPartyRow> = ['relationship']
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 
 function parseNum(val: any): number {
@@ -124,7 +122,7 @@ export function emptyRelatedPartyRow(): RelatedPartyRow {
 }
 
 /** 反序列化单行（含公式重算） */
-function deserializeRow(raw: any): RelatedPartyRow {
+export function deserializeRow(raw: any): RelatedPartyRow {
   const row = emptyRelatedPartyRow()
   if (raw && typeof raw.id === 'string' && raw.id) row.id = raw.id
   for (const f of STRING_FIELDS) {

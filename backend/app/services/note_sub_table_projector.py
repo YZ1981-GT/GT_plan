@@ -73,6 +73,20 @@ def _clean_defs(defs_raw: Any) -> list[dict]:
     return [d for d in defs_raw if isinstance(d, dict) and d.get("key")]
 
 
+def _split_defs(defs: list[dict]) -> tuple[dict | None, list[dict]]:
+    """（标签列定义, 值列定义）—— 投影 ``values`` 的列序与公式写回的列键共用这一个切分。"""
+    label_def = _pick_label_def(defs)
+    return label_def, [d for d in defs if d is not label_def]
+
+
+def projected_value_keys(table: Any) -> list[str]:
+    """投影表 ``values[i]`` 对应的 ``sub_table_data`` 业务列键（附注公式写回用；与 ``project_sub_tables`` 同口径）。"""
+    if not isinstance(table, dict):
+        return []
+    _label, value_defs = _split_defs(_clean_defs(table.get("columns")))
+    return [str(d.get("key")) for d in value_defs]
+
+
 def _inverse_project_row(row: dict, defs: list[dict]) -> dict:
     """把投影态行（``label`` / ``values[]`` / ``is_total``）还原为业务键行。
 
@@ -217,9 +231,8 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
             })
             continue
 
-        label_def = _pick_label_def(defs)
+        label_def, value_defs = _split_defs(defs)
         label_key = label_def.get("key") if isinstance(label_def, dict) else None
-        value_defs = [d for d in defs if d is not label_def]
         # headers 产出子列名
         headers = [str(label_def.get("label", ""))] + [
             str(d.get("label", "")) for d in value_defs

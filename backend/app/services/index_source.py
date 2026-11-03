@@ -18,7 +18,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.ai_models import KnowledgeSourceType, Contract, DocumentScan
+from app.models.ai_models import KnowledgeSourceType, DocumentScan
 from app.models.audit_platform_models import (
     Adjustment,
     AdjustmentEntry,
@@ -54,8 +54,9 @@ class BusinessDataSource:
     """业务数据索引源 — 包装现有 11 类 KnowledgeSourceType 成员。
 
     行为与原 _fetch_project_texts 完全一致，仅从硬编码提取为注册式。
-    实际索引 6 类已实现的业务数据（DocumentScan/AdjustmentEntry/TrialBalance/
-    AuditReport/Contract/AuditFinding），其余 5 类枚举成员暂无对应查询。
+    实际索引 5 类已实现的业务数据（DocumentScan/AdjustmentEntry/TrialBalance/
+    AuditReport/AuditFinding），其余枚举成员暂无对应查询。
+    Contract 表已在 V231 删除（Spec F FEAT-001），对应索引段一并移除。
     """
 
     source_type: str = "business_data"
@@ -132,21 +133,7 @@ class BusinessDataSource:
             )
             texts.append((KnowledgeSourceType.report, report.id, content))
 
-        # -- Contract --
-        contract_result = await self._db.execute(
-            select(Contract).where(
-                Contract.project_id == project_id,
-                Contract.is_deleted == False,  # noqa: E712
-            )
-        )
-        for contract in contract_result.scalars().all():
-            content = (
-                f"合同 {getattr(contract, 'contract_no', '') or ''}，"
-                f"甲方 {contract.party_a or ''}，乙方 {contract.party_b or ''}，"
-                f"金额 {getattr(contract, 'contract_amount', '')}，"
-                f"类型 {getattr(contract, 'contract_type', '未知')}。"
-            )
-            texts.append((KnowledgeSourceType.contract, contract.id, content))
+        # -- Contract -- 表已在 V231 删除（Spec F FEAT-001），索引段移除。
 
         # -- AuditFinding --
         finding_result = await self._db.execute(

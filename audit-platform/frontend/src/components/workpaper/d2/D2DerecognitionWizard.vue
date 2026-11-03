@@ -6,6 +6,7 @@
  */
 import { ref, toRef, computed, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { useD2Derecognition, type KnowledgeRef, type StepJudgment } from '../composables/useD2Derecognition'
 
 const props = defineProps<{
@@ -142,6 +143,11 @@ function onSaveApply(): void {
               <el-button size="small" :disabled="isReadonly">📎 上传附件并 OCR</el-button>
             </el-upload>
             <span v-if="cur.attachmentName" class="att-name">已上传：{{ cur.attachmentName }}</span>
+            <AttachmentEyeButton
+              v-if="cur.attachmentId"
+              :attachment-id="cur.attachmentId"
+              :file-name="cur.attachmentName"
+            />
           </div>
           <el-input
             v-model="cur.evidenceText"

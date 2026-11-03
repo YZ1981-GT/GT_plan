@@ -89,13 +89,14 @@ _SECTION_PROMPTS: dict[str, str] = {
         "逐项给出合规/不合规判断及依据。"
     ),
     "overall-opinion": (
-        "请生成K7-1审定表底部的审计综合意见。综合评价递延收益科目整体的"
+        "请提供K7-1审定表底部的科目结论措辞建议。综合评价递延收益科目整体的"
         "完整性（是否存在少计递延收益/未确认政府补助）、存在性（补助真实性验证）、"
         "计价和分摊（分摊方法/期限是否恰当，测算差异是否在可接受范围）、分类（流动vs非流动）、"
         "列报与披露的恰当性（CAS16政府补助披露要求）。"
         "说明是否发现需要调整的重大事项，审定数与未审数的主要差异原因。"
         "重点评价：分摊合理性（与资产使用寿命/补偿期匹配）、分摊去向正确性"
-        "（其他收益/营业外收入）、补助条件持续满足情况、退回风险评估。"
+        "（其他收益/营业外收入）、补助条件持续满足情况、退回风险评估；"
+        "列明证据缺口和建议程序，不得形成最终审计意见。"
     ),
 }
 
@@ -137,7 +138,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

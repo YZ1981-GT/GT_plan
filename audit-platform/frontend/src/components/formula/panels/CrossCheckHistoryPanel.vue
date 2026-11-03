@@ -62,7 +62,7 @@ import { ref } from 'vue'
 import api from '@/services/apiProxy'
 import { fmtDateTime } from '@/utils/formatters'
 
-const props = defineProps<{ projectId?: string; year?: number }>()
+const props = defineProps<{ projectId?: string; year?: number | null }>()
 
 const open = ref<string[]>([])
 const runs = ref<any[]>([])

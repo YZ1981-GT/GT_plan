@@ -20,7 +20,8 @@
   D. 新接门路由真实隔离（Req 3.3/3.4）：**真实 FastAPI 路由 handler + 真实 PostgreSQL**：
      附件族(links/attachment-workpapers/ocr-fields)接 enforce_attachment_wp_visibility 后，
      委派 lead 放行；越权成员(scope_cycles 不含底稿循环)统一 External_Not_Found(404)；跨项目 404；
-     未绑定底稿的附件放行(additive passthrough，不越界收紧项目级证据)。
+     未绑定底稿的附件不受 wp 可见性收紧(additive passthrough)，交项目级判定（附件溯源关联：readonly 成员放行、
+     非成员 403，spec formula-hub-integrity-closure 需求 7.3）。
 
 不改父 spec gate 语义；仅审计分类 + 接线附件族 leak_risk + 扩展 coverage_guard。真实 PostgreSQL
 （audit_platform），每用例事务隔离回滚。leak_risk_deferred 是诚实待接线 GAP，Task 4 marker 不因此翻绿。
@@ -361,17 +362,25 @@ class TestNewlyGatedRouteIsolation:
             await ctx.__aexit__()
 
     async def test_unlinked_attachment_passthrough_additive(self):
-        """未绑定底稿的附件 → 放行(additive passthrough)，不越界收紧项目级证据（Req 3.4 边界）。"""
+        """未绑定底稿的附件：wp 可见性层放行（additive passthrough，不按底稿可见性收紧项目级证据，Req 3.4 边界），
+        交项目级判定 —— 本项目 readonly 成员放行，非项目成员 403。
+
+        旧断言「非项目成员也放行」固化了缺陷：未绑定底稿的附件，任何登录用户都能读到它的溯源关联（跨项目可读）。
+        spec formula-hub-integrity-closure 需求 7.3 / ADR-FHIC-13 要求查询按附件所属项目 readonly 判定，按此改写。
+        """
         from app.routers.attachment_lineage import get_attachment_links
 
         ctx = _PgCtx()
         s = await ctx.__aenter__()
         try:
-            proj, _lead, _wi, _wp = await _lead_scenario(s)
+            proj, lead, _wi, _wp = await _lead_scenario(s)  # lead：本项目 readonly 级成员
             att = await _mk_attachment(s, proj.id)  # 未创建 AttachmentWorkingPaper 关联
-            outsider = await mk_user(s)  # 甚至非项目成员
-            res = await get_attachment_links(attachment_id=att.id, db=s, current_user=outsider)
-            assert res is not None  # passthrough：不因 wp 可见性收紧未绑定底稿的附件
+            res = await get_attachment_links(attachment_id=att.id, db=s, current_user=lead)
+            assert res == []  # passthrough：wp 可见性层不收紧，项目级 readonly 放行（该附件尚无关联）
+            outsider = await mk_user(s)  # 非项目成员
+            with pytest.raises(HTTPException) as ei:
+                await get_attachment_links(attachment_id=att.id, db=s, current_user=outsider)
+            assert ei.value.status_code == 403
         finally:
             await ctx.__aexit__()
 
@@ -394,10 +403,21 @@ class TestNewlyGatedRouteIsolation:
         finally:
             await ctx.__aexit__()
 
-    async def test_ocr_fields_deny_outsider_404_before_service(self):
-        """ocr-fields：越权成员在 gate 处即 404（先于 OCR 服务，Req 3.4 deny）。"""
-        from app.routers.ocr_fields import extract_ocr_fields
+    async def test_ocr_fields_deny_outsider_404_before_service(self, monkeypatch):
+        """ocr-fields：项目级 edit 但底稿不可见的成员在 gate 处即 404（先于 OCR 服务，Req 3.4 deny）。
 
+        spec attachment-security-baseline 需求 2.3 在底稿门之前加了项目级门（未缓存要 edit）；
+        成员行默认 readonly，原写法在项目门就 403、根本走不到底稿门 ⇒ 这里显式给 edit，
+        让本用例继续证明「底稿门拒绝」。项目门本身的拒绝见下一条用例。
+        """
+        from app.models.base import PermissionLevel
+        from app.routers.ocr_fields import extract_ocr_fields
+        from app.services.ocr_fields_service import OcrFieldsService
+
+        async def _must_not_run(*_a, **_k):
+            raise AssertionError("越权请求不得进入 OCR 服务")
+
+        monkeypatch.setattr(OcrFieldsService, "get_or_trigger_ocr_fields", _must_not_run)
         ctx = _PgCtx()
         s = await ctx.__aenter__()
         try:
@@ -405,11 +425,38 @@ class TestNewlyGatedRouteIsolation:
             att = await _mk_attachment(s, proj.id)
             await _link_att_wp(s, att.id, wp.id)
             outsider = await mk_user(s)
-            await mk_project_user(s, proj.id, outsider.id, scope_cycles="")
+            pu = await mk_project_user(s, proj.id, outsider.id, scope_cycles="")
+            pu.permission_level = PermissionLevel.edit
             await s.flush()
             with pytest.raises(HTTPException) as ei:
                 await extract_ocr_fields(attachment_id=att.id, db=s, current_user=outsider)
             assert ei.value.status_code == 404
+            assert ei.value.detail == EXTERNAL_NOT_FOUND_DETAIL
+        finally:
+            await ctx.__aexit__()
+
+    async def test_ocr_fields_readonly_member_403_at_project_gate(self, monkeypatch):
+        """ocr-fields：只读成员触发识别（未缓存、会写库）在项目门 403，先于底稿门与 OCR 服务
+        （spec attachment-security-baseline 需求 2.3）。"""
+        from app.routers.ocr_fields import extract_ocr_fields
+        from app.services.ocr_fields_service import OcrFieldsService
+
+        async def _must_not_run(*_a, **_k):
+            raise AssertionError("越权请求不得进入 OCR 服务")
+
+        monkeypatch.setattr(OcrFieldsService, "get_or_trigger_ocr_fields", _must_not_run)
+        ctx = _PgCtx()
+        s = await ctx.__aenter__()
+        try:
+            proj, _lead, _wi, wp = await _lead_scenario(s)
+            att = await _mk_attachment(s, proj.id)
+            await _link_att_wp(s, att.id, wp.id)
+            member = await mk_user(s)
+            await mk_project_user(s, proj.id, member.id, scope_cycles="D")  # 默认 readonly
+            await s.flush()
+            with pytest.raises(HTTPException) as ei:
+                await extract_ocr_fields(attachment_id=att.id, db=s, current_user=member)
+            assert ei.value.status_code == 403
         finally:
             await ctx.__aexit__()
 

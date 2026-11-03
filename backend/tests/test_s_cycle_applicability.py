@@ -62,21 +62,26 @@ def test_bundle_parent_applicability_is_aggregated_from_mapping_children() -> No
     }
 
 
-def test_refinancing_is_limited_to_pure_predicate_before_storage_decision() -> None:
-    """String(10) 决策未批准前，只验证 flag/predicate，不宣称 PG/render 通过。"""
-    flags = business_category_flags(" refinancing ", "soe")
+@pytest.mark.parametrize(
+    ("business_category", "scenario"),
+    [
+        (" refinancing ", None),   # V219 迁移前残留在分类列的旧场景值
+        ("C", "refinancing"),      # R4 起的权威来源：专项场景
+        ("A4", "normal"),          # 参考标准细分类 A4 再融资
+    ],
+)
+def test_refinancing_hits_s35_from_scenario_legacy_value_or_a4(business_category, scenario) -> None:
+    """S35（再融资）三种来源判定一致（project_classification 单一解释）。"""
+    flags = business_category_flags(business_category, "soe", scenario)
 
-    assert flags == {
-        "biz_ipo": False,
-        "biz_listed": False,
-        "biz_neeq": False,
-        "biz_refinancing": True,
-    }
+    assert {k for k, v in flags.items() if v} == {"biz_refinancing"}
     assert applicable_when_hit(
         _WP_APPLICABLE_WHEN["S35"],
         flags,
         key_filter={"business_category"},
     ) is True
+    _, not_applicable = _render_applicability("S35", business_category, "soe", scenario)
+    assert not_applicable is False
 
 
 def test_render_config_does_not_hide_unknown_industry_declaration(monkeypatch) -> None:

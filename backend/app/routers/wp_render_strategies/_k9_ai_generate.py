@@ -102,15 +102,15 @@ _SECTION_PROMPTS: dict[str, str] = {
         "6) 合同检查总体结论"
     ),
     "overall-opinion": (
-        "请生成K9管理费用底稿总体审计意见。"
+        "请提供K9管理费用底稿的科目结论措辞建议。"
         "需涵盖：\n"
         "1) 科目概况（6602管理费用本期发生额/审定数/重大程度）\n"
         "2) 实质性分析结论（波动是否合理/异常项是否已获取充分解释）\n"
         "3) 截止测试结论（截止是否正确）\n"
         "4) 合同检查结论（费用真实性/合规性）\n"
         "5) 与相关科目联动情况（K8销售费用/D4营业收入占比）\n"
-        "6) 总体审计结论（是否存在重大错报/审计调整建议）\n"
-        "7) 剩余审计风险评估"
+        "6) 待人工判断事项（潜在重大错报迹象/可能调整事项，仅列依据）\n"
+        "7) 剩余审计风险及建议程序。不得形成最终审计意见"
     ),
 }
 
@@ -158,7 +158,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

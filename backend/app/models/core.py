@@ -1,12 +1,13 @@
 """5张核心业务表模型：User, Project, ProjectUser, Log, Notification"""
 
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.models.base import (
     AuditMixin,
@@ -87,6 +88,12 @@ class User(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
 # Project 模型
 # ---------------------------------------------------------------------------
 
+#: 锁定的 ACNR 目录版本号形态：14 位 UTC 时间戳（T17）。
+#: 形态与 `app.services.acnr.catalog_contract.REGISTRY_VERSION_PATTERN` 必须一致 ——
+#: 模型层不反向依赖 services，改为由守卫
+#: `backend/tests/acnr/test_project_registry_lock_schema.py` 逐字比对两处，任一处改了即红。
+_ACNR_REGISTRY_VERSION_RE = re.compile(r"^\d{14}$")
+
 
 class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     """审计项目"""
@@ -116,8 +123,9 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     short_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # audit-report-template-integration V066: 企业子类型 type_a/type_b/type_c/type_d
     company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    # V077: 业务分类 A/B/C
-    business_category: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # V077→V209→V219: 质控业务分类码（A / A1~A8、B / B1~B6、C），NULL = 未填写；IPO / 再融资等是 scenario。
+    # 判定一律经 app.services.project_classification（不要按首字母 / 子串自行解释）。
+    business_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # V087: A21~A25 复核底稿模板选择
     audit_type: Mapped[str | None] = mapped_column(
         String(32), nullable=True, server_default=text("'financial'")
@@ -181,7 +189,7 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         String(20),
         nullable=False,
         server_default=text("'normal'"),
-        comment="项目场景: normal/ipo/listed/transfer/restructure/fraud_response",
+        comment="专项场景: normal/ipo/listed/refinancing/transfer/restructure/fraud_response（V219 CHECK）",
     )
     has_foreign_currency: Mapped[bool] = mapped_column(
         nullable=False,
@@ -213,6 +221,52 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         comment='工时预算配置: {"by_cycle":{"D":100,"E":80,...},"by_user":{"user_id":160,...},"total":800}',
     )
 
+    # V212（voucher-identity-writeback-and-audit-phase 任务 8，ADR-VK-09）：当前审计阶段与预审截止日。
+    # 抽凭、挂凭、挂凭回拉生成的行按 current_audit_phase 标阶段；改动只走
+    # PUT /api/projects/{id}/audit-phase（经理、合伙人含签字合伙人、admin），写 app_audit_log。
+
+    # V250（platform-global-display-settings-closure 任务 1A）：项目默认金额单位。
+    # 正式导出以此为底；「跟随项目」的用户显示偏好读此值。三值枚举，默认元。
+    amount_unit: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text("'yuan'"),
+        comment="项目默认金额单位: yuan/qian/wan（CHECK ck_projects_amount_unit）",
+    )
+
+    current_audit_phase: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="final", server_default=text("'final'"),
+        comment="当前审计阶段: preliminary 预审 / final 年审（CHECK ck_projects_current_audit_phase）",
+    )
+    interim_cutoff_date: Mapped[date | None] = mapped_column(nullable=True, comment="预审截止日")
+
+    # V216（acnr-foundation-defect-closure 需求 7.1~7.2 / D5 / T17）：锁定的 ACNR 地址目录版本。
+    # NULL = 未锁定，按当前目录解析；存量不回填（归档时没记过版本，编不出真实值）。
+    # 只由 `app/services/acnr/project_registry_lock.py` 在归档 / 取消归档的同一事务里写，
+    # 两列同写同清；写入前要求该版本的快照存在且内容自洽，否则不落库（RegistryLockError）。
+    acnr_registry_version: Mapped[str | None] = mapped_column(
+        String(14), nullable=True,
+        comment="锁定的 ACNR 地址目录版本号（14 位 UTC 时间戳）；NULL = 未锁定，按当前目录解析",
+    )
+    acnr_registry_locked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        comment="ACNR 目录版本锁定时间；与 acnr_registry_version 同写同清",
+    )
+
+    @validates("acnr_registry_version")
+    def _validate_acnr_registry_version(self, _key: str, value: str | None) -> str | None:
+        """版本号必须是 14 位 UTC 时间戳；清锁写 None。
+
+        在模型层拦一道是为了「写进去的就一定解析得回来」：版本号是快照文件名，
+        形态不对意味着按它找不到快照，而那时项目已经归档、错误发现得太晚。
+        """
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not _ACNR_REGISTRY_VERSION_RE.fullmatch(normalized):
+            raise ValueError(
+                f"acnr_registry_version 必须是 14 位 UTC 时间戳（形如 20261029075533），收到 {value!r}"
+            )
+        return normalized
+
     # 软删除标记
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
@@ -223,6 +277,18 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
             "idx_projects_status",
             "status",
             postgresql_where=text("is_deleted = false"),
+        ),
+        # V219（trim-generation-plan-followup-optimizations R4）：分类只放质控业务分类码、场景只放登记值。
+        # 登记值与 app.services.project_classification / V219 迁移逐值同步（tests/test_project_classification.py）。
+        CheckConstraint(
+            "business_category IS NULL OR business_category IN ("
+            "'A', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', "
+            "'B', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'C')",
+            name="ck_projects_business_category_registered",
+        ),
+        CheckConstraint(
+            "scenario IN ('normal', 'ipo', 'listed', 'refinancing', 'transfer', 'restructure', 'fraud_response')",
+            name="ck_projects_scenario_registered",
         ),
     )
 

@@ -2,6 +2,8 @@
  * G13 公允价值变动收益 — 公式引擎（纯函数）
  * Spec: .kiro/specs/g13-fair-value-changes/
  */
+import { amountsEqualToCent } from './templateAmountEquals'
+
 export function parseNum(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0
   const n = typeof v === 'number' ? v : Number(v)
@@ -68,9 +70,12 @@ export function isBsFvReconciled(
   return Math.abs(calcFairValueFromParts(cost, cumulativeFvChange) - parseNum(fairValue)) <= tolerance
 }
 
-/** 计入损益 ↔ 损益科目审定数勾稽 */
-export function isPlReconciled(amountInPl: number, audited: number, tolerance = 0.01): boolean {
-  return Math.abs(parseNum(amountInPl) - parseNum(audited)) <= tolerance
+/**
+ * 计入损益 ↔ 损益科目审定数勾稽（模板 K = `J=D`）：按分相等。
+ * 原为 `|差| ≤ 0.01`，差一分时会因浮点尾差判成一致，与模板相反。
+ */
+export function isPlReconciled(amountInPl: number, audited: number): boolean {
+  return amountsEqualToCent(parseNum(amountInPl), parseNum(audited))
 }
 
 export function calcSubtotal(values: number[]): number {

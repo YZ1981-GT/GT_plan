@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import json
 import logging
-import re
+import threading
 import time
 from collections import deque
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 from uuid import UUID
 
 from sqlalchemy import text
@@ -31,32 +31,36 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
-# ─── Format Detection + Normalization (ACNR consumer wiring, task 3.5) ────────
+# ─── 起点身份（acnr-foundation-defect-closure T21，需求 9.3，design §10.2） ────────
+#
+# 图键与写入口都经 ``acnr.v2_canonical`` 算 identity_key（只调 exact_identity，不用正则从表显示名里猜
+# sheet_code）：同一物理格 / 同一张表同一标签的多种写法并入同一个键；算不出身份的输入不写库并返回原因。
 
-# 检测 legacy WP URI 前缀: WP:{wp_code}:{sheet_display}: (至少三段冒号分隔)
-_LEGACY_WP_URI = re.compile(r"^WP:[^:]+:[^:]+:")
+
+def _is_addr_form(uri: str) -> bool:
+    """addr_id 形态 ``{wp_code}/{sheet_code}/{末段}``（首个 ``/`` 之前不含冒号）。"""
+    head = uri.split("/", 1)[0]
+    return ":" not in head and uri.count("/") >= 2
 
 
-def _detect_and_normalize(source_uri: str) -> str:
-    """格式检测 + 归一化。
+def _identity_of(uri: str, index: Any = None) -> Any:
+    """WP 写法或 addr_id → ``CanonicalNode``；非 WP 域返回 None（按字面）。"""
+    from app.services.acnr import v2_canonical
 
-    - 含 ``WP:`` 前缀 + 多 ``:`` (legacy ``WP:{wp_code}:{sheet}:{cell}``) →
-      调用 ``_normalize_wp_uri_to_addr_id`` 归一化为 addr_id。
-    - 含 ``/`` 分隔且无 ``WP:`` 前缀 (addr_id ``{wp_code}/{sheet_code}/{cell}``) →
-      直接使用（原样返回）。
-    - 其他（``REPORT:``、``TB:``、``NOTE:``、``MAPPING:`` 等非 WP 域）→ 原样返回。
+    if uri.startswith("WP:"):
+        return v2_canonical.canonical_uri(uri, index=index)
+    if _is_addr_form(uri):
+        return v2_canonical.canonical_addr(uri, index=index)
+    return None
 
-    Args:
-        source_uri: 变更源 URI，可能为 legacy WP 格式或 addr_id 格式。
 
-    Returns:
-        归一化后的 addr_id（legacy WP 域）或原始 URI（addr_id / 非 WP 域）。
-    """
-    if _LEGACY_WP_URI.match(source_uri):
-        from app.services.linkage_graph_builder import _normalize_wp_uri_to_addr_id
-
-        return _normalize_wp_uri_to_addr_id(source_uri)
-    return source_uri
+#: 推迟加载时第一次被读到才补齐的实例字段（spec backend-startup-and-request-overhead R1.4）。
+#: 2026-10-30 合入远端 T21：原 `_addr_id_index` 已换成按目录版本惰性构建的 `_identity_index` / `_identity_version`。
+_DEFERRED_FIELDS: Final[frozenset[str]] = frozenset(
+    {"_graph", "_reverse_graph", "_identity_index", "_identity_version", "_degraded", "_loaded"}
+)
+#: 推迟加载 / 重新加载互斥：两个线程同时第一次读到时只加载一次，读者看不到加载到一半的图。
+_load_lock = threading.RLock()
 
 
 class StalePropagationEngine:
@@ -66,15 +70,43 @@ class StalePropagationEngine:
     - _bfs(): BFS 遍历依赖图，visited 防环，max_depth 截断
     - _mark_stale_by_uri(): 按 URI 前缀分发写 DB
     - _notify_frontend(): SSE 推送 linkage:stale-changed 事件
+
+    ``defer_load=True``（模块单例用）：构造时不读图（依赖图 JSON 约 12 MB，导入时读要 0.1 s 以上），
+    ``_DEFERRED_FIELDS`` 里任一字段第一次被读到时在临时实例里加载完、再一次补进本实例。
+    字段仍是普通实例属性：直接读写 ``_graph`` 的调用方、先赋值 / monkeypatch 某个字段的测试都不用改；
+    已经有的字段不覆盖（与「导入时加载、之后再改」的结果相同）。只补一次：之后缺字段照常
+    AttributeError（``mock.patch`` 退出时据此把原值放回）。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, defer_load: bool = False) -> None:
+        if defer_load:
+            self.__dict__["_deferred_load"] = True
+            return
         self._graph: dict[str, list[str]] = {}  # adjacency list (source → targets)
         self._reverse_graph: dict[str, list[str]] = {}  # target → sources
-        self._addr_id_index: dict[str, str] = {}  # addr_id → graph_key 映射 (O(1) lookup)
+        # identity_key → 图键列表（同一身份的多种写法）；按目录版本惰性构建（T21）
+        self._identity_index: dict[str, list[str]] = {}
+        self._identity_version: str | None = None
         self._degraded: bool = False
         self._loaded: bool = False
         self._load_graph()
+
+    def __getattr__(self, name: str) -> Any:
+        # 只在常规查找找不到时才进来
+        if name in _DEFERRED_FIELDS and self.__dict__.get("_deferred_load"):
+            with _load_lock:
+                if self.__dict__.get("_deferred_load"):
+                    self._finish_deferred_load()
+            if name in self.__dict__:
+                return self.__dict__[name]
+        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+
+    def _finish_deferred_load(self) -> None:
+        """在临时实例里完整加载，再把本实例还没有的字段补上（调用方须持有 ``_load_lock``）。"""
+        loaded = StalePropagationEngine()
+        for name in _DEFERRED_FIELDS:
+            self.__dict__.setdefault(name, loaded.__dict__[name])
+        self.__dict__["_deferred_load"] = False
 
     # ─── Graph Loading ────────────────────────────────────────────────────
 
@@ -100,13 +132,10 @@ class StalePropagationEngine:
                     self._reverse_graph.setdefault(target, []).append(source)
             self._loaded = True
             self._degraded = False
-            # 加载后构建 addr_id → graph_key 索引 (Req 4.4)
-            self._build_addr_id_index()
-            logger.info(
-                "StalePropagationEngine: loaded %d edges into adjacency list, %d addr_id index entries",
-                len(edges),
-                len(self._addr_id_index),
-            )
+            # 身份索引在首次使用时按当前目录构建（避免导入期加载目录）
+            self._identity_index = {}
+            self._identity_version = None
+            logger.info("StalePropagationEngine: loaded %d edges into adjacency list", len(edges))
         except (json.JSONDecodeError, OSError, KeyError) as e:
             logger.warning(
                 "Failed to load unified_dependency_graph.json: %s, entering degraded mode",
@@ -114,30 +143,57 @@ class StalePropagationEngine:
             )
             self._degraded = True
 
-    def _build_addr_id_index(self) -> None:
-        """构建 addr_id → graph_key 的 O(1) 查找索引 (Req 4.4)。
+    def _ensure_identity_index(self) -> dict[str, list[str]]:
+        """identity_key → 图键列表；目录版本变化时重建。
 
-        - graph 每个 key 自映射（key → key），保证 addr_id 格式的输入直通命中。
-        - 对 legacy WP 格式的 key，额外建立其归一化 addr_id → key 的反向映射，
-          使新旧两种格式都能匹配到同一图节点（strangler-fig 过渡兼容）。
+        - ``WP:`` 图键经 ``v2_canonical.canonical_uri`` 算身份，同一身份的多种写法进同一个列表（不再
+          ``setdefault`` 先到者胜出）；算不出身份的图键只能按字面命中。
+        - 其他图键（TB: / REPORT: / addr_id 形态等）只按字面：addr_id 形态的图键若由旧构建器用正则归一得到，
+          不能当作可信身份（design §10.2、§16 Q6）。
         """
-        self._addr_id_index.clear()
+        from app.services.acnr.catalog import get_catalog
+
+        catalog = get_catalog()
+        # 版本含图键数：启动后注入的边（workpaper_trace_stale_integration）新增图键时重建
+        version = f"{getattr(catalog, 'registry_version', '') or id(catalog)}#{len(self._graph)}"
+        if self._identity_version == version:
+            return self._identity_index
+        index: dict[str, list[str]] = {}
         for key in self._graph:
-            # 基础自映射
-            self._addr_id_index[key] = key
-            # legacy WP key → 归一化 addr_id 反向映射
-            if _LEGACY_WP_URI.match(key):
-                normalized = _detect_and_normalize(key)
-                if normalized != key:
-                    self._addr_id_index.setdefault(normalized, key)
+            index.setdefault(key, []).append(key)
+            if key.startswith("WP:"):
+                ident = _identity_of(key, catalog).identity_key
+                if ident and ident != key:
+                    index.setdefault(ident, []).append(key)
+        self._identity_index = index
+        self._identity_version = version
+        return index
+
+    def _start_keys(self, source_uri: str) -> tuple[list[str], Any]:
+        """写入口：输入 → (BFS 起点图键, 无法确定身份时的 CanonicalNode)。
+
+        WP 写法 / addr_id 先算 identity_key 再查索引；identity_key 为空时不给起点并返回原因。
+        身份算出但图中无此节点 → ([], None)（空影响，不是错误）。非 WP 域按字面、不加载目录。
+        """
+        node = _identity_of(source_uri)
+        if node is None:
+            return ([source_uri] if source_uri in self._graph else []), None
+        if not node.identity_key:
+            return [], node
+        keys = list(self._ensure_identity_index().get(node.identity_key, []))
+        if source_uri in self._graph and source_uri not in keys:
+            keys.append(source_uri)
+        return keys, None
 
     def reload_graph(self) -> None:
-        """重新加载依赖图（用于图更新后刷新）。重建 addr_id 索引 (Req 4.5)。"""
-        self._graph.clear()
-        self._reverse_graph.clear()
-        self._addr_id_index.clear()
-        self._loaded = False
-        self._load_graph()
+        """重新加载依赖图（用于图更新后刷新）。身份索引随之清空、下次使用时重建。"""
+        with _load_lock:
+            self._graph.clear()
+            self._reverse_graph.clear()
+            self._identity_index = {}
+            self._identity_version = None
+            self._loaded = False
+            self._load_graph()
 
     # ─── BFS Traversal (Task 2.2) ────────────────────────────────────────
 
@@ -170,20 +226,58 @@ class StalePropagationEngine:
 
         return affected
 
+    def _bfs_many(self, starts: list[str], max_depth: int = 5) -> list[str]:
+        """多起点 BFS（同一身份的多种写法）：起点自身都不计入结果。"""
+        if len(starts) == 1:
+            return self._bfs(starts[0], max_depth=max_depth)
+        affected: list[str] = []
+        seen: set[str] = set(starts)
+        for start in starts:
+            for uri in self._bfs(start, max_depth=max_depth):
+                if uri not in seen:
+                    seen.add(uri)
+                    affected.append(uri)
+        return affected
+
+    @staticmethod
+    def _unresolved_response(node: Any) -> dict[str, Any]:
+        return {
+            "affected": [],
+            "total": 0,
+            "degraded": False,
+            "unresolved_code": node.unresolved_code,
+            "unresolved_reason": node.unresolved_reason,
+        }
+
     # ─── Mark Stale by URI (Task 2.3) ────────────────────────────────────
 
     async def _mark_stale_by_uri(
-        self, uris: list[str], project_id: UUID | str, year: int
+        self,
+        uris: list[str],
+        project_id: UUID | str,
+        year: int,
+        *,
+        source_uri: str | None = None,
     ) -> dict[str, int]:
         """按 URI 前缀分发写 DB：
 
         - WP:* → UPDATE working_paper SET prefill_stale=true WHERE wp_code=...
         - REPORT:* → UPDATE financial_report SET is_stale=true WHERE ...
-        - NOTE:* → UPDATE disclosure_notes SET is_stale=true WHERE ...
+        - NOTE:* → 经 ``stale_state.mark_note_stale`` 按章节写入
         - DELIVERABLE:{word_export_task_id}:{section_code} → UPDATE deliverable_section_state SET is_stale=true
         """
         pid = str(project_id)
         counts: dict[str, int] = {"wp": 0, "report": 0, "note": 0, "deliverable": 0}
+        from app.services.stale_state import StaleSource, mark_note_stale
+
+        source_prefix = str(source_uri or "").split(":", 1)[0].upper()
+        note_source = {
+            "TB": StaleSource.TRIAL_BALANCE,
+            "ADJ": StaleSource.ADJUSTMENT,
+            "REPORT": StaleSource.REPORT,
+            "WP": StaleSource.WORKPAPER_SYNC,
+            "NOTE": StaleSource.LINKAGE_PROPAGATION,
+        }.get(source_prefix, StaleSource.LINKAGE_PROPAGATION)
 
         # Group URIs by module prefix
         wp_codes: list[str] = []
@@ -234,17 +328,15 @@ class StalePropagationEngine:
                     )
                     counts["report"] = result.rowcount or 0
 
-                # Mark notes stale (实际列名 note_section 不是 section_code)
+                # Mark notes stale through the single DisclosureNote state entry point.
                 if note_codes:
-                    result = await session.execute(
-                        text(
-                            "UPDATE disclosure_notes SET is_stale = true "
-                            "WHERE project_id = :pid AND year = :year "
-                            "AND note_section = ANY(:codes)"
-                        ),
-                        {"pid": pid, "year": year, "codes": note_codes},
+                    counts["note"] = await mark_note_stale(
+                        session,
+                        project_id,
+                        source=note_source,
+                        sections=note_codes,
+                        year=year,
                     )
-                    counts["note"] = result.rowcount or 0
 
                 # Mark deliverable sections stale (deliverable_section_state)
                 if deliverable_codes:
@@ -385,10 +477,11 @@ class StalePropagationEngine:
         Parameters
         ----------
         source_uri : str
-            变更源 URI。支持两种格式（Req 4.1-4.3）：
-            - legacy WP: ``WP:{wp_code}:{sheet_display}:{cell}`` → 自动归一化为 addr_id
-            - addr_id: ``{wp_code}/{sheet_code}/{cell}`` → 直接使用
-            - 非 WP 域（REPORT:/TB:/NOTE: 等）→ 原样使用
+            变更源 URI（T21：起点只按精确身份，见 ``_start_keys``）：
+            - ``WP:{wp_code}:{表名/别名/编码}:{A1 或标签}`` → 经 exact_identity 算 identity_key 后查图
+            - addr_id ``{wp_code}/{sheet_code}/{cell}`` → 同上
+            - 非 WP 域（REPORT:/TB:/NOTE: 等）→ 按字面
+            身份算不出时不写库，返回 ``unresolved_code`` / ``unresolved_reason``。
         project_id : UUID | str
             项目 ID
         year : int
@@ -406,19 +499,29 @@ class StalePropagationEngine:
 
         start_time = time.time()
 
-        # 格式检测 + 归一化（legacy WP URI → addr_id；addr_id / 非 WP 域原样）(Req 4.1-4.3)
-        normalized = _detect_and_normalize(source_uri)
-        # 经 addr_id 索引解析到实际图 key（O(1) 查找，兼容新旧格式）(Req 4.4)
-        graph_key = self._addr_id_index.get(normalized, normalized)
+        # 起点只按精确身份（T21 / 需求 9.3）：算不出身份不写库、返回原因
+        start_keys, unresolved = self._start_keys(source_uri)
+        if unresolved is not None:
+            logger.info("[StalePropagation] 起点无法确定身份，不写 stale：%s（%s）",
+                        source_uri, unresolved.unresolved_code)
+            from app.services.acnr.metrics import get_acnr_metrics
+
+            get_acnr_metrics().record_stale_start_unresolved(unresolved.unresolved_code)  # T26
+            return self._unresolved_response(unresolved)
 
         # BFS 遍历
-        affected_uris = self._bfs(graph_key, max_depth=5)
+        affected_uris = self._bfs_many(start_keys, max_depth=5) if start_keys else []
 
         if not affected_uris:
             return {"affected": [], "total": 0, "degraded": False}
 
         # 写 DB stale 标记
-        await self._mark_stale_by_uri(affected_uris, project_id, year)
+        await self._mark_stale_by_uri(
+            affected_uris,
+            project_id,
+            year,
+            source_uri=source_uri,
+        )
 
         # SSE 推送前端
         await self._notify_frontend(project_id, affected_uris)
@@ -441,6 +544,31 @@ class StalePropagationEngine:
             "duration_ms": duration_ms,
         }
 
+    def preview_impact(self, source_uri: str, max_depth: int = 5) -> dict[str, Any]:
+        """只读下游影响预览：只做 BFS，不写 DB、不推 SSE、不记审计。
+
+        供 ``GET /api/linkage-bus/impact-by-addr`` 用——该端点原来是会写库的 GET
+        （调 :meth:`on_change`），改为只读预览后不再有副作用（spec
+        acnr-foundation-defect-closure D8 / 需求 10）。
+
+        降级模式下尝试重载图；仍降级则返回空影响 + ``degraded=True``（不回退到
+        粗粒度 mark_stale——那是写操作，只读预览不该触发）。
+        """
+        if self._degraded:
+            self._load_graph()
+            if self._degraded:
+                return {"affected": [], "total": 0, "degraded": True}
+
+        start_keys, unresolved = self._start_keys(source_uri)
+        if unresolved is not None:
+            return self._unresolved_response(unresolved)
+        affected_uris = self._bfs_many(start_keys, max_depth=max_depth) if start_keys else []
+        return {
+            "affected": affected_uris,
+            "total": len(affected_uris),
+            "degraded": False,
+        }
+
     @property
     def is_degraded(self) -> bool:
         """当前是否处于降级模式。"""
@@ -454,4 +582,5 @@ class StalePropagationEngine:
 
 # ─── Module-level singleton ──────────────────────────────────────────────────
 
-stale_engine = StalePropagationEngine()
+# 导入时不读图：第一次用到（on_change / is_degraded / 直接读 _graph）时才加载
+stale_engine = StalePropagationEngine(defer_load=True)

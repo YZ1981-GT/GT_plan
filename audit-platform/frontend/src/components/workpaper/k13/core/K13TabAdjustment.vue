@@ -67,14 +67,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -309,6 +302,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K13TabAdjustment — K13-3 营业外支出调整分录汇总（借贷平衡+EventBus）
  *
@@ -341,7 +335,7 @@ import { useK13Adjustment, K13_ADJ_ITEM_KEY } from '../../composables/useK13Adju
 import { useK13ImportExport } from '../../composables/useK13ImportExport'
 import { generateK13AiText } from '../../composables/useK13AiText'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
@@ -384,6 +378,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: () => props.wpId,
   wpCode: 'K13',
   itemId: () => `K13-adj-${adjustment.activeType.value}`,
+  entryType: adjustment.activeType,
   buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
     account_name: e.accountName,
     report_line_code: e.reportItem || undefined,

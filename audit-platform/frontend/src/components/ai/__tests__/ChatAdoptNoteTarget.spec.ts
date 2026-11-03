@@ -228,6 +228,23 @@ describe('chatTargetOptions 纯映射', () => {
 // ===========================================================================
 
 describe('请求体与后端模型对账（extra=forbid：多一个键或少一个必填键都是 422）', () => {
+  it('导出对话框所需名称上限与请求状态契约', async () => {
+    const noteModule = await import('@/composables/useAiNoteCapture')
+    expect(noteModule.NOTE_NAME_MAX_LENGTH).toBe(200)
+
+    const messages = [{ id: MSG, role: 'assistant', status: 'completed', text: '回复' }] as any[]
+    const capture = noteModule.useAiNoteCapture({ messages: () => messages, host: () => WP_REF })
+    expect(capture.lastRequest.value).toBeNull()
+    capture.toggleMessage(MSG)
+    fetchMock.mockResolvedValueOnce(failJson(503, {
+      code: 503,
+      message: { code: 'internal_error', message: '笔记保存失败，请重试' },
+    }))
+    const request = { name: '存货监盘要点', target: { kind: 'host_project' as const } }
+    await capture.saveAsNote(request)
+    expect(capture.lastRequest.value).toEqual(request)
+  })
+
   it('解析器本身不空转：已知必填字段都能解析出来', () => {
     expect(requiredOf(backendModelFields('AdoptRequest')))
       .toEqual(['host', 'idempotency_key', 'message_id'])

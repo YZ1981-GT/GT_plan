@@ -15,14 +15,13 @@ Validates: requirements.md §三 C-3 批量导出进度反馈
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import uuid
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +45,25 @@ class ExportTask:
     completed_at: Optional[datetime] = None
 
 
+@dataclass(frozen=True)
+class ExportFile:
+    """已完成权限/项目过滤、可安全交给文件线程的导出项。"""
+
+    source: Path
+    arcname: str
+
+
 class ExportProgressService:
-    """批量导出任务管理器 — 内存维护任务状态 + 后台异步生成 ZIP"""
+    """批量导出任务管理器。
+
+    任务状态暂按旧契约保存在内存；ZIP 查询一次完成，数据库会话关闭后才在线程中
+    压缩到临时文件，避免大 ZIP 阻塞事件循环或在内存中保留两份。耐久任务迁移由
+    ``platform-heavy-jobs-and-capacity-closure`` 批 B 承接。
+    """
 
     def __init__(self) -> None:
         self._tasks: dict[str, ExportTask] = {}
+        self._background_tasks: set[asyncio.Task] = set()
 
     # ------------------------------------------------------------------
     # 任务创建 + 异步执行
@@ -62,7 +75,7 @@ class ExportProgressService:
         user_id: str,
         wp_ids: list[str],
     ) -> ExportTask:
-        """创建任务并立即返回；后台 asyncio.create_task 异步处理"""
+        """创建任务并立即返回；后台任务保留强引用直至结束。"""
         task_id = str(uuid.uuid4())
         task = ExportTask(
             task_id=task_id,
@@ -73,14 +86,17 @@ class ExportProgressService:
         )
         self._tasks[task_id] = task
 
-        # 后台异步执行（不阻塞响应）
+        coro = self._run_export(task)
         try:
-            asyncio.create_task(self._run_export(task))
+            background = asyncio.create_task(coro)
         except RuntimeError:
-            # 测试环境无 running loop 时同步报错记录
+            coro.close()
             logger.warning("export task %s scheduled outside event loop", task_id)
             task.status = "failed"
             task.error = "no running event loop"
+        else:
+            self._background_tasks.add(background)
+            background.add_done_callback(self._background_tasks.discard)
         return task
 
     def get_task(self, task_id: str) -> Optional[ExportTask]:
@@ -90,38 +106,98 @@ class ExportProgressService:
     # 后台执行
     # ------------------------------------------------------------------
 
-    async def _run_export(self, task: ExportTask) -> None:
-        """实际生成 ZIP 文件 + SSE 推送进度"""
-        from app.core.database import async_session as async_session_factory
-        from app.services.event_bus import event_bus
-        from app.models.workpaper_models import WorkingPaper, WpIndex
+    async def _load_export_files(self, task: ExportTask) -> list[ExportFile | None]:
+        """一次查询全部底稿；返回顺序与请求一致，缺失项以 None 占位。"""
         import sqlalchemy as sa
+
+        from app.core.database import async_session as async_session_factory
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+
+        try:
+            project_id = uuid.UUID(task.project_id)
+        except ValueError:
+            return [None] * task.total
+        ids: list[uuid.UUID] = []
+        for raw in task.wp_ids:
+            try:
+                ids.append(uuid.UUID(raw))
+            except ValueError:
+                continue
+        if not ids:
+            return [None] * task.total
+
+        async with async_session_factory() as db:
+            rows = (await db.execute(
+                sa.select(
+                    WorkingPaper.id,
+                    WorkingPaper.file_path,
+                    WpIndex.audit_cycle,
+                    WpIndex.wp_code,
+                )
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(
+                    WorkingPaper.id.in_(ids),
+                    WorkingPaper.project_id == project_id,
+                    WpIndex.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.is_deleted == sa.false(),
+                )
+            )).all()
+
+        by_id = {
+            str(row[0]): ExportFile(
+                source=Path(row[1]),
+                arcname=f"{row[2] or 'OTHER'}/{row[3]}.xlsx",
+            )
+            for row in rows
+            if row[1]
+        }
+        return [by_id.get(raw) for raw in task.wp_ids]
+
+    @staticmethod
+    def _write_zip(
+        temp_path: Path,
+        final_path: Path,
+        files: list[ExportFile | None],
+        progress: Callable[[int], None],
+    ) -> None:
+        """同步文件工作在线程执行；直接写盘并在成功后原子切换。"""
+        try:
+            with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+                for index, item in enumerate(files, start=1):
+                    try:
+                        if item is not None and item.source.is_file():
+                            archive.write(item.source, item.arcname)
+                    except OSError as exc:
+                        logger.warning("export: skip %s due to %s", item.source if item else "missing", exc)
+                    finally:
+                        progress(index)
+            temp_path.replace(final_path)
+        except BaseException:
+            temp_path.unlink(missing_ok=True)
+            raise
+
+    async def _run_export(self, task: ExportTask) -> None:
+        """批量取元数据，关闭 DB 会话后在线程直接生成 ZIP。"""
+        from app.services.event_bus import event_bus
 
         task.status = "running"
         EXPORT_DIR.mkdir(parents=True, exist_ok=True)
         zip_path = EXPORT_DIR / f"{task.task_id}.zip"
-
+        temp_path = EXPORT_DIR / f".{task.task_id}.{uuid.uuid4().hex}.tmp"
         try:
-            buffer = io.BytesIO()
-            async with async_session_factory() as db:
-                with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                    for idx, wp_id_str in enumerate(task.wp_ids, start=1):
-                        try:
-                            await self._add_one_workpaper(db, zf, wp_id_str)
-                        except Exception as exc:  # 单个底稿失败不阻断整体
-                            logger.warning(
-                                "export task %s: skip wp %s due to %s",
-                                task.task_id,
-                                wp_id_str,
-                                exc,
-                            )
-                        finally:
-                            task.done = idx
-                            self._broadcast_progress(task)
-
-            # 写入磁盘
-            buffer.seek(0)
-            zip_path.write_bytes(buffer.read())
+            files = await self._load_export_files(task)
+            loop = asyncio.get_running_loop()
+            await asyncio.to_thread(
+                self._write_zip,
+                temp_path,
+                zip_path,
+                files,
+                lambda done: loop.call_soon_threadsafe(self._set_progress, task, done),
+            )
+            # call_soon_threadsafe 的逐项进度排在 to_thread 完成通知之前；再让出一次，确保
+            # complete 永远晚于最后一条 progress。
+            await asyncio.sleep(0)
             task.file_path = zip_path
             task.status = "complete"
             task.completed_at = datetime.now(timezone.utc)
@@ -144,6 +220,7 @@ class ExportProgressService:
                 zip_path,
             )
         except Exception as exc:
+            temp_path.unlink(missing_ok=True)
             logger.exception("export task %s failed", task.task_id)
             task.status = "failed"
             task.error = str(exc)
@@ -157,34 +234,12 @@ class ExportProgressService:
                 },
             )
 
-    async def _add_one_workpaper(self, db, zf: zipfile.ZipFile, wp_id_str: str) -> None:
-        """从 DB 加载单个底稿文件并写入 ZIP"""
-        from app.models.workpaper_models import WorkingPaper, WpIndex
-        import sqlalchemy as sa
-
-        try:
-            wp_id = uuid.UUID(wp_id_str)
-        except ValueError:
-            return
-        result = await db.execute(
-            sa.select(WorkingPaper, WpIndex)
-            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-        )
-        row = result.first()
-        if not row:
-            return
-        wp, idx = row
-        if not wp.file_path:
-            return
-        fp = Path(wp.file_path)
-        if not fp.exists():
-            return
-        arcname = f"{idx.audit_cycle or 'OTHER'}/{idx.wp_code}.xlsx"
-        zf.write(fp, arcname)
+    def _set_progress(self, task: ExportTask, done: int) -> None:
+        task.done = done
+        self._broadcast_progress(task)
 
     def _broadcast_progress(self, task: ExportTask) -> None:
-        """推送 export.progress SSE 事件"""
+        """推送 export.progress SSE 事件。"""
         from app.services.event_bus import event_bus
 
         percent = int(task.done * 100 / max(task.total, 1))

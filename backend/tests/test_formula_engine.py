@@ -71,7 +71,12 @@ class TestFormulaEngine:
         assert r.value == Decimal('0')
         assert r.ok
 
-    def test_missing_account(self):
+    def test_missing_row_is_none_and_not_zero(self):
+        result = execute("ROW('BS-MISSING')", FormulaContext())
+        assert result.ok is False
+        assert result.value is None
+        assert any("不存在" in error for error in result.errors)
+
         ctx = FormulaContext.from_simple_map({})
         r = execute("TB('9999','期末余额')", ctx)
         assert r.value == Decimal('0')

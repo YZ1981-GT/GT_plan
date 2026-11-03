@@ -912,7 +912,7 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
-  // H5 油气资产（八、25 国企专属，上市无独立章节）— 行业限定底稿 oil_gas/mining
+  // H5 油气资产（八、25 国企专属，上市无独立章节）— CAS 27，通常只在油气开采企业核算
   if (isH5OilGasAssetNoteSection(section)) {
     // 油气资产仅国企有独立章节，上市版不跳转
     if (!section.startsWith('八') && !std.startsWith('soe')) return null

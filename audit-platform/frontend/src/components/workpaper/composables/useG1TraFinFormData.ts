@@ -1,4 +1,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
@@ -79,7 +81,7 @@ export function useG1TraFinFormData(opts: {
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
       items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-    })
+    }, { _dedupe: false } as AxiosRequestConfig)
     opts.onAfterSave?.()
   }
 
@@ -93,7 +95,12 @@ export function useG1TraFinFormData(opts: {
       itemId,
       setTimeout(() => {
         _debounceTimers.delete(itemId)
-        void saveImmediate(itemId, updated)
+        void trackPendingWrite(saveImmediate(itemId, updated)).catch((err: unknown) => {
+        // 这家没有重试、没有本地草稿：静默就等于编辑丢了且用户不知道。
+        // 屏障仍从 trackPendingWrite 得到失败，这里只负责让用户看见。
+        ElMessage.error('保存失败，请检查网络后重试')
+        console.error('[G1] 底稿保存未落库', err)
+      })
       }, 2000),
     )
   }
@@ -108,17 +115,25 @@ export function useG1TraFinFormData(opts: {
   // POST publish-to-tb，科目1501余额口径）承载，故移除此重复定义及其 return export。
 
   /** 切表/卸载前刷出未到点的 debounce，避免 <2s 编辑丢失 */
-  function flushPending(): void {
+  async function flushPending(): Promise<void> {
+    const inFlight: Array<Promise<void>> = []
     for (const [itemId, timer] of _debounceTimers.entries()) {
       clearTimeout(timer)
       const resp = allResponses.value.get(itemId)
-      if (resp) void saveImmediate(itemId, resp)
+      if (resp) inFlight.push(saveImmediate(itemId, resp))
     }
     _debounceTimers.clear()
+    // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+    await Promise.all(inFlight)
   }
 
+  registerPendingFlusher(flushPending)
+
   onScopeDispose(() => {
-    flushPending()
+    void flushPending().catch((err: unknown) => {
+      // 卸载时没有 UI 可提示：至少留下可排查的痕迹，不能让失败的保存彻底无痕消失。
+      console.error('[G1] 卸载时仍有未落库的底稿保存', err)
+    })
   })
 
   return {

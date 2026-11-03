@@ -193,8 +193,8 @@ class TestLCycleTriangleLogic:
             checks = await gate.check_l_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "L8勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_l8_01_skip_l8_not_saved(self, db_session, project_id):
         """VR-L8-01 跳过: L8 审定数缺失"""
@@ -210,8 +210,8 @@ class TestLCycleTriangleLogic:
             checks = await gate.check_l_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "L8勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_l8_01_partial_sources_triggers_check(self, db_session, project_id):
         """VR-L8-01 部分来源已保存: 仅 L1 已保存 → 仍触发校验"""
@@ -296,8 +296,8 @@ class TestLCycleTriangleLogic:
             checks = await gate.check_l_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "L1勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_l1_01_skip_partial_data(self, db_session, project_id):
         """VR-L1-01 跳过: L1 有部分数据但期末缺失"""
@@ -317,8 +317,8 @@ class TestLCycleTriangleLogic:
             checks = await gate.check_l_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "L1勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
 
     # --- VR-L3-01: L3 期末 + 重分类 = 期初 + 新增 − 偿还 (warning) ---
@@ -386,8 +386,8 @@ class TestLCycleTriangleLogic:
             checks = await gate.check_l_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "L3勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_l3_01_is_warning_not_blocking(self, db_session, project_id):
         """VR-L3-01 验证: severity 是 warning 不是 blocking（不阻断签字）"""
@@ -496,10 +496,10 @@ class TestLCycleBoundaryConditions:
         ):
             checks = await gate.check_l_cycle_triangle_reconciliation(project_id, 2025)
 
-        # 3 条规则全部 skip 但 passed=True
+        # 3 条规则全部 skip ，status=not_executed
         assert len(checks) == 3
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
         # 模拟 ConsistencyResult 不会被 L 阻断
         result = ConsistencyResult(overall="pass", checks=checks)
         assert result.has_blocking_failures is False
@@ -520,19 +520,19 @@ class TestLCycleIntegration:
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
         ), patch.object(
             gate, "check_tb_balance", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="tb", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="tb", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_bs_balance", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="bs", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="bs", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_is_reconciliation", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="is", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="is", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_notes_completeness", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="notes", passed=True, severity="warning"),
+            return_value=CheckItem(status="passed", check_name="notes", passed=True, severity="warning"),
         ), patch.object(
             gate, "check_data_freshness", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="fresh", passed=True, severity="warning"),
+            return_value=CheckItem(status="passed", check_name="fresh", passed=True, severity="warning"),
         ), patch.object(
             gate, "check_e1_cfs_reconciliation", new_callable=AsyncMock,
             return_value=[],
@@ -563,8 +563,8 @@ class TestLCycleIntegration:
         # L cycle produces 3 checks (all skip since _get_wp_parsed_data returns None)
         l_checks = [c for c in result.checks if "L" in c.check_name and "勾稽" in c.check_name]
         assert len(l_checks) == 3
-        # All should be passed=True (skip mode)
-        assert all(c.passed for c in l_checks)
+        # 数据缺失 ⇒ 全部未执行（五态，spec formula-hub-integrity-closure 需求 16.2）
+        assert all(c.status == "not_executed" for c in l_checks)
         # Verify rule names cover L8/L1/L3
         joined = " ".join(c.check_name for c in l_checks)
         assert "L8勾稽" in joined

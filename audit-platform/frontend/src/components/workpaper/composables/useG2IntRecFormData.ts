@@ -1,6 +1,8 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
 import { G2_ACCOUNT_CODE } from './g2AdjudicationItems'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -9,6 +11,14 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!opts.wpId.value) throw new Error('缺少底稿标识，无法保存')
+      await cas.save({ wpId: opts.wpId.value, projectId: opts.projectId.value, items })
+    },
+  })
   const itemPrefix = 'G2-'
 
   async function loadResponses() {
@@ -16,6 +26,7 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     try {
       const res = await api.get(`/api/workpapers/${opts.wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id?.startsWith(itemPrefix)) {
@@ -47,13 +58,31 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   }
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>) {
+    const timer = _debounceTimers.get(itemId)
+    if (timer) clearTimeout(timer)
+    _debounceTimers.delete(itemId)
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated = { ...existing, ...data }
+    const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
-    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
-      project_id: opts.projectId.value,
-      items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
+    queue.mark(itemId)
+    await queue.flush()
+  }
+
+  async function saveBatch(items: ChecklistResponse[]): Promise<void> {
+    if (!items.length) return
+    const payload = items.map((item) => {
+      const timer = _debounceTimers.get(item.item_id)
+      if (timer) clearTimeout(timer)
+      _debounceTimers.delete(item.item_id)
+      const existing = allResponses.value.get(item.item_id) || {
+        item_id: item.item_id, conclusion: null, remark: null,
+      }
+      const updated = { ...existing, ...item, item_id: item.item_id }
+      allResponses.value.set(item.item_id, updated)
+      return updated
     })
+    queue.markMany(payload.map((item) => item.item_id))
+    await queue.flush()
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -62,9 +91,10 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     allResponses.value.set(itemId, updated)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
+    queue.mark(itemId)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void queue.flush().catch(() => undefined)
     }, 2000))
   }
 
@@ -75,17 +105,14 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   // 已改由 useG2Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目1132余额口径）
   // 承载，故移除此重复定义及其 return export。
 
-  function flushPending(): void {
-    for (const [itemId, timer] of _debounceTimers.entries()) {
-      clearTimeout(timer)
-      const resp = allResponses.value.get(itemId)
-      if (resp) void saveImmediate(itemId, resp)
-    }
+  async function flushPending(): Promise<void> {
+    for (const timer of _debounceTimers.values()) clearTimeout(timer)
     _debounceTimers.clear()
+    await queue.flush()
   }
 
   onScopeDispose(() => {
-    flushPending()
+    void flushPending().catch(() => undefined)
   })
 
   return {
@@ -95,6 +122,7 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     loadAll,
     getSheet,
     saveImmediate,
+    saveBatch,
     debouncedSave,
     flushPending,
     accountCode: G2_ACCOUNT_CODE,

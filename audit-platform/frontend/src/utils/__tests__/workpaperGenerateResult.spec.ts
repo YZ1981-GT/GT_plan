@@ -66,6 +66,16 @@ describe('summarizeWorkpaperGenerateResult', () => {
     })
   })
 
+  it('operation stale / failed 不误报为生成完成', () => {
+    const stale = summarizeWorkpaperGenerateResult({ created: 0, status: 'stale' })
+    expect(stale.level).toBe('warning')
+    expect(stale.message).toContain('程序裁剪结果已变化')
+    expect(stale.message).not.toContain('生成完成')
+    const failed = summarizeWorkpaperGenerateResult({ created: 0, status: 'failed' })
+    expect(failed.level).toBe('warning')
+    expect(failed.message).toContain('底稿生成失败')
+  })
+
   it('统一回执（spec procedure-chain-hardening-and-java-contracts R11）：已有底稿与请求内未填表头只作说明，失败带原因', () => {
     const info = summarizeWorkpaperGenerateResult({
       created: 2,

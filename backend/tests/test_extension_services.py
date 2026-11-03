@@ -757,6 +757,12 @@ class TestSignaturesAPI:
 
 class TestAIPluginsAPI:
 
+    @pytest_asyncio.fixture(autouse=True)
+    async def _admin_role(self, db_session, seeded_db):
+        user = await db_session.get(User, FAKE_USER_ID)
+        user.role = UserRole.admin
+        await db_session.commit()
+
     @pytest.mark.asyncio
     async def test_register_api(self, client):
         resp = await client.post("/api/ai-plugins", json={

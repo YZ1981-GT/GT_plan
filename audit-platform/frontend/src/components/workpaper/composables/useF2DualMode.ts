@@ -3,6 +3,7 @@
  */
 import { ref, onMounted, type Ref } from 'vue'
 import http from '@/utils/http'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 export type F2RenderMode = 'html' | 'onlyoffice'
 
@@ -27,11 +28,12 @@ export function useF2DualMode(options: UseF2DualModeOptions) {
     { label: '在线编辑', value: 'onlyoffice' },
   ]
 
-  function loadPersistedMode(): void {
+  function loadPersistedMode(): F2RenderMode | null {
     try {
       const saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+      if (saved === 'html' || saved === 'onlyoffice') return saved
     } catch { /* ignore */ }
+    return null
   }
 
   function persistMode(mode: F2RenderMode): void {
@@ -61,19 +63,21 @@ export function useF2DualMode(options: UseF2DualModeOptions) {
     if (target === 'onlyoffice' && !isOoAvailable.value) return
 
     if (target === 'onlyoffice') {
-      const sn = sheetName?.value || 'F2'
-      try {
-        const res = await http.get(
-          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config`,
-          { _silent: true } as any,
-        )
-        const result = res.data?.data ?? res.data ?? {}
-        ooConfig.value = result.data || result
-        currentMode.value = 'onlyoffice'
-        persistMode('onlyoffice')
-      } catch {
-        isOoAvailable.value = false
-      }
+      await runLegacyOnlyOfficeTransition(async () => {
+        const sn = sheetName?.value || 'F2'
+        try {
+          const res = await http.get(
+            `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config`,
+            { _silent: true } as any,
+          )
+          const result = res.data?.data ?? res.data ?? {}
+          ooConfig.value = result.data || result
+          currentMode.value = 'onlyoffice'
+          persistMode('onlyoffice')
+        } catch {
+          isOoAvailable.value = false
+        }
+      })
     } else {
       currentMode.value = 'html'
       ooConfig.value = null
@@ -87,14 +91,9 @@ export function useF2DualMode(options: UseF2DualModeOptions) {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    // OO 健康检查不阻塞首屏；仅在用户曾选 OO 或主动切换时再探测
+    const saved = loadPersistedMode()
+    // OO 健康检查不阻塞首屏；恢复偏好也必须走完整保存屏障，不能先挂 OO。
     void (async () => {
-      let saved: string | null = null
-      try {
-        saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      } catch { /* ignore */ }
-
       if (saved === 'onlyoffice') {
         const healthy = await checkOOHealth()
         if (healthy) {

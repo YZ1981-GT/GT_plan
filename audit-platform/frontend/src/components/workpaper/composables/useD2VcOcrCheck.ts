@@ -21,6 +21,7 @@ import { ref, inject, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { VoucherCheckRow, OcrExtractedData } from './useD2VoucherCheckEnhanced'
+import { appendRowEvidence, refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -300,8 +301,13 @@ export function backfillCheckColumns(row: VoucherCheckRow, confirmed: CheckCompa
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
+/** 识别附件挂到本行的表页键（行槽位 `row:{行 id}`）；宿主 📎 旁的小眼睛按同一位置读取 */
+export const D2_7_EVIDENCE_SHEET = 'D2-7'
+
 export interface UseD2VcOcrCheckOptions {
   wpId: Ref<string>
+  /** 项目 id：识别成功后刷新本底稿附件链接（行内小眼睛立即看到新文件） */
+  projectId?: Ref<string | null | undefined>
   /** 获取指定行数据的函数 */
   getRow: (rowId: string) => VoucherCheckRow | undefined
   /** 更新行数据的函数 */
@@ -309,7 +315,7 @@ export interface UseD2VcOcrCheckOptions {
 }
 
 export function useD2VcOcrCheck(options: UseD2VcOcrCheckOptions) {
-  const { wpId, getRow, updateRow } = options
+  const { wpId, getRow, updateRow, projectId } = options
 
   const isProcessing = ref(false)
 
@@ -335,12 +341,15 @@ export function useD2VcOcrCheck(options: UseD2VcOcrCheckOptions) {
       // 1. Call OCR service
       const formData = new FormData()
       formData.append('file', file)
+      // 附件挂到本行（抽样凭证行同时挂到该凭证，spec attachment-voucher-evidence-binding）
+      appendRowEvidence(formData, D2_7_EVIDENCE_SHEET, rowEvidenceCell(rowId), row)
 
       const res = await http.post(
         `/api/workpapers/${wpId.value}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
 
       // 2. Extract OCR fields
       const rawResponse = res?.data?.data ?? res?.data

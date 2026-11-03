@@ -140,17 +140,18 @@
           </template>
         </el-table-column>
 
+        <!-- 派生行（R11/R13/R20）的调整、上期列与月度格一样由模板跨行公式算，只读 -->
         <el-table-column v-if="isColVisible('aje')" label="AJE" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'aje', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.aje) }}</span>
+            <el-input-number v-if="!isReadonly && !isL82DerivedAmountField(row.key, 'aje')" :model-value="row.aje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'aje', val ?? 0)" />
+            <span v-else :class="{ 'formula-value': isL82DerivedAmountField(row.key, 'aje') }">{{ fmtAmount(row.aje) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column v-if="isColVisible('rje')" label="RJE" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.rje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'rje', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.rje) }}</span>
+            <el-input-number v-if="!isReadonly && !isL82DerivedAmountField(row.key, 'rje')" :model-value="row.rje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'rje', val ?? 0)" />
+            <span v-else :class="{ 'formula-value': isL82DerivedAmountField(row.key, 'rje') }">{{ fmtAmount(row.rje) }}</span>
           </template>
         </el-table-column>
 
@@ -167,33 +168,33 @@
 
         <el-table-column v-if="isColVisible('ratio')" label="占比" width="80" align="right">
           <template #header>
-            <el-tooltip content="公式: 本期审定/合计×100%" placement="top">
+            <el-tooltip content="公式: 本期审定 / 合计行本期审定（模板 R = IF(Q=0,0,Q/Q22)）" placement="top">
               <span class="formula-col-header">占比</span>
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <span class="formula-value">{{ row.ratio ? row.ratio.toFixed(1) + '%' : '—' }}</span>
+            <span class="formula-value">{{ row.ratio ? (row.ratio * 100).toFixed(2) + '%' : '—' }}</span>
           </template>
         </el-table-column>
 
         <el-table-column v-if="isColVisible('priorUnadjusted')" label="上期未审" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorUnadjusted', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
+            <el-input-number v-if="!isReadonly && !isL82DerivedAmountField(row.key, 'priorUnadjusted')" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorUnadjusted', val ?? 0)" />
+            <span v-else :class="{ 'formula-value': isL82DerivedAmountField(row.key, 'priorUnadjusted') }">{{ fmtAmount(row.priorUnadjusted) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column v-if="isColVisible('priorAje')" label="上期AJE" width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorAje', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.priorAje) }}</span>
+            <el-input-number v-if="!isReadonly && !isL82DerivedAmountField(row.key, 'priorAje')" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorAje', val ?? 0)" />
+            <span v-else :class="{ 'formula-value': isL82DerivedAmountField(row.key, 'priorAje') }">{{ fmtAmount(row.priorAje) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column v-if="isColVisible('priorRje')" label="上期RJE" width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorRje', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.priorRje) }}</span>
+            <el-input-number v-if="!isReadonly && !isL82DerivedAmountField(row.key, 'priorRje')" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorRje', val ?? 0)" />
+            <span v-else :class="{ 'formula-value': isL82DerivedAmountField(row.key, 'priorRje') }">{{ fmtAmount(row.priorRje) }}</span>
           </template>
         </el-table-column>
 
@@ -224,9 +225,18 @@
       </el-table-column>
     </el-table>
 
+    <!-- 新增行不在模板合计行（R22）里：OnlyOffice 侧同样不计入 -->
+    <el-alert v-if="hasRowsOutsideTotal" type="warning" :closable="false" show-icon style="margin-top: 8px">
+      <template #title>
+        新增项目不计入合计：模板合计行只取利息净支出、未确认融资费用、未实现融资收益、承兑汇票贴息、汇兑净损失、手续费及其他六项，新增项目的金额请并入相应项目（如「手续费及其他」）
+      </template>
+    </el-alert>
+
     <!-- ═══ 净财务费用高亮汇总 ═══ -->
     <div class="summary-bar">
-      <span>本期审定合计：<strong class="formula-value--primary">{{ fmtAmount(totalPeriodAudited) }}</strong></span>
+      <el-tooltip content="与模板合计行 R22 同：利息净支出 + 未确认融资费用 − 未实现融资收益 + 承兑汇票贴息 + 汇兑净损失 + 手续费及其他" placement="top">
+        <span>本期审定合计：<strong class="formula-value--primary">{{ fmtAmount(totalPeriodAudited) }}</strong></span>
+      </el-tooltip>
       <span>上期审定合计：<strong>{{ fmtAmount(totalPriorAudited) }}</strong></span>
       <span>变动率：<strong :class="{ 'abnormal-rate': totalChangeRate !== 'N/A' && Math.abs(totalChangeRate as number) > 20 }">{{ fmtRate(totalChangeRate) }}</strong></span>
       <span>共 <strong>{{ computedRows.length }}</strong> 个项目</span>
@@ -264,8 +274,10 @@
       <ul>
         <li>23列按3区段Tab拆分管理，行跨区段同步（切换不丢数据）</li>
         <li>本期未审合计（N列）= SUM(1月~12月)；本期审定 = 未审合计 + AJE + RJE</li>
-        <li>占比 = 本期审定 / 合计行审定 × 100%</li>
-        <li>默认行对齐L8-1审定表10项费用结构，可新增自定义项目</li>
+        <li>利息费用 / 利息净支出 / 汇兑净损失三行由上方科目跨行计算（月度、调整列只读，汇兑净损失含上期列）</li>
+        <li>合计 = 利息净支出 + 未确认融资费用 − 未实现融资收益 + 承兑汇票贴息 + 汇兑净损失 + 手续费及其他（与模板合计行同）</li>
+        <li>占比 = 本期审定 / 合计行本期审定</li>
+        <li>默认行对齐L8-1审定表10项费用结构；新增项目不计入合计，金额请并入相应项目</li>
         <li>利息支出与L1/L3/L4/L5联动（通过EventBus自动接收）</li>
       </ul>
     </details>
@@ -296,7 +308,7 @@ import {
   type L8DetailRow,
   type L8DetailSegment,
 } from '../../composables/useL8Detail'
-import { isL82DerivedRowKey, isL82TemplateRowId } from './l8DetailRowIdentity'
+import { isL82DerivedAmountField, isL82DerivedRowKey, isL82TemplateRowId } from './l8DetailRowIdentity'
 import { useL8ImportExport } from '../../composables/useL8ImportExport'
 
 const props = defineProps<{
@@ -329,6 +341,7 @@ const {
   totalPriorAudited,
   totalChangeRate,
   abnormalRows,
+  hasRowsOutsideTotal,
   addRow,
   removeRow,
   updateRow,

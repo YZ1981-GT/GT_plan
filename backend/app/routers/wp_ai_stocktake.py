@@ -145,9 +145,10 @@ async def stocktake_summary(
         raise HTTPException(400, "差异记录和当前结论不能同时为空")
 
     # 调用 LLM 生成摘要（复用 wp_ai_service 的脱敏 + LLM 调用机制）
+    from app.services.ai_task_executor import actor_role
     from app.services.wp_ai_service import WpAIService
 
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     diff_text = _format_differences(body.differences)
 
     try:

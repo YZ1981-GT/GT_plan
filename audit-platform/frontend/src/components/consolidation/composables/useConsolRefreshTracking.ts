@@ -49,8 +49,8 @@ export interface RefreshTrackingDeps {
   loadGroupTree: () => Promise<boolean>
   /** 重新读取附注章节（向子组件代理）。 */
   reloadNoteForRefresh: (context: RefreshContext) => Promise<any>
-  /** 捕获当前刷新上下文快照。 */
-  captureRefreshContext: () => RefreshContext
+  /** 捕获当前刷新上下文快照；年度未就绪为 null。 */
+  captureRefreshContext: () => RefreshContext | null
   /** 当前活跃 tab 名。 */
   getActiveTab: () => string
 }
@@ -130,7 +130,7 @@ export function useConsolRefreshTracking(deps: RefreshTrackingDeps) {
         // 冻结上下文过期时 best-effort 用当前章节补重读一次
         if (noteResult?.status === 'stale' || noteResult?.status === 'skipped') {
           const currentCtx = deps.captureRefreshContext()
-          if (currentCtx.sectionId && currentCtx.sectionId !== context.sectionId
+          if (currentCtx && currentCtx.sectionId && currentCtx.sectionId !== context.sectionId
               && currentCtx.projectId === context.projectId
               && currentCtx.year === context.year
               && currentCtx.nodeKey === context.nodeKey) {

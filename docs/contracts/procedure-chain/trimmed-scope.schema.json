@@ -1,0 +1,161 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/trimmed-scope.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_scope_retention.py（TrimmedScope.to_payload / decide）；接口：POST /api/projects/{pid}/procedure-trim/preview|apply",
+  "title": "TrimmedScope（粗裁结果快照）",
+  "description": "一个项目的粗裁结果。由 procedure_instances 的（编码, 状态）行构建：编码 = coalesce(wp_code, procedure_code)，状态 skip / not_applicable 为已裁、execute 为保留；同一编码多行时任一行 execute 即保留。判定规则（decision）见 README「粗裁判定」与 cases/trimmed-scope.cases.json。",
+  "type": "object",
+  "required": ["exact", "ranges"],
+  "additionalProperties": false,
+  "properties": {
+    "exact": {
+      "description": "普通程序行：规范化编码 → 是否已裁。",
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "ranges": {
+      "description": "区间程序行原文（如 D2-6至D2-13）→ 是否已裁；成员编码由区间展开得出（右侧可省前缀：D2-6至13）。",
+      "type": "object",
+      "propertyNames": { "pattern": "至" },
+      "additionalProperties": { "type": "boolean" }
+    }
+  },
+  "$defs": {
+    "scopeStatus": {
+      "description": "procedure_instances.status 取值。",
+      "enum": ["execute", "skip", "not_applicable"]
+    },
+    "decision": {
+      "description": "一个底稿编码的判定：decided_by = 决定它的程序行编码（区间成员回报区间行原文），没有任何程序行覆盖时为 null（保留）。",
+      "type": "object",
+      "required": ["wp_code", "decided_by", "trimmed"],
+      "additionalProperties": false,
+      "properties": {
+        "wp_code": { "type": "string" },
+        "decided_by": { "type": ["string", "null"] },
+        "trimmed": { "type": "boolean" }
+      }
+    },
+    "unavailable": {
+      "description": "读不到粗裁结果（库错误）：生成 / 委派一律停止（fail-closed），HTTP 503。",
+      "type": "object",
+      "required": ["error", "message"],
+      "properties": {
+        "error": { "const": "trim_scope_unavailable" },
+        "message": { "type": "string" }
+      }
+    },
+    "scopeEntry": {
+      "description": "粗裁条目（canonical key = scope:{cycle}:{wp_index_code}）。",
+      "type": "object",
+      "required": ["kind", "cycle", "wp_index_code", "target_status"],
+      "properties": {
+        "kind": { "const": "scope" },
+        "cycle": { "$ref": "common.schema.json#/$defs/cycle" },
+        "wp_index_code": { "$ref": "common.schema.json#/$defs/wpCode" },
+        "target_status": { "$ref": "#/$defs/scopeStatus" },
+        "skip_reason": { "type": ["string", "null"], "maxLength": 500 },
+        "reason_code": { "type": ["string", "null"], "maxLength": 50 }
+      }
+    },
+    "rowEntry": {
+      "description": "细裁条目（canonical key = row:{template_code}:{sheet_key}:{definition_key}）。",
+      "type": "object",
+      "required": ["kind", "template_code", "sheet_key", "definition_key", "target_applicability"],
+      "properties": {
+        "kind": { "const": "row" },
+        "template_code": { "type": "string" },
+        "sheet_key": { "type": "string" },
+        "definition_key": { "type": "string" },
+        "target_applicability": { "enum": ["execute", "not_applicable"] }
+      }
+    },
+    "previewRequest": {
+      "type": "object",
+      "properties": {
+        "entries": { "type": "array", "items": { "anyOf": [{ "$ref": "#/$defs/scopeEntry" }, { "$ref": "#/$defs/rowEntry" }] } },
+        "scheme_id": { "$ref": "common.schema.json#/$defs/nullableUuid" }
+      }
+    },
+    "applyRequest": {
+      "description": "preview_id 一次性消费；同一 request_id 重试幂等返回上次结果。confirm_substantive_recycle 不进预览哈希（确认后可用同一凭证重试）。",
+      "allOf": [{ "$ref": "#/$defs/previewRequest" }],
+      "required": ["preview_id", "request_id"],
+      "properties": {
+        "preview_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "confirm_substantive_recycle": { "type": "boolean" }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "required": ["key", "reason"],
+      "properties": {
+        "key": { "type": "string" },
+        "reason": { "enum": ["no_scope_target", "no_active_task", "legacy_uuid_unresolvable"] }
+      }
+    },
+    "substantiveTarget": {
+      "description": "有编制内容、将移入回收站的底稿；应用时须 confirm_substantive_recycle=true，否则 409 substantive_recycle_unconfirmed。",
+      "type": "object",
+      "required": ["wp_index_id", "wp_code", "wp_name", "substantive_reasons"],
+      "additionalProperties": false,
+      "properties": {
+        "wp_index_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "wp_code": { "type": "string" },
+        "wp_name": { "type": "string" },
+        "substantive_reasons": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "recyclePreview": {
+      "type": "object",
+      "required": ["to_recycle", "substantive", "to_restore", "to_reopen_tasks"],
+      "additionalProperties": false,
+      "properties": {
+        "to_recycle": { "type": "array", "items": { "type": "string" } },
+        "substantive": { "type": "array", "items": { "$ref": "#/$defs/substantiveTarget" } },
+        "to_restore": { "type": "array", "items": { "type": "string" } },
+        "to_reopen_tasks": { "$ref": "common.schema.json#/$defs/count" }
+      }
+    },
+    "previewResponse": {
+      "type": "object",
+      "required": ["preview_id", "expires_at", "summary", "conflicts", "migration_conflicts", "recycle_preview"],
+      "properties": {
+        "preview_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "expires_at": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "summary": {
+          "type": "object",
+          "required": ["targets", "would_change", "unchanged", "conflict", "migration_conflict"],
+          "additionalProperties": { "$ref": "common.schema.json#/$defs/count" }
+        },
+        "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
+        "migration_conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
+        "recycle_preview": { "$ref": "#/$defs/recyclePreview" }
+      }
+    },
+    "applyResponse": {
+      "type": "object",
+      "required": ["applied", "unchanged", "conflict", "conflicts", "per_entry", "recycled_codes", "restored_codes"],
+      "properties": {
+        "applied": { "$ref": "common.schema.json#/$defs/count" },
+        "unchanged": { "$ref": "common.schema.json#/$defs/count" },
+        "conflict": { "$ref": "common.schema.json#/$defs/count" },
+        "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
+        "per_entry": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "applied", "unchanged"],
+            "properties": {
+              "key": { "type": "string" },
+              "applied": { "$ref": "common.schema.json#/$defs/count" },
+              "unchanged": { "$ref": "common.schema.json#/$defs/count" }
+            }
+          }
+        },
+        "recycled_codes": { "type": "array", "items": { "type": "string" } },
+        "restored_codes": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

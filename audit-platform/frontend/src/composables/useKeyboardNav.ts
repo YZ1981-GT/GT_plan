@@ -16,6 +16,11 @@ import { onMounted, onUnmounted, type Ref } from 'vue'
 export interface KeyboardNavOptions {
   /** 容器元素 ref */
   containerRef: Ref<HTMLElement | { $el: HTMLElement } | null>
+  /**
+   * 当前是否处理按键（缺省始终处理）。表格按 Excel 方式工作时键盘由表格内核负责，
+   * 调用方传 `() => !cellSelection.kernelActive()` 让开（spec excel-style-table-editing 5.2）。
+   */
+  enabled?: () => boolean
   /** 总行数 */
   rowCount: () => number
   /** 总列数 */
@@ -40,6 +45,7 @@ export function useKeyboardNav(options: KeyboardNavOptions) {
   }
 
   function handleKeyDown(e: KeyboardEvent) {
+    if (options.enabled && !options.enabled()) return
     // 忽略在 input/textarea 中的按键（除了 Tab 和 Escape）
     const target = e.target as HTMLElement
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable

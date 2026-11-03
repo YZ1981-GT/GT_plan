@@ -8,6 +8,7 @@
  */
 import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import {
   assignAdjustmentCollaboration,
   getGroupCollaboration,
@@ -68,7 +69,8 @@ function handleCollabError(e: any, fallback: string): void {
 
 export interface UseAdjustmentCollaborationOptions {
   projectId: Ref<string> | (() => string) | string
-  year: Ref<number> | (() => number) | number
+  /** 审计年度；项目没填为 null ⇒ 转派提示去填年度、不发请求 */
+  year: Ref<number | null> | (() => number | null) | number | null
 }
 
 export function useAdjustmentCollaboration(opts: UseAdjustmentCollaborationOptions) {
@@ -78,10 +80,15 @@ export function useAdjustmentCollaboration(opts: UseAdjustmentCollaborationOptio
   const pid = () => unwrap(opts.projectId)
 
   async function assign(entryGroupId: string, assigneeId: string, note?: string): Promise<boolean> {
+    const year = unwrap(opts.year)
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return false
+    }
     busy.value = true
     try {
       await assignAdjustmentCollaboration(pid(), entryGroupId, {
-        assignee_id: assigneeId, year: unwrap(opts.year), note,
+        assignee_id: assigneeId, year, note,
       })
       ElMessage.success('已转派给协作者')
       return true

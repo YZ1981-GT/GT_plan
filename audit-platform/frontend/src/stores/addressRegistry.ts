@@ -21,10 +21,12 @@ import { addressRegistry as paths } from '@/services/apiPaths'
 import { eventBus } from '@/utils/eventBus'
 import {
   useAcnr,
+  isListedCell,
   type AcnrSheetEntry,
   type AcnrCellEntry,
   type AcnrResolveResult,
 } from '@/services/acnr/useAcnr'
+import { isAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
 
 /**
  * 整库加载一次最多取的地址条数 = 后端 `ADDRESS_REGISTRY_MAX_LIMIT`（守卫 backend/tests/test_address_registry_limit.py 比对）。
@@ -62,6 +64,8 @@ export interface ResolveResult {
   jump_route?: string
   domain?: string
   tags?: string[]
+  error?: string
+  reason?: string
 }
 
 export interface ValidateResult {
@@ -106,11 +110,13 @@ function _mapAcnrResolveToResult(uri: string, r: AcnrResolveResult): ResolveResu
   return {
     found: !!r.found,
     uri: outUri,
-    label: r.semantic_label,
+    label: r.display_label,
     formula_ref: r.formula_ref,
     jump_route: r.jump_route,
     domain: _domainFromUri(r.uri) ?? _domainFromUri(uri) ?? (r.addr_id ? 'wp' : undefined),
     tags: undefined,
+    error: r.error,
+    reason: r.reason,
   }
 }
 
@@ -122,7 +128,7 @@ function _mapSheetToEntry(s: AcnrSheetEntry): AddressEntry {
     source: s.parent_wp_code,
     path: s.sheet_code,
     cell: '',
-    label: s.sheet_name || s.sheet_code,
+    label: s.display_label || s.sheet_code,
     formula_ref: '',
     jump_route: '',
     wp_code: s.parent_wp_code,
@@ -139,7 +145,7 @@ function _mapCellToEntry(c: AcnrCellEntry): AddressEntry {
     source: wpCode,
     path: sheetCode,
     cell: c.cell_address || coord,
-    label: c.semantic_label || c.cell_address || c.addr_id,
+    label: c.display_label || c.cell_address || c.addr_id,
     formula_ref: c.formula_ref || '',
     jump_route: '',
     wp_code: wpCode,
@@ -170,7 +176,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
 
   // ACNR SDK 单例：store 内复用同一实例，保证其内部缓存归 store 掌控，
   // 便于 template-applied / formula-changed 时统一 clearCache（R16.5）。
-  const _acnr = useAcnr()
+  // D9（需求 11.1）：按当前绑定项目订阅 SSE 失效。store 是 Pinia setup store（effect scope
+  // 内），useAcnr 内部 watch 会在 refresh 切 _projectId 时同步切订阅、随 store 释放。
+  const _acnr = useAcnr(() => _projectId.value)
 
   // ─── 按域分组的计算属性 ───
   const tbAddresses = computed(() => addresses.value.filter(a => a.domain === 'tb'))
@@ -261,7 +269,7 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
 
     const matchedSheets = kw
       ? sheetList.filter(s =>
-          (s.sheet_name || '').toLowerCase().includes(kw) ||
+          (s.display_label || '').toLowerCase().includes(kw) ||
           (s.sheet_code || '').toLowerCase().includes(kw) ||
           (s.parent_wp_code || '').toLowerCase().includes(kw),
         )
@@ -274,7 +282,8 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     for (const s of matchedSheets.slice(0, CELL_SHEET_LIMIT)) {
       try {
         const cells = await _acnr.listCells(s.parent_wp_code, s.sheet_code)
-        for (const c of cells) results.push(_mapCellToEntry(c))
+        // 停用 cell 不列（与地址树 loadCellNodes 同一谓词，RV7-02）
+        for (const c of cells.filter(isListedCell)) results.push(_mapCellToEntry(c))
       } catch {
         /* 单 sheet cell 加载失败忽略，不影响整体搜索 */
       }
@@ -344,7 +353,10 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
       if (acnrRes && acnrRes.found) {
         return _mapAcnrResolveToResult(uri, acnrRes)
       }
-      // found=false（含 invalid_uri / 未命中）→ 落到 legacy 回退
+      if (isAcnrRegistryFailure(acnrRes)) {
+        return _mapAcnrResolveToResult(uri, acnrRes)
+      }
+      // found=false（普通未命中）→ 落到 legacy 回退
     } catch (e) {
       console.warn('[addressRegistry] ACNR resolve 异常，回退 legacy', e)
     }
@@ -376,6 +388,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
         const r = await _acnr.resolveFormula(formula, _projectId.value || undefined)
         if (r && r.found) {
           return { valid: true, issues: [], formula }
+        }
+        if (isAcnrRegistryFailure(r)) {
+          return { valid: false, issues: [{ ref: formula, message: r.reason }], formula }
         }
       } catch (e) {
         console.warn('[addressRegistry] ACNR validate 异常，回退 legacy(fail-open)', e)

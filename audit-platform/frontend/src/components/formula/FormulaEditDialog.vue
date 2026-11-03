@@ -50,14 +50,12 @@
             />
           </div>
           <div class="gt-fe-formula-input">
-            <el-input
+            <FormulaInput
               v-model="f.expression"
-              type="textarea"
-              :rows="1"
-              :autosize="{ minRows: 2, maxRows: 6 }"
+              :project-id="projectId"
+              :report-rows="formulaInputReportRows"
+              :wp-codes="formulaInputWpCodes"
               placeholder="输入公式，如 TB('1001','期末余额') 或 ROW('BS-001')+ROW('BS-002')"
-              resize="none"
-              :input-style="{ fontSize: '11px', fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace', lineHeight: '1.5' }"
             />
             <div class="gt-fe-quick-btns">
               <span class="gt-fe-btn-label">取数:</span>
@@ -256,7 +254,7 @@
         </el-button>
         <div>
           <el-button @click="visible = false">取消</el-button>
-          <el-button type="primary" @click="onSave">保存公式</el-button>
+          <el-button type="primary" :disabled="hasFormulaValidationError" @click="onSave">保存公式</el-button>
         </div>
       </div>
     </template>
@@ -437,6 +435,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
 import {
@@ -445,10 +444,10 @@ import {
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
 import { ADDRESS_REGISTRY_FULL_LOAD_LIMIT } from '@/stores/addressRegistry'
 import FormulaDebugPanel from './FormulaDebugPanel.vue'
+import FormulaInput from './FormulaInput.vue'
+import { validate } from '@/composables/formula/formulaSyntaxParser'
 
 const route = useRoute()
-// ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）
-const acnr = useAcnr()
 
 interface FormulaItem {
   expression: string
@@ -461,12 +460,21 @@ interface FormulaItem {
 const props = defineProps<{
   modelValue: boolean
   row: any
+  /** 打开时预填（公式管理「建议公式」：该行还没有公式，带入上游公式与分类，确认后才保存）；行已有公式时不用 */
+  prefill?: { formula: string; category?: string; description?: string } | null
   sourceRows?: any[]
   applicableStandard?: string
   projectId?: string
   year?: number
+  /** 当前底稿编码，供 WP 参数补全；报表编辑场景可不传。 */
+  wpCode?: string
   wpContext?: WpFormulaContext
 }>()
+
+// ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）。
+// D9（需求 11.1）：按当前项目订阅 SSE 失效（props 优先、其次路由项目）。放 defineProps 之后——
+// useAcnr 内部 watch immediate 在 setup 期同步读 props，props 须先初始化（否则 TDZ）。
+const acnr = useAcnr(() => props.projectId || (route.params.projectId as string))
 
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
@@ -480,6 +488,29 @@ const visible = computed({
 })
 
 const formulas = ref<FormulaItem[]>([])
+
+/** 增强输入器候选：当前报表行次和底稿编码均从本次弹窗上下文派生。 */
+const formulaInputReportRows = computed(() => {
+  const seen = new Set<string>()
+  const rows: Array<{ row_code: string; row_name?: string }> = []
+  for (const source of props.sourceRows || []) {
+    const code = String(source?.row_code || '').trim()
+    if (!code || seen.has(code)) continue
+    seen.add(code)
+    rows.push({ row_code: code, row_name: String(source?.row_name || '') })
+  }
+  return rows
+})
+
+const formulaInputWpCodes = computed(() => {
+  const candidates = [props.wpCode, props.wpContext?.wpCode, props.row?.wp_code,
+    ...(props.sourceRows || []).map((source: any) => source?.wp_code)]
+  return [...new Set(candidates.map((code) => String(code || '').trim()).filter(Boolean))]
+})
+
+const formulaValidationErrors = computed(() => formulas.value.flatMap((formula) => validate(formula.expression).errors))
+const hasFormulaValidationError = computed(() => formulaValidationErrors.value.length > 0)
+
 const initialDraftFingerprint = ref('')
 const showDebugPanel = ref(false)
 const currentEditFormula = computed(() => {
@@ -523,9 +554,9 @@ watch(visible, (v) => {
       }
     } else {
       formulas.value = [{
-        expression: '',
-        category: 'auto_calc',
-        description: '',
+        expression: props.prefill?.formula || '',
+        category: props.prefill?.category || 'auto_calc',
+        description: props.prefill?.description || '',
         target_cell: props.row.target_cell || '',
         _checked: false,
       }]
@@ -764,16 +795,12 @@ async function openSourceBrowserForTB(fn: string) {
     const pid = resolveProjectId()
     const yr = resolveYear()
     if (!pid) throw new Error('缺少项目ID')
-    const resp = await api.get(`/api/projects/${pid}/trial-balance`, {
-      params: { year: yr },
-      _silent: true,
-      validateStatus: (s: number) => s < 600,
-    } as any)
-    const rows = resp?.items ?? resp?.data ?? resp ?? []
-    sourceBrowserRows.value = (Array.isArray(rows) ? rows : []).map((r: any) => ({
-      row_code: r.standard_account_code || r.account_code || '',
-      row_name: r.account_name || r.standard_account_name || '',
-      indent_level: (r.level || 1) - 1,
+    const { rows } = await fetchTrialBalanceRows(pid, { year: yr })
+    sourceBrowserRows.value = rows.map((r) => ({
+      row_code: r.standard_account_code || '',
+      row_name: r.account_name || '',
+      // 试算表行没有层级字段（原先读不存在的 level 恒 0）：按标准科目码位数缩进（4 位一级、每多 2 位深一级）
+      indent_level: Math.max(0, Math.floor((r.standard_account_code.replace(/[^0-9]/g, '').length - 4) / 2)),
       formula: '',
       _ref: sourceBrowserRefBuilder.value(r),
     }))
@@ -891,7 +918,7 @@ async function openSourceBrowserForWP() {
         .sort((a, b) => (a.sheet_code || '').localeCompare(b.sheet_code || ''))
         .map((s) => ({
           row_code: s.sheet_code || s.parent_wp_code || '',
-          row_name: s.mapped_sheet_name || s.account_name || s.sheet_name || '',
+          row_name: s.display_label || s.sheet_code || '',
           indent_level: 0,
           formula: '',
           _ref: `WP('${s.parent_wp_code || ''}','${s.sheet_code || ''}','审定数')`,
@@ -908,6 +935,10 @@ async function openSourceBrowserForWP() {
 }
 
 function onSave() {
+  if (hasFormulaValidationError.value) {
+    ElMessage.warning(`请先修正公式语法错误：${formulaValidationErrors.value[0]?.message || '公式不合法'}`)
+    return
+  }
   const validFormulas = formulas.value.filter(f => f.expression.trim())
   if (!validFormulas.length) {
     const first = formulas.value[0]
@@ -943,7 +974,7 @@ function toggleRefGroup(key: string) {
 
 // ── 数据源一览树形数据（与公式管理中心左侧树同结构） ──
 // useAcnr / AcnrSheetEntry 已在文件顶部统一 import（此处勿重复，否则 TS2300 重复标识符）。
-import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
+import { wpCodeNaturalCompare, sortSheetsForGroup, groupHeaderLabel } from '@/services/acnr/sheetDisplayName'
 
 const acnrSourceSheets = shallowRef<AcnrSheetEntry[]>([])
 const acnrSourceLoaded = ref(false)
@@ -954,7 +985,7 @@ const noteSourceLoaded = ref(false)
 async function loadAcnrSources() {
   if (acnrSourceLoaded.value) return
   try {
-    const acnr = useAcnr()
+    const acnr = useAcnr(() => props.projectId || (route.params.projectId as string))
     acnrSourceSheets.value = await acnr.listSheets()
     acnrSourceLoaded.value = true
   } catch { /* 降级用静态 */ }
@@ -1090,8 +1121,7 @@ const sourceTreeData = computed(() => {
       const parentNodes = [...byParent.entries()]
         .sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))
         .map(([parentCode, parentSheets]) => {
-          const subjectAbbr = parentSheets.find(s => s.account_name)?.account_name || ''
-          const children = composeSheetLabelsForGroup(parentSheets).map(({ entry, label }) => {
+          const children = sortSheetsForGroup(parentSheets).map(({ entry, label }) => {
             totalLeaves++
             return {
               key: `wp_${entry.sheet_code?.replace(/-/g, '_')?.toLowerCase() || entry.addr_id}`,
@@ -1104,7 +1134,7 @@ const sourceTreeData = computed(() => {
           })
           return {
             key: `wp_p_${parentCode.toLowerCase()}`,
-            label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+            label: groupHeaderLabel(parentCode, parentSheets),
             icon: '',
             children,
           }

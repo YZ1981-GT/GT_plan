@@ -99,25 +99,6 @@ export const consolNoteFormulas = {
   seed: '/api/consol-note-formulas/seed',
 } as const
 
-// 合并附注映射规则模板 + 值变化 + 确认 + 结构锁（spec: consol-note-mapping-reuse-and-reference-push）
-export const consolNoteReuse = {
-  // 映射规则模板
-  promote: (pid: string, ruleId: string) => `/api/projects/${pid}/consol-note-mapping/rules/${ruleId}/promote`,
-  templates: '/api/consol-note-mapping-templates',
-  templateDetail: (tid: string) => `/api/consol-note-mapping-templates/${tid}`,
-  // 标准科目参考
-  accountReference: (pid: string, sectionId: string) => `/api/projects/${pid}/consol-note-account-reference/${sectionId}`,
-  // 值变化通知
-  staleSummary: (pid: string) => `/api/projects/${pid}/consol-note-value/stale-summary`,
-  // 值确认
-  confirm: (pid: string) => `/api/projects/${pid}/consol-note-value/confirm`,
-  confirmationStatus: (pid: string) => `/api/projects/${pid}/consol-note-value/confirmation-status`,
-  readinessCheck: (pid: string) => `/api/projects/${pid}/consol-note-value/readiness-check`,
-  // 结构锁
-  structureLock: (pid: string) => `/api/projects/${pid}/consol-note-structure-lock`,
-  structureLockRelease: (pid: string, sectionId: string) => `/api/projects/${pid}/consol-note-structure-lock/${sectionId}`,
-} as const
-
 // ─── 现金流量表工作底稿 ─────────────────────────────────────────────────────
 
 export const cfsWorksheet = {
@@ -152,6 +133,9 @@ export const disclosureNotes = {
   clearFormulas: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/clear-formulas`,
   exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
   priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
+  // 单元格最终来源诊断（只读，spec note-chain-followup-optimizations R2）
+  cellSources: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/cell-sources`,
+  cellTrace: (noteId: string, row: number, col: number) => `/api/disclosure-notes/${noteId}/cells/${row}/${col}/trace`,
   relatedWorkpapers: (pid: string, year: number, section: string, rowCode: string) => `/api/notes/${pid}/${year}/${encodeURIComponent(section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
   templateStructure: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/template-structure`,
   // Sprint 4 Task 4.4: 致同附注 Word 排版规范（21 项参数）
@@ -342,6 +326,8 @@ export const consolidation = {
     summary: '/api/consolidation/eliminations/summary/year',
     // 合并抵消分录明细表（spec consol-elimination-single-source-push 需求 1~2）
     treeLines: '/api/consolidation/eliminations/tree-lines',
+    worksheetPreview: '/api/consolidation/eliminations/worksheet-preview',
+    worksheetGenerate: '/api/consolidation/eliminations/worksheet-generate',
     generateFromWorksheet: '/api/consolidation/eliminations/generate-from-worksheet',
     legacySheet: '/api/consolidation/eliminations/legacy-sheet',
     legacySheetConvert: '/api/consolidation/eliminations/legacy-sheet/convert',
@@ -375,6 +361,11 @@ export const consolidation = {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,
     generate: '/api/consolidation/reports/generate',
     balanceCheck: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/balance-check`,
+    artifacts: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/artifacts`,
+    artifactDownload: (pid: string, year: number, artifactId: string) =>
+      `/api/consolidation/reports/${pid}/${year}/artifacts/${artifactId}/download`,
+    workpaper: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/workpaper`,
+    workpaperDownload: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/workpaper/download`,
     // 报表级合并穿透明细：报表行次读时计算（与报表差额表同源），纯数字科目码读已落库明细
     consolBreakdown: (pid: string, year: number, accountCode: string) =>
       `/api/consolidation/report/${pid}/${year}/${accountCode}/consol-breakdown`,
@@ -412,6 +403,12 @@ export const consolidation = {
   refreshAll: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/refresh-all`,
   refreshStatus: (pid: string, year: number, jobId: string) =>
     `/api/consolidation/${pid}/${year}/refresh-status/${jobId}`,
+  // 四张抵销后表 canonical projection（服务端只读真源；自动列来自 approved 分录，batch 3 / ADR-CRW-004）
+  postElimination: (pid: string, year: number) =>
+    `/api/consolidation/post-elimination/${pid}/${year}`,
+  // 七域五态 readiness（服务端只读，不执行重算；batch 5 / ADR-CRW-005 R7）
+  readiness: (pid: string, year: number) =>
+    `/api/consolidation/readiness/${pid}/${year}`,
 } as const
 
 // ─── 合并工作底稿数据 ───────────────────────────────────────────────────────

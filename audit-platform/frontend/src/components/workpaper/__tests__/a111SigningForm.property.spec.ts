@@ -10,6 +10,8 @@ import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
 import { ref } from 'vue'
 import { SIGN_SLOTS, useA111Signing } from '../composables/useA111Signing'
+import { AUTO_FILL_MAP } from '../composables/useA111FormData'
+import type { ProjectClassification } from '@/types/projectClassification'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,13 @@ describe('Feature: a1-11-signing-control-form, Property 1: Required signing slot
       { numRuns: 100 },
     )
   })
+
+  it.each([
+    ['A1', 4], ['A8', 4], ['b3', 2], ['C', 2], ['IPO', 2], ['', 0],
+  ] as const)('细分类码先归组别：%s → %i 个必签槽位（原 A1 恒 0 个）', (code, count) => {
+    const signStates = ref<Record<string, { conclusion: string | null; remark: string | null; wp_ref: string | null }>>({})
+    expect(useA111Signing(ref<string>(code), signStates).requiredSlots.value).toHaveLength(count)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -139,36 +148,43 @@ describe('Feature: a1-11-signing-control-form, Property 4: Auto-fill only popula
   /**
    * Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5
    *
-   * Reproduce the auto-fill logic from useA111FormData:
+   * 自动填充的是生产映射本身（原先这里抄了一份映射，生产改了它照样绿）：
    * - AUTO_FILL_MAP defines which fields get populated
    * - Only fields NOT in existingItemIds get populated
    */
-  const AUTO_FILL_KEYS = [
-    'A1-11-entity-name',
-    'A1-11-entity-type',
-    'A1-11-industry',
-    'A1-11-engagement-no',
-    'A1-11-biz-category',
-  ] as const
-
-  const AUTO_FILL_MAP: Record<string, (p: any) => { conclusion?: string | null; remark?: string | null; wp_ref?: string | null }> = {
-    'A1-11-entity-name': (p) => ({ remark: p.entity_name || null }),
-    'A1-11-entity-type': (p) => ({ remark: p.entity_type || null }),
-    'A1-11-industry': (p) => ({ remark: p.industry || null }),
-    'A1-11-engagement-no': (p) => ({ remark: p.engagement_letter_no || null }),
-    'A1-11-biz-category': (p) => ({ conclusion: p.business_category || null }),
-  }
+  const AUTO_FILL_KEYS = Object.keys(AUTO_FILL_MAP)
 
   /** Arbitrary for a subset of auto-fill keys (simulates existing responses) */
   const arbExistingKeys = fc.subarray([...AUTO_FILL_KEYS])
 
-  /** Arbitrary for project context */
+  /** 项目详情下发的 project_classification（只有组别 / 码 / 是否未填写参与预填，其余取默认） */
+  const classification = (category_code: string | null, category_group: 'A' | 'B' | 'C', defaulted: boolean): ProjectClassification => ({
+    category_code, category_group, defaulted, scenario: 'normal', scenario_label: '常规年审',
+    is_ipo: false, is_refinancing: false, is_capital_market: false, tags: [],
+  })
+
+  /** Arbitrary for project context（分类取项目详情下发的 project_classification） */
   const arbProjectContext = fc.record({
     entity_name: fc.option(fc.string({ minLength: 1, maxLength: 30 }), { nil: undefined }),
     entity_type: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
     industry: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
     engagement_letter_no: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
-    business_category: fc.option(fc.constantFrom('A', 'B', 'C'), { nil: undefined }),
+    project_classification: fc.option(
+      fc.tuple(
+        fc.constantFrom('A', 'A1', 'B', 'B2', 'C', null),
+        fc.constantFrom<'A' | 'B' | 'C'>('A', 'B', 'C'),
+        fc.boolean(),
+      ).map(([code, group, defaulted]) => classification(code, group, defaulted)),
+      { nil: undefined },
+    ),
+  })
+
+  it('鉴证业务分类按组别预填（下拉只有 A / B / C），分类未填写不预填', () => {
+    const fill = AUTO_FILL_MAP['A1-11-biz-category']
+    expect(fill({ project_classification: classification('A1', 'A', false) }).conclusion).toBe('A')
+    expect(fill({ project_classification: classification('B2', 'B', false) }).conclusion).toBe('B')
+    expect(fill({ project_classification: classification(null, 'C', true) }).conclusion).toBeNull()
+    expect(fill({ business_category: 'A1' }).conclusion).toBeNull() // 不再读分类原值
   })
 
   it('auto-fill writes only to fields NOT in existingResponses', () => {

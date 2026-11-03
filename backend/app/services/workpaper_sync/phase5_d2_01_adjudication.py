@@ -21,7 +21,7 @@ d2.receivable_detail），不建独立 entry。
 ═══ 结构：逐格形态（实测 311 公式 / 62 行 13 列 / 密度 38%）═══
 
 受管 sheet = ``审定表D2-1``（openpyxl 直读权威模板，与父 pilot 同 workbook，
-sha256=``7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466``）：
+sha256=``4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044``）：
 
 * **核心 4 行**（spec 裁决聚焦，evidence/T01）：
   - R8  单项计提坏账准备（rowKey=individual）：F8/G8/H8 = SUMIF「单项计提」
@@ -59,7 +59,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"
+    "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044"
 )
 
 MANAGED_SHEET_D21: Final[str] = "审定表D2-1"

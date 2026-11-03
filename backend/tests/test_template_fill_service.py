@@ -524,3 +524,53 @@ async def test_emphasis_choice_end_to_end_and_standalone_cleanup(session, tmp_pa
     assert report.report_body_json["opinion_choice"] == "unqualified_with_emphasis"
     # 一键生成全套沿用同一选择（否则下次全套生成就丢了强调事项段）
     assert FullDeliverablesExecutor._opinion_value(report) == "unqualified_with_emphasis"
+
+
+# ---------------------------------------------------------------------------
+# 报表口径回退（spec consol-autotree-residual-closure R6）
+# ---------------------------------------------------------------------------
+
+
+class _ProjectOnlyDB:
+    """只回答 ``db.get(Project, id)`` 的桩：口径解析只读这一行。"""
+
+    def __init__(self, project):
+        self._project = project
+
+    async def get(self, _model, _pk):
+        return self._project
+
+
+def _project(report_scope, wizard_state):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(report_scope=report_scope, wizard_state=wizard_state)
+
+
+def _steps(scope):
+    return {"basic_info": {"data": {"report_scope": scope}}}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("report_scope", "wizard_state", "expected"),
+    [
+        # 向导建项目、保存基本信息只写 steps；原实现只读平铺位置 ⇒ 单体项目的报告正文按合并口径生成
+        (None, {"steps": _steps("standalone")}, "standalone"),
+        (None, {"steps": _steps("consolidated"), "basic_info": {"data": {"report_scope": "standalone"}}},
+         "consolidated"),  # steps 优先于旧平铺
+        (None, {"basic_info": {"data": {"report_scope": "standalone"}}}, "standalone"),  # 旧数据兜底
+        ("standalone", {"steps": _steps("consolidated")}, "standalone"),  # 项目列是权威源
+        ("", {}, "consolidated"),
+        (None, None, "consolidated"),
+    ],
+)
+async def test_resolve_report_scope_reads_wizard_steps_first(report_scope, wizard_state, expected):
+    svc = TemplateFillService(_ProjectOnlyDB(_project(report_scope, wizard_state)), loader=object(), registry=object())
+    assert await svc._resolve_report_scope(uuid.uuid4()) == expected
+
+
+@pytest.mark.asyncio
+async def test_resolve_report_scope_missing_project_defaults_consolidated():
+    svc = TemplateFillService(_ProjectOnlyDB(None), loader=object(), registry=object())
+    assert await svc._resolve_report_scope(uuid.uuid4()) == "consolidated"

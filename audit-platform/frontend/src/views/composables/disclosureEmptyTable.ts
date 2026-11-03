@@ -11,7 +11,9 @@
  *
  * 判定规则见后端 docstring；要点：
  * - 行标签**不参与**判断（模板骨架恒有标签，否则永不为空）
- * - 合计行 / 段标题行 / 假表头行不参与判断
+ * - 段标题行 / 假表头行 / 可扩位行不参与判断
+ * - 合计 / 小计行只看数：金额列（没有列定义时任意列）有非零数 ⇒ 非空，文字不算（公式推送找不到明细时把审定数
+ *   写在合计行；原规则「合计行一律不看」让这些表显示「本期无此情形」。spec note-pull-header-formula-closure R5）
  * - 数值列（format ∈ amount|percent|number）：null / '' / 0 视为空
  * - 其余按文本：trim 后为空视为空
  *
@@ -22,7 +24,7 @@
 export const AMOUNT_FORMATS: ReadonlySet<string> = new Set(['amount', 'percent', 'number'])
 
 /**
- * 不参与空表判定的行类型（派生行 / 结构行 / 可扩位行）
+ * 不参与空表判定的结构行（段标题 / 假表头 / 可扩位行）
  *
  * 🔴 必须与后端 `note_empty_table_detector.SKIP_ROW_TYPES` 逐项一致
  * （守卫 `test_note_expandable_rows.py` 读本文件源码交叉锁死）。
@@ -30,11 +32,18 @@ export const AMOUNT_FORMATS: ReadonlySet<string> = new Set(['amount', 'percent',
  * spec: note-template-columns-and-legacy-snapshot-closure Property 33
  */
 export const SKIP_ROW_TYPES: ReadonlySet<string> = new Set([
-  'total',
-  'subtotal',
   'section',
   'header_label',
   'expandable',
+])
+
+/**
+ * 合计 / 小计行：只看数（金额列 / 无列定义时任意列），非零 ⇒ 表非空；文字不算。
+ * 🔴 与后端 `note_empty_table_detector.TOTAL_ROW_TYPES` 逐项一致（`test_note_empty_table_detector.py` 交叉锁死）。
+ */
+export const TOTAL_ROW_TYPES: ReadonlySet<string> = new Set([
+  'total',
+  'subtotal',
 ])
 
 /** 数值零容差：附注金额保留 2 位小数，绝对值小于半分即视为零 */
@@ -73,8 +82,31 @@ function isAmountCol(d: EmptyTableColumnDef): boolean {
 }
 
 function skipRow(row: EmptyTableRow): boolean {
-  if (row.is_total) return true
   return SKIP_ROW_TYPES.has(String(row.row_type ?? ''))
+}
+
+function totalRow(row: EmptyTableRow): boolean {
+  return Boolean(row.is_total) || TOTAL_ROW_TYPES.has(String(row.row_type ?? ''))
+}
+
+/** 合计行只看数：不是数（含「—」「不适用」）/ 绝对值小于半分 ⇒ 空 */
+function numberIsBlank(v: unknown): boolean {
+  if (v === null || v === undefined || typeof v === 'boolean') return true
+  if (typeof v === 'number') return !Number.isFinite(v) || Math.abs(v) < ZERO_EPS
+  let cleaned = String(v).trim().replace(/[,，\s]/g, '')
+  if (cleaned.startsWith('(') && cleaned.endsWith(')')) cleaned = `-${cleaned.slice(1, -1)}`
+  if (!cleaned) return true
+  const n = Number(cleaned)
+  return !Number.isFinite(n) || Math.abs(n) < ZERO_EPS
+}
+
+function totalValuesBlank(values: unknown[], vdefs: EmptyTableColumnDef[]): boolean {
+  for (let j = 0; j < values.length; j++) {
+    const col = j < vdefs.length ? vdefs[j] : null
+    if (col && !isAmountCol(col)) continue // 合计行的文本 / 说明列不看
+    if (!numberIsBlank(values[j])) return false
+  }
+  return true
 }
 
 function amountIsBlank(v: unknown): boolean {
@@ -122,6 +154,10 @@ export function isEmptyTable(
     if (skipRow(row)) continue
     const values = row.values
     if (!Array.isArray(values)) continue
+    if (totalRow(row)) {
+      if (!totalValuesBlank(values, vdefs)) return false
+      continue
+    }
     for (let j = 0; j < values.length; j++) {
       const col = j < vdefs.length ? vdefs[j] : null
       const blank =

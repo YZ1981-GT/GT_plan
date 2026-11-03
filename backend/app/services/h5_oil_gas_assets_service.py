@@ -1,12 +1,15 @@
 """H5 油气资产 — 业务逻辑服务层
 
 功能：
-- 行业适用性检查（oil_gas / mining）
 - 折耗公式后端验证
 - 跨sheet勾稽校验
 - 导入导出辅助方法
 
-Requirements: 9.1-9.5, 12.1-12.3
+原有的「行业适用性检查」已删除（spec trim-followup-residual-findings-closure R1.3）：它查不存在的
+``projects.industry`` 列（每次调用必 500），平台也没有项目级行业来源；本底稿是否适用看试算表
+（渲染策略返回 ``accounts_found``）。
+
+Requirements: 9.1-9.5
 """
 
 from __future__ import annotations
@@ -14,62 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession
-
 logger = logging.getLogger(__name__)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 行业适用性
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_APPLICABLE_INDUSTRIES = {"oil_gas", "mining"}
-
-
-async def check_industry_applicability(
-    db: AsyncSession,
-    project_id: str,
-) -> dict[str, Any]:
-    """
-    检查项目行业是否适用H5油气资产底稿。
-
-    Returns:
-        {
-            "is_applicable": bool,
-            "industry": str | None,
-            "message": str,
-        }
-    """
-    result = await db.execute(
-        sa.text("""
-            SELECT industry FROM projects WHERE id = :pid LIMIT 1
-        """),
-        {"pid": project_id},
-    )
-    row = result.first()
-    if not row:
-        return {
-            "is_applicable": False,
-            "industry": None,
-            "message": "项目不存在",
-        }
-
-    industry = (row[0] or "").strip().lower()
-    is_applicable = industry in _APPLICABLE_INDUSTRIES
-
-    if is_applicable:
-        return {
-            "is_applicable": True,
-            "industry": industry,
-            "message": f"项目行业 [{industry}] 适用H5油气资产底稿",
-        }
-    else:
-        return {
-            "is_applicable": False,
-            "industry": industry,
-            "message": f"本底稿仅适用于石油天然气/采矿行业项目（当前行业: {industry or '未设置'}）",
-        }
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 折耗公式后端验证

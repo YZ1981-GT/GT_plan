@@ -131,8 +131,8 @@ export interface D4DisclosureSnapshot {
   section6Rows?: D4ObligationRow[]
   /** section8（试运行销售收入，仅上市，两期表行） */
   section8Rows?: D4TwoPeriodRow[]
-  /** 审计年度（用于（6）年度列派生），缺省 2025 */
-  auditYear?: number
+  /** 审计年度（用于（6）年度列派生）；未传 / null ⇒ 不推（6）表（年度列无从派生，不按 2025 兜底） */
+  auditYear?: number | null
   /** 各子节说明文本（note-1..note-8），与披露表文本框保持一致后同步到附注 text_content */
   notes: Record<string, string>
 }
@@ -237,10 +237,13 @@ export function buildD4SyncPayload(
   )
 
   // ⑤（6）与剩余履约义务有关的信息 — flat 单级表头（Req 6.4 / 6.7）
-  const auditYear = snapshot.auditYear ?? 2025
-  const obligationCols = buildD4ObligationColumns(auditYear)
-  const obligationRows = buildObligationPayloadRows(snapshot.section6Rows ?? [], auditYear)
-  put(names.obligation, obligationRows, obligationCols)
+  // 原先 `snapshot.auditYear ?? 2025`：两张披露页都没传年度 ⇒ 附注（6）表头恒为 2026年 / 2027年
+  const auditYear = snapshot.auditYear ?? null
+  if (auditYear != null) {
+    const obligationCols = buildD4ObligationColumns(auditYear)
+    const obligationRows = buildObligationPayloadRows(snapshot.section6Rows ?? [], auditYear)
+    put(names.obligation, obligationRows, obligationCols)
+  }
 
   // ⑥（8）试运行销售收入 — 仅上市，两级 group（Req 6.4）
   if (isListed && 'trialRun' in names) {

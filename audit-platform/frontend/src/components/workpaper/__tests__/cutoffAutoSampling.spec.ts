@@ -303,9 +303,26 @@ describe('applyFillMode - 填充策略', () => {
     })
 
     it('全部重复时长度不变', () => {
-      const same = [makeVoucher({ voucherNo: 'E-001' }), makeVoucher({ voucherNo: 'E-002' })]
+      const same = existing.map(v => ({ ...v }))
       const result = applyFillMode(existing, same, 'merge')
       expect(result.length).toBe(2)
+    })
+
+    // voucher-identity-writeback-and-audit-phase 任务 9：同一笔按分录指纹认，没有指纹按凭证号 + 日期 + 金额
+    it('同号别日 / 同号别金额是别的分录，照样并入（以前按凭证号会被丢掉）', () => {
+      const otherDay = makeVoucher({ voucherNo: 'E-001', debitAmount: '100.00', voucherDate: '2026-01-05' })
+      const otherAmount = makeVoucher({ voucherNo: 'E-002', debitAmount: '999.00' })
+      const result = applyFillMode(existing, [otherDay, otherAmount], 'merge')
+      expect(result.length).toBe(4)
+    })
+
+    it('有分录指纹时按指纹认同一笔', () => {
+      const a = makeVoucher({ voucherNo: 'F-1', lineFp: 'fp-a' })
+      const sameFp = makeVoucher({ voucherNo: 'F-1', lineFp: 'fp-a', remark: '再次抽中' })
+      const otherOccurrence = makeVoucher({ voucherNo: 'F-1', lineFp: 'fp-b' }) // 同凭证同科目同金额的第二笔
+      const result = applyFillMode([a], [sameFp, otherOccurrence], 'merge')
+      expect(result.map(v => v.lineFp)).toEqual(['fp-a', 'fp-b'])
+      expect(result[0].remark).toBe(a.remark)
     })
   })
 })

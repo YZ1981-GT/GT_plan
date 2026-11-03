@@ -114,7 +114,8 @@ import { useG7ConsolLinkageEntry } from '../../composables/g7ConsolLinkageEntry'
 
 const props = defineProps<{
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 预览处写明去填年度（不按今年兜底） */
+  year: number | null
   readonly?: boolean
   canEdit?: boolean
 }>()

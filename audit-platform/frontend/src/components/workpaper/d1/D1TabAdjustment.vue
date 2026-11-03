@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabAdjustment — 调整分录 D1-5（对齐 D4-4）
@@ -8,7 +9,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD1Adjustment, type D1AdjustmentRow } from '../composables/useD1Adjustment'
 import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import { useD1AiGenerate } from '../composables/useD1AiGenerate'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -227,12 +228,7 @@ function saveAuditMeta() {
           @click="syncToCentral"
           title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
         >同步到集中登记</el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 

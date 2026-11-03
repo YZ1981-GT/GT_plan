@@ -297,6 +297,17 @@ class ChatRunService:
                 configured.value, engine.value, gate_reason,
             )
 
+        # ③a 项目附件：任何 run/session/message 写入前逐项做项目+底稿 ACL，并在根锁内
+        # 钉住确定 version/blob/hash。客户端从不提交这些权威字段。
+        from app.services.ai_chat.run_resource_service import AiRunResourceService
+
+        resource_service = AiRunResourceService(self._db)
+        project_attachment_pins = await resource_service.authorize_project_attachments(
+            user=user,
+            host=host,
+            attachment_ids=list(request.project_attachment_ids),
+        )
+
         # ③ 客户端若提交 session_id，必须与服务端定位结果一致。
         #    先只读校验、再 upsert：否则伪造 session_id 的请求会留下一行会话副作用。
         if request.session_id is not None:
@@ -334,6 +345,13 @@ class ChatRunService:
             engine_preference=engine.value,
             review_mode=request.review_mode,
         )
+        from app.services.ai_chat.attachment_service import AttachmentService as ChatAttachmentService
+
+        chat_attachments = await ChatAttachmentService(self._db).validate_for_run(
+            attachment_ids=list(request.attachment_ids),
+            owner_id=host.principal_id,
+            session_id=session.id,
+        )
 
         # ⑤ run：按 (actor_id, session_id, idempotency_key) 原子 upsert。
         run, created = await upsert_run(
@@ -347,11 +365,24 @@ class ChatRunService:
             engine=engine,
             request_id=req_id,
             capability_snapshot=capabilities.model_dump(),
+            context_request_snapshot=request.context_snapshot(),
         )
 
-        # ⑥ user message 只由创建者写入，且与 run 插入同一事务（Req 4.6）。
+        # ⑥ user message 与项目附件 pin 只由创建者写入，且与 run 插入同一事务（Req 4.6）。
         user_message_id: UUID | None = None
         if created:
+            await resource_service.persist_chat_attachments(
+                run_id=run.id,
+                session_id=session.id,
+                actor_user_id=host.principal_id,
+                attachments=chat_attachments,
+            )
+            await resource_service.persist_project_attachments(
+                run_id=run.id,
+                session_id=session.id,
+                actor_user_id=host.principal_id,
+                pins=project_attachment_pins,
+            )
             message = await append_message(
                 self._db,
                 session,
@@ -473,6 +504,7 @@ class ChatRunService:
         citations: Any = None,
         context_manifest: Any = None,
         draft_message_id: UUID | None = None,
+        assistant_message_id: UUID | None = None,
     ) -> tuple[ChatEvent | None, AIChatMessage | None]:
         """成功终态：CAS → done 与 completed assistant 消息在**同一事务**内完成。
 
@@ -519,6 +551,7 @@ class ChatRunService:
                 model_used=model_used,
                 tokens_used=tokens_used,
                 latency_ms=latency_ms,
+                message_id=assistant_message_id,
             )
         row = await self._load(run_id)
         event = self._build_event(
@@ -625,6 +658,7 @@ class ChatRunService:
         session: AIChatSession,
         run_id: UUID,
         text: str,
+        message_id: UUID | None = None,
     ) -> AIChatMessage | None:
         """写 assistant **草稿**（status=draft）。run 已进终态时拒绝。
 
@@ -641,6 +675,7 @@ class ChatRunService:
             text=text,
             status=ChatMessageStatus.draft,
             run_id=run_id,
+            message_id=message_id,
         )
 
     async def update_assistant_draft(

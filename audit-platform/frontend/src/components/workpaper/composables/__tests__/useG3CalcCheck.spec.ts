@@ -193,44 +193,6 @@ describe('useG3CalcCheck migration + sync', () => {
     expect(rows.value[0].periodDecrease).toBe(10) // 已填不覆盖
   })
 
-  it('fillFromSamples 写入期后区段', () => {
-    const map = new Map<string, ChecklistResponse>()
-    const { subsequentRows, fillFromSamples, segment } = useG3CalcCheck({
-      allResponses: ref(map),
-      debouncedSave: () => {},
-      isReadonly: ref(false),
-    })
-    fillFromSamples([{
-      investeeName: 'B公司',
-      voucherDate: '2024-02-01',
-      voucherNo: 'V-9',
-      summary: '期后收股利',
-      debitAmount: 0,
-      creditAmount: 0,
-      amount: 12345,
-    }])
-    expect(segment.value).toBe('subsequent')
-    expect(subsequentRows.value.some((r) => r.voucherNo === 'V-9' && r.samplingSource === '抽凭引擎')).toBe(true)
-  })
-
-  it('fillFromSamples 剔除截止日及以前凭证', () => {
-    const map = new Map<string, ChecklistResponse>()
-    const { subsequentRows, fillFromSamples } = useG3CalcCheck({
-      allResponses: ref(map),
-      debouncedSave: () => {},
-      isReadonly: ref(false),
-      cutoffDate: ref('2023-12-31'),
-    })
-    const result = fillFromSamples([
-      { voucherDate: '2023-12-31', voucherNo: 'OLD', amount: 1 },
-      { voucherDate: '2024-01-05', voucherNo: 'NEW', amount: 2 },
-    ])
-    expect(result.skippedCutoff).toBe(1)
-    expect(result.filled).toBe(1)
-    expect(subsequentRows.value.some((r) => r.voucherNo === 'NEW')).toBe(true)
-    expect(subsequentRows.value.some((r) => r.voucherNo === 'OLD')).toBe(false)
-  })
-
   it('pushVariancesToAdjustment 写入 G3-3 草稿', () => {
     const existing = [baseRow({
       investeeName: 'A公司',

@@ -72,6 +72,7 @@ import { notificationApi } from '@/services/collaborationApi'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { getNotificationJumpRoute } from '@/services/notificationTypes'
 import { handleApiError } from '@/utils/errorHandler'
+import { useAdaptivePoll } from '@/composables/useAdaptivePoll'
 
 const collaborationStore = useCollaborationStore()
 const router = useRouter()
@@ -107,19 +108,44 @@ function onTabChange() {
   // Tab 切换时无需额外操作，computed 自动过滤
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+/** 列表是否已取过（首次打开才取；铃铛上的红点只需要未读数）。 */
+const listLoaded = ref(false)
 
-onMounted(async () => {
-  await fetchNotifications()
+/**
+ * 未读数轮询（spec runtime-performance-and-reload-hardening-followup R6.3）。
+ *
+ * 🔴 改动三点：
+ * ① 挂载只取未读数 —— 列表原来在首屏就取，而它只在 popover 打开后才显示；
+ * ② 列表首次打开才取（之后靠 SSE / 手动操作刷新）；
+ * ③ 固定 `setInterval(30s)` 换成 `useAdaptivePoll`：页面隐藏时停、重新可见立即校准一次，
+ *    且同一时刻只有一条链（原实现的 interval 在请求慢于 30 秒时会重叠发请求）。
+ * 这里不接 SSE 通知（项目流不带全局通知事件），所以轮询不能删，只能收敛。
+ */
+const unreadPoll = useAdaptivePoll(async () => {
   await fetchUnreadCount()
-  // Auto-poll every 30 seconds
-  pollTimer = setInterval(async () => {
-    await fetchUnreadCount()
-  }, 30000)
+  // 通知未读数没有「进行中 / 空闲」之分，固定按 idle 节奏（30 秒）续链。
+  return false
+}, { idleMs: 30000 })
+
+onMounted(() => {
+  unreadPoll.start()
 })
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  unreadPoll.dispose()
+})
+
+// popover 首次打开才取列表；之后打开复用已有数据（标记已读 / 跳转仍各自刷新）。
+// 取失败不置 listLoaded，下次打开重试；连续开关不重叠发请求。
+let listLoading = false
+watch(popoverVisible, async (open) => {
+  if (!open || listLoaded.value || listLoading) return
+  listLoading = true
+  try {
+    listLoaded.value = await fetchNotifications()
+  } finally {
+    listLoading = false
+  }
 })
 
 // 监听 collaboration store 的 unreadCount 变化（SSE 触发时实时刷新）
@@ -137,12 +163,15 @@ function isDoNotDisturbTime(): boolean {
   return hour >= 22 || hour < 8
 }
 
-async function fetchNotifications() {
+/** 返回是否取成功：失败与「真的没有通知」都会把列表置空，调用方只能靠返回值区分。 */
+async function fetchNotifications(): Promise<boolean> {
   try {
     const { data } = await notificationApi.list({ unread_only: false, limit: 20 })
     notifications.value = data?.items ?? data ?? []
+    return true
   } catch {
     notifications.value = []
+    return false
   }
 }
 

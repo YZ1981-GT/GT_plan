@@ -7,11 +7,15 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
 
 export interface ChecklistResponse {
   item_id: string
   conclusion: string | null
   remark: string | null
+  version?: string
+  updated_at?: string
 }
 
 export interface ProjectContext {
@@ -43,13 +47,27 @@ export function useF4FormData(options: UseF4FormDataOptions) {
   const sheetCache = ref<Record<string, any>>({})
 
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  const _pendingItems = new Set<string>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!wpId.value) throw new Error('缺少底稿标识，无法保存')
+      try {
+        await cas.save({ wpId: wpId.value, projectId: projectId.value, items })
+      } catch (err: any) {
+        const msg = err?.message || ''
+        if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') ElMessage.error('保存失败，请稍后重试')
+        throw err
+      }
+    },
+  })
 
   async function loadResponses(): Promise<void> {
     if (!wpId.value) return
     try {
       const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id?.startsWith('F4-') || r.item_id?.startsWith('F4A') || r.item_id?.startsWith('F4-note-')) {
@@ -129,22 +147,9 @@ export function useF4FormData(options: UseF4FormDataOptions) {
   }
 
   async function _doSave(items: ChecklistResponse[]): Promise<void> {
-    if (!wpId.value || items.length === 0) return
-    try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: projectId.value,
-        items: items.map((item) => ({
-          item_id: item.item_id,
-          conclusion: item.conclusion || null,
-          remark: item.remark || null,
-        })),
-      })
-    } catch (err: any) {
-      const msg = err?.message || ''
-      if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
-        ElMessage.error('保存失败，请稍后重试')
-      }
-    }
+    if (items.length === 0) return
+    queue.markMany(items.map((item) => item.item_id))
+    await queue.flush()
   }
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>): Promise<void> {
@@ -153,7 +158,6 @@ export function useF4FormData(options: UseF4FormDataOptions) {
       clearTimeout(timer)
       _debounceTimers.delete(itemId)
     }
-    _pendingItems.delete(itemId)
 
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated: ChecklistResponse = {
@@ -177,7 +181,6 @@ export function useF4FormData(options: UseF4FormDataOptions) {
         clearTimeout(timer)
         _debounceTimers.delete(itemId)
       }
-      _pendingItems.delete(itemId)
 
       const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
       const updated: ChecklistResponse = {
@@ -208,15 +211,14 @@ export function useF4FormData(options: UseF4FormDataOptions) {
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
     }
     allResponses.value.set(itemId, updated)
-    _pendingItems.add(itemId)
+    queue.mark(itemId)
 
     const prevTimer = _debounceTimers.get(itemId)
     if (prevTimer) clearTimeout(prevTimer)
 
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
-      _pendingItems.delete(itemId)
-      void _doSave([updated])
+      void queue.flush().catch(() => undefined)
     }, 2000)
     _debounceTimers.set(itemId, timer)
   }
@@ -226,23 +228,14 @@ export function useF4FormData(options: UseF4FormDataOptions) {
   // 改造后 TB 回写走显式发布门（F4TabAdjudication.publishToTb → publish-to-tb）。
   // 唯一消费方 GtF4AccountsPayable.handleF4Writeback 已随监听器移除 ⇒ 此函数为零消费死代码。
 
-  function _flushPending(): void {
+  async function _flushPending(): Promise<void> {
     for (const timer of _debounceTimers.values()) clearTimeout(timer)
     _debounceTimers.clear()
-
-    if (_pendingItems.size > 0) {
-      const items: ChecklistResponse[] = []
-      for (const itemId of _pendingItems) {
-        const resp = allResponses.value.get(itemId)
-        if (resp) items.push(resp)
-      }
-      _pendingItems.clear()
-      if (items.length > 0) void _doSave(items)
-    }
+    await queue.flush()
   }
 
   onScopeDispose(() => {
-    _flushPending()
+    void _flushPending().catch(() => undefined)
   })
 
   return {

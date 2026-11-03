@@ -25,7 +25,7 @@ F4 的默认预设是 **THREE_YEAR**（`DEFAULT_SUBJECT_PRESETS.F4 = 'THREE_YEAR
 两个 nested 账龄组：
 | 组 | 组标题格 | 列 | json_prefix | 段 |
 |---|---|---|---|---|
-| 未审账龄 | N9 | N/O/P/Q | agingUnadjusted | within1/y1to2/y2to3/over3 |
+| 未审账龄 | N9 | N/O/P/Q | agingCurrent | within1/y1to2/y2to3/over3 |
 | 审定账龄 | U9 | U/V/W/X | agingAudited | within1/y1to2/y2to3/over3 |
 
 ═══ 前端已对齐 ═══
@@ -83,6 +83,11 @@ F402_AGING_DOWNGRADE_MESSAGE: Final[str] = (
 )
 
 #: 15 个非账龄 editable 字段（A~AA 减去公式列 H/K/M/T 和账龄列 N~Q/U~X）。
+#: 🔴 json 键逐字取前端 `useF4Detail.StoredAPDetailRow`（spec oo-writeback-template-parity-closure R3 批 B，字段名
+#:    守卫报出；模块头「前端已对齐」那句只核了公式口径、没核字段名）：原写 debitOccurrence / creditOccurrence /
+#:    reclassAdjustment / currentAje / currentRje / postPeriodPayment、未审账龄组 agingUnadjusted，前端存
+#:    currentDebit / currentCredit / entityReclassification / closingAje / closingRje / subsequentPayment、agingCurrent。
+#:    列键不变。
 FIELD_SPECS_F402: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
@@ -94,25 +99,25 @@ FIELD_SPECS_F402: Final[
     ("opening_aje", "F", "editable", "amount", "openingAje", "期初账项调整", ""),
     ("opening_rje", "G", "editable", "amount", "openingRje", "期初重分类调整", ""),
     # H 公式（期初审定）
-    ("debit_occurrence", "I", "editable", "amount", "debitOccurrence", "借方发生", ""),
-    ("credit_occurrence", "J", "editable", "amount", "creditOccurrence", "贷方发生", ""),
+    ("debit_occurrence", "I", "editable", "amount", "currentDebit", "借方发生", ""),
+    ("credit_occurrence", "J", "editable", "amount", "currentCredit", "贷方发生", ""),
     # K 公式（期末余额）
-    ("reclass_adjustment", "L", "editable", "amount", "reclassAdjustment", "被审计单位重分类调整", ""),
+    ("reclass_adjustment", "L", "editable", "amount", "entityReclassification", "被审计单位重分类调整", ""),
     # M 公式（期末未审）
     # N~Q 未审账龄（aging_groups）
-    ("current_aje", "R", "editable", "amount", "currentAje", "账项调整", ""),
-    ("current_rje", "S", "editable", "amount", "currentRje", "重分类调整", ""),
+    ("current_aje", "R", "editable", "amount", "closingAje", "账项调整", ""),
+    ("current_rje", "S", "editable", "amount", "closingRje", "重分类调整", ""),
     # T 公式（审定数）
     # U~X 审定账龄（aging_groups）
     ("is_confirmed", "Y", "editable", "text", "isConfirmed", "是否函证", ""),
-    ("post_period_payment", "Z", "editable", "amount", "postPeriodPayment", "期后付款", ""),
+    ("post_period_payment", "Z", "editable", "amount", "subsequentPayment", "期后付款", ""),
     ("remark", "AA", "editable", "text", "remark", "备注", ""),
 )
 
 #: 两个 nested 账龄组（照 F1-2 / D3 先例翻成 AgingGroupSpec）。
 _AGING_GROUPS_F402: Final[tuple[AgingGroupSpec, ...]] = (
     AgingGroupSpec(
-        json_prefix="agingUnadjusted",
+        json_prefix="agingCurrent",
         group_header_cell=f"N{HEADER_GROUP_ROW_F402}",
         segments=tuple(
             (seg_key, col)

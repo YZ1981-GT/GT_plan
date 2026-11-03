@@ -72,12 +72,8 @@ export interface G11TbRowLike {
   account_name?: string
   standard_account_name?: string
   opening_balance?: number | string | null
-  closing_balance?: number | string | null
-  ending_balance?: number | string | null
   audited_amount?: number | string | null
   unadjusted_amount?: number | string | null
-  debit_amount?: number | string | null
-  credit_amount?: number | string | null
 }
 
 export interface G11TbOpenClose {
@@ -94,14 +90,14 @@ function rowName(r: G11TbRowLike): string {
   return String(r.account_name ?? r.standard_account_name ?? '').trim()
 }
 
-/** 期末余额：优先 closing/ending，再审定/未审，再借−贷（资产） */
+/** 期末余额：审定优先，其次未审（端点没有 closing / ending / 借贷字段） */
 export function pickTbClosing(row: G11TbRowLike): number {
-  const direct = row.closing_balance ?? row.ending_balance ?? row.audited_amount ?? row.unadjusted_amount
+  const direct = row.audited_amount ?? row.unadjusted_amount
   if (direct != null && String(direct).trim() !== '') {
     const n = parseNum(direct)
     if (Number.isFinite(n)) return n
   }
-  return parseNum(row.debit_amount) - parseNum(row.credit_amount)
+  return 0
 }
 
 export function pickTbOpening(row: G11TbRowLike): number {

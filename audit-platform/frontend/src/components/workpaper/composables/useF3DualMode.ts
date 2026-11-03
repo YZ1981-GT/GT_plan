@@ -5,6 +5,7 @@
  */
 import { ref, onMounted, type Ref } from 'vue'
 import { getAuthHeaders } from '@/utils/authToken'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 export type F3RenderMode = 'html' | 'onlyoffice'
 
@@ -31,11 +32,12 @@ export function useF3DualMode(options: UseF3DualModeOptions) {
     { label: '在线编辑', value: 'onlyoffice' },
   ]
 
-  function loadPersistedMode(): void {
+  function loadPersistedMode(): F3RenderMode | null {
     try {
       const saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+      if (saved === 'html' || saved === 'onlyoffice') return saved
     } catch { /* ignore */ }
+    return null
   }
 
   function persistMode(mode: F3RenderMode): void {
@@ -69,23 +71,25 @@ export function useF3DualMode(options: UseF3DualModeOptions) {
     if (target === 'onlyoffice' && !isOoAvailable.value) return
 
     if (target === 'onlyoffice') {
-      const sn = sheetName?.value || 'F3'
-      try {
-        // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401，被下方 catch 成「OO 不可用」）
-        const qs = projectId?.value ? `?project_id=${encodeURIComponent(projectId.value)}` : ''
-        const response = await fetch(
-          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config${qs}`,
-          { headers: getAuthHeaders() },
-        )
-        if (response.ok) {
-          const result = await response.json()
-          ooConfig.value = result.data || result
-          currentMode.value = 'onlyoffice'
-          persistMode('onlyoffice')
+      await runLegacyOnlyOfficeTransition(async () => {
+        const sn = sheetName?.value || 'F3'
+        try {
+          // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401，被下方 catch 成「OO 不可用」）
+          const qs = projectId?.value ? `?project_id=${encodeURIComponent(projectId.value)}` : ''
+          const response = await fetch(
+            `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config${qs}`,
+            { headers: getAuthHeaders() },
+          )
+          if (response.ok) {
+            const result = await response.json()
+            ooConfig.value = result.data || result
+            currentMode.value = 'onlyoffice'
+            persistMode('onlyoffice')
+          }
+        } catch {
+          isOoAvailable.value = false
         }
-      } catch {
-        isOoAvailable.value = false
-      }
+      })
     } else {
       currentMode.value = 'html'
       ooConfig.value = null
@@ -99,8 +103,12 @@ export function useF3DualMode(options: UseF3DualModeOptions) {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    const saved = loadPersistedMode()
+    // 恢复偏好保持 HTML 起页，健康检查成功后再走完整保存屏障。
+    void checkOOHealth().then(async (healthy) => {
+      if (healthy && saved === 'onlyoffice') await switchMode('onlyoffice')
+      else if (!healthy) persistMode('html')
+    })
   })
 
   return {

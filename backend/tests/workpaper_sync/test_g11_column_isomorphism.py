@@ -252,14 +252,23 @@ class TestJsonKeysMatchFrontendRowInterface:
         """🔴 `seq` 在 G11 是**真列**（A 列「序号」，模板 A10-A30 预填 1..21）。
 
         G9/G10/G8 的同名字段是纯显示序号、不占模板列 —— 照抄那三家把 `seq` 排除在
-        受管面外，会让 A 列脱管、OO 侧改序号不回流。
+        受管面外，会让 A 列脱管（HTML 侧的序号带不进 OO）。
+
+        🔴 受管但 `auto_source`（spec oo-writeback-template-parity-closure R3 批 B1）：前端每次载入
+        与重算都按位置重编（`parseRows` / `recomputeAll` 一律 `enrichRow(r, i + 1)`），存值从不被读回
+        ⇒ OO 侧改的序号回流了也会在下一次载入被覆盖、两侧来回变。改成「HTML 侧带出、OO 改了报受保护
+        冲突」，与 E1-4 序号同口径；锚点随之改指 B（见 `test_ghost_row_anchor_not_protected.py`）。
         """
         by_col = {f[1]: f for f in FIELD_SPECS_G1102}
         assert by_col["A"][4] == "seq"
         assert by_col["A"][3] == "integer"
-        assert by_col["A"][2] == "editable"
+        assert by_col["A"][2] == "auto_source"
+        assert SPEC_G1102.ghost_row_anchor_index == 1
         seeded = [ws.cell(row=r, column=1).value for r in _DATA_ROWS]
         assert seeded == list(range(1, 22)), f"A 列预填实得 {seeded}"
+        src = FE_COMPOSABLE.read_text(encoding="utf-8")
+        assert "parsed.map((r, i) => enrichRow(r, i + 1))" in src, "前端载入不再按位置编序号 ⇒ 重新裁 A 列 mode"
+        assert "enrichRow(r, i + 1, { current: currentTotal, prior: priorTotal })" in src
 
     def test_row_identity_field_id_is_not_a_managed_column(self) -> None:
         assert SPEC_G1102.row_identity_key == "id" == FRONTEND_ONLY_FIELDS_G1102[0]

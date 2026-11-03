@@ -191,3 +191,12 @@ class TestResolveStandaloneTableName:
         # 主表名可能是 "货币资金" 或 None（首表兜底）
         # 不做过于严格的断言
         assert name is None or isinstance(name, str)
+
+
+def test_parent_company_investment_income_never_falls_back_to_main_chapter():
+    """标题清理后「投资收益」在八章与十二章同名；合并母公司章只能映射到十二章。"""
+    assert resolve_standalone_section("soe", "十二-投资收益-1") == "十二、投资收益"
+    data = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+    entry = next(item for item in data["mappings"]["soe"] if item["consol_section_id"] == "十二-投资收益-1")
+    assert entry["standalone_section_title"] == "投资收益"
+    assert entry["match_type"] in {"table_title", "chapter", "exact", "section_override"}

@@ -290,6 +290,134 @@ class TestDomainBoundariesSynthetic:
         assert rc == 1
 
 
+class TestBoundaryCheckerHardening:
+    def test_generated_directories_and_generated_declarations_are_excluded(self, tmp_path: Path):
+        _seed_core(tmp_path)
+        generated = write(
+            tmp_path,
+            "backend/app/services/alpha/generated/client.py",
+            "from app.services.beta.mod import Y\n",
+        )
+        declaration = write(
+            tmp_path,
+            "audit-platform/frontend/src/feature/api.generated.ts",
+            "import '@/forbidden/runtime'\n",
+        )
+        dts = write(
+            tmp_path,
+            "audit-platform/frontend/src/feature/components.d.ts",
+            "import '@/forbidden/runtime'\n",
+        )
+        files = guard.iter_production_files(tmp_path)
+        assert generated not in files
+        assert declaration not in files
+        assert dts not in files
+        assert guard._is_excluded("audit-platform/frontend/src/generated/client.ts")
+        assert not guard._is_excluded("audit-platform/frontend/src/feature/client.ts")
+
+    def test_python_from_import_alias_resolves_the_imported_submodule(self, tmp_path: Path):
+        _seed_core(tmp_path)
+        (tmp_path / "audit-platform/frontend/src").mkdir(parents=True, exist_ok=True)
+        write(tmp_path, "backend/app/services/__init__.py", "")
+        write(tmp_path, "backend/app/services/alpha/__init__.py", "")
+        write(tmp_path, "backend/app/services/beta/__init__.py", "Y = 1\n")
+        write(
+            tmp_path,
+            "backend/app/services/alpha/mod.py",
+            "from app.services import beta as renamed\nX = renamed.Y\n",
+        )
+        manifest = write_manifest(tmp_path, MINIMAL_DOMAINS)
+        violations, _, _ = guard.collect_edges(tmp_path, guard.load_manifest(manifest))
+        assert any(
+            v.kind == guard.KIND_FORBIDDEN
+            and v.identity.endswith("backend/app/services/beta/__init__.py")
+            for v in violations
+        )
+
+    def test_equal_specificity_owner_tie_is_ambiguous_and_order_independent(self, tmp_path: Path):
+        (tmp_path / "audit-platform/frontend/src").mkdir(parents=True, exist_ok=True)
+        target = write(tmp_path, "backend/app/services/shared/mod.py", "X = 1\n")
+        shared = {
+            "owners": ["platform"],
+            "paths": ["backend/app/services/shared/**"],
+            "may_depend_on": [],
+        }
+        first = {
+            "alpha": dict(shared),
+            "beta": dict(shared),
+        }
+        second = {
+            "beta": dict(shared),
+            "alpha": dict(shared),
+        }
+        identities = []
+        for domains in (first, second):
+            manifest = write_manifest(tmp_path, domains)
+            violations, _, mapping = guard.collect_edges(
+                tmp_path, guard.load_manifest(manifest), files=[target],
+            )
+            ambiguous = [v for v in violations if v.kind == guard.KIND_AMBIGUOUS_OWNER]
+            assert len(ambiguous) == 1
+            assert "alpha,beta" in ambiguous[0].identity
+            assert mapping == {}
+            identities.append(ambiguous[0].identity)
+        assert identities[0] == identities[1]
+
+    @staticmethod
+    def _two_forbidden_world(tmp_path: Path) -> tuple[Path, list[guard.Violation]]:
+        _seed_core(tmp_path)
+        (tmp_path / "audit-platform/frontend/src").mkdir(parents=True, exist_ok=True)
+        write(tmp_path, "backend/app/services/alpha/__init__.py", "")
+        write(tmp_path, "backend/app/services/beta/__init__.py", "")
+        write(tmp_path, "backend/app/services/beta/one.py", "A = 1\n")
+        write(tmp_path, "backend/app/services/beta/two.py", "B = 2\n")
+        write(
+            tmp_path,
+            "backend/app/services/alpha/mod.py",
+            "from app.services.beta.one import A\nfrom app.services.beta.two import B\n",
+        )
+        manifest = write_manifest(tmp_path, MINIMAL_DOMAINS)
+        violations, _, _ = guard.collect_edges(tmp_path, guard.load_manifest(manifest))
+        forbidden = sorted(
+            (v for v in violations if v.kind == guard.KIND_FORBIDDEN),
+            key=lambda item: item.identity,
+        )
+        assert len(forbidden) >= 2
+        return manifest, forbidden
+
+    def test_write_baseline_refuses_new_identity_without_changing_file(self, tmp_path: Path, capsys):
+        manifest, forbidden = self._two_forbidden_world(tmp_path)
+        baseline = tmp_path / "baseline.json"
+        write_baseline(baseline, [forbidden[0].identity])
+        before = baseline.read_bytes()
+
+        rc = guard.run_check(
+            root=tmp_path, manifest_path=manifest, baseline_path=baseline,
+            write_baseline=True,
+        )
+
+        assert rc == 1
+        assert baseline.read_bytes() == before
+        assert "refusing --write-baseline" in capsys.readouterr().out
+
+    def test_shrink_only_removes_stale_but_never_absorbs_new(self, tmp_path: Path, capsys):
+        manifest, forbidden = self._two_forbidden_world(tmp_path)
+        baseline = tmp_path / "baseline.json"
+        stale = "forbidden_edge:alpha->beta:stale.py->gone.py"
+        write_baseline(baseline, [forbidden[0].identity, stale])
+
+        rc = guard.run_check(
+            root=tmp_path, manifest_path=manifest, baseline_path=baseline,
+            shrink_only=True,
+        )
+
+        assert rc == 0
+        assert guard.load_baseline(baseline) == {forbidden[0].identity}
+        assert forbidden[1].identity not in guard.load_baseline(baseline)
+        assert "ignored" in capsys.readouterr().out
+        assert guard.run_check(root=tmp_path, manifest_path=manifest, baseline_path=baseline) == 1
+
+
 class TestCiAttributionGuard:
     """Attribution-style guard: assert this job and its file refs exist (not other jobs)."""
 

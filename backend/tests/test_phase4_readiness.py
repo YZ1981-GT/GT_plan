@@ -164,6 +164,7 @@ async def _seed_reports(
 ):
     """种入财务报表行。"""
     from app.models.report_models import FinancialReport
+    from app.services.report_freshness import CALC_VERSION
     for i in range(count):
         report = FinancialReport(
             id=uuid.uuid4(),
@@ -174,6 +175,8 @@ async def _seed_reports(
             row_name=f"报表行{i}",
             current_period_amount=Decimal("50000.00"),
             is_stale=is_stale,
+            # 无计算版本的行读作过期（spec formula-hub-integrity-closure D13-A，report_freshness.stale_clause）
+            calc_version=CALC_VERSION,
         )
         db.add(report)
     await db.flush()

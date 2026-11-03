@@ -63,9 +63,14 @@ class BulkProgressService:
         user_id: str,
         operation: str,
         total: int,
+        *,
+        task_id: str | None = None,
     ) -> BulkTaskProgress:
-        """创建进度追踪任务，返回 task 对象。"""
-        task_id = str(uuid.uuid4())
+        """创建进度追踪任务，返回 task 对象；durable job 可复用其 UUID。"""
+        task_id = task_id or str(uuid.uuid4())
+        existing = self._tasks.get(task_id)
+        if existing is not None:
+            return existing
         task = BulkTaskProgress(
             task_id=task_id,
             project_id=project_id,
@@ -76,6 +81,14 @@ class BulkProgressService:
         self._tasks[task_id] = task
         task.status = "running"
         return task
+
+    def resume(self, task_id: str) -> None:
+        """durable retry/restart 后恢复内存 SSE 投影。"""
+        task = self._tasks.get(task_id)
+        if task:
+            task.status = "running"
+            task.error = None
+            task.completed_at = None
 
     def get_task(self, task_id: str) -> Optional[BulkTaskProgress]:
         return self._tasks.get(task_id)

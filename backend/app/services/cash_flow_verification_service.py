@@ -203,47 +203,6 @@ class CashFlowVerificationService:
             return True
         return False
 
-    async def create_cf_adjustment_from_diff(
-        self, project_id: UUID, year: int, item_code: str, difference: Decimal, description: str = ""
-    ) -> dict[str, Any]:
-        """从 CF 差异一键创建调整分录"""
-        from app.models.audit_platform_models import Adjustment, AdjustmentType
-        from datetime import datetime, timezone
-
-        # 查找现有同项的 CF 调整，避免重复
-        existing_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == AdjustmentType.cf,
-            Adjustment.summary.ilike(f"%{item_code}%"),
-            Adjustment.is_deleted == sa.false(),
-        )
-        result = await self.db.execute(existing_stmt)
-        if (result.scalar() or 0) > 0:
-            return {"success": False, "error": f"已存在 {item_code} 的 CF 调整分录"}
-
-        # 生成调整编号
-        count_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == AdjustmentType.cf,
-        )
-        count_result = await self.db.execute(count_stmt)
-        seq = (count_result.scalar() or 0) + 1
-
-        adj = Adjustment(
-            project_id=project_id,
-            year=year,
-            company_code="standalone",
-            adjustment_no=f"CF-{seq:03d}",
-            adjustment_type=AdjustmentType.cf,
-            summary=description or f"CF核查差异调整 {item_code}",
-            review_status="pending",
-        )
-        self.db.add(adj)
-        await self.db.flush()
-        return {"success": True, "adjustment_no": adj.adjustment_no, "id": str(adj.id)}
-
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

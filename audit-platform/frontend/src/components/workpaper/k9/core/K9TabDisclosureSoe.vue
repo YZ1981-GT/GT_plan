@@ -106,9 +106,15 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { generateK9AiText } from '../../composables/useK9AiText'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { K9_FEE_NATURES_SOE } from '../../composables/k9FeeNatures'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK9SyncPayload } from '../../composables/k9NoteSectionMap'
+import {
+  applyK9AutoFill,
+  k9DisclosureSyncRows,
+  loadK9DisclosureState,
+  type K9DisclosureFormRow,
+  type K9RowIdentity,
+} from '../../composables/k9DisclosureSnapshot'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K9_ACCOUNT_CODE = '6602'
@@ -130,11 +136,11 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 合计行由载荷层统一派生，此处只推明细行（避免双合计）
+  // 合计行由载荷层统一派生，此处只推明细行（避免双合计；与离屏同步共用 k9DisclosureSyncRows）
   const payload = buildK9SyncPayload(
     'soe',
     props.wpId || '',
-    disclosureRows.value.filter(r => !r.isTotal),
+    k9DisclosureSyncRows(disclosureRows.value),
     narrativeText.value,
   )
   try {
@@ -149,77 +155,28 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  id: string
-  project: string
-  currentAmount: number
-  priorAmount: number
-  remark: string
-  isTotal?: boolean
-}
+type DisclosureRow = K9DisclosureFormRow
 
 const disclosureRows = ref<DisclosureRow[]>([])
 const narrativeText = ref('')
 const hasAutoData = ref(false)
 
-// ─── 默认行（国企费用性质分类） ──────────────────────────────────────────────
+/** 行身份走值化身份工厂（载荷不含身份） */
+const ROW_IDENTITY: K9RowIdentity = { newRow: (kind) => newRowIdentity(kind) }
 
-const DEFAULT_PROJECTS_SOE = K9_FEE_NATURES_SOE
-
-function initDefaultRows(): void {
-  disclosureRows.value = DEFAULT_PROJECTS_SOE.map((name, idx) => ({
-    id: newRowIdentity('row'),
-    project: name,
-    currentAmount: 0,
-    priorAmount: 0,
-    remark: '',
-  }))
-}
-
-// ─── 加载已保存数据 ──────────────────────────────────────────────────────────
+// ─── 加载已保存数据（缺失回国企费用性质清单；与离屏同步共用 k9DisclosureSnapshot） ──
 
 function loadSavedData(): void {
-  const saved = props.allResponses.get('K9-disclosure-soe-rows')
-  if (saved?.remark) {
-    try {
-      disclosureRows.value = JSON.parse(saved.remark)
-    } catch { initDefaultRows() }
-  } else {
-    initDefaultRows()
-  }
-
-  const savedNarrative = props.allResponses.get('K9-disclosure-soe-narrative')
-  if (savedNarrative?.remark) {
-    narrativeText.value = savedNarrative.remark
-  }
+  const state = loadK9DisclosureState(props.allResponses, 'soe', ROW_IDENTITY)
+  disclosureRows.value = state.rows
+  narrativeText.value = state.narrativeText
 }
 
-// ─── 自动取数（从K9-1审定表） ────────────────────────────────────────────────
-
-/** 归一化费用项目名以提升 K9-1 ↔ 附注名称匹配率（去尾差：费用/费/摊销/空格） */
-function normName(s: string): string {
-  return String(s || '').replace(/\s+/g, '').replace(/(费用|摊销)$/, '').replace(/费$/, '')
-}
+// ─── 自动取数（从K9-1审定表，按费用性质名 / 归一化名匹配） ──────────────────
 
 function applyAutoFill(): void {
-  const adjData = props.allResponses.get('K9-1-audited-by-item')
-  if (!adjData?.remark) return
-  try {
-    const data = JSON.parse(adjData.remark)
-    if (!data || typeof data !== 'object') return
-    const normIndex: Record<string, any> = {}
-    for (const [k, v] of Object.entries(data)) normIndex[normName(k)] = v
-    let matched = 0
-    for (const row of disclosureRows.value) {
-      const src = data[row.project] ?? normIndex[normName(row.project)]
-      if (src) {
-        row.currentAmount = Number(src.currentAmount ?? src.audited ?? 0)
-        row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
-        matched++
-      }
-    }
-    hasAutoData.value = matched > 0
-  } catch { /* silent */ }
+  const matched = applyK9AutoFill(props.allResponses, disclosureRows.value)
+  if (matched !== null) hasAutoData.value = matched > 0
 }
 
 // ─── 字段更新 + 持久化 ──────────────────────────────────────────────────────

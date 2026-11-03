@@ -96,13 +96,15 @@ describe('AiContentPendingBanner', () => {
     expect(wrapper.text()).toContain('2')
   })
 
-  it('后端 404 静默 fallback 到 0', async () => {
+  it('后端失败时显示治理状态未知，不伪装为 0 条', async () => {
     mockGet.mockRejectedValue(new Error('404 Not Found'))
     const wrapper = mount(AiContentPendingBanner, {
       props: { projectId: 'p4' },
     })
     await flushPromises()
     expect(wrapper.find('.gt-ai-pending-banner').exists()).toBe(false)
+    expect(wrapper.find('.gt-ai-pending-error').exists()).toBe(true)
+    expect(wrapper.text()).toContain('不能判定为零条')
   })
 
   it('expose refresh() 方法供父组件调用', async () => {
@@ -210,5 +212,29 @@ describe('AiContentPendingBanner', () => {
     await flushPromises()
     expect(writeText).toHaveBeenCalledWith('待复制的 AI 文本')
     expect(msgSuccess).toHaveBeenCalledWith(expect.stringContaining('复制'))
+  })
+
+  it('DraftArtifact 确认后保留安全撤销入口，撤销调用服务端版本门', async () => {
+    const artifact = {
+      id: 'log-1', instance_type: 'note', content: 'AI 段落',
+      before_content: '旧正文', proposed_content: '新正文',
+      writeback_status: 'pending', can_undo: false,
+    }
+    mockGet.mockResolvedValue({ count: 1, items: [artifact] })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    mockPost.mockResolvedValueOnce({
+      confirm_action: 'confirmed',
+      writeback: { written: true, note_section: '五、1' },
+      artifact: { ...artifact, writeback_status: 'applied', can_undo: true },
+    })
+    await (wrapper.vm as any).act(artifact, 'confirm')
+    await flushPromises()
+    expect(wrapper.text()).toContain('撤销本次写入')
+
+    mockPost.mockResolvedValueOnce({ writeback: { written: true, undone: true } })
+    await (wrapper.vm as any).undo({ ...artifact, writeback_status: 'applied', can_undo: true })
+    expect(mockPost).toHaveBeenLastCalledWith('/api/ai-content/log-1/undo')
+    expect(msgSuccess).toHaveBeenCalledWith('已撤销本次 AI 写入')
   })
 })

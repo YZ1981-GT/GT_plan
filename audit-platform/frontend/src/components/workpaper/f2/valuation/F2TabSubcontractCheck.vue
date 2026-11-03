@@ -288,9 +288,10 @@
               <el-input :model-value="row.remark" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { remark: v })" />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="72" fixed="right">
+          <el-table-column label="操作" width="96" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="openVoucher(row)">核对</el-button>
+              <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SUBCONTRACT_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
           <el-table-column width="44">
@@ -354,6 +355,9 @@ import type { ChecklistResponse } from '../../composables/useF2ValuationFormData
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import F2SubcontractVoucherDialog from './F2SubcontractVoucherDialog.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { F2_SUBCONTRACT_EVIDENCE_SHEET } from '../../composables/useF2SubcontractOcr'
 
 const props = defineProps<{
   wpId?: string

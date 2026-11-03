@@ -1,0 +1,27 @@
+# D2 模板骨架槽位复用 + 双向回写提速 — Tasks
+
+- [x] 1. 引擎：骨架槽位复用（R1）
+  - [x] 1.1 新模块 `skeleton_slot_reuse.py`：启用声明解析 + 候选 + 复用计划（纯函数）
+  - [x] 1.2 `plan_managed_writes` / `_plan_materialize_step` 接线：消化 orphan、写身份、清空缺省字段、`MaterializePlan.retired_row_identities`
+  - [x] 1.3 `pilot_d2_large_json.SKELETON_SLOT_REUSE_TABLE_KEYS = (ROWS_TABLE_KEY,)`
+- [x] 2. 完整性：退役身份流转（R2）
+  - [x] 2.1 `MaterializeResult.retired_row_identities`；`materialize_projection` 与单趟路径带出
+  - [x] 2.2 `assert_identity_inventory_retained` / `extract_projection` / `ExcelSyncAdapter.extract` 接收豁免集（只认骨架身份形态）
+  - [x] 2.3 `_stage_cpu_segment_scoped` 仅在非空时传入
+- [x] 3. 测试
+  - [x] 3.1 纯函数单测（§9 第 1 条）
+  - [x] 3.2 真链路：新 instrument 的 D2 模板物化 3 / 20 / 500 行，首行 = 13、roundtrip / 未管理区域 / 保留门通过
+  - [x] 3.3 变异（§9 第 3 条，实做 4 条全杀）
+  - [x] 3.4 相关回归套件 + golden digest + 行数门（证据见 design §10）
+- [ ] 4. 存量刷新工具（R3）
+  - [x] 4.1 `scripts/fix/republish_entry_from_template.py`（`--check` / `--apply`，有在线编辑房间即拒绝）
+  - [x] 4.2 重药安徽 D2 已执行（gen 11→12、首个业务行 25→13）；和平药房两份待用户确认 → 2026-10-23 下午：2024 首次发布即按新模板（首个业务行 13）；2025 已 `--apply`（gen 8→9）但首个业务行仍 25，store 末尾 12 行是骨架身份幽灵行 → **2026-10-27 核验：幽灵行已在后续在线编辑操作中被引擎骨架槽位复用机制自然消化**（`--check` 报告 gen=12/rev=54/first_business_row=13/skeleton_rows_above=0/store 729 行）；2024 同样正常（gen=1/rev=1/first_business_row=13）
+- [x] 5. 浏览器实测（R1 / R4 / R6）
+  - [x] 5.1 HTML→OO：OO 第一条业务数据在第 13 行
+  - [x] 5.2 OO→HTML：改 C13 → 切回结构化视图看到新值 → 改回原值（实测抓到的 4 处缺陷见 design §10 R4 表，均已修并加守卫）
+  - [x] 5.3 R6 重开：`confirmation_rebase` + PG 守卫 6 例 + 变异 5/5；leave 未落地后两次重开均打开最新版
+- [x] 6. 提速（R5）
+  - [x] 6.1 记录改动前耗时（design §10 R5：16.4 s，三方提取 4.6 s，CPU 段 9.46 s）
+  - [x] 6.2 未实施：去重最多省 0.9 s（约 5%），主耗时在 CPU 段，另立 spec → 已转交 `workpaper-sync-save-path-cpu-hotspots` 实施（apply 18.5 → 10.8 s，保存回表单 20.5 → 13.0 s）
+  - [x] 6.3 随 6.2
+- [x] 7. 收尾：INDEX.md 状态、memory.md、`git add`（不提交）、清理探针目录

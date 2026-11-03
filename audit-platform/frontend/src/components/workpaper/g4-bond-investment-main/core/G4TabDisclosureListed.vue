@@ -645,7 +645,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 
  */
 
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
 import { ElMessage } from 'element-plus'
 
@@ -667,17 +667,11 @@ import {
 
   addStageDetail,
 
-  buildDefaultStageBlocks,
-
   bookValue,
 
   eclRatePct,
 
-  endingImpairmentTotal,
-
   methodTotals,
-
-  parseStageBlocks,
 
   patchStageDetail,
 
@@ -695,14 +689,13 @@ import {
 
 } from '../../composables/g4ListedStageDisclosure'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
+import { G4_DISCLOSURE_STAGE_KEYS, useG4DisclosureTabState } from '../../composables/g4DisclosureTabState'
 
 
 
 const G4_ACCOUNT_CODE = '1501'
 
-const STAGE_ROWS_KEY = 'G4-disclosure-listed-stages'
-
-const STAGE_NOTE_KEY = 'G4-disclosure-listed-stage-note'
+const { rows: STAGE_ROWS_KEY, note: STAGE_NOTE_KEY } = G4_DISCLOSURE_STAGE_KEYS.listed
 
 
 
@@ -750,34 +743,6 @@ const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4MainAiGener
 
 
 
-function readSaved(key: string): string {
-
-  const cr = props.htmlData?.checklist_responses
-
-  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
-
-    const v = (cr as Record<string, any>)[key]
-
-    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
-
-  }
-
-  const resp = props.htmlData?.responses
-
-  if (Array.isArray(resp)) {
-
-    const found = resp.find((r: any) => r?.item_id === key)
-
-    if (found?.remark) return found.remark
-
-  }
-
-  return ''
-
-}
-
-
-
 async function saveAudit(key: string, val: string): Promise<void> {
 
   if (props.isReadonly) return
@@ -798,201 +763,9 @@ async function saveAudit(key: string, val: string): Promise<void> {
 
 
 
-interface DisclosureRow {
-
-  item: string
-
-  endingBalance: number
-
-  endingImpairment: number
-
-  endingBookValue: number
-
-  priorBalance: number
-
-  priorImpairment: number
-
-  priorBookValue: number
-
-  isFormula?: boolean
-
-  openingBalance?: number
-
-  closingBalance?: number
-
-  impairment?: number
-
-  amortizedCost?: number
-
-}
-
-
-
-interface DisclosureSection {
-
-  id: string
-
-  title: string
-
-  rows: DisclosureRow[]
-
-  hasTextArea: boolean
-
-  textContent: string
-
-}
-
-
-
-function buildSections(): DisclosureSection[] {
-
-  return [
-
-    {
-
-      id: 'bond-overview',
-
-      title: '债权投资',
-
-      rows: [
-
-        { item: '国债', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '企业债', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '其他债权投资', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '小计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-        { item: '减：一年内到期的债权投资', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'impairment-movement',
-
-      title: '（1）债权投资减值准备本期变动情况',
-
-      rows: [
-
-        { item: '期初余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期增加', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期减少', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '期末余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'important-bonds',
-
-      title: '（2）期末重要的债权投资',
-
-      rows: [
-
-        { item: '重要债权投资1', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '重要债权投资2', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'stage-impairment',
-
-      title: '（3）减值准备计提情况（三阶段）',
-
-      rows: [],
-
-      hasTextArea: false,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'provision-walkforward',
-
-      title: '（4）本期计提、收回或转回的减值准备情况',
-
-      rows: [
-
-        { item: '上年年末余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期计提', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期转回', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期核销', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '期末余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'writeoff',
-
-      title: '（5）本期实际核销的债权投资',
-
-      rows: [
-
-        { item: '实际核销的债权投资', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-  ]
-
-}
-
-
-
-const sections = reactive<DisclosureSection[]>(buildSections())
-
-const stageBlocks = ref<G4StageBlock[]>(buildDefaultStageBlocks())
-
-const stageNoteText = ref('')
+// 段落表格 / 三阶段块 / 三阶段说明 + 打开时回显 + 同步快照：与附注页离屏同步共用（g4DisclosureTabState）
+const { sections, stageBlocks, stageNoteText, loadFromHtmlData, buildSyncSnapshot } =
+  useG4DisclosureTabState('listed', () => props.htmlData)
 
 
 
@@ -1258,42 +1031,6 @@ async function fillAiDraft(sectionIdx: number): Promise<void> {
 
 
 
-function loadFromHtmlData(): void {
-
-  if (props.htmlData?.disclosureListed?.sections) {
-
-    const saved = props.htmlData.disclosureListed.sections as DisclosureSection[]
-
-    saved.forEach((s, i) => {
-
-      if (sections[i] && sections[i].id !== 'stage-impairment') {
-
-        if (s.textContent) sections[i].textContent = s.textContent
-
-        if (s.rows?.length) sections[i].rows = s.rows
-
-      }
-
-    })
-
-  }
-
-  const parsed = parseStageBlocks(readSaved(STAGE_ROWS_KEY))
-
-  if (parsed) stageBlocks.value = parsed
-
-  const note = readSaved(STAGE_NOTE_KEY)
-
-  if (note) stageNoteText.value = note
-
-  // 暴露勾稽值供调试/扩展
-
-  void endingImpairmentTotal(stageBlocks.value)
-
-}
-
-
-
 // ─── 同步到附注（§五、14 债权投资）──────────────────────────────────────────
 // 🔴 只推送底稿字段真实存在的表：主表（7 列两级）+ 六张三阶段表（6 列单级）。
 //    其余 6 张模板表在底稿里复用了主表的 6 列行模型、无对应字段 → 见
@@ -1302,34 +1039,6 @@ function loadFromHtmlData(): void {
 const isSyncing = ref(false)
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-
-
-
-function buildSyncSnapshot() {
-
-  const main = sections.find((s) => s.id === 'bond-overview')
-
-  const sectionTexts: Record<string, string> = {}
-
-  for (const s of sections) {
-
-    if (s.hasTextArea && s.textContent) sectionTexts[s.id] = s.textContent
-
-  }
-
-  return {
-
-    mainRows: main?.rows ?? [],
-
-    stageBlocks: stageBlocks.value,
-
-    stageNote: stageNoteText.value,
-
-    sectionTexts,
-
-  }
-
-}
 
 
 

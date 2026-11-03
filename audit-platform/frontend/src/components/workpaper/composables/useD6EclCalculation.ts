@@ -130,7 +130,7 @@ export function recalcSingleRow(row: EclSingleRow): EclSingleRow {
   return { ...row, expectedProvision, difference }
 }
 
-function createEmptySingleRow(): EclSingleRow {
+export function createEmptySingleRow(): EclSingleRow {
   return {
     rowId: generateRowId(),
     debtorName: '',

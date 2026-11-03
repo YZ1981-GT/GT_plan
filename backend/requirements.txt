@@ -14,6 +14,7 @@ openpyxl
 python-calamine  # ledger_import_use_calamine flag（B3，xlsx 3× 加速）的解析引擎；曾漏声明→镜像内 ModuleNotFoundError→账套导入 500
 xlrd==2.0.2  # legacy .xls reader used by the S17 classification dry-run
 PyYAML
+jsonschema==4.26.0  # ACNR 目录契约校验（catalog_contract.build_schema / 发布门禁 Draft-07）
 boto3
 
 # OCR dependencies (optional, install as needed)
@@ -30,6 +31,8 @@ fakeredis
 aiosqlite
 hypothesis==6.152.4
 sqlglot>=27  # 裸 SQL 列级契约测试静态解析（test_raw_sql_schema_contract）
+jsonschema==4.26.0  # 程序链契约（docs/contracts/procedure-chain）按 JSON Schema 2020-12 校验；此前只是 schemathesis 的传递依赖
+referencing==0.37.0  # jsonschema 的 $ref 注册表：契约测试按 $id 把各 schema 互相引用解析到本地文件
 ruff==0.11.12
 jsonpath-ng
 pypinyin

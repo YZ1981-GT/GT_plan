@@ -384,10 +384,7 @@ import {
 } from '../../composables/g7DisclosureCrossSheet'
 import {
   G7_LISTED_DISCLOSURE_SECTIONS,
-  buildG7ListedColumns,
   buildG7ListedSyncData,
-  buildG7ListedSyncPayloads,
-  markG7ListedSynced,
   createG7ListedDisclosureState,
   resolveG7ListedTableColumns,
   type G7DisclosureColumnType,
@@ -401,7 +398,6 @@ import { buildG7HeaderBlocks, type G7HeaderBlock } from './g7DisclosureHeaderBlo
 import { describeSyncError, describeSyncTailFailure } from './g7DisclosureSyncFeedback'
 import G7DisclosureCell from './G7DisclosureCell.vue'
 // 🔴 列元数据收窄（数据风险闭合）：见 g7PayloadColumns.ts 顶部注释。
-import { pickColumnsForPayload } from './g7PayloadColumns'
 import { tableMetaSources } from './g7DisclosureTableMeta'
 import { seedG7MovementFromLeafCategories, type G7LeafBucketSlot } from '../../composables/g7FourTableSeed'
 // 🔴 科目码单一真源：运行态取宿主 provide 的 tb_source_codes（报表映射解析结果），
@@ -412,11 +408,14 @@ import {
 } from '../../composables/g7AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
-// 金额录入已下沉到 `G7DisclosureCell.vue`（两级表头改造），此处不再直接用 WpAmountInput；
-// 样式 `.disclosure-table :deep(.el-input-number)` 仍对子组件渲染出的控件生效，故保留 CSS。
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { buildG7ConsistencyChecks, type G7ConsistencyInput } from '../../composables/g7DisclosureConsistency'
+import {
+  applyG7ListedSavedState,
+  serialiseG7ListedState,
+} from '../../composables/g7DisclosureStateCodec'
+import { buildG7ListedBatchRequest } from '../../composables/g7DisclosureSyncPayload'
 
 const RESPONSE_KEY = 'G7-main-disclosure-listed-v2'
 const NOTE_SECTION_ID = '五、18'
@@ -778,28 +777,7 @@ async function removeSlotEntity(slotConfig: { slot: string }, name: string): Pro
 }
 
 function serialisableState(): G7ListedDisclosureState {
-  return {
-    version: 2,
-    tables: Object.fromEntries(
-      Object.entries(state.tables).map(([key, rows]) => [
-        key,
-        rows.map(row => ({
-          ...row,
-          values: { ...row.values },
-          sumRows: row.sumRows ? [...row.sumRows] : undefined,
-          diffRows: row.diffRows ? [...row.diffRows] as [string, string] : undefined,
-        })),
-      ]),
-    ),
-    texts: { ...state.texts },
-    updatedAt: new Date().toISOString(),
-    previouslySyncedTables: Object.fromEntries(
-      Object.entries(state.previouslySyncedTables ?? {}).map(([k, v]) => [k, [...v]]),
-    ),
-    entitySlots: Object.fromEntries(
-      Object.entries(state.entitySlots ?? {}).map(([k, v]) => [k, [...v]]),
-    ),
-  }
+  return serialiseG7ListedState(state)
 }
 
 function scheduleSave(options?: { userEdit?: boolean }): void {
@@ -859,13 +837,20 @@ function captureVersionFromItem(item: any): void {
   if (next) loadedVersion.value = String(next)
 }
 
+/** 编辑后的保存：存成功排一次自动同步 */
 async function persist(): Promise<void> {
-  if (props.isReadonly || !props.wpId) return
+  if (await saveState()) autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+/** 只存不排同步（同步前后的保存用这个；用 persist 会每 800ms 再同步一次，直到卸载）；存成功回 true */
+async function saveState(): Promise<boolean> {
+  if (props.isReadonly || !props.wpId) return false
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
   }
   savePhase.value = SAVE_PHASE.SAVING
+  let saved = false
   try {
     await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId || undefined,
@@ -878,45 +863,19 @@ async function persist(): Promise<void> {
     }, { _silent: true } as any)
     hasLocalEdits = false
     savePhase.value = SAVE_PHASE.SAVED
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+    saved = true
     await refreshLoadedVersion()
   } catch (err: any) {
     const status = err?.response?.status
     const detail = err?.response?.data?.detail
-    if (status === 409 || detail?.code === 'version_conflict') {
-      savePhase.value = SAVE_PHASE.ERROR
-      ElMessage.error('披露数据已被他人修改，请刷新页面后重试')
-      return
-    }
     savePhase.value = SAVE_PHASE.ERROR
+    if (status === 409 || detail?.code === 'version_conflict') ElMessage.error('披露数据已被他人修改，请刷新页面后重试')
   }
+  return saved
 }
 
 function applySavedState(saved: Partial<G7ListedDisclosureState>): void {
-  if (saved.version !== 2) return
-  if (saved.tables && typeof saved.tables === 'object') {
-    for (const [tableId, rows] of Object.entries(saved.tables)) {
-      if (Array.isArray(rows) && tableId in state.tables) {
-        state.tables[tableId] = rows.map(row => ({
-          ...row,
-          values: { ...(row.values ?? {}) },
-          sumRows: row.sumRows ? [...row.sumRows] : undefined,
-          diffRows: row.diffRows ? [...row.diffRows] as [string, string] : undefined,
-        }))
-      }
-    }
-  }
-  if (saved.texts && typeof saved.texts === 'object') Object.assign(state.texts, saved.texts)
-  if (saved.previouslySyncedTables && typeof saved.previouslySyncedTables === 'object') {
-    state.previouslySyncedTables = Object.fromEntries(
-      Object.entries(saved.previouslySyncedTables).map(([k, v]) => [k, Array.isArray(v) ? [...v] : []]),
-    )
-  }
-  if (saved.entitySlots && typeof saved.entitySlots === 'object') {
-    state.entitySlots = Object.fromEntries(
-      Object.entries(saved.entitySlots).map(([k, v]) => [k, Array.isArray(v) ? [...v] : []]),
-    )
-  }
+  applyG7ListedSavedState(state, saved)
 }
 
 function parseSavedRemark(remark: unknown): boolean {
@@ -1052,30 +1011,17 @@ async function syncToDisclosureNotes(): Promise<void> {
     //    **同时出现**而库里已全部写入 ⇒ 失败提示是误报、指向根本没问题的章节映射，
     //    还诱使重复写库。两侧同款结构，一并改造。
     let data: any
-    let payloads: ReturnType<typeof buildG7ListedSyncPayloads>
+    let request: ReturnType<typeof buildG7ListedBatchRequest>
     try {
-      await persist()
-      payloads = buildG7ListedSyncPayloads(serialisableState())
+      if (!await saveState()) return
+      request = buildG7ListedBatchRequest({
+        wpId: props.wpId,
+        year: resolveAuditYear(props.htmlData as Record<string, any> | null),
+        state: serialisableState(),
+      })
       const result: any = await api.post(
         `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
-        {
-          wp_id: props.wpId,
-          current_standard: 'listed',
-          year: resolveAuditYear(props.htmlData as Record<string, any> | null),
-          // 🔴 列元数据必须**按 payload 收窄**（不能传全量 map）：后端对
-          // `_sub_table_columns` 是全量覆盖、对 `sub_table_data` 是按表名浅合并 ⇒
-          // 传全量会把「本章节没推的表」的列也换成新 key，而它们的行仍是旧键 ⇒
-          // 投影时行名整列变空（实测复现）。收窄后行与列恒在同一请求原子更新。
-          items: payloads.map(payload => ({
-            sheet_name: payload.sheetName,
-            section_id: payload.noteSectionId,
-            sub_table_data: payload.subTableData,
-            columns: pickColumnsForPayload(
-              payload.subTableData,
-              buildG7ListedColumns(state.entitySlots),
-            ),
-          })),
-        },
+        request,
       )
       data = result?.data ?? result
     } catch (err: unknown) {
@@ -1091,11 +1037,9 @@ async function syncToDisclosureNotes(): Promise<void> {
     // ── ② 成功后的收尾：失败 ⇒ 附注**已落地**，绝不能报「同步失败」──────────
     const okText =
       `已同步 ${Number(data?.rows_synced ?? 0)} 行到 ` +
-      `${Number(data?.sections_synced ?? payloads.length)} 个附注章节` +
+      `${Number(data?.sections_synced ?? request.items.length)} 个附注章节` +
       `（含 ${NOTE_SECTION_ID} 长期股权投资与 七、1 在其他主体中的权益）`
     try {
-      state.previouslySyncedTables = markG7ListedSynced(serialisableState(), payloads)
-      await persist()
       dispatchNoteUpdated()
       ElMessage.success(okText)
     } catch (err: unknown) {

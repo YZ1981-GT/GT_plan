@@ -157,7 +157,7 @@ def _router_source() -> str:
 def test_voucher_undo_calls_undo_registration():
     """接线断言：撤销端点必须调用投影撤销。
 
-    这是 Property 1 的**充分条件** —— 三个查询函数（project_level_extracted_voucher_nos /
+    这是 Property 1 的**充分条件** —— 三个查询函数（project_level_extracted_vouchers /
     cross_workpaper_duplicate_vouchers / project_sampling_coverage）都已带
     `is_deleted == false` 条件（本文件另有断言核实），故一旦软删生效，它们必然不再暴露该批次。
     """
@@ -186,18 +186,25 @@ def test_voucher_undo_passes_batch_id_from_record():
 @pytest.mark.parametrize(
     "func_name",
     [
-        "project_level_extracted_voucher_nos",
+        "project_level_extracted_vouchers",
         "cross_workpaper_duplicate_vouchers",
         "project_sampling_coverage",
     ],
 )
 def test_projection_consumers_filter_soft_deleted(func_name: str):
-    """三个消费方都必须过滤软删行，软删才能真正生效。"""
+    """三个消费方都必须过滤软删行，软删才能真正生效。
+
+    凭证身份 spec 任务 5 起三者在 sampled_voucher_queries.py，登记行条件收在 ``_engine_rows``
+    （项目、年度、未软删、引擎登记）；登记服务保留同名导出。
+    """
     import inspect
 
+    from app.services import sampled_voucher_queries as q
+
     src = inspect.getsource(getattr(svc, func_name))
-    assert "is_deleted == sa.false()" in src, (
-        f"{func_name} 未过滤 is_deleted —— 软删对它无效，撤销后仍会暴露该批次"
+    assert "_engine_rows(" in src, f"{func_name} 不经 _engine_rows 取登记行 —— 软删过滤可能被绕开"
+    assert "is_deleted == sa.false()" in inspect.getsource(q._engine_rows), (
+        "_engine_rows 未过滤 is_deleted —— 软删对三个消费方都无效，撤销后仍会暴露该批次"
     )
 
 

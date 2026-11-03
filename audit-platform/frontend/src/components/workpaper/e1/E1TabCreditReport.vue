@@ -13,6 +13,8 @@
  *
  * Requirements: 10.1-10.2
  */
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
 import { ref, computed, inject, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -92,12 +94,14 @@ async function runCreditOcr(file: File): Promise<boolean> {
   try {
     const form = new FormData()
     form.append('file', file)
-    if (creditOcrAttachmentId.value) form.append('attachment_id', creditOcrAttachmentId.value)
+    // 每次都是新选的文件：不带上一次的附件编号（带了后端按编号复用上次识别结果，新文件被忽略）
+    appendRowEvidence(form, 'E1-18')
     const { data } = await http.post(
       `/api/workpapers/${props.wpId}/e1/credit-ocr`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     )
+    refreshRowEvidence(props.projectId, props.wpId)
     creditOcrFields.value = data?.extracted_fields || {}
     creditOcrConfidence.value = typeof data?.confidence === 'number' ? data.confidence : undefined
     creditOcrPreview.value = String(data?.ocr_text || '').slice(0, 2000)
@@ -369,6 +373,7 @@ async function generateAuditConclusion(): Promise<void> {
             征信报告 OCR
           </el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" sheet-key="E1-18" />
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -499,6 +504,7 @@ async function generateAuditConclusion(): Promise<void> {
     <!-- 征信 OCR 确认对话框 -->
     <E1CreditOcrConfirmDialog
       v-model="creditOcrVisible"
+      :attachment-id="creditOcrAttachmentId"
       :fields="creditOcrFields"
       :confidence="creditOcrConfidence"
       :ocr-preview="creditOcrPreview"

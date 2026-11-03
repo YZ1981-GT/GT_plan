@@ -56,7 +56,10 @@ describe('useChecklistPersistence', () => {
 
     expect(api.put).toHaveBeenCalledWith(
       '/api/workpapers/wp-2/checklist-responses',
-      { items: [{ item_id: 'D2-note', remark: 'new', conclusion: null, wp_ref: null }] },
+      {
+        items: [{ item_id: 'D2-note', remark: 'new', conclusion: null, wp_ref: null }],
+        require_if_match: true,
+      },
       expect.objectContaining({ signal: expect.any(AbortSignal), _silent: true }),
     )
     expect(persistence.stateOf('D2-note')).toMatchObject({
@@ -165,5 +168,48 @@ describe('useChecklistPersistence', () => {
     expect(onSaved).toHaveBeenCalledTimes(3)
     expect(persistence.stateOf('J2-listed-summary').status).toBe('saved')
     expect(persistence.stateOf('J2-soe-note-dbp').status).toBe('saved')
+  })
+
+  it('sends the loaded version and advances it after every successful save', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: [{ item_id: 'same-item', remark: 'v1 data', conclusion: null, version: 'v1' }],
+    })
+    vi.mocked(api.put)
+      .mockResolvedValueOnce({
+        data: [{ item_id: 'same-item', remark: 'first', conclusion: null, version: 'v2' }],
+      })
+      .mockResolvedValueOnce({
+        data: [{ item_id: 'same-item', remark: 'second', conclusion: null, version: 'v3' }],
+      })
+    const persistence = useChecklistPersistence({ wpId: ref('wp-cas') })
+    await persistence.load()
+
+    await persistence.save('same-item', { remark: 'first' })
+    await persistence.save('same-item', { remark: 'second' })
+
+    const calls = vi.mocked(api.put).mock.calls
+    expect((calls[0][1] as any).items[0].if_match).toBe('v1')
+    expect((calls[1][1] as any).items[0].if_match).toBe('v2')
+    expect(persistence.stateOf('same-item')).toMatchObject({
+      status: 'saved', serverVersion: 'v3',
+    })
+  })
+
+  it('keeps the local edit dirty when strict CAS reports a missing baseline', async () => {
+    vi.mocked(api.put).mockRejectedValue({
+      response: {
+        status: 428,
+        data: { detail: { code: 'version_required', message: '底稿条目已有更新版本，请刷新后再保存' } },
+      },
+    })
+    const persistence = useChecklistPersistence({ wpId: ref('wp-cas') })
+
+    await expect(persistence.save('existing-item', { remark: '本地修改' })).rejects.toBeTruthy()
+
+    expect(persistence.responses.value.get('existing-item')?.remark).toBe('本地修改')
+    expect(persistence.stateOf('existing-item')).toMatchObject({
+      status: 'conflict',
+      lastError: '底稿条目已有更新版本，请刷新后再保存',
+    })
   })
 })

@@ -22,6 +22,7 @@ from app.deps import get_current_user
 from app.models.base import UserRole
 from app.routers.voucher_sampling import router
 from app.services.ledger_sampling_service import StatsResult
+from tests.test_voucher_sampling_integration import _legacy_exclusions
 
 _PID = uuid.uuid4()
 _WP = uuid.uuid4()
@@ -118,12 +119,9 @@ async def _call(unit: str, population: list[dict]) -> dict:
     with patch(
         "app.routers.voucher_sampling.LedgerSamplingService"
     ) as MockService, patch(
-        "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-        new=AsyncMock(return_value=[]),
-    ), patch(
-        "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-        new=AsyncMock(return_value=[]),
-    ), patch(
+        "app.routers.voucher_sampling.collect_exclusions",
+        new=_legacy_exclusions(extracted=[], preliminary=[]),
+    ) as mock_excl, patch(
         "app.routers.voucher_sampling.resolve_population_reconcile",
         new=AsyncMock(return_value=MagicMock(
             available=False, to_stats=lambda: {

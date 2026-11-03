@@ -70,6 +70,11 @@ async function mountCenter() {
   mocks.markRead.mockResolvedValue({})
   const wrapper = mount(NotificationCenter, { global: { stubs } })
   await flushPromises()
+  // 通知列表改为「popover 首次打开才取」（spec runtime-performance-and-reload-hardening-followup
+  // R6.3：挂载只取未读数，列表只在打开后才显示）。本文件判的是「点开通知后的跳转行为」，
+  // 打开 popover 正是它的真实前提；断言强度不变。
+  ;(wrapper.vm as unknown as { popoverVisible: boolean }).popoverVisible = true
+  await flushPromises()
   return wrapper
 }
 

@@ -26,6 +26,11 @@
             :class="{ 'gt-formula-source__pending': !hasComputed }"
           >{{ displayComputedAt }}</span>
         </div>
+        <!-- 来源地址已停用：照实说明并给出替代地址（design §3.3 / RV7-03） -->
+        <div v-if="deprecatedReason" class="gt-formula-source__row">
+          <span class="gt-formula-source__label">地址状态</span>
+          <span class="gt-formula-source__value gt-formula-source__deprecated">{{ deprecatedReason }}</span>
+        </div>
       </div>
     </template>
 
@@ -52,6 +57,7 @@ import { computed, ref } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { fmtDateTime } from '@/utils/formatters'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 const props = withDefaults(
   defineProps<{
@@ -78,12 +84,15 @@ const props = withDefaults(
   },
 )
 
-const { resolveAddr, resolveFormula } = useAcnr()
+// D9（需求 11.1）：按当前项目订阅 ACNR 失效（组件无项目入参，取路由/store 当前项目）。
+const { resolveAddr, resolveFormula } = useAcnr(useCurrentProjectId())
 
 const resolving = ref(false)
 const resolved = ref(false)
 /** 前端 resolve 得到的 canonical semantic_label */
 const resolvedLabel = ref<string | null>(null)
+/** 来源地址已停用时后端给的中文原因（含替代地址），没停用则为空 */
+const deprecatedReason = ref('')
 
 const displayExpression = computed(() => {
   const e = (props.expression ?? '').trim()
@@ -135,6 +144,8 @@ async function handleBeforeShow() {
     if (result.found && result.semantic_label) {
       resolvedLabel.value = result.semantic_label
     }
+    // 停用条目仍能解析（found=true），但要把停用原因显示出来，文案取后端 reason
+    deprecatedReason.value = result.deprecated ? (result.reason || '').trim() : ''
     resolved.value = true
   } finally {
     resolving.value = false
@@ -175,6 +186,10 @@ async function handleBeforeShow() {
 .gt-formula-source__pending {
   color: #e6a23c;
   font-style: italic;
+}
+
+.gt-formula-source__deprecated {
+  color: #e6a23c;
 }
 .gt-formula-source__spin {
   animation: gt-formula-spin 1s linear infinite;

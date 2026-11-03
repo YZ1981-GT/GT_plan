@@ -73,6 +73,14 @@ class ExecuteCompatibilityAdapter:
         raw_targets = getattr(body, "acnr_targets", [])
         raw_limit = getattr(body, "limit", 500)
         raw_offset = getattr(body, "offset", 0)
+        raw_count_token = getattr(body, "count_token", None)
+        # 结构化条件（advanced-query-linkage-closure R6.1）：旧请求体没有这两个字段时取默认（无条件、and）
+        raw_conditions = getattr(body, "conditions", [])
+        conditions = (
+            [_model_dict(item) for item in raw_conditions] if isinstance(raw_conditions, (list, tuple)) else []
+        )
+        raw_logic = getattr(body, "condition_logic", "and")
+        condition_logic = raw_logic if raw_logic in ("and", "or") else "and"
         return QueryRequest(
             entry="business",
             project_id=str(body.project_id),
@@ -87,6 +95,9 @@ class ExecuteCompatibilityAdapter:
             pivot=pivot,
             limit=int(raw_limit) if isinstance(raw_limit, int) else 500,
             offset=int(raw_offset) if isinstance(raw_offset, int) else 0,
+            count_token=str(raw_count_token) if raw_count_token else None,
+            conditions=conditions,
+            condition_logic=condition_logic,
         )
 
     @staticmethod
@@ -97,7 +108,7 @@ class ExecuteCompatibilityAdapter:
                 columns.append(asdict(column))
             else:
                 columns.append(column.key)
-        return {
+        payload: dict[str, Any] = {
             "rows": result.rows,
             "columns": columns,
             "total": result.total,
@@ -106,6 +117,18 @@ class ExecuteCompatibilityAdapter:
             "warnings": result.warnings,
             "cache_hit": result.cache_hit,
         }
+        # 新增可选键（N3）：没有内容时整键省略，既有键与类型不变
+        meta = getattr(result, "meta", None)
+        if meta:
+            payload["meta"] = meta
+            if meta.get("count_token"):
+                payload["count_token"] = meta["count_token"]
+                payload["count_reused"] = bool(meta.get("count_reused"))
+        # acnr_targets 取值块（acnr-foundation-defect-closure T15）：不带目标时整键省略
+        acnr_results = getattr(result, "acnr_results", None)
+        if acnr_results is not None:
+            payload["acnr_results"] = acnr_results
+        return payload
 
     async def execute(self, body: Any, *, user: Any, db: Any) -> dict[str, Any]:
         request = self.to_orchestrator_request(body)

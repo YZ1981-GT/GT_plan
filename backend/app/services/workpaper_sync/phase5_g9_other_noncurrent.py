@@ -120,9 +120,9 @@ ADAPTER_ID: Final[str] = "g9.other_noncurrent_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G9O"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G9 其他非流动金融资产.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；88,636 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；76,973 B）
 TEMPLATE_SHA256: Final[str] = (
-    "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379"
+    "8eb68bfc0491c0d92e7820d697e4facfcb109e936347adad4ec35cafaf86b65c"
 )
 
 #: 受管 store item（明细表G9-2 的三区共用）—— 按值取自 `useG9Detail.ts` 的 `ITEM_ID_ROWS`
@@ -370,7 +370,7 @@ _REVIEWED_BASIS: Final[str] = (
     "G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段）"
     " + 模板编制思路见 spec evidence/task8-template-design-logic.md"
     "（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / "
-    "四阶段 未审→账项调整→审定→重分类报表 / P=C+M 与 Q=D+N 走未审线）"
+    "四阶段 未审→账项调整→审定→重分类报表（L=J+K / Y=W+X）/ P=C+M 与 Q=D+N 走未审线）"
 )
 
 

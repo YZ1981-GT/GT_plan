@@ -52,7 +52,9 @@ async def test_no_failure_means_no_warning(fallback) -> None:
 async def test_local_model_unavailable_names_the_server_fallback(fallback) -> None:
     fallback["answer"] = True
     text = await router._local_unavailable_warning(_Db(), _model(deployment="local"), FAILURE)
-    assert text.startswith("本机模型当前不可用（连接被拒绝），已启用") and "另一候选兜底" in text, text
+    assert text.startswith("本机模型当前不可用（连接被拒绝），已启用"), text
+    # 需求 4.4：兜底提示点明实际去向（服务器模型），不只说「另一候选」
+    assert "服务器模型兜底" in text, text
     assert fallback["asked"] == ["server"], "本机模型不可用时应问有没有服务器候选"
 
 

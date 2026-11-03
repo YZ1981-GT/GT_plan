@@ -7,12 +7,18 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'I3'" class="i3-header-toolbar">
         <el-segmented
-          v-if="dualMode.isOoAvailable.value"
+          v-if="dualMode.isOoAvailable.value && i3GEntrySync.presentation.value.showModeSwitch"
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"
         />
+        <!--
+          能力披露（spec task 3.5 / AC 1.5）：上面的模式开关一旦被同步能力单源藏起来，
+          这里必须讲清楚「为什么没有在线编辑」+ 可操作的下一步。只隐藏开关不给原因，
+          比显示一个打不开的假开关更糟。entry id 与开关的门用**同一个**表达式。
+        -->
+        <GtEntrySyncCapabilityNotice :entry-id="SYNC_ENTRY_ID" />
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
       </div>
 
@@ -215,6 +221,9 @@
  * Spec: .kiro/specs/i3-goodwill/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -331,12 +340,8 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
-      params: { account_prefix: '1711', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    // 经试算表唯一入口取数（年度为空时后端按项目审计年度取）
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '1711' })).rows
     let u1711 = 0, a1711 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
@@ -409,6 +414,26 @@ onMounted(() => {
   void selfLoad()
   void _loadTbData()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实，不由本宿主判断。
+ *
+ * 🔴 `SYNC_ENTRY_ID` 取自 `sync/workpaperSyncManifest.generated.ts` 里 `hostPath`
+ * 指向本文件的那条 entry（manifest 是 entry 身份的生成真源）。它在这里是个字面量，
+ * 所以由 `sync/__tests__/entrySyncHostWiringContract.spec.ts` 钉住两边一致 ——
+ * 否则宿主与真源会各自漂移。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const SYNC_ENTRY_ID = 'xlsx/gt-i3-goodwill'
+const i3GEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

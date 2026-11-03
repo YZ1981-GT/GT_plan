@@ -50,7 +50,8 @@ let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 export function useStaleSummaryFull(
   projectId: Ref<string>,
-  year: Ref<number>,
+  /** 审计年度；项目没填为 null ⇒ 不请求（与未传项目同） */
+  year: Ref<number | null>,
   options?: { debounceMs?: number },
 ) {
   const debounceMs = options?.debounceMs ?? 500

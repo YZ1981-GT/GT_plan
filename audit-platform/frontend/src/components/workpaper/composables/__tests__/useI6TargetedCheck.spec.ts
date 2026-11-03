@@ -3,7 +3,16 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { ref, nextTick } from 'vue'
+
+vi.mock('@/utils/http', () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
+vi.mock('element-plus', () => ({
+  ElMessage: { info: vi.fn(), success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+  ElMessageBox: { confirm: vi.fn(), prompt: vi.fn() },
+}))
+
 import { useI6TargetedCheck } from '../useI6TargetedCheck'
+
+// 抽凭回填（去重、挂接 I6-2 项目、年审阶段预审行只读）走共享回填函数，用例见 iTargetedVoucherFill.spec.ts
 
 function makeMap(extra?: Record<string, unknown>) {
   const m = new Map<string, { item_id: string; conclusion: null; remark: string | null }>()
@@ -92,24 +101,6 @@ describe('useI6TargetedCheck', () => {
     expect(r.ok).toBe(true)
     expect(sampleMeta.value.populationAmount).toBe(520)
     expect(sampleMeta.value.populationDesc).toContain('I6-2')
-  })
-
-  it('fillFromSampledVouchers 去重并挂接 I6-2 项目', async () => {
-    const allResponses = makeMap({
-      'I6-2-detail-rows': [{ category: '智能平台', months: [100], aje: 0, rje: 0 }],
-    })
-    const { fillFromSampledVouchers, rows } = useI6TargetedCheck(allResponses)
-    await nextTick()
-    const n1 = fillFromSampledVouchers([
-      { voucherNo: '001', voucherDate: '2025-01-01', summary: '智能平台材料', debitAmount: 100 },
-    ])
-    const n2 = fillFromSampledVouchers([
-      { voucherNo: '001', voucherDate: '2025-01-01', summary: '智能平台材料', debitAmount: 100 },
-    ])
-    expect(n1).toBe(1)
-    expect(n2).toBe(0)
-    expect(rows.value).toHaveLength(1)
-    expect(rows.value[0].projectName).toBe('智能平台')
   })
 
   it('pushAdjDraftsToI63 写入 I6-3-rows 并去重', async () => {

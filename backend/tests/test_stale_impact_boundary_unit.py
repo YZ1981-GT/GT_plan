@@ -1,182 +1,104 @@
-"""Unit tests for GET /api/linkage-bus/impact-by-addr boundary conditions.
+"""GET /api/linkage-bus/impact-by-addr 边界条件单测。
 
-Task 3.9 (acnr-consumer-wiring): example-based boundary tests for the
-stale_impact-by-addr endpoint implemented in task 3.7.
+原 Task 3.9（acnr-consumer-wiring）。spec acnr-foundation-defect-closure D8 把该端点由「会写库的 GET」
+改为只读预览（``stale_engine.preview_impact``，不写库 / 不推 SSE / 不记审计）并加 ``require_project_access("readonly")``
+鉴权，故本文件改用权限世界 fixtures（真实成员行 + 生产门禁）发请求，并把被观测的引擎入口换成 ``preview_impact``。
 
-Covers three boundary cases:
-1. empty/whitespace addr_id → HTTP 400 ("addr_id is required")
-2. stale_engine.is_degraded == True → HTTP 503
-3. valid addr_id + non-degraded engine → HTTP 200 with correct response schema
-
-Validates: Requirements 5.5, 5.6
+覆盖：
+1. 空 / 纯空白 addr_id → 400（鉴权通过后，函数体首句判定）
+2. 引擎降级 → 503
+3. 正常 addr_id + 非降级 → 200，响应 schema 正确；preview_impact 被调、on_change 不被调（只读）
 """
 
 from __future__ import annotations
 
-import uuid
-from unittest.mock import AsyncMock
-
 import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+import pytest_asyncio
 
-from app.deps import get_current_user
-from app.models.core import UserRole
 from app.routers import linkage_bus
-from app.routers.linkage_bus import router
+from app.services import stale_propagation_engine as stale_module
+from tests.authz_world import TARGET_PROJECT_ID, sqlite_world
+
+_PROJECT_ID = str(TARGET_PROJECT_ID)
 
 
-# ─── Fixtures ────────────────────────────────────────────────────────────────
-
-_PROJECT_ID = str(uuid.uuid4())
-
-
-class _FakeUser:
-    id = uuid.uuid4()
-    username = "test_user"
-    role = UserRole.admin
+@pytest_asyncio.fixture
+async def world(monkeypatch: pytest.MonkeyPatch):
+    async with sqlite_world(monkeypatch) as w:
+        yield w
 
 
-def _make_app() -> FastAPI:
-    """Create a minimal FastAPI app with the linkage-bus router + auth override."""
-    app = FastAPI()
-    app.include_router(router)
-
-    async def _user():
-        return _FakeUser()
-
-    app.dependency_overrides[get_current_user] = _user
-    return app
+def _stub_preview(world, returns):
+    if "preview_impact" in vars(stale_module.stale_engine):
+        world.monkeypatch.delattr(stale_module.stale_engine, "preview_impact")
+    return world.stub(stale_module.StalePropagationEngine, "preview_impact", returns=returns, awaitable=False)
 
 
-def _client(app: FastAPI) -> AsyncClient:
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+async def _get(world, user, **params):
+    async with world.client(linkage_bus.router, user=user) as client:
+        return await client.get("/api/linkage-bus/impact-by-addr", params=params)
 
 
-# ─── Case 1: empty / whitespace addr_id → 400 ───────────────────────────────
+# ─── Case 1: 空 / 纯空白 addr_id → 400 ──────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_empty_addr_id_returns_400(monkeypatch):
-    """空 addr_id → 400 且 detail 为 'addr_id is required'（Req 5.5）。"""
-    # engine 状态无关紧要：400 在 degraded 检查之前触发
-    # is_degraded 是只读 property，需 patch 其后端字段 _degraded
-    monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
-
-    app = _make_app()
-    async with _client(app) as client:
-        resp = await client.get(
-            "/api/linkage-bus/impact-by-addr",
-            params={"addr_id": "", "project_id": _PROJECT_ID},
-        )
-
-    assert resp.status_code == 400
+@pytest.mark.parametrize("addr_id", ["", "   "])
+async def test_blank_addr_id_returns_400(world, addr_id: str):
+    """空 / 纯空白 addr_id → 400（鉴权通过后，函数体首句 strip 判定）。"""
+    user = (await world.admin_non_member()).user  # admin 过项目鉴权
+    world.monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
+    resp = await _get(world, user, addr_id=addr_id, project_id=_PROJECT_ID)
+    assert resp.status_code == 400, resp.text
     assert resp.json()["detail"] == "addr_id is required"
 
 
-@pytest.mark.asyncio
-async def test_whitespace_addr_id_returns_400(monkeypatch):
-    """纯空白 addr_id → 400（Req 5.5，strip 后视为空）。"""
-    monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
-
-    app = _make_app()
-    async with _client(app) as client:
-        resp = await client.get(
-            "/api/linkage-bus/impact-by-addr",
-            params={"addr_id": "   ", "project_id": _PROJECT_ID},
-        )
-
-    assert resp.status_code == 400
-    assert resp.json()["detail"] == "addr_id is required"
+# ─── Case 2: 引擎降级 → 503 ─────────────────────────────────────────────────
 
 
-# ─── Case 2: engine degraded → 503 ──────────────────────────────────────────
+async def test_engine_degraded_returns_503(world):
+    """引擎降级 → 503；preview_impact 不被调用（degraded 短路在它之前）。"""
+    user = (await world.admin_non_member()).user
+    world.monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", True, raising=False)
+    preview = _stub_preview(world, {"affected": [], "total": 0, "degraded": True})
+    resp = await _get(world, user, addr_id="D2/D2-2/E100", project_id=_PROJECT_ID)
+    assert resp.status_code == 503, resp.text
+    assert preview.count == 0
 
 
-@pytest.mark.asyncio
-async def test_engine_degraded_returns_503(monkeypatch):
-    """引擎降级 → 503（Req 5.6）。"""
-    monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", True, raising=False)
-    # on_change 不应被调用（degraded 短路）
-    on_change_mock = AsyncMock()
-    monkeypatch.setattr(linkage_bus.stale_engine, "on_change", on_change_mock, raising=False)
-
-    app = _make_app()
-    async with _client(app) as client:
-        resp = await client.get(
-            "/api/linkage-bus/impact-by-addr",
-            params={"addr_id": "D2/D2-2/E100", "project_id": _PROJECT_ID},
-        )
-
-    assert resp.status_code == 503
-    on_change_mock.assert_not_awaited()
+# ─── Case 3: 正常 addr_id + 非降级 → 200，只读 preview ────────────────────────
 
 
-# ─── Case 3: valid addr_id + non-degraded → 200 with correct schema ─────────
-
-
-@pytest.mark.asyncio
-async def test_valid_addr_id_returns_200_with_schema(monkeypatch):
-    """正常 addr_id + 非降级 → 200，响应含正确 schema（Req 5.4, 5.5）。"""
-    monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
-
-    async def _fake_on_change(*, source_uri, project_id, year):
-        # 直通校验：addr_id 原样作为 source_uri 传入
-        assert source_uri == "D2/D2-2/E100"
-        assert project_id == _PROJECT_ID
-        return {
-            "affected": ["D3/D3-1/A1", "D4/D4-1/B2"],
-            "total": 2,
-        }
-
-    monkeypatch.setattr(linkage_bus.stale_engine, "on_change", _fake_on_change, raising=False)
-
-    app = _make_app()
-    async with _client(app) as client:
-        resp = await client.get(
-            "/api/linkage-bus/impact-by-addr",
-            params={"addr_id": "D2/D2-2/E100", "project_id": _PROJECT_ID, "max_depth": 3},
-        )
-
-    assert resp.status_code == 200
+async def test_valid_addr_id_returns_200_with_schema(world):
+    """正常 addr_id + 非降级 → 200，响应 schema 正确；走只读 preview_impact（不是 on_change）。"""
+    user = (await world.admin_non_member()).user
+    world.monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
+    preview = _stub_preview(world, {"affected": ["D3/D3-1/A1", "D4/D4-1/B2"], "total": 2, "degraded": False})
+    resp = await _get(world, user, addr_id="D2/D2-2/E100", project_id=_PROJECT_ID, max_depth=3)
+    assert resp.status_code == 200, resp.text
     data = resp.json()
-
-    # 顶层 schema
     assert data["addr_id"] == "D2/D2-2/E100"
     assert data["total_affected"] == 2
-    assert isinstance(data["affected"], list)
-    assert len(data["affected"]) == 2
-
-    # 每项 schema：addr_id / depth / via_ref / match_type
+    assert isinstance(data["affected"], list) and len(data["affected"]) == 2
     for item in data["affected"]:
         assert set(item.keys()) == {"addr_id", "depth", "via_ref", "match_type"}
-        assert isinstance(item["addr_id"], str)
-        assert isinstance(item["depth"], int)
+        assert isinstance(item["addr_id"], str) and isinstance(item["depth"], int)
         assert item["match_type"] == "graph_edge"
+    assert data["affected"][0]["addr_id"] == "D3/D3-1/A1" and data["affected"][0]["depth"] == 1
+    # 只读：preview 被调 1 次，且传入的是请求里的 addr_id 与 max_depth
+    assert preview.count == 1
+    (args, kwargs) = preview.calls[0]
+    called = {**dict(zip(("source_uri", "max_depth"), args)), **kwargs}
+    assert called["source_uri"] == "D2/D2-2/E100"
+    assert called["max_depth"] == 3
 
-    # 首项内容与 depth 近似
-    assert data["affected"][0]["addr_id"] == "D3/D3-1/A1"
-    assert data["affected"][0]["depth"] == 1
 
-
-@pytest.mark.asyncio
-async def test_valid_addr_id_empty_affected_returns_200(monkeypatch):
+async def test_valid_addr_id_empty_affected_returns_200(world):
     """正常 addr_id 但无下游影响 → 200，affected 空列表、total_affected=0。"""
-    monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
-
-    async def _fake_on_change(*, source_uri, project_id, year):
-        return {"affected": [], "total": 0}
-
-    monkeypatch.setattr(linkage_bus.stale_engine, "on_change", _fake_on_change, raising=False)
-
-    app = _make_app()
-    async with _client(app) as client:
-        resp = await client.get(
-            "/api/linkage-bus/impact-by-addr",
-            params={"addr_id": "D2/D2-2/E100", "project_id": _PROJECT_ID},
-        )
-
-    assert resp.status_code == 200
+    user = (await world.admin_non_member()).user
+    world.monkeypatch.setattr(linkage_bus.stale_engine, "_degraded", False, raising=False)
+    _stub_preview(world, {"affected": [], "total": 0, "degraded": False})
+    resp = await _get(world, user, addr_id="D2/D2-2/E100", project_id=_PROJECT_ID)
+    assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["addr_id"] == "D2/D2-2/E100"
     assert data["total_affected"] == 0

@@ -46,9 +46,10 @@ _EXTRA_PROJECT_TOKENS: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] =
     # 报表配置写：按行归属分流 —— 项目行 assert_project_permission(edit)，全局模板行仅 admin
     "_authorize_report_config_write": (
         ("routers/report_config.py", "_authorize_report_config_write", ("assert_project_permission",)),),
-    # 附件 / 附件预览：ProjectUser 成员级别比对（admin 放行）
+    # 附件：委托 assert_project_permission（spec attachment-security-baseline 起，原自写成员比对不判归档）；
+    # 附件预览：ProjectUser 成员级别比对（admin 放行）
     "_ensure_project_access": (
-        ("routers/attachments.py", "_ensure_project_access", ("ProjectUser", "PERMISSION_HIERARCHY")),
+        ("routers/attachments.py", "_ensure_project_access", ("assert_project_permission",)),
         ("routers/office_preview.py", "_ensure_project_access", ("ProjectUser", "PERMISSION_HIERARCHY")),
     ),
     # 自定义查询回写：项目可见集 + 编辑级成员 + 逐目标 ownership_guard
@@ -70,6 +71,19 @@ _EXTRA_PROJECT_TOKENS: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] =
     # 本 spec 新增：公式导入 / 新增自定义预设的引用解析项目上下文（readonly）
     "_assert_context_project": (
         ("routers/formula_import_export.py", "_assert_context_project", ("assert_project_permission",)),),
+    # spec acnr-foundation-defect-closure T15：构建器三端点的项目校验 = 作用域解析 → 与业务视图同一个 ownership_guard
+    # （project_users 成员 ∪ project_assignments 委派，admin / partner 放行）；acnr_targets 取值只在它放行后发生
+    "_builder_scope": (
+        ("routers/query_builder.py", "_builder_scope", ("resolve_builder_scope",)),
+        ("services/custom_query/builder_scope.py", "resolve_builder_scope",
+         ("ownership_guard", "assert_target_accessible")),
+        ("services/custom_query/ownership_guard.py", "OwnershipGuard.assert_target_accessible",
+         ("_can_access_project",)),
+        ("services/custom_query/ownership_guard.py", "OwnershipGuard._can_access_project",
+         ("_accessible_project_ids",)),
+        ("services/custom_query/ownership_guard.py", "OwnershipGuard._accessible_project_ids",
+         ("ProjectUser", "ProjectAssignment")),
+    ),
 }
 
 #: 刻意保持仅登录、不计入欠账的端点 → 理由（可伪证：``test_identity_by_design_endpoints_do_not_touch_data``）
@@ -78,7 +92,11 @@ _BODY_IDENTITY_BY_DESIGN: dict[str, str] = {
     "address_registry.py::get_jump_route": "只做字符串换算、不读库",
 }
 
-_BODY_PROJECT_TOKENS = _PROJECT_LEVEL_TOKENS + tuple(_EXTRA_PROJECT_TOKENS)
+#: ``require_operation`` 只校验路径 / 查询参数里的项目 id；本维项目在请求体里，它看不到项目 ⇒ 在本维只算身份档。
+#: 原先照搬基线把它算项目级：生成报表只挂它、对任何项目的成员都不校，本维却一直把它记成已隔离
+#: （spec consol-autotree-residual-closure R3.3；``test_require_operation_is_identity_tier_in_body_dimension`` 钉住）。
+_BODY_PROJECT_TOKENS = tuple(t for t in _PROJECT_LEVEL_TOKENS if t != "require_operation") + tuple(_EXTRA_PROJECT_TOKENS)
+_BODY_IDENTITY_TOKENS = _IDENTITY_ONLY_TOKENS + ("require_operation",)
 
 #: 本 spec 修过的端点（回归钉子：必须在本维且是项目级）
 _FIXED_ENDPOINTS = frozenset({
@@ -88,6 +106,10 @@ _FIXED_ENDPOINTS = frozenset({
     "draft_refresh.py::one_click_draft_refresh",
     "refresh_scopes.py::list_refresh_scopes",
     "row_name_alignment_router.py::batch_refresh",
+    # spec acnr-foundation-defect-closure D8：联动总线写 stale 的两个端点
+    # （/impact 写 stale 走 edit；/impact-by-addr 改只读预览走 readonly）
+    "linkage_bus.py::stale_impact",
+    "linkage_bus.py::stale_impact_by_addr",
     # spec formula-fetch-followup-defect-closure R4.1：地址库读项目数据的五个端点（只读级）
     "address_registry.py::search_addresses",
     "address_registry.py::get_stats",
@@ -98,6 +120,8 @@ _FIXED_ENDPOINTS = frozenset({
     "wp_template_list.py::get_template_list",
     "wp_field_overrides.py::get_field_overrides",
     "wp_field_overrides.py::set_field_override",
+    # spec consol-autotree-residual-closure R1.2：生成报表（项目在请求体）在函数体里按请求体项目校验 edit
+    "reports.py::generate_reports",
 })
 
 #: 不用会话令牌、自带签名校验的端点 → 必须调到的校验依赖（可伪证：``test_body_self_auth_endpoints_really_verify``）
@@ -126,7 +150,13 @@ _BODY_KNOWN_GAPS: frozenset[str] = frozenset({
 #: 2026-10-24 spec formula-fetch-followup-defect-closure R4.1 修地址库五个读端点（jump 只拼路由、登记进
 #: _BODY_IDENTITY_BY_DESIGN 不计欠账）后现算 87。
 #: 2026-10-24 spec procedure-trim-generation-delegation-chain 修生成前模板清单与底稿字段覆盖值两个端点后现算 84。
-_BODY_IDENTITY_ONLY_BASELINE = 84
+#: 2026-10-27 spec acnr-foundation-defect-closure D8：linkage-bus /impact（edit）、/impact-by-addr（readonly）
+#: 两个 stale 写端点加项目鉴权升到 project 档，v2 notify-cell-change 下线去请求体（不再带项目、退出本维）后现算 84。
+#: 2026-10-28 合入远端（BM：上两条分属两条线，合并后两侧修复都在）现算 81。
+#: 2026-10-28 spec advanced-query-linkage-closure 任务 24：模板执行在函数体内直接校验目标项目归属（升到 project 档）后现算 80。
+#: 2026-10-29 spec trim-followup-residual-findings-closure R1.3：删除 GET /api/h5/industry-check（查询参数项目、
+#: 只校验登录、查不存在的列必 500，无调用方）后现算 79。
+_BODY_IDENTITY_ONLY_BASELINE = 79
 
 
 def _rooted_at_param(expr: ast.AST, params: set[str]) -> bool:
@@ -177,7 +207,7 @@ def _scan_source(rel: str, src: str) -> list[tuple[str, str, str]]:
                 break
             names = _auth_names_in_node(node) | router_deps
             tier = "project" if _matches(names, _BODY_PROJECT_TOKENS) else \
-                "identity" if _matches(names, _IDENTITY_ONLY_TOKENS) else "none"
+                "identity" if _matches(names, _BODY_IDENTITY_TOKENS) else "none"
             out.append((f"{rel}::{node.name}", f"{method.upper()} {full}", tier))
             break
     return out
@@ -348,6 +378,21 @@ def test_scanner_self_check():
     got = {k: tier for k, _, tier in _scan_source("s.py", sample)}
     assert got == {"s.py::bare": "none", "s.py::via_dict": "identity", "s.py::via_subscript": "identity",
                    "s.py::via_query": "project", "s.py::via_helper": "project"}, got
+
+
+def test_require_operation_is_identity_tier_in_body_dimension():
+    """项目在请求体时 ``require_operation`` 取不到项目、只按系统角色判 ⇒ 本维只算身份档；函数体再直调门禁才是项目级。"""
+    sample = (
+        'router = APIRouter(prefix="/api/x")\n'
+        '@router.post("/only-operation")\n'
+        'async def only_operation(data: Body, db=Depends(get_db), user=Depends(require_operation("report:edit"))):\n'
+        "    return data.project_id\n"
+        '@router.post("/operation-and-gate")\n'
+        'async def operation_and_gate(data: Body, db=Depends(get_db), user=Depends(require_operation("report:edit"))):\n'
+        '    await assert_project_permission(db, user, data.project_id, "edit")\n'
+    )
+    got = {k: tier for k, _, tier in _scan_source("s.py", sample)}
+    assert got == {"s.py::only_operation": "identity", "s.py::operation_and_gate": "project"}, got
 
 
 def _calls_project_token(tree: ast.AST) -> bool:

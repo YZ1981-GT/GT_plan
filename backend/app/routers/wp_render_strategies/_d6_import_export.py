@@ -64,7 +64,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
     "D6-5": [
         "关联方名称", "关联关系", "期初余额", "借方发生", "贷方发生", "期末余额",
-        "坏账准备", "账面价值", "发生时间及账龄", "未结转原因",
+        "坏账准备", "账面价值", "发生时间及账龄", "发生原因（款项性质）", "未结转原因",
         "至审计日结转金额", "处理计划", "索引号", "备注",
     ],
     "D6-6-period": [
@@ -116,6 +116,10 @@ _SHEET_ITEM_ID: dict[str, str] = {
 
 def _get_headers(sheet_code: str) -> list[str]:
     return _SHEET_HEADERS.get(sheet_code, [])
+
+
+#: 后加的列：旧版导出文件没有，导入时缺列照常导入、字段留空（spec oo-writeback-template-parity-closure R3 批 B2，同 D7-4）。
+_OPTIONAL_IMPORT_HEADERS: dict[str, frozenset[str]] = {"D6-5": frozenset({"发生原因（款项性质）"})}
 
 
 def _validate_sheet(sheet_code: str) -> None:
@@ -264,7 +268,8 @@ async def d6_import_data(
         raise HTTPException(400, "xlsx文件中无活动工作表")
 
     # 验证列头
-    expected_headers = _get_headers(sheet)
+    optional_headers = _OPTIONAL_IMPORT_HEADERS.get(sheet, frozenset())
+    expected_headers = [h for h in _get_headers(sheet) if h not in optional_headers]
     actual_headers = [
         str(cell.value).strip() if cell.value else ""
         for cell in next(ws.iter_rows(min_row=1, max_row=1))
@@ -523,7 +528,8 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_float(data.get("priorBalance")), _safe_float(data.get("debitAmount")),
             _safe_float(data.get("creditAmount")), _safe_float(data.get("endBalance")),
             _safe_float(data.get("impairment")), _safe_float(data.get("bookValue")),
-            _safe_str(data.get("agingAndTiming")), _safe_str(data.get("unsettledReason")),
+            _safe_str(data.get("agingAndTiming")), _safe_str(data.get("transactionReason")),
+            _safe_str(data.get("unsettledReason")),
             _safe_float(data.get("postSettlement")), _safe_str(data.get("plan")),
             _safe_str(data.get("indexRef")), _safe_str(data.get("remark")),
         ]
@@ -594,7 +600,9 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
         prior_audited = prior_unadj + prior_aje + prior_rje
         debit = _safe_float(_col_val(row, actual_headers, "借方发生"))
         credit = _safe_float(_col_val(row, actual_headers, "贷方发生"))
-        end_unadj = prior_audited + debit - credit
+        # 期末未审 = 期初未审 + 借方 − 贷方（模板 D6-2 Q = G + O − P，与前端 useD6Detail.recalcRow 同口径；
+        # 原用期初审定 —— spec oo-writeback-template-parity-closure R2）
+        end_unadj = prior_unadj + debit - credit
         end_aje = _safe_float(_col_val(row, actual_headers, "期末AJE"))
         end_rje = _safe_float(_col_val(row, actual_headers, "期末RJE"))
         end_audited = end_unadj + end_aje + end_rje
@@ -636,7 +644,9 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
         reversal = _safe_float(_col_val(row, actual_headers, "本期转回"))
         writeoff = _safe_float(_col_val(row, actual_headers, "本期核销"))
         other_dec = _safe_float(_col_val(row, actual_headers, "本期其他减少"))
-        end_unadj = prior_audited + provision + other_inc - reversal - writeoff - other_dec
+        # 期末未审 = 期初未审 + 计提 + 其他增加 − 转回 − 核销 − 其他减少（模板 D6-3 K = B + SUM(F:G) − SUM(H:J)，
+        # 与前端 recalcImpairmentRow 同口径；原用期初审定 —— spec oo-writeback-template-parity-closure R2）
+        end_unadj = prior_unadj + provision + other_inc - reversal - writeoff - other_dec
         end_aje = _safe_float(_col_val(row, actual_headers, "期末AJE"))
         end_rje = _safe_float(_col_val(row, actual_headers, "期末RJE"))
         return {
@@ -665,6 +675,7 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
             "impairment": impairment,
             "bookValue": end_bal - impairment,
             "agingAndTiming": _safe_str(_col_val(row, actual_headers, "发生时间及账龄")),
+            "transactionReason": _safe_str(_col_val(row, actual_headers, "发生原因（款项性质）")),
             "unsettledReason": _safe_str(_col_val(row, actual_headers, "未结转原因")),
             "postSettlement": _safe_float(_col_val(row, actual_headers, "至审计日结转金额")),
             "plan": _safe_str(_col_val(row, actual_headers, "处理计划")),

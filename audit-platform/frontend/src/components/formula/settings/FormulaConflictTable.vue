@@ -2,7 +2,9 @@
   冲突三方对比 + 逐条 / 批量决策（spec formula-global-settings-sync，design §11，R3.2 / R4.1 / R7.3 / R13.3）。
   管理员发布、模板发布、订阅 / 退订、应用到指定项目共用：只列分类为「冲突」的条目，
   每条给出 原定义（本项目基线）/ 新定义 / 本项目当前，处理方式由调用方给出（文案随场景不同）。
-  决策以 `{条目 key → 处理}` 回传，与后端 Decisions.conflict_choices 同口径。
+  决策以 `{条目 key → 处理}` 回传，与后端 Decisions.conflict_choices 同口径。key 只用服务端条目 key
+  （`{域}|{项目}|{公式位}`，公式位可含 `|`），不按项目 + 公式位拼接或解析：多域预览里同项目同名公式位是两条
+  （spec formula-hub-integrity-closure 需求 8.4）。
 -->
 <template>
   <div class="gt-fct" data-testid="formula-conflict-table">
@@ -47,7 +49,7 @@ defineOptions({ name: 'FormulaConflictTable' })
 
 const props = withDefaults(defineProps<{
   items: PlanItem[]
-  /** 冲突决策 `{条目 key → 处理}`；未出现的条目按 defaultChoice 处理 */
+  /** 冲突决策 `{服务端条目 key → 处理}`；未出现的条目按 defaultChoice 处理 */
   modelValue: Record<string, ConflictChoice>
   choices: ReadonlyArray<{ value: ConflictChoice; label: string }>
   defaultChoice?: ConflictChoice

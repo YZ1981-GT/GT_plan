@@ -95,7 +95,7 @@ _SECTION_PROMPTS: dict[str, str] = {
         "5) 分类评价结论（分类是否正确/是否需要重分类调整）"
     ),
     "overall-opinion": (
-        "请生成K12营业外收入底稿总体审计意见。"
+        "请提供K12营业外收入底稿的科目结论措辞建议。"
         "需涵盖：\n"
         "1) 科目概况（6301营业外收入本期发生额/审定数/重大程度）\n"
         "2) 来源构成及合理性评价\n"
@@ -103,8 +103,8 @@ _SECTION_PROMPTS: dict[str, str] = {
         "4) 偶发性/非经常性损益界定评价\n"
         "5) 同比变动分析及原因说明\n"
         "6) 与相关科目联动（其他收益K10/政府补助/债务重组）\n"
-        "7) 总体审计结论（是否存在重大错报/审计调整建议）\n"
-        "8) 剩余审计风险评估"
+        "7) 待人工判断事项（潜在重大错报迹象/可能调整事项，仅列依据）\n"
+        "8) 剩余审计风险及建议程序。不得形成最终审计意见"
     ),
 }
 
@@ -152,7 +152,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

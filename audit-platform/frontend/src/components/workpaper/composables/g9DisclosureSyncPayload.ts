@@ -64,6 +64,20 @@ export interface G9SyncSnapshot {
   noteText: string
 }
 
+/**
+ * 披露 Tab 的同步快照 = `useG9Disclosure` 的明细行 + 审计说明（由 `G9TabDisclosureBase.syncToDisclosureNotes`
+ * 原样抽出，Tab 与附注页离屏同步共用，spec note-pull-followup-closure R1）。
+ */
+export function g9DisclosureSyncSnapshot(disc: {
+  readonly dataRows: { readonly value: readonly G9SyncRow[] }
+  readonly noteText: { readonly value: string }
+}): G9SyncSnapshot {
+  return {
+    rows: disc.dataRows.value,
+    noteText: disc.noteText.value,
+  }
+}
+
 export interface G9SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string

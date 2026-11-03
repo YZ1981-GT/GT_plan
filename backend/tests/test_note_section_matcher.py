@@ -315,3 +315,54 @@ class TestNormalization:
     def test_none_and_non_string(self) -> None:
         assert normalize_for_match(None) == ""
         assert normalize_for_match(123) == ""  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# resolve_alias_counterparts：全部别名写法（note_section_pairing 的别名桥接依赖它）
+# ---------------------------------------------------------------------------
+
+
+class TestResolveAliasCounterparts:
+    """``note_section_pairing.bridge_alias_pairs`` 惰性导入本函数；它曾缺失 ⇒ 桥接一调用即 ImportError。"""
+
+    @pytest.mark.parametrize("pair", SECTION_TITLE_ALIASES, ids=lambda p: p.soe_title)
+    def test_first_item_equals_singular_counterpart(self, pair: AliasPair) -> None:
+        from app.services.note_section_matcher import resolve_alias_counterparts
+
+        assert resolve_alias_counterparts(pair.soe_title, "listed")[0] == resolve_alias_counterpart(
+            pair.soe_title, "listed"
+        )
+        assert resolve_alias_counterparts(pair.listed_title, "soe")[0] == resolve_alias_counterpart(
+            pair.listed_title, "soe"
+        )
+
+    def test_returns_every_counterpart_in_list_order(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """同一标题在对侧登记了两种写法 ⇒ 两个都返回（单数版只给第一个）。"""
+        import app.services.note_section_matcher as mod
+
+        extra = (
+            AliasPair(soe_title="甲乙", listed_title="甲和乙", evidence="替身"),
+            AliasPair(soe_title="甲与乙", listed_title="甲和乙", evidence="替身"),
+        )
+        monkeypatch.setattr(mod, "SECTION_TITLE_ALIASES", mod.SECTION_TITLE_ALIASES + extra)
+        assert mod.resolve_alias_counterparts("甲和乙", "soe") == ("甲乙", "甲与乙")
+        assert mod.resolve_alias_counterpart("甲和乙", "soe") == "甲乙"
+        assert mod.resolve_alias_counterparts(" 甲 乙 ", "listed") == ("甲和乙",)
+
+    def test_no_alias_invalid_side_or_blank_title(self) -> None:
+        from app.services.note_section_matcher import resolve_alias_counterparts
+
+        assert resolve_alias_counterparts("货币资金", "listed") == ()
+        assert resolve_alias_counterparts(SECTION_TITLE_ALIASES[0].soe_title, "other") == ()
+        assert resolve_alias_counterparts(None, "listed") == ()
+        assert resolve_alias_counterparts("  ", "soe") == ()
+
+    def test_bridge_alias_pairs_runs_through_lazy_import(self) -> None:
+        """别名桥接真调一次：惰性 import 能解析，按别名配上同类章的目标、不配无关节。"""
+        from app.services.note_section_pairing import bridge_alias_pairs
+
+        pair = next(p for p in SECTION_TITLE_ALIASES if p.soe_title == "营业收入、营业成本")
+        src = {"section_id": "s1", "title": pair.soe_title, "pairing_group": "items"}
+        tgt = {"section_id": "t1", "title": pair.listed_title, "pairing_group": "items"}
+        other = {"section_id": "t2", "title": "货币资金", "pairing_group": "items"}
+        assert bridge_alias_pairs([src], [other, tgt], "soe") == [(src, tgt)]

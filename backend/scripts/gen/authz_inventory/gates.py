@@ -28,7 +28,7 @@ from .routes import DeclaredRoute, DependencyRef, RouteRecord
 
 __all__ = ["CATEGORIES", "LEVELS", "LEVEL_RANK", "LEVELLED", "LEVEL_UNDETERMINED", "REGISTRY", "REGISTRY_MISMATCH",
            "UNKNOWN_DEPENDENCY", "UNSUPPORTED", "Arg", "EndpointGates", "GateSpec", "GateUse", "Issue", "ModuleInfo",
-           "ParseFailure", "analyze_module", "max_level", "recognize_endpoint", "recognize_function"]
+           "ParseFailure", "MethodLevel", "analyze_module", "max_level", "recognize_endpoint", "recognize_function"]
 
 LEVELS = ("readonly", "review", "edit")
 LEVEL_RANK = {level: rank for rank, level in enumerate(LEVELS, start=1)}
@@ -53,12 +53,25 @@ class Arg:
 
 
 @dataclass(frozen=True)
+class MethodLevel:
+    """路由 HTTP 方法决定项目权限：读方法 readonly，其余 fail-closed 为 edit。"""
+
+    readonly_methods: frozenset[str] = frozenset({"GET", "HEAD"})
+    default: str = "edit"
+
+    def resolve(self, method: str | None) -> str | None:
+        if method is None:
+            return None
+        return "readonly" if method.upper() in self.readonly_methods else self.default
+
+
+@dataclass(frozen=True)
 class GateSpec:
     """登记表的一项。``local`` = 同文件具名门禁：必须定义在调用方同一文件，按辅助函数展开后核对登记级别。"""
 
     name: str
     category: str
-    level: str | Arg | None = None  # 固定级别 / 由实参给出 / 无项目级级别
+    level: str | Arg | MethodLevel | None = None  # 固定 / 调用实参 / HTTP 方法 / 无项目级级别
     args: tuple[Arg, ...] = ()
     factory: bool = False  # 调用返回依赖函数：Depends(f(...)) 或 f(...)(...)
     local: bool = False
@@ -84,6 +97,10 @@ _SPECS = (
     GateSpec("require_wp_edit_permission", "project_wp", "edit", factory=True, home=_D,
              overlays=(_BYPASS, ("global_capability", "WORKPAPER_WRITE"))),
     GateSpec("authorize_wp_read", "project_wp", "readonly", home=_D, overlays=(_BYPASS,)),
+    GateSpec("require_attachment_permission", "project_object", Arg("level", 3, "min_permission"),
+             home="app.services.attachment_access", source="attachment-security-baseline：附件所属项目门"),
+    GateSpec("confirmation_project_gate", "project_object", MethodLevel(),
+             home="app.services.confirmation_scope_gate", source="attachment-security-baseline：函证 router 方法级门"),
     GateSpec("assert_target_accessible", "project", "readonly", home="app.services.custom_query.ownership_guard",
              overlays=(_BYPASS, ("membership", "成员行 ∪ 现行委派")), source="现扫补全：disclosure_notes.trace_cell"),
     GateSpec("_assert_project_edit", "project_object", "edit", local=True, home=_DN),
@@ -202,8 +219,8 @@ def _bound(val: Val | None, bindings: dict[str, Val] | None) -> Val | None:
 class _Resolver:
     """为一个端点展开门禁：挂载声明 + 函数体（逐层进入同文件辅助函数，按调用方绑定实参）。"""
 
-    def __init__(self, info: ModuleInfo, function: str) -> None:
-        self.info, self.function = info, function
+    def __init__(self, info: ModuleInfo, function: str, method: str | None = None) -> None:
+        self.info, self.function, self.method = info, function, method
         self.uses: list[GateUse] = []
         self.issues: list[Issue] = []
 
@@ -216,7 +233,12 @@ class _Resolver:
         spec = REGISTRY[name]
         where = f"（经 {' → '.join(chain)}）" if chain else ""
         level, origin = (spec.level, "fixed") if isinstance(spec.level, str) else (None, None)
-        if isinstance(spec.level, Arg):
+        if isinstance(spec.level, MethodLevel):
+            level = spec.level.resolve(self.method)
+            origin = "method" if level is not None else None
+            if level is None:
+                self.issue(LEVEL_UNDETERMINED, name, f"路由方法无法静态确定{where}")
+        elif isinstance(spec.level, Arg):
             val = bind(_pick(spec.level, args, kwargs, star))
             if val is not None and val.kind == "literal" and val.value in LEVEL_RANK:
                 level, origin = val.value, val.origin
@@ -314,10 +336,13 @@ class _Resolver:
                            for r in _rules(spec) if r.keyword in dict(ref.closure))
             self.gate(spec.name, (), kwargs, False, lambda v: v, "registration", False, (), None, site)
 
-    @staticmethod
-    def _level_of(name: str, value: Callable[[Arg], Any]) -> Any:
+    def _level_of(self, name: str, value: Callable[[Arg], Any]) -> Any:
         spec = REGISTRY.get(name)
-        return value(spec.level) if spec is not None and isinstance(spec.level, Arg) else None
+        if spec is None:
+            return None
+        if isinstance(spec.level, MethodLevel):
+            return spec.level.resolve(self.method)
+        return value(spec.level) if isinstance(spec.level, Arg) else None
 
     def _decl_key(self, decl: Decl) -> tuple[str, Any]:
         def literal(rule: Arg) -> Any:
@@ -342,7 +367,7 @@ class _Resolver:
 
 def recognize_endpoint(info: ModuleInfo, declared: DeclaredRoute, route: RouteRecord | None = None) -> EndpointGates:
     """识别一条声明路由的现门禁。``route`` 为路由表里对应的记录（未注册的端点传 None，不做运行时对账）。"""
-    resolver = _Resolver(info, declared.function)
+    resolver = _Resolver(info, declared.function, declared.method)
     unit = info.units.get(declared.function)
     entries = info.endpoints.get(declared.function, ())
     if unit is None or declared.decorator >= len(entries) or declared.router not in info.routers:

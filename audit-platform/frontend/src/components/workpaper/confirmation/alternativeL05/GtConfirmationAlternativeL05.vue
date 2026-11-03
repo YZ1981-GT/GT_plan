@@ -226,10 +226,20 @@
               </template>
             </template>
           </el-table-column>
-          <!-- 📎OCR列 -->
-          <el-table-column label="📎" width="50" align="center">
+          <!-- 行内附件（spec attachment-confirmation-evidence-loop 需求 3.4）：与其余 8 个替代程序页同一组件，只读也显示小眼睛 -->
+          <el-table-column label="附件" width="76" align="center">
             <template #default="{ row }">
-              <el-button size="small" link @click="handleOcr(row, block.key)">📎</el-button>
+              <AlternativeRowEvidence
+                v-if="row._row_id && wpId"
+                :wp-id="wpId"
+                :project-id="projectId"
+                sheet-key="L0-5"
+                :row-id="row._row_id"
+                :columns="l05Columns(block)"
+                :row="row"
+                :readonly="readonly"
+                @fill="(patch: Record<string, string | number>) => fillRow(block.key, row, patch)"
+              />
             </template>
           </el-table-column>
           <!-- 索引号 -->
@@ -307,6 +317,8 @@ import { ref, computed, inject, watch, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
+import AlternativeRowEvidence from '../alternativeD05/AlternativeRowEvidence.vue'
+import type { AltColumn } from '../alternativeD05/alternativeDocMapping'
 import { useAlternativeL05Data } from '../l0-confirmation/composables/useAlternativeL05Data'
 import { calcReconcileDiff } from '../l0-confirmation/composables/useL0FormulaEngine'
 import { useWorkpaperImportExport } from '../../composables/useWorkpaperImportExport'
@@ -612,38 +624,32 @@ function computeFormulaCell(row: CheckRow, col: EvidenceCol, blockType: BlockTyp
   return String(row[col.key] ?? '')
 }
 
-// ─── OCR ────────────────────────────────────────────────────────────────────
+// ─── 行内单据（spec attachment-confirmation-evidence-loop 需求 3.4）──────────
+// 原先调 `/api/workpapers/d4/contract-ocr`（缺底稿 id，路由不匹配），并把整个回执 `Object.assign` 进行数据。
 
-async function handleOcr(row: CheckRow, blockType: BlockType) {
-  try {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*,.pdf'
-    input.onchange = async (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file) return
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await http.post('/api/workpapers/d4/contract-ocr', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      const ocrData = res.data?.data ?? res.data
-      if (!ocrData || Object.keys(ocrData).length === 0) {
-        ElMessage.warning('未识别到有效借款信息')
-        return
-      }
-      await ElMessageBox.confirm(
-        `OCR识别结果：${JSON.stringify(ocrData, null, 2).slice(0, 300)}...\n确认填入当前行？`,
-        'OCR识别结果',
-        { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
-      )
-      Object.assign(row, ocrData)
-      markDirty()
-    }
-    input.click()
-  } catch {
-    // 用户取消
+/** 本区块可由识别结果填入的列：左侧记账凭证 5 列（分组「记账凭证」）+ 本区块证据列（无分组） */
+const L05_VOUCHER_COLUMNS: AltColumn[] = [
+  { field: 'voucher_date', label: '日期', group: '记账凭证' },
+  { field: 'voucher_no', label: '凭证编号', group: '记账凭证' },
+  { field: 'business_desc', label: '业务内容', group: '记账凭证' },
+  { field: 'counter_account', label: '对方科目', group: '记账凭证' },
+  { field: 'voucher_amount', label: '金额', group: '记账凭证' },
+]
+
+function l05Columns(block: BlockConfig): AltColumn[] {
+  return [
+    ...L05_VOUCHER_COLUMNS,
+    ...block.evidenceCols.map((c) => ({ field: c.key, label: c.label, type: c.type === 'text' ? undefined : c.type })),
+  ]
+}
+
+function fillRow(blockType: BlockType, row: CheckRow, patch: Record<string, string | number>) {
+  const companyId = currentCompany.value?._company_id
+  if (!companyId || !row._row_id) return
+  for (const [field, value] of Object.entries(patch)) {
+    data.updateBlockField(companyId, blockType, row._row_id, field, value)
   }
+  markDirty()
 }
 
 // ─── AI辅助 ─────────────────────────────────────────────────────────────────

@@ -26,9 +26,19 @@ export function normalizeSheetName(name: string): string {
  * 深链别名：`?sheet=@program` ⇒ 这本底稿的程序表页签（第一张 componentType = a-program-console 的表）。
  * 程序裁剪页「进入程序表」不知道表名（H1A / 函证程序表F0A …），原先不带 sheet ⇒ 落到「底稿目录」
  * （spec procedure-chain-hardening-and-java-contracts R5）。按表名解析的 `resolveSheetNameByDeepLink`
- * 不认这个别名（它只看表名，别名要按 componentType 认，见 `useWpRenderer.resolveRenderSheet`）。
+ * 不认这个别名（它只看表名，别名要按 componentType 认，见 `useWpRenderer.resolveRenderSheet`）；
+ * 按表名就能认的别名（`ADJUSTMENT_SHEET_ALIAS`）在 `resolveSheetNameByDeepLink` 里认。
  */
 export const PROGRAM_SHEET_ALIAS = '@program'
+
+/**
+ * 深链别名：`?sheet=@adjustment` ⇒ 这本底稿名称含「调整分录」的那张表（唯一；没有或多于一张 ⇒ null，不猜）。
+ * 调整分录页「底稿 X」跳来源底稿只知道 source_ref（{wp_id}:{item_id}），item_id 的编码前缀落不到调整分录表
+ * （D1-entry-rows → D1 审定表、L1-adj-AJE → 程序表、H9-5-rows 而表是 H9-4，spec wp-deeplink-locate-residual-closure 需求 1.1）。
+ * 按表名判定（「调整分录汇总表D1-5」含「汇总」，sheet_type 启发式会判成审定表），HTML 与 Univer 两条路径同一口径。
+ */
+export const ADJUSTMENT_SHEET_ALIAS = '@adjustment'
+const ADJUSTMENT_SHEET_MARK = '调整分录'
 
 /**
  * 深链 `?sheet=` → 实际 sheet_name 解析（纯函数，供 `GtWpRenderer` 与守卫共用）。
@@ -52,6 +62,10 @@ export function resolveSheetNameByDeepLink(
 ): string | null {
   const want = String(target ?? '')
   if (!want) return null
+  if (want === ADJUSTMENT_SHEET_ALIAS) {
+    const adjustment = sheetNames.filter((n) => normalizeSheetName(n).includes(ADJUSTMENT_SHEET_MARK))
+    return adjustment.length === 1 ? adjustment[0] : null
+  }
   const exact = sheetNames.find((n) => n === want)
   if (exact !== undefined) return exact
   const normWant = normalizeSheetName(want)

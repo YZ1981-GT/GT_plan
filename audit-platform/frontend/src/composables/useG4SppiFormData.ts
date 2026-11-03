@@ -13,6 +13,8 @@
  * - selfLoad逻辑（render-config?force_component_type=g4-bond-investment-sppi）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
+import { registerPendingFlusher, trackPendingWrite } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 
@@ -118,12 +120,14 @@ export function useG4SppiFormData(opts: UseG4SppiFormDataOptions) {
           conclusion: item.conclusion || null,
           remark: item.remark || null,
         })),
-      })
+      }, { _dedupe: false } as AxiosRequestConfig)
       opts.onAfterSave?.()
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
         ElMessage.error('保存失败，请稍后重试')
+        // 过渡屏障须看见失败：吞掉会让 flushHtml 读到未落库的旧投影
+        throw err
       }
     }
   }
@@ -200,14 +204,14 @@ export function useG4SppiFormData(opts: UseG4SppiFormDataOptions) {
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
       _pendingItems.delete(itemId)
-      void _doSave([updated])
+      void trackPendingWrite(_doSave([updated])).catch(() => undefined)
     }, 2000)
     _debounceTimers.set(itemId, timer)
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
-  function _flushPending(): void {
+  async function _flushPending(): Promise<void> {
     for (const timer of _debounceTimers.values()) {
       clearTimeout(timer)
     }
@@ -221,15 +225,18 @@ export function useG4SppiFormData(opts: UseG4SppiFormDataOptions) {
       }
       _pendingItems.clear()
       if (items.length > 0) {
-        void _doSave(items)
+        // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+        await _doSave(items)
       }
     }
   }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
+  registerPendingFlusher(_flushPending)
+
   onScopeDispose(() => {
-    _flushPending()
+    void _flushPending().catch(() => undefined)
   })
 
   return {
@@ -243,6 +250,7 @@ export function useG4SppiFormData(opts: UseG4SppiFormDataOptions) {
     saveBatch,
     saveItemsFromEvent,
     debouncedSave,
+    flushPending: _flushPending,
   }
 }
 

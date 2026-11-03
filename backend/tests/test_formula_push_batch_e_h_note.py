@@ -262,9 +262,12 @@ def test_h_balance_adj_tb_unavailable_returns_empty():
 
 
 def test_h10_is_income_type_uses_current_amount():
-    """H10 资产处置损益（损益类 6115）: ending 取「本期发生额」，opening 取「年初余额」。"""
+    """H10 资产处置损益（损益类 6115）: ending 取「本期发生额」，上期取上年试算表发生额（本年年初余额不是上期）。"""
+    from app.services.formula_push.sources import PriorPlSnapshot
+
     binding = balance_adj_for("H10")
-    binding._last_tb_data = _make_tb("6115", "0", "200000", "300000")
+    binding._last_tb_data = _make_tb("6115", "0", "999", "300000")  # 年初余额不该被当成上期
+    binding._last_prior_pl = PriorPlSnapshot(_make_tb("6115", "0", "0", "200000"))
 
     # H10 无 note.main 规则，直接测 binding 行为（用 G 循环同类损益科目的 note_rows 签名）
     # balance_adj note_rows 需要 rule 参数，但主要用于选行。

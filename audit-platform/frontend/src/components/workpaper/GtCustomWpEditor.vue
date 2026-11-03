@@ -25,7 +25,7 @@
   <div class="gt-custom-wp">
     <div class="gt-custom-wp__toolbar">
       <el-segmented
-        v-if="dualMode.isOoAvailable.value"
+        v-if="dualMode.isOoAvailable.value && customWpEditorEntrySync.presentation.value.showModeSwitch"
         class="gt-custom-wp__mode"
         :model-value="dualMode.currentMode.value"
         :options="MODE_OPTIONS"
@@ -33,6 +33,12 @@
         :disabled="dualMode.checking.value || refreshing"
         @change="dualMode.onModeChange"
       />
+      <!--
+        能力披露（spec task 3.5 / AC 1.5）：上面的模式开关一旦被同步能力单源藏起来，
+        这里必须讲清楚「为什么没有在线编辑」+ 可操作的下一步。只隐藏开关不给原因，
+        比显示一个打不开的假开关更糟。entry id 与开关的门用**同一个**表达式。
+      -->
+      <GtEntrySyncCapabilityNotice :entry-id="SYNC_ENTRY_ID" />
       <el-button
         type="primary"
         size="small"
@@ -134,6 +140,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import apiPaths from '@/services/apiPaths'
@@ -198,7 +206,8 @@ const effectiveHtmlData = computed<Record<string, unknown> | undefined>(
  *    「OO 里改的东西丢了」，而清空则比不刷新更糟（本来还看得见旧内容）。
  */
 async function refreshProjection(): Promise<void> {
-  if (!props.wpGenerated) return
+  // 只读（编辑锁在别的窗口 / 无编辑权）：重投影会写 parsed_data，不发（workpaper-multi-window-lock-gaps R3.5）
+  if (!props.wpGenerated || props.readonly) return
   refreshing.value = true
   try {
     const res = (await api.post(
@@ -350,8 +359,10 @@ async function removeFormula(row: FormulaListItem) {
     return // 用户取消
   }
   try {
+    // 🔴 删除同样强制 CAS（formula-hub-integrity-closure ADR-FHIC-11 / 需求 13.4）：不带版本号 ⇒ 后端 428
     const res = (await api.delete(
-      apiPaths.workpapers.formulaDetail(props.wpId, row.id)
+      apiPaths.workpapers.formulaDetail(props.wpId, row.id),
+      { params: { expected_version: row.definition_version ?? undefined } },
     )) as { cell_clear_failed?: boolean }
     // 🔴 如实反映「定义已删但残留值清理失败」——静默成功会让用户以为该格已干净
     if (res?.cell_clear_failed) {
@@ -452,6 +463,26 @@ async function onFormulaSave(payload: {
 onMounted(() => {
   if (props.wpGenerated) void fetchFormulaList()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实，不由本宿主判断。
+ *
+ * 🔴 `SYNC_ENTRY_ID` 取自 `sync/workpaperSyncManifest.generated.ts` 里 `hostPath`
+ * 指向本文件的那条 entry（manifest 是 entry 身份的生成真源）。它在这里是个字面量，
+ * 所以由 `sync/__tests__/entrySyncHostWiringContract.spec.ts` 钉住两边一致 ——
+ * 否则宿主与真源会各自漂移。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const SYNC_ENTRY_ID = 'xlsx/gt-custom-wp-editor'
+const customWpEditorEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

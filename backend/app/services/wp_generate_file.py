@@ -43,15 +43,21 @@ class GeneratedWorkpaperFile:
 
 
 async def load_generation_scenario(db: AsyncSession, project_id: UUID) -> tuple[str, bool]:
-    """项目场景与是否有外币业务（与链路编排同口径；取不到按 normal / 无外币）。"""
+    """项目场景与是否有外币业务（与链路编排同口径；取不到按 normal / 无外币）。
+
+    场景取 ``project_classification`` 单一解释（R4）：迁移前残留在分类列里的 IPO / refinancing
+    在场景仍为 normal 时按场景处理，生成文件的场景裁剪与其他模块一致。
+    """
     from app.models.core import Project
+    from app.services.project_classification import resolve
 
     row = (await db.execute(
-        sa.select(Project.scenario, Project.has_foreign_currency).where(Project.id == project_id)
+        sa.select(Project.business_category, Project.scenario, Project.has_foreign_currency)
+        .where(Project.id == project_id)
     )).first()
     if row is None:
         return "normal", False
-    return (row[0] or "normal"), bool(row[1])
+    return resolve(row[0], row[1]).scenario, bool(row[2])
 
 
 def materialize_workpaper_file(
@@ -62,6 +68,7 @@ def materialize_workpaper_file(
     *,
     scenario: str = "normal",
     has_foreign_currency: bool = False,
+    target_base_path: Path | None = None,
 ) -> GeneratedWorkpaperFile:
     """按模板生成底稿文件；找不到模板时在同一存储位置建空白册并标 ``from_template=False``。"""
     path = _init.init_workpaper_from_template(
@@ -70,13 +77,15 @@ def materialize_workpaper_file(
         wp_code=wp_code,
         scenario=scenario,
         has_foreign_currency=has_foreign_currency,
+        target_base_path=target_base_path,
     )
     if path is not None:
         return GeneratedWorkpaperFile(path=Path(path), from_template=True)
 
     import openpyxl
 
-    target = _init.get_workpaper_storage_path(project_id, wp_id)
+    target = target_base_path or _init.get_workpaper_storage_path(project_id, wp_id)
+    target.parent.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.Workbook()
     try:
         ws = wb.active
@@ -151,12 +160,13 @@ async def create_template_workpaper(
 
 @dataclass(frozen=True)
 class WorkpaperFileJob:
-    """批量落文件的一项：``library_file`` = 项目在模板库里选定的文件（没有则按模板目录索引找）。"""
+    """批量落文件的一项：``library_file`` = 项目选定模板；``target_base_path`` = 可选 staging 基础路径。"""
 
     wp_id: UUID
     wp_code: str
     wp_name: str
     library_file: str | None = None
+    target_base_path: Path | None = None
 
 
 def _copy_library_file(project_id: UUID, job: WorkpaperFileJob) -> GeneratedWorkpaperFile | None:
@@ -172,7 +182,9 @@ def _copy_library_file(project_id: UUID, job: WorkpaperFileJob) -> GeneratedWork
         return None
     import shutil
 
-    target = _init.get_workpaper_storage_path(project_id, job.wp_id).with_suffix(source.suffix)
+    target_base = job.target_base_path or _init.get_workpaper_storage_path(project_id, job.wp_id)
+    target_base.parent.mkdir(parents=True, exist_ok=True)
+    target = target_base.with_suffix(source.suffix)
     shutil.copy2(source, target)
     return GeneratedWorkpaperFile(path=target, from_template=True)
 
@@ -195,6 +207,7 @@ def materialize_workpaper_files(
             generated = _copy_library_file(project_id, job) or materialize_workpaper_file(
                 project_id, job.wp_id, job.wp_code, job.wp_name,
                 scenario=scenario, has_foreign_currency=has_foreign_currency,
+                target_base_path=job.target_base_path,
             )
             done.append(generated)
     except BaseException:

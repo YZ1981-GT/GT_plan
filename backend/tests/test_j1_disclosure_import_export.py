@@ -42,11 +42,30 @@ def _tab_src(variant: str) -> str:
     return _read(TAB_DIR / _TAB_FILE[variant])
 
 
-def _parse_default_rows(src: str, const_name: str) -> list[tuple[str, str, int]]:
-    """从 `.vue` 提取 `DEFAULT_*` 的 (id, label, indent) 序列。"""
-    start = src.index(f"const {const_name}")
-    end = src.index("\n]", start)
-    block = src[start:end]
+#: 默认骨架行的单一来源：两个披露 Tab 与附注页离屏同步共用（spec note-pull-followup-closure R1 从 Tab 原样抽出）
+DEFAULTS_TS = J1_COMPOSABLES / "j1DisclosureDefaults.ts"
+_DEFAULT_KEY = {"DEFAULT_SUMMARY": "summary", "DEFAULT_SHORT_TERM": "shortTerm", "DEFAULT_POST": "postEmployment"}
+
+
+def _variant_defaults_src(variant: str) -> str:
+    """`J1_DISCLOSURE_DEFAULTS` 里本变体那一段（`listed: {…}` / `soe: {…}`）。"""
+    src = _read(DEFAULTS_TS)
+    start = src.index(f"\n  {variant}: {{")
+    end = src.index("\n  },", start)
+    return src[start:end]
+
+
+def _default_block(variant: str, const_name: str) -> str:
+    """本变体 `summary / shortTerm / postEmployment` 那一个数组的源码。"""
+    src = _variant_defaults_src(variant)
+    start = src.index(f"\n    {_DEFAULT_KEY[const_name]}: ([")
+    end = src.index("\n    ]", start)
+    return src[start:end]
+
+
+def _parse_default_rows(variant: str, const_name: str) -> list[tuple[str, str, int]]:
+    """从默认骨架行模块提取本变体 `summary / shortTerm / postEmployment` 的 (id, label, indent) 序列。"""
+    block = _default_block(variant, const_name)
     out: list[tuple[str, str, int]] = []
     for m in re.finditer(r"\{\s*id:\s*'([^']+)',\s*label:\s*'([^']*)',([^}]*)\}", block):
         indent = 1 if re.search(r"indent:\s*(\d+)", m.group(3)) else 0
@@ -82,18 +101,33 @@ def _parse_note_fields(src: str, const_name: str) -> list[tuple[str, str]]:
     ],
 )
 def test_skeleton_mirrors_frontend_defaults(variant: str, const_name: str, suffix: str):
-    fe = _parse_default_rows(_tab_src(variant), const_name)
-    assert fe, f"{variant} {const_name} 解析失败（.vue 格式变了？）"
+    fe = _parse_default_rows(variant, const_name)
+    assert fe, f"{variant} {const_name} 解析失败（j1DisclosureDefaults.ts 格式变了？）"
     blk = next(b for b in mod.blocks_of(variant) if b.suffix == suffix)  # type: ignore[arg-type]
     assert list(blk.skeleton) == fe
 
 
 @pytest.mark.parametrize("variant", _VARIANTS)
+def test_tab_takes_its_defaults_from_the_shared_module(variant: str):
+    """Tab 的默认骨架就是共用模块里本变体那份（否则上面比的不是 Tab 实际用的行）。"""
+    assert f"defaults: J1_DISCLOSURE_DEFAULTS.{variant}," in _tab_src(variant)
+    assert "const DEFAULT_SUMMARY" not in _tab_src(variant), "Tab 里又内联了一份默认骨架 ⇒ 两份真源"
+
+
+_SUFFIX_DEFAULT = {"summary": "DEFAULT_SUMMARY", "short-term": "DEFAULT_SHORT_TERM", "post-employment": "DEFAULT_POST"}
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
 def test_category_mirrors_frontend(variant: str):
-    """行 `category` 字面必须与前端一致（合计口径按 category 归组）。"""
-    src = _tab_src(variant)
+    """行 `category` 字面必须与前端一致（合计口径按 category 归组）：区块里每一行都写本区块的 category。
+
+    只查「本变体源码里出现过这个 category」的话，改掉某一行的 category 照样全绿（那一行的合计归错组）。
+    """
     for blk in mod.blocks_of(variant):  # type: ignore[arg-type]
-        assert f"category: '{blk.category}'" in src
+        rows = re.findall(r"\{\s*id:\s*'[^']+',[^}]*\}", _default_block(variant, _SUFFIX_DEFAULT[blk.suffix]))
+        cats = [(m.group(1) if (m := re.search(r"category:\s*'([^']*)'", r)) else None) for r in rows]
+        assert len(cats) == len(blk.skeleton), (variant, blk.suffix, len(cats))
+        assert set(cats) == {blk.category}, (variant, blk.suffix, cats)
 
 
 @pytest.mark.parametrize("variant", _VARIANTS)

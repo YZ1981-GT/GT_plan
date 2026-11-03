@@ -9,7 +9,7 @@
   <div class="gt-a51">
     <!-- Toolbar -->
     <div class="gt-a51__toolbar">
-      <el-segmented v-model="viewMode" :options="segOpts" size="small" />
+      <el-segmented v-if="a51EntrySync.presentation.value.showModeSwitch" v-model="viewMode" :options="segOpts" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a51-cashflow-audit" />
       <div class="gt-a51__toolbar-right">
         <el-button size="small" text @click="tipsVisible = true">💡 会计提示</el-button>
@@ -276,6 +276,7 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useA51CashflowAudit, AUDIT_OBJECTIVES, PROGRAM_STEPS, AUDIT_ROWS, RECONCILE_GROUPS, CHECK4_SECTIONS, CHECK5_ROWS, OTHER_CF_GROUPS, ACCOUNTING_TIPS } from './composables/useA51CashflowAudit'
 import { useA51SyncMode, A51_SYNC_ENTRY_ID } from './composables/useA51SyncMode'
 import { fmtAmount } from '@/utils/formatters'
@@ -374,6 +375,17 @@ onMounted(async () => {
   // 🔴 健康检查已由 useA51SyncMode 的 mount 期自动探测，不需额外调用
 })
 onBeforeUnmount(() => { flushPendingSave() })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const a51EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-a51-cashflow-audit',
+})
+
 </script>
 
 <style scoped>

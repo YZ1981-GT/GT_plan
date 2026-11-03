@@ -14,13 +14,14 @@
  * - 超100行启用 max-height 虚拟滚动
  * - truncated 时顶部黄色 el-alert
  * - "追加"按钮（搜索框弹出，从序时账搜索追加）— placeholder UI
- * - 底部：填充策略 el-radio-group（年审时 replace/merge disabled）+ "确认填充"按钮
+ * - 底部：填充策略「追加 / 替换本阶段抽凭行」（合并进底稿由宿主的共享回填函数做，ADR-VK-07）+ "确认填充"按钮
  *
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 7.5
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { Search, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { amountString, normDate, normText, signedAmount } from '@/utils/voucherIdentity'
 import type { SampledVoucher, CoverageStats, FillMode, CheckResult, Phase } from '../composables/useSamplingAlgorithms'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -30,7 +31,6 @@ interface Props {
   vouchers: SampledVoucher[]
   coverageStats: CoverageStats | null
   fillMode: FillMode
-  isFillModeRestricted: boolean
   selectedCount: number
   selectedDebitTotal: number
   selectedCreditTotal: number
@@ -57,7 +57,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  phase: 'preliminary',
+  phase: 'final',
   confirmBlockedReason: null,
   reconcileIssue: null,
   reconcileOverrideReason: '',
@@ -169,7 +169,7 @@ const checkResultOptions: { value: CheckResult; label: string }[] = [
   { value: '异常', label: '异常' },
 ]
 
-// ─── 追加按钮：人工增补凭证（凭证号去重）─────────────────────────────────────
+// ─── 追加按钮：人工增补凭证（凭证号 + 日期 + 金额认同一笔）──────────────────────
 
 const appendSearchVisible = ref(false)
 const appendForm = ref<{ voucherNo: string; voucherDate: string; debitAmount: string; creditAmount: string; summary: string }>(
@@ -182,8 +182,11 @@ function handleOpenAppendSearch() {
 }
 
 /**
- * 人工新增勾选一条系统抽样未选中的凭证（R6.2）；按凭证号去重（R6.4）。
- * 若凭证号已存在则改为勾选该已有行而不重复添加。
+ * 人工新增勾选一条系统抽样未选中的凭证（R6.2）。
+ *
+ * 同一笔的认法（任务 9 修正）：凭证号相同，且填了日期 / 金额时日期 / 金额也相同。凭证号单独不唯一
+ * （同号别日、同日别凭证字的是别的凭证），以前只按凭证号认，会把别的凭证当成已有行只勾选、不添加。
+ * 命中唯一一行 → 只勾选；命中多行 → 请补日期或金额区分；没命中 → 新增。
  */
 function handleAppendSearch() {
   const no = appendForm.value.voucherNo.trim()
@@ -191,11 +194,21 @@ function handleAppendSearch() {
     ElMessage.warning('请填写凭证号')
     return
   }
-  // 凭证号去重：已存在则仅勾选
-  const existing = props.vouchers.find(v => v.voucherNo === no)
-  if (existing) {
-    existing.selected = true
-    ElMessage.info(`凭证号 ${no} 已存在，已为其勾选`)
+  const date = normDate(appendForm.value.voucherDate)
+  const amount = appendForm.value.debitAmount || appendForm.value.creditAmount
+    ? amountString(signedAmount(appendForm.value.debitAmount || 0, appendForm.value.creditAmount || 0).abs())
+    : null
+  const hits = props.vouchers.filter(v => normText(v.voucherNo) === no
+    && (!date || normDate(v.voucherDate) === date)
+    && (amount === null || amountString(signedAmount(v.debitAmount, v.creditAmount).abs()) === amount))
+  if (hits.length > 1) {
+    ElMessage.warning(`凭证号 ${no} 在列表里有 ${hits.length} 笔，请补填日期或金额区分`)
+    return
+  }
+  if (hits.length === 1) {
+    hits[0].selected = true
+    void syncTableSelection()
+    ElMessage.info(`凭证 ${no}（${hits[0].voucherDate || '无日期'}）已在列表里，已为其勾选`)
     appendSearchVisible.value = false
     return
   }
@@ -221,6 +234,7 @@ function handleAppendSearch() {
     editTrail: [],
   })
   ElMessage.success(`已新增凭证 ${no}`)
+  void syncTableSelection()
   appendSearchVisible.value = false
 }
 
@@ -234,10 +248,34 @@ function handleRemoveRow(row: SampledVoucher) {
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
 
+// ─── 表格勾选与样本 selected 同步 ─────────────────────────────────────────────
+// 样本默认全选（selected = true），但 el-table 的勾选框不读 selected：以前打开时勾选框全空、统计却是全选，
+// 不点就确认会填入全部，点一下又只剩这一行。打开 / 增补后按 selected 把表格勾上，同步期间不回写。
+const tableRef = ref<{ clearSelection: () => void; toggleRowSelection: (row: unknown, selected?: boolean) => void } | null>(null)
+let syncingSelection = false
+async function syncTableSelection() {
+  await nextTick()
+  const table = tableRef.value
+  if (!table) return
+  const wanted = props.vouchers.filter(v => v.selected)
+  syncingSelection = true
+  try {
+    table.clearSelection()
+    for (const v of wanted) table.toggleRowSelection(v, true)
+  } finally {
+    syncingSelection = false
+  }
+}
+// 表格在 el-dialog 的内容里，弹窗打开后才渲染：等表格实例就位再勾（挂载时它还不在）
+watch(tableRef, (table) => { if (table) void syncTableSelection() })
+watch(() => props.vouchers, syncTableSelection)
+
 function handleSelectionChange(selection: SampledVoucher[]) {
-  const selectedNos = new Set(selection.map(v => v.voucherNo))
+  if (syncingSelection) return
+  // 按行本身认勾选（以前按凭证号：勾一笔会把同号的别的分录、别的凭证一起勾上）；比原始对象，不比响应式代理
+  const chosen = new Set(selection.map(v => toRaw(v)))
   props.vouchers.forEach(v => {
-    v.selected = selectedNos.has(v.voucherNo)
+    v.selected = chosen.has(toRaw(v))
   })
 }
 
@@ -384,6 +422,7 @@ function handleConfirm() {
       :max-height="500"
       border
       size="small"
+      ref="tableRef"
       class="voucher-table"
       @selection-change="handleSelectionChange"
       @select-all="handleSelectAll"
@@ -436,6 +475,9 @@ function handleConfirm() {
             <span>{{ row.counterpartAccount }}</span>
             <span v-if="row.counterpartAccountName" style="color: var(--el-text-color-secondary); margin-left: 4px">{{ row.counterpartAccountName }}</span>
           </template>
+          <span v-else-if="row.voucherEntriesOmitted" :title="`整张凭证 ${row.voucherLineCount ?? ''} 行分录，超过展示上限，请在序时账查看`">
+            多科目（分录过多，请在序时账查看）
+          </span>
           <template v-else>
             <el-button size="small" link type="primary" @click="showVoucherEntries(row)">多科目 (点击查看分录)</el-button>
           </template>
@@ -578,21 +620,15 @@ function handleConfirm() {
     <div class="dialog-footer">
       <div class="fill-mode-section">
         <span class="fill-mode-label">填充策略：</span>
-        <el-radio-group :model-value="fillMode" @change="handleFillModeChange">
-          <el-radio value="append">追加</el-radio>
-          <el-tooltip
-            :disabled="!isFillModeRestricted"
-            content="年审阶段不可覆盖预审数据"
-            placement="top"
-          >
-            <el-radio value="replace" :disabled="isFillModeRestricted">替换</el-radio>
+        <el-radio-group :model-value="fillMode === 'replace' ? 'replace' : 'append'" @change="handleFillModeChange">
+          <el-tooltip content="已在底稿里的分录不重复填入，保留原行的核对内容" placement="top">
+            <el-radio value="append">追加</el-radio>
           </el-tooltip>
           <el-tooltip
-            :disabled="!isFillModeRestricted"
-            content="年审阶段不可覆盖预审数据"
+            content="只删除本阶段由抽凭填入的行，预审阶段的行、手工行与挂凭行不动；已填核对内容的行删除前先确认"
             placement="top"
           >
-            <el-radio value="merge" :disabled="isFillModeRestricted">合并去重</el-radio>
+            <el-radio value="replace" data-testid="fill-mode-replace">替换本阶段抽凭行</el-radio>
           </el-tooltip>
         </el-radio-group>
       </div>
@@ -615,7 +651,7 @@ function handleConfirm() {
       </el-tooltip>
     </div>
 
-    <!-- ═══ 人工增补凭证弹窗（凭证号去重）═══ -->
+    <!-- ═══ 人工增补凭证弹窗 ═══ -->
     <el-dialog
       v-model="appendSearchVisible"
       title="人工增补凭证"
@@ -646,7 +682,7 @@ function handleConfirm() {
           </el-form-item>
         </el-form>
         <div class="append-hint">
-          手工增补的凭证将默认勾选并纳入样本；相同凭证号自动去重。
+          手工增补的凭证将默认勾选并纳入样本；凭证号、日期、金额都相同的视为同一笔，已在列表里的只勾选。
         </div>
       </div>
       <template #footer>

@@ -15,16 +15,18 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user, require_project_access
 from app.models.core import User
 from app.services.linkage_graph_builder import LinkageGraphBuilder
 from app.services.linkage_label_resolver import LinkageLabelResolver
+from app.services.project_audit_year import fetch_project_audit_year
 from app.services.stale_propagation_engine import stale_engine
 
 logger = logging.getLogger(__name__)
@@ -62,8 +64,9 @@ class HeaderRuleRequest(BaseModel):
 
 class ImpactRequest(BaseModel):
     source_uri: str
-    project_id: str
-    year: int
+    project_id: UUID
+    # 年度可缺省；缺省时按项目审计年度补齐（spec acnr-foundation-defect-closure D8）。
+    year: int | None = Field(None, ge=2000, le=2100)
 
 
 # ─── Endpoints ───────────────────────────────────────────────────
@@ -73,12 +76,30 @@ class ImpactRequest(BaseModel):
 async def stale_impact(
     body: ImpactRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """BFS 下游影响分析（替代 /v2/notify-cell-change）。
 
     接收变更源 URI，执行 BFS 传播，写 DB stale 标记，SSE 推送前端。
-    降级模式下返回 503。
+    会写 stale、推 SSE，属项目级写操作：须对 ``body.project_id`` 有 edit 权限
+    （spec acnr-foundation-defect-closure D8 / 需求 10）。降级模式下返回 503。
     """
+    # 项目级鉴权：写 stale 前先校验（非成员 / 权限不足 → 403）
+    await assert_project_permission(db, current_user, body.project_id, "edit")
+
+    # 年度缺省时按项目审计年度补齐；仍补不出 → 422（不写死 2025）
+    year = body.year
+    if year is None or year <= 0:
+        year = await fetch_project_audit_year(db, body.project_id)
+    if year is None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error_code": "YEAR_REQUIRED",
+                "message": "项目审计年度未知，无法标记下游待更新",
+            },
+        )
+
     if stale_engine.is_degraded:
         raise HTTPException(
             status_code=503,
@@ -87,8 +108,8 @@ async def stale_impact(
 
     result = await stale_engine.on_change(
         source_uri=body.source_uri,
-        project_id=body.project_id,
-        year=body.year,
+        project_id=str(body.project_id),
+        year=year,
     )
     return result
 
@@ -97,14 +118,14 @@ async def stale_impact(
 async def stale_impact_by_addr(
     addr_id: str = Query("", description="ACNR addr_id，如 D2/D2-2/E100"),
     max_depth: int = Query(3, ge=1, le=10, description="最大 BFS 深度"),
-    project_id: str = Query(..., description="项目 ID"),
-    year: int = Query(0, description="年度（可选）"),
-    current_user: User = Depends(get_current_user),
+    project_id: UUID = Query(..., description="项目 ID"),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, Any]:
-    """按 ACNR addr_id 查询下游影响（BFS 传播分析）。
+    """按 ACNR addr_id 查询下游影响（只读 BFS 预览）。
 
-    addr_id 格式直通 StalePropagationEngine.on_change，执行 BFS 传播并返回
-    受影响 addr_id 列表。addr_id 缺失 → 400；引擎降级 → 503。
+    改为只读预览（spec acnr-foundation-defect-closure D8 / 需求 10）：只做 BFS，
+    不写 DB stale 标记、不推 SSE、不记审计；对 ``project_id`` 须有 readonly 及以上
+    权限。addr_id 缺失 → 400；引擎降级 → 503。
     """
     if not addr_id or not addr_id.strip():
         raise HTTPException(status_code=400, detail="addr_id is required")
@@ -115,11 +136,7 @@ async def stale_impact_by_addr(
             detail="Stale propagation engine is in degraded mode",
         )
 
-    result = await stale_engine.on_change(
-        source_uri=addr_id,  # addr_id 格式直通
-        project_id=project_id,
-        year=year,
-    )
+    result = stale_engine.preview_impact(source_uri=addr_id, max_depth=max_depth)
 
     # 格式化响应
     affected_list = []

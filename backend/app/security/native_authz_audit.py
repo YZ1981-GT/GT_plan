@@ -263,6 +263,12 @@ JUSTIFIED_ALLOWLIST: dict[tuple[str, str], str] = {
         "错报评价为 A13 项目/年度错报汇总聚合，非个别底稿正文。",
     ("/api/workpapers/{project_id}/{year}/misstatement-for-letter", "GET"):
         "错报(致管理层函)为 A13 项目/年度汇总聚合，非个别底稿正文。",
+    # ── 单底稿 AI 复核(spec project-pid-path-authz-coverage: authorize_wp_read + assert_project_permission review) ──
+    ("/api/workpapers/{wp_id}/review", "POST"):
+        "单底稿 AI 复核：authorize_wp_read 确认底稿存在且用户有底稿只读权，再按底稿所属项目校验 review 级"
+        "（与批量复核同级）；产出独立写入 ai_content，不改动底稿正文；未接 dedicated_wp_gate 因底稿门的"
+        " ai_generate 矩阵不含 reviewer（QC 需要复核）；scope-internal 可见性差异为合伙人/admin 可越过"
+        "委派可见性审查，但 AI 复核不是正常编辑流程——与合并报表聚合输出等价。",
     ("/api/workpapers/{project_id}/{year}/misstatement-summary", "GET"):
         "错报汇总为 A13 项目/年度聚合，非个别底稿正文。",
     # ── 健康探针 / WOPI 锁与统计(不返回任何底稿正文) ──

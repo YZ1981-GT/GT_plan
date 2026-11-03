@@ -188,10 +188,29 @@ const GUIDANCE_TEXTS = [
             <GtReviewDot row-prefix="D2-bizmodel-group" :row-key="row.rowId" />
           </template>
         </el-table-column>
-        <el-table-column label="业务模式" width="140">
+        <!-- 列与模板 D2-13（一）A~E 一致；SPPI 结果 / 计量基础 模板没有，排在后面 -->
+        <el-table-column label="管理业务模式" width="160">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.bizModel" size="small" @change="(v: string) => updateGroup(row.rowId, 'bizModel', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.bizModel" size="small" placeholder="如以收取合同现金流量为目标" @change="(v: string) => updateGroup(row.rowId, 'bizModel', v)" />
             <span v-else>{{ row.bizModel || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="具体依据" min-width="160">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.basis" size="small" placeholder="如频繁出售 / 持有至到期" @change="(v: string) => updateGroup(row.rowId, 'basis', v)" />
+            <span v-else>{{ row.basis || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="索引号" @change="(v: string) => updateGroup(row.rowId, 'indexRef', v)" />
+            <span v-else>{{ row.indexRef || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注" @change="(v: string) => updateGroup(row.rowId, 'remark', v)" />
+            <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="SPPI结果" width="100">
@@ -209,12 +228,6 @@ const GUIDANCE_TEXTS = [
               <el-option v-for="o in MEASUREMENT_OPTIONS" :key="o" :label="o" :value="o" />
             </el-select>
             <span v-else>{{ row.measurementBasis || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注" @change="(v: string) => updateGroup(row.rowId, 'remark', v)" />
-            <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="60" v-if="!isReadonly">

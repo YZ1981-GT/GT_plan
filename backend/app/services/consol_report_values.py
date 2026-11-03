@@ -527,9 +527,23 @@ class RowValue:
 
 
 def ordered_rows(rows: Iterable[ReportRow]) -> list[ReportRow]:
-    """求值顺序：报表类型按 ``REPORT_TYPE_ORDER``（与单体增量重算同序），类型内按行号。"""
+    """求值顺序：报表类型按 ``REPORT_TYPE_ORDER``，表内按公式依赖拓扑序（ADR-ISL-01，与单体三路同一内核）。
+
+    拓扑序只在表内生效：跨表仍按 ``REPORT_TYPE_ORDER``，与单体「报表类型序 → 表内求值」一致，
+    引用排在后面报表类型的行照旧留空并说明（``_Pass.inputs``）。
+    """
+    from app.services.report_eval_order import order_within_type, plan_for_configs
+
     rank = {t: i for i, t in enumerate(REPORT_TYPE_ORDER)}
-    return sorted(rows, key=lambda r: (rank.get(r.report_type, len(rank)), r.report_type, r.row_number, r.row_code))
+    items = list(rows)
+    positions = plan_for_configs(items).positions
+    by_type: dict[str, list[ReportRow]] = {}
+    for row in items:
+        by_type.setdefault(row.report_type, []).append(row)
+    out: list[ReportRow] = []
+    for report_type in sorted(by_type, key=lambda t: (rank.get(t, len(rank)), t)):
+        out.extend(order_within_type(by_type[report_type], positions))
+    return out
 
 
 class _Pass:
@@ -592,6 +606,8 @@ class _Pass:
         amount = await evaluate_formula(shape.formula, resolver=self.resolver, row_cache=needed)
         if self.resolver.reasons:
             return RowValue(None, "；".join(self.resolver.reasons), linear=shape.linear)
+        if amount is None:
+            return RowValue(None, "公式执行未返回数值", linear=shape.linear)
         return RowValue(to_cents(amount), None, linear=shape.linear)
 
     async def run(self) -> dict[str, RowValue]:

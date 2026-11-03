@@ -244,6 +244,8 @@ class ConversionSession(FakeSession):
             bool(note.is_deleted),
             copy.deepcopy(note.table_data),
             copy.deepcopy(note.template_lineage),
+            note.section_title,
+            note.account_name,
         )
 
     def _resync_flushed_state(self) -> None:
@@ -1131,10 +1133,11 @@ class TestProperty32_RollbackRoundtrip:
         assert "snapshot" in rolled["message"].lower()
 
     def test_snapshot_projection_only_carries_reversible_fields(self, fx: _Fx) -> None:
-        """``snapshot_note_state`` 只投影可回退的四项 + note_id，**不含 ``table_data``**。
+        """``snapshot_note_state`` 只投影可回退的六项 + note_id，**不含 ``table_data``**。
 
         把 ``table_data`` 存进快照会让 30 天前的旧值有机会覆盖这期间的正常录入
         （数据销毁风险），而 ``binding_id`` 前缀改写本身是可逆变换、无需快照。
+        ``section_title`` / ``account_name`` 是系统标题时转换会改，回滚只在现值仍是系统值时退回。
         """
         note = _pair_note(fx, fx.c0, table_data=binding_table_data(fx.c0["src_num"]))
         state = snapshot_note_state(note)
@@ -1144,6 +1147,8 @@ class TestProperty32_RollbackRoundtrip:
             "note_section",
             "is_deleted",
             "template_lineage",
+            "section_title",
+            "account_name",
         }, f"快照投影字段集漂移：{sorted(state)}"
         assert "table_data" not in state
         assert isinstance(state["note_id"], str), "note_id 必须是 str（JSONB 可序列化）"

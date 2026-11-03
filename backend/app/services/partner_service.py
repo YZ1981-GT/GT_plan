@@ -163,7 +163,7 @@ class SignReadinessService:
         """
         from app.services.gate_engine import gate_engine
         from app.services.gate_eval_store import store_gate_eval
-        from app.services.readiness_facade import build_readiness_response
+        from app.services.readiness_facade import build_readiness_response, enum_text
 
         # 若调用方未给 actor，兜底走 project.created_by
         resolved_actor = actor_id
@@ -195,13 +195,14 @@ class SignReadinessService:
         extra = await self._compute_sign_extra_findings(project_id, proj)
 
         # 3) 生成 gate_eval_id（5 分钟 TTL）
-        gate_decision = str(gate_result.decision)
+        # 门禁枚举取 .value 再比（str() 得到 'GateSeverity.blocking'，比较恒假，见 readiness_facade.enum_text）
+        gate_decision = enum_text(gate_result.decision)
         has_blocking = any(
             f["severity"] == "blocking"
             for items in extra.values()
             for f in items
         ) or any(
-            str(getattr(h, "severity", "")) == "blocking"
+            enum_text(getattr(h, "severity", "")) == "blocking"
             for h in (gate_result.hit_rules or [])
         )
         ready_flag = (gate_decision != "block") and (not has_blocking)
@@ -464,19 +465,21 @@ class SignReadinessService:
                         "detail": f"{inconsistent} 张底稿数据不一致" if inconsistent else "全部一致"})
         if not p4: all_pass = False
 
-        # 5. 证据充分（简化：检查是否有附件关联）
-        try:
-            no_att_q = sa.text("""
-                SELECT COUNT(*) FROM working_paper wp
-                WHERE wp.project_id = :pid AND wp.is_deleted = false
-                AND NOT EXISTS (SELECT 1 FROM attachment_working_paper awp WHERE awp.working_paper_id = wp.id)
-            """)
-            no_att = (await self.db.execute(no_att_q, {"pid": str(project_id)})).scalar() or 0
-        except Exception:
-            no_att = 0
-        p5 = no_att == 0
-        checks.append({"check_name": "证据充分", "passed": p5,
-                        "detail": f"{no_att} 张底稿无附件" if no_att else "全部有附件"})
+        # 5. 证据充分：与 QC、归档、/sufficiency 共用四态单一来源。
+        from app.services.evidence_readiness import EvidenceReadinessService
+
+        evidence = await EvidenceReadinessService(self.db).evaluate_project(project_id)
+        p5 = evidence.status in {"ready", "not_declared"}
+        blockers = len(evidence.blockers)
+        if evidence.status == "unknown":
+            evidence_detail = "证据状态无法判断"
+        elif evidence.status == "not_ready":
+            evidence_detail = f"{blockers} 张底稿证据未就绪"
+        elif evidence.status == "not_declared":
+            evidence_detail = "项目底稿未声明专项证据要求"
+        else:
+            evidence_detail = "全部已声明证据均就绪"
+        checks.append({"check_name": "证据充分", "passed": p5, "detail": evidence_detail})
         if not p5: all_pass = False
 
         elapsed = int((time.monotonic() - start) * 1000)

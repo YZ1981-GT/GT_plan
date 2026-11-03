@@ -11,7 +11,7 @@
  *
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, getCurrentInstance, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
@@ -217,14 +217,21 @@ export function useAgingConfig(
     refresh()
   }
 
-  onMounted(() => {
-    window.addEventListener('aging-config:changed', _onConfigChanged)
-    fetchConfig()
-  })
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('aging-config:changed', _onConfigChanged)
+      fetchConfig()
+    })
 
-  onUnmounted(() => {
-    window.removeEventListener('aging-config:changed', _onConfigChanged)
-  })
+    onUnmounted(() => {
+      window.removeEventListener('aging-config:changed', _onConfigChanged)
+    })
+  } else {
+    // 离屏使用（附注页离屏同步在 effectScope 里调用，没有组件实例）：不发请求，只套用缓存 ——
+    // 调用方先 await primeAgingConfig(projectId)；没缓存时与原来一样由调用方兜底预设段
+    const cached = projectId.value ? _cache.get(projectId.value) : undefined
+    if (cached) _applyConfig(cached, projectId.value)
+  }
 
   // ── projectId 变化时重新加载 ─────────────────────────────
 
@@ -279,6 +286,24 @@ export const PRESET_SEGMENTS: Record<string, AgingSegment[]> = {
     { key: 'y4to5', label: '4-5年', dayFrom: 1461, dayTo: 1825 },
     { key: 'over5', label: '5年以上', dayFrom: 1826, dayTo: null },
   ],
+}
+
+/**
+ * 预取项目账龄配置进缓存（附注页离屏同步用：之后在 effectScope 里调用 useAgingConfig 同步命中缓存）。
+ * 取数失败不抛（与组件内加载失败同样由调用方兜底预设段）。
+ */
+export async function primeAgingConfig(projectId: string): Promise<void> {
+  if (!projectId || _cache.has(projectId)) return
+  try {
+    const res = await api.get<AgingConfigResponse>(`/api/projects/${projectId}/aging/config`, { _silent: true } as any)
+    _cache.set(projectId, {
+      preset: res.preset,
+      segments: res.effective_segments,
+      subjectOverrides: res.subject_overrides || {},
+    })
+  } catch (err: any) {
+    console.warn('[useAgingConfig] 预取失败，离屏同步按默认账龄段', err?.message)
+  }
 }
 
 /**

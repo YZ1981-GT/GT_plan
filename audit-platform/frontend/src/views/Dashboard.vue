@@ -486,28 +486,38 @@ onMounted(async () => {
   } catch { /* ignore */ }
   loadingProjects.value = false
 
+  // 🔴 assignments 只取一次：原来「今日日程」和「我的待办底稿」各 await 一次
+  // getMyAssignments()，首屏实测对 /api/my/assignments 发两条完全相同的请求。
+  // 单飞后两处共用同一个 promise，失败语义不变（各自 catch 后各自降级）。
+  const assignmentsPromise = getMyAssignments()
+
   // 加载今日日程
   try {
-    todaySchedule.value = (await getMyAssignments()).slice(0, 6)
+    todaySchedule.value = (await assignmentsPromise).slice(0, 6)
   } catch { /* ignore */ }
   loadingSchedule.value = false
 
   // 加载我的待办底稿（draft 或被退回的）
   try {
-    const assignments = await getMyAssignments()
+    const assignments = await assignmentsPromise
+    const projects = assignments.slice(0, 5)
+    // 原来逐个项目串行 await（5 个项目 = 5 个往返排队）。改并发 + allSettled：
+    // 单个项目失败只丢它自己那一段，输入顺序与每项目取前 3 条、总共前 6 条的语义不变。
+    const settled = await Promise.allSettled(
+      projects.map((proj: any) => httpApi.get(P_wp.list(proj.project_id), {
+        params: { assigned_to_me: true, status: 'draft,rejected' },
+        validateStatus: (s: number) => s < 600,
+      })),
+    )
     const wpList: any[] = []
-    for (const proj of assignments.slice(0, 5)) {
-      try {
-        const data = await httpApi.get(P_wp.list(proj.project_id), {
-          params: { assigned_to_me: true, status: 'draft,rejected' },
-          validateStatus: (s: number) => s < 600,
-        })
-        const items = Array.isArray(data) ? data : data?.items || []
-        for (const wp of items.slice(0, 3)) {
-          wpList.push({ ...wp, project_id: proj.project_id })
-        }
-      } catch { /* ignore */ }
-    }
+    settled.forEach((result, index) => {
+      if (result.status !== 'fulfilled') return
+      const data: any = result.value
+      const items = Array.isArray(data) ? data : data?.items || []
+      for (const wp of items.slice(0, 3)) {
+        wpList.push({ ...wp, project_id: projects[index].project_id })
+      }
+    })
     myWorkpapers.value = wpList.slice(0, 6)
   } catch { /* ignore */ }
 })

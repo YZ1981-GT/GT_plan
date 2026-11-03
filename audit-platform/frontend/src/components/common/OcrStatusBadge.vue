@@ -5,9 +5,12 @@
   用法：
     <OcrStatusBadge status="ok" />
     <OcrStatusBadge status="processing" />
+
+  后端附件识别状态写的是 completed（attachment_ocr_writeback / ocr_fields_service），
+  原样传进来时同样显示「OCR ✓」（spec attachment-inline-preview 需求 3.1）；未知值不显示英文原文。
 -->
 <template>
-  <span class="gt-ocr-badge" :class="`gt-ocr-badge--${status}`">
+  <span class="gt-ocr-badge" :class="`gt-ocr-badge--${key}`">
     {{ label }}
   </span>
 </template>
@@ -16,8 +19,15 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  status: 'ok' | 'processing' | 'failed' | 'pending'
+  status: 'ok' | 'processing' | 'failed' | 'pending' | 'completed' | string
 }>()
+
+const ALIASES: Record<string, string> = { completed: 'ok', done: 'ok', running: 'processing', error: 'failed' }
+
+const key = computed(() => {
+  const raw = String(props.status || '').toLowerCase()
+  return ALIASES[raw] || raw
+})
 
 const label = computed(() => {
   const map: Record<string, string> = {
@@ -26,7 +36,7 @@ const label = computed(() => {
     failed: 'OCR失败',
     pending: '待OCR',
   }
-  return map[props.status] || props.status
+  return map[key.value] || '识别状态未知'
 })
 </script>
 

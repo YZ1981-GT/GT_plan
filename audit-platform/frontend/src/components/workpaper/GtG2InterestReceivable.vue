@@ -3,8 +3,13 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="currentSheet !== '底稿目录'" class="g2-interest-receivable-toolbar">
+        <!--
+          模式开关可见性 = sheet 级条件（isHtmlSheet）∧ **同步能力单源**
+          （g2EntrySync.presentation.showModeSwitch：静态裁决 + 运行时 readiness）。
+          spec: workpaper-html-onlyoffice-bidirectional-writeback-closure task 3.5 / AC 1.4
+        -->
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && g2EntrySync.presentation.value.showModeSwitch"
           :model-value="renderMode"
           :options="renderModeOptions"
           size="small"
@@ -41,7 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="ooSheetName"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
         @fallback="onOoFallback"
       />
@@ -203,7 +208,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
+        :readonly="businessReadonly"
         style="height: calc(100vh - 180px)"
       />
 
@@ -241,11 +246,13 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 // ── G2 canary 真双向（spec: g-cycle-sync-foundation-and-first-canary · Task 15）──
 // 受管 sheet（G2-2 明细表）走 syncBridge；非受管保留 legacy GtOnlyOfficeSheet（假双向，如实登记）。
 import { g2SheetKeyOf, isG2OoWiredRowsSheet } from './sync/g2ManagedSheets'
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -286,7 +293,8 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG2IntRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
-const isReadonly = computed(() => !!props.readonly)
+const businessReadonly = computed(() => !!props.readonly)
+const isReadonly = computed(() => businessReadonly.value || pendingWriteBarrierActive.value)
 // 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
 // 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
 const applicableStandards = useHostApplicableStandards({
@@ -362,6 +370,17 @@ const {
   editorHostRef: syncEditorHostRef,
 })
 
+/**
+ * 同步能力单源（spec task 3.5 / AC 1.4）：开关可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），不再由宿主的 `isHtmlSheet` 独自决定。
+ * `isHtmlSheet` 保留为 sheet 级附加条件（这张 sheet 本身是不是 HTML 可渲染的）。
+ */
+const g2EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => G2_SYNC_ENTRY_ID,
+})
+
 function onOoFallback(): void {
   dualMode.onOoFallback()
 }
@@ -400,7 +419,7 @@ const syncBridge = useWorkpaperSyncBridge({
   //    `all_store_item_ids()` 投影**整个 entry** 的全部受管区），传了会被静默丢弃并让
   //    TS 报 excess property。本 lane 按真实签名传三段。
   flushHtml: async () => {
-    formData.flushPending()
+    await formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -447,8 +466,10 @@ provide('reloadWorkpaperData', () => formData.loadAll())
 async function handleG2SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    try {
+      await formData.saveBatch(items)
+    } catch {
+      return
     }
     scheduleAutoSnapshot()
   }
@@ -481,7 +502,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('g2:save-items', handleG2SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  formData.flushPending()
+  void formData.flushPending().catch(() => undefined)
 })
 </script>
 

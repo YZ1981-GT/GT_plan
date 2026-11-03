@@ -18,13 +18,17 @@
  *  - 协作补充过的分录组不自动覆盖（提示手动同步）
  *  - 卸载时有待发同步则立即发出
  */
-import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ADJUSTMENT_STATUS_LABELS } from '@/constants/statusEnum'
+import { registerAdjustmentEntryGroup } from '@/composables/adjustmentEntryGroupLocate'
+import { highlightElement } from '@/composables/useCellLocate'
 import {
   syncAdjustmentFromWorkpaper,
   getAdjustmentBySourceRef,
 } from '@/services/auditPlatformApi'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 export interface CentralSyncLineItem {
   standard_account_code?: string
@@ -42,6 +46,7 @@ export interface CentralStatus {
   source_wp_code?: string
   /** 协作接力状态回流（pending/acknowledged/contributed/confirmed/rejected/closed），底稿侧只读展示 + 覆盖保护 */
   collaboration_status?: string | null
+  client_booking?: { status: string; effective: boolean; voucher_keys: string[] } | null
 }
 
 /** 协作状态中文标签（底稿侧展示） */
@@ -50,13 +55,23 @@ export const COLLAB_STATUS_LABELS_MIN: Record<string, string> = {
   confirmed: '已确认', rejected: '已退回', closed: '已关闭',
 }
 
+/** 按类型分组的页签（K10 / K12 / K13、L、M、N1~N3）的分录类型 */
+export type AdjustmentEntryType = 'AJE' | 'RJE'
+export const ADJUSTMENT_ENTRY_TYPES: readonly AdjustmentEntryType[] = ['AJE', 'RJE']
+
 export interface UseAdjustmentCentralSyncOptions {
   projectId: Ref<string> | (() => string)
-  year: Ref<number> | (() => number)
+  /** 审计年度；项目没填为 null ⇒ 手动同步提示去填、自动同步静默跳过（不按今年写集中登记） */
+  year: Ref<number | null> | (() => number | null)
   wpId: Ref<string> | (() => string)
   wpCode: Ref<string> | (() => string) | string
   /** 该 tab 分录组的 checklist item_id（幂等键构成）；可为 getter 以支持随类型切换的动态 itemId */
   itemId: string | (() => string)
+  /**
+   * itemId 随类型切换时传当前类型的 ref（即 itemId 模板串里用的那个）：调整分录页跳来源底稿定位分录组时，
+   * 按 item_id 切到对应类型（spec wp-deeplink-locate-residual-closure 需求 1.2；守卫 adjustmentEntryGroupWiring.spec.ts）。
+   */
+  entryType?: Ref<AdjustmentEntryType>
   /** tab 把自身 rows 映射为标准 line_items */
   buildLineItems: () => CentralSyncLineItem[]
   /** tab 提供 description + adjustmentType（报表调整→rje / 其余→aje） */
@@ -74,13 +89,13 @@ function unwrap<T>(v: Ref<T> | (() => T) | T): T {
   return v as T
 }
 
-/** 复核状态中文标签 */
-export const CENTRAL_STATUS_LABELS: Record<string, string> = {
-  draft: '草稿',
-  pending_review: '待复核',
-  approved: '已通过',
-  rejected: '已驳回',
-}
+/**
+ * 复核状态中文标签：取调整分录页同一常量（系统字典「调整分录状态」）。原先这里单写一份，
+ * 「已批准」写成了「已通过」，底稿侧与调整分录页对同一条分录叫法不同（spec consol-autotree-residual-closure R4）。
+ */
+export const CENTRAL_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(ADJUSTMENT_STATUS_LABELS).map(([status, entry]) => [status, entry.label]),
+)
 
 /**
  * 计算分录组内容签名（简单哈希，用于变化检测）。
@@ -110,6 +125,23 @@ export function computeContentSignature(
   return (hash >>> 0).toString(36)
 }
 
+/**
+ * 推送结果提示（后端 sync_outcome：created / updated / unchanged）。
+ * 更新时原为待复核 / 已驳回的，后端已把分录退回草稿 —— 提示到调整分录模块重新提交复核。
+ */
+export function syncOutcomeMessage(res: { sync_outcome?: string; previous_status?: string | null; adjustment_no?: string } | null | undefined): string {
+  const no = res?.adjustment_no ? `（${res.adjustment_no}）` : ''
+  if (res?.sync_outcome === 'unchanged') return `调整分录模块中的分录${no}已是最新内容，无需重复同步`
+  if (res?.sync_outcome === 'updated') {
+    const prev = res.previous_status
+    if (prev === 'pending_review' || prev === 'rejected') {
+      return `已更新调整分录模块中的分录${no}；原为「${CENTRAL_STATUS_LABELS[prev] || prev}」，已回到草稿，请到调整分录模块重新提交复核`
+    }
+    return `已更新调整分录模块中的分录${no}`
+  }
+  return `已同步到调整分录模块${no}，为草稿：请提交复核；批准后方可从来源审定表显式发布到试算表`
+}
+
 export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) {
   const centralStatus = ref<CentralStatus | null>(null)
   const syncing = ref(false)
@@ -125,6 +157,30 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     return `${unwrap(opts.wpId)}:${resolveItemId()}`
   }
 
+  // ─── 定位（调整分录页「底稿 X」跳来源底稿，spec wp-deeplink-locate-residual-closure 需求 1.2） ───
+  /** item_id 是本页签的分录组则认领；按类型取 item_id 的先切到该类型，都不是则还原原类型 */
+  function selectEntryGroup(itemId: string): boolean {
+    if (resolveItemId() === itemId) return true
+    const typeRef = opts.entryType
+    if (!typeRef) return false
+    const original = typeRef.value
+    for (const type of ADJUSTMENT_ENTRY_TYPES) {
+      if (type === original) continue
+      typeRef.value = type
+      if (resolveItemId() === itemId) return true
+    }
+    typeRef.value = original
+    return false
+  }
+  const instance = getCurrentInstance()
+  /** 高亮对象：本页签根元素里第一张表格（分录表）；没有表格（在线编辑区等）时高亮根元素 */
+  function entryGroupElement(): Element | null {
+    const el = instance?.proxy?.$el as Node | null | undefined
+    const rootEl = el?.nodeType === 1 ? (el as Element) : ((el as CharacterData | null | undefined)?.nextElementSibling ?? null)
+    return rootEl?.querySelector('.el-table') ?? rootEl
+  }
+  let _unregisterLocate: (() => void) | null = null
+
   // ─── Phase 3: 签名跟踪与错误去重 ─────────────────────────────────
   /** 上一次成功同步时的签名（首次载入前为 null → 跳过首次同步） */
   let _lastSyncedSignature: string | null = null
@@ -139,6 +195,10 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const wpId = unwrap(opts.wpId)
     if (!projectId || !wpId) {
       ElMessage.warning('缺少项目/底稿上下文，无法同步到集中登记')
+      return
+    }
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
       return
     }
     const lineItems = opts.buildLineItems().filter(
@@ -176,7 +236,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const meta = opts.buildMeta()
     syncing.value = true
     try {
-      await syncAdjustmentFromWorkpaper(projectId, {
+      const res: any = await syncAdjustmentFromWorkpaper(projectId, {
         year,
         wp_id: wpId,
         item_id: resolveItemId(),
@@ -188,28 +248,18 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
       // Phase 3: 记录签名
       _lastSyncedSignature = computeContentSignature(lineItems, meta)
       _lastErrorKey = ''
-      ElMessage.success('已同步到集中调整登记')
+      ElMessage({ type: res?.sync_outcome === 'unchanged' ? 'info' : 'success',
+        message: syncOutcomeMessage(res), duration: 5000, showClose: true })
       await refreshStatus()
-      // P0-3: 显示同步后的编号供确认
-      if (centralStatus.value?.adjustment_no) {
-        ElMessage({
-          type: 'info',
-          message: `集中登记编号：${centralStatus.value.adjustment_no}`,
-          duration: 4000,
-          showClose: true,
-        })
-      }
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       const code = detail?.error_code
       if (code === 'APPROVED_LOCKED') {
-        ElMessage.warning('该调整已在集中登记复核通过，需先撤回复核再同步')
-      } else if (code === 'UNBALANCED') {
-        ElMessage.error(detail?.message || '借贷不平衡，无法同步')
-      } else if (code === 'UNRESOLVED_ACCOUNTS') {
-        ElMessage.error(detail?.message || '存在无法解析的科目，请补全科目编码')
+        ElMessage.warning('该调整已在调整分录模块复核通过（已批准），需由复核人先撤回复核再同步')
       } else {
-        ElMessage.error('同步到集中登记失败')
+        // 其余错误（借贷不平衡 / 科目无法解析 / 协作锁定 / 合并锁定 / 无权限…）显示后端给出的原因
+        const reason = typeof detail === 'string' ? detail : detail?.message
+        ElMessage.error(reason ? `同步到调整分录模块失败：${reason}` : '同步到调整分录模块失败，请稍后重试')
       }
     } finally {
       syncing.value = false
@@ -229,17 +279,38 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
 
   // P0-4: 订阅集中登记复核状态变更事件，底稿侧自动回流刷新（SSE 真通道）
   let _reviewSub: ProjectEventSubscription | null = null
+  let _bookingSub: ProjectEventSubscription | null = null
   onMounted(() => {
+    _unregisterLocate = registerAdjustmentEntryGroup(() => unwrap(opts.wpId), (itemId) => {
+      if (!selectEntryGroup(itemId)) return false
+      const el = entryGroupElement()
+      if (el) highlightElement(el, `adjustment:${unwrap(opts.wpId)}:${itemId}`)
+      return true
+    })
     const pid = unwrap(opts.projectId)
     if (pid) {
-      _reviewSub = subscribeProjectEvent(pid, 'adjustment:review-changed', () => refreshStatus())
+      _reviewSub = subscribeProjectEvent(
+        pid,
+        'adjustment:review-changed',
+        () => refreshStatus(),
+        { onReconnect: () => refreshStatus() },
+      )
+      _bookingSub = subscribeProjectEvent(
+        pid,
+        'adjustment:client-booking-changed',
+        () => refreshStatus(),
+        { onReconnect: () => refreshStatus() },
+      )
     }
     refreshStatus()
     // Phase 3: 首次载入完成后解除 firstLoad 标记（下一个 microtask）
     Promise.resolve().then(() => { _isFirstLoad = false })
   })
   onBeforeUnmount(() => {
+    _unregisterLocate?.()
+    _unregisterLocate = null
     _reviewSub?.close()
+    _bookingSub?.close()
     // Phase 3: 卸载冲刷 —— 有待发同步则立即发出
     if (_autoSyncTimer) {
       clearTimeout(_autoSyncTimer)
@@ -272,6 +343,9 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const projectId = unwrap(opts.projectId)
     const wpId = unwrap(opts.wpId)
     if (!projectId || !wpId) return
+    // 项目没填审计年度：自动同步静默跳过（手动同步会提示去填）
+    const year = unwrap(opts.year)
+    if (year == null) return
 
     const lineItems = opts.buildLineItems().filter(
       (li) => (Number(li.debit_amount) || 0) !== 0 || (Number(li.credit_amount) || 0) !== 0,
@@ -306,7 +380,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     syncing.value = true
     try {
       await syncAdjustmentFromWorkpaper(projectId, {
-        year: unwrap(opts.year),
+        year,
         wp_id: wpId,
         item_id: resolveItemId(),
         source_wp_code: String(unwrap(opts.wpCode) || ''),
@@ -346,6 +420,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     refreshStatus,
     sourceRef,
     scheduleAutoSync,
+    selectEntryGroup,
   }
 }
 

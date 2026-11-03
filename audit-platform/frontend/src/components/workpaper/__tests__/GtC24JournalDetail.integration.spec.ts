@@ -105,7 +105,7 @@ vi.mock('../c24/C24AnomalyEntrySheet.vue', () => ({
     name: 'C24AnomalyEntrySheet',
     props: ['enabledRules', 'ruleParams', 'anomalies', 'anomalyNotes', 'hasData', 'conclusion', 'isReadonly'],
     emits: ['update:conclusion', 'update:enabled-rules', 'update:rule-param', 'update:anomaly-note', 'run-screen', 'ai-suggest'],
-    template: '<div class="c24-anomaly-stub" :data-anomaly-count="anomalies.length" />',
+    template: '<div class="c24-anomaly-stub" :data-anomaly-count="anomalies.length" :data-vague-keywords="ruleParams.vagueKeywordsText" />',
   },
 }))
 
@@ -130,7 +130,12 @@ vi.mock('../c24/C24HolidaySheet.vue', () => ({
 }))
 
 import GtC24JournalDetail from '../GtC24JournalDetail.vue'
-import type { JournalEntry } from '@/composables/useC24AnalyticsEngine'
+import {
+  screenAnomalies,
+  type AnomalyRules,
+  type JournalEntry,
+} from '@/composables/useC24AnalyticsEngine'
+import { SPECIAL_EVENT_KEYWORDS, VAGUE_KEYWORDS_DEFAULT } from '@/generated/journalEntryRules'
 
 // ─── 测试数据：已知属性的分录集 ─────────────────────────────────────────────
 
@@ -151,6 +156,18 @@ function buildTestEntries(): JournalEntry[] {
     { voucherDate: '2025-03-01', voucherMonth: 3, voucherType: '转', voucherNo: '转-001', summary: '结转成本', accountCode: '6001', accountName: '主营业务收入', debit: 0, credit: 1000000, voucherSheets: '1', preparer: '张三', reviewer: '李四', poster: '王五' },
     { voucherDate: '2025-03-15', voucherMonth: 3, voucherType: '转', voucherNo: '转-003', summary: '结转损益', accountCode: '6602', accountName: '管理费用', debit: 2450000, credit: 1950000, voucherSheets: '1', preparer: '张三', reviewer: '李四', poster: '王五' },
   ]
+}
+
+const isolatedAnomalyRules: AnomalyRules = {
+  holidays: [],
+  nightStartHour: 22,
+  nightEndHour: 6,
+  largeAmountThreshold: Infinity,
+  approvalLimit: 0,
+  roundAmountDigits: 0,
+  vagueKeywords: [],
+  checkEmptySummary: false,
+  duplicateCheck: false,
 }
 
 // ─── 挂载辅助 ────────────────────────────────────────────────────────────────
@@ -276,6 +293,28 @@ describe('端到端：导入分录 → 跳号测试（Req 3.3）', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('端到端：导入分录 → 异常筛选（Req 4.1）', () => {
+  it.each(SPECIAL_EVENT_KEYWORDS)('规则 11 对关键词“%s”标记特殊事件', (keyword) => {
+    const entry = {
+      ...buildTestEntries()[0],
+      summary: `${keyword}相关事项`,
+      debit: 100,
+      credit: 0,
+    }
+    const result = screenAnomalies([entry], isolatedAnomalyRules)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].reasons).toContain('与特殊事件有关')
+  })
+
+  it('C24-5 默认模糊词等于生成常量', async () => {
+    const responses = buildResponsesWithEntries([buildTestEntries()[0]])
+    const wrapper = mountC24({ sheetName: 'C24-5', responses })
+    await flushPromises()
+
+    expect(wrapper.find('.c24-anomaly-stub').attributes('data-vague-keywords'))
+      .toBe(VAGUE_KEYWORDS_DEFAULT.join(','))
+  })
+
   it('检测到预期异常分录（大额/假期/约整数）', async () => {
     const entries = buildTestEntries()
     const responses = buildResponsesWithEntries(entries)

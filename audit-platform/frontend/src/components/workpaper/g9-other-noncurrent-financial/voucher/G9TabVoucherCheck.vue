@@ -27,7 +27,7 @@
       <div class="params-grid">
         <div class="param-item">
           <span class="param-label">测试总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.testPopulation"
             size="small"
             :disabled="isReadonly"
@@ -37,7 +37,7 @@
         </div>
         <div class="param-item">
           <span class="param-label">特定样本</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.specificSamples"
             size="small"
             :disabled="isReadonly"
@@ -47,7 +47,7 @@
         </div>
         <div class="param-item">
           <span class="param-label">抽样总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.samplingPopulation"
             size="small"
             :disabled="isReadonly"
@@ -113,7 +113,7 @@
         </div>
         <div class="param-item param-item-wide">
           <span class="param-label">抽样过程</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.samplingProcess"
             size="small"
             type="textarea"
@@ -301,10 +301,16 @@
       border stripe size="small"
       style="font-size:13px;margin-top:8px"
       highlight-current-row
-      :row-class-name="rowClassName"
+      :row-class-name="voucherRowClassName"
       @current-change="onRowChange"
     >
       <el-table-column prop="seq" label="#" width="44" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="engineYear" />
+        </template>
+      </el-table-column>
       <template v-if="vc.activeTab.value === 'basic'">
         <el-table-column label="日期" width="108">
           <template #default="{ row }">
@@ -377,10 +383,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="56" align="center">
+        <el-table-column label="📎" width="84" align="center">
           <template #default="{ row }">
             <el-button v-if="!isReadonly" size="small" link @click="uploadOcr(row)">OCR</el-button>
             <span v-else>{{ row.attachmentRef || '—' }}</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
       </template>
@@ -581,12 +588,12 @@
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
         :account-code="G9_SAMPLING_ACCOUNT_CODE"
-        phase="final"
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="engineYear"
         @filled="onSampleFilled"
+        @undo-request="vc.onUndoRequest"
       />
     </el-dialog>
 
@@ -602,15 +609,20 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, h, ref, watch, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
 import type { Column } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../../voucher-sampling/PostFillAiReviewDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G9AuditTextCards from '../G9AuditTextCards.vue'
 import {
   useG9VoucherCheck,
@@ -649,6 +661,7 @@ import { GCYCLE_CUTOFF_EVENT } from '../../composables/gCycleCutoffFill'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -660,6 +673,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G9-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const tabOptions = [
   { label: '凭证基础', value: 'basic' },
@@ -717,7 +733,10 @@ const virtualColumns = computed<Column<any>[]>(() => {
         cellRenderer: ({ rowData }: { rowData: G9VoucherRow }) => h('span', fmt(rowData.debitAmount)) },
       { key: 'creditAmount', title: '贷方', dataKey: 'creditAmount', width: 100, align: 'right',
         cellRenderer: ({ rowData }: { rowData: G9VoucherRow }) => h('span', fmt(rowData.creditAmount)) },
-      { key: 'source', title: '来源', dataKey: 'source', width: 72 },
+      { key: 'source', title: '来源', dataKey: 'source', width: 150,
+        cellRenderer: ({ rowData }: { rowData: G9VoucherRow }) => h(VoucherRowMetaCell, {
+          row: rowData, locked: vc.isVoucherRowLocked(rowData), projectId: props.projectId, year: engineYear.value,
+        }) },
     ]
   }
   if (vc.activeTab.value === 'check') {
@@ -756,6 +775,9 @@ function onRowChange(row: G9VoucherRow | undefined) {
   if (idx >= 0) vc.setActiveRowIndex(idx)
 }
 
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(rowClassName, vc.voucherRowClass)
+
 function rowClassName({ row }: { row: G9VoucherRow }) {
   return row.isAbnormal ? 'abnormal-row' : ''
 }
@@ -789,62 +811,34 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (engineYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, engineYear.value, props.wpId, G9_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await vc.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: {
-  samples?: Array<{
-    summary?: string
-    amount?: number
-    debitAmount?: number | string
-    creditAmount?: number | string
-    voucherDate?: string
-    voucherNo?: string
-    counterpartAccount?: string
-    abnormal?: boolean
-    isHighValue?: boolean
-    selectionReason?: string
-  }>
-  method?: string
-  fillMode?: 'append' | 'merge' | 'replace'
-}) {
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。原实现按凭证号去重、经 expandMultiAccountVouchers 展开，已删除。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { method?: string; methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
+  void persistMethodology(payload?.methodology)
   const samples = payload.samples ?? []
   if (!samples.length) return
-  const n = vc.fillFromSampling(
-    samples.map((s) => ({
-      summary: s.summary,
-      debitAmount: s.debitAmount ?? s.amount,
-      creditAmount: s.creditAmount,
-      voucherDate: s.voucherDate,
-      voucherNo: s.voucherNo,
-      counterpartAccount: s.counterpartAccount,
-      counterpartAccountName: s.counterpartAccountName,
-      voucherEntries: (s as any).voucherEntries,
-      abnormal: s.abnormal,
-      isHighValue: s.isHighValue,
-      selectionReason: s.selectionReason,
-    })),
-    payload.fillMode ?? 'append',
-    payload.method,
-  )
+  const out = await vc.onEngineFilled(payload)
+  if (out.cancelled) return
   showSampling.value = false
-  if (n > 0) {
-    ElMessage.success(`已回填 ${n} 笔抽凭样本`)
-    triggerPostFillReview(samples)
-  } else {
-    ElMessage.info('未回填任何样本（可能已存在相同凭证号）')
-  }
+  if (out.added > 0) triggerPostFillReview(samples as Parameters<typeof triggerPostFillReview>[0])
 }
 
 function triggerPostFillReview(samples: Array<{
@@ -958,12 +952,14 @@ async function uploadOcr(row: G9VoucherRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
       let res
       try {
         res = await http.post(`/api/workpapers/${props.wpId}/g9/contract-ocr`, formData)
       } catch {
         res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData)
       }
+      rowEv.refresh()
       const { fields, confidence } = extractG9OcrPayload(res.data)
       const { patch, lowConfidence } = mapG9OcrToVoucherFields(fields, confidence)
       const merged = computeG9OcrMergePatch(row, patch)
@@ -1022,6 +1018,7 @@ function onCutoffFilled(e: Event) {
 }
 
 onMounted(() => {
+  void vc.voucherFillReady()
   window.addEventListener(GCYCLE_CUTOFF_EVENT.g9, onCutoffFilled as EventListener)
 })
 onBeforeUnmount(() => {

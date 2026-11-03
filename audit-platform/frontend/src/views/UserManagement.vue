@@ -266,6 +266,10 @@ const filteredUsers = computed(() => {
   return list
 })
 
+const activeManagers = computed(() => users.value.filter(
+  user => user.role === 'manager' && user.is_active,
+))
+
 // 角色选项（单一来源，与后端 UserRole 枚举对齐；qc/eqcr 后端 permission_matrix 已支持）
 //
 // ⚠️ manager=「项目经理」、site_lead=「现场经理」是**两个不同角色**（权限相同、
@@ -520,5 +524,22 @@ onMounted(() => {
 .gt-user-name {
   font-weight: 500;
   color: var(--el-text-color-primary);
+}
+
+.gt-staff-binding-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.gt-staff-binding-item { display: inline-flex; align-items: center; gap: 4px; }
+.gt-staff-binding-empty { color: var(--el-text-color-secondary); }
+.gt-grants-card { margin-top: 16px; }
+.gt-grants-error { margin: 12px; width: auto; }
+.gt-grants-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.gt-grants-header > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.gt-grants-header span { color: var(--el-text-color-secondary); font-size: 12px; }
+
+@media (max-width: 680px) {
+  .gt-users { padding: 12px; }
+  .gt-users-filter { align-items: stretch; flex-direction: column; }
+  .gt-users-filter :deep(.el-input), .gt-users-filter :deep(.el-select) { width: 100% !important; }
+  .gt-users-count { margin-left: 0; }
+  .gt-grants-header { align-items: stretch; flex-direction: column; }
 }
 </style>

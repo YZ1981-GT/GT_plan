@@ -140,7 +140,7 @@
         size="small"
         max-height="520"
         class="check-table"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
         show-summary
         :summary-method="getSummary"
       >
@@ -149,6 +149,11 @@
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="onField(row, 'name')" />
             <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
           </template>
         </el-table-column>
         <el-table-column prop="entryAmount" label="入账金额" width="110" align="right">
@@ -434,6 +439,7 @@
         <el-table-column label="附件" width="56" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link :disabled="isReadonly" title="OCR" @click="handleOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="48" align="center" fixed="right">
@@ -664,15 +670,15 @@
       </ol>
     </details>
 
-    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（科目 ${samplingAccountCode} 增加）" width="720px" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`抽凭引擎（科目 ${samplingAccountCode} 增加）`" width="720px" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && wpId && projectId"
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
-        phase="final"
-        :year="year"
+        :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -683,9 +689,11 @@
  * I1TabAdditionCheck.vue — I1-5 无形资产增加检查表
  * 对齐源表：取得方式分段列 + 检查比例防 DIV/0 + I1-2 联动
  */
-import { ref, computed, toRef, inject, watch, defineComponent, h } from 'vue'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { ref, computed, toRef, inject, watch, defineComponent, h, onMounted } from 'vue'
 import type { Ref } from 'vue'
-import { ElMessage, ElMessageBox, ElSelect, ElOption } from 'element-plus'
+import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
+import { ElSelect } from '@/components/grid/adapters'
 import {
   useI1AdditionCheck,
   I1_ADDITION_METHODS,
@@ -699,6 +707,8 @@ import {
 import { isI1VatMismatch } from '../../composables/i1AdditionCheckModel'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import http from '@/utils/http'
 
 /**
@@ -713,6 +723,8 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -747,10 +759,13 @@ const YnSelect = defineComponent({
 const props = defineProps<{
   wpId: string
   projectId: string
-  year?: number
+  year?: number | null
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'I1-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
@@ -785,9 +800,18 @@ const {
   flushPersist,
   exportXlsx,
   importXlsx,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useI1AdditionCheck(toRef(props, 'wpId'), allResponsesRef as any, {
   onSave: (itemId, value) => emit('save', itemId, value),
+  projectId: () => props.projectId,
+  isReadonly: () => props.isReadonly,
 })
+onMounted(() => { void voucherFillReady() })
 
 const auditNote = ref('')
 const conclusion = ref('')
@@ -878,31 +902,25 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, I1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled(samples)
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(samples: any[]) {
-  showSamplingDialog.value = false
-  if (!samples?.length) return
-  for (const s of samples) {
-    addRow({
-      name: s.summary || s.description || s.accountName || '抽样项',
-      entryDate: s.date ?? s.entryDate ?? '',
-      entryAmount: Number(s.amount) || 0,
-      voucherNo: s.voucherNo ?? '',
-      voucherSampleId: s.sampleId ?? '',
-      acquisitionMethod: '购买',
-    })
-  }
-  ElMessage.success(`已添加 ${samples.length} 个抽样项`)
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 async function handleOcr(row: I1AdditionCheckRow) {
@@ -914,12 +932,14 @@ async function handleOcr(row: I1AdditionCheckRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
       if (!Object.keys(fields).length) {
         ElMessageBox.alert('OCR完成，未识别到可填充字段', '提示')
@@ -969,6 +989,9 @@ function rowClassName({ row }: { row: I1AdditionCheckRow }) {
   if (row.isRelatedParty === 'Y' || isI1VatMismatch(row)) return 'risk-row'
   return ''
 }
+
+/** 行样式：异常 / 风险提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, voucherRowClass)
 
 function traceRowClassName({ row }: { row: I1TraceRow }) {
   if (row.recordedInBooks === 'N' || row.checkResult === 'ERR' || Math.abs(row.amountDiff) > 1) {

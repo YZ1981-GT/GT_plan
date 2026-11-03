@@ -203,11 +203,16 @@ function rendersMethodologyBar(src: string): boolean {
   return src.includes('WpSamplingMethodologyBar')
 }
 
-/** 最小字段集的四类语义（R6.5）；金额借贷任一即可 */
+/**
+ * 最小字段集的四类语义（R6.5）；金额借贷任一即可。
+ * 资产类明细表（H / I 循环）经共享小工具 `assetAmount(item, 'debit' | 'credit')`（composables/assetVoucherFill.ts）取样本
+ * 自己那一栏的金额（spec voucher-identity-writeback-and-audit-phase 任务 12）：调用它就是读了金额 —— 它的函数体确实读
+ * `debitAmount` 与 `creditAmount` 由「一级委托解析自检」里的反向用例钉住，函数体改了这条判据随之打红
+ */
 const FIELD_CATEGORIES: ReadonlyArray<readonly [string, RegExp]> = [
   ['凭证号', /\b(?:voucherNo|voucher_no)\b/],
   ['凭证日期', /\b(?:voucherDate|voucher_date)\b/],
-  ['金额（借或贷）', /\b(?:debitAmount|debit_amount|creditAmount|credit_amount)\b/],
+  ['金额（借或贷）', /\b(?:debitAmount|debit_amount|creditAmount|credit_amount)\b|\bassetAmount\s*\(/],
   ['科目编码', /\b(?:accountCode|account_code)\b/],
 ]
 
@@ -623,13 +628,13 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
-    fields: '分层判据缺 凭证日期/金额（借或贷）/科目编码；行模型无金额位（合规检查项/计价测试型），补列须先回源模板核对，归 voucher-check-shared-layer',
+    fields: '分层判据缺 科目编码（凭证日期 / 入账金额已随 voucher-identity-writeback-and-audit-phase 任务 12 接入共享回填函数映射）；未渲染方法学 bar 故层2「科目来源」不满足；接 bar 即自动满足，归 voucher-check-shared-layer 一并接',
   },
   'I1TabDisposalCheck.vue': {
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
-    fields: '分层判据缺 金额（借或贷）/科目编码；行模型无金额位（合规检查项/计价测试型），补列须先回源模板核对，归 voucher-check-shared-layer',
+    fields: '分层判据缺 科目编码（原值已随 voucher-identity-writeback-and-audit-phase 任务 12 接入共享回填函数映射）；未渲染方法学 bar 故层2「科目来源」不满足；接 bar 即自动满足，归 voucher-check-shared-layer 一并接',
   },
   'I2TabMaterialCheck.vue': {
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
@@ -646,7 +651,7 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
-    fields: '分层判据缺 金额（借或贷）/科目编码；行模型无金额位（合规检查项/计价测试型），补列须先回源模板核对，归 voucher-check-shared-layer',
+    fields: '分层判据缺 科目编码；人员认定行模型无金额位（金额类判据由同文件 i2SheetRowsFill 的 I2-10 工时映射命中，不代表人员行有金额），未渲染方法学 bar 故层2「科目来源」不满足；归 voucher-check-shared-layer',
   },
   'I2TabTargetedCheck.vue': {
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
@@ -657,7 +662,9 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
-    fields: '分层判据缺 凭证日期；行模型无记账凭证日期字段（只有业务事件日期/源单据日期号），补列须先回源模板核对，归 voucher-check-shared-layer',
+    // voucher-identity-writeback-and-audit-phase 任务 12 曾以「工时行记凭证号 + 日期」删去本条，实为误判：科目编码判据是被
+    // 取 6602 试算表的 `item.account_code`（与样本映射无关）满足的；上游改用 fetchTrialBalanceRows 后这处文本没了（任务 14 合入时发现）
+    fields: '分层判据缺 科目编码；工时行模型没有科目列，未渲染方法学 bar 故层2「科目来源」不满足；接 bar 即自动满足，归 voucher-check-shared-layer 一并接',
   },
   'I3TabTargetedCheck.vue': {
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
@@ -699,7 +706,6 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
-    fields: '分层判据缺 科目编码；未渲染方法学 bar 故层2「科目来源」不满足；接 bar 即自动满足，归 voucher-check-shared-layer 一并接',
   },
   'K13TabNonOperatingCheck.vue': {
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
@@ -791,6 +797,8 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
 })
 
 /** 豁免总数基线（= allowlist 里所有 {宿主 × 要求} 条目数），只许调小 */
+// 任务 12（voucher-identity-writeback-and-audit-phase）：I2TabWorkHourCheck.fields 已满足（工时行记凭证号 + 日期）删去 122→121
+// 任务 14 勘误：上面那条是误判（科目编码是被无关的试算表取数文本满足的），上游改写取数后现形，恢复该豁免 121→122
 const ALLOWED_EXCUSE_BASELINE = 122
 
 function excuseCount(list: Allowlist): number {
@@ -1364,6 +1372,16 @@ describe('一级委托解析自检', () => {
     `)
     const map = destructuredComposableMap(stub)
     expect(Object.keys(map).sort()).toEqual(['aiLoading', 'applySamplingResults', 'seq'])
+  })
+
+  it('assetAmount( 调用算读了金额：其函数体确实读 debitAmount 与 creditAmount（函数体改了这条判据即失效）', () => {
+    const src = readFileSync(join(WORKPAPER_DIR, 'composables', 'assetVoucherFill.ts'), 'utf-8')
+    const body = extractFunctionBody(src, 'assetAmount')
+    expect(body).not.toBeNull()
+    expect(body).toMatch(/\bdebitAmount\b/)
+    expect(body).toMatch(/\bcreditAmount\b/)
+    expect(missingFieldCategories(["row.amount = assetAmount(item, 'debit')"])).not.toContain('金额（借或贷）')
+    expect(missingFieldCategories(['row.amount = assetAmountOf(item)'])).toContain('金额（借或贷）')
   })
 
   it('🔴 回归：类型 import 与共享定义件不得成为「字段来源」', () => {

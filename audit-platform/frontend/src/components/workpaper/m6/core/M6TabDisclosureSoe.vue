@@ -184,7 +184,7 @@
  * - 国企特定字段：一般风险准备/转增资本
  * - inject openReviewDialog
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
@@ -212,26 +212,31 @@ const aiLoading = ref('')
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM6SyncPayload, type M6DisclosureRow } from '../../composables/m6NoteSectionMap'
+import {
+  createM6SoeRows,
+  m6NoteText,
+  m6WireRows,
+  recalcM6SoeRows,
+  restoreM6SoeRows,
+  type M6SoeRow,
+} from '../../composables/m6DisclosureForm'
+import { buildM6SyncPayload } from '../../composables/m6NoteSectionMap'
 import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M6DisclosureRow[] = movementRows.value
-    .filter((r) => !r.isFormula || r.key === 'end-retained')
-    .map((r) => ({
-      label: r.item.trim(),
-      current: r.currentPeriod,
-      prior: r.priorPeriod,
-    }))
-  const noteText = riskReserveNote.value || ''
-  const payload = buildM6SyncPayload(props.wpId, 'soe', rows, noteText)
-  if (!payload) return
+  const payload = buildM6SyncPayload(
+    props.wpId,
+    'soe',
+    m6WireRows('soe', movementRows.value),
+    m6NoteText(formData.allResponses.value, 'soe'),
+  )
+  if (!payload || props.isReadonly) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -242,36 +247,7 @@ const formData = useM6FormData({
 
 // ─── Movement Table Rows (国企格式) ──────────────────────────────────────────
 
-interface SoeMovementRow {
-  item: string
-  priorYearEnd: number
-  beginAdj: number
-  beginBalance: number   // 公式: 上年末 + 期初调整
-  increase: number
-  decrease: number
-  endBalance: number     // 公式: 本期年初 + 增加 - 减少
-  isFormula: boolean
-  isSubtotal: boolean
-  formulaDesc?: string
-  key: string
-}
-
-const movementRows = ref<SoeMovementRow[]>([
-  { item: '一、期初未分配利润', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: true, key: 'begin-retained' },
-  { item: '  加：会计政策变更影响', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'policy-change' },
-  { item: '  加：前期差错更正影响', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'error-correction' },
-  { item: '二、本期增加', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: true, isSubtotal: true, formulaDesc: '= 本期净利润 + 其他', key: 'total-increase' },
-  { item: '  其中：本期净利润', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'net-profit' },
-  { item: '  其中：其他转入', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'other-transfer-in' },
-  { item: '三、本期减少', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: true, isSubtotal: true, formulaDesc: '= 盈余公积 + 股利 + 风险准备 + 转增资本 + 其他', key: 'total-decrease' },
-  { item: '  其中：提取法定盈余公积', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'statutory-surplus' },
-  { item: '  其中：提取任意盈余公积', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'discretionary-surplus' },
-  { item: '  其中：应付股利（利润）', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'dividend' },
-  { item: '  其中：提取一般风险准备', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'general-risk-reserve' },
-  { item: '  其中：转增资本', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'capital-conversion' },
-  { item: '  其中：其他', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: false, isSubtotal: false, key: 'other-decrease' },
-  { item: '四、期末未分配利润', priorYearEnd: 0, beginAdj: 0, beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, isFormula: true, isSubtotal: true, formulaDesc: '= 期初 + 增加合计 - 减少合计', key: 'end-retained' },
-])
+const movementRows = ref<M6SoeRow[]>(createM6SoeRows())
 
 // ─── Text Notes ──────────────────────────────────────────────────────────────
 
@@ -281,46 +257,7 @@ const soeDistributionNote = ref('')
 // ─── Formula Calculations ────────────────────────────────────────────────────
 
 function recalcFormulas() {
-  const rows = movementRows.value
-
-  // 计算每行的 beginBalance = priorYearEnd + beginAdj
-  for (const row of rows) {
-    row.beginBalance = row.priorYearEnd + row.beginAdj
-  }
-
-  // 二、本期增加合计 = 净利润 + 其他转入
-  const totalIncrease = rows.find(r => r.key === 'total-increase')
-  const netProfit = rows.find(r => r.key === 'net-profit')
-  const otherIn = rows.find(r => r.key === 'other-transfer-in')
-  if (totalIncrease && netProfit && otherIn) {
-    totalIncrease.increase = netProfit.increase + otherIn.increase
-    totalIncrease.decrease = 0
-  }
-
-  // 三、本期减少合计 = 法定盈余 + 任意盈余 + 股利 + 风险准备 + 转增资本 + 其他
-  const totalDecrease = rows.find(r => r.key === 'total-decrease')
-  const decreaseKeys = ['statutory-surplus', 'discretionary-surplus', 'dividend', 'general-risk-reserve', 'capital-conversion', 'other-decrease']
-  if (totalDecrease) {
-    totalDecrease.decrease = decreaseKeys.reduce((sum, key) => {
-      const row = rows.find(r => r.key === key)
-      return sum + (row ? row.decrease : 0)
-    }, 0)
-    totalDecrease.increase = 0
-  }
-
-  // 四、期末未分配利润 = 期初 + 增加合计 - 减少合计
-  const endRetained = rows.find(r => r.key === 'end-retained')
-  const beginRetained = rows.find(r => r.key === 'begin-retained')
-  if (endRetained && beginRetained && totalIncrease && totalDecrease) {
-    endRetained.endBalance = beginRetained.beginBalance + totalIncrease.increase - totalDecrease.decrease
-  }
-
-  // 计算非公式行的 endBalance = beginBalance + increase - decrease
-  for (const row of rows) {
-    if (!row.isFormula) {
-      row.endBalance = row.beginBalance + row.increase - row.decrease
-    }
-  }
+  movementRows.value = recalcM6SoeRows(movementRows.value)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -330,18 +267,18 @@ function updateRow(index: number, field: 'priorYearEnd' | 'beginAdj' | 'increase
     movementRows.value[index][field] = val
     recalcFormulas()
     formData.debouncedSave(`M6-disclosure-soe-${movementRows.value[index].key}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleRiskReserveNoteChange() {
   formData.debouncedSave('M6-disclosure-soe-risk-reserve', { remark: riskReserveNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleSoeDistributionNoteChange() {
   formData.debouncedSave('M6-disclosure-soe-distribution', { remark: soeDistributionNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 async function handleAI(section: string) {
@@ -387,22 +324,9 @@ function fmtAmount(val: number): string {
 
 function restoreData(): void {
   const responses = formData.allResponses.value
-  const editableFields: Array<'priorYearEnd' | 'beginAdj' | 'increase' | 'decrease'> = ['priorYearEnd', 'beginAdj', 'increase', 'decrease']
-
-  for (const row of movementRows.value) {
-    if (row.isFormula) continue
-    for (const field of editableFields) {
-      const resp = responses.get(`M6-disclosure-soe-${row.key}-${field}`)
-      if (resp?.remark) row[field] = Number(resp.remark) || 0
-    }
-  }
-  recalcFormulas()
-
-  const riskResp = responses.get('M6-disclosure-soe-risk-reserve')
-  if (riskResp?.remark) riskReserveNote.value = riskResp.remark
-
-  const distResp = responses.get('M6-disclosure-soe-distribution')
-  if (distResp?.remark) soeDistributionNote.value = distResp.remark
+  movementRows.value = restoreM6SoeRows(responses)
+  riskReserveNote.value = responses.get('M6-disclosure-soe-risk-reserve')?.remark || ''
+  soeDistributionNote.value = responses.get('M6-disclosure-soe-distribution')?.remark || ''
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
@@ -422,6 +346,8 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

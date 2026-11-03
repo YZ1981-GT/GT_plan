@@ -2,7 +2,8 @@
 
 实现 cell 级写回到 working_papers.parsed_data['univer_snapshot'] JSONB，
 支持乐观锁冲突检测（X-File-Opened-At vs updated_at）、单事务一致性、
-跨模块路由写入（workpaper / report / note / adj / tb）。
+按模块路由写入（workpaper / note）。tb / adj / report 三个写入实现已删除
+（advanced-query-linkage-closure 任务 13，ADR-AQL-02：试算表审定数只经发布门、调整分录只经调整分录服务）。
 
 ACNR 集成 (M2, R15.1, R15.2, R15.4):
   - 写回时通过 ACNR resolve 获取 canonical addr_id
@@ -10,7 +11,9 @@ ACNR 集成 (M2, R15.1, R15.2, R15.4):
   - resolve 携带 project context（project_id）保证 wp_id 正确解析
 
 11 步事务算法（design.md §11 WritebackPreview + SnapshotWriter，advanced-query Task 15.3）:
-  1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id FOR UPDATE
+  1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id AND project_id = pid FOR UPDATE OF wp
+     （取行带请求项目：他项目的底稿查不到、不加锁 → WritebackTargetNotFound；缺项目 → ValueError，
+     advanced-query-linkage-closure R4.2 / design §3.7）
   2. Belt+suspenders project_id 归属校验
   3. IF opened_at < updated_at → raise WritebackConflict(updated_at, last_editor)（乐观锁）
   4. **写回前解析 addr_id 身份**：经 full_resolve（AddressingService，5s 超时）解析目标为
@@ -52,10 +55,12 @@ from app.services.custom_query.snapshot_writer_shared import (  # noqa: F401  (r
     ERR_CODE_AUDIT_WRITE_FAILED,
     ERR_CODE_RESOLVE_UNAVAILABLE,
     ERR_CODE_TARGET_UNRESOLVABLE,
+    ERR_CODE_WRITEBACK_TARGET_NOT_FOUND,
     AuditWriteFailed,
     WritebackConflict,
     WritebackPermissionDenied,
     WritebackResolveUnavailable,
+    WritebackTargetNotFound,
     WritebackTargetUnresolvable,
     parse_cell_ref as _parse_cell_ref,
 )
@@ -69,12 +74,9 @@ logger = logging.getLogger(__name__)
 class SnapshotWriter:
     """双向编辑写回管线。
 
-    支持 5 个模块的 cell 写回：
+    支持 2 个模块的 cell 写回：
       - workpaper → parsed_data['univer_snapshot']
-      - report → report_snapshot.data
       - note → consol_note_data.data
-      - adj → adjustments 表 UPDATE
-      - tb → trial_balance.audited_amount UPDATE
     """
 
     async def write_cell(
@@ -105,7 +107,7 @@ class SnapshotWriter:
             cell_ref: cell 引用 (e.g. "B7")
             new_value: 新值
             opened_at: 前端打开时的 updated_at 时间戳
-            module: 模块名 ('workpaper', 'report', 'note', 'adj', 'tb')
+            module: 模块名 ('workpaper', 'note')；其余（含已删除的 tb / adj / report）→ ValueError
             project_id: 项目 ID（ACNR 解析 project context，R15.4）
 
         Returns:
@@ -120,16 +122,15 @@ class SnapshotWriter:
         Raises:
             WritebackConflict: 乐观锁冲突
             WritebackPermissionDenied: 无写权限
+            WritebackTargetNotFound: 底稿在请求项目里不存在（取行带项目条件，不锁他项目行）
+            NoteRecordNotFound: 附注记录在请求项目里不存在（同上）
+            ValueError: 不支持的模块（请求层已是 422，这里防直接调用）；缺项目
         """
         if module == "workpaper":
             return await self._write_workpaper_cell(
                 db, user, wp_id, sheet_name, cell_ref, new_value, opened_at, project_id
             )
-        elif module == "report":
-            return await self._write_report_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
-            )
-        elif module == "note":
+        if module == "note":
             return await self._write_note_cell(
                 db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
                 note_record_id=note_record_id,
@@ -138,16 +139,7 @@ class SnapshotWriter:
                 note_node_key=note_node_key,
                 note_project_id=note_project_id,
             )
-        elif module == "adj":
-            return await self._write_adj_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
-            )
-        elif module == "tb":
-            return await self._write_tb_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
-            )
-        else:
-            raise WritebackPermissionDenied(f"Unsupported module: {module}")
+        raise ValueError(f"不支持的回写模块：{module}（只支持 workpaper / note）")
 
     # ─── workpaper 模块写回 ──────────────────────────────────────────────
 
@@ -177,7 +169,9 @@ class SnapshotWriter:
          10. 审计 log_action 纳入事务成功判定（失败 → 回滚 + AUDIT_WRITE_FAILED）
          11. 组装 addr_id + column_metadata 返回
         """
-        # Step 1: SELECT FOR UPDATE
+        # Step 1: SELECT FOR UPDATE —— 取行带请求项目（R4.2）：他项目的底稿与不存在的 id 一样查不到，
+        # 既不读取也不加锁。缺项目即拒绝（两个回写端点恒传请求项目；直接调用不得退回「只按 id 加锁」）。
+        pid = _require_project_uuid(project_id)
         result = await db.execute(
             text("""
                 -- working_paper 无 wp_code 列（在 wp_index 上）。
@@ -187,14 +181,14 @@ class SnapshotWriter:
                        wp.file_path, wp.project_id
                 FROM working_paper wp
                 LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
-                WHERE wp.id = :wp_id
+                WHERE wp.id = :wp_id AND wp.project_id = :pid
                 FOR UPDATE OF wp
             """),
-            {"wp_id": wp_id},
+            {"wp_id": wp_id, "pid": str(pid)},
         )
         row = result.first()
         if not row:
-            raise ValueError(f"Working paper not found: {wp_id}")
+            raise WritebackTargetNotFound(str(wp_id))
 
         current_updated_at = row[0]
         parsed_data = row[1] or {}
@@ -202,11 +196,10 @@ class SnapshotWriter:
         file_path = row[3] or ""
         row_project_id = row[4]
 
-        # Step 2: Belt+suspenders — verify project_id matches
-        if project_id and row_project_id:
-            expected_pid = UUID(project_id) if isinstance(project_id, str) else project_id
+        # Step 2: Belt+suspenders — 取行已带项目条件，这里再核一次（取行语句被改坏时不静默跨项目写）
+        if row_project_id:
             actual_pid = UUID(str(row_project_id)) if not isinstance(row_project_id, UUID) else row_project_id
-            if expected_pid != actual_pid:
+            if pid != actual_pid:
                 raise WritebackPermissionDenied("Project mismatch")
 
         # Step 3: 乐观锁比对
@@ -413,26 +406,11 @@ class SnapshotWriter:
         if downstream_warnings:
             payload["warnings"] = downstream_warnings
         return payload
-    # ─── 非 workpaper 模块写回（实现在 snapshot_writer_modules）──────────
-    # 四个模块写回都是「SELECT FOR UPDATE → 乐观锁 → 定位虚拟 sheet 列 → UPDATE」的
-    # 同构流程，与 workpaper 的 11 步事务无关，故下沉到伴生模块。类上保留同名薄委托：
-    # 既有测试用 hasattr 检查模块分派、并用实例赋值做替身，搬走会让两者失效。
+    # ─── 附注模块写回（实现在 snapshot_writer_modules）──────────────────
+    # 「SELECT FOR UPDATE → 归属复验 → 乐观锁 → 定位虚拟 sheet 列 → UPDATE」与 workpaper 的
+    # 11 步事务无关，故下沉到伴生模块。类上保留同名薄委托：既有测试用 hasattr 检查模块分派、
+    # 并用实例赋值做替身。tb / adj / report 的委托随写入实现一并删除（任务 13）。
 
-    async def _write_report_cell(
-        self,
-        db: AsyncSession,
-        user: Any,
-        wp_id: str,
-        sheet_name: str,
-        cell_ref: str,
-        new_value: Any,
-        opened_at: datetime,
-    ) -> dict:
-        """写回 report_snapshot.data JSONB（委托 snapshot_writer_modules）。"""
-        return await _mod.write_report_cell(
-            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
-            check_lock=self._check_optimistic_lock,
-        )
     async def _write_note_cell(
         self,
         db: AsyncSession,
@@ -458,36 +436,6 @@ class SnapshotWriter:
             note_year=note_year,
             note_node_key=note_node_key,
             note_project_id=note_project_id,
-        )
-    async def _write_adj_cell(
-        self,
-        db: AsyncSession,
-        user: Any,
-        wp_id: str,
-        sheet_name: str,
-        cell_ref: str,
-        new_value: Any,
-        opened_at: datetime,
-    ) -> dict:
-        """写回 adjustments 表（委托 snapshot_writer_modules）。"""
-        return await _mod.write_adj_cell(
-            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
-            check_lock=self._check_optimistic_lock,
-        )
-    async def _write_tb_cell(
-        self,
-        db: AsyncSession,
-        user: Any,
-        wp_id: str,
-        sheet_name: str,
-        cell_ref: str,
-        new_value: Any,
-        opened_at: datetime,
-    ) -> dict:
-        """写回 trial_balance.audited_amount（委托 snapshot_writer_modules）。"""
-        return await _mod.write_tb_cell(
-            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
-            check_lock=self._check_optimistic_lock,
         )
 
     # ─── 辅助方法 ────────────────────────────────────────────────────────
@@ -734,6 +682,16 @@ class SnapshotWriter:
 
 
 # ─── 模块级辅助 ──────────────────────────────────────────────────────────────
+
+
+def _require_project_uuid(project_id: Any) -> UUID:
+    """回写取行的项目条件（R4.2）：缺失或不是合法 UUID → ValueError（router 转 400），不退回只按 id 取行。"""
+    if project_id is None or project_id == "":
+        raise ValueError("底稿回写缺少项目（project_id），不能只按底稿 id 定位")
+    try:
+        return project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise ValueError(f"项目标识非法：{project_id!r}") from exc
 
 
 def _as_uuid(value: Any) -> UUID | None:

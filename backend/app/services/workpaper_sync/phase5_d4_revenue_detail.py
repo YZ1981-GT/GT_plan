@@ -2377,9 +2377,16 @@ STORE_ITEM_ID_D49_DICT: Final[str] = STORE_ITEM_ID_D49
 #: D4-33 store item（dict 形态 {bizTypes,months,priorYear}，嵌套非行数组）。同 D4-9：**在**
 #: STORE_ITEM_IDS 里（combined projection），但 oo_to_html 镜像走专用 dict 块（3-tuple 门面
 #: merge_d433_from_projection），**不进** merge_projection_into_all_d4_stores 的 rows 4-tuple 循环。
-#: 🔴 **仅当 _INCLUDE_D433_MARGIN_SHEET 时导出**：oo_to_html 用 `hasattr(bridge, "STORE_ITEM_ID_D433_DICT")`
-#: 判定是否跑 D4-33 dict 块；flag=False（引擎不支持纯静态 sheet）时不导出，块自动跳过，
-#: 避免对未进契约的 D4-33 空投影误写空 store。
+#: 🔴 **仅当 _INCLUDE_D433_MARGIN_SHEET 时导出**（别名保留给历史调用方）。
+#:
+#: 2026-11-01 勘误：原注释说「oo_to_html 用 `hasattr(bridge, "STORE_ITEM_ID_D433_DICT")`
+#: 判定是否跑 D4-33 dict 块；flag=False 时块自动跳过」——**已不成立**。
+#: `store_mirror._resolve_dedicated_store_providers` 现在按注册表声明直接从 owning module 取
+#: `STORE_ITEM_ID_D433`，不经过这个被 flag 闸住的别名，所以 flag 翻 False 后 dedicated 镜像
+#: 照跑，而下面的 `STORE_ITEM_IDS` 会把该 item 排除 ⇒ 两边口径分叉。
+#: 现在由注册表不变量兜住：每个 `dedicated_items` 的 item_id 必须出现在本 adapter 声明的
+#: store item 集合里（见 `tests/workpaper_sync/test_store_merge_registry_invariants.py`），
+#: flag 翻 False 即打红，强制同步更新声明，而不是静默分叉。
 if _INCLUDE_D433_MARGIN_SHEET:
     STORE_ITEM_ID_D433_DICT: Final[str] = STORE_ITEM_ID_D433
 

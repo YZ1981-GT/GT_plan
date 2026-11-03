@@ -6,6 +6,14 @@
       </template>
     </GtPageHeader>
 
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="下列预设插件仍在开发中，不能启用、执行或保存生产配置；这里只展示规划能力。"
+      class="gt-plugin-mgmt__notice"
+    />
+
     <PluginList :plugins="plugins" :loading="loading" :is-stub="isStubPlugin" @config="openConfig" @toggled="loadPlugins" @execute="executePlugin" />
 
     <el-divider />
@@ -59,6 +67,10 @@ async function loadPlugins() {
 }
 
 function openConfig(plugin: any) {
+  if (isStubPlugin(plugin.plugin_id)) {
+    ElMessage.info('该插件正在开发中，当前不保存生产配置')
+    return
+  }
   configPlugin.value = plugin
   showConfig.value = true
 }
@@ -77,6 +89,7 @@ onMounted(loadPlugins)
 
 <style scoped>
 .gt-plugin-mgmt { padding: var(--gt-space-4); }
+.gt-plugin-mgmt__notice { margin-bottom: var(--gt-space-3); }
 .gt-page-header {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: var(--gt-space-4);

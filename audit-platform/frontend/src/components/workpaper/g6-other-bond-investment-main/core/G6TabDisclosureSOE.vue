@@ -286,10 +286,8 @@ import { useG6MainAiGenerate } from '../../composables/useG6MainAiGenerate'
 import {
   addStageDetail,
   bookValue,
-  buildDefaultSoeStageBlocks,
   eclRatePct,
   methodTotals,
-  parseStageBlocks,
   patchStageDetail,
   removeStageDetail,
   serializeStageBlocks,
@@ -300,35 +298,15 @@ import {
 } from '../../composables/g4ListedStageDisclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
-import type { ColumnDef } from '../../composables/disclosureColumnDefs'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
-
-interface BalanceRow {
-  item: string
-  endingBalance: number
-  openingBalance: number
-}
-
-interface ImportantRow {
-  item: string
-  faceValue: number
-  amortizedCost: number
-  fairValue: number
-  ociCumulative: number
-  impairment: number
-}
-
-type MovementAmountKey = 'stage1' | 'stage2' | 'stage3'
-
-interface MovementRow {
-  key: string
-  item: string
-  stage1: number
-  stage2: number
-  stage3: number
-  editable: boolean
-}
+import {
+  G6_SOE_DISCLOSURE_KEYS,
+  g6SoeNum as n,
+  useG6SoeDisclosureState,
+  type G6SoeMovementAmountKey as MovementAmountKey,
+  type G6SoeMovementRow as MovementRow,
+} from '../../composables/g6SoeDisclosureTabState'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -340,85 +318,25 @@ const props = defineProps<{
 }>()
 
 const ACCOUNT_CODE = '1503'
-const STRUCTURED_KEY = 'G6-disclosure-soe-rows'
-const STAGES_KEY = 'G6-disclosure-soe-stages'
-const TEXT_KEY = 'G6-disclosure-soe-text'
+const { rows: STRUCTURED_KEY, stages: STAGES_KEY, text: TEXT_KEY } = G6_SOE_DISCLOSURE_KEYS
 
 const isReadonly = computed(() => props.isReadonly)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6MainAiGenerate(wpIdRef)
 const isSyncing = ref(false)
-const sourceFvEnd = ref(0)
-const sourceFvOpening = ref(0)
-const sourceProvisionEnd = ref(0)
-
-const balanceRows = ref<BalanceRow[]>(
-  Array.from({ length: 4 }, (_, i) => ({
-    item: `项目${i + 1}（可改名）`,
-    endingBalance: 0,
-    openingBalance: 0,
-  })),
-)
-const importantRows = ref<ImportantRow[]>(
-  Array.from({ length: 4 }, (_, i) => ({
-    item: `重要项目${i + 1}`,
-    faceValue: 0,
-    amortizedCost: 0,
-    fairValue: 0,
-    ociCumulative: 0,
-    impairment: 0,
-  })),
-)
-
-const movementRows = ref<MovementRow[]>([
-  { key: 'opening', item: '期初余额', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'transfer-2', item: '—转入第二阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'transfer-3', item: '—转入第三阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'return-2', item: '—转回第二阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'return-1', item: '—转回第一阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'provision', item: '本期计提', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'reversal', item: '本期转回', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'transfer-out', item: '本期转销', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'write-off', item: '本期核销', stage1: 0, stage2: 0, stage3: 0, editable: true },
-  { key: 'other', item: '其他变动', stage1: 0, stage2: 0, stage3: 0, editable: true },
-])
-
-function g6StageDefaults(): G4StageBlock[] {
-  return buildDefaultSoeStageBlocks().map(block => ({
-    ...block,
-    title: block.title.replace('债权投资', '其他债权投资'),
-  }))
-}
-
-const stageBlocks = ref<G4StageBlock[]>(g6StageDefaults())
-const noteText = ref('')
+// 表格状态 / 回显 / 回填 / 同步载荷：与附注页离屏同步共用（g6SoeDisclosureTabState）
+const soe = useG6SoeDisclosureState({ allResponses: () => props.allResponses, htmlData: () => props.htmlData })
+const {
+  sourceFvEnd, sourceProvisionEnd, balanceRows, importantRows, movementRows, stageBlocks, noteText,
+  noteSection, balanceTotals, loadPersisted, buildSyncData,
+} = soe
 const stageMethods: G4StageMethod[] = ['individual', 'portfolio']
 const movementStages: Array<{ key: MovementAmountKey; label: string }> = [
   { key: 'stage1', label: '第一阶段' },
   { key: 'stage2', label: '第二阶段' },
   { key: 'stage3', label: '第三阶段' },
 ]
-
-const standards = computed<string[]>(() => {
-  const raw =
-    props.htmlData?.applicable_standards
-    ?? props.htmlData?.render_config?.applicable_standards
-    ?? []
-  return Array.isArray(raw) ? raw.map(String) : []
-})
-const currentStandard = computed(() =>
-  standards.value.find(s => s === 'soe_standalone' || s === 'soe_consolidated')
-  ?? 'soe_standalone',
-)
-const noteSection = computed(() =>
-  currentStandard.value === 'soe_consolidated' ? '五、17' : '八、16',
-)
-
-function n(value: unknown): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
-}
 
 function fmt(value: unknown): string {
   const amount = n(value)
@@ -429,22 +347,6 @@ function fmt(value: unknown): string {
 
 function fmtRate(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? '—' : `${value.toFixed(2)}%`
-}
-
-function readResponse(key: string): string {
-  const direct = props.allResponses?.get(key)
-  if (direct?.remark || direct?.conclusion) return direct.remark || direct.conclusion || ''
-  const map = props.htmlData?.checklist_responses
-  if (map?.[key]) {
-    const item = map[key]
-    return typeof item === 'object' ? item.remark || item.conclusion || '' : String(item)
-  }
-  const list = props.htmlData?.responses
-  if (Array.isArray(list)) {
-    const item = list.find((entry: any) => entry?.item_id === key)
-    return item?.remark || item?.conclusion || ''
-  }
-  return ''
 }
 
 function saveResponse(key: string, remark: string): void {
@@ -478,93 +380,13 @@ function persistNote(): void {
   }))
 }
 
-function loadPersisted(): boolean {
-  let found = false
-  const structured = readResponse(STRUCTURED_KEY)
-  if (structured) {
-    try {
-      const parsed = JSON.parse(structured)
-      if (Array.isArray(parsed.balanceRows)) balanceRows.value = parsed.balanceRows
-      if (Array.isArray(parsed.importantRows)) importantRows.value = parsed.importantRows
-      if (Array.isArray(parsed.movementRows)) movementRows.value = parsed.movementRows
-      found = true
-    } catch { /* invalid legacy payload */ }
-  }
-  const parsedStages = parseStageBlocks(readResponse(STAGES_KEY))
-  if (parsedStages) {
-    const ids = new Set(g6StageDefaults().map(block => block.id))
-    stageBlocks.value = parsedStages
-      .filter(block => ids.has(block.id))
-      .map(block => ({ ...block, title: block.title.replace('债权投资', '其他债权投资') }))
-    found = true
-  }
-  noteText.value = readResponse(TEXT_KEY)
-  return found
-}
-
-function parseJson(raw: string): any {
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return null }
-}
-
+/** 从 G6-1 / G6-2 / G6-3 回填（soe.applySourceRows，只改内存）后保存；`force` 时提示 */
 function refreshFromSources(force = false): void {
-  const adjudication = parseJson(readResponse('G6-1-rows')) || {}
-  let fvEnd = 0
-  let fvOpening = 0
-  balanceRows.value = balanceRows.value.map((row, index) => {
-    const source = adjudication[`fv-item-${index + 1}`] || {}
-    const endingBalance = n(source.closingUnadjusted) + n(source.closingAdjustment)
-    const openingBalance = n(source.openingUnadjusted) + n(source.openingAdjustment)
-    fvEnd += endingBalance
-    fvOpening += openingBalance
-    return {
-      item: String(source.itemLabel || row.item),
-      endingBalance: force || !row.endingBalance ? endingBalance : row.endingBalance,
-      openingBalance: force || !row.openingBalance ? openingBalance : row.openingBalance,
-    }
-  })
-  sourceFvEnd.value = fvEnd
-  sourceFvOpening.value = fvOpening
-
-  const detail = parseJson(readResponse('G6-2-rows'))
-  if (Array.isArray(detail)) {
-    const rows = detail.filter((row: any) => row?.investProject || n(row?.closingAudited)).slice(0, 4)
-    importantRows.value = importantRows.value.map((current, index) => {
-      const row = rows[index]
-      if (!row) return current
-      return {
-        item: String(row.investProject || current.item),
-        faceValue: n(row.faceValue),
-        amortizedCost: n(row.closingSubtotal),
-        fairValue: n(row.closingAudited || row.closingFairValue),
-        ociCumulative: n(row.closingCumulativeFvChange),
-        impairment: current.impairment,
-      }
-    })
-  }
-
-  const badDebt = parseJson(readResponse('G6-3-rows'))
-  if (Array.isArray(badDebt)) {
-    sourceProvisionEnd.value = badDebt.reduce((sum: number, row: any) => {
-      const closingUnadjusted =
-        n(row.openingUnadjusted)
-        + n(row.provisionIncrease)
-        + n(row.otherIncrease)
-        - n(row.reversal)
-        - n(row.writeOff)
-        - n(row.otherDecrease)
-      return sum + closingUnadjusted + n(row.closingAdjustment)
-    }, 0)
-  }
-
+  soe.applySourceRows(force)
   persistStructured()
   if (force) ElMessage.success('已从 G6-1/G6-2/G6-3 更新可自动承接的数据')
 }
 
-const balanceTotals = computed(() => ({
-  ending: balanceRows.value.reduce((sum, row) => sum + n(row.endingBalance), 0),
-  opening: balanceRows.value.reduce((sum, row) => sum + n(row.openingBalance), 0),
-}))
 const importantTotals = computed(() =>
   importantRows.value.reduce(
     (sum, row) => ({
@@ -672,85 +494,13 @@ function patchStageRow(
   persistStages()
 }
 
-// 列头元数据（disclosure-table-sync-convergence）：label 取自本组件 el-table-column
-const G6_SOE_COLUMNS: Record<string, ColumnDef[]> = {
-  其他债权投资情况: [
-    { key: 'label', label: '项目', is_label: true },
-    { key: 'end_balance', label: '期末余额', format: 'amount' },
-    { key: 'prior_balance', label: '期初余额', format: 'amount' },
-  ],
-  期末重要的其他债权投资: [
-    { key: 'label', label: '其他债权投资项目', is_label: true },
-    { key: 'face_value', label: '面值', format: 'amount' },
-    { key: 'amortized_cost', label: '摊余成本', format: 'amount' },
-    { key: 'fair_value', label: '公允价值', format: 'amount' },
-    { key: 'oci_cumulative', label: '累计计入 OCI 的公允价值变动', format: 'amount' },
-    { key: 'impairment', label: '减值准备', format: 'amount' },
-  ],
-  减值准备计提情况: [
-    { key: 'label', label: '类别', is_label: true },
-    { key: 'book_balance', label: '账面余额', format: 'amount' },
-    { key: 'impairment', label: '减值准备', format: 'amount' },
-    { key: 'book_value', label: '账面价值（分析口径）', format: 'amount' },
-    { key: 'reason', label: '理由' },
-  ],
-  减值准备变动: [
-    { key: 'label', label: '减值准备', is_label: true },
-    { key: 'stage1', label: '第一阶段', format: 'amount' },
-    { key: 'stage2', label: '第二阶段', format: 'amount' },
-    { key: 'stage3', label: '第三阶段', format: 'amount' },
-    { key: 'total', label: '合计', format: 'amount' },
-  ],
-}
-
-function buildSyncData(): Record<string, Record<string, unknown>[] | string[]> {
-  return {
-    其他债权投资情况: [
-      ...balanceRows.value.map(row => ({
-        label: row.item,
-        end_balance: n(row.endingBalance),
-        prior_balance: n(row.openingBalance),
-        row_type: 'data',
-      })),
-      {
-        label: '合计',
-        end_balance: balanceTotals.value.ending,
-        prior_balance: balanceTotals.value.opening,
-        row_type: 'subtotal',
-        is_total: true,
-      },
-    ],
-    期末重要的其他债权投资: importantRows.value.map(row => ({
-      label: row.item,
-      face_value: n(row.faceValue),
-      amortized_cost: n(row.amortizedCost),
-      fair_value: n(row.fairValue),
-      oci_cumulative: n(row.ociCumulative),
-      impairment: n(row.impairment),
-      row_type: 'data',
-    })),
-    // 🔴 国企减值准备计提情况交叉引用 G5 §八、15（附注模板 text_section 明确写
-    // 「参照附注八、15 债权投资（3）减值准备计提情况进行披露」），不推三阶段表。
-    // 底稿仍录入（审计证据），但不进附注。历史孤儿通过 _removed_table_keys 清理。
-    _removed_table_keys: ['减值准备计提情况', '减值准备变动'],
-    _note_texts: [{ section: 'soe-audit-note', title: '其他债权投资审计说明', text: noteText.value }],
-  }
-}
-
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
     const result: any = await api.post(
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
-      {
-        wp_id: props.wpId,
-        sheet_name: '附注披露信息（国企）',
-        section_id: noteSection.value,
-        current_standard: currentStandard.value,
-        sub_table_data: buildSyncData(),
-        columns: G6_SOE_COLUMNS,
-      },
+      soe.buildSyncPayload(props.wpId),
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块“${noteSection.value} 其他债权投资”`)

@@ -35,3 +35,21 @@ backend/data/note_workpaper_sync_registry.json text eol=lf
 # `workpaper_sync_contracts/` 下、已被覆盖，本文件是唯一漏网的。
 # index 里本就是 LF，加这条不产生行尾 churn。
 backend/data/workpaper_sync_entry_wp_code_adjudication.json text eol=lf
+# ACNR 目录契约 schema 强制 LF（2026-10-27，spec acnr-foundation-defect-closure T03/D3）。
+# `test_catalog_schema_single_source.py::test_schema_file_byte_equal_to_build_schema` 校验磁盘字节
+# 必须与 catalog_contract.schema_json() 逐字节相等（LF）。core.autocrlf=true 会在 checkout 时把
+# LF blob 转成 CRLF ⇒ 该守卫在 Windows 本机红、CI 的 Linux 上绿。index 里本就是 LF，不产生行尾 churn。
+docs/acnr/schemas/global_catalog.schema.json text eol=lf
+# ACNR 目录产物强制 LF（2026-10-27，spec acnr-foundation-defect-closure 段四审计 F4-07 / T08）。
+# 目录内容哈希口径 = LF 规范内容（catalog_integrity.content_sha256，即 git blob 内容的 sha256），
+# 报告 release.catalog_sha256 与加载期互校都用它；T07 生成器的幂等判定要求磁盘字节与已提交产物
+# 逐字节相等，core.autocrlf=true 的 CRLF 检出会让 Windows 上永远「不相等」。index 里本就是 LF，
+# 不产生行尾 churn。
+backend/data/acnr/global_catalog.json text eol=lf
+backend/data/acnr/catalog_report.json text eol=lf
+backend/data/acnr/catalog_snapshots/*.json text eol=lf
+
+# 鉴权清册（附注写端点清册 / edit 级影响清单 / 目标门禁声明，2026-10-27 spec note-pull-followup-closure R21）。
+# 生成器恒写 LF、`--check` 原来比原始字节 ⇒ 干净检出（autocrlf 转成 CRLF）上检查模式与双生成判据恒红，
+# 「红成常态」后真实漂移也没人看。检查模式已改为按换行归一比较；这里再固定检出为 LF。index 里本就是 LF，不产生行尾 churn。
+backend/data/authz/*.json text eol=lf

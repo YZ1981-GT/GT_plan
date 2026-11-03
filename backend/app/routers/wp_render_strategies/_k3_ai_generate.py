@@ -84,11 +84,11 @@ _SECTION_PROMPTS: dict[str, str] = {
         "期后回款/偿付情况验证。"
     ),
     "overall-opinion": (
-        "请生成K3-1审定表底部的审计综合意见。综合评价其他应付款科目整体的"
+        "请提供K3-1审定表底部的科目结论措辞建议。综合评价其他应付款科目整体的"
         "完整性（是否存在少计负债，反向截止测试结论）、存在性（长期挂账真实性）、"
         "计价和分摊（金额准确性）、权利和义务、列报与披露的恰当性。"
         "说明是否发现需要调整的重大事项，审定数与未审数的主要差异原因，"
-        "对报表层面影响的结论。强调负债类完整性认定的审计关注。"
+        "列明报表层面潜在影响的判断因素、证据缺口和建议程序，强调负债类完整性认定；不得形成最终审计意见。"
     ),
 }
 
@@ -130,7 +130,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

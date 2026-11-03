@@ -205,7 +205,7 @@
           </div>
         </template>
         <!-- 各段结论 -->
-        <table class="c1-grid-table c1-conclusion-table">
+        <GtGridTable class="c1-grid-table c1-conclusion-table">
           <thead>
             <tr>
               <th style="min-width: 200px">要素 / 段</th>
@@ -241,7 +241,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
         <!-- 整体结论 -->
         <div class="c1-overall-row">
           <span class="c1-overall-label">企业层面控制整体结论</span>
@@ -276,7 +276,7 @@
             </div>
           </div>
         </template>
-        <table class="c1-grid-table c1-defect-table">
+        <GtGridTable class="c1-grid-table c1-defect-table">
           <thead>
             <tr>
               <th style="width: 32px">#</th>
@@ -312,7 +312,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </el-card>
 
       <!-- 右下角浮动按钮: 查看示例 -->
@@ -718,7 +718,7 @@
               </el-tooltip>
             </div>
           </template>
-          <table class="c1-grid-table">
+          <GtGridTable class="c1-grid-table">
             <thead>
               <tr>
                 <th style="width: 32px">#</th>
@@ -787,7 +787,7 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </el-card>
       </el-dialog>
 
@@ -835,7 +835,7 @@
           </details>
 
           <!-- 过程记录字段区 -->
-          <table class="c1-grid-table c1-proc-table">
+          <GtGridTable class="c1-grid-table c1-proc-table">
             <tbody>
               <tr v-for="f in processFieldsForActive" :key="f.key">
                 <td class="c1-proc-label">{{ f.label }}</td>
@@ -890,7 +890,7 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <!-- 📎 附件区 -->
           <div class="c1-ref-row" style="margin-top: 12px">
@@ -909,6 +909,7 @@
               <el-tooltip v-if="procAttachName()" :content="procAttachName()" placement="top">
                 <el-icon class="c1-attach-flag"><Paperclip /></el-icon>
               </el-tooltip>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="procEvidenceSheet()" />
             </div>
           </div>
 
@@ -983,7 +984,7 @@
         </details>
 
         <!-- 过程记录字段区（C1-4-4） -->
-        <table class="c1-grid-table c1-proc-table">
+        <GtGridTable class="c1-grid-table c1-proc-table">
           <tbody>
             <tr v-for="f in processFieldsForSample" :key="f.key">
               <td class="c1-proc-label">{{ f.label }}</td>
@@ -1024,7 +1025,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
 
         <el-divider />
 
@@ -1042,7 +1043,7 @@
           </div>
         </div>
 
-        <table class="c1-grid-table c1-sample-table">
+        <GtGridTable class="c1-grid-table c1-sample-table">
           <thead>
             <tr>
               <th style="width: 32px">#</th>
@@ -1125,6 +1126,7 @@
                   <el-icon class="c1-attach-flag"><Paperclip /></el-icon>
                 </el-tooltip>
                 <span v-else-if="isReadonly" class="c1-ref-empty">—</span>
+                <RowEvidenceEye :project-id="projectId" :wp-id="wpId" sheet-key="C1-4-4" :cell-ref="rowEvidenceCell(row.__rid)" />
               </td>
               <td v-if="!isReadonly">
                 <el-button type="danger" size="small" text @click="removeSampleRow(i)">删除</el-button>
@@ -1159,7 +1161,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
 
         <template #footer>
           <el-button @click="sampleDialogVisible = false">关闭</el-button>
@@ -1212,6 +1214,10 @@ import {
   normalizeConclusion,
 } from './composables/useC1ConclusionEngine'
 
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
+
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 
@@ -1226,6 +1232,8 @@ const props = defineProps<{
   sheetName?: string
   htmlData?: any
 }>()
+/** 识别附件挂到位置：样本行 = C1-4-4 + `row:{rid}`；过程记录 = C1-4-{k} 表页级（spec attachment-inline-preview） */
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 defineEmits<{
   (e: 'save'): void
@@ -2063,6 +2071,8 @@ const procAttachItemId = (): string => {
   const k = activeProcessIndex.value + 1
   return `${C1_ITEM_PREFIX}4-${k}-attach`
 }
+/** 过程记录附件的表页键（C1-4-1 ~ C1-4-6） */
+const procEvidenceSheet = (): string => `C1-4-${activeProcessIndex.value + 1}`
 
 function sampleAttachName(rid: number): string {
   return c1data.getRemark(sampleAttachItemId(rid)) || ''
@@ -2084,6 +2094,7 @@ async function onUploadSampleOcr(i: number, rawFile: File): Promise<void> {
   c1data.setFieldDebounced(sampleAttachItemId(row.__rid), { remark: rawFile.name })
   const formData = new FormData()
   formData.append('file', rawFile)
+  rowEv.append(formData, 'C1-4-4', rowEvidenceCell(row.__rid))
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(
@@ -2091,6 +2102,7 @@ async function onUploadSampleOcr(i: number, rawFile: File): Promise<void> {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     ocrFields = unwrapOcrFields(res)
   } catch {
     ElMessage.warning('识别失败，请手动填写')
@@ -2129,6 +2141,7 @@ async function onUploadProcOcr(rawFile: File): Promise<void> {
   c1data.setFieldDebounced(procAttachItemId(), { remark: rawFile.name })
   const formData = new FormData()
   formData.append('file', rawFile)
+  rowEv.append(formData, procEvidenceSheet())
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(
@@ -2136,6 +2149,7 @@ async function onUploadProcOcr(rawFile: File): Promise<void> {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     ocrFields = unwrapOcrFields(res)
   } catch {
     ElMessage.warning('识别失败，请手动填写')

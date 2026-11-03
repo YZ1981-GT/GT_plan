@@ -99,6 +99,22 @@ export interface H6PullResult {
   detailCount: number
 }
 
+/**
+ * 挂载时的初始带入：清理明细为空则从本底稿 H6-1/H6-2 取数（附注说明为空时一并带入草稿），返回是否带入了
+ * （Tab 带入后保存；离屏同步不保存）。底稿披露 Tab 与附注页离屏同步共用（spec note-pull-followup-closure R1）。
+ */
+export function seedH6ClearingFromLocal(
+  state: H6DisclosureState,
+  pullFromLocalSources: (opts?: { overwriteNote?: boolean; existingNote?: string }) => H6PullResult,
+): boolean {
+  if (state.clearingRows.length) return false
+  const r = pullFromLocalSources({ overwriteNote: !state.clearingNote.trim(), existingNote: state.clearingNote })
+  if (r.status !== 'ok') return false
+  state.clearingRows = r.clearingRows.map((x) => ({ ...x }))
+  if (r.clearingNoteDraft && !state.clearingNote.trim()) state.clearingNote = r.clearingNoteDraft
+  return true
+}
+
 export function useH6Disclosure(allResponses: Ref<Map<string, any>> | ComputedRef<Map<string, any>>) {
   const autoFill = computed(() => pullClearingFromH6Responses(allResponses.value))
 

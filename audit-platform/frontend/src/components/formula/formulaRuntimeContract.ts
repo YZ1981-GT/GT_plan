@@ -28,13 +28,16 @@ export interface DraftRefreshRequest {
 }
 
 export interface DraftRefreshResponse {
-  status: 'success' | 'partial_success' | 'idempotent_hit' | 'failed'
+  status: 'success' | 'recomputed' | 'draft_marked' | 'no_effect' | 'partial_success' | 'failed' | 'idempotent_hit'
   run_id: string
   transaction_mode: 'all_or_nothing' | 'partial_success'
   affected_count: number
   applied_count: number
   failed_count: number
   skipped_count: number
+  recomputed_count: number
+  draft_marked_count: number
+  outcome: string
   scopes: string[]
   idempotent: boolean
   rollback_available: boolean
@@ -53,7 +56,7 @@ export interface RollbackResponse {
 
 // ─── Status classification helpers ─────────────────────────────────────────────
 
-const VALID_STATUSES = ['success', 'partial_success', 'idempotent_hit', 'failed'] as const
+export const VALID_STATUSES = ['success', 'recomputed', 'draft_marked', 'no_effect', 'partial_success', 'failed', 'idempotent_hit'] as const
 
 export function isSuccess(resp: DraftRefreshResponse): boolean {
   return resp.status === 'success'
@@ -105,6 +108,9 @@ export function parseDraftRefreshResponse(raw: unknown): DraftRefreshResponse {
   const applied_count = typeof obj.applied_count === 'number' ? obj.applied_count : 0
   const failed_count = typeof obj.failed_count === 'number' ? obj.failed_count : 0
   const skipped_count = typeof obj.skipped_count === 'number' ? obj.skipped_count : 0
+  const recomputed_count = typeof obj.recomputed_count === 'number' ? obj.recomputed_count : 0
+  const draft_marked_count = typeof obj.draft_marked_count === 'number' ? obj.draft_marked_count : 0
+  const outcome = typeof obj.outcome === 'string' ? obj.outcome : ''
 
   // Array fields — fallback to []
   const scopes = Array.isArray(obj.scopes) ? (obj.scopes as string[]) : []
@@ -131,6 +137,9 @@ export function parseDraftRefreshResponse(raw: unknown): DraftRefreshResponse {
     applied_count,
     failed_count,
     skipped_count,
+    recomputed_count,
+    draft_marked_count,
+    outcome,
     scopes,
     idempotent,
     rollback_available,

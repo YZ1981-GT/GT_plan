@@ -431,7 +431,15 @@
         />
         <div class="gt-filter-spacer" />
         <el-tag v-if="tabLedgerAccount" type="info" size="small">{{ tabLedgerAccount }} 序时账</el-tag>
-        <el-tag size="small">{{ tabLedgerDisplay.length }} 行</el-tag>
+        <LedgerWindowPager
+          v-if="tabLedgerAccount"
+          :range-text="tabLedgerWindow.rangeText.value"
+          :has-previous="tabLedgerWindow.hasPrevious.value"
+          :has-next="tabLedgerWindow.hasNext.value"
+          :loading="loading"
+          @previous="moveTabLedgerWindow('previous')"
+          @next="moveTabLedgerWindow('next')"
+        />
         <el-button size="small" @click="loadTabLedger(true)" :loading="loading" :disabled="!tabLedgerAccount">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportTabLedgerExcel" :disabled="!tabLedgerAccount">导出Excel</el-button>
@@ -439,14 +447,6 @@
       </div>
       <div v-if="!tabLedgerAccount" class="gt-empty-state">
         <el-empty description="请在上方选择一个科目查看序时账" :image-size="80" />
-      </div>
-      <!-- 加载进度条 -->
-      <div v-else-if="tabLoadProgress.active" class="gt-load-progress">
-        <el-progress :percentage="tabLoadProgress.total ? Math.round(tabLoadProgress.loaded / tabLoadProgress.total * 100) : 0" :stroke-width="6" style="width: 320px" />
-        <span class="gt-load-progress__text">
-          已加载 {{ tabLoadProgress.loaded.toLocaleString() }} / {{ tabLoadProgress.total.toLocaleString() }} 行
-          <template v-if="tabLoadProgress.elapsed > 0">（{{ tabLoadProgress.elapsed }}秒{{ tabLoadEta ? '，' + tabLoadEta : '' }}）</template>
-        </span>
       </div>
       <el-table-v2
         v-else-if="tabLedgerDisplay.length > 1000"
@@ -551,22 +551,25 @@
         </el-select>
         <div class="gt-filter-spacer" />
         <el-tag v-if="tabAuxAccount" type="info" size="small">{{ tabAuxAccount }}{{ tabAuxType ? ' / ' + tabAuxType : '' }}{{ tabAuxCode ? ' / ' + tabAuxCode : '' }} 辅助明细</el-tag>
-        <el-tag size="small">{{ tabAuxLedgerDisplay.length }} 行</el-tag>
+        <LedgerWindowPager
+          v-if="tabAuxType"
+          :range-text="tabAuxWindow.rangeText.value"
+          :has-previous="tabAuxWindow.hasPrevious.value"
+          :has-next="tabAuxWindow.hasNext.value"
+          :loading="loading"
+          @previous="moveTabAuxWindow('previous')"
+          @next="moveTabAuxWindow('next')"
+        />
         <el-button size="small" @click="loadTabAuxLedger(true)" :loading="loading" :disabled="!tabAuxAccount">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
-        <el-button size="small" plain @click="exportTabAuxLedgerExcel" :disabled="!tabAuxAccount">导出Excel</el-button>
+        <el-button size="small" plain @click="exportTabAuxLedgerExcel" :disabled="!tabAuxType">导出Excel</el-button>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <div v-if="!tabAuxAccount" class="gt-empty-state">
         <el-empty description="请在上方选择一个科目查看辅助明细账" :image-size="80" />
       </div>
-      <!-- 加载进度条 -->
-      <div v-else-if="tabLoadProgress.active" class="gt-load-progress">
-        <el-progress :percentage="tabLoadProgress.total ? Math.round(tabLoadProgress.loaded / tabLoadProgress.total * 100) : 0" :stroke-width="6" style="width: 320px" />
-        <span class="gt-load-progress__text">
-          已加载 {{ tabLoadProgress.loaded.toLocaleString() }} / {{ tabLoadProgress.total.toLocaleString() }} 行
-          <template v-if="tabLoadProgress.elapsed > 0">（{{ tabLoadProgress.elapsed }}秒{{ tabLoadEta ? '，' + tabLoadEta : '' }}）</template>
-        </span>
+      <div v-else-if="!tabAuxType" class="gt-empty-state">
+        <el-empty description="请继续选择一个辅助类型，避免跨维度重复累计" :image-size="80" />
       </div>
       <el-table-v2
         v-else-if="tabAuxLedgerDisplay.length > 1000"
@@ -638,7 +641,15 @@
         <el-button size="small" @click="drillToAuxBalance">辅助余额</el-button>
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} 序时账</el-tag>
-        <el-button size="small" @click="loadLedger" :loading="loading">刷新</el-button>
+        <LedgerWindowPager
+          :range-text="mainLedgerWindow.rangeText.value"
+          :has-previous="mainLedgerWindow.hasPrevious.value"
+          :has-next="mainLedgerWindow.hasNext.value"
+          :loading="loading"
+          @previous="moveMainLedgerWindow('previous')"
+          @next="moveMainLedgerWindow('next')"
+        />
+        <el-button size="small" @click="reloadLedgerWindow" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportLedgerExcel">导出Excel</el-button>
         <el-popover v-if="ledgerExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
@@ -654,7 +665,7 @@
               v-for="k in ledgerExtraAllKeys"
               :key="k"
               :model-value="!hiddenExtraCols.has(k)"
-              @change="(v) => toggleExtraCol(k, v as boolean)"
+              @change="toggleExtraCol(k, $event as boolean)"
             >{{ k }}</el-checkbox>
           </div>
         </el-popover>
@@ -677,20 +688,13 @@
           <el-option label="仅贷方" value="credit" />
         </el-select>
         <el-button
-          v-if="ledgerSort"
-          size="small"
-          plain
-          @click="clearLedgerSort"
-          title="清除排序，恢复原始月份小计视图"
-        >清排序</el-button>
-        <el-button
           v-if="ledgerSearchKeyword || ledgerAmountDir !== 'all'"
           size="small"
           plain
           @click="clearLedgerFilters"
         >清筛选</el-button>
         <span class="gt-virtual-stats">
-          {{ ledgerVirtualDisplay.length }} / {{ ledgerDisplay.length }} 行
+          当前窗口 {{ ledgerItems.length.toLocaleString() }} 条 · 借方合计 {{ mainLedgerWindow.summary.value?.debit_total || '0.00' }} · 贷方合计 {{ mainLedgerWindow.summary.value?.credit_total || '0.00' }}
         </span>
       </div>
       <el-table-v2
@@ -703,8 +707,6 @@
         :header-height="40"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="virtualRowEventHandlers"
-        :sort-by="(ledgerSort as any) || undefined"
-        :on-column-sort="onLedgerColumnSort"
         fixed
       />
       <!-- 标准模式（≤1000 行使用 el-table） -->
@@ -763,18 +765,23 @@
           <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
         </el-table-column>
       </el-table>
-      <!-- 明细账已全量加载（运行余额/月小计需跨整账计算），≤1000 行用普通表，
-           >1000 行自动切虚拟滚动；不再做服务端分页（按页算余额会错）。 -->
+      <!-- 每次最多 200 条业务行；余额/月小计由服务端按完整查询口径计算。 -->
     </template>
 
     <!-- ═══ 第三层：凭证分录 ═══ -->
     <template v-if="currentLevel === 'voucher'">
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
-        <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
-        <el-button size="small" plain @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
-        <el-button size="small" type="primary" plain @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
-        <el-button size="small" type="warning" plain @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表">挂凭到底稿</el-button>
+        <el-tag type="info" size="small">凭证 {{ voucherLabel(currentVoucherType, currentVoucher) }}</el-tag>
+        <VoucherLinkTags
+          v-if="!voucherAmbiguity && voucherItems.length"
+          :links="voucherLinks.linksOfKey(currentVoucherEvidenceKey)"
+          :evidence-status="voucherLinks.evidenceStatusOf(currentVoucherEvidenceKey)"
+          @retry="voucherLinks.retryEvidence(currentVoucherEvidenceKey)"
+        />
+        <el-button size="small" plain :disabled="!!voucherAmbiguity" @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
+        <el-button size="small" type="primary" plain :disabled="!!voucherAmbiguity" @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
+        <el-button size="small" type="warning" plain :disabled="!!voucherAmbiguity" @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表（同号多张凭证时先在下方选定一张）">挂凭到底稿</el-button>
         <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportVoucherExcel">导出Excel</el-button>
         <el-popover v-if="voucherExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
@@ -790,13 +797,21 @@
               v-for="k in voucherExtraAllKeys"
               :key="k"
               :model-value="!hiddenExtraCols.has(k)"
-              @change="(v) => toggleExtraCol(k, v as boolean)"
+              @change="toggleExtraCol(k, $event as boolean)"
             >{{ k }}</el-checkbox>
           </div>
         </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
+      <VoucherKeyCandidates
+        v-if="voucherAmbiguity"
+        :candidates="voucherAmbiguity.candidates"
+        :message="voucherAmbiguity.message"
+        :truncated="voucherAmbiguity.truncated"
+        @pick="pickVoucherCandidate"
+      />
       <el-table
+        v-else
         :data="voucherItems"
         border
         stripe
@@ -873,7 +888,15 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} / {{ currentAuxCode }} 辅助明细</el-tag>
-        <el-button size="small" @click="loadAuxLedger" :loading="loading">刷新</el-button>
+        <LedgerWindowPager
+          :range-text="auxDrillWindow.rangeText.value"
+          :has-previous="auxDrillWindow.hasPrevious.value"
+          :has-next="auxDrillWindow.hasNext.value"
+          :loading="loading"
+          @previous="moveAuxDrillWindow('previous')"
+          @next="moveAuxDrillWindow('next')"
+        />
+        <el-button size="small" @click="loadAuxLedger(true)" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportAuxLedgerExcel">导出Excel</el-button>
         <el-popover v-if="auxLedgerExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
@@ -889,7 +912,7 @@
               v-for="k in auxLedgerExtraAllKeys"
               :key="k"
               :model-value="!hiddenExtraCols.has(k)"
-              @change="(v) => toggleExtraCol(k, v as boolean)"
+              @change="toggleExtraCol(k, $event as boolean)"
             >{{ k }}</el-checkbox>
           </div>
         </el-popover>
@@ -950,7 +973,7 @@
           <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
         </el-table-column>
       </el-table>
-      <!-- 辅助明细账已全量加载（运行余额/月小计需跨整账计算），不再做服务端分页。 -->
+      <!-- 辅助明细每次最多 200 条业务行；完整导出走服务端。 -->
     </template>
 
   </div>
@@ -983,6 +1006,7 @@
     :year="year"
     :vouchers="attachVouchers"
     :all-account-codes="attachAllAccountCodes"
+    @attached="onVouchersAttached"
     @navigate-to-wp="onNavigateToWp"
   />
 
@@ -1017,6 +1041,18 @@
          element-loading-background="rgba(255,255,255,0.85)">
     <!-- 步骤1：上传文件 -->
     <div v-if="importStep === 'upload'">
+      <el-alert
+        v-if="incrementalUploadRequest"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <template #title>增量追加不会修改当前账套</template>
+        文件月份：{{ incrementalUploadRequest.filePeriods.join('、') || '待文件解析确认' }}；
+        策略：{{ incrementalUploadRequest.strategy === 'overwrite' ? '重叠月份使用文件版本' : '重叠月份保留上一版本' }}。
+        只有新 staged 完整合并并通过校验后才会激活。
+      </el-alert>
       <el-upload
         ref="uploadRef"
         drag
@@ -1179,6 +1215,19 @@
           </el-table-column>
         </el-table>
       </div>
+
+      <el-alert
+        v-if="incrementalUploadRequest"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-top: 12px"
+      >
+        <template #title>余额表沿用确认</template>
+        <el-checkbox v-model="balanceCarryConfirmed">
+          我已知悉：如果本次文件没有余额表，系统会沿用上一版本余额表；新增月份不会自动改写余额表口径。
+        </el-checkbox>
+      </el-alert>
     </div>
 
     <!-- 步骤3：导入中 -->
@@ -1200,6 +1249,8 @@
         :validation-title="importValidationSummaryTitle"
         :validation-alert-type="importValidationSummaryAlertType"
         :show-success-icon="true"
+        :append-report="importedResult?.append"
+        :voucher-diff="importedResult?.voucher_diff"
         container-style="text-align: center; padding: 30px 0"
         validation-panel-style="margin-top: 16px; text-align: left"
       />
@@ -1235,7 +1286,7 @@
         解析预览
       </el-button>
       <el-button v-if="importStep === 'preview'" @click="importStep = 'upload'">返回修改</el-button>
-      <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" @click="doImport">
+      <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" :disabled="!!incrementalUploadRequest && !balanceCarryConfirmed" @click="doImport">
         确认导入
       </el-button>
       <el-button v-if="importStep === 'importing'" @click="onMoveToBackground">关闭（后台继续）</el-button>
@@ -1341,6 +1392,19 @@
             <el-table-column prop="activated_at" label="激活时间" width="140">
               <template #default="{ row }"><span class="gt-amt">{{ row.activated_at ? new Date(row.activated_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' }}</span></template>
             </el-table-column>
+            <el-table-column label="操作" width="130" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="row.status === 'active' && row.previous_dataset_id"
+                  type="warning"
+                  link
+                  @click="rollbackDataset(row)"
+                >
+                  回滚到上一版本
+                </el-button>
+                <span v-else style="color: var(--gt-color-text-tertiary)">—</span>
+              </template>
+            </el-table-column>
           </el-table>
         </el-tab-pane>
       </el-tabs>
@@ -1349,16 +1413,19 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide, h, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLedgerUrlSync } from '@/composables/useLedgerUrlSync'
 import { Search, Upload, Loading, Warning, Setting, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount, fmtAmountUnit } from '@/utils/formatters'
 import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
+import { appendFormFields, type IncrementalUploadRequest, type LedgerAppendReport, type VoucherDiffReport } from '@/components/ledger-import/ledgerAppendResult'
 import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
 import { buildImportFormData } from '@/utils/importFormData'
 import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
@@ -1367,23 +1434,34 @@ import { applyImportSuccess, resolveImportSuccess } from '@/utils/importSuccess'
 import { resolveImportCompletionToast, resolveImportFailureMessage, shouldFinishImportPolling, hasImportFailed } from '@/utils/useImportJobFlow'
 import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
 import { useImportValidation } from '@/utils/useImportValidation'
-import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
+import { getActiveLedgerDataset, getImportJob, rollbackLedgerDataset, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
-import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDisplay'
+import { materializeLedgerWindow } from '@/utils/ledgerDisplay'
+import { useLedgerWindow } from '@/composables/useLedgerWindow'
+import { downloadLedgerWindow, type LedgerWindowQuery } from '@/services/ledgerWindowApi'
 import { buildExtraColumns, buildClipboardTable, fmtExtraCell } from '@/views/ledgerExtraColumns'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import LedgerWindowPager from '@/components/ledger/LedgerWindowPager.vue'
 import AttachVoucherToWpDialog from '@/views/ledger/AttachVoucherToWpDialog.vue'
+import { attachFailureReason, attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import VoucherKeyCandidates from '@/views/ledger/VoucherKeyCandidates.vue'
+import VoucherLinkTags from '@/views/ledger/VoucherLinkTags.vue'
+import { useVoucherLinkTags } from '@/views/ledger/useVoucherLinkTags'
+import { voucherKeyAmbiguityOf, voucherLabel, type VoucherKeyAmbiguity, type VoucherKeyCandidate } from '@/utils/voucherIdentity'
 // Domain-split composables (platform-global-hardening Req 6.1/6.3)
 import { useLedgerImport } from '@/views/composables/useLedgerImport'
 import { useLedgerBalance, resolveDir as _resolveDir, balanceTip as _balanceTip } from '@/views/composables/useLedgerBalance'
 import { useLedgerNavigation } from '@/views/composables/useLedgerNavigation'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 
 import { handleApiError } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 
 const route = useRoute()
 const router = useRouter()
@@ -1391,12 +1469,16 @@ const { syncToUrl, readFromUrl } = useLedgerUrlSync()
 const penetrate = usePenetrate()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const { onContextChange } = useAuditContext()
+const projectStore = useProjectStore()
 const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => {
-  const q = Number(route.query.year)
-  if (q && q > 2000) return q
-  return null
-})
+// 年度：路由 ?year= → 项目审计年度（DefaultLayout 的 ProjectContextGate 定下来后才挂本页）；都没有为 null，不按日历猜。
+// 原先只读路由：仪表盘、导入完成、报表空态等入口不带 ?year=，四张表请求都缺 year ⇒ 422、整页空白。
+const year = computed<number | null>(() => parseAuditYear(route.query.year) ?? projectStore.year)
+const mainLedgerWindow = useLedgerWindow()
+const tabLedgerWindow = useLedgerWindow()
+const tabAuxWindow = useLedgerWindow()
+const auxDrillWindow = useLedgerWindow()
+const voucherLinks = useVoucherLinkTags(projectId, year) // 已挂 / 已抽于哪些底稿（任务 14，需求 5.2）
 
 // 金额单位（从 active dataset 的 source_summary.amount_unit 读取）
 const amountUnit = ref<string>('')
@@ -1413,7 +1495,8 @@ interface ProjectInfo { id: string; name: string; client_name?: string; wizard_s
 const projectList = ref<ProjectInfo[]>([])
 const currentProject = ref<ProjectInfo | null>(null)
 const selectedProjectId = ref('')
-const selectedYear = ref(2025)
+// 原先 ref(2025)：下面的 watch(immediate) 立即用路由年度覆盖，路由没带时实际是 null（类型却写成 number）
+const selectedYear = ref<number | null>(null)
 
 // 保持 selectedYear 与路由 query.year 同步（切换年度后选择器显示正确年份）
 watch(year, (newYear) => {
@@ -1521,7 +1604,8 @@ async function loadProjectMaterialityAndPeriod() {
     }
   } catch { /* ignore */ }
   try {
-    // 获取重要性水平（含 performance_materiality）
+    // 获取重要性水平（含 performance_materiality）；项目没填审计年度不拼 year=null
+    if (selectedYear.value == null) return
     const mat = await api.get(
       `${P_mat.get(projectId.value)}?year=${selectedYear.value}`
     )
@@ -1533,7 +1617,8 @@ async function loadProjectMaterialityAndPeriod() {
 
 function onProjectChange(newId: string) {
   if (newId && newId !== projectId.value) {
-    router.push({ path: `/projects/${newId}/ledger`, query: { year: String(selectedYear.value) } })
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    router.push({ path: `/projects/${newId}/ledger`, query: selectedYear.value == null ? {} : { year: String(selectedYear.value) } })
   }
 }
 
@@ -1654,6 +1739,10 @@ const validating = ref(false)
 const validateResult = ref<any>(null)
 
 async function runValidation() {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   validating.value = true
   validateDialogVisible.value = true
   validateResult.value = null
@@ -1674,6 +1763,10 @@ const deduping = ref(false)
 
 async function runDedup() {
   if (!projectId.value) return
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   deduping.value = true
   try {
     // 1. 先 dry_run 预览将删除的重复行数
@@ -1721,6 +1814,8 @@ async function runDedup() {
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
+const incrementalUploadRequest = ref<IncrementalUploadRequest | null>(null)
+const balanceCarryConfirmed = ref(false)
 
 // 账表数据管理弹窗
 const dataManagerVisible = ref(false)
@@ -1745,6 +1840,33 @@ async function loadImportHistory() {
   }
 }
 
+async function rollbackDataset(row: { id: string; previous_dataset_id?: string | null }) {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '确认回滚到上一版本？当前版本仍会保留在导入历史中。',
+      '回滚数据集',
+      { type: 'warning', confirmButtonText: '确认回滚', cancelButtonText: '取消' },
+    )
+    await rollbackLedgerDataset(
+      projectId.value,
+      row.id,
+      selectedYear.value,
+      '用户从导入历史回滚',
+    )
+    ElMessage.success('回滚成功，已恢复上一版本账套')
+    await loadImportHistory()
+    await getActiveLedgerDataset(projectId.value, selectedYear.value)
+    onDataChanged()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    handleApiError(error, '回滚')
+  }
+}
+
 function formatRecordSummary(summary: Record<string, unknown> | null | undefined) {
   if (!summary) return '—'
   const parts: string[] = []
@@ -1761,18 +1883,19 @@ function onDataChanged() {
   loadAuxBalance()
 }
 
-function onIncrementalUpload(year: number) {
-  // 用户在数据管理弹窗选了增量追加
+function onIncrementalUpload(request: IncrementalUploadRequest) {
   dataManagerVisible.value = false
+  incrementalUploadRequest.value = request
+  balanceCarryConfirmed.value = false
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
-  importYear.value = year
+  importYear.value = request.year
   ElNotification({
     title: '增量追加模式',
-    message: `请上传 ${year} 年的序时账文件，系统将自动检测并只追加新月份`,
+    message: `请上传 ${request.year} 年文件；新版本会继承未覆盖月份，当前账套在成功激活前不会改动`,
     type: 'info',
-    duration: 5000,
+    duration: 6000,
   })
 }
 const importFiles = ref<File[]>([])
@@ -1802,6 +1925,8 @@ interface LedgerImportResultPayload {
   validation_summary?: ImportValidationSummary
   errors?: string[]
   batch_id?: string | null
+  append?: LedgerAppendReport | null
+  voucher_diff?: VoucherDiffReport | null
 }
 
 const importedResult = ref<LedgerImportResultPayload | null>(null)
@@ -1946,10 +2071,12 @@ function stopImportStatusPolling() {
 }
 
 function openImportDialog(options: { autoRecoverActiveJob?: boolean } = {}) {
+  incrementalUploadRequest.value = null
+  balanceCarryConfirmed.value = false
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
-  importYear.value = selectedYear.value || year.value
+  importYear.value = selectedYear.value || year.value || undefined
   previewResult.value = null
   importedResult.value = null
   uploadToken.value = ''
@@ -2171,6 +2298,11 @@ async function doImport() {
       mappingFieldName: 'custom_mapping',
       mappingPayload: mappingParam,
     })
+    for (const [key, value] of Object.entries(
+      appendFormFields(incrementalUploadRequest.value, balanceCarryConfirmed.value),
+    )) {
+      formData.append(key, value)
+    }
     const url = buildImportJobUrl({
       basePath: P_ledger.smartImport(projectId.value),
       year: yr,
@@ -2208,16 +2340,13 @@ async function doImport() {
       shouldIgnoreError: (error) => (error as Error)?.message === '__ABORTED__',
       onSuccessStatus: (status) => {
         const payload = status?.result
-        const resolvedImportedResult = (payload?.imported && !payload?.validation)
-          ? { imported: payload.imported }
-          : payload
         const importSuccess = resolveImportSuccess({
-          result: resolvedImportedResult,
+          result: payload,
           nextStage: 'done' as const,
         })
         const completionToast = resolveImportCompletionToast(
           status?.message || null,
-          resolvedImportedResult?.validation_summary as any,
+          payload?.validation_summary as any,
         )
         if (completionToast.type === 'warning') {
           ElMessage.warning(completionToast.message)
@@ -2389,8 +2518,10 @@ onContextChange(() => {
   _lastAuxCtx = ctxKey
   if (projectId.value) {
     _auxBalanceLoadedKey.value = ''  // 清除辅助余额表缓存
-    _tabLedgerCache.clear()          // 清除序时账 Tab 缓存
-    _tabAuxLedgerCache.clear()       // 清除辅助明细 Tab 缓存
+    mainLedgerWindow.clear()
+    tabLedgerWindow.clear()
+    tabAuxWindow.clear()
+    auxDrillWindow.clear()
     tabLedgerAccount.value = ''
     tabLedgerItems.value = []
     tabAuxAccount.value = ''
@@ -2461,7 +2592,7 @@ function onContextAction(action: string) {
 
 // ── 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）──
 const attachDialogVisible = ref(false)
-const attachVouchers = ref<Array<{ voucherNo: string; accountCode?: string | null }>>([])
+const attachVouchers = ref<Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; companyCode?: string | null; accountCode?: string | null }>>([])
 /** 当前凭证所有分录涉及的科目编码（去重），供弹窗推荐底稿 */
 const attachAllAccountCodes = ref<string[]>([])
 
@@ -2473,28 +2604,32 @@ function openAttachToWorkpaper(fallbackRow?: any) {
     : (fallbackRow ? [fallbackRow] : [])
 
   const seen = new Set<string>()
-  const list: Array<{ voucherNo: string; voucherDate?: string | null; accountCode?: string | null }> = []
+  const list: Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; companyCode?: string | null; accountCode?: string | null }> = []
   for (const r of pool) {
     const vno = String(r?.voucher_no || '').trim()
     if (!vno) continue
-    // 🔴 去重键必须含日期：凭证号在真实数据中跨日重复（实测单号最多对应 83 个日期），
-    //    只按 voucher_no 去重会把「1月的0075」和「3月的0075」误并成一条，
-    //    导致只挂进去一张、另一张静默丢失。
+    // 🔴 去重键 = 主体 + 日期 + 凭证字 + 号：凭证号跨日重复（单号最多对应 83 个日期），同日同号也可能是
+    //    多张凭证（FY-0003 / ZZ-0003），一套账还可能有两个主体。少一样就会把两张凭证并成一条，只挂进去一张。
     const vdate = normalizeVoucherDate(r?.voucher_date)
-    const key = `${vno}@${vdate || ''}`
+    const vtype = rowVoucherType(r)
+    const key = `${vno}@${vdate || ''}@${vtype ?? '?'}@${r?.company_code ?? '?'}`
     if (seen.has(key)) continue
     seen.add(key)
     list.push({
       voucherNo: vno,
       voucherDate: vdate,
+      voucherType: vtype,
+      companyCode: r?.company_code ?? null,
       accountCode: r?.account_code || currentAccount.value || null,
     })
   }
-  // 凭证层：右键行无 voucher_no 时用当前凭证兜底（带当前穿透的日期）
+  // 凭证层：右键行无 voucher_no 时用当前凭证兜底（带当前穿透的日期与凭证字）
   if (list.length === 0 && currentLevel.value === 'voucher' && currentVoucher.value) {
     list.push({
       voucherNo: currentVoucher.value,
       voucherDate: currentVoucherDate.value || null,
+      voucherType: currentVoucherType.value,
+      companyCode: currentVoucherCompany.value,
       accountCode: currentAccount.value || null,
     })
   }
@@ -2536,6 +2671,8 @@ function attachCurrentVoucher() {
   attachVouchers.value = [{
     voucherNo: currentVoucher.value,
     voucherDate: currentVoucherDate.value || null,
+    voucherType: currentVoucherType.value,
+    companyCode: currentVoucherCompany.value,
     accountCode: currentAccount.value || null,
   }]
   // 从当前凭证所有分录提取涉及的科目（多对多凭证推荐所有相关底稿）
@@ -2543,6 +2680,8 @@ function attachCurrentVoucher() {
   attachDialogVisible.value = true
 }
 
+/** 挂凭后只重查这几张凭证的已挂标识 */
+const onVouchersAttached = (p: { voucherKeys: string[] }) => void voucherLinks.refresh(p.voucherKeys)
 /** 挂凭成功后用户选择跳转到目标底稿 */
 function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: string }) {
   router.push({
@@ -2555,18 +2694,18 @@ function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: 
 const COPY_EXCLUDE_KEYS = ['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra', 'extra_fields']
 
 /** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
-function copySelectedRows(fallbackRow?: any) {
+async function copySelectedRows(fallbackRow?: any) {
   const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
   if (rows.length === 0) return
   const { lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = lines.join('\n')
-  navigator.clipboard?.writeText(text).then(() => {
+  void copyText(text).then(() => {
     ElMessage.success(`已复制 ${rows.length} 行`)
   })
 }
 
 /** 复制本凭证全部分录到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
-function copyCurrentVoucher() {
+async function copyCurrentVoucher() {
   const rows = voucherItems.value.filter(r => r._type !== 'subtotal' && r._type !== 'view_subtotal')
   if (rows.length === 0) {
     ElMessage.warning('本凭证无分录可复制')
@@ -2574,25 +2713,27 @@ function copyCurrentVoucher() {
   }
   const { header, lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = [header, ...lines].join('\n')
-  navigator.clipboard?.writeText(text).then(() => {
+  void copyText(text).then(() => {
     ElMessage.success(`已复制凭证 ${currentVoucher.value} 共 ${rows.length} 条分录`)
   })
 }
 
 /** 抽中本凭证：标记为抽样凭证（用于审计抽凭） */
 async function sampleCurrentVoucher() {
-  if (!currentVoucher.value) return
+  const auditYear = year.value
+  if (!currentVoucher.value || auditYear == null) return
   try {
-    await api.post(`/api/projects/${projectId.value}/ledger/sample-voucher`, {
-      year: year.value,
-      voucher_no: currentVoucher.value,
-      voucher_date: currentVoucherDate.value || null,
-      account_code: currentAccount.value || null,
+    await attachVoucher(projectId.value, {
+      year: auditYear,
+      voucherNo: currentVoucher.value,
+      voucherDate: currentVoucherDate.value || null,
+      voucherType: currentVoucherType.value,
+      companyCode: currentVoucherCompany.value,
+      accountCode: currentAccount.value || null,
     })
-    ElMessage.success(`已将凭证 ${currentVoucher.value} 加入抽样`)
+    ElMessage.success(`已将凭证 ${voucherLabel(currentVoucherType.value, currentVoucher.value)} 加入抽样`)
   } catch (e: any) {
-    // 后端端点未就绪时降级为本地提示（不阻断）
-    ElMessage.warning(`抽样登记失败：${e?.message || '功能待后端支持'}`)
+    ElMessage.warning(`抽样登记失败：${attachFailureReason(e)}`)
   }
 }
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
@@ -2605,12 +2746,23 @@ const currentVoucherMonth = ref<number | null>(null)
 // 🔴 凭证号在真实数据中不唯一（实测 8 个项目里 7 个跨月/跨日重复，单号最多对应
 // 83 个不同日期）。(voucher_date, voucher_no) 才唯一对应一张凭证，故穿透时带上日期。
 const currentVoucherDate = ref<string>('')
+// 凭证字：同日同号也可能是多张凭证（四川物流 2025-01-07 的 FY-0003 与 ZZ-0003）。null = 不知道，
+// 交给后端判断；命中多张时后端回 409 + 候选（voucherCandidates），用户选一张再穿透，不合并分录。
+const currentVoucherType = ref<string | null>(null)
+// 主体：一套账两个主体同日同号同凭证字时（真库 3 个已软删的性能测试项目各 92 组），选候选不带主体会再次 409、永远打不开
+const currentVoucherCompany = ref<string | null>(null)
+const voucherAmbiguity = ref<VoucherKeyAmbiguity | null>(null)
 const currentAuxType = ref('')
 const currentAuxCode = ref('')
 const searchKeyword = ref('')
 const balanceFilter = ref('all')
 const treeMode = ref(false)
-const balanceTab = ref<'account' | 'aux' | 'ledger' | 'aux_detail'>('account')
+type BalanceTab = 'account' | 'aux' | 'ledger' | 'aux_detail'
+const BALANCE_TABS: readonly string[] = ['account', 'aux', 'ledger', 'aux_detail']
+// 切页签会写 URL（多窗口现场恢复），DefaultLayout 按 fullPath 给页面加 key ⇒ 每次切页签都整页重挂、从 URL 恢复。
+// 页签在建实例时就按 URL 定（原先挂载完才恢复：先闪一下科目余额表和「暂无账套数据」）；URL 里的非法值按科目余额表处理
+const _urlBalanceTab = readFromUrl().balanceTab
+const balanceTab = ref<BalanceTab>(BALANCE_TABS.includes(_urlBalanceTab) ? _urlBalanceTab as BalanceTab : 'account')
 const auxSearchKeyword = ref('')
 const auxFilter = ref('all')
 const auxPage = ref(1)
@@ -2618,7 +2770,10 @@ const auxPageSize = ref(100)
 const auxPageSizeOptions = [50, 100, 200, 500]
 const dateRange = ref<string[] | null>(null)
 
-interface Crumb { label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string }
+interface Crumb {
+  label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string
+  voucherDate?: string; voucherType?: string | null; voucherCompany?: string | null; voucherMonth?: number | null
+}
 const breadcrumbs = ref<Crumb[]>([{ label: '账簿查询', level: 'balance' }])
 
 // ── 数据 ──
@@ -2640,9 +2795,7 @@ const ledgerColumnWidths = ref<Record<string, number>>({
   balance: 140,
 })
 
-// 排序状态（key + order）
-type SortOrderEnum = 'asc' | 'desc'
-const ledgerSort = ref<{ key: string; order: SortOrderEnum } | null>(null)
+// 服务端窗口固定采用规范账序；客户端不再对当前窗口局部排序。
 
 // 筛选状态（摘要关键字 + 借/贷方向）
 const ledgerSearchKeyword = ref('')
@@ -2651,7 +2804,7 @@ const ledgerAmountDir = ref<'all' | 'debit' | 'credit'>('all')
 // 虚拟滚动列定义（响应式，重算依赖列宽 + 排序态）
 const ledgerVirtualColumns = computed(() => {
   const w = ledgerColumnWidths.value
-  const sortKey = ledgerSort.value?.key
+  const sortKey: string | undefined = undefined
   // 选择列（自定义渲染 + 表头全选）
   const cols: any[] = [
     {
@@ -2700,7 +2853,7 @@ const ledgerVirtualColumns = computed(() => {
     // 非关键列（导入时保留的 raw_extra 业务字段）动态列：固定列（余额）后追加；空数组自然不产出
     ...ledgerExtraColumns.value.map((k) =>
       makeResizableCol(`ef_${k}`, k, w[`ef_${k}`] ?? 140, sortKey, {
-        // 额外列纯展示：不排序（避免 onLedgerColumnSort 传入 buildLedgerFilteredDisplay 不认的 key）
+        // 额外列纯展示：窗口固定规范账序，不支持把局部页排序伪装成全量排序。
         sortable: false,
         // 额外列视觉区分（Task 8.3*）：与固定列不同底色 class
         class: 'gt-ef-vcell',
@@ -2746,7 +2899,7 @@ function makeResizableCol(
     dataKey: key,
     title: label,
     width,
-    sortable: true,
+    sortable: false,
     ...extra,
     headerCellRenderer: ({ column }: any) =>
       h(
@@ -2787,11 +2940,9 @@ function startColumnResize(event: MouseEvent, columnKey: string, startWidth: num
   document.addEventListener('mouseup', onUp)
 }
 
-/** 表头标题：附加排序箭头指示符 */
-function sortHeader(label: string, currentKey: string | undefined, columnKey: string) {
-  if (currentKey !== columnKey) return label
-  const order = ledgerSort.value?.order
-  return order === 'asc' ? `${label} ▲` : order === 'desc' ? `${label} ▼` : label
+/** 窗口固定规范账序，表头不显示局部排序状态。 */
+function sortHeader(label: string, _currentKey: string | undefined, _columnKey: string) {
+  return label
 }
 
 /** 行唯一标识（用于选择集去重） */
@@ -2852,19 +3003,20 @@ const virtualRowEventHandlers = {
   },
 }
 
-/** 列排序：el-table-v2 onColumnSort 回调 */
-function onLedgerColumnSort({ key, order }: { key: string | number | symbol; order: 'asc' | 'desc' }) {
-  ledgerSort.value = { key: String(key), order }
-}
-
-function clearLedgerSort() {
-  ledgerSort.value = null
-}
-
 function clearLedgerFilters() {
   ledgerSearchKeyword.value = ''
   ledgerAmountDir.value = 'all'
 }
+
+let ledgerFilterTimer: number | null = null
+watch([ledgerSearchKeyword, ledgerAmountDir], () => {
+  if (!_initialized || currentLevel.value !== 'ledger' || !currentAccount.value) return
+  if (ledgerFilterTimer !== null) window.clearTimeout(ledgerFilterTimer)
+  ledgerFilterTimer = window.setTimeout(() => {
+    ledgerFilterTimer = null
+    void loadLedger()
+  }, 250)
+})
 
 function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
   if (rowData._type === 'opening') return 'gt-ledger-opening'
@@ -2872,22 +3024,16 @@ function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
   return ''
 }
 
-/** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
+/** 序时账窗口展示：服务端给运行余额/月小计，浏览器只物化本窗口。 */
 const ledgerDisplay = computed(() =>
-  buildLedgerDisplay(ledgerItems.value, currentAccountOpening.value, {
+  materializeLedgerWindow(mainLedgerWindow.response.value, {
+    includeOpening: mainLedgerWindow.position.value === 0,
     syntheticExtra: { account_code: '' },
   }),
 )
 
-/** 虚拟滚动专用展示：筛选子集重算月小计；排序时附「当前视图合计」 */
-const ledgerVirtualDisplay = computed(() =>
-  buildLedgerFilteredDisplay(ledgerItems.value, currentAccountOpening.value, {
-    keyword: ledgerSearchKeyword.value,
-    amountDir: ledgerAmountDir.value,
-    sort: ledgerSort.value,
-    syntheticExtra: { account_code: '' },
-  }),
-)
+/** 筛选已进入服务端查询，虚拟表不得再对当前窗口做局部重排。 */
+const ledgerVirtualDisplay = computed(() => ledgerDisplay.value)
 
 /**
  * 额外列（extra_fields 业务键）显隐偏好：存「隐藏键集合」到 localStorage（新键默认显示）。
@@ -2921,11 +3067,18 @@ function showAllExtraCols() {
 }
 
 /** 序时账明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
-const ledgerExtraAllKeys = computed(() => buildExtraColumns(ledgerItems.value))
+const ledgerExtraAllKeys = computed(() =>
+  mainLedgerWindow.extraColumns.value.length
+    ? mainLedgerWindow.extraColumns.value
+    : buildExtraColumns(ledgerItems.value),
+)
 /** 序时账明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
 const ledgerExtraColumns = computed(() => visibleExtra(ledgerExtraAllKeys.value))
 
 const voucherItems = ref<any[]>([])
+const currentVoucherEvidenceKey = computed<string | null>(() =>
+  voucherItems.value.find((row: any) => row.voucher_key)?.voucher_key ?? null,
+)
 /** 凭证明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
 const voucherExtraAllKeys = computed(() => buildExtraColumns(voucherItems.value))
 /** 凭证明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
@@ -2936,12 +3089,17 @@ const auxLedgerTotal = ref(0)
 
 /** 辅助明细账增强显示：期初行 + 每笔余额 + 月小计行 */
 /** 辅助明细账「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
-const auxLedgerExtraAllKeys = computed(() => buildExtraColumns(auxLedgerItems.value))
+const auxLedgerExtraAllKeys = computed(() =>
+  auxDrillWindow.extraColumns.value.length
+    ? auxDrillWindow.extraColumns.value
+    : buildExtraColumns(auxLedgerItems.value),
+)
 /** 辅助明细账「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
 const auxLedgerExtraColumns = computed(() => visibleExtra(auxLedgerExtraAllKeys.value))
 
 const auxLedgerDisplay = computed(() =>
-  buildLedgerDisplay(auxLedgerItems.value, currentAuxOpening.value, {
+  materializeLedgerWindow(auxDrillWindow.response.value, {
+    includeOpening: auxDrillWindow.position.value === 0,
     syntheticExtra: { aux_name: '', account_code: '' },
   }),
 )
@@ -3237,7 +3395,8 @@ function ledgerRowFlags(row: any): { icon: string; tip: string }[] {
       flags.push({ icon: '📅', tip: `凭证日期在审计期末最后 6 天内（${row.voucher_date}），属于截止测试关注范围` })
     }
   }
-  return flags
+  const linked = voucherLinks.flagOfRow(row) // 📎 已挂 / 已抽于哪些底稿
+  return linked ? [...flags, linked] : flags
 }
 
 function balanceRowStyle({ row }: { row: any }) {
@@ -3305,6 +3464,7 @@ async function loadBalance() {
 
 /** 从 active dataset 读取金额单位 */
 async function loadAmountUnit() {
+  if (year.value == null) { amountUnit.value = ''; return }
   try {
     const ds = await getActiveLedgerDataset(projectId.value, year.value)
     const unit = ds?.source_summary?.amount_unit || ''
@@ -3343,65 +3503,100 @@ async function checkImportActive() {
  * 后端 get_ledger_entries_cursor 是 keyset 分页，10 万+行性能稳定；
  * 首页返回 total，后续页靠 next_cursor 续取。
  */
-async function fetchAllLedgerEntries(
-  account: string,
-): Promise<{ items: any[]; total: number }> {
-  const all: any[] = []
-  let cursor: string | null = null
-  let total = 0
-  const PAGE = 1000
-  const MAX_PAGES = 200 // 安全上限 20 万行，防异常数据死循环
-  for (let i = 0; i < MAX_PAGES; i++) {
-    const params: any = { year: year.value, limit: PAGE }
-    if (cursor) params.cursor = cursor
-    if (dateRange.value?.length === 2) {
-      params.date_from = dateRange.value[0]
-      params.date_to = dateRange.value[1]
-    }
-    const data: any = await api.get(P_ledger.entries(projectId.value, account), { params })
-    const items = data?.items ?? []
-    all.push(...items)
-    if (data?.total != null) total = data.total
-    if (!data?.has_more || !data?.next_cursor) break
-    cursor = data.next_cursor
+function mainLedgerQuery(): LedgerWindowQuery | null {
+  if (!projectId.value || !year.value || !currentAccount.value) return null
+  return {
+    kind: 'ledger', projectId: projectId.value, year: year.value,
+    accountCode: currentAccount.value, limit: 200,
+    dateFrom: dateRange.value?.[0] || null, dateTo: dateRange.value?.[1] || null,
+    keyword: ledgerSearchKeyword.value || null, amountDir: ledgerAmountDir.value,
   }
-  return { items: all, total: total || all.length }
+}
+
+function syncMainLedgerWindow() {
+  const result = mainLedgerWindow.response.value
+  ledgerItems.value = result?.entries ?? []
+  ledgerTotal.value = result?.summary.total ?? 0
+  currentAccountOpening.value = num(result?.summary.range_opening)
+  ledgerSelectedKeys.value = new Set()
+  selectedRows.value = []
 }
 
 async function loadLedger() {
+  const query = mainLedgerQuery()
+  if (!query) return
   loading.value = true
   try {
-    // 先取期初余额（整期，确保运行余额起点准确），再全量取该科目分录
-    const [obData, { items, total }] = await Promise.all([
-      api.get(P_ledger.openingBalance(projectId.value, currentAccount.value), { params: { year: year.value } }),
-      fetchAllLedgerEntries(currentAccount.value),
-    ])
-    currentAccountOpening.value = num((obData as any)?.opening_balance)
-    ledgerItems.value = items
-    ledgerTotal.value = total
-    // estimated-row-height 模式下虚拟表初次渲染可能滚动偏移，强制回顶
+    await mainLedgerWindow.loadFirst(query)
+    syncMainLedgerWindow()
     nextTick(() => {
       const wrapper = document.querySelector('.el-table-v2 .el-vl__wrapper')
       if (wrapper) wrapper.scrollTop = 0
     })
-  } catch { ledgerItems.value = [] }
+  } catch (e: any) {
+    ledgerItems.value = []
+    ledgerTotal.value = 0
+    handleApiError(e, '加载序时账窗口')
+  } finally { loading.value = false }
+}
+
+async function reloadLedgerWindow() {
+  if (!mainLedgerWindow.response.value) return await loadLedger()
+  loading.value = true
+  try { await mainLedgerWindow.reload(); syncMainLedgerWindow() }
+  catch (e: any) { handleApiError(e, '刷新序时账窗口') }
+  finally { loading.value = false }
+}
+
+async function moveMainLedgerWindow(direction: 'previous' | 'next') {
+  loading.value = true
+  try {
+    await mainLedgerWindow[direction]()
+    syncMainLedgerWindow()
+  } catch (e: any) { handleApiError(e, '序时账翻页') }
   finally { loading.value = false }
 }
 
 async function loadVoucher() {
   loading.value = true
+  voucherAmbiguity.value = null
   try {
     const params: Record<string, unknown> = { year: year.value }
-    // 优先用完整日期（唯一定位一张凭证），无日期时退化为月份过滤
+    // 优先用完整日期，无日期时退化为月份过滤；凭证字已知才传（空串 = 凭证字为空的那张）
     if (currentVoucherDate.value) params.voucher_date = currentVoucherDate.value
     else if (currentVoucherMonth.value != null) params.month = currentVoucherMonth.value
+    if (currentVoucherType.value != null) params.voucher_type = currentVoucherType.value
+    if (currentVoucherCompany.value) params.company_code = currentVoucherCompany.value
+    // _silent：409（命中多张凭证）由本处列候选，其余错误由 handleApiError 提示一次
     const data = await api.get(
       P_ledger.voucher(projectId.value, currentVoucher.value),
-      { params }
+      { params, _silent: true } as any
     )
     voucherItems.value = data ?? []
-  } catch { voucherItems.value = [] }
+  } catch (e: any) {
+    voucherItems.value = []
+    voucherAmbiguity.value = voucherKeyAmbiguityOf(e)
+    if (!voucherAmbiguity.value) handleApiError(e, '加载凭证分录')
+  }
   finally { loading.value = false }
+}
+
+/** 从 409 候选里选一张凭证：带上日期与凭证字重新穿透，并把面包屑改成这张凭证。 */
+function pickVoucherCandidate(c: VoucherKeyCandidate) {
+  currentVoucherDate.value = c.voucher_date
+  currentVoucherType.value = c.voucher_type
+  currentVoucherCompany.value = c.company_code || null
+  currentVoucherMonth.value = Number(c.voucher_date.slice(5, 7)) || null
+  const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
+  if (crumb?.level === 'voucher') {
+    Object.assign(crumb, {
+      label: `凭证 ${voucherLabel(c.voucher_type, c.voucher_no)}（${c.voucher_date}）`,
+      voucherDate: c.voucher_date, voucherType: c.voucher_type, voucherCompany: currentVoucherCompany.value,
+      voucherMonth: currentVoucherMonth.value,
+    })
+  }
+  loadVoucher()
+  _syncLedgerToUrl() // 选定的凭证写进 URL：刷新 / 新窗口打开回到这张凭证，不再列候选
 }
 
 async function loadAuxBalance() {
@@ -3969,31 +4164,13 @@ const tabLedgerDateRange = ref<string[] | null>(null)
 const tabLedgerItems = ref<any[]>([])
 const tabLedgerOpening = ref(0)
 const tabLedgerDisplay = computed(() =>
-  buildLedgerDisplay(tabLedgerItems.value, tabLedgerOpening.value, {
+  materializeLedgerWindow(tabLedgerWindow.response.value, {
+    includeOpening: tabLedgerWindow.position.value === 0,
     syntheticExtra: { account_code: '' },
   }),
 )
 
-// 加载进度状态（序时账 + 辅助明细共用）
-const tabLoadProgress = ref({ loaded: 0, total: 0, elapsed: 0, active: false })
-const _tabLoadTimer = ref<ReturnType<typeof setInterval> | null>(null)
-function _startProgressTimer() {
-  tabLoadProgress.value = { loaded: 0, total: 0, elapsed: 0, active: true }
-  const t0 = Date.now()
-  _tabLoadTimer.value = setInterval(() => {
-    tabLoadProgress.value.elapsed = Math.round((Date.now() - t0) / 1000)
-  }, 500)
-}
-function _stopProgressTimer() {
-  tabLoadProgress.value.active = false
-  if (_tabLoadTimer.value) { clearInterval(_tabLoadTimer.value); _tabLoadTimer.value = null }
-}
-const tabLoadEta = computed(() => {
-  const { loaded, total, elapsed } = tabLoadProgress.value
-  if (!total || !loaded || !elapsed) return ''
-  const remaining = Math.round(((total - loaded) / loaded) * elapsed)
-  return remaining > 0 ? `预计剩余 ${remaining} 秒` : '即将完成'
-})
+// 窗口加载由 useLedgerWindow 管理；不再显示“全量加载 x/total”的误导性进度。
 
 // ── Tab 虚拟滚动勾选状态（序时账 tab + 辅助明细 tab 共用） ──
 const tabSelectedKeys = ref<Set<string>>(new Set())
@@ -4112,15 +4289,6 @@ const tabVirtualRowEventHandlers = {
   },
 }
 
-// 缓存：key = `${account}|${dateFrom}|${dateTo}` → { items, opening }
-const _tabLedgerCache = new Map<string, { items: any[]; opening: number }>()
-
-function _ledgerCacheKey(acct: string) {
-  const df = tabLedgerDateRange.value?.[0] || ''
-  const dt = tabLedgerDateRange.value?.[1] || ''
-  return `${projectId.value}|${year.value}|${acct}|${df}|${dt}`
-}
-
 function switchToLedgerTab() {
   balanceTab.value = 'ledger'
   tabSelectedKeys.value = new Set()
@@ -4129,63 +4297,48 @@ function switchToLedgerTab() {
 }
 
 function onTabLedgerAccountChange() {
+  tabLedgerWindow.clear()
   tabLedgerItems.value = []
   tabLedgerOpening.value = 0
   if (tabLedgerAccount.value) loadTabLedger()
 }
 
-async function loadTabLedger(forceRefresh = false) {
-  if (!tabLedgerAccount.value) return
-  const acct = tabLedgerAccount.value
-  const cacheKey = _ledgerCacheKey(acct)
-
-  // 命中缓存直接返回（刷新按钮传 forceRefresh=true 跳过缓存）
-  if (!forceRefresh && _tabLedgerCache.has(cacheKey)) {
-    const cached = _tabLedgerCache.get(cacheKey)!
-    tabLedgerItems.value = cached.items
-    tabLedgerOpening.value = cached.opening
-    return
+function tabLedgerQuery(): LedgerWindowQuery | null {
+  if (!projectId.value || !year.value || !tabLedgerAccount.value) return null
+  return {
+    kind: 'ledger', projectId: projectId.value, year: year.value,
+    accountCode: tabLedgerAccount.value, limit: 200,
+    dateFrom: tabLedgerDateRange.value?.[0] || null,
+    dateTo: tabLedgerDateRange.value?.[1] || null,
   }
-
-  loading.value = true
-  _startProgressTimer()
-  try {
-    const [obData, entriesData] = await Promise.all([
-      api.get(P_ledger.openingBalance(projectId.value, acct), { params: { year: year.value } }),
-      fetchAllLedgerEntriesForTab(acct),
-    ])
-    const opening = num((obData as any)?.opening_balance)
-    tabLedgerOpening.value = opening
-    tabLedgerItems.value = entriesData.items
-    // 写入缓存
-    _tabLedgerCache.set(cacheKey, { items: entriesData.items, opening })
-  } catch { tabLedgerItems.value = [] }
-  finally { loading.value = false; _stopProgressTimer() }
 }
 
-async function fetchAllLedgerEntriesForTab(account: string): Promise<{ items: any[]; total: number }> {
-  const all: any[] = []
-  let cursor: string | null = null
-  let total = 0
-  const PAGE = 1000
-  const MAX_PAGES = 200
-  for (let i = 0; i < MAX_PAGES; i++) {
-    const params: any = { year: year.value, limit: PAGE }
-    if (cursor) params.cursor = cursor
-    if (tabLedgerDateRange.value?.length === 2) {
-      params.date_from = tabLedgerDateRange.value[0]
-      params.date_to = tabLedgerDateRange.value[1]
-    }
-    const data: any = await api.get(P_ledger.entries(projectId.value, account), { params })
-    all.push(...(data?.items ?? []))
-    if (data?.total != null) total = data.total
-    // 更新进度
-    tabLoadProgress.value.loaded = all.length
-    tabLoadProgress.value.total = total || all.length
-    if (!data?.has_more || !data?.next_cursor) break
-    cursor = data.next_cursor
-  }
-  return { items: all, total: total || all.length }
+function syncTabLedgerWindow() {
+  const result = tabLedgerWindow.response.value
+  tabLedgerItems.value = result?.entries ?? []
+  tabLedgerOpening.value = num(result?.summary.range_opening)
+  tabSelectedKeys.value = new Set()
+  selectedRows.value = []
+}
+
+async function loadTabLedger(forceRefresh: unknown = false) {
+  const query = tabLedgerQuery()
+  if (!query) return
+  loading.value = true
+  try {
+    await tabLedgerWindow.loadFirst(query, forceRefresh === true)
+    syncTabLedgerWindow()
+  } catch (e: any) {
+    tabLedgerItems.value = []
+    handleApiError(e, '加载序时账窗口')
+  } finally { loading.value = false }
+}
+
+async function moveTabLedgerWindow(direction: 'previous' | 'next') {
+  loading.value = true
+  try { await tabLedgerWindow[direction](); syncTabLedgerWindow() }
+  catch (e: any) { handleApiError(e, '序时账翻页') }
+  finally { loading.value = false }
 }
 
 // ── 辅助明细账 Tab 状态 ──
@@ -4197,17 +4350,15 @@ const tabAuxCodeOptions = ref<any[]>([])
 const tabAuxLedgerItems = ref<any[]>([])
 const tabAuxOpening = ref(0)
 const tabAuxLedgerDisplay = computed(() =>
-  buildLedgerDisplay(tabAuxLedgerItems.value, tabAuxOpening.value, {
+  materializeLedgerWindow(tabAuxWindow.response.value, {
+    includeOpening: tabAuxWindow.position.value === 0,
     syntheticExtra: { aux_name: '', account_code: '' },
   }),
 )
+// 明细表 / 凭证层读入后按行上凭证键补查已挂标识（查过的键不再查）
+watch([ledgerItems, auxLedgerItems, tabLedgerItems, tabAuxLedgerItems, voucherItems], lists => lists.forEach(l => void voucherLinks.loadForRows(l)))
 
-// 缓存：key = `${account}|${auxType}|${auxCode}` → { items, opening }
-const _tabAuxLedgerCache = new Map<string, { items: any[]; opening: number }>()
-
-function _auxLedgerCacheKey() {
-  return `${projectId.value}|${year.value}|${tabAuxAccount.value}|${tabAuxType.value}|${tabAuxCode.value}`
-}
+// useLedgerWindow 内部用最多 5 个窗口的 LRU；不再按科目保存无界全量数组。
 
 function switchToAuxDetailTab() {
   balanceTab.value = 'aux_detail'
@@ -4222,6 +4373,7 @@ async function onTabAuxAccountChange() {
   tabAuxTypeOptions.value = []
   tabAuxCodeOptions.value = []
   tabAuxLedgerItems.value = []
+  tabAuxWindow.clear()
   if (!tabAuxAccount.value) return
   // 拉取该科目的辅助余额，提取辅助类型列表
   try {
@@ -4235,67 +4387,59 @@ async function onTabAuxAccountChange() {
     // 缓存辅助余额数据用于后续选编码
     tabAuxCodeOptions.value = rows
   } catch { tabAuxTypeOptions.value = [] }
-  // 选科目后立即加载该科目全部辅助明细
-  loadTabAuxLedger()
+  // 必须先选一个辅助类型：跨类型会把同一凭证按多个维度重复累计。
 }
 
 function onTabAuxTypeChange() {
   tabAuxCode.value = ''
   tabAuxLedgerItems.value = []
-  // 选类型后立即加载该科目+类型的辅助明细
-  loadTabAuxLedger()
+  tabAuxWindow.clear()
+  if (tabAuxType.value) loadTabAuxLedger()
 }
 
 const tabAuxCodeFiltered = computed(() =>
   tabAuxCodeOptions.value.filter((r: any) => r.aux_type === tabAuxType.value),
 )
 
-async function loadTabAuxLedger(forceRefresh = false) {
-  if (!tabAuxAccount.value) return
+function tabAuxQuery(): LedgerWindowQuery | null {
+  if (!projectId.value || !year.value || !tabAuxAccount.value || !tabAuxType.value) return null
+  return {
+    kind: 'aux_ledger', projectId: projectId.value, year: year.value,
+    accountCode: tabAuxAccount.value, auxType: tabAuxType.value,
+    auxCode: tabAuxCode.value || null, limit: 200,
+  }
+}
 
-  const cacheKey = _auxLedgerCacheKey()
-  if (!forceRefresh && _tabAuxLedgerCache.has(cacheKey)) {
-    const cached = _tabAuxLedgerCache.get(cacheKey)!
-    tabAuxLedgerItems.value = cached.items
-    tabAuxOpening.value = cached.opening
+function syncTabAuxWindow() {
+  const result = tabAuxWindow.response.value
+  tabAuxLedgerItems.value = result?.entries ?? []
+  tabAuxOpening.value = num(result?.summary.range_opening)
+  tabSelectedKeys.value = new Set()
+  selectedRows.value = []
+}
+
+async function loadTabAuxLedger(forceRefresh: unknown = false) {
+  const query = tabAuxQuery()
+  if (!query) {
+    tabAuxWindow.clear()
+    tabAuxLedgerItems.value = []
     return
   }
-
   loading.value = true
-  _startProgressTimer()
   try {
-    const all: any[] = []
-    let cursor: string | null = null
-    let total = 0
-    const PAGE = 1000
-    const MAX_PAGES = 200
-    for (let i = 0; i < MAX_PAGES; i++) {
-      const params: any = {
-        year: year.value, limit: PAGE,
-      }
-      if (tabAuxType.value) params.aux_type = tabAuxType.value
-      if (tabAuxCode.value) params.aux_code = tabAuxCode.value
-      if (cursor) params.cursor = cursor
-      const data: any = await api.get(
-        P_ledger.auxEntries(projectId.value, tabAuxAccount.value), { params },
-      )
-      all.push(...(data?.items ?? []))
-      if (data?.total != null) total = data.total
-      tabLoadProgress.value.loaded = all.length
-      tabLoadProgress.value.total = total || all.length
-      if (!data?.has_more || !data?.next_cursor) break
-      cursor = data.next_cursor
-    }
-    // 从辅助余额找期初
-    const matched = tabAuxCodeOptions.value.find(
-      (r: any) => r.aux_type === tabAuxType.value && r.aux_code === tabAuxCode.value
-    )
-    const opening = num(matched?.opening_balance)
-    tabAuxOpening.value = opening
-    tabAuxLedgerItems.value = all
-    _tabAuxLedgerCache.set(cacheKey, { items: all, opening })
-  } catch { tabAuxLedgerItems.value = [] }
-  finally { loading.value = false; _stopProgressTimer() }
+    await tabAuxWindow.loadFirst(query, forceRefresh === true)
+    syncTabAuxWindow()
+  } catch (e: any) {
+    tabAuxLedgerItems.value = []
+    handleApiError(e, '加载辅助明细窗口')
+  } finally { loading.value = false }
+}
+
+async function moveTabAuxWindow(direction: 'previous' | 'next') {
+  loading.value = true
+  try { await tabAuxWindow[direction](); syncTabAuxWindow() }
+  catch (e: any) { handleApiError(e, '辅助明细翻页') }
+  finally { loading.value = false }
 }
 
 /** 从顶层 Tab 的序时账/辅助明细表格双击凭证号穿透到凭证详情 */
@@ -4306,6 +4450,8 @@ function drillToVoucherFromTab(row: any) {
   currentAccount.value = acct
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
+  currentVoucherType.value = rowVoucherType(row)
+  currentVoucherCompany.value = rowVoucherCompany(row)
   const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
   currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
@@ -4314,9 +4460,10 @@ function drillToVoucherFromTab(row: any) {
     { label: `${acct} 序时账`, level: 'ledger', account: acct },
     {
       label: currentVoucherDate.value
-        ? `凭证 ${row.voucher_no}（${currentVoucherDate.value}）`
+        ? `凭证 ${voucherLabel(currentVoucherType.value, row.voucher_no)}（${currentVoucherDate.value}）`
         : `凭证 ${row.voucher_no}`,
       level: 'voucher', voucher: row.voucher_no, voucherDate: currentVoucherDate.value,
+      voucherType: currentVoucherType.value, voucherCompany: currentVoucherCompany.value,
     },
   ]
   loadVoucher()
@@ -4375,79 +4522,47 @@ async function exportBalanceExcel() {
   }
 }
 
-/** 导出序时账为 Excel */
-async function exportLedgerExcel() {
+function saveLedgerBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+async function exportWindowQuery(query: LedgerWindowQuery, fileName: string) {
   try {
-    const params: any = { year: year.value }
-    if (dateRange.value?.length === 2) {
-      params.date_from = dateRange.value[0]
-      params.date_to = dateRange.value[1]
-    }
-    const blobResult = await api.get(
-      P_ledger.exportLedger(projectId.value, currentAccount.value),
-      { params, responseType: 'blob' }
-    )
-    const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
-    const url = URL.createObjectURL(blobData)
-    const a = document.createElement('a')
-    a.href = url
-    const acctLabel = currentAccount.value.replace('*', '')
-    a.download = `序时账_${acctLabel}_${year.value}.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
-  } catch (e: any) {
-    handleApiError(e, '导出')
-  }
+    saveLedgerBlob(await downloadLedgerWindow(query), fileName)
+    ElMessage.success('完整账簿导出成功')
+  } catch (e: any) { handleApiError(e, '导出完整账簿') }
 }
 
-/** 导出序时账 Tab 为 Excel（前端直接导出当前页面数据） */
+/** 导出当前普通序时账查询的完整结果（服务端流式取数）。 */
+async function exportLedgerExcel() {
+  const query = mainLedgerQuery()
+  if (!query) return
+  await exportWindowQuery(query, `序时账_${currentAccount.value.replace('*', '')}_${year.value}.xlsx`)
+}
+
+/** 导出序时账 Tab 的完整查询结果；不依赖当前 200 行窗口。 */
 async function exportTabLedgerExcel() {
-  if (!tabLedgerAccount.value) return
-  const rows = tabLedgerDisplay.value
-  if (rows.length === 0) { ElMessage.warning('暂无数据可导出'); return }
-  const { exportData } = await import('@/composables/useExcelIO')
-  await exportData({
-    data: rows,
-    columns: [
-      { key: 'voucher_date', header: '日期', width: 14 },
-      { key: 'voucher_no', header: '凭证号', width: 10 },
-      { key: 'summary', header: '摘要', width: 50 },
-      { key: 'debit_amount', header: '借方', width: 16 },
-      { key: 'credit_amount', header: '贷方', width: 16 },
-      { key: 'balance', header: '余额', width: 18 },
-    ],
-    numericColumnKeys: ['debit_amount', 'credit_amount', 'balance'],
-    sheetName: `${tabLedgerAccount.value} 序时账`,
-    fileName: `序时账_${tabLedgerAccount.value}_${year.value}.xlsx`,
-    successMessage: `已导出 ${rows.length} 行`,
-  })
+  const query = tabLedgerQuery()
+  if (!query) return
+  await exportWindowQuery(query, `序时账_${tabLedgerAccount.value}_${year.value}.xlsx`)
 }
 
-/** 导出辅助明细账 Tab 为 Excel（前端直接导出当前页面数据） */
+/** 导出辅助明细 Tab 的完整查询结果；不依赖当前窗口。 */
 async function exportTabAuxLedgerExcel() {
-  if (!tabAuxAccount.value) return
-  const rows = tabAuxLedgerDisplay.value
-  if (rows.length === 0) { ElMessage.warning('暂无数据可导出'); return }
-  const { exportData } = await import('@/composables/useExcelIO')
-  await exportData({
-    data: rows,
-    columns: [
-      { key: 'voucher_date', header: '日期', width: 14 },
-      { key: 'voucher_no', header: '凭证号', width: 10 },
-      { key: 'aux_name', header: '辅助名称', width: 20 },
-      { key: 'summary', header: '摘要', width: 50 },
-      { key: 'debit_amount', header: '借方', width: 16 },
-      { key: 'credit_amount', header: '贷方', width: 16 },
-      { key: 'balance', header: '余额', width: 18 },
-    ],
-    numericColumnKeys: ['debit_amount', 'credit_amount', 'balance'],
-    sheetName: `${tabAuxAccount.value}${tabAuxType.value ? ' ' + tabAuxType.value : ''}${tabAuxCode.value ? ' ' + tabAuxCode.value : ''} 辅助明细`,
-    fileName: `辅助明细账_${tabAuxAccount.value}${tabAuxCode.value ? '_' + tabAuxCode.value : ''}_${year.value}.xlsx`,
-    successMessage: `已导出 ${rows.length} 行`,
-  })
+  const query = tabAuxQuery()
+  if (!query) {
+    ElMessage.warning('请先选择辅助类型')
+    return
+  }
+  const suffix = tabAuxCode.value ? `_${tabAuxCode.value}` : ''
+  await exportWindowQuery(query, `辅助明细账_${tabAuxAccount.value}${suffix}_${year.value}.xlsx`)
 }
 
 /** 导出凭证明细为 Excel */
@@ -4471,27 +4586,11 @@ async function exportVoucherExcel() {
   })
 }
 
-/** 导出辅助序时账穿透为 Excel */
+/** 导出辅助穿透的完整查询结果。 */
 async function exportAuxLedgerExcel() {
-  const rows = auxLedgerDisplay.value
-  if (rows.length === 0) { ElMessage.warning('暂无数据可导出'); return }
-  const { exportData } = await import('@/composables/useExcelIO')
-  await exportData({
-    data: rows,
-    columns: [
-      { key: 'voucher_date', header: '日期', width: 14 },
-      { key: 'voucher_no', header: '凭证号', width: 10 },
-      { key: 'aux_name', header: '辅助名称', width: 20 },
-      { key: 'summary', header: '摘要', width: 50 },
-      { key: 'debit_amount', header: '借方', width: 16 },
-      { key: 'credit_amount', header: '贷方', width: 16 },
-      { key: 'balance', header: '余额', width: 18 },
-    ],
-    numericColumnKeys: ['debit_amount', 'credit_amount', 'balance'],
-    sheetName: `${currentAccount.value} ${currentAuxCode.value} 辅助明细`,
-    fileName: `辅助明细_${currentAccount.value}_${currentAuxCode.value}_${year.value}.xlsx`,
-    successMessage: `已导出 ${rows.length} 行`,
-  })
+  const query = auxDrillQuery()
+  if (!query) return
+  await exportWindowQuery(query, `辅助明细_${currentAccount.value}_${currentAuxCode.value}_${year.value}.xlsx`)
 }
 
 function drillToAuxLedgerFromBalance(row: any) {
@@ -4513,32 +4612,41 @@ function drillToAuxLedgerFromBalance(row: any) {
   loadAuxLedger()
 }
 
-async function loadAuxLedger() {
+function auxDrillQuery(): LedgerWindowQuery | null {
+  if (!projectId.value || !year.value || !currentAccount.value || !currentAuxType.value) return null
+  return {
+    kind: 'aux_ledger', projectId: projectId.value, year: year.value,
+    accountCode: currentAccount.value, auxType: currentAuxType.value,
+    auxCode: currentAuxCode.value || null, limit: 200,
+  }
+}
+
+function syncAuxDrillWindow() {
+  const result = auxDrillWindow.response.value
+  auxLedgerItems.value = result?.entries ?? []
+  auxLedgerTotal.value = result?.summary.total ?? 0
+  currentAuxOpening.value = num(result?.summary.range_opening)
+  selectedRows.value = []
+}
+
+async function loadAuxLedger(forceRefresh: unknown = false) {
+  const query = auxDrillQuery()
+  if (!query) return
   loading.value = true
   try {
-    // 全量拉取（运行余额/月小计需跨整账计算，不能按页）
-    const all: any[] = []
-    let cursor: string | null = null
-    let total = 0
-    const PAGE = 1000
-    const MAX_PAGES = 200
-    for (let i = 0; i < MAX_PAGES; i++) {
-      const params: any = {
-        year: year.value, aux_type: currentAuxType.value,
-        aux_code: currentAuxCode.value, limit: PAGE,
-      }
-      if (cursor) params.cursor = cursor
-      const data: any = await api.get(
-        P_ledger.auxEntries(projectId.value, currentAccount.value), { params },
-      )
-      all.push(...(data?.items ?? []))
-      if (data?.total != null) total = data.total
-      if (!data?.has_more || !data?.next_cursor) break
-      cursor = data.next_cursor
-    }
-    auxLedgerItems.value = all
-    auxLedgerTotal.value = total || all.length
-  } catch { auxLedgerItems.value = [] }
+    await auxDrillWindow.loadFirst(query, forceRefresh === true)
+    syncAuxDrillWindow()
+  } catch (e: any) {
+    auxLedgerItems.value = []
+    auxLedgerTotal.value = 0
+    handleApiError(e, '加载辅助明细窗口')
+  } finally { loading.value = false }
+}
+
+async function moveAuxDrillWindow(direction: 'previous' | 'next') {
+  loading.value = true
+  try { await auxDrillWindow[direction](); syncAuxDrillWindow() }
+  catch (e: any) { handleApiError(e, '辅助明细翻页') }
   finally { loading.value = false }
 }
 
@@ -4550,7 +4658,8 @@ function _syncLedgerToUrl() {
     level: currentLevel.value,
     account: currentAccount.value,
     voucherNo: currentVoucher.value,
-    voucherDate: currentVoucherDate.value,
+    voucherDate: currentVoucherDate.value, voucherType: currentVoucherType.value,
+    voucherCompany: currentVoucherCompany.value ?? '',
     dateFrom: dateRange.value?.[0] || '',
     dateTo: dateRange.value?.[1] || '',
     auxType: currentAuxType.value,
@@ -4586,7 +4695,6 @@ function drillToLedger(row: any) {
 
 /** V3 Req 12.2.2: 重置虚拟滚动模式的临时状态（切换账户/穿透时调用） */
 function resetLedgerVirtualState() {
-  ledgerSort.value = null
   ledgerSearchKeyword.value = ''
   ledgerAmountDir.value = 'all'
   ledgerSelectedKeys.value = new Set()
@@ -4603,20 +4711,33 @@ function normalizeVoucherDate(raw: unknown): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ''
 }
 
+/** 行上带了凭证字列就算已知（NULL = 凭证字为空，按空串）；没有这一列返回 null，交给后端判歧义。 */
+function rowVoucherType(row: any): string | null {
+  return row && 'voucher_type' in row ? String(row.voucher_type ?? '').trim() : null
+}
+/** 行上的主体编码；没有这一列或为空返回 null（= 不限主体，交给后端判歧义）。 */
+function rowVoucherCompany(row: any): string | null {
+  return String(row?.company_code ?? '').trim() || null
+}
+
 function drillToVoucher(row: any) {
   if (!row.voucher_no) return
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
+  currentVoucherType.value = rowVoucherType(row)
+  currentVoucherCompany.value = rowVoucherCompany(row)
   const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
   currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
   breadcrumbs.value.push({
     label: currentVoucherDate.value
-      ? `凭证 ${row.voucher_no}（${currentVoucherDate.value}）`
+      ? `凭证 ${voucherLabel(currentVoucherType.value, row.voucher_no)}（${currentVoucherDate.value}）`
       : `凭证 ${row.voucher_no}`,
     level: 'voucher',
     voucher: row.voucher_no,
     voucherDate: currentVoucherDate.value,
+    voucherType: currentVoucherType.value,
+    voucherCompany: currentVoucherCompany.value,
     voucherMonth: currentVoucherMonth.value,
   })
   loadVoucher()
@@ -4657,7 +4778,10 @@ function navigateTo(index: number) {
   currentLevel.value = crumb.level
   if (crumb.level === 'balance') loadBalance()
   else if (crumb.level === 'ledger') { currentAccount.value = crumb.account || ''; loadLedger() }
-  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher() }
+  else if (crumb.level === 'voucher') {
+    currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherType.value = crumb.voucherType ?? null
+    currentVoucherCompany.value = crumb.voucherCompany ?? null; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher()
+  }
   else if (crumb.level === 'aux_balance') { currentAccount.value = crumb.account || ''; loadAuxBalance() }
   else if (crumb.level === 'aux_ledger') {
     currentAccount.value = crumb.account || currentAccount.value
@@ -4672,7 +4796,7 @@ function refresh() {
   if (currentLevel.value === 'balance') {
     loadBalance()
     if (balanceTab.value === 'ledger' && tabLedgerAccount.value) loadTabLedger()
-    else if (balanceTab.value === 'aux_detail' && tabAuxCode.value) loadTabAuxLedger()
+    else if (balanceTab.value === 'aux_detail' && tabAuxType.value) loadTabAuxLedger(true)
   }
   else if (currentLevel.value === 'ledger') loadLedger()
   else if (currentLevel.value === 'voucher') loadVoucher()
@@ -4682,9 +4806,8 @@ function refresh() {
 
 // ── 键盘快捷键：Enter 返回上一级 / Backspace 返回上一页 ──
 function onKeyDown(e: KeyboardEvent) {
-  // 如果焦点在输入框内，不拦截
-  const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
-  if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return
+  // 如果焦点在输入框内，不拦截（表格承接框不算输入框：选中单元格时照常返回）
+  if (isTextEntryTarget(e.target)) return
 
   if (e.key === 'Enter' && currentLevel.value !== 'balance') {
     e.preventDefault()
@@ -4703,6 +4826,9 @@ function onKeyDown(e: KeyboardEvent) {
 }
 onMounted(async () => {
   document.addEventListener('keydown', onKeyDown)
+  // 从 URL 恢复到辅助余额表（切页签后整页重挂 / F5 / 新窗口打开）：先加载它的维度列表和数据。
+  // 原先只恢复页签、不加载 ⇒ 新实例只剩「全部 0」、没有各维度可选（多窗口查账 2026-10-13 起）。
+  if (balanceTab.value === 'aux') await loadAllAuxBalance()
   await loadProjectList()
   await loadCurrentProject()
   await loadAvailableYears()
@@ -4722,10 +4848,12 @@ onMounted(async () => {
     if (urlState.level === 'voucher' && urlState.voucherNo) {
       currentVoucher.value = urlState.voucherNo
       currentVoucherDate.value = urlState.voucherDate
+      currentVoucherType.value = urlState.voucherType ?? null // 现场带凭证字 / 主体：同日同号多张时不再先弹候选
+      currentVoucherCompany.value = urlState.voucherCompany || null
       breadcrumbs.value = [
         { label: '账簿查询', level: 'balance' },
         { label: `${urlState.account} 序时账`, level: 'ledger', account: urlState.account },
-        { label: `凭证 ${urlState.voucherNo}`, level: 'voucher', voucher: urlState.voucherNo, voucherDate: urlState.voucherDate },
+        { label: `凭证 ${voucherLabel(currentVoucherType.value, urlState.voucherNo)}`, level: 'voucher', voucher: urlState.voucherNo, voucherDate: urlState.voucherDate, voucherType: currentVoucherType.value, voucherCompany: currentVoucherCompany.value },
       ]
       loadVoucher()
     } else if (urlState.level === 'ledger') {
@@ -4754,21 +4882,7 @@ onMounted(async () => {
     // 数据溯源：从试算表跳转过来时自动定位到指定科目（保留旧行为）
     _scrollToAccount(route.query.account as string)
   }
-  if (urlState.balanceTab !== 'account') {
-    // URL 恢复现场（?balanceTab=aux 等）：只赋值不会触发数据加载——
-    // 数据加载全挂在 tab 点击事件（switchToAuxTab 等）上。
-    // 🔴 2026-10-27：此前这里缺数据加载 → 打开查账/刷新恢复到辅助余额表 tab 时
-    // 一直空态，要手动点一次别的 tab 再点回来（或点「刷新」）才有数据。
-    const restoredTab = urlState.balanceTab
-    balanceTab.value = restoredTab as any
-    if (restoredTab === 'aux' && !_auxLoadInflight) {
-      loadAllAuxBalance()
-    } else if (restoredTab === 'ledger' && !tabLedgerAccount.value) {
-      // 序时账 tab 恢复：无指定科目时由用户自行选择，避免误加载全量
-    } else if (restoredTab === 'aux_detail' && !tabAuxCode.value) {
-      // 辅助明细 tab 恢复：同上
-    }
-  }
+  // 页签已在建实例时按 URL 定好（见 balanceTab 声明处），辅助余额表的数据在 onMounted 开头加载，这里不再恢复
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
@@ -4776,8 +4890,11 @@ onUnmounted(() => {
 onBeforeUnmount(() => {
   // 需求 22.1：组件卸载时清理导入状态轮询定时器
   stopImportStatusPolling()
-  // 清理加载进度定时器
-  _stopProgressTimer()
+  // 清理窗口筛选防抖
+  if (ledgerFilterTimer !== null) {
+    window.clearTimeout(ledgerFilterTimer)
+    ledgerFilterTimer = null
+  }
   // 清理完成提示延时器（防止销毁后回调误触发）
   if (_completionPromptTimer !== null) {
     clearTimeout(_completionPromptTimer)
@@ -4918,7 +5035,7 @@ onBeforeUnmount(() => {
   font-size: 10px /* allow-px: special */;
   line-height: 1.4;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   display: block;
 }
 :deep(.gt-summary-col .cell) {
@@ -4968,12 +5085,12 @@ onBeforeUnmount(() => {
   border: 1px solid var(--gt-color-border, #e4e7ed);
   border-bottom: none;
   border-radius: 4px 4px 0 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-virtual-toolbar .gt-virtual-stats {
   margin-left: auto;
   color: var(--gt-color-text-secondary, #909399);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-ledger-vrow-checkbox {
   cursor: pointer;

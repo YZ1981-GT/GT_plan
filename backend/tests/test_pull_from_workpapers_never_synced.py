@@ -9,7 +9,8 @@
 
 测试方式：TestClient 真发请求（只 override `get_current_user` / `get_db`，
 让 `require_project_access("edit")` 照常执行）。两向：
-1. 表格带同步指纹 `_last_sync_wp_id` 的章节 → 被标记（`_last_sync_at` 刷新）；
+1. 表格带同步指纹 `_last_sync_wp_id` 的章节 → 补 `_source=workpaper` 并由路由提交（2026-10-26 起不再改写
+   `_last_sync_at`：没有同步就不算同步，spec note-pull-header-formula-closure R2）；
 2. 从未同步的章节 → `table_data` 逐键不变，计入 `skipped_never_synced`。
 """
 from __future__ import annotations
@@ -41,9 +42,10 @@ _NEVER_SYNCED_TD = {
     ],
     "headers": ["项目", "期末余额", "期初余额"],
 }
+# 同步过（有指纹）但缺 `_source` 标记：端点补标记并提交后，另开会话才读得到（路由漏 commit 会打红）
 _SYNCED_TD = {
-    "_source": "workpaper",
     "_last_sync_wp_id": str(uuid.uuid4()),
+    "_last_sync_at": "2026-10-01T00:00:00+00:00",
     "sub_table_data": {"应收账款": [{"label": "1年以内", "end_amount": 100.0}]},
 }
 
@@ -126,8 +128,9 @@ async def test_synced_section_still_gets_marked(env):
     assert r.status_code == 200, r.text
     assert r.json()["synced"] == 1
     td = await _td(factory, pid, "八、5")
-    assert td["_source"] == "workpaper"
-    assert td.get("_last_sync_at"), "同步过的章节未刷新 _last_sync_at"
+    assert td.get("_source") == "workpaper", "同步过的章节没补上来源标记（或路由没提交）"
+    # 2026-10-26 起不再每次刷新改写同步时间：没有同步就不算同步（spec note-pull-header-formula-closure R2）
+    assert td.get("_last_sync_at") == _SYNCED_TD["_last_sync_at"], "没有同步却改了同步时间"
     assert td["sub_table_data"] == _SYNCED_TD["sub_table_data"], "同步过的章节表格被改动"
 
 
@@ -138,5 +141,9 @@ async def test_single_section_mode_obeys_same_rule(env):
         f"/api/disclosure-notes/{pid}/2025/pull-from-workpapers", params={"note_section": "八、1"},
     )
     assert r.status_code == 200, r.text
-    assert r.json() == {"synced": 0, "skipped": 0, "skipped_never_synced": 1}
+    body = r.json()
+    assert {k: body[k] for k in ("synced", "skipped", "skipped_never_synced")} == {
+        "synced": 0, "skipped": 0, "skipped_never_synced": 1}
+    assert [s["section"] for s in body["sections"]] == ["八、1"], "单章节模式只处理该章节"
+    assert body["push"]["wp_codes"] == ["E1"], "单章节模式只推该章节对应的底稿"
     assert "_source" not in await _td(factory, pid, "八、1")

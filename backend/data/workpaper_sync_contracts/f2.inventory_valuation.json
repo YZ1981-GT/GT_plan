@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "b11cc9ef10dcc637994510194b15e835182ed86a9e9a89429c7cf7b3c51ad4a5",
+  "instrumentation_definition_sha256": "871706a2116bda08ab40cccf22adc28d28eb2c729f02d54301540201b207f7d2",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f2-inventory-valuation",
@@ -41,13 +41,13 @@
                 "column": "A",
                 "row_from": "row_identity"
               },
-              "column_key": "item_code",
+              "column_key": "category",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!A6",
-              "header_text": "存货编号",
-              "json_pointer": "/rows/{row_uuid}/itemCode",
+              "header_text": "存货类别",
+              "json_pointer": "/rows/{row_uuid}/category",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!A7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/item_code",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/category",
               "store_item_id": "F2-48-rows",
               "value_type": "text"
             },
@@ -56,13 +56,13 @@
                 "column": "B",
                 "row_from": "row_identity"
               },
-              "column_key": "item_name",
+              "column_key": "item_code",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!B6",
-              "header_text": "存货名称",
-              "json_pointer": "/rows/{row_uuid}/itemName",
+              "header_text": "存货编码",
+              "json_pointer": "/rows/{row_uuid}/itemCode",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!B7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/item_name",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/item_code",
               "store_item_id": "F2-48-rows",
               "value_type": "text"
             },
@@ -71,13 +71,13 @@
                 "column": "C",
                 "row_from": "row_identity"
               },
-              "column_key": "spec",
+              "column_key": "item_name",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!C6",
-              "header_text": "规格型号",
-              "json_pointer": "/rows/{row_uuid}/spec",
+              "header_text": "存货名称",
+              "json_pointer": "/rows/{row_uuid}/itemName",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!C7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/spec",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/item_name",
               "store_item_id": "F2-48-rows",
               "value_type": "text"
             },
@@ -86,13 +86,13 @@
                 "column": "D",
                 "row_from": "row_identity"
               },
-              "column_key": "unit",
+              "column_key": "specification",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!D6",
-              "header_text": "计量单位",
-              "json_pointer": "/rows/{row_uuid}/unit",
+              "header_text": "存货规格",
+              "json_pointer": "/rows/{row_uuid}/specification",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!D7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/unit",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/specification",
               "store_item_id": "F2-48-rows",
               "value_type": "text"
             },
@@ -101,28 +101,28 @@
                 "column": "E",
                 "row_from": "row_identity"
               },
-              "column_key": "qty",
+              "column_key": "unit",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!E6",
-              "header_text": "数量",
-              "json_pointer": "/rows/{row_uuid}/qty",
+              "header_text": "存货单位",
+              "json_pointer": "/rows/{row_uuid}/unit",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!E7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/qty",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/unit",
               "store_item_id": "F2-48-rows",
-              "value_type": "amount"
+              "value_type": "text"
             },
             {
               "cell": {
                 "column": "F",
                 "row_from": "row_identity"
               },
-              "column_key": "unit_cost",
+              "column_key": "qty",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!F6",
-              "header_text": "单位成本",
-              "json_pointer": "/rows/{row_uuid}/unitCost",
+              "header_text": "结存数量",
+              "json_pointer": "/rows/{row_uuid}/qty",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!F7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/unit_cost",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/qty",
               "store_item_id": "F2-48-rows",
               "value_type": "amount"
             },
@@ -131,13 +131,13 @@
                 "column": "G",
                 "row_from": "row_identity"
               },
-              "column_key": "book_amt",
+              "column_key": "unit_price",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!G6",
-              "header_text": "账面金额",
-              "json_pointer": "/rows/{row_uuid}/bookAmt",
+              "header_text": "结存单价",
+              "json_pointer": "/rows/{row_uuid}/unitPrice",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!G7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/book_amt",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/unit_price",
               "store_item_id": "F2-48-rows",
               "value_type": "amount"
             },
@@ -146,13 +146,13 @@
                 "column": "H",
                 "row_from": "row_identity"
               },
-              "column_key": "aging_amt",
+              "column_key": "ending_amount",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!H6",
-              "header_text": "库龄金额",
-              "json_pointer": "/rows/{row_uuid}/agingAmt",
+              "header_text": "结存金额",
+              "json_pointer": "/rows/{row_uuid}/endingAmount",
               "mode": "formula",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!H7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_amt",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/ending_amount",
               "store_item_id": "F2-48-rows",
               "value_type": "amount"
             },
@@ -161,75 +161,90 @@
                 "column": "I",
                 "row_from": "row_identity"
               },
-              "column_key": "aging_desc",
+              "column_key": "aging_within_1y",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!I6",
-              "header_text": "库龄说明",
-              "json_pointer": "/rows/{row_uuid}/agingDesc",
+              "header_text": "1年以内",
+              "json_pointer": "/rows/{row_uuid}/aging/within1y",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!I7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_desc",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_within_1y",
               "store_item_id": "F2-48-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
                 "column": "J",
                 "row_from": "row_identity"
               },
-              "column_key": "status",
+              "column_key": "aging_1y_to_2y",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!J6",
-              "header_text": "品质状况",
-              "json_pointer": "/rows/{row_uuid}/status",
+              "header_text": "1-2年",
+              "json_pointer": "/rows/{row_uuid}/aging/y1to2",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!J7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/status",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_1y_to_2y",
               "store_item_id": "F2-48-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
                 "column": "K",
                 "row_from": "row_identity"
               },
-              "column_key": "reason",
+              "column_key": "aging_2y_to_3y",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!K6",
-              "header_text": "形成原因",
-              "json_pointer": "/rows/{row_uuid}/reason",
+              "header_text": "2-3年",
+              "json_pointer": "/rows/{row_uuid}/aging/y2to3",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!K7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/reason",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_2y_to_3y",
               "store_item_id": "F2-48-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
                 "column": "L",
                 "row_from": "row_identity"
               },
-              "column_key": "plan",
+              "column_key": "aging_over_3y",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!L6",
-              "header_text": "处理计划",
-              "json_pointer": "/rows/{row_uuid}/plan",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/aging/over3y",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!L7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/plan",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_over_3y",
               "store_item_id": "F2-48-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
                 "column": "M",
                 "row_from": "row_identity"
               },
-              "column_key": "remark",
+              "column_key": "impairment_signs",
               "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!M6",
-              "header_text": "备注",
-              "json_pointer": "/rows/{row_uuid}/remark",
+              "header_text": "是否存在过时冷背呆滞等各种减值迹象",
+              "json_pointer": "/rows/{row_uuid}/impairmentSigns",
               "mode": "editable",
               "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!M7",
-              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/remark",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/impairment_signs",
               "store_item_id": "F2-48-rows",
               "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "provision_amount",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!N6",
+              "header_text": "计提跌价金额",
+              "json_pointer": "/rows/{row_uuid}/provisionAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!N7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/provision_amount",
+              "store_item_id": "F2-48-rows",
+              "value_type": "amount"
             }
           ],
           "footer_anchor": {

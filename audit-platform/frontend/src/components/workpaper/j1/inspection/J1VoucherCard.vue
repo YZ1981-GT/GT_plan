@@ -75,7 +75,10 @@
 
         <!-- 证据区：各外部单据独立字段 + 📎上传OCR -->
         <div class="jvc-evidence">
-          <div class="jvc-ev-title">外部单据核对（每份单据有独立字段，📎 上传自动 OCR 识别回填）</div>
+          <div class="jvc-ev-title">
+            外部单据核对（每份单据有独立字段，📎 上传自动 OCR 识别回填）
+            <RowEvidenceEye v-if="wpId && evidenceSheet" :project-id="projectId" :wp-id="wpId" :sheet-key="evidenceSheet" :cell-ref="rowEvidenceCell(row.id)" />
+          </div>
 
           <!-- 贷方：职工薪酬计算表 -->
           <div v-if="direction === 'credit'" class="jvc-doc">
@@ -150,6 +153,8 @@
 import { ref, computed } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
 import type { K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 // row 上会有 useK1VoucherCheck 之外的扩展字段（staffCount/approver/sampleSource/attachments/evidence）
 interface J1Evidence {
@@ -173,6 +178,10 @@ const props = defineProps<{
   isReadonly: boolean
   ocrLoadingId: string | null
   defaultExpanded?: boolean
+  /** 本笔凭证的识别附件小眼睛（表页键 + `row:{行 id}`）；不传 wpId 则不显示 */
+  wpId?: string
+  projectId?: string
+  evidenceSheet?: string
 }>()
 
 const emit = defineEmits<{

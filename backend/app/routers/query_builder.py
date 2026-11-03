@@ -2,8 +2,9 @@
 
 POST /api/query/preview      预览生成的 SQL（不执行）
 POST /api/query/execute      执行查询，返回结构化结果
-POST /api/query/export-excel 执行查询并导出 Excel
+POST /api/query/export-excel 导出全部（服务端流式、不分页；> 1,000,000 行 400，不截断）
 GET  /api/query/schema       返回白名单表/字段元信息（前端用于构造可视化选择器）
+GET  /api/query/access       当前用户能否使用构建器、作用域内项目数与置灰原因（前端入口与后端判定同源）
 
 设计要点：
 - 仅允许查询白名单的只读 audit/财务表（trial_balance / working_paper / wp_index /
@@ -12,7 +13,8 @@ GET  /api/query/schema       返回白名单表/字段元信息（前端用于�
 - 完全使用 SQLAlchemy core `select()` 按列引用构造，**不做字符串拼接**，
   绑定参数走 SQLAlchemy bindparam，杜绝 SQL 注入
 - 字段名/表名/操作符/排序方向通过白名单核对后才写入 query
-- 仅 admin / manager 可访问
+- 准入：系统角色 admin / partner / manager，或任一未删除项目的项目经理 / 合伙人（edit 级）
+  （``services/custom_query/builder_access``，ADR-AQL-08）；能查哪些项目由构建器作用域决定
 - 不暴露 user / role / token / auth 表
 
 注册到 router_registry.system 域 §117。
@@ -22,12 +24,12 @@ Validates: requirements §三 · S-3 高级查询构建器
 
 from __future__ import annotations
 
-import io
+import asyncio
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,19 +38,27 @@ from app.deps import get_current_user
 from app.models.core import User
 # 白名单单一真源在 services/custom_query/table_whitelist；DSL→SQL 构建在
 # services/custom_query/builder_dsl（见下方 re-export 段）。router 只保留 HTTP 层。
+from app.services.custom_query.builder_access import (
+    FORBIDDEN_REASON,
+    SYSTEM_BUILDER_ROLES,
+    builder_admission,
+    resolve_builder_access,
+)
+from app.services.custom_query.acnr_target_values import acnr_sheet, plan_builder_targets, with_acnr_results
+from app.services.custom_query import count_token as count_tokens
 from app.services.custom_query.builder_scope import (
+    BuilderScope,
     resolve_builder_scope,
     scope_signature,
 )
 from app.services.custom_query.execution_guard import (
-    EXPORT_TIMEOUT_MS,
     QUERY_TIMEOUT_MS,
     cancellable_query,
 )
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
+    BUILDER_UI_OPERATORS,
     JOIN_WHITELIST,
-    OPERATOR_WHITELIST,
     PII_ALLOWED_ROLES,
     TABLE_WHITELIST,
     visible_fields_for_role,
@@ -57,45 +67,47 @@ from app.services.custom_query.table_whitelist import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/query", tags=["query-builder"])
+SUCCESS_AUDIT_TIMEOUT_S = 1.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# RBAC：仅 admin / manager / partner（partner ⊃ manager 权限超集）可访问
+# 准入：系统角色 admin / manager / partner，或任一未删除项目的项目经理 / 合伙人（edit 级）
 # ─────────────────────────────────────────────────────────────────────────────
 def _get_role_value(user: User) -> str:
     role = getattr(user, "role", "")
     return role.value if hasattr(role, "value") else str(role)
 
 
-# 白名单构建器可访问角色（R11.2）：admin / manager；partner 为 manager 权限超集，
-# 平台既有约定纳入（signing partner 亦可用构建器）。auditor / qc / readonly 等
-# 其余已认证角色一律 403 ROLE_FORBIDDEN（R11.3）。
-_QUERY_BUILDER_ROLES = ("admin", "manager", "partner")
+# 凭系统角色即可使用构建器的角色（R11.2）：真源在 builder_access，此处引用同一对象。
+# 系统角色不在其中的用户，凭项目成员行（项目经理 / 合伙人、edit 级）也可使用（AQ-21）。
+_QUERY_BUILDER_ROLES = SYSTEM_BUILDER_ROLES
+
+
+def _forbidden() -> HTTPException:
+    return HTTPException(status_code=403, detail={"error_code": "ROLE_FORBIDDEN", "message": FORBIDDEN_REASON})
 
 
 def _require_admin_or_manager(user: User) -> None:
-    """角色门禁纯函数（保留供内部/测试直接调用）。
+    """系统角色门禁纯函数（不含项目经理分支，保留供内部 / 测试直接调用）。
 
     error_code 对齐 design.md Error Handling 表：构建器角色不足 → ``ROLE_FORBIDDEN`` 403。
     """
-    role = _get_role_value(user)
-    if role not in _QUERY_BUILDER_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail={"error_code": "ROLE_FORBIDDEN",
-                    "message": "高级查询构建器仅 admin / manager 可访问"},
-        )
+    if _get_role_value(user) not in _QUERY_BUILDER_ROLES:
+        raise _forbidden()
 
 
-def require_query_builder_access(
+async def require_query_builder_access(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    """FastAPI 依赖：白名单构建器统一角色门禁（R11.2 / R11.3）。
+    """FastAPI 依赖：白名单构建器统一准入门禁（R3.6 / R11.2 / R11.3）。
 
-    作为 Whitelist_Query_Builder 全部端点的单点准入依赖注入。未认证请求由
-    ``get_current_user`` 先行拦截（R11.4）；已认证但角色不足 → 403 ``ROLE_FORBIDDEN``。
+    作为 Whitelist_Query_Builder 全部端点的单点准入依赖注入，判定只在 ``builder_access.builder_admission``
+    （与 ``GET /api/query/access`` 同一实现）。未认证请求由 ``get_current_user`` 先行拦截（R11.4）；已认证但没有准入
+    → 403 ``ROLE_FORBIDDEN``（中文原因含合伙人与项目经理，AQ-29）。
     """
-    _require_admin_or_manager(current_user)
+    if not (await builder_admission(current_user, db)).allowed:
+        raise _forbidden()
     return current_user
 
 
@@ -108,12 +120,14 @@ def require_query_builder_access(
 # 此处 re-export，保持 `from app.routers.query_builder import QueryDSL,
 # _build_select` 等既有导入与测试不变。
 # ─────────────────────────────────────────────────────────────────────────────
-from app.services.custom_query.builder_dsl import (  # noqa: E402
+from app.services.custom_query.builder_dsl import (  # noqa: E402, F401
+    ExportDSL,
     FilterCond,
     OrderBy,
     QueryDSL,
     _build_filter,
     _build_select,
+    build_count,
     _coerce_value,
     _excel_cell_value,
     _resolve_column,
@@ -154,9 +168,11 @@ async def get_schema(
                         "target_table": target,
                         "target_label": TABLE_WHITELIST[target]["label"],
                         "on": [
-                            {"left_field": l, "right_field": r}
-                            for l, r in spec["on"]
+                            {"left_field": left_name, "right_field": right_name}
+                            for left_name, right_name in spec["on"]
                         ],
+                        # many_to_one / one_to_many：一对多的关联会放大结果行数（R3.4）
+                        "cardinality": spec["cardinality"],
                     }
                     for target, spec in JOIN_WHITELIST.get(name, {}).items()
                     if target in TABLE_WHITELIST
@@ -164,9 +180,39 @@ async def get_schema(
             }
             for name, meta in TABLE_WHITELIST.items()
         ],
-        "operators": sorted(OPERATOR_WHITELIST),
+        "operators": sorted(BUILDER_UI_OPERATORS),
         "aggregates": sorted(AGGREGATE_WHITELIST),
     }
+
+
+@router.get("/access")
+async def get_access(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """当前用户能否使用构建器（前端入口据此置灰并显示原因，与后端门禁同一判定，R3.6）。
+
+    返回 ``allowed`` / ``basis`` / ``reason`` / ``all_projects`` / ``accessible_project_count``：admin / partner 不限项目
+    （计数为 null）；其余身份的计数按构建器作用域计（与执行时同一函数），为 0 时 ``reason`` 写明原因。
+    """
+    return (await resolve_builder_access(current_user, db)).to_dict()
+
+
+async def _builder_scope(
+    body: QueryDSL, *, user: User, db: AsyncSession, requested_project_id: Any, year: int | None
+) -> BuilderScope:
+    """解析作用域；人员表角色门（``TABLE_ROLE_FORBIDDEN``）等可区分拒绝记审计后原样上抛（R5.5）。"""
+    try:
+        return await resolve_builder_scope(
+            user=user,
+            dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
+            requested_project_id=requested_project_id,
+            year=year,
+            db=db,
+        )
+    except HTTPException as http_exc:
+        await _audit_query_rejection(http_exc, user=user, table=body.table)
+        raise
 
 
 @router.post("/preview")
@@ -181,21 +227,21 @@ async def preview_query(
     「预览无 WHERE project_id」正是本次改造前实测到的现象。
     """
     warnings: list[str] = []
-    scope = await resolve_builder_scope(
-        user=current_user,
-        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
-        db=db,
+    scope = await _builder_scope(
+        body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
+    acnr = await plan_builder_targets(body, db=db)  # 只解析不取值（acnr design §2.2）
     stmt, column_names = _build_select(
         body, scope=scope, role=_get_role_value(current_user), warnings=warnings
     )
-    return {
+    payload = {
         "sql": _stmt_to_sql(stmt),
         "columns": column_names,
         "table": body.table,
         "scope": scope.describe(),
         "warnings": warnings,
     }
+    return payload if acnr is None else {**payload, "acnr_resolved": await acnr.preview(db)}
 
 
 async def _audit_query_rejection(
@@ -218,35 +264,72 @@ async def _audit_query_rejection(
     )
 
 
+async def _audit_query_success(
+    body: QueryDSL,
+    *,
+    user: User,
+    scope: BuilderScope,
+    total: int,
+    cache_hit: bool,
+    db: AsyncSession,
+) -> None:
+    """成功查询留痕；值只用于节流摘要，审计明细不复制业务数据。"""
+    try:
+        dialect = str(db.get_bind().dialect.name).lower()
+    except Exception:
+        return
+    if dialect not in {"postgres", "postgresql"}:
+        return
+
+    from app.core.redis import get_redis
+    from app.services.custom_query.audit_helper import record_query_execution
+
+    try:
+        definition = body.model_dump(mode="json", exclude={"count_token"})
+
+        async def record() -> None:
+            redis = await get_redis()
+            await record_query_execution(
+                redis=redis,
+                user_id=user.id,
+                source=f"builder:{body.table}",
+                filters={"definition": definition},
+                project_id=body.project_id,
+                action="custom_query.builder_execute",
+                details={
+                    "table": body.table,
+                    "scope": scope.describe(),
+                    "row_count": int(total),
+                    "condition_count": len(body.filters),
+                    "condition_fields": sorted({item.field for item in body.filters}),
+                    "join_count": len(body.joins),
+                    "aggregate_count": len(body.aggregates),
+                    "cross_project": body.project_id is None,
+                    "cache_hit": cache_hit,
+                },
+            )
+
+        await asyncio.wait_for(record(), timeout=SUCCESS_AUDIT_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 — 只读查询不因审计通道故障失败
+        logger.warning("query_builder 成功审计写入失败: %s", exc)
+
+
 def _derive_formula_refs(table: str, rows: list[dict]) -> list[str | None]:
-    """为查询结果每行派生可用的公式引用语法（无法定位返回 None）。
+    """为查询结果每行派生可用的公式引用语法（无法定位返回 None；R3.7，ADR-AQL-18）。
 
-    打通高级查询（自由 SQL 探查）与结构化公式引用层：
-    - trial_balance → ``TB('{standard_account_code}','审定数')``
-    - tb_balance    → ``TB('{standard_account_code}','期末')``
+    只给试算表行：``TB('{standard_account_code}','审定数')``，与 ``address_registry.formula_ref_to_uri`` 的 ref 语法
+    一致，前端可直接校验或复制进公式编辑器。
 
-    与 ``address_registry.formula_ref_to_uri`` 的 ref 语法保持一致，
-    前端可直接把 ref 丢给 useAddressRegistry.resolve/validate 或复制进公式编辑器。
-    其余表（working_paper/report_config 等）暂无稳定单值定位语义，返回 None。
-
-    Req 21.3（grammar_v1 契约）：此处产出的 ``TB('{code}','审定数')`` /
-    ``TB('{code}','期末')`` 均为 grammar_v1-valid 的 TB 域 ref —— TB 是非 wp 域，
-    经 ``acnr.resolver.full_resolve`` 的 V1 delegation（``_delegate_v1`` →
-    ``address_registry.formula_ref_to_uri`` → ``tb://{code}#{col}``）解析为
-    ``found=True``（非 null），不会产出畸形 ref。两种列名（审定数/期末）都仅作为 URI
-    的 ``#cell`` 段透传，解析恒成立。契约由 task 34.2 的公式构造 grammar_v1 断言测试统一覆盖。
+    科目余额表（tb_balance）行不再生成（AQ-27）：原先给的 ``TB('{客户科目码}','期末')`` 有两处错——TB 域按**标准**科目码
+    取数（客户科目码不属于 TB 域），「期末」也不是试算表列名（地址库认 审定数 / 未审数 / 期末余额 等）——地址库校验判无效。
+    旧的写法闭包测试只用「能解析成 URI」判它，``#cell`` 段原样透传，恒成立，是假绿。其余表无稳定单值定位语义。
     """
+    if table != "trial_balance":
+        return [None] * len(rows)
     refs: list[str | None] = []
-    if table == "trial_balance":
-        for row in rows:
-            code = row.get("standard_account_code")
-            refs.append(f"TB('{code}','审定数')" if code else None)
-    elif table == "tb_balance":
-        for row in rows:
-            code = row.get("standard_account_code") or row.get("account_code")
-            refs.append(f"TB('{code}','期末')" if code else None)
-    else:
-        refs = [None] * len(rows)
+    for row in rows:
+        code = row.get("standard_account_code")
+        refs.append(f"TB('{code}','审定数')" if code else None)
     return refs
 
 
@@ -257,14 +340,14 @@ async def execute_query(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_query_builder_access),
 ):
-    """执行查询，返回结构化结果。"""
+    """执行查询，返回结构化结果（``total`` 为全量行数，分组时为组数）。"""
     warnings: list[str] = []
     # ─── 项目作用域（R2）：解析先于 SQL 构建与缓存读取 ────────────────────
-    scope = await resolve_builder_scope(
-        user=current_user,
-        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
-        db=db,
+    scope = await _builder_scope(
+        body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
+    # acnr_targets：作用域判定（项目归属）之后、SQL 与缓存之前解析；拒绝即 422 / 503，不执行查询
+    acnr = await plan_builder_targets(body, db=db)
     try:
         stmt, column_names = _build_select(
             body, scope=scope, role=_get_role_value(current_user), warnings=warnings
@@ -283,15 +366,34 @@ async def execute_query(
     cache_key = compute_cache_key(
         user_id=str(current_user.id),
         project_id=f"__query_builder__:{scope_signature(scope)}",
-        query_params=body.model_dump(),
+        query_params=body.model_dump(exclude={"count_token"}),
     )
     cached = await get_cached_result(cache_key)
     if cached is not None:
         response.headers["X-Cache"] = "HIT"
-        return cached
+        final = with_acnr_results(cached, await acnr.results(db) if acnr else None)
+        await _audit_query_success(
+            body, user=current_user, scope=scope, total=int(cached.get("total", 0)), cache_hit=True, db=db
+        )
+        return final
 
     try:
         async with cancellable_query(db, QUERY_TIMEOUT_MS):
+            # total 对同一语句计数（R2.6）；后续页可带服务端签名凭证跳过重复 COUNT。
+            # 不分组的聚合恒为一行（与 offset 无关），无需另跑计数。
+            ungrouped_aggregate = bool(body.aggregates) and not body.group_by
+            count_reused = False
+            next_count_token: str | None = None
+            if ungrouped_aggregate:
+                total = 1
+            else:
+                count_stmt = build_count(stmt)
+                count_subject = f"{count_tokens.subject_of(current_user)}:{scope_signature(scope)}"
+                count_digest = count_tokens.statement_digest(count_stmt, db.get_bind(), subject=count_subject)
+                reused_total = count_tokens.reuse(body.count_token, digest=count_digest, subject=count_subject)
+                count_reused = reused_total is not None
+                total = int(reused_total) if count_reused else (await db.execute(count_stmt)).scalar_one()
+                next_count_token = count_tokens.issue(digest=count_digest, total=int(total), subject=count_subject)
             result = await db.execute(stmt)
             rows = result.fetchall()
     except HTTPException as http_exc:
@@ -299,16 +401,20 @@ async def execute_query(
         await _audit_query_rejection(http_exc, user=current_user, table=body.table)
         raise
     except SQLAlchemyError as exc:
+        correlation_id = uuid.uuid4().hex
         try:
             await db.rollback()
         except Exception:
             pass
-        logger.exception("query_builder execute failed")
+        logger.exception("query_builder execute failed [correlation_id=%s]", correlation_id)
         raise HTTPException(
             status_code=400,
-            detail={"error_code": "QUERY_EXECUTION_FAILED",
-                    "message": f"查询执行失败：{exc}"},
-        )
+            detail={
+                "error_code": "QUERY_EXECUTION_FAILED",
+                "message": "查询执行失败，请检查字段、条件和关联关系",
+                "correlation_id": correlation_id,
+            },
+        ) from exc
 
     rows_serialized: list[dict] = []
     for r in rows:
@@ -321,7 +427,9 @@ async def execute_query(
     query_result = {
         "rows": rows_serialized,
         "columns": column_names,
-        "total": len(rows_serialized),
+        "total": int(total),
+        "count_token": next_count_token,
+        "count_reused": count_reused,
         "table": body.table,
         "sql": _stmt_to_sql(stmt),
         # 明示本次生效的项目范围（R2.2）：admin/partner 不限项目时也要让用户知道
@@ -333,105 +441,51 @@ async def execute_query(
         "formula_refs": _derive_formula_refs(body.table, rows_serialized),
     }
 
-    # 回写 Redis 缓存（短 TTL）
+    # 回写 Redis 缓存（短 TTL）；单元格取值每次现读，不进缓存
     await set_cached_result(cache_key, query_result)
 
-    return query_result
+    final = with_acnr_results(query_result, await acnr.results(db) if acnr else None)
+    await _audit_query_success(
+        body, user=current_user, scope=scope, total=int(total), cache_hit=False, db=db
+    )
+    return final
 
 
-_EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数，避免全量加载
-
-# 导出行数硬上限复用 export_service 既有常量（R6.7：不在 router 层另写一套阈值）
-from app.services.custom_query.export_service import EXPORT_ROW_HARD_LIMIT  # noqa: E402
+_EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数（服务端游标），避免全量加载
 
 
 @router.post("/export-excel")
 async def export_excel(
-    body: QueryDSL,
+    body: ExportDSL,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_query_builder_access),
 ):
-    """执行查询并以流式/分页方式生成 Excel（write_only 模式避免全量内存峰值）。"""
-    scope = await resolve_builder_scope(
-        user=current_user,
-        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
-        db=db,
+    """导出全部（advanced-query-linkage-closure R8，ADR-AQL-14）：与 execute 同一作用域与语句（不分页），经
+    ``export_service.stream_xlsx`` 流式写出。
+
+    改造前复用分页语句（``limit ≤ 1000``）、表头写列键、文件名 ASCII，结果最多 1,000 行（AQ-20）。现在：与业务视图导出共用
+    导出闸（本人 1 个、全进程 4 个，超出 429）；先 COUNT，超过 1,000,000 行 400、不产生文件（不再截断）；表头取请求的
+    ``headers``，附「查询说明」sheet；每次导出记审计（流程在 ``services/custom_query/query_export``）。
+    """
+    from app.services.custom_query.query_export import export_builder_query
+
+    warnings: list[str] = []
+    scope = await _builder_scope(
+        body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
-    stmt, column_names = _build_select(
-        body, scope=scope, role=_get_role_value(current_user)
-    )
+    acnr = await plan_builder_targets(body, db=db)
     try:
-        async with cancellable_query(db, EXPORT_TIMEOUT_MS):
-            result = await db.execute(stmt)
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        try:
-            await db.rollback()
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "QUERY_EXECUTION_FAILED",
-                    "message": f"查询执行失败：{exc}"},
+        stmt, column_names = _build_select(
+            body, scope=scope, role=_get_role_value(current_user), warnings=warnings, for_export=True
         )
-
-    from openpyxl import Workbook
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Alignment, Font, PatternFill
-
-    wb = Workbook(write_only=True)
-    table_label = TABLE_WHITELIST[body.table]["label"]
-    ws = wb.create_sheet(title=table_label[:31])
-
-    # 表头（write_only 模式通过 WriteOnlyCell 设置样式）
-    header_font = Font(bold=True)
-    header_fill = PatternFill(start_color="F0EDF5", end_color="F0EDF5", fill_type="solid")
-    header_alignment = Alignment(horizontal="center")
-    header_cells = []
-    for name in column_names:
-        cell = WriteOnlyCell(ws, value=name)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        header_cells.append(cell)
-    ws.append(header_cells)
-
-    # 分页读取数据行并逐批写入（避免全量加载到内存）
-    # 行数硬上限（R6.6）：改造前 fetchmany 无上限，笛卡尔积 JOIN 下会把百万行全部
-    # 拉完。达上限时**在文件内显式标注**被截断 —— 静默产出不完整文件最危险，
-    # 审计师会把它当完整证据留档。
-    written = 0
-    truncated = False
-    while True:
-        batch = result.fetchmany(_EXPORT_FETCH_SIZE)
-        if not batch:
-            break
-        for row in batch:
-            if written >= EXPORT_ROW_HARD_LIMIT:
-                truncated = True
-                break
-            ws.append([_excel_cell_value(row[i] if i < len(row) else None)
-                       for i in range(len(column_names))])
-            written += 1
-        if truncated:
-            break
-
-    if truncated:
-        ws.append([])
-        ws.append([
-            f"※ 结果已达导出上限 {EXPORT_ROW_HARD_LIMIT} 行并被截断，"
-            "本文件不是完整结果集；请补充筛选条件后重新导出"
-        ])
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    filename = f"query_{body.table}.xlsx"
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    except HTTPException as http_exc:
+        # 预算超限 / PII 越权发生在 SQL 构建期，也要留痕（同 execute）
+        await _audit_query_rejection(http_exc, user=current_user, table=body.table)
+        raise
+    return await export_builder_query(
+        body, stmt=stmt, column_names=column_names, scope=scope, warnings=warnings,
+        table_label=TABLE_WHITELIST[body.table]["label"], user=current_user, db=db, batch=_EXPORT_FETCH_SIZE,
+        extra_sheet=acnr_sheet(await acnr.results(db) if acnr else None),
     )
 
 

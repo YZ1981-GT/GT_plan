@@ -17,6 +17,7 @@
  * 科目：2241 其他应付款（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类方向相反）
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -128,11 +129,7 @@ export function useK3FormData(params: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '2241' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '2241' })).rows
 
       let unadjusted = 0
       let audited = 0
@@ -141,8 +138,9 @@ export function useK3FormData(params: {
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
         if (code.startsWith(ACCOUNT_CODE_2241)) {
-          unadjusted = Number(item.unadjusted_amount ?? 0)
-          audited = Number(item.audited_amount ?? 0)
+          // 科目及其明细之和（原先 `=` 覆盖：有明细科目时只剩最后一行）
+          unadjusted += Number(item.unadjusted_amount ?? 0)
+          audited += Number(item.audited_amount ?? 0)
           found = true
         }
       }

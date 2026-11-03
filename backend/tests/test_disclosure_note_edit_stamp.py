@@ -74,7 +74,11 @@ async def notes_env() -> AsyncGenerator[dict, None]:
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = lambda: _Actor(ids["me"])
     app.dependency_overrides[check_consol_lock] = lambda: None
-    with patch("app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()), \
+    # 编辑门禁打桩：自 cad40da77 起门禁收口到 note_edit_gate（三种形态都调同一个判定实现
+    # ``assert_note_edit_access``；路由函数体形态引用的是路由模块里导入的同名对象 ⇒ 两处都换）。
+    # 原先 patch 的 ``_assert_project_edit`` 已不存在，本文件 8 例一直在 fixture 阶段报错、从未执行。
+    with patch("app.services.note_edit_gate.assert_note_edit_access", new=AsyncMock()), \
+            patch("app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()), \
             patch.object(DisclosureMutationCoordinator, "_redis", new=AsyncMock(return_value=None)), \
             patch("app.services.event_bus.event_bus.publish", new=AsyncMock()):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -171,7 +175,9 @@ class TestFormulaEdits:
 
         since = datetime.now(timezone.utc) - timedelta(seconds=1)
         saved = {"formulas": [{"target": "B2"}], "loaded": {}, "events": []}
-        with patch.object(note_settings, "save_section", new=AsyncMock(return_value=saved)):
+        # 本用例只看盖章；目标单元格校验（本章节是文字章节、没有表格）另见 test_note_formula_save_ref_check
+        with patch.object(note_settings, "save_section", new=AsyncMock(return_value=saved)), \
+                patch.object(note_settings, "target_problems", new=AsyncMock(return_value=[])):
             resp = await notes_env["client"].put(_section_url(notes_env, f"{SECTION}/formulas"),
                                                  json={"formulas": [{"target": "B2", "formula": "=1"}]})
         assert resp.status_code == 200, resp.text
@@ -200,7 +206,9 @@ _STAMP_CALLS = {"stamp_note_edit", "stamp_section_edit"}
 _NOT_EDITS = {
     "generate_notes": "按模板重新生成 / 刷新（正文受 is_local_override 保护、表格三态合并），不是人工编辑",
     "set_formula_gray": "只改项目向导状态，不写章节",
-    "pull_from_workpapers": "只刷新表格的同步簿记键（_source / _last_sync_at）",
+    "pull_from_workpapers": ("从底稿取数：公式推送（引擎有操作人才记编辑人）+ 附注公式重算（系统路径，只写 auto 格）"
+                             "+ 已同步章节补 _source 簿记键，不是人工编辑"),
+    "refresh_from_disclosure": "只读：底稿披露表同步状态（2026-10-26 起不再写附注）",
     "validate_notes": "写校验结果表，不写章节",
     "confirm_finding": "写校验结果表，不写章节",
     "export_word": "导出，不写章节",
@@ -259,6 +267,8 @@ _USER_WRITERS: dict[str, tuple[str, ...]] = {
     "services/note_text_batch_apply.py": ("apply_batch",),
     "services/wp_disclosure_sync_service.py": ("sync_from_workpaper", "WpDisclosureSyncService.sync_from_html"),
     "services/disclosure_engine.py": ("DisclosureEngine.update_note",),
+    # 合并附注「📤 下推模板」以操作人身份改子企业附注（note-pull-header-formula-closure R6.1）
+    "services/consol_note_template_push_service.py": ("_push_to_one",),
 }
 #: 调用上面这些写入方必须把操作人传进去：关键字缺省为 None，漏传只记时间不记人（静默退化）
 _ACTOR_KEYWORDS: dict[str, str] = {
@@ -285,6 +295,7 @@ _SYSTEM_WRITERS: dict[str, tuple[str, ...]] = {
     "services/note_trim_service.py": ("NoteTrimService.auto_trim_v2",),
     "routers/note_wp_mapping.py": ("refresh_all_bindings",),
     "routers/disclosure_notes.py": ("pull_from_workpapers",),
+    "services/note_workpaper_pull_service.py": ("_mark_synced_sections", "_apply_note_formulas"),
 }
 _SQL_SET = re.compile(r"\bSET\b", re.IGNORECASE)
 

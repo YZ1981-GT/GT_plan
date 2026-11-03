@@ -70,6 +70,8 @@ async def _has_custom_procedure(
 
     与 `wp_render_config_helpers._has_custom_procedure` 逐字同构（守卫交叉锁死）。
     """
+    from app.services.procedure_identity import normalize_wp_code
+    wp_code = normalize_wp_code(wp_code) or ""
     n = (
         await db.execute(
             sa.select(sa.func.count())

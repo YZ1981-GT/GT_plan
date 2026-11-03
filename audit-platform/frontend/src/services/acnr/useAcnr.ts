@@ -19,7 +19,15 @@
  *
  * Requirements: 14.1, 14.2, 15.3；acnr-invalidation-overlay-hardening R1/R4
  */
-import { ref, shallowRef, onUnmounted } from 'vue'
+import {
+  ref,
+  shallowRef,
+  watch,
+  toValue,
+  getCurrentScope,
+  onScopeDispose,
+  type MaybeRefOrGetter,
+} from 'vue'
 import http from '@/utils/http'
 import {
   subscribeProjectEvent,
@@ -27,7 +35,9 @@ import {
   type ProjectEventSubscription,
 } from '@/services/sse/projectEventStream'
 import { isValidUri, isValidIndexRef } from './resolveUri'
-import { composeSheetLabelsForGroup } from './sheetDisplayName'
+import { groupHeaderLabel, sortSheetsForGroup } from './sheetDisplayName'
+import { parseAcnrRegistryFailure } from './registryLockFailure'
+import { isListedCell } from './cellListing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +81,14 @@ export interface AcnrCellEntry {
   formula_ref: string
   uri?: string
   deprecated?: boolean
+  /** 单元格显示标签「{A1} {语义标签}」（后端 display.cell_labels 写入目录，T29） */
+  cell_label?: string
+  /** 统一显示名「{所属 sheet 的 display_label} › {cell_label}」 */
+  display_label?: string
 }
+
+// 停用 cell 不进地址树 / 选址列表的唯一谓词（RV7-02），loadCellNodes 与各选址处共用
+export { isListedCell }
 
 /** Resolve 结果 */
 export interface AcnrResolveResult {
@@ -80,6 +97,8 @@ export interface AcnrResolveResult {
   entry_type?: 'sheet' | 'cell' | 'runtime'
   cell_address?: string
   semantic_label?: string
+  /** 统一显示名（目录字段；L3 / 非底稿域由后端同一函数现算，T29） */
+  display_label?: string
   formula_ref?: string
   uri?: string
   jump_route?: string
@@ -90,8 +109,15 @@ export interface AcnrResolveResult {
   verified?: boolean
   /** 裁剪状态（底稿域命中但当前项目被裁剪时由后端返回）。 */
   trimmed?: boolean
-  /** 判不存在 / 无法确认的原因 */
+  /** 判不存在 / 无法确认的原因（中文，可直接显示） */
   reason?: string
+  /** 下一步该怎么办（中文；外部命名空间等不可定位场景由后端必填，T31） */
+  next_step?: string
+  /** 多义 / 禁止别名时需要补的上下文字段名（T31） */
+  required_context?: string[]
+  /** 命中停用条目（design §3.3）及其替代地址 */
+  deprecated?: boolean
+  replaced_by?: string
   candidates?: Array<{
     addr_id: string
     display_label: string
@@ -390,18 +416,121 @@ export function subscribeInvalidation(projectId: string): () => void {
   }
 }
 
+// ─── 批量合并解析（spec procedure-chain-hardening-and-java-contracts R15）────────────────
+// 关联底稿 chip 原先每个各发一条 GET /resolve：程序表一屏几十个 chip 就是几十条请求；同一编码出现多次时，
+// 同 URL 的并发 GET 被 utils/http 去重取消先发的那条，被取消的 chip 拿到 resolve_failed、显示成「底稿不存在」。
+// 现在：同一轮（当前同步代码 + 微任务末尾）的解析按项目排队，合并、去重后每批 ≤ RESOLVE_BATCH_LIMIT 调一次
+// POST /resolve-batch；同键在途共享同一个 Promise；命中结果进 LRU（与 resolveIndex 同一个缓存键）。
+
+/** 后端 /resolve-batch 每次最多 50 项（超出 422） */
+export const RESOLVE_BATCH_LIMIT = 50
+
+/** 整批请求失败（网络 / 权限 / 服务异常）时每项的错误码 —— 与「引用不存在」区分，调用方显示「暂时无法校验」 */
+export const BATCH_RESOLVE_FAILED = 'batch_resolve_failed'
+
+type _ResolveWaiter = (r: AcnrResolveResult) => void
+/** 待发队列：项目 id（无项目为空串）→ index_ref → 等待者（失效前后各有一个在途时可能多于一个） */
+const _batchQueue = new Map<string, Map<string, _ResolveWaiter[]>>()
+const _resolveInflight = new Map<string, Promise<AcnrResolveResult>>()
+let _batchFlushScheduled = false
+
+function _resolveCacheKey(indexRef: string, projectId?: string): string {
+  return `resolve:${JSON.stringify({ index_ref: indexRef, project_id: projectId })}`
+}
+
+async function _sendResolveBatch(projectKey: string, chunk: Array<[string, _ResolveWaiter[]]>): Promise<void> {
+  const epoch = _cacheEpoch
+  const pid = projectKey || undefined
+  let results: unknown[] | null = null
+  try {
+    const { data } = await http.post(
+      ACNR_PATHS.resolveBatch,
+      { items: chunk.map(([indexRef]) => ({ index_ref: indexRef })), ...(pid ? { project_id: pid } : {}) },
+      { _silent: true } as any,
+    )
+    results = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : null)
+  } catch {
+    results = null
+  }
+  chunk.forEach(([indexRef, waiters], i) => {
+    const r = results?.[i] as AcnrResolveResult | undefined
+    const result: AcnrResolveResult = r && typeof r === 'object' ? r : { found: false, error: BATCH_RESOLVE_FAILED }
+    // 在途期间缓存被整体失效 ⇒ 结果照样给等待者，但不写进缓存
+    if (r && epoch === _cacheEpoch) _resolveCacheSet(_resolveCacheKey(indexRef, pid), result)
+    waiters.forEach((done) => done(result))
+  })
+}
+
+function _flushResolveBatches(): void {
+  _batchFlushScheduled = false
+  const queues = Array.from(_batchQueue.entries())
+  _batchQueue.clear()
+  for (const [projectKey, refs] of queues) {
+    const entries = Array.from(refs.entries())
+    for (let i = 0; i < entries.length; i += RESOLVE_BATCH_LIMIT) {
+      void _sendResolveBatch(projectKey, entries.slice(i, i + RESOLVE_BATCH_LIMIT))
+    }
+  }
+}
+
+/**
+ * 关联底稿 chip 用的索引解析（R15）：与 `resolveIndex` 同一缓存键与结果形态，只是合并走批量端点。
+ * 不抛错：整批失败时返回 `{ found: false, error: BATCH_RESOLVE_FAILED }`。
+ */
+export function resolveIndexBatched(indexRef: string, projectId?: string): Promise<AcnrResolveResult> {
+  if (!indexRef || !isValidIndexRef(indexRef)) {
+    return Promise.resolve({ found: false, error: 'invalid_index_ref' })
+  }
+  const pid = projectId || undefined
+  const cacheKey = _resolveCacheKey(indexRef, pid)
+  const cached = _resolveCacheGet(cacheKey)
+  if (cached) return Promise.resolve(cached)
+  // 键带缓存纪元：失效后的调用另发请求，不复用失效前的那一发
+  return _shareInflight(_resolveInflight, `${_cacheEpoch}|${cacheKey}`, () => new Promise<AcnrResolveResult>((done) => {
+    const projectKey = pid ?? ''
+    let refs = _batchQueue.get(projectKey)
+    if (!refs) {
+      refs = new Map()
+      _batchQueue.set(projectKey, refs)
+    }
+    const waiters = refs.get(indexRef)
+    if (waiters) waiters.push(done)
+    else refs.set(indexRef, [done])
+    if (!_batchFlushScheduled) {
+      _batchFlushScheduled = true
+      queueMicrotask(_flushResolveBatches)
+    }
+  }))
+}
+
 // ─── Composable ───────────────────────────────────────────────────────────────
 
-export function useAcnr(projectId?: string) {
+export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>) {
   // 使用模块级缓存引用（所有实例共享）
   const sheetsCache = _sheetsCache
   const cellsCache = _cellsCache
 
-  // R1: 有项目上下文时订阅项目级 SSE 实时失效（引用计数复用）；
-  // 无 projectId → 不建连接，仅靠 TTL_Fallback（R1.3）。
-  if (projectId) {
-    const _cleanupSSE = subscribeInvalidation(projectId)
-    onUnmounted(() => {
+  /** 当前项目上下文（D9：支持 ref / getter / 静态字符串）。 */
+  function currentProjectId(): string {
+    return toValue(projectId) || ''
+  }
+
+  // D9 需求 11.1/11.4：订阅随项目切换。只在存在 effect scope（组件 setup、Pinia setup
+  // store）时订阅——此时才能 onScopeDispose 释放；在普通函数里调用 useAcnr() 无从释放连接，
+  // 不订阅（只作 resolve* 的缺省项目来源，R1.3 全局/无上下文不建连接）。
+  // 订阅随 projectId 变化切换：A→B 时先 cleanup 掉 A 再建 B（本层按 projectId 引用计数
+  // 复用总线连接），空值不建连接。
+  if (getCurrentScope()) {
+    let _cleanupSSE: () => void = () => {}
+    watch(
+      currentProjectId,
+      (pid) => {
+        _cleanupSSE()
+        _cleanupSSE = subscribeInvalidation(pid)
+      },
+      { immediate: true },
+    )
+    onScopeDispose(() => {
       _cleanupSSE()
     })
   }
@@ -527,7 +656,7 @@ export function useAcnr(projectId?: string) {
     }
     // 试算表 / 报表 / 附注 / 辅助余额引用按项目数据判定是否存在；不带项目时后端答「无法确认」
     // （error=project_context_required），不再一律判存在（spec formula-fetch-followup-defect-closure R5.4）
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     // Req-20: resolve 缓存 (epoch 变则已由 invalidateModuleCache 清空)
     const cacheKey = `resolve:${JSON.stringify({ formula_ref: formulaRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
@@ -540,9 +669,9 @@ export function useAcnr(projectId?: string) {
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      // 网络错误也视为校验失败（保守策略：非法引用绝不入库）
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      // 目录版本治理错误是终态：上层不得把归档项目改按当前目录或 V1 解析。
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -554,7 +683,7 @@ export function useAcnr(projectId?: string) {
     if (!uri || !isValidUri(uri)) {
       return { found: false, error: 'invalid_uri' }
     }
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     // Req-20: resolve 缓存（按项目分开：非底稿域按项目数据判存在）
     const cacheKey = `resolve:${JSON.stringify({ uri, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
@@ -567,8 +696,8 @@ export function useAcnr(projectId?: string) {
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -592,8 +721,8 @@ export function useAcnr(projectId?: string) {
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -606,7 +735,7 @@ export function useAcnr(projectId?: string) {
     if (!indexRef || !isValidIndexRef(indexRef)) {
       return { found: false, error: 'invalid_index_ref' }
     }
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     // Req-20: resolve 缓存
     const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
@@ -623,8 +752,8 @@ export function useAcnr(projectId?: string) {
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -710,7 +839,7 @@ export function useAcnr(projectId?: string) {
     projectIdArg?: string,
   ): Promise<AcnrResolveResult[]> {
     if (!inputs || inputs.length === 0) return []
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     try {
       const { data } = await http.post(ACNR_PATHS.resolveBatch, {
         items: inputs,
@@ -745,17 +874,16 @@ export function useAcnr(projectId?: string) {
       groups.get(key)!.push(s)
     }
 
-    // 构建树（显示名走单一真源 composeSheetLabelsForGroup，与公式管理树一致）
+    // 构建树（显示名读目录 display_label，后端 display.py 单一来源，与公式管理树一致，T30）
     const tree: AcnrTreeNode[] = []
     for (const [parentCode, sheetsInGroup] of groups) {
-      const subjectAbbr = sheetsInGroup.find((s) => s.account_name)?.account_name || ''
       const parentNode: AcnrTreeNode = {
         // 父节点带科目简称（如「D2 应收账款」），value 仍用 parentCode 不变
-        label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+        label: groupHeaderLabel(parentCode, sheetsInGroup),
         value: parentCode,
         type: 'sheet',
         addrId: parentCode,
-        children: composeSheetLabelsForGroup(sheetsInGroup).map(({ entry, label }) => ({
+        children: sortSheetsForGroup(sheetsInGroup).map(({ entry, label }) => ({
           label,
           value: entry.addr_id,
           type: 'sheet' as const,
@@ -772,12 +900,13 @@ export function useAcnr(projectId?: string) {
   }
 
   /**
-   * 懒加载某 sheet 下的 cell 子节点
+   * 懒加载某 sheet 下的 cell 子节点（停用 cell 不进地址树；/anchors 仍返回它们并带 deprecated 标记，design §3.3）
    */
   async function loadCellNodes(sheetEntry: AcnrSheetEntry): Promise<AcnrTreeNode[]> {
     const cellList = await listCells(sheetEntry.parent_wp_code, sheetEntry.sheet_code)
-    return cellList.map((c) => ({
-      label: c.semantic_label || c.cell_address || c.addr_id,
+    return cellList.filter(isListedCell).map((c) => ({
+      // 叶子用 cell_label（父节点已显示 sheet 名，design §13.2）
+      label: c.cell_label || c.cell_address || c.addr_id,
       value: c.addr_id,
       type: 'cell' as const,
       addrId: c.addr_id,
@@ -847,6 +976,7 @@ export function useAcnr(projectId?: string) {
     resolveUri,
     resolveAddr,
     resolveIndex,
+    resolveIndexBatched,
     resolveInstance,
     batchResolve,
     // 树构建

@@ -1,6 +1,10 @@
 /**
  * custom-workpaper-formula-binding — Playwright UAT（任务 10.3 + 11.5）
  *
+ * ⚠️ 本地专用，不纳入 CI（formula-e2e-ci-gate ADR-FEC-03）。
+ * 原因：写死辽宁卫生项目 ID，依赖本机模板库数据。
+ * CI 覆盖由 e2e/formula-hub/ 目录下的规格承担。
+ *
  * 前置：后端 9980 + 前端 3030（playwright.config 可 reuseExistingServer 拉起 dev）
  * 数据：辽宁卫生 2025 项目 + 可自动 create-custom 自建底稿
  *

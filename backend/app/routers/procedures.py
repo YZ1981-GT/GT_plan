@@ -108,14 +108,57 @@ async def get_trim_decision_context(
     return await build_trim_decision_context(db, project_id, year, cycle_list)
 
 
+@router.get("/{project_id}/procedure-scope/generation-plan")
+async def get_generation_plan(
+    project_id: UUID,
+    template_set_id: UUID | None = Query(None, description="模板集；不传按全部模板编码"),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
+):
+    """生成计划（spec trim-generation-plan-linkage R1，只读）：按循环给出每个模板编码这次生不生成、为什么。
+
+    与生成接口同一判定（粗裁 / 回收站 / 已生成）；读不到粗裁结果 503，模板集不存在 404。
+    """
+    from app.services.procedure_generation_plan import TemplateSetNotFound, build_generation_plan
+    from app.services.procedure_scope_retention import TrimScopeUnavailable
+
+    try:
+        return await build_generation_plan(db, project_id, template_set_id)
+    except TemplateSetNotFound:
+        raise HTTPException(status_code=404, detail="模板集不存在")
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
+
+
+@router.get("/{project_id}/procedure-scope/confirmations")
+async def get_scope_confirmations(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
+):
+    """各循环粗裁状态：未打开 / 未保存 / 已保存（最近一次保存人与时间）。只读。"""
+    from app.services.procedure_generation_plan import build_scope_confirmations
+    from app.services.procedure_scope_retention import TrimScopeUnavailable
+
+    try:
+        return await build_scope_confirmations(db, project_id)
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
+
+
 @router.get("/{project_id}/procedures/{cycle}")
 async def get_procedures(
     project_id: UUID, cycle: str,
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_access("readonly")),
 ):
+    from app.services.procedure_catalog import ProcedureCatalogUnavailable
+
     svc = ProcedureService(db)
-    return await svc.get_procedures(project_id, cycle)
+    try:
+        return await svc.get_procedures(project_id, cycle)
+    except ProcedureCatalogUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail()) from e
 
 
 @router.post("/{project_id}/procedures/{cycle}/init")
@@ -124,8 +167,13 @@ async def init_procedures(
     db: AsyncSession = Depends(get_db),
     _guard: DelegatorContext = Depends(require_project_delegator),
 ):
+    from app.services.procedure_catalog import ProcedureCatalogUnavailable
+
     svc = ProcedureService(db)
-    result = await svc.init_from_templates(project_id, cycle)
+    try:
+        result = await svc.init_from_templates(project_id, cycle)
+    except ProcedureCatalogUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail()) from e
     await db.commit()
     return {"count": len(result), "procedures": result}
 
@@ -200,7 +248,7 @@ async def add_custom_with_template(
         project_id=project_id,
         wp_code=wp_code,
         wp_name=procedure_name,
-        audit_cycle=cycle,
+        audit_cycle=result.get("audit_cycle") or cycle.strip().upper(),
         status=WpStatus.not_started,
     )
     db.add(wp_idx)

@@ -178,9 +178,12 @@ def test_k6_note_rows():
     ("K13", "6711", "营业外支出"),
 ], ids=["K8", "K9", "K11", "K13"])
 def test_note_direct_note_rows_uses_current_amount(code: str, account_code: str, account_name: str):
-    """损益类 K 科目 note_rows: ending 取「本期发生额」（非期末余额），opening 取「年初余额」。"""
+    """损益类 K 科目 note_rows: ending 取「本期发生额」（非期末余额），上期取上年试算表发生额（非本年年初余额）。"""
+    from app.services.formula_push.sources import PriorPlSnapshot
+
     binding = note_direct_for(code)
-    binding._last_tb_data = _make_tb(account_code, "0", "200000", "300000")
+    binding._last_tb_data = _make_tb(account_code, "0", "999", "300000")  # 年初余额不该被当成上期
+    binding._last_prior_pl = PriorPlSnapshot(_make_tb(account_code, "0", "0", "200000"))
 
     rule = _k_note_rule(code)
     rows = binding.note_rows({}, "listed", rule)
@@ -188,9 +191,33 @@ def test_note_direct_note_rows_uses_current_amount(code: str, account_code: str,
     assert len(rows) == 1
     row = rows[0]
     assert row["ending"] == 300000.0  # 本期发生额，非期末余额
-    assert row["opening"] == 200000.0  # 年初余额
+    assert row["opening"] == 200000.0  # 上年发生额
     assert row["ending_resolved"] is True
     assert row["label"] == account_name
+
+
+def test_pl_prior_period_unavailable_is_unresolved_not_zero():
+    """损益类上期取不到上年数据 ⇒ 不出值（不推 0），原因随行带给引擎。
+
+    2026-10-31 真库：原来取本年试算表年初余额（损益类恒 0），和平 2025 八、65 等 8 节「上期发生额」被推成 0.00，
+    报表上期是上年发生额（销售费用 242,169,736.06）。spec disclosure-note-template-word-realignment Task 34/35。
+    """
+    from app.services.formula_push.sources import PriorPlSnapshot
+
+    binding = note_direct_for("K8")
+    binding._last_tb_data = _make_tb("6601", "0", "0", "300000")
+    for prior, reason in ((None, "未取上年数据"), (PriorPlSnapshot(None, "损益类上期发生额取上年试算表：没有上年项目"),
+                                                  "没有上年项目")):
+        binding._last_prior_pl = prior
+        row = binding.note_rows({}, "listed", _k_note_rule("K8"))[0]
+        assert row["ending"] == 300000.0 and row["ending_resolved"] is True
+        assert row["opening_resolved"] is False and reason in row["opening_reason"]
+    # 资产负债类不受影响：期初仍取本年年初余额
+    k2 = balance_adj_for("K2")
+    k2._last_tb_data = _make_tb("1901", "10", "7", "3")
+    k2._last_prior_pl = None
+    row = k2.note_rows({}, "listed", _k_note_rule("K2"))[0]
+    assert row["opening"] == 7.0 and row["opening_resolved"] is True and "opening_reason" not in row
 
 
 def test_note_direct_tb_unavailable_returns_empty():

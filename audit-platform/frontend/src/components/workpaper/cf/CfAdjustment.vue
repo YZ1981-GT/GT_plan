@@ -1,8 +1,7 @@
 <template>
   <div class="cf-adjustment">
     <p class="cf-adjustment-desc">
-      CF 调整分录复用调整分录模块（adjustment_type='cf'）。
-      请前往调整分录页面录入 CF 调整。
+      现金流量相关的调整统一在调整分录模块按审计调整 / 重分类录入、提交复核，批准后计入试算表与报表。
     </p>
     <el-button type="primary" size="small" @click="goToAdjustments">
       前往调整分录
@@ -17,11 +16,12 @@ const props = defineProps<{ projectId: string; year: number }>()
 const router = useRouter()
 
 function goToAdjustments() {
+  // 路由名原写成小写 'adjustments'（不存在）⇒ 点击即报「没有匹配的路由」
   router.push({
-    name: 'adjustments',
+    name: 'Adjustments',
     params: { projectId: props.projectId },
-    query: { type: 'cf' },
-  })
+    query: props.year ? { year: String(props.year) } : undefined,
+  }).catch(() => { /* 导航被取消 */ })
 }
 </script>
 

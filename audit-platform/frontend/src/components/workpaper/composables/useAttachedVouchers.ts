@@ -2,17 +2,23 @@
  * useAttachedVouchers.ts — 序时账「挂凭到底稿」↔ 底稿凭证检查联动（可复用）
  *
  * 两个方向：
- *  1. 序时账侧（LedgerPenetration）手工挑选凭证 → `attachVoucher` 记录到 sampled_vouchers
- *     （带 working_paper_id + source='ledger'），作为该底稿的手工挂入样本清单。
- *  2. 底稿凭证检查侧（如 E1-23 收支检查）→ `pullSamplesForWorkpaper` 拉取挂到本底稿的
- *     凭证，逐张取回完整分录，映射为抽凭引擎同款 `SampledVoucher[]`，喂给底稿既有
- *     的 `onSampleFilled`/`fillFromSamples`（与抽凭引擎回填口径一致）。
+ *  1. 序时账侧（LedgerPenetration）手工挑选凭证 → 挂凭弹窗走 `attachVouchersBatch`（多张凭证 × 多张底稿一次挂，
+ *     逐条返回新挂 / 已挂 / 失败原因）；凭证层「抽中本凭证」走 `attachVoucher`（单张，可不指定底稿）。两者都记到
+ *     sampled_vouchers 的手工侧（batch_id 为空）：凭证按当前账套定位成一张（凭证键），阶段取项目当前阶段，
+ *     已挂的再挂不改阶段。`queryVoucherLinks`：凭证键 → 已挂 / 已抽于哪些底稿（序时账明细层与凭证层的标签）。
+ *  2. 底稿凭证检查侧（如 E1-23 收支检查）→ `pullSamplesForWorkpaper` 拉取挂到本底稿的凭证，逐张按凭证键
+ *     取回完整分录，映射为抽凭引擎同款 `SampledVoucher[]`，交给宿主的共享回填函数
+ *     （`useVoucherCheckFill().onAttachImported`：与抽凭引擎回填同一口径，按分录指纹去重、多科目按配对展开）。
  *
- * 不新造抽样算法/不改抽凭引擎；仅复用既有 sample-voucher / sampled-vouchers /
- * ledger/voucher/{no} 三个端点。
+ * 不新造抽样算法、不改抽凭引擎。端点：sample-voucher / sample-vouchers/batch / voucher-links/query /
+ * sampled-vouchers / ledger/voucher/{no}。
  */
 import http from '@/utils/http'
 import { ledger as P_ledger } from '@/services/apiPaths'
+import {
+  voucherKeyAmbiguityOf, voucherLabel, type VoucherKeyAmbiguity, type VoucherKeyCandidate,
+} from '@/utils/voucherIdentity'
+import { counterpartLabelOf, type SamplePairing } from './shared/voucherCheckFill'
 import type { SampledVoucher } from './useSamplingAlgorithms'
 
 /** 后端 sampled_vouchers 行 */
@@ -21,6 +27,14 @@ export interface AttachedVoucherRecord {
   voucher_no: string
   /** V166：凭证日期。null = 历史行未记日期，回拉时退化为按年度匹配（可能命中同号别张凭证）。 */
   voucher_date: string | null
+  /** V210：凭证字（'' = 凭证字为空）。null / 缺省 = 旧行未记，同日同号多凭证字时回拉拿不到唯一一张。 */
+  voucher_type?: string | null
+  /** V210：主体编码 */
+  company_code?: string | null
+  /** 凭证键（有日期的记录才有）；回拉按它定位单张凭证 */
+  voucher_key?: string | null
+  /** 挂凭时的审计阶段 preliminary / final；null = 旧行未标 */
+  phase?: string | null
   account_code: string | null
   sampling_record_id: string | null
   working_paper_id: string | null
@@ -38,6 +52,11 @@ export interface AttachVoucherPayload {
   voucherNo: string
   /** 凭证日期 YYYY-MM-DD。🔴 凭证号跨日重复，强烈建议传入以精确定位单张凭证。 */
   voucherDate?: string | null
+  /** 凭证字（'' = 凭证字为空）；null / 缺省 = 不知道，由后端在当前账套里补全，命中多张时 409 */
+  voucherType?: string | null
+  companyCode?: string | null
+  /** 审计阶段；缺省由后端按项目阶段取 */
+  phase?: 'preliminary' | 'final'
   accountCode?: string | null
   workpaperId?: string | null
   source?: string
@@ -50,23 +69,147 @@ function unwrap<T = any>(res: any): T {
 }
 
 /**
- * 挂凭：把一张凭证记录到抽样清单（可关联目标底稿）。同项目+年度+凭证号去重
- * （已挂则更新 working_paper_id/note）。
+ * 挂凭（单张）：把一张凭证记录到抽样清单，可关联一张目标底稿（凭证层「抽中本凭证」不指定底稿）。
+ * 同一凭证（凭证键）挂同一底稿只有一条：再挂 = 更新说明与意图科目，阶段保持当初挂凭时的；挂到不同底稿各一条。
+ * 挂多张底稿用 {@link attachVouchersBatch}。后端按当前账套定位凭证：命中多张 409 VOUCHER_KEY_AMBIGUOUS（带候选），
+ * 找不到 404 VOUCHER_NOT_FOUND —— 原样抛出，由调用方把原因告诉用户。`_silent`：不弹全局提示。
  */
 export async function attachVoucher(
   projectId: string,
   payload: AttachVoucherPayload,
-): Promise<{ id: string; voucher_no: string; status: string }> {
-  const res = await http.post(P_ledger.sampleVoucher(projectId), {
+): Promise<{ id: string; voucher_no: string; voucher_type?: string | null; status: string }> {
+  const body: Record<string, unknown> = {
     year: payload.year,
     voucher_no: payload.voucherNo,
     voucher_date: payload.voucherDate ?? null,
+    voucher_type: payload.voucherType ?? null,
+    company_code: payload.companyCode ?? null,
     account_code: payload.accountCode ?? null,
     working_paper_id: payload.workpaperId ?? null,
     source: payload.source ?? 'ledger',
     note: payload.note ?? null,
-  })
+  }
+  if (payload.phase) body.phase = payload.phase
+  const res = await http.post(P_ledger.sampleVoucher(projectId), body, { _silent: true } as any)
   return unwrap(res)
+}
+
+/** 挂凭失败的原因（给用户看的中文）：多张凭证 / 账套里没有 / 其他 */
+export function attachFailureReason(err: unknown): string {
+  const ambiguity = voucherKeyAmbiguityOf(err)
+  if (ambiguity) {
+    const names = ambiguity.candidates.slice(0, 3).map(c => `${c.voucher_date} ${voucherLabel(c.voucher_type, c.voucher_no)}`)
+    return `对应多张凭证（${names.join('、')}${ambiguity.candidates.length > 3 ? ' 等' : ''}），请在凭证层选定一张再挂`
+  }
+  const res = (err as { response?: { status?: number; data?: { detail?: unknown } } } | null)?.response
+  if (res?.status === 404) return '当前账套里没有这张凭证（可能账套已重导）'
+  if (res?.status === 403) return '没有本项目的编辑权限'
+  const detail = res?.data?.detail as { message?: unknown } | undefined
+  if (res?.status === 422 && typeof detail?.message === 'string') return detail.message
+  return '挂凭失败，请稍后重试'
+}
+
+/** 一次最多挂这么多个「凭证 × 底稿」组合；已挂查询一次最多这么多个凭证键（与后端 voucher_links 一致） */
+export const ATTACH_BATCH_MAX_PAIRS = 500
+export const VOUCHER_LINKS_MAX_KEYS = 500
+
+export interface AttachBatchVoucher {
+  voucherNo: string
+  voucherDate?: string | null
+  /** '' = 凭证字为空；null / 缺省 = 不知道（后端补全，命中多张时这一条失败并列候选） */
+  voucherType?: string | null
+  companyCode?: string | null
+  /** 挂凭意图科目（用户所在行的科目），回拉时第 ② 级筛选用 */
+  accountCode?: string | null
+}
+
+/** 批量挂凭逐条状态：新挂（含软删后复活）/ 之前已挂（原行不动）/ 没挂上 */
+export const ATTACH_STATUS = { CREATED: 'created', EXISTED: 'existed', FAILED: 'failed' } as const
+
+/** 批量挂凭的一条结果：一个「凭证 × 底稿」 */
+export interface AttachBatchResult {
+  voucher_no: string
+  voucher_date: string | null
+  voucher_type: string | null
+  /** 定位成功才有 */
+  voucher_key: string | null
+  working_paper_id: string
+  /** 底稿不在本项目时为 null（不透出别的项目底稿编码） */
+  wp_code: string | null
+  status: (typeof ATTACH_STATUS)[keyof typeof ATTACH_STATUS]
+  id?: string
+  /** 已挂（existed）的是当初挂凭时的阶段 */
+  phase?: string | null
+  error_code?: string
+  reason?: string
+  /** 凭证对应多张时的前几张候选 */
+  candidates?: VoucherKeyCandidate[]
+}
+
+export interface AttachBatchResponse {
+  results: AttachBatchResult[]
+  created: number
+  existed: number
+  failed: number
+  phase?: string
+}
+
+/**
+ * 批量挂凭：多张凭证 × 多张底稿一次提交，逐条返回新挂（created）/ 已挂（existed，原行不动）/ 失败 + 原因
+ * （凭证对应多张、账套里没有、底稿不在本项目、数据库拒绝）。阶段由后端取项目当前阶段，不传。
+ * 整单失败（无编辑权限 403、组合超过 500 个 422）原样抛出，用 {@link attachFailureReason} 取原因。
+ */
+export async function attachVouchersBatch(
+  projectId: string,
+  payload: { year: number; vouchers: AttachBatchVoucher[]; workpaperIds: string[]; note?: string | null; source?: string },
+): Promise<AttachBatchResponse> {
+  const body = {
+    year: payload.year,
+    vouchers: payload.vouchers.map(v => ({
+      voucher_no: v.voucherNo,
+      voucher_date: v.voucherDate ?? null,
+      voucher_type: v.voucherType ?? null,
+      company_code: v.companyCode ?? null,
+      account_code: v.accountCode ?? null,
+    })),
+    working_paper_ids: payload.workpaperIds,
+    note: payload.note ?? null,
+    source: payload.source ?? 'ledger',
+  }
+  const res = await http.post(P_ledger.sampleVouchersBatch(projectId), body, { _silent: true } as any)
+  const data = unwrap<AttachBatchResponse>(res)
+  return { ...data, results: Array.isArray(data?.results) ? data.results : [] }
+}
+
+/** 已挂 / 已抽标识的一条：凭证挂到（或被抽到）某张底稿，按来源 × 阶段合并 */
+export interface VoucherLink {
+  working_paper_id: string | null
+  wp_code: string | null
+  wp_name: string | null
+  /** 记录指向的底稿已删除或不在本项目 */
+  wp_missing: boolean
+  /** manual = 序时账手工挂凭；sampling_engine = 抽凭引擎登记 */
+  source: 'manual' | 'sampling_engine'
+  phase: 'preliminary' | 'final' | null
+  /** 同一底稿被几个抽凭批次抽到（手工挂凭恒为 1） */
+  count: number
+  /** 旧登记没记凭证字或主体：同日同号的另一张凭证也会显示它 */
+  legacy: boolean
+}
+
+/**
+ * 凭证键 → 已挂 / 已抽于哪些底稿（一次最多 500 个键；超过请调用方分段）。没有记录的键不在结果里。
+ * 只读查询走 POST（键里有主体名称，500 个键放进查询串会超长）；`_dedupe: false`：分段查询互不取消。
+ */
+export async function queryVoucherLinks(
+  projectId: string,
+  year: number,
+  keys: string[],
+): Promise<Record<string, VoucherLink[]>> {
+  if (keys.length === 0) return {}
+  const res = await http.post(P_ledger.voucherLinksQuery(projectId), { year, keys }, { _silent: true, _dedupe: false } as any)
+  const data = unwrap<{ links?: Record<string, VoucherLink[]> }>(res)
+  return data?.links && typeof data.links === 'object' ? data.links : {}
 }
 
 /**
@@ -78,10 +221,12 @@ export async function attachVoucher(
  */
 export async function listAttachedVouchers(
   projectId: string,
-  year: number,
+  /** 审计年度；项目没填为 null ⇒ 不发请求、按「没有挂凭」处理（只读计数 / 角标） */
+  year: number | null,
   workpaperId?: string,
   manualOnly = false,
 ): Promise<AttachedVoucherRecord[]> {
+  if (year == null) return []
   const params: Record<string, unknown> = { year }
   if (workpaperId) params.working_paper_id = workpaperId
   if (manualOnly) params.manual_only = true
@@ -96,22 +241,27 @@ export async function removeAttachedVoucher(projectId: string, sampledId: string
 }
 
 /**
- * 单张凭证的完整分录（穿透）。
+ * 单张凭证的完整分录（穿透），按凭证键定位：日期 + 凭证字 + 号。
  *
- * 🔴 必须传 `voucherDate`：凭证号在真实数据中**不唯一** —— 实测 8 个项目里 7 个
- * 跨月/跨日重复，单个号最多对应 83 个不同日期。只传 year 时后端返回**全年所有同号
- * 凭证**的分录（实测某项目 0075 号返回 66 张凭证共 5918 行，借方虚增到 3.7 亿），
- * 回填到底稿就是错的样本。带上日期后 `(voucher_date, voucher_no)` 唯一定位一张凭证。
+ * 🔴 凭证号单独不唯一（单号最多对应 83 个日期），同日同号也不唯一（四川物流 2025-01-07 的
+ * FY-0003 与 ZZ-0003）。后端命中多张凭证时回 409 VOUCHER_KEY_AMBIGUOUS + 候选、不合并分录，
+ * 这里原样抛出，由调用方处理（以前只传号会拿回全年同号凭证的分录，借方虚增到 3.7 亿）。
+ * `_silent`：逐张凭证失败不弹全局提示，调用方把原因写进占位样本。
  */
-async function fetchVoucherLines(
+export async function fetchVoucherLines(
   projectId: string,
   year: number,
   voucherNo: string,
   voucherDate?: string | null,
+  voucherType?: string | null,
+  /** 主体编码：一套账两个主体同日同号同凭证字时必带；空 = 不限 */
+  companyCode?: string | null,
 ): Promise<any[]> {
   const params: Record<string, unknown> = { year }
   if (voucherDate) params.voucher_date = voucherDate
-  const res = await http.get(P_ledger.voucher(projectId, voucherNo), { params })
+  if (voucherType != null) params.voucher_type = voucherType
+  if (companyCode) params.company_code = companyCode
+  const res = await http.get(P_ledger.voucher(projectId, voucherNo), { params, _silent: true } as any)
   const data = unwrap<any>(res)
   if (Array.isArray(data)) return data
   if (Array.isArray(data?.items)) return data.items
@@ -150,38 +300,6 @@ export interface PullSamplesResult {
   misattached: MisattachedVoucher[]
 }
 
-/**
- * 推断对方科目（仿后端 enrich_counterpart_accounts 逻辑）。
- *
- * 规则：按借贷方向分桶 → 当前行是借方则对方取贷方科目，反之亦然。
- * - 1 对 1：直填对方科目代码 + 名称
- * - 多对多 / 1 对多：填「多科目」
- */
-function inferCounterpart(
-  currentLine: any,
-  allLines: any[],
-): { code: string | null; name: string | null } {
-  const debitAccounts = new Map<string, string>()
-  const creditAccounts = new Map<string, string>()
-  for (const l of allLines) {
-    const code = String(l?.account_code ?? '').trim()
-    const name = String(l?.account_name ?? '').trim()
-    if (!code) continue
-    const d = Number(l?.debit_amount ?? 0)
-    const c = Number(l?.credit_amount ?? 0)
-    if (d > 0) debitAccounts.set(code, name)
-    if (c > 0) creditAccounts.set(code, name)
-  }
-  // 判断当前行方向：借方有值则当前行在借方侧，对方取贷方侧
-  const isDebit = Number(currentLine?.debit_amount ?? 0) > 0
-  const counterparts = isDebit ? creditAccounts : debitAccounts
-  if (counterparts.size === 0) return { code: null, name: null }
-  if (counterparts.size === 1) {
-    const [code, name] = [...counterparts.entries()][0]
-    return { code, name }
-  }
-  return { code: '多科目', name: '多科目' }
-}
 
 /**
  * 拉取挂到指定底稿的凭证 → 映射为 SampledVoucher[]。
@@ -220,20 +338,22 @@ export async function pullSamplesForWorkpaper(
   for (const rec of records) {
     let lines: any[] = []
     let fetchFailed = false
+    let ambiguity: VoucherKeyAmbiguity | null = null
     try {
-      // 带上挂凭时记录的日期 → 精确定位单张凭证（无日期的历史行退化为按年匹配）
-      lines = await fetchVoucherLines(projectId, year, rec.voucher_no, rec.voucher_date)
-    } catch {
+      // 带上挂凭时记录的日期、凭证字与主体 → 定位单张凭证（旧行缺这几列时可能命中多张，后端回 409）
+      lines = await fetchVoucherLines(projectId, year, rec.voucher_no, rec.voucher_date, rec.voucher_type, rec.company_code)
+    } catch (e) {
       lines = []
-      fetchFailed = true
+      ambiguity = voucherKeyAmbiguityOf(e)
+      fetchFailed = !ambiguity
     }
 
-    // ── 穿透失败（技术失败）：保留占位样本供手工补录，与业务错挂区分（R3.6）──
+    // ── 穿透失败（技术失败）或命中多张凭证：保留占位样本，不把多张凭证的分录并进来（R3.6）──
     if (lines.length === 0) {
       samples.push(makeSample(
         rec.voucher_no, rec.voucher_date || '', rec.account_code || '',
         null, null, null,
-        fetchFailed ? '凭证分录穿透失败，请手工补录' : null,
+        ambiguity ? ambiguousVoucherNote(ambiguity) : fetchFailed ? '凭证分录穿透失败，请手工补录' : null,
         rec.voucher_date == null,
       ))
       continue
@@ -266,7 +386,8 @@ export async function pullSamplesForWorkpaper(
     }
 
     for (const line of picked) {
-      const cp = inferCounterpart(line, lines)
+      // 对方科目取后端配对结果（voucher_pairing，需求 3）：配上的填科目，配不上的「多科目」，不在前端按借贷分桶推断
+      const cp = counterpartLabelOf(line?.pairing) ?? { code: null, name: null }
       samples.push(
         makeSample(
           rec.voucher_no,
@@ -289,11 +410,23 @@ export async function pullSamplesForWorkpaper(
             credit_amount: l?.credit_amount != null ? String(l.credit_amount) : null,
             summary: String(l?.summary ?? ''),
           })),
+          line?.voucher_type != null ? String(line.voucher_type) : null,
+          // 后端给每行分录补的凭证键与分录指纹：宿主据此去重，账套重导后仍认得同一笔
+          line?.voucher_key ?? rec.voucher_key ?? null,
+          line?.line_fp ?? null,
+          line?.pairing ?? null,
         ),
       )
     }
   }
   return { samples, records, misattached }
+}
+
+/** 挂凭记录对应多张凭证（旧行缺日期或凭证字）：列出是哪几张，提示重新挂凭，不猜是哪一张。 */
+function ambiguousVoucherNote(a: VoucherKeyAmbiguity): string {
+  const names = a.candidates.slice(0, 5).map(c => `${c.voucher_date} ${voucherLabel(c.voucher_type, c.voucher_no)}`)
+  const more = a.candidates.length > 5 || a.truncated ? ' 等' : ''
+  return `该凭证号对应多张凭证（${names.join('、')}${more}），挂凭时未记凭证字或日期，请在序时账重新挂凭后再导入`
 }
 
 function makeSample(
@@ -317,6 +450,13 @@ function makeSample(
   counterpartAccountName: string | null = null,
   /** 完整凭证分录明细 */
   voucherEntries: SampledVoucher['voucherEntries'] = [],
+  /** 凭证字（分录行上带的；未知为 null） */
+  voucherType: string | null = null,
+  /** 凭证键 / 分录指纹（后端穿透给的；占位样本只有挂凭记录的凭证键） */
+  voucherKey: string | null = null,
+  lineFp: string | null = null,
+  /** 后端配对结果（穿透每行带）：回填按它展开或标「多科目」 */
+  pairing: SamplePairing | null = null,
 ): SampledVoucher {
   /**
    * 🔴 两类歧义都要如实标注，且可叠加 —— 静默会让审计师以为这些行是正常取到的。
@@ -333,6 +473,9 @@ function makeSample(
     : '序时账手工挂入'
 
   return {
+    voucherKey,
+    lineFp,
+    pairing,
     voucherNo,
     voucherDate,
     summary,
@@ -342,8 +485,9 @@ function makeSample(
     accountName,
     counterpartAccount,
     counterpartAccountName,
+    isMultiAccount: counterpartAccount === '多科目',
     voucherEntries,
-    voucherType: null,
+    voucherType,
     accountingPeriod: null,
     checkResult: '',
     abnormal: false,

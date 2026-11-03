@@ -1,0 +1,24 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "409 快照回退 V1 未在本批次处置",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "addressRegistry.ts 的 resolve/validate 仍无条件 catch 后落 legacy V1，无 409 区分；属 T18/R2-F13（D5）后续工作，tasks.md 标未做、后端 409 映射未入库。评审指令点名但不在交付范围，记为证据缺口，不阻断本批次。"
+    },
+    {
+      "label": "T28 多项目 SSE 浏览器实测缺截图/查库读回",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "如实标 [ ]*「代码已改但未实测」，依赖未入库的 acnr_targets/display 取数管线；单测层面的按项目隔离已覆盖，tmp_acnr_foundation 下无 screenshots 目录与自述一致。"
+    },
+    {
+      "label": "测试结果与 tsc 变异证明来自提交信息",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "按评审指令未重跑 coder 已跑套件；vitest(3+9+12+9) 全绿与单区域 tsc TS2322 变异证明取自 commit 64eade2e1 信息，后端 16+6 passed 取自 60168a027。"
+    }
+  ],
+  "reviewDoc": "d:\\GT_plan\\.kiro\\specs\\acnr-foundation-defect-closure\\review-p2.md"
+}

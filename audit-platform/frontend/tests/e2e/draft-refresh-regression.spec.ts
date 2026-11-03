@@ -1,6 +1,10 @@
 /**
  * draft-refresh 全局刷新 — 五角色端到端强验收（Playwright）
  *
+ * ⚠️ 本地专用，不纳入 CI（formula-e2e-ci-gate ADR-FEC-03）。
+ * 原因：依赖五个角色账号与本机共享库真实项目数据。
+ * CI 覆盖由 e2e/formula-hub/ 目录下的规格承担。
+ *
  * Spec: formula-runtime-convergence
  * Requirements: 1–14 | P3, P4, P9, P11, P12, P16
  *

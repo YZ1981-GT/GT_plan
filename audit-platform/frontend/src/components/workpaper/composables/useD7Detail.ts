@@ -30,6 +30,7 @@ import {
   AUX_IMPORT_NETWORK_ERROR_PROMPT,
 } from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD7FormData'
+import { postTransferAmount } from './useD7VoucherCheck'
 import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
 import { migrateD7FlatToNested, migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
 
@@ -417,7 +418,7 @@ export function useD7Detail(options: UseD7DetailOptions) {
       for (const pr of postRows) {
         const name = pr.customerName || ''
         if (!name) continue
-        transferMap.set(name, (transferMap.get(name) || 0) + parseNum(pr.creditAmount))
+        transferMap.set(name, (transferMap.get(name) || 0) + postTransferAmount(pr))
       }
 
       let changed = false

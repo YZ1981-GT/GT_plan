@@ -57,14 +57,7 @@
       >
         同步到集中登记
       </el-button>
-      <el-tag
-        v-if="centralStatus?.review_status"
-        size="small"
-        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-        :title="centralStatus.rejection_reason || ''"
-      >
-        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-      </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       <el-tag size="small" type="info" effect="plain" data-testid="g13-adjustment-count">
         共 {{ adj.rows.value.length }} 行
       </el-tag>
@@ -311,11 +304,12 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG13Adjustment } from '../composables/useG13Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useG13Detail } from '../composables/useG13Detail'
 import { G13_BELONG_ACCOUNT_LABELS } from '../composables/g13Constants'

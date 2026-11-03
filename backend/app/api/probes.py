@@ -56,7 +56,24 @@ async def _get_health_snapshot_cached() -> dict:
         if not all_healthy:
             result = {"status": "unhealthy"}
         else:
-            result = {"status": "healthy"}
+            from app.api.health import (
+                _query_migration_status,
+                _query_schema_drift,
+                critical_schema_drift,
+                migration_blocks_readiness,
+            )
+
+            migration = await _query_migration_status()
+            schema_drift = await _query_schema_drift()
+            degraded = (
+                migration_blocks_readiness(migration)
+                or critical_schema_drift(schema_drift)
+            )
+            result = {
+                "status": "degraded" if degraded else "healthy",
+                "migration": migration,
+                "schema_drift": schema_drift,
+            }
 
         _health_cache["data"] = result
         _health_cache["ts"] = now
@@ -83,6 +100,8 @@ async def readyz():
         return JSONResponse(status_code=503, content={
             "status": "not_ready",
             "migration_complete": False,
+            "health": "degraded",
+            "degraded": True,
         })
 
     # 2. 短 TTL 缓存的 health 数据
@@ -94,6 +113,22 @@ async def readyz():
             "status": "not_ready",
             "migration_complete": True,
             "health": "unhealthy",
+        })
+
+    from app.api.health import critical_schema_drift, migration_blocks_readiness
+
+    migration = health.get("migration") or {}
+    schema_drift = health.get("schema_drift") or {}
+    migration_blocked = migration_blocks_readiness(migration)
+    drift_blocked = critical_schema_drift(schema_drift)
+    if migration_blocked or drift_blocked:
+        return JSONResponse(status_code=503, content={
+            "status": "not_ready",
+            "migration_complete": not migration_blocked,
+            "health": "degraded",
+            "degraded": True,
+            "migration": migration,
+            "schema_drift": schema_drift,
         })
 
     return JSONResponse(status_code=200, content={

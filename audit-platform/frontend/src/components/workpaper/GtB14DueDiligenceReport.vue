@@ -419,9 +419,11 @@ async function doAiGenerate(chapterId: string, field: string, mode: 'generate' |
     const prompt = mode === 'polish'
       ? `请润色以下"${chMeta?.title || chapterId}"章节内容，保持专业审计报告语调，优化语句但不改变事实`
       : `请为尽职调查（预备调查）报告的"${chMeta?.title || chapterId}"章节撰写初稿草案，内容应专业、简洁`
+    // 平台没有项目级行业来源（渲染恒给空），空时不发「所属行业：」空行
+    const industry = projectContext.value?.industry || ''
     const ctx: Record<string, string> = {
       被审计单位: projectContext.value?.client_name || '',
-      所属行业: projectContext.value?.industry || '',
+      ...(industry ? { 所属行业: industry } : {}),
       章节: chMeta?.title || chapterId,
       版本: variant.value === 'standard' ? '标准版' : '简化版',
     }

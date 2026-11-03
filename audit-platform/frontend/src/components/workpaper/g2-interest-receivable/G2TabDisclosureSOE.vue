@@ -377,7 +377,7 @@ const wpId = computed(() => props.wpId ?? '')
 const projectId = computed(() => props.projectId ?? '')
 const router = useRouter()
 const route = useRoute()
-const { resolveInstance: acnrResolveInstance } = useAcnr()
+const { resolveInstance: acnrResolveInstance } = useAcnr(() => props.projectId)
 
 const noteTarget = computed(() => resolveG2NoteSectionTarget('soe', props.applicableStandards))
 const noteChip = computed(() => noteTarget.value?.chipValue ?? `Note:${G2_NOTE_SECTION.soe}`)

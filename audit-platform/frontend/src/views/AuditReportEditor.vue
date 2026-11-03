@@ -32,6 +32,9 @@
       </el-button>
     </div>
 
+    <!-- 项目没填审计年度（路由也没带）：报告正文按年度生成 / 导出，不按今年兜底 -->
+    <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
+
     <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <!-- 编辑锁提示 -->
@@ -197,6 +200,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE, useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
   updateAuditReportStatus, refreshAuditReportFinancialData, exportAuditReportWord,
@@ -231,10 +235,15 @@ const router = useRouter()
 const dictStore = useDictStore()
 const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const projectId = computed(() => route.params.projectId as string)
-const year = computed<number | null>(() => {
+const routeYear = computed<number | null>(() => {
   const value = Number(route.query.year)
   return Number.isFinite(value) && value > 0 ? value : null
 })
+// 路由没带年度时按项目审计年度取（原先只认路由 ⇒ 从别处进来全页取不到数）；都没有为 null，不按今年兜底
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(projectId)
+const year = computed<number | null>(() => routeYear.value ?? projectAuditYear.value)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 
 // R8-S2-03：Stale 状态追踪
 import { useStaleStatus } from '@/composables/useStaleStatus'
@@ -299,6 +308,7 @@ const readiness = ref<DataReadiness>({ trialBalanceReady: false, reportsReady: f
  * （match DeliverableCenter 容忍度），由后端 confirm 阶段兜底校验。
  */
 async function refreshReadiness() {
+  if (year.value == null) return
   try {
     const c = await fetchCompleteness(projectId.value, year.value)
     readiness.value = {
@@ -355,6 +365,7 @@ function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger
 function onSectionSelect(s: string) { activeSection.value = s }
 
 async function fetchReport() {
+  if (year.value == null) { report.value = null; return }
   loading.value = true
   try {
     report.value = await getAuditReport(projectId.value, year.value)
@@ -366,6 +377,10 @@ async function fetchReport() {
 }
 
 async function onGenerate() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 需求 14：报告正文生成前置守卫（与交付件中心三入口统一）。
   // 先刷新就绪状态再校验：财务报表未就绪时阻止并提示，不打开 OPT 弹窗。
   await refreshReadiness()
@@ -406,6 +421,10 @@ async function onGenerate() {
  * 重新生成（已有报告）时先提示「将覆盖当前编辑内容」（需求 6.5）。
  */
 async function onOptConfirm(selections: Record<string, boolean>) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 需求 6.5：已有报告版本时确认覆盖
   if (report.value) {
     try {
@@ -441,6 +460,10 @@ async function onOptConfirm(selections: Record<string, boolean>) {
 
 /** 旧版单阶段生成路径（保留备用，不再作为主入口） */
 async function onGenerateLegacy() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   genLoading.value = true
   try {
     await generateAuditReport(projectId.value, year.value, genForm.value.opinion_type, genForm.value.company_type)
@@ -470,6 +493,10 @@ async function onStatusChange(status: string) {
 }
 
 async function onExportWord() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   exportingWord.value = true
   try {
     const blob = await exportAuditReportWord(projectId.value, year.value)
@@ -489,6 +516,10 @@ async function onExportWord() {
 
 async function onRefreshFinancialData() {
   if (!report.value) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   refreshLoading.value = true
   try {
     const result = await refreshAuditReportFinancialData(projectId.value, year.value)
@@ -509,12 +540,16 @@ async function onRefreshFinancialData() {
 }
 
 onMounted(async () => {
+  if (routeYear.value == null) await ensureAuditYear()
+  yearResolved.value = true
   await fetchReport()
   // 需求 20.2：检查未更正错报是否超过重要性水平
   try {
-    const summary = await getMisstatementSummary(projectId.value, year.value)
-    if (summary?.exceeds_materiality === true) {
-      misstatementWarning.value = true
+    if (year.value != null) {
+      const summary = await getMisstatementSummary(projectId.value, year.value)
+      if (summary?.exceeds_materiality === true) {
+        misstatementWarning.value = true
+      }
     }
   } catch { /* 静默失败，不影响主流程 */ }
   // R8-S2-14：关闭浏览器/刷新前警告

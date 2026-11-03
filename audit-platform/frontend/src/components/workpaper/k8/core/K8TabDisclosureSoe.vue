@@ -107,6 +107,14 @@ import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK8SyncPayload } from '../../composables/k8NoteSectionMap'
+import {
+  applyK8AutoFill,
+  k8DisclosureSyncRows,
+  loadK8DisclosureState,
+  readK81AuditedMap,
+  type K8DisclosureFormRow,
+  type K8RowIdentity,
+} from '../../composables/k8DisclosureSnapshot'
 import type { Ref } from 'vue'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
@@ -129,11 +137,11 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 合计行由载荷层统一派生，此处只推明细行（避免双合计）
+  // 合计行由载荷层统一派生，此处只推明细行（避免双合计；与离屏同步共用 k8DisclosureSyncRows）
   const payload = buildK8SyncPayload(
     'soe',
     props.wpId || '',
-    disclosureRows.value.filter(r => !r.isTotal),
+    k8DisclosureSyncRows(disclosureRows.value),
     narrativeText.value,
   )
   try {
@@ -148,100 +156,31 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  id: string
-  project: string
-  currentAmount: number
-  priorAmount: number
-  isTotal?: boolean
-}
+type DisclosureRow = K8DisclosureFormRow
 
 const disclosureRows = ref<DisclosureRow[]>([])
 const narrativeText = ref('')
 const hasAutoData = ref(false)
 
-// ─── 默认行（国企简化版） ────────────────────────────────────────────────────
+/** 行身份走值化身份工厂（载荷不含身份） */
+const ROW_IDENTITY: K8RowIdentity = { newRow: (kind) => newRowIdentity(kind) }
 
-const DEFAULT_SOE_PROJECTS = [
-  '职工薪酬', '差旅费', '业务招待费', '广告宣传费', '运输费',
-  '折旧费', '摊销费', '办公费', '通讯费', '物料消耗',
-  '租赁费', '保险费', '修理费', '包装费', '佣金及手续费',
-  '售后服务费', '水电费', '仓储费', '其他',
-]
-
-function initDefaultRows(): void {
-  disclosureRows.value = DEFAULT_SOE_PROJECTS.map((name, idx) => ({
-    id: newRowIdentity('soe'),
-    project: name,
-    currentAmount: 0,
-    priorAmount: 0,
-  }))
-}
-
-// ─── 加载已保存数据 ──────────────────────────────────────────────────────────
-
-/** 读 K8-1-audited-by-item（{项目名:{audited,prior}}） */
-function _readK81Map(): Record<string, { audited?: number; prior?: number }> {
-  const adjData = props.allResponses.get('K8-1-audited-by-item')
-  if (!adjData?.remark) return {}
-  try {
-    const m = JSON.parse(adjData.remark)
-    return m && typeof m === 'object' ? m : {}
-  } catch { return {} }
-}
-
-/** 从 K8-1 审定表项目动态构建披露行 */
-function buildRowsFromK81(): DisclosureRow[] | null {
-  const map = _readK81Map()
-  const names = Object.keys(map)
-  if (!names.length) return null
-  return names.map((name, idx) => ({
-    id: newRowIdentity('k81'),
-    project: name,
-    currentAmount: Number(map[name].audited ?? 0),
-    priorAmount: Number(map[name].prior ?? 0),
-  }))
-}
+// ─── 加载已保存数据（无手工保存时优先按 K8-1 审定表项目建行，否则默认清单；与离屏同步共用） ──
 
 function loadSavedData(): void {
-  const saved = props.allResponses.get('K8-disclosure-soe-rows')
-  if (saved?.remark) {
-    try { disclosureRows.value = JSON.parse(saved.remark) } catch { initDefaultRows() }
-  } else {
-    const fromK81 = buildRowsFromK81()
-    if (fromK81) { disclosureRows.value = fromK81; hasAutoData.value = true }
-    else initDefaultRows()
-  }
-  const savedNarrative = props.allResponses.get('K8-disclosure-soe-narrative')
-  if (savedNarrative?.remark) { narrativeText.value = savedNarrative.remark }
+  const state = loadK8DisclosureState(props.allResponses, 'soe', ROW_IDENTITY)
+  disclosureRows.value = state.rows
+  if (state.hasAutoData) hasAutoData.value = true
+  narrativeText.value = state.narrativeText
 }
 
-// ─── 自动取数 ────────────────────────────────────────────────────────────────
+// ─── 自动取数（回填同名行 + 追加新费用项目，再保存） ────────────────────────
 
 function applyAutoFill(): void {
-  const data = _readK81Map()
-  const names = Object.keys(data)
-  if (!names.length) return
+  const data = readK81AuditedMap(props.allResponses)
+  if (!Object.keys(data).length) return
   hasAutoData.value = true
-  const existing = new Set(disclosureRows.value.map(r => r.project))
-  for (const row of disclosureRows.value) {
-    const src = (data as any)[row.project]
-    if (src) {
-      row.currentAmount = Number(src.currentAmount ?? src.audited ?? 0)
-      row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
-    }
-  }
-  for (const name of names) {
-    if (!existing.has(name)) {
-      const src = (data as any)[name]
-      disclosureRows.value.push({
-        id: newRowIdentity('k81'),
-        project: name,
-        currentAmount: Number(src.audited ?? 0),
-        priorAmount: Number(src.prior ?? 0),
-      })
-    }
-  }
+  applyK8AutoFill(data, disclosureRows.value, 'soe', ROW_IDENTITY)
   persistRows()
 }
 
@@ -312,7 +251,7 @@ onUnmounted(() => {
 // ─── 披露合计 ↔ K8-1审定合计 勾稽 ──────────────────────────────────────────
 const disclosureCurrentTotal = computed(() => disclosureRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0))
 const k81AuditedTotal = computed(() => {
-  const m = _readK81Map()
+  const m = readK81AuditedMap(props.allResponses)
   return Object.values(m).reduce((s: number, v: any) => s + Number(v?.audited ?? 0), 0)
 })
 const disclosureReconcile = computed(() => {

@@ -15,11 +15,11 @@
       "item_ids": [
         "G3-2-detail-rows"
       ],
-      "note": "G9 其他非流动金融资产的明细行存成 checklist_responses 的 **remark** JSON 数组（真库实证 remark 605 B / conclusion 0 B）。🔴 三个受管区（其他非流动金融资产 / 划分为FVTPL / 指定为FVTPL）共用**同一个** `G3-2-detail-rows` 数组，行的区归属由 `section` 字段表达 —— 契约里对应三条 `tables[]`（逐段不同 uuid_col 与行区间），但 `html_store.item_ids` 只有一条。",
+      "note": "G3-2 明细行存成 checklist_responses 的 **conclusion** JSON 数组（`useG3Detail` 读写 conclusion）。两个受管区（一年以内 / 一年以上）共用**同一个** `G3-2-detail-rows` 数组，行的区归属由 `agingCategory` 字段表达 —— 契约里对应两条 `tables[]`（逐区不同 uuid_col 与行区间），`html_store.item_ids` 只有一条。",
       "payload_column": "conclusion",
       "payload_column_mode": "conclusion_only",
-      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts —— 写入点为 debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(list) })",
-      "row_section_field": "section",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts —— 写入点为 opts.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(rows.value) })",
+      "row_section_field": "agingCategory",
       "row_section_values": [
         "within_one_year",
         "over_one_year"
@@ -28,7 +28,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "phase5_dividend_receivable_detail",
-    "reviewed_basis": "openpyxl 逐格实测 G/G3 应收股利.xlsx 的 `明细表G9-2`（两级表头 R9 组 / R10 叶子 / 三个受管区 R12-16·R19-23·R26-28 / 区标题行 R11·R18·R25 无公式 / 小计 R17·R24·R29 / 合计 R30 枚举相加 =SUM(C17,C24,C29) / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / 有效内容列 28 即 A-AB / 0 个 definedName / 受管表零裸 IF) + 前端 `useG9Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段） + 模板编制思路见 spec evidence/task8-template-design-logic.md（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / 四阶段 未审→账项调整→审定→重分类报表 / P=C+M 与 Q=D+N 走未审线）"
+    "reviewed_basis": "受管表 `明细表G3-2` 两区 R13-20 / R23-28（footer R21 / R29），区字段 `agingCategory`（within_one_year / over_one_year），行身份 `id`，隐藏身份列 AH / AI；几何以 `phase5_g3_02_detail` 为准。前端 `useG3Detail.ts`（DATA_KEY = G3-2-detail-rows）。（原文整段照抄 G9 的 `明细表G9-2` 三区几何与 `useG9Detail.ts`，spec oo-writeback-template-parity-closure R3 批 B3 改正。）"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",

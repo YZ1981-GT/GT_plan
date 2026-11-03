@@ -57,6 +57,13 @@
             <div v-if="summaryRows.length === 0" style="text-align: center; padding: 40px; color: var(--gt-color-text-tertiary)">
               暂无已导入数据
             </div>
+            <div v-for="(dataset, datasetYear) in summary.datasets || {}" :key="dataset.id" class="active-dataset-result">
+              <div class="active-dataset-title">{{ datasetYear }} 年当前账套</div>
+              <LedgerAppendResultPanel
+                :append-report="dataset.source_summary?.append"
+                :voucher-diff="dataset.source_summary?.voucher_diff"
+              />
+            </div>
           </div>
         </el-tab-pane>
 
@@ -168,10 +175,22 @@
                   </el-tag>
                   <span v-if="incrementalDiff.diff.overlap.length === 0" style="color: var(--gt-color-text-tertiary)">无</span>
                 </div>
+                <div>
+                  <span style="color: var(--gt-color-primary); font-weight: 600">将继承月份：</span>
+                  <span>{{ (incrementalDiff.inherited_periods || []).map((p: number) => `${p}月`).join('、') || '无' }}</span>
+                </div>
+                <div v-if="incrementalDiff.skipped_file_periods?.length">
+                  <span style="color: var(--gt-color-wheat); font-weight: 600">将跳过文件月份：</span>
+                  <span>{{ incrementalDiff.skipped_file_periods.map((p: number) => `${p}月`).join('、') }}</span>
+                </div>
+                <div v-if="incrementalDiff.overwritten_periods?.length">
+                  <span style="color: var(--gt-color-wheat); font-weight: 600">将由文件替代：</span>
+                  <span>{{ incrementalDiff.overwritten_periods.map((p: number) => `${p}月`).join('、') }}</span>
+                </div>
                 <div v-if="incrementalDiff.diff.overlap.length > 0" style="margin-top: 8px">
-                  <el-radio-group v-model="overlapStrategy">
+                  <el-radio-group v-model="overlapStrategy" @change="() => onDetectIncremental()">
                     <el-radio value="skip">跳过重叠月份（只追加新月份）</el-radio>
-                    <el-radio value="overwrite">覆盖重叠月份（删除旧数据）</el-radio>
+                    <el-radio value="overwrite">文件月份替代上一版本（上一版本仍可回滚）</el-radio>
                   </el-radio-group>
                 </div>
               </div>
@@ -186,10 +205,10 @@
               <template #title>操作步骤</template>
               <template #default>
                 <ol style="margin: 4px 0 0 16px; padding: 0; font-size: var(--gt-font-size-sm); line-height: 1.8">
-                  <li>选择年度（上方）</li>
-                  <li>点击"检测"输入文件将要导入的月份</li>
-                  <li>确认重叠策略（跳过/覆盖）</li>
-                  <li>执行清理旧数据后上传文件继续导入</li>
+                  <li>选择年度，并填写文件包含的月份</li>
+                  <li>点击「检测差异」查看已有 / 文件 / 继承 / 重叠月份</li>
+                  <li>确认重叠月份保留上一版本还是使用文件版本</li>
+                  <li>上传文件；系统只在新 staged 内合并，成功前不修改当前账套</li>
                 </ol>
               </template>
             </el-alert>
@@ -206,15 +225,6 @@
                 @click="onDetectIncremental"
               >
                 检测差异
-              </el-button>
-              <el-button
-                v-if="incrementalDiff && (incrementalDiff.diff.overlap.length > 0 || incrementalDiff.diff.new.length > 0)"
-                size="small"
-                type="warning"
-                :disabled="!incrementalForm.year"
-                @click="onApplyIncremental"
-              >
-                执行清理
               </el-button>
               <el-button
                 size="small"
@@ -240,6 +250,12 @@ import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useProjectStore } from '@/stores/project'
+import LedgerAppendResultPanel from './LedgerAppendResultPanel.vue'
+import {
+  buildIncrementalDetectBody,
+  normalizeIncrementalRequest,
+  type IncrementalUploadRequest,
+} from './ledgerAppendResult'
 
 const props = defineProps<{
   modelValue: boolean
@@ -249,7 +265,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'data-changed'): void
-  (e: 'request-incremental-upload', year: number): void
+  (e: 'request-incremental-upload', request: IncrementalUploadRequest): void
 }>()
 
 const visible = ref(props.modelValue)
@@ -419,7 +435,16 @@ async function onDelete() {
 
 function onOpenIncrementalUpload() {
   if (!incrementalForm.value.year) return
-  emit('request-incremental-upload', incrementalForm.value.year)
+  const request = normalizeIncrementalRequest({
+    year: incrementalForm.value.year,
+    strategy: overlapStrategy.value,
+    filePeriods: _parseFilePeriods(),
+  })
+  if (request.filePeriods.length === 0) {
+    ElMessage.warning('请先填写并检测文件月份')
+    return
+  }
+  emit('request-incremental-upload', request)
 }
 
 function _parseFilePeriods(): number[] {
@@ -440,7 +465,11 @@ async function onDetectIncremental() {
   try {
     incrementalDiff.value = await api.post(
       ledger.data.incrementalDetect(props.projectId),
-      { year: incrementalForm.value.year, file_periods },
+      buildIncrementalDetectBody({
+        year: incrementalForm.value.year,
+        filePeriods: file_periods,
+        strategy: overlapStrategy.value,
+      }),
     )
     // 默认策略：有 overlap 则提示用户选择，否则 skip
     if (incrementalDiff.value.diff.overlap.length === 0) {
@@ -448,55 +477,6 @@ async function onDetectIncremental() {
     }
   } catch (exc: any) {
     handleApiError(exc, '检测')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function onApplyIncremental() {
-  if (!incrementalForm.value.year || !incrementalDiff.value) return
-  const file_periods = _parseFilePeriods()
-  const strategy = overlapStrategy.value
-
-  if (strategy === 'overwrite') {
-    const ovMonths = incrementalDiff.value.diff.overlap.join(', ')
-    try {
-      await ElMessageBox.confirm(
-        `即将覆盖 ${incrementalForm.value.year} 年 ${ovMonths} 月数据，此操作不可恢复，是否继续？`,
-        '覆盖确认',
-        { confirmButtonText: '确认覆盖', cancelButtonText: '取消', type: 'warning' },
-      )
-    } catch {
-      return
-    }
-  }
-
-  loading.value = true
-  try {
-    const result: any = await api.post(
-      ledger.data.incrementalApply(props.projectId),
-      {
-        year: incrementalForm.value.year,
-        file_periods,
-        overlap_strategy: strategy,
-        confirmed: strategy === 'overwrite',
-      },
-    )
-    if (result.executed) {
-      const rows = result.action?.rows_deleted
-      const total = rows
-        ? Object.values(rows).reduce((a: number, b: any) => a + (Number(b) || 0), 0)
-        : 0
-      ElMessage.success(`已清理 ${total} 行旧数据，请上传文件继续`)
-    } else {
-      ElMessage.info('跳过策略下无需清理，可直接上传新月份文件')
-    }
-    emit('data-changed')
-    await refreshSummary()
-    // 清空检测结果，鼓励用户上传新文件
-    incrementalDiff.value = null
-  } catch (exc: any) {
-    handleApiError(exc, '清理')
   } finally {
     loading.value = false
   }
@@ -511,3 +491,13 @@ watch(visible, (v) => {
   if (v) refreshSummary()
 })
 </script>
+<style scoped>
+.active-dataset-result {
+  margin-top: var(--gt-space-4);
+}
+
+.active-dataset-title {
+  color: var(--gt-color-text-primary);
+  font-weight: 600;
+}
+</style>

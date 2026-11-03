@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """N2 应交税费 —— 双向回写 provider（照 N4 范式）。
 
-spec: n-cycle-sync-continuation
-entry: xlsx/gt-n3-deferred-tax-liabilities
-科目: 2901 应交税费（贷方/负债类）
+spec: oo-writeback-template-parity-closure R3 批 C
+entry: xlsx/gt-n2-taxes-payable
+科目: 2221 应交税费（贷方/负债类）
 受管 sheet: 应交税费明细表N2-2
 """
 from __future__ import annotations
@@ -23,7 +23,6 @@ from app.services.workpaper_sync.contracts import (
     contract_path_for,
     load_contract,
 )
-from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import (
     DescriptorFacts,
     RoomFacts,
@@ -63,6 +62,8 @@ from app.services.workpaper_sync.phase5_n2_sheets import (  # noqa: F401,E402
     MANAGED_LAST_COL,
     MANAGED_SHEET,
     PHASE5_WAVE,
+    PAYLOAD_COLUMN,
+    PAYLOAD_COLUMN_MODE,
     ROW_IDENTITY_STORE_KEY,
     ROWS_TABLE_KEY,
     SHEET_KEY,
@@ -167,7 +168,7 @@ def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
 def instrumentation_spec() -> ExcelInstrumentationSpec:
     specs = instrumentation_specs()
     if len(specs) != 1:
-        raise EntrySelectionError(f"N3 应有 1 条 instrumentation spec，实际 {len(specs)}")
+        raise EntrySelectionError(f"N2 应有 1 条 instrumentation spec，实际 {len(specs)}")
     return specs[0]
 
 

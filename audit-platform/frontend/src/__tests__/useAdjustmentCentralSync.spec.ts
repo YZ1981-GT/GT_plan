@@ -39,6 +39,7 @@ vi.mock('@/services/sse/projectEventStream', () => ({
 import {
   useAdjustmentCentralSync,
   computeContentSignature,
+  syncOutcomeMessage,
   type UseAdjustmentCentralSyncOptions,
   type CentralSyncLineItem,
 } from '@/components/workpaper/composables/useAdjustmentCentralSync'
@@ -158,6 +159,44 @@ describe('useAdjustmentCentralSync', () => {
     expect(s.centralStatus.value?.review_status).toBe('approved')
   })
 
+  // post-push-residual-defect-closure R2：项目没填审计年度不按今年写集中登记
+  it('审计年度为空：手动同步提示去填年度、不调用后端', async () => {
+    statusMock.mockResolvedValue(null)
+    const s = useAdjustmentCentralSync({
+      projectId: ref('proj-1'),
+      year: ref<number | null>(null),
+      wpId: ref('wp-1'),
+      wpCode: 'D4',
+      itemId: 'D4-4-rows',
+      buildLineItems: () => BALANCED_ITEMS,
+      buildMeta: () => ({ description: '收入调整', adjustmentType: 'aje' }),
+    })
+    await s.syncToCentral()
+    expect(syncMock).not.toHaveBeenCalled()
+    expect(msg.warning).toHaveBeenCalledWith('未设置审计年度，请先在项目基本信息中填写')
+  })
+
+  // ─── adjustment-hall-entry-review-closure：推送结果与失败原因如实提示 ─────────
+
+  it('推送结果按后端 sync_outcome 提示（新建 / 更新回草稿 / 未变化）', () => {
+    expect(syncOutcomeMessage({ sync_outcome: 'created', adjustment_no: 'AJE-005' }))
+      .toContain('请提交复核；批准后方可从来源审定表显式发布到试算表')
+    const updated = syncOutcomeMessage({ sync_outcome: 'updated', previous_status: 'pending_review', adjustment_no: 'AJE-005' })
+    expect(updated).toContain('已回到草稿')
+    expect(updated).toContain('重新提交复核')
+    expect(syncOutcomeMessage({ sync_outcome: 'updated', previous_status: 'draft' })).not.toContain('重新提交')
+    expect(syncOutcomeMessage({ sync_outcome: 'unchanged', adjustment_no: 'AJE-005' })).toContain('无需重复同步')
+  })
+
+  it('其余错误码显示后端原因（如协作锁定），不再是笼统的「同步失败」', async () => {
+    syncMock.mockRejectedValue({ response: { status: 409, data: { detail: {
+      error_code: 'COLLABORATION_LOCKED', message: '该分录组存在进行中的协作补充' } } } })
+    statusMock.mockResolvedValue(null)
+    const s = makeSync(BALANCED_ITEMS)
+    await s.syncToCentral()
+    expect(msg.error).toHaveBeenCalledWith(expect.stringContaining('该分录组存在进行中的协作补充'))
+  })
+
   // ─── Phase 3：computeContentSignature ──────────────────────────────────
 
   describe('computeContentSignature', () => {
@@ -269,6 +308,20 @@ describe('useAdjustmentCentralSync', () => {
       s.scheduleAutoSync()
       await vi.advanceTimersByTimeAsync(5000)
       expect(syncMock).not.toHaveBeenCalled()
+      expect(msg.error).not.toHaveBeenCalled()
+    })
+
+    it('审计年度为空时自动同步静默跳过（不弹消息、不调用后端）', async () => {
+      statusMock.mockResolvedValue(null)
+      const items = ref(BALANCED_ITEMS)
+      const { sync: s, wrapper: w } = mountSync(items, { year: ref<number | null>(null) })
+      wrapper = w
+      await vi.advanceTimersByTimeAsync(0)
+
+      s.scheduleAutoSync()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(syncMock).not.toHaveBeenCalled()
+      expect(msg.warning).not.toHaveBeenCalled()
       expect(msg.error).not.toHaveBeenCalled()
     })
 

@@ -90,14 +90,6 @@ describe('useF5MajorAdjustment', () => {
     expect(adj.rows.value.find((r) => r.id === id)).toBeFalsy()
   })
 
-  it('抽凭样本 merge 借方/贷方', () => {
-    const allResponses = mkResponses()
-    const adj = useF5MajorAdjustment({ allResponses, isReadonly: ref(false) })
-    const n = adj.mergeSamplingRows([
-      { voucher_date: '2024-03-01', voucher_no: '记-9', summary: '成本调整', debit_amount: 100, credit_amount: 0 },
-    ])
-    expect(n).toBe(1)
-    expect(adj.rows.value[0].voucherNo).toBe('记-9')
-    expect(adj.rows.value[0].debitAmount).toBe(100)
-  })
+  // 抽凭样本填入（原 mergeSamplingRows）改经共享回填函数，见 f5MajorAdjFill.spec
+  // （spec voucher-identity-writeback-and-audit-phase 任务 11）
 })

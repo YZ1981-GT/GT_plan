@@ -160,6 +160,13 @@ import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK7SyncPayload, K7_NOTE_SECTION } from '../../composables/k7NoteSectionMap'
+import {
+  applyK7AutoFill,
+  buildK7DisclosureSnapshot,
+  loadK7DisclosureState,
+  type K7DisclosureFormRow,
+  type K7RowIdentity,
+} from '../../composables/k7DisclosureSnapshot'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K7_ACCOUNT_CODE = '2401'
@@ -185,104 +192,29 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  id: string
-  project: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  reason: string
-  isTotal?: boolean
-  isAutoFill?: boolean
-}
+type DisclosureRow = K7DisclosureFormRow
 
 const assetRelatedRows = ref<DisclosureRow[]>([])
 const incomeRelatedRows = ref<DisclosureRow[]>([])
 const narrativeText = ref('')
 const hasAutoData = ref(false)
 
-// ─── 默认行 ──────────────────────────────────────────────────────────────────
+/** 行身份走值化身份工厂（载荷不含身份） */
+const ROW_IDENTITY: K7RowIdentity = { newRow: (kind) => newRowIdentity(kind) }
 
-function initDefaultRows(): void {
-  const assetDefaults = ['设备购置补助', '厂房建设补助', '技改项目补助', '环保设备补助', '其他与资产相关补助']
-  const incomeDefaults = ['研发费用补助', '稳岗补贴', '产业扶持资金', '出口退税补贴', '其他与收益相关补助']
-
-  assetRelatedRows.value = assetDefaults.map((name, idx) => ({
-    id: newRowIdentity('asset'),
-    project: name,
-    beginBalance: 0,
-    increase: 0,
-    decrease: 0,
-    reason: '',
-  }))
-
-  incomeRelatedRows.value = incomeDefaults.map((name, idx) => ({
-    id: newRowIdentity('income'),
-    project: name,
-    beginBalance: 0,
-    increase: 0,
-    decrease: 0,
-    reason: '',
-  }))
-}
-
-// ─── 加载已保存数据 ──────────────────────────────────────────────────────────
+// ─── 加载已保存数据（缺失回默认行；与离屏同步共用 k7DisclosureSnapshot） ──────
 
 function loadSavedData(): void {
-  const savedAsset = allResponsesRef.value.get('K7-disclosure-listed-asset-rows')
-  if (savedAsset?.remark) {
-    try {
-      assetRelatedRows.value = JSON.parse(savedAsset.remark)
-    } catch { initDefaultRows() }
-  } else {
-    initDefaultRows()
-  }
-
-  const savedIncome = allResponsesRef.value.get('K7-disclosure-listed-income-rows')
-  if (savedIncome?.remark) {
-    try {
-      incomeRelatedRows.value = JSON.parse(savedIncome.remark)
-    } catch { /* keep default */ }
-  }
-
-  const savedNarrative = allResponsesRef.value.get('K7-disclosure-listed-narrative')
-  if (savedNarrative?.remark) {
-    narrativeText.value = savedNarrative.remark
-  }
+  const state = loadK7DisclosureState(allResponsesRef.value, 'listed', ROW_IDENTITY)
+  assetRelatedRows.value = state.assetRows
+  incomeRelatedRows.value = state.incomeRows
+  narrativeText.value = state.narrativeText
 }
 
 // ─── 自动取数（从K7-1审定表） ────────────────────────────────────────────────
 
 function applyAutoFill(): void {
-  const adjData = allResponsesRef.value.get('K7-1-audited-by-type')
-  if (adjData?.remark) {
-    hasAutoData.value = true
-    try {
-      const data = JSON.parse(adjData.remark)
-      if (data?.assetRelated) {
-        for (const row of assetRelatedRows.value) {
-          const src = data.assetRelated[row.project]
-          if (src) {
-            row.beginBalance = Number(src.beginBalance ?? 0)
-            row.increase = Number(src.increase ?? 0)
-            row.decrease = Number(src.decrease ?? 0)
-            row.isAutoFill = true
-          }
-        }
-      }
-      if (data?.incomeRelated) {
-        for (const row of incomeRelatedRows.value) {
-          const src = data.incomeRelated[row.project]
-          if (src) {
-            row.beginBalance = Number(src.beginBalance ?? 0)
-            row.increase = Number(src.increase ?? 0)
-            row.decrease = Number(src.decrease ?? 0)
-            row.isAutoFill = true
-          }
-        }
-      }
-    } catch { /* silent */ }
-  }
+  if (applyK7AutoFill(allResponsesRef.value, assetRelatedRows.value, incomeRelatedRows.value)) hasAutoData.value = true
 }
 
 // ─── 字段更新 ────────────────────────────────────────────────────────────────
@@ -444,17 +376,12 @@ function handleAiNarrative(): Promise<void> {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 附注 五、51 只有 1 张表 → 与资产相关 / 与收益相关 两张底稿表的行拼成一个列表。
+  // 附注 五、51 只有 1 张表 → 与资产相关 / 与收益相关 两张底稿表的行拼成一个列表（快照与离屏同步共用）。
   // 上市版 5 个值列（末列 形成原因），期末余额由 builder 按 F51-3 算（期初+增加−减少）。
-  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value]
-    .filter(r => !r.isTotal)
-    .map(r => ({
-      project: r.project,
-      beginBalance: r.beginBalance ?? 0,
-      increase: r.increase ?? 0,
-      decrease: r.decrease ?? 0,
-      reason: r.reason ?? '',
-    }))
+  const { rows } = buildK7DisclosureSnapshot('listed', {
+    assetRows: assetRelatedRows.value,
+    incomeRows: incomeRelatedRows.value,
+  })
   const payload = buildK7SyncPayload('listed', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)

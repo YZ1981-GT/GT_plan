@@ -64,7 +64,7 @@ export async function fetchCycleAuditedAmounts(
 
 export function useCycleAuditedAmounts(
   projectId: MaybeRef<string | undefined>,
-  year: MaybeRef<number | undefined>,
+  year: MaybeRef<number | null | undefined>,
 ) {
   const amounts = ref<CycleAuditedAmounts | null>(null)
   const loading = ref(false)

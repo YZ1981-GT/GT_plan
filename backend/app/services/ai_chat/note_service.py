@@ -12,9 +12,9 @@ Requirements:
 Design: "Components and Interfaces → 8. 项目笔记转存"
 
 笔记转存流程：
-1. 校验 knowledge.create 权限
+1. 反查来源会话 + 判定保存位置并判权（``note_target``，spec ai-chat-adopt-and-note-target-picker）
 2. claim_action_receipt 抢占幂等收据
-3. 定位/创建目标文件夹（"AI 对话笔记" 项目级文件夹，单一真源）
+3. 定位/创建目标文件夹（项目「AI 对话笔记」系统文件夹，或用户选定的知识库文件夹）
 4. 从数据库读取 completed assistant 正文（服务端权威来源，不信任客户端正文）
 5. 写入 KnowledgeDocument（复用 KnowledgeDocumentService.create_document）
 6. settle_action_receipt 成功/失败
@@ -39,17 +39,16 @@ from app.models.ai_models import (
     ChatMessageStatus,
     ChatRole,
 )
-from app.models.knowledge_models import KnowledgeFolder
 from app.services.ai_chat.access import ResourceAccessResolver
-from app.services.ai_chat.contracts import (
-    AccessDecision,
-    AiChatAction,
-    ResourceType,
-)
 from app.services.ai_chat.host_context import AuthorizedHostContext
+from app.services.ai_chat.note_target import (
+    NoteSaveFailed,
+    folder_location_label,
+    resolve_note_source,
+    resolve_note_target,
+)
 from app.services.ai_chat.persistence import (
     claim_action_receipt,
-    content_hash,
     settle_action_receipt,
 )
 from app.services.knowledge_folder_service import PROJECT_FOLDER_SLOTS
@@ -82,14 +81,8 @@ def knowledge_jump_route(*, doc_id: Any = None, folder_id: Any = None) -> str:
 #: AI 笔记文件夹的标准名称（单一真源在 knowledge_folder_service.PROJECT_FOLDER_SLOTS，Req 8.4）
 AI_NOTES_FOLDER_NAME = PROJECT_FOLDER_SLOTS["ai_notes"]
 
-
-class NoteSaveFailed(Exception):
-    """笔记转存失败。"""
-
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
+# NoteSaveFailed 定义在 note_target（来源 / 位置判定先于收据抛出），此处 re-export：
+# 路由与既有测试仍从 note_service 导入。
 
 
 class NoteSaveRequest:
@@ -119,11 +112,14 @@ class NoteSaveResult:
         folder_id: UUID | None,
         name: str,
         replayed: bool = False,
+        location: str = "",
     ) -> None:
         self.document_id = document_id
         self.folder_id = folder_id
         self.name = name
         self.replayed = replayed
+        #: 实际保存位置（知识库文件夹完整路径），前端成功提示原样展示
+        self.location = location
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -132,6 +128,7 @@ class NoteSaveResult:
             "folder_id": str(self.folder_id) if self.folder_id else None,
             "name": self.name,
             "replayed": self.replayed,
+            "location": self.location,
             # 前端真实路由（KnowledgeBase.vue 读 ?folder_id / ?doc_id 深链）；
             # 旧值 /knowledge/docs/{id} 前端没有该路由，点击恒 404。
             "jump_route": knowledge_jump_route(doc_id=self.document_id, folder_id=self.folder_id),
@@ -149,17 +146,23 @@ async def save_note(
     user: Any,
     actor_id: UUID,
     host: AuthorizedHostContext,
-    session_id: UUID,
+    session_id: UUID | None,
     message_ids: list[UUID],
     name: str,
     idempotency_key: str,
+    target_project_id: UUID | None = None,
+    target_folder_id: UUID | None = None,
+    access: ResourceAccessResolver | None = None,
 ) -> NoteSaveResult:
-    """执行项目笔记转存。
+    """执行笔记转存。
 
     Req 8.1–8.9 的完整流程。失败时回滚 receipt，可安全重试。
+    保存位置（spec ai-chat-adopt-and-note-target-picker R4）：``target_project_id`` /
+    ``target_folder_id`` 二选一，都不传用宿主项目；``session_id`` 可选（服务端由消息反查）。
+    来源会话与位置的判定都先于收据，失败零副作用。
 
     Raises:
-        NoteSaveFailed: 权限/消息/名称校验失败
+        NoteSaveFailed: 权限/消息/名称/位置校验失败
     """
     if not message_ids:
         raise NoteSaveFailed("no_messages", "请至少选择一条 AI 消息")
@@ -167,25 +170,20 @@ async def save_note(
         raise NoteSaveFailed("empty_name", "请提供笔记名称")
     name = name.strip()[:200]  # 限制名称长度
 
-    project_id = host.project_id
-    if project_id is None:
-        raise NoteSaveFailed(
-            "no_project", "当前宿主无项目绑定，无法创建项目笔记"
-        )
-
-    # ① 校验 knowledge.create 权限（Req 8.2）
-    resolver = ResourceAccessResolver(db)
-    host_decision = AccessDecision(
-        allowed=True,
-        principal_id=host.principal_id,
-        project_id=project_id,
-        cycle_scope=host.cycle_scope,
-        allowed_actions=host.allowed_actions,
-        scope_unbounded=host.scope_unbounded,
+    # ① 来源会话（服务端反查）与保存位置（含判权），均在收据之前
+    source = await resolve_note_source(
+        db, actor_id=actor_id, message_ids=message_ids, session_id=session_id
     )
-    # 检查角色是否有 note_create 动作权限
-    if not host.allows(AiChatAction.note_create):
-        raise NoteSaveFailed("action_denied", "当前角色无权创建项目笔记")
+    session_id = source.session_id
+    target = await resolve_note_target(
+        db,
+        user=user,
+        host=host,
+        source=source,
+        target_project_id=target_project_id,
+        target_folder_id=target_folder_id,
+        access=access,
+    )
 
     # ② claim_action_receipt 抢占幂等收据（Req 8.8）
     receipt, claimed = await claim_action_receipt(
@@ -200,11 +198,13 @@ async def save_note(
         # 幂等命中：检查既有收据状态
         if receipt.status == ActionReceiptStatus.succeeded.value:
             # 已成功，直接返回同一文档（Req 8.8：重复点击复用同一 idempotency key）
+            replay_folder = await _replayed_folder_id(db, receipt)
             return NoteSaveResult(
                 document_id=receipt.result_resource_id,
-                folder_id=await _replayed_folder_id(db, receipt),
+                folder_id=replay_folder,
                 name=name,
                 replayed=True,
+                location=await folder_location_label(db, replay_folder),
             )
         elif receipt.status == ActionReceiptStatus.failed.value:
             # 失败收据：重置为 pending 允许重试（Req 8.9）
@@ -221,17 +221,19 @@ async def save_note(
         messages = await _load_messages(db, message_ids, actor_id, session_id)
         if not messages:
             raise NoteSaveFailed(
-                "messages_not_found", "所选消息不存在或非当前用户的已完成 assistant 消息"
+                "messages_not_found", "所选回复不存在、未完成或不属于你的对话"
             )
 
         # ④ 拼接笔记正文
         note_content = _assemble_note_content(messages, name)
 
-        # ⑤ 定位/创建目标文件夹（单一真源规则，Req 8.4）
-        folder = await _ensure_notes_folder(db, project_id, actor_id)
+        # ⑤ 定位/创建目标文件夹：项目目标 = 项目「AI 对话笔记」（单一真源规则，Req 8.4）；
+        #    文件夹目标 = 用户选定的知识库文件夹（已判权）
+        folder = await target.ensure_folder(db)
+        access_level, project_ids = target.document_access
 
         # ⑥ 写入 KnowledgeDocument（文档服务；旧代码调用 KnowledgeFolderService.create_document
-        #    —— 该方法不存在，转存恒失败）
+        #    —— 该方法不存在，转存恒失败）。同 (folder, name) 自动成为新版本。
         from app.services.knowledge_folder_service import KnowledgeDocumentService
 
         doc = await KnowledgeDocumentService(db).create_document(
@@ -241,8 +243,8 @@ async def save_note(
             file_type="md",
             file_size=len(note_content.encode("utf-8")),
             tags=["ai-note", "auto-generated"],
-            access_level="project_group",
-            project_ids=[str(project_id)],
+            access_level=access_level,
+            project_ids=project_ids,
             created_by=actor_id,
         )
 
@@ -262,6 +264,7 @@ async def save_note(
             document_id=doc.id,
             folder_id=folder.id,
             name=name,
+            location=await folder_location_label(db, folder.id),
         )
 
     except NoteSaveFailed:
@@ -359,27 +362,6 @@ def _assemble_note_content(messages: list[AIChatMessage], title: str) -> str:
                 parts.extend(f"- {label}" for label in labels)
 
     return "\n".join(parts)
-
-
-async def _ensure_notes_folder(
-    db: AsyncSession,
-    project_id: UUID,
-    actor_id: UUID,
-) -> KnowledgeFolder:
-    """定位或创建项目的 "AI 对话笔记" 文件夹（Req 8.4 单一真源规则）。
-
-    委托 ``knowledge_folder_service.ensure_project_folder``：按 ``system_key``（V170 部分唯一
-    索引）定位，SAVEPOINT 内建、冲突重查，不回滚调用方事务。
-
-    旧实现三处致命缺陷（spec knowledge-base-retrieval-and-authz-closure 5.9）：按不存在的
-    ``KnowledgeFolder.project_id`` 查询与构造（恒 AttributeError / TypeError）；冲突时
-    ``db.rollback()`` 把已 claim 的幂等收据一起回滚；按名称定位会被同名用户文件夹劫持。
-    ``actor_id`` 保留在签名里只为调用方不变：系统文件夹不归任何个人所有。
-    """
-    from app.services.knowledge_folder_service import ensure_project_folder
-
-    del actor_id  # 系统文件夹 created_by 恒为空（仅管理员可管理）
-    return await ensure_project_folder(db, project_id, "ai_notes")
 
 
 async def _replayed_folder_id(db: AsyncSession, receipt: AIChatActionReceipt) -> UUID | None:

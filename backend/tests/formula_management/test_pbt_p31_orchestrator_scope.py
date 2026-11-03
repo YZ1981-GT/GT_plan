@@ -10,12 +10,13 @@
 - **(b) 范围隔离（未勾选域零写入）**：对任一**未被勾选**的合法 scope，刷新后无任何
   ``draft_marker`` 落在其域/循环前缀内（数据快照逐一不变）——``draft_marker`` 是本层
   唯一可观测的写入（各生成器经 ``_dispatch`` mock 隔离）。
-- **(c) affected_count 真实**：``affected_count == len(refreshed_units)``（≥0），且被勾选
-  域产出内容时 ``> 0``（不再恒为 0）。
+- **(c) 计数真实**：``draft_marked_count == len(refreshed_units)``（≥0），且被勾选
+  域产出内容时 ``> 0``（不再恒为 0）；spec formula-hub-integrity-closure 需求 3.3 起 ``affected_count`` =
+  金额变化 + 仅重算，只打 Draft 标记时为 0。
 
 **model-based**：Hypothesis 随机非空勾选子集；mock ``_dispatch`` 让各 scope 产出带该
 scope 专属前缀的 units（page_keys 空 → 不经预设库另生单元）；断言 (a) refreshed_units
-全落被勾选域前缀、(b) 未勾选域无单元、(c) ``affected_count == len(refreshed_units)``。
+全落被勾选域前缀、(b) 未勾选域无单元、(c) ``draft_marked_count == len(refreshed_units)``。
 
 被测：``app.services.formula_management.draft_refresh_orchestrator.DraftRefreshOrchestrator``
 （``generate`` → ``refresh_with_presets`` → ``refresh`` 治理链）。
@@ -183,11 +184,16 @@ def _fake_dispatch_factory(dispatched: list[str]):
     return _fake
 
 
+# spec formula-hub-integrity-closure 任务 20（ADR-FHIC-07 / 08）：report 范围不再经 ``_dispatch`` 产单元，勾选后在执行段
+# 走报表权威生成路径（本文件 9 张表的 SQLite 夹具跑不了，由真 PG 用例覆盖）⇒ 勾选只从其余范围抽；report 恒为未勾选域，
+# 仍在 (b) 范围隔离判据里，并核对报表范围没有执行（rollback_available 仍为 True）。
+_SELECTABLE_SCOPES: list[str] = [scope for scope in _CANDIDATE_SCOPES if scope != "report"]
+
 # 非空勾选子集：从合法 scope 集抽样，去重、保序无关（generate 内部保序去重）。
 _SELECTED = st.lists(
-    st.sampled_from(_CANDIDATE_SCOPES),
+    st.sampled_from(_SELECTABLE_SCOPES),
     min_size=1,
-    max_size=min(6, len(_CANDIDATE_SCOPES)),
+    max_size=min(6, len(_SELECTABLE_SCOPES)),
     unique=True,
 )
 
@@ -195,7 +201,11 @@ _SELECTED = st.lists(
 @given(selected=_SELECTED)
 @settings(max_examples=5)
 def test_global_refresh_scope_isolation_and_affected_count(selected):
-    """P31：全局刷新按勾选范围生成初稿、范围隔离、affected_count 真实。
+    """P31：全局刷新按勾选范围生成初稿、范围隔离、计数真实。
+
+    spec formula-hub-integrity-closure 任务 20 改断言（需求 3.2 / 3.3）：只打 Draft 标记 ⇒ ``status`` / ``outcome`` =
+    ``draft_marked``，(c) 改为 ``draft_marked_count == len(refreshed_units)``、``affected_count = applied + recomputed = 0``；
+    勾选池去掉 report（理由见 ``_SELECTABLE_SCOPES``）。用例名沿用。
 
     **Validates: Requirements 21.1, 21.3, 21.4**
     """
@@ -219,7 +229,9 @@ def test_global_refresh_scope_isolation_and_affected_count(selected):
                 )
                 await db.commit()
 
-                assert result.status == "success", result.blocking
+                assert (result.status, result.outcome) == ("draft_marked", "draft_marked"), result.blocking
+                # 未勾选的报表范围没有执行（执行过会置 rollback_available=False 并给中文说明）
+                assert result.rollback_available is True and result.warnings == []
 
                 selected_set = set(selected)
                 selected_prefixes = tuple(_prefix_for(s) for s in selected_set)
@@ -250,13 +262,14 @@ def test_global_refresh_scope_isolation_and_affected_count(selected):
                         us.startswith(unsel_prefix) for us in result.refreshed_units
                     )
 
-                # ── (c) affected_count == len(refreshed_units)，勾选域有内容 → > 0 ──
-                assert result.affected_count == len(result.refreshed_units)
-                assert result.affected_count == 2 * len(selected_set)
-                assert result.affected_count > 0
+                # ── (c) draft_marked_count == len(refreshed_units)，勾选域有内容 → > 0；affected_count 0 ──
+                assert result.draft_marked_count == len(result.refreshed_units)
+                assert result.draft_marked_count == 2 * len(selected_set)
+                assert result.draft_marked_count > 0
+                assert result.affected_count == 0
 
                 # 治理层为每个刷新单元打了 Draft 标记（写入=刷新单元数）。
-                assert await _count(db, DraftMarker) == result.affected_count
+                assert await _count(db, DraftMarker) == result.draft_marked_count
         finally:
             await engine.dispose()
 

@@ -2,7 +2,7 @@
 //
 // 验证底稿列表服务层消费 Task 8 分页 envelope（组件 C13）：
 //  - listWorkpapersPaged / listMyLeadWorkpapers 返回完整 {items,total,stats,page,page_size}
-//  - legacy listWorkpapers 兼容 envelope（抽 items）并逐页拉取全集、过滤 nullable wp
+//  - listWorkpapersAll 一次取完全部可见底稿（spec platform-perf-hotspots R5）；legacy listWorkpapers 基于它、过滤 nullable wp
 //  - legacy `status` 查询参数映射到 index_status（Req 12.6）
 //  - 两个独立视图打不同端点（Req 11.11/11.12：程序任务 vs 主编不串线）
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -17,6 +17,7 @@ import {
   listWorkpapersPaged,
   listMyLeadWorkpapers,
   listWorkpapers,
+  listWorkpapersAll,
 } from '@/services/workpaperApi'
 
 function envItem(over: Record<string, any> = {}) {
@@ -69,22 +70,67 @@ describe('listMyLeadWorkpapers — 独立主编视图端点', () => {
   })
 })
 
-describe('legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable 过滤', () => {
-  it('extracts items from a single-page envelope and maps id from wp_id', async () => {
-    mockGet.mockResolvedValue({
-      data: { items: [envItem({ wp_id: 'wp-9' })], total: 1, page: 1, page_size: 100, stats: {} },
-    })
+describe('listWorkpapersAll — 全部可见底稿一次取完（spec platform-perf-hotspots R5）', () => {
+  it('一次请求取完，不带分页参数（原先 100 条一页逐页拉）', async () => {
+    const items = Array.from({ length: 250 }, (_, i) => envItem({ wp_index_id: `wi-${i}`, wp_id: `w-${i}` }))
+    mockGet.mockResolvedValue({ data: { items, total: 250 } })
+    const got = await listWorkpapersAll('p1')
+    expect(got.length).toBe(250)
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    const [url, cfg] = mockGet.mock.calls[0]
+    expect(url).toBe('/api/projects/p1/working-papers-all')
+    expect(cfg.params).toEqual({})
+  })
+
+  it('只带有值的过滤参数', async () => {
+    mockGet.mockResolvedValue({ data: { items: [], total: 0 } })
+    await listWorkpapersAll('p1', { audit_cycle: 'D', file_status: '', assigned_to: undefined })
+    expect(mockGet.mock.calls[0][1].params).toEqual({ audit_cycle: 'D' })
+  })
+
+  it('同项目同过滤的并发调用共享一次请求，各自拿到独立的数组与项', async () => {
+    let release!: (v: unknown) => void
+    mockGet.mockReturnValue(new Promise((r) => { release = r }))
+    const a = listWorkpapersAll('p1', { audit_cycle: 'D' })
+    const b = listWorkpapersAll('p1', { audit_cycle: 'D' })
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    release({ data: { items: [envItem()], total: 1 } })
+    const [ra, rb] = await Promise.all([a, b])
+    expect(ra).toEqual(rb)
+    expect(ra).not.toBe(rb)
+    ra[0].wp_code = '改过'
+    expect(rb[0].wp_code).toBe('D2-1')
+  })
+
+  it('过滤不同各发各的；请求结束后不留缓存（再调重新取）', async () => {
+    mockGet.mockResolvedValue({ data: { items: [], total: 0 } })
+    await Promise.all([listWorkpapersAll('p1', { audit_cycle: 'D' }), listWorkpapersAll('p1', { audit_cycle: 'K' })])
+    expect(mockGet).toHaveBeenCalledTimes(2)
+    await listWorkpapersAll('p1', { audit_cycle: 'D' })
+    expect(mockGet).toHaveBeenCalledTimes(3)
+  })
+
+  it('响应没有 items 数组时给空数组', async () => {
+    mockGet.mockResolvedValue({ data: null })
+    expect(await listWorkpapersAll('p1')).toEqual([])
+  })
+})
+
+describe('legacy listWorkpapers — 基于全量清单 + nullable 过滤', () => {
+  it('maps id from wp_id and status from file_status', async () => {
+    mockGet.mockResolvedValue({ data: { items: [envItem({ wp_id: 'wp-9' })], total: 1 } })
     const rows = await listWorkpapers('p1')
     expect(rows.length).toBe(1)
     expect(rows[0].id).toBe('wp-9') // id 从 wp_id 映射
     expect(rows[0].status).toBe('draft') // file_status → status
+    expect(mockGet.mock.calls[0][0]).toBe('/api/projects/p1/working-papers-all')
   })
 
   it('filters out nullable wp (wp_generated=false) for legacy consumers', async () => {
     mockGet.mockResolvedValue({
       data: {
         items: [envItem({ wp_index_id: 'a', wp_id: 'wp-a' }), envItem({ wp_index_id: 'b', wp_id: null, wp_generated: false })],
-        total: 2, page: 1, page_size: 100, stats: {},
+        total: 2,
       },
     })
     const rows = await listWorkpapers('p1')
@@ -92,33 +138,10 @@ describe('legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable �
     expect(rows[0].id).toBe('wp-a')
   })
 
-  it('paginates through all pages until total is covered', async () => {
-    // 250 total across 3 pages of 100
-    const page1 = Array.from({ length: 100 }, (_, i) => envItem({ wp_index_id: `p1-${i}`, wp_id: `w1-${i}` }))
-    const page2 = Array.from({ length: 100 }, (_, i) => envItem({ wp_index_id: `p2-${i}`, wp_id: `w2-${i}` }))
-    const page3 = Array.from({ length: 50 }, (_, i) => envItem({ wp_index_id: `p3-${i}`, wp_id: `w3-${i}` }))
-    mockGet
-      .mockResolvedValueOnce({ data: { items: page1, total: 250, page: 1, page_size: 100, stats: {} } })
-      .mockResolvedValueOnce({ data: { items: page2, total: 250, page: 2, page_size: 100, stats: {} } })
-      .mockResolvedValueOnce({ data: { items: page3, total: 250, page: 3, page_size: 100, stats: {} } })
-    const rows = await listWorkpapers('p1')
-    expect(rows.length).toBe(250)
-    expect(mockGet).toHaveBeenCalledTimes(3)
-  })
-
   it('maps legacy `status` query param to index_status (Req 12.6)', async () => {
-    mockGet.mockResolvedValue({ data: { items: [], total: 0, page: 1, page_size: 100, stats: {} } })
+    mockGet.mockResolvedValue({ data: { items: [], total: 0 } })
     await listWorkpapers('p1', { status: 'archived' })
     const [, cfg] = mockGet.mock.calls[0]
-    expect(cfg.params.index_status).toBe('archived')
-    expect(cfg.params.status).toBeUndefined()
-  })
-
-  it('supports a plain legacy array response (un-upgraded backend)', async () => {
-    mockGet.mockResolvedValue({ data: [{ id: 'old-1', wp_index_id: 'wi', status: 'reviewed' }] })
-    const rows = await listWorkpapers('p1')
-    expect(rows.length).toBe(1)
-    expect(rows[0].id).toBe('old-1')
-    expect(mockGet).toHaveBeenCalledTimes(1)
+    expect(cfg.params).toEqual({ index_status: 'archived' })
   })
 })

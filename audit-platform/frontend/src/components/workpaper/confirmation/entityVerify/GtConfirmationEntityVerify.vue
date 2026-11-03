@@ -72,6 +72,9 @@
             :row="currentRow"
             :readonly="readonly"
             :dict-data="dictData"
+            :wp-id="wpId"
+            :project-id="evidenceProjectId"
+            :sheet-key="evidenceSheetKey"
             @update="handleFieldUpdate"
           />
         </div>
@@ -293,6 +296,8 @@ import EntityVerifyDashboard from './EntityVerifyDashboard.vue'
 import EntityVerifyFraudPanel from './EntityVerifyFraudPanel.vue'
 import EntityVerifyMaster from './EntityVerifyMaster.vue'
 import EntityVerifyDetail from './EntityVerifyDetail.vue'
+import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
+import { routeProjectId } from '@/components/attachment/rowEvidence'
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 
@@ -312,6 +317,11 @@ const emit = defineEmits<{
 // ─── Readonly computed ────────────────────────────────────────────────────────
 
 const readonly = computed(() => props.readonly ?? false)
+
+// 核实证据挂到本行（spec attachment-confirmation-evidence-loop 需求 4）：表页 = 本循环对象核实表编码
+const routePid = routeProjectId()
+const evidenceProjectId = computed(() => props.projectId || routePid)
+const evidenceSheetKey = computed(() => getCycleConfirmationMeta(props.wpCode).entityVerifyCode)
 
 // ─── Legacy format check ──────────────────────────────────────────────────────
 

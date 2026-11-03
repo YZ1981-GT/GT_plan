@@ -180,6 +180,41 @@ async def list_entries(
     return [_entry_to_dict(e) for e in entries]
 
 
+# ⚠️ 静态段 ``/summary`` 必须注册在 ``/{entry_id}`` 之前（否则被当成条目 id 截走、恒 422）；
+# 同前缀的 ``workhour_budget`` / ``workhour_approval`` 由 router_registry 先于本路由 include。
+# 守卫 tests/test_route_shadow_guard.py。
+@router.get("/summary")
+async def get_summary(
+    project_id: UUID,
+    period: Literal["day", "week", "month"] = Query("week"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """工时汇总统计"""
+    stmt = select(WorkHourEntry).where(WorkHourEntry.project_id == project_id)
+    if current_user.role.value != "admin":
+        stmt = stmt.where(WorkHourEntry.user_id == current_user.id)
+
+    result = await db.execute(stmt)
+    entries = result.scalars().all()
+
+    by_day: dict[str, float] = {}
+    by_cycle: dict[str, float] = {}
+    total = Decimal("0")
+
+    for e in entries:
+        day_key = e.date.isoformat()
+        by_day[day_key] = by_day.get(day_key, 0) + float(e.hours)
+        by_cycle[e.cycle] = by_cycle.get(e.cycle, 0) + float(e.hours)
+        total += e.hours
+
+    return {
+        "by_day": by_day,
+        "by_cycle": by_cycle,
+        "total": float(total),
+    }
+
+
 @router.get("/{entry_id}")
 async def get_entry(
     project_id: UUID,
@@ -317,38 +352,6 @@ async def batch_submit(
 
     await db.commit()
     return {"submitted_count": submitted_count, "total_requested": len(body.entry_ids)}
-
-
-@router.get("/summary")
-async def get_summary(
-    project_id: UUID,
-    period: Literal["day", "week", "month"] = Query("week"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """工时汇总统计"""
-    stmt = select(WorkHourEntry).where(WorkHourEntry.project_id == project_id)
-    if current_user.role.value != "admin":
-        stmt = stmt.where(WorkHourEntry.user_id == current_user.id)
-
-    result = await db.execute(stmt)
-    entries = result.scalars().all()
-
-    by_day: dict[str, float] = {}
-    by_cycle: dict[str, float] = {}
-    total = Decimal("0")
-
-    for e in entries:
-        day_key = e.date.isoformat()
-        by_day[day_key] = by_day.get(day_key, 0) + float(e.hours)
-        by_cycle[e.cycle] = by_cycle.get(e.cycle, 0) + float(e.hours)
-        total += e.hours
-
-    return {
-        "by_day": by_day,
-        "by_cycle": by_cycle,
-        "total": float(total),
-    }
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,8 @@ export interface SheetRenderConfigWire {
   cross_refs: CrossRefWire[]
   sheet_type?: SheetContentType | null
   field_sources?: Record<string, FieldSourceContract> | null
+  /** 只在 `share_html_data=1` 时出现：html_data 的其余键在 RenderConfigWire.shared_html_data[ref]。 */
+  html_data_ref?: string | null
 }
 
 export interface RenderPermissionsWire {
@@ -75,6 +77,9 @@ export interface RenderConfigWire {
 
   /** active：由 WpDecisionTracePanel 只读消费。 */
   decision_trace?: RenderDecisionWire[]
+
+  /** 只在 `share_html_data=1` 时出现；由 expandSharedHtmlData 展开回各页签后删除。 */
+  shared_html_data?: Record<string, Record<string, any>> | null
 }
 
 /**
@@ -102,6 +107,7 @@ export const RENDER_CONFIG_FIELD_STATUS = {
   sign_status: 'reserved',
   permissions: 'reserved',
   decision_trace: 'active',
+  shared_html_data: 'active',
 } as const satisfies Record<keyof RenderConfigWire, 'active' | 'reserved'>
 
 // 迁移期兼容导出；类型真源仅为上述 Wire 定义。

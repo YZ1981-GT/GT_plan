@@ -1,13 +1,14 @@
 /**
- * 集成测试 — M8 一般风险准备：风险测试 + 行业守卫适用性 + 跨sheet交叉验证
+ * 集成测试 — M8 一般风险准备：风险测试 + 跨sheet交叉验证
  *
  * 覆盖：
  * 1. 风险资产计提测试（M8-4）：G=E×F, H=B-G, SUM totals, 阈值高亮, 充足性结论
- * 2. 行业守卫（Industry Guard）：金融/银行/证券/保险/信托/基金/期货/金融租赁
+ * 2. 不按行业判定：原 isFinancialEntity 读恒空的 project_info.industry（平台没有行业来源），已删
+ *    （spec trim-followup-residual-findings-closure R1；宿主改按科目有无提示，见 GtM8 宿主测试）
  * 3. 跨sheet交叉验证：adjudicationVsDetail（M8-1 vs M8-2）
  *
  * Spec: .kiro/specs/m8-general-risk-reserve/ Task 7.2
- * Requirements: 3.3-3.7, 5.1-5.3
+ * Requirements: 3.3-3.7, 2.5
  *
  * 科目：一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
  * 金融企业专属：银行/证券/保险/信托/基金/期货/金融租赁
@@ -192,129 +193,14 @@ describe('集成测试 — M8-4 风险资产计提测试完整流程 (Req 3.3-3.
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Section 2: 行业守卫适用性（Req 5.1-5.3）
+// Section 2: 不按行业判定（spec trim-followup-residual-findings-closure R1）
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('集成测试 — 行业守卫 isFinancialEntity (Req 5.1-5.3)', () => {
-  it('金融行业关键词命中 → isFinancialEntity=true', () => {
-    const financialKeywords = [
-      '金融', '银行', '证券', '保险', '信托', '基金', '期货', '金融租赁',
-    ]
-
-    for (const keyword of financialKeywords) {
-      const responses = createResponses([])
-      const projectInfo = ref({ industry: `XX${keyword}有限公司` })
-
-      const scope = effectScope()
-      scope.run(() => {
-        const { isFinancialEntity } = useM8CrossSheet(responses, projectInfo)
-        expect(isFinancialEntity.value).toBe(true)
-      })
-      scope.stop()
-    }
-  })
-
-  it('非金融企业 → isFinancialEntity=false', () => {
-    const nonFinancialIndustries = [
-      '制造业', '房地产开发', '软件信息技术', '零售贸易', '医药生物',
-    ]
-
-    for (const industry of nonFinancialIndustries) {
-      const responses = createResponses([])
-      const projectInfo = ref({ industry })
-
-      const scope = effectScope()
-      scope.run(() => {
-        const { isFinancialEntity } = useM8CrossSheet(responses, projectInfo)
-        expect(isFinancialEntity.value).toBe(false)
-      })
-      scope.stop()
-    }
-  })
-
-  it('空/null行业 → 默认适用（isFinancialEntity=true）', () => {
-    // 无 projectInfo → 默认适用
-    const responses = createResponses([])
-
+describe('集成测试 — 不再按行业判定金融企业', () => {
+  it('useM8CrossSheet 只返回交叉验证（isFinancialEntity 已删）', () => {
     const scope = effectScope()
     scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses)
-      expect(isFinancialEntity.value).toBe(true) // 默认适用
-    })
-    scope.stop()
-  })
-
-  it('projectInfo为null + 无checklist记录 → 默认适用', () => {
-    const responses = createResponses([])
-    const projectInfo = ref(null)
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses, projectInfo)
-      expect(isFinancialEntity.value).toBe(true)
-    })
-    scope.stop()
-  })
-
-  it('projectInfo无industry字段 → 默认适用', () => {
-    const responses = createResponses([])
-    const projectInfo = ref({ name: '某公司' }) // 无industry
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses, projectInfo)
-      expect(isFinancialEntity.value).toBe(true)
-    })
-    scope.stop()
-  })
-
-  it('checklist_responses持久化覆盖：conclusion=financial', () => {
-    const responses = createResponses([
-      ['M8-industry-guard', { conclusion: 'financial', remark: '商业银行' }],
-    ])
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses)
-      expect(isFinancialEntity.value).toBe(true)
-    })
-    scope.stop()
-  })
-
-  it('checklist_responses持久化覆盖：conclusion=non-financial', () => {
-    const responses = createResponses([
-      ['M8-industry-guard', { conclusion: 'non-financial', remark: '制造业' }],
-    ])
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses)
-      expect(isFinancialEntity.value).toBe(false)
-    })
-    scope.stop()
-  })
-
-  it('client_industry备选字段也能命中', () => {
-    const responses = createResponses([])
-    const projectInfo = ref({ client_industry: '中国建设银行股份有限公司' })
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses, projectInfo)
-      expect(isFinancialEntity.value).toBe(true)
-    })
-    scope.stop()
-  })
-
-  it('remark字段降级判断：行业名含金融关键词', () => {
-    const responses = createResponses([
-      ['M8-industry-guard', { conclusion: null, remark: '证券投资基金管理公司' }],
-    ])
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses)
-      expect(isFinancialEntity.value).toBe(true)
+      expect(Object.keys(useM8CrossSheet(createResponses([])))).toEqual(['adjudicationVsDetail'])
     })
     scope.stop()
   })
@@ -418,13 +304,11 @@ describe('集成测试 — adjudicationVsDetail M8-1 vs M8-2 (Req 2.5)', () => {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Section 4: E2E — 完整流程：风险测试 + 行业守卫 + 交叉验证闭环
+// Section 4: E2E — 完整流程：风险测试 + 交叉验证闭环
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('集成测试 — E2E: 金融企业M8风险计提完整闭环 (Req 3.3-3.7, 5.1-5.3)', () => {
-  it('完整流程：行业判定→审定→明细→风险计提→交叉验证', () => {
-    // Step 1: 行业守卫 — 确认金融企业
-    const projectInfo = ref({ industry: '商业银行' })
+describe('集成测试 — E2E: 金融企业M8风险计提完整闭环 (Req 3.3-3.7)', () => {
+  it('完整流程：审定→明细→风险计提→交叉验证', () => {
     const responses = createResponsesSimple([
       ['M8-M8-1-total-end-audited', '15000000'],
       ['M8-M8-2-total-end-amount', '15000000'],
@@ -432,10 +316,7 @@ describe('集成测试 — E2E: 金融企业M8风险计提完整闭环 (Req 3.3-
 
     const scope = effectScope()
     scope.run(() => {
-      const { isFinancialEntity, adjudicationVsDetail } = useM8CrossSheet(responses, projectInfo)
-
-      // Step 1 验证：金融企业适用
-      expect(isFinancialEntity.value).toBe(true)
+      const { adjudicationVsDetail } = useM8CrossSheet(responses)
 
       // Step 2: 交叉验证通过
       expect(adjudicationVsDetail.value.isMatch).toBe(true)
@@ -461,21 +342,7 @@ describe('集成测试 — E2E: 金融企业M8风险计提完整闭环 (Req 3.3-
     expect(audited).toBe(25_000_000)
   })
 
-  it('非金融企业场景：行业守卫拦截', () => {
-    const projectInfo = ref({ industry: '装备制造' })
-    const responses = createResponses([])
-
-    const scope = effectScope()
-    scope.run(() => {
-      const { isFinancialEntity } = useM8CrossSheet(responses, projectInfo)
-      expect(isFinancialEntity.value).toBe(false)
-      // 非金融企业不适用M8 → 显示提示
-    })
-    scope.stop()
-  })
-
   it('计提不足场景：差异>阈值 + 交叉验证不一致', () => {
-    const projectInfo = ref({ industry: '城市商业银行' })
     const responses = createResponsesSimple([
       ['M8-M8-1-total-end-audited', '12000000'],
       ['M8-M8-2-total-end-amount', '12000000'],
@@ -483,9 +350,8 @@ describe('集成测试 — E2E: 金融企业M8风险计提完整闭环 (Req 3.3-
 
     const scope = effectScope()
     scope.run(() => {
-      const { isFinancialEntity, adjudicationVsDetail } = useM8CrossSheet(responses, projectInfo)
+      const { adjudicationVsDetail } = useM8CrossSheet(responses)
 
-      expect(isFinancialEntity.value).toBe(true)
       expect(adjudicationVsDetail.value.isMatch).toBe(true)
     })
     scope.stop()

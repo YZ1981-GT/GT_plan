@@ -194,7 +194,7 @@ const ElTabsStub = defineComponent({
   name: 'ElTabs',
   props: ['modelValue'],
   emits: ['update:modelValue'],
-  template: '<div class="el-tabs"><slot /></div>',
+  template: '<div class="el-tabs" :data-active-tab="modelValue"><slot /></div>',
 })
 
 /**
@@ -336,6 +336,10 @@ describe('Overview 行点击切换 Tab (Req 3.3)', () => {
     overview.vm.$emit('navigate', 'S34-16')
     await nextTick()
 
+    // ElTabs stub 暴露 v-model 当前值：以前只检查 pane DOM（stub 无条件渲染所有 pane），
+    // 即使导航守卫恒真 / 恒假也会绿，必须直接钉住实际 activeTab。
+    expect(wrapper.find('.el-tabs').attributes('data-active-tab')).toBe('S34-16')
+
     // 验证 S34-16 pane 中的 regRef 区块包含正确内容
     const s3416Pane = findInPane(wrapper, 'S34-16')
     expect(s3416Pane).toBeDefined()
@@ -355,7 +359,8 @@ describe('Overview 行点击切换 Tab (Req 3.3)', () => {
     overview.vm.$emit('navigate', 'S34-99')
     await nextTick()
 
-    // overview 仍然可见
+    // pane stub 无条件渲染，不能只断言 overview DOM 存在；必须确认 activeTab 没有被写成非法码。
+    expect(wrapper.find('.el-tabs').attributes('data-active-tab')).toBe('overview')
     const overviewCheck = wrapper.find('[data-testid="s34-overview"]')
     expect(overviewCheck.exists()).toBe(true)
   })

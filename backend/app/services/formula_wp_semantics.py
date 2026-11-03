@@ -8,10 +8,10 @@ formula-fetch-followup-defect-closure 6.5 按收敛后的现状改写。
 ============  ================================================  ================================================
 维度          预填路径 ``formula_preloader._load_wp``            报表 / 自定义公式路径 ``WPExecutor.execute``
 ============  ================================================  ================================================
-实参          ``(wp_code, sheet_name, cell_ref)`` — 3 个         ``(wp_code, column[, field])`` — 2 个（field 仅 D2-3）
+实参          ``(wp_code, sheet_name, cell_ref)`` — 3 个         ``(wp_code, column[, field])`` — field 为 D2-3 字段或 A1
 数据源        ``checklist_responses.remark``（经中文锚点映射）   ``working_paper.parsed_data``（顶层键 / 单元格）
 存进 ctx 的键 ``wp_data[wp_code]['表!锚点']``                    ``wp_data[wp_code][列名]``
-取不到时      不存键 ⇒ L1 三参报错，该格不写                     ``Decimal('0')``（与「值确实为 0」不可区分）
+取不到时      不存键 ⇒ L1 三参报错，该格不写                     两参与 D2-3 ``Decimal('0')``（与「值确实为 0」不可区分）；第三参为 A1 时返回 None
 ============  ================================================  ================================================
 
 🔴 2026-10-24（formula-fetch-followup 6.5）：预填收敛到「预载 + L1」（formula-execution-path-convergence）后，
@@ -30,6 +30,8 @@ from dataclasses import dataclass
 PREFILL_WP_IMPL = "app/services/formula_preloader.py::_load_wp"
 ENGINE_WP_IMPL = "app/services/formula_engine.py::_handle_wp"
 EXECUTOR_WP_IMPL = "app/services/formula_engine.py::WPExecutor.execute"
+#: 共享单元格读取函数（formula-hub ADR-FHIC-06 第 1 点 / §8.2；acnr-foundation-defect-closure T11 先落地）
+WP_CELL_READER_IMPL = "app/services/wp_cell_reader.py::resolve_wp_cell"
 
 
 @dataclass(frozen=True)
@@ -72,13 +74,37 @@ WP_IMPLS: tuple[WpImplSpec, ...] = (
     ),
     WpImplSpec(
         impl=EXECUTOR_WP_IMPL,
-        positional_args=("wp_code", "column"),
+        positional_args=("wp_code", "column", "field"),
         data_source=(
-            "working_paper.parsed_data：审定数 / 未审数 / 期初余额 / 期末余额映射顶层键，单元格地址经 ACNR 定位后从 "
-            "extract_custom_cells 取；第二参含「坏账准备明细表」时走 D2-3 嵌套表（field 为第三参）"
+            "working_paper.parsed_data：审定数 / 未审数 / 期初余额 / 期末余额映射 WP_COLUMN_KEYS 顶层键；"
+            "两参单元格经 resolve_wp_cell(db, project_id, year, wp_code, None, cell) 三态读取；"
+            "第二参含「坏账准备明细表」时走 D2-3 嵌套表（field 为第三参）；"
+            "第三参为 A1 时经 acnr.wp_cell_target.read_formula_cell 按目录 sheet 精确取值（先 sheet 级底稿、无则父底稿），"
+            "取不到返回 None"
         ),
-        on_missing="Decimal('0')（底稿不存在 / 键缺失 / 异常一律 0）",
-        measured="2026-10-24 现读：报表引擎与 FormulaEngine.execute 预载两参 WP 用它；未改动",
+        on_missing=(
+            "FormulaEvalError（两参：读取函数非 ok / 底稿不存在 / 键缺失 / 异常均报错，原因透传）；"
+            "三参 A1 取不到返回 None"
+        ),
+        measured=(
+            "2026-10-28 acnr-foundation-defect-closure T13：三参 A1 改为按 sheet 精确取值（原来把表名当列名、恒 0）。"
+            "2026-10-28 formula-hub 任务 23：两参单元格分支改调 resolve_wp_cell、列名映射提为 WP_COLUMN_KEYS；"
+            "2026-10-31 formula-grammar-resolver-unification Task 7（ADR-FGR-06）：两参与默认调用缺数抛 FormulaEvalError "
+            "（原因透传），不再返回 0 —— 与 wp_ref_strict / typed_eval 严格轨口径一致，typed_eval_strictness 差异维度消除"
+        ),
+    ),
+    WpImplSpec(
+        impl=WP_CELL_READER_IMPL,
+        positional_args=("wp_code", "sheet_key", "cell"),
+        data_source=(
+            "working_paper.parsed_data（经 extract_custom_cells）；底稿经 wp_index.wp_code JOIN 未删 working_paper，"
+            "工作表按 normalize_sheet_key 归一后与可接受键比较（sheet_key 为 None 时不判表）"
+        ),
+        on_missing="state=missing / blocked + 中文 reason，value=None（不代 0）",
+        measured=(
+            "2026-10-28 acnr-foundation-defect-closure T11 新建（formula-hub 任务 23 未入库）；当时尚无生产调用方，"
+            "WPExecutor 两参分支改调它归 formula-hub 任务 23"
+        ),
     ),
 )
 
@@ -100,8 +126,8 @@ WP_KNOWN_DIFFERENCES: tuple[WpKnownDifference, ...] = (
     WpKnownDifference(
         dimension="positional_arg_count",
         detail=(
-            "预填路径 3 个实参（含 sheet_name），WPExecutor 2 个（第三参只给 D2-3 嵌套表）⇒ 三参 WP 只在预填路径有数据，"
-            "报表 / 自定义公式路径里写三参得到的是 L1 报错；两参 WP 在预填路径会被当成「表 = 锚点」去查锚点映射"
+            "预填路径三参读 checklist_responses；WPExecutor 三参只对 A1 第三参按 sheet 精确取值，语义第三参仍不支持；"
+            "报表路径三参报错"
         ),
         reason=(
             "统一实参要么给 WPExecutor 加 sheet 维度（改 parsed_data 取数口径，波及报表与全部 Tier A 求值），要么让预填路径"
@@ -128,6 +154,8 @@ WP_KNOWN_DIFFERENCES: tuple[WpKnownDifference, ...] = (
         ),
         owner_spec="formula-fetch-followup-defect-closure",
     ),
+    # 🔴 typed_eval_strictness 差异已在 formula-grammar-resolver-unification Task 7（ADR-FGR-06）消除：
+    # WPExecutor.execute 两参与默认调用缺数改为抛 FormulaEvalError，与 wp_ref_strict / typed_eval 严格轨口径一致。
 )
 
 #: 已登记差异维度集合（守卫用它做精确相等断言 —— 新增差异必须登记）。

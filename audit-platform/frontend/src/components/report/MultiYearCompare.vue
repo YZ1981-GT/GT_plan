@@ -69,7 +69,7 @@
         <!-- 金额列 -->
         <el-table-column :label="`${yr}年`" align="right" min-width="140" :resizable="true">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.values[String(yr)]) }}</span>
+            <span class="gt-amt" :data-gt-value="row.values[String(yr)] ?? ''">{{ formatAmount(row.values[String(yr)]) }}</span>
           </template>
         </el-table-column>
         <!-- YoY 变动列（第一年无变动率） -->
@@ -120,6 +120,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -132,7 +133,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 /* ── Props ── */
 const props = defineProps<{
   projectId: string
-  currentYear: number
+  currentYear?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -186,11 +187,11 @@ function onCellDblClick(row: any, column: any) {
   }
 }
 
-function onCtxCopy() {
+async function onCtxCopy() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) return
   const text = cells.map(c => c.value ?? '-').join('\t')
-  navigator.clipboard.writeText(text)
+  void copyText(text)
   ElMessage.success('已复制')
   ctxMenu.value.visible = false
 }
@@ -236,11 +237,11 @@ function onCtxViewFormula() {
   ctxMenu.value.visible = false
 }
 
-function onCtxExportSelection() {
+async function onCtxExportSelection() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) { ElMessage.warning('请先选中单元格'); ctxMenu.value.visible = false; return }
   const text = cells.map(c => c.value ?? '-').join('\n')
-  navigator.clipboard.writeText(text)
+  void copyText(text)
   ElMessage.success(`已导出 ${cells.length} 个单元格到剪贴板`)
   ctxMenu.value.visible = false
 }

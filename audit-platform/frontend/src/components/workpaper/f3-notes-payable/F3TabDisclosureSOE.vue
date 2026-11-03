@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useF3DisclosureSoe } from '../composables/useF3DisclosureSoe'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
-import { buildF3SyncPayload, F3_NOTE_SECTION } from '../composables/f3NoteSectionMap'
+import { buildF3SyncPayloadFromDisclosure, F3_NOTE_SECTION } from '../composables/f3NoteSectionMap'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
@@ -67,18 +67,10 @@ const isSyncing = ref(false)
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId) return
-  const payload = buildF3SyncPayload(
-    'soe',
-    props.wpId,
-    props.applicableStandards,
-    section1Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
-    {
-      label: '合计',
-      endAmount: section1Subtotal.value.endAmount,
-      priorAmount: section1Subtotal.value.priorAmount,
-    },
-    noteText.value,
-  )
+  // 与附注页离屏同步同一个载荷函数（spec note-pull-followup-closure R1）
+  const payload = buildF3SyncPayloadFromDisclosure('soe', props.wpId, props.applicableStandards, {
+    section1Rows, section1Subtotal, noteText,
+  })
   isSyncing.value = true
   try {
     const result: any = await api.post(

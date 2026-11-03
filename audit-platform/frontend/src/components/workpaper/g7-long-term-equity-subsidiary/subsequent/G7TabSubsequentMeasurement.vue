@@ -516,7 +516,8 @@
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, defineComponent, h, inject, onMounted, reactive, ref, toRef } from 'vue'
-import { ElInputNumber, ElMessage, ElMessageBox, ElOption, ElSelect } from 'element-plus'
+import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
+import { ElInputNumber, ElSelect } from '@/components/grid/adapters'
 import {
   createDividendRow,
   createNciPurchaseRow,

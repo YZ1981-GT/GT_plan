@@ -11,6 +11,7 @@
  */
 
 import { getClientInstanceId } from './clientInstance'
+import { toCloneable } from './cloneable'
 
 // ── 消息类型 ──
 
@@ -64,7 +65,6 @@ export function requestSession(): Promise<{ token: string; refreshToken: string;
     const ch = getChannel()
     if (!ch) { resolve(null); return }
 
-    const myId = getClientInstanceId()
     const timer = setTimeout(() => {
       ch.removeEventListener('message', handler)
       resolve(null)
@@ -72,7 +72,8 @@ export function requestSession(): Promise<{ token: string; refreshToken: string;
 
     function handler(ev: MessageEvent<AuthMessage>) {
       const msg = ev.data
-      if (msg.type === 'session-response' && msg.senderId !== myId) {
+      // 按当前编号比较：窗口编号认领后可能换了新号（workpaper-multi-window-lock-gaps R1.4）
+      if (msg.type === 'session-response' && msg.senderId !== getClientInstanceId()) {
         clearTimeout(timer)
         ch!.removeEventListener('message', handler)
         resolve({ token: msg.token, refreshToken: msg.refreshToken, user: msg.user })
@@ -82,9 +83,38 @@ export function requestSession(): Promise<{ token: string; refreshToken: string;
 
     ch.postMessage({
       type: 'session-request',
-      senderId: myId,
+      senderId: getClientInstanceId(),
     } satisfies AuthMessage)
   })
+}
+
+// ── 新标签页会话接力 ──
+
+export type HandoffSession = { token: string; refreshToken: string; user: any }
+
+let _handoff: Promise<void> = Promise.resolve()
+
+/**
+ * 新标签页（地址栏打开、noopener 链接）没有 opener 复制的 sessionStorage：启动时向已登录标签页要一次会话，
+ * 拿到后交给 `apply` 写进本页。须在 `app.use(router)` 之前调用；路由守卫判「未登录」前用 {@link awaitSessionHandoff} 等它。
+ * 🔴 原先 main.ts 挂载与要会话并行：首个导航在回执到达前就被守卫送去登录页，回执到了也停在登录页
+ *    （spec attachment-confirmation-evidence-loop 浏览器走查实测；同一处另有回执带响应式 user 发不出去的缺陷）。
+ */
+export function startSessionHandoff(apply: (session: HandoffSession) => void | Promise<void>): Promise<void> {
+  if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token')) return _handoff
+  _handoff = requestSession()
+    .then(async (session) => {
+      if (session) await apply(session)
+    })
+    .catch(() => {
+      // BroadcastChannel 不可用或回执处理出错 ⇒ 当作没有已登录标签页，由路由守卫跳登录页
+    })
+  return _handoff
+}
+
+/** 会话接力结束（没有发起过时立即结束）。 */
+export function awaitSessionHandoff(): Promise<void> {
+  return _handoff
 }
 
 // ── 监听 API ──
@@ -104,11 +134,11 @@ export function listenAuthEvents(handlers: AuthEventHandlers): void {
   const ch = getChannel()
   if (!ch) return
 
-  const myId = getClientInstanceId()
-
   ch.addEventListener('message', (ev: MessageEvent<AuthMessage>) => {
     const msg = ev.data
-    // 忽略自己发出的消息
+    // 忽略自己发出的消息。按当前编号比较：监听在启动时就装上，「复制标签页」认领后会换新号，
+    // 记下旧号会把原标签页的令牌更新 / 登出广播当成自己的而丢掉（workpaper-multi-window-lock-gaps R1.4）
+    const myId = getClientInstanceId()
     if (msg.senderId === myId) return
 
     switch (msg.type) {
@@ -123,9 +153,12 @@ export function listenAuthEvents(handlers: AuthEventHandlers): void {
       case 'session-request': {
         const session = handlers.onSessionRequest?.()
         if (session) {
+          // 🔴 user 来自 Pinia state（响应式 Proxy），postMessage 结构化克隆它抛 DataCloneError ⇒ 回执发不出去、
+          //    新标签页 2 秒后跳登录页（spec attachment-confirmation-evidence-loop 浏览器走查实测）。先去掉代理再发。
           ch.postMessage({
             type: 'session-response',
             ...session,
+            user: toCloneable(session.user),
             senderId: myId,
           } satisfies AuthMessage)
         }

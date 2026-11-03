@@ -195,7 +195,15 @@ import { calcEquityEndBalance } from '../../composables/useM5FormulaEngine'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import { M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import {
+  buildMEquityTabSyncPayload,
+  createMEquityDisclosureRows,
+  M5_DISCLOSURE_FORM,
+  restoreMEquityDisclosure,
+  type MEquityDisclosureRow as DisclosureRow,
+  type MEquityDisclosureState,
+} from '../../composables/mEquityDisclosureForm'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -230,22 +238,16 @@ const formData = useM5FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  item: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  endBalance: number
-  _isTotal?: boolean
-}
-
-const dataRows = ref<DisclosureRow[]>([
-  { item: '法定盈余公积', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { item: '任意盈余公积', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-])
+// 默认行 / 读回 / 同步快照与附注页离屏同步共用 mEquityDisclosureForm（spec note-pull-followup-closure R1）
+const FORM = M5_DISCLOSURE_FORM.listed
+const dataRows = ref<DisclosureRow[]>(createMEquityDisclosureRows(FORM))
 
 const statutoryNote = ref('')
 const discretionaryNote = ref('')
+
+function disclosureState(): MEquityDisclosureState {
+  return { rows: dataRows.value, notes: [statutoryNote.value, discretionaryNote.value] }
+}
 
 // ─── 合计行 + 计算 ──────────────────────────────────────────────────────────
 
@@ -298,17 +300,7 @@ function handleDiscretionaryNoteChange() {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payload = buildMEquitySyncPayload(props.wpId, {
-    cycle: 'M5',
-    variant: 'listed',
-    rows: dataRows.value.map((r) => ({
-      label: r.item,
-      begin: Number(r.beginBalance) || 0,
-      increase: Number(r.increase) || 0,
-      decrease: Number(r.decrease) || 0,
-    })),
-    note: [statutoryNote.value, discretionaryNote.value].filter(Boolean).join('\n') || undefined,
-  })
+  const payload = buildMEquityTabSyncPayload(props.wpId, FORM, disclosureState())
   if (!payload) {
     ElMessage.warning('当前项目准则不适用上市附注同步')
     return
@@ -370,18 +362,9 @@ function fmtAmount(val: number): string {
 // ─── 数据恢复 ────────────────────────────────────────────────────────────────
 
 function restoreData(): void {
-  for (let i = 0; i < dataRows.value.length; i++) {
-    for (const field of ['beginBalance', 'increase', 'decrease'] as const) {
-      const resp = formData.allResponses.value.get(`M5-disclosure-listed-${i}-${field}`)
-      if (resp?.remark) {
-        dataRows.value[i][field] = Number(resp.remark) || 0
-      }
-    }
-  }
-  const statResp = formData.allResponses.value.get('M5-disclosure-listed-statutory-note')
-  if (statResp?.remark) statutoryNote.value = statResp.remark
-  const discResp = formData.allResponses.value.get('M5-disclosure-listed-discretionary-note')
-  if (discResp?.remark) discretionaryNote.value = discResp.remark
+  const { notes: [statutory, discretionary] } = restoreMEquityDisclosure(formData.allResponses.value, FORM, disclosureState())
+  statutoryNote.value = statutory
+  discretionaryNote.value = discretionary
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────

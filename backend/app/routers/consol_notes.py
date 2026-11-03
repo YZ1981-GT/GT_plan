@@ -251,19 +251,24 @@ async def update_consol_note_gray(
 
 
 class PushTemplateRequest(BaseModel):
-    """下推集团模板到子企业的请求。"""
-    template_version_id: str
+    """下推集团模板到子企业的请求。
+
+    每个章节下推它绑定的明细模板版本；``template_version_id`` 只用来核对（只推一个章节时传，须与该章节绑定的版本一致）。
+    """
+    template_version_id: str | None = None
     section_ids: list[str] | None = None  # None = 全部已绑定章节
-    activate_lock: bool = True
+    # 旧前端仍可能带 activate_lock：模型不禁止多余字段，忽略即可（结构锁已退役，spec note-pull-followup-closure R16）
 
 
 class PushTemplateResponse(BaseModel):
-    """下推结果。"""
+    """下推结果：``results`` 逐章节逐企业（success / skipped / failed + 原因），``errors`` 为没能下推的章节。"""
     success: bool
     results: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
     total_entities: int = 0
     total_success: int = 0
     total_failure: int = 0
+    total_skipped: int = 0
 
 
 @router.post(
@@ -276,50 +281,64 @@ async def push_template_to_subsidiaries(
     request: PushTemplateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """下推集团附注模板到各子企业——在子企业附注中预生成行骨架。
+    """下推集团附注模板到各子企业：在子企业单体附注对应的表上打行身份、补缺的模板行（不改已有行名与数值）。
 
-    合并负责人定义好集团级披露模板后，通过此端点一键推送到全部子企业。
-    固定行锁定不可删改名，可选行子企业可以取消，动态行区子企业可自行添加。
+    逐家按附注编辑门禁判权（无权限 / 项目归档 / 合并锁定的企业跳过并写明原因）；每章节、每家各一个保存点。
     """
-    from app.services.consol_note_template_push_service import push_template_to_subsidiaries as push_svc
     from app.services.consol_note_detail_template_service import get_bindings
+    from app.services.consol_note_template_push_service import (
+        PushTemplateError,
+        push_template_to_subsidiaries as push_svc,
+    )
 
-    version_id = UUID(request.template_version_id)
+    bindings = {b["section_id"]: b for b in await get_bindings(db, project_id)}
+    sections = list(dict.fromkeys(request.section_ids or bindings))
+    if not sections:
+        raise HTTPException(status_code=400, detail="没有绑定明细模板的章节，请先在「📋 明细映射」中绑定")
+    if request.template_version_id and len(sections) != 1:
+        raise HTTPException(status_code=400, detail="指定模板版本时一次只能下推一个章节")
 
-    if request.section_ids:
-        sections = request.section_ids
-    else:
-        # 全部已绑定章节
-        bindings = await get_bindings(db, project_id)
-        sections = [b["section_id"] for b in bindings]
-        if not sections:
-            return PushTemplateResponse(success=False, results=[], total_entities=0)
-
-    all_results = []
-    total_e = total_s = total_f = 0
-
-    for sid in sections:
-        result = await push_svc(
-            db,
-            consol_project_id=project_id,
-            section_id=sid,
-            year=year,
-            template_version_id=version_id,
-            pushed_by=current_user.id if hasattr(current_user, "id") else None,
-            activate_lock=request.activate_lock,
-        )
-        all_results.append(result.to_dict())
-        total_e += result.entity_count
-        total_s += result.success_count
-        total_f += result.failure_count
-
-    await db.commit()
+    all_results: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    totals = {"entity": 0, "success": 0, "failure": 0, "skip": 0}
+    try:
+        for sid in sections:
+            bound = (bindings.get(sid) or {}).get("template_version_id")
+            if not bound:
+                errors.append({"section_id": sid, "error": "章节未绑定明细模板，请先在「📋 明细映射」中绑定"})
+                continue
+            if request.template_version_id and str(request.template_version_id) != str(bound):
+                errors.append({"section_id": sid, "error": "下推的模板版本与本章节绑定的版本不一致，请先绑定该版本"})
+                continue
+            try:
+                async with db.begin_nested():
+                    result = await push_svc(
+                        db, consol_project_id=project_id, section_id=sid, year=year,
+                        template_version_id=UUID(str(bound)), actor=current_user,
+                    )
+            except PushTemplateError as exc:
+                errors.append({"section_id": sid, "error": str(exc)})
+                continue
+            all_results.append(result.to_dict())
+            totals["entity"] += result.entity_count
+            totals["success"] += result.success_count
+            totals["failure"] += result.failure_count
+            totals["skip"] += result.skip_count
+        if errors and not all_results:  # 请求的章节一个都没能下推：整单 400，原因逐章节写明
+            raise HTTPException(status_code=400, detail="；".join(f"{e['section_id']}：{e['error']}" for e in errors))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
     return PushTemplateResponse(
-        success=total_f == 0,
+        success=not errors and totals["failure"] == 0,
         results=all_results,
-        total_entities=total_e,
-        total_success=total_s,
-        total_failure=total_f,
+        errors=errors,
+        total_entities=totals["entity"],
+        total_success=totals["success"],
+        total_failure=totals["failure"],
+        total_skipped=totals["skip"],
     )

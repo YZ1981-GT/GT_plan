@@ -5,6 +5,7 @@
  *   （一）终止确认明细  （二）继续涉入明细  （三）CAS23 九步终止确认判断
  * 结论映射：终止确认 / 不终止确认（质押借款） / 按继续涉入程度确认
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import { parseNum } from '@/composables/useG5FormulaEngine'
 import { STEP_DEFS, type StepJudgment } from './useD2Derecognition'
@@ -100,7 +101,7 @@ export function conclusionToTreatment(c: FactoringConclusion | string): Factorin
 
 export function emptyRow(partial?: Partial<FactoringCheckRow>): FactoringCheckRow {
   return {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq: 0,
     debtor: '',
     factor: '',
@@ -147,7 +148,7 @@ function migrateLegacyRow(raw: any, index: number): FactoringCheckRow {
       : (raw?.derecognition === '是' ? '是' : '否')
 
   return emptyRow({
-    id: raw?.id || crypto.randomUUID(),
+    id: raw?.id || newUuid(),
     seq: index + 1,
     debtor: raw?.debtor || raw?.itemName || '',
     factor: raw?.factor || '',

@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG11Adjudication — G11-1 审定表（损益类/本期-上期）
@@ -336,19 +337,10 @@ export function useG11Adjudication(opts: {
     if (_year == null) return
     if (!opts.projectId.value) return
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G11_ACCOUNT_CODE  },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G11_ACCOUNT_CODE),
-      )
-      if (hit) {
-        const credit = parseNum(hit.credit_amount ?? hit.period_credit)
-        const debit = parseNum(hit.debit_amount ?? hit.period_debit)
-        updateTrialBalance(credit - debit)
-      }
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year, accountPrefix: G11_ACCOUNT_CODE })
+      // 本期发生额 = 试算表未审数（单边口径，与报表同）；原先读端点没有的借 / 贷字段算差额，恒 0
+      const amount = tbSumUnder(list, G11_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount != null) updateTrialBalance(amount)
     } catch { /* optional */ }
   }
 

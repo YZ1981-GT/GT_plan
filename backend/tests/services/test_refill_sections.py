@@ -363,7 +363,8 @@ async def test_refill_no_change_no_update():
         report = await eng.refill_sections(PROJECT_ID, YEAR, ["五、7"])
 
     assert report.cells_updated == 0
-    assert report.sections_recomputed == []
+    assert report.changed_sections == []
+    assert report.recomputed_sections == ["五、7"]
 
 
 @pytest.mark.asyncio
@@ -414,3 +415,50 @@ async def test_refill_mixed_sections():
     assert "一、1" in report.text_only_sections
     assert "五、1" in report.sections_recomputed
     assert report.cells_updated == 1
+
+
+@pytest.mark.asyncio
+async def test_refill_none_result_is_failed_and_not_recomputed():
+    """解析器缺数据不是成功重算，章节必须保留 stale。"""
+    eng = _make_engine()
+    table_data = {
+        "headers": ["项目", "金额"],
+        "rows": [{
+            "label": "缺数据行",
+            "values": [88.0],
+            "_cell_modes": {"0": "auto"},
+            "_cell_meta": {"0": {"semantic": "closing_balance"}},
+        }],
+    }
+    note = _make_note("五、缺数据", content_type=ContentType.table, table_data=table_data)
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = [note]
+    eng.db.execute = AsyncMock(return_value=mock_result)
+    binding = {
+        "tables": [{
+            "header_normalize": [{"semantic": "row_label"}, {"semantic": "closing_balance"}],
+            "rows": {"缺数据行": {"binding": {"closing_balance": {"source": "trial_balance"}}}},
+        }]
+    }
+
+    with (
+        patch.object(eng, "_preload_data_for_notes", new_callable=AsyncMock),
+        patch(
+            "app.services.note_template_bindings_loader.get_binding_for_section",
+            return_value=binding,
+        ),
+        patch(
+            "app.services.note_source_resolvers.dispatch_resolver",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+    ):
+        report = await eng.refill_sections(PROJECT_ID, YEAR, ["五、缺数据"])
+
+    assert report.requested_sections == ["五、缺数据"]
+    assert report.recomputed_sections == []
+    assert report.changed_sections == []
+    assert report.failed_sections == ["五、缺数据"]
+    assert report.cells_updated == 0
+    assert table_data["rows"][0]["values"][0] == 88.0
+    assert report.error_details[0]["stage"] == "resolver"

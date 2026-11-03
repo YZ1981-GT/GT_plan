@@ -2,6 +2,7 @@
  * useF2LossContract — F2-58 亏损合同预计损失测算
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   defaultLossContractSheet,
@@ -82,6 +83,15 @@ export function useF2LossContract(opts: {
   const adjustCount = computed(() =>
     enrichedProjects.value.filter((r) => r.hasDifference).length,
   )
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

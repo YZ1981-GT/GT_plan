@@ -207,7 +207,6 @@ function fmt(v: number): string {
 
 function onReconcileRefresh(): void {
   dis.pullLatestAdjudicated()
-  dis.syncFromDetail()
 }
 
 // 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）

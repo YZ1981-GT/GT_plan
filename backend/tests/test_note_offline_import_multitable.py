@@ -11,13 +11,19 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 _BACKEND = Path(__file__).resolve().parents[1]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 from app.services.note_offline_import_tables import (  # noqa: E402
+    OfflineImportProtectedCellError,
+    OfflineImportStructureError,
+    count_changed_tables,
     extract_sheet_tables,
     merge_imported_tables_into_section,
+    merge_selected_cells_into_section,
 )
 
 
@@ -108,12 +114,12 @@ def test_merge_updates_values_and_preserves_non_value_fields() -> None:
     }
     imported = [
         {"name": "货币资金", "headers": ["项目", "期末", "期初"],
-         "rows": [{"cells": ["库存现金", 100, 90]}, {"cells": ["合计", 100, 90]}]},
+         "rows": [{"cells": ["库存现金", 0, 90]}, {"cells": ["合计", 100, 90]}]},
         {"name": "受限", "headers": ["项目", "金额"], "rows": [{"cells": ["质押", 50]}]},
     ]
     out = merge_imported_tables_into_section(existing, imported)
     t0 = out["_tables"][0]
-    assert t0["rows"][0]["values"] == [100, 90], "明细值未并入"
+    assert t0["rows"][0]["values"] == [0, 90], "未保护列的值未并入"
     assert t0["rows"][0]["row_type"] == "data", "row_type 丢失"
     assert t0["rows"][0]["_cell_meta"]["0"]["binding_id"] == "八、1.库存现金.end", "绑定丢失"
     assert t0["rows"][1]["is_total"] is True, "is_total 丢失"
@@ -199,9 +205,149 @@ def test_apply_import_writes_tables_not_flat() -> None:
             ],
         },
     }
-    xlsx_bytes, _ = export_sections_to_xlsx([section], project_name="测试", include_formulas=False)
+    import copy
+
+    imported = copy.deepcopy(section)
+    imported["table_data"]["_tables"][0]["rows"][0]["values"] = [100, 90]
+    imported["table_data"]["_tables"][1]["rows"][0]["values"] = [5]
+    xlsx_bytes, _ = export_sections_to_xlsx([imported], project_name="测试", include_formulas=False)
     result = apply_import(xlsx_bytes, [section], {"八、1": ConflictResolution.OVERWRITE})
     assert result.sections_imported == 1
     assert result.tables_written == 2, f"回执应报 2 张表写入，实为 {result.tables_written}"
     td = result.applied_sections["八、1"]
     assert isinstance(td.get("_tables"), list) and len(td["_tables"]) == 2, "未写回多表结构"
+
+
+def test_headers_without_label_column_roundtrip() -> None:
+    """模板 headers 只含数据列时，导出会补「项目」；结构解析必须按同一规则识别。"""
+    grid = [["项目", "期末"], ["A", 1]]
+    expected = [{"headers": ["期末"], "rows": [{"label": "A", "values": [0]}]}]
+    assert extract_sheet_tables(grid, expected=expected)[0]["rows"][0]["cells"] == ["A", 1]
+
+
+def test_structure_change_is_rejected_instead_of_silently_dropping_rows() -> None:
+    import pytest
+
+    expected = [{"name": "明细", "headers": ["项目", "金额"],
+                 "rows": [{"label": "A", "values": [0]}]}]
+    with pytest.raises(OfflineImportStructureError, match="只允许改值"):
+        extract_sheet_tables([["项目", "金额"], ["A", 1], ["★ 新增", 2]], expected=expected)
+
+
+def test_row_reorder_is_rejected_instead_of_positional_overwrite() -> None:
+    import pytest
+
+    existing = {"headers": ["项目", "金额"], "rows": [
+        {"label": "A", "values": [1]}, {"label": "B", "values": [2]},
+    ]}
+    imported = [{"headers": ["项目", "金额"], "rows": [
+        {"cells": ["B", 20]}, {"cells": ["A", 10]},
+    ]}]
+    with pytest.raises(OfflineImportStructureError, match="行结构已变化"):
+        merge_imported_tables_into_section(existing, imported)
+
+
+def test_merge_selected_cells_supports_second_table_and_keeps_other_values() -> None:
+    existing = {"_tables": [
+        {"name": "表1", "headers": ["项目", "金额"], "rows": [{"label": "A", "values": [1]}]},
+        {"name": "表2", "headers": ["项目", "金额", "期初"],
+         "rows": [{"label": "B", "values": [2, 3], "row_type": "data"}]},
+    ]}
+    imported = [
+        {"name": "表1", "headers": ["项目", "金额"], "rows": [{"cells": ["A", 10]}]},
+        {"name": "表2", "headers": ["项目", "金额", "期初"], "rows": [{"cells": ["B", 20, 30]}]},
+    ]
+    out = merge_selected_cells_into_section(existing, imported, ["1:0:1"])
+    assert out["_tables"][0]["rows"][0]["values"] == [1]
+    assert out["_tables"][1]["rows"][0]["values"] == [2, 30]
+    assert out["_tables"][1]["rows"][0]["row_type"] == "data"
+    assert out["rows"] == out["_tables"][0]["rows"]
+    assert count_changed_tables(existing, out) == 1
+
+
+def test_apply_import_rejects_import_only_and_noop_receipt_is_zero() -> None:
+    from app.services.note_offline_export_service import export_sections_to_xlsx
+    from app.services.note_offline_import_service import ConflictResolution, apply_import
+
+    current = {"section_id": "s1", "section_title": "现有", "table_data": {
+        "headers": ["项目", "金额"], "rows": [{"label": "A", "values": [1]}],
+    }}
+    new = {"section_id": "s2", "section_title": "新增", "table_data": {
+        "headers": ["项目", "金额"], "rows": [{"label": "A", "values": [2]}],
+    }}
+    same_bytes, _ = export_sections_to_xlsx([current])
+    same = apply_import(same_bytes, [current], {"s1": ConflictResolution.OVERWRITE})
+    assert same.success is True and same.sections_imported == 0 and same.tables_written == 0
+
+    new_bytes, _ = export_sections_to_xlsx([new])
+    rejected = apply_import(new_bytes, [current], {"s2": ConflictResolution.OVERWRITE})
+    assert rejected.success is False and rejected.sections_imported == 0
+    assert rejected.tables_written == 0 and "不创建新章节" in rejected.errors[0]
+
+
+def test_missing_expected_table_header_is_rejected_not_silently_kept() -> None:
+    import pytest
+
+    expected = [{"name": "明细", "headers": ["项目", "金额"], "rows": [{"label": "A", "values": [1]}]}]
+    with pytest.raises(OfflineImportStructureError, match="找不到既有表"):
+        extract_sheet_tables([["项目", "被改名"], ["A", 2]], expected=expected)
+
+
+def _protected_table_data(marker: str) -> dict:
+    row = {"label": "A", "values": [1, 2]}
+    root = {"headers": ["项目", "金额", "期初"], "rows": [row]}
+    if marker == "binding":
+        row["_cell_meta"] = {"0": {"binding_id": "bind-1"}}
+    elif marker in {"auto", "formula", "locked"}:
+        row["_cell_modes"] = {"0": marker}
+    elif marker == "source":
+        row["_cell_meta"] = {"0": {"source": "trial_balance"}}
+    elif marker == "legacy_binding":
+        root["_bindings"] = {"0:0": {"source": "trial_balance"}}
+    elif marker == "legacy_formula":
+        root["_formulas"] = {"0:0": {"expression": "=1+1"}}
+    return root
+
+
+@pytest.mark.parametrize(
+    "marker", ["binding", "auto", "formula", "locked", "source", "legacy_binding", "legacy_formula"],
+)
+def test_overwrite_rejects_changed_protected_cells(marker: str) -> None:
+    existing = _protected_table_data(marker)
+    imported = [{"headers": ["项目", "金额", "期初"], "rows": [{"cells": ["A", 9, 2]}]}]
+    with pytest.raises(OfflineImportProtectedCellError, match="不得改写"):
+        merge_imported_tables_into_section(existing, imported)
+
+
+def test_protected_equal_value_is_allowed_and_manual_value_can_change() -> None:
+    protected = _protected_table_data("binding")
+    same = [{"headers": ["项目", "金额", "期初"], "rows": [{"cells": ["A", 1.0, 2]}]}]
+    assert merge_imported_tables_into_section(protected, same)["rows"][0]["values"] == [1.0, 2]
+
+    manual = _protected_table_data("manual")
+    changed = [{"headers": ["项目", "金额", "期初"], "rows": [{"cells": ["A", 9, 2]}]}]
+    assert merge_imported_tables_into_section(manual, changed)["rows"][0]["values"] == [9, 2]
+
+
+def test_merge_checks_only_selected_cells_against_current_db_protection() -> None:
+    existing = _protected_table_data("binding")
+    imported = [{"headers": ["项目", "金额", "期初"], "rows": [{"cells": ["A", 9, 20]}]}]
+    out = merge_selected_cells_into_section(existing, imported, ["0:1"])
+    assert out["rows"][0]["values"] == [1, 20], "未选择的受保护变化不得阻断手工格合并"
+    with pytest.raises(OfflineImportProtectedCellError, match="binding"):
+        merge_selected_cells_into_section(existing, imported, ["0:0"])
+
+
+def test_merge_rejects_protected_cell_in_second_table() -> None:
+    existing = {"_tables": [
+        {"name": "表1", "headers": ["项目", "金额"], "rows": [{"label": "A", "values": [1]}]},
+        {"name": "表2", "headers": ["项目", "金额"], "rows": [
+            {"label": "B", "values": [2], "_cell_modes": {"0": "locked"}},
+        ]},
+    ]}
+    imported = [
+        {"name": "表1", "headers": ["项目", "金额"], "rows": [{"cells": ["A", 1]}]},
+        {"name": "表2", "headers": ["项目", "金额"], "rows": [{"cells": ["B", 3]}]},
+    ]
+    with pytest.raises(OfflineImportProtectedCellError, match="1:0:0"):
+        merge_selected_cells_into_section(existing, imported, ["1:0:0"])

@@ -8,13 +8,15 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.time_utils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -167,10 +169,11 @@ class DataLifecycleService:
         retention_until = result.scalar_one_or_none()
 
         if retention_until is not None:
-            # 统一为 naive UTC 比较（兼容 SQLite 测试和 PG 生产）
-            now_utc = datetime.now(timezone.utc)
+            # 统一为 naive UTC 比较：PG 的 timestamptz 读回带时区（先换算到 UTC 再去掉时区），SQLite 读回不带时区。
+            # 原写法当前时间仍带时区 ⇒ 一比较就 TypeError，保留期内外都报 500
+            now_utc = utcnow()
             retention_naive = (
-                retention_until.replace(tzinfo=None)
+                retention_until.astimezone(timezone.utc).replace(tzinfo=None)
                 if retention_until.tzinfo is not None
                 else retention_until
             )

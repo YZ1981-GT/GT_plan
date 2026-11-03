@@ -232,6 +232,117 @@ async def test_sync_happy_path_admin(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_sync_response_keeps_service_feedback_fields():
+    """服务层返回的反馈字段原样到达前端（spec note-pull-followup-closure R3）。
+
+    原响应模型只声明了 6 个字段，FastAPI 按 response_model 过滤 ⇒ ``row_scope_unresolved``（行级合并 fail closed）
+    与 ``row_scope_unresolved_reasons`` 前端读到的恒为 undefined，提示从未出现过；``push_kept`` 同理。
+    """
+    app, _mock_db = _make_app(role=UserRole.admin)
+    kept = [{"table": "货币资金", "row": "库存现金", "period": "end", "field": "end_amount", "kind": "cell",
+             "pushed": 390.0, "incoming": 999}]
+    fake_result = {
+        "success": True, "section_id": "五、1", "synced_at": "2026-10-27T00:00:00+00:00", "rows_synced": 4,
+        "created": False, "revived": False, "blocked_by_manual_override": False, "texts_synced": 0,
+        "row_scoped_tables": [], "row_scope_unresolved": ["外币货币性项目"],
+        "row_scope_unresolved_reasons": {"外币货币性项目": "项目准则未设置"}, "push_kept": kept,
+    }
+    payload = {"wp_id": str(WP_ID), "sheet_name": "附注披露信息(上市公司)", "section_id": "五、1",
+               "sub_table_data": {"货币资金": [{"label": "库存现金", "end_amount": 999}]},
+               "current_standard": "listed_standalone", "year": 2025}
+    with patch("app.routers.wp_disclosure_sync.sync_from_workpaper", new=AsyncMock(return_value=fake_result)), \
+         patch("app.deps.set_rls_context", new=AsyncMock()), \
+         patch.object(wp_disclosure_sync_module, "_autorun_validation", new=AsyncMock()):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(f"/api/projects/{PROJECT_ID}/disclosure-notes/sync-from-workpaper", json=payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["row_scope_unresolved"] == ["外币货币性项目"]
+    assert body["row_scope_unresolved_reasons"] == {"外币货币性项目": "项目准则未设置"}
+    assert body["push_kept"] == kept
+    # 服务层返回的每个键都在响应里（新加字段忘了声明会再次被过滤）
+    assert set(fake_result) <= set(body), set(fake_result) - set(body)
+
+
+def _returned_keys(func_name: str) -> set[str]:
+    """服务函数里所有 ``return {...}`` 字面量与 ``return _helper(...)``（同文件、返回字面量的辅助函数）的键。"""
+    import ast
+    import inspect
+
+    import app.services.wp_disclosure_sync_service as svc
+
+    tree = ast.parse(inspect.getsource(svc))
+    funcs = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+    def dict_keys(fn) -> set[str]:
+        keys: set[str] = set()
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Return) or node.value is None:
+                continue
+            if isinstance(node.value, ast.Dict):
+                keys |= {k.value for k in node.value.keys if isinstance(k, ast.Constant)}
+            elif isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) \
+                    and node.value.func.id in funcs:
+                keys |= dict_keys(funcs[node.value.func.id])
+        return keys
+
+    return dict_keys(funcs[func_name])
+
+
+@pytest.mark.parametrize(("func_name", "model", "handled"), [
+    ("sync_from_workpaper", wp_disclosure_sync_module.SyncFromWorkpaperResponse, {"synced", "skipped_reason"}),
+    ("sync_from_html", wp_disclosure_sync_module.SyncFromHtmlResponse, set()),
+])
+def test_response_models_declare_every_service_key(func_name, model, handled):
+    """服务返回的每个键都在响应模型里（否则 FastAPI 按 response_model 过滤掉、前端读到 undefined）。
+
+    ``handled``：路由单独处理的形态（没有审计年度 ⇒ 422，见 test_sync_without_audit_year_is_422）。"""
+    keys = _returned_keys(func_name)
+    assert {"success", "push_kept", "row_scope_unresolved"} <= keys, "判据空转：没扫到服务的返回字典"
+    missing = keys - set(model.model_fields) - handled
+    assert not missing, f"{func_name} 返回了响应模型没声明的键（会被过滤）：{sorted(missing)}"
+
+
+@pytest.mark.asyncio
+async def test_sync_without_audit_year_is_422():
+    """项目没有审计年度、载荷也没带年度：服务层不写入并回 skipped_reason ⇒ 422 中文原因（原来构造响应模型缺字段 ⇒ 500）。"""
+    app, _mock_db = _make_app(role=UserRole.admin)
+    payload = {"wp_id": str(WP_ID), "sheet_name": "附注", "section_id": "五、1",
+               "sub_table_data": {"货币资金": []}, "current_standard": "listed_standalone"}
+    with patch("app.routers.wp_disclosure_sync.sync_from_workpaper",
+               new=AsyncMock(return_value={"synced": 0, "skipped_reason": "未设置审计年度"})), \
+         patch("app.deps.set_rls_context", new=AsyncMock()):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(f"/api/projects/{PROJECT_ID}/disclosure-notes/sync-from-workpaper", json=payload)
+    assert resp.status_code == 422, resp.text
+    assert "未设置审计年度" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_batch_sync_without_audit_year_is_422_and_rolls_back():
+    """批量端点同口径（L3 国企、G7 走批量）：子章节回 skipped_reason ⇒ 整批回滚、422 中文原因。
+
+    原来把跳过结果当成功汇总：读 ``results[-1]["synced_at"]`` KeyError ⇒ 500「附注批量同步失败: 'synced_at'」。
+    服务层用真实 ``sync_batch_from_workpaper``，只替换它调用的单章节同步。"""
+    app, mock_db = _make_app(role=UserRole.admin)
+    payload = {"wp_id": str(WP_ID), "current_standard": "soe_standalone", "items": [
+        {"section_id": "八、49", "sheet_name": "附注", "sub_table_data": {"长期借款": []}},
+        {"section_id": "八、45", "sheet_name": "附注", "sub_table_data": {"一年内到期的非流动负债": []}},
+    ]}
+    single = AsyncMock(return_value={"synced": 0, "skipped_reason": "未设置审计年度"})
+    with patch("app.services.wp_disclosure_sync_service.sync_from_workpaper", new=single), \
+         patch("app.deps.set_rls_context", new=AsyncMock()):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                f"/api/projects/{PROJECT_ID}/disclosure-notes/sync-batch-from-workpaper", json=payload)
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"] == "附注未同步：未设置审计年度"
+    assert single.await_count == 1, "第一节就没写成，后面的章节不再同步"
+    mock_db.commit.assert_not_awaited()
+    mock_db.rollback.assert_awaited()
+
+
+@pytest.mark.asyncio
 async def test_sync_422_when_section_id_missing():
     """Pydantic catches missing required field → 422."""
     app, _mock_db = _make_app()
@@ -360,6 +471,32 @@ async def _post_as_member(world, user, payload, *, result=None):
     return resp, sync, validation, client
 
 
+_BATCH_SYNC_PATH = f"/api/projects/{TARGET_PROJECT_ID}/disclosure-notes/sync-batch-from-workpaper"
+_BATCH_RBAC_PAYLOAD = {
+    "wp_id": str(WP_ID),
+    "current_standard": "soe_standalone",
+    "year": 2025,
+    "require_all_applied": True,
+    "items": [{
+        "sheet_name": "附注披露信息(国企)",
+        "section_id": "八、18",
+        "sub_table_data": {"长期股权投资": []},
+        "owner_key": "G7:soe",
+        "replace_owned_tables": True,
+    }],
+}
+
+
+async def _post_batch_as_member(world, user):
+    sync = world.stub(wp_disclosure_sync_module, "sync_batch_from_workpaper", returns={
+        "success": True, "sections_synced": 1, "rows_synced": 0, "texts_synced": 0,
+        "synced_at": "2026-10-29T00:00:00+00:00", "results": [],
+    })
+    async with world.client(wp_disclosure_sync_router, user=user) as client:
+        resp = await client.post(_BATCH_SYNC_PATH, json=_BATCH_RBAC_PAYLOAD)
+    return resp, sync, client
+
+
 @pytest.mark.asyncio
 async def test_sync_403_for_non_admin_without_project_access(world):
     """auditor without project_users record on the target project → 403（在另一项目上是 edit 级也不行）。"""
@@ -391,6 +528,27 @@ async def test_sync_403_for_readonly_user(world):
 
 
 @pytest.mark.asyncio
+async def test_batch_sync_403_for_non_member(world):
+    identity = await world.non_member()
+    resp, sync, client = await _post_batch_as_member(world, identity.user)
+
+    assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
+    assert sync.count == 0
+    client.assert_passed(_GATE, times=1)
+
+
+@pytest.mark.asyncio
+async def test_batch_sync_403_for_readonly_member(world):
+    role, level = map_assignment_role("观察员")
+    identity = await world.member(level, role)
+    resp, sync, client = await _post_batch_as_member(world, identity.user)
+
+    assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
+    assert sync.count == 0
+    client.assert_passed(_GATE, times=1)
+
+
+@pytest.mark.asyncio
 async def test_sync_with_edit_user_succeeds(world):
     """Non-admin member whose project_users row is edit（委派角色 auditor → ROLE_MAP 值 (auditor, edit)）→ 200."""
     role, level = ROLE_MAP["auditor"]
@@ -410,7 +568,10 @@ async def test_sync_with_edit_user_succeeds(world):
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["created"] is True
-    assert body == {**fake_result, "texts_synced": 0}
+    # 服务没返回的反馈字段取默认值（2026-10-27 起响应模型声明了服务层的全部键，spec note-pull-followup-closure R3）
+    assert body == {**fake_result, "texts_synced": 0, "revived": False, "blocked_by_manual_override": False,
+                    "row_scoped_tables": [], "row_scope_unresolved": [], "row_scope_unresolved_reasons": {},
+                    "push_kept": [], "skipped": False, "reason": None}
     ((args, kwargs),) = sync.calls
     assert args[1] == TARGET_PROJECT_ID
     assert (kwargs["wp_id"], kwargs["section_id"], kwargs["user"].id) == (WP_ID, "五-1-1 应收账款", identity.user.id)
@@ -496,11 +657,14 @@ async def test_sync_batch_happy_path():
     payload = {
         "wp_id": str(WP_ID),
         "current_standard": "soe",
+        "require_all_applied": True,
         "items": [
             {
                 "sheet_name": "附注披露信息（国企）",
                 "section_id": "七、本期纳入合并报表范围的子公司基本情况",
                 "sub_table_data": {"主表": [{"a": 1}]},
+                "owner_key": "G7:soe",
+                "replace_owned_tables": True,
             },
             {
                 "sheet_name": "附注披露信息（国企）",
@@ -541,4 +705,7 @@ async def test_sync_batch_happy_path():
     assert body["texts_synced"] == 1
     assert mock_svc.await_count == 1
     assert len(mock_svc.await_args.kwargs["items"]) == 2
+    assert mock_svc.await_args.kwargs["require_all_applied"] is True
+    assert mock_svc.await_args.kwargs["items"][0]["owner_key"] == "G7:soe"
+    assert mock_svc.await_args.kwargs["items"][0]["replace_owned_tables"] is True
 

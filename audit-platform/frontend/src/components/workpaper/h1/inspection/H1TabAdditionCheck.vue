@@ -238,9 +238,14 @@
         size="small"
         max-height="520"
         class="check-table"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
       >
         <el-table-column type="index" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <!-- 账面基础信息 -->
         <el-table-column label="账面记录" align="center">
@@ -556,6 +561,7 @@
         <el-table-column label="📎" width="48" align="center">
           <template #default="{ row }">
             <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="100">
@@ -865,7 +871,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 固定资产-增加）"
+      :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 固定资产-增加）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -875,15 +881,16 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, watch, type Ref } from 'vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
@@ -900,6 +907,8 @@ import {
 } from '../../composables/useH1AdditionCheck'
 import type { MethodChecklistItem } from '../../composables/h1AdditionMethodChecklist'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import {
@@ -919,6 +928,8 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -930,8 +941,11 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  year?: number
+  year?: number | null
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H1-7'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 /** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
 const samplingYear = computed<number | null>(() => props.year ?? null)
@@ -950,6 +964,7 @@ function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
 function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
 
 onMounted(() => {
+  void state.voucherFillReady()
   const n = props.allResponses.get(NOTE_KEY)
   if (n?.remark) auditNoteText.value = n.remark
   const c = props.allResponses.get(CONCLUSION_KEY)
@@ -966,6 +981,7 @@ const state = useH1AdditionCheck(
   allResponsesRef as any,
   {
     onSave: (itemId, value) => saveResponse(itemId, value),
+    isReadonly: computed(() => props.isReadonly === true),
   },
 )
 
@@ -1119,54 +1135,27 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any) {
+/** 抽凭回填走共享函数：一个样本一行（对方科目按配对拼接），按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  showSamplingDialog.value = false
-  // 引擎 emit('filled', { samples, phase, fillMode, ... })；兼容旧数组形态
-  const samples: any[] = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!samples.length) return
-  for (const s of samples) {
-    state.addRow(s.summary || '抽样项')
-    const lastRow = state.rows.value[state.rows.value.length - 1]
-    if (!lastRow) continue
-    // 固定资产增加在原值借方；无借方额时回退贷方
-    lastRow.originalCost = Math.abs(Number(s.debitAmount ?? s.creditAmount ?? 0) || 0)
-    lastRow.voucherNo = s.voucherNo || ''
-    lastRow.acquisitionDate = s.voucherDate || ''
-    // 多科目时拼接所有对方科目代码和名称
-    const entries = s.voucherEntries || []
-    if ((s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0) {
-      const sDebit = Number(s.debitAmount ?? 0)
-      const counterEntries = entries.filter((e: any) =>
-        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-      )
-      const toShow = counterEntries.length > 0 ? counterEntries : entries
-      lastRow.counterpartAccount = toShow.map((e: any) => e.account_code).filter(Boolean).join('/')
-      lastRow.counterpartAccountName = toShow.map((e: any) => e.account_name).filter(Boolean).join('/')
-    } else {
-      lastRow.counterpartAccount = s.counterpartAccount || ''
-      lastRow.counterpartAccountName = s.counterpartAccountName || ''
-    }
-    lastRow.voucherSampleId = s.voucherNo || ''
-    lastRow.isAbnormal = s.abnormal ? 'Y' : 'N'
-    lastRow.checkResult = s.abnormal ? 'ERR' : ''
-    lastRow.remark = s.selectionReason || s.remark || (s.isHighValue ? 'MUS高值必选' : '')
-    state.updateCell(lastRow.rowId, 'originalCost', lastRow.originalCost)
-  }
-  ElMessage.success(`已回填 ${samples.length} 笔抽样凭证`)
+  void persistMethodology(payload?.methodology)
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 async function handleOcr(row: AdditionRow) {
@@ -1178,12 +1167,14 @@ async function handleOcr(row: AdditionRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const data = res.data?.data ?? res.data
       const fields = data?.extracted_fields || {}
       if (!Object.keys(fields).length) {
@@ -1210,6 +1201,9 @@ function rowClassName({ row }: { row: AdditionRow }) {
   if (state.needsCipAcceptanceWarning(row) || state.needsProvisionalDepWarning(row)) return 'row-cip-warn'
   return ''
 }
+
+/** 行样式：异常 / 金额不符提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, state.voucherRowClass)
 
 function traceRowClassName({ row }: { row: TraceRow }) {
   if (row.recordedInBooks === 'N' || row.checkResult === 'ERR') return 'row-anomaly'

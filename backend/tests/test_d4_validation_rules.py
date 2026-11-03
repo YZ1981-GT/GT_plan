@@ -261,14 +261,14 @@ class TestD4ValidationLogic:
         assert vr04.severity == "blocking"
 
     async def test_missing_data_skips_gracefully(self, db_session, project_id):
-        """数据缺失时所有检查跳过（passed=True）"""
+        """数据缺失时所有检查跳过（status=not_executed）"""
         gate = ConsistencyGate(db_session)
         with patch.object(gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None):
             checks = await gate.check_d4_revenue_reconciliation(project_id, 2025)
 
         assert len(checks) == 4
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
 
     async def test_blocking_rules_prevent_signoff(self, db_session, project_id):
         """VR-D4-01/04 blocking 失败时 overall=fail（阻断签字）"""
@@ -293,10 +293,10 @@ class TestD4ValidationLogic:
         """VR-D4-02/03 warning 失败不阻断签字"""
         # Construct a result where only warnings fail
         checks = [
-            CheckItem(check_name="D4勾稽:营业收入合计=主营+其他", passed=True, severity="blocking"),
-            CheckItem(check_name="D4勾稽:应收增长率vs收入增长率", passed=False, severity="warning"),
-            CheckItem(check_name="D4勾稽:毛利率波动<5%", passed=False, severity="warning"),
-            CheckItem(check_name="D4勾稽:合同负债vs D7-1审定数", passed=True, severity="blocking"),
+            CheckItem(status="passed", check_name="D4勾稽:营业收入合计=主营+其他", passed=True, severity="blocking"),
+            CheckItem(status="failed", check_name="D4勾稽:应收增长率vs收入增长率", passed=False, severity="warning"),
+            CheckItem(status="failed", check_name="D4勾稽:毛利率波动<5%", passed=False, severity="warning"),
+            CheckItem(status="passed", check_name="D4勾稽:合同负债vs D7-1审定数", passed=True, severity="blocking"),
         ]
         result = ConsistencyResult(overall="pass", checks=checks)
         assert not result.has_blocking_failures

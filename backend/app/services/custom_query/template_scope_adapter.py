@@ -37,12 +37,16 @@ class NormalizedTemplateScope:
 
 
 def normalize_scope(scope: Any) -> CanonicalTemplateScope:
-    """Return canonical scope; legacy ``global``/``personal`` are input-only."""
+    """Return canonical scope; legacy ``global``/``personal`` are input-only.
+
+    报错文案中文（advanced-query-linkage-closure R9.1）：由路由原样放进 422 ``TEMPLATE_SCOPE_INVALID``、
+    由 ``template_service`` 转成 400 ``TEMPLATE_INVALID``，界面直接显示。
+    """
     if not isinstance(scope, str):
-        raise TemplateScopeValidationError("scope must be a string")
+        raise TemplateScopeValidationError("scope 必须是字符串")
     normalized = scope.strip().lower()
     if normalized not in _ACCEPTED_SCOPES:
-        raise TemplateScopeValidationError(f"unsupported template scope: {scope!r}")
+        raise TemplateScopeValidationError(f"不支持的模板范围：{scope}")
     aliases = {"global": "public", "personal": "private"}
     return aliases.get(normalized, normalized)  # type: ignore[return-value]
 
@@ -72,21 +76,17 @@ def normalize_project_ids(
     if scope in {"private", "team", "public"}:
         return ()
     if not isinstance(values, (list, tuple, set)) or not values:
-        raise TemplateScopeValidationError(
-            "project scope requires at least one shared_project_id"
-        )
+        raise TemplateScopeValidationError("指定项目共享至少需要一个项目")
 
     project_ids: set[uuid.UUID] = set()
     for raw in values:
         project_id = _as_uuid(raw)
         if project_id is None:
-            raise TemplateScopeValidationError(f"invalid shared project id: {raw!r}")
+            raise TemplateScopeValidationError(f"共享项目标识非法：{raw}")
         project_ids.add(project_id)
 
     if not project_ids:
-        raise TemplateScopeValidationError(
-            "project scope requires at least one shared_project_id"
-        )
+        raise TemplateScopeValidationError("指定项目共享至少需要一个项目")
     return tuple(sorted(project_ids, key=str))
 
 

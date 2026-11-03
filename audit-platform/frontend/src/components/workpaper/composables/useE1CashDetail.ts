@@ -20,6 +20,7 @@
  *
  * Requirements: 3.1-3.6
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import {
@@ -62,10 +63,7 @@ const CROSS_SHEET_KEY_ENDING = 'E1-cash-detail-total-unaudited'
 
 /** 生成行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `cash-${crypto.randomUUID()}`
-  }
-  return `cash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `cash-${newUuid()}`
 }
 
 /** 重算行内公式字段 */
@@ -95,6 +93,26 @@ function createDefaultRmbRow(): CashDetailRow {
     adjustment: 0,
     auditedRmb: 0,
     note: '',
+  })
+}
+
+/**
+ * 存库行 → 算好公式列的一行（载入与对拍守卫共用）。
+ * 公式按模板「现金明细表E1-2」：E = B + C − D；G = E × F；I = G + H × F。
+ */
+export function normalizeE1CashDetailRow(r: Record<string, unknown>): CashDetailRow {
+  return recalcRow({
+    id: String(r.id || generateRowId()),
+    currency: String(r.currency || ''),
+    opening: parseNum(r.opening),
+    increase: parseNum(r.increase),
+    decrease: parseNum(r.decrease),
+    endingFc: 0, // recalculated
+    fxRate: parseNum(r.fxRate),
+    endingRmb: 0, // recalculated
+    adjustment: parseNum(r.adjustment),
+    auditedRmb: 0, // recalculated
+    note: String(r.note || ''),
   })
 }
 
@@ -140,19 +158,9 @@ export function useE1CashDetail(options: UseE1BaseOptions) {
         rows.value = [createDefaultRmbRow()]
         return
       }
-      const loadedRows: CashDetailRow[] = parsed.map((r: Record<string, unknown>) => recalcRow({
-        id: String(r.id || generateRowId()),
-        currency: String(r.currency || ''),
-        opening: parseNum(r.opening),
-        increase: parseNum(r.increase),
-        decrease: parseNum(r.decrease),
-        endingFc: 0, // recalculated
-        fxRate: parseNum(r.fxRate),
-        endingRmb: 0, // recalculated
-        adjustment: parseNum(r.adjustment),
-        auditedRmb: 0, // recalculated
-        note: String(r.note || ''),
-      }))
+      const loadedRows: CashDetailRow[] = parsed.map(
+        (r: Record<string, unknown>) => normalizeE1CashDetailRow(r),
+      )
 
       // Ensure default RMB row exists
       const hasRmb = loadedRows.some(r => r.id === 'fixed-rmb')

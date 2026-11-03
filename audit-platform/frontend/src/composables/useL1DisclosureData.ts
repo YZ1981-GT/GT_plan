@@ -13,7 +13,7 @@
  *
  * 依赖父入口 provide 的共享 useL1FormData（allResponses 与审定表共享 → 审定变更自动反映）。
  */
-import { computed, ref, watch, onUnmounted, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, onScopeDispose, type ComputedRef, type Ref } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 
@@ -53,7 +53,9 @@ export function useL1DisclosureData(
   const _onAdjChange = () => { refreshTick.value++ }
   eventBus.on('substantive:adjudicated', _onAdjChange)
   eventBus.on('adjustment:created', _onAdjChange)
-  onUnmounted(() => {
+  // 作用域销毁时退订：组件内 = 卸载时（同 onUnmounted）；附注页离屏同步在 effectScope 里用（没有组件实例，onUnmounted 不生效
+  // 会漏退订），框架用完 stop 即退订（spec note-pull-followup-closure R1）
+  onScopeDispose(() => {
     eventBus.off('substantive:adjudicated', _onAdjChange)
     eventBus.off('adjustment:created', _onAdjChange)
   })

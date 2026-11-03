@@ -80,15 +80,15 @@ _SECTION_PROMPTS: dict[str, str] = {
         "6) 汇总结论（减值计提是否充分/是否存在需关注事项）"
     ),
     "overall-opinion": (
-        "请生成K11资产减值损失底稿总体审计意见。"
+        "请提供K11资产减值损失底稿的科目结论措辞建议。"
         "需涵盖：\n"
         "1) 科目概况（6701资产减值损失本期发生额/审定数/重大程度）\n"
         "2) 各类资产减值汇总核对结论\n"
         "3) 商誉减值特殊考虑（不可转回/是否需要进一步减值测试）\n"
         "4) 与相关科目联动情况（各资产科目减值准备变动一致性）\n"
         "5) 减值迹象判断及管理层估计合理性\n"
-        "6) 总体审计结论（是否存在重大错报/审计调整建议）\n"
-        "7) 剩余审计风险评估"
+        "6) 待人工判断事项（潜在重大错报迹象/可能调整事项，仅列依据）\n"
+        "7) 剩余审计风险及建议程序。不得形成最终审计意见"
     ),
 }
 
@@ -136,7 +136,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

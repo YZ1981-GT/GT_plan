@@ -54,7 +54,9 @@ interface WorkflowStatusResponse {
 
 const props = defineProps<{
   projectId: string
-  year?: number
+  /** 审计年度：不传 ⇒ 不带 year，由后端按项目审计年度取（require_project_audit_year）；
+   *  null = 宿主已知项目没填年度（或还在解析）⇒ 不请求，年度到了 watch 再取 */
+  year?: number | null
 }>()
 
 const router = useRouter()
@@ -100,9 +102,15 @@ const steps = [
 
 async function fetchStatus() {
   if (!props.projectId) return
+  // 项目没填审计年度：不请求（原先缺年度 422 后按「默认在试算表步骤」显示一条假进度）
+  if (props.year === null) {
+    loaded.value = false
+    return
+  }
   try {
-    const yr = props.year || 2025
-    const res = await api.get(`/api/projects/${props.projectId}/workflow-status?year=${yr}`, { _silent: true } as any) as WorkflowStatusResponse
+    // 原先 `props.year || 2025`：没传年度的页面一律按 2025 年度算进度
+    const params = props.year ? { year: props.year } : {}
+    const res = await api.get(`/api/projects/${props.projectId}/workflow-status`, { params, _silent: true } as any) as WorkflowStatusResponse
     currentStep.value = res.current_step
     nextAction.value = res.next_action
     loaded.value = true

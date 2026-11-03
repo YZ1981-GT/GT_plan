@@ -1,8 +1,9 @@
-"""E1 专用 OCR — 临时 id 收敛到真实附件表。
+"""E1 专用 OCR — 识别前先建真实附件（spec attachment-evidence-intake 需求 2，原 provision_wp_linked_attachment 已删）。
 
 验证：
-- 预创建 OCR 附件时会写入 attachments + attachment_working_paper
-- E1 statement OCR 返回的 attachment_id 可在附件表中查到，并带 working_paper 关联
+- 证据入口建附件时写入 attachments + attachment_working_paper（整稿关联、关联类型 = 证据类型）
+- E1 statement OCR 返回的 attachment_id 可在附件表中查到，带底稿关联与写回的识别结果
+附件落在临时目录（原用例写进 backend/storage/attachments，跑一次留一份文件）。
 """
 
 from __future__ import annotations
@@ -21,9 +22,11 @@ from starlette.datastructures import UploadFile
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
+from app.models.wp_optimization_models import EvidenceLink
 from app.models.workpaper_models import WorkingPaper, WpFileStatus, WpIndex, WpSourceType, WpStatus
 from app.routers.wp_render_strategies._e1_statement_ocr import e1_statement_ocr
-from app.services.attachment_ocr_writeback import provision_wp_linked_attachment
+from app.services.workpaper_evidence_intake import create_evidence, load_workpaper
+from tests.attachment_evidence_intake._helpers import use_local_storage
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -36,7 +39,13 @@ _TABLES = [
     WorkingPaper.__table__,
     Attachment.__table__,
     AttachmentWorkingPaper.__table__,
+    EvidenceLink.__table__,
 ]
+
+
+@pytest.fixture(autouse=True)
+def storage_root(tmp_path, monkeypatch):
+    return use_local_storage(tmp_path, monkeypatch)
 
 
 @pytest_asyncio.fixture
@@ -94,39 +103,30 @@ async def seeded_db(db_session: AsyncSession):
     return {"user": user, "project_id": project_id, "wp": wp}
 
 
-class TestProvisionWpLinkedAttachment:
+class TestCreateEvidence:
     @pytest.mark.asyncio
     async def test_creates_real_attachment_and_link(self, db_session, seeded_db):
-        att_id_str, att_id = await provision_wp_linked_attachment(
-            db_session,
-            wp_id=seeded_db["wp"].id,
-            file_name="statement.pdf",
-            content=b"fake-pdf",
-            attachment_type="bank_statement",
-            created_by=seeded_db["user"].id,
+        wp = await load_workpaper(db_session, seeded_db["wp"].id)
+        created = await create_evidence(
+            db_session, wp=wp, file_name="statement.pdf", content=b"%PDF-1.4 fake",
+            evidence_type="bank_statement", user=seeded_db["user"],
         )
-        assert att_id is not None
-        assert att_id_str == str(att_id)
+        att_id = uuid.UUID(created["attachment"]["id"])
+        assert created["evidence_link"] is None
 
-        att = (
-            await db_session.execute(sa.select(Attachment).where(Attachment.id == att_id))
-        ).scalar_one()
+        att = (await db_session.execute(sa.select(Attachment).where(Attachment.id == att_id))).scalar_one()
         assert att.project_id == seeded_db["project_id"]
-        assert att.reference_type == "working_paper"
-        assert att.reference_id == seeded_db["wp"].id
+        assert (att.reference_type, att.reference_id) == ("working_paper", seeded_db["wp"].id)
         assert att.attachment_type == "bank_statement"
+        assert att.created_by == seeded_db["user"].id
 
-        cnt = (
-            await db_session.execute(
-                sa.select(sa.func.count())
-                .select_from(AttachmentWorkingPaper)
-                .where(
-                    AttachmentWorkingPaper.attachment_id == att_id,
-                    AttachmentWorkingPaper.wp_id == seeded_db["wp"].id,
-                )
+        link = (await db_session.execute(
+            sa.select(AttachmentWorkingPaper).where(
+                AttachmentWorkingPaper.attachment_id == att_id,
+                AttachmentWorkingPaper.wp_id == seeded_db["wp"].id,
             )
-        ).scalar()
-        assert int(cnt or 0) == 1
+        )).scalar_one()
+        assert link.association_type == "bank_statement"
 
 
 class TestE1StatementOcrAttachmentId:

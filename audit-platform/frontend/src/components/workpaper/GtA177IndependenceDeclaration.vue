@@ -454,6 +454,14 @@ const ooReady = ref(false)
 const ooError = ref('')
 
 async function handleModeChange() {
+  if (props.readonly) {
+    // 只读（编辑锁在别的窗口 / 无编辑权）：生成 / 回写 Word 都是写操作，不进在线编辑（workpaper-multi-window-lock-gaps R3.5）
+    if (mode.value === '在线编辑') {
+      ElMessage.warning('当前为只读，不能进入在线编辑')
+      mode.value = '结构化视图'
+    }
+    return
+  }
   if (mode.value === '在线编辑') {
     await flushPendingSaves()
     ooGenerating.value = true

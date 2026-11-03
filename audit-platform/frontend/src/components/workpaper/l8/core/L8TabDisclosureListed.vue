@@ -170,6 +170,11 @@ import {
   type L8InputKey,
   type L8PeriodValues,
 } from '../../composables/l8NoteSectionMap'
+import {
+  L8_DISCLOSURE_DATA_ITEM_ID,
+  buildL8DisclosureSnapshot,
+  restoreL8Disclosure,
+} from '../../composables/l8DisclosureTabState'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
@@ -198,7 +203,7 @@ const formData = useL8FormData({
 //
 // 🔴 只持久化 8 个**录入行**，派生行由 `buildL8DisplayRows` 读时推导
 //    （派生值持久化会在编辑后错位）。
-const DATA_ITEM_ID = 'L8-disclosure-listed-data'
+const DATA_ITEM_ID = L8_DISCLOSURE_DATA_ITEM_ID.listed
 
 const current = ref<L8PeriodValues>(createEmptyL8Period())
 const prior = ref<L8PeriodValues>(createEmptyL8Period())
@@ -249,12 +254,11 @@ function saveCapitalizationNote() {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payload = buildL8SyncPayload(props.wpId, {
-    variant: 'listed',
+  const payload = buildL8SyncPayload(props.wpId, buildL8DisclosureSnapshot('listed', {
     current: current.value,
     prior: prior.value,
     capitalizationNote: capitalizationNote.value,
-  })
+  }))
   if (!payload) {
     ElMessage.warning('当前项目准则不适用上市附注同步')
     return
@@ -325,49 +329,21 @@ onUnmounted(() => {
 onBeforeUnmount(() => { autoSync.cancelPending() })
 
 /**
- * 反序列化。
+ * 反序列化（restoreL8Disclosure，离屏同步共用）。
  *
  * 新格式 `{current:{...}, prior:{...}}`（按录入键）；
  * 旧格式是 7 行数组 `[{item,currentAmount,priorAmount}...]`（自造行名），
  * 按行名映射到源模板录入键，映射不到的丢弃。
  */
-const LEGACY_LABEL_TO_KEY: Record<string, L8InputKey> = {
-  '利息费用': 'interestTotal',
-  '  其中：利息资本化金额': 'interestCapitalized',
-  '减：利息资本化金额': 'interestCapitalized',
-  '减：利息收入': 'interestIncome',
-  '汇兑损益（净损失以"+"号列示）': 'exchangeLoss',
-  '手续费': 'feeAndOther',
-}
-
 function _restoreData() {
-  const data = formData.allResponses.value.get(DATA_ITEM_ID)
-  if (data?.remark) {
-    try {
-      const parsed = JSON.parse(data.remark)
-      if (parsed && !Array.isArray(parsed) && (parsed.current || parsed.prior)) {
-        current.value = { ...createEmptyL8Period(), ...(parsed.current || {}) }
-        prior.value = { ...createEmptyL8Period(), ...(parsed.prior || {}) }
-      } else if (Array.isArray(parsed)) {
-        const c = createEmptyL8Period()
-        const p = createEmptyL8Period()
-        for (const r of parsed) {
-          const key = LEGACY_LABEL_TO_KEY[String(r?.item ?? '')]
-          if (!key) continue
-          c[key] = Number(r?.currentAmount) || 0
-          p[key] = Number(r?.priorAmount) || 0
-        }
-        current.value = c
-        prior.value = p
-      }
-    } catch { /* ignore */ }
+  const saved = restoreL8Disclosure('listed', formData.allResponses.value)
+  if (saved.periods) {
+    current.value = saved.periods.current
+    prior.value = saved.periods.prior
   }
-  const nt = formData.allResponses.value.get('L8-disclosure-listed-note')
-  if (nt?.remark) noteText.value = String(nt.remark)
-  const cap = formData.allResponses.value.get('L8-disclosure-listed-capitalization')
-  if (cap?.remark) capitalizationNote.value = String(cap.remark)
-  const conc = formData.allResponses.value.get('L8-disc-listed-conclusion')
-  if (conc?.remark) conclusion.value = String(conc.remark)
+  if (saved.noteText) noteText.value = saved.noteText
+  if (saved.capitalizationNote) capitalizationNote.value = saved.capitalizationNote
+  if (saved.conclusion) conclusion.value = saved.conclusion
 }
 </script>
 

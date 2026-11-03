@@ -27,14 +27,22 @@
       <!-- 其余 HTML sheet：结构化 / OnlyOffice 双模式切换（健康门控） -->
       <template v-else>
         <div class="mode-toggle-bar">
+          <!--
+            模式开关可见性来自**同步能力单源** `useEntrySyncReadiness`（静态裁决 + 运行时
+            readiness），不再由宿主自行决定。本地 `dualMode.ooAvailable` 仍参与禁用态：
+            它是「这张 sheet 的 OO 侧能不能拉起来」的局部健康，与「这条 entry 有没有已验收
+            的双向链路」是两件事，两者都成立才给点。
+            spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
+          -->
           <el-segmented
+            v-if="entrySync.presentation.value.showModeSwitch"
             :model-value="dualMode.mode.value"
             :options="modeToggleOptions"
             size="small"
             @change="dualMode.switchMode"
           />
-          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
-          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m7-special-reserve" />
+          <!-- BP-7 MC-12: 能力诚实披露（与上方开关同一个 readiness 单源） -->
+          <GtEntrySyncCapabilityNotice :entry-id="M7_SYNC_ENTRY_ID" />
         </div>
 
         <!-- 结构化视图（HTML sheet 分支） -->
@@ -145,6 +153,7 @@ import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM7EntryDualMode } from './composables/useM7EntryDualMode'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
@@ -251,14 +260,27 @@ const dualMode = useM7EntryDualMode({
   },
 })
 
-const modeToggleOptions = computed(() => [
-  { label: '结构化', value: 'html' as const },
-  {
-    label: dualMode.ooAvailable.value ? 'OnlyOffice（拉取成功）' : 'OnlyOffice（不可用）',
-    value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
-  },
-])
+/** 本宿主的同步 entry 身份（开关与 notice 共用这一个常量，不各写一处字面量）。 */
+const M7_SYNC_ENTRY_ID = 'xlsx/gt-m7-special-reserve'
+
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => M7_SYNC_ENTRY_ID,
+})
+
+const modeToggleOptions = computed(() => {
+  const ooAllowed =
+    dualMode.ooAvailable.value && entrySync.presentation.value.canSwitchToOnlyOffice
+  return [
+    { label: '结构化', value: 'html' as const },
+    {
+      label: ooAllowed ? 'OnlyOffice（拉取成功）' : 'OnlyOffice（不可用）',
+      value: 'onlyoffice' as const,
+      disabled: !ooAllowed,
+    },
+  ]
+})
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，

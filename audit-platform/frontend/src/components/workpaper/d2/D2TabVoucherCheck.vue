@@ -17,7 +17,7 @@
  *   - useD2VcMethodology（方法学参数 + B15/B50 联动）
  *   - useD2VcAuditSummary（统计自动化）
  *   - useD2VcImportExport（双区分 sheet 导入导出）
- *   - GtVoucherSamplingEngine（dialog-mode + @filled → 双区回填）
+ *   - GtVoucherSamplingEngine（@filled / @undo-request → 共享回填函数按凭证日期分到双区，按分录指纹去重）
  *   - Runtime Boundary（统一版本历史与保存快照）
  *   - GtIndexChip（value="wp:D2-7"）
  *   - PostFillAiReviewDialog（回填后 AI 复核）
@@ -41,8 +41,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import PostFillAiReviewDialog from '../voucher-sampling/PostFillAiReviewDialog.vue'
 
-import type { SampledVoucher } from '../composables/useD2VoucherCheckEnhanced'
-import type { Phase } from '../composables/useSamplingAlgorithms'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 
 /**
  * 抽凭科目码取自单一真源 `dCycleAccountScope`（D2 应收账款）。
@@ -104,12 +103,18 @@ const {
   addRow,
   removeRow,
   updateRow,
-  fillFromSampledVouchers,
   saveToResponses,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useD2VoucherCheckEnhanced({
   allResponses: allResponsesRef,
   isReadonly: isReadonlyRef,
   bsDate: bsDateRef,
+  projectId: projectIdRef,
 })
 
 // 方法学参数
@@ -194,8 +199,6 @@ const year = computed<number | null>(() => {
   return props.year ?? null
 })
 
-const currentPhase = computed<Phase>(() => 'final')
-
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
@@ -219,15 +222,20 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, year.value, props.wpId, D2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, fillMode: 'merge' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: { samples: SampledVoucher[]; fillMode: string }): void {
-  const { samples, fillMode } = payload
-  fillFromSampledVouchers(samples, fillMode === 'merge' ? 'merge' : 'replace')
+/**
+ * 抽凭引擎回填：共享回填函数按凭证日期分到本期 / 期后两区，按分录指纹去重；
+ * 「追加」不再被当成替换（原来除「合并」外一律整表替换），「替换本阶段抽凭行」只删本阶段抽凭填入的行。
+ */
+async function onSampleFilled(payload: EngineFilledPayload): Promise<void> {
+  const samples = payload?.samples ?? []
+  const out = await onEngineFilled(payload)
+  if (out.cancelled || out.added === 0) return
   // Keep refs for PostFill review
   lastFilledRows.value = samples.map(s => ({
     voucherNo: s.voucherNo,
@@ -286,6 +294,7 @@ onMounted(() => {
   methodology.initialize()
   auditSummary.loadOccurrenceAmount()
   loadConclusion()
+  void voucherFillReady()
 })
 </script>
 
@@ -364,12 +373,12 @@ onMounted(() => {
           <GtVoucherSamplingEngine
             v-if="wpId && projectId && !isReadonly"
             :account-code="samplingAccountCode"
-            :phase="currentPhase"
             default-method="random"
             :workpaper-id="wpId"
             :project-id="projectId"
             :year="year"
             @filled="onSampleFilled"
+            @undo-request="onUndoRequest"
           />
           <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
             <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
@@ -423,6 +432,9 @@ onMounted(() => {
             :is-readonly="isReadonly"
             :wp-id="wpId"
             :project-id="projectId"
+            :year="year"
+            :row-class-name="voucherRowClass"
+            :is-row-locked="isVoucherRowLocked"
             @update-row="updateRow"
             @add-row="addRow"
             @remove-row="removeRow"
@@ -433,6 +445,8 @@ onMounted(() => {
             :is-readonly="isReadonly"
             :wp-id="wpId"
             :project-id="projectId"
+            :year="year"
+            :is-row-locked="isVoucherRowLocked"
             @update-row="updateRow"
           />
         </el-tab-pane>
@@ -448,6 +462,9 @@ onMounted(() => {
             :is-readonly="isReadonly"
             :wp-id="wpId"
             :project-id="projectId"
+            :year="year"
+            :row-class-name="voucherRowClass"
+            :is-row-locked="isVoucherRowLocked"
             @update-row="updateRow"
             @add-row="addRow"
             @remove-row="removeRow"
@@ -458,6 +475,8 @@ onMounted(() => {
             :is-readonly="isReadonly"
             :wp-id="wpId"
             :project-id="projectId"
+            :year="year"
+            :is-row-locked="isVoucherRowLocked"
             @update-row="updateRow"
           />
         </el-tab-pane>
@@ -514,7 +533,7 @@ onMounted(() => {
         <p><strong>操作说明：</strong></p>
         <ul>
           <li><strong>方法学参数配置</strong>：系统将自动联动 B15（重要性水平）和 B50（风险评估）数据，推荐抽样方法和样本量。用户可覆盖 AI 推荐值。</li>
-          <li><strong>抽凭引擎</strong>：点击工具栏"抽凭"按钮，配置科目和抽样参数后执行抽样。抽样结果自动按凭证日期分配到本期/期后区块。</li>
+          <li><strong>抽凭引擎</strong>：点击工具栏"抽凭"按钮，配置科目和抽样参数后执行抽样。抽样结果自动按凭证日期分配到本期/期后区块；同一分录再次抽中或从序时账挂入导入不会重复填入，「来源」列标明阶段与来源。</li>
           <li><strong>OCR 核对</strong>：在矩阵视图中点击📎按钮上传发票/合同等证据文件，系统自动 OCR 识别并与凭证数据比对，确认后回填核对内容1~5。</li>
           <li><strong>异常标记</strong>：在"是否异常"列可选择或自定义异常类型。异常标记会自动纳入审计说明统计。</li>
           <li><strong>审计说明</strong>：统计指标（覆盖比例、异常率等）自动计算，2 秒内刷新。可点击 AI 按钮生成审计说明文字。</li>

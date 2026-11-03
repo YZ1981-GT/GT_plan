@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
 /**
  * D4TabMarginMonthly — D4-7 主营业务收入毛利率分析表
  *
@@ -23,6 +24,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 四、审计结论
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
@@ -35,6 +37,7 @@ import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId: string
@@ -58,7 +61,7 @@ const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncS
   isReadonly: toRef(props, 'isReadonly'),
   views: ['结构化视图'],
   flushHtml: async () => {
-    flushSave()
+    flushPendingSave()
     const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd47-managed' }
   },
@@ -429,9 +432,31 @@ function flushSave() {
   const items = keys.map(k => props.allResponses.get(k)).filter(Boolean)
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+function flushPendingSave() {
+  if (!debounceTimer) return
+  clearTimeout(debounceTimer)
+  debounceTimer = null
+  flushSave()
+}
+registerPendingFlusher(flushPendingSave)
+onBeforeUnmount(flushPendingSave)
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const d4TEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-d4-operating-revenue',
+})
+
 </script>
 
 
@@ -440,7 +465,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
     <!-- 双模式切换 -->
     <div class="mode-bar">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <el-segmented v-if="d4TEntrySync.presentation.value.showModeSwitch" v-model="editorMode" :options="modeOptions" size="small" />
       <el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag>
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" />
     </div>
@@ -491,7 +516,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
         </span>
       </h4>
       <div class="monthly-table-wrap">
-        <table class="monthly-table" border="1" cellpadding="0" cellspacing="0">
+        <GtGridTable class="monthly-table" border="1" cellpadding="0" cellspacing="0">
           <thead>
             <tr>
               <th class="col-label">月份</th>
@@ -579,7 +604,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
               <td class="cell-computed"></td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 

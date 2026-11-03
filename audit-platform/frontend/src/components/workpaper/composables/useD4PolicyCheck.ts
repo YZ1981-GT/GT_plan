@@ -15,7 +15,9 @@
  *
  * Requirements: 7.1-7.7, 21.3
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import type { UseD4BaseOptions } from './useD4Adjudication'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -103,10 +105,7 @@ let _gid = 0
 function nextGroupId(): string {
   _gid += 1
   // UUID-shaped id so Excel row_identity / GTROW align with PolicyGroup.id
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `pg-${Date.now().toString(36)}-${_gid}-${Math.random().toString(36).slice(2, 10)}`
+  return newUuid()
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -274,12 +273,13 @@ export function useD4PolicyCheck(options: UseD4BaseOptions): PolicyCheckReturn {
 
   /** 切 OO 前强制落盘（与 D4-3 flushPendingSave 同角色）。 */
   function flushPendingSave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

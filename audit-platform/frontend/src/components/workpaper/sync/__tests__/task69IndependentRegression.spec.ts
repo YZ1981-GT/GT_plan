@@ -74,6 +74,11 @@ const OBS = vi.hoisted(() => ({
   classify(url: string): string {
     const path = url.split('?')[0]
     const table: [string, RegExp][] = [
+      // spec workpaper-html-onlyoffice-bidirectional-writeback-closure：统一桥在
+      // flush **之前**先查 entry 运行时就绪（blocked/error 时零写请求）⇒ 真实链路上
+      // 多了一次 `GET …/readiness`。未登记时它会被分类成 UNKNOWN 并被 harness 拒绝，
+      // 把本文件 26 条判据连带打红 —— 新端点必须在这里显式登记。
+      ['read_entry_readiness', /\/readiness$/],
       ['create_pending_mutation', /\/pending-mutations$/],
       ['materialize', /\/materialize$/],
       ['confirm_descriptor', /\/rooms\/[^/]+\/confirm-descriptor$/],
@@ -188,6 +193,13 @@ function resetObservations(): void {
   OBS.net.length = 0
   OBS.routes.length = 0
   OBS.counter.n = 0
+  // 🔴 readiness 的默认应答必须在**这里**补，不是在 `beforeEach` 里：有若干用例在测试
+  //    体内再次调用 `resetObservations()`（换 harness 前清观测带），那会把 beforeEach
+  //    登记的路由一并清掉，于是桥 flush 前的 readiness 预检变成「未登记的请求」。
+  //    统一桥已把该预检放进无条件路径（spec
+  //    workpaper-html-onlyoffice-bidirectional-writeback-closure）⇒ 它属于基线路由。
+  //    需要测「未就绪 ⇒ 零写请求」的用例在自己那条里后登记一条覆盖即可（后登记优先）。
+  respond('read_entry_readiness', () => readinessWire(), 'GET')
 }
 
 /** 登记一条响应。后登记的优先（便于在单个测试里覆盖默认响应）。 */
@@ -349,6 +361,37 @@ function pendingWire(over: Record<string, unknown> = {}): Record<string, unknown
     expected_revision: 11,
     payload_sha256: DIGEST(7),
     expires_at: '2026-09-01T00:05:00Z',
+    ...over,
+  }
+}
+
+/** `GET …/readiness` 的默认放行应答（statically terminal + runtime ready + 已验收）。 */
+function readinessWire(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    entry_id: ENTRY,
+    effective_entry_id: ENTRY,
+    capability: 'bidirectional',
+    adjudication_state: 'terminal',
+    allowed_modes: ['html', 'oo'],
+    can_claim_bidirectional: true,
+    runtime: {
+      ready: true,
+      adapter_id: 'd4.revenue_detail',
+      authority_model: 'projection_contract',
+      definition_bundle_id: UUID(931),
+      definition_bundle_sha256: DIGEST(9),
+      typed_slots_complete: true,
+      typed_slots: [],
+      representation_id: UUID(924),
+      representation_generation: 3,
+    },
+    acceptance: {
+      state: 'verified',
+      stale: false,
+      run_id: UUID(932),
+      required_scenario_set_digest: DIGEST(10),
+    },
+    reason: null,
     ...over,
   }
 }

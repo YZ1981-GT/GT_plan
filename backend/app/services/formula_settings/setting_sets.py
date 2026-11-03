@@ -87,7 +87,8 @@ async def replace_set(db: AsyncSession, *, domain: str, project_id: uuid.UUID,
                                         source=source))["events"]
     if removes:
         events += (await restore_global(db, domain=domain, project_id=project_id, slot_keys=removes,
-                                        user_id=user_id))["events"]
+                                        user_id=user_id,
+                                        expected_versions=None))["events"]  # replace_set 已在同一事务内做过 CAS
     merged: dict[str, list[str]] = {}
     for ev in events:
         merged.setdefault(ev["project_id"], []).extend(ev["slot_keys"])

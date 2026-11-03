@@ -11,6 +11,7 @@
  * 计息核对字段（面值/利率/起止日等）保留，便于与 G2-5 交叉核对。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcAccruedDays,
@@ -80,7 +81,7 @@ export interface InterestDetailRow {
   indexRef: string
 }
 
-interface StoredDetailRow {
+export interface StoredDetailRow {
   id: string
   seq: number
   investType: string
@@ -177,7 +178,7 @@ function sumAging(rows: InterestDetailRow[], field: 'agingPrior' | 'agingAudited
   return out
 }
 
-function safeParseRows(jsonStr: string | null | undefined, segs: AgingSegment[]): StoredDetailRow[] {
+export function safeParseRows(jsonStr: string | null | undefined, segs: AgingSegment[]): StoredDetailRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
@@ -224,7 +225,7 @@ function safeParseRows(jsonStr: string | null | undefined, segs: AgingSegment[])
   }
 }
 
-function computeRow(stored: StoredDetailRow, segs: AgingSegment[]): InterestDetailRow {
+export function computeRow(stored: StoredDetailRow, segs: AgingSegment[]): InterestDetailRow {
   const openingAudited = calcAdjustedAmount(stored.openingUnadjusted, stored.openingAdjustment, 0)
   // 模板 H = C + F − G：从期初未审（C）滚动，不是期初审定（E）
   const closingUnadjusted = calcDebitBalance(stored.openingUnadjusted, stored.debit, stored.credit)
@@ -592,6 +593,15 @@ export function useG2Detail(options: UseG2DetailOptions) {
   }
   window.addEventListener('g2:aging-preset-sync', onG2AgingSync)
   eventListeners.push({ event: 'g2:aging-preset-sync', handler: onG2AgingSync })
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     for (const { event, handler } of eventListeners) {

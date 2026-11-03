@@ -160,7 +160,20 @@
           </el-table>
           <el-empty v-else description="无下游引用" :image-size="40" />
         </div>
-        <el-empty v-else description="该数字暂无溯源信息" :image-size="60" />
+        <OutputAttachmentLinks
+          v-if="rvTraceResult.objectId"
+          :project-id="projectId || rvTraceResult.projectId"
+          object-type="report_row"
+          target-type="report_row"
+          :target-ref="rvTraceResult.objectId"
+          resource="report"
+          :initial-attachments="rvTraceResult.attachments || []"
+        />
+        <el-empty
+          v-if="!rvTraceResult.upstream.length && !rvTraceResult.downstream.length && !(rvTraceResult.attachments || []).length"
+          description="该数字暂无溯源信息"
+          :image-size="60"
+        />
       </template>
     </div>
   </el-dialog>
@@ -168,6 +181,7 @@
 
 <script setup lang="ts">
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import OutputAttachmentLinks from '@/components/attachment/OutputAttachmentLinks.vue'
 import type { ReportConsistencyCheck } from '@/services/auditPlatformApi'
 import type { TraceLocation } from '@/views/composables/useReportCellActions'
 
@@ -187,7 +201,10 @@ defineProps<{
   // Cell trace (lineage)
   rvTraceDialogVisible: boolean
   rvTraceLoading: boolean
-  rvTraceResult: { upstream: any[]; downstream: any[] } | null
+  rvTraceResult: {
+    upstream: any[]; downstream: any[]; attachments: any[]; objectId: string; projectId: string
+  } | null
+  projectId?: string
 
   // Helper function from parent
   parseTraceLocations: (check: any) => TraceLocation[]

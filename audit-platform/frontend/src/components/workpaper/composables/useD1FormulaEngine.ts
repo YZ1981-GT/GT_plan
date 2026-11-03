@@ -203,18 +203,17 @@ export function calcCurrentUnadjusted(
 /**
  * 贴息天数 = 到期日 - 贴现日（自然天数差）
  *
- * D1-9 贴息检查表：解析到期日与贴现日为日期，返回相差的整数天数。
- * 任一日期为空或非法 → 返回 0。
- * 贴现日 > 到期日（异常数据）→ 返回 0（贴息天数显示为 0）。
+ * D1-9 贴息检查表：解析到期日与贴现日为日期，返回相差的整数天数（模板 H = F − G）。
+ * 任一日期为空或非法 → 返回 0（日期没填完不算）。
+ * 贴现日晚于到期日 → 负数，与模板同（原先记 0，表单与 OnlyOffice 两侧显示不同；
+ * spec oo-writeback-template-parity-closure R2.4 对拍守卫）。
  */
 export function calcDiscountDays(maturityDate: string, discountDate: string): number {
   if (!maturityDate || !discountDate) return 0
   const maturity = new Date(maturityDate).getTime()
   const discount = new Date(discountDate).getTime()
   if (isNaN(maturity) || isNaN(discount)) return 0
-  const days = (maturity - discount) / 86400000
-  if (days < 0) return 0
-  return days
+  return (maturity - discount) / 86400000
 }
 
 /**

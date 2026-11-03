@@ -32,10 +32,16 @@ export interface BizModelJudgment {
   explanation: string          // 说明
 }
 
+/**
+ * 分组表列与模板 D2-13（一）一致（A~E：组合名称 / 管理业务模式 / 具体依据 / 索引号 / 备注）；
+ * SPPI 测试结果 / 计量基础模板没有，只在 HTML 侧（spec oo-writeback-template-parity-closure R3 批 B2b，原缺 具体依据 / 索引号）。
+ */
 export interface BizModelGroup {
   rowId: string
   groupName: string            // 组合名称
   bizModel: string             // 业务模式分类
+  basis: string                // 具体依据（模板 C）
+  indexRef: string             // 索引号（模板 D）
   sppiResult: string           // SPPI测试结果
   measurementBasis: string     // 计量基础
   remark: string               // 备注
@@ -87,6 +93,8 @@ function createEmptyGroup(): BizModelGroup {
     rowId: generateRowId(),
     groupName: '',
     bizModel: '',
+    basis: '',
+    indexRef: '',
     sppiResult: '',
     measurementBasis: '',
     remark: '',
@@ -120,6 +128,8 @@ function parseGroups(jsonStr: string | null | undefined): BizModelGroup[] {
       rowId: raw.rowId || generateRowId(),
       groupName: raw.groupName || '',
       bizModel: raw.bizModel || '',
+      basis: raw.basis || '',
+      indexRef: raw.indexRef || '',
       sppiResult: raw.sppiResult || '',
       measurementBasis: raw.measurementBasis || '',
       remark: raw.remark || '',

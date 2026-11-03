@@ -1004,7 +1004,9 @@ class CommitFenceHook(Protocol):
     * :meth:`before_write` —— 「DB commit 前再次重验 project/visibility/workflow、
       generation/write fence、initiator epoch/contributors 与 bundle identity」，
       发生在 wp advisory+row lock **之后**、任何写入**之前**；
-    * :meth:`after_pointers` —— 「单事务提交 …… application/operation timeline 与 outbox」。
+    * :meth:`after_pointers` —— 「单事务提交 …… application/operation timeline、
+      调用方派生 store 与 outbox」。该 hook 仍在唯一事务内，严禁调用 ``commit`` 或
+      ``rollback``；抛异常由 :meth:`_commit_once` 统一回滚。
 
     抛异常即中止：`_commit_once` 的 `except` 会 rollback 整个事务，`_stage_and_verify`
     抛出时连 publish 都不会发生（文件侧只剩 staging 临时目录）。

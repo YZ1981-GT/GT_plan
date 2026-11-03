@@ -30,9 +30,9 @@ export interface UseReportColumnsReturn {
   eqRowClassName: (params: { row: any }) => string
   eqCellVal: (row: any, colKey: string, yearKey?: 'current_year' | 'prior_year') => any
 
-  // Impairment columns
-  impIncCols: { key: string; label: string }[]
-  impDecCols: { key: string; label: string }[]
+  // Impairment columns（sum = 本组合计列）
+  impIncCols: { key: string; label: string; sum?: boolean }[]
+  impDecCols: { key: string; label: string; sum?: boolean }[]
   impRowClassName: (params: { row: any }) => string
 
   // Shared helpers
@@ -117,19 +117,20 @@ const eqConsolExtra = [
   { key: 'minority', label: '少数股东权益' },
 ]
 
+// 减值表列键 = 导出模板 `{{imp:CODE:列键}}` 的列键（后端按它存取 source_accounts，spec excel-style-table-editing 5.4）
 const impIncCols = [
   { key: 'provision', label: '本期计提额' },
-  { key: 'merge_add', label: '合并增加额' },
-  { key: 'other_add', label: '其他原因增加额' },
-  { key: 'add_total', label: '合计' },
+  { key: 'merge_increase', label: '合并增加额' },
+  { key: 'other_increase', label: '其他原因增加额' },
+  { key: 'subtotal_increase', label: '合计', sum: true },
 ]
 
 const impDecCols = [
   { key: 'reversal', label: '转回额' },
-  { key: 'writeoff', label: '转销额' },
-  { key: 'merge_dec', label: '合并减少额' },
-  { key: 'other_dec', label: '其他原因减少额' },
-  { key: 'dec_total', label: '合计' },
+  { key: 'write_off', label: '转销额' },
+  { key: 'merge_decrease', label: '合并减少额' },
+  { key: 'other_decrease', label: '其他原因减少额' },
+  { key: 'subtotal_decrease', label: '合计', sum: true },
 ]
 
 /** 前端列键 → 后端 eq_matrix / {{eq:}} 列键 */

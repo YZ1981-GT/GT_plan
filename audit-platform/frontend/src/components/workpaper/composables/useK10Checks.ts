@@ -18,6 +18,8 @@
  * - "K10-6-coverage-rate": 检查覆盖率
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { useVoucherCheckFill, withRowMeta, type EngineFilledPayload, type FillSample, type PreparedItem } from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf } from './assetVoucherFill'
 import { parseNum, calcSubtotal } from './useK10FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -126,6 +128,17 @@ export function deriveCollectionStatus(amount: number, postCollectionAmount: num
   return '未收回'
 }
 
+/** K10-6 行上已改过两项判断（替换与撤销抽凭时据此先确认；缺省「不适用」与回填写的备注不算） */
+export function hasK10IncomeCheckContent(r: K10IncomeCheckRow): boolean {
+  return r.classificationCorrect !== '不适用' || r.conditionMet !== '不适用'
+}
+
+/** K10-6 旧行（没有 `_gt`）身份：备注里的「抽凭：凭证号」+ 检查金额（原实现取绝对值；表里没有凭证日期） */
+function k10IncomeLegacy(r: K10IncomeCheckRow): string | null {
+  const m = /^抽凭：(\S+)/.exec(String(r.remark ?? ''))
+  return m ? assetLegacyKey(m[1], '', r.checkAmount) : null
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK10Checks(params: UseK10ChecksParams) {
@@ -139,6 +152,18 @@ export function useK10Checks(params: UseK10ChecksParams) {
   const incomeCheckRows = ref<K10IncomeCheckRow[]>([])
   const isChanged = ref(false)
 
+  // K10-6 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数（一笔样本一条检查行，按分录指纹去重）
+  const voucherFill = useVoucherCheckFill<K10IncomeCheckRow>({
+    projectId,
+    tables: incomeCheckRows,
+    mapSampleToRow: (item) => _incomeRowFromPrepared(item),
+    persist: () => { isChanged.value = true; _persist() },
+    hasUserContent: hasK10IncomeCheckContent,
+    policy: 'join',
+    legacy: k10IncomeLegacy,
+    readonly: isReadonly,
+  })
+
   // ─── Load ──────────────────────────────────────────────────────────────────
 
   function initFromResponses(): void {
@@ -147,6 +172,8 @@ export function useK10Checks(params: UseK10ChecksParams) {
       receivableRows.value = Array.isArray(raw) ? raw.map(_normalizeReceivableRow) : []
     } else {
       incomeCheckRows.value = Array.isArray(raw) ? raw.map(_normalizeIncomeCheckRow) : []
+      // 记下预审行的读入版本（年审阶段保存时据此写回）
+      voucherFill.markLoaded()
     }
   }
 
@@ -174,7 +201,7 @@ export function useK10Checks(params: UseK10ChecksParams) {
   }
 
   function _normalizeIncomeCheckRow(raw: any): K10IncomeCheckRow {
-    return {
+    return withRowMeta({
       rowKey: raw.rowKey ?? `row-${Math.random().toString(36).slice(2, 10)}`,
       checkItem: raw.checkItem ?? '',
       checkAmount: parseNum(raw.checkAmount),
@@ -184,7 +211,7 @@ export function useK10Checks(params: UseK10ChecksParams) {
       overallStatus: _toCheckStatus(raw.overallStatus),
       remark: raw.remark ?? '',
       isEditable: raw.isEditable ?? true,
-    }
+    }, raw)
   }
 
   function _toCheckStatus(val: any): CheckStatus {
@@ -265,7 +292,7 @@ export function useK10Checks(params: UseK10ChecksParams) {
   function updateIncomeCheckCell(rowKey: string, field: string, value: any): void {
     if (isReadonly?.value) return
     const row = incomeCheckRows.value.find(r => r.rowKey === rowKey)
-    if (!row || !row.isEditable) return
+    if (!row || !row.isEditable || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     isChanged.value = true
     _persist()
@@ -312,6 +339,21 @@ export function useK10Checks(params: UseK10ChecksParams) {
     }
   }
 
+  /**
+   * 共享回填函数的待写入项 → K10-6 检查行：检查项目取摘要，检查金额取样本自己那一栏（其他收益在贷方，红字带符号照记；
+   * 原实现取绝对值），备注记「抽凭：凭证号」（挂凭导入记「挂凭：」）
+   */
+  function _incomeRowFromPrepared(item: PreparedItem): K10IncomeCheckRow {
+    const s = sampleOf(item)
+    const no = String(s.voucherNo ?? '')
+    const summary = String(s.summary ?? '').trim()
+    return _blankIncomeRow(summary || (no ? `凭证 ${no}` : '抽样凭证'), {
+      checkAmount: assetAmount(item, 'credit'),
+      classification: '其他收益',
+      remark: no ? `${item.meta.src.includes('attach') ? '挂凭' : '抽凭'}：${no}` : '',
+    })
+  }
+
   /** 带金额/分类的检查行（供抽凭生成检查行使用） */
   function addIncomeCheckRowFull(partial: Partial<K10IncomeCheckRow> & { checkItem: string }): void {
     if (isReadonly?.value) return
@@ -354,7 +396,8 @@ export function useK10Checks(params: UseK10ChecksParams) {
       if (idx >= 0) receivableRows.value.splice(idx, 1)
     } else {
       const idx = incomeCheckRows.value.findIndex(r => r.rowKey === rowKey)
-      if (idx >= 0) incomeCheckRows.value.splice(idx, 1)
+      // 年审阶段的预审行不删
+      if (idx >= 0 && !voucherFill.isRowLocked(incomeCheckRows.value[idx])) incomeCheckRows.value.splice(idx, 1)
     }
     isChanged.value = true
     _persist()
@@ -367,7 +410,7 @@ export function useK10Checks(params: UseK10ChecksParams) {
     if (sheetKey === 'K10-5') {
       onSave(ROWS_KEY, receivableRows.value)
     } else {
-      onSave(ROWS_KEY, incomeCheckRows.value)
+      onSave(ROWS_KEY, voucherFill.guardPersist(incomeCheckRows.value))
       // 存覆盖率供其他组件使用
       onSave(`${sheetKey}-coverage-rate`, coverageRate.value)
     }
@@ -385,6 +428,13 @@ export function useK10Checks(params: UseK10ChecksParams) {
     receivableSummary,
     // K10-6
     incomeCheckRows,
+    // K10-6 抽凭回填 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     incomeCheckSummary,
     coverageRate,
     misclassifiedRows,

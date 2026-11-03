@@ -44,18 +44,30 @@ async def _client_account_filters(
     db: AsyncSession,
     year: int | None = None,
 ) -> list[Any]:
-    # 🔴 不按 dataset_id 过滤：account_chart 唯一约束 uq_account_chart_project_code_source
-    # = (project_id, account_code, source)，client 科目为项目全局唯一（每个 code 仅一行，
-    # 不含 dataset/year 维度）。四表重新导入产生新 active dataset 后，既有 client 科目行
-    # 仍 tag 着旧(superseded) dataset_id 且无法在新 dataset 上重建（唯一约束禁止分身）。
-    # 若此处按 active dataset_id 过滤，会把这些"全局唯一但 tag 旧 dataset"的科目排除 →
-    # auto_match/auto_suggest 看到 0 客户科目 → 静默产不出映射（dataset-stranding bug）。
-    # year 参数保留仅为签名兼容，不再用于 dataset 过滤。
-    return [
+    resolved_year = await _resolve_event_year(project_id, db, year)
+    filters: list[Any] = [
         AccountChart.project_id == project_id,
         AccountChart.source == AccountSource.client,
         AccountChart.is_deleted == False,  # noqa: E712
     ]
+    if resolved_year is None:
+        return filters
+    active_id = await DatasetService.get_active_dataset_id(db, project_id, resolved_year)
+    if active_id is None:
+        return filters
+    specific_count = await db.scalar(
+        select(func.count()).select_from(AccountChart).where(
+            *filters,
+            AccountChart.dataset_id == active_id,
+        )
+    )
+    # 老数据的客户科目没有 dataset_id；仅在 active 版本还没有版本化科目时回退。
+    filters.append(
+        AccountChart.dataset_id == active_id
+        if specific_count
+        else AccountChart.dataset_id.is_(None)
+    )
+    return filters
 
 
 async def _resolve_event_year(
@@ -264,14 +276,13 @@ async def _generate_client_accounts_from_balance(
         name = row.account_name or code
         cat = _infer_category_canonical(code, name)  # 编码+名称双保险（AccountCategory 枚举）
 
-        # 检查是否已存在（account_chart 唯一约束 uq_account_chart_project_code_source
-        # = (project_id, account_code, source)，不含 dataset_id → client 科目为项目全局
-        # 唯一，禁止按 dataset 分身；此处 dataset 无关地跳过已存在行，避免唯一约束冲突）。
+        # 客户科目按 active dataset 版本化；同一编码可在旧版本继续保留。
         existing = await db.execute(
             select(AccountChart.id).where(
                 AccountChart.project_id == project_id,
                 AccountChart.account_code == code,
                 AccountChart.source == AccountSource.client,
+                AccountChart.dataset_id == dataset_id,
                 AccountChart.is_deleted == False,  # noqa: E712
             ).limit(1)
         )
@@ -313,13 +324,12 @@ async def _generate_standard_accounts_from_client(
     import uuid as _uuid
     from app.models.audit_platform_models import AccountCategory, AccountDirection
 
-    # 获取该项目所有客户科目
+    # 获取当前 active 版本客户科目（无数据集的老项目按 helper 回退）。
+    client_filters = await _client_account_filters(project_id, db)
     result = await db.execute(
-        select(AccountChart.account_code, AccountChart.account_name, AccountChart.category).where(
-            AccountChart.project_id == project_id,
-            AccountChart.source == AccountSource.client,
-            AccountChart.is_deleted == False,  # noqa: E712
-        ).order_by(AccountChart.account_code)
+        select(AccountChart.account_code, AccountChart.account_name, AccountChart.category)
+        .where(*client_filters)
+        .order_by(AccountChart.account_code)
     )
     client_rows = result.fetchall()
     if not client_rows:

@@ -120,6 +120,23 @@ class TestScanMigrations:
         with pytest.raises(RuntimeError, match="重复版本号"):
             runner.scan_migrations()
 
+    def test_scan_rollback_raises_on_duplicate_version(self, tmp_migrations: Path):
+        """R 文件同号也必须拒绝，避免回滚脚本与前向迁移失配。"""
+        (tmp_migrations / "R003__rollback_demo.sql").write_text(
+            "DROP TABLE IF EXISTS demo;\n",
+            encoding="utf-8",
+        )
+        (tmp_migrations / "R003__zzz_other.sql").write_text(
+            "-- conflicting rollback\n",
+            encoding="utf-8",
+        )
+        runner = MigrationRunner(
+            database_url="sqlite+aiosqlite:///:memory:",
+            migrations_dir=tmp_migrations,
+        )
+        with pytest.raises(RuntimeError, match="重复版本号回滚"):
+            runner.scan_rollback_scripts()
+
     def test_scan_no_false_positive_on_unique_versions(self, tmp_migrations: Path):
         """唯一版本号不应误报（去重检测无回归）。"""
         (tmp_migrations / "V044__unique.sql").write_text("-- ok\n", encoding="utf-8")

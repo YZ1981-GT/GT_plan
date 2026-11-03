@@ -110,6 +110,15 @@ async def _is_frozen(db, project_id: uuid.UUID) -> bool | None:
     return status == ProjectStatus.archived
 
 
+async def _is_consolidated(db, project_id: uuid.UUID) -> bool:
+    """项目的 report_scope 是否为 ``consolidated``（不存在 / 已删除 / 非合并均返 False）。"""
+    from app.models.core import Project
+
+    rs = (await db.execute(sa.select(Project.report_scope).where(
+        Project.id == project_id, Project.is_deleted == sa.false()))).scalar_one_or_none()
+    return rs == "consolidated"
+
+
 async def propagate_report(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
     from app.models.report_models import FinancialReport
     from app.services.formula_settings.effective_report import load_effective_report_configs
@@ -172,19 +181,22 @@ async def propagate_wp(project_id: uuid.UUID, year: int | None, slot_keys: list[
 
 
 async def propagate_note(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
-    """先把有效集合物化进各年度附注（执行器读 ``_user_formulas``），再标章节过期。"""
-    from app.models.report_models import DisclosureNote
+    """先物化有效公式，再经 stale_state 标记附注过期。"""
     from app.services.formula_settings.note_settings import materialize
+    from app.services.stale_state import StaleSource, mark_note_stale
 
     sections = sorted({s.split("|", 1)[0] for s in slot_keys if s})
     async with _factory()() as db:
         if await _is_frozen(db, project_id) is not False:
             return {"skipped": True}
         materialized = await materialize(db, project_id, sections)
-        n = (await db.execute(sa.update(DisclosureNote).where(
-            DisclosureNote.project_id == project_id, DisclosureNote.note_section.in_(sections),
-            DisclosureNote.is_deleted == sa.false(),
-        ).values(is_stale=True).execution_options(synchronize_session=False))).rowcount or 0
+        n = await mark_note_stale(
+            db,
+            project_id,
+            source=StaleSource.FORMULA_SETTINGS,
+            sections=sections,
+            year=year,
+        )
         await db.commit()
     return {"sections": sections, "materialized": materialized, "marked": int(n)}
 
@@ -196,6 +208,8 @@ async def propagate_consol_note(project_id: uuid.UUID, year: int | None, slot_ke
     if year is None:
         return {"skipped": "no_year", "sections": sections}
     async with _factory()() as db:
+        if not await _is_consolidated(db, project_id):
+            return {"skipped": "not_consolidated"}
         if await _is_frozen(db, project_id) is not False:
             return {"skipped": True}
         result = await fill_note_sections(db, project_id, year, sections)
@@ -241,24 +255,14 @@ async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_ke
 
 
 async def propagate_tb_detail(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
-    """试算表科目明细公式变更 → 标全项目底稿 prefill_stale。
+    """试算表科目明细公式变更 → 当前无消费方，不做任何写入（ADR-FHIC-22 止血）。
 
-    科目明细公式影响所有依赖 TB 取数的底稿（任何使用 ``TB('科目','字段')`` 的底稿），
-    无法按 wp_code 精准缩小范围，故标全部底稿。底稿下次打开时检测 ``prefill_stale``
-    并重新预填。
+    tb_detail 域目前没有有效定义的读取入口（``consumers.READER_ENTRIES["tb_detail"]``
+    为空元组），保存 tb_detail 不应改写任何 ``working_paper.prefill_stale``。
+    当 tb_detail 有了真正的消费方后，在 ``consumers.READER_ENTRIES`` 注册并在此
+    函数里实现对应的过期标记。
     """
-    from app.models.workpaper_models import WorkingPaper
-
-    async with _factory()() as db:
-        frozen = await _is_frozen(db, project_id)
-        if frozen is None or frozen:
-            return {"skipped": "frozen" if frozen else "missing"}
-        n = (await db.execute(sa.update(WorkingPaper).where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        ).values(prefill_stale=True).execution_options(synchronize_session=False))).rowcount or 0
-        await db.commit()
-    return {"slot_keys": slot_keys, "marked": int(n)}
+    return {"slot_keys": slot_keys, "skipped": "no_consumer"}
 
 
 async def propagate_push(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:

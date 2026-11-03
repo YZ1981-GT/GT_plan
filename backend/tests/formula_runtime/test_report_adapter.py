@@ -98,7 +98,7 @@ def _run(coro):
 
 def _make_target(
     project_id: uuid.UUID | None = None,
-    report_type: str = "BS",
+    report_type: str = "balance_sheet",
     row_code: str = "BS-01",
     period: str = "current",
 ) -> CanonicalFormulaTarget:
@@ -141,7 +141,7 @@ async def _seed_report_row(
     session: AsyncSession,
     project_id: uuid.UUID,
     year: int = 2025,
-    report_type: str = "BS",
+    report_type: str = "balance_sheet",
     row_code: str = "BS-01",
     current_amount: Decimal | None = Decimal("1000.50"),
     prior_amount: Decimal | None = Decimal("800.25"),
@@ -180,11 +180,11 @@ class TestLocatorValidation:
 
     def test_missing_row_code(self):
         with pytest.raises(ValueError, match="missing keys"):
-            _validate_locator({"report_type": "BS", "period": "current"})
+            _validate_locator({"report_type": "balance_sheet", "period": "current"})
 
     def test_missing_period(self):
         with pytest.raises(ValueError, match="missing keys"):
-            _validate_locator({"report_type": "BS", "row_code": "BS-01"})
+            _validate_locator({"report_type": "balance_sheet", "row_code": "BS-01"})
 
     def test_invalid_report_type(self):
         with pytest.raises(ValueError, match="Invalid report_type"):
@@ -192,15 +192,15 @@ class TestLocatorValidation:
 
     def test_invalid_period(self):
         with pytest.raises(ValueError, match="Invalid period"):
-            _validate_locator({"report_type": "BS", "row_code": "BS-01", "period": "future"})
+            _validate_locator({"report_type": "balance_sheet", "row_code": "BS-01", "period": "future"})
 
     def test_empty_row_code(self):
         with pytest.raises(ValueError, match="row_code must not be empty"):
-            _validate_locator({"report_type": "BS", "row_code": "  ", "period": "current"})
+            _validate_locator({"report_type": "balance_sheet", "row_code": "  ", "period": "current"})
 
     def test_valid_locator_passes(self):
         # Should not raise
-        _validate_locator({"report_type": "IS", "row_code": "IS-03", "period": "prior"})
+        _validate_locator({"report_type": "income_statement", "row_code": "IS-03", "period": "prior"})
 
 
 class TestPrepareApplyDecimalRoundTrip:
@@ -603,3 +603,64 @@ def test_pbt_version_conflict_on_restore(
             await _teardown(engine, rm, orig_model)
 
     _run(_inner())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# report_type 白名单与 ORM 枚举同源（2026-10-29 新增）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestReportTypeWhitelistParity:
+    """``VALID_REPORT_TYPES`` 必须恰等于 ``FinancialReportType`` 全集。
+
+    🔴 这道判据是补上一个真实缺陷的防线：原先 ``VALID_REPORT_TYPES`` 在
+    ``adapters/report.py`` 里硬编码 6 个字符串，与 ``financial_report_type``
+    枚举（DB 与 ORM 一致）对不上 ——
+
+      多出 ``equity_change_statement``（真名 ``equity_statement``，拼错）、
+            ``trial_balance_audit``、``coverage_stats``（两者枚举里根本没有）
+      漏掉 ``cash_flow_supplement``、``impairment_provision``
+
+    ``_validate_locator`` 守在 prepare_many / apply_many / restore_many /
+    read_versions 四个入口，所以权益变动表、现金流量表补充资料、减值准备表三类
+    报表的 Runtime 读 / 写 / 回滚全部被 ``ValueError`` 拒 —— 6 种报表类型里 3 种
+    不可用，而本文件的夹具当时用的是 ``"BS"`` 缩写，两边都错、互相掩盖。
+
+    现已改为 ``frozenset(t.value for t in FinancialReportType)`` 单一来源派生。
+    本判据钉住这一点：任何一侧再加/改/删枚举成员而另一侧没跟上，立刻打红。
+    """
+
+    def test_whitelist_equals_orm_enum(self):
+        from app.models.report_models import FinancialReportType
+        from app.services.formula_runtime.adapters.report import VALID_REPORT_TYPES
+
+        assert VALID_REPORT_TYPES == frozenset(t.value for t in FinancialReportType)
+
+    def test_whitelist_is_not_trivially_empty(self):
+        """反向断言：判据不是「两边都空所以相等」的空转。"""
+        from app.models.report_models import FinancialReportType
+        from app.services.formula_runtime.adapters.report import VALID_REPORT_TYPES
+
+        assert len(VALID_REPORT_TYPES) == 6, sorted(VALID_REPORT_TYPES)
+        assert len(list(FinancialReportType)) == 6
+
+    def test_previously_wrong_names_are_rejected(self):
+        """曾经混进白名单的三个不存在的取值现在必须被拒。"""
+        from app.services.formula_runtime.adapters.report import VALID_REPORT_TYPES
+
+        for bogus in ("equity_change_statement", "trial_balance_audit",
+                      "coverage_stats", "BS", "IS"):
+            assert bogus not in VALID_REPORT_TYPES, bogus
+
+    def test_previously_missing_names_are_accepted(self):
+        """曾经漏掉的两个真实报表类型现在必须被接受，且能过 locator 校验。"""
+        from app.services.formula_runtime.adapters.report import (
+            VALID_REPORT_TYPES,
+            _validate_locator,
+        )
+
+        for real in ("equity_statement", "cash_flow_supplement",
+                     "impairment_provision"):
+            assert real in VALID_REPORT_TYPES, real
+            _validate_locator({"report_type": real, "row_code": "X-01",
+                               "period": "current"})

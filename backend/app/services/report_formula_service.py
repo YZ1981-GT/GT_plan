@@ -17,10 +17,11 @@ from pathlib import Path
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.report_models import FinancialReportType, ReportConfig
+from app.models.report_models import ReportConfig
 from app.services.four_table.report_config_account_names import (
     DERIVED_ROW_NAMES_WITHOUT_ACCOUNT,
 )
+from app.services.report_total_formula_guard import has_explicit_formula, range_blocked
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,9 @@ _IS_SPECIAL: dict[str, str] = {
     "其他业务收入": "TB('6051','本期发生额')",
     # ===== 营业成本 =====
     "营业成本": "TB('6401','本期发生额')+TB('6402','本期发生额')",
-    "营业总成本": "TB('6401','本期发生额')+TB('6402','本期发生额')+TB('6403','本期发生额')+TB('6601','本期发生额')+TB('6602','本期发生额')+TB('6603','本期发生额')+TB('6604','本期发生额')",
+    # 🔴 ADR-ISL-04 删除「营业总成本」→ 7 个科目直接求和：与权威模板的恒等式口径
+    #    （国企 =SUM(C13:C30)+C34，即明细行 IS-008~IS-025 + IS-029）并存，且漏掉金融类明细与「其他」；
+    #    唯一定义在种子（design §2），本表不再给它编公式。
     "主营业务成本": "TB('6401','本期发生额')",
     "其他业务成本": "TB('6402','本期发生额')",
     # ===== 税金及费用 =====
@@ -173,33 +176,34 @@ _IS_SPECIAL: dict[str, str] = {
     "管理费用": "TB('6602','本期发生额')",
     "研发费用": "TB('6604','本期发生额')",
     "财务费用": "TB('6603','本期发生额')",
-    "利息费用": "TB('6603','本期发生额')",
-    "利息收入": "TB('6603','本期发生额')",
+    # 🔴 ADR-ISL-04 删除「利息费用」「利息收入」→ TB('6603')：二者是财务费用的「其中」项，
+    #    各自映到财务费用全额会让两行都等于整笔财务费用；design §2 判为手工输入行。
     # ===== 收益类 =====
     "投资收益": "TB('6111','本期发生额')",
     "其中对联营企业和合营企业的投资收益": "TB('6111','本期发生额')",
-    "以摊余成本计量的金融资产终止确认收益": "TB('6111','本期发生额')",
+    # 🔴 ADR-ISL-04 删除「以摊余成本计量的金融资产终止确认收益」→ TB('6111')：它是投资收益的
+    #    「其中」项，映到投资收益全额会与父行重复；design §2 判为手工输入行。
     "净敞口套期收益": "TB('6113','本期发生额')",
     "公允价值变动收益": "TB('6101','本期发生额')",
     # 🔴 6701=资产减值损失 / 6702=信用减值损失（account_chart 零分歧，V137 已在
     #    report_config 修对）；filler 侧曾整整互换，此处按真源纠正
-    "信用减值损失": "TB('6702','本期发生额')",
-    "资产减值损失": "TB('6701','本期发生额')",
+    # 🔴 减值损失列报为负（行名「损失以“－”号填列」）：试算表存正数，取数必带负号
+    #    （spec income-statement-lower-section-formulas ADR-ISL-04，与 design §2 同源）
+    "信用减值损失": "-TB('6702','本期发生额')",
+    "资产减值损失": "-TB('6701','本期发生额')",
     "资产处置收益": "TB('6115','本期发生额')",
     "其他收益": "TB('6117','本期发生额')",
-    "汇兑收益": "TB('6603','本期发生额')",
     # ===== 营业外 =====
     "营业外收入": "TB('6301','本期发生额')",
     "营业外支出": "TB('6711','本期发生额')",
     "非流动资产处置损失": "TB('6711','本期发生额')",
     # ===== 所得税 =====
     "所得税费用": "TB('6801','本期发生额')",
-    # ===== 其他综合收益 =====
-    "其他综合收益的税后净额": "TB('3102','本期发生额')",
-    "综合收益总额": "TB('6801','本期发生额')",
-    # ===== 每股收益 =====
-    "基本每股收益": "TB('6901','本期发生额')",
-    "稀释每股收益": "TB('6902','本期发生额')",
+    # 🔴 ADR-ISL-04 删除 5 条错误映射（原值写在注释里，便于核对，不要恢复）：
+    #    「汇兑收益」→ TB('6603')（财务费用，不是汇兑收益）
+    #    「其他综合收益的税后净额」→ TB('3102')（活项目其他综合收益科目码是 4003；且该行是恒等行，由 design §2 定义）
+    #    「综合收益总额」→ TB('6801')（所得税费用；该行是恒等行 = 净利润 + 其他综合收益）
+    #    「基本每股收益」/「稀释每股收益」→ TB('6901'/'6902')（无此损益科目，属手工输入行）
 }
 
 _EQ_SPECIAL: dict[str, str] = {
@@ -525,15 +529,20 @@ def _generate_fallback_formula(row_code: str, row_name: str, col: str) -> str | 
     return None
 
 
-def _generate_sum_formula(configs: list, current_idx: int) -> str | None:
+def _generate_sum_formula(configs: list, current_idx: int, warnings: list[str] | None = None) -> str | None:
     """为合计行自动生成 SUM_ROW 公式。
 
     策略：
     1. 向上查找 indent_level 更深的子行（直到遇到同级或更浅的行）
     2. 如果没有子行，查找同级行（直到遇到另一个合计行或标题行）
     3. 对找到的子行范围生成 SUM_ROW('first','last')
+
+    约束（ADR-FHIC-23，判定在 report_total_formula_guard）：本行已有显式定义 ⇒ 不生成；
+    SUM_ROW 区间含其他 is_total_row 行 ⇒ 不生成，warning 追加到 ``warnings``。
     """
     current = configs[current_idx]
+    if has_explicit_formula(current):
+        return None
     ci = current.indent_level
     child_codes: list[str] = []
 
@@ -564,6 +573,8 @@ def _generate_sum_formula(configs: list, current_idx: int) -> str | None:
                 child_codes.append(row.row_code)
 
     if len(child_codes) >= 2:
+        if range_blocked(configs, current_idx, child_codes[-1], child_codes[0], warnings):
+            return None
         return f"SUM_ROW('{child_codes[-1]}','{child_codes[0]}')"
     elif len(child_codes) == 1:
         return f"ROW('{child_codes[0]}')"
@@ -639,7 +650,7 @@ class ReportFormulaService:
             user_id: 操作人（留痕）
 
         Returns:
-            {total, updated, skipped, no_formula, coverage_pct, events}
+            {total, updated, skipped, no_formula, coverage_pct, events, warnings}（warnings：合计行未自动生成的原因）
         """
         from app.services.formula_settings.publish import publish_global
         from app.services.formula_settings.stores import report_slot_key
@@ -654,6 +665,7 @@ class ReportFormulaService:
 
         stats = {"total": 0, "updated": 0, "skipped": 0, "no_formula": 0}
         events: list[dict] = []
+        warnings: list[str] = []
 
         for std in standards:
             std_changes: dict[str, dict] = {}
@@ -723,13 +735,13 @@ class ReportFormulaService:
 
                     # 策略 3: 合计行关键词
                     if not formula and any(kw in row_name for kw in ("合计", "小计", "总计", "总额")):
-                        formula = _generate_sum_formula(type_configs, idx)
+                        formula = _generate_sum_formula(type_configs, idx, warnings)
                         if formula:
                             source = "auto_total"
 
                     # 策略 4: is_total_row 标记
                     if not formula and cfg.is_total_row:
-                        formula = _generate_sum_formula(type_configs, idx)
+                        formula = _generate_sum_formula(type_configs, idx, warnings)
                         if formula:
                             source = "auto_total_flag"
 
@@ -761,6 +773,9 @@ class ReportFormulaService:
                 events.extend(published.get("events") or [])
 
         stats["events"] = events
+        stats["warnings"] = list(dict.fromkeys(warnings))  # 策略 3、4 对同一行各调一次生成器 ⇒ 去重
+        for text in stats["warnings"]:
+            logger.warning("fill_all_formulas: %s", text)
         # 计算覆盖率
         fillable = stats["total"] - stats["skipped"]
         coverage_pct = round(stats["updated"] / max(fillable, 1) * 100, 1)

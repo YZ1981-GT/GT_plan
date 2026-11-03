@@ -305,9 +305,9 @@
    "adjudication_reason": "N1 实测**有** HTML 对端（checklist_responses + `N1-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N1 递延所得税资产.xlsx`（10 张 sheet、593 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L206",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L210",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L231",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L235",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L317",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],

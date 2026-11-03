@@ -4,6 +4,7 @@
  * 对齐 Excel：①账面余额 / ④⑨摊余成本；补 PV、信用组合；
  * Stage1/2 损失率法，Stage3 现值法（参考 G4-10）。
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch } from 'vue'
 import {
   calcImpairmentProvision,
@@ -67,7 +68,7 @@ export function createEmptyImpairmentRow(
 ): ImpairmentCalcRow {
   const stage = (partial.stage || partial.stageGroup || 'Stage1') as ImpairmentCalcRow['stage']
   const { stage: _s, stageGroup: _sg, ...rest } = partial
-  const id = rest.id || crypto.randomUUID()
+  const id = rest.id || newUuid()
   return {
     amortizedCost: 0,
     pvFutureCashFlow: 0,
@@ -360,7 +361,7 @@ export function applyStageUpdatesToRows(
     if (matchVia === 'name' && (nameCounts.get(key) || 0) > 1) ambiguous.push(name)
 
     if (!row) {
-      const id = stableId || crypto.randomUUID()
+      const id = stableId || newUuid()
       row = createEmptyImpairmentRow({
         id,
         seq: rows.length + 1,
@@ -544,7 +545,7 @@ export function useG6EclImpairmentCalc() {
       })
       if (!value?.trim()) return
       const newRow = createEmptyImpairmentRow({
-        id: crypto.randomUUID(),
+        id: newUuid(),
         seq: rows.value.length + 1,
         investProject: value.trim(),
         stageGroup: defaultStage,

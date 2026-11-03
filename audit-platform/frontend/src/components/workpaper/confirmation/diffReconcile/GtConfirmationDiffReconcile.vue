@@ -29,6 +29,9 @@
         :diff-type-options="diffTypeOptions"
         :subject-summary="data.subjectSummary.value"
         :is-over-materiality="data.isOverMateriality"
+        :wp-id="wpId"
+        :project-id="evidenceProjectId"
+        :evidence-sheet="evidenceSheetKey"
         @add="handleAdd"
         @delete="handleDelete"
         @save="handleSave"
@@ -104,6 +107,7 @@ import { filterSummaryRows, defaultDiffFilter } from '../coordination/importFrom
 import { CONFIRMATION_DICTS, fallbackSelectOptions } from '../coordination/confirmationDicts'
 import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
+import { routeProjectId } from '@/components/attachment/rowEvidence'
 import { eventBus } from '@/utils/eventBus'
 // 真源在 confirmation/composables/（本文件在 confirmation/diffReconcile/，故为 '../composables/'）
 import { buildDiffMisstatementPayload } from '../composables/confirmationRiskPush'
@@ -131,6 +135,11 @@ const emit = defineEmits<{
 
 // 🔴 setup 顶层取（useRouter 是 setup 作用域 composable，写进函数体静默失效）
 const router = useRouter()
+
+// 调节依据挂到本行（spec attachment-confirmation-evidence-loop 需求 4）：表页 = 本循环差异调节表编码
+const routePid = routeProjectId()
+const evidenceProjectId = computed(() => props.projectId || routePid)
+const evidenceSheetKey = computed(() => getCycleConfirmationMeta(props.wpCode).diffCode || '')
 
 // ─── 格式检测 ────────────────────────────────────────────────────────────────
 

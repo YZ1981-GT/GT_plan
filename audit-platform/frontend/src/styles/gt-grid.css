@@ -1,0 +1,161 @@
+/*
+ * 表格按 Excel 方式呈现与编辑（spec excel-style-table-editing）
+ * 只针对内核自己写的 data-gt-* 属性与 .gt-cell-display / .gt-grid-* 类，不改 el-table 原有样式。
+ * 选区边框用 td::after、当前格用 inset box-shadow：el-table 固定列的阴影占用了 td::before。
+ */
+:root {
+  --gt-grid-active-color: var(--gt-color-primary, #4b2d77);
+  --gt-grid-sel-color: var(--gt-color-primary, #4b2d77);
+  --gt-grid-sel-bg: rgba(75, 45, 119, 0.08);
+  --gt-grid-blur-color: #a8a3b3;
+}
+
+/* ── 承接框：选中态下的键盘 / 输入法入口（透明，贴在当前格上） ── */
+.gt-grid-sink {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0 6px;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font: inherit;
+  line-height: 22px;
+  white-space: pre;
+  box-sizing: border-box;
+}
+/* 输入法组字期间显示成编辑框，组好的字随后转交给编辑器 */
+.gt-grid-sink.gt-grid-sink--composing {
+  opacity: 1;
+  color: var(--el-text-color-primary, #303133);
+  caret-color: auto;
+  background: var(--el-bg-color, #fff);
+  box-shadow: inset 0 0 0 2px var(--gt-grid-active-color);
+}
+.gt-grid-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── 原生表格接入（GtGridTable：根节点就是 <table>） ──
+ * 定位用 :where() 零优先级：页面给表格 / 单元格写了 position（如 sticky 首列）一律以页面为准，
+ * sticky 同样是定位元素，选区边框照样以它为基准。 */
+:where(table.gt-grid-raw) {
+  position: relative;
+}
+/* 选区边框（::after 绝对定位）只在被选中 / 复制框住的格上需要定位基准；平时不改单元格的 position */
+:where(table.gt-grid-raw) :where(td[data-gt-sel], th[data-gt-sel], td[data-gt-copy], th[data-gt-copy]) {
+  position: relative;
+}
+/* 承接框宿主：零高 caption（里面只有绝对定位的承接框与播报，不占高度、不参与列宽） */
+table.gt-grid-raw > caption.gt-grid-raw__host {
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: visible !important;
+  background: none !important;
+}
+
+/* ── 选区 ── */
+[data-gt-grid-root] td[data-gt-sel],
+[data-gt-grid-root] th[data-gt-sel] {
+  background-image: linear-gradient(var(--gt-grid-sel-bg), var(--gt-grid-sel-bg));
+}
+[data-gt-grid-root] td[data-gt-sel]::after,
+[data-gt-grid-root] td[data-gt-copy]::after,
+[data-gt-grid-root] th[data-gt-sel]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 0 solid var(--gt-grid-sel-color);
+  z-index: 2;
+}
+/* 区域外沿：选择器带上 td / th，与上面的 border 简写同优先级、写在后面才生效（否则宽度被 border: 0 盖掉） */
+[data-gt-grid-root] td[data-gt-sel~='t']::after, [data-gt-grid-root] th[data-gt-sel~='t']::after { border-top-width: 1px; }
+[data-gt-grid-root] td[data-gt-sel~='b']::after, [data-gt-grid-root] th[data-gt-sel~='b']::after { border-bottom-width: 1px; }
+[data-gt-grid-root] td[data-gt-sel~='l']::after, [data-gt-grid-root] th[data-gt-sel~='l']::after { border-left-width: 1px; }
+[data-gt-grid-root] td[data-gt-sel~='r']::after, [data-gt-grid-root] th[data-gt-sel~='r']::after { border-right-width: 1px; }
+/* 复制后的虚线框（Esc 或下一次编辑后消失） */
+[data-gt-grid-root] td[data-gt-copy]::after { border-style: dashed; border-color: var(--gt-grid-sel-color); }
+[data-gt-grid-root] td[data-gt-copy~='t']::after { border-top-width: 2px; }
+[data-gt-grid-root] td[data-gt-copy~='b']::after { border-bottom-width: 2px; }
+[data-gt-grid-root] td[data-gt-copy~='l']::after { border-left-width: 2px; }
+[data-gt-grid-root] td[data-gt-copy~='r']::after { border-right-width: 2px; }
+
+/* 当前格 */
+[data-gt-grid-root] td[data-gt-active],
+[data-gt-grid-root] th[data-gt-active] {
+  box-shadow: inset 0 0 0 2px var(--gt-grid-active-color) !important;
+}
+[data-gt-grid-root]:not([data-gt-grid-focused]) td[data-gt-active] {
+  box-shadow: inset 0 0 0 2px var(--gt-grid-blur-color) !important;
+}
+
+/* ── 显示态：只渲染文本 ── */
+.gt-cell-display {
+  display: block;
+  width: 100%;
+  min-height: 22px;
+  line-height: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: cell;
+  box-sizing: border-box;
+}
+.gt-cell-display--number {
+  font-variant-numeric: tabular-nums;
+}
+.gt-cell-display--multiline {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gt-cell-display--negative {
+  color: var(--gt-color-coral, #f56c6c);
+}
+.gt-cell-display--empty::before {
+  content: attr(data-placeholder);
+  color: var(--el-text-color-placeholder, #a8abb2);
+  opacity: 0;
+}
+[data-gt-grid-root] td[data-gt-active] .gt-cell-display--empty::before {
+  opacity: 0.8;
+}
+.gt-grid-cell__silent {
+  display: none;
+}
+
+/* ── 编辑态：编辑器贴合单元格，不撑高行 ── */
+[data-gt-grid-root] td[data-gt-editing] {
+  box-shadow: inset 0 0 0 2px var(--gt-grid-active-color) !important;
+}
+[data-gt-grid-root] td[data-gt-editing] .el-input__wrapper,
+[data-gt-grid-root] td[data-gt-editing] .el-select__wrapper,
+[data-gt-grid-root] td[data-gt-editing] .el-textarea__inner {
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  background: var(--el-bg-color, #fff) !important;
+}
+
+/* 拖拽框选时禁止选中文字 */
+body.gt-grid-dragging,
+body.gt-grid-dragging * {
+  user-select: none !important;
+}

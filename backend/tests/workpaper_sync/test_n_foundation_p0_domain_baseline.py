@@ -12,10 +12,7 @@ NF-P: 1~5, 10~11, 34
 from __future__ import annotations
 
 import hashlib
-import json
 import pathlib
-import re
-from collections import defaultdict
 from typing import Any
 
 import pytest
@@ -35,7 +32,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 SLICE_PATH = DATA / "workpaper_sync_n_cycle_manifest_slice.json"
 
 # 导入扫描器模块
-import sys
+import sys  # noqa: E402
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
 import n_cycle_scanner_summary as scanner  # noqa: E402
 
@@ -50,7 +47,7 @@ ENTRIES = {
         "direction": "debit",
         "category": "asset",
         "sheets": 10,
-        "formulas": 593,
+        "formulas": 595,
         "fx_sheets": 8,
         "html_child": 8,
         "prog": 1,
@@ -78,7 +75,7 @@ ENTRIES = {
         "direction": "credit",
         "category": "liability",
         "sheets": 6,
-        "formulas": 162,
+        "formulas": 164,
         "fx_sheets": 4,
         "html_child": 4,
         "prog": 0,
@@ -92,8 +89,8 @@ ENTRIES = {
         "direction": "debit",
         "category": "expense",
         "sheets": 9,
-        "formulas": 236,
-        "fx_sheets": 7,
+        "formulas": 231,
+        "fx_sheets": 6,
         "html_child": 6,
         "prog": 1,
         "oo_fallback": 2,
@@ -197,14 +194,14 @@ class TestEntryBaseline:
         assert total_sheets == 59, f"sheets 合计 {total_sheets}（期望 59）"
 
     def test_formula_total(self):
-        """NF-P4（部分）：公式格合计 2185。"""
+        """NF-P4（部分）：公式格合计 2184（N4 净化 -5，N1/N3 footer 补式 +4）。"""
         total = sum(e["formulas"] for e in ENTRIES.values())
-        assert total == 2185, f"公式格合计 {total}（期望 2185）"
+        assert total == 2184, f"公式格合计 {total}（期望 2184）"
 
     def test_fx_sheets_total(self):
-        """带 fx sheet 合计 49。"""
+        """带 fx sheet 合计 48（N4 隐藏原底稿公式中性化后 -1）。"""
         total = sum(e["fx_sheets"] for e in ENTRIES.values())
-        assert total == 49, f"带 fx sheet 合计 {total}（期望 49）"
+        assert total == 48, f"带 fx sheet 合计 {total}（期望 48）"
 
     def test_html_child_plus_prog_plus_oo_equals_sheets(self):
         """HTML child 45 + prog 2 + OO 兜底 12 = 59 sheets。"""
@@ -243,11 +240,11 @@ class TestTemplateGeometry:
     def test_total_sheets_59(self, templates: dict):
         assert templates["totals"]["sheets"] == 59
 
-    def test_total_formulas_2185(self, templates: dict):
-        assert templates["totals"]["formulas"] == 2185
+    def test_total_formulas_2184(self, templates: dict):
+        assert templates["totals"]["formulas"] == 2184
 
-    def test_sheets_with_fx_49(self, templates: dict):
-        assert templates["totals"]["sheets_with_fx"] == 49
+    def test_sheets_with_fx_48(self, templates: dict):
+        assert templates["totals"]["sheets_with_fx"] == 48
 
     def test_data_only_true_returns_zero(self):
         """data_only=True 反证命中 0。"""
@@ -286,7 +283,6 @@ class TestDomainFileSet:
     def test_production_count(self, domain: tuple):
         """生产文件数应与 design.md 声明一致。"""
         prod, test = domain
-        total = len(prod) + len(test)
         # design.md 声明 160，扫描器含 nCycle 引用文件可能不同
         # 此处取现算值断言一致性
         assert len(prod) > 100, f"生产文件 {len(prod)} 太少"

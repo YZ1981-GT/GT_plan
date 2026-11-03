@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,19 +28,19 @@ async def is_attachment_linked_to_wp(
     attachment_id: UUID,
     wp_id: UUID,
 ) -> bool:
-    """权威链表或 reference 任一命中即视为已关联。"""
-    link_cnt = (
-        await db.execute(
-            sa.select(sa.func.count())
-            .select_from(AttachmentWorkingPaper)
-            .where(
-                AttachmentWorkingPaper.attachment_id == attachment_id,
-                AttachmentWorkingPaper.wp_id == wp_id,
+    """整稿关联、本底稿证据链接（行级证据，spec attachment-evidence-intake 需求 3.7）或 reference 任一命中即视为已关联。"""
+    from app.models.wp_optimization_models import EvidenceLink
+
+    for model in (AttachmentWorkingPaper, EvidenceLink):
+        link_cnt = (
+            await db.execute(
+                sa.select(sa.func.count())
+                .select_from(model)
+                .where(model.attachment_id == attachment_id, model.wp_id == wp_id)
             )
-        )
-    ).scalar()
-    if int(link_cnt or 0) > 0:
-        return True
+        ).scalar()
+        if int(link_cnt or 0) > 0:
+            return True
 
     ref = (
         await db.execute(
@@ -193,63 +193,5 @@ def parse_optional_uuid(value: str | None) -> UUID | None:
         return None
 
 
-async def provision_wp_linked_attachment(
-    db: AsyncSession,
-    *,
-    wp_id: UUID,
-    file_name: str,
-    content: bytes,
-    attachment_type: str = "evidence",
-    created_by: UUID | None = None,
-) -> tuple[str, UUID | None]:
-    """为底稿 OCR 预先创建真实附件并关联到底稿。
-
-    返回 ``(attachment_id_str, attachment_uuid_or_none)``。
-    若创建失败，fail-open 返回临时 UUID 字符串 + ``None``，以维持旧调用路径可用。
-    """
-    temp_id = str(uuid4())
-    try:
-        from app.models.workpaper_models import WorkingPaper
-        from app.services.attachment_service import AttachmentService
-
-        project_id = (
-            await db.execute(
-                sa.select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
-            )
-        ).scalar_one_or_none()
-        if project_id is None:
-            return temp_id, None
-
-        svc = AttachmentService(db)
-        created = await svc.upload_attachment_file(
-            project_id=project_id,
-            file_name=file_name,
-            content=content,
-            metadata={
-                "attachment_type": attachment_type,
-                "reference_id": wp_id,
-                "reference_type": "working_paper",
-                "file_type": svc._guess_file_type(file_name),
-                "ocr_status": "processing",
-            },
-            created_by=created_by,
-        )
-        att_id = parse_optional_uuid(created.get("id"))
-        if att_id is None:
-            return temp_id, None
-        await svc.associate_with_wp(
-            att_id,
-            wp_id,
-            association_type="evidence",
-            created_by=created_by,
-        )
-        await db.commit()
-        return str(att_id), att_id
-    except Exception:
-        logger.warning(
-            "event=awp_e1_attachment_provision_fail_open wp_id=%s file_name=%s",
-            wp_id,
-            file_name,
-            exc_info=True,
-        )
-        return temp_id, None
+# 识别前建附件的写法统一在 services/workpaper_evidence_intake.py（spec attachment-evidence-intake ADR-AEI-01）：
+# 原 provision_wp_linked_attachment 建附件失败时退回临时 id 继续识别，行里存下的 id 在附件表不存在，已删除。

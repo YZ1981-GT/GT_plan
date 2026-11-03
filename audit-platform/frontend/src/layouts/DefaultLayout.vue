@@ -92,13 +92,16 @@
           @recalc="onRecalcStale"
           @detail="onShowStaleDetail"
         />
-        <router-view v-slot="{ Component, route: viewRoute }">
-          <ErrorBoundary :key="viewRoute.fullPath">
-            <Transition :name="transitionName" mode="out-in">
-              <component :is="Component" :key="viewRoute.fullPath" />
-            </Transition>
-          </ErrorBoundary>
-        </router-view>
+        <!-- 换项目后年度定下来之前不挂载页面（6.5：原先页面先按去年 / 上一个项目的年度取数） -->
+        <ProjectContextGate>
+          <router-view v-slot="{ Component, route: viewRoute }">
+            <ErrorBoundary :key="routeViewKey(viewRoute)">
+              <Transition :name="transitionName" mode="out-in">
+                <component :is="Component" :key="routeViewKey(viewRoute)" />
+              </Transition>
+            </ErrorBoundary>
+          </router-view>
+        </ProjectContextGate>
       </div>
     </template>
   </ThreeColumnLayout>
@@ -117,6 +120,7 @@ import DetailProjectPanel from '@/components/layout/DetailProjectPanel.vue'
 import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import ProjectContextGate from '@/components/layout/ProjectContextGate.vue'
 import LinkageStatusBar from '@/components/common/LinkageStatusBar.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
@@ -125,11 +129,15 @@ import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
 import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { initGlobalBackspace } from '@/composables/useNavigationStack'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getGlobalReviewInbox } from '@/services/pmApi'
 import { eventBus } from '@/utils/eventBus'
+import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { routeViewKey } from '@/utils/routeViewKey'
 
 const route = useRoute()
 const router = useRouter()
@@ -170,28 +178,35 @@ async function loadStaleCount() {
   } catch { staleCount.value = 0 }
 }
 
+/** 当前项目的年度：store（路由年度 / 项目审计年度）→ 路由；都没有为 null，不拿去年兜底 */
+function currentProjectYear(): number | null {
+  return projectStore.year ?? parseAuditYear(route.query.year)
+}
+
 /**
  * 「查看详情」→ 底稿列表的「仅看待重算」视图。
  *
- * 必须带 view=list（筛选栏只在列表视图渲染）+ year（WorkpaperList.currentYear 读
- * route.query.year，漏传会退到当前自然年导致跨年度串数据）。
+ * 必须带 view=list（筛选栏只在列表视图渲染）；year 有才带 —— 不带时底稿列表按项目审计年度取，
+ * 项目没填会自己提示（原先缺失时用去年兜底，跨年度串数据）。
  */
 function onShowStaleDetail() {
   const pid = route.params.projectId as string
   if (!pid) return
-  const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
   router.push({
     path: `/projects/${pid}/workpapers`,
-    query: { view: 'list', filter: 'stale', year: String(year) },
+    query: { view: 'list', filter: 'stale', ...yearQuery(currentProjectYear()) },
   })
 }
 
 async function onRecalcStale() {
   const pid = route.params.projectId as string
   if (!pid) return
-  // year 必传：后端 trial-balance/recalc 端点声明 year=Query(...) 必填，
-  // 漏传会爆 422 "[{type:missing,loc:[query,year],msg:Field required}]"
-  const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
+  // year 必传：后端 trial-balance/recalc 端点声明 year=Query(...) 必填；缺年度提示后不发（原先兜底去年会重算错年度）
+  const year = currentProjectYear()
+  if (year == null) {
+    ElMessage.warning(`${MISSING_AUDIT_YEAR_MESSAGE}（本次重算未执行）`)
+    return
+  }
   try {
     const resp: any = await import('@/services/apiProxy').then(m =>
       m.api.post(`/api/projects/${pid}/trial-balance/recalc`, undefined, { params: { year } })
@@ -254,9 +269,8 @@ onBeforeUnmount(() => {
 
 function onGlobalSearchShortcut(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    // 不拦截输入框/textarea/contentEditable 内的 Ctrl+K
-    const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+    // 不拦截输入框/textarea/contentEditable 内的 Ctrl+K（表格承接框不算输入框：选中单元格时照常打开搜索）
+    if (isTextEntryTarget(e.target)) return
     e.preventDefault()
     showGlobalSearch.value = true
   }
@@ -300,7 +314,8 @@ const FULLWIDTH_PATHS = [
   // procedure-delegation-notification / Task 12：跨项目"我的程序任务"全宽独立页
   '/my-procedures',
 ]
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/']
+// '/workpapers/'：底稿短链（定位后替换到编辑器）不是项目子路径，不加则落进浏览模式、路由内容不渲染（acnr T16）
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/', '/workpapers/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true
@@ -354,14 +369,15 @@ async function handleProjectSwitch(item: { project_id: string; year?: number }) 
   const targetId = item.project_id
   if (targetId === route.params.projectId) return  // 同项目不操作
 
-  const year = item.year || projectStore.year
   const activeTab = activeCatalog.value
   const subRoute = tabToRoute(activeTab)
 
   try {
+    // 年度只认目录项自带的（目标项目的审计年度）；没有就不带，由项目 store 按目标项目取。
+    // 原先回退到 projectStore.year ⇒ 把当前项目的年度带给了目标项目
     await router.push({
       path: `/projects/${targetId}/${subRoute}`,
-      query: { year: String(year) }
+      query: yearQuery(item.year),
     })
   } catch (err: any) {
     ElMessage.error('项目切换失败：' + (err.message || '未知错误'))

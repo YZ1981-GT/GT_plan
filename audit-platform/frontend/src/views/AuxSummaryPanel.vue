@@ -40,15 +40,30 @@ import { useRoute } from 'vue-router'
 import { auxSummary } from '@/services/commonApi'
 import { fmtAmount } from '@/utils/formatters'
 import { usePenetrate } from '@/composables/usePenetrate'
+import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE, useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 const route = useRoute()
 const penetrate = usePenetrate()
 const projectId = ref(route.params.projectId as string || '')
-const year = ref(2025)
+// 年度：路由 → 项目审计年度（原先 ref(2025)：任何项目进来都按 2025 汇总）；都没有为空，等用户在上方填
+const routeYear = Number(route.query.year)
+const year = ref<number | undefined>(Number.isFinite(routeYear) && routeYear > 2000 ? routeYear : undefined)
+const { ensureAuditYear } = useProjectAuditYear(projectId)
 const items = ref<any[]>([])
 function rowClass({ row }: any) { return row.is_matched ? '' : 'gt-row-mismatch' }
-async function fetch() { if (projectId.value) items.value = await auxSummary(projectId.value, year.value) }
-onMounted(fetch)
+async function fetch() {
+  if (!projectId.value) return
+  if (year.value == null) { items.value = []; return }
+  items.value = await auxSummary(projectId.value, year.value)
+}
+onMounted(async () => {
+  if (year.value == null) {
+    year.value = (await ensureAuditYear()) ?? undefined
+    if (year.value == null) ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+  }
+  await fetch()
+})
 </script>
 <style scoped>
 .gt-aux-summary { padding: var(--gt-space-4); }

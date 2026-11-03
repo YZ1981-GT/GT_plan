@@ -178,6 +178,7 @@ async def _seed_full_readiness(db: AsyncSession, project_id: uuid.UUID, year: in
     ))
 
     from app.models.report_models import FinancialReport
+    from app.services.report_freshness import CALC_VERSION
     for i in range(3):
         db.add(FinancialReport(
             id=uuid.uuid4(),
@@ -188,6 +189,8 @@ async def _seed_full_readiness(db: AsyncSession, project_id: uuid.UUID, year: in
             row_name=f"报表行{i}",
             current_period_amount=Decimal("50000.00"),
             is_stale=False,
+            # 无计算版本的行读作过期（spec formula-hub-integrity-closure D13-A，report_freshness.stale_clause）
+            calc_version=CALC_VERSION,
         ))
 
     from app.models.report_models import DisclosureNote

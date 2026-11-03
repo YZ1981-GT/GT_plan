@@ -106,10 +106,13 @@ def test_p5_validate_only_standard_code():
 
 
 def test_p2_import_keeps_level1_normalization_and_persists_detail():
-    """P2/P3：导入仍归一 std_code，且把明细码写入 line_item detail_account_code。"""
-    src = _read("app/routers/import_templates.py")
+    """P2/P3：导入仍归一 std_code，且把明细码写入 line_item detail_account_code。
+
+    导入实现 2026-10-31 迁到 adjustment_import_service（import_templates._import_adjustments 为薄壳）。
+    """
+    src = _read("app/services/adjustment_import_service.py")
     assert "_normalize_to_level1" in src, "一级归一逻辑保留"
-    assert "detail_code" in src and "detail_account_code=ln.get(\"detail_code\")" in src
+    assert "detail_code" in src and "detail_account_code=line.detail_code" in src
 
 
 def test_create_update_persist_detail_code():

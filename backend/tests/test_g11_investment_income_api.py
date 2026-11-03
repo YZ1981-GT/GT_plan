@@ -11,6 +11,7 @@ from app.deps import get_current_user
 from app.main import app
 from app.models.base import UserRole
 from app.core.database import get_db
+from app.routers._wp_gate import dedicated_wp_gate
 from app.routers.wp_render_strategies import RENDERER_DISPATCH
 from app.routers.wp_render_strategies._g11_investment_income_import_export import _G11_SPECS
 
@@ -83,7 +84,11 @@ async def test_g11_ai_sections(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_g11_contract_ocr_route_exists(monkeypatch):
+async def test_g11_contract_ocr_route_exists(monkeypatch, tmp_path):
+    """识别前先建附件并关联底稿（spec attachment-evidence-intake 需求 2）：SQLite 世界 + 只挂本路由、不挂统一门。"""
+    from app.routers.wp_render_strategies._g11_contract_ocr import router as g11_ocr_router
+    from tests.attachment_evidence_intake._helpers import ocr_world, unwrap
+
     async def _fake_ocr(*_a, **_k):
         return {"text": "凭证摘要测试"}
 
@@ -95,13 +100,13 @@ async def test_g11_contract_ocr_route_exists(monkeypatch):
         "app.routers.wp_render_strategies._g11_contract_ocr.chat_completion",
         AsyncMock(return_value='{"summary":"测试","businessContent":"投资收益"}'),
     )
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/api/workpapers/test-wp/g11/contract-ocr",
+    async with ocr_world(monkeypatch, tmp_path, g11_ocr_router, wp_code="G11-3") as w:
+        resp = await w.client.post(
+            f"/api/workpapers/{w.wp.id}/g11/contract-ocr",
             files={"file": ("v.pdf", b"%PDF-1.4", "application/pdf")},
         )
-    assert resp.status_code in (200, 500)
+    assert resp.status_code == 200, resp.text
+    assert unwrap(resp.json())["written_back"] is True
 
 
 @pytest.mark.asyncio

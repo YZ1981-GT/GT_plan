@@ -55,8 +55,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.continuous_audit import router as continuous_audit_router
     from app.routers.ledger_datasets import router as ledger_datasets_router
     from app.routers.dataset_force_unbind import router as dataset_force_unbind_router
+    # 项目当前审计阶段与预审截止日（凭证身份 spec 任务 8）
+    from app.routers.project_audit_phase import router as project_audit_phase_router
 
-    for r in [batch_project_router, project_wizard_router, account_chart_router,
+    for r in [batch_project_router, project_wizard_router, project_audit_phase_router, account_chart_router,
               mapping_router, rlm_router, data_import_router, data_lifecycle_router,
               continuous_audit_router, ledger_datasets_router,
               dataset_force_unbind_router]:
@@ -73,8 +75,15 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §3. 查账与试算 ═══
     from app.routers.drilldown import router as drilldown_router
     from app.routers.ledger_penetration import router as ledger_router
+    # 挂凭（sample-voucher / sampled-vouchers）：与 ledger_router 同一 URL 前缀，凭证身份 spec 任务 6 迁出
+    from app.routers.voucher_links import router as voucher_links_router
     from app.routers.trial_balance import router as tb_router
     from app.routers.adjustments import router as adj_router
+    # 调整分录复核流转（提交复核 / 撤回提交 / 批量复核 / 复核人）与项目级 Excel 导入 —— 同前缀、路径不重叠
+    from app.routers.adjustment_review import router as adj_review_router
+    from app.routers.adjustment_import import router as adj_import_router
+    from app.routers.adjustment_client_booking import router as adj_booking_router
+    from app.routers.adjustment_treatment import router as adj_treatment_router
     from app.routers.materiality import router as mat_router
     from app.routers.misstatements import router as mis_router
     from app.routers.events import router as events_router
@@ -82,8 +91,8 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.data_validation import router as dv_router
     from app.routers.consistency import router as consistency_router
 
-    for r in [drilldown_router, ledger_router, tb_router, adj_router,
-              mat_router, mis_router, events_router, tb_sync_router,
+    for r in [drilldown_router, ledger_router, voucher_links_router, tb_router, adj_router, adj_review_router,
+              adj_import_router, adj_booking_router, adj_treatment_router, mat_router, mis_router, events_router, tb_sync_router,
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])
 
@@ -94,7 +103,6 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §6. 合并报表 ═══
     from app.routers.consolidation import router as consol_router
     from app.routers.consol_scope import router as cs_router
-    from app.routers.consol_scope_diff import router as csd_router
     from app.routers.consol_trial import router as ct_router
     from app.routers.internal_trade import router as it_router
     from app.routers.component_auditor import router as ca_router
@@ -114,17 +122,20 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.query_builder import router as qb_router
     from app.routers.consol_refresh import router as crf_router
     from app.routers.consol_push import router as cpush_router
+    from app.routers.consol_operation import router as cop_router
+    from app.routers.consol_post_elimination import router as cpe_router
+    from app.routers.consol_readiness import router as cready_router
     from app.routers.consol_note_formulas import router as cnf_router
     from app.routers.consol_scope_confirmation import router as csc_router
     from app.routers.share_change_events import router as sce_router
     from app.routers.consol_note_detail_templates import router as cndt_router
-    from app.routers.consol_note_mapping_templates import router as cnmt_router
+    # consol_note_mapping_templates（V202 规则模板库 / 值确认 / 结构锁）已退役（spec note-pull-followup-closure R16）
 
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
               cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
-              crf_router, crb_router, csd_router, cpush_router, cnf_router, csc_router, sce_router,
-              cndt_router, cnmt_router]:
+              crf_router, crb_router, cpush_router, cop_router, cpe_router, cready_router, cnf_router, csc_router, sce_router,
+              cndt_router]:
         app.include_router(r, tags=["合并报表"])
 
     # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══
@@ -235,6 +246,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.project_config import router as project_config_router
     app.include_router(project_config_router, tags=["project-config"])
 
+    # ═══ §233. platform-global-display-settings-closure：账号级显示偏好 ═══
+    from app.routers.user_display_preferences import router as display_prefs_router
+    app.include_router(display_prefs_router, tags=["display-preferences"])
+
     # ═══ §53b. 项目级账龄配置（AgingConfigService 增强版） ═══
     from app.routers.aging_config import router as aging_config_router
     app.include_router(aging_config_router, tags=["aging-config"])
@@ -243,9 +258,9 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.b60_plan import router as b60_plan_router
     app.include_router(b60_plan_router, tags=["b60-plan"])
 
-    # ═══ §53d. B60 章节定义 API ═══
-    from app.routers.b60_chapters import router as b60_chapters_router
-    app.include_router(b60_chapters_router, tags=["b60-chapters"])
+    # ═══ §53d. B60 章节定义 API —— 只在 workpaper 组「数据」里注册一次 ═══
+    # 原先这里也 include 了同一个 router（同一函数注册两次，这里先注册、没有登录校验）；2026-10-31 删除，
+    # 守卫 tests/test_duplicate_route_registration_baseline.py。
 
     # ═══ §53e. B50-3 确定审计范围：试算表重要科目预填 ═══
     from app.routers.b50_scope import router as b50_scope_router

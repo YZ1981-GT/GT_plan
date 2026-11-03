@@ -39,14 +39,7 @@
         >
           推送错报至 A13 ({{ a13PushableCount }})
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" @click="openReview">💬复核</el-button>
       </div>
     </div>
@@ -315,6 +308,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G7TabAdjustment.vue — G7-3 调整分录汇总（源模板22行×10列，HTML动态行）
@@ -347,13 +341,14 @@ import {
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useWorkpaperAuditYear } from '../../composables/workpaperAuditYear'
 import type { G7MainImportableSheet } from '../../composables/useG7ImportExport'
 import { api } from '@/services/apiProxy'
 import { adjustments as adjustmentPaths } from '@/services/apiPaths/accounting'
 import { eventBus } from '@/utils/eventBus'
+import { clonePlain } from '@/utils/cloneable'
 import {
   G7_ADJUSTMENT_PUSHED_EVENT,
   adoptAllSuggestedDrafts,
@@ -708,7 +703,7 @@ async function persistAdjudicationWriteback(
   try {
     data = JSON.parse(stored?.remark || '')
   } catch {
-    data = structuredClone(props.htmlData?.adjudication || { groups: [] })
+    data = clonePlain(props.htmlData?.adjudication || { groups: [] }) // htmlData 可能是响应式：裸 structuredClone 抛 DataCloneError
   }
   const byInvesteeGross = aggregateByInvestee(entries.value, accountGross.value, tbSourceCodes.value)
   const byInvesteeImpair = aggregateByInvestee(entries.value, accountImpairment.value, tbSourceCodes.value)

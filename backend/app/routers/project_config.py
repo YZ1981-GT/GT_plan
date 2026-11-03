@@ -104,6 +104,16 @@ async def update_project_config(
             detail="合并方式由下级企业的与上级关系自动识别，不再手工设置",
         )
 
+    if body.report_scope is not None:
+        from app.services.group_topology_lock import lock_topology_years
+        from app.services.project_audit_year import resolve_project_audit_year
+
+        year_hint = resolve_project_audit_year(project)
+        await lock_topology_years(db, [year_hint])
+        await db.refresh(project)
+        if resolve_project_audit_year(project) != year_hint:
+            raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
+
     changed_fields = []
 
     if body.report_standard is not None and hasattr(project, "template_type"):

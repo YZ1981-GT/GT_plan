@@ -299,7 +299,7 @@
  * H2TabDisclosureSoe — 附注披露信息（国有企业）
  * 对齐源 xlsx 列结构；动态插行；同步附注八、23
  */
-import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -315,14 +315,11 @@ import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureCo
 import { buildH2SoeChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_DISCLOSURE_SHEET_NAME, H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { useRestrictedAssetsSync } from '../../composables/useRestrictedAssetsSync'
-import { buildH2SoeSyncPayloads, type H2SoeSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
+import { useH2SoeDisclosureState } from '../../composables/h2DisclosureTabState'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import {
   H2_SOE_ITEM,
-  createDefaultSoeSummary,
   createEmptySoeProject,
-  mapDetailToSoeDetail,
-  mapDetailToSoeProjects,
   newRowId,
   num,
   soeCarrying,
@@ -331,10 +328,6 @@ import {
   soeProjectEnd,
   soeProjectSubtotal,
   soeSummaryTotal,
-  type SoeDetailRow,
-  type SoeImpairmentRow,
-  type SoeProjectRow,
-  type SoeSummaryRow,
 } from '../../composables/h2SoeDisclosureModel'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -361,11 +354,9 @@ const noteSectionId = H2_NOTE_SECTION.soe
 const isSyncing = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-const summary = reactive<SoeSummaryRow[]>(createDefaultSoeSummary())
-const detailRows = ref<SoeDetailRow[]>([])
-const projectRows = ref<SoeProjectRow[]>([])
-const impairmentRows = ref<SoeImpairmentRow[]>([])
-const noteImpairment = ref('')
+// 表单状态、挂载读回、取数计算、同步快照与载荷与附注页离屏同步共用（h2DisclosureTabState，spec note-pull-followup-closure R1）
+const soeState = useH2SoeDisclosureState()
+const { summary, detailRows, projectRows, impairmentRows, noteImpairment } = soeState
 
 // ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
 const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
@@ -461,62 +452,9 @@ function fmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function parseJson(itemId: string): any {
-  const raw = props.allResponses.get(itemId)?.remark
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return null }
-}
-
 function load() {
-  const s = parseJson(H2_SOE_ITEM.summary)
-  if (Array.isArray(s) && s.length) {
-    for (const row of s) {
-      const t = summary.find((x) => x.key === row.key)
-      if (t) {
-        t.endBook = num(row.endBook)
-        t.endImpairment = num(row.endImpairment)
-        t.beginBook = num(row.beginBook)
-        t.beginImpairment = num(row.beginImpairment)
-      }
-    }
-  }
-  const d = parseJson(H2_SOE_ITEM.detail)
-  detailRows.value = Array.isArray(d) ? d.map((r: any) => ({
-    rowId: r.rowId || newRowId('soe-det'),
-    name: r.name || '',
-    endBook: num(r.endBook),
-    endImpairment: num(r.endImpairment),
-    beginBook: num(r.beginBook),
-    beginImpairment: num(r.beginImpairment),
-  })) : []
-  const p = parseJson(H2_SOE_ITEM.projects)
-  projectRows.value = Array.isArray(p) ? p.map((r: any) => ({
-    ...createEmptySoeProject(),
-    ...r,
-    rowId: r.rowId || newRowId('soe-proj'),
-    beginBalance: num(r.beginBalance),
-    increase: num(r.increase),
-    transferToFA: num(r.transferToFA),
-    otherDecrease: num(r.otherDecrease),
-    interestCapAccum: num(r.interestCapAccum),
-    interestCapCurrent: num(r.interestCapCurrent),
-    interestCapRate: num(r.interestCapRate),
-    budget: num(r.budget),
-    cumInputPct: num(r.cumInputPct),
-    accumulatedInput: num(r.accumulatedInput),
-  })) : []
-  const i = parseJson(H2_SOE_ITEM.impairment)
-  impairmentRows.value = Array.isArray(i) ? i.map((r: any) => ({
-    rowId: r.rowId || newRowId('soe-imp'),
-    name: r.name || '',
-    provisionAmount: num(r.provisionAmount),
-    reason: r.reason || '',
-  })) : []
-  noteImpairment.value = String(props.allResponses.get(H2_SOE_ITEM.noteImpairment)?.remark ?? '')
-
-  const hasData = detailRows.value.length || projectRows.value.length
-    || summary.some((r) => r.endBook || r.beginBook)
-  if (!hasData) pullFromSources(false)
+  // 读回已保存的披露表；没有数据则从 H2-1 / H2-2 取数
+  if (!soeState.load(props.allResponses)) pullFromSources(false)
 }
 
 function scheduleSave() {
@@ -525,7 +463,14 @@ function scheduleSave() {
   saveTimer = setTimeout(() => persistAll(), 300)
 }
 
+/** 编辑后的保存：存完排一次自动同步 */
 function persistAll() {
+  saveAll()
+  autoSync.scheduleAutoSync(syncToNotes)
+}
+
+/** 只存不排同步（同步前先存用这个；用 persistAll 会每 800ms 再同步一次，直到卸载） */
+function saveAll() {
   saveResponse(H2_SOE_ITEM.summary, summary.map((r) => ({ ...r })))
   saveResponse(H2_SOE_ITEM.detail, detailRows.value)
   saveResponse(H2_SOE_ITEM.projects, projectRows.value)
@@ -539,7 +484,6 @@ function persistAll() {
     sectionIds: [noteSectionId],
     text: noteImpairment.value || '',
   })
-  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function updateSummary(
@@ -591,52 +535,9 @@ function removeImpairment(rowId: string) {
 }
 
 function pullFromSources(showMsg = true) {
-  const adjRaw = props.allResponses.get('H2-1-rows')?.remark
-  const detRaw = props.allResponses.get('H2-2-rows')?.remark
-  let adj: any[] = []
-  let det: any[] = []
-  try { if (adjRaw) adj = JSON.parse(adjRaw) } catch { /* ignore */ }
-  try { if (detRaw) det = JSON.parse(detRaw) } catch { /* ignore */ }
-
-  if (Array.isArray(det) && det.length) {
-    detailRows.value = mapDetailToSoeDetail(det)
-    projectRows.value = mapDetailToSoeProjects(det)
-  }
-
-  if (Array.isArray(adj) && adj.length) {
-    const cipBegin = adj.reduce((s, r) => s + num(r.cipBegin), 0)
-    const cipEnd = adj.reduce((s, r) => s + num(r.cipEnd ?? r.audited), 0)
-    const impair = adj.reduce((s, r) => s + num(r.impairment), 0)
-    const cip = summary.find((r) => r.key === 'cip')
-    if (cip) {
-      cip.endBook = cipEnd
-      cip.endImpairment = impair
-      cip.beginBook = cipBegin
-      cip.beginImpairment = 0
-    }
-  } else if (detailRows.value.length) {
-    const tot = soeDetailSubtotal(detailRows.value)
-    const cip = summary.find((r) => r.key === 'cip')
-    if (cip) {
-      cip.endBook = tot.endBook
-      cip.endImpairment = tot.endImpairment
-      cip.beginBook = tot.beginBook
-      cip.beginImpairment = tot.beginImpairment
-    }
-  }
-
+  soeState.applySources(props.allResponses)
   scheduleSave()
   if (showMsg) ElMessage.success('已从 H2-1/H2-2 取数填充披露表')
-}
-
-function getSnapshot(): H2SoeSyncSnapshot {
-  return {
-    summary: summary.map((r) => ({ ...r })),
-    detail: detailRows.value,
-    projects: projectRows.value,
-    impairment: impairmentRows.value,
-    noteImpairment: noteImpairment.value,
-  }
 }
 
 /**
@@ -658,8 +559,8 @@ const syncRestrictedAssets = useRestrictedAssetsSync({
 
 async function syncToNotes() {
   if (isSyncing.value || isReadonly.value || !props.projectId || !props.wpId) return
-  persistAll()
-  const payloads = buildH2SoeSyncPayloads(props.wpId, [], getSnapshot())
+  saveAll()
+  const payloads = soeState.syncPayloads(props.wpId)
   if (!payloads.length) {
     ElMessage.warning('当前不适用国企附注同步')
     return

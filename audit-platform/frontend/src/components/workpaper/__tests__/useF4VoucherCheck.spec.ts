@@ -100,52 +100,8 @@ describe('F4-8 检查比例与抽凭分配', () => {
     expect(book).toEqual({ bookDebit: 150, bookCredit: 280 })
   })
 
-  it('抽凭样本按借贷方向分配，并计算检查比例', () => {
-    const opts = options([
-      ['F4-2-rows', [
-        { currentDebit: 1000, currentCredit: 5000 },
-        { currentDebit: 1000, currentCredit: 5000 },
-      ]],
-    ])
-    const api = useF4VoucherCheck(opts)
-    api.applySamplingResults([
-      {
-        voucherDate: '2025-03-01',
-        voucherNo: '记-D1',
-        summary: '付款',
-        counterpartAccount: '1002',
-        debitAmount: '800',
-        creditAmount: '',
-      } as any,
-      {
-        voucherDate: '2025-03-02',
-        voucherNo: '记-C1',
-        summary: '采购',
-        counterpartAccount: '1405',
-        debitAmount: '',
-        creditAmount: '4000',
-      } as any,
-    ], 'replace')
-
-    expect(api.debitRows.value).toHaveLength(1)
-    expect(api.creditRows.value).toHaveLength(1)
-    expect(api.debitTotal.value).toBe(800)
-    expect(api.creditTotal.value).toBe(4000)
-    expect(api.checkRatios.value[0]).toMatchObject({
-      label: '本期借方',
-      bookAmount: 2000,
-      checkedAmount: 800,
-      ratio: 40,
-    })
-    expect(api.checkRatios.value[1]).toMatchObject({
-      label: '本期贷方',
-      bookAmount: 10000,
-      checkedAmount: 4000,
-      ratio: 40,
-    })
-
-    vi.advanceTimersByTime(1300)
-  })
+  // 抽凭样本按借贷方向分配与检查比例（原 applySamplingResults）改经共享回填函数，见 f4VoucherFill.spec
+  // （spec voucher-identity-writeback-and-audit-phase 任务 11）
 
   it('弹窗保存回填更新借方证据字段', () => {
     const opts = options([

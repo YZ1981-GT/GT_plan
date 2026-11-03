@@ -213,7 +213,19 @@ describe('FormulaTemplateDetailDrawer', () => {
     await (w.vm as any).onDelete()
     expect(api.deleteTemplate).not.toHaveBeenCalled()
     await (w.vm as any).onDelete()
-    expect(api.deleteTemplate).toHaveBeenCalledWith('t1')
+    expect(api.deleteTemplate).toHaveBeenCalledWith('t1', 3)
+    w.unmount()
+  })
+
+  it('删除：版本冲突（409）提示并重取详情，不关抽屉（spec formula-hub-integrity-closure ADR-FHIC-11）', async () => {
+    const w = mountDrawer()
+    await flushPromises()
+    const before = api.template.mock.calls.length
+    api.deleteTemplate.mockRejectedValueOnce({ response: { status: 409, data: { detail: { message: '模板已被他人修改' } } } })
+    await (w.vm as any).onDelete()
+    await flushPromises()
+    expect(api.template.mock.calls.length).toBe(before + 1)
+    expect(w.emitted('changed')).toBeUndefined()
     w.unmount()
   })
 })

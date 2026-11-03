@@ -26,9 +26,11 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from app.services.audit_logger_enhanced import audit_logger
 from app.services.custom_query.addressing_service import (
     AddressingService,
     ResolvedTarget,
+    addressing_service,
 )
 from app.services.custom_query.snapshot_writer import (
     AuditWriteFailed,
@@ -36,6 +38,7 @@ from app.services.custom_query.snapshot_writer import (
     WritebackConflict,
     WritebackPermissionDenied,
     WritebackResolveUnavailable,
+    WritebackTargetNotFound,
     WritebackTargetUnresolvable,
 )
 from app.services.custom_query.writeback_preview import (
@@ -99,8 +102,8 @@ async def test_p29_optimistic_lock_stale_rejection(
     预览之后确认之前：预览过期 或 目标 cell 当前旧值与预览时不一致 → 拒绝回写、
     数据不变、提示重新预览；仅当窗口内且旧值一致时通过。
     """
-    # monkeypatch 确认门只读复核读取的「当前旧值」
-    async def _fake_read(db, wp_id, sheet_name, cell_ref):
+    # monkeypatch 确认门只读复核读取的「当前旧值」（取行带请求项目：任务 14 起多一个关键字参数）
+    async def _fake_read(db, wp_id, sheet_name, cell_ref, *, project_id=None):
         return current_value
 
     monkeypatch.setattr(
@@ -145,10 +148,11 @@ async def test_p29_optimistic_lock_stale_rejection(
 # Property 30: 回写事务原子性（Task 15.7, R3.6 / R9.4 / R14.8）
 # ═══════════════════════════════════════════════════════════════════════════
 
-_RESOLVE_TARGET_PATH = (
-    "app.services.custom_query.addressing_service.addressing_service.resolve_target"
-)
-_AUDIT_LOGGER_PATH = "app.services.audit_logger_enhanced.audit_logger"
+# 🔴 模块单例 addressing_service / audit_logger 的桩用 ``monkeypatch.setitem(vars(单例), 方法名, 桩)``，不用
+# ``monkeypatch.setattr(单例, …)``：后者对「来自类」的方法撤销时把原方法写回成实例属性留在单例上，挡住之后用例的
+# 类级替换（advanced-query-linkage-closure B6：排在本文件之后的 test_aql_writeback_isolation_pg 4 例因此调到真实
+# resolve_target）；setitem 撤销时删键、不留残留，也不受前序用例残留的实例属性影响（类级打桩会被那种残留挡住——
+# B6 全组里 test_advanced_query_audit_helper 等留下的 log_action 残留就让类级版本的 audit_fails 用例不抛异常）。
 
 # 归属校验用的两个合法 UUID（project_mismatch 场景）
 _PID_A = "11111111-1111-1111-1111-111111111111"
@@ -156,8 +160,9 @@ _PID_B = "22222222-2222-2222-2222-222222222222"
 
 # 可注入失败的步骤 → 期望异常类型（含跨 sheet 归属校验 / 数据步 / 审计写入失败）
 _FATAL_STEPS = {
-    "select_not_found": ValueError,               # step1 记录不存在
-    "project_mismatch": WritebackPermissionDenied,  # step2 归属校验失败（R9.4）
+    "missing_project": ValueError,                # step1 前：缺请求项目即拒绝（取行带项目，linkage-closure R4.2）
+    "select_not_found": WritebackTargetNotFound,  # step1 请求项目里查不到（含他项目的底稿）
+    "project_mismatch": WritebackPermissionDenied,  # step2 归属校验失败（R9.4；取行语句被改坏时的兜底）
     "optimistic_conflict": WritebackConflict,     # step3 乐观锁
     "resolve_unresolvable": WritebackTargetUnresolvable,  # step4 addr_id 无法解析（R3.4）
     "resolve_unavailable": WritebackResolveUnavailable,   # step4 resolve 不可用（R3.5）
@@ -168,6 +173,7 @@ _FATAL_STEPS = {
 
 # 失败于写入前（step≤4）→ UPDATE 从不触达
 _PRE_WRITE_STEPS = {
+    "missing_project",
     "select_not_found",
     "project_mismatch",
     "optimistic_conflict",
@@ -213,12 +219,16 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
     sheet_name = "S"
     parsed_data = _snapshot_with_cell(sheet_name, 0, 0, "old")
 
-    # 归属：project_mismatch 场景 row/passed 不同；其余 passed=None（跳过 step2）
+    # 归属：取行恒带请求项目（任务 14）。project_mismatch 场景 mock 无视取行条件返回他项目的行（模拟取行语句被改坏），
+    # 由 step2 兜底；missing_project 不传项目；其余请求项目与行一致
     if inject == "project_mismatch":
         passed_project_id = _PID_A
         row_project_id = _PID_B
-    else:
+    elif inject == "missing_project":
         passed_project_id = None
+        row_project_id = _PID_A
+    else:
+        passed_project_id = _PID_A
         row_project_id = _PID_A
 
     # 乐观锁：optimistic_conflict 场景 opened_at < updated_at
@@ -278,7 +288,7 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
                 jump_route="/wp/x", entry_type="cell",
             )
 
-    monkeypatch.setattr(_RESOLVE_TARGET_PATH, _fake_resolve)
+    monkeypatch.setitem(vars(addressing_service), "resolve_target", _fake_resolve)
 
     # 审计桩（step10）
     async def _audit_ok(**kwargs):
@@ -287,10 +297,7 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
     async def _audit_boom(**kwargs):
         raise RuntimeError("audit queue down")
 
-    monkeypatch.setattr(
-        f"{_AUDIT_LOGGER_PATH}.log_action",
-        _audit_boom if inject == "audit_fails" else _audit_ok,
-    )
+    monkeypatch.setitem(vars(audit_logger), "log_action", _audit_boom if inject == "audit_fails" else _audit_ok)
 
     writer = SnapshotWriter()
 

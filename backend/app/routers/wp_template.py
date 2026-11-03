@@ -17,9 +17,10 @@ Validates: Requirements 1.1-1.8
 from __future__ import annotations
 
 import re
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -77,6 +78,7 @@ class GenerateWorkpapersRequest(BaseModel):
 
     template_set_id: UUID
     year: int | None = None
+    operation_id: UUID | None = None
     # 生成前裁剪弹窗确认的编码；不传 = 整套生成（兼容旧调用方），空列表 = 一个都不生成
     selected_templates: list[str] | None = None
 
@@ -252,9 +254,9 @@ async def update_template_set(
 @router.post("/api/template-sets/seed")
 async def seed_template_sets(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin", "partner"])),
 ):
-    """初始化6个内置模板集（幂等）"""
+    """幂等初始化内置模板集（全局数据，只许 admin / partner；启动任务已自动初始化，同种子一键加载 D7）"""
     engine = TemplateEngine()
     created = await engine.seed_builtin_template_sets(db=db)
     await db.commit()
@@ -292,6 +294,26 @@ async def generate_project_workpapers(
         if not check["ok"]:
             raise HTTPException(status_code=400, detail=check)
 
+    # 带 operation_id 的新客户端走两阶段链；缺省保留旧内部调用方的同步实现。
+    if data.operation_id is not None:
+        from app.routers.wp_generation_operation_flow import run_generation_operation
+        from app.services.wp_generation_operation_service import OperationConflict
+
+        try:
+            flow = await run_generation_operation(
+                db,
+                current_user,
+                operation_id=data.operation_id,
+                project_id=project_id,
+                year=year,
+                kind="template_set",
+                template_set_id=data.template_set_id,
+                codes=data.selected_templates,
+            )
+        except OperationConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return JSONResponse(status_code=flow.status_code, content=flow.payload) if flow.status_code != 200 else flow.payload
+
     engine = TemplateEngine()
     try:
         outcome = await engine.generate_project_workpapers_detailed(
@@ -311,11 +333,28 @@ async def generate_project_workpapers(
     return {**outcome.receipt.to_payload(), "count": len(outcome.workpapers)}
 
 
+@router.get("/api/projects/{project_id}/working-papers/generation-operations/{operation_id}")
+async def get_workpaper_generation_operation(
+    project_id: UUID,
+    operation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """读取持久生成 operation；路径项目与 operation 归属同时匹配。"""
+    from app.services.wp_generation_operation_service import get_operation, operation_payload
+
+    operation = await get_operation(db, project_id, operation_id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="生成操作不存在")
+    return operation_payload(operation)
+
+
 class GenerateFromCodesRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")  # 同上：前后端字段漂移时报错而不是静默丢弃
 
     wp_codes: list[str]
     year: int | None = None
+    operation_id: UUID | None = None
 
 
 @router.post("/api/projects/{project_id}/working-papers/generate-from-codes")
@@ -364,6 +403,25 @@ async def generate_from_codes(
     check = await PrerequisiteChecker().check(db, project_id, year, "generate_from_codes")
     if not check["ok"]:
         raise HTTPException(status_code=422, detail=check)
+
+    if data.operation_id is not None:
+        from app.routers.wp_generation_operation_flow import run_generation_operation
+        from app.services.wp_generation_operation_service import OperationConflict
+
+        try:
+            flow = await run_generation_operation(
+                db,
+                current_user,
+                operation_id=data.operation_id,
+                project_id=project_id,
+                year=year,
+                kind="from_codes",
+                template_set_id=None,
+                codes=data.wp_codes,
+            )
+        except OperationConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return JSONResponse(status_code=flow.status_code, content=flow.payload) if flow.status_code != 200 else flow.payload
 
     # 模板库只作名称 / 循环的候选来源（文件解析不再走它）
     lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"

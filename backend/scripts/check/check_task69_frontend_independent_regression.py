@@ -82,7 +82,33 @@ UPSTREAM_STRUCTURAL_PATH: Final[Path] = DATA / "workpaper_sync_task67_structural
 UPSTREAM_DELETION_PLAN_PATH: Final[Path] = DATA / "workpaper_sync_task66_legacy_deletion_plan.json"
 UPSTREAM_BACKEND_REGRESSION_PATH: Final[Path] = DATA / "workpaper_sync_task68_backend_chain_regression.json"
 
-SPEC_DIR: Final[Path] = REPO / ".kiro" / "specs" / SPEC
+# 🔴 同 Task 68 门：本门解析 **Wave 6 形态**的三件套（整数任务号 `- [x] 69.` +
+#    `### Property N`）。
+#    2026-11-01 active 目录被**重写**成「7 条扁平 AC + 两级任务号」，于是写死 active
+#    路径会让本门绑到一份它根本解析不了的文档上 —— 那是**指错地方**的错误：契约没丢，
+#    它在归档快照里。用内容标记声明「我要哪一种文档形态」，解析就从「目录在不在」
+#    升级成「契约对不对」：形态哪天回到 active 会自动改回 active，也不会像写死归档
+#    路径那样静默选错快照。
+# 🔴 同目录兄弟模块：CLI 路径下 Python 自动把脚本目录放进 sys.path[0]，但被
+#    `importlib.spec_from_file_location` 加载时**不动 sys.path** ⇒ import 期
+#    ModuleNotFoundError ⇒ 引用本脚本的测试模块连采集都过不去（CI 的 backend-tests 是
+#    `pytest -x`，一个采集错误会停掉整个 job）。判据：
+#    backend/tests/test_check_scripts_importable.py
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+if str(_Path(__file__).resolve().parent) not in _sys.path:
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+SPEC_DIR: Final[Path] = resolve_spec_dir(
+    SPEC,
+    require_files=["tasks.md", "design.md"],
+    require_matches={
+        "tasks.md": (rf"^\s*-\s\[[ x~\-]\]\s+{TASK_NUMBER}\.",),
+        "design.md": (r"^### Property \d+",),
+    },
+)
 TASKS_MD: Final[Path] = SPEC_DIR / "tasks.md"
 DESIGN_MD: Final[Path] = SPEC_DIR / "design.md"
 

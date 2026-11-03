@@ -1,21 +1,16 @@
 /**
- * Integration Tests — H5 油气资产跨Sheet数据流 + 行业守卫
+ * Integration Tests — H5 油气资产跨Sheet数据流
  *
  * Spec: .kiro/specs/h5-oil-gas-assets/ Task 7.2
- * Requirements: 2.8, 7.6, 12.1-12.3
+ * Requirements: 2.8, 7.6
  *
- * 测试范围：
- * 1. useH5CrossSheet — H5-1↔H5-2 一致性 / 折耗↔审定表同步
- * 2. useH5IndustryGuard — 行业拦截逻辑
+ * 测试范围：useH5CrossSheet — H5-1↔H5-2 一致性 / 折耗↔审定表同步。
+ * 原 useH5IndustryGuard（按项目「行业」拦截）已删：平台没有项目级行业来源，判定永不命中；
+ * 宿主改按试算表有无油气资产科目提示（spec trim-followup-residual-findings-closure R1）。
  */
 import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
 import { useH5CrossSheet } from '../composables/useH5CrossSheet'
-import {
-  useH5IndustryGuard,
-  APPLICABLE_INDUSTRIES,
-  INDUSTRY_GUARD_MESSAGE,
-} from '../composables/useH5IndustryGuard'
 
 // ============================================================
 // useH5CrossSheet — 跨Sheet数据流集成
@@ -170,85 +165,6 @@ describe('useH5CrossSheet — 跨Sheet一致性检查', () => {
 
       expect(adjudicationVsDetail.value.isMatch).toBe(false)
       expect(adjudicationVsDetail.value.diff).toBe(100)
-    })
-  })
-})
-
-// ============================================================
-// useH5IndustryGuard — 行业适用性拦截
-// ============================================================
-
-describe('useH5IndustryGuard — 行业拦截 (Req 12.1-12.3)', () => {
-  // 注意：useH5IndustryGuard 使用 inject('projectContext')，
-  // 在非组件环境下 inject 返回 fallback null → 默认放行。
-  // 这里我们直接测试常量和核心逻辑。
-
-  describe('APPLICABLE_INDUSTRIES 白名单', () => {
-    it('包含 oil_gas', () => {
-      expect(APPLICABLE_INDUSTRIES).toContain('oil_gas')
-    })
-
-    it('包含 mining', () => {
-      expect(APPLICABLE_INDUSTRIES).toContain('mining')
-    })
-
-    it('不包含其他行业', () => {
-      expect(APPLICABLE_INDUSTRIES).not.toContain('manufacturing')
-      expect(APPLICABLE_INDUSTRIES).not.toContain('financial')
-      expect(APPLICABLE_INDUSTRIES).not.toContain('retail')
-    })
-
-    it('只有2个适用行业', () => {
-      expect(APPLICABLE_INDUSTRIES).toHaveLength(2)
-    })
-  })
-
-  describe('INDUSTRY_GUARD_MESSAGE 提示信息', () => {
-    it('包含关键信息', () => {
-      expect(INDUSTRY_GUARD_MESSAGE).toContain('石油天然气')
-      expect(INDUSTRY_GUARD_MESSAGE).toContain('采矿')
-    })
-  })
-
-  describe('行业判断逻辑（无inject环境默认放行）', () => {
-    it('无 projectContext → isApplicable = true', () => {
-      // 在非组件环境中 inject 返回 null fallback，守卫默认放行
-      const { isApplicable, message } = useH5IndustryGuard()
-      expect(isApplicable.value).toBe(true)
-      expect(message.value).toBe('')
-    })
-  })
-
-  describe('行业白名单校验逻辑（直接测试判断）', () => {
-    it('oil_gas 在白名单中 → 适用', () => {
-      const industry = 'oil_gas'
-      const applicable = (APPLICABLE_INDUSTRIES as readonly string[]).includes(industry)
-      expect(applicable).toBe(true)
-    })
-
-    it('mining 在白名单中 → 适用', () => {
-      const industry = 'mining'
-      const applicable = (APPLICABLE_INDUSTRIES as readonly string[]).includes(industry)
-      expect(applicable).toBe(true)
-    })
-
-    it('manufacturing 不在白名单中 → 不适用', () => {
-      const industry = 'manufacturing'
-      const applicable = (APPLICABLE_INDUSTRIES as readonly string[]).includes(industry)
-      expect(applicable).toBe(false)
-    })
-
-    it('空字符串不在白名单 → 但守卫默认放行（未设置行业）', () => {
-      const industry = ''
-      const applicable = (APPLICABLE_INDUSTRIES as readonly string[]).includes(industry)
-      expect(applicable).toBe(false)
-      // 注意：实际 composable 中空 industry 默认放行（isApplicable=true）
-    })
-
-    it('financial_services 不适用', () => {
-      const industry = 'financial_services'
-      const applicable = (APPLICABLE_INDUSTRIES as readonly string[]).includes(industry)
-      expect(applicable).toBe(false)
     })
   })
 })

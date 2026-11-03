@@ -130,7 +130,9 @@ describe('useReportExport — onExportAllExcel', () => {
 describe('useReportExport — copyReportTable', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('with rows, calls clipboard.write with HTML+text and shows success message', () => {
+  // copyReportTable 走 utils/clipboard 的 copyRichText（内网 http 非安全上下文要能降级），是 async：
+  // 不 await 的话断言跑在 await 之前，成功提示还没发出（本文件在 6f4c5a54a 之后一直整份编译失败，这个走查漏了）
+  it('with rows, calls clipboard.write with HTML+text and shows success message', async () => {
     const fakeRows = makeFakeRows(2)
     const options = createOptions(fakeRows)
     const { copyReportTable } = useReportExport(options)
@@ -143,7 +145,7 @@ describe('useReportExport — copyReportTable', () => {
       constructor(public items: Record<string, Blob>) {}
     }
 
-    copyReportTable()
+    await copyReportTable()
 
     expect(mockWrite).toHaveBeenCalledTimes(1)
     const clipboardItem = mockWrite.mock.calls[0][0][0]

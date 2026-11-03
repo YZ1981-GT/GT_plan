@@ -1,13 +1,15 @@
 /**
- * useM8CrossSheet — M8 一般风险准备跨sheet校验引擎 + 行业守卫
+ * useM8CrossSheet — M8 一般风险准备跨sheet校验引擎
  *
  * Spec: .kiro/specs/m8-general-risk-reserve/
  * Task: 3.2
- * Requirements: 2.5, 5.1-5.3
+ * Requirements: 2.5
  *
- * 职责：
- * 1. adjudicationVsDetail — M8-1审定表合计 vs M8-2明细表合计 交叉验证
- * 2. isFinancialEntity — 行业守卫（金融/银行/证券/保险/信托/基金/期货/金融租赁）
+ * 职责：adjudicationVsDetail — M8-1审定表合计 vs M8-2明细表合计 交叉验证。
+ *
+ * 原第 2 项 isFinancialEntity（按项目「行业」关键词判金融企业）已删：平台没有项目级行业来源，
+ * project_info.industry 恒空；适用性改由宿主按试算表有无一般风险准备科目提示（不阻断），
+ * 不适用走程序裁剪（spec trim-followup-residual-findings-closure R1）。
  *
  * 联动方向：
  *   M8-1 审定表 row 13 = SUM(rows 7-12) 期末合计
@@ -44,12 +46,6 @@ export interface AdjudicationVsDetailResult {
 /** 审定-明细勾稽匹配阈值（1元内视为匹配，考虑四舍五入差异） */
 const MATCH_THRESHOLD = 1
 
-/**
- * 金融行业关键词列表
- * 一般风险准备仅适用金融企业（ADR-2）
- */
-const FINANCIAL_INDUSTRIES = ['金融', '银行', '证券', '保险', '信托', '基金', '期货', '金融租赁']
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -64,14 +60,12 @@ function parseNum(v: any): number {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 /**
- * M8 跨sheet校验引擎 + 行业守卫
+ * M8 跨sheet校验引擎
  *
  * @param allResponses - 全部 checklist_responses（来自 useM8FormData）
- * @param projectInfo - 项目信息（含 industry 字段，用于行业守卫判定）
  */
 export function useM8CrossSheet(
   allResponses: Ref<Map<string, ChecklistResponse>>,
-  projectInfo?: Ref<any>,
 ) {
   // ─── 1. adjudicationVsDetail — 审定表M8-1合计 vs 明细表M8-2合计 ─────────
 
@@ -113,53 +107,10 @@ export function useM8CrossSheet(
     }
   })
 
-  // ─── 2. isFinancialEntity — 行业守卫（金融企业适用性） ──────────────────────
-
-  /**
-   * 判断当前审计项目是否为金融企业。
-   *
-   * 数据来源优先级：
-   * 1. projectInfo prop（从 render-config 中的 project_info 获取）
-   * 2. allResponses 中的 "M8-industry-guard" 持久化值（markNotApplicable 或上次判定结果）
-   *
-   * 金融行业关键词：金融/银行/证券/保险/信托/基金/期货/金融租赁
-   * 非金融企业 → M8 不适用，显示提示并允许标记不适用
-   *
-   * Requirements 5.1-5.3:
-   *   5.1 判断企业行业属性
-   *   5.2 非金融企业显示提示
-   *   5.3 在底稿目录显示适用性状态
-   */
-  const isFinancialEntity: ComputedRef<boolean> = computed(() => {
-    // 优先从 projectInfo 判断
-    if (projectInfo?.value) {
-      const industry = projectInfo.value.industry || projectInfo.value.client_industry || ''
-      if (industry) {
-        return FINANCIAL_INDUSTRIES.some((keyword) => industry.includes(keyword))
-      }
-    }
-
-    // 降级：从 checklist_responses 读取持久化的行业判定
-    const industryResp = allResponses.value.get('M8-industry-guard')
-    if (industryResp?.conclusion) {
-      // conclusion 存储 "financial", "non-financial", 或 "not-applicable"
-      return industryResp.conclusion === 'financial'
-    }
-
-    // 也尝试从 remark 字段读取行业名称判断
-    if (industryResp?.remark) {
-      return FINANCIAL_INDUSTRIES.some((keyword) => industryResp.remark!.includes(keyword))
-    }
-
-    // 默认适用（避免阻塞用户操作，后续由 selfLoad 更新实际状态）
-    return true
-  })
-
   // ─── Return ────────────────────────────────────────────────────────────────
 
   return {
     adjudicationVsDetail,
-    isFinancialEntity,
   }
 }
 

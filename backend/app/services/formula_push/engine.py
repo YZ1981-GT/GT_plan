@@ -35,10 +35,18 @@ import sqlalchemy as sa
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
+from app.services.formula_warnings import collect as collect_formula_warnings, messages as formula_warning_messages
 from app.services.formula_push import note_writer
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
+from app.services.formula_push.persistence import (
+    execute_and_commit as _execute_and_commit,
+    load_states as _load_states,
+    notify_committed,
+    rule_inputs as _rule_inputs,
+    save_states as _save_states,
+)
 from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
-from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value, _jsonable
+from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value
 from app.services.formula_push.rules import (
     TRIGGERS,
     BindingSpec,
@@ -57,8 +65,6 @@ from app.services.formula_runtime.contracts import CanonicalFormulaTarget, Formu
 
 logger = logging.getLogger(__name__)
 
-#: SSE 事件名
-SSE_EVENT = "formula.pushed"
 MANUAL = "manual"
 #: 推送规则有效定义变化后的重推（公式治理内核传播；选规则按「手动」口径，记录保留本值）
 FORMULA_CONFIG_CHANGED = "FORMULA_CONFIG_CHANGED"
@@ -91,10 +97,15 @@ class _StateWrite:
     state: str
     record_pushed: bool
     forced: bool
+    definition_identity: Any | None = None
+    inputs: list[Any] = field(default_factory=list)
+    calculation_applied: bool = False
+    calculation_status: str = "succeeded"
 
 
 class PushActionError(ValueError):
     """用户操作不合法（采用 / 锁定的目标不存在、策略不允许等；路由转 400）。"""
+
 
 # ── 规则 / 并发 / 年度 ────────────────────────────────────────────────────────
 
@@ -218,15 +229,6 @@ async def _read_entries(
     return {r[0]: (r[1], _version_from_timestamp(r[2])) for r in rows}
 
 
-async def _load_states(db, project_id: UUID, year: int) -> dict[str, FormulaPushState]:
-    rows = (await db.execute(
-        sa.select(FormulaPushState).where(
-            FormulaPushState.project_id == project_id, FormulaPushState.year == year,
-        )
-    )).scalars().all()
-    return {r.addr_id: r for r in rows}
-
-
 @dataclass
 class _Ctx:
     """一次运行的共享状态。"""
@@ -239,6 +241,7 @@ class _Ctx:
     now: datetime
     states: dict[str, FormulaPushState]
     result: RunResult
+    ruleset_hash: str | None = None
     state_writes: list[_StateWrite] = field(default_factory=list)
 
     def skip(self, rule_id: str, stage: str, domain: str, addr_id: str | None, reason: str) -> None:
@@ -322,6 +325,8 @@ async def _execute(
     from app.services.formula_settings.push_settings import effective_push_rules
 
     rules, rule_issues = await effective_push_rules(db, project_id)
+    from app.services.formula_provenance import push_rule_snapshot, sha256_canonical
+    ruleset_hash = sha256_canonical([push_rule_snapshot(rule) for rule in rules])
     code_of = {r.rule_id: r.wp_code for r in rules}
     for rid, msg in rule_issues:
         if codes is None or code_of.get(rid) in codes:
@@ -366,6 +371,7 @@ async def _execute(
     ctx = _Ctx(
         db=db, project_id=project_id, year=year, triggered_by=triggered_by, force=force,
         now=now, states=await _load_states(db, project_id, year), result=result,
+        ruleset_hash=ruleset_hash,
     )
     if not plan:
         result.add_warning("本项目没有已接入公式推送的底稿（当前接入：" + "、".join(supported_wp_codes()) + "）")
@@ -465,6 +471,8 @@ async def _push_workpaper(
     ctx: _Ctx, *, wp_code: str, binding: Any, rules: tuple[PushRule, ...], paper: _Paper,
     push_note: bool = True,
 ) -> None:
+    from app.services.formula_provenance import push_rule_identity
+
     result = ctx.result
     paper_code = paper.paper_code or wp_code
 
@@ -485,8 +493,9 @@ async def _push_workpaper(
             "status": "frozen", "reason": frozen,
         })
         return
-    sources = await binding.load_sources(ctx.db, ctx.project_id, ctx.year, paper.id)
-    for text in sources.warnings:
+    with collect_formula_warnings() as fetch_warnings:  # 取数告警（ADR-FHIC-03）并入结果，失败回滚时按检查点撤下
+        sources = await binding.load_sources(ctx.db, ctx.project_id, ctx.year, paper.id)
+    for text in [*sources.warnings, *formula_warning_messages(fetch_warnings)]:
         result.add_warning(text)
     # 从 binding 获取存储列（默认 remark，N3 等使用 conclusion）
     storage_field = getattr(binding, "storage_field", "remark")
@@ -497,7 +506,9 @@ async def _push_workpaper(
     effective_items: set[str] = set()
     for stage in ("source", "derived"):
         for rule in (r for r in rules if r.stage == stage):
-            targets, skips = binding.workpaper_targets(rule, overlay, sources)
+            from app.services.formula_inputs import collect as collect_formula_inputs
+            with collect_formula_inputs() as rule_inputs:
+                targets, skips = binding.workpaper_targets(rule, overlay, sources)
             for s in skips:
                 ctx.skip(rule.rule_id, stage, "workpaper", _remap(s.addr_id), s.reason)
             for t in targets:
@@ -518,6 +529,9 @@ async def _push_workpaper(
                     note_section=None, formula_value=t.formula_value,
                     current_after=t.formula_value if decision.writes else t.current_value,
                     state=decision.state, record_pushed=decision.record_pushed, forced=addr in ctx.force,
+                    definition_identity=push_rule_identity(rule, ctx.ruleset_hash),
+                    inputs=_rule_inputs(rule, rule_inputs, t.formula_value),
+                    calculation_applied=decision.record_pushed and t.formula_value is not None,
                 )))
     for text in binding.entry_warnings(overlay):
         result.add_warning(text)
@@ -552,7 +566,12 @@ async def _push_workpaper(
     sections: list[str] = []
     if push_note:
         for rule in (r for r in rules if r.stage == "note"):
-            section = await _push_note(ctx, rule=rule, binding=binding, overlay=overlay, sources=sources, paper=paper)
+            from app.services.formula_inputs import collect as collect_formula_inputs
+            write_start = len(ctx.state_writes)
+            with collect_formula_inputs() as note_inputs:
+                section = await _push_note(ctx, rule=rule, binding=binding, overlay=overlay, sources=sources, paper=paper)
+            for state_write in ctx.state_writes[write_start:]:
+                state_write.inputs = _rule_inputs(rule, note_inputs, state_write.formula_value)
             if section:
                 sections.append(section)
     result.workpapers.append({
@@ -603,9 +622,8 @@ async def _push_note(
     from app.models.report_models import DisclosureNote
 
     table_name = rule.target.resolve_table(sources.template_type) or rule.target.table
-    # section_title 校验用的名称：table_by_template 场景下子表名可能不等于章节标题
-    # （如国企 八、4 章节标题"应收票据"、子表名"应收票据分类"），此时用 rule.target.table（章节级）比较
-    _title_check_name = rule.target.table if rule.target.table_by_template else table_name
+    # section_title 校验用的名称（见 _expected_section_title）
+    _title_check_name = _expected_section_title(rule, sources.template_type, table_name)
     template_type = sources.template_type
     section = rule.target.sections.get(template_type) if template_type else None
     if section is None:
@@ -622,51 +640,46 @@ async def _push_note(
         ).with_for_update()
     )).scalar_one_or_none()
     reason = None
+    # 子表规则（``*.note.subtable_*``）只认本章节里精确同名的那张表：不回退首表、不按章节标题改投到别的章节、缺表不建骨架
+    # （原先回退首表 / 改投会把科目合计写进别的表；spec note-pull-followup-closure R2.3）
+    is_subtable = ".note.subtable_" in rule.rule_id
     if note is None:
         reason = f"附注尚未生成「{section} {table_name}」章节（在附注模块生成后下次推送纳入）"
-    elif (note.section_title or "").strip() != _title_check_name:
-        # ── 章节号不匹配：子表规则可通过 sub_table_data 验证 ──
-        # 子表规则的 table_name 不等于章节标题是正常的（如 D1 章节「应收票据」下有
-        # 「应收票据分类」「坏账分类」等子表）。仅对 subtable 规则：如果 sub_table_data
-        # 中能找到目标表，就不因标题不匹配而 skip。主表规则仍需标题匹配。
-        # spec: formula-push-subtable-expansion
-        _is_subtable = "subtable" in rule.rule_id
-        _td = note.table_data if isinstance(note.table_data, dict) else {}
-        _sub = _td.get("sub_table_data", {})
-        if _is_subtable and isinstance(_sub, dict) and table_name in _sub:
-            pass  # 子表存在于该章节中，跳过标题校验
+    elif is_subtable:
+        if not note_writer.has_table(note.table_data, table_name):
+            reason = f"附注 {section}「{note.section_title or ''}」里没有「{table_name}」表（子表规则只按表名精确定位），未推送"
+    elif not is_subtable and (note.section_title or "").strip() != _title_check_name:
+        # ── 章节号不匹配：主表规则按章节标题反查（spec: formula-push-note-skip-reduction · 需求 3.1） ──
+        _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
+        fallback_rows = (await ctx.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == ctx.project_id,
+                DisclosureNote.year == ctx.year,
+                DisclosureNote.section_title == _title_check_name,
+                DisclosureNote.is_deleted == sa.false(),
+                DisclosureNote.note_section.like(f"{_section_prefix}%"),
+            ).with_for_update()
+        )).scalars().all()
+        if len(fallback_rows) == 1:
+            logger.info(
+                "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
+                _title_check_name, fallback_rows[0].note_section, section,
+            )
+            note = fallback_rows[0]
+            section = fallback_rows[0].note_section
+            section_addr = f"note://{section}/{table_name}"
         else:
-            # 尝试按 section_title 反查（spec: formula-push-note-skip-reduction · 需求 3.1）
-            _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
-            fallback_rows = (await ctx.db.execute(
-                sa.select(DisclosureNote).where(
-                    DisclosureNote.project_id == ctx.project_id,
-                    DisclosureNote.year == ctx.year,
-                    DisclosureNote.section_title == _title_check_name,
-                    DisclosureNote.is_deleted == sa.false(),
-                    DisclosureNote.note_section.like(f"{_section_prefix}%"),
-                ).with_for_update()
-            )).scalars().all()
-            if len(fallback_rows) == 1:
-                logger.info(
-                    "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
-                    _title_check_name, fallback_rows[0].note_section, section,
-                )
-                note = fallback_rows[0]
-                section = fallback_rows[0].note_section
-                section_addr = f"note://{section}/{table_name}"
-            else:
-                reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
-    elif str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
+            reason = f"附注 {section} 是「{note.section_title}」章节，不是「{_title_check_name}」，未推送"
+    if reason is None and note is not None and str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
         reason = "附注章节已确认，公式推送不改写"
     table_data = copy.deepcopy(note.table_data) if note is not None else None
     table = None
     if reason is None:
-        table, reason = note_writer.locate_table(table_data, table_name)
+        table, reason = note_writer.locate_table(table_data, table_name, exact=is_subtable)
 
-    # ── 缺表时尝试建骨架（需求 5.1）──────────────────────────────────
+    # ── 缺表时尝试建骨架（需求 5.1；子表规则宁缺勿造，不建） ──────────────────
     skeleton_built = False
-    if table is None and reason and "没有" in reason and table_data is not None:
+    if not is_subtable and table is None and reason and "没有" in reason and table_data is not None:
         # _source 为 workpaper/workpaper_html 或 None（旧格式未标记）都允许建骨架
         source = table_data.get("_source")
         if source in note_writer.WORKPAPER_SOURCES or source is None:
@@ -687,7 +700,8 @@ async def _push_note(
             sub[table_name] = skeleton.rows
             cols = table_data.setdefault("_sub_table_columns", {})
             cols[table_name] = skeleton.columns
-            table_data["_source"] = "workpaper"
+            # `_source` 是结构来源，不是本次动作来源；先完成骨架定位，成功写入后才为
+            # 本次新建且尚无来源的结构补标。既有 workpaper_html 必须原样保留。
             # 缺省 _current_standard（引擎按项目模板类型选章节，此时该字段可能未设）
             if "_current_standard" not in table_data:
                 table_data["_current_standard"] = template_type
@@ -706,7 +720,8 @@ async def _push_note(
 
     wrote = False
     any_data_row_matched = False
-    pending_row_skips: list[tuple[str, str]] = []  # spec: formula-push-note-row-matching · 需求 1.2 — (addr_id, reason) 延迟记录
+    # spec: formula-push-note-row-matching · 需求 1.2 — (addr_id, reason, 字段) 延迟记录
+    pending_row_skips: list[tuple[str, str, str]] = []
     # 缓存 note_rows 结果，避免重复调用（消除隐式一致性依赖）
     all_note_rows = binding.note_rows(overlay, template_type, rule)
     data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
@@ -735,14 +750,21 @@ async def _push_note(
             if index is None:
                 # spec: formula-push-note-row-matching · 需求 1.2
                 # 延迟记录：合计行兜底成功后将重分类为 fallback_to_total
-                pending_row_skips.append((addr, f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）"))
+                pending_row_skips.append((addr, f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）",
+                                          field_name))
             elif collided:
                 ctx.skip(rule.rule_id, "note", "note", addr,
                          f"取数行「{'」「'.join(dict.fromkeys(claims[index]))}」都对上附注「{note_writer.row_label(table.rows[index])}」"
                          "行，同一格不能由多条取数覆盖写，附注保持原值")
+            elif f"{value_key}_resolved" not in row:
+                # 取数行没有这个值（子表字段如「坏账准备」「比例」不由本底稿取数）：原来 KeyError 让整张底稿回滚
+                # （spec note-pull-followup-closure R2.3）
+                ctx.skip(rule.rule_id, "note", "note", addr,
+                         f"取数行没有「{field_name}」的值（本底稿取数只有期末 / 期初数），附注保持原值")
             elif not row[f"{value_key}_resolved"]:
-                # 科目不存在是真正 skip，不参与延迟
-                ctx.skip(rule.rule_id, "note", "note", addr, "底稿未取到该行数值（本项目无此科目），附注保持原值")
+                # 科目不存在是真正 skip，不参与延迟；取数行带了原因（如损益类上期取不到上年数据）就用它的
+                ctx.skip(rule.rule_id, "note", "note", addr,
+                         row.get(f"{value_key}_reason") or "底稿未取到该行数值（本项目无此科目），附注保持原值")
             else:
                 wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
                                          row=table.rows[index], field_name=field_name,
@@ -752,8 +774,20 @@ async def _push_note(
     # 所有数据行都未命中附注行 → 把审定数写入合计行
     skip_total_recalc = False
     fallback_wrote = False  # spec: formula-push-note-row-matching · 需求 1.3
+    fallback_ambiguity: str | None = None
+    unresolved_fields: dict[str, str] = {}
     if not any_data_row_matched:
-        total_idx = note_writer.find_total_row(table.rows)
+        candidates = note_writer.total_row_candidates(table.rows)
+        total_idx = candidates[0] if len(candidates) == 1 else None
+        if len(candidates) > 1:
+            # 多个汇总行：分段合计（「一、账面原值合计 / … / 五、账面价值合计」）或「小计 / 减：减值准备 / 合计」。
+            # 取数只有科目余额，是哪一段由科目决定（主科目余额是原值 / 小计，长期借款审定数是重分类后的合计），
+            # 引擎不知道 ⇒ 不兜底、也不按上方各行重算（上方明细一个都没取到）。2026-10-31 真库：按「最终合计」兜底
+            # 把长期股权投资 / 投资性房地产 / 使用权资产的原值写进了账面价值合计（和平 八、26 账面价值
+            # 176,203,072.87，应为 66,389,073.02）。spec disclosure-note-template-word-realignment Task 34/35。
+            labels = "、".join(note_writer.row_label(table.rows[i]) or "（无名）" for i in candidates)
+            fallback_ambiguity = f"表里有 {len(candidates)} 个合计行（{labels}），不知道科目余额该写哪一行，不兜底"
+            skip_total_recalc = True
         if total_idx is not None:
             # 单科目：用唯一数据行（is_total=False）的值
             # 多科目：用 is_total 行的汇总值
@@ -775,6 +809,10 @@ async def _push_note(
                                                  row=total_row, field_name=field_name,
                                                  value=source_row[value_key], paper=paper)
                         fallback_cell_called = True
+                    else:
+                        # 这一格取不到（如损益类上期没有上年数据）：合计格不写，该字段的逐行记录如实记跳过
+                        unresolved_fields[field_name] = (source_row.get(f"{value_key}_reason")
+                                                         or "底稿未取到该行数值（本项目无此科目）")
                 skip_total_recalc = True  # 已直接写入合计行，跳过后续重算
                 # fallback_wrote 仅在至少一个字段真正调用了 _push_note_cell 时为 True
                 # （所有 resolved=False 时兜底路径进入但没写——per-row skip 应保持 skipped）
@@ -782,8 +820,14 @@ async def _push_note(
 
     # spec: formula-push-note-row-matching · 需求 1.4
     # 统一 flush 延迟的 per-row skip 记录：兜底成功 → fallback_to_total；未成功 → skipped
-    for _paddr, _preason in pending_row_skips:
+    for _paddr, _preason, _pfield in pending_row_skips:
         _paction = FALLBACK_TO_TOTAL if fallback_wrote else SKIPPED
+        _unresolved = unresolved_fields.get(_pfield)
+        if _unresolved:
+            _paction = SKIPPED
+            _preason = f"{_preason}；{_unresolved}，附注保持原值"
+        if fallback_ambiguity:
+            _preason = f"{_preason}；{fallback_ambiguity}，附注保持原值"
         ctx.result.items.append(PushItem(
             rule.rule_id, "note", "note", _paddr, _paction, reason=_preason
         ))
@@ -793,13 +837,13 @@ async def _push_note(
 
     if not wrote:
         return None
-    # spec: formula-push-note-skip-reduction · 需求 1.4
-    # 首次推送后标记 _source，下次推送走正常路径不再触发旧格式兜底
-    if table_data.get("_source") is None:
+    # JSON `_source` 只描述 sub_table_data 的投影结构（ADR-NRG-007）。原生 `_tables`
+    # 写入保持原值；只有本次真正建成骨架且发生写入时，才为缺失的结构来源补标。
+    if skeleton_built and table_data.get("_source") is None:
         table_data["_source"] = "workpaper"
-    # 同步指纹：与 sync-from-workpaper 同写，pull-from-workpapers 据此认定「真正同步过」（需求 5）
-    table_data["_last_sync_wp_id"] = str(paper.id)
-    table_data["_last_sync_at"] = ctx.now.isoformat()
+    # 推送不写同步指纹（``_last_sync_wp_id`` / ``_last_sync_at``）：指纹只表示「底稿披露表同步过」，离屏同步据此判断
+    # 「已有人工填写不覆盖」；推送写了它，推送过的章节就冒充同步过（spec note-pull-followup-closure R3.2 / ADR-3）。
+    # 推送的来源记在 ``last_sync_source`` 与推送状态表。
     note_writer.sync_first_table_mirror(table_data)  # 旧格式写的是 _tables[0] ⇒ 顶层镜像跟着改
     note.table_data = table_data
     flag_modified(note, "table_data")
@@ -807,8 +851,14 @@ async def _push_note(
     note.last_sync_wp_id = paper.id
     note.last_sync_at = ctx.now
     note.last_sync_user_id = ctx.triggered_by
-    note.is_stale = False  # 推送成功 → 清除 stale（与 sync-from-workpaper 同语义）
-    note.stale_source = None
+    from app.services.stale_state import clear_note_stale
+
+    await clear_note_stale(
+        ctx.db,
+        note.project_id,
+        sections=[section],
+        year=note.year,
+    )
     # 「最近一次编辑」：用户点推送记操作人；事件触发的推送没有操作人，不动编辑人（原来直接赋 None，
     # 把上一位编辑人清空；spec disclosure-note-template-word-realignment Task 18）
     if ctx.triggered_by is not None:
@@ -817,6 +867,22 @@ async def _push_note(
     await ctx.db.flush()
     ctx.result.note_sections.append(section)
     return section
+
+
+def _expected_section_title(rule: PushRule, template_type: str | None, table_name: str) -> str:
+    """主表规则校验章节标题（及章节号对不上时按标题反查）用的名称。
+
+    规则按准则声明了表名（``table_by_template``）⇒ 主表名一般不是章节名，取该准则种子在规则章节号上的章节标题：国企
+    八、64「营业收入、营业成本」（规则通用表名是上市章节名「营业收入和营业成本」）、八、12「持有待售资产」（通用表名
+    「持有待售资产和持有待售负债」）、八、5「应收账款」（D2 主表名「（1）按账龄披露应收账款」）。原来一律拿通用表名比，
+    这几条规则在国企项目恒「不是…章节」跳过，跳过原因里印的又是准则表名，看着与章节名一模一样（2026-10-31 三个真实
+    项目 八、64 / 八、12 / 八、5 都是）。种子里没有该章节时沿用通用表名；没声明 ``table_by_template`` 的规则主表名即
+    章节名，照旧按表名比。spec disclosure-note-template-word-realignment Task 34/35。
+    """
+    if not rule.target.table_by_template:
+        return table_name
+    section = rule.target.sections.get(template_type) if template_type else None
+    return note_writer.template_section_title(template_type, section) or rule.target.table
 
 
 def _find_total_by_label(rows: Any, label: str) -> int | None:
@@ -861,7 +927,7 @@ def _note_keep_reason(mode: str | None, decision: Decision) -> str | None:
 def _push_note_total(
     ctx: _Ctx, *, rule: PushRule, section: str, table_name: str, table: note_writer.NoteTable, paper: _Paper,
 ) -> bool:
-    """合计 = 合计行之前各行之和（人工行一并计入）。"""
+    """合计 = 合计行之前各行之和（人工行一并计入）；上方各行这一列都没有数则不重算（不写 0）。"""
     index = note_writer.find_total_row(table.rows)
     if index is None:
         return False
@@ -875,6 +941,10 @@ def _push_note_total(
             continue
         value = note_writer.total_formula(table.rows, index, field_name, table.value_keys)
         addr = note_addr_id(section, table_name, label, period)
+        if value is None:
+            ctx.skip(rule.rule_id, "note", "note", addr,
+                     f"合计行「{label}」上方各行这一列都没有数，合计不按 0 重算，附注保持原值")
+            continue
         mode = note_writer.external_mode(table.section_locked, cell_mode)
         decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
         if decision.writes:
@@ -888,6 +958,8 @@ def _record_note(
     ctx: _Ctx, rule: PushRule, section: str, addr: str, decision: Decision,
     value: Any, current: Any, paper: _Paper, reason: str | None,
 ) -> None:
+    from app.services.formula_provenance import push_rule_identity
+
     ctx.result.items.append(PushItem(
         rule.rule_id, "note", "note", addr, decision.action, decision.state,
         formula=value, current=current, reason=reason,
@@ -896,34 +968,9 @@ def _record_note(
         addr_id=addr, rule_id=rule.rule_id, domain="note", wp_id=paper.id, note_section=section,
         formula_value=value, current_after=value if decision.writes else current,
         state=decision.state, record_pushed=decision.record_pushed, forced=addr in ctx.force,
+        definition_identity=push_rule_identity(rule, ctx.ruleset_hash),
+        calculation_applied=decision.record_pushed and value is not None,
     ))
-
-
-async def _save_states(ctx: _Ctx, run_id: UUID) -> None:
-    """``(project_id, year, addr_id)`` 唯一的推送状态 upsert。"""
-    for w in ctx.state_writes:
-        row = ctx.states.get(w.addr_id)
-        if row is None:
-            row = FormulaPushState(
-                id=uuid.uuid4(), project_id=ctx.project_id, year=ctx.year, addr_id=w.addr_id,
-                rule_id=w.rule_id, domain=w.domain, state=w.state,
-            )
-            ctx.db.add(row)
-            ctx.states[w.addr_id] = row
-        row.rule_id = w.rule_id
-        row.domain = w.domain
-        row.wp_id = w.wp_id
-        row.note_section = w.note_section
-        row.last_formula_value = _jsonable(w.formula_value)
-        row.current_value = _jsonable(w.current_after)
-        if w.record_pushed:
-            row.last_pushed_value = _jsonable(w.formula_value)
-        row.state = w.state
-        row.last_run_id = run_id
-        row.updated_at = ctx.now
-        if w.forced:
-            row.updated_by = ctx.triggered_by
-    await ctx.db.flush()
 
 
 # ── 提交包装（路由与事件 handler 共用）────────────────────────────────────────
@@ -942,47 +989,9 @@ async def run_and_commit(
     force_addr_ids: Iterable[str] = (),
 ) -> RunResult:
     """执行并提交；dry_run 只回滚不提交。"""
-    try:
-        result = await run(
-            db, project_id=project_id, year=year, trigger=trigger, triggered_by=triggered_by,
-            wp_id=wp_id, codes=codes, dry_run=dry_run, force_addr_ids=force_addr_ids,
-        )
-        if dry_run:
-            await db.rollback()
-        else:
-            await db.commit()
-    except Exception as exc:
-        await db.rollback()
-        if not dry_run and not isinstance(exc, PushActionError):
-            await _record_failure(db, project_id=project_id, year=year, trigger=trigger,
-                                  triggered_by=triggered_by, error=exc)
-        raise
-    if not dry_run and result.run_id is not None:
-        _broadcast(result)
-    return result
+    return await _execute_and_commit(
+        run, PushActionError, db, project_id=project_id, year=year, trigger=trigger,
+        triggered_by=triggered_by, wp_id=wp_id, codes=codes,
+        dry_run=dry_run, force_addr_ids=force_addr_ids,
+    )
 
-
-async def _record_failure(
-    db, *, project_id: UUID, year: int, trigger: str, triggered_by: UUID | None, error: BaseException,
-) -> None:
-    """失败运行记录（面板可见降级）。"""
-    now = datetime.now(timezone.utc)
-    try:
-        db.add(FormulaPushRun(
-            id=uuid.uuid4(), project_id=project_id, year=year, trigger_source=trigger,
-            triggered_by=triggered_by, status="failed", started_at=now, finished_at=now,
-            detail={"error": f"{type(error).__name__}: {error}"[:2000]},
-        ))
-        await db.commit()
-    except Exception:  # noqa: BLE001 — 记录失败本身不能掩盖原始异常
-        logger.exception("formula_push: 失败运行记录写入失败 project=%s year=%s", project_id, year)
-        await db.rollback()
-
-
-def _broadcast(result: RunResult) -> None:
-    try:
-        from app.services.event_bus import event_bus
-
-        event_bus.broadcast_raw(SSE_EVENT, result.summary())
-    except Exception:  # noqa: BLE001 — SSE 是提交后的通知，失败不影响已落库数据
-        logger.warning("formula_push: SSE 广播失败 project=%s", result.project_id, exc_info=True)

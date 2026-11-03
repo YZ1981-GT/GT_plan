@@ -165,7 +165,7 @@ async def states(
     if state is not None and state not in PUSH_STATES:
         raise HTTPException(status_code=400, detail=f"未知状态 {state}（可选：{'、'.join(PUSH_STATES)}）")
     rows = await panel.list_states(db, project_id=project_id, year=year, state=state, wp_code=wp_code)
-    return {"states": [panel.state_view(r) for r in rows]}
+    return {"states": [panel.state_view(r, allowed_project_ids={project_id}) for r in rows]}
 
 
 @router.post("/states/adopt")
@@ -201,7 +201,7 @@ async def lock(
     except engine.PushActionError as exc:
         await db.rollback()
         raise _bad_request(exc) from exc
-    return {"states": [panel.state_view(r) for r in rows]}
+    return {"states": [panel.state_view(r, allowed_project_ids={project_id}) for r in rows]}
 
 
 # ── 运行历史与逐项明细（按 run 批次筛选 skip/failed）──────────────

@@ -132,6 +132,38 @@ def is_standard_wp_code(wp_code: str) -> bool:
     return bool(STANDARD_WP_CODE_RE.search((wp_code or "").strip()))
 
 
+# ─── 索引命名空间（T31：外部模块的中文标签与下一步） ─────────────────────────
+
+def index_namespaces() -> dict[str, dict]:
+    """返回 grammar_v1.json 的 index_namespaces（唯一来源，调用方不得自带副本）。"""
+    return _grammar.get("index_namespaces", {})
+
+
+def external_namespace_names() -> list[str]:
+    """标了 external_module 的命名空间名（大小写同 grammar 原文）。"""
+    return [k for k, v in index_namespaces().items() if v.get("external_module")]
+
+
+def external_namespace_meta(ns: str) -> Optional[dict]:
+    """按命名空间名取外部模块元数据（大小写不敏感）。
+
+    返回 ``{"name", "label_zh", "next_step_zh"}``；非外部模块或未登记返回 None。
+    `label_zh` / `next_step_zh` 缺失时返回空串，由调用方按「缺文案即红」的守卫兜住
+    （`backend/tests/acnr/test_external_namespace_reasons.py`），不在此处编造默认值。
+    """
+    if not ns:
+        return None
+    target = ns.strip().lower()
+    for name, meta in index_namespaces().items():
+        if name.lower() == target and meta.get("external_module"):
+            return {
+                "name": name,
+                "label_zh": meta.get("label_zh") or "",
+                "next_step_zh": meta.get("next_step_zh") or "",
+            }
+    return None
+
+
 # ─── formula_ref ↔ URI 互转 (R10.3, 无损往返) ────────────────────────────────
 #
 # 这是 ACNR grammar 层的互转入口，WP/PREV 委托 parse_wp_formula() 结构化解析。

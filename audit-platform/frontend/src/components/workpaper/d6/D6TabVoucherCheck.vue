@@ -109,46 +109,52 @@
   <!-- (1) 本期增减变动检查 -->
   <div class="check-block">
     <h4 class="card-title">(1) 本期增减变动检查</h4>
-    <el-table :data="block1Rows" size="small" border stripe max-height="460" style="width:100%">
+    <el-table :data="block1Rows" size="small" border stripe :row-class-name="voucherRowClass" max-height="460" style="width:100%">
       <el-table-column label="客户名称" min-width="120" fixed>
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.customerName" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'customerName', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.customerName" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'customerName', v)" />
           <span v-else>{{ row.customerName || '-' }}</span>
+        </template>
+      </el-table-column>
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
         </template>
       </el-table-column>
       <el-table-column label="日期" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.date" size="small" placeholder="yyyy-mm-dd" @change="(v: string) => updateSampleCell(1, row.rowId, 'date', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.date" size="small" placeholder="yyyy-mm-dd" @change="(v: string) => updateSampleCell(1, row.rowId, 'date', v)" />
           <span v-else>{{ row.date || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="凭证编号" width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'voucherNo', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.voucherNo" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'voucherNo', v)" />
           <span v-else>{{ row.voucherNo || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="对方科目" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterAccount" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'counterAccount', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.counterAccount" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'counterAccount', v)" />
           <span v-else>{{ row.counterAccount || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="对方明细科目" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterDetail" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'counterDetail', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.counterDetail" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'counterDetail', v)" />
           <span v-else>{{ row.counterDetail || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="合同金额" width="110" align="right">
         <template #default="{ row }">
-          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateSampleCell(1, row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="!rowReadonly(row)" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateSampleCell(1, row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="发票/核实文件" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.supportDoc" size="small" placeholder="发票号/合同编号" @change="(v: string) => updateSampleCell(1, row.rowId, 'supportDoc', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.supportDoc" size="small" placeholder="发票号/合同编号" @change="(v: string) => updateSampleCell(1, row.rowId, 'supportDoc', v)" />
           <span v-else>{{ row.supportDoc || '-' }}</span>
         </template>
       </el-table-column>
@@ -158,7 +164,7 @@
           <el-tooltip content="①记账凭证与原始凭证核对" placement="top"><span>①</span></el-tooltip>
         </template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check1 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(1, row.rowId, 'check1')">{{ row.check1 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check1 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(1, row.rowId, 'check1')">{{ row.check1 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="②合同" width="52" align="center">
@@ -166,7 +172,7 @@
           <el-tooltip content="②合同/协议存在性" placement="top"><span>②</span></el-tooltip>
         </template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check2 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(1, row.rowId, 'check2')">{{ row.check2 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check2 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(1, row.rowId, 'check2')">{{ row.check2 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="③履约" width="52" align="center">
@@ -174,7 +180,7 @@
           <el-tooltip content="③履约进度是否恰当" placement="top"><span>③</span></el-tooltip>
         </template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check3 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(1, row.rowId, 'check3')">{{ row.check3 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check3 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(1, row.rowId, 'check3')">{{ row.check3 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="④计量" width="52" align="center">
@@ -182,7 +188,7 @@
           <el-tooltip content="④计量是否准确" placement="top"><span>④</span></el-tooltip>
         </template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check4 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(1, row.rowId, 'check4')">{{ row.check4 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check4 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(1, row.rowId, 'check4')">{{ row.check4 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="⑤分类" width="52" align="center">
@@ -190,12 +196,12 @@
           <el-tooltip content="⑤分类是否正确" placement="top"><span>⑤</span></el-tooltip>
         </template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check5 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(1, row.rowId, 'check5')">{{ row.check5 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check5 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(1, row.rowId, 'check5')">{{ row.check5 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="索引号" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'indexRef', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.indexRef" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'indexRef', v)" />
           <span v-else>{{ row.indexRef || '-' }}</span>
         </template>
       </el-table-column>
@@ -207,13 +213,13 @@
       </el-table-column>
       <el-table-column label="备注" min-width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'remark', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.remark" size="small" @change="(v: string) => updateSampleCell(1, row.rowId, 'remark', v)" />
           <span v-else>{{ row.remark || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button type="danger" text size="small" @click="removeSample(1, row.rowId)">删</el-button>
+          <el-button type="danger" text size="small" :disabled="isVoucherRowLocked(row)" @click="removeSample(1, row.rowId)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -223,28 +229,34 @@
   <!-- (2) 期后结算检查 -->
   <div class="check-block">
     <h4 class="card-title">(2) 期后结算检查</h4>
-    <el-table :data="block2Rows" size="small" border stripe max-height="420" style="width:100%">
+    <el-table :data="block2Rows" size="small" border stripe :row-class-name="voucherRowClass" max-height="420" style="width:100%">
       <el-table-column label="客户名称" min-width="120" fixed>
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.customerName" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'customerName', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.customerName" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'customerName', v)" />
           <span v-else>{{ row.customerName || '-' }}</span>
+        </template>
+      </el-table-column>
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
         </template>
       </el-table-column>
       <el-table-column label="日期" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.date" size="small" placeholder="yyyy-mm-dd" @change="(v: string) => updateSampleCell(2, row.rowId, 'date', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.date" size="small" placeholder="yyyy-mm-dd" @change="(v: string) => updateSampleCell(2, row.rowId, 'date', v)" />
           <span v-else>{{ row.date || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="凭证编号" width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'voucherNo', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.voucherNo" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'voucherNo', v)" />
           <span v-else>{{ row.voucherNo || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="对方科目" width="130">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterAccount" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'counterAccount', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.counterAccount" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'counterAccount', v)" />
           <template v-else>
             <span>{{ row.counterAccount || '-' }}</span>
             <GtIndexChip v-if="row.counterAccount && row.counterAccount.includes('主营业务收入')" value="wp:D4" :context-project-id="projectId" style="margin-left:4px" />
@@ -253,13 +265,13 @@
       </el-table-column>
       <el-table-column label="贷方金额" width="120" align="right">
         <template #default="{ row }">
-          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateSampleCell(2, row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="!rowReadonly(row)" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateSampleCell(2, row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="支持性文件" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.supportDoc" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'supportDoc', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.supportDoc" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'supportDoc', v)" />
           <span v-else>{{ row.supportDoc || '-' }}</span>
         </template>
       </el-table-column>
@@ -267,36 +279,36 @@
       <el-table-column label="①" width="44" align="center">
         <template #header><el-tooltip content="①记账凭证核对" placement="top"><span>①</span></el-tooltip></template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check1 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(2, row.rowId, 'check1')">{{ row.check1 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check1 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(2, row.rowId, 'check1')">{{ row.check1 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="②" width="44" align="center">
         <template #header><el-tooltip content="②合同/协议存在性" placement="top"><span>②</span></el-tooltip></template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check2 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(2, row.rowId, 'check2')">{{ row.check2 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check2 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(2, row.rowId, 'check2')">{{ row.check2 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="③" width="44" align="center">
         <template #header><el-tooltip content="③履约进度恰当" placement="top"><span>③</span></el-tooltip></template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check3 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(2, row.rowId, 'check3')">{{ row.check3 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check3 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(2, row.rowId, 'check3')">{{ row.check3 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="④" width="44" align="center">
         <template #header><el-tooltip content="④计量准确" placement="top"><span>④</span></el-tooltip></template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check4 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(2, row.rowId, 'check4')">{{ row.check4 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check4 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(2, row.rowId, 'check4')">{{ row.check4 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="⑤" width="44" align="center">
         <template #header><el-tooltip content="⑤分类正确" placement="top"><span>⑤</span></el-tooltip></template>
         <template #default="{ row }">
-          <span class="check-dot" :class="row.check5 === '✓' ? 'on' : ''" @click="!isReadonly && toggleCheck(2, row.rowId, 'check5')">{{ row.check5 === '✓' ? '✓' : '' }}</span>
+          <span class="check-dot" :class="row.check5 === '✓' ? 'on' : ''" @click="!rowReadonly(row) && toggleCheck(2, row.rowId, 'check5')">{{ row.check5 === '✓' ? '✓' : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="索引号" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'indexRef', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.indexRef" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'indexRef', v)" />
           <span v-else>{{ row.indexRef || '-' }}</span>
         </template>
       </el-table-column>
@@ -308,13 +320,13 @@
       </el-table-column>
       <el-table-column label="备注" min-width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'remark', v)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.remark" size="small" @change="(v: string) => updateSampleCell(2, row.rowId, 'remark', v)" />
           <span v-else>{{ row.remark || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button type="danger" text size="small" @click="removeSample(2, row.rowId)">删</el-button>
+          <el-button type="danger" text size="small" :disabled="isVoucherRowLocked(row)" @click="removeSample(2, row.rowId)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -383,11 +395,11 @@
   <GtVoucherSamplingEngine
     v-if="showSamplingDialog"
     :account-code="samplingAccountCode"
-    phase="final"
     :workpaper-id="props.wpId"
     :project-id="props.projectId"
     :year="samplingYear"
     @filled="onSampleFilled"
+    @undo-request="onUndoRequest"
     @close="showSamplingDialog = false"
   />
 </div>
@@ -401,7 +413,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * 凭证级检查表：双区块(本期+期后) + 5项核对结果(点选色块) + 检查比例汇总
  * 对齐源模板结构：客户/日期/凭证/对方科目/明细/金额/核实文件 + ①②③④⑤核对 + 索引/异常/备注
  */
-import { computed, ref, inject, toRef, type Ref } from 'vue'
+import { computed, ref, inject, toRef, onMounted, type Ref } from 'vue'
 import { useD6Inspection } from '../composables/useD6Inspection'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
 import type { ChecklistResponse } from '../composables/useD6FormData'
@@ -411,7 +423,8 @@ import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
-import { partyNameForColumn } from '../composables/shared/samplingPartyTarget'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 
 /**
  * 抽凭科目码取自单一真源 `dCycleAccountScope`（D6 合同资产）。
@@ -426,6 +439,7 @@ import {
 import { dSlotQueryCodes, pickDTbSourceCodes } from '../composables/dCycleAccountScope'
 import { ElMessage } from 'element-plus'
 import { dCycleScope } from '../composables/dCycleAccountScope'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = dCycleScope('D6')?.queryCodes().join(',') ?? ''
@@ -470,13 +484,23 @@ const {
   samplingParams, block1Rows, block2Rows,
   addSample, removeSample, updateSampleCell,
   checkRatioSummary, auditNotes,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass, isVoucherRowLocked, voucherFillReady,
 } = useD6Inspection({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+  isReadonly: () => props.isReadonly,
+  // 挂凭导入按凭证日期分区：晚于资产负债表日进区块(2)
+  bsDate: () => (props.year ? `${props.year}-12-31` : null),
 })
+onMounted(() => { void voucherFillReady() })
+
+/** 本行只读：整张底稿只读，或年审阶段的预审行 */
+function rowReadonly(row: unknown): boolean {
+  return props.isReadonly || isVoucherRowLocked(row as never)
+}
 
 const sampleCount = computed(() => block1Rows.value.length + block2Rows.value.length)
 
@@ -521,67 +545,22 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, D6_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any) {
+/**
+ * 抽凭引擎回填：共享回填函数写进区块(1)（已在区块(2)的分录不重复插入），按分录指纹去重；
+ * 对方科目只按后端配对结果（配不上的整张凭证标「多科目」），不再前端按对方分录展开、翻转金额。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const samples: any[] = payload?.samples || []
-  if (samples.length === 0) return
-  const existingNos = new Set(block1Rows.value.map(r => r.voucherNo).filter(Boolean))
-  const mapped = samples
-    .filter((s: any) => s.voucherNo && !existingNos.has(s.voucherNo))
-    .flatMap((s: any) => {
-      const base = {
-        customerName: partyNameForColumn(s, 'customer'),
-        date: s.voucherDate || '',
-        voucherNo: s.voucherNo || '',
-        businessContent: s.summary || '',
-        supportDoc: '',
-        check1: '', check2: '', check3: '', check4: '', check5: '',
-        indexRef: '',
-        isAbnormal: '否',
-        remark: '',
-      }
-      const entries = s.voucherEntries || []
-      const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
-      if (isMulti) {
-        const sDebit = Number(s.debitAmount ?? 0)
-        const counterEntries = entries.filter((e: any) => {
-          if (sDebit > 0) return e.credit_amount && Number(e.credit_amount) > 0
-          return e.debit_amount && Number(e.debit_amount) > 0
-        })
-        const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
-        return entriesToWrite.map((e: any) => ({
-          rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-          ...base,
-          businessContent: e.summary || s.summary || '',
-          counterAccount: e.account_code || '',
-          counterDetail: e.account_name || '',
-          debitAmount: Number(e.debit_amount) || 0,
-          creditAmount: Number(e.credit_amount) || 0,
-        }))
-      }
-      return [{
-        rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-        ...base,
-        counterAccount: s.counterpartAccount || '',
-        counterDetail: s.counterpartAccountName || '',
-        debitAmount: s.debitAmount || 0,
-        creditAmount: s.creditAmount || 0,
-      }]
-    })
-  if (mapped.length > 0) {
-    block1Rows.value = [...block1Rows.value, ...mapped]
-    // Persist block1 rows
-    props.debouncedSave('D6-6-block1-rows', { remark: JSON.stringify(block1Rows.value) })
-  }
-  showSamplingDialog.value = false
+  void persistMethodology(payload?.methodology)
+  if (!(payload?.samples ?? []).length) return
+  const out = await onEngineFilled(payload, { tables: ['block1'] })
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ─── 核对结果切换(点选色块) ───────────────────────────────────────────

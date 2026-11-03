@@ -27,7 +27,7 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import all_, and_, any_, false, or_, true
+from sqlalchemy import String, all_, and_, any_, false, func, literal, not_, or_, true
 from sqlalchemy import Column
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -36,6 +36,74 @@ from sqlalchemy.sql.elements import ColumnElement
 # param_sql_builder / QueryOrchestrator 三处各维护副本导致漂移。
 # ─────────────────────────────────────────────────────────────────────────────
 from app.services.custom_query.table_whitelist import OPERATOR_WHITELIST
+
+#: LIKE 的转义字符（``escape_like`` 与 ``ESCAPE`` 子句同一个，PG 与 SQLite 同形）
+LIKE_ESCAPE = "\\"
+
+#: 只供注册表旧筛选键使用的内部算子（不进 OPERATOR_WHITELIST，用户条件仍只认白名单，ADR-AQL-03）
+INTERNAL_OPERATORS = frozenset({"prefix", "nonempty"})
+
+#: 「空白」字符集 = ECMAScript ``String.prototype.trim()`` 认的 25 个码点（与 C24 的 JS ``trim()`` 同一字符集）：
+#: Unicode Zs 17 个 + TAB / LF / VT / FF / CR + U+2028 / U+2029 + U+FEFF
+BLANK_CHARS = (
+    "\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000"
+    "\u0009\u000a\u000b\u000c\u000d\u2028\u2029\ufeff"
+)
+
+
+def escape_like(value: Any) -> str:
+    """把用户值里的 ``\\`` ``%`` ``_`` 转义为字面字符（配合 ``ESCAPE '\\'``）。"""
+    return str(value).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _prefix_predicate(col: Column, value: Any) -> ColumnElement:
+    """字面前缀匹配；用户提供的 LIKE 元字符先转义，只追加实现自己的末尾通配符。"""
+    return col.like(f"{escape_like(value)}%", escape=LIKE_ESCAPE)
+
+
+def _weekday_predicate(col: Column, value: Any) -> ColumnElement:
+    """按星期筛日期列；0=周日，1..6=周一至周六，全部值保持绑定参数。"""
+    try:
+        py_type = col.type.python_type
+    except (NotImplementedError, AttributeError):
+        py_type = None
+    if py_type not in (_dt.date, _dt.datetime):
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": "WEEKDAY_FIELD_INVALID", "message": "星期条件只能用于日期字段"},
+        )
+    valid = (
+        isinstance(value, (list, tuple))
+        and 1 <= len(value) <= 7
+        and all(type(item) is int and 0 <= item <= 6 for item in value)
+        and len(set(value)) == len(value)
+    )
+    if not valid:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "INVALID_WEEKDAY_VALUE",
+                "message": "星期条件要求 1 至 7 个不重复的 0 至 6 整数（0 表示周日）",
+            },
+        )
+    return func.extract("dow", col).in_(list(value))
+
+
+def _blank_predicate(col: Column) -> ColumnElement:
+    """「为空或空白」：``col IS NULL OR trim(col, :blank_chars) = ''``（PG 16 与 SQLite 同形）。
+
+    只含空白的值也算「没有」是有意的（与 C24 规则 13 的 ``!summary || summary.trim() === ''`` 同一判断）。
+    """
+    try:
+        py_type = col.type.python_type
+    except (NotImplementedError, AttributeError):
+        py_type = None
+    if py_type is not str:
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": "BLANK_FIELD_INVALID", "message": "「为空或空白」只能用于文本字段"},
+        )
+    return or_(col.is_(None), func.trim(col, literal(BLANK_CHARS, String)) == "")
 
 
 def coerce_value(col: Column, value: Any) -> Any:
@@ -197,17 +265,25 @@ def build_filter(col: Column, op: str, value: Any) -> ColumnElement:
         hi = coerce_value(col, value[1])
         return col.between(lo, hi)
 
-    # ── IS NULL / IS NOT NULL（忽略 value）──
+    if op == "weekday_in":
+        return _weekday_predicate(col, value)
+
+    # ── 无值算子（忽略 value）──
     if op == "is_null":
         return col.is_(None)
     if op == "is_not_null":
         return col.isnot(None)
+    if op == "is_blank":
+        return _blank_predicate(col)
 
-    # ── LIKE / NOT LIKE（强制字符串语义，不 coerce）──
+    # ── LIKE / NOT LIKE / 字面前缀（强制字符串语义，不 coerce）──
+    # 用户输入里的 % _ \ 按字面匹配（R6.2）：改造前「包含 50%_」会把 % _ 当通配符
     if op == "like":
-        return col.like(f"%{value}%")
+        return col.like(f"%{escape_like(value)}%", escape=LIKE_ESCAPE)
     if op == "not_like":
-        return col.notlike(f"%{value}%")
+        return col.notlike(f"%{escape_like(value)}%", escape=LIKE_ESCAPE)
+    if op == "starts_with":
+        return _prefix_predicate(col, value)
 
     # ── 标量比较：eq / neq / gt / gte / lt / lte ──
     coerced = coerce_value(col, value)
@@ -229,6 +305,49 @@ def build_filter(col: Column, op: str, value: Any) -> ColumnElement:
         status_code=400,
         detail={"error_code": "OP_NOT_IMPLEMENTED", "message": f"操作符 {op} 未实现"},
     )
+
+
+def build_portable_filter(col: Column, op: str, value: Any, *, allow_internal: bool = False) -> ColumnElement:
+    """方言中立的单条谓词：业务视图条件、旧筛选键与构建器条件共用（R12.2，ADR-AQL-03）。
+
+    - ``in`` / ``not_in``：``in_`` / ``notin_``（SQLAlchemy 2.x expanding bindparam，asyncpg 下同样参数化），
+      空集合恒假 / 恒真、不报错（R10.3）——构建器端点测试在 SQLite 上真实执行，SQLite 没有 ``ANY``。
+    - ``prefix`` / ``nonempty``：只供注册表旧筛选键（``allow_internal=True``）。``prefix`` 与用户
+      ``starts_with`` 共用 :func:`_prefix_predicate`；``nonempty`` 值为真 = 非「为空或空白」，为假 =
+      「为空或空白」，与用户 ``is_blank`` 共用 :func:`_blank_predicate`。
+    - 其余算子委托 :func:`build_filter`（含白名单校验：用户条件只认 ``OPERATOR_WHITELIST``）。
+    """
+    if op in INTERNAL_OPERATORS:
+        if not allow_internal:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "OP_NOT_ALLOWED",
+                    "message": f"操作符 '{op}' 不在白名单中",
+                    "allowed_ops": sorted(OPERATOR_WHITELIST),
+                },
+            )
+        if op == "prefix":
+            return _prefix_predicate(col, value)
+        blank = _blank_predicate(col)
+        return not_(blank) if _truthy(value) else blank
+    if op in ("in", "not_in"):
+        if not isinstance(value, (list, tuple)):
+            raise HTTPException(
+                status_code=400,
+                detail={"error_code": "INVALID_IN_VALUE", "message": f"{op} 操作符要求 value 为数组"},
+            )
+        coerced = [coerce_value(col, v) for v in value]
+        if not coerced:
+            return false() if op == "in" else true()
+        return col.in_(coerced) if op == "in" else col.notin_(coerced)
+    return build_filter(col, op, value)
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes")
+    return bool(value)
 
 
 class ParamSQLBuilder:

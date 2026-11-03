@@ -15,6 +15,7 @@
  * 比照 useG2InterestCalc / useG4MainAdjustment
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
@@ -813,6 +814,15 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
       ElMessage.error('G4-4 回写失败')
     }
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   // ─── 生命周期清理 ───
   onBeforeUnmount(() => {

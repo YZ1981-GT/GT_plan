@@ -188,6 +188,12 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK5SyncPayload, K5_NOTE_SECTION } from '../../composables/k5NoteSectionMap'
+import {
+  applyK5ProvisionAutoFill,
+  k5DisclosureSyncRows,
+  loadK5DisclosureState,
+  type K5ListedProvisionRow,
+} from '../../composables/k5DisclosureTabState'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 // 🔴 科目码走单一真源，原硬编码 '2701'（长期应付款）—— 预计负债是 '2801'。
 //    与 K5TabAdjudication 的 substantive:adjudicated 事件口径必须一致，否则附注静默失同步。
@@ -212,17 +218,7 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface ProvisionRow {
-  id: string
-  category: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  endBalance: number
-  remark: string
-  isTotal: boolean
-  isAutoFill: boolean
-}
+type ProvisionRow = K5ListedProvisionRow
 
 interface ContingentItem {
   id: string
@@ -249,16 +245,13 @@ const policyPlaceholder = `企业对预计负债的确认条件和计量方法�
 
 // ─── Init/Load ───────────────────────────────────────────────────────────────
 
+// 预计负债表的读回 / 默认分类 / 自动取数 / 同步行与附注页离屏同步共用（k5DisclosureTabState，spec note-pull-followup-closure R1）
+
 function loadSavedData(): void {
   // 从 allResponses 恢复持久化数据
-  const saved = props.allResponses.get('K5-disclosure-listed-provision-table')
-  if (saved?.remark) {
-    try {
-      provisionTable.value = JSON.parse(saved.remark)
-    } catch { initDefaultTable() }
-  } else {
-    initDefaultTable()
-  }
+  const saved = loadK5DisclosureState(props.allResponses, 'listed', () => newRowIdentity('row'))
+  provisionTable.value = saved.rows
+  if (saved.narrative != null) narrativeText.value = saved.narrative
 
   const savedContingent = props.allResponses.get('K5-disclosure-listed-contingent')
   if (savedContingent?.remark) {
@@ -267,43 +260,10 @@ function loadSavedData(): void {
     } catch { contingentItems.value = [] }
   }
 
-  const savedNarrative = props.allResponses.get('K5-disclosure-listed-narrative')
-  if (savedNarrative?.remark) {
-    narrativeText.value = savedNarrative.remark
-  }
-
   const savedPolicy = props.allResponses.get('K5-disclosure-listed-policy')
   if (savedPolicy?.remark) {
     policyNarrative.value = savedPolicy.remark
   }
-}
-
-function initDefaultTable(): void {
-  const categories = ['产品质量保证', '未决诉讼', '亏损合同', '重组义务', '弃置义务', '其他']
-  provisionTable.value = [
-    ...categories.map((cat, idx) => ({
-      id: newRowIdentity('row'),
-      category: cat,
-      beginBalance: 0,
-      increase: 0,
-      decrease: 0,
-      endBalance: 0,
-      remark: '',
-      isTotal: false,
-      isAutoFill: false,
-    })),
-    {
-      id: 'row-total',
-      category: '合计',
-      beginBalance: 0,
-      increase: 0,
-      decrease: 0,
-      endBalance: 0,
-      remark: '',
-      isTotal: true,
-      isAutoFill: false,
-    },
-  ]
 }
 
 /**
@@ -311,36 +271,8 @@ function initDefaultTable(): void {
  * 当 substantive:adjudicated 事件触发时，重新获取最新数据填充。
  */
 function applyAutoFill(): void {
-  // 读取跨sheet审定数据（来自K5-1审定表保存的allResponses）
-  const adjTotal = props.allResponses.get('K5-1-audited-total')
-  if (adjTotal?.remark) {
-    hasAutoData.value = true
-    try {
-      const data = JSON.parse(adjTotal.remark)
-      // 将审定表各类型的审定数据回填到附注表
-      if (data && typeof data === 'object') {
-        for (const row of provisionTable.value) {
-          if (!row.isTotal && data[row.category]) {
-            const d = data[row.category]
-            row.beginBalance = Number(d.beginBalance ?? 0)
-            row.increase = Number(d.increase ?? 0)
-            row.decrease = Number(d.decrease ?? 0)
-            row.endBalance = Number(d.endBalance ?? 0)
-            row.isAutoFill = true
-          }
-        }
-        // 更新合计行
-        const totalRow = provisionTable.value.find(r => r.isTotal)
-        if (totalRow) {
-          const dataRows = provisionTable.value.filter(r => !r.isTotal)
-          totalRow.beginBalance = dataRows.reduce((s, r) => s + r.beginBalance, 0)
-          totalRow.increase = dataRows.reduce((s, r) => s + r.increase, 0)
-          totalRow.decrease = dataRows.reduce((s, r) => s + r.decrease, 0)
-          totalRow.endBalance = dataRows.reduce((s, r) => s + r.endBalance, 0)
-        }
-      }
-    } catch { /* silent */ }
-  }
+  // 读取跨sheet审定数据（来自K5-1审定表保存的allResponses），回填到附注表并重算合计行
+  if (applyK5ProvisionAutoFill(provisionTable.value, props.allResponses)) hasAutoData.value = true
 
   // 从 K5-2 明细表筛选 或有负债披露项（可能性=possible → disclose）
   const detailData = props.allResponses.get('K5-2-detail-rows')
@@ -462,13 +394,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   // 附注 五、50 只有「期末余额 / 上年年末余额 / 形成原因」三个值列（预设 F50-1/2/3）；
   // 底稿 roll-forward 的本期增加/减少不进附注列，`remark`（变动说明）落 `形成原因`。
-  const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({
-    project: r.category,
-    endAmount: r.endBalance ?? 0,
-    priorAmount: r.beginBalance ?? 0,
-    reason: r.remark ?? '',
-  }))
-  const payload = buildK5SyncPayload('listed', props.wpId || '', rows, narrativeText.value)
+  const payload = buildK5SyncPayload('listed', props.wpId || '', k5DisclosureSyncRows(provisionTable.value, 'listed'), narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {

@@ -35,6 +35,7 @@ async def list_staff(
     title: str | None = Query(None),
     status: str | None = Query(None),
     project_id: str | None = Query(None),
+    unbound_only: bool = Query(False, description="只列未绑定登录账号的人员（用户管理页绑定人员档案用）"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -42,7 +43,10 @@ async def list_staff(
 ):
     svc = StaffService(db)
     pid = UUID(project_id) if project_id else None
-    items, total = await svc.list_staff(search, department, partner_name, title, status, pid, offset, limit)
+    items, total = await svc.list_staff(
+        search, department, partner_name, title, status, pid, offset, limit,
+        unbound_only=unbound_only,
+    )
     return StaffListResponse(
         items=[StaffResponse.model_validate(s) for s in items],
         total=total,
@@ -222,46 +226,25 @@ async def get_my_staff_id(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """获取当前登录用户关联的 staff_member ID"""
-    from app.models.staff_models import StaffMember
-    import sqlalchemy as sa
+    """获取当前登录用户关联的人员档案 ID。
 
-    result = await db.execute(
-        sa.select(StaffMember).where(
-            StaffMember.user_id == user.id,
-            StaffMember.is_deleted == False,
-        )
+    按姓名自动关联只认唯一、未绑定、未离职且不在项目团队中的同名档案（spec
+    batch-project-authorization-and-lock-hardening R6.6）：原先会把已绑定他人的同名档案改绑到当前账号，
+    当前账号由此获得对方的委派权限。不满足条件时 409，提示联系管理员绑定；完全无同名档案才自动新建。
+    """
+    from app.services.staff_account_binding_service import (
+        audit_binding_change,
+        resolve_self_staff,
     )
-    staff = result.scalar_one_or_none()
-    if staff:
-        return {"staff_id": str(staff.id), "name": staff.name}
 
-    # 如果没有关联，尝试按用户名匹配
-    result = await db.execute(
-        sa.select(StaffMember).where(
-            StaffMember.name == user.username,
-            StaffMember.is_deleted == False,
-        )
-    )
-    staff = result.scalar_one_or_none()
-    if staff:
-        # 自动关联
-        staff.user_id = user.id
-        await db.commit()
-        return {"staff_id": str(staff.id), "name": staff.name}
-
-    # 都没找到，自动创建一条 custom 记录
-    from app.models.staff_models import StaffMember as SM
-    import uuid
-    new_staff = SM(
-        id=uuid.uuid4(),
-        user_id=user.id,
-        name=user.username,
-        source="custom",
-    )
-    db.add(new_staff)
+    result = await resolve_self_staff(db, user)
     await db.commit()
-    return {"staff_id": str(new_staff.id), "name": new_staff.name, "auto_created": True}
+    if result.get("auto_linked"):
+        await audit_binding_change(
+            user.id, action="user.staff_binding.bound", staff_id=result["staff_id"],
+            user_id=str(user.id), entrypoint="self_service_name_match",
+        )
+    return result
 
 
 @router.post("/import-excel")

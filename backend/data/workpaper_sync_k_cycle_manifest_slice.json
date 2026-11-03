@@ -1,4 +1,6 @@
 {
+  "current_projection_schema_version": "workpaper-sync-cycle-current-projection:v1",
+  "current_projection_ref": "backend/data/workpaper_sync_cycle_current_projection.json",
   "schema_version": "manifest-slice:v1",
   "task": "Task 53",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",

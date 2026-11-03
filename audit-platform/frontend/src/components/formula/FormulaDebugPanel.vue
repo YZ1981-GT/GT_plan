@@ -24,13 +24,18 @@
       <div class="gt-fd-value-bar" :class="{ 'gt-fd-ok': result.ok, 'gt-fd-error': !result.ok }">
         <span class="gt-fd-value-label">结果：</span>
         <span v-if="result.ok" class="gt-fd-value">{{ result.value ?? '—' }}</span>
-        <span v-else class="gt-fd-value gt-fd-error-text">{{ result.state === 'blocked' ? '⛔ 公式被拦截' : '❌ 执行失败' }}</span>
+        <span v-else class="gt-fd-value gt-fd-error-text">—</span>
         <el-tag :type="result.ok ? 'success' : 'danger'" size="small" style="margin-left: 8px;">
           {{ result.state }}
         </el-tag>
       </div>
 
       <!-- 错误信息 -->
+      <div v-if="failureReason(result)" class="gt-fd-errors" data-testid="formula-debug-failure-reason">
+        <div class="gt-fd-error-item">
+          <span style="color: var(--gt-color-danger);">⚠</span> 失败原因：{{ failureReason(result) }}
+        </div>
+      </div>
       <div v-if="result.errors?.length" class="gt-fd-errors">
         <div v-for="(err, i) in result.errors" :key="i" class="gt-fd-error-item">
           <span style="color: var(--gt-color-danger);">⚠</span> {{ err }}
@@ -80,12 +85,14 @@ import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import { formulaDebug } from '@/services/apiPaths/formula'
 import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 const props = defineProps<{
   /** 外部传入的公式文本（来自 FormulaEditDialog 的编辑区） */
   formula?: string
   projectId?: string
-  year?: number
+  /** 审计年度；项目没填为 null ⇒ 运行时在面板里提示去填 */
+  year?: number | null
   scope?: string
   /** 是否显示内置输入框（嵌入 FormulaEditDialog 时 = false，独立使用时 = true） */
   showInput?: boolean
@@ -108,7 +115,12 @@ const formula = computed(() => props.formula ?? localFormula.value)
 
 async function onRun() {
   const f = formula.value?.trim()
-  if (!f || !props.projectId || !props.year) return
+  if (!f || !props.projectId) return
+  if (props.year == null) {
+    // 项目没填审计年度：在面板里说明原因（原先静默不动，按钮像坏了）
+    result.value = { ok: false, state: 'error', errors: [MISSING_AUDIT_YEAR_MESSAGE], trace: [] }
+    return
+  }
 
   running.value = true
   result.value = null
@@ -134,6 +146,14 @@ async function onRun() {
   } finally {
     running.value = false
   }
+}
+
+function failureReason(value: any): string | null {
+  if (!value) return null
+  if (value.error) return String(value.error)
+  const errors = Array.isArray(value.errors) ? value.errors.filter(Boolean) : []
+  if (errors.length) return errors.join('；')
+  return value.ok === false ? '公式执行失败' : null
 }
 
 function isErrorStep(step: string) {

@@ -1,37 +1,56 @@
 /**
- * API 代理层 — 统一解包 + 类型安全
- * 
- * 用法：将页面中的 `import http from '@/utils/http'` 替换为 `import { api } from '@/services/apiProxy'`
- * 
- * 区别：
- * - http.get(url) 返回 AxiosResponse，需要 `const { data } = await http.get(url)`
- * - api.get(url) 直接返回业务数据，`const data = await api.get(url)`
- * 
- * 这样页面不再需要双层解包
+ * API 代理层：统一解包、类型安全与受控 GET single-flight。
  *
- * GET 请求 in-flight 共享：相同 URL 同时发起时返回同一个 Promise（避免 axios dedup 取消旧请求 + 重复网络）
+ * `http.get` 返回 AxiosResponse；`api.get` 返回已解包业务数据。只有可证明语义等价的 GET 才共享在途 producer；
+ * 每个调用者仍拿到自己的订阅 Promise，因此取消一个调用者不会取消其他调用者或底层请求。
+ * 共享规则（白名单、取消边界、身份代际、新鲜度屏障、后加入者拷贝）在 `utils/getSingleFlight`，与 utils/http 同一份；
+ * 本层有自己的在途表，生产者以 `_dedupe:false` 交给 http，不在 http 层再共享一次。
  */
 import http from '@/utils/http'
 import type { AxiosRequestConfig } from 'axios'
+import {
+  asAbortSignal,
+  canceledError,
+  copySharedData,
+  planSharedGet,
+  sharedGet,
+  standaloneGet,
+  type Flight,
+  type SharedGetConfig,
+} from '@/utils/getSingleFlight'
 
-const _inflightGet = new Map<string, Promise<any>>()
+type ProxyGetConfig = SharedGetConfig
 
-async function get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  // 仅对无 config 的纯 GET 启用共享（带 params/headers 时 key 不稳定不缓存）
-  const shouldShare = !config
-  if (shouldShare && _inflightGet.has(url)) {
-    return _inflightGet.get(url) as Promise<T>
+const _inflightGet = new Map<string, Flight<any>>()
+
+function createProducer<T>(url: string, config?: ProxyGetConfig): Promise<T> {
+  return http.get(url, config).then(({ data }) => data as T)
+}
+
+/**
+ * GET single-flight with a conservative allowlist. Unsafe configs remain
+ * independent and are explicitly passed to http with `_dedupe:false`.
+ */
+function get<T = any>(url: string, config?: ProxyGetConfig): Promise<T> {
+  const signal = asAbortSignal(config?.signal)
+  if (signal?.aborted) return Promise.reject(canceledError(config))
+  const plan = planSharedGet(url, config)
+  if (!plan) {
+    const standalone: ProxyGetConfig = { ...(config ?? {}), _dedupe: false }
+    return standaloneGet<T>(createProducer<T>(url, standalone), signal ?? undefined, config)
   }
-  const p = (async () => {
-    try {
-      const { data } = await http.get(url, config)
-      return data as T
-    } finally {
-      if (shouldShare) _inflightGet.delete(url)
-    }
-  })()
-  if (shouldShare) _inflightGet.set(url, p)
-  return p
+  return sharedGet<T>(
+    _inflightGet,
+    plan,
+    () => createProducer<T>(url, { ...plan.transport, _dedupe: false }),
+    copySharedData,
+    config,
+  )
+}
+
+/** Vitest only: make flight lifetime explicit between examples. */
+export function resetApiProxyInflightForTests(): void {
+  _inflightGet.clear()
 }
 
 async function post<T = any>(url: string, body?: any, config?: AxiosRequestConfig): Promise<T> {
@@ -54,9 +73,9 @@ async function del<T = any>(url: string, config?: AxiosRequestConfig): Promise<T
   return data as T
 }
 
-/** 下载文件（blob） */
+/** 下载永远独立发送：Blob 预览/下载不共享在途（每次点击都是一次真实下载）。 */
 async function download(url: string, filename: string): Promise<void> {
-  const response = await http.get(url, { responseType: 'blob' })
+  const response = await http.get(url, { responseType: 'blob', _dedupe: false } as ProxyGetConfig)
   const blob = new Blob([response.data])
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)

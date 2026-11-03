@@ -1,0 +1,12 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "impact-by-addr max_depth now honored",
+      "severity": "info",
+      "confidence": "possible",
+      "detail": "The read-only preview_impact(source_uri, max_depth) passes the query-param max_depth (default 3) through to BFS, whereas the old on_change write path ignored it and always used depth 5. Benign behavioral change worth noting; no action required."
+    }
+  ],
+  "reviewDoc": "d:\\GT_plan\\.kiro\\specs\\acnr-foundation-defect-closure\\review-p1.md"
+}

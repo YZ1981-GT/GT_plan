@@ -152,7 +152,8 @@ describe('P12 生产接线守卫', () => {
 
   it('批量预览类型含 warnings 与关系/口径字段', () => {
     const src = fs.readFileSync(path.resolve(__dirname, '../BatchImportDialog.vue'), 'utf-8')
-    expect(src).toContain('warnings?: BatchWarning[]')
+    const api = fs.readFileSync(path.resolve(__dirname, '../../../services/batchProjectImport.ts'), 'utf-8')
+    expect(api).toContain('warnings: BatchWarning[]')
     expect(src).toContain('data.relation')
     expect(src).toContain('data.consolidatedProjectId')
     expect(src).toContain('data.standaloneProjectId')

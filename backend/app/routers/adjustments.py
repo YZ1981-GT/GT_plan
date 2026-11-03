@@ -8,12 +8,14 @@
 - POST review 变更状态
 - GET  summary 汇总统计
 - GET  account-dropdown 科目下拉
-- GET  wp-summary/{wp_code} 底稿审定表数据
+- GET  wp-summary/{wp_code} 已退役（410）
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -21,11 +23,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.bulk_operations import BulkRequest, bulk_execute
+from app.core.bulk_operations import BulkRequest
 from app.core.database import get_db
 from app.core.field_selection import parse_fields, BLOCKED_FIELDS
 from app.core.pagination import PaginationParams
-from app.deps import get_current_user, check_consol_lock, require_project_access, require_project_permission, require_operation, get_user_scope_cycles
+from app.deps import check_consol_lock, require_project_access, require_project_permission, get_user_scope_cycles
 from app.models.core import User
 from app.models.audit_platform_models import (
     Adjustment,
@@ -43,7 +45,6 @@ from app.models.audit_platform_schemas import (
     AdjustmentSyncRequest,
     AdjustmentUpdate,
     ReviewStatusChange,
-    WPAdjustmentSummary,
 )
 from app.services.adjustment_service import AdjustmentService
 from app.services.adjustment_sync_service import AdjustmentSyncService, AdjustmentSyncError
@@ -69,164 +70,28 @@ async def _notify_affected_wp_assignees(
     data: "AdjustmentSyncRequest",
     adjustment_no: str,
     sender_user_id: UUID,
+    *,
+    account_codes: list[str] | None = None,
+    entry_group_id: UUID | None = None,
 ) -> None:
-    """底稿同步新分录后，按 line_items 科目反查其他底稿负责人推通知。
+    """底稿同步新分录后，按科目反查其他底稿负责人推通知（best-effort，异常不阻断）。
 
-    best-effort：任何异常静默跳过不阻断。
+    ``account_codes`` 传服务层解析后的标准科目（只填科目名称的行也能通知到）；未传时退回请求里的原始码。
+    实现见 ``adjustment_hall_notify.notify_sync_arrived``（映射表是唯一来源，排除来源底稿那一族与发送人）。
     """
-    import re
+    from app.services.adjustment_hall_notify import notify_sync_arrived
 
-    from app.models.workpaper_models import WorkingPaper, WpIndex
-    from app.services.notification_service import NotificationService
-    from app.services.wp_mapping_service import workpapers_for_account_codes
-
-    # 1~2. 分录科目 → 关联底稿（映射表是唯一来源）。🔴 原先自己拼路径读 app/data/ 下的两个 json（文件不在那里），
-    #      且把 {"mappings": [...]} 按列表取 ⇒ 映射恒空，从未通知过任何人（spec formula-fetch-followup R1.6）。
-    affected_wp_codes = set(workpapers_for_account_codes(
-        [li.standard_account_code or "" for li in data.line_items], include_parent=True,
-    ))
-    # 去掉源底稿自己那一族（如 K9 同步不提示 K9 / K9-1 / K9A）
-    def _family(code: str) -> str:
-        m = re.match(r"^([A-Z]\d+)", code)
-        return m.group(1) if m else code
-
-    source_wp_code = (data.source_wp_code or "").upper()
-    if source_wp_code:
-        affected_wp_codes = {w for w in affected_wp_codes if _family(w) != _family(source_wp_code)}
-    if not affected_wp_codes:
-        return
-
-    # 3. 查这些 wp_code 的 working_paper.assigned_to（底稿负责人）
-    q = (
-        sa.select(WpIndex.wp_code, WorkingPaper.assigned_to)
-        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
-        .where(
-            WpIndex.project_id == project_id,
-            WpIndex.wp_code.in_(list(affected_wp_codes)),
-            WorkingPaper.is_deleted == sa.false(),
-            WorkingPaper.assigned_to.isnot(None),
-        )
+    codes = account_codes if account_codes is not None else [li.standard_account_code or "" for li in data.line_items]
+    sent = await notify_sync_arrived(
+        db, project_id, source_wp_code=data.source_wp_code or "", account_codes=codes,
+        adjustment_no=adjustment_no, sender_user_id=sender_user_id,
+        entry_group_id=entry_group_id, year=getattr(data, "year", None),
     )
-    rows = (await db.execute(q)).all()
-    if not rows:
-        return
-
-    # 4. 去重+排除发送者自己
-    assignee_wp_map: dict[UUID, list[str]] = {}
-    for wp_code, assignee_id in rows:
-        if assignee_id and assignee_id != sender_user_id:
-            assignee_wp_map.setdefault(assignee_id, []).append(wp_code)
-
-    if not assignee_wp_map:
-        return
-
-    # 5. 推通知
-    ns = NotificationService(db)
-    for user_id, wp_codes in assignee_wp_map.items():
-        codes_str = "、".join(sorted(set(wp_codes))[:5])
-        await ns.send_notification(
-            user_id=user_id,
-            notification_type="adjustment_sync_arrived",
-            title=f"新调整分录 {adjustment_no} 涉及你负责的底稿",
-            content=f"来自 {source_wp_code or '未知'} 的调整分录涉及科目属于底稿 {codes_str}，建议在审定表中带入该调整。",
-            metadata={
-                "project_id": str(project_id),
-                "adjustment_no": adjustment_no,
-                "affected_wp_codes": list(set(wp_codes)),
-                "source_wp_code": source_wp_code,
-            },
-        )
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-
-
-# ---------------------------------------------------------------------------
-# 协作确认后回写源底稿（P1-6）
-# ---------------------------------------------------------------------------
-
-async def _writeback_to_source_workpaper(
-    db: AsyncSession,
-    project_id: UUID,
-    entry_group_id: UUID,
-    source_ref: str,
-) -> None:
-    """协作 confirm 后，把集中登记最新明细行写回源底稿的 checklist_responses。
-
-    source_ref 格式: '{wp_id}:{item_id}'。写回 item_id 对应的 remark 字段（JSON 数组）。
-    best-effort，失败不阻断。
-    """
-    from app.models.audit_platform_models import AdjustmentEntry, ChecklistResponse
-
-    if not source_ref or ":" not in source_ref:
-        return
-    wp_id_str, item_id = source_ref.split(":", 1)
-    try:
-        wp_id = UUID(wp_id_str)
-    except ValueError:
-        return
-
-    # 读取最新明细行
-    q = (
-        sa.select(AdjustmentEntry)
-        .where(
-            AdjustmentEntry.entry_group_id == entry_group_id,
-            AdjustmentEntry.is_deleted == sa.false(),
-        )
-        .order_by(AdjustmentEntry.line_no)
-    )
-    entries = (await db.execute(q)).scalars().all()
-    if not entries:
-        return
-
-    import json
-    # 构建底稿侧 JSON 行（对齐底稿 composable 的行模型）
-    rows = []
-    for e in entries:
-        rows.append({
-            "index": e.line_no,
-            "description": "",
-            "category": "",
-            "reportItem": "",
-            "accountName": e.account_name or "",
-            "noteItem": "",
-            "type": "AJE",  # 简化，底稿侧按 activeType 筛选
-            "debitAmount": float(e.debit_amount or 0),
-            "creditAmount": float(e.credit_amount or 0),
-            "standard_account_code": e.standard_account_code or "",
-            "refIndex": "",
-            "remark": "",
-        })
-    json_str = json.dumps(rows, ensure_ascii=False)
-
-    # 查找底稿项目 ID
-    from app.models.workpaper_models import WorkingPaper
-    wp_row = (await db.execute(
-        sa.select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
-    )).scalar_one_or_none()
-    if not wp_row:
-        return
-
-    # Upsert checklist_responses
-    existing = (await db.execute(
-        sa.select(ChecklistResponse).where(
-            ChecklistResponse.wp_id == wp_id,
-            ChecklistResponse.item_id == item_id,
-        )
-    )).scalar_one_or_none()
-
-    if existing:
-        existing.remark = json_str
-    else:
-        new_resp = ChecklistResponse(
-            wp_id=wp_id,
-            item_id=item_id,
-            project_id=project_id,
-            remark=json_str,
-        )
-        db.add(new_resp)
-    await db.flush()
+    if sent:
+        try:
+            await db.commit()
+        except Exception:  # noqa: BLE001
+            await db.rollback()
 
 
 router = APIRouter(
@@ -235,56 +100,13 @@ router = APIRouter(
 )
 
 
-async def _enrich_adjustment_list(db: AsyncSession, project_id: UUID, items: list[dict]) -> None:
-    """批量附加 creator_name + has_active_collaboration（P2 视图/筛选，fail-open 不阻断列表）。"""
-    from app.models.audit_platform_models import AdjustmentCollaboration
-    from app.models.staff_models import StaffMember
-    from app.services.adjustment_collaboration_service import ACTIVE_STATUSES
+async def _enrich_adjustment_list(
+    db: AsyncSession, project_id: UUID, items: list[dict], *, year: int | None = None,
+) -> None:
+    """列表富化：人员、协作、来源、错报与客户已入账投影。"""
+    from app.services.adjustment_list_enrich import enrich_adjustment_list
 
-    def _as_uuid(v):
-        try:
-            return UUID(str(v))
-        except Exception:
-            return None
-
-    group_ids = [g for g in (_as_uuid(it.get("entry_group_id")) for it in items) if g]
-    creator_raw = {it.get("created_by") for it in items if it.get("created_by")}
-    creator_ids = [g for g in (_as_uuid(c) for c in creator_raw) if g]
-
-    active_groups: set[str] = set()
-    if group_ids:
-        r = await db.execute(
-            sa.select(AdjustmentCollaboration.entry_group_id).where(
-                AdjustmentCollaboration.project_id == project_id,
-                AdjustmentCollaboration.entry_group_id.in_(group_ids),
-                AdjustmentCollaboration.status.in_(list(ACTIVE_STATUSES)),
-                AdjustmentCollaboration.is_deleted == sa.false(),
-            )
-        )
-        active_groups = {str(x) for x in r.scalars().all()}
-
-    name_map: dict[str, str] = {}
-    if creator_ids:
-        sr = await db.execute(
-            sa.select(StaffMember.user_id, StaffMember.staff_name).where(
-                StaffMember.user_id.in_(creator_ids),
-                StaffMember.is_deleted == sa.false(),
-            )
-        )
-        for uid, sname in sr.all():
-            if sname:
-                name_map[str(uid)] = sname
-        ur = await db.execute(
-            sa.select(User.id, User.username).where(User.id.in_(creator_ids))
-        )
-        for uid, uname in ur.all():
-            name_map.setdefault(str(uid), uname)
-
-    for it in items:
-        gid = it.get("entry_group_id")
-        it["has_active_collaboration"] = bool(gid and str(gid) in active_groups)
-        cb = it.get("created_by")
-        it["creator_name"] = name_map.get(str(cb)) if cb else None
+    await enrich_adjustment_list(db, project_id, items, year=year)
 
 
 @router.get("")
@@ -294,46 +116,65 @@ async def list_adjustments(
     adjustment_type: AdjustmentType | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
     origin: str | None = Query(None, description="来源筛选：manual（手工，含历史）/ workpaper（底稿汇聚）"),
+    search: str | None = Query(None, max_length=100, description="编号、摘要、科目编码或名称"),
+    account_code: str | None = Query(None),
+    amount_min: Decimal | None = Query(None, ge=0),
+    amount_max: Decimal | None = Query(None, ge=0),
+    created_by: UUID | None = Query(None),
+    reviewer_id: UUID | None = Query(None),
+    audit_phase: str | None = Query(None, pattern="^(preliminary|final)$"),
+    treatment_status: str | None = Query(None, pattern="^(include_in_working_tb|client_booked|client_booked_inactive|unadjusted_misstatement|pending)$"),
+    focus_entry_group_id: UUID | None = Query(None),
+    created_from: datetime | None = Query(None),
+    created_to: datetime | None = Query(None),
+    sort_by: str = Query("adjustment_no", pattern="^(adjustment_no|description|created_at|review_status|amount)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     fields: str | None = Query(None, description="逗号分隔的字段名，如 id,adjustment_no,description"),
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """分录列表（支持 type/status/origin 筛选，需项目成员权限）"""
+    """分录组服务端分页、搜索、筛选和稳定排序。"""
+    if amount_min is not None and amount_max is not None and amount_min > amount_max:
+        raise HTTPException(status_code=422, detail="最小金额不能大于最大金额")
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    allowed_codes: set[str] | None = None
+    if scope_cycles is not None:
+        try:
+            allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("调整分录按循环过滤：取循环科目失败 project=%s: %s", project_id, exc)
+            allowed_codes = set()
+
     svc = AdjustmentService(db)
     result = await svc.list_entries(
         project_id, year,
         adjustment_type=adjustment_type,
         review_status=review_status,
         origin=origin,
+        search=search,
+        account_code=account_code,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        created_by=created_by,
+        reviewer_id=reviewer_id,
+        audit_phase=audit_phase,
+        treatment_status=treatment_status,
+        focus_entry_group_id=focus_entry_group_id,
+        created_from=created_from,
+        created_to=created_to,
+        allowed_account_codes=allowed_codes,
+        sort_by=sort_by,
+        sort_order=sort_order,
         page=pagination.page, page_size=pagination.page_size,
     )
-
-    # scope_cycles 过滤：受限成员只看有效范围内循环对应科目的分录（空范围 ⇒ 空）。读不到循环对应的
-    # 科目时按「一个都不对应」处理 —— 原先异常即整段跳过 = 全部放行（spec procedure-trim-generation-
-    # delegation-chain 需求 5）
-    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
-    if scope_cycles is not None and isinstance(result, dict) and "items" in result:
-        try:
-            allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("调整分录按循环过滤：取循环科目失败 project=%s: %s", project_id, exc)
-            allowed_codes = set()
-        result["items"] = [
-            e for e in result["items"]
-            if any(
-                li.get("standard_account_code") in allowed_codes
-                for li in (e.get("line_items") or [])
-            )
-        ]
-        result["total"] = len(result["items"])
 
     # P2 增强：批量附加 creator_name（按人分组）+ has_active_collaboration（协作中筛选），fail-open
     if isinstance(result, dict) and result.get("items"):
         try:
-            await _enrich_adjustment_list(db, project_id, result["items"])
-        except Exception:
-            pass
+            await _enrich_adjustment_list(db, project_id, result["items"], year=year)
+        except Exception as exc:  # noqa: BLE001 — 富化失败不阻断列表，但要留痕
+            logger.warning("调整分录列表富化失败 project=%s: %s", project_id, exc)
 
     # 字段选择：过滤返回字段（仅过滤 items 内的字段，保留分页元数据）
     requested_fields = parse_fields(fields)
@@ -354,7 +195,7 @@ async def create_adjustment(
     data: AdjustmentCreate,
     batch_mode: bool = Query(False, description="批量模式：暂不触发重算事件"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_operation("wp:edit")),
+    user=Depends(require_project_permission("adjustment:create")),
     _lock_check=Depends(check_consol_lock),
 ):
     """创建调整分录（合并锁定期间禁止，需编辑权限）"""
@@ -372,7 +213,7 @@ async def sync_from_workpaper(
     project_id: UUID,
     data: AdjustmentSyncRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_operation("wp:edit")),
+    user=Depends(require_project_permission("adjustment:create")),
     _lock_check=Depends(check_consol_lock),
 ):
     """底稿调整分录组 → 集中式登记（幂等 by source_ref，origin='workpaper'）。
@@ -383,8 +224,12 @@ async def sync_from_workpaper(
     """
     svc = AdjustmentSyncService(db)
     try:
-        result = await svc.sync_from_workpaper(project_id, data, user.id)
+        synced = await svc.sync_with_outcome(project_id, data, user.id)
+        result = synced.response
         await db.commit()
+        body = {**result.model_dump(), "sync_outcome": synced.outcome, "previous_status": synced.previous_status}
+        if synced.outcome == "unchanged":
+            return body  # 内容没变：不写库、不广播、不重发通知
         # P0-1: 同步成功后 SSE 广播，让大厅在线用户实时感知新分录到达
         try:
             from app.services.event_bus import event_bus
@@ -398,14 +243,15 @@ async def sync_from_workpaper(
             )
         except Exception:
             pass  # best-effort，不阻断响应
-        # 「新调整到达→按科目反查底稿负责人→推通知」
+        # 「新调整到达→按解析后的标准科目反查底稿负责人→推通知」
         try:
             await _notify_affected_wp_assignees(
-                db, project_id, data, result.adjustment_no, user.id
+                db, project_id, data, result.adjustment_no, user.id,
+                account_codes=synced.resolved_codes, entry_group_id=result.entry_group_id,
             )
         except Exception:
             pass  # best-effort
-        return result.model_dump()
+        return body
     except AdjustmentSyncError as e:
         if e.code in ("APPROVED_LOCKED", "COLLABORATION_LOCKED"):
             raise HTTPException(status_code=409, detail={
@@ -465,7 +311,7 @@ async def collaboration_assign(
     entry_group_id: UUID,
     data: AdjustmentCollaborationAssignRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:edit")),
 ):
     """转派/重派分录组给项目成员补充+确认。"""
     svc = AdjustmentCollaborationService(db)
@@ -526,7 +372,7 @@ async def collaboration_acknowledge(
     project_id: UUID,
     collaboration_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:edit")),
 ):
     svc = AdjustmentCollaborationService(db)
     try:
@@ -543,7 +389,7 @@ async def collaboration_contribute(
     collaboration_id: UUID,
     data: AdjustmentCollaborationContributeRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     svc = AdjustmentCollaborationService(db)
@@ -562,24 +408,12 @@ async def collaboration_confirm(
     project_id: UUID,
     collaboration_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:edit")),
 ):
     svc = AdjustmentCollaborationService(db)
     try:
         result = await svc.confirm(project_id, collaboration_id, user.id)
         await db.commit()
-        # P1-6: 协作确认后回写源底稿 checklist_responses（best-effort）
-        try:
-            entry_group_id = result.entry_group_id if hasattr(result, 'entry_group_id') else None
-            source_ref = result.source_ref if hasattr(result, 'source_ref') else None
-            if entry_group_id and source_ref:
-                await _writeback_to_source_workpaper(db, project_id, entry_group_id, source_ref)
-                await db.commit()
-        except Exception:
-            try:
-                await db.rollback()
-            except Exception:
-                pass
         return result.model_dump()
     except CollaborationError as e:
         raise _collab_http(e)
@@ -591,7 +425,7 @@ async def collaboration_reject(
     collaboration_id: UUID,
     data: AdjustmentCollaborationRejectRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:edit")),
 ):
     svc = AdjustmentCollaborationService(db)
     try:
@@ -620,7 +454,7 @@ async def batch_commit(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:submit")),
 ):
     """批量提交：统一触发一次重算事件（配合 batch_mode=true 使用）"""
     svc = AdjustmentService(db)
@@ -648,6 +482,7 @@ class PreviewLineItem(BaseModel):
 class AdjustmentPreviewRequest(BaseModel):
     line_items: list[PreviewLineItem] = Field(min_length=1)
     year: int | None = None
+    adjustment_type: AdjustmentType = AdjustmentType.aje
 
 
 @router.post("/preview-impact")
@@ -678,6 +513,7 @@ async def preview_adjustment_impact(
         project_id=project_id,
         line_items=raw_items,
         year=body.year,
+        adjustment_type=body.adjustment_type.value,
     )
     serialized_rows = [
         {
@@ -690,9 +526,18 @@ async def preview_adjustment_impact(
         for r in result["affected_report_rows"]
     ]
     return {
+        "affected_tb_accounts": [
+            {**item, **{
+                key: str(value) if isinstance(value, Decimal) else value
+                for key, value in item.items()
+            }} for item in result["affected_tb_accounts"]
+        ],
         "affected_report_rows": serialized_rows,
         "affected_workpapers": result["affected_workpapers"],
+        "affected_notes": result["affected_notes"],
+        "judgment_items": result["judgment_items"],
         "unmapped_accounts": result["unmapped_accounts"],
+        "direction_unknown_accounts": result["direction_unknown_accounts"],
     }
 
 
@@ -702,7 +547,7 @@ async def update_adjustment(
     entry_group_id: UUID,
     data: AdjustmentUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_project_permission("adjustment:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     """修改调整分录（合并锁定期间禁止，需编辑权限）"""
@@ -719,14 +564,20 @@ async def update_adjustment(
 async def delete_adjustment(
     project_id: UUID,
     entry_group_id: UUID,
+    expected_revision: int | None = Query(None, ge=1),
     db: AsyncSession = Depends(get_db),
     _lock_check=Depends(check_consol_lock),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_project_permission("adjustment:delete")),
 ):
     """软删除调整分录（合并锁定期间禁止，需编辑权限）"""
     svc = AdjustmentService(db)
     try:
-        await svc.delete_entry(project_id, entry_group_id)
+        await svc.delete_entry(
+            project_id,
+            entry_group_id,
+            expected_revision=expected_revision,
+            user_id=current_user.id,
+        )
         await db.commit()
         return {"message": "删除成功"}
     except ValueError as e:
@@ -739,19 +590,26 @@ async def batch_delete_adjustments(
     body: BulkRequest,
     db: AsyncSession = Depends(get_db),
     _lock_check=Depends(check_consol_lock),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_project_permission("adjustment:delete")),
 ):
-    """批量软删除调整分录（合并锁定期间禁止，需编辑权限）"""
+    """批量软删除调整分录组（ids 为分录组 id；合并锁定期间禁止，需编辑权限）。
+
+    原实现经 bulk_execute 按行主键取行再把行 id 当分录组 id 删 ⇒ 恒「调整分录不存在」。
+    现逐组 SAVEPOINT 走 service 删除（含状态校验 + 事件），一组失败不影响其余。
+    """
     svc = AdjustmentService(db)
-
-    async def _delete_one(_db, _row):
-        # 复用 service 层的删除逻辑（含状态校验+事件发布）
-        await svc.delete_entry(project_id, _row.id)
-
-    from app.models.audit_platform_models import Adjustment
-    result = await bulk_execute(db, Adjustment, body.ids, _delete_one)
+    succeeded: list[str] = []
+    failed: list[dict] = []
+    for gid in dict.fromkeys(body.ids):
+        try:
+            async with db.begin_nested():
+                await svc.delete_entry(project_id, gid)
+            succeeded.append(str(gid))
+        except ValueError as exc:
+            failed.append({"id": str(gid), "error": str(exc)})
     await db.commit()
-    return result
+    return {"succeeded": succeeded, "failed": failed, "total": len(body.ids),
+            "success_count": len(succeeded), "fail_count": len(failed)}
 
 
 @router.post("/{entry_group_id}/review")
@@ -761,114 +619,95 @@ async def review_adjustment(
     change: ReviewStatusChange,
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_permission("adjustment:review")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """变更复核状态（需复核权限）"""
-    svc = AdjustmentService(db)
+    """批准/驳回一笔已提交的复核任务；无任务或草稿直批均拒绝。"""
+    from app.services import adjustment_review_service as review_flow
+    from app.routers.adjustment_review import broadcast_review_changed, publish_review_events
+
+    if change.status not in (ReviewStatus.approved, ReviewStatus.rejected):
+        raise HTTPException(status_code=400, detail="该端点只接受批准或驳回")
+    if change.status == ReviewStatus.approved:
+        from app.services.project_permissions import resolve_project_context
+
+        context = await resolve_project_context(db, user, project_id)
+        if "adjustment:approve" not in context.permissions:
+            raise HTTPException(status_code=403, detail="没有批准调整分录的权限")
     try:
-        affected = await svc.change_review_status(
-            project_id, entry_group_id, change, user.id
+        result = await review_flow.review_groups(
+            db,
+            project_id,
+            group_ids=[entry_group_id],
+            status=change.status,
+            actor=user,
+            reason=change.reason,
         )
-        await db.commit()
-
-        # adj-formula-repair-and-approval-gate-wiring 任务 3.2:
-        # 转 approved 时发布 ADJUSTMENT_APPROVED 事件（commit 之后）。
-        # 触发下游：TB 重算 + 附注 stale + 底稿 stale + 报表 stale + SSE。
-        # 失败记 warning 不阻断审批本身（EH3 约定）。
-        # 受影响科目/年度由 service 返回（不调私有方法、不二次查库）。
-        if change.status == "approved":
-            try:
-                from app.models.audit_platform_schemas import EventPayload, EventType
-                from app.services.event_bus import event_bus
-
-                await event_bus.publish(EventPayload(
-                    event_type=EventType.ADJUSTMENT_APPROVED,
-                    project_id=project_id,
-                    year=affected.get("year"),
-                    account_codes=affected.get("account_codes") or [],
-                    entry_group_id=entry_group_id,
-                    extra={
-                        "operator_id": str(user.id),
-                        "operator_name": getattr(user, "username", ""),
-                    },
-                ))
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning(
-                    "[adj-approved] 事件发布失败（审批已落库）: %s", e
-                )
-
-        # P0-4: 复核状态变更后 SSE 广播，让底稿侧实时回流 + 大厅其他用户感知
-        try:
-            from app.services.event_bus import event_bus
-            event_bus.broadcast_raw(
-                "adjustment:review-changed",
-                extra={
-                    "project_id": str(project_id),
-                    "year": affected.get("year"),
-                    "entry_group_id": str(entry_group_id),
-                    "new_status": change.status,
+        if not result["succeeded"]:
+            failure = result["failed"][0]
+            raise HTTPException(
+                status_code=409 if failure.get("error_code") else 400,
+                detail={
+                    "error_code": failure.get("error_code") or "REVIEW_BLOCKED",
+                    "message": failure["reason"],
+                    "detail": failure,
                 },
             )
-        except Exception:
-            pass  # best-effort
-        return {"message": "状态变更成功"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        await db.commit()
+        await publish_review_events(db)
+        broadcast_review_changed(project_id, result["succeeded"], change.status.value)
+        return {
+            "message": "复核批准成功" if change.status == ReviewStatus.approved else "复核驳回成功",
+            "notified": result["notified"],
+            "review_task_id": result["succeeded"][0].get("review_task_id"),
+        }
+    except review_flow.ReviewFlowError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.code, "message": str(exc), "detail": exc.detail},
+        )
+
+
+class RevokeReviewRequest(BaseModel):
+    """撤回复核（原因可选，写入给编制人的通知）。"""
+    reason: str | None = Field(default=None, max_length=1000)
 
 
 @router.post("/{entry_group_id}/revoke-review")
 async def revoke_adjustment_review(
     project_id: UUID,
     entry_group_id: UUID,
+    body: RevokeReviewRequest | None = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_permission("adjustment:review")),
+    user=Depends(require_project_permission("adjustment:approve")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """撤回复核通过的调整分录，回到草稿并触发下游回退。"""
-    svc = AdjustmentService(db)
+    """撤回复核并在同一事务回退手工调整列；底稿来源只回退复核状态。"""
+    from app.routers.adjustment_review import broadcast_review_changed, publish_review_events
+    from app.services.adjustment_review_coordinator import AdjustmentReviewCoordinator
+    from app.services.adjustment_review_service import notify_single_change
+
     try:
-        affected = await svc.change_review_status(
-            project_id,
-            entry_group_id,
-            ReviewStatusChange(status=ReviewStatus.draft),
-            user.id,
-            allow_approved_revoke=True,
+        reason = (body.reason or "").strip() if body else ""
+        decision = await AdjustmentReviewCoordinator(db).revoke(
+            project_id=project_id,
+            entry_group_id=entry_group_id,
+            actor=user,
+            reason=reason or None,
+        )
+        affected = decision.info
+        notified = await notify_single_change(
+            db, project_id, affected, actor=user, reason=reason or None,
         )
         await db.commit()
-
-        try:
-            from app.models.audit_platform_schemas import EventPayload, EventType
-            from app.services.event_bus import event_bus
-
-            await event_bus.publish(EventPayload(
-                event_type=EventType.ADJUSTMENT_REVIEW_REVOKED,
-                project_id=project_id,
-                year=affected.get("year"),
-                account_codes=affected.get("account_codes") or [],
-                entry_group_id=entry_group_id,
-                extra={
-                    "operator_id": str(user.id),
-                    "operator_name": getattr(user, "username", ""),
-                },
-            ))
-        except Exception as e:
-            logger.warning("[adj-review-revoked] 事件发布失败（撤回已落库）: %s", e)
-
-        try:
-            from app.services.event_bus import event_bus
-            event_bus.broadcast_raw(
-                "adjustment:review-changed",
-                extra={
-                    "project_id": str(project_id),
-                    "year": affected.get("year"),
-                    "entry_group_id": str(entry_group_id),
-                    "new_status": ReviewStatus.draft.value,
-                },
-            )
-        except Exception:
-            pass  # best-effort
-        return {"message": "已撤回复核，调整分录恢复为草稿"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        await publish_review_events(db)
+        broadcast_review_changed(project_id, [affected], ReviewStatus.draft.value)
+        return {
+            "message": "已撤回复核，调整分录恢复为草稿",
+            "notified": notified,
+            "tb_update_status": affected.get("tb_update_status"),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -891,7 +730,7 @@ async def convert_adjustment_to_misstatement(
     entry_group_id: UUID,
     body: ConvertToMisstatementRequest | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_project_permission("adjustment:convert_to_misstatement")),
 ):
     """将被驳回的 AJE 组一键转为《未更正错报汇总表》的一条记录。
 
@@ -1031,27 +870,38 @@ async def get_summary(
 async def get_account_dropdown(
     project_id: UUID,
     report_line_code: str | None = Query(None),
+    year: int | None = Query(None, description="传年度时附试算表审定数作参考余额"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """科目下拉选项"""
+    """科目下拉选项（全部标准科目，已确认映射的带报表项目）"""
     svc = AdjustmentService(db)
-    options = await svc.get_account_dropdown(project_id, report_line_code)
+    options = await svc.get_account_dropdown(project_id, report_line_code, year=year)
     return [o.model_dump() for o in options]
 
 
-@router.get("/wp-summary/{wp_code}")
+@router.get("/wp-summary/{wp_code}", status_code=410)
 async def get_wp_summary(
     project_id: UUID,
     wp_code: str,
     year: int = Query(...),
-    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """底稿审定表数据"""
-    svc = AdjustmentService(db)
-    result = await svc.get_wp_adjustment_summary(project_id, year, wp_code)
-    return result.model_dump()
+    """旧底稿调整汇总已退役；保留鉴权后的 410 兼容壳。"""
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error_code": "WP_SUMMARY_RETIRED",
+            "message": "旧底稿调整汇总接口已退役，请使用正式试算表汇总和调整分录列表。",
+            "replacements": {
+                "trial_balance": (
+                    f"/api/projects/{project_id}/trial-balance/summary-with-adjustments?year={year}"
+                ),
+                "adjustments": f"/api/projects/{project_id}/adjustments?year={year}",
+            },
+            "wp_code": wp_code,
+        },
+    )
 
 
 @router.get("/export-summary")
@@ -1060,55 +910,35 @@ async def export_adjustment_summary(
     year: int = Query(...),
     format: str = Query("excel", description="导出格式: excel 或 json"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_permission("adjustment:export")),
 ):
     """导出审计调整汇总表（AJE + RJE）"""
-    import logging
-    _logger = logging.getLogger(__name__)
-    _logger.info(
-        "adjustment_export: user=%s project=%s year=%s",
-        str(current_user.id), str(project_id), year,
-    )
+    from app.services.adjustment_export_service import build_full_projection, export_excel
 
-    svc = AdjustmentService(db)
-    aje_result = await svc.list_entries(project_id, year, adjustment_type=AdjustmentType.aje, page_size=500)
-    rje_result = await svc.list_entries(project_id, year, adjustment_type=AdjustmentType.rje, page_size=500)
-    # list_entries 返回 dict {"items": [...], "total": ...}
-    aje_list = aje_result.get("items", []) if isinstance(aje_result, dict) else aje_result
-    rje_list = rje_result.get("items", []) if isinstance(rje_result, dict) else rje_result
-
+    projection = await build_full_projection(db, project_id, year)
     if format == "json":
+        from app.services.adjustment_export_service import _status_label
         return {
-            "aje": [_adj_to_dict(a) for a in aje_list],
-            "rje": [_adj_to_dict(a) for a in rje_list],
-            "aje_count": len(aje_list),
-            "rje_count": len(rje_list),
+            "aje": [{
+                "adjustment_no": a.get("adjustment_no", ""),
+                "description": a.get("description", ""),
+                "total_debit": str(a.get("total_debit", 0)),
+                "total_credit": str(a.get("total_credit", 0)),
+                "review_status": _status_label(a.get("review_status")),
+            } for a in projection["aje"]],
+            "rje": [{
+                "adjustment_no": a.get("adjustment_no", ""),
+                "description": a.get("description", ""),
+                "total_debit": str(a.get("total_debit", 0)),
+                "total_credit": str(a.get("total_credit", 0)),
+                "review_status": _status_label(a.get("review_status")),
+            } for a in projection["rje"]],
+            "aje_count": projection["aje_count"],
+            "rje_count": projection["rje_count"],
         }
 
-    # Excel 导出
-    from io import BytesIO
     from fastapi.responses import StreamingResponse
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill
-    except ImportError:
-        raise HTTPException(500, "openpyxl 未安装")
-
-    wb = openpyxl.Workbook()
-
-    # AJE sheet
-    ws_aje = wb.active
-    ws_aje.title = "AJE审计调整"
-    _write_adj_sheet(ws_aje, aje_list, "AJE")
-
-    # RJE sheet
-    ws_rje = wb.create_sheet("RJE重分类")
-    _write_adj_sheet(ws_rje, rje_list, "RJE")
-
-    buf = BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
+    buf = export_excel(projection, year)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1130,7 +960,7 @@ async def export_adjustment_template(
         description="模板类型: soe=国企版 / listed=上市版,不传则从项目派生",
     ),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_permission("adjustment:export")),
 ):
     """导出调整分录空白模板 Excel (按项目实际数据生成,支持国企/上市两版).
 
@@ -1345,7 +1175,7 @@ async def export_adjustment_template(
         (f"📋 调整分录导入模板使用说明 - {template_label}", "header"),
         ("", ""),
         ("一、字段说明 (9 列结构)", "section"),
-        ("• A 编号 (adjustment_no)", "可留空,系统自动生成 (AJE-001 / RJE-001)"),
+        ("• A 编号 (adjustment_no)", "同一编号的多行为一笔；可留空：连续多行未填编号时按借贷平衡自动切分为一笔"),
         ("• B 类型 (type)", "必填,AJE=审计调整 / RJE=重分类调整"),
         ("• C 摘要 (description)", "必填,简要说明调整原因 (≤ 200 字)"),
         ("• D 二级科目编码", "自动填充 (公式),根据 E 列名称反查"),
@@ -1363,10 +1193,13 @@ async def export_adjustment_template(
         ("第四步: G/H 列 一级名称 + 报表项目 自动填 (依据本项目映射规则)", ""),
         ("", ""),
         ("三、校验规则", "section"),
-        ("✅ 借贷必须平衡", "同一编号下所有行的借方合计 = 贷方合计 (容差 0.01)"),
+        ("✅ 借贷必须平衡", "同一笔分录借方合计 = 贷方合计（金额按分舍入后比较），且合计不能为 0"),
         ("✅ 科目必须在项目库", "下拉只显示本项目已加载的标准科目 + 客户实际科目"),
         ("✅ 一级映射必须存在", "F/G/H 列联动失败 = 该科目还未做映射规则,请先到 [试算表 → 映射规则] 完善"),
-        ("✅ 金额方向", "借方/贷方至少填一个,且只能填一个 (互斥)"),
+        ("✅ 金额方向", "借方/贷方只填一个（互斥）；金额不能为负数，冲减请录入到相反方向"),
+        ("✅ 类型", "只能填 AJE 或 RJE，同一笔分录类型一致；留空时按 sheet 名（AJE模板 / RJE模板）推断"),
+        ("✅ 导入模式", "追加：按系统编号入库（文件编号只用于分组）；覆盖：按文件编号替换同编号的草稿 / 已驳回分录"),
+        ("✅ 导入之后", "分录为草稿，提交复核并批准后才计入试算表审定数；上传后会先预检，再确认导入"),
         ("", ""),
         ("四、AJE / RJE 区别", "section"),
         ("AJE 审计调整", "影响审定数 (P/L 损益类调整),会更新报表数据"),
@@ -1646,8 +1479,13 @@ def _adj_to_dict(adj) -> dict:
 def _write_adj_sheet(ws, entries, adj_type: str):
     from openpyxl.styles import Font, Alignment, PatternFill
 
-    # #4/#5: 导出增加「调整目的」「所属循环」「协作状态」列
-    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "来源", "所属循环", "协作状态"]
+    # #4/#5: 导出增加「所属循环」「协作状态」列；2026-10-31 增「复核状态」「编制人」（导回时按未知列忽略）
+    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "来源", "所属循环", "协作状态", "复核状态", "编制人", "提出阶段", "客户处理"]
+    _labels = {"draft": "草稿", "pending_review": "待复核", "approved": "已批准", "rejected": "已驳回"}
+
+    def _status_label(raw) -> str:
+        # model_dump 出来是枚举成员，str() 会得到「ReviewStatus.draft」⇒ 先取 .value
+        return _labels.get(str(getattr(raw, "value", raw) or ""), "")
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
     header_font = Font(bold=True, size=11)
 
@@ -1658,9 +1496,11 @@ def _write_adj_sheet(ws, entries, adj_type: str):
         cell.alignment = Alignment(horizontal="center")
 
     def _origin_label(a: dict) -> str:
-        """来源标签：底稿 {wp_code} / 手工。wp_code 从 source_ref item_id 前缀派生。"""
+        """来源标签：底稿 {wp_code} / 手工。优先用富化查到的真实底稿编码，否则从 item_id 前缀派生。"""
         if (a.get("origin") or "manual") != "workpaper":
             return "手工"
+        if a.get("source_wp_code"):
+            return f"底稿 {a['source_wp_code']}"
         ref = a.get("source_ref") or ""
         item_id = ref.split(":", 1)[1] if ":" in ref else ""
         import re as _re
@@ -1696,6 +1536,12 @@ def _write_adj_sheet(ws, entries, adj_type: str):
             return "协作中"
         return ""
 
+    def _booking_label(a: dict) -> str:
+        booking = a.get("client_booking") or {}
+        if booking.get("status") != "booked":
+            return "未标记"
+        return "客户已入账（不再计入调整）" if booking.get("effective") else "已标记（当前账套未生效）"
+
     row_idx = 2
     for adj in entries:
         if isinstance(adj, dict) and "line_items" in adj:
@@ -1716,6 +1562,10 @@ def _write_adj_sheet(ws, entries, adj_type: str):
                 ws.cell(row=row_idx, column=8, value=origin_label)
                 ws.cell(row=row_idx, column=9, value=cycle_label)
                 ws.cell(row=row_idx, column=10, value=collab_label)
+                ws.cell(row=row_idx, column=11, value=_status_label(adj.get("review_status")))
+                ws.cell(row=row_idx, column=12, value=adj.get("creator_name") or "")
+                ws.cell(row=row_idx, column=13, value="预审" if adj.get("audit_phase") == "preliminary" else "年审")
+                ws.cell(row=row_idx, column=14, value=_booking_label(adj))
                 row_idx += 1
             else:
                 for li in line_items:
@@ -1729,6 +1579,10 @@ def _write_adj_sheet(ws, entries, adj_type: str):
                     ws.cell(row=row_idx, column=8, value=origin_label)
                     ws.cell(row=row_idx, column=9, value=cycle_label)
                     ws.cell(row=row_idx, column=10, value=collab_label)
+                    ws.cell(row=row_idx, column=11, value=_status_label(adj.get("review_status")))
+                    ws.cell(row=row_idx, column=12, value=adj.get("creator_name") or "")
+                    ws.cell(row=row_idx, column=13, value="预审" if adj.get("audit_phase") == "preliminary" else "年审")
+                    ws.cell(row=row_idx, column=14, value=_booking_label(adj))
                     row_idx += 1
         else:
             # 扁平模式兼容
@@ -1741,6 +1595,8 @@ def _write_adj_sheet(ws, entries, adj_type: str):
             ws.cell(row=row_idx, column=6, value=float(d["debit_amount"] or 0))
             ws.cell(row=row_idx, column=7, value=float(d["credit_amount"] or 0))
             ws.cell(row=row_idx, column=8, value=_origin_label(d) if isinstance(d, dict) else "手工")
+            ws.cell(row=row_idx, column=13, value="")
+            ws.cell(row=row_idx, column=14, value="")
             row_idx += 1
 
     # 列宽
@@ -1752,6 +1608,12 @@ def _write_adj_sheet(ws, entries, adj_type: str):
     ws.column_dimensions["F"].width = 16
     ws.column_dimensions["G"].width = 16
     ws.column_dimensions["H"].width = 14
+    ws.column_dimensions["I"].width = 12
+    ws.column_dimensions["J"].width = 12
+    ws.column_dimensions["K"].width = 12
+    ws.column_dimensions["L"].width = 14
+    ws.column_dimensions["M"].width = 12
+    ws.column_dimensions["N"].width = 26
 
 
 # R10 Spec B / Sprint 3.2.3 — 调整分录组关联底稿
@@ -1760,9 +1622,9 @@ async def get_adjustment_related_workpapers(
     project_id: UUID,
     entry_group_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """R10 Spec B / F8：根据调整分录组中所有 line_items 的科目反查关联底稿。"""
+    """R10 Spec B / F8：根据调整分录组中所有 line_items 的科目反查关联底稿（项目成员只读权限）。"""
     from app.models.audit_platform_models import Adjustment, AdjustmentEntry
     from app.services.workpaper_query import find_workpapers_by_account_codes
 

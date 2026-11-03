@@ -533,3 +533,14 @@ def test_preview_lists_skipped_sources_with_reason_for_left_pane_status() -> Non
     assert [s for s in p2["skipped_sources"] if s["source_id"] == "b"] == [
         {"source_id": "b", "match_kind": "folded", "evidence": "已并入「金融工具」"}]
     assert len(p2["skipped_sources"]) == p2["summary"]["folded"] + p2["summary"]["out_of_scope"] + p2["summary"]["anchor"]
+
+
+def test_matrix_index_rejects_duplicate_code_owner() -> None:
+    """同一准则 / 章节号被两个 account 认领时 fail-closed，不能用 setdefault 静默挑第一个。"""
+    from app.services.note_text_batch_service import _index_variant_matrix
+
+    with pytest.raises(ValueError, match="同时属于"):
+        _index_variant_matrix({"accounts": [
+            {"account_key": "one", "variants": {"soe_standalone": "八、70"}},
+            {"account_key": "two", "variants": {"soe_standalone": "八、70"}},
+        ]})

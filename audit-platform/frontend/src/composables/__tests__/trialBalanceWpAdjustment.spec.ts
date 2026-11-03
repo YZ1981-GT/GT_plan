@@ -19,6 +19,7 @@ describe('TrialBalanceRow 类型', () => {
       standard_account_code: '1001',
       account_name: '库存现金',
       account_category: 'asset',
+      direction: 'debit',
       unadjusted_amount: '100.00',
       rje_adjustment: '0',
       aje_adjustment: '10.00',
@@ -27,6 +28,7 @@ describe('TrialBalanceRow 类型', () => {
       opening_balance: '90.00',
       exceeds_materiality: false,
       below_trivial: false,
+      updated_at: null,
       wp_publish_base: '100.00',
       wp_published_at: '2026-10-01T12:00:00Z',
     }
@@ -40,6 +42,7 @@ describe('TrialBalanceRow 类型', () => {
       standard_account_code: '1002',
       account_name: '银行存款',
       account_category: 'asset',
+      direction: 'debit',
       unadjusted_amount: '200.00',
       rje_adjustment: '0',
       aje_adjustment: '0',
@@ -48,6 +51,7 @@ describe('TrialBalanceRow 类型', () => {
       opening_balance: null,
       exceeds_materiality: false,
       below_trivial: false,
+      updated_at: null,
       wp_publish_base: null,
       wp_published_at: null,
     }
@@ -73,6 +77,7 @@ describe('hasPublishBaseChanged', () => {
       standard_account_code: '1001',
       account_name: '库存现金',
       account_category: 'asset',
+      direction: 'debit',
       unadjusted_amount: '100.00',
       rje_adjustment: '0',
       aje_adjustment: '0',
@@ -81,6 +86,7 @@ describe('hasPublishBaseChanged', () => {
       opening_balance: null,
       exceeds_materiality: false,
       below_trivial: false,
+      updated_at: null,
       wp_publish_base: null,
       wp_published_at: null,
       ...overrides,
@@ -142,16 +148,16 @@ describe('小计行 wp_adjustment 累加', () => {
 
   it('多行 wp_adjustment 累加正确', () => {
     const rows: TrialBalanceRow[] = [
-      { standard_account_code: '1001', account_name: 'A', account_category: 'asset', unadjusted_amount: '100', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: '5.00', audited_amount: '105', opening_balance: null, exceeds_materiality: false, below_trivial: false, wp_publish_base: null, wp_published_at: null },
-      { standard_account_code: '1002', account_name: 'B', account_category: 'asset', unadjusted_amount: '200', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: '-3.00', audited_amount: '197', opening_balance: null, exceeds_materiality: false, below_trivial: false, wp_publish_base: null, wp_published_at: null },
-      { standard_account_code: '1003', account_name: 'C', account_category: 'asset', unadjusted_amount: '300', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: null, audited_amount: '300', opening_balance: null, exceeds_materiality: false, below_trivial: false, wp_publish_base: null, wp_published_at: null },
+      { standard_account_code: '1001', account_name: 'A', account_category: 'asset', direction: 'debit', unadjusted_amount: '100', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: '5.00', audited_amount: '105', opening_balance: null, exceeds_materiality: false, below_trivial: false, updated_at: null, wp_publish_base: null, wp_published_at: null },
+      { standard_account_code: '1002', account_name: 'B', account_category: 'asset', direction: 'debit', unadjusted_amount: '200', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: '-3.00', audited_amount: '197', opening_balance: null, exceeds_materiality: false, below_trivial: false, updated_at: null, wp_publish_base: null, wp_published_at: null },
+      { standard_account_code: '1003', account_name: 'C', account_category: 'asset', direction: 'debit', unadjusted_amount: '300', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: null, audited_amount: '300', opening_balance: null, exceeds_materiality: false, below_trivial: false, updated_at: null, wp_publish_base: null, wp_published_at: null },
     ]
     expect(computeSubtotal(rows)).toBeCloseTo(2.00)
   })
 
   it('全部 null → 0', () => {
     const rows: TrialBalanceRow[] = [
-      { standard_account_code: '1001', account_name: 'A', account_category: 'asset', unadjusted_amount: '100', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: null, audited_amount: '100', opening_balance: null, exceeds_materiality: false, below_trivial: false, wp_publish_base: null, wp_published_at: null },
+      { standard_account_code: '1001', account_name: 'A', account_category: 'asset', direction: 'debit', unadjusted_amount: '100', rje_adjustment: '0', aje_adjustment: '0', wp_adjustment: null, audited_amount: '100', opening_balance: null, exceeds_materiality: false, below_trivial: false, updated_at: null, wp_publish_base: null, wp_published_at: null },
     ]
     expect(computeSubtotal(rows)).toBe(0)
   })
@@ -197,6 +203,7 @@ describe('setupTableDrag 列号映射', () => {
     standard_account_code: '1001',
     account_name: '库存现金',
     account_category: 'asset',
+    direction: 'debit',
     unadjusted_amount: '100.00',
     rje_adjustment: '10.00',
     aje_adjustment: '20.00',
@@ -205,6 +212,7 @@ describe('setupTableDrag 列号映射', () => {
     opening_balance: null,
     exceeds_materiality: false,
     below_trivial: false,
+    updated_at: null,
     wp_publish_base: '100.00',
     wp_published_at: '2026-10-01T00:00:00Z',
   }

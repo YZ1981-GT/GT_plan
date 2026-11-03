@@ -16,6 +16,7 @@
  */
 import { ref, onMounted, type Ref } from 'vue'
 import { getAuthHeaders } from '@/utils/authToken'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -136,22 +137,24 @@ export function useD4DualMode(options: UseD4DualModeOptions) {
     if (target === 'onlyoffice' && !isOoAvailable.value) return
 
     if (target === 'onlyoffice') {
-      try {
-        const sheetName = getSheetNameFromTab(activeTab?.value || 'adjudication')
-        // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401，被下方 catch 成「OO 不可用」）
-        const response = await fetch(
-          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
-          { headers: getAuthHeaders() },
-        )
-        if (response.ok) {
-          const result = await response.json()
-          ooConfig.value = result.data || result
-          currentMode.value = 'onlyoffice'
+      await runLegacyOnlyOfficeTransition(async () => {
+        try {
+          const sheetName = getSheetNameFromTab(activeTab?.value || 'adjudication')
+          // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401，被下方 catch 成「OO 不可用」）
+          const response = await fetch(
+            `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
+            { headers: getAuthHeaders() },
+          )
+          if (response.ok) {
+            const result = await response.json()
+            ooConfig.value = result.data || result
+            currentMode.value = 'onlyoffice'
+          }
+        } catch {
+          // 降级保持结构化模式
+          isOoAvailable.value = false
         }
-      } catch {
-        // 降级保持结构化模式
-        isOoAvailable.value = false
-      }
+      })
     } else {
       // 切回结构化视图: 重新加载数据（OO 编辑可能通过 callback 已回写）
       currentMode.value = 'structured'

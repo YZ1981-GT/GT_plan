@@ -20,12 +20,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, get_current_user_stream, require_project_access
 from app.models.core import User
 from app.services.export_progress_service import export_progress_service
 
@@ -44,8 +44,8 @@ download_router = APIRouter(
 
 
 class BatchExportAsyncRequest(BaseModel):
-    """批量异步导出请求体"""
-    wp_ids: list[str]
+    """批量异步导出请求体；限制单任务规模，避免无界内存/文件队列。"""
+    wp_ids: list[str] = Field(min_length=1, max_length=1000)
 
 
 class BatchExportAsyncResponse(BaseModel):
@@ -64,6 +64,14 @@ class ExportTaskStatus(BaseModel):
     percent: int
     error: str | None = None
     download_url: str | None = None
+
+
+def _owned_task(task_id: str, current_user: User):
+    """任务不存在和非本人统一 404，避免通过 task id 枚举导出状态或文件。"""
+    task = export_progress_service.get_task(task_id)
+    if task is None or task.user_id != str(current_user.id):
+        raise HTTPException(status_code=404, detail="导出任务不存在或已过期")
+    return task
 
 
 @router.post("/batch-export-async", response_model=BatchExportAsyncResponse)
@@ -109,9 +117,7 @@ async def get_export_status(
     current_user: User = Depends(get_current_user),
 ) -> ExportTaskStatus:
     """查询导出任务状态"""
-    task = export_progress_service.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="导出任务不存在或已过期")
+    task = _owned_task(task_id, current_user)
     download_url = (
         f"/api/exports/{task.task_id}"
         if task.status == "complete" and task.file_path
@@ -132,12 +138,10 @@ async def get_export_status(
 @download_router.get("/{task_id}")
 async def download_export(
     task_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_stream),
 ):
     """下载已生成的 ZIP 文件"""
-    task = export_progress_service.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="导出任务不存在或已过期")
+    task = _owned_task(task_id, current_user)
     if task.status != "complete":
         raise HTTPException(status_code=409, detail=f"任务尚未完成（状态：{task.status}）")
     if not task.file_path or not Path(task.file_path).exists():

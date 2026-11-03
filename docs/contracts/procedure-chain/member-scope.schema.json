@@ -1,0 +1,23 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/member-scope.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/wp_visibility/effective_scope.py（resolve_member_scope / MemberScope.to_payload）",
+  "title": "MemberScope（项目成员的有效循环范围）",
+  "description": "主管 = 系统管理员，或「唯一人员档案 + 唯一项目成员行」且本项目任一有效团队分配角色属于主管角色（见 cases/member-scope.cases.json 的 supervisor_roles）⇒ cycles = A~N、S ∪ 本项目底稿索引里出现的循环。其余为受限：cycles = 全部有效团队分配勾选的循环 ∪ project_users.scope_cycles（委派扩权 / 手工设置）；都没有 ⇒ 空集，什么都看不到（不按「空 = 全部」）。查询失败按受限空集（fail-closed）。角色分类器、委派跨循环校验、试算表 / 调整 / 附注的循环过滤同用此判定。",
+  "type": "object",
+  "required": ["is_supervisor", "cycles", "assigned", "expanded", "roles", "is_member", "is_admin"],
+  "additionalProperties": false,
+  "properties": {
+    "is_supervisor": { "type": "boolean" },
+    "cycles": { "description": "有效范围。", "$ref": "common.schema.json#/$defs/sortedCycleList" },
+    "assigned": { "description": "团队分配勾选（assigned_cycles，JSON 数组或 {cycles: [...]})。", "$ref": "common.schema.json#/$defs/sortedCycleList" },
+    "expanded": { "description": "project_users.scope_cycles（逗号分隔文本）。", "$ref": "common.schema.json#/$defs/sortedCycleList" },
+    "roles": {
+      "description": "有效团队分配角色（去首尾空白、小写）。",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "is_member": { "description": "本项目有未删除的项目成员行（没有就无从扩大可见范围）。", "type": "boolean" },
+    "is_admin": { "type": "boolean" }
+  }
+}

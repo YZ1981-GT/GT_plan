@@ -4,6 +4,19 @@
       <el-button class="guide-btn" @click="guideVisible = true">📖 使用文档</el-button>
     </GtPageHeader>
 
+    <el-alert
+      v-if="appendStrategy"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="append-alert"
+    >
+      <template #title>增量追加：当前账套在新版本校验通过前不会被修改</template>
+      <el-checkbox v-model="balanceCarryConfirmed">
+        我已知悉：文件不含余额表时将沿用上一版本余额表。
+      </el-checkbox>
+    </el-alert>
+
     <!-- 步骤条 -->
     <el-steps :active="currentStep" finish-status="success" class="import-steps">
       <el-step title="上传" />
@@ -80,7 +93,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { Loading, CircleClose } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import UploadStep from '@/components/ledger-import/UploadStep.vue'
 import DetectionPreview from '@/components/ledger-import/DetectionPreview.vue'
@@ -95,14 +110,19 @@ const LedgerImportGuideDialog = defineAsyncComponent(
 import type {
   LedgerDetectionResult,
   SheetDetection,
-  ConfirmedMapping,
   ImportError,
 } from '@/components/ledger-import/LedgerImportDialog.vue'
+import type { ConfirmedMapping } from '@/types/ledger-import'
 
 const route = useRoute()
 const router = useRouter()
 
 const projectId = route.params.projectId as string
+const appendStrategy = computed<'skip' | 'overwrite' | null>(() => {
+  if (route.query.mode !== 'append') return null
+  return route.query.strategy === 'overwrite' ? 'overwrite' : 'skip'
+})
+const balanceCarryConfirmed = ref(route.query.balanceConfirmed === '1')
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -158,6 +178,11 @@ const submitting = ref(false)
 
 async function submitImportJob(mappings: ConfirmedMapping[]) {
   if (!detectionResult.value) return
+  if (appendStrategy.value && !balanceCarryConfirmed.value) {
+    ElMessage.warning('请先确认余额表可能沿用上一版本口径')
+    currentStep.value = 2
+    return
+  }
   if (submitting.value) return  // 防重复点击
   submitting.value = true
   lastMappings.value = mappings
@@ -175,10 +200,14 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
         confirmed_mappings: mappings,
         force_activate: false,
         force_submit: forceSubmitFlag.value,
+        incremental: !!appendStrategy.value,
+        overlap_strategy: appendStrategy.value || 'skip',
+        balance_carry_confirmed: balanceCarryConfirmed.value,
       },
       { timeout: 600000, _silent: true } as any
     )
     jobId.value = (res as { job_id: string }).job_id
+    eventBus.emit('ledger-import:submitted', { projectId })
   } catch (err: any) {
     console.error('提交导入作业失败', err)
     // 提交失败 → 停留在 step 3 显示失败态 + 重试按钮（不突兀地弹窗+退步骤）
@@ -249,6 +278,10 @@ async function _checkConsolLinkage() {
 </script>
 
 <style scoped>
+.append-alert {
+  margin-bottom: var(--gt-space-4);
+}
+
 .ledger-import-page {
   padding: 24px 32px;
   max-width: 960px;
@@ -265,7 +298,7 @@ async function _checkConsolLinkage() {
 }
 .guide-btn:hover,
 .guide-btn:focus {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   color: var(--gt-color-primary, #4b2d77);
 }
 
@@ -283,18 +316,18 @@ async function _checkConsolLinkage() {
   padding: 60px 0;
 }
 .submit-spinner {
-  font-size: 40px;
+  font-size: 40px /* allow-px: special */;
   color: var(--gt-color-primary, #4b2d77);
 }
 .submit-msg {
   margin-top: 16px;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
   color: var(--gt-color-primary, #4b2d77);
 }
 .submit-hint {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 .submit-spinner--fail {

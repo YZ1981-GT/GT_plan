@@ -142,11 +142,13 @@ async def get_workpaper_guidance(
     template_path = Path(raw_template_path) if raw_template_path else None
     # inventory 分母必须基于 parent 的完整最终 render manifest；请求 sheet 只在
     # resolve_render_sheet_context 阶段选择，不能先过滤成单页再冒充全量清册。
+    # manifest_only：只读 sheets 身份字段与 template_version，不跑渲染器 / 取数（spec platform-perf-hotspots R3）。
     render_response = await wp_render_config._get_render_config_impl(
         wp_uuid,
         None,
         db,
         current_user,
+        manifest_only=True,
     )
     render_sheets = render_response.get("sheets", []) if isinstance(render_response, dict) else []
 

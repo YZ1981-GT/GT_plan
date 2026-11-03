@@ -58,6 +58,9 @@ _ROUTERS = _ROOT / "backend/app/routers"
 _PROJECT_LEVEL_TOKENS = (
     "require_project_access",
     "assert_project_permission",
+    # 项目 id 在路径 / 查询参数里时，矩阵放行后再 assert_project_permission（2026-10-27 起；此前只看权限矩阵、
+    # 不校成员却一直记作项目级 —— spec consol-autotree-residual-closure R3）。项目在请求体里它看不到，
+    # 请求体维不认它（test_project_endpoint_authz_body_carried）。可伪证：test_require_operation_token_tier.py
     "require_operation",
     "require_wp_edit_permission",
     "authorize_wp_read",
@@ -81,6 +84,20 @@ _PROJECT_LEVEL_TOKENS = (
     "require_note_edit_access",
     "assert_note_edit_access",
     "assert_note_role_access",
+    # 2026-10-27 补（spec attachment-security-baseline 需求 2.1）：函证路由的路由级门 services/confirmation_scope_gate.py
+    # —— 先 assert_project_permission（GET readonly / 其余 edit），再核对路径与请求体对象属于路径项目。
+    # 可伪证：tests/attachment_security_baseline/test_confirmation_gate_token_proof.py::test_confirmation_project_gate_is_really_project_level
+    "confirmation_project_gate",
+    # 2026-10-31 补（spec project-pid-path-authz-coverage：项目段参数叫 {pid} 的 49 条路由进视野后现算出现）。
+    # 可伪证：tests/test_project_pid_path_authz_baseline.py 的 *_is_really_project_level 各条
+    "enforce_wp_gate",                    # 底稿门：把路径项目交给 resolve_wp_binding_and_access，拒绝即 404
+    "enforce_task_gate",                  # 任务门：同上（任务绑定）
+    "resolve_conversation_access",        # 程序复核参与者判定（端点同时 _load_task 绑定路径项目）
+    "_authorize_survival",                # 抽样阶段：底稿权限 + 底稿属于路径项目
+    "_authorize_and_validate_extract",    # 抽凭提取：同上（编辑权）
+    "_authorize_and_validate_evaluation", # 抽凭评价：同上（编辑权）
+    "_authorize_undo",                    # 抽凭撤销：记录属于路径项目 + 底稿编辑权
+    "_authorize_cutoff_wp",               # 截止测试：底稿权限 + 底稿属于路径项目
 )
 
 #: 仅身份认证 / 角色判定，不含项目维度
@@ -96,6 +113,14 @@ _IDENTITY_ONLY_TOKENS = (
 _AUTH_TOKENS = _PROJECT_LEVEL_TOKENS + _IDENTITY_ONLY_TOKENS
 
 _DECOR = re.compile(r'@router\.(get|post|put|patch|delete)\(\s*[\'"]([^\'"]+)[\'"]')
+
+#: 项目段：字面量 ``{project_id}``，或 ``/projects/{任意名}``（原先只认前者，49 条 ``{pid}`` 路由从未进视野，
+#: 其中 AI 批量复核等 3 个一个鉴权依赖都没有 —— spec project-pid-path-authz-coverage）
+_PROJECT_SEG = re.compile(r"/projects/\{\w+(?::\w+)?\}")
+
+
+def _has_project_segment(path: str) -> bool:
+    return "{project_id}" in path or bool(_PROJECT_SEG.search(path))
 
 #: **桩端点**豁免：函数体只 `raise` 4xx/5xx（410 已废弃 / 501 未实现），
 #: **不触达 DB、不接收文件、无任何副作用** ⇒ 无鉴权合理。现算 **7** 处
@@ -227,7 +252,7 @@ def _scan_unauthorized() -> list[tuple[str, str]]:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             route = _endpoint_route(src, node)
-            if route is None or "{project_id}" not in route[1]:
+            if route is None or not _has_project_segment(route[1]):
                 continue
             if _has_auth(node):
                 continue
@@ -250,7 +275,7 @@ def _total_project_endpoints() -> int:
             for d in node.decorator_list:
                 seg = ast.get_source_segment(src, d) or ""
                 m = _DECOR.search(seg if seg.startswith("@") else "@" + seg)
-                if m and "{project_id}" in m.group(2):
+                if m and _has_project_segment(m.group(2)):
                     n += 1
                     break
     return n
@@ -352,6 +377,14 @@ _FIXED_ENDPOINTS: frozenset[str] = frozenset({
     "formula_audit_log.py::rollback_formula",
     "t_accounts.py::list_t_accounts",
     "metabase.py::clear_cache",
+    # spec formula-fetch-followup-defect-closure R4.2/R4.3 + procedure-chain-hardening：
+    # 生成底稿五端点（edit×4 + readonly×1）与模板清单（readonly）
+    "wp_template.py::generate_project_workpapers",
+    "wp_template.py::generate_from_codes",
+    "wp_template.py::create_custom_workpaper",
+    "wp_template.py::create_custom_workpaper_batch",
+    "wp_template.py::preview_custom_workpaper_batch",
+    "wp_template_list.py::get_template_list",
 })
 
 
@@ -383,7 +416,7 @@ def _scan_identity_only() -> list[tuple[str, str]]:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             route = _endpoint_route(src, node)
-            if route is None or "{project_id}" not in route[1]:
+            if route is None or not _has_project_segment(route[1]):
                 continue
             names = _auth_names_in_node(node)
             has_project = any(
@@ -420,7 +453,16 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 准则切换两端点补项目级判定（edit / readonly）后降 7。
 #: 2026-10-26 现算 191：spec procedure-chain-followup-closure R2.3 给程序行任务物化两端点（materialize /
 #: materialize-jobs，原先任何登录用户都能给任意项目物化）挂 ``require_project_delegator`` 后降 2。
-_IDENTITY_ONLY_BASELINE = 191
+#: 2026-10-27 现算 169（改前 189）：spec consol-autotree-residual-closure R1.1 / R1.3 给报表页 / 报表行次映射 / 报表行关联
+#: 底稿 / 试算分析四个 router 共 20 个端点改挂 ``require_project_access``（readonly / edit）后降 20。
+#: 2026-10-27 现算 166：审计报告 3 个端点（generate/update_paragraph/update_status）加 assert_project_permission 后降 3。
+#: 2026-10-31 现算 153（改前 165）：spec platform-performance-residual-findings-closure R1 —— 账龄配置 GET / PUT
+#: 改挂 ``require_project_access``（readonly / edit）2 个、completion_phase 删掉与正式实现重复注册的 5 个、
+#: 被遮蔽的附注裁剪 2 个与附注底稿映射 1 个恢复可达时补 readonly 门，去重后才生效的问题提示 / 底稿摘要 2 个
+#: 补 readonly 门，共降 12。
+#: 2026-10-31 现算 152（改前 153）：spec platform-performance-residual-findings-closure R12 —— batch_review 从
+#: readonly 提升到 review（项目级），不再算「仅登录不校项目」。
+_IDENTITY_ONLY_BASELINE = 152
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -463,22 +505,26 @@ def test_audit_log_writes_real_user_id():
     原实现 `user_id = uuid.UUID("00000000-0000-0000-0000-000000000000")`
     + 注释「POST 端点无 current_user 上下文」⇒ 留痕可伪造。
     """
+    zero = "00000000-0000-0000-0000-000000000000"
+
+    def _strip(text: str) -> str:
+        # 剔注释后再查，避免把「说明为什么不能这么写」的注释数成真实代码
+        return re.sub(r'"""[\s\S]*?"""', "", re.sub(r"#.*$", "", text, flags=re.MULTILINE))
+
     src = (_ROUTERS / "formula_audit_log.py").read_text(encoding="utf-8", errors="replace")
-    # 剔注释后再查，避免把「说明为什么不能这么写」的注释数成真实代码
-    code = re.sub(r"#.*$", "", src, flags=re.MULTILINE)
-    code = re.sub(r'"""[\s\S]*?"""', "", code)
+    code = _strip(src)
     assert '"user_id": current_user.id' in code, (
         "审计日志未写真实操作人 user_id"
     )
-    assert "00000000-0000-0000-0000-000000000000" not in code, (
+    assert zero not in code, (
         "又出现写死的全零 user_id ⇒ 审计留痕可伪造"
     )
 
-    # 双向变异自检：注释里的全零 UUID 不应被数进来
-    assert "00000000-0000-0000-0000-000000000000" in src, (
-        "本文件已完全不含全零 UUID 字样，上一条断言的剔注释逻辑无从验证 —— "
-        "若确实连注释都删了，请同步删除本自检"
-    )
+    # 双向变异自检：剔注释逻辑只剔注释 / docstring，代码里的全零 UUID 照样数进来。原自检依赖本文件注释里恰好留着
+    # 全零 UUID 字样（spec formula-hub-integrity-closure 重写 add_audit_log 的 docstring 后已不含）⇒ 改用合成样本
+    sample = f'"""说明：不得写 {zero}"""\n# 旧写法 {zero}\nuser_id = uuid.UUID("{zero}")\n'
+    assert _strip(sample).count(zero) == 1, "剔注释逻辑失效：注释 / docstring 里的全零 UUID 被数进来，或代码里的被剔掉"
+    assert zero not in _strip(f'"""{zero}"""\n# {zero}\nok = 1\n')
 
 
 def _first_func(sample: str) -> ast.AST:
@@ -590,8 +636,16 @@ _PREFIXED_SELF_AUTH: dict[str, str] = {
 _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
 #: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
-#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277
-_PREFIXED_IDENTITY_ONLY_BASELINE = 270
+#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277。
+#: 2026-10-27 现算 256（改前 260）：spec consol-autotree-residual-closure R1.3 报表映射 3 个端点 + 报表 Excel 导出改挂项目级。
+#: 2026-10-27 spec attachment-security-baseline：函证路由 17 个端点挂路由级项目门，在上一条基础上再减 17，现算 → 239
+#: 2026-10-28 合入远端（BM，advanced-query-linkage-closure 在 tmp_aql_verify 构建 M）后现算 238。
+#: 2026-10-31 HEAD 841166b57 现算 232；spec platform-performance-residual-findings-closure R1.4 给恢复可达的工时
+#: 预算对比、待审批列表两个端点补 readonly 门后降 2 → 230（未计入别处未入库的 continuous_audit 改动）。
+#: spec project-pid-path-authz-coverage：项目段认 ``{pid}`` 后，HEAD 9791805c8 现算 235（截止测试 4 + 抽凭历史 / 对比 2
+#: 进视野，原先这 6 个只校验登录）；本 spec 把这 6 个改成项目级、R1.4 降 2 ⇒ 227。主工作树另含并发会话未入库的
+#: continuous_audit 1 + 调整分录锁 / 重分类 / 关联底稿 7 个改动，现算 219（随那些改动入库再下调）。
+_PREFIXED_IDENTITY_ONLY_BASELINE = 227
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:
@@ -639,7 +693,7 @@ def _scan_prefixed_source(rel: str, src: str) -> list[tuple[str, str, str]]:
                 continue
             var, method, path = m.groups()
             prefix, router_deps = routers.get(var, ("", set()))
-            if "{project_id}" in prefix + path and not (var == "router" and "{project_id}" in path):
+            if _has_project_segment(prefix + path) and not (var == "router" and _has_project_segment(path)):
                 names = _auth_names_in_node(node) | router_deps
                 tier = "project" if _matches(names, _PROJECT_LEVEL_TOKENS) else \
                     "identity" if _matches(names, _IDENTITY_ONLY_TOKENS) else "none"

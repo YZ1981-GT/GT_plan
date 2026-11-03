@@ -115,7 +115,7 @@ describe('http _dedupe:false contract', () => {
     expect(r2.status).toBe(200)
   })
 
-  it('未传 _dedupe 的存量 GET 仍取消先发请求', async () => {
+  it('未传 _dedupe 的同一 GET 在飞时共用一次请求（R11：原先取消先发请求），两方都成功', async () => {
     const p1 = http.get('/api/attachments/dedupe/preview', {
       responseType: 'blob',
       _silent: true,
@@ -125,8 +125,12 @@ describe('http _dedupe:false contract', () => {
       responseType: 'blob',
       _silent: true,
     } as any)
-    await expect(p1).rejects.toMatchObject({ code: 'ERR_CANCELED' })
-    const r2 = await p2
+    const [r1, r2] = await Promise.all([p1, p2])
+    expect(r1.status).toBe(200)
     expect(r2.status).toBe(200)
+    expect(started.length).toBe(1)
+    // Blob 不可变 ⇒ 共用同一个；响应对象各自一份
+    expect(r2.data).toBe(r1.data)
+    expect(r2).not.toBe(r1)
   })
 })

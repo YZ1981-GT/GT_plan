@@ -142,6 +142,14 @@ def utf8_console() -> None:
             stream.reconfigure(encoding="utf-8", errors="replace")
 
 
+def normalize_newlines(raw: bytes) -> bytes:
+    """已提交产物的字节按 LF 归一：产物恒写 LF、index 里也是 LF，Windows（autocrlf）检出是 CRLF。
+
+    检查模式与双生成判据都要先归一 —— 否则干净检出上恒判「不一致」（spec note-pull-followup-closure R21）。
+    """
+    return raw.replace(b"\r\n", b"\n")
+
+
 def write_text(path: str | os.PathLike[str], text: str) -> None:
     """原子写出（同目录临时文件 + 替换）；按 UTF-8 字节写，不做换行转换。"""
     target = Path(path)

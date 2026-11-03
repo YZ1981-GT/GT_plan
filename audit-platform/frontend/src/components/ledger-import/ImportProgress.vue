@@ -39,6 +39,12 @@
       style="margin-top: 20px"
     />
 
+    <LedgerAppendResultPanel
+      v-if="isSuccess"
+      :append-report="resultPayload?.append"
+      :voucher-diff="resultPayload?.voucher_diff"
+    />
+
     <!-- 操作按钮 -->
     <div class="step-actions">
       <el-tooltip
@@ -72,7 +78,7 @@
         v-if="isSuccess"
         type="primary"
         aria-label="完成导入"
-        @click="emit('complete')"
+        @click="emit('complete', resultPayload)"
       >
         完成
       </el-button>
@@ -92,7 +98,7 @@
       <ul class="tips-list">
         <li>数据正在后台写入，关闭或切走页面不会中断导入；顶栏"导入中"指示器可追踪进度</li>
         <li>大文件（&gt;50MB）耗时较长，建议点"放到后台继续"先处理别的工作</li>
-        <li>导入完成前请勿重复提交同一年度的相同文件，否则旧 dataset 会被 superseded 但数据可能累加</li>
+        <li>同一项目年度已有导入作业时，服务器会拒绝重复提交，避免并发切换基准版本</li>
         <li>取消导入会清理 staged 数据但不影响已激活的历史数据集</li>
       </ul>
     </el-alert>
@@ -104,6 +110,8 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSSEReconnect } from '@/composables/useSSEReconnect'
+import LedgerAppendResultPanel from './LedgerAppendResultPanel.vue'
+import type { LedgerAppendReport, VoucherDiffReport } from './ledgerAppendResult'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -113,13 +121,19 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  complete: []
+  complete: [result?: ImportResultPayload | null]
   failed: []
   canceled: []
   background: []  // 放后台继续（不取消 worker，仅关闭对话框）
 }>()
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+interface ImportResultPayload {
+  append?: LedgerAppendReport | null
+  voucher_diff?: VoucherDiffReport | null
+  [key: string]: unknown
+}
 
 interface PhaseInfo {
   key: string
@@ -149,6 +163,7 @@ const statusMessage = ref('准备中...')
 const currentFile = ref('')
 const isFinished = ref(false)
 const isSuccess = ref(false)
+const resultPayload = ref<ImportResultPayload | null>(null)
 
 const phases = ref<PhaseInfo[]>([
   { key: 'uploading', label: '上传', percent: 100, completed: true },
@@ -208,6 +223,7 @@ const { connected, reconnecting, gaveUp, close: closeSSE } = useSSEReconnect({
       currentFile.value = ''
       phases.value.forEach(p => { p.percent = 100; p.completed = true })
       totalPercent.value = 100
+      resultPayload.value = (job?.result_summary || job?.result || null) as ImportResultPayload | null
       return 'completed'
     }
     if (status === 'failed' || status === 'timed_out' || status === 'canceled') {
@@ -272,6 +288,7 @@ function handleSSEMessage(data: SSEMessage) {
     currentFile.value = ''
     phases.value.forEach(p => { p.percent = 100; p.completed = true })
     totalPercent.value = 100
+    resultPayload.value = (data.result || null) as ImportResultPayload | null
     closeSSE()
   }
 

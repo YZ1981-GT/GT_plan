@@ -12,6 +12,7 @@
 import { ref, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { listAdjustments } from '@/services/auditPlatformApi'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 export interface AdjustmentLineMatch {
   entry_group_id: string
@@ -104,13 +105,15 @@ export function useAdjustmentDetailPropagation(opts: UseAdjustmentDetailPropagat
   }
 
   const router = useRouter()
+  /** 跳到调整大厅并定位、高亮该分录组。 */
   function jumpToAdjustment(entryGroupId: string): void {
     const projectId = unwrap(opts.projectId)
-    router.push({
-      name: 'Adjustments',
-      params: { projectId },
-      query: { group: entryGroupId },
-    }).catch(() => { /* 导航异常允许 */ })
+    const year = unwrap(opts.year)
+    router.push(buildAdjustmentRouteTarget(
+      projectId,
+      { kind: 'focus', entryGroupId },
+      { year },
+    )).catch(() => { /* 导航异常允许 */ })
   }
 
   return { allLines, loaded, load, matchByAccount, countForRow, jumpToAdjustment }

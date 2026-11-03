@@ -9,6 +9,7 @@
     <template v-else>
       <div v-if="isProcedureSheet" class="l3-procedure-toolbar">
         <el-segmented
+          v-if="procedureDualMode.showModeSwitch.value"
           :model-value="procedureDualMode.currentMode.value"
           :options="procedureDualMode.modeOptions.value"
           size="small"
@@ -173,6 +174,7 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useL3FormData } from './composables/useL3FormData'
 import { useL3CrossSheet } from './composables/useL3CrossSheet'
 import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -253,9 +255,20 @@ const currentSheet = computed(() => {
 })
 
 const isProcedureSheet = computed(() => currentSheet.value === 'L3A')
+/**
+ * 同步能力单源（spec task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实，
+ * 不由宿主或 OO 服务探活独自决定。下方把它作为 `entrySync` 传给双模式 composable。
+ */
+const l3EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-l3-long-term-loans',
+})
+
 const procedureDualMode = useCycleHtmlOoDualMode({
   wpId: toRef(props, 'wpId') as any,
   storagePrefix: 'l3-proc:',
+  entrySync: l3EntrySync,
 })
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───

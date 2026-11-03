@@ -70,10 +70,10 @@ _SECTION_PROMPTS: dict[str, str] = {
         "请结合CAS14和CAS30相关准则要求进行评价。"
     ),
     "overall-opinion": (
-        "请生成K2-1审定表底部的审计综合意见，综合评价其他流动资产科目整体的存在性、"
+        "请提供K2-1审定表底部的科目结论措辞建议，综合评价其他流动资产科目整体的存在性、"
         "完整性、计价和分摊（摊销充分性）、权利和义务、列报与披露的恰当性。"
         "说明是否发现需要调整的重大事项，审定数与未审数的主要差异原因，"
-        "合同取得成本摊销的总体合理性，对报表层面影响的结论。"
+        "合同取得成本摊销的总体合理性，并列明报表层面潜在影响的判断因素、证据缺口和建议程序；不得形成最终审计意见。"
     ),
 }
 
@@ -115,7 +115,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

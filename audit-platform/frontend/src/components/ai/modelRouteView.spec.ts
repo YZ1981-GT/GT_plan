@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import type { AIModel, AIRoute, AIRouteCandidate } from '@/services/aiModelApi'
 import {
-  activeTagText, candidateName, chainOf, deactivateConsequence, effectiveClass, effectiveText, statusText,
+  activeTagText, candidateName, candidatePolicyText, chainOf, deactivateConsequence, effectiveClass, effectiveText, statusText,
 } from './modelRouteView'
 
 function candidate(overrides: Partial<AIRouteCandidate> = {}): AIRouteCandidate {
   return {
     model_id: 'id-server', model_name: 'qwen3.8', deployment: 'server', provider: 'custom',
-    endpoint: null, source: 'database', reasoning_effort: null, implicit: false,
+    endpoint: null, source: 'database', reasoning_effort: null,
+    trust_zone: 'firm_private', client_data_allowed: true, mask_policy: 'role_based',
+    implicit: false,
     status: 'available', reason: '可用', latency_ms: 120, checked_at: null, ...overrides,
   }
 }
@@ -28,7 +30,9 @@ function model(overrides: Partial<AIModel>): AIModel {
     id: 'm', preset_key: null, model_name: 'm', model_type: 'chat', provider: 'custom',
     endpoint_url: null, reasoning_effort: null, ocr_capability: null, ocr_protocol: null,
     api_path: null, auth_scheme: null, auth_header_name: null, request_timeout_seconds: null,
-    has_api_key: false, api_key_updated_at: null, deployment: 'server', is_active: true,
+    has_api_key: false, api_key_updated_at: null, deployment: 'server',
+    trust_zone: 'firm_private', client_data_allowed: true, mask_policy: 'role_based',
+    is_active: true,
     context_window: null, performance_notes: null, created_at: null, updated_at: null, ...overrides,
   }
 }
@@ -68,6 +72,10 @@ describe('调用路由面板展示逻辑', () => {
     expect(statusText(candidate({ status: 'unknown' }))).toBe('未检测')
     expect(candidateName(candidate({ implicit: true, source: 'environment', model_name: 'Qwen3.5' }))).toBe('Qwen3.5（.env 默认）')
     expect(candidateName(candidate({ implicit: true, source: 'builtin', model_name: '本机 OCR 引擎' }))).toBe('内置引擎')
+    expect(candidatePolicyText(candidate())).toBe('事务所私有 · 可处理客户数据 · 按角色脱敏')
+    expect(candidatePolicyText(candidate({
+      trust_zone: 'approved_provider', client_data_allowed: true, mask_policy: 'strict',
+    }))).toBe('已批准外部 · 可处理客户数据 · 严格脱敏')
   })
 })
 

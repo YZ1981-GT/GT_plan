@@ -180,6 +180,9 @@
         :rows="getBlockRows(company, bt)"
         :totals="getBlockTotal(company, bt)"
         :readonly="readonly"
+        :wp-id="wpId"
+        :project-id="projectId"
+        :evidence-sheet="evidenceSheet"
         @add-row="addBlockRow(company._company_id!, bt)"
         @delete-row="(rowId: string) => deleteBlockRow(company._company_id!, bt, rowId)"
         @update-field="(rowId: string, field: string, val: any) => updateBlockField(company._company_id!, bt, rowId, field, val)"
@@ -274,6 +277,10 @@ const props = defineProps<{
   readonly: boolean
   blockTypes: BlockType[]
   blockConfigs: Record<string, BlockConfig>
+  /** 检查表行内附件（spec attachment-confirmation-evidence-loop ADR-ACE-03），原样传给 CheckBlock */
+  wpId?: string
+  projectId?: string
+  evidenceSheet?: string
   /** 余额卡第 6 项字段（D05: sales_amount，F05/F06: purchase_amount） */
   balanceField: keyof BalanceSummary
   /** 第 6 项标签（三套均为「本期销售金额」，可覆盖） */

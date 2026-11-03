@@ -471,32 +471,88 @@ class FormulaReverseIndex:
 
 _singleton: FormulaReverseIndex | None = None
 _singleton_lock = None  # asyncio.Lock created on first use
+_singleton_version: int = 0  # 本进程记下的 Redis 版本号
+_REDIS_VERSION_KEY = "formula:reverse_index:version"
+_CACHE_TTL_S = 5  # 版本号缓存秒数（不每次请求都 GET Redis）
+_last_version_check: float = 0.0
+
+
+async def _remote_version() -> int | None:
+    """从 Redis 读版本号；不可用返回 None（降级为定时重建）。"""
+    try:
+        from app.core.redis_client import get_redis
+        redis = await get_redis()
+        if redis is None:
+            return None
+        val = await redis.get(_REDIS_VERSION_KEY)
+        return int(val) if val is not None else 0
+    except Exception:
+        return None
+
+
+async def _incr_remote_version() -> None:
+    """INCR Redis 版本号；失败只记日志。"""
+    try:
+        from app.core.redis_client import get_redis
+        redis = await get_redis()
+        if redis is not None:
+            await redis.incr(_REDIS_VERSION_KEY)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).debug("reverse_index: Redis INCR 失败，其他进程将按 60s 定时重建")
 
 
 async def get_reverse_index(db: AsyncSession | None = None, *, force_rebuild: bool = False) -> FormulaReverseIndex:
     """获取共享的 FormulaReverseIndex 单例。
 
-    避免每次 API 调用都重建索引（spec 复盘 P1.1）。
-
-    - 首次调用时构建
-    - force_rebuild=True 时强制重建（如 prefill_mapping JSON 改动后）
-    - 并发安全（asyncio.Lock）
+    跨进程失效（S4 ADR-SDO-04）：
+    - 每次获取时比较 Redis 版本号（5 秒缓存，不每次 GET Redis）
+    - 版本号不同即重建（另一个进程调了 invalidate_reverse_index）
+    - Redis 不可用时退回 60 秒定时重建
     """
-    global _singleton, _singleton_lock
+    global _singleton, _singleton_lock, _singleton_version, _last_version_check
     import asyncio
+    import time
 
     if _singleton_lock is None:
         _singleton_lock = asyncio.Lock()
 
     async with _singleton_lock:
-        if _singleton is None or force_rebuild:
+        now = time.monotonic()
+        need_rebuild = force_rebuild or _singleton is None
+
+        if not need_rebuild and (now - _last_version_check) >= _CACHE_TTL_S:
+            remote_ver = await _remote_version()
+            _last_version_check = now
+            if remote_ver is None:
+                # Redis 不可用：60 秒定时重建
+                if (now - _last_version_check) >= 60:
+                    need_rebuild = True
+            elif remote_ver != _singleton_version:
+                need_rebuild = True
+                _singleton_version = remote_ver
+
+        if need_rebuild:
             idx = FormulaReverseIndex(db=db)
             await idx.build()
             _singleton = idx
+            # 同步版本号
+            remote_ver = await _remote_version()
+            if remote_ver is not None:
+                _singleton_version = remote_ver
+            _last_version_check = now
         return _singleton
 
 
 def invalidate_reverse_index() -> None:
-    """触发下次访问时重建（如 JSON 文件 mtime 变化）。"""
+    """触发本进程下次访问时重建 + INCR Redis 版本号通知其他进程。"""
     global _singleton
     _singleton = None
+    # 异步 INCR：在事件循环里调度（invalidate 是同步函数，调用方可能不在 async 上下文）
+    try:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        loop.create_task(_incr_remote_version())
+    except RuntimeError:
+        # 没有运行中的事件循环（启动期/测试），跳过 Redis 通知
+        pass

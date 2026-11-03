@@ -3,6 +3,8 @@
  *
  * 守护：只列冲突条目；逐条 / 批量决策以 `{条目 key → 处理}` 回传；逐项目「本次应用 / 暂缓」（冻结项目不可选）；
  * 提交的 decisions 与后端 Decisions 同形；版本不一致时禁止提交；换一份预览从默认开始；只读决策（提交候选）不带选择。
+ * 决策键只用服务端条目 key（`{域}|{项目}|{公式位}`，公式位可含 `|`）：多域预览里同项目同名公式位的两条各自决策，
+ * 不按项目 + 公式位拼接（spec formula-hub-integrity-closure 需求 8.4）。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -17,14 +19,30 @@ const DialogStub = defineComponent({
   template: '<div v-if="modelValue" class="dlg"><slot /><slot name="footer" /></div>',
 })
 const stubs = { ElDialog: DialogStub }
+/** 逐行处理的单选组：露出绑定值、可直接发选择（看模板里每行用的是哪个 key） */
+const RadioGroupStub = defineComponent({
+  name: 'ElRadioGroupStub',
+  props: { modelValue: { type: String, default: '' }, disabled: { type: Boolean, default: false } },
+  emits: ['update:modelValue'],
+  template: '<div class="fct-choice" :data-value="modelValue"><slot /></div>',
+})
+const RadioButtonStub = defineComponent({ name: 'ElRadioButtonStub', template: '<span><slot /></span>' })
 
-function plan(key: string, category: string, over: Record<string, unknown> = {}) {
-  const [pid, slot] = key.split('|')
+/** 服务端预览条目：key 由服务端给出（`{域}|{项目}|{公式位}`），组件只认它 */
+function plan(domain: string, pid: string, slot: string, category: string, over: Record<string, unknown> = {}) {
   return {
-    key, project_id: pid, project_name: `项目${pid}`, frozen: false, slot_key: slot, label: slot,
-    category, category_label: category, base_formula: 'A', new_formula: 'B', local_formula: 'C', ...over,
+    key: `${domain}|${pid}|${slot}`, domain, project_id: pid, project_name: `项目${pid}`, frozen: false,
+    slot_key: slot, label: slot, category, category_label: category, base_formula: 'A', new_formula: 'B',
+    local_formula: 'C', ...over,
   }
 }
+
+const K1 = 'report|p1|balance_sheet:BS-002'
+const K2 = 'report|p2|balance_sheet:BS-002'
+/** 两个域同项目同名公式位（公式位含 `|`）：服务端给两条不同的 key */
+const SAME_SLOT = '五、1|4:1'
+const TWO_DOMAINS = [plan('tb_detail', 'p1', SAME_SLOT, 'conflict'), plan('note', 'p1', SAME_SLOT, 'conflict')]
+const [TB_KEY, NOTE_KEY] = TWO_DOMAINS.map((i) => i.key)
 
 const PREVIEW = {
   domain: 'report', scope: 'soe_standalone',
@@ -39,10 +57,10 @@ const PREVIEW = {
     ],
   },
   items: [
-    plan('p1|balance_sheet:BS-002', 'conflict'),
-    plan('p2|balance_sheet:BS-002', 'conflict'),
-    plan('p2|balance_sheet:BS-003', 'follow'),
-    plan('p3|balance_sheet:BS-002', 'frozen', { frozen: true }),
+    plan('report', 'p1', 'balance_sheet:BS-002', 'conflict'),
+    plan('report', 'p2', 'balance_sheet:BS-002', 'conflict'),
+    plan('report', 'p2', 'balance_sheet:BS-003', 'follow'),
+    plan('report', 'p3', 'balance_sheet:BS-002', 'frozen', { frozen: true }),
   ],
 }
 
@@ -55,13 +73,29 @@ describe('FormulaConflictTable', () => {
       },
       global: { plugins: [ElementPlus] },
     })
-    expect((w.vm as any).conflicts.map((i: any) => i.key)).toEqual(['p1|balance_sheet:BS-002', 'p2|balance_sheet:BS-002'])
-    ;(w.vm as any).setOne('p1|balance_sheet:BS-002', 'keep')
-    expect(w.emitted('update:modelValue')?.[0]).toEqual([{ 'p1|balance_sheet:BS-002': 'keep' }])
+    expect((w.vm as any).conflicts.map((i: any) => i.key)).toEqual([K1, K2])
+    ;(w.vm as any).setOne(K1, 'keep')
+    expect(w.emitted('update:modelValue')?.[0]).toEqual([{ [K1]: 'keep' }])
     await w.find('[data-testid="fct-all-adopt"]').trigger('click')
-    expect(w.emitted('update:modelValue')?.[1]).toEqual([{
-      'p1|balance_sheet:BS-002': 'adopt', 'p2|balance_sheet:BS-002': 'adopt',
-    }])
+    expect(w.emitted('update:modelValue')?.[1]).toEqual([{ [K1]: 'adopt', [K2]: 'adopt' }])
+    w.unmount()
+  })
+
+  it('两个域的同名公式位：每行按服务端 key 显示与回传，不按项目 + 公式位拼接', async () => {
+    const w = mount(FormulaConflictTable, {
+      props: {
+        items: TWO_DOMAINS as any, modelValue: { [NOTE_KEY]: 'keep' }, defaultChoice: 'ask',
+        choices: [{ value: 'adopt', label: '采用' }, { value: 'keep', label: '保留' }, { value: 'ask', label: '交确认' }],
+      },
+      global: { plugins: [ElementPlus], stubs: { ElRadioGroup: RadioGroupStub, ElRadioButton: RadioButtonStub } },
+    })
+    await flushPromises()
+    const rows = w.findAllComponents(RadioGroupStub)
+    expect(rows.map((r) => r.props('modelValue'))).toEqual(['ask', 'keep'])
+    rows[0].vm.$emit('update:modelValue', 'adopt')
+    expect(w.emitted('update:modelValue')?.[0]).toEqual([{ [NOTE_KEY]: 'keep', [TB_KEY]: 'adopt' }])
+    await w.find('[data-testid="fct-all-adopt"]').trigger('click')
+    expect(w.emitted('update:modelValue')?.[1]).toEqual([{ [TB_KEY]: 'adopt', [NOTE_KEY]: 'adopt' }])
     w.unmount()
   })
 })
@@ -93,17 +127,27 @@ describe('FormulaPublishPreviewDialog', () => {
     const vm = w.vm as any
     vm.setAllProjects('defer')
     vm.setProject('p2', 'apply')
-    vm.conflictChoices = { 'p1|balance_sheet:BS-002': 'adopt' }
+    vm.conflictChoices = { [K1]: 'adopt' }
     vm.note = '  统一口径  '
     await vm.onSubmit()
     expect(submit).toHaveBeenCalledWith({
       decisions: {
         project_choices: { p1: 'defer', p2: 'apply' },
-        conflict_choices: { 'p1|balance_sheet:BS-002': 'adopt' },
+        conflict_choices: { [K1]: 'adopt' },
         default_conflict: 'ask',
       },
       note: '统一口径',
     })
+    w.unmount()
+  })
+
+  it('多域预览：表格里的逐条决策经 v-model 原样以服务端 key 提交（公式位含 |）', async () => {
+    const w = open({ preview: { ...PREVIEW, items: TWO_DOMAINS } })
+    const table = w.findComponent(FormulaConflictTable)
+    ;(table.vm as any).setOne(NOTE_KEY, 'keep')
+    await nextTick()
+    await (w.vm as any).onSubmit()
+    expect(submit.mock.calls[0][0].decisions.conflict_choices).toEqual({ [NOTE_KEY]: 'keep' })
     w.unmount()
   })
 
@@ -141,7 +185,7 @@ describe('FormulaPublishPreviewDialog', () => {
     const w = open()
     const vm = w.vm as any
     vm.setProject('p1', 'defer')
-    vm.conflictChoices = { 'p1|balance_sheet:BS-002': 'keep' }
+    vm.conflictChoices = { [K1]: 'keep' }
     await w.setProps({ preview: { ...PREVIEW } as any })
     await nextTick()
     expect(vm.projectChoices).toEqual({})
@@ -153,7 +197,7 @@ describe('FormulaPublishPreviewDialog', () => {
     const w = open({ readonlyDecisions: true })
     const vm = w.vm as any
     vm.setProject('p1', 'defer')
-    vm.conflictChoices = { 'p1|balance_sheet:BS-002': 'adopt' }
+    vm.conflictChoices = { [K1]: 'adopt' }
     await vm.onSubmit()
     expect(submit.mock.calls[0][0].decisions).toEqual({ project_choices: {}, conflict_choices: {}, default_conflict: 'ask' })
     w.unmount()

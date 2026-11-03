@@ -102,4 +102,22 @@ describe('useG7ConsolLinkageEntry', () => {
     expect(ok).toBe(false)
     expect(e.configError.value).toContain('上下文')
   })
+
+  // post-push-residual-defect-closure R2：项目没填审计年度为 null（不按今年兜底）
+  it('审计年度为空：预览不发请求、写明去填年度；导入不发请求；跳合并页不带 year=null', async () => {
+    const year = ref<number | null>(null)
+    const e = useG7ConsolLinkageEntry(ref('p1'), year)
+    expect(await e.openPreview()).toBe(false)
+    expect(e.configError.value).toBe('未设置审计年度，请先在项目基本信息中填写')
+    expect(apiMocks.previewG7Linkage).not.toHaveBeenCalled()
+
+    // 预览后年度被清空（项目信息改了）：导入不发请求、提示去填
+    year.value = 2025
+    apiMocks.previewG7Linkage.mockResolvedValue(mkPreview())
+    expect(await e.openPreview()).toBe(true)
+    year.value = null
+    expect(await e.confirmImport()).toBe(false)
+    expect(apiMocks.importG7Linkage).not.toHaveBeenCalled()
+    expect(elMsg.warning).toHaveBeenCalledWith('未设置审计年度，请先在项目基本信息中填写')
+  })
 })

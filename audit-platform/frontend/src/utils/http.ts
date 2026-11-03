@@ -4,16 +4,36 @@
  * 功能：Bearer token 自动附加、401 自动刷新、ApiResponse 统一解包、
  *       分级错误处理、请求取消（AbortController）、请求去重、自动重试
  */
-import axios, { type AxiosResponse, type InternalAxiosRequestConfig, type AxiosError } from 'axios'
+import axios, { type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig, type AxiosError } from 'axios'
 import NProgress from 'nprogress'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
-import { getClientInstanceId } from './clientInstance'
+import { claimClientInstanceId, getClientInstanceId, isClientInstanceSettled } from './clientInstance'
 import { refIssueDetailText } from './formulaRefIssues'
+import {
+  advanceGetShareBarrier,
+  asAbortSignal,
+  canceledError,
+  copySharedData,
+  planSharedGet,
+  sharedGet,
+  standaloneGet,
+  type Flight,
+  type SharedGetConfig,
+} from './getSingleFlight'
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
+const PROGRESS_COUNTED = Symbol('gtProgressCounted')
+const SERIALIZED_BODY_FINGERPRINT = Symbol('gtSerializedBodyFingerprint')
+
+export type GtRequestConfig = AxiosRequestConfig & {
+  _background?: boolean
+  _dedupe?: boolean
+  _retrySafe?: boolean
+  _silent?: boolean
+}
 
 // ── Trace ID 存储（R7-S2-11）──────────────────────────────
 let _lastTraceId = ''
@@ -71,7 +91,7 @@ const http = axios.create({
   timeout: 180000,
 })
 
-// ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────
+// ── 写请求防重复提交（GET 不进这里：同一 GET 在飞时共享那一次请求，见文末 http.get 包装与 getSingleFlight）──
 const pendingMap = new Map<string, AbortController>()
 // POST/PUT/PATCH 防重复提交的自动清理定时器（防止超时/取消时 key 泄漏）
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -98,32 +118,64 @@ const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const DEDUPE_KEY = Symbol('gtDedupeKey')
 const DEDUPE_OWNER = Symbol('gtDedupeOwner')
 
+function hashRequestBody(text: string): string {
+  // 两路 32-bit FNV，完整扫描正文，避免「前 100 字符 + 长度」碰撞误杀不同写请求。
+  let first = 0x811c9dc5
+  let second = 0x9e3779b9
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index)
+    first = Math.imul(first ^ code, 0x01000193)
+    second = Math.imul(second ^ code, 0x85ebca6b)
+  }
+  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
+}
+
+function isPlainJsonBody(value: unknown): value is Record<string, unknown> | unknown[] {
+  if (Array.isArray(value)) return true
+  if (!value || typeof value !== 'object') return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function sameTransforms(left: unknown, right: unknown): boolean {
+  const a = Array.isArray(left) ? left : left == null ? [] : [left]
+  const b = Array.isArray(right) ? right : right == null ? [] : [right]
+  return a.length === b.length && a.every((item, index) => item === b[index])
+}
+
+function prepareJsonBody(config: InternalAxiosRequestConfig): void {
+  if (!isPlainJsonBody(config.data)) return
+  if (!sameTransforms(config.transformRequest, http.defaults.transformRequest)) return
+  try {
+    const serialized = JSON.stringify(config.data)
+    ;(config as any)[SERIALIZED_BODY_FINGERPRINT] = `${hashRequestBody(serialized)}|len:${serialized.length}`
+    config.data = serialized
+    const headers = config.headers as any
+    if (typeof headers?.setContentType === 'function') headers.setContentType('application/json')
+    else if (typeof headers?.set === 'function') headers.set('Content-Type', 'application/json')
+    else headers['Content-Type'] = 'application/json'
+  } catch {
+    // 环引用或自定义序列化失败时保持 Axios 原路径，由它给出标准错误。
+  }
+}
+
 function getRequestKey(config: InternalAxiosRequestConfig): string {
   const base = `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
-  // POST/PUT/PATCH 请求：对 body 做轻量 hash（取前100字符+总长度），避免大 body 时 JSON.stringify 性能差
-  if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
-    try {
-      const bodyStr = JSON.stringify(config.data)
-      const bodyHash = `${bodyStr.slice(0, 100)}|len:${bodyStr.length}`
-      return `${base}:${bodyHash}`
-    } catch {
-      return base
-    }
-  }
-  return base
+  const fingerprint = (config as any)[SERIALIZED_BODY_FINGERPRINT] as string | undefined
+  return fingerprint ? `${base}:${fingerprint}` : base
 }
 
 function addPending(config: InternalAxiosRequestConfig) {
   // 附件预览等调用方可显式关闭去重：不进 pendingMap，且保留调用方 signal
   if ((config as any)._dedupe === false) return
+  const method = (config.method || 'get').toUpperCase()
+  // GET 不进去重表、保留调用方 signal：同一 GET 在飞时由 http.get 包装共享那一次请求
+  //（原先「后发取消先发」：同页两个组件取同一地址时先发方静默失败，spec platform-performance-residual-findings-closure R11）
+  if (method === 'GET') return
   const key = getRequestKey(config)
   // 跳过 FormData 上传请求（文件上传不参与去重）
   if (config.data instanceof FormData) return
-  const method = config.method?.toUpperCase()
-  if (method === 'GET' && pendingMap.has(key)) {
-    // GET 去重：取消前一个相同请求
-    pendingMap.get(key)!.abort()
-  } else if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && pendingMap.has(key)) {
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && pendingMap.has(key)) {
     // POST/PUT/PATCH 防重复提交：取消当前请求（保留先发的）
     const controller = new AbortController()
     controller.abort()
@@ -156,9 +208,8 @@ function removePending(config: InternalAxiosRequestConfig) {
   //    pendingMap（`_dedupe:false` / FormData / 被防重复提交早退的那一发）⇒ 无事可做。
   const key = (config as any)?.[DEDUPE_KEY] as string | undefined
   if (!key) return
-  // GET 去重会 abort 先发请求并让后发请求**接管**同一把键。先发请求的 rejection 是在
-  // 后发请求 addPending 之后才派发的微任务，此时条目里已是后发者的 controller ——
-  // 按 owner 比对，避免先发者把后发者还在飞的闸门删掉。
+  // 按 owner 比对，只删自己占的那一条（原先 GET 去重会 abort 先发者、让后发者接管同一把键，
+  // 先发者的 rejection 晚到时不得删掉后发者的闸门；GET 现已不进去重表，比对保留作防御）。
   const owner = (config as any)[DEDUPE_OWNER] as AbortController | undefined
   if (owner && pendingMap.get(key) !== owner) return
   pendingMap.delete(key)
@@ -168,6 +219,11 @@ function removePending(config: InternalAxiosRequestConfig) {
     clearTimeout(timer)
     pendingTimers.delete(key)
   }
+}
+
+/** 非 GET 即写请求（结束时推进 GET 共享的新鲜度屏障） */
+function isWriteRequest(config?: { method?: string }): boolean {
+  return !!config && (config.method || 'get').toUpperCase() !== 'GET'
 }
 
 /**
@@ -236,29 +292,66 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
 }
 
 // ── 请求拦截器 ──────────────────────────────────────────
+
+/**
+ * 要带窗口编号 X-Client-Instance 的请求（不涉鉴权，仅编辑锁隔离；后端按它判断是不是持锁的那个窗口发的）：
+ * 编辑锁端点、所有写请求、取 OnlyOffice 配置（锁在别的窗口时后端给只读配置）。
+ * spec: multi-window-ledger-workbench Phase 3 Task 16；workpaper-multi-window-lock-gaps R2.6 / R3.4
+ */
+export function needsClientInstance(method: string, url: string | undefined): boolean {
+  if (method !== 'GET') return true
+  return !!url && (url.includes('/editing-locks/') || url.includes('/onlyoffice-config'))
+}
+
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const method = (config.method || 'get').toUpperCase()
+  // 正文序列化与同写防重必须在任何异步窗口认领之前完成。否则两个同体写请求会因
+  // claimClientInstanceId 的完成顺序倒置，后调用者反而占到闸门。
+  prepareJsonBody(config)
+  addPending(config)
+  if (needsClientInstance(method, config.url) && !isClientInstanceSettled()) {
+    // 窗口编号定下来之前不发：复制出来的标签页认领时可能换号（workpaper-multi-window-lock-gaps R5.4）
+    return claimClientInstanceId()
+      .then(() => prepareRequest(config, method))
+      .catch((error) => {
+        removePending(config)
+        throw error
+      })
+  }
+  return prepareRequest(config, method)
+})
+
+function beginProgress(config: InternalAxiosRequestConfig): void {
+  if ((config as any)._background === true) return
+  ;(config as any)[PROGRESS_COUNTED] = true
+  activeRequests += 1
+  if (activeRequests === 1) NProgress.start()
+  else NProgress.inc()
+}
+
+function endProgress(config?: InternalAxiosRequestConfig): void {
+  if (!config || !(config as any)[PROGRESS_COUNTED]) return
+  delete (config as any)[PROGRESS_COUNTED]
+  activeRequests = Math.max(0, activeRequests - 1)
+  if (activeRequests === 0) NProgress.done()
+}
+
+function prepareRequest(config: InternalAxiosRequestConfig, method: string): InternalAxiosRequestConfig {
   const authStore = useAuthStore()
   config.headers = config.headers ?? {}
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
-  // 多窗口编辑锁隔离：编辑锁端点自动携带 X-Client-Instance header
-  // spec: multi-window-ledger-workbench Phase 3 Task 16
-  if (config.url && config.url.includes('/editing-locks/')) {
+  if (needsClientInstance(method, config.url)) {
     config.headers['X-Client-Instance'] = getClientInstanceId()
   }
-  addPending(config)
-  // NProgress：首个请求启动进度条，后续请求递增
-  activeRequests++
-  if (activeRequests === 1) {
-    NProgress.start()
-  } else {
-    NProgress.inc()
-  }
+  // 写请求发出：此前在飞的 GET 不再给之后的请求共用（结束时再推一次，见 getSingleFlight 新鲜度屏障）
+  if (method !== 'GET') advanceGetShareBarrier()
+  beginProgress(config)
   // 记录请求开始时间
   ;(config as any)._startTime = Date.now()
   return config
-})
+}
 
 // ── 401 刷新队列 ────────────────────────────────────────
 let isRefreshing = false
@@ -288,10 +381,38 @@ function _hideRetryToast() {
   }
 }
 
+const RETRYABLE_5XX = new Set([500, 502, 503])
+
+function headerValue(headers: unknown, name: string): unknown {
+  if (!headers || typeof headers !== 'object') return undefined
+  const value = headers as any
+  if (typeof value.get === 'function') {
+    const found = value.get(name)
+    if (found != null) return found
+  }
+  const wanted = name.toLowerCase()
+  const key = Object.keys(value).find((item) => item.toLowerCase() === wanted)
+  return key ? value[key] : undefined
+}
+
+/** 5xx 自动重试只允许幂等读，或带服务端幂等键/显式安全声明的写请求。 */
+export function shouldRetry5xx(
+  config: (AxiosRequestConfig & { _retrySafe?: boolean }) | undefined,
+  status: number | undefined,
+): boolean {
+  if (!config || status == null || !RETRYABLE_5XX.has(status)) return false
+  const method = String(config.method || 'get').toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true
+  if ((config as any)._retrySafe === true) return true
+  const idempotencyKey = headerValue(config.headers, 'Idempotency-Key')
+  return typeof idempotencyKey === 'string' && idempotencyKey.trim().length > 0
+}
+
 // ── 响应拦截器 ──────────────────────────────────────────
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
+    if (isWriteRequest(response.config)) advanceGetShareBarrier()
     // R7-S2-11: 存储 trace id
     _lastTraceId = response.headers?.['x-request-id'] || ''
     // 版本协商：读 X-App-Version 头推送到 versionBridge
@@ -301,9 +422,8 @@ http.interceptors.response.use(
     }
     // R10 Spec C: 5xx 环形缓冲区记录响应
     _trackResponse(response.status)
-    // NProgress：所有请求完成后结束进度条
-    activeRequests = Math.max(0, activeRequests - 1)
-    if (activeRequests === 0) NProgress.done()
+    // NProgress：只结束本请求在发送时实际登记的前台进度。
+    endProgress(response.config as InternalAxiosRequestConfig)
     // 记录请求日志
     const startTime = (response.config as any)._startTime
     if (startTime) {
@@ -330,15 +450,15 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+    if (isWriteRequest(error.config)) advanceGetShareBarrier()
     // 信封适配：必须在任何 return/reject 之前，保证每条错误出口的 data 形状一致
     normaliseErrorEnvelope(error.response)
     // R7-S2-11: 存储 trace id（错误响应）
     _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
     // R10 Spec C: 5xx 环形缓冲区记录错误响应
     _trackResponse(error.response?.status ?? 0)
-    // NProgress：错误时也递减计数
-    activeRequests = Math.max(0, activeRequests - 1)
-    if (activeRequests === 0) NProgress.done()
+    // NProgress：background 请求未登记，不得减少其他前台请求的计数。
+    endProgress(error.config as InternalAxiosRequestConfig | undefined)
 
     // 记录错误请求日志
     if (error.config) {
@@ -359,7 +479,11 @@ http.interceptors.response.use(
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
 
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean
+      _retryCount?: number
+      _bookedAdjustmentRetried?: boolean
+    }
     const authStore = useAuthStore()
     const status = error.response?.status
 
@@ -391,6 +515,7 @@ http.interceptors.response.use(
         return new Promise((resolve, reject) => {
           refreshQueue.push({
             resolve: (token: string) => {
+              originalRequest._retry = true
               originalRequest.headers = originalRequest.headers ?? {}
               originalRequest.headers.Authorization = `Bearer ${token}`
               resolve(http(originalRequest))
@@ -427,6 +552,26 @@ http.interceptors.response.use(
         window.location.href = '/login'
       }
       return Promise.reject(error)
+    }
+
+    // 底稿发布涉及“客户已入账”调整：用户逐组确认移除后，保留原 body/token 重发一次。
+    if (status === 409 && originalRequest && !originalRequest._bookedAdjustmentRetried) {
+      const { addBookedAdjustmentAck, bookedAdjustmentConfirmText, parseBookedAdjustmentAckError } = await import('./bookedAdjustmentPublishRetry')
+      const groups = parseBookedAdjustmentAckError(error.response?.data)
+      if (groups) {
+        try {
+          await ElMessageBox.confirm(
+            bookedAdjustmentConfirmText(groups),
+            '确认底稿未重复计入客户已入账调整',
+            { type: 'warning', confirmButtonText: '已移除，继续发布', cancelButtonText: '取消发布' },
+          )
+        } catch {
+          return Promise.reject(error)
+        }
+        const retry = addBookedAdjustmentAck(originalRequest, groups) as typeof originalRequest
+        retry._bookedAdjustmentRetried = true
+        return http(retry)
+      }
     }
 
     // _silent 模式：调用方自行处理错误，不弹全局 toast
@@ -466,8 +611,8 @@ http.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 500/502/503 自动重试（最多 2 次）+ loading 提示
-    if (status && status >= 500 && originalRequest && (originalRequest._retryCount ?? 0) < 2) {
+    // 500/502/503 自动重试（最多 2 次）。写请求必须携带服务端幂等键或显式声明安全。
+    if (shouldRetry5xx(originalRequest, status) && (originalRequest._retryCount ?? 0) < 2) {
       originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
       _showRetryToast(originalRequest._retryCount)
       try {
@@ -579,8 +724,12 @@ export function saveBlobAsFile(blob: Blob, fileName: string) {
   const a = document.createElement('a')
   a.href = objectUrl
   a.download = fileName
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  window.URL.revokeObjectURL(objectUrl)
+  a.remove()
+  // Safari/Chromium 需要在下载任务接管 blob URL 后再释放；同步 revoke 会偶发得到 0 字节或不触发下载。
+  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0)
 }
 
 export async function downloadFile(
@@ -616,12 +765,41 @@ export function createCancelToken() {
   }
 }
 
+// ── GET 共享在途（spec platform-performance-residual-findings-closure R11）──────────
+// 同一 GET（地址、参数、返回类型、静默标记、登录身份相同，配置只含白名单项）在飞时，后发者共用先发者那一次请求，
+// 各调用方有自己的取消边界、拿自己的响应对象；白名单外的配置（headers / timeout / validateStatus / 适配器……）
+// 或 `_dedupe:false` 独立发送。规则在 getSingleFlight（与 apiProxy 同一份）。
+const _rawGet = http.get.bind(http) as typeof http.get
+const _getFlights = new Map<string, Flight<AxiosResponse>>()
+
+/** 后加入者的响应：响应对象浅拷贝、数据按 copySharedData 拷贝（第一个拿到的调用方拿原对象） */
+function copySharedResponse(response: AxiosResponse): AxiosResponse {
+  return { ...response, data: copySharedData(response.data) }
+}
+
+http.get = (<T = any, R = AxiosResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>): Promise<R> => {
+  const plan = planSharedGet(url, config as SharedGetConfig | undefined)
+  if (plan) {
+    return sharedGet<AxiosResponse>(_getFlights, plan, () => _rawGet(url, plan.transport), copySharedResponse, config) as Promise<R>
+  }
+  // 独立发送（调用方 signal 原样给底层）；同样有身份代际边界：登出 / 换人后旧请求的结果不交给新身份
+  const signal = asAbortSignal(config?.signal) ?? undefined
+  if (signal?.aborted) return Promise.reject(canceledError(config))
+  return standaloneGet(_rawGet<T, R, D>(url, config), signal, config)
+}) as typeof http.get
+
+/** Vitest only：用例之间不共享在途记录 */
+export function resetHttpGetFlightsForTests(): void {
+  _getFlights.clear()
+}
+
 export default http
 
 /**
- * 判断错误是否由 GET 请求去重（`addPending` 的 `AbortController.abort()`）导致的取消。
+ * 判断错误是否是「取消」：调用方自己的 signal 取消了请求 / 订阅，或登录身份已切换（见 getSingleFlight）。
  *
- * 调用方的 catch 块应优先检查此函数——取消不是真正的失败，后发请求会带回正确数据。
+ * 调用方的 catch 块应优先检查此函数——取消不是真正的失败。原先 GET 去重是「后发取消先发」，同一 GET 的先发方也会
+ * 收到取消；现在同一 GET 在飞时共享那一次请求，不再因去重而取消。
  * 导出此函数是为了让全仓 composable 不必各自 `import axios` 再调 `axios.isCancel`。
  */
 export function isRequestCancelled(error: unknown): boolean {

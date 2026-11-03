@@ -403,7 +403,6 @@ import { reviewContent, updateReviewStatus, type ReviewIssue } from '@/services/
 import { handleApiError } from '@/utils/errorHandler'
 import ReviewPrioritySelector from '@/components/review/ReviewPrioritySelector.vue'
 import ReviewTemplatePanel from '@/components/review/ReviewTemplatePanel.vue'
-import { api } from '@/services/apiProxy'
 import GtRowActions from '@/components/common/GtRowActions.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
@@ -474,11 +473,43 @@ function isResubmitRow(row: ReviewInboxItem): boolean {
 }
 
 function reviewStatusLabel(s: string): string {
-  if (s === 'pending_level1') return '待一级复核'
-  if (s === 'pending_level2') return '待二级复核'
-  if (s === 'level1_rejected') return '一级退回'
-  if (s === 'level2_rejected') return '二级退回'
-  return s
+  const m: Record<string, string> = {
+    pending_level1: '待一级复核',
+    level1_in_progress: '一级复核中',
+    level1_passed: '一级通过',
+    level1_rejected: '一级退回',
+    pending_level2: '待二级复核',
+    level2_in_progress: '二级复核中',
+    level2_passed: '二级通过',
+    level2_rejected: '二级退回',
+    pending_level3: '待三级复核',
+    level3_in_progress: '三级复核中',
+    level3_passed: '三级通过',
+    level3_rejected: '三级退回',
+    pending_level4: '待四级复核',
+    level4_in_progress: '四级复核中',
+    level4_passed: '四级通过',
+    level4_rejected: '四级退回',
+    not_submitted: '未提交',
+  }
+  return m[s] ?? s
+}
+
+/**
+ * 从当前 review_status 推导「通过」后的下一个状态值。
+ * pending_levelN / levelN_in_progress → levelN_passed
+ */
+function resolveNextPassedStatus(current: string): string {
+  const m = current.match(/(?:pending_|)level(\d)/)
+  const n = m ? m[1] : '1'
+  return `level${n}_passed`
+}
+
+/** 从当前 review_status 推导「退回」后的下一个状态值。 */
+function resolveNextRejectedStatus(current: string): string {
+  const m = current.match(/(?:pending_|)level(\d)/)
+  const n = m ? m[1] : '1'
+  return `level${n}_rejected`
 }
 
 function severityClass(s: string): string {
@@ -631,8 +662,7 @@ async function approveCurrent() {
   actioning.value = true
   pendingAction.value = 'approve'
   try {
-    const nextStatus =
-      item.review_status === 'pending_level2' ? 'level2_passed' : 'level1_passed'
+    const nextStatus = resolveNextPassedStatus(item.review_status)
     await updateReviewStatus(item.project_id, item.id, nextStatus)
     ElMessage.success('复核通过')
     items.value = items.value.filter((i) => i.id !== item.id)
@@ -652,8 +682,7 @@ async function rejectCurrent() {
   actioning.value = true
   pendingAction.value = 'reject'
   try {
-    const nextStatus =
-      item.review_status === 'pending_level2' ? 'level2_rejected' : 'level1_rejected'
+    const nextStatus = resolveNextRejectedStatus(item.review_status)
     await updateReviewStatus(item.project_id, item.id, nextStatus, reviewComment.value)
     ElMessage.warning('已退回修改')
     items.value = items.value.filter((i) => i.id !== item.id)
@@ -728,14 +757,10 @@ async function confirmBatchPass() {
   if (!pid) return
   batchPassLoading.value = true
   try {
-    const result = await api.post<{ success_count: number; skipped_count: number; skipped_items: { wp_id: string; reason: string }[] }>(
-      `/api/projects/${pid}/batch-review-pass`,
-      { wp_ids: selectedIds.value, comment: batchPassComment.value }
-    )
-    batchPassResult.value = result
+    const result = await batchReview(pid, selectedIds.value, 'approve', batchPassComment.value)
+    batchPassResult.value = result as any
     showBatchPassDialog.value = false
     showBatchPassResult.value = true
-    // 刷新列表
     await loadData()
   } catch (e: any) {
     handleApiError(e, '批量通过')

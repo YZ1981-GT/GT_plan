@@ -1,4 +1,4 @@
-"""H7 生产性生物资产 — 路由（4端点）.
+"""H7 生产性生物资产 — 路由（3端点）.
 
 Spec: .kiro/specs/h7-biological-assets/ Task 5.2
 Requirements: 3.4, 13.3
@@ -7,7 +7,9 @@ Requirements: 3.4, 13.3
 - GET  /h7/export-template  导出模板
 - GET  /h7/export-data      导出数据
 - POST /h7/import-data      导入数据
-- GET  /h7/industry-check   行业适用性校验
+
+原 ``GET /h7/industry-check`` 已删除（spec trim-followup-residual-findings-closure R1.3）：它把质控分类码当行业、
+永不命中，前端也没有调用方。
 """
 from __future__ import annotations
 
@@ -19,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.services.h7_biological_assets_service import (
-    check_industry_applicability,
     export_h7_template,
     export_h7_data,
     import_h7_data,
@@ -28,16 +29,6 @@ from app.services.h7_biological_assets_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/workpapers/{wp_id}/h7", tags=["h7-biological-assets"])
-
-
-@router.get("/industry-check")
-async def industry_check(
-    wp_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """检查项目行业适用性（农林牧渔）."""
-    result = await check_industry_applicability(wp_id, db)
-    return {"data": result}
 
 
 @router.get("/export-template")

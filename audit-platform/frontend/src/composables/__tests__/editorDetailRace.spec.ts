@@ -1,7 +1,7 @@
 /**
  * 编辑器首屏底稿详情竞态（spec procedure-chain-hardening-and-java-contracts R1）
  *
- * 真实 utils/http（GET 去重取消先发）+ apiProxy（无 config 的 GET 在途共享）+ 假 adapter；
+ * 真实 utils/http（R11 起同一 GET 在飞时共享、不再取消先发）+ apiProxy（GET 在途共享）+ 假 adapter；
  * 不 mock useEditorMode / useEditorUniver / workpaperApi。复现 Shell（fetchComponentType）与
  * Univer 核心（initUniver）同时取同一底稿详情：修复前 2 发、先发被取消、核心判「底稿文件尚未生成」。
  */
@@ -104,12 +104,12 @@ describe('编辑器首屏底稿详情竞态（真实 GET 去重）', () => {
   }
 
   /** 以组件宿主挂 useWpRenderer（它在 onMounted 里发请求）。 */
-  async function mountRenderer(options?: { silent?: boolean }) {
+  async function mountRenderer() {
     const { useWpRenderer } = await import('@/composables/useWpRenderer')
     let state: any
     const Host = defineComponent({
       setup() {
-        state = options ? useWpRenderer(ref(WID), options) : useWpRenderer(ref(WID))
+        state = useWpRenderer(ref(WID))
         return () => h('div')
       },
     })
@@ -144,7 +144,7 @@ describe('编辑器首屏底稿详情竞态（真实 GET 去重）', () => {
     expect(vi.mocked(ElMessage.warning)).not.toHaveBeenCalled()
   })
 
-  it('详情 404 时壳的辅助请求也静默：步骤映射、侧栏渲染配置（R10）；不带 silent 的照旧提示（对照）', async () => {
+  it('详情 404 时壳的辅助请求也静默：步骤映射（R10）；GtWpRenderer 主路径照旧提示（对照）', async () => {
     const { ElMessage } = await import('element-plus')
     const axiosMod = (await import('axios')).default
     http.defaults.adapter = async (config: any) => {
@@ -155,16 +155,15 @@ describe('编辑器首屏底稿详情竞态（真实 GET 去重）', () => {
     try {
       const { useStepMapping } = await import('@/composables/useStepMapping')
       await useStepMapping(WID).loadMapping()
-      const shell = await mountRenderer({ silent: true })
-      await vi.waitFor(() => expect(shell.state.loading.value).toBe(false))
-      expect(shell.state.error.value).toBeTruthy()
       expect(vi.mocked(ElMessage.warning)).not.toHaveBeenCalled()
       expect(vi.mocked(ElMessage.error)).not.toHaveBeenCalled()
-      shell.wrapper.unmount()
 
-      // 对照：GtWpRenderer 的主路径不带 silent，仍由全局拦截器提示 —— 证明上面的「没提示」不是空转
+      // 对照：GtWpRenderer 的主路径不静默，仍由全局拦截器提示 —— 证明上面的「没提示」不是空转。
+      // （壳原先另有一份静默的 render-config 给侧栏 decision_trace，spec platform-perf-hotspots R4 起改读
+      //  GtWpRenderer 的配置，壳不再自带实例 —— 由 WorkpaperEditor.chainWiring.spec.ts 钉住。）
       const renderer = await mountRenderer()
       await vi.waitFor(() => expect(renderer.state.loading.value).toBe(false))
+      expect(renderer.state.error.value).toBeTruthy()
       expect(vi.mocked(ElMessage.warning)).toHaveBeenCalledTimes(1)
       renderer.wrapper.unmount()
     } finally {
@@ -172,51 +171,21 @@ describe('编辑器首屏底稿详情竞态（真实 GET 去重）', () => {
     }
   })
 
-  it('侧栏渲染配置（silent）与 GtWpRenderer 同时取同一 render-config：互不取消（R10）', async () => {
-    const axiosMod = (await import('axios')).default
-    const outcomes: string[] = []
-    let open!: () => void
-    const gate = new Promise<void>((r) => { open = r })
-    http.defaults.adapter = async (config: any) => {
-      const i = outcomes.push('pending') - 1
-      await new Promise<void>((resolve, reject) => {
-        const onAbort = () => { outcomes[i] = 'canceled'; reject(new axiosMod.CanceledError(undefined, undefined, config)) }
-        if (config.signal?.aborted) return onAbort()
-        config.signal?.addEventListener?.('abort', onAbort, { once: true })
-        gate.then(() => { config.signal?.removeEventListener?.('abort', onAbort); resolve() })
-      })
-      outcomes[i] = 'ok'
-      return { data: { wp_code: 'H1A', sheets: [] }, status: 200, statusText: 'OK', headers: {}, config }
-    }
-    const shell = await mountRenderer({ silent: true }) // 壳在挂载时先发
-    await vi.waitFor(() => expect(outcomes).toHaveLength(1))
-    const renderer = await mountRenderer() // 归类加载完 GtWpRenderer 再发，壳那一发还在途
-    await vi.waitFor(() => expect(outcomes).toHaveLength(2))
-    open()
-    await vi.waitFor(() => {
-      expect(shell.state.loading.value).toBe(false)
-      expect(renderer.state.loading.value).toBe(false)
-    })
-    expect(outcomes).toEqual(['ok', 'ok'])
-    expect(shell.state.renderConfig.value?.wp_code).toBe('H1A')
-    expect(renderer.state.renderConfig.value?.wp_code).toBe('H1A')
-    shell.wrapper.unmount()
-    renderer.wrapper.unmount()
-  })
-
-  it('同 URL 的独立请求取消了共享的那一发 ⇒ 两边重取后都就绪（取消不当失败）', async () => {
+  it('同 URL 的另一处独立请求不再取消共享的那一发 ⇒ 三方都就绪（spec platform-performance-residual-findings-closure R11）', async () => {
     const { wpDetail, mode, univer } = await setup()
     const shell = mode.fetchComponentType()
     const core = univer.initUniver()
     await new Promise((r) => setTimeout(r, 0))
-    // 页面上另一处直接用 utils/http 取同一详情（如保存后刷新）：GET 去重取消先发的共享请求
+    // 页面上另一处直接用 utils/http 取同一详情（如保存后刷新）：原先 GET 去重取消先发的那一发、壳与核心靠重取兜底；
+    // 现在同一 GET 在飞时共用、不取消任何一方
     const other = http.get(DETAIL_URL).catch((e: unknown) => e)
     await new Promise((r) => setTimeout(r, 0))
     releaseDetail()
-    await Promise.all([shell, core, other])
+    const [, , otherResult] = await Promise.all([shell, core, other])
 
-    expect(calls.some((c) => c.outcome === 'canceled')).toBe(true)
-    expect(calls.some((c) => c.outcome === 'ok')).toBe(true)
+    expect(calls.length).toBeGreaterThan(0)
+    expect(calls.every((c) => c.outcome === 'ok')).toBe(true)
+    expect((otherResult as any)?.data?.wp_code).toBe('H1A')
     expect(univer.loadErrorState.value).toBeNull()
     expect(mode.componentType.value).toBe('univer') // 详情里没有 component_type 时仍按 univer
     expect(wpDetail.value?.wp_code).toBe('H1A')

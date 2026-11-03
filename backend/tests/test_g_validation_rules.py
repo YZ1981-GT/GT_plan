@@ -191,7 +191,7 @@ class TestGCycleTriangleLogic:
         assert rule.severity == "blocking"
 
     async def test_vr_g7_01_skip_zero_shareholding_ratio(self, db_session, project_id):
-        """VR-G7-01 跳过: shareholding_ratio=0 → skip (passed=True)"""
+        """VR-G7-01 跳过: shareholding_ratio=0 → skip (status=not_executed)"""
         gate = ConsistencyGate(db_session)
         g7_data = {
             "recognized_income": "2500000.00",
@@ -209,8 +209,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "权益法投资收益" in c.check_name)
-        assert rule.passed is True
-        assert "持股比例为零" in rule.details or "未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "持股比例为零" in rule.reason or "未保存" in rule.reason
 
     async def test_vr_g7_01_skip_no_data(self, db_session, project_id):
         """VR-G7-01 跳过: G7 完全未保存 → skip"""
@@ -221,7 +221,7 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "权益法投资收益" in c.check_name)
-        assert rule.passed is True
+        assert rule.status == "not_executed"
 
     async def test_vr_g7_01_boundary_within_tolerance(self, db_session, project_id):
         """VR-G7-01 边界: 差异 = 0.5 (< 1.0 通过)"""
@@ -305,8 +305,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "投资收益=G1+G4+G6+G7+G8" in c.check_name)
-        assert rule.passed is True
-        assert "子循环底稿未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "子循环底稿未保存" in rule.reason
 
     async def test_vr_g11_01_skip_g11_not_saved(self, db_session, project_id):
         """VR-G11-01 跳过: G11 未保存但子循环已保存 → skip"""
@@ -322,8 +322,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "投资收益=G1+G4+G6+G7+G8" in c.check_name)
-        assert rule.passed is True
-        assert "未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "未保存" in rule.reason
 
     async def test_vr_g11_01_pass_with_partial_subs_filled(self, db_session, project_id):
         """VR-G11-01 通过: 仅 1 子循环已保存 (其余视为 0), 等式仍成立"""
@@ -417,8 +417,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "公允价值变动" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     async def test_vr_g1_01_skip_partial_field_missing(self, db_session, project_id):
         """VR-G1-01 跳过: G1 部分字段缺失 (fv_opening 缺失)"""
@@ -438,8 +438,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "公允价值变动" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     # --- VR-G14-01 ---
 
@@ -496,8 +496,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "信用减值损失" in c.check_name)
-        assert rule.passed is True
-        assert "子循环底稿未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "子循环底稿未保存" in rule.reason
 
     async def test_vr_g14_01_skip_g14_not_saved(self, db_session, project_id):
         """VR-G14-01 跳过: G14 未保存但 G4 已保存"""
@@ -513,8 +513,8 @@ class TestGCycleTriangleLogic:
             checks = await gate.check_g_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "信用减值损失" in c.check_name)
-        assert rule.passed is True
-        assert "未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "未保存" in rule.reason
 
     async def test_vr_g14_01_pass_partial_sub_saved(self, db_session, project_id):
         """VR-G14-01 通过: 仅 G6 已保存 (G4 视为 0), 等式成立"""
@@ -536,7 +536,7 @@ class TestGCycleTriangleLogic:
     # --- Integration tests ---
 
     async def test_all_skip_when_no_data(self, db_session, project_id):
-        """所有数据缺失时全部跳过 (passed=True), 长度=4"""
+        """所有数据缺失时全部跳过 (status=not_executed), 长度=4"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
@@ -545,7 +545,7 @@ class TestGCycleTriangleLogic:
 
         assert len(checks) == 4
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
 
     async def test_all_blocking_severity(self, db_session, project_id):
         """4 条 G 循环规则全部 severity=blocking"""

@@ -299,11 +299,14 @@ def derive_sum_formula(
     variant: str = "",
     table_index: int = 0,
 ) -> tuple[list[FormulaSpec], list[SkippedItem]]:
-    """合计/小计行 → 同列求和规格（范围严格对齐 ``_backfill_totals``，§V8）.
+    """合计/小计行 → 同列求和规格（与 ``_backfill_totals`` 同一合计构成 ``note_total_terms``）.
 
-    求和范围 = 上一合计行之后 → 本合计行之前的**所有非合计行**（含 header_label
-    行 —— 它们 values 恒 None，求值期被 fail-open 跳过，与 backfill 等价）。
+    构成展开到明细行（小计换成它自己的明细，求和项里没有合计行）；判不准的合计行跳过（``ambiguous_sum_range``）。
+    旧口径「上一合计行之后 → 本合计行之前的所有非合计行」把「小计 / 减：坏账准备 / 合计」的合计登记成坏账准备
+    （spec note-pull-header-formula-closure R5）。
     """
+    from app.services.note_total_terms import flatten_terms, total_terms
+
     rows = _template_rows(table_template)
     n_cols = _num_value_cols(table_template)
     table_name = (
@@ -316,6 +319,7 @@ def derive_sum_formula(
     if not rows or n_cols <= 0:
         return specs, skipped
 
+    plans, reasons = total_terms(rows)
     for i, row in enumerate(rows):
         if not is_total_row(row):
             continue
@@ -329,17 +333,13 @@ def derive_sum_formula(
             )
             continue
 
-        start = 0
-        for j in range(i - 1, -1, -1):
-            if is_total_row(rows[j]):
-                start = j + 1
-                break
-        members = [j for j in range(start, i) if not is_total_row(rows[j])]
+        members = flatten_terms(rows, plans, i)
         if not members:
+            empty = i not in plans and reasons.get(i) == "没有可合计的明细行"
             skipped.append(
                 SkippedItem(
                     section_number, variant, table_index, i, label, None,
-                    "empty_sum_range",
+                    "empty_sum_range" if empty else "ambiguous_sum_range",
                 )
             )
             continue
@@ -367,12 +367,12 @@ def derive_sum_formula(
                     semantic=sem,
                     target_cell=cell_coord(i, c),
                     signed_cells=tuple(
-                        (cell_coord(j, c), "+") for j in members
+                        (cell_coord(j, c), "+" if sign > 0 else "-") for j, sign in members
                     ),
                     derived_by="sum_total",
                     derived_note=(
-                        "合计 = 上一合计行之后至本行之前的非合计行之和"
-                        "（与 _backfill_totals 同口径）"
+                        "合计 = 合计构成展开到明细行"
+                        "（与 _backfill_totals 同一判定 note_total_terms）"
                     ),
                 )
             )

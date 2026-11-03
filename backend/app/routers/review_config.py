@@ -21,7 +21,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
+from app.models.base import ProjectUserRole
 from app.models.core import Project, User
 from app.models.workpaper_models import WpReviewStatus, WorkingPaper
 
@@ -35,8 +36,13 @@ DEFAULT_REVIEW_CONFIG = {
     "level_roles": {"L1": "manager", "L2": "partner"},
 }
 
-# Allowed roles for modification
+# Allowed global roles for modification
 ALLOWED_ROLES = {"manager", "partner", "admin"}
+
+# Canonical project roles that may own a review level. Read-only members cannot review.
+REVIEW_LEVEL_ROLES = frozenset(
+    role.value for role in ProjectUserRole if role is not ProjectUserRole.readonly
+)
 
 # Statuses that indicate reviews are in progress
 IN_PROGRESS_STATUSES = {
@@ -69,8 +75,12 @@ class ReviewConfigUpdate(BaseModel):
 
     @field_validator("level_roles")
     @classmethod
-    def validate_level_roles(cls, v: dict[str, str], info) -> dict[str, str]:
-        # Will be validated against levels in the endpoint
+    def validate_level_roles(cls, v: dict[str, str]) -> dict[str, str]:
+        invalid = sorted(set(v.values()) - REVIEW_LEVEL_ROLES)
+        if invalid:
+            raise ValueError(
+                f"level_roles 包含非法角色 {invalid}；合法值为 {sorted(REVIEW_LEVEL_ROLES)}"
+            )
         return v
 
 
@@ -88,7 +98,7 @@ class ReviewConfigResponse(BaseModel):
 async def get_review_config(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
     """获取项目复核链配置
 
@@ -116,7 +126,7 @@ async def update_review_config(
     project_id: UUID,
     body: ReviewConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> dict:
     """更新复核链配置
 

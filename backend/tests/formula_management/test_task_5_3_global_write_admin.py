@@ -58,6 +58,18 @@ from app.models.report_models import FinancialReportType, ReportConfig
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
+
+@pytest.fixture(autouse=True)
+def _isolate_custom_functions():
+    """自定义函数注册表自 ADR-FHIC-17 起是模块级单一注册表 ⇒ 每例结束注销它新注册的函数（admin 注册的 ``ADMFN`` 原先留在
+    注册表里，同一进程后跑的 ``test_custom_dsl_coding`` 的 list 用例数到 3）。"""
+    from app.services.formula_custom_functions import get_custom_registry, unregister_custom_function
+
+    before = set(get_custom_registry())
+    yield
+    for name in set(get_custom_registry()) - before:
+        unregister_custom_function(name)
+
 _engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
 

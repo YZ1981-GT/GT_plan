@@ -57,7 +57,7 @@
           <el-checkbox label="conversion">转换事项</el-checkbox>
           <el-checkbox label="other">其他</el-checkbox>
         </el-checkbox-group>
-        <el-input
+        <WpCommitInput
           v-if="state.testReasons.value.includes('other')"
           :model-value="state.testReasonOther.value"
           size="small"
@@ -175,6 +175,11 @@
         :row-class-name="state.rowClassName"
       >
         <el-table-column type="index" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
         <el-table-column label="投资性房地产信息" align="center">
           <el-table-column prop="category" label="类别" width="100">
             <template #default="{ row, $index }">
@@ -294,9 +299,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="48" align="center">
-          <template #default="{ $index }">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index)">📎</el-button>
+        <el-table-column label="📎" width="72" align="center">
+          <template #default="{ row, $index }">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId, row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注说明" min-width="100">
@@ -323,6 +329,11 @@
         :row-class-name="state.rowClassName"
       >
         <el-table-column type="index" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
         <el-table-column label="投资性房地产信息" align="center">
           <el-table-column prop="category" label="类别" width="100">
             <template #default="{ row, $index }">
@@ -442,9 +453,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="48" align="center">
-          <template #default="{ $index }">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index)">📎</el-button>
+        <el-table-column label="📎" width="72" align="center">
+          <template #default="{ row, $index }">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId, row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注说明" min-width="100">
@@ -667,7 +679,7 @@
           </span>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="state.auditNote.value"
         type="textarea"
         :autosize="{ minRows: 4 }"
@@ -682,7 +694,7 @@
       <template #header>
         <div class="card-header"><span>五、审计结论</span></div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="state.auditConclusion.value"
         type="textarea"
         :autosize="{ minRows: 3 }"
@@ -703,17 +715,18 @@
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSamplesFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H3TabAdditionCheck.vue — H3-5 增减检查表（成本/公允统一组件）
@@ -754,6 +767,11 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -767,6 +785,9 @@ const props = defineProps<{
   /** render 下发的整册载荷（抽凭引擎的科目码取自其 `tb_source_codes`） */
   htmlData?: Record<string, any> | null
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H3-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -886,6 +907,7 @@ function traceTableRowClass(ctx: { row: H3TraceRow }): string {
 }
 
 onMounted(() => {
+  void state.voucherFillReady()
   const focus = h3Nav?.consumeFocus('H3-5')
   if (focus?.section === 'trace') {
     nextTick(() => {
@@ -961,27 +983,30 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H3_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples?: any[] }) {
+/** 抽凭回填走共享函数：进当前计量模式那张表，按分录指纹去重；填入几行由共享函数提示 */
+async function onSamplesFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const n = state.fillFromSampledVouchers(payload?.samples ?? [])
-  samplingVisible.value = false
-  ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已回填 ${n} 笔抽样凭证到增减检查行` : '未回填新凭证（可能已存在或无样本）')
+  void persistMethodology(payload?.methodology)
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
-async function handleOcr(index: number) {
+async function handleOcr(index: number, rowId: string, row?: unknown) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -991,11 +1016,14 @@ async function handleOcr(index: number) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      // 按行 id 挂（不按序号：删行后序号会前移，附件会错位到下一行）
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId), row)
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
+      rowEv.refresh()
       const ocrData = res.data?.data ?? res.data
       if (!ocrData) return
       await ElMessageBox.confirm(

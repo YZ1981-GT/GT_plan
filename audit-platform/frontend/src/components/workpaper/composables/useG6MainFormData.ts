@@ -17,6 +17,8 @@
  * Requirements: 1.4, 3.3, 7.3
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
@@ -290,12 +292,14 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
           conclusion: item.conclusion || null,
           remark: item.remark || null,
         })),
-      })
+      }, { _dedupe: false } as AxiosRequestConfig)
       opts.onAfterSave?.()
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
         ElMessage.error('保存失败，请稍后重试')
+        // 过渡屏障须看见失败：吞掉会让 flushHtml 读到未落库的旧投影
+        throw err
       }
     }
   }
@@ -372,7 +376,7 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
       _pendingItems.delete(itemId)
-      void _doSave([updated])
+      void trackPendingWrite(_doSave([updated])).catch(() => undefined)
     }, 2000)
     _debounceTimers.set(itemId, timer)
   }
@@ -407,7 +411,7 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
-  function _flushPending(): void {
+  async function _flushPending(): Promise<void> {
     for (const timer of _debounceTimers.values()) {
       clearTimeout(timer)
     }
@@ -421,15 +425,18 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
       }
       _pendingItems.clear()
       if (items.length > 0) {
-        void _doSave(items)
+        // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+        await _doSave(items)
       }
     }
   }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
+  registerPendingFlusher(_flushPending)
+
   onScopeDispose(() => {
-    _flushPending()
+    void _flushPending().catch(() => undefined)
   })
 
   return {

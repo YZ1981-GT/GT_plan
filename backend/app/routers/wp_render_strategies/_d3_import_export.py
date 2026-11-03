@@ -123,7 +123,9 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "借方调整金额", "贷方调整金额", "索引", "备注",
     ],
     "D3-4-debit": ["行键", "项目", "金额", "来源", "备注"],
-    "D3-4-credit": ["行键", "项目", "金额", "来源", "备注"],
+    # 「与对方科目核对」= 模板「（三）贷方发生额分析」D 列；「备注」列即模板 E「说明」
+    # （spec oo-writeback-template-parity-closure R3）
+    "D3-4-credit": ["行键", "项目", "金额", "来源", "备注", "与对方科目核对"],
     "D3-2": [
         "对方单位名称", "公司代码", "款项性质", "关联方类型",
         "期初未审余额", "期初账项调整", "期初重分类调整",
@@ -163,6 +165,15 @@ _SHEET_ITEM_ID: dict[str, str] = {
 
 def _get_headers(sheet_code: str) -> list[str]:
     return _SHEET_HEADERS.get(sheet_code, [])
+
+
+#: 导入时可缺的列（后加的列；旧版导出文件没有它，缺了照常导入、该字段留空）。
+_OPTIONAL_IMPORT_HEADERS: dict[str, frozenset[str]] = {"D3-4-credit": frozenset({"与对方科目核对"})}
+
+
+def _required_import_headers(sheet_code: str) -> list[str]:
+    optional = _OPTIONAL_IMPORT_HEADERS.get(sheet_code, frozenset())
+    return [h for h in _get_headers(sheet_code) if h not in optional]
 
 
 def _validate_sheet(sheet_code: str) -> None:
@@ -278,7 +289,7 @@ async def d3_export_data(
         elif sheet == "D3-4-debit":
             row_values = _export_d3_4_row(data_row)
         elif sheet == "D3-4-credit":
-            row_values = _export_d3_4_row(data_row)
+            row_values = _export_d3_4_row(data_row, credit=True)
         elif sheet == "D3-5":
             row_values = _export_d3_5_row(data_row)
         elif sheet == "D3-6":
@@ -340,7 +351,7 @@ async def d3_import_data(
             lambda _h: None, actual_headers, d3_2_segments, subject_aging_periods("D3"),
         )
     else:
-        expected_headers = _get_headers(sheet)
+        expected_headers = _required_import_headers(sheet)
 
     errors: list[str] = []
     missing_cols = [h for h in expected_headers if h not in actual_headers]
@@ -375,7 +386,7 @@ async def d3_import_data(
         elif sheet == "D3-4-debit":
             row_dict = _parse_d3_4_row(row, actual_headers)
         elif sheet == "D3-4-credit":
-            row_dict = _parse_d3_4_row(row, actual_headers)
+            row_dict = _parse_d3_4_row(row, actual_headers, credit=True)
         elif sheet == "D3-5":
             row_dict = _parse_d3_5_row(row, actual_headers)
         elif sheet == "D3-6":
@@ -784,20 +795,24 @@ def _parse_d3_3_row(row: tuple, actual_headers: list[str]) -> dict:
     }
 
 
-def _parse_d3_4_row(row: tuple, actual_headers: list[str]) -> dict | None:
+def _parse_d3_4_row(row: tuple, actual_headers: list[str], *, credit: bool = False) -> dict | None:
     row_key = _safe_str(_col_val(row, actual_headers, "行键"))
     label = _safe_str(_col_val(row, actual_headers, "项目"))
     if not row_key and not label:
         return None
     if row_key in ("debit-total", "debit-diff", "credit-total", "credit-diff"):
         return None
-    return {
+    parsed: dict[str, Any] = {
         "rowKey": row_key or label,
         "label": label or row_key,
         "amount": _safe_float(_col_val(row, actual_headers, "金额")),
         "source": _safe_str(_col_val(row, actual_headers, "来源")),
         "remark": _safe_str(_col_val(row, actual_headers, "备注")),
     }
+    if credit:
+        # 贷方区「与对方科目核对」（模板 D 列）；旧版导出文件缺这一列 ⇒ 留空
+        parsed["counterCheck"] = _safe_str(_col_val(row, actual_headers, "与对方科目核对"))
+    return parsed
 
 
 def _export_d3_3_row(data: dict) -> list:
@@ -814,14 +829,17 @@ def _export_d3_3_row(data: dict) -> list:
     ]
 
 
-def _export_d3_4_row(data: dict) -> list:
-    return [
+def _export_d3_4_row(data: dict, *, credit: bool = False) -> list:
+    values = [
         _safe_str(data.get("rowKey")),
         _safe_str(data.get("label")),
         _safe_float(data.get("amount")),
         _safe_str(data.get("source")),
         _safe_str(data.get("remark")),
     ]
+    if credit:
+        values.append(_safe_str(data.get("counterCheck")))
+    return values
 
 
 async def _fetch_response_map(

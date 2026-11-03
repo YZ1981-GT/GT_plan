@@ -55,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, watch } from 'vue'
 import type { FollowupRow } from './followupTypes'
 import { useMemoCompose } from './composables/useMemoCompose'
@@ -117,9 +118,9 @@ function handleManualEdit(value: string) {
   emit('update', 'memo_text', value)
 }
 
-function handleCopy() {
+async function handleCopy() {
   const text = composedResult.value.text || props.row?.memo_text || ''
-  navigator.clipboard.writeText(text)
+  void copyText(text)
 }
 </script>
 

@@ -61,17 +61,22 @@ ROW_IDENTITY_KEY: Final[str] = "rowKey"
 #
 # 6 列公式（B/E/F/G/H/I），A 不可受管，C/D/J 可编辑。
 
+#: 🔴 json 键逐字取前端 `useF3Adjudication.StoredF3AdjRow / F3AdjudicationRow`（spec oo-writeback-template-parity-
+#:    closure R3 任务 9.4c）：原写 prior* / end*，前端是 opening* / closing*。列键不变。
+#:    store item 仍是前端不存在的 `F3-1-adj-seed-rows` / `-slot-rows`（前端两区共存 `F3-1-adj-rows`，
+#:    且前端行模型与模板不同构：期初未审可录、期末 AJE / RJE 在本表录入、另存本期借贷），
+#:    改接需要区分区的判据与多区门面，见 design §4.3，未在本批改。
 _FIELD_SPECS_SEED: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     # A 列不可受管（SUMPRODUCT 匹配键）
-    ("prior_unadjusted",   "B", "formula",  "amount", "priorUnadjusted",  "期初未审数",       ""),
-    ("prior_aje",          "C", "editable", "amount", "priorAje",         "期初账项调整",     ""),
-    ("prior_rje",          "D", "editable", "amount", "priorRje",         "期初重分类调整",   ""),
-    ("prior_audited",      "E", "formula",  "amount", "priorAudited",     "期初审定数",       ""),
-    ("end_unadjusted",     "F", "formula",  "amount", "endUnadjusted",    "期末未审数",       ""),
-    ("end_aje",            "G", "formula",  "amount", "endAje",           "期末账项调整",     ""),
-    ("end_rje",            "H", "formula",  "amount", "endRje",           "期末重分类调整",   ""),
-    ("end_audited",        "I", "formula",  "amount", "endAudited",       "期末审定数",       ""),
-    ("index_ref",          "J", "editable", "text",   "indexRef",         "索引",             ""),
+    ("prior_unadjusted",   "B", "formula",  "amount", "openingUnadjusted", "期初未审数",       ""),
+    ("prior_aje",          "C", "editable", "amount", "openingAje",        "期初账项调整",     ""),
+    ("prior_rje",          "D", "editable", "amount", "openingRje",        "期初重分类调整",   ""),
+    ("prior_audited",      "E", "formula",  "amount", "openingAdjusted",   "期初审定数",       ""),
+    ("end_unadjusted",     "F", "formula",  "amount", "closingUnadjusted", "期末未审数",       ""),
+    ("end_aje",            "G", "formula",  "amount", "closingAje",        "期末账项调整",     ""),
+    ("end_rje",            "H", "formula",  "amount", "closingRje",        "期末重分类调整",   ""),
+    ("end_audited",        "I", "formula",  "amount", "closingAdjusted",   "期末审定数",       ""),
+    ("index_ref",          "J", "editable", "text",   "indexRef",          "索引",             ""),
 )
 
 SPEC_F301_SEED: Final[RowTableSheetSpec] = RowTableSheetSpec(
@@ -106,16 +111,16 @@ SPEC_F301_SEED: Final[RowTableSheetSpec] = RowTableSheetSpec(
 # 2 列公式（E/I），其余可编辑（A/B/C/D/F/G/H/J）。
 
 _FIELD_SPECS_SLOT: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("category",           "A", "editable", "text",   "category",         "项目",             ""),
-    ("prior_unadjusted",   "B", "editable", "amount", "priorUnadjusted",  "期初未审数",       ""),
-    ("prior_aje",          "C", "editable", "amount", "priorAje",         "期初账项调整",     ""),
-    ("prior_rje",          "D", "editable", "amount", "priorRje",         "期初重分类调整",   ""),
-    ("prior_audited",      "E", "formula",  "amount", "priorAudited",     "期初审定数",       ""),
-    ("end_unadjusted",     "F", "editable", "amount", "endUnadjusted",    "期末未审数",       ""),
-    ("end_aje",            "G", "editable", "amount", "endAje",           "期末账项调整",     ""),
-    ("end_rje",            "H", "editable", "amount", "endRje",           "期末重分类调整",   ""),
-    ("end_audited",        "I", "formula",  "amount", "endAudited",       "期末审定数",       ""),
-    ("index_ref",          "J", "editable", "text",   "indexRef",         "索引",             ""),
+    ("category",           "A", "editable", "text",   "label",             "项目",             ""),
+    ("prior_unadjusted",   "B", "editable", "amount", "openingUnadjusted", "期初未审数",       ""),
+    ("prior_aje",          "C", "editable", "amount", "openingAje",        "期初账项调整",     ""),
+    ("prior_rje",          "D", "editable", "amount", "openingRje",        "期初重分类调整",   ""),
+    ("prior_audited",      "E", "formula",  "amount", "openingAdjusted",   "期初审定数",       ""),
+    ("end_unadjusted",     "F", "editable", "amount", "closingUnadjusted", "期末未审数",       ""),
+    ("end_aje",            "G", "editable", "amount", "closingAje",        "期末账项调整",     ""),
+    ("end_rje",            "H", "editable", "amount", "closingRje",        "期末重分类调整",   ""),
+    ("end_audited",        "I", "formula",  "amount", "closingAdjusted",   "期末审定数",       ""),
+    ("index_ref",          "J", "editable", "text",   "indexRef",          "索引",             ""),
 )
 
 SPEC_F301_SLOT: Final[RowTableSheetSpec] = RowTableSheetSpec(

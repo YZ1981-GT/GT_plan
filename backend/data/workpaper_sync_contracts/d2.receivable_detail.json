@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "2eda9d230462500749c267383f6d47595348a8c5a84efe9d25a7fa965868a06e",
+  "instrumentation_definition_sha256": "ce1fc87075f87c9c03261195e38de2c999aef6a8186a2c0d82d5c49141ca6310",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-accounts-receivable",
@@ -19,7 +19,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "d2_large_json",
-    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx 的 11 张 sheet，只取受管 sheet 明细表D2-2：两级表头 11/12 行（三个账龄组各横跨 6 列、其余 21 列纵向合并）、数据区 13..25 行、Q/S/AB 三列逐行公式 =E+O-P / =Q+R / =S+Z+AA、H 列模板内无公式故判 editable、A26 合计 footer；39 个字段的 source_ref / header_source_ref / group_source_ref 均指向上述真实单元格，字段键集合与前端 useD2DetailColumnPrefs.FIXED_COLUMNS 及 useAgingConfig.PRESET_SEGMENTS.FIVE_YEAR 三源锁死"
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx 的 11 张 sheet，只取受管 sheet 明细表D2-2：两级表头 11/12 行（三个账龄组各横跨 6 列、其余 21 列纵向合并）、数据区 13..25 行、H/Q/S/AB 四列逐行公式 =E+F+G / =E+O-P / =Q+R / =S+Z+AA（H 为第三批补的模板公式）、A26 合计 footer；39 个字段的 source_ref / header_source_ref / group_source_ref 均指向上述真实单元格，字段键集合与前端 useD2DetailColumnPrefs.FIXED_COLUMNS 及 useAgingConfig.PRESET_SEGMENTS.FIVE_YEAR 三源锁死"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -150,7 +150,7 @@
               "header_source_ref": "源xlsx!明细表D2-2!H11",
               "header_text": "期初审定余额",
               "json_pointer": "/rows/{row_uuid}/priorAudited",
-              "mode": "editable",
+              "mode": "formula",
               "source_ref": "源xlsx!明细表D2-2!H13",
               "stable_field_key": "receivable_detail_rows/{row_uuid}/prior_audited",
               "store_item_id": "D2-detail-rows",
@@ -665,6 +665,7 @@
             "search_column": "A"
           },
           "formula_mask": [
+            "H13:H24",
             "Q13:Q24",
             "S13:S24",
             "AB13:AB24"
@@ -1346,9 +1347,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b79233b",
+    "normalized_structure_hash": "bd19b4dba8f3d05dfe55e1a18782671860a278b9cd1764042345267c34cc80c4",
     "relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-    "template_sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"
+    "template_sha256": "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044"
   },
-  "template_definition_sha256": "4bdc6ecb78699bf6006bf976629b8f6cae9d748a769dd0163d9bc1b00e04d648"
+  "template_definition_sha256": "e98dfbe75f1064c07e1e8b8b7f0d96e0fe2eed89453163a063730a7706dc0647"
 }

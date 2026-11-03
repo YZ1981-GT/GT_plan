@@ -13,7 +13,10 @@ import os
 from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
+
+from app.services.acnr import catalog_integrity as _integrity
+from app.services.acnr.catalog_integrity import use_catalog  # noqa: F401  门禁 / 测试经 catalog.use_catalog 调用
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +47,15 @@ def _wp_name_index() -> dict[str, dict[str, str]]:
         return {}
 
 
-# 按文件 mtime 缓存 sheet_display_names.json（重生成后无需重启即生效）
+# 按文件 mtime 缓存 sheet_display_names.json（修改后无需重启即生效）
 _SHEET_DISPLAY_CACHE: dict[str, dict[str, str]] = {}
 
 
 def _sheet_display_names() -> dict[str, str]:
     """{sheet_code: 规范底稿名} 索引，源自 sheet_display_names.json。
 
-    权威真源为 workpaper_sheet_classification（每张 sheet 真实 tab 名以自身
-    wp_code 结尾）；用 scripts/gen_sheet_display_names.py 生成。作为
+    初值取自 workpaper_sheet_classification（每张 sheet 真实 tab 名以自身
+    wp_code 结尾），现为手工维护的目录生成器输入（生成脚本已删除，T29）。作为
     wp_account_mapping 的兜底，补齐重名占位 sheet（如 D2-7~13/D4-14~36）的
     可区分名称。按 mtime 缓存：JSON 重生成后自动生效，无需重启。
     降级：文件缺失/加载失败返回空 dict 不阻断。
@@ -84,6 +87,16 @@ class CatalogLoadError(Exception):
 
     触发此异常意味着操作整体失败，需人工介入。
     Requirements: R23.5
+    """
+    pass
+
+
+class CatalogIntegrityError(CatalogLoadError):
+    """目录自身完整性破坏（addr_id 重复 / 加载期互校不一致）时抛出。
+
+    继承 `CatalogLoadError`，`_load_catalog` 的降级分支与 `load_versioned_catalog`
+    按同一路径处理（§8 映射 409）。消息列前 10 个问题与总数。
+    Requirements: design §5.5 / D4
     """
     pass
 
@@ -129,6 +142,13 @@ class CatalogIndex:
         self.cells_by_parent: dict[str, list[dict]] = {}
         # cell addr_id → entry
         self.cells_by_addr_id: dict[str, dict] = {}
+        # 父级 wp_code → 该父级下的 sheet 列表（§6.2 第 1 步用）
+        self.sheets_by_parent: dict[str, list[dict]] = {}
+
+        # fail-closed：三类 addr_id 重复（design §5.5）；sheet_code 重复不在此拦（解析时报歧义）。
+        dup_problems = _integrity.duplicate_addr_id_problems(sheets, cells)
+        if dup_problems:
+            raise CatalogIntegrityError(_integrity.format_duplicate_problems(dup_problems))
 
         for s in sheets:
             aid = s.get("addr_id", "")
@@ -136,6 +156,7 @@ class CatalogIndex:
 
             code = s.get("sheet_code", "")
             self.sheets_by_code.setdefault(code, []).append(s)
+            self.sheets_by_parent.setdefault(s.get("parent_wp_code", ""), []).append(s)
 
             # 别名索引（含 sheet_name 本身作为 alias key）
             name = s.get("sheet_name", "")
@@ -149,6 +170,11 @@ class CatalogIndex:
             self.cells_by_addr_id[aid] = c
             parent = c.get("parent_addr_id", "")
             self.cells_by_parent.setdefault(parent, []).append(c)
+
+        # 禁止别名：同父一名多码 ∪ 顶层 alias_policy.forbidden（exact_identity 第 3 步优先读此属性）
+        self.forbidden_aliases = _integrity.forbidden_alias_index(sheets, data.get("alias_policy"))
+        # 加载期 release 互校状态（_load_catalog 写入；直接构造的索引为 None）
+        self.release_check_status: str | None = None
 
         # 合并全部条目（sheet + cell）用于 fuzzy 搜索
         self._all_entries: list[dict] = sheets + cells
@@ -174,23 +200,32 @@ def _load_catalog() -> CatalogIndex:
     catalog_path = Path(os.environ.get("ACNR_CATALOG_PATH", str(_CATALOG_PATH)))
 
     try:
-        data = json.loads(catalog_path.read_text(encoding="utf-8"))
+        raw = catalog_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        release_status = _cross_check_release_report(catalog_path, raw, data)
         _catalog = CatalogIndex(data)
+        _catalog.release_check_status = release_status
         _last_good_catalog = _catalog  # 保存为下次降级缓存
         logger.info(
-            "ACNR catalog 加载完成: version=%s, sheets=%d, cells=%d",
+            "ACNR catalog 加载完成: version=%s, sheets=%d, cells=%d, release_check=%s",
             _catalog.registry_version,
             len(_catalog.sheets_by_addr_id),
             len(_catalog.cells_by_addr_id),
+            release_status,
         )
         return _catalog
-    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+    except (FileNotFoundError, json.JSONDecodeError, OSError, CatalogIntegrityError) as e:
         # Branch 1: 有旧缓存 → 只读上一版 + 告警
         if _last_good_catalog is not None:
             logger.error(
                 "ACNR catalog 加载失败，降级为只读上一版: %s", e
             )
-            _alert_admin("catalog_load_failed", str(e))
+            event = (
+                "catalog_integrity_failed"
+                if isinstance(e, CatalogIntegrityError)
+                else "catalog_load_failed"
+            )
+            _alert_admin(event, str(e))
             _catalog = _last_good_catalog
             return _catalog
 
@@ -199,13 +234,30 @@ def _load_catalog() -> CatalogIndex:
             "ACNR catalog 加载失败且无可用缓存，需人工介入: %s", e
         )
         _alert_admin("catalog_load_failed_no_cache", str(e))
+        if isinstance(e, CatalogIntegrityError):
+            raise
         raise CatalogLoadError(
             "Catalog 加载失败且不存在可用的上一版缓存，操作整体失败"
         ) from e
 
 
+def _cross_check_release_report(catalog_path: Path, raw: str, data: dict[str, Any]) -> str:
+    """加载期互校（规则见 catalog_integrity.check_release_report）：返回执行状态，
+    问题即抛 CatalogIntegrityError。默认生产路径缺报告同样失败；其他目录缺报告跳过。"""
+    is_default = catalog_path.resolve() == _CATALOG_PATH.resolve()
+    status, problem = _integrity.check_release_report(
+        catalog_path, raw, data, is_default_path=is_default
+    )
+    if problem:
+        raise CatalogIntegrityError(problem)
+    return status
+
+
 def get_catalog() -> CatalogIndex:
-    """获取 catalog 索引（已缓存）。"""
+    """获取 catalog 索引（已缓存）。use_catalog() 作用域内返回被覆盖的索引。"""
+    override = _integrity.current_override()
+    if override is not None:
+        return override
     return _load_catalog()
 
 
@@ -222,8 +274,9 @@ def reload_catalog() -> CatalogIndex:
 def list_sheets(
     cycle: str | None = None,
     import_export_only: bool = False,
+    include_deprecated: bool = False,
 ) -> list[dict]:
-    """列出 sheet 目录条目，可按 cycle 和 import_export 过滤。
+    """列出 sheet 目录条目，可按 cycle 和 import_export 过滤；停用条目默认不列（design §3.3）。
 
     Requirements: R14.1, R15.3
     """
@@ -234,9 +287,12 @@ def list_sheets(
         result = [s for s in result if s.get("cycle", "").upper() == cycle.upper()]
     if import_export_only:
         result = [s for s in result if s.get("import_export", {}).get("enabled")]
+    if not include_deprecated:
+        result = [s for s in result if not s.get("deprecated")]
 
     # 附加「科目简称」(account_name，取父底稿) 与「规范底稿名」(mapped_sheet_name，
-    # 取本 sheet_code)，供前端组建可区分的显示名。返回浅拷贝避免污染 catalog 缓存。
+    # 取本 sheet_code)，只增不改（统一显示名已由生成器写进 display_label，口径同 display.NameSources）。
+    # 返回浅拷贝避免污染 catalog 缓存。
     # mapped_sheet_name 优先 wp_account_mapping 的策管名，兜底 classification 真名。
     name_idx = _wp_name_index()
     disp_names = _sheet_display_names()
@@ -535,183 +591,116 @@ def _build_jump_route(cell: dict) -> str | None:
     return None
 
 
-def _uri_to_addr_id(uri: str) -> str | None:
-    """从 URI 推导 addr_id。
+class RefIdentity(NamedTuple):
+    """写法 → 身份的结构化结果（design §6.2，T10）。
 
-    standard: wp://{parent}/{sheet_name}#{cell} → {parent}/{sheet_code}/{cell}
-    custom_flat: wp://{wp_code}/{cell} → 需要查索引
+    addr_id：推导出的地址（未命中为 None）；match：`exact_identity.sheet_of` 的判定
+    （非 WP 写法、无 sheet 段或 custom_flat 时为 None）。`blocked` 为真（多义 / 命中禁止别名）时
+    调用方须把 match 直接作为结果，不得再按别的规则猜。
     """
-    if not uri.startswith("wp://"):
-        return None
 
-    body = uri[5:]  # 去掉 "wp://"
-    cat = get_catalog()
+    addr_id: str | None
+    match: Any = None
 
-    # 带 # 分隔符 → cell 级
-    if "#" in body:
-        path_part, cell_part = body.rsplit("#", 1)
-        parts = path_part.split("/")
-        if len(parts) == 2:
-            parent, sheet_name = parts
-            # 通过 parent + sheet_name 找到 sheet 的 addr_id
-            for s in cat.sheets_by_addr_id.values():
-                if s.get("parent_wp_code") == parent and s.get("sheet_name") == sheet_name:
-                    return f"{s['addr_id']}/{cell_part}"
-            # fallback: 尝试 sheet_code 匹配
-            for s in cat.sheets_by_addr_id.values():
-                if s.get("parent_wp_code") == parent and s.get("sheet_code") == sheet_name:
-                    return f"{s['addr_id']}/{cell_part}"
-            # fallback: 尝试别名匹配
-            alias_hits = cat.sheets_by_alias.get(sheet_name, [])
-            parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == parent]
-            if len(parent_filtered) == 1:
-                return f"{parent_filtered[0]['addr_id']}/{cell_part}"
-            # fallback: 尝试 sheet_name 包含 sheet_code 的模式匹配（取最长匹配避免歧义）
-            # 例如 "明细表D2-2" 对应 sheet_code="D2-2"
-            best_uri_match: dict | None = None
-            best_uri_code_len = 0
-            for s in cat.sheets_by_addr_id.values():
-                if s.get("parent_wp_code") == parent:
-                    code = s.get("sheet_code", "")
-                    if code and code in sheet_name and len(code) > best_uri_code_len:
-                        best_uri_match = s
-                        best_uri_code_len = len(code)
-            if best_uri_match:
-                return f"{best_uri_match['addr_id']}/{cell_part}"
-        elif len(parts) == 1:
-            # custom_flat: wp://{wp_code}#{cell}
-            wp_code = parts[0]
-            matches = cat.sheets_by_code.get(wp_code, [])
-            if len(matches) == 1:
-                return f"{matches[0]['addr_id']}/{cell_part}"
-    else:
-        # 无 # → sheet 级
-        parts = body.split("/")
-        if len(parts) == 2:
-            parent, sheet_name = parts
-            for s in cat.sheets_by_addr_id.values():
-                if s.get("parent_wp_code") == parent and s.get("sheet_name") == sheet_name:
-                    return s["addr_id"]
-                if s.get("parent_wp_code") == parent and s.get("sheet_code") == sheet_name:
-                    return s["addr_id"]
-            # 别名
-            alias_hits = cat.sheets_by_alias.get(sheet_name, [])
-            parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == parent]
-            if len(parent_filtered) == 1:
-                return parent_filtered[0]["addr_id"]
-            # sheet_name 包含 sheet_code（取最长匹配避免歧义）
-            best_uri_s: dict | None = None
-            best_uri_s_len = 0
-            for s in cat.sheets_by_addr_id.values():
-                if s.get("parent_wp_code") == parent:
-                    code = s.get("sheet_code", "")
-                    if code and code in sheet_name and len(code) > best_uri_s_len:
-                        best_uri_s = s
-                        best_uri_s_len = len(code)
-            if best_uri_s:
-                return best_uri_s["addr_id"]
-        elif len(parts) == 1:
-            # 可能是裸 wp_code
-            return parts[0]
-
-    return None
+    @property
+    def blocked(self) -> bool:
+        return self.match is not None and self.match.state in ("ambiguous", "alias_forbidden")
 
 
-def _formula_ref_to_addr_id(formula_ref: str) -> str | None:
-    """从 formula_ref 推导 addr_id。
-
-    WP('D2','明细表D2-2','E100') → D2/D2-2/E100
-    WP('D2','明细表D2-2') → D2/D2-2
-    WP('CUST-01','B7') → CUST-01（custom_flat，需查索引）
-    """
-    if not formula_ref.startswith("WP(") and not formula_ref.startswith("PREV("):
-        return None
-
-    # 提取参数
-    start = formula_ref.index("(") + 1
-    end = formula_ref.rindex(")")
-    args_str = formula_ref[start:end]
-
-    # 简单解析单引号分隔的参数
+def _parse_quoted_args(formula_ref: str) -> list[str]:
+    """提取 WP(...) / PREV(...) 里单引号包围的参数。"""
+    try:
+        args_str = formula_ref[formula_ref.index("(") + 1: formula_ref.rindex(")")]
+    except ValueError:
+        return []
     args: list[str] = []
     in_quote = False
     current = ""
     for ch in args_str:
-        if ch == "'" and not in_quote:
-            in_quote = True
-        elif ch == "'" and in_quote:
-            in_quote = False
-            args.append(current)
-            current = ""
+        if ch == "'":
+            if in_quote:
+                args.append(current)
+                current = ""
+            in_quote = not in_quote
         elif in_quote:
             current += ch
-
-    cat = get_catalog()
-
-    if len(args) == 3:
-        # 三参: WP(parent, sheet_name, cell|semantic)
-        parent, sheet_name, cell_or_semantic = args
-        # 找 sheet
-        for s in cat.sheets_by_addr_id.values():
-            if s.get("parent_wp_code") == parent and s.get("sheet_name") == sheet_name:
-                return f"{s['addr_id']}/{cell_or_semantic}"
-            if s.get("parent_wp_code") == parent and s.get("sheet_code") == sheet_name:
-                return f"{s['addr_id']}/{cell_or_semantic}"
-        # 别名匹配
-        alias_hits = cat.sheets_by_alias.get(sheet_name, [])
-        parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == parent]
-        if len(parent_filtered) == 1:
-            return f"{parent_filtered[0]['addr_id']}/{cell_or_semantic}"
-        # sheet_name 包含 sheet_code 的模式匹配（取最长匹配避免 D4-1 vs D4-13 歧义）
-        best_match: dict | None = None
-        best_code_len = 0
-        for s in cat.sheets_by_addr_id.values():
-            if s.get("parent_wp_code") == parent:
-                code = s.get("sheet_code", "")
-                if code and code in sheet_name and len(code) > best_code_len:
-                    best_match = s
-                    best_code_len = len(code)
-        if best_match:
-            return f"{best_match['addr_id']}/{cell_or_semantic}"
-        # fallback: 直接拼
-        return f"{parent}/{sheet_name}/{cell_or_semantic}"
-
-    elif len(args) == 2:
-        # 二参: WP(parent, sheet_name) or WP(wp_code, cell)
-        first, second = args
-        # 优先尝试 standard: parent + sheet_name
-        for s in cat.sheets_by_addr_id.values():
-            if s.get("parent_wp_code") == first and s.get("sheet_name") == second:
-                return s["addr_id"]
-            if s.get("parent_wp_code") == first and s.get("sheet_code") == second:
-                return s["addr_id"]
-        # 别名匹配
-        alias_hits = cat.sheets_by_alias.get(second, [])
-        parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == first]
-        if len(parent_filtered) == 1:
-            return parent_filtered[0]["addr_id"]
-        # sheet_name 包含 sheet_code（取最长匹配避免歧义）
-        best_match_2: dict | None = None
-        best_code_len_2 = 0
-        for s in cat.sheets_by_addr_id.values():
-            if s.get("parent_wp_code") == first:
-                code = s.get("sheet_code", "")
-                if code and code in second and len(code) > best_code_len_2:
-                    best_match_2 = s
-                    best_code_len_2 = len(code)
-        if best_match_2:
-            return best_match_2["addr_id"]
-        # 尝试 custom_flat: wp_code + cell
-        matches = cat.sheets_by_code.get(first, [])
-        if len(matches) == 1:
-            return f"{matches[0]['addr_id']}/{second}"
-        # fallback
-        return f"{first}/{second}"
-
-    return None
+    return args
 
 
-def _index_ref_to_addr_id(index_ref: str) -> str | None:
+def _custom_flat(cat: CatalogIndex, wp_code: str, cell: str) -> str | None:
+    """custom_flat 语法 `WP('{sheet_code}','{cell}')` / `wp://{sheet_code}#{cell}`：编码在目录内唯一才成立。"""
+    matches = cat.sheets_by_code.get(wp_code, [])
+    return f"{matches[0]['addr_id']}/{cell}" if len(matches) == 1 else None
+
+
+def _sheet_match(cat: CatalogIndex, parent: str, text: str):
+    from app.services.acnr.exact_identity import sheet_of
+
+    return sheet_of(parent, text, index=cat)
+
+
+def _uri_to_sheet_match(uri: str, *, index: CatalogIndex | None = None) -> RefIdentity:
+    """从 URI 推导身份（sheet 判定只用 exact_identity，删去子串与拼接启发式）。
+
+    standard: wp://{parent}/{sheet}#{cell} → {sheet.addr_id}/{cell}
+    custom_flat: wp://{sheet_code}#{cell}
+    """
+    if not uri.startswith("wp://"):
+        return RefIdentity(None)
+    cat = index if index is not None else get_catalog()
+    body = uri[5:]
+    path_part, _, cell_part = body.rpartition("#") if "#" in body else (body, "", "")
+    parts = path_part.split("/")
+    if len(parts) == 2:
+        sm = _sheet_match(cat, parts[0], parts[1])
+        if not sm.ok:
+            return RefIdentity(None, sm)
+        sheet_addr = sm.entry["addr_id"]
+        return RefIdentity(f"{sheet_addr}/{cell_part}" if "#" in body else sheet_addr, sm)
+    if len(parts) == 1:
+        if "#" in body:
+            return RefIdentity(_custom_flat(cat, parts[0], cell_part))
+        return RefIdentity(parts[0])  # 裸 wp_code（由后续按 sheet_code 查找）
+    return RefIdentity(None)
+
+
+def _formula_ref_to_sheet_match(formula_ref: str, *, index: CatalogIndex | None = None) -> RefIdentity:
+    """从 formula_ref 推导身份（sheet 判定只用 exact_identity）。
+
+    WP('D2','明细表D2-2','E100') → D2/D2-2/E100；WP('D2','D2-2') → D2/D2-2；
+    WP('D2-2','E100') → custom_flat。父级不在目录（自定义底稿，wp_not_in_catalog）时原样拼成
+    `{第一参}/…` 交给 L3 运行时条目匹配——这不是对目录的猜测；父级在目录内而表找不到即未命中。
+    """
+    if not formula_ref.startswith("WP(") and not formula_ref.startswith("PREV("):
+        return RefIdentity(None)
+    args = _parse_quoted_args(formula_ref)
+    if len(args) not in (2, 3):
+        return RefIdentity(None)
+    cat = index if index is not None else get_catalog()
+    sm = _sheet_match(cat, args[0], args[1])
+    if sm.ok:
+        sheet_addr = sm.entry["addr_id"]
+        return RefIdentity(f"{sheet_addr}/{args[2]}" if len(args) == 3 else sheet_addr, sm)
+    if sm.state == "wp_not_in_catalog":
+        return RefIdentity("/".join(args), sm)
+    if len(args) == 2 and sm.state == "not_found":
+        flat = _custom_flat(cat, args[0], args[1])
+        if flat:
+            return RefIdentity(flat)
+    return RefIdentity(None, sm)
+
+
+def _uri_to_addr_id(uri: str) -> str | None:
+    """薄壳（原签名）：多义 / 禁止别名 / 未命中返回 None。"""
+    return _uri_to_sheet_match(uri).addr_id
+
+
+def _formula_ref_to_addr_id(formula_ref: str) -> str | None:
+    """薄壳（原签名）：多义 / 禁止别名 / 未命中返回 None。"""
+    return _formula_ref_to_sheet_match(formula_ref).addr_id
+
+
+def _index_ref_to_addr_id(index_ref: str, *, index: CatalogIndex | None = None) -> str | None:
     """从索引命名空间语法推导 addr_id。
 
     cell:D2-2!E100 → D2/D2-2/E100
@@ -724,15 +713,13 @@ def _index_ref_to_addr_id(index_ref: str) -> str | None:
 
     ns, target = index_ref.split(":", 1)
     ns_lower = ns.lower()
-    cat = get_catalog()
+    cat = index if index is not None else get_catalog()
 
     if ns_lower == "cell":
         # cell:D2-2!E100 → sheet_code=D2-2, cell=E100
         if "!" in target:
             sheet_code, cell = target.split("!", 1)
-            matches = cat.sheets_by_code.get(sheet_code, [])
-            if len(matches) == 1:
-                return f"{matches[0]['addr_id']}/{cell}"
+            return _custom_flat(cat, sheet_code, cell)
         return None
 
     elif ns_lower in ("wp", "sheet"):

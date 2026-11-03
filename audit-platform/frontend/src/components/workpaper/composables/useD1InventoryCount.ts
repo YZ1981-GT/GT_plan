@@ -23,6 +23,7 @@
  *
  * Requirements: 1.1-1.6, 2.1-2.5, 3.1-3.5, 15.1, 15.5, 15.7
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { sumColumn, type InventoryCountRow } from './d1InspectionFormulas'
@@ -110,10 +111,7 @@ const SELECT_FIELDS: Array<keyof InventoryCountRow> = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 
 function parseNum(val: any): number {

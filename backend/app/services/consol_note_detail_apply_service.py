@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.consol_note_data_models import ConsolNoteData
 from app.services.consol_note_table_totals import to_decimal as _to_decimal
 from app.models.consol_note_mapping_models import (
+    ConsolNoteDetailTemplate,
     ConsolNoteDetailTemplateVersion,
     ConsolNoteMappingBinding,
     ConsolNoteMappingRule,
@@ -79,8 +80,20 @@ async def apply_detail_refresh(
         compute_source_structure_hash,
         load_source_tables,
         resolve_section_template_type,
+        source_group,
+        source_occurrence,
     )
     from app.services.consol_note_formula_service import find_table
+    from app.services.consol_note_row_groups import row_groups
+    from app.services.consol_note_topn import apply_topn_refresh, section_topn_limit
+
+    if template_type is None:
+        template_type = await resolve_section_template_type(db, project_id)
+    # 「前 N 名」表：行是欠款单位、随数据变化，不经明细模板与映射骨架，按单位合并重排（R10 / ADR-7）
+    topn = section_topn_limit(template_type, section_id)
+    if topn:
+        return await apply_topn_refresh(db, project_id=project_id, section_id=section_id, year=year, limit=topn,
+                                        template_type=template_type, node_key=node_key, scope_leaves=scope_leaves)
 
     # ── 1. 模板绑定 ──
     binding = (await db.execute(
@@ -99,11 +112,17 @@ async def apply_detail_refresh(
     )).scalar_one_or_none()
     if version is None:
         raise ApplyError(400, "VERSION_MISSING", "绑定的模板版本不存在")
+    template_identity = (await db.execute(
+        sa.select(ConsolNoteDetailTemplate.template_type, ConsolNoteDetailTemplate.section_id).where(
+            ConsolNoteDetailTemplate.id == version.template_id,
+            ConsolNoteDetailTemplate.is_deleted == sa.false(),
+        )
+    )).one_or_none()
+    if template_identity is None or template_identity.template_type != template_type or template_identity.section_id != section_id:
+        raise ApplyError(409, "TEMPLATE_BINDING_MISMATCH", "绑定的模板版本不属于当前附注口径或章节，请重新绑定")
 
     template_rows: list[dict[str, Any]] = version.rows if isinstance(version.rows, list) else []
     target_row_index = {str(tr["target_row_id"]): i for i, tr in enumerate(template_rows)}
-    if template_type is None:
-        template_type = await resolve_section_template_type(db, project_id)
 
     # ── 2. 加载确认绑定（按节点子树限定） ──
     entity_bindings = list((await db.execute(
@@ -139,18 +158,35 @@ async def apply_detail_refresh(
 
     def _rows_of(pid: UUID) -> list[Any]:
         src = sources.get(pid)
-        return src.rows if src is not None else []
+        # R15 / ADR-11：unreadable（金额列全未匹配）的来源不当作有行——apply 不应按空金额写入
+        return src.rows if src is not None and src.usable else []
 
-    if preview_entity_hashes:
-        for b in confirmed:
+    # 服务端每次 apply 都复核绑定时结构，不能只相信可选的客户端 preview hash。
+    fresh_confirmed: list[ConsolNoteMappingBinding] = []
+    structure_changed: list[str] = []
+    for b in confirmed:
+        current_hash = compute_source_structure_hash(section_id, _rows_of(b.entity_project_id))
+        if current_hash != b.bound_source_hash:
+            b.status = "stale"
+            stale.append(b)
+            structure_changed.append(b.entity_node_key)
+            continue
+        if preview_entity_hashes:
             expected = preview_entity_hashes.get(b.entity_node_key)
-            if expected is None:
-                continue
-            if compute_source_structure_hash(section_id, _rows_of(b.entity_project_id)) != expected:
+            if expected is not None and current_hash != expected:
                 raise ApplyError(
                     409, "SOURCE_CHANGED",
                     f"企业 {b.entity_node_key} 的来源数据已变化，请重新预览",
                 )
+        fresh_confirmed.append(b)
+    confirmed = fresh_confirmed
+    if not confirmed and structure_changed:
+        await db.flush()
+        raise ApplyError(
+            409, "SOURCE_CHANGED",
+            "来源结构已变化，请重新预览并确认映射",
+            {"stale_entities": structure_changed[:50]},
+        )
 
     # ── 4. 加载规则并检查阻断 ──
     rule_ids = list({b.rule_id for b in confirmed if b.rule_id is not None})
@@ -166,6 +202,14 @@ async def apply_detail_refresh(
         rule = rule_cache.get(b.rule_id)
         if rule is None:
             unmapped_labels.append(f"企业 {b.entity_node_key} 的规则已删除")
+            continue
+        if (
+            rule.is_active is not True
+            or rule.project_id != project_id
+            or rule.section_id != section_id
+            or rule.template_version_id != binding.template_version_id
+        ):
+            unmapped_labels.append(f"企业 {b.entity_node_key} 的规则与当前项目、章节或模板版本不一致")
             continue
         for m in (rule.mappings if isinstance(rule.mappings, list) else []):
             if m.get("mapping_action", "") in ("map", "map_merge"):
@@ -211,6 +255,10 @@ async def apply_detail_refresh(
         source_by_label: dict[str, list[Any]] = {}
         # V204: 同时按 _pushed_row_id 索引（集团下推行即使改了名也能找到）
         source_by_rid: dict[str, list[Any]] = {}
+        # 每行的（分组, 组内同名序号）：读取层带出，没有时按同一函数现算（R3）
+        fallback_groups = row_groups([_first_cell(sr).strip() for sr in source_rows],
+                                     [sr.get("row_type") if isinstance(sr, dict) else None for sr in source_rows])
+        group_of = {id(sr): source_group(sr, *fallback) for sr, fallback in zip(source_rows, fallback_groups)}
         for sr in source_rows:
             source_by_label.setdefault(_first_cell(sr).strip(), []).append(sr)
             rid = sr.get("_pushed_row_id") or (sr if isinstance(sr, dict) else {}).get("_pushed_row_id", "")
@@ -218,6 +266,8 @@ async def apply_detail_refresh(
                 source_by_rid.setdefault(rid, []).append(sr)
 
         entity_contrib: list[dict[str, Any]] = []
+        inactive_optional: list[str] = []
+        consumed: set[int] = set()  # 同一来源行只累加一次（R11：同名行被两条映射同时认领时不重复加）
         for m in (rule.mappings if isinstance(rule.mappings, list) else []):
             if m.get("mapping_action", "") == "ignore":
                 continue
@@ -226,11 +276,26 @@ async def apply_detail_refresh(
             if target_idx is None:
                 continue
             source_label = str(m.get("source_label", "")).strip()
-            # 按 label 找来源行；找不到时 fallback 按 _pushed_row_id（V204）
+            # 按 label 找来源行（映射声明了同名序号 source_occurrence ⇒ 只取第几次出现的那一行，R11）；
+            # 找不到时 fallback 按 _pushed_row_id（V204）
             matched_rows = source_by_label.get(source_label, [])
+            occurrence = m.get("source_occurrence")
+            group, group_occ = m.get("source_group"), m.get("source_group_occurrence")
+            if isinstance(group, str):
+                # 按（行名, 分组[, 组内序号]）取行（R3）：组里没有就不取，不按位置到别的组找
+                matched_rows = [sr for sr in matched_rows if group_of[id(sr)][0] == group
+                                and (not isinstance(group_occ, int) or group_of[id(sr)][1] == group_occ)]
+            elif isinstance(occurrence, int) and not isinstance(occurrence, bool):
+                matched_rows = [sr for k, sr in enumerate(matched_rows) if source_occurrence(sr, k) == occurrence]
             if not matched_rows:
                 matched_rows = source_by_rid.get(target_row_id, [])
             for sr in matched_rows:
+                if id(sr) in consumed:
+                    continue
+                consumed.add(id(sr))
+                if _optional_inactive(sr):  # 子企业标了「本企业不适用」的下推可选行：不取数（R12）
+                    inactive_optional.append(_first_cell(sr).strip())
+                    continue
                 amounts = _extract_amounts(sr, width)
                 bucket = target_amounts.setdefault(target_idx, {})
                 for col, val in amounts.items():
@@ -247,6 +312,7 @@ async def apply_detail_refresh(
             "entity_node_key": b.entity_node_key,
             "entity_project_id": str(b.entity_project_id),
             "contributions": entity_contrib,
+            **({"inactive_optional_rows": sorted(set(inactive_optional))} if inactive_optional else {}),
         })
 
     # 本节点范围内读到了来源、却还没确认映射的企业（合并数会缺它们）
@@ -271,21 +337,25 @@ async def apply_detail_refresh(
         }
 
     data = dict(note_record.data) if isinstance(note_record.data, dict) else {}
-    protected = _parse_manual_cells(data) | _parse_locked_cells(note_record)
+    manual, locked = _parse_manual_cells(data), _parse_locked_cells(note_record)
     existing_rows = data.get("rows", [])
     if existing_rows and isinstance(existing_rows[0], (list, tuple)):
         width = max(width, len(existing_rows[0]))
 
     # ── 7. 构建新行（以模板行为骨架；合计 / 小计按本表数据重算，与节点子树汇总共用） ──
-    from app.services.consol_note_table_totals import build_table_rows
+    # 「……」占位行（动态行区 / 占位行名）没有映射来的数就不写；手工 / 锁定格按行名对到新行号（R15）
+    from app.services.consol_note_table_totals import build_note_rows
 
-    new_rows, filled, kept_manual = build_table_rows(
+    built = build_note_rows(
         [(tr.get("canonical_name", ""), tr.get("row_type")) for tr in template_rows],
         target_amounts,
         width=width,
-        protected=protected,
+        protected=manual | locked,
         existing_rows=existing_rows,
+        placeholders=placeholder_rows(template_rows),
     )
+    new_rows, filled, kept_manual = built.rows, built.filled, built.kept
+    lost_protected = remap_protected(data, note_record, manual, locked, built.old_to_new)
 
     headers = data.get("headers") or template_headers or ["项目"] + [f"列{c}" for c in range(1, width)]
 
@@ -299,6 +369,16 @@ async def apply_detail_refresh(
     note_record.data = data
     note_record.is_stale = False
     note_record.updated_at = datetime.now(timezone.utc)
+    # V243：来源投影
+    from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
+
+    _mode = compute_source_mode(
+        "detail_mapping",
+        manual_cells=manual,
+        locked_cells=locked,
+        previous_source=getattr(note_record, "source_mode", None),
+    )
+    update_source_projection(note_record, _mode, digest=_sd(data))
     await db.flush()
 
     return {
@@ -316,6 +396,9 @@ async def apply_detail_refresh(
         "kept_manual": kept_manual[:50],
         "template_row_count": len(template_rows),
         "output_row_count": len(new_rows),
+        "dropped_placeholders": built.dropped_placeholders,
+        "lost_protected": lost_protected[:50],
+        "inactive_optional_count": sum(len(p.get("inactive_optional_rows") or []) for p in provenance),
     }
 
 
@@ -345,6 +428,41 @@ def _first_cell(row: Any) -> str:
     """提取行标签——与 source service 同口径。"""
     from app.services.consol_note_detail_source_service import _first_cell as _fc
     return _fc(row)
+
+
+def _optional_inactive(row: Any) -> bool:
+    """集团下推的可选行被子企业标成「本企业不适用」（读取层带出的 ``_pushed_optional_active`` 为 False）。"""
+    return isinstance(row, dict) and row.get("_pushed_optional_active") is False
+
+
+def placeholder_rows(template_rows: list[Any]) -> list[int]:
+    """明细模板里的「……」占位行：动态行区，或行名整段是省略号（修复前建的模板把它标成固定行）。"""
+    from app.services.consol_note_detail_suggest import is_placeholder_label
+
+    return [i for i, tr in enumerate(template_rows) if isinstance(tr, dict) and (
+        tr.get("category") == "dynamic_zone" or is_placeholder_label(tr.get("canonical_name")))]
+
+
+def remap_protected(data: dict, record: Any, manual: set[tuple[int, int]], locked: set[tuple[int, int]],
+                    old_to_new: dict[int, int]) -> list[dict[str, Any]]:
+    """手工 / 锁定坐标改写成新行号（R15：不写占位行、模板插删行后不错位）。
+
+    所在行没写进新表的坐标不落到别的行上，回报给调用方；坐标没变时不改存储。
+    """
+    from app.services.consol_note_table_totals import remap_cells
+
+    lost: list[dict[str, Any]] = []
+    if manual:
+        moved, gone = remap_cells(manual, old_to_new)
+        if set(moved) != manual:
+            data["manual_cells"] = [{"row": r, "col": c} for r, c in sorted(moved)]
+        lost += [{"row": r, "col": c, "kind": "manual"} for r, c in gone]
+    if locked:
+        moved, gone = remap_cells(locked, old_to_new)
+        if set(moved) != locked:
+            record.locked_cells = [{"row_index": r, "col_index": c} for r, c in sorted(moved)]
+        lost += [{"row": r, "col": c, "kind": "locked"} for r, c in gone]
+    return lost
 
 
 def _row_width(row: Any) -> int:

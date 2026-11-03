@@ -3,7 +3,7 @@
  * E1TabBankFlowReconcile.vue — E1-31 银行流水双向核对表
  * （一）月度汇总 （二）账→流 （三）流→账 + OCR流水 + 覆盖率/结论
  */
-import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, onMounted, type Ref } from 'vue'
 import { MagicStick, Paperclip } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -20,7 +20,8 @@ import { useE1ImportExport } from '../composables/useE1ImportExport'
 // 科目码单一真源（禁组件内字面量）
 import { E1_FALLBACK_STANDARD } from '../composables/e1AccountScope'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
-import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import E1StatementOcrConfirmDialog, {
   type StatementOcrFields,
 } from './E1StatementOcrConfirmDialog.vue'
@@ -32,6 +33,9 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+import WpCommitInput from '../shared/WpCommitInput.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -83,7 +87,11 @@ const {
   addJournalLine,
   removeJournalLine,
   updateJournalLine,
-  mergeJournalLines,
+  onEngineFilled,
+  onUndoRequest,
+  journalRowClass,
+  isJournalLocked,
+  voucherFillReady,
   updateCheckRow,
   addCheckRow,
   removeCheckRow,
@@ -95,9 +103,11 @@ const {
   saveConclusion,
   hydrate,
 } = useE1BankFlowReconcile(options)
+onMounted(() => { void voucherFillReady() })
 
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
 const sheetCode = computed(() => 'E1-31')
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const { exportTemplate, exportData, importData, isImporting } = useE1ImportExport({
   wpId: toRef(props, 'wpId') as unknown as Ref<string>,
   sheet: sheetCode as unknown as Ref<string>,
@@ -132,7 +142,6 @@ const lastOcrHint = computed(() => {
 })
 
 const samplingVisible = ref(false)
-const samplingPhase = ref<'final' | 'preliminary'>('final')
 
 /**
  * 抽凭科目码，取自真源 `e1AccountScope`（原硬编码 `"1002"`）。
@@ -169,27 +178,18 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly),
 })
 
-function onSampleFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }): void {
+/**
+ * 抽凭引擎回填日记账明细：共享回填函数一个样本一行（整笔银行分录金额，对方科目按后端配对拼接），
+ * 按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的日记账行（原「替换」会把整张日记账清掉）。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const { samples, fillMode } = payload
-  if (!samples?.length) return
-  const mapped = samples.map(s => ({
-    date: s.voucherDate || '',
-    voucherNo: s.voucherNo || '',
-    businessContent: s.summary || '',
-    counterAccount: s.counterpartAccount || '',
-    counterAccountName: s.counterpartAccountName || '',
-    counterparty: '',
-    debit: s.debitAmount ? Number(s.debitAmount) : 0,
-    credit: s.creditAmount ? Number(s.creditAmount) : 0,
-    source: '抽凭',
-  }))
-  const mode = fillMode === 'replace' ? 'replace' : fillMode === 'merge' ? 'merge' : 'append'
-  const n = mergeJournalLines(mapped, mode)
+  void persistMethodology(payload?.methodology)
+  if (!(payload?.samples ?? []).length) return
+  const out = await onEngineFilled(payload)
+  if (out.cancelled) return
   samplingVisible.value = false
-  ElMessage.success(`已回填 ${n} 笔日记账（${mode === 'replace' ? '替换' : mode === 'merge' ? '合并' : '追加'}）`)
+  // 填入几行（含已存在 / 被替换）由共享回填函数按实际行数提示
   activeTab.value = 'lines'
 }
 
@@ -361,9 +361,11 @@ async function runOcr(file: File): Promise<boolean> {
   try {
     const form = new FormData()
     form.append('file', file)
+    rowEv.append(form, sheetCode.value) // 对账单挂到本表页（表页级），「流水 OCR」旁的小眼睛按同一位置读取
     const { data } = await http.post(`/api/workpapers/${props.wpId}/e1/statement-ocr`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+    rowEv.refresh()
     const fields = data?.extracted_fields || {}
     if (!Array.isArray(fields.lines) || !fields.lines.length) {
       ElMessage.warning('OCR 完成，未识别到流水明细')
@@ -488,6 +490,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
             <el-icon><Paperclip /></el-icon> 流水 OCR
           </el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="sheetCode" />
         <el-tag v-if="lastOcrHint" size="small" type="info" effect="plain">{{ lastOcrHint }}</el-tag>
         <el-button size="small" :disabled="isReadonly || !isApplicable" @click="onRecalcMonthly">回填月度</el-button>
         <el-button size="small" type="primary" :disabled="isReadonly || !isApplicable" @click="openSampling">抽凭→日记账</el-button>
@@ -505,11 +508,11 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
         <el-card shadow="never" class="section-card meta-card">
           <el-form inline size="small">
             <el-form-item label="开户银行">
-              <el-input :model-value="pack.bank" :disabled="isReadonly" style="width: 200px"
+              <WpCommitInput :model-value="pack.bank" :disabled="isReadonly" style="width: 200px"
                 @change="(v: string) => updateMeta('bank', v)" />
             </el-form-item>
             <el-form-item label="账号">
-              <el-input :model-value="pack.accountNo" :disabled="isReadonly" style="width: 200px"
+              <WpCommitInput :model-value="pack.accountNo" :disabled="isReadonly" style="width: 200px"
                 @change="(v: string) => updateMeta('accountNo', v)" />
             </el-form-item>
           </el-form>
@@ -603,19 +606,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 <el-table :data="pagedStatements" border size="small" max-height="420">
                   <el-table-column label="日期" width="120">
                     <template #default="{ row }">
-                      <el-input :model-value="row.date" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.date" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateStatementLine(row.id, 'date', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="摘要" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.summary" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.summary" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateStatementLine(row.id, 'summary', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="对方" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.counterparty" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.counterparty" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateStatementLine(row.id, 'counterparty', v)" />
                     </template>
                   </el-table-column>
@@ -657,46 +660,52 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   <el-button size="small" type="primary" plain :disabled="isReadonly" @click="openSampling">抽凭回填</el-button>
                   <el-button size="small" :disabled="isReadonly" @click="addJournalLine()">+ 行</el-button>
                 </div>
-                <el-table :data="pagedJournals" border size="small" max-height="420">
+                <el-table :data="pagedJournals" border size="small" max-height="420" :row-class-name="journalRowClass">
+                  <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+                  <el-table-column label="来源" width="150">
+                    <template #default="{ row }">
+                      <VoucherRowMetaCell :row="row" :locked="isJournalLocked(row)" :project-id="projectId" :year="year" />
+                    </template>
+                  </el-table-column>
                   <el-table-column label="日期" width="110">
                     <template #default="{ row }">
-                      <el-input :model-value="row.date" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.date" :disabled="isReadonly || isJournalLocked(row)" size="small"
                         @change="(v: string) => updateJournalLine(row.id, 'date', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="凭证号" width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.voucherNo" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.voucherNo" :disabled="isReadonly || isJournalLocked(row)" size="small"
                         @change="(v: string) => updateJournalLine(row.id, 'voucherNo', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="业务内容" min-width="80">
                     <template #default="{ row }">
-                      <el-input :model-value="row.businessContent" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.businessContent" :disabled="isReadonly || isJournalLocked(row)" size="small"
                         @change="(v: string) => updateJournalLine(row.id, 'businessContent', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="往来" min-width="80">
                     <template #default="{ row }">
-                      <el-input :model-value="row.counterparty" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.counterparty" :disabled="isReadonly || isJournalLocked(row)" size="small"
                         @change="(v: string) => updateJournalLine(row.id, 'counterparty', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="借方" width="90" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.debit" :disabled="isReadonly || isJournalLocked(row)" :controls="false" :precision="2" size="small" style="width: 100%"
                         @change="(v: number) => updateJournalLine(row.id, 'debit', v ?? 0)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="贷方" width="90" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.credit" :disabled="isReadonly || isJournalLocked(row)" :controls="false" :precision="2" size="small" style="width: 100%"
                         @change="(v: number) => updateJournalLine(row.id, 'credit', v ?? 0)" />
                     </template>
                   </el-table-column>
                   <el-table-column width="50">
                     <template #default="{ row }">
-                      <el-button type="danger" text size="small" :disabled="isReadonly" @click="removeJournalLine(row.id)">删</el-button>
+                      <el-button type="danger" text size="small" :disabled="isReadonly || isJournalLocked(row)" @click="removeJournalLine(row.id)">删</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -750,25 +759,25 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 <el-table-column label="记账凭证" align="center">
                   <el-table-column label="日期" width="110">
                     <template #default="{ row }">
-                      <el-input :model-value="row.vDate" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.vDate" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'vDate', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="凭证号" width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.voucherNo" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.voucherNo" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'voucherNo', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="业务内容" min-width="100">
                     <template #default="{ row }">
-                      <el-input :model-value="row.businessContent" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.businessContent" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'businessContent', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="往来单位" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.counterparty" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.counterparty" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'counterparty', v)" />
                     </template>
                   </el-table-column>
@@ -788,19 +797,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 <el-table-column label="银行对账单" align="center">
                   <el-table-column label="收付日期" width="110">
                     <template #default="{ row }">
-                      <el-input :model-value="row.sDate" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.sDate" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'sDate', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="摘要" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.summary" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.summary" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'summary', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="收付款方" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.payerPayee" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.payerPayee" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bookToBank', row.id, 'payerPayee', v)" />
                     </template>
                   </el-table-column>
@@ -829,19 +838,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 </el-table-column>
                 <el-table-column label="不一致原因" min-width="100">
                   <template #default="{ row }">
-                    <el-input :model-value="row.inconsistencyReason" :disabled="isReadonly" size="small"
+                    <WpCommitInput :model-value="row.inconsistencyReason" :disabled="isReadonly" size="small"
                       @change="(v: string) => updateCheckRow('bookToBank', row.id, 'inconsistencyReason', v)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="支持文件" min-width="100">
                   <template #default="{ row }">
-                    <el-input :model-value="row.supportDocs" :disabled="isReadonly" size="small"
+                    <WpCommitInput :model-value="row.supportDocs" :disabled="isReadonly" size="small"
                       @change="(v: string) => updateCheckRow('bookToBank', row.id, 'supportDocs', v)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="结论" min-width="90">
                   <template #default="{ row }">
-                    <el-input :model-value="row.conclusion" :disabled="isReadonly" size="small"
+                    <WpCommitInput :model-value="row.conclusion" :disabled="isReadonly" size="small"
                       @change="(v: string) => updateCheckRow('bookToBank', row.id, 'conclusion', v)" />
                   </template>
                 </el-table-column>
@@ -900,19 +909,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 <el-table-column label="银行对账单" align="center">
                   <el-table-column label="收付日期" width="110">
                     <template #default="{ row }">
-                      <el-input :model-value="row.sDate" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.sDate" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'sDate', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="摘要" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.summary" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.summary" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'summary', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="收付款方" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.payerPayee" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.payerPayee" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'payerPayee', v)" />
                     </template>
                   </el-table-column>
@@ -926,25 +935,25 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 <el-table-column label="记账凭证" align="center">
                   <el-table-column label="日期" width="110">
                     <template #default="{ row }">
-                      <el-input :model-value="row.vDate" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.vDate" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'vDate', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="凭证号" width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.voucherNo" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.voucherNo" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'voucherNo', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="业务内容" min-width="100">
                     <template #default="{ row }">
-                      <el-input :model-value="row.businessContent" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.businessContent" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'businessContent', v)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="往来单位" min-width="90">
                     <template #default="{ row }">
-                      <el-input :model-value="row.counterparty" :disabled="isReadonly" size="small"
+                      <WpCommitInput :model-value="row.counterparty" :disabled="isReadonly" size="small"
                         @change="(v: string) => updateCheckRow('bankToBook', row.id, 'counterparty', v)" />
                     </template>
                   </el-table-column>
@@ -979,19 +988,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 </el-table-column>
                 <el-table-column label="不一致原因" min-width="100">
                   <template #default="{ row }">
-                    <el-input :model-value="row.inconsistencyReason" :disabled="isReadonly" size="small"
+                    <WpCommitInput :model-value="row.inconsistencyReason" :disabled="isReadonly" size="small"
                       @change="(v: string) => updateCheckRow('bankToBook', row.id, 'inconsistencyReason', v)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="支持文件" min-width="100">
                   <template #default="{ row }">
-                    <el-input :model-value="row.supportDocs" :disabled="isReadonly" size="small"
+                    <WpCommitInput :model-value="row.supportDocs" :disabled="isReadonly" size="small"
                       @change="(v: string) => updateCheckRow('bankToBook', row.id, 'supportDocs', v)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="结论" min-width="90">
                   <template #default="{ row }">
-                    <el-input :model-value="row.conclusion" :disabled="isReadonly" size="small"
+                    <WpCommitInput :model-value="row.conclusion" :disabled="isReadonly" size="small"
                       @change="(v: string) => updateCheckRow('bankToBook', row.id, 'conclusion', v)" />
                   </template>
                 </el-table-column>
@@ -1040,7 +1049,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   <template #default="{ row }">{{ fmtRate(row.p2) }}</template>
                 </el-table-column>
               </el-table>
-              <el-input
+              <WpCommitInput
                 type="textarea"
                 :model-value="pack.coverageLowReason"
                 :disabled="isReadonly"
@@ -1060,7 +1069,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 >
                   {{ t.label }}
                 </el-checkbox>
-                <el-input
+                <WpCommitInput
                   v-if="t.checked"
                   :model-value="t.note"
                   :disabled="isReadonly"
@@ -1146,12 +1155,12 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
         :account-code="samplingAccountCode"
-        :phase="samplingPhase"
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="year"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>

@@ -24,6 +24,11 @@ declare module 'vue-router' {
     roles?: string[]
     /** 标记为开发中页面，访问时提示并阻止导航 */
     developing?: boolean
+    /**
+     * 只改 query（`?year=` 除外）时复用页面实例、不重挂（见 utils/routeViewKey）。
+     * 只给自己监听了会变 query 的页面开；默认按 fullPath 重挂。
+     */
+    reuseOnQueryChange?: boolean
   }
 }
 

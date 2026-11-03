@@ -9,6 +9,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
+
+// 试算表唯一入口（services/trialBalanceRows）经 apiProxy 取数：mock 端点，真走入口的参数与解包
+const apiGet = vi.hoisted(() => vi.fn())
+vi.mock('@/services/apiProxy', () => ({ api: { get: apiGet, post: vi.fn(), put: vi.fn() } }))
+
 import { fetchI2TbData, persistI2TbData, type I2TbData } from '../useI2FormData'
 import { computeI2SheetCompletion } from '../i2ConsistencyModel'
 import { I2_DISC_KEYS } from '../i2DisclosureModel'
@@ -17,45 +22,33 @@ import { useI2Impairment } from '../useI2Impairment'
 // ─── 1. fetchI2TbData / persistI2TbData ────────────────────────────────────
 
 describe('fetchI2TbData', () => {
-  it('聚合科目1717未审/审定/AJE/RJE（axios风格 res.data）', async () => {
-    const httpClient = {
-      get: vi.fn().mockResolvedValue({
-        data: [
-          { standard_account_code: '171701', unadjusted_amount: 100, audited_amount: 120, aje_adjustment: 10, rje_adjustment: 10 },
-          { standard_account_code: '171702', unadjusted_amount: 50, audited_amount: 50, aje_adjustment: 0, rje_adjustment: 0 },
-          { standard_account_code: '2221', unadjusted_amount: 999, audited_amount: 999, aje_adjustment: 0, rje_adjustment: 0 },
-        ],
-      }),
-    }
-    const tb = await fetchI2TbData(httpClient, 'proj-1')
+  beforeEach(() => {
+    apiGet.mockReset()
+  })
+
+  it('经试算表唯一入口按 1717 前缀取数：科目及其明细之和（带 /api 前缀，原先缺）', async () => {
+    apiGet.mockResolvedValue([
+      { standard_account_code: '171701', unadjusted_amount: '100', audited_amount: '120', aje_adjustment: '10', rje_adjustment: '10' },
+      { standard_account_code: '171702', unadjusted_amount: '50', audited_amount: '50', aje_adjustment: '0', rje_adjustment: '0' },
+      { standard_account_code: '2221', unadjusted_amount: '999', audited_amount: '999', aje_adjustment: '0', rje_adjustment: '0' },
+    ])
+    const tb = await fetchI2TbData('proj-1')
     expect(tb).toEqual({ unadjusted1717: 150, audited1717: 170, aje1717: 10, rje1717: 10 })
-    expect(httpClient.get).toHaveBeenCalledWith(
-      '/projects/proj-1/trial-balance',
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/projects/proj-1/trial-balance',
       expect.objectContaining({ params: { account_prefix: '1717' } }),
     )
   })
 
-  it('聚合科目1717未审/审定/AJE/RJE（api风格：已解包为数组）', async () => {
-    const httpClient = {
-      get: vi.fn().mockResolvedValue([
-        { account_code: '1717', unadjusted_amount: 200, audited_amount: 200, aje_adjustment: 0, rje_adjustment: 0 },
-      ]),
-    }
-    const tb = await fetchI2TbData(httpClient, 'proj-2')
-    expect(tb.unadjusted1717).toBe(200)
-  })
-
   it('projectId 为空时返回全零，不发起请求', async () => {
-    const httpClient = { get: vi.fn() }
-    const tb = await fetchI2TbData(httpClient, '')
+    const tb = await fetchI2TbData('')
     expect(tb).toEqual({ unadjusted1717: 0, audited1717: 0, aje1717: 0, rje1717: 0 })
-    expect(httpClient.get).not.toHaveBeenCalled()
+    expect(apiGet).not.toHaveBeenCalled()
   })
 
-  it('请求失败时静默返回全零', async () => {
-    const httpClient = { get: vi.fn().mockRejectedValue(new Error('network')) }
-    const tb = await fetchI2TbData(httpClient, 'proj-3')
-    expect(tb).toEqual({ unadjusted1717: 0, audited1717: 0, aje1717: 0, rje1717: 0 })
+  it('请求失败抛错，调用方不落库（原先返回全零并被写进 I2-tb-data）', async () => {
+    apiGet.mockRejectedValue(new Error('network'))
+    await expect(fetchI2TbData('proj-3')).rejects.toThrow('network')
   })
 })
 

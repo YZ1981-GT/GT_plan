@@ -280,8 +280,16 @@ import {
   buildK7SyncPayload,
   grantDetailEndAmount,
   K7_NOTE_SECTION,
-  type K7GrantDetailRow,
 } from '../../composables/k7NoteSectionMap'
+import {
+  applyK7AutoFill,
+  buildK7DisclosureSnapshot,
+  loadK7DisclosureState,
+  toK7GrantPayloadRow,
+  type K7DisclosureFormRow,
+  type K7GrantFormRow,
+  type K7RowIdentity,
+} from '../../composables/k7DisclosureSnapshot'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K7_ACCOUNT_CODE = '2401'
@@ -307,29 +315,10 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  id: string
-  project: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  isTotal?: boolean
-  isAutoFill?: boolean
-}
+type DisclosureRow = K7DisclosureFormRow
 
 /** 附注 八、56 表2「其中：递延收益-政府补助情况」行（10 列） */
-interface GrantRow {
-  id: string
-  grantItem: string
-  beginBalance: number
-  newGrant: number
-  toPl: number
-  plLineItem: string
-  refund: number
-  otherChange: number
-  grantKind: string
-  refundReason: string
-}
+type GrantRow = K7GrantFormRow
 
 /** 「本期计入损益的列报项目」可选值 —— CAS16 允许的两个列报项目 + 常见冲减项 */
 const PL_LINE_ITEMS = ['其他收益', '营业外收入', '冲减相关成本费用', '冲减资产折旧/摊销'] as const
@@ -340,111 +329,26 @@ const grantRows = ref<GrantRow[]>([])
 const narrativeText = ref('')
 const hasAutoData = ref(false)
 
-// ─── 默认行 ──────────────────────────────────────────────────────────────────
-
-function initDefaultRows(): void {
-  const assetDefaults = ['设备购置补助', '厂房建设补助', '技改项目补助', '环保设备补助', '其他与资产相关补助']
-  const incomeDefaults = ['研发费用补助', '稳岗补贴', '产业扶持资金', '出口退税补贴', '其他与收益相关补助']
-
-  assetRelatedRows.value = assetDefaults.map((name, idx) => ({
-    id: newRowIdentity('asset'),
-    project: name,
-    beginBalance: 0,
-    increase: 0,
-    decrease: 0,
-  }))
-
-  incomeRelatedRows.value = incomeDefaults.map((name, idx) => ({
-    id: newRowIdentity('income'),
-    project: name,
-    beginBalance: 0,
-    increase: 0,
-    decrease: 0,
-  }))
+/** 行身份走值化身份工厂；已保存的明细行沿用已存 id（载荷不含身份） */
+const ROW_IDENTITY: K7RowIdentity = {
+  newRow: (kind) => newRowIdentity(kind),
+  grantRow: (raw) => String(raw?.id || newRowIdentity('grant')),
 }
 
-// ─── 加载已保存数据 ──────────────────────────────────────────────────────────
+// ─── 加载已保存数据（缺失回默认行；与离屏同步共用 k7DisclosureSnapshot） ──────
 
 function loadSavedData(): void {
-  const savedAsset = allResponsesRef.value.get('K7-disclosure-soe-asset-rows')
-  if (savedAsset?.remark) {
-    try {
-      assetRelatedRows.value = JSON.parse(savedAsset.remark)
-    } catch { initDefaultRows() }
-  } else {
-    initDefaultRows()
-  }
-
-  const savedIncome = allResponsesRef.value.get('K7-disclosure-soe-income-rows')
-  if (savedIncome?.remark) {
-    try {
-      incomeRelatedRows.value = JSON.parse(savedIncome.remark)
-    } catch { /* keep default */ }
-  }
-
-  const savedGrant = allResponsesRef.value.get('K7-disclosure-soe-grant-rows')
-  if (savedGrant?.remark) {
-    try {
-      const parsed = JSON.parse(savedGrant.remark)
-      if (Array.isArray(parsed)) grantRows.value = parsed.map(normalizeGrantRow)
-    } catch { /* keep empty */ }
-  }
-
-  const savedNarrative = allResponsesRef.value.get('K7-disclosure-soe-narrative')
-  if (savedNarrative?.remark) {
-    narrativeText.value = savedNarrative.remark
-  }
-}
-
-/** 反序列化补齐字段（旧载荷可能缺列），防 undefined 进公式变 NaN */
-function normalizeGrantRow(raw: any, idx: number): GrantRow {
-  const n = (v: any): number => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0)
-  return {
-    id: String(raw?.id || newRowIdentity('grant')),
-    grantItem: String(raw?.grantItem ?? ''),
-    beginBalance: n(raw?.beginBalance),
-    newGrant: n(raw?.newGrant),
-    toPl: n(raw?.toPl),
-    plLineItem: String(raw?.plLineItem ?? ''),
-    refund: n(raw?.refund),
-    otherChange: n(raw?.otherChange),
-    grantKind: String(raw?.grantKind ?? ''),
-    refundReason: String(raw?.refundReason ?? ''),
-  }
+  const state = loadK7DisclosureState(allResponsesRef.value, 'soe', ROW_IDENTITY)
+  assetRelatedRows.value = state.assetRows
+  incomeRelatedRows.value = state.incomeRows
+  grantRows.value = state.grantRows
+  narrativeText.value = state.narrativeText
 }
 
 // ─── 自动取数（从K7-1审定表） ────────────────────────────────────────────────
 
 function applyAutoFill(): void {
-  const adjData = allResponsesRef.value.get('K7-1-audited-by-type')
-  if (adjData?.remark) {
-    hasAutoData.value = true
-    try {
-      const data = JSON.parse(adjData.remark)
-      if (data?.assetRelated) {
-        for (const row of assetRelatedRows.value) {
-          const src = data.assetRelated[row.project]
-          if (src) {
-            row.beginBalance = Number(src.beginBalance ?? 0)
-            row.increase = Number(src.increase ?? 0)
-            row.decrease = Number(src.decrease ?? 0)
-            row.isAutoFill = true
-          }
-        }
-      }
-      if (data?.incomeRelated) {
-        for (const row of incomeRelatedRows.value) {
-          const src = data.incomeRelated[row.project]
-          if (src) {
-            row.beginBalance = Number(src.beginBalance ?? 0)
-            row.increase = Number(src.increase ?? 0)
-            row.decrease = Number(src.decrease ?? 0)
-            row.isAutoFill = true
-          }
-        }
-      }
-    } catch { /* silent */ }
-  }
+  if (applyK7AutoFill(allResponsesRef.value, assetRelatedRows.value, incomeRelatedRows.value)) hasAutoData.value = true
 }
 
 // ─── 字段更新 ────────────────────────────────────────────────────────────────
@@ -481,21 +385,7 @@ function persistIncomeRows(): void {
 
 /** F51-7a~7d：期末 = 期初 + 本期新增 − 本期计入损益 − 本期返还 − 其他变动（读时推导，不持久化） */
 function grantEnd(row: GrantRow): number {
-  return grantDetailEndAmount(toGrantPayloadRow(row))
-}
-
-function toGrantPayloadRow(row: GrantRow): K7GrantDetailRow {
-  return {
-    grantItem: row.grantItem,
-    beginBalance: row.beginBalance,
-    newGrant: row.newGrant,
-    toPl: row.toPl,
-    plLineItem: row.plLineItem,
-    refund: row.refund,
-    otherChange: row.otherChange,
-    grantKind: row.grantKind,
-    refundReason: row.refundReason,
-  }
+  return grantDetailEndAmount(toK7GrantPayloadRow(row))
 }
 
 function addGrantRow(): void {
@@ -575,20 +465,18 @@ async function syncToDisclosureNotes(): Promise<void> {
   // 附注 八、56 表1 只有 4 个值列（**无 形成原因**：源 xlsx A7:E7 / 附注模版 L3972 /
   // note headers 三源一致，国企 `DisclosureRow` 也没有 `reason` 字段）。
   // 表2「其中：递延收益-政府补助情况」已补录入区块 → 有行才推（空表会整表覆盖模板骨架）。
-  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value]
-    .filter(r => !r.isTotal)
-    .map(r => ({
-      project: r.project,
-      beginBalance: r.beginBalance ?? 0,
-      increase: r.increase ?? 0,
-      decrease: r.decrease ?? 0,
-    }))
+  // 快照与离屏同步共用 buildK7DisclosureSnapshot。
+  const snapshot = buildK7DisclosureSnapshot('soe', {
+    assetRows: assetRelatedRows.value,
+    incomeRows: incomeRelatedRows.value,
+    grantRows: grantRows.value,
+  })
   const payload = buildK7SyncPayload(
     'soe',
     props.wpId || '',
-    rows,
+    snapshot.rows,
     narrativeText.value,
-    grantRows.value.map(toGrantPayloadRow),
+    snapshot.grantRows,
   )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)

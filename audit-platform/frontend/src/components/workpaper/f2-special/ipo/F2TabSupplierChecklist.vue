@@ -54,7 +54,7 @@
     </div>
 
     <div class="table-scroll">
-      <table class="checklist-table">
+      <GtGridTable class="checklist-table">
         <thead>
           <tr>
             <th rowspan="2" class="sticky supplier">供应商名称</th>
@@ -190,7 +190,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <el-card class="opinion-card" shadow="never">
@@ -255,13 +255,14 @@
 
 <script setup lang="ts">
 import { defineComponent, h, onMounted, ref, toRef, type Ref } from 'vue'
-import { ElInput, ElInputNumber } from 'element-plus'
+import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import { useF2SupplierChecklist } from '../../composables/useF2SupplierChecklist'
 import type { CheckMethodField } from '../../composables/useF2SupplierChecklistFormulas'
 import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

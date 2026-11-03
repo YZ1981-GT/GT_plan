@@ -20,6 +20,7 @@ import pytest
 from app.services.evidence_governance.typed_adapters import (
     SUPPORTED_EVIDENCE_TYPES,
     AiContentAdapter,
+    AdjustmentAdapter,
     AttachmentVersionAdapter,
     ConfirmationAdapter,
     DeliverableAdapter,
@@ -55,18 +56,19 @@ EXPECTED_EVIDENCE_TYPES = frozenset({
     "report",
     "ai_content",
     "deliverable",
+    "adjustment",
     "attachment_version",
 })
 
 
-def test_all_10_evidence_types_registered():
-    """All 10 Controlled Modules must be in the registry."""
+def test_all_11_evidence_types_registered():
+    """All controlled modules, including adjustment groups, must be registered."""
     assert SUPPORTED_EVIDENCE_TYPES == EXPECTED_EVIDENCE_TYPES
 
 
-def test_registry_count_is_10():
-    """Exactly 10 adapters in the registry."""
-    assert len(list_adapters()) == 10
+def test_registry_count_is_11():
+    """Exactly 11 adapters in the registry."""
+    assert len(list_adapters()) == 11
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +96,7 @@ def test_adapter_satisfies_protocol(evidence_type: str):
         (ReportAdapter, "report"),
         (AiContentAdapter, "ai_content"),
         (DeliverableAdapter, "deliverable"),
+        (AdjustmentAdapter, "adjustment"),
         (AttachmentVersionAdapter, "attachment_version"),
     ],
 )

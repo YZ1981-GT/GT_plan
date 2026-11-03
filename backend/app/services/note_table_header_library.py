@@ -125,7 +125,10 @@ def _build_vocabulary(raw: dict) -> Vocabulary:
         if period not in PERIODS:
             raise ValueError(f"未知期间类别：{period}")
         for w in items:
-            words[norm(w)] = period
+            key = norm(w)
+            if key in words and words[key] != period:
+                raise ValueError(f"标题行库词表：期间词「{key}」同时出现在 {words[key]} 和 {period} 里")
+            words[key] = period
     prefixes = tuple(sorted(((norm(p), k) for p, k in raw.get("period_prefixes") or []), key=lambda x: -len(x[0])))
     suffixes = tuple(sorted(((norm(p), k) for p, k in raw.get("period_suffixes") or []), key=lambda x: -len(x[0])))
     columns: dict[tuple[str, str, int], dict] = {}
@@ -137,6 +140,24 @@ def _build_vocabulary(raw: dict) -> Vocabulary:
         _require_reason(entry, "continuations")
         continuations[_override_table_key(entry["variant"], entry["table"])] = entry
     digest = hashlib.sha1(json.dumps(raw, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+
+    # ── schema 校验（复盘建议 #2：手工维护的词表加运行时断言，错加一个词不会静默失效） ──
+
+    # ① movement_words 里的词不能同时是期间词（否则 movement_kind 不判定、period_side 误认）
+    movement_word_set = {norm(word) for kind_list in (raw.get("movement_words") or {}).values() for word in kind_list}
+    period_word_set = set(words.keys())
+    overlap = movement_word_set & period_word_set
+    if overlap:
+        raise ValueError(f"标题行库词表：movement_words 与 period_words 重叠：{'、'.join(sorted(overlap))}")
+
+    # ② period_prefixes / period_suffixes 的期间类别必须是已知的
+    for _prefix, kind in raw.get("period_prefixes") or []:
+        if kind not in PERIODS:
+            raise ValueError(f"标题行库词表：period_prefixes 里的期间类别「{kind}」不在 {PERIODS}")
+    for _suffix, kind in raw.get("period_suffixes") or []:
+        if kind not in PERIODS:
+            raise ValueError(f"标题行库词表：period_suffixes 里的期间类别「{kind}」不在 {PERIODS}")
+
     return Vocabulary(
         period_words=words,
         prefixes=prefixes,

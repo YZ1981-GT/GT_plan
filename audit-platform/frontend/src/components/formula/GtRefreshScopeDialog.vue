@@ -87,7 +87,7 @@
           class="gt-rsd-status-banner"
         >
           <template #title>
-            刷新成功：已应用 {{ parsedResult.applied_count }} 个单元
+            已应用 {{ parsedResult.applied_count }} 个单元的金额变化
           </template>
           <template #default>
             <span v-if="presetSummary" class="gt-rsd-preset-info">预设套用：{{ presetSummary }}</span>
@@ -146,6 +146,45 @@
         >
           <template #title>
             幂等命中：相同请求已执行过，无新变更
+          </template>
+        </el-alert>
+
+        <!-- recomputed 信息（Task 21-2） -->
+        <el-alert
+          v-else-if="parsedResult.status === 'recomputed'"
+          type="info"
+          show-icon
+          :closable="false"
+          class="gt-rsd-status-banner"
+        >
+          <template #title>
+            计算已完成，金额未变化（重算 {{ parsedResult.recomputed_count }} 个）
+          </template>
+        </el-alert>
+
+        <!-- draft_marked 信息（Task 21-2） -->
+        <el-alert
+          v-else-if="parsedResult.status === 'draft_marked'"
+          type="info"
+          show-icon
+          :closable="false"
+          class="gt-rsd-status-banner"
+        >
+          <template #title>
+            已标记 {{ parsedResult.draft_marked_count }} 个为待刷新草稿
+          </template>
+        </el-alert>
+
+        <!-- no_effect 信息（Task 21-2） -->
+        <el-alert
+          v-else-if="parsedResult.status === 'no_effect'"
+          type="info"
+          show-icon
+          :closable="false"
+          class="gt-rsd-status-banner"
+        >
+          <template #title>
+            本次刷新无可执行的变更
           </template>
         </el-alert>
 
@@ -216,6 +255,7 @@ import http from '@/utils/http'
 // spec: formula-management-runtime-closure Task 14/16 - 端点收敛进 apiPaths（纯搬迁）
 import { draftRefresh } from '@/services/apiPaths/formula'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useRoleContextStore } from '@/stores/roleContext'
 import {
   parseDraftRefreshResponse,
@@ -241,7 +281,8 @@ interface ScopeTreeNode {
 
 const props = defineProps<{
   projectId: string
-  year: number
+  /** 项目年度；项目没填审计年度为 null ⇒ 不打开（原先宿主兜底去年，刷新的是别的年度） */
+  year: number | null
 }>()
 
 const emit = defineEmits<{
@@ -301,6 +342,10 @@ const presetSummary = computed<string>(() => {
 
 // ─── 打开弹窗 ─────────────────────────────────────────────────────────────────
 async function openDialog() {
+  if (props.year == null) {
+    ElMessage.warning(`${MISSING_AUDIT_YEAR_MESSAGE}（一键刷新按项目年度执行）`)
+    return
+  }
   visible.value = true
   parsedResult.value = null
   await loadScopes()
@@ -361,6 +406,10 @@ async function onConfirm() {
     ElMessage.warning('请至少勾选一项刷新内容')
     return
   }
+  if (props.year == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   submitting.value = true
   try {
     // apiPaths 里该端点名为 `run`（`execute` 从未存在 ⇒ URL 恒 undefined，
@@ -378,13 +427,16 @@ async function onConfirm() {
 
     // 只有 success 或 partial_success 才弹成功提示并通知宿主重载
     if (isSuccess(result)) {
-      ElMessage.success(`刷新成功，已应用 ${result.applied_count} 个单元`)
+      ElMessage.success(`已应用 ${result.applied_count} 个单元的金额变化`)
       emit('refresh-complete', result)
     } else if (isPartialSuccess(result)) {
       ElMessage.warning(`部分成功，已应用 ${result.applied_count} 个，失败 ${result.failed_count} 个`)
       emit('refresh-complete', result)
+    } else if (['recomputed', 'draft_marked', 'no_effect'].includes(result.status)) {
+      // 重算/草稿标记/无变更：不弹 toast，但 emit refresh-complete（宿主可能需要刷新数据）
+      emit('refresh-complete', result)
     }
-    // failed / idempotent_hit 不弹 success toast（铁律：失败不弹成功）
+    // failed / idempotent_hit 不弹 toast 不 emit
   } catch (err: unknown) {
     ElMessage.error(extractError(err, '一键刷新失败'))
   } finally {

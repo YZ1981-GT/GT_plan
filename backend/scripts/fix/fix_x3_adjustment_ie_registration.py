@@ -1,38 +1,31 @@
 """Catalog_Registrar —— X-3 调整分录 I/E 登记器（spec `x3-adjustment-entry-import-export`）。
 
-形态对齐既有 `backend/scripts/fix/fix_acnr_catalog_ie_gap.py`：`--check` / `--dry-run` / `--apply`。
-交付于任务 **8.3**（只读态：`--check` / `--dry-run`）；`--apply` 的施加属任务 **9.1**。
+形态对齐既有 `backend/scripts/fix/fix_acnr_catalog_ie_gap.py`：`--check` / `--dry-run`，
+另有只写 Deviation 侧车的 `--record-deviations`。交付于任务 **8.3**；任务 **9.1** 的 `--apply`
+（就地外科补丁写目录）已按 acnr-foundation-defect-closure T07（design §5.4「目录只由生成器写出」）删除。
 
 作业面 = L/M/N 三份 `partial: true` manifest 登记的 **16 张 X-3 调整分录汇总表**
-（L 2 · M 10 · N 4）。这 16 张在 committed catalog 里**已有条目**且 `import_export`
-均缺失（R5.2），故本脚本只就地填段、不新建条目。
+（L 2 · M 10 · N 4）。这 16 张在 manifest 里登记，`generate_catalog.py --write` 由 manifest 产出
+它们的 `import_export` 段；本脚本只核对生成后的目录，不写目录。
 
-## 六步（design §C4，R5.1~R5.8）
+## 步骤（design §C4，R5.1~R5.8；Step 3 改为核对）
 
 | Step | 做什么 | 判据形态 |
 |---|---|---|
 | 1 | **Preflight** | 行为判据：`IE_ADAPTER_REGISTRY[短前缀]` 存在 → 解析模块并**真 import** → `_endpoint_for` 三态**均非 None** → `sheet ∈ module.IE_SHEETS` |
-| 2 | manifest 就位（幂等） | manifest 段与 Key_Ledger 派生值**逐字段相等**；不相等 / 未登记 ⇒ 拒绝 |
-| 3 | committed catalog **外科补丁** | 16 个 `addr_id` 的 `import_export`；写盘前 round-trip 自检 + 差异集恰好等于目标集 |
-| 4 | 可复现性自检 | `generate_catalog(offline=True, registry_version=现值)` 输出中这 16 条与补丁值逐字段相等 |
+| 2 | manifest 就位 | manifest 段与 Key_Ledger 派生值**逐字段相等**；不相等 / 未登记 ⇒ 拒绝 |
+| 3 | 核对生成后的目录 | 16 个 `addr_id` 的 `import_export` 与 Key_Ledger 派生值逐字段相等；缺段 ⇒ 未收口（改 manifest 后跑生成器，不手改目录） |
+| 4 | 可复现性自检 | `generate_catalog(offline=True, registry_version=现值)` 输出中这 16 条与目标段逐字段相等 |
 | 5 | `--check` 退出码 | **0 收口 / 2 未收口**（含一切拒绝态） |
-| 6 | 二次执行零变更 | 无待补项 ⇒ 一个字节都不写（两文件 md5 不变） |
 
-## 🔴 三条禁区（写进代码，不只写进注释）
+## 🔴 两条禁区（写进代码，不只写进注释）
 
-1. **绝不整体重生成 catalog**。跑一次 `generate_catalog` 会顺手杀掉 **38 条**已启用 I/E
-   （H5/H7/I/L1/L3/L4/L5/N4 —— Deviation_Registry G2「无 manifest 兜底的启用条目」），
-   它们会整批掉出 bulk 作业面。故：①本脚本从不调 `write_catalog`，只在 `json.loads`
-   出来的 dict 上就地改 16 个 `addr_id`；②`_assert_surgical` 强制「差异集 == 目标集」
-   且「补丁前后已启用集合只增这 16 条、一条不少」，出现第 17 个差异即拒绝写盘。
-   Step 4 只把生成器输出当**参照物**读，从不把它当写入源。
-2. **`--check` / `--dry-run` 零写盘**。全模块唯一写盘出口是 `_write_text(...)`；`run()` 里
-   只有 `--apply` 一条分支把 `write=True` 传进 `patch_catalog`，其余模式根本不进那次调用
-   （`--dry-run` 走**同一条**补丁与校验路径，只是不落地 ⇒ 台账与施加物同源）。
-   `_write_text(..., allow=False)` 抛 `RegistrarRefusal` 是纵深防御，守卫可直接钉它。
-3. **Preflight 失败 = 拒绝，不是警告**。任一门不过的 sheet **不进 plan**（拒绝写入），
-   并按 R5.8 落进显式登记表 `PREFLIGHT_BLOCK_REGISTRY` + `Deviation_Registry` 侧车文件；
-   `--apply` 在有任何被挡 sheet 时**整体不执行**（R5.1 是任务 9.1 的前置门控）。
+1. **本脚本不写目录**。目录只由 `backend/scripts/acnr/generate_catalog.py` 写出（发布门禁通过才写）；
+   守卫 `backend/tests/acnr/test_only_generator_writes_catalog.py` 用 AST 污点分析钉住写出方只有生成器。
+   全模块唯一写盘出口 `_write_text(...)` 只被 Deviation 侧车调用，`--check` / `--dry-run` 零写盘，
+   `_write_text(..., allow=False)` 抛 `RegistrarRefusal` 是纵深防御。
+2. **Preflight 失败 = 拒绝，不是警告**。任一门不过的 sheet 判拒绝，按 R5.8 落进显式登记表
+   `PREFLIGHT_BLOCK_REGISTRY`，`--record-deviations` 把拒绝记录写进 Deviation_Registry 侧车文件。
    异常一律记 **ERROR 态**并判不过（R10.11 禁 fail-open：`except Exception: pass`
    会把「函数名写错 / 模块改名」吞成「本项目无此数据」）。
 
@@ -40,7 +33,7 @@
 
     python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --check
     python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --dry-run
-    python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --apply   # 任务 9.1
+    python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --record-deviations   # 只写侧车
 
 Requirements: 5.1, 5.3, 5.4, 5.5, 5.6, 5.8
 """
@@ -127,10 +120,10 @@ class RegistrarRefusal(RuntimeError):
 
 
 def _write_text(path: Path, text: str, *, allow: bool) -> None:
-    """全模块唯一写盘出口。`allow` 为假 ⇒ 拒绝（`--check` / `--dry-run` 零写盘）。"""
+    """全模块唯一写盘出口（只写 Deviation 侧车）。`allow` 为假 ⇒ 拒绝（`--check` / `--dry-run` 零写盘）。"""
     if not allow:
         raise RegistrarRefusal(
-            f"拒绝写盘：{path} —— 只有 --apply 允许写盘（--check / --dry-run 零写盘）"
+            f"拒绝写盘：{path} —— 只有 --record-deviations 允许写 Deviation 侧车（--check / --dry-run 零写盘）"
         )
     path.write_text(text, encoding="utf-8")
 
@@ -415,7 +408,7 @@ def build_targets(*, sources_dir: Path | None = None) -> tuple[list[Target], lis
 
 
 # ---------------------------------------------------------------------------
-# Step 3 —— committed catalog 外科补丁
+# Step 3 —— 核对生成后的目录（只读）
 # ---------------------------------------------------------------------------
 
 
@@ -463,7 +456,7 @@ def build_plan(
     idx = _catalog_index(data)
     for t in targets:
         if t.sheet_code in blocked_codes:
-            continue  # 🔴 拒绝写入该 sheet（不是警告）—— 不进 plan
+            continue  # 🔴 拒绝登记该 sheet（不是警告）—— 不进 plan
         hits = idx.get(t.sheet_code) or []
         if len(hits) != 1:
             plan.refusals.append(
@@ -512,120 +505,15 @@ def _enabled_addr_ids(data: dict[str, Any]) -> set[str]:
     }
 
 
-def _structural_diff(before: dict[str, Any], after: dict[str, Any]) -> dict[str, list[str]]:
-    """逐 `addr_id` 结构化差异（禁区 1 的判据载体）。"""
-    out: dict[str, list[str]] = {}
-    b_top = {k: v for k, v in before.items() if k not in ("sheets", "cells")}
-    a_top = {k: v for k, v in after.items() if k not in ("sheets", "cells")}
-    if b_top != a_top:
-        out["<top-level>"] = sorted(
-            k for k in set(b_top) | set(a_top) if b_top.get(k) != a_top.get(k)
-        )
-    if before.get("cells") != after.get("cells"):
-        out["<cells>"] = ["cells 整段被改动"]
-
-    b_sheets = {str(s.get("addr_id") or ""): s for s in before.get("sheets", [])}
-    a_sheets = {str(s.get("addr_id") or ""): s for s in after.get("sheets", [])}
-    for addr in sorted(set(b_sheets) ^ set(a_sheets)):
-        out[addr] = ["<条目新增/删除>"]
-    for addr in sorted(set(b_sheets) & set(a_sheets)):
-        b, a = b_sheets[addr], a_sheets[addr]
-        if b == a:
-            continue
-        out[addr] = sorted(k for k in set(b) | set(a) if b.get(k) != a.get(k))
-    return out
-
-
-def _assert_surgical(
-    before: dict[str, Any],
-    after: dict[str, Any],
-    target_addrs: set[str],
-) -> dict[str, list[str]]:
-    """禁区 1 的硬判据：差异集 == 目标集，且每处只动 `import_export`。
-
-    额外钉住「已启用集合只增这些、一条不少」—— 整体重生成会让 38 条已启用条目
-    （Deviation_Registry G2）掉出集合，这条断言使那种写法无法通过。
-    """
-    diff = _structural_diff(before, after)
-    extra = sorted(set(diff) - target_addrs)
-    if extra:
-        raise RegistrarRefusal(
-            f"差异集含非目标 addr_id {extra} ⇒ 拒绝写盘"
-            "（禁区：绝不整体重生成 catalog —— 会杀掉 38 条已启用 I/E）"
-        )
-    for addr, keys in diff.items():
-        if keys != ["import_export"]:
-            raise RegistrarRefusal(
-                f"{addr} 被改动的键 {keys} != ['import_export'] ⇒ 拒绝写盘"
-            )
-    lost = _enabled_addr_ids(before) - _enabled_addr_ids(after)
-    if lost:
-        raise RegistrarRefusal(
-            f"补丁后 {len(lost)} 条已启用 I/E 掉出集合（如 {sorted(lost)[:5]}）⇒ 拒绝写盘"
-        )
-    gained = _enabled_addr_ids(after) - _enabled_addr_ids(before)
-    if not gained <= target_addrs:
-        raise RegistrarRefusal(
-            f"补丁后新增的已启用条目 {sorted(gained - target_addrs)} 不在目标集内 ⇒ 拒绝写盘"
-        )
-    return diff
-
-
-def _deterministic(data: dict[str, Any]) -> str:
-    """复用生成器的确定性序列化，保证格式不可能与 committed 文件漂移。"""
-    from generate_catalog import _deterministic_json
-
-    return _deterministic_json(data)
-
-
-def patch_catalog(
-    data: dict[str, Any],
-    raw: str,
-    plan: Plan,
-    *,
-    write: bool,
-    catalog_path: Path | None = None,
-) -> dict[str, list[str]]:
-    """Step 3：round-trip 自检 → 就地补丁 → 差异集校验 → （仅 `write=True`）写盘。
-
-    `write` 只在 `--apply` 为真（`run()` 里一行决定）；`--dry-run` 走同一条补丁与
-    校验路径、只是不落地 ⇒ 台账与施加物同源，不会出现"dry-run 说的和 apply 做的不同"。
-    """
-    cat_path = catalog_path or CATALOG
-
-    # round-trip 自检（R5.5）：json.loads(原文) 重序列化后必须与磁盘逐字节相同
-    round_trip = _deterministic(data)
-    if round_trip != raw:
-        raise RegistrarRefusal(
-            "round-trip 不一致，拒绝写盘（防重排整个文件与并发会话互相回退）"
-            f"—— 重序列化 {len(round_trip)} B vs 磁盘 {len(raw)} B"
-        )
-
-    before = json.loads(raw)
-    target_addrs = {_addr_of(data, t.sheet_code) for t in plan.pending}
-    if "" in target_addrs:
-        raise RegistrarRefusal("目标 sheet 在 catalog 无 addr_id ⇒ 拒绝写盘")
-
-    idx = _catalog_index(data)
-    for t in plan.pending:
-        idx[t.sheet_code][0]["import_export"] = dict(t.expected_segment)
-
-    diff = _assert_surgical(before, data, target_addrs)
-    text = _deterministic(data)
-    if write and plan.pending:
-        _write_text(cat_path, text, allow=True)
-    return diff
-
-
 # ---------------------------------------------------------------------------
 # Step 4 —— 可复现性自检
 # ---------------------------------------------------------------------------
 
 
 def reproducibility(plan: Plan) -> list[str]:
-    """Step 4：`generate_catalog(offline=True, 同版本号)` 的这些条目与补丁值逐字段相等。
+    """Step 4：`generate_catalog(offline=True, 同版本号)` 的这些条目与目标段逐字段相等。
 
-    只读参照物：本函数**从不**把生成器输出写入磁盘（那会杀掉 38 条已启用 I/E）。
+    只读参照物：本函数**从不**把生成器输出写入磁盘（写目录只走 `generate_catalog.py --write` 的发布流程）。
     """
     from generate_catalog import generate_catalog
 
@@ -646,7 +534,7 @@ def reproducibility(plan: Plan) -> list[str]:
         for key in sorted(set(t.expected_segment) | set(got)):
             if got.get(key) != t.expected_segment.get(key):
                 problems.append(
-                    f"{t.sheet_code}.{key}: 生成器={got.get(key)!r} != 补丁值="
+                    f"{t.sheet_code}.{key}: 生成器={got.get(key)!r} != 目标段="
                     f"{t.expected_segment.get(key)!r}"
                 )
     return problems
@@ -713,7 +601,7 @@ def write_deviation_sidecar(
                 "正表由 check_x3_deviation_registry.py --emit 生成、组集合 G1~G11 闭集校验，"
                 "第二个生产者直写会判 STRUCTURE_ERROR；故本文件产出同形记录待并入。"
             ),
-            "generated_by": "python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --apply",
+            "generated_by": "python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --record-deviations",
             "written_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
             "record_count": len(records),
             "requirements": ["5.1", "5.8"],
@@ -743,7 +631,7 @@ def _print_preflight(plan: Plan, *, verbose: bool) -> None:
             for g in p.gates:
                 print(f"      · {g.name}: {g.state} — {g.detail}")
     for p in plan.blocked:
-        print(f"  ✗ {p.sheet_code}: 拒绝写入 —— {p.reason}")
+        print(f"  ✗ {p.sheet_code}: 拒绝登记 —— {p.reason}")
 
 
 def _print_manifest_state(plan: Plan) -> None:
@@ -767,13 +655,13 @@ def run(
     deviation_path: Path | None = None,
     verbose: bool = False,
 ) -> int:
-    """三态入口。返回退出码：0 收口 / 2 未收口（含一切拒绝态）。"""
-    if mode not in ("check", "dry-run", "apply"):
+    """三态入口（都不写目录）。返回退出码：0 收口 / 2 未收口（含一切拒绝态；`--dry-run` 只出台账、未收口也返 0）。"""
+    if mode not in ("check", "dry-run", "record-deviations"):
         raise ValueError(f"未知模式 {mode!r}")
-    allow_write = mode == "apply"
+    allow_write = mode == "record-deviations"  # 只写 Deviation 侧车
 
     try:
-        plan, data, raw = build_plan(catalog_path=catalog_path, sources_dir=sources_dir)
+        plan, data, _raw = build_plan(catalog_path=catalog_path, sources_dir=sources_dir)
     except RegistrarRefusal as exc:
         print(f"[FAIL] {exc}")
         return 2
@@ -810,7 +698,7 @@ def run(
     _print_manifest_state(plan)
 
     print(
-        f"[Step 3 台账] 待补 {len(plan.pending)} / 已收口 {len(plan.already)}"
+        f"[Step 3 核对生成后的目录] 缺段 {len(plan.pending)} / 已收口 {len(plan.already)}"
         f" / 被挡 {len(plan.blocked)}（目标 {len(plan.targets)}）"
     )
     for t in plan.pending:
@@ -835,59 +723,37 @@ def run(
     print(
         f"[Step 4 可复现性] generate_catalog(offline=True,"
         f" registry_version={plan.registry_version}) 的 {len(plan.targets)} 条"
-        f" import_export 与补丁值逐字段相等"
+        f" import_export 与目标段逐字段相等"
     )
 
     if plan.blocked:
-        # R5.1 是任务 9.1 的前置门控：有任何一张被挡 ⇒ 整体不施加
-        print("[FAIL] Preflight 未 16/16 通过 ⇒ 不施加（R5.1 先适配器、再 catalog）")
+        # R5.1：有任何一张被挡 ⇒ 拒绝登记（先适配器、再 catalog）
+        print("[FAIL] Preflight 未 16/16 通过 ⇒ 拒绝登记（R5.1 先适配器、再 catalog）")
         return 2
 
-    if mode == "check":
-        if plan.pending:
-            print(f"[FAIL] {len(plan.pending)} 张未在 committed catalog 启用 I/E ⇒ 未收口，请跑 --apply")
-            return 2
-        print("[OK] 16/16 已收口：catalog 的 import_export 段与 manifest / Key_Ledger 一致")
-        return 0
-
-    if mode == "dry-run":
-        try:
-            diff = patch_catalog(
-                json.loads(raw), raw, plan, write=False, catalog_path=catalog_path
-            )
-        except RegistrarRefusal as exc:
-            print(f"[FAIL] {exc}")
-            return 2
+    if plan.pending:
+        if mode == "dry-run":
+            print(f"[DRY-RUN] 目录缺 {len(plan.pending)} 张的 import_export 段；未写盘（零字节写入）")
+            return 0
         print(
-            f"[DRY-RUN] 差异集 {len(diff)} 个 addr_id，均只改 import_export："
-            f"{sorted(diff)}"
+            f"[FAIL] 目录缺 {len(plan.pending)} 张的 import_export 段 ⇒ 未收口："
+            "核对 manifest 后跑 `python backend/scripts/acnr/generate_catalog.py --write`（目录只由生成器写出，不手改）"
         )
-        print("[DRY-RUN] 未写盘（零字节写入）")
-        return 0
-
-    # --apply（任务 9.1）
-    if not plan.pending:
-        print("[OK] 无待补项 ⇒ 一个字节都不写（幂等，R5.4）")
-        return 0
-    try:
-        diff = patch_catalog(data, raw, plan, write=True, catalog_path=catalog_path)
-    except RegistrarRefusal as exc:
-        print(f"[FAIL] {exc}")
         return 2
-    print(f"[APPLIED] {len(diff)} 个 addr_id 的 import_export 段：{sorted(diff)}")
+    print("[OK] 16/16 已收口：生成后目录的 import_export 段与 manifest / Key_Ledger 一致")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Catalog_Registrar — X-3 I/E 登记器")
+    ap = argparse.ArgumentParser(description="Catalog_Registrar — X-3 I/E 登记核对（不写目录）")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--check", action="store_true", help="以退出码表达收口（0 收口 / 2 未收口）")
     g.add_argument("--dry-run", action="store_true", help="全量台账，零写盘")
-    g.add_argument("--apply", action="store_true", help="施加（任务 9.1）")
+    g.add_argument("--record-deviations", action="store_true", help="同 --check，另把 Preflight 拒绝记录写进 Deviation 侧车")
     ap.add_argument("--verbose", action="store_true", help="逐门打印 Preflight 明细")
     args = ap.parse_args(argv)
 
-    mode = "check" if args.check else ("dry-run" if args.dry_run else "apply")
+    mode = "check" if args.check else ("dry-run" if args.dry_run else "record-deviations")
     return run(mode, verbose=args.verbose)
 
 

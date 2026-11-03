@@ -46,7 +46,7 @@ async def _resolve_adj_rje(db: AsyncSession, project_id: UUID, year: int, **kw) 
 async def _resolve_adj_passed(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """未更正错报（Passed Adjustments）数量统计。
 
-    数据来源: adjustment 表（passed_reason IS NOT NULL，通过 wp_adjustment_helpers）
+    数据来源: unadjusted_misstatements 正式错报表（通过 wp_adjustment_helpers）
     返回结构: {"summary": str}
     """
     count = await count_adjustments(db, project_id, year, "passed")
@@ -74,7 +74,7 @@ async def _resolve_adj_consol(db: AsyncSession, project_id: UUID, year: int, **k
 async def _resolve_misstatement_summary(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """未更正错报笔数摘要（A13 评价错报用）。
 
-    数据来源: adjustment 表（passed_reason IS NOT NULL，通过 wp_adjustment_helpers）
+    数据来源: unadjusted_misstatements 正式错报表（通过 wp_adjustment_helpers）
     返回结构: {"summary": str}
     """
     count = await count_adjustments(db, project_id, year, "passed")
@@ -85,31 +85,30 @@ async def _resolve_misstatement_summary(db: AsyncSession, project_id: UUID, year
 async def _resolve_misstatement_eval(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """未更正错报与重要性水平对比评价（A13 错报评价用）。
 
-    数据来源: adjustment / adjustment_entry / materiality 表
+    数据来源: unadjusted_misstatements / materiality 表
     返回结构: {"summary": str}（含错报金额与执行重要性/明显微小阈值比较结论）
     """
-    from app.models.audit_platform_models import Adjustment, Materiality, AdjustmentEntry
+    from app.models.audit_platform_models import Materiality, UnadjustedMisstatement
     passed_stmt = sa.select(
-        sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
-    ).join(
-        Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
+        sa.func.coalesce(sa.func.sum(UnadjustedMisstatement.misstatement_amount), 0)
     ).where(
-        Adjustment.project_id == project_id,
-        Adjustment.year == year,
-        Adjustment.passed_reason.isnot(None),
-        Adjustment.is_deleted == sa.false(),
+        UnadjustedMisstatement.project_id == project_id,
+        UnadjustedMisstatement.year == year,
+        UnadjustedMisstatement.is_deleted == sa.false(),
+        UnadjustedMisstatement.prior_year_status != "reversed",
     )
-    passed_r = await db.execute(passed_stmt)
-    passed_amount = passed_r.scalar() or 0
+    passed_amount = Decimal(str((await db.execute(passed_stmt)).scalar_one() or 0))
     mat_stmt = sa.select(Materiality.performance_materiality, Materiality.trivial_threshold).where(
         Materiality.project_id == project_id,
+        Materiality.year == year,
+        Materiality.is_deleted == sa.false(),
     )
     mat_r = await db.execute(mat_stmt)
     mat_row = mat_r.first()
     if not mat_row or not mat_row.performance_materiality:
         return {"summary": f"未更正错报 ¥{passed_amount:,.0f}（重要性待设置）"}
-    perf_mat = float(mat_row.performance_materiality)
-    trivial = float(mat_row.trivial_threshold) if mat_row.trivial_threshold else 0
+    perf_mat = Decimal(str(mat_row.performance_materiality))
+    trivial = Decimal(str(mat_row.trivial_threshold or 0))
     if passed_amount == 0:
         return {"summary": "无未更正错报"}
     if passed_amount > perf_mat:

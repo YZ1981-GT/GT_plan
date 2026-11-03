@@ -1,8 +1,11 @@
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG9FormData — G9 其他非流动金融资产底稿数据层
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
+import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -44,7 +47,7 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
         const updated = JSON.parse(localStorage.getItem(key) || '') as ChecklistResponse
         if (updated?.item_id) {
           allResponses.value.set(itemId, updated)
-          void saveImmediate(itemId, updated, 1)
+          void trackPendingWrite(saveImmediate(itemId, updated, 1)).catch(() => undefined)
           localStorage.removeItem(key)
         }
       } catch { /* ignore */ }
@@ -116,7 +119,7 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
         await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
           project_id: opts.projectId.value,
           items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-        })
+        }, { _dedupe: false } as AxiosRequestConfig)
         try {
           localStorage.removeItem(draftKey(opts.wpId.value, itemId))
         } catch { /* ignore */ }
@@ -129,6 +132,8 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     try {
       localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
     } catch { /* ignore */ }
+    // 草稿只是本地兜底，未落库必须让调用方与过渡屏障看见
+    throw new Error(`保存未落库，已暂存本地草稿：${itemId}`)
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -140,7 +145,7 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void trackPendingWrite(saveImmediate(itemId, updated)).catch(() => undefined)
     }, 2000))
   }
 
@@ -160,11 +165,7 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year })
       const hit = resolveG9TbRow(list)
       if (!hit) return null
       return g9TbRowBalance(hit)
@@ -179,17 +180,22 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
   // tbResolvedCode 动态透传）承载，故移除此重复定义及其 return export。
 
   /** 卸载前刷出未落盘的 debounce 保存（比照 F2/G7） */
-  function flushPending(): void {
+  async function flushPending(): Promise<void> {
+    const inFlight: Array<Promise<void>> = []
     for (const [itemId, timer] of _debounceTimers.entries()) {
       clearTimeout(timer)
       const resp = allResponses.value.get(itemId)
-      if (resp) void saveImmediate(itemId, resp, 1)
+      if (resp) inFlight.push(saveImmediate(itemId, resp, 1))
     }
     _debounceTimers.clear()
+    // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
+    await Promise.all(inFlight)
   }
 
+  registerPendingFlusher(flushPending)
+
   onScopeDispose(() => {
-    flushPending()
+    void flushPending().catch(() => undefined)
   })
 
   return {

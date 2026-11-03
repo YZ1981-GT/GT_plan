@@ -4,6 +4,8 @@
   - 切换项目时丢弃上一个项目晚到的响应，弹窗随之关闭；
   - 每条给出原因（冲突 / 管理员暂缓）与三方对比：原定义 / 新定义（来自全局设置、公式模板或其他项目）/ 本项目当前；
   - 逐条或批量：采用新定义 / 保留本项目 / 手工修改；处理需本项目编辑权限（只读成员可看不可处理）。
+  - 提交回传每条的修订号；事项已被新的发布覆盖或已被处理（409）时重新拉取，修订号变了的事项清掉原选择、须重新确认
+    （spec formula-hub-integrity-closure 需求 8.3）。
 -->
 <template>
   <span v-if="projectId && count > 0" class="gt-fps-anchor">
@@ -117,6 +119,8 @@ const submitting = ref(false)
 const choices = reactive<Record<string, ResolutionChoice | ''>>({})
 const custom = reactive<Record<string, Record<string, string>>>({})
 const domains = ref<Record<string, FormulaDomainInfo>>({})
+/** 上次拉取时各事项的修订号：重新拉取后修订号变了（已被新的发布覆盖）的事项，原先的选择作废、须重新确认 */
+const revisions = new Map<string, number>()
 let loadSeq = 0
 
 const count = computed(() => items.value.length)
@@ -174,6 +178,7 @@ function markShown(pid: string) {
 function resetChoices() {
   for (const k of Object.keys(choices)) delete choices[k]
   for (const k of Object.keys(custom)) delete custom[k]
+  revisions.clear()
 }
 
 /** 拉取本项目待确认；`autoOpen` = 进入项目时的自动弹出（会话内每项目一次）。 */
@@ -186,8 +191,12 @@ async function reload(autoOpen = false) {
     const data = await formulaSettingsApi.pending(pid)
     if (seq !== loadSeq || pid !== props.projectId) return // 晚到：已切到别的项目
     items.value = data?.items || []
-    const alive = new Set(items.value.map((i) => i.id))
-    for (const k of Object.keys(choices)) if (!alive.has(k)) { delete choices[k]; delete custom[k] }
+    const alive = new Map(items.value.map((i) => [i.id, i.revision]))
+    const outdated = (k: string) => !alive.has(k) || alive.get(k) !== revisions.get(k)
+    for (const k of Object.keys(choices)) if (outdated(k)) delete choices[k]
+    for (const k of Object.keys(custom)) if (outdated(k)) delete custom[k]
+    revisions.clear()
+    for (const [id, rev] of alive) revisions.set(id, rev)
     if (autoOpen && items.value.length && !alreadyShown(pid)) {
       markShown(pid)
       openDialog()
@@ -244,7 +253,7 @@ function setAll(v: ResolutionChoice) {
 function buildResolutions(): Resolution[] {
   return items.value.filter((i) => choices[i.id]).map((i) => {
     const choice = choices[i.id] as ResolutionChoice
-    const r: Resolution = { item_id: i.id, choice, upstream_version: i.upstream_version }
+    const r: Resolution = { item_id: i.id, choice, revision: i.revision }
     if (choice === 'custom') r.custom_definition = { ...(i.local_definition || {}), ...custom[i.id] }
     return r
   })
@@ -265,10 +274,14 @@ async function onSubmit() {
     emit('resolved', touched)
     if (!items.value.length) visible.value = false
   } catch (e: any) {
-    if (errorCodeOf(e) === 'FORMULA_SYNC_ITEM_STALE') {
-      ElMessage.warning('有事项已被新的发布更新，已刷新列表，请重新确认')
+    const status = e?.response?.status || e?.status || 0
+    // 409 = 修订号已变（被新的发布覆盖）或已被处理；428 = 没带修订号（旧页面）：一律重新拉取，变了的事项须重新选择
+    if (status === 409 || status === 428 || errorCodeOf(e) === 'FORMULA_SYNC_ITEM_STALE') {
+      ElMessage.warning(status === 428
+        ? '缺少修订号，已刷新列表，请重新确认'
+        : '有事项已被新的发布更新或已被处理，已刷新列表，请重新确认')
       await reload()
-    } else if ((e?.response?.status || e?.status) === 403) {
+    } else if (status === 403) {
       ElMessage.warning('只读成员可以查看，处理需要本项目的编辑权限')
     } else {
       ElMessage.error(formulaErrorText(e, '处理待确认失败'))

@@ -62,3 +62,41 @@ def test_stale_groups_follow_flat_template_but_projected_groups_kept() -> None:
     assert td_gen["_tables"][0]["headers"] == tpl["headers"]
     assert td_gen["_tables"][0]["_column_groups"] == []
     assert td_proj["_tables"][0]["_column_groups"] == stale
+
+
+def _d2_tables() -> list[dict]:
+    return _tables("八、5")
+
+
+def test_leaked_name_with_other_first_header_is_not_renamed_by_position() -> None:
+    """泄漏名（表名 = 自己首列表头）不再单独放行（R3.2）：存量 11 表旧结构第 3 张「债务人名称」表原先按位置被改成
+    「（2）…（续：期初数）」并换上类别 / 金额表头，库里的数显示在错的列下。"""
+    tpl = _d2_tables()
+    assert _norm(tpl[2]["headers"][0]) != "债务人名称", "前提：同位置模板表的首列不是债务人名称"
+    leaked = [{"name": "账  龄", "headers": list(tpl[0]["headers"]), "rows": []},
+              {"name": "类  别", "headers": list(tpl[1]["headers"]), "rows": []},
+              {"name": "债务人名称", "headers": ["债务人名称", "账面余额", "坏账准备", "账龄", "计提比例", "计提理由"],
+               "rows": []}]
+    td = {"_tables": copy.deepcopy(leaked)}
+    carry_template_table_names(td, "soe", "八、5")
+    assert td["_tables"][2]["name"] == "债务人名称" and td["_tables"][2]["headers"] == leaked[2]["headers"]
+    assert td["_tables"][0]["name"] == tpl[0]["name"], "首列与列数都对得上的仍按位置回填表名"
+
+
+def test_position_fallback_needs_the_same_column_count() -> None:
+    tpl = _d2_tables()
+    wider = {"name": "账龄（旧）", "headers": [tpl[0]["headers"][0], "期末数", "期初数", "备注"], "rows": []}
+    td = {"_tables": [copy.deepcopy(wider)]}
+    carry_template_table_names(td, "soe", "八、5")
+    assert td["_tables"][0]["name"] == "账龄（旧）" and td["_tables"][0]["headers"] == wider["headers"]
+
+
+def test_headerless_table_named_like_template_gets_headers() -> None:
+    tpl = _d2_tables()
+    td = {"_tables": [{"name": tpl[0]["name"], "rows": [{"label": "1年以内（含1年）", "values": [1.0, 2.0]}]}]}
+    carry_template_table_names(td, "soe", "八、5")
+    assert td["_tables"][0]["headers"] == tpl[0]["headers"]
+
+
+def _norm(text: str) -> str:
+    return "".join(str(text or "").split())

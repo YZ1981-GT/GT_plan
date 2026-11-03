@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -64,6 +65,9 @@ def _make_app_with_router(router, user):
     mock_result.all.return_value = []
     mock_db.execute = AsyncMock(return_value=mock_result)
     mock_db.get = AsyncMock(return_value=None)
+    # 带项目 id 的端点在矩阵放行后还要过项目成员判定（admin 直通但会设 RLS 上下文）；
+    # 设 RLS 先看方言，SQLite 上跳过 —— 让替身会话按 SQLite 应答（spec consol-autotree-residual-closure R3）
+    mock_db.get_bind = MagicMock(return_value=SimpleNamespace(dialect=SimpleNamespace(name="sqlite")))
 
     async def _override_db():
         yield mock_db

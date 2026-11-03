@@ -2,6 +2,7 @@
  * 签字流水线 API — R1 需求 4
  */
 import http from '@/utils/http'
+import { confirmationHeaders } from '@/utils/passwordConfirm'
 import { signatures, projects as P_proj } from '@/services/apiPaths'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 
@@ -37,10 +38,11 @@ export async function getSignatureWorkflow(projectId: string): Promise<WorkflowS
 }
 
 /**
- * 执行签字
+ * 执行签字（后端要求二次密码确认令牌；调用方先 `requestConfirmationToken()`，取消即不调用。
+ * spec attachment-archive-and-a-class-evidence 需求 4.3：改造前不带令牌，签字恒 403）
  */
-export async function signDocument(params: SignDocumentParams): Promise<any> {
-  const { data } = await http.post(signatures.sign, params)
+export async function signDocument(params: SignDocumentParams, confirmationToken: string): Promise<any> {
+  const { data } = await http.post(signatures.sign, params, { headers: confirmationHeaders(confirmationToken) })
   return data
 }
 

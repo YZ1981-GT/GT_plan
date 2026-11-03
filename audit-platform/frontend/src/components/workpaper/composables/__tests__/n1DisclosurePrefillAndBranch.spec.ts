@@ -204,7 +204,8 @@ describe('Property 4/5 — 四表直通预填', () => {
             responses: [['N1-disclosure-listed-unoffset', { conclusion: saved }]],
             assetPrefill: { 资产减值准备: { opening: incoming, closing: incoming } },
           })
-          expect(tables.assetRows.value[0].endTax).toBe(existing)
+          // JSON 持久化会把 -0 规范化为 0；审计金额按数值相等判断，不把零的符号位当业务差异。
+          expect(tables.assetRows.value[0].endTax === existing).toBe(true)
         },
       ),
       { numRuns: 25 },

@@ -244,6 +244,7 @@ async def activate_dataset(
     activated_by: UUID | None = None,
     record_summary: dict | None = None,
     validation_summary: dict | None = None,
+    expected_active_dataset_id: UUID | None = None,
 ):
     """Activate a staged dataset (atomic switch).
 
@@ -270,6 +271,7 @@ async def activate_dataset(
         activated_by=activated_by,
         record_summary=record_summary,
         validation_summary=validation_summary,
+        expected_active_dataset_id=expected_active_dataset_id,
     )
 
 

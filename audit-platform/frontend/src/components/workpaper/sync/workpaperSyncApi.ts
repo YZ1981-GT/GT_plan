@@ -32,6 +32,7 @@
  * * 没有 `document.url` 的签名逻辑 —— URL 由服务端在响应时放进 `onlyoffice_config`。
  */
 import http from '@/utils/http'
+import type { WorkpaperSyncCapability } from './workpaperSyncManifest.generated'
 
 import {
   WP_SYNC_ROUTES,
@@ -243,6 +244,100 @@ async function request(options: RequestOptions): Promise<Record<string, unknown>
       ? await http.get(url, config)
       : await http.post(url, options.body ?? {}, config)
   return assertUnwrappedOnce(response?.data, options.endpoint)
+}
+
+export interface EntrySyncReadinessReason {
+  readonly code: string
+  readonly message: string
+  readonly next_action: string
+}
+
+export interface EntrySyncRuntimeReadiness {
+  readonly ready: boolean
+  readonly adapter_id: string | null
+  readonly authority_model: string | null
+  readonly definition_bundle_id: string | null
+  readonly definition_bundle_sha256: string | null
+  readonly typed_slots_complete: boolean
+  readonly typed_slots: readonly {
+    readonly slot: string
+    readonly type: string
+    readonly sha256: string
+  }[]
+  readonly representation_id: string | null
+  readonly representation_generation: number | null
+}
+
+export interface EntrySyncAcceptanceReadiness {
+  readonly state: 'not_applicable' | 'missing' | 'stale' | 'verified' | 'failed' | 'unverifiable'
+  readonly stale: boolean
+  readonly run_id: string | null
+  readonly required_scenario_set_digest: string | null
+}
+
+export interface EntrySyncReadiness {
+  readonly entry_id: string
+  readonly effective_entry_id: string
+  readonly capability: WorkpaperSyncCapability | null
+  readonly adjudication_state: 'terminal' | 'pending' | 'inherited'
+  readonly allowed_modes: readonly ('html' | 'oo')[]
+  readonly can_claim_bidirectional: boolean
+  readonly runtime: EntrySyncRuntimeReadiness
+  readonly acceptance: EntrySyncAcceptanceReadiness
+  readonly reason: EntrySyncReadinessReason | null
+}
+
+const READINESS_CAPABILITIES = new Set<string>([
+  'bidirectional', 'single_html', 'single_onlyoffice', 'unreachable',
+])
+const READINESS_STATES = new Set<string>([
+  'not_applicable', 'missing', 'stale', 'verified', 'failed', 'unverifiable',
+])
+
+function parseEntrySyncReadiness(raw: Record<string, unknown>): EntrySyncReadiness {
+  const runtime = raw.runtime as Record<string, unknown> | null
+  const acceptance = raw.acceptance as Record<string, unknown> | null
+  const reason = raw.reason as Record<string, unknown> | null
+  const capability = raw.capability
+  const allowedModes = raw.allowed_modes
+  if (
+    typeof raw.entry_id !== 'string'
+    || typeof raw.effective_entry_id !== 'string'
+    || (capability !== null && !READINESS_CAPABILITIES.has(String(capability)))
+    || !Array.isArray(allowedModes)
+    || allowedModes.some((mode) => mode !== 'html' && mode !== 'oo')
+    || runtime === null || typeof runtime !== 'object'
+    || typeof runtime.ready !== 'boolean'
+    || acceptance === null || typeof acceptance !== 'object'
+    || !READINESS_STATES.has(String(acceptance.state))
+    || typeof acceptance.stale !== 'boolean'
+    || typeof raw.can_claim_bidirectional !== 'boolean'
+  ) {
+    refuse('entry_readiness_invalid', 'readiness 响应缺少必需字段或使用了未登记枚举')
+  }
+  return raw as unknown as EntrySyncReadiness
+}
+
+const ENTRY_READINESS_IN_FLIGHT = new Map<string, Promise<EntrySyncReadiness>>()
+
+/** 只读查询一条目标底稿的静态裁决、运行时供给与验收证据；同 scope 共用在途。 */
+export function readEntrySyncReadiness(
+  scope: WorkpaperSyncEntryScope,
+): Promise<EntrySyncReadiness> {
+  const key = `${scope.projectId}\u0000${scope.wpId}\u0000${scope.entryId}`
+  const existing = ENTRY_READINESS_IN_FLIGHT.get(key)
+  if (existing) return existing
+  const pending = request({
+    endpoint: 'read_entry_readiness',
+    scope,
+    silent: true,
+  }).then(parseEntrySyncReadiness).finally(() => {
+    if (ENTRY_READINESS_IN_FLIGHT.get(key) === pending) {
+      ENTRY_READINESS_IN_FLIGHT.delete(key)
+    }
+  })
+  ENTRY_READINESS_IN_FLIGHT.set(key, pending)
+  return pending
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1096,6 +1191,7 @@ export async function adoptSubstrate(
 export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
   adoptSubstrate: 'adopt_substrate',
   createPendingMutation: 'create_pending_mutation',
+  readEntrySyncReadiness: 'read_entry_readiness',
   readStoreProjection: 'read_store_projection',
   ensureFirstPublication: 'ensure_first_publication',
   materialize: 'materialize',

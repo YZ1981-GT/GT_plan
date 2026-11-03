@@ -6,7 +6,7 @@
 背景（design Property 26 / Req 21.3）:
     `query_builder.py::_derive_formula_refs` 为高级查询结果每行派生结构化公式引用：
       - trial_balance → ``TB('{standard_account_code}','审定数')``
-      - tb_balance    → ``TB('{standard_account_code|account_code}','期末')``
+      - 其余表（含 tb_balance）→ None
     这些是 **非 wp 域**（TB）ref，故 catalog ``_formula_ref_to_addr_id``（只解析 WP/PREV）
     对其返回 None —— 它们的 grammar_v1 解析入口是 ``acnr.resolver.full_resolve`` 的 V1
     委托（``_detect_non_wp_domain`` → "tb" → ``_delegate_v1`` →
@@ -14,14 +14,20 @@
     ``found=True``）。
 
 契约断言:
-    1. ``_derive_formula_refs`` 对含 code 的行产出非 None ref；无 code 行产出 None（不产畸形）。
+    1. ``_derive_formula_refs`` 对含 code 的试算表行产出非 None ref；无 code 行产出 None（不产畸形）。
     2. 每个非 None ref 经 ``full_resolve(formula_ref=...)`` 解析为 ``found=True``（非 null）。
     3. ``_formula_ref_to_addr_id`` 对这些 TB ref 返回 None（记录：TB 走 V1 委托而非 WP 解析器），
        畸形 WP ref 同样返回 None（解析器不过宽）。
-    4. 非可定位表（working_paper 等）产出全 None（不产畸形 ref）。
+    4. 非可定位表（tb_balance、working_paper 等）产出全 None（不产畸形 ref）。
 
 本文件测的是写法闭包（能否解析成统一契约），故以只建身份的口径调用（``verify_existence=False``）；
 按项目数据判存在是另一件事（spec formula-fetch-followup-defect-closure R5.1，见 ``tests/test_formula_ref_check.py``）。
+
+2026-10-27 advanced-query-linkage-closure 任务 11（R3.7，ADR-AQL-18；AQ-27 / AQ-32）：原文件把 tb_balance 的
+``TB('{客户科目码}','期末')`` 锁成期望，并用「两种列名都能解析成 URI」证明它可用——``#cell`` 段原样透传，解析恒成立，
+是假绿：地址库校验判它无效（TB 域按标准科目码取数、「期末」不是试算表列名）。现 tb_balance 行不再生成引用；
+「审定数有效 / 期末无效」改到真 PG 用 ``address_registry.validate_formula_refs`` 断言（
+``tests/advanced_query_linkage/test_aql_builder_total_refs_pg.py``）。
 """
 
 from __future__ import annotations
@@ -60,18 +66,13 @@ def test_derive_formula_refs_trial_balance_shape():
 
 
 def test_derive_formula_refs_tb_balance_shape():
-    """tb_balance → TB('{code}','期末')；standard_account_code 优先，其次 account_code。"""
+    """tb_balance → 全 None：客户科目码不属于 TB 域，「期末」也不是试算表列名（AQ-27）。"""
     rows = [
         {"standard_account_code": "1001"},
-        {"account_code": "6001"},  # 回退 account_code
+        {"account_code": "6001"},
         {"standard_account_code": None, "account_code": None},
     ]
-    refs = _derive_formula_refs("tb_balance", rows)
-    assert refs == [
-        "TB('1001','期末')",
-        "TB('6001','期末')",
-        None,
-    ]
+    assert _derive_formula_refs("tb_balance", rows) == [None, None, None]
 
 
 def test_derive_formula_refs_non_locatable_table_all_none():
@@ -87,7 +88,6 @@ def test_derive_formula_refs_non_locatable_table_all_none():
     "table,rows",
     [
         ("trial_balance", [{"standard_account_code": c} for c in ("1001", "1122", "6001", "222101")]),
-        ("tb_balance", [{"account_code": c} for c in ("1001", "6601", "1601")]),
     ],
 )
 async def test_query_builder_refs_resolve_under_grammar_v1(table, rows):
@@ -100,13 +100,6 @@ async def test_query_builder_refs_resolve_under_grammar_v1(table, rows):
         # V1 委托产出统一契约：tb 域 URI + 非空 addr_id
         assert result.addr_id, f"{ref!r} 解析结果缺 addr_id"
         assert result.uri and result.uri.startswith("tb://"), f"{ref!r} → {result.uri!r} 非 tb 域 URI"
-
-
-async def test_query_builder_ref_both_column_variants_resolve():
-    """两种列名（审定数 / 期末）都仅作 URI #cell 段透传，解析恒成立。"""
-    for ref in ("TB('1001','审定数')", "TB('1001','期末')"):
-        result = await full_resolve(formula_ref=ref, verify_existence=False)
-        assert result.found is True, f"{ref!r} 未解析"
 
 
 # ─── _formula_ref_to_addr_id 语义记录 + 解析器不过宽 ───────────────────────────

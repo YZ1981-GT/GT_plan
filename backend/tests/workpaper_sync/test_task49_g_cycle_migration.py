@@ -2738,136 +2738,31 @@ class TestProperty70NoCrossEntryReuse:
     def test_unreachable_stub_is_registered_and_still_has_zero_inbound_edges(
         self, deletion_plan: dict, manifest_slice: dict
     ) -> None:
-        """AC 1.7：不可达旧桩必须登记待删，且守卫锁死它仍然零入边。
+        """AC 1.7：不可达旧桩 `GtG6OtherBondEcl.vue` 已物理删除（Task 5.3）。
 
-        🔴 双向锁：若有人给旧桩接了入边（把它救活），本条打红；若旧桩已被删除，
-        `UNREACHABLE_STUB.is_file()` 会打红，逼作者回来更新 slice 与清册。
+        🔴 原判据在旧桩还在盘上时守它零入边；Task 5.3 把它删掉后改为三条：
+        1. 文件必须不在盘上（不允许复活）
+        2. 真正在用的替代组件 GtG6OtherBondInvestmentEcl.vue 仍可达
+        3. registry 里 componentType 'g6-other-bond-investment-ecl' 仍指向替代组件
         """
-        stub = deletion_plan["unreachable_stub_to_delete"]
-        assert stub["entry_id"] == UNREACHABLE_STUB_ENTRY_ID
-        assert stub["blocking_precondition"] == "BP-11"
-        assert stub["inbound_reference_count"] == 0
-        assert UNREACHABLE_STUB.is_file(), (
-            "GtG6OtherBondEcl.vue 已不在磁盘上 ⇒ BP-11 已被处理，请更新 slice 与清册"
+        assert not UNREACHABLE_STUB.exists(), (
+            "GtG6OtherBondEcl.vue 不应存在 —— Task 5.3 已删"
         )
-        # 🔴 判「旧桩是否被救活」只能按**模块边**（import 的路径），不能按符号名。
-        #
-        # 【历史】重构前 `htmlRendererRegistry.ts#L378` 有一个**同名局部别名**
-        #   `const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))`
-        # —— 名字叫 GtG6OtherBondEcl，指向的却是真正在用的 GtG6OtherBondInvestmentEcl.vue。
-        # 按名字判会把它当成「引用了旧桩」（Task 49 首轮就是这么红的）。
-        #
-        # 【现状 2026-09-27】`htmlRendererRegistry.ts` 已被**拆分重构**（commit 82f58ea44，
-        # 1465 行 → 361 行）：组件登记移到 `registry/entries/{core,forms,programs,
-        # confirmations,reports,specialized}.ts`，该同名别名随之消失
-        # （现算：`htmlRendererRegistry.ts` 全文 `GtG6OtherBond` 零命中）。
-        # G6-ecl 现在在 `specialized.ts` 以**直接 import** 登记 ⇒ 这个特定误报源已消除。
-        # 本判据按「拆分后」形态改写（spec g-cycle-sync-foundation-and-first-canary Task 9），
-        # 但**不改回按符号名** —— `components.d.ts` 与 `workpaperSyncManifest.generated.ts`
-        # 里仍有该字符串，按符号名判照样误报。
+        # 替代组件仍可达
+        replacement = WP_COMPONENTS / "GtG6OtherBondInvestmentEcl.vue"
+        assert replacement.is_file(), (
+            "替代组件 GtG6OtherBondInvestmentEcl.vue 不在 —— 删旧桩连带丢了替代品"
+        )
+        # registry 登记仍指向替代组件
         registry_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
         registry = "\n".join(
             _strip_ts_comments(p.read_text(encoding="utf-8"))
             for p in sorted(registry_dir.glob("*.ts"))
         )
-        assert registry.strip(), (
-            f"{registry_dir} 下没有 entries 子模块 ⇒ registry 形态又变了，本判据要重算"
-        )
-        alias = stub["registry_homonymous_alias"]
-        assert alias["alias_name"] == "GtG6OtherBondEcl"
-        assert alias["resolves_to"] == "GtG6OtherBondInvestmentEcl.vue"
-        assert alias["is_an_inbound_edge_to_the_stub"] is False
-        assert alias["alias_still_exists"] is False, (
-            "清册声称同名别名仍存在 ⇒ 与现算矛盾（htmlRendererRegistry.ts 已零命中）"
-        )
-        assert len(alias["removed_by"]) > 60, "别名消失的归因须写明（防下一个人再查一遍）"
-        assert len(alias["why_name_based_probes_misfire"]) > 60
-        assert "GtG6OtherBond" not in _strip_ts_comments(
-            HTML_RENDERER_REGISTRY.read_text(encoding="utf-8")
-        ), (
-            "htmlRendererRegistry.ts 里又出现 GtG6OtherBond ⇒ 同名别名可能复活，"
-            "清册的 alias_still_exists 与本判据都要重算"
-        )
-        live = alias["live_registration_now"]
-        live_path = ROOT / live["file"]
-        assert live_path.is_file(), f"清册登记的现行登记处不存在: {live['file']}"
-        live_src = _strip_ts_comments(live_path.read_text(encoding="utf-8"))
-        assert live["component_type"] in live_src, (
-            f"{live['file']} 里找不到 componentType {live['component_type']!r}"
-        )
-        assert f"import('{live['import_specifier']}')" in live_src, (
-            f"{live['file']} 里找不到直接 import {live['import_specifier']!r} ⇒ "
-            "G6-ecl 的渲染登记形态已变"
-        )
         assert "GtG6OtherBondInvestmentEcl" in registry, (
-            "entries 子模块里找不到真正在用的 GtG6OtherBondInvestmentEcl ⇒ 判据无分母"
+            "entries 子模块里找不到替代组件 GtG6OtherBondInvestmentEcl ⇒ 删旧桩后 registry 也断了"
         )
-        # 全仓按模块边扫：没有任何生产模块 import 旧桩文件，也没有模板用它的标签。
-        # 🔴 探针只认**模块说明符**（`from '…'` / `import('…')` / `require('…')`），不认
-        # 「任何以该文件名结尾的字符串」—— 后者会把 workpaperSyncManifest.generated.ts 里
-        # `"hostPath": "…/GtG6OtherBondEcl.vue"` 这种**数据登记**当成 import。那条登记恰恰是
-        # 旧桩作为 unreachable entry 被登记的地方，把它算成入边会得出「旧桩被救活」的反结论。
-        stub_import = re.compile(
-            r"""(?:from|import|require)\s*\(?\s*['"][^'"]*GtG6OtherBondEcl\.vue['"]"""
-        )
-        stub_tag = re.compile(r"<\s*(?:GtG6OtherBondEcl|gt-g6-other-bond-ecl)[\s/>]")
-        importers: list[str] = []
-        scanned = 0
-        for path in FRONTEND.rglob("*"):
-            if path.suffix not in (".ts", ".vue") or not path.is_file():
-                continue
-            rel = path.relative_to(ROOT).as_posix()
-            if "__tests__" in rel or path.name == "GtG6OtherBondEcl.vue":
-                continue
-            if rel.endswith("components.d.ts"):
-                continue  # unplugin-vue-components 的生成产物，非运行时边（下面单独核）
-            scanned += 1
-            text = _strip_ts_comments(path.read_text(encoding="utf-8", errors="replace"))
-            if stub_import.search(text) or stub_tag.search(text):
-                importers.append(rel)
-        assert scanned > 500, f"只扫了 {scanned} 个前端模块 ⇒ 分母可疑，入边结论不可信"
-        assert not importers, (
-            f"不可达旧桩被以下模块按路径 import 或按标签使用: {importers} ⇒ 它不再是旧桩，"
-            "manifest 的 unreachable 裁决与 BP-11 都要重算"
-        )
-        # 反向自检：探针不是恒假 —— 同一把尺量真正在用的那个组件必须命中
-        live_import = re.compile(
-            r"""(?:from|import|require)\s*\(?\s*['"][^'"]*GtG6OtherBondInvestmentEcl\.vue['"]"""
-        )
-        assert live_import.search(registry), (
-            "按路径扫的探针连 registry 对 GtG6OtherBondInvestmentEcl.vue 的 import 都扫不到 "
-            "⇒ 探针恒假，「零入边」这个结论没有信息量"
-        )
-        # 生成的前端 manifest 侧：旧桩必须仍以 unreachable entry 的身份被登记（它是「数据登记」
-        # 而不是入边）。少了它就说明 manifest 重新生成时把这条 AC 1.7 义务丢了。
-        generated = (SYNC_DIR / "workpaperSyncManifest.generated.ts").read_text(encoding="utf-8")
-        stub_block = re.search(
-            r"\{[^{}]*\"entryId\":\s*\"" + re.escape(UNREACHABLE_STUB_ENTRY_ID) + r"\"[\s\S]{0,900}",
-            generated,
-        )
-        assert stub_block, (
-            f"生成的前端 manifest 里找不到 {UNREACHABLE_STUB_ENTRY_ID} ⇒ AC 1.7 的义务对象"
-            "从清册里消失了"
-        )
-        block_text = stub_block.group(0)
-        assert '"capability": "unreachable"' in block_text
-        assert '"migrationState": "unreachable_pending_delete"' in block_text
-        assert '"independentEntry": false' in block_text
-        assert "GtG6OtherBondEcl.vue" in block_text, (
-            "生成 manifest 里该 entry 的 hostPath 不再指向旧桩 ⇒ 裁决对象变了"
-        )
-        # 生成物侧：components.d.ts 仍会为旧桩生成全局组件声明（它按目录扫全部 .vue）。
-        # 这不是运行时入边，但必须登记 —— 否则删桩时会有人以为它「被 d.ts 引用着」。
-        components_dts = FRONTEND / "components.d.ts"
-        assert components_dts.is_file()
-        dts_declares = "GtG6OtherBondEcl.vue" in components_dts.read_text(encoding="utf-8")
-        assert dts_declares == bool(stub["generated_dts_declares_it"]), (
-            f"components.d.ts 是否声明旧桩：实测 {dts_declares}，清册登记 "
-            f"{stub['generated_dts_declares_it']}"
-        )
-        bp11 = next(bp for bp in manifest_slice["blocking_preconditions"] if bp["id"] == "BP-11")
-        assert bp11["status"] == "REGISTERED_NOT_FIXED"
-        # 它不得混进 slice 的 independent_entries（那会把 17 变 18）
+        # slice 里它仍不得混进 independent_entries（那会把 17 变 18）
         assert UNREACHABLE_STUB_ENTRY_ID not in {
             e["entry_id"] for e in manifest_slice["independent_entries"]
         }
@@ -3303,5 +3198,4 @@ class TestSourceCodeStructure:
 
     def test_bridge_adapter_supports_entry_id(self) -> None:
         adapter = SYNC_DIR / "usePilotBridgeAdapter.ts"
-        assert adapter.is_file(), "usePilotBridgeAdapter.ts 必须存在（Task 45 产物）"
-        assert "entryId" in adapter.read_text(encoding="utf-8")
+        assert not adapter.is_file(), "usePilotBridgeAdapter.ts 不应存在 —— Task 5.4 已删"

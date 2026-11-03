@@ -1,13 +1,7 @@
-"""EQCR 快照服务 — 聚合项目数据生成只读快照供 EQCR 独立复核使用。
+"""EQCR 快照服务，聚合项目数据生成独立复核用只读快照。
 
-快照数据结构:
-{
-    "workpapers": [...],
-    "reports": {...},
-    "adjustments": [...],
-    "vr_results": [...],
-    "metadata": { "snapshot_version": 1, "total_workpapers": N, "signed_workpapers": N }
-}
+快照 v2 将调整分录按 ``entry_group_id`` 冻结，每组包含 line_items、
+借贷合计、来源与复核元数据；历史 v1 快照仍按原 JSON 原样读取。
 """
 
 import uuid
@@ -16,7 +10,7 @@ from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_models import Adjustment
+from app.models.audit_platform_models import Adjustment, AdjustmentEntry
 from app.models.report_models import FinancialReport
 from app.models.workpaper_models import WpIndex, WorkingPaper
 
@@ -91,37 +85,93 @@ async def _aggregate_reports(
 async def _aggregate_adjustments(
     db: AsyncSession, project_id: uuid.UUID, year: int
 ) -> list[dict]:
-    """聚合项目调整分录数据。"""
+    """按分录组冻结调整明细、行级金额、来源和复核链。"""
     result = await db.execute(
-        select(Adjustment).where(
+        select(Adjustment)
+        .where(
             Adjustment.project_id == project_id,
             Adjustment.year == year,
             Adjustment.is_deleted == False,  # noqa: E712
         )
+        .order_by(Adjustment.adjustment_no, Adjustment.entry_group_id, Adjustment.id)
     )
-    adjustments = result.scalars().all()
-    return [
-        {
-            "id": str(a.id),
-            "adjustment_type": (
-                a.adjustment_type.value
-                if hasattr(a.adjustment_type, "value")
-                else str(a.adjustment_type)
-            ),
-            "adjustment_no": a.adjustment_no,
-            "account_code": a.account_code,
-            "account_name": a.account_name,
-            "debit_amount": float(a.debit_amount) if a.debit_amount else None,
-            "credit_amount": float(a.credit_amount) if a.credit_amount else None,
-            "review_status": (
-                a.review_status.value
-                if hasattr(a.review_status, "value")
-                else str(a.review_status)
-            ),
-            "description": a.description,
-        }
-        for a in adjustments
-    ]
+    adjustment_rows = result.scalars().all()
+    if not adjustment_rows:
+        return []
+
+    rows_by_group: dict[uuid.UUID, list[Adjustment]] = {}
+    for row in adjustment_rows:
+        rows_by_group.setdefault(row.entry_group_id, []).append(row)
+
+    entry_result = await db.execute(
+        select(AdjustmentEntry)
+        .where(
+            AdjustmentEntry.entry_group_id.in_(list(rows_by_group)),
+            AdjustmentEntry.is_deleted == False,  # noqa: E712
+        )
+        .order_by(
+            AdjustmentEntry.entry_group_id,
+            AdjustmentEntry.line_no,
+            AdjustmentEntry.id,
+        )
+    )
+    entries_by_group: dict[uuid.UUID, list[AdjustmentEntry]] = {}
+    for entry in entry_result.scalars().all():
+        entries_by_group.setdefault(entry.entry_group_id, []).append(entry)
+
+    def _enum_value(value):
+        return value.value if hasattr(value, "value") else str(value)
+
+    def _iso(value):
+        return value.isoformat() if value is not None else None
+
+    def _first(rows: list[Adjustment], attr: str):
+        return next(
+            (value for row in rows if (value := getattr(row, attr, None)) is not None),
+            None,
+        )
+
+    groups: list[dict] = []
+    for group_id, rows in rows_by_group.items():
+        head = rows[0]
+        line_items = [
+            {
+                "id": str(entry.id),
+                "adjustment_id": str(entry.adjustment_id),
+                "line_no": entry.line_no,
+                "standard_account_code": entry.standard_account_code,
+                "detail_account_code": entry.detail_account_code,
+                "account_name": entry.account_name,
+                "report_line_code": entry.report_line_code,
+                "debit_amount": float(entry.debit_amount or 0),
+                "credit_amount": float(entry.credit_amount or 0),
+            }
+            for entry in entries_by_group.get(group_id, [])
+        ]
+        reviewer_id = _first(rows, "reviewer_id")
+        created_by = _first(rows, "created_by")
+        groups.append({
+            "id": str(group_id),
+            "entry_group_id": str(group_id),
+            "adjustment_type": _enum_value(head.adjustment_type),
+            "adjustment_no": head.adjustment_no,
+            "description": head.description,
+            "line_items": line_items,
+            # 金额是行级可加事实；按组求和但不对相同金额做 DISTINCT。
+            "total_debit": float(sum((row.debit_amount or 0) for row in rows)),
+            "total_credit": float(sum((row.credit_amount or 0) for row in rows)),
+            "origin": head.origin or "manual",
+            "source_ref": head.source_ref,
+            "review_status": _enum_value(head.review_status),
+            "reviewer_id": str(reviewer_id) if reviewer_id else None,
+            "reviewed_at": _iso(_first(rows, "reviewed_at")),
+            "rejection_reason": _first(rows, "rejection_reason"),
+            "passed_reason": _first(rows, "passed_reason"),
+            "passed_communication_date": _iso(_first(rows, "passed_communication_date")),
+            "created_by": str(created_by) if created_by else None,
+            "created_at": _iso(_first(rows, "created_at")),
+        })
+    return groups
 
 
 async def _aggregate_vr_results(
@@ -160,7 +210,7 @@ def _build_metadata(workpapers: list[dict]) -> dict:
     total = len(workpapers)
     signed = sum(1 for wp in workpapers if wp.get("status") == "signed")
     return {
-        "snapshot_version": 1,
+        "snapshot_version": 2,
         "total_workpapers": total,
         "signed_workpapers": signed,
     }
@@ -185,7 +235,8 @@ async def create_snapshot(
     # 1. 聚合数据
     workpapers = await _aggregate_workpapers(db, project_id)
     reports = await _aggregate_reports(db, project_id, year)
-    adjustments = await _aggregate_adjustments(db, project_id, year)
+    from app.services.adjustment_export_service import build_snapshot_projection
+    adjustments = await build_snapshot_projection(db, project_id, year)
     vr_results = await _aggregate_vr_results(db, project_id, year)
     metadata = _build_metadata(workpapers)
 

@@ -267,8 +267,20 @@ class _Guard:
 
 @pytest.fixture
 def patch_guard(monkeypatch):
+    async def _all_live(_db, project_ids):
+        # 作用域的下一层「排除已删项目」查库；本组用例不带库（db=None），按全部未删处理。
+        # 已删项目的排除另由 advanced_query_linkage 的真库用例覆盖。
+        return frozenset(project_ids)
+
+    async def _unrestricted(self, _project_id):
+        # 循环范围（advanced-query-linkage-closure 任务 23）要查人员与委派；本组不带库，按不受限处理。
+        # 受限项目的排除另由 advanced_query_linkage/test_aql_cycle_scope_pg.py 的真库用例覆盖。
+        return False
+
     def _apply(guard):
         monkeypatch.setattr(bs, "ownership_guard", guard)
+        monkeypatch.setattr(bs, "_live_project_ids", _all_live)
+        monkeypatch.setattr(bs.CycleScopeCache, "is_restricted", _unrestricted)
         return guard
 
     return _apply
@@ -399,6 +411,9 @@ class _RecordingSession:
         self.statements: list[str] = []
         self._in_tx = in_tx
         self.rolled_back = False
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
 
     def in_transaction(self):
         return self._in_tx
@@ -543,12 +558,11 @@ class TestBuilderWiring:
         """R6.2 接线：超预算的 DSL 在 `_build_select` 即被拒。"""
         from app.routers.query_builder import _build_select
 
+        dsl = self._dsl()
+        # 绕过请求模型后再篡改，证明服务层预算仍是第二道门。
+        dsl.group_by = [f"g{i}" for i in range(MAX_GROUP_DIMS + 1)]
         with pytest.raises(HTTPException) as exc:
-            _build_select(
-                self._dsl(
-                    group_by=[f"g{i}" for i in range(MAX_GROUP_DIMS + 1)],
-                )
-            )
+            _build_select(dsl)
         assert exc.value.detail["error_code"] == "COMPLEXITY_BUDGET_EXCEEDED"
 
     def test_pii_access_is_enforced_by_build_select(self):

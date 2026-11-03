@@ -6,8 +6,10 @@
  * - 账龄段枚举：THREE_YEAR / FIVE_YEAR / CUSTOM（useAgingConfig）
  * - 从 K1-1 / K1-2 / K1-3 / K1-9 自动取数
  * - sync-from-workpaper → 附注模块
+ * - 附注页离屏同步（spec note-pull-followup-closure R1）调同一套：`initialFillFromSources`（打开时的取数，不弹提示）
+ *   + `buildSyncPayloads`（同步载荷）；没有组件实例时不挂生命周期、不订阅审定事件
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useAgingConfig } from '@/composables/useAgingConfig'
@@ -42,7 +44,7 @@ import {
   type K1TransferRow,
   type K1WriteoffDisclosureRow,
 } from './k1DisclosureModel'
-import { buildK1ListedSyncPayloads } from './k1DisclosureSyncPayload'
+import { buildK1ListedSyncPayloads, type K1SyncFromWorkpaperPayload } from './k1DisclosureSyncPayload'
 import {
   K1_ACCOUNT_CODE,
   K1_NOTE_SECTION,
@@ -213,8 +215,9 @@ export function useK1DisclosureListed(opts: {
     },
   )
 
-  function refreshFromSources(force = false): void {
-    if (isReadonly.value && !force) return
+  /** 从源底稿取数（不弹提示）；只读且非强制时不取，返回是否取了 */
+  function fillFromSources(force = false): boolean {
+    if (isReadonly.value && !force) return false
     payload.value = autoFillFromK1Sources(
       { ...payload.value },
       allResponses.value,
@@ -223,7 +226,21 @@ export function useK1DisclosureListed(opts: {
     )
     lastSyncHint.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     persistPayload()
+    return true
+  }
+
+  function notifyRefreshed(force: boolean): void {
     ElMessage.success(force ? '已强制从源底稿覆盖取数' : '已从 K1-1/K1-2/K1-3/K1-9 同步取数')
+  }
+
+  function refreshFromSources(force = false): void {
+    if (fillFromSources(force)) notifyRefreshed(force)
+  }
+
+  /** 打开时的初始化（不弹提示）：本底稿还没有已存披露数据 ⇒ 强制从源底稿取数。返回是否取了（Tab 据此提示） */
+  function initialFillFromSources(): boolean {
+    if (allResponses.value.get(K1_DISC_STORAGE_KEY)?.remark) return false
+    return fillFromSources(true)
   }
 
   function updateAgingRow(rowId: string, field: 'endAmount' | 'priorAmount', value: number): void {
@@ -542,15 +559,20 @@ export function useK1DisclosureListed(opts: {
     return JSON.parse(serializeK1ListedPayload(payload.value))
   }
 
-  async function syncToNotes(): Promise<void> {
-    if (isSyncing.value || !projectId.value || isReadonly.value) return
-    const payloads = buildK1ListedSyncPayloads(
+  /** 同步载荷（快照 + 上市 builder；口径不适用回空）。Tab 的同步与附注页离屏同步共用 */
+  function buildSyncPayloads(): K1SyncFromWorkpaperPayload[] {
+    return buildK1ListedSyncPayloads(
       wpId.value,
       _standards(),
       getSyncSnapshot(),
       noteText.value,
       readK1SummaryFigures(allResponses.value),
     )
+  }
+
+  async function syncToNotes(): Promise<void> {
+    if (isSyncing.value || !projectId.value || isReadonly.value) return
+    const payloads = buildSyncPayloads()
     if (!payloads.length) {
       ElMessage.warning('当前项目准则不适用上市附注同步')
       return
@@ -580,15 +602,17 @@ export function useK1DisclosureListed(opts: {
     refreshFromSources(false)
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-    const hasData = !!allResponses.value.get(K1_DISC_STORAGE_KEY)?.remark
-    if (!hasData) refreshFromSources(true)
-  })
+  // 离屏同步在 effectScope 里调用（没有组件实例）：不挂生命周期、不订阅审定事件
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+      if (initialFillFromSources()) notifyRefreshed(true)
+    })
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+  }
 
   return {
     agingConfig,
@@ -627,6 +651,7 @@ export function useK1DisclosureListed(opts: {
     endStageProvisionTotal,
     priorStageProvisionTotal,
     refreshFromSources,
+    initialFillFromSources,
     updateAgingRow,
     updateAgingRowLabel,
     updateNatureRow,
@@ -653,6 +678,7 @@ export function useK1DisclosureListed(opts: {
     updateNoteSection,
     noteSection,
     getSyncSnapshot,
+    buildSyncPayloads,
     syncToNotes,
     payload,
   }

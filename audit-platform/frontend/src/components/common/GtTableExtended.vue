@@ -27,6 +27,7 @@
     :max-height="maxHeight"
     :default-sortable="defaultSortable"
     :group-by="groupBy"
+    :summary-method="summaryMethod"
     @ctx-formula="$emit('ctx-formula')"
     @ctx-compare="$emit('ctx-compare')"
     @row-click="(row, idx) => $emit('row-click', row, idx)"
@@ -63,7 +64,8 @@
  */
 import GtEditableTable, { type GtColumn } from './GtEditableTable.vue'
 
-defineProps<{
+// 布尔默认值与 GtEditableTable 一致（不写默认值时未传的布尔 prop 会以 false 传下去；spec excel-style-table-editing 5.2）
+withDefaults(defineProps<{
   modelValue: Record<string, any>[]
   columns: GtColumn[]
   showToolbar?: boolean
@@ -73,7 +75,10 @@ defineProps<{
   defaultSortable?: boolean
   groupBy?: string
   summaryMethod?: (param: { columns: any[]; data: any[] }) => any[]
-}>()
+}>(), {
+  showToolbar: true, showFooter: true, showSummary: false, maxHeight: 'calc(100vh - 260px)', defaultSortable: true,
+  groupBy: undefined, summaryMethod: undefined,
+})
 
 defineEmits<{
   (e: 'ctx-formula'): void

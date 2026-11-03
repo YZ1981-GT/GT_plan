@@ -1,6 +1,8 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { createChecklistCasClient } from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
 import type { ChecklistResponse } from './useF1FormData'
 
 export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
@@ -14,12 +16,14 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   /** 后端 render 提供的 project_context（含 tb_amount/bs_date/related_parties 等） */
   const projectContext = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  /**
-   * 待落库的 item（debounce 计时中、尚未 PUT）。
-   * 与 useD3FormData / useF3FormData / useF4FormData 同构：flush 时按 itemId 从
-   * `allResponses` 取**最新**值保存，而不是保存 timer 闭包里的旧快照。
-   */
-  const _pendingItems = new Set<string>()
+  const cas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: async (items) => {
+      if (!opts.wpId.value) throw new Error('缺少底稿标识，无法保存')
+      await cas.save({ wpId: opts.wpId.value, projectId: opts.projectId.value, items })
+    },
+  })
   const itemPrefix = 'F5-'
 
   async function loadResponses() {
@@ -27,6 +31,7 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     try {
       const res = await api.get(`/api/workpapers/${opts.wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      cas.remember(responses)
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         if (r.item_id?.startsWith(itemPrefix)) {
@@ -72,21 +77,16 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   }
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>) {
-    // 🔴 必须先撤销同 item 的 debounce 计时器：该计时器闭包捕获的是**旧** updated，
-    // 若不撤销，2s 后它会用旧值把这里刚写的新值覆盖回去（D3/F3/F4 三家同此处置）。
     const timer = _debounceTimers.get(itemId)
     if (timer) {
       clearTimeout(timer)
       _debounceTimers.delete(itemId)
     }
-    _pendingItems.delete(itemId)
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated = { ...existing, ...data }
+    const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
-    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
-      project_id: opts.projectId.value,
-      items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-    })
+    queue.mark(itemId)
+    await queue.flush()
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -95,28 +95,27 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     allResponses.value.set(itemId, updated)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
-    _pendingItems.add(itemId)
+    queue.mark(itemId)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      _pendingItems.delete(itemId)
-      void saveImmediate(itemId, updated)
+      void queue.flush().catch(() => undefined)
     }, 2000))
   }
 
-  /** 批量保存多个 item（一次 PUT 提交，用于导入/整表提交） */
+  /** 批量保存多个 item（一次 strict-CAS PUT 提交，用于导入/整表提交）。 */
   async function saveBatch(items: Array<{ item_id: string } & Partial<ChecklistResponse>>) {
     if (!items.length) return
-    for (const it of items) {
+    const payload = items.map((it) => {
+      const timer = _debounceTimers.get(it.item_id)
+      if (timer) clearTimeout(timer)
+      _debounceTimers.delete(it.item_id)
       const existing = allResponses.value.get(it.item_id) || { item_id: it.item_id, conclusion: null, remark: null }
-      allResponses.value.set(it.item_id, { ...existing, ...it })
-    }
-    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
-      project_id: opts.projectId.value,
-      items: items.map((it) => {
-        const r = allResponses.value.get(it.item_id)!
-        return { item_id: it.item_id, conclusion: r.conclusion, remark: r.remark }
-      }),
+      const updated = { ...existing, ...it, item_id: it.item_id }
+      allResponses.value.set(it.item_id, updated)
+      return updated
     })
+    queue.markMany(payload.map((item) => item.item_id))
+    await queue.flush()
   }
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
@@ -135,21 +134,13 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
    *      切到 OO 侧后会用旧值覆盖 HTML 侧刚写的编辑。
    * 取值口径与 D3/F3/F4 一致：从 `allResponses` 取最新值，不用 timer 闭包的旧快照。
    */
-  function _flushPending(): void {
+  async function _flushPending(): Promise<void> {
     for (const t of _debounceTimers.values()) clearTimeout(t)
     _debounceTimers.clear()
-
-    if (_pendingItems.size > 0) {
-      const ids = Array.from(_pendingItems)
-      _pendingItems.clear()
-      const items = ids
-        .map((id) => allResponses.value.get(id))
-        .filter((r): r is ChecklistResponse => r != null)
-      if (items.length > 0) void saveBatch(items)
-    }
+    await queue.flush()
   }
 
-  onScopeDispose(() => { _flushPending() })
+  onScopeDispose(() => { void _flushPending().catch(() => undefined) })
 
   return {
     isLoading,

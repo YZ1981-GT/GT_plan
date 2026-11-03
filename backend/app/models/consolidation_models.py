@@ -208,6 +208,9 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     origin: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # V172：来源内确定性键（同来源同键只对应一笔未删分录，重复生成按此更新草稿）
     origin_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # V241：工作表自动生成草稿所绑定的来源版本向量摘要。
+    source_version: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    source_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_continuous: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     prior_year_entry_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     review_status: Mapped[ReviewStatusEnum] = mapped_column(
@@ -466,6 +469,10 @@ class ConsolNoteTemplatePushLog(Base):
     failure_count: Mapped[int] = mapped_column(
         Integer, server_default=text("0"), nullable=False
     )
+    # `'[]'` 而不是 `'[]'::jsonb`：带 `::` 的文本被原样塞进 CREATE TABLE，SQLite 报
+    # `unrecognized token: ":"`，任何走 `Base.metadata.create_all(sqlite)` 的测试都在 setup
+    # 阶段报错（2026-10-27 实测 117 例）。真实表由 V204 创建，PG 对 jsonb 列的 `DEFAULT '[]'`
+    # 隐式转型，两种写法在真实库上等价。守卫：tests/test_orm_server_default_dialect_neutral.py
     # NOTE: 不写 `'[]'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`，整批 create_all 报
     # "unrecognized token"（回收站 / WOPI 等 SQLite 用例因此全挂）。`'[]'` 在 PG/SQLite 双方言下都能解析为
     # 合法空 JSON 数组（同 workpaper_models / custom_query_models 约定；守卫 test_model_server_default_portability）。

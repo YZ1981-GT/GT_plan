@@ -4,7 +4,8 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import {
   F3_OVERDUE_NOTE_TYPES,
   F3_YES_NO_OPTIONS,
@@ -111,36 +112,29 @@ async function uploadAndRecognize(file: File) {
   const row = activeRow.value
   if (!row || props.isReadonly) return
   evidenceUploading.value = true
+  // 同一文件先经底稿证据入口存为本票的行级证据（F3-5 · 第 n 项，与下方逐项附件同一位置），
+  // 再带附件编号送识别，避免附件与识别结果脱节（spec attachment-evidence-intake 需求 5.4）
+  let attId = ''
   try {
-    // 同一文件先保存为逐票关联附件，再送OCR识别，避免附件与识别结果脱节。
-    const attachmentForm = new FormData()
-    attachmentForm.append('file', file)
-    attachmentForm.append('attachment_type', 'workpaper_item')
-    attachmentForm.append('reference_type', 'working_paper')
-    attachmentForm.append('reference_id', props.wpId)
-    const objectId = `${props.wpId}:F3-5:${row.attSlot}`
-    attachmentForm.append('title', objectId)
-    attachmentForm.append('document_type', objectId)
-    const uploadRes = await api.post(`/api/projects/${props.projectId}/attachments/upload`, attachmentForm, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      _silent: true,
-    } as any)
+    const { attachment } = await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file,
+      sheetName: 'F3-5',
+      cellRef: itemCellRef(row.attSlot),
+    })
+    attId = String(attachment.id)
     attachmentRefresh.value += 1
-    const uploaded = uploadRes?.data?.data ?? uploadRes?.data ?? uploadRes
-    const attId = String(uploaded?.id || uploaded?.attachment_id || '')
-    if (attId) {
-      try {
-        await api.post(`/api/attachments/${attId}/associate`, {
-          wp_id: props.wpId,
-          association_type: 'evidence',
-        }, { _silent: true } as any)
-      } catch { /* fail-open */ }
-    }
-
+  } catch (error: unknown) {
+    handleApiError(error, '上传附件')
+    evidenceUploading.value = false
+    return
+  }
+  try {
     const ocrForm = new FormData()
     ocrForm.append('file', file)
     ocrForm.append('document_type', 'overdue-note')
-    if (attId) ocrForm.append('attachment_id', attId)
+    ocrForm.append('attachment_id', attId)
     const res = await http.post(`/api/workpapers/${props.wpId}/f3/contract-ocr`, ocrForm, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,
@@ -162,7 +156,7 @@ async function uploadAndRecognize(file: File) {
     if (error === 'cancel' || error?.message === 'cancel') {
       ElMessage.success('附件已关联，未执行字段回填')
     } else {
-      ElMessage.warning('附件已尝试保存，但识别失败，请检查附件列表并手工填写')
+      ElMessage.warning('附件已保存到本票，但识别失败，请手工填写')
     }
   } finally {
     evidenceUploading.value = false

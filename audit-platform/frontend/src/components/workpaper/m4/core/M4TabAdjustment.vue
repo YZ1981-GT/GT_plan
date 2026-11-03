@@ -39,7 +39,7 @@
           保存并发布
         </el-button>
         <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="!adjustment.currentBalance.value.isBalanced || adjustment.filteredEntries.value.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
-        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -234,6 +234,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * M4TabAdjustment — M4-3 调整分录汇总（借贷平衡）
  *
@@ -256,7 +257,7 @@ import { useM4FormData } from '../../composables/useM4FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM4Adjustment, type M4AdjustmentType } from '../../composables/useM4Adjustment'
 import { eventBus } from '@/utils/eventBus'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
@@ -298,6 +299,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: toRef(props, 'wpId') as Ref<string>,
   wpCode: 'M4',
   itemId: () => `M4-adj-${adjustment.activeType.value}`,
+  entryType: adjustment.activeType,
   buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
     account_name: e.accountName,
     report_line_code: e.reportItem || undefined,

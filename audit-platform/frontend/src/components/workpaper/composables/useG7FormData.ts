@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG7FormData — G7 长期股权投资(main组) 数据加载/保存/selfLoad/writebackTB
@@ -427,17 +428,9 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
 
     if (!projectId.value) return null
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G7_ACCOUNT_CODE  },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G7_ACCOUNT_CODE),
-      )
-      if (!hit) return null
-      // 借方/资产类科目：期末 = 期初 + 借 - 贷 → 取 unadjusted_amount 或计算余额
-      return Number(hit.unadjusted_amount ?? hit.audited_amount ?? 0)
+      const { rows: list } = await fetchTrialBalanceRows(projectId.value, { year: _year, accountPrefix: G7_ACCOUNT_CODE })
+      // 资产类期末未审数（科目及其明细科目之和），没有未审数时用审定数
+      return tbSumUnder(list, G7_ACCOUNT_CODE, 'unadjusted_amount') ?? tbSumUnder(list, G7_ACCOUNT_CODE, 'audited_amount')
     } catch {
       return null
     }

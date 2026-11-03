@@ -156,6 +156,8 @@ class _Savepoint:
                 n.is_deleted,
                 deepcopy(n.table_data),
                 deepcopy(n.template_lineage),
+                n.section_title,
+                n.account_name,
             )
             for n in self.session.notes
         }
@@ -173,6 +175,8 @@ class _Savepoint:
                         n.is_deleted,
                         n.table_data,
                         n.template_lineage,
+                        n.section_title,
+                        n.account_name,
                     ) = snap
             keep = set(self.snapshot)
             self.session.notes = [

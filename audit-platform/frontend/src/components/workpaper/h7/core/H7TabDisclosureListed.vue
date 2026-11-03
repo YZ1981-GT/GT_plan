@@ -154,6 +154,14 @@ import {
 } from '../../composables/h7DisclosureSyncPayload'
 import { H7_NOTE_SECTION } from '../../composables/h7NoteSectionMap'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
+// hydrate 解析与「同步到附注」快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import {
+  H7_LISTED_NOTE_ITEM_ID,
+  H7_LISTED_NOTE_KEYS,
+  h7ListedSyncSnapshot,
+  readH7ListedForm,
+  type H7ListedNoteKey,
+} from '../../composables/h7DisclosureForm'
 
 const props = defineProps<{
   wpId: string
@@ -171,19 +179,15 @@ const isSyncing = ref(false)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
 
-const NOTE_KEYS = ['listed-policy', 'listed-impairment', 'listed-supplement'] as const
-type NoteKey = (typeof NOTE_KEYS)[number]
+const NOTE_KEYS = H7_LISTED_NOTE_KEYS
+type NoteKey = H7ListedNoteKey
 
 const SRC_HINT: Record<string, string> = {
   'listed-impairment': `${H7_LISTED_GUIDANCE.impairment}${H7_LISTED_GUIDANCE.impairmentNote}`,
   'listed-supplement': H7_LISTED_GUIDANCE.supplement,
 }
 
-const NOTE_ITEM_ID: Record<NoteKey, string> = {
-  'listed-policy': H7_LISTED_KEYS.notePolicy,
-  'listed-impairment': H7_LISTED_KEYS.noteImpairment,
-  'listed-supplement': H7_LISTED_KEYS.noteSupplement,
-}
+const NOTE_ITEM_ID = H7_LISTED_NOTE_ITEM_ID
 
 const categories = ref<H7ListedCategory[]>(createDefaultH7Categories())
 const costMap = ref<MovementCellMap>(emptyMovement())
@@ -202,25 +206,12 @@ const orderedCategories = computed(() => orderH7Categories(categories.value))
  */
 const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
 
-function readRaw(itemId: string): string {
-  const item = localResponses.value.get(itemId)
-  return String(item?.remark ?? item?.conclusion ?? '')
-}
-
-function parseJson<T>(raw: string, fallback: T): T {
-  if (!raw.trim()) return fallback
-  try {
-    const v = JSON.parse(raw)
-    return (v && typeof v === 'object') ? (v as T) : fallback
-  } catch { return fallback }
-}
-
 function hydrate(): void {
-  const cats = parseJson<H7ListedCategory[]>(readRaw(H7_LISTED_KEYS.categories), [])
-  categories.value = Array.isArray(cats) && cats.length ? cats : createDefaultH7Categories()
-  costMap.value = parseJson<MovementCellMap>(readRaw(H7_LISTED_KEYS.cost), emptyMovement())
-  fairMap.value = parseJson<MovementCellMap>(readRaw(H7_LISTED_KEYS.fair), emptyMovement())
-  for (const k of NOTE_KEYS) noteTexts.value[k] = readRaw(NOTE_ITEM_ID[k])
+  const form = readH7ListedForm(localResponses.value)
+  categories.value = form.categories
+  costMap.value = form.cost
+  fairMap.value = form.fair
+  for (const k of NOTE_KEYS) noteTexts.value[k] = form.noteTexts[k]
 }
 
 async function loadOwn(): Promise<void> {
@@ -379,14 +370,12 @@ function handleReview(key: string): void {
 
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
-  const payloads = buildH7ListedSyncPayloads(props.wpId, props.applicableStandards || [], {
+  const payloads = buildH7ListedSyncPayloads(props.wpId, props.applicableStandards || [], h7ListedSyncSnapshot({
     categories: categories.value,
     cost: costMap.value,
     fair: fairMap.value,
-    notePolicy: noteTexts.value['listed-policy'] || '',
-    noteImpairment: noteTexts.value['listed-impairment'] || '',
-    noteSupplement: noteTexts.value['listed-supplement'] || '',
-  })
+    noteTexts: noteTexts.value,
+  }))
   if (!payloads.length) {
     ElMessage.warning('当前不适用上市附注同步')
     return

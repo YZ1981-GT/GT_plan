@@ -26,8 +26,11 @@ export const L5_NOTE_SECTION = {
   soe: '八、53',
 } as const satisfies Record<L5DisclosureVariant, string>
 
-/** 一年内到期的长期应付款 —— 仅国企有独立章节（上市侧并入 五、48 主表减项） */
-export const L5_WITHIN1Y_NOTE_SECTION = { soe: '八、47' } as const
+/** 一年内到期的长期应付款：上市在五、43，国企在八、47。 */
+export const L5_WITHIN1Y_NOTE_SECTION = {
+  listed: '五、43',
+  soe: '八、47',
+} as const satisfies Record<L5DisclosureVariant, string>
 
 export const L5_DISCLOSURE_SHEET_NAME = {
   listed: '附注披露信息（上市公司）',
@@ -60,10 +63,11 @@ export const L6_SOE_SUBTABLE = {
   special: '①专项应付款期末余额最大的前5 项',
 } as const
 
-/** 八、47 子表 */
+/** 一年内到期子表，两版表名字面不同。 */
 export const L5_WITHIN1Y_SUBTABLE = {
-  main: '（3）一年内到期的长期应付款',
-} as const
+  listed: '一年内到期的长期应付款',
+  soe: '（3）一年内到期的长期应付款',
+} as const satisfies Record<L5DisclosureVariant, string>
 
 export const L5_TOTAL_LABEL = '合计'
 export const L5_SUBTOTAL_LABEL = '小计'
@@ -164,8 +168,12 @@ export function l6ColumnsFor(variant: L5DisclosureVariant): Record<string, Colum
 export const buildL6ListedColumns = () => l6ColumnsFor('listed')
 export const buildL6SoeColumns = () => l6ColumnsFor('soe')
 
-export function l5Within1yColumns(): Record<string, ColumnDef[]> {
-  return { [L5_WITHIN1Y_SUBTABLE.main]: twoPeriod('期末余额', '期初余额') }
+export function l5Within1yColumns(variant: L5DisclosureVariant): Record<string, ColumnDef[]> {
+  return {
+    [L5_WITHIN1Y_SUBTABLE[variant]]: twoPeriod(
+      '期末余额', variant === 'listed' ? '上年年末余额' : '期初余额',
+    ),
+  }
 }
 
 // ── 行模型 ───────────────────────────────────────────────────────────────────
@@ -440,13 +448,14 @@ export function buildL6SyncPayload(
   }
 }
 
-/** 八、47 一年内到期的长期应付款（仅国企） */
+/** 一年内到期的长期应付款（上市 / 国企独立章节，表名字面分取） */
 export function buildL5Within1ySyncPayload(
   wpId: string,
+  variant: L5DisclosureVariant,
   rows: readonly L5TwoPeriodRow[],
   applicableStandards?: readonly string[] | null,
 ): L5SyncPayload | null {
-  if (!isL5DisclosureApplicable('soe', applicableStandards)) return null
+  if (!isL5DisclosureApplicable(variant, applicableStandards)) return null
   const data = rows.filter((r) => String(r.label ?? '').trim() && !isTotalLabel(r.label))
   const out: Record<string, unknown>[] = data.map((r) => ({
     label: String(r.label).trim(),
@@ -461,10 +470,10 @@ export function buildL5Within1ySyncPayload(
   })
   return {
     wp_id: wpId,
-    sheet_name: L5_DISCLOSURE_SHEET_NAME.soe,
-    section_id: L5_WITHIN1Y_NOTE_SECTION.soe,
-    current_standard: resolveL5CurrentStandard('soe', applicableStandards),
-    sub_table_data: { [L5_WITHIN1Y_SUBTABLE.main]: out },
-    columns: l5Within1yColumns(),
+    sheet_name: L5_DISCLOSURE_SHEET_NAME[variant],
+    section_id: L5_WITHIN1Y_NOTE_SECTION[variant],
+    current_standard: resolveL5CurrentStandard(variant, applicableStandards),
+    sub_table_data: { [L5_WITHIN1Y_SUBTABLE[variant]]: out },
+    columns: l5Within1yColumns(variant),
   }
 }

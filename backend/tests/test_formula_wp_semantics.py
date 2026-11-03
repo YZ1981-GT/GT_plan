@@ -119,10 +119,10 @@ class TestRegistryMatchesSource:
         assert "raise FormulaColumnError" in code, "三参取不到不再报错 → 登记表 on_missing 需同步"
         assert "Decimal('0')" in code, "两参取不到不再返 0 → 登记表 on_missing 需同步"
 
-    def test_executor_reads_parsed_data_and_returns_zero(self) -> None:
+    def test_executor_reads_parsed_data_and_raises_on_missing(self) -> None:
         code = _code(EXECUTOR_WP_IMPL)
-        assert "parsed_data" in code and "D('0')" in code
-        assert impl_of(EXECUTOR_WP_IMPL).on_missing.startswith("Decimal('0')")
+        assert "parsed_data" in code and "FormulaEvalError" in code
+        assert impl_of(EXECUTOR_WP_IMPL).on_missing.startswith("FormulaEvalError")
 
     def test_on_missing_registry_matches(self) -> None:
         assert "报错" in impl_of(PREFILL_WP_IMPL).on_missing
@@ -216,7 +216,9 @@ class TestKnownDifferencesRegistered:
     """Property 17：每处差异都要登记，且带理由与归属 spec。"""
 
     def test_all_three_dimensions_registered(self) -> None:
-        assert REGISTERED_DIFFERENCE_DIMENSIONS == {"positional_arg_count", "on_missing_return", "data_source"}
+        assert REGISTERED_DIFFERENCE_DIMENSIONS == {
+            "positional_arg_count", "on_missing_return", "data_source",
+        }
         assert len(WP_KNOWN_DIFFERENCES) == 3
 
     def test_each_difference_has_reason_and_owner(self) -> None:
@@ -235,12 +237,15 @@ class TestKnownDifferencesRegistered:
             assert exists, f"归属 spec 不存在: {diff.owner_spec}"
 
     def test_arg_count_difference_matches_reality(self) -> None:
-        """预填路径 3 个实参、WPExecutor 2 个：实参个数真相同了，这条差异应从登记表移出。"""
+        """预填路径三参读锚点、WPExecutor 三参只认 A1（acnr T13）：语义第三参仍只在预填路径有数据，差异照旧登记。"""
         assert len(impl_of(PREFILL_WP_IMPL).positional_args) == 3
-        assert len(impl_of(EXECUTOR_WP_IMPL).positional_args) == 2
-        assert [a.arg for a in _func_def(EXECUTOR_WP_IMPL).args.args][:4] == ["db", "project_id", "wp_code", "column"]
+        assert impl_of(EXECUTOR_WP_IMPL).positional_args == ("wp_code", "column", "field")
+        assert [a.arg for a in _func_def(EXECUTOR_WP_IMPL).args.args][:5] == [
+            "db", "project_id", "wp_code", "column", "field"]
+        names = {n.id for n in ast.walk(_func_def(EXECUTOR_WP_IMPL)) if isinstance(n, ast.Name)}
+        assert "_A1_FIELD" in names and "read_sheet_cell" in _called_names(EXECUTOR_WP_IMPL)
         diff = difference_of("positional_arg_count")
-        assert diff is not None and "3" in diff.detail and "2" in diff.detail
+        assert diff is not None and "A1" in diff.detail and "语义第三参仍不支持" in diff.detail
 
     def test_unregistered_dimension_returns_none(self) -> None:
         assert difference_of("__not_a_dimension__") is None

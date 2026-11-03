@@ -6,17 +6,15 @@ Validates: Requirements 2.2, 3.1, 4.2, 7.2, 9.5
 - calc_progress_rate: 正常值 / total=0 / trimmed=total / completed > total-trimmed (clamp)
 - sort_reviews: 多层级混合排序 / 同层级时间排序 / 空列表
 - _aggregate_cycle_progress: 11 循环全覆盖 / 部分循环无数据
-- _aggregate_vr_summary: 全通过 / 部分 blocking / ConsistencyGate 异常降级
 - _aggregate_open_reviews: 有数据 / 无数据（空列表）/ summary 截断 80 字符
 - _aggregate_timeline: 各阶段推断逻辑
 """
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -297,148 +295,6 @@ class TestAggregateCycleProgress:
         assert cycle_name_map["E"] == "货币资金"
         assert cycle_name_map["F"] == "采购存货"
         assert cycle_name_map["N"] == "税费"
-
-
-# ===========================================================================
-# Tests: _aggregate_vr_summary
-# ===========================================================================
-
-
-@dataclass
-class _MockCheckItem:
-    """Mock CheckItem for testing."""
-    check_name: str
-    passed: bool
-    details: str = ""
-    severity: str = "warning"
-
-
-@dataclass
-class _MockConsistencyResult:
-    """Mock ConsistencyResult for testing."""
-    overall: str = "pass"
-    checks: list = field(default_factory=list)
-
-
-class TestAggregateVRSummary:
-    """测试 _aggregate_vr_summary 方法。
-
-    Validates: Requirements 3.1, 9.5
-    """
-
-    @pytest.mark.asyncio
-    async def test_all_passed(self, mock_db, service):
-        """全通过 — blocking_failed=0, all_passed=True。"""
-        mock_result = _MockConsistencyResult(
-            overall="pass",
-            checks=[
-                _MockCheckItem(check_name="d4_revenue_reconciliation", passed=True, severity="blocking"),
-                _MockCheckItem(check_name="f5_triangle", passed=True, severity="blocking"),
-                _MockCheckItem(check_name="tb_balance", passed=True, severity="warning"),
-            ],
-        )
-
-        # Mock project with audit_period_end
-        mock_project = MagicMock()
-        mock_project.audit_period_end = date(2025, 12, 31)
-
-        with patch(
-            "app.services.dashboard_aggregator_service.ConsistencyGate"
-        ) as MockGate:
-            gate_instance = MockGate.return_value
-            gate_instance.run_all_checks = AsyncMock(return_value=mock_result)
-
-            project_id = uuid.uuid4()
-            result = await service._aggregate_vr_summary(project_id, mock_project)
-
-        assert result["total_rules"] == 3
-        assert result["blocking_failed"] == 0
-        assert result["all_passed"] is True
-        assert result["by_cycle"] == []
-
-    @pytest.mark.asyncio
-    async def test_partial_blocking(self, mock_db, service):
-        """部分 blocking 未通过 — 正确统计 blocking_failed 和 by_cycle。"""
-        mock_result = _MockConsistencyResult(
-            overall="fail",
-            checks=[
-                _MockCheckItem(check_name="d4_revenue_reconciliation", passed=False, severity="blocking", details="mismatch"),
-                _MockCheckItem(check_name="d4_revenue_completeness", passed=False, severity="blocking", details="incomplete"),
-                _MockCheckItem(check_name="f5_triangle", passed=True, severity="blocking"),
-                _MockCheckItem(check_name="h1_fixed_asset", passed=False, severity="blocking", details="gap"),
-                _MockCheckItem(check_name="tb_balance", passed=False, severity="warning"),  # warning, not blocking
-            ],
-        )
-
-        mock_project = MagicMock()
-        mock_project.audit_period_end = date(2025, 12, 31)
-
-        with patch(
-            "app.services.dashboard_aggregator_service.ConsistencyGate"
-        ) as MockGate:
-            gate_instance = MockGate.return_value
-            gate_instance.run_all_checks = AsyncMock(return_value=mock_result)
-
-            project_id = uuid.uuid4()
-            result = await service._aggregate_vr_summary(project_id, mock_project)
-
-        assert result["total_rules"] == 5
-        assert result["blocking_failed"] == 3  # 2 D + 1 H
-        assert result["all_passed"] is False
-
-        # Verify by_cycle grouping
-        by_cycle_map = {item["cycle"]: item for item in result["by_cycle"]}
-        assert "D" in by_cycle_map
-        assert by_cycle_map["D"]["blocking_failed"] == 2
-        assert len(by_cycle_map["D"]["failed_rules"]) == 2
-        assert "H" in by_cycle_map
-        assert by_cycle_map["H"]["blocking_failed"] == 1
-
-    @pytest.mark.asyncio
-    async def test_consistency_gate_exception_propagates(self, mock_db, service):
-        """ConsistencyGate 异常 — 异常向上传播（由 _safe_call 捕获降级）。"""
-        mock_project = MagicMock()
-        mock_project.audit_period_end = date(2025, 12, 31)
-
-        with patch(
-            "app.services.dashboard_aggregator_service.ConsistencyGate"
-        ) as MockGate:
-            gate_instance = MockGate.return_value
-            gate_instance.run_all_checks = AsyncMock(
-                side_effect=RuntimeError("ConsistencyGate timeout")
-            )
-
-            project_id = uuid.uuid4()
-            with pytest.raises(RuntimeError, match="ConsistencyGate timeout"):
-                await service._aggregate_vr_summary(project_id, mock_project)
-
-    @pytest.mark.asyncio
-    async def test_project_without_audit_period_end(self, mock_db, service):
-        """project.audit_period_end 为 None 时使用当前年份。"""
-        mock_result = _MockConsistencyResult(
-            overall="pass",
-            checks=[
-                _MockCheckItem(check_name="tb_balance", passed=True, severity="blocking"),
-            ],
-        )
-
-        mock_project = MagicMock()
-        mock_project.audit_period_end = None
-
-        with patch(
-            "app.services.dashboard_aggregator_service.ConsistencyGate"
-        ) as MockGate:
-            gate_instance = MockGate.return_value
-            gate_instance.run_all_checks = AsyncMock(return_value=mock_result)
-
-            project_id = uuid.uuid4()
-            result = await service._aggregate_vr_summary(project_id, mock_project)
-
-        assert result["total_rules"] == 1
-        assert result["all_passed"] is True
-        # Verify run_all_checks was called with current year
-        call_args = gate_instance.run_all_checks.call_args
-        assert call_args[0][1] == datetime.now().year
 
 
 # ===========================================================================

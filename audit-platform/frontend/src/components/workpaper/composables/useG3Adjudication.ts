@@ -13,6 +13,7 @@
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 4.1
  * Requirements: 3.1~3.10
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -385,21 +386,10 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
     const year = resolveAuditYear()
     if (!pid || year == null) return null
     try {
-      const res = await api.get(`/api/projects/${pid}/trial-balance`, {
-        params: { year, account_prefix: G3_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res)
-        ? (res?.data ?? res)
-        : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G3_ACCOUNT_CODE),
-      )
-      if (!hit) return null
-      const amount = parseNum(
-        hit.audited_amount ?? hit.unadjusted_amount ?? hit.ending_balance
-          ?? ((Number(hit.debit_amount ?? 0) - Number(hit.credit_amount ?? 0))),
-      )
+      const { rows: list } = await fetchTrialBalanceRows(pid, { year, accountPrefix: G3_ACCOUNT_CODE })
+      // 审定优先、其次未审（科目及其明细科目之和）；端点没有 ending_balance / 借贷字段
+      const amount = tbSumUnder(list, G3_ACCOUNT_CODE, 'audited_amount') ?? tbSumUnder(list, G3_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount == null) return null
       setTrialBalance(amount)
       return amount
     } catch {

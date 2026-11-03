@@ -267,12 +267,12 @@
                 :rows="getBlockRows(selectedCompany, bt)"
                 :totals="data.getBlockTotal(selectedCompany, bt)"
                 :readonly="readonly"
-                :enable-ocr="true"
-                :ocr-loading-row-id="ocrLoadingRowId"
+                :wp-id="wpId"
+                :project-id="projectId"
+                evidence-sheet="K0-6"
                 @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
                 @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
                 @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-                @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
               />
             </template>
             <!-- block3 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
@@ -296,12 +296,12 @@
                   :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'debit')"
                   :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'debit')"
                   :readonly="readonly"
-                  :enable-ocr="true"
-                  :ocr-loading-row-id="ocrLoadingRowId"
+                  :wp-id="wpId"
+                  :project-id="projectId"
+                  evidence-sheet="K0-6"
                   @add-row="addDirectionRow('debit')"
                   @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
                   @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
-                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
                 />
               </div>
               <div class="split-direction-block__sub">
@@ -311,12 +311,12 @@
                   :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'credit')"
                   :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'credit')"
                   :readonly="readonly"
-                  :enable-ocr="true"
-                  :ocr-loading-row-id="ocrLoadingRowId"
+                  :wp-id="wpId"
+                  :project-id="projectId"
+                  evidence-sheet="K0-6"
                   @add-row="addDirectionRow('credit')"
                   @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
                   @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
-                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
                 />
               </div>
             </div>
@@ -395,7 +395,6 @@
 import { ref, computed, inject, defineAsyncComponent, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { parseFile } from '@/composables/useExcelIO'
-import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import type { ConfirmationUpdatedPayload } from '@/utils/eventBus'
@@ -809,85 +808,6 @@ function handleSave() {
       wpId: props.wpId,
       timestamp: Date.now(),
     })
-  }
-}
-
-// ─── 行级 OCR：上传证据文件 → contract-ocr 识别 → 确认 → merge 填入 ────────
-const ocrLoadingRowId = ref<string | null>(null)
-
-const OCR_FIELD_MAP: Record<BlockType, Record<string, string>> = {
-  block1: {
-    date: 'approvalDateNo', 日期: 'approvalDateNo',
-    approval_no: 'approvalDateNo', 审批编号: 'approvalDateNo',
-    receipt_date: 'receiptDate', 回单日期: 'receiptDate',
-    payee: 'payee', 收款方: 'payee',
-    amount: 'paymentAmount', 金额: 'paymentAmount', 付款金额: 'paymentAmount',
-  },
-  block2: {
-    date: 'loanApprovalDateNo', 日期: 'loanApprovalDateNo',
-    agreement_no: 'agreementNo', 协议编号: 'agreementNo', 借据编号: 'agreementNo',
-    counterparty: 'counterparty', 对方单位: 'counterparty',
-    amount: 'agreementAmount', 金额: 'agreementAmount',
-  },
-  block3: {
-    date: 'docDateNo', 日期: 'docDateNo',
-    doc_no: 'docDateNo', 单据编号: 'docDateNo',
-    reason: 'docReason', 事由: 'docReason',
-    approver: 'approver', 审批人: 'approver',
-    amount: 'approvalAmount', 金额: 'approvalAmount',
-  },
-  block4: {
-    date: 'reconcileDate', 日期: 'reconcileDate', 对账日期: 'reconcileDate',
-    other_balance: 'otherBalance', 对方余额: 'otherBalance',
-    self_balance: 'selfBalance', 本方余额: 'selfBalance',
-    agreement_no: 'agreementNo', 协议编号: 'agreementNo',
-    sign_date: 'signDate', 签订日期: 'signDate',
-  },
-}
-
-async function handleRowOcr(blockType: BlockType, rowId: string, file: File): Promise<void> {
-  if (!selectedCompany.value || !props.wpId) return
-  ocrLoadingRowId.value = rowId
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d4/contract-ocr`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
-    )
-    const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
-    if (!Object.keys(fields).length) {
-      ElMessage.info('OCR完成，未识别到可填充字段')
-      return
-    }
-    const map = OCR_FIELD_MAP[blockType]
-    const patch: Record<string, any> = {}
-    for (const [ocrKey, val] of Object.entries(fields)) {
-      const target = map[ocrKey]
-      if (target && val != null && String(val).trim() !== '') {
-        patch[target] = val
-      }
-    }
-    if (Object.keys(patch).length === 0) {
-      ElMessage.info('OCR完成，识别字段无法匹配本区块')
-      return
-    }
-    const preview = Object.entries(patch)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join('，')
-    await ElMessageBox.confirm(`识别到证据信息：\n${preview}\n是否填入当前行？`, 'OCR识别结果', {
-      confirmButtonText: '填入',
-      cancelButtonText: '取消',
-    })
-    for (const [field, val] of Object.entries(patch)) {
-      data.updateBlockField(selectedCompany.value._company_id!, blockType, rowId, field, val)
-    }
-    ElMessage.success('已填入识别结果')
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.warning('OCR识别失败')
-  } finally {
-    ocrLoadingRowId.value = null
   }
 }
 

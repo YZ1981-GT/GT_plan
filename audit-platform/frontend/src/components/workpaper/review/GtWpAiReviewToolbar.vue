@@ -72,7 +72,7 @@ const props = defineProps<{
   /** 当前 sheet 名称；有值才显示「本页AI复核」 */
   sheetName?: string
   /** 审计年度 */
-  year?: number
+  year?: number | null
   /** 弹窗标题科目名（可选，如「管理费用」） */
   label?: string
 }>()

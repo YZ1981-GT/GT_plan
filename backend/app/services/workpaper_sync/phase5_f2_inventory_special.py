@@ -129,6 +129,25 @@ def _spec_of_store_item(store_item_id: str) -> Any:
     )
 
 
+#: dict store 的行数组键 —— 逐字取前端（F2-57 `ContractCostImpairmentSheet` / F2-58
+#: `useF2LossContract` 是 `projects`；F2-55 `products`；F2-56 `samples`）。
+_ROWS_KEY_BY_STORE_ITEM: Final[Mapping[str, str]] = {
+    "F2-57-rows": "projects",
+    "F2-58-rows": "projects",
+    "F2-55-rows": "products",
+    "F2-56-rows": "samples",
+}
+
+
+def _rows_key_of(store_item_id: str) -> str:
+    try:
+        return _ROWS_KEY_BY_STORE_ITEM[store_item_id]
+    except KeyError:
+        raise EntrySelectionError(
+            f"store item {store_item_id!r} 没有登记 dict 行数组键（_ROWS_KEY_BY_STORE_ITEM）"
+        ) from None
+
+
 def build_store_projection(
     payload: str | bytes | Sequence[Any],
     *,
@@ -140,21 +159,17 @@ def build_store_projection(
         build_store_projection as _engine,
     )
     import json as _json
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    # dict 形态（StoreKind.dict）：载荷是 {"products": [...]} 或 "{}"
-    # 引擎期望纯数组 → 提取子数组，空 dict 时给空数组
+    sid = store_item_id or STORE_ITEM_ID
+    spec = _spec_of_store_item(sid)
+    # dict 形态（StoreKind.dict）：载荷是 {"projects": [...]}（F2-57）/ {"products": [...]} 或 "{}"
     if isinstance(payload, (str, bytes, bytearray)):
         text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
         parsed = _json.loads(text) if text.strip() else {}
     else:
         parsed = payload
-    if isinstance(parsed, dict):
-        rows = []
-        for v in parsed.values():
-            if isinstance(v, list):
-                rows = v
-                break
-        payload = rows
+    if isinstance(parsed, Mapping):
+        # 按名取行数组；键缺失 = 空表；值不是数组时原样交给引擎 fail closed
+        payload = parsed.get(_rows_key_of(sid), [])
     return _engine(spec, payload, contract=contract, limits=limits)
 
 
@@ -171,6 +186,30 @@ def merge_projection_into_store_rows(
     return _engine_merge(
         spec, projection=projection, base_rows=base_rows
     )
+
+
+def merge_projection_into_store_state(
+    *,
+    projection: Any,
+    base_state: Mapping[str, Any] | None,
+    store_item_id: str | None = None,
+) -> tuple[dict[str, Any], int, int]:
+    """回写门面（`store_mirror` 的 state 分支按名调用）：只换 dict 里的行数组，其余键原样保留。
+
+    🔴 spec oo-writeback-template-parity-closure R3：同 F2-48（`phase5_f2_inventory_valuation`）——
+    原先走 rows 分支 ⇒ 基线恒为 `[]`、写回裸数组，外层 `projects` 丢失、非受管字段（备注）被清掉。
+    """
+    sid = store_item_id or STORE_ITEM_ID
+    key = _rows_key_of(sid)
+    state: dict[str, Any] = dict(base_state or {})
+    base_rows = state.get(key)
+    rows, applied, visited, _touched = merge_projection_into_store_rows(
+        projection=projection,
+        base_rows=list(base_rows) if isinstance(base_rows, list) else [],
+        store_item_id=sid,
+    )
+    state[key] = rows
+    return state, applied, visited
 
 
 def _managed_last_col_of(spec: Any) -> str:

@@ -22,7 +22,7 @@ import sqlalchemy as sa
 
 from app.core.database import get_db
 from app.deps import get_current_user, require_wp_edit_permission
-from app.models.core import Project, User
+from app.models.core import User
 from app.models.workpaper_models import (
     WpCrossRef,
     WpIndex,
@@ -35,6 +35,7 @@ from app.services.wp_classification_service import (
     _WP_APPLICABLE_WHEN,
 )
 from app.services.wp_auto_fill_service import _resolve_auto_fill_values
+from app.services.project_classification import resolve as resolve_classification
 from app.services.wp_generation_matching import (
     applicable_when_hit,
     business_category_flags,
@@ -72,6 +73,13 @@ from app.routers.wp_render_config_helpers import (  # noqa: F401
     _resolve_sheet_type,
     _resolve_template_path,
     _unpack_sheet_schema,
+    _WORKBOOK_SCOPED_RENDERERS,
+    _memo_hit_html_data,
+    share_duplicated_html_data,
+    # canonical sheet identity（测试契约经本模块引用）
+    _EMBEDDED_CODE_RE,
+    annotate_sheet_identities,
+    annotate_sheet_identity,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,6 +103,7 @@ def _render_applicability(
     wp_code: str,
     business_category: str | None,
     template_type: str | None,
+    scenario: str | None = None,
 ) -> tuple[dict | None, bool]:
     """返回 render-config 顶层适用性声明和不适用判定。
 
@@ -112,7 +121,7 @@ def _render_applicability(
     if not set(applicable_when).issubset(available_keys):
         return applicable_when, False
 
-    flags = business_category_flags(business_category, template_type)
+    flags = business_category_flags(business_category, template_type, scenario)
     return applicable_when, not applicable_when_hit(
         applicable_when,
         flags,
@@ -306,6 +315,7 @@ _SELF_CONTAINED_DEDICATED: set[str] = {
     # noRendererGridFallback → 误走 GtGridSheet 遮蔽 b23-process-control 聚合组件。
     "b23-process-control",
 }
+
 
 # ─── Response schemas ────────────────────────────────────────────────────────
 
@@ -572,6 +582,7 @@ async def get_render_config(
     wp_id: UUID,
     sheet_name: str | None = Query(None, description="可选，仅返回单 sheet 数据"),
     component_type: str | None = Query(None, alias="force_component_type", description="强制使用指定 componentType 渲染策略"),
+    share_html_data: bool = Query(False, description="内容相同的页签 html_data 只下发一份（顶层 shared_html_data + 页签 html_data_ref）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -596,6 +607,8 @@ async def get_render_config(
     _cold = len(_TEMPLATE_SHEET_ORDER_CACHE) == 0
     try:
         result = await _get_render_config_impl(wp_id, sheet_name, db, current_user, force_component_type=component_type)
+        if share_html_data is True:  # 不带参数（或直接调用拿到 Query 默认对象）不调用 ⇒ 响应不变（R1）
+            result = share_duplicated_html_data(result)
         # 从结果中提取主 componentType（第一个 sheet 的 componentType）
         _sheets = result.get("sheets", []) if isinstance(result, dict) else []
         _ct = _sheets[0]["componentType"] if _sheets else "unknown"
@@ -615,8 +628,9 @@ async def _get_render_config_impl(
     db: AsyncSession,
     current_user,
     force_component_type: str | None = None,
+    manifest_only: bool = False,
 ):
-    """实际实现（从原 get_render_config 提取）。"""
+    """实际实现（从原 get_render_config 提取）。manifest_only：只算页签清册（guidance 用，R3）。"""
     from app.routers.wp_render_strategies import RENDERER_DISPATCH
     from app.routers.wp_render_strategies._context import RenderContext
     from app.routers.wp_render_strategies._context import CrossRefItem as _CRI
@@ -695,28 +709,28 @@ async def _get_render_config_impl(
 
     # Step 6: 公共数据
     html_data_all = (working_paper.parsed_data or {}).get("html_data", {})
-    cross_ref_items = [CrossRefItem(wp_code=cr.target_wp_code, cell=cr.cell_reference)
+    cross_ref_items = [] if manifest_only else [CrossRefItem(wp_code=cr.target_wp_code, cell=cr.cell_reference)
                        for cr in (await db.execute(sa.select(WpCrossRef).where(
                            WpCrossRef.source_wp_id == wp_id, WpCrossRef.project_id == project_id
                        ))).scalars().all()]
-    _prog_year, _prog_biz, _prog_template_type = None, "C", None
-    try:
-        pj = (await db.execute(
-            PROJECT_AUDIT_YEAR_BIZ_SQL, {"pid": str(project_id)}
-        )).first()
-        if pj:
-            _prog_year, _prog_biz = pj[0], pj[1] or "C"
-    except Exception as e:  # noqa: BLE001
-        logger.warning("查询项目年度/业务类别失败 pid=%s: %s", project_id, e)
-    try:
-        _prog_template_type = (await db.execute(
-            sa.select(Project.template_type).where(Project.id == project_id)
-        )).scalar_one_or_none()
-    except Exception as e:  # noqa: BLE001
-        logger.warning("查询项目模板类型失败 pid=%s: %s", project_id, e)
+    _prog_year, _prog_biz, _prog_template_type, _prog_scenario = None, "C", None, None
+    _prog_raw_biz = None
+    if not manifest_only:  # 年度 / 业务类别 / 场景 / 模板类型只供渲染器与响应字段，清册不用
+        try:
+            pj = (await db.execute(
+                PROJECT_AUDIT_YEAR_BIZ_SQL, {"pid": str(project_id)}
+            )).first()
+            if pj:
+                _prog_year, _prog_raw_biz = pj[0], pj[1]
+                _prog_biz = pj[1] or "C"
+                _prog_scenario, _prog_template_type = pj[2], pj[3]
+        except Exception as e:  # noqa: BLE001
+            logger.warning("查询项目年度/业务类别失败 pid=%s: %s", project_id, e)
+    # 分类 / 场景单一解释（R4）：适用性、渲染上下文与响应字段同一份结果
+    _prog_classification = resolve_classification(_prog_raw_biz, _prog_scenario, _prog_template_type)
 
     _applicable_when, _not_applicable = _render_applicability(
-        wp_code, _prog_biz, _prog_template_type
+        wp_code, _prog_biz, _prog_template_type, _prog_classification.scenario
     )
     _tpl = _resolve_template_path(working_paper, wp_code)
 
@@ -866,7 +880,8 @@ async def _get_render_config_impl(
             component_type = "skip"
         schema_data: dict | None = None
         try:
-            schema_data = _schema_service.load_schema(wp_code=wp_code, template_version_id=tpl_ver_id)
+            if not manifest_only:
+                schema_data = _schema_service.load_schema(wp_code=wp_code, template_version_id=tpl_ver_id)
         except FileNotFoundError:
             pass
         sheet_schema = _unpack_sheet_schema(schema_data, cls.sheet_name)
@@ -896,12 +911,15 @@ async def _get_render_config_impl(
         if force_component_type and force_component_type in RENDERER_DISPATCH:
             component_type = force_component_type
             renderer = RENDERER_DISPATCH[force_component_type]
-        # 整册专属组件：同一 renderer 对所有 sheet 输出一致 → 单请求内 memo，避免 N 倍冗余查询
+        # 整册专属组件 / D 循环渲染器（只差 sheet_name）：各 sheet 输出一致 → 单请求内 memo，避免 N 倍冗余查询
         _is_whole_dedicated = (component_type == ovr and ovr in _WHOLE_WP_MULTISHEET_DEDICATED)
-        if renderer and _is_whole_dedicated and component_type in _dedicated_render_memo:
+        _memo_eligible = _is_whole_dedicated or component_type in _WORKBOOK_SCOPED_RENDERERS
+        if renderer and manifest_only:
+            pass  # 只算清册：componentType 已定，渲染器只产出 html_data / schema（R3）
+        elif renderer and _memo_eligible and component_type in _dedicated_render_memo:
             _memoized = _dedicated_render_memo[component_type]
             if _memoized is not None:
-                sheet_html_data = _memoized
+                sheet_html_data = _memo_hit_html_data(_memoized, component_type, cls.sheet_name)
         elif renderer:
             from app.services.wp_metrics import wp_metrics as _wpm
             _wpm.inc_renderer_invocation(component_type)
@@ -914,12 +932,12 @@ async def _get_render_config_impl(
                 cross_ref_items=[_CRI(wp_code=ci.wp_code, cell=ci.cell) for ci in cross_ref_items],
                 prep_info=None, classifications=classifications, audit_cycle=audit_cycle,
                 source_files=list(getattr(cls, "source_files", []) or []),
-                user_id=_user_id)
+                user_id=_user_id, project_classification=_prog_classification)
             try:
                 result = await renderer(ctx)
                 if result is not None:
                     sheet_html_data = result
-                if _is_whole_dedicated:
+                if _memo_eligible:
                     _dedicated_render_memo[component_type] = result
                 if ctx.sheet_schema is not None and ctx.sheet_schema != sheet_schema:
                     sheet_schema = ctx.sheet_schema
@@ -941,7 +959,7 @@ async def _get_render_config_impl(
             # confirmation 精细组件首次打开（无持久化数据）→ 返回空的新格式初始数据
             # 前端组件检测 _format → 显示可编辑新表（而非"旧格式只读"降级）
             sheet_html_data = _confirmation_initial_data(component_type)
-        elif not sheet_html_data and _tpl and _is_multi_sheet:
+        elif not sheet_html_data and _tpl and _is_multi_sheet and not manifest_only:
             # 白名单内无后端 renderer 且无持久化数据的 sheet（如 d-form-confirmation / d-form-table）：
             # 从模板提取网格 cells 供前端组件消费。
             try:
@@ -961,7 +979,7 @@ async def _get_render_config_impl(
         # 🔴 fail-open：xlsx 缺失/损坏返回空网格 + `source_unavailable` 标记，
         #    前端据此区分「文件异常」与「空底稿」（都显示「暂无内容」会掩盖文件损坏）。
         # spec: custom-workpaper-dual-mode-formula-and-batch R2.6 / Task 27
-        if component_type == "custom":
+        if component_type == "custom" and not manifest_only:
             try:
                 from app.services.custom_workpaper_projection import project_if_empty
                 sheet_html_data = project_if_empty(
@@ -978,7 +996,7 @@ async def _get_render_config_impl(
             continue
         # 函证覆盖率 population：向 confirmation-summary 注入科目审定总额（TB）作覆盖率分母。
         # 加法式，不改 rows/_format；不可解析时注入 null（前端显示"不可用"，Skip-on-missing）。
-        if component_type == "confirmation-summary" and isinstance(sheet_html_data, dict):
+        if component_type == "confirmation-summary" and isinstance(sheet_html_data, dict) and not manifest_only:
             try:
                 await _inject_confirmation_population(
                     db, project_id, _prog_year, sheet_html_data
@@ -1029,6 +1047,8 @@ async def _get_render_config_impl(
                 "explicit_code" if str(_sheet.get("sheet_code") or "").strip()
                 else "template_sheet_name"
             )
+    if manifest_only:  # guidance 只读清册（sheets 身份字段 + template_version），不做取数 / 签字 / 准则 / 静态指引
+        return {**_base, "is_real_workpaper": is_real, "sheets": sheets}
 
     # Step 7: auto-fill + Step 8: response
     fill_results: dict = {}
@@ -1103,81 +1123,3 @@ async def _get_render_config_impl(
         response["sign_status"] = sign_status
         response["permissions"] = permissions
     return response
-
-
-
-# ---------------------------------------------------------------------------
-# Canonical sheet identity helpers（guidance Task 10 — 被测试契约引用）
-# ---------------------------------------------------------------------------
-
-
-# 嵌入编码提取：比 _SHEET_CODE_RE（末尾锚定、仅大写尾字母）更宽泛，
-# 允许编码在 sheet_name 中间、小写字母尾缀（如 D0-4b、F1-CONF）。
-_EMBEDDED_CODE_RE = re.compile(r"([A-Z]\d+(?:-\d+)*(?:-?[A-Za-z]+)?)")
-
-
-def annotate_sheet_identity(sheet: dict) -> dict:
-    """为单个 render-config sheet dict 添加 canonical identity 字段（in-place）.
-
-    - ``sheet_code``: 从 sheet_name 提取的标准编码，或保留显式值
-    - ``sheet_code_reason``: 来源（explicit_code / embedded_code / no_canonical_code / whole_workbook）
-    - ``whole_workbook``: 整册标记
-    """
-    whole = bool(sheet.get("whole_workbook", False))
-
-    # whole_workbook 标记冲突检测
-    if whole:
-        if sheet.get("sheet_code") and str(sheet["sheet_code"]).strip():
-            raise ValueError(
-                f"whole_workbook=True 不应携带 sheet_code=null 以外的值，"
-                f"实际 sheet_code={sheet['sheet_code']!r}"
-            )
-        sheet.setdefault("sheet_code", None)
-        sheet["sheet_code_reason"] = "whole_workbook"
-        sheet["whole_workbook"] = True
-        return sheet
-
-    sheet.setdefault("whole_workbook", False)
-
-    # 已有显式 sheet_code
-    existing_code = sheet.get("sheet_code")
-    if existing_code is not None and str(existing_code).strip():
-        # 检查 sheet_name 里的解析结果是否冲突
-        parsed = _EMBEDDED_CODE_RE.search(sheet.get("sheet_name") or "")
-        if parsed and parsed.group(1) != str(existing_code).strip():
-            raise ValueError(
-                f"sheet_name 中的解析结果 {parsed.group(1)!r} 与 "
-                f"显式 sheet_code {existing_code!r} 冲突（解析结果冲突）"
-            )
-        sheet["sheet_code_reason"] = "explicit_code"
-        return sheet
-
-    # 从 sheet_name 提取
-    name = sheet.get("sheet_name") or ""
-    m = _EMBEDDED_CODE_RE.search(name)
-    if m:
-        sheet["sheet_code"] = m.group(1)
-        sheet["sheet_code_reason"] = "embedded_code"
-    else:
-        sheet["sheet_code"] = None
-        # 保留调用方已设置的 reason（如 virtual_sheet_without_standard_code）
-        if not sheet.get("sheet_code_reason"):
-            sheet["sheet_code_reason"] = "no_canonical_code"
-
-    return sheet
-
-
-def annotate_sheet_identities(
-    sheets: list[dict],
-    parent_wp_code: str | None = None,
-) -> list[dict]:
-    """对 sheet 列表批量标注 canonical identity（in-place，返回原列表）."""
-    from app.services.guidance_render_identity import (
-        annotate_sheet_canonical_identity,
-    )
-
-    for sheet in sheets:
-        annotate_sheet_identity(sheet)
-        if parent_wp_code:
-            annotate_sheet_canonical_identity(sheet, parent_wp_code=parent_wp_code)
-    return sheets

@@ -24,20 +24,42 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-async def _push(project_id: Any, year: Any, trigger: str) -> None:
+async def _push(event: Any, trigger: str) -> None:
+    project_id = getattr(event, "project_id", None)
+    year = getattr(event, "year", None)
     if not project_id or not year:
         logger.debug("合并推送事件缺 project_id 或 year，跳过（trigger=%s）", trigger)
         return
     try:
-        from app.core.database import async_session as async_session_factory
-        from app.services.consol_push_service import push
+        import uuid
 
+        from app.core.database import async_session as async_session_factory
+        from app.services.consol_operation_service import request_operation
+        from app.workers.consol_operation_worker import wake
+
+        source_id = (
+            getattr(event, "entry_group_id", None)
+            or (getattr(event, "extra", None) or {}).get("entry_id")
+            or uuid.uuid4()
+        )
         async with async_session_factory() as db:
-            result = await push(db, project_id, year, trigger=trigger)
-        logger.info("分录%s → 合并推送 %s（项目 %s 年度 %s）", trigger, result.status, project_id, year)
+            requested = await request_operation(
+                db,
+                project_id=project_id,
+                year=int(year),
+                operation_type="push",
+                idempotency_key=f"elimination:{trigger}:{source_id}",
+                trigger_source=trigger,
+            )
+            await db.commit()
+        wake()
+        logger.info(
+            "分录%s → 合并 operation %s（项目 %s 年度 %s）",
+            trigger, requested.operation.id, project_id, year,
+        )
     except Exception as err:
-        # 顶层兜底：推送故障绝不阻断审批本身（EH3）；push 内部已落失败运行
-        logger.error("合并推送事件处理失败（项目 %s 年度 %s）：%s", project_id, year, err)
+        # 顶层兜底：入队故障绝不回滚已提交的审批；持久 operation 自己记录运行失败。
+        logger.error("合并推送事件入队失败（项目 %s 年度 %s）：%s", project_id, year, err)
 
 
 async def handle_elimination_approved(event: Any) -> None:
@@ -47,7 +69,7 @@ async def handle_elimination_approved(event: Any) -> None:
     """
     from app.services.consol_push_service import TRIGGER_APPROVED
 
-    await _push(getattr(event, "project_id", None), getattr(event, "year", None), TRIGGER_APPROVED)
+    await _push(event, TRIGGER_APPROVED)
 
 
 async def handle_elimination_revoked(event: Any) -> None:
@@ -57,7 +79,7 @@ async def handle_elimination_revoked(event: Any) -> None:
     """
     from app.services.consol_push_service import TRIGGER_REVOKED
 
-    await _push(getattr(event, "project_id", None), getattr(event, "year", None), TRIGGER_REVOKED)
+    await _push(event, TRIGGER_REVOKED)
 
 
 def register_consol_elimination_recalc_handler(event_bus: Any) -> None:

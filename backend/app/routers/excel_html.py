@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_audit_year
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User
 from app.services.excel_html_converter import (
     excel_to_structure,
@@ -703,11 +703,15 @@ async def execute_formulas(
     sheet_index: int = Query(default=0),
     year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """执行 structure.json 中所有公式并回填计算结果
 
     遍历所有含 formula 的单元格，调用 execute_formula 计算值并写回。
+
+    🔴 鉴权升级（spec formula-fetch-followup-defect-closure A4）：原仅 get_current_user，
+    任何登录用户可对任意项目执行公式并写回结果。改为 require_project_access("edit")——
+    该端点写回 structure.json / xlsx / html 三份文件，属编辑类操作。
     """
     from app.services.cell_formula_evaluator import execute_formula
     from app.services.excel_html_converter import save_version_snapshot
@@ -735,6 +739,8 @@ async def execute_formulas(
         return {"executed": 0, "message": "无公式需要执行"}
 
     # 预加载 trial_balance 全量数据（避免N+1查询）
+    import sqlalchemy as sa
+
     from app.models.audit_platform_models import TrialBalance
     tb_result = await db.execute(
         sa.select(TrialBalance).where(

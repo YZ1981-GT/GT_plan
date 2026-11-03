@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "keyword_sets": {
+    "reversal": ["冲销", "红字", "冲红", "冲回"],
+    "special_event": ["关联交易", "收购", "合并", "重组", "诉讼", "处置", "清算", "破产"],
+    "vague": ["调整", "暂估", "其他", "冲销"]
+  },
+  "presets": [
+    {
+      "id": "je_account_ledger", "name": "指定科目序时账", "category": "序时账", "description": "按科目编码前缀查询序时账明细。",
+      "notes": ["请填写科目编码；留空时不能查询。"],
+      "config": {"source": "ledger_entries", "condition_logic": "and", "conditions": [
+        {"field": "account_code", "op": "starts_with", "value": ""}
+      ]}
+    },
+    {
+      "id": "je_reversal", "name": "摘要含冲销 / 红字", "category": "序时账", "description": "查询摘要含冲销或红字相关用语的分录。",
+      "notes": [],
+      "config": {"source": "ledger_entries", "condition_logic": "or", "conditions": [
+        {"$keyword_set": "reversal", "field": "summary", "op": "like"}
+      ]}
+    },
+    {
+      "id": "je_negative_amount", "name": "负数金额（红字）分录", "category": "序时账", "description": "查询借方或贷方金额小于零的分录行。",
+      "notes": [],
+      "config": {"source": "ledger_entries", "condition_logic": "or", "conditions": [
+        {"field": "debit_amount", "op": "lt", "value": 0},
+        {"field": "credit_amount", "op": "lt", "value": 0}
+      ]}
+    },
+    {
+      "id": "je_cutoff", "name": "期末前后 5 天凭证", "category": "序时账", "description": "查询审计期末日前后各五天的凭证。",
+      "notes": ["期后部分在下一年度序时账（如已导入），请切换年度。"],
+      "config": {"source": "ledger_entries", "condition_logic": "and", "conditions": [
+        {"field": "voucher_date", "op": "between", "value": [{"$param": "cutoff_start"}, {"$param": "cutoff_end"}]}
+      ]}
+    },
+    {
+      "id": "je_large_amount", "name": "大额分录", "category": "序时账", "description": "按实际执行的重要性水平查询大额分录。",
+      "notes": ["借、贷较大者，与抽凭、截止测试同口径，不取绝对值；负数红字见负数金额分录。"],
+      "config": {"source": "ledger_entries", "condition_logic": "and", "conditions": [
+        {"field": "line_amount", "op": "gte", "value": {"$param": "materiality_performance"}}
+      ]}
+    },
+    {
+      "id": "je_weekend", "name": "周末分录", "category": "序时账", "description": "查询周六、周日入账的分录。",
+      "notes": ["只按周六、周日筛选：调休上班日也会列出，法定节假日不在其内。"],
+      "config": {"source": "ledger_entries", "condition_logic": "and", "conditions": [
+        {"field": "voucher_date", "op": "weekday_in", "value": [0, 6]}
+      ]}
+    },
+    {
+      "id": "je_special_event", "name": "摘要涉及特殊事件", "category": "序时账", "description": "查询摘要涉及特殊事项的分录。",
+      "notes": ["关键词与 C24 规则 11 相同。"],
+      "config": {"source": "ledger_entries", "condition_logic": "or", "conditions": [
+        {"$keyword_set": "special_event", "field": "summary", "op": "like"}
+      ]}
+    },
+    {
+      "id": "je_vague_keywords", "name": "摘要含模糊词", "category": "序时账", "description": "按 C24 默认模糊词查询摘要。",
+      "notes": ["默认词表与 C24 底稿相同，载入后可增删。"],
+      "config": {"source": "ledger_entries", "condition_logic": "or", "conditions": [
+        {"$keyword_set": "vague", "field": "summary", "op": "like"}
+      ]}
+    },
+    {
+      "id": "je_both_sides", "name": "借、贷都有金额的分录行", "category": "序时账", "description": "查询同一分录行借方和贷方均有金额的情形。",
+      "notes": ["判断口径与 C24 规则 9 相同。"],
+      "config": {"source": "ledger_entries", "condition_logic": "and", "conditions": [
+        {"field": "debit_amount", "op": "gt", "value": 0},
+        {"field": "credit_amount", "op": "gt", "value": 0}
+      ]}
+    },
+    {
+      "id": "je_no_summary", "name": "没有摘要", "category": "序时账", "description": "查询摘要为空或仅含空白字符的分录。",
+      "notes": ["空白指只含空格、制表符、换行、全角空格等空白字符。"],
+      "config": {"source": "ledger_entries", "condition_logic": "and", "conditions": [
+        {"field": "summary", "op": "is_blank", "value": null}
+      ]}
+    }
+  ]
+}

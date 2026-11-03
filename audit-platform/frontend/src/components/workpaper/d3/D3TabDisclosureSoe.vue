@@ -162,8 +162,9 @@ import { useD3DisclosureSoe } from '../composables/useD3DisclosureSoe'
 import {
   buildD3SyncPayload,
   D3_NOTE_SECTION,
-  type D3DisclosureSnapshot,
 } from '../composables/d3NoteSectionMap'
+// 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import { buildD3SoeSnapshot } from '../composables/d3DisclosureSnapshot'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
@@ -270,13 +271,12 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
-    const snapshot: D3DisclosureSnapshot = {
-      mainRows: section1Rows.value.map((r) => ({ rowKey: r.rowKey, label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
-      mainTotal: { label: '合计', endAmount: section1Subtotal.value.endAmount, priorAmount: section1Subtotal.value.priorAmount },
-      longTermRows: section2Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount, reason: r.reason })),
-      longTermTotal: { label: '合计', endAmount: section2Subtotal.value.endAmount, priorAmount: section2Subtotal.value.priorAmount },
-      notes: {},
-    }
+    const snapshot = buildD3SoeSnapshot({
+      section1Rows: section1Rows.value,
+      section1Subtotal: section1Subtotal.value,
+      section2Rows: section2Rows.value,
+      section2Subtotal: section2Subtotal.value,
+    })
     const payload = buildD3SyncPayload('soe', props.wpId || '', applicableStandardsRef.value, snapshot)
     const result: any = await http.post(
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,

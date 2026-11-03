@@ -363,7 +363,8 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
   })
 
   // ─── ACNR NOTE 索引解析（Req 17.2 / 17.4） ──────────────────────────────────
-  const acnr = useAcnr()
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效（projectId 为 Ref/ComputedRef）。
+  const acnr = useAcnr(() => projectId.value)
 
   /**
    * 将附注节点的 indexRef（`note:{note_section}`）经 ACNR resolveIndex 解析为 jump_route。

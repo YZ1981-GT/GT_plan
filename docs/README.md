@@ -9,6 +9,7 @@
 | [`acnr/`](./acnr/) | ACNR 地址坐标名称库 | 规则冻结、贡献指南、fixtures/schemas |
 | [`adr/`](./adr/) | 架构决策记录（ADR） | 56 条决策（通用32 + 合并13 + 公式2 + 报表1），含 INDEX.md |
 | [`architecture/`](./architecture/) | 系统架构 | 服务依赖图、规模快照、穿透图、Ledger 等 |
+| [`contracts/`](./contracts/) | 接口与数据契约 | 程序链（裁剪 → 生成 → 委派 → 可见性）JSON Schema、共享用例、OpenAPI 子集，供 Java 版实现复用 |
 | [`deployment/`](./deployment/) | 部署与运维 | 冒烟清单、K8s映射、零停机、启动手册 |
 | [`frontend/`](./frontend/) | 前端规范 | 组件用法、CSS变量、显示偏好、加载态、侧面板 |
 | [`i18n/`](./i18n/) | 术语与国际化 | 审计业务术语表 |

@@ -44,8 +44,11 @@
                 ⚡ 刷新全部公式
               </el-button>
             </el-tooltip>
-            <el-tooltip v-if="canCreateWp" content="选择模板集 → 配置裁剪范围 → 批量创建本项目底稿" placement="bottom">
-              <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
+            <el-tooltip content="按循环决定哪些底稿执行、填写裁剪理由并指定底稿主编" placement="bottom">
+              <el-button size="small" @click="goProcedureTrim()">✂️ 程序裁剪</el-button>
+            </el-tooltip>
+            <el-tooltip v-if="canCreateWp" content="按程序裁剪结果生成本项目底稿：选模板集，按循环确认生成范围" placement="bottom">
+              <el-button type="success" size="small" @click="onGenerateWorkpapers">
                 ⬇️ 生成底稿
               </el-button>
             </el-tooltip>
@@ -120,6 +123,12 @@
     <ArchivedBanner />
     <ConsolLockedBanner />
 
+    <ExportProgressBar
+      v-if="batchExportTask"
+      :task-id="batchExportTask.task_id"
+      :total="batchExportTask.total"
+    />
+
     <!-- 批量状态变更操作栏 -->
     <BatchActionBar
       v-if="selectedWpIds.length > 0"
@@ -145,6 +154,7 @@
       </el-select>
       <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 110px">
         <el-option label="全部" value="" />
+        <el-option label="未分配" :value="UNASSIGNED_FILTER" />
         <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
       </el-select>
       <!-- 联动状态横条「查看详情」跳转 ?filter=stale 落到这里 -->
@@ -227,11 +237,15 @@
       @created="fetchWpIndex"
     />
 
-    <!-- 底稿裁剪确认弹窗（生成前选择范围） -->
-    <WorkpaperTrimDialog
-      v-model="showTrimDialog"
+    <!-- 按程序裁剪结果生成底稿（spec trim-generation-plan-linkage；与程序裁剪页共用） -->
+    <GenerationPlanDialog
+      v-model="showGenerateDialog"
       :project-id="projectId"
-      @confirm="(codes: string[]) => { trimDialogResolve?.(codes); showTrimDialog = false }"
+      :year="currentYear"
+      :can-submit="canCreateWp"
+      disabled-reason="项目已归档或你已失去本项目编辑权限，不能生成底稿"
+      @generated="fetchWpIndex"
+      @navigate-cycle="goProcedureTrim"
     />
   </div>
 </template>
@@ -249,7 +263,7 @@
  *
  * Requirements: 1.1-1.8, 4.1-4.5, 5.1-5.6
  */
-import { ref, computed, provide, watch, onMounted, defineAsyncComponent, h } from 'vue'
+import { ref, shallowRef, computed, provide, watch, onMounted, defineAsyncComponent } from 'vue'
 import type { Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -261,12 +275,13 @@ import {
   type ProgressInfo,
 } from '@/composables/useWorkpaperListContext'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
-import { listWorkpapers, getWpIndex, downloadWorkpaperPack } from '@/services/workpaperApi'
+import { listWorkpapers, getWpIndex, startWorkpaperPackExport, getWpMappingByAccount, type WorkpaperPackExportTask } from '@/services/workpaperApi'
 import { listUsers } from '@/services/commonApi'
+import { UNASSIGNED_FILTER, readListEntryQuery } from './workpaper-list/workpaperListEntryQuery'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
-import { summarizeWorkpaperGenerateResult } from '@/utils/workpaperGenerateResult'
-import { resolveAuditYearFromProject, resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
+import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
+import { indexFirstBy } from '@/utils/indexFirstBy'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useProjectStore } from '@/stores/project'
@@ -285,8 +300,9 @@ import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpBatchExportDialog from '@/components/workpaper/WpBatchExportDialog.vue'
 import WpBulkDialog from '@/components/workpaper/bulk-tab/WpBulkDialog.vue'
 import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
-import WorkpaperTrimDialog from '@/components/workpaper/WorkpaperTrimDialog.vue'
+import GenerationPlanDialog from '@/components/workpaper/generation/GenerationPlanDialog.vue'
 import GtCustomWpBatchDialog from '@/components/workpaper/custom/GtCustomWpBatchDialog.vue'
+import ExportProgressBar from '@/components/workpaper/ExportProgressBar.vue'
 
 defineOptions({ name: 'WorkpaperList' })
 
@@ -303,15 +319,18 @@ const { can: canOp, whyCannot } = usePermissionMatrix()
 // DEPRECATED: 旧 authStore.user?.role 直接判断仍保留，后续逐步替换为 canOp()
 
 const projectId = computed(() => route.params.projectId as string)
-/** 本项目的审计年度（挂载时随项目信息读取） */
-const projectAuditYear = ref<number | null>(null)
-// 审计年度：路由 ?year= > 本项目审计年度 > null（全平台同一解析，不按日历猜）
-const currentYear = computed<number | null>(() => resolveEffectiveAuditYear({ routeYear: route.query.year, storeAuditYear: projectAuditYear.value }))
-const projectName = ref('')
+// 审计年度单一来源：路由 ?year= > ProjectContextGate 已解析的 projectStore.year > null；
+// 本页自己的项目名称 GET 失败不能把「读取失败」误报成「项目未设置年度」。
+const currentYear = computed<number | null>(() => resolveEffectiveAuditYear({ routeYear: route.query.year, storeAuditYear: projectStore.year }))
+const projectName = computed(() => projectStore.currentProjectContext?.projectName || projectStore.clientName || '')
 
 // ─── 核心数据 ─────────────────────────────────────────────────────────────────
-const wpList = ref<WorkpaperDetail[]>([])
-const wpIndex = ref<WpIndexItem[]>([])
+// 浅层响应式：两张清单一直整体替换（fetchWpIndex），没有人改元素；深层 ref 让 929 × 2 个对象每次读字段都走代理
+// 与依赖收集（spec platform-perf-hotspots R7）
+const wpList = shallowRef<WorkpaperDetail[]>([])
+const wpIndex = shallowRef<WpIndexItem[]>([])
+/** wp_index.id → 索引项（同 id 取第一个，与原先 find 一致） */
+const wpIndexById = computed(() => indexFirstBy(wpIndex.value, (i) => i.id))
 const loading = ref(false)
 const viewMode = ref('workbench')
 const searchKeyword = ref('')
@@ -321,6 +340,12 @@ const filterStatus = ref('')
 const filterStale = ref(false)
 const filterAssignee = ref('')
 const selectedWpId = ref('')
+/** 入口定位（?highlight= / ?wp_code= / ?search=）：列表视图按 seq 只执行一次 */
+const locateTarget = ref<{ code: string; seq: number } | null>(null)
+const listLoaded = ref(false)
+/** 首次取数结束（成功、取消、失败都算）：?account= 要按本项目已生成的底稿筛映射编码 */
+let markFirstLoad: () => void = () => {}
+const firstLoad = new Promise<void>((done) => { markFirstLoad = done })
 const selectedWpIds = ref<string[]>([])
 const userOptions = ref<any[]>([])
 const showWpImport = ref(false)
@@ -332,11 +357,9 @@ const showTemplateCopy = ref(false)
 const showCustomBatch = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
-const generateLoading = ref(false)
+const batchExportTask = ref<WorkpaperPackExportTask | null>(null)
 const formulaRefreshLoading = ref(false)
-const showTrimDialog = ref(false)
-const trimDialogResolve = ref<((codes: string[]) => void) | null>(null)
-const trimDialogReject = ref<(() => void) | null>(null)
+const showGenerateDialog = ref(false)
 
 const hasData = computed(() => wpIndex.value.length > 0 || wpList.value.length > 0)
 
@@ -497,13 +520,15 @@ async function fetchWpIndex() {
       listWorkpapers(projectId.value, {
         audit_cycle: filterCycle.value || undefined,
         status: filterStatus.value || undefined,
-        assigned_to: filterAssignee.value || undefined,
+        assigned_to: filterAssignee.value && filterAssignee.value !== UNASSIGNED_FILTER ? filterAssignee.value : undefined,
       }),
       getWpIndex(projectId.value),
     ])
     wpList.value = wps
+    listLoaded.value = true
+    const wpByIndexId = indexFirstBy(wps, (wp) => wp.wp_index_id)
     wpIndex.value = idx.map((item) => {
-      const matchedWorkpaper = wps.find((wp) => wp.wp_index_id === item.id)
+      const matchedWorkpaper = wpByIndexId.get(item.id)
       return {
         ...item,
         assigned_to: matchedWorkpaper?.assigned_to ?? item.assigned_to,
@@ -511,13 +536,13 @@ async function fetchWpIndex() {
       }
     })
   } catch (err: any) {
-    // 请求被取消不是错误：query 变更（如 ?filter=stale 补 view=list）会让
-    // DefaultLayout 按 fullPath 重建本视图，新实例的同 URL GET 触发 http.ts 去重
-    // abort 旧实例在飞的请求。此处吞掉，否则 CanceledError 冒泡到 ErrorBoundary。
+    // 请求被取消不是错误：同 URL 的 GET 后发会让 http.ts 去重 abort 在飞的这一发（换 ?year= 重挂本页、
+    // 别处同时取同一清单）。此处吞掉，否则 CanceledError 冒泡到 ErrorBoundary。
     if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
     throw err
   } finally {
     loading.value = false
+    markFirstLoad()
   }
 }
 
@@ -547,6 +572,8 @@ const ctx: WpListContext = {
   filterStale,
   showTrimmedFilter,
   selectedWpId,
+  locateTarget,
+  listLoaded,
   totalProgress,
   roleViewPreset,
   roleViewWpList,
@@ -609,7 +636,7 @@ async function onMutate(payload: MutatePayload) {
 // ─── 批量操作 ─────────────────────────────────────────────────────────────────
 const batchAssignWpList = computed(() => {
   return wpList.value.map((w: WorkpaperDetail) => {
-    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const idx = wpIndexById.value.get(w.wp_index_id)
     return {
       id: w.id,
       wp_code: w.wp_code || idx?.wp_code || '',
@@ -646,146 +673,36 @@ async function onFormulaRefreshAll() {
   }
 }
 
-async function onGenerateWorkpapers() {
+/** 打开生成计划弹窗（选模板集、按循环确认；逐个底稿的排除走程序裁剪页） */
+function onGenerateWorkpapers() {
   if (currentYear.value == null) {
     ElMessage.warning('未设置审计年度，请先在项目基本信息中填写')
     return
   }
-  generateLoading.value = true
-  try {
-    // 0. 确保模板集编码是最新的（幂等 seed，会自动更新旧的占位编码）
-    try { await api.post('/api/template-sets/seed', {}, { _silent: true } as any) } catch { /* ignore */ }
-    // 1. 获取模板集列表
-    const { listTemplateSets } = await import('@/services/workpaperApi')
-    let sets = await listTemplateSets()
-    if (!sets || sets.length === 0) {
-      // 尝试自动初始化内置模板集（国企版+上市版）
-      try {
-        await api.post('/api/template-sets/seed')
-        sets = await listTemplateSets()
-      } catch { /* ignore */ }
-      if (!sets || sets.length === 0) {
-        ElMessage.warning('暂无可用模板集，请在「模板库」中创建')
-        return
-      }
-    }
-    // 2. 过滤：只显示"标准年审" + 用户自建模板集（去掉 IPO/上市/附注/精简等内置占位）
-    const SHOW_BUILTIN = new Set(['标准年审'])
-    const filteredSets = sets.filter(s =>
-      SHOW_BUILTIN.has(s.set_name) || !['IPO', '上市公司', '上市附注', '国企附注', '精简版'].includes(s.set_name)
-    )
-    if (filteredSets.length === 0) {
-      ElMessage.warning('暂无可用模板集')
-      return
-    }
-    // 3. 弹窗让用户选择模板集
-    const options = filteredSets.map(s => ({ label: s.set_name, value: s.id }))
-    const selectedSetId = await new Promise<string>((resolve, reject) => {
-      ElMessageBox({
-        title: '📋 第一步：选择底稿模板集',
-        message: () => {
-          return h('div', { style: 'padding: 8px 0' }, [
-            h('p', { style: 'margin: 0 0 8px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.5' },
-              '模板集决定生成哪些底稿。选择后进入下一步配置裁剪范围。'),
-            h('p', { style: 'margin: 0 0 12px; color: var(--el-text-color-placeholder); font-size: 12px' },
-              `共 ${filteredSets.length} 个可用模板集`),
-            h('select', {
-              id: '__wp_tpl_select',
-              style: 'width: 100%; padding: 10px 14px; border: 1px solid var(--el-border-color); border-radius: 8px; font-size: 14px; outline: none; background: var(--el-fill-color-blank); color: var(--el-text-color-primary); cursor: pointer; transition: border-color .2s;',
-              onfocus: 'this.style.borderColor="var(--el-color-primary)"',
-              onblur: 'this.style.borderColor="var(--el-border-color)"',
-            }, options.map(o => h('option', { value: o.value }, o.label))),
-          ])
-        },
-        confirmButtonText: '下一步：配置裁剪',
-        cancelButtonText: '取消',
-        showCancelButton: true,
-        beforeClose: (action, instance, done) => {
-          if (action === 'confirm') {
-            const el = document.getElementById('__wp_tpl_select') as HTMLSelectElement | null
-            const val = el?.value || options[0]?.value
-            if (val) { resolve(val); done() }
-          } else {
-            reject('cancel'); done()
-          }
-        },
-      }).catch(() => reject('cancel'))
-    })
-    // 3. 弹出裁剪确认弹窗（WorkpaperTrimDialog），让用户确认生成范围
-    const { getTemplateSet } = await import('@/services/workpaperApi')
-    const selectedSet = await getTemplateSet(selectedSetId)
-    const allCodes: string[] = selectedSet?.template_codes || []
-    let confirmedCodes: string[] = allCodes
+  showGenerateDialog.value = true
+}
 
-    if (allCodes.length > 0) {
-      try {
-        confirmedCodes = await new Promise<string[]>((resolve, reject) => {
-          trimDialogResolve.value = resolve
-          trimDialogReject.value = reject
-          showTrimDialog.value = true
-          // 监听弹窗关闭（用户点取消时 modelValue 变 false 但 resolve 没被调）
-          const unwatch = watch(showTrimDialog, (v) => {
-            if (!v && trimDialogResolve.value) {
-              reject()
-              unwatch()
-            }
-          })
-        })
-      } catch {
-        return
-      } finally {
-        trimDialogResolve.value = null
-        trimDialogReject.value = null
-      }
-    }
-
-    if (confirmedCodes.length === 0) {
-      ElMessage.warning('未选择任何底稿')
-      return
-    }
-
-    // 4. 调用生成 API（传裁剪后的编码列表）
-    let result: any
-    try {
-      result = await api.post(
-        `/api/projects/${projectId.value}/working-papers/generate`,
-        { template_set_id: selectedSetId, year: currentYear.value, selected_templates: confirmedCodes },
-      )
-    } catch (genErr: any) {
-      if (genErr?.response?.status >= 500) {
-        try {
-          result = await api.post(
-            `/api/projects/${projectId.value}/working-papers/generate-from-codes`,
-            { wp_codes: confirmedCodes, year: currentYear.value },
-          )
-        } catch {
-          throw genErr
-        }
-      } else {
-        throw genErr
-      }
-    }
-    // 回执里的未生成 / 空白底稿 / 失败编码如实提示（R4 / R5），不再一律报「生成完成」
-    const notice = summarizeWorkpaperGenerateResult(result)
-    ElMessage[notice.level]({
-      message: notice.message,
-      duration: notice.level === 'warning' ? 10000 : 3000,
-      showClose: notice.level === 'warning',
-    })
-    // 4. 刷新列表
-    await fetchWpIndex()
-  } catch (e: any) {
-    if (String(e).includes('cancel')) return
-    handleApiError(e, '生成底稿')
-  } finally {
-    generateLoading.value = false
-  }
+/** 去程序裁剪页（从生成弹窗点「去程序裁剪」时直接打开对应循环） */
+function goProcedureTrim(cycle?: string) {
+  router.push({
+    name: 'ProcedureTrimming',
+    params: { projectId: projectId.value },
+    query: cycle ? { cycle, from: 'generate' } : {},
+  })
 }
 
 async function onBatchDownload() {
+  const wpIds = selectedWpIds.value.length > 0
+    ? [...selectedWpIds.value]
+    : wpList.value.map((workpaper) => workpaper.id).filter(Boolean)
+  if (wpIds.length === 0) {
+    ElMessage.warning('当前没有可下载的底稿')
+    return
+  }
   downloadLoading.value = true
   try {
-    await downloadWorkpaperPack(projectId.value, selectedWpIds.value.length > 0 ? selectedWpIds.value : undefined)
+    batchExportTask.value = await startWorkpaperPackExport(projectId.value, wpIds)
+    ElMessage.info(`已提交 ${batchExportTask.value.total} 份底稿，完成后可下载 ZIP`)
   } catch (e: any) {
     handleApiError(e, '批量下载')
   } finally {
@@ -809,13 +726,19 @@ async function onBatchStatusChange(payload: { action: string; ids: string[] }) {
   } catch { return }
 
   try {
-    const data = await api.post(
-      `/api/projects/${projectId.value}/working-papers/batch-status`,
-      { wp_ids: payload.ids, action: payload.action }
-    ) as any
+    const data = payload.action === 'submit_review'
+      ? await api.post(
+          `/api/projects/${projectId.value}/working-papers/batch-submit`,
+          { wp_ids: payload.ids },
+        ) as any
+      : await api.post(
+          `/api/projects/${projectId.value}/working-papers/batch-status`,
+          { wp_ids: payload.ids, action: payload.action },
+        ) as any
     ElMessage.success(data?.message || `成功${label}`)
-    if (data?.skipped?.length > 0) {
-      ElMessage.warning(`${data.skipped.length} 个底稿被跳过（状态不允许）`)
+    const skipped = data?.skipped_reasons ?? data?.skipped ?? []
+    if (skipped.length > 0) {
+      ElMessage.warning(`${skipped.length} 个底稿被跳过，请查看操作结果`)
     }
     fetchWpIndex()
   } catch (e: any) {
@@ -825,6 +748,7 @@ async function onBatchStatusChange(payload: { action: string; ids: string[] }) {
 
 // ─── 筛选选项 ─────────────────────────────────────────────────────────────────
 const cycleOptions = [
+  { value: 'A', label: 'A类 完成阶段' },
   { value: 'B', label: 'B类 计划阶段' },
   { value: 'C', label: 'C类 控制测试' },
   { value: 'D', label: 'D类 收入循环' },
@@ -861,6 +785,69 @@ const statusOptions = computed(() => {
 // ─── 生命周期 ─────────────────────────────────────────────────────────────────
 watch([filterCycle, filterStatus, filterAssignee], () => fetchWpIndex())
 
+/**
+ * 地址栏 → 状态（挂载时与同页 query 变化共用一条规则）：
+ * `?filter=stale`（联动状态横条「查看详情」）⇒ 开启待重算过滤并强制列表视图（筛选栏只在 list 视图渲染，
+ * 落到工作台视图会让用户看不到自己被过滤了）；否则 `?view=` 在白名单内取它，不在取工作台。
+ * 本页按路径复用（路由 meta.reuseOnQueryChange，spec platform-perf-hotspots R6）：同页内只改 query
+ * （浏览器前进后退、站内跳到 `?view=list&filter=stale`）不再整页重挂重取，靠这里同步。
+ * 与「状态 → 地址栏」的两个监听互为幂等：状态与地址一致时什么都不改，不会来回触发。
+ * 待重算强制列表而状态本来就是列表时，那个监听不会触发 ⇒ 这里把地址栏的 view 改成 list：否则地址栏留着
+ * `view=workbench`，之后一取消勾选就按它跳回工作台（原先整页重挂，挂载时总会写回 view=list）。
+ * 入口参数（`highlight` / `wp_code` / `search` 定位、`cycle` 按循环筛选、`upload` 打开导入，spec wp-deeplink-locate-residual-closure
+ * 需求 2）只在**到达时**（签名变化）处理一次：定位与筛选强制列表视图；签名没变时视图照旧按 `?view=`（否则带着 highlight 就切不出列表）。
+ */
+let appliedEntry = ''
+let locateSeq = 0
+function applyRouteQuery(query: Record<string, unknown>) {
+  const stale = query.filter === 'stale'
+  if (filterStale.value !== stale) filterStale.value = stale
+  const entry = readListEntryQuery(query)
+  const fresh = entry.signature !== appliedEntry
+  appliedEntry = entry.signature
+  if (fresh && entry.cycle && filterCycle.value !== entry.cycle) filterCycle.value = entry.cycle
+  const assignee = entry.assigned === 'me' ? String(authStore.user?.id || '') : entry.assigned === 'unassigned' ? UNASSIGNED_FILTER : ''
+  if (fresh && assignee && filterAssignee.value !== assignee) filterAssignee.value = assignee
+  if (fresh && entry.code) locateTarget.value = { code: entry.code, seq: ++locateSeq }
+  if (fresh && entry.account && !entry.code) void locateAccount(entry.account)
+  if (fresh && entry.upload) {
+    showWpImportEnhanced.value = true
+    const rest = { ...route.query }
+    delete rest.upload
+    router.replace({ query: rest }) // 打开一次即可：去掉后刷新 / 后退不再弹（路由变化会再进本函数，届时已无 upload）
+    return
+  }
+  const view = query.view
+  const fromQuery = typeof view === 'string' && VIEW_MODE_WHITELIST.has(view) ? view : 'workbench'
+  const wanted = stale || (fresh && (entry.code || entry.account || entry.cycle || entry.assigned)) ? 'list' : fromQuery
+  if (viewMode.value !== wanted) viewMode.value = wanted // 「状态 → 地址栏」监听随后写回 view
+  else if (wanted !== fromQuery) router.replace({ query: { ...route.query, view: wanted } })
+}
+watch(() => [route.query.view, route.query.filter, route.query.highlight, route.query.wp_code, route.query.search,
+  route.query.account, route.query.cycle, route.query.assigned, route.query.upload] as const, () => applyRouteQuery(route.query))
+
+/**
+ * ?account=：按科目取关联底稿（与试算表「查看关联底稿」同一映射）。映射里还有表级编码（D2-2）和本项目没有的底稿，
+ * 等首次取数后只认本项目已生成的：定位第一张，多张时点名；一张都没生成时按映射第一张定位（列表按原因提示）；映射为空时提示。
+ */
+async function locateAccount(account: string) {
+  try {
+    const mapped = [...new Set((await getWpMappingByAccount(projectId.value, account)).map((m) => m.wp_code).filter(Boolean))]
+    if (!mapped.length) {
+      ElMessage.warning(`科目 ${account} 没有关联的底稿`)
+      return
+    }
+    await firstLoad
+    const generated = new Set(wpList.value.map((w) => wpIndexById.value.get(w.wp_index_id)?.wp_code))
+    const codes = mapped.filter((c) => generated.has(c))
+    const first = codes[0] ?? mapped[0]
+    locateTarget.value = { code: first, seq: ++locateSeq }
+    if (codes.length > 1) ElMessage.info(`科目 ${account} 关联底稿 ${codes.join('、')}，已定位到 ${first}`)
+  } catch (e: any) {
+    handleApiError(e, '查询科目关联底稿')
+  }
+}
+
 // filterStale 纯前端过滤（prefill_stale 已在列表响应里），无需重拉；仅同步 URL 便于分享/刷新保留
 watch(filterStale, (on) => {
   const q = { ...route.query }
@@ -889,26 +876,10 @@ onMounted(async () => {
     }
   }
 
-  // 从 URL query 读取视图模式
-  const queryView = route.query.view as string
-  if (queryView && VIEW_MODE_WHITELIST.has(queryView)) {
-    viewMode.value = queryView
-  }
-  // ?filter=stale（联动状态横条「查看详情」）→ 开启待重算过滤并强制列表视图
-  // （筛选栏只在 list 视图渲染，落到工作台视图会让用户看不到自己被过滤了）
-  if (route.query.filter === 'stale') {
-    filterStale.value = true
-    viewMode.value = 'list'
-  }
+  // 从 URL query 读取视图模式 / 待重算过滤 / 入口参数（规则见 applyRouteQuery）
+  applyRouteQuery(route.query)
   await fetchWpIndex()
-  // 加载项目名称
-  try {
-    const { default: http } = await import('@/utils/http')
-    const resp = await http.get(`/api/projects/${projectId.value}`)
-    const proj = resp.data
-    projectName.value = proj?.name || proj?.project_name || ''
-    projectAuditYear.value = resolveAuditYearFromProject(proj)
-  } catch { /* 静默 */ }
+  // 项目标题与年度均由外层 ProjectContextGate / projectStore 提供，不在本页重复请求项目详情。
   // 加载用户列表
   try {
     const users = await listUsers()

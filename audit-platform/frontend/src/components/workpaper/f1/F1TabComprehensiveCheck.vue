@@ -37,7 +37,7 @@
     <div class="params-grid">
       <div class="param-item span-2">
         <span class="param-label">测试总体</span>
-        <el-input
+        <WpCommitInput
           :model-value="samplingParams.testName"
           size="small"
           :disabled="isReadonly"
@@ -47,7 +47,7 @@
       </div>
       <div class="param-item span-2">
         <span class="param-label">特定样本</span>
-        <el-input
+        <WpCommitInput
           :model-value="samplingParams.specificSamples"
           size="small"
           :disabled="isReadonly"
@@ -57,7 +57,7 @@
       </div>
       <div class="param-item">
         <span class="param-label">抽样总体笔数</span>
-        <el-input
+        <WpCommitInput
           :model-value="samplingParams.samplingPopulationCount"
           size="small"
           :disabled="isReadonly"
@@ -66,7 +66,7 @@
       </div>
       <div class="param-item">
         <span class="param-label">抽样总体金额</span>
-        <el-input
+        <WpCommitInput
           :model-value="samplingParams.samplingPopulationAmount"
           size="small"
           :disabled="isReadonly"
@@ -75,7 +75,7 @@
       </div>
       <div class="param-item">
         <span class="param-label">目标样本量</span>
-        <el-input
+        <WpCommitInput
           :model-value="samplingParams.targetSampleSize"
           size="small"
           :disabled="isReadonly"
@@ -96,7 +96,7 @@
       </div>
       <div class="param-item span-2">
         <span class="param-label">抽样过程</span>
-        <el-input
+        <WpCommitInput
           :model-value="samplingParams.samplingProcess"
           size="small"
           :disabled="isReadonly"
@@ -138,15 +138,15 @@
   </nav>
 
   <el-collapse id="f1-7-sampling" class="sampling-engine-collapse" style="margin-bottom: 12px">
-    <el-collapse-item title="自动抽凭（科目 ${samplingAccountCode} 预付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
+    <el-collapse-item :title="`自动抽凭（科目 ${samplingAccountCode} 预付账款 · 样本按借贷方向自动分配）`" name="auto-sampling">
       <GtVoucherSamplingEngine
         :account-code="samplingAccountCode"
-        :phase="currentPhase"
         default-method="mus"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="auditYear"
         @filled="handleSamplingFilled"
+        @undo-request="onUndoRequest"
       />
     </el-collapse-item>
   </el-collapse>
@@ -195,12 +195,12 @@
       border
       stripe
       :height="debitRows.length > 12 ? '400px' : undefined"
-      :row-class-name="rowClassName"
+      :row-class-name="voucherRowClassName"
     >
       <el-table-column label="供应商名称" width="120" fixed>
         <template #default="{ row }">
           <span v-if="row.rowId === '__subtotal__'" class="subtotal-label">合计</span>
-          <el-input
+          <WpCommitInput
             v-else
             :model-value="row.supplierName"
             size="small"
@@ -209,9 +209,18 @@
           />
         </template>
       </el-table-column>
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell
+            v-if="row.rowId !== '__subtotal__'"
+            :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="auditYear"
+          />
+        </template>
+      </el-table-column>
       <el-table-column label="日期" width="100">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.date"
             size="small"
@@ -223,7 +232,7 @@
       </el-table-column>
       <el-table-column label="凭证编号" width="90">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.voucherNo"
             size="small"
@@ -235,7 +244,7 @@
       <el-table-column label="记账凭证" align="center">
         <el-table-column label="业务内容" width="120">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.businessContent"
               size="small"
@@ -246,7 +255,7 @@
         </el-table-column>
         <el-table-column label="对方科目" width="90">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.counterAccount"
               size="small"
@@ -257,7 +266,7 @@
         </el-table-column>
         <el-table-column label="对方明细" width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.counterDetailAccount"
               size="small"
@@ -269,7 +278,7 @@
         <el-table-column label="借方金额" width="100" align="right">
           <template #default="{ row }">
             <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(debitChecked) }}</span>
-            <el-input
+            <WpCommitInput
               v-else
               :model-value="row.debitAmount"
               size="small"
@@ -282,7 +291,7 @@
       <el-table-column label="付款审批单" align="center">
         <el-table-column label="日期/编号" width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.approvalDateNo"
               size="small"
@@ -310,7 +319,7 @@
       <el-table-column label="银行回单" align="center">
         <el-table-column label="付款方" width="90">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.bankPayment"
               size="small"
@@ -321,7 +330,7 @@
         </el-table-column>
         <el-table-column label="收款方" width="90">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.bankPayee"
               size="small"
@@ -332,7 +341,7 @@
         </el-table-column>
         <el-table-column label="金额" width="90" align="right">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.bankAmount"
               size="small"
@@ -345,7 +354,7 @@
       <el-table-column label="合同/订单" align="center">
         <el-table-column label="名称" width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.contractName"
               size="small"
@@ -356,7 +365,7 @@
         </el-table-column>
         <el-table-column label="合同金额" width="90" align="right">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.contractAmount"
               size="small"
@@ -367,7 +376,7 @@
         </el-table-column>
         <el-table-column label="签收单据" width="90">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="row.rowId !== '__subtotal__'"
               :model-value="row.receiptDoc"
               size="small"
@@ -379,7 +388,7 @@
       </el-table-column>
       <el-table-column label="索引号" width="70">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.indexRef"
             size="small"
@@ -413,10 +422,11 @@
           >{{ debitEvidenceStatus(row).label }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isReadonly" label="OCR" width="56" align="center" fixed="right">
+      <!-- 只读时也显示本列：已识别的凭证可用小眼睛预览（spec attachment-inline-preview） -->
+      <el-table-column label="OCR" width="76" align="center" fixed="right">
         <template #default="{ row }">
           <el-upload
-            v-if="row.rowId !== '__subtotal__'"
+            v-if="!isReadonly && row.rowId !== '__subtotal__'"
             :show-file-list="false"
             accept="image/*,.pdf"
             :disabled="ocrLoadingRowId === row.rowId"
@@ -424,6 +434,7 @@
           >
             <el-button link size="small" :loading="ocrLoadingRowId === row.rowId" title="上传凭证 OCR">📎</el-button>
           </el-upload>
+          <RowEvidenceEye v-if="row.rowId !== '__subtotal__'" :project-id="projectId" :wp-id="wpId" :sheet-key="f1VoucherEvidence('debit', row.rowId).sheet" :cell-ref="f1VoucherEvidence('debit', row.rowId).cell" />
         </template>
       </el-table-column>
       <el-table-column label="操作" :width="isReadonly ? 80 : 130" fixed="right">
@@ -471,6 +482,11 @@
       :checked-total="creditChecked"
       :is-readonly="isReadonly"
       :ocr-loading-row-id="ocrLoadingRowId"
+      :wp-id="wpId"
+      :project-id="projectId"
+      :year="auditYear"
+      :is-row-locked="isVoucherRowLocked"
+      evidence-section="credit"
       @update="(rowId, field, value) => updateCell('credit', rowId, field, value)"
       @remove="(rowId) => removeSample('credit', rowId)"
       @ocr="(file, rowId) => handleRowOcr(file, 'credit', rowId)"
@@ -526,6 +542,11 @@
       :checked-total="postChecked"
       :is-readonly="isReadonly"
       :ocr-loading-row-id="ocrLoadingRowId"
+      :wp-id="wpId"
+      :project-id="projectId"
+      :year="auditYear"
+      :is-row-locked="isVoucherRowLocked"
+      evidence-section="postPeriod"
       @update="(rowId, field, value) => updateCell('postPeriod', rowId, field, value)"
       @remove="(rowId) => removeSample('postPeriod', rowId)"
       @ocr="(file, rowId) => handleRowOcr(file, 'postPeriod', rowId)"
@@ -565,7 +586,7 @@
       <el-table-column prop="direction" label="方向" width="120" />
       <el-table-column label="账面金额" align="right" min-width="140">
         <template #default="{ row, $index }">
-          <el-input
+          <WpCommitInput
             :model-value="row.bookAmount"
             size="small"
             :disabled="isReadonly"
@@ -648,7 +669,8 @@
  * F1TabComprehensiveCheck.vue — F1-7 预付账款检查表（对齐 Excel）
  * 一目标 / 二抽样 / 三(1)借方(2)贷方(3)期后 / 四检查比例 / 五结论
  */
-import { computed, inject, ref, toRef, type Ref } from 'vue'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useF1VoucherCheck,
@@ -669,7 +691,8 @@ import { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import { useStickySectionNav } from '../composables/useStickySectionNav'
 import { parseNum } from '../composables/useF1FormulaEngine'
 import type { ChecklistResponse } from '../composables/useF1FormData'
-import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import { api } from '@/services/apiProxy'
 
 // @ts-ignore
@@ -696,6 +719,10 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
+import { f1VoucherEvidence } from './f1VoucherEvidence'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 // ─── 科目映射码注入（provide/inject，与 D/E 循环同模式）────────────────────────
 // GtF1.vue provide('tbSourceCodes', ...) → 本组件 inject → f1QueryCodes(src) 三层降级
@@ -734,6 +761,8 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+/** 行内识别附件挂到本笔凭证（f1VoucherEvidence：与弹窗 ⑤ 本笔附件同一位置），📎 旁的小眼睛按同一位置读取 */
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
@@ -762,7 +791,12 @@ const {
   fillBookFromDetail,
   importPrioritySamples,
   autoMarkCrossPeriod,
-  distributeSamples,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useF1VoucherCheck({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -777,7 +811,6 @@ const { exportTemplate, exportData, importData, importing } = useF1ImportExport(
 const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
 const auditYear = computed<number | null>(() => props.year ?? null)
-const currentPhase = computed<Phase>(() => 'final')
 const crossPeriodCutoff = ref(`${auditYear.value}-12-31`)
 
 const checkDialogVisible = ref(false)
@@ -834,26 +867,33 @@ async function refreshAttachedCount(): Promise<void> {
   } catch { attachedCount.value = 0 }
 }
 void refreshAttachedCount()
+onMounted(() => { void voucherFillReady() })
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, auditYear.value, props.wpId, F1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+/**
+ * 抽凭引擎回填：按借贷方向进本期借方 / 贷方表，共享回填函数一个对方科目一行（后端配对），按分录指纹去重，
+ * 填入几行由共享函数提示；「替换本阶段抽凭行」只动这两张表。
+ */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  distributeSamples(payload.samples as Array<Record<string, any>>)
-  ElMessage.success(`已回填 ${payload.samples.length} 笔抽凭样本（按借贷方向分配至借方/贷方表）`)
+  void persistMethodology(payload?.methodology)
+  await onEngineFilled(payload)
 }
 
 const BOOK_FIELDS = ['bookDebit', 'bookCredit', 'bookPostPeriod'] as const
@@ -896,6 +936,8 @@ const debitTableData = computed(() => {
 function rowClassName({ row }: { row: { rowId: string } }) {
   return row.rowId === '__subtotal__' ? 'subtotal-row' : ''
 }
+/** 合计行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(rowClassName, voucherRowClass as (a: { row: { rowId: string } }) => string)
 
 function onBookAmountChange(index: number, value: any) {
   const field = BOOK_FIELDS[index]
@@ -954,11 +996,16 @@ async function handleRowOcr(file: File, section: 'debit' | 'credit' | 'postPerio
   try {
     const formData = new FormData()
     formData.append('file', file)
+    // 与「逐笔单据核对」弹窗 ⑤ 本笔附件同一位置（f1VoucherEvidence）
+    const ev = f1VoucherEvidence(section, rowId)
+    const sectionRows = section === 'debit' ? debitRows.value : section === 'credit' ? creditRows.value : postPeriodRows.value
+    rowEv.append(formData, ev.sheet, ev.cell, sectionRows.find(r => r.rowId === rowId))
     const res: any = await api.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields: Record<string, any> = (res?.data?.data ?? res?.data ?? res)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR 完成，未识别到可填充字段')

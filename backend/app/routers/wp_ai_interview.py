@@ -69,9 +69,10 @@ async def interview_summary(
         raise HTTPException(400, "访谈记录不能为空")
 
     # 调用 LLM 生成摘要（复用 wp_ai_service 的脱敏 + LLM 调用机制）
+    from app.services.ai_task_executor import actor_role
     from app.services.wp_ai_service import WpAIService
 
-    svc = WpAIService(db)
+    svc = WpAIService(db, role=actor_role(user))
     try:
         result = await svc._execute_llm_with_mask(
             system_prompt=(

@@ -17,6 +17,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.report_models import FinancialReportType
 from app.services.formula_runtime.contracts import (
     AppliedMutation,
     CanonicalFormulaTarget,
@@ -28,7 +29,14 @@ from app.services.formula_runtime.contracts import (
 # 支持的 report_type / period 枚举
 # ---------------------------------------------------------------------------
 
-VALID_REPORT_TYPES = frozenset({"BS", "IS", "CFS", "EQ", "CFSS", "IMP"})
+# report_type 合法取值 = ORM 枚举全集（单一来源，避免再次漂移）。
+# 🔴 2026-10-29 修：原先在此硬编码 6 个字符串，其中 `equity_change_statement` 拼错
+#    （真名 `equity_statement`）、`trial_balance_audit` 与 `coverage_stats` 在
+#    `financial_report_type` 枚举里根本不存在，又漏了 `cash_flow_supplement` 和
+#    `impairment_provision`。`_validate_locator` 守在 prepare_many / apply_many /
+#    restore_many 三个入口 ⇒ 权益变动表、现金流量表补充资料、减值准备表三类报表的
+#    Runtime 读 / 写 / 回滚全部被拒（3/6 种报表类型不可用）。
+VALID_REPORT_TYPES = frozenset(t.value for t in FinancialReportType)
 VALID_PERIODS = frozenset({"current", "prior"})
 REQUIRED_LOCATOR_KEYS = frozenset({"report_type", "row_code", "period"})
 

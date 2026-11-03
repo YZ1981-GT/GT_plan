@@ -2,6 +2,44 @@
   <div class="gt-sampling-enhanced gt-fade-in">
     <GtPageHeader title="审计抽样" :show-back="false" />
     <el-tabs v-model="activeTab">
+      <!-- 项目级抽凭概览：当前账套版本的存续核对未确认数（任务 17，需求 8.3） -->
+      <el-tab-pane label="抽凭概览" name="voucher">
+        <div class="voucher-overview-toolbar">
+          <el-input-number v-model="voucherYear" :min="2020" :max="2100" aria-label="抽凭概览年度" />
+          <el-button :loading="voucherLoading" @click="loadVoucherOverview">刷新</el-button>
+          <span v-if="voucherOverview?.active_dataset_id" class="overview-hint">
+            当前账套 {{ String(voucherOverview.active_dataset_id).slice(0, 8) }}
+          </span>
+        </div>
+        <el-table :data="voucherOverview?.by_workpaper ?? []" stripe size="small" empty-text="暂无抽凭或存续核对记录">
+          <el-table-column prop="wp_code" label="底稿编码" width="110" />
+          <el-table-column prop="wp_name" label="底稿名称" min-width="220" />
+          <el-table-column prop="batch_count" label="抽凭批次" width="100" align="right" />
+          <el-table-column prop="sample_count" label="样本数" width="90" align="right" />
+          <el-table-column label="预审样本存续核对" min-width="250">
+            <template #default="{ row }">
+              <template v-if="row.interim_survival_counts">
+                <el-tag v-if="row.interim_survival_unacked > 0" type="danger" effect="plain">
+                  {{ row.interim_survival_unacked }} 条变化未确认
+                </el-tag>
+                <el-tag v-else type="success" effect="plain">已核对，无待确认变化</el-tag>
+                <span class="overview-hint">
+                  未变 {{ row.interim_survival_counts.unchanged }} / 已改 {{ row.interim_survival_counts.modified }} /
+                  疑似改号 {{ row.interim_survival_counts.renumbered }} / 已删 {{ row.interim_survival_counts.deleted }}
+                </span>
+              </template>
+              <span v-else class="overview-hint">尚未在当前账套核对</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-alert
+          v-if="voucherOverview?.duplicated?.length"
+          type="warning"
+          :closable="false"
+          :title="`另有 ${voucherOverview.duplicated.length} 张凭证被多张底稿抽取，请结合抽凭目的复核是否有意重复`"
+          class="overview-duplicate"
+        />
+      </el-tab-pane>
       <!-- 截止性测试 -->
       <el-tab-pane label="截止性测试" name="cutoff">
         <el-form :model="cutoffForm" label-width="100px" style="max-width: 600px">
@@ -82,8 +120,10 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
+import http from '@/utils/http'
 import { cutoffTest, agingAnalysis, monthlyDetail } from '@/services/commonApi'
 import { useEditMode } from '@/composables/useEditMode'
 import { useProjectStore } from '@/stores/project'
@@ -94,6 +134,9 @@ const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEd
 const projectStore = useProjectStore()
 const activeTab = ref('cutoff')
 const loading = ref(false)
+const voucherLoading = ref(false)
+const voucherYear = ref<number | null>(projectStore.year ?? null)
+const voucherOverview = ref<any>(null)
 const cutoffForm = ref({ codes: '6001', year: projectStore.year || new Date().getFullYear() - 1, days_before: 5, days_after: 5, threshold: 10000 })
 const cutoffResult = ref<any>(null)
 const agingForm = ref({
@@ -108,6 +151,20 @@ const agingForm = ref({
 const agingResult = ref<any>(null)
 const monthlyForm = ref({ account_code: '6001', year: 2025 })
 const monthlyResult = ref<any>(null)
+async function loadVoucherOverview() {
+  if (!projectId.value) return
+  voucherLoading.value = true
+  try {
+    const params: Record<string, number> = {}
+    if (voucherYear.value != null) params.year = voucherYear.value
+    const res = await http.get(`/api/projects/${projectId.value}/sampling/voucher-coverage`, {
+      params, _silent: true,
+    } as any)
+    voucherOverview.value = res?.data?.data ?? res?.data ?? res
+  } catch {
+    ElMessage.error('抽凭概览读取失败，请重试')
+  } finally { voucherLoading.value = false }
+}
 async function runCutoff() {
   loading.value = true
   try {
@@ -132,8 +189,12 @@ async function runMonthly() {
   try { monthlyResult.value = await monthlyDetail(projectId.value, monthlyForm.value) }
   finally { loading.value = false }
 }
+onMounted(() => { void loadVoucherOverview() })
 </script>
 <style scoped>
 .gt-sampling-enhanced { padding: var(--gt-space-4); }
 .gt-page-header { margin-bottom: var(--gt-space-3); }
+.voucher-overview-toolbar { display: flex; align-items: center; gap: var(--gt-space-2); margin-bottom: var(--gt-space-3); }
+.overview-hint { margin-left: var(--gt-space-2); color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); }
+.overview-duplicate { margin-top: var(--gt-space-3); }
 </style>

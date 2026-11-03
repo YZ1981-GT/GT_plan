@@ -11,11 +11,16 @@
  * - 业务合伙人 = partner
  * - 质量控制复核合伙人 = qc_partner
  * - EQCR 技术复核人 = eqcr
+ * - 只读用户 / 未登记角色 = readonly（最小矩阵：只能查看）
  */
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
-export type Role = 'assistant' | 'manager' | 'partner' | 'qc_partner' | 'eqcr'
+/**
+ * `readonly`：只读用户（系统角色 readonly，以及未登记 / 空角色的兜底），最小矩阵 = 只能查看。
+ * spec trim-generation-plan-followup-optimizations R5.3：原先未知角色兜底成 assistant，只读账号在界面上能编辑底稿。
+ */
+export type Role = 'assistant' | 'manager' | 'partner' | 'qc_partner' | 'eqcr' | 'readonly'
 
 export type Action = 'edit' | 'review' | 'approve' | 'delete' | 'export' | 'import' | 'refresh' | 'view'
 
@@ -83,10 +88,18 @@ const PERMISSION_TABLE: Record<Role, Record<Resource, Set<Action>>> = {
     template: new Set(['view']),
     project_settings: new Set(['view']),
   },
+  readonly: {
+    workpaper: new Set(['view']),
+    adjustment: new Set(['view']),
+    report: new Set(['view']),
+    note: new Set(['view']),
+    template: new Set(['view']),
+    project_settings: new Set(['view']),
+  },
 }
 
 // ─── 全部角色列表（用于属性测试枚举） ──────────────────────────────────────────
-export const ALL_ROLES: readonly Role[] = ['assistant', 'manager', 'partner', 'qc_partner', 'eqcr'] as const
+export const ALL_ROLES: readonly Role[] = ['assistant', 'manager', 'partner', 'qc_partner', 'eqcr', 'readonly'] as const
 export const ALL_ACTIONS: readonly Action[] = ['edit', 'review', 'approve', 'delete', 'export', 'import', 'refresh', 'view'] as const
 export const ALL_RESOURCES: readonly Resource[] = ['workpaper', 'adjustment', 'report', 'note', 'template', 'project_settings'] as const
 
@@ -185,6 +198,7 @@ export function whyCannotDo(
     partner: '业务合伙人',
     qc_partner: '质量控制复核合伙人',
     eqcr: 'EQCR技术复核人',
+    readonly: '只读用户',
   }
 
   return `${roleNames[role]}无权对${resource}执行${action}操作`

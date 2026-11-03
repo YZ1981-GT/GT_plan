@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, get_current_user_sse
+from app.deps import get_current_user, get_current_user_sse, get_current_user_stream
 from app.models.ai_models import (
     AIChatMessage,
     AIChatRun,
@@ -330,7 +330,7 @@ async def stream_run_events(
         default=None, description="断线重连的续传点（等价于 Last-Event-ID 头）"
     ),
     last_event_id_header: str | None = Header(default=None, alias="Last-Event-ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user_sse),
 ):
     """按 ``Last-Event-ID`` 回放并订阅后续事件，带心跳并接入 ``sse_registry`` drain。
@@ -483,6 +483,9 @@ class AdoptRequest(BaseModel):
 
     message_id: UUID = Field(..., description="服务端签发的 assistant 消息 ID")
     host: AdoptHostRef = Field(..., description="采纳目标宿主")
+    source_host: AdoptHostRef | None = Field(
+        None, description="消息所在会话的宿主；用户另选采纳目标时提交"
+    )
     target_cell: str | None = Field(None, max_length=120, description="目标单元格引用")
     target_field: str | None = Field(None, max_length=120, description="目标字段名")
     idempotency_key: UUID = Field(..., description="客户端生成的幂等键")
@@ -510,8 +513,8 @@ async def doc_ai_chat(
     doc_type: str,
     doc_id: str,
     req: DocChatRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user_stream),
 ):
     """文档级 AI 对话 — SSE streaming 响应
 
@@ -792,6 +795,20 @@ async def adopt_ai_content(
         entrypoint="ai_chat.adopt",
         year=req.host.year,
     )
+    # 当前请求可把全局 / 报表 / 知识库会话的消息采纳到已授权业务目标。
+    # 目标仍按 adopt 授权；来源只为读取权威消息而按 history 授权。
+    source_host = None
+    if req.source_host is not None:
+        source_host = await _authorize_doc_host(
+            db,
+            current_user,
+            doc_type=req.source_host.type,
+            doc_id=req.source_host.id,
+            project_id=req.source_host.project_id,
+            action=AiChatAction.history,
+            entrypoint="ai_chat.adopt.source",
+            year=req.source_host.year,
+        )
     try:
         outcome = await adopt_message(
             db,
@@ -801,6 +818,7 @@ async def adopt_ai_content(
             idempotency_key=req.idempotency_key,
             target_cell=req.target_cell,
             target_field=req.target_field,
+            source_host=source_host,
         )
     except AdoptFailed as exc:
         # 下游失败绝不产生成功文案（Property 33）；内部异常细节只进日志（Req 12.5）。
@@ -1055,7 +1073,10 @@ class NoteSaveRequestBody(BaseModel):
     idempotency_key: str = Field(
         ..., min_length=1, max_length=128, description="幂等键（防重复转存）"
     )
-    session_id: UUID = Field(..., description="当前会话 ID")
+    session_id: UUID | None = Field(None, description="会话 ID 断言（缺省由服务端按消息反查）")
+    # 保存位置二选一；都不传时保存到宿主项目的“AI 对话笔记”。
+    target_project_id: UUID | None = Field(None, description="保存到该项目的 AI 对话笔记")
+    target_folder_id: UUID | None = Field(None, description="保存到该知识库文件夹")
 
 
 class NoteSaveResponseBody(BaseModel):
@@ -1067,6 +1088,7 @@ class NoteSaveResponseBody(BaseModel):
     name: str
     replayed: bool = False
     jump_route: str = ""
+    location: str = ""
 
 
 @router.post(
@@ -1095,14 +1117,16 @@ async def save_ai_note(
     """
     from app.services.ai_chat.note_service import NoteSaveFailed, save_note
 
-    # ① 授权
+    # 显式位置时当前宿主只证明消息来源，会在服务内按真正目标重新判写权限。
+    # 没有显式位置时才保留“当前宿主就是项目笔记目标”的 note_create 判定。
+    explicit_target = req.target_project_id is not None or req.target_folder_id is not None
     host = await _authorize_doc_host(
         db,
         current_user,
         doc_type=req.host_type,
         doc_id=req.host_id,
         project_id=req.project_id,
-        action=AiChatAction.note_create,
+        action=AiChatAction.history if explicit_target else AiChatAction.note_create,
         entrypoint="ai_chat.note_save",
         year=req.year,
     )
@@ -1118,6 +1142,8 @@ async def save_ai_note(
             message_ids=req.message_ids,
             name=req.name,
             idempotency_key=req.idempotency_key,
+            target_project_id=req.target_project_id,
+            target_folder_id=req.target_folder_id,
         )
     except NoteSaveFailed as exc:
         raise HTTPException(
@@ -1229,11 +1255,15 @@ async def get_review_prompt_preview(
     tags=["ai-chat-metrics"],
     include_in_schema=False,  # 内部端点，不需暴露到 OpenAPI
 )
-async def ai_chat_metrics():
-    """暴露 AI Chat Run 相关 Prometheus 指标。
+async def ai_chat_metrics(current_user: User = Depends(get_current_user)):
+    """暴露 AI Chat Run 相关 Prometheus 指标（仅 admin）。
 
     不含 token 正文、完整正文、附件内容或未脱敏上下文（Req 12.7）。
+    本端点在 ``/api/`` 下、经网关对外可达，运行容量与模型状态只给管理员看
+    （spec llm-linkage-audit-practice-closure ADR-LLM-010）；内网 Prometheus 抓取走根路径 ``/metrics``。
     """
+    if getattr(current_user.role, "value", current_user.role) != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可访问 AI 运行指标")
     from starlette.responses import Response as StarletteResponse
 
     from app.services.ai_chat.metrics import render_ai_chat_metrics

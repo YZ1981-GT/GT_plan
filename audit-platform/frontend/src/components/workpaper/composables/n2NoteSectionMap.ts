@@ -140,7 +140,8 @@ export interface N2SyncPayload {
   sheet_name: string
   section_id: string
   current_standard: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 后端按项目审计年度定位（`_resolve_target_year`，不猜自然年） */
+  year: number | null
   sub_table_data: Record<string, unknown>
   columns: Record<string, ColumnDef[]>
 }
@@ -202,7 +203,7 @@ export function computeN2SoeEnd(row: {
 export function buildN2SyncPayload(
   variant: N2DisclosureVariant,
   snapshot: N2DisclosureSnapshot,
-  ctx: { wpId: string; year: number; applicableStandards?: readonly string[] | null },
+  ctx: { wpId: string; year: number | null; applicableStandards?: readonly string[] | null },
 ): N2SyncPayload {
   const key = N2_SUB_TABLE_KEYS[variant].taxes
   const columns = n2ColumnsFor(variant)

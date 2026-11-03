@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from app.services.project_audit_year import resolve_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -99,86 +98,6 @@ class PrivateStorageService:
             file_path.unlink()
             return True
         return False
-
-
-class ProjectArchiveService:
-    """归档联动服务（Phase 10）
-
-    归档流程：锁定底稿 → 生成清单 → 推送云端 → 可选清理本地
-    """
-
-    async def archive_project(
-        self, db: Any, project_id: UUID,
-        push_to_cloud: bool = True,
-        cleanup_local: bool = False,
-    ) -> dict[str, Any]:
-        """项目归档：锁定底稿+生成清单+推送云端"""
-        import sqlalchemy as sa
-        from app.models.workpaper_models import WorkingPaper, WpIndex
-
-        # 1. 锁定所有底稿为 archived
-        result = await db.execute(
-            sa.select(WorkingPaper, WpIndex)
-            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false())
-        )
-        rows = result.all()
-        archive_list = []
-        for wp, idx in rows:
-            wp.status = "archived"
-            archive_list.append({
-                "wp_code": idx.wp_code,
-                "wp_name": idx.wp_name,
-                "status": "archived",
-                "file_version": wp.file_version,
-                "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
-                "reviewer": str(wp.reviewer) if wp.reviewer else None,
-            })
-        await db.flush()
-
-        # 2. 获取项目信息用于云端目录命名
-        from app.models.core import Project
-        proj_result = await db.execute(
-            sa.select(Project).where(Project.id == project_id)
-        )
-        project = proj_result.scalar_one_or_none()
-        project_name = project.client_name if project else "unknown"
-        year = resolve_project_audit_year(project) if project else None
-        if year is None:
-            raise ValueError("未设置审计年度，请先在项目基本信息中填写")
-
-        # 3. 推送云端
-        cloud_result = None
-        if push_to_cloud:
-            from app.services.cloud_storage_service import CloudStorageService
-            from app.services.task_center import create_task, update_task, TaskType, TaskStatus
-            cloud_task_id = create_task(TaskType.sync_upload, project_id=str(project_id), params={"action": "archive_push"})
-            update_task(cloud_task_id, TaskStatus.processing)
-            cloud_svc = CloudStorageService()
-            try:
-                cloud_result = await cloud_svc.upload_project_archive(project_id, project_name, year)
-                update_task(cloud_task_id, TaskStatus.success, result=cloud_result)
-                logger.info("cloud_push: project=%s result=%s", project_id, cloud_result.get("status"))
-            except Exception as e:
-                update_task(cloud_task_id, TaskStatus.failed, error=str(e))
-                logger.error("cloud_push failed: %s", e)
-                cloud_result = {"status": "failed", "error": str(e)}
-
-        # 4. 可选清理本地
-        cleanup_result = None
-        if cleanup_local and cloud_result and cloud_result.get("status") == "success":
-            from app.services.cloud_storage_service import CloudStorageService
-            cloud_svc = CloudStorageService()
-            cleanup_result = await cloud_svc.cleanup_local_after_archive(project_id)
-
-        logger.info("archive_project: project=%s, workpapers=%d", project_id, len(archive_list))
-        return {
-            "project_id": str(project_id),
-            "archived_count": len(archive_list),
-            "archive_list": archive_list,
-            "cloud_push": cloud_result,
-            "local_cleanup": cleanup_result,
-        }
 
 
 class StorageStatsService:

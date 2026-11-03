@@ -91,7 +91,7 @@ def _extract_parent_wp_code(wp_code: str) -> str:
 
 
 def _build_display_label(parent: str, sheet_name: str) -> str:
-    """构建展示路径。"""
+    """基础产物里的占位展示路径；发布候选由 `display.apply_display_labels` 改写为统一显示名（T29）。"""
     return f"底稿 > {parent} > {sheet_name}"
 
 

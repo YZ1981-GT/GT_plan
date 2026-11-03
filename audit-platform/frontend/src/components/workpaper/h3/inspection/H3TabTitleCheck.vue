@@ -362,10 +362,11 @@
         </template>
       </el-table-column>
 
-      <el-table-column v-if="!isReadonly" label="操作" width="90" align="center" fixed="right">
+      <el-table-column label="操作" width="114" align="center" fixed="right">
         <template #default="{ row, $index }">
-          <el-button type="primary" link size="small" :disabled="isReadonly" @click="handleTitleOcr(row)">📎OCR</el-button>
-          <el-button type="danger" link size="small" @click="removeRow($index)">删</el-button>
+          <el-button v-if="!isReadonly" type="primary" link size="small" :disabled="isReadonly" @click="handleTitleOcr(row)">📎OCR</el-button>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
+          <el-button v-if="!isReadonly" type="danger" link size="small" @click="removeRow($index)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -456,6 +457,8 @@ import http from '@/utils/http'
 import { pullL1PledgeForH3, pullL3PledgeForH3, buildH3MortgageReconcile } from '../../composables/h3MortgageReconcile'
 import type { MortgageReconcileResult } from '../../composables/h3MortgageReconcile'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -465,6 +468,9 @@ const props = defineProps<{
   htmlData?: any
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H3-12'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -723,11 +729,13 @@ async function handleTitleOcr(row: TitleRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
       const res = await http.post(
         `/api/workpapers/${props.wpId}/h3/real-estate-title-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
+      rowEv.refresh()
       loading.close()
       const data = res.data?.data ?? res.data
       const f = data?.extracted_fields

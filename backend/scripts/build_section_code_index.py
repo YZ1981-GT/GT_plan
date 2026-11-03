@@ -42,11 +42,45 @@ SOE_LEGACY_ALIASES: dict[str, list[str]] = {
 }
 
 
-def load_json_sections(seed_file: str) -> dict[str, dict[str, Any]]:
+def load_json_sections(seed_file: str) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """返回（section_number 索引，section_id 索引）。"""
     path = DATA / seed_file
     data = json.loads(path.read_text(encoding="utf-8"))
-    sections = data.get("sections", [])
-    return {s["section_number"]: s for s in sections if s.get("section_number")}
+    sections = [s for s in data.get("sections", []) if isinstance(s, dict)]
+    by_code = {s["section_number"]: s for s in sections if s.get("section_number")}
+    by_id = {s["section_id"]: s for s in sections if s.get("section_id")}
+    return by_code, by_id
+
+
+def _previous_sections(variant_key: str) -> dict[str, dict[str, Any]]:
+    """既有 index 的 marker code → entry；用于截断码通过稳定 section_id 回连当前种子。"""
+    if not OUT_PATH.exists():
+        return {}
+    try:
+        root = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    entries = ((root.get("variants") or {}).get(variant_key) or {}).get("sections") or []
+    return {e["section_code"]: e for e in entries if isinstance(e, dict) and e.get("section_code")}
+
+
+def resolve_marker_seed(
+    code: str,
+    by_code: dict[str, dict[str, Any]],
+    by_id: dict[str, dict[str, Any]],
+    previous: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any] | None, bool]:
+    """解析 Word marker；返回（当前种子节，是否经既有稳定 section_id 恢复）。"""
+    if code in by_code:
+        return by_code[code], False
+    old = previous.get(code) or {}
+    section_id = old.get("section_id")
+    if section_id and section_id in by_id:
+        return by_id[section_id], True
+    # 旧 index 的 section_id 也可能已迁移；Word marker 常是固定宽度截断码。
+    # 仅在当前种子中唯一前缀命中时恢复，多命中绝不猜。
+    prefix_hits = [seed for full_code, seed in by_code.items() if full_code.startswith(code)]
+    return (prefix_hits[0], True) if len(prefix_hits) == 1 else (None, False)
 
 
 def scan_section_markers(docx_path: Path) -> list[str]:
@@ -94,16 +128,20 @@ def build_variant_index(variant_key: str) -> dict[str, Any]:
     if not docx_path.is_file():
         raise FileNotFoundError(docx_path)
 
-    by_code = load_json_sections(seed_file)
+    by_code, by_id = load_json_sections(seed_file)
+    previous = _previous_sections(variant_key)
     marked = scan_section_markers(docx_path)
     sections: list[dict[str, Any]] = []
     missing_seed: list[str] = []
+    recovered_by_section_id: list[str] = []
 
     for code in marked:
-        seed = by_code.get(code)
+        seed, recovered = resolve_marker_seed(code, by_code, by_id, previous)
         if not seed:
             missing_seed.append(code)
             continue
+        if recovered:
+            recovered_by_section_id.append(code)
         sections.append(build_entry(code, seed, template_type=template_type))
 
     return {
@@ -115,6 +153,7 @@ def build_variant_index(variant_key: str) -> dict[str, Any]:
             "marked_in_docx": len(marked),
             "indexed": len(sections),
             "missing_seed": missing_seed,
+            "recovered_by_section_id": recovered_by_section_id,
         },
     }
 
@@ -156,7 +195,8 @@ def main() -> None:
             print(f"SKIP {vk}: {e}", file=sys.stderr)
             continue
         meta = payload.pop("_meta", {})
-        print(f"{vk}: marked={meta.get('marked_in_docx')} indexed={meta.get('indexed')}")
+        print(f"{vk}: marked={meta.get('marked_in_docx')} indexed={meta.get('indexed')}"
+              f" recovered={len(meta.get('recovered_by_section_id') or [])}")
         if meta.get("missing_seed"):
             print(f"  missing_seed: {meta['missing_seed']}")
         store = {k: v for k, v in payload.items() if not k.startswith("_")}

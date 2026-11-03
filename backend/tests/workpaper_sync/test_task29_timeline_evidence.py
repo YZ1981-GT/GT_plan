@@ -1629,9 +1629,22 @@ class TestDerivationOverTheRealManifest:
     def test_every_entry_either_derives_or_reports_profile_drift(
         self, entries: list[dict[str, Any]]
     ) -> None:
+        # 🔴 分母必须先把 **pending** 摘出去：`capability=null` 推不出 required set 是
+        #    设计行为（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+        #    AC 1.3），和「终裁了却 profile 交叉规则不自洽」是两类事实。混在一起时本条
+        #    打红报的是「推导坏了」，真因却是「还有多少条没裁决」—— 判据指错人。
+        pending = [
+            entry for entry in entries if entry.get("capability") is None
+        ]
+        adjudicated = [
+            entry for entry in entries if entry.get("capability") is not None
+        ]
+        assert len(pending) + len(adjudicated) == len(entries)
+        assert adjudicated, "终裁分母为空 —— 判据会在空集上恒真"
+
         derived = 0
         drifted: list[str] = []
-        for entry in entries:
+        for entry in adjudicated:
             try:
                 EV.derive_for_manifest_entry(
                     entry, authority_model=AuthorityModel.opaque_single_onlyoffice
@@ -1639,25 +1652,39 @@ class TestDerivationOverTheRealManifest:
                 derived += 1
             except EntryProfileError:
                 drifted.append(str(entry["entry_id"]))
-        assert derived + len(drifted) == len(entries)
-        # 🔴 下限必须**相对 manifest 现有条数**算，不能写绝对条数。写死过 175，而 manifest
+        assert derived + len(drifted) == len(adjudicated)
+        # 🔴 下限必须**相对现有终裁条数**算，不能写绝对条数。写死过 175，而 manifest
         # 会随宿主拓扑增减（实测 186 → 176 → 155：commit cd9592ff5 把 D4 各 tab 迁到
         # `useD4SyncMode` 后 21 条 `xlsx/d4/**` entry 退网）—— 绝对下限一旦落后于真实条数，
         # 打红的就是「manifest 缩了」而不是「推导坏了」，判据指错人。
-        assert derived >= len(entries) * 9 // 10, (
-            f"{len(entries)} 条 manifest 里只有 {derived} 条能推导出 required set"
+        assert derived >= len(adjudicated) * 9 // 10, (
+            f"{len(adjudicated)} 条已终裁 entry 里只有 {derived} 条能推导出 required set"
         )
         # 🔴 不断言 drifted 的具体条数：那会把「manifest 当前的欠账」锁成基线。
         # 判据是「漂移的都能被指名」，欠账 owner 是 Task 1/67。
         assert all("/" in item for item in drifted), drifted
+        # pending 侧同样要有正面判据：它们必须**确实**推不出 required set（而不是被
+        # 悄悄跳过），否则未裁决入口会拿到一份凭空的验收清单。
+        for entry in pending:
+            with pytest.raises(EntryProfileError):
+                EV.derive_for_manifest_entry(
+                    entry, authority_model=AuthorityModel.opaque_single_onlyoffice
+                )
 
     def test_the_close_predicate_hits_every_shared_editable_entry(
         self, entries: list[dict[str, Any]]
     ) -> None:
-        """独立分母：直接从 manifest 字段算谓词，与推导结果双向比对。"""
+        """独立分母：直接从 manifest 字段算谓词，与推导结果双向比对。
+
+        只走**已终裁** entry：`capability_of` 对 `capability=null` 按设计抛
+        `EntryProfileError`（封闭四态里没有 pending），pending entry 也没有 required
+        scenario 可言。
+        """
         expected = 0
         actual = 0
-        for entry in entries:
+        adjudicated = [e for e in entries if e.get("capability") is not None]
+        assert adjudicated, "终裁分母为空 —— 判据会在空集上恒真"
+        for entry in adjudicated:
             profile = extract_entry_profile(entry)
             capability = capability_of(entry)
             if profile.editability is Editability.editable and (

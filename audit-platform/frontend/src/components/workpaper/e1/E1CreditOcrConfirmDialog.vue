@@ -2,6 +2,7 @@
 /**
  * E1CreditOcrConfirmDialog — 征信 OCR/AI 识别结果确认后回填
  */
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { reactive, watch } from 'vue'
 
 export interface CreditOcrFields {
@@ -24,6 +25,8 @@ const props = defineProps<{
   confidence?: number
   ocrPreview?: string
   fileName?: string
+  /** 本次识别的附件编号：有则在文件名旁给小眼睛看原件（spec attachment-inline-preview） */
+  attachmentId?: string
 }>()
 
 const emit = defineEmits<{
@@ -91,6 +94,7 @@ function onCancel(): void {
   >
     <div class="ocr-meta">
       <el-tag v-if="fileName" size="small" type="info">{{ fileName }}</el-tag>
+      <AttachmentEyeButton v-if="attachmentId" :attachment-id="attachmentId" :file-name="fileName" />
       <el-tag v-if="confidence != null" size="small" :type="(confidence || 0) >= 0.5 ? 'success' : 'warning'">
         置信度 {{ Math.round((confidence || 0) * 100) }}%
       </el-tag>

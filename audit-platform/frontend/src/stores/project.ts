@@ -17,7 +17,8 @@
  * const projectStore = useProjectStore()
  * // 读取
  * projectStore.projectId   // 当前项目 ID
- * projectStore.year        // 当前审计年度
+ * projectStore.year        // 当前审计年度（换项目后取到项目信息前、项目没填审计年度时为 null）
+ * projectStore.yearStatus  // 年度解析状态：idle / loading / ready / failed
  * projectStore.clientName  // 客户名称
  * projectStore.currentProjectContext // 完整上下文 facade
  * // 切换
@@ -29,18 +30,29 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import { getProject, getProjectAuditYear } from '@/services/auditPlatformApi'
-import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
+import { getProject, type ProjectListItem } from '@/services/auditPlatformApi'
+import { parseAuditYear, resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
+/** 只用于年度下拉选项（今年前后），不当审计年度用 */
 const currentYear = new Date().getFullYear()
+
+/**
+ * 当前项目审计年度的解析状态（spec post-push-residual-defect-closure 6.5）：
+ * - idle：非项目页；
+ * - loading：换了项目、路由没带年度，还没取到项目信息（此时 year 为 null，不是「没填」）；
+ * - ready：年度已定 —— 路由年度、项目审计年度，或项目没填（year 为 null）；
+ * - failed：取项目信息失败、年度未知（与「没填」分开，页面不能据此让用户去填年度）。
+ */
+export type ProjectYearStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
 // ─── P0-2: ProjectContext 类型定义 ───────────────────────────────────────────
 export interface ProjectContextData {
   projectId: string
   projectName: string
-  year: number
+  /** 审计年度；年度未定 / 项目没填为 null */
+  year: number | null
   applicableStandard: string
   auditScope: 'standalone' | 'consolidated'
   projectStatus: string
@@ -50,7 +62,11 @@ export interface ProjectContextData {
 export const useProjectStore = defineStore('project', () => {
   // ─── 核心状态 ───
   const projectId = ref('')
-  const year = ref(currentYear - 1)
+  // 不给初值：原先初值是去年、换到没填年度的项目也不清，页面就静默按去年 / 上一个项目的年度取数
+  const year = ref<number | null>(null)
+  const yearStatus = ref<ProjectYearStatus>('idle')
+  // 每次换项目 / 重取递增：取项目信息返回时序号已变 ⇒ 期间又换了项目，丢弃这次的结果
+  let contextSeq = 0
   const standard = ref<'soe' | 'listed'>('soe')
   const clientName = ref('')
   const auditYear = ref<number | null>(null)
@@ -73,51 +89,94 @@ export const useProjectStore = defineStore('project', () => {
     return [...all].sort((a, b) => b - a)
   })
 
-  // ─── 从路由自动同步（DefaultLayout watch route 调用） ───
+  /**
+   * 取项目详情，失败再取一次（与原先「取年度一次 + 取项目信息一次」同样两次机会）。
+   * 不参与 http 层 GET 去重：合并目录等同页组件会发同址 GET，去重会取消这一次，年度就被误判成取失败。
+   */
+  async function fetchProjectDetail(pid: string): Promise<ProjectListItem | undefined> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await getProject(pid, { dedupe: false })
+      } catch { /* 再取一次 */ }
+    }
+    return undefined
+  }
+
+  function applyProjectInfo(proj: ProjectListItem) {
+    const p = proj as any
+    clientName.value = p?.client_name || p?.name || ''
+    projectStatus.value = p?.status || ''
+    auditScope.value = p?.audit_scope || (p?.project_type === 'consolidated' ? 'consolidated' : 'standalone')
+  }
+
+  /**
+   * 取项目信息并定年度（本次序号 seq）。路由已给年度（status 已是 ready）时只补项目信息、不改年度；
+   * 还在等年度（loading）时年度 = 项目审计年度，没填就是 null。期间换了项目 ⇒ 丢弃。
+   */
+  async function loadProjectInfo(pid: string, seq: number) {
+    const proj = await fetchProjectDetail(pid)
+    if (seq !== contextSeq || projectId.value !== pid) return
+    if (!proj) {
+      if (yearStatus.value !== 'ready') yearStatus.value = 'failed'
+      return
+    }
+    applyProjectInfo(proj)
+    const resolved = resolveAuditYearFromProject(proj)
+    auditYear.value = resolved
+    if (yearStatus.value !== 'ready') year.value = resolved
+    yearStatus.value = 'ready'
+  }
+
+  // ─── 从路由自动同步（路由守卫 + DefaultLayout watch route 调用） ───
   async function syncFromRoute(route: RouteLocationNormalizedLoaded) {
     const pid = route.params.projectId as string | undefined
     if (!pid) {
-      // 非项目页面，清空
+      // 非项目页面，清空（年度也清：没有项目就没有审计年度，下一个项目页不会先拿到这个年度）
+      contextSeq++
       projectId.value = ''
       clientName.value = ''
       auditYear.value = null
+      year.value = null
+      yearStatus.value = 'idle'
       return
     }
 
     const changed = pid !== projectId.value
     projectId.value = pid
-
-    // 从 query 解析年度
-    const qy = Number(route.query.year)
-    if (Number.isFinite(qy) && qy > 2000) {
-      year.value = qy
-    } else if (changed) {
-      // 路由没带 year，尝试从后端获取项目审计年度
-      try {
-        const ay = await getProjectAuditYear(pid)
-        if (ay) {
-          auditYear.value = ay
-          year.value = ay
-        }
-      } catch { /* ignore */ }
+    // 路由显式带的年度（用户在看哪一年）优先
+    const routeYear = parseAuditYear(route.query.year)
+    if (routeYear != null) {
+      year.value = routeYear
+      yearStatus.value = 'ready'
     }
 
-    // 项目切换时加载项目信息 + 清理旧项目状态
-    if (changed) {
-      resetProjectScopedState('route-change')
-      loadDataYears(pid)
-      try {
-        const proj = await getProject(pid)
-        clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
-        projectStatus.value = (proj as any)?.status || ''
-        auditScope.value = (proj as any)?.audit_scope || ((proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone')
-        const resolved = resolveAuditYearFromProject(proj as any)
-        if (resolved) {
-          auditYear.value = resolved
-          if (!Number.isFinite(qy) || qy <= 2000) year.value = resolved
-        }
-      } catch { /* ignore */ }
+    if (!changed) {
+      // 同一项目：路由不带年度时保持当前年度；上次没取到项目信息（failed）⇒ 再导航时重取
+      if (yearStatus.value === 'failed') {
+        yearStatus.value = 'loading'
+        await loadProjectInfo(pid, ++contextSeq)
+      }
+      return
     }
+
+    // 换项目：路由没带年度 ⇒ 先清掉上一个项目的年度，取到本项目信息前是 loading（页面由 ProjectContextGate 挡住）
+    const seq = ++contextSeq
+    if (routeYear == null) {
+      year.value = null
+      yearStatus.value = 'loading'
+    }
+    resetProjectScopedState('route-change')
+    loadDataYears(pid)
+    // 只取一次项目详情：年度与项目信息都来自这一次（R16：原先先取一次只为年度、再整份取一次）
+    await loadProjectInfo(pid, seq)
+  }
+
+  /** 取项目信息失败后重试（ProjectContextGate 的「重试」） */
+  async function retryProjectContext() {
+    const pid = projectId.value
+    if (!pid || yearStatus.value !== 'failed') return
+    yearStatus.value = 'loading'
+    await loadProjectInfo(pid, ++contextSeq)
   }
 
   // ─── P0-2.3: loadProjectContext — 手动加载完整项目上下文 ───
@@ -129,17 +188,24 @@ export const useProjectStore = defineStore('project', () => {
     }
     projectId.value = pid
     loadDataYears(pid)
-    try {
-      const proj = await getProject(pid)
-      clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
-      projectStatus.value = (proj as any)?.status || ''
-      auditScope.value = (proj as any)?.audit_scope || ((proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone')
-      const resolved = resolveAuditYearFromProject(proj as any)
-      if (resolved) {
+    const seq = ++contextSeq
+    if (changed) {
+      year.value = null
+      yearStatus.value = 'loading'
+    }
+    const proj = await fetchProjectDetail(pid)
+    if (seq === contextSeq && projectId.value === pid) {
+      if (proj) {
+        applyProjectInfo(proj)
+        const resolved = resolveAuditYearFromProject(proj)
         auditYear.value = resolved
-        year.value = resolved
+        // 重载回到项目审计年度（原行为）；换项目且没填年度 ⇒ null，不沿用上一个项目的
+        if (resolved != null || changed) year.value = resolved
+        yearStatus.value = 'ready'
+      } else if (yearStatus.value === 'loading') {
+        yearStatus.value = 'failed'
       }
-    } catch { /* ignore */ }
+    }
     // Load project role
     try {
       const roleData = await api.get(`/api/projects/${pid}/my-role`, {
@@ -169,6 +235,7 @@ export const useProjectStore = defineStore('project', () => {
   function changeYear(y: number) {
     const prev = year.value
     year.value = y
+    if (projectId.value) yearStatus.value = 'ready' // 显式选了年度：年度已定，晚到的项目信息不再覆盖它
     if (prev !== y && projectId.value) {
       eventBus.emit('year:changed', {
         projectId: projectId.value,
@@ -181,6 +248,7 @@ export const useProjectStore = defineStore('project', () => {
   function setCurrentYear(y: number, options?: { reload?: boolean }) {
     const prev = year.value
     year.value = y
+    if (projectId.value) yearStatus.value = 'ready'
 
     if (prev !== y && projectId.value) {
       // P0-3.2: 清理底稿、试算表、报表、附注、合并相关缓存
@@ -194,7 +262,7 @@ export const useProjectStore = defineStore('project', () => {
       eventBus.emit('year:changed', {
         projectId: projectId.value,
         year: y,
-        previousYear: prev,
+        previousYear: prev ?? undefined, // 年度原先未定（null）时不带
       })
 
       // 触发 SSE 重连
@@ -258,6 +326,7 @@ export const useProjectStore = defineStore('project', () => {
     // 状态
     projectId,
     year,
+    yearStatus,
     standard,
     clientName,
     auditYear,
@@ -271,6 +340,7 @@ export const useProjectStore = defineStore('project', () => {
     currentProjectContext,
     // 方法
     syncFromRoute,
+    retryProjectContext,
     loadProjectContext,
     resetProjectScopedState,
     changeYear,

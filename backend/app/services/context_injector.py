@@ -21,7 +21,7 @@ class WpChatContext:
     component_type: str
     client_name: str
     audit_period: str  # e.g. "2024-01-01 至 2024-12-31"
-    business_category: str  # e.g. "C" (制造业)
+    business_category: str  # 质控业务分类码，如 "A1" / "C"（不是行业）
     guidance_text: str  # from GuidanceService
     filled_data_summary: str  # summary of current data in workpaper
 
@@ -37,7 +37,7 @@ class ContextInjector:
 - 类型：{component_type}
 - 客户名称：{client_name}
 - 审计期间：{audit_period}
-- 行业类别：{business_category}
+- 质控业务分类：{business_category}
 
 编制说明：
 {guidance_text}

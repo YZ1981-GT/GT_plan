@@ -32,6 +32,7 @@ const EXPECTED_ACTIVE = [
   'delegated_module',
   'target_path',
   'decision_trace',
+  'shared_html_data',
 ] as const
 
 describe('RenderConfigWire field lifecycle', () => {

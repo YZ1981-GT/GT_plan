@@ -257,6 +257,12 @@
       "path": "/api/account-note-mapping/{project_id}/{mapping_id}",
       "target": "keep_current",
       "reason": "范围外 R10（design §9）：account_note_mapping.py 的 3 个 edit 级写端点（写作时前端零调用点），本 spec 不改其门禁"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/disclosure-notes/{project_id}/formula-gray",
+      "target": "keep_current",
+      "reason": "spec note-pull-followup-closure R22：写 projects.wizard_state 的项目级附注公式灰度开关，不写附注数据；门禁 = 角色门（经理及以上）+ 本项目 edit 成员（formula-governance-coverage-closure R1.7，tests/formula_settings/test_formula_endpoint_authz.py 钉住），不改挂附注编辑门禁"
     }
   ]
 }

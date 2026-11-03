@@ -8,7 +8,7 @@
   <div class="gt-a171">
     <!-- Toolbar -->
     <div class="gt-a171__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-if="a171AEntrySync.presentation.value.showModeSwitch" v-model="mode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a171-audit-summary" />
       <div class="gt-a171__toolbar-right">
         <el-button
@@ -262,12 +262,14 @@
 
 <script setup lang="ts">
 import { ref, toRef, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { Loading } from '@element-plus/icons-vue'
 import { useA171AuditSummary, CHAPTER_TEMPLATE, CHAPTER_GUIDANCE } from './composables/useA171AuditSummary'
 import { useA171Navigation } from './composables/useA171Navigation'
 import type { A171RenderData } from './composables/useA171AuditSummary'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { classificationOf } from '@/types/projectClassification'
 import ConsistencyPanel from './a17/ConsistencyPanel.vue'
 import type { ConsistencyResult } from './a17/ConsistencyPanel.vue'
 
@@ -293,7 +295,8 @@ const props = withDefaults(defineProps<{
   wpId: string
   projectId?: string
   htmlData?: A171RenderData | null
-}>(), { projectId: '', htmlData: null })
+  readonly?: boolean
+}>(), { projectId: '', htmlData: null, readonly: false })
 
 // ─── Mode Switch ───
 const mode = ref<'html' | 'docx'>('html')
@@ -446,13 +449,13 @@ async function handleChapterPull(n: number) {
   }
 }
 
-// ─── Signature visibility by business_category ───
+// ─── Signature visibility by 质控分类组别（渲染下发的 project_context.project_classification；原按 business_category 首字母）───
 const visibleSignatureRows = computed(() => {
-  const bc = projectContext.value?.business_category || ''
+  const group = classificationOf(projectContext.value)?.category_group ?? 'C'
   // A类: 4角色全显 | B类: 编制人+复核人+EQCR(跳过质控)=3 | C类: 编制人+复核人=2
-  if (bc.startsWith('A')) {
+  if (group === 'A') {
     return signatureTable.value.map((row, idx) => ({ ...row, originalIndex: idx }))
-  } else if (bc.startsWith('B')) {
+  } else if (group === 'B') {
     // 跳过 index 2 (质量控制复核合伙人)
     return signatureTable.value
       .filter((_, idx) => idx !== 2)
@@ -524,6 +527,12 @@ const ooError = ref('')
 // Flush + generate docx before switching to OO; sync back when returning
 watch(mode, async (newMode, oldMode) => {
   if (oldMode === 'html' && newMode === 'docx') {
+    if (props.readonly) {
+      // 只读（编辑锁在别的窗口 / 无编辑权）：生成 Word 是写操作，不进在线编辑（workpaper-multi-window-lock-gaps R3.5）
+      ElMessage.warning('当前为只读，不能进入在线编辑')
+      mode.value = 'html'
+      return
+    }
     await flushPendingSaves()
     // Generate docx from structured data
     ooGenerating.value = true
@@ -539,6 +548,7 @@ watch(mode, async (newMode, oldMode) => {
       ooGenerating.value = false
     }
   } else if (oldMode === 'docx' && newMode === 'html') {
+    if (props.readonly) return // 只读：没进过在线编辑，没有要同步回来的
     // Sync docx edits back to structured data
     try {
       const { api } = await import('@/services/apiProxy')
@@ -672,6 +682,21 @@ const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 onMounted(() => { checkOOHealth(); selfLoad(); loadChapterStale() })
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: () => flushPendingSaves() })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const a171AEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-a171-audit-summary',
+})
+
 </script>
 
 <style scoped>

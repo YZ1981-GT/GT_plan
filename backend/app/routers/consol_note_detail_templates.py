@@ -20,9 +20,11 @@ spec: consol-note-detail-template-and-mapping Phase 1 Task 4 + Phase 2 Task 12~1
 刷新预览与建议（Phase 2）：
   POST   /api/projects/{pid}/consol-note-detail-refresh/preview           — 预览
   POST   /api/projects/{pid}/consol-note-detail-refresh/suggest-template  — 模板建议
+  POST   /api/projects/{pid}/consol-note-detail-refresh/auto-map          — ⚡ 自动映射（建模板 + 确认可自动确认的组）
 """
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -334,6 +336,37 @@ async def api_suggest_template(
     )
 
 
+class AutoMapRequest(BaseModel):
+    year: int
+    section_ids: list[str] | None = None  # 空 = 合并附注模板里有单体对应的全部章节
+
+
+@router.post("/api/projects/{project_id}/consol-note-detail-refresh/auto-map")
+async def api_auto_map(
+    project_id: UUID,
+    body: AutoMapRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """⚡ 自动映射：未绑定的章节按来源建议建模板并绑定，能自动确认的结构组确认映射；其余组回报待人工确认
+    （note-pull-header-formula-closure R6.3）。不写合并附注数据。"""
+    from app.services.consol_note_auto_mapping import AutoMapError, auto_map_sections
+
+    try:
+        result = await auto_map_sections(
+            db, project_id=project_id, year=body.year, section_ids=body.section_ids, user_id=user.id,
+        )
+        await db.commit()
+    except AutoMapError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
+    return result
+
+
 # ─── 映射规则 CRUD + confirm_mapping（Phase 3） ──────────────────────────────
 
 
@@ -442,6 +475,38 @@ async def api_confirm_mapping(
 ):
     """确认映射——校验 + 写规则 + 批量绑定。409 表示来源已变化需重新预览。"""
     from app.services.consol_note_mapping_rule_service import MappingRuleError, confirm_mapping
+    # 不信任请求体里的 entity project/hash：按当前企业树与单体附注现读重建。
+    from app.services.consol_note_detail_source_service import scan_all_entities
+
+    scanned = await scan_all_entities(
+        db, consol_project_id=project_id, section_id=body.section_id, year=body.year,
+    )
+    authoritative = {item["node_key"]: item for item in scanned}
+    canonical_entities: list[dict[str, Any]] = []
+    for requested in body.entity_node_keys:
+        node_key = str(requested.get("node_key") or "")
+        current = authoritative.get(node_key)
+        if current is None or current.get("project_id") is None:
+            raise HTTPException(status_code=422, detail={
+                "error_code": "ENTITY_NOT_IN_TREE",
+                "message": f"企业节点 {node_key or '（空）'} 不在当前企业树的数据叶子中",
+            })
+        requested_pid = str(requested.get("project_id") or "")
+        if requested_pid and requested_pid != str(current["project_id"]):
+            raise HTTPException(status_code=422, detail={
+                "error_code": "ENTITY_PROJECT_MISMATCH",
+                "message": f"企业节点 {node_key} 与单体项目不匹配，请重新预览",
+            })
+        if current["hash"] != body.source_structure_hash:
+            raise HTTPException(status_code=409, detail={
+                "error_code": "SOURCE_STRUCTURE_CONFLICT",
+                "message": f"企业 {node_key} 的来源结构已变化，请重新预览",
+            })
+        canonical_entities.append({
+            "node_key": node_key,
+            "project_id": str(current["project_id"]),
+            "hash": current["hash"],
+        })
     try:
         result = await confirm_mapping(
             db,
@@ -451,11 +516,11 @@ async def api_confirm_mapping(
             template_version_id=UUID(body.template_version_id),
             source_structure_hash=body.source_structure_hash,
             mappings=body.mappings,
-            entity_node_keys=body.entity_node_keys,
+            entity_node_keys=canonical_entities,
             excluded_node_keys=body.excluded_node_keys,
             confirmed_by=user.id,
             preview_token=body.preview_token,
-            current_entity_hashes=body.current_entity_hashes,
+            current_entity_hashes={item["node_key"]: item["hash"] for item in canonical_entities},
         )
         await db.commit()
 
@@ -512,7 +577,12 @@ async def api_apply_detail_refresh(
         await db.commit()
         return result
     except ApplyError as exc:
-        await db.rollback()
+        # SOURCE_CHANGED 在任何合并数据写入前产生；保留服务端刚标出的 mapping stale，
+        # 让下一次预览和界面状态可见。其他错误仍整单回滚。
+        if exc.code == "SOURCE_CHANGED":
+            await db.commit()
+        else:
+            await db.rollback()
         raise HTTPException(status_code=exc.status, detail={
             "error_code": exc.code, "message": exc.message, "detail": exc.detail,
         })

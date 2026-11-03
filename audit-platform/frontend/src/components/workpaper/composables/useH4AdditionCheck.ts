@@ -26,13 +26,17 @@ import {
 import { H44_AJE_MARKER, pushDraftPairsToH43 } from './h4AdjustmentDraftPush'
 import {
   type H4AdditionSamplePatch,
-  mapVoucherSampleToAdditionPatch,
+  mapPreparedToAdditionPatch,
   applyAdditionSamplePatch,
   applyOcrPatchToAdditionRow,
-  normalizeFilledSamples,
   mapOcrToAdditionPatch,
   extractOcrFields,
 } from './h4AdditionSampleFill'
+import {
+  metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetLegacyKey, fillIntoSelectedRow } from './assetVoucherFill'
 
 export type {
   H4AdditionCheckRow,
@@ -57,11 +61,24 @@ const CONCLUSION_KEY = 'H4-4-conclusion'
 const DETAIL_ROWS_KEY = 'H4-2-rows'
 const POP_MANUAL_KEY = 'H4-4-population-manual'
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：类别、支持性文件、供应商与单据、核对勾选、关联方、结论等 */
+export function hasH4AdditionContent(r: H4AdditionCheckRow): boolean {
+  return [r.category, r.supportingDocs, r.supplier, r.contractNo, r.inboundNo, r.invoiceNo, r.inspector,
+    r.indexRef, r.conclusion, r.relatedPartyName, r.relationship].some(v => String(v ?? '').trim() !== '')
+    || Object.values(r.checks ?? {}).some(Boolean)
+    || Number(r.invoiceAmount) !== 0 || r.hasAttachment || r.isRelatedParty === '是'
+}
+
+/** 旧行（没有 `_gt`）身份：凭证号 + 凭证日期 + 借方金额（原实现取绝对值） */
+const additionLegacy = (r: H4AdditionCheckRow) => assetLegacyKey(r.voucherNo, r.voucherDate, r.amount)
+
 export function useH4AdditionCheck(params: {
   wpId: Ref<string>
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
+  /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+  isReadonly?: Ref<boolean>
 }) {
   const { allResponses, onSave } = params
 
@@ -98,8 +115,9 @@ export function useH4AdditionCheck(params: {
   function load(): void {
     const data = _getJson(ROWS_KEY)
     rows.value = Array.isArray(data) && data.length > 0
-      ? data.map((r, i) => normalizeAdditionRow(r, i))
+      ? data.map((r, i) => withRowMeta(normalizeAdditionRow(r, i), r))
       : []
+    voucherFill.markLoaded()
 
     const sp = _getJson(PARAMS_KEY)
     samplingParams.value = normalizeSamplingParams(sp)
@@ -110,6 +128,25 @@ export function useH4AdditionCheck(params: {
     auditNote.value = _getString(NOTE_KEY)
     auditConclusion.value = _getString(CONCLUSION_KEY)
   }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行，对方科目按配对拼接）
+  const voucherFill = useVoucherCheckFill<H4AdditionCheckRow>({
+    projectId: () => params.projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: (item) => {
+      const row = normalizeAdditionRow({ seq: 0 }, 0)
+      applyAdditionSamplePatch(row, mapPreparedToAdditionPatch(item), { skipNameIfFilled: false })
+      if (!row.name) row.name = '抽凭样本'
+      recalcAdditionRow(row)
+      return row
+    },
+    persist: () => _persistRows(),
+    hasUserContent: hasH4AdditionContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    legacy: additionLegacy,
+    readonly: () => params.isReadonly?.value === true,
+  })
 
   watch(allResponses, () => load(), { immediate: true })
 
@@ -140,9 +177,9 @@ export function useH4AdditionCheck(params: {
 
   function _persistRows(): void {
     if (!onSave) return
-    const toPersist = rows.value.map(r => {
+    const toPersist = voucherFill.guardPersist(rows.value).map(r => {
       recalcAdditionRow(r)
-      return {
+      return withRowMeta({
         rowId: r.rowId,
         seq: r.seq,
         category: r.category,
@@ -178,7 +215,7 @@ export function useH4AdditionCheck(params: {
         relationship: r.relationship,
         voucherResult: r.voucherResult,
         hasAttachment: r.hasAttachment,
-      }
+      }, r)
     })
     onSave(ROWS_KEY, toPersist)
     onSave(ADDITION_TOTAL_KEY, additionTotal.value)
@@ -197,7 +234,7 @@ export function useH4AdditionCheck(params: {
 
   function deleteRow(rowId: string): void {
     const idx = rows.value.findIndex(r => r.rowId === rowId)
-    if (idx === -1) return
+    if (idx === -1 || voucherFill.isRowLocked(rows.value[idx])) return
     rows.value.splice(idx, 1)
     rows.value.forEach((r, i) => { r.seq = i + 1 })
     _persistRows()
@@ -205,7 +242,7 @@ export function useH4AdditionCheck(params: {
 
   function updateCell(rowId: string, field: string, value: any): void {
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
 
     if (field.startsWith('checks.')) {
       const key = field.split('.')[1] as keyof typeof row.checks
@@ -349,45 +386,33 @@ export function useH4AdditionCheck(params: {
     })
   }
 
-  /**
-   * 抽凭回填：有 targetRowId 则填该行；否则批量新增行。
-   * 业务内容←摘要，对方科目/明细←counterpartAccount（可拆分）。
-   */
-  function applyVoucherSamples(payload: unknown, targetRowId?: string | null): number {
-    const samples = normalizeFilledSamples(payload)
-    if (!samples.length) return 0
+  /** 抽凭引擎回填（整表）：一个样本一行，按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行 */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload)
+  }
 
-    if (targetRowId) {
-      const row = rows.value.find(r => r.rowId === targetRowId)
-      if (!row) return 0
-      const patch = mapVoucherSampleToAdditionPatch(samples[0])
-      applyAdditionSamplePatch(row, patch, { skipNameIfFilled: true })
-      recalcAdditionRow(row)
-      _persistRows()
-      return 1
-    }
-
-    let added = 0
-    for (const sample of samples) {
-      const patch = mapVoucherSampleToAdditionPatch(sample)
-      const seq = rows.value.length + 1
-      const row = normalizeAdditionRow({
-        name: String(patch.name || patch.businessContent || '抽凭样本').slice(0, 40),
-        seq,
-      }, seq - 1)
-      applyAdditionSamplePatch(row, patch, { skipNameIfFilled: false })
-      recalcAdditionRow(row)
-      rows.value.push(row)
-      added += 1
-    }
-    if (added > 0) _persistRows()
-    return added
+  /** 逐行抽凭（「抽凭」列）：第一笔写进所选行（已填的物资名称保留），其余样本并入（assetVoucherFill） */
+  function onEngineFilledIntoRow(payload: EngineFilledPayload, rowId: string) {
+    return fillIntoSelectedRow({
+      fill: voucherFill,
+      rows,
+      rowId,
+      idOf: r => r.rowId,
+      payload,
+      apply: (row, item) => {
+        applyAdditionSamplePatch(row, mapPreparedToAdditionPatch(item), { skipNameIfFilled: true })
+        recalcAdditionRow(row)
+      },
+      persist: () => _persistRows(),
+      legacy: additionLegacy,
+      readonly: () => params.isReadonly?.value === true,
+    })
   }
 
   /** OCR 字段填入：支持性文件合并；供应商/发票等仅填空 */
   function mergeOcrResult(rowId: string, fields: Record<string, unknown>): H4AdditionSamplePatch {
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return {}
+    if (!row || voucherFill.isRowLocked(row)) return {}
     const { patch } = mapOcrToAdditionPatch(fields)
     applyOcrPatchToAdditionRow(row, patch)
     recalcAdditionRow(row)
@@ -395,7 +420,12 @@ export function useH4AdditionCheck(params: {
     return patch
   }
 
+  /** 行样式：异常 / 发票差异 / 核对未完 + 年审阶段预审行只读 */
   function rowClassName({ row }: { row: H4AdditionCheckRow }): string {
+    return [flagClassName(row), voucherFill.rowClass({ row })].filter(Boolean).join(' ')
+  }
+
+  function flagClassName(row: H4AdditionCheckRow): string {
     if (row.isAbnormal === '是' || row.isAbnormal === 'Y') return 'row-anomaly'
     if (Math.abs(row.diff) > 0.01 && row.invoiceAmount > 0) return 'row-anomaly'
     if (isCheckIncomplete(row)) return 'row-warn'
@@ -428,7 +458,14 @@ export function useH4AdditionCheck(params: {
     draftNote,
     draftConclusion,
     pushAjeDraftToH43,
-    applyVoucherSamples,
+    onEngineFilled,
+    onEngineFilledIntoRow,
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+    /** 行已关联凭证（有 `_gt`）：逐行抽凭只写未关联凭证的行 */
+    rowHasVoucher: (row: H4AdditionCheckRow) => !!metaOf(row),
     mergeOcrResult,
     rowClassName,
     save,
@@ -437,14 +474,12 @@ export function useH4AdditionCheck(params: {
 }
 
 export {
-  mapVoucherSampleToAdditionPatch,
-  normalizeFilledSamples,
+  mapPreparedToAdditionPatch,
   mapOcrToAdditionPatch,
   extractOcrFields,
-  splitCounterpartAccount,
   mergeSupportingDocs,
 } from './h4AdditionSampleFill'
 
-export type { H4VoucherSampleLike, H4AdditionSamplePatch } from './h4AdditionSampleFill'
+export type { H4AdditionSamplePatch } from './h4AdditionSampleFill'
 
 export default useH4AdditionCheck

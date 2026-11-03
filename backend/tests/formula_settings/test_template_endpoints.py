@@ -42,13 +42,16 @@ async def api(monkeypatch):
             await add_member(db, team, users["member"], "readonly")
             await add_member(db, sibling, users["member"], "readonly")
             await db.commit()
-        events: list = []
+        event_log: list = []
 
-        async def fake_publish_events(evs, **kw):
-            events.extend(evs)
-            return len(evs)
+        async def fake_record_changes(db, *, domain="", events=(), source="", publish_id=None):
+            event_log.extend(events)
 
-        monkeypatch.setattr(ft_router, "publish_events", fake_publish_events)
+        async def fake_publish_pending(db):
+            return {"queued": 0}  # S4: publish_pending 打桩
+
+        monkeypatch.setattr(ft_router, "record_changes", fake_record_changes)
+        monkeypatch.setattr(ft_router, "publish_pending", fake_publish_pending)
         app = FastAPI()
         app.include_router(ft_router.router)
         app.include_router(ft_router.project_router)
@@ -64,7 +67,7 @@ async def api(monkeypatch):
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_current_user] = _user
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
-            yield {"c": client, "f": factory, "events": events, "as": lambda n: who.update(u=users[n]),
+            yield {"c": client, "f": factory, "events": event_log, "as": lambda n: who.update(u=users[n]),
                    "p": {"root": root, "child": child, "sibling": sibling, "team": team}}
 
 
@@ -146,7 +149,7 @@ async def test_manage_publish_subscribe_permissions(api):
     assert [(s["template_id"], s["template_version"]) for s in listed] == [(ids["group"], 1)]
     assert (await c.post(f"/api/projects/{p['child']}/formula-templates/subscribe",
                          json={"template_id": ids["personal"], "domain": "report"})).status_code == 409, "每域只订阅一个"
-    assert (await c.delete(f"/api/formula-templates/{ids['group']}")).status_code == 409, "有订阅不能删"
+    assert (await c.delete(f"/api/formula-templates/{ids['group']}", params={"expected_version": 1})).status_code == 409, "有订阅不能删"
     assert (await c.post(f"/api/formula-templates/{ids['group']}/publish", json={**body, "expected_version": None})
             ).status_code == 428
     pub = await c.post(f"/api/formula-templates/{ids['group']}/publish", json=body)
@@ -158,10 +161,93 @@ async def test_manage_publish_subscribe_permissions(api):
     async with api["f"]() as db:
         assert await db.scalar(sa.select(sa.func.count()).select_from(FormulaTemplateSubscription).where(
             FormulaTemplateSubscription.is_active == sa.true())) == 0
-    assert (await c.delete(f"/api/formula-templates/{ids['group']}")).status_code == 200
+    assert (await c.delete(f"/api/formula-templates/{ids['group']}", params={"expected_version": 2})).status_code == 200
 
     api["as"]("member")  # 可见但不是 admin：设为全局 = 提交候选；预览仅 admin
     assert (await c.post(f"/api/formula-templates/{ids['firm']}/promote-preview", json={"domain": "report"})
             ).status_code == 403
     cand = await c.post(f"/api/formula-templates/{ids['firm']}/promote", json={"domain": "report"})
     assert cand.status_code == 200 and cand.json()["candidate"]["status"] == "pending"
+
+
+async def test_diff_rollback_preview_and_idempotent_publish(api):
+    ids = await _templates(api)
+    c = api["c"]
+    api["as"]("owner")
+    tid = ids["group"]
+    changed = {"domain": "report", "slot_key": SLOT,
+               "definition": {"formula": "TB('1001','审定数')"}}
+    same = await c.get(f"/api/formula-templates/{tid}/diff", params={"from": 1, "to": 1})
+    assert same.status_code == 200 and same.json()["changes"] == []
+    published = await c.post(f"/api/formula-templates/{tid}/publish", json={
+        "expected_version": 1, "changes": [changed],
+    })
+    assert published.status_code == 200 and published.json()["version"] == 2
+    diff = await c.get(f"/api/formula-templates/{tid}/diff", params={"from": 1, "to": 2})
+    assert diff.status_code == 200
+    assert [(x["kind"], x["slot_key"]) for x in diff.json()["changes"]] == [("changed", SLOT)]
+
+    before = (await c.get(f"/api/formula-templates/{tid}/versions")).json()["items"]
+    preview = await c.post(f"/api/formula-templates/{tid}/rollback-preview", json={
+        "target_version": 1, "expected_version": 2,
+    })
+    assert preview.status_code == 200
+    assert preview.json()["target_version"] == 1
+    after_preview = (await c.get(f"/api/formula-templates/{tid}/versions")).json()["items"]
+    assert len(after_preview) == len(before), "rollback preview 不得写版本"
+
+    rollback_body = {"target_version": 1, "expected_version": 2, "request_id": "endpoint-rollback-1"}
+    rolled = await c.post(f"/api/formula-templates/{tid}/rollback", json=rollback_body)
+    assert rolled.status_code == 200 and rolled.json()["version"] == 3
+    replay = await c.post(f"/api/formula-templates/{tid}/rollback", json={
+        **rollback_body, "expected_version": 3,
+    })
+    assert replay.status_code == 200 and replay.json()["idempotent"] is True
+    assert len((await c.get(f"/api/formula-templates/{tid}/versions")).json()["items"]) == 3
+
+    current = await c.post(f"/api/formula-templates/{tid}/rollback-preview", json={
+        "target_version": 3, "expected_version": 3,
+    })
+    assert current.status_code == 422
+
+
+async def test_rollback_cas_precedes_empty_diff(api):
+    """回滚的 CAS 必须先于「有没有差集」判断（S6 Task 4 UAT 7.6 实测缺陷）。
+
+    回滚完成后目标版本与当前版本内容相同、差集为空。此时若先算差集，
+    带着过期版本号或不带版本号的请求会收到 422「没有可回滚的变化」，
+    用户看不出真正原因是版本已变 —— 必须是 428 / 409。
+    """
+    ids = await _templates(api)
+    c = api["c"]
+    api["as"]("owner")
+    tid = ids["group"]
+    body = {"expected_version": 1, "changes": [{"domain": "report", "slot_key": SLOT,
+                                                "definition": {"formula": "TB('1001','审定数')"}}]}
+    assert (await c.post(f"/api/formula-templates/{tid}/publish", json=body)).status_code == 200
+    rolled = await c.post(f"/api/formula-templates/{tid}/rollback",
+                          json={"target_version": 1, "expected_version": 2})
+    assert rolled.status_code == 200 and rolled.json()["version"] == 3
+
+    # v3 与 v1 内容相同 ⇒ 差集为空。缺版本号必须 428、版本不符必须 409，都不得被 422 吞掉。
+    empty_no_cas = await c.post(f"/api/formula-templates/{tid}/rollback", json={"target_version": 1})
+    assert empty_no_cas.status_code == 428, empty_no_cas.text
+    stale = await c.post(f"/api/formula-templates/{tid}/rollback",
+                         json={"target_version": 1, "expected_version": 1})
+    assert stale.status_code == 409, stale.text
+    pre_no_cas = await c.post(f"/api/formula-templates/{tid}/rollback-preview", json={"target_version": 1})
+    assert pre_no_cas.status_code == 428, pre_no_cas.text
+    # 版本号正确时才轮到内容判断：此时差集确实为空 ⇒ 422
+    empty = await c.post(f"/api/formula-templates/{tid}/rollback-preview",
+                         json={"target_version": 1, "expected_version": 3})
+    assert empty.status_code == 422, empty.text
+
+
+async def test_diff_and_rollback_keep_template_visibility(api):
+    ids = await _templates(api)
+    api["as"]("outsider")
+    diff = await api["c"].get(f"/api/formula-templates/{ids['group']}/diff", params={"from": 1})
+    rollback = await api["c"].post(f"/api/formula-templates/{ids['group']}/rollback-preview", json={
+        "target_version": 1, "expected_version": 1,
+    })
+    assert diff.status_code == 404 and rollback.status_code == 404

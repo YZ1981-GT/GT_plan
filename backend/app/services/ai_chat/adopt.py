@@ -52,6 +52,14 @@ Properties:
 ``commit`` 也在本模块内：Req 8.7 把"commit 失败"与"日志写失败"并列要求同一处置
 （回滚 + ``adopt_log_failed``），放在两个层里必然出现"一边回滚一边返回成功"的缝。
 
+## 采纳到另选的目标（spec ai-chat-adopt-and-note-target-picker R2）
+
+全局知识 / 报表 / 知识库会话自身不能当采纳目标（无项目或无实例 UUID），用户在面板里
+另选底稿或附注时，请求带 ``source_host``（消息所在会话的宿主）。此时归属链对**来源会话**
+校验，并且必须同时满足 :func:`_assert_cross_target` 的四条规则；底稿 / 附注会话仍是严格
+同宿主绑定（「A 底稿里生成、采纳到 B 底稿」照旧拒绝）。全局会话里项目类资源一律
+``project_required``、上下文不检索项目数据 ⇒ 采纳到用户有写权的目标不构成跨项目泄漏。
+
 ## 存量消息为什么可能不可采纳
 
 ``ai_chat_message.content_hash`` 由 V147 新增且**未回填**。没有服务端哈希的行无法
@@ -110,6 +118,8 @@ __all__ = [
     "ADOPT_LOG_FAILED",
     "ADOPT_SOURCE_STATUS",
     "ADOPT_SOURCE_ROLE",
+    "ADOPT_TARGET_TYPES",
+    "CROSS_TARGET_SOURCE_TYPES",
     "AdoptFailed",
     "AdoptOutcome",
     "AuthoritativeMessage",
@@ -154,6 +164,21 @@ ADOPT_CONFIRM_FLOW_MESSAGE = "AI 内容已进入确认流，待审核确认后�
 ADOPT_SOURCE_ROLE = ChatRole.assistant
 ADOPT_SOURCE_STATUS = ChatMessageStatus.completed
 
+#: 可接收采纳的目标宿主（确认流记录挂在具体业务实例上）。报表没有实例 UUID、
+#: 知识库没有项目业务实例，都不是采纳目标。前端 ``canAdoptInPlace`` 与此同口径。
+ADOPT_TARGET_TYPES: frozenset[HostType] = frozenset({HostType.workpaper, HostType.note})
+
+#: 允许「来源会话 ≠ 目标」的来源宿主 —— 恰好是**自身不能当采纳目标**的那几类。
+#: 底稿 / 附注会话不在其中：它们的回复只能采纳回本文件。
+CROSS_TARGET_SOURCE_TYPES: frozenset[HostType] = frozenset(
+    {
+        HostType.global_knowledge,
+        HostType.report,
+        HostType.knowledge_doc,
+        HostType.knowledge_folder,
+    }
+)
+
 # ---------------------------------------------------------------------------
 # 哈希链审计
 # ---------------------------------------------------------------------------
@@ -178,6 +203,9 @@ ADOPT_AUDIT_DETAIL_KEYS: frozenset[str] = frozenset(
         "receipt_id",
         "host_type",
         "host_id",
+        # 消息所在会话的宿主（同宿主采纳时与 host_* 相同；另选目标时为全局知识等）
+        "source_host_type",
+        "source_host_id",
         "target",
     }
 )
@@ -205,6 +233,7 @@ class AuthoritativeMessage:
     text: str
     content_hash: str
     model_used: str | None
+    context_manifest: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -287,6 +316,7 @@ async def load_authoritative_message(
                 AIChatMessage.message_text,
                 AIChatMessage.content_hash,
                 AIChatMessage.model_used,
+                AIChatMessage.context_manifest,
                 AIChatSession.user_id.label("session_user_id"),
                 AIChatSession.project_id.label("session_project_id"),
                 AIChatSession.host_type.label("session_host_type"),
@@ -301,6 +331,7 @@ async def load_authoritative_message(
             .join(AIChatSession, AIChatSession.id == AIChatMessage.session_id)
             .outerjoin(AIChatRun, AIChatRun.id == AIChatMessage.run_id)
             .where(AIChatMessage.id == message_id)
+            .with_for_update()
         )
     ).first()
     if row is None:
@@ -356,6 +387,7 @@ async def load_authoritative_message(
         text=text,
         content_hash=stored_hash,
         model_used=row.model_used,
+        context_manifest=row.context_manifest,
     )
 
 
@@ -375,8 +407,12 @@ async def adopt_message(
     target_field: str | None = None,
     access: ResourceAccessResolver | None = None,
     request_id: str | None = None,
+    source_host: AuthorizedHostContext | None = None,
 ) -> AdoptOutcome:
     """把服务端权威 assistant 正文送入确认流。成功返回 :class:`AdoptOutcome`。
+
+    ``source_host``：消息所在会话的宿主（已按读权限授权）。为 None 或与 ``host`` 相同
+    时走同宿主绑定；不同时必须通过 :func:`_assert_cross_target`，归属链改对来源会话校验。
 
     :raises ExternalNotFound: 归属链任一段不成立（不可枚举 404）。
     :raises AdoptFailed: 日志写入 / 核验 / 审计 / commit 失败（已回滚）。
@@ -396,11 +432,24 @@ async def adopt_message(
         logger.info("采纳被拒：宿主 %s 无实例 UUID 可作为回写目标", host.resource_type.value)
         raise ExternalNotFound()
 
+    binding = host
+    if source_host is not None and not _same_host(source_host, host):
+        await _assert_cross_target(
+            db,
+            source=source_host,
+            target=host,
+            actor_id=actor_id,
+            message_id=message_id,
+            access=access,
+            request_id=request_id,
+        )
+        binding = source_host
+
     source = await load_authoritative_message(
         db,
         message_id=message_id,
         actor_id=actor_id,
-        host=host,
+        host=binding,
         access=access,
         request_id=request_id,
     )
@@ -442,6 +491,7 @@ async def adopt_message(
             db,
             actor_id=actor_id,
             host=host,
+            source_host=binding,
             source=source,
             log_id=result,
             receipt_id=receipt_id,
@@ -485,6 +535,57 @@ async def adopt_message(
         receipt_id=receipt_id,
         idempotent_replay=False,
     )
+
+
+def _same_host(a: AuthorizedHostContext, b: AuthorizedHostContext) -> bool:
+    """两个已授权宿主是否指向同一资源（类型 + canonical ID + 项目）。"""
+    return (
+        a.resource_type is b.resource_type
+        and a.resource_id == b.resource_id
+        and a.project_id == b.project_id
+    )
+
+
+async def _assert_cross_target(
+    db: AsyncSession,
+    *,
+    source: AuthorizedHostContext,
+    target: AuthorizedHostContext,
+    actor_id: UUID,
+    message_id: UUID,
+    access: ResourceAccessResolver | None,
+    request_id: str | None,
+) -> None:
+    """来源会话 ≠ 目标时的四条规则（spec ai-chat-adopt-and-note-target-picker R2.2）。
+
+    ① 来源与目标都授权给当前用户 ② 来源类型 ∈ :data:`CROSS_TARGET_SOURCE_TYPES`
+    ③ 目标类型 ∈ :data:`ADOPT_TARGET_TYPES` ④ 来源有项目时目标必须同项目。
+    违规先写内部 denial audit 再抛不可枚举 404，发生在读取消息与任何写入之前。
+    """
+    code: AiChatDenialCode | None = None
+    if source.principal_id != actor_id or target.principal_id != actor_id:
+        code = AiChatDenialCode.access_denied
+    elif (
+        source.resource_type not in CROSS_TARGET_SOURCE_TYPES
+        or target.resource_type not in ADOPT_TARGET_TYPES
+    ):
+        code = AiChatDenialCode.host_context_mismatch
+    elif source.project_id is not None and source.project_id != target.project_id:
+        code = AiChatDenialCode.cross_project
+    if code is None:
+        return
+    resolver = access if access is not None else ResourceAccessResolver(db)
+    await resolver.audit_denial(
+        principal_id=actor_id,
+        project_id=target.project_id,
+        denial_code=code.value,
+        entrypoint="ai_chat.adopt.cross_target",
+        action=AiChatAction.adopt,
+        resource_type=_RESOURCE_BY_HOST.get(target.resource_type),
+        resource_id=str(message_id),
+        request_id=request_id,
+    )
+    raise ExternalNotFound()
 
 
 def _replay_of(
@@ -543,15 +644,43 @@ async def _write_content_log(
       ① ``ai_content_log_id`` 非空 —— 不能读 ``id``（那是与数据库无关的临时 uuid4）；
       ② 该 ID 在同一事务内**查得到行** —— 防"返回了 ID 但行没落库"。
     """
+    if host.resource_type.value == "note":
+        from app.models.ai_task_job_models import AiTaskItem
+        from app.services.draft_artifact_facade import prepare_note_artifact
+
+        task_item = (await db.execute(
+            sa.select(AiTaskItem).where(AiTaskItem.message_id == source.message_id).limit(1)
+        )).scalar_one_or_none()
+        ai_log = await prepare_note_artifact(
+            db,
+            project_id=host.project_id,
+            user_id=actor_id,
+            note_id=instance_id,
+            content=source.text,
+            model=source.model_used or "unknown",
+            source_message_id=source.message_id,
+            generation_id=task_item.generation_id if task_item else None,
+            task_code=(
+                "note.policy_draft"
+                if task_item
+                else str((source.context_manifest or {}).get("task_code") or "chat.general")
+            ),
+            context_manifest=source.context_manifest,
+            via_adopt=True,
+        )
+        log_id = ai_log.id
+        if ai_log.confirm_action != "pending" or ai_log.writeback_status not in {"pending", "stale"}:
+            raise _LogWriteFailed("DraftArtifact 未处于可确认状态")
+        if ai_log.content_hash != source.content_hash:
+            raise _LogWriteFailed("DraftArtifact content_hash 与服务端消息哈希不一致")
+        return log_id
+
+    # 底稿等尚无稳定 typed locator 的宿主继续进入人工复制确认流，不自动写业务数据。
     from app.services.wp_ai_service import wrap_ai_output_with_log
 
     result = await wrap_ai_output_with_log(
-        # 权威正文：数据库里的服务端消息，客户端不参与。
         content=source.text,
-        # 平台未记录 per-message 模型置信度；客户端提交的置信度不可信 ⇒ 显式留空，
-        # 不用 0.85 之类的假值冒充（ai_content_log.confidence 可空）。
         confidence=None,
-        # 模型标识同样取服务端记录（None 时由 wrap 回落 settings 默认）。
         source_model=source.model_used,
         target_cell=target_cell,
         target_field=target_field,
@@ -576,8 +705,6 @@ async def _write_content_log(
             f"ai_content_log 未处于 pending：{result.get('confirm_action')!r}"
         )
     if result.get("content_hash") != source.content_hash:
-        # wrap 对同一正文重算的 sha256 必须与消息哈希一致；不一致说明送进确认流的
-        # 不是这条消息的正文。
         raise _LogWriteFailed("确认流记录的 content_hash 与服务端消息哈希不一致")
     return log_id
 
@@ -587,6 +714,7 @@ async def _write_adopt_audit(
     *,
     actor_id: UUID,
     host: AuthorizedHostContext,
+    source_host: AuthorizedHostContext,
     source: AuthoritativeMessage,
     log_id: UUID,
     receipt_id: UUID,
@@ -605,6 +733,8 @@ async def _write_adopt_audit(
         "receipt_id": str(receipt_id),
         "host_type": host.resource_type.value,
         "host_id": host.resource_id,
+        "source_host_type": source_host.resource_type.value,
+        "source_host_id": source_host.resource_id,
         "target": target_cell or target_field,
     }
     if set(details) != ADOPT_AUDIT_DETAIL_KEYS:

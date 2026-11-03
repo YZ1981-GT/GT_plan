@@ -18,7 +18,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import async_session
-from app.services.llm_client import chat_completion
+from app.services.ai_review_verdict import resolve_ai_review_verdict
 from app.services.llm_response_parser import LlmResponseParser, ReviewFinding
 from app.services.review_prompt_service import ReviewPromptService
 
@@ -79,6 +79,7 @@ class ReviewResult:
     model_used: str
     prompt_source: str
     error_message: str | None = None
+    deterministic_checks: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -388,7 +389,7 @@ class BatchReviewService:
         return _WP_CODE_DISPLAY_NAMES.get(wp_code, wp_name)
 
     async def _review_single_sheet(
-        self, sheet: dict, session_id: str, model_used: str
+        self, sheet: dict, session_id: str, model_used: str, role: str | None = None
     ) -> ReviewResult:
         """对单张底稿执行复核
 
@@ -408,8 +409,18 @@ class BatchReviewService:
             from app.services.cycle_review_context import (
                 append_reconciliation_to_user_prompt,
                 build_review_reconciliation_context,
+                build_review_reconciliation_findings,
             )
             recon_context = await build_review_reconciliation_context(wp_id, wp_code)
+            deterministic_checks = await build_review_reconciliation_findings(wp_id, wp_code)
+            deterministic_blocking_failures = sum(
+                1 for check in deterministic_checks
+                if check.get("severity") == "blocking" and check.get("passed") is False
+            )
+            deterministic_unknown = any(
+                check.get("severity") == "blocking" and check.get("passed") is None
+                for check in deterministic_checks
+            )
 
             # 3. 调用 LLM
             system_prompt = (
@@ -438,51 +449,47 @@ class BatchReviewService:
             if recon_context:
                 user_prompt = append_reconciliation_to_user_prompt(user_prompt, recon_context)
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-            raw_response = await chat_completion(
-                messages=messages,
-                temperature=0.1,  # was 0.3 — 复核任务不需要创造性
-                max_tokens=3000,
+            from app.services.ai_task_executor import invoke_ai_task
+
+            invocation = await invoke_ai_task(
+                "review.workpaper",
+                action="review",
+                user_prompt=user_prompt,
+                system_addendum=system_prompt,
+                role=role,
+                temperature=0.1,
             )
-
-            if not isinstance(raw_response, str):
-                raw_response = ""
-
-            # 4. 检查 LLM 是否返回了错误/降级标记
-            if raw_response.startswith("[") and ("不可用" in raw_response or "失败" in raw_response or "超时" in raw_response or "熔断" in raw_response):
+            model_result = invocation.result
+            if not model_result.succeeded:
                 return ReviewResult(
                     wp_id=wp_id,
                     sheet_name=sheet_name,
                     wp_code=wp_code,
-                    pass_status="review_error",
+                    pass_status="manual_review_required",
                     findings=[],
                     risk_summary={"high": 0, "medium": 0, "low": 0},
                     reviewed_at=datetime.now(timezone.utc).isoformat(),
-                    model_used=model_used,
+                    model_used=model_result.model_name or "unknown",
                     prompt_source=prompt_result.source_level,
-                    error_message=raw_response,
+                    error_message=model_result.error_message or model_result.error_code,
+                    deterministic_checks=deterministic_checks,
                 )
+            raw_response = model_result.text or ""
 
-            # 5. 解析
+            # 5. 解析并由统一边界判定。AI 只能提出疑点，不能产生业务 pass。
             parse_result = LlmResponseParser.parse(raw_response)
-            pass_status = LlmResponseParser.determine_pass_status(
-                parse_result.findings, sheet_name=sheet_name
+            verdict = resolve_ai_review_verdict(
+                parse_success=parse_result.parse_success and not deterministic_unknown,
+                findings=parse_result.findings,
+                deterministic_blocking_failures=deterministic_blocking_failures,
             )
-
-            # 如果解析失败且降级为 unknown，标记 manual_review_required
-            if not parse_result.parse_success:
-                pass_status = "manual_review_required"
+            pass_status = verdict.status.value
 
             # 计算风险汇总
             risk_summary = {"high": 0, "medium": 0, "low": 0}
             for f in parse_result.findings:
                 if not f.pass_status and f.risk_level in risk_summary:
                     risk_summary[f.risk_level] += 1
-
-            from app.services.llm_route import served_model_label
 
             return ReviewResult(
                 wp_id=wp_id,
@@ -492,10 +499,10 @@ class BatchReviewService:
                 findings=parse_result.findings,
                 risk_summary=risk_summary,
                 reviewed_at=datetime.now(timezone.utc).isoformat(),
-                # 实际回答的模型（本机不可用时路由改用服务器，ADR-ROUTE-008）
-                model_used=served_model_label(model_used),
+                model_used=model_result.model_name or "unknown",
                 prompt_source=prompt_result.source_level,
                 error_message=None,
+                deterministic_checks=deterministic_checks,
             )
 
         except Exception as e:
@@ -515,6 +522,7 @@ class BatchReviewService:
                 model_used=model_used,
                 prompt_source="unknown",
                 error_message=str(e),
+                deterministic_checks=[],
             )
 
     async def _get_workpaper_content(self, wp_id: str, sheet_name: str | None) -> str:
@@ -530,12 +538,11 @@ class BatchReviewService:
         Requirements: 4.3
         """
         total_sheets = len(results)
+        # `pass` 只可能来自历史记录或未来人工确认，AI 新结果不会生成它。
         passed_count = sum(1 for r in results if r.pass_status == "pass")
-        failed_count = sum(1 for r in results if r.pass_status == "fail")
-        error_count = sum(
-            1 for r in results
-            if r.pass_status in ("review_error", "manual_review_required")
-        )
+        failed_statuses = {"fail", "ai_findings_present", "deterministic_failure"}
+        failed_count = sum(1 for r in results if r.pass_status in failed_statuses)
+        error_count = total_sheets - passed_count - failed_count
         total_findings = sum(len(r.findings) for r in results)
 
         findings_by_risk: dict[str, int] = {"high": 0, "medium": 0, "low": 0}

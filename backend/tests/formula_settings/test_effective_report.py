@@ -144,3 +144,29 @@ async def test_two_report_resolvers_agree_slot_by_slot():
             "balance_sheet:BS-001": "A", "balance_sheet:BS-002": "ROW('BS-001')",
             "balance_sheet:BS-003": None, "balance_sheet:BS-099": "ROW('BS-002')",
         }
+
+
+async def test_effective_report_configs_carry_stable_provenance_identity_metadata():
+    """S5：合并后的 detached 配置仍明确公式实际来源，不能按拷贝对象猜层级。"""
+    from app.services.formula_provenance import report_definition_identity
+
+    async with make_db() as factory, factory() as db:
+        global_row = await add_global_row(db, "BS-001", "TB('1001','期末余额')")
+        await add_global_row(db, "BS-002", "TB('1002','期末余额')", row_number=2)
+        pid = await add_project(db, "S5 来源")
+        project_row = await add_project_row(db, pid, "BS-002", "TB('1012','期末余额')",
+                                            base_formula="TB('1002','期末余额')")
+        await db.commit()
+
+        rows = {row.row_code: row for row in await load_effective_report_configs(
+            db, standard=STD, project_id=pid,
+        )}
+        inherited = report_definition_identity(rows["BS-001"])
+        overridden = report_definition_identity(rows["BS-002"])
+
+        assert inherited.layer == "global"
+        assert inherited.source_id == str(global_row.id)
+        assert inherited.definition_ref["id"] == str(global_row.id)
+        assert overridden.layer == "project"
+        assert overridden.source_id == str(project_row.id)
+        assert overridden.definition_snapshot["formula"] == "TB('1012','期末余额')"

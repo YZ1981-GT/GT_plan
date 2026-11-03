@@ -12,8 +12,9 @@ Spec: .kiro/specs/advanced-query-module (design.md §Architecture 异步陷阱�
 
 **Validates: Requirements 1.6, 4.2**
 
-不重写 ACNR 核心：orchestrator 的寻址依赖以 stub `AddressingService` 注入，仅验证
-「同步 BFS + async 编排」的接线契约与异步安全性。
+节点身份（acnr-foundation-defect-closure T20）：编排器对每个节点经 `exact_identity.cell_of`
+（真实目录，不打桩）判定「父底稿 + sheet + A1」，不再把节点拼成 `cell:{sheet 名}!{A1}` 交寻址层；
+端到端（真 PG + TestClient）见 `tests/acnr/test_cross_sheet_trace_async_e2e.py`。
 """
 
 from __future__ import annotations
@@ -26,10 +27,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
 
 import pytest
 
-from app.services.custom_query.addressing_service import (
-    AddressingService,
-    ResolvedTarget,
-)
+from app.services.custom_query import addressing_service as addressing_mod
 from app.services.custom_query.cross_sheet_resolver import (
     CrossSheetResolver,
     _cell_ref_to_indices,
@@ -42,30 +40,22 @@ from app.services.custom_query.cross_sheet_trace_orchestrator import (
 )
 
 
-# ─── Stub AddressingService（注入 orchestrator，不触达 ACNR/DB）──────────────
+#: 目录权威名（真实目录 E1 下的两张表）
+_E1_14 = "货币资金分析表E1-14"
+_E1_15 = "利息收入月度分析E1-15"
 
 
-class _StubAddressing(AddressingService):
-    """resolve_many 返回受控 addr_id，记录调用以验证 async IO 上浮到 orchestrator。"""
+@pytest.fixture
+def no_addressing(monkeypatch):
+    """编排器不得再经统一寻址层解析节点（旧做法把节点拼成 cell:{sheet 名}!{A1}，真实 sheet 名恒解析不到）。"""
+    calls: list = []
 
-    def __init__(self) -> None:
-        self.calls: list[list[str]] = []
+    async def _forbidden(self, raws, **kwargs):
+        calls.append(list(raws))
+        raise AssertionError("编排器不应调用 AddressingService.resolve_many")
 
-    async def resolve_many(
-        self, raws, *, project_id=None, db=None, timeout_s=5.0
-    ) -> list[ResolvedTarget]:
-        self.calls.append(list(raws))
-        # 每个链节点解析为一个 canonical addr_id + jump_route
-        return [
-            ResolvedTarget(
-                raw=raw,
-                found=True,
-                addr_id=f"ADDR::{raw}",
-                jump_route=f"/jump/{i}",
-                entry_type="cell",
-            )
-            for i, raw in enumerate(raws)
-        ]
+    monkeypatch.setattr(addressing_mod.AddressingService, "resolve_many", _forbidden)
+    return calls
 
 
 def _snapshot_with_formula(sheet_name: str, cell_ref: str, formula: str) -> dict:
@@ -131,7 +121,7 @@ async def test_resolver_resolve_inside_running_loop_does_not_raise():
         assert node.resolve_missed is True  # running loop → 全部降级 fallback
 
 
-# ─── 2. async 编排：IO 上浮 + addr_id 合并 ───────────────────────────────────
+# ─── 2. async 编排：身份经 exact_identity 判定（acnr T20）───────────────────
 
 
 def test_orchestrator_trace_is_coroutine():
@@ -140,66 +130,59 @@ def test_orchestrator_trace_is_coroutine():
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_merges_addr_id_from_async_resolution():
-    """同步 BFS 得链 → async 并发解析 addr_id → 合并回链的每个节点。"""
-    stub = _StubAddressing()
-    orch = CrossSheetTraceOrchestrator(
-        resolver=CrossSheetResolver(), addressing=stub
-    )
-    snap = _snapshot_with_formula("Sheet1", "A1", "=Sheet2!B2")
+async def test_orchestrator_merges_canonical_identity(no_addressing):
+    """同步 BFS 得链 → 每个节点按「父底稿 + sheet 名 + A1」判出规范 addr_id，并标是否为登记 cell。"""
+    orch = CrossSheetTraceOrchestrator(resolver=CrossSheetResolver(resolve_identity=False))
+    snap = _snapshot_with_formula(_E1_14, "C10", f"='{_E1_15}'!C8+'{_E1_14}'!Z99")
 
-    resp = await orch.trace(snap, "Sheet1", "A1", project_id="proj-1", max_depth=3)
+    resp = await orch.trace(snap, _E1_14, "C10", parent_wp_code="E1", max_depth=3)
 
     assert isinstance(resp, CrossSheetTraceResponse)
-    assert len(resp.chain) == 2
-    # async 寻址被调用恰一次（批量 resolve_many），IO 上浮到 orchestrator
-    assert len(stub.calls) == 1
-    assert len(stub.calls[0]) == 2  # 两个链节点一次性并发解析
+    got = [(n.uri, n.addr_id, n.resolved, n.in_catalog, n.unresolved_reason) for n in resp.chain]
+    assert got == [
+        (f"{_E1_14}!C10", "E1/E1-14/C10", True, True, None),
+        (f"{_E1_15}!C8", "E1/E1-15/C8", True, True, None),
+        # sheet 已识别、A1 合法但不是登记 cell：仍是规范身份（R2-F8）
+        (f"{_E1_14}!Z99", "E1/E1-14/Z99", True, False, None),
+    ]
     for node in resp.chain:
         assert isinstance(node, TracedRefNode)
-        assert node.resolved is True
-        assert node.addr_id is not None and node.addr_id.startswith("ADDR::")
-        assert node.jump_route is not None
+        # 无项目上下文：不查底稿实例
+        assert node.wp_id is None and node.jump_route is None
+    assert no_addressing == []
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_empty_chain_skips_addressing():
-    """空链（起点 cell 无法定位仍产出 root 节点）时仍安全返回，不误报。"""
-    stub = _StubAddressing()
-    orch = CrossSheetTraceOrchestrator(
-        resolver=CrossSheetResolver(), addressing=stub
-    )
-    # parsed_data=None → 单 root 节点、无跨表引用
-    resp = await orch.trace(None, "SheetX", "A1", project_id="proj-1")
-    assert isinstance(resp, CrossSheetTraceResponse)
+async def test_orchestrator_unresolvable_nodes_carry_chinese_reason(no_addressing):
+    """sheet 不在目录 / A1 非法 / 父级内多义 ⇒ resolved=False、addr_id=None、带中文原因，不中断整条链。"""
+    orch = CrossSheetTraceOrchestrator(resolver=CrossSheetResolver(resolve_identity=False))
+    snap = _snapshot_with_formula(_E1_14, "C10", "='不存在的表'!A1")
+    resp = await orch.trace(snap, _E1_14, "C10", parent_wp_code="E1")
+    assert [n.resolved for n in resp.chain] == [True, False]
+    missing = resp.chain[1]
+    assert missing.addr_id is None and "不存在的表" in (missing.unresolved_reason or "")
+
+    bad = await orch.trace(None, _E1_14, "A1B", parent_wp_code="E1")
+    assert bad.chain[0].resolved is False and "A1B" in (bad.chain[0].unresolved_reason or "")
+
+    ambiguous = await orch.trace(None, "底稿目录", "A1", parent_wp_code="F2")
+    node = ambiguous.chain[0]
+    assert node.resolved is False and node.addr_id is None
+    assert "F2-33" in (node.unresolved_reason or "") and "F2-34" in (node.unresolved_reason or "")
+    assert no_addressing == []
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_without_parent_reports_reason(no_addressing):
+    """没给父底稿编码（端点总会给）⇒ 单 root 节点 resolved=False 且原因说明缺父底稿。"""
+    orch = CrossSheetTraceOrchestrator(resolver=CrossSheetResolver(resolve_identity=False))
+    resp = await orch.trace(None, "SheetX", "A1")
     assert len(resp.chain) == 1
-    # 有一个节点 → resolve_many 被调用一次解析该节点
-    assert len(stub.calls) == 1
-    assert resp.chain[0].resolved is True
+    assert resp.chain[0].resolved is False
+    assert resp.chain[0].unresolved_reason == "缺少父底稿编码，无法确定单元格身份"
+    assert no_addressing == []
 
 
-@pytest.mark.asyncio
-async def test_orchestrator_runs_bfs_synchronously_then_awaits_io():
-    """编排顺序契约：先同步 BFS（无 IO），再 await 异步 addr_id 解析。
-
-    通过在 stub 内断言链已成型（长度、顺序）来证明 BFS 已在 await 前同步完成。
-    """
-    captured: dict = {}
-
-    class _OrderStub(AddressingService):
-        async def resolve_many(self, raws, *, project_id=None, db=None, timeout_s=5.0):
-            captured["inputs"] = list(raws)
-            return [
-                ResolvedTarget(raw=r, found=True, addr_id=f"ADDR::{r}")
-                for r in raws
-            ]
-
-    orch = CrossSheetTraceOrchestrator(
-        resolver=CrossSheetResolver(), addressing=_OrderStub()
-    )
-    snap = _snapshot_with_formula("A", "A1", "=B!B1")
-    resp = await orch.trace(snap, "A", "A1")
-
-    # BFS 在 await resolve_many 前已完整成型（两节点，按发现顺序传入寻址层）
-    assert captured["inputs"] == ["cell:A!A1", "cell:B!B1"]
-    assert [n.uri for n in resp.chain] == ["A!A1", "B!B1"]
+def test_production_singleton_does_not_bridge_identity():
+    """编排器缺省用的模块单例只做 BFS（resolve_identity=False），不经同步桥接取身份。"""
+    assert cross_sheet_resolver._resolve_identity is False

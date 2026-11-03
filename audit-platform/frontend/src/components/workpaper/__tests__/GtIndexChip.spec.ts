@@ -32,7 +32,9 @@ const mockAcnrResolve = vi.fn()
 const mockAcnrResolveInstance = vi.fn()
 vi.mock('@/services/acnr', () => ({
   useAcnr: () => ({
-    resolve: mockAcnrResolve,
+    // R15：chip 走批量解析 resolveIndexBatched(indexRef, projectId)；这里转成原 resolve 的对象参数，既有断言不变
+    resolveIndexBatched: (indexRef: string, projectId?: string) =>
+      mockAcnrResolve({ index_ref: indexRef, project_id: projectId }),
     resolveInstance: mockAcnrResolveInstance,
   }),
 }))
@@ -232,6 +234,38 @@ describe('GtIndexChip — ACNR resolve 校验（R13.3）', () => {
     await flushPromises()
     const tag = wrapper.find('.el-tag-stub')
     expect(tag.attributes('data-type')).toBe('danger')
+  })
+
+  it('禁用（程序步骤不适用）的 chip 不解析；解除禁用后再解析（procedure-chain-hardening R15）', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2' })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'D2', validate: true, disabled: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    expect(mockAcnrResolve).not.toHaveBeenCalled()
+    await wrapper.setProps({ disabled: false })
+    await flushPromises()
+    expect(mockAcnrResolve).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.el-tag-stub').attributes('data-type')).toBe('primary')
+  })
+
+  it('整批解析请求失败 ⇒ error（不灰显、提示暂时无法校验），点击仍尝试跳转（R15）', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: false, error: 'batch_resolve_failed' })
+    mockAcnrResolveInstance.mockResolvedValue({ found: true, wp_id: 'wp-9', jump_route: '/projects/proj-123/workpapers/wp-9/edit' })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'D2', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    const tag = wrapper.find('.el-tag-stub')
+    expect(tag.attributes('data-type')).toBe('danger')
+    expect(tag.classes()).not.toContain('gt-index-chip--disabled')
+    expect(wrapper.find('.el-tooltip-stub').attributes('data-content')).toBe('暂时无法校验，仍可点击尝试跳转')
+    await tag.trigger('click')
+    await flushPromises()
+    expect(mockAcnrResolveInstance).toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-123/workpapers/wp-9/edit')
   })
 
   it('cell:D2-2!E100 索引调用 ACNR resolve 时传 index_ref=cell:D2-2!E100（R11.3）', async () => {

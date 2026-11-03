@@ -10,6 +10,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useProjectRole } from '@/composables/useProjectRole'
+import { classificationOf, describeCategoryGroup } from '@/types/projectClassification'
 
 interface ReviewItem {
   seq: number
@@ -130,10 +131,8 @@ const signButtonTooltip = computed(() => {
   return ''
 })
 
-const categoryLabel = computed(() => {
-  const bc = String(context.value.business_category || '')
-  return bc ? `${bc[0]}类` : ''
-})
+// 复核上下文下发的分类解释（原取 business_category 首字母：旧值 IPO 显示成「I类」）
+const categoryLabel = computed(() => describeCategoryGroup(classificationOf(context.value)))
 
 async function loadDefinition() {
   if (!effectiveWpCode.value) return

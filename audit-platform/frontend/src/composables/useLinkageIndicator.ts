@@ -33,7 +33,8 @@ export interface LinkedWorkpaper {
   status?: string
 }
 
-export function useLinkageIndicator(projectId: Ref<string>, year: Ref<number>) {
+/** year：审计年度；项目没填为 null ⇒ 徽章不取数（与未传项目同） */
+export function useLinkageIndicator(projectId: Ref<string>, year: Ref<number | null>) {
   // Cache: rowCode → data
   const adjustmentsCache = ref<Record<string, LinkedAdjustment[]>>({})
   const workpapersCache = ref<Record<string, LinkedWorkpaper[]>>({})
@@ -49,7 +50,7 @@ export function useLinkageIndicator(projectId: Ref<string>, year: Ref<number>) {
 
   async function fetchAdjustments(rowCode: string): Promise<LinkedAdjustment[]> {
     const pid = projectId.value
-    if (!pid || !rowCode) return []
+    if (!pid || !rowCode || year.value == null) return []
     try {
       const data = await api.get(P.tbRowAdjustments(pid, rowCode), { params: { year: year.value } })
       const items = data ?? []
@@ -62,7 +63,7 @@ export function useLinkageIndicator(projectId: Ref<string>, year: Ref<number>) {
 
   async function fetchWorkpapers(rowCode: string): Promise<LinkedWorkpaper[]> {
     const pid = projectId.value
-    if (!pid || !rowCode) return []
+    if (!pid || !rowCode || year.value == null) return []
     try {
       const data = await api.get(P.tbRowWorkpapers(pid, rowCode), { params: { year: year.value } })
       const items = data ?? []

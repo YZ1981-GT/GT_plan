@@ -20,6 +20,7 @@
  *
  * item_id 命名规则：前缀 "H7-{sheet编号}-{field}"
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -120,15 +121,12 @@ export function useH7FormData(opts: {
 
   async function loadTbData(): Promise<void> {
     try {
-      const { data } = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_codes: ACCOUNT_CODE_1621 },
-      })
-      const rows = data?.data ?? data ?? []
-      for (const row of rows) {
-        if (row.standard_account_code === ACCOUNT_CODE_1621) {
-          tbData.value.costUnadjusted = parseNum(row.unadjusted_amount)
-          tbData.value.costAudited = parseNum(row.audited_amount)
-        }
+      // 原先 `const { data } = await api.get(...)` 二次解包（api 已返回数组）⇒ rows 恒空、从未取到数
+      const { rows } = await fetchTrialBalanceRows(projectId.value, { accountPrefix: ACCOUNT_CODE_1621 })
+      const costUnadjusted = tbSumUnder(rows, ACCOUNT_CODE_1621, 'unadjusted_amount')
+      if (costUnadjusted != null) {
+        tbData.value.costUnadjusted = costUnadjusted
+        tbData.value.costAudited = tbSumUnder(rows, ACCOUNT_CODE_1621, 'audited_amount') ?? 0
       }
     } catch { /* TB may not be imported yet */ }
   }

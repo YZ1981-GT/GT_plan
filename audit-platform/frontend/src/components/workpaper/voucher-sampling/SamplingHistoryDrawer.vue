@@ -20,6 +20,8 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ExtractionLogEntry } from '../composables/useVoucherSampling'
 import type { SamplingMethod, Phase } from '../composables/useSamplingAlgorithms'
+import { FINAL_POPULATION_MODE_LABELS } from '../composables/useFinalPopulationMode'
+import { parseServerTime } from '@/utils/formatters'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +68,8 @@ function getPhaseLabel(phase: Phase): string {
 
 function formatTime(isoStr: string): string {
   if (!isoStr) return '—'
-  const d = new Date(isoStr.endsWith('Z') ? isoStr : isoStr + 'Z')
+  const d = parseServerTime(isoStr)
+  if (Number.isNaN(d.getTime())) return isoStr
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -196,6 +199,17 @@ function isCoverageSufficient(entry: ExtractionLogEntry): boolean {
             </el-tag>
             <el-tag v-if="entry.isUndone" size="small" type="info" class="tag-undone">
               已撤销
+            </el-tag>
+            <el-tag
+              v-if="entry.legacyExclusion"
+              size="small"
+              type="warning"
+              title="这条记录只记了凭证号：排除已抽凭证时按凭证号整张排除，可能连带同号的其他凭证"
+            >
+              旧记录按凭证号排除
+            </el-tag>
+            <el-tag v-if="entry.finalPopulationMode" size="small" type="success" data-testid="history-final-population-mode">
+              {{ FINAL_POPULATION_MODE_LABELS[entry.finalPopulationMode] }}
             </el-tag>
           </div>
 

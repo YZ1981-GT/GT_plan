@@ -2,11 +2,10 @@
  * K 系负债/递延类（K3/K4/K5/K7）披露子表 ↔ 附注模板契约 + 载荷断言
  *
  * P1~P5 由共享 helper 覆盖；本文件另断言：
- * - K3 七张 / 六张表列头逐位同形（改造前只推主表 1 张，其余 6/5 张附注侧永空）
- * - 条件表（逾期利息 / 超1年未付股利 / 账龄超1年）无行时不推且进 `_removed_table_keys`
- * - 应付利息 / 应付股利未接线时**不推空表**（`_source=workpaper` 下推空表会整表覆盖模板骨架）
+ * - K3 只发送按性质与账龄超一年两张 owner 表，绝不写删 L2/M1 表或共享主表
+ * - K3 自有账龄超一年条件表无行时不推且进入 `_removed_table_keys`
  * - K4 债券续表名已由泄漏名 `债券名称` 正名为「短期应付债券（续）」，旧键进 removed
- * - 主表三行由分表合计派生（与源模板 `=B17`/`=C17` 取数关系一致）
+ * - 共享主表派生与三 owner 排列由后端 `test_wp_disclosure_other_payables_owners.py` 验证
  * - 底稿审计分析段（按账龄 / 前五名）不进载荷
  *
  * spec: .kiro/specs/k-cycle-disclosure-alignment/ Task 9
@@ -21,7 +20,7 @@ import {
   K3_LISTED_SUBTABLE,
   K3_NOTE_SECTION,
   K3_SOE_SUBTABLE,
-  K3_SUMMARY_ROWS,
+  K3_TABLE_SCOPE,
   buildK3ListedColumns,
   buildK3SoeColumns,
   buildK3SyncPayload,
@@ -343,30 +342,33 @@ describe('buildK3SyncPayload', () => {
     }
   })
 
-  it('主表三行由分表合计派生（与源模板 =B17/=C17 取数关系一致）', () => {
-    const p = buildK3SyncPayload('listed', 'wp-1', snapshot({
+  it.each(['listed', 'soe'] as const)('%s 只发送 K3 独占表，主表/利息/股利输入均被忽略', (variant) => {
+    const p = buildK3SyncPayload(variant, 'wp-1', snapshot({
       interest: [{ project: '企业债券利息', endAmount: 5, priorAmount: 3 }],
       dividend: [{ project: '普通股股利', endAmount: 7, priorAmount: 4 }],
+      interestOverdue: [{ unit: '甲银行', amount: 9 }],
+      dividendOverdue: [{ shareholder: '乙股东', amount: 11 }],
+      agingOver1y: [{ name: '丙单位', endAmount: 13, reason: '未结算' }],
     }))
-    const rows = p.sub_table_data[K3_LISTED_SUBTABLE.summary] as Array<Record<string, unknown>>
-    expect(rows.map(r => r.label)).toEqual([...K3_SUMMARY_ROWS.listed, '合计'])
-    expect(rows[0]).toMatchObject({ end_amount: 5, prior_amount: 3 })
-    expect(rows[1]).toMatchObject({ end_amount: 7, prior_amount: 4 })
-    expect(rows[2]).toMatchObject({ end_amount: 140, prior_amount: 80 })
-    expect(rows[3]).toMatchObject({ is_total: true, end_amount: 152, prior_amount: 87 })
+    const keys = Object.keys(p.sub_table_data).filter((key) => !key.startsWith('_')).sort()
+    expect(keys).toEqual([...K3_TABLE_SCOPE[variant]].sort())
+    expect(Object.keys(p.columns).sort()).toEqual([...K3_TABLE_SCOPE[variant]].sort())
+    const T = variant === 'listed' ? K3_LISTED_SUBTABLE : K3_SOE_SUBTABLE
+    const forbidden: string[] = [T.summary, T.interest, T.interestOverdue, T.dividend]
+    if (variant === 'listed') forbidden.push(K3_LISTED_SUBTABLE.dividendOverdue)
+    const removed = (p.sub_table_data._removed_table_keys ?? []) as string[]
+    for (const name of forbidden) {
+      expect(p.sub_table_data[name]).toBeUndefined()
+      expect(p.columns[name]).toBeUndefined()
+      expect(removed).not.toContain(name)
+    }
   })
 
-  it('国企主表第三行标签是「其他应付款项」（与上市不同）', () => {
-    const p = buildK3SyncPayload('soe', 'wp-1', snapshot())
-    const rows = p.sub_table_data[K3_SOE_SUBTABLE.summary] as Array<Record<string, unknown>>
-    expect(rows[2].label).toBe('其他应付款项')
-  })
-
-  it('条件表无行 → 不推且进 _removed_table_keys；columns 同步剔除', () => {
+  it('K3 自有长期挂账表无行 → 不推且进入删除清单', () => {
     const p = buildK3SyncPayload('listed', 'wp-1', snapshot())
     const T = K3_LISTED_SUBTABLE
     const removed = p.sub_table_data._removed_table_keys as string[]
-    for (const name of [T.interestOverdue, T.dividendOverdue, T.agingOver1y]) {
+    for (const name of [T.agingOver1y]) {
       expect(p.sub_table_data[name]).toBeUndefined()
       expect(p.columns[name]).toBeUndefined()
       expect(removed).toContain(name)

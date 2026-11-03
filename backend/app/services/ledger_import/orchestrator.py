@@ -242,6 +242,8 @@ class ImportOrchestrator:
         force_activate: bool = False,
         created_by: UUID | None = None,
         adapter_id: str | None = None,
+        append_strategy: str | None = None,
+        balance_carry_confirmed: bool = False,
     ) -> dict:
         """Create ImportJob + ImportArtifact, return job info.
 
@@ -317,6 +319,16 @@ class ImportOrchestrator:
             db.add(artifact)
             await db.flush()
 
+        from app.services.ledger_dataset_merge import freeze_append_options
+
+        append_options = await freeze_append_options(
+            db,
+            project_id=project_id,
+            year=year,
+            strategy=append_strategy,
+            balance_carry_confirmed=balance_carry_confirmed,
+        )
+
         # Create ImportJob
         job = ImportJob(
             id=uuid.uuid4(),
@@ -329,6 +341,7 @@ class ImportOrchestrator:
                 "upload_token": upload_token,
                 "adapter_id": adapter_id,
                 "force_activate": force_activate,
+                "append": append_options,
             },
             created_by=created_by,
         )

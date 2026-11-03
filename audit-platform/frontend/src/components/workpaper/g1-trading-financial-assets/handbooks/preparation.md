@@ -1,6 +1,5 @@
 # G1 交易性金融资产 — 底稿编制手册
 
-> **文档副本**：仓库可读版见 `audit-platform/docs/handbooks/`；  
 > 程序内弹窗以本目录 `preparation.md` / `usage.md` 为准（G1A 程序控制台「编制手册」按钮）。
 >
 > **适用范围**：科目 **1501**（交易性金融资产）结构化底稿包  
@@ -402,8 +401,8 @@ flowchart TB
 
 | 项 | 约定 |
 |----|------|
-| 本手册路径 | `audit-platform/docs/handbooks/G1-交易性金融资产-编制手册.md` |
-| 操作手册 | `audit-platform/docs/handbooks/G1-交易性金融资产-使用手册.md` |
+| 本手册路径 | `frontend/.../g1-trading-financial-assets/handbooks/preparation.md` |
+| 操作手册 | `frontend/.../g1-trading-financial-assets/handbooks/usage.md` |
 | 页内说明 | **默认不改**；准则或 Excel 模板重大变更时另开任务同步 |
 | 标签真源 | `frontend/.../composables/g1SheetLabels.ts` |
 | 实现入口 | `frontend/.../GtG1TradingFinancialAssets.vue` |

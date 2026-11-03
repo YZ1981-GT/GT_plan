@@ -2,6 +2,7 @@
  * useF2DevCostSheet — F2-11 开发成本明细
  * 对齐 Excel：（一）原值 ·（二）跌价准备 ·（三）净值 + 审计说明
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcEndAmount, calcSubtotal } from './useF2InvMaiFormulaEngine'
@@ -81,7 +82,7 @@ function emptyNotes(): DevCostNotePack {
 
 /** BP-7 修复：稳定行身份生成器。 */
 function generateF2RowId(): string {
-  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `f2-${newUuid()}`
 }
 
 function emptyRow(id: string): DevCostRow {

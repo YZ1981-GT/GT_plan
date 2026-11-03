@@ -61,6 +61,19 @@ def _stub_ref_template_type():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_audit_year():
+    """隔离审计年度补齐（spec formula-hub-integrity-closure 需求 11.1 / D-1）：保存 / 删除写审计时调用方不传 year，
+    `wp_formula_audit.write_wp_formula_audit` 按项目审计年度补齐，会查 `projects`；本组只建 `wp_formula` 表、项目并不
+    存在 ⇒ 桩成「项目没有审计年度」（None，载荷不带 year，与补齐之前相同）。年度补齐本身由
+    `tests/formula_hub/test_formula_history_year_writers.py` ⑨ 用真 projects 行覆盖。"""
+    with patch(
+        "app.services.project_audit_year.resolve_project_audit_year_for_request",
+        new=AsyncMock(return_value=None),
+    ):
+        yield
+
+
 class _FakeUser:
     id = uuid.uuid4()
     is_active = True
@@ -156,7 +169,9 @@ async def test_wp_formula_crud_roundtrip():
                             assert items[0]["target_cell"] == "B5"
 
                             del_resp = await client.delete(
-                                f"/api/workpapers/{wp_id}/formulas/{saved_id}"
+                                f"/api/workpapers/{wp_id}/formulas/{saved_id}",
+                                # 删除强制带版本号（spec formula-hub-integrity-closure ADR-FHIC-11 / 需求 13.4，缺 ⇒ 428）
+                                params={"expected_version": body["saved"]["definition_version"]},
                             )
                             assert del_resp.status_code == 200
 

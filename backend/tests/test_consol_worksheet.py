@@ -60,12 +60,6 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 
-class _WorkpaperStub(Base):
-    __tablename__ = "workpapers"
-    __table_args__ = {"extend_existing": True}
-    id = sa.Column(sa.Uuid, primary_key=True)
-
-
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 engine = create_async_engine(TEST_DB_URL, echo=False)
 

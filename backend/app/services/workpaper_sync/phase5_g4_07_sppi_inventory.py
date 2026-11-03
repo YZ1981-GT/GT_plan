@@ -48,13 +48,16 @@ FOOTER_MARKER_G407: Final[str] = "三、审计说明："
 FORMULA_COLUMNS_G407: Final[tuple[str, ...]] = ()
 
 #: 6 个受管字段（B..G），A 列空不声明。
+#: 🔴 spec oo-writeback-template-parity-closure R3 批 B（字段名守卫报出）：B 的 json 键原写 securityName，前端
+#:    `useG4SppiInventory.InventoryItem` 存 securitiesName；E 总计模板无公式，前端按 面值 × 数量 现算、载入即覆盖
+#:    ⇒ auto_source（HTML 侧带出，OO 改了报受保护冲突，不让两侧来回变值；同 F3-4 期限）。列键不变。
 FIELD_SPECS_G407: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
-    ("security_name", "B", "editable", "text", "securityName", "证券名称", ""),
+    ("security_name", "B", "editable", "text", "securitiesName", "证券名称", ""),
     ("face_value", "C", "editable", "amount", "faceValue", "面值", ""),
     ("quantity", "D", "editable", "amount", "quantity", "数量", ""),
-    ("total", "E", "editable", "amount", "total", "总计", ""),
+    ("total", "E", "auto_source", "amount", "total", "总计", ""),
     ("coupon_rate", "F", "editable", "rate", "couponRate", "票面利率", ""),
     ("maturity_date", "G", "editable", "text", "maturityDate", "到期日", ""),
 )

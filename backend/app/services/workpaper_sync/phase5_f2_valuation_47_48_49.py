@@ -24,24 +24,32 @@ ROW_IDENTITY_KEY: Final[str] = "id"
 # ═══════════════════════════════════════════════════════════════════════════
 # F2-48 长库龄呆滞超保质期存货明细表（canary）
 # ═══════════════════════════════════════════════════════════════════════════
-# 几何：22r×N，表头 R5/R6（两级），数据 R7-16，footer A17
-# store: F2-48-rows → dict {products:[...]}，id 形如 f2imp-…
+# 几何：22r×N，表头 R5/R6（两级，I5:L5「库龄」合并），数据 R7-16，footer A17
+# store: F2-48-rows → dict {products:[...]}，id 形如 f2obs-…
 # formula_in_data: H（=F*G）
+#
+# 🔴 字段键逐字取前端 `useF2ObsoleteInventoryFormulas.ObsoleteInventoryItem`
+#    （spec oo-writeback-template-parity-closure R3）。原声明照另一种版式写（A 存货编号 / E 数量 /
+#    F 单位成本 / H 库龄金额 / I~M 库龄说明·品质·原因·计划·备注），与模板 R5/R6 表头整体错位：
+#    OO 填的存货类别写进前端没有的 `itemCode`，H 列「结存金额 = F × G」被当成 单位成本 × 账面金额。
+#    库龄四档是嵌套对象 `aging.{within1y,y1to2,y2to3,over3y}`（与 F2-47 共用 ImpairmentAging）。
+#    结存金额 H 由前端 `enrichObsoleteItem` 现算、不落库（formula 字段只读）。
 
 _FIELD_SPECS_F248: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("item_code",   "A", "editable", "text",   "itemCode",     "存货编号", ""),
-    ("item_name",   "B", "editable", "text",   "itemName",     "存货名称", ""),
-    ("spec",        "C", "editable", "text",   "spec",         "规格型号", ""),
-    ("unit",        "D", "editable", "text",   "unit",         "计量单位", ""),
-    ("qty",         "E", "editable", "amount", "qty",          "数量",     ""),
-    ("unit_cost",   "F", "editable", "amount", "unitCost",     "单位成本", ""),
-    ("book_amt",    "G", "editable", "amount", "bookAmt",      "账面金额", ""),
-    ("aging_amt",   "H", "formula",  "amount", "agingAmt",     "库龄金额", ""),
-    ("aging_desc",  "I", "editable", "text",   "agingDesc",    "库龄说明", ""),
-    ("status",      "J", "editable", "text",   "status",       "品质状况", ""),
-    ("reason",      "K", "editable", "text",   "reason",       "形成原因", ""),
-    ("plan",        "L", "editable", "text",   "plan",         "处理计划", ""),
-    ("remark",      "M", "editable", "text",   "remark",       "备注",     ""),
+    ("category",         "A", "editable", "text",   "category",        "存货类别", ""),
+    ("item_code",        "B", "editable", "text",   "itemCode",        "存货编码", ""),
+    ("item_name",        "C", "editable", "text",   "itemName",        "存货名称", ""),
+    ("specification",    "D", "editable", "text",   "specification",   "存货规格", ""),
+    ("unit",             "E", "editable", "text",   "unit",            "存货单位", ""),
+    ("qty",              "F", "editable", "amount", "qty",             "结存数量", ""),
+    ("unit_price",       "G", "editable", "amount", "unitPrice",       "结存单价", ""),
+    ("ending_amount",    "H", "formula",  "amount", "endingAmount",    "结存金额", ""),
+    ("aging_within_1y",  "I", "editable", "amount", "aging/within1y",  "1年以内",  "I5"),
+    ("aging_1y_to_2y",   "J", "editable", "amount", "aging/y1to2",     "1-2年",    "I5"),
+    ("aging_2y_to_3y",   "K", "editable", "amount", "aging/y2to3",     "2-3年",    "I5"),
+    ("aging_over_3y",    "L", "editable", "amount", "aging/over3y",    "3年以上",  "I5"),
+    ("impairment_signs", "M", "editable", "text",   "impairmentSigns", "是否存在过时冷背呆滞等各种减值迹象", ""),
+    ("provision_amount", "N", "editable", "amount", "provisionAmount", "计提跌价金额", ""),
 )
 
 SPEC_F248: Final[RowTableSheetSpec] = RowTableSheetSpec(

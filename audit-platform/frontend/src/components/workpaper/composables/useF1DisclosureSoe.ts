@@ -2,7 +2,7 @@
  * useF1DisclosureSoe — 预付账款附注披露（国企）
  * 对齐 Excel：账龄列示(账面+坏账) / 超1年大额 / 前五名 + 同步附注八、7
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcPercentage } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { useF1CrossSheet } from './useF1CrossSheet'
@@ -73,6 +73,11 @@ export interface UseF1DisclosureSoeOptions {
   crossSheet: ReturnType<typeof useF1CrossSheet>
   isReadonly: Ref<boolean>
   applicableStandards: Ref<string[]>
+  /**
+   * 是否订阅附注编辑器的跨组件文本更新。真实 Tab 缺省订阅；离屏 provider 必须显式关闭，
+   * 避免刷新附注时短暂挂全局监听或响应另一个页面的 UI 事件。
+   */
+  listenForNoteUpdates?: boolean
   /**
    * 四表库减值准备（render `impairment_prefill`）；`null` = 四表库无
    * 「坏账准备-预付账款」科目。
@@ -221,7 +226,7 @@ export function buildSoeOver1Rows(input: {
 export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
   const {
     allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards,
-    impairmentPrefill, clientName,
+    impairmentPrefill, clientName, listenForNoteUpdates = true,
   } = options
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
@@ -511,8 +516,10 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
       else if (idx === '3') note3.value = detail.text || ''
     }
   }
-  window.addEventListener('note:section-updated', noteUpdateHandler)
-  eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  if (listenForNoteUpdates) {
+    window.addEventListener('note:section-updated', noteUpdateHandler)
+    eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  }
 
   function getSyncSnapshot(): F1SoeSyncSnapshot {
     return {
@@ -560,7 +567,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     }
   }
 
-  onBeforeUnmount(() => {
+  // 作用域销毁时清理（组件卸载与附注页离屏同步都会走到；onBeforeUnmount 在离屏时不注册 ⇒ 窗口监听泄漏）
+  onScopeDispose(() => {
     for (const { event, handler } of eventListeners) {
       window.removeEventListener(event, handler)
     }

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import http from '@/utils/http'
+import { invalidateProjectListQuery } from '@/services/projectListQuery'
 
 export interface BasicInfo {
   client_name: string
@@ -9,8 +10,11 @@ export interface BasicInfo {
   accounting_standard: string
   company_code: string
   template_type: string
-  // audit-report-template-integration 需求 1.5：企业子类型 type_a/b/c/d
+  // audit-report-template-integration 需求 1.5：报告模板类型（企业子类型）type_a/b/c/d
   company_subtype: string | null
+  // R4：质控业务分类码（A / A1~A8、B / B1~B6、C；null = 未填写，判定按 C 类）与专项场景（登记值）
+  business_category: string | null
+  scenario: string
   custom_template_id: string
   custom_template_name: string
   custom_template_version: string
@@ -93,6 +97,18 @@ export function pickGroupFields(source: Record<string, unknown> | null | undefin
   return out
 }
 
+/** 从项目详情/创建响应取质控业务分类与专项场景（后端解释后的值，R4） */
+export function pickClassification(
+  source: Record<string, unknown> | null | undefined,
+): { business_category: string | null; scenario: string } {
+  const category = source?.business_category
+  const scenario = source?.scenario
+  return {
+    business_category: typeof category === 'string' && category ? category : null,
+    scenario: typeof scenario === 'string' && scenario ? scenario : 'normal',
+  }
+}
+
 export const useWizardStore = defineStore('wizard', {
   state: () => ({
     projectId: null as string | null,
@@ -144,8 +160,11 @@ export const useWizardStore = defineStore('wizard', {
       }
     },
 
-    /** Create project via POST /api/projects */
-    async createProject(basicInfo: BasicInfo) {
+    /**
+     * Create project via POST /api/projects
+     * @param options.onForbidden 403 时由请求拦截器调用（替代通用的「权限不足」提示），用于显示建项授权的具体原因
+     */
+    async createProject(basicInfo: BasicInfo, options: { onForbidden?: (error: unknown) => void } = {}) {
       this.loading = true
       try {
         // Filter out null values for optional fields
@@ -163,6 +182,9 @@ export const useWizardStore = defineStore('wizard', {
         if (basicInfo.company_subtype) {
           payload.company_subtype = basicInfo.company_subtype
         }
+        // R4：两个键始终发送（null = 未填写分类），后端按登记值校验，非法值 422
+        payload.business_category = basicInfo.business_category || null
+        payload.scenario = basicInfo.scenario || 'normal'
         if (basicInfo.template_type === 'custom' && basicInfo.custom_template_id) {
           payload.custom_template_id = basicInfo.custom_template_id
           if (basicInfo.custom_template_name) {
@@ -193,11 +215,15 @@ export const useWizardStore = defineStore('wizard', {
           payload.contract_amount = basicInfo.contract_amount
         }
         
-        const { data } = await http.post('/api/projects', payload)
+        const { data } = options.onForbidden
+          ? await http.post('/api/projects', payload, { _forbiddenHandler: options.onForbidden } as any)
+          : await http.post('/api/projects', payload)
+        invalidateProjectListQuery()
         const project = data
         this.projectId = project.id
-        // 后端可能补齐了集团关系（按名称默认关系、继承同企业另一口径项目、按上级补控制方），以响应为准
-        this.stepData.basic_info = { ...basicInfo, ...pickGroupFields(project) }
+        // 后端可能补齐了集团关系（按名称默认关系、继承同企业另一口径项目、按上级补控制方），以响应为准；
+        // 分类 / 场景也以后端归一后的值为准（大小写、空白）
+        this.stepData.basic_info = { ...basicInfo, ...pickGroupFields(project), ...pickClassification(project) }
         this.completedSteps.basic_info = true
         this.lastNotices = Array.isArray(project?.notices) ? project.notices : []
         return project
@@ -252,6 +278,7 @@ export const useWizardStore = defineStore('wizard', {
           report_scope: proj.report_scope || 'standalone',
           // 需求 1.6：批量导入项目的兜底回填也要恢复集团关系
           ...pickGroupFields(proj),
+          ...pickClassification(proj),
         }
         this.completedSteps.basic_info = true
       } catch {
@@ -265,6 +292,7 @@ export const useWizardStore = defineStore('wizard', {
       this.loading = true
       try {
         const { data } = await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
+        invalidateProjectListQuery()
         const state = data as WizardState & { notices?: string[] }
         this.applyWizardState(state)
         this.lastNotices = Array.isArray(state?.notices) ? state.notices : []

@@ -267,6 +267,7 @@
 </template>
 
 <script setup lang="ts">
+import { tbErrorText } from '@/services/trialBalanceRows'
 import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -286,7 +287,6 @@ import {
 } from '../../composables/iCycleAccountScope'
 import { useICycleAdjudicationSeeding } from '../../composables/useICycleAdjudicationSeeding'
 import { iCycleSeedSpec } from '../../composables/iCycleAdjudicationSeed'
-import http from '@/utils/http'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -348,9 +348,12 @@ async function handleLoadTb(silent = false): Promise<void> {
   if (!props.projectId) return
   isLoadingTb.value = true
   try {
-    const tb: I2TbData = await fetchI2TbData(http, props.projectId)
+    const tb: I2TbData = await fetchI2TbData(props.projectId)
     await persistI2TbData(props.saveResponse, tb)
     if (!silent) ElMessage.success('已从 TB 带入科目1717数据')
+  } catch (err) {
+    // 取不到不落库（原先失败也写全零并提示「已带入」）
+    if (!silent) ElMessage.warning(`未能从 TB 带入：${tbErrorText(err)}`)
   } finally {
     isLoadingTb.value = false
   }

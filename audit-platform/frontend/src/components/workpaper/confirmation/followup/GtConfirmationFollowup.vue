@@ -48,6 +48,9 @@
           <FollowupDetail
             :row="currentRow"
             :readonly="readonly"
+            :wp-id="wpId"
+            :project-id="evidenceProjectId"
+            :sheet-key="evidenceSheetKey"
             @update="handleFieldUpdate"
           >
             <template #memo-preview>
@@ -155,6 +158,8 @@ import FollowupDashboard from './FollowupDashboard.vue'
 import FollowupMaster from './FollowupMaster.vue'
 import FollowupDetail from './FollowupDetail.vue'
 import FollowupMemoPreview from './FollowupMemoPreview.vue'
+import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
+import { routeProjectId } from '@/components/attachment/rowEvidence'
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 
@@ -174,6 +179,11 @@ const emit = defineEmits<{
 // ─── Readonly computed ────────────────────────────────────────────────────────
 
 const readonly = computed(() => props.readonly ?? false)
+
+// 跟函证据挂到本行（spec attachment-confirmation-evidence-loop 需求 4）：表页 = 本循环跟函表编码
+const routePid = routeProjectId()
+const evidenceProjectId = computed(() => props.projectId || routePid)
+const evidenceSheetKey = computed(() => getCycleConfirmationMeta(props.wpCode).followupCode)
 
 // ─── Legacy format check ──────────────────────────────────────────────────────
 

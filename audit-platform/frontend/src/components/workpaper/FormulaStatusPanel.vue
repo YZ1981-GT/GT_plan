@@ -114,7 +114,7 @@ const props = defineProps<{
   projectId: string
   wpId: string
   /** 保存/求值悬空校验所需年度；缺省回退当前年度 */
-  year?: number
+  year?: number | null
 }>()
 
 const { canDo } = usePermissionMatrix(props.projectId)
@@ -382,11 +382,18 @@ async function restoreDefault(binding: TierABinding) {
     ElMessage.error('未找到对应的用户公式记录')
     return
   }
+  const item = rawItems.value.find((it) => it.id === fid)
+  const ver = item?.definition_version ?? 1
   try {
-    await api.delete(wpFormula.remove(props.wpId, fid))
+    await api.delete(wpFormula.remove(props.wpId, fid), { params: { expected_version: ver }, _silent: true } as any)
     ElMessage.success('已恢复默认')
     await loadFormulas()
-  } catch {
+  } catch (e: any) {
+    if (e?.response?.status === 409 || e?.response?.status === 428) {
+      ElMessage.warning('公式已被修改，请刷新后重试')
+      await loadFormulas()
+      return
+    }
     ElMessage.error('恢复默认失败')
   }
 }

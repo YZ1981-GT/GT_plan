@@ -101,13 +101,17 @@ UUID_COL_D305: Final[str] = "I"
 #: 8 个受管字段（7 元组，末位 group_header_cell 为 "" —— 单级表头无分组）。
 #: 顺序即 Excel 列序 A→H；表头文本与 R10 逐字相等（本任务独立 openpyxl 复核确认）。
 #: 数据行区间（11-13）内逐行没有任何公式列 ⇒ 全部 8 列均为 editable，无 formula 列。
+#: 🔴 json 键逐字取前端 `useD3LongTerm.LongTermRow`（spec oo-writeback-template-parity-closure R3 批 B，字段名
+#:    守卫 `test_contract_field_names_in_frontend.py` 报出）：原写 counterpartyName / endingBalance / businessReason /
+#:    unsettledReason / settledByAuditDate，前端与导入导出都存 customerName / endBalance / businessDescription /
+#:    reason / settlementAmount。列键不变。
 FIELD_SPECS_D305: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("counterparty_name", "A", "editable", "text", "counterpartyName", "对方单位名称", ""),
-    ("ending_balance", "B", "editable", "amount", "endingBalance", "期末余额", ""),
+    ("counterparty_name", "A", "editable", "text", "customerName", "对方单位名称", ""),
+    ("ending_balance", "B", "editable", "amount", "endBalance", "期末余额", ""),
     ("aging", "C", "editable", "text", "aging", "账龄", ""),
-    ("business_reason", "D", "editable", "text", "businessReason", "经济业务说明", ""),
-    ("unsettled_reason", "E", "editable", "text", "unsettledReason", "未结转或未偿还的原因", ""),
-    ("settled_by_audit_date", "F", "editable", "amount", "settledByAuditDate", "至审计日结转或偿还金额", ""),
+    ("business_reason", "D", "editable", "text", "businessDescription", "经济业务说明", ""),
+    ("unsettled_reason", "E", "editable", "text", "reason", "未结转或未偿还的原因", ""),
+    ("settled_by_audit_date", "F", "editable", "amount", "settlementAmount", "至审计日结转或偿还金额", ""),
     ("plan", "G", "editable", "text", "plan", "处理计划", ""),
     ("remark", "H", "editable", "text", "remark", "备注", ""),
 )

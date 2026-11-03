@@ -488,7 +488,8 @@
  * 对齐致同 50 列逻辑 + H1-2 编制范式：4 区段 Tab / 未审→调整→审定 / 减值净值 / 结论 A/B/C
  */
 import { ref, computed, inject, toRef, defineComponent, h } from 'vue'
-import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElInputNumber } from '@/components/grid/adapters'
 import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH2Detail,

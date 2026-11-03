@@ -12,6 +12,7 @@
     :model-value="modelValue"
     title="调整分录协作"
     width="720px"
+    style="max-width: calc(100vw - 32px)"
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="onOpen"
   >
@@ -124,7 +125,8 @@ interface LineItem { standard_account_code?: string; account_name?: string; debi
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 转派提示去填年度 */
+  year: number | null
   entryGroupId: string
   adjustmentNo?: string
   accountOptions?: AccountOption[]

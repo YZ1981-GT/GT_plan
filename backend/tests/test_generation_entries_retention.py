@@ -32,6 +32,7 @@ from app.routers import wp_template, wp_template_copy_router, wp_template_list  
 from app.services import wp_template_init_service  # noqa: E402
 from app.services.procedure_scope_retention import TrimScopeUnavailable  # noqa: E402
 from app.services.template_engine import TemplateEngine  # noqa: E402
+from tests._sqlite_fk import enable_sqlite_foreign_keys  # noqa: E402
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,6 +60,7 @@ async def world(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(wp_template_init_service, "STORAGE_DIR", tmp_path / "wp_storage")
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    enable_sqlite_foreign_keys(engine)  # 与 PG 一样检查外键（R20）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as db:

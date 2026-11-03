@@ -132,22 +132,20 @@
             </el-table-column>
           </template>
 
-          <!-- 行级 OCR 附件列 -->
-          <el-table-column v-if="enableOcr && !readonly" label="📎OCR" width="70" align="center" fixed="right">
+          <!-- 行内附件（spec attachment-confirmation-evidence-loop 需求 3.1）：只读也显示（小眼睛），编辑态多一个 📎 -->
+          <el-table-column v-if="wpId && evidenceSheet" label="附件" width="76" align="center" fixed="right">
             <template #default="{ row }">
-              <el-upload
-                :show-file-list="false"
-                :auto-upload="false"
-                accept=".jpg,.jpeg,.png,.pdf"
-                :on-change="(f: any) => onOcrFileChange(row, f)"
-              >
-                <el-button
-                  size="small"
-                  text
-                  :loading="ocrLoadingRowId === row._row_id"
-                  title="上传证券对账单/交易单据，OCR识别后填入本行"
-                >📎</el-button>
-              </el-upload>
+              <AlternativeRowEvidence
+                v-if="row._row_id"
+                :wp-id="wpId"
+                :project-id="projectId"
+                :sheet-key="evidenceSheet"
+                :row-id="row._row_id"
+                :columns="config.columns"
+                :row="row"
+                :readonly="readonly"
+                @fill="(patch: Record<string, string | number>) => onFill(row, patch)"
+              />
             </template>
           </el-table-column>
         </el-table>
@@ -170,6 +168,7 @@ import { ArrowRight, ArrowDown, Plus, Delete, InfoFilled } from '@element-plus/i
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import AlternativeRowEvidence from './AlternativeRowEvidence.vue'
 import { formatPlainNumber } from './blockNumberFormat'
 import type { CheckRow, BlockType } from './alternativeD05Types'
 import type { BlockConfig, BlockColumnDef } from './blockColumnConfigs'
@@ -179,23 +178,25 @@ const props = defineProps<{
   rows: CheckRow[]
   totals: Record<string, number>
   readonly: boolean
-  /** 开启行级 OCR 附件列（📎），上传后 emit('ocr-upload', rowId, file） */
-  enableOcr?: boolean
-  /** 正在 OCR 识别的行 id（显示 loading） */
-  ocrLoadingRowId?: string | null
+  /**
+   * 行内附件列：三者齐时显示（spec attachment-confirmation-evidence-loop ADR-ACE-03）。
+   * `evidenceSheet` = 本替代程序页编码（如 `D0-5`），附件只挂到 `row:{行 id}`；识别结果经 `update-field` 回到宿主。
+   */
+  wpId?: string
+  projectId?: string
+  evidenceSheet?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'add-row'): void
   (e: 'delete-row', rowId: string): void
   (e: 'update-field', rowId: string, field: string, value: any): void
-  (e: 'ocr-upload', rowId: string, file: File): void
 }>()
 
-function onOcrFileChange(row: CheckRow, uploadFile: any): void {
-  const file: File | undefined = uploadFile?.raw ?? uploadFile
-  if (!file || !row._row_id) return
-  emit('ocr-upload', row._row_id, file)
+/** 识别结果确认后：只写弹窗里勾选的（本行为空的）列 */
+function onFill(row: CheckRow, patch: Record<string, string | number>): void {
+  if (!row._row_id) return
+  for (const [field, value] of Object.entries(patch)) emit('update-field', row._row_id, field, value)
 }
 
 const collapsed = ref(false)

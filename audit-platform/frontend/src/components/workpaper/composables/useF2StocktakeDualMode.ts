@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { runLegacyOnlyOfficeTransition } from '../sync/legacyPendingWriteBarrier'
 
 export type F2StRenderMode = 'html' | 'onlyoffice'
 const STORAGE_PREFIX = 'f2-st-dual-mode:'
@@ -14,13 +15,19 @@ export function useF2StocktakeDualMode(options: {
   /** 切回结构化前刷盘 pending 保存 */
   flushPending?: () => Promise<void>
   reloadAll?: () => Promise<void>
+  /**
+   * 只读（编辑锁在别的窗口 / 无编辑权）：Word 双向同步是写操作，不做；在线编辑照常打开（后端给只读配置）。
+   * spec workpaper-multi-window-lock-gaps R3.5
+   */
+  readonly?: Readonly<Ref<boolean>>
 }) {
-  const { wpId, projectId, sheetCode, flushPending, reloadAll } = options
+  const { wpId, projectId, sheetCode, flushPending, reloadAll, readonly } = options
   const currentMode = ref<F2StRenderMode>('html')
   const isOoAvailable = ref(false)
   /** 切换到 OO 前同步成功后递增，强制 GtOnlyOfficeSheet 重挂载 */
   const ooRemountKey = ref(0)
   const syncing = ref(false)
+  let transitionEpoch = 0
   const modeOptions = [
     { label: '结构化视图', value: 'html' },
     { label: '在线编辑', value: 'onlyoffice' },
@@ -40,19 +47,15 @@ export function useF2StocktakeDualMode(options: {
     return `${STORAGE_PREFIX}${wpId.value}:${sheet}`
   }
 
-  function loadModeFromStorage(): void {
+  function readModeFromStorage(): F2StRenderMode | null {
     try {
       const perSheet = localStorage.getItem(storageKey())
-      if (perSheet === 'html' || perSheet === 'onlyoffice') {
-        currentMode.value = perSheet
-        return
-      }
+      if (perSheet === 'html' || perSheet === 'onlyoffice') return perSheet
       // 兼容旧版：仅按 wpId 存储
       const legacy = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (legacy === 'html' || legacy === 'onlyoffice') {
-        currentMode.value = legacy
-      }
+      if (legacy === 'html' || legacy === 'onlyoffice') return legacy
     } catch { /* ignore */ }
+    return null
   }
 
   function persistMode(target: F2StRenderMode): void {
@@ -89,7 +92,7 @@ export function useF2StocktakeDualMode(options: {
 
   async function syncDocToOo(): Promise<boolean> {
     const sheet = syncSheet()
-    if (!sheet) return true
+    if (!sheet || readonly?.value) return true
     try {
       const params: Record<string, string> = { sheet }
       const pid = projectId?.value?.trim()
@@ -105,7 +108,7 @@ export function useF2StocktakeDualMode(options: {
 
   async function syncDocFromOo(): Promise<boolean> {
     const sheet = syncSheet()
-    if (!sheet) return true
+    if (!sheet || readonly?.value) return true
     try {
       const params: Record<string, string> = { sheet }
       const pid = projectId?.value?.trim()
@@ -130,8 +133,9 @@ export function useF2StocktakeDualMode(options: {
     return ''
   }
 
-  async function switchMode(target: F2StRenderMode): Promise<void> {
-    if (target === currentMode.value) return
+  async function switchMode(target: F2StRenderMode, expectedEpoch?: number): Promise<void> {
+    const epoch = expectedEpoch ?? ++transitionEpoch
+    if (epoch !== transitionEpoch || target === currentMode.value) return
     if (target === 'onlyoffice' && !isOoAvailable.value) return
 
     if (target === 'onlyoffice' && !supportsBidirectionalSync()) {
@@ -144,23 +148,32 @@ export function useF2StocktakeDualMode(options: {
       } catch {
         return
       }
+      if (epoch !== transitionEpoch) return
     }
 
     syncing.value = true
     try {
       if (target === 'onlyoffice') {
-        if (flushPending) await flushPending()
-        await syncDocToOo()
-        ooRemountKey.value += 1
-        currentMode.value = 'onlyoffice'
+        await runLegacyOnlyOfficeTransition(async () => {
+          if (epoch !== transitionEpoch) return
+          if (flushPending) await flushPending()
+          if (epoch !== transitionEpoch) return
+          if (!(await syncDocToOo())) return
+          if (epoch !== transitionEpoch) return
+          ooRemountKey.value += 1
+          currentMode.value = 'onlyoffice'
+          persistMode('onlyoffice')
+        })
       } else {
-        await syncDocFromOo()
+        if (!(await syncDocFromOo())) return
+        if (epoch !== transitionEpoch) return
         currentMode.value = 'html'
         if (reloadAll) await reloadAll()
+        if (epoch !== transitionEpoch) return
+        persistMode('html')
       }
-      persistMode(target)
     } finally {
-      syncing.value = false
+      if (epoch === transitionEpoch) syncing.value = false
     }
   }
 
@@ -168,15 +181,32 @@ export function useF2StocktakeDualMode(options: {
     void switchMode(val as F2StRenderMode)
   }
 
+  async function restorePersistedMode(): Promise<void> {
+    const epoch = ++transitionEpoch
+    currentMode.value = 'html'
+    syncing.value = true
+    try {
+      const saved = readModeFromStorage()
+      const healthy = await checkOOHealth()
+      if (epoch !== transitionEpoch) return
+      if (healthy && saved === 'onlyoffice') {
+        await switchMode('onlyoffice', epoch)
+      } else if (!healthy) {
+        persistMode('html')
+      }
+    } finally {
+      if (epoch === transitionEpoch) syncing.value = false
+    }
+  }
+
   if (sheetCode) {
     watch(sheetCode, () => {
-      loadModeFromStorage()
+      void restorePersistedMode()
     })
   }
 
   onMounted(() => {
-    loadModeFromStorage()
-    void checkOOHealth()
+    void restorePersistedMode()
   })
 
   return {

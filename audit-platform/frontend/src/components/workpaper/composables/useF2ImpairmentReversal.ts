@@ -2,6 +2,7 @@
  * useF2ImpairmentReversal — F2-49 存货跌价准备转回核对表
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
 import {
   defaultReversalSheet,
@@ -90,6 +91,15 @@ export function useF2ImpairmentReversal(options: {
     ].filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
   }
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function persist(): void {
     if (readonly.value) return

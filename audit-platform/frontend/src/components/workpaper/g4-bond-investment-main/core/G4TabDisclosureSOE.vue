@@ -479,7 +479,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 
  */
 
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
 import { ElMessage } from 'element-plus'
 
@@ -503,13 +503,9 @@ import {
 
   bookValue,
 
-  buildDefaultSoeStageBlocks,
-
   eclRatePct,
 
   methodTotals,
-
-  parseStageBlocks,
 
   patchStageDetail,
 
@@ -527,14 +523,13 @@ import {
 
 } from '../../composables/g4ListedStageDisclosure'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
+import { G4_DISCLOSURE_STAGE_KEYS, useG4DisclosureTabState } from '../../composables/g4DisclosureTabState'
 
 
 
 const G4_ACCOUNT_CODE = '1501'
 
-const STAGE_ROWS_KEY = 'G4-disclosure-soe-stages'
-
-const STAGE_NOTE_KEY = 'G4-disclosure-soe-stage-note'
+const { rows: STAGE_ROWS_KEY, note: STAGE_NOTE_KEY } = G4_DISCLOSURE_STAGE_KEYS.soe
 
 
 
@@ -582,34 +577,6 @@ const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4MainAiGener
 
 
 
-function readSaved(key: string): string {
-
-  const cr = props.htmlData?.checklist_responses
-
-  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
-
-    const v = (cr as Record<string, any>)[key]
-
-    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
-
-  }
-
-  const resp = props.htmlData?.responses
-
-  if (Array.isArray(resp)) {
-
-    const found = resp.find((r: any) => r?.item_id === key)
-
-    if (found?.remark) return found.remark
-
-  }
-
-  return ''
-
-}
-
-
-
 async function saveAudit(key: string, val: string): Promise<void> {
 
   if (props.isReadonly) return
@@ -630,145 +597,9 @@ async function saveAudit(key: string, val: string): Promise<void> {
 
 
 
-interface DisclosureRow {
-
-  item: string
-
-  endingBalance: number
-
-  endingImpairment: number
-
-  endingBookValue: number
-
-  priorBalance: number
-
-  priorImpairment: number
-
-  priorBookValue: number
-
-  isFormula?: boolean
-
-}
-
-
-
-interface DisclosureSection {
-
-  id: string
-
-  title: string
-
-  rows: DisclosureRow[]
-
-  hasTextArea: boolean
-
-  textContent: string
-
-}
-
-
-
-function buildSections(): DisclosureSection[] {
-
-  return [
-
-    {
-
-      id: 'bond-overview',
-
-      title: '（1）债权投资情况',
-
-      rows: [
-
-        { item: '项目1', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '项目2', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '项目3', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'important-bonds',
-
-      title: '（2）期末重要的债权投资情况',
-
-      rows: [
-
-        { item: '重要项目1', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '重要项目2', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'stage-impairment',
-
-      title: '（3）减值准备计提情况',
-
-      rows: [],
-
-      hasTextArea: false,
-
-      textContent: '',
-
-    },
-
-    {
-
-      id: 'provision-walkforward',
-
-      title: '本期计提、收回或转回的减值准备情况',
-
-      rows: [
-
-        { item: '期初余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期计提', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期转回', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '本期核销', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
-
-        { item: '期末余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
-
-      ],
-
-      hasTextArea: true,
-
-      textContent: '',
-
-    },
-
-  ]
-
-}
-
-
-
-const sections = reactive<DisclosureSection[]>(buildSections())
-
-const stageBlocks = ref<G4StageBlock[]>(buildDefaultSoeStageBlocks())
-
-const stageNoteText = ref('')
+// 段落表格 / 三阶段块 / 三阶段说明 + 打开时回显 + 同步快照：与附注页离屏同步共用（g4DisclosureTabState）
+const { sections, stageBlocks, stageNoteText, loadFromHtmlData, buildSyncSnapshot } =
+  useG4DisclosureTabState('soe', () => props.htmlData)
 
 // ─── 同步到附注（§八、15 债权投资）──────────────────────────────────────────
 // 🔴 只推送底稿字段真实存在的表：主表「债权投资情况」（7 列两级）+ 三张期末三阶段表
@@ -777,20 +608,6 @@ const stageNoteText = ref('')
 //    （见 `g4NoteSectionMap.G4_NOT_SYNCED_TABLES`，宁缺勿造）。
 const isSyncing = ref(false)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-
-function buildSyncSnapshot() {
-  const main = sections.find((s) => s.id === 'bond-overview')
-  const sectionTexts: Record<string, string> = {}
-  for (const s of sections) {
-    if (s.hasTextArea && s.textContent) sectionTexts[s.id] = s.textContent
-  }
-  return {
-    mainRows: main?.rows ?? [],
-    stageBlocks: stageBlocks.value,
-    stageNote: stageNoteText.value,
-    sectionTexts,
-  }
-}
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId) return
@@ -1075,63 +892,6 @@ async function fillAiDraft(sectionIdx: number): Promise<void> {
   }
 
 }
-
-
-
-function loadFromHtmlData(): void {
-
-  if (props.htmlData?.disclosureSOE?.sections) {
-
-    const saved = props.htmlData.disclosureSOE.sections as DisclosureSection[]
-
-    saved.forEach((s, i) => {
-
-      if (sections[i] && sections[i].id !== 'stage-impairment') {
-
-        if (s.textContent) sections[i].textContent = s.textContent
-
-        if (s.rows?.length && 'endingBalance' in (s.rows[0] || {})) {
-
-          sections[i].rows = s.rows as DisclosureRow[]
-
-        }
-
-      }
-
-    })
-
-  }
-
-  const parsed = parseStageBlocks(readSaved(STAGE_ROWS_KEY))
-
-  if (parsed) {
-
-    // 国企仅保留期末三阶段
-
-    const soeIds = new Set(buildDefaultSoeStageBlocks().map(b => b.id))
-
-    const filtered = parsed.filter(b => soeIds.has(b.id))
-
-    stageBlocks.value = filtered.length ? filtered : buildDefaultSoeStageBlocks()
-
-    // 补全缺省 block
-
-    const have = new Set(stageBlocks.value.map(b => b.id))
-
-    for (const def of buildDefaultSoeStageBlocks()) {
-
-      if (!have.has(def.id)) stageBlocks.value.push(def)
-
-    }
-
-  }
-
-  const note = readSaved(STAGE_NOTE_KEY)
-
-  if (note) stageNoteText.value = note
-
-}
-
 </script>
 
 

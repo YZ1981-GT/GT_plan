@@ -23,6 +23,7 @@ import { WP_LIST_CONTEXT_KEY } from '@/composables/useWorkpaperListContext'
 import type { WpChildProps, WpChildEmits } from '@/composables/useWorkpaperListContext'
 import InnerLifecycle from '@/components/workpaper/WorkpaperLifecycleView.vue'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
+import { indexFirstBy } from '@/utils/indexFirstBy'
 
 defineOptions({ name: 'WorkpaperLifecycleView' })
 
@@ -33,10 +34,13 @@ const _ctx = inject(WP_LIST_CONTEXT_KEY)
 if (!_ctx) throw new ReferenceError('WpListContext not provided — must be used inside WorkpaperList Shell')
 const ctx = _ctx
 
+/** wp_index.id → 索引项（原先每行 find 一遍；同 id 取第一个，与 find 一致。spec platform-perf-hotspots R7） */
+const wpIndexById = computed(() => indexFirstBy(ctx.wpIndex.value, (i: WpIndexItem) => i.id))
+
 /** 给 LifecycleView 提供合并好的 wp 列表（含 wp_code/wp_name） */
 const lifecycleWpItems = computed(() =>
   ctx.wpList.value.map((w: WorkpaperDetail) => {
-    const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const idx = wpIndexById.value.get(w.wp_index_id)
     return {
       id: w.id,
       wp_code: w.wp_code || idx?.wp_code || '',

@@ -12,6 +12,7 @@
  *
  * Requirements: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch } from 'vue'
 import {
   calcImpairmentProvision,
@@ -212,7 +213,7 @@ export function applyEclRateUpdatesToRows(
   const rows: ImpairmentCalcRow[] = Array.isArray(existing)
     ? existing.map((r, i) => createBlankRow({
         ...r,
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: r.seq || i + 1,
         investProject: r.investProject || `投资${i + 1}`,
         stageGroup: r.stageGroup || 'Stage1',
@@ -303,7 +304,7 @@ export function applyStageUpdatesToRows(
   const rows: ImpairmentCalcRow[] = Array.isArray(existing)
     ? existing.map((r, i) => createBlankRow({
         ...r,
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: r.seq || i + 1,
         investProject: r.investProject || `投资${i + 1}`,
         stageGroup: r.stageGroup || 'Stage1',
@@ -320,7 +321,7 @@ export function applyStageUpdatesToRows(
     let row = byName.get(key)
     if (!row) {
       row = createBlankRow({
-        id: crypto.randomUUID(),
+        id: newUuid(),
         seq: rows.length + 1,
         investProject: name,
         stageGroup: u.auditStage,
@@ -453,7 +454,7 @@ export function useG4EclImpairmentCalc() {
     if (!value?.trim()) return
 
     const newRow = createBlankRow({
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: rows.value.length + 1,
       investProject: value.trim(),
       stageGroup: defaultStage,
@@ -473,7 +474,7 @@ export function useG4EclImpairmentCalc() {
     rows.value = data.map((r, i) => {
       const row = createBlankRow({
         ...r,
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: i + 1,
         adjustedPvFutureCashFlow: r.adjustedPvFutureCashFlow ?? r.pvFutureCashFlow ?? 0,
         adjRateTouched: r.adjRateTouched ?? false,

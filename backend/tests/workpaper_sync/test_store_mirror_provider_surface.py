@@ -76,6 +76,25 @@ def test_provider_exposes_every_attribute_the_mirror_dereferences(adapter_id: st
     )
 
 
+@pytest.mark.parametrize("adapter_id", _mirrorable_plans())
+def test_dedicated_provider_declarations_resolve_to_callable_symbols(adapter_id: str) -> None:
+    """注册表声明的 dedicated 常量/函数必须真实存在，不能靠运行期 soft-skip。"""
+    plan = REG.STORE_MERGE_REGISTRY[adapter_id]
+    for dedicated in plan.dedicated_items:
+        module = importlib.import_module(
+            f"app.services.workpaper_sync.{dedicated.provider_module}"
+        )
+        item_id = getattr(module, dedicated.item_id_const, None)
+        merge_fn = getattr(module, dedicated.merge_fn, None)
+        assert isinstance(item_id, str) and item_id.strip(), (
+            f"{adapter_id}: {dedicated.provider_module}.{dedicated.item_id_const} "
+            "必须是非空 item id"
+        )
+        assert callable(merge_fn), (
+            f"{adapter_id}: {dedicated.provider_module}.{dedicated.merge_fn} 必须可调用"
+        )
+
+
 def test_registry_is_not_vacuous() -> None:
     assert len(_mirrorable_plans()) >= 60, "注册表规模骤降 ⇒ 判据 1 的覆盖面可能被意外收窄"
     assert "d2.receivable_detail" in _mirrorable_plans()
@@ -85,15 +104,14 @@ def test_registry_is_not_vacuous() -> None:
 # 判据 2：模型完整性（store_mirror 的无保护解引用点 ≡ 本文件模型 + 已知受 hasattr 保护的点）
 # ═══════════════════════════════════════════════════════════════════════════
 
-#: 直接 ``bridge.<attr>``：前两项是硬取（判据 1 已建模），其余六项都在 ``if hasattr(bridge, …)`` 分支内。
+#: 直接 ``bridge.<attr>``：全部都由对应 ``hasattr`` 分支保护；item 清单改在锁前 resolver 中校验。
 _BRIDGE_ATTRS = frozenset({
-    "STORE_ITEM_ID",
-    "STORE_ITEM_IDS",
     "STORE_ITEM_IDS_D45_FIXED", "merge_d45_fixed_from_projection",
     "STORE_ITEM_IDS_D413_FIXED", "merge_d413_fixed_from_projection",
     "STORE_ITEM_IDS_D47_DEDICATED", "merge_d47_from_projection",
 })
-#: 无默认值的 ``getattr(bridge|module, X)``：前三项判据 1 已建模；dedicated 两项在 hasattr 软跳过之后。
+#: 无默认值的 ``getattr(bridge|module, X)``：前三项由主 provider 判据覆盖；dedicated
+#: 两项在任何 SQL 前由 fail-visible 解析器验证。
 _GETATTR_NO_DEFAULT = frozenset({
     "bridge:plan.merge_state_fn",
     "bridge:plan.merge_rows_fn",
@@ -172,3 +190,89 @@ def test_single_provider_without_store_item_id_is_reported() -> None:
     merge_name = plan.merge_state_fn or plan.merge_rows_fn
     fake = _fake_module(**{merge_name: lambda **_: None})
     assert _missing_hard_attrs(plan, fake) == ["STORE_ITEM_ID"]
+
+
+class _NoSqlSession:
+    def __init__(self) -> None:
+        self.execute_calls = 0
+
+    async def execute(self, *_args: Any, **_kwargs: Any) -> None:
+        self.execute_calls += 1
+        raise AssertionError("dedicated 声明未验证完就执行了 SQL")
+
+
+@pytest.mark.parametrize("missing", ["STORE_ITEM", "merge_store"])
+def test_missing_dedicated_symbol_fails_before_any_store_sql(
+    monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    """缺 item 常量或 merge 函数都必须在第一条 SELECT 前显式失败。"""
+    from app.services.workpaper_sync.store_item_specs import (
+        StoreMergePlanNotRegisteredError,
+    )
+
+    dedicated = types.SimpleNamespace(
+        provider_module="fake_dedicated",
+        item_id_const="STORE_ITEM",
+        merge_fn="merge_store",
+        base_kind="dict",
+    )
+    plan = types.SimpleNamespace(
+        dedicated_items=(dedicated,),
+        merge_all_fn="merge_all",
+        dual_store_fn="mirror_dual",
+        items=(),
+    )
+    attrs: dict[str, Any] = {
+        "STORE_ITEM": "D4-fake-store",
+        "merge_store": lambda **_: ({}, 0, set()),
+    }
+    attrs.pop(missing)
+    fake_provider = _fake_module(**attrs)
+    monkeypatch.setattr(importlib, "import_module", lambda _name: fake_provider)
+    session = _NoSqlSession()
+
+    with pytest.raises(StoreMergePlanNotRegisteredError, match=missing):
+        store_mirror._resolve_mirror_targets(
+            adapter_id="d4.fake",
+            plan=plan,
+            bridge=_fake_module(all_store_item_ids=lambda: ("D4-row",)),
+        )
+    assert session.execute_calls == 0
+
+
+def test_every_store_mirror_commit_is_guarded_by_the_commit_flag() -> None:
+    """所有单/多/dedicated 分支都必须让 ``commit=False`` 保持零内部提交。"""
+    tree = ast.parse(Path(store_mirror.__file__).read_bytes().decode("utf-8"))
+    parents: dict[ast.AST, ast.AST] = {
+        child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)
+    }
+    commits = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "commit"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "session"
+    ]
+    assert len(commits) == 2, "单/多 store 路径应只保留顶层两个 commit 出口"
+    unguarded: list[int] = []
+    wrong_scope: list[int] = []
+    for call in commits:
+        cursor: ast.AST | None = call
+        guarded = False
+        owner = ""
+        while cursor in parents:
+            cursor = parents[cursor]
+            if isinstance(cursor, ast.If) and isinstance(cursor.test, ast.Name):
+                if cursor.test.id == "commit":
+                    guarded = True
+            if isinstance(cursor, ast.AsyncFunctionDef):
+                owner = cursor.name
+                break
+        if not guarded:
+            unguarded.append(call.lineno)
+        if owner != "mirror_projection_into_store":
+            wrong_scope.append(call.lineno)
+    assert unguarded == [], f"这些镜像 commit 未受 commit 参数保护: {unguarded}"
+    assert wrong_scope == [], f"内部 helper 仍会中途 commit: {wrong_scope}"

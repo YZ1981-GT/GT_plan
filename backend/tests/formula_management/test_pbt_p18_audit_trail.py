@@ -227,6 +227,9 @@ def _scope_key(scope) -> str:
 def test_p18_audit_trail_complete_and_immutable(accounts, scope, unit_scopes):
     """P18：成功刷新写入的审计记录完整（Req 4.1）且 append-only 不可篡改（Req 4.6）。
 
+    受影响记录数按 spec formula-hub-integrity-closure 需求 3.3 改：``refresh()`` 只打 Draft 标记，``affected_count``
+    （= applied + recomputed）为 0，刷新单元数改记 ``detail.draft_marked_count``（改造前 ``affected_count`` = 刷新单元数）。
+
     **Validates: Requirements 4.1, 4.6**
     """
 
@@ -286,9 +289,9 @@ def test_p18_audit_trail_complete_and_immutable(accounts, scope, unit_scopes):
                 assert audit.year == YEAR
                 # 触发范围（归一化后的 scope 键）
                 assert audit.scope == expected_scope
-                # 受影响记录数 == 实际刷新单元数
-                assert audit.affected_count == first.affected_count
-                assert audit.affected_count == len(set(unit_scopes))
+                # 受影响记录数（marker 路径为 0）与结果一致；实际刷新单元数 == detail.draft_marked_count
+                assert audit.affected_count == first.affected_count == 0
+                assert audit.detail["draft_marked_count"] == first.draft_marked_count == len(set(unit_scopes))
                 # 幂等键非空 + 成功状态
                 assert audit.tb_snapshot_hash
                 assert audit.result_status == "success"

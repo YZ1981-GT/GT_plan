@@ -106,6 +106,16 @@ class TestComputeSourceStructureHash:
         # 排序后 hash 相同——同样的行不同顺序的子企业共用规则
         assert ha == hb
 
+    def test_pushed_row_identity_does_not_change_hash(self):
+        """下推只给行打集团行身份、不改行名 / 行类型：指纹不变，已确认的映射照旧有效（否则每次下推都让已确认企业
+        变成「结构已变化」，重新汇总跳过它 —— 2026-10-26 浏览器实测）；身份仍留在来源行里给 exact_id 用。"""
+        plain = [{"label": "1年以内", "values": [1]}, {"label": "合  计", "values": [1], "row_type": "total"}]
+        pushed = [{**plain[0], "_pushed_row_id": "r1"}, {**plain[1], "_pushed_row_id": "r9"}]
+        assert compute_source_structure_hash("五-5-6", pushed) == compute_source_structure_hash("五-5-6", plain)
+        assert [r.get("_pushed_row_id") for r in extract_source_rows(pushed)] == ["r1", "r9"]
+        renamed = [{**pushed[0], "label": "一年以内"}, pushed[1]]
+        assert compute_source_structure_hash("五-5-6", renamed) != compute_source_structure_hash("五-5-6", plain)
+
 
 class TestGroupEntitiesByStructure:
     def test_same_structure_grouped(self):

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.models.base import Base
 from app.models.core import Project, ProjectStatus
+from app.models.staff_models import StaffMember, WorkHour
 from app.models.workpaper_models import (
     WorkingPaper,
     WpFileStatus,
@@ -36,9 +37,19 @@ _engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    # 仅建本模块触达的表；全量 metadata 含 PG 专用 CHECK，不能由 SQLite 编译。
+    tables = [
+        Project.__table__,
+        WpIndex.__table__,
+        WorkingPaper.__table__,
+        WpQcResult.__table__,
+        StaffMember.__table__,
+        WorkHour.__table__,
+        Adjustment.__table__,
+    ]
     async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.drop_all, tables=tables)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
@@ -103,7 +114,7 @@ async def _create_qc_result(db, wp_id, *, passed=True):
     return qc
 
 
-async def _create_adjustment(db, project_id, *, is_deleted=False):
+async def _create_adjustment(db, project_id, *, is_deleted=False, entry_group_id=None):
     adj = Adjustment(
         id=uuid.uuid4(),
         project_id=project_id,
@@ -114,7 +125,7 @@ async def _create_adjustment(db, project_id, *, is_deleted=False):
         account_code="1001",
         debit_amount=100,
         credit_amount=0,
-        entry_group_id=uuid.uuid4(),
+        entry_group_id=entry_group_id or uuid.uuid4(),
         review_status=ReviewStatus.draft,
         is_deleted=is_deleted,
         created_by=uuid.uuid4(),
@@ -220,12 +231,14 @@ async def test_review_completion_rate(db_session):
 
 @pytest.mark.asyncio
 async def test_adjustment_count(db_session):
-    """8.5: adjustment_count = active (non-deleted) adjustments."""
+    """8.5: adjustment_count 按活跃 entry_group_id 计业务笔数。"""
     svc = DashboardService(db_session)
     p = await _create_project(db_session)
+    first_group = uuid.uuid4()
 
-    await _create_adjustment(db_session, p.id, is_deleted=False)
-    await _create_adjustment(db_session, p.id, is_deleted=False)
+    await _create_adjustment(db_session, p.id, entry_group_id=first_group)
+    await _create_adjustment(db_session, p.id, entry_group_id=first_group)
+    await _create_adjustment(db_session, p.id)
     await _create_adjustment(db_session, p.id, is_deleted=True)
 
     metrics = await svc.get_quality_metrics()

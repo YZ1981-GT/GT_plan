@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F3TabAdjustment — F3-3 调整分录 | Task 6 (比照 D4TabAdjustment) */
 import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Adjustment } from '../composables/useF3Adjustment'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
@@ -128,12 +129,7 @@ async function runAdjAi(section: 'adjustment-note' | 'adjustment-conclusion'): P
           @click="syncToCentral"
           title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
         >同步到集中登记</el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
       <div class="toolbar-right">
         <F3ImportExportToolbar :wp-id="wpId" :project-id="projectId" sheet="F3-3" :disabled="isReadonly" @imported="onImported" />

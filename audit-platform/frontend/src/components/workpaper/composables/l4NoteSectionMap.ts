@@ -163,7 +163,7 @@ export interface L4SyncPayloadOptions {
 }
 
 export function buildL4SyncPayload(opts: L4SyncPayloadOptions) {
-  const { variant, mainRows, movementRows, within1yRows, noteTexts } = opts
+  const { variant, mainRows, movementRows, noteTexts } = opts
 
   const sub_table_data: Record<string, unknown[]> = {}
   const columns = variant === 'listed' ? buildL4ListedColumns() : buildL4SoeColumns()

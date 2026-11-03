@@ -121,7 +121,7 @@ APPLY_KEYS = frozenset({
 }) | ADDITIVE_KEYS["apply"]
 
 # 附注同步链路的**既有**模块（本 spec 的 Task 21 联动为纯新增，不得改它们）。
-NOTE_CHAIN_FILES = (
+NOTE_CHAIN_STRUCTURE_FILES = (
     "backend/app/services/note_content_utils.py",
     "backend/app/services/disclosure_engine.py",
     "backend/app/services/note_word_exporter.py",
@@ -132,6 +132,19 @@ NOTE_CHAIN_FILES = (
     "backend/app/services/wp_note_linkage_service.py",
     "backend/app/services/note_readiness_service.py",
     "backend/app/services/disclosure_stale_marker.py",
+)
+
+# 这份 Task 23 的工作树字节哨兵只用于发现程序裁剪联动以外的在途改动。
+# disclosure_engine 的唯一例外由 Phase 8 的两条实际行为用例承重，不能扩大为通用豁免。
+NOTE_CHAIN_BYTE_GUARD_EXEMPTIONS = {
+    "backend/app/services/disclosure_engine.py": (
+        "disclosure-note-template-word-realignment Phase 8 title_hint 投影与写入",
+        "tests/test_note_title_hint_and_pairing.py::test_standard_template_loader_preserves_title_hint",
+        "tests/test_disclosure_note_generation_text_order.py::test_title_hint_is_written_to_guidance_without_mutating_title_or_body",
+    ),
+}
+NOTE_CHAIN_BYTE_GUARD_FILES = tuple(
+    rel for rel in NOTE_CHAIN_STRUCTURE_FILES if rel not in NOTE_CHAIN_BYTE_GUARD_EXEMPTIONS
 )
 NOTE_LINKAGE_NEW = "backend/app/services/procedure_trim_note_linkage.py"
 
@@ -578,10 +591,11 @@ class TestZeroRegressionEvidenceAnchors:
 # (e) 既有附注同步链路输出逐字节不变
 # ═══════════════════════════════════════════════════════════════════════════
 class TestNoteChainUnchanged:
-    """本 spec 的附注联动是**纯新增模块**，既有链路一字未改。
+    """本 spec 的附注联动是**纯新增模块**，不得侵入既有链路。
 
-    判据取源码字节（行尾归一后）与 HEAD 相等 —— 比"跑一遍看输出"更强：输出相同
-    可能是测试面没覆盖到改动，源码字节相同则连未覆盖路径也不可能变。
+    结构判据始终扫描全部既有模块；工作树字节哨兵只扫描没有具名替代行为测试的模块。
+    ``disclosure_engine.py`` 的 Phase 8 标题提示改动由加载投影 + 生成写入两条行为测试承重，
+    不再依赖「提交前恒红、提交后自愈」的 HEAD 字节比较。
 
     ─── 并发 spec 改动登记（2026-09-30，按下方判据的失败提示如实登记）───────────
     `backend/app/services/disclosure_engine.py` 被**并发**的「单体附注不得出现合并
@@ -608,6 +622,26 @@ class TestNoteChainUnchanged:
     `TOC \\o "1-3" \\u` 为空，上年附注导入 / 上传附注文档认不出标题。只加段落属性 `w:outlineLvl`，
     文字、表格、书签不变；与程序裁剪联动无关，既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。
     行为测试见 ``tests/test_note_prior_year_plan.py::TestPlatformExportRoundTrip``。
+
+    ─── 并发 spec 改动登记（2026-10-26，spec note-pull-header-formula-closure R4 / R5 / 任务 20）───
+    该 spec 有意改了既有链路的 4 个文件，提交前下面的字节判据对这 4 个文件恒红、提交后自愈：
+    - `disclosure_engine.py`：`_backfill_totals` 改按合计构成（`note_formula_tables.recalc_table_totals`，
+      与刷新 / 前端同一判定）只写判得准的合计行与金额列、不盖手工格；`get_template_structure` 按表名 /
+      序号取模板里的同一张表（`note_template_structure`），找不到返回 None、不再拿章节第一张表顶。
+    - `note_empty_table_detector.py` / `note_is_empty_calc.py`：合计 / 小计行改为「只看数」——
+      公式推送找不到明细行时把审定数写在合计行，原规则「合计行一律不看」让这些表显示「本期无此情形」、
+      Word 导出整表省略。
+    - `note_word_exporter.py`：期间层（`note_period_layout`：底稿按期间并列的表合成、≥3 层表头按 N 行渲染）。
+    四处都不碰程序裁剪联动，既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。行为测试见
+    ``tests/services/test_disclosure_note_formula_baseline.py``（合计回填）、
+    ``tests/services/test_note_empty_table_detector.py``、``tests/services/test_note_is_empty_calc.py``、
+    ``tests/test_note_template_structure.py``、``tests/test_note_period_layout.py``。
+    ─── 并发 spec 改动登记（2026-10-28，spec note-pull-followup-closure R5，与上一条同一提交）───
+    `disclosure_engine.py` 再改一处：生成附注时没有 binding、或 binding 为 manual 且没有预填值的格不再标
+    `manual`，只在 `_cell_meta` 记 `unbound`（新增 `binding_cell_unbound`；原先标 manual ⇒ 公式推送 keep_manual、
+    附注公式与合计回填只写自动格，这些格永远进不来数）；刷新时这类格不拿空值覆盖已写入的值。不碰程序裁剪联动，
+    既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。字节判据同样提交前恒红、提交后自愈。行为测试见
+    ``tests/test_note_unbound_cells.py``。
     """
 
     def test_existing_chain_never_imports_linkage_module(self):
@@ -618,7 +652,7 @@ class TestNoteChainUnchanged:
         """
         stem = Path(NOTE_LINKAGE_NEW).stem
         offenders = []
-        for rel in NOTE_CHAIN_FILES:
+        for rel in NOTE_CHAIN_STRUCTURE_FILES:
             src = _read(_REPO / rel)
             body = "\n".join(
                 ln for ln in src.splitlines() if not ln.lstrip().startswith("#")
@@ -634,7 +668,7 @@ class TestNoteChainUnchanged:
             f"联动模块自身不含模块名 {stem} ⇒ 扫描串写错，本判据恒绿"
         )
 
-    @pytest.mark.parametrize("rel", NOTE_CHAIN_FILES)
+    @pytest.mark.parametrize("rel", NOTE_CHAIN_BYTE_GUARD_FILES)
     def test_existing_chain_file_bytes_equal_head(self, rel):
         p = _REPO / rel
         assert p.exists(), f"既有附注链路文件缺失: {rel}"
@@ -672,7 +706,20 @@ class TestNoteChainUnchanged:
         )
 
     def test_chain_file_list_is_not_empty_and_paths_are_real(self):
-        """扫描面自检：清单非空且每条都真实存在（防路径写错导致参数化空转）。"""
-        assert len(NOTE_CHAIN_FILES) >= 8, "既有链路清单过短，覆盖面可疑"
-        missing = [r for r in NOTE_CHAIN_FILES if not (_REPO / r).exists()]
+        """结构扫描覆盖全部链路；字节豁免必须具名、存在替代行为测试且不能扩散。"""
+        assert len(NOTE_CHAIN_STRUCTURE_FILES) >= 8, "既有链路清单过短，覆盖面可疑"
+        missing = [r for r in NOTE_CHAIN_STRUCTURE_FILES if not (_REPO / r).exists()]
         assert not missing, f"清单里有不存在的路径（判据会空转）: {missing}"
+        assert set(NOTE_CHAIN_BYTE_GUARD_FILES) < set(NOTE_CHAIN_STRUCTURE_FILES)
+        assert set(NOTE_CHAIN_STRUCTURE_FILES) - set(NOTE_CHAIN_BYTE_GUARD_FILES) == set(
+            NOTE_CHAIN_BYTE_GUARD_EXEMPTIONS
+        )
+        assert set(NOTE_CHAIN_BYTE_GUARD_EXEMPTIONS) == {
+            "backend/app/services/disclosure_engine.py"
+        }, "字节豁免不得扩散；新增例外必须另行建立行为契约"
+        for _rel, (_reason, *node_ids) in NOTE_CHAIN_BYTE_GUARD_EXEMPTIONS.items():
+            assert _reason.strip() and len(node_ids) >= 2
+            for node_id in node_ids:
+                test_path, test_name = node_id.split("::", 1)
+                source = _read(_REPO / f"backend/{test_path}")
+                assert f"def {test_name}(" in source, f"替代行为测试不存在：{node_id}"

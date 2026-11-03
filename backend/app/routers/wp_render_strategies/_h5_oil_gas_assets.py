@@ -5,7 +5,9 @@
   累计折耗 = 1632 油气资产累计折耗
   无 BS 报表行（仅 CFSS-005 提折耗）
 
-行业适用性守卫：仅 oil_gas / mining 行业适用
+不按行业拦截：平台没有项目级行业来源，原先把质控分类码（A1 / C …）当行业比对 oil_gas，
+对所有项目返回 industry_error、HTML 视图拿不到已填内容与试算表（spec trim-followup-residual-findings-closure R1）。
+本科目是否适用看试算表：返回 ``accounts_found``，前端在找不到科目时给不阻断提示 + 程序裁剪入口。
 返回 allResponses + projectContext + TB数据(三层) + sheet_list + tb_source_codes
 
 spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
@@ -21,6 +23,7 @@ from app.services.dataset_query import get_active_filter
 from app.services.four_table.h5_account_scope import H5_ACCOUNT_SPEC, H5_SLOT_KEY_PREFIX
 from app.services.four_table.semantic_account_resolver import (
     SemanticAccountResult,
+    has_resolved_tb_rows,
     resolve_semantic_accounts,
 )
 from app.services.four_table.leaf_aggregation import (
@@ -33,12 +36,6 @@ from app.services.four_table.parent_check import build_parent_check
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
-
-# 适用行业
-_APPLICABLE_INDUSTRIES = {"oil_gas", "mining"}
-
-# 适用行业
-_APPLICABLE_INDUSTRIES = {"oil_gas", "mining"}
 
 H5_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "h5-oil-gas-assets"},
@@ -68,35 +65,19 @@ H5_SHEETS = [
 ]
 
 
-async def _check_industry_applicability(ctx: RenderContext) -> tuple[bool, str]:
-    """检查项目行业适用性（oil_gas/mining）."""
-    try:
-        result = await ctx.db.execute(
-            sa.text(
-                "SELECT business_category FROM projects WHERE id = :pid"
-            ),
-            {"pid": str(ctx.project_id)},
-        )
-        row = result.fetchone()
-        if row:
-            industry = (row.business_category or "").strip().lower()
-            if industry in _APPLICABLE_INDUSTRIES:
-                return True, industry
-            return False, industry
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H5 industry check failed: %s", e)
-    return False, ""
-
-
-async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+async def _fetch_tb_data(
+    ctx: RenderContext,
+) -> tuple[dict, SemanticAccountResult, bool | None]:
     """按语义槽取油气资产三层数据（原值 / 累计折耗 / 减值准备）。
 
     Returns:
-        ``(tb_values, accounts)``
+        ``(tb_values, accounts, accounts_found)``；最后一项按 active ``tb_balance`` 实际行判定，
+        查询失败时为 ``None``（未知），不能拿解析器的 fallback 码冒充已找到科目。
     """
     accounts = await resolve_semantic_accounts(ctx, H5_ACCOUNT_SPEC)
 
     tb_rows: list = []
+    tb_fetch_ok = True
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -115,6 +96,7 @@ async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResul
         )
         tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
+        tb_fetch_ok = False
         logger.warning("H5 TB balance fetch failed: %s", e)
 
     trial_rows: list = []
@@ -140,7 +122,9 @@ async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResul
     tb["_parent_check"] = build_parent_check(
         accounts, tb_rows, trial_rows, H5_SLOT_KEY_PREFIX.keys()
     )
-    return tb, accounts
+    return tb, accounts, (
+        has_resolved_tb_rows(accounts, tb_rows) if tb_fetch_ok else None
+    )
 
 
 def _build_h5_tb_values(
@@ -197,7 +181,7 @@ def _build_h5_tb_values(
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
-    """加载项目上下文（客户名/审计年度/行业/适用准则）."""
+    """加载项目上下文（客户名/审计年度/质控分类原值/适用准则）。分类码不是行业，不参与适用性判断。"""
     project_ctx: dict = {}
     try:
         result = await ctx.db.execute(
@@ -221,24 +205,12 @@ async def _load_project_context(ctx: RenderContext) -> dict:
 
 
 async def render(ctx: RenderContext) -> dict | None:
-    """H5油气资产渲染策略：行业校验 + allResponses + projectContext + TB数据.
+    """H5油气资产渲染策略：allResponses + projectContext + TB数据 + 四表增强.
 
-    行业适用性前后端双重校验（ADR-2）：
-    - oil_gas / mining → 正常渲染
-    - 其他行业 → 返回 industry_error 信息供前端显示 el-empty
+    任何项目都完整取数；``accounts_found`` = 语义槽在本项目试算表里找到了科目（前端据此决定是否提示
+    「试算表中未找到油气资产科目」，提示不阻断编制）。
     """
-    # ─── 1. 行业适用性守卫 ──────────────────────────────────────────────────
-    is_applicable, industry = await _check_industry_applicability(ctx)
-    if not is_applicable:
-        return {
-            "component_type": "h5-oil-gas-assets",
-            "industry_error": True,
-            "industry_detected": industry,
-            "message": "本底稿仅适用于石油天然气/采矿行业项目",
-            "applicable_industries": list(_APPLICABLE_INDUSTRIES),
-        }
-
-    # ─── 2. 加载 checklist_responses（H5-前缀） ────────────────────────────
+    # ─── 1. 加载 checklist_responses（H5-前缀） ────────────────────────────
     responses_snapshot: dict = {}
     try:
         result = await ctx.db.execute(
@@ -256,10 +228,10 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H5 render responses load failed: %s", e)
 
-    # ─── 3. TB 数据（语义定位：油气资产 + 累计折耗 + 减值准备） ────────────
-    tb_values, accounts = await _fetch_tb_data(ctx)
+    # ─── 2. TB 数据（语义定位：油气资产 + 累计折耗 + 减值准备） ────────────
+    tb_values, accounts, accounts_found = await _fetch_tb_data(ctx)
 
-    # ─── 4. 项目上下文 ──────────────────────────────────────────────────────
+    # ─── 3. 项目上下文 ──────────────────────────────────────────────────────
     project_context = await _load_project_context(ctx)
 
     resolved_codes = sorted({c for slot in accounts.slots.values() if slot.found for c in slot.codes})
@@ -273,10 +245,11 @@ async def render(ctx: RenderContext) -> dict | None:
         "project_context": project_context,
         "prefix": "H5",
         "sheets": H5_SHEETS,
-        "industry": industry,
+        # active TB 查询实际命中行才算找到；解析器裸 fallback 码不算，查询失败为 None（未知）
+        "accounts_found": accounts_found,
     }
 
-    # ─── 灰度：H/I 四表取数增强（仅行业适用时，AFTER industry guard） ──────
+    # ─── 灰度：H/I 四表取数增强（按解析到的科目槽取数，找不到科目时自然无段） ──────
     from app.core.config import settings
     if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
         try:

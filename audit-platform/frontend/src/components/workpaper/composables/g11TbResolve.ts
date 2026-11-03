@@ -7,15 +7,10 @@ export const G11_ACCOUNT_NAME = '投资收益'
 export interface G11TbRowLike {
   standard_account_code?: string
   account_code?: string
-  account_name?: string
+  account_name?: string | null
   standard_account_name?: string
-  debit_amount?: number | string
-  credit_amount?: number | string
-  period_debit?: number | string
-  period_credit?: number | string
-  unadjusted_amount?: number | string
-  closing_balance?: number | string
-  ending_balance?: number | string
+  unadjusted_amount?: number | string | null
+  audited_amount?: number | string | null
 }
 
 function rowCode(r: G11TbRowLike): string {
@@ -41,12 +36,14 @@ export function resolveG11TbRow(rows: G11TbRowLike[]): G11TbRowLike | null {
   return byName ?? null
 }
 
-/** 6111 损益类发生额：贷−借 */
+/**
+ * 6111 投资收益本期发生额 = 试算表未审数（单边口径，与报表同）。
+ * 🔴 不用「贷 − 借」：端点原先不回借 / 贷字段（恒 0）；含年末结转分录时余额表借贷两侧相等，差额也恒 0
+ */
 export function g11TbRowPlAmount(row: G11TbRowLike | null | undefined): number {
-  if (!row) return 0
-  const credit = Number(row.credit_amount ?? row.period_credit ?? 0) || 0
-  const debit = Number(row.debit_amount ?? row.period_debit ?? 0) || 0
-  return credit - debit
+  if (!row || row.unadjusted_amount == null || row.unadjusted_amount === '') return 0
+  const n = Number(row.unadjusted_amount)
+  return Number.isFinite(n) ? n : 0
 }
 
 /** 6111 子科目行（用于分项预填） */

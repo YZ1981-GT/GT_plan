@@ -12,6 +12,8 @@
  *
  * Requirements: 8.3
  */
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
 import { ref, inject, toRef, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -97,12 +99,14 @@ async function runCommitOcr(file: File): Promise<boolean> {
   try {
     const form = new FormData()
     form.append('file', file)
-    if (commitOcrAttachmentId.value) form.append('attachment_id', commitOcrAttachmentId.value)
+    // 每次都是新选的文件：不带上一次的附件编号（带了后端按编号复用上次识别结果，新文件被忽略）
+    appendRowEvidence(form, 'E1-11')
     const { data } = await http.post(
       `/api/workpapers/${props.wpId}/e1/commit-ocr`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     )
+    refreshRowEvidence(props.projectId, props.wpId)
     commitOcrFields.value = data?.extracted_fields || {}
     commitOcrConfidence.value = typeof data?.confidence === 'number' ? data.confidence : undefined
     commitOcrPreview.value = String(data?.ocr_text || '').slice(0, 2000)
@@ -388,6 +392,7 @@ onBeforeUnmount(() => {
             承诺书 OCR
           </el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" sheet-key="E1-11" />
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -559,6 +564,7 @@ onBeforeUnmount(() => {
     <!-- 承诺书 OCR 确认对话框 -->
     <E1CommitOcrConfirmDialog
       v-model="commitOcrVisible"
+      :attachment-id="commitOcrAttachmentId"
       :fields="commitOcrFields"
       :confidence="commitOcrConfidence"
       :ocr-preview="commitOcrPreview"

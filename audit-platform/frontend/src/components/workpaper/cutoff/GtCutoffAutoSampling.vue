@@ -24,7 +24,8 @@ interface Props {
   defaultConditions?: Partial<CutoffConfig>
   workpaperId: string
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null（默认截止日留空、一键取数提示补填） */
+  year: number | null
   /** 只读态：为真时禁用一键取数与回写（R25.6） */
   readonly?: boolean
 }

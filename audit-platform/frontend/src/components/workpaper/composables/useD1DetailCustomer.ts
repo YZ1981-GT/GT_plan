@@ -25,6 +25,7 @@
  *   期末未审 = 期末余额 + 重分类（被审计单位重分类调整）
  *   期末审定 = 期末未审 + 期末AJE + 期末RJE
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -84,7 +85,7 @@ const CONCLUSION_KEY = 'D1-cust-conclusion'
  * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
  * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。同 F1-2 裁决 F1-H3。
  */
-function recalcRow(row: CustomerRow): CustomerRow {
+export function recalcRow(row: CustomerRow): CustomerRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
   const currentBalance = row.priorUnadjusted + row.currentIncrease - row.currentDecrease
   const currentUnadjusted = currentBalance + row.reclassification
@@ -100,15 +101,11 @@ function recalcRow(row: CustomerRow): CustomerRow {
 
 /** 生成动态行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `dynamic-${crypto.randomUUID()}`
-  }
-  // Fallback for environments without crypto.randomUUID
-  return `dynamic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `dynamic-${newUuid()}`
 }
 
 /** 创建空白客户行 */
-function createEmptyRow(): CustomerRow {
+export function createEmptyRow(): CustomerRow {
   return recalcRow({
     rowId: generateRowId(),
     customerName: '',

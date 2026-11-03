@@ -299,3 +299,36 @@ export function buildG10SoeSyncPayloads(
     },
   ]
 }
+
+// ── 披露 Tab 的同步步骤（由 `G10TabDisclosureBase` 原样抽出，Tab 与附注页离屏同步共用，spec note-pull-followup-closure R1）──
+
+/** 披露 Tab 审计说明的条目号（Tab 挂载时读一次进 `auditNote`，同步时写进 `{variant}-audit-note` 说明段） */
+export function g10DisclosureAuditNoteKey(variant: G10DisclosureVariant): string {
+  return `G10-disclosure-${variant}-audit-note`
+}
+
+/** 披露 Tab 挂载时的审计说明 */
+export function readG10DisclosureAuditNote(
+  responses: ReadonlyMap<string, { remark?: string | null }>,
+  variant: G10DisclosureVariant,
+): string {
+  return responses.get(g10DisclosureAuditNoteKey(variant))?.remark ?? ''
+}
+
+/**
+ * 披露 Tab「同步到附注」的载荷：`useG10Disclosure.getSyncSnapshot(审计说明)` → 本版本 builder（上市 五、34，有衍生负债数据时
+ * 另加 五、35；国企 八、34）。口径不适用回空数组（Tab 据此提示）。
+ */
+export function buildG10TabSyncPayloads(
+  wpId: string,
+  variant: G10DisclosureVariant,
+  applicableStandards: readonly string[] | null | undefined,
+  dis: { getSyncSnapshot: (auditNote?: string) => G10ListedSyncSnapshot | G10SoeSyncSnapshot },
+  auditNote: string,
+): G10SyncFromWorkpaperPayload[] {
+  const standards = applicableStandards ?? []
+  const snap = dis.getSyncSnapshot(auditNote)
+  return variant === 'listed'
+    ? buildG10ListedSyncPayloads(wpId, standards, snap as G10ListedSyncSnapshot)
+    : buildG10SoeSyncPayloads(wpId, standards, snap as G10SoeSyncSnapshot)
+}

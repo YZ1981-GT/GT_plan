@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG12Adjudication — G12-1 审定表
@@ -147,11 +148,11 @@ export function useG12Adjudication(opts: {
     if (!opts.projectId.value) return
     tbLoading.value = true
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, { params: { year: _year, account_prefix: G12_ACCOUNT_CODE  }, _silent: true } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) => String(r.standard_account_code ?? r.account_code ?? '').startsWith(G12_ACCOUNT_CODE))
-      if (hit) {
-        updateTrialBalance(parseNum(hit.credit_amount ?? 0) - parseNum(hit.debit_amount ?? 0))
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year, accountPrefix: G12_ACCOUNT_CODE })
+      // 本期发生额 = 试算表未审数（单边口径，与报表同）；原先读端点没有的借 / 贷字段算差额，恒 0
+      const amount = tbSumUnder(list, G12_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount != null) {
+        updateTrialBalance(amount)
         if (showMessage) ElMessage.success('已从试算平衡表取数（6103）')
       } else if (showMessage) {
         ElMessage.warning('试算平衡表中未找到 6103 科目')

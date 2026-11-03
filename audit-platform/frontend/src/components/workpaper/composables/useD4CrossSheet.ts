@@ -270,10 +270,10 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
 
   // ─── IPO组可见性 ──────────────────────────────────────────────────────
 
-  /** 通过核心 IPO 工具并扩展 D4 专属 fraud_risk 判断一级 Tab 可见性 */
+  /** 通过核心 IPO 工具并扩展 D4 专属 fraud_risk 判断一级 Tab 可见性（后端 project_classification 优先，R4） */
   const ipoGroupVisible: ComputedRef<boolean> = computed(() => {
     return isIpoProject(
-      projectContext.value.business_category || '',
+      projectContext.value.project_classification ?? projectContext.value.business_category ?? '',
       [...IPO_BIZ_KEYWORDS, 'fraud_risk'],
     )
   })

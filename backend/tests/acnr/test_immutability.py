@@ -1,12 +1,7 @@
-"""Tests for ACNR addr_id 不可变政策 + registry_version 处理
+"""Tests for ACNR addr_id 不可变、重命名与弃用政策。
 
-Covers:
-- R19.1: addr_id 不可变校验
-- R19.2: 重命名政策（旧名 → aliases，addr_id 不变）
-- R19.3: 弃用政策（deprecated + 保留 ≥1 version）
-- R19.4: 归档项目 registry_version 记录
-
-Requirements: 19.1, 19.2, 19.3, 19.4
+项目 registry_version 持久锁由 test_project_registry_lock_schema / pg 覆盖；
+本模块不再测试已删除的进程内字典。
 """
 from __future__ import annotations
 
@@ -15,13 +10,8 @@ import pytest
 from app.services.acnr.immutability import (
     AddrIdImmutabilityError,
     check_addr_id_immutable,
-    clear_all_project_versions,
     deprecate_entry,
-    get_project_registry_version,
     is_safe_to_remove,
-    list_archived_projects,
-    record_project_registry_version,
-    remove_project_registry_version,
     rename_sheet,
     validate_addr_id_immutable,
 )
@@ -81,13 +71,6 @@ def base_catalog() -> dict:
             },
         ],
     }
-
-
-@pytest.fixture(autouse=True)
-def _clean_project_versions():
-    """每个测试后清理项目版本记录。"""
-    yield
-    clear_all_project_versions()
 
 
 # ─── R19.1: addr_id 不可变校验 ───────────────────────────────────────────────
@@ -352,51 +335,3 @@ class TestDeprecateEntry:
         """deprecated 但无版本记录 → 保守不移除。"""
         entry = {"addr_id": "D2/D2-3", "deprecated": True}
         assert is_safe_to_remove(entry, "20260711000000") is False
-
-
-# ─── R19.4: 归档项目 registry_version 记录 ─────────────────────────────────
-
-
-class TestProjectRegistryVersion:
-    """R19.4: 归档项目记录 registry_version。"""
-
-    def test_record_and_get(self):
-        """记录并获取项目 registry_version。"""
-        record_project_registry_version("proj-001", "20260710102744")
-        assert get_project_registry_version("proj-001") == "20260710102744"
-
-    def test_get_nonexistent_returns_none(self):
-        """未记录的项目返回 None。"""
-        assert get_project_registry_version("proj-999") is None
-
-    def test_record_overwrites(self):
-        """重复记录覆盖旧值。"""
-        record_project_registry_version("proj-001", "20260710000000")
-        record_project_registry_version("proj-001", "20260711000000")
-        assert get_project_registry_version("proj-001") == "20260711000000"
-
-    def test_remove_version(self):
-        """移除项目 registry_version 记录。"""
-        record_project_registry_version("proj-001", "20260710102744")
-        assert remove_project_registry_version("proj-001") is True
-        assert get_project_registry_version("proj-001") is None
-
-    def test_remove_nonexistent(self):
-        """移除不存在的项目返回 False。"""
-        assert remove_project_registry_version("proj-999") is False
-
-    def test_list_archived_projects(self):
-        """列出所有归档项目。"""
-        record_project_registry_version("proj-001", "20260710000000")
-        record_project_registry_version("proj-002", "20260711000000")
-        result = list_archived_projects()
-        assert result == {
-            "proj-001": "20260710000000",
-            "proj-002": "20260711000000",
-        }
-
-    def test_clear_all(self):
-        """清除全部记录。"""
-        record_project_registry_version("proj-001", "20260710000000")
-        clear_all_project_versions()
-        assert list_archived_projects() == {}

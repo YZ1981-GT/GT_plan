@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildWorkpaperUri, buildTraceUri, RESOLVE_FAIL_MSG } from '../querySourceUri'
+import { buildWorkpaperUri, buildTraceUri, reportTypeOfSource, RESOLVE_FAIL_MSG } from '../querySourceUri'
 
 describe('buildWorkpaperUri — URI 拼装 (Property 7)', () => {
   it('完整三段', () => {
@@ -39,13 +39,46 @@ describe('buildTraceUri — 溯源 URI 推断分支', () => {
     expect(buildTraceUri(row, '')).toBe('note:五、1')
   })
 
-  it('回退 selectedSource', () => {
+  it('按数据源生成 address-resolve 认的模块前缀（原先注册表源键原样发出 ⇒ 400；advanced-query-linkage-closure 任务 32）', () => {
     const row = { amount: 100 }
-    expect(buildTraceUri(row, 'tb_detail')).toBe('tb_detail')
+    expect(buildTraceUri(row, 'tb_detail')).toBe('tb:tb_detail')
+    expect(buildTraceUri(row, 'ledger_entries')).toBe('tb:ledger_entries')
+    expect(buildTraceUri(row, 'adj_aje')).toBe('adj:adj_aje')
+    expect(buildTraceUri(row, 'adjustment')).toBe('adj:adjustment')
+    expect(buildTraceUri(row, 'report_balance_sheet')).toBe('report:balance_sheet')
+    expect(buildTraceUri({ report_type: 'cash_flow_statement', row_code: 'CF-001' }, 'report_lines'))
+      .toBe('report:cash_flow_statement')
+    expect(buildTraceUri(row, 'disclosure_note:八、1')).toBe('note:八、1')
+    expect(buildTraceUri(row, 'disclosure')).toBe('note:')
+    expect(buildTraceUri(row, 'workpaper:D2|审定表D2-1')).toBe('workpaper:D2|审定表D2-1')
+  })
+
+  it('底稿清单行只有 wp_code（没有 sheet）也按底稿溯源', () => {
+    expect(buildTraceUri({ wp_code: 'E1', wp_name: '货币资金' }, 'workpaper')).toBe('workpaper:E1')
   })
 
   it('全无则返回空串', () => {
     expect(buildTraceUri({}, '')).toBe('')
+  })
+})
+
+describe('reportTypeOfSource — 只有报表叶子带报表类型（advanced-query-linkage-closure 任务 17）', () => {
+  it('报表叶子 report_{类型} → 类型', () => {
+    expect(reportTypeOfSource('report_balance_sheet')).toBe('balance_sheet')
+    expect(reportTypeOfSource('report_income_statement')).toBe('income_statement')
+    expect(reportTypeOfSource('report_impairment_provision')).toBe('impairment_provision')
+  })
+
+  it('报表行次配置 report_lines 不是报表叶子（否则请求带 report_type=lines，后端得 0 行）', () => {
+    expect(reportTypeOfSource('report_lines')).toBeNull()
+  })
+
+  it('通用 report、其他源与空键 → null', () => {
+    expect(reportTypeOfSource('report')).toBeNull()
+    expect(reportTypeOfSource('report_')).toBeNull()
+    expect(reportTypeOfSource('tb_detail')).toBeNull()
+    expect(reportTypeOfSource('adj_aje')).toBeNull()
+    expect(reportTypeOfSource('')).toBeNull()
   })
 })
 

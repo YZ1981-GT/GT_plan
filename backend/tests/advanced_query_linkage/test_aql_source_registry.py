@@ -1,0 +1,654 @@
+"""源注册表与 SQL 分页内核（advanced-query-linkage-closure 任务 4；design §3.1、§10.1；ADR-AQL-03 / 06）。
+
+- 注册表自洽：每个源的显示列 / 隐藏列 / 旧筛选键 / 默认排序 / 唯一键都落在其 ORM 表的真实列上；
+- 源键解析：别名、前缀、合并单位、底稿叶子（带 / 不带单元格区域）、附注叶子、未知源 400；
+- 语句形态（postgresql 方言编译）：WHERE 含项目、年度、未删与生效数据集谓词，ORDER BY 末项为唯一键、
+  NULLS LAST 只在可空列，用户值只在绑定参数里；sqlite 方言同一语句可编译；
+- 未登记的筛选键 / 条件字段 / 算子 / 列 → 400（不再静默忽略，R6.2）；offset 超 100,000 → 422；
+- SQLite 真执行：like / 前缀按字面匹配 ``%`` ``_`` ``\\``，COUNT 与分页、可空列空值在后、无生效数据集的 warnings；
+- ``build_portable_filter`` 与构建器 ``_build_filter`` 对白名单算子等价，内部算子只对旧筛选键开放。
+"""
+from __future__ import annotations
+
+import datetime as dt
+import unicodedata
+import uuid
+from decimal import Decimal
+
+import pytest
+import pytest_asyncio
+import sqlalchemy as sa
+from fastapi import HTTPException
+from sqlalchemy.dialects import postgresql, sqlite
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import StaticPool
+
+from app.models.audit_platform_models import TbLedger
+from app.models.base import Base, ProjectStatus
+from app.models.core import Project
+from app.models.dataset_models import LedgerDataset
+from app.services.custom_query import paged_fetch
+from app.services.custom_query import source_registry as sr
+from app.services.custom_query.builder_dsl import _build_filter
+from app.services.custom_query.param_sql_builder import BLANK_CHARS, build_portable_filter
+from app.services.custom_query.table_whitelist import OPERATOR_WHITELIST
+from app.services.dataset_service import DatasetService
+from tests.advanced_query_linkage.builder_tables import create_tables_with_closure
+
+_PID = uuid.UUID("11111111-2222-3333-4444-555555555555")
+_DATASET = uuid.UUID("99999999-8888-7777-6666-555555555555")
+
+
+def _ctx(db=None, **kw) -> sr.FetchContext:
+    return sr.FetchContext(db=db, user=None, project_id=kw.pop("project_id", _PID), year=kw.pop("year", 2025),
+                           filters=kw.pop("filters", {}), **kw)
+
+
+def _pg(stmt) -> str:
+    return str(stmt.compile(dialect=postgresql.dialect()))
+
+
+def _detail(exc: pytest.ExceptionInfo) -> dict:
+    assert isinstance(exc.value, HTTPException)
+    return exc.value.detail
+
+
+# ─── 注册表自洽 ──────────────────────────────────────────────────────────────
+
+
+#: 响应列键与表列名不同的登记（沿用旧取数器的响应键，前端标签与编码类列判定都按它）
+_RENAMED_KEYS = {("report", "indent"): "indent_level", ("report", "is_total"): "is_total_row"}
+
+
+@pytest.mark.parametrize("spec", list(sr.SOURCE_REGISTRY.values()), ids=list(sr.SOURCE_REGISTRY))
+def test_registry_entries_are_real_orm_columns(spec: sr.SourceSpec) -> None:
+    keys = [c.key for c in (*spec.columns, *spec.hidden, *spec.condition_only)]
+    assert len(keys) == len(set(keys)), f"{spec.key} 列键重复：{keys}"
+    for column in (*spec.columns, *spec.hidden):
+        base = sr._base_column(column.expr)
+        assert isinstance(base, sa.Column), f"{spec.key}.{column.key} 不是表列：{base!r}"
+        assert Base.metadata.tables.get(base.table.name) is base.table, f"{spec.key}.{column.key} 不在 ORM 元数据里"
+        expected_name = _RENAMED_KEYS.get((spec.key, column.key), column.key)
+        assert base.name == expected_name, f"{spec.key}.{column.key} 与列名 {base.name} 不一致"
+    for column in spec.condition_only:
+        assert isinstance(column.expr, sa.sql.ColumnElement), f"{spec.key}.{column.key} 不是 SQL 条件表达式"
+        assert column.conditionable and not column.sortable, f"{spec.key}.{column.key} 只能作条件，不得排序"
+    filter_keys = {fk.key for fk in spec.filter_keys}
+    assert not (set(spec.context_filters) & filter_keys), f"{spec.key} 口径筛选键与通用筛选键重叠"
+    for key, _value in spec.fixed_filters:
+        assert key in filter_keys or key in spec.context_filters, f"{spec.key} 固定筛选 {key} 没有消费方"
+    for fk in spec.filter_keys:
+        assert spec.column(fk.column) is not None, f"{spec.key} 筛选键 {fk.key} 指向未登记的列 {fk.column}"
+    sortable = {c.key for c in (*spec.columns, *spec.hidden) if c.sortable}
+    for field, direction in spec.default_sort:
+        assert field in sortable and direction in ("asc", "desc"), (spec.key, field, direction)
+    assert spec.unique_key in {c.key for c in spec.hidden}, f"{spec.key} 唯一键须是隐藏列"
+    assert not ({c.key for c in spec.columns} & {c.key for c in spec.hidden}), f"{spec.key} 显示列与隐藏列重叠"
+    assert not (set(spec.display_keys) & {c.key for c in spec.condition_only}), f"{spec.key} 条件专用列泄漏为显示列"
+
+
+def test_nullable_is_read_from_column_definition() -> None:
+    led = sr.LEDGER_ENTRIES
+    assert led.column("voucher_date").nullable is False and led.column("debit_amount").nullable is True
+    assert sr.WORKPAPER.column("status").nullable is False, "Cast 包着的枚举列按底层列定义判可空"
+
+
+# ─── 源键解析 ────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(("source", "filters", "expect"), [
+    ("tb_detail", {}, ("spec", "trial_balance", {}, None)),
+    ("trial_balance", {}, ("spec", "trial_balance", {}, None)),
+    ("account_balance", {}, ("spec", "account_balance", {}, None)),
+    ("ledger_entries", {}, ("spec", "ledger_entries", {}, None)),
+    ("workhours", {}, ("spec", "workhours", {}, None)),
+    ("workpaper", {}, ("spec", "workpaper", {}, None)),
+    ("workpaper:E1", {}, ("spec", "workpaper", {"wp_code": "E1"}, None)),
+    ("workpaper:E1|审定表", {}, ("spec", "workpaper", {"wp_code": "E1", "sheet_name": "审定表"}, None)),
+    ("workpaper:E1|审定表", {"cell_range": "A1:B2"},
+     ("json", sr.WORKPAPER_CELLS, {"wp_code": "E1", "sheet_name": "审定表"}, None)),
+    ("workpaper", {"wp_code": "E1", "cell_range": "A1"}, ("json", sr.WORKPAPER_CELLS, {}, None)),
+    ("consol_unit:C01:ledger_entries", {}, ("spec", "ledger_entries", {}, "C01")),
+    ("consol_unit:C01:tb_detail", {}, ("spec", "trial_balance", {}, "C01")),
+    # 合并单位下唯一的「调整分录」叶子 = 该单位的全部类型（原写死大写 'AJE'，PG 枚举没有这个值、恒 500）
+    ("consol_unit:C01:adjustment", {}, ("spec", "adjustment", {}, "C01")),
+    ("disclosure_note:八、1", {}, ("json", ("disclosure", "_query_disclosure_section"), {"section_id": "八、1"}, None)),
+    ("disclosure", {}, ("json", ("disclosure", "_query_disclosure_catalog"), {}, None)),
+    ("tb_summary", {}, ("json", ("worksheet", "_query_tb_summary"), {}, None)),
+    # 任务 38：源键决定 sheet（与 report_{类型} / adj_aje 同机制）。原先这一格期望空 fixed_filters，
+    # 而 `_query_worksheet` 读 `filters.sheet_key` 且只有弹窗会设它 ⇒ 不设的调用方静默取到 `info` 的数据
+    ("ws_consol_tb", {}, ("json", ("worksheet", "_query_worksheet"), {"sheet_key": "consol_tb"}, None)),
+    ("ws_elimination", {}, ("json", ("worksheet", "_query_worksheet"), {"sheet_key": "elimination"}, None)),
+    # 请求自带的 sheet_key 不得盖掉源键（fixed_filters 在 business_fetchers 里后合并）
+    ("ws_info", {"sheet_key": "elimination"},
+     ("json", ("worksheet", "_query_worksheet"), {"sheet_key": "info"}, None)),
+    ("report", {}, ("spec", "report", {}, None)),
+    ("report_balance_sheet", {}, ("spec", "report", {"report_type": "balance_sheet"}, None)),
+    ("report_impairment_provision", {}, ("spec", "report", {"report_type": "impairment_provision"}, None)),
+    ("report_lines", {}, ("spec", "report_lines", {}, None)),
+    ("adjustment", {}, ("spec", "adjustment", {}, None)),
+    ("adj_aje", {}, ("spec", "adj_aje", {"adjustment_type": "aje"}, None)),
+    ("adj_rje", {}, ("spec", "adj_rje", {"adjustment_type": "rje"}, None)),
+    ("adj_rcl", {}, ("spec", "adj_rje", {"adjustment_type": "rje"}, None)),
+])
+def test_resolve_source(source: str, filters: dict, expect: tuple) -> None:
+    kind, target, fixed, company = expect
+    resolved = sr.resolve_source(source, filters)
+    if kind == "spec":
+        assert resolved.spec is sr.SOURCE_REGISTRY[target] and resolved.json_fetcher is None
+    else:
+        assert resolved.json_fetcher == target and resolved.spec is None
+    assert dict(resolved.fixed_filters) == fixed and resolved.company_code == company
+
+
+@pytest.mark.parametrize("source", ["", "nope", "consol_unit:C01", "consol_unit::ledger_entries",
+                                    "consol_unit:C01:workhours", "workpaper:", "report_nope", "report_",
+                                    "adj_cf", "adj_"])
+def test_unknown_source_is_400(source: str) -> None:
+    with pytest.raises(HTTPException) as exc:
+        sr.resolve_source(source, {})
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE"
+
+
+#: 跨模块单元格源键（``{report|note|adj|tb}:限定词|区域``）：取数实现随任务 34 删除（AQ-25，design §3.9），前端没有入口发它们
+_MODULE_CELL_SOURCES = ["report:balance_sheet|A1:C5", "note:五-1-1|C3:D8", "adj:aje|B2:E10", "tb:detail|C1:C50"]
+
+
+def _module_cell_req(source: str):
+    from app.services.custom_query.query_orchestrator import QueryRequest
+
+    return QueryRequest(entry="business", project_id=str(_PID), year=2025, source=source)
+
+
+@pytest.mark.parametrize("source", _MODULE_CELL_SOURCES)
+async def test_module_cell_source_keys_are_unknown_in_business_fetcher(source: str) -> None:
+    """execute 的分派入口按未知数据源 400（改前：先认出该源族，交跨模块单元格取数、200 返回虚拟单元格）。"""
+    from app.services.custom_query import business_fetchers
+
+    with pytest.raises(HTTPException) as exc:
+        await business_fetchers.business_fetcher(_module_cell_req(source), [], None)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE", _detail(exc)
+
+
+@pytest.mark.parametrize("source", _MODULE_CELL_SOURCES)
+async def test_module_cell_source_keys_are_unknown_in_prepare_export(source: str) -> None:
+    """「导出全部」同一分派入口同样 400（改前：当作非 SQL 源返回 None，交内存路径取数）。"""
+    from app.services.custom_query import business_fetchers
+
+    with pytest.raises(HTTPException) as exc:
+        await business_fetchers.prepare_export(_module_cell_req(source), None)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE", _detail(exc)
+
+
+# ─── 语句形态 ────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def fixed_active_dataset(monkeypatch):
+    async def _active(db, project_id, year):
+        return _DATASET
+
+    monkeypatch.setattr(DatasetService, "get_active_dataset_id", staticmethod(_active))
+
+
+async def test_ledger_statement_where_and_order_in_postgres(fixed_active_dataset) -> None:
+    hostile = "10'01; DROP TABLE tb_ledger --"
+    ctx = _ctx(filters={"account_code": hostile, "summary": "冲销"})
+    stmt, display = await paged_fetch.build_statement(
+        sr.LEDGER_ENTRIES, ctx, conditions=[{"field": "debit_amount", "op": "gt", "value": "100000000"}],
+    )
+    sql = _pg(stmt)
+    for clause in ("tb_ledger.project_id = %(", "tb_ledger.year = %(", "tb_ledger.dataset_id = %(",
+                   "tb_ledger.is_deleted = false", "tb_ledger.debit_amount > %(", "tb_ledger.account_code LIKE %(",
+                   "tb_ledger.summary LIKE %("):
+        assert clause in sql, f"WHERE 缺 {clause}：{sql}"
+    assert "DROP" not in sql and "冲销" not in sql and "100000000" not in sql, "用户值只能出现在绑定参数里"
+    assert [c.key for c in display] == sr.LEDGER_ENTRIES.display_keys
+    ordered = _pg(stmt.order_by(*paged_fetch._order_by(sr.LEDGER_ENTRIES, ())))
+    tail = ordered.split("ORDER BY", 1)[1]
+    assert "voucher_date DESC" in tail and "voucher_date DESC NULLS LAST" not in tail, "非空列不加 NULLS LAST"
+    assert "entry_seq ASC NULLS LAST" in tail, "可空列加 NULLS LAST"
+    assert tail.strip().endswith("id ASC"), f"ORDER BY 末项须是唯一键：{tail}"
+    by_debit = _pg(stmt.order_by(*paged_fetch._order_by(sr.LEDGER_ENTRIES, [{"field": "debit_amount", "direction": "desc"}])))
+    assert "debit_amount DESC NULLS LAST" in by_debit.split("ORDER BY", 1)[1]
+    str(stmt.compile(dialect=sqlite.dialect()))  # 同一语句以 sqlite 方言编译不报错
+
+
+async def test_trial_balance_and_workpaper_statement_shape() -> None:
+    tb_stmt, _ = await paged_fetch.build_statement(sr.TRIAL_BALANCE, _ctx(company_code="C01"))
+    sql = _pg(tb_stmt)
+    for clause in ("trial_balance.project_id = %(", "trial_balance.year = %(", "trial_balance.is_deleted = false",
+                   "trial_balance.company_code = %("):
+        assert clause in sql, sql
+    wp_stmt, _ = await paged_fetch.build_statement(
+        sr.WORKPAPER, _ctx(filters={"wp_code": "E1", "sheet_name": "审定表"}))
+    wp_sql = _pg(wp_stmt)
+    assert "JOIN wp_index ON wp_index.id = working_paper.wp_index_id" in wp_sql
+    assert "wp_index.wp_code = %(" in wp_sql and "wp_index.wp_code LIKE %(" in wp_sql, "编码精确或其子编码"
+    assert " AS sheet_name" in wp_sql, "底稿叶子的 sheet 名以隐藏列回显"
+    assert "working_paper.project_id = %(" in wp_sql and "working_paper.is_deleted = false" in wp_sql
+
+
+async def test_report_statement_joins_generated_amounts_and_project_rows() -> None:
+    """报表源（任务 17）：准则行 ∪ 本项目独有行，金额 LEFT JOIN financial_report（同项目年度、同类型行次、未删）。"""
+    ctx = _ctx(filters={"report_type": "income_statement", "standard": "soe_standalone"})
+    stmt, display = await paged_fetch.build_statement(sr.REPORT, ctx)
+    sql = _pg(stmt)
+    join = sql.split("LEFT OUTER JOIN financial_report ON", 1)[1].split("WHERE", 1)[0]
+    for clause in ("financial_report.project_id = %(", "financial_report.year = %(",
+                   "financial_report.report_type = report_config.report_type",
+                   "financial_report.row_code = report_config.row_code", "financial_report.is_deleted = false"):
+        assert clause in join, f"金额关联条件缺 {clause}：{join}"
+    where = sql.split("WHERE", 1)[1]
+    assert "report_config.is_deleted = false" in where and "report_config.report_type = %(" in where
+    assert "report_config.applicable_standard = %(" in where
+    shadow = where.split("NOT (EXISTS (SELECT *", 1)[1]
+    assert shadow.lstrip().startswith("FROM report_config AS rc_standard"), "独有行判定只看准则下的同号行（相关子查询）"
+    assert "rc_standard.report_type = report_config.report_type" in shadow
+    assert "rc_standard.row_code = report_config.row_code" in shadow
+    params = stmt.compile(dialect=postgresql.dialect()).params
+    assert "income_statement" in params.values() and f"project:{_PID}" in params.values()
+    assert [c.key for c in display] == sr.REPORT.display_keys
+    ordered = _pg(stmt.order_by(*paged_fetch._order_by(sr.REPORT, ()))).split("ORDER BY", 1)[1]
+    assert ordered.strip() == "report_config.row_number ASC, report_config.row_code ASC, report_config.id ASC"
+    by_amount = _pg(stmt.order_by(*paged_fetch._order_by(
+        sr.REPORT, [{"field": "current_period_amount", "direction": "desc"}]))).split("ORDER BY", 1)[1]
+    assert "financial_report.current_period_amount DESC NULLS LAST" in by_amount
+    assert sr.REPORT.column("is_stale").nullable, "外连接一侧的列按可空处理（无匹配行时为空）"
+    str(stmt.compile(dialect=sqlite.dialect()))
+
+
+@pytest.mark.parametrize(("filters", "key"), [
+    ({"report_type": "nope", "standard": "soe_standalone"}, "report_type"),
+    ({"report_type": "balance_sheet", "standard": f"project:{_PID}"}, "standard"),
+])
+async def test_report_context_filters_are_validated(filters: dict, key: str) -> None:
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.REPORT, _ctx(filters=filters))
+    assert _detail(exc)["error_code"] == "INVALID_FILTER_VALUE" and _detail(exc)["filter_key"] == key
+    with pytest.raises(HTTPException) as unknown:
+        await paged_fetch.build_statement(sr.REPORT, _ctx(filters={"report_type": "balance_sheet", "row_code": "x"}))
+    assert _detail(unknown)["error_code"] == "UNKNOWN_FILTER_KEY"
+    assert {"report_type", "standard"} <= set(_detail(unknown)["allowed"]), "口径筛选键也列在可用项里"
+
+
+async def test_report_lines_statement_and_enum_sort() -> None:
+    """报表行次（任务 17）：只含准则行与本项目副本行；报表类型显示 / 条件按文本，排序按枚举声明顺序。"""
+    stmt, _ = await paged_fetch.build_statement(sr.REPORT_LINES, _ctx(filters={"has_formula": True}))
+    sql = _pg(stmt)
+    assert "CAST(report_config.report_type AS VARCHAR) AS report_type" in sql
+    assert "report_config.applicable_standard NOT LIKE %(" in sql and "report_config.applicable_standard = %(" in sql
+    assert "trim(report_config.formula" in sql, "has_formula = 非「为空或空白」"
+    ordered = _pg(stmt.order_by(*paged_fetch._order_by(sr.REPORT_LINES, ()))).split("ORDER BY", 1)[1]
+    assert ordered.strip() == ("report_config.applicable_standard ASC, report_config.report_type ASC, "
+                               "report_config.row_number ASC, report_config.id ASC")
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("AJE", "aje"), ("aje", "aje"), (" Rje ", "rje"), ("RCL", "rje"),
+                                               ("rcl", "rje")])
+def test_adjustment_type_values_are_normalized(raw: str, expected: str) -> None:
+    assert sr.normalize_adjustment_type(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["CF", "cf", "XYZ", "1"])
+def test_unknown_adjustment_type_is_400(raw: str) -> None:
+    with pytest.raises(HTTPException) as exc:
+        sr.normalize_adjustment_type(raw)
+    assert _detail(exc)["error_code"] == "INVALID_FILTER_VALUE" and "AJE" in _detail(exc)["message"]
+
+
+@pytest.mark.parametrize(("filters", "conditions", "logic", "single", "expected"), [
+    ({"aux_type": "银行账户"}, [], "and", True, True),
+    ({"aux_type": " "}, [], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": "银行账户"}], "and", True, True),
+    ({}, [{"field": "aux_type", "op": "in", "value": ["银行账户"]}], "and", True, True),
+    ({}, [{"field": "aux_type", "op": "in", "value": ["银行账户", "金融机构"]}], "and", True, False),
+    ({}, [{"field": "aux_type", "op": "in", "value": ["银行账户", "金融机构"]}], "and", False, True),
+    ({}, [{"field": "aux_type", "op": "between", "value": ["A", "B"]}], "and", False, True),
+    ({}, [{"field": "aux_type", "op": "like", "value": "银行"}], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": ""}], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "in", "value": []}], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": "X"}, {"field": "summary", "op": "like", "value": "y"}], "or",
+     False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": "X"}], "or", False, True),
+    ({}, [{"field": "account_code", "op": "eq", "value": "1002"}], "and", False, False),
+], ids=["filter", "blank-filter", "eq", "in-one", "in-two-single", "in-two", "between", "like", "eq-blank", "in-empty",
+        "or-two", "or-one", "other-field"])
+def test_filtered_by_semantics(filters, conditions, logic, single, expected) -> None:
+    ctx = _ctx(filters=filters, conditions=tuple(conditions), condition_logic=logic)
+    assert sr.filtered_by(ctx, "aux_type", single_value=single) is expected
+
+
+async def test_aux_ledger_requires_account_or_type(fixed_active_dataset) -> None:
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx())
+    assert _detail(exc)["error_code"] == "AUX_FILTER_REQUIRED"
+    assert _detail(exc)["message"] == "辅助明细请先按科目或辅助类型筛选"
+    stmt, _ = await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx(filters={"account_code": "1002"}))
+    sql = _pg(stmt)
+    for clause in ("tb_aux_ledger.project_id = %(", "tb_aux_ledger.year = %(", "tb_aux_ledger.dataset_id = %(",
+                   "tb_aux_ledger.is_deleted = false", "tb_aux_ledger.account_code LIKE %("):
+        assert clause in sql, sql
+    await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx(), conditions=[
+        {"field": "aux_type", "op": "eq", "value": "银行账户"}])
+    with pytest.raises(HTTPException) as either:
+        await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx(), logic="or", conditions=[
+            {"field": "aux_type", "op": "eq", "value": "银行账户"}, {"field": "summary", "op": "like", "value": "x"}])
+    assert _detail(either)["error_code"] == "AUX_FILTER_REQUIRED"
+
+
+async def test_aux_balance_warns_about_cross_dimension_sums(fixed_active_dataset) -> None:
+    class _DB:
+        async def get(self, model, pk):
+            return None
+
+    ctx = _ctx(_DB(), filters={"account_code": "1002"})
+    await paged_fetch.build_statement(sr.AUX_BALANCE, ctx)
+    assert sr.AUX_CROSS_DIMENSION_WARNING in await sr.AUX_BALANCE.warn(ctx)
+    narrowed = _ctx(_DB(), filters={"account_code": "1002"})
+    await paged_fetch.build_statement(sr.AUX_BALANCE, narrowed, conditions=[
+        {"field": "aux_type", "op": "eq", "value": "银行账户"}])
+    assert sr.AUX_CROSS_DIMENSION_WARNING not in await sr.AUX_BALANCE.warn(narrowed)
+
+
+async def test_adjustment_statement_compares_type_as_text() -> None:
+    stmt, display = await paged_fetch.build_statement(sr.ADJUSTMENT, _ctx(filters={"adjustment_type": "RCL"},
+                                                                            company_code="C01"))
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    sql = str(compiled)
+    assert "CAST(adjustments.adjustment_type AS VARCHAR) = %(" in sql, "枚举列按文本比较（非法值是查不到，不是 500）"
+    assert "rje" in compiled.params.values() and "RCL" not in compiled.params.values()
+    for clause in ("adjustments.project_id = %(", "adjustments.year = %(", "adjustments.is_deleted = false",
+                   "adjustments.company_code = %("):
+        assert clause in sql, sql
+    assert "adjustment_type" in [c.key for c in display], "通用源带类型列"
+    typed, typed_display = await paged_fetch.build_statement(sr.ADJUSTMENT_AJE, _ctx(filters={"adjustment_type": "aje"}))
+    assert "adjustment_type" not in [c.key for c in typed_display] and " AS entry_group_id" in _pg(typed)
+
+
+# ─── 未登记的输入一律 400 ─────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(("kwargs", "code"), [
+    ({"filters": {"debit_amount_min": 1}}, "UNKNOWN_FILTER_KEY"),
+    # 任务 45（W6，ADR-AQL-20）起 ``account_code`` 按设计收多值；其余筛选键仍坚持单值
+    ({"filters": {"voucher_no": ["A", "B"]}}, "INVALID_FILTER_VALUE"),
+    ({"filters": {"account_code": []}}, "INVALID_FILTER_VALUE"),
+    ({"filters": {"account_code": [f"{i:04d}" for i in range(51)]}}, "INVALID_FILTER_VALUE"),
+    ({"conditions": [{"field": "nope", "op": "eq", "value": 1}]}, "UNKNOWN_CONDITION_FIELD"),
+    ({"conditions": [{"field": "id", "op": "eq", "value": 1}]}, "UNKNOWN_CONDITION_FIELD"),
+    ({"conditions": [{"field": "summary", "op": "regex", "value": "x"}]}, "OP_NOT_ALLOWED"),
+    ({"conditions": [{"field": "account_code", "op": "prefix", "value": "10"}]}, "OP_NOT_ALLOWED"),
+    ({"conditions": [{"field": "account_code", "op": "in", "value": [str(i) for i in range(501)]}]}, "INVALID_IN_VALUE"),
+    ({"columns": ["account_name", "closing_balance"]}, "UNKNOWN_COLUMN"),
+], ids=["filter-key", "filter-list", "filter-empty-codes", "filter-too-many-codes", "cond-field", "cond-hidden",
+        "cond-op", "cond-internal-op", "cond-in-500", "column"])
+async def test_unregistered_inputs_are_400(kwargs: dict, code: str, fixed_active_dataset) -> None:
+    # 口径谓词不触库（生效数据集 id 固定）：校验若被跳过，语句照常建出 ⇒ 形态是 DID NOT RAISE，而不是别的报错
+    # 不改参数化的 dict（原先 pop 掉 filters：同一会话里再收集到一次时第二次 filters 为空 ⇒ DID NOT RAISE）
+    rest = {key: value for key, value in kwargs.items() if key != "filters"}
+    ctx = _ctx(filters=kwargs.get("filters", {}))
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, ctx, **rest)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == code, _detail(exc)
+    assert _detail(exc)["message"], "400 须带中文原因"
+
+
+async def test_offset_beyond_100k_is_422_and_bad_sort_is_422() -> None:
+    with pytest.raises(HTTPException) as deep:
+        await paged_fetch.page(sr.LEDGER_ENTRIES, _ctx(), limit=100, offset=paged_fetch.MAX_SQL_OFFSET + 1)
+    assert deep.value.status_code == 422 and _detail(deep)["error_code"] == "OFFSET_TOO_DEEP"
+    with pytest.raises(HTTPException) as bad_field:
+        await paged_fetch.page(sr.LEDGER_ENTRIES, _ctx(), sort=[{"field": "nope"}], limit=10, offset=0)
+    assert bad_field.value.status_code == 422 and _detail(bad_field)["error_code"] == "INVALID_SORT_FIELD"
+    with pytest.raises(HTTPException) as bad_dir:
+        await paged_fetch.page(sr.LEDGER_ENTRIES, _ctx(), sort=[{"field": "voucher_no", "direction": "up"}],
+                               limit=10, offset=0)
+    assert _detail(bad_dir)["error_code"] == "INVALID_SORT_FIELD_DIRECTION"
+
+
+# ─── SQLite 真执行 ───────────────────────────────────────────────────────────
+
+
+@pytest_asyncio.fixture
+async def ledger_db():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(create_tables_with_closure, (TbLedger.__table__, LedgerDataset.__table__, Project.__table__))
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        session.add(Project(id=_PID, name="【测试】aql 注册表", client_name="aql", status=ProjectStatus.created))
+        rows = [
+            ("50%_x", "10_1", Decimal("5")), ("50abx", "1001", None), ("5", "10%1", Decimal("7")),
+            ("a\\b", "1002", Decimal("3")), ("50%_y", "1001", None),
+        ]
+        for i, (summary, code, debit) in enumerate(rows):
+            session.add(TbLedger(project_id=_PID, year=2025, company_code="001", voucher_date=dt.date(2025, 1, 1 + i),
+                                 voucher_no=f"V{i}", account_code=code, summary=summary, debit_amount=debit))
+        session.add(TbLedger(project_id=_PID, year=2025, company_code="001", voucher_date=dt.date(2025, 2, 1),
+                             voucher_no="DEL", account_code="1001", summary="50%_deleted", is_deleted=True))
+        await session.commit()
+        yield session
+    await engine.dispose()
+
+
+async def _page(db, **kw):
+    filters = kw.pop("filters", {})
+    return await paged_fetch.page(sr.LEDGER_ENTRIES, _ctx(db, filters=filters), limit=kw.pop("limit", 100),
+                                  offset=kw.pop("offset", 0), **kw)
+
+
+async def test_like_matches_percent_and_underscore_literally(ledger_db) -> None:
+    hit = await _page(ledger_db, conditions=[{"field": "summary", "op": "like", "value": "50%_"}])
+    assert sorted(r["summary"] for r in hit.rows) == ["50%_x", "50%_y"], "包含 50%_ 按字面匹配，不把 % _ 当通配符"
+    assert hit.total == 2 and hit.paged
+    backslash = await _page(ledger_db, conditions=[{"field": "summary", "op": "like", "value": "a\\b"}])
+    assert [r["summary"] for r in backslash.rows] == ["a\\b"]
+    exclude = await _page(ledger_db, conditions=[{"field": "summary", "op": "not_like", "value": "50%_"}])
+    assert exclude.total == 3
+
+
+async def test_prefix_filter_key_is_literal(ledger_db) -> None:
+    underscore = await _page(ledger_db, filters={"account_code": "10_"})
+    assert [r["account_code"] for r in underscore.rows] == ["10_1"], "前缀筛选的 _ 按字面匹配"
+    percent = await _page(ledger_db, filters={"account_code": "10%"})
+    assert [r["account_code"] for r in percent.rows] == ["10%1"]
+
+
+async def test_count_paging_nulls_last_and_warning(ledger_db) -> None:
+    first = await _page(ledger_db, limit=2, sort=[{"field": "debit_amount", "direction": "desc"}])
+    second = await _page(ledger_db, limit=2, offset=2, sort=[{"field": "debit_amount", "direction": "desc"}])
+    third = await _page(ledger_db, limit=2, offset=4, sort=[{"field": "debit_amount", "direction": "desc"}])
+    assert first.total == second.total == third.total == 5, "total 来自 COUNT，不随页变化；软删行不计"
+    debits = [r["debit_amount"] for r in (*first.rows, *second.rows, *third.rows)]
+    assert debits == [7.0, 5.0, 3.0, None, None], "降序时空值在后"
+    asc = await _page(ledger_db, sort=[{"field": "debit_amount", "direction": "asc"}])
+    assert [r["debit_amount"] for r in asc.rows] == [3.0, 5.0, 7.0, None, None], "升序时空值也在后"
+    ids = [r["id"] for r in (*first.rows, *second.rows, *third.rows)]
+    assert len(set(ids)) == 5, "逐页并集 = 全集且互不重叠"
+    assert sr.NO_ACTIVE_DATASET_WARNING in first.warnings, "没有生效数据集时 warnings 写明按未删除行返回"
+    # meta = 引用校验上下文 + 显示列类型（任务 28 / 29 的金额格式化按它判定；隐藏列不在其中）+ 计数凭证
+    assert set(first.meta) == {"ref_context", "column_types", "count_token", "count_reused"}
+    assert first.meta["ref_context"] == {"template_type": "soe", "year": 2025}
+    assert first.meta["column_types"] == {c.key: c.dtype for c in sr.LEDGER_ENTRIES.columns}
+    assert first.meta["column_types"]["debit_amount"] == "number" and first.meta["column_types"]["summary"] == "text"
+    # 首页照常计数并签发凭证；复用判据见 test_count_token_reuse.py
+    assert first.meta["count_token"]
+    assert first.meta["count_reused"] is False
+    assert [c.key for c in first.columns] == sr.LEDGER_ENTRIES.display_keys
+    assert {"id", "entry_seq", "accounting_period", "company_code"} <= set(first.rows[0]), "隐藏列随行返回"
+
+
+async def test_column_types_follow_the_projection(ledger_db) -> None:
+    """只选部分列时 column_types 只含所选列（与 columns 同一份显示列）。"""
+    page = await _page(ledger_db, columns=["account_name", "debit_amount"])
+    assert page.meta["column_types"] == {"account_name": "text", "debit_amount": "number"}
+
+
+async def test_column_projection_keeps_hidden_keys(ledger_db) -> None:
+    page = await _page(ledger_db, columns=["account_name", "voucher_no"])
+    assert [c.key for c in page.columns] == ["voucher_no", "account_name"], "只含所选列（按源定义的列序）"
+    assert "summary" not in page.rows[0] and "id" in page.rows[0], "未选的显示列不返回，下钻键随行返回"
+
+
+async def test_all_rows_rejects_aggregation_over_cap(ledger_db) -> None:
+    full = await paged_fetch.all_rows(sr.LEDGER_ENTRIES, _ctx(ledger_db), cap=5)
+    assert full.total == 5 and not full.paged
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.all_rows(sr.LEDGER_ENTRIES, _ctx(ledger_db), cap=4)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "AGGREGATION_TOO_LARGE"
+    assert _detail(exc)["row_count"] == 5
+
+
+# ─── 谓词来源 ────────────────────────────────────────────────────────────────
+
+_COL = TbLedger.__table__.c.account_code
+_NUM = TbLedger.__table__.c.debit_amount
+_DATE = TbLedger.__table__.c.voucher_date
+_VALUES = {
+    "in": ["1001", "1002"], "not_in": ["1001"], "between": ["1001", "1009"],
+    "is_null": None, "is_not_null": None, "is_blank": None, "weekday_in": [0, 6],
+}
+
+
+@pytest.mark.parametrize("op", sorted(OPERATOR_WHITELIST))
+def test_portable_filter_equals_builder_filter(op: str) -> None:
+    column = _DATE if op == "weekday_in" else _COL
+    value = _VALUES.get(op, "10_1%")
+    portable = build_portable_filter(column, op, value).compile(dialect=postgresql.dialect())
+    builder = _build_filter(column, op, value).compile(dialect=postgresql.dialect())
+    assert str(portable) == str(builder) and portable.params == builder.params
+
+
+def test_internal_operators_only_for_legacy_filter_keys() -> None:
+    for op in ("prefix", "nonempty"):
+        with pytest.raises(HTTPException) as exc:
+            build_portable_filter(_COL, op, "x")
+        assert _detail(exc)["error_code"] == "OP_NOT_ALLOWED"
+        with pytest.raises(HTTPException):
+            _build_filter(_COL, op, "x")
+    prefix = build_portable_filter(_COL, "prefix", "10_", allow_internal=True).compile(dialect=postgresql.dialect())
+    assert "LIKE" in str(prefix) and list(prefix.params.values()) == ["10\\_%"]
+    blank = str(build_portable_filter(_COL, "nonempty", False, allow_internal=True).compile(dialect=sqlite.dialect()))
+    nonempty = str(build_portable_filter(_COL, "nonempty", True, allow_internal=True).compile(dialect=sqlite.dialect()))
+    assert "IS NULL" in blank and "trim(" in blank and nonempty.startswith("NOT")
+
+
+def test_blank_chars_are_js_trim_whitespace() -> None:
+    zs = {chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == "Zs"}
+    expected = zs | {"\t", "\n", "\x0b", "\x0c", "\r", "\u2028", "\u2029", "\ufeff"}
+    assert set(BLANK_CHARS) == expected and len(BLANK_CHARS) == len(expected) == 25
+
+
+def test_numeric_condition_value_is_coerced_and_bad_value_400() -> None:
+    compiled = build_portable_filter(_NUM, "gt", "100000000").compile(dialect=postgresql.dialect())
+    assert list(compiled.params.values()) == [Decimal("100000000")]
+    with pytest.raises(HTTPException) as exc:
+        build_portable_filter(_NUM, "gt", "一亿")
+    assert _detail(exc)["error_code"] == "INVALID_DECIMAL"
+
+
+@pytest.mark.parametrize(("condition", "message"), [
+    ({"field": "debit_amount", "op": "gte", "value": None}, None),
+    ({"field": "debit_amount", "op": "gte", "value": "  "}, None),
+    ({"field": "debit_amount", "op": "between", "value": ["1", ""]}, None),
+    ({"field": "voucher_date", "op": "weekday_in", "value": []}, None),
+    ({"field": "debit_amount", "op": "gte", "value": {"$param": "materiality_performance"}}, None),
+    ({"field": "debit_amount", "op": "gte", "value": "", "missing_reason": "本项目未设置阈值"},
+     "本项目未设置阈值"),
+], ids=["none", "blank", "between-end", "weekday-empty", "param", "specific-reason"])
+async def test_condition_value_required_is_fail_closed(condition, message, fixed_active_dataset) -> None:
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, _ctx(), conditions=[condition])
+    assert _detail(exc)["error_code"] == "CONDITION_VALUE_REQUIRED"
+    assert _detail(exc)["message"] == (message or f"条件「{condition['field']}」未填写值")
+
+
+async def test_empty_in_and_not_in_keep_defined_semantics(fixed_active_dataset) -> None:
+    stmt, _ = await paged_fetch.build_statement(
+        sr.LEDGER_ENTRIES, _ctx(), conditions=[{"field": "account_code", "op": "in", "value": []}],
+    )
+    sql = _pg(stmt).lower()
+    assert "where false" in sql, "in 空集必须把整个谓词化简为恒假"
+
+    stmt, _ = await paged_fetch.build_statement(
+        sr.LEDGER_ENTRIES, _ctx(), conditions=[{"field": "account_code", "op": "not_in", "value": []}],
+    )
+    sql = _pg(stmt).lower()
+    # SQLAlchemy 会把 true() 与既有 WHERE 合取后优化掉；不能要求 SQL 字面出现 true。
+    assert "where false" not in sql and "not in" not in sql, "not_in 空集必须恒真，不得额外收窄"
+
+
+async def test_line_amount_is_condition_only_and_decimal_bound(fixed_active_dataset) -> None:
+    spec = sr.LEDGER_ENTRIES
+    assert [(column.key, column.dtype) for column in spec.condition_only] == [("line_amount", "number")]
+    assert "line_amount" not in spec.display_keys
+    stmt, display = await paged_fetch.build_statement(
+        spec,
+        _ctx(),
+        conditions=[{"field": "line_amount", "op": "gte", "value": "1000000"}],
+        columns=["voucher_no"],
+    )
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    assert "greatest" in str(compiled).lower()
+    assert Decimal("1000000") in compiled.params.values()
+    assert [column.key for column in display] == ["voucher_no"]
+    assert "line_amount" not in str(compiled).split("FROM", 1)[0]
+
+    with pytest.raises(HTTPException) as selected:
+        await paged_fetch.build_statement(spec, _ctx(), columns=["line_amount"])
+    assert _detail(selected)["error_code"] == "UNKNOWN_COLUMN"
+    with pytest.raises(HTTPException) as sorted_by:
+        paged_fetch._order_by(spec, [{"field": "line_amount", "direction": "desc"}])
+    assert _detail(sorted_by)["error_code"] == "INVALID_SORT_FIELD"
+
+
+async def test_indicator_leaves_of_registry_sources_declare_registry_columns() -> None:
+    """指标树叶子声明的列 = 注册表显示列（R5.7；任务 7 起 execute 对未登记列 400，页面版按叶子列发 columns）。"""
+    from app.routers import custom_query as router_module
+
+    tree = await router_module.get_indicators(project_id=None, depth=1, branch=None, response=None, db=None,
+                                              current_user=None)
+    leaves = {leaf["key"]: leaf for group in tree for leaf in group.get("children") or [] if "key" in leaf}
+    for key in ("tb_detail", "account_balance", "ledger_entries", "workhours", "report_lines", "adj_aje", "adj_rje", "aux_balance", "aux_ledger",
+                "report_balance_sheet", "report_income_statement", "report_impairment_provision"):
+        spec = sr.resolve_source(key).spec
+        assert leaves[key]["columns"] == spec.display_keys, key
+        assert leaves[key]["condition_fields"] == [
+            {"key": column.key, "dtype": column.dtype} for column in spec.condition_columns
+        ], key
+    assert {"key": "line_amount", "dtype": "number"} in leaves["ledger_entries"]["condition_fields"]
+    assert "line_amount" not in leaves["ledger_entries"]["columns"]
+    assert "entry_number" not in leaves["adj_aje"]["columns"], "旧叶子声明了表里没有的列（页面版按叶子列发 columns ⇒ 400）"
+    for kind, canonical in sr.CONSOL_UNIT_KINDS.items():  # 合并单位叶子（_build_consol_units_tree）同一定义
+        assert router_module._registry_columns(f"consol_unit:C01:{kind}") == sr.SOURCE_REGISTRY[canonical].display_keys
+    assert router_module._INDICATORS_SCHEMA_VERSION == 15, "condition_fields 改变缓存契约，必须从当前 v14 顺延"
+
+
+async def test_ref_context_follows_project_template_type_without_loading_full_project() -> None:
+    class _Result:
+        def __init__(self, template_type):
+            self.template_type = template_type
+
+        def scalar_one_or_none(self):
+            return self.template_type
+
+    class _DB:
+        def __init__(self, template_type):
+            self.template_type, self.calls, self.statements = template_type, 0, []
+
+        async def execute(self, statement):
+            self.calls += 1
+            self.statements.append(str(statement))
+            return _Result(self.template_type)
+
+        async def get(self, *_args, **_kwargs):  # pragma: no cover - 走到即说明又加载了整 ORM
+            raise AssertionError("ref_context 只允许投影 Project.template_type，不能加载整项目行")
+
+    listed = _DB("listed")
+    ctx = _ctx(listed)
+    assert await sr.ref_context(ctx) == {"template_type": "listed", "year": 2025}
+    assert await sr.ref_context(ctx) == {"template_type": "listed", "year": 2025} and listed.calls == 1, "同一请求只查一次"
+    statement = listed.statements[0]
+    assert "projects.template_type" in statement
+    assert "projects.amount_unit" not in statement and "projects.client_name" not in statement, "不得投影无关项目列"
+    assert await sr.ref_context(_ctx(_DB(None))) == {"template_type": "soe", "year": 2025}

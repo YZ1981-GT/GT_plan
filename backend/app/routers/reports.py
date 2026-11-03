@@ -22,16 +22,25 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, require_operation, check_consol_lock
+from app.deps import assert_project_permission, require_project_access, require_operation, check_consol_lock
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
-from app.models.report_models import FinancialReport, FinancialReportType
+from app.models.report_models import FinancialReport, FinancialReportType, ReportGenerationRun
 from app.models.report_schemas import (
     ReportGenerateRequest,
+    ReportProvenanceResponse,
     ReportRow,
 )
 from app.services.event_bus import event_bus
+from app.services.formula_provenance import redact_final_provenance
 from app.services.report_engine import ReportEngine
+from app.services.report_freshness import (
+    definition_hash_for,
+    formula_for,
+    load_effective_formula_state,
+    row_status,
+    status_note,
+)
 
 router = APIRouter(
     prefix="/api/reports",
@@ -45,6 +54,33 @@ async def _resolve_applicable_standard(db: AsyncSession, project_id: UUID) -> st
     return await ReportConfigService.resolve_applicable_standard(db, project_id)
 
 
+def _generation_warnings(results: dict) -> list[dict[str, str]]:
+    """从引擎覆盖率元数据提取需要直接告知用户的生成级 warning。
+
+    行级 formula_warning / dangling_row_ref 已随各行返回，不在生成成功 toast 里重复轰炸；这里只回传
+    S9 的 ``stale_trial_balance``。输入形状损坏时返回空，不能让提示加工反过来使生成接口 500。
+    """
+    coverage = results.get("coverage_stats")
+    if not isinstance(coverage, dict):
+        return []
+    by_type = coverage.get("by_type")
+    if not isinstance(by_type, dict):
+        return []
+    income = by_type.get(FinancialReportType.income_statement.value)
+    if not isinstance(income, dict):
+        return []
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in income.get("warnings") or []:
+        if not isinstance(item, dict) or item.get("type") != "stale_trial_balance":
+            continue
+        message = str(item.get("message") or "").strip()
+        if message and message not in seen:
+            out.append({"type": "stale_trial_balance", "message": message})
+            seen.add(message)
+    return out
+
+
 @router.post("/generate")
 async def generate_reports(
     data: ReportGenerateRequest,
@@ -53,6 +89,10 @@ async def generate_reports(
 ):
     """生成/重新生成四张报表"""
     from app.services.prerequisite_checker import PrerequisiteChecker
+
+    # 项目在请求体：操作矩阵取不到项目，只按系统角色判 ⇒ 这里按请求体项目校验编辑权限
+    # （spec consol-autotree-residual-closure R1.2；不是该项目成员即 403）
+    await assert_project_permission(db, current_user, data.project_id, "edit")
 
     # 合并锁定检查（project_id 在 body，显式调用反查）— Phase 1 Task 5
     await check_consol_lock(project_id=data.project_id, db=db)
@@ -66,7 +106,9 @@ async def generate_reports(
 
     engine = ReportEngine(db)
     try:
-        results = await engine.generate_all_reports(data.project_id, data.year, applicable_standard)
+        results = await engine.generate_all_reports(
+            data.project_id, data.year, applicable_standard, triggered_by=current_user.id,
+        )
         await db.commit()
         await event_bus.publish_immediate(EventPayload(
             event_type=EventType.REPORTS_UPDATED,
@@ -92,6 +134,7 @@ async def generate_reports(
             "message": "报表生成成功",
             "report_types": list(results.keys()),
             "row_counts": {k: len(v) for k, v in results.items()},
+            "warnings": _generation_warnings(results),
             "summary": {
                 "total_rows": total_rows,
                 "non_zero_rows": non_zero_rows,
@@ -154,6 +197,83 @@ async def consistency_check(
     }
 
 
+@router.get("/{project_id}/{year}/{report_type}/rows/{row_code}/provenance", response_model=ReportProvenanceResponse)
+async def get_report_row_provenance(
+    project_id: UUID,
+    year: int,
+    report_type: FinancialReportType,
+    row_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """读取报表本期最终值来源；输入明细按当前请求人权限脱敏。"""
+    row = (await db.execute(
+        sa.select(FinancialReport).where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
+            FinancialReport.report_type == report_type,
+            FinancialReport.row_code == row_code,
+            FinancialReport.is_deleted == sa.false(),
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="报表行不存在")
+
+    formulas, definition_hashes = await load_effective_formula_state(
+        db, project_id, report_type=report_type,
+    )
+    freshness = row_status(
+        row,
+        formula_for(formulas, row),
+        definition_hash_for(definition_hashes, row),
+    )
+    envelope, inputs_redacted, legacy = redact_final_provenance(
+        row.provenance, allowed_project_ids={project_id},
+    )
+    run_payload: dict | None = None
+    computed_by_label: str | None = None
+    run_id = row.run_id
+    if run_id is None and isinstance(envelope, dict):
+        last_calculation = envelope.get("last_calculation")
+        if isinstance(last_calculation, dict) and last_calculation.get("run_id"):
+            try:
+                run_id = UUID(str(last_calculation["run_id"]))
+            except (TypeError, ValueError):
+                run_id = None
+    if run_id is not None:
+        run = await db.get(ReportGenerationRun, run_id)
+        if run is not None:
+            run_payload = {
+                "id": str(run.id),
+                "trigger": run.trigger,
+                "triggered_by": str(run.triggered_by) if run.triggered_by else None,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                "status": run.status,
+                "changed_rows": run.changed_rows,
+                "recomputed_rows": run.recomputed_rows,
+                "failed_rows": run.failed_rows,
+                "error_summary": run.error_summary,
+                "calc_version": run.calc_version,
+            }
+            if run.triggered_by:
+                actor = await db.get(User, run.triggered_by)
+                if actor is not None:
+                    computed_by_label = actor.username or actor.email
+
+    return ReportProvenanceResponse(
+        row_code=row.row_code,
+        value_slot="current",
+        value=row.current_period_amount,
+        envelope=envelope,
+        run=run_payload,
+        stale=bool(freshness["is_stale"]),
+        legacy=legacy or envelope is None,
+        computed_by_label=computed_by_label,
+        inputs_redacted=inputs_redacted,
+    )
+
+
 @router.get("/{project_id}/{year}/{report_type}")
 async def get_report(
     project_id: UUID,
@@ -162,9 +282,9 @@ async def get_report(
     unadjusted: bool = Query(False, description="是否返回未审报表数据"),
     applicable_standard: str | None = Query(None, description="报表标准，如 soe_consolidated"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取指定报表数据（支持未审/已审切换+国企/上市切换）"""
+    """获取指定报表数据（支持未审/已审切换+国企/上市切换）；只认项目成员（spec consol-autotree-residual-closure R1.1）"""
     # 确定标准
     std = applicable_standard
     if not std:
@@ -209,26 +329,51 @@ async def get_report(
             ]
         raise HTTPException(status_code=404, detail="报表数据不存在，请先生成报表")
 
+    # 逐行新鲜度（report_freshness：已标过期 / 计算版本不是当前版本 / 生成时公式与当前生效公式不同）+ 两种原因
+    formulas, definition_hashes = await load_effective_formula_state(
+        db, project_id, report_type=report_type,
+    )
+    statuses = {
+        r.row_code: row_status(
+            r,
+            formula_for(formulas, r),
+            definition_hash_for(definition_hashes, r),
+        )
+        for r in rows
+    }
+    row_dicts = [{**_row_fields(r), **statuses[r.row_code]} for r in rows]
+
     if report_type == FinancialReportType.equity_statement:
         engine = ReportEngine(db)
-        row_dicts = [
-            {
-                "id": r.id,
-                "row_code": r.row_code,
-                "row_name": r.row_name,
-                "current_period_amount": r.current_period_amount,
-                "prior_period_amount": r.prior_period_amount,
-                "indent_level": r.indent_level,
-                "is_total_row": r.is_total_row,
-                "formula_used": r.formula_used,
-                "source_accounts": r.source_accounts,
-            }
-            for r in rows
-        ]
         enriched = await engine.enrich_equity_statement_rows(project_id, year, row_dicts)
-        return [ReportRow.model_validate(d) for d in enriched]
+        return [ReportRow.model_validate({**d, **statuses.get(d.get("row_code"), {})}) for d in enriched]
 
-    return [ReportRow.model_validate(r) for r in rows]
+    return [ReportRow.model_validate(d) for d in row_dicts]
+
+
+def _provenance_attempt_id(raw: object) -> str | None:
+    if not isinstance(raw, dict):
+        return None
+    attempt = raw.get("last_calculation")
+    value = attempt.get("attempt_id") if isinstance(attempt, dict) else None
+    return str(value) if value else None
+
+
+def _row_fields(r: FinancialReport) -> dict:
+    """报表视图行的基础字段（过期状态与原因由 report_freshness.row_status 另给，不读原始 is_stale 列）。"""
+    return {
+        "id": r.id,
+        "row_code": r.row_code,
+        "row_name": r.row_name,
+        "current_period_amount": r.current_period_amount,
+        "prior_period_amount": r.prior_period_amount,
+        "indent_level": r.indent_level,
+        "is_total_row": r.is_total_row,
+        "formula_used": r.formula_used,
+        "source_accounts": r.source_accounts,
+        "run_id": r.run_id,
+        "provenance_attempt_id": _provenance_attempt_id(r.provenance),
+    }
 
 
 @router.get("/{project_id}/{year}/{report_type}/drilldown/{row_code}")
@@ -238,9 +383,9 @@ async def drilldown_report_row(
     report_type: FinancialReportType,
     row_code: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """报表行穿透查询"""
+    """报表行穿透查询（只认项目成员）"""
     engine = ReportEngine(db)
     result = await engine.drilldown(project_id, year, report_type, row_code)
     if "error" in result:
@@ -254,9 +399,9 @@ async def export_report_excel(
     year: int,
     report_type: FinancialReportType,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """导出单张报表为 Excel"""
+    """导出单张报表为 Excel（只认项目成员）"""
     import logging
     logger = logging.getLogger(__name__)
     logger.info(
@@ -283,8 +428,11 @@ async def export_report_excel(
         ws = wb.active
         ws.title = report_type.value
 
-        # Header
-        ws.append(["行次代码", "项目", "期末余额", "年初余额"])
+        # Header（「说明」= report_freshness.status_note：已过期 / 计算失败原因 / 口径留空原因）
+        ws.append(["行次代码", "项目", "期末余额", "年初余额", "说明"])
+        formulas, definition_hashes = await load_effective_formula_state(
+            db, project_id, report_type=report_type,
+        )
 
         for row in rows:
             ws.append([
@@ -292,6 +440,11 @@ async def export_report_excel(
                 row.row_name or "",
                 float(row.current_period_amount) if row.current_period_amount else 0,
                 float(row.prior_period_amount) if row.prior_period_amount else 0,
+                status_note(row_status(
+                    row,
+                    formula_for(formulas, row),
+                    definition_hash_for(definition_hashes, row),
+                )),
             ])
 
         output = BytesIO()
@@ -649,10 +802,12 @@ async def update_report_cell(
             row.source_accounts = sa_data
         await db.flush()
     else:
-        sa: dict | None = None
+        # 🔴 别叫 sa：函数里给 sa 赋值会让整个函数的 sa 变成局部变量，开头的 sa.select 恒抛
+        # UnboundLocalError（2026-06-12 起本端点每次调用都 500；spec excel-style-table-editing 5.4）
+        new_sa: dict | None = None
         cp_amount: str | None = None
         if rt_enum == FinancialReportType.equity_statement:
-            sa = apply_equity_cell_edit_to_source_accounts(
+            new_sa = apply_equity_cell_edit_to_source_accounts(
                 None, body.column_key, body.value, year_key=effective_year_key,
             )
             if ui_col in ("current_period_amount", "total") and effective_year_key == "current_year":
@@ -660,7 +815,7 @@ async def update_report_cell(
         elif body.column_key in ("current_period_amount", "total"):
             cp_amount = str(body.value) if body.value is not None else None
         else:
-            sa = {body.column_key: body.value}
+            new_sa = {body.column_key: body.value}
 
         new_row = FinancialReport(
             project_id=project_id,
@@ -669,7 +824,7 @@ async def update_report_cell(
             row_code=body.row_code,
             row_name=body.row_code,
             current_period_amount=cp_amount,
-            source_accounts=sa,
+            source_accounts=new_sa,
         )
         db.add(new_row)
         await db.flush()

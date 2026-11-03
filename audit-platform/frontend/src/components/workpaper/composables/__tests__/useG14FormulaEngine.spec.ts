@@ -7,8 +7,9 @@ import {
   calcChangeRate,
   isDebitCreditBalanced,
   isRollForwardBalanced,
-  migrateReversalToPositive,
+  isReconciled,
 } from '../useG14FormulaEngine'
+import { enrichRow } from '../useG14Detail'
 
 describe('useG14FormulaEngine', () => {
   it('calcAdjustedAmount', () => {
@@ -51,8 +52,18 @@ describe('useG14FormulaEngine', () => {
     expect(closing).toBe(570)
   })
 
-  it('migrateReversalToPositive 兼容旧带符号数据', () => {
-    expect(migrateReversalToPositive(-20)).toBe(20)
-    expect(migrateReversalToPositive(15)).toBe(15)
+  it('转回按录入值计算，载入时不改号（与模板 J=F+G-H-I、K=G-H 同）', () => {
+    const row = enrichRow({
+      rowKey: 'notes', openingProvision: 500, currentProvision: 100, currentReversal: -20, currentWriteoff: 10,
+    })
+    expect(row.currentReversal).toBe(-20)
+    expect(row.profitLoss).toBe(120)
+    expect(row.closingProvision).toBe(610)
+  })
+
+  it('核对按分相等：差一分不平（原 |差|≤0.01 会因浮点尾差判平）', () => {
+    expect(isReconciled(0.1 + 0.2, 0.3)).toBe(true)
+    expect(isReconciled(-239135.95999999996, -239135.95)).toBe(false)
+    expect(isReconciled(100, 100.01)).toBe(false)
   })
 })

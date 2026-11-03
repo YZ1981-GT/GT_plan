@@ -68,7 +68,7 @@ async function batchSubmit() {
 
   operating.value = true
   try {
-    const data = await api.post(`/api/projects/${props.projectId}/workpapers/batch-submit`, {
+    const data = await api.post(`/api/projects/${props.projectId}/working-papers/batch-submit`, {
       wp_ids: selectedIds.value,
     })
     const res = data as any

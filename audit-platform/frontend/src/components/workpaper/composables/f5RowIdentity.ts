@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 /**
  * F5 行身份铸造 —— BP-7（下标派生行身份）的单点修复。
  *
@@ -49,12 +50,9 @@ export function isLegacyOrdinalRowId(value: unknown): boolean {
   return LEGACY_ORDINAL_ID_PATTERN.test(String(value ?? ''))
 }
 
-/** 铸一个稳定行身份。优先 `crypto.randomUUID()`，不可用时退时间戳+随机。 */
+/** 铸一个稳定行身份。优先 `newUuid()`，不可用时退时间戳+随机。 */
 export function mintStableRowId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return `${prefix}-${newUuid()}`
 }
 
 /**

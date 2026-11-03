@@ -64,10 +64,12 @@ vi.mock('@/utils/logger', () => ({
   logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { useEditorSave, type UseEditorSaveOptions } from '../useEditorSave'
+import { useEditorSave, __resetUnresolvedNotices, type UseEditorSaveOptions } from '../useEditorSave'
 import { api as httpApi } from '@/services/apiProxy'
 import { getWorkpaper } from '@/services/workpaperApi'
 import { eventBus } from '@/utils/eventBus'
+import { confirmVersionConflict } from '@/utils/confirm'
+import { ElMessage } from 'element-plus'
 
 function makeOptions(overrides: Partial<UseEditorSaveOptions> = {}): UseEditorSaveOptions {
   return {
@@ -136,6 +138,18 @@ describe('useEditorSave — onSave 主要行为', () => {
     vi.clearAllMocks()
     vi.mocked(httpApi.post).mockResolvedValue({ message: '保存成功' })
     vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 } as any)
+  })
+
+  it('保存后的影响分析按项目年度（spec post-push-residual-defect-closure 6.5.3：原先兜底今年）', async () => {
+    const opts = makeOptions({ year: computed(() => 2025) })
+    await useEditorSave(opts).onSave()
+    expect(opts.staleImpact.notify).toHaveBeenCalledWith(expect.objectContaining({ year: 2025, project_id: 'proj-1' }))
+  })
+
+  it('项目没填年度、底稿详情也没有 year：影响分析传 null（由 useStaleImpact 跳过），不拿今年', async () => {
+    const opts = makeOptions({ year: computed(() => null) })
+    await useEditorSave(opts).onSave()
+    expect(opts.staleImpact.notify).toHaveBeenCalledWith(expect.objectContaining({ year: null }))
   })
 
   it('onSave 调用 httpApi.post 并在成功后将 dirty 设为 false', async () => {
@@ -210,5 +224,145 @@ describe('useEditorSave — onSave 主要行为', () => {
 
     expect(success).toBe(false)
     expect(httpApi.post).not.toHaveBeenCalled()
+  })
+})
+
+describe('useEditorSave — 起点身份算不出时提示「未能分析下游影响」（design §10.2 / RV9.1-02）', () => {
+  const REASON = '引用末段是语义标签、不是 A1 单元格坐标'
+  const sheetName = ref('审定表D2-1')
+
+  /** 走真实 onSave；staleImpact 只替换网络那一层（notify），原因由 unresolvedReason 给出。 */
+  function optsWithReason(reason: string) {
+    return makeOptions({
+      year: computed(() => 2025),
+      univerAPI: ref({
+        getActiveWorkbook: () => ({
+          getSnapshot: () => ({ id: 'wb1', sheets: { s1: {} } }),
+          getActiveSheet: () => ({ getSheetName: () => sheetName.value }),
+        }),
+      }),
+      staleImpact: { notify: vi.fn().mockResolvedValue({ total: 0 }), unresolvedReason: ref(reason) } as any,
+    })
+  }
+
+  const unresolvedNotices = () => vi.mocked(ElMessage.info).mock.calls
+    .map((c) => String((c[0] as any)?.message ?? c[0]))
+    .filter((m) => m.startsWith('未能分析下游影响'))
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    __resetUnresolvedNotices()
+    sheetName.value = '审定表D2-1'
+    vi.mocked(httpApi.post).mockResolvedValue({ message: '保存成功' })
+    vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 } as any)
+  })
+
+  it('同一底稿同一 sheet 连存两次只提示一次、文案带后端原因；换 sheet 再提示一次', async () => {
+    const save = useEditorSave(optsWithReason(REASON))
+    expect(await save.onSave()).toBe(true)
+    expect(await save.onSave()).toBe(true)
+    expect(unresolvedNotices()).toEqual([`未能分析下游影响：${REASON}`])
+    sheetName.value = '明细表D2-2'
+    await save.onSave()
+    expect(unresolvedNotices()).toHaveLength(2)
+  })
+
+  it('编辑器重新挂载（新的 useEditorSave 实例）后同一 (底稿, sheet) 不再提示', async () => {
+    await useEditorSave(optsWithReason(REASON)).onSave()
+    await useEditorSave(optsWithReason(REASON)).onSave()
+    expect(unresolvedNotices()).toHaveLength(1)
+  })
+
+  it('后端能分析（原因为空或只有空白）时不提示', async () => {
+    await useEditorSave(optsWithReason('')).onSave()
+    await useEditorSave(optsWithReason('   ')).onSave()
+    expect(unresolvedNotices()).toEqual([])
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+describe('useEditorSave — 保存代际与单飞', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 3 } as any)
+  })
+
+  it('保存期间继续编辑会串行补存最新 snapshot，并使用首轮返回的新版本', async () => {
+    const first = deferred<any>()
+    const second = deferred<any>()
+    vi.mocked(httpApi.post)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    let snapshot: any = { revision: 1 }
+    const opts = makeOptions({
+      dirty: ref(true),
+      univerAPI: ref({
+        getActiveWorkbook: () => ({
+          getSnapshot: () => snapshot,
+          getActiveSheet: () => ({ getSheetName: () => 'Sheet1' }),
+        }),
+      }),
+    })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    const pending = save.onSave()
+    await vi.waitFor(() => expect(httpApi.post).toHaveBeenCalledTimes(1))
+    snapshot = { revision: 2 }
+    save.markEdited()
+    const joined = save.onSave()
+    expect(joined).toBe(pending)
+
+    first.resolve({ success: true, version: 2, message: '保存成功 v2' })
+    await vi.waitFor(() => expect(httpApi.post).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(httpApi.post).mock.calls[1][1]).toMatchObject({
+      snapshot: { revision: 2 },
+      expected_version: 2,
+    })
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
+
+    second.resolve({ success: true, version: 3, message: '保存成功 v3' })
+    await expect(pending).resolves.toBe(true)
+    expect(opts.dirty.value).toBe(false)
+    expect(opts.autoSave.clearDirty).toHaveBeenCalledTimes(1)
+    expect(ElMessage.success).toHaveBeenCalledTimes(1)
+  })
+
+  it('409 选择留下时不绕过 expected_version 强制覆盖，并保留 dirty', async () => {
+    vi.mocked(httpApi.post).mockResolvedValue({
+      detail: { error_code: 'VERSION_CONFLICT', server_version: 4, expected_version: 1 },
+    })
+    vi.mocked(confirmVersionConflict).mockRejectedValueOnce('cancel')
+    const initUniver = vi.fn().mockResolvedValue(undefined)
+    const opts = makeOptions({ dirty: ref(true), initUniver })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    await expect(save.onSave()).resolves.toBe(false)
+
+    expect(httpApi.post).toHaveBeenCalledTimes(1)
+    expect(initUniver).not.toHaveBeenCalled()
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
+    expect(eventBus.emit).not.toHaveBeenCalled()
+  })
+
+  it('网络异常返回 false 且不清除 dirty', async () => {
+    vi.mocked(httpApi.post).mockRejectedValue({ response: { status: 500 } })
+    const opts = makeOptions({ dirty: ref(true) })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    await expect(save.onSave()).resolves.toBe(false)
+
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
   })
 })

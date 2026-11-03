@@ -4,21 +4,22 @@
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 行业适用性守卫：非农林牧渔行业 -->
-    <el-empty
-      v-else-if="!isApplicable"
-      description="本底稿仅适用于农林牧渔行业项目"
-      :image-size="120"
-    />
-
     <template v-else>
+      <!-- 试算表里找不到生产性生物资产科目时提示（不阻断；原按「行业」整页拦截，平台没有行业来源） -->
+      <WpAccountAbsenceHint
+        :project-id="props.projectId"
+        cycle="H"
+        account-name="生产性生物资产"
+        usual-scope="生产性生物资产（CAS 5 生物资产）通常只在农林牧渔企业核算"
+        :accounts-found="accountsFound"
+      />
       <div v-if="currentSheet !== 'H7'" class="h7-header-toolbar">
         <!--
           🔴 切换器改 `v-model` 且**不带 `:disabled`**：健康检查是 mount 期异步，
           disabled 在未就绪时会把「在线编辑」锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
           健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
         -->
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h7EntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <!-- 计量模式切换 -->
         <el-segmented
           v-if="currentMode === 'html'"
@@ -378,7 +379,8 @@
  * 外层 GtWpRenderer 通过底稿目录行(chips)控制当前 sheet。
  * measurementModel: 双计量模式(成本/公允价值)控制 H7-1/H7-2/H7-6/H7-7 的双版本显隐。
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
- * 行业守卫: applicable_when industry IN ['agriculture','forestry','livestock','fishery']。
+ * 科目提示: 渲染返回 accounts_found=false 时顶部提示（不阻断，WpAccountAbsenceHint）；不按行业拦截
+ *   （平台没有项目级行业来源，spec trim-followup-residual-findings-closure R1）。
  * useVersionTrail: autoSnapshot on save。
  * useHSyncMode: HTML↔OnlyOffice 统一双向接桥（替代宿主内联的 currentMode/onModeChange）。
  *
@@ -386,11 +388,13 @@
  * Requirements: 1.1-1.9, 1.11, 1.13
  */
 import { ref, computed, onMounted, provide, toRef, inject, watch, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import WpAccountAbsenceHint from './shared/WpAccountAbsenceHint.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
@@ -460,19 +464,10 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 const _h7TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
 provide('tbSourceCodes', _h7TbSourceCodes)
 
-// ─── 行业适用性守卫 ──────────────────────────────────────────────────────────
-const APPLICABLE_INDUSTRIES = ['agriculture', 'forestry', 'livestock', 'fishery']
-const projectContext = inject<any>('projectContext', null)
-const isApplicable = ref(true)
-
-function checkIndustryApplicability() {
-  if (!projectContext?.value && !projectContext) return // 无context默认放行
-  const ctx = projectContext?.value || projectContext
-  const industry = ctx?.industry || ctx?.project?.industry || ''
-  if (industry && !APPLICABLE_INDUSTRIES.includes(industry)) {
-    isApplicable.value = false
-  }
-}
+// ─── 科目提示（渲染返回 accounts_found；自加载时从 render-config 取） ──────────
+const selfLoadedAccountsFound = ref<boolean | null>(null)
+const accountsFound = computed<boolean | null>(() =>
+  typeof props.htmlData?.accounts_found === 'boolean' ? props.htmlData.accounts_found : selfLoadedAccountsFound.value)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
@@ -643,6 +638,9 @@ async function selfLoad(): Promise<void> {
           if (sheet.html_data?.measurement_model) {
             measurementModel.value = sheet.html_data.measurement_model
           }
+          if (typeof sheet.html_data?.accounts_found === 'boolean') {
+            selfLoadedAccountsFound.value = sheet.html_data.accounts_found
+          }
         }
         allResponses.value = map
       }
@@ -744,9 +742,19 @@ watch(measurementModel, () => {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
-  checkIndustryApplicability()
   void selfLoad()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关可见性来自 entry 级三层事实，不由本宿主判断。
+ * 声明位置在 setup 末尾是有意的（`watch(immediate)` 会立即读 props，放前面会撞 TDZ）。
+ */
+const h7EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H7_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

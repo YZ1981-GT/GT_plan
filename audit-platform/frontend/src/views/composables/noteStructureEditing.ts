@@ -10,6 +10,8 @@ const WORKPAPER_SOURCES = new Set(['workpaper', 'workpaper_html'])
 export interface NoteStructureEditState {
   table: any | null
   reason: string | null
+  /** 源表在 `_tables` 里的序号（旧单表格式为 0）；「恢复模板结构」按它和表名找模板里的同一张表 */
+  index?: number | null
 }
 
 export function resolveNoteStructureEditState(
@@ -54,12 +56,12 @@ export function resolveNoteStructureEditState(
   if (Array.isArray(tableData._tables) && tableData._tables[sourceIndex]) {
     const table = tableData._tables[sourceIndex]
     if (Array.isArray(table.headers) && Array.isArray(table.rows)) {
-      return { table, reason: null }
+      return { table, reason: null, index: sourceIndex }
     }
   }
 
   if (sourceIndex === 0 && Array.isArray(tableData.headers) && Array.isArray(tableData.rows)) {
-    return { table: tableData, reason: null }
+    return { table: tableData, reason: null, index: 0 }
   }
 
   return {

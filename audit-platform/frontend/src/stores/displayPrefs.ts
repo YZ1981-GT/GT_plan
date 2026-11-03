@@ -44,6 +44,24 @@ export interface FixedColumnsConfig {
   [pageKey: string]: string[]  // pageKey → 固定的列 key 数组
 }
 
+/**
+ * 表格编辑方式（spec excel-style-table-editing R1）
+ * - excel：单击选中，双击 / F2 / 直接输入编辑（默认）
+ * - click：单击可编辑格直接编辑，其余同 excel
+ * - classic：单元格输入框常驻，不启用选中框与表格键盘（回退开关）
+ */
+export type GridEditMode = 'excel' | 'click' | 'classic'
+
+export const GRID_EDIT_MODES: Record<GridEditMode, { label: string; hint: string }> = {
+  excel: { label: 'Excel', hint: '单击选中；双击、F2 或直接输入开始编辑；Enter / Tab 提交并移动，Esc 取消' },
+  click: { label: '单击编辑', hint: '单击可编辑的格直接编辑；键盘与 Excel 方式相同' },
+  classic: { label: '经典', hint: '单元格里的输入框一直显示，不启用表格选中与键盘' },
+}
+
+function isGridEditMode(v: unknown): v is GridEditMode {
+  return typeof v === 'string' && v in GRID_EDIT_MODES
+}
+
 interface DisplayPrefsData {
   amountUnit: AmountUnit
   fontSize: FontSize
@@ -53,6 +71,7 @@ interface DisplayPrefsData {
   highlightThreshold: number  // 变动超过此比例高亮（0.2 = 20%），0 表示关闭
   density: TableDensity
   fixedColumns: FixedColumnsConfig
+  gridEditMode: GridEditMode
 }
 
 const DEFAULTS: DisplayPrefsData = {
@@ -64,6 +83,7 @@ const DEFAULTS: DisplayPrefsData = {
   highlightThreshold: 0.2,
   density: 'default',
   fixedColumns: {},
+  gridEditMode: 'excel',
 }
 
 function loadFromStorage(): DisplayPrefsData {
@@ -72,6 +92,7 @@ function loadFromStorage(): DisplayPrefsData {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<DisplayPrefsData> & { _v?: number }
       const merged = { ...DEFAULTS, ...parsed }
+      if (!isGridEditMode(merged.gridEditMode)) merged.gridEditMode = DEFAULTS.gridEditMode
       // 一次性迁移：v2 起平台默认「元」；将旧版本遗留的默认「万元」归一到「元」
       if ((parsed._v ?? 1) < PREFS_VERSION) {
         if (parsed.amountUnit === 'wan') merged.amountUnit = 'yuan'
@@ -98,6 +119,7 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
   const highlightThreshold = ref(saved.highlightThreshold)
   const density = ref<TableDensity>(saved.density)
   const fixedColumns = ref<FixedColumnsConfig>(saved.fixedColumns)
+  const gridEditMode = ref<GridEditMode>(saved.gridEditMode)
 
   // 持久化
   function persist() {
@@ -110,7 +132,15 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
       highlightThreshold: highlightThreshold.value,
       density: density.value,
       fixedColumns: fixedColumns.value,
+      gridEditMode: gridEditMode.value,
     })
+  }
+
+  // 切换表格编辑方式（非法值忽略）
+  function setGridEditMode(mode: GridEditMode) {
+    if (!isGridEditMode(mode)) return
+    gridEditMode.value = mode
+    persist()
   }
 
   // 切换单位
@@ -235,6 +265,8 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
   const unitOptions = Object.entries(AMOUNT_UNITS).map(([k, v]) => ({ value: k, label: v.label }))
   const fontOptions = Object.entries(FONT_SIZES).map(([k, v]) => ({ value: k, label: v.label }))
   const densityOptions = Object.entries(TABLE_DENSITIES).map(([k, v]) => ({ value: k, label: v.label }))
+  const gridEditModeOptions = (Object.keys(GRID_EDIT_MODES) as GridEditMode[])
+    .map((k) => ({ value: k, label: GRID_EDIT_MODES[k].label, hint: GRID_EDIT_MODES[k].hint }))
 
   return {
     amountUnit,
@@ -245,6 +277,9 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
     highlightThreshold,
     density,
     fixedColumns,
+    gridEditMode,
+    setGridEditMode,
+    gridEditModeOptions,
     setUnit,
     setFontSize,
     setShowZero,

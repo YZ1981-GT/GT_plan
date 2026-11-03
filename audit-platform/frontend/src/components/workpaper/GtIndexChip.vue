@@ -29,8 +29,12 @@
         :type="chipType"
         :effect="chipEffect"
         :class="chipClass"
+        :role="isKeyboardNavigable ? 'button' : undefined"
+        :tabindex="isKeyboardNavigable ? 0 : -1"
         size="small"
         @click.stop="handleClick"
+        @keydown.enter.stop.prevent="handleClick"
+        @keydown.space.stop.prevent="handleClick"
       >
         {{ displayText }}
       </el-tag>
@@ -59,8 +63,12 @@
       :type="chipType"
       :effect="chipEffect"
       :class="chipClass"
+      :role="isKeyboardNavigable ? 'button' : undefined"
+      :tabindex="isKeyboardNavigable ? 0 : -1"
       size="small"
       @click.stop="handleClick"
+      @keydown.enter.stop.prevent="handleClick"
+      @keydown.space.stop.prevent="handleClick"
     >
       {{ displayText }}
     </el-tag>
@@ -75,6 +83,7 @@ import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
 import { useAcnr, type AcnrResolveResult } from '@/services/acnr'
 import { BUNDLE_SHEET_ALIASES } from './bundleSheetAliases'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
@@ -114,9 +123,6 @@ const route = useRoute()
 const router = useRouter()
 const { push: pushNavHistory } = useWpNavigationHistory()
 
-// ─── ACNR SDK (R13.3: 不自行 parse，委托 ACNR resolve) ───
-const { resolve: acnrResolve, resolveInstance: acnrResolveInstance } = useAcnr()
-
 // ─── State ───
 const parsed = ref<ResolvedIndexRef | null>(null)
 const resolveStatus = ref<'pending' | 'exists' | 'not_exists' | 'trimmed' | 'error'>('pending')
@@ -129,6 +135,13 @@ const acnrResult = ref<AcnrResolveResult | null>(null)
 const projectId = computed(() => {
   return props.contextProjectId || (route?.params?.projectId as string) || ''
 })
+
+// ─── ACNR SDK (R13.3: 不自行 parse，委托 ACNR resolve) ───
+// D9（需求 11.1）：按当前项目订阅 SSE 失效（复用 chip 既有 projectId 计算属性，contextProjectId
+// 优先、其次路由）。放在 projectId 之后——useAcnr 内部 watch immediate 会在 setup 期读它。
+const { resolveIndexBatched, resolveInstance: acnrResolveInstance } = useAcnr(
+  () => projectId.value,
+)
 
 const isCrossProject = computed(() => {
   // If contextProjectId is provided and differs from current route project, it's cross-project
@@ -173,21 +186,23 @@ const chipEffect = computed(() => {
   return 'plain'
 })
 
+/** Adj 是模块级业务引用，ACNR 暂无物理地址时仍可按编号进入调整大厅。 */
+const isKeyboardNavigable = computed(() => {
+  if (!parsed.value || props.disabled || isCrossProject.value) return false
+  if (props.preventNavigate) return true
+  if (resolveStatus.value === 'trimmed') return false
+  return resolveStatus.value !== 'not_exists' || parsed.value.ns === 'Adj'
+})
+
 const chipClass = computed(() => {
   const classes = ['gt-index-chip']
-  if (props.disabled) {
-    classes.push('gt-index-chip--disabled')
-    return classes
-  }
-  if (resolveStatus.value === 'exists' && !isCrossProject.value) {
-    classes.push('gt-index-chip--clickable')
-  }
-  if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') {
+  if (isKeyboardNavigable.value) classes.push('gt-index-chip--clickable')
+  if (props.disabled || isCrossProject.value
+    || (resolveStatus.value === 'trimmed')
+    || (resolveStatus.value === 'not_exists' && parsed.value?.ns !== 'Adj')) {
     classes.push('gt-index-chip--disabled')
   }
-  if (resolving.value) {
-    classes.push('gt-index-chip--loading')
-  }
+  if (resolving.value) classes.push('gt-index-chip--loading')
   return classes
 })
 
@@ -203,8 +218,12 @@ const tooltipContent = computed(() => {
   }
 
   if (resolveStatus.value === 'not_exists') {
-    // 试算表 / 附注等非底稿引用按项目数据判不存在时后端给出原因（R5.1），照实显示，不说成「底稿不存在」
-    return acnrResult.value?.reason || '底稿不存在'
+    // T31：后端对判不出地址的情形给中文 reason + next_step（外部命名空间 Adj/Att/EQCR/
+    // Calc/Sample/Confirm 走的就是这条路）。两句都照实显示，绝不显示 error 英文码，
+    // 也不把非底稿引用一律说成「底稿不存在」。
+    const lines = [acnrResult.value?.reason, acnrResult.value?.next_step]
+    const text = lines.filter(Boolean).join('\n')
+    return text || '底稿不存在'
   }
 
   if (resolveStatus.value === 'trimmed') {
@@ -214,16 +233,24 @@ const tooltipContent = computed(() => {
   if (resolveStatus.value === 'exists') {
     const { ns, layer, target } = parsed.value
     const layerLabel = ['', '单元格', 'Sheet', '底稿', '模块'][layer] || ''
-    const base = `${layerLabel}跳转 → ${ns}:${target}`
-    // 附带上下文摘要
-    if (props.context) {
-      return `${base}\n${props.context}`
-    }
-    return base
+    // 首行：解析结果的统一显示名（目录 display_label，T30）；
+    // 停用条目仍可跳转，但要把停用原因一并说清（RV7-03 / design §3.3）；
+    // 其后跳转说明与上下文摘要。
+    const lines = [
+      acnrResult.value?.display_label,
+      acnrResult.value?.deprecated ? acnrResult.value?.reason : '',
+      `${layerLabel}跳转 → ${ns}:${target}`,
+      props.context,
+    ]
+    return lines.filter(Boolean).join('\n')
   }
 
   if (resolveStatus.value === 'pending' && resolving.value) {
     return '正在校验...'
+  }
+
+  if (resolveStatus.value === 'error') {
+    return '暂时无法校验，仍可点击尝试跳转'
   }
 
   return ''
@@ -244,11 +271,10 @@ async function resolveRef() {
   resolving.value = true
   try {
     // R13.3: 调 resolve(ns:target) 获取 addr_id + jump_route，不自行 parse
+    // R15（procedure-chain-hardening）：同一轮渲染的 chip 合并成批量解析、同编码在途共享 —— 原先各发一条 GET，
+    // 同 URL 的并发 GET 被去重取消，被取消的 chip 显示成「底稿不存在」
     const indexRef = buildIndexRef(parsed.value)
-    const result = await acnrResolve({
-      index_ref: indexRef,
-      project_id: projectId.value || undefined,
-    })
+    const result = await resolveIndexBatched(indexRef, projectId.value || undefined)
 
     acnrResult.value = result
 
@@ -257,6 +283,9 @@ async function resolveRef() {
       if (result.trimmed) {
         resolveStatus.value = 'trimmed'
         trimReason.value = result.reason || ''
+      } else if (result.error === 'batch_resolve_failed') {
+        // 整批请求失败（useAcnr BATCH_RESOLVE_FAILED）≠ 引用不存在：不灰显，仍可点击尝试跳转
+        resolveStatus.value = 'error'
       } else {
         resolveStatus.value = 'not_exists'
       }
@@ -351,18 +380,9 @@ async function resolveAndNavigateToWp(wpCode: string, pid: string) {
 }
 
 function handleClick() {
-  if (!parsed.value) return
-  if (props.disabled) return
-  if (isCrossProject.value) return
-  // preventNavigate 模式下跳过存在性检查（弹窗子底稿可能未生成实例）
-  if (!props.preventNavigate) {
-    if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return
-  }
-
+  if (!parsed.value || !isKeyboardNavigable.value) return
   emit('click', parsed.value)
-  if (!props.preventNavigate) {
-    navigateToTarget(parsed.value)
-  }
+  if (!props.preventNavigate) navigateToTarget(parsed.value)
 }
 
 function handleMultiTargetSelect(target: string) {
@@ -443,11 +463,8 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
       break
 
     case 'Adj':
-      // Layer 4: adjustments
-      router.push({
-        path: `/projects/${pid}/adjustments`,
-        query: { id: target },
-      })
+      // 模块级引用按分录组/历史编号定位；旧 id 只在接收方兼容读取。
+      router.push(buildAdjustmentRouteTarget(pid, { kind: 'focus', entryGroupId: target }))
       break
 
     case 'Att':
@@ -497,12 +514,17 @@ function init() {
   } else {
     parsed.value = parseIndexRef(refValue.value)
   }
-  if (parsed.value) {
+  // 禁用（程序步骤不适用）的 chip 不解析（R15）；解除禁用时再解析
+  if (parsed.value && !props.disabled) {
     resolveRef()
   }
 }
 
 onMounted(init)
+
+watch(() => props.disabled, (disabled, was) => {
+  if (!disabled && was && parsed.value && resolveStatus.value === 'pending') resolveRef()
+})
 
 // Re-parse and re-validate when value changes
 watch(refValue, () => {
@@ -550,6 +572,11 @@ watch(refValue, () => {
 
 .gt-index-chip--clickable:hover {
   opacity: 0.8;
+}
+
+.gt-index-chip--clickable:focus-visible {
+  outline: 2px solid var(--gt-color-primary);
+  outline-offset: 2px;
 }
 
 .gt-index-chip--disabled {

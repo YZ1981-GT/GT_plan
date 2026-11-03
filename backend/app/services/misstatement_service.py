@@ -14,6 +14,7 @@ Validates: Requirements 11.1-11.8
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -24,6 +25,7 @@ from app.models.audit_platform_models import (
     Adjustment,
     Materiality,
     MisstatementType,
+    ReviewStatus,
     UnadjustedMisstatement,
 )
 from app.models.audit_platform_schemas import (
@@ -80,6 +82,7 @@ class UnadjustedMisstatementService:
             misstatement_amount=data.misstatement_amount,
             misstatement_type=data.misstatement_type,
             management_reason=data.management_reason,
+            management_communication_at=data.management_communication_at,
             auditor_evaluation=data.auditor_evaluation,
             # 溯源：底稿推送错报时携带来源底稿编码（A13 反查来源）
             source_wp_code=data.source_wp_code,
@@ -121,24 +124,33 @@ class UnadjustedMisstatementService:
         return self._to_response(row)
 
     # ------------------------------------------------------------------
-    # create_from_rejected_aje
+    # create_from_adjustment_group / legacy alias
     # ------------------------------------------------------------------
-    async def create_from_rejected_aje(
+    async def create_from_adjustment_group(
         self,
         project_id: UUID,
         entry_group_id: UUID,
         year: int,
         created_by: UUID | None = None,
+        *,
+        management_reason: str | None = None,
+        management_communication_at: datetime | None = None,
+        auditor_evaluation: str | None = None,
+        required_review_status: ReviewStatus | None = None,
     ) -> MisstatementResponse:
-        """从被拒绝AJE预填充创建未更正错报
+        """从一笔 AJE 分录组创建正式未更正错报。
 
-        Spec A R4 / D5：幂等检查 — 同一笔 AJE 只能转一次错报。
-        若 source_adjustment_id 已存在，抛 ValueError("ALREADY_CONVERTED")
-        让 router 转 409，前端提示"已转换过，跳转查看"。
+        ``required_review_status`` 由处理状态入口传 ``approved``；旧的显式“被驳回
+        AJE 转错报”接口通过兼容别名调用且不借此混淆内部复核与管理层不更正。
         """
         adj = Adjustment.__table__
         # 1. 取分录组首行 id 作为幂等键
-        first_id_q = sa.select(adj.c.id).where(
+        first_id_q = sa.select(
+            adj.c.id,
+            adj.c.adjustment_type,
+            adj.c.review_status,
+            adj.c.year,
+        ).where(
             adj.c.project_id == project_id,
             adj.c.entry_group_id == entry_group_id,
             adj.c.is_deleted == sa.false(),
@@ -146,6 +158,15 @@ class UnadjustedMisstatementService:
         first_id_row = (await self.db.execute(first_id_q)).first()
         if first_id_row is None:
             raise ValueError("调整分录不存在")
+        if int(first_id_row.year) != int(year):
+            raise ValueError("调整分录年度与请求年度不一致")
+        raw_type = getattr(first_id_row.adjustment_type, "value", first_id_row.adjustment_type)
+        if str(raw_type).lower() != "aje":
+            raise ValueError("只有审计调整 AJE 可以转为未更正错报")
+        if required_review_status is not None:
+            raw_status = getattr(first_id_row.review_status, "value", first_id_row.review_status)
+            if str(raw_status) != required_review_status.value:
+                raise ValueError("只有已批准的 AJE 才能选择不予更正")
         first_adj_id = first_id_row.id
 
         # 2. 幂等检查：source_adjustment_id 已存在则拒绝（D5）
@@ -170,6 +191,9 @@ class UnadjustedMisstatementService:
                 adj.c.account_name,
                 adj.c.debit_amount,
                 adj.c.credit_amount,
+                adj.c.adjustment_type,
+                adj.c.review_status,
+                adj.c.year,
             )
             .where(
                 adj.c.project_id == project_id,
@@ -181,6 +205,15 @@ class UnadjustedMisstatementService:
         rows = result.fetchall()
         if not rows:
             raise ValueError("调整分录不存在")
+        if any(str(getattr(r.adjustment_type, "value", r.adjustment_type)).lower() != "aje" for r in rows):
+            raise ValueError("分录组类型不一致，无法转为未更正错报")
+        if any(int(r.year) != int(year) for r in rows):
+            raise ValueError("分录组年度不一致，无法转为未更正错报")
+        if required_review_status is not None and any(
+            str(getattr(r.review_status, "value", r.review_status)) != required_review_status.value
+            for r in rows
+        ):
+            raise ValueError("只有整组已批准的 AJE 才能选择不予更正")
 
         # 汇总金额：取净额（借方-贷方的绝对值）
         total_debit = sum(Decimal(str(r.debit_amount or 0)) for r in rows)
@@ -203,7 +236,11 @@ class UnadjustedMisstatementService:
             affected_account_name=account_names[0] if len(account_names) == 1 else ",".join(account_names),
             misstatement_amount=net_amount,
             misstatement_type=MisstatementType.factual,
+            management_reason=(management_reason or "").strip() or None,
+            management_communication_at=management_communication_at,
+            auditor_evaluation=(auditor_evaluation or "").strip() or None,
             source_wp_code=await self._derive_source_wp_code(project_id, account_codes),
+            source_identity=f"adjustment:{entry_group_id}",
             created_by=created_by,
         )
         # F50 / Sprint 8.19: AJE 转错报也绑定当前 active dataset
@@ -220,6 +257,21 @@ class UnadjustedMisstatementService:
         await self.db.flush()
         return self._to_response(row)
 
+    async def create_from_rejected_aje(
+        self,
+        project_id: UUID,
+        entry_group_id: UUID,
+        year: int,
+        created_by: UUID | None = None,
+    ) -> MisstatementResponse:
+        """兼容旧显式入口；调用本身不把内部驳回解释为管理层不更正。"""
+        return await self.create_from_adjustment_group(
+            project_id,
+            entry_group_id,
+            year,
+            created_by,
+        )
+
     # ------------------------------------------------------------------
     # list_misstatements
     # ------------------------------------------------------------------
@@ -235,6 +287,7 @@ class UnadjustedMisstatementService:
                 UnadjustedMisstatement.project_id == project_id,
                 UnadjustedMisstatement.year == year,
                 UnadjustedMisstatement.is_deleted == sa.false(),
+                UnadjustedMisstatement.prior_year_status != "reversed",
             )
             .order_by(UnadjustedMisstatement.created_at)
         )
@@ -267,6 +320,8 @@ class UnadjustedMisstatementService:
             row.misstatement_type = data.misstatement_type
         if data.management_reason is not None:
             row.management_reason = data.management_reason
+        if data.management_communication_at is not None:
+            row.management_communication_at = data.management_communication_at
         if data.auditor_evaluation is not None:
             row.auditor_evaluation = data.auditor_evaluation
 
@@ -312,6 +367,7 @@ class UnadjustedMisstatementService:
                 tbl.c.project_id == project_id,
                 tbl.c.year == year,
                 tbl.c.is_deleted == sa.false(),
+                tbl.c.prior_year_status != "reversed",
             )
             .group_by(tbl.c.misstatement_type)
         )
@@ -369,6 +425,7 @@ class UnadjustedMisstatementService:
                 tbl.c.project_id == project_id,
                 tbl.c.year == year,
                 tbl.c.is_deleted == sa.false(),
+                tbl.c.prior_year_status != "reversed",
             )
         )
         result = await self.db.execute(q)
@@ -435,6 +492,7 @@ class UnadjustedMisstatementService:
                 UnadjustedMisstatement.project_id == prior_project_id,
                 UnadjustedMisstatement.year == prior_year,
                 UnadjustedMisstatement.is_deleted == sa.false(),
+                UnadjustedMisstatement.prior_year_status != "reversed",
             )
         )
         result = await self.db.execute(q)
@@ -452,6 +510,7 @@ class UnadjustedMisstatementService:
                 misstatement_amount=prior.misstatement_amount,
                 misstatement_type=prior.misstatement_type,
                 management_reason=prior.management_reason,
+                management_communication_at=getattr(prior, "management_communication_at", None),
                 auditor_evaluation=prior.auditor_evaluation,
                 is_carried_forward=True,
                 prior_year_id=prior.id,
@@ -514,6 +573,7 @@ class UnadjustedMisstatementService:
                 tbl.c.project_id == project_id,
                 tbl.c.year == year,
                 tbl.c.is_deleted == sa.false(),
+                tbl.c.prior_year_status != "reversed",
                 sa.or_(
                     tbl.c.management_reason.is_(None),
                     tbl.c.management_reason == "",
@@ -599,6 +659,7 @@ class UnadjustedMisstatementService:
             misstatement_amount=row.misstatement_amount,
             misstatement_type=row.misstatement_type,
             management_reason=row.management_reason,
+            management_communication_at=getattr(row, "management_communication_at", None),
             auditor_evaluation=row.auditor_evaluation,
             source_wp_code=getattr(row, "source_wp_code", None),
             source_identity=getattr(row, "source_identity", None),

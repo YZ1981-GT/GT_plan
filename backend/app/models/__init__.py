@@ -91,6 +91,7 @@ from app.models.workpaper_models import (
     WpTemplateStatus,
 )
 from app.models.workpaper_template_version import WorkpaperTemplateVersion
+from app.models.workpaper_lifecycle_models import WorkpaperLifecycleEvent
 from app.models.project_wp_sheet_override import ProjectWorkpaperSheetOverride
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
@@ -128,11 +129,22 @@ from app.models.wp_export_models import (  # noqa: F401
 from app.models.procedure_models import (  # noqa: F401
     ProcedureInstance,
     ProcedureOperationPreview,
+    ProcedureTrimCycleConfirmation,
     ProcedureRowDefinition,
     ProcedureRowTask,
     ProcedureRowTaskHistory,
     ProcedureTrimScheme,
 )
+from app.models.wp_generation_models import (  # noqa: F401
+    WorkpaperGenerationItem,
+    WorkpaperGenerationOperation,
+)
+from app.models.consol_operation_models import ConsolOperation  # noqa: F401
+from app.models.report_generation_models import (  # noqa: F401
+    ConsolArtifact,
+    ReportGenerationRun,
+)
+from app.models.batch_project_models import ProjectBatchImportPlan  # noqa: F401
 from app.models.wp_visibility_models import (  # noqa: F401
     WorkpaperDelegationHistory,
     WpAccessSecurityOutbox,
@@ -169,11 +181,15 @@ from app.models.formula_setting_models import (  # noqa: F401
     FormulaTemplateSubscription,
     FormulaTemplateVersion,
 )
+# 预审样本存续核对汇总（迁移 V212）
+from app.models.audit_phase_models import InterimSurvivalCheck  # noqa: F401
 # D5 合并范围用户确认快照（迁移 V183）
 from app.models.consol_scope_confirmation_models import (  # noqa: F401
     ConsolScopeConfirmation,
     ConsolScopeConfirmationNode,
 )
+# 门禁逐项确认留痕（迁移 V217, S2 ADR-CCN-06）
+from app.models.gate_acknowledgement_models import GateAcknowledgement  # noqa: F401
 # 底稿 HTML ↔ OnlyOffice 双向回写同步域（迁移 V151 的 28 张表）
 from app.models.workpaper_sync_models import (  # noqa: F401
     WORKPAPER_SYNC_TABLES,
@@ -206,6 +222,8 @@ from app.models.workpaper_sync_models import (  # noqa: F401
     WorkpaperSyncScopeIndex,
     WorkpaperSyncTestRun,
 )
+# V250（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
+from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -302,6 +320,7 @@ __all__ = [
     "ReviewRecord",
     "WorkpaperSheetClassification",
     "WorkpaperTemplateVersion",
+    "WorkpaperLifecycleEvent",
     "ProjectWorkpaperSheetOverride",
     # --- archive models ---
     "ArchiveJob",
@@ -348,6 +367,14 @@ __all__ = [
     "ProcedureRowTask",
     "ProcedureRowTaskHistory",
     "ProcedureOperationPreview",
+    # --- 粗裁确认投影 / 两阶段生成 (trim-generation-plan-followup-optimizations / V218、V224) ---
+    "ProcedureTrimCycleConfirmation",
+    "WorkpaperGenerationOperation",
+    "WorkpaperGenerationItem",
+    "ConsolOperation",
+    "ReportGenerationRun",
+    "ConsolArtifact",
+    "ProjectBatchImportPlan",
     # --- 底稿可见性隔离 (procedure-delegation-visibility-isolation / V113) ---
     "WorkpaperDelegationHistory",
     "WpAccessSecurityOutbox",
@@ -360,4 +387,19 @@ __all__ = [
     # --- 公式推送引擎 (chain-closure-phase2-formula-push-engine / V169) ---
     "FormulaPushRun",
     "FormulaPushState",
+    # --- 显示偏好 (platform-global-display-settings-closure / V250) ---
+    "UserDisplayPreferences",
 ]
+
+# 调整分录持久化复核、处理历史与客户已入账（迁移 V235）
+from app.models.adjustment_review_models import (  # noqa: F401
+    AdjustmentClientBooking,
+    AdjustmentReviewTask,
+    AdjustmentTreatmentEvent,
+)
+
+# 调整分录导入批次与逐组结果（迁移 V235）
+from app.models.adjustment_import_models import (  # noqa: F401
+    AdjustmentImportBatch,
+    AdjustmentImportGroupResult,
+)

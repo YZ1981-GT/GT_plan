@@ -23,7 +23,7 @@ import sqlalchemy as sa
 from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
-from app.models.workpaper_models import WpIndex, WorkingPaper, WpFileStatus
+from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.models.wp_optimization_models import WorkpaperProcedure
 
 router = APIRouter(
@@ -318,34 +318,50 @@ async def batch_submit_review(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """批量提交复核（跳过不满足条件的底稿）"""
+    """批量提交复核；每稿一个保存点，但全部复用单笔提交服务与五项门禁。"""
+    from app.services.workpaper_review_submission_service import (
+        ReviewSubmissionUnavailable,
+        WorkpaperReviewSubmissionService,
+    )
+
+    service = WorkpaperReviewSubmissionService()
     submitted = 0
-    skipped = []
-
-    for wp_id_str in data.wp_ids:
-        wp_id = UUID(wp_id_str)
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-        )
-        wp = result.scalar_one_or_none()
-        if not wp:
-            skipped.append({"wp_id": wp_id_str, "reason": "不存在"})
-            continue
-        if wp.status != WpFileStatus.edit_complete:
-            skipped.append({"wp_id": wp_id_str, "reason": f"状态为{wp.status.value}，需先完成编制"})
-            continue
-
-        # 简化门禁：检查复核人是否已分配
-        if not wp.reviewer:
-            skipped.append({"wp_id": wp_id_str, "reason": "未分配复核人"})
-            continue
-
-        wp.status = WpFileStatus.under_review
-        submitted += 1
-
-    await db.flush()
-    await db.commit()
-    return {"submitted": submitted, "skipped": skipped, "message": f"已提交 {submitted} 个，跳过 {len(skipped)} 个"}
+    skipped: list[dict[str, str]] = []
+    try:
+        for raw_id in data.wp_ids:
+            try:
+                wp_id = UUID(raw_id)
+            except (TypeError, ValueError):
+                skipped.append({"wp_id": raw_id, "reason": "底稿编号格式无效"})
+                continue
+            try:
+                async with db.begin_nested():
+                    result = await service.submit(
+                        db, project_id=project_id, wp_id=wp_id, actor_id=current_user.id,
+                    )
+                    if not result.can_submit:
+                        skipped.append({
+                            "wp_id": raw_id,
+                            "reason": "；".join(result.blocking_reasons) or "提交门禁未通过",
+                        })
+                    else:
+                        submitted += 1
+            except (LookupError, ValueError, PermissionError) as exc:
+                skipped.append({"wp_id": raw_id, "reason": str(exc)})
+        await db.commit()
+    except ReviewSubmissionUnavailable as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
+    return {
+        "total": len(data.wp_ids),
+        "submitted": submitted,
+        "skipped": len(skipped),
+        "skipped_reasons": skipped,
+        "message": f"已提交 {submitted} 个，跳过 {len(skipped)} 个",
+    }
 
 
 @router.post("/working-papers/batch-export")

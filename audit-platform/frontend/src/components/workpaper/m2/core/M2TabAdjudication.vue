@@ -440,6 +440,7 @@
  * 科目：4001 实收资本/股本（贷方/权益类！期末=期初+贷方-借方）
  * 增资在贷方增加，减资在借方减少
  */
+import { fetchTrialBalanceRows, tbRowsUnder, tbSumUnder } from '@/services/trialBalanceRows'
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
@@ -818,15 +819,13 @@ function _restoreRemarks(): void {
 /** 从TB取4001科目余额用于勾稽 */
 async function _loadTbData(): Promise<void> {
   try {
-    const resp = await import('@/utils/http').then(m => m.default.get(
-      `/api/projects/${props.projectId}/trial-balance`,
-      { params: { account_code: M_CYCLE_ACCOUNT.M2.code }, _silent: true } as any,
-    ))
-    const data = resp?.data?.data ?? resp?.data
-    if (data) {
-      // TB返回的是审定数(正数)
-      tbBeginBalance.value = Number(data.opening_balance ?? data.begin_audited ?? 0)
-      tbEndBalance.value = Number(data.audited_amount ?? data.end_audited ?? 0)
+    // 原先把行列表当单个对象读（`data.opening_balance` 恒 undefined ⇒ 勾稽恒 0）
+    const code = M_CYCLE_ACCOUNT.M2.code
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { accountPrefix: code })
+    if (tbRowsUnder(rows, code).length) {
+      // 试算表金额为正数口径；科目及其明细之和
+      tbBeginBalance.value = tbSumUnder(rows, code, 'opening_balance') ?? 0
+      tbEndBalance.value = tbSumUnder(rows, code, 'audited_amount') ?? 0
     }
   } catch {
     // TB取数失败静默降级

@@ -175,6 +175,18 @@
       </template>
     </el-table-column>
 
+    <el-table-column label="发生原因（款项性质）" width="150">
+      <template #default="{ row }">
+        <el-input
+          v-if="!isReadonly"
+          :model-value="row.transactionReason"
+          size="small"
+          @change="(v: string) => updateCell(row.rowId, 'transactionReason', v)"
+        />
+        <span v-else>{{ row.transactionReason }}</span>
+      </template>
+    </el-table-column>
+
     <el-table-column label="未结转原因" width="140">
       <template #default="{ row }">
         <el-input

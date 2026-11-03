@@ -1,3 +1,4 @@
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { onMounted, onUnmounted, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { SelectedCell } from '@/composables/useCellSelection'
@@ -48,7 +49,7 @@ export async function copySelection(selectedCells: SelectedCell[], tableData: Re
   const htmlR = lines.map(r => '<tr>' + r.map(c => '<td>' + escapeHtml(c) + '</td>').join('') + '</tr>').join('')
 
   const html = '<table border="1">' + htmlR + '</table>'
-  try { await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]); ElMessage.success('已复制') } catch (e) { await navigator.clipboard?.writeText(text); ElMessage.success('已复制为文本格式') }
+  try { await copyRichText(html, text); ElMessage.success('已复制') } catch (e) { await copyText(text); ElMessage.success('已复制为文本格式') }
 }
 export function buildPasteDiff(pasteMatrix: string[][], selectedCells: SelectedCell[], tableData: Record<string, any>[], columns: { key: string; label: string }[], normalizeAmounts = true): PasteDiffResult {
   const cells: PasteDiffCell[] = []; let overflowCount = 0

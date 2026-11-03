@@ -12,7 +12,7 @@
  *
  * 兼容：旧扁平 18 列（测算+凭证同行）自动迁移凭证字段 → subsequent
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
@@ -23,6 +23,10 @@ import {
 import { createEmptyG3AdjustmentRow, type G3AdjustmentRow } from './useG3Adjustment'
 import { G3_ACCOUNT_CODE, G3_ADJUSTMENT_ROWS_KEY, G3_DETAIL_ROWS_KEY, G3_WP_CODE } from './g3Constants'
 import type { ChecklistResponse } from './useF1FormData'
+import {
+  metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -510,10 +514,10 @@ function parseSubsequentRows(raw: string | undefined, fallback: SubsequentRow[])
       return fallback.length ? fallback : [enrichSubsequent(emptySubsequent(generateId('sub'), 1))]
     }
     return parsed.map((p, i) =>
-      enrichSubsequent({
+      withRowMeta(enrichSubsequent({
         ...emptySubsequent(String(p.id ?? generateId('sub')), Number(p.seq ?? i + 1)),
         ...p,
-      } as SubsequentRow),
+      } as SubsequentRow), p),
     )
   } catch {
     return fallback.length ? fallback : [enrichSubsequent(emptySubsequent(generateId('sub'), 1))]
@@ -538,6 +542,44 @@ export function needsDecreaseExplain(row: CalcCheckRow): boolean {
 
 export function isCrossCheckMismatch(row: CalcCheckRow): boolean {
   return parseNum(row.investeeTotalDividend) > 0 && Math.abs(row.crossCheckDiff) > 1
+}
+
+/** 期后区空白占位行：没有行元数据，凭证、金额、核对与说明都没填 */
+export function isBlankSubsequentRow(r: SubsequentRow): boolean {
+  return !metaOf(r) && !r.voucherNo && !r.voucherDate && !r.samplingSource
+    && !parseNum(r.debitAmount) && !parseNum(r.creditAmount) && !parseNum(r.amount)
+    && !hasG3SubsequentContent(r) && !String(r.investeeName ?? '').trim() && !String(r.summary ?? '').trim()
+}
+
+/** 行上已勾核对项或已填支持性文件、索引、异常判断或说明（替换与撤销抽凭时据此先确认） */
+export function hasG3SubsequentContent(r: SubsequentRow): boolean {
+  return [r.check1, r.check2, r.check3, r.check4, r.check5, r.supportingDocs, r.indexNo, r.isAbnormal, r.abnormalNote]
+    .some((v) => String(v ?? '').trim() !== '')
+}
+
+/**
+ * 共享回填函数的待写入项 → 期后收回行：金额在样本自己的借贷栏（红字带符号照记，金额列同值），对方科目 = 编码、
+ * 对方明细科目 = 名称（配不上写「多科目」）；被投资方取样本科目名称（明细科目常按被投资方设）
+ */
+export function mapPreparedToG3SubsequentRow(item: PreparedItem): SubsequentRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null; accountName?: string | null }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  const debit = parseNum(item.debitAmount)
+  const credit = parseNum(item.creditAmount)
+  return enrichSubsequent({
+    ...emptySubsequent(generateId('sub'), 0),
+    investeeName: s.accountName ?? '',
+    voucherDate: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    summary: s.summary || '',
+    counterAccount: code,
+    counterDetailAccount: name && name !== code ? name : '',
+    debitAmount: debit,
+    creditAmount: credit,
+    amount: debit || credit,
+    samplingSource: item.meta.src.includes('attach') ? '挂凭' : '抽凭引擎',
+  })
 }
 
 export function isSamplingRow(row: SubsequentRow): boolean {
@@ -617,6 +659,8 @@ export function useG3CalcCheck(opts: {
   isReadonly: Ref<boolean>
   /** 资产负债表日 YYYY-MM-DD（期后校验用） */
   cutoffDate?: Ref<string>
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: MaybeRefOrGetter<string | null | undefined>
 }) {
   const cutoffRef = opts.cutoffDate
   const boot = parseMainRows(opts.allResponses.value.get(DATA_KEY)?.conclusion)
@@ -628,6 +672,33 @@ export function useG3CalcCheck(opts: {
     ),
   )
   const segment = ref<CalcCheckSegment['key']>(G3_CALCCHECK_SEGMENTS[0].key)
+
+  /**
+   * 抽凭回填用的期后区表：写入时去掉空白占位行（原实现填空槽位），表空了补一行空白行；序号重排
+   */
+  const subsequentFillTable = computed<SubsequentRow[]>({
+    get: () => subsequentRows.value,
+    set: (list) => {
+      const kept = list.filter((r) => !!metaOf(r) || !isBlankSubsequentRow(r))
+      const next = kept.length ? kept : [enrichSubsequent(emptySubsequent(generateId('sub'), 1))]
+      subsequentRows.value = next.map((r, i) => ({ ...r, seq: i + 1 }))
+    },
+  })
+  // 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<SubsequentRow>({
+    projectId: opts.projectId ?? null,
+    tables: subsequentFillTable,
+    mapSampleToRow: (item) => mapPreparedToG3SubsequentRow(item),
+    persist: () => persistSubsequent(),
+    hasUserContent: hasG3SubsequentContent,
+    readonly: () => opts.isReadonly.value,
+  })
+  voucherFill.markLoaded()
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function subsequentLocked(id: string): boolean {
+    const row = subsequentRows.value.find((r) => r.id === id)
+    return !!row && voucherFill.isRowLocked(row)
+  }
 
   // 迁移：写入期后表；剥离主表旧凭证字段并回写，避免重复迁移
   if (!opts.isReadonly.value) {
@@ -651,6 +722,7 @@ export function useG3CalcCheck(opts: {
       opts.allResponses.value.get(SUBSEQUENT_KEY)?.conclusion,
       next.migratedSubsequent,
     )
+    voucherFill.markLoaded()
   }
 
   watch(
@@ -688,7 +760,7 @@ export function useG3CalcCheck(opts: {
 
   function persistSubsequent() {
     if (!opts.isReadonly.value) {
-      opts.debouncedSave(SUBSEQUENT_KEY, { conclusion: JSON.stringify(subsequentRows.value) })
+      opts.debouncedSave(SUBSEQUENT_KEY, { conclusion: JSON.stringify(voucherFill.guardPersist(subsequentRows.value)) })
     }
   }
 
@@ -699,9 +771,9 @@ export function useG3CalcCheck(opts: {
   }
 
   function updateSubsequentRow(id: string, patch: Partial<SubsequentRow>) {
-    if (opts.isReadonly.value) return
+    if (opts.isReadonly.value || subsequentLocked(id)) return
     subsequentRows.value = subsequentRows.value.map((r) =>
-      r.id === id ? enrichSubsequent({ ...r, ...patch }) : r,
+      r.id === id ? withRowMeta(enrichSubsequent({ ...r, ...patch }), r) : r,
     )
     persistSubsequent()
   }
@@ -743,7 +815,7 @@ export function useG3CalcCheck(opts: {
   function removeRow(id: string) {
     if (opts.isReadonly.value) return
     if (segment.value === 'subsequent') {
-      if (subsequentRows.value.length <= 1) return
+      if (subsequentRows.value.length <= 1 || subsequentLocked(id)) return
       subsequentRows.value = subsequentRows.value
         .filter((r) => r.id !== id)
         .map((r, i) => ({ ...r, seq: i + 1 }))
@@ -757,78 +829,30 @@ export function useG3CalcCheck(opts: {
     persistMain()
   }
 
+  /** 期后区只收资产负债表日之后的凭证：截止日及以前的剔除并提示 */
+  function dropNotSubsequent<S extends FillSample>(samples: S[]): S[] {
+    const cutoff = cutoffRef?.value ?? ''
+    if (!cutoff) return samples
+    const kept = samples.filter((s) => !(s.voucherDate && isNotSubsequentDate(String(s.voucherDate), cutoff)))
+    const skipped = samples.length - kept.length
+    if (skipped) ElMessage.warning(`期后收回区只收资产负债表日（${cutoff}）之后的凭证，已剔除截止日及以前 ${skipped} 笔`)
+    return kept
+  }
+
   /**
-   * 抽凭引擎集成 — 样本填入期后收回区段。
-   * 若提供 cutoffDate，自动剔除凭证日 ≤ 截止日的样本（非期后）。
+   * 抽凭引擎回填期后收回区：截止日及以前的凭证先剔除，其余一个对方科目一行（后端配对）、金额在样本自己的
+   * 借贷栏、按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行。原 fillFromSamples 按空槽位填 /
+   * 追加、不去重（宿主按对方分录展开多科目凭证、行金额取对方分录金额），已删除。
    */
-  function fillFromSamples(
-    samples: Partial<SubsequentRow>[],
-    options?: { cutoffDate?: string },
-  ): { filled: number; skippedCutoff: number } {
-    if (opts.isReadonly.value || !samples.length) return { filled: 0, skippedCutoff: 0 }
-
-    const cutoff = options?.cutoffDate ?? cutoffRef?.value ?? ''
-    let skippedCutoff = 0
-    const accepted = samples.filter((s) => {
-      const d = String(s.voucherDate ?? '')
-      if (cutoff && d && isNotSubsequentDate(d, cutoff)) {
-        skippedCutoff++
-        return false
-      }
-      return true
-    })
-
-    if (!accepted.length) {
-      if (skippedCutoff) {
-        ElMessage.warning(`已跳过 ${skippedCutoff} 笔截止日及以前凭证（非期后）`)
-      }
-      return { filled: 0, skippedCutoff }
-    }
-
-    const updated = [...subsequentRows.value]
-    let nextSeq = updated.length + 1
-    let filled = 0
-
-    for (const sample of accepted) {
-      const emptySlot = updated.find(
-        (r) => !r.voucherNo && !r.voucherDate && !r.samplingSource && !r.amount,
-      )
-
-      const patch: Partial<SubsequentRow> = {
-        investeeName: sample.investeeName ?? '',
-        voucherDate: sample.voucherDate ?? '',
-        voucherNo: sample.voucherNo ?? '',
-        summary: sample.summary ?? '',
-        counterAccount: sample.counterAccount ?? '',
-        counterDetailAccount: sample.counterDetailAccount ?? '',
-        debitAmount: parseNum(sample.debitAmount ?? sample.amount),
-        creditAmount: parseNum(sample.creditAmount),
-        supportingDocs: sample.supportingDocs ?? '',
-        samplingSource: '抽凭引擎',
-      }
-
-      if (emptySlot) {
-        const idx = updated.indexOf(emptySlot)
-        updated[idx] = enrichSubsequent({ ...emptySlot, ...patch })
-      } else {
-        updated.push(
-          enrichSubsequent({
-            ...emptySubsequent(generateId('sub'), nextSeq),
-            ...patch,
-          }),
-        )
-        nextSeq++
-      }
-      filled++
-    }
-
-    subsequentRows.value = updated
+  async function onEngineFilled(payload: EngineFilledPayload) {
     segment.value = 'subsequent'
-    persistSubsequent()
-    if (skippedCutoff) {
-      ElMessage.warning(`已填入 ${filled} 笔；跳过 ${skippedCutoff} 笔截止日及以前凭证`)
-    }
-    return { filled, skippedCutoff }
+    return voucherFill.onEngineFilled({ ...payload, samples: dropNotSubsequent(payload.samples ?? []) })
+  }
+
+  /** 从序时账挂入导入期后收回区：同样只收期后凭证，幂等追加（与抽凭命中同一分录只留一行） */
+  async function onAttachImported(samples: FillSample[]) {
+    segment.value = 'subsequent'
+    return voucherFill.onAttachImported(dropNotSubsequent(samples))
   }
 
   /** 将测算/减少差异推送为 G3-3 调整草稿（不自动确认回写） */
@@ -1026,7 +1050,13 @@ export function useG3CalcCheck(opts: {
     addRow,
     addSubsequentRow,
     removeRow,
-    fillFromSamples,
+    // 抽凭回填 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     pushVariancesToAdjustment,
     syncFromDetail,
     isVarianceExceeding,

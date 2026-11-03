@@ -7,7 +7,7 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'K7'" class="k7-header-toolbar">
         <el-segmented
-          v-if="dualMode.isOoAvailable.value"
+          v-if="dualMode.isOoAvailable.value && k7DEntrySync.presentation.value.showModeSwitch"
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
@@ -161,9 +161,10 @@
  * Spec: .kiro/specs/k7-deferred-income/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
@@ -375,11 +376,7 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '2401', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '2401' })).rows
     let u2401 = 0, a2401 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
@@ -426,6 +423,21 @@ onMounted(() => {
   void selfLoad()
   void _loadTbData()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const k7DEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-k7-deferred-income',
+})
+
 </script>
 
 <style scoped>

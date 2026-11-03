@@ -189,7 +189,7 @@ class TestF5F2TriangleLogic:
         assert rule.severity == "blocking"
 
     async def test_vr_f5_01_skip_when_data_missing(self, db_session, project_id):
-        """VR-F5-01 数据缺失时跳过 (passed=True, blocking)"""
+        """VR-F5-01 数据缺失时跳过 (status=not_executed, blocking)"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate,
@@ -200,8 +200,8 @@ class TestF5F2TriangleLogic:
             checks = await gate.check_f5_f2_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "营业成本=期初+采购-期末" in c.check_name)
-        assert rule.passed is True  # Skipped, not failed
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"  # Skipped, not failed
+        assert "数据不完整" in rule.reason
 
     async def test_vr_f5_02_pass(self, db_session, project_id):
         """VR-F5-02 通过: 毛利率波动 < 5%"""
@@ -318,7 +318,7 @@ class TestF5F2TriangleLogic:
         assert rule.severity == "warning"
 
     async def test_all_skip_when_no_data(self, db_session, project_id):
-        """所有数据缺失时全部跳过 (passed=True), 长度=4"""
+        """所有数据缺失时全部跳过 (status=not_executed), 长度=4"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate,
@@ -330,7 +330,7 @@ class TestF5F2TriangleLogic:
 
         assert len(checks) == 4
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
 
     async def test_blocking_rule_prevents_signoff(self, db_session, project_id):
         """VR-F5-01 blocking 失败时阻断签字"""
@@ -356,22 +356,22 @@ class TestF5F2TriangleLogic:
         """VR-F5-02 / VR-F2-01 / VR-F2-02 warning 失败不阻断"""
         # Only warnings fail
         checks = [
-            CheckItem(
+            CheckItem(status="passed",
                 check_name="F5勾稽:营业成本=期初+采购-期末",
                 passed=True,
                 severity="blocking",
             ),
-            CheckItem(
+            CheckItem(status="failed",
                 check_name="F5勾稽:毛利率波动<5%(交叉VR-D4-03)",
                 passed=False,
                 severity="warning",
             ),
-            CheckItem(
+            CheckItem(status="failed",
                 check_name="F2勾稽:跌价准备计提率波动<3%",
                 passed=False,
                 severity="warning",
             ),
-            CheckItem(
+            CheckItem(status="failed",
                 check_name="F2勾稽:存货周转天数vs行业均值",
                 passed=False,
                 severity="warning",

@@ -12,6 +12,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const mockGet = vi.fn()
 const mockPost = vi.fn()
@@ -45,7 +48,43 @@ vi.mock('element-plus', async () => {
   }
 })
 
+// 构建器用 useRoute() 取项目上下文，本 spec 不装路由。2026-10-27 acnr D9（64eade2e1）起 useAcnrDrill 经
+// useAcnr(getter) 在 setup 里立即求值 route.params，未装路由时 useRoute() 为 undefined ⇒ 每次挂载都
+// TypeError「reading 'params'」（advanced-query-linkage-closure 任务 1 回归基线发现）。生产环境总装着路由，
+// 这里给一个不在项目内的路由（params 为空），其余导出保持原样。
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => ({ params: {}, query: {}, path: '/advanced-query' }),
+  useRouter: () => ({ resolve: () => ({ href: '/' }) }),
+}))
+
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
+import { resetQueryBuilderAccessCache } from '@/composables/useQueryBuilderAccess'
+import { useAuthStore } from '@/stores/auth'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+function pythonFrozensetMembers(name: string): string[] {
+  const source = readFileSync(resolve(
+    HERE, '../../../../../backend/app/services/custom_query/table_whitelist.py',
+  ), 'utf-8')
+  const marker = source.indexOf(`${name}:`)
+  expect(marker).toBeGreaterThanOrEqual(0)
+  const start = source.indexOf('(', marker)
+  let depth = 0
+  let end = -1
+  for (let index = start; index < source.length; index += 1) {
+    if (source[index] === '(') depth += 1
+    else if (source[index] === ')') {
+      depth -= 1
+      if (depth === 0) { end = index + 1; break }
+    }
+  }
+  expect(end).toBeGreaterThan(start)
+  return [...source.slice(start, end).matchAll(/"([a-z_]+)"/g)].map((match) => match[1]).sort()
+}
+
+const BUILDER_UI_OPERATORS = pythonFrozensetMembers('BUILDER_UI_OPERATORS')
 
 const FIXTURE_SCHEMA = {
   tables: [
@@ -63,11 +102,7 @@ const FIXTURE_SCHEMA = {
       fields: ['id', 'project_id', 'adjustment_no', 'description'],
     },
   ],
-  operators: [
-    'eq', 'neq', 'gt', 'gte', 'lt', 'lte',
-    'like', 'not_like', 'in', 'not_in',
-    'is_null', 'is_not_null', 'between',
-  ],
+  operators: BUILDER_UI_OPERATORS,
   aggregates: ['count', 'sum', 'avg', 'min', 'max'],
 }
 
@@ -75,12 +110,17 @@ beforeEach(() => {
   mockGet.mockReset()
   mockPost.mockReset()
   mockHttpPost.mockReset()
+  sessionStorage.clear()
+  resetQueryBuilderAccessCache()
 })
 
 
 describe('AdvancedQueryBuilder — schema 加载', () => {
-  it('mount 时调用 /api/query/schema 并渲染表选项', async () => {
-    mockGet.mockResolvedValue(FIXTURE_SCHEMA)
+  it('mount 时调用 /api/query/schema 并渲染表选项；副标题不写死角色，随 access 接口（advanced-query-linkage-closure 任务 30）', async () => {
+    useAuthStore().token = 'tok'
+    mockGet.mockImplementation((url: string) => Promise.resolve(url === '/api/query/access'
+      ? { allowed: false, basis: null, reason: '高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用', all_projects: false, accessible_project_count: 0 }
+      : FIXTURE_SCHEMA))
     const wrapper = mount(AdvancedQueryBuilder, {
       global: {
         stubs: {
@@ -103,7 +143,47 @@ describe('AdvancedQueryBuilder — schema 加载', () => {
     await flushPromises()
     expect(mockGet).toHaveBeenCalledWith('/api/query/schema')
     expect(wrapper.text()).toContain('高级查询构建器')
-    expect(wrapper.text()).toContain('admin / manager')
+    // 改造前副标题写死「仅 admin / manager / partner 可访问」（漏了项目经理）：现在显示接口给的原因
+    expect(wrapper.text()).not.toContain('admin / manager')
+    expect(wrapper.find('[data-testid="aqb-subtitle"]').text()).toContain('含任一项目的项目经理')
+  })
+
+  it('构建器按后端字面量 13 项渲染，且每个算子都有非键名标签', async () => {
+    expect(BUILDER_UI_OPERATORS).toHaveLength(13)
+    expect(BUILDER_UI_OPERATORS).not.toContain('starts_with')
+    mockGet.mockResolvedValue(FIXTURE_SCHEMA)
+    const wrapper = mount(AdvancedQueryBuilder, {
+      global: {
+        stubs: {
+          'el-select': { template: '<div><slot /></div>' },
+          'el-option': {
+            props: ['label', 'value'],
+            template: '<i class="operator-option" :data-label="label" :data-value="value" />',
+          },
+          'el-form': { template: '<form><slot /></form>' },
+          'el-form-item': { template: '<div><slot /></div>' },
+          'el-checkbox-group': true,
+          'el-checkbox': true,
+          'el-radio-group': true,
+          'el-radio-button': true,
+          'el-button': { template: '<button><slot /></button>' },
+          'el-input': true,
+          'el-input-number': true,
+          'el-table': true,
+          'el-table-column': true,
+        },
+      },
+    })
+    await flushPromises()
+    const vm: any = wrapper.vm
+    vm.dsl.table = 'trial_balance'
+    vm.addFilter()
+    await flushPromises()
+    const rendered = wrapper.findAll('.operator-option')
+      .map((option) => ({ value: option.attributes('data-value') || '', label: option.attributes('data-label') || '' }))
+      .filter((option) => BUILDER_UI_OPERATORS.includes(option.value))
+    expect(rendered.map((option) => option.value).sort()).toEqual(BUILDER_UI_OPERATORS)
+    expect(rendered.every((option) => option.label && option.label !== option.value)).toBe(true)
   })
 })
 
@@ -160,7 +240,8 @@ describe('AdvancedQueryBuilder — buildPayload 序列化', () => {
     await vm.doPreview()
     await flushPromises()
 
-    expect(mockPost).toHaveBeenCalledWith('/api/query/preview', expect.any(Object))
+    // T16：调用方自管错误提示，请求带 _silent
+    expect(mockPost).toHaveBeenCalledWith('/api/query/preview', expect.any(Object), expect.objectContaining({ _silent: true }))
     const sentPayload = mockPost.mock.calls[0][1]
 
     expect(sentPayload.table).toBe('trial_balance')
@@ -232,7 +313,7 @@ describe('AdvancedQueryBuilder — execute & emit', () => {
     await vm.doExecute()
     await flushPromises()
 
-    expect(mockPost).toHaveBeenCalledWith('/api/query/execute', expect.any(Object))
+    expect(mockPost).toHaveBeenCalledWith('/api/query/execute', expect.any(Object), expect.objectContaining({ _silent: true }))
     expect(vm.result.total).toBe(2)
     expect(vm.result.columns).toEqual(['standard_account_code', 'audited_amount'])
     // SQL 预览同步更新

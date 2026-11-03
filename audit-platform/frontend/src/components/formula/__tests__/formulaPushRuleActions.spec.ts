@@ -154,7 +154,7 @@ describe('面板：规则本项目适配（真挂载）', () => {
     await flushPromises()
     await button(w, 'enable').trigger('click')
     await flushPromises()
-    expect(calls).toEqual([{ fn: 'restoreGlobal', args: ['p1', 'push', [CASH.rule_id]] }])
+    expect(calls).toEqual([{ fn: 'restoreGlobal', args: ['p1', 'push', [CASH.rule_id], [3]] }])
     calls.length = 0
     w = mountPanel([{ ...CASH, status: 'disabled', disabled: true, layer: 'global' }])
     await flushPromises()
@@ -192,7 +192,7 @@ describe('面板：规则本项目适配（真挂载）', () => {
     await flushPromises()
     await button(w, 'restore').trigger('click')
     await flushPromises()
-    expect(calls).toEqual([{ fn: 'restoreGlobal', args: ['p1', 'push', [SYSTEM.rule_id]] }])
+    expect(calls).toEqual([{ fn: 'restoreGlobal', args: ['p1', 'push', [SYSTEM.rule_id], [1]] }])
   })
 
   it('无编辑权：适配按钮不可用', async () => {

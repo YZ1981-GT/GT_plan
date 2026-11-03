@@ -94,7 +94,7 @@ function generateRowId(): string {
 }
 
 /** 创建空行（使用动态 segments 初始化账龄数据） */
-function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
+export function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
   const agingData = createEmptyAgingData(segments, 'D2')
   return {
     rowId: generateRowId(),
@@ -135,7 +135,7 @@ function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
  * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
  * 有期初调整的行在表单与 OnlyOffice 之间会来回变值（OO 按模板公式重算）。同 F1-2 裁决 F1-H3。
  */
-function recalcRow(row: DetailRow): DetailRow {
+export function recalcRow(row: DetailRow): DetailRow {
   row.priorAudited = getAuditedAmount(
     parseNum(row.priorUnadjusted),
     parseNum(row.priorAje),

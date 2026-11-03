@@ -68,8 +68,11 @@ class DomainStore:
     def spec(self):
         return get_spec(self.domain)
 
-    async def project_scope(self, db: AsyncSession, project_id: uuid.UUID) -> str:
-        """项目在本域的全局作用范围（与批量口径 ``projects.scope_of`` 同一函数）。"""
+    async def project_scope(self, db: AsyncSession, project_id: uuid.UUID) -> str | None:
+        """项目在本域的全局作用范围（与批量口径 ``projects.scope_of`` 同一函数）。
+
+        返回 ``None`` 表示该域对此项目不适用。
+        """
         if self.spec.scope_kind == "any":
             return ANY_SCOPE
         from app.models.core import Project
@@ -80,7 +83,9 @@ class DomainStore:
                 Project.id == project_id, Project.is_deleted == sa.false())
         )).one_or_none()
         if row is None:
-            return scope_of(self.domain, None, None) if self.spec.scope_kind == "template_type" else "enterprise"
+            if self.spec.scope_kind in ("template_type", "consolidated_template_type"):
+                return scope_of(self.domain, None, None)
+            return "enterprise"
         return scope_of(self.domain, row[0], row[1])
 
     #: 全局层是否有通用作用范围 ``*``（精确范围优先、回退 ``*``）
@@ -153,6 +158,16 @@ def _report_structure(row: ReportConfig) -> dict:
 def _report_label(row: ReportConfig) -> str:
     rt = row.report_type.value if hasattr(row.report_type, "value") else str(row.report_type)
     return f"{_REPORT_TYPE_LABELS.get(rt, rt)} {row.row_code} {row.row_name or ''}".strip()
+
+
+def _report_label_from_slot(slot_key: str) -> str:
+    """从 slot_key 生成简单标签（校验器错误消息用）。"""
+    try:
+        rt, code = parse_report_slot(slot_key)
+        rt_str = rt.value if hasattr(rt, "value") else str(rt)
+        return f"{_REPORT_TYPE_LABELS.get(rt_str, rt_str)} {code}"
+    except (ValueError, KeyError):
+        return slot_key
 
 
 def _apply_report_definition(row: ReportConfig, definition: dict | None) -> None:
@@ -232,6 +247,8 @@ class ReportStore(DomainStore):
         )
 
     async def write_global(self, db, scope, slot_key, definition, *, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition("report", definition, label=label or _report_label_from_slot(slot_key), slot_key=slot_key)
         row = await self._find(db, scope, slot_key)
         if definition is None:
             if row is None or row.is_deleted:
@@ -256,6 +273,8 @@ class ReportStore(DomainStore):
 
     async def write_project(self, db, project_id, slot_key, *, definition, base_definition, base_version,
                             pinned, base_origin, base_template_id, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition("report", definition, label=label or _report_label_from_slot(slot_key), slot_key=slot_key)
         std = f"project:{project_id}"
         row = await self._find(db, std, slot_key)
         if row is None:
@@ -359,6 +378,8 @@ class SettingStore(DomainStore):
         return (await db.execute(q)).scalars().first()
 
     async def write_global(self, db, scope, slot_key, definition, *, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition(self.domain, definition, label=label or slot_key, slot_key=slot_key)
         row = await self._find(db, "global", slot_key, scope=scope)
         if definition is None:
             if row is None:
@@ -387,6 +408,8 @@ class SettingStore(DomainStore):
 
     async def write_project(self, db, project_id, slot_key, *, definition, base_definition, base_version,
                             pinned, base_origin, base_template_id, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition(self.domain, definition, label=label or slot_key, slot_key=slot_key)
         row = await self._find(db, "project", slot_key, project_id=project_id)
         payload = dict(definition or {DISABLED_KEY: True})
         if structure:

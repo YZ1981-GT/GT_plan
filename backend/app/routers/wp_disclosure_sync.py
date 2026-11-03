@@ -96,6 +96,19 @@ class SyncFromWorkpaperResponse(BaseModel):
         description="是否新建了 disclosure_notes 记录（False=更新现有）",
     )
     texts_synced: int = Field(0, description="写入的叙述正文章节数")
+    # 以下字段服务层早就返回，原响应模型没声明 ⇒ 被 FastAPI 按 response_model 过滤掉，前端读到的恒为 undefined
+    # （行级合并 fail closed 的提示从未出现过；spec note-pull-followup-closure R3 补齐，test_wp_disclosure_sync 钉住）
+    revived: bool = Field(False, description="是否复活了被软删的同键章节")
+    blocked_by_manual_override: bool = Field(False, description="是否被整节人工覆盖守卫拦下（表格未写）")
+    row_scoped_tables: list[str] = Field(default_factory=list, description="本次走行级合并的表")
+    row_scope_unresolved: list[str] = Field(default_factory=list, description="段边界解析失败而跳过写入的表")
+    row_scope_unresolved_reasons: dict[str, str] = Field(default_factory=dict, description="逐表的解析失败原因")
+    push_kept: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="公式推送写过、本次同步来的值与之不同而保持推送值的格（以试算表审定数为准）",
+    )
+    skipped: bool = Field(False, description="章节不适用于本项目口径（单体项目的合并专属章节等），未写入")
+    reason: str | None = Field(None, description="跳过原因")
 
 
 class SyncBatchItem(BaseModel):
@@ -108,6 +121,15 @@ class SyncBatchItem(BaseModel):
         description="子表数据（含 `_` 前缀元数据键，同单章节同步）",
     )
     columns: dict[str, list[dict]] | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
+    owner_key: str | None = Field(
+        None,
+        min_length=1,
+        description="该章节内的稳定子表 owner；与 replace_owned_tables 配合由服务端计算删除差集",
+    )
+    replace_owned_tables: bool = Field(
+        False,
+        description="是否以本次表集合替换该 owner 上次成功集合；纯叙述章节必须为 false",
+    )
 
 
 class SyncBatchFromWorkpaperRequest(BaseModel):
@@ -117,6 +139,10 @@ class SyncBatchFromWorkpaperRequest(BaseModel):
     current_standard: str = Field(..., min_length=1)
     items: list[SyncBatchItem] = Field(..., min_length=1)
     year: int | None = None
+    require_all_applied: bool = Field(
+        False,
+        description="任一章节被跳过、人工覆盖拦截或行段未解析时整批回滚",
+    )
 
 
 class StandardMismatchDetail(BaseModel):
@@ -176,6 +202,39 @@ async def _autorun_validation(
         logger.warning("autorun validation after sync skipped: %s", err)
 
 
+async def _publish_note_saved(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int | None,
+    section_ids: list[str],
+    *,
+    wp_id: UUID,
+) -> None:
+    """披露数据提交后逐章节发布统一附注变更事件；失败不影响已提交同步。"""
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+        from app.services.wp_disclosure_sync_service import _resolve_target_year
+
+        effective_year = await _resolve_target_year(db, project_id, year)
+        if not effective_year:
+            return
+        for section_id in dict.fromkeys(section_ids):
+            if section_id:
+                await event_bus.publish(EventPayload(
+                    event_type=EventType.NOTE_SECTION_SAVED,
+                    project_id=project_id,
+                    year=effective_year,
+                    extra={
+                        "section_code": section_id,
+                        "action": "workpaper_disclosure_sync",
+                        "wp_id": str(wp_id),
+                    },
+                ))
+    except Exception as err:  # pragma: no cover — 业务已提交，通知只能 fail-open
+        logger.warning("publish NOTE_SECTION_SAVED after disclosure sync skipped: %s", err, exc_info=True)
+
+
 @router.post(
     "/{project_id}/disclosure-notes/sync-from-workpaper",
     response_model=SyncFromWorkpaperResponse,
@@ -228,6 +287,16 @@ async def sync_disclosure_from_workpaper(
             detail=f"附注同步失败: {exc}",
         ) from exc
 
+    if "skipped_reason" in result:
+        # 项目没有审计年度、载荷也没带年度：服务层不按今年猜、不写入。原来把这个结果直接构造响应模型 ⇒ 缺必填字段
+        # 抛 ValidationError、对外是 500（spec note-pull-followup-closure R3 顺带修）
+        raise HTTPException(status_code=422, detail=f"附注未同步：{result['skipped_reason']}")
+
+    if not result.get("blocked_by_manual_override") and not result.get("skipped"):
+        await _publish_note_saved(
+            db, project_id, body.year, [result["section_id"]], wp_id=body.wp_id,
+        )
+
     # P0-4（附注联动复盘）：底稿同步成功（service 内已 commit）后自动补跑一次附注校验
     # 并落库，使 findings 在附注树/看板上可见。fail-open，不影响已提交的同步结果。
     await _autorun_validation(db, project_id, body.year)
@@ -261,6 +330,7 @@ async def sync_disclosure_batch_from_workpaper(
             items=[item.model_dump() for item in body.items],
             user=current_user,
             year=body.year,
+            require_all_applied=body.require_all_applied,
         )
     except StandardMismatchError as exc:
         raise _standard_mismatch_http(exc) from exc
@@ -277,6 +347,12 @@ async def sync_disclosure_batch_from_workpaper(
             detail=f"附注批量同步失败: {exc}",
         ) from exc
 
+    changed_sections = [
+        str(item.get("section_id") or "")
+        for item in result.get("results", [])
+        if not item.get("blocked_by_manual_override") and not item.get("skipped")
+    ]
+    await _publish_note_saved(db, project_id, body.year, changed_sections, wp_id=body.wp_id)
     await _autorun_validation(db, project_id, body.year)
 
     return SyncBatchFromWorkpaperResponse(**result)
@@ -305,6 +381,11 @@ class SyncFromHtmlResponse(BaseModel):
     synced_at: str | None = None
     created: bool | None = None
     reason: str | None = None
+    # 与 SyncFromWorkpaperResponse 同名同义（原模型没声明 ⇒ 被过滤；spec note-pull-followup-closure R3）
+    row_scoped_tables: list[str] = Field(default_factory=list)
+    row_scope_unresolved: list[str] = Field(default_factory=list)
+    row_scope_unresolved_reasons: dict[str, str] = Field(default_factory=dict)
+    push_kept: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ConflictDetail(BaseModel):
@@ -380,4 +461,8 @@ async def sync_html_to_disclosure(
             detail=f"附注同步失败: {exc}",
         ) from exc
 
+    if sync_result.get("synced") and sync_result.get("section_id"):
+        await _publish_note_saved(
+            db, project_id, None, [str(sync_result["section_id"])], wp_id=wp_id,
+        )
     return SyncFromHtmlResponse(**sync_result)

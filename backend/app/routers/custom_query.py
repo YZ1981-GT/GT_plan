@@ -22,6 +22,7 @@
 
 API:
   POST   /api/custom-query/execute              — 执行查询
+  POST   /api/custom-query/export               — 导出全部（服务端流式，> 1,000,000 行 400）
   GET    /api/custom-query/indicators           — 获取可查询指标库（树形）
   GET    /api/custom-query/templates            — 列出查询模板（私有 + 全局）
   POST   /api/custom-query/templates            — 创建查询模板
@@ -30,21 +31,26 @@ API:
   DELETE /api/custom-query/templates/{id}       — 删除模板（仅创建者或 admin）
 """
 
-import asyncio
 import json
 import logging
 import uuid
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import or_, select, text
+from pydantic import BaseModel, Field, ValidationError, model_validator
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, get_visible_project_ids, require_project_access
+from app.deps import (
+    get_current_user,
+    get_visible_project_ids,
+    require_project_access,
+    require_project_audit_year,
+)
 from app.models.core import Project, ProjectUser, User
 from app.models.custom_query_models import CustomQueryTemplate
 # 模板治理三件套在模块级 import：既是「唯一消费方」的落点，也使契约测试可对
@@ -52,14 +58,20 @@ from app.models.custom_query_models import CustomQueryTemplate
 from app.services.custom_query.template_scope_adapter import (
     NormalizedTemplateScope,
     TemplateScopeAdapter,
-    TemplateScopeValidationError,
 )
-from app.services.custom_query.template_service import template_service
+from app.services.custom_query import template_presets
+from app.services.custom_query.template_service import TemplateForbiddenError, TemplateInvalidError, template_service
 from app.services.custom_query.pagination import (
-    FETCH_HARD_CAP,
     MAX_LIMIT as PAGE_MAX_LIMIT,
     MIN_LIMIT as PAGE_MIN_LIMIT,
 )
+# 取数器下沉（advanced-query-linkage-closure 任务 7 / 17 / 18）：SQL 源由 source_registry + paged_fetch 在数据库内
+# 计数 / 排序 / 分页，JSON 内存源与底稿选区辅助在 fetchers/，本模块不再有取数器；wp-sheet-preview 的只读取数在
+# fetchers/workpaper_cells（任务 16）。
+from app.services.custom_query.fetchers.disclosure import _query_disclosure  # noqa: F401 — 再导出（test_note_table_payload_readers_pg）
+from app.services.custom_query.fetchers.workpaper_cells import render_sheet_preview
+from app.services.custom_query.source_registry import resolve_source
+from app.services.custom_query.strict_model import AcnrTargetList, StrictRequestModel, TemplateConfig, template_config_rejected
 from app.services.wp_template_registry import wp_template_registry_service
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
@@ -78,26 +90,44 @@ class SortSpec(BaseModel):
     direction: Literal["asc", "desc"] = "asc"
 
 
-class QueryRequest(BaseModel):
+class ConditionSpec(BaseModel):
+    """一条结构化条件（advanced-query-linkage-closure R6.1）。
+
+    算子与字段的合法性由注册表在取数层判定（未登记 → 400 ``OP_NOT_ALLOWED`` / ``UNKNOWN_CONDITION_FIELD``，
+    message 指明可用项），这里只限长度；值由 ``param_sql_builder`` 按列类型转换并参数化绑定。
+    """
+
+    field: str = Field(..., min_length=1, max_length=64)
+    op: str = Field(..., min_length=1, max_length=32)
+    value: Any | None = None
+
+
+class QueryRequest(StrictRequestModel):
     project_id: str
-    year: int
-    source: str  # report | trial_balance | disclosure | adjustment | worksheet | workpaper | account_balance | ledger_entries | report_lines | workhours
-    filters: dict = {}  # report_type, account_name, section_id, company_code, etc.
-    columns: list[str] = []  # 要查询的列（空=全部）
+    year: int = Field(..., ge=2000, le=2100)
+    source: str  # 注册源键 / 别名 / consol_unit: / workpaper: / disclosure_note: 形态（source_registry.resolve_source）
+    filters: dict = {}  # 旧筛选键：SQL 源只认注册表登记的键（未登记 → 400 UNKNOWN_FILTER_KEY）
+    #: 要返回的显示列（空 = 全部；未登记 → 400 UNKNOWN_COLUMN），下钻所需键随行返回不显示
+    columns: list[str] = Field(default_factory=list, max_length=60)
+    #: 结构化条件（字段、算子、值）与组合逻辑：只有注册表 SQL 源支持，内存源带条件 → 400 CONDITIONS_UNSUPPORTED
+    conditions: list[ConditionSpec] = Field(default_factory=list, max_length=20)
+    condition_logic: Literal["and", "or"] = "and"
     # 分页边界与 pagination.MIN_LIMIT / MAX_LIMIT 保持一致（R4.6）。
     # 改造前 limit 无约束、offset 声明后全文件零使用（14 个取数器只拼 LIMIT :lim），
     # 前端却一直在传 offset ⇒ 业务视图从来没有第 2 页。
     limit: int = Field(default=500, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
     offset: int = Field(default=0, ge=0)
-    #: 排序项，由 StablePagination 消费。非法方向在此层即 422（R4.7）。
-    sort: list[SortSpec] = Field(default_factory=list)
+    #: 服务端签发的精确 COUNT 复用凭证；查询或身份变化时自动失效并重算。
+    count_token: str | None = Field(default=None, max_length=2048)
+    #: 排序项：SQL 源在数据库内排序（可空列空值在后），内存源由 StablePagination 消费。非法方向在此层即 422（R4.7）。
+    sort: list[SortSpec] = Field(default_factory=list, max_length=5)
     #: 分组配置 {"dimensions": [...], "aggregates": [{"field","op","alias"}]}。
     group: dict | None = None
     #: 透视配置 {"row_dims","col_dims","value_field","agg","max_cols"}。
     pivot: dict | None = None
     #: ACNR 寻址目标（addr_id / uri / report:/note:/tb: 语法糖）。
     #: 改造前该字段未被 pydantic 声明 ⇒ 前端发送后被静默丢弃、无 warning。
-    acnr_targets: list[str] = Field(default_factory=list)
+    acnr_targets: AcnrTargetList = Field(default_factory=list)
 
 
 @router.get("/indicators")
@@ -113,6 +143,7 @@ async def get_indicators(
         default=None,
         description="按分支懒加载子节点（disclosure / workpaper），与 depth 配合使用",
     ),
+    year: int | None = Query(default=None, ge=2000, le=2100, description="附注分支的年度；缺省取项目审计年度"),
     response: Response = None,  # type: ignore[assignment]
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -143,6 +174,13 @@ async def get_indicators(
 
     template_type = await _resolve_project_template_type(db, project_id)
     standard_label = _STANDARD_LABEL.get(template_type, "通用")
+    # 附注上下文（任务 19 / 23）：年度缺省取项目审计年度、本人循环章节、X-Notes-Version（骨架 / 分支 / 全量都带）
+    from app.services.custom_query.fetchers.disclosure import resolve_notes_context
+
+    notes = await resolve_notes_context(db, project_id, year if isinstance(year, int) else None, current_user)
+    if response is not None:
+        response.headers["X-Notes-Version"] = notes.version
+    is_consolidated = notes.report_scope == "consolidated"
 
     # ─── 分支懒加载（R12.2）：只构建被展开的那一支 ────────────────────────
     # 🔴 用 isinstance 而非真值判断：本端点也被契约测试**直接调用**（不经 FastAPI
@@ -150,7 +188,7 @@ async def get_indicators(
     # `if branch:` 会恒为真。同理 depth 也必须按真实类型判断。
     branch_key = branch if isinstance(branch, str) and branch else None
     if branch_key:
-        return await _build_indicator_branch(branch_key, db, project_id, template_type)
+        return await _build_indicator_branch(branch_key, db, project_id, template_type, notes=notes)
 
     # depth=1 → 骨架：重分支（附注 / 底稿）子节点留空并标 lazy。
     # 实测全量树约 578KB / 3089 节点 / 2766 叶子、慢请求监控 3391ms，其中绝大部分
@@ -162,19 +200,19 @@ async def get_indicators(
     # 6 张报表：BS / IS / CFS / CFS-补充资料 / 权益变动 / 减值准备表
     # 减值准备表 (impairment_provision) 仅 soe 模板有数据，listed 自动隐藏避免误点
     report_children = [
-        {"key": "report_balance_sheet", "label": f"资产负债表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_income_statement", "label": f"利润表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_cash_flow_statement", "label": f"现金流量表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_cash_flow_supplement", "label": f"现金流量表补充资料（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_equity_statement", "label": f"所有者权益变动表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+        _leaf("report_balance_sheet", f"资产负债表（{standard_label}）", standard=template_type),
+        _leaf("report_income_statement", f"利润表（{standard_label}）", standard=template_type),
+        _leaf("report_cash_flow_statement", f"现金流量表（{standard_label}）", standard=template_type),
+        _leaf("report_cash_flow_supplement", f"现金流量表补充资料（{standard_label}）", standard=template_type),
+        _leaf("report_equity_statement", f"所有者权益变动表（{standard_label}）", standard=template_type),
     ]
     if template_type == "soe":
         report_children.append(
-            {"key": "report_impairment_provision", "label": f"减值准备表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type}
+            _leaf("report_impairment_provision", f"减值准备表（{standard_label}）", standard=template_type)
         )
 
-    # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
-    disclosure_children = [] if skeleton else await _build_disclosure_tree(template_type)
+    # ─── 附注树：单体项目按本项目章节（叠加循环范围），合并项目 / 无项目用模板种子树 ─────────────
+    disclosure_children = [] if skeleton else await _build_disclosure_tree(template_type, **_notes_kwargs(db, project_id, notes))
 
     # ─── 合并范围单位树（仅合并项目可见）────────────────────────
     consol_units_node = await _build_consol_units_tree(db, project_id)
@@ -187,15 +225,20 @@ async def get_indicators(
         "domain": "report",
         "children": report_children,
     })
+    # 单体项目隐藏合并试算平衡表与整组合并工作底稿（ADR-AQL-10：单体项目上恒 0 行）；「科目明细」更名
+    tb_children = [
+        _leaf("tb_detail", "试算平衡表（科目）"),
+        _leaf("account_balance", "科目余额表"),
+        _leaf("ledger_entries", "序时账明细"),
+        _leaf("aux_balance", "辅助余额"),
+        _leaf("aux_ledger", "辅助明细"),
+    ]
+    if is_consolidated:
+        tb_children.insert(1, _leaf("tb_summary", "合并试算平衡表（工作底稿）"))
     base_tree.append({
         "key": "trial_balance", "label": "📑 试算平衡表", "icon": "📑",
         "domain": "tb",
-        "children": [
-            {"key": "tb_detail", "label": "科目明细", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
-            {"key": "tb_summary", "label": "试算平衡表", "columns": ["row_code", "row_name", "unadjusted", "aje_dr", "aje_cr", "rcl_dr", "rcl_cr", "audited"]},
-            {"key": "account_balance", "label": "科目余额表", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
-            {"key": "ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"]},
-        ],
+        "children": tb_children,
     })
     base_tree.append({
         "key": "disclosure",
@@ -212,43 +255,44 @@ async def get_indicators(
         "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
         "domain": "wp",
         "children": [
-            {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
-            {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
+            _leaf("adj_aje", "审计调整分录(AJE)"),
+            _leaf("adj_rje", "重分类调整分录(RJE)"),
         ],
     })
-    base_tree.append({
-        "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
-        "domain": "wp",
-        "children": [
-            {"key": "ws_info", "label": "基本信息表", "columns": ["company_name", "company_code", "holding_type", "non_common_ratio"]},
-            {"key": "ws_elimination", "label": "抵消分录", "columns": ["direction", "subject", "amount", "desc"]},
-            {"key": "ws_consol_tb", "label": "合并试算平衡表", "columns": ["row_code", "row_name", "summary", "equity_dr", "equity_cr", "audited"]},
-        ],
-    })
+    if is_consolidated:
+        base_tree.append({
+            "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
+            "domain": "wp",
+            "children": [
+                _leaf("ws_info", "基本信息表"),
+                _leaf("ws_elimination", "抵消分录"),
+                _leaf("ws_consol_tb", "合并试算平衡表"),
+            ],
+        })
+    # 「底稿清单」叶子在骨架与全量树里都有：页面版（骨架 + 附注分支）的底稿组只留它（ADR-AQL-16）
+    workpaper_list_leaf = _leaf("workpaper", "底稿清单")
     base_tree.append({
         "key": "workpaper", "label": "📋 底稿", "icon": "📋",
         "domain": "wp",
-        "children": [] if skeleton else await _build_workpaper_tree(db, project_id),
+        "children": [workpaper_list_leaf] if skeleton else [workpaper_list_leaf, *await _build_workpaper_tree(db, project_id)],
         "lazy": skeleton,
     })
     base_tree.append({
         "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
         "domain": "report",
-        "children": [
-            {"key": "report_lines", "label": "报表行次配置", "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula"]},
-        ],
+        "children": [_leaf("report_lines", "报表行次配置")],
     })
     base_tree.append({
         "key": "workhours", "label": "⏱️ 工时记录", "icon": "⏱️",
         "domain": "aux",
-        "children": [
-            {"key": "workhours", "label": "工时记录", "columns": ["work_date", "hours", "description", "status", "staff_id"]},
-        ],
+        "children": [_leaf("workhours", "工时记录")],
     })
     if response is not None:
         # version = max(static schema version, DB registry max version)
         try:
-            db_max_version = await wp_template_registry_service.get_max_version(db)
+            # 保存点：表不存在等失败时回滚到这里（PG 上吞掉异常而不回滚会让本请求事务停在 aborted，B6 实测）
+            async with db.begin_nested():
+                db_max_version = await wp_template_registry_service.get_max_version(db)
             effective_version = max(_INDICATORS_SCHEMA_VERSION, db_max_version)
         except Exception:
             effective_version = _INDICATORS_SCHEMA_VERSION
@@ -263,14 +307,55 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 # indicators 树结构 schema 版本：树字段/叶子 key 形态有变更时升 1，前端用此值自动失效旧缓存
 # 历史演进：v1 扁平 → v2 项目级 → v3 6 报表 → v4 合并模块 → v5 底稿 3 层 → v6 sheet 全集 → v7 disabled → v8 sheet 辅助灰度 + ancestorKeys → v9 wp_template_registry DB
 # v10：节点新增 `lazy` 字段 + 支持 depth/branch 懒加载（R12），旧缓存需失效
-_INDICATORS_SCHEMA_VERSION = 10
+# v11：注册表 SQL 源的叶子 columns 由 source_registry 生成（advanced-query-linkage-closure 任务 7）——
+#      execute 起对未登记列返回 400 UNKNOWN_COLUMN，旧缓存里「科目明细」的 account_code / closing_balance 等
+#      试算表没有的列必须失效
+# v12：报表、报表行次、调整分录（含合并单位）切到注册表，叶子 columns 同样由它生成（任务 17 / 18：调整分录旧叶子声明
+#      表里没有的 entry_number，页面版按叶子列发 columns 会 400）；同批任务 22 的试算表重分类列、余额方向列共用 v12
+# v13：树形按项目（任务 19 / 20）——单体项目附注分支按本项目章节（叶子 disclosure_note:八、1 与「附注目录」）、单体隐藏
+#      合并试算平衡表与合并工作底稿组、「科目明细」更名、调整分录叶子 adj_rje、试算组增辅助两叶子、叶子带 supports_conditions
+# v14：底稿组首个叶子「底稿清单」（注册表源 workpaper，骨架里也有）——页面版只加载「骨架 + 附注分支」、底稿组只留它
+#      （ADR-AQL-16，任务 29）；弹窗全量树同样多这一个叶子
+# v15：SQL 源叶子新增带 dtype 的 condition_fields，并包含不返回结果的 condition_only 计算列（任务 40）
+_INDICATORS_SCHEMA_VERSION = 15
+
+
+def _registry_columns(source: str) -> list[str]:
+    """指标树叶子声明的列 = 注册表显示列（同一定义生成，R5.7；只用于注册表 SQL 源的叶子）。"""
+    spec = resolve_source(source).spec
+    assert spec is not None, f"指标树叶子 {source} 不是注册表 SQL 源"
+    return list(spec.display_keys)
+
+
+def _leaf(key: str, label: str, **extra: Any) -> dict:
+    """指标树叶子：SQL 源下发显示列与带 dtype 的可条件字段；JSON 源两者都为空。"""
+    spec = resolve_source(key).spec
+    return {
+        "key": key,
+        "label": label,
+        "columns": list(spec.display_keys) if spec is not None else [],
+        "condition_fields": (
+            [{"key": column.key, "dtype": column.dtype} for column in spec.condition_columns]
+            if spec is not None else []
+        ),
+        "supports_conditions": spec is not None,
+        **extra,
+    }
+
+
+def _notes_kwargs(db: AsyncSession, project_id: str | None, notes: Any) -> dict:
+    """``_build_disclosure_tree`` 的项目上下文参数（无项目时不传，测试替身只收 template_type 也能用）。"""
+    if not project_id:
+        return {}
+    return {"db": db, "project_id": project_id, "year": notes.year, "report_scope": notes.report_scope,
+            "sections": notes.sections}
 
 #: 支持按分支懒加载的大类 key → 子节点构建器名（见 _build_indicator_branch）
 LAZY_INDICATOR_BRANCHES: tuple[str, ...] = ("disclosure", "workpaper")
 
 
 async def _build_indicator_branch(
-    branch: str, db: AsyncSession, project_id: str | None, template_type: str
+    branch: str, db: AsyncSession, project_id: str | None, template_type: str, *, notes: Any = None
 ) -> list[dict]:
     """按分支返回子节点（R12.2）。
 
@@ -278,7 +363,7 @@ async def _build_indicator_branch(
     分不清是「真没有」还是「参数写错了」。
     """
     if branch == "disclosure":
-        return await _build_disclosure_tree(template_type)
+        return await _build_disclosure_tree(template_type, **(_notes_kwargs(db, project_id, notes) if notes else {}))
     if branch == "workpaper":
         return await _build_workpaper_tree(db, project_id)
     raise HTTPException(
@@ -320,10 +405,11 @@ async def _resolve_project_template_type(db: AsyncSession, project_id: str | Non
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         return "soe"
-    proj = await db.get(Project, proj_uuid)
-    if proj and proj.template_type in _STANDARD_LABEL:
-        return proj.template_type
-    return "soe"
+    # 只投影一列（同 ``source_registry.ref_context``）：整行投影会因共享库缺任一无关新列而整体 500
+    template_type = (await db.execute(
+        select(Project.template_type).where(Project.id == proj_uuid).limit(1)
+    )).scalar_one_or_none()
+    return template_type if template_type in _STANDARD_LABEL else "soe"
 
 
 async def _resolve_project_report_scope(db: AsyncSession, project_id: str | None) -> str:
@@ -334,10 +420,10 @@ async def _resolve_project_report_scope(db: AsyncSession, project_id: str | None
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         return "standalone"
-    proj = await db.get(Project, proj_uuid)
-    if proj and proj.report_scope in ("standalone", "consolidated"):
-        return proj.report_scope
-    return "standalone"
+    scope = (await db.execute(
+        select(Project.report_scope).where(Project.id == proj_uuid).limit(1)
+    )).scalar_one_or_none()
+    return scope if scope in ("standalone", "consolidated") else "standalone"
 
 
 async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> dict | None:
@@ -391,10 +477,10 @@ async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> 
             "label": unit_label,
             "company_code": cc,
             "children": [
-                {"key": f"consol_unit:{cc}:account_balance", "label": "科目余额", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"], "company_code": cc},
-                {"key": f"consol_unit:{cc}:ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"], "company_code": cc},
-                {"key": f"consol_unit:{cc}:tb_detail", "label": "试算表（个体）", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"], "company_code": cc},
-                {"key": f"consol_unit:{cc}:adjustment", "label": "调整分录", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"], "company_code": cc},
+                _leaf(f"consol_unit:{cc}:account_balance", "科目余额", company_code=cc),
+                _leaf(f"consol_unit:{cc}:ledger_entries", "序时账明细", company_code=cc),
+                _leaf(f"consol_unit:{cc}:tb_detail", "试算表（个体）", company_code=cc),
+                _leaf(f"consol_unit:{cc}:adjustment", "调整分录", company_code=cc),
             ],
         })
     return {
@@ -405,8 +491,19 @@ async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> 
     }
 
 
-async def _build_disclosure_tree(template_type: str) -> list[dict]:
-    """读 consol_note_sections_{template_type}.json，按 parent_section 分组成两层树。
+async def _build_disclosure_tree(
+    template_type: str,
+    *,
+    db: AsyncSession | None = None,
+    project_id: str | None = None,
+    year: int | None = None,
+    report_scope: str = "standalone",
+    sections: frozenset[str] | None = None,
+) -> list[dict]:
+    """附注分支（ADR-AQL-16）：单体项目按本项目本年度章节（``fetchers.disclosure.project_note_tree``，叠加循环范围
+    ``sections``）；取不到年度时不建（空，``X-Notes-Version: no-year``）；合并项目 / 无项目读模板种子树。
+
+    种子树：读 consol_note_sections_{template_type}.json，按 parent_section 分组成两层树。
 
     返回结构：
       [
@@ -417,14 +514,23 @@ async def _build_disclosure_tree(template_type: str) -> list[dict]:
         ...
       ]
     """
-    sections = _load_disclosure_sections(template_type)
-    if not sections:
+    if db is not None and project_id and report_scope != "consolidated":
+        if year is None:
+            return []
+        from app.services.custom_query.fetchers.disclosure import project_note_tree
+
+        return await project_note_tree(db, project_id, year, sections=sections)
+    seed = _load_disclosure_sections(template_type)
+    if not seed:
         # 降级：未读到 JSON 时返回单一通用入口
-        return [{"key": "disclosure_note", "label": "附注章节数据（通用）", "columns": ["section_id", "headers", "rows"]}]
+        return [{
+            "key": "disclosure_note", "label": "附注章节数据（通用）",
+            "columns": [], "condition_fields": [], "supports_conditions": False,
+        }]
 
     # 按 parent_section 分组（按 parent_seq 排序）
     groups: dict[str, dict] = {}
-    for sec in sections:
+    for sec in seed:
         parent = sec.get("parent_section") or sec.get("title") or "其他"
         parent_seq = sec.get("parent_seq", 999)
         if parent not in groups:
@@ -440,7 +546,9 @@ async def _build_disclosure_tree(template_type: str) -> list[dict]:
             "key": f"disclosure_note:{section_id}",
             "label": f"{section_id} {title}".strip(),
             "section_id": section_id,
-            "columns": ["section_id", "headers", "rows"],
+            "columns": [],  # JSON 内存源：列随所选表（R5.7）
+            "condition_fields": [],
+            "supports_conditions": False,
             "_seq": sec.get("seq", 999),
         })
 
@@ -596,7 +704,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
 
     if registry_data:
         # Build from DB registry
-        map_by_code: dict[str, dict] = {r["wp_code"]: r for r in registry_data}
         primaries: list[dict] = []
         for r in registry_data:
             sheets_list = r.get("sheets") or []
@@ -612,7 +719,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
         # Fallback to JSON files
         mapping = _load_wp_mapping()
         sheet_map = _load_step_sheet_mapping()
-        map_by_code = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
 
         primaries = []
         seen: set[str] = set()
@@ -727,214 +833,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
     return result
 
 
-def _sync_parse_sheet_preview(content: bytes, sheet_name: str | None) -> dict:
-    """同步函数：openpyxl 解析单 sheet 返回 cellData（供 run_in_executor 调用避免阻塞 event loop）
-
-    公式 cell 处理：data_only=True 拿不到 cache（None）时同时附 formula 字段，前端可标识灰色斜体
-    """
-    from io import BytesIO
-    from openpyxl import load_workbook
-    wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
-    target = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
-    if not target:
-        wb.close()
-        return {"error": "工作簿无 sheet"}
-    ws = wb[target]
-    rows = min(ws.max_row or 0, 100)
-    cols = min(ws.max_column or 0, 30)
-    cells: dict[str, dict] = {}
-    has_unresolved_formula = False
-    # 第二份 wb 用 data_only=False 探测公式（仅按需打开）
-    wb_formula = None
-    ws_formula = None
-    for row_iter in ws.iter_rows(min_row=1, max_row=rows, max_col=cols):
-        for cell in row_iter:
-            try:
-                row_num = cell.row
-                col_num = cell.column
-                v = cell.value
-            except AttributeError:
-                continue
-            key = f"{row_num - 1},{col_num - 1}"
-            if v is None:
-                # 可能是公式 cell 但 cache 缺失
-                if wb_formula is None:
-                    wb_formula = load_workbook(BytesIO(content), read_only=True, data_only=False)
-                    ws_formula = wb_formula[target] if target in wb_formula.sheetnames else None
-                if ws_formula is not None:
-                    # read_only 模式不能 ws.cell(r, c)，用 iter_rows 一次性扫公式
-                    if not hasattr(ws_formula, "_formula_cache"):
-                        fcache: dict[tuple[int, int], str] = {}
-                        for f_row_iter in ws_formula.iter_rows(min_row=1, max_row=rows, max_col=cols):
-                            for fc in f_row_iter:
-                                try:
-                                    if isinstance(fc.value, str) and fc.value.startswith("="):
-                                        fcache[(fc.row, fc.column)] = fc.value
-                                except AttributeError:
-                                    continue
-                        ws_formula._formula_cache = fcache  # type: ignore[attr-defined]
-                    raw = ws_formula._formula_cache.get((row_num, col_num))  # type: ignore[attr-defined]
-                    if raw:
-                        cells[key] = {"v": "", "f": raw}
-                        has_unresolved_formula = True
-                continue
-            cells[key] = {"v": v if isinstance(v, (int, float)) else str(v)}
-    merges = []
-    for mr in (ws.merged_cells.ranges if hasattr(ws, "merged_cells") else []):
-        merges.append({"r1": mr.min_row - 1, "c1": mr.min_col - 1, "r2": mr.max_row - 1, "c2": mr.max_col - 1})
-    all_sheets = list(wb.sheetnames)
-    wb.close()
-    if wb_formula is not None:
-        wb_formula.close()
-    return {
-        "sheet_name": target,
-        "all_sheets": all_sheets,
-        "rows": rows,
-        "cols": cols,
-        "cells": cells,
-        "merges": merges,
-        "has_unresolved_formula": has_unresolved_formula,
-    }
-
-
-def _sync_extract_cell_range(content: bytes, sheet_name: str | None, r1: int, c1: int, r2: int, c2: int, max_cells: int = 500) -> dict:
-    """同步函数：按 cell_range 提取单元格值清单（run_in_executor 调用）
-
-    公式还原策略：data_only=True 读 cache + data_only=False 探公式字符串。
-    注意 openpyxl read_only 模式下 ws.cell(r, c) 不能随机访问，必须 iter_rows 顺序读取。
-    """
-    from io import BytesIO
-    from openpyxl import load_workbook
-
-    # 第一份：data_only=True 读 cache（用 iter_rows，read_only 模式 ws.cell 不可随机）
-    wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
-    target = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
-    if not target:
-        wb.close()
-        return {"error": "工作簿无 sheet"}
-    ws = wb[target]
-    cache_map: dict[tuple[int, int], Any] = {}
-    for row_iter in ws.iter_rows(min_row=r1, max_row=r2, min_col=c1, max_col=c2):
-        for cell in row_iter:
-            # read_only 模式下边界外为 EmptyCell（无 row/column 属性），跳过
-            try:
-                cache_map[(cell.row, cell.column)] = cell.value
-            except AttributeError:
-                continue
-    wb.close()
-
-    # 第二份：data_only=False 读公式字符串
-    formula_map: dict[tuple[int, int], str] = {}
-    has_unresolved_formula = False
-    expected_count = (r2 - r1 + 1) * (c2 - c1 + 1)
-    if any(v is None for v in cache_map.values()) or len(cache_map) < expected_count:
-        wb_f = load_workbook(BytesIO(content), read_only=True, data_only=False)
-        if target in wb_f.sheetnames:
-            ws_f = wb_f[target]
-            for row_iter in ws_f.iter_rows(min_row=r1, max_row=r2, min_col=c1, max_col=c2):
-                for cell in row_iter:
-                    try:
-                        if isinstance(cell.value, str) and cell.value.startswith("="):
-                            formula_map[(cell.row, cell.column)] = cell.value
-                            if cache_map.get((cell.row, cell.column)) is None:
-                                has_unresolved_formula = True
-                    except AttributeError:
-                        continue
-        wb_f.close()
-
-    out_rows: list[dict] = []
-    idx = 0
-    for r in range(r1, r2 + 1):
-        for c in range(c1, c2 + 1):
-            idx += 1
-            if idx > max_cells:
-                break
-            col_letters = ""
-            cc = c
-            while cc > 0:
-                cc, rem = divmod(cc - 1, 26)
-                col_letters = chr(65 + rem) + col_letters
-            cell_ref = f"{col_letters}{r}"
-            v = cache_map.get((r, c))
-            f_str = formula_map.get((r, c))
-            if v is None:
-                val_str: str | int | float = ""
-            elif isinstance(v, (int, float)):
-                val_str = v
-            else:
-                val_str = str(v)
-            row_obj: dict = {"cell_ref": cell_ref, "value": val_str}
-            if f_str:
-                row_obj["formula"] = f_str
-            out_rows.append(row_obj)
-        if idx >= max_cells:
-            break
-    return {
-        "rows": out_rows,
-        "sheet_name": target,
-        "has_unresolved_formula": has_unresolved_formula,
-    }
-
-
-_LIBREOFFICE_PATHS = (
-    "libreoffice", "soffice",
-    r"C:\Program Files\LibreOffice\program\soffice.exe",
-    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-    "/usr/bin/libreoffice",
-    "/usr/bin/soffice",
-    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-)
-
-
-def _find_soffice() -> str | None:
-    """检测 LibreOffice 可执行路径（4 路径 fallback，与 archive_pdf_generators 对齐）"""
-    import shutil as _shutil
-    for cmd in _LIBREOFFICE_PATHS:
-        path = _shutil.which(cmd) if not Path(cmd).is_absolute() else (cmd if Path(cmd).exists() else None)
-        if path:
-            return path
-    return None
-
-
-def _sync_recompute_xlsx_with_libreoffice(xlsx_path: Path) -> bool:
-    """用 LibreOffice headless 重算 xlsx 公式 + 回写缓存（覆盖原文件）
-
-    仅在 _sync_extract_cell_range 返回 has_unresolved_formula=True 时按需触发。
-    成功返回 True，LibreOffice 不可用 / 转换失败返回 False。
-    Windows 用户文件锁场景：通过 --convert-to xlsx --outdir 转换到临时目录再 copy 覆盖避免。
-    """
-    import subprocess
-    import tempfile
-    import shutil as _shutil
-
-    soffice = _find_soffice()
-    if soffice is None:
-        logger.warning("LibreOffice 未找到，公式无法重算（请装 LibreOffice 或在 PATH 中加 soffice）")
-        return False
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            # --calc 强制用 Calc 打开（默认会用 Writer 打开 xlsx 失败）
-            # --convert-to xlsx 触发重算 + 回写 cache
-            result = subprocess.run(
-                [soffice, "--headless", "--calc", "--convert-to", "xlsx", "--outdir", str(tmpdir_path), str(xlsx_path)],
-                capture_output=True,
-                timeout=60,
-            )
-            if result.returncode != 0:
-                logger.warning("LibreOffice 转换失败 rc=%d stderr=%s", result.returncode, result.stderr[:200])
-                return False
-            converted = tmpdir_path / f"{xlsx_path.stem}.xlsx"
-            if not converted.exists():
-                logger.warning("LibreOffice 转换后文件不存在: %s", converted)
-                return False
-            _shutil.copy(converted, xlsx_path)
-            return True
-    except Exception as e:
-        logger.warning("LibreOffice 重算异常: %s", e)
-        return False
-
-
 @router.get("/wp-id-by-code")
 async def wp_id_by_code(
     project_id: str = Query(..., description="项目 ID"),
@@ -967,69 +865,6 @@ async def wp_id_by_code(
     return {"wp_id": str(row[0]), "wp_code": wp_code, "project_id": project_id}
 
 
-def _try_render_preview_from_snapshot(parsed_data: dict, sheet_name: str | None) -> dict | None:
-    """从 parsed_data['univer_snapshot'] 直接渲染 picker 预览（零计算）
-
-    返回 {sheet_name, all_sheets, rows, cols, cells, merges} 或 None（snapshot 不可用降级 xlsx）
-    """
-    if not isinstance(parsed_data, dict):
-        return None
-    snapshot = parsed_data.get("univer_snapshot")
-    if not isinstance(snapshot, dict):
-        return None
-    sheets_map = snapshot.get("sheets") or {}
-    if not sheets_map:
-        return None
-    order = snapshot.get("sheet_order_names") or list(sheets_map.keys())
-    target = sheet_name if sheet_name and sheet_name in sheets_map else (order[0] if order else None)
-    if not target:
-        return None
-    sheet_obj = sheets_map.get(target) or {}
-    cell_data = sheet_obj.get("cellData") or {}
-    if not isinstance(cell_data, dict):
-        return None
-    # 转为 picker 期望的 {(r,c): {v, f}} 形式（0-indexed key 'r,c'），同时算 rows/cols 边界
-    cells: dict[str, dict] = {}
-    max_r = 0
-    max_c = 0
-    for r_str, row in cell_data.items():
-        try:
-            r = int(r_str)
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(row, dict):
-            continue
-        for c_str, cell in row.items():
-            try:
-                c = int(c_str)
-            except (TypeError, ValueError):
-                continue
-            if not isinstance(cell, dict):
-                continue
-            obj: dict = {}
-            v = cell.get("v")
-            if v is not None and v != "":
-                obj["v"] = v if isinstance(v, (int, float)) else str(v)
-            else:
-                obj["v"] = ""
-            if cell.get("f"):
-                obj["f"] = str(cell["f"])
-            if obj.get("v") != "" or obj.get("f"):
-                cells[f"{r},{c}"] = obj
-                if r > max_r:
-                    max_r = r
-                if c > max_c:
-                    max_c = c
-    return {
-        "sheet_name": target,
-        "all_sheets": order,
-        "rows": min(max_r + 1, 100) or 30,
-        "cols": min(max_c + 1, 30) or 10,
-        "cells": cells,
-        "merges": [],  # snapshot 暂不存合并信息（未来可加 mergeData 字段）
-    }
-
-
 @router.get("/wp-sheet-preview")
 async def wp_sheet_preview(
     project_id: str = Query(..., description="项目 ID"),
@@ -1038,11 +873,11 @@ async def wp_sheet_preview(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """高级查询 sheet 选区器专用端点：返回 cellData 用于网格预览。
+    """高级查询 sheet 选区器专用端点：返回 cellData 用于网格预览（只读，R4.4）。
 
     数据源优先级：
       1. `working_paper.parsed_data['univer_snapshot']` — 用户保存底稿时已落库（首选，零计算）
-      2. storage xlsx → openpyxl 解析（首次未保存的模板）
+      2. storage xlsx → openpyxl 解析缓存值；没有文件返回 `available: false`，不从模板生成
     """
     try:
         proj_uuid = uuid.UUID(project_id)
@@ -1051,8 +886,8 @@ async def wp_sheet_preview(
 
     # ─── 认证 + 归属校验（R1.1 / R1.2 / R1.4）─────────────────────────────
     # 本端点直接返回底稿单元格值（含公式），改造前无任何认证 —— 实测未认证直连
-    # 返回 200。更严重的是下方降级分支会调 `init_workpaper_from_template`
-    # **写文件**，即无认证端点触发副作用；故守卫必须在此、先于一切读写。
+    # 返回 200。改造前下方降级分支还会从模板生成文件（写 storage，AQ-23，任务 16 已改为只读）；
+    # 守卫仍须在此、先于一切读取。
     from app.services.custom_query.ownership_guard import ownership_guard
 
     await ownership_guard.assert_target_accessible(
@@ -1068,50 +903,10 @@ async def wp_sheet_preview(
     """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
     if not row:
         return {"available": False, "reason": "底稿在当前项目中不存在", "wp_code": wp_code}
-    wp_id = row[0]
+
+    # 2. 预览只读（R4.4）：snapshot 优先、其次 storage xlsx 缓存值；没有文件不从模板生成（fetchers/workpaper_cells）
     parsed_data = row[1] if isinstance(row[1], dict) else {}
-
-    # 2. 优先从 parsed_data['univer_snapshot'] 渲染
-    snap_view = _try_render_preview_from_snapshot(parsed_data, sheet_name)
-    if snap_view is not None:
-        return {
-            "available": True,
-            "wp_code": wp_code,
-            "wp_id": str(wp_id),
-            "source": "univer_snapshot",
-            **snap_view,
-        }
-
-    # 3. 降级 storage xlsx 解析（异步化）
-    from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
-    storage_path = get_workpaper_file(proj_uuid, wp_id)
-    if not storage_path:
-        # 从模板初始化
-        init_result = init_workpaper_from_template(proj_uuid, wp_id, wp_code)
-        if not init_result:
-            return {"available": False, "reason": f"模板文件不存在: {wp_code}", "wp_code": wp_code}
-        storage_path = init_result
-
-    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
-        return {"available": False, "reason": "非 xlsx 类底稿", "wp_code": wp_code}
-
-    # 3. openpyxl 解析（异步化：放线程池避免阻塞 event loop）
-    try:
-        content = storage_path.read_bytes()
-        loop = asyncio.get_running_loop()
-        parsed = await loop.run_in_executor(None, _sync_parse_sheet_preview, content, sheet_name)
-        if "error" in parsed:
-            return {"available": False, "reason": parsed["error"], "wp_code": wp_code}
-        return {
-            "available": True,
-            "wp_code": wp_code,
-            "wp_id": str(wp_id),
-            "source": "xlsx_cache",
-            **parsed,
-        }
-    except Exception as e:
-        logger.warning("wp-sheet-preview parse failed for %s: %s", wp_code, e)
-        return {"available": False, "reason": f"解析失败: {e}", "wp_code": wp_code}
+    return await render_sheet_preview(proj_uuid, row[0], wp_code, parsed_data, sheet_name)
 
 
 @router.post("/execute")
@@ -1140,10 +935,7 @@ async def execute_query(
         response.headers["X-Index-Status"] = "building"
 
     from app.services.custom_query.audit_helper import record_query_rejected
-    from app.services.custom_query.business_fetchers import (
-        business_fetcher,
-        fetch_cap_warning,
-    )
+    from app.services.custom_query.business_fetchers import business_fetcher
     from app.services.custom_query.execute_compatibility import (
         ExecuteCompatibilityAdapter,
     )
@@ -1153,7 +945,8 @@ async def execute_query(
     year = body.year
     filters = body.filters
 
-    adapter = ExecuteCompatibilityAdapter(business_fetcher=business_fetcher)
+    # 当前用户绑进取数钩子：试算表 / 调整分录 / 附注按其循环范围过滤（R3.8）；模板执行也经本函数
+    adapter = ExecuteCompatibilityAdapter(business_fetcher=partial(business_fetcher, user=current_user))
     try:
         result = await adapter.execute(body, user=current_user, db=db)
     except HTTPException as http_exc:
@@ -1196,12 +989,8 @@ async def execute_query(
     if result.get("cache_hit"):
         response.headers["X-Cache"] = "HIT"
 
-    # 触达取数硬上限 → 明示 total 与后续分页可能不完整（R4.8）
-    cap_warning = fetch_cap_warning(len(result.get("rows") or []))
-    if cap_warning:
-        warnings = result.setdefault("warnings", [])
-        if isinstance(warnings, list):
-            warnings.append(cap_warning)
+    # 原「触达取数硬上限」warning 已删（advanced-query-linkage-closure 任务 7）：它拿本页行数比 5,000，
+    # 永不触发；现在 SQL 源的 total 来自数据库 COUNT，内存源超过上限直接 400，不再返回截断结果。
 
     # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
     # 查询执行按 60s 窗口节流为 1 条（advanced-query-module R14.4，audit_helper 单点接线）
@@ -1233,876 +1022,41 @@ async def execute_query(
     return result
 
 
-def _effective_limit(limit: int | None) -> int:
-    """取数器 SQL 实际使用的 LIMIT 值。
+class QueryExportRequest(QueryRequest):
+    """「导出全部」请求（advanced-query-linkage-closure R8.1）：查询同 execute（``limit`` / ``offset`` 不参与导出），另带
+    界面所见列名 ``headers``（键为列键；标签真源是前端 queryColumnLabels）与下载文件名。"""
 
-    ``limit=None`` 表示**调用方不施加展示截断**（R4.8）：编排器要在取数之后才做
-    排序与切片，若取数层已按展示 ``limit`` 截断，``total`` 就恒等于截断行数、
-    前端无法判断是否还有下一页。
+    headers: dict[str, str] = Field(default_factory=dict, max_length=200)
+    file_name: str | None = Field(default=None, max_length=200)
 
-    但 SQL 仍必须有硬上限 —— ``tb_ledger`` 实测约 697 万行，``LIMIT NULL``
-    一次查询即打满内存与连接。故 None 归一为 :data:`FETCH_HARD_CAP`，
-    ``total`` 在该上限内真实、触达上限时由 ``fetch_cap_warning`` 明示可能不完整。
+
+@router.post("/export")
+async def export_query(
+    body: QueryExportRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务视图「导出全部」：按当前查询（条件、列、排序）服务端流式导出全量结果（R8，ADR-AQL-14，design §3.5）。
+
+    项目归属在本函数体内直接校验（端点鉴权基线按函数体识别项目级判定，第 4 轮评审 #5）；解析校验与 execute 相同，分组 400、
+    导出闸 429、COUNT 预检 400、首块预取与审计在 ``services/custom_query/query_export``。
     """
-    if limit is None:
-        return FETCH_HARD_CAP
-    try:
-        value = int(limit)
-    except (TypeError, ValueError):
-        return FETCH_HARD_CAP
-    return max(1, min(value, FETCH_HARD_CAP))
+    from app.services.custom_query.ownership_guard import ownership_guard
+    from app.services.custom_query.query_export import export_business_query
+
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=body.project_id, db=db)
+    return await export_business_query(body, user=current_user, db=db)
 
 
-async def _legacy_business_fetcher(
-    req, resolved, db
-) -> tuple[list[dict], list]:
+async def _legacy_business_fetcher(req, resolved, db):
     """编排器 ``business_fetcher`` 的 router 侧入口（R3.7 / R4.8）。
 
-    存在于 router 模块是为了让取数器 monkeypatch 与分派在同一命名空间生效；
-    实现委托 ``services.custom_query.business_fetchers.business_fetcher``，
-    不构成第二条分派路径。
+    实现委托 ``services.custom_query.business_fetchers.business_fetcher``，不构成第二条分派路径；返回
+    ``FetchPage``（注册表 SQL 源 / JSON 内存源；跨模块单元格源键已随任务 34 删除，按未知数据源 400）。
     """
     from app.services.custom_query.business_fetchers import business_fetcher
 
     return await business_fetcher(req, resolved, db)
-
-
-async def _query_report(db, pid, year, filters, limit):
-    """报表数据查询：双源策略
-
-    模板源（report_config）：永远有数据，提供报表结构（行次/行名/缩进/总计标识/公式描述）
-    项目源（report_snapshot.data JSONB）：项目实际生成的报表金额（按 report_type/year 索引）
-    返回：模板结构 + JOIN 项目金额（无项目时金额为 None，模板浏览模式可用）
-    """
-    report_type = filters.get("report_type", "balance_sheet")
-    # standard 优先级：filters.standard > 项目 template_type + report_scope > soe_standalone
-    standard = filters.get("standard")
-    if not standard:
-        template_type = await _resolve_project_template_type(db, pid)
-        scope = await _resolve_project_report_scope(db, pid)
-        if template_type == "soe":
-            standard = "soe_standalone"
-        else:
-            standard = f"listed_{scope or 'standalone'}"
-
-    # 1) 模板结构（无项目时也可查）
-    structure_sql = """
-        SELECT row_code, row_name, indent_level, is_total_row, formula, formula_description
-        FROM report_config
-        WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false
-        ORDER BY row_number
-        LIMIT :lim
-    """
-    result = await db.execute(text(structure_sql), {"rt": report_type, "std": standard, "lim": _effective_limit(limit)})
-    structure_rows = result.fetchall()
-
-    # 2) 项目金额（report_snapshot.data JSONB），仅传 pid + year 时可用
-    amount_map: dict[str, dict] = {}
-    source_marker = "template_only"
-    if pid and year:
-        try:
-            snap_row = (await db.execute(text("""
-                SELECT data FROM report_snapshot
-                WHERE project_id = :pid AND year = :y AND report_type = :rt
-                ORDER BY generated_at DESC
-                LIMIT 1
-            """), {"pid": pid, "y": year, "rt": report_type})).first()
-            if snap_row and isinstance(snap_row[0], dict):
-                # report_snapshot.data 通常是 {rows: [{row_code, current_period_amount, prior_period_amount, ...}]}
-                data = snap_row[0]
-                rows_arr = data.get("rows") if isinstance(data, dict) else None
-                if isinstance(rows_arr, list):
-                    for item in rows_arr:
-                        if isinstance(item, dict) and item.get("row_code"):
-                            amount_map[str(item["row_code"])] = item
-                    source_marker = "project_snapshot"
-        except Exception as e:
-            logger.debug("report_snapshot 读取失败 pid=%s year=%s: %s", pid, year, e)
-
-    # 3) 合并模板结构 + 项目金额
-    rows = []
-    for r in structure_rows:
-        row_code = r[0]
-        amt = amount_map.get(str(row_code), {})
-        rows.append({
-            "row_code": row_code,
-            "row_name": r[1],
-            "current_period_amount": amt.get("current_period_amount"),
-            "prior_period_amount": amt.get("prior_period_amount"),
-            "indent": r[2],
-            "is_total": r[3],
-            "formula": r[4],
-            "formula_description": r[5],
-        })
-    return {
-        "rows": rows,
-        "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount", "indent", "is_total"],
-        "total": len(rows),
-        "applicable_standard": standard,
-        "source": source_marker,
-    }
-
-
-async def _query_trial_balance(db, pid, year, filters, limit):
-    # 真实列（audit_platform_models.TrialBalance）：standard_account_code / account_name /
-    # unadjusted_amount / aje_adjustment / audited_amount / opening_balance。
-    # 旧实现误查 account_code/closing_balance/debit_amount/credit_amount 四个不存在的列，
-    # 导致"试算表明细"与合并单位树 tb_detail 叶子点击 100% 抛 UndefinedColumn 被吞成 error。
-    query = (
-        "SELECT standard_account_code, account_name, opening_balance, "
-        "unadjusted_amount, aje_adjustment, audited_amount "
-        "FROM trial_balance WHERE project_id = :pid AND year = :y"
-    )
-    params: dict = {"pid": pid, "y": year, "lim": _effective_limit(limit)}
-    if filters.get("account_name"):
-        query += " AND account_name LIKE :an"
-        params["an"] = f"%{filters['account_name']}%"
-    if filters.get("company_code"):
-        query += " AND company_code = :cc"
-        params["cc"] = filters["company_code"]
-    query += " ORDER BY standard_account_code LIMIT :lim"
-    result = await db.execute(text(query), params)
-    rows = [
-        {
-            "standard_account_code": r[0],
-            "account_name": r[1],
-            "opening_balance": float(r[2]) if r[2] is not None else None,
-            "unadjusted_amount": float(r[3]) if r[3] is not None else None,
-            "aje_adjustment": float(r[4]) if r[4] is not None else None,
-            "audited_amount": float(r[5]) if r[5] is not None else None,
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": [
-            "standard_account_code", "account_name", "opening_balance",
-            "unadjusted_amount", "aje_adjustment", "audited_amount",
-        ],
-        "total": len(rows),
-    }
-
-
-async def _query_tb_summary(db, pid, year, filters, limit):
-    sheet_type = filters.get("report_type", "balance_sheet")
-    result = await db.execute(
-        text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
-        {"pid": pid, "y": year, "sk": f"tb_summary_{sheet_type}"},
-    )
-    row = result.fetchone()
-    if row and isinstance(row[0], dict):
-        rows = row[0].get("rows", [])[:limit]
-        return {"rows": rows, "columns": ["row_code", "row_name", "unadjusted", "aje_dr", "aje_cr", "rcl_dr", "rcl_cr", "audited"], "total": len(rows)}
-    return {"rows": [], "columns": [], "total": 0}
-
-
-def _flatten_disclosure_note_rows(
-    note_section: str,
-    section_title: str,
-    source_template: str | None,
-    table_data: Any,
-    *,
-    max_rows_per_section: int = 100,
-) -> tuple[list[dict], list[str]]:
-    """把 ``disclosure_notes.table_data`` 展平为查询行（多表走 ``_tables``）。
-
-    表头缺失（legacy ``headers=[]``）时经 ``note_header_projector`` 读时派生
-    （模板优先 → 语义兜底），与附注模块/Word 导出同口径。
-    行支持两种形态：``{label, values:[...]}``（当前）与 ``[...]``（旧扁平）。
-    """
-    from app.services.note_header_projector import derive_headers_for_legacy_table
-
-    if not isinstance(table_data, dict):
-        return [], []
-
-    tables = table_data.get("_tables")
-    if isinstance(tables, list) and tables:
-        pairs = [(i, t) for i, t in enumerate(tables) if isinstance(t, dict)]
-    else:
-        pairs = [(0, table_data)]
-
-    out: list[dict] = []
-    columns: list[str] = []
-    for t_idx, tbl in pairs:
-        rows = tbl.get("rows")
-        if not isinstance(rows, list) or not rows:
-            continue
-        headers = tbl.get("headers")
-        if not (isinstance(headers, list) and headers):
-            headers = derive_headers_for_legacy_table(
-                tbl,
-                section_number=note_section,
-                source_template=source_template,
-                table_index=t_idx,
-            ) or []
-        headers = [str(h or "") for h in headers]
-        if not columns and headers:
-            columns = ["note_section", "section_title", "table_name"] + headers
-        table_name = str(tbl.get("name") or "")
-        for row in rows[:max_rows_per_section]:
-            if isinstance(row, dict):
-                cells = [row.get("label", "")] + list(row.get("values") or [])
-            elif isinstance(row, list):
-                cells = list(row)
-            else:
-                continue
-            obj: dict = {
-                "note_section": note_section,
-                "section_title": section_title,
-                "table_name": table_name,
-            }
-            for hi, h in enumerate(headers):
-                if h:
-                    obj[h] = cells[hi] if hi < len(cells) else ""
-            out.append(obj)
-    return out, columns
-
-
-async def _query_disclosure(db, pid, year, filters, limit):
-    """附注数据查询。
-
-    无 node_key 的兼容查询优先读取单体 ``disclosure_notes``，再读取合并附注 legacy NULL 行。
-    节点查询不消费缺少节点身份的单体/legacy 数据，只返回精确 node_key 的合并附注行。
-    """
-    section_id = str(filters.get("section_id", "") or "").strip()
-    node_key = filters.get("node_key")
-
-    # ── 第 1 真源：单体附注 disclosure_notes ─────────────────────────────
-    # disclosure_notes 没有 node_key 列。节点级查询不得将项目级单体附注误当成合并节点数据。
-    if node_key is None:
-        try:
-            if section_id:
-                note_res = await db.execute(
-                    text(
-                        "SELECT note_section, section_title, source_template::text, table_data "
-                        "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
-                        "AND is_deleted = false AND note_section = :sid"
-                    ),
-                    {"pid": pid, "y": year, "sid": section_id},
-                )
-            else:
-                # 「有表」= 非空 JSON 对象（与附注章节读取 / Word 导出同口径）：生成链把 None 存成 JSON null，
-                # IS NOT NULL 对它恒真 ⇒ 纯文字章节占 LIMIT 名额却展平不出任何行（第 26 组）
-                note_res = await db.execute(
-                    text(
-                        "SELECT note_section, section_title, source_template::text, table_data "
-                        "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
-                        "AND is_deleted = false AND jsonb_typeof(table_data) = 'object' "
-                        "AND table_data::text <> '{}' "
-                        "ORDER BY sort_order NULLS LAST, note_section LIMIT :lim"
-                    ),
-                    {"pid": pid, "y": year, "lim": _effective_limit(limit)},
-                )
-            note_flat: list[dict] = []
-            note_cols: list[str] = []
-            for r in note_res.fetchall():
-                rows_part, cols_part = _flatten_disclosure_note_rows(
-                    r[0] or "", r[1] or "", r[2], r[3],
-                )
-                if cols_part and not note_cols:
-                    note_cols = cols_part
-                note_flat.extend(rows_part)
-            if note_flat:
-                return {
-                    "rows": note_flat[:limit],
-                    "columns": note_cols or ["note_section", "section_title", "table_name"],
-                    "total": len(note_flat),
-                }
-        except Exception as err:  # noqa: BLE001 - 缺表/无数据时继续合并附注兼容读取
-            logger.warning("query disclosure_notes failed, fallback to consol: %s", err)
-
-    # ── 第 2 真源（回退）：合并附注 consol_note_data ─────────────────────
-    # 使用 ORM UUID 类型匹配，避免 SQLite/PG UUID 参数格式差异；稳定按主键排序。
-    from app.models.consol_note_data_models import ConsolNoteData
-
-    try:
-        from uuid import UUID
-        project_uuid = pid if isinstance(pid, UUID) else UUID(str(pid))
-    except (ValueError, TypeError, AttributeError):
-        return {"rows": [], "columns": ["section_id"], "total": 0}
-
-    stmt = select(ConsolNoteData.section_id, ConsolNoteData.data).where(
-        ConsolNoteData.project_id == project_uuid,
-        ConsolNoteData.year == year,
-    )
-    if section_id:
-        stmt = stmt.where(ConsolNoteData.section_id == section_id)
-    # 节点请求精确匹配；旧请求只读 legacy NULL，绝不混入其它节点行。
-    if node_key is None:
-        stmt = stmt.where(ConsolNoteData.node_key.is_(None))
-    else:
-        stmt = stmt.where(ConsolNoteData.node_key == node_key)
-    stmt = stmt.order_by(ConsolNoteData.id).limit(_effective_limit(limit))
-    result = await db.execute(stmt)
-
-    # 将附注数据展平为表格行（每个章节的每行数据变成一条记录）
-    flat_rows = []
-    all_headers: list[str] = []
-    for r in result.fetchall():
-        data = r[1] if isinstance(r[1], dict) else {}
-        headers = data.get("headers", [])
-        rows = data.get("rows", [])
-        if headers and not all_headers:
-            all_headers = ["section_id"] + headers
-        for row_data in rows[:100]:  # 每章节最多100行
-            obj: dict = {"section_id": r[0]}
-            for hi, h in enumerate(headers):
-                obj[h] = row_data[hi] if hi < len(row_data) else ''
-            flat_rows.append(obj)
-    columns = all_headers if all_headers else ["section_id"]
-    return {"rows": flat_rows[:limit], "columns": columns, "total": len(flat_rows)}
-
-
-async def _query_adjustments(db, pid, year, filters, limit):
-    # 真实列（audit_platform_models.Adjustment）：adjustment_no（非 entry_number）/
-    # review_status（非 status）。account_name/debit_amount/credit_amount 确实存在（单行式分录）。
-    adj_type = filters.get("adjustment_type", "AJE")
-    result = await db.execute(
-        text(
-            "SELECT adjustment_no, account_name, debit_amount, credit_amount, "
-            "description, review_status::text "
-            "FROM adjustments WHERE project_id = :pid AND year = :y "
-            "AND adjustment_type = :at AND is_deleted = false "
-            "ORDER BY adjustment_no LIMIT :lim"
-        ),
-        {"pid": pid, "y": year, "at": adj_type, "lim": _effective_limit(limit)},
-    )
-    rows = [
-        {
-            "adjustment_no": r[0],
-            "account_name": r[1],
-            "debit_amount": float(r[2]) if r[2] is not None else None,
-            "credit_amount": float(r[3]) if r[3] is not None else None,
-            "description": r[4],
-            "review_status": r[5],
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": [
-            "adjustment_no", "account_name", "debit_amount",
-            "credit_amount", "description", "review_status",
-        ],
-        "total": len(rows),
-    }
-
-
-async def _query_worksheet(db, pid, year, filters, limit):
-    sheet_key = filters.get("sheet_key", "info")
-    result = await db.execute(
-        text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
-        {"pid": pid, "y": year, "sk": sheet_key},
-    )
-    row = result.fetchone()
-    if row and isinstance(row[0], dict):
-        data = row[0]
-        rows = data.get("rows", [])[:limit]
-        columns = list(rows[0].keys()) if rows else []
-        return {"rows": rows, "columns": columns, "total": len(rows), "updated_at": str(row[1]) if row[1] else None}
-    return {"rows": [], "columns": [], "total": 0}
-
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# Sprint 6 Task 6.4 — 新增 5 个数据源查询函数
-# ──────────────────────────────────────────────────────────────────────────
-
-
-async def _query_workpaper(db, pid, year, filters, limit):
-    """底稿列表（working_paper + wp_index）— working_paper 无 year 字段，year 仅用于过滤兼容
-
-    特殊路径：当 filters 含 wp_code + cell_range 时，
-    走「单元格区域提取」分支：解析模板 xlsx 的指定 sheet，按 cell_range 提取真实单元格值返回（用于高级查询 sheet 选区器）
-    """
-    # 单元格区域提取分支（高级查询 sheet picker 专用）
-    if filters.get("wp_code") and filters.get("cell_range"):
-        return await _query_workpaper_cell_range(db, pid, filters)
-
-    sql = """
-        SELECT wi.wp_code, wi.wp_name, wi.audit_cycle, wp.status, wp.review_status,
-               wp.assigned_to, wp.created_at, wp.updated_at
-        FROM working_paper wp
-        LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
-        WHERE wp.project_id = :pid AND wp.is_deleted = false
-    """
-    params: dict = {"pid": pid, "lim": _effective_limit(limit)}
-    if filters.get("status"):
-        sql += " AND wp.status = :st"
-        params["st"] = filters["status"]
-    if filters.get("review_status"):
-        sql += " AND wp.review_status = :rs"
-        params["rs"] = filters["review_status"]
-    if filters.get("cycle"):
-        sql += " AND wi.audit_cycle = :cy"
-        params["cy"] = filters["cycle"]
-    if filters.get("wp_code"):
-        # 支持精确单底稿查询（树叶子点击）+ 同 cycle 下子表前缀模糊（wp_code='E1' 时也带出 E1-1/E1-2）
-        sql += " AND (wi.wp_code = :wpc OR wi.wp_code LIKE :wpc_like)"
-        params["wpc"] = filters["wp_code"]
-        params["wpc_like"] = f"{filters['wp_code']}-%"
-    sql += " ORDER BY wi.wp_code LIMIT :lim"
-    result = await db.execute(text(sql), params)
-    sheet_echo = filters.get("sheet_name")
-    rows = []
-    for r in result.fetchall():
-        row = {
-            "wp_code": r[0],
-            "wp_name": r[1],
-            "audit_cycle": r[2],
-            "status": r[3],
-            "review_status": r[4],
-            "assigned_to": str(r[5]) if r[5] else None,
-            "created_at": str(r[6]) if r[6] else None,
-            "updated_at": str(r[7]) if r[7] else None,
-        }
-        if sheet_echo:
-            row["sheet_name"] = sheet_echo
-        rows.append(row)
-    columns = ["wp_code", "wp_name", "audit_cycle", "status", "review_status", "assigned_to"]
-    if sheet_echo:
-        columns.append("sheet_name")
-    return {
-        "rows": rows,
-        "columns": columns,
-        "total": len(rows),
-    }
-
-
-async def _query_workpaper_cell_range(db, pid: str, filters: dict):
-    """按 cell_range 提取真实单元格值
-
-    数据源优先级（零计算路径优先）：
-      1. `working_paper.parsed_data['univer_snapshot']` — 用户保存底稿时已落库的 Univer 计算后值（首选，零计算）
-      2. storage xlsx 的 cache（data_only=True 读，模板从未保存过时为 None）
-      3. LibreOffice headless 重算（仅前两路径都拿不到值时按需触发，重算后回写 cache）
-
-    支持语法：'A1:C3' / 'B5' / 'A1:A10,C1:C5' / 'A:A' / 'A:C'
-    """
-    wp_code = filters["wp_code"]
-    sheet_name = filters.get("sheet_name")
-    cell_range = filters["cell_range"]
-
-    try:
-        proj_uuid = uuid.UUID(pid)
-    except (TypeError, ValueError):
-        return {"rows": [], "columns": [], "total": 0, "error": "invalid project_id"}
-
-    # 1. wp_code → wp_id + parsed_data 一次查询拿到
-    row = (await db.execute(text("""
-        SELECT w.id, w.parsed_data
-        FROM working_paper w
-        JOIN wp_index i ON w.wp_index_id = i.id
-        WHERE i.project_id = :pid AND i.wp_code = :wpc AND w.is_deleted = false
-        LIMIT 1
-    """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
-    if not row:
-        return {"rows": [], "columns": [], "total": 0, "error": f"底稿 {wp_code} 在当前项目不存在"}
-    wp_id = row[0]
-    parsed_data = row[1] if isinstance(row[1], dict) else {}
-
-    # 2. 解析 cell_range 多区域
-    ranges = _parse_cell_ranges(cell_range)
-    if not ranges:
-        return {"rows": [], "columns": [], "total": 0, "error": f"无效 cell_range: {cell_range}"}
-
-    # 3. 优先尝试 parsed_data['univer_snapshot']（零计算快路径）
-    snapshot_rows = _try_extract_from_univer_snapshot(parsed_data, sheet_name, ranges, wp_code)
-    if snapshot_rows is not None:
-        result_columns = ["index", "wp_code", "sheet_name", "cell_ref", "value"]
-        if any("formula" in r for r in snapshot_rows):
-            result_columns.append("formula")
-        return {
-            "rows": snapshot_rows,
-            "columns": result_columns,
-            "total": len(snapshot_rows),
-            "source": "univer_snapshot",
-        }
-
-    # Req 6: snapshot 缺失，记录监控指标后走 LibreOffice 兜底
-    from app.services.custom_query.metrics import inc_snapshot_missing
-    inc_snapshot_missing(wp_code)
-
-    # 4. 降级：storage xlsx 路径（含 LibreOffice 按需重算）
-    from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
-    storage_path = get_workpaper_file(proj_uuid, wp_id)
-    if not storage_path:
-        init_result = init_workpaper_from_template(proj_uuid, wp_id, wp_code)
-        if not init_result:
-            return {"rows": [], "columns": [], "total": 0, "error": f"模板文件不存在: {wp_code}"}
-        storage_path = init_result
-
-    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
-        return {"rows": [], "columns": [], "total": 0, "error": "非 xlsx 类底稿"}
-
-    try:
-        content = storage_path.read_bytes()
-        loop = asyncio.get_running_loop()
-        all_rows: list[dict] = []
-        used_sheet = ""
-        idx = 0
-        MAX_TOTAL = 500
-        any_unresolved = False
-        for (r1, c1, r2, c2) in ranges:
-            remaining = MAX_TOTAL - idx
-            if remaining <= 0:
-                break
-            parsed = await loop.run_in_executor(
-                None, _sync_extract_cell_range, content, sheet_name, r1, c1, r2, c2, remaining
-            )
-            if "error" in parsed:
-                return {"rows": [], "columns": [], "total": 0, "error": parsed["error"]}
-            used_sheet = parsed.get("sheet_name", used_sheet)
-            if parsed.get("has_unresolved_formula"):
-                any_unresolved = True
-            for cell_row in parsed["rows"]:
-                idx += 1
-                row_obj = {
-                    "index": idx,
-                    "wp_code": wp_code,
-                    "sheet_name": used_sheet,
-                    "cell_ref": cell_row["cell_ref"],
-                    "value": cell_row["value"],
-                }
-                if "formula" in cell_row:
-                    row_obj["formula"] = cell_row["formula"]
-                all_rows.append(row_obj)
-                if idx >= MAX_TOTAL:
-                    break
-
-        # 公式还原：检测到未求值公式 → 调 LibreOffice 重算后再读一次
-        recomputed = False
-        if any_unresolved:
-            ok = await loop.run_in_executor(None, _sync_recompute_xlsx_with_libreoffice, storage_path)
-            if ok:
-                recomputed = True
-                new_content = storage_path.read_bytes()
-                value_map: dict[str, Any] = {}
-                for (r1, c1, r2, c2) in ranges:
-                    parsed2 = await loop.run_in_executor(
-                        None, _sync_extract_cell_range, new_content, sheet_name, r1, c1, r2, c2, MAX_TOTAL
-                    )
-                    if "error" in parsed2:
-                        continue
-                    for cell_row in parsed2["rows"]:
-                        value_map[cell_row["cell_ref"]] = cell_row["value"]
-                for row_obj in all_rows:
-                    cref = row_obj.get("cell_ref")
-                    if cref and cref in value_map and row_obj.get("formula"):
-                        new_v = value_map[cref]
-                        if new_v != "":
-                            row_obj["value"] = new_v
-
-        result_columns = ["index", "wp_code", "sheet_name", "cell_ref", "value"]
-        if any(("formula" in r) for r in all_rows):
-            result_columns.append("formula")
-        return {
-            "rows": all_rows,
-            "columns": result_columns,
-            "total": len(all_rows),
-            "source": "xlsx_recomputed" if recomputed else "xlsx_cache",
-            "formula_recomputed": recomputed,
-        }
-    except Exception as e:
-        logger.warning("cell_range extract failed for %s/%s: %s", wp_code, cell_range, e)
-        return {"rows": [], "columns": [], "total": 0, "error": f"解析失败: {e}"}
-
-
-def _try_extract_from_univer_snapshot(parsed_data: dict, sheet_name: str | None, ranges: list, wp_code: str) -> list[dict] | None:
-    """从 working_paper.parsed_data['univer_snapshot'] 直接提取，零计算
-
-    返回 None 表示快路径不可用（无 snapshot 或 sheet 不存在），让上层走 xlsx fallback
-    """
-    if not isinstance(parsed_data, dict):
-        return None
-    snapshot = parsed_data.get("univer_snapshot")
-    if not isinstance(snapshot, dict):
-        return None
-    sheets_map = snapshot.get("sheets") or {}
-    if not sheets_map:
-        return None
-    # 选 sheet：优先精确匹配 sheet_name，否则取第一个（与 _sync_extract_cell_range 行为一致）
-    target_sheet_name = None
-    if sheet_name and sheet_name in sheets_map:
-        target_sheet_name = sheet_name
-    else:
-        order = snapshot.get("sheet_order_names") or list(sheets_map.keys())
-        target_sheet_name = order[0] if order else None
-    if not target_sheet_name:
-        return None
-    sheet_obj = sheets_map.get(target_sheet_name) or {}
-    cell_data = sheet_obj.get("cellData") or {}
-    if not isinstance(cell_data, dict):
-        return None
-    # snapshot 用 0-indexed (与 Univer 一致)，cell_range 解析后 ranges 是 1-indexed
-    out_rows: list[dict] = []
-    idx = 0
-    MAX_TOTAL = 500
-    for (r1, c1, r2, c2) in ranges:
-        for r in range(r1, r2 + 1):
-            for c in range(c1, c2 + 1):
-                idx += 1
-                if idx > MAX_TOTAL:
-                    break
-                # cell_ref
-                col_letters = ""
-                cc = c
-                while cc > 0:
-                    cc, rem = divmod(cc - 1, 26)
-                    col_letters = chr(65 + rem) + col_letters
-                cell_ref = f"{col_letters}{r}"
-                # 取值（snapshot 0-indexed: row=r-1, col=c-1）
-                row_obj = cell_data.get(str(r - 1)) or {}
-                cell = row_obj.get(str(c - 1)) if isinstance(row_obj, dict) else None
-                v = ""
-                f_str = ""
-                if isinstance(cell, dict):
-                    cv = cell.get("v")
-                    if cv is None or cv == "":
-                        v = ""
-                    elif isinstance(cv, (int, float)):
-                        v = cv
-                    else:
-                        v = str(cv)
-                    if cell.get("f"):
-                        f_str = str(cell["f"])
-                row_dict: dict = {
-                    "index": idx,
-                    "wp_code": wp_code,
-                    "sheet_name": target_sheet_name,
-                    "cell_ref": cell_ref,
-                    "value": v,
-                }
-                if f_str:
-                    row_dict["formula"] = f_str
-                out_rows.append(row_dict)
-            if idx >= MAX_TOTAL:
-                break
-        if idx >= MAX_TOTAL:
-            break
-    return out_rows
-
-
-def _parse_cell_ranges(spec: str) -> list[tuple[int, int, int, int]]:
-    """解析 cell_range 字符串为 (r1, c1, r2, c2) 元组列表（1-indexed）
-
-    支持：
-      - 'A1:C3'    → [(1, 1, 3, 3)]
-      - 'B5'       → [(5, 2, 5, 2)]
-      - 'A1:A10,C1:C5' → [(1, 1, 10, 1), (1, 3, 5, 3)]
-      - 'A:A'      → [(1, 1, 100, 1)]  整列限 100 行
-      - 'A:C'      → [(1, 1, 100, 3)]
-    """
-    import re as _re
-    INTEGER_COL_LIMIT = 100  # 整列默认行数上限
-
-    def _col_to_idx(s: str) -> int:
-        n = 0
-        for ch in s:
-            n = n * 26 + (ord(ch) - 64)
-        return n
-
-    out: list[tuple[int, int, int, int]] = []
-    for part in spec.split(","):
-        part = part.strip().upper()
-        if not part:
-            continue
-        # 单 cell 'B5'
-        m = _re.match(r"^([A-Z]+)(\d+)$", part)
-        if m:
-            col = _col_to_idx(m.group(1)); r = int(m.group(2))
-            out.append((r, col, r, col))
-            continue
-        # 整列 'A:A' / 'A:C'
-        m = _re.match(r"^([A-Z]+):([A-Z]+)$", part)
-        if m:
-            c1 = _col_to_idx(m.group(1)); c2 = _col_to_idx(m.group(2))
-            out.append((1, min(c1, c2), INTEGER_COL_LIMIT, max(c1, c2)))
-            continue
-        # 矩形 'A1:C3'
-        m = _re.match(r"^([A-Z]+)(\d+):([A-Z]+)(\d+)$", part)
-        if m:
-            c1 = _col_to_idx(m.group(1)); r1 = int(m.group(2))
-            c2 = _col_to_idx(m.group(3)); r2 = int(m.group(4))
-            out.append((min(r1, r2), min(c1, c2), max(r1, r2), max(c1, c2)))
-            continue
-    return out
-
-
-async def _query_account_balance(db, pid, year, filters, limit):
-    """科目余额表（tb_balance）— B' 视图架构按 is_deleted=false 过滤"""
-    sql = """
-        SELECT account_code, account_name, opening_balance, closing_balance,
-               debit_amount, credit_amount, currency_code
-        FROM tb_balance
-        WHERE project_id = :pid AND year = :y AND is_deleted = false
-    """
-    params: dict = {"pid": pid, "y": year, "lim": _effective_limit(limit)}
-    if filters.get("account_code"):
-        sql += " AND account_code LIKE :ac"
-        params["ac"] = f"{filters['account_code']}%"
-    if filters.get("account_name"):
-        sql += " AND account_name LIKE :an"
-        params["an"] = f"%{filters['account_name']}%"
-    if filters.get("company_code"):
-        sql += " AND company_code = :cc"
-        params["cc"] = filters["company_code"]
-    sql += " ORDER BY account_code LIMIT :lim"
-    result = await db.execute(text(sql), params)
-    rows = [
-        {
-            "account_code": r[0],
-            "account_name": r[1],
-            "opening_balance": float(r[2]) if r[2] is not None else None,
-            "closing_balance": float(r[3]) if r[3] is not None else None,
-            "debit_amount": float(r[4]) if r[4] is not None else None,
-            "credit_amount": float(r[5]) if r[5] is not None else None,
-            "currency_code": r[6],
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount", "currency_code"],
-        "total": len(rows),
-    }
-
-
-async def _query_ledger_entries(db, pid, year, filters, limit):
-    """序时账（tb_ledger）"""
-    sql = """
-        SELECT voucher_date, voucher_no, account_code, account_name,
-               debit_amount, credit_amount, summary
-        FROM tb_ledger
-        WHERE project_id = :pid AND year = :y AND is_deleted = false
-    """
-    params: dict = {"pid": pid, "y": year, "lim": _effective_limit(limit)}
-    if filters.get("account_code"):
-        sql += " AND account_code LIKE :ac"
-        params["ac"] = f"{filters['account_code']}%"
-    if filters.get("voucher_no"):
-        sql += " AND voucher_no LIKE :vn"
-        params["vn"] = f"%{filters['voucher_no']}%"
-    if filters.get("summary"):
-        sql += " AND summary LIKE :sm"
-        params["sm"] = f"%{filters['summary']}%"
-    if filters.get("date_from"):
-        sql += " AND voucher_date >= :df"
-        params["df"] = filters["date_from"]
-    if filters.get("date_to"):
-        sql += " AND voucher_date <= :dt"
-        params["dt"] = filters["date_to"]
-    sql += " ORDER BY voucher_date DESC, voucher_no LIMIT :lim"
-    result = await db.execute(text(sql), params)
-    rows = [
-        {
-            "voucher_date": str(r[0]) if r[0] else None,
-            "voucher_no": r[1],
-            "account_code": r[2],
-            "account_name": r[3],
-            "debit_amount": float(r[4]) if r[4] is not None else None,
-            "credit_amount": float(r[5]) if r[5] is not None else None,
-            "summary": r[6],
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"],
-        "total": len(rows),
-    }
-
-
-async def _query_report_lines(db, pid, year, filters, limit):
-    """报表行次配置（report_config）"""
-    sql = """
-        SELECT row_code, row_name, report_type, applicable_standard,
-               indent_level, is_total_row, formula, sort_order
-        FROM report_config
-        WHERE is_deleted = false
-    """
-    params: dict = {"lim": _effective_limit(limit)}
-    if filters.get("report_type"):
-        sql += " AND report_type = :rt"
-        params["rt"] = filters["report_type"]
-    if filters.get("applicable_standard"):
-        sql += " AND applicable_standard = :std"
-        params["std"] = filters["applicable_standard"]
-    if filters.get("has_formula") is True:
-        sql += " AND formula IS NOT NULL AND formula != ''"
-    elif filters.get("has_formula") is False:
-        sql += " AND (formula IS NULL OR formula = '')"
-    if filters.get("row_name"):
-        sql += " AND row_name LIKE :rn"
-        params["rn"] = f"%{filters['row_name']}%"
-    sql += " ORDER BY applicable_standard, report_type, sort_order LIMIT :lim"
-    result = await db.execute(text(sql), params)
-    rows = [
-        {
-            "row_code": r[0],
-            "row_name": r[1],
-            "report_type": r[2],
-            "applicable_standard": r[3],
-            "indent_level": r[4],
-            "is_total_row": r[5],
-            "formula": r[6],
-            "sort_order": r[7],
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula", "sort_order"],
-        "total": len(rows),
-    }
-
-
-async def _query_workhours(db, pid, year, filters, limit):
-    """工时记录（work_hours）"""
-    sql = """
-        SELECT work_date, hours, description, status, staff_id, project_id, created_at
-        FROM work_hours
-        WHERE is_deleted = false
-    """
-    params: dict = {"lim": _effective_limit(limit)}
-    # 可选项目过滤（pid 可能为空字符串）
-    if pid:
-        sql += " AND project_id = :pid"
-        params["pid"] = pid
-    if year:
-        sql += " AND EXTRACT(YEAR FROM work_date) = :y"
-        params["y"] = year
-    if filters.get("staff_id"):
-        sql += " AND staff_id = :sid"
-        params["sid"] = filters["staff_id"]
-    if filters.get("status"):
-        sql += " AND status = :st"
-        params["st"] = filters["status"]
-    if filters.get("date_from"):
-        sql += " AND work_date >= :df"
-        params["df"] = filters["date_from"]
-    if filters.get("date_to"):
-        sql += " AND work_date <= :dt"
-        params["dt"] = filters["date_to"]
-    sql += " ORDER BY work_date DESC LIMIT :lim"
-    result = await db.execute(text(sql), params)
-    rows = [
-        {
-            "work_date": str(r[0]) if r[0] else None,
-            "hours": float(r[1]) if r[1] is not None else 0,
-            "description": r[2],
-            "status": r[3],
-            "staff_id": str(r[4]) if r[4] else None,
-            "project_id": str(r[5]) if r[5] else None,
-            "created_at": str(r[6]) if r[6] else None,
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": ["work_date", "hours", "description", "status", "staff_id"],
-        "total": len(rows),
-    }
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -2114,7 +1068,7 @@ class TemplateCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     data_source: str = Field(..., min_length=1, max_length=50)
-    config: dict
+    config: TemplateConfig
     # legacy `global` / `personal` 仍接受为输入，输出恒为 canonical（R8.1）
     scope: Literal["private", "team", "project", "public", "global", "personal"] = "private"
     shared_project_ids: list[str] = Field(default_factory=list)
@@ -2124,15 +1078,19 @@ class TemplateUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
     data_source: str | None = None
-    config: dict | None = None
+    config: TemplateConfig | None = None
     scope: Literal["private", "team", "project", "public", "global", "personal"] | None = None
     shared_project_ids: list[str] | None = None
 
 
 class TemplateExecuteRequest(BaseModel):
-    """模板执行请求：只带目标项目，其余查询参数取自模板 config。"""
+    """模板执行请求：目标项目、可选年度（缺省取目标项目审计年度，R9.3）与翻页；其余查询参数取自模板 config。"""
 
     project_id: str
+    year: int | None = Field(default=None, ge=2000, le=2100)
+    count_token: str | None = Field(default=None, max_length=2048)
+    limit: int | None = Field(default=None, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
+    offset: int | None = Field(default=None, ge=0)
 
 
 class TemplateResponse(BaseModel):
@@ -2273,45 +1231,75 @@ async def _assert_writeback_authorized(
 # 此处 re-export，保持契约测试对 router_module.writeback_preview /
 # _normalize_template_scope 等的直调与 monkeypatch 不变。
 # ─────────────────────────────────────────────────────────────────────────────
-from app.routers.custom_query_writeback import (  # noqa: E402
+from app.routers.custom_query_writeback import (  # noqa: E402, F401
     WritebackConfirmRequest,
     WritebackPreviewRequest,
     WritebackTargetSpec,
     _to_writeback_targets,
     writeback_confirm,
     writeback_preview,
+    writeback_retired_error,
 )
 from app.services.custom_query.template_scope_guard import (  # noqa: E402
     _assert_template_visible,
+    _load_template,
     _normalize_template_scope,
+    _template_not_visible,
     _template_owner_id,
 )
+
+
+def _template_invalid(exc: TemplateInvalidError) -> HTTPException:
+    return HTTPException(status_code=400, detail={"error_code": exc.error_code, "message": exc.message})
+
 
 @router.get("/templates")
 async def list_templates(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """列出可见模板：本人创建的所有 + 全局共享。
-
-    按 updated_at 倒序排列（最近编辑置顶）。
-    """
-    stmt = (
-        select(CustomQueryTemplate)
-        .where(
-            or_(
-                CustomQueryTemplate.created_by == current_user.id,
-                CustomQueryTemplate.scope == "global",
-            )
-        )
-        .order_by(CustomQueryTemplate.updated_at.desc())
-    )
-    result = await db.execute(stmt)
-    templates = result.scalars().all()
+    """列出当前用户可见的模板（本人、公开、指定项目共享、历史 team；R9.2），最近修改在前，最多 500 条（先过滤后截断）。"""
+    templates = await template_service.visible_templates(current_user, db)
     return {
         "templates": [_serialize_template(t, current_user.id) for t in templates],
         "total": len(templates),
     }
+
+
+@router.get("/template-share-targets")
+async def template_share_targets(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """「保存为模板」里「指定项目共享」可选的项目（AQ-39）：与保存时逐项目 edit 鉴权同一口径，只列本人能分享到的项目。
+
+    页面版原先取 ``GET /api/projects`` 的 ``can_edit``，该接口从不下发此字段 ⇒ 分享两档恒置灰。
+    """
+    from app.services.custom_query.template_scope_guard import template_share_target_ids
+
+    return {"project_ids": await template_share_target_ids(db, current_user)}
+
+
+@router.get("/template-presets")
+async def list_template_presets(_current_user: User = Depends(get_current_user)):
+    return {"presets": template_presets.list_presets()}
+
+
+@router.get("/template-presets/{preset_id}/resolve")
+async def resolve_template_preset(
+    preset_id: str, project_id: str, year: int | None = Query(default=None, ge=2000, le=2100),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=project_id, db=db)
+    resolved_year = await require_project_audit_year(db, project_id, year)
+    try:
+        return await template_presets.resolve(db, preset_id, project_id=project_id, year=resolved_year)
+    except template_presets.PresetNotFoundError:
+        raise HTTPException(status_code=404, detail={
+            "error_code": "TEMPLATE_PRESET_NOT_FOUND", "message": "系统预置模板不存在",
+        }) from None
 
 
 @router.post("/templates", status_code=201)
@@ -2338,19 +1326,40 @@ async def create_template(
         await db.rollback()
         raise
 
-    tpl = await template_service.save_template(
-        db=db,
-        creator_id=current_user.id,
-        name=body.name,
-        scope=normalized.scope,
-        config=body.config,
-        description=body.description,
-        data_source=body.data_source,
-        shared_project_ids=list(normalized.shared_project_ids),
-    )
+    try:
+        tpl = await template_service.save_template(
+            db=db,
+            creator_id=current_user.id,
+            name=body.name,
+            scope=normalized.scope,
+            config=body.config,
+            description=body.description,
+            data_source=body.data_source,
+            shared_project_ids=list(normalized.shared_project_ids),
+        )
+    except TemplateInvalidError as exc:  # 名称 / scope 校验失败：400 中文原因（R9.1），原先未捕获 ⇒ 500
+        raise _template_invalid(exc) from None
     await db.commit()
     await db.refresh(tpl)
     return _serialize_template(tpl, current_user.id)
+
+
+@router.get("/templates/{template_id}/resolve")
+async def resolve_user_template(
+    template_id: str, project_id: str, year: int | None = Query(default=None, ge=2000, le=2100),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    tpl = await _load_template(db, template_id)
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=project_id, db=db)
+    resolved_year = await require_project_audit_year(db, project_id, year)
+    try:
+        resolved = await template_presets.resolve_config(db, tpl.config, project_id=project_id, year=resolved_year)
+    except ValueError as exc:
+        raise _template_invalid(TemplateInvalidError(str(exc))) from None
+    return {"config": resolved.config, "params": resolved.params, "notes": resolved.notes}
 
 
 @router.get("/templates/{template_id}")
@@ -2359,17 +1368,9 @@ async def get_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取模板详情。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
-    # 权限：本人 or 全局可见
-    if tpl.scope != "global" and tpl.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail={"error_code": "TEMPLATE_NOT_VISIBLE"})
+    """获取模板详情：可见性与列表、执行同一判定（R9.2）。"""
+    tpl = await _load_template(db, template_id)
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
     return _serialize_template(tpl, current_user.id)
 
 
@@ -2381,18 +1382,18 @@ async def update_template(
     current_user: User = Depends(get_current_user),
 ):
     """更新模板（仅创建者）。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    tpl = await _load_template(db, template_id)
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     # 仅创建者可改 —— **admin 也不例外**（R8.5）。模板承载的是个人查询习惯与分享
     # 意图，管理员改他人模板会让对方看到与自己意图不符的结果却无从察觉。
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_UPDATE"})
+    try:  # 名称与参数目录均在任何 ORM 赋值前校验；失败保持 400 且不产生部分更新
+        name = template_service.validate_name(body.name) if body.name is not None else None
+        if body.config is not None:
+            template_service.validate_config_params(body.config)
+    except TemplateInvalidError as exc:
+        raise _template_invalid(exc) from None
 
     if body.scope is not None or body.shared_project_ids is not None:
         normalized = _normalize_template_scope(
@@ -2409,19 +1410,18 @@ async def update_template(
         except HTTPException:
             await db.rollback()
             raise
+        # 入库只写归一后的值（原先末尾又把 body.scope 原样写回 ⇒ 传 global 入库仍是 global，AQ-16）
         tpl.scope = normalized.scope
         tpl.shared_project_ids = list(normalized.shared_project_ids)
 
-    if body.name is not None:
-        tpl.name = body.name
+    if name is not None:
+        tpl.name = name
     if body.description is not None:
         tpl.description = body.description
     if body.data_source is not None:
         tpl.data_source = body.data_source
     if body.config is not None:
         tpl.config = body.config
-    if body.scope is not None:
-        tpl.scope = body.scope
     tpl.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(tpl)
@@ -2435,17 +1435,11 @@ async def delete_template(
     current_user: User = Depends(get_current_user),
 ):
     """删除模板 —— **仅创建者**，admin 亦不可删他人模板（R8.5）。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    tpl = await _load_template(db, template_id)
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_DELETE"})
-    await db.delete(tpl)
+    await template_service.soft_delete(tpl, db)  # 进回收站（R9.5）；原先 db.delete 硬删、无法找回（AQ-30）
     await db.commit()
     return None
 
@@ -2458,145 +1452,44 @@ async def execute_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6）。
+    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6；R9.3）。
 
     关键在于**不另走旁路**：模板只是一组查询参数，执行仍经 `execute_query` →
     `ExecuteCompatibilityAdapter` → 编排器，因此归属校验、分页、审计与直接查询
-    完全一致。改造前根本没有此端点，模板「执行」由前端把 config 拼成 execute
-    请求体自行发起，服务端无从校验模板可见性。
+    完全一致。顺序：模板可见（403 ``TEMPLATE_NOT_VISIBLE``）→ 目标项目归属（403，在本函数体内直接校验，先于
+    年度解析，免得无权用户从 422 得知项目有没有审计年度）→ 年度 = 请求年度，否则目标项目审计年度（都没有 422，
+    平台统一文案）→ ``config_to_request``（唯一翻译）→ ``execute_query``。改造前年度取模板里存的值，在别的项目上
+    执行会查错年度；模板没存年度时 ``year=0`` 直接 422。
     """
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
-
-    # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
-    await template_service.assert_executable(tpl, user=current_user, db=db)
-
-    config = tpl.config if isinstance(tpl.config, dict) else {}
-    query_body = QueryRequest(
-        project_id=str(body.project_id),
-        year=int(config.get("year") or 0),
-        source=str(config.get("source") or tpl.data_source or ""),
-        filters=config.get("filters") or {},
-        columns=list(config.get("selected_columns") or config.get("columns") or []),
-        limit=int(config.get("page_size") or config.get("limit") or 500),
-        offset=int(config.get("offset") or 0),
-        sort=list(config.get("sort") or []),
-        group=config.get("group"),
-        pivot=config.get("pivot"),
-        acnr_targets=list(config.get("acnr_targets") or []),
-    )
-    return await execute_query(query_body, response, db, current_user)
-
-
-# ─── Batch Execute Endpoint (Req 1) ──────────────────────────────────────────
-
-
-class BatchExecuteRequest(BaseModel):
-    wp_codes: list[str] = Field(..., min_length=1, max_length=20)
-    project_id: str
-    year: int | None = None
-    filters: dict = {}
-    cell_range: str | None = None
-    sheet_name: str | None = None
-
-
-class BatchExecuteResponse(BaseModel):
-    results: dict[str, Any]  # {wp_code: {columns, rows, total, source} | {error: str}}
-    total_success: int
-    total_failed: int
-
-
-@router.post("/batch-execute", response_model=BatchExecuteResponse)
-async def batch_execute(
-    body: BatchExecuteRequest,
-    response: Response,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """批量查询多个底稿 wp_code（Req 1）。
-
-    - 参数校验：wp_codes 1~20 个
-    - 按 wp_code 循环调用 execute_query 内部逻辑
-    - 任一子请求失败不阻塞其它
-    - 审计日志聚合（节流适用）
-    """
-    # ─── GIN index degradation header ────────────────────────────────────
-    from app.services.gin_index_monitor import is_index_building
-    if is_index_building():
-        response.headers["X-Index-Status"] = "building"
-
-    # ─── OwnershipGuard 单点准入（BEFORE sub-query loop）R9.1/R9.2/R9.5 ─────
     from app.services.custom_query.ownership_guard import ownership_guard
-    await ownership_guard.assert_target_accessible(
-        user=current_user, project_id=body.project_id, db=db
-    )
 
-    results: dict[str, Any] = {}
-    total_success = 0
-    total_failed = 0
-
-    for wp_code in body.wp_codes:
-        try:
-            # 构建 source：workpaper:{wp_code} 或 workpaper:{wp_code}|{sheet_name}
-            if body.sheet_name:
-                source = f"workpaper:{wp_code}|{body.sheet_name}"
-            else:
-                source = f"workpaper:{wp_code}"
-
-            filters = {**body.filters, "wp_code": wp_code}
-            if body.sheet_name:
-                filters["sheet_name"] = body.sheet_name
-
-            # 判断是否走 cell_range 路径
-            if body.cell_range:
-                filters["cell_range"] = body.cell_range
-                sub_result = await _query_workpaper_cell_range(db, body.project_id, filters)
-            else:
-                sub_result = await _query_workpaper(
-                    db, body.project_id, body.year, filters, 500
-                )
-
-            results[wp_code] = sub_result
-            total_success += 1
-        except Exception as e:
-            results[wp_code] = {"error": str(e), "rows": [], "columns": [], "total": 0}
-            total_failed += 1
-
-    # 审计日志聚合（查询执行按 60s 窗口节流为 1 条，R14.4，audit_helper 单点接线）
+    tpl = await _load_template(db, template_id)
+    try:  # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
+        await template_service.assert_executable(tpl, user=current_user, db=db)
+    except TemplateForbiddenError:  # 原先未映射 ⇒ 500
+        raise _template_not_visible() from None
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=body.project_id, db=db)
+    year = await require_project_audit_year(db, body.project_id, body.year)
     try:
-        from app.core.redis import get_redis
-        from app.services.custom_query.audit_helper import record_query_execution
-
-        redis = await get_redis()
-        await record_query_execution(
-            redis=redis,
-            user_id=current_user.id,
-            source=f"batch:{','.join(body.wp_codes[:5])}",
-            filters=body.filters,
-            project_id=body.project_id,
-            action="custom_query.batch_execute",
-            details={
-                "wp_codes": body.wp_codes,
-                "year": body.year,
-                "total_success": total_success,
-                "total_failed": total_failed,
-                "cell_range": body.cell_range,
-                "sheet_name": body.sheet_name,
-            },
+        resolved = await template_presets.resolve_config(
+            db, tpl.config, project_id=body.project_id, year=year,
         )
-    except Exception as audit_e:
-        logger.warning("audit_log enqueue failed for batch_execute: %s", audit_e)
-
-    return BatchExecuteResponse(
-        results=results,
-        total_success=total_success,
-        total_failed=total_failed,
-    )
+        missing_param = next((item for item in resolved.params if item.get("value") is None), None)
+        if missing_param is not None:
+            raise HTTPException(status_code=400, detail={
+                "error_code": "CONDITION_VALUE_REQUIRED",
+                "message": missing_param["missing_reason"],
+            })
+        # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
+        query_body = QueryRequest(**template_service.config_to_request(
+            resolved.config, project_id=body.project_id, year=year, limit=body.limit, offset=body.offset,
+            count_token=body.count_token, fallback_source=tpl.data_source,
+        ))
+    except ValidationError as exc:
+        raise template_config_rejected(exc) from None
+    except ValueError as exc:  # 条件里还有未取值的参数占位
+        raise HTTPException(status_code=400, detail={"error_code": "TEMPLATE_INVALID", "message": str(exc)}) from None
+    return await execute_query(query_body, response, db, current_user)
 
 
 # ─── Cell Writeback Endpoint (Req 2, Req 13) ────────────────────────────────
@@ -2608,7 +1501,8 @@ class CellWritebackRequest(BaseModel):
     sheet_name: str
     cell_ref: str  # e.g. "B7"
     new_value: Any = None
-    module: Literal["workpaper", "report", "note", "adj", "tb"] = "workpaper"
+    # tb / adj / report 写入实现已删除（任务 13，ADR-AQL-02）：审定数只经发布门、调整分录只经调整分录服务 ⇒ 422
+    module: Literal["workpaper", "note"] = "workpaper"
 
     # ── 附注归属字段（module="note" 时必填）──────────────────────────────
     # 设计 §五.2：writeback schema 显式带归属元组，不得把 record id 视作权限边界。
@@ -2646,7 +1540,12 @@ class CellWritebackRequest(BaseModel):
         return self
 
 
-@router.post("/cell-writeback")
+@router.post("/cell-writeback", status_code=410)
+async def cell_writeback_gone():
+    """高级查询不再提供写入口；保留路径让旧客户端得到可诊断的 410。"""
+    raise writeback_retired_error()
+
+
 async def cell_writeback(
     body: CellWritebackRequest,
     response: Response,
@@ -2666,6 +1565,7 @@ async def cell_writeback(
         WritebackConflict,
         WritebackPermissionDenied,
         WritebackResolveUnavailable,
+        WritebackTargetNotFound,
         WritebackTargetUnresolvable,
         snapshot_writer,
     )
@@ -2718,10 +1618,11 @@ async def cell_writeback(
         )
         wp_row = result.first()
         if not wp_row:
-            raise HTTPException(status_code=404, detail="Working paper not found in this project")
+            not_found = WritebackTargetNotFound(body.wp_code)
+            raise HTTPException(status_code=404, detail={"error_code": not_found.error_code, "message": not_found.message})
         wp_id = str(wp_row[0])
     else:
-        # 对于其他模块，wp_code 作为标识符传递
+        # 附注模块：记录以 note_record_id 定位，wp_code 只作兼容标识传递
         wp_id = body.wp_code
 
     try:
@@ -2760,6 +1661,10 @@ async def cell_writeback(
             status_code=403,
             detail={"error": e.reason},
         )
+    except WritebackTargetNotFound as e:
+        # R4.2：取行带请求项目，他项目底稿查不到即 404（不读、不锁）
+        await db.rollback()
+        raise HTTPException(status_code=404, detail={"error_code": e.error_code, "message": e.message})
     except WritebackTargetUnresolvable as e:
         # R3.4：回写目标无法解析为有效 addr_id → 中止、数据不变
         await db.rollback()
@@ -2938,12 +1843,13 @@ async def cross_sheet_trace(
     # 为什么不能直接调 cross_sheet_resolver.resolve()：本端点是 async，调用时事件循环
     # 正在运行，而同步 BFS 内部的 `_sync_resolve` 一探测到 running loop 就返回 None
     # 降级 → 每个链节点的 addr_id 恒为 None，溯源结果无法跳转、审计日志也拿不到真
-    # addr_id。异步 IO 由 orchestrator 上浮：BFS 仍是同步纯函数，addr_id 经
-    # AddressingService 一次性并发解析后合并回链。
+    # addr_id。异步 IO 由 orchestrator 上浮：BFS 仍是同步纯函数、不取身份，节点身份由编排器经
+    # exact_identity 按「父底稿（本端点 wp_code）+ sheet + A1」判定（acnr T20）。
     trace_result = await cross_sheet_trace_orchestrator.trace(
         parsed_data,
         sheet_name,
         cell_ref,
+        parent_wp_code=wp_code,
         project_id=project_id,
         db=db,
         max_depth=max_depth,
@@ -2989,9 +1895,39 @@ class AddressResolveResponse(BaseModel):
     template_name: str | None = None
     sheet_name: str | None = None
     cell_ref: str | None = None
-    registered: bool = False  # wp_template_registry 是否已注册
-    route_path: str = ""  # 前端跳转路径
-    route_query: dict = Field(default_factory=dict)  # highlight 参数
+    registered: bool = False  # 模板目录里有没有这个模板（底稿：wp_template_registry 表或 JSON 目录）
+    route_path: str = ""  # 前端跳转路径（未登记 / 没有模板定义时为空）
+    route_query: dict = Field(default_factory=dict)  # 模板库页签名与定位键（tab / wp_code 等），不含 highlight
+
+
+# 模板库（TemplateLibraryMgmt）真实页签名：原先返回 workpaper / report / note，页面认不出、只停在默认页签
+_TEMPLATE_LIBRARY_TABS = {"workpaper": "wp-template", "report": "report-config", "note": "note-template"}
+
+
+async def _wp_template_name(db: AsyncSession, wp_code: str) -> str | None:
+    """底稿编码在模板目录里的名称，未登记为 None（ADR-AQL-17，与指标树 ``_build_workpaper_tree`` 同一目录）。
+
+    ``wp_template_registry`` 表存在且有记录时以表为准；表不存在 / 为空 / 查询失败时用 JSON 目录
+    （wp_account_mapping + step_sheet_mapping）。原先无条件查表，表不存在即 500（AQ-17）。
+    """
+    try:
+        async with db.begin_nested():  # 保存点：查表失败回滚到这里，不让本请求事务停在 aborted（PG）
+            if await wp_template_registry_service.table_exists(db):
+                rows = await wp_template_registry_service.load_tree(db)
+                if rows:
+                    hit = next((r for r in rows if r.get("wp_code") == wp_code), None)
+                    return (hit.get("wp_name") or wp_code) if hit else None
+    except Exception as exc:  # 表不存在（SQLite 无 information_schema）等：改用 JSON 目录
+        logger.debug("address-resolve: wp_template_registry 不可用，改用 JSON 目录：%s", exc)
+    try:
+        step = _load_step_sheet_mapping().get(wp_code)
+        if step:
+            return step.get("wp_name") or wp_code
+        hit = next((m for m in _load_wp_mapping() if m.get("wp_code") == wp_code), None)
+        return (hit.get("wp_name") or hit.get("account_name") or wp_code) if hit else None
+    except Exception as exc:
+        logger.warning("address-resolve: 底稿模板目录读取失败，按未登记返回：%s", exc)
+        return None
 
 
 @router.get("/address-resolve", response_model=AddressResolveResponse)
@@ -3000,80 +1936,47 @@ async def address_resolve(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """URI 反查模板信息（模板溯源）。
+    """URI 反查模板信息（模板溯源，ADR-AQL-17；R7.4）。
 
-    Requirements: Req 14 AC 2, AC 3
-    - 解析 URI 得到 module / wp_code / sheet / cell
-    - 查 wp_template_registry 判断是否已注册
-    - 返回前端跳转路径 + highlight 参数
+    - 底稿：按模板目录判定登记（``_wp_template_name``），登记了才返回模板库「底稿模板」页签与 ``wp_code``（页面按它搜索）；
+    - 报表 / 附注：模板库「报表配置」/「附注模板」页签；
+    - 调整分录 / 试算类结果没有模板定义：``registered=false``、空路由（前端提示「该类结果没有模板定义」）；
+    - 不再返回 ``highlight``：模板页不支持按单元格高亮。
     """
     from app.services.custom_query.module_cell_resolver import parse_source_uri
 
     parsed = parse_source_uri(uri)
     if not parsed:
-        raise HTTPException(status_code=400, detail=f"Invalid source URI: {uri}")
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_SOURCE_URI", "message": f"无法识别的数据源地址：{uri}"})
 
     module = parsed.get("module", "")
     qualifier = parsed.get("qualifier", "")
     sheet_name = parsed.get("sheet_name")
     cell_range = parsed.get("cell_range")
 
-    # 对于 workpaper 模块，qualifier 是 wp_code
     template_wp_code: str | None = None
-    template_name: str | None = None
+    template_name: str | None = qualifier or None
     registered = False
-    route_path = ""
     route_query: dict = {}
 
     if module == "workpaper":
         template_wp_code = qualifier
-        # 查 wp_template_registry 判断是否已注册
-        result = await db.execute(
-            text("SELECT wp_name FROM wp_template_registry WHERE wp_code = :code"),
-            {"code": qualifier},
-        )
-        row = result.first()
-        if row:
-            registered = True
-            template_name = row[0]
-        # 前端跳转路径：模板库底稿详情
-        route_path = "/template-library"
-        route_query = {"tab": "workpaper", "wp_code": qualifier}
-        if sheet_name:
-            route_query["sheet"] = sheet_name
-        if cell_range:
-            route_query["highlight"] = cell_range
-
+        template_name = await _wp_template_name(db, qualifier)
+        registered = template_name is not None
+        route_query = {"wp_code": qualifier}
     elif module == "report":
-        template_wp_code = None
-        template_name = qualifier  # report_type as name
-        registered = True  # 报表模板始终存在于 report_config
-        route_path = "/template-library"
-        route_query = {"tab": "report", "report_type": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
-
+        registered = True  # 报表模板恒在 report_config
+        route_query = {"report_type": qualifier}
     elif module == "note":
-        template_wp_code = None
-        template_name = qualifier  # section_id as name
-        registered = True  # 附注模板始终存在于 seed JSON
-        route_path = "/template-library"
-        route_query = {"tab": "note", "section_id": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
+        registered = True  # 附注模板恒在种子 JSON
+        route_query = {"section_id": qualifier}
+    elif module not in ("adj", "tb"):
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_SOURCE_URI", "message": f"不支持的模块：{module}"})
 
-    elif module in ("adj", "tb"):
-        template_wp_code = None
-        template_name = qualifier
-        registered = False
-        route_path = "/template-library"
-        route_query = {"tab": module, "qualifier": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
-
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported module: {module}")
-
+    route_path = "/template-library" if registered else ""
+    route_query = {"tab": _TEMPLATE_LIBRARY_TABS[module], **route_query} if registered else {}
     return AddressResolveResponse(
         module=module,
         template_wp_code=template_wp_code,

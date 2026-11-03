@@ -16,8 +16,8 @@
     "entry_id": "xlsx/gt-n2-taxes-payable",
     "html_store": {
       "html_only_keys": [],
-      "item_id": "N2-2-rows",
-      "note": "N2-2 明细表存成 N2-2-rows 的 conclusion（JSON 数组）。15行固定税种。",
+      "item_id": "N2-2-detail-rows",
+      "note": "N2-2 明细表存成 N2-2-detail-rows 的 conclusion（JSON 数组）。15行固定税种。",
       "row_identity_key": "id",
       "shape": "json_array_of_row_objects",
       "table": "checklist_responses"
@@ -48,11 +48,11 @@
               "column_key": "tax_name",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!A8",
               "header_text": "项目",
-              "json_pointer": "/rows/{row_uuid}/taxName",
+              "json_pointer": "/rows/{row_uuid}/taxType",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!A10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/tax_name",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "text"
             },
             {
@@ -67,7 +67,7 @@
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!B10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/tax_rate",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "text"
             },
             {
@@ -78,11 +78,11 @@
               "column_key": "prior_opening",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!C8",
               "header_text": "期初数",
-              "json_pointer": "/rows/{row_uuid}/priorOpening",
+              "json_pointer": "/rows/{row_uuid}/unadjBegin",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!C10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/prior_opening",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -93,11 +93,11 @@
               "column_key": "prior_accrued",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!D8",
               "header_text": "本期应交数",
-              "json_pointer": "/rows/{row_uuid}/priorAccrued",
+              "json_pointer": "/rows/{row_uuid}/unadjPayable",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!D10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/prior_accrued",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -108,11 +108,11 @@
               "column_key": "prior_paid",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!E8",
               "header_text": "本期已交数",
-              "json_pointer": "/rows/{row_uuid}/priorPaid",
+              "json_pointer": "/rows/{row_uuid}/unadjPaid",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!E10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/prior_paid",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -123,11 +123,11 @@
               "column_key": "prior_closing",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!F8",
               "header_text": "期末数",
-              "json_pointer": "/rows/{row_uuid}/priorClosing",
+              "json_pointer": "/rows/{row_uuid}/unadjEnd",
               "mode": "formula",
               "source_ref": "源xlsx!应交税费明细表N2-2!F10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/prior_closing",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -138,11 +138,11 @@
               "column_key": "adj_aje",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!G8",
               "header_text": "账项调整",
-              "json_pointer": "/rows/{row_uuid}/adjAje",
+              "json_pointer": "/rows/{row_uuid}/beginAdjust",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!G10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/adj_aje",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -153,11 +153,11 @@
               "column_key": "adj_rje",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!H8",
               "header_text": "重分类调整",
-              "json_pointer": "/rows/{row_uuid}/adjRje",
+              "json_pointer": "/rows/{row_uuid}/beginRje",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!H10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/adj_rje",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -168,11 +168,11 @@
               "column_key": "aje_accrued",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!I8",
               "header_text": "本期应交",
-              "json_pointer": "/rows/{row_uuid}/ajeAccrued",
+              "json_pointer": "/rows/{row_uuid}/ajePayable",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!I10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/aje_accrued",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -187,7 +187,7 @@
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!J10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/aje_paid",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -198,11 +198,11 @@
               "column_key": "rje_accrued",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!K8",
               "header_text": "本期应交",
-              "json_pointer": "/rows/{row_uuid}/rjeAccrued",
+              "json_pointer": "/rows/{row_uuid}/rjePayable",
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!K10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/rje_accrued",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -217,7 +217,7 @@
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!L10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/rje_paid",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -228,11 +228,11 @@
               "column_key": "audited_opening",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!M8",
               "header_text": "期初数",
-              "json_pointer": "/rows/{row_uuid}/auditedOpening",
+              "json_pointer": "/rows/{row_uuid}/audBegin",
               "mode": "formula",
               "source_ref": "源xlsx!应交税费明细表N2-2!M10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/audited_opening",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -243,11 +243,11 @@
               "column_key": "audited_accrued",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!N8",
               "header_text": "本期应交数",
-              "json_pointer": "/rows/{row_uuid}/auditedAccrued",
+              "json_pointer": "/rows/{row_uuid}/audPayable",
               "mode": "formula",
               "source_ref": "源xlsx!应交税费明细表N2-2!N10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/audited_accrued",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -258,11 +258,11 @@
               "column_key": "audited_paid",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!O8",
               "header_text": "本期已交数",
-              "json_pointer": "/rows/{row_uuid}/auditedPaid",
+              "json_pointer": "/rows/{row_uuid}/audPaid",
               "mode": "formula",
               "source_ref": "源xlsx!应交税费明细表N2-2!O10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/audited_paid",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -273,11 +273,11 @@
               "column_key": "audited_closing",
               "header_source_ref": "源xlsx!应交税费明细表N2-2!P8",
               "header_text": "期末数",
-              "json_pointer": "/rows/{row_uuid}/auditedClosing",
+              "json_pointer": "/rows/{row_uuid}/audEnd",
               "mode": "formula",
               "source_ref": "源xlsx!应交税费明细表N2-2!P10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/audited_closing",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "amount"
             },
             {
@@ -292,7 +292,7 @@
               "mode": "editable",
               "source_ref": "源xlsx!应交税费明细表N2-2!Q10",
               "stable_field_key": "taxes_payable_detail_rows/{row_uuid}/remark",
-              "store_item_id": "N2-2-rows",
+              "store_item_id": "N2-2-detail-rows",
               "value_type": "text"
             }
           ],

@@ -52,11 +52,10 @@ def _subsidiary_rows(cash: float, bank: float, *, deactivate_optional: bool = Fa
         skeleton[2]["_pushed_optional_active"] = False
     else:
         skeleton[2]["values"] = [10, 5]  # 其他货币资金
-    # 动态行区：企业自行新增一行（如果有）
+    # 企业自行新增一行（如果有）：下推不写动态行区占位行（R6.1），用户行加在合计之前
     if extra_label:
-        # 在动态行区占位前插入用户行
-        dz_idx = next(i for i, r in enumerate(skeleton) if r.get("row_type") == "dynamic_zone_marker")
-        skeleton.insert(dz_idx, {"label": extra_label, "values": [99, 0], "row_type": "data"})
+        total_idx = next(i for i, r in enumerate(skeleton) if r.get("row_type") == "total")
+        skeleton.insert(total_idx, {"label": extra_label, "values": [99, 0], "row_type": "data"})
     return skeleton
 
 
@@ -88,11 +87,27 @@ class TestPushThenPullFullChain:
             assert m["confidence"] == 1.0
 
     def test_optional_deactivated_excluded(self):
-        """可选行子企业取消后，来源行的 _pushed_optional_active=False。"""
-        sub = _subsidiary_rows(100, 200, deactivate_optional=True)
-        # 其他货币资金行应该标 optional_active=False
-        optional_row = next(r for r in sub if r.get("_pushed_row_id") == RID_OTHER)
-        assert optional_row["_pushed_optional_active"] is False
+        """可选行子企业取消后：读取层带出 _pushed_optional_active=False，拉数判它不取数，结构指纹不变。
+
+        原用例只断言自己造的夹具（假绿，spec note-pull-followup-closure F13）；改走读取层（拉数读的就是这一层），
+        拉数跳过见 test_consol_note_detail_apply::TestApplyOptionalAndPlaceholder。
+        """
+        from app.services.consol_note_detail_apply_service import _optional_inactive
+        from app.services.consol_note_standalone_reader import read_source_table
+
+        def read(rows):
+            table_data = {"_tables": [{"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"], "rows": rows}]}
+            return read_source_table(table_data, consol_table=None, table_name="货币资金").rows
+
+        active = read(_subsidiary_rows(100, 200))
+        inactive = read(_subsidiary_rows(100, 200, deactivate_optional=True))
+        by_rid = {r.get("_pushed_row_id"): r for r in inactive}
+        assert by_rid[RID_OTHER]["_pushed_optional_active"] is False and _optional_inactive(by_rid[RID_OTHER])
+        assert by_rid[RID_OTHER]["_pushed_category"] == "optional"
+        assert by_rid[RID_CASH]["_pushed_category"] == "required" and "_pushed_optional_active" not in by_rid[RID_CASH]
+        assert not any(_optional_inactive(r) for r in active)
+        assert compute_source_structure_hash("五-1-1", active) == compute_source_structure_hash("五-1-1", inactive), (
+            "勾选 / 取消可选行不改结构指纹（否则已确认的映射变成「结构已变化」）")
 
     def test_dynamic_rows_use_name_matching(self):
         """动态行走七级匹配（无 _pushed_row_id）。"""

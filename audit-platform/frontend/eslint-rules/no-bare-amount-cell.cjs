@@ -6,15 +6,16 @@
 //   1) <el-table-column> 含 align="right" 属性
 //   2) prop 命中金额关键字（amount/balance/debit/credit/tax/cost/price/...）
 //      或 label 含中文金额关键字（金额/余额/借方/贷方/税金/成本/价格/合计/...）
-//   3) 子树未含 <GtAmountCell> / <gt-amount-cell> / <g-t-amount-cell>
-//      也未含 formatAmount / displayAmount / amountFormatter 等格式化调用
+//   3) 子树未含 <GtAmountCell> / <gt-amount-cell> / <g-t-amount-cell>，也未含登记的金额格包装组件
+//      （AMOUNT_CELL_WRAPPERS，内部用 GtAmountCell 显示），也未含 formatAmount / displayAmount /
+//      amountFormatter 等格式化调用
 //
 // Level: warn（baseline 模式：只减不增；接入时以 baseline=109 为起点）
 //
 // 注：本规则用 vue-eslint-parser defineTemplateBodyVisitor 走模板 AST，
 //     不能直接 return { VElement(...) }（vue 文件默认 visitor 不走模板）。
 
-// 金额关键字（与 _scan_bare_amount_cells.mjs 保持一致）
+// 金额关键字（prop / label 任一命中即视为金额列）
 const AMOUNT_PROP_RE =
   /(amount|balance|debit|credit|tax|cost|price|principal|interest|payable|receivable|salary|fund|equity|capital|fee|charge|discount|profit|loss|revenue|expense|income|net_asset|netasset)/i
 const AMOUNT_LABEL_RE =
@@ -22,6 +23,21 @@ const AMOUNT_LABEL_RE =
 
 const GT_AMOUNT_TAG_RE = /^(GtAmountCell|gt-amount-cell|g-t-amount-cell)$/
 const FORMAT_HELPER_RE = /(formatAmount|displayAmount|amountFormatter|toCurrency|formatCurrency)/
+
+/**
+ * 金额格包装组件：显示一律由组件内部的 <GtAmountCell> 渲染（只是列模板里看不到它）。
+ * 组件名 → 组件文件（相对 frontend/src）。登记即声明「该组件的显示是 GtAmountCell」——
+ * 守卫 src/components/report/__tests__/amountCellWrapperRule.spec.ts 逐个核对组件模板里确有 <GtAmountCell>，
+ * 改了组件不再用 GtAmountCell 就打红（spec excel-style-table-editing 5.4：报表权益 / 减值表格内编辑）。
+ */
+const AMOUNT_CELL_WRAPPERS = {
+  ReportMatrixCell: 'components/report/ReportMatrixCell.vue',
+}
+
+function isAmountCellWrapper(tag) {
+  const pascal = String(tag).replace(/(^|-)([a-z])/g, (_m, _d, ch) => ch.toUpperCase())
+  return Object.prototype.hasOwnProperty.call(AMOUNT_CELL_WRAPPERS, pascal)
+}
 
 /** @type {import('eslint').Rule.RuleModule} */
 const rule = {
@@ -96,7 +112,7 @@ const rule = {
       if (!node) return false
       if (node.type === 'VElement') {
         const tag = getTagName(node)
-        if (tag && GT_AMOUNT_TAG_RE.test(tag)) return true
+        if (tag && (GT_AMOUNT_TAG_RE.test(tag) || isAmountCellWrapper(tag))) return true
       }
       // VExpressionContainer 内含 formatAmount(...) 等调用：查源文本
       if (node.type === 'VExpressionContainer' && node.expression) {
@@ -144,3 +160,5 @@ const rule = {
 }
 
 module.exports = rule
+// 供守卫核对登记的包装组件（ESLint 只读 meta / create，多出的字段不影响规则加载）
+module.exports.AMOUNT_CELL_WRAPPERS = AMOUNT_CELL_WRAPPERS

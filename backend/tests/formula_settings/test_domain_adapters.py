@@ -83,7 +83,7 @@ async def test_wp_publish_inherit_follow_conflict_then_adopt():
         assert mine.expression == MINE, "冲突不覆盖本项目公式"
         (item,) = await pending_items(db, conflict)
         await resolve_items(db, project_id=conflict, user_id=admin.id,
-                            resolutions=[{"item_id": str(item.id), "choice": "adopt"}])
+                            resolutions=[{"item_id": str(item.id), "choice": "adopt", "revision": item.revision}])
         (mine,) = await wp_rows(db, conflict)
         assert (mine.expression, mine.formula_source, mine.base_version) == (G2, "preset", 2)
 
@@ -325,7 +325,7 @@ async def test_consol_note_effective_and_kernel():
 
     async with make_db(EXTRA) as factory, factory() as db:
         admin = await add_user(db, "adm", "admin")
-        follow, mine = await add_project(db, "乙"), await add_project(db, "丙")
+        follow, mine = await add_project(db, "乙", report_scope="consolidated"), await add_project(db, "丙", report_scope="consolidated")
         await publish_global(db, domain="consol_note", scope="soe", user_id=admin.id, changes=[
             {"slot_key": CELL, "definition": {"formula": "TB('1122','期末余额')"}}])
         g = (await db.execute(sa.select(ConsolNoteFormula))).scalar_one()

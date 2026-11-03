@@ -79,6 +79,39 @@ def plan_attempts(route: list[RouteCandidate]) -> list[RouteCandidate]:
     return fresh or list(route)
 
 
+def filter_route_by_policy(
+    route: list[RouteCandidate],
+    *,
+    allowed_trust_zones: set[str] | frozenset[str] | None,
+    client_data: bool,
+) -> list[RouteCandidate]:
+    """按任务信任域过滤候选；未知/受限配置不能静默处理客户资料。"""
+    if allowed_trust_zones is None:
+        return list(route)
+    allowed = {str(getattr(value, "value", value)) for value in allowed_trust_zones}
+    eligible: list[RouteCandidate] = []
+    reasons: list[str] = []
+    for candidate in route:
+        config = candidate.config
+        if config is None:
+            reasons.append(f"{candidate.label}：配置无法解析，信任域不可验证")
+            continue
+        if config.trust_zone not in allowed:
+            reasons.append(f"{candidate.label}：信任域 {config.trust_zone} 不在任务许可范围")
+            continue
+        if client_data and not config.client_data_allowed:
+            reasons.append(f"{candidate.label}：未获准处理客户数据")
+            continue
+        eligible.append(candidate)
+    if eligible:
+        return eligible
+    raise LLMRuntimeError(
+        "route_policy_denied",
+        "没有符合本任务数据政策的模型候选" + ("：" + "；".join(reasons) if reasons else ""),
+        kind="request",
+    )
+
+
 def route_identity(route: list[RouteCandidate]) -> str:
     """整条路由的身份（熔断器按它绑定，ADR-ROUTE-007）。"""
     return "||".join(candidate.identity for candidate in route)

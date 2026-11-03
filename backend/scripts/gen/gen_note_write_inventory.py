@@ -305,7 +305,8 @@ def check_against(out: Path, built: Built) -> int:
     if not out.is_file():
         print(f"附注写端点清册与仓库现状不一致：已提交的清册不存在（{out}）", file=sys.stderr)
         return EXIT_DRIFT
-    raw = out.read_bytes()
+    # 换行归一：index 是 LF，Windows 检出（autocrlf）是 CRLF —— 只差换行不算漂移（spec note-pull-followup-closure R21）
+    raw = render.normalize_newlines(out.read_bytes())
     if raw == built.text.encode("utf-8"):
         print(CONSISTENT)
         return EXIT_OK

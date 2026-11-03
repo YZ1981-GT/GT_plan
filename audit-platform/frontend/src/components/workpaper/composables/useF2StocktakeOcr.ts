@@ -5,6 +5,7 @@ import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
+import { refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 export type F2StOcrSheet = 'F2-24' | 'F2-25' | 'F2-26'
 
@@ -29,15 +30,19 @@ export function useF2StocktakeOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   ): Promise<void> {
     ocrLoadingId.value = rowId
     try {
+      // 识别附件挂到本行（F2-24/25/26 + `row:{行 id}`，spec attachment-inline-preview），小眼睛按同一位置读取
       const { form } = await buildLinkedOcrFormData(file, {
         projectId: projectId?.value,
         wpId: wpId.value,
+        evidenceSheet: sheet,
+        evidenceCell: rowEvidenceCell(rowId),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-st/contract-ocr?sheet=${encodeURIComponent(sheet)}`,
         form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as Record<string, unknown>
       const confidence = data?.confidence ?? 0

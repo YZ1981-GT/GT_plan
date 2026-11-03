@@ -280,7 +280,7 @@ describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () =
     expect(nonBranch.find('[data-testid="cw-branch-notice"]').exists()).toBe(false)
   })
 
-  it('保存遇到版本冲突（409）时自动重载数据并提示用户', async () => {
+  it('保存遇到版本冲突（409）时保留当前编辑，不用服务端新值静默覆盖', async () => {
     // 首次加载带版本号
     worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({
       status: 'loaded',
@@ -306,8 +306,11 @@ describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () =
     await wrapper.find('[data-testid="info-save"]').trigger('click')
     await flushPromises()
 
-    // 409 后应自动重载，展示新版本数据
-    expect(setupData(wrapper).subsidiaryInfo[0].company_code).toBe('V2_RELOADED')
+    // 409 后保留当前已加载/编辑的值，不自动重载覆盖；用户可显式放弃后重新读取。
+    expect(setupData(wrapper).subsidiaryInfo[0].company_code).toBe('V1')
+    expect(worksheetApi.loadAllWorksheetData).toHaveBeenCalledTimes(1)
+    const { ElMessage } = await import('element-plus')
+    expect(ElMessage.warning).toHaveBeenCalledWith(expect.stringContaining('当前编辑已保留'))
     // saveWorksheetData 被调用时应传入版本号 5
     expect(worksheetApi.saveWorksheetData).toHaveBeenCalledWith(
       'project-7', 2025, 'info', { rows: [{ company_code: 'A' }] }, 5,

@@ -360,6 +360,12 @@
             <span v-if="row.attachmentName" class="attach-name" :title="row.attachmentName">
               {{ row.attachmentName }}
             </span>
+            <RowEvidenceEye
+              :project-id="projectId"
+              :wp-id="wpId"
+              sheet-key="G7-17"
+              :cell-ref="rowEvidenceCell(row.id)"
+            />
           </div>
         </template>
       </el-table-column>
@@ -488,6 +494,8 @@ import { normalizeG7DetailRows } from '../../composables/g7DetailModel'
 import { emitG7SourceRowsSaved } from '../../composables/g7DisclosureCrossSheet'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import {
   G7_IMPAIRMENT_UPDATED_EVENT,
   applyAutoAuditConclusion,
@@ -512,6 +520,9 @@ const props = defineProps<{
 
 const isReadonly = computed(() => props.readonly ?? false)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+/** 估值依据附件的位置键：表页 G7-17，行槽位 row:{行 id} */
+const G7_17_EVIDENCE_SHEET = 'G7-17'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const formData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
@@ -888,12 +899,21 @@ async function handleAttachment(row: ImpairmentTestRow): Promise<void> {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await api.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd)
-      const data = res?.data?.data ?? res?.data ?? {}
+      // 附件挂到本行（行级证据），行内小眼睛可直接预览（spec attachment-inline-preview ADR-AIP-03）
+      rowEv.append(fd, G7_17_EVIDENCE_SHEET, rowEvidenceCell(row.id))
+      const res: any = await api.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd)
+      rowEv.refresh()
+      // apiProxy 已返回业务体：{ attachment_id, ocr_text, extracted_fields }。原先读不存在的
+      // businessContent / summary / amount ⇒ 摘要恒为「未识别到结构化字段」（需求 3.4）
+      const data = (res ?? {}) as { ocr_text?: string; extracted_fields?: Record<string, unknown> }
+      const fields = data.extracted_fields ?? {}
+      const text = String(data.ocr_text ?? '').replace(/\s+/g, ' ').trim()
+      const amount = Number(fields.contractAmount)
       const preview = [
-        data.businessContent || data.summary || data.content || '',
-        data.amount != null ? `金额:${data.amount}` : '',
-      ].filter(Boolean).join(' / ') || '（未识别到结构化字段）'
+        String(fields.serviceContent ?? '').trim(),
+        String(fields.counterparty ?? '').trim(),
+        Number.isFinite(amount) && amount !== 0 ? `金额:${amount}` : '',
+      ].filter(Boolean).join(' / ') || text.slice(0, 120) || '（未识别到文字）'
       await ElMessageBox.confirm(
         `OCR 识别：${preview}\n是否将摘要追加到审计说明？`,
         '估值依据 OCR',

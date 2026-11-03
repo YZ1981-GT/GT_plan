@@ -1,0 +1,23 @@
+[
+  {
+    "file": "components/workpaper/f1/F1SheetAttachments.vue",
+    "rule": "item-attachment",
+    "owner": "F1 表页附件区",
+    "reason": "表页级附件区（槽位 0，整页一份），不对应某一笔凭证；逐笔凭证的附件在「逐笔单据核对」弹窗与表格行尾，已带凭证键",
+    "verify": { "type": "itemAttachmentOutsideRows" }
+  },
+  {
+    "file": "components/workpaper/f2-special/contract/F2TabContractCostCheck.vue",
+    "rule": "item-attachment",
+    "owner": "F2 合同成本检查（表页附件）",
+    "reason": "表页级附件槽位（F2-56 槽位 1），挂整份合同资料，不对应某一笔凭证；逐笔凭证的识别走行内识别，已带凭证键",
+    "verify": { "type": "itemAttachmentOutsideRows" }
+  },
+  {
+    "file": "components/workpaper/f5-cost-of-sales/F5SheetAttachments.vue",
+    "rule": "item-attachment",
+    "owner": "F5 表页附件区",
+    "reason": "表页级附件区（槽位 0，整页一份），不对应某一笔凭证",
+    "verify": { "type": "itemAttachmentOutsideRows" }
+  }
+]

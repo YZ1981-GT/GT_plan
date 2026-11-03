@@ -155,6 +155,15 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { K12_NOTE_SECTION, buildK12SyncPayload } from '../../composables/k12NoteSectionMap'
+import {
+  K12_DISCLOSURE_CATEGORIES as CATEGORIES,
+  K12_DISCLOSURE_NARRATIVE_ITEM,
+  applyK12AutoFill,
+  k12DefaultDisclosureRows,
+  k12DisclosureSyncRows,
+  loadK12DisclosureState,
+  type K12DisclosureTabRow,
+} from '../../composables/k12DisclosureTabState'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -178,107 +187,38 @@ onBeforeUnmount(() => autoSync.cancelPending())
 const ACCOUNT_CODE = '6301'
 const ABNORMAL_THRESHOLD = 0.5 // 同比变动超50%标异常
 
-/** 营业外收入标准来源分类（P1 对齐源模板 K12-1 canonical 行，与审定表按 name 匹配） */
-const CATEGORIES = [
-  '与日常活动无关的政府补助',
-  '捐赠利得',
-  '盘盈利得（不包括存货盘盈及固定资产盘盈）',
-  '碳排放配额出售利得',
-  '其他',
-]
+// ─── Types / State ───────────────────────────────────────────────────────────
+// 来源分类、披露行、读回与审定表取数与附注页离屏同步共用（k12DisclosureTabState，spec note-pull-followup-closure R1）
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+type DisclosureRow = K12DisclosureTabRow
 
-interface DisclosureRow {
-  category: string
-  currentAmount: number
-  priorAmount: number
-  /** 计入当期非经常性损益的金额（源模板必填列） */
-  nonRecurringAmount: number
-  remark: string
-}
-
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, nonRecurringAmount: 0, remark: '' }))
-)
+const disclosureRows = ref<DisclosureRow[]>(k12DefaultDisclosureRows())
 const narrativeText = ref('')
 const totalAdjudicated = ref(0)
 
 // ─── Load saved data from allResponses ───────────────────────────────────────
 
 function loadSavedData(): void {
-  // 加载各行数据
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const key = `K12-disc-listed-row-${i}`
-    const saved = props.allResponses.get(key)
-    if (saved) {
-      try {
-        const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-        if (parsed) {
-          disclosureRows.value[i] = {
-            category: CATEGORIES[i],
-            currentAmount: Number(parsed.currentAmount || 0),
-            priorAmount: Number(parsed.priorAmount || 0),
-            nonRecurringAmount: Number(parsed.nonRecurringAmount || 0),
-            remark: parsed.remark || '',
-          }
-        }
-      } catch { /* ignore parse errors */ }
-    }
-  }
-
-  // 加载叙述文本
-  const narrativeSaved = props.allResponses.get('K12-disclosure-listed-narrative')
-  if (narrativeSaved) {
-    narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
-  }
+  const saved = loadK12DisclosureState(props.allResponses, 'listed')
+  disclosureRows.value = saved.rows
+  if (saved.narrative != null) narrativeText.value = saved.narrative
 }
 
 // ─── Auto-fill from K12-1 adjudicated data ───────────────────────────────────
 
 /**
- * 从 K12-1 审定表取数（P0 修复：原读 `K12-1-row-${i}-audited` 死键，
- * useK12Adjudication 从不写 → 恒 no-op；改读 `K12-1-rows` 按 name 匹配）。
+ * 从 K12-1 审定表取数（读 `K12-1-rows` 按 name 匹配），命中的行逐行保存。
  * @param silent true 时不弹提示（EventBus 自动刷新用）
  */
 function applyAutoFill(silent = false): void {
-  const saved = props.allResponses.get('K12-1-rows')
-  if (!saved) {
+  const res = applyK12AutoFill(disclosureRows.value, props.allResponses, handleRowChange)
+  if (res === 'missing') {
     if (!silent) ElMessage.warning('未找到 K12-1 审定表数据，请先编制审定表')
     return
   }
-  let k12Rows: any[] = []
-  try {
-    const raw = saved.remark ?? saved.conclusion ?? saved
-    k12Rows = typeof raw === 'string' ? JSON.parse(raw) : raw
-  } catch { return }
-  if (!Array.isArray(k12Rows)) return
-
-  const byName = new Map<string, { audited: number; prior: number }>()
-  for (const r of k12Rows) {
-    const audited = Number(
-      r.audited ?? (Number(r.unadjusted || 0) + Number(r.aje || 0) + Number(r.rje || 0)),
-    )
-    const prior = Number(
-      r.priorAudited ?? (Number(r.priorUnadj || 0) + Number(r.priorAje || 0) + Number(r.priorRje || 0)),
-    )
-    byName.set(String(r.name || '').trim(), { audited, prior })
-  }
-
-  let matched = 0
-  for (const row of disclosureRows.value) {
-    const hit = byName.get(row.category.trim())
-    if (hit) {
-      row.currentAmount = hit.audited
-      row.priorAmount = hit.prior
-      handleRowChange(row)
-      matched++
-    }
-  }
-  totalAdjudicated.value = k12Rows.reduce((s, r) => s + Number(r.audited ?? 0), 0)
-  if (!silent) ElMessage.success(`已从 K12-1 审定表带入 ${matched} 项`)
+  if (res === 'invalid') return
+  totalAdjudicated.value = res.totalAudited
+  if (!silent) ElMessage.success(`已从 K12-1 审定表带入 ${res.matched} 项`)
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' ───────────────────────────
@@ -312,7 +252,7 @@ function handleRowChange(row: DisclosureRow): void {
 }
 
 function handleNarrativeSave(): void {
-  emit('save', 'K12-disclosure-listed-narrative', { remark: narrativeText.value })
+  emit('save', K12_DISCLOSURE_NARRATIVE_ITEM.listed, { remark: narrativeText.value })
   // Publish disclosure note text updated event
   eventBus.emit('disclosure:note-text-updated' as any, {
     noteId: 'non_operating_income',
@@ -325,15 +265,8 @@ function handleNarrativeSave(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK12SyncPayload('listed', props.wpId || '',
-    // 第 4 列「计入当期非经常性损益的金额」是源模板必填列，旧载荷从未推送
-    disclosureRows.value.map(r => ({
-      project: r.category,
-      currentAmount: r.currentAmount,
-      priorAmount: r.priorAmount,
-      nonRecurringAmount: r.nonRecurringAmount,
-    })),
-    narrativeText.value)
+  // 含第 4 列「计入当期非经常性损益的金额」（源模板必填列）
+  const payload = buildK12SyncPayload('listed', props.wpId || '', k12DisclosureSyncRows(disclosureRows.value), narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {

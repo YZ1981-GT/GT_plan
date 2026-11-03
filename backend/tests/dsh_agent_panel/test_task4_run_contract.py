@@ -387,7 +387,7 @@ class TestRequestRejectsPrivilegedFields:
         fields = set(ChatRunRequest.model_fields)
         assert fields == {
             "host", "query", "idempotency_key", "session_id",
-            "mentions", "attachment_ids", "review_mode", "sheet_name",
+            "mentions", "attachment_ids", "project_attachment_ids", "review_mode", "sheet_name",
         }, f"请求体字段集合漂移：{sorted(fields)}"
         assert not (fields & PRIVILEGED_REQUEST_FIELDS), (
             f"请求体声明了越权字段：{sorted(fields & PRIVILEGED_REQUEST_FIELDS)}"
@@ -565,7 +565,7 @@ class TestOpenApiExposesFrontendTypes:
         }, f"capability 字段漂移：{sorted(props)}"
         for engine in ChatEngineName:
             assert engine in CAPABILITIES_BY_ENGINE, f"{engine.value} 未登记 capability"
-        assert CAPABILITIES_BY_ENGINE[ChatEngineName.native].local_only is True
+        assert CAPABILITIES_BY_ENGINE[ChatEngineName.native].local_only is False
         assert CAPABILITIES_BY_ENGINE[ChatEngineName.dsh].local_only is True
 
     def test_denial_codes_all_map_to_stable_error_codes(self):

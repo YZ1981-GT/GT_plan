@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "report": {
+    "emitted": ["TB", "SUM_TB", "ROW", "SUM_ROW", "ADJ", "WP", "NOTE"],
+    "unsupported_zero_not_emitted": ["AUX", "PREV"]
+  },
+  "note": {
+    "emitted": ["CELL", "SUM", "TB", "REPORT", "NOTE", "WP", "PRIOR", "AGING"]
+  },
+  "push": {
+    "emitted": ["TB", "FOUR_TABLE", "DERIVED", "ADJ", "WP", "NOTE"]
+  }
+}

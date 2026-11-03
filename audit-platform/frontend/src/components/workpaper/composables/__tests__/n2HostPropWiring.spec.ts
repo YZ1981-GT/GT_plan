@@ -86,6 +86,13 @@ describe('N2 宿主 htmlData 传参', () => {
       ).toBe(true)
     }
   })
+  it('N2TabDetail 收到 project-id，并在导入成功后交给宿主刷新唯一快照', () => {
+    const m = HOST_TEMPLATE.match(/<N2TabDetail\b([\s\S]*?)\/>/)
+    expect(m, '宿主未渲染 N2TabDetail').toBeTruthy()
+    const attrs = m![1]
+    expect(attrs).toContain(':project-id')
+    expect(attrs).toMatch(/@imported\s*=\s*"selfLoad"/)
+  })
 })
 
 describe('披露 composable 消费 renderPrefill', () => {

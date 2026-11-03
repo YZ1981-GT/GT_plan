@@ -7,6 +7,7 @@
  * Spec: .kiro/specs/d4-12-contract-inspection/
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { parseNum } from './useD4FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export interface ContractInspectionItem {
   // 附件
   attachmentId?: string
   attachmentName?: string
+  evidenceLinkId?: string
   ocrStatus?: 'none' | 'processing' | 'done' | 'failed'
 }
 
@@ -273,11 +275,12 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
     }
   }
 
-  function setAttachment(id: string, attachmentId: string, attachmentName: string) {
+  function setAttachment(id: string, attachmentId: string, attachmentName: string, evidenceLinkId = '') {
     const item = contracts.value.find(c => c.id === id)
     if (item) {
       item.attachmentId = attachmentId
       item.attachmentName = attachmentName
+      item.evidenceLinkId = evidenceLinkId
       persistContracts()
     }
   }
@@ -328,7 +331,7 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
   })
 
   const completedCount = computed(() =>
-    contracts.value.filter(c => c.conclusion && c.conclusion !== '').length,
+    contracts.value.filter(c => Boolean(c.conclusion)).length,
   )
 
   const summaryConclusion = computed(() => {
@@ -392,9 +395,13 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
    * 供同步桥 flushHtml 在 readStoreProjection 前调用, 防投影旧值(切 OO 前先落库)。
    */
   async function flushPendingSave(): Promise<void> {
-    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }

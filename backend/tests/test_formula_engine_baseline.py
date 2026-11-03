@@ -53,7 +53,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.formula_engine import execute as fe_execute, FormulaContext, safe_eval_expr
+from app.services.formula_engine import execute as fe_execute, FormulaContext, FormulaEvalError, safe_eval_expr
 from app.services.report_engine import evaluate_formula as re_evaluate, _safe_eval_expr as re_safe_eval
 from app.services.formula_parse_utils import evaluate_formula as fp_evaluate
 from app.services.cell_formula_evaluator import (
@@ -221,7 +221,7 @@ RE_BASELINE: dict[str, Decimal] = {
     "F07_REPORT":         Decimal("100"),
     "F08_PREV":           Decimal("0"),          # 报表语境强制 0 → D2
     "F09_AUX":            Decimal("0"),
-    "F10_NESTED_PREV_TB": Decimal("0"),
+    "F10_NESTED_PREV_TB": None,
     "F11_IF":             Decimal("100000"),
     "F12_ABS":            Decimal("30000"),
     "F13_ROUND":          Decimal("33333.33"),
@@ -248,7 +248,7 @@ FP_BASELINE: dict[str, float | None] = {
     "F07_REPORT":         100.0,  # AST 默认：REPORT 走 row_cache（BS-002=100）
     "F08_PREV":           0.0,
     "F09_AUX":            0.0,
-    "F10_NESTED_PREV_TB": 0.0,
+    "F10_NESTED_PREV_TB": None,
     "F11_IF":             None,   # '>' 比较运算符未词法化 → 解析报错
     "F12_ABS":            0.0,    # ABS 委托内核但 ctx 空 → 0
     "F13_ROUND":          0.0,
@@ -334,10 +334,8 @@ KNOWN_DIVERGENCES: dict[str, tuple[Decimal, Decimal, str]] = {
         "PREV 取数：formula_engine 取上年 prior_tb_data vs report_engine 报表语境强制 0",
     ),
     "F10_NESTED_PREV_TB": (
-        Decimal("80000"), Decimal("0"),
-        "PREV 取数（嵌套形态，同 D2 根因）：AST 默认（_PARSE_MODE parallel→ast）后嵌套 "
-        "PREV(TB(...)) 由递归下降正确求值取上年 80000 vs report_engine 报表语境强制 PREV→0。"
-        "旧 parallel 模式下 regex 不识别嵌套 → 两引擎都 0（伪收敛），AST 修复后暴露真实分歧。",
+        Decimal("80000"), None,
+        "PREV 取数（嵌套形态）：报表路径把嵌套展开成无效的一参 PREV，现按失败语义返回 None。",
     ),
 }
 
@@ -407,8 +405,19 @@ class TestArithmeticCoreConvergence:
         ("(1+2)*3", Decimal("9")),
         ("100-50", Decimal("50")),
         ("100/4", Decimal("25")),
-        ("100/0", Decimal("0")),   # 4 套统一约定除零 → 0
+        # 除零不再是统一约定的 0：报表 DSL 改为报错，见 test_division_by_zero_* 两条
     ]
+
+    def test_division_by_zero_is_error_in_report_dsl(self):
+        """报表 DSL 的两个入口（同一个 safe_eval_expr）除零报错（spec formula-hub-integrity-closure 需求 2.3）。"""
+        for evaluate in (safe_eval_expr, re_safe_eval):
+            with pytest.raises(FormulaEvalError, match="除数为 0"):
+                evaluate("100/0")
+
+    def test_division_by_zero_cell_formula_evaluator_is_error(self):
+        """底稿 Excel 语法域除零返回明确错误，不再伪装成 0。"""
+        with pytest.raises(ZeroDivisionError, match="除数为 0"):
+            fu_safe_eval("100/0")
 
     @pytest.mark.parametrize("expr,expected", ARITH_CASES)
     def test_formula_engine_arith(self, expr, expected):
@@ -420,7 +429,7 @@ class TestArithmeticCoreConvergence:
 
     @pytest.mark.parametrize("expr,expected", ARITH_CASES)
     def test_cell_formula_evaluator_arith(self, expr, expected):
-        # cell_formula_evaluator 返回 float（Excel 语法域，非 Decimal）
+        # cell_formula_evaluator 与 L1 / report_engine 一样返回 Decimal。
         result = fu_safe_eval(expr)
         assert Decimal(str(result)) == expected
 

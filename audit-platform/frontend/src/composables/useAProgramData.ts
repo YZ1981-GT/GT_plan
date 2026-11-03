@@ -42,10 +42,11 @@ export function useAProgramData(projectId: Ref<string>) {
       }
       return false
     }
-    // dict 形式：如 { business_category: ['ipo', 'listed'] }
+    // dict 形式：如 { business_category: ['ipo', 'listed'] }（模板声明的适用性标签）
     if (typeof aw === 'object' && aw.business_category) {
-      const biz = projectInfo.value?.business_category || ''
-      return !isIpoProject(biz, aw.business_category)
+      // R4：项目详情下发的后端分类 / 场景单一解释优先（标签精确匹配）；旧响应只有分类原值时按子串兼容
+      const source = projectInfo.value?.project_classification ?? projectInfo.value?.business_category ?? ''
+      return !isIpoProject(source, aw.business_category)
     }
     return false
   })

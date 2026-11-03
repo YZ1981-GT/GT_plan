@@ -21,7 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_audit_year
+from app.deps import check_consol_lock, require_project_access, require_project_audit_year
 from app.models.core import User
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,16 @@ def _split_balanced_groups(rows: list[dict]) -> tuple[list[list[dict]], list[lis
     return balanced_groups, unbalanced_groups
 
 
+def _amount(value, row_no: int) -> float:
+    """解析金额；无法识别时 400 并指明行号。"""
+    from app.services.adjustment_entry_rules import to_cents
+
+    try:
+        return float(to_cents(str(value).replace(",", "") if value is not None else None))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"第 {row_no} 行金额无法识别：{value}")
+
+
 # ── 端点 ──
 
 @router.get("/template")
@@ -104,7 +114,7 @@ async def export_reclassification_template(
     project_id: UUID,
     year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出重分类 Excel 模板（预填科目列表）。
 
@@ -184,7 +194,7 @@ async def import_reclassification(
     project_id: UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """导入重分类 Excel，按连续借贷平衡组拆分为多笔独立分录。"""
     import openpyxl
@@ -210,8 +220,8 @@ async def import_reclassification(
 
         account_code = str(row[0] or "").strip()
         account_name = str(row[1] or "").strip() if len(row) > 1 else ""
-        debit = float(row[2] or 0) if len(row) > 2 and row[2] else 0
-        credit = float(row[3] or 0) if len(row) > 3 and row[3] else 0
+        debit = _amount(row[2] if len(row) > 2 else None, i)
+        credit = _amount(row[3] if len(row) > 3 else None, i)
         summary = str(row[4] or "").strip() if len(row) > 4 else ""
 
         if not account_code and debit == 0 and credit == 0:
@@ -264,105 +274,44 @@ async def inline_submit_reclassification(
     project_id: UUID,
     body: InlineSubmitRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """多行录入一键提交（借贷平衡门控）。
+    """多行录入一键提交为一笔重分类调整（RJE 草稿）。
 
-    当 sum(debit_amount) ≠ sum(credit_amount) 时拒绝提交（返回 400）。
+    原实现裸 INSERT 写 ORM 与迁移都没有的列（summary / status / version）、类型写 'reclassification'
+    （不在 aje / rje 枚举里）、漏 NOT NULL 的 company_code / created_by ⇒ 必然失败；现走与大厅新建
+    同一套校验、编号与事件（spec adjustment-hall-entry-review-closure 需求 6）。
     """
-    # 借贷平衡校验
-    total_debit = sum(Decimal(str(r.debit_amount)) for r in body.rows)
-    total_credit = sum(Decimal(str(r.credit_amount)) for r in body.rows)
+    from app.models.audit_platform_models import AdjustmentType
+    from app.models.audit_platform_schemas import AdjustmentCreate, AdjustmentLineItem
+    from app.services.adjustment_service import AdjustmentService
 
-    if total_debit != total_credit:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error_code": "DEBIT_CREDIT_IMBALANCE",
-                "message": f"借贷不平衡：借方合计 {float(total_debit)}，贷方合计 {float(total_credit)}，差额 {float(total_debit - total_credit)}",
-                "total_debit": float(total_debit),
-                "total_credit": float(total_credit),
-                "difference": float(total_debit - total_credit),
-            },
-        )
-
-    # 创建重分类调整分录
-    from uuid import uuid4
-    from datetime import datetime, timezone
-    from app.services.event_bus import event_bus
-    from app.models.audit_platform_schemas import EventPayload, EventType
-
-    entry_group_id = uuid4()
-    account_codes: list[str] = []
-
-    # 获取下一个分录号
-    no_query = text("""
-        SELECT MAX(CAST(SUBSTRING(adjustment_no FROM '[0-9]+$') AS INTEGER))
-        FROM adjustments
-        WHERE project_id = :project_id AND year = :year AND is_deleted = false
-    """)
+    summary = next((r.summary for r in body.rows if r.summary), "") or "重分类调整"
     try:
-        no_result = await db.execute(
-            no_query, {"project_id": str(project_id), "year": body.year}
-        )
-        max_no = no_result.scalar() or 0
-    except Exception:
-        max_no = 0
-
-    adjustment_no = f"RJE-{max_no + 1:03d}"
-
-    for row in body.rows:
-        row_id = uuid4()
-        insert_query = text("""
-            INSERT INTO adjustments
-                (id, project_id, year, entry_group_id, adjustment_no,
-                 account_code, account_name, debit_amount, credit_amount,
-                 summary, adjustment_type, status, is_deleted, created_at, updated_at, version)
-            VALUES
-                (:id, :project_id, :year, :entry_group_id, :adjustment_no,
-                 :account_code, :account_name, :debit_amount, :credit_amount,
-                 :summary, :adjustment_type, :status, false, :now, :now, 1)
-        """)
-        now = datetime.now(timezone.utc)
-        await db.execute(
-            insert_query,
-            {
-                "id": str(row_id),
-                "project_id": str(project_id),
-                "year": body.year,
-                "entry_group_id": str(entry_group_id),
-                "adjustment_no": adjustment_no,
-                "account_code": row.account_code,
-                "account_name": row.account_name,
-                "debit_amount": float(row.debit_amount) if row.debit_amount else None,
-                "credit_amount": float(row.credit_amount) if row.credit_amount else None,
-                "summary": row.summary,
-                "adjustment_type": "reclassification",
-                "status": "committed",
-                "now": now,
-            },
-        )
-        if row.account_code:
-            account_codes.append(row.account_code)
-
-    await db.commit()
-
-    # 发布批量提交事件（单次级联）
-    unique_codes = list(set(account_codes))
-    if unique_codes:
-        await event_bus.publish(EventPayload(
-            event_type=EventType.ADJUSTMENT_BATCH_COMMITTED,
-            project_id=project_id,
+        data = AdjustmentCreate(
+            adjustment_type=AdjustmentType.rje,
             year=body.year,
-            account_codes=unique_codes,
-            entry_group_id=entry_group_id,
-        ))
-
+            description=summary,
+            line_items=[
+                AdjustmentLineItem(
+                    standard_account_code=r.account_code,
+                    account_name=r.account_name or None,
+                    debit_amount=Decimal(str(r.debit_amount or 0)),
+                    credit_amount=Decimal(str(r.credit_amount or 0)),
+                )
+                for r in body.rows
+            ],
+        )
+        result = await AdjustmentService(db).create_entry(project_id, data, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error_code": "INVALID_ENTRY", "message": str(e)})
+    await db.commit()
     return {
-        "message": "重分类提交成功",
-        "entry_group_id": str(entry_group_id),
-        "adjustment_no": adjustment_no,
+        "message": "重分类已保存为草稿，提交复核并批准后计入试算表",
+        "entry_group_id": str(result.entry_group_id),
+        "adjustment_no": result.adjustment_no,
         "rows_count": len(body.rows),
-        "total_debit": float(total_debit),
-        "total_credit": float(total_credit),
+        "total_debit": float(result.total_debit),
+        "total_credit": float(result.total_credit),
     }

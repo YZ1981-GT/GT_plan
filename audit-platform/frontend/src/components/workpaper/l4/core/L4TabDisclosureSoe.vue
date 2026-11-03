@@ -120,15 +120,16 @@
  * - 国企附注模板（额外披露审批/用途/偿债计划/国资委）
  * - subscribe 'substantive:adjudicated' 刷新
  */
-import { inject, onMounted, onUnmounted, onBeforeUnmount, ref, computed, watch } from 'vue'
+import { inject, nextTick, onMounted, onUnmounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useL4FormData } from '../../composables/useL4FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import {
-  buildL4SyncPayload,
-  L4_NOTE_SECTION,
-  L4_DISCLOSURE_SHEET_NAME,
-} from '../../composables/l4NoteSectionMap'
+  buildL4DisclosureSyncBody,
+  createL4DisclosureItems,
+  restoreL4DisclosureState,
+  type L4DisclosureItem,
+} from '../../composables/l4DisclosureTabState'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
@@ -150,29 +151,7 @@ const formData = useL4FormData({
   projectId: computed(() => props.projectId),
 })
 
-interface DisclosureItem {
-  seq: number
-  item: string
-  noteContent: string
-  auditedData: string
-  isConsistent: string
-  diffNote: string
-}
-
-const disclosureItems = ref<DisclosureItem[]>([
-  { seq: 1, item: '债券名称及面值', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 2, item: '发行日期及期限', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 3, item: '票面利率/实际利率', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 4, item: '期初摊余成本', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 5, item: '本期利息费用', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 6, item: '本期兑付金额', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 7, item: '期末摊余成本', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 8, item: '审批机关及批准文号', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 9, item: '资金用途及使用进度', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 10, item: '偿债计划及资金来源', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 11, item: '国资委备案情况', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-  { seq: 12, item: '担保情况', noteContent: '', auditedData: '', isConsistent: '', diffNote: '' },
-])
+const disclosureItems = ref<L4DisclosureItem[]>(createL4DisclosureItems('soe'))
 
 const noteText = ref('')
 const conclusion = ref('')
@@ -197,28 +176,24 @@ function saveConclusion() {
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
+let disclosureHydrated = false
+
+function currentDisclosureState() {
+  return {
+    ...restoreL4DisclosureState(formData.allResponses.value, 'soe'),
+    items: disclosureItems.value,
+    noteText: noteText.value,
+    conclusion: conclusion.value,
+  }
+}
+
 async function syncToDisclosureNotes(): Promise<void> {
   if (props.isReadonly || !props.projectId) return
   try {
-    const noteTextsPayload: Array<{ section: string; title: string; text: string }> = []
-    const text = (noteText.value || '').trim()
-    if (text) {
-      noteTextsPayload.push({ section: 'l4-convertible-bond', title: '可转换公司债券', text })
-    }
-    const payload = buildL4SyncPayload({
-      variant: 'soe',
-      wpId: props.wpId,
-      projectId: props.projectId,
-      noteTexts: noteTextsPayload.length ? noteTextsPayload : undefined,
+    const body = buildL4DisclosureSyncBody({
+      variant: 'soe', wpId: props.wpId, projectId: props.projectId, state: currentDisclosureState(),
     })
-    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-      wp_id: props.wpId,
-      sheet_name: L4_DISCLOSURE_SHEET_NAME.soe,
-      section_id: L4_NOTE_SECTION.soe,
-      current_standard: 'soe_standalone',
-      sub_table_data: payload.sub_table_data,
-      columns: payload._sub_table_columns,
-    })
+    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, body)
   } catch {
     // 自动同步失败静默
   }
@@ -226,7 +201,7 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 watch(
   [noteText, disclosureItems],
-  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  () => { if (disclosureHydrated) autoSync.scheduleAutoSync(syncToDisclosureNotes) },
   { deep: true },
 )
 
@@ -238,6 +213,12 @@ function onAdjudicated() {
 
 onMounted(async () => {
   await formData.loadData()
+  const restored = restoreL4DisclosureState(formData.allResponses.value, 'soe')
+  disclosureItems.value = restored.items
+  noteText.value = restored.noteText
+  conclusion.value = restored.conclusion
+  await nextTick()
+  disclosureHydrated = true
   eventBus.on('substantive:adjudicated', onAdjudicated)
 })
 

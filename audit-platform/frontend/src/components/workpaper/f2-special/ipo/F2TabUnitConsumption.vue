@@ -119,7 +119,7 @@
         />
       </div>
       <div class="table-scroll">
-        <table class="matrix-table structure-table">
+        <GtGridTable class="matrix-table structure-table">
           <thead>
             <tr>
               <th rowspan="2">年度</th>
@@ -182,7 +182,7 @@
               </tr>
             </template>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
       <AuditNoteBlock
         title="审计说明"
@@ -205,7 +205,7 @@
         </div>
       </header>
       <div class="table-scroll">
-        <table class="matrix-table flow-table">
+        <GtGridTable class="matrix-table flow-table">
           <thead>
             <tr>
               <th>年度</th>
@@ -251,7 +251,7 @@
               </tr>
             </template>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
       <AuditNoteBlock
         title="审计说明"
@@ -274,7 +274,7 @@
         </div>
       </header>
       <div class="table-scroll">
-        <table class="matrix-table unit-table">
+        <GtGridTable class="matrix-table unit-table">
           <thead>
             <tr>
               <th rowspan="2">年度</th>
@@ -347,7 +347,7 @@
               </tr>
             </template>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
 
       <div class="sub-panel">
@@ -364,7 +364,7 @@
           />
         </div>
         <div class="table-scroll">
-          <table class="matrix-table peer-table">
+          <GtGridTable class="matrix-table peer-table">
             <thead>
               <tr>
                 <th>项目</th>
@@ -387,7 +387,7 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </div>
       </div>
       <AuditNoteBlock
@@ -423,7 +423,7 @@
         />
       </div>
       <div class="table-scroll">
-        <table class="matrix-table material-table">
+        <GtGridTable class="matrix-table material-table">
           <thead>
             <tr>
               <th rowspan="2">年度</th>
@@ -517,7 +517,7 @@
               </tr>
             </template>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
       <AuditNoteBlock
         title="审计说明"
@@ -560,13 +560,15 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref, toRef, type Ref } from 'vue'
-import { ElButton, ElInput } from 'element-plus'
+import { ElButton } from 'element-plus'
+import { ElInput } from '@/components/grid/adapters'
 import { useF2UnitConsumption } from '../../composables/useF2UnitConsumption'
 import { F2_64_OBJECTIVE, type UnitConsumptionSheet } from '../../composables/useF2UnitConsumptionFormulas'
 import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

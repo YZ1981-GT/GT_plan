@@ -130,7 +130,7 @@
  * - textarea sections (autosize) for each disclosure area
  * - AI辅助 per section title
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -153,25 +153,26 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
-// ─── 同步链路（浅合并推 K3 §八、42 的应付股利子表） ──────────────────────────
+// ─── 同步链路（浅合并推 K3 §八、42 的应付股利子表；行 / 读回 / 快照在 m1DisclosureForm，与附注页离屏同步共用） ──
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM1SyncPayload, type M1DividendRow } from '../../composables/m1NoteSectionMap'
+import {
+  buildM1SoeTabSyncPayload,
+  createM1SoeDisclosureRows,
+  restoreM1SoeDisclosureRows,
+} from '../../composables/m1DisclosureForm'
 import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const dividendRows: M1DividendRow[] = detailRows.value.map((r: any) => ({
-    label: r.item || r.label || '',
-    endAmount: Number(r.endAmount) || 0,
-    priorAmount: Number(r.priorAmount) || 0,
-  }))
-  const payload = buildM1SyncPayload(props.wpId, 'soe', dividendRows)
+  const payload = buildM1SoeTabSyncPayload(props.wpId, detailRows.value)
   if (!payload) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -182,12 +183,7 @@ const formData = useM1FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const detailRows = ref([
-  { item: '应付国有股东股利', beginBalance: 0, endBalance: 0 },
-  { item: '应付法人股东股利', beginBalance: 0, endBalance: 0 },
-  { item: '应付其他股东股利', beginBalance: 0, endBalance: 0 },
-  { item: '合计', beginBalance: 0, endBalance: 0 },
-])
+const detailRows = ref(createM1SoeDisclosureRows())
 
 const soeCapitalNote = ref('')
 const distributionNote = ref('')
@@ -199,18 +195,18 @@ function updateDetailRow(index: number, field: 'beginBalance' | 'endBalance', va
   if (index >= 0 && index < detailRows.value.length) {
     detailRows.value[index][field] = val
     formData.debouncedSave(`M1-disclosure-soe-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleSoeCapitalNoteChange() {
   formData.debouncedSave('M1-disclosure-soe-capital', { remark: soeCapitalNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleDistributionNoteChange() {
   formData.debouncedSave('M1-disclosure-soe-distribution', { remark: distributionNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleConclusionChange() {
@@ -258,16 +254,12 @@ onMounted(async () => {
   distributionNote.value = responses.get('M1-disclosure-soe-distribution')?.remark || ''
   disclosureConclusion.value = responses.get('M1-disc-soe-conclusion')?.remark || ''
   // Restore detail rows
-  for (let i = 0; i < detailRows.value.length; i++) {
-    const beginResp = responses.get(`M1-disclosure-soe-${i}-beginBalance`)
-    const endResp = responses.get(`M1-disclosure-soe-${i}-endBalance`)
-    if (beginResp?.remark) detailRows.value[i].beginBalance = Number(beginResp.remark) || 0
-    if (endResp?.remark) detailRows.value[i].endBalance = Number(endResp.remark) || 0
-  }
+  restoreM1SoeDisclosureRows(responses, detailRows.value)
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 </script>

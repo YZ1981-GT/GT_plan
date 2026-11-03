@@ -7,6 +7,7 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="f1-header-toolbar">
         <el-segmented
+          v-if="f1PEntrySync.presentation.value.showModeSwitch"
           v-model="renderMode"
           :options="dualMode.modeOptions"
           size="small"
@@ -200,6 +201,7 @@
  * 科目覆盖：1123 预付账款（借方科目/资产类）
  */
 import { ref, computed, onMounted, provide, inject, toRef, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage } from 'element-plus'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
@@ -210,6 +212,7 @@ import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { pickF1TbSourceCodes } from './composables/f1AccountScope'
+import { f1ClientNameOf, f1ImpairmentPrefillOf } from './composables/f1HostRenderContext'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 const F1TabAdjudication = defineAsyncComponent(() => import('./f1/F1TabAdjudication.vue'))
@@ -320,10 +323,7 @@ const f1TbCrossCycleCodes = computed(() => {
  * （从底稿目录「被审计单位：XXX」截出）。这里改读 render 已下发的
  * `project_context.client_name`，不去解析底稿目录 sheet 的单元格。
  */
-const f1ClientName = computed<string>(() => {
-  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
-  return String(ctx.client_name ?? ctx.clientName ?? '').trim()
-})
+const f1ClientName = computed<string>(() => f1ClientNameOf(props.htmlData))
 
 /**
  * F1-1「按性质分类」四表库预填（render `adjudication_prefill.nature`）。
@@ -339,11 +339,7 @@ const f1NaturePrefill = computed<Record<string, { opening?: number; closing?: nu
  * 减值准备（坏账准备-预付账款）四表库预填（render `impairment_prefill`）。
  * `null` = 四表库无该备抵科目 → 披露侧保持手工录入（宁缺勿造）。
  */
-const f1ImpairmentPrefill = computed<{ end: number; prior: number } | null>(() => {
-  const raw = props.htmlData?.impairment_prefill ?? props.htmlData?.impairmentPrefill
-  if (!raw || typeof raw !== 'object') return null
-  return { end: Number(raw.end ?? 0) || 0, prior: Number(raw.prior ?? 0) || 0 }
-})
+const f1ImpairmentPrefill = computed(() => f1ImpairmentPrefillOf(props.htmlData))
 
 // 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
 // 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
@@ -544,6 +540,21 @@ async function selfLoad() {
 onMounted(() => {
   void selfLoad()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const f1PEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => F1_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

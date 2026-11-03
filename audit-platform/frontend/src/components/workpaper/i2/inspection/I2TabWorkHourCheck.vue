@@ -111,7 +111,7 @@
         size="small"
         class="check-table"
         max-height="520"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
         show-summary
         :summary-method="getSummary"
       >
@@ -121,6 +121,12 @@
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.projectName" size="small" placeholder="项目" />
             <span v-else>{{ row.projectName || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="hourRows.isRowLocked(row)" :project-id="props.projectId" :year="samplingYear" />
           </template>
         </el-table-column>
 
@@ -274,12 +280,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="attachmentIndex" label="附件索引号" min-width="100">
+        <el-table-column prop="attachmentIndex" label="附件索引号" min-width="128">
           <template #default="{ row, $index }">
             <div class="attach-cell">
               <el-input v-if="!isReadonly" v-model="row.attachmentIndex" size="small" placeholder="索引" />
               <span v-else>{{ row.attachmentIndex || '—' }}</span>
               <el-button v-if="!isReadonly" size="small" text @click="handleOcr($index)">📎</el-button>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
             </div>
           </template>
         </el-table-column>
@@ -310,7 +317,7 @@
 
     <el-card shadow="never" class="audit-note-card">
       <template #header><span>三、审计说明</span></template>
-      <el-input
+      <WpCommitInput
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"
@@ -327,7 +334,7 @@
           <el-button v-if="!isReadonly" size="small" text type="primary" @click="fillAutoConclusion">生成草稿</el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         type="textarea"
         :model-value="auditConclusion"
         :disabled="isReadonly"
@@ -344,25 +351,31 @@
       </ol>
     </details>
 
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 开发支出(1717) 工时检查" width="90%" top="5vh" destroy-on-close>
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 开发支出(${samplingAccountCode}) 工时检查`" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSamplesFilled"
+        @undo-request="hourRows.onUndoRequest"
       />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, rowVoucherKey } from '@/components/attachment/rowEvidence'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { fetchTrialBalanceRows, tbRowsUnder, tbNumber } from '@/services/trialBalanceRows'
 import { computed, defineAsyncComponent, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
+import { useI2WorkHourRowsFill } from '../../composables/i2SheetRowsFill'
 import { exportData } from '@/composables/useExcelIO'
 import {
   I2_WORKHOUR_BASIS_OPTIONS,
@@ -374,8 +387,6 @@ import {
   I2_WORKHOUR_AUDIT_CONCLUSION_KEY,
   buildWorkHourConclusionDraft,
   emptyI2WorkHourRow,
-  normalizeI2WorkHourRow,
-  persistI2WorkHourRow,
   recomputeI2WorkHourRow,
   reconcileWorkHourSalaryVsAnalysis,
   seedWorkHourFromDetail,
@@ -407,6 +418,7 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 // spec: voucher-attach-account-mapping-closure（批次 6，任务 20）
@@ -428,6 +440,8 @@ const props = defineProps<{
   isReadonly?: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'I2-10'
 
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
@@ -440,7 +454,13 @@ const STAFF_KEY = I2_STAFF_STORAGE_KEY
 const DETAIL_KEY = 'I2-2-rows'
 const ANALYSIS_BUNDLE_KEY = 'I2-5-analysis-bundle'
 
-const rows = ref<I2WorkHourCheckRow[]>([])
+/** 工时行的读入 / 保存与抽凭回填、挂凭导入、撤销、年审阶段预审行只读（共享回填函数，一个样本一行） */
+const hourRows = useI2WorkHourRowsFill({
+  projectId: () => props.projectId,
+  readonly: () => props.isReadonly === true,
+  saveResponse: (sheetCode, data) => props.saveResponse(sheetCode, data),
+})
+const rows = hourRows.rows
 const auditNote = ref('')
 const auditConclusion = ref('')
 const columnViewMode = ref<'compact' | 'full'>('compact')
@@ -500,7 +520,7 @@ function parseRows(key: string): any[] {
 }
 
 function loadData() {
-  rows.value = parseRows(STORAGE_KEY).map(normalizeI2WorkHourRow)
+  hourRows.load(props.allResponses.get(STORAGE_KEY))
 }
 
 function hydrateAudit() {
@@ -522,6 +542,7 @@ watch(() => props.allResponses, () => { loadData(); hydrateAudit() }, { immediat
 onMounted(() => {
   hydrateAudit()
   void _loadTb6602()
+  void hourRows.ready()
 })
 
 function onRowChange(row: I2WorkHourCheckRow) {
@@ -539,8 +560,7 @@ function handleAddRow() {
 }
 
 function handleRemoveRow(index: number) {
-  if (index < 0 || index >= rows.value.length) return
-  rows.value.splice(index, 1)
+  hourRows.removeAt(index)
 }
 
 function mergeSeeded(seeded: I2WorkHourCheckRow[], mode: 'staff' | 'detail') {
@@ -556,6 +576,8 @@ function mergeSeeded(seeded: I2WorkHourCheckRow[], mode: 'staff' | 'detail') {
   for (const s of seeded) {
     const key = keyOf(s)
     const hit = rows.value.find((r) => keyOf(r) === key)
+    // 年审阶段预审行只读：同人员同项目同月带入不改它
+    if (hit && hourRows.isRowLocked(hit)) continue
     if (hit) {
       if (mode === 'detail') {
         hit.projectCode = s.projectCode || hit.projectCode
@@ -591,6 +613,7 @@ function handleSeedFromDetail() {
 
 function applyAllSuggestions() {
   for (const row of rows.value) {
+    if (hourRows.isRowLocked(row)) continue
     row.suggestedConclusion = suggestWorkHourConclusion(row)
     row.conclusion = row.suggestedConclusion
   }
@@ -598,8 +621,7 @@ function applyAllSuggestions() {
 }
 
 async function handleSave() {
-  const persist = rows.value.map(persistI2WorkHourRow)
-  await props.saveResponse('I2-10', { [STORAGE_KEY]: JSON.stringify(persist) })
+  await hourRows.save()
   const total = summary.value.totalCount
   const progress = total <= 0
     ? 10
@@ -645,6 +667,7 @@ function fillAutoConclusion() {
 
 /** 行级 OCR：上传领用/工时单据 → runWorkpaperOcr 回填 */
 async function handleOcr(idx: number) {
+  const rowId = rows.value[idx]?.rowId
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -652,7 +675,12 @@ async function handleOcr(idx: number) {
     const file = input.files?.[0]
     if (!file) return
     try {
-      const fields = await runWorkpaperOcr(props.wpId, file)
+      const fields = await runWorkpaperOcr(props.wpId, file, {
+        projectId: props.projectId,
+        evidenceSheet: EVIDENCE_SHEET,
+        evidenceCell: rowId ? rowEvidenceCell(rowId) : undefined,
+        voucherKey: rowVoucherKey(rows.value[idx]),
+      })
       const name = pickOcrField(fields, 'name', 'staffName', 'personName')
       const project = pickOcrField(fields, 'projectName', 'project')
       const hours = pickOcrField(fields, 'hours', 'rdHours', 'workHours')
@@ -708,54 +736,34 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, I2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await hourRows.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples?: any[] }) {
-  const samples = payload?.samples ?? []
-  let n = 0
-  for (const s of samples) {
-    const amount = Number(s?.debitAmount) || Number(s?.creditAmount) || Number(s?.amount) || 0
-    const summaryText = String(s?.summary ?? s?.description ?? '')
-    const row = emptyI2WorkHourRow({
-      staffName: summaryText || String(s?.voucherNo ?? ''),
-      projectName: String(s?.projectName ?? s?.accountName ?? ''),
-      salaryAccrual: amount,
-      attachmentIndex: s?.voucherNo ? `凭证 ${s.voucherNo}` : '',
-    })
-    rows.value.push(row)
-    onRowChange(row)
-    n++
-  }
-  samplingVisible.value = false
-  ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已回填 ${n} 笔抽样到工时行` : '未回填新凭证')
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await hourRows.onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 async function _loadTb6602(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6602' },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let total = 0
-    let hit = false
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (!code.startsWith('6602')) continue
-      hit = true
-      total += Number(item.audited_amount ?? item.unadjusted_amount ?? 0) || 0
-    }
-    tb6602.value = hit ? Math.abs(total) : null
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '6602' })
+    const family = tbRowsUnder(rows, '6602')
+    const total = family.reduce((sum, r) => sum + (tbNumber(r.audited_amount) ?? tbNumber(r.unadjusted_amount) ?? 0), 0)
+    tb6602.value = family.length ? Math.abs(total) : null
   } catch {
     tb6602.value = null
   }
@@ -800,6 +808,9 @@ function handleReview() {
 function rowClassName({ row }: { row: I2WorkHourCheckRow }) {
   return workHourRowRiskClass(row)
 }
+
+/** 行样式：风险提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, hourRows.rowClass)
 
 function conclusionTagType(c: string): 'success' | 'danger' | 'warning' | 'info' {
   if (c === '合理') return 'success'

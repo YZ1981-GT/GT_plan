@@ -24,7 +24,6 @@ import {
   H_AMOUNT_TARGET_FILES,
   H_NON_AMOUNT_NAME_HINTS,
   H_NON_AMOUNT_FIELDS,
-  H_NON_AMOUNT_NAME_HINTS,
   isHNonAmountField,
 } from '../composables/hCycleAmountControlRegistry'
 

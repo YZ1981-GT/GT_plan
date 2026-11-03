@@ -161,7 +161,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * H4TabDisclosureSoe — 附注披露信息（国有企业）
  * CIP 行：H2 EventBus substantive:adjudicated + sessionStorage 回放
  */
-import { ref, reactive, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useRouter } from 'vue-router'
@@ -177,16 +177,14 @@ import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import {
   H4_SOE_ITEM,
   buildH4SoeSummaryDisplay,
-  createDefaultH4SoeSummary,
   num,
-  type H4SoeSummaryRow,
 } from '../../composables/h4SoeDisclosureModel'
 import { buildH4SoeSyncPayloads } from '../../composables/h4SoeDisclosureSyncPayload'
 import { useH4Disclosure } from '../../composables/useH4Disclosure'
+import { useH4SoeDisclosureForm } from '../../composables/h4DisclosureForm'
 import {
   parseH2CipFromAdjudicatedEvent,
   readH2CipSnapshot,
-  type H2CipAdjudicatedSnapshot,
 } from '../../composables/h2CipBridge'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -202,12 +200,14 @@ const props = defineProps<{
 const isReadonly = computed(() => props.isReadonly)
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-const { pullSoeSummary, soeCrossCheck, significantNoteDraft } = useH4Disclosure(allResponsesRef as any)
+const disclosure = useH4Disclosure(allResponsesRef as any)
+const { soeCrossCheck, significantNoteDraft } = disclosure
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const router = useRouter()
 
-const summary = reactive<H4SoeSummaryRow[]>(createDefaultH4SoeSummary())
-const noteText = ref('')
+// 表单状态 / 读回 / 取数 / 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+const form = useH4SoeDisclosureForm({ disclosure, onChange: () => scheduleSave() })
+const { summary, noteText, applyCipSnapshot } = form
 
 // ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
 const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
@@ -233,51 +233,6 @@ const crossWarnings = computed(() => soeCrossCheck(summary))
 function fmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function parseJson(itemId: string): any {
-  const raw = props.allResponses.get(itemId)?.remark
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return null }
-}
-
-function cipRowEmpty(): boolean {
-  const cip = summary.find((r) => r.key === 'cip')
-  if (!cip) return true
-  return !num(cip.endBook) && !num(cip.beginBook) && !num(cip.endImpairment) && !num(cip.beginImpairment)
-}
-
-function applyCipSnapshot(snap: H2CipAdjudicatedSnapshot, force: boolean): boolean {
-  const cip = summary.find((r) => r.key === 'cip')
-  if (!cip) return false
-  if (!force && !cipRowEmpty()) return false
-  cip.endBook = snap.endBook
-  cip.endImpairment = snap.endImpairment
-  cip.beginBook = snap.beginBook
-  cip.beginImpairment = snap.beginImpairment
-  scheduleSave()
-  return true
-}
-
-function load() {
-  const saved = parseJson(H4_SOE_ITEM.summary)
-  if (Array.isArray(saved) && saved.length) {
-    for (const row of saved) {
-      const t = summary.find((x) => x.key === row.key)
-      if (!t) continue
-      t.endBook = num(row.endBook)
-      t.endImpairment = num(row.endImpairment)
-      t.beginBook = num(row.beginBook)
-      t.beginImpairment = num(row.beginImpairment)
-    }
-  }
-  noteText.value = String(props.allResponses.get(H4_SOE_ITEM.noteText)?.remark ?? '')
-  const hasMat = summary.some((r) => r.key === 'materials' && (r.endBook || r.beginBook || r.endImpairment))
-  if (!hasMat) pullFromSources(false)
-  if (cipRowEmpty() && props.projectId) {
-    const cached = readH2CipSnapshot(props.projectId)
-    if (cached) applyCipSnapshot(cached, false)
-  }
 }
 
 function persistAll() {
@@ -307,10 +262,7 @@ function scheduleSave() {
 // ─── 同步到附注 ──────────────────────────────────────────────────────────────
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payloads = buildH4SoeSyncPayloads(props.wpId, null, {
-    summary: summary.map((r) => ({ ...r })),
-    noteText: noteText.value,
-  })
+  const payloads = buildH4SoeSyncPayloads(props.wpId, null, form.snapshot())
   if (!payloads.length) {
     ElMessage.warning('当前项目准则不适用国企附注同步')
     return
@@ -354,19 +306,7 @@ function updateSummary(
 }
 
 function pullFromSources(notify = true) {
-  const next = pullSoeSummary(summary.map((r) => ({ ...r })))
-  for (const row of next) {
-    const t = summary.find((x) => x.key === row.key)
-    if (!t) continue
-    t.endBook = row.endBook
-    t.endImpairment = row.endImpairment
-    t.beginBook = row.beginBook
-    t.beginImpairment = row.beginImpairment
-  }
-  if (!noteText.value.trim() && significantNoteDraft.value) {
-    noteText.value = significantNoteDraft.value
-  }
-  scheduleSave()
+  form.pullFromSources()
   if (notify) ElMessage.success('已从 H4-1 审定同步工程物资行')
 }
 
@@ -407,7 +347,7 @@ function onH2Adjudicated(detail: any) {
 }
 
 onMounted(() => {
-  load()
+  form.load(props.allResponses, props.projectId)
   const busHandler = (payload: any) => onH2Adjudicated(payload)
   eventBus.on('substantive:adjudicated', busHandler)
   const winHandler = (e: Event) => onH2Adjudicated((e as CustomEvent).detail)

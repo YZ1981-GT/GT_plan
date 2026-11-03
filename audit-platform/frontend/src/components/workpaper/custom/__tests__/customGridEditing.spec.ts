@@ -437,16 +437,23 @@ describe('Property 14: 公式格不可手工覆盖（数据驱动，非 CSS）',
     expect(body).toMatch(/if\s*\(\s*isFormulaCell\([^)]*\)\s*\)\s*return\s+false/)
   })
 
-  it('双击进入编辑 / Esc 取消 / Enter 提交 在模板中接线', () => {
-    expect(tpl).toMatch(/@dblclick/)
-    expect(tpl).toMatch(/@keyup\.esc/)
-    expect(tpl).toMatch(/@keyup\.enter/)
+  // spec excel-style-table-editing 5.5：双击 / F2 / 直接输入进编辑、Enter / Tab 提交、Esc 取消改由表格内核统一处理
+  // （GtGridTable + GtGridCell），原先的 @dblclick + @keyup.enter / esc 自建编辑删掉；键位行为由 grid 单测守护
+  it('格内编辑接内核：表格是 GtGridTable，编辑器在 GtGridCell 里、可编辑由 canEdit 门控、提交走 @change', () => {
+    expect(tpl).toMatch(/<GtGridTable(?=[\s/>])/)
+    expect(tpl).not.toMatch(/<table(?=[\s/>])/)
+    expect(tpl).toMatch(/<GtGridCell\s[^>]*:editable="canEdit\(r, c\)"/)
+    expect(tpl).toMatch(/<ElInput(?=[\s/>])[\s\S]*?@change="\(v: unknown\) => onCellCommit\(r, c, v\)"/)
+    expect(tpl).not.toMatch(/@keyup\.(esc|enter)/)
+    // 编辑器来自适配层（单向 :model-value 打字时由适配组件保留草稿，不会被重置回原值 —— 原先要求绑 @input 的原因）
+    expect(script).toMatch(/import\s*\{\s*ElInput\s*\}\s*from\s*'@\/components\/grid\/adapters'/)
   })
 
-  it('🔴 编辑控件绑 @input（只绑 @change 会被 EP 在 nextTick 重置回 modelValue，抹掉键入）', () => {
-    // 编辑输入必须是 el-input 且带 @input
-    expect(tpl).toMatch(/<el-input(?=[\s/>])/)
-    expect(tpl).toMatch(/@input\s*=/)
+  it('🔴 提交判据：值未变不产生脏格（不空写盘）', () => {
+    const body = fnBody(script, 'onCellCommit')
+    expect(body, 'onCellCommit 未找到').toBeTruthy()
+    expect(body).toMatch(/if\s*\(\s*String\(original\)\s*===\s*next\s*\)/)
+    expect(body).toMatch(/scheduleFlush\(\)/)
   })
 
   it('公式格有 tooltip 展示表达式（不是只有角标）', () => {

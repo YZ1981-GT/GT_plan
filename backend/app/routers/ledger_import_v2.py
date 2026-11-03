@@ -14,17 +14,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session, get_db
-from app.deps import require_project_access
+from app.deps import require_project_access, require_project_access_stream
 from app.models.core import User
 from app.models.dataset_models import ImportJob, JobStatus
 
@@ -73,18 +73,21 @@ class SubmitRequest(BaseModel):
         False,
         description="规模警告强制继续（detect 返回 scale_warnings 时必填 true）",
     )
-    # S7-9: 增量追加模式
     incremental: bool = Field(
         False,
-        description="S7-9 增量追加模式：true 时 submit 前按 overlap_strategy 清理旧数据",
+        description="增量追加：新 staged 继承基准版本的未覆盖月份",
     )
-    overlap_strategy: str = Field(
+    overlap_strategy: Literal["skip", "overwrite"] = Field(
         "skip",
-        description="增量追加重叠月份策略（skip=跳过 / overwrite=覆盖），仅 incremental=true 时生效",
+        description="重叠月份策略（skip=保留基准 / overwrite=使用文件）",
     )
     file_periods: Optional[list[int]] = Field(
         None,
-        description="文件包含的月份列表（incremental+overwrite 时必填，用于精确清理）",
+        description="兼容旧客户端；实际月份由 staged 数据现算，不信任此字段",
+    )
+    balance_carry_confirmed: bool = Field(
+        False,
+        description="确认新增月份时余额表可能沿用上一版本口径",
     )
 
 
@@ -226,8 +229,8 @@ async def submit_import(
 ):
     """Accept confirmed mappings, create ImportJob, return job info.
 
-    S7-9: 支持 incremental 模式——submit 前自动按 overlap_strategy 清理旧数据，
-    用户无需先调 /incremental/apply 再上传（一步到位）。
+    增量模式只冻结当前 active 作为基准；文件写入新 staged 后由共享合并服务继承月份，
+    不触碰当前 active 数据。
 
     F42 / design D30：detect 阶段产生 ``scale_warnings`` 时必须在前端点"强制
     继续"后以 ``force_submit=True`` 重发；否则此端点返回 400 + 错误码
@@ -283,22 +286,7 @@ async def submit_import(
                 },
             )
 
-    # S7-9: 增量追加模式——submit 前清理旧月份
-    if body.incremental and body.overlap_strategy == "overwrite":
-        if not body.file_periods:
-            raise HTTPException(
-                status_code=400,
-                detail="incremental+overwrite 模式必须提供 file_periods",
-            )
-        from app.services.ledger_data_service import apply_incremental
-        await apply_incremental(
-            db,
-            project_id=project_id,
-            year=body.year,
-            file_periods=body.file_periods,
-            overlap_strategy="overwrite",
-        )
-        # apply_incremental 内部已 commit
+    # 增量模式只冻结基准并写入作业 options；任何删除都只能发生在新 staged 内。
 
     try:
         result = await ImportOrchestrator.submit(
@@ -312,6 +300,8 @@ async def submit_import(
             force_activate=body.force_activate,
             created_by=current_user.id,
             adapter_id=body.adapter_id,
+            append_strategy=body.overlap_strategy if body.incremental else None,
+            balance_carry_confirmed=body.balance_carry_confirmed,
         )
     except ValueError as exc:
         # 并发护栏：同 project+year 已有进行中作业 → 409 冲突
@@ -350,13 +340,13 @@ async def submit_import(
 # ---------------------------------------------------------------------------
 
 
-async def _sse_generator_with_registry(job_id: UUID):
+async def _sse_generator_with_registry(project_id: UUID, job_id: UUID):
     """Wrap _sse_generator with SSE registry for graceful drain."""
     from app.core.sse_registry import sse_registry
 
     conn = sse_registry.register()
     try:
-        async for chunk in _sse_generator(job_id):
+        async for chunk in _sse_generator(project_id, job_id):
             if conn.is_closed:
                 # Server is draining, stop sending
                 yield f"event: server_draining\ndata: {{}}\n\n"
@@ -366,15 +356,18 @@ async def _sse_generator_with_registry(job_id: UUID):
         sse_registry.unregister(conn)
 
 
-async def _sse_generator(job_id: UUID):
-    """Generate SSE events by polling job status every 2 seconds.
+async def _sse_generator(project_id: UUID, job_id: UUID):
+    """Generate SSE events by polling one project-bound job every 2 seconds.
 
     Uses its own DB session per iteration (request-scoped session
     closes when streaming starts).
     """
     while True:
         async with async_session() as db:
-            stmt = select(ImportJob).where(ImportJob.id == job_id)
+            stmt = select(ImportJob).where(
+                ImportJob.id == job_id,
+                ImportJob.project_id == project_id,
+            )
             result = await db.execute(stmt)
             job = result.scalar_one_or_none()
 
@@ -407,7 +400,7 @@ async def _sse_generator(job_id: UUID):
 async def stream_job_progress(
     project_id: UUID,
     job_id: UUID,
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """SSE endpoint for real-time job progress updates.
 
@@ -416,7 +409,7 @@ async def stream_job_progress(
     Registered with sse_registry for graceful drain during rolling updates.
     """
     return StreamingResponse(
-        _sse_generator_with_registry(job_id),
+        _sse_generator_with_registry(project_id, job_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -559,6 +552,14 @@ class TakeoverRequest(BaseModel):
         max_length=500,
     )
 
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("接管原因不能为空")
+        return value
+
 
 @router.post("/jobs/{job_id}/takeover")
 async def takeover_job(
@@ -571,7 +572,7 @@ async def takeover_job(
     """F22 / Sprint 5.10-5.11: 接管导入作业。
 
     前置条件：
-    - 当前用户角色为 PM / admin / partner
+    - 当前用户角色为 manager / admin / partner
     - job 的 heartbeat 已过期（heartbeat_at 为 NULL 或 > 5 分钟前）
 
     动作：
@@ -580,12 +581,12 @@ async def takeover_job(
     """
     from datetime import timezone
 
-    # 权限检查：仅 PM / admin / partner 可接管
-    allowed_roles = {"pm", "admin", "partner"}
+    # 权限检查：仅项目经理 / 管理员 / 合伙人可接管
+    allowed_roles = {"manager", "admin", "partner"}
     if current_user.role.value not in allowed_roles:
         raise HTTPException(
             status_code=403,
-            detail="仅 PM / admin / partner 可接管导入作业",
+            detail="仅项目经理、管理员或合伙人可接管导入作业",
         )
 
     # 查找 job

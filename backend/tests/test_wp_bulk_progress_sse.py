@@ -356,3 +356,60 @@ class TestProgressEndpoint:
         assert "event: complete" in text
 
         bulk_progress_service._tasks.pop(task.task_id, None)
+
+
+@pytest.mark.asyncio
+async def test_durable_progress_fallback_survives_empty_memory_projection(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from uuid import uuid4
+
+    from app.core import database
+    from app.routers import wp_bulk_router
+    from app.services import platform_job_service
+
+    project_id = uuid4()
+    user_id = uuid4()
+    job_id = uuid4()
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+    snapshots = [
+        {
+            "status": "running",
+            "progress_current": 1,
+            "progress_total": 2,
+            "progress_message": "处理中",
+        },
+        {
+            "status": "succeeded",
+            "progress_current": 2,
+            "progress_total": 2,
+            "progress_message": "完成",
+        },
+    ]
+    get_snapshot = AsyncMock(side_effect=snapshots)
+    monkeypatch.setattr(database, "async_session", lambda: Session())
+    monkeypatch.setattr(platform_job_service, "get_job_snapshot", get_snapshot)
+    monkeypatch.setattr(wp_bulk_router.asyncio, "sleep", AsyncMock())
+
+    response = await wp_bulk_router.get_bulk_progress_stream(
+        project_id=project_id,
+        task_id=str(job_id),
+        current_user=SimpleNamespace(id=user_id),
+    )
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk.encode() if isinstance(chunk, str) else chunk
+
+    text = body.decode()
+    assert "event: progress" in text
+    assert "处理中" in text
+    assert "event: complete" in text
+    assert get_snapshot.await_count == 2
+    assert get_snapshot.call_args.kwargs["actor_id"] == user_id

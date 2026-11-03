@@ -4,6 +4,7 @@
   */
  import type { AxiosRequestConfig } from 'axios'
  import http from '@/utils/http'
+ import { api } from '@/services/apiProxy'
  import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
  import {
    projects as P_proj, trialBalance as P_tb, adjustments as P_adj,
@@ -11,6 +12,8 @@
    cfsWorksheet as P_cfs, disclosureNotes as P_dn, auditReport as P_ar,
    exportTask as P_exp, workpaperSummary as P_ws,
  } from '@/services/apiPaths'
+ import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
+ import type { TrialBalanceRow } from '@/services/trialBalanceRows'
 
  export interface ProjectListItem {
    id: string
@@ -26,9 +29,10 @@
    return Array.isArray(data) ? data : (data?.items ?? [])
  }
 
- export async function getProject(projectId: string): Promise<ProjectListItem> {
-  const { data } = await http.get(P_proj.detail(projectId))
-  return data
+/** 项目详情：经 apiProxy 共享同址在途请求（R16：编辑器打开时项目 store / 页面各取一次，原先各发一条）。 */
+ export async function getProject(projectId: string, opts: { dedupe?: boolean } = {}): Promise<ProjectListItem> {
+  // dedupe:false：不进 http 层 GET 去重（项目 store 换项目时用：被同址 GET 取消会把年度误判成取失败）
+  return api.get<ProjectListItem>(P_proj.detail(projectId), opts.dedupe === false ? ({ _dedupe: false } as any) : undefined)
 }
 
 export async function getProjectAuditYear(projectId: string): Promise<number | null> {
@@ -38,32 +42,14 @@ export async function getProjectAuditYear(projectId: string): Promise<number | n
 
 // ─── Trial Balance ───
 
-export interface TrialBalanceRow {
-  standard_account_code: string
-  account_name: string | null
-  account_category: string | null
-  unadjusted_amount: string | null
-  rje_adjustment: string
-  aje_adjustment: string
-  wp_adjustment: string | null
-  audited_amount: string | null
-  opening_balance: string | null
-  exceeds_materiality: boolean
-  below_trivial: boolean
-  updated_at?: string | null
-  wp_publish_base: string | null
-  wp_published_at: string | null
-}
+export type { TrialBalanceRow }
 
 export async function getTrialBalance(projectId: string, year: number, companyCode?: string): Promise<TrialBalanceRow[]> {
-  const params: Record<string, any> = { year }
-  if (companyCode) params.company_code = companyCode
-  const { data } = await http.get(P_tb.get(projectId), { params })
-  // 后端过渡期语义（sign_convention readiness）返回 {data, warning} 对象而非纯数组
-  if (data && !Array.isArray(data) && Array.isArray(data.data)) {
-    return data.data
-  }
-  return Array.isArray(data) ? data : []
+  const result = await fetchTrialBalanceRows(projectId, {
+    year,
+    companyCode,
+  })
+  return result.rows
 }
 
 export async function recalcTrialBalance(projectId: string, year: number) {
@@ -119,13 +105,44 @@ export interface AccountOption {
   code: string
   name: string
   level: number
-  report_line?: string  // 对应报表行次名称
+  report_line?: string | null  // 对应报表行次名称（已确认映射的才有）
+  balance?: string | null      // 传年度时附试算表审定数（参考余额）
+}
+
+export interface AdjustmentListQuery {
+  adjustment_type?: string
+  review_status?: string
+  origin?: string
+  search?: string
+  account_code?: string
+  amount_min?: number
+  amount_max?: number
+  created_by?: string
+  reviewer_id?: string
+  audit_phase?: string
+  treatment_status?: string
+  focus_entry_group_id?: string
+  created_from?: string
+  created_to?: string
+  sort_by?: 'adjustment_no' | 'description' | 'created_at' | 'review_status' | 'amount'
+  sort_order?: 'asc' | 'desc'
+  page?: number
+  page_size?: number
+}
+
+export interface AdjustmentListPage {
+  items: any[]
+  total: number
+  page: number
+  page_size: number
+  has_more: boolean
+  status_counts: Record<string, number>
 }
 
 export async function listAdjustments(
   projectId: string, year: number,
-  opts?: { adjustment_type?: string; review_status?: string; origin?: string; page?: number; page_size?: number }
-) {
+  opts?: AdjustmentListQuery,
+): Promise<AdjustmentListPage> {
   const { data } = await http.get(P_adj.list(projectId), {
     params: { year, ...opts },
   })
@@ -146,7 +163,8 @@ export async function syncAdjustmentFromWorkpaper(projectId: string, body: {
     debit_amount: number; credit_amount: number
   }>
 }) {
-  const { data } = await http.post(P_adj.syncFromWorkpaper(projectId), body)
+  // 调用方（useAdjustmentCentralSync）按错误码自管提示 ⇒ 静默，免得全局拦截器先弹一次
+  const { data } = await http.post(P_adj.syncFromWorkpaper(projectId), body, { _silent: true } as any)
   return data
 }
 
@@ -157,24 +175,29 @@ export async function getAdjustmentBySourceRef(projectId: string, sourceRef: str
     entry_group_id?: string; adjustment_no?: string; adjustment_type?: string
     review_status?: string; rejection_reason?: string | null; source_wp_code?: string
     collaboration_status?: string | null
+    client_booking?: { status: string; effective: boolean; voucher_keys: string[] } | null
   }
+}
+
+/** 调整大厅写操作（新建 / 修改 / 删除 / 撤回复核）的调用方都自管失败提示 ⇒ 静默 */
+const ADJ_SILENT = { _silent: true } as any
+
+export interface AdjustmentLineInput {
+  standard_account_code: string
+  account_name?: string
+  detail_account_code?: string | null
+  report_line_code?: string | null
+  debit_amount: number
+  credit_amount: number
 }
 
 export async function createAdjustment(projectId: string, body: {
   adjustment_type: string; year: number; company_code?: string;
-  description?: string; line_items: Array<{
-    standard_account_code: string; account_name?: string;
-    debit_amount: number; credit_amount: number
-  }>
-}, opts?: { batch_mode?: boolean }) {
-  const params: Record<string, any> = {}
-  if (opts?.batch_mode) params.batch_mode = true
-  const { data } = await http.post(P_adj.create(projectId), body, { params })
-  return data
-}
-
-export async function batchCommitAdjustments(projectId: string, year: number) {
-  const { data } = await http.post(P_adj.batchCommit(projectId), null, { params: { year } })
+  /** 自定义编号（不填自动编号；同项目同年度不得重复） */
+  adjustment_no?: string
+  description?: string; line_items: AdjustmentLineInput[]
+}) {
+  const { data } = await http.post(P_adj.create(projectId), body, ADJ_SILENT)
   return data
 }
 
@@ -237,32 +260,23 @@ export async function rejectCollaboration(projectId: string, cid: string, reason
 }
 
 export async function updateAdjustment(projectId: string, groupId: string, body: {
-  description?: string; line_items: Array<{
-    standard_account_code: string; account_name?: string;
-    debit_amount: number; credit_amount: number
-  }>
+  expected_revision?: number; description?: string; audit_phase?: 'preliminary' | 'final'; line_items: AdjustmentLineInput[]
 }) {
-  const { data } = await http.put(P_adj.detail(projectId, groupId), body)
+  const { data } = await http.put(P_adj.detail(projectId, groupId), body, ADJ_SILENT)
   return data
 }
 
-export async function deleteAdjustment(projectId: string, groupId: string) {
-  const { data } = await http.delete(P_adj.detail(projectId, groupId))
+export async function deleteAdjustment(projectId: string, groupId: string, expectedRevision?: number) {
+  const config = { ...ADJ_SILENT, params: expectedRevision ? { expected_revision: expectedRevision } : undefined }
+  const { data } = await http.delete(P_adj.detail(projectId, groupId), config)
   return data
 }
 
-export async function reviewAdjustment(projectId: string, groupId: string, body: {
-  status: string; reason?: string
-}) {
-  const { data } = await http.post(P_adj.review(projectId, groupId), body)
-  return data
-}
-
-/** 撤回复核（approved→draft）（chain-closure-phase3-push-rollout 需求 3.1） */
+/** 撤回复核（approved→draft）（chain-closure-phase3-push-rollout 需求 3.1）；返回含 notified（通知了谁） */
 export async function revokeAdjustmentReview(projectId: string, groupId: string, body: {
   reason?: string
 }) {
-  const { data } = await http.post(P_adj.revokeReview(projectId, groupId), body)
+  const { data } = await http.post(P_adj.revokeReview(projectId, groupId), body, ADJ_SILENT)
   return data
 }
 
@@ -271,10 +285,249 @@ export async function getAdjustmentSummary(projectId: string, year: number): Pro
   return data
 }
 
-export async function getAccountDropdown(projectId: string, reportLineCode?: string): Promise<AccountOption[]> {
-  const params: Record<string, string> = {}
+export async function getAccountDropdown(
+  projectId: string, reportLineCode?: string, year?: number | null,
+): Promise<AccountOption[]> {
+  const params: Record<string, string | number> = {}
   if (reportLineCode) params.report_line_code = reportLineCode
+  if (year != null) params.year = year
   const { data } = await http.get(P_adj.accountDropdown(projectId), { params })
+  return data
+}
+
+// ── 调整分录复核流转 / 导入（spec adjustment-hall-entry-review-closure）──
+// 调用方自管提示 ⇒ 一律 _silent（否则全局拦截器先弹一次，同一原因提示两遍）
+
+export interface AdjustmentReviewer {
+  user_id: string
+  name: string
+  project_role: string | null
+  system_role: string
+}
+
+export interface AdjustmentFlowItem {
+  entry_group_id: string
+  adjustment_no?: string | null
+  status?: string
+  previous_status?: string
+  reason?: string
+  [key: string]: unknown
+}
+
+export interface AdjustmentFlowResult {
+  succeeded: AdjustmentFlowItem[]
+  failed: Array<{ entry_group_id: string; adjustment_no: string | null; reason: string }>
+  notified: Array<{ user_id: string; name: string; kind: string }>
+  warning?: string | null
+}
+
+export interface AdjustmentReviewTask {
+  id: string
+  entry_group_id: string
+  year: number
+  status: 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'stale'
+  required_level: 'manager' | 'partner'
+  revision: number
+  group_content_revision: number
+  assigned_reviewer_ids: string[]
+  submitted_by: string
+  submitted_at: string | null
+  submit_note?: string | null
+}
+
+export async function listAdjustmentReviewTasks(
+  projectId: string, year?: number | null, mineOnly = true,
+): Promise<AdjustmentReviewTask[]> {
+  const params: Record<string, string | number | boolean> = { mine_only: mineOnly, status: 'pending' }
+  if (year != null) params.year = year
+  const { data } = await http.get(P_adj.reviewTasks(projectId), { params, _silent: true } as any)
+  return data
+}
+
+export interface AdjustmentClientBookingProjection {
+  status: 'booked' | 'revoked'
+  effective: boolean
+  voucher_keys: string[]
+  booked_dataset_id: string | null
+  created_by: string | null
+  created_at: string | null
+  note?: string | null
+}
+
+export interface AdjustmentBookingCandidate {
+  voucher_key: string
+  label: string
+  voucher_date: string
+  voucher_type: string
+  voucher_no: string
+  company_code: string
+  summary: string
+  distance_days: number
+  matches: Array<Record<string, unknown>>
+}
+
+export interface AdjustmentBookingSuggestion {
+  entry_group_id: string
+  adjustment_no: string
+  description?: string | null
+  audit_phase: string
+  candidates: AdjustmentBookingCandidate[]
+}
+
+export async function listAdjustmentBookingSuggestions(
+  projectId: string, year: number,
+): Promise<AdjustmentBookingSuggestion[]> {
+  const { data } = await http.get(P_adj.clientBookingSuggestions(projectId), {
+    params: { year }, _silent: true,
+  } as any)
+  return data
+}
+
+export async function markAdjustmentClientBooked(
+  projectId: string, groupId: string, body: { year: number; voucher_keys: string[]; note?: string },
+) {
+  const { data } = await http.post(P_adj.clientBooking(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function revokeAdjustmentClientBooking(
+  projectId: string, groupId: string, body: { year: number; reason: string },
+) {
+  const { data } = await http.post(P_adj.clientBookingRevoke(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function getAdjustmentClientBookingHistory(projectId: string, groupId: string, year: number) {
+  const { data } = await http.get(P_adj.clientBookingHistory(projectId, groupId), { params: { year } })
+  return data
+}
+
+export interface AdjustmentTreatmentProjection {
+  status: 'pending_internal_review' | 'awaiting_workpaper_publish' | 'include_in_working_tb' | 'client_booked' | 'unadjusted_misstatement'
+  effective: boolean
+  latest_action: string | null
+  sequence: number | null
+  misstatement_id: string | null
+  client_booking_id: string | null
+  reason?: string | null
+  created_by?: string | null
+  created_at?: string | null
+}
+
+export async function getAdjustmentTreatment(projectId: string, groupId: string, year: number): Promise<AdjustmentTreatmentProjection> {
+  const { data } = await http.get(P_adj.treatment(projectId, groupId), { params: { year }, _silent: true } as any)
+  return data
+}
+
+export async function getAdjustmentTreatmentHistory(projectId: string, groupId: string, year: number) {
+  const { data } = await http.get(P_adj.treatmentHistory(projectId, groupId), { params: { year }, _silent: true } as any)
+  return data
+}
+
+export async function markAdjustmentUnadjusted(projectId: string, groupId: string, body: {
+  year: number; management_reason: string; management_communication_at: string; auditor_evaluation?: string
+}) {
+  const { data } = await http.post(P_adj.treatmentUnadjusted(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function includeAdjustmentInWorkingTb(projectId: string, groupId: string, body: { year: number; reason?: string }) {
+  const { data } = await http.post(P_adj.treatmentInclude(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function withdrawAdjustmentTreatment(projectId: string, groupId: string, body: { year: number; reason: string }) {
+  const { data } = await http.post(P_adj.treatmentWithdraw(projectId, groupId), body, ADJ_SILENT)
+  return data
+}
+
+export async function listAdjustmentReviewers(projectId: string): Promise<AdjustmentReviewer[]> {
+  const { data } = await http.get(P_adj.reviewers(projectId), { _silent: true } as any)
+  return data
+}
+
+export async function submitAdjustmentsForReview(projectId: string, body: {
+  entry_group_ids: string[]; reviewer_ids?: string[]; note?: string
+}): Promise<AdjustmentFlowResult> {
+  const { data } = await http.post(P_adj.submitReview(projectId), body, { _silent: true } as any)
+  return data
+}
+
+export async function withdrawAdjustmentSubmission(projectId: string, groupId: string) {
+  const { data } = await http.post(P_adj.withdrawSubmission(projectId, groupId), null, { _silent: true } as any)
+  return data
+}
+
+export async function reviewAdjustmentsBatch(projectId: string, body: {
+  entry_group_ids: string[]; status: 'approved' | 'rejected'; reason?: string; reasons?: Record<string, string>
+}): Promise<AdjustmentFlowResult> {
+  const { data } = await http.post(P_adj.reviewBatch(projectId), body, { _silent: true } as any)
+  return data
+}
+
+export async function batchDeleteAdjustments(projectId: string, ids: string[]): Promise<{
+  succeeded: string[]; failed: Array<{ id: string; error: string }>
+}> {
+  const { data } = await http.post(P_adj.batchDelete(projectId), { ids }, { _silent: true } as any)
+  return data
+}
+
+export interface AdjustmentImportPreviewGroup {
+  key: string
+  adjustment_no: string
+  adjustment_type: 'AJE' | 'RJE'
+  description: string
+  rows: number[]
+  lines: Array<{ label: string; account_code: string; account_name: string; debit: string; credit: string }>
+  total_debit: string
+  total_credit: string
+  action: 'create' | 'replace' | 'skip'
+  skip_reason: string | null
+  errors: string[]
+  ok: boolean
+}
+
+export interface AdjustmentImportPreview {
+  mode: 'append' | 'overwrite'
+  groups: AdjustmentImportPreviewGroup[]
+  warnings: string[]
+  structure_errors: string[]
+  summary: { total: number; ok: number; error: number; skip: number; replace: number }
+  example_skipped: number
+}
+
+export interface AdjustmentImportResult {
+  imported: number
+  skipped: number
+  failed: number
+  failed_rows: Array<{ row: number; adj_no: string; rows_in_group: number[]; error: string }>
+  skipped_rows?: Array<{ row: number; adj_no: string; rows_in_group: number[]; reason: string }>
+  created: Array<{ key: string; entry_group_id: string; adjustment_no: string | null }>
+  warnings: string[]
+  message: string
+}
+
+function _importForm(file: File): FormData {
+  const form = new FormData()
+  form.append('file', file)
+  return form
+}
+
+export async function previewAdjustmentImport(
+  projectId: string, year: number, mode: 'append' | 'overwrite', file: File,
+): Promise<AdjustmentImportPreview> {
+  const { data } = await http.post(P_adj.importPreview(projectId), _importForm(file), {
+    params: { year, mode }, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000, _silent: true,
+  } as any)
+  return data
+}
+
+export async function importAdjustmentsFile(
+  projectId: string, year: number, mode: 'append' | 'overwrite', file: File,
+): Promise<AdjustmentImportResult> {
+  const { data } = await http.post(P_adj.importFile(projectId), _importForm(file), {
+    params: { year, mode }, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000, _silent: true,
+  } as any)
   return data
 }
 
@@ -386,6 +639,7 @@ export interface MisstatementItem {
   misstatement_amount: string
   misstatement_type: string
   management_reason: string | null
+  management_communication_at?: string | null
   auditor_evaluation: string | null
   source_wp_code?: string | null
   is_carried_forward: boolean
@@ -452,6 +706,10 @@ export interface ReportDrilldownData {
   row_code: string
   row_name: string
   formula: string
+  /** W6（ADR-AQL-20）：行级「按此查询明细」要的报表类型、年度与项目；年度 = 本次穿透请求用的那一个 */
+  report_type?: string
+  year?: number
+  project_id?: string
   accounts: Array<{
     code: string
     name: string

@@ -1,9 +1,10 @@
-"""归档 Deprecated 标记 + 幂等测试
+"""归档旧端点下线 + 编排可达 + 幂等 + 鉴权
 
-3 场景：
-1. 旧端点 Deprecation 头存在且值为 version="R6"
-2. 新路径 /api/projects/{pid}/archive/orchestrate 可达
+1. 3 个旧归档端点已删除（spec attachment-archive-and-a-class-evidence 需求 3.1：只要登录即可对任意项目
+   归档 / 锁底稿，前端无调用方）
+2. 新路径 /api/projects/{pid}/archive/orchestrate 可达，成功后项目锁定
 3. 幂等返回同 job_id（24h 内 succeeded/running 不重复打包）
+4. 编排 / 重试要求二次密码确认；作业查询校验作业属于路径项目
 
 需求 1 AC6, AC7。
 """
@@ -118,26 +119,35 @@ async def client(db_session: AsyncSession) -> AsyncClient:
     app.dependency_overrides.clear()
 
 
-# ── 场景 1：旧端点 Deprecation 头存在且值为 version="R6" ──────────────
+# ── 场景 1：3 个旧归档端点已删除 ──────────────────────────────────
+
+
+OLD_ARCHIVE_ROUTES = {
+    "/api/data-lifecycle/projects/{project_id}/archive",
+    "/api/projects/{project_id}/archive",
+    "/api/workpapers/projects/{project_id}/archive",
+}
+
+
+def test_old_archive_endpoints_removed():
+    """整站路由表里不再有 3 个旧归档端点；编排端点仍在。"""
+    from app.main import app as full_app
+
+    posts = {r.path for r in full_app.routes if "POST" in (getattr(r, "methods", None) or set())}
+    assert not (OLD_ARCHIVE_ROUTES & posts), sorted(OLD_ARCHIVE_ROUTES & posts)
+    assert "/api/projects/{project_id}/archive/orchestrate" in posts
+    assert "/api/projects/{project_id}/archive/jobs/{job_id}/retry" in posts
+    import app.services.private_storage_service as pss
+    import app.services.wp_storage_service as wss
+
+    assert not hasattr(pss, "ProjectArchiveService")
+    assert not hasattr(wss.WpStorageService, "archive_project")
 
 
 @pytest.mark.asyncio
-async def test_deprecated_endpoint_has_deprecation_header(client: AsyncClient):
-    """旧端点 /api/workpapers/projects/{pid}/archive 应返回 Deprecation: version="R6" 头。"""
-    project_id = uuid.uuid4()
-
-    # Mock WpStorageService.archive_project 避免实际执行
-    with patch(
-        "app.routers.wp_storage.WpStorageService"
-    ) as MockSvc:
-        mock_instance = MockSvc.return_value
-        mock_instance.archive_project = AsyncMock(return_value={"status": "ok"})
-
-        resp = await client.post(f"/api/workpapers/projects/{project_id}/archive")
-
-    assert resp.status_code == 200
-    assert "deprecation" in resp.headers
-    assert resp.headers["deprecation"] == 'version="R6"'
+async def test_old_wp_storage_archive_path_is_gone(client: AsyncClient):
+    resp = await client.post(f"/api/workpapers/projects/{uuid.uuid4()}/archive")
+    assert resp.status_code in (404, 405)
 
 
 # ── 场景 2：新路径 /api/projects/{pid}/archive/orchestrate 可达 ──────
@@ -162,19 +172,13 @@ async def test_new_orchestrate_endpoint_reachable(client: AsyncClient, db_sessio
     db_session.add(project)
     await db_session.flush()
 
-    # Mock 归档步骤避免实际执行
+    # 门禁与打包另有专测；锁定步骤真实执行
     with patch(
         "app.services.archive_orchestrator.ArchiveOrchestrator._step_gate",
-        new_callable=AsyncMock,
+        new_callable=AsyncMock, return_value=None,
     ), patch(
-        "app.services.archive_orchestrator.ArchiveOrchestrator._step_wp_storage",
-        new_callable=AsyncMock,
-    ), patch(
-        "app.services.archive_orchestrator.ArchiveOrchestrator._persist_integrity_hashes",
-        new_callable=AsyncMock,
-    ), patch(
-        "app.services.archive_orchestrator.ArchiveOrchestrator._set_project_retention",
-        new_callable=AsyncMock,
+        "app.services.archive_orchestrator.ArchiveOrchestrator._step_package",
+        new_callable=AsyncMock, return_value={"path": "x.zip", "sha256": "0" * 64},
     ), patch(
         "app.services.archive_orchestrator.ArchiveOrchestrator._notify_project_members",
         new_callable=AsyncMock,
@@ -189,6 +193,10 @@ async def test_new_orchestrate_endpoint_reachable(client: AsyncClient, db_sessio
     body = resp.json()
     assert body["project_id"] == str(project_id)
     assert body["status"] == "succeeded"
+    assert set(body["section_progress"]) == {"gate", "package", "lock"}
+    await db_session.refresh(project)
+    assert getattr(project.status, "value", project.status) == "archived"
+    assert project.archived_at is not None and project.retention_until is not None
 
 
 # ── 场景 3：幂等返回同 job_id ──────────────────────────────────────
@@ -200,11 +208,12 @@ async def test_idempotent_returns_same_job_id(client: AsyncClient, db_session: A
     from app.models.core import Project
 
     project_id = uuid.uuid4()
+    # 成功作业锁定后项目即「已归档」；解除归档后成功作业不再命中幂等（见 test_unarchive_restores_lock）
     project = Project(
         id=project_id,
         name="幂等测试项目",
         client_name="测试客户",
-        status="execution",
+        status="archived",
     )
     db_session.add(project)
     await db_session.flush()
@@ -267,3 +276,41 @@ async def test_orchestrate_requires_confirmation_token(client: AsyncClient, db_s
         select(func.count()).select_from(ArchiveJob).where(ArchiveJob.project_id == project_id)
     )).scalar_one()
     assert jobs == 0
+
+
+# ── 场景 5：重试同样要求二次密码确认；作业查询 / 重试校验作业属于路径项目 ──
+
+
+@pytest.mark.asyncio
+async def test_retry_requires_confirmation_token(client: AsyncClient, db_session: AsyncSession):
+    from app.core.redis import get_redis
+    from app.routers.password_confirm import require_confirmation_token
+
+    project_id, job_id = uuid.uuid4(), uuid.uuid4()
+    db_session.add(ArchiveJob(id=job_id, project_id=project_id, scope="final", status="failed",
+                              push_to_cloud=False, purge_local=False, failed_section="package"))
+    await db_session.commit()
+    app = client.app_under_test  # type: ignore[attr-defined]
+    app.dependency_overrides.pop(require_confirmation_token)
+
+    async def _redis_available():
+        return object()
+
+    app.dependency_overrides[get_redis] = _redis_available
+    resp = await client.post(f"/api/projects/{project_id}/archive/jobs/{job_id}/retry")
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "X-Confirmation-Token header required"
+    job = await db_session.get(ArchiveJob, job_id)
+    assert job.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_job_of_other_project_is_404(client: AsyncClient, db_session: AsyncSession):
+    owner, other, job_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    db_session.add(ArchiveJob(id=job_id, project_id=owner, scope="final", status="failed",
+                              push_to_cloud=False, purge_local=False))
+    await db_session.commit()
+    assert (await client.get(f"/api/projects/{owner}/archive/jobs/{job_id}")).status_code == 200
+    assert (await client.get(f"/api/projects/{other}/archive/jobs/{job_id}")).status_code == 404
+    assert (await client.post(f"/api/projects/{other}/archive/jobs/{job_id}/retry")).status_code == 404
+    assert (await client.get(f"/api/projects/{other}/archive/jobs/{job_id}/package")).status_code == 404

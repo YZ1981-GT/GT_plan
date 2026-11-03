@@ -10,8 +10,10 @@
 **「空」语义**：所有 ``data + dynamic_data`` 行的 values 中：
   - 数值类的绝对值都 ≤ threshold（默认 0）
   - 文本类 trim 后非空 → 视为「非空」（即整张表非空）
-  - 跳过的 row_type：``header_label / dynamic_anchor / dynamic_marker_end /
-    total / subtotal``（这些行不参与判空）
+  - 跳过的 row_type：``header_label / dynamic_anchor / dynamic_marker_end / expandable``
+  - 合计 / 小计行（``is_total`` / total / subtotal）只看数：绝对值 > threshold ⇒ 非空，文字不算（公式推送找不到
+    明细时把审定数写在合计行；原先合计行一律不看 ⇒ 这类表被换成「本期无此业务」、整章被删。spec
+    note-pull-header-formula-closure R5）
 
 边界
 ----
@@ -45,8 +47,6 @@ _SKIP_ROW_TYPES = frozenset(
         "header_label",
         "dynamic_anchor",
         "dynamic_marker_end",
-        "total",
-        "subtotal",
         # 源模板留的可扩位行（`……` / `可无限量添加行`）——「只有可扩位」的表必须判空，
         # 否则空骨架会被当成有内容而不折叠。
         # spec: note-template-columns-and-legacy-snapshot-closure Property 33
@@ -56,7 +56,7 @@ _SKIP_ROW_TYPES = frozenset(
 
 
 def _is_total_row(row: dict[str, Any]) -> bool:
-    """合计行判定（与 note_total_recalc.is_total_row 同语义）."""
+    """合计行判定（``is_total`` 或 row_type ∈ total / subtotal，与 note_total_terms.row_kind 的合计判定同语义）."""
     if row.get("is_total") is True:
         return True
     rt = row.get("row_type")
@@ -92,10 +92,8 @@ def _to_decimal_or_text(x: Any) -> tuple[Decimal | None, str | None]:
 
 
 def _row_is_data_row(row: dict[str, Any]) -> bool:
-    """判定行是否参与 is_empty 检查."""
+    """判定行是否参与 is_empty 检查（合计 / 小计行另判：只看数）."""
     if not isinstance(row, dict):
-        return False
-    if _is_total_row(row):
         return False
     rt = row.get("row_type")
     if isinstance(rt, str) and rt in _SKIP_ROW_TYPES:
@@ -118,9 +116,10 @@ def _rows_have_any_value(
         vals = r.get("values")
         if not isinstance(vals, list):
             continue
+        total = _is_total_row(r)
         for v in vals:
             num, text = _to_decimal_or_text(v)
-            if text is not None:
+            if text is not None and not total:
                 # 任何非空字符串都算非空
                 return True
             if num is not None and abs(num) > threshold:

@@ -8,7 +8,7 @@
 🔴 R21 合计在 A21，footer_marker="所得税费用审定数"。
 """
 from __future__ import annotations
-from typing import Any, Final, Mapping
+from typing import Final, Mapping
 from app.services.workpaper_sync.models import AuthorityModel
 from app.services.workpaper_sync.phase5_row_table_sheet import (
     RowTableSheetSpec, StoreKind,
@@ -23,7 +23,7 @@ ADAPTER_ID: Final[str] = "n5.income_tax_expense"
 WP_CODES: Final[frozenset[str]] = frozenset({"N5I"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "N/N5 所得税费用.xlsx"
-TEMPLATE_SHA256: Final[str] = "d5dd5b29ac649dbbd2959496bcdad4c984f0210996bdaba2407072758c4e89b3"
+TEMPLATE_SHA256: Final[str] = "bcf8392a4468c851edf7a1a74895e33717fdbe9092a0014e0ea76c5d6037818c"
 MANAGED_SHEET: Final[str] = "所得税费用明细表N5-2"
 DERIVED_SHEET: Final[str] = "所得税费用审定表N5-1"
 TEMPLATE_ID: Final[str] = "N52"

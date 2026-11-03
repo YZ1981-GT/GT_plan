@@ -16,6 +16,7 @@
  * Requirements: 3.1-3.10
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import {
   parseNum,
   calcMonthlyTotal,
@@ -46,7 +47,7 @@ export interface RevenueDetailRow {
 }
 
 /** Stored row (without computed fields) */
-interface StoredRevenueRow {
+export interface StoredRevenueRow {
   rowId: string
   product: string
   months: number[]
@@ -102,7 +103,7 @@ function safeParseRows(jsonStr: string | null | undefined): StoredRevenueRow[] {
 /**
  * Compute full RevenueDetailRow from stored data (apply formulas)
  */
-function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
+export function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
   const months = stored.months.length === 12 ? stored.months : [...EMPTY_MONTHS]
   const periodTotal = calcMonthlyTotal(months)
   const audited = calcAuditedWithAdj(periodTotal, stored.auditAdjustment)
@@ -348,12 +349,13 @@ export function useD4RevenueDetail(options: UseD4BaseOptions) {
 
   /** 宿主 flushPendingSave 发来 d4:flush-pending 时，立即冲掉 debounce 确保数据落库。 */
   function flushPendingSave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
     flushSave()
   }
+
+  registerPendingFlusher(flushPendingSave)
 
   function onHostFlushPending(): void {
     flushPendingSave()

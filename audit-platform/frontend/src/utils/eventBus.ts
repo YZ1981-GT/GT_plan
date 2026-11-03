@@ -13,6 +13,7 @@ import type { SSEEventType } from '@/types/sse'
 import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
 import type { WorkpaperCapabilitySnapshot } from '@/shell/formula/workpaperCapabilitySnapshot'
 import type { FormulaManagerSession } from '@/shell/formula/openFormulaManagerCommand'
+import type { QueryEntryRequest } from '@/components/query/queryEntryContext'
 
 // Re-export SSEEventType for convenience
 export type { SSEEventType } from '@/types/sse'
@@ -66,12 +67,18 @@ export interface OpenFormulaManagerPayload {
   /** 附注公式入口的当前章节编号与标题。 */
   noteSection?: string
   noteSectionTitle?: string
+  /** 报表/试算入口当前选中的报表类型，用于公式中心定位对应节点。 */
+  initialReportType?: string
   /** 统一公式管理入口的上下文类型与 canonical session。 */
   contextKind?: 'workpaper' | 'scope'
   canonicalLocation?: CanonicalWorkpaperLocation
   capabilitySnapshot?: WorkpaperCapabilitySnapshot
   formulaSession?: FormulaManagerSession
   readOnly?: boolean
+  /** 模板详情深链：打开项目公式管理器并自动进入指定模板订阅弹窗。 */
+  templateId?: string
+  templateAction?: 'subscribe'
+  templateDomain?: string
 }
 
 /**
@@ -157,10 +164,10 @@ export interface ConsolRefreshEntityPayload {
   types: string[]
 }
 
-/** 合并一键刷新完成（通知各 tab 刷新缓存） */
+/** 合并一键刷新完成 / 企业树变化（通知各 tab 刷新缓存）；中栏重读企业树不依赖年度 ⇒ 年度未就绪时为 null */
 export interface ConsolRefreshDonePayload {
   projectId: string
-  year: number
+  year: number | null
 }
 
 /**
@@ -445,6 +452,8 @@ export type Events = {
   'sse:disconnect': { reason: string }
   /** 年度切换后重建 SSE 订阅。 */
   'sse:reconnect': { projectId: string; year: number }
+  /** 账表导入已提交：导入进度轮询立即查一次（没有任务时轮询降到 30 秒，见 useAdaptivePoll） */
+  'ledger-import:submitted': { projectId: string }
 
   // 底稿生命周期
   'workpaper:parsed': WorkpaperParsedPayload
@@ -501,6 +510,13 @@ export type Events = {
     wpCode: string
     section?: string
     timestamp: number
+    accountCode?: string
+    text?: string
+    projectId?: string
+    wpId?: string
+    sectionId?: string
+    sectionIds?: string[]
+    variant?: 'listed' | 'soe'
   }
 
   // D4 价格分析异常回标上游（D4-10 客户价格 / D4-11 产品价格 → D4-2 主营明细行标记）
@@ -540,6 +556,10 @@ export type Events = {
   'adjustment:deleted': void
   /** SSE bridge: 后端 broadcast_raw 复核状态变更 → 前端 mitt（大厅/底稿刷新） */
   'adjustment:review-changed': { projectId: string; year?: number; entry_group_id?: string; new_status?: string }
+  /** SSE bridge: 客户已入账状态变更 → 大厅/底稿刷新 */
+  'adjustment:client-booking-changed': { projectId: string; year?: number; entry_group_id?: string; action?: string }
+  /** SSE bridge: 最终财务处理变更 → 大厅/底稿刷新 */
+  'adjustment:treatment-changed': { projectId: string; year?: number; entry_group_id?: string; action?: string }
   /** SSE bridge: 后端 broadcast_raw 底稿同步到达 → 前端 mitt（大厅刷新） */
   'adjustment:sync-arrived': { projectId: string; year?: number; wp_code?: string }
   'dataset:activated': void
@@ -553,7 +573,10 @@ export type Events = {
   }
 
   // 全局打开自定义查询（Dashboard 快捷操作 / 侧栏 / 模板页 → ThreeColumnLayout 打开弹窗）
-  'open-custom-query': { tab?: 'basic' | 'advanced'; source?: string; project_id?: string } | undefined
+  // entry：业务页行级「按此查询明细」的上下文（W6，ADR-AQL-20；由 queryEntryContext.buildQueryEntry 生成）
+  'open-custom-query': {
+    tab?: 'basic' | 'advanced'; source?: string; project_id?: string; entry?: QueryEntryRequest
+  } | undefined
 
   // 年度切换（R8-S1-04）
   'year:changed': YearChangedPayload
@@ -767,6 +790,9 @@ export type Events = {
 
   // disclosure-note-doc-upload-and-batch-fill Task 50：附注正文批量写入成功 → 编辑器来源标记刷新
   'note-text-batch:applied': { projectId: string; year: number }
+
+  // ai-content-pending-target-label：AI 面板采纳成功（新增一条待确认 AI 内容）→ 同项目的待确认横幅重拉
+  'ai-content:adopted': { projectId: string }
 
   // A1 Dashboard 子底稿依赖联动
   'a17-audit-summary-completed': { projectId?: string }

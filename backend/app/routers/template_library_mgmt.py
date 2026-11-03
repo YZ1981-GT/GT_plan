@@ -23,11 +23,10 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -796,7 +795,7 @@ async def _record_history(
 async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> dict:
     """执行单个 seed（在 SAVEPOINT 内调用，由调用方处理事务边界）。
 
-    返回结构 {seed_name, status, inserted, updated, record_count, errors}
+    返回结构 {seed_name, status, inserted, updated, record_count, errors, warnings?}
     """
     if seed_name == "report_config":
         from app.services.report_config_service import ReportConfigService
@@ -811,6 +810,7 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
             "updated": 0,
             "record_count": int(count or 0),
             "errors": [],
+            "warnings": list(formula_stats.get("warnings") or []),
             # 填出的公式经全局发布（formula-global-settings-sync）：commit 后由调用方发变更事件，不进响应
             "_formula_events": formula_stats.get("events") or [],
         }
@@ -922,24 +922,18 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
             "errors": [],
         }
     if seed_name == "template_sets":
-        # template_sets 通过 wp_template.py /api/template-sets/seed 端点加载
-        # 直接调用其 service 等价逻辑
-        try:
-            from app.services.wp_template_service import WpTemplateService
-            svc = WpTemplateService(db)
-            if hasattr(svc, "seed_template_sets"):
-                result = await svc.seed_template_sets()
-            else:
-                result = {}
-        except ImportError:
-            result = {}
+        # 与 /api/template-sets/seed、启动任务同一函数。原先 import 不存在的 app.services.wp_template_service，
+        # ImportError 被吞成 {} ⇒ 一键加载报「已加载、0 条」却什么也没做（spec trim-followup-residual-findings-closure R2）
+        from app.services.builtin_template_sets import seed_builtin_template_sets_safely
+
+        result = (await seed_builtin_template_sets_safely(db)).as_dict()
         row = (await db.execute(text("SELECT COUNT(*) AS c FROM wp_template_set"))).mappings().first()
         record_count = int(row["c"] or 0) if row else 0
         return {
             "seed_name": seed_name,
             "status": "loaded",
-            "inserted": int((result or {}).get("inserted", 0)) if isinstance(result, dict) else 0,
-            "updated": int((result or {}).get("updated", 0)) if isinstance(result, dict) else 0,
+            "inserted": result["inserted"],
+            "updated": result["updated"],
             "record_count": record_count,
             "errors": [],
         }
@@ -992,12 +986,14 @@ async def seed_all(
             })
 
     # 全部完成后统一 commit（history 记录 + 各 seed 已 SAVEPOINT 提交）
-    await db.commit()
     formula_events = [ev for r in results for ev in (r.pop("_formula_events", None) or [])]
     if formula_events:
-        from app.services.formula_settings.propagation import publish_events
+        from app.services.formula_settings.outbox import record_changes, publish_pending
 
-        await publish_events(formula_events, domain="report", source="seed")
+        await record_changes(db, events=formula_events, domain="report", source="seed")
+    await db.commit()
+    if formula_events:
+        await publish_pending(db)
 
     success_count = sum(1 for r in results if r.get("status") == "loaded")
     failed_count = sum(1 for r in results if r.get("status") == "failed")

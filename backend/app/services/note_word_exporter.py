@@ -31,9 +31,8 @@ from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
-from docx.oxml.ns import qn, nsdecls
-from docx.oxml.parser import parse_xml
-from docx.shared import Cm, Pt, RGBColor, Emu
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt, RGBColor
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -51,6 +50,7 @@ from app.services.note_section_catalog import (
 )
 from app.services.note_section_numbering import compute_section_numbers
 from app.services.note_html_sanitizer import note_text_to_html
+from app.services.note_period_layout import apply_period_layout, export_header_defs
 from app.services.note_text_word_render import (
     append_note_text,
     fill_paragraph_with_note_text,
@@ -831,8 +831,14 @@ class NoteWordExporter:
             report_scope = await self._resolve_report_scope(project_id)
         report_scope = normalize_report_scope(report_scope)
 
-        # Load notes data
-        notes = await self._load_notes(project_id, year, sections)
+        # Load notes data. 合并项目必须读企业树根节点 ConsolNoteData；单体路径保持原查询。
+        notes = await self._load_export_notes(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+        )
         notes = [
             n for n in notes
             if note_applies_to_report_scope(n.note_section, template_type, report_scope)
@@ -861,7 +867,6 @@ class NoteWordExporter:
         level1_idx = 0
         level2_idx = 0
         level3_idx = 0
-        current_level1 = ""
 
         for note in notes:
             section_code = note.note_section or ""
@@ -871,7 +876,6 @@ class NoteWordExporter:
                 level1_idx += 1
                 level2_idx = 0
                 level3_idx = 0
-                current_level1 = section_code
                 self._add_heading1(doc, level1_idx, note.section_title or section_code, section_code)
             elif level == 2:
                 level2_idx += 1
@@ -1017,7 +1021,14 @@ class NoteWordExporter:
         index_sections = _load_section_code_index(variant_key)
 
         # 2~5. 模板预处理 → 块与附注对应 → 删除 / 按模板结构重建（spec deliverable-trio-generation-accuracy §2）
-        notes = await self._load_notes(project_id, year, sections)
+        notes = await self._load_export_notes(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+            index_sections=index_sections,
+        )
         notes = [
             n
             for n in notes
@@ -1299,7 +1310,8 @@ class NoteWordExporter:
                 self._skipped_empty_tables.append(str(final.get("name") or f"表{idx + 1}"))
                 continue
             result.append(final)
-        return result
+        # 期间层（spec note-pull-header-formula-closure R4）：底稿按期间并列的表合成、最上层期间加回表头
+        return apply_period_layout(result, source_template, section_number)
 
     def _render_table_at(self, doc: Document, anchor_para, table_data: dict) -> None:
         """在 anchor 段落处渲染表格（复用 _render_table，再把它追加的块原样移到锚点之后）.
@@ -1361,7 +1373,7 @@ class NoteWordExporter:
         notes = await self._load_notes(project_id, year)
 
         html_parts = ['<div class="note-preview" style="font-family: 仿宋_GB2312, FangSong; font-size: 12pt;">']
-        html_parts.append(f'<h1 style="text-align:center;">财务报表附注</h1>')
+        html_parts.append('<h1 style="text-align:center;">财务报表附注</h1>')
         html_parts.append(f'<p style="text-align:center;">（{year}年度）</p>')
 
         level1_idx = 0
@@ -1422,6 +1434,37 @@ class NoteWordExporter:
         )
         row = result.scalar_one_or_none()
         return normalize_report_scope(row if isinstance(row, str) else None)
+
+    async def _load_export_notes(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str,
+        report_scope: str,
+        sections: list[str] | None = None,
+        index_sections: list[dict[str, Any]] | None = None,
+    ) -> list[Any]:
+        """按项目口径加载 Word 导出章节；合并项目只读企业树根节点。"""
+        if report_scope != "consolidated":
+            return await self._load_notes(project_id, year, sections)
+
+        from app.services.consol_note_export_adapter import (
+            load_root_consol_export_notes,
+        )
+
+        if index_sections is None:
+            index_sections = _load_section_code_index(
+                build_variant_key(template_type, report_scope)
+            )
+        return await load_root_consol_export_notes(
+            self.db,
+            project_id,
+            year,
+            template_type=template_type,
+            index_sections=index_sections,
+            selected_sections=sections,
+        )
 
     async def _load_notes(
         self, project_id: UUID, year: int, sections: list[str] | None = None
@@ -1631,8 +1674,10 @@ class NoteWordExporter:
         column_groups = table_data.get("_column_groups")
         has_multi_header = isinstance(column_groups, list) and len(column_groups) > 0
         has_raw_multi = isinstance(table_data.get("multi_header"), list) and len(table_data.get("multi_header", [])) > 0
+        # ≥ 3 层表头 / 期间层（合成表、加了期间）：N 行表头（spec note-pull-header-formula-closure R4）
+        n_level_defs = export_header_defs(table_data)
 
-        if has_multi_header or has_raw_multi:
+        if has_multi_header or has_raw_multi or n_level_defs:
             # 多级表头：保留全部列，空标题是合并子表头占位
             valid_indices = list(range(len(headers_raw)))
         else:
@@ -1643,10 +1688,9 @@ class NoteWordExporter:
         headers = [headers_raw[i] for i in valid_indices]
 
         num_cols = len(headers)
-        num_rows = len(rows) + 1  # +1 for header row
-
-        if has_multi_header:
-            num_rows = len(rows) + 2  # +2 for two header rows
+        # 多级表头逐行定义：两层分组 = 两行；≥ 3 层 / 期间层 = N 行；扁平表头 = None（一行）
+        header_defs = n_level_defs or (_build_two_level_header_rows(headers, column_groups) if has_multi_header else None)
+        num_rows = len(rows) + (len(header_defs) if header_defs else 1)
 
         table = doc.add_table(rows=num_rows, cols=num_cols)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -1654,13 +1698,12 @@ class NoteWordExporter:
         # Sprint 2 Task 2.2: 致同三线表（顶/底 1pt + 表头 cell tcBorders.bottom 1/2pt + 其他 nil）
         apply_gt_three_line(table)
 
-        if has_multi_header:
-            # 两级表头：用 fill_multi_header 渲染合并单元格
-            header_row_defs = _build_two_level_header_rows(headers, column_groups)
-            fill_multi_header(table, header_row_defs, num_cols)
-            apply_gt_row_height(table.rows[0], cm=0.7)
-            apply_gt_row_height(table.rows[1], cm=0.7)
-            data_start_row = 2
+        if header_defs:
+            # 多级表头：用 fill_multi_header 渲染合并单元格
+            fill_multi_header(table, header_defs, num_cols)
+            for r in range(len(header_defs)):
+                apply_gt_row_height(table.rows[r], cm=0.7)
+            data_start_row = len(header_defs)
         else:
             # 单级扁平表头
             header_row = table.rows[0]

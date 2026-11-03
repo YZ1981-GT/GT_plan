@@ -1,7 +1,7 @@
 /**
  * useF2FormData — 单元测试
  *
- * 覆盖：debouncedSave乐观更新 / saveBatch / writebackTrialBalance / selfLoad / flushPending
+ * 覆盖：debouncedSave 乐观更新 / strict-CAS saveBatch / 禁止直接 TB 回写 / flushPending
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
@@ -53,10 +53,12 @@ describe('useF2FormData', () => {
       '/api/workpapers/wp-1/checklist-responses',
       expect.objectContaining({
         project_id: 'proj-1',
+        require_if_match: true,
         items: expect.arrayContaining([
           expect.objectContaining({ item_id: 'F2-3-rows', remark: 'data' }),
         ]),
       }),
+      { _dedupe: false },
     )
   })
 
@@ -89,18 +91,19 @@ describe('useF2FormData', () => {
     expect(api.put).toHaveBeenCalledTimes(1)
     const items = (api.put as any).mock.calls[0][1].items
     expect(items).toHaveLength(2)
-    expect(items[0].item_id).toBe('F2-1-adj-note')
-    expect(items[1].item_id).toBe('F2-1-adj-conclusion')
+    expect(Object.fromEntries(items.map((item: any) => [item.item_id, item.remark]))).toEqual({
+      'F2-1-adj-note': 'note1',
+      'F2-1-adj-conclusion': 'conclusion1',
+    })
   })
 
-  it('writebackTrialBalance 调用正确端点', async () => {
+  it('不暴露绕过显式发布门的直接 TB 回写方法', () => {
     const formData = useF2FormData({ wpId: ref('wp-1'), projectId: ref('proj-1') })
 
-    await formData.writebackTrialBalance('1401', 50000)
-
-    expect(api.put).toHaveBeenCalledWith(
+    expect((formData as any).writebackTrialBalance).toBeUndefined()
+    expect(api.put).not.toHaveBeenCalledWith(
       '/api/projects/proj-1/trial-balance/writeback',
-      { account_code: '1401', audited_amount: 50000 },
+      expect.anything(),
     )
   })
 

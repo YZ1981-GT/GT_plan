@@ -11,7 +11,12 @@
  * toLedger('1001')
  */
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { useNavigationStack, type NavigationEntry } from './useNavigationStack'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 export function usePenetrate() {
   const router = useRouter()
@@ -22,8 +27,15 @@ export function usePenetrate() {
     return (route.params.projectId as string) || ''
   }
 
-  function year(): number {
-    return Number(route.query.year) || new Date().getFullYear() - 1
+  /** 当前年度：路由 → 项目 store；都没有为 null（跳转不带 year，目标页按项目审计年度取；原先兜底去年） */
+  function year(): number | null {
+    const routeYear = parseAuditYear(route.query.year)
+    if (routeYear != null) return routeYear
+    try {
+      return useProjectStore().year
+    } catch {
+      return null // 无 pinia 上下文
+    }
   }
 
   /**
@@ -47,7 +59,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/ledger`,
-        query: { code: accountCode, year: String(year()) },
+        query: { code: accountCode, ...yearQuery(year()) },
       })
     },
 
@@ -55,16 +67,16 @@ export function usePenetrate() {
     toTB(accountCode: string) {
       router.push({
         path: `/projects/${pid()}/trial-balance`,
-        query: { code: accountCode, year: String(year()) },
+        query: { code: accountCode, ...yearQuery(year()) },
       })
     },
 
-    /** 穿透到底稿（按底稿编码） */
+    /** 穿透到底稿（按底稿编码）：列表页按 ?highlight= 定位该行（原 ?code= 列表页不读，spec wp-deeplink-locate-residual-closure） */
     toWorkpaper(wpCode: string) {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/workpapers`,
-        query: { code: wpCode },
+        query: { highlight: wpCode },
       })
     },
 
@@ -73,17 +85,28 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'up')
       router.push({
         path: `/projects/${pid()}/reports`,
-        query: { tab: reportType, row: rowCode, year: String(year()) },
+        query: { tab: reportType, row: rowCode, ...yearQuery(year()) },
       })
     },
 
-    /** 穿透到调整分录（按科目或分录组 ID） */
-    toAdjustment(accountOrGroupId: string) {
+    /** 穿透到调整分录（按科目编码筛选）。 */
+    toAdjustment(accountCode: string) {
       _pushCurrentRoute(undefined, 'down')
-      router.push({
-        path: `/projects/${pid()}/adjustments`,
-        query: { account: accountOrGroupId, year: String(year()) },
-      })
+      router.push(buildAdjustmentRouteTarget(
+        pid(),
+        { kind: 'account', accountCode },
+        { year: year() },
+      ))
+    },
+
+    /** 穿透到调整分录组（定位、展开并高亮）。 */
+    toAdjustmentGroup(entryGroupId: string) {
+      _pushCurrentRoute(undefined, 'down')
+      router.push(buildAdjustmentRouteTarget(
+        pid(),
+        { kind: 'focus', entryGroupId },
+        { year: year() },
+      ))
     },
 
     /** 穿透到未更正错报 */
@@ -91,7 +114,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/misstatements`,
-        query: { id, year: String(year()) },
+        query: { id, ...yearQuery(year()) },
       })
     },
 
@@ -100,7 +123,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/disclosure-notes`,
-        query: { section: sectionId, year: String(year()) },
+        query: { section: sectionId, ...yearQuery(year()) },
       })
     },
 
@@ -123,7 +146,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/disclosure-notes`,
-        query: { fromReport: rowCode, year: String(year()) },
+        query: { fromReport: rowCode, ...yearQuery(year()) },
       })
     },
 
@@ -132,7 +155,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'up')
       router.push({
         path: `/projects/${pid()}/reports`,
-        query: { fromNote: sectionCode, year: String(year()) },
+        query: { fromNote: sectionCode, ...yearQuery(year()) },
       })
     },
 
@@ -141,29 +164,26 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/workpapers`,
-        query: { fromReport: rowCode, year: String(year()) },
+        query: { fromReport: rowCode, ...yearQuery(year()) },
       })
     },
 
     /** 调整分录 → 影响范围分析 */
-    toImpactAnalysis(adjustmentId: string) {
+    toImpactAnalysis(entryGroupId: string) {
       _pushCurrentRoute(undefined, 'down')
-      router.push({
-        path: `/projects/${pid()}/adjustments`,
-        query: { impact: adjustmentId, year: String(year()) },
-      })
+      router.push(buildAdjustmentRouteTarget(
+        pid(),
+        { kind: 'impact', entryGroupId },
+        { year: year() },
+      ))
     },
 
-    /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1） */
-    toWorkpaperFromNote(wpCode: string, locate?: { sheet?: string; cell?: string }) {
+    /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1）：按编码取本项目底稿后打开编辑器并带 ?sheet=&cell=
+     *  （原先跳底稿列表页，列表页不读 code / sheet / cell，定位丢失；spec wp-deeplink-locate-coverage-closure） */
+    async toWorkpaperFromNote(wpCode: string, locate?: { sheet?: string; cell?: string }) {
       _pushCurrentRoute(undefined, 'up')
-      const query: Record<string, string> = { code: wpCode, year: String(year()) }
-      if (locate?.sheet) query.sheet = locate.sheet
-      if (locate?.cell) query.cell = locate.cell
-      router.push({
-        path: `/projects/${pid()}/workpapers`,
-        query,
-      })
+      const reason = await openWorkpaperCell(router, { projectId: pid(), wpCode, sheet: locate?.sheet, cell: locate?.cell })
+      if (reason) ElMessage.warning(reason)
     },
   }
 }

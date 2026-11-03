@@ -130,14 +130,18 @@ export function useD7FormData(options: UseD7FormDataOptions) {
 
   // ─── Save ────────────────────────────────────────────────────────────────
 
-  /** 内部保存逻辑 — PUT 单条 response */
+  /**
+   * 内部保存逻辑 — 单条也走批量 PUT `/checklist-responses`（一条 items）。
+   * 🔴 后端没有按 item 的路由：原来 PUT `/checklist-responses/{itemId}` 恒 404、提示「保存失败」，D7 各表的即时保存与
+   * 防抖保存全部丢（只有卸载时的批量 flush 写得进去）。spec voucher-identity-writeback-and-audit-phase 任务 14 在
+   * 【测试】项目真实写入时发现（任务 10 的浏览器走查拦截了写请求、回假 200，看不出来）。
+   */
   async function _doSave(itemId: string, data: Partial<ChecklistResponse>): Promise<void> {
     if (!wpId.value || !itemId) return
     try {
-      await http.put(`/api/workpapers/${wpId.value}/checklist-responses/${itemId}`, {
-        item_id: itemId,
-        conclusion: data.conclusion ?? null,
-        remark: data.remark ?? null,
+      await http.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
+        project_id: projectId.value,
+        items: [{ item_id: itemId, conclusion: data.conclusion ?? null, remark: data.remark ?? null }],
       })
     } catch (err: any) {
       const msg = err?.message || ''

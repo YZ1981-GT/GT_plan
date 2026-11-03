@@ -14,6 +14,7 @@
  * - 租赁投资净额期末 = 应收期末 − 未实现期末
  * - 账面净值 = 净投资期末 − 减值准备 − 已核销
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import {
   parseNum,
@@ -392,7 +393,7 @@ export function useG5LeaseAmortization() {
 
   function createEmptyPeriod(periodNo: number): LeaseAmortizationPeriod {
     return {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       periodNo,
       openingReceivable: 0,
       openingUnrealized: 0,
@@ -409,7 +410,7 @@ export function useG5LeaseAmortization() {
 
   function createEmptyGroup(projectName: string): LeaseAmortizationGroup {
     return {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       projectName,
       basic: emptyBasic(),
       periods: [createEmptyPeriod(1)],
@@ -498,11 +499,11 @@ export function useG5LeaseAmortization() {
     if (!data) return
     if (Array.isArray(data.groups)) {
       groups.value = data.groups.map((g: any) => ({
-        id: g.id || crypto.randomUUID(),
+        id: g.id || newUuid(),
         projectName: g.projectName || '',
         basic: normalizeBasic(g.basic),
         periods: Array.isArray(g.periods) ? g.periods.map((p: any, idx: number) => ({
-          id: p.id || crypto.randomUUID(),
+          id: p.id || newUuid(),
           periodNo: p.periodNo ?? idx + 1,
           openingReceivable: parseNum(p.openingReceivable),
           openingUnrealized: parseNum(p.openingUnrealized),

@@ -29,8 +29,12 @@ async def trace_cell(
     col_idx: int,
     *,
     tb_cache: dict | None = None,
+    table_index: int = 0,
 ) -> dict:
     """单元格溯源：返回 binding 元数据 + 公式展开 + 命中数据行采样.
+
+    ``table_index``：章节第几张表（``_tables`` 下标，默认第 1 张；原先只看第 1 张表，spec
+    note-chain-followup-optimizations R2）；binding 定义按同一下标取模板表。
 
     Spec:   .kiro/specs/disclosure-note-full-revamp/ Sprint 2 Task 2.3
     Design: D5 CellTrace 溯源链 端点 schema
@@ -51,11 +55,17 @@ async def trace_cell(
 
     # 2. 解析 row / col 索引
     td = note.table_data or {}
-    rows = td.get("rows") or []
-    if not rows and isinstance(td.get("_tables"), list) and td["_tables"]:
-        first_tbl = td["_tables"][0]
-        if isinstance(first_tbl, dict):
-            rows = first_tbl.get("rows") or []
+    tables = td.get("_tables") if isinstance(td.get("_tables"), list) else []
+    if table_index:
+        picked = tables[table_index] if 0 <= table_index < len(tables) else None
+        if not isinstance(picked, dict):
+            return {"error": "cell_index_out_of_range", "axis": "table", "table_index": table_index,
+                    "table_count": len(tables), "computed_value": None}
+        rows = picked.get("rows") or []
+    else:
+        rows = td.get("rows") or []
+        if not rows and tables and isinstance(tables[0], dict):
+            rows = tables[0].get("rows") or []
 
     if not isinstance(row_idx, int) or row_idx < 0 or row_idx >= len(rows):
         return {
@@ -102,7 +112,7 @@ async def trace_cell(
         }
 
     # 3. 反查 binding 定义
-    binding = _lookup_binding(note, row, semantic)
+    binding = _lookup_binding(note, row, semantic, table_index)
     if not binding:
         return {
             "error": "binding_not_found",
@@ -135,8 +145,9 @@ def _lookup_binding(
     note: DisclosureNote,
     row: dict,
     semantic: str | None,
+    table_index: int = 0,
 ) -> dict | None:
-    """从 note_template_bindings.json 反查单元格级 binding 定义."""
+    """从 note_template_bindings.json 反查单元格级 binding 定义（第 ``table_index`` 张模板表）."""
     if not isinstance(semantic, str) or not semantic:
         return None
     try:
@@ -149,9 +160,9 @@ def _lookup_binding(
     if not sec_binding:
         return None
     tables = sec_binding.get("tables") or []
-    if not tables or not isinstance(tables[0], dict):
+    if not 0 <= table_index < len(tables) or not isinstance(tables[table_index], dict):
         return None
-    table_binding = tables[0]
+    table_binding = tables[table_index]
     rows_def = table_binding.get("rows")
     if not isinstance(rows_def, dict):
         return None

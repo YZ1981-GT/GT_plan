@@ -18,6 +18,17 @@ export const users = {
   list: '/api/users/',
   me: '/api/users/me',
   detail: (id: string) => `/api/users/${id}`,
+  projectCreationGrants: {
+    list: '/api/users/project-creation-grants',
+    grant: (managerId: string) => `/api/users/project-creation-grants/${managerId}`,
+    revoke: (grantId: string) => `/api/users/project-creation-grants/${grantId}/revoke`,
+  },
+  /** 人员档案与登录账号绑定（仅 admin） */
+  staffBindings: {
+    list: '/api/users/staff-bindings',
+    bind: (userId: string) => `/api/users/${userId}/staff-binding`,
+    unbind: (userId: string) => `/api/users/${userId}/staff-binding/unbind`,
+  },
   privateStorage: {
     list: (uid: string) => `/api/users/${uid}/private-storage`,
     quota: (uid: string) => `/api/users/${uid}/private-storage/quota`,
@@ -110,6 +121,9 @@ export const knowledgeLibrary = {
   documentOcrRetry: (docId: string) => `/api/knowledge-library/documents/${docId}/ocr-retry`,
   /** 上传到项目知识文件夹（「{项目名}（项目资料）/ A17-3 咨询附件」，项目组可见） */
   projectUpload: (projectId: string) => `/api/knowledge-library/projects/${projectId}/upload`,
+  /** 将当前可读的知识文档版本显式快照为项目证据 */
+  documentPromoteEvidence: (projectId: string, docId: string) =>
+    `/api/knowledge-library/projects/${projectId}/evidence/from-document/${docId}`,
 } as const
 
 // ─── 看板 ───────────────────────────────────────────────────────────────────
@@ -278,7 +292,6 @@ export const processRecord = {
   editHistory: (pid: string, wpId: string) => `/api/process-record/projects/${pid}/workpapers/${wpId}/edit-history`,
   attachments: (pid: string, wpId: string) => `/api/process-record/projects/${pid}/workpapers/${wpId}/attachments`,
   attachmentWorkpapers: (attachmentId: string) => `/api/process-record/attachments/${attachmentId}/workpapers`,
-  linkAttachment: '/api/process-record/link-attachment',
   pendingAIContent: (pid: string) => `/api/process-record/projects/${pid}/ai-content/pending`,
   confirmAIContent: (contentId: string) => `/api/process-record/ai-content/${contentId}/confirm`,
   aiCheck: (pid: string, wpId: string) => `/api/process-record/projects/${pid}/workpapers/${wpId}/ai-check`,
@@ -291,16 +304,43 @@ export const attachments = {
   search: '/api/attachments/search',
   upload: (pid: string) => `/api/projects/${pid}/attachments/upload`,
   classify: (pid: string) => `/api/projects/${pid}/attachments/classify`,
+  /** 附件详情（文件名 / 类型 / 识别状态；项目门 + 底稿可见性门，不存在或无权 ⇒ 404 / 403） */
+  detail: (id: string) => `/api/attachments/${id}`,
   preview: (id: string) => `/api/attachments/${id}/preview`,
   /** Office 文件高保真预览：后端 LibreOffice 转 PDF（503 时前端降级到下载提示） */
   previewPdf: (id: string) => `/api/attachments/${id}/preview-pdf`,
   download: (id: string) => `/api/attachments/${id}/download`,
   associate: (id: string) => `/api/attachments/${id}/associate`,
   ocrStatus: (id: string) => `/api/attachments/${id}/ocr-status`,
+  /** 识别全文 + sha256 + 确认状态（列表里的 ocr_text 只是 200 字预览） */
+  ocrText: (id: string) => `/api/attachments/${id}/ocr-text`,
+  /** 核对后确认识别结果（带打开核对时全文的 sha256，不一致 409） */
+  ocrConfirm: (id: string) => `/api/attachments/${id}/ocr-confirm`,
+  /** 重新识别（重置状态并调度识别任务） */
+  retryOcr: (id: string) => `/api/attachments/${id}/retry-ocr`,
   /** 附件版本列表（AttachmentVersionsDialog 加载用） */
   versions: (id: string) => `/api/attachments/${id}/versions`,
   /** 回滚附件到指定版本（创建新版本复制旧版本内容） */
   rollback: (id: string, versionId: string) => `/api/attachments/${id}/versions/${versionId}/rollback`,
+  /** 本底稿附件统一视图：整稿关联 ∪ reference ∪ 函证挂载 ∪ 行级证据链接 */
+  wpView: (wpId: string) => `/api/working-papers/${wpId}/attachments`,
+  /** 底稿内上传证据（唯一写法）：不带表页 / 单元格 ⇒ 整稿关联；带 ⇒ 只写行级证据链接 */
+  evidenceUpload: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/upload`,
+  /** 本底稿证据链接（可按 sheet_name / cell_ref 过滤，带附件元数据） */
+  evidenceLinks: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence`,
+  /** 把本底稿已有附件链接到表页 / 单元格 */
+  evidenceLinkCreate: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/link`,
+  /** 删除一条证据链接（不删附件） */
+  evidenceLink: (pid: string, wpId: string, linkId: string) =>
+    `/api/projects/${pid}/workpapers/${wpId}/evidence/${linkId}`,
+  /** 把别的可见底稿上同一凭证的证据引用到本底稿（spec attachment-voucher-evidence-binding） */
+  evidenceVoucherReuse: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/voucher-reuse`,
+  /** 批量查询本项目可见底稿上的合同证据 */
+  evidenceContractQuery: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/contract-query`,
+  /** 给本底稿附件位置绑定或改绑合同身份 */
+  evidenceContractLink: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/contract-link`,
+  /** 把他稿同一合同的证据引用到本底稿 */
+  evidenceContractReuse: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/contract-reuse`,
 } as const
 
 /** Office 在线预览健康探测（决定是否展示 iframe） */
@@ -489,6 +529,8 @@ export const archive = {
   orchestrate: (pid: string) => `/api/projects/${pid}/archive/orchestrate`,
   job: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}`,
   retry: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}/retry`,
+  /** 解除归档（admin / 合伙人）：项目与底稿恢复归档前状态 */
+  unarchive: (pid: string) => `/api/projects/${pid}/unarchive`,
   exportPdf: (pid: string) => `/api/projects/${pid}/archive/export-pdf`,
   modifications: {
     request: (pid: string) => `/api/projects/${pid}/archive/modifications`,
@@ -635,7 +677,7 @@ export const addressRegistry = {
     anchors: '/api/address-registry/v2/anchors',
     staleImpact: '/api/address-registry/v2/stale-impact',
     dependencies: '/api/address-registry/v2/dependencies',
-    notifyCellChange: '/api/address-registry/v2/notify-cell-change',
+    // notify-cell-change 已停用（spec acnr-foundation-defect-closure D8），常量随之删除
   },
 } as const
 
@@ -654,10 +696,28 @@ export const acnr = {
 export const customQuery = {
   indicators: '/api/custom-query/indicators',
   execute: '/api/custom-query/execute',
-  batchExecute: '/api/custom-query/batch-execute',
-  cellWriteback: '/api/custom-query/cell-writeback',
+  /** 业务视图「导出全部」：按当前查询服务端流式导出全量结果（R8.1，advanced-query-linkage-closure 任务 28 / 29） */
+  export: '/api/custom-query/export',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
+  /** 解析含项目参数占位的用户模板（W3）；只在载入含 `$param` 的模板时调用。 */
+  templateResolve: (id: string) => `/api/custom-query/templates/${id}/resolve`,
+  /** 按当前项目执行模板（服务端重新鉴权、可翻页；年度缺省取目标项目审计年度，R9.3） */
+  templateExecute: (id: string) => `/api/custom-query/templates/${id}/execute`,
+  /** 系统预置目录与按当前项目、年度解析后的可编辑配置（W3）。 */
+  templatePresets: '/api/custom-query/template-presets',
+  templatePresetResolve: (id: string) => `/api/custom-query/template-presets/${id}/resolve`,
+  /** 「保存为模板」里「指定项目共享」可选的项目（与保存时逐项目 edit 鉴权同一口径，AQ-39） */
+  templateShareTargets: '/api/custom-query/template-share-targets',
+} as const
+
+// ─── 高级查询构建器（advanced-query-linkage-closure 任务 30） ───────────────────────
+// preview / execute / export-excel 三个请求仍以字符串字面量写在构建器里：acnr-foundation-defect-closure T16 的
+// 请求体契约（components/custom-query/__tests__/queryPayloads.contract.spec.ts）按字面量识别构建器调用点。
+export const queryBuilder = {
+  /** 当前用户能否使用构建器、作用域内项目数与不可用原因（前端入口与后端门禁同一判定，R3.6） */
+  access: '/api/query/access',
+  schema: '/api/query/schema',
 } as const
 
 // ─── 系统枚举字典 ───────────────────────────────────────────────────────────

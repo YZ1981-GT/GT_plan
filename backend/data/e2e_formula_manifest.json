@@ -1,0 +1,26 @@
+{
+  "accounts": {
+    "fhe2e_auditor": "auditor123",
+    "fhe2e_eqcr": "eqcr123",
+    "fhe2e_manager": "manager123",
+    "fhe2e_partner": "partner123",
+    "fhe2e_qc": "qc123"
+  },
+  "consolidated": {
+    "project_id": "8177fec4-3399-4e76-9f48-70f7a8504e0b",
+    "project_name": "【E2E】公式链路合并_2025",
+    "wp_ids": {
+      "A1": "b809c7b1-e5f8-4a78-ba11-6f46b41d3c72",
+      "D2-1": "4bbf1594-6f94-4706-813d-e642c51ee98b"
+    }
+  },
+  "standalone": {
+    "project_id": "f27cbd6e-037e-43ea-8fe8-1bca7f355564",
+    "project_name": "【E2E】公式链路单体_2025",
+    "wp_ids": {
+      "A1": "4b3f9bd8-3735-442e-b49f-d7e66c50e9dc",
+      "D2-1": "c49cf2a0-7ab2-43b8-9ca3-90a798a8c1ce"
+    }
+  },
+  "year": 2025
+}

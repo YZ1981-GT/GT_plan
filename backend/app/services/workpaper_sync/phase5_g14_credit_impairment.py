@@ -21,16 +21,16 @@ spec: `g-cycle-single-region-detail-lanes` · Task 10 / C-9
 挤下去。已按用户拍板的**选项 A** 把合同资产的三处落点（1142 试算取数 / D6 的 ECL 事件 /
 含「合同资产」的调整分录 rowKey 推断）并入模板 R19「其他」行。
 
-═══ 🔴 二：`K` 列公式是模板缺陷（`=G+H` 应为 `=G-H`）═══
+═══ 🔴 二：`K` 列公式（模板原为 `=G+H`，已按会计口径修为 `=G-H`）═══
 
-`J=F+G-H-I` 要求 `H`「本期转回」填**正数**，而同表 `K=G+H` 把转回当成**增加**损益 ——
+`J=F+G-H-I` 要求 `H`「本期转回」填**正数**，而模板原先的 `K=G+H` 把转回当成**增加**损益 ——
 两式对 `H` 的符号约定互相矛盾。判定「`K` 错」的三条依据（会计口径 / `J` 与准则逐字一致 /
-前端 `migrateReversalToPositive` 早已裁定转回填正数）详见 `phase5_g14_02_detail` 模块头。
+平台早已裁定转回填正数（填报口径，载入时不改号））详见 `phase5_g14_02_detail` 模块头。
 
-处置同 G8：`K` 在模板每行都有公式 ⇒ 判 `mode=formula`，`formula_templates` 逐字记模板
-原式；前端按 `计提 − 转回` 算 ⇒ 有转回时 Excel 侧比平台侧多 2×转回。如实登记为欠账
-（见 spec evidence `task10-c9-g14-rootfix.md` §2.2）。模板自带的 `L=D=K` 核对列会在有
-转回时显示不平 —— 用户看得见，不是静默错。
+spec `oo-writeback-template-parity-closure` 第三批已改权威模板字节（#29），`K` 在模板每行
+都有公式 ⇒ 判 `mode=formula`，`formula_templates` 逐字记修后的模板式 `=G-H`；前端同口径，
+两侧不再相差 2×转回。原缺陷登记留痕见 `phase5_g14_02_detail.TEMPLATE_DEFECT_K_G1402`
+（evidence `task10-c9-g14-rootfix.md` §2.2 登记的欠账就此结清）。
 
 ═══ 🔴 三：`L` 是布尔校验列（裁决 G1R-H4）═══
 
@@ -114,9 +114,9 @@ ADAPTER_ID: Final[str] = "g14.credit_impairment_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G14C"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G14 信用减值损失.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；99,458 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；51,758 B）
 TEMPLATE_SHA256: Final[str] = (
-    "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6"
+    "952d7adabd035fedb1bc29267525e6592f8437aba0ff34295ceed9497ea703d9"
 )
 
 #: 受管 store item —— 按值取自 `useG14Detail.ts` 的 `ITEM_ID_ROWS`
@@ -350,8 +350,8 @@ _REVIEWED_BASIS: Final[str] = (
     "**固定 9 行** R11-R19（行集由模板 A 列写死）/ footer R20 逐列 =SUM(x11:x19) 且 "
     "L20 例外是布尔 =D20=K20 / 有效内容列 13 即 A-M **恰等于 max_column**（无空尾列）/ "
     "0 个 definedName / 受管表零裸 IF，整册 11 格裸 IF 全在 审定表G14-1 / "
-    "🔴 模板缺陷：K 列 =G+H 把「本期转回」当成增加损益，而同表 J 的 -H 要求 H 填正数 ⇒ "
-    "会计正确应为 =G-H（信用减值损失 = 计提 − 转回）)"
+    "🔴 模板缺陷（已修）：K 列原 =G+H 把「本期转回」当成增加损益，与同表 J 的 -H 矛盾 ⇒ "
+    "第三批已改模板为 =G-H（信用减值损失 = 计提 − 转回）)"
     " + 前端 `useG14Detail.ts` 按值 grep（ITEM_ID_ROWS / rowKey 不生成也不派生自位置 / "
     "G14DetailRow 前 13 字段与模板列序 A..M 逐列对应 / 固定行集 G14_LINE_ITEMS 9 项）"
     " + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §4"

@@ -89,22 +89,36 @@ class TestF2P3StoreItemIds:
         assert "F2-25-rows" != "F2-25-floor-rows"
 
     # ── valuation / special 册 dict 子数组路径 ────────────────────────
+    # 🔴 spec oo-writeback-template-parity-closure R3：原判据只断言常量本身（恒绿），表里
+    #    F2-57 / F2-58 写的 `products` 实为 `projects`。改为两头实测：前端 composable 的读法
+    #    与 provider 的行数组键登记（投影 / 回写按名取子数组的唯一来源）。
     DICT_STORE_ITEMS = [
-        ("F2-47-rows", "products"),
-        ("F2-48-rows", "products"),
-        ("F2-49-rows", "products"),
-        ("F2-55-rows", "products"),
-        ("F2-56-rows", "samples"),
-        ("F2-57-rows", "products"),
-        ("F2-58-rows", "products"),
+        ("F2-47-rows", "products", "useF2ImpairmentTest.ts", "phase5_f2_inventory_valuation"),
+        ("F2-48-rows", "products", "useF2ObsoleteInventory.ts", "phase5_f2_inventory_valuation"),
+        ("F2-49-rows", "products", "useF2ImpairmentReversal.ts", "phase5_f2_inventory_valuation"),
+        ("F2-55-rows", "products", "useF2ContractCost.ts", "phase5_f2_inventory_special"),
+        ("F2-56-rows", "samples", "useF2ContractCostCheck.ts", "phase5_f2_inventory_special"),
+        ("F2-57-rows", "projects", "useF2Impairment.ts", "phase5_f2_inventory_special"),
+        ("F2-58-rows", "projects", "useF2LossContract.ts", "phase5_f2_inventory_special"),
     ]
 
-    @pytest.mark.parametrize("store_key,rows_path", DICT_STORE_ITEMS)
-    def test_dict_store_rows_path(self, store_key: str, rows_path: str) -> None:
-        """dict 子数组的 rows_path 按值实测（D1-7 同范式）。"""
-        assert isinstance(store_key, str)
-        assert isinstance(rows_path, str)
-        assert rows_path in ("products", "samples")
+    @pytest.mark.parametrize("store_key,rows_path,composable,provider", DICT_STORE_ITEMS)
+    def test_dict_store_rows_path(
+        self, store_key: str, rows_path: str, composable: str, provider: str
+    ) -> None:
+        """dict 子数组的行数组键：前端读法 == provider 登记（D1-7 同范式）。"""
+        import importlib
+
+        src = (
+            _REPO / "audit-platform" / "frontend" / "src" / "components" / "workpaper"
+            / "composables" / composable
+        ).read_text(encoding="utf-8")
+        assert f"const ROWS_KEY = '{store_key}'" in src, f"{composable} 不是 {store_key} 的读写方"
+        assert f"Array.isArray(parsed?.{rows_path})" in src, (
+            f"{composable} 读 {store_key} 的行数组键不是 {rows_path!r}"
+        )
+        mod = importlib.import_module(f"app.services.workpaper_sync.{provider}")
+        assert mod._ROWS_KEY_BY_STORE_ITEM[store_key] == rows_path
 
 
 # ═══════════════════════════════════════════════════════════════════════════

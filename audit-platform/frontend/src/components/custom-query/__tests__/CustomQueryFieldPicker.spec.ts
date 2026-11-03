@@ -30,13 +30,33 @@ if (!(globalThis as any).ResizeObserver) {
 const mockBuildAddressTree = vi.fn()
 const mockLoadCellNodes = vi.fn()
 const mockClearCache = vi.fn()
+const mockUseAcnrProject = vi.fn()
 
 vi.mock('@/services/acnr/useAcnr', () => ({
-  useAcnr: () => ({
-    buildAddressTree: mockBuildAddressTree,
-    loadCellNodes: mockLoadCellNodes,
-    clearCache: mockClearCache,
-  }),
+  useAcnr: (projectRef: unknown) => {
+    mockUseAcnrProject(projectRef)
+    return {
+      buildAddressTree: mockBuildAddressTree,
+      loadCellNodes: mockLoadCellNodes,
+      clearCache: mockClearCache,
+    }
+  },
+}))
+
+// 🔴 回退路由/store 的「诱饵」：三条可能的回退来源一律返回非空项目。
+//    组件若借用其中任何一条，下面「无项目 ⇒ 空字符串」的断言立刻打红。
+//    （只断言空字符串不足以证明没有回退 —— 测试环境里真实回退本就取不到值，
+//      故障注入会全绿；spec advanced-query-safety-and-consistency-closure 任务 8 实测过这一点。）
+const ROUTE_PROJECT_BAIT = 'route-store-bait-project'
+vi.mock('@/composables/useCurrentProjectId', () => ({
+  useCurrentProjectId: () => ({ value: ROUTE_PROJECT_BAIT }),
+}))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: { projectId: ROUTE_PROJECT_BAIT }, query: { project_id: ROUTE_PROJECT_BAIT } }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
+vi.mock('@/stores/project', () => ({
+  useProjectStore: () => ({ currentProjectId: ROUTE_PROJECT_BAIT, currentProject: { id: ROUTE_PROJECT_BAIT }, year: 2025 }),
 }))
 
 // ─── Import after mocks ───────────────────────────────────────────────────────
@@ -161,6 +181,35 @@ describe('CustomQueryFieldPicker — 单元测试', () => {
   afterEach(() => {
     // 真 eventBus 为单例，清理以免跨用例串扰
     eventBus.all.clear()
+  })
+
+  it('显式使用宿主项目，切项目时清除旧选择并重载', async () => {
+    const wrapper = mountPicker({ projectId: 'project-a', modelValue: ['D2/D2-2/E100'] })
+    await flushPromises()
+    const projectRef = mockUseAcnrProject.mock.calls[0][0] as { value: string }
+    expect(projectRef.value).toBe('project-a')
+
+    mockClearCache.mockClear()
+    await wrapper.setProps({ projectId: 'project-b' })
+    await flushPromises()
+    expect(projectRef.value).toBe('project-b')
+    expect(mockClearCache).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ projectId: null })
+    await flushPromises()
+    // 空值即「无项目」：即使路由 / store 里有残留项目（上面三条诱饵），也不得借用
+    expect(projectRef.value).toBe('')
+    expect(projectRef.value).not.toBe(ROUTE_PROJECT_BAIT)
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('不传 projectId 时也不借用路由/store 项目（无项目模式）', async () => {
+    const wrapper = mountPicker({})
+    await flushPromises()
+    const projectRef = mockUseAcnrProject.mock.calls[0][0] as { value: string }
+    expect(projectRef.value).toBe('')
+    expect(projectRef.value).not.toBe(ROUTE_PROJECT_BAIT)
+    wrapper.unmount()
   })
 
   it('挂载时以正确 cycle 调用 buildAddressTree（cycle="D"）', async () => {

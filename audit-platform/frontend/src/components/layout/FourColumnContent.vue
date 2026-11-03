@@ -53,12 +53,12 @@
 </template>
 
 <script setup lang="ts">
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import DetailProjectPanel from './DetailProjectPanel.vue'
 import { fmtAmount } from '@/utils/formatters'
-import * as P from '@/services/apiPaths'
 
 const props = defineProps<{
   project: any | null
@@ -113,12 +113,8 @@ watch(() => props.catalogItem, async (item) => {
 
   if (item.type === 'trial_balance') {
     try {
-      const data = await api.get(P.trialBalance.get(pid), {
-        params: { year: selectedYear.value },
-        validateStatus: (s: number) => s < 600,
-      })
-      const rows = data ?? []
-      tbDetail.value = rows.find((r: any) => r.standard_account_code === item.code) || null
+      const { rows } = await fetchTrialBalanceRows(pid, { year: selectedYear.value })
+      tbDetail.value = rows.find((r) => r.standard_account_code === item.code) || null
     } catch { tbDetail.value = null }
   }
 }, { immediate: true })

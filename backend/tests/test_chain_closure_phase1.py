@@ -343,6 +343,9 @@ class TestR2ReportScopePageKeys:
 
         修复前：派生出 ['report:*']，命中 0（红）
         修复后：派生出全部 report: 前缀键，逐个命中（绿）
+
+        spec formula-hub-integrity-closure 任务 20（ADR-FHIC-07）：report 范围不再经 coordinator，page_keys 改由
+        ``_dispatch("report")`` 直接从预设库派生 ⇒ 调用入口由 ``_dispatch_via_coordinator`` 改为 ``_dispatch``，判据不变。
         """
         from app.services.formula_management.draft_refresh_orchestrator import (
             DraftRefreshOrchestrator,
@@ -353,7 +356,7 @@ class TestR2ReportScopePageKeys:
         expected = sorted(k for k in idx if k.startswith("report:"))
 
         orch = DraftRefreshOrchestrator(seeded)
-        _units, page_keys = await orch._dispatch_via_coordinator(
+        _units, page_keys = await orch._dispatch(
             "report", project_id=PROJ_ID, year=YEAR
         )
 

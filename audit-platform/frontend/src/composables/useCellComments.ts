@@ -22,7 +22,8 @@ export interface CellComment {
   updated_at?: string
 }
 
-export function useCellComments(projectId: () => string, year: () => number, module: string) {
+/** year：审计年度；项目没填为 null ⇒ 各方法与未传项目同样不发请求 */
+export function useCellComments(projectId: () => string, year: () => number | null, module: string) {
   const comments = ref<CellComment[]>([])
   const loading = ref(false)
 

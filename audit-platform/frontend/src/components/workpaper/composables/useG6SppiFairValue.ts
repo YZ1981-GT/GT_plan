@@ -123,28 +123,36 @@ function migrateLevel(raw: any): { unadj: FairValueLevel; audited: FairValueLeve
   return { unadj, audited }
 }
 
+/** 存储里没有这个键（旧版数据）—— 与「录了 0」区分开 */
+function absent(v: unknown): boolean {
+  return v === undefined || v === null || v === ''
+}
+
 export function migrateFairValueRow(raw: any, seq: number): FairValueItem {
   const levels = migrateLevel(raw)
   const base = emptyRow(String(raw.id || `fv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`), seq, raw.investProject || '')
-  // 若旧数据只存了公允价值而无单价，尽量反推单价
+  // 旧版数据只存了公允价值、没有单价 / 数量：尽量反推。
+  // 🔴 只在键缺失时反推（spec oo-writeback-template-parity-closure R3 批 B）：数量 / 单价是两侧都能改的录入列，
+  //    在线编辑里把单价改成 0（或数量、单价都清成 0）是合法编辑，按「为 0」反推会拿 HTML 上次的公允价值把它改回去，
+  //    两侧来回变值（同 E1-4 汇率：缺省才取默认，录了 0 照存）。
   let unadjQty = parseNum(raw.unadjQty)
   let unadjPrice = parseNum(raw.unadjPrice)
   let auditedQty = parseNum(raw.auditedQty)
   let auditedPrice = parseNum(raw.auditedPrice)
   const legacyUnadjFv = parseNum(raw.unadjFairValue)
   const legacyAuditedFv = parseNum(raw.auditedFairValue)
-  if (!unadjPrice && unadjQty && legacyUnadjFv) {
+  if (absent(raw.unadjPrice) && unadjQty && legacyUnadjFv) {
     unadjPrice = Math.round((legacyUnadjFv / unadjQty) * 10000) / 10000
   }
-  if (!auditedPrice && auditedQty && legacyAuditedFv) {
+  if (absent(raw.auditedPrice) && auditedQty && legacyAuditedFv) {
     auditedPrice = Math.round((legacyAuditedFv / auditedQty) * 10000) / 10000
   }
   // 旧数据只有 FV 无数量：默认数量=1，单价=FV
-  if (!unadjQty && !unadjPrice && legacyUnadjFv) {
+  if (absent(raw.unadjQty) && absent(raw.unadjPrice) && legacyUnadjFv) {
     unadjQty = 1
     unadjPrice = legacyUnadjFv
   }
-  if (!auditedQty && !auditedPrice && legacyAuditedFv) {
+  if (absent(raw.auditedQty) && absent(raw.auditedPrice) && legacyAuditedFv) {
     auditedQty = 1
     auditedPrice = legacyAuditedFv
   }

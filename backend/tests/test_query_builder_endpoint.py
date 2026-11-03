@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import io
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -37,15 +37,29 @@ from app.models.audit_platform_models import (
     ReviewStatus,
     TrialBalance,
 )
-from app.models.base import Base
-from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
+from app.models.core import Project, ProjectStatus, ProjectType, UserRole
 from app.routers.query_builder import router as query_builder_router
+from app.services.custom_query import audit_helper
+from app.services.custom_query.table_whitelist import BUILDER_UI_OPERATORS, OPERATOR_WHITELIST
+from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 
 PROJECT_ID = uuid.uuid4()
 USER_ID = uuid.uuid4()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _no_shared_audit():
+    """审计写入换成空操作（advanced-query-linkage-closure 任务 26 起导出记审计 ``custom_query.export``）：真实写入经
+    ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。"""
+    async def _no_audit(**_kwargs):
+        return True
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(audit_helper, "_log_unthrottled", _no_audit)
+        yield
 
 
 class _FakeUser:
@@ -59,10 +73,12 @@ class _FakeUser:
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    # 只建构建器白名单表及其外键闭包（AQ-32）：建全部 ORM 表时，任一无关模型带 PG 专用 server_default，
+    # 本文件全部用例都会在 setup 阶段报错（见 builder_tables 模块说明）
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(create_builder_schema)
+        await assert_only_builder_tables(conn)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
@@ -151,9 +167,10 @@ async def test_schema_returns_whitelist(db_session: AsyncSession):
     # 严格不暴露 user/role/auth 表
     assert "users" not in table_names
     assert "roles" not in table_names
-    # 操作符与聚合白名单存在
-    assert "eq" in body["operators"]
-    assert "between" in body["operators"]
+    # 构建器界面固定下发已支持的 13 项；业务视图专用三项仍可由 DSL 直接编译。
+    assert body["operators"] == sorted(BUILDER_UI_OPERATORS)
+    assert len(BUILDER_UI_OPERATORS) == 13
+    assert OPERATOR_WHITELIST - BUILDER_UI_OPERATORS == {"starts_with", "weekday_in", "is_blank"}
     assert "sum" in body["aggregates"]
 
 
@@ -185,6 +202,22 @@ async def test_preview_generates_sql_without_executing(db_session: AsyncSession)
     # 必须使用绑定参数（: 占位）— SQLAlchemy 默认带 :param_N
     assert ":" in body["sql"]
     assert body["columns"] == ["standard_account_code", "account_name", "audited_amount"]
+
+
+@pytest.mark.asyncio
+async def test_builder_dsl_starts_with_compiles_although_ui_does_not_list_it(db_session: AsyncSession):
+    app = _make_app(db_session)
+    payload = {
+        "table": "trial_balance",
+        "fields": ["standard_account_code"],
+        "filters": [{"field": "standard_account_code", "op": "starts_with", "value": "10%_"}],
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.post("/api/query/preview", json=payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "LIKE" in body["sql"].upper()
+    assert "10%_" not in body["sql"], "用户前缀只能作为绑定参数"
 
 
 # ───────────────────────────────────────────────────────────

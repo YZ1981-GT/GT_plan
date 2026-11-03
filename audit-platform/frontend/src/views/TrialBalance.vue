@@ -454,6 +454,8 @@
     <!-- 归档横幅 -->
     <ArchivedBanner />
     <ConsolLockedBanner />
+    <!-- 项目没填审计年度：试算表按年度取数 / 重算，不按今年兜底 -->
+    <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
 
     <!-- 折叠/展开按钮 -->
     <div class="gt-header-toggle" @click="headerCollapsed = !headerCollapsed">
@@ -503,6 +505,9 @@
         <el-button size="small" @click="triggerTbSumImport" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">📥 导入</el-button>
         <input ref="tbSumImportInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onTbSumImportFile" />
         <el-button size="small" @click="saveTbSummary" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">💾 保存</el-button>
+        <span v-if="tbSummarySaving" class="gt-tb-autosave-status">自动保存中…</span>
+        <span v-else-if="tbSummarySaveError" class="gt-tb-autosave-status gt-tb-autosave-status--error">{{ tbSummarySaveError }}</span>
+        <span v-else-if="tbSummaryDirty" class="gt-tb-autosave-status">等待自动保存…</span>
         <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-left:12px">{{ tbSummaryRows.length }} 行</span>
       </template>
       <!-- 科目明细工具栏（导出/导入） -->
@@ -721,12 +726,13 @@
       <el-table-column prop="account_name" label="科目名称" min-width="180" />
       <el-table-column label="方向" width="80" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
         <template #default="{ row }">
+          <!-- 单击只选中；双击或右键「切换借贷方向」才改（spec excel-style-table-editing R8.4） -->
           <span
             v-if="!row._isSubtotal && !row._isTotal"
             :class="getDirectionClass(row)"
             class="gt-dir-toggle"
-            @click="toggleDirection(row)"
-            :title="'点击切换借贷方向'"
+            @dblclick="toggleDirection(row)"
+            title="双击切换借贷方向（或右键「切换借贷方向」）"
           >
             {{ getDirection(row) }}
           </span>
@@ -895,24 +901,19 @@
             </template>
           </el-table-column>
           <el-table-column prop="unadjusted" label="未审数" width="140" align="right" class-name="gt-tb-sum-unadj-col">
-            <template #default="{ row, $index }">
-              <template v-if="tbSumUnadjEditable || row.formula_detached">
-                <el-input-number
-                  v-if="tbSumLazyEdit.isEditing($index, 0)"
-                  v-model="row.unadjusted"
-                  size="small"
-                  :controls="false"
-                  style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
-                  autofocus
-                />
-                <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 0)">
-                  <span v-if="row.formula_detached" class="gt-tb-detached-icon" title="已断开公式（手动值）">✂️</span>
-                  {{ fmt(row.unadjusted) }}
-                </span>
-              </template>
+            <template #default="{ row }">
+              <!-- 格内编辑（spec excel-style-table-editing 5.3）：平时显示文字，双击 / F2 / 直接输入才挂输入框 -->
+              <GtGridCell v-if="tbSumUnadjEditable || row.formula_detached" :value="row.unadjusted">
+                <template #display>
+                  <span class="gt-tb-editable gt-amt" :data-gt-value="row.unadjusted">
+                    <span v-if="row.formula_detached" class="gt-tb-detached-icon" title="已断开公式（手动值）">✂️</span>
+                    {{ fmt(row.unadjusted) }}
+                  </span>
+                </template>
+                <el-input-number v-model="row.unadjusted" size="small" :controls="false" style="width:100%" @change="onTbSummaryUnadjustedChange(row)" />
+              </GtGridCell>
               <span v-else-if="row.unadjusted == null && !row.is_total && !row.is_category" class="gt-tb-nomap" title="该报表行无对应科目映射（不适用）">—</span>
-              <span v-else class="gt-amt">
+              <span v-else class="gt-amt" :data-gt-value="row.unadjusted">
                 <el-tooltip v-if="row._formula" :content="'ƒx ' + row._formula" placement="top" :show-after="500">
                   <span>{{ fmt(row.unadjusted) }}</span>
                 </el-tooltip>
@@ -936,35 +937,19 @@
           </el-table-column>
           <el-table-column v-if="!tbSumCollapseAdj" label="重分类调整" header-align="center">
             <el-table-column prop="rcl_dr" label="借方" width="120" align="right">
-              <template #default="{ row, $index }">
-                <el-input-number
-                  v-if="tbSumLazyEdit.isEditing($index, 2)"
-                  v-model="row.rcl_dr"
-                  size="small"
-                  :controls="false"
-                  style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
-                  autofocus
-                />
-                <span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit($index, 2)">
-                  <GtAmountCell :value="row.rcl_dr" />
-                </span>
+              <template #default="{ row }">
+                <GtGridCell :editable="canEdit && !row.is_total && !row.is_category" :value="row.rcl_dr">
+                  <template #display><span class="gt-tb-editable"><GtAmountCell :value="row.rcl_dr" /></span></template>
+                  <el-input-number v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" @change="onTbSummaryRclChange(row, 'rcl_dr')" />
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column prop="rcl_cr" label="贷方" width="120" align="right">
-              <template #default="{ row, $index }">
-                <el-input-number
-                  v-if="tbSumLazyEdit.isEditing($index, 3)"
-                  v-model="row.rcl_cr"
-                  size="small"
-                  :controls="false"
-                  style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
-                  autofocus
-                />
-                <span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit($index, 3)">
-                  <GtAmountCell :value="row.rcl_cr" />
-                </span>
+              <template #default="{ row }">
+                <GtGridCell :editable="canEdit && !row.is_total && !row.is_category" :value="row.rcl_cr">
+                  <template #display><span class="gt-tb-editable"><GtAmountCell :value="row.rcl_cr" /></span></template>
+                  <el-input-number v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" @change="onTbSummaryRclChange(row, 'rcl_cr')" />
+                </GtGridCell>
               </template>
             </el-table-column>
           </el-table-column>
@@ -987,7 +972,7 @@
           <el-table-column v-if="tbSumShowVariance" label="调整净额" width="120" align="right" class-name="gt-tb-sum-variance-col">
             <template #default="{ row }">
               <template v-if="!row.is_total && !row.is_category && row.unadjusted != null && row.audited != null">
-                <span :class="{ 'gt-tb-var-warn': Math.abs(Number(row.audited) - Number(row.unadjusted)) > 0.01 }" :style="{ color: (Number(row.audited) - Number(row.unadjusted)) < 0 ? 'var(--gt-color-coral)' : '' }">
+                <span :class="{ 'gt-tb-var-warn': Math.abs(Number(row.audited) - Number(row.unadjusted)) > 0.01 }" :style="{ color: (Number(row.audited) - Number(row.unadjusted)) < 0 ? 'var(--gt-color-coral)' : '' }" :data-gt-value="Number(row.audited) - Number(row.unadjusted)">
                   {{ fmt(Number(row.audited) - Number(row.unadjusted)) }}
                   <el-tooltip v-if="materialityLevels.sat > 0 && Math.abs(Number(row.audited) - Number(row.unadjusted)) > materialityLevels.sat" content="调整金额超微小错报阈值(SAT)，可能构成未更正错报" placement="top">
                     <span style="color:var(--el-color-warning);margin-left:2px">⚠</span>
@@ -1030,19 +1015,13 @@
 
       <!-- 试算平衡表右键菜单 -->
       <div v-if="tbSumCtxVisible" class="gt-tb-sum-ctx" :style="{ left: tbSumCtxX + 'px', top: tbSumCtxY + 'px' }" @contextmenu.prevent>
-        <div class="gt-ucell-ctx-item" @click="onTbSumCtxCopy">
-          <span class="gt-ucell-ctx-icon">📋</span> {{ tbSumSelectedRows.size > 1 ? `复制选中 (${tbSumSelectedRows.size}行)` : '复制值' }}
-        </div>
+        <div class="gt-ucell-ctx-item" @click="onTbSumCtxCopy"><span class="gt-ucell-ctx-icon">📋</span> {{ tbSumPickedRows.length > 1 ? `复制选中 (${tbSumPickedRows.length}行)` : '复制值' }}</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxFormula"><span class="gt-ucell-ctx-icon">ƒx</span> 查看公式</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxDetail"><span class="gt-ucell-ctx-icon">📊</span> 汇总明细</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>
         <div class="gt-ucell-ctx-divider"></div>
-        <div v-if="tbSumCtxRow?.formula_detached" class="gt-ucell-ctx-item" @click="onTbSumCtxRestoreFormula">
-          <span class="gt-ucell-ctx-icon">🔗</span> 恢复公式
-        </div>
-        <div v-else class="gt-ucell-ctx-item" @click="onTbSumCtxDetachFormula">
-          <span class="gt-ucell-ctx-icon">✂️</span> 断开公式（手动填写）
-        </div>
+        <div v-if="tbSumCtxRow?.formula_detached" class="gt-ucell-ctx-item" @click="onTbSumCtxRestoreFormula"><span class="gt-ucell-ctx-icon">🔗</span> 恢复公式</div>
+        <div v-else class="gt-ucell-ctx-item" @click="onTbSumCtxDetachFormula"><span class="gt-ucell-ctx-icon">✂️</span> 断开公式（手动填写）</div>
       </div>
 
       <el-empty v-if="!tbSummaryRows.length && !tbSummaryLoading" description="点击刷新从科目明细汇总生成" />
@@ -1050,7 +1029,7 @@
 
     <!-- #10: 对比视图（激活时替代主表） -->
     <TbComparisonView
-      v-if="comparisonActive"
+      v-if="comparisonActive && year != null"
       :project-id="projectId"
       :year="year"
       :current-rows="rows"
@@ -1162,12 +1141,13 @@
 
     <!-- 公式管理弹窗 -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       scope="tb"
       :initial-report-type="tbViewMode === 'summary' ? tbSummaryType : undefined"
       :rows="rows"
       :project-id="projectId"
-      :year="year"
+      :year="year ?? undefined"
       :template-type="selectedTemplateType"
       @applied="fetchData"
     />
@@ -1197,12 +1177,14 @@
     @compare="onTbCtxCompare"
   >
     <div class="gt-ucell-ctx-item" @click="onTbCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看明细</div>
+    <QueryDetailEntry kind="tb_row" variant="ctx" :target="tbCtx.contextMenu.rowData" :year="year" @opened="tbCtx.closeContextMenu()" />
     <div class="gt-ucell-ctx-item" @click="onTbCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看调整分录</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewLinkedWp"><span class="gt-ucell-ctx-icon">🔗</span> 查看关联底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewReferences"><span class="gt-ucell-ctx-icon">🔎</span> 查看引用方</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxCellTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数字溯源</div>
+    <div v-if="isTbAccountRow(tbCtx.contextMenu.rowData)" class="gt-ucell-ctx-item" @click="onTbCtxToggleDirection"><span class="gt-ucell-ctx-icon">⇄</span> 切换借贷方向</div>
   </CellContextMenu>
 
   <!-- V3 Req 9.6: 数字信任度面板 -->
@@ -1339,21 +1321,23 @@
 // ProjectContext + 年度切换协议已接入
 // TODO(P1): 逐步替换 selectedYear 本地 ref 为 projectStore.year 直取
 
-import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { copyRichText, copyText } from '@/utils/clipboard'
+import { ref, computed, defineAsyncComponent, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Link, ArrowDown, WarningFilled, MoreFilled } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
-import { useLazyEdit } from '@/composables/useLazyEdit'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -1378,11 +1362,15 @@ import StaleIndicator from '@/components/StaleIndicator.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
+import { commitAllGridEdits } from '@/components/grid/GridKernel'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 import DataQualityDialog from '@/components/DataQualityDialog.vue'
 import TbVersionDrawer from '@/components/trial-balance/TbVersionDrawer.vue'
 import TbComparisonView from '@/components/trial-balance/TbComparisonView.vue'
 import ReportLineMappingDialog from '@/components/trial-balance/ReportLineMappingDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 import { exportMultiSheetData, readSheetAoa } from '@/composables/useExcelIO'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
@@ -1395,10 +1383,17 @@ import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useTbSummary } from '@/views/composables/useTbSummary'
 import { useTbBalanceCheck } from '@/views/composables/useTbBalanceCheck'
 import { useTbCellInteraction } from '@/views/composables/useTbCellInteraction'
+import {
+  markManualRcl, useTbSummaryPersistence,
+  type TbSummaryPersistContext, type TbSummaryRclField,
+} from '@/views/composables/useTbSummaryPersistence'
+import { useTbSummaryNavigationGuard } from '@/views/composables/useTbSummaryNavigationGuard'
+import { recalcTbSummaryRow, recalcTbSummaryRows } from '@/views/composables/tbSummaryRecalc'
 import * as P from '@/services/apiPaths'
 import LinkageBadge from '@/components/LinkageBadge.vue'
 import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 
@@ -1416,7 +1411,7 @@ const { can: canOp, whyCannot } = usePermissionMatrix()
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
-const selectedYear = ref(projectStore.year)
+const selectedYear = ref<number | null>(projectStore.year)
 const yearOptions = computed(() => projectStore.yearOptions)
 
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
@@ -1433,13 +1428,15 @@ const staleRefresh = useStaleRefresh(projectId, {
 
 // ─── 联动徽章 [enterprise-linkage 3.6] ─────────────────────────────────────────
 const linkageProjectId = projectId
-const linkageYear = computed(() => selectedYear.value ?? 2025)
+// 原先 `selectedYear ?? 2025`：信息栏没选年度时徽章按 2025 取数
+const linkageYear = computed<number | null>(() => selectedYear.value ?? year.value)
 const { getAdjustments, getWorkpapers } = useLinkageIndicator(linkageProjectId, linkageYear)
 
 function onProjectChange(pid: string) {
   router.push({
     path: `/projects/${pid}/trial-balance`,
-    query: { year: String(selectedYear.value) },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: selectedYear.value == null ? {} : { year: String(selectedYear.value) },
   })
 }
 
@@ -1592,6 +1589,13 @@ function getFreezeKey() {
 }
 
 async function loadFreezeState() {
+  // 项目没填审计年度：没有该年度试算表，不查锁定状态（按年度取，缺年度 422）
+  if (year.value == null) {
+    isFrozen.value = false
+    frozenBy.value = null
+    frozenAt.value = null
+    return
+  }
   // 优先从后端读取锁定状态（跨设备/团队可见）
   try {
     const res = await api.get(`/api/projects/${projectId.value}/trial-balance/freeze-status`, { params: { year: year.value }, _silent: true } as any)
@@ -1666,6 +1670,8 @@ const routeYear = computed(() => {
 })
 const projectYear = ref<number | null>(null)
 const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 
 const loading = ref(false)
 const showTbImport = ref(false)
@@ -1680,6 +1686,7 @@ const showTbGuide = ref(false)
 const recalcLoading = ref(false)
 const checkLoading = ref(false)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)  // 首次打开才下载 / 挂载公式管理
 const rows = ref<TrialBalanceRow[]>([])
 const consistencyResult = ref<ConsistencyResult | null>(null)
 
@@ -2033,6 +2040,7 @@ async function loadBalanceCheck() {
 // P1-8: 重要性水平（PM/TE/SAT）
 const materialityLevels = ref<{ pm: number; te: number; sat: number }>({ pm: 0, te: 0, sat: 0 })
 async function loadMaterialityLevels() {
+  if (year.value == null) return // 项目没填审计年度：不拼 year=null
   try {
     const mat = await api.get(`${P.materiality.get(projectId.value)}?year=${year.value}`)
     if (mat) {
@@ -2076,8 +2084,10 @@ const freshnessText = computed(() => {
 })
 
 async function loadLatestAdjustmentTime() {
+  const y = year.value
+  if (y == null) { latestAdjustmentAt.value = null; return }
   try {
-    const adjs = await listAdjustments(projectId.value, year.value)
+    const adjs = await listAdjustments(projectId.value, y)
     if (adjs && adjs.length > 0) {
       const times = adjs.map((a: any) => a.updated_at).filter(Boolean).sort().reverse()
       latestAdjustmentAt.value = times[0] || null
@@ -2184,6 +2194,7 @@ const autoMapNeedsAttention = computed(
 )
 
 async function loadAutoMapOutcome() {
+  if (selectedYear.value == null) { autoMapOutcome.value = null; return }
   try {
     const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
     autoMapOutcome.value = ds?.auto_map ?? null
@@ -2194,6 +2205,12 @@ async function loadAutoMapOutcome() {
 
 /** 检测当前数据状态（用于自动推进步骤） */
 async function detectDataState() {
+  // 项目没填审计年度：余额表 / 映射完成率都按年度取（缺年度 422），不发，步骤停在「导入」
+  if (selectedYear.value == null) {
+    dataState.value = { hasBalance: false, mappingRate: 0, hasTb: rows.value.length > 0 }
+    await loadAutoMapOutcome()
+    return
+  }
   try {
     const [balance, mapping] = await Promise.allSettled([
       api.get(P.ledger.balance(projectId.value), { params: { year: selectedYear.value } }),
@@ -2226,10 +2243,12 @@ watch(tbImportVisible, async (visible) => {
   checkingData.value = true
   existingDataSummary.value = null
   try {
+    // 年度未设置：不查余额表（按年度取，缺年度 422），弹窗照常打开、不显示「已有数据」摘要
+    if (selectedYear.value == null) return
     // 从余额表查询是否有数据
     const balance = await api.get(P.ledger.balance(projectId.value), { params: { year: selectedYear.value } })
     const balanceRows = balance ?? []
-    if (balanceRows.length > 0) {
+    if (balanceRows.length > 0 && selectedYear.value != null) {
       // 有数据，获取数据集信息
       const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
       existingDataSummary.value = {
@@ -2256,7 +2275,8 @@ function goToLedgerImport() {
 
 // 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）
 function onOpenLedgerWindow() {
-  openLedgerWindow(projectId.value, year.value)
+  // 年度为空不带（查账页按项目审计年度口径）
+  openLedgerWindow(projectId.value, year.value ?? undefined)
 }
 
 function onImportDone() {
@@ -2352,24 +2372,39 @@ function rowClassName({ row }: { row: DisplayRow }) {
 
 
 async function ensureProjectYear() {
-  if (routeYear.value !== null) {
-    projectYear.value = null
-    return
-  }
   try {
-    projectYear.value = await getProjectAuditYear(projectId.value)
-  } catch {
-    projectYear.value = null
+    if (routeYear.value !== null) {
+      projectYear.value = null
+      return
+    }
+    try {
+      projectYear.value = await getProjectAuditYear(projectId.value)
+    } catch {
+      projectYear.value = null
+    }
+  } finally {
+    yearResolved.value = true
   }
 }
 
 const fetchData = withLoading(loading, async () => {
-  const result = await getTrialBalance(projectId.value, year.value, hasMultipleCompanies.value ? companyCode.value : undefined)
+  const y = year.value
+  // 项目没填审计年度：页头横幅已说明，不发请求（原先把 null 发给后端）
+  if (y == null) { rows.value = []; return }
+  const result = await getTrialBalance(projectId.value, y, hasMultipleCompanies.value ? companyCode.value : undefined)
   rows.value = Array.isArray(result) ? result : []
-  await loadBalanceCheck()
+  await Promise.all([
+    loadBalanceCheck(),
+    tbComments.loadComments('trial_balance'),
+  ])
 })
 
 const onRecalc = withLoading(recalcLoading, async () => {
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 重算前确认弹窗（含上下文提示）
   const rowCount = rows.value.length
   const lastTime = lastRecalcAt.value ? displayPrefs.fmtDateTime(lastRecalcAt.value) : '从未重算'
@@ -2393,7 +2428,7 @@ const onRecalc = withLoading(recalcLoading, async () => {
     }
   }
 
-  await recalcTrialBalance(projectId.value, year.value)
+  await recalcTrialBalance(projectId.value, y)
   await fetchData()
   await loadLatestAdjustmentTime()
 
@@ -2435,7 +2470,12 @@ const onRecalc = withLoading(recalcLoading, async () => {
 })
 
 const onConsistencyCheck = withLoading(checkLoading, async () => {
-  consistencyResult.value = await checkConsistency(projectId.value, year.value)
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  consistencyResult.value = await checkConsistency(projectId.value, y)
   // 持久化校验时间到本地（用于显示"最近校验时间"）
   try {
     localStorage.setItem(`tb_last_check_${projectId.value}_${year.value}`, new Date().toISOString())
@@ -2460,6 +2500,10 @@ function onTbImported() {
 }
 
 async function onExport() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 导出前自动检查：若有未通过的质量问题则弹提示
   if (dataQualityIssueCount.value > 0) {
     try {
@@ -2500,16 +2544,22 @@ function onUnadjustedClick(row: TrialBalanceRow) {
   if (!row.standard_account_code) return
   router.push({
     path: `/projects/${projectId.value}/ledger`,
-    query: { year: String(year.value), account: row.standard_account_code },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: { ...(year.value != null ? { year: String(year.value) } : {}), account: row.standard_account_code },
   })
 }
 
 async function onAdjClick(row: TrialBalanceRow, type: string) {
   adjDialogType.value = type.toUpperCase()
   adjDialogAccount.value = `${row.standard_account_code} ${row.account_name || ''}`
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   adjDialogVisible.value = true
   try {
-    const result = await listAdjustments(projectId.value, year.value, {
+    const result = await listAdjustments(projectId.value, y, {
       adjustment_type: type, page_size: 200,
     })
     // Filter by account code from line_items
@@ -2533,7 +2583,7 @@ async function reloadTrialBalanceContext() {
   loadFreezeState()  // Task 4: 加载冻结状态
   loadMaterialityLevels()  // P1-8: 加载重要性水平
   // P1-1: 自动执行一次数据质量检查（best-effort 填充 badge）
-  if (rows.value.length > 0) {
+  if (rows.value.length > 0 && year.value != null) {
     checkConsistency(projectId.value, year.value)
       .then(r => { consistencyResult.value = r })
       .catch(() => { /* 静默 */ })
@@ -2554,6 +2604,7 @@ async function reloadTrialBalanceContext() {
   try {
     wpList.value = await listWorkpapers(projectId.value)
   } catch { /* ignore */ }
+  if (tbViewMode.value === 'summary') await loadTbSummary()
 }
 
 // 初次加载（替代 onMounted 一次性加载）
@@ -2582,14 +2633,15 @@ onUnmounted(() => {
 })
 onBeforeUnmount(() => {
   eventBus.off('materiality:changed', onMaterialityChanged)
+  tbSummaryPersistence.dispose()
 })
 
 /** 快捷键保存：根据当前视图保存试算平衡表 */
-function onShortcutSave() {
+async function onShortcutSave() {
   if (tbViewMode.value === 'summary') {
-    saveTbSummary()
+    await saveTbSummary()
   } else {
-    onRecalc()
+    await onRecalc()
   }
 }
 
@@ -2612,6 +2664,10 @@ function onVersionRestored() {
 
 // #10: 对比模式切换
 function onComparisonMode(cmd: string) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   comparisonMode.value = cmd as 'cross_year' | 'cross_project'
   comparisonActive.value = true
 }
@@ -2680,6 +2736,32 @@ const tbSumPeriod = ref<'ending' | 'opening'>('ending')
 // 期初数据来源：'prior_year'（连续审计，从上年带入）或 'manual'（首次承接，手动填写）
 const tbSumOpeningSource = ref<'prior_year' | 'manual'>('manual')
 
+function tbSummaryPersistContext(period: 'ending' | 'opening' = tbSumPeriod.value): TbSummaryPersistContext | null {
+  const auditYear = selectedYear.value
+  if (!projectId.value || auditYear == null) return null
+  const sheetKey = `${period === 'opening' ? 'tb_summary_opening' : 'tb_summary'}_${tbSummaryType.value}`
+  return { projectId: projectId.value, year: auditYear, sheetKey }
+}
+
+const tbSummaryPersistence = useTbSummaryPersistence({
+  getContext: () => tbSummaryPersistContext(),
+  getRows: () => tbSummaryRows.value,
+  canSave: () => canEdit.value && !!projectId.value && selectedYear.value != null,
+})
+const { saving: tbSummarySaving, dirty: tbSummaryDirty, errorMessage: tbSummarySaveError } = tbSummaryPersistence
+const tbSummaryNavigation = useTbSummaryNavigationGuard(tbSummaryPersistence)
+
+function onTbSummaryRclChange(row: any, field: TbSummaryRclField): void {
+  if (!canEdit.value || row.is_total || row.is_category) return
+  markManualRcl(row, field)
+  recalcTbSummaryRow(row)
+  tbSummaryPersistence.queue()
+}
+
+function onTbSummaryUnadjustedChange(row: any): void {
+  recalcTbSummaryRow(row)
+}
+
 // 未审数列是否可编辑（编辑模式开启时所有报表类型都可编辑）
 const tbSumUnadjEditable = computed(() => tbSumEditMode.value)
 
@@ -2692,6 +2774,16 @@ const tbSumCtxX = ref(0)
 const tbSumCtxY = ref(0)
 const tbSumCtxRow = ref<any>(null)
 const tbSummaryTableRef = ref<any>(null)
+tbSumCtx.followTables(() => [tbSummaryTableRef.value])
+
+/** 选中的行（右键「复制选中」用）：Excel / 单击编辑方式取表格内核选区所在行（可见行 = 筛选后的数据），经典方式取页面的行选择 */
+const tbSumPickedRows = computed<any[]>(() => {
+  if (tbSumCtx.kernelActive()) {
+    const visible = [...new Set(tbSumCtx.selectedCells.value.map((c) => c.row))].sort((a, b) => a - b)
+    return visible.map((i) => filteredTbSummaryRows.value[i]).filter(Boolean)
+  }
+  return [...tbSumSelectedRows.value].sort((a, b) => a - b).map((i) => tbSummaryRows.value[i]).filter(Boolean)
+})
 
 // 试算平衡表最大高度（表头固定）
 const tbSummaryMaxHeight = computed(() => {
@@ -2706,7 +2798,8 @@ function tbSumRowClassName({ row, rowIndex }: { row: any; rowIndex: number }) {
   if (row.is_total) classes.push('gt-tb-sum-total')
   if (row.is_category) classes.push('gt-tb-sum-category')
   if (row.formula_detached) classes.push('gt-tb-sum-detached')
-  if (tbSumSelectedRows.value.has(rowIndex)) classes.push('gt-tb-sum-selected')
+  // Excel / 单击编辑方式选区由表格内核画，不再另画一套行选中
+  if (!tbSumCtx.kernelActive() && tbSumSelectedRows.value.has(rowIndex)) classes.push('gt-tb-sum-selected')
   // P1-8: 审定数 > PM 的行加粗（重大科目醒目）
   if (materialityLevels.value.pm > 0 && !row.is_total && !row.is_category) {
     const audited = Math.abs(Number(row.audited) || 0)
@@ -2723,7 +2816,7 @@ function tbSumCellClassName({ rowIndex, columnIndex }: { rowIndex: number; colum
 // el-table 单元格点击事件（单选单元格 + 行选择）
 function onTbSumCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const ri = tbSummaryRows.value.indexOf(row)
-  if (ri < 0) return
+  if (ri < 0 || tbSumCtx.kernelActive()) return // Excel / 单击编辑方式：鼠标按下时表格内核已选好（行选择见 tbSumPickedRows）
   // 列索引映射
   const colIdx = _tbSumColIndex(column.property)
   if (colIdx >= 0) {
@@ -2757,9 +2850,16 @@ function onTbSumElContextMenu(row: any, _column: any, event: MouseEvent) {
   onTbSumContextMenu(event, row, ri)
 }
 
-// el-table 行双击事件
-function onTbSumElDblClick(row: any) {
+// el-table 行双击：只读格才跳转；可编辑格双击是编辑（Excel / 单击编辑方式由表格内核接管、不冒泡到这里，经典方式在这里挡住）
+function onTbSumElDblClick(row: any, column: any) {
+  if (isTbSumEditableCell(row, column?.property)) return
   onTbSumDblClick(row)
+}
+
+/** 试算平衡表可编辑格：重分类借贷始终可改，未审数在编辑模式或断开公式的行可改 */
+function isTbSumEditableCell(row: any, prop: string | undefined): boolean {
+  if (prop === 'rcl_dr' || prop === 'rcl_cr') return true
+  return prop === 'unadjusted' && (tbSumUnadjEditable.value || !!row.formula_detached)
 }
 
 // 兼容旧代码的单行选中
@@ -2800,8 +2900,8 @@ function onTbSumContextMenu(event: MouseEvent, row: any, _ri: number) {
 }
 
 function onTbSumDblClick(row: any) {
-  // 可编辑模式或已断开公式的行双击不跳转
-  if (tbSumEditMode.value || row.formula_detached) return
+  // 编辑模式下整表可编辑：双击不跳转，改走右键「数据溯源」或行尾「更多」（R8.4）；断开公式的行只挡可编辑格（见 onTbSumElDblClick）
+  if (tbSumEditMode.value) return
   // #7: 优先跳转底稿（如有关联底稿），否则溯源到科目明细
   if (row.row_name && wpMappingIndex.value) {
     const found = Object.values(wpMappingIndex.value).find((m: any) => m.wp_name?.includes(row.row_name))
@@ -2842,22 +2942,21 @@ function onTbSumTrace(row: any) {
   }, 200)
 }
 
-function onTbSumCtxCopy() {
+async function onTbSumCtxCopy() {
   tbSumCtxVisible.value = false
   // 多行复制
-  const selectedIndices = [...tbSumSelectedRows.value].sort((a, b) => a - b)
-  if (!selectedIndices.length && tbSumCtxRow.value) {
+  const picked = tbSumPickedRows.value
+  if (!picked.length && tbSumCtxRow.value) {
     // 没有选中行时复制右键行
     const row = tbSumCtxRow.value
-    navigator.clipboard.writeText(`${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.audited || ''}`)
+    await copyText(`${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.audited || ''}`)
     ElMessage.success('已复制')
     return
   }
-  const lines = selectedIndices.map(i => {
-    const row = tbSummaryRows.value[i]
+  const lines = picked.map((row) => {
     return `${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.aje_dr || ''}\t${row.aje_cr || ''}\t${row.rcl_dr || ''}\t${row.rcl_cr || ''}\t${row.audited || ''}`
   })
-  navigator.clipboard.writeText(lines.join('\n'))
+  await copyText(lines.join('\n'))
   ElMessage.success(`已复制 ${lines.length} 行`)
 }
 
@@ -2983,18 +3082,9 @@ function _closeTbSumCtx() { tbSumCtxVisible.value = false }
 
 
 function recalcTbSummaryAudited() {
-  for (const r of tbSummaryRows.value) {
-    const u = Number(r.unadjusted) || 0
-    const ad = Number(r.aje_dr) || 0
-    const ac = Number(r.aje_cr) || 0
-    const rd = Number(r.rcl_dr) || 0
-    const rc = Number(r.rcl_cr) || 0
-    const result = u + ad - ac + rd - rc
-    r.audited = result !== 0 ? Math.round(result * 100) / 100 : null
-  }
+  recalcTbSummaryRows(tbSummaryRows.value)
 }
 
-watch(tbSummaryRows, recalcTbSummaryAudited, { deep: true })
 const { isFullscreen: tbFullscreen, toggleFullscreen: toggleTbFullscreen } = useFullscreen()
 
 // 表格最大高度（视口高度 - 顶部区域，实现表头固定）
@@ -3004,7 +3094,7 @@ const tableMaxHeight = computed(() => {
   return 'calc(100vh - 320px)'
 })
 
-function copyTbTable() {
+async function copyTbTable() {
   const data = tbViewMode.value === 'summary' ? tbSummaryRows.value : groupedRows.value
   if (!data?.length) { ElMessage.warning('无数据可复制'); return }
   let headers: string[], dataRows: any[][]
@@ -3018,16 +3108,15 @@ function copyTbTable() {
   const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
   const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
   try {
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    await copyRichText(html, text)
     ElMessage.success(`已复制 ${dataRows.length} 行`)
-  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
+  } catch { await copyText(text); ElMessage.success('已复制') }
 }
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const tbCtx = useCellSelection()
 const penetrate = usePenetrate()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
-const tbSumLazyEdit = useLazyEdit()
 
 // ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
 const tbTableRef = ref<any>(null)
@@ -3100,11 +3189,18 @@ const tbSearch = useTableSearch(
 
 /** Ctrl+F 快捷键触发搜索栏（拦截浏览器默认搜索） */
 function onKeydown(e: KeyboardEvent) {
+  // shortcutManager 当前未在应用入口安装；本页直接兜住 Ctrl+S。若以后全局层先处理，defaultPrevented 可避免重复保存。
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's' && !e.defaultPrevented) {
+    e.preventDefault()
+    e.stopPropagation()
+    commitAllGridEdits()
+    void onShortcutSave()
+    return
+  }
   // Backspace：从溯源返回试算平衡表原位置
   if (e.key === 'Backspace' && tbTraceOrigin.value?.fromSummary && tbViewMode.value === 'detail') {
-    const target = e.target as HTMLElement
-    // 不拦截输入框内的 Backspace
-    if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
+    // 不拦截输入框内的 Backspace（表格承接框不算输入框：选中单元格时照常返回）
+    if (isTextEntryTarget(e.target)) return
     e.preventDefault()
     const origin = tbTraceOrigin.value
     tbViewMode.value = 'summary'
@@ -3114,6 +3210,9 @@ function onKeydown(e: KeyboardEvent) {
       const scrollEl = tbSummaryTableRef.value?.$el?.querySelector('.el-table__body-wrapper')
       if (scrollEl && origin.scrollTop) scrollEl.scrollTop = origin.scrollTop
       if (origin.rowIndex >= 0) tbSumSelectedRows.value = new Set([origin.rowIndex])
+      // Excel / 单击编辑方式选区归表格内核：选中原来那一行
+      const vi = filteredTbSummaryRows.value.indexOf(tbSummaryRows.value[origin.rowIndex])
+      if (tbSumCtx.kernelActive() && vi >= 0) tbSumCtx.selectRow(vi, 0)
     }, 100)
     return
   }
@@ -3136,7 +3235,7 @@ function tbCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
   const selClass = tbCtx.cellClassName({ rowIndex, columnIndex })
   if (selClass) classes.push(selClass)
-  const ccClass = tbComments.commentCellClass('tb_detail', rowIndex, columnIndex)
+  const ccClass = tbComments.commentCellClass('trial_balance', rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
   return classes.join(' ')
 }
@@ -3300,7 +3399,8 @@ async function onTbCtxTrace() {
   // 跳转到查账页面，带上科目编码参数，查账页面会自动定位
   router.push({
     path: `/projects/${projectId.value}/ledger`,
-    query: { year: String(year.value), account: row.standard_account_code },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: { ...(year.value != null ? { year: String(year.value) } : {}), account: row.standard_account_code },
   })
 }
 
@@ -3414,6 +3514,18 @@ function onTbCtxOpenWp() {
   if (tbCtx.contextMenu.rowData?.standard_account_code) onOpenWorkpaper(tbCtx.contextMenu.rowData.standard_account_code)
 }
 
+/** 科目行（非小计 / 合计）才能切换借贷方向 */
+function isTbAccountRow(row: any): boolean {
+  return !!row?.standard_account_code && !row._isSubtotal && !row._isTotal
+}
+
+// 方向切换改走双击或右键菜单：单击只选中（spec excel-style-table-editing R8.4）
+function onTbCtxToggleDirection() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (isTbAccountRow(row)) toggleDirection(row)
+}
+
 // V3 Req 9.6: 数字信任度
 const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
 function onTbCtxTrustScore() {
@@ -3444,10 +3556,11 @@ function onTbCtxViewAdj() {
     ElMessage.info('请先选中一个科目行')
     return
   }
-  router.push({
-    path: `/projects/${projectId.value}/adjustments`,
-    query: { year: String(year.value), account: row.standard_account_code },
-  })
+  router.push(buildAdjustmentRouteTarget(
+    projectId.value,
+    { kind: 'account', accountCode: row.standard_account_code },
+    { year: year.value },
+  ))
 }
 
 // enterprise-linkage 3.10：右键"查看关联底稿" → 跳转底稿列表筛选该科目
@@ -3504,6 +3617,9 @@ const tbSummaryTypes = [
 ]
 
 async function loadTbSummary() {
+  if (!await tbSummaryNavigation.settle('刷新')) return
+  const loadContext = tbSummaryPersistContext()
+  if (loadContext) tbSummaryPersistence.invalidate(loadContext)
   tbSummaryLoading.value = true
   try {
     if (tbSumPeriod.value === 'opening') {
@@ -3535,6 +3651,8 @@ async function loadTbSummary() {
         rcl_dr: r.rcl_dr ?? null,
         rcl_cr: r.rcl_cr ?? null,
         audited: r.audited ?? null,
+        _formula: r._formula ?? r.formula ?? r.formula_used ?? null,
+        formula_used: r.formula_used ?? r.formula ?? r._formula ?? null,
       }))
     } else {
       // 新接口无数据（报表行次未配置），降级：从报表配置+科目明细构建
@@ -3584,6 +3702,8 @@ async function loadTbSummary() {
           rcl_dr: rcl.dr || null,
           rcl_cr: rcl.cr || null,
           audited: null as number | null,
+          _formula: r.formula ?? r.formula_used ?? null,
+          formula_used: r.formula_used ?? r.formula ?? null,
         }
       })
       recalcTbSummaryAudited()
@@ -3591,7 +3711,10 @@ async function loadTbSummary() {
 
     // 合并已保存的手动编辑数据（用户手动填写的未审数不被公式计算覆盖）
     await _mergeSavedTbSummary()
-  } catch { tbSummaryRows.value = [] }
+  } catch {
+    tbSummaryRows.value = []
+    if (loadContext) tbSummaryPersistence.invalidate(loadContext)
+  }
   finally { tbSummaryLoading.value = false }
 }
 
@@ -3671,71 +3794,32 @@ async function _loadOpeningTbSummary() {
 }
 
 /**
- * 合并已保存的手动数据：对于公式计算结果为空（null/0）的行，
- * 用之前手动保存的值覆盖（典型场景：现金流量表无公式，全靠手动填写）
+ * 合并已保存的手工数据。加载成功后同时记录 CAS 版本；加载失败保持不可保存。
  */
-async function _mergeSavedTbSummary(periodOverride?: string) {
-  try {
-    const period = periodOverride || tbSumPeriod.value
-    const sheetKey = period === 'opening'
-      ? `tb_summary_opening_${tbSummaryType.value}`
-      : `tb_summary_${tbSummaryType.value}`
-    const saved = await api.get(
-      P.consolWorksheetData.get(projectId.value, selectedYear.value, sheetKey),
-      { validateStatus: (s: number) => s < 600 }
-    )
-    const savedRows: any[] = saved?.data?.rows || saved?.rows || []
-    if (!savedRows.length) return
-
-    // 按 row_code 建索引
-    const savedMap = new Map<string, any>()
-    for (const sr of savedRows) {
-      if (sr.row_code) savedMap.set(sr.row_code, sr)
-    }
-
-    // 对当前行：如果公式计算结果为空但已保存有值，用保存值覆盖
-    // formula_detached=true 的行强制用保存值（不管公式是否有值）
-    for (const row of tbSummaryRows.value) {
-      const saved = savedMap.get(row.row_code)
-      if (!saved) continue
-      // 恢复 formula_detached 标记
-      if (saved.formula_detached) {
-        row.formula_detached = true
-        // 断开公式的行：强制用保存值覆盖
-        if (saved.unadjusted != null) row.unadjusted = saved.unadjusted
-        if (saved.rcl_dr != null) row.rcl_dr = saved.rcl_dr
-        if (saved.rcl_cr != null) row.rcl_cr = saved.rcl_cr
-      } else {
-        // 未断开的行：仅公式无值时用保存值
-        if (!row.unadjusted && saved.unadjusted) row.unadjusted = saved.unadjusted
-        if (!row.rcl_dr && saved.rcl_dr) row.rcl_dr = saved.rcl_dr
-        if (!row.rcl_cr && saved.rcl_cr) row.rcl_cr = saved.rcl_cr
-      }
-    }
-    // 重算审定数
-    recalcTbSummaryAudited()
-  } catch { /* 无保存数据或接口不可用，静默跳过 */ }
+async function _mergeSavedTbSummary(periodOverride?: 'ending' | 'opening') {
+  const context = tbSummaryPersistContext(periodOverride || tbSumPeriod.value)
+  if (!context) return
+  if (await tbSummaryPersistence.hydrate(context)) recalcTbSummaryAudited()
 }
 
-async function saveTbSummary() {
-  try {
-    const saveRows = tbSummaryRows.value.map((r: any) => ({
-      row_code: r.row_code, row_name: r.row_name,
-      unadjusted: r.unadjusted, aje_dr: r.aje_dr, aje_cr: r.aje_cr,
-      rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr,
-      formula_detached: r.formula_detached || false,
-    }))
-    const sheetKey = tbSumPeriod.value === 'opening'
-      ? `tb_summary_opening_${tbSummaryType.value}`
-      : `tb_summary_${tbSummaryType.value}`
-    await api.put(
-      P.consolWorksheetData.get(projectId.value, selectedYear.value, sheetKey),
-      { sheet_key: sheetKey, data: { rows: saveRows } },
-      { validateStatus: (s: number) => s < 600 }
-    )
-    ElMessage.success('试算平衡表已保存')
-    tbSumEditMode.value = false  // 保存后退出编辑模式，恢复双击溯源
-  } catch (e) { handleApiError(e, '保存试算平衡表') }
+async function saveTbSummary(): Promise<boolean> {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return false
+  }
+  if (!canEdit.value) {
+    ElMessage.warning('当前项目不可编辑')
+    return false
+  }
+
+  const saved = await tbSummaryPersistence.flush(true)
+  if (!saved) {
+    ElMessage.error(tbSummarySaveError.value || '保存试算平衡表失败')
+    return false
+  }
+  ElMessage.success('试算平衡表已保存')
+  tbSumEditMode.value = false
+  return true
 }
 
 async function exportTbSummary() {
@@ -4068,6 +4152,8 @@ async function onTbSumImportFile(e: Event) {
     margin-bottom: 8px;
     padding: 4px 0;
   }
+  .gt-tb-autosave-status { margin-left: 8px; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); white-space: nowrap; }
+  .gt-tb-autosave-status--error { color: var(--gt-color-coral); }
 
   /* P2-9: 变动分析列 */
   .gt-tb-var-warn { color: var(--el-color-warning); font-weight: 600; }

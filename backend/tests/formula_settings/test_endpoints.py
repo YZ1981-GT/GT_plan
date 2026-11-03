@@ -43,11 +43,14 @@ async def api(monkeypatch):
             await db.commit()
         events: list = []
 
-        async def fake_publish_events(evs, **kw):
-            events.extend(evs)
-            return len(evs)
+        async def fake_record_changes(db, *, domain="", events=(), source="", publish_id=None):
+            pass  # S4: record_changes 打桩，不实际入队
 
-        monkeypatch.setattr(fs_router, "publish_events", fake_publish_events)
+        async def fake_publish_pending(db):
+            return {"queued": 0}  # S4: publish_pending 打桩
+
+        monkeypatch.setattr(fs_router, "record_changes", fake_record_changes)
+        monkeypatch.setattr(fs_router, "publish_pending", fake_publish_pending)
         app = FastAPI()
         app.include_router(fs_router.router)
         app.include_router(fs_router.project_router)
@@ -146,12 +149,13 @@ async def test_project_effective_and_overrides_permissions(api):
             ReportConfig.applicable_standard == f"project:{a}"))).first() is None
     assert api["events"] == []
     api["as"]("editor")
-    r = await c.put(f"{base}/overrides", json=body)
-    assert r.status_code == 200, r.text
+    save_r = await c.put(f"{base}/overrides", json=body)
+    assert save_r.status_code == 200, save_r.text
     assert api["events"] == [{"project_id": str(a), "slot_keys": [SLOT]}]
     eff = await c.get(f"{base}/effective")
     assert eff.json()["slots"][0]["layer"] == "project"
-    r = await c.delete(f"{base}/overrides", params={"slot_key": SLOT})
+    saved_ver = save_r.json()["saved"][0]["version"] if save_r.json().get("saved") else 1
+    r = await c.delete(f"{base}/overrides", params={"slot_key": SLOT, "expected_version": saved_ver})
     assert r.status_code == 200 and r.json()["restored"] == [SLOT]
     assert (await c.get(f"{base}/effective")).json()["slots"][0]["layer"] == "global"
 
@@ -164,7 +168,7 @@ async def test_pending_read_resolve_permissions(api):
     assert pend.status_code == 200 and pend.json()["count"] == 1
     item = pend.json()["items"][0]
     assert (item["base_formula"], item["upstream_formula"], item["local_formula"]) == (OLD, NEW, MINE)
-    body = {"resolutions": [{"item_id": item["id"], "choice": "adopt", "upstream_version": item["upstream_version"]}]}
+    body = {"resolutions": [{"item_id": item["id"], "choice": "adopt", "revision": item["revision"]}]}
     assert (await c.post(f"/api/projects/{b}/formula-settings/pending/resolve", json=body)).status_code == 403
     async with api["f"]() as db:
         assert (await db.get(FormulaSyncItem, uuid.UUID(item["id"]))).status == "pending"
@@ -183,7 +187,7 @@ async def test_pending_resolve_keep_reports_no_recalc(api):
     api["as"]("editor")
     item = (await c.get(f"/api/projects/{b}/formula-settings/pending")).json()["items"][0]
     before = list(api["events"])
-    body = {"resolutions": [{"item_id": item["id"], "choice": "keep", "upstream_version": item["upstream_version"]}]}
+    body = {"resolutions": [{"item_id": item["id"], "choice": "keep", "revision": item["revision"]}]}
     r = await c.post(f"/api/projects/{b}/formula-settings/pending/resolve", json=body)
     assert r.status_code == 200 and r.json()["resolved"] == [item["id"]]
     assert r.json()["recalc_domains"] == []

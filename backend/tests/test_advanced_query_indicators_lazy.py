@@ -88,7 +88,7 @@ def stub_trees(monkeypatch):
         for c in ("A", "B", "C")
     ]
 
-    async def _disclosure(template_type):
+    async def _disclosure(template_type, **_project_context):  # 任务 19：带项目时多传 db / year / 范围等
         return [dict(x) for x in disclosure]
 
     async def _workpaper(db, project_id):
@@ -143,18 +143,24 @@ class TestIndicatorsSkeleton:
 
     @pytest.mark.asyncio
     async def test_lazy_branches_marked_and_emptied(self, stub_trees):
-        """重分支在骨架中 children 为空且标 lazy=True。"""
+        """重分支在骨架中不带懒加载内容且标 lazy=True。
+
+        底稿组例外地带一个「底稿清单」叶子（注册表源 workpaper，advanced-query-linkage-closure 任务 29 / ADR-AQL-16：
+        页面版只加载「骨架 + 附注分支」，底稿组只留它）；逐底稿 / 逐 sheet 的子树仍按需加载。
+        """
         skeleton = {n["key"]: n for n in await _indicators(depth=1)}
         for key in LAZY_INDICATOR_BRANCHES:
             assert key in skeleton, f"骨架缺大类 {key}"
-            assert skeleton[key]["children"] == []
+            kept = ["workpaper"] if key == "workpaper" else []
+            assert [child["key"] for child in skeleton[key]["children"]] == kept
             assert skeleton[key]["lazy"] is True
 
     @pytest.mark.asyncio
     async def test_light_categories_stay_inline_in_skeleton(self, stub_trees):
         """轻量大类（试算/调整/工时等）仍内联 —— 为它们再发一次请求不值得。"""
         skeleton = {n["key"]: n for n in await _indicators(depth=1)}
-        for key in ("trial_balance", "adjustment", "worksheet", "workhours"):
+        # 合并工作底稿组只在合并项目出现（advanced-query-linkage-closure ADR-AQL-10）；本替身无项目 = 单体口径
+        for key in ("trial_balance", "adjustment", "workhours"):
             assert skeleton[key]["children"], f"{key} 不应被懒加载"
 
     @pytest.mark.asyncio

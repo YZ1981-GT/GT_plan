@@ -53,109 +53,74 @@ const arbInvalidYear = fc.oneof(
   fc.constant(-Infinity),
 )
 
-// ─── Property 6: year 自动解析后底层请求永不缺失 year ────────────────────────────
-// **Validates: Requirements 5.2**
+// ─── Property 6: 年度只用调用方给的合法年度，否则交给后端按项目审计年度取（不按日历猜）──────────
+// **Validates: Requirements 5.2**（spec audit-year-calendar-fallback-ratchet 起不再兜底「今年 − 1」；
+// post-push-residual-defect-closure R1：试算表端点 year 可省、按项目审计年度取）
 
-describe('Property 6: year 自动解析后底层请求永不缺失 year', () => {
+describe('Property 6: 年度只用调用方给的合法年度，否则不带 year', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockedGet.mockResolvedValue({ items: [] })
+    mockedGet.mockResolvedValue([])
   })
 
-  it('for any valid year, getTbAmount request SHALL have a finite integer year > 2000', async () => {
+  it('for any valid year, getTbAmount request SHALL carry exactly that year', async () => {
     await fc.assert(
       fc.asyncProperty(arbValidYear, fc.constantFrom('1001', '2202', '6001'), async (year, code) => {
         vi.clearAllMocks()
-        mockedGet.mockResolvedValue({ items: [] })
-
-        const projectId = ref('proj-test')
-        const yearRef = ref(year)
-        const sdk = useAuditData(projectId, yearRef)
+        mockedGet.mockResolvedValue([])
+        const sdk = useAuditData(ref('proj-test'), ref(year))
 
         await sdk.getTbAmount(code)
 
-        expect(mockedGet).toHaveBeenCalled()
-        const callArgs = mockedGet.mock.calls[0]
-        const params = (callArgs[1] as any)?.params
-        expect(params).toBeDefined()
-        expect(params.year).toBeDefined()
-        expect(Number.isFinite(params.year)).toBe(true)
-        expect(Number.isInteger(params.year)).toBe(true)
-        expect(params.year).toBeGreaterThan(2000)
+        const params = (mockedGet.mock.calls[0][1] as any)?.params
+        expect(params.year).toBe(year)
+        expect(params.account_prefix).toBe(code)
       }),
       { numRuns: 100 },
     )
   })
 
-  it('for any invalid year, getTbAmount SHALL still have a finite integer year > 2000 (fallback)', async () => {
+  it('for any invalid year, getTbAmount SHALL omit year (backend resolves the project audit year)', async () => {
     await fc.assert(
       fc.asyncProperty(arbInvalidYear, async (badYear) => {
         vi.clearAllMocks()
-        mockedGet.mockResolvedValue({ items: [] })
-
-        const projectId = ref('proj-test')
-        const yearRef = ref(badYear)
-        const sdk = useAuditData(projectId, yearRef)
+        mockedGet.mockResolvedValue([])
+        const sdk = useAuditData(ref('proj-test'), ref(badYear))
 
         await sdk.getTbAmount('1122')
 
-        expect(mockedGet).toHaveBeenCalled()
-        const callArgs = mockedGet.mock.calls[0]
-        const params = (callArgs[1] as any)?.params
+        const params = (mockedGet.mock.calls[0][1] as any)?.params
         expect(params).toBeDefined()
-        expect(params.year).toBeDefined()
-        expect(Number.isFinite(params.year)).toBe(true)
-        expect(Number.isInteger(params.year)).toBe(true)
-        expect(params.year).toBeGreaterThan(2000)
+        expect('year' in params).toBe(false)
       }),
       { numRuns: 100 },
     )
   })
 
-  it('for any valid year, getPrevYear request SHALL have a finite integer year > 2000', async () => {
+  it('for any valid year, getPrevYear SHALL ask for prior amounts of that year (not year − 1)', async () => {
     await fc.assert(
       fc.asyncProperty(arbValidYear, async (year) => {
         vi.clearAllMocks()
-        mockedGet.mockResolvedValue({ items: [] })
-
-        const projectId = ref('proj-test')
-        const yearRef = ref(year)
-        const sdk = useAuditData(projectId, yearRef)
+        mockedGet.mockResolvedValue([])
+        const sdk = useAuditData(ref('proj-test'), ref(year))
 
         await sdk.getPrevYear('1122')
 
-        expect(mockedGet).toHaveBeenCalled()
-        const callArgs = mockedGet.mock.calls[0]
-        const params = (callArgs[1] as any)?.params
-        expect(params).toBeDefined()
-        expect(params.year).toBeDefined()
-        expect(Number.isFinite(params.year)).toBe(true)
-        expect(Number.isInteger(params.year)).toBe(true)
-        // getPrevYear uses year - 1, so it must be > 2000 when year > 2001
-        expect(params.year).toBeGreaterThanOrEqual(2000)
+        const params = (mockedGet.mock.calls[0][1] as any)?.params
+        expect(params.year).toBe(year)
+        expect(params.include_prior).toBe(true)
       }),
       { numRuns: 100 },
     )
   })
 
-  it('when year ref is omitted (undefined), requests SHALL have a valid fallback year', async () => {
-    vi.clearAllMocks()
-    mockedGet.mockResolvedValue({ items: [] })
-
-    const projectId = ref('proj-test')
-    // No year ref provided
-    const sdk = useAuditData(projectId)
+  it('when year ref is omitted, requests SHALL omit year', async () => {
+    const sdk = useAuditData(ref('proj-test'))
 
     await sdk.getTbAmount('1122')
 
-    expect(mockedGet).toHaveBeenCalled()
-    const callArgs = mockedGet.mock.calls[0]
-    const params = (callArgs[1] as any)?.params
-    expect(params).toBeDefined()
-    expect(params.year).toBeDefined()
-    expect(Number.isFinite(params.year)).toBe(true)
-    expect(Number.isInteger(params.year)).toBe(true)
-    expect(params.year).toBeGreaterThan(2000)
+    const params = (mockedGet.mock.calls[0][1] as any)?.params
+    expect(params).toEqual({ account_prefix: '1122' })
   })
 })
 

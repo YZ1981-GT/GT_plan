@@ -34,6 +34,7 @@ from app.services.procedure_authorization import (  # noqa: E402
     require_staff_active_user,
 )
 from app.services.wp_visibility.delegation_transaction import DelegationTransactionService  # noqa: E402
+from tests._sqlite_fk import enable_sqlite_foreign_keys  # noqa: E402
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,6 +47,7 @@ def _user(name: str, role: UserRole = UserRole.auditor, **kw) -> User:
 @pytest.fixture
 async def world(monkeypatch):
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    enable_sqlite_foreign_keys(engine)  # 与 PG 一样检查外键（R20）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     epochs: list[tuple] = []

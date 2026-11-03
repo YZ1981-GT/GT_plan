@@ -5,12 +5,15 @@
  * Tasks: 13.1, 13.2, 13.3, 13.4
  *
  * 使用 fast-check + vitest 验证 Property 6, 8, 10, 12。
+ * Property 6 / 8 的合并已移到共享回填函数（voucher-identity-writeback-and-audit-phase 任务 9），这里按新口径验证。
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
 import { computeVersionDiff } from '../composables/useSamplingAlgorithms'
-import type { SampledVoucher, Phase, FillMode, EditTrailEntry } from '../composables/useSamplingAlgorithms'
-import { applyFillMode } from '../composables/useVoucherSampling'
+import type { SampledVoucher, Phase, EditTrailEntry } from '../composables/useSamplingAlgorithms'
+import type { AuditPhase } from '@/composables/useProjectAuditPhase'
+import { mergeVoucherCheckRows, type RowSource, type VoucherFillMode } from '../composables/shared/voucherCheckFill'
+import { disjoint, fillRowsArb, lfpsOf, type FillRow } from '../composables/shared/__tests__/voucherCheckFillArbs'
 
 // ─── Generators ──────────────────────────────────────────────────────────────
 
@@ -25,6 +28,9 @@ function sampledVoucherArb(phase?: 'preliminary' | 'final'): fc.Arbitrary<Sample
     accountCode: fc.string({ minLength: 4, maxLength: 6 }),
     accountName: fc.option(fc.string({ maxLength: 20 }), { nil: null }),
     counterpartAccount: fc.option(fc.string({ maxLength: 10 }), { nil: null }),
+    counterpartAccountName: fc.constant<string | null>(null),
+    isMultiAccount: fc.constant(false),
+    voucherEntries: fc.constant([] as SampledVoucher['voucherEntries']),
     voucherType: fc.option(fc.string({ maxLength: 5 }), { nil: null }),
     accountingPeriod: fc.option(fc.integer({ min: 1, max: 12 }), { nil: null }),
     checkResult: fc.constantFrom('' as const, 'Y' as const, 'N' as const, '异常' as const),
@@ -36,235 +42,120 @@ function sampledVoucherArb(phase?: 'preliminary' | 'final'): fc.Arbitrary<Sample
   })
 }
 
-/** Generate array of SampledVouchers with unique voucherNo */
-function uniqueVouchersArb(
-  phase?: 'preliminary' | 'final',
-  minLen = 0,
-  maxLen = 10,
-): fc.Arbitrary<SampledVoucher[]> {
-  return fc.array(sampledVoucherArb(phase), { minLength: minLen, maxLength: maxLen })
-    .map(vouchers => {
-      const seen = new Set<string>()
-      return vouchers.filter(v => {
-        if (seen.has(v.voucherNo)) return false
-        seen.add(v.voucherNo)
-        return true
-      })
-    })
-}
-
-/** Generate fill mode */
-const arbFillMode: fc.Arbitrary<FillMode> = fc.constantFrom('append', 'replace', 'merge')
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// Property 6: 阶段隔离 — 年审永不覆盖预审
+// Property 6 / 8：回填合并（spec voucher-identity-writeback-and-audit-phase 任务 9 移植）
+//
+// 合并进底稿归共享回填函数 shared/voucherCheckFill.mergeVoucherCheckRows（ADR-VK-07）：引擎不再算合并结果，
+// 原 applyFillMode 的属性在这里按新口径验证——按分录指纹认同一笔（不再按凭证号），「替换本阶段抽凭行」
+// 只删同阶段、来源只有抽凭的行，年审回填不动预审行。
 // ═══════════════════════════════════════════════════════════════════════════════
+
+const RUNS = { numRuns: 20 }
+const ENGINE_ONLY: RowSource[][] = [['engine']]
 
 describe('Feature: voucher-sampling-engine, Property 6: 阶段隔离 — 年审永不覆盖预审', () => {
-  /**
-   * **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 7.5, 9.4**
-   *
-   * For any samples array containing preliminary-phase rows and any fill operation
-   * during final phase with mode forced to 'append':
-   * - Preliminary-phase rows SHALL remain unchanged (deep-equal)
-   * - New rows SHALL all have phase='final'
-   * - View filtering SHALL correctly partition by phase
-   */
-
-  it('fill with phase=final and mode=append preserves all preliminary rows unchanged', () => {
+  it('年审回填（追加或替换）后预审行原样保留（逐字段相等）', () => {
     fc.assert(
       fc.property(
-        uniqueVouchersArb('preliminary', 1, 10),
-        uniqueVouchersArb('final', 1, 8),
-        (preliminaryRows, newFinalRows) => {
-          // Deep copy preliminary rows before operation
-          const preliminarySnapshot = JSON.parse(JSON.stringify(preliminaryRows)) as SampledVoucher[]
-
-          // Existing samples = preliminary rows (simulating pre-existing data)
-          const existing: SampledVoucher[] = [...preliminaryRows]
-
-          // Apply fill with phase='final', mode='append' (forced in final phase)
-          const result = applyFillMode(existing, newFinalRows, 'append', 'final')
-
-          // Assert: all original preliminary rows are unchanged (deep-equal)
-          const resultPreliminary = result.filter(v => v.phase === 'preliminary')
-          expect(resultPreliminary.length).toBe(preliminarySnapshot.length)
-          for (let i = 0; i < preliminarySnapshot.length; i++) {
-            expect(resultPreliminary[i]).toEqual(preliminarySnapshot[i])
-          }
+        fillRowsArb({ phase: 'preliminary' }, 1, 8),
+        fillRowsArb({ phase: 'final', sources: ENGINE_ONLY }, 0, 6),
+        fillRowsArb({ phase: 'final', sources: ENGINE_ONLY }, 1, 6),
+        fc.constantFrom<VoucherFillMode>('append', 'replace'),
+        (prelim, finals, incomingRaw, mode) => {
+          const incoming = disjoint([...prelim, ...finals], incomingRaw)
+          const snapshot = JSON.parse(JSON.stringify(prelim))
+          const { rows } = mergeVoucherCheckRows([...prelim, ...finals], incoming, { mode, phase: 'final', source: 'engine' })
+          expect(rows.filter(r => r._gt.ph === 'preliminary')).toEqual(snapshot)
         },
       ),
-      { numRuns: 20 },
+      RUNS,
     )
   })
 
-  it('all new rows appended during final phase have phase=final', () => {
+  it('新增的行就是本次待写入行，接在已有行之后', () => {
     fc.assert(
       fc.property(
-        uniqueVouchersArb('preliminary', 0, 8),
-        uniqueVouchersArb('final', 1, 8),
-        (preliminaryRows, newFinalRows) => {
-          const existing: SampledVoucher[] = [...preliminaryRows]
-          const result = applyFillMode(existing, newFinalRows, 'append', 'final')
-
-          // New rows = result items beyond the original existing length
-          const appendedRows = result.slice(existing.length)
-          for (const row of appendedRows) {
-            expect(row.phase).toBe('final')
-          }
+        fillRowsArb({}, 0, 8),
+        fillRowsArb({ phase: 'final', sources: ENGINE_ONLY }, 1, 6),
+        (existing, incomingRaw) => {
+          const incoming = disjoint(existing, incomingRaw)
+          const { rows, added } = mergeVoucherCheckRows(existing, incoming, { mode: 'append', phase: 'final', source: 'engine' })
+          expect(added).toBe(incoming.length)
+          expect(rows.slice(existing.length)).toEqual(incoming)
         },
       ),
-      { numRuns: 20 },
-    )
-  })
-
-  it('view filtering correctly partitions samples by phase', () => {
-    fc.assert(
-      fc.property(
-        uniqueVouchersArb('preliminary', 1, 8),
-        uniqueVouchersArb('final', 1, 8),
-        (preliminaryRows, finalRows) => {
-          // Combined samples (mixed phases)
-          const allSamples = [...preliminaryRows, ...finalRows]
-
-          // Simulate view mode filtering
-          const viewPreliminary = allSamples.filter(v => v.phase === 'preliminary')
-          const viewFinal = allSamples.filter(v => v.phase === 'final')
-          const viewAll = allSamples
-
-          // Assert: preliminary-only shows only preliminary
-          for (const v of viewPreliminary) {
-            expect(v.phase).toBe('preliminary')
-          }
-
-          // Assert: final-only shows only final
-          for (const v of viewFinal) {
-            expect(v.phase).toBe('final')
-          }
-
-          // Assert: all = union of preliminary + final
-          expect(viewAll.length).toBe(viewPreliminary.length + viewFinal.length)
-
-          // Assert: no items lost
-          expect(viewPreliminary.length).toBe(preliminaryRows.length)
-          expect(viewFinal.length).toBe(finalRows.length)
-        },
-      ),
-      { numRuns: 20 },
+      RUNS,
     )
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Property 8: 填充策略正确性
-// ═══════════════════════════════════════════════════════════════════════════════
-
 describe('Feature: voucher-sampling-engine, Property 8: 填充策略正确性', () => {
-  /**
-   * **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
-   *
-   * For any existing samples (mixed phases) + selected vouchers + mode + currentPhase:
-   * - append: current_phase_count grows by M
-   * - replace: current_phase rows = M (other phase untouched)
-   * - merge: no duplicate voucher_no within same phase
-   */
-
-  it('append: current phase count grows by exactly M', () => {
+  it('追加：没有重叠时长度 = 已有 + 待写入，已有行不变', () => {
     fc.assert(
-      fc.property(
-        uniqueVouchersArb(undefined, 0, 10),
-        uniqueVouchersArb('final', 1, 8),
-        (existing, selected) => {
-          const currentPhase: Phase = 'final'
-          const existingPhaseCount = existing.filter(v => v.phase === currentPhase).length
-
-          const result = applyFillMode(existing, selected, 'append', currentPhase)
-
-          // Total length = existing + selected
-          expect(result.length).toBe(existing.length + selected.length)
-
-          // Current phase count in result = existingPhaseCount + M
-          const resultPhaseCount = result.filter(v => v.phase === currentPhase).length
-          expect(resultPhaseCount).toBe(existingPhaseCount + selected.length)
-        },
-      ),
-      { numRuns: 20 },
+      fc.property(fillRowsArb({}, 0, 10), fillRowsArb({ phase: 'final' }, 1, 8), (existing, incomingRaw) => {
+        const incoming = disjoint(existing, incomingRaw)
+        const snapshot = JSON.parse(JSON.stringify(existing))
+        const { rows } = mergeVoucherCheckRows(existing, incoming, { mode: 'append', phase: 'final', source: 'engine' })
+        expect(rows.length).toBe(existing.length + incoming.length)
+        expect(rows.slice(0, existing.length)).toEqual(snapshot)
+      }),
+      RUNS,
     )
   })
 
-  it('replace: current phase rows replaced entirely, other phase untouched', () => {
+  it('追加幂等：同一批再写一次不增加行，都算已存在', () => {
     fc.assert(
-      fc.property(
-        uniqueVouchersArb('preliminary', 1, 5),
-        uniqueVouchersArb('final', 0, 5),
-        uniqueVouchersArb('final', 1, 8),
-        (preliminaryRows, existingFinalRows, selected) => {
-          const currentPhase: Phase = 'final'
-          const existing = [...preliminaryRows, ...existingFinalRows]
-
-          const result = applyFillMode(existing, selected, 'replace', currentPhase)
-
-          // Other phase rows untouched
-          const resultPreliminary = result.filter(v => v.phase === 'preliminary')
-          expect(resultPreliminary.length).toBe(preliminaryRows.length)
-          for (let i = 0; i < preliminaryRows.length; i++) {
-            expect(resultPreliminary[i]).toEqual(preliminaryRows[i])
-          }
-
-          // Current phase = exactly M (the selected rows)
-          const resultFinal = result.filter(v => v.phase === currentPhase)
-          expect(resultFinal.length).toBe(selected.length)
-        },
-      ),
-      { numRuns: 20 },
+      fc.property(fillRowsArb({}, 0, 8), fillRowsArb({ phase: 'final', sources: ENGINE_ONLY }, 1, 6), (existing, incomingRaw) => {
+        const incoming = disjoint(existing, incomingRaw)
+        const opts = { mode: 'append' as const, phase: 'final' as const, source: 'engine' as const }
+        const once = mergeVoucherCheckRows(existing, incoming, opts).rows
+        const twice = mergeVoucherCheckRows(once, incoming, opts)
+        expect(twice.rows).toEqual(once)
+        expect(twice.added).toBe(0)
+        expect(twice.existed).toBe(incoming.length)
+      }),
+      RUNS,
     )
   })
 
-  it('merge: no duplicate voucher_no within same phase', () => {
+  it('替换：只删同阶段且来源只有抽凭的行，其余逐字段保留', () => {
     fc.assert(
       fc.property(
-        uniqueVouchersArb('final', 1, 8),
-        uniqueVouchersArb('final', 1, 8),
-        (existing, selected) => {
-          const currentPhase: Phase = 'final'
-
-          const result = applyFillMode(existing, selected, 'merge', currentPhase)
-
-          // No duplicate voucher_no within current phase
-          const phaseRows = result.filter(v => v.phase === currentPhase)
-          const nos = phaseRows.map(v => v.voucherNo)
-          expect(new Set(nos).size).toBe(nos.length)
-
-          // Count = existing + (selected non-overlapping)
-          const existingNos = new Set(existing.map(v => v.voucherNo))
-          const newCount = selected.filter(v => !existingNos.has(v.voucherNo)).length
-          expect(phaseRows.length).toBe(existing.length + newCount)
+        fillRowsArb({}, 0, 10),
+        fillRowsArb({ phase: 'final', sources: ENGINE_ONLY }, 0, 6),
+        fc.constantFrom<AuditPhase>('preliminary', 'final'),
+        (existing, incomingRaw, phase) => {
+          const incoming = disjoint(existing, incomingRaw)
+          const removable = (r: FillRow) => r._gt.ph === phase && r._gt.src.every(s => s === 'engine')
+          const kept = JSON.parse(JSON.stringify(existing.filter(r => !removable(r))))
+          const res = mergeVoucherCheckRows(existing, incoming, { mode: 'replace', phase, source: 'engine' })
+          expect(res.replaced).toBe(existing.filter(removable).length)
+          expect(res.rows.slice(0, kept.length)).toEqual(kept)
+          expect(res.rows.slice(kept.length)).toEqual(incoming)
         },
       ),
-      { numRuns: 20 },
+      RUNS,
     )
   })
 
-  it('all three modes: result items are a subset of existing ∪ selected', () => {
+  it('两种模式：结果行都来自已有行或待写入行，且同一分录（指纹 + 对方科目）只出现一次', () => {
     fc.assert(
       fc.property(
-        uniqueVouchersArb(undefined, 0, 8),
-        uniqueVouchersArb('preliminary', 1, 5),
-        arbFillMode,
-        (existing, selected, mode) => {
-          const currentPhase: Phase = 'preliminary'
-          const result = applyFillMode(existing, selected, mode, currentPhase)
-
-          const allNos = new Set([
-            ...existing.map(v => v.voucherNo),
-            ...selected.map(v => v.voucherNo),
-          ])
-          for (const item of result) {
-            expect(allNos.has(item.voucherNo)).toBe(true)
-          }
+        fillRowsArb({}, 0, 8),
+        fillRowsArb({ phase: 'preliminary' }, 1, 6),
+        fc.constantFrom<VoucherFillMode>('append', 'replace'),
+        fc.boolean(),
+        (existing, incomingRaw, mode, overlap) => {
+          // overlap = true：待写入里混进已有行的指纹（再次抽中同一分录）
+          const incoming = overlap ? [...incomingRaw, ...existing.slice(0, 2)] : disjoint(existing, incomingRaw)
+          const { rows } = mergeVoucherCheckRows(existing, incoming, { mode, phase: 'preliminary', source: 'engine' })
+          const universe = new Set([...lfpsOf(existing), ...lfpsOf(incoming)])
+          for (const r of rows) expect(universe.has(r._gt.lfp as string)).toBe(true)
+          const keys = rows.map(r => `${r._gt.lfp}#${r._gt.cp ?? ''}`)
+          expect(new Set(keys).size).toBe(keys.length)
         },
       ),
-      { numRuns: 20 },
+      RUNS,
     )
   })
 })

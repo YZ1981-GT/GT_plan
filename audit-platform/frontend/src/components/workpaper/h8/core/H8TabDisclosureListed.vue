@@ -211,7 +211,7 @@ import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
 import { H8_NOTE_AI_SECTIONS } from '../../composables/h8NoteAiSections'
 import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { useH8ListedDisclosure } from '../../composables/useH8Disclosure'
+import { h8ListedSyncSnapshot, useH8ListedDisclosure } from '../../composables/useH8Disclosure'
 import {
   H8_LISTED_DEFAULT_CATEGORIES,
   H8_LISTED_GUIDANCE,
@@ -259,6 +259,10 @@ function jumpToNote(target: DisclosureVariant): void {
   router.push(route)
 }
 
+const listedNote = useH8ListedDisclosure({
+  allResponses: toRef(props, 'allResponses'),
+  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
+})
 const {
   categories,
   movement,
@@ -271,10 +275,7 @@ const {
   addCategory,
   removeCategory,
   pullFromSources,
-} = useH8ListedDisclosure({
-  allResponses: toRef(props, 'allResponses'),
-  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
-})
+} = listedNote
 
 // ─── 披露说明 AI 辅助 + 复核 ─────────────────────────────────────────────────
 // 🔴 原实现是 `emit('open-ai', …)` / `emit('open-review', …)`，而宿主
@@ -332,12 +333,8 @@ function handlePull() {
 async function syncToNotes() {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
   persist()
-  const payloads = buildH8ListedSyncPayloads(props.wpId, props.applicableStandards || [], {
-    categories: categories.value,
-    movement: movement.value,
-    noteShortLow: noteShortLow.value,
-    noteImpairment: noteImpairment.value,
-  })
+  // 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+  const payloads = buildH8ListedSyncPayloads(props.wpId, props.applicableStandards || [], h8ListedSyncSnapshot(listedNote))
   if (!payloads.length) {
     ElMessage.warning('当前不适用上市附注同步')
     return

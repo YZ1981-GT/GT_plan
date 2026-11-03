@@ -1,4 +1,4 @@
-"""S6-15: apply_incremental 增量追加测试。"""
+"""增量预检月份差集纯函数测试；破坏性 apply 已退役。"""
 from __future__ import annotations
 
 from app.services.ledger_data_service import compute_incremental_diff

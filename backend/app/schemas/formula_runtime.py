@@ -36,13 +36,23 @@ class DraftRefreshRequest(BaseModel):
 
 
 class DraftRefreshResponse(BaseModel):
-    """POST /api/workpapers/draft-refresh 标准响应（design §11）。"""
+    """POST /api/workpapers/draft-refresh 标准响应（design §11）。
 
-    status: Literal["success", "partial_success", "idempotent_hit", "failed"]
+    ``status`` / ``outcome`` 按需求 3.2 状态表派生（``formula_management.refresh_outcome`` 的 ``RESPONSE_STATUSES`` /
+    ``OUTCOMES`` 与这里的 Literal 相等，有测试守着）；幂等命中 ``status = idempotent_hit``、``outcome`` = 首次运行的
+    outcome。计数（需求 3.3）：``affected_count = applied_count + recomputed_count``，``draft_marked_count`` 单列。
+    """
+
+    status: Literal[
+        "success", "recomputed", "draft_marked", "no_effect", "partial_success", "failed", "idempotent_hit",
+    ]
+    outcome: Literal["applied", "recomputed", "draft_marked", "no_effect", "partial", "failed"] | None = None
     run_id: UUID
     transaction_mode: Literal["all_or_nothing", "partial_success"]
     affected_count: int = 0
     applied_count: int = 0
+    recomputed_count: int = 0
+    draft_marked_count: int = 0
     failed_count: int = 0
     skipped_count: int = 0
     scopes: list[str] = Field(default_factory=list)

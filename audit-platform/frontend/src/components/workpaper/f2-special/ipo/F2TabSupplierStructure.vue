@@ -72,7 +72,7 @@
       </div>
 
       <div class="table-scroll-wrap">
-        <table class="supplier-table">
+        <GtGridTable class="supplier-table">
           <thead>
             <tr>
               <th rowspan="2" class="sticky seq">序号</th>
@@ -222,7 +222,7 @@
               <td colspan="15"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -277,7 +277,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, toRef, type Ref } from 'vue'
-import { ElInput, ElInputNumber } from 'element-plus'
+import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import { useF2SupplierStructure } from '../../composables/useF2SupplierStructure'
 import type {
   EnrichedSupplierStructureRow,
@@ -289,6 +289,7 @@ import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/u
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

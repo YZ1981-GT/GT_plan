@@ -12,7 +12,7 @@ from app.models.formula_setting_models import FormulaPublish
 from app.services.formula_settings.audit import audit_global, audit_project, change_entry
 from app.services.formula_settings.definitions import display_formula, get_spec
 from app.services.formula_settings.effective import effective_slots, upstream_records
-from app.services.formula_settings.engine import Decisions, lock_domain, lock_project
+from app.services.formula_settings.engine import Decisions, decision_key, lock_domain, lock_project
 from app.services.formula_settings.errors import FormulaSettingError, NotFound
 from app.services.formula_settings.pending import close_pending, upsert_pending
 from app.services.formula_settings.project_ops import require_project
@@ -50,9 +50,14 @@ async def _source_definitions(db: AsyncSession, domain: str, project_id: uuid.UU
 
 
 async def _push_plan(db: AsyncSession, domain: str, source_id: uuid.UUID, slot_keys: list[str],
-                     target_ids: list[uuid.UUID]) -> tuple[dict[str, dict], list[dict[str, Any]]]:
+                     target_ids: list[uuid.UUID]) -> tuple[dict[str, dict], list[dict[str, Any]], list[dict[str, Any]]]:
+    """返回 (source_definitions, plan, skipped)。
+
+    ``skipped`` 列出被域作用范围过滤掉的目标（例如 consol_note 域中的单体项目）。
+    """
     source = await _source_definitions(db, domain, source_id, slot_keys)
-    targets = await list_projects(db, domain, ids=[t for t in target_ids if t != source_id])
+    non_source_ids = [t for t in target_ids if t != source_id]
+    targets = await list_projects(db, domain, ids=non_source_ids)
     plan = []
     for t in targets:
         eff = await effective_slots(db, domain, t.id, scope=t.scope)
@@ -64,14 +69,28 @@ async def _push_plan(db: AsyncSession, domain: str, source_id: uuid.UUID, slot_k
                                      local=lo.local_state() if lo else None, frozen=t.frozen)
             plan.append({"target": t, "slot_key": slot, "label": src["label"], "structure": src["structure"],
                          "source": src["definition"], "effective": e, "category": category})
-    return source, plan
+    # 被域作用范围过滤的目标
+    skipped: list[dict[str, Any]] = []
+    resolved_ids = {t.id for t in targets}
+    missing_ids = [tid for tid in non_source_ids if tid not in resolved_ids]
+    if missing_ids:
+        from app.models.core import Project
+        existing = {row[0] for row in (await db.execute(
+            sa.select(Project.id).where(Project.id.in_(missing_ids), Project.is_deleted == sa.false())
+        )).all()}
+        for tid in missing_ids:
+            if tid in existing:
+                skipped.append({"project_id": str(tid),
+                                "reason": "该项目不是合并项目，不适用合并附注公式"})
+    return source, plan, skipped
 
 
 def _push_item_dict(domain: str, p: dict[str, Any]) -> dict[str, Any]:
     t, e = p["target"], p["effective"]
     lo = e.local if e is not None else None
     return {
-        "key": f"{t.id}|{p['slot_key']}", "project_id": str(t.id), "project_name": t.name,
+        "key": decision_key(domain, t.id, p["slot_key"]), "domain": domain, "project_id": str(t.id),
+        "project_name": t.name,
         "project_status": t.status, "frozen": t.frozen, "slot_key": p["slot_key"], "label": p["label"],
         "category": p["category"].value, "category_label": CATEGORY_LABELS.get(p["category"].value, ""),
         "new_upstream": _plain(p["source"]), "new_formula": display_formula(domain, p["source"]),
@@ -86,12 +105,15 @@ def _push_item_dict(domain: str, p: dict[str, Any]) -> dict[str, Any]:
 async def apply_preview(db: AsyncSession, *, domain: str, project_id: uuid.UUID, slot_keys: list[str],
                         target_ids: list[uuid.UUID]) -> dict[str, Any]:
     get_spec(domain)
-    _, plan = await _push_plan(db, domain, project_id, slot_keys, target_ids)
+    _, plan, skipped = await _push_plan(db, domain, project_id, slot_keys, target_ids)
     counts: dict[str, int] = {c.value: 0 for c in Category}
     for p in plan:
         counts[p["category"].value] += 1
-    return {"domain": domain, "counts": counts, "conflict_count": counts[Category.CONFLICT.value],
-            "items": [_push_item_dict(domain, p) for p in plan]}
+    result: dict[str, Any] = {"domain": domain, "counts": counts, "conflict_count": counts[Category.CONFLICT.value],
+                               "items": [_push_item_dict(domain, p) for p in plan]}
+    if skipped:
+        result["skipped"] = skipped
+    return result
 
 
 async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.UUID, slot_keys: list[str],
@@ -106,7 +128,7 @@ async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.U
             return {"publish_id": str(replay.id), "idempotent": True, "summary": replay.summary, "events": []}
     for t in sorted(set(target_ids) - {project_id}, key=str):
         await lock_project(db, domain, t)
-    source, plan = await _push_plan(db, domain, project_id, slot_keys, target_ids)
+    source, plan, skipped = await _push_plan(db, domain, project_id, slot_keys, target_ids)
     store = get_store(domain)
     publish_id = uuid.uuid4()
     counts: dict[str, int] = {c.value: 0 for c in Category}
@@ -121,7 +143,7 @@ async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.U
         if t.scope not in upstream_cache:
             upstream_cache[t.scope] = await upstream_records(db, store, t.scope)
         up = upstream_cache[t.scope].get(slot)
-        choice = decisions.conflict_choices.get(f"{t.id}|{slot}", decisions.default_conflict)
+        choice = decisions.conflict_for(domain, t.id, slot)  # 三段键优先，旧两段键仍识别（需求 8.4）
         effect = decide_push(domain, p["category"], source=p["source"], local=lo.local_state() if lo else None,
                              upstream=up.definition if up else None, upstream_version=up.version if up else None,
                              conflict_choice=choice)
@@ -165,8 +187,11 @@ async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.U
     for pid, entries in audits.items():
         await audit_project(db, user_id=user_id, project_id=pid, domain=domain, action="push",
                             source="apply_to_projects", changes=entries, publish_id=publish_id)
-    return {"publish_id": str(publish_id), "idempotent": False, "summary": summary,
-            "events": [{"project_id": str(pid), "slot_keys": slots} for pid, slots in events.items()]}
+    result = {"publish_id": str(publish_id), "idempotent": False, "summary": summary,
+              "events": [{"project_id": str(pid), "slot_keys": slots} for pid, slots in events.items()]}
+    if skipped:
+        result["skipped"] = skipped
+    return result
 
 
 # ── 设为全局 / 全局候选 ───────────────────────────────────────────────────────

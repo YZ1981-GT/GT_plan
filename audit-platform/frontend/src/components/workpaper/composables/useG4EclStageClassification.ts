@@ -8,6 +8,7 @@
  *
  * 判定优先级：Stage3（已减值）> Stage2（SICR 且未适用低风险豁免）> Stage1
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import { determineStage, isStageConsistent } from '@/composables/useG4EclFormulaEngine'
 import { ElMessageBox } from 'element-plus'
@@ -410,7 +411,7 @@ export function useG4EclStageClassification(_opts?: any) {
       const s3vals = SECTION_THREE_ITEMS.map((_, rowIdx) => sectionThreeMatrix?.[rowIdx]?.[colIdx])
 
       const row: StageClassificationRow = {
-        id: crypto.randomUUID(),
+        id: newUuid(),
         seq: arrIdx + 1,
         investProject: investProject || `投资${arrIdx + 1}`,
         bookBalance: 0,
@@ -434,7 +435,7 @@ export function useG4EclStageClassification(_opts?: any) {
 
   function createEmptyRow(investProject: string): StageClassificationRow {
     return {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: rows.value.length + 1,
       investProject,
       bookBalance: 0,
@@ -497,7 +498,7 @@ export function useG4EclStageClassification(_opts?: any) {
         normalizeBoolValue,
       )
       const row: StageClassificationRow = {
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: i + 1,
         investProject: r.investProject || `投资${i + 1}`,
         bookBalance: Number(r.bookBalance) || 0,

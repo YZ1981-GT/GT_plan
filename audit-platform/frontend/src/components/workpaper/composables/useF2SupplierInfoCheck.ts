@@ -1,5 +1,6 @@
 /** F2-70 供应商信息核查表状态管理（沿用 F2-70-entities 存储键）。 */
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   emptySupplierInfoEntity,
@@ -20,6 +21,15 @@ export function useF2SupplierInfoCheck(opts: {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const entities = ref<SupplierInfoEntity[]>([emptySupplierInfoEntity()])
   const auditNote = ref('')
+
+  function flushPendingSave(): void {
+    if (!debounceTimer) return
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    flushSave()
+  }
+
+  registerPendingFlusher(flushPendingSave)
 
   function flushSave(): void {
     const items = [

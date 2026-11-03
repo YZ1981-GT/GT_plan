@@ -11,7 +11,7 @@ from uuid import UUID
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -319,10 +319,19 @@ class ImportB3PeriodsRequest(BaseModel):
 @router.post("/independence/import-b3-periods")
 async def independence_import_b3_periods(
     body: ImportB3PeriodsRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """从 B3 导入独立性期间字段到 A17-7"""
+    from app.deps import authorize_wp_edit
+    from app.routers._wp_gate import enforce_edit_lock_for_content_write
+
+    # 底稿 id 在请求体里，路由级底稿门不覆盖：原先只校验登录 ⇒ 任何登录用户都能改任意项目的 A17-7、读到它的 B3 期间。
+    # 先校验底稿编辑权与项目归属，再看编辑锁（spec workpaper-multi-window-lock-gaps R3.2）。
+    if await authorize_wp_edit(db, current_user, body.wp_id) != body.project_id:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    await enforce_edit_lock_for_content_write(db, current_user, request, body.wp_id)
     result = await import_b3_periods_to_a177(
         db,
         body.project_id,

@@ -124,6 +124,8 @@
             :rows="data.filteredRows.value"
             :readonly="readonly"
             :selected-ids="selectedIds"
+            :attachment-counts="projectId ? hubAttachments.counts.value : undefined"
+            @open-attachments="hubAttachments.open"
             @update:selected-ids="selectedIds = $event"
             @add="handleAdd"
             @delete="handleDelete"
@@ -153,6 +155,16 @@
             :wp-code="props.wpCode"
             :current-wp-code="currentSummaryCode"
             @navigate-sheet="onCrossNavigateSheet"
+          />
+          <!-- 与函证中心同一个附件抽屉（只读时只能查看） -->
+          <ConfirmationAttachmentDrawer
+            v-if="projectId"
+            v-model:visible="hubAttachments.drawer.visible"
+            :confirmation-id="hubAttachments.drawer.confirmationId"
+            :project-id="projectId"
+            :counterparty-name="hubAttachments.drawer.counterparty"
+            :readonly="readonly"
+            @updated="hubAttachments.reload"
           />
         </template>
 
@@ -418,6 +430,8 @@ import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { useConfirmationData } from './composables/useConfirmationData'
 import { useViewMode } from './composables/useViewMode'
+import { useHubAttachmentCounts } from './composables/useHubAttachmentCounts'
+import ConfirmationAttachmentDrawer from './ConfirmationAttachmentDrawer.vue'
 import { syncHubFromSummary, hubStatusToRowPatch, accountTypeToHubType, rowToHubStatus } from './coordination/syncHubFromSummary'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { emitConfirmationCompletedFromSummary, isConfirmationInFlight } from './coordination/emitConfirmationCompleted'
@@ -443,8 +457,7 @@ import {
 // 🔴 「已回函行数」统计必须走 `replyStatus` 归一谓词 —— `is_replied` 有 boolean 与
 //    `'是'/'否'` 两种真实持久化形态，裸 `=== true` / 裸真值判断各有一半恒不成立
 //    （`'否'` 是 truthy，会把明确未回函的行数成已回函）。
-//    本文件另有三处 G0/H0/L0 的 `r.is_replied === '是' || r.is_replied === true`
-//    是第三份内联口径，属已登记的待收敛项（不在本 spec 半径内，勿顺手改）。
+//    本文件的 G0/H0/K0/L0 统计与看板口径已全部收敛到它（spec attachment-confirmation-evidence-loop 需求 1.6）。
 import { isRepliedTrue } from './replyStatus'
 import {
   describeH0PullResult,
@@ -659,7 +672,7 @@ async function handleH0LowerAi(aiSection: string, key: string) {
       relatedContext: {
         底稿编码: String(props.wpCode || 'H0-1'),
         函证行数: String(data.rows.value.length),
-        已回函行数: String(data.rows.value.filter((r: ConfirmationRow) => r.is_replied === '是' || r.is_replied === true).length),
+        已回函行数: String(data.rows.value.filter((r: ConfirmationRow) => isRepliedTrue(r)).length),
         不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
       },
     })
@@ -885,7 +898,7 @@ async function handleG0LowerAi(aiSection: string, key: string) {
         底稿编码: String(props.wpCode || 'G0-1'),
         函证行数: String(data.rows.value.length),
         已回函行数: String(
-          data.rows.value.filter((r: ConfirmationRow) => r.is_replied === '是' || r.is_replied === true).length,
+          data.rows.value.filter((r: ConfirmationRow) => isRepliedTrue(r)).length,
         ),
         不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
         账面金额已取数品种: (g0Sources.value?.diagnostics.bookResolved ?? []).join('、') || '无',
@@ -1022,7 +1035,7 @@ async function handleL0LowerAi(aiSection: string, key: string) {
         底稿编码: String(props.wpCode || 'L0-1'),
         函证行数: String(data.rows.value.length),
         已回函行数: String(
-          data.rows.value.filter((r: ConfirmationRow) => r.is_replied === '是' || r.is_replied === true).length,
+          data.rows.value.filter((r: ConfirmationRow) => isRepliedTrue(r)).length,
         ),
         不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
       },
@@ -1311,6 +1324,9 @@ const data = useConfirmationData({
 
 const viewMode = useViewMode()
 
+// 行内函证附件：计数 + 同一个附件抽屉（spec attachment-confirmation-evidence-loop 需求 1）
+const hubAttachments = useHubAttachmentCounts(() => props.projectId)
+
 // P1-1: 保存后自动同步到函证中心台账（防抖/非阻塞/失败静默/只读gate）
 const autoSync = useDisclosureAutoSync({
   isReadonly: () => props.readonly,
@@ -1386,6 +1402,7 @@ async function _backflowFromHub(force = false) {
       { _silent: true } as any,
     )
     const items: any[] = res?.items ?? res?.data?.items ?? []
+    hubAttachments.ingest(items) // 同一份列表顺带给「函证附件」列计数（不另发同一个 GET）
     if (!items.length) return
     // 建索引：按 id 与按对方名称
     const byId = new Map<string, any>()
@@ -1463,11 +1480,11 @@ const notesAiStats = computed(() => {
   const rows = data.rows.value
   const totalCount = rows.length
   const totalAmount = rows.reduce((s, r) => s + (r.amount || 0), 0)
-  const repliedCount = rows.filter(r => r.is_replied).length
+  const repliedCount = rows.filter(r => isRepliedTrue(r)).length
   const matchedCount = rows.filter(r => r.match_status === '相符').length
   const unrepliedCount = totalCount - repliedCount
   const coveragePct = totalAmount > 0
-    ? (rows.filter(r => r.is_replied).reduce((s, r) => s + (r.amount || 0), 0) / totalAmount) * 100
+    ? (rows.filter(r => isRepliedTrue(r)).reduce((s, r) => s + (r.amount || 0), 0) / totalAmount) * 100
     : 0
   const accountTypes = [...new Set(rows.map(r => r.account_type).filter(Boolean))] as string[]
   return { totalCount, totalAmount, repliedCount, matchedCount, unrepliedCount, coveragePct, accountTypes }
@@ -1623,6 +1640,7 @@ async function handleImportFile(event: Event) {
       importCount++
     }
     if (importCount > 0) {
+      markDirty() // 导入只改内存：原先不标未保存 ⇒ 工具栏保存按钮灰着，刷新即丢
       ElMessage.success(`成功导入 ${importCount} 条函证记录`)
     } else {
       ElMessage.warning('未识别到有效数据行，请检查 Excel 列头是否包含：被询证单位、科目、函证金额')
@@ -1660,6 +1678,9 @@ async function handleSyncHub() {
       rows: data.rows.value,
     })
     const summary = `新增 ${res.created} · 更新 ${res.updated} · 状态推进 ${res.transitioned}`
+    void hubAttachments.reload() // 新同步的行有了函证，计数列随之可点
+    // 函证 id 写回了行上：本表没有别的未保存改动时顺带落库（同保存后自动同步），有则随下次保存落库
+    if (res.remapped && !hasUnsavedChanges.value) emit('save', data.buildPayload())
     if (res.errors.length) {
       ElMessage.warning(`同步完成（部分失败）：${summary}；${res.errors[0]}`)
     } else if (res.created + res.updated + res.transitioned === 0) {
@@ -1747,7 +1768,9 @@ function _triggerAutoSyncHub() {
       hub_confirmation_id: r._hub_confirmation_id || undefined,
     }))
 
-    const res = await http.post<any>(
+    // 🔴 `api`（直接返回业务数据）而非 `http`：原先 `http.post` 返回 AxiosResponse，`res.hub_ids` 恒 undefined
+    //    ⇒ 自动同步从未把函证 id 写回行上（spec attachment-confirmation-evidence-loop 需求 1.5）
+    const res = await api.post<any>(
       `/api/projects/${props.projectId}/confirmations/batch-sync`,
       {
         items,

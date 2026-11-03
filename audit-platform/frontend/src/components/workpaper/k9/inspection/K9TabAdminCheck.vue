@@ -131,8 +131,14 @@
           </div>
         </div>
       </template>
-      <el-table :data="occurrenceRows" border size="small" :max-height="460" class="voucher-table" :row-class-name="abnormalRowClass">
+      <el-table :data="occurrenceRows" border size="small" :max-height="460" class="voucher-table" :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="year" />
+          </template>
+        </el-table-column>
         <el-table-column v-if="isColVisible('debtorName')" label="费用明细项目" min-width="130">
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
         </el-table-column>
@@ -160,15 +166,18 @@
             <span v-else>{{ row.supportingDoc || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="附件OCR" width="72" align="center">
+        <el-table-column label="附件OCR" width="84" align="center">
           <template #default="{ row }">
             <el-upload
+              v-if="!isReadonly"
               :show-file-list="false"
               :before-upload="(f: File) => handleVoucherOcr(row, f)"
               accept=".pdf,.jpg,.jpeg,.png"
+              style="display:inline-block"
             >
               <el-button link size="small" type="primary" :loading="ocrLoadingId === row.id">📎</el-button>
             </el-upload>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column v-if="isColVisible('checks')" label="核对内容" width="180" align="center">
@@ -255,8 +264,8 @@
       </ul>
     </details>
 
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 管理费用(6602)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 管理费用(${samplingAccountCode})`" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" @undo-request="onUndoRequest" />
     </el-dialog>
   </div>
 </template>
@@ -267,13 +276,18 @@
  * 科目 6602 管理费用（借方/损益类/发生额）。仅借方检查比例。
  * 参照 D4 收入底稿规格。
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, reactive, computed, inject, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { generateK9AiText } from '../../composables/useK9AiText'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /**
  * 抽凭科目码取自单一真源 `k9AccountScope`（K9 管理费用）。原为模板内字面量；
@@ -313,6 +327,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（只读也能看）（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K9-8'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
@@ -328,8 +345,13 @@ const {
   checkRatios, lowRatioWarnings, abnormalRows,
   occurrenceDebitChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
-  fillFromSamples, serialize,
-} = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: 'K9-8-voucher-check', checkLabels: K9_CHECK_LABELS })
+  serialize,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass: lockedRowClass, isVoucherRowLocked,
+  voucherFillReady,
+} = useK1VoucherCheck({
+  projectId: () => props.projectId, readonly: () => props.isReadonly, persist: () => persist(),
+  allResponses: allResponsesRef as any, itemId: 'K9-8-voucher-check', checkLabels: K9_CHECK_LABELS })
+onMounted(() => { void voucherFillReady() })
 
 // K9-8 检查比例仅借方（损益科目发生额=借方）
 const k8CheckRatios = computed(() => checkRatios.value.filter(r => r.direction === '本期借方'))
@@ -390,7 +412,7 @@ const K9_ACCOUNT_PREFIXES = computed(() => k9QueryCodes(_injectedTbSrc?.value ??
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -398,21 +420,25 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K9_ACCOUNT_PREFIXES.value,
+      props.projectId, year.value, props.wpId, K9_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[] }) {
-  fillFromSamples('occurrence', payload?.samples ?? [])
-  samplingVisible.value = false
-  persist()
+/** 抽凭引擎回填（共享回填函数：一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行） */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 function persist() {
@@ -434,6 +460,8 @@ function fmtAmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(abnormalRowClass, lockedRowClass)
 
 const aiLoading = ref(false)
 async function handleAiGenerate() {
@@ -511,9 +539,11 @@ async function handleVoucherOcr(row: K1VoucherRow, file: File): Promise<boolean>
   try {
     const fd = new FormData()
     fd.append('file', file)
+    rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }, _silent: true,
     } as any)
+    rowEv.refresh()
     const data = res.data?.data ?? res.data
     const fields: Record<string, any> = data?.extracted_fields || {}
     const doc = String(fields.serviceContent ?? fields.full_text ?? '').trim()

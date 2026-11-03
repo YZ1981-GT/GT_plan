@@ -5,8 +5,9 @@
   2. 全 0 values → empty
   3. 任意非 0 数值 → 非空
   4. 任意非空字符串 → 非空
-  5. 跳过 header_label / total / subtotal / dynamic_anchor / dynamic_marker_end
-  6. 合计行有值但 data 行空 → empty（合计是衍生值，不算原始数据）
+  5. 跳过 header_label / dynamic_anchor / dynamic_marker_end / expandable
+  6. 合计 / 小计行只看数：有超过阈值的数 → 非空（明细空也算；公式推送找不到明细时把审定数写在合计行），
+     文字不算（spec note-pull-header-formula-closure R5；原规则「合计是衍生值、一律不看」）
   7. 多表 _tables：任一非空 → 非空
   8. None / 非 dict / 缺 rows → empty
   9. threshold 阈值生效（绝对值 ≤ threshold 视为空）
@@ -99,36 +100,39 @@ def test_empty_string_treated_as_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_total_row_with_value_does_not_count() -> None:
-    """合计行有值但 data 行空 → empty（合计是衍生值）."""
+def test_total_row_with_value_counts() -> None:
+    """合计行有数但明细空 → 非空（公式推送找不到明细时把审定数写在合计行；spec note-pull-header-formula-closure
+    R5，原规则判空 ⇒ 表被换成「本期无此业务」、整章被删）."""
     td = {
         "rows": [
             {"label": "A", "values": [None], "row_type": "data"},
             {"label": "合计", "values": [9999.0], "row_type": "total"},
         ],
     }
-    assert is_table_data_empty(td) is True
+    assert is_table_data_empty(td) is False
 
 
-def test_subtotal_row_with_value_does_not_count() -> None:
+def test_subtotal_row_with_value_counts() -> None:
     td = {
         "rows": [
             {"label": "A", "values": [None], "row_type": "data"},
             {"label": "小计", "values": [9999.0], "row_type": "subtotal"},
         ],
     }
-    assert is_table_data_empty(td) is True
+    assert is_table_data_empty(td) is False
 
 
-def test_is_total_legacy_field_skipped() -> None:
-    """is_total=True 的行也跳过（兼容老 schema）."""
+def test_is_total_legacy_field_counts_numbers_only() -> None:
+    """is_total=True 的行（老 schema）只看数：文字不算、不超过阈值不算."""
     td = {
         "rows": [
             {"label": "A", "values": [None]},
-            {"label": "合计", "values": [9999.0], "is_total": True},
+            {"label": "合计", "values": ["—", 0.004], "is_total": True},
         ],
     }
-    assert is_table_data_empty(td) is True
+    assert is_table_data_empty(td, threshold=0.01) is True
+    td["rows"][1]["values"] = ["—", 9999.0]
+    assert is_table_data_empty(td) is False
 
 
 def test_header_and_anchor_rows_skipped() -> None:

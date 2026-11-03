@@ -22,6 +22,7 @@ import { useProjectStore } from '@/stores/project'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useAuthStore } from '@/stores/auth'
 import { Reading } from '@element-plus/icons-vue'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import EvidenceGovernanceHandbookDialog from './EvidenceGovernanceHandbookDialog.vue'
 import EvidenceRefsTab from '@/components/evidence-governance/EvidenceRefsTab.vue'
 import OcrGovernanceTab from '@/components/evidence-governance/OcrGovernanceTab.vue'
@@ -68,7 +69,7 @@ watch(
         <h2 class="page-title">证据链治理中心</h2>
         <div class="header-meta">
           <el-tag v-if="clientName" type="info" size="small">{{ clientName }}</el-tag>
-          <el-tag type="info" size="small">{{ year }} 年度</el-tag>
+          <el-tag v-if="year != null" type="info" size="small">{{ year }} 年度</el-tag>
           <el-tag size="small">当前角色：{{ role }}</el-tag>
         </div>
       </div>
@@ -85,7 +86,9 @@ watch(
       style="margin-bottom: 12px"
     />
 
-    <el-tabs v-model="activeTab" type="border-card" class="gov-tabs">
+    <!-- 各治理页按项目年度取数：项目没填审计年度时不加载（原先 store 初值去年，静默按去年取） -->
+    <el-empty v-if="year == null" :description="MISSING_AUDIT_YEAR_MESSAGE" />
+    <el-tabs v-else v-model="activeTab" type="border-card" class="gov-tabs">
       <el-tab-pane label="证据关系" name="refs" lazy>
         <EvidenceRefsTab :project-id="projectId" :year="year" />
       </el-tab-pane>

@@ -178,7 +178,7 @@ def _valid_indices(table_data: dict) -> list[int]:
     column_groups = table_data.get("_column_groups")
     multi = (isinstance(column_groups, list) and len(column_groups) > 0) or (
         isinstance(table_data.get("multi_header"), list) and len(table_data.get("multi_header", [])) > 0
-    )
+    ) or bool(table_data.get("_header_paths"))  # 期间层合成 / 加层的表（note_period_layout）
     if multi:
         return list(range(len(headers_raw)))
     return [i for i, h in enumerate(headers_raw) if h and str(h).strip()]
@@ -433,6 +433,11 @@ def _sample_font_size(sample) -> int | None:
 
 
 def _header_rows(table: dict) -> int:
-    """``_render_table`` 的表头行数：有分组表头（``_column_groups``）两行，否则一行。"""
+    """``_render_table`` 的表头行数：≥ 3 层 / 期间层按 N 行（``export_header_defs``），有分组表头两行，否则一行。"""
+    from app.services.note_period_layout import export_header_defs
+
+    defs = export_header_defs(table)
+    if defs:
+        return len(defs)
     groups = table.get("_column_groups")
     return 2 if isinstance(groups, list) and groups else 1

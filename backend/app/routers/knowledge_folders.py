@@ -8,11 +8,11 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User
 from app.services.knowledge_access_policy import (
     KnowledgeAccessPolicy,
@@ -43,10 +43,44 @@ _MANAGE_DENIED = "只有资料的创建者或系统管理员可以执行此操�
 _READONLY_DENIED = "只读账号不能修改知识库"
 
 
+def _is_admin(current_user: User) -> bool:
+    return KnowledgeWritePolicy.is_admin(getattr(current_user, "role", None))
+
+
+async def _assert_folder_accepts_user_content(
+    db: AsyncSession, current_user: User, folder_id: UUID,
+) -> None:
+    """全所公开/系统目录只允许管理员写，防止低权限资料进入全所 RAG。"""
+    import sqlalchemy as sa
+    from app.models.knowledge_models import KnowledgeFolder
+
+    row = (await db.execute(
+        sa.select(KnowledgeFolder.access_level, KnowledgeFolder.system_key).where(
+            KnowledgeFolder.id == folder_id,
+            KnowledgeFolder.is_deleted == sa.false(),
+        )
+    )).first()
+    if row is None:
+        raise ExternalNotFound()
+    if (row.access_level == KnowledgeAccessLevel.public or row.system_key) and not _is_admin(current_user):
+        raise HTTPException(status_code=403, detail="全所公开和系统知识目录仅管理员可以写入")
+
+
 def _require_write_role(current_user: User) -> None:
     """知识资产写动作的角色上界：系统角色 readonly 一律 403（spec knowledge-base-retrieval-and-authz-closure 6.4）。"""
     if not KnowledgeWritePolicy.role_allows_write(getattr(current_user, "role", None)):
         raise HTTPException(status_code=403, detail=_READONLY_DENIED)
+
+
+async def _authorize_folder_read(
+    db: AsyncSession, current_user: User, folder_id: UUID,
+) -> KnowledgeAccessSubject:
+    """文件夹不存在或不可读统一 404；列表不得把无权伪装成合法空目录。"""
+    subject = await KnowledgeAccessPolicy.resolve_subject(db, current_user)
+    folder = await KnowledgeAccessPolicy.load_folder_permission(db, folder_id)
+    if folder is None or not KnowledgeAccessPolicy.can_read(subject, folder):
+        raise ExternalNotFound()
+    return subject
 
 
 async def _authorize_folder_create(
@@ -62,6 +96,7 @@ async def _authorize_folder_create(
     if folder is None or not KnowledgeAccessPolicy.can_create_in_folder(subject, folder):
         raise ExternalNotFound()
     _require_write_role(current_user)
+    await _assert_folder_accepts_user_content(db, current_user, folder_id)
 
 
 async def _authorize_folder_manage(
@@ -77,6 +112,48 @@ async def _authorize_folder_manage(
     ):
         raise HTTPException(status_code=403, detail=_MANAGE_DENIED)
     return subject
+
+
+async def _authorize_folder_subtree_manage(
+    db: AsyncSession, current_user: User, folder_id: UUID,
+) -> list[UUID]:
+    """递归删除前逐文件夹、逐文档验证管理权；返回需撤销索引的文档 ID。"""
+    import sqlalchemy as sa
+    from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+
+    subject = await _authorize_folder_manage(db, current_user, folder_id)
+    role = getattr(current_user, "role", None)
+    pending = [folder_id]
+    document_ids: list[UUID] = []
+    while pending:
+        current = pending.pop()
+        folder = await KnowledgeAccessPolicy.load_folder_permission(db, current)
+        if folder is None or not KnowledgeAccessPolicy.can_read(subject, folder):
+            raise ExternalNotFound()
+        if not KnowledgeWritePolicy.can_manage(subject, visible=True, owner_id=folder.created_by, role=role):
+            raise HTTPException(status_code=403, detail="子目录中存在你无权删除的资料")
+        children = list((await db.execute(
+            sa.select(KnowledgeFolder.id).where(
+                KnowledgeFolder.parent_id == current,
+                KnowledgeFolder.is_deleted == sa.false(),
+            )
+        )).scalars().all())
+        pending.extend(children)
+        documents = list((await db.execute(
+            sa.select(KnowledgeDocument).where(
+                KnowledgeDocument.folder_id == current,
+                KnowledgeDocument.is_deleted == sa.false(),
+            )
+        )).scalars().all())
+        for document in documents:
+            resource = KnowledgeResource.of_document(document)
+            visible = KnowledgeAccessPolicy.can_read_document(subject, resource, folder)
+            if not KnowledgeWritePolicy.can_manage(
+                subject, visible=visible, owner_id=document.created_by, role=role,
+            ):
+                raise HTTPException(status_code=403, detail="目录中存在其他用户管理的文档，不能递归删除")
+            document_ids.append(document.id)
+    return document_ids
 
 
 async def _authorize_document_read(
@@ -178,6 +255,18 @@ class DocumentCreateRequest(BaseModel):
     project_ids: list[str] | None = None
 
 
+class PromoteKnowledgeEvidenceRequest(BaseModel):
+    idempotency_key: str
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def validate_idempotency_key(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized or len(normalized) > 128:
+            raise ValueError("幂等键不能为空且不能超过 128 个字符")
+        return normalized
+
+
 @router.get("/tree")
 async def get_folder_tree(
     db: AsyncSession = Depends(get_db),
@@ -212,6 +301,8 @@ async def create_folder(
         await _authorize_folder_create(db, current_user, UUID(data.parent_id))
     else:
         _require_write_role(current_user)
+        if level == KnowledgeAccessLevel.public and not _is_admin(current_user):
+            raise HTTPException(status_code=403, detail="全所公开知识目录仅管理员可以创建")
 
     if level == KnowledgeAccessLevel.project_group:
         subject = await KnowledgeAccessPolicy.resolve_subject(db, current_user)
@@ -241,7 +332,7 @@ async def list_documents(
     current_user: User = Depends(get_current_user),
 ):
     """列出文件夹下的文档（权限过滤；每行带 ``can_manage``，前端据此显示删除/改名/移动）"""
-    subject = await KnowledgeAccessPolicy.resolve_subject(db, current_user)
+    subject = await _authorize_folder_read(db, current_user, folder_id)
     svc = KnowledgeDocumentService(db)
     docs = await svc.list_documents(folder_id, subject)
     role = getattr(current_user, "role", None)
@@ -372,6 +463,51 @@ async def upload_project_documents(
     return await _store_uploaded_files(db, folder.id, files, current_user, background_tasks)
 
 
+@router.post("/projects/{project_id}/evidence/from-document/{doc_id}")
+async def promote_document_to_project_evidence(
+    project_id: UUID,
+    doc_id: UUID,
+    data: PromoteKnowledgeEvidenceRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """把当前可读的知识文档版本显式快照为项目证据。
+
+    源知识 ACL 与目标项目 edit/归档/年度分别校验；客户端只提交幂等键，
+    版本、hash、blob 与存储位置全部由服务端现读并钉住。
+    """
+    from app.services.knowledge_evidence_promotion_service import (
+        KnowledgeEvidencePromotionError,
+        KnowledgeEvidencePromotionService,
+    )
+
+    await _authorize_document_read(db, current_user, doc_id)
+    audit_year = await require_project_audit_year(db, project_id)
+    service = KnowledgeEvidencePromotionService(db)
+    result = None
+    try:
+        result = await service.promote(
+            source_document_id=doc_id,
+            project_id=project_id,
+            audit_year=audit_year,
+            actor_user_id=current_user.id,
+            idempotency_key=data.idempotency_key,
+        )
+        await db.commit()
+    except KnowledgeEvidencePromotionError as exc:
+        await db.rollback()
+        service.cleanup_after_rollback(result)
+        raise HTTPException(status_code=exc.status_code, detail=exc.as_detail()) from exc
+    except Exception:
+        await db.rollback()
+        service.cleanup_after_rollback(result)
+        raise
+    return {
+        **result.as_dict(),
+        "message": "已转为项目证据" if not result.replayed else "该知识版本已转为项目证据",
+    }
+
+
 @router.delete("/folders/{folder_id}")
 async def delete_folder(
     folder_id: UUID,
@@ -382,9 +518,11 @@ async def delete_folder(
 
     不可读 → 404；非创建者且非管理员 / readonly → 403（spec knowledge-base-retrieval-and-authz-closure 6.2）。
     """
-    await _authorize_folder_manage(db, current_user, folder_id)
+    document_ids = await _authorize_folder_subtree_manage(db, current_user, folder_id)
     svc = KnowledgeFolderService(db)
     await svc.delete_folder(folder_id)
+    for document_id in document_ids:
+        await _trigger_index_delete(db, document_id)
     await db.commit()
     return {"message": "文件夹已删除"}
 
@@ -446,7 +584,8 @@ async def init_preset_folders(
     current_user: User = Depends(get_current_user),
 ):
     """初始化预制分类文件夹（幂等；只读账号不可执行）"""
-    _require_write_role(current_user)
+    if not _is_admin(current_user):
+        raise HTTPException(status_code=403, detail="初始化系统知识目录仅管理员可操作")
     svc = KnowledgeFolderService(db)
     count = await svc.init_preset_folders()
     await db.commit()
@@ -657,7 +796,11 @@ async def preview_document(
         return {**base, "preview_type": "text", "content": doc.content_text[:100000]}  # 最多 100K 字符
 
     # 二进制文档返回下载链接
-    if doc.storage_path and Path(doc.storage_path).exists():
+    from app.services.asset_blob_service import resolve_within_root
+    from app.services.knowledge_upload_service import knowledge_storage_root
+
+    file_path = resolve_within_root(doc.storage_path, knowledge_storage_root())
+    if file_path is not None:
         return {
             **base,
             "preview_type": "download",
@@ -682,8 +825,11 @@ async def download_document(
     doc = await db.get(KnowledgeDocument, doc_id)
     if not doc.storage_path:
         raise HTTPException(status_code=404, detail="该文档没有原始文件")
-    file_path = Path(doc.storage_path)
-    if not file_path.exists():
+    from app.services.asset_blob_service import resolve_within_root
+    from app.services.knowledge_upload_service import knowledge_storage_root
+
+    file_path = resolve_within_root(doc.storage_path, knowledge_storage_root())
+    if file_path is None:
         raise HTTPException(status_code=404, detail="文件不存在")
 
-    return FileResponse(file_path, filename=doc.name)
+    return FileResponse(file_path, filename=doc.name, headers={"X-Content-Type-Options": "nosniff"})

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "64f58e398e89d2ac432328c1cb2b5e7e90b693851e2cd3eb83669d462e378aa7",
+  "instrumentation_definition_sha256": "fdc555ed2eeb21299a4e94a4f430087ef9c3bc78da11fafd81b84ad7b4efed09",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g9-other-noncurrent-financial",
@@ -29,7 +29,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "phase5_other_noncurrent_financial",
-    "reviewed_basis": "openpyxl 逐格实测 G/G9 其他非流动金融资产.xlsx 的 `明细表G9-2`（两级表头 R9 组 / R10 叶子 / 三个受管区 R12-16·R19-23·R26-28 / 区标题行 R11·R18·R25 无公式 / 小计 R17·R24·R29 / 合计 R30 枚举相加 =SUM(C17,C24,C29) / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / 有效内容列 28 即 A-AB / 0 个 definedName / 受管表零裸 IF) + 前端 `useG9Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段） + 模板编制思路见 spec evidence/task8-template-design-logic.md（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / 四阶段 未审→账项调整→审定→重分类报表 / P=C+M 与 Q=D+N 走未审线）"
+    "reviewed_basis": "openpyxl 逐格实测 G/G9 其他非流动金融资产.xlsx 的 `明细表G9-2`（两级表头 R9 组 / R10 叶子 / 三个受管区 R12-16·R19-23·R26-28 / 区标题行 R11·R18·R25 无公式 / 小计 R17·R24·R29 / 合计 R30 枚举相加 =SUM(C17,C24,C29) / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / 有效内容列 28 即 A-AB / 0 个 definedName / 受管表零裸 IF) + 前端 `useG9Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段） + 模板编制思路见 spec evidence/task8-template-design-logic.md（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / 四阶段 未审→账项调整→审定→重分类报表（L=J+K / Y=W+X）/ P=C+M 与 Q=D+N 走未审线）"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -2121,9 +2121,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "ac654db9baf0c1fc01583995cca0d4f34fea5da313d3b296d535d1ebcec93cf8",
+    "normalized_structure_hash": "feeb5155c4fe931a7e5bd9c62be1647b1b780c506996718241ebdb8493f084a1",
     "relative_path": "G/G9 其他非流动金融资产.xlsx",
-    "template_sha256": "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379"
+    "template_sha256": "8eb68bfc0491c0d92e7820d697e4facfcb109e936347adad4ec35cafaf86b65c"
   },
-  "template_definition_sha256": "cc38e99be25a009bcb2a28e09582c136edde0c4d1b2979d0948e98039aaea5c6"
+  "template_definition_sha256": "04ae3d329f615d26490634d54cfedaac5008c51b672bb0406ca74ab5a8fc3241"
 }

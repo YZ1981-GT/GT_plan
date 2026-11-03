@@ -22,6 +22,7 @@ import re
 import pytest
 
 # 🔴 只借**删除账本常量**（单一真源）；p0 的扫描逻辑仍自包含。
+from tests.workpaper_sync.k_domain_growth_facts import K_DOMAIN_ADDED_FILES
 from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     BP5_DELETED_COUNT,
     BP5_DELETED_ORPHAN_NAMES,
@@ -124,24 +125,38 @@ class TestKDomainFileBaseline:
     def test_k_domain_file_count_excluding_kam(
         self, k_files: list[pathlib.Path]
     ) -> None:
-        """现算 == 基线 367 − 已删 7。"""
+        """现算 == 基线 367 − 已删 7 + 具名新增。"""
         assert EXPECTED_K_DOMAIN_FILE_COUNT == BP5_K_DOMAIN_FILES_BASELINE == 367, (
             "基线被篡改"
         )
         expected = bp5_expected_k_domain_files()
         assert len(k_files) == expected, (
             f"K 域文件数漂移：基线 {BP5_K_DOMAIN_FILES_BASELINE} − 已删 "
-            f"{BP5_DELETED_COUNT} = {expected}，实得 {len(k_files)}"
+            f"{BP5_DELETED_COUNT} + 具名新增 {len(K_DOMAIN_ADDED_FILES)} = {expected}，"
+            f"实得 {len(k_files)}"
         )
 
     def test_k_domain_file_count_including_kam(
         self, k_files_with_kam: list[pathlib.Path]
     ) -> None:
-        """现算 == 基线 368 − 已删 7。"""
+        """现算 == 基线 368 − 已删 7 + 具名新增。"""
         expected = bp5_expected_k_domain_files(include_kam=True)
         assert len(k_files_with_kam) == expected, (
-            f"含 KAM 的 K 域文件数漂移：期望 {expected}，实得 {len(k_files_with_kam)}"
+            f"含 KAM 的 K 域文件数漂移：基线 368 − 已删 {BP5_DELETED_COUNT} "
+            f"+ 具名新增 {len(K_DOMAIN_ADDED_FILES)} = {expected}，"
+            f"实得 {len(k_files_with_kam)}"
         )
+
+    def test_added_file_ledger_is_exact_and_live(
+        self, k_files: list[pathlib.Path]
+    ) -> None:
+        """具名新增项必须存在、被扫描口径收录且无重复。"""
+        assert len(K_DOMAIN_ADDED_FILES) == len(set(K_DOMAIN_ADDED_FILES))
+        expected = {ROOT / relative for relative in K_DOMAIN_ADDED_FILES}
+        missing = sorted(str(path) for path in expected if not path.is_file())
+        assert missing == [], f"新增账本存在失效路径：{missing}"
+        outside = sorted(str(path) for path in expected - set(k_files))
+        assert outside == [], f"新增账本未被 K 域扫描收录：{outside}"
 
     def test_the_seven_deleted_orphans_are_really_gone(
         self, k_files: list[pathlib.Path]

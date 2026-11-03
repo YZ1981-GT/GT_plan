@@ -813,13 +813,14 @@ function goToReviewInbox(projectId?: string) {
 
 function goToUnassigned(projectId?: string) {
   recordOrigin()
+  // 列表页按 ?assigned=unassigned 筛未分配（原 filter_assigned 列表页不读，spec wp-deeplink-locate-residual-closure）
   if (projectId) {
-    router.push({ path: `/projects/${projectId}/workpapers`, query: { filter_assigned: 'unassigned' } })
+    router.push({ path: `/projects/${projectId}/workpapers`, query: { assigned: 'unassigned' } })
   } else {
     // 跳到第一个有待分配的项目
     const proj = overview.value?.projects.find(p => p.pending_assign > 0)
     if (proj) {
-      router.push({ path: `/projects/${proj.project_id}/workpapers`, query: { filter_assigned: 'unassigned' } })
+      router.push({ path: `/projects/${proj.project_id}/workpapers`, query: { assigned: 'unassigned' } })
     }
   }
 }

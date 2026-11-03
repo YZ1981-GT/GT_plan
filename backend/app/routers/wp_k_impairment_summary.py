@@ -293,6 +293,11 @@ async def _maybe_apply_summary_to_workpaper(
     db: AsyncSession, wp_id: str, sheet: str, data: dict[str, Any]
 ) -> str | None:
     """把减值汇总结果写回 working_paper.parsed_data.impairment_summary[sheet]"""
+    # 只读窗口只能算、不能写回：编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.1）
+    from app.routers._wp_gate import enforce_edit_lock_at_write_point
+
+    await enforce_edit_lock_at_write_point(db, wp_id)
+
     from app.models.workpaper_models import WorkingPaper
 
     try:

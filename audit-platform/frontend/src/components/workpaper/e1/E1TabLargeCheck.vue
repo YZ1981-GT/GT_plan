@@ -8,15 +8,22 @@
  * - Uses useE1IpoSpecial with sheetCode='E1-23'
  * - Generic table driven by COLUMN_CONFIG['E1-23']
  * - Dynamic rows
+ * - 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（useE1IpoSpecial 的 voucherFill，
+ *   一个对方科目一行、按分录指纹去重；spec voucher-identity-writeback-and-audit-phase 任务 10）
  *
  * Requirements: 10.6
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, inject, toRef, onMounted, computed, type Ref } from 'vue'
 import {
   useE1IpoSpecial,
   type IpoSheetCode,
+  type IpoRow,
   type ColumnDef,
 } from '../composables/useE1IpoSpecial'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
+import { hasLargeCheckContent, largeCheckLegacyKey, mapSampleToLargeCheckRow } from '../composables/e1LargeCheckVoucherFill'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
@@ -74,7 +81,21 @@ const {
   addRow,
   removeRow,
   updateCell,
-} = useE1IpoSpecial(options)
+  voucherFill,
+} = useE1IpoSpecial({
+  ...options,
+  voucherFill: {
+    projectId: () => props.projectId,
+    policy: 'expand',
+    mapSampleToRow: item => mapSampleToLargeCheckRow(item),
+    hasUserContent: hasLargeCheckContent,
+    // 旧行（没有 `_gt`）：凭证编号 + 日期 + 金额
+    legacy: largeCheckLegacyKey,
+  },
+})
+// 传了 voucherFill ⇒ 一定有（E1-23 收支检查接入共享回填函数）
+const fill = voucherFill!
+const isVoucherRowLocked = (row: unknown) => fill.isRowLocked(row as IpoRow)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,15 +137,6 @@ const samplingAccountCode = computed(() =>
   e1SamplingAccountCode(tbSourceCodes?.value ?? null)
 )
 
-/** 科目编码 → 所属科目名称（1001 现金 / 1002 银行存款 / 1012 其他货币资金） */
-function accountNameOf(code: string): string {
-  const c = String(code || '')
-  if (c.startsWith('1001')) return '现金'
-  if (c.startsWith('1002')) return '银行存款'
-  if (c.startsWith('1012')) return '其他货币资金'
-  return c
-}
-
 /**
  * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
  * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
@@ -136,73 +148,18 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly),
 })
 
-function onSampleFilled(payload: any): void {
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。原实现按凭证号去重、按对方分录展开并取对方分录金额，已删除。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const samples = payload?.samples || []
-  if (!Array.isArray(samples) || samples.length === 0) return
-  let added = 0
-  for (const s of samples) {
-    const debit = Number(s.debitAmount) || 0
-    const credit = Number(s.creditAmount) || 0
-    // 货币资金借方=收入(现金流入)，贷方=支出(现金流出)
-    const direction = debit > 0 ? '收' : credit > 0 ? '支' : ''
-    // 按凭证号去重
-    const voucherNo = s.voucherNo || ''
-    if (voucherNo && rows.value.some(r => r.voucherNo === voucherNo)) continue
-
-    // 多科目凭证：按对方分录逐行展开（每个对方科目+金额一行）
-    const entries = s.voucherEntries || []
-    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
-    if (isMulti) {
-      // 找出对方分录（与当前行方向相反的那些）
-      const counterEntries = entries.filter((e: any) => {
-        if (debit > 0) return e.credit_amount && Number(e.credit_amount) > 0
-        if (credit > 0) return e.debit_amount && Number(e.debit_amount) > 0
-        return false
-      })
-      const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
-      for (const e of entriesToWrite) {
-        const eDebit = Number(e.debit_amount) || 0
-        const eCredit = Number(e.credit_amount) || 0
-        addRow()
-        const lastRow = rows.value[rows.value.length - 1]
-        if (lastRow) {
-          updateCell(lastRow.id, 'direction', direction)
-          updateCell(lastRow.id, 'accountName', accountNameOf(s.accountCode))
-          updateCell(lastRow.id, 'date', s.voucherDate || '')
-          updateCell(lastRow.id, 'voucherNo', voucherNo)
-          updateCell(lastRow.id, 'content', e.summary || s.summary || '')
-          updateCell(lastRow.id, 'counterAccount', e.account_code || '')
-          updateCell(lastRow.id, 'counterSubAccount', e.account_name || '')
-          updateCell(lastRow.id, 'amount', String(eDebit || eCredit || 0))
-        }
-        added++
-      }
-    } else {
-      // 1对1 或无明细：单行写入
-      addRow()
-      const lastRow = rows.value[rows.value.length - 1]
-      if (lastRow) {
-        updateCell(lastRow.id, 'direction', direction)
-        updateCell(lastRow.id, 'accountName', accountNameOf(s.accountCode))
-        updateCell(lastRow.id, 'date', s.voucherDate || '')
-        updateCell(lastRow.id, 'voucherNo', voucherNo)
-        updateCell(lastRow.id, 'content', s.summary || '')
-        updateCell(lastRow.id, 'counterAccount', s.counterpartAccount || '')
-        updateCell(lastRow.id, 'counterSubAccount', s.counterpartAccountName || '')
-        updateCell(lastRow.id, 'amount', String(debit || credit || 0))
-        if (s.abnormal) {
-          updateCell(lastRow.id, 'isAbnormal', true)
-          updateCell(lastRow.id, 'issue', '抽凭引擎标记异常，待核查')
-        }
-      }
-      added++
-    }
-  }
+  void persistMethodology(payload?.methodology)
+  if (!(payload?.samples ?? []).length) return
+  // 填入几行（含已存在 / 被替换）由共享回填函数按实际行数提示
+  const out = await fill.onEngineFilled(payload)
+  if (out.cancelled) return
   samplingVisible.value = false
-  ElMessage.success(added > 0 ? `已导入 ${added} 笔凭证` : '未新增（凭证号重复已跳过）')
 }
 
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
@@ -240,6 +197,10 @@ async function refreshAttachedCount(): Promise<void> {
 /** 拉取挂到本底稿的序时账凭证 → 映射为样本 → 复用 onSampleFilled 导入检查行 */
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
@@ -249,7 +210,7 @@ async function importFromAttached(): Promise<void> {
       MF_ACCOUNT_PREFIXES.value,
     )
 
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await fill.onAttachImported(samples)
 
     // 🔴 挂错底稿的凭证如实告知（含其实际科目），便于用户判断该挂到哪张底稿。
     //    改造前这些凭证会被「筛空回退取全部分录」静默灌进本表（spec R3.4/R3.5）。
@@ -288,6 +249,7 @@ onMounted(() => {
   const concResp = props.allResponses.get(CONCLUSION_KEY)
   if (concResp?.remark) auditConclusion.value = concResp.remark
   void refreshAttachedCount()
+  void fill.ready()
 })
 
 function saveAuditNote(val: string): void {
@@ -312,6 +274,8 @@ function saveAuditConclusion(val: string): void {
 import E1LargeCheckOcrConfirmDialog from './E1LargeCheckOcrConfirmDialog.vue'
 import type { LargeCheckOcrFields } from './E1LargeCheckOcrConfirmDialog.vue'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const ocrVisible = ref(false)
 const ocrSide = ref<'debit' | 'credit'>('debit')
@@ -319,14 +283,18 @@ const ocrFields = ref<Partial<LargeCheckOcrFields>>({})
 const ocrConfidence = ref<number | undefined>()
 const ocrPreview = ref('')
 const ocrFileName = ref('')
+/** 识别是先传单据、确认后才新建行 ⇒ 附件挂到本表页（表页级），工具栏「借方 / 贷方 OCR」旁的小眼睛按同一位置读取 */
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 async function onOcrUpload(file: File, side: 'debit' | 'credit'): Promise<boolean> {
   ocrSide.value = side
   const form = new FormData()
   form.append('file', file)
   form.append('side', side)
+  rowEv.append(form, sheetCode)
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/e1/large-check-ocr`, form)
+    rowEv.refresh()
     const data = res?.data ?? res
     ocrFields.value = data?.fields ?? {}
     ocrConfidence.value = data?.confidence
@@ -366,6 +334,8 @@ import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
 
@@ -430,6 +400,7 @@ async function generateAuditConclusion(): Promise<void> {
         <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" :before-upload="(f: File) => onOcrUpload(f, 'credit')" :disabled="isReadonly" style="display:inline-block;margin-left:4px">
           <el-button size="small" :disabled="isReadonly">📎 贷方OCR</el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="sheetCode" />
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
           <el-button
             size="small"
@@ -448,7 +419,13 @@ async function generateAuditConclusion(): Promise<void> {
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
-        <el-table :data="rows" border stripe size="small" max-height="500" style="width: 100%">
+        <el-table :data="rows" border stripe size="small" max-height="500" style="width: 100%" :row-class-name="fill.rowClass">
+          <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+          <el-table-column label="来源" width="150">
+            <template #default="{ row }">
+              <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+            </template>
+          </el-table-column>
           <el-table-column
             v-for="col in columns"
             :key="col.key"
@@ -466,7 +443,7 @@ async function generateAuditConclusion(): Promise<void> {
               <WpAmountInput
                 v-else-if="col.type === 'number' && isAmountColumn(col)"
                 :model-value="row[col.key]"
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 size="small"
                 :aria-label="col.label"
                 @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
@@ -474,7 +451,7 @@ async function generateAuditConclusion(): Promise<void> {
               <el-input-number
                 v-else-if="col.type === 'number'"
                 :model-value="row[col.key]"
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 :controls="false"
                 size="small"
                 @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
@@ -483,14 +460,14 @@ async function generateAuditConclusion(): Promise<void> {
               <el-checkbox
                 v-else-if="col.type === 'boolean'"
                 :model-value="!!row[col.key]"
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 @change="(val: boolean) => updateCell(row.id, col.key, val)"
               />
               <!-- Date -->
               <el-date-picker
                 v-else-if="col.type === 'date'"
                 :model-value="row[col.key]"
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 type="date"
                 value-format="YYYY-MM-DD"
                 size="small"
@@ -498,10 +475,10 @@ async function generateAuditConclusion(): Promise<void> {
                 @update:model-value="(val: string) => updateCell(row.id, col.key, val || '')"
               />
               <!-- Text (default) -->
-              <el-input
+              <WpCommitInput
                 v-else
                 :model-value="row[col.key]"
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 size="small"
                 @change="(val: string) => updateCell(row.id, col.key, val)"
               />
@@ -510,7 +487,7 @@ async function generateAuditConclusion(): Promise<void> {
 
           <el-table-column label="操作" width="70" align="center" fixed="right">
             <template #default="{ row }">
-              <el-button v-if="!isReadonly" type="danger" text size="small"
+              <el-button v-if="!isReadonly && !isVoucherRowLocked(row)" type="danger" text size="small"
                 @click="removeRow(row.id)">删除</el-button>
             </template>
           </el-table-column>
@@ -521,7 +498,7 @@ async function generateAuditConclusion(): Promise<void> {
           <template #header>
             <div class="card-header"><span>审计说明</span></div>
           </template>
-          <el-input
+          <WpCommitInput
             type="textarea"
             :model-value="auditNote"
             :disabled="isReadonly"
@@ -536,7 +513,7 @@ async function generateAuditConclusion(): Promise<void> {
           <template #header>
             <div class="card-header"><span>审计结论</span></div>
           </template>
-          <el-input
+          <WpCommitInput
             type="textarea"
             :model-value="auditConclusion"
             :disabled="isReadonly"
@@ -558,13 +535,13 @@ async function generateAuditConclusion(): Promise<void> {
     >
       <GtVoucherSamplingEngine
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         :initial-config-patch="{ accountCodes: ['1001', '1002', '1012'] }"
         config-hint="货币资金收支检查：默认总体含库存现金(1001)/银行存款(1002)/其他货币资金(1012)，可在抽样配置中调整科目范围。"
         @filled="onSampleFilled"
+        @undo-request="fill.onUndoRequest"
       />
     </el-dialog>
 

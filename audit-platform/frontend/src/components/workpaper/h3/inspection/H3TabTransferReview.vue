@@ -295,7 +295,8 @@
  * 四方向（含存货→投资）+ 转换比例接入公式 + 字段分离 + 重要性预警 + H3-5联动
  */
 import { ref, computed, inject, toRef, onMounted, defineComponent, h } from 'vue'
-import { ElInput, ElInputNumber, ElSelect, ElOption, ElButton, ElTag, ElTable, ElTableColumn } from 'element-plus'
+import { ElOption, ElButton, ElTag, ElTable, ElTableColumn } from 'element-plus'
+import { ElInput, ElInputNumber, ElSelect } from '@/components/grid/adapters'
 import { useH3TransferReview, CATEGORY_LABELS } from '../../composables/useH3TransferReview'
 import type { TransferDirection, H3TransferRow, AssetCategory } from '../../composables/useH3TransferReview'
 import { useH3FormData } from '../../composables/useH3FormData'

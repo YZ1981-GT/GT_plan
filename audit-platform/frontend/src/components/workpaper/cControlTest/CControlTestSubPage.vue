@@ -301,7 +301,7 @@
         <el-table-column type="index" label="#" width="45" align="center" />
 
         <!-- 📎 附件上传列（Req 10.1） -->
-        <el-table-column label="📎" width="65" align="center">
+        <el-table-column label="📎" width="96" align="center">
           <template #default="{ $index }">
             <div class="cct-attach-cell">
               <!-- 已有附件：显示文件名链接 -->
@@ -311,12 +311,17 @@
                 placement="top"
               >
                 <a
-                  :href="`/api/attachments/${sampleAttachments[$index]!.id}/download`"
-                  target="_blank"
+                  href="#"
                   class="cct-attach-link"
-                  @click.stop
+                  :aria-label="`下载 ${sampleAttachments[$index]!.fileName}`"
+                  @click.stop.prevent="downloadAttachment(sampleAttachments[$index]!.id, sampleAttachments[$index]!.fileName)"
                 >📎</a>
               </el-tooltip>
+              <AttachmentEyeButton
+                v-if="sampleAttachments[$index]"
+                :attachment-id="sampleAttachments[$index]!.id"
+                :file-name="sampleAttachments[$index]!.fileName"
+              />
               <!-- 上传按钮（非只读模式） -->
               <el-upload
                 v-if="!readonly"
@@ -512,10 +517,12 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { ArrowLeft, Plus, Delete, MagicStick, InfoFilled, WarningFilled, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { suggestSampleSize } from '@/composables/useSampleSizeEngine'
 import { api } from '@/services/apiProxy'
-import { uploadAttachment } from '@/services/commonApi'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import type { ControlPage, SampleResult } from '@/composables/useCControlTestData'
@@ -659,26 +666,15 @@ async function onUploadSampleAttachment(index: number, file: File) {
 
   uploadingRow.value = index
   try {
-    // 1) 上传附件
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${file.name} [${props.wpCode}-1-${props.pageIndex + 1} 样本${index + 1}]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 关联到底稿
-    try {
-      await api.post(`/api/attachments/${attachmentId}/associate`, {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `${props.wpCode}-ctrl-${props.pageIndex + 1}-sample-${index + 1}`,
-      })
-    } catch { /* 关联失败不阻断 */ }
+    // 1) 经底稿证据入口上传：只写本样本行的证据链接（{编码}-1-{控制} · 第 n 项，spec attachment-evidence-intake 需求 5.4）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file,
+      sheetName: `${props.wpCode}-1-${props.pageIndex + 1}`,
+      cellRef: itemCellRef(index + 1),
+    })
+    const attachmentId = String(uploaded.id)
 
     // 存储附件引用
     const attachment: SampleAttachmentInfo = { id: attachmentId, fileName: file.name, ocrMerged: false }
@@ -694,7 +690,7 @@ async function onUploadSampleAttachment(index: number, file: File) {
 
     // 2) OCR 识别（仅图片/PDF 可识别）— Req 10.2
     if (isOcrEligible(file.name)) {
-      await doOcrMerge(file, index)
+      await doOcrMerge(file, index, attachmentId)
     }
   } catch (e: any) {
     const detail = e?.response?.data?.detail || e?.message || '上传失败'
@@ -708,9 +704,11 @@ async function onUploadSampleAttachment(index: number, file: File) {
  * OCR 识别 + 确认弹窗 + merge 填入（Req 10.2）
  * 复用 /d4/contract-ocr 端点
  */
-async function doOcrMerge(file: File, index: number): Promise<void> {
+async function doOcrMerge(file: File, index: number, attachmentId: string): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  formData.append('attachment_id', attachmentId)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(

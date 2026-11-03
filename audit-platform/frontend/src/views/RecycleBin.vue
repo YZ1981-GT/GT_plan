@@ -93,13 +93,20 @@
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button type="primary" size="small" link v-permission="'recycle:restore'" @click="restoreItem(row)">
-            恢复
-          </el-button>
-          <el-button v-if="row.purgeable !== false" type="danger" size="small" link v-permission="'recycle:purge'"
-            @click="confirmDelete(row)">
-            删除
-          </el-button>
+          <!-- 按作者可见的类型（查询模板）：按后端逐行能力显示，作者多为系统 auditor，不能按系统角色藏掉 -->
+          <template v-if="typeof row.can_restore === 'boolean'">
+            <el-button v-if="row.can_restore" type="primary" size="small" link @click="restoreItem(row)">恢复</el-button>
+            <el-button v-if="row.can_purge && row.purgeable !== false" type="danger" size="small" link @click="confirmDelete(row)">删除</el-button>
+          </template>
+          <template v-else>
+            <el-button type="primary" size="small" link v-permission="'recycle:restore'" @click="restoreItem(row)">
+              恢复
+            </el-button>
+            <el-button v-if="row.purgeable !== false" type="danger" size="small" link v-permission="'recycle:purge'"
+              @click="confirmDelete(row)">
+              删除
+            </el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>

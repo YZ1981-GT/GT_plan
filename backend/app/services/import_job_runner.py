@@ -295,15 +295,15 @@ class ImportJobRunner:
 
     @classmethod
     async def _release_timed_out_job(cls, job: ImportJob) -> None:
-        ImportQueueService.release_lock(job.project_id)
+        await ImportQueueService.release_lock_async(job.project_id)
         batch_id_raw = (job.options or {}).get("queue_batch_id")
         try:
             async with async_session() as status_db:
                 from app.services.dataset_service import DatasetService
 
                 await DatasetService.mark_failed_for_job(status_db, job.id)
+                await status_db.commit()
                 if not batch_id_raw:
-                    await status_db.commit()
                     return
                 await ImportQueueService.fail_job(
                     job.project_id,
@@ -499,6 +499,7 @@ class ImportJobRunner:
                     job_id=job_id,
                     created_by=created_by,
                     force_activate=bool(options.get("force_activate")),
+                    append_options=options.get("append"),
                 )
 
             from app.services.ledger_import_application_service import LedgerImportApplicationService
@@ -551,8 +552,9 @@ class ImportJobRunner:
                         year=result.get("year"),
                         record_count=LedgerImportApplicationService._count_total_records(result),
                     )
+                    await status_db.commit()
             else:
-                ImportQueueService.release_lock(project_id)
+                await ImportQueueService.release_lock_async(project_id)
 
         except Exception as exc:
             logger.exception("ImportJob 执行失败: %s", job_id)
@@ -609,7 +611,7 @@ class ImportJobRunner:
                         year=failure_year,
                     )
             else:
-                ImportQueueService.release_lock(project_id)
+                await ImportQueueService.release_lock_async(project_id)
         finally:
             monitor_task.cancel()
             cls._cancel_events.pop(job_id, None)
@@ -660,11 +662,12 @@ class ImportJobRunner:
                     },
                 )
                 await db.commit()
-            ImportQueueService.release_lock(project_id)
+            await ImportQueueService.release_lock_async(project_id)
             return
 
         logger.info("ImportJob %s: v2 engine starting (project=%s year=%s)",
                     job_id, project_id, year)
+        batch_id_raw = options.get("queue_batch_id")
 
         # 后台心跳任务：整个作业期间每隔 N 秒独立 ping heartbeat_at，
         # 不依赖 pipeline 进度回调。根治"后置阶段（大表 COUNT/激活/rebuild）
@@ -750,6 +753,7 @@ class ImportJobRunner:
                 progress_cb=_progress_cb,
                 cancel_check=_cancel_check,
                 phase_marker=_phase_marker,
+                append_options=options.get("append"),
             )
 
             # ── Phase 5: writing → activating → completed（对齐状态机）──
@@ -764,23 +768,32 @@ class ImportJobRunner:
                 )
                 await db.commit()
             await cls._persist_progress(job_id, 98, "收尾")
+            result_payload = {
+                "engine": "v2",
+                "dataset_id": str(result.dataset_id) if result.dataset_id else None,
+                "imported": {
+                    "tb_balance": result.balance_rows,
+                    "tb_aux_balance": result.aux_balance_rows,
+                    "tb_ledger": result.ledger_rows,
+                    "tb_aux_ledger": result.aux_ledger_rows,
+                },
+                "balance_rows": result.balance_rows,
+                "aux_balance_rows": result.aux_balance_rows,
+                "ledger_rows": result.ledger_rows,
+                "aux_ledger_rows": result.aux_ledger_rows,
+                "total_parsed": result.total_rows_parsed,
+                "warnings": result.warnings,
+                "blocking_findings": result.blocking_findings,
+                "year": result.year,
+                "append": result.append_report,
+                "voucher_diff": result.voucher_diff_report,
+            }
             async with async_session() as db:
                 await ImportJobService.transition(
                     db, job_id, JobStatus.completed,
                     progress_pct=100,
                     progress_message="v2 导入完成",
-                    result_summary={
-                        "engine": "v2",
-                        "dataset_id": str(result.dataset_id) if result.dataset_id else None,
-                        "balance_rows": result.balance_rows,
-                        "aux_balance_rows": result.aux_balance_rows,
-                        "ledger_rows": result.ledger_rows,
-                        "aux_ledger_rows": result.aux_ledger_rows,
-                        "total_parsed": result.total_rows_parsed,
-                        "warnings": result.warnings,
-                        "blocking_findings": result.blocking_findings,
-                        "year": result.year,
-                    },
+                    result_summary=result_payload,
                 )
                 await db.commit()
 
@@ -794,7 +807,25 @@ class ImportJobRunner:
                         await ImportArtifactService.mark_consumed(artifact_db, artifact.id)
                         await artifact_db.commit()
 
-            ImportQueueService.release_lock(project_id)
+            if batch_id_raw:
+                async with async_session() as status_db:
+                    await ImportQueueService.complete_job(
+                        project_id,
+                        UUID(str(batch_id_raw)),
+                        status_db,
+                        message="v2 导入完成",
+                        result=result_payload,
+                        year=result.year,
+                        record_count=(
+                            result.balance_rows
+                            + result.aux_balance_rows
+                            + result.ledger_rows
+                            + result.aux_ledger_rows
+                        ),
+                    )
+                    await status_db.commit()
+            else:
+                await ImportQueueService.release_lock_async(project_id)
             logger.info(
                 "ImportJob %s v2 completed: %d+%d balance, %d+%d ledger rows",
                 job_id, result.balance_rows, result.aux_balance_rows,
@@ -882,9 +913,20 @@ class ImportJobRunner:
                     )
                     await asyncio.sleep(1)
             try:
-                ImportQueueService.release_lock(project_id)
+                if batch_id_raw:
+                    async with async_session() as status_db:
+                        await ImportQueueService.fail_job(
+                            project_id,
+                            UUID(str(batch_id_raw)),
+                            status_db,
+                            message=error_msg,
+                            result={"engine": "v2", "error": error_msg},
+                            year=year,
+                        )
+                else:
+                    await ImportQueueService.release_lock_async(project_id)
             except Exception:
-                logger.exception("ImportQueueService.release_lock failed for %s", project_id)
+                logger.exception("ImportQueueService.release_lock_async failed for %s", project_id)
         finally:
             # 无论成功/失败/取消，都停掉后台心跳任务
             heartbeat_task.cancel()

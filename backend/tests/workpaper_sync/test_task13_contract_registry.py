@@ -1641,18 +1641,23 @@ class TestProperty3BidirectionalRequiresAdapter:
         )
         assert sorted(report.bidirectional_without_adapter) == expected
         assert report.registered_adapter_ids == ()
-        # ③ adapter_id 与 capability 一致（不放宽：仍逐 entry 断言，只是按 capability 分情形）
+        # ③ adapter_id 与 capability 一致：独立 bidirectional 才拥有本地 adapter；
+        # parent duplicate 继承父级 capability/effective_entry_id，但不得重复注册。
         for entry in entries.values():
-            if entry.get("capability") == "bidirectional":
+            if entry.get("capability") == "bidirectional" and entry.get("independent_entry"):
                 assert entry.get("adapter_id") is not None, (
-                    f"bidirectional entry {entry.get('entry_id')!r} 缺 adapter_id "
+                    f"independent bidirectional entry {entry.get('entry_id')!r} 缺 adapter_id "
                     "⇒ overlay 裁决与 adapter_id 写回脱钩"
                 )
             else:
                 assert entry.get("adapter_id") is None, (
-                    f"非 bidirectional entry {entry.get('entry_id')!r} 却有 adapter_id "
-                    "⇒ 未裁决双向却写了 adapter_id"
+                    f"非独立 bidirectional entry {entry.get('entry_id')!r} 却有 adapter_id "
+                    "⇒ pending/single/parent 不得独立注册"
                 )
+            if not entry.get("independent_entry") and entry.get("parent_entry_id"):
+                parent = entries[entry["parent_entry_id"]]
+                assert entry.get("effective_entry_id") == parent["entry_id"]
+                assert entry.get("capability") == parent.get("capability")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2611,15 +2616,16 @@ class TestRegistryReportHasAProductionConsumer:
         registry = RG.WorkpaperSyncAdapterRegistry(manifest=manifest)
         report = registry.build_report(contract_ids=C.available_contract_ids())
         assert facts["registry_missing_entry_profile"] == list(report.missing_profile)
+        assert facts["registry_unadjudicated"] == list(report.unadjudicated)
         assert facts["registry_bidirectional_without_registered_adapter"] == list(
             report.bidirectional_without_adapter
         )
         # 🔴 接线判据：门的 `main()` 必须真的把 facts 传进去。只测 `build_registry_facts`
         # 可被调用不够 —— 那样它仍可能是没人调的死代码（假绿第①源）。
         main_body = _func_body(_stripped(_CLOSURE_PY), "def main(")
-        assert "build_registry_facts(manifest)" in main_body, (
-            "closure gate 的 main() 没有把 registry facts 传给 evaluate_closure ⇒ "
-            "registry 报告是死代码"
+        assert "_collect_runtime_registry_facts(manifest)" in main_body, (
+            "closure gate 的 main() 没有执行真实 register_from_manifest 并把 registry facts "
+            "传给 evaluate_closure ⇒ registry 报告仍是构造后空快照"
         )
 
     def test_registry_facts_participate_in_the_blocking_total(self) -> None:

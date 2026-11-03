@@ -198,5 +198,8 @@ describe('MyProcedureTasks payload regression (Task 12)', () => {
     expect(arg.query.task_id).toBe('task-1')
     expect(arg.query.sheet_key).toBe('D2A')
     expect(arg.query.definition_key).toBe('D2A::D2A::abc')
+    // 打开编辑器的程序表页签（程序表按 sheet_key + definition_key 定位行），不是底稿列表页
+    expect(arg.path).toBe('/projects/project-1/workpapers/wp-1/edit')
+    expect(arg.query.sheet).toBe('@program')
   })
 })

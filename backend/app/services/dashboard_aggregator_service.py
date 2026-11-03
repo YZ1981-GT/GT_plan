@@ -25,7 +25,7 @@ from app.models.workpaper_models import (
     WorkingPaper,
     WpIndex,
 )
-from app.services.consistency_gate import ConsistencyGate
+from app.services.consistency_gate import ConsistencyGate, check_status, five_state_counts, not_passed_checks
 
 logger = logging.getLogger(__name__)
 
@@ -236,19 +236,29 @@ class DashboardAggregatorService:
         self, project_id: UUID, project: Project
     ) -> dict[str, Any]:
         """调用 ConsistencyGate.run_all_checks，按循环分组统计 blocking 未通过数。"""
-        year = (
-            project.audit_period_end.year
-            if project.audit_period_end
-            else datetime.now().year
-        )
+        from app.services.project_audit_year import fetch_project_audit_year
+
+        year = await fetch_project_audit_year(self.db, project_id)
+        if year is None:
+            return {
+                "unavailable": True,
+                "reason": "项目未设置审计年度，未运行一致性检查",
+                "total_rules": 0,
+                "blocking_failed": 0,
+                # 没运行 ≠ 全部通过；缺这个字段时响应模型校验失败、整个看板 500
+                "all_passed": False,
+                "by_cycle": [],
+                "status_counts": five_state_counts([]),
+                "not_passed_checks": [],
+            }
 
         gate = ConsistencyGate(self.db)
         result = await gate.run_all_checks(project_id, year)
 
-        # Group blocking failures by cycle
+        # 原计数字段保持「失败」含义（ADR-FHIC-14 第 5 点展示行）：未执行 / 不适用 / 异常另计五态，不计入 blocking_failed
         total_rules = len(result.checks)
         blocking_failed = sum(
-            1 for c in result.checks if not c.passed and c.severity == "blocking"
+            1 for c in result.checks if check_status(c) == "failed" and c.severity == "blocking"
         )
 
         # Infer cycle from check_name (e.g., "d4_revenue_xxx" → "D")
@@ -256,7 +266,7 @@ class DashboardAggregatorService:
         cycle_failures: dict[str, list[dict[str, Any]]] = {}
 
         for check in result.checks:
-            if not check.passed and check.severity == "blocking":
+            if check_status(check) == "failed" and check.severity == "blocking":
                 cycle_code = self._infer_cycle_from_check(check.check_name)
                 if cycle_code not in cycle_failures:
                     cycle_failures[cycle_code] = []
@@ -280,8 +290,12 @@ class DashboardAggregatorService:
         return {
             "total_rules": total_rules,
             "blocking_failed": blocking_failed,
-            "all_passed": blocking_failed == 0,
+            # 「全部通过」= 每项都通过，与 consistency-check 的 all_passed 同口径：未执行 / 检查异常 / 不适用都不算通过
+            # （需求 16.5）；只看 blocking_failed 会把 39 项未执行的项目显示成「全部通过」
+            "all_passed": all(check_status(c) == "passed" for c in result.checks),
             "by_cycle": by_cycle,
+            "status_counts": five_state_counts(result.checks),
+            "not_passed_checks": not_passed_checks(result.checks),
         }
 
     def _infer_cycle_from_check(self, check_name: str) -> str:

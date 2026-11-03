@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # JSON 规则加载（Task 74d）
 # ---------------------------------------------------------------------------
 
-_RULES_FILE = Path(__file__).resolve().parents[4] / "data" / "ledger_recognition_rules.json"
+_RULES_FILE = Path(__file__).resolve().parents[3] / "data" / "ledger_recognition_rules.json"
 
 _RULES: dict = {}
 MATCHING_CONFIG: dict = {}
@@ -168,7 +168,7 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     # 辅助核算（混合维度列 = 单列含多维度字符串）
     "aux_dimensions": ["核算维度", "辅助核算", "核算项目", "辅助维度", "多维度"],
     # 辅助核算（独立列：类型/编码/名称分开三列）
-    "aux_type": ["辅助类型", "辅助核算类型"],
+    "aux_type": ["辅助类型", "核算类型", "辅助核算类型"],
     "aux_code": ["辅助编码", "核算项目编码", "辅助项目编码"],
     "aux_name": ["辅助名称", "核算项目名称", "辅助项目名称"],
     # 科目表

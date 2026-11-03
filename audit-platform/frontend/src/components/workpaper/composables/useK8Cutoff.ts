@@ -13,6 +13,11 @@
  * - 跨期项红色标记并提示调整
  *
  * Item IDs: "K8-6-row-{idx}-{field}" / "K8-7-row-{idx}-{field}"
+ *
+ * 抽凭引擎回填 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个样本一行（记账日期、凭证号、
+ * 账面金额、摘要、对方科目），按分录指纹去重，行元数据 `_gt` 随行落库；支出凭单编号 / 日期 / 金额留空，查原件后补填
+ * （原实现把记账凭证的号、日期、金额同时抄进支出凭单三列，双侧证据「齐全」、截止结论恒为正常）
+ * （spec voucher-identity-writeback-and-audit-phase 任务 13）。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -20,6 +25,10 @@ import { parseNum } from './useK8FormulaEngine'
 import { isCrossPeriod } from './useK8CutoffEngine'
 import { deriveConclusion as canonicalDeriveConclusion } from './cutoffCanonical'
 import { newRowIdentity } from './shared/rowIdentity'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta, type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf } from './assetVoucherFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +121,42 @@ function getKeys(direction: CutoffDirection) {
   }
 }
 
+/** 共享回填函数的待写入项 → 截止测试行（记账凭证一侧；支出凭单一侧留空，查原件后补填） */
+export function mapPreparedToK8CutoffRow(item: PreparedItem): K8CutoffRow {
+  const s = sampleOf(item) as ReturnType<typeof sampleOf> & { accountCode?: string | null; accountName?: string | null }
+  return {
+    rowKey: newRowIdentity('row'),
+    index: 0,
+    voucherNo: String(s.voucherNo ?? ''),
+    bookDate: String(s.voucherDate ?? ''),
+    summary: String(s.summary ?? ''),
+    // 样本自己那一栏的金额（销售费用在借方），红字带符号照记
+    amount: assetAmount(item, 'debit'),
+    sourceDate: '',
+    accountCode: String(s.accountCode || ACCOUNT_CODE_6601),
+    accountName: String(s.accountName ?? ''),
+    sourceVoucherNo: '',
+    sourceAmount: 0,
+    businessContent: String(s.summary ?? ''),
+    offsetAccount: counterpartText(item),
+    isCross: false,
+    crossAmount: 0,
+    amountMismatch: false,
+    isTimely: true,
+    conclusion: '',
+    remark: '',
+  }
+}
+
+/** 行上已填支出凭单一侧或结论、备注（替换与撤销抽凭时据此先确认） */
+export function hasK8CutoffContent(r: K8CutoffRow): boolean {
+  return [r.sourceVoucherNo, r.sourceDate, r.conclusion, r.remark].some(v => String(v ?? '').trim() !== '')
+    || !!Number(r.sourceAmount)
+}
+
+/** 旧行（没有 `_gt`）身份：凭证号 + 记账日期 + 金额（原实现取借方或贷方的正数） */
+const k8CutoffLegacy = (r: K8CutoffRow) => assetLegacyKey(r.voucherNo, r.bookDate, r.amount)
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK8Cutoff(params: UseK8CutoffParams) {
@@ -125,6 +170,19 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
   const isChanged = ref(false)
   const isLoading = ref(false)
 
+  // 抽凭引擎回填 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行）
+  const voucherFill = useVoucherCheckFill<K8CutoffRow>({
+    projectId,
+    tables: samples,
+    mapSampleToRow: (item) => mapPreparedToK8CutoffRow(item),
+    persist: () => _persist(),
+    hasUserContent: hasK8CutoffContent,
+    policy: 'join',
+    afterChange: (_key, rows) => rows.forEach((r, i) => { r.index = i + 1 }),
+    legacy: k8CutoffLegacy,
+    readonly: isReadonly,
+  })
+
   // ─── Load ──────────────────────────────────────────────────────────────────
 
   function initFromResponses(): void {
@@ -135,6 +193,8 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
       samples.value = []
     }
     conclusion.value = _getString(CONCLUSION_KEY)
+    // 记下预审行的读入版本（年审阶段保存时据此写回）
+    voucherFill.markLoaded()
   }
 
   function _getJson(itemId: string): any {
@@ -170,7 +230,7 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
 
     const amount = parseNum(raw.amount)
     const sourceAmount = parseNum(raw.sourceAmount)
-    return {
+    return withRowMeta({
       rowKey: raw.rowKey ?? newRowIdentity('row'),
       index: idx + 1,
       voucherNo: raw.voucherNo ?? '',
@@ -190,7 +250,7 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
       isTimely: raw.isTimely ?? !isCross,
       conclusion: raw.conclusion ?? _defaultConclusion(bookDate, sourceDate, isCross),
       remark: raw.remark ?? '',
-    }
+    }, raw)
   }
 
   // ─── Computed: 带公式列的完整行 ───────────────────────────────────────────
@@ -337,7 +397,8 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
   function removeSample(rowKey: string): void {
     if (isReadonly?.value) return
     const idx = samples.value.findIndex(r => r.rowKey === rowKey)
-    if (idx >= 0) {
+    // 年审阶段的预审行不删
+    if (idx >= 0 && !voucherFill.isRowLocked(samples.value[idx])) {
       samples.value.splice(idx, 1)
       isChanged.value = true
       _persist()
@@ -349,7 +410,7 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
   function updateCell(rowKey: string, field: string, value: any): void {
     if (isReadonly?.value) return
     const row = samples.value.find(r => r.rowKey === rowKey)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
 
     // 日期变化时自动重算跨期
@@ -368,7 +429,7 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
 
   function _persist(): void {
     if (!onSave) return
-    onSave(ROWS_KEY, samples.value)
+    onSave(ROWS_KEY, voucherFill.guardPersist(samples.value))
   }
 
   function saveConclusion(text: string): void {
@@ -398,6 +459,13 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
     updateCell,
     saveConclusion,
     initFromResponses,
+    // 抽凭引擎回填 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

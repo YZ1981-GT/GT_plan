@@ -74,7 +74,7 @@ _SECTION_PROMPTS: dict[str, str] = {
         "3) 与上期同期比较（变动率及原因）\n"
         "4) 费用化与资本化划分的合理性（VR-I6-01校验）\n"
         "5) 与明细表月度合计的一致性核对\n"
-        "6) 总体审计结论（是否存在重大错报）"
+        "6) 待人工判断事项（潜在重大错报迹象、证据缺口和建议程序；不得形成最终审计意见）"
     ),
     "detail": (
         "请生成I6研发费用月度波动分析，关注：\n"
@@ -163,7 +163,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

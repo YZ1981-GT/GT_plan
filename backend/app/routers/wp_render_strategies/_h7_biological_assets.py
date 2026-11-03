@@ -6,8 +6,15 @@
   减值准备 = （无独立编码）
   报表行 BS-030 = TB('1621')
 
-行业适用性守卫：仅 agriculture/forestry/livestock/fishery 行业适用
-返回 allResponses + projectContext + TB数据(三层) + sheet_list + tb_source_codes
+不按行业判定：平台没有项目级行业来源，原先把质控分类码当行业比对农林牧渔，``is_applicable`` 恒 False、
+四表增强永远不跑（spec trim-followup-residual-findings-closure R1）。返回 ``accounts_found`` 供前端在
+试算表里找不到生产性生物资产科目时给不阻断提示。
+返回本页 html_data：TB数据(三层) + sheet_list + tb_source_codes + 已保存的计量模式。
+
+🔴 2026-07-09 起本策略每页都抛 AttributeError（读 RenderContext 没有的 ``sheet_name``，路由吞成告警、
+html_data 为 None），返回值还多包了一层 ``{"sheets": [{"html_data": …}]}``；路由与宿主都按「返回值即本页
+html_data」读（同 H3 / H5）⇒ 改为直接返回 html_data。计量模式原先写死 ``cost``，接通后会在每次重载时把用户
+选的公允价值模式改回成本模式 ⇒ 读宿主保存的 ``H7-measurement-model``。
 
 spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
@@ -22,6 +29,7 @@ from app.services.dataset_query import get_active_filter
 from app.services.four_table.h7_account_scope import H7_ACCOUNT_SPEC, H7_SLOT_KEY_PREFIX
 from app.services.four_table.semantic_account_resolver import (
     SemanticAccountResult,
+    has_resolved_tb_rows,
     resolve_semantic_accounts,
 )
 from app.services.four_table.leaf_aggregation import (
@@ -34,12 +42,6 @@ from app.services.four_table.parent_check import build_parent_check
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
-
-# 适用行业：农业/林业/畜牧业/渔业
-_APPLICABLE_INDUSTRIES = {"agriculture", "forestry", "livestock", "fishery"}
-
-# 适用行业：农业/林业/畜牧业/渔业
-_APPLICABLE_INDUSTRIES = {"agriculture", "forestry", "livestock", "fishery"}
 
 H7_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "h7-biological-assets"},
@@ -66,29 +68,14 @@ H7_SHEETS = [
 ]
 
 
-async def _check_industry_applicability(ctx: RenderContext) -> tuple[bool, str]:
-    """检查项目行业适用性（agriculture/forestry/livestock/fishery）."""
-    try:
-        result = await ctx.db.execute(
-            sa.text("SELECT business_category FROM projects WHERE id = :pid"),
-            {"pid": str(ctx.project_id)},
-        )
-        row = result.fetchone()
-        if row:
-            industry = (row.business_category or "").strip().lower()
-            if industry in _APPLICABLE_INDUSTRIES:
-                return True, industry
-            return False, industry
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H7 industry check failed: %s", e)
-    return False, ""
-
-
-async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
-    """按语义槽取生产性生物资产三层数据。"""
+async def _fetch_tb_data(
+    ctx: RenderContext,
+) -> tuple[dict, SemanticAccountResult, bool | None]:
+    """按语义槽取生产性生物资产三层数据，并按 active TB 实际行返回科目存在状态。"""
     accounts = await resolve_semantic_accounts(ctx, H7_ACCOUNT_SPEC)
 
     tb_rows: list = []
+    tb_fetch_ok = True
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -107,6 +94,7 @@ async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResul
         )
         tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
+        tb_fetch_ok = False
         logger.warning("H7 TB balance fetch failed: %s", e)
 
     trial_rows: list = []
@@ -132,7 +120,9 @@ async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResul
     tb["_parent_check"] = build_parent_check(
         accounts, tb_rows, trial_rows, H7_SLOT_KEY_PREFIX.keys()
     )
-    return tb, accounts
+    return tb, accounts, (
+        has_resolved_tb_rows(accounts, tb_rows) if tb_fetch_ok else None
+    )
 
 
 def _build_h7_tb_values(accounts: SemanticAccountResult, tb_rows, trial_rows) -> dict[str, float]:
@@ -177,71 +167,91 @@ def _build_h7_tb_values(accounts: SemanticAccountResult, tb_rows, trial_rows) ->
     return out
 
 
-async def render_h7_biological_assets(ctx: RenderContext) -> dict:
-    """H7 生产性生物资产 RENDERER_DISPATCH 入口."""
-    # 行业校验
-    is_applicable, industry = await _check_industry_applicability(ctx)
+_MEASUREMENT_MODELS = ("cost", "fair_value")
 
+
+async def _load_measurement_model(ctx: RenderContext) -> str:
+    """宿主保存的计量模式（``PUT checklist-responses`` 写在 remark）；没存过或读不到按成本模式。
+
+    保存点隔离：读失败不让 PG 事务停在 aborted、连累同一请求里后面页签的渲染。
+    """
+    try:
+        async with ctx.db.begin_nested():
+            row = (await ctx.db.execute(
+                sa.text(
+                    "SELECT remark, conclusion FROM checklist_responses "
+                    "WHERE wp_id = :wp_id AND item_id = 'H7-measurement-model' LIMIT 1"
+                ),
+                {"wp_id": str(ctx.wp_id)},
+            )).first()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H7 measurement_model load failed: %s", e)
+        return "cost"
+    for value in (getattr(row, "remark", None), getattr(row, "conclusion", None)):
+        if value in _MEASUREMENT_MODELS:
+            return value
+    return "cost"
+
+
+async def render_h7_biological_assets(ctx: RenderContext) -> dict:
+    """H7 生产性生物资产 RENDERER_DISPATCH 入口（不按行业判定，见模块说明）."""
     # TB 取数（语义定位）
-    tb_data, accounts = await _fetch_tb_data(ctx)
+    tb_data, accounts, accounts_found = await _fetch_tb_data(ctx)
     resolved_codes = sorted({c for slot in accounts.slots.values() if slot.found for c in slot.codes})
 
     # 构建 html_data
     html_data = {
         "component_type": "h7-biological-assets",
-        "industry": industry,
-        "is_applicable": is_applicable,
-        "measurement_model": "cost",
+        "measurement_model": await _load_measurement_model(ctx),
         "account_codes": resolved_codes or ["1621"],
+        # active TB 查询实际命中行才算找到；解析器裸 fallback 码不算，查询失败为 None（未知）
+        "accounts_found": accounts_found,
         "tb_data": tb_data,
         "tb_source_codes": accounts.as_dict(),
         "sheet_list": H7_SHEETS,
     }
 
-    # ─── 灰度：H/I 四表取数增强（仅行业适用时） ─────────────────────────────
-    if is_applicable:
-        from app.core.config import settings
-        if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
-            try:
-                import asyncio
-                from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
+    # ─── 灰度：H/I 四表取数增强（按解析到的科目槽取数，找不到科目时自然无段） ─────────
+    from app.core.config import settings
+    if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            import asyncio
+            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
 
-                segments = []
-                for slot_key, prefix in H7_SLOT_KEY_PREFIX.items():
-                    slot = accounts.slots.get(slot_key)
-                    if not slot or not slot.found:
-                        continue
-                    for code in slot.codes:
-                        seg_items = await asyncio.wait_for(
-                            build_d_adjudication_prefill(ctx, account_prefix=code, mode="balance"),
-                            timeout=5.0,
-                        )
-                        if seg_items:
-                            segments.append({"segment": slot_key, "account_prefix": code, "mode": "balance", "items": seg_items})
+            segments = []
+            for slot_key, prefix in H7_SLOT_KEY_PREFIX.items():
+                slot = accounts.slots.get(slot_key)
+                if not slot or not slot.found:
+                    continue
+                for code in slot.codes:
+                    seg_items = await asyncio.wait_for(
+                        build_d_adjudication_prefill(ctx, account_prefix=code, mode="balance"),
+                        timeout=5.0,
+                    )
+                    if seg_items:
+                        segments.append({"segment": slot_key, "account_prefix": code, "mode": "balance", "items": seg_items})
 
-                if segments:
-                    html_data["adjudication_segment_prefill"] = {"segments": segments, "enabled": True}
-                    html_data["hi_extraction_enabled"] = True
-                if "responses_snapshot" not in html_data:
-                    html_data["responses_snapshot"] = {}
-                from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
-                from app.services.d_cycle_extraction.presets import resolve_effective
-                from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
-                await asyncio.wait_for(
-                    seed_tier_a_reconciliation(
-                        ctx, "H7",
-                        html_data["responses_snapshot"],
-                        resolve_effective=resolve_effective,
-                        evaluate_wp_formula_expression=evaluate_wp_formula_expression,
-                    ),
-                    timeout=5.0,
-                )
-            except Exception as e:
-                logger.warning("HI extraction prefill failed (%s): %s", "H7", e)
+            if segments:
+                html_data["adjudication_segment_prefill"] = {"segments": segments, "enabled": True}
+                html_data["hi_extraction_enabled"] = True
+            if "responses_snapshot" not in html_data:
+                html_data["responses_snapshot"] = {}
+            from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
+            from app.services.d_cycle_extraction.presets import resolve_effective
+            from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+            await asyncio.wait_for(
+                seed_tier_a_reconciliation(
+                    ctx, "H7",
+                    html_data["responses_snapshot"],
+                    resolve_effective=resolve_effective,
+                    evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+                ),
+                timeout=5.0,
+            )
+        except Exception as e:
+            logger.warning("HI extraction prefill failed (%s): %s", "H7", e)
 
-    return {
-        "sheets": [{"sheet_name": ctx.sheet_name or "底稿目录", "html_data": html_data}],
-    }
+    return html_data
 
 
 # Alias for RENDERER_DISPATCH registration pattern

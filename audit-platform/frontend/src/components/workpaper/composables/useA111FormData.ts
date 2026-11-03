@@ -16,6 +16,7 @@ import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { isRequestCancelled } from '@/utils/http'
+import { classificationOf, type ProjectClassification } from '@/types/projectClassification'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -31,7 +32,8 @@ export interface ProjectContext {
   entity_type?: string
   industry?: string
   engagement_letter_no?: string
-  business_category?: string
+  /** 项目详情下发的质控分类单一解释 */
+  project_classification?: ProjectClassification
   audit_period_end?: string
   [key: string]: any
 }
@@ -43,12 +45,16 @@ export interface A111FormState {
 
 // ─── Auto-fill 映射 ──────────────────────────────────────────────────────────
 
-const AUTO_FILL_MAP: Record<string, (p: ProjectContext) => { conclusion?: string | null; remark?: string | null; wp_ref?: string | null }> = {
+export const AUTO_FILL_MAP: Record<string, (p: ProjectContext) => { conclusion?: string | null; remark?: string | null; wp_ref?: string | null }> = {
   'A1-11-entity-name': (p) => ({ remark: p.entity_name || null }),
   'A1-11-entity-type': (p) => ({ remark: p.entity_type || null }),
   'A1-11-industry': (p) => ({ remark: p.industry || null }),
   'A1-11-engagement-no': (p) => ({ remark: p.engagement_letter_no || null }),
-  'A1-11-biz-category': (p) => ({ conclusion: p.business_category || null }),
+  // 下拉只有 A / B / C：预填组别，分类未填写不预填（原取分类原值，A1 不在选项里、必签槽位算成 0 个）
+  'A1-11-biz-category': (p) => {
+    const classification = classificationOf(p)
+    return { conclusion: classification && !classification.defaulted ? classification.category_group : null }
+  },
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

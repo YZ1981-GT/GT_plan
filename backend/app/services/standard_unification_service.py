@@ -27,6 +27,7 @@ import logging
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -50,6 +51,29 @@ DEFAULT_STANDARD: dict[str, str] = {
     "scope": "standalone",
     "stage": "normal",
 }
+
+
+def wizard_basic_info_data(wizard_state: dict | None) -> dict:
+    """向导「基本信息」步骤的数据；都没有返回空 dict。
+
+    先取 ``steps.basic_info.data`` —— 向导建项目、每次保存基本信息都只写这里；再取平铺的 ``basic_info.data``
+    —— 只有 ``set_standard`` 写过（向导确认之后才有），作旧数据兜底。
+
+    🔴 原先 ``derive_from_wizard`` 只读平铺位置：向导确认时那里还不存在 ⇒ 任何项目一确认就被派生成默认的
+    国企单户，并经 ``set_standard`` 双写回 ``template_type`` / ``report_scope`` 两列 —— 上市项目被改成国企、
+    合并项目被改成单户（企业树随之按单户重建）。真库现存项目恰好都是国企单户，没有显出来
+    （spec consol-autotree-residual-closure R6）。
+    """
+    state = wizard_state if isinstance(wizard_state, dict) else {}
+    steps = state.get("steps")
+    if isinstance(steps, dict):
+        step = steps.get("basic_info")
+        data = step.get("data") if isinstance(step, dict) else None
+        if isinstance(data, dict) and data:
+            return data
+    flat = state.get("basic_info")
+    data = flat.get("data") if isinstance(flat, dict) else None
+    return data if isinstance(data, dict) else {}
 
 
 def derive_applicable_standards(standard: dict | None) -> list[str]:
@@ -172,16 +196,14 @@ class StandardUnificationService:
     def derive_from_wizard(self, wizard_state: dict | None) -> dict:
         """从向导状态推断结构化 standard（纯函数，无 DB / 无副作用）。
 
-        读取 ``wizard_state.basic_info.data`` 下的 ``template_type`` /
+        读取向导「基本信息」数据（:func:`wizard_basic_info_data`）里的 ``template_type`` /
         ``report_scope``（以及可选的 ``stage`` / ``scenario``）映射为结构化
         准则；缺失或非法值时回退到默认值
         ``{entity_type: "soe", scope: "standalone", stage: "normal"}``。
 
         需求 1.2。
         """
-        basic: dict = {}
-        if wizard_state:
-            basic = (wizard_state or {}).get("basic_info", {}).get("data", {}) or {}
+        basic = wizard_basic_info_data(wizard_state)
 
         template_type = str(basic.get("template_type") or "").lower()
         report_scope = str(basic.get("report_scope") or "").lower()
@@ -218,6 +240,14 @@ class StandardUnificationService:
         返回归一化后的新 standard。
         """
         project = await self._get_project(project_id)
+        from app.services.group_topology_lock import lock_topology_years
+        from app.services.project_audit_year import resolve_project_audit_year
+
+        year_hint = year or resolve_project_audit_year(project)
+        await lock_topology_years(self.db, [year_hint])
+        await self.db.refresh(project)
+        if resolve_project_audit_year(project) != year_hint:
+            raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
 
         # 1. 捕获旧状态（在任何变更之前）
         old_standard = self._read_standard(project)
@@ -311,9 +341,11 @@ class StandardUnificationService:
             if rs in VALID_SCOPES:
                 derived["scope"] = rs
 
-        scenario = getattr(project, "scenario", None)
-        if scenario:
-            sc = str(scenario).lower()
+        # 场景取 project_classification 单一解释（含迁移前残留在分类列里的 IPO / refinancing，R4）
+        if getattr(project, "scenario", None):
+            from app.services.project_classification import project_classification
+
+            sc = project_classification(project).scenario
             if sc in VALID_STAGES:
                 derived["stage"] = sc
 

@@ -4,7 +4,6 @@
 - data_validation_engine 会把有底稿调整的行误报为「审定数公式不正确」
 - module_cell_resolver 的 closing_balance 虚拟列漏加底稿调整
 - tb_snapshot_service 恢复快照丢失底稿调整分量
-- adjustment_service 的 WPAdjustmentSummary 审定数缺底稿调整
 - trial_balance_full_view_service 把底稿调整混入「其他调整」
 - linkage_service 的全量重算漏加底稿调整
 

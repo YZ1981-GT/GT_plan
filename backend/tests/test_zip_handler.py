@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -449,3 +450,44 @@ class TestCheckNoSecrets:
         data = b"aws_secret_access_key = AKIAIOSFODNN7EXAMPLE"
         with pytest.raises(ValueError, match="敏感信息模式"):
             check_no_secrets(data, "config.txt")
+
+
+class TestZipReaderPath:
+    """磁盘路径模式与 bytes 模式保持相同校验语义。"""
+
+    def test_from_path_matches_bytes_mode(self, tmp_path: Path):
+        files = {"D/D2/test.xlsx": b"path-backed data"}
+        manifest = _build_manifest_with_files(files)
+        zip_bytes = _make_zip_bytes(files, manifest=manifest)
+        zip_path = tmp_path / "bulk.zip"
+        zip_path.write_bytes(zip_bytes)
+
+        with ZipReader.from_bytes(zip_bytes) as bytes_reader:
+            expected_manifest = bytes_reader.manifest
+        with ZipReader.from_path(zip_path) as reader:
+            assert reader.manifest == expected_manifest
+            assert reader.get_file("D/D2/test.xlsx") == files["D/D2/test.xlsx"]
+            assert reader.verify_integrity() == []
+
+        # Windows 上仍有句柄时 unlink 会失败，借此守护 close 行为。
+        zip_path.unlink()
+        assert not zip_path.exists()
+
+    def test_from_path_applies_compressed_size_limit(self, tmp_path: Path):
+        zip_path = tmp_path / "too-large.zip"
+        zip_path.write_bytes(_make_zip_bytes({}, manifest={"files": []}))
+
+        with pytest.raises(ZipSizeLimitExceeded, match="ZIP 文件大小"):
+            ZipReader.from_path(zip_path, max_total_zip_size=10)
+
+    def test_from_path_closes_handle_when_manifest_is_missing(self, tmp_path: Path):
+        zip_path = tmp_path / "missing-manifest.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("data.xlsx", b"data")
+
+        with pytest.raises(ZipManifestMissing):
+            ZipReader.from_path(zip_path)
+
+        renamed = tmp_path / "renamed.zip"
+        zip_path.replace(renamed)
+        assert renamed.exists()

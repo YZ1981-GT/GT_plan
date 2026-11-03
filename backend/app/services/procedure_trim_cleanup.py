@@ -188,7 +188,7 @@ async def apply_cleanup(
     after = await reconcile(db, plan.project_id)
     skipped = {m["code"] for m in plan.manual_review}  # 跳过人工处理的裁剪行，它们管的底稿本次不动
     scope = await load_trimmed_scope(db, plan.project_id)
-    left = [c for c in after["live_trimmed"] if (scope.decided_by(c) or ("",))[0] not in skipped]
+    left = [c for c in after["live_trimmed"] if not any(d in skipped for d in scope.deciders(c))]
     if left or after["open_tasks_under_recycled"]:
         raise CleanupError(f"对账不变式不成立：在用的已裁底稿 {left}，"
                            f"回收站底稿下未终结任务 {after['open_tasks_under_recycled']} 条")

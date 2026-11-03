@@ -14,7 +14,8 @@ Sprint A.2 完整地图（11/11 子任务，A.2.11 验收 ✓）
 - A.2.5  多源 fallback 链 → ``services/note_fallback_chain.py``
 - A.2.6  _cell_provenance 记录 → 同 A.2.5 模块（attach_cell_provenance）
 - A.2.7  动态行 label 自动填充（本文件 auto_populate_row_labels）
-- A.2.8  合计公式自动适配 → ``services/note_total_recalc.py``
+- A.2.8  合计公式自动适配 → ``services/note_total_terms.py`` + ``note_formula_tables.recalc_table_totals``
+        （原 ``note_total_recalc`` 从未接入生产、算法把「其中」与减项也加进合计，2026-10-27 删除）
 - A.2.9  行+列三态合并 PBT → ``services/note_cell_merge.py``
         新增 ``merge_columns_preserving_cell_modes`` 列级三态
         + 6 PBT + 6 边界单测（CI-3 列 id 唯一）
@@ -28,7 +29,7 @@ Sprint A.2 完整地图（11/11 子任务，A.2.11 验收 ✓）
     table_data = expand_dynamic_rows(table_data, ctx)        # A.2.1
     table_data = expand_dynamic_columns(table_data, ctx)     # A.2.2
     table_data = auto_populate_row_labels(table_data, ctx)   # A.2.7
-    table_data = recalc_totals_after_dynamic_expansion(td)   # A.2.8
+    recalc_table_totals(table)                               # A.2.8（note_formula_tables，逐表）
     # 持久化前
     merged = merge_columns_preserving_cell_modes(old_td, table_data)  # A.2.9
     # auto_trim 前

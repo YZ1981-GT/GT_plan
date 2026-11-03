@@ -30,6 +30,16 @@ ROOT = Path(__file__).resolve().parents[3]  # GT_plan 根目录
 # spec 归档后仍能定位（active 优先、回退 _archive/**）。
 # 用共享 helper _spec_dir.resolve_spec_dir 作单一来源，不在本脚本内复制归档回退逻辑
 # （否则又成"多份拷贝漂移"的反模式）。
+# 🔴 同目录兄弟模块：CLI 路径下 Python 自动把脚本目录放进 sys.path[0]，但被
+#    `importlib.spec_from_file_location` 加载时**不动 sys.path** ⇒ import 期
+#    ModuleNotFoundError ⇒ 引用本脚本的测试模块连采集都过不去（CI 的 backend-tests 是
+#    `pytest -x`，一个采集错误会停掉整个 job）。故在兄弟 import 之前显式补路径；
+#    CLI 路径下这段是 no-op。判据：backend/tests/test_check_scripts_importable.py
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+if str(_Path(__file__).resolve().parent) not in _sys.path:
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from _spec_dir import resolve_spec_dir  # noqa: E402
 
 SPEC_DIR = resolve_spec_dir("formula-runtime-convergence", require_files=["tasks.md"])

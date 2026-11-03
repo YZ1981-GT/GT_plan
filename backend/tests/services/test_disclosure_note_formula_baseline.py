@@ -80,7 +80,10 @@ def _make_engine() -> DisclosureEngine:
 
 
 def test_backfill_totals_sums_all_non_total_rows_since_previous_total():
-    """合计口径 = 上一合计行之后 → 本行之前的所有非合计行（含 header_label）。"""
+    """合计构成（note_total_terms，spec note-pull-header-formula-closure R5）：小计 = 本组明细；合计 = 小计 + 后面的明细。
+
+    旧口径「合计 = 上一个合计行之后的非合计行」只得丙（漏掉小计一那一组），已按 R5 改正。
+    """
     rows = [
         {"label": "分组一", "row_type": "header_label", "values": [None, None]},
         {"label": "甲", "row_type": "data", "values": [1.0, 10.0]},
@@ -91,10 +94,33 @@ def test_backfill_totals_sums_all_non_total_rows_since_previous_total():
     ]
     DisclosureEngine._backfill_totals(rows, 2)
 
-    # 小计一 = 甲 + 乙（header_label 行 values 全 None 不贡献）
+    # 小计一 = 甲 + 乙（header_label 是结构行，不参与）
     assert rows[3]["values"] == [3.0, 30.0]
-    # 合计 = 上一个合计行之后的 丙（**不含**小计一之前的行）
-    assert rows[5]["values"] == [3.0, None]
+    # 合计 = 小计一 + 丙
+    assert rows[5]["values"] == [6.0, 30.0]
+
+
+def test_backfill_totals_subtotal_less_deduction_and_manual_cells():
+    """「小计 / 减：坏账准备 / 合计」：合计 = 小计 − 坏账准备（旧口径得坏账准备本身）；手工格不覆盖、比例列不加总。"""
+    rows = [
+        {"label": "1年以内", "row_type": "data", "values": [100.0, 10.0]},
+        {"label": "1至2年", "row_type": "data", "values": [50.0, 20.0]},
+        {"label": "小计", "row_type": "subtotal", "is_total": True, "values": [None, None]},
+        {"label": "减：坏账准备", "row_type": "data", "values": [15.0, None]},
+        {"label": "合计", "row_type": "total", "is_total": True, "values": [None, 7.0],
+         "_cell_modes": {"1": "manual"}},
+    ]
+    DisclosureEngine._backfill_totals(rows, 2)
+    assert rows[2]["values"] == [150.0, 30.0]
+    assert rows[4]["values"] == [135.0, 7.0]
+
+    table = {"headers": ["账龄", "账面余额", "比例(%)"], "rows": [
+        {"label": "1年以内", "row_type": "data", "values": [100.0, 60.0]},
+        {"label": "1至2年", "row_type": "data", "values": [50.0, 40.0]},
+        {"label": "合计", "row_type": "total", "is_total": True, "values": [None, None]},
+    ]}
+    DisclosureEngine._backfill_totals(table["rows"], 2, table)
+    assert table["rows"][2]["values"] == [150.0, None]
 
 
 def test_backfill_totals_first_row_total_is_skipped():
@@ -196,11 +222,11 @@ async def test_build_with_binding_num_value_cols_excludes_label_column():
 
 
 @pytest.mark.asyncio
-async def test_build_with_binding_manual_todo_cells_are_none_and_mode_manual():
-    """manual+todo 候选格基线：values=None + _cell_modes='manual'。
+async def test_build_with_binding_manual_todo_cells_are_none_and_unbound():
+    """manual+todo 候选格（没有预填值）：values=None、不标 manual、``_cell_meta`` 记 unbound。
 
-    本 spec 把候选格改写为公式 binding 后，灰度关闭时 values **仍为 None**，
-    但 _cell_modes 会变为 'auto'（Property 10 唯一声明性差异）。
+    原基线是 ``_cell_modes='manual'`` —— 推送 keep_manual、公式与合计回填只写自动格，这些格永远进不来数；
+    manual 只留给「用户改过」（spec note-pull-followup-closure R5 / ADR-5）。
     """
     eng = _make_engine()
     out = await eng._build_with_binding(
@@ -208,10 +234,38 @@ async def test_build_with_binding_manual_todo_cells_are_none_and_mode_manual():
     )
     data_row = out["rows"][1]
     assert data_row["values"] == [None, None, None, None]
-    assert data_row["_cell_modes"] == {"0": "manual", "1": "manual", "2": "manual", "3": "manual"}
+    assert data_row["_cell_modes"] == {}
     assert data_row["_cell_meta"]["3"]["semantic"] == "closing_balance"
-    # header_label 行无 binding → 全 manual placeholder
+    assert all(data_row["_cell_meta"][str(c)]["unbound"] is True for c in range(4))
+    assert data_row["_cell_meta"]["3"]["binding_id"] == "八、99.甲资产.closing_balance"
+    # header_label 行无 binding → 同样留空、不标 manual
     assert out["rows"][0]["values"] == [None, None, None, None]
+    assert out["rows"][0]["_cell_modes"] == {}
+
+
+@pytest.mark.asyncio
+async def test_build_with_binding_manual_with_prefill_stays_manual():
+    """binding 为 manual 且有预填值：照旧取预填值、标 manual（不是占位）。"""
+    eng = _make_engine()
+    binding = _binding_all_manual_todo()
+    binding["rows"]["甲资产"] = {"row_type": "data", "binding": {
+        "closing_balance": {"source": "manual", "mode": "manual", "manual_value": 8.0, "account_codes": []}}}
+    out = await eng._build_with_binding(uuid4(), 2025, "八、99", _template_with_header_label(), binding)
+    row = out["rows"][1]
+    assert row["values"][3] == 8.0 and row["_cell_modes"] == {"3": "manual"}
+    assert "unbound" not in row["_cell_meta"]["3"]
+
+
+@pytest.mark.asyncio
+async def test_build_with_binding_locked_cell_keeps_lock_without_source():
+    """binding 为 locked（锁定格，不取数）：照旧标 locked、值留空，不当成「没有绑定」去掉模式。"""
+    eng = _make_engine()
+    binding = _binding_all_manual_todo()
+    binding["rows"]["甲资产"] = {"row_type": "data", "binding": {"closing_balance": {"mode": "locked"}}}
+    out = await eng._build_with_binding(uuid4(), 2025, "八、99", _template_with_header_label(), binding)
+    row = out["rows"][1]
+    assert row["values"][3] is None and row["_cell_modes"] == {"3": "locked"}
+    assert "unbound" not in row["_cell_meta"]["3"]
 
 
 # ---------------------------------------------------------------------------

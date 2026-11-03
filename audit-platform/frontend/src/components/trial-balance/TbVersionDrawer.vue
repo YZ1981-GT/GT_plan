@@ -51,9 +51,11 @@
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
-const props = defineProps<{ projectId: string; year: number; visible: boolean }>()
+// year：审计年度；项目没填为 null ⇒ 不读版本、恢复提示去填年度（不按今年兜底）
+const props = defineProps<{ projectId: string; year: number | null; visible: boolean }>()
 const emit = defineEmits<{ close: []; restored: [] }>()
 
 const displayPrefs = useDisplayPrefsStore()
@@ -88,6 +90,11 @@ watch(() => props.visible, async (v) => {
 })
 
 async function loadVersions() {
+  if (props.year == null) {
+    versions.value = []
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   loading.value = true
   try {
     const { data } = await http.get(`/api/projects/${props.projectId}/trial-balance/snapshots`, { params: { year: props.year } })
@@ -97,6 +104,7 @@ async function loadVersions() {
 }
 
 async function selectVersion(vno: number) {
+  if (props.year == null) return
   selectedVersion.value = vno
   try {
     const { data } = await http.get(`/api/projects/${props.projectId}/trial-balance/snapshots/${vno}`, { params: { year: props.year } })
@@ -105,6 +113,10 @@ async function selectVersion(vno: number) {
 }
 
 async function doRestore(vno: number) {
+  if (props.year == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   try {
     await http.post(`/api/projects/${props.projectId}/trial-balance/snapshots/${vno}/restore`, null, { params: { year: props.year } })
     ElMessage.success('已恢复到 v' + vno + '，当前状态已保存为新快照')

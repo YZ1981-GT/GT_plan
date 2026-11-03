@@ -123,7 +123,7 @@ export interface G9DetailRow {
 
   /** K 期初重分类数 */
   openingReclass: number
-  /** L 期初报表数　**【公式】** `=E+K` */
+  /** L 期初报表数　**【公式】** `=J+K`（期初审定公允价值 + 期初重分类） */
   openingReported: number
 
   /** M 本期变动 / 成本（借方发生填正数） */
@@ -154,7 +154,7 @@ export interface G9DetailRow {
 
   /** X 期末重分类数 */
   closingReclass: number
-  /** Y 期末报表数　**【公式】** `=R+X` */
+  /** Y 期末报表数　**【公式】** `=W+X`（期末审定公允价值 + 期末重分类） */
   closingReported: number
 
   /** Z 期末应收利息 */
@@ -281,10 +281,11 @@ function genId(): string {
 /**
  * 按模板 **12 条公式**重算派生列。
  *
- * `E=C+D` `H=C+F` `I=D+G` `J=H+I` `L=E+K` `P=C+M` `Q=D+N` `R=P+Q`
- * `U=P+S` `V=Q+T` `W=U+V` `Y=R+X`
+ * `E=C+D` `H=C+F` `I=D+G` `J=H+I` `L=J+K` `P=C+M` `Q=D+N` `R=P+Q`
+ * `U=P+S` `V=Q+T` `W=U+V` `Y=W+X`
  *
  * 🔴 `P`/`Q` 走**未审线**；`O` 股息不进任何余额公式。
+ * 🔴 `L`/`Y` 报表数从**审定**公允价值起算（模板原 `=E+K` / `=R+X` 漏了账项调整，第三批已修模板）。
  */
 export function enrichG9DetailRow(
   raw: Partial<G9DetailRow> & { rowId: string },
@@ -302,7 +303,7 @@ export function enrichG9DetailRow(
   const openingAuditedFairValue = openingAuditedCost + openingAuditedCumulativeFv  // J=H+I
 
   const openingReclass = parseNum(raw.openingReclass)
-  const openingReported = openingFairValue + openingReclass                        // L=E+K
+  const openingReported = openingAuditedFairValue + openingReclass                 // L=J+K
 
   const periodCost = parseNum(raw.periodCost)
   const periodFvChange = parseNum(raw.periodFvChange)
@@ -320,7 +321,7 @@ export function enrichG9DetailRow(
   const closingAuditedFairValue = closingAuditedCost + closingAuditedCumulativeFv  // W=U+V
 
   const closingReclass = parseNum(raw.closingReclass)
-  const closingReported = closingFairValue + closingReclass                        // Y=R+X
+  const closingReported = closingAuditedFairValue + closingReclass                 // Y=W+X
 
   return {
     rowId: raw.rowId,

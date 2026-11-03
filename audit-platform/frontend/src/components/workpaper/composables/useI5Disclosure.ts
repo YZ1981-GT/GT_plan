@@ -9,7 +9,7 @@
  *
  * Spec: .kiro/specs/i5-other-noncurrent-assets/
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -215,6 +215,17 @@ export function useI5Disclosure(
     _persistField(_keys().auditConclusion, val)
   }
 
+  /**
+   * 同步载荷 = 快照 + 本版本 builder（`syncToNotes` 与附注页离屏同步共用，spec note-pull-followup-closure R1）；
+   * 当前报告准则不适用本版本时回空数组。
+   */
+  function buildSyncPayloads() {
+    const state = { rows: rows.value, otherNote: otherNote.value }
+    return isListed.value
+      ? buildI5ListedSyncPayloads(wpId.value, _standards(), state)
+      : buildI5SoeSyncPayloads(wpId.value, _standards(), state)
+  }
+
   /** 同步到附注模块 */
   async function syncToNotes(): Promise<void> {
     if (isSyncing.value || !projectId.value || !wpId.value) return
@@ -231,10 +242,7 @@ export function useI5Disclosure(
       }
     }
 
-    const state = { rows: rows.value, otherNote: otherNote.value }
-    const payloads = isListed.value
-      ? buildI5ListedSyncPayloads(wpId.value, _standards(), state)
-      : buildI5SoeSyncPayloads(wpId.value, _standards(), state)
+    const payloads = buildSyncPayloads()
 
     if (!payloads.length) {
       ElMessage.warning('当前报告准则不适用本披露版本同步')
@@ -318,12 +326,16 @@ export function useI5Disclosure(
   watch(allResponses, () => _load(), { immediate: true })
   watch(variant, () => _load())
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-  })
-  onUnmounted(() => {
-    window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+    })
+    onUnmounted(() => {
+      window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+    })
+  }
 
   return {
     variant,
@@ -345,6 +357,7 @@ export function useI5Disclosure(
     saveOtherNote,
     saveAuditNote,
     saveAuditConclusion,
+    buildSyncPayloads,
     syncToNotes,
     generateNoteText,
   }

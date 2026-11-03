@@ -619,15 +619,15 @@ class TestTask17L6KeyEvidence:
     """L6 读写键取证——结论由数据决定。"""
 
     def test_l6_disclosure_read_write_key_evidence(self) -> None:
-        """L6 Disclosure 读侧使用 ${i}（1-based 循环 for i=1..20）。"""
+        """L6 附注读侧与明细表写侧同一个键 `L6-L6-2-rows`（取证结论：原读侧逐格键无写入方，已改）。"""
+        detail_src = _cached_text(WP_COMPOSABLES / "useL6Detail.ts")
+        assert "export const L6_DETAIL_ROWS_ITEM_ID = 'L6-L6-2-rows'" in detail_src
         for name in ("L6TabDisclosureListed.vue", "L6TabDisclosureSoe.vue"):
             path = WP_COMPONENTS / "l6" / "core" / name
-            if not path.exists():
-                continue
+            assert path.exists(), name
             text = _cached_text(path)
-            # 读侧：for (let i = 1; i <= 20; i++) ... row${i}
-            assert "for (let i = 1" in text, f"{name} 应有 1-based 循环"
-            assert "row${i}" in text or "row$" in text, f"{name} 应有 row${{i}} 读取"
+            assert "row${i}" not in text, f"{name} 仍按无写入方的 row${{i}} 逐格键读"
+            assert "readL6DetailRows" in text, f"{name} 应改读 L6-L6-2-rows 整表"
 
     def test_l6_write_side_uses_different_pattern(self) -> None:
         """L6 写侧（Adjudication/Detail）使用 row-${…} 形态。"""

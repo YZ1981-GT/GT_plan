@@ -156,7 +156,7 @@ export function useN4DisclosureTables(opts: UseN4DisclosureTablesOptions) {
     }
   }
 
-  function buildPayload(ctx: { wpId: string; year: number }) {
+  function buildPayload(ctx: { wpId: string; year: number | null }) {
     return buildN4SyncPayload('listed', buildSnapshot(), ctx)
   }
 

@@ -327,36 +327,5 @@
       "medium_confidence": 60,
       "low_confidence": 30
     }
-  },
-  "column_aliases": {
-    "account_code": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
-    "account_name": ["科目名称", "科目全名", "账户名称", "Account Name"],
-    "opening_balance": ["期初余额", "年初余额"],
-    "opening_debit": ["期初借方", "期初借方余额"],
-    "opening_credit": ["期初贷方", "期初贷方余额"],
-    "year_opening_debit": ["年初借方", "年初借方余额"],
-    "year_opening_credit": ["年初贷方", "年初贷方余额"],
-    "year_debit": ["本年累计借方", "累计借方"],
-    "year_credit": ["本年累计贷方", "累计贷方"],
-    "debit_amount": ["借方金额", "本期借方", "借方发生额", "借方本期", "借方本期发生额", "本期借方发生额", "借方", "Debit", "DR"],
-    "credit_amount": ["贷方金额", "本期贷方", "贷方发生额", "贷方本期", "贷方本期发生额", "本期贷方发生额", "贷方", "Credit", "CR"],
-    "closing_balance": ["期末余额"],
-    "closing_debit": ["期末借方", "期末借方余额"],
-    "closing_credit": ["期末贷方", "期末贷方余额"],
-    "voucher_date": ["日期", "记账日期", "凭证日期", "制单日期", "业务日期"],
-    "voucher_no": ["凭证号", "凭证字号", "凭证编号"],
-    "voucher_type": ["凭证类型", "凭证字", "字"],
-    "summary": ["摘要", "凭证摘要", "摘要说明", "Description"],
-    "preparer": ["制单人", "制单", "经办人"],
-    "currency_code": ["币种", "币别", "Currency"],
-    "entry_seq": ["分录号", "序号", "Line", "Line No", "Line Number"],
-    "level": ["级次", "科目级别", "Level"],
-    "aux_type": ["辅助类型", "核算类型", "辅助核算类型"],
-    "aux_code": ["辅助编码", "核算项目编码", "辅助项目编码"],
-    "aux_name": ["辅助名称", "核算项目名称", "辅助项目名称"],
-    "category": ["类别", "科目类别"],
-    "direction": ["方向", "余额方向", "科目方向"],
-    "company_code": ["公司代码", "公司编码", "组织编码", "核算组织", "Company Code"],
-    "accounting_period": ["会计期间", "期间", "Period"]
   }
 }

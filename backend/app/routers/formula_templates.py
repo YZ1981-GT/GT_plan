@@ -11,7 +11,7 @@ import uuid
 from typing import Any, Literal
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,8 +22,10 @@ from app.models.formula_setting_models import FormulaTemplate, FormulaTemplateSu
 from app.routers.formula_settings import DecisionsIn, _http, _public_result, _run
 from app.services.formula_settings import template_service as svc
 from app.services.formula_settings import template_sync as sync
-from app.services.formula_settings.errors import Forbidden, FormulaSettingError
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.errors import (
+    Forbidden, FormulaSettingError, VersionConflict, VersionRequired,
+)
+from app.services.formula_settings.outbox import record_changes, publish_pending
 from app.services.formula_settings.template_access import Viewer, get_managed, get_visible, list_visible
 
 router = APIRouter(prefix="/api/formula-templates", tags=["formula-templates"])
@@ -73,6 +75,14 @@ class PublishBody(BaseModel):
     note: str | None = Field(None, max_length=2000)
 
 
+class RollbackBody(BaseModel):
+    target_version: int = Field(ge=1)
+    expected_version: int | None = None
+    decisions: DecisionsIn = Field(default_factory=DecisionsIn)
+    request_id: str | None = Field(None, max_length=64)
+    note: str | None = Field(None, max_length=2000)
+
+
 class PromoteBody(BaseModel):
     domain: str = Field(min_length=1, max_length=32)
     slot_keys: list[str] | None = Field(None, max_length=5000)
@@ -105,9 +115,11 @@ async def _call(coro):
         raise _http(exc) from None
 
 
-async def _emit(result: dict[str, Any], source: str) -> dict[str, Any]:
-    await publish_events(result.get("events") or [], domain="template", source=source,
-                         token=result.get("publish_id"))
+async def _emit(db: AsyncSession, result: dict[str, Any], source: str) -> dict[str, Any]:
+    await record_changes(db, events=result.get("events") or [], domain="template", source=source,
+                         publish_id=result.get("publish_id"))
+    await db.commit()
+    await publish_pending(db)
     return _public_result(result)
 
 
@@ -154,6 +166,7 @@ async def create_template(body: CreateBody, db: AsyncSession = Depends(get_db),
         owner_project_id=body.owner_project_id, applicable_scope=body.applicable_scope, source=body.source,
         domains=body.domains or sorted({i.domain for i in body.items}), source_project_id=body.source_project_id,
         slot_keys=body.slot_keys, items=[i.model_dump() for i in body.items], note=body.note))
+    await db.commit()
     return await _call(svc.template_detail(db, tpl, viewer=viewer))
 
 
@@ -170,6 +183,16 @@ async def get_versions(template_id: uuid.UUID, db: AsyncSession = Depends(get_db
                        current_user: User = Depends(get_current_user)):
     tpl = await _call(get_visible(db, await _viewer(db, current_user), template_id))
     return {"items": await svc.template_versions(db, tpl)}
+
+
+@router.get("/{template_id}/diff")
+async def get_diff(template_id: uuid.UUID, from_version: int = Query(..., alias="from", ge=1),
+                   to_version: int | None = Query(None, alias="to", ge=1),
+                   db: AsyncSession = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    viewer = await _viewer(db, current_user)
+    tpl = await _call(get_visible(db, viewer, template_id))
+    return await _call(svc.template_diff(db, tpl, from_version=from_version, to_version=to_version))
 
 
 @router.get("/{template_id}/subscribers")
@@ -190,14 +213,28 @@ async def update_template(template_id: uuid.UUID, body: UpdateBody, db: AsyncSes
             "share_scope" in changes or "owner_project_id" in changes):
         await assert_project_permission(db, current_user, owner, "edit")
     await _run(db, svc.update_meta(db, tpl, viewer=viewer, changes=changes))
+    await db.commit()
     return await _call(svc.template_detail(db, tpl, viewer=viewer))
 
 
 @router.delete("/{template_id}")
-async def delete_template(template_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+async def delete_template(template_id: uuid.UUID,
+                          expected_version: int | None = Query(None),
+                          db: AsyncSession = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
     tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    # ADR-FHIC-11：删除模板强制 CAS；缺 428、不符 409
+    if expected_version is None:
+        raise HTTPException(status_code=428, detail={
+            "error_code": "FORMULA_VERSION_REQUIRED",
+            "message": "删除模板必须带当前版本号，请刷新后重试"})
+    if tpl.version != expected_version:
+        raise HTTPException(status_code=409, detail={
+            "error_code": "FORMULA_VERSION_CONFLICT",
+            "message": "模板已被他人修改，请刷新后重试",
+            "expected": expected_version, "actual": tpl.version})
     await _run(db, svc.delete_template(db, tpl, user_id=current_user.id))
+    await db.commit()
     return {"id": str(template_id), "deleted": True}
 
 
@@ -209,6 +246,58 @@ async def publish_preview(template_id: uuid.UUID, body: PublishBody, db: AsyncSe
                                             expected_version=body.expected_version))
 
 
+def _rollback_cas(tpl: FormulaTemplate, expected_version: int | None) -> None:
+    """回滚的 CAS 前置校验：必须先于任何内容判断。
+
+    🔴 次序有业务含义：客户端拿着过期版本号来回滚时，必须收到 428 / 409「请刷新后重试」，
+    而不是先按自己这份过期视图算差集、再得到「没有可回滚的变化」422 —— 后者会让用户
+    以为目标版本没差异，实际是他看到的版本已经不是当前版本（S6 Task 4 UAT 7.6 实测）。
+    """
+    if expected_version is None:
+        raise VersionRequired("回滚模板必须带当前版本号，请刷新后重试")
+    if int(expected_version) != tpl.version:
+        raise VersionConflict("模板已被他人修改，请刷新后重试",
+                              detail={"expected_version": expected_version, "current_version": tpl.version})
+
+
+@router.post("/{template_id}/rollback-preview")
+async def rollback_preview(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession = Depends(get_db),
+                           current_user: User = Depends(get_current_user)):
+    tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    try:
+        _rollback_cas(tpl, body.expected_version)
+    except FormulaSettingError as exc:
+        raise _http(exc) from None
+    diff, changes = await _call(svc.rollback_changes(db, tpl, body.target_version))
+    if not changes:
+        raise _http(FormulaSettingError("目标版本与当前版本没有可回滚的定义变化",
+                                       code="FORMULA_TEMPLATE_ROLLBACK_EMPTY", status_code=422))
+    preview = await _call(sync.publish_preview(db, tpl, changes=changes, expected_version=body.expected_version))
+    return {**preview, "target_version": body.target_version, "rollback_changes": diff["changes"]}
+
+
+@router.post("/{template_id}/rollback")
+async def rollback(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    try:
+        _rollback_cas(tpl, body.expected_version)
+    except FormulaSettingError as exc:
+        raise _http(exc) from None
+    _diff, changes = await _call(svc.rollback_changes(db, tpl, body.target_version))
+    if not changes and not body.request_id:
+        raise _http(FormulaSettingError("目标版本与当前版本没有可回滚的定义变化",
+                                       code="FORMULA_TEMPLATE_ROLLBACK_EMPTY", status_code=422))
+    result = await _run(db, sync.publish_template(
+        db, tpl, changes=changes, expected_version=body.expected_version, user_id=current_user.id,
+        decisions=body.decisions.to_decisions(), request_id=body.request_id, note=body.note,
+        publish_source="template_rollback", item_action="template_rollback",
+        audit_action="template_rollback",
+        audit_details={"source_version": body.target_version},
+    ))
+    return await _emit(db, result, "template_rollback")
+
+
 @router.post("/{template_id}/publish")
 async def publish(template_id: uuid.UUID, body: PublishBody, db: AsyncSession = Depends(get_db),
                   current_user: User = Depends(get_current_user)):
@@ -217,7 +306,7 @@ async def publish(template_id: uuid.UUID, body: PublishBody, db: AsyncSession = 
         db, tpl, changes=[c.model_dump() for c in body.changes], expected_version=body.expected_version,
         user_id=current_user.id, decisions=body.decisions.to_decisions(), request_id=body.request_id,
         note=body.note))
-    return await _emit(result, "template_publish")
+    return await _emit(db, result, "template_publish")
 
 
 @router.post("/{template_id}/promote-preview")
@@ -238,8 +327,9 @@ async def promote(template_id: uuid.UUID, body: PromoteBody, db: AsyncSession = 
     result = await _run(db, svc.promote(db, tpl, viewer=viewer, domain=body.domain, slot_keys=body.slot_keys,
                                         decisions=body.decisions.to_decisions(), request_id=body.request_id,
                                         note=body.note))
-    await publish_events(result.get("events") or [], domain=body.domain, source="template_promote",
-                         token=result.get("publish_id"))
+    await record_changes(db, events=result.get("events") or [], domain=body.domain, source="template_promote",
+                         publish_id=result.get("publish_id"))
+    await db.commit()
     return _public_result(result)
 
 
@@ -271,7 +361,7 @@ async def subscribe(project_id: uuid.UUID, body: SubscribeBody, db: AsyncSession
     tpl = await _call(get_visible(db, await _viewer(db, current_user), body.template_id))
     result = await _run(db, sync.subscribe(db, project_id=project_id, tpl=tpl, domain=body.domain,
                                            decisions=body.decisions.to_decisions(), user_id=current_user.id))
-    return await _emit(result, "template_subscribe")
+    return await _emit(db, result, "template_subscribe")
 
 
 @project_router.post("/unsubscribe-preview")
@@ -285,4 +375,4 @@ async def unsubscribe(project_id: uuid.UUID, body: UnsubscribeBody, db: AsyncSes
                       current_user: User = Depends(require_project_access("edit"))):
     result = await _run(db, sync.unsubscribe(db, project_id=project_id, domain=body.domain, mode=body.mode,
                                              decisions=body.decisions.to_decisions(), user_id=current_user.id))
-    return await _emit(result, "template_unsubscribe")
+    return await _emit(db, result, "template_unsubscribe")

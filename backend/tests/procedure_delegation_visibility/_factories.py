@@ -29,7 +29,9 @@ from app.models.procedure_models import (
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType
 
-IS_PG = app_settings.DATABASE_URL.startswith("postgresql")
+from tests._pg_url import is_pg_url  # noqa: E402
+
+IS_PG = is_pg_url(app_settings.DATABASE_URL)  # 认 postgres://（R20）
 
 _HASH64 = "0" * 64  # CHAR(64) 占位 revision hash
 

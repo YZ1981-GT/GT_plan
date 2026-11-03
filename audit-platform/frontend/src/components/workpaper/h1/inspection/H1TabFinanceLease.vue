@@ -115,9 +115,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="52" align="center" fixed="right">
+        <el-table-column label="OCR" width="76" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link size="small" :loading="ocrLoadingId === row.rowId" title="上传租赁合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <el-button v-if="!isReadonly" link size="small" :loading="ocrLoadingId === row.rowId" title="上传租赁合同 OCR 预填" @click="handleOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="50" v-if="!isReadonly" fixed="right">
@@ -427,8 +428,13 @@ import {
 } from '../../composables/h1FinanceLeaseG5Pull'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H1-20'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
@@ -573,6 +579,7 @@ async function handleOcr(row: FinanceLeaseRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
     ocrLoadingId.value = row.rowId
     try {
       const res = await http.post(
@@ -580,6 +587,7 @@ async function handleOcr(row: FinanceLeaseRow) {
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const data = res.data?.data ?? res.data
       const fields = { ...(data?.extracted_fields || {}) }
       if (data?.attachment_id) fields.attachment_id = data.attachment_id

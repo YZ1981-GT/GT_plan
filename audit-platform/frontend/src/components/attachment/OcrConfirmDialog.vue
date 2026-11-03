@@ -14,23 +14,24 @@
         <div class="gt-ocr-section-title">
           <span class="gt-ocr-section-icon">📄</span> 原件预览
         </div>
-        <div class="gt-ocr-preview-area">
+        <div class="gt-ocr-preview-area" v-loading="previewState === 'loading'">
           <img
-            v-if="isImage"
+            v-if="isImage && previewSrc"
             :src="previewSrc"
             class="gt-ocr-preview-img"
             alt="原件"
           />
           <iframe
-            v-else-if="isPdf"
+            v-else-if="isPdf && previewSrc"
             :src="previewSrc"
             class="gt-ocr-preview-iframe"
             frameborder="0"
+            title="原件"
           />
           <div v-else class="gt-ocr-preview-fallback">
             <div class="gt-ocr-preview-fallback-icon">{{ fileEmoji }}</div>
             <div class="gt-ocr-preview-fallback-name">{{ fileName }}</div>
-            <div class="gt-ocr-preview-fallback-hint">此文件类型暂不支持预览，请参考右侧识别结果</div>
+            <div class="gt-ocr-preview-fallback-hint">{{ previewHint }}</div>
           </div>
         </div>
       </div>
@@ -47,12 +48,22 @@
         <div class="gt-ocr-section-title">
           <span class="gt-ocr-section-icon">✏️</span> 识别结果
           <el-tag size="small" type="warning" effect="plain" style="margin-left: 8px">可编辑</el-tag>
+          <span v-if="baseSha256" class="gt-ocr-length">全文 {{ originalText.length }} 字</span>
         </div>
-        <div class="gt-ocr-edit-area">
+        <el-alert
+          v-if="loadError"
+          :title="loadError"
+          type="error"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        />
+        <div class="gt-ocr-edit-area" v-loading="loadingText">
           <el-input
             v-model="editedText"
             type="textarea"
             :autosize="{ minRows: 12, maxRows: 30 }"
+            :disabled="loadingText || !baseSha256"
             placeholder="OCR 识别内容将在此显示..."
             class="gt-ocr-textarea"
           />
@@ -89,7 +100,7 @@
         </div>
         <div class="gt-ocr-footer-right">
           <el-button @click="onReject">放弃识别</el-button>
-          <el-button type="primary" @click="onConfirm" :loading="saving">
+          <el-button type="primary" @click="onConfirm" :loading="saving" :disabled="loadingText || !baseSha256">
             <el-icon><Check /></el-icon> 确认入库
           </el-button>
         </div>
@@ -102,15 +113,16 @@
 import { ref, computed, watch } from 'vue'
 import { Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
-import { attachments as P_att } from '@/services/apiPaths'
+import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+import { OCR_TEXT_CHANGED_TIP, confirmOcrText, isOcrTextChanged, loadOcrText } from './ocrTextApi'
 
 export interface OcrConfirmPayload {
   attachmentId: string
   fileName: string
   fileType: string
   previewUrl: string
-  ocrText: string
+  /** 列表 / 上传回执里的 200 字预览：不参与确认，打开时按附件 id 取全文 */
+  ocrText?: string
   confidence?: number
 }
 
@@ -131,18 +143,39 @@ const visible = computed({
 })
 
 const editedText = ref('')
+/** 打开核对时取到的全文及其 sha256：确认时作 base，后端与当前全文一致才写 */
+const originalText = ref('')
+const baseSha256 = ref('')
+const loadingText = ref(false)
+const loadError = ref('')
 const saving = ref(false)
 const skipNextTime = ref(false)
+let loadSeq = 0
 
-// 当 payload 变化时初始化
-watch(() => props.payload, (p) => {
-  if (p) {
-    editedText.value = p.ocrText || ''
+// 打开时按附件 id 取全文（原先拿列表里的 200 字预览当初值，确认后全文被截断）
+async function loadFullText(attachmentId: string) {
+  const seq = ++loadSeq
+  loadingText.value = true
+  loadError.value = ''
+  baseSha256.value = ''
+  try {
+    const snap = await loadOcrText(attachmentId)
+    if (seq !== loadSeq) return
+    editedText.value = snap.text
+    originalText.value = snap.text
+    baseSha256.value = snap.sha256
+  } catch {
+    if (seq === loadSeq) loadError.value = '识别全文加载失败，请关闭后重试'
+  } finally {
+    if (seq === loadSeq) loadingText.value = false
   }
+}
+
+watch(() => [props.modelValue, props.payload?.attachmentId] as const, ([show, id]) => {
+  if (show && id) void loadFullText(id)
 }, { immediate: true })
 
 const fileName = computed(() => props.payload?.fileName || '未知文件')
-const previewSrc = computed(() => props.payload?.previewUrl || '')
 const confidence = computed(() => props.payload?.confidence ?? null)
 
 const isImage = computed(() => {
@@ -162,19 +195,35 @@ const fileEmoji = computed(() => {
   return '📄'
 })
 
+// 原件经已鉴权请求换成 blob: 地址：iframe / img 直接用 /api 路径带不上令牌，恒 401
+const canPreview = computed(() => (isImage.value || isPdf.value) && !!props.payload?.previewUrl)
+const { url: previewSrc, state: previewState } = useAuthedObjectUrl(
+  () => (props.modelValue && canPreview.value ? props.payload?.previewUrl : ''),
+  { type: () => (isPdf.value ? 'application/pdf' : undefined) },
+)
+const previewHint = computed(() => {
+  if (!canPreview.value) return '此文件类型暂不支持预览，请参考右侧识别结果'
+  return authedObjectUrlFailureText(previewState.value) || '原件加载中…'
+})
+
 async function onConfirm() {
-  if (!props.payload) return
+  if (!props.payload || !baseSha256.value) return
+  const attachmentId = props.payload.attachmentId
+  const revised = editedText.value !== originalText.value ? editedText.value : undefined
   saving.value = true
   try {
-    await api.put(P_att.ocrStatus(props.payload.attachmentId), {
-      status: 'completed',
-      ocr_text: editedText.value,
-    })
+    await confirmOcrText(attachmentId, baseSha256.value, revised)
     ElMessage.success('识别结果已确认入库')
-    emit('confirmed', { attachmentId: props.payload.attachmentId, text: editedText.value })
+    emit('confirmed', { attachmentId, text: editedText.value })
     visible.value = false
   } catch (e: any) {
-    ElMessage.error('入库失败：' + (e?.message || '未知错误'))
+    if (isOcrTextChanged(e)) {
+      // 核对期间文本被改过（重新识别 / 他人确认）：提示并重新取全文
+      ElMessage.warning(OCR_TEXT_CHANGED_TIP)
+      await loadFullText(attachmentId)
+    } else {
+      ElMessage.error('入库失败：' + (e?.message || '未知错误'))
+    }
   } finally {
     saving.value = false
   }
@@ -188,7 +237,12 @@ function onReject() {
 }
 
 function onClosed() {
+  loadSeq++ // 作废未返回的全文请求
   editedText.value = ''
+  originalText.value = ''
+  baseSha256.value = ''
+  loadError.value = ''
+  loadingText.value = false
 }
 </script>
 
@@ -220,6 +274,13 @@ function onClosed() {
 .gt-ocr-section-icon {
   margin-right: 6px;
   font-size: 16px;
+}
+
+.gt-ocr-length {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gt-color-text-tertiary);
 }
 
 .gt-ocr-preview-area {
@@ -301,9 +362,14 @@ function onClosed() {
 
 .gt-ocr-edit-area {
   flex: 1;
+  min-height: 0;
 }
 
+/* 全文常有上千字：文本框封顶、内部滚动，不得溢出盖住底部按钮
+   （2026-10-27 走查：3607 字时文本框高 688px，「确认入库」点不到） */
 .gt-ocr-textarea :deep(.el-textarea__inner) {
+  max-height: calc(70vh - 140px);
+  overflow-y: auto;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 13px;
   line-height: 1.7;

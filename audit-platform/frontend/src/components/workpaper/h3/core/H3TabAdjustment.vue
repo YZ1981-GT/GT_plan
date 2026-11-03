@@ -37,14 +37,7 @@
       >
         同步到集中登记
       </el-button>
-      <el-tag
-        v-if="centralStatus?.review_status"
-        size="small"
-        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-        :title="centralStatus.rejection_reason || ''"
-      >
-        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-      </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
     </div>
 
     <!-- H3-3 → H3-1 同步预览 -->
@@ -192,6 +185,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * H3TabAdjustment.vue — H3-3 调整分录
  * el-table 10列+借贷平衡+推送A13
@@ -199,7 +193,7 @@
 import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { useH3Adjustment } from '../../composables/useH3Adjustment'
 import { useH3FormData } from '../../composables/useH3FormData'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { H3_ASSET_CATEGORIES } from '../../composables/h3CategoryMap'
 

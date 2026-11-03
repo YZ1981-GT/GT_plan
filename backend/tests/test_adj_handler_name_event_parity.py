@@ -238,29 +238,19 @@ def register(event_bus, handler):
             f"实际订阅 EventType.{event_name}"
         )
 
-    def test_batch_committed_handler_has_matching_name(self):
-        """P10: on_event_adjustment_batch_committed 名实相符。
-
-        任务 3.6 新建了独立命名的 handler 订阅 ADJUSTMENT_BATCH_COMMITTED，
-        验证它的名字也与事件匹配（不复用 approved 命名）。
-        """
-        pairs = self._parse_subscription_pairs()
-
-        batch_handlers = [
-            (handler, event) for event, handler in pairs
-            if handler == "on_event_adjustment_batch_committed"
-        ]
-        assert len(batch_handlers) == 1, (
-            f"期望恰 1 个 on_event_adjustment_batch_committed 订阅，"
-            f"得到 {len(batch_handlers)}"
-        )
-
-        handler_name, event_name = batch_handlers[0]
-        assert "batch_committed" in handler_name.lower()
-        assert "batch_committed" in event_name.lower(), (
-            f"on_event_adjustment_batch_committed 应订阅含 'batch_committed' 的事件，"
-            f"实际订阅 EventType.{event_name}"
-        )
+    def test_batch_committed_does_not_mark_formal_outputs_stale(self):
+        """草稿批量提交只更新待办，不得污染正式底稿、报表、附注或交付件。"""
+        pairs = self._parse_all_subscription_pairs()
+        forbidden = {
+            "_mark_workpapers_stale_by_account",
+            "_mark_reports_stale_on_adjustment",
+            "_stale_engine_on_adjustment",
+            "on_event_adjustment_batch_committed",
+            "_on_upstream_changed_mark_deliverable_stale",
+        }
+        offenders = [handler for event, handler in pairs
+                     if event == "ADJUSTMENT_BATCH_COMMITTED" and handler in forbidden]
+        assert offenders == [], f"草稿批量提交仍把正式输出标过期: {offenders}"
 
     def test_all_on_event_handlers_have_semantic_match(self):
         """综合守卫：每个 on_event_* handler 的名称与订阅事件值至少共享一个语义词根。

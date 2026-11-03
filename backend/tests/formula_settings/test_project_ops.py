@@ -85,7 +85,7 @@ async def test_resolve_three_choices(choice, formula, base):
         pid, _ = await _seed(db)
         item = await _conflict_item(db, pid)
         await project_ops.resolve_items(db, project_id=pid, user_id=None, resolutions=[{
-            "item_id": str(item.id), "choice": choice, "upstream_version": item.upstream_version,
+            "item_id": str(item.id), "choice": choice, "revision": item.revision,
             "custom_definition": {"formula": "ROW('X')"} if choice == "custom" else None}])
         await db.commit()
         row = (await project_rows(db, pid))["BS-001"]
@@ -98,17 +98,21 @@ async def test_resolve_rejects_stale_item():
     async with make_db() as factory, factory() as db:
         pid, _ = await _seed(db)
         item = await _conflict_item(db, pid)
-        item_id, version = str(item.id), item.upstream_version
+        # 修订号是唯一 CAS 依据（spec formula-hub-integrity-closure 需求 8.2）：不等 / 已结案 409，缺 428
+        item_id, revision, upstream_version = str(item.id), item.revision, item.upstream_version
         with pytest.raises(SyncItemStale):
             await project_ops.resolve_items(db, project_id=pid, user_id=None, resolutions=[
-                {"item_id": item_id, "choice": "adopt", "upstream_version": version - 1}])
+                {"item_id": item_id, "choice": "adopt", "revision": revision + 1}])
         await db.rollback()
+        with pytest.raises(VersionRequired):
+            await project_ops.resolve_items(db, project_id=pid, user_id=None, resolutions=[
+                {"item_id": item_id, "choice": "adopt", "upstream_version": upstream_version}])
         await project_ops.resolve_items(db, project_id=pid, user_id=None, resolutions=[
-            {"item_id": item_id, "choice": "adopt", "upstream_version": version}])
+            {"item_id": item_id, "choice": "adopt", "revision": revision}])
         await db.commit()
         with pytest.raises(SyncItemStale):
             await project_ops.resolve_items(db, project_id=pid, user_id=None, resolutions=[
-                {"item_id": item_id, "choice": "keep", "upstream_version": version}])
+                {"item_id": item_id, "choice": "keep", "revision": revision}])
 
 
 async def test_apply_to_projects_inherit_writes_conflict_asks_or_adopts():
@@ -133,7 +137,7 @@ async def test_apply_to_projects_inherit_writes_conflict_asks_or_adopts():
         assert out["events"] == [{"project_id": str(inherit), "slot_keys": [SLOT]}]
         # 目标项目采用推送：定义 = 来源，基线仍是目标自己的上游
         await project_ops.resolve_items(db, project_id=conflicted, user_id=None, resolutions=[
-            {"item_id": str(item.id), "choice": "adopt"}])
+            {"item_id": str(item.id), "choice": "adopt", "revision": item.revision}])
         await db.commit()
         row = (await project_rows(db, conflicted))["BS-001"]
         assert (row.formula, row.base_definition["formula"]) == (MINE, OLD)

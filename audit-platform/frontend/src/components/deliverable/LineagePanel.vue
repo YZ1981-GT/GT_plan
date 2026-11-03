@@ -566,16 +566,16 @@ async function onRefreshAllStale(): Promise<void> {
  * 🔴 附带修复：原 `useSSEReconnect` 用 native EventSource 无 token → 端点鉴权后恒 401 降级，
  * 实时徽标其实从未生效；迁移后 LINKAGE_STALE_CHANGED 首次真正送达。
  */
+function refreshLineageAfterEvent() {
+  // stale 事件漏掉时，重连后按当前章节 + 全章节列表校准（只读，不覆盖编辑）。
+  if (currentSectionCode.value) void traceSection(currentSectionCode.value)
+  void loadSections()
+}
 const _lineageSub = subscribeProjectEvent(
   props.projectId,
   'LINKAGE_STALE_CHANGED',
-  () => {
-    // 当前章节可能变 stale → 刷新溯源徽标 + 刷新下拉 stale 标记
-    if (currentSectionCode.value) {
-      traceSection(currentSectionCode.value)
-    }
-    loadSections()
-  },
+  refreshLineageAfterEvent,
+  { onReconnect: refreshLineageAfterEvent },
 )
 
 onMounted(loadSections)

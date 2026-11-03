@@ -28,14 +28,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -244,6 +237,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * L1TabAdjustment — L1-3 调整分录汇总
  *
@@ -262,7 +256,7 @@ import { computed, inject, toRef, watch, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import { useL1Adjustment, type AdjustmentType } from '@/composables/useL1Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -306,6 +300,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: toRef(props, 'wpId') as Ref<string>,
   wpCode: 'L1',
   itemId: () => `L1-adj-${activeType.value}`,
+  entryType: activeType,
   buildLineItems: () => filteredEntries.value.map(e => ({
     standard_account_code: e.accountCode || undefined,
     account_name: e.accountName,

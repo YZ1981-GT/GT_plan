@@ -559,8 +559,9 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useG10Disclosure } from '../../composables/useG10Disclosure'
 import {
-  buildG10ListedSyncPayloads,
-  buildG10SoeSyncPayloads,
+  buildG10TabSyncPayloads,
+  g10DisclosureAuditNoteKey,
+  readG10DisclosureAuditNote,
 } from '../../composables/g10DisclosureSyncPayload'
 import { G10_NOTE_SECTION } from '../../composables/g10NoteSectionMap'
 import { api } from '@/services/apiProxy'
@@ -614,9 +615,9 @@ const noteAiSection = computed<G10AiSection>(() =>
   props.variant === 'listed' ? 'disclosure-listed-note' : 'disclosure-soe-note',
 )
 
-const NOTE_KEY = `G10-disclosure-${props.variant}-audit-note`
+const NOTE_KEY = g10DisclosureAuditNoteKey(props.variant)
 const CONCLUSION_KEY = `G10-disclosure-${props.variant}-audit-conclusion`
-const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+const auditNote = ref(readG10DisclosureAuditNote(props.allResponses, props.variant))
 const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
@@ -642,11 +643,7 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 async function syncToNotes() {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
-  const standards = props.applicableStandards ?? []
-  const snap = dis.getSyncSnapshot(auditNote.value)
-  const payloads = props.variant === 'listed'
-    ? buildG10ListedSyncPayloads(props.wpId, standards, snap as any)
-    : buildG10SoeSyncPayloads(props.wpId, standards, snap as any)
+  const payloads = buildG10TabSyncPayloads(props.wpId, props.variant, props.applicableStandards, dis, auditNote.value)
   if (!payloads.length) {
     ElMessage.warning('当前项目准则不适用附注同步')
     return

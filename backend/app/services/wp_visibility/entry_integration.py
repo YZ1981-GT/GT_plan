@@ -181,19 +181,23 @@ async def try_gate_wp(
 # 附件 wp-link 可见性隔离（additive；不替换既有项目级授权）
 # ---------------------------------------------------------------------------
 async def _linked_wp_ids(db: AsyncSession, attachment_id: UUID) -> list[UUID]:
-    """附件关联的底稿 wp_id 列表（未软删的关联；Design attachment→links→wp）。"""
-    from app.models.attachment_models import Attachment, AttachmentWorkingPaper
+    """附件关联的底稿 wp_id 列表（未软删的关联；Design attachment→links→wp）。
 
-    rows = (
-        await db.execute(
-            sa.select(AttachmentWorkingPaper.wp_id)
-            .join(Attachment, Attachment.id == AttachmentWorkingPaper.attachment_id)
-            .where(
-                AttachmentWorkingPaper.attachment_id == attachment_id,
-                Attachment.is_deleted == sa.false(),
+    整稿关联 ∪ 行级证据链接（spec attachment-evidence-intake 需求 3.7）：只挂在某一行上的证据同样按其所在底稿隔离，
+    否则会被当成「项目级证据」对全项目成员可见。
+    """
+    from app.models.attachment_models import Attachment, AttachmentWorkingPaper
+    from app.models.wp_optimization_models import EvidenceLink
+
+    rows: list[UUID] = []
+    for model in (AttachmentWorkingPaper, EvidenceLink):
+        rows.extend((
+            await db.execute(
+                sa.select(model.wp_id)
+                .join(Attachment, Attachment.id == model.attachment_id)
+                .where(model.attachment_id == attachment_id, Attachment.is_deleted == sa.false())
             )
-        )
-    ).scalars().all()
+        ).scalars().all())
     # 去重保序
     seen: set[UUID] = set()
     out: list[UUID] = []

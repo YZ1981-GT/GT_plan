@@ -64,20 +64,21 @@ describe('PasswordConfirmDialog', () => {
     await vm.handleSubmit()
     await flushPromises()
 
+    // _silent：错误在对话框内提示，不弹全局 toast
     expect(http.post).toHaveBeenCalledWith('/api/auth/verify-password', {
       password: 'correct-password',
-    })
+    }, { _silent: true })
 
     const confirmed = wrapper.emitted('confirmed')
     expect(confirmed).toBeTruthy()
     expect(confirmed![0][0]).toBe('test-token-123')
   })
 
-  it('shows error on 401 (wrong password)', async () => {
+  it('shows error on 403 (wrong password; 401 would be treated as session expiry)', async () => {
     vi.mocked(http.post).mockRejectedValue({
       response: {
-        status: 401,
-        data: { detail: { detail: 'Invalid password', attempts_remaining: 3 } },
+        status: 403,
+        data: { detail: { error_code: 'PASSWORD_INVALID', detail: 'Invalid password', attempts_remaining: 3 } },
       },
     })
 

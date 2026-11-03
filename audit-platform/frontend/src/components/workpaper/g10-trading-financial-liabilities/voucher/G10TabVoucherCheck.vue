@@ -6,7 +6,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G10-7 交易性金融负债凭证检查表</h3>
       <div class="head-actions">
-        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId && auditYear != null" :project-id="projectId" :workpaper-id="wpId" :account-code="G10_SAMPLING_ACCOUNT_CODE" phase="final" :year="auditYear" @filled="onSampleFilled" />
+        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId && auditYear != null" :project-id="projectId" :workpaper-id="wpId" :account-code="G10_SAMPLING_ACCOUNT_CODE" :year="auditYear" @filled="onSampleFilled" @undo-request="vc.onUndoRequest" />
         <G10ImportExportDropdown :wp-id="wpId" sheet="G10-7" @imported="onImported" />
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
           <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
@@ -52,7 +52,7 @@
       <div class="params-grid">
         <div class="param-item param-item-wide">
           <span class="param-label">测试总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.activeScopeParams.value.testPopulation"
             size="small"
             :disabled="isReadonly"
@@ -62,7 +62,7 @@
         </div>
         <div class="param-item param-item-wide">
           <span class="param-label">特定样本</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.activeScopeParams.value.specificSamples"
             size="small"
             :disabled="isReadonly"
@@ -247,9 +247,15 @@
     />
 
     <el-table v-else :data="vc.scopedRows.value" border stripe style="width:100%;font-size:13px" max-height="480"
-      highlight-current-row :row-class-name="({ row }) => row.isAbnormal ? 'abnormal-row' : ''"
+      highlight-current-row :row-class-name="voucherRowClassName"
       @current-change="onRowChange">
       <el-table-column prop="seq" label="序号" width="52" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="attachedYear" />
+        </template>
+      </el-table-column>
       <template v-if="vc.activeTab.value === 'basic'">
         <el-table-column label="日期" width="110">
           <template #default="{ row }">
@@ -295,9 +301,10 @@
         </el-table-column>
       </template>
       <template v-else-if="vc.activeTab.value === 'check'">
-        <el-table-column label="📎" width="52">
+        <el-table-column label="📎" width="76">
           <template #default="{ row }">
             <el-button size="small" link :disabled="isReadonly" @click="uploadOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column label="支持性文件" min-width="140">
@@ -401,7 +408,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, computed, toRef, watch, h, inject, type Ref } from 'vue'
+import { ref, computed, toRef, watch, h, inject, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Column } from 'element-plus'
 import http from '@/utils/http'
@@ -423,11 +430,16 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
 import G10AuditTextCards from '../G10AuditTextCards.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -439,6 +451,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G10-7'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
@@ -482,8 +497,16 @@ const checkLabels = G10_VOUCHER_CHECK_DEFS.map((d) => d.label)
 const checkKeys = G10_VOUCHER_CHECK_DEFS.map((d) => d.key)
 const tableWidth = 960
 
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass<{ row: G10VoucherCheckRow }>(({ row }) => (row.isAbnormal ? 'abnormal-row' : ''), vc.voucherRowClass)
+onMounted(() => { void vc.voucherFillReady() })
+
 const virtualColumns = computed<Column<any>[]>(() => [
   { key: 'seq', title: '#', dataKey: 'seq', width: 44, align: 'center' },
+  { key: 'gtMeta', title: '来源', dataKey: 'source', width: 150,
+    cellRenderer: ({ rowData }: { rowData: G10VoucherCheckRow }) => h(VoucherRowMetaCell, {
+      row: rowData, locked: vc.isVoucherRowLocked(rowData), projectId: props.projectId, year: attachedYear.value,
+    }) },
   { key: 'voucherNo', title: '凭证编号', dataKey: 'voucherNo', width: 100 },
   { key: 'businessContent', title: '业务内容', dataKey: 'businessContent', width: 180 },
   { key: 'creditAmount', title: '贷方', dataKey: 'creditAmount', width: 100, align: 'right',
@@ -605,29 +628,21 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, attachedYear.value, props.wpId, G10_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await vc.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string; counterpartAccount?: string; counterpartAccountName?: string; voucherEntries?: any[]; debitAmount?: any; creditAmount?: any }> }) {
+/**
+ * 抽凭引擎回填当前口径：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 「替换本阶段抽凭行」只删当前口径本阶段抽凭填入的行。原实现逐条追加、不去重、金额取 amount 写进贷方，已删除。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  for (const s of payload.samples ?? []) {
-    vc.mergeSample({
-      businessContent: s.summary,
-      creditAmount: s.amount,
-      voucherDate: s.voucherDate,
-      voucherNo: s.voucherNo,
-      counterpartAccount: s.counterpartAccount,
-      counterpartAccountName: s.counterpartAccountName,
-      voucherEntries: s.voucherEntries,
-      debitAmount: s.debitAmount,
-      source: '抽凭',
-    })
-  }
+  void persistMethodology(payload?.methodology)
+  if (!(payload?.samples ?? []).length) return
+  await vc.onEngineFilled(payload)
 }
 
 async function uploadOcr(row: G10VoucherCheckRow) {
@@ -640,12 +655,14 @@ async function uploadOcr(row: G10VoucherCheckRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
       let res
       try {
         res = await http.post(`/api/workpapers/${props.wpId}/g10/contract-ocr`, formData)
       } catch {
         res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData)
       }
+      rowEv.refresh()
       const data = res.data?.data ?? res.data ?? {}
       const summary = data.summary ?? data.extracted_fields?.businessContent ?? ''
       if (!summary) { ElMessage.warning('OCR 未识别到内容'); return }

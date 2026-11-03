@@ -6,6 +6,107 @@
 - **定位**：平台级 **单一真源（Single Source of Truth）**，统一底稿/报表/附注/试算表/辅助余额的 **名称、坐标、URI、跳转、依赖锚点**
 - **关联文档**：[`workpaper-bulk-tab-import-export-requirements.md`](./workpaper-bulk-tab-import-export-requirements.md)（bulk ZIP 为 ACNR 消费者之一；命名规则见该文档 §8.6）
 
+## 现状（2026-10-26）
+
+> 本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**。守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py` 逐项复算：「已落地」事实表的每个值从真实产物（`global_catalog.json`、`catalog_report.json`、快照、生成器源码）现算，组件表用 AST 确认模块、符号与测试存在，「计划中（未落地）」的任务号必须在 tasks.md 里仍未勾选。节内每句正文与事实表「事实」、组件表「组件」、计划表「事项」三列的每个单元格都在守卫 `backend/tests/acnr/test_acnr_status_doc_statements.py` 里逐字登记并绑定复算判据（前端组件的描述另由 `audit-platform/frontend/src/services/acnr/tests/acnrArchitectureStatusDoc.spec.ts` 用 TS 编译器 API 核对），未登记、判据不成立或登记失效都打红。本文其余段落为架构提案原文，未改一字，其中对「当前状态」的陈述以本节为准（见末尾「过时陈述勘误」）。
+>
+> 修订（2026-10-27，段四审计 F4-01）：本节初版（提交 `96fba2c49`）把尚未实施的内容写成了现状（发布后目录规模、生成器结构化比对、版本锁持久化、跨模块单元格取值、显示名统一、「已完成 P0/P1/P2」等），已按上述口径重写；未落地内容全部移到「计划中（未落地）」并标任务号。
+
+### 已落地：目录与代码现算事实
+
+| 事实 | 值 | 复算键 |
+|---|---|---|
+| 目录版本号 | `20261030155451` | `catalog.registry_version` |
+| 目录 sheet 条目数 | `1225` | `catalog.sheets` |
+| 目录 cell 条目数 | `542` | `catalog.cells` |
+| 父 sheet 在目录内的 cell | `542` | `catalog.cells_with_parent` |
+| 孤儿 cell（父 sheet 不在目录） | `0` | `catalog.orphan_cells` |
+| 孤儿 cell 所属 sheet 编码 | `无` | `catalog.orphan_parent_sheet_codes` |
+| 停用（deprecated）条目数 | `479` | `catalog.deprecated_entries` |
+| 条目所属域 | `wp` | `catalog.domains` |
+| 父级编码覆盖的循环 | `A、B、C、D、E、F、G、H、I、J、K、L、M、N、S` | `catalog.parent_cycles` |
+| cell 自带 formula_ref 能解析回本身的条目 | `542` | `catalog.formula_ref_roundtrip_ok` |
+| 按现行契约 `catalog_contract.build_schema()` 校验目录的错误数 | `0` | `catalog.schema_errors` |
+| 报告是否带 release 段 | `是` | `report.has_release` |
+| 历史快照份数 | `14` | `snapshots.count` |
+| 仍在仓库的分片文件 | `无` | `shards.files` |
+| 生成器命令行参数 | `--write、--check、--registry-version` | `generator.cli_flags` |
+| 生成器写出前是否跑发布门禁 | `是` | `generator.runs_release_gates` |
+| 生产代码中导入发布门禁模块的文件数 | `2` | `catalog_release.production_importers` |
+
+说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果；孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 479）；生成器写出前跑 catalog_release 门禁（`generator.runs_release_gates` 为 是），加载期 release 互校已在生产目录生效（`report.has_release` 为 是）。本子节表格以外的数字都写明复算键，守卫逐个比对现算值。
+
+### 已落地：组件
+
+| 组件 | 类型 | 模块 | 符号 | 测试 |
+|---|---|---|---|---|
+| L1 目录加载与内存索引 | 后端 | `backend/app/services/acnr/catalog.py` | `CatalogIndex`、`get_catalog`、`list_sheets`、`list_cells` | `backend/tests/acnr/test_catalog_index_fail_closed.py` |
+| 加载期完整性：重复 addr_id fail-closed、LF 内容哈希口径、报告 release 段互校（缺 release 段即拒绝） | 后端 | `backend/app/services/acnr/catalog_integrity.py` | `duplicate_addr_id_problems`、`content_sha256`、`check_release_report` | `backend/tests/acnr/test_catalog_index_fail_closed.py` |
+| 底稿域 canonical resolver（非底稿域委托 V1） | 后端 | `backend/app/services/acnr/resolver.py` | `full_resolve`、`resolve_instance` | `backend/tests/acnr/test_full_resolve.py` |
+| L2 项目 overlay | 后端 | `backend/app/services/acnr/overlay.py` | `get_project_overlay`、`ProjectOverlay` | `backend/tests/acnr/test_overlay.py` |
+| L3 运行时条目 | 后端 | `backend/app/services/acnr/runtime.py` | `get_runtime_entries` | `backend/tests/acnr/test_runtime.py` |
+| 唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线、跨 sheet 追溯编排器、V2 依赖图节点规范身份与 CCR 端点规范身份调用它） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
+| 底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码导入它的是单元格取值接线与 formula-hub 的四个读取方：底稿公式执行器、Runtime 计划求值、Runtime 协调器、严格外部取值） | 后端 | `backend/app/services/wp_cell_reader.py` | `resolve_wp_cell`、`WpCellRead` | `backend/tests/test_wp_cell_reader_contract.py` |
+| 单元格取值接线（锁定项目按锁定目录判名、锁定来源与 `full_resolve` 同为项目表落库的版本锁、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录）） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
+| 高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；后端已接到业务视图 execute、模板执行与构建器预览 / 执行 / 导出，构建器先过与业务视图同一项目守卫，带单元格缺项目或年度补不出即拒绝，取值不进查询缓存） | 后端 | `backend/app/services/custom_query/acnr_target_values.py` | `resolve_acnr_targets`、`read_acnr_target_values`、`classify_target`、`plan_builder_targets`、`complete_year` | `backend/tests/acnr/test_acnr_targets_query_e2e.py` |
+| 高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验；查询模板保存时同样校验 acnr_targets，执行时模板配置不合格即拒绝并点名非法项、不再报服务器错误） | 后端 | `backend/app/services/custom_query/strict_model.py` | `StrictRequestModel`、`AcnrTargetList`、`TemplateConfig`、`template_config_rejected` | `backend/tests/test_query_dsl_rejects_unknown_fields.py` |
+| `full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址） | 后端 | `backend/app/services/acnr/resolve_identity.py` | `step1_identity`、`deprecation_fields` | `backend/tests/acnr/test_catalog_roundtrip_real.py` |
+| 跨 sheet 追溯节点规范身份（`/api/custom-query/cross-sheet-trace` 的每个节点按「父底稿 + sheet 名或编码 + A1」经唯一精确身份判定取规范 addr_id：sheet 已识别且 A1 合法即解析成功并标明是否为目录登记格，sheet 不识别、多义、命中禁止别名或 A1 非法给中文原因；同步追溯的生产构造都不经同步桥接取身份） | 后端 | `backend/app/services/custom_query/cross_sheet_trace_orchestrator.py` | `CrossSheetTraceOrchestrator`、`TracedRefNode` | `backend/tests/acnr/test_cross_sheet_trace_async_e2e.py` |
+| V2 依赖图节点规范身份与 stale 起点身份（V2 `/resolve`、`/anchors`、`/stale-impact`、`/dependencies` 的节点与边端点追加 addr_id、sheet_addr_id、unresolved_code、unresolved_reason，经唯一精确身份判定取得，addr_id 与中文原因恰有其一，addr_id 为目录登记格时另带目录的统一显示名 display_label；`/resolve` 的包含匹配只作候选；stale 写入口与图中底稿键共用同一身份函数，身份算不出不写 stale 并返回原因） | 后端 | `backend/app/services/acnr/v2_canonical.py` | `canonical_node`、`canonical_uri`、`canonical_addr`、`annotate` | `backend/tests/acnr/test_v2_canonical_reconcile.py` |
+| CCR 端点规范身份与 CI 检查（`cross_wp_references.json` 的源与底稿目标经唯一精确身份判定取身份，检查器无私有匹配、只依赖标准库；不可解析的源须在豁免清单逐条登记，清单外或已失效的豁免即阻断；生成器按新目录把不可解析源写进报告问题清单，供豁免门禁核实；解析到停用条目的引用单列） | 后端 | `backend/app/services/acnr/ccr_sources.py` | `source_end`、`target_ends`、`unresolved_source_ids`、`is_deprecated` | `backend/tests/acnr/test_ccr_resolve.py` |
+| V2 静态数据双读对账产物（L2 语义锚点、resolved refs、L3 依赖、CCR 四个文件的每个节点与边端点，经 V2 读端点同一身份函数按来源文件 × 分类计数，每类附中文原因与样本，不含时间戳；`--check` 比对，CI 运行） | 后端 | `backend/scripts/acnr/reconcile_v2_canonical.py` | `build`、`main` | `backend/tests/acnr/test_ccr_resolve.py` |
+| 目录契约单一来源，schema 由它生成 | 后端 | `backend/app/services/acnr/catalog_contract.py` | `build_schema`、`REGISTRY_VERSION_PATTERN`、`FUNCTIONAL_TYPES` | `backend/tests/acnr/test_catalog_schema_single_source.py` |
+| 发布门禁模块（生成器写出与 `--check` 都调用） | 后端 | `backend/app/services/acnr/catalog_release.py` | `run_release_gates`、`GateViolation` | `backend/tests/acnr/test_catalog_release_gates.py` |
+| 孤儿与历史移除判定记录的 loader（发布候选构建读取） | 后端 | `backend/app/services/acnr/loaders/from_sheet_verdicts.py` | `load_sheet_verdicts` | `backend/tests/acnr/test_sheet_verdicts.py` |
+| 平台底稿索引名 loader（名称规则模块调用） | 后端 | `backend/app/services/acnr/loaders/from_wp_account_mapping.py` | `load_wp_account_mapping_aliases` | `backend/tests/acnr/test_name_system.py` |
+| 生成器名称规则：平台底稿名并入别名并逐条往返、同父一名多码记禁止别名、cell 写法按名称归属选模板名或编码 | 后端 | `backend/app/services/acnr/catalog_names.py` | `merge_platform_names`、`apply_cell_names`、`apply_cell_verdicts` | `backend/tests/acnr/test_name_system.py` |
+| 发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段 | 后端 | `backend/app/services/acnr/catalog_build.py` | `build_release`、`locate_previous`、`inputs_fingerprint` | `backend/tests/acnr/test_generator_release_flow.py` |
+| 统一显示名（发布候选构建按同一规则写进目录：sheet 的 display_label 为「编码 名称」，名称取平台底稿名、其次手工维护的 sheet 显示名、再次去尾编码的模板名，名称等于编码时只显示编码，加科目简称前缀，同父级重名按编码自然序加序号（编码等于所属底稿编码的那张不参与序号），停用条目加「（已停用）」；cell 的 cell_label 为「A1 语义标签」、display_label 为「sheet 显示名 › cell_label」；`/api/acnr/resolve` 的命中与候选、acnr_targets、V2 节点输出同一字段，L3 运行时条目与非底稿域委托结果用同一函数现算） | 后端 | `backend/app/services/acnr/display.py` | `compose_sheet_labels`、`cell_labels`、`apply_display_labels` | `backend/tests/acnr/test_display_contract.py` |
+| 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
+| 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
+| 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
+| ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源为项目表落库的版本锁；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other） | 后端 | `backend/app/services/acnr/metrics.py` | `AcnrMetricsCollector`、`get_acnr_metrics`、`VERSION_LOCK_COUNTERS` | `backend/tests/acnr/test_acnr_metrics.py` |
+| 版本锁已落库到项目表（归档的两条写入路径——交付件全部归档、归档编排的锁定步——都在把项目置为已归档之前锁定当时的目录版本，锁前先确认该版本的快照存在且内容自洽，锁不上就不归档；解除归档在同一事务里解锁；`full_resolve` 与单元格取值接线读同一份落库的锁，带项目而无会话时如实标明未核对；锁定版本的快照缺失、损坏或锁定失败返回冲突错误与中文原因，前端收到后不回退其他解析方式） | 后端 | `backend/app/services/acnr/project_registry_lock.py` | `lock_project_registry`、`unlock_project_registry`、`get_locked_version`、`verify_snapshot`、`RegistryLockError` | `backend/tests/acnr/test_project_registry_lock_pg.py` |
+| 运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口，不带会话时自开短会话；引用集只认数据库里项目表落库的版本锁，含移入回收站的项目，不读进程内归档字典；没有会话或查库失败即一个都不删；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理） | 后端 | `backend/app/services/acnr/catalog_snapshot_gc.py` | `run_db_aware_gc`、`referenced_registry_versions`、`committed_snapshot_versions` | `backend/tests/acnr/test_catalog_snapshot_gc_runtime.py` |
+| 快照生命周期门禁（CI 作业按运行时清理同一判据核对：不在最近保留份数之内、未登记进 git 索引、也未被锁定的快照即违规，已登记的快照不论多少份都不算；判定不了哪些已登记即失败） | 后端 | `backend/scripts/check/check_acnr_snapshot_count.py` | `lifecycle_problems`、`main` | `backend/tests/acnr/test_acnr_snapshot_count_guard.py` |
+| 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
+| 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
+| 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
+| 高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目且有单元格目标才发送单元格目标；构建器的项目与年度在限定当前项目或带单元格目标时发送、年度未知不发；拒绝、无权、解析不可用转成中文提示） | 前端 | `audit-platform/frontend/src/components/custom-query/queryPayloads.ts` | `buildBusinessPayload`、`buildBuilderPayload`、`queryErrorText` | `audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts` |
+| 底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，底稿或其所属项目在回收站都给中文原因） | 后端 | `backend/app/routers/acnr.py` | `acnr_locate_workpaper` | `backend/tests/acnr/test_workpaper_locate_endpoint.py` |
+| 底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约 | 前端 | `audit-platform/frontend/src/views/composables/workpaperShortLink.ts` | `resolveShortLink`、`shortLinkQuery` | `audit-platform/frontend/src/views/__tests__/WorkpaperShortLink.spec.ts` |
+| 前端显示名只读目录（选址器、高级查询选字段、公式管理与公式编辑三棵树，公式选址器、地址库搜索、已选字段、取值结果区与索引 chip 都读目录的 display_label / cell_label，前端只按编码排序、父节点标题加科目简称；停用 cell 由同一谓词过滤） | 前端 | `audit-platform/frontend/src/services/acnr/sheetDisplayName.ts` | `sortSheetsForGroup`、`groupHeaderLabel`、`wpCodeNaturalCompare` | `audit-platform/frontend/src/acnrDisplaySingleSource.spec.ts` |
+| 歧义候选与外部命名空间的中文原因（`full_resolve` 多命中给中文原因、所需补充的上下文与下一步；六类外部模块引用返回「该类引用暂不支持定位到物理地址」与下一步，中文标签与下一步取自语法文件，解析器不自带文案字面量） | 后端 | `backend/app/services/acnr/reasons.py` | `external_namespace_reason`、`ambiguous_fields`、`EXTERNAL_NAMESPACE_REASON` | `backend/tests/acnr/test_external_namespace_reasons.py` |
+| 地址解析不出唯一结果时的可解释提示（显示后端给的中文原因、需补充的上下文与候选，点选候选按 addr_id 重解析；上下文字段名显示为中文说明，未登记的字段名照原样显示） | 前端 | `audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue` | `AcnrCandidatesHint` | `audit-platform/frontend/src/components/acnr/__tests__/acnrCandidatesHint.spec.ts` |
+
+门禁清单：已经在跑的守卫见上表「测试」列。
+
+### 计划中（未落地）
+
+| 事项 | 任务 |
+|---|---|
+| INDEX 登记与提交边界核对 | T33 |
+
+### 版本号格式
+
+- `registry_version` 为 **14 位 UTC 时间戳**（`%Y%m%d%H%M%S`，形态 `^\d{14}$`，与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致；当前值见上表），由生成器在写出时赋值；不再使用 `YYYY.N.N`（本文下方示例中的 `2026.07.10` 已过时，见末尾勘误）。
+
+### V1 / V2 / legacy 导航的并行关系（现状）
+
+- **ACNR（L1 + L2 + L3）**：底稿域（wp）由 `acnr/resolver.py` 解析；L1 目录只覆盖底稿域（见上表 `catalog.domains`）。
+- **V1**（`services/address_registry`，动态寻址）：试算表 / 报表 / 附注 / 辅助余额等非底稿域的解析者，ACNR 对这些域委托 V1。定位是「canonical resolver + legacy 委托」，不是全平台唯一入口；平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点，已冻结为基线（见组件表「消费方绕过棘轮与台账」）。
+- **V2**（`routers/address_registry_v2.py` 与 stale 传播引擎）：依赖图与 stale 标记；读端点的节点与 stale 写入口经 `acnr/v2_canonical.py` 取规范身份，四个静态文件的双读对账产物与 CCR 端点身份检查见组件表。写 stale 的端点已加项目鉴权（见组件表）。
+- **legacy 导航门面**（`wp_index_resolve` 等）：已转发 ACNR，`resolve_instance` 按 `wp_index.wp_code` 绑定项目已有底稿。
+
+### 过时陈述勘误（原文保留，仅在此指出）
+
+- 「文档体系地图」表「实施 spec」行的「❌ **尚未创建**（G8 阻塞项）」：实施 spec `acnr-foundation-defect-closure` 已创建，进度以其 tasks.md 为准；上方「计划中（未落地）」所列任务均未完成。
+- 「5.2 SheetCatalogEntry」「5.3 CellCatalogEntry」两节示例里的 `registry_version: "2026.07.10"`：版本号已改为 14 位 UTC 时间戳，`YYYY.N.N` 形态作废。
+- 「执行摘要」表「M0（先落地）」行的「D 循环 catalog JSON 进库」等按 D 循环分期的陈述：L1 目录现已按 classification 骨架覆盖上表 `catalog.parent_cycles` 所列各循环（仍只覆盖底稿域）。
+- 「执行摘要」表「L1 首期」行的「经同一 `resolve` 出口」、「15.3 文档问题与矛盾」表 D-D10 行的「五域统一 resolve 出口」，以及 resolver 模块旧注释「四大消费库的唯一解析入口」（design §15.2 第 2 条）：应称「canonical resolver + legacy 委托」——底稿域由 ACNR 解析，其他域委托 V1，平台里仍有直接调用 V1 的绕过点（见上一子节）；resolver 模块注释已据此更正。
+
+> —— 现状节到此结束；以下为提案原文（未改动）——
+
 ### 文档体系地图
 
 | 文档 | 路径 | 角色 | 状态 |

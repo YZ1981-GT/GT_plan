@@ -64,14 +64,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -262,6 +255,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K12TabAdjustment — K12-3 营业外收入调整分录汇总（借贷平衡+EventBus）
  *
@@ -291,7 +285,7 @@ import { useK12FormData } from '../../composables/useK12FormData'
 import { useK12Adjustment, K12_ADJ_ROWS_KEY } from '../../composables/useK12Adjustment'
 import { generateK12AiText } from '../../composables/useK12AiText'
 import { eventBus } from '@/utils/eventBus'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
@@ -332,6 +326,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: () => props.wpId,
   wpCode: 'K12',
   itemId: () => `K12-adj-${adjustment.activeType.value}`,
+  entryType: adjustment.activeType,
   buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
     standard_account_code: e.accountCode || undefined,
     account_name: e.accountName,

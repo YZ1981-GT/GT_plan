@@ -46,6 +46,12 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
   const totalAffected = ref(0)
   const loading = ref(false)
   const lastNotifyTs = ref(0)
+  /**
+   * 起点地址算不出规范身份时后端给的中文原因（design §10.2 / RV9.1-02）。
+   * 后端此时不写 stale，返回 unresolved_code + unresolved_reason；界面要告诉用户
+   * 「这次没能分析下游」而不是静悄悄当成「没有下游」。能分析时置空。
+   */
+  const unresolvedReason = ref('')
 
   const wpCode = computed(() => unref(wpCodeSource))
 
@@ -55,20 +61,38 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     cell?: string
     max_depth?: number
     project_id?: string
-    year?: number
+    /** 项目审计年度：给了但为空（项目没填）⇒ 不分析；不传 ⇒ 由后端按项目审计年度补齐（/impact 的 year 可缺省） */
+    year?: number | null
   }) {
+    // 每次通知先清掉上一次的原因：本次没发请求（缺项目 / 年度）或请求失败时，调用方读到的不能是上一次
+    // 别的 sheet 留下的原因（T31 返工）
+    unresolvedReason.value = ''
     const code = wpCode.value
     if (!code) return
+    // 没有项目上下文就不发请求：后端要求项目鉴权，裸发必 403
+    // （spec acnr-foundation-defect-closure D8 / 需求 10）
+    if (!payload.project_id) return
+    // 调用方给了年度键但值为空（项目没填年度）⇒ 不分析：原先兜底今年会标别的年度的下游
+    // （post-push-residual-defect-closure 6.5.3）。调用方根本不传年度 ⇒ 照常发、不带 year，由后端按项目审计年度
+    // 补齐（acnr-foundation-defect-closure D8）。两条语义分属合并前的两条线，合并时都保留。
+    if ('year' in payload && payload.year == null) return null
     loading.value = true
     try {
       // 构建统一 URI: WP:{wp_code}:{sheet}:{cell_or_label}
       const sourceUri = `WP:${code}:${payload.sheet || ''}:${payload.cell || '审定数'}`
 
-      const res: any = await http.post(linkageBus.impact, {
+      // 年度未知时不带 year，由后端按项目审计年度补齐（不用日历年兜底）
+      const body: { source_uri: string; project_id: string; year?: number } = {
         source_uri: sourceUri,
-        project_id: payload.project_id || '',
-        year: payload.year || new Date().getFullYear(),
-      })
+        project_id: payload.project_id,
+      }
+      if (payload.year) body.year = payload.year
+
+      const res: any = await http.post(linkageBus.impact, body)
+      const payloadBody = res.data || res || {}
+
+      // 起点身份算不出：后端没写 stale，把原因留给调用方提示（RV9.1-02）
+      unresolvedReason.value = String(payloadBody.unresolved_reason || '').trim()
 
       // 将 affected URIs 转换为 StaleAffectedItem 格式
       const affectedUris: string[] = res.data?.affected || res?.affected || []
@@ -91,6 +115,11 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
       // 降级模式：503 时静默（不显示黄条，不阻断保存）
       if (e?.response?.status === 503) {
         logger.log('[useStaleImpact] Engine degraded (503), silently skipping')
+        return null
+      }
+      // 无权访问该项目：非阻塞，静默跳过（不阻断保存）
+      if (e?.response?.status === 403) {
+        logger.log('[useStaleImpact] No project access (403), silently skipping')
         return null
       }
       console.warn('[useStaleImpact] notify failed:', e)
@@ -130,6 +159,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     affected.value = []
     totalAffected.value = 0
     lastNotifyTs.value = 0
+    unresolvedReason.value = ''
   }
 
   return {
@@ -141,6 +171,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     refresh,
     clear,
     lastNotifyTs,
+    unresolvedReason,
   }
 }
 

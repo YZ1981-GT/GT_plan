@@ -229,24 +229,14 @@ def validate_definition(domain: str, definition: dict, label: str, slot_key: str
     """模板 / 手工录入的定义按域校验（与各域写入时同一口径）；停用不能写进模板。
 
     ``slot_key``：推送规则域按公式位（规则编号）找规则做校验，其余域不用。
+
+    薄转发至 ``validator.validate_formula_definition``（需求 12.1，ADR-FHIC-09）。
     """
+    from app.services.formula_settings.validator import validate_formula_definition
+
     if is_disabled(definition):
         raise FormulaSettingError(f"{label}：模板里只放公式，不能放「停用」")
-    if domain == "wp":
-        checked_wp_definition(definition, label)
-    elif domain == "push":
-        from app.services.formula_settings.push_settings import validate_push_definition
-
-        validate_push_definition(slot_key, definition, label)
-    elif domain == "note":
-        check_note_definition(definition, label)
-    elif domain == "consol_note":
-        from app.services.consol_note_formula_service import NoteFormulaError, validate_note_formula
-
-        try:
-            validate_note_formula(str(definition.get("formula") or ""))
-        except NoteFormulaError as exc:
-            raise FormulaSettingError(f"{label}：{exc}") from exc
+    validate_formula_definition(domain, definition, label=label, slot_key=slot_key)
 
 
 # ── 附注 ──────────────────────────────────────────────────────────────────────

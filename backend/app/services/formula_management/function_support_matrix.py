@@ -39,6 +39,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 
 
@@ -171,6 +172,27 @@ def expression_functions(expression: str | None) -> list[str]:
             seen.add(name)
             result.append(name)
     return result
+
+
+#: 引号段（单 / 双引号字符串字面量）与函数调用名（前面紧挨字母 / 数字 / 下划线的不算新名字）
+_QUOTED_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
+_CALL_RE = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
+def called_function_names(expression: str | None) -> list[str]:
+    """表达式里**全部**函数调用名：先剔除引号段，再取每个 ``标识符(``，大写、去重、按出现顺序（ADR-FHIC-19 预检）。
+
+    与 :func:`expression_functions` 不同：后者只认矩阵登记的取数函数，``EVIL()``、``ROUND()`` 这类一律看不见；
+    预检要逐个分类（取数函数查矩阵、内置纯函数与已注册自定义函数放行、其余拒绝），必须先拿到全集。
+    """
+    if not expression:
+        return []
+    names: list[str] = []
+    for match in _CALL_RE.finditer(_QUOTED_RE.sub("''", expression)):
+        name = match.group(1).upper()
+        if name not in names:
+            names.append(name)
+    return names
 
 
 def support_issues(expression: str | None, executor: Executor | str) -> list[dict[str, str]]:

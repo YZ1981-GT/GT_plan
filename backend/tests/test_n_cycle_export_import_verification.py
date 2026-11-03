@@ -75,12 +75,14 @@ class TestP0Registration:
         "N1-1", "N1-2", "N1-3", "N1-4", "N1-5", "N1-6",
         # N2 应交税费
         "N2-1", "N2-2", "N2-3", "N2-4", "N2-5", "N2-6",
+        "N2-7", "N2-8", "N2-9", "N2-10", "N2-11",
         # N3 递延所得税负债
-        "N3-1", "N3-2", "N3-3", "N3-4", "N3-5", "N3-6",
+        "N3-1", "N3-2", "N3-3",
         # N4 税金及附加
-        "N4-1", "N4-2", "N4-3", "N4-4",
+        "N4-1", "N4-2", "N4-3",
         # N5 所得税费用
-        "N5-1", "N5-2", "N5-3", "N5-4", "N5-5", "N5-6", "N5-7", "N5-8",
+        "N5-1", "N5-2", "N5-3", "N5-4", "N5-5",
+        "N5-6", "N5-6-1", "N5-6-2", "N5-7", "N5-8",
     ]
 
     _PARENT_CODES = ["N1", "N2", "N3", "N4", "N5"]
@@ -107,13 +109,26 @@ class TestP0Registration:
                 f"N 类父码 '{code}' 未在 _WP_CODE_OVERRIDE 中注册"
             )
 
+    # N 循环级 componentType 映射（wp_code_overrides.json 实际值）
+    _CYCLE_CT = {
+        "N1": "n1-deferred-tax-assets",
+        "N2": "n2-taxes-payable",
+        "N3": "n3-deferred-tax-liabilities",
+        "N4": "n4-taxes-and-surcharges",
+        "N5": "n5-income-tax-expense",
+    }
+
     def test_all_program_codes_have_override(self):
         """所有 N 类程序表在 _WP_CODE_OVERRIDE 中有映射。"""
         for code in self._PROGRAM_CODES:
             assert code in _WP_CODE_OVERRIDE, (
                 f"N 类程序表 '{code}' 未在 _WP_CODE_OVERRIDE 中注册"
             )
-            assert _WP_CODE_OVERRIDE[code] == "a-program-console"
+            prefix = code.rstrip("A")
+            expected = self._CYCLE_CT[prefix]
+            assert _WP_CODE_OVERRIDE[code] == expected, (
+                f"{code} 应映射 {expected}，实际 {_WP_CODE_OVERRIDE[code]}"
+            )
 
     def test_all_component_types_valid(self):
         """所有 N 类子码 componentType 必须是合法类型。"""
@@ -130,24 +145,28 @@ class TestP0Registration:
             assert ct != "confirmation-hub", f"N 类 '{code}' 不应映射 confirmation-hub"
 
     def test_type_distribution(self):
-        """N 类 componentType 分布符合预期。"""
+        """N 类 componentType 分布符合预期：以循环级专用类型为主。"""
         n_codes = {code: ct for code, ct in _WP_CODE_OVERRIDE.items() if re.match(r'^N\d', code)}
         type_counts: dict[str, int] = {}
         for ct in n_codes.values():
             type_counts[ct] = type_counts.get(ct, 0) + 1
-        # 5 c-note-table (N1~N5 parent)
-        assert type_counts.get("c-note-table", 0) == 5
-        # 5 a-program-console (N1A~N5A)
-        assert type_counts.get("a-program-console", 0) == 5
-        # d-form-table: 审定表(5) + 调整分录(5) + 结构化检查(N1-4/N2-4/N3-4/N5-6)
-        assert type_counts.get("d-form-table", 0) >= 14
-        # audit-sheet: 明细/差异/计算/分析
-        assert type_counts.get("audit-sheet", 0) >= 14
+        # 5 个循环级 componentType 覆盖绝大多数 N 码
+        cycle_types = {
+            "n1-deferred-tax-assets", "n2-taxes-payable",
+            "n3-deferred-tax-liabilities", "n4-taxes-and-surcharges",
+            "n5-income-tax-expense",
+        }
+        cycle_total = sum(type_counts.get(ct, 0) for ct in cycle_types)
+        assert cycle_total >= 38, f"循环级类型覆盖 {cycle_total} 个，应 ≥38"
+        # N1-6 例外映射为 d-form-table
+        assert type_counts.get("d-form-table", 0) >= 1
 
     @pytest.mark.parametrize("wp_code", ["N1-1", "N2-1", "N3-1", "N4-1", "N5-1"])
-    def test_audit_determination_tables_are_d_form(self, wp_code):
-        """N{n}-1 审定表映射为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE.get(wp_code) == "d-form-table"
+    def test_audit_determination_maps_to_cycle_component(self, wp_code):
+        """N{n}-1 审定表映射为对应循环级 componentType。"""
+        prefix = wp_code.split("-")[0]
+        expected = self._CYCLE_CT[prefix]
+        assert _WP_CODE_OVERRIDE.get(wp_code) == expected
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -328,43 +347,40 @@ class TestP3AddressRegistry:
 
 
 class TestP4SpecialProcedures:
-    """P4: 特殊程序验证。"""
+    """P4: 特殊程序 componentType 映射验证（全部映射到循环级专用类型）。"""
 
-    def test_n5_3_is_audit_sheet(self):
-        """N5-3 所得税计算表映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N5-3") == "audit-sheet"
+    # N 循环级 componentType 映射
+    _CYCLE_CT = {
+        "N1": "n1-deferred-tax-assets",
+        "N2": "n2-taxes-payable",
+        "N3": "n3-deferred-tax-liabilities",
+        "N4": "n4-taxes-and-surcharges",
+        "N5": "n5-income-tax-expense",
+    }
 
-    def test_n5_4_is_audit_sheet(self):
-        """N5-4 纳税调增调减明细映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N5-4") == "audit-sheet"
+    _SPECIAL_CODES = [
+        ("N5-3", "所得税计算表"),
+        ("N5-4", "纳税调增调减明细"),
+        ("N5-5", "有效税率分析"),
+        ("N1-3", "暂时性差异计算（可抵扣）"),
+        ("N3-3", "暂时性差异计算（应纳税）"),
+        ("N2-3", "增值税核对表"),
+        ("N1-4", "可抵扣确认条件"),
+        ("N5-6", "递延所得税联动"),
+        ("N5-7", "研发加计扣除"),
+    ]
 
-    def test_n5_5_is_audit_sheet(self):
-        """N5-5 有效税率分析映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N5-5") == "audit-sheet"
-
-    def test_n1_3_is_audit_sheet(self):
-        """N1-3 暂时性差异计算（可抵扣）映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N1-3") == "audit-sheet"
-
-    def test_n3_3_is_audit_sheet(self):
-        """N3-3 暂时性差异计算（应纳税）映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N3-3") == "audit-sheet"
-
-    def test_n2_3_is_audit_sheet(self):
-        """N2-3 增值税核对表映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N2-3") == "audit-sheet"
-
-    def test_n1_4_is_d_form_table(self):
-        """N1-4 可抵扣确认条件映射为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE.get("N1-4") == "d-form-table"
-
-    def test_n5_6_is_d_form_table(self):
-        """N5-6 递延所得税联动映射为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE.get("N5-6") == "d-form-table"
-
-    def test_n5_7_is_audit_sheet(self):
-        """N5-7 研发加计扣除映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("N5-7") == "audit-sheet"
+    @pytest.mark.parametrize(("wp_code", "label"),
+                             _SPECIAL_CODES,
+                             ids=[c for c, _ in _SPECIAL_CODES])
+    def test_special_code_maps_to_cycle_component(self, wp_code, label):
+        """N 类特殊程序底稿映射到对应循环级 componentType。"""
+        prefix = wp_code.split("-")[0]
+        expected = self._CYCLE_CT[prefix]
+        actual = _WP_CODE_OVERRIDE.get(wp_code)
+        assert actual == expected, (
+            f"{wp_code}（{label}）应映射 {expected}，实际 {actual}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -431,33 +447,54 @@ class TestP5Linkage:
 class TestP6ExportImport:
     """P6: 导入导出基础设施验证。"""
 
+    # N 循环级 componentType 映射
+    _CYCLE_CT = {
+        "N1": "n1-deferred-tax-assets",
+        "N2": "n2-taxes-payable",
+        "N3": "n3-deferred-tax-liabilities",
+        "N4": "n4-taxes-and-surcharges",
+        "N5": "n5-income-tax-expense",
+    }
+
     _N_FORM_TABLE_CODES = [
         "N1-1", "N1-4", "N1-6",
         "N2-1", "N2-4", "N2-6",
-        "N3-1", "N3-4", "N3-6",
-        "N4-1", "N4-4",
+        "N3-1",
+        "N4-1",
         "N5-1", "N5-6", "N5-8",
     ]
 
     _AUDIT_SHEET_CODES = [
         "N1-2", "N1-3", "N1-5",
         "N2-2", "N2-3", "N2-5",
-        "N3-2", "N3-3", "N3-5",
+        "N3-2", "N3-3",
         "N4-2", "N4-3",
         "N5-2", "N5-3", "N5-4", "N5-5", "N5-7",
     ]
 
     @pytest.mark.parametrize("wp_code", _N_FORM_TABLE_CODES)
-    def test_n_form_table_registered(self, wp_code):
-        """N 类 d-form-table 底稿在 _WP_CODE_OVERRIDE 中注册正确。"""
+    def test_n_structured_code_maps_to_cycle_component(self, wp_code):
+        """N 类结构化底稿映射到对应循环级 componentType。"""
         assert wp_code in _WP_CODE_OVERRIDE
-        assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table"
+        prefix = wp_code.split("-")[0]
+        expected = self._CYCLE_CT[prefix]
+        # N1-6 例外：映射到 d-form-table
+        if wp_code == "N1-6":
+            assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table"
+        else:
+            assert _WP_CODE_OVERRIDE[wp_code] == expected, (
+                f"{wp_code} 应映射 {expected}，实际 {_WP_CODE_OVERRIDE[wp_code]}"
+            )
 
     @pytest.mark.parametrize("wp_code", _AUDIT_SHEET_CODES)
-    def test_n_audit_sheet_registered(self, wp_code):
-        """N 类 audit-sheet 底稿在 _WP_CODE_OVERRIDE 中注册正确。"""
+    def test_n_analysis_code_maps_to_cycle_component(self, wp_code):
+        """N 类分析底稿映射到对应循环级 componentType。"""
         assert wp_code in _WP_CODE_OVERRIDE
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet"
+        prefix = wp_code.split("-")[0]
+        expected = self._CYCLE_CT[prefix]
+        assert _WP_CODE_OVERRIDE[wp_code] == expected, (
+            f"{wp_code} 应映射 {expected}，实际 {_WP_CODE_OVERRIDE[wp_code]}"
+        )
 
     def test_all_n_codes_in_mapping(self, n_class_entries):
         """所有 N 类 wp_code 在 wp_account_mapping 注册（批量导出可枚举）。"""
@@ -491,10 +528,15 @@ class TestP6ExportImport:
         assert schema.get("dynamic_rows") is False
 
     def test_batch_export_type_distribution(self):
-        """N 类 componentType 分布合理。"""
+        """N 类 componentType 以循环级专用类型为主。"""
         n_codes = {code: ct for code, ct in _WP_CODE_OVERRIDE.items() if re.match(r'^N\d', code)}
         type_counts: dict[str, int] = {}
         for ct in n_codes.values():
             type_counts[ct] = type_counts.get(ct, 0) + 1
-        assert type_counts.get("d-form-table", 0) >= 14
-        assert type_counts.get("audit-sheet", 0) >= 14
+        cycle_types = {
+            "n1-deferred-tax-assets", "n2-taxes-payable",
+            "n3-deferred-tax-liabilities", "n4-taxes-and-surcharges",
+            "n5-income-tax-expense",
+        }
+        cycle_total = sum(type_counts.get(ct, 0) for ct in cycle_types)
+        assert cycle_total >= 38, f"循环级类型覆盖 {cycle_total} 个，应 ≥38"

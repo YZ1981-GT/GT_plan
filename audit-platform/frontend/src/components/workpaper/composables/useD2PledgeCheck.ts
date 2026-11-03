@@ -21,18 +21,29 @@ import { registerPendingFlusher } from '../sync/pendingWrites'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * 列与模板 D2-12（一）质押区一致（A~I：客户名称 / 期末余额 / 质押金额 / 质权人 / 质押原因 / 质押条件 /
+ * 质押期限 / 质押协议 / 索引号）；质押日期 / 状态 / 备注模板没有，只在 HTML 侧。
+ * spec oo-writeback-template-parity-closure R3 批 B2b（原缺 期末余额 / 质押条件 / 质押协议）。
+ */
 export interface PledgeRow {
   rowId: string
-  debtorName: string           // 质押债务人
+  debtorName: string           // 客户名称
+  endBalance: number           // 期末余额（模板 B）
   pledgeAmount: number         // 质押金额
   pledgeDate: string           // 质押日期
   pledgee: string              // 质权人
-  pledgePurpose: string        // 质押目的
-  expiryDate: string           // 到期日
+  pledgePurpose: string        // 质押原因
+  pledgeCondition: string      // 质押条件（模板 F）
+  expiryDate: string           // 质押期限（到期日）
+  pledgeAgreement: string      // 质押协议（模板 H）
   status: string               // 状态（有效/已解除）
   remark: string               // 备注
   indexRef: string             // 索引号
 }
+
+/** 质押行金额字段（录入按数值解析） */
+const PLEDGE_NUMERIC_FIELDS: (keyof PledgeRow)[] = ['endBalance', 'pledgeAmount']
 
 export interface FactoringRow {
   rowId: string
@@ -66,11 +77,14 @@ function createEmptyPledgeRow(): PledgeRow {
   return {
     rowId: generateRowId(),
     debtorName: '',
+    endBalance: 0,
     pledgeAmount: 0,
     pledgeDate: '',
     pledgee: '',
     pledgePurpose: '',
+    pledgeCondition: '',
     expiryDate: '',
+    pledgeAgreement: '',
     status: '有效',
     remark: '',
     indexRef: '',
@@ -111,11 +125,14 @@ function parsePledgeRows(jsonStr: string | null | undefined): PledgeRow[] {
     return parsed.map((raw: any) => ({
       rowId: raw.rowId || generateRowId(),
       debtorName: raw.debtorName || '',
+      endBalance: parseNum(raw.endBalance),
       pledgeAmount: parseNum(raw.pledgeAmount),
       pledgeDate: raw.pledgeDate || '',
       pledgee: raw.pledgee || '',
       pledgePurpose: raw.pledgePurpose || '',
+      pledgeCondition: raw.pledgeCondition || '',
       expiryDate: raw.expiryDate || '',
+      pledgeAgreement: raw.pledgeAgreement || '',
       status: raw.status || '有效',
       remark: raw.remark || '',
       indexRef: raw.indexRef || '',
@@ -196,6 +213,11 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
     return pledgeRows.value.reduce((sum, r) => sum + r.pledgeAmount, 0)
   })
 
+  /** 质押客户期末余额合计（模板 B19 = SUM(B16:B18)） */
+  const pledgeEndBalanceTotal: ComputedRef<number> = computed(() => {
+    return pledgeRows.value.reduce((sum, r) => sum + r.endBalance, 0)
+  })
+
   /**
    * 质押比例 = 质押总额 / 应收账款审定总额
    * 从 allResponses 读取 D2-adj-total 审定数
@@ -272,8 +294,8 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
     if (pledgeRow) {
       const key = field as keyof PledgeRow
       if (key === 'rowId') return
-      if (key === 'pledgeAmount') {
-        pledgeRow.pledgeAmount = parseNum(value)
+      if (PLEDGE_NUMERIC_FIELDS.includes(key)) {
+        ;(pledgeRow as any)[key] = parseNum(value)
       } else {
         ;(pledgeRow as any)[key] = String(value)
       }
@@ -378,6 +400,7 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
     pledgeRows,
     factoringRows,
     pledgeTotal,
+    pledgeEndBalanceTotal,
     pledgeRatio,
     pledgeRatioWarning,
     auditedTotal,

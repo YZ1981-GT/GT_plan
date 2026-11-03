@@ -178,7 +178,7 @@ import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9Disclosure } from '../../composables/useG9Disclosure'
 import { g9AccountLabel } from '../../composables/g9AccountMatch'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildG9SyncPayload } from '../../composables/g9DisclosureSyncPayload'
+import { buildG9SyncPayload, g9DisclosureSyncSnapshot } from '../../composables/g9DisclosureSyncPayload'
 import { G9_NOTE_SECTION } from '../../composables/g9NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
@@ -209,10 +209,7 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId) return
-  const payload = buildG9SyncPayload(props.wpId, props.variant, props.applicableStandards, {
-    rows: disc.dataRows.value,
-    noteText: disc.noteText.value,
-  })
+  const payload = buildG9SyncPayload(props.wpId, props.variant, props.applicableStandards, g9DisclosureSyncSnapshot(disc))
   if (!payload) return
   isSyncing.value = true
   try {

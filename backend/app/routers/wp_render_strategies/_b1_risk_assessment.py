@@ -251,7 +251,7 @@ async def _load_kaa_hint(wp_id, db) -> dict | None:
 
 
 async def _load_project_context(project_id, db) -> dict:
-    """从 projects 表加载项目上下文信息."""
+    """从 projects 表加载项目上下文信息（industry 恒为空：平台没有项目级行业来源，质控分类码不是行业）."""
     project_context: dict = {
         "client_name": "",
         "industry": "",
@@ -261,7 +261,7 @@ async def _load_project_context(project_id, db) -> dict:
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year, business_category "
+                "SELECT client_name, audit_year "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(project_id)},
@@ -272,7 +272,6 @@ async def _load_project_context(project_id, db) -> dict:
             year = proj_row.audit_year
             if year:
                 project_context["audit_period"] = f"{year}年度"
-            project_context["industry"] = proj_row.business_category or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("B1 风险评估 project context 查询失败: %s", e)
     return project_context

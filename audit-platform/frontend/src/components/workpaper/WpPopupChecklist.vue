@@ -5,12 +5,13 @@
  * - 14 条适用性判断列表：每条有 description(只读) + 是否适用(el-select) + 索引号(el-input)
  * - 头部：业务分类标记 + 是否首次承接
  * - 底部：重大业务咨询/分歧事项 自由文本区
- * - 根据 business_category 自动提示适用性
+ * - 根据项目详情下发的 project_classification（质控分类组别）自动提示适用性
  * - Debounce 2s 自动保存
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { classificationOf, describeCategoryGroup } from '@/types/projectClassification'
 
 const props = defineProps<{
   wpCode: string
@@ -53,11 +54,14 @@ const isFirstEngagement = ref(false)
 const loading = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-const businessCategory = computed(() => props.projectInfo?.business_category || '')
+// 原按 business_category 精确比较：A1 / B2 这类细分类的标签颜色错、C 类提示看不到未填写按 C 类的项目
+const classification = computed(() => classificationOf(props.projectInfo))
+const categoryGroup = computed(() => classification.value?.category_group ?? null)
+const categoryText = computed(() => describeCategoryGroup(classification.value))
 
 // C类非特定情形显示提示
 const showNotApplicableHint = computed(() => {
-  return businessCategory.value === 'C'
+  return categoryGroup.value === 'C'
 })
 
 function initStates() {
@@ -176,10 +180,10 @@ onBeforeUnmount(() => {
       <div class="header-field">
         <span class="header-label">业务分类：</span>
         <el-tag
-          :type="businessCategory === 'A' ? 'danger' : businessCategory === 'B' ? 'warning' : 'info'"
+          :type="categoryGroup === 'A' ? 'danger' : categoryGroup === 'B' ? 'warning' : 'info'"
           size="small"
         >
-          {{ businessCategory || '未设定' }}类
+          {{ categoryText || '未设定' }}
         </el-tag>
       </div>
       <div class="header-field">

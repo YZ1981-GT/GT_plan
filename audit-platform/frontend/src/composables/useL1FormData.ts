@@ -74,7 +74,7 @@ export interface AdjudicationState {
  *
  * 🔴 字段顺序即 Excel 列序（A→AB）。`endBalance` / `auditedPrior` / `auditedIncrease` /
  * `auditedDecrease` / `auditedEnd` 五个在模板里**是公式**（K/R/S/T/U），受契约
- * `formula_mask` 保护，OO 侧不得被值覆盖；前端仍保留派生值用于展示与交叉校验。
+ * `formula_mask` 保护，OO 侧不得被值覆盖；前端按同式计算（`recalcL1DetailRow`）。
  *
  * 🔴 `amount` / `currency` 模板**无对应列**，是 HTML-only 字段（契约
  * `review.html_store.html_only_keys` 已登记），不参与 OO 往返。
@@ -152,6 +152,26 @@ export function createEmptyDetailRow(): DetailRow {
     remark: '',
     amount: 0,
     currency: 'CNY',
+  }
+}
+
+/**
+ * L1-2 行公式（对齐模板 明细表L1-2）：K=H+I−J；R=H+L+M；S=I+N+P；T=J+O+Q；U=R+S−T。
+ *
+ * 审定四列 R~U 原先只声明不计算（恒 0）；载入、编辑、保存都经它，与 OO 侧按同一组公式重算。
+ */
+export function recalcL1DetailRow(row: DetailRow): DetailRow {
+  const n = (v: unknown): number => Number(v) || 0
+  const auditedPrior = n(row.beginning) + n(row.priorAje) + n(row.priorRje)
+  const auditedIncrease = n(row.creditAmount) + n(row.ajeIncrease) + n(row.rjeIncrease)
+  const auditedDecrease = n(row.debitAmount) + n(row.ajeDecrease) + n(row.rjeDecrease)
+  return {
+    ...row,
+    endBalance: n(row.beginning) + n(row.creditAmount) - n(row.debitAmount),
+    auditedPrior,
+    auditedIncrease,
+    auditedDecrease,
+    auditedEnd: auditedPrior + auditedIncrease - auditedDecrease,
   }
 }
 
@@ -261,28 +281,28 @@ export function useL1FormData(
     try {
       const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
       const responses: ChecklistItem[] = Array.isArray(res) ? res : (res?.data ?? [])
-
-      // 存储原始 responses
-      const map = new Map<string, ChecklistItem>()
-      for (const r of responses) {
-        if (r.item_id?.startsWith('L1-')) {
-          map.set(r.item_id, r)
-        }
-      }
-      _allResponses.value = map
-
-      // 解析到各 sheet state
-      _parseAdjudication(map)
-      _parseDetailRows(map)
-      _parseInterestCalcRows(map)
-      _parseCreditCheckRows(map)
-      _parseOverdueCheckRows(map)
-      _parsePledgeCheckRows(map)
+      applyResponses(responses)
     } catch {
       ElMessage.warning('L1数据加载失败，可手动填写')
     } finally {
       isLoading.value = false
     }
+  }
+
+  // 回复 → 结构化 state（只留 L1- 条目，解析到各 sheet）：selfLoad 拉到回复后调；附注页离屏同步把框架已读的同一批回复直接
+  // 交给它（不发请求、不弹提示，spec note-pull-followup-closure R1）。🔴 本段与 selfLoad 合计行数不变：GET / PUT 行号被数据锚点引用
+  function applyResponses(responses: readonly ChecklistItem[]): void {
+    const map = new Map<string, ChecklistItem>()
+    for (const r of responses) {
+      if (r.item_id?.startsWith('L1-')) map.set(r.item_id, r)
+    }
+    _allResponses.value = map
+    _parseAdjudication(map)
+    _parseDetailRows(map)
+    _parseInterestCalcRows(map)
+    _parseCreditCheckRows(map)
+    _parseOverdueCheckRows(map)
+    _parsePledgeCheckRows(map)
   }
 
   // ─── Parse helpers ─────────────────────────────────────────────────────────
@@ -402,7 +422,7 @@ export function useL1FormData(
       detailRows.value = []
       return
     }
-    detailRows.value = parsed.map((row) => ({
+    detailRows.value = parsed.map((row) => recalcL1DetailRow({
       ...createEmptyDetailRow(),
       ...(row as Partial<DetailRow>),
       // 🔴 缺 rowId 的历史行当场补铸：身份缺失时按位置兜底会把位置化又带回来
@@ -577,7 +597,7 @@ export function useL1FormData(
     items.push({
       item_id: DETAIL_ROWS_ITEM_ID,
       conclusion: null,
-      remark: detailRows.value.length ? JSON.stringify(detailRows.value) : null,
+      remark: detailRows.value.length ? JSON.stringify(detailRows.value.map(recalcL1DetailRow)) : null,
     })
 
     // ─── Interest calc: L1-int-{n}-{field} ───
@@ -683,6 +703,7 @@ export function useL1FormData(
     pledgeCheckRows,
     // Actions
     selfLoad,
+    applyResponses,
     saveImmediate,
     debounceSave,
     writebackTB,

@@ -6,8 +6,12 @@
  * - 金额：Hub.book_amount←amount；Hub.confirmed_amount←reply_amount（非可确认金额）
  * - 行上写入 _hub_confirmation_id，下次按 id 精确匹配
  */
-import api from '@/utils/http'
+// 🔴 `apiProxy.api` 直接返回业务数据。原先 `import api from '@/utils/http'`（axios 实例，返回 AxiosResponse），
+//    下面按业务数据读 `res.items` / `created.id` ⇒ 既有台账恒读成空、新建的 id 恒取不到：每次同步都重复建函证，
+//    行上从不写回 `_hub_confirmation_id`（spec attachment-confirmation-evidence-loop 需求 1.5）。
+import { api } from '@/services/apiProxy'
 import type { ConfirmationRow } from '../confirmationTypes'
+import { isRepliedTrue } from '../replyStatus'
 import { isConfirmationInFlight } from './emitConfirmationCompleted'
 
 export type HubConfirmType = 'receivable' | 'payable' | 'bank' | 'loan'
@@ -63,7 +67,9 @@ export function accountTypeToHubType(accountType?: string, accountCode?: string)
 export function rowToHubStatus(row: ConfirmationRow): HubStatus {
   if (row.match_status === '相符') return 'matched'
   if (row.match_status === '不符') return 'discrepancy'
-  if (row.is_replied || row.reply_date) return 'returned'
+  // 🔴 走归一谓词：明细面板写的是 '是' / '否'，'否' 是真值 ⇒ 原写法把「明确未回函」推成已回函，
+  //    函证证据声明随之误判（spec attachment-confirmation-evidence-loop 需求 1.6，浏览器走查实测）
+  if (isRepliedTrue(row) || row.reply_date) return 'returned'
   if (row.send_date || row.confirmation_method || row.match_status === '未回函') return 'sent'
   return 'pending'
 }
@@ -99,6 +105,8 @@ export interface SyncHubResult {
   errors: string[]
   /** 写回行上的 _hub_confirmation_id，供调用方持久化 */
   hubIdByRowId: Record<string, string>
+  /** 本次新写入 / 改变了 `_hub_confirmation_id` 的行数（> 0 时调用方需持久化本表） */
+  remapped: number
 }
 
 /**
@@ -121,6 +129,12 @@ export async function syncHubFromSummary(options: {
     transitioned: 0,
     errors: [],
     hubIdByRowId: {},
+    remapped: 0,
+  }
+  const linkRow = (row: ConfirmationRow, rowId: string, hubId: string) => {
+    result.hubIdByRowId[rowId] = hubId
+    if (row._hub_confirmation_id !== hubId) result.remapped++
+    row._hub_confirmation_id = hubId
   }
   if (!projectId?.trim()) {
     result.errors.push('缺少 projectId')
@@ -190,8 +204,7 @@ export async function syncHubFromSummary(options: {
         if (hub?.id) {
           hubItems.push(hub)
           result.created++
-          result.hubIdByRowId[rowId] = hub.id
-          row._hub_confirmation_id = hub.id
+          linkRow(row, rowId, hub.id)
         }
       } else {
         await api.put(
@@ -207,8 +220,7 @@ export async function syncHubFromSummary(options: {
           { _silent: true } as any,
         )
         result.updated++
-        result.hubIdByRowId[rowId] = hub.id
-        row._hub_confirmation_id = hub.id
+        linkRow(row, rowId, hub.id)
       }
 
       if (hub?.id) {

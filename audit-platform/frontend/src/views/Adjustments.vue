@@ -15,15 +15,9 @@
         @year-change="onYearChange"
       />
       <template #actions>
-        <GtToolbar
-          :show-export="true"
-          :show-import="true"
-          export-label="导出汇总"
-          @export="onExportSummary"
-          @import="showImportDialog = true"
-        >
+        <GtToolbar :show-export="perms.export" :show-import="perms.import" export-label="导出汇总" @export="actions.exportSummary()" @import="openImport">
           <template #right-extra>
-            <el-dropdown @command="onExportTemplate">
+            <el-dropdown @command="(t: 'soe' | 'listed') => actions.exportTemplate(t, currentTemplateType)">
               <el-button size="small" plain>
                 📋 导出模板
                 <el-icon style="margin-left: 4px"><ArrowDown /></el-icon>
@@ -41,696 +35,302 @@
             </el-dropdown>
           </template>
           <template #left>
-            <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">+ 新建分录</el-button>
+            <el-button size="small" type="primary" @click="openCreate()" :disabled="!perms.writable || !perms.create"
+              :title="perms.writable ? (perms.create ? '' : '没有新建调整分录的权限') : '项目已归档，无法编辑'">+ 新建分录</el-button>
             <el-badge :value="collabInboxCount" :max="99" :hidden="collabInboxCount === 0" class="gt-adj-inbox-badge">
               <el-button size="small" plain @click="inboxDrawerVisible = true" title="转派给我、待我补充/确认的调整分录协作">
                 🤝 待我协作
               </el-button>
             </el-badge>
-            <div class="gt-adj-batch-toggle">
-              <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
-              <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
-                <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">
-                  📦 批量提交
-                </el-button>
-              </el-badge>
-            </div>
           </template>
         </GtToolbar>
       </template>
     </GtPageHeader>
 
-    <!-- 归档横幅 -->
+    <!-- 归档 / 合并锁定 / 缺审计年度 -->
     <ArchivedBanner />
     <ConsolLockedBanner />
+    <el-alert v-if="yearLoadFailed" type="error" :closable="false" show-icon style="margin-bottom: 8px">
+      <template #title>
+        <span>读取项目审计年度失败，无法加载调整数据。</span>
+        <el-button size="small" text type="primary" @click="reloadAdjustmentContext">重试</el-button>
+      </template>
+    </el-alert>
+    <el-alert v-else-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
+
+    <section v-if="resourceFailures.length" class="gt-adj-resource-errors" aria-live="polite" aria-label="数据读取状态">
+      <el-alert v-for="item in resourceFailures" :key="item.key" type="error" :closable="false" show-icon>
+        <template #title>
+          <div class="gt-adj-resource-error-row">
+            <span>{{ item.label }}：{{ item.error }}</span>
+            <span v-if="item.lastSuccessAt" class="gt-adj-resource-stale">
+              当前保留上次成功数据（{{ lastSuccessText(item.lastSuccessAt) }}）
+            </span>
+            <el-button size="small" text type="primary" :loading="item.loading" @click="retryResource(item.key)">重试</el-button>
+          </div>
+        </template>
+      </el-alert>
+    </section>
 
     <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
     <AiContentPendingBanner :project-id="projectId" />
 
+    <ClientBookingSuggestionBar :suggestions="bookingSuggestions" @review="openBookingSuggestion" />
+
     <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
     <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
-    <ConflictResolutionPanel
-      v-model="conflictPanelVisible"
-      :project-id="projectId"
-      @resolved="onConflictResolved"
-    />
+    <ConflictResolutionPanel v-model="conflictPanelVisible" :project-id="projectId" />
 
-    <!-- V3 Req 9.6: 数字信任度面板 -->
     <TrustScorePanel ref="trustScorePanelRef" :project-id="projectId" />
-
-    <!-- V3 Req 10.4: 可解释状态机面板 -->
     <StatusMachinePanel ref="smPanelRef" module="adjustment" :instance-id="selectedAdjId" />
-
-    <!-- V3 Req 11.6: 时光机面板 -->
-    <TimeMachineDrawer ref="tmDrawerRef" module="adjustment" :instance-id="selectedAdjId" @restored="onTimeMachineRestored" />
+    <TimeMachineDrawer ref="tmDrawerRef" module="adjustment" :instance-id="selectedAdjId" @restored="reloadLists" />
 
     <!-- 在线成员 [enterprise-linkage 3.2] -->
     <PresenceAvatars :project-id="projectId" view-name="adjustments" />
 
-    <!-- P0-2: 汇总面板（有分录时显示，0笔时隐藏减噪声） -->
+    <!-- 汇总面板（有分录时显示） -->
     <div class="gt-summary-panel" v-if="summary && (summary.aje_count + summary.rje_count > 0)">
       <div class="gt-summary-card">
         <span class="gt-summary-label">审计调整</span>
         <span class="gt-summary-value">{{ summary.aje_count }} 笔</span>
-        <span class="gt-summary-sub">借 {{ fmtAmt(summary.aje_total_debit) }} / 贷 {{ fmtAmt(summary.aje_total_credit) }}</span>
-        <!-- P2-14: 平衡标签 -->
-        <el-tag v-if="summary.aje_count > 0" :type="summary.aje_total_debit === summary.aje_total_credit ? 'success' : 'danger'" size="small" style="margin-top: 4px">
-          {{ summary.aje_total_debit === summary.aje_total_credit ? '✓ 平衡' : '✗ 不平衡' }}
-        </el-tag>
+        <span class="gt-summary-sub">借 {{ fmtAmount(summary.aje_total_debit) }} / 贷 {{ fmtAmount(summary.aje_total_credit) }}</span>
       </div>
       <div class="gt-summary-card">
         <span class="gt-summary-label">重分类</span>
         <span class="gt-summary-value">{{ summary.rje_count }} 笔</span>
-        <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
-        <!-- P2-14: 平衡标签 -->
-        <el-tag v-if="summary.rje_count > 0" :type="summary.rje_total_debit === summary.rje_total_credit ? 'success' : 'danger'" size="small" style="margin-top: 4px">
-          {{ summary.rje_total_debit === summary.rje_total_credit ? '✓ 平衡' : '✗ 不平衡' }}
-        </el-tag>
+        <span class="gt-summary-sub">借 {{ fmtAmount(summary.rje_total_debit) }} / 贷 {{ fmtAmount(summary.rje_total_credit) }}</span>
       </div>
-      <div class="gt-summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
-        <span class="gt-summary-label">{{ dictStore.label('adjustment_status', st as string) }}</span>
-        <span class="gt-summary-value">{{ cnt }}</span>
-      </div>
-      <!-- P1-5: TB影响概览条 -->
-      <div class="gt-summary-card gt-summary-card--impact" v-if="summary.aje_count + summary.rje_count > 0">
-        <span class="gt-summary-label">试算表影响</span>
-        <span class="gt-summary-value gt-summary-value--sm">{{ impactAccountCount }} 科目</span>
+      <div class="gt-summary-card gt-summary-card--impact">
+        <span class="gt-summary-label">已计入试算表</span>
+        <span class="gt-summary-value gt-summary-value--sm">{{ approvedImpact.entries }} 笔 · {{ approvedImpact.accounts }} 个科目</span>
+        <span v-if="approvedImpact.workpaperReady" class="gt-summary-sub">另有 {{ approvedImpact.workpaperReady }} 笔底稿来源分录已批准、等待来源审定表发布</span>
         <span class="gt-summary-sub">
-          <el-tag type="success" size="small" effect="plain" v-if="!loading">已更新</el-tag>
+          手工分录批准后计入；底稿来源分录批准后允许来源审定表显式发布
           <el-button size="small" text type="primary" @click="router.push(`/projects/${projectId}/trial-balance`)">查看试算表 →</el-button>
         </span>
       </div>
-      <el-button
-        style="margin-left: auto; align-self: flex-start"
-        type="primary"
-        plain
-        :icon="Reading"
-        @click="showHandbook = true"
-      >
-        使用手册
-      </el-button>
+      <el-button style="margin-left: auto; align-self: flex-start" type="primary" plain :icon="Reading" @click="showHandbook = true">使用手册</el-button>
     </div>
 
-    <!-- P0-1: 空态引导卡片（替代简单 info alert，让审计师第一眼就知道从哪开始） -->
-    <div v-if="!loading && entries.length === 0 && summary && (summary.aje_count + summary.rje_count === 0)" class="gt-adj-empty-guide">
+    <!-- 空态引导 -->
+    <div v-if="entriesResource.status.value === 'success' && summaryResource.status.value === 'success' && entries.length === 0 && summary && (summary.aje_count + summary.rje_count === 0)" class="gt-adj-empty-guide">
       <div class="gt-adj-empty-guide__header">
         <h3>开始编制调整分录</h3>
-        <p>调整分录将自动更新试算表审定数和报表数据。选择一种方式开始：</p>
+        <p>分录先存为草稿并提交复核。手工分录批准后计入试算表；底稿来源分录批准后允许来源审定表显式发布，随后联动报表与附注。选择一种方式开始：</p>
       </div>
       <div class="gt-adj-empty-guide__cards">
-        <div class="gt-adj-guide-card" @click="onGuideSyncFromWp">
+        <button type="button" class="gt-adj-guide-card" @click="onGuideSyncFromWp">
           <span class="gt-adj-guide-card__icon">📥</span>
           <span class="gt-adj-guide-card__title">从底稿同步</span>
-          <span class="gt-adj-guide-card__desc">将各科目底稿中已编制的调整分录汇聚到此处统一管理</span>
-        </div>
-        <div class="gt-adj-guide-card" @click="openCreateDialog">
+          <span class="gt-adj-guide-card__desc">把各科目底稿里编好的调整分录汇聚到这里统一复核</span>
+        </button>
+        <button type="button" class="gt-adj-guide-card" @click="openCreate()">
           <span class="gt-adj-guide-card__icon">✏️</span>
           <span class="gt-adj-guide-card__title">手工新建</span>
-          <span class="gt-adj-guide-card__desc">直接录入调整分录，支持快捷模板（坏账/折旧/重分类等）</span>
-        </div>
-        <div class="gt-adj-guide-card" @click="showImportDialog = true">
+          <span class="gt-adj-guide-card__desc">直接录入，支持常用模板（坏账 / 折旧 / 重分类等）和从 Excel 粘贴</span>
+        </button>
+        <button type="button" class="gt-adj-guide-card" @click="openImport">
           <span class="gt-adj-guide-card__icon">📊</span>
           <span class="gt-adj-guide-card__title">Excel 导入</span>
-          <span class="gt-adj-guide-card__desc">下载国企版/上市版模板填写后批量导入</span>
-        </div>
-        <div class="gt-adj-guide-card" @click="showHandbook = true">
+          <span class="gt-adj-guide-card__desc">下载国企版 / 上市版模板填写，预检通过后批量导入</span>
+        </button>
+        <button type="button" class="gt-adj-guide-card" @click="showHandbook = true">
           <span class="gt-adj-guide-card__icon">📖</span>
-          <span class="gt-adj-guide-card__title">查看编制手册</span>
-          <span class="gt-adj-guide-card__desc">了解调整分录编制规范、借贷方向、复核流程</span>
-        </div>
+          <span class="gt-adj-guide-card__title">查看使用手册</span>
+          <span class="gt-adj-guide-card__desc">录入规则、复核流程、通知与联动</span>
+        </button>
       </div>
     </div>
-
-    <!-- summary 未就绪时也保留手册入口 -->
-    <div v-else-if="!summary" class="gt-adj-handbook-fallback">
+    <div v-else-if="summaryResource.status.value === 'success' && !summary" class="gt-adj-handbook-fallback">
       <el-button type="primary" plain :icon="Reading" @click="showHandbook = true">使用手册</el-button>
     </div>
 
-    <!-- Tab 切换 + 全屏按钮（同行右对齐） -->
+    <!-- 筛选 -->
     <div class="gt-adj-tabs-row">
-      <el-tabs v-model="activeTab" class="gt-adj-tabs" @tab-change="onTabChange">
+      <el-tabs v-model="activeTab" class="gt-adj-tabs" @tab-change="adjPage = 1">
         <el-tab-pane label="全部" name="all" />
         <el-tab-pane label="审计调整" name="aje" />
         <el-tab-pane label="重分类" name="rje" />
       </el-tabs>
-      <el-segmented
-        v-model="originFilter"
-        :options="ORIGIN_FILTER_OPTIONS"
-        size="small"
-        class="gt-adj-origin-filter"
-        @change="loadEntries"
-      >
+      <el-input v-model="searchText" clearable size="small" placeholder="搜索编号、摘要、科目" style="width: 210px"
+        @keyup.enter="applyServerFilters" @clear="applyServerFilters" />
+      <el-segmented v-model="originFilter" :options="ORIGIN_FILTER_OPTIONS" size="small" class="gt-adj-origin-filter" @change="adjPage = 1">
         <template #default="{ item }">
           <el-tooltip :content="item.tip" placement="top" :disabled="!item.tip" :show-after="200">
             <span>{{ item.label }}</span>
           </el-tooltip>
         </template>
       </el-segmented>
-      <!-- P1-6: 从底稿同步主动入口 -->
-      <el-button size="small" type="success" plain @click="onGuideSyncFromWp" :disabled="!canEdit"
-        title="查看各科目底稿中有未同步到此处的调整分录，一键批量同步">
-        📥 从底稿同步
-      </el-button>
-      <el-select
-        v-model="creatorFilter"
-        placeholder="全部编制人"
-        clearable
-        size="small"
-        class="gt-adj-creator-filter"
-        style="width: 150px"
-        @change="adjPage = 1"
-        v-if="entries.length > 0"
-      >
-        <el-option v-for="name in creatorOptions" :key="name" :label="name" :value="name" />
+      <el-select v-model="phaseFilter" size="small" style="width: 112px" @change="adjPage = 1">
+        <el-option label="全部阶段" value="all" />
+        <el-option label="预审提出" value="preliminary" />
+        <el-option label="年审提出" value="final" />
       </el-select>
-      <el-checkbox v-model="collabOnly" size="small" class="gt-adj-collab-only" @change="adjPage = 1" v-if="entries.length > 0">仅看协作中</el-checkbox>
+      <el-select v-model="bookingFilter" size="small" style="width: 168px" @change="adjPage = 1">
+        <el-option label="全部最终处理" value="all" />
+        <el-option label="纳入工作试算表" value="included" />
+        <el-option label="客户已入账" value="effective" />
+        <el-option label="已入账但未生效" value="inactive" />
+        <el-option label="不予更正" value="unadjusted" />
+        <el-option label="待形成处理" value="pending" />
+      </el-select>
+      <el-select v-model="sortKey" size="small" style="width: 118px" @change="applyServerFilters">
+        <el-option label="编号排序" value="adjustment_no" />
+        <el-option label="金额排序" value="amount" />
+        <el-option label="创建时间" value="created_at" />
+        <el-option label="复核状态" value="review_status" />
+      </el-select>
+      <el-button size="small" plain @click="toggleSortOrder">{{ sortOrder === 'asc' ? '升序 ↑' : '降序 ↓' }}</el-button>
+      <el-button size="small" type="success" plain @click="onGuideSyncFromWp" title="底稿里编的调整分录如何汇聚到这里">📥 从底稿同步</el-button>
+      <el-select v-if="entries.length > 0" v-model="creatorFilter" placeholder="全部编制人" clearable size="small" style="width: 140px" @change="adjPage = 1">
+        <el-option v-for="person in creatorOptions" :key="person.id" :label="person.name" :value="person.id" />
+      </el-select>
+      <el-checkbox v-if="entries.length > 0" v-model="collabOnly" size="small" @change="adjPage = 1">仅看协作中</el-checkbox>
       <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
-        <el-button size="small" plain class="gt-adj-fs-btn" @click="onToggleFullscreen">
-          {{ tableFullscreen ? '退出全屏' : '⛶ 全屏' }}
-        </el-button>
+        <el-button size="small" plain class="gt-adj-fs-btn" @click="hallTableRef?.toggleFullscreen()">⛶ 全屏</el-button>
       </el-tooltip>
+    </div>
+    <div v-if="entries.length > 0" class="gt-adj-status-row">
+      <el-radio-group v-model="statusFilter" size="small" @change="adjPage = 1">
+        <el-radio-button v-for="s in STATUS_FILTERS" :key="s.value" :value="s.value">{{ s.label }} {{ statusCounts[s.value] || 0 }}</el-radio-button>
+      </el-radio-group>
+      <span v-if="myReviewTasks.length" class="gt-adj-status-hint">有 {{ myReviewTasks.length }} 笔分配给你复核</span>
+      <span v-else-if="statusCounts.pending_review && perms.review" class="gt-adj-status-team-hint">团队待复核 {{ statusCounts.pending_review }} 笔</span>
     </div>
 
     <!-- 科目过滤提示（从试算表跳转时显示） -->
-    <el-alert
-      v-if="filterAccount"
-      type="info"
-      show-icon
-      :closable="true"
-      style="margin-bottom: 12px"
-      @close="filterAccount = ''; fetchEntries()"
-    >
+    <el-alert v-if="filterAccount" type="info" show-icon :closable="true" style="margin-bottom: 12px" @close="filterAccount = ''">
       <template #title>
         <span>当前仅显示科目 <strong>{{ filterAccount }}</strong> 的相关分录</span>
-        <el-button size="small" text type="primary" style="margin-left: 8px" @click="filterAccount = ''; fetchEntries()">查看全部</el-button>
+        <el-button size="small" text type="primary" style="margin-left: 8px" @click="filterAccount = ''">查看全部</el-button>
       </template>
     </el-alert>
+    <el-alert v-if="entriesResource.status.value === 'success' && entries.length > 0 && filteredEntries.length === 0" type="info" show-icon :closable="false" style="margin-bottom: 12px"
+      title="当前筛选条件下没有分录，切换类型 / 状态或清除筛选查看全部。" />
 
-    <!-- 分录列表（P0-4: 有数据才显示筛选器，空态已由引导卡片处理） -->
-    <el-alert
-      v-if="!loading && entries.length === 0 && summary && (summary.aje_count + summary.rje_count > 0)"
-      type="info"
-      show-icon
-      :closable="false"
-      style="margin-bottom: 12px"
-    >
-      <template #title>当前筛选条件下无{{ activeTab === 'aje' ? '审计调整' : activeTab === 'rje' ? '重分类' : '' }}分录</template>
-      <div style="font-size: var(--gt-font-size-xs); line-height: 1.6; margin-top: 4px">
-        尝试切换 Tab 或清除筛选条件查看全部分录。
-      </div>
-    </el-alert>
-    <GtEditableTable
-      ref="adjTableRef"
-      :model-value="pagedEntries"
-      :columns="adjColumns"
-      :editable="false"
-      :show-selection="true"
-      :show-toolbar="false"
-      :show-footer="true"
-      :show-selection-bar="true"
-      v-loading="loading"
-      @selection-change="onSelectionChange"
-    >
-      <!-- 展开行：显示行项明细 -->
-      <template #expand="{ row }">
-        <div class="gt-adj-expand-detail">
-          <table class="gt-adj-line-table">
-            <colgroup>
-              <col style="width: 140px" />
-              <col />
-              <col style="width: 80px" />
-              <col style="width: 160px" />
-              <col style="width: 160px" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>科目编码</th>
-                <th>科目名称</th>
-                <th style="text-align:center">方向</th>
-                <th style="text-align:right">借方金额</th>
-                <th style="text-align:right">贷方金额</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(li, idx) in (row.line_items || [])" :key="idx">
-                <td>{{ li.standard_account_code }}</td>
-                <td>{{ li.account_name }}</td>
-                <td style="text-align:center">
-                  <span :class="Number(li.debit_amount) > 0 ? 'gt-adj-dir-dr' : 'gt-adj-dir-cr'">
-                    {{ Number(li.debit_amount) > 0 ? '借' : '贷' }}
-                  </span>
-                </td>
-                <td style="text-align:right" class="gt-amt">
-                  <GtAmountCell v-if="Number(li.debit_amount) > 0" :value="li.debit_amount" />
-                </td>
-                <td style="text-align:right" class="gt-amt">
-                  <GtAmountCell v-if="Number(li.credit_amount) > 0" :value="li.credit_amount" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="gt-adj-expand-footer">
-            <span v-if="row.description" class="gt-adj-expand-desc">📝 {{ row.description }}</span>
-            <span class="gt-adj-expand-impact" v-if="row.line_items?.length">
-              影响科目：{{ row.line_items.map((li: any) => li.account_name || li.standard_account_code).filter(Boolean).join('、') }}
-            </span>
-            <!-- P2-10: 查看变更历史 -->
-            <el-button size="small" text type="primary" class="gt-adj-expand-history"
-              @click="selectedAdjId = row.entry_group_id; openTimeMachine()">
-              🕐 查看历史
-            </el-button>
-            <!-- P2-10: 影响追溯（影响的报表行/附注章节） -->
-            <el-button size="small" text type="primary" class="gt-adj-expand-history"
-              @click="cellDetailWpCode = row.line_items?.[0]?.standard_account_code || ''; showCellFormulaDetail = true">
-              🔗 影响追溯
-            </el-button>
-          </div>
-        </div>
-      </template>
-      <template #col-adjustment_type="{ row }">
-        <el-tag :type="normalizeAdjustmentType(row.adjustment_type) === 'aje' ? 'danger' : 'warning'" size="small">
-          {{ formatAdjustmentType(row.adjustment_type) }}
-        </el-tag>
-      </template>
-      <template #col-main_account="{ row }">
-        <div v-if="row.line_items?.length" class="gt-adj-voucher">
-          <template v-for="(li, idx) in row.line_items" :key="idx">
-            <div
-              v-if="isDirectionSwitch(row.line_items, idx)"
-              class="gt-adj-voucher-divider-line"
-            ></div>
-            <div class="gt-adj-voucher-row">
-              <span class="gt-adj-voucher-code">{{ li.standard_account_code }}</span>
-              <span class="gt-adj-voucher-name">{{ li.account_name || '—' }}</span>
-            </div>
-          </template>
-        </div>
-        <span v-else class="gt-adj-col-placeholder">—</span>
-      </template>
-      <template #col-total_debit="{ row }">
-        <div v-if="row.line_items?.length" class="gt-adj-voucher">
-          <template v-for="(li, idx) in row.line_items" :key="idx">
-            <div
-              v-if="isDirectionSwitch(row.line_items, idx)"
-              class="gt-adj-voucher-divider-line"
-            ></div>
-            <div class="gt-adj-voucher-amt-cell gt-amt">
-              <GtAmountCell
-                v-if="Number(li.debit_amount) > 0"
-                :value="li.debit_amount"
-              />
-              <span v-else></span>
-            </div>
-          </template>
-        </div>
-      </template>
-      <template #col-total_credit="{ row }">
-        <div v-if="row.line_items?.length" class="gt-adj-voucher">
-          <template v-for="(li, idx) in row.line_items" :key="idx">
-            <div
-              v-if="isDirectionSwitch(row.line_items, idx)"
-              class="gt-adj-voucher-divider-line"
-            ></div>
-            <div class="gt-adj-voucher-amt-cell gt-amt">
-              <GtAmountCell
-                v-if="Number(li.credit_amount) > 0"
-                :value="li.credit_amount"
-              />
-              <span v-else></span>
-            </div>
-          </template>
-        </div>
-      </template>
-      <template #col-created_at="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
-      <template #col-origin="{ row }">
-        <el-tag v-if="row.origin === 'workpaper'" type="success" size="small"
-          style="cursor: pointer" @click="jumpToSourceWorkpaper(row)"
-          :title="'跳转来源底稿 ' + (sourceWpLabel(row) || '')">
-          底稿 {{ sourceWpLabel(row) }}
-        </el-tag>
-        <el-tag v-else type="info" size="small" effect="plain">手工</el-tag>
-      </template>
-      <template #col-review_status="{ row }">
-        <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
-        <el-tag v-if="row.has_active_collaboration" type="primary" size="small" effect="plain"
-          style="margin-left: 4px; cursor: pointer" title="存在进行中的协作补充，点击查看" @click="openCollabDialog(row)">
-          🤝协作中
-        </el-tag>
-        <!-- Sprint 4：StaleIndicator 统一组件 -->
-        <StaleIndicator
-          v-if="row.converted_to_misstatement_id && missStaleIdSet.has(row.converted_to_misstatement_id)"
-          :stale="true"
-          tooltip="错报阈值已变更，建议重新评估"
-          size="small"
-        />
-      </template>
-      <template #extra-columns>
-        <el-table-column label="操作" width="320" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="openEditDialog(row)"
-              :disabled="!canEdit || row.origin === 'workpaper' || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
-              :title="!canEdit ? '项目已归档，无法编辑' : (row.origin === 'workpaper' ? '该分录来源于底稿，请在来源底稿中修改后重新同步（此处编辑会在下次同步时被覆盖）' : '')">
-              编辑
-            </el-button>
-            <!-- chain-closure-phase3: 复核通过（草稿/待复核可操作） -->
-            <el-button v-if="canReview && (row.review_status === ADJUSTMENT_STATUS.DRAFT || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW)"
-              size="small" type="success" plain @click="singleReview(row, 'approved')">
-              通过
-            </el-button>
-            <!-- chain-closure-phase3: 撤回复核（仅已通过可操作） -->
-            <el-button v-if="canReview && row.review_status === ADJUSTMENT_STATUS.APPROVED"
-              size="small" type="info" plain @click="singleRevoke(row)">
-              撤回
-            </el-button>
-            <el-button size="small" type="primary" plain @click="openCollabDialog(row)"
-              title="转派给项目成员补充明细并确认（多人协作）">
-              协作
-            </el-button>
-            <el-button size="small" type="danger" @click="onDelete(row)"
-              v-permission="'adjustment:delete'"
-              :disabled="!canEdit || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
-              :title="!canEdit ? '项目已归档，无法编辑' : ''">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
+    <!-- 批量操作栏 -->
+    <div v-if="selectedRows.length > 0" class="gt-adj-batch-actions">
+      <span>已选 {{ selectedRows.length }} 笔</span>
+      <el-button v-for="b in batchButtons" :key="b.action" size="small" :type="b.type" :disabled="!b.count || !!actions.busy.value"
+        :loading="actions.isBusy(b.action)" @click="onBatch(b.action)">{{ b.label }} ({{ b.count }})</el-button>
+      <el-button size="small" text @click="hallTableRef?.clearSelection()">取消选择</el-button>
+    </div>
 
-      </template>
-      <!-- R10 Spec B / F8：调整分录右键菜单 - 查看关联底稿 -->
-      <template #context-menu="{ selectedCells }">
-        <div class="gt-ucell-ctx-item" @click="onCtxRelatedWp(selectedCells)">
-          <span class="gt-ucell-ctx-icon">📝</span> 查看关联底稿
-        </div>
-        <div class="gt-ucell-ctx-item" @click="onCtxViewImpactScope(selectedCells)">
-          <span class="gt-ucell-ctx-icon">🔎</span> 查看影响范围
-        </div>
-        <div class="gt-ucell-ctx-item" @click="onCtxTrustScore(selectedCells)">
-          <span class="gt-ucell-ctx-icon">📋</span> 数字信任度
-        </div>
-      </template>
-    </GtEditableTable>
-
-    <!-- 分页 -->
-    <div class="gt-pagination" v-if="adjTotal > adjPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
-      <el-pagination
-        v-model:current-page="adjPage"
-        :page-size="adjPageSize"
-        :total="adjTotal"
-        layout="total, prev, pager, next"
-        background
-        small
+    <!-- 分录列表（点表格后粘贴 Excel 多行 ⇒ 打开新建弹窗预填；tabindex 让点表格时焦点落在这里，粘贴事件才到得了） -->
+    <div class="gt-adj-paste-zone" tabindex="0" @paste="onHallPaste">
+      <AdjustmentHallTable
+        ref="hallTableRef"
+        :rows="pagedEntries"
+        :loading="loading"
+        :perms="perms"
+        :busy="actions.busy.value"
+        :focus-id="focusId"
+        :stale-misstatement-ids="missStaleIdSet"
+        @selection-change="(rows: any[]) => (selectedRows = rows)"
+        @action="onRowAction"
       />
     </div>
-
-    <!-- 批量复核操作（chain-closure-phase3: 按 adjustment:review 权限显示） -->
-    <div class="gt-adj-batch-actions" v-if="selectedRows.length > 0 && canReview">
-      <span>已选 {{ selectedRows.length }} 条</span>
-      <el-button type="success" size="small" @click="batchReview('approved')">批量批准</el-button>
-      <el-button type="warning" size="small" @click="showRejectDialog = true">批量驳回</el-button>
-      <el-button type="info" size="small" @click="showRevokeDialog = true">撤回复核</el-button>
+    <div class="gt-pagination" v-if="adjTotal > adjPageSize">
+      <el-pagination v-model:current-page="adjPage" :page-size="adjPageSize" :total="adjTotal" layout="total, prev, pager, next" background small />
     </div>
 
-    <!-- 批量模式浮动提交栏 -->
-    <transition name="el-fade-in">
-      <div v-if="batchMode && batchPendingCount > 0" class="gt-adj-batch-float-bar">
-        <span>📦 批量模式：{{ batchPendingCount }} 笔待提交</span>
-        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-info)">提交后将一次性触发试算表重算</span>
-        <span style="flex:1" />
-        <el-button size="small" @click="batchMode = false; batchPendingCount = 0">取消全部</el-button>
-        <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">
-          ✓ 提交全部 ({{ batchPendingCount }})
-        </el-button>
-      </div>
-    </transition>
+    <!-- 弹窗 -->
+    <AdjustmentEntryDialog ref="entryDialogRef" :project-id="projectId" :year="year" :account-options="accountOptions"
+      :accounts-ready="accountsReady" :can-edit="perms.writable && (perms.create || perms.edit)" @saved="onEntrySaved" />
+    <AdjustmentSubmitReviewDialog ref="submitDialogRef" :project-id="projectId" @done="reloadLists" />
+    <AdjustmentReasonDialog ref="reasonDialogRef" />
+    <AdjustmentImportDialog ref="importDialogRef" :project-id="projectId" :year="year" :template-type="currentTemplateType"
+      :can-edit="perms.writable && perms.import" @download-template="onDownloadTemplate"
+      @imported="reloadLists" @submit-review="onSubmitImported" />
 
-    <!-- 驳回原因弹窗 -->
-    <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="520px" @open="onRejectDialogOpen">
-      <!-- 模式切换 -->
-      <div style="margin-bottom: 16px">
-        <el-radio-group v-model="rejectMode" size="small">
-          <el-radio-button value="unified">统一原因</el-radio-button>
-          <el-radio-button value="individual">逐条原因</el-radio-button>
-        </el-radio-group>
-      </div>
-
-      <!-- 统一原因模式 -->
-      <template v-if="rejectMode === 'unified'">
-        <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="请输入统一驳回原因" />
-      </template>
-
-      <!-- 逐条原因模式 -->
-      <template v-else>
-        <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 8px">
-          为每条分录填写独立驳回原因（留空时使用统一原因）
-        </div>
-        <el-input
-          v-model="rejectReason"
-          type="textarea"
-          :rows="2"
-          placeholder="统一原因（逐条留空时使用）"
-          style="margin-bottom: 12px"
-        />
-        <div
-          v-for="row in selectedRows"
-          :key="row.entry_group_id"
-          style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px"
-        >
-          <span style="min-width: 120px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text); flex-shrink: 0">
-            {{ row.adjustment_no || row.entry_group_id?.slice(0, 8) }}
-          </span>
-          <el-input
-            v-model="individualReasons[row.entry_group_id]"
-            size="small"
-            placeholder="此条驳回原因（可留空）"
-            style="flex: 1"
-          />
-        </div>
-      </template>
-
-      <template #footer>
-        <el-button @click="showRejectDialog = false">取消</el-button>
-        <el-button type="primary" @click="batchReview('rejected')" :disabled="!rejectReason && rejectMode === 'unified'">确认驳回</el-button>
-      </template>
+    <el-dialog v-model="impactVisible" :title="`影响范围 · ${impactRow?.adjustment_no || ''}`" width="640px" append-to-body>
+      <p class="gt-adj-impact-tip">按本分录的科目与金额测算对报表行、底稿的影响（批准后才计入；草稿只是预览）。</p>
+      <AdjustmentImpactPreview v-if="impactVisible && impactRow" :project-id="projectId" :year="year"
+        :adjustment-type="String(impactRow.adjustment_type || 'aje').toLowerCase() === 'rje' ? 'rje' : 'aje'"
+        :line-items="impactRow.line_items || []" />
     </el-dialog>
-
-    <!-- 新建/编辑分录弹窗 -->
-    <el-dialog append-to-body v-model="formDialogVisible" :title="isEditing ? '编辑分录' : '新建分录'" width="800px" destroy-on-close>
-
-    <!-- 撤回复核弹窗（chain-closure-phase3 需求 3.1） -->
-    <el-dialog append-to-body v-model="showRevokeDialog" title="撤回复核" width="520px">
-      <p style="margin-bottom: 12px; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm)">
-        撤回复核后，分录将回到草稿状态，下游试算表、报表与附注将随之回退。
-      </p>
-      <el-input v-model="revokeReason" type="textarea" :rows="3" placeholder="撤回原因（可选）" />
-      <template #footer>
-        <el-button @click="showRevokeDialog = false">取消</el-button>
-        <el-button type="primary" @click="onBatchRevoke">确认撤回</el-button>
-      </template>
+    <el-dialog v-model="relatedVisible" title="关联底稿" width="480px" append-to-body>
+      <button v-for="w in relatedWps" :key="w.id" type="button" class="gt-adj-related-item" @click="openWorkpaper(w.id)">
+        <span class="gt-adj-related-code">{{ w.wp_code }}</span> {{ w.wp_name }}
+      </button>
     </el-dialog>
-      <el-form ref="adjFormRef" :model="form" :rules="adjFormRules" label-width="90px">
-        <el-form-item label="类型" prop="adjustment_type" v-if="!isEditing">
-          <el-radio-group v-model="form.adjustment_type">
-            <el-radio value="aje">审计调整</el-radio>
-            <el-radio value="rje">重分类</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="快捷模板" v-if="!isEditing">
-          <el-select v-model="selectedTemplate" placeholder="选择常用模板快速填充" clearable size="small" style="width:100%" @change="onTemplateSelect">
-            <el-option-group label="审计调整常用">
-              <el-option value="bad_debt" label="坏账准备计提" />
-              <el-option value="depreciation" label="固定资产折旧" />
-              <el-option value="amortization" label="无形资产摊销" />
-              <el-option value="accrued_expense" label="预提费用" />
-              <el-option value="revenue_cutoff" label="收入截止调整" />
-            </el-option-group>
-            <el-option-group label="重分类常用">
-              <el-option value="rcl_current_noncurrent" label="流动/非流动重分类" />
-              <el-option value="rcl_ar_prepay" label="应收/预付重分类" />
-              <el-option value="rcl_ap_advance" label="应付/预收重分类" />
-            </el-option-group>
-          </el-select>
-        </el-form-item>
-        <!-- P2-7: 自定义编号（可选，不填则自动生成） -->
-        <el-form-item label="编号" v-if="!isEditing">
-          <el-input v-model="form.custom_no" placeholder="留空则自动生成 AJE-001 / RJE-001" clearable>
-            <template #prefix><span style="color:var(--gt-color-text-tertiary);font-size:12px">#</span></template>
-          </el-input>
-          <div style="font-size:11px;color:var(--gt-color-text-tertiary);margin-top:2px">自动编号规则：类型前缀 + 序号（如 AJE-003），可按事务所内部编号体系自定义</div>
-        </el-form-item>
-        <el-form-item label="摘要" prop="description">
-          <el-input v-model="form.description" placeholder="调整说明（如：基于ECL模型补提应收账款坏账准备）" />
-        </el-form-item>
-        <!-- P2-15: 调整目的/审计依据（导出Excel时附带） -->
-        <el-form-item label="调整目的">
-          <el-input v-model="form.purpose" placeholder="可选，如：更正截止性错误 / 补提资产减值" />
-        </el-form-item>
-
-        <!-- 动态行项 -->
-        <div class="gt-adj-line-items-header">
-          <span>行项明细</span>
-          <el-button size="small" @click="addLine">+ 添加行</el-button>
-        </div>
-        <el-table :data="form.line_items" border size="small" style="margin-bottom: 12px">
-          <el-table-column label="科目" min-width="240">
-            <template #default="{ row, $index }">
-              <el-select v-model="row.standard_account_code" filterable placeholder="选择科目"
-                style="width: 100%" @change="onAccountSelect($index)">
-                <el-option v-for="opt in accountOptions" :key="opt.code"
-                  :label="`${opt.code} ${opt.name}`" :value="opt.code">
-                  <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-                    <span>{{ opt.code }} {{ opt.name }}</span>
-                    <span style="display:flex;align-items:center;gap:8px">
-                      <!-- P2-13: 科目下拉显示试算表余额 -->
-                      <span v-if="opt.balance != null" style="color:var(--gt-color-text-tertiary);font-size:11px;font-variant-numeric:tabular-nums">
-                        余额 {{ fmtAmt(opt.balance) }}
-                      </span>
-                      <span v-if="opt.report_line" style="color:var(--gt-color-text-tertiary);font-size:11px">
-                        → {{ opt.report_line }}
-                      </span>
-                    </span>
-                  </div>
-                </el-option>
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="借方" width="140">
-            <template #default="{ row }">
-              <el-input-number v-model="row.debit_amount" :min="0" :precision="2" :controls="false"
-                style="width: 100%" />
-            </template>
-          </el-table-column>
-          <el-table-column label="贷方" width="140">
-            <template #default="{ row }">
-              <el-input-number v-model="row.credit_amount" :min="0" :precision="2" :controls="false"
-                style="width: 100%" />
-            </template>
-          </el-table-column>
-          <el-table-column width="60">
-            <template #default="{ $index }">
-              <el-button size="small" type="danger" text @click="removeLine($index)"
-                :disabled="form.line_items.length <= 1">✕</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <!-- 借贷差额 -->
-        <div class="gt-adj-balance-diff" :class="{ 'gt-adj-unbalanced': balanceDiff !== 0 }">
-          借方合计: {{ fmtAmountWithZero(totalDebit) }} | 贷方合计: {{ fmtAmountWithZero(totalCredit) }}
-          | 差额: {{ fmtAmountWithZero(balanceDiff) }}
-        </div>
-
-        <!-- 影响预判面板 [enterprise-linkage 3.8] -->
-        <ImpactPreviewPanel :preview="impactPreview" :loading="impactLoading" />
-      </el-form>
-      <template #footer>
-        <el-button @click="formDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="onSubmit" :disabled="!canEdit || balanceDiff !== 0" :loading="adjSubmitting || submitLoading">
-          {{ isEditing ? '保存' : '创建' }}
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 统一导入弹窗 -->
-    <UnifiedImportDialog
-      v-model="showImportDialog"
-      import-type="adjustments"
-      :project-id="projectId"
-      :year="year"
-      @imported="onImported"
-    />
-
-    <!-- Sprint 5.9: 影响范围弹窗 -->
-    <CellFormulaDetail
-      :visible="showCellFormulaDetail"
-      module="ADJ"
-      :wp-code="cellDetailWpCode"
-      :sheet-name="cellDetailSheet"
-      :label="cellDetailLabel"
-      @update:visible="showCellFormulaDetail = $event"
-      @navigate="onCellDetailNavigate"
-    />
 
     <!-- 调整分录协作接力（adjustment-collaboration-and-propagation） -->
     <AdjustmentCollaborationDialog
       v-model="collabDialogVisible"
       :project-id="projectId"
-      :year="selectedYear ?? year ?? 2025"
+      :year="selectedYear ?? year"
       :entry-group-id="collabRow?.entry_group_id || ''"
       :adjustment-no="collabRow?.adjustment_no"
       :account-options="accountOptions"
       :line-items="collabLineItems"
-      :can-edit="canEdit"
+      :can-edit="perms.writable && perms.edit"
       @updated="onCollabUpdated"
     />
 
-    <!-- 待我协作 收件箱（P0-3） -->
+    <!-- 待我协作 收件箱 -->
     <el-drawer v-model="inboxDrawerVisible" title="待我协作的调整分录" size="420px" append-to-body>
-      <el-empty v-if="collabInbox.length === 0" description="暂无待我协作的分录组" :image-size="80" />
-      <div v-else class="gt-adj-inbox-list">
-        <div v-for="it in collabInbox" :key="it.id" class="gt-adj-inbox-item" @click="openCollabFromInbox(it)">
+      <el-alert v-if="collabResource.status.value === 'error'" type="error" :closable="false" show-icon :title="collabResource.error.value">
+        <template #default>
+          <el-button size="small" text type="primary" @click="refreshCollabInbox">重试</el-button>
+        </template>
+      </el-alert>
+      <div v-else-if="collabResource.status.value === 'loading'" class="gt-adj-inbox-loading">正在加载协作事项…</div>
+      <el-empty v-else-if="collabResource.status.value === 'success' && collabInbox.length === 0" description="暂无待我协作的分录组" :image-size="80" />
+      <div v-else-if="collabInbox.length" class="gt-adj-inbox-list">
+        <button v-for="it in collabInbox" :key="it.id" type="button" class="gt-adj-inbox-item" @click="openCollabFromInbox(it)">
           <div class="gt-adj-inbox-row">
-            <span class="gt-adj-inbox-no">{{ it.entry_group_id.slice(0, 8) }}</span>
+            <span class="gt-adj-inbox-no">{{ entryNo(it.entry_group_id) }}</span>
             <el-tag size="small" :type="it.status === 'contributed' ? 'primary' : (it.status === 'acknowledged' ? 'warning' : 'info')">
               {{ COLLAB_STATUS_LABELS[it.status] || it.status }}
             </el-tag>
             <span class="gt-adj-inbox-round">第 {{ it.round }} 轮</span>
           </div>
           <div v-if="it.note" class="gt-adj-inbox-note">📝 {{ it.note }}</div>
-        </div>
+        </button>
       </div>
     </el-drawer>
 
-    <!-- 使用手册 -->
+    <ClientBookingDialog ref="bookingDialogRef" :project-id="projectId" :year="year" @updated="reloadAdjustmentContext" />
+    <AdjustmentTreatmentDialog ref="treatmentDialogRef" :project-id="projectId" :year="year" @updated="reloadAdjustmentContext" />
+    <AdjustmentEvidenceDialog ref="evidenceDialogRef" :project-id="projectId" :year="year" />
     <AdjustmentsHandbookDialog v-model="showHandbook" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+/**
+ * 调整分录大厅（spec adjustment-hall-entry-review-closure 需求 5）。
+ *
+ * 录入 / 导入 / 提交复核 / 驳回 / 撤回等弹窗在 components/adjustment，写操作在 useAdjustmentHallActions；
+ * 本页负责取数（全部分页）、筛选与计数、深链（?focus= 定位高亮、?group= 打开协作、?account= 按科目过滤）与 SSE 刷新。
+ */
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Reading } from '@element-plus/icons-vue'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import AdjustmentsHandbookDialog from '@/views/adjustments/AdjustmentsHandbookDialog.vue'
-import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
 import {
-  listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
-  reviewAdjustment, revokeAdjustmentReview, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
-  batchCommitAdjustments,
-  convertAjeToMisstatement,
-  getCollaborationInbox,
-  type AdjustmentSummary, type AccountOption,
+  getAccountDropdown, getAdjustmentSummary, getCollaborationInbox, listAdjustmentBookingSuggestions,
+  listAdjustmentReviewTasks, listAdjustments,
+  type AccountOption, type AdjustmentBookingSuggestion, type AdjustmentListPage,
+  type AdjustmentReviewTask, type AdjustmentSummary,
 } from '@/services/auditPlatformApi'
 import { COLLAB_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCollaboration'
 import { useProjectStore } from '@/stores/project'
-import { useDictStore } from '@/stores/dict'
-import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
-import { fmtAmount, fmtAmountWithZero } from '@/utils/formatters'
-import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { fmtAmount } from '@/utils/formatters'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
-import { operationHistory } from '@/utils/operationHistory'
-import { useAutoSave } from '@/composables/useAutoSave'
 import { useProjectRole } from '@/composables/useProjectRole'
-import { usePasteImport } from '@/composables/usePasteImport'
-import { parseApiError } from '@/composables/useApiError'
-import { useEditMode } from '@/composables/useEditMode'
-// Spec A R1：跨视图 stale 摘要
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
-import StaleIndicator from '@/components/StaleIndicator.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { ADJUSTMENT_SHEET_ALIAS } from '@/utils/normalizeSheetName'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
-import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
-import GtAmountCell from '@/components/common/GtAmountCell.vue'
-import GtEditableTable from '@/components/common/GtEditableTable.vue'
-import type { GtColumn } from '@/components/common/GtEditableTable.vue'
-import ImpactPreviewPanel from '@/components/ImpactPreviewPanel.vue'
-import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
-import AdjustmentCollaborationDialog from '@/components/adjustment/AdjustmentCollaborationDialog.vue'
-import { useImpactPreview } from '@/composables/useImpactPreview'
-import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { ADJUSTMENT_STATUS, ADJUSTMENT_STATUS_LABELS } from '@/constants/statusEnum'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
@@ -743,296 +343,604 @@ import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPan
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
-import { rules, makeRules } from '@/utils/formRules'
-import { useFormSubmit } from '@/composables/useFormSubmit'
-import type { FormInstance, FormRules } from 'element-plus'
+import AdjustmentCollaborationDialog from '@/components/adjustment/AdjustmentCollaborationDialog.vue'
+import AdjustmentHallTable from '@/components/adjustment/AdjustmentHallTable.vue'
+import AdjustmentEntryDialog from '@/components/adjustment/AdjustmentEntryDialog.vue'
+import AdjustmentSubmitReviewDialog from '@/components/adjustment/AdjustmentSubmitReviewDialog.vue'
+import AdjustmentReasonDialog from '@/components/adjustment/AdjustmentReasonDialog.vue'
+import AdjustmentImportDialog from '@/components/adjustment/AdjustmentImportDialog.vue'
+import ClientBookingDialog from '@/components/adjustment/ClientBookingDialog.vue'
+import AdjustmentTreatmentDialog from '@/components/adjustment/AdjustmentTreatmentDialog.vue'
+import AdjustmentEvidenceDialog from '@/components/adjustment/AdjustmentEvidenceDialog.vue'
+import ClientBookingSuggestionBar from '@/components/adjustment/ClientBookingSuggestionBar.vue'
+import AdjustmentImpactPreview from '@/components/adjustment/AdjustmentImpactPreview.vue'
+import { parsePastedLines, type EditableLine, type EntrySavedPayload } from '@/components/adjustment/adjustmentLineRules'
+import {
+  skipMessage, splitEligible, useAdjustmentHallActions, withDescriptions,
+  type HallAction, type HallEntry, type HallPerms,
+} from '@/composables/useAdjustmentHallActions'
+import { useAdjustmentHallResource } from '@/composables/useAdjustmentHallResource'
+import { buildAdjustmentRouteTarget, parseAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 const showHandbook = ref(false)
 const route = useRoute()
 const router = useRouter()
-const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
-const { canEdit, onContextChange } = useAuditContext()
-const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
-
-/** GtEditableTable 列配置 (P2-8: 摘要列 show-overflow-tooltip; P2-13: 科目下拉带余额) */
-const adjColumns: GtColumn[] = [
-  { prop: 'adjustment_no', label: '编号', width: 120 },
-  { prop: 'adjustment_type', label: '类型', width: 70 },
-  { prop: 'description', label: '摘要', minWidth: 200, showOverflowTooltip: true },
-  { prop: 'main_account', label: '主要科目', minWidth: 280 },
-  { prop: 'total_debit', label: '借方金额', width: 130, align: 'right' },
-  { prop: 'total_credit', label: '贷方金额', width: 130, align: 'right' },
-  { prop: 'creator_name', label: '编制人', width: 100 },
-  { prop: 'created_at', label: '日期', width: 130 },
-  { prop: 'origin', label: '来源', width: 110 },
-  { prop: 'review_status', label: '状态', width: 110 },
-]
-
-/** 判断当前行是否是借/贷方向切换点（用于在三列同步加分隔线） */
-function isDirectionSwitch(items: any[], idx: number): boolean {
-  if (!items || idx === 0) return false
-  const prev = items[idx - 1]
-  const curr = items[idx]
-  const prevIsDebit = Number(prev?.debit_amount) > 0
-  const currIsDebit = Number(curr?.debit_amount) > 0
-  return prevIsDebit !== currIsDebit
-}
-
-const dictStore = useDictStore()
+const { isArchived, onContextChange } = useAuditContext()
 const projectStore = useProjectStore()
 
 const projectId = computed(() => projectStore.projectId)
 const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
-const yearOptions = computed(() => projectStore.yearOptions)
-const selectedYear = ref(projectStore.year)
+const selectedYear = ref<number | null>(projectStore.year)
 
-// chain-closure-phase3: 复核权限门控
+// 权限：项目可写（未归档）× 项目内权限（编辑 / 复核调整分录）
 const { projectCan } = useProjectRole(computed(() => projectId.value || ''))
-const canReview = computed(() => projectCan('adjustment:review'))
+const perms = computed<HallPerms>(() => ({
+  writable: !isArchived.value,
+  create: projectCan('adjustment:create'),
+  edit: projectCan('adjustment:edit'),
+  submit: projectCan('adjustment:submit'),
+  review: projectCan('adjustment:review'),
+  approve: projectCan('adjustment:approve'),
+  delete: projectCan('adjustment:delete'),
+  import: projectCan('adjustment:import'),
+  export: projectCan('adjustment:export'),
+}))
 
-// ─── useStaleRefresh：试算表变更后自动刷新调整分录 ────────────────────────────
-const adjStaleRefresh = useStaleRefresh(projectId, {
-  events: ['trial-balance:updated', 'adjustment:sync-arrived', 'adjustment:review-changed'],
+// ─── useStaleRefresh：试算表变更 / 底稿推送 / 复核状态变化后自动刷新 ───────────
+useStaleRefresh(projectId, {
+  events: ['trial-balance:updated', 'adjustment:sync-arrived', 'adjustment:review-changed', 'adjustment:client-booking-changed', 'adjustment:treatment-changed'],
   mode: 'auto',
-  onRefresh: () => { fetchEntries(); fetchSummary(); refreshCollabInbox() },
+  onRefresh: () => { void reloadLists() },
 })
 
 // ─── SSE → mitt 桥接：broadcast_raw 事件经 SSE 到达，转发到 mitt 供 useStaleRefresh 消费 ──
 const _sseSubs: ProjectEventSubscription[] = []
-const SSE_BRIDGE_EVENTS = ['adjustment:review-changed', 'adjustment:sync-arrived'] as const
+const SSE_BRIDGE_EVENTS = ['adjustment:review-changed', 'adjustment:sync-arrived', 'adjustment:client-booking-changed', 'adjustment:treatment-changed'] as const
+function _refreshAdjustmentsAfterReconnect() {
+  // 两个事件走 broadcast_raw、没有 typed replay id；barrier 完成后按当前项目全量校准。
+  void fetchEntries()
+  void fetchSummary()
+  void refreshCollabInbox()
+}
 function _setupSseBridge(pid: string) {
   _teardownSseBridge()
   if (!pid) return
   for (const evt of SSE_BRIDGE_EVENTS) {
     _sseSubs.push(subscribeProjectEvent(pid, evt, (data) => {
       eventBus.emit(evt as any, { ...(data as Record<string, unknown> || {}), projectId: pid })
-    }))
+    }, { onReconnect: _refreshAdjustmentsAfterReconnect }))
   }
 }
 function _teardownSseBridge() {
   for (const s of _sseSubs.splice(0)) s.close()
 }
 watch(projectId, (pid) => _setupSseBridge(pid || ''), { immediate: true })
-onBeforeUnmount(_teardownSseBridge)
 
-// 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
 const conflictPanelVisible = ref(false)
-function onConflictResolved(_id: string, _resolution: string) {
-  // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
-}
 
 function onProjectChange(pid: string) {
-  router.push({ path: `/projects/${pid}/adjustments`, query: route.query })
+  // 换项目只带年度（定位 / 协作 / 科目过滤参数属于原项目）
+  router.push(buildAdjustmentRouteTarget(pid, null, { year: routeYear.value }))
 }
 function onYearChange(y: number) {
   selectedYear.value = y
   projectStore.changeYear(y)
-  router.push({ path: route.path, query: { year: String(y) } })
+  router.push(buildAdjustmentRouteTarget(projectId.value, null, { year: y }))
 }
 
-const routeYear = computed(() => {
-  const value = Number(route.query.year)
-  return Number.isFinite(value) && value > 2000 ? value : null
-})
-const projectYear = ref<number | null>(null)
-const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
+const parsedRouteTarget = computed(() => parseAdjustmentRouteTarget(route.query as Record<string, unknown>))
+const routeYear = computed(() => parsedRouteTarget.value.year)
+const year = computed<number | null>(() => routeYear.value ?? projectStore.year ?? null)
+/** 项目 store 已解析年度后才显示“未设置”，读取失败与业务空值分开。 */
+const yearResolved = computed(() => projectStore.yearStatus !== 'loading')
+const yearLoadFailed = computed(() => projectStore.yearStatus === 'failed')
 
-// Spec A R1：跨视图 stale 摘要（错报阈值变化时显示标志）
-const projectIdRef = computed(() => projectId.value || '')
-const { misstatements: missStaleSummary } = useStaleSummaryFull(projectIdRef, year)
-const missStaleIdSet = computed(() => new Set(missStaleSummary.value.items.map((it: any) => it.id)))
+// Spec A R1：错报阈值变化时，已转错报的分录标「建议重新评估」
+const { misstatements: missStaleSummary } = useStaleSummaryFull(computed(() => projectId.value || ''), year)
+const missStaleIdSet = computed(() => new Set<string>(missStaleSummary.value.items.map((it: any) => it.id)))
 
-const loading = ref(false)
-const showImportDialog = ref(false)
-const submitLoading = ref(false)
-const currentTemplateType = ref<'soe' | 'listed' | ''>('')  // 当前项目的模板类型(国企/上市)
-const activeTab = ref('all')
-// 来源筛选（workpaper-adjustment-centralization）：全部/手工/底稿
-const ORIGIN_FILTER_OPTIONS = [
-  { label: '全部来源', value: 'all', tip: '显示手工录入与底稿汇聚的全部调整分录' },
-  { label: '手工录入', value: 'manual', tip: '在本模块直接新建/录入的调整分录' },
-  { label: '底稿汇聚', value: 'workpaper', tip: '从各科目底稿点击"同步到调整分录模块"汇聚而来的分录' },
-]
-const originFilter = ref('all')
-const entries = ref<any[]>([])
-const summary = ref<AdjustmentSummary | null>(null)
+// ─── 数据：五类读取各自保留状态、错误、最后成功时间和请求代际 ───────────────
+type TemplateType = 'soe' | 'listed' | ''
+type CollabInboxItem = { id: string; entry_group_id: string; status: string; round: number; note?: string | null }
+
+const contextEpoch = ref(0)
+const resourceContextKey = () => `${contextEpoch.value}:${projectId.value}:${year.value ?? 'none'}`
+const entriesResource = useAdjustmentHallResource<AdjustmentListPage>(() => ({
+  items: [], total: 0, page: 1, page_size: 50, has_more: false, status_counts: {},
+}), resourceContextKey)
+const summaryResource = useAdjustmentHallResource<AdjustmentSummary | null>(() => null, resourceContextKey)
+const accountsResource = useAdjustmentHallResource(() => [] as AccountOption[], resourceContextKey)
+const templateResource = useAdjustmentHallResource<TemplateType>(() => '', resourceContextKey)
+const collabResource = useAdjustmentHallResource(() => [] as CollabInboxItem[], resourceContextKey)
+const reviewTaskResource = useAdjustmentHallResource(() => [] as AdjustmentReviewTask[], resourceContextKey)
+const bookingSuggestionResource = useAdjustmentHallResource(() => [] as AdjustmentBookingSuggestion[], resourceContextKey)
+
+const entries = computed<any[]>(() => entriesResource.data.value.items)
+const summary = summaryResource.data
+const accountOptions = accountsResource.data
+const currentTemplateType = templateResource.data
+const collabInbox = collabResource.data
+const myReviewTasks = reviewTaskResource.data
+const bookingSuggestions = bookingSuggestionResource.data
+const loading = computed(() => entriesResource.status.value === 'loading')
+const accountsReady = computed(() => accountsResource.status.value === 'success')
 const selectedRows = ref<any[]>([])
 
-// ─── 分页 ─────────────────────────────────────────────────────────────────────
-const adjPage = ref(1)
-const adjPageSize = ref(50)
-// P2-7 按编制人筛选 / P2-8 仅看协作中（客户端过滤，数据由 list 接口 enrich 的 creator_name/has_active_collaboration 驱动）
-const creatorFilter = ref('')
-const collabOnly = ref(false)
-const creatorOptions = computed<string[]>(() => {
-  const s = new Set<string>()
-  for (const e of entries.value) if (e.creator_name) s.add(e.creator_name)
-  return [...s].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-})
-const filteredEntries = computed(() => entries.value.filter((e: any) =>
-  (!creatorFilter.value || e.creator_name === creatorFilter.value)
-  && (!collabOnly.value || e.has_active_collaboration),
-))
-const adjTotal = computed(() => filteredEntries.value.length)
-const pagedEntries = computed(() => {
-  const start = (adjPage.value - 1) * adjPageSize.value
-  return filteredEntries.value.slice(start, start + adjPageSize.value)
-})
+const resourceFailures = computed(() => [
+  { key: 'entries', label: '分录列表', resource: entriesResource },
+  { key: 'summary', label: '汇总数据', resource: summaryResource },
+  { key: 'accounts', label: '科目数据', resource: accountsResource },
+  { key: 'template', label: '模板类型', resource: templateResource },
+  { key: 'collaboration', label: '协作事项', resource: collabResource },
+  { key: 'reviewTasks', label: '我的复核任务', resource: reviewTaskResource },
+  { key: 'bookingSuggestions', label: '客户已入账建议', resource: bookingSuggestionResource },
+].filter(({ resource }) => resource.status.value === 'error').map(({ key, label, resource }) => ({
+  key,
+  label,
+  error: resource.error.value,
+  lastSuccessAt: resource.lastSuccessAt.value,
+  loading: resource.status.value === 'loading',
+})))
 
-// P1-5: 试算表影响科目数（从分录行项的科目去重计数）
-const impactAccountCount = computed(() => {
-  const codes = new Set<string>()
-  for (const e of entries.value) {
-    for (const li of (e.line_items || [])) {
-      if (li.standard_account_code) codes.add(li.standard_account_code)
-    }
-  }
-  return codes.size
-})
-
-// ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
-const impactProjectId = projectId
-const impactYear = computed(() => selectedYear.value ?? 2025)
-const { preview: impactPreview, loading: impactLoading, fetchPreview } = useImpactPreview(impactProjectId, impactYear)
-
-// R7-S3-08 Task 41 + R9 F10 Task 33：粘贴多行分录
-const adjTableRef = ref<HTMLElement | null>(null)
-
-// 全屏代理：从 GtEditableTable 内部 fullscreen 实例读写状态
-const tableFullscreen = computed(() => (adjTableRef.value as any)?.fullscreen?.isFullscreen?.value || false)
-function onToggleFullscreen() {
-  ;(adjTableRef.value as any)?.fullscreen?.toggleFullscreen?.()
+function lastSuccessText(value: number | null): string {
+  if (value == null) return ''
+  return new Date(value).toLocaleTimeString('zh-CN', { hour12: false })
 }
 
-// R10 Spec B / F8：右键查看关联底稿
-async function onCtxRelatedWp(selectedCells: any[]) {
-  // 从选中单元格找到对应的分录行（通过 GtEditableTable 内部 cellSelection.contextMenu.row）
-  const ctxMenu = (adjTableRef.value as any)?.cellSelection?.contextMenu
-  const row = ctxMenu?.row
-  if (!row || !row.entry_group_id) {
-    ElMessage.warning('请右键点击具体分录行')
+// ─── 筛选（客户端：已取全部分录）与状态计数 ─────────────────────────────────
+const activeTab = ref('all')
+const ORIGIN_FILTER_OPTIONS = [
+  { label: '全部来源', value: 'all', tip: '显示手工录入与底稿汇聚的全部调整分录' },
+  { label: '手工录入', value: 'manual', tip: '在本模块直接新建 / 导入的调整分录' },
+  { label: '底稿汇聚', value: 'workpaper', tip: '从各科目底稿点「同步到调整分录」汇聚而来的分录' },
+]
+const originFilter = ref('all')
+const phaseFilter = ref('all')
+const bookingFilter = ref('all')
+const searchText = ref('')
+const sortKey = ref<'adjustment_no' | 'amount' | 'created_at' | 'review_status'>('adjustment_no')
+const sortOrder = ref<'asc' | 'desc'>('asc')
+const STATUS_FILTERS = [
+  { value: 'all', label: '全部' },
+  ...Object.values(ADJUSTMENT_STATUS).map((s) => ({ value: s, label: ADJUSTMENT_STATUS_LABELS[s].label })),
+]
+const statusFilter = ref('all')
+const creatorFilter = ref('')
+const collabOnly = ref(false)
+const filterAccount = ref(parsedRouteTarget.value.account)
+
+const creatorOptions = computed<Array<{ id: string; name: string }>>(() => {
+  const byId = new Map<string, string>()
+  for (const entry of entries.value) {
+    if (entry.created_by && entry.creator_name) byId.set(entry.created_by, entry.creator_name)
+  }
+  return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+})
+/** 服务端已完成类型、状态、来源、阶段、处理、科目和人员过滤；协作筛选仍只作用于当前页。 */
+const filteredEntries = computed(() => collabOnly.value
+  ? entries.value.filter((entry: any) => entry.has_active_collaboration)
+  : entries.value)
+const serverTotal = computed(() => entriesResource.data.value.total)
+const serverStatusCounts = computed(() => entriesResource.data.value.status_counts || {})
+const statusCounts = computed(() => ({ all: serverTotal.value, ...serverStatusCounts.value }))
+
+const adjPage = ref(1)
+const adjPageSize = 50
+const adjTotal = computed(() => serverTotal.value)
+const pagedEntries = computed(() => filteredEntries.value)
+watch(adjTotal, (n) => {
+  const max = Math.max(1, Math.ceil(n / adjPageSize))
+  if (adjPage.value > max) adjPage.value = max
+})
+
+function applyServerFilters(): void {
+  if (adjPage.value !== 1) adjPage.value = 1
+  else void fetchEntries()
+}
+function toggleSortOrder(): void {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+watch(
+  [activeTab, originFilter, phaseFilter, bookingFilter, statusFilter, creatorFilter, filterAccount, sortKey, sortOrder],
+  () => { applyServerFilters() },
+)
+let syncingServerPage = false
+watch(adjPage, () => {
+  if (syncingServerPage) { syncingServerPage = false; return }
+  void fetchEntries()
+})
+
+/** 已批准（计入试算表）的笔数与科目数 —— 草稿 / 待复核 / 已驳回不进审定数 */
+const approvedImpact = computed(() => {
+  const approved = entries.value.filter((e: any) => e.review_status === ADJUSTMENT_STATUS.APPROVED)
+  const applied = approved.filter((e: any) => e.origin !== 'workpaper'
+    && (e.treatment?.status || 'include_in_working_tb') === 'include_in_working_tb')
+  const codes = new Set<string>()
+  for (const e of applied) for (const li of e.line_items || []) if (li.standard_account_code) codes.add(li.standard_account_code)
+  return {
+    entries: applied.length,
+    accounts: codes.size,
+    workpaperReady: approved.length - applied.length,
+  }
+})
+
+// ─── 取数 ────────────────────────────────────────────────────────────────────
+function resetReadResources(): void {
+  entriesResource.reset()
+  summaryResource.reset()
+  accountsResource.reset()
+  templateResource.reset()
+  collabResource.reset()
+  reviewTaskResource.reset()
+  bookingSuggestionResource.reset()
+  selectedRows.value = []
+}
+
+async function fetchProjectMeta(): Promise<boolean> {
+  const pid = projectId.value
+  if (!pid) return false
+  return templateResource.load(async () => {
+    const data = await api.get(P.projects.detail(pid))
+    const tt = data?.template_type || data?.basic_info?.template_type || ''
+    return tt === 'soe' || tt === 'listed' ? tt : ''
+  }, '读取项目模板类型失败，请重试')
+}
+
+async function fetchEntries(): Promise<boolean> {
+  const pid = projectId.value
+  const requestedYear = year.value
+  if (!pid || requestedYear == null) return false
+  const treatmentStatus = {
+    included: 'include_in_working_tb',
+    effective: 'client_booked',
+    inactive: 'client_booked_inactive',
+    unadjusted: 'unadjusted_misstatement',
+    pending: 'pending',
+  }[bookingFilter.value]
+  const ok = await entriesResource.load(
+    () => listAdjustments(pid, requestedYear, {
+      page: adjPage.value,
+      page_size: adjPageSize,
+      adjustment_type: activeTab.value === 'all' ? undefined : activeTab.value,
+      review_status: statusFilter.value === 'all' ? undefined : statusFilter.value,
+      origin: originFilter.value === 'all' ? undefined : originFilter.value,
+      audit_phase: phaseFilter.value === 'all' ? undefined : phaseFilter.value,
+      treatment_status: treatmentStatus,
+      focus_entry_group_id: parsedRouteTarget.value.focus || undefined,
+      account_code: filterAccount.value || undefined,
+      created_by: creatorFilter.value || undefined,
+      search: searchText.value.trim() || undefined,
+      sort_by: sortKey.value,
+      sort_order: sortOrder.value,
+    }),
+    '读取分录列表失败，请重试',
+  )
+  if (ok && entriesResource.data.value.page !== adjPage.value) {
+    syncingServerPage = true
+    adjPage.value = entriesResource.data.value.page
+  }
+  return ok
+}
+
+async function fetchSummary(): Promise<boolean> {
+  const pid = projectId.value
+  const requestedYear = year.value
+  if (!pid || requestedYear == null) return false
+  return summaryResource.load(
+    () => getAdjustmentSummary(pid, requestedYear),
+    '读取汇总数据失败，请重试',
+  )
+}
+
+async function fetchAccountOptions(): Promise<boolean> {
+  const pid = projectId.value
+  const requestedYear = year.value
+  if (!pid || requestedYear == null) return false
+  return accountsResource.load(
+    () => getAccountDropdown(pid, undefined, requestedYear),
+    '读取科目数据失败，请重试',
+  )
+}
+
+async function refreshCollabInbox(): Promise<boolean> {
+  const pid = projectId.value
+  if (!pid) return false
+  return collabResource.load(
+    () => getCollaborationInbox(pid),
+    '读取协作事项失败，请重试',
+  )
+}
+
+async function refreshReviewTasks(): Promise<boolean> {
+  const pid = projectId.value
+  const requestedYear = year.value
+  if (!pid || requestedYear == null) return false
+  return reviewTaskResource.load(
+    () => listAdjustmentReviewTasks(pid, requestedYear, true),
+    '读取我的复核任务失败，请重试',
+  )
+}
+
+async function refreshBookingSuggestions(): Promise<boolean> {
+  const pid = projectId.value
+  const requestedYear = year.value
+  if (!pid || requestedYear == null) return false
+  return bookingSuggestionResource.load(
+    () => listAdjustmentBookingSuggestions(pid, requestedYear),
+    '读取客户已入账建议失败，请重试',
+  )
+}
+
+function retryResource(key: string): void {
+  if (key === 'entries') void fetchEntries().then((ok) => { if (ok) void applyRouteTargets() })
+  else if (key === 'summary') void fetchSummary()
+  else if (key === 'accounts') void fetchAccountOptions()
+  else if (key === 'template') void fetchProjectMeta()
+  else if (key === 'collaboration') void refreshCollabInbox()
+  else if (key === 'reviewTasks') void refreshReviewTasks()
+  else if (key === 'bookingSuggestions') void refreshBookingSuggestions()
+}
+
+async function reloadLists() {
+  await Promise.all([fetchEntries(), fetchSummary(), refreshCollabInbox(), refreshReviewTasks(), refreshBookingSuggestions()])
+}
+
+async function reloadAdjustmentContext() {
+  const generation = ++contextEpoch.value
+  resetReadResources()
+  await projectStore.syncFromRoute(route)
+  if (generation !== contextEpoch.value) return
+  selectedProjectId.value = projectId.value
+  selectedYear.value = year.value
+  filterAccount.value = parsedRouteTarget.value.account
+  await Promise.all([fetchEntries(), fetchSummary(), fetchAccountOptions(), fetchProjectMeta(), refreshCollabInbox(), refreshReviewTasks(), refreshBookingSuggestions()])
+  if (generation !== contextEpoch.value) return
+  if (!projectOptions.value.length) void projectStore.loadProjectOptions()
+  void applyRouteTargets()
+}
+
+// ─── 深链 ────────────────────────────────────────────────────────────────────
+const focusId = ref('')
+let focusTimer: ReturnType<typeof setTimeout> | null = null
+let appliedRouteSignature = ''
+
+function findEntryTarget(target: string): any | null {
+  return entries.value.find((entry: any) => entry.entry_group_id === target
+    || entry.adjustment_no === target
+    || (entry.line_items || []).some((line: any) => line.id === target)) || null
+}
+
+async function applyRouteTargets() {
+  if (year.value == null || entriesResource.status.value !== 'success') return
+  const target = parsedRouteTarget.value
+  const signature = JSON.stringify(target)
+  if (signature === appliedRouteSignature) return
+  appliedRouteSignature = signature
+
+  if (target.group) {
+    openCollabDialog(findEntryTarget(target.group) || { entry_group_id: target.group, line_items: [] })
+  }
+  if (target.impact) {
+    const row = findEntryTarget(target.impact)
+    if (row) {
+      impactRow.value = row
+      impactVisible.value = true
+    } else {
+      ElMessage.info('没有找到要查看影响的分录（可能已删除、不在当前审计年度或不在你的可见范围）')
+    }
+  }
+  if (target.focus) await focusEntry(target.focus, target.status)
+}
+
+async function focusEntry(target: string, _status: string): Promise<boolean> {
+  const row = findEntryTarget(target)
+  if (!row) {
+    ElMessage.info('没有找到要定位的分录（可能已删除、不在当前审计年度或不在你的可见范围）')
+    return false
+  }
+  focusId.value = row.entry_group_id
+  await nextTick()
+  await hallTableRef.value?.reveal(row.entry_group_id)
+  if (focusTimer) clearTimeout(focusTimer)
+  focusTimer = setTimeout(() => { focusId.value = '' }, 8000)
+  return true
+}
+
+// ─── 操作 ────────────────────────────────────────────────────────────────────
+const hallTableRef = ref<InstanceType<typeof AdjustmentHallTable> | null>(null)
+const entryDialogRef = ref<InstanceType<typeof AdjustmentEntryDialog> | null>(null)
+const submitDialogRef = ref<InstanceType<typeof AdjustmentSubmitReviewDialog> | null>(null)
+const reasonDialogRef = ref<InstanceType<typeof AdjustmentReasonDialog> | null>(null)
+const importDialogRef = ref<InstanceType<typeof AdjustmentImportDialog> | null>(null)
+const bookingDialogRef = ref<InstanceType<typeof ClientBookingDialog> | null>(null)
+const treatmentDialogRef = ref<InstanceType<typeof AdjustmentTreatmentDialog> | null>(null)
+const evidenceDialogRef = ref<InstanceType<typeof AdjustmentEvidenceDialog> | null>(null)
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
+const selectedAdjId = ref('')
+
+const actions = useAdjustmentHallActions({ projectId, year, onChanged: reloadLists })
+
+function openCreate(prefill?: { lines?: EditableLine[]; description?: string; problems?: string[] }) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
     return
   }
+  entryDialogRef.value?.openCreate(prefill)
+}
+
+function openImport() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  importDialogRef.value?.open()
+}
+
+function onDownloadTemplate(type: 'soe' | 'listed') {
+  void actions.exportTemplate(type, currentTemplateType.value)
+}
+
+/** 导入结果里「提交复核（本次 N 笔）」：导入回执只有编号，摘要从刚刷新的列表里补齐 */
+async function onSubmitImported(rows: Array<{ entry_group_id: string; adjustment_no: string | null }>) {
+  await reloadLists()
+  submitDialogRef.value?.open(withDescriptions(rows, entries.value))
+}
+
+async function onEntrySaved(p: EntrySavedPayload) {
+  await reloadLists()
+  if (!p.submit) return
+  submitDialogRef.value?.open(
+    withDescriptions([{ entry_group_id: p.entryGroupId, adjustment_no: p.adjustmentNo }], entries.value),
+  )
+}
+
+/** 表格上粘贴 Excel 多行：打开新建弹窗预填，由用户确认保存（原先直接按 AJE 建分录） */
+function onHallPaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text/plain') || ''
+  if (!text.includes('\t') || !perms.value.writable || !perms.value.edit) return
+  if ((e.target as HTMLElement | null)?.closest?.('input, textarea')) return
+  const parsed = parsePastedLines(text, accountOptions.value)
+  if (!parsed.lines.length) return
+  e.preventDefault()
+  openCreate({ lines: parsed.lines, description: parsed.summary, problems: parsed.problems })
+}
+
+function openReason(mode: 'reject' | 'revoke', rows: HallEntry[]) {
+  reasonDialogRef.value?.open(mode, rows, async ({ reason, reasons }) => {
+    const ok = mode === 'reject' ? await actions.reject(rows, reason, reasons) : await actions.revoke(rows, reason)
+    if (ok) hallTableRef.value?.clearSelection()
+    return ok
+  })
+}
+
+const BATCH_DEFS: Array<{ action: HallAction; label: string; type: 'primary' | 'success' | 'danger' | 'warning' }> = [
+  { action: 'submit', label: '提交复核', type: 'primary' },
+  { action: 'approve', label: '通过', type: 'success' },
+  { action: 'reject', label: '驳回', type: 'danger' },
+  { action: 'revoke', label: '撤回复核', type: 'warning' },
+  { action: 'delete', label: '删除', type: 'danger' },
+]
+const batchButtons = computed(() => BATCH_DEFS
+  .map((d) => ({ ...d, count: splitEligible(selectedRows.value, d.action, perms.value).eligible.length }))
+  .filter((d) => d.count > 0))
+
+async function onBatch(action: HallAction) {
+  const { eligible, skipped } = splitEligible(selectedRows.value, action, perms.value)
+  if (!eligible.length) return
+  if (skipped) ElMessage.info(skipMessage(action, skipped))
+  if (action === 'submit') submitDialogRef.value?.open(eligible)
+  else if (action === 'reject' || action === 'revoke') openReason(action, eligible)
+  else if (action === 'approve') { if (await actions.approve(eligible)) hallTableRef.value?.clearSelection() }
+  else if (action === 'delete') { await actions.removeMany(eligible); hallTableRef.value?.clearSelection() }
+}
+
+// 影响范围 / 关联底稿
+const impactVisible = ref(false)
+const impactRow = ref<any>(null)
+const relatedVisible = ref(false)
+const relatedWps = ref<Array<{ id: string; wp_code: string; wp_name: string }>>([])
+
+async function showRelatedWorkpapers(row: any) {
   try {
-    const data: any = await api.get(
-      `/api/projects/${projectId.value}/adjustments/${row.entry_group_id}/related-workpapers`,
-    )
+    const data: any = await api.get(P.adjustments.relatedWorkpapers(projectId.value, row.entry_group_id))
     const wps = data?.workpapers || []
     if (!wps.length) {
-      ElMessage.info('该分录暂无关联底稿')
+      ElMessage.info('该分录涉及的科目暂无对应底稿')
       return
     }
     if (wps.length === 1) {
-      router.push({
-        name: 'WorkpaperEditor',
-        params: { projectId: projectId.value, wpId: wps[0].id },
-      })
+      openWorkpaper(wps[0].id)
       return
     }
-    const list = wps.map((w: any) => `${w.wp_code} ${w.wp_name}`).join('\n')
-    ElMessage.info(`该分录关联 ${wps.length} 张底稿：\n${list}`)
-  } catch (e: any) {
+    relatedWps.value = wps
+    relatedVisible.value = true
+  } catch (e) {
     handleApiError(e, '查看关联底稿')
   }
 }
 
-// Sprint 5.9: 查看影响范围
-const showCellFormulaDetail = ref(false)
-const cellDetailWpCode = ref('')
-const cellDetailSheet = ref('')
-const cellDetailLabel = ref('')
+function openWorkpaper(wpId: string) {
+  relatedVisible.value = false
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
+}
 
-function onCtxViewImpactScope(_selectedCells: any[]) {
-  const ctxMenu = (adjTableRef.value as any)?.cellSelection?.contextMenu
-  const row = ctxMenu?.row
-  if (!row?.standard_account_code) {
-    ElMessage.warning('请右键点击具体分录行')
+/**
+ * 跳转到来源底稿的调整分录页（source_ref='{wp_id}:{item_id}'，前缀即 wp_id）。
+ * ?sheet=@adjustment：该底稿名称含「调整分录」的那张表（item_id 前缀落不到它：D1-entry-rows → 审定表、L1-adj-AJE → 程序表）；
+ * ?highlight=source_ref：来源页签认领分录组并切到对应类型（spec wp-deeplink-locate-residual-closure 需求 1，
+ * 守卫 adjustmentEntryGroupWiring.spec.ts）。来源底稿已删除时只提示、不跳转。
+ */
+function jumpToSourceWorkpaper(row: any) {
+  const ref = String(row?.source_ref || '')
+  const wpId = ref.indexOf(':') >= 0 ? ref.slice(0, ref.indexOf(':')) : ''
+  if (!wpId || row?.source_missing) {
+    ElMessage.info(row?.source_missing ? '来源底稿已删除；如这笔分录已无用，可直接删除' : '没有来源底稿信息')
     return
   }
-  cellDetailWpCode.value = row.standard_account_code
-  cellDetailSheet.value = ''
-  cellDetailLabel.value = ''
-  showCellFormulaDetail.value = true
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query: { sheet: ADJUSTMENT_SHEET_ALIAS, highlight: ref } })
 }
 
-// V3 Req 9.6: 数字信任度
-const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
-
-// V3 Req 10.4: 可解释状态机
-const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
-const selectedAdjId = ref('')
-function openStatusMachine() {
-  smPanelRef.value?.open()
+function goMisstatements() {
+  router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
 }
 
-// V3 Req 11.6: 时光机
-const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
-function openTimeMachine() {
-  tmDrawerRef.value?.open()
-}
-function onTimeMachineRestored(_snap: any) {
-  window.location.reload()
-}
-function onCtxTrustScore(_selectedCells: any[]) {
-  const ctxMenu = (adjTableRef.value as any)?.cellSelection?.contextMenu
-  const row = ctxMenu?.row
-  const context = `adj:${row?.adjustment_type || 'aje'}|${row?.standard_account_code || ''}`
-  trustScorePanelRef.value?.open(context)
+function openBookingSuggestion(suggestion: AdjustmentBookingSuggestion): void {
+  const target = entries.value.find((entry: any) => entry.entry_group_id === suggestion.entry_group_id)
+  if (!target) {
+    ElMessage.info('对应调整分录不在当前可见列表，请刷新后重试')
+    return
+  }
+  bookingDialogRef.value?.open(target, suggestion.candidates, false)
 }
 
-function onCellDetailNavigate(uri: string) {
-  showCellFormulaDetail.value = false
-  const parts = uri.split(':')
-  const mod = parts[0]?.toUpperCase()
-  if (mod === 'WP' && parts[1]) {
-    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
-  } else if (mod === 'REPORT') {
-    router.push({ name: 'ReportView', params: { id: projectId.value } })
-  } else if (mod === 'NOTE') {
-    router.push({ name: 'DisclosureEditor', params: { id: projectId.value } })
-  } else if (mod === 'TB') {
-    router.push({ path: `/projects/${projectId.value}/trial-balance` })
+function openClientBooking(row: HallEntry, revoke = false): void {
+  const suggestion = bookingSuggestions.value.find((item) => item.entry_group_id === row.entry_group_id)
+  bookingDialogRef.value?.open(row, suggestion?.candidates || [], revoke)
+}
+
+async function onRowAction(action: string, row: any) {
+  switch (action) {
+    case 'client-booking': openClientBooking(row); break
+    case 'client-booking-revoke': openClientBooking(row, true); break
+    case 'treatment': await treatmentDialogRef.value?.open(row); break
+    case 'evidence': await evidenceDialogRef.value?.open(row); break
+    case 'edit': entryDialogRef.value?.openEdit(row); break
+    case 'submit': submitDialogRef.value?.open([row]); break
+    case 'withdraw': await actions.withdraw(row); break
+    case 'approve': await actions.approve([row]); break
+    case 'reject':
+    case 'revoke': openReason(action, [row]); break
+    case 'delete': await actions.remove(row); break
+    case 'convert': if (await actions.convert(row)) goMisstatements(); break
+    case 'misstatement': goMisstatements(); break
+    case 'source': jumpToSourceWorkpaper(row); break
+    case 'collab': openCollabDialog(row); break
+    case 'related': await showRelatedWorkpapers(row); break
+    case 'impact': impactRow.value = row; impactVisible.value = true; break
+    case 'trust': trustScorePanelRef.value?.open(`adj:${row.adjustment_type || 'aje'}|${row.line_items?.[0]?.standard_account_code || ''}`); break
+    case 'history':
+    case 'status-machine':
+      selectedAdjId.value = row.entry_group_id
+      await nextTick()
+      if (action === 'history') tmDrawerRef.value?.open()
+      else smPanelRef.value?.open()
+      break
   }
 }
-usePasteImport({
-  containerRef: adjTableRef,
-  columns: [
-    { key: 'standard_account_code', label: '科目编码' },
-    { key: 'account_name', label: '科目名称' },
-    { key: 'debit_amount', label: '借方' },
-    { key: 'credit_amount', label: '贷方' },
-    { key: 'summary', label: '摘要' },
-  ],
-  onInsert: async (rows) => {
-    // 粘贴的行作为新分录的 line_items 创建
-    const lineItems = rows.map(r => ({
-      standard_account_code: r.standard_account_code || '',
-      account_name: r.account_name || '',
-      debit_amount: parseFloat(r.debit_amount) || 0,
-      credit_amount: parseFloat(r.credit_amount) || 0,
-    }))
-    const summary = rows[0]?.summary || `粘贴导入 ${lineItems.length} 行`
-    await createAdjustment(projectId.value, {
-      adjustment_type: 'aje',
-      year: year.value,
-      description: summary,
-      line_items: lineItems,
-    })
-    await fetchEntries()
-    await fetchSummary()
-  },
-})
-const showRejectDialog = ref(false)
-const rejectReason = ref('')
-const rejectMode = ref<'unified' | 'individual'>('unified')
-const individualReasons = ref<Record<string, string>>({})
-const accountOptions = ref<AccountOption[]>([])
 
-// chain-closure-phase3: 撤回复核弹窗状态
-const showRevokeDialog = ref(false)
-const revokeReason = ref('')
-// ─── 协作接力对话框（adjustment-collaboration-and-propagation） ───────────────
+/** 底稿编的分录如何汇聚到这里 */
+function onGuideSyncFromWp() {
+  ElMessage.info({
+    message: '到各科目底稿的「调整分录」页签点「同步到调整分录」，分录会以草稿汇聚到这里（来源列显示底稿编码），再在这里提交复核。',
+    duration: 6000,
+    showClose: true,
+  })
+}
+
+// ─── 协作接力（adjustment-collaboration-and-propagation）与待我协作收件箱 ─────
 const collabDialogVisible = ref(false)
 const collabRow = ref<any>(null)
 const collabLineItems = computed<Array<{ standard_account_code?: string; account_name?: string; debit_amount: number; credit_amount: number }>>(() =>
@@ -1047,611 +955,32 @@ function openCollabDialog(row: any): void {
   collabRow.value = row
   collabDialogVisible.value = true
 }
-/** 协作对话框操作后：刷新分录列表 + 待我协作收件箱。 */
 async function onCollabUpdated(): Promise<void> {
-  await fetchEntries()
-  await refreshCollabInbox()
+  await Promise.all([fetchEntries(), refreshCollabInbox()])
 }
 
-// 科目过滤（来自 route.query.account，支持从试算表跳转过来）
-const filterAccount = ref(typeof route.query.account === 'string' ? route.query.account : '')
-
-// Batch mode state
-const batchMode = ref(false)
-const batchPendingCount = ref(0)
-const batchCommitting = ref(false)
-// R1 需求 3 — AJE 一键转错报：正在转换的 entry_group_id（避免重复点击）
-const convertingGroupId = ref<string>('')
-// Form state
-const formDialogVisible = ref(false)
-const isEditing = ref(false)
-const editingGroupId = ref('')
-const selectedTemplate = ref('')
-const form = ref({
-  adjustment_type: 'aje',
-  description: '',
-  custom_no: '',
-  purpose: '',
-  line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
-})
-
-// V3 Req 3.3：表单校验 + 统一提交拦截
-const adjFormRef = ref<FormInstance>()
-const adjFormRules: FormRules = {
-  adjustment_type: [rules.required('类型', 'change')],
-  description: makeRules('摘要'),
-}
-const { submit: submitAdjForm, submitting: adjSubmitting } = useFormSubmit(adjFormRef)
-
-// #5: 快捷模板项目级可配（从 wizard_state.adjustment_templates 读取，无则用默认）
-const ADJUSTMENT_TEMPLATES: Record<string, { type: string; description: string; lines: { code: string; name: string; dr: number; cr: number }[] }> = {
-  bad_debt: { type: 'aje', description: '计提坏账准备', lines: [
-    { code: '6601', name: '资产减值损失', dr: 0, cr: 0 },
-    { code: '1231', name: '坏账准备', dr: 0, cr: 0 },
-  ]},
-  depreciation: { type: 'aje', description: '补提折旧', lines: [
-    { code: '6602', name: '管理费用-折旧', dr: 0, cr: 0 },
-    { code: '1602', name: '累计折旧', dr: 0, cr: 0 },
-  ]},
-  amortization: { type: 'aje', description: '补提摊销', lines: [
-    { code: '6602', name: '管理费用-摊销', dr: 0, cr: 0 },
-    { code: '1702', name: '累计摊销', dr: 0, cr: 0 },
-  ]},
-  accrued_expense: { type: 'aje', description: '预提费用', lines: [
-    { code: '6602', name: '管理费用', dr: 0, cr: 0 },
-    { code: '2211', name: '应付职工薪酬', dr: 0, cr: 0 },
-  ]},
-  revenue_cutoff: { type: 'aje', description: '收入截止调整', lines: [
-    { code: '5001', name: '主营业务收入', dr: 0, cr: 0 },
-    { code: '2205', name: '合同负债', dr: 0, cr: 0 },
-  ]},
-  rcl_current_noncurrent: { type: 'rje', description: '一年内到期非流动资产重分类', lines: [
-    { code: '1503', name: '一年内到期的非流动资产', dr: 0, cr: 0 },
-    { code: '1511', name: '长期股权投资', dr: 0, cr: 0 },
-  ]},
-  rcl_ar_prepay: { type: 'rje', description: '应收/预付重分类', lines: [
-    { code: '1123', name: '预付款项', dr: 0, cr: 0 },
-    { code: '1122', name: '应收账款', dr: 0, cr: 0 },
-  ]},
-  rcl_ap_advance: { type: 'rje', description: '应付/预收重分类', lines: [
-    { code: '2203', name: '预收款项', dr: 0, cr: 0 },
-    { code: '2202', name: '应付账款', dr: 0, cr: 0 },
-  ]},
-}
-// 项目级自定义模板（从 wizard_state 加载，后续接线）
-const projectTemplates = ref<Record<string, any>>({})
-const mergedTemplateKeys = computed(() => {
-  // 项目级模板优先（同 key 覆盖默认），再追加默认
-  return Object.keys({ ...ADJUSTMENT_TEMPLATES, ...projectTemplates.value })
-})
-function getTemplate(key: string) {
-  return projectTemplates.value[key] || ADJUSTMENT_TEMPLATES[key]
-}
-
-function onTemplateSelect(key: string) {
-  if (!key) return
-  const tpl = getTemplate(key)
-  if (!tpl) return
-  form.value.adjustment_type = tpl.type
-  form.value.description = tpl.description
-  form.value.line_items = tpl.lines.map((l: any) => ({
-    standard_account_code: l.code,
-    account_name: l.name,
-    debit_amount: l.dr,
-    credit_amount: l.cr,
-  }))
-}
-
-const totalDebit = computed(() => form.value.line_items.reduce((s, l) => Number(decAdd(String(s), String(l.debit_amount || 0))), 0))
-const totalCredit = computed(() => form.value.line_items.reduce((s, l) => Number(decAdd(String(s), String(l.credit_amount || 0))), 0))
-const balanceDiff = computed(() => Number(decSub(String(totalDebit.value), String(totalCredit.value))))
-
-const fmtAmt = fmtAmount
-
-// ── 自动保存/草稿恢复 [R3.8] ──
-const { clearDraft: clearAutoSaveDraft } = useAutoSave(
-  `adjustment_form_${projectId.value}`,
-  () => {
-    if (!formDialogVisible.value) return null
-    return {
-      adjustment_type: form.value.adjustment_type,
-      description: form.value.description,
-      line_items: form.value.line_items,
-      isEditing: isEditing.value,
-      editingGroupId: editingGroupId.value,
-    }
-  },
-  (data) => {
-    if (!data) return
-    form.value.adjustment_type = data.adjustment_type || 'aje'
-    form.value.description = data.description || ''
-    form.value.line_items = data.line_items || [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }]
-    if (data.isEditing != null) isEditing.value = data.isEditing
-    if (data.editingGroupId) editingGroupId.value = data.editingGroupId
-    formDialogVisible.value = true
-  },
-  { enabled: formDialogVisible },
-)
-
-
-
-function normalizeAdjustmentType(type: string) {
-  return String(type || '').toLowerCase()
-}
-
-function formatAdjustmentType(type: string) {
-  const n = normalizeAdjustmentType(type)
-  return n === 'aje' ? '审计调整' : '重分类'
-}
-
-async function ensureProjectYear() {
-  if (routeYear.value !== null) {
-    projectYear.value = null
-    return
-  }
-  try {
-    projectYear.value = await getProjectAuditYear(projectId.value)
-  } catch {
-    projectYear.value = null
-  }
-}
-
-async function fetchProjectMeta() {
-  // 加载当前项目的 template_type (国企/上市) 用于顶部 badge 显示 + 默认导出版本
-  if (!projectId.value) {
-    currentTemplateType.value = ''
-    return
-  }
-  try {
-    const data = await api.get(`/api/projects/${projectId.value}`)
-    const tt = data?.template_type || data?.basic_info?.template_type || ''
-    currentTemplateType.value = (tt === 'soe' || tt === 'listed') ? tt : ''
-  } catch {
-    currentTemplateType.value = ''
-  }
-}
-
-async function fetchEntries() {
-  loading.value = true
-  try {
-    const opts: any = { page_size: 200 }
-    if (activeTab.value !== 'all') opts.adjustment_type = activeTab.value
-    if (originFilter.value !== 'all') opts.origin = originFilter.value
-    const result = await listAdjustments(projectId.value, year.value, opts)
-    let items = Array.isArray(result) ? result : (result.items || [])
-    // 按科目过滤（来自试算表跳转的 account query 参数）
-    if (filterAccount.value) {
-      items = items.filter((e: any) =>
-        e.line_items?.some((li: any) => li.standard_account_code === filterAccount.value)
-      )
-    }
-    entries.value = items
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchSummary() {
-  try {
-    summary.value = await getAdjustmentSummary(projectId.value, year.value)
-  } catch { /* ignore */ }
-}
-
-async function fetchAccountOptions() {
-  try {
-    accountOptions.value = await getAccountDropdown(projectId.value)
-  } catch { /* ignore */ }
-}
-
-function onTabChange() { adjPage.value = 1; fetchEntries() }
-function onSelectionChange(rows: any[]) { selectedRows.value = rows }
-
-function addLine() {
-  form.value.line_items.push({ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 })
-}
-
-function removeLine(idx: number) {
-  form.value.line_items.splice(idx, 1)
-}
-
-function onAccountSelect(idx: number) {
-  const code = form.value.line_items[idx].standard_account_code
-  const opt = accountOptions.value.find(o => o.code === code)
-  if (opt) form.value.line_items[idx].account_name = opt.name
-  // [enterprise-linkage 3.8] Fetch impact preview when account changes
-  if (code) fetchPreview(code)
-}
-
-function openCreateDialog() {
-  isEditing.value = false
-  editingGroupId.value = ''
-  form.value = {
-    adjustment_type: 'aje',
-    description: '',
-    custom_no: '',
-    purpose: '',
-    line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
-  }
-  formDialogVisible.value = true
-}
-
-/** P1-6 + P0-1: 从底稿同步入口（引导审计师到各底稿调整tab点同步，或提示已全部同步） */
-async function onGuideSyncFromWp() {
-  ElMessage.info({
-    message: '请到各科目底稿的"调整分录"页签，点击"同步到集中登记"按钮将分录汇聚到此处。已同步的分录会在"来源"列显示底稿编码标签。',
-    duration: 6000,
-    showClose: true,
-  })
-}
-
-function openEditDialog(row: any) {
-  // workpaper-origin 分录以来源底稿为准，中央页编辑会在下次同步时被覆盖 → 引导至来源底稿
-  if (row.origin === 'workpaper') {
-    ElMessage.info('该分录来源于底稿，请在来源底稿中修改后重新同步（中央页编辑会在下次同步时被覆盖）')
-    return
-  }
-  isEditing.value = true
-  editingGroupId.value = row.entry_group_id
-  form.value = {
-    adjustment_type: normalizeAdjustmentType(row.adjustment_type),
-    description: row.description || '',
-    line_items: (row.line_items || []).map((li: any) => ({
-      standard_account_code: li.standard_account_code,
-      account_name: li.account_name || '',
-      debit_amount: parseFloat(li.debit_amount) || 0,
-      credit_amount: parseFloat(li.credit_amount) || 0,
-    })),
-  }
-  if (!form.value.line_items.length) {
-    form.value.line_items = [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }]
-  }
-  formDialogVisible.value = true
-}
-
-async function onSubmit() {
-  await submitAdjForm(async () => {
-    submitLoading.value = true
-    try {
-      if (isEditing.value) {
-        await updateAdjustment(projectId.value, editingGroupId.value, {
-          description: form.value.description,
-          line_items: form.value.line_items,
-        })
-        ElMessage.success('保存成功')
-        _showImpactFeedback()
-      } else {
-        await createAdjustment(projectId.value, {
-          adjustment_type: form.value.adjustment_type,
-          year: year.value,
-          description: form.value.description,
-          line_items: form.value.line_items,
-        }, { batch_mode: batchMode.value })
-        if (batchMode.value) {
-          batchPendingCount.value++
-          ElMessage.success(`创建成功（批量模式，待提交 ${batchPendingCount.value} 笔）`)
-        } else {
-          ElMessage.success('创建成功')
-          _showImpactFeedback()
-        }
-      }
-      formDialogVisible.value = false
-      clearAutoSaveDraft()
-      fetchEntries()
-      fetchSummary()
-    } finally {
-      submitLoading.value = false
-    }
-  })
-}
-
-/** 显示分录对试算表的影响反馈 */
-function _showImpactFeedback() {
-  const accounts = form.value.line_items
-    .map(li => li.account_name || li.standard_account_code)
-    .filter(Boolean)
-  if (!accounts.length) return
-  const type = form.value.adjustment_type === 'aje' ? '审计调整' : '重分类'
-  ElMessage({
-    type: 'info',
-    message: `${type}已更新试算表：${accounts.join('、')}`,
-    duration: 4000,
-    showClose: true,
-  })
-}
-
-async function onBatchCommit() {
-  batchCommitting.value = true
-  try {
-    await batchCommitAdjustments(projectId.value, year.value)
-    ElMessage.success(`批量提交成功，${batchPendingCount.value} 笔分录已触发重算`)
-    batchPendingCount.value = 0
-    batchMode.value = false
-    fetchEntries()
-    fetchSummary()
-  } catch (e: any) {
-    handleApiError(e, '批量提交')
-  } finally {
-    batchCommitting.value = false
-  }
-}
-
-async function onDelete(row: any) {
-  await confirmDelete('该分录')
-  // 缓存分录数据用于撤销恢复
-  const cachedRow = JSON.parse(JSON.stringify(row))
-  await operationHistory.execute({
-    description: `删除分录 ${row.adjustment_no}`,
-    execute: async () => {
-      await deleteAdjustment(projectId.value, row.entry_group_id)
-      fetchEntries()
-      fetchSummary()
-    },
-    undo: async () => {
-      await createAdjustment(projectId.value, {
-        adjustment_type: normalizeAdjustmentType(cachedRow.adjustment_type),
-        year: year.value,
-        description: cachedRow.description || '',
-        line_items: (cachedRow.line_items || []).map((li: any) => ({
-          standard_account_code: li.standard_account_code,
-          account_name: li.account_name || '',
-          debit_amount: parseFloat(li.debit_amount) || 0,
-          credit_amount: parseFloat(li.credit_amount) || 0,
-        })),
-      })
-      fetchEntries()
-      fetchSummary()
-    },
-  })
-}
-
-// workpaper-adjustment-centralization — 来源底稿展示 + 跳转
-/** 从 source_ref='{wp_id}:{item_id}' 解析展示用底稿编码（item_id 前缀，如 D4/K9-3） */
-function sourceWpLabel(row: any): string {
-  const ref = row?.source_ref || ''
-  const idx = ref.indexOf(':')
-  const itemId = idx >= 0 ? ref.slice(idx + 1) : ''
-  const m = itemId.match(/^[A-Z]\d+(?:-\d+)?/)
-  return m ? m[0] : ''
-}
-/** 跳转到来源底稿的调整分录页（source_ref 前缀即 wp_id；item_id 前缀编码作 ?sheet= 定位 tab） */
-function jumpToSourceWorkpaper(row: any) {
-  const ref = row?.source_ref || ''
-  const wpId = ref.indexOf(':') >= 0 ? ref.slice(0, ref.indexOf(':')) : ''
-  if (!wpId) {
-    ElMessage.info('无来源底稿信息')
-    return
-  }
-  // sheetCode 如 K9-3 / D4-4 → GtWpRenderer 以编码 endsWith/includes 兜底定位调整分录 sheet，
-  // 不带 ?sheet= 会回退到底稿目录页。
-  // P1-8: 带 highlight=source_ref 供底稿侧定位到具体分录行
-  const sheetCode = sourceWpLabel(row)
-  const query: Record<string, string> = {}
-  if (sheetCode) query.sheet = sheetCode
-  if (ref) query.highlight = ref
-  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query })
-}
-
-// R1 需求 3 / Task 10 — 将被驳回的 AJE 一键转为未更正错报
-async function onConvertToMisstatement(row: any) {
-  if (row.review_status !== 'rejected' || normalizeAdjustmentType(row.adjustment_type) !== 'aje') {
-    return
-  }
-  try {
-    await confirmConvert('该分录', '未更正错报')
-  } catch {
-    return
-  }
-
-  convertingGroupId.value = row.entry_group_id
-  try {
-    const res = await convertAjeToMisstatement(projectId.value, row.entry_group_id)
-    ElMessage.success(`已转为错报（净额 ${res.net_amount}）`)
-    try {
-      await confirmDangerous('是否立即查看《未更正错报汇总表》？', '转换成功')
-      router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
-    } catch {
-      /* 用户选择稍后，不跳转 */
-    }
-  } catch (err: any) {
-    // R1 Bug Fix 8: 使用 parseApiError 统一解析
-    const parsed = parseApiError(err)
-    if (parsed.code === 'ALREADY_CONVERTED') {
-      try {
-        await confirmDangerous('该分录已转为未更正错报，是否跳转查看？', '已转换')
-        router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
-      } catch {
-        /* 用户选择关闭 */
-      }
-    } else {
-      handleApiError({ response: { status: 400, data: { detail: parsed.message || '转换失败' } } }, '转换错报')
-    }
-  } finally {
-    convertingGroupId.value = ''
-  }
-}
-
-async function batchReview(status: string) {
-  // chain-closure-phase3: 复核通过/驳回可作用于草稿与待复核（需求 3.4）
-  const eligible = selectedRows.value.filter(r =>
-    r.review_status === ADJUSTMENT_STATUS.DRAFT
-    || r.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW
-  )
-  const skipped = selectedRows.value.length - eligible.length
-  if (skipped > 0) {
-    ElMessage.warning(`已跳过 ${skipped} 条不可操作的分录（仅草稿与待复核可批准/驳回）`)
-  }
-  const rows = eligible
-  if (!rows.length) {
-    ElMessage.warning('没有可操作的分录')
-    return
-  }
-  for (const row of rows) {
-    let reason: string | undefined
-    if (status === 'rejected') {
-      if (rejectMode.value === 'individual') {
-        const individual = individualReasons.value[row.entry_group_id]?.trim()
-        reason = individual || rejectReason.value || undefined
-      } else {
-        reason = rejectReason.value || undefined
-      }
-    }
-    await reviewAdjustment(projectId.value, row.entry_group_id, {
-      status,
-      reason,
-    })
-  }
-  ElMessage.success(`已${status === 'approved' ? '批准' : '驳回'} ${rows.length} 条`)
-  showRejectDialog.value = false
-  rejectReason.value = ''
-  individualReasons.value = {}
-  rejectMode.value = 'unified'
-  selectedRows.value = []
-  fetchEntries()
-  fetchSummary()
-}
-
-/** chain-closure-phase3: 撤回复核（approved→draft，需求 3.1） */
-async function onBatchRevoke() {
-  const eligible = selectedRows.value.filter(r => r.review_status === ADJUSTMENT_STATUS.APPROVED)
-  const skipped = selectedRows.value.length - eligible.length
-  if (skipped > 0) {
-    ElMessage.warning(`已跳过 ${skipped} 条非已通过状态的分录（仅已通过可撤回）`)
-  }
-  if (!eligible.length) {
-    ElMessage.warning('没有可撤回的分录')
-    showRevokeDialog.value = false
-    return
-  }
-  for (const row of eligible) {
-    await revokeAdjustmentReview(projectId.value, row.entry_group_id, {
-      reason: revokeReason.value || undefined,
-    })
-  }
-  ElMessage.success(`已撤回 ${eligible.length} 条分录的复核`)
-  showRevokeDialog.value = false
-  revokeReason.value = ''
-  selectedRows.value = []
-  fetchEntries()
-  fetchSummary()
-}
-
-/** chain-closure-phase3: 单条复核通过/驳回 */
-async function singleReview(row: any, status: 'approved' | 'rejected') {
-  await reviewAdjustment(projectId.value, row.entry_group_id, { status })
-  ElMessage.success(status === 'approved' ? '已通过' : '已驳回')
-  fetchEntries()
-  fetchSummary()
-}
-
-/** chain-closure-phase3: 单条撤回复核 */
-async function singleRevoke(row: any) {
-  await revokeAdjustmentReview(projectId.value, row.entry_group_id, {})
-  ElMessage.success('已撤回复核')
-  fetchEntries()
-  fetchSummary()
-}
-
-function onRejectDialogOpen() {
-  // 初始化逐条原因（每条分录 id 对应空字符串）
-  const reasons: Record<string, string> = {}
-  for (const row of selectedRows.value) {
-    reasons[row.entry_group_id] = ''
-  }
-  individualReasons.value = reasons
-}
-
-function onImported() {
-  showImportDialog.value = false
-  fetchEntries()
-}
-
-function onExportSummary() {
-  // P2-9: 导出含协作状态+调整目的列（后端 additive 参数）
-  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-    downloadFileAsBlob(
-      `${P.adjustments.exportSummary(projectId.value)}?year=${year.value}&format=excel&include_collaboration=true`,
-      `审计调整汇总_${year.value}.xlsx`
-    )
-  })
-}
-
-async function onExportTemplate(templateType: 'soe' | 'listed' = 'soe') {
-  const label = templateType === 'soe' ? '国企版' : '上市版'
-
-  // 当前项目版本与所选版本不一致时提醒(避免下错版本)
-  if (currentTemplateType.value && currentTemplateType.value !== templateType) {
-    const projLabel = currentTemplateType.value === 'soe' ? '国企版' : '上市版'
-    try {
-      await confirmDangerous({
-        title: '版本与项目不匹配',
-        message: `当前项目是【${projLabel}】,但你选择导出【${label}】模板。\n\n报表项目联动可能不准(项目映射规则按 ${projLabel} 配置)。\n\n建议导出 ${projLabel} 模板。是否仍然导出 ${label}?`,
-        confirmText: `仍导出 ${label}`,
-        cancelText: '取消',
-      })
-    } catch {
-      return  // 用户取消
-    }
-  }
-
-  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-    downloadFileAsBlob(
-      `${P.adjustments.exportTemplate(projectId.value)}?year=${year.value}&template_type=${templateType}`,
-      `调整分录导入模板_${label}_${year.value}.xlsx`
-    )
-    ElMessage.success(`${label}模板已开始下载,请按 [关注事项] sheet 提示填写`)
-  })
-}
-
-async function reloadAdjustmentContext() {
-  await ensureProjectYear()
-  await fetchProjectMeta()
-  projectStore.syncFromRoute(route)
-  selectedYear.value = year.value
-  // 同步科目过滤参数
-  filterAccount.value = typeof route.query.account === 'string' ? route.query.account : ''
-  await fetchEntries()
-  await fetchSummary()
-  await fetchAccountOptions()
-  if (!projectOptions.value.length) projectStore.loadProjectOptions()
-  await refreshCollabInbox()
-  maybeOpenGroupFromQuery()
-}
-
-// ─── 协作深链（?group=）+ 待我协作收件箱（P0-2 / P0-3） ─────────────────────
-const collabInbox = ref<Array<{ id: string; entry_group_id: string; status: string; round: number; note?: string | null }>>([])
 const inboxDrawerVisible = ref(false)
 const collabInboxCount = computed(() => collabInbox.value.length)
 
-async function refreshCollabInbox() {
-  try {
-    collabInbox.value = await getCollaborationInbox(projectId.value)
-  } catch { collabInbox.value = [] }
+function entryNo(entryGroupId: string): string {
+  return entries.value.find((e: any) => e.entry_group_id === entryGroupId)?.adjustment_no || entryGroupId.slice(0, 8)
 }
 
-/** 通知/明细表跳转携 ?group= → 定位分录组并打开协作对话框（处理后清除 query 防重复触发）。 */
-function maybeOpenGroupFromQuery() {
-  const g = typeof route.query.group === 'string' ? route.query.group : ''
-  if (!g) return
-  const row = entries.value.find((e: any) => e.entry_group_id === g)
-    || { entry_group_id: g, line_items: [] }
-  openCollabDialog(row)
-  const q = { ...route.query }
-  delete q.group
-  router.replace({ path: route.path, query: q }).catch(() => { /* ignore */ })
-}
-
-/** 从收件箱打开某分录组协作（优先用列表中已加载的完整行以预填明细）。 */
 function openCollabFromInbox(item: { entry_group_id: string }) {
   inboxDrawerVisible.value = false
-  const row = entries.value.find((e: any) => e.entry_group_id === item.entry_group_id)
-    || { entry_group_id: item.entry_group_id, line_items: [] }
-  openCollabDialog(row)
+  openCollabDialog(entries.value.find((e: any) => e.entry_group_id === item.entry_group_id)
+    || { entry_group_id: item.entry_group_id, line_items: [] })
 }
 
-// 初次加载（替代 onMounted 一次性加载）
+onBeforeUnmount(() => {
+  _teardownSseBridge()
+  if (focusTimer) clearTimeout(focusTimer)
+})
+
+// 初次加载
 reloadAdjustmentContext()
 
-// V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代散落的 watch）
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载
 onContextChange(() => {
   reloadAdjustmentContext()
 })
@@ -1659,15 +988,6 @@ onContextChange(() => {
 
 <style scoped>
 .gt-adjustments { padding: var(--gt-space-5); }
-
-/* 批量模式 */
-.gt-adj-batch-toggle {
-  display: flex; align-items: center; gap: 10px;
-}
-.gt-adj-batch-toggle :deep(.el-switch__label) { color: rgba(255,255,255,0.85); font-size: var(--gt-font-size-xs); }
-.gt-adj-batch-toggle :deep(.el-switch.is-checked .el-switch__core) { background-color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
-.gt-adj-batch-badge :deep(.el-badge__content) { z-index: 2; }
-.gt-adj-batch-toggle .el-button--success { background: rgba(103, 194, 58, 0.85); border-color: rgba(103, 194, 58, 0.6); color: #fff; }
 
 /* 导出模板下拉: 当前项目版本高亮 */
 :deep(.is-current-version) {
@@ -1683,176 +1003,50 @@ onContextChange(() => {
   padding: var(--gt-space-4) var(--gt-space-5);
   box-shadow: var(--gt-shadow-sm); min-width: 140px; text-align: center;
   border: 1px solid rgba(75, 45, 119, 0.04);
-  transition: all var(--gt-transition-base);
-  position: relative; overflow: hidden;
 }
-.gt-summary-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow-md); }
-.gt-summary-card::after {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 3px;
-  background: var(--gt-gradient-primary);
-  opacity: 0;
-  transition: opacity var(--gt-transition-fast);
-}
-.gt-summary-card:hover::after { opacity: 1; }
-.gt-summary-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.gt-summary-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-weight: 500; letter-spacing: 0.5px; }
 .gt-summary-value { display: block; font-size: var(--gt-font-size-2xl); font-weight: 800; color: var(--gt-color-primary); margin: 4px 0; letter-spacing: -0.5px; }
+.gt-summary-value--sm { font-size: var(--gt-font-size-lg) !important; }
 .gt-summary-sub { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
+.gt-summary-card--impact { border-left: 3px solid var(--gt-color-success); }
+
+/* 筛选行 */
+.gt-adj-tabs-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.gt-adj-tabs-row :deep(.el-tabs) { flex: 1; margin-bottom: 0; }
+.gt-adj-tabs-row :deep(.el-tabs__header) { margin-bottom: 0; }
+:deep(.el-tabs__item.is-active) { font-weight: 600; }
+.gt-adj-fs-btn { flex-shrink: 0; }
+.gt-adj-status-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.gt-adj-status-hint { font-size: var(--gt-font-size-xs); color: var(--el-color-warning-dark-2); font-weight: 600; }
+.gt-adj-status-team-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 
 /* 批量操作 */
 .gt-adj-batch-actions {
-  display: flex; align-items: center; gap: var(--gt-space-3);
-  margin-top: var(--gt-space-4);
-  padding: var(--gt-space-3) var(--gt-space-4);
-  background: linear-gradient(135deg, #f8f6fb, #f4f0fa);
+  display: flex; align-items: center; gap: var(--gt-space-3); flex-wrap: wrap;
+  margin-bottom: var(--gt-space-3);
+  padding: var(--gt-space-2) var(--gt-space-4);
+  background: var(--gt-color-primary-bg);
   border-radius: var(--gt-radius-md);
   border: 1px solid rgba(75, 45, 119, 0.08);
 }
+.gt-pagination { margin-top: 12px; display: flex; justify-content: flex-end; }
 
-/* 行项明细 */
-.gt-adj-line-items-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: var(--gt-space-2); font-weight: 600;
-  padding-bottom: var(--gt-space-2);
-  border-bottom: 1px solid rgba(75, 45, 119, 0.06);
-}
+.gt-adj-impact-tip { margin: 0 0 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-adj-related-item { display: block; width: 100%; padding: 6px 8px; cursor: pointer; border: 0; background: transparent; text-align: left; font: inherit; border-radius: var(--gt-radius-sm); }
+.gt-adj-related-item:hover { background: var(--gt-color-primary-bg); }
+.gt-adj-related-item:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 1px; }
+.gt-adj-related-code { font-weight: 600; color: var(--gt-color-primary); margin-right: 6px; }
 
-/* 借贷差额 */
-.gt-adj-balance-diff {
-  text-align: right; font-size: var(--gt-font-size-sm);
-  padding: var(--gt-space-2) var(--gt-space-3);
-  border-radius: var(--gt-radius-sm);
-  background: var(--gt-color-success-light);
-  color: var(--gt-color-success); font-weight: 600;
-  margin-top: var(--gt-space-2);
-}
-.gt-adj-balance-diff.gt-adj-unbalanced {
-  background: var(--gt-color-coral-light);
-  color: var(--gt-color-coral);
-}
+/* 待我协作 */
+.gt-adj-inbox-item { display: block; width: 100%; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; border: 1px solid var(--gt-color-border-light); background: transparent; text-align: left; font: inherit; border-radius: var(--gt-radius-md); }
+.gt-adj-inbox-item:hover { background: var(--gt-color-primary-bg); }
+.gt-adj-inbox-item:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 1px; }
+.gt-adj-inbox-row { display: flex; align-items: center; gap: 8px; }
+.gt-adj-inbox-no { font-weight: 600; }
+.gt-adj-inbox-round, .gt-adj-inbox-note { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-adj-inbox-note { margin-top: 4px; }
 
-.gt-adj-col-placeholder {
-  color: var(--gt-color-text-tertiary, #909399);
-}
-
-/* 主要科目列：会计凭证样式（科目编码+名称多行） */
-.gt-adj-voucher {
-  display: flex;
-  flex-direction: column;
-  max-width: 100%;
-}
-.gt-adj-voucher-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--gt-font-size-sm);
-  line-height: 1.7;
-  min-height: calc(var(--gt-font-size-sm) * 1.7);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.gt-adj-voucher-code {
-  font-family: var(--gt-font-family-mono, monospace);
-  font-size: var(--gt-font-size-xs);
-  color: var(--gt-color-text-secondary);
-  flex-shrink: 0;
-}
-.gt-adj-voucher-name {
-  color: var(--gt-color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-/* 借方/贷方金额列：每行高度与主要科目列对齐（line-height 1.7） */
-.gt-adj-voucher-amt-cell {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  font-size: var(--gt-font-size-sm);
-  line-height: 1.7;
-  min-height: calc(var(--gt-font-size-sm) * 1.7);
-}
-/* 借贷方向切换分隔线（三列同步独立行，相同 idx 同步插入保证水平对齐） */
-.gt-adj-voucher-divider-line {
-  height: 9px;
-  border-top: 1px dashed var(--gt-color-border, rgba(75, 45, 119, 0.18));
-  margin: 4px 0;
-}
-
-/* 展开行明细 */
-.gt-adj-expand-detail {
-  padding: 8px 16px 8px 48px;
-  background: var(--gt-color-primary-bg);
-}
-.gt-adj-line-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--gt-font-size-xs);
-}
-.gt-adj-line-table th {
-  background: var(--gt-color-primary-bg);
-  padding: 4px 8px;
-  font-weight: 600;
-  text-align: left;
-  border-bottom: 1px solid var(--gt-color-border-purple);
-}
-.gt-adj-line-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--gt-color-border-light);
-}
-.gt-adj-expand-footer {
-  display: flex;
-  gap: 16px;
-  margin-top: 6px;
-  font-size: var(--gt-font-size-xs);
-  color: var(--gt-color-info);
-}
-.gt-adj-expand-desc { color: var(--gt-color-text-regular); }
-.gt-adj-expand-impact { color: var(--gt-color-primary); font-weight: 500; }
-.gt-adj-dir-dr { color: var(--gt-color-coral); font-weight: 600; }
-.gt-adj-dir-cr { color: var(--gt-color-teal); font-weight: 600; }
-
-/* 批量模式浮动提交栏 */
-.gt-adj-batch-float-bar {
-  position: fixed;
-  bottom: 0;
-  left: 220px;
-  right: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 24px;
-  background: linear-gradient(135deg, #f8f6fb, #ece4f5);
-  border-top: 2px solid var(--gt-color-primary);
-  box-shadow: 0 -4px 12px rgba(75, 45, 119, 0.1);
-  font-size: var(--gt-font-size-sm);
-  font-weight: 600;
-  color: var(--gt-color-primary);
-}
-
-:deep(.el-tabs__item.is-active) { font-weight: 600; }
-
-/* Tab 栏 + 全屏按钮同行右对齐（合并到 tab 行不独占行） */
-.gt-adj-tabs-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.gt-adj-tabs-row :deep(.el-tabs) {
-  flex: 1;
-  margin-bottom: 0;
-}
-.gt-adj-tabs-row :deep(.el-tabs__header) {
-  margin-bottom: 0;
-}
-.gt-adj-fs-btn {
-  flex-shrink: 0;
-  margin-bottom: 8px; /* 对齐 tabs 下边线 */
-}
-
-/* P0-1: 空态引导卡片 */
+/* 空态引导卡片 */
 .gt-adj-empty-guide {
   background: linear-gradient(135deg, #faf8fc 0%, #f4f0fa 100%);
   border: 1px solid rgba(75, 45, 119, 0.08);
@@ -1860,72 +1054,24 @@ onContextChange(() => {
   padding: 32px;
   margin-bottom: 20px;
 }
-.gt-adj-empty-guide__header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-.gt-adj-empty-guide__header h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--gt-color-primary, #4b2d77);
-  margin: 0 0 8px;
-}
-.gt-adj-empty-guide__header p {
-  font-size: 13px;
-  color: var(--gt-color-text-secondary, #606266);
-  margin: 0;
-}
-.gt-adj-empty-guide__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-}
+.gt-adj-empty-guide__header { text-align: center; margin-bottom: 24px; }
+.gt-adj-empty-guide__header h3 { font-size: var(--gt-font-size-xl); font-weight: 700; color: var(--gt-color-primary); margin: 0 0 8px; }
+.gt-adj-empty-guide__header p { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin: 0; }
+.gt-adj-empty-guide__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .gt-adj-guide-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 20px 16px;
-  background: #fff;
-  border-radius: var(--gt-radius-md, 8px);
-  border: 1px solid rgba(75, 45, 119, 0.06);
-  cursor: pointer;
-  transition: all 0.2s;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 20px 16px; background: var(--gt-color-bg-white);
+  border-radius: var(--gt-radius-md, 8px); border: 1px solid rgba(75, 45, 119, 0.06);
+  cursor: pointer; transition: all 0.2s; font: inherit; color: inherit;
 }
-.gt-adj-guide-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(75, 45, 119, 0.12);
-  border-color: var(--gt-color-primary, #4b2d77);
-}
-.gt-adj-guide-card__icon {
-  font-size: 28px;
-  margin-bottom: 10px;
-}
-.gt-adj-guide-card__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gt-color-text, #303133);
-  margin-bottom: 6px;
-}
-.gt-adj-guide-card__desc {
-  font-size: 12px;
-  color: var(--gt-color-text-tertiary, #909399);
-  line-height: 1.5;
-}
-
-/* P1-5: TB影响概览卡片 */
-.gt-summary-card--impact {
-  border-left: 3px solid var(--gt-color-success, #67c23a);
-}
-.gt-summary-value--sm {
-  font-size: var(--gt-font-size-lg, 18px) !important;
-}
-
-/* P2-10: 展开行底部历史链接 */
-.gt-adj-expand-history {
-  margin-top: 6px;
-  font-size: 12px;
-}
-
-/* P0-3: 查看明细→链接明确化已在模板内处理 */
+.gt-adj-guide-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(75, 45, 119, 0.12); border-color: var(--gt-color-primary); }
+.gt-adj-guide-card:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
+.gt-adj-guide-card__icon { font-size: var(--gt-font-size-3xl); margin-bottom: 10px; }
+.gt-adj-guide-card__title { font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text); margin-bottom: 6px; }
+.gt-adj-guide-card__desc { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); line-height: 1.5; }
+.gt-adj-resource-errors { display: grid; gap: 6px; margin-bottom: 8px; }
+.gt-adj-resource-error-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gt-adj-resource-stale { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); }
+.gt-adj-inbox-loading { padding: 16px; color: var(--gt-color-text-tertiary); text-align: center; }
+.gt-adj-paste-zone:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
 </style>

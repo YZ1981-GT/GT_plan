@@ -171,7 +171,7 @@
           </template>
         </el-table-column>
         <!-- 📎 核查证据上传列 (Req 10.2) -->
-        <el-table-column label="📎" width="60" align="center">
+        <el-table-column label="📎" width="96" align="center">
           <template #default="{ row, $index }">
             <div class="attach-cell">
               <!-- 已有附件 -->
@@ -181,12 +181,17 @@
                 placement="top"
               >
                 <a
-                  :href="`/api/attachments/${evidenceAttachments[$index]!.id}/download`"
-                  target="_blank"
+                  href="#"
                   class="attach-link"
-                  @click.stop
+                  :aria-label="`下载 ${evidenceAttachments[$index]!.fileName}`"
+                  @click.stop.prevent="downloadAttachment(evidenceAttachments[$index]!.id, evidenceAttachments[$index]!.fileName)"
                 >📎</a>
               </el-tooltip>
+              <AttachmentEyeButton
+                v-if="evidenceAttachments[$index]"
+                :attachment-id="evidenceAttachments[$index]!.id"
+                :file-name="evidenceAttachments[$index]!.fileName"
+              />
               <!-- 上传按钮 (非只读) -->
               <el-upload
                 v-if="!isReadonly"
@@ -239,9 +244,11 @@
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
-import { uploadAttachment } from '@/services/commonApi'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import type { AnomalyResult } from '@/composables/useC24AnalyticsEngine'
 import { fmtAmount } from '@/utils/formatters'
 
@@ -399,26 +406,15 @@ async function onUploadEvidence(index: number, file: File) {
 
   uploadingRow.value = index
   try {
-    // 1) 上传附件
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${file.name} [C24-5 异常分录${index + 1} 核查证据]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 关联到底稿
-    try {
-      await api.post(`/api/attachments/${attachmentId}/associate`, {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `C24-5-anomaly-${index}`,
-      })
-    } catch { /* 关联失败不阻断 */ }
+    // 1) 经底稿证据入口上传：只写本异常分录行的证据链接（C24-5 · 第 n 项，spec attachment-evidence-intake 需求 5.4）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file,
+      sheetName: 'C24-5',
+      cellRef: itemCellRef(index + 1),
+    })
+    const attachmentId = String(uploaded.id)
 
     // 存储附件引用
     const attachment: EvidenceAttachment = { id: attachmentId, fileName: file.name, ocrMerged: false }
@@ -436,7 +432,7 @@ async function onUploadEvidence(index: number, file: File) {
 
     // 2) OCR 辅助（图片/PDF）
     if (isOcrEligible(file.name)) {
-      await doOcrAssist(file, index)
+      await doOcrAssist(file, index, attachmentId)
     }
   } catch (e: any) {
     const detail = e?.response?.data?.detail || e?.message || '上传失败'
@@ -455,9 +451,11 @@ function isOcrEligible(filename: string): boolean {
  * OCR 辅助填充核查内容（Req 10.2）
  * 识别证据内容，辅助填充核查描述
  */
-async function doOcrAssist(file: File, index: number): Promise<void> {
+async function doOcrAssist(file: File, index: number, attachmentId: string): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  formData.append('attachment_id', attachmentId)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(

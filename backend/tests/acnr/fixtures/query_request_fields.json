@@ -1,0 +1,69 @@
+{
+  "QueryDSL": {
+    "fields": [
+      "acnr_targets",
+      "aggregates",
+      "count_token",
+      "fields",
+      "filter_logic",
+      "filters",
+      "group_by",
+      "joins",
+      "limit",
+      "offset",
+      "order_by",
+      "project_id",
+      "table",
+      "year"
+    ],
+    "required": [
+      "table"
+    ]
+  },
+  "ExportDSL": {
+    "fields": [
+      "acnr_targets",
+      "aggregates",
+      "count_token",
+      "fields",
+      "file_name",
+      "filter_logic",
+      "filters",
+      "group_by",
+      "headers",
+      "joins",
+      "limit",
+      "offset",
+      "order_by",
+      "project_id",
+      "table",
+      "year"
+    ],
+    "required": [
+      "table"
+    ]
+  },
+  "QueryRequest": {
+    "fields": [
+      "acnr_targets",
+      "columns",
+      "count_token",
+      "condition_logic",
+      "conditions",
+      "filters",
+      "group",
+      "limit",
+      "offset",
+      "pivot",
+      "project_id",
+      "sort",
+      "source",
+      "year"
+    ],
+    "required": [
+      "project_id",
+      "source",
+      "year"
+    ]
+  }
+}

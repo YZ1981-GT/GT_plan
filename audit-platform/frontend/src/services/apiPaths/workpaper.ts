@@ -6,6 +6,8 @@
 
 export const workpapers = {
   list: (pid: string) => `/api/projects/${pid}/working-papers`,
+  /** 全部可见底稿（不分页，spec platform-perf-hotspots R5） */
+  listAll: (pid: string) => `/api/projects/${pid}/working-papers-all`,
   myLead: (pid: string) => `/api/projects/${pid}/my-lead-workpapers`,
   detail: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}`,
   download: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/download`,
@@ -172,7 +174,14 @@ export const templates = {
   sets: {
     list: '/api/template-sets',
     detail: (setId: string) => `/api/template-sets/${setId}`,
+    /** 幂等初始化内置模板集（会更新旧的占位编码） */
+    seed: '/api/template-sets/seed',
   },
+  /** 按模板集生成本项目底稿（只生成粗裁保留、所选的编码） */
+  generateFromSet: (pid: string) => `/api/projects/${pid}/working-papers/generate`,
+  /** 持久生成 operation 状态（响应丢失后按客户端 UUID 恢复原回执） */
+  generationOperation: (pid: string, operationId: string) =>
+    `/api/projects/${pid}/working-papers/generation-operations/${operationId}`,
 } as const
 
 // ─── 审计程序 ───────────────────────────────────────────────────────────────
@@ -196,6 +205,10 @@ export const procedures = {
    */
   trimDecisionContext: (pid: string) =>
     `/api/projects/${pid}/procedure-scope/trim-decision-context`,
+  /** 生成计划（只读，spec trim-generation-plan-linkage R1）：按循环给出每个模板编码这次生不生成、为什么 */
+  generationPlan: (pid: string) => `/api/projects/${pid}/procedure-scope/generation-plan`,
+  /** 各循环粗裁状态：未打开 / 未保存 / 已保存（谁、何时） */
+  scopeConfirmations: (pid: string) => `/api/projects/${pid}/procedure-scope/confirmations`,
 } as const
 
 // ─── 底稿主编（procedure-mainline-convergence 需求 5）────────────────────────

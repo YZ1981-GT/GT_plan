@@ -361,7 +361,7 @@ class TestEngineContract:
         """
         caps = asyncio.run(NativeEngine(db=None).capabilities())
         assert caps.streaming is True
-        assert caps.local_only is True
+        assert caps.local_only is False  # 需求 4.4：Native 可经事务所服务器兜底，不得声明全本地
         assert caps.tools is False, "native 没有工具调用实现，不得声明 tools=True"
         assert caps.subagents is False, "native 没有子 Agent 实现"
         identifiers = _code_identifiers(NativeEngine)
@@ -1688,3 +1688,33 @@ class TestTerminalUniqueness:
         assert r["late_message"] is None
         assert r["db_status"] == ChatRunStatus.error.value
         assert r["assistant_message_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_native_model_consumes_shared_context_plan_project_attachment() -> None:
+    """统一计划中的项目附件哨兵必须进入 Native 最终模型 messages。"""
+    from unittest.mock import AsyncMock
+
+    from app.services.ai_chat.context_plan import ContextPlan
+    from app.services.doc_ai_context_builder import ChatContext
+
+    sentinel = "项目附件唯一哨兵：收入截止测试"
+    plan = ContextPlan(
+        context=ChatContext(
+            doc_excerpt="", project_summary="", knowledge_hits=[], citations=[], token_estimate=1,
+        ),
+        system_message=f"平台政策\n【项目附件】\n{sentinel}",
+        manifest={"included": [{"source_type": "project_attachment"}]},
+        citations=(),
+    )
+    model = FakeModelClient(chunks=["已分析"])
+    engine = NativeEngine(db=None, model=model)
+    engine._build_context_plan = AsyncMock(return_value=plan)  # noqa: SLF001
+    engine._load_history = AsyncMock(return_value=[])  # noqa: SLF001
+    stream = engine.run(_minimal_request(principal=object()), NEVER_CANCELLED)
+    events = [event async for event in stream]
+
+    assert events[-1].type is ChatEventType.done
+    assert len(model.messages_seen) == 1
+    system_messages = [m["content"] for m in model.messages_seen[0] if m["role"] == "system"]
+    assert len(system_messages) == 1 and sentinel in system_messages[0]

@@ -140,12 +140,17 @@
                     placement="top"
                   >
                     <a
-                      :href="`/api/attachments/${c25Attachments[row.index]!.id}/download`"
-                      target="_blank"
+                      href="#"
                       class="attach-link"
-                      @click.stop
+                      :aria-label="`下载 ${c25Attachments[row.index]!.fileName}`"
+                      @click.stop.prevent="downloadAttachment(c25Attachments[row.index]!.id, c25Attachments[row.index]!.fileName)"
                     >📎</a>
                   </el-tooltip>
+                  <AttachmentEyeButton
+                    v-if="c25Attachments[row.index]"
+                    :attachment-id="c25Attachments[row.index]!.id"
+                    :file-name="c25Attachments[row.index]!.fileName"
+                  />
                   <el-upload
                     v-if="!isReadonly"
                     :auto-upload="true"
@@ -288,9 +293,11 @@
 import { computed, ref, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { InfoFilled, MagicStick, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { useC25C26Data } from '@/composables/useC25C26Data'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
-import { uploadAttachment } from '@/services/commonApi'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from './GtIndexChip.vue'
@@ -491,26 +498,15 @@ async function onUploadC25Attachment(index: number, file: File) {
 
   uploadingC25Row.value = index
   try {
-    // 1) 上传
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${file.name} [C25 步骤${index + 1}]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 关联底稿
-    try {
-      await api.post(`/api/attachments/${attachmentId}/associate`, {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `C25-step-${index + 1}`,
-      })
-    } catch { /* 关联失败不阻断 */ }
+    // 1) 经底稿证据入口上传：只写本步骤行的证据链接（C25 · 第 n 项，spec attachment-evidence-intake 需求 5.4）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file,
+      sheetName: 'C25',
+      cellRef: itemCellRef(index + 1),
+    })
+    const attachmentId = String(uploaded.id)
 
     const attachment: C25Attachment = { id: attachmentId, fileName: file.name, ocrMerged: false }
     c25Attachments.value[index] = attachment
@@ -519,7 +515,7 @@ async function onUploadC25Attachment(index: number, file: File) {
 
     // 2) OCR 识别
     if (isOcrEligible(file.name)) {
-      await doC25OcrMerge(file, index)
+      await doC25OcrMerge(file, index, attachmentId)
     }
   } catch (e: any) {
     const detail = e?.response?.data?.detail || e?.message || '上传失败'
@@ -535,9 +531,11 @@ function isOcrEligible(filename: string): boolean {
 }
 
 /** OCR → 确认弹窗 → merge 到执行情况说明 */
-async function doC25OcrMerge(file: File, index: number): Promise<void> {
+async function doC25OcrMerge(file: File, index: number, attachmentId: string): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  formData.append('attachment_id', attachmentId)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(

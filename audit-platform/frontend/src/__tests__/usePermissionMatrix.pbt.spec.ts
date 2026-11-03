@@ -84,6 +84,15 @@ const EXPECTED_TABLE: Record<Role, Record<Resource, Set<Action>>> = {
     template: new Set(['view']),
     project_settings: new Set(['view']),
   },
+  // R5.3（trim-generation-plan-followup-optimizations）：只读用户 / 未登记角色的最小矩阵
+  readonly: {
+    workpaper: new Set(['view']),
+    adjustment: new Set(['view']),
+    report: new Set(['view']),
+    note: new Set(['view']),
+    template: new Set(['view']),
+    project_settings: new Set(['view']),
+  },
 }
 
 /**

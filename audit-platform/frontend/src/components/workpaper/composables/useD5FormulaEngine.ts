@@ -53,17 +53,17 @@ export function calcFairValue(faceValue: number, discountInterest: number): numb
 /**
  * 剩余天数 = 到期日 - 计量日（天数差）
  *
- * D5-4 公允价值测算表 G列公式。
- * 日期格式：YYYY-MM-DD。无效日期返回 0。
+ * D5-4 公允价值测算表 G列公式（模板 G = F − E）。
+ * 日期格式：YYYY-MM-DD。任一日期为空或无效返回 0（日期没填完不算）。
+ * 到期日早于计量日 → 负数，与模板同（原先记 0，表单与 OnlyOffice 两侧显示不同；
+ * spec oo-writeback-template-parity-closure R2.4 对拍守卫）。
  */
 export function calcRemainingDays(measurementDate: string, maturityDate: string): number {
   if (!measurementDate || !maturityDate) return 0
   const d1 = new Date(measurementDate)
   const d2 = new Date(maturityDate)
   if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0
-  const diffMs = d2.getTime() - d1.getTime()
-  if (diffMs <= 0) return 0
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+  return Math.ceil((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 // ─── 审定表公式（D5-1）─────────────────────────────────────────────────────

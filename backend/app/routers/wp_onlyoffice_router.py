@@ -787,6 +787,14 @@ async def get_sheet_onlyoffice_config(
     # gate_ctx 为 None 表示 enforce 关闭且门拒绝（dev 放行），不额外收紧。
     if gate_ctx is not None and getattr(gate_ctx, "readonly", False):
         mode = "view"
+    # 编辑锁在别人或本人另一个窗口手里 ⇒ 只读配置（spec workpaper-multi-window-lock-gaps R3.4）。
+    # OnlyOffice 开着浏览器令牌校验，以签名里的 mode 为准：前端把模式改成只读不生效，只能在这里给。
+    if mode == "edit":
+        from app.routers._wp_gate import client_instance_of
+        from app.services.editing_lock_service import find_blocking_lock
+
+        if await find_blocking_lock(db, "workpaper", str(wp_id), current_user.id, client_instance_of(request)):
+            mode = "view"
 
     # 6.5 席位接入：仅 edit 模式占席位；view（只读）不占
     if mode == "edit":

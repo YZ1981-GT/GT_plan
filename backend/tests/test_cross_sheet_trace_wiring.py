@@ -142,6 +142,8 @@ async def test_endpoint_goes_through_orchestrator(wired_endpoint):
     assert kwargs.get("project_id"), "未把 project_id 传给 orchestrator，ACNR 无法定位"
     assert kwargs.get("db") is not None, "未把 db 传给 orchestrator，ACNR 无法查库"
     assert kwargs.get("max_depth") == 3
+    # 节点身份按「父底稿 + sheet + A1」判定（acnr T20），父底稿就是端点的 wp_code
+    assert kwargs.get("parent_wp_code") == "D2-1", "未把端点 wp_code 作为父底稿传给 orchestrator"
 
 
 @pytest.mark.asyncio

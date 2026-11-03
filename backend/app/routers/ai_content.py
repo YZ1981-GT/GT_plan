@@ -16,6 +16,10 @@
 - revise 与 confirm 共用 _confirm_or_revise（写 revised_content）
 - target_label enrich 修 key（str(log.id)）+ savepoint 降级
 - 底稿类不自动写入（提示复制）
+
+目标标签修复（spec ai-content-pending-target-label，2026-10-30）：上面 R6 的标签修复没生效 ——
+底稿查 ``working_paper.wp_name``（列在 ``wp_index``）、附注把 ``target_cell`` 末段当章节号、两条查询同一保存点。
+现按 ``target_cell`` 第二段的实例 id 用 ORM 分类查询，口径与 AI 面板宿主标签一致，并补 ``target_position``。
 """
 
 from __future__ import annotations
@@ -28,13 +32,26 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, assert_project_permission
+from app.deps import (
+    assert_project_permission,
+    check_consol_lock,
+    get_current_user,
+    require_project_access,
+)
 from app.models.core import User
 from app.services import ai_content_log_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["AI 内容溯源"])
+
+
+def _record_human_action(action: str) -> None:
+    from app.services.ai_chat.metrics import record_human_action_metric
+    from app.services.llm_metrics import llm_metrics
+
+    llm_metrics.record_human_action(action)
+    record_human_action_metric(action)
 
 
 # ---------------------------------------------------------------------------
@@ -53,15 +70,34 @@ class ReviseRequest(BaseModel):
         return v
 
 
+def _parse_target(target_cell: str | None) -> tuple[str | None, str | None, str | None]:
+    """拆 ``target_cell`` 为（类型, 实例 id 原文, 位置原文）。
+
+    编码以写入方为准：``ai_content_log_service.create`` 存 ``{instance_type}:{instance_id}[:{位置}]``。
+    位置是第二个冒号之后的全部原文（本身还可能含冒号），如 ``E5`` / ``正文第一段``。
+    """
+    if not target_cell:
+        return None, None, None
+    parts = target_cell.split(":", 2)
+    kind = parts[0] or None
+    target_id = parts[1] if len(parts) >= 2 and parts[1] else None
+    position = parts[2] if len(parts) == 3 and parts[2] else None
+    return kind, target_id, position
+
+
 def _serialize(log) -> dict:
-    """将 AiContentLog ORM 对象序列化为 banner / badge 所需的字典。"""
-    target_cell = log.target_cell or ""
-    instance_type = target_cell.split(":", 1)[0] if target_cell else None
+    """将 legacy 日志或 V238 DraftArtifact 序列化为统一待确认 DTO。"""
+    if getattr(log, "target_locator", None):
+        from app.services.draft_artifact_facade import serialize_artifact
+
+        return serialize_artifact(log)
+    instance_type, _target_id, position = _parse_target(log.target_cell)
     return {
         "id": str(log.id),
         "ai_content_log_id": str(log.id),
         "instance_type": instance_type,
         "target_cell": log.target_cell,
+        "target_position": position,
         "model": log.model,
         "confidence": float(log.confidence) if log.confidence is not None else None,
         "generated_at": log.generated_at.isoformat() if log.generated_at else None,
@@ -70,95 +106,103 @@ def _serialize(log) -> dict:
     }
 
 
-async def _enrich_target_labels(db: AsyncSession, items: list) -> list:
-    """给每条 pending 日志补充 target_label（底稿名 / 附注章节标题）。
+def _coerce_uuid(value: str | None) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
 
-    用 str(log.id) 做 dict key（修复原 UUID 对象 key 写 / str 查全 miss）。
-    允许多条日志指向同一目标。查询失败降级 None，不毒化外层事务。
-    """
-    if not items:
-        return items
 
-    from sqlalchemy import select, text
+async def _workpaper_labels(db: AsyncSession, project_id: UUID, ids: set[UUID]) -> dict[UUID, str]:
+    """底稿 id → ``"{wp_code} {wp_name}"``。先当 ``working_paper.id``（经 ``wp_index`` 取名），没取到的再当 ``wp_index.id``。"""
+    from sqlalchemy import select
 
-    serialized = [_serialize(it) for it in items]
+    from app.models.workpaper_models import WorkingPaper, WpIndex
 
+    labels: dict[UUID, str] = {}
+    rows = (await db.execute(
+        select(WorkingPaper.id, WpIndex.wp_code, WpIndex.wp_name)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.project_id == project_id, WorkingPaper.id.in_(list(ids)))
+    )).all()
+    for wp_id, code, name in rows:
+        labels[wp_id] = f"{code} {name}".strip()
+    rest = ids - labels.keys()
+    if rest:
+        # 早期写入的记录存的是索引 id（共享库现存一条，2026-10-30 现查）
+        rows = (await db.execute(
+            select(WpIndex.id, WpIndex.wp_code, WpIndex.wp_name)
+            .where(WpIndex.project_id == project_id, WpIndex.id.in_(list(rest)))
+        )).all()
+        for idx_id, code, name in rows:
+            labels[idx_id] = f"{code} {name}".strip()
+    return labels
+
+
+async def _note_labels(db: AsyncSession, project_id: UUID, ids: set[UUID]) -> dict[UUID, str]:
+    """附注 id（``disclosure_notes.id``）→ ``"{note_section} {section_title}"``。"""
+    from sqlalchemy import select
+
+    from app.models.report_models import DisclosureNote
+
+    rows = (await db.execute(
+        select(DisclosureNote.id, DisclosureNote.note_section, DisclosureNote.section_title)
+        .where(DisclosureNote.project_id == project_id, DisclosureNote.id.in_(list(ids)))
+    )).all()
+    return {note_id: f"{section} {title}".strip() for note_id, section, title in rows}
+
+
+async def _lookup_labels(db: AsyncSession, what: str, fetch, project_id: UUID, ids: set[UUID]) -> dict[UUID, str]:
+    """一类标签一个保存点：查询失败只让这一类为空，不影响另一类，也不中止调用方事务。"""
+    if not ids:
+        return {}
     try:
         async with db.begin_nested():
-            # 按 target_cell 前缀分组
-            wp_logs = {}  # str(log.id) -> target_cell
-            note_logs = {}
-            for it, raw in zip(serialized, items):
-                lid = str(raw.id)
-                tc = raw.target_cell or ""
-                if tc.startswith("workpaper:"):
-                    wp_logs[lid] = tc
-                elif tc.startswith("note:"):
-                    note_logs[lid] = tc
-
-            # 底稿标签：从 target_cell 里提取 wp_id，查 working_paper.wp_name
-            wp_labels = {}
-            if wp_logs:
-                wp_ids = set()
-                for tc in wp_logs.values():
-                    parts = tc.split(":")
-                    if len(parts) >= 2:
-                        try:
-                            wp_ids.add(UUID(parts[1]))
-                        except ValueError:
-                            pass
-                if wp_ids:
-                    placeholders = ", ".join(f"'{str(u)}'" for u in wp_ids)
-                    rows = (await db.execute(
-                        text(f"SELECT id, wp_name FROM working_paper WHERE id IN ({placeholders})")
-                    )).fetchall()
-                    for row in rows:
-                        wp_labels[str(row[0])] = row[1]
-
-            # 附注标签：从 target_cell 里提取 note_section，查 disclosure_notes.section_title
-            note_labels = {}
-            if note_logs:
-                # 提取所有 note_section（target_cell 格式 "note:<note_id>:<section>" 或 "note:<section>"）
-                sections = set()
-                project_ids = set()
-                for raw in items:
-                    if raw.project_id:
-                        project_ids.add(raw.project_id)
-                    tc = raw.target_cell or ""
-                    if tc.startswith("note:"):
-                        parts = tc.split(":")
-                        if len(parts) >= 2:
-                            sections.add(parts[-1])
-                if sections and project_ids:
-                    pid = str(list(project_ids)[0])
-                    sec_list = ", ".join(f"'{s}'" for s in sections)
-                    rows = (await db.execute(
-                        text(f"SELECT note_section, section_title FROM disclosure_notes "
-                             f"WHERE project_id = '{pid}' AND note_section IN ({sec_list})")
-                    )).fetchall()
-                    for row in rows:
-                        note_labels[row[0]] = row[1]
-
-            # 回填 target_label
-            for it, raw in zip(serialized, items):
-                lid = str(raw.id)
-                tc = raw.target_cell or ""
-                label = None
-                if tc.startswith("workpaper:"):
-                    parts = tc.split(":")
-                    if len(parts) >= 2:
-                        label = wp_labels.get(parts[1])
-                elif tc.startswith("note:"):
-                    parts = tc.split(":")
-                    if len(parts) >= 2:
-                        label = note_labels.get(parts[-1])
-                it["target_label"] = label
-
+            return await fetch(db, project_id, ids)
     except Exception:
-        logger.warning("_enrich_target_labels 查询失败，降级 None", exc_info=True)
-        for it in serialized:
-            it.setdefault("target_label", None)
+        logger.warning("待确认 AI 内容：%s标签查询失败，该类标签置空", what, exc_info=True)
+        return {}
 
+
+async def _enrich_target_labels(db: AsyncSession, project_id: UUID, items: list) -> list:
+    """给每条待确认日志补 ``target_label``（底稿 / 附注的展示名）。
+
+    - 口径与 AI 面板宿主标签一致（``ai_chat/host_context.py`` 的 ``_label_workpaper`` / ``_label_note``）。
+    - 实例 id 取 ``target_cell`` 第二段（附注是 ``disclosure_notes.id``，不是章节号）；不是 UUID 的不查。
+    - 只取本项目的行：``target_cell`` 是存下来的字符串，不能凭它读别的项目的名称。
+    - 目标已删除时仍显示原名称，便于认出这段 AI 内容原本写给谁。
+    - 全部 ORM 绑定参数，不拼 SQL。
+    """
+    serialized = [_serialize(it) for it in items]
+    if not items:
+        return serialized
+
+    targets = []
+    wp_ids: set[UUID] = set()
+    note_ids: set[UUID] = set()
+    for raw in items:
+        kind, target_id, _position = _parse_target(raw.target_cell)
+        uid = _coerce_uuid(target_id)
+        targets.append((kind, uid))
+        if uid is None:
+            continue
+        if kind == "workpaper":
+            wp_ids.add(uid)
+        elif kind == "note":
+            note_ids.add(uid)
+
+    wp_labels = await _lookup_labels(db, "底稿", _workpaper_labels, project_id, wp_ids)
+    note_labels = await _lookup_labels(db, "附注", _note_labels, project_id, note_ids)
+
+    for it, (kind, uid) in zip(serialized, targets):
+        label = None
+        if uid is not None and kind == "workpaper":
+            label = wp_labels.get(uid)
+        elif uid is not None and kind == "note":
+            label = note_labels.get(uid)
+        it["target_label"] = label
     return serialized
 
 
@@ -197,73 +241,71 @@ def _note_target_id(log) -> UUID | None:
 async def _writeback_note(db: AsyncSession, log, user, note_id: UUID) -> dict:
     """把确认 / 修订后的 AI 文本追加进附注 ``text_content``。
 
-    走 DisclosureEngine.update_note（盖编辑戳 + 协调器语义）。
+    经 ``DisclosureEngine(db).update_note`` 写入（盖「最近一次编辑」），提交后由调用方发 NOTE_SECTION_SAVED。
     写前检查 edit 权限和合并锁，不满足则抛 HTTPException（由调用方捕获回滚）。
     """
     # edit 无权 → 403
     await assert_project_permission(db, user, log.project_id, "edit")
 
-    # 合并锁 → 423
-    from app.services.consol_lock_service import check_consol_lock
-    await check_consol_lock(db, log.project_id)
+    # 合并锁 → 423（锁定时 check_consol_lock 抛 HTTPException(423)）
+    await check_consol_lock(project_id=log.project_id, db=db)
 
     content = log.revised_content if log.revised_content else log.generated_content
     if not content or not content.strip():
         return {"written": False, "reason": "AI 内容为空，未写入"}
 
+    from sqlalchemy import select
+
+    from app.models.report_models import DisclosureNote
     from app.services.disclosure_engine import DisclosureEngine
 
-    # 读当前附注正文，追加 AI 文本
-    from sqlalchemy import select, text as sa_text
+    # 只认本日志所属项目里未删除的附注：上面的 edit 权限与合并锁都按 log.project_id 判，
+    # 写入目标必须在同一个项目里（target_cell 里的附注 id 是存下来的字符串，不能单凭它跨项目写）。
+    # 用 ORM 比较 UUID：原生 SQL 绑 str(uuid) 在 SQLite（存 32 位十六进制）上恒匹配不到。
     row = (await db.execute(
-        sa_text("SELECT text_content, note_section, project_id FROM disclosure_notes WHERE id = :nid"),
-        {"nid": str(note_id)},
-    )).fetchone()
+        select(DisclosureNote.text_content, DisclosureNote.note_section, DisclosureNote.year).where(
+            DisclosureNote.id == note_id,
+            DisclosureNote.project_id == log.project_id,
+            DisclosureNote.is_deleted.is_(False),
+        )
+    )).first()
 
-    if not row:
+    if row is None:
         return {"written": False, "reason": "附注不存在"}
 
-    current_text = row[0] or ""
-    note_section = row[1]
+    current_text = row.text_content or ""
     separator = "\n\n---\n\n" if current_text.strip() else ""
     new_text = current_text + separator + content.strip()
 
-    await DisclosureEngine.update_note(
-        db=db,
-        note_id=note_id,
+    # update_note 是实例方法：盖「最近一次编辑」并走附注写入的统一校验
+    note = await DisclosureEngine(db).update_note(
+        note_id,
         text_content=new_text,
         user_id=user.id,
     )
+    if note is None:
+        return {"written": False, "reason": "附注不存在"}
     await db.flush()
-
-    # 取附注年度（用于 NOTE_SECTION_SAVED 事件）
-    note_year = None
-    try:
-        yr_row = (await db.execute(
-            sa_text("SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"),
-            {"pid": str(log.project_id)},
-        )).scalar()
-        note_year = yr_row
-    except Exception:
-        pass
 
     return {
         "written": True,
-        "note_section": note_section,
-        "note_year": note_year,
+        "note_section": row.note_section,
+        "note_year": row.year,
     }
 
 
 async def _note_saved_event(note_id, project_id, note_year, note_section):
     """发 NOTE_SECTION_SAVED 事件（附注刷新 / 下游失效）。失败不回滚已提交内容。"""
     try:
-        from app.services.event_bus import event_bus, EventPayload
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        # 与附注编辑端点（disclosure_notes.update_note）同一载荷：订阅方从 extra.section_code 定位章节
         await event_bus.publish(EventPayload(
-            event_type="NOTE_SECTION_SAVED",
-            source_id=str(note_id),
-            project_id=str(project_id),
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=project_id,
             year=note_year,
-            detail={"note_section": note_section},
+            extra={"section_code": note_section or str(note_id), "action": "update"},
         ))
     except Exception:
         logger.warning("AI 确认写附注已提交但 NOTE_SECTION_SAVED 发布失败", exc_info=True)
@@ -283,6 +325,59 @@ async def _confirm_or_revise(
     4. 底稿类：不自动写，提示复制
     """
     log = await _load_log_or_404(db, log_id)
+
+    if getattr(log, "target_locator", None):
+        from app.services.draft_artifact_facade import (
+            DraftArtifactConflict,
+            DraftArtifactStale,
+            apply_note_artifact,
+        )
+
+        try:
+            applied = await apply_note_artifact(
+                db, log_id=log_id, user=user, revised_content=revised_content
+            )
+            await db.commit()
+            _record_human_action(
+                "revised" if revised_content is not None else "confirmed"
+            )
+        except DraftArtifactStale as exc:
+            # stale 是一项需要用户看见的治理状态，提交该标记后返回冲突。
+            await db.commit()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except DraftArtifactConflict as exc:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ai_content_log_service.AiContentLogAlreadyProcessedError as exc:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except HTTPException as exc:
+            await db.rollback()
+            if exc.status_code in {403, 423}:
+                reason = "项目已被合并锁定，内容保持待确认" if exc.status_code == 423 \
+                    else "当前用户无编辑权限，内容保持待确认"
+                return {
+                    "id": str(log_id),
+                    "confirm_action": "pending",
+                    "writeback": {"written": False, "skipped": True, "reason": reason},
+                }
+            raise
+        await _note_saved_event(
+            UUID(applied["note_id"]), log.project_id,
+            applied.get("note_year"), applied.get("note_section"),
+        )
+        artifact = applied["artifact"]
+        return {
+            "id": str(log_id),
+            "confirm_action": artifact["confirm_action"],
+            "artifact": artifact,
+            "writeback": {
+                "written": True,
+                "note_section": applied.get("note_section"),
+                "after_version": artifact.get("applied_version"),
+                "after_hash": artifact.get("applied_hash"),
+            },
+        }
 
     # P0 修复：项目鉴权（review 级）
     await assert_project_permission(db, user, log.project_id, "review")
@@ -307,6 +402,7 @@ async def _confirm_or_revise(
     if note_id is None:
         # 底稿类：不自动写入。
         await db.commit()
+        _record_human_action("revised" if revised_content is not None else "confirmed")
         result["writeback"] = {
             "written": False,
             "reason": "底稿内容不自动写入，请在底稿页面复制到目标位置",
@@ -327,6 +423,8 @@ async def _confirm_or_revise(
         }
 
     await db.commit()
+    from app.services.llm_metrics import llm_metrics
+    llm_metrics.record_human_action("revised" if revised_content is not None else "confirmed")
 
     # commit 成功后发 NOTE_SECTION_SAVED。失败不回滚已提交内容。
     if writeback.get("written"):
@@ -359,7 +457,7 @@ async def list_pending_ai_content(
     count = await ai_content_log_service.count_pending_by_project(
         db=db, project_id=project_id
     )
-    serialized = await _enrich_target_labels(db, items)
+    serialized = await _enrich_target_labels(db, project_id, items)
     return {
         "count": count,
         "items": serialized,
@@ -421,12 +519,62 @@ async def reject_ai_content(
     log = await _load_log_or_404(db, log_id)
     await assert_project_permission(db, user, log.project_id, "review")
     try:
-        log = await ai_content_log_service.reject(
-            db=db, log_id=log_id, user_id=user.id
-        )
+        if getattr(log, "target_locator", None):
+            from app.services.draft_artifact_facade import reject_artifact, serialize_artifact
+
+            log = await reject_artifact(db, log_id=log_id, user=user)
+            artifact = serialize_artifact(log)
+        else:
+            log = await ai_content_log_service.reject(
+                db=db, log_id=log_id, user_id=user.id
+            )
+            artifact = None
         await db.commit()
-        return {"id": str(log.id), "confirm_action": log.confirm_action}
+        _record_human_action("rejected")
+        result = {"id": str(log.id), "confirm_action": log.confirm_action}
+        if artifact is not None:
+            result["artifact"] = artifact
+        return result
     except ai_content_log_service.AiContentLogNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/api/ai-content/{log_id}/undo")
+async def undo_ai_content(
+    log_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """撤销本次 AI 写回；目标版本已变化时拒绝覆盖后续人工修改。"""
+    from app.services.draft_artifact_facade import (
+        DraftArtifactConflict,
+        undo_note_artifact,
+    )
+
+    try:
+        restored = await undo_note_artifact(db, log_id=log_id, user=user)
+        await db.commit()
+        _record_human_action("undone")
+    except ai_content_log_service.AiContentLogNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DraftArtifactConflict as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await _note_saved_event(
+        UUID(restored["note_id"]),
+        UUID(restored["project_id"]),
+        restored.get("note_year"),
+        restored.get("note_section"),
+    )
+    return {
+        "id": str(log_id),
+        "artifact": restored["artifact"],
+        "writeback": {
+            "written": True,
+            "undone": True,
+            "note_section": restored.get("note_section"),
+        },
+    }

@@ -84,6 +84,9 @@ export function hintIndustryFromExpenseMix(
 
 /**
  * 综合推荐：优先项目上下文关键词，其次明细结构
+ *
+ * 不读 business_category：那是质控业务分类码（A1 / B / C …），不是行业
+ * （spec trim-followup-residual-findings-closure R1）。
  */
 export function recommendPeerIndustry(opts: {
   projectContext?: Record<string, any> | null
@@ -96,7 +99,6 @@ export function recommendPeerIndustry(opts: {
     ctx.client_name,
     ctx.name,
     ctx.project_name,
-    ctx.business_category,
   ].filter(Boolean).join(' ')
 
   const fromText = hintIndustryFromText(text)

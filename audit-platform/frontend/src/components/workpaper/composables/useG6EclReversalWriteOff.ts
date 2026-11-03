@@ -1,6 +1,7 @@
 /**
  * useG6EclReversalWriteOff — G6-14 转回（收回）/核销检查（对齐 Excel 双表）
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { isReversalValid, calcSumColumn, parseNum } from '@/composables/useG6EclFormulaEngine'
@@ -290,7 +291,7 @@ export function useG6EclReversalWriteOff() {
       let row = (agg.crossId && byId.get(agg.crossId)) || byName.get(norm(agg.name))
       if (!row) {
         row = createEmptyReversal({
-          id: crypto.randomUUID(),
+          id: newUuid(),
           seq: reversals.value.length + 1,
           unitName: agg.name,
           crossSheetInvestmentId: agg.crossId || undefined,
@@ -327,7 +328,7 @@ export function useG6EclReversalWriteOff() {
       })
       if (!value?.trim()) return
       reversals.value.push(createEmptyReversal({
-        id: crypto.randomUUID(),
+        id: newUuid(),
         seq: reversals.value.length + 1,
         unitName: value.trim(),
         isReasonable: '合理',
@@ -345,7 +346,7 @@ export function useG6EclReversalWriteOff() {
       })
       if (!value?.trim()) return
       writeOffs.value.push(createEmptyWriteOff({
-        id: crypto.randomUUID(),
+        id: newUuid(),
         seq: writeOffs.value.length + 1,
         unitName: value.trim(),
         isReasonable: '合理',

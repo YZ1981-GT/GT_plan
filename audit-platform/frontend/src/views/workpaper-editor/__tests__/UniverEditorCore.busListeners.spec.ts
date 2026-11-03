@@ -55,16 +55,30 @@ describe('UniverEditorCore — 事件监听与详情回传', () => {
     vi.clearAllMocks()
     vi.mocked(useEditorUniver).mockReturnValue({
       univerAPI: ref(null), loading: ref(false), loadingHint: ref(''), loadErrorState: ref(null),
-      loadErrorMessage: ref(''), dirty: ref(false), initUniver: vi.fn(), dispose: vi.fn(),
+      loadErrorMessage: ref(''), dirty: ref(false), editRevision: ref(0), initUniver: vi.fn(), dispose: vi.fn(),
     } as any)
     vi.mocked(useWorkpaperAutoSave).mockReturnValue({
       saving: ref(false), lastSavedAt: ref(null), markDirty: vi.fn(),
     } as any)
     vi.mocked(useEditorSave).mockReturnValue({
       saving: ref(false), submitting: ref(false), syncLoading: ref(false), prefillLoading: ref(false),
-      exportingPdf: ref(false), onSave: vi.fn(), onSubmitForReview: vi.fn(), onSyncStructure: vi.fn(),
+      exportingPdf: ref(false), markEdited: vi.fn(), onSave: vi.fn(), onSubmitForReview: vi.fn(), onSyncStructure: vi.fn(),
       onRefreshPrefill: vi.fn(), onDownload: vi.fn(), onExportPdf: vi.fn(), onUpload: vi.fn(),
     } as any)
+  })
+
+  it('每个 editRevision 都同步推进保存协调器和自动保存 dirty', () => {
+    const wrapper = mountCore()
+    const univerState = vi.mocked(useEditorUniver).mock.results[0].value as any
+    const autoSaveState = vi.mocked(useWorkpaperAutoSave).mock.results[0].value as any
+    const editorSaveState = vi.mocked(useEditorSave).mock.results[0].value as any
+
+    univerState.editRevision.value += 1
+    univerState.editRevision.value += 1
+
+    expect(editorSaveState.markEdited).toHaveBeenCalledTimes(2)
+    expect(autoSaveState.markDirty).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 
   it('Shell 收到 saved 后同步再广播：Core 只转发一次（不递归）', () => {
@@ -100,7 +114,7 @@ describe('UniverEditorCore — 事件监听与详情回传', () => {
     open.unmount()
     vi.mocked(useEditorUniver).mockReturnValue({
       univerAPI: ref(null), loading: ref(false), loadingHint: ref(''), loadErrorState: ref('no_index'),
-      loadErrorMessage: ref('无法打开这张底稿'), dirty: ref(false), initUniver: vi.fn(), dispose: vi.fn(),
+      loadErrorMessage: ref('无法打开这张底稿'), dirty: ref(false), editRevision: ref(0), initUniver: vi.fn(), dispose: vi.fn(),
     } as any)
     const denied = mountCore()
     expect(denied.find('.gt-wp-editor-left-col').attributes('style') ?? '').toContain('display: none')

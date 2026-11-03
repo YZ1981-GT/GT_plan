@@ -10,8 +10,11 @@ Word 导出实际显示的那张表：
    （补期间 / 补列）按行名对行，行续表（补行）追加在主表后；比例列不加总、说明类列不取数；
    对不上的列不填，列名回报给用户。
 
-产出 V186 标准来源行 ``{label, row_type, values}``：``values[k]`` 对应合并模板第 ``k+1``
-列（第 0 列是行名）。合计 / 小计行由 apply 按本表数据重算，不信任来源合计。
+产出 V186 标准来源行 ``{label, row_type, values, _occurrence, _group, _group_occurrence}``：``values[k]`` 对应合并
+模板第 ``k+1`` 列（第 0 列是行名）；``_occurrence`` 是同名行的出现序号（从 0 起，映射可按（行名, 序号）取行）；
+``_group`` / ``_group_occurrence`` 是同名行所在分组与组内序号（``consol_note_row_groups``，映射可按（行名, 分组）取行）；
+集团下推的行另带 ``_pushed_row_id``（明细映射按它精确对应，``exact_id``）。合计 / 小计行由 apply 按本表数据重算，
+不信任来源合计。
 
 spec: consol-note-pull-from-standalone → consol-note-header-library-and-node-reaggregate（读取层收口）
 """
@@ -38,6 +41,9 @@ from app.services.note_table_header_match import (
 
 __all__ = ["SourceTable", "pick_standalone_table", "read_source_table"]
 
+# ``table_choice`` 取值：name 按表名 / structure 按表头结构 / single_table 章节只有一张表 /
+# transposed 单体与合并行列互换后认到（R14）
+
 
 @dataclass
 class SourceTable:
@@ -52,22 +58,39 @@ class SourceTable:
     # missing（未生成）/ not_applicable（本期无此情形）/ no_source（合并特有章节）/
     # unreadable（有附注但读不出表）；空 = 按 rows 推断
     status: str = ""
-    # 怎么认到的这张表：name 按表名 / structure 按表头结构 / single_table 章节只有一张表
+    # 怎么认到的这张表：name 按表名 / structure 按表头结构 / single_table 章节只有一张表 /
+    # transposed 行列互换后认到（R14）
     table_choice: str = ""
+    # 并进「合计」行的单体行（「小计」「减：坏账准备」，consol_note_provision_fold）
+    folded_rows: list[str] = field(default_factory=list)
+
+    @property
+    def status_code(self) -> str:
+        """来源读取状态；观察到行不代表读到了合并所需金额列。"""
+        return self.status or ("found" if self.rows else "unreadable")
+
+    @property
+    def usable(self) -> bool:
+        """该来源能否参与映射、apply 与父节点汇总。"""
+        return self.status_code == "found"
 
     def to_status(self) -> dict[str, Any]:
         return {
-            "status": self.status or ("found" if self.rows else "unreadable"),
+            "status": self.status_code,
             "reason": self.reason,
             "table_name": self.table_name,
             "table_choice": self.table_choice or None,
             "row_count": len(self.rows),
             "unmatched_columns": self.unmatched_columns,
             "ratio_columns": self.ratio_columns,
+            "folded_rows": self.folded_rows,
         }
 
 
-_SKIP_ROW_TYPES = frozenset({"expandable", "dynamic_anchor", "dynamic_marker_end"})
+_SKIP_ROW_TYPES = frozenset({
+    "expandable", "dynamic_anchor", "dynamic_marker_end",
+    "header", "header_label", "title", "section_header",
+})
 
 
 def _row_label(row: Any) -> str:
@@ -182,7 +205,17 @@ def _rows_from(
             src = r if pos == 0 else joined[pos - 1].get(occurrence)
             if src is not None and 1 <= c <= width:
                 values[c - 1] = _cell(src, s)
-        out.append({"label": label, "row_type": rt, "values": values})
+        item: dict[str, Any] = {"label": label, "row_type": rt, "values": values}
+        pushed = r.get("_pushed_row_id") if isinstance(r, dict) else None
+        if pushed:  # 集团下推的行（consol_note_template_push_service）：按行身份对应合并模板行
+            item["_pushed_row_id"] = str(pushed)
+            # 下推类别与可选行开关一起带出：子企业把可选行标成「本企业不适用」（False）⇒ 拉数不取这一行的数
+            # （spec note-pull-followup-closure R12；结构指纹不含这两个键，见 extract_source_rows）
+            if r.get("_pushed_category"):
+                item["_pushed_category"] = str(r["_pushed_category"])
+            if "_pushed_optional_active" in r:
+                item["_pushed_optional_active"] = r["_pushed_optional_active"] is not False
+        out.append(item)
     return out
 
 
@@ -197,7 +230,74 @@ def read_source_table(
     consol_section_id: str | None = None,
     standalone_section: str | None = None,
 ) -> SourceTable:
-    """读一家企业单体附注章节里与合并章节对应的表，按合并模板列对齐成标准来源行。
+    """读一家企业单体附注章节里与合并章节对应的表（转置口径见 ``_read_transposed``）。
+
+    正常按列语义键认列（``_read_aligned``）；一个金额列都没对上、或连表都没选中时，
+    再判一次单体表是否与合并表行列互换（R14），命中才按转置视图重读。
+    """
+    kwargs: dict[str, Any] = {
+        "table_name": table_name, "title": title, "section_title": section_title,
+        "std": std, "consol_section_id": consol_section_id, "standalone_section": standalone_section,
+    }
+    direct = _read_aligned(table_data, consol_table=consol_table, **kwargs)
+    # 这道前置门是「成功路径零额外开销」，不是正确性判据（`looks_transposed` 已足够严，
+    # 摘掉它结果也不变）⇒ 只能白盒断言（见 tests/test_note_table_transpose.py::TestRetryGates）
+    if not _may_be_transposed(direct) or not isinstance(consol_table, dict):
+        return direct
+    alt = _read_transposed(table_data, consol_table=consol_table, **kwargs)
+    return alt if alt is not None else direct
+
+
+def _may_be_transposed(result: SourceTable) -> bool:
+    """值得试转置：没选中表 / 没有行 / 金额列一列都没对上。"""
+    if result.table_name is None and not result.rows:
+        return True
+    if not result.rows:
+        return True
+    return not result.matched_columns
+
+
+def _read_transposed(
+    table_data: Any, *, consol_table: dict, **kwargs: Any,
+) -> SourceTable | None:
+    """把单体表按行列互换成视图再走同一条认列路径；条件不成立或仍拉不到金额则返回 None。"""
+    from app.services.note_table_transpose import looks_transposed, transpose_view
+
+    std = kwargs.get("std")
+    standalone_section = kwargs.get("standalone_section")
+    tables = _tables_of(table_data, section_number=standalone_section, source_template=std)
+    label_header = (consol_table.get("headers") or [None])[0]
+    for table in tables:
+        if not looks_transposed(consol_table, table):
+            continue
+        view = transpose_view(table, label_header=label_header)
+        if view is None:
+            continue
+        # 视图只有一张表 ⇒ 选表必中它；认列仍按合并模板列语义键（不放宽）
+        alt = _read_aligned({"_tables": [view]}, consol_table=consol_table, **{**kwargs, "table_name": None})
+        # 防御性冗余：`looks_transposed` 命中时这两项恒非空（行名取自原列名、列名逐个对应），
+        # 故本条件改成恒真行为也不变、变异测不到（已登记）。留着是为了将来放宽启用条件时，
+        # 不会用一个更差的结果顶替掉原本说得清的失败原因。
+        if alt.rows and alt.matched_columns:
+            alt.table_name = str(table.get("name") or "") or alt.table_name
+            alt.table_choice = "transposed"
+            alt.reason = None
+            return alt
+    return None
+
+
+def _read_aligned(
+    table_data: Any,
+    *,
+    consol_table: dict | None,
+    table_name: str | None = None,
+    title: str | None = None,
+    section_title: str | None = None,
+    std: str | None = None,
+    consol_section_id: str | None = None,
+    standalone_section: str | None = None,
+) -> SourceTable:
+    """按合并模板列语义键认列读取（原 ``read_source_table`` 本体）。
 
     ``consol_table`` 为合并附注模板表（``find_table``）；缺失时按单体表自身列输出。
     ``section_title`` 为单体章节标题（旧单表格式的表没有名字时用来确认是主表）。
@@ -241,13 +341,39 @@ def read_source_table(
         extra_match = match_columns(target_keys, extra_keys, vocab)
         if extra_match.col_map:
             rows += _rows_from(tables[extra], [], extra_match.col_map, width)
+    folded: list[str] = []
+    if has_target:  # 单体「小计 / 减：坏账准备 / 合计」→ 合并「合计」行的余额 + 坏账准备列（R6.6）
+        from app.services.consol_note_provision_fold import fold_provision_rows
 
+        rows, folded = fold_provision_rows(rows, target_keys, sorted(match.col_map),
+                                           [_row_label(r) for r in consol_table.get("rows") or []])
+    amount_cols = [k.index for k in target_keys[1:] if k.kind == "amount"]
+    no_amount = bool(rows and amount_cols and not set(amount_cols) & set(match.col_map))
+    # 同名行的出现序号（主表 + 行续表连起来数）：映射可按（行名, 序号）取行（spec note-pull-followup-closure R11）
+    # 按去首尾空白的行名数（与映射的 source_label、建议的来源行同一个键）
+    seen: dict[str, int] = {}
+    for item in rows:
+        item["_occurrence"] = seen.get(item["label"], 0)
+        seen[item["label"]] = item["_occurrence"] + 1
+    # 同名行所在分组与组内序号：映射按（行名, 分组）取行，来源少一组 / 组序不同也不会配到别的组
+    # （spec note-chain-followup-optimizations R3；与明细模板同一函数，不进结构指纹）
+    from app.services.consol_note_row_groups import row_groups
+
+    for item, (group, group_occurrence) in zip(rows, row_groups([i["label"] for i in rows],
+                                                                [i["row_type"] for i in rows])):
+        item["_group"], item["_group_occurrence"] = group, group_occurrence
+
+    name = str(primary.get("name") or "") or None
     return SourceTable(
         rows=rows,
-        table_name=str(primary.get("name") or "") or None,
+        table_name=name,
         matched_columns=sorted(match.col_map),
         unmatched_columns=[target_keys[c].label for c in match.unmatched],
         ratio_columns=[target_keys[c].label for c in match.ratio],
-        reason=None if rows else "单体附注对应表格没有行",
+        # 金额列一列都没对上：有行但拉不到数 ⇒ 显式 unreadable（R15 / ADR-11）
+        reason=("单体附注对应表格没有行" if not rows else
+                f"单体表「{name or '主表'}」的金额列与合并表一列都没对上，拉不到数" if no_amount else None),
+        status="unreadable" if no_amount else "",
         table_choice=choice.method,
+        folded_rows=folded,
     )

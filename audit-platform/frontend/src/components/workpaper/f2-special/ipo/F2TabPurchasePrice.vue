@@ -87,7 +87,7 @@
         </div>
       </header>
       <div class="table-scroll">
-        <table class="matrix-table">
+        <GtGridTable class="matrix-table">
           <thead>
             <tr>
               <th class="sticky col-name">主要原材料/月份</th>
@@ -246,7 +246,7 @@
               <td />
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -308,6 +308,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

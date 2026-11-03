@@ -80,11 +80,28 @@ Windows 一键启动后端（:9980）+ 前端（:3030）：
 start-dev.bat
 ```
 
-打包为可执行程序：
+### 固定快照运行与正式前端构建
+
+```bat
+set GT_RUNTIME_MODE=stable
+start-dev.bat
+```
+
+stable 模式会在独立目录构建候选产物，依次通过包体预算和 built artifact smoke 后才切换当前快照；任一步失败都保留旧快照与现有服务。前端命令职责如下：
 
 ```bash
-python build_exe.py
+cd audit-platform/frontend
+npm run typecheck      # 只做全量类型检查
+npm run test:unit      # 只跑前端单测
+npm run build          # 只生成 dist Vite 生产产物
+npm run bundle:check   # 按已提交基线检查入口、总量和普通 chunk
+npm run smoke:built    # 检查 SPA 深链、动态块与 API/WOPI 代理
+npm run build:verify   # 隔离构建、验证并选中 stable 快照
 ```
+
+首次包体基线只能在当前源码真实构建成功后，由维护者审阅产物并显式运行 `npm run bundle:update`；缺少基线时正常检查会拒绝通过。
+
+前端容器使用 `audit-platform/frontend/Dockerfile` 多阶段构建和 Nginx 静态托管。桌面 EXE 与 `build_exe.py` 尚未交付，本轮不宣称具备 PyInstaller 打包能力。
 
 ### 手动启动
 
@@ -153,7 +170,10 @@ GT_plan/
 │   ├── scripts/                  # 工具脚本（check/seed/gen/analyze/ops/fix/migrate/e2e）
 │   └── tests/                    # 测试（1637 个 test_*.py）
 ├── audit-platform/frontend/      # Vue 3 前端（唯一前端路径）
-│   └── src/                      # views / components / composables（2159 个 .vue）
+│   ├── src/                      # views / components / composables（2159 个 .vue）
+│   ├── scripts/                  # 构建预算、验证快照与 built artifact smoke
+│   ├── docker/nginx.conf         # SPA 静态托管、缓存及 API/WOPI 代理
+│   └── Dockerfile                # Node 构建 + Nginx 运行时多阶段镜像
 ├── storage/                      # 项目级 + 用户私人库存储
 ├── .kiro/
 │   ├── specs/                    # Spec 三件套（active + _archive，详见 INDEX.md）
@@ -161,8 +181,7 @@ GT_plan/
 ├── docs/                         # 项目文档与提案
 ├── docker-compose.yml            # 主服务编排
 ├── docker-compose.mineru.yml     # MinerU 服务编排
-├── start-dev.bat                 # 本地一键启动
-└── build_exe.py                  # PyInstaller 打包
+└── start-dev.bat                 # 本地 dev / stable 一键启动
 ```
 
 ## 数据库迁移
@@ -277,7 +296,7 @@ pre-commit install
 | `backend-tests` | pytest（排除 integration/e2e） |
 | `backend-lint` | ruff check + signature_level 用法检查 |
 | `seed-validate` | seed JSON schema 校验 |
-| `frontend-build` | npm ci + npm run build |
+| `frontend-build` | typecheck、Vitest、纯 Vite build、包体预算与 built artifact smoke（各职责只执行一次） |
 | `gitleaks` | 密钥泄露扫描（gitleaks-action@v2） |
 
 ## 贡献指南

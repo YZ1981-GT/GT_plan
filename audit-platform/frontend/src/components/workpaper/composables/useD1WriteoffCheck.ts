@@ -23,6 +23,7 @@
  * Requirements: 1.1-1.5, 2.1-2.6, 3.1-3.4, 4.1-4.5, 5.1-5.6, 6.1-6.4,
  *              9.5-9.7, 10.1-10.5, 11.2-11.4, 12.1-12.3
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -232,10 +233,7 @@ const WRITEOFF_SELECT_FIELDS: Array<keyof WriteoffRow> = ['noteNature', 'isRelat
 // ═══════════════════════════════════════════════════════════════════════════
 
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 
 function emptyReversalRow(): ReversalRow {

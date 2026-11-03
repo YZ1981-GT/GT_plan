@@ -25,19 +25,16 @@ interface CtxLike {
 export interface UseNoteTableInteractionOptions {
   activeTableData: Ref<any> | ComputedRef<any>
   currentNote: Ref<any> | ComputedRef<any>
-  editMode: Ref<boolean> | ComputedRef<boolean>
   showNoteFormulaManager: Ref<boolean>
   deCtx: CtxLike
   deComments: { commentCellClass: (sheetKey: string, r: number, c: number) => string }
-  /** 激活单元格编辑（label 列用 -1 标识） */
-  activateCell: (rowIndex: number, colIndex: number) => void
   fmtAmount: (n: number) => string
 }
 
 export function useNoteTableInteraction(options: UseNoteTableInteractionOptions) {
   const {
-    activeTableData, currentNote, editMode, showNoteFormulaManager,
-    deCtx, deComments, activateCell, fmtAmount,
+    activeTableData, currentNote, showNoteFormulaManager,
+    deCtx, deComments, fmtAmount,
   } = options
 
   // ─── 面板句柄（模板 ref= 绑定）───────────────────────────────────────────
@@ -55,13 +52,16 @@ export function useNoteTableInteraction(options: UseNoteTableInteractionOptions)
 
   // ─── 单元格定位 ─────────────────────────────────────────────────────────
 
-  /** 把 (row, column) 解析成表内下标；任一维解析失败返回 null */
+  /** 把 (row, column) 解析成表内下标；任一维解析失败返回 null。
+   * 列优先按列树叶子的 column-key（`h{表头序号}`，NoteTableColumnNode）：多级表头里期末 / 上年年末下各有一列「应收账款」，
+   * 按列名只能找到第一列 —— 点上年年末的格子会选中、编辑期末那一格（2026-10-26 浏览器实测）；没有 key 才按列名。 */
   function locate(row: any, column: any): { rowIdx: number; colIdx: number; values: any[] } | null {
     const tableRows = activeTableData.value?.rows || []
     const rowIdx = tableRows.findIndex((candidate: any) => toRaw(candidate) === toRaw(row))
     const headers = activeTableData.value?.headers || []
-    const colIdx = headers.indexOf(column?.label)
-    if (rowIdx < 0 || colIdx < 0) return null
+    const keyed = /^h(\d+)$/.exec(String(column?.columnKey ?? ''))
+    const colIdx = keyed ? Number(keyed[1]) : headers.indexOf(column?.label)
+    if (rowIdx < 0 || colIdx < 0 || colIdx >= headers.length) return null
     return { rowIdx, colIdx, values: row?.values || row?.cells || [] }
   }
 
@@ -88,20 +88,18 @@ export function useNoteTableInteraction(options: UseNoteTableInteractionOptions)
     const value = cellValue(row, values, colIdx)
     deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
     deCtx.contextMenu.itemName = row?.label || `行${rowIdx + 1}`
-    // 单元格激活编辑：编辑模式下点击非合计行直接激活
-    if (editMode.value && !row.is_total) {
-      activateCell(rowIdx, colIdx === 0 ? -1 : colIdx - 1)
-    }
   }
 
   function onDeCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
     const hit = locate(row, column)
-    // 如果右键点击的单元格已在选区内，保持选区不变
-    if (hit && !deCtx.isCellSelected(hit.rowIdx, hit.colIdx)) {
+    if (!hit) return
+    // 经典方式没有捕获阶段的内核选中：只有点到选区外才改为单选；Excel / 单击编辑方式由内核先选好。
+    if (!deCtx.isCellSelected(hit.rowIdx, hit.colIdx)) {
       const value = cellValue(row, hit.values, hit.colIdx)
       deCtx.selectCell(hit.rowIdx, hit.colIdx, value, false)
-      deCtx.contextMenu.itemName = row?.label || `行${hit.rowIdx + 1}`
     }
+    // 右键可能点在已有多选区内。菜单标题必须跟这次点到的行，不能沿用上一次右键的标题。
+    deCtx.contextMenu.itemName = row?.label || `行${hit.rowIdx + 1}`
     deCtx.openContextMenu(event, deCtx.contextMenu.itemName)
   }
 

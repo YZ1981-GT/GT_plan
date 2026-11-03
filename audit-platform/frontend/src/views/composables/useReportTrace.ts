@@ -1,8 +1,9 @@
 import { ref, computed, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { useRouter } from 'vue-router'
 import { handleApiError } from '@/utils/errorHandler'
-import { eventBus } from '@/utils/eventBus'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import type { useCellSelection } from '@/composables/useCellSelection'
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
@@ -15,7 +16,8 @@ export interface TraceLocation {
 
 export interface UseReportTraceOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null（仅用于导出文件名） */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   activeTabLabel: ComputedRef<string>
   consistencyResult: Ref<any>
@@ -26,9 +28,15 @@ export interface UseReportTraceOptions {
 export interface UseReportTraceReturn {
   rvTraceDialogVisible: Ref<boolean>
   rvTraceLoading: Ref<boolean>
-  rvTraceResult: Ref<{ upstream: any[]; downstream: any[] } | null>
+  rvTraceResult: Ref<{
+    upstream: any[]
+    downstream: any[]
+    attachments: any[]
+    objectId: string
+    projectId: string
+  } | null>
   onRvCtxCellTrace: () => Promise<void>
-  onRvTraceLocate: (node: any) => void
+  onRvTraceLocate: (node: any) => Promise<void>
 
   showAuditDialog: Ref<boolean>
   auditTab: Ref<string>
@@ -57,7 +65,13 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
   // ─── Cell Trace (Lineage) ─────────────────────────────────────────────────
   const rvTraceDialogVisible = ref(false)
   const rvTraceLoading = ref(false)
-  const rvTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+  const rvTraceResult = ref<{
+    upstream: any[]
+    downstream: any[]
+    attachments: any[]
+    objectId: string
+    projectId: string
+  } | null>(null)
 
   async function onRvCtxCellTrace() {
     rvCtx.closeContextMenu()
@@ -76,8 +90,13 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
       )
       const upstream = data?.upstream || []
       const downstream = data?.downstream || []
-      rvTraceResult.value = { upstream, downstream }
-      if (!upstream.length && !downstream.length) {
+      const attachments = data?.attachments || []
+      rvTraceResult.value = {
+        upstream, downstream, attachments,
+        objectId: row.row_code,
+        projectId: projectId.value,
+      }
+      if (!upstream.length && !downstream.length && !attachments.length) {
         rvTraceDialogVisible.value = false
         ElMessage.info('该数字暂无溯源信息')
       }
@@ -89,15 +108,11 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
     }
   }
 
-  function onRvTraceLocate(node: any) {
+  const router = useRouter()
+  async function onRvTraceLocate(node: any) {
     rvTraceDialogVisible.value = false
-    if (node.wp_code) {
-      eventBus.emit('workpaper:locate-cell', {
-        wpId: node.wp_code,
-        sheetName: node.sheet_name || undefined,
-        cellRef: node.cell_ref || '',
-      })
-    }
+    const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+    if (reason) ElMessage.warning(reason)
   }
 
   // ─── Audit Dialog ─────────────────────────────────────────────────────────
@@ -133,7 +148,7 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `审核报告_${activeTabLabel.value}_${year.value}.csv`
+    a.download = `审核报告_${activeTabLabel.value}${year.value != null ? `_${year.value}` : ''}.csv`
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('审核报告已导出')

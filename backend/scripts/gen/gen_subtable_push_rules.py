@@ -9,11 +9,12 @@
 不带 --write 则只打印到 stdout；--write 追加到 formula_push_rules.json。
 --wp-code 可过滤只生成指定底稿的规则。
 
-⚠ 2026-10-25（spec consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）：本生成器不分口径 —— 表名取先扫到的
-那一版、``section_by_template`` 两版都填、rule_id 用该版表序号；产物须逐条按两版模板核对（只在一版的表收窄口径，两版
-同键异名的表补 ``table_by_template``）。子表规则与主表共用 binding 的取数行（科目合计），命中合计行兜底的规则会把科目
-合计写进子表合计行 ⇒ 由 ``tests/test_formula_push_subtable_total_fallback.py`` 逐条裁决（当日删掉的 22 条写错数规则
-重跑本脚本会补回，守卫会点名）。
+⚠ 2026-10-25（spec consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）：子表规则与主表共用 binding 的取数行
+（科目合计），命中合计行兜底的规则会把科目合计写进子表合计行 ⇒ 由 ``tests/test_formula_push_subtable_total_fallback.py``
+逐条裁决（当日删掉的 22 条写错数规则重跑本脚本会补回，守卫会点名）。
+2026-10-27（spec note-pull-followup-closure R2.2）：①只生成字段取得到值（映射到 ending / opening）的规则 ②``section_by_template``
+只给模板章节里真有这张同名表的那一版（原先两版都填，引擎在另一版回退写首表）③``EXCLUDED_RULES`` 按语义删除过的不补回。
+引擎侧子表规则只按精确表名定位（``note_writer.locate_table(exact=True)``），守卫 ``tests/test_formula_push_note_rule_targets.py``。
 
 spec: formula-push-subtable-expansion Phase 1
 """
@@ -62,6 +63,58 @@ KNOWN_FIELDS = {
 # 表名最大长度——超长的表名通常是指引文本误入，跳过
 _MAX_TABLE_NAME_LEN = 60
 
+#: 子表规则与主表共用 binding 的取数行：除 D1 主表外，取数行只有 ``ending`` / ``opening`` 两个值（tier_a / note_direct /
+#: balance_adj / e1 / k1 同口径）⇒ 字段经 ``note_writer.NOTE_FIELDS`` 映射不到这两个值的，规则永远写不出数（2026-10-27
+#: 清点 99 条，且取数行对上附注行时原来还会 KeyError 让整张底稿回滚 —— spec note-pull-followup-closure R2.2）
+_ACCOUNT_VALUE_KEYS = frozenset({"ending", "opening"})
+
+#: 字段映射得到期末 / 期初、但写进去就是错数 / 永远写不出的子表（按（底稿, 表名）认 —— rule_id 里的表序号随模板改表序会漂）；
+#: 重跑本脚本不得补回（2026-10-27 起由本表拦住；此前「当日删掉的规则重跑会补回、靠守卫点名」—— note-pull-followup-closure R2.2）
+_NOT_ACCOUNT_TOTAL = "科目合计不是这张表的合计（部分 / 明细 / 变动 / 前 N 名 / 账龄超 1 年 / 逾期 / 继续涉入），合计行兜底写进去就是错数"
+EXCLUDED_TABLES: dict[tuple[str, str], str] = {
+    # 2026-10-27 语义裁决（design §3.1）
+    ("F2", "存货跌价准备及合同履约成本减值准备"): "binding 不给子表出行（账面价值口径），且科目余额不是减值准备变动",
+    ("F2", "开发产品"): "binding 不给子表出行（账面价值口径）",
+    ("F2", "周转房"): "binding 不给子表出行（账面价值口径）",
+    ("K2", "碳排放配额变动情况"): "其他流动资产科目余额不是配额变动",
+    ("M2", "股本（单位：万股）"): "试算表金额是元，写进万股表就是错数",
+    # 2026-10-25 删除的写错数规则（consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）
+    ("D2", "（1）按账龄披露应收账款"): "与主表 D2.note.main 同表同字段，重复推送",
+    **dict.fromkeys((
+        ("E1", "受限制的货币资金明细"), ("D2", "期末单项计提坏账准备的应收账款"),
+        ("D2", "组合计提项目：应收中央企业客户"), ("D2", "组合计提项目：应收中央企业客户（续：期初数）"),
+        ("D2", "组合计提项目：应收海外企业客户"), ("D2", "组合计提项目：应收海外企业客户（续：期初数）"),
+        ("D2", "采用余额百分比或其他组合方法计提坏账准备的应收账款"), ("D2", "（3）本期计提、收回或转回的坏账准备情况"),
+        ("F1", "按欠款方归集的期末余额前五名的预付款项"), ("K6", "持有待售资产减值准备"),
+        ("G5", "转移长期应收款且继续涉入形成的资产、负债的金额"), ("L1", "已逾期未偿还的短期借款情况"),
+        ("F4", "账龄超过1 年的重要应付账款"), ("D3", "账龄超过1年的重要预收账款"), ("K3", "账龄超过1年的重要其他应付款项"),
+        ("L5", "①长期应付款项期末余额最大的前5 项"), ("L5", "①专项应付款期末余额最大的前5 项"),
+        ("K7", "其中：递延收益-政府补助情况"), ("G4", "债权投资减值准备本期变动情况"), ("G6", "其他债权投资减值准备本期变动情况"),
+        ("D7", "账龄超过1年的重要合同负债"), ("K3", "其中，账龄超过1年的重要其他应付款"),
+        ("M9", "资产负债表中归属于母公司的其他综合收益："),
+        # 2026-10-27 按口径生成后另一版里冒出来的同类表（同一裁决）
+        ("D2", "组合计提项目：应收地方国有企业客户"), ("D2", "组合计提项目：组合4"), ("D2", "组合计提项目：组合5"),
+        ("F1", "按预付对象归集的预付款项期末余额前五名单位情况"), ("L1", "（2）逾期借款情况"),
+        ("F4", "其中，账龄超过1年的重要应付账款"), ("D3", "账龄超过1年的重要预收款项"),
+    ), _NOT_ACCOUNT_TOTAL),
+    ("D2", "按账龄披露"): "上市版主表（D2.note.main 已推），重复推送",
+    ("M2", "实收资本"): "国企版主表（M2.note.main 已推），重复推送",
+    ("K6", "持有待售负债"): "binding 取数行是持有待售资产 + 负债两个科目（合计 = 两者之和），不是负债表的合计",
+    ("L5", "长期应付款（按款项性质列示）"): "L5 只有主表规则；按性质分类表未裁决合计口径，宁缺勿造",
+    ("L5", "专项应付款"): "按项目列示的变动表（期初 / 增加 / 减少 / 期末），L5 取数行不是它的合计",
+}
+
+
+def _note_value_key(field: str) -> str | None:
+    """规则字段 → 取数行值键（与引擎同一张 ``NOTE_FIELDS``；脚本独立运行时导入不到 app 就按同名退化）。"""
+    try:
+        from app.services.formula_push.note_writer import NOTE_FIELDS
+    except ImportError:  # pragma: no cover —— 脚本从仓库根以外运行
+        sys.path.insert(0, str(ROOT))
+        from app.services.formula_push.note_writer import NOTE_FIELDS
+    entry = NOTE_FIELDS.get(field)
+    return entry[0] if entry else None
+
 
 def load_registry() -> dict[str, dict[str, str]]:
     doc = json.loads(REGISTRY_PATH.read_text("utf-8"))
@@ -80,16 +133,23 @@ def load_existing_rules() -> set[str]:
 
 
 def table_fields(tbl: dict) -> list[str]:
-    """从子表的 columns 提取数值字段（排除 is_label）。"""
+    """从子表的 columns 提取数值字段（排除 is_label；只留取数行取得到值的字段，见 ``_ACCOUNT_VALUE_KEYS``）。"""
     cols = tbl.get("columns", [])
     fields = []
     for c in cols:
         if not isinstance(c, dict) or c.get("is_label"):
             continue
         key = c.get("key", "")
-        if key and key in KNOWN_FIELDS:
+        if key and key in KNOWN_FIELDS and _note_value_key(key) in _ACCOUNT_VALUE_KEYS:
             fields.append(key)
     return fields
+
+
+def _section_tables(template: dict, section_number: str | None) -> set[str]:
+    for sec in template.get("sections", []):
+        if section_number and sec.get("section_number") == section_number:
+            return {str(t.get("name") or "") for t in sec.get("tables", [])}
+    return set()
 
 
 def _load_existing_main_derivations() -> dict[str, tuple[str, str]]:
@@ -114,22 +174,19 @@ def _load_existing_main_derivations() -> dict[str, tuple[str, str]]:
     return out
 
 
-def _load_existing_note_tables() -> set[tuple[str, str]]:
-    """从现有规则中提取 (table, section_key) 对。
-
-    section_key = 所有 section_by_template 值拼接（如 "五、42|八、42"），用于检测
-    跨 wp_code 的同章节同表名冲突（如 K3 子表「应付利息」与 L2 主表撞同一章节）。
-    """
+def _load_existing_note_tables() -> set[tuple[str, str, str]]:
+    """现有规则已推的（口径, 章节, 表名）—— 表名按口径取（``table_by_template`` 优先），用于检测跨 wp_code 的同章节同表名
+    冲突（如 K3 子表「应付利息」与 L2 主表撞同一章节）与同一张表换了口径名的规则。"""
     doc = json.loads(RULES_PATH.read_text("utf-8"))
-    out: set[tuple[str, str]] = set()
+    out: set[tuple[str, str, str]] = set()
     for r in doc.get("rules", []):
-        if r.get("target", {}).get("domain") != "note":
+        target = r.get("target", {})
+        if target.get("domain") != "note":
             continue
-        table = r.get("target", {}).get("table")
-        sbt = r.get("target", {}).get("section_by_template", {})
-        if table and sbt:
-            sec_key = "|".join(sorted(sbt.values()))
-            out.add((table, sec_key))
+        for std, sec in (target.get("section_by_template") or {}).items():
+            name = (target.get("table_by_template") or {}).get(std) or target.get("table")
+            if name and sec:
+                out.add((std, sec, name))
     return out
 
 
@@ -142,12 +199,15 @@ def generate_rules(wp_code_filter: str | None = None) -> list[dict]:
     # 已生成的 (wp_code, table_name) 对——跨准则模板去重
     generated_tables: set[tuple[str, str]] = set()
     new_rules: list[dict] = []
+    templates = {
+        std: json.loads((DATA / f"note_template_{std}.json").read_text("utf-8"))
+        for std in ("soe", "listed") if (DATA / f"note_template_{std}.json").exists()
+    }
 
     for std in ("soe", "listed"):
-        tpl_path = DATA / f"note_template_{std}.json"
-        if not tpl_path.exists():
+        tpl = templates.get(std)
+        if tpl is None:
             continue
-        tpl = json.loads(tpl_path.read_text("utf-8"))
 
         for sec in tpl.get("sections", []):
             sn = sec.get("section_number", "")
@@ -181,22 +241,20 @@ def generate_rules(wp_code_filter: str | None = None) -> list[dict]:
 
                 # 生成 rule_id：{WP_CODE}.note.subtable_{表序号}
                 rule_id = f"{wp_code}.note.subtable_{ti}"
-                if rule_id in existing:
-                    continue  # 已存在
+                if rule_id in existing or (wp_code, tname) in EXCLUDED_TABLES:
+                    continue  # 已存在 / 按语义裁决删除过
 
-                # section_by_template
+                # section_by_template：只给模板章节里真有这张表（同名）的那一版 —— 原先两版都填，另一版里没有这张表时引擎
+                # 回退写首表（2026-10-27 清点 74 个口径对表名错版，spec note-pull-followup-closure R2.2）
                 sbt: dict[str, str] = {}
                 for v in ("listed", "soe"):
                     sec_v = registry.get(wp_code, {}).get(v)
-                    if sec_v:
+                    if sec_v and tname in _section_tables(templates.get(v) or {}, sec_v):
                         sbt[v] = sec_v
 
+                # 排除现有规则已推的（口径, 章节, 表名）
+                sbt = {v: s for v, s in sbt.items() if (v, s, tname) not in existing_tables}
                 if not sbt:
-                    continue
-
-                # 排除与现有规则同 (table, section) 的子表（已有规则覆盖）
-                sec_key = "|".join(sorted(sbt.values()))
-                if (tname, sec_key) in existing_tables:
                     continue
 
                 # 跨准则模板去重：同一 (wp_code, table_name) 只生成一条

@@ -2,7 +2,7 @@
  * useI1AdditionCheck — I1-5 无形资产增加检查表
  * 对齐源表 19 列分段检查 + 检查比例防 DIV/0 + I1-2 / I2 联动
  */
-import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onScopeDispose, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 
 import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import type { ChecklistItem } from './useI1FormData'
@@ -30,6 +30,11 @@ import {
   collectActiveColGroups,
   shouldShowColGroup,
 } from './i1AdditionCheckModel'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, carryRowMeta, sampleOf, sampleRemark } from './assetVoucherFill'
 
 export {
   I1_ADDITION_METHODS,
@@ -68,9 +73,27 @@ function _getNum(v: any): number {
   return Number.isFinite(n) ? n : 0
 }
 
+/**
+ * 行上已填核对内容（替换与撤销抽凭时据此先确认）：交易对方、各取得方式的核对项与金额、关联方与风险、审查结论、附件。
+ * 抽凭写入的取得方式「购买」是缺省值，不算
+ */
+export function hasI1AdditionContent(r: I1AdditionCheckRow): boolean {
+  const texts = [
+    r.counterparty, r.purchaseContractComplete, r.purchasePaymentApproved, r.purchaseEntryCorrect, r.vatSplitOk,
+    r.investApproval, r.investProcedureComplete, r.investPriceFair, r.financeEntryCorrect, r.comboRecognitionMet,
+    r.comboPpaIndex, r.otherMethod, r.otherCompliant, r.isRelatedParty, r.relatedPartyName, r.fundOccupationRisk,
+    r.checkConclusion, r.attachmentUrl, r.ocrResult,
+  ]
+  const amounts = [r.invoiceAmountExTax, r.inputVat, r.financeBookAmount, r.financeEffectiveRate, r.financeCost, r.comboAmount]
+  const method = String(r.acquisitionMethod ?? '').trim()
+  return texts.some(v => String(v ?? '').trim() !== '') || amounts.some(v => Number(v) !== 0)
+    || (method !== '' && method !== '购买')
+}
+
 function _mergeSeededRows(
   current: I1AdditionCheckRow[],
   seeded: I1AdditionCheckRow[],
+  isLocked: (row: I1AdditionCheckRow) => boolean,
 ): { rows: I1AdditionCheckRow[]; count: number } {
   const byName = new Map(current.map((r) => [r.name.trim(), r]))
   let count = 0
@@ -78,6 +101,8 @@ function _mergeSeededRows(
   for (const s of seeded) {
     const key = s.name.trim()
     const prev = byName.get(key)
+    // 年审阶段预审行只读：同名带入不改它
+    if (prev && isLocked(prev)) continue
     if (prev) {
       prev.entryAmount = s.entryAmount
       prev.entryDate = s.entryDate || prev.entryDate
@@ -98,7 +123,12 @@ function _mergeSeededRows(
 export function useI1AdditionCheck(
   wpId: Ref<string>,
   allResponses: Ref<Map<string, ChecklistItem>>,
-  options?: { onSave?: (itemId: string, value: any) => void },
+  options?: {
+    onSave?: (itemId: string, value: any) => void
+    projectId?: MaybeRefOrGetter<string | null | undefined>
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: MaybeRefOrGetter<boolean | undefined>
+  },
 ) {
   const rows = ref<I1AdditionCheckRow[]>([])
   const traceRows = ref<I1TraceRow[]>([])
@@ -113,7 +143,8 @@ export function useI1AdditionCheck(
 
   function _load() {
     const resp = allResponses.value.get(ITEM_ROWS)
-    rows.value = _safeParse(resp?.remark ?? resp?.conclusion).map(normalizeI1AdditionRow)
+    rows.value = _safeParse(resp?.remark ?? resp?.conclusion).map(r => withRowMeta(normalizeI1AdditionRow(r), r))
+    voucherFill.markLoaded()
 
     const tr = allResponses.value.get(ITEM_TRACE)
     traceRows.value = _safeParse(tr?.remark ?? tr?.conclusion).map(normalizeI1TraceRow)
@@ -148,7 +179,7 @@ export function useI1AdditionCheck(
   }
 
   function _persistRows() {
-    options?.onSave?.(ITEM_ROWS, rows.value)
+    options?.onSave?.(ITEM_ROWS, voucherFill.guardPersist(rows.value))
   }
 
   function _persistTrace() {
@@ -165,6 +196,38 @@ export function useI1AdditionCheck(
   function _persistCoverageThreshold() {
     options?.onSave?.(ITEM_COVERAGE, coverageThreshold.value)
   }
+
+  /** 旧行（没有 `_gt`）身份：凭证号 + 入账日期 + 入账金额 */
+  const _legacyKey = (r: I1AdditionCheckRow) => assetLegacyKey(r.voucherNo, r.entryDate, r.entryAmount)
+
+  /**
+   * 共享回填函数的待写入项 → 增加检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：名称取摘要，
+   * 入账日期、凭证号、入账金额（样本自己那一栏，增加在借方，红字带符号照记）。原实现把引擎回填载荷当样本数组读
+   * （载荷是对象 ⇒ 一行不填），挂凭导入读不存在的 `date` / `amount` 字段（日期为空、金额为 0）
+   */
+  function _rowFromPrepared(item: PreparedItem): I1AdditionCheckRow {
+    const s = sampleOf(item)
+    return emptyI1AdditionRow({
+      name: String(s.summary || '抽样项').slice(0, 80),
+      entryDate: String(s.voucherDate ?? ''),
+      entryAmount: assetAmount(item, 'debit'),
+      voucherNo: String(s.voucherNo ?? ''),
+      acquisitionMethod: '购买',
+      remark: sampleRemark(item),
+    })
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行）
+  const voucherFill = useVoucherCheckFill<I1AdditionCheckRow>({
+    projectId: () => toValue(options?.projectId),
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => _persistRows(),
+    hasUserContent: hasI1AdditionContent,
+    legacy: _legacyKey,
+    readonly: () => toValue(options?.isReadonly) === true,
+  })
 
   const linkedPeriodTotal: ComputedRef<{ amount: number; source: string }> = computed(() => {
     for (const key of ['I1-adjudication-cost-addition-total', 'I1-adj-cost-increase-total']) {
@@ -234,7 +297,7 @@ export function useI1AdditionCheck(
     if (!seeded.length) {
       return { ok: false, count: 0, message: 'I1-2 无本期增加>0 的明细可带入' }
     }
-    const merged = _mergeSeededRows(rows.value, seeded)
+    const merged = _mergeSeededRows(rows.value, seeded, voucherFill.isRowLocked)
     rows.value = merged.rows
     if (!periodManual.value || !(periodTotal.value > 0)) {
       const linked = linkedPeriodTotal.value
@@ -292,7 +355,7 @@ export function useI1AdditionCheck(
         message: '未找到 I2 资本化转入。请先在 I2 填写「转无形」并保存，或保持本页打开以接收联动事件。',
       }
     }
-    const merged = _mergeSeededRows(rows.value, seeded)
+    const merged = _mergeSeededRows(rows.value, seeded, voucherFill.isRowLocked)
     rows.value = merged.rows
     const amount = seeded.reduce((s, r) => s + (Number(r.entryAmount) || 0), 0)
     _persistRows()
@@ -313,14 +376,14 @@ export function useI1AdditionCheck(
 
   function removeRow(rowId: string) {
     const idx = rows.value.findIndex((r) => r.rowId === rowId)
-    if (idx < 0) return
+    if (idx < 0 || voucherFill.isRowLocked(rows.value[idx])) return
     rows.value.splice(idx, 1)
     _persistRows()
   }
 
   function updateCell(rowId: string, field: keyof I1AdditionCheckRow, value: any) {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     _persistRows()
   }
@@ -385,7 +448,8 @@ export function useI1AdditionCheck(
 
   function importRows(imported: Partial<I1AdditionCheckRow>[], replace = true) {
     const mapped = imported.map(normalizeI1AdditionRow)
-    if (replace) rows.value = mapped
+    // 整表替换：导入的同一笔分录带回原行的 `_gt`（导出表里没有这一列）；年审阶段预审行按读入版本（内存与落库一致）
+    if (replace) rows.value = voucherFill.guardPersist(carryRowMeta(mapped, rows.value, _legacyKey))
     else rows.value.push(...mapped)
     _persistRows()
   }
@@ -504,6 +568,12 @@ export function useI1AdditionCheck(
     importRows,
     exportXlsx,
     importXlsx,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 
