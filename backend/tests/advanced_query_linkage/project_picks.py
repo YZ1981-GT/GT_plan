@@ -215,13 +215,53 @@ CAPABILITIES: dict[str, Capability] = {
     "balance_without_active_dataset": Capability(
         name="balance_without_active_dataset",
         description=(
-            "有余额表行但该年度**没有 active 数据集**：生效数据集口径在"
-            "「没有 active 数据集时只按未删过滤」这一分支上的判据"
+            "有余额表行但该行所属年度**没有 active 数据集**：生效数据集口径在"
+            "「没有 active 数据集时只按未删过滤」这一分支上的判据。"
+            "🔴 注意这里**不限定审计年度** —— 现算共享库里「审计年度本身没有 active 数据集」的活项目"
+            "是 0 个（见 `closure.md` §16.7），要在审计年度上走这条分支只能在回滚事务里自建"
+            "（夹具 `no_active_dataset_project`）"
         ),
         metric_sql=(
             "SELECT count(*) FROM tb_balance b WHERE b.project_id = l.id AND NOT b.is_deleted "
             f"AND NOT EXISTS (SELECT 1 FROM ({_ACTIVE_DATASET}) act "
             "WHERE act.project_id = b.project_id AND act.year = b.year)"
+        ),
+    ),
+    "balance_with_narrowing_active_dataset": Capability(
+        name="balance_with_narrowing_active_dataset",
+        description=(
+            "审计年度**有** active 数据集，且生效口径**严格窄于**「只按未删」"
+            "（即该年度还存在属于非生效数据集的行）：这是 AQ-02 那个口径差的正面样本 —— "
+            "口径相等的项目证明不了「生效数据集过滤真的在起作用」"
+        ),
+        metric_sql=(
+            "SELECT count(*) FROM tb_balance b "
+            "WHERE b.project_id = l.id AND b.year = l.audit_year AND NOT b.is_deleted"
+        ),
+        extra_sql=(
+            "l.audit_year IS NOT NULL "
+            f"AND EXISTS (SELECT 1 FROM ({_ACTIVE_DATASET}) act "
+            "WHERE act.project_id = l.id AND act.year = l.audit_year) "
+            f"AND (SELECT count(*) FROM tb_balance b2 JOIN ({_ACTIVE_DATASET}) act2 "
+            "ON act2.project_id = b2.project_id AND act2.year = b2.year AND act2.dataset_id = b2.dataset_id "
+            "WHERE b2.project_id = l.id AND b2.year = l.audit_year AND NOT b2.is_deleted) "
+            "< (SELECT count(*) FROM tb_balance b3 "
+            "WHERE b3.project_id = l.id AND b3.year = l.audit_year AND NOT b3.is_deleted)"
+        ),
+    ),
+    "tb_and_notes_copy_source": Capability(
+        name="tb_and_notes_copy_source",
+        description=(
+            "审计年度同时有试算表与附注章节：循环级可见性用例要把这两张表整体复制到"
+            "回滚事务里新建的【测试】项目上（真实项目只读）"
+        ),
+        metric_sql=(
+            "SELECT count(*) FROM trial_balance t "
+            "WHERE t.project_id = l.id AND t.year = l.audit_year AND NOT t.is_deleted"
+        ),
+        extra_sql=(
+            "l.audit_year IS NOT NULL AND EXISTS ("
+            "  SELECT 1 FROM disclosure_notes d WHERE d.project_id = l.id)"
         ),
     ),
     "consolidated_with_notes": Capability(

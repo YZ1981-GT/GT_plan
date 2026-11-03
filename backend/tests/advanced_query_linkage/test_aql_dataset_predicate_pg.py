@@ -5,7 +5,12 @@
 
 - SQLite：编译执行不报错；两个 active 数据集取最新、superseded 与软删行不出现、无数据集的项目按未删；
 - 真 PG：四表 × 每个活项目年度，两种谓词的行集合逐行相等（同一次扫描里计「只在一边成立」的行数 = 0），
-  且多项目一次调用 = 各项目单独口径之和（宜宾临港店有多个数据集、和平物流没有 active 数据集都在其中）。
+  且多项目一次调用 = 各项目单独口径之和；另把两条分支各钉一个样本 —— 「有非生效数据集 ⇒ 更窄」用真实
+  项目（按能力解析），「完全没有数据集 ⇒ 等于只按未删」在回滚事务里自建。
+
+🔴 **2026-11-01 阶段 0 改造**：原先两条分支分别写死 `YB`（宜宾临港店）/ `WL`（和平物流）两个 UUID，
+两者现算在 `projects` 里都已查不到行；且共享库现在**没有任何活项目**的审计年度满足「没有 active 数据集」
+⇒ 后者改为自建（详见 `closure.md` §16.7）。
 """
 from __future__ import annotations
 
@@ -24,7 +29,6 @@ from app.models.core import Project
 from app.models.dataset_models import DatasetStatus, LedgerDataset
 from app.services.dataset_query import active_rows_predicate, get_active_filter
 from tests.advanced_query_linkage.builder_tables import create_tables_with_closure
-from tests.advanced_query_linkage.gold import WL, YB
 
 FOUR_TABLES = (TbBalance.__table__, TbLedger.__table__, TbAuxBalance.__table__, TbAuxLedger.__table__)
 
@@ -132,15 +136,42 @@ async def test_pg_equivalent_to_get_active_filter(pg_rollback_session, table: sa
     assert in_multi == total_single, f"{table.name}：多项目一次调用 {in_multi} ≠ 各项目单独口径之和 {total_single}"
 
 
-@pytest.mark.pg_only
-async def test_pg_covers_multi_dataset_and_no_dataset_projects(pg_rollback_session, gold) -> None:
-    """宜宾临港店有非生效数据集的行（口径比只按未删更窄）、和平物流没有 active 数据集（口径 = 只按未删）。"""
+async def _predicate_count(session, pick) -> int:
     t = TbBalance.__table__
-    for pid, narrower in ((YB, True), (WL, False)):
-        where = await active_rows_predicate(pg_rollback_session, t, project_ids=[pid], year=2025)
-        got = (await pg_rollback_session.execute(
-            sa.select(sa.func.count()).select_from(t).where(t.c.project_id == pid, t.c.year == 2025, where)
-        )).scalar_one()
-        undeleted = await gold.scalar(
-            "SELECT count(*) FROM tb_balance WHERE project_id = :pid AND year = 2025 AND NOT is_deleted", pid=pid)
-        assert got > 0 and ((got < undeleted) if narrower else (got == undeleted)), (pid, got, undeleted)
+    where = await active_rows_predicate(session, t, project_ids=[pick.id], year=pick.audit_year)
+    return (await session.execute(
+        sa.select(sa.func.count()).select_from(t)
+        .where(t.c.project_id == pick.id, t.c.year == pick.audit_year, where)
+    )).scalar_one()
+
+
+@pytest.mark.pg_only
+async def test_pg_narrower_than_undeleted_when_non_active_datasets_exist(pg_rollback_session, gold, picks) -> None:
+    """真实项目：该年度有 active 数据集且还有非生效数据集的行 ⇒ 多项目谓词比只按未删更窄。"""
+    pick = await picks.resolve("balance_with_narrowing_active_dataset")
+    got = await _predicate_count(pg_rollback_session, pick)
+    undeleted = await gold.scalar(
+        "SELECT count(*) FROM tb_balance WHERE project_id = :pid AND year = :year AND NOT is_deleted",
+        pid=pick.id, year=pick.audit_year)
+    assert got > 0 and got < undeleted, (pick, got, undeleted)
+
+
+@pytest.mark.pg_only
+async def test_pg_falls_back_to_undeleted_without_any_dataset(pg_rollback_session, no_active_dataset_project) -> None:
+    """自建项目：该年度没有任何数据集行 ⇒ 多项目谓词 = 只按未删。
+
+    为什么自建而不从真库里挑：现算共享库里**没有任何活项目**的审计年度是「没有 active 数据集」的
+    （见 `closure.md` §16.7）。挑一个「口径恰好相等」的真实项目也能让断言变绿，但走的是
+    「所有行都属于生效数据集」那条路，**这条分支会静默失去覆盖**。
+    金标准在同一会话上读 —— 自建行还没提交，换连接读到的是 0，断言会以"两边都空"的方式假绿。
+    """
+    pick = no_active_dataset_project
+    got = await _predicate_count(pg_rollback_session, pick)
+    undeleted = (await pg_rollback_session.execute(sa.text(
+        "SELECT count(*) FROM tb_balance WHERE project_id = :pid AND year = :year AND NOT is_deleted"),
+        {"pid": pick.id, "year": pick.audit_year})).scalar_one()
+    total = (await pg_rollback_session.execute(sa.text(
+        "SELECT count(*) FROM tb_balance WHERE project_id = :pid AND year = :year"),
+        {"pid": pick.id, "year": pick.audit_year})).scalar_one()
+    assert got == undeleted > 0, (pick, got, undeleted)
+    assert undeleted < total, f"自建项目应含软删行（现 {undeleted}/{total}）—— 否则「只按未删」这一半没被走到"
