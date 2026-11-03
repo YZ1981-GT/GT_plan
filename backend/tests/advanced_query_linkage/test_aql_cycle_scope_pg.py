@@ -29,7 +29,7 @@ from app import deps
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
-from app.models.core import PermissionLevel, Project, ProjectUser, ProjectUserRole, User
+from app.models.core import PermissionLevel, ProjectUser, ProjectUserRole, User
 from app.models.report_models import DisclosureNote
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.routers import custom_query
@@ -37,7 +37,7 @@ from app.services.custom_query import audit_helper, cycle_scope
 from app.services.custom_query.builder_access import CYCLE_SCOPED_REASON
 from app.services.disclosure_engine import DisclosureEngine
 from app.services.mapping_service import get_codes_by_cycles, get_sections_by_cycles
-from tests.advanced_query_linkage.gold import AUDIT_YEAR, HS
+from tests.advanced_query_linkage.writable_projects import insert_test_project
 from tests.authz_world import build_app
 
 pytestmark = pytest.mark.pg_only
@@ -51,17 +51,23 @@ async def _columns(session, table: str) -> list[str]:
         "AND is_generated = 'NEVER' ORDER BY ordinal_position"), {"t": table})).all()]
 
 
-async def _copy_from_hs(session, table: str, pid: uuid.UUID) -> int:
-    """把华氏该年度的行复制到【测试】项目（新 id、新项目，其余列原值；华氏行只读）。"""
+async def _copy_from_source(session, table: str, pid: uuid.UUID, source_id: uuid.UUID, year: int) -> int:
+    """把来源项目该年度的行复制到【测试】项目（新 id、新项目，其余列原值；来源项目只读）。
+
+    列清单按 information_schema 现读（排除生成列），所以来源表再加列也不会让这里失配。
+    """
     cols = await _columns(session, table)
     exprs = ["gen_random_uuid()" if c == "id" else ":pid" if c == "project_id" else c for c in cols]
     result = await session.execute(sa.text(
         f"INSERT INTO {table} ({', '.join(cols)}) SELECT {', '.join(exprs)} FROM {table} "
-        f"WHERE project_id = :hs AND year = :year AND NOT is_deleted"), {"pid": pid, "hs": HS, "year": AUDIT_YEAR})
+        f"WHERE project_id = :src AND year = :year AND NOT is_deleted"),
+        {"pid": pid, "src": source_id, "year": year})
     return result.rowcount
 
 
-async def _seed_adjustments(session, pid: uuid.UUID, d_code: str, other_code: str) -> dict[str, uuid.UUID]:
+async def _seed_adjustments(
+    session, pid: uuid.UUID, d_code: str, other_code: str, year: int
+) -> dict[str, uuid.UUID]:
     """两组分录：IN 组一行 D 循环科目 + 一行非 D 科目（整组可见）；OUT 组两行都是非 D 科目（不可见）。"""
     creator = (await session.execute(sa.text("SELECT id FROM users WHERE username = 'admin'"))).scalar_one()
     groups = {"IN": uuid.uuid4(), "OUT": uuid.uuid4()}
@@ -71,21 +77,25 @@ async def _seed_adjustments(session, pid: uuid.UUID, d_code: str, other_code: st
             "INSERT INTO adjustments (id, project_id, year, company_code, adjustment_no, adjustment_type, description, account_code, "
             "account_name, debit_amount, credit_amount, entry_group_id, created_by) VALUES (:id, :pid, :year, 'AQLB6', :no, "
             "CAST('aje' AS adjustment_type), '【测试】B6 回滚事务造行', :acct, :acct, :dr, :cr, :grp, :creator)"),
-            {"id": uuid.uuid4(), "pid": pid, "year": AUDIT_YEAR, "no": number, "acct": account, "dr": Decimal(debit),
+            {"id": uuid.uuid4(), "pid": pid, "year": year, "no": number, "acct": account, "dr": Decimal(debit),
              "cr": Decimal(credit), "grp": groups["IN" if number.endswith("IN") else "OUT"], "creator": creator})
     return groups
 
 
 @pytest.fixture
-async def world(pg_rollback_session):
+async def world(pg_rollback_session, picks):
     session = pg_rollback_session
-    pid = uuid.uuid4()
-    hs = await session.get(Project, HS)
-    session.add(Project(id=pid, name="【测试】B6 循环范围", client_name="【测试】B6 循环范围",
-                        template_type=hs.template_type, report_scope="standalone"))
-    await session.flush()
-    tb = await _copy_from_hs(session, "trial_balance", pid)
-    notes = await _copy_from_hs(session, "disclosure_notes", pid)
+    # 来源项目按能力解析（审计年度同时有试算表与附注），不再写死华氏的 UUID —— 它现算已不存在。
+    # 🔴 也不能 `session.get(Project, ...)` 取 template_type：那是全列 ORM 投影，共享库缺
+    #    `projects.amount_unit`（V250 未落库）时当场 500；`Pick` 自带 template_type。
+    source = await picks.resolve("tb_and_notes_copy_source")
+    year = source.audit_year
+    pid, _name = await insert_test_project(
+        session, name_suffix="B6 循环范围", audit_year=year,
+        report_scope="standalone", template_type=source.template_type,
+    )
+    tb = await _copy_from_source(session, "trial_balance", pid, source.id, year)
+    notes = await _copy_from_source(session, "disclosure_notes", pid, source.id, year)
     user = User(id=uuid.uuid4(), username=f"aql-b6-{uuid.uuid4().hex[:8]}", email=f"aql-b6-{uuid.uuid4().hex[:8]}@test.invalid",
                 hashed_password="x", role=UserRole.manager, is_active=True)
     session.add(user)
@@ -107,13 +117,14 @@ async def world(pg_rollback_session):
     d_section = sorted(d_sections)[0]
     if not (await session.execute(sa.select(DisclosureNote.id).where(
             DisclosureNote.project_id == pid, DisclosureNote.note_section == d_section))).first():
-        session.add(DisclosureNote(project_id=pid, year=AUDIT_YEAR, note_section=d_section, section_title="【测试】B6 D 循环章节",
+        session.add(DisclosureNote(project_id=pid, year=year, note_section=d_section, section_title="【测试】B6 D 循环章节",
                                    sort_order=0, table_data={"_tables": [{"name": "明细", "headers": ["项目", "期末余额"],
                                                                           "rows": [{"label": "甲", "values": [1]}]}]}))
         await session.flush()
-    groups = await _seed_adjustments(session, pid, sorted(d_codes)[0], "1001")
-    yield type("W", (), {"session": session, "pid": pid, "user": user, "assignment": assignment, "d_codes": d_codes,
-                         "d_sections": d_sections, "d_section": d_section, "groups": groups})
+    groups = await _seed_adjustments(session, pid, sorted(d_codes)[0], "1001", year)
+    yield type("W", (), {"session": session, "pid": pid, "year": year, "user": user,
+                         "assignment": assignment, "d_codes": d_codes, "d_sections": d_sections,
+                         "d_section": d_section, "groups": groups, "source": source})
 
 
 @asynccontextmanager
@@ -143,16 +154,16 @@ async def _client(session, user: User, monkeypatch, *routers: Any) -> AsyncItera
         await redis.aclose()
 
 
-async def _rows(http: AsyncClient, pid: uuid.UUID, source: str, **body: Any) -> dict:
-    response = await http.post(EXEC, json={"project_id": str(pid), "year": AUDIT_YEAR, "source": source,
+async def _rows(http: AsyncClient, world, source: str, **body: Any) -> dict:
+    response = await http.post(EXEC, json={"project_id": str(world.pid), "year": world.year, "source": source,
                                            "limit": 2000, **body})
     assert response.status_code == 200, response.text[:800]
     return response.json()
 
 
-async def _tb_gold(session, pid: uuid.UUID, codes: frozenset[str] | set[str] | None) -> int:
+async def _tb_gold(session, pid: uuid.UUID, year: int, codes: frozenset[str] | set[str] | None) -> int:
     where = "" if codes is None else "AND standard_account_code = ANY(:codes)"
-    params: dict[str, Any] = {"pid": pid, "year": AUDIT_YEAR}
+    params: dict[str, Any] = {"pid": pid, "year": year}
     if codes is not None:
         params["codes"] = sorted(codes)
     return (await session.execute(sa.text(
@@ -160,8 +171,9 @@ async def _tb_gold(session, pid: uuid.UUID, codes: frozenset[str] | set[str] | N
         params)).scalar_one()
 
 
-async def _tree_sections(http: AsyncClient, pid: uuid.UUID) -> tuple[list[str], str]:
-    response = await http.get(IND, params={"project_id": str(pid), "year": AUDIT_YEAR, "branch": "disclosure"})
+async def _tree_sections(http: AsyncClient, world) -> tuple[list[str], str]:
+    response = await http.get(IND, params={"project_id": str(world.pid), "year": world.year,
+                                           "branch": "disclosure"})
     assert response.status_code == 200, response.text[:800]
     leaves = [leaf for node in response.json() for leaf in ([node] if "children" not in node else node["children"])]
     assert leaves[0]["key"] == "disclosure", "附注分支首个叶子应为「附注目录」"
@@ -191,20 +203,20 @@ async def test_restricted_member_sees_only_cycle_rows(world, monkeypatch, builde
     access = (await builder.request(world.user, "GET", "/access")).json()
     assert (access["accessible_project_count"], access["reason"]) == (0, CYCLE_SCOPED_REASON)
     async with _client(world.session, world.user, monkeypatch) as http:
-        tb = await _rows(http, world.pid, "trial_balance")
-        assert tb["total"] == await _tb_gold(world.session, world.pid, world.d_codes) > 0
+        tb = await _rows(http, world, "trial_balance")
+        assert tb["total"] == await _tb_gold(world.session, world.pid, world.year, world.d_codes) > 0
         assert {r["standard_account_code"] for r in tb["rows"]} <= set(world.d_codes)
-        adj = await _rows(http, world.pid, "adjustment")
+        adj = await _rows(http, world, "adjustment")
         assert {r["entry_group_id"] for r in adj["rows"]} == {str(world.groups["IN"])}, "只见含 D 科目的分录组（整组）"
         assert adj["total"] == 2
-        sections, _version = await _tree_sections(http, world.pid)
-        tree = await DisclosureEngine(world.session).get_notes_tree(world.pid, AUDIT_YEAR)
+        sections, _version = await _tree_sections(http, world)
+        tree = await DisclosureEngine(world.session).get_notes_tree(world.pid, world.year)
         assert sections == [n["note_section"] for n in tree if n["note_section"] in world.d_sections]
         assert world.d_section in sections
-        catalog = await _rows(http, world.pid, "disclosure")
+        catalog = await _rows(http, world, "disclosure")
         assert {r["note_section"] for r in catalog["rows"]} <= set(world.d_sections) and catalog["total"] > 0
         outside = next(n["note_section"] for n in tree if n["note_section"] not in world.d_sections)
-        denied = await http.post(EXEC, json={"project_id": str(world.pid), "year": AUDIT_YEAR,
+        denied = await http.post(EXEC, json={"project_id": str(world.pid), "year": world.year,
                                              "source": f"disclosure_note:{outside}"})
         assert denied.status_code == 403, denied.text[:500]
         assert denied.json()["detail"]["error_code"] == "SECTION_OUT_OF_SCOPE"
@@ -215,16 +227,16 @@ async def test_supervisor_is_unrestricted_and_empty_selection_sees_nothing(world
     world.assignment.role = "manager"
     await world.session.flush()
     async with _client(world.session, world.user, monkeypatch) as http:
-        tb = await _rows(http, world.pid, "trial_balance", limit=1999)
-        assert tb["total"] == await _tb_gold(world.session, world.pid, None)
-        assert (await _rows(http, world.pid, "adjustment", limit=1999))["total"] == 4
+        tb = await _rows(http, world, "trial_balance", limit=1999)
+        assert tb["total"] == await _tb_gold(world.session, world.pid, world.year, None)
+        assert (await _rows(http, world, "adjustment", limit=1999))["total"] == 4
     world.assignment.role, world.assignment.assigned_cycles = "auditor", []
     await world.session.flush()
     async with _client(world.session, world.user, monkeypatch) as http:
-        assert (await _rows(http, world.pid, "trial_balance", limit=1998))["total"] == 0
-        assert (await _rows(http, world.pid, "adjustment", limit=1998))["total"] == 0
-        assert (await _rows(http, world.pid, "disclosure", limit=1998))["total"] == 0
-        sections, _version = await _tree_sections(http, world.pid)
+        assert (await _rows(http, world, "trial_balance", limit=1998))["total"] == 0
+        assert (await _rows(http, world, "adjustment", limit=1998))["total"] == 0
+        assert (await _rows(http, world, "disclosure", limit=1998))["total"] == 0
+        sections, _version = await _tree_sections(http, world)
         assert sections == []
 
 
@@ -244,7 +256,7 @@ async def test_platform_query_failure_does_not_abort_the_request(world, monkeypa
     event.listen(sync_conn, "before_cursor_execute", _inject, retval=True)
     try:
         async with _client(world.session, world.user, monkeypatch) as http:
-            response = await http.post(EXEC, json={"project_id": str(world.pid), "year": AUDIT_YEAR,
+            response = await http.post(EXEC, json={"project_id": str(world.pid), "year": world.year,
                                                    "source": "trial_balance", "limit": 1997})
     finally:
         event.remove(sync_conn, "before_cursor_execute", _inject)
@@ -252,4 +264,4 @@ async def test_platform_query_failure_does_not_abort_the_request(world, monkeypa
     assert response.status_code == 200, f"平台入口吞掉异常后事务应已回滚到保存点：{response.status_code} {response.text[:300]}"
     assert response.json()["total"] == 0, "读取失败按受限空集（fail-closed）"
     # 同一会话随后的查询照常（事务没有停在 aborted）
-    assert await _tb_gold(world.session, world.pid, None) > 0
+    assert await _tb_gold(world.session, world.pid, world.year, None) > 0
