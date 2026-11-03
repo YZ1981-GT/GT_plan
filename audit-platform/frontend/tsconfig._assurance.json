@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force", "resolveJsonModule": true,
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/citar/taxAssuranceApi.ts",
+    "src/citar/citarRoutes.ts",
+    "src/citar/CitarLayout.vue",
+    "src/citar/screens/CitarReportBody.vue",
+    "src/citar/screens/CitarReviewNotes.vue",
+    "src/citar/screens/CitarFinancialStatements.vue",
+    "src/views/tax-return/taxReturnSheets.ts",
+    "src/views/tax-return/taxReturnApi.ts",
+    "src/views/tax-return/TaxReturnView.vue",
+    "src/views/tax-return/TaxReturnCatalog.vue",
+    "src/views/tax-return/TaxReturnSheetPanel.vue",
+    "src/views/tax-workpapers/useTaxSheetEditor.ts",
+    "src/views/tax-workpapers/TaxWorkpaperSheetPanel.vue",
+    "src/views/tax-workpapers/TaxWorkpaperView.vue",
+    "src/views/tax-workpapers/TaxWorkpaperCatalog.vue",
+    "src/router/domains/projects.ts",
+    "src/services/apiPaths/accounting.ts",
+    "src/services/apiPaths/index.ts",
+    "src/env.d.ts"
+  ]
+}

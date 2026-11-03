@@ -19,7 +19,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, check_consol_lock, get_current_user
 from app.models.core import User
 from app.services.import_template_service import (
     IMPORT_TYPE_LABELS,
@@ -101,6 +101,15 @@ async def import_data(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """校验 + 导入数据到系统（事务保护，全部成功或全部回滚）"""
+    # 项目级鉴权：原先只校验登录，任意用户可往他人项目导入。
+    # 调整分录与新建分录端点同口径（编辑级 + 合并锁）；其余类型至少须是项目成员（不改各域既有可用角色）。
+    if project_id is not None:
+        if import_type == ImportType.adjustments:
+            await assert_project_permission(db, current_user, project_id, "edit")
+            await check_consol_lock(project_id=project_id, db=db)
+        else:
+            await assert_project_permission(db, current_user, project_id, "readonly")
+
     content = await _read_upload(file)
 
     # 1. 校验

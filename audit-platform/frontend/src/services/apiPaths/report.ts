@@ -18,6 +18,15 @@ export const reports = {
   lineComposition: (pid: string, lineCode: string) => `/api/projects/${pid}/reports/line-composition?line_code=${encodeURIComponent(lineCode)}`,
   multiYear: (pid: string, years: number[], reportType: string) =>
     `/api/projects/${pid}/reports/multi-year?years=${years.join(',')}&report_type=${reportType}`,
+  /** 报表分析（spec citar-report-analysis）：试算全景 / 平衡 / 期初核对 / 变动分析 / 财务比率 */
+  analysis: {
+    fullTb: (pid: string, year: number) => `/api/workpapers/${pid}/${year}/full-tb`,
+    balanceCheck: (pid: string, year: number) => `/api/workpapers/${pid}/${year}/tb-balance-check`,
+    openingReconcile: (pid: string, year: number) => `/api/workpapers/${pid}/${year}/opening-reconcile`,
+    bsTrend: (pid: string, year: number) => `/api/workpapers/${pid}/${year}/bs-trend`,
+    plTrend: (pid: string, year: number) => `/api/workpapers/${pid}/${year}/pl-trend`,
+    ratios: (pid: string, year: number) => `/api/workpapers/${pid}/${year}/financial-ratios`,
+  },
   // Sprint 4 Task 4.3: 反查所有引用此报表行的附注章节
   noteReferences: (pid: string, year: number, rowCode: string) =>
     `/api/financial-reports/${pid}/${year}/${encodeURIComponent(rowCode)}/note-references`,

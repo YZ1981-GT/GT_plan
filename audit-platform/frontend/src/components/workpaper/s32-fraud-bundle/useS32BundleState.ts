@@ -17,6 +17,7 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { getWpIndex } from '@/services/workpaperApi'
+import { useBundleAssigneeLabels } from '../composables/useBundleAssigneeLabels'
 import { api } from '@/services/apiProxy'
 import { S32_FRAUD_TABS, type S32TabDef } from './S32_TAB_CONFIG'
 
@@ -42,6 +43,8 @@ export interface UseS32BundleStateOptions {
 }
 
 export interface UseS32BundleStateReturn {
+  /** 页签标签附带索引接口解析的负责人显示名。 */
+  tabLabel: (label: string, wpCode?: string) => string
   /** S32-x wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
   /** 仅 wpIdMap 有值的舞弊情形 Tab（驱动 el-tabs 渲染） */
@@ -124,6 +127,7 @@ export function computeProgressSummary(
 
 export function useS32BundleState(options: UseS32BundleStateOptions): UseS32BundleStateReturn {
   const { projectId } = options
+  const { setAssignees, tabLabel } = useBundleAssigneeLabels()
 
   const loading = ref(false)
   /** S32-x → wp_id 内部状态 */
@@ -163,14 +167,17 @@ export function useS32BundleState(options: UseS32BundleStateOptions): UseS32Bund
   async function loadWpIndex(): Promise<void> {
     if (!projectId.value) {
       wpIdMapState.value = {}
+      setAssignees([])
       return
     }
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
       wpIdMapState.value = buildWpIdMap(items)
+      setAssignees(items)
     } catch {
       wpIdMapState.value = {}
+      setAssignees([])
     } finally {
       loading.value = false
     }
@@ -231,6 +238,7 @@ export function useS32BundleState(options: UseS32BundleStateOptions): UseS32Bund
   }
 
   return {
+    tabLabel,
     wpIdMap,
     visibleTabs,
     completionMap,

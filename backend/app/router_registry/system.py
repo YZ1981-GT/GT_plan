@@ -88,8 +88,11 @@ def register_system_routers(app: FastAPI) -> None:
         app.include_router(r, tags=["查账与试算"])
 
     # 税审底稿取数 / 公式计算 / 手工值保存（spec tax-workpaper-data-fetch）
+    from app.routers.tax_assurance import router as tax_assurance_router
     from app.routers.tax_workpapers import router as tax_workpapers_router
     app.include_router(tax_workpapers_router, tags=["税审底稿"])
+    # 鉴证报告：报告正文 / 审核说明 / 汇算申报表 / 单体财务报表（spec citar-assurance-report-menus）
+    app.include_router(tax_assurance_router, tags=["税审鉴证报告"])
 
     # ═══ §3b. 通用 auto_data_source resolver API ═══
     from app.routers.auto_data import router as auto_data_router

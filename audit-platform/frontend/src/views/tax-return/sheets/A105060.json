@@ -1,0 +1,26 @@
+{
+  "code": "A105060",
+  "parts": [
+    {
+      "source": "A105060",
+      "rows": [
+        [{"text":"A105060                                             广告费和业务宣传费等跨年度纳税调整明细表","kind":"title","colSpan":4}],
+        [{"text":"行次","kind":"header","rowSpan":2},{"text":"项目","kind":"header","rowSpan":2},{"text":"广告和业务宣传费","kind":"header"},{"text":"保险企业手续费及佣金支出","kind":"header"}],
+        [{"text":"1","kind":"number"},{"text":"2","kind":"number"}],
+        [{"text":"1"},{"text":"一、本年支出"},{"kind":"number","ref":"C4","role":"f","fmt":"money"},{"kind":"number","ref":"D4","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"减：不允许扣除的支出"},{"kind":"number","ref":"C5","role":"f","fmt":"money"},{"kind":"number","ref":"D5","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"二、本年符合条件的支出（1-2）"},{"kind":"number","ref":"C6","role":"f","fmt":"money"},{"kind":"number","ref":"D6","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"三、本年计算扣除限额的基数"},{"kind":"number","ref":"C7","role":"f","fmt":"money"},{"kind":"number","ref":"D7","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"乘：税收规定扣除率"},{"kind":"number","ref":"C8","role":"f","fmt":"pct"},{"kind":"number","ref":"D8","role":"f","fmt":"pct"}],
+        [{"text":"6"},{"text":"四、本企业计算扣除限额（4×5）"},{"kind":"number","ref":"C9","role":"f","fmt":"money"},{"kind":"number","ref":"D9","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"五、本年结转以后年度扣除额（3＞6，本行=3-6；3≤6，本行=0）"},{"kind":"number","ref":"C10","role":"f","fmt":"money"},{"kind":"number","ref":"D10","role":"f","fmt":"money"}],
+        [{"text":"8"},{"text":"加：以前年度累计结转扣除额"},{"kind":"number","ref":"C11","role":"f","fmt":"money"},{"kind":"number","ref":"D11","role":"f","fmt":"money"}],
+        [{"text":"9"},{"text":"减：本年扣除的以前年度结转额[3＞6，本行=0；3≤6，本行=8与（6-3）孰小值]"},{"kind":"number","ref":"C12","role":"f","fmt":"money"},{"kind":"number","ref":"D12","role":"f","fmt":"money"}],
+        [{"text":"10"},{"text":"六、按照分摊协议归集至其他关联方的金额（10≤3与6孰小值）"},{"kind":"number","ref":"C13","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"11"},{"text":"按照分摊协议从其他关联方归集至本企业的金额"},{"kind":"number","ref":"C14","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"12"},{"text":"七、本年支出纳税调整金额\n（3＞6，本行=2+3-6+10-11；3≤6，本行=2+10-11-9）"},{"kind":"number","ref":"C15","role":"f","fmt":"money"},{"kind":"number","ref":"D15","role":"f","fmt":"money"}],
+        [{"text":"13"},{"text":"八、累计结转以后年度扣除额（7+8-9）"},{"kind":"number","ref":"C16","role":"f","fmt":"money"},{"kind":"number","ref":"D16","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

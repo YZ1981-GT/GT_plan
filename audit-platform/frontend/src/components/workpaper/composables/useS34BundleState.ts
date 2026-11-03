@@ -20,6 +20,7 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { getWpIndex } from '@/services/workpaperApi'
+import { useBundleAssigneeLabels } from './useBundleAssigneeLabels'
 import { api } from '@/services/apiProxy'
 
 // ─── Types (exported for testability & cross-module reuse) ───
@@ -93,6 +94,8 @@ export interface UseS34BundleStateOptions {
 }
 
 export interface UseS34BundleStateReturn {
+  /** 页签标签附带索引接口解析的负责人显示名。 */
+  tabLabel: (label: string, wpCode?: string) => string
   /** S34-x wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
   /** S34-0 核查清单结构化数据 */
@@ -267,6 +270,7 @@ export function mapApiChecklist(
 
 export function useS34BundleState(options: UseS34BundleStateOptions): UseS34BundleStateReturn {
   const { projectId } = options
+  const { setAssignees, tabLabel } = useBundleAssigneeLabels()
 
   const loading = ref(false)
   /** S34-x → wp_id 内部状态 */
@@ -306,14 +310,17 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
   async function loadWpIndex(): Promise<void> {
     if (!projectId.value) {
       wpIdMapState.value = {}
+      setAssignees([])
       return
     }
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
       wpIdMapState.value = buildWpIdMap(items)
+      setAssignees(items)
     } catch {
       wpIdMapState.value = {}
+      setAssignees([])
     } finally {
       loading.value = false
     }
@@ -351,6 +358,7 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
   }
 
   return {
+    tabLabel,
     wpIdMap,
     checklist,
     applicableCodes,

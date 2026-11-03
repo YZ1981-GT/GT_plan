@@ -78,7 +78,7 @@
 
 - [x] P2.1 对 `risk_assessments` 执行 `SELECT DISTINCT account_or_cycle ... LIMIT 50`，记录真实值域并确认映射；若数据库不可用，保留环境阻塞，不伪造枚举。
 - [x] P2.2 实现 S34 风险指示器和四象限 `applicable/recommended/not_applicable`，增加 service/Overview 测试。
-- [-] P2.3 在 4 个 bundle 的 tab 展示 `assigned_to` 对应 staff name，缺失时回退 username；增加 JOIN/展示测试，不改变 assignment_service 粒度。
+- [x] P2.3 在 4 个 bundle 的 tab 展示 `assigned_to` 对应 staff name，缺失时回退 username；增加 JOIN/展示测试，不改变 assignment_service 粒度。
 
 ## Phase Final — 回归与收口
 
@@ -253,3 +253,14 @@
 - **B50 真实来源核对**：`public.checklist_responses` 的关键列为 `project_id uuid`、`wp_id uuid`、`item_id varchar`、`conclusion text`、`remark text`，全表当前 215 行；但按真实关系 `working_paper.wp_index_id → wp_index.id` 且 `wp_index.wp_code='B50'` 联查，当前有 7 个 B50 工作稿（7 个项目），`B50` 对应 `checklist_responses` 为 **0 行**。因此本次也没有可从实时 B50 数据记录的账号/循环值域。
 - **服务与映射实证**：`backend/app/services/b50_risk_reader.py` 的 `_find_b50_wp_id()` 按 `working_paper JOIN wp_index` 定位 B50；`load_b50_accounts()` 只读 `checklist_responses` 中 `item_id LIKE 'B50-T3-%'`，其中 `B50-T3-cycle-{account}` 的 `conclusion` 是循环值，矩阵 `B50-T3-matrix-{account}-{assertion}-RMM/SR` 分别解析 H/M/L 与 Y；`load_b50_risks()` 再将矩阵展平。该读取器已被 `backend/app/routers/b60_data_pull.py`、`backend/app/services/auto_data_resolvers/_cycle.py`、`_control_b.py` 及 `a176_agenda_prefill.py` 消费；这确认 B50 checklist 是现行风险联动的代码真源路径，但当前共享库没有 B50 响应数据。
 - **边界 / 状态**：本次只执行 SELECT / schema 元数据读取，未执行任何 INSERT、UPDATE、DELETE、seed 或迁移。P2.1 保持 `[-]` 环境/数据阻塞；待真实 B50 checklist 写入后重新执行值域查询并由用户确认风险到 S 类的映射，未以空结果伪造枚举或标记 P2.1 完成。
+
+## P2.3 执行记录（2026-11-03；代码与专项验证完成，未提交）
+
+- `/api/projects/{project_id}/wp-index` 复用 `resolve_user_display_names`，返回 `assignee_name` / `reviewer_name`：按 `assigned_to → users.id → staff_members.user_id` 解析，人员档案姓名优先，缺失或档案已删除时回退 username。原 ID 字段、委派和保存逻辑不变。
+- S32/S33/S34/S35 在既有索引请求中读取显示名，共用 `useBundleAssigneeLabels`，页签展示「原标签（负责人：姓名）」；未分配、无底稿实体或缺姓名时保留原标签。重新加载撤销分配或请求失败时清除旧姓名，不新增人员请求。
+- 后端 `test_s_bundle_assignee_names.py`：真实 SQLite ORM 查询及关联，覆盖 staff 姓名优先、username 回退、删除档案回退、未分配、复核人、无底稿实体和空项目，**1 passed**。测试只使用内存库。
+- 前端 `SBundleAssigneeLabels.spec.ts`：挂载四个真实 bundle、走真实状态加载与展示，覆盖中文姓名、回退用户名、未分配、撤销分配、加载失败及无效姓名，**13 passed**。
+- 四个 bundle 目录及新增用例回归：**319 passed / 1 failed（18 files）**。失败为 `s34-bundle.pbt.spec.ts` 的「S34-16-1 公式重算结果等于纯函数计算」；相同反例 `E/F[10] = -1.401298464324817e-45` 在 HEAD `e881fac20` 的纯函数引擎上同样得到 actual=null、expected=1、gap=1。该公式引擎与测试本次均未改，F2 不因本次专项验证而勾选。
+- Playwright：独立浏览器上下文、隔离 API 响应夹具，逐一挂载真实 bundle 与真实 Element Plus，确认四类页签均显示「张审计」/「auditor_fallback」、未分配不显示负责人，实际点击后 `aria-selected=true`。程序表等下层内容使用桩；这是页签运行时验证，不声称真实项目全链路验收。未写真实项目数据，结束后卸载、移除拦截并停回 about:blank。
+- ESLint：本次前端文件 **0 errors / 2 warnings**，警告为原有 S34/S35 进度百分比的金额运算规则。局部 vue-tsc 共 7 条诊断：GtAProgramConsole 年度/类型 2 条、四 bundle 缺 schema/htmlData 5 条；HEAD 输入对照逐条同样存在，本次新增类型错误为 0。进程内注入 `number = string` 能新增 TS2322，检查器有效；未把检查退出 1 报成通过。
+- 本轮只将 P2.3 勾选，F1～F4 保留未完成；未改 assignment_service 粒度，未执行提交或推送。

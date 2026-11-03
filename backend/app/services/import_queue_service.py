@@ -36,6 +36,8 @@ _acquire_mutex = asyncio.Lock()
 _REDIS_LOCK_PREFIX = "import_lock:"
 _REDIS_LOCK_TTL = 1800  # 30min auto-expire failsafe
 _REDIS_ACTIVE_SET_KEY = "import_lock:active_set"
+# release_lock 另起的 Redis 清理任务（持有引用，防止任务没跑完就被回收）
+_pending_redis_releases: set[asyncio.Task] = set()
 
 
 class ImportLockError(RuntimeError):
@@ -301,17 +303,40 @@ class ImportQueueService:
             logger.warning("Redis lock release failed (pid=%s): %s", project_id, e)
 
     @staticmethod
-    async def _redis_check_global_concurrency() -> int | None:
+    async def _redis_check_global_concurrency(
+        db: AsyncSession | None = None, current_project_id: UUID | None = None,
+    ) -> int | None:
         """检查全局活跃导入数（Redis Set: import_lock:active_set）。
 
         返回当前活跃数量，Redis 不可用时返回 None。
+
+        达到上限时先清理残留成员再判断（spec mapping-code-collision-and-fetch-by-mapping 第二批）：
+        集合本身没有过期时间，进程被杀 / 释放没走到 Redis 的项目会永久留在集合里，满额后所有导入都报「系统繁忙」。
+        残留 = 本项目自己（刚拿到它的 Redis 锁，之前的成员必是残留）或 既没有锁键、也没有进行中导入批次的项目。
         """
         redis = await ImportQueueService._get_redis()
         if redis is None:
             return None
         try:
-            count = await redis.scard(_REDIS_ACTIVE_SET_KEY)
-            return int(count or 0)
+            count = int(await redis.scard(_REDIS_ACTIVE_SET_KEY) or 0)
+            if count < _MAX_CONCURRENT_IMPORTS or db is None:
+                return count
+            members = [m.decode() if isinstance(m, bytes) else str(m) for m in (await redis.smembers(_REDIS_ACTIVE_SET_KEY) or [])]
+            stale = [m for m in members if current_project_id is not None and m == str(current_project_id)]
+            for m in members:
+                if m in stale or await redis.exists(f"{_REDIS_LOCK_PREFIX}{m}"):
+                    continue
+                try:
+                    pid = UUID(m)
+                except ValueError:
+                    stale.append(m)
+                    continue
+                if await ImportQueueService._get_active_job_batch(pid, db) is None:
+                    stale.append(m)
+            if stale:
+                await redis.srem(_REDIS_ACTIVE_SET_KEY, *stale)
+                logger.warning("Redis active_set 清理残留成员 %d 个：%s", len(stale), stale)
+            return max(count - len(stale), 0)
         except Exception as e:
             logger.warning("Redis SCARD active_set failed: %s", e)
             return None
@@ -405,8 +430,8 @@ class ImportQueueService:
                     return False, "项目正在导入中（DB 锁检测）", None
             # redis_result is True → Redis 锁已获取
 
-            # Step 2: 检查全局并发上限
-            redis_active = await ImportQueueService._redis_check_global_concurrency()
+            # Step 2: 检查全局并发上限（满额时先清残留成员）
+            redis_active = await ImportQueueService._redis_check_global_concurrency(db, project_id)
             if redis_active is not None:
                 if redis_active >= _MAX_CONCURRENT_IMPORTS:
                     # 释放刚获取的 Redis 锁
@@ -476,12 +501,26 @@ class ImportQueueService:
 
     @staticmethod
     def release_lock(project_id: UUID):
-        """释放导入锁（内存态，兼容同步调用场景）。
+        """释放导入锁（同步调用；全部导入流程都调这个）。
 
-        注意：同步版本不清理 Redis 锁（依赖 TTL 自动过期兜底）。
-        推荐使用 release_lock_async。
+        内存态立即清；在事件循环里时另起任务清 Redis（活跃集合成员 + 锁键）。
+        原来只清内存：锁键要等 30 分钟才过期（期间同一项目重新导入报「另一 worker 持有锁」），
+        活跃集合没有过期时间、成员永久累积，满 ``_MAX_CONCURRENT_IMPORTS`` 个后所有导入都报「系统繁忙」。
         """
         _import_locks.pop(str(project_id), None)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # 不在事件循环里：Redis 残留由并发检查清理（_redis_check_global_concurrency）
+        task = loop.create_task(ImportQueueService._redis_release_all(project_id))
+        _pending_redis_releases.add(task)
+        task.add_done_callback(_pending_redis_releases.discard)
+
+    @staticmethod
+    async def _redis_release_all(project_id: UUID) -> None:
+        """先移出活跃集合、再删锁键：删锁键之前新的导入拿不到锁，不会出现「已占名额却不计数」。"""
+        await ImportQueueService._redis_remove_from_active_set(project_id)
+        await ImportQueueService._redis_release_lock(project_id)
 
     # -----------------------------------------------------------------------
     # F23 / Sprint 5.14: activate / rollback 轻量级项目锁

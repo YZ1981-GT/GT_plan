@@ -186,3 +186,11 @@ backend/scripts/diagnose/_mutation_reports/
 # 临时 commit message 文件（PowerShell 下长中文 commit message 只能走 -F <file>；
 # 2026-09-22 实测 `git add -A` 会抢在 `git commit -F` 读取之前把它一起提交进去）
 _commit_msg.tmp
+
+# 本地知识库索引缓存（kb_search.py 运行时生成，不入库）
+.claude/kb/.cache.pkl
+
+# 外部资料转换件（kb_convert.py 产物，含真实税审案例、序时账 / 余额表、内部会议纪要，不入库）
+# 只保留已跟踪的 .gitkeep 占位
+knowledge/external/*
+!knowledge/external/.gitkeep

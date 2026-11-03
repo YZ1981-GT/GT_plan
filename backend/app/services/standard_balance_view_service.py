@@ -125,6 +125,10 @@ async def build_standard_balance_view(
     db: AsyncSession, project_id: UUID, year: int, company_code: str = "001",
 ) -> list[dict]:
     """全部标准科目（含零余额行）的余额视图，按标准科目码排序。"""
+    # 先跑经 get_active_filter 的查询：数据集查询失败时它会 rollback，先读的 ORM 行会过期，
+    # 之后访问属性在异步会话里触发懒加载报错（MissingGreenlet）
+    period = await _period_by_standard(db, project_id, year)
+    adjustments = await _adjustments_by_standard(db, project_id, year)
     tb_rows = (
         await db.execute(
             sa.select(TrialBalance).where(
@@ -135,8 +139,6 @@ async def build_standard_balance_view(
             )
         )
     ).scalars().all()
-    period = await _period_by_standard(db, project_id, year)
-    adjustments = await _adjustments_by_standard(db, project_id, year)
     standard_names = await _standard_names(db, project_id)
 
     by_code = {r.standard_account_code: r for r in tb_rows}

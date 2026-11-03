@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/citar/useCitarReportAnalysis.ts",
+    "src/citar/useCitarReportGenerate.ts",
+    "src/citar/__tests__/useCitarReportAnalysis.spec.ts",
+    "src/citar/screens/CitarReportAnalysis.vue",
+    "src/citar/screens/CitarAuditedReports.vue",
+    "src/citar/components/CitarStatementView.vue",
+    "src/citar/components/CitarEquityMatrix.vue",
+    "src/citar/components/CitarCrossCheckPanel.vue",
+    "src/citar/components/CitarMultiYearPanel.vue",
+    "src/citar/components/CitarTrendPanel.vue",
+    "src/citar/components/CitarIndicatorsPanel.vue",
+    "src/services/apiPaths/report.ts",
+    "src/env.d.ts"
+  ]
+}

@@ -7,8 +7,9 @@
  * 调整列用底色区分,标明哪些值由调整分录驱动。
  */
 
+/* 与 CITAR 原样不同：去掉 max-width: 1180px，随内容区宽度自适应（用户 2026-11-03） */
 .aud-screen {
-  max-width: 1180px;
+  min-width: 0;
 }
 
 .aud-header {

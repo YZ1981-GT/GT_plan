@@ -1,0 +1,29 @@
+{
+  "code": "A107050",
+  "parts": [
+    {
+      "source": "A107050",
+      "rows": [
+        [{"text":"A107050","kind":"title","colSpan":2},{"text":"税额抵免优惠明细表","kind":"title","colSpan":8}],
+        [{"text":"行次","kind":"header","rowSpan":2},{"text":"类别","kind":"header","rowSpan":2},{"text":"项目","kind":"header","rowSpan":2},{"text":"年度","kind":"header"},{"text":"当年抵免前应纳税额","kind":"header"},{"text":"当年允许抵免的专用设备投资额","kind":"header"},{"text":"当年实际可抵免税额","kind":"header"},{"text":"以前年度已抵免额小计","kind":"header"},{"text":"本年实际抵免的各年度税额","kind":"header"},{"text":"可结转以后年度抵免的税额","kind":"header"}],
+        [{"text":"1","kind":"number"},{"text":"2","kind":"number"},{"text":"3","kind":"number"},{"text":"4","kind":"number"},{"text":"5","kind":"number"},{"text":"6","kind":"number"},{"text":"7","kind":"number"}],
+        [{"text":"1"},{"text":"抵免情况","rowSpan":8},{"text":"前五年度"},{"ref":"D4","role":"f"},{"kind":"number","ref":"E4","role":"f","fmt":"money"},{"kind":"number","ref":"F4","role":"f","fmt":"money"},{"kind":"number","ref":"G4","role":"f","fmt":"money"},{"kind":"number","ref":"H4","role":"f","fmt":"money"},{"kind":"number","ref":"I4","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"2"},{"text":"前四年度"},{"ref":"D5","role":"f"},{"kind":"number","ref":"E5","role":"f","fmt":"money"},{"kind":"number","ref":"F5","role":"f","fmt":"money"},{"kind":"number","ref":"G5","role":"f","fmt":"money"},{"kind":"number","ref":"H5","role":"f","fmt":"money"},{"kind":"number","ref":"I5","role":"f","fmt":"money"},{"kind":"number","ref":"J5","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"前三年度"},{"ref":"D6","role":"f"},{"kind":"number","ref":"E6","role":"f","fmt":"money"},{"kind":"number","ref":"F6","role":"f","fmt":"money"},{"kind":"number","ref":"G6","role":"f","fmt":"money"},{"kind":"number","ref":"H6","role":"f","fmt":"money"},{"kind":"number","ref":"I6","role":"f","fmt":"money"},{"kind":"number","ref":"J6","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"前二年度"},{"ref":"D7","role":"f"},{"kind":"number","ref":"E7","role":"f","fmt":"money"},{"kind":"number","ref":"F7","role":"f","fmt":"money"},{"kind":"number","ref":"G7","role":"f","fmt":"money"},{"kind":"number","ref":"H7","role":"f","fmt":"money"},{"kind":"number","ref":"I7","role":"f","fmt":"money"},{"kind":"number","ref":"J7","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"前一年度"},{"ref":"D8","role":"f"},{"kind":"number","ref":"E8","role":"f","fmt":"money"},{"kind":"number","ref":"F8","role":"f","fmt":"money"},{"kind":"number","ref":"G8","role":"f","fmt":"money"},{"kind":"number","ref":"H8","role":"f","fmt":"money"},{"kind":"number","ref":"I8","role":"f","fmt":"money"},{"kind":"number","ref":"J8","role":"f","fmt":"money"}],
+        [{"text":"6"},{"text":"本年度"},{"ref":"D9","role":"f"},{"kind":"number","ref":"E9","role":"f","fmt":"money"},{"kind":"number","ref":"F9","role":"f","fmt":"money"},{"kind":"number","ref":"G9","role":"f","fmt":"money"},{"text":"*"},{"kind":"number","ref":"I9","role":"f","fmt":"money"},{"kind":"number","ref":"J9","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"本年实际抵免税额合计","colSpan":6},{"kind":"number","ref":"I10","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"8"},{"text":"可结转以后年度抵免的税额合计","colSpan":7},{"kind":"number","ref":"J11","role":"f","fmt":"money"}],
+        [{"text":"9","kind":"header"},{"text":"本年允许抵免专用设备投资情况","kind":"header","rowSpan":8},{"text":"投资类型","kind":"header","colSpan":3},{"text":"投资额","kind":"header","colSpan":2},{"text":"抵免比例","kind":"header"},{"text":"可抵免税额","kind":"header","colSpan":2}],
+        [{"text":"9.1"},{"text":"环境保护专用设备","colSpan":3},{"kind":"number","colSpan":2,"ref":"F13","role":"f","fmt":"money"},{"kind":"number","ref":"H13","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I13","role":"f","fmt":"money"}],
+        [{"text":"9.2"},{"text":"节能节水专用设备","colSpan":3},{"kind":"number","colSpan":2,"ref":"F14","role":"f","fmt":"money"},{"kind":"number","ref":"H14","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I14","role":"f","fmt":"money"}],
+        [{"text":"9.3"},{"text":"安全生产专用设备","colSpan":3},{"kind":"number","colSpan":2,"ref":"F15","role":"f","fmt":"money"},{"kind":"number","ref":"H15","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I15","role":"f","fmt":"money"}],
+        [{"text":"9.4"},{"text":"环境保护专用设备数字化智能化改造投入","colSpan":3},{"kind":"number","colSpan":2,"ref":"F16","role":"f","fmt":"money"},{"kind":"number","ref":"H16","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I16","role":"f","fmt":"money"}],
+        [{"text":"9.5"},{"text":"节能节水专用设备数字化智能化改造投入","colSpan":3},{"kind":"number","colSpan":2,"ref":"F17","role":"f","fmt":"money"},{"kind":"number","ref":"H17","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I17","role":"f","fmt":"money"}],
+        [{"text":"9.6"},{"text":"安全生产专用设备数字化智能化改造投入","colSpan":3},{"kind":"number","colSpan":2,"ref":"F18","role":"f","fmt":"money"},{"kind":"number","ref":"H18","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I18","role":"f","fmt":"money"}],
+        [{"text":"9.7"},{"text":"其他专用设备投资","colSpan":3},{"kind":"number","colSpan":2,"ref":"F19","role":"f","fmt":"money"},{"kind":"number","ref":"H19","role":"f","fmt":"pct"},{"kind":"number","colSpan":2,"ref":"I19","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

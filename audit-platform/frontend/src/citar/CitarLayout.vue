@@ -53,8 +53,8 @@
           </section>
         </nav>
 
-        <!-- 税务底稿：目录栏由 TaxWorkpaperView 自己渲染（开合状态经 CITAR_SUBNAV_OPEN_KEY 下发），内容区不留内边距 -->
-        <main class="shell-content" :class="{ 'citar-content--flush': segment === CITAR_WORKPAPER_SEGMENT }">
+        <!-- 税务底稿 / 汇算申报表：目录栏由页面自己渲染（底稿目录开合经 CITAR_SUBNAV_OPEN_KEY 下发），内容区不留内边距 -->
+        <main class="shell-content" :class="{ 'citar-content--flush': CITAR_FLUSH_SEGMENTS.has(segment || '') }">
           <slot />
         </main>
       </div>
@@ -77,6 +77,7 @@ import {
   Connection, Document, DocumentChecked, EditPen, Grid, Notebook, Search, Tickets, Upload,
 } from '@element-plus/icons-vue'
 import {
+  CITAR_FLUSH_SEGMENTS,
   CITAR_HOME_SEGMENT,
   CITAR_NAV_GROUPS,
   CITAR_PROJECT_KEY,

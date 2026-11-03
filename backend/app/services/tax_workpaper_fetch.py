@@ -160,8 +160,8 @@ class AccountBook:
         return False
 
     # ── 名称匹配 ──
-    def match(self, candidates: list[Node], target: str) -> list[Node]:
-        """先全等，再同义词全等，再包含（较短一方 ≥ 2 字）。"""
+    def match(self, candidates: list[Node], target: str, *, contains_ok: bool = True) -> list[Node]:
+        """先全等，再同义词全等，再包含（较短一方 ≥ 2 字；``contains_ok=False`` 时不做包含）。"""
         key = name_key(target)
         if not key:
             return []
@@ -170,7 +170,7 @@ class AccountBook:
             return hits
         synonyms = {name_key(s) for s in SYNONYMS.get(display_name(target), [])}
         hits = [n for n in candidates if name_key(n.name) in synonyms]
-        if hits:
+        if hits or not contains_ok:
             return hits
 
         def contains(a: str, b: str) -> bool:
@@ -184,26 +184,37 @@ class AccountBook:
                 and not (n.parent and self.nodes[n.parent].standard == std)]
 
     def tops(self, name: str) -> list[Node]:
-        """一级名称 → 顶层节点。别名组（存货）取全部成员；否则按同名标准码依次找（6xxx 新码优先）。"""
+        """一级名称 → 顶层节点（spec mapping-code-collision-and-fetch-by-mapping R3：一级科目只认映射）。
+
+        - 别名组（存货）：映射到组内标准科目的客户科目；
+        - 名称在标准科目表里：只取映射到该标准科目的客户科目（同名多码时 6xxx 新码优先）；没有 ⇒ 空，
+          不按客户科目名兜底（原兜底的包含匹配会让「短期借款」「长期借款」都取到其他应付款-借款）；
+        - 不在标准科目表里（民非 / 事业单位科目）：只认**客户一级科目**的名称全等 / 同义词，不做包含匹配、不认同名明细。
+        """
         if name in GROUP_ALIASES:
             hits = [n for std in GROUP_ALIASES[name] for n in self._std_tops(std)]
             return sorted(hits, key=lambda n: n.code)
-        for std in self.chart_names.get(name, []):
+        std_codes = self.chart_names.get(name, [])
+        for std in std_codes:
             hits = self._std_tops(std)
             if hits:
                 return sorted(hits, key=lambda n: n.code)
-        # 标准科目表没有 / 未映射：按客户科目名找最浅的同名科目
-        hits = self.match(list(self.nodes.values()), name)
-        if not hits:
+        if std_codes:
             return []
-        shallowest = min(self.depth(n) for n in hits)
-        return sorted((n for n in hits if self.depth(n) == shallowest), key=lambda n: n.code)
+        return sorted(self.match(self.roots(), name, contains_ok=False), key=lambda n: n.code)
+
+    def top_issue(self, name: str) -> str:
+        """一级科目取不到时的原因。"""
+        std_codes = list(GROUP_ALIASES.get(name) or self.chart_names.get(name, []))
+        if std_codes:
+            return f"没有客户科目映射到标准科目「{name}」（{' / '.join(std_codes)}），请在底稿映射「客户科目 → 标准科目」补映射"
+        return f"未找到科目「{name}」"
 
     def resolve(self, path: list[str]) -> tuple[list[Node], str | None]:
         """科目路径 → 节点；取不到返回 ([], 原因)。"""
         nodes = self.tops(path[0])
         if not nodes:
-            return [], f"未找到科目「{path[0]}」"
+            return [], self.top_issue(path[0])
         walked = [path[0]]
         for part in path[1:]:
             pool = [k for n in nodes for k in self.kids(n)]

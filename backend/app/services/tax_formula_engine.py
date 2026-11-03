@@ -529,6 +529,39 @@ def _fn_counta(args, ctx):
     return Decimal(count)
 
 
+def _format_number(v: Decimal, fmt: str) -> str:
+    """TEXT 的数字格式：千分位 ``,``、小数位 ``.00``、百分比 ``%``（审核报告说明用 ``#,##0.00``）。"""
+    number_part = re.sub(r'"[^"]*"', "", fmt).split(";")[0]
+    pct = "%" in number_part
+    if pct:
+        v = v * 100
+    decimals = len(number_part.split(".", 1)[1].rstrip("%")) if "." in number_part else 0
+    rounded = v.quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
+    if rounded == 0:
+        rounded = abs(rounded)  # 舍入成 0 的微小负数不出「-0.00」
+    grouping = "," if "," in number_part else ""
+    text = f"{rounded:{grouping}.{decimals}f}"
+    return text + ("%" if pct else "")
+
+
+def _fn_text(args, ctx):
+    """TEXT(值, 格式)：数字按格式转文字；文字原样返回；格式里没有数字占位符时原样输出格式。"""
+    v = _scalar(args, 0, ctx)
+    fmt = _scalar(args, 1, ctx, "")
+    if is_error(v):
+        return v
+    if is_error(fmt):
+        return fmt
+    fmt_text = to_text(fmt)
+    if v is None:
+        v = Decimal(0)
+    if isinstance(v, bool) or isinstance(v, str):
+        return to_text(v)
+    if not re.search(r"[0#]", fmt_text):
+        return fmt_text
+    return _format_number(v, fmt_text)
+
+
 _CRITERIA_RE = re.compile(r"^(<=|>=|<>|<|>|=)?(.*)$", re.S)
 
 
@@ -596,4 +629,5 @@ FUNCTIONS: dict[str, Callable[[list[Node], Context], Value]] = {
     "LEFT": _fn_left,
     "COUNTA": _fn_counta,
     "SUMIF": _fn_sumif,
+    "TEXT": _fn_text,
 }

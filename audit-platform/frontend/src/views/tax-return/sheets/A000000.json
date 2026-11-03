@@ -1,0 +1,48 @@
+{
+  "code": "A000000",
+  "parts": [
+    {
+      "source": "A000000",
+      "rows": [
+        [{"text":"A000000","kind":"title"},{},{"text":"企业所得税年度纳税申报基础信息表","kind":"title","colSpan":10}],
+        [{"text":"基本经营情况（必填项目）","kind":"title","colSpan":12}],
+        [{"text":"101纳税申报企业类型（填写代码）","colSpan":5},{"colSpan":2,"ref":"F3","role":"f"},{"text":"102分支机构就地纳税比例（%）","colSpan":4},{"kind":"number","ref":"L3","role":"f","fmt":"pct"}],
+        [{"text":"103资产总额（填写平均值，单位：万元）","colSpan":5},{"kind":"number","colSpan":2,"ref":"F4","role":"f","fmt":"money"},{"text":"104从业人数（填写平均值，单位：人）","colSpan":4},{"ref":"L4","role":"f"}],
+        [{"text":"105所属国民经济行业（填写代码）","colSpan":5},{"colSpan":2,"ref":"F5","role":"f"},{"text":"106从事国家限制或禁止行业","colSpan":4},{"ref":"L5","role":"f"}],
+        [{"text":"107适用会计准则或会计制度（填写代码）","colSpan":5},{"colSpan":2,"ref":"F6","role":"f"},{"text":"108采用一般企业财务报表格式（2019年版）","colSpan":4},{"ref":"L6","role":"f"}],
+        [{"text":"109小型微利企业","colSpan":5},{"colSpan":2,"ref":"F7","role":"f"},{"text":"110上市公司","colSpan":2},{"colSpan":3,"ref":"J7","role":"f"}],
+        [{"text":"有关涉税事项情况（存在或者发生下列事项时必填）","kind":"header","colSpan":12}],
+        [{"text":"201从事股权投资业务","colSpan":5},{"colSpan":2,"ref":"F9","role":"f"},{"text":"202存在境外关联交易","colSpan":4},{"ref":"L9","role":"f"}],
+        [{"text":"203境外所得信息","rowSpan":2},{"text":"203-1 选择采用的境外所得抵免方式","colSpan":4},{"colSpan":7,"ref":"F10","role":"f"}],
+        [{"text":"203-2 新增境外直接投资信息","colSpan":4},{"colSpan":7,"ref":"F11","role":"f"}],
+        [{"text":"204有限合伙制创业投资企业的法人合伙人","colSpan":5},{"colSpan":2,"ref":"F12","role":"f"},{"text":"205创业投资企业","colSpan":4},{"ref":"L12","role":"f"}],
+        [{"text":"206技术先进型服务企业类型（填写代码）","colSpan":5},{"colSpan":2,"ref":"F13","role":"f"},{"text":"207非营利组织","colSpan":4},{"ref":"L13","role":"f"}],
+        [{"text":"208软件、集成电路企业类型（填写代码）","colSpan":5},{"colSpan":2,"ref":"F14","role":"f"},{"text":"209集成电路生产项目类型","colSpan":3},{"colSpan":2,"ref":"K14","role":"f"}],
+        [{"text":"210科技型中小企业","rowSpan":2},{"colSpan":6,"ref":"B15","role":"f"},{"colSpan":2,"ref":"H15","role":"f"},{"text":"210-2入库时间1","colSpan":2},{"ref":"L15","role":"f"}],
+        [{"colSpan":6,"ref":"B16","role":"f"},{"colSpan":2,"ref":"H16","role":"f"},{"text":"210-4入库时间2","colSpan":2},{"ref":"L16","role":"f"}],
+        [{"text":"211高新技术企业申报所属期年度有效的高新技术企业证书","colSpan":4,"rowSpan":2},{"text":"211-1 证书编号1","colSpan":3},{"colSpan":2,"ref":"H17","role":"f"},{"text":"211-2发证时间1","colSpan":2},{"ref":"L17","role":"f"}],
+        [{"text":"211-3 证书编号2","colSpan":3},{"colSpan":2,"ref":"H18","role":"f"},{"text":"211-4发证时间2","colSpan":2},{"ref":"L18","role":"f"}],
+        [{"text":"212重组事项税务处理方式","colSpan":4},{"colSpan":3,"ref":"E19","role":"f"},{"text":"213重组交易类型（填写代码）","colSpan":4},{"ref":"L19","role":"f"}],
+        [{"text":"214重组当事方类型（填写代码）","colSpan":4},{"colSpan":3,"ref":"E20","role":"e"},{"text":"215政策性搬迁开始时间","colSpan":4},{"ref":"L20","role":"f"}],
+        [{"text":"216发生政策性搬迁且停止生产经营无所得年度","colSpan":6},{"ref":"G21","role":"f"},{"text":"217政策性搬迁损失分期扣除年度","colSpan":4},{"ref":"L21","role":"f"}],
+        [{"text":"218发生非货币性资产对外投资递延纳税事项","colSpan":6},{"ref":"G22","role":"f"},{"text":"219非货币性资产对外投资转让所得递延纳税年度","colSpan":4},{"ref":"L22","role":"f"}],
+        [{"text":"220发生技术成果投资入股递延纳税事项","colSpan":6},{"ref":"G23","role":"f"},{"text":"221技术成果投资入股递延纳税年度","colSpan":4},{"ref":"L23","role":"f"}],
+        [{"text":"222发生资产（股权）划转特殊性税务处理事项","colSpan":6},{"ref":"G24","role":"f"},{"text":"223债务重组所得递延纳税年度","colSpan":4},{"ref":"L24","role":"f"}],
+        [{"text":"224研发支出辅助账样式","colSpan":6},{"text":"□2015版    □2021版   □自行设计","colSpan":6}],
+        [{"text":"主要股东及分红情况（必填项目）","kind":"header","colSpan":12}],
+        [{"text":"股东名称","kind":"header","colSpan":2},{"text":"证件种类","kind":"header"},{"text":"证件号码","kind":"header","colSpan":4},{"text":"投资比例（%）","kind":"header"},{"text":"当年（决议日）分配的股息、红利等权益性投资收益金额","kind":"header","colSpan":3},{"text":"国籍（注册地址）","kind":"header"}],
+        [{"colSpan":2,"ref":"A28","role":"f"},{"ref":"C28","role":"f"},{"colSpan":4,"ref":"D28","role":"f"},{"kind":"number","ref":"H28","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I28","role":"f","fmt":"money"},{"ref":"L28","role":"f"}],
+        [{"colSpan":2,"ref":"A29","role":"f"},{"ref":"C29","role":"f"},{"colSpan":4,"ref":"D29","role":"f"},{"kind":"number","ref":"H29","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I29","role":"f","fmt":"money"},{"ref":"L29","role":"f"}],
+        [{"colSpan":2,"ref":"A30","role":"f"},{"ref":"C30","role":"f"},{"colSpan":4,"ref":"D30","role":"f"},{"kind":"number","ref":"H30","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I30","role":"f","fmt":"money"},{"ref":"L30","role":"f"}],
+        [{"colSpan":2,"ref":"A31","role":"f"},{"ref":"C31","role":"f"},{"colSpan":4,"ref":"D31","role":"f"},{"kind":"number","ref":"H31","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I31","role":"f","fmt":"money"},{"ref":"L31","role":"f"}],
+        [{"colSpan":2,"ref":"A32","role":"f"},{"ref":"C32","role":"f"},{"colSpan":4,"ref":"D32","role":"f"},{"kind":"number","ref":"H32","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I32","role":"f","fmt":"money"},{"ref":"L32","role":"f"}],
+        [{"colSpan":2,"ref":"A33","role":"f"},{"ref":"C33","role":"f"},{"colSpan":4,"ref":"D33","role":"f"},{"kind":"number","ref":"H33","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I33","role":"f","fmt":"money"},{"ref":"L33","role":"f"}],
+        [{"colSpan":2,"ref":"A34","role":"f"},{"ref":"C34","role":"f"},{"colSpan":4,"ref":"D34","role":"f"},{"kind":"number","ref":"H34","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I34","role":"f","fmt":"money"},{"ref":"L34","role":"f"}],
+        [{"colSpan":2,"ref":"A35","role":"f"},{"ref":"C35","role":"f"},{"colSpan":4,"ref":"D35","role":"f"},{"kind":"number","ref":"H35","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I35","role":"f","fmt":"money"},{"ref":"L35","role":"f"}],
+        [{"colSpan":2,"ref":"A36","role":"f"},{"ref":"C36","role":"f"},{"colSpan":4,"ref":"D36","role":"f"},{"kind":"number","ref":"H36","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I36","role":"f","fmt":"money"},{"ref":"L36","role":"f"}],
+        [{"colSpan":2,"ref":"A37","role":"f"},{"ref":"C37","role":"f"},{"colSpan":4,"ref":"D37","role":"f"},{"kind":"number","ref":"H37","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I37","role":"f","fmt":"money"},{"ref":"L37","role":"f"}],
+        [{"text":"其余股东合计","colSpan":2},{"ref":"C38","role":"f"},{"colSpan":4,"ref":"D38","role":"f"},{"kind":"number","ref":"H38","role":"f","fmt":"pct"},{"kind":"number","colSpan":3,"ref":"I38","role":"f","fmt":"money"},{"ref":"L38","role":"f"}]
+      ]
+    }
+  ]
+}

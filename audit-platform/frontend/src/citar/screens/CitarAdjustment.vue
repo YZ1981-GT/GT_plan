@@ -10,7 +10,13 @@
     <p v-if="!year" class="citar-adj__empty">{{ yearLoading ? '正在读取项目信息…' : '项目未设置审核年度，请先在项目信息里填写' }}</p>
     <template v-else>
       <div class="adj-toolbar">
-        <button class="adj-button" type="button" disabled title="请在原调整分录页使用粘贴导入">导入分录</button>
+        <button
+          class="adj-button"
+          type="button"
+          :disabled="!!editingKey || busy"
+          title="下载模板填写后上传，或把「导出分录」的文件改完再导回"
+          @click="showImport = true"
+        >导入分录</button>
         <button class="adj-button" type="button" :disabled="exporting || !entries.length" @click="exportSummary">
           {{ exporting ? '导出中…' : '导出分录' }}
         </button>
@@ -46,6 +52,15 @@
       <div class="adj-footer">
         <button class="adj-add-entry" type="button" :disabled="!!editingKey || busy" @click="startNew">+ 增加一条分录</button>
       </div>
+
+      <!-- 复用平台统一导入弹窗：富模板下载 / 校验预览 / 追加或按编号覆盖 -->
+      <UnifiedImportDialog
+        v-model="showImport"
+        import-type="adjustments"
+        :project-id="projectId"
+        :year="year ?? undefined"
+        @imported="onImported"
+      />
     </template>
   </div>
 </template>
@@ -53,7 +68,9 @@
 <script setup lang="ts">
 /**
  * 调整分录（CITAR 版式，接平台调整分录）：
- * 列表 / 新建 / 编辑 / 删除（草稿与驳回）/ 提交复核 / 复核通过 / 驳回 / 撤回复核 / 导出汇总。
+ * 列表 / 新建 / 编辑 / 删除（草稿与驳回）/ 提交复核 / 复核通过 / 驳回 / 撤回复核 / 导出汇总 / Excel 导入。
+ * 导入复用 UnifiedImportDialog → POST /api/import-templates/adjustments/import；
+ * 导出的汇总表（AJE审计调整 / RJE重分类 两张 sheet）可原样导回，覆盖模式按编号更新。
  * 一次只编辑一条：未保存的修改在取消或刷新时丢弃。
  */
 import { computed, ref, watch } from 'vue'
@@ -64,6 +81,7 @@ import { downloadFile } from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { useProjectRole } from '@/composables/useProjectRole'
 import { ADJUSTMENT_STATUS } from '@/constants/statusEnum'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import CitarAdjustmentCard from '../components/CitarAdjustmentCard.vue'
 import { newEntry, useCitarAdjustments, type AdjEntry, type ReviewTarget } from '../useCitarAdjustments'
 import { useCitarProject } from '../useCitarProject'
@@ -82,6 +100,7 @@ const canReview = computed(() => projectCan('adjustment:review'))
 
 const busy = ref(false)
 const exporting = ref(false)
+const showImport = ref(false)
 /** 正在编辑的分录：已保存的用 groupId，新建的用 'new' */
 const editingKey = ref('')
 /** 新建中的分录（保存前不在列表里） */
@@ -202,6 +221,11 @@ async function onRevoke(entry: AdjEntry) {
     return
   }
   void run(() => revoke(entry), '撤回复核', '已撤回，分录回到草稿')
+}
+
+/** 导入成功后刷新列表；弹窗保持打开，让用户看到跳过 / 失败行的原因 */
+function onImported() {
+  void load()
 }
 
 async function exportSummary() {

@@ -1686,3 +1686,12 @@ backend/app/services/import_engine/parsers.py  955
 #     对照表与判定放新模块 legacy_pl_crosswalk.py，这里只加接线（+21 行）。
 #     拆分方向：自动匹配（auto_suggest / _match_single / 坏账二级）与映射 CRUD / 完成率拆两个模块。
 backend/app/services/mapping_service.py  1035
+#   import_queue_service.py —— 历史大文件（HEAD 已 932 行且未登记，任何改动都会被门禁拒）。
+#     2026-11-03 mapping-code-collision-and-fetch-by-mapping 第二批：导入锁活跃集合泄漏（release_lock 只清内存）
+#     ⇒ release_lock 另起任务清 Redis + 并发检查满额时清残留成员（+39 行）。
+#     拆分方向：Redis 分布式锁 / 活跃集合 helper 与导入批次进度 / 状态查询拆两个模块。
+backend/app/services/import_queue_service.py  971
+#   import_templates.py —— HEAD 799 行（贴着 800 上限）。
+#     2026-11-03：导入端点原先只校验登录、任意用户可往他人项目导入 ⇒ 补项目级鉴权（调整分录 edit + 合并锁，其余类型 readonly）（+9 行）。
+#     拆分方向：_import_adjustments（约 360 行）等七个 _import_* 写库函数移到 service 模块，路由只留四个端点。
+backend/app/routers/import_templates.py  808

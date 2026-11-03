@@ -76,7 +76,8 @@ _IS_VARIABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "net_profit": ("IS-019", ("IS-019", "净利润")),
     "revenue": ("IS-001", ("IS-001", "营业收入")),
     "cost": ("IS-002", ("IS-002", "营业成本")),
-    "gross_profit": ("IS-003", ("IS-003", "毛利", "营业毛利", "主营业务毛利")),
+    # 两版模板都没有独立毛利行；IS-003 在国企是「△利息收入」、上市是「税金及附加」⇒ 只认名字
+    "gross_profit": ("IS-003", ("毛利", "营业毛利", "主营业务毛利")),
     "profit_before_tax": ("IS-017", ("IS-017", "利润总额")),
     "income_tax": ("IS-018", ("IS-018", "所得税费用", "所得税")),
 }
@@ -167,6 +168,9 @@ _CROSS_CHECK_SEEDS: list[dict[str, Any]] = [
         "refs": ["BS-001"],
     },
 ]
+
+
+_SEED_REFS: dict[str, tuple[str, ...]] = {s["id"]: tuple(s["refs"]) for s in _CROSS_CHECK_SEEDS}
 
 
 def build_cross_check_formulas() -> list[FormulaRecord]:
@@ -276,18 +280,57 @@ def build_report_row_cache(
     row_cache 的键即表达式中 ``ROW('...')`` 的 REPORT 域 row_code。
     eq_rows 用于 #5（权益变动表期末合计 vs BS 权益合计）。
     """
+    bs_rows = list(bs_rows)
+    is_rows = list(is_rows)
+    eq_rows = list(eq_rows) if eq_rows else []
     bs_map = _build_report_map(bs_rows)
     is_map = _build_report_map(is_rows)
-    eq_map = _build_report_map(eq_rows) if eq_rows else {}
+    eq_map = _build_report_map(eq_rows)
 
     row_cache: dict[str, Decimal] = {}
-    for _var, (ref_code, candidates) in _BS_VARIABLES.items():
-        row_cache[ref_code] = _resolve_value(bs_map, candidates)
-    for _var, (ref_code, candidates) in _IS_VARIABLES.items():
-        row_cache[ref_code] = _resolve_value(is_map, candidates)
-    for _var, (ref_code, candidates) in _EQ_VARIABLES.items():
-        row_cache[ref_code] = _resolve_value(eq_map, candidates)
+    for groups, rows, report_map in (
+        (_BS_VARIABLES, bs_rows, bs_map),
+        (_IS_VARIABLES, is_rows, is_map),
+        (_EQ_VARIABLES, eq_rows, eq_map),
+    ):
+        for var, (ref_code, candidates) in groups.items():
+            located = _locate_by_name(rows, var)
+            row_cache[ref_code] = (
+                located if located is not None else _resolve_value(report_map, candidates)
+            )
     return row_cache
+
+
+#: 逻辑变量 → ``report_row_locator`` 语义键（spec citar-report-analysis §2.6）。
+#: 现行模板里 IS-017 / IS-018 / IS-019 / BS-001 是「▲赔付支出净额」「流动资产：」等别的行，
+#: 子串兜底「净利润」又会先命中「1.归属于母公司所有者的净利润」⇒ 先按行名定位，定位不到才回退。
+#: 毛利（gross_profit）两版模板都没有独立行，不定位（回退逻辑只认精确名「毛利」等）。
+_LOCATOR_KEYS: dict[str, str] = {
+    "assets_total": "total_assets",
+    "liabilities_total": "total_liabilities",
+    "equity_total": "total_equity",
+    "cash": "cash",
+    "net_profit": "net_profit",
+    "revenue": "revenue",
+    "cost": "cost_of_sales",
+    "profit_before_tax": "profit_before_tax",
+    "income_tax": "income_tax",
+    "eq_ending_total": "equity_ending",
+}
+
+
+def _locate_by_name(rows: list[Any], var: str) -> Decimal | None:
+    key = _LOCATOR_KEYS.get(var)
+    if key is None or not rows:
+        return None
+    from app.services.report_row_locator import locate
+
+    row = locate(rows, key)
+    if row is None:
+        return None
+    value = row.get("current_period_amount") if isinstance(row, dict) else getattr(
+        row, "current_period_amount", None)
+    return _to_decimal(value)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -301,6 +344,8 @@ class CrossCheckOutcome:
     description: str
     expression: str
     passed: bool
+    #: 本条引用的取数键（与 ``CrossCheckResult.inputs`` 对应，供界面显示参与比较的数）
+    refs: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -320,6 +365,9 @@ class CrossCheckResult:
     outcomes: list[CrossCheckOutcome]
     last_computed_at: Optional[datetime] = None
     hints: list[HintItem] = field(default_factory=list)
+    #: 内置勾稽的取数结果（引用键 → 金额）：logic_check 不通过时 Issue 不带左右值，
+    #: 界面靠它显示每条参与比较的数（spec citar-report-analysis R3）
+    inputs: dict[str, Decimal] = field(default_factory=dict)
 
     @property
     def executed_count(self) -> int:
@@ -367,6 +415,7 @@ async def run_cross_checks(
                 description=formula.issue_description or "",
                 expression=formula.expression,
                 passed=passed,
+                refs=list(_SEED_REFS.get(formula.id, ())),
             )
         )
         if result.last_computed_at is not None:
@@ -377,6 +426,7 @@ async def run_cross_checks(
         outcomes=outcomes,
         last_computed_at=last_computed_at,
         hints=hints,
+        inputs=dict(row_cache),
     )
 
 
@@ -519,7 +569,12 @@ async def execute_report_cross_checks(
         db, project_id=project_id, year=year,
         report_type=FinancialReportType.income_statement,
     )
-    row_cache = build_report_row_cache(bs_rows, is_rows)
+    eq_rows = await _fetch_report_rows(
+        db, project_id=project_id, year=year,
+        report_type=FinancialReportType.equity_statement,
+    )
+    # 权益变动表此前从未传入 ⇒ #5「变动表年末 = 资产负债表权益」恒拿 0 比
+    row_cache = build_report_row_cache(bs_rows, is_rows, eq_rows)
     result = await run_cross_checks(
         row_cache, db=db, project_id=str(project_id), resolve_refs=True
     )

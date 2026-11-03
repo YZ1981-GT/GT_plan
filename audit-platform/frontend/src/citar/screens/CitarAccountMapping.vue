@@ -2,12 +2,30 @@
   <div class="aud-screen">
     <header class="aud-header">
       <h1 class="aud-header__title">底稿映射</h1>
-      <span class="aud-header__note">客户科目 → 标准科目：试算平衡表、审定报表与底稿取数都按标准科目汇总</span>
+      <span class="aud-header__note">{{ TAB_NOTES[tab] }}</span>
     </header>
+
+    <nav class="aud-tabs">
+      <button
+        v-for="t in TABS"
+        :key="t.key"
+        class="aud-tab"
+        :class="{ 'aud-tab--active': tab === t.key }"
+        type="button"
+        @click="tab = t.key"
+      >
+        {{ t.label }}
+        <span v-if="t.key === 'standard' && unmapped.length" class="citar-map__badge">{{ unmapped.length }}</span>
+      </button>
+    </nav>
 
     <section class="aud-panel">
       <p v-if="!year" class="sheet-empty">{{ yearLoading ? '正在读取项目信息…' : '项目未设置审核年度，请先在项目信息里填写' }}</p>
-      <template v-else>
+      <!-- 两个页签都用 v-show：切换不重新读取，第二个页签里未保存的输入也保留 -->
+      <div v-if="year" v-show="tab === 'workpaper'">
+        <CitarWorkpaperMapTab :project-id="projectId" :year="year" :refresh-key="refreshKey" @go-standard="tab = 'standard'" />
+      </div>
+      <div v-if="year" v-show="tab === 'standard'">
         <div class="citar-map__summary">
           <div>
             <span class="citar-map__rate">{{ rate.completion_rate.toLocaleString('zh-CN', { maximumFractionDigits: 1 }) }}%</span>
@@ -88,24 +106,40 @@
         <p v-if="loading" class="sheet-empty">正在读取映射…</p>
         <p v-else-if="error" class="sheet-empty">{{ error }}</p>
         <p v-else-if="!mappings.length" class="sheet-empty">还没有映射。导入账套后会自动匹配一次，也可点「自动匹配」。</p>
-      </template>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * 底稿映射（客户科目 → 标准科目），接平台 /mapping 端点。
- * 映射保存后后端发 MAPPING_CHANGED，试算表按新映射重算（平台既有链路）。
+ * 底稿映射，两个页签（spec citar-account-workpaper-map）：
+ * - 科目 → 底稿（默认）：客户科目进入哪些税审底稿，按取数规则推算、只读（CitarWorkpaperMapTab）；
+ * - 客户科目 → 标准科目：接平台 /mapping 端点；映射保存后后端发 MAPPING_CHANGED，试算表按新映射重算（平台既有链路），
+ *   第一个页签随之重新读取。
  */
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { accountChart as P_chart, accountMapping as P_map } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import CitarWorkpaperMapTab from '../components/CitarWorkpaperMapTab.vue'
 import { fmtMoney, useCitarProject } from '../useCitarProject'
 
 defineOptions({ name: 'CitarAccountMapping' })
+
+type TabKey = 'workpaper' | 'standard'
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'workpaper', label: '科目 → 底稿' },
+  { key: 'standard', label: '客户科目 → 标准科目' },
+]
+const TAB_NOTES: Record<TabKey, string> = {
+  workpaper: '客户科目进入哪些税审底稿：按税审底稿取数规则推算',
+  standard: '客户科目 → 标准科目：试算平衡表、审定报表与底稿取数都按标准科目汇总',
+}
+const tab = ref<TabKey>('workpaper')
+/** 标准科目映射改动后 +1，「科目 → 底稿」重新读取 */
+const refreshKey = ref(0)
 
 interface MappingRow {
   id: string
@@ -202,6 +236,7 @@ async function run(action: () => Promise<unknown>, context: string, done: string
   try {
     const message = await action()
     ElMessage.success(typeof message === 'string' ? message : done)
+    refreshKey.value += 1
     await load()
   } catch (e) {
     handleApiError(e, context)
@@ -296,6 +331,20 @@ watch(
 }
 
 .citar-map__warn {
+  color: var(--citar-c-8a5300);
+}
+
+/* 页签上的「有余额未映射」数 */
+.citar-map__badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--citar-c-fdf0dc);
+  font-size: var(--citar-fs-12);
+  font-weight: 400;
+  line-height: 18px;
   color: var(--citar-c-8a5300);
 }
 

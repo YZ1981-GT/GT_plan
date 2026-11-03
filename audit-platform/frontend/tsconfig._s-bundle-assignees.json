@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/components/workpaper/composables/useBundleAssigneeLabels.ts",
+    "src/components/workpaper/composables/useS34BundleState.ts",
+    "src/components/workpaper/composables/useS35BundleState.ts",
+    "src/components/workpaper/s32-fraud-bundle/useS32BundleState.ts",
+    "src/components/workpaper/s33-ann14-bundle/useS33BundleState.ts",
+    "src/components/workpaper/s32-fraud-bundle/GtS32Bundle.vue",
+    "src/components/workpaper/s33-ann14-bundle/GtS33Bundle.vue",
+    "src/components/workpaper/s34-ipo-bundle/GtS34Bundle.vue",
+    "src/components/workpaper/s35-refinance-bundle/GtS35Bundle.vue",
+    "src/components/workpaper/__tests__/SBundleAssigneeLabels.spec.ts",
+    "src/env.d.ts"
+  ]
+}

@@ -4,6 +4,7 @@
 - PUT  /api/projects/{project_id}/tax-workpapers/params?year=           保存表头参数
 - GET  /api/projects/{project_id}/tax-workpapers/sheets/{code}?year=    取数 + 公式计算后的本表值
 - PUT  /api/projects/{project_id}/tax-workpapers/sheets/{code}?year=    保存手工值，返回重算结果
+- GET  /api/projects/{project_id}/tax-workpapers/account-map?year=      客户科目 → 取数用到它的税审底稿（底稿映射页）
 
 读只读权限、写编辑权限；保存带版本号，冲突 409。
 """
@@ -56,6 +57,16 @@ async def put_params(
     await svc.save_params(db, project_id, year, body.version, body.values, current_user.id)
     await db.commit()
     return await svc.get_params(db, project_id, year)
+
+
+@router.get("/account-map")
+async def get_account_map(
+    project_id: UUID,
+    year: int = Query(..., ge=1990, le=2100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    return await svc.account_workpaper_map(db, project_id, year)
 
 
 @router.get("/sheets/{code}")

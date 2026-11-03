@@ -55,7 +55,9 @@ export interface WpIndexItem {
   audit_cycle: string | null
   status: string | null
   assigned_to: string | null
+  assignee_name?: string | null
   reviewer: string | null
+  reviewer_name?: string | null
 }
 
 export interface WorkpaperDetail {

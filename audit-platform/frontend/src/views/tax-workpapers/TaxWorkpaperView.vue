@@ -1,5 +1,5 @@
 <template>
-  <div class="tw-view">
+  <div class="tw-view tw-tokens">
     <TaxWorkpaperCatalog
       v-if="catalogOpen"
       :active-code="activeCode"
@@ -51,7 +51,7 @@ import TaxWorkpaperCatalog from './TaxWorkpaperCatalog.vue'
 import TaxWorkpaperIndexPanel from './TaxWorkpaperIndexPanel.vue'
 import TaxWorkpaperParamsPanel from './TaxWorkpaperParamsPanel.vue'
 import TaxWorkpaperSheetPanel from './TaxWorkpaperSheetPanel.vue'
-import { TAX_INDEX_CODE, findTaxWorkpaperSheet } from './taxWorkpaperIndex'
+import { TAX_INDEX_CODE, loadActiveTaxSheet, saveActiveTaxSheet } from './taxWorkpaperIndex'
 import {
   loadHideAbsent,
   loadMarks,
@@ -63,8 +63,6 @@ import {
 } from './taxWorkpaperMarks'
 
 defineOptions({ name: 'TaxWorkpaperView' })
-
-const ACTIVE_PREFIX = 'gt.tax-workpaper-active.'
 
 // 年度：路由 ?year= 优先，否则项目审核年度（读完之前不渲染取数页，避免误报「未设置年度」）
 const { projectId, year, yearLoading } = useCitarProject()
@@ -78,23 +76,13 @@ const contentRef = ref<HTMLElement | null>(null)
 /** 目录栏开合：CITAR 框架点「税务底稿」时切换；不在该框架下（inject 不到）时常开 */
 const catalogOpen = inject(CITAR_SUBNAV_OPEN_KEY, ref(true))
 
-function loadActiveCode(pid: string): string {
-  try {
-    const saved = sessionStorage.getItem(ACTIVE_PREFIX + pid)
-    if (saved && (saved === TAX_INDEX_CODE || findTaxWorkpaperSheet(saved))) return saved
-  } catch {
-    // sessionStorage 不可用时回到索引页
-  }
-  return TAX_INDEX_CODE
-}
-
 // 切项目时重读该项目的标记与上次打开的表
 watch(
   projectId,
   (pid) => {
     marks.value = loadMarks(pid)
     hideAbsent.value = loadHideAbsent(pid)
-    activeCode.value = loadActiveCode(pid)
+    activeCode.value = loadActiveTaxSheet(pid)
   },
   { immediate: true },
 )
@@ -118,11 +106,7 @@ async function openSheet(code: string) {
     }
   }
   activeCode.value = code
-  try {
-    sessionStorage.setItem(ACTIVE_PREFIX + projectId.value, code)
-  } catch {
-    // 记不住上次的表不影响使用
-  }
+  saveActiveTaxSheet(projectId.value, code)
   await nextTick()
   // 整页滚动由外层容器负责，换表后回到内容区顶部
   contentRef.value?.scrollIntoView({ block: 'start' })
@@ -156,43 +140,11 @@ function toggleHide() {
 }
 </script>
 
-<style scoped>
-/*
- * 配色照 CITAR 白紫（#6e0ba6 一系）。stylelint 禁止 color/background 直接写十六进制，
- * 统一在根上定义 --tw-* 变量，子组件只用 var()（自定义属性会继承进子组件）。
- */
-.tw-view {
-  --tw-accent: #6e0ba6;
-  --tw-accent-light: #8b3fd0;
-  --tw-accent-deep: #4c1273;
-  --tw-accent-soft: #f3edfa;
-  --tw-accent-hover: #f7f1fe;
-  --tw-on-accent: #ffffff;
-  --tw-header-gradient: linear-gradient(90deg, #5b1a8c 0%, #8b3fd0 100%);
-  --tw-subnav-bg: #fbf9fe;
-  --tw-th-bg: #f1e7fb;
-  --tw-page-bg: #f5f6fa;
-  --tw-surface: #ffffff;
-  --tw-input-bg: #fdfcff;
-  --tw-line: #e8e8ec;
-  --tw-line-soft: #f0eaf8;
-  --tw-line-strong: #d9d9e0;
-  --tw-line-accent: #e4d8f3;
-  --tw-line-accent-strong: #d9c4ee;
-  --tw-text: #3c3c48;
-  --tw-text-muted: #6b6b76;
-  --tw-text-faint: #a79bb5;
-  --tw-text-hint: #8a6aa8;
-  --tw-mark-present: #1a7f37;
-  --tw-mark-absent: #c0392b;
-  /* 单元格来源：公式 / 按规则取数 / 待确认 / 需人工填写 / 手工修改 / 取不到 */
-  --tw-formula-bg: #f7f7fa;
-  --tw-rule-auto-bg: #eef6ff;
-  --tw-rule-confirm-bg: #fff4e0;
-  --tw-rule-manual-bg: #f2f2f2;
-  --tw-manual-bg: #fbf3ff;
-  --tw-issue-mark: #e6a23c;
+<!-- 配色变量（--tw-*）与汇算申报表页共用 -->
+<style scoped src="./taxWorkpaperTokens.css"></style>
 
+<style scoped>
+.tw-view {
   /* 在 CITAR 框架内容区里铺满（内容区为 flex 容器，见 CitarLayout .citar-content--flush） */
   display: flex;
   flex: 1 1 auto;
@@ -208,6 +160,6 @@ function toggleHide() {
 }
 
 .tw-view__params {
-  max-width: 1180px;
+  min-width: 0;
 }
 </style>

@@ -1,0 +1,51 @@
+{
+  "code": "A102020",
+  "parts": [
+    {
+      "source": "A102020",
+      "rows": [
+        [{"text":"A102020                           金融企业支出明细表","kind":"title","colSpan":3}],
+        [{"text":"行次","kind":"header"},{"text":"项目","kind":"header"},{"text":"金额","kind":"header"}],
+        [{"text":"1"},{"text":"一、营业支出（2+15+25+31+32）"},{"kind":"number","ref":"C3","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"（一）银行业务支出（3+11）"},{"kind":"number","ref":"C4","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"1.银行利息支出（4+5+6+7+8+9+10）"},{"kind":"number","ref":"C5","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"（1）同业存放"},{"kind":"number","ref":"C6","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"（2）向中央银行借款"},{"kind":"number","ref":"C7","role":"f","fmt":"money"}],
+        [{"text":"6"},{"text":"（3）拆入资金"},{"kind":"number","ref":"C8","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"（4）吸收存款"},{"kind":"number","ref":"C9","role":"f","fmt":"money"}],
+        [{"text":"8"},{"text":"（5）卖出回购金融资产"},{"kind":"number","ref":"C10","role":"f","fmt":"money"}],
+        [{"text":"9"},{"text":"（6）发行债券"},{"kind":"number","ref":"C11","role":"f","fmt":"money"}],
+        [{"text":"10"},{"text":"（7）其他"},{"kind":"number","ref":"C12","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"2.银行手续费及佣金支出（12+13+14）"},{"kind":"number","ref":"C13","role":"f","fmt":"money"}],
+        [{"text":"12"},{"text":"（1）手续费支出"},{"kind":"number","ref":"C14","role":"f","fmt":"money"}],
+        [{"text":"13"},{"text":"（2）佣金支出"},{"kind":"number","ref":"C15","role":"f","fmt":"money"}],
+        [{"text":"14"},{"text":"（3）其他"},{"kind":"number","ref":"C16","role":"f","fmt":"money"}],
+        [{"text":"15"},{"text":"（二）保险业务支出（16+17-18+19-20+21+22-23+24）"},{"kind":"number","ref":"C17","role":"f","fmt":"money"}],
+        [{"text":"16"},{"text":"1.退保金"},{"kind":"number","ref":"C18","role":"f","fmt":"money"}],
+        [{"text":"17"},{"text":"2.赔付支出"},{"kind":"number","ref":"C19","role":"f","fmt":"money"}],
+        [{"text":"18"},{"text":"减：摊回赔付支出"},{"kind":"number","ref":"C20","role":"f","fmt":"money"}],
+        [{"text":"19"},{"text":"3.提取保险责任准备金"},{"kind":"number","ref":"C21","role":"f","fmt":"money"}],
+        [{"text":"20"},{"text":"减：摊回保险责任准备金"},{"kind":"number","ref":"C22","role":"f","fmt":"money"}],
+        [{"text":"21"},{"text":"4.保单红利支出"},{"kind":"number","ref":"C23","role":"f","fmt":"money"}],
+        [{"text":"22"},{"text":"5.分保费用"},{"kind":"number","ref":"C24","role":"f","fmt":"money"}],
+        [{"text":"23"},{"text":"减：摊回分保费用"},{"kind":"number","ref":"C25","role":"f","fmt":"money"}],
+        [{"text":"24"},{"text":"6.保险业务手续费及佣金支出"},{"kind":"number","ref":"C26","role":"f","fmt":"money"}],
+        [{"text":"25"},{"text":"（三）证券业务支出（26+30）"},{"kind":"number","ref":"C27","role":"f","fmt":"money"}],
+        [{"text":"26"},{"text":"1.证券业务手续费及佣金支出（27+28+29）"},{"kind":"number","ref":"C28","role":"f","fmt":"money"}],
+        [{"text":"27"},{"text":"（1）证券经纪业务手续费支出"},{"kind":"number","ref":"C29","role":"f","fmt":"money"}],
+        [{"text":"28"},{"text":"（2）佣金支出"},{"kind":"number","ref":"C30","role":"f","fmt":"money"}],
+        [{"text":"29"},{"text":"（3）其他"},{"kind":"number","ref":"C31","role":"f","fmt":"money"}],
+        [{"text":"30"},{"text":"2.其他证券业务支出"},{"kind":"number","ref":"C32","role":"f","fmt":"money"}],
+        [{"text":"31"},{"text":"（四）其他金融业务支出"},{"kind":"number","ref":"C33","role":"f","fmt":"money"}],
+        [{"text":"32"},{"text":"（五）其他业务成本"},{"kind":"number","ref":"C34","role":"f","fmt":"money"}],
+        [{"text":"33"},{"text":"二、营业外支出（34+35+36+37+38+39）"},{"kind":"number","ref":"C35","role":"f","fmt":"money"}],
+        [{"text":"34"},{"text":"（一）非流动资产处置损失"},{"kind":"number","ref":"C36","role":"f","fmt":"money"}],
+        [{"text":"35"},{"text":"（二）非货币性资产交换损失"},{"kind":"number","ref":"C37","role":"f","fmt":"money"}],
+        [{"text":"36"},{"text":"（三）债务重组损失"},{"kind":"number","ref":"C38","role":"f","fmt":"money"}],
+        [{"text":"37"},{"text":"（四）捐赠支出"},{"kind":"number","ref":"C39","role":"f","fmt":"money"}],
+        [{"text":"38"},{"text":"（五）非常损失"},{"kind":"number","ref":"C40","role":"f","fmt":"money"}],
+        [{"text":"39"},{"text":"（六）其他"},{"kind":"number","ref":"C41","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

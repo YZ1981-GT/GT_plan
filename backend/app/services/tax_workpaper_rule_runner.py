@@ -7,11 +7,17 @@ op（见 spec design §3）：
   行数不够时超出部分并入最后一行（「其他（共 N 个科目）」）
 - others_sum：``path`` 下排除 ``exclude`` 名称后的合计
 status：auto 照取 / confirm 照取但标待确认 / manual 不取数（需人工判断）
+
+底稿映射页「科目 → 税审底稿」据此反查（与取数同一套执行代码）：
+- ``RuleResult.nodes``：本格实际用到的客户科目节点；manual / 取不到 / 空行为空。
+- ``RuleResult.scope``：取不到（有 ``issue``）时，规则一级科目对应的客户科目 —— 规则指向它、但没取到数
+  （如「主营业务成本」下没有「销售商品」明细）；一级科目口径与取数相同（``AccountBook.tops``：只认标准科目映射，
+  标准表没有的名称只认客户一级科目全等 / 同义）；一级科目都找不到、manual、空行为空。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable
 
@@ -24,6 +30,8 @@ class RuleResult:
     status: str
     rule: str
     issue: str | None = None
+    nodes: list[Node] = field(default_factory=list)
+    scope: list[Node] = field(default_factory=list)
 
 
 @dataclass
@@ -114,6 +122,14 @@ class RuleRunner:
 
     # ── 单格 ──
     def run(self, item: dict) -> RuleResult:
+        res = self._run(item)
+        if res.issue and not res.nodes and res.status != "manual" and not self.book.empty:
+            path = item.get("path") or (self.lists[item["list"]]["path"] if item.get("list") else None)
+            if path:
+                res.scope = self.book.tops(path[0])
+        return res
+
+    def _run(self, item: dict) -> RuleResult:
         status, rule = item["status"], item["rule"]
         if status == "manual":
             return RuleResult(None, status, rule, "需人工判断后填写")
@@ -123,8 +139,9 @@ class RuleRunner:
         if op == "list_name":
             entries, issue = self.entries(item["list"])
             i = item["index"]
-            name = entries[i].name if i < len(entries) else None
-            return RuleResult(name, status, rule, issue if i == 0 else None)
+            if i >= len(entries):
+                return RuleResult(None, status, rule, issue if i == 0 else None)
+            return RuleResult(entries[i].name, status, rule, issue if i == 0 else None, list(entries[i].nodes))
         if op == "list_amount":
             return self._list_amount(item)
         if op == "others_sum":
@@ -141,9 +158,10 @@ class RuleRunner:
         if op == "month":
             value = self.book.month(nodes, item["measure"], item["month"])
             if value is None:
-                return RuleResult(None, status, rule, "本年度尚未导入序时账")
-            return RuleResult(value, status, rule)
-        return RuleResult(self.book.measure(nodes, item["measure"]), status, rule)
+                # 科目已找到、只是没读序时账：节点照带（底稿映射页不读序时账也能反查）
+                return RuleResult(None, status, rule, "本年度尚未导入序时账", nodes)
+            return RuleResult(value, status, rule, None, nodes)
+        return RuleResult(self.book.measure(nodes, item["measure"]), status, rule, None, nodes)
 
     def _list_amount(self, item: dict) -> RuleResult:
         status, rule = item["status"], item["rule"]
@@ -160,13 +178,13 @@ class RuleRunner:
             hits = self.book.match([d for b in base for d in self.book.descendants(b)], override)
             if not hits:
                 return RuleResult(None, status, rule, f"未找到明细科目「{override}」")
-            return RuleResult(self.book.measure(hits, item["measure"]), status, rule)
+            return RuleResult(self.book.measure(hits, item["measure"]), status, rule, None, hits)
         if i >= len(entries):
             return RuleResult(None, status, rule, None)
         nodes = self._amount_nodes(entries[i], base)
         if not nodes:
             return RuleResult(None, status, rule, f"「{'-'.join(item.get('path') or list_spec['path'])}」下未找到与「{entries[i].name}」对应的明细")
-        return RuleResult(self.book.measure(nodes, item["measure"]), status, rule)
+        return RuleResult(self.book.measure(nodes, item["measure"]), status, rule, None, nodes)
 
     def _others_sum(self, item: dict) -> RuleResult:
         status, rule = item["status"], item["rule"]
@@ -176,4 +194,4 @@ class RuleRunner:
         kids = [k for n in base for k in self.book.kids(n)]
         excluded = {k.code for name in item["exclude"] for k in self._strict(kids, name)}
         rest = [k for k in kids if k.code not in excluded]
-        return RuleResult(self.book.measure(rest, item["measure"]), status, rule)
+        return RuleResult(self.book.measure(rest, item["measure"]), status, rule, None, rest)

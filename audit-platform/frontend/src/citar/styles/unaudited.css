@@ -6,8 +6,9 @@
  * 报表三张带完整行次与会计数字格式,数据列留空。
  */
 
+/* 与 CITAR 原样不同：去掉 max-width: 1180px，随内容区宽度自适应（用户 2026-11-03） */
 .unaudited-screen {
-  max-width: 1180px;
+  min-width: 0;
 }
 
 .unaudited-header {

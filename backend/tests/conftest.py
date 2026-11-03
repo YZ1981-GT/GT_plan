@@ -313,6 +313,27 @@ _SINGLETON_SHADOW_TARGETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 @pytest.fixture(autouse=True)
+def _isolated_import_queue_redis(monkeypatch):
+    """导入队列锁一律用本用例独享的 fakeredis，不连 ``.env`` 里的真 Redis。
+
+    ``ImportQueueService._get_redis`` 直接调 ``app.core.redis.get_redis``（不经 FastAPI 依赖注入，
+    ``dependency_overrides[get_redis]`` 管不到）。原来测试里 ``acquire_lock`` 写进真 Redis 的
+    ``import_lock:active_set`` 成员从不移除，跑几次就占满并发上限 3 ⇒ 本机真实导入恒「系统繁忙」
+    （2026-11-03 真库残留 3 个随机项目 id，spec mapping-code-collision-and-fetch-by-mapping 第二批）。
+    用例里自己 ``patch.object(ImportQueueService, "_get_redis", ...)`` 的照常覆盖本替身。
+    """
+    from app.services.import_queue_service import ImportQueueService
+
+    fake = fakeredis.aioredis.FakeRedis(server=fakeredis.FakeServer(), decode_responses=True)
+
+    async def _fake_get_redis():
+        return fake
+
+    monkeypatch.setattr(ImportQueueService, "_get_redis", staticmethod(_fake_get_redis))
+    yield fake
+
+
+@pytest.fixture(autouse=True)
 def _drop_singleton_method_shadows():
     """测试结束后清掉单例上的实例级方法覆盖（详见上方注释）。"""
     yield

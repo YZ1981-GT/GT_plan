@@ -6,8 +6,9 @@
  * 不用表格:多借多贷时行合并的跨度随借贷行数变化,视觉上容易错乱。
  */
 
+/* 与 CITAR 原样不同：去掉 max-width: 1040px，随内容区宽度自适应（用户 2026-11-03） */
 .adj-screen {
-  max-width: 1040px;
+  min-width: 0;
 }
 
 .adj-header {

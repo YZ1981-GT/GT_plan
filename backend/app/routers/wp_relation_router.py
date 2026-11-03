@@ -37,8 +37,15 @@ async def list_wp_index(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """底稿索引列表（需项目成员权限）"""
+    """底稿索引列表（需项目成员权限）。
+
+    ``assignee_name`` / ``reviewer_name``：人员档案姓名优先、回退用户名（单一来源
+    ``resolve_user_display_names``）—— 原先只回 id，S32/S33/S34/S35 bundle 的页签负责人无从显示
+    （spec s-cycle-linkage-trimming-and-component-wiring P2.3）。委派粒度不变，这里只做显示名解析。
+    """
     from app.models.workpaper_models import WorkingPaper
+    from app.services.user_display_names import resolve_user_display_names
+
     result = await db.execute(
         sa.select(WpIndex, WorkingPaper.id.label("wp_id"))
         .outerjoin(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
@@ -46,7 +53,7 @@ async def list_wp_index(
         .order_by(WpIndex.wp_code)
     )
     rows = result.all()
-    return [
+    items = [
         {
             "id": str(row.WpIndex.id),
             "wp_id": str(row.wp_id) if row.wp_id else None,
@@ -59,6 +66,13 @@ async def list_wp_index(
         }
         for row in rows
     ]
+    names = await resolve_user_display_names(
+        db, {i["assigned_to"] for i in items} | {i["reviewer"] for i in items},
+    )
+    for item in items:
+        item["assignee_name"] = names.get(item["assigned_to"]) if item["assigned_to"] else None
+        item["reviewer_name"] = names.get(item["reviewer"]) if item["reviewer"] else None
+    return items
 
 
 @router.get("/wp-cross-refs")

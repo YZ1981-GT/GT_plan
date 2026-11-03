@@ -1,0 +1,40 @@
+{
+  "code": "A103000",
+  "parts": [
+    {
+      "source": "A103000",
+      "rows": [
+        [{"text":"A103000      事业单位、民间非营利组织收入、支出明细表","kind":"title","colSpan":3}],
+        [{"text":"行次","kind":"header"},{"text":"项        目","kind":"header"},{"text":"金    额","kind":"header"}],
+        [{"text":"1"},{"text":"一、事业单位收入（2+3+4+5+6+7）"},{"kind":"number","ref":"C3","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"（一）财政补助收入"},{"kind":"number","ref":"C4","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"（二）事业收入"},{"kind":"number","ref":"C5","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"（三）上级补助收入"},{"kind":"number","ref":"C6","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"（四）附属单位上缴收入"},{"kind":"number","ref":"C7","role":"f","fmt":"money"}],
+        [{"text":"6"},{"text":"（五）经营收入"},{"kind":"number","ref":"C8","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"（六）其他收入（8+9）"},{"kind":"number","ref":"C9","role":"f","fmt":"money"}],
+        [{"text":"8"},{"text":"其中：投资收益"},{"kind":"number","ref":"C10","role":"f","fmt":"money"}],
+        [{"text":"9"},{"text":"其他"},{"kind":"number","ref":"C11","role":"f","fmt":"money"}],
+        [{"text":"10"},{"text":"二、民间非营利组织收入(11+12+13+14+15+16+17)"},{"kind":"number","ref":"C12","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"（一）接受捐赠收入"},{"kind":"number","ref":"C13","role":"f","fmt":"money"}],
+        [{"text":"12"},{"text":"（二）会费收入"},{"kind":"number","ref":"C14","role":"f","fmt":"money"}],
+        [{"text":"13"},{"text":"（三）提供劳务收入"},{"kind":"number","ref":"C15","role":"f","fmt":"money"}],
+        [{"text":"14"},{"text":"（四）商品销售收入"},{"kind":"number","ref":"C16","role":"f","fmt":"money"}],
+        [{"text":"15"},{"text":"（五）政府补助收入"},{"kind":"number","ref":"C17","role":"f","fmt":"money"}],
+        [{"text":"16"},{"text":"（六）投资收益"},{"kind":"number","ref":"C18","role":"f","fmt":"money"}],
+        [{"text":"17"},{"text":"（七）其他收入"},{"kind":"number","ref":"C19","role":"f","fmt":"money"}],
+        [{"text":"18"},{"text":"三、事业单位支出（19+20+21+22+23）"},{"kind":"number","ref":"C20","role":"f","fmt":"money"}],
+        [{"text":"19"},{"text":"（一）事业支出"},{"kind":"number","ref":"C21","role":"f","fmt":"money"}],
+        [{"text":"20"},{"text":"（二）上缴上级支出"},{"kind":"number","ref":"C22","role":"f","fmt":"money"}],
+        [{"text":"21"},{"text":"（三）对附属单位补助"},{"kind":"number","ref":"C23","role":"f","fmt":"money"}],
+        [{"text":"22"},{"text":"（四）经营支出"},{"kind":"number","ref":"C24","role":"f","fmt":"money"}],
+        [{"text":"23"},{"text":"（五）其他支出"},{"kind":"number","ref":"C25","role":"f","fmt":"money"}],
+        [{"text":"24"},{"text":"四、民间非营利组织支出（25+26+27+28）"},{"kind":"number","ref":"C26","role":"f","fmt":"money"}],
+        [{"text":"25"},{"text":"（一）业务活动成本"},{"kind":"number","ref":"C27","role":"f","fmt":"money"}],
+        [{"text":"26"},{"text":"（二）管理费用"},{"kind":"number","ref":"C28","role":"f","fmt":"money"}],
+        [{"text":"27"},{"text":"（三）筹资费用"},{"kind":"number","ref":"C29","role":"f","fmt":"money"}],
+        [{"text":"28"},{"text":"（四）其他费用"},{"kind":"number","ref":"C30","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

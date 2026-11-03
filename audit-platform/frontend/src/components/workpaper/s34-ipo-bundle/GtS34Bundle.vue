@@ -43,6 +43,7 @@ const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
 
 const {
+  tabLabel,
   wpIdMap,
   checklist,
   applicableCodes,
@@ -277,7 +278,7 @@ onMounted(async () => {
         <el-tab-pane
           v-for="tab in visibleTabs"
           :key="tab.id"
-          :label="tab.label"
+          :label="tabLabel(tab.label, tab.wpCode)"
           :name="tab.id"
           lazy
         >

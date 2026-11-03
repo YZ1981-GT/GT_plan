@@ -87,8 +87,11 @@ def _cell_ref(row: int, col: int) -> str:
     return f"{get_column_letter(col)}{row}"
 
 
-def build_model(wb_fx, wb_val, codes: dict[str, list[str]], code_key) -> tuple[dict, ParsedRules]:
-    """返回 (模型 dict, 解析后的规则)。``codes``：编号 → [sheet 名]。"""
+def build_model(
+    wb_fx, wb_val, codes: dict[str, list[str]], code_key,
+    extra_formulas: dict[tuple[str, str], str] | None = None,
+) -> tuple[dict, ParsedRules]:
+    """返回 (模型 dict, 解析后的规则)。``codes``：编号 → [sheet 名]；``extra_formulas``：(sheet, 格) → 替换样表原值的公式。"""
     code_sheets = [s for names in codes.values() for s in names]
     bounds = {s: print_bounds(wb_fx[s]) for s in code_sheets}
 
@@ -119,6 +122,7 @@ def build_model(wb_fx, wb_val, codes: dict[str, list[str]], code_key) -> tuple[d
     rules = RuleParser(cell_text, column_texts, resolve_sheet).parse_all(collect_raw_rules(wb_fx, code_sheets))
     rule_keys = {(i["sheet"], i["ref"]) for i in rules.items}
     injected = {(s, ref): f for s, ref, f in rules.formulas}
+    injected.update(extra_formulas or {})
 
     # 种子：编号 sheet 打印区内全部非空格 + 取数目标格 + 注入公式
     cells: dict[str, dict[str, object]] = {}

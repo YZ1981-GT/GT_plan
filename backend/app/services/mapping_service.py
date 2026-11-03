@@ -32,7 +32,19 @@ from app.services.event_bus import event_bus
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.dataset_query import get_active_filter
 from app.services.dataset_service import DatasetService
+from app.services.account_name_compat import current_noncurrent_conflict, reliable_level1_name
 from app.services.legacy_pl_crosswalk import crosswalk_target, detect_legacy_pl_crosswalk
+from app.services.mapping_level1_match import (
+    NO_MATCH,
+    UNRELIABLE_PARENT_METHODS,
+    client_level1_context,
+    code_and_level1_step,
+    is_level1 as _is_level1,
+    level1_code as _client_level1_code,
+    mapping_type_for,
+    std_name_index as _std_name_index,
+    strip_dot_zero as _strip_dot_zero,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -189,10 +201,34 @@ async def auto_suggest(
     if detected:
         logger.info("auto_suggest: project=%s 损益科目按 %s 对照新准则映射", project_id, detected[0])
 
-    suggestions: list[MappingSuggestion] = []
+    # 先配一级科目，再配明细（明细跟随一级科目、按一级科目名校验编码撞号）
+    std_index = _std_name_index(standard_accounts)
+    level1_rows, level1_ctx = client_level1_context(list(client_accounts), std_index)
+    by_code: dict[str, MappingSuggestion | None] = {}
+    for code, client in level1_rows.items():
+        by_code[code] = _match_single(
+            client, std_by_code, std_by_name, standard_accounts, pl_crosswalk,
+            level1_name=level1_ctx[id(client)][0], std_index=std_index,
+        )
 
+    suggestions: list[MappingSuggestion] = []
     for client in client_accounts:
-        suggestion = _match_single(client, std_by_code, std_by_name, standard_accounts, pl_crosswalk)
+        code = _strip_dot_zero(client.account_code)
+        l1 = _client_level1_code(client.account_code)
+        if code == l1 and level1_rows.get(code) is client:
+            suggestion = by_code[code]
+        else:
+            l1_name, has_row = level1_ctx[id(client)]
+            parent = by_code.get(l1)
+            if parent is not None and parent.match_method in UNRELIABLE_PARENT_METHODS:
+                parent = None  # 一级科目只是模糊认出来的：明细不跟随，按自己的名称 / 编码匹配
+            suggestion = _match_single(
+                client, std_by_code, std_by_name, standard_accounts, pl_crosswalk,
+                level1_name=l1_name,
+                parent_suggestion=parent,
+                has_level1_row=has_row and by_code.get(l1) is None,
+                std_index=std_index,
+            )
         if suggestion:
             suggestions.append(suggestion)
 
@@ -422,21 +458,22 @@ async def auto_match(
             AccountMapping.is_deleted == False,  # noqa: E712
         )
     )
-    existing_codes = {row[0] for row in existing_result.all()}
+    # 按剥「.0」后的编码比较：旧导入的「1133.0」与新导入的「1133」是同一科目，不再插第二条
+    existing_codes = {_strip_dot_zero(row[0]) for row in existing_result.all()}
 
     saved = 0
     skipped = 0
     details: list[MappingSuggestion] = []
 
     for s in suggestions:
-        if s.original_account_code in existing_codes:
+        if _strip_dot_zero(s.original_account_code) in existing_codes:
             skipped += 1
             # Still include in details for display
             details.append(s)
             continue
 
         # Save mapping
-        mapping_type = MappingType.auto_exact if s.confidence >= 0.92 else MappingType.auto_fuzzy
+        mapping_type = mapping_type_for(s.confidence)
         record = AccountMapping(
             project_id=project_id,
             original_account_code=s.original_account_code,
@@ -543,13 +580,25 @@ def _match_single(
     std_by_name: dict[str, AccountChart],
     standard_accounts: list[AccountChart],
     pl_crosswalk: dict[str, str] | None = None,
+    *,
+    level1_name: str | None = None,
+    parent_suggestion: MappingSuggestion | None = None,
+    has_level1_row: bool = False,
+    std_index: dict[str, AccountChart] | None = None,
 ) -> MappingSuggestion | None:
-    """Try to match a single client account against standard accounts."""
+    """Try to match a single client account against standard accounts.
+
+    编码撞号防护见 ``mapping_level1_match.code_and_level1_step``（spec mapping-code-collision-and-fetch-by-mapping R1）。
+    直接调用（不传 ``level1_name``）时，一级科目自身用自己的名称校验；明细不校验（与原逻辑一致）。
+    """
     code = client.account_code
     name = client.account_name
+    is_level1 = _is_level1(code)
+    if level1_name is None and is_level1:
+        level1_name = reliable_level1_name(name)
     # Normalize: strip all common separators for lookup
-    # "6401.01" / "6401-01" / "6401/01" / "6401_01" / "6401 01" → "640101"
-    normalized = _normalize_account_code(code)
+    # "6401.01" / "6401-01" / "6401/01" / "6401_01" / "6401 01" → "640101"（先剥「.0」：1133.0 → 1133，不当成 11330）
+    normalized = _normalize_account_code(_strip_dot_zero(code))
 
     # 计算 prefix(后续多处用到)
     prefix = normalized[:4] if len(normalized) >= 4 else normalized
@@ -583,44 +632,16 @@ def _match_single(
                 match_method="bad_debt_sub_account",
             )
 
-    # Priority 0: Full code exact match (e.g. "221101" → "221101 工资")
-    if normalized in std_by_code:
-        std = std_by_code[normalized]
-        return MappingSuggestion(
-            original_account_code=code,
-            original_account_name=name,
-            suggested_standard_code=std.account_code,
-            suggested_standard_name=std.account_name,
-            confidence=1.0,
-            match_method="exact_code",
-        )
-
-    # Priority 1a: First-4-digit prefix match (e.g. "640101" → "6401")
-    # 注: prefix 已在上面计算
-
-    if prefix in std_by_code:
-        std = std_by_code[prefix]
-        return MappingSuggestion(
-            original_account_code=code,
-            original_account_name=name,
-            suggested_standard_code=std.account_code,
-            suggested_standard_name=std.account_name,
-            confidence=0.98,
-            match_method="prefix",
-        )
-
-    # Priority 1b: Level-1 code from separator (e.g. "6401.01" → "6401")
-    level1 = _extract_level1_code(code)
-    if level1 != prefix and level1 in std_by_code:
-        std = std_by_code[level1]
-        return MappingSuggestion(
-            original_account_code=code,
-            original_account_name=name,
-            suggested_standard_code=std.account_code,
-            suggested_standard_name=std.account_name,
-            confidence=0.96,
-            match_method="level1_prefix",
-        )
+    # Priority 0 ~ 1c：编码（完整码 → 前 4 位 → 一级码）+ 一级科目名校验（防编码撞号）+ 明细跟随 + 一级科目名 / 同义表
+    step = code_and_level1_step(
+        client, std_by_code, std_index or _std_name_index(standard_accounts),
+        normalized=normalized, prefix=prefix, level1_name=level1_name, is_level1=is_level1,
+        parent_suggestion=parent_suggestion, has_level1_row=has_level1_row,
+    )
+    if step is NO_MATCH:
+        return None
+    if step is not None:
+        return step
 
     # Priority 2: Name exact match
     if name in std_by_name:
@@ -652,6 +673,8 @@ def _match_single(
     best_score = 0.0
     best_std: AccountChart | None = None
     for std in standard_accounts:
+        if current_noncurrent_conflict(name, std.account_name):
+            continue  # 「其他流动资产」与「其他非流动金融资产」字面像、性质相反（ABC餐饮 1302 曾被配到 1519）
         score = _fuzzy_score(name, std.account_name)
         if score > best_score:
             best_score = score
@@ -919,7 +942,7 @@ async def _get_unmapped_with_balance(
             AccountMapping.is_deleted == False,  # noqa: E712
         )
     )
-    mapped_codes = {row[0] for row in mapped_result.all()}
+    mapped_codes = {_strip_dot_zero(row[0]) for row in mapped_result.all()}
 
     # Get client accounts
     client_filters = await _client_account_filters(project_id, db, year)
@@ -929,7 +952,7 @@ async def _get_unmapped_with_balance(
     client_accounts = client_result.scalars().all()
 
     unmapped_codes = [
-        a.account_code for a in client_accounts if a.account_code not in mapped_codes
+        a.account_code for a in client_accounts if _strip_dot_zero(a.account_code) not in mapped_codes
     ]
 
     if not unmapped_codes:

@@ -1,0 +1,33 @@
+{
+  "code": "A107042",
+  "parts": [
+    {
+      "source": "A107042",
+      "rows": [
+        [{"text":"A107042                      软件、集成电路企业优惠情况及明细表","kind":"title","colSpan":6}],
+        [{"text":"税收优惠基本信息","kind":"title","colSpan":6}],
+        [{"text":"选择适用优惠政策","colSpan":2},{"text":"□延续适用原有优惠政策            □适用新出台优惠政策","kind":"title","colSpan":4}],
+        [{"text":"减免方式1","colSpan":2},{"colSpan":2,"ref":"C4","role":"e"},{"text":"获利年度\\开始计算优惠期年度1"},{"ref":"F4","role":"e"}],
+        [{"text":"减免方式2","colSpan":2},{"colSpan":2,"ref":"C5","role":"e"},{"text":"获利年度\\开始计算优惠期年度2"},{"ref":"F5","role":"e"}],
+        [{"text":"税收优惠有关情况情况","kind":"header","colSpan":6}],
+        [{"text":"行次","kind":"header"},{"text":"项       目","kind":"header","colSpan":4},{"text":"数量\\金额","kind":"header"}],
+        [{"text":"1"},{"text":"人员指标","rowSpan":3},{"text":"一、企业本年月平均职工总人数","colSpan":3},{"ref":"F8","role":"f"}],
+        [{"text":"2"},{"text":"其中： 签订劳动合同关系且具有大学专科以上学历的职工人数","colSpan":3},{"ref":"F9","role":"f"}],
+        [{"text":"3"},{"text":"研究开发人员人数","colSpan":3},{"ref":"F10","role":"f"}],
+        [{"text":"4"},{"text":"研发费指标","rowSpan":2},{"text":"二、研究开发费用总额","colSpan":3},{"kind":"number","ref":"F11","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"其中：企业在中国境内发生的研究开发费用金额","colSpan":3},{"kind":"number","ref":"F12","role":"f","fmt":"money"}],
+        [{"text":"6"},{"text":"收入指标","rowSpan":3},{"text":"三、企业收入总额","colSpan":3},{"kind":"number","ref":"F13","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"四、符合条件的销售（营业）收入","colSpan":3},{"kind":"number","ref":"F14","role":"f","fmt":"money"}],
+        [{"text":"8"},{"text":"其中：自主设计、自主开发销售及服务收入","colSpan":3},{"kind":"number","ref":"F15","role":"f","fmt":"money"}],
+        [{"text":"9"},{"text":"知识产权指标","rowSpan":4},{"text":"五、拥有核心关键技术和属于本企业的知识产权总数","colSpan":3},{"kind":"number","ref":"F16","role":"f","fmt":"money"}],
+        [{"text":"10"},{"text":"其中： 发明专利","colSpan":3},{"kind":"number","ref":"F17","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"集成电路布图设计登记","colSpan":3},{"kind":"number","ref":"F18","role":"f","fmt":"money"}],
+        [{"text":"12"},{"text":"计算机 软件著作权","colSpan":3},{"kind":"number","ref":"F19","role":"f","fmt":"money"}],
+        [{"text":"13"},{"text":"业务类型及领域","rowSpan":3},{"text":"是否从事 8 英寸及以下集成电路生产","colSpan":3},{"ref":"F20","role":"f"}],
+        [{"text":"14"},{"text":"是否按照开发、销售嵌入式软件企业条件享受政策","colSpan":3},{"ref":"F21","role":"f"}],
+        [{"text":"15"},{"text":"重点集成电路设计领域和重点软件领域","colSpan":3},{"ref":"F22","role":"f"}],
+        [{"text":"16"},{"text":"减免税金额","colSpan":4},{"kind":"number","ref":"F23","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

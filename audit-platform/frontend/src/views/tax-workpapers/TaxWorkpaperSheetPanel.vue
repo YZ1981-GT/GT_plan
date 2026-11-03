@@ -105,12 +105,11 @@
  * 可填写格点击即改，修改先记草稿，点「保存」一次提交本表全部手工值（带版本号，冲突时提示刷新）。
  */
 import { computed, ref, shallowRef, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { handleApiError } from '@/utils/errorHandler'
 import TaxWorkpaperGrid from './TaxWorkpaperGrid.vue'
 import { findTaxWorkpaperGroup, findTaxWorkpaperSheet } from './taxWorkpaperIndex'
 import { loadTaxWorkpaperSheet, type TaxWorkpaperSheetDefinition } from './taxWorkpaperSheets'
-import { fetchTaxSheet, saveTaxSheet, type TaxInputs, type TaxSheetPartValues, type TaxSheetResult } from './taxWorkpaperApi'
+import { fetchTaxSheet, saveTaxSheet } from './taxWorkpaperApi'
+import { useTaxSheetEditor } from './useTaxSheetEditor'
 
 const props = defineProps<{
   code: string
@@ -128,52 +127,24 @@ const group = computed(() => findTaxWorkpaperGroup(props.code))
 const definition = shallowRef<TaxWorkpaperSheetDefinition>()
 const loadState = ref<'loading' | 'ready' | 'missing' | 'error'>('loading')
 
-/** 后端取数 + 计算结果 */
-const result = shallowRef<TaxSheetResult | null>(null)
-const loadingValues = ref(false)
-const valuesError = ref('')
-/** 未保存的修改：{sheet: {ref: 值}} */
-const drafts = ref<TaxInputs>({})
-const saving = ref(false)
-
-const draftCount = computed(() => Object.values(drafts.value).reduce((n, cells) => n + Object.keys(cells).length, 0))
-const dirty = computed(() => draftCount.value > 0)
-
-const EMPTY_PART: TaxSheetPartValues = { source: '', values: {}, cells: {} }
-function partValues(source: string): TaxSheetPartValues {
-  return result.value?.parts.find(p => p.source === source) ?? EMPTY_PART
-}
-
-let loadSeq = 0
-async function loadValues() {
-  if (!props.year || !props.projectId) {
-    result.value = null
-    valuesError.value = props.year ? '' : '项目未设置审核年度，无法取数'
-    return
-  }
-  const seq = ++loadSeq
-  const code = props.code
-  loadingValues.value = true
-  valuesError.value = ''
-  try {
-    const data = await fetchTaxSheet(props.projectId, props.year, code)
-    if (seq === loadSeq) result.value = data
-  } catch (e: any) {
-    if (seq === loadSeq) {
-      result.value = null
-      valuesError.value = e?.response?.data?.detail || e?.message || '取数失败'
-    }
-  } finally {
-    if (seq === loadSeq) loadingValues.value = false
-  }
-}
+/** 后端取数 + 计算结果、草稿与保存（与汇算申报表共用） */
+const {
+  result, loadingValues, valuesError, drafts, saving, draftCount, dirty,
+  partValues, loadValues, reset, setDraft, save, discard,
+} = useTaxSheetEditor({
+  projectId: () => props.projectId,
+  year: () => props.year,
+  code: () => props.code,
+  fetch: fetchTaxSheet,
+  save: saveTaxSheet,
+  label: '底稿',
+})
 
 watch(
   () => props.code,
   async (code) => {
     definition.value = undefined
-    result.value = null
-    drafts.value = {}
+    reset()
     loadState.value = 'loading'
     try {
       const loaded = await loadTaxWorkpaperSheet(code)
@@ -192,49 +163,6 @@ watch(() => [props.projectId, props.year], () => {
   drafts.value = {}
   if (definition.value) void loadValues()
 })
-
-function setDraft(source: string, refName: string, value: number | string | null) {
-  drafts.value = { ...drafts.value, [source]: { ...(drafts.value[source] ?? {}), [refName]: value } }
-}
-
-/** 已保存的手工值 + 草稿 = 本次要提交的全部手工值 */
-function mergedInputs(): TaxInputs {
-  const out: TaxInputs = {}
-  for (const part of result.value?.parts ?? []) {
-    for (const [refName, meta] of Object.entries(part.cells)) {
-      if (meta.origin !== 'input') continue
-      const v = part.values[refName]
-      out[part.source] ??= {}
-      out[part.source][refName] = !v ? null : 'n' in v ? Number(v.n) : 's' in v ? v.s : null
-    }
-  }
-  for (const [source, cells] of Object.entries(drafts.value)) {
-    out[source] = { ...(out[source] ?? {}), ...cells }
-  }
-  return out
-}
-
-async function save() {
-  if (!props.year || !result.value) return
-  saving.value = true
-  try {
-    result.value = await saveTaxSheet(props.projectId, props.year, props.code, result.value.version, mergedInputs())
-    drafts.value = {}
-    ElMessage.success('已保存')
-  } catch (e: any) {
-    if (e?.response?.status === 409) {
-      ElMessage.warning('底稿已被他人修改，请重新取数后再改')
-    } else {
-      handleApiError(e, '保存底稿')
-    }
-  } finally {
-    saving.value = false
-  }
-}
-
-function discard() {
-  drafts.value = {}
-}
 
 /** 切表统一由父组件处理（有未保存修改时由父组件确认） */
 function openOther(code: string) {

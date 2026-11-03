@@ -1,0 +1,120 @@
+/*
+ * 报表分析菜单新增的少量样式：分段按钮、矩阵表、取数键值、提示色。
+ * 配色与字号沿用 citar-tokens.css（stylelint 卡点：color / background / font-size 不写字面量）。
+ */
+
+.ra-seg {
+  display: inline-flex;
+  border: 1px solid #d8cfe6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ra-seg__btn {
+  padding: 5px 12px;
+  border: none;
+  border-left: 1px solid #d8cfe6;
+  background: var(--citar-c-ffffff);
+  font: inherit;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-5c5c68);
+  cursor: pointer;
+}
+
+.ra-seg__btn:first-child {
+  border-left: none;
+}
+
+.ra-seg__btn:hover:not(:disabled) {
+  color: var(--citar-c-6e0ba6);
+}
+
+.ra-seg__btn--active {
+  background: var(--citar-c-f1e7fb);
+  color: var(--citar-c-4c1273);
+  font-weight: 700;
+}
+
+.ra-seg__btn:disabled {
+  cursor: not-allowed;
+  color: var(--citar-c-b4a8c2);
+}
+
+.ra-select {
+  margin-left: 6px;
+  padding: 4px 8px;
+  border: 1px solid #d8cfe6;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--citar-fs-13);
+  background: var(--citar-c-ffffff);
+}
+
+/* 金额提示：变动率超阈值、比率偏离常见区间、未解释差额 */
+.sheet-table td.ra-alert {
+  color: var(--citar-c-a3262a);
+  font-weight: 700;
+}
+
+.sheet-table td.ra-adjusted {
+  background: var(--citar-c-fffaf2);
+  color: var(--citar-c-8a5300);
+}
+
+.sheet-table th.ra-col-seq {
+  width: 40px;
+}
+
+.sheet-table th.ra-col-status {
+  width: 80px;
+}
+
+/* 跨表核对 / 财务比率里的「名称 金额」 */
+.ra-kv {
+  display: inline-flex;
+  gap: 6px;
+  margin-right: 14px;
+  color: var(--citar-c-6b6b76);
+}
+
+.ra-kv b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--citar-c-1f1f1f);
+}
+
+.ra-note {
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-8a5300);
+  white-space: normal;
+}
+
+.ra-footnote {
+  margin: 10px 0 0;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-9a9aa4);
+}
+
+.citar-notice.ra-notice--ok {
+  border-color: #bfe3d3;
+  background: var(--citar-c-e3f5ee);
+  color: var(--citar-c-0b6e4f);
+}
+
+/* 权益变动表矩阵：项目列固定宽度，横向滚动看各权益项目 */
+.ra-matrix th,
+.ra-matrix td {
+  min-width: 110px;
+}
+
+.ra-matrix .ra-matrix__name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 240px;
+  background: var(--citar-c-ffffff);
+}
+
+.ra-matrix thead .ra-matrix__name {
+  background: var(--citar-c-f7f1fe);
+}

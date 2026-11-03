@@ -420,7 +420,9 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 准则切换两端点补项目级判定（edit / readonly）后降 7。
 #: 2026-10-26 现算 191：spec procedure-chain-followup-closure R2.3 给程序行任务物化两端点（materialize /
 #: materialize-jobs，原先任何登录用户都能给任意项目物化）挂 ``require_project_delegator`` 后降 2。
-_IDENTITY_ONLY_BASELINE = 191
+#: 2026-11-03 现算 183：spec citar-report-analysis 给 wp_report_analysis 6 个报表分析端点改项目级只读
+#: 鉴权后降 6（另 2 个是并发会话此前已补、基线未同步下调）。
+_IDENTITY_ONLY_BASELINE = 183
 
 
 def test_identity_only_endpoints_do_not_grow():

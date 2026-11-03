@@ -17,6 +17,7 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { getWpIndex } from '@/services/workpaperApi'
+import { useBundleAssigneeLabels } from './useBundleAssigneeLabels'
 import { api } from '@/services/apiProxy'
 
 // ─── Types (exported for testability & cross-module reuse) ───
@@ -45,6 +46,8 @@ export interface UseS35BundleStateOptions {
 }
 
 export interface UseS35BundleStateReturn {
+  /** 页签标签附带索引接口解析的负责人显示名。 */
+  tabLabel: (label: string, wpCode?: string) => string
   /** S35-x（含子表）wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
   /** 仅显示 wpIdMap 中有 wp_id 的 Tab */
@@ -188,6 +191,7 @@ export function computeVisibleTabs(
 
 export function useS35BundleState(options: UseS35BundleStateOptions): UseS35BundleStateReturn {
   const { projectId } = options
+  const { setAssignees, tabLabel } = useBundleAssigneeLabels()
 
   const loading = ref(false)
   /** S35-x（含子表）→ wp_id 内部状态 */
@@ -225,14 +229,17 @@ export function useS35BundleState(options: UseS35BundleStateOptions): UseS35Bund
   async function loadWpIndex(): Promise<void> {
     if (!projectId.value) {
       wpIdMapState.value = {}
+      setAssignees([])
       return
     }
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
       wpIdMapState.value = buildS35WpIdMap(items)
+      setAssignees(items)
     } catch {
       wpIdMapState.value = {}
+      setAssignees([])
     } finally {
       loading.value = false
     }
@@ -293,6 +300,7 @@ export function useS35BundleState(options: UseS35BundleStateOptions): UseS35Bund
   }
 
   return {
+    tabLabel,
     wpIdMap,
     visibleTabs,
     completionMap,

@@ -1,0 +1,38 @@
+{
+  "code": "A102010",
+  "parts": [
+    {
+      "source": "A102010",
+      "rows": [
+        [{"text":"A102010","kind":"title"},{"text":"一般企业成本支出明细表","kind":"title"},{}],
+        [{"text":"行次","kind":"header"},{"text":"项目","kind":"header"},{"text":"金额","kind":"header"}],
+        [{"text":"1"},{"text":"一、营业成本（2+9）"},{"kind":"number","ref":"C3","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"（一）主营业务成本（3+5+6+7+8）"},{"kind":"number","ref":"C4","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"1.销售商品成本"},{"kind":"number","ref":"C5","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"其中:非货币性资产交换成本"},{"kind":"number","ref":"C6","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"2.提供劳务成本"},{"kind":"number","ref":"C7","role":"f","fmt":"money"}],
+        [{"text":"6"},{"text":"3.建造合同成本"},{"kind":"number","ref":"C8","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"4.让渡资产使用权成本"},{"kind":"number","ref":"C9","role":"f","fmt":"money"}],
+        [{"text":"8"},{"text":"5.其他"},{"kind":"number","ref":"C10","role":"f","fmt":"money"}],
+        [{"text":"9"},{"text":"（二）其他业务成本（10+12+13+14+15）"},{"kind":"number","ref":"C11","role":"f","fmt":"money"}],
+        [{"text":"10"},{"text":"1.材料销售成本"},{"kind":"number","ref":"C12","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"其中:非货币性资产交换成本"},{"kind":"number","ref":"C13","role":"f","fmt":"money"}],
+        [{"text":"12"},{"text":"2.出租固定资产成本"},{"kind":"number","ref":"C14","role":"f","fmt":"money"}],
+        [{"text":"13"},{"text":"3.出租无形资产成本"},{"kind":"number","ref":"C15","role":"f","fmt":"money"}],
+        [{"text":"14"},{"text":"4.包装物出租成本"},{"kind":"number","ref":"C16","role":"f","fmt":"money"}],
+        [{"text":"15"},{"text":"5.其他"},{"kind":"number","ref":"C17","role":"f","fmt":"money"}],
+        [{"text":"16"},{"text":"二、营业外支出（17+18+19+20+21+22+23+24+25+26）"},{"kind":"number","ref":"C18","role":"f","fmt":"money"}],
+        [{"text":"17"},{"text":"（一）非流动资产处置损失"},{"kind":"number","ref":"C19","role":"f","fmt":"money"}],
+        [{"text":"18"},{"text":"（二）非货币性资产交换损失"},{"kind":"number","ref":"C20","role":"f","fmt":"money"}],
+        [{"text":"19"},{"text":"（三）债务重组损失"},{"kind":"number","ref":"C21","role":"f","fmt":"money"}],
+        [{"text":"20"},{"text":"（四）非常损失"},{"kind":"number","ref":"C22","role":"f","fmt":"money"}],
+        [{"text":"21"},{"text":"（五）捐赠支出"},{"kind":"number","ref":"C23","role":"f","fmt":"money"}],
+        [{"text":"22"},{"text":"（六）赞助支出"},{"kind":"number","ref":"C24","role":"f","fmt":"money"}],
+        [{"text":"23"},{"text":"（七）罚没支出"},{"kind":"number","ref":"C25","role":"f","fmt":"money"}],
+        [{"text":"24"},{"text":"（八）坏账损失"},{"kind":"number","ref":"C26","role":"f","fmt":"money"}],
+        [{"text":"25"},{"text":"（九）无法收回的债券股权投资损失"},{"kind":"number","ref":"C27","role":"f","fmt":"money"}],
+        [{"text":"26"},{"text":"（十）其他"},{"kind":"number","ref":"C28","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

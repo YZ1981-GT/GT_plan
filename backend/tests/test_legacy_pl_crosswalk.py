@@ -141,13 +141,17 @@ async def test_auto_suggest_maps_legacy_pl_to_new_standard(db):
 
 @pytest.mark.asyncio
 async def test_auto_suggest_new_standard_chart_unchanged(db):
-    """新准则账套：5001 生产成本 / 5403 机械作业 不被当成收入 / 税金及附加。"""
+    """新准则账套：5001 生产成本 / 5403 机械作业 不被当成收入 / 税金及附加。
+
+    原断言 ``5001 → 5001``：标准科目表 5001 是「主营业务收入」，按编码认就是把生产成本当收入（同码不同义）。
+    spec mapping-code-collision-and-fetch-by-mapping 后按名称改配 4001 生产成本 / 4403 机械作业。
+    """
     got = await _suggest(db, [
         "1001,库存现金,借", "5001,生产成本,借", "5403,机械作业,借",
         "6001,主营业务收入,贷", "6401,主营业务成本,借",
     ])
-    assert got["5001"].suggested_standard_code == "5001"
-    assert got["5403"].suggested_standard_code != "6403"
+    assert got["5001"].suggested_standard_code == "4001"
+    assert got["5403"].suggested_standard_code == "4403"
     assert got["6001"].suggested_standard_code == "6001"
     assert all(s.match_method != "legacy_pl_crosswalk" for s in got.values())
 

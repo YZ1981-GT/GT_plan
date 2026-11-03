@@ -53,17 +53,31 @@ export const projectsRoutes: RouteRecordRaw[] = [
           component: () => import('@/citar/screens/CitarAdjustment.vue'),
         },
 {
-          // 平台暂无对应功能的三个菜单：CITAR 待开发页
+          // CITAR「报表分析」：旧财务报表页 9 个标签（六张报表 + 跨表核对 / 多年对比 / 分析）+ 变动分析
           path: 'projects/:projectId/report-analysis',
           name: 'CitarReportAnalysis',
-          component: () => import('@/citar/CitarPendingNode.vue'),
-          meta: { citarTitle: '报表分析' },
+          component: () => import('@/citar/screens/CitarReportAnalysis.vue'),
+        },
+{
+          // CITAR「鉴证报告」四个菜单（spec citar-assurance-report-menus）
+          path: 'projects/:projectId/report-body',
+          name: 'CitarReportBody',
+          component: () => import('@/citar/screens/CitarReportBody.vue'),
+        },
+{
+          path: 'projects/:projectId/review-notes',
+          name: 'CitarReviewNotes',
+          component: () => import('@/citar/screens/CitarReviewNotes.vue'),
         },
 {
           path: 'projects/:projectId/tax-return',
           name: 'CitarTaxReturn',
-          component: () => import('@/citar/CitarPendingNode.vue'),
-          meta: { citarTitle: '纳税申报表' },
+          component: () => import('@/views/tax-return/TaxReturnView.vue'),
+        },
+{
+          path: 'projects/:projectId/financial-statements',
+          name: 'CitarFinancialStatements',
+          component: () => import('@/citar/screens/CitarFinancialStatements.vue'),
         },
 {
           path: 'projects/:projectId/materiality',

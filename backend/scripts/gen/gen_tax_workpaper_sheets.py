@@ -44,6 +44,34 @@ MULTI_PART = {
     "1-01": [("1-01报告封面", "报告封面"), ("1-01报告正文", "报告正文")],
 }
 
+# 鉴证报告用到的样表 sheet（spec citar-assurance-report-menus）：不进底稿索引，作为额外编号进计算模型。
+# 汇算申报表：申报表封面、表单 + 表单里列出的全部 A 类表；前端显示结构另放 views/tax-return/。
+TAX_RETURN_DIR = ROOT / "audit-platform" / "frontend" / "src" / "views" / "tax-return"
+TAX_RETURN_SHEETS_DIR = TAX_RETURN_DIR / "sheets"
+TAX_RETURN_INDEX = TAX_RETURN_DIR / "taxReturnIndex.json"
+TAX_RETURN_COVER = ("TR-COVER", "申报表封面")
+TAX_RETURN_FORMS = ("TR-FORMS", "表单")
+FORM_CODE_RE = re.compile(r"^A\d{6}$")
+# 审核说明：规则表 + 页眉页脚 + 格式，只读（不接受保存）
+REVIEW_NOTES_CODES = {
+    "RN-RULES": "审核报告说明",
+    "RN-HEADER": "审核报告说明-页眉页脚",
+    "RN-FORMAT": "审核报告说明-格式",
+}
+# 样表里写死的文字改成取参数的公式：(sheet, 格) → (样表原文开头，用于核对没改错格, 公式)
+PARAMS_REF = "'填写参数（无需打印）'"
+# 样表笔误（逐条登记，原文对不上即失败）：(sheet, 格, 原文片段, 改为, 说明)。
+# 案例 1 底稿（CITRv1.0）J594 的「2024年度」笔误在 10.16 样表里已改正，无需登记。
+TEXT_FIXES: list[tuple[str, str, str, str, str]] = []
+INJECTED_FORMULAS = {
+    ("1-01报告封面", "A8"): ("2025年度", f"={PARAMS_REF}!B10"),
+    ("1-01报告正文", "E3"): ("手动粘贴报告号", f"={PARAMS_REF}!B15"),
+    ("申报表封面", "A6"): (
+        "税款所属期间：",
+        f'="税款所属期间："&LEFT({PARAMS_REF}!B10,4)&"年1月1日至"&LEFT({PARAMS_REF}!B10,4)&"年12月31日"',
+    ),
+}
+
 META_RE = re.compile(r"索引号|金额单位")
 TOTAL_RE = re.compile(r"^(合计|小计|总计)")
 NUMERIC_FMT_RE = re.compile(r"[0#]")
@@ -335,16 +363,36 @@ def build(src: Path) -> tuple[dict[str, str], str, dict]:
             errors.append(f"{code}: 样表中没有 sheet {missing}")
             continue
         codes[code] = sources
+    for sheet, ref, old, new, _why in TEXT_FIXES:
+        cell = wb_fx[sheet][ref] if sheet in wb_fx.sheetnames else None
+        if cell is None or old not in str(cell.value or ""):
+            errors.append(f"{sheet}!{ref} 笔误更正对不上原文「{old}」")
+            continue
+        cell.value = str(cell.value).replace(old, new)
+    tax_return_codes, forms_index = tax_return_sheets(wb_val, errors)
+    for code, sheet in REVIEW_NOTES_CODES.items():
+        if sheet not in wb_val.sheetnames:
+            errors.append(f"{code}: 样表中没有 sheet {sheet}")
+    injected = {}
+    for (sheet, ref), (expect, formula) in INJECTED_FORMULAS.items():
+        actual = wb_fx[sheet][ref].value if sheet in wb_fx.sheetnames else None
+        if not (isinstance(actual, str) and actual.strip().startswith(expect)):
+            errors.append(f"{sheet}!{ref} 样表原文不是「{expect}…」（{actual!r}），不能改成公式")
+        injected[(sheet, ref)] = formula
     if errors:
         raise SystemExit("编号与样表对不上：\n  " + "\n  ".join(errors))
 
-    model, rules = build_model(wb_fx, wb_val, {c: [s for s, _ in v] for c, v in codes.items()}, code_key)
+    model_codes = {c: [s for s, _ in v] for c, v in codes.items()}
+    model_codes.update({c: [s] for c, s in tax_return_codes.items()})
+    model_codes.update({c: [s] for c, s in REVIEW_NOTES_CODES.items()})
+    model, rules = build_model(wb_fx, wb_val, model_codes, code_key, injected)
+    model["groups"] = {"tax_return": list(tax_return_codes), "review_notes": list(REVIEW_NOTES_CODES)}
+    model["readonly_codes"] = list(REVIEW_NOTES_CODES)
     rule_refs: dict[str, dict[str, str]] = {}
     for item in rules.items:
         rule_refs.setdefault(item["sheet"], {})[item["ref"]] = item["op"]
 
-    outputs: dict[str, str] = {}
-    for code, sources in codes.items():
+    def render_code(code: str, sources: list[tuple[str, str | None]]) -> str:
         parts = []
         for sheet_name, title in sources:
             rows = convert_sheet(wb_val[sheet_name], wb_fx[sheet_name], model["sheets"].get(sheet_name), rule_refs.get(sheet_name))
@@ -353,8 +401,49 @@ def build(src: Path) -> tuple[dict[str, str], str, dict]:
             if title:
                 part["title"] = title
             parts.append(part)
-        outputs[file_name(code)] = render_json(code, parts)
+        return render_json(code, parts)
+
+    outputs: dict[Path, str] = {}
+    for code, sources in codes.items():
+        outputs[OUT_DIR / file_name(code)] = render_code(code, sources)
+    for code, sheet in tax_return_codes.items():
+        # 表单页由目录（taxReturnIndex.json）呈现，不出表格结构
+        if code != TAX_RETURN_FORMS[0]:
+            outputs[TAX_RETURN_SHEETS_DIR / file_name(code)] = render_code(code, [(sheet, None)])
+    outputs[TAX_RETURN_INDEX] = json.dumps(forms_index, ensure_ascii=False, indent=2) + "\n"
     return outputs, render_model(model), model
+
+
+def tax_return_sheets(wb_val, errors: list[str]) -> tuple[dict[str, str], dict]:
+    """汇算申报表：编号 → sheet（封面、表单、表单列出的 A 类表），以及目录（表单页每行的编号 / 表名 / 默认是否填报）。"""
+    for _, sheet in (TAX_RETURN_COVER, TAX_RETURN_FORMS):
+        if sheet not in wb_val.sheetnames:
+            errors.append(f"样表中没有 sheet {sheet}")
+            return {}, {}
+    ws = wb_val[TAX_RETURN_FORMS[1]]
+    forms = []
+    for r in range(1, ws.max_row + 1):
+        code = str(ws.cell(r, 1).value or "").strip()
+        if not FORM_CODE_RE.match(code):
+            continue
+        if code not in wb_val.sheetnames:
+            errors.append(f"表单第 {r} 行 {code}：样表中没有该 sheet")
+            continue
+        mark = str(ws.cell(r, 3).value or "").strip()
+        forms.append({"code": code, "name": str(ws.cell(r, 2).value or "").strip(), "markRef": f"C{r}", "filed": mark == "√"})
+    listed = {f["code"] for f in forms}
+    extra = [n for n in wb_val.sheetnames if FORM_CODE_RE.match(n) and n not in listed]
+    if extra:
+        errors.append(f"样表有 A 类表未列在表单里：{extra}")
+    codes = {TAX_RETURN_COVER[0]: TAX_RETURN_COVER[1], TAX_RETURN_FORMS[0]: TAX_RETURN_FORMS[1]}
+    codes.update({f["code"]: f["code"] for f in forms})
+    index = {
+        "cover": {"code": TAX_RETURN_COVER[0], "name": TAX_RETURN_COVER[1]},
+        "formsCode": TAX_RETURN_FORMS[0],
+        "formsSheet": TAX_RETURN_FORMS[1],
+        "forms": forms,
+    }
+    return codes, index
 
 
 def main() -> int:
@@ -370,27 +459,36 @@ def main() -> int:
         parser.error(f"样表不存在：{src}")
 
     outputs, model_text, model = build(src)
-    existing = {p.name: p.read_text(encoding="utf-8") for p in OUT_DIR.glob("*.json")} if OUT_DIR.is_dir() else {}
-    changed = sorted(n for n, t in outputs.items() if existing.get(n) != t)
+    existing: dict[Path, str] = {}
+    for directory in (OUT_DIR, TAX_RETURN_SHEETS_DIR):
+        if directory.is_dir():
+            existing.update({p: p.read_text(encoding="utf-8") for p in directory.glob("*.json")})
+    if TAX_RETURN_INDEX.is_file():
+        existing[TAX_RETURN_INDEX] = TAX_RETURN_INDEX.read_text(encoding="utf-8")
+    changed = sorted(p for p, t in outputs.items() if existing.get(p) != t)
     stale = sorted(set(existing) - set(outputs))
     model_changed = (MODEL_PATH.read_text(encoding="utf-8") if MODEL_PATH.is_file() else None) != model_text
+    sheet_count = sum(1 for p in outputs if p.parent == OUT_DIR)
     summary = (
-        f"{len(outputs)} 张表；计算模型 {len(model['sheets'])} 个 sheet、取数项 {len(model['rules'])} 个、"
-        f"列表 {len(model['lists'])} 个、纠正 {len(model['corrections'])} 条"
+        f"{sheet_count} 张底稿、{len(model['groups']['tax_return'])} 张申报表；计算模型 {len(model['sheets'])} 个 sheet、"
+        f"取数项 {len(model['rules'])} 个、列表 {len(model['lists'])} 个、纠正 {len(model['corrections'])} 条"
     )
+
+    def rel(paths: list[Path]) -> list[str]:
+        return [str(p.relative_to(ROOT)) for p in paths[:10]]
 
     if args.check:
         if changed or stale or model_changed:
-            print(f"[DRIFT] 表差异 {len(changed)} 个，多余 {len(stale)} 个，模型{'有' if model_changed else '无'}差异：{(changed + stale)[:10]}")
+            print(f"[DRIFT] 文件差异 {len(changed)} 个，多余 {len(stale)} 个，模型{'有' if model_changed else '无'}差异：{rel(changed + stale)}")
             return 2
         print(f"[OK] {summary}，与样表一致")
         return 0
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for name in changed:
-        (OUT_DIR / name).write_text(outputs[name], encoding="utf-8", newline="\n")
-    for name in stale:
-        (OUT_DIR / name).unlink()
+    for path in changed:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(outputs[path], encoding="utf-8", newline="\n")
+    for path in stale:
+        path.unlink()
     if model_changed:
         MODEL_PATH.write_text(model_text, encoding="utf-8", newline="\n")
     print(f"[WRITE] {summary}；写入表 {len(changed)}，删除 {len(stale)}，模型{'已更新' if model_changed else '未变'}")

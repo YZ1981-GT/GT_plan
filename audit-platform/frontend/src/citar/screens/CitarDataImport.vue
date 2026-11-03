@@ -320,10 +320,6 @@ function formatSize(bytes: number): string {
 <style scoped src="../styles/data-import.css"></style>
 
 <style scoped>
-/* 识别预览 / 列映射是宽表，放宽 CITAR 原 880px */
-.citar-import {
-  max-width: 1180px;
-}
 
 .citar-import__year {
   margin-left: 16px;

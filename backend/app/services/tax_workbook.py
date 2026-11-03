@@ -35,6 +35,14 @@ MODEL_PATH = Path(__file__).resolve().parents[2] / "data" / "tax_workpaper_model
 Key = tuple[str, int, int]
 
 
+class Results(dict):
+    """公式计算结果；``blank`` = 只引用一个空格的公式（计算按 0，显示为空白）。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.blank: set[Key] = set()
+
+
 def parse_a1(ref: str) -> tuple[int, int]:
     col, row = coordinate_from_string(ref)
     return row, column_index_from_string(col)
@@ -158,7 +166,7 @@ class TaxWorkbook:
         rule_values: dict[Key, Value],
     ) -> dict[Key, Value]:
         """按拓扑序求 ``needed`` 里的公式格；取数格取 ``rule_values``，手工值优先于取数与常量。"""
-        results: dict[Key, Value] = {}
+        results = Results()
         wb = self
 
         class _Ctx:
@@ -185,15 +193,20 @@ class TaxWorkbook:
             ctx.current = (key[1], key[2])  # 隐式交集按公式所在格
             ast = self.formulas[key]
             value = evaluate(ast, ctx)
-            # 只引用一个空格的公式（表头 ='填写参数'!B11 这类）保持空白，Excel 会显示 0、页面上显示 0 不合适；
-            # 其余公式结果为空按 Excel 显示 0
-            if value is None and ast[0] != "ref":
+            # 公式结果为空按 Excel 一律算 0（下游 MIN / SUM 才与 Excel 一致：MIN 忽略空格、不忽略 0）。
+            # 只引用一个空格的公式（表头 ='填写参数'!B11 这类）显示时保持空白（页面上显示 0 不合适），见 cell_value
+            if value is None:
+                if ast[0] == "ref":
+                    results.blank.add(key)
                 value = Decimal(0)
             results[key] = value
         return results
 
     def cell_value(self, key: Key, inputs: dict[Key, Value], rule_values: dict[Key, Value], results: dict[Key, Value]) -> Value:
+        """显示值：公式格取计算结果；只引用一个空格的公式显示空白（参与计算时是 0）。"""
         if key in self.formulas:
+            if key in getattr(results, "blank", ()):
+                return None
             return results.get(key)
         if key in inputs:
             return inputs[key]

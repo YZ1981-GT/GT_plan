@@ -21,6 +21,23 @@ export const taxWorkpapers = {
   sheet: (pid: string, code: string) => `/api/projects/${pid}/tax-workpapers/sheets/${encodeURIComponent(code)}`,
   /** GET / PUT 表头参数（被审核单位、编制人等，?year=） */
   params: (pid: string) => `/api/projects/${pid}/tax-workpapers/params`,
+  /** GET 客户科目 → 取数用到它的税审底稿（底稿映射页，?year=） */
+  accountMap: (pid: string) => `/api/projects/${pid}/tax-workpapers/account-map`,
+} as const
+
+// ─── 税审鉴证报告（报告正文 / 审核说明 / 汇算申报表 / 单体财务报表，?year=） ────────────────
+
+export const taxAssurance = {
+  /** GET 取值 / PUT 保存手工值与「是否填报」 */
+  taxReturnSheet: (pid: string, code: string) => `/api/projects/${pid}/tax-assurance/tax-return/sheets/${encodeURIComponent(code)}`,
+  taxReturnExport: (pid: string) => `/api/projects/${pid}/tax-assurance/tax-return/export`,
+  /** GET 报告正文 / PUT 报告日期 */
+  reportBody: (pid: string) => `/api/projects/${pid}/tax-assurance/report-body`,
+  reportBodyExport: (pid: string) => `/api/projects/${pid}/tax-assurance/report-body/export`,
+  reviewNotes: (pid: string) => `/api/projects/${pid}/tax-assurance/review-notes`,
+  reviewNotesExport: (pid: string) => `/api/projects/${pid}/tax-assurance/review-notes/export`,
+  financialStatements: (pid: string) => `/api/projects/${pid}/tax-assurance/financial-statements`,
+  financialStatementsExport: (pid: string) => `/api/projects/${pid}/tax-assurance/financial-statements/export`,
 } as const
 
 // ─── 调整分录 ───────────────────────────────────────────────────────────────

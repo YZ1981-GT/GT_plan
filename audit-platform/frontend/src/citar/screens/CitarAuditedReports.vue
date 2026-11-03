@@ -51,13 +51,10 @@
  * 生成：POST /api/reports/generate（平台既有前置条件：已导入账套、已映射、已重算试算表）
  */
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { getReport } from '@/services/auditPlatformApi'
-import { api } from '@/services/apiProxy'
-import { reports as P_rpt } from '@/services/apiPaths'
-import { handleApiError } from '@/utils/errorHandler'
 import CitarReportTable, { type CitarReportRow } from '../components/CitarReportTable.vue'
 import { useCitarProject } from '../useCitarProject'
+import { useCitarReportGenerate } from '../useCitarReportGenerate'
 
 defineOptions({ name: 'CitarAuditedReports' })
 
@@ -67,21 +64,13 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'income_statement', label: '利润表' },
 ]
 
-/** 生成报表前置条件 → 本版式里去完成它的菜单 */
-const PREREQUISITE_SEGMENTS: Record<string, { segment: string; label: string }> = {
-  import_ledger: { segment: 'ledger-import', label: '数据导入' },
-  auto_match: { segment: 'mapping', label: '底稿映射' },
-  recalc: { segment: 'trial-balance', label: '试算平衡表' },
-}
-
 const { projectId, year, yearLoading, entityName, goSegment } = useCitarProject()
+const { generating, prerequisite, generate: runGenerate } = useCitarReportGenerate(projectId, year)
 
 const tab = ref<TabKey>('balance_sheet')
 const rows = ref<CitarReportRow[]>([])
 const loading = ref(false)
-const generating = ref(false)
 const error = ref('')
-const prerequisite = ref<{ message: string; segment?: string; label?: string } | null>(null)
 
 /** 未生成时后端返回模板行次、金额全空 */
 const generated = computed(() =>
@@ -103,30 +92,7 @@ async function load() {
 }
 
 async function generate() {
-  if (!year.value) return
-  generating.value = true
-  prerequisite.value = null
-  try {
-    // _silent：错误由本页处理（前置条件转成提示条），不再叠一层全局弹窗
-    const res: any = await api.post(
-      P_rpt.generate,
-      { project_id: projectId.value, year: year.value },
-      { _silent: true, timeout: 300000 } as any,
-    )
-    ElMessage.success(`报表已生成：${res?.summary?.non_zero_rows ?? 0} 行有数`)
-    await load()
-  } catch (e: any) {
-    // 前置条件不满足：400 + {ok:false, message, prerequisite_action}
-    const detail = e?.response?.data?.detail
-    if (e?.response?.status === 400 && detail?.message) {
-      const target = PREREQUISITE_SEGMENTS[detail.prerequisite_action || '']
-      prerequisite.value = { message: detail.message, ...target }
-    } else {
-      handleApiError(e, '生成报表')
-    }
-  } finally {
-    generating.value = false
-  }
+  if (await runGenerate()) await load()
 }
 
 watch([projectId, year, tab], load, { immediate: true })

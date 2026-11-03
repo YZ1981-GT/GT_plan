@@ -47,10 +47,13 @@ export const CITAR_NAV_GROUPS: CitarNavGroup[] = [
     ],
   },
   {
+    // 用户 2026-11-03：鉴证报告分为报告正文、审核说明、汇算申报表、单体财务报表四个菜单（spec citar-assurance-report-menus）
     title: '鉴证报告',
     items: [
-      { key: 'tax-return', label: '纳税申报表', segment: 'tax-return', icon: 'Document' },
-      { key: 'report', label: '税审报告', segment: 'disclosure-notes', icon: 'DocumentChecked' },
+      { key: 'report-body', label: '报告正文', segment: 'report-body', icon: 'DocumentChecked' },
+      { key: 'review-notes', label: '审核说明', segment: 'review-notes', icon: 'Notebook' },
+      { key: 'tax-return', label: '汇算申报表', segment: 'tax-return', icon: 'Document' },
+      { key: 'financial-statements', label: '单体财务报表', segment: 'financial-statements', icon: 'Tickets' },
     ],
   },
 ]
@@ -63,6 +66,9 @@ export const CITAR_WORKPAPER_SEGMENT = 'workpapers'
 
 /** 项目空页（从项目列表点进来先到这里） */
 export const CITAR_HOME_SEGMENT = 'home'
+
+/** 页面自带目录栏、内容区不留内边距的菜单段（税务底稿、汇算申报表） */
+export const CITAR_FLUSH_SEGMENTS: ReadonlySet<string> = new Set([CITAR_WORKPAPER_SEGMENT, 'tax-return'])
 
 const PROJECT_SEGMENTS = new Set([CITAR_HOME_SEGMENT, ...CITAR_NAV.map(n => n.segment)])
 

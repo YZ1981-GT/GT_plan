@@ -1,0 +1,37 @@
+/*
+ * 税务底稿 / 汇算申报表共用配色（照 CITAR 白紫 #6e0ba6 一系）。
+ * stylelint 禁止 color/background 直接写十六进制，统一在根上定义 --tw-* 变量，子组件只用 var()（自定义属性会继承进子组件）。
+ * 用法：页面根元素加 class="tw-tokens"，<style scoped src> 引入本文件。
+ */
+.tw-tokens {
+  --tw-accent: #6e0ba6;
+  --tw-accent-light: #8b3fd0;
+  --tw-accent-deep: #4c1273;
+  --tw-accent-soft: #f3edfa;
+  --tw-accent-hover: #f7f1fe;
+  --tw-on-accent: #ffffff;
+  --tw-header-gradient: linear-gradient(90deg, #5b1a8c 0%, #8b3fd0 100%);
+  --tw-subnav-bg: #fbf9fe;
+  --tw-th-bg: #f1e7fb;
+  --tw-page-bg: #f5f6fa;
+  --tw-surface: #ffffff;
+  --tw-input-bg: #fdfcff;
+  --tw-line: #e8e8ec;
+  --tw-line-soft: #f0eaf8;
+  --tw-line-strong: #d9d9e0;
+  --tw-line-accent: #e4d8f3;
+  --tw-line-accent-strong: #d9c4ee;
+  --tw-text: #3c3c48;
+  --tw-text-muted: #6b6b76;
+  --tw-text-faint: #a79bb5;
+  --tw-text-hint: #8a6aa8;
+  --tw-mark-present: #1a7f37;
+  --tw-mark-absent: #c0392b;
+  /* 单元格来源：公式 / 按规则取数 / 待确认 / 需人工填写 / 手工修改 / 取不到 */
+  --tw-formula-bg: #f7f7fa;
+  --tw-rule-auto-bg: #eef6ff;
+  --tw-rule-confirm-bg: #fff4e0;
+  --tw-rule-manual-bg: #f2f2f2;
+  --tw-manual-bg: #fbf3ff;
+  --tw-issue-mark: #e6a23c;
+}

@@ -1,0 +1,36 @@
+{
+  "code": "A105110",
+  "parts": [
+    {
+      "source": "A105110",
+      "rows": [
+        [{"text":"A105110                            政策性搬迁纳税调整明细表","kind":"title","colSpan":3}],
+        [{"text":"行次","kind":"header"},{"text":"项目","kind":"header"},{"text":"金额","kind":"header"}],
+        [{"text":"1","kind":"number"},{"text":"一、搬迁收入(2+8)"},{"kind":"number","ref":"C3","role":"f","fmt":"money"}],
+        [{"text":"2","kind":"number"},{"text":"（一）搬迁补偿收入（3+4+5+6+7）"},{"kind":"number","ref":"C4","role":"f","fmt":"money"}],
+        [{"text":"3","kind":"number"},{"text":"1.对被征用资产价值的补偿"},{"kind":"number","ref":"C5","role":"f","fmt":"money"}],
+        [{"text":"4","kind":"number"},{"text":"2.因搬迁、安置而给予的补偿"},{"kind":"number","ref":"C6","role":"f","fmt":"money"}],
+        [{"text":"5","kind":"number"},{"text":"3.对停产停业形成的损失而给予的补偿"},{"kind":"number","ref":"C7","role":"f","fmt":"money"}],
+        [{"text":"6","kind":"number"},{"text":"4.资产搬迁过程中遭到毁损而取得的保险赔款"},{"kind":"number","ref":"C8","role":"f","fmt":"money"}],
+        [{"text":"7","kind":"number"},{"text":"5.其他补偿收入"},{"kind":"number","ref":"C9","role":"f","fmt":"money"}],
+        [{"text":"8","kind":"number"},{"text":"（二）搬迁资产处置收入"},{"kind":"number","ref":"C10","role":"f","fmt":"money"}],
+        [{"text":"9","kind":"number"},{"text":"二、搬迁支出(10+16)"},{"kind":"number","ref":"C11","role":"f","fmt":"money"}],
+        [{"text":"10","kind":"number"},{"text":"（一）搬迁费用支出(11+12+13+14+15)"},{"kind":"number","ref":"C12","role":"f","fmt":"money"}],
+        [{"text":"11","kind":"number"},{"text":"1.安置职工实际发生的费用"},{"kind":"number","ref":"C13","role":"f","fmt":"money"}],
+        [{"text":"12","kind":"number"},{"text":"2.停工期间支付给职工的工资及福利费"},{"kind":"number","ref":"C14","role":"f","fmt":"money"}],
+        [{"text":"13","kind":"number"},{"text":"3.临时存放搬迁资产而发生的费用"},{"kind":"number","ref":"C15","role":"f","fmt":"money"}],
+        [{"text":"14","kind":"number"},{"text":"4.各类资产搬迁安装费用"},{"kind":"number","ref":"C16","role":"f","fmt":"money"}],
+        [{"text":"15","kind":"number"},{"text":"5.其他与搬迁相关的费用"},{"kind":"number","ref":"C17","role":"f","fmt":"money"}],
+        [{"text":"16","kind":"number"},{"text":"（二）搬迁资产处置支出"},{"kind":"number","ref":"C18","role":"f","fmt":"money"}],
+        [{"text":"17","kind":"number"},{"text":"三、搬迁所得或损失（1-9）"},{"kind":"number","ref":"C19","role":"f","fmt":"money"}],
+        [{"text":"18","kind":"number"},{"text":"四、应计入本年应纳税所得额的搬迁所得或损失（19+20+21）"},{"kind":"number","ref":"C20","role":"f","fmt":"money"}],
+        [{"text":"19","kind":"number"},{"text":"其中：搬迁所得"},{"kind":"number","ref":"C21","role":"f","fmt":"money"}],
+        [{"text":"20","kind":"number"},{"text":"搬迁损失一次性扣除"},{"kind":"number","ref":"C22","role":"f","fmt":"money"}],
+        [{"text":"21","kind":"number"},{"text":"搬迁损失分期扣除"},{"kind":"number","ref":"C23","role":"f","fmt":"money"}],
+        [{"text":"22","kind":"number"},{"text":"五、计入当期损益的搬迁收益或损失"},{"kind":"number","ref":"C24","role":"f","fmt":"money"}],
+        [{"text":"23","kind":"number"},{"text":"六、以前年度搬迁损失当期扣除金额"},{"kind":"number","ref":"C25","role":"f","fmt":"money"}],
+        [{"text":"24","kind":"number"},{"text":"七、纳税调整金额（18-22-23）"},{"kind":"number","ref":"C26","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

@@ -292,3 +292,27 @@ export function findTaxWorkpaperGroup(code: string): TaxWorkpaperGroup | undefin
 
 /** 索引页的编号：不是真实底稿，借「当前表编号」这一条通道表达「当前在索引页」 */
 export const TAX_INDEX_CODE = '__index__'
+
+/**
+ * 税审底稿页「上次打开的表」（按项目存 sessionStorage）。
+ * 税审底稿页刷新后回到这张表；别的页面（底稿映射）要打开某张底稿时先写这里再跳转。
+ */
+const ACTIVE_PREFIX = 'gt.tax-workpaper-active.'
+
+export function loadActiveTaxSheet(projectId: string): string {
+  try {
+    const saved = sessionStorage.getItem(ACTIVE_PREFIX + projectId)
+    if (saved && (saved === TAX_INDEX_CODE || findTaxWorkpaperSheet(saved))) return saved
+  } catch {
+    // sessionStorage 不可用时回到索引页
+  }
+  return TAX_INDEX_CODE
+}
+
+export function saveActiveTaxSheet(projectId: string, code: string): void {
+  try {
+    sessionStorage.setItem(ACTIVE_PREFIX + projectId, code)
+  } catch {
+    // 记不住上次的表不影响使用
+  }
+}

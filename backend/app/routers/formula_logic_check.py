@@ -58,9 +58,12 @@ def _serialize(result: CrossCheckResult) -> dict[str, Any]:
                 "description": o.description,
                 "expression": o.expression,
                 "passed": o.passed,
+                "refs": list(getattr(o, "refs", []) or []),
             }
             for o in result.outcomes
         ],
+        # 内置勾稽的取数结果（引用键 → 金额），界面逐条显示参与比较的数
+        "inputs": {k: str(v) for k, v in (getattr(result, "inputs", None) or {}).items()},
         "last_computed_at": (
             result.last_computed_at.isoformat()
             if result.last_computed_at is not None
