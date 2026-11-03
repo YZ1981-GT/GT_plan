@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from typing import BinaryIO
 
 from fastapi import HTTPException
+from app.core.code_text import code_text
 
 
 # ---------------------------------------------------------------------------
@@ -791,14 +792,14 @@ class GenericParser(BaseParser):
 
     def _parse_single_row(self, row: dict, data_type: str) -> dict | None:
         """Parse a single row based on data type."""
-        account_code = str(row.get("account_code", "")).strip()
+        account_code = code_text(row.get("account_code"))
         if not account_code:
             return None
 
         base = {
             "account_code": account_code,
             "account_name": str(row.get("account_name", "")).strip() or None,
-            "company_code": str(row.get("company_code", "")).strip() or "default",
+            "company_code": code_text(row.get("company_code")) or "default",
             "currency_code": str(row.get("currency_code", "")).strip() or "CNY",
         }
 
@@ -818,7 +819,7 @@ class GenericParser(BaseParser):
             })
         elif data_type == "tb_ledger":
             voucher_date = _parse_date(row.get("voucher_date"))
-            voucher_no = str(row.get("voucher_no", "")).strip()
+            voucher_no = code_text(row.get("voucher_no"))
             if not voucher_date or not voucher_no:
                 return None
             # 解析会计期间（支持 "2025年1期" 格式）
@@ -846,7 +847,7 @@ class GenericParser(BaseParser):
                 return None
             base.update({
                 "aux_type": aux_type,
-                "aux_code": str(row.get("aux_code", "")).strip() or None,
+                "aux_code": code_text(row.get("aux_code")) or None,
                 "aux_name": str(row.get("aux_name", "")).strip() or None,
                 "opening_balance": _parse_decimal(row.get("opening_balance")),
                 "debit_amount": _parse_decimal(row.get("debit_amount")),
@@ -864,10 +865,10 @@ class GenericParser(BaseParser):
                     pass
             base.update({
                 "aux_type": str(row.get("aux_type", "")).strip() or None,
-                "aux_code": str(row.get("aux_code", "")).strip() or None,
+                "aux_code": code_text(row.get("aux_code")) or None,
                 "aux_name": str(row.get("aux_name", "")).strip() or None,
                 "voucher_date": _parse_date(row.get("voucher_date")),
-                "voucher_no": str(row.get("voucher_no", "")).strip() or None,
+                "voucher_no": code_text(row.get("voucher_no")) or None,
                 "accounting_period": accounting_period,
                 "voucher_type": str(row.get("voucher_type", "")).strip() or None,
                 "debit_amount": _parse_decimal(row.get("debit_amount")),

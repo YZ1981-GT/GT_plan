@@ -1,0 +1,127 @@
+/*
+ * 税务底稿内容区共用版式（单表页与索引页）。
+ * 版式照 CITAR 的 aud-* / wp-*：紫色渐变横幅 → 下划线页签 → 白色卡片。
+ * 颜色取自页面根上定义的 --tw-* 变量（TaxWorkpaperView.vue）。
+ */
+
+.tw-screen {
+  max-width: 1180px;
+}
+
+.tw-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: var(--tw-header-gradient);
+}
+
+/* 编号与表名分开：编号是索引标识，表名是业务名称 */
+.tw-header__code {
+  font-size: var(--gt-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.tw-header__title {
+  margin: 0;
+  font-size: var(--gt-font-size-xl);
+  font-weight: 700;
+  color: var(--tw-on-accent);
+}
+
+.tw-header__note {
+  margin-left: auto;
+  font-size: var(--gt-font-size-xs);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.tw-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.tw-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--tw-line-strong);
+  border-radius: 6px;
+  background: var(--tw-surface);
+  font: inherit;
+  font-size: var(--gt-font-size-sm);
+  color: var(--tw-text-muted);
+  cursor: pointer;
+}
+
+.tw-button:hover:not(:disabled) {
+  border-color: var(--tw-accent);
+  color: var(--tw-accent);
+}
+
+.tw-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 主操作（保存） */
+.tw-button--primary:not(:disabled) {
+  border-color: var(--tw-accent);
+  background: var(--tw-accent);
+  color: var(--tw-on-accent);
+}
+
+.tw-button--primary:hover:not(:disabled) {
+  background: var(--tw-accent-light);
+  color: var(--tw-on-accent);
+}
+
+/* 开关按下态（与禁用态区分） */
+.tw-button--on {
+  border-color: var(--tw-accent);
+  background: var(--tw-accent);
+  color: var(--tw-on-accent);
+}
+
+.tw-panel {
+  margin-top: 16px;
+  padding: 20px 22px 24px;
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-line);
+  border-radius: 10px;
+}
+
+.tw-pending {
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--tw-input-bg);
+  border: 1px dashed var(--tw-line-accent-strong);
+  border-radius: 8px;
+}
+
+.tw-pending__title {
+  margin: 0 0 8px;
+  font-size: var(--gt-font-size-base);
+  color: var(--tw-text-muted);
+}
+
+.tw-pending__hint {
+  margin: 0;
+  font-size: var(--gt-font-size-sm);
+  line-height: 1.8;
+  color: var(--tw-text-faint);
+}
+
+.tw-pending__code {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: var(--gt-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--tw-accent);
+  background: var(--tw-accent-soft);
+}

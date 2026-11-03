@@ -1,0 +1,24 @@
+{
+  "code": "1-19",
+  "parts": [
+    {
+      "source": "1-19",
+      "rows": [
+        [{"text":"承接条件评价表","kind":"title","colSpan":7}],
+        [{"text":"索引号：1-19","kind":"meta","colSpan":7}],
+        [{"text":"被审核人","rowSpan":2},{"rowSpan":2,"ref":"B3","role":"f"},{"text":"编制人"},{"ref":"D3","role":"f"},{"text":"编制日期"},{"colSpan":2,"ref":"F3","role":"f"}],
+        [{"text":"复核人"},{"ref":"D4","role":"f"},{"text":"复核日期"},{"colSpan":2,"ref":"F4","role":"f"}],
+        [{"text":"承接条件","kind":"header","colSpan":2},{"text":"评价事项","kind":"header","colSpan":3},{"text":"是否符合（√或×）","kind":"header","colSpan":2}],
+        [{"text":"（一）属于审核业务项目","colSpan":2,"rowSpan":2},{"text":"1.属于法定的事项","colSpan":3},{"colSpan":2,"ref":"F6","role":"e"}],
+        [{"text":"2.纳税人在法定期限内必须办理的事项。","colSpan":3},{"colSpan":2,"ref":"F7","role":"e"}],
+        [{"text":"（二）税务师事务所能够获取充分、适当的证据以支持其结论","colSpan":2,"rowSpan":3},{"text":"1.能否做到不执行审核不发表意见。","colSpan":3},{"colSpan":2,"ref":"F8","role":"e"}],
+        [{"text":"2.审核过程必须搜集和取得证据。","colSpan":3},{"colSpan":2,"ref":"F9","role":"e"}],
+        [{"text":"3.审核结论必须依据证据。","colSpan":3},{"colSpan":2,"ref":"F10","role":"e"}],
+        [{"text":"（三）计划承揽的审核业务具有合理的目的","colSpan":2,"rowSpan":2},{"text":"1.受托方的目的不合理。如果审核的范围、取证条件等方面受到限制，仍执意恶性承揽。","colSpan":3},{"colSpan":2,"ref":"F11","role":"e"}],
+        [{"text":"2.委托人的目的不合理。如果委托方是为了利用审核报告应付税务机关的审核要求，或者收买审核执业人员出具不适当的报告。","colSpan":3},{"colSpan":2,"ref":"F12","role":"e"}],
+        [{"text":"（四）能够与委托方协商签订涉税审核业务约定书","colSpan":2,"rowSpan":2},{"text":"1.能够与委托方协商签订涉税审核业务约定书","colSpan":3},{"colSpan":2,"ref":"F13","role":"e"}],
+        [{"text":"2.不能够与委托方协商签订涉税审核业务约定书","colSpan":3},{"colSpan":2,"ref":"F14","role":"e"}]
+      ]
+    }
+  ]
+}

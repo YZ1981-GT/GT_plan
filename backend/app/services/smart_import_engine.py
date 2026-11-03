@@ -367,6 +367,7 @@ from app.services.account_chart_service import (
     _infer_level as _infer_level_svc,
     parse_aux_dimensions,
 )
+from app.core.code_text import code_text
 
 
 def _detect_missing_fields(data_type: str, matched_fields: set[str]) -> tuple[list[str], list[str]]:
@@ -581,7 +582,7 @@ def _append_account_record(
     staged: bool = False,
     dataset_id: UUID | None = None,
 ) -> bool:
-    code = str(row.get("account_code", "")).strip()
+    code = code_text(row.get("account_code"))
     name = str(row.get("account_name", "")).strip()
     if not code or not name or code in seen_codes:
         return False
@@ -1040,12 +1041,12 @@ def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
     aux_balance_rows = []
 
     for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
+        account_code = code_text(row.get("account_code"))
         if not account_code:
             continue
 
         account_name = str(row.get("account_name", "")).strip()
-        company_code = str(row.get("company_code", "")).strip() or "default"
+        company_code = code_text(row.get("company_code")) or "default"
 
         # ── 期初：年度优先（年初 → 期初分列），月度兜底（与 v2 converter 同步）──
         od = _first_decimal(row.get("year_opening_debit"), row.get("opening_debit"))
@@ -1095,7 +1096,7 @@ def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
         # 多列格式：辅助类型 + 辅助编码（不含冒号分隔）
         if not aux_dim_str:
             aux_type_val = str(row.get("aux_type", "")).strip()
-            aux_code_val = str(row.get("aux_code", "")).strip()
+            aux_code_val = code_text(row.get("aux_code"))
             if aux_type_val and aux_code_val:
                 aux_name_val = str(row.get("aux_name", "")).strip() or aux_code_val
                 aux_dim_str = f"{aux_type_val}:{aux_code_val},{aux_name_val}"
@@ -1153,12 +1154,12 @@ def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]
     aux_stats: dict[str, int] = {}
 
     for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
+        account_code = code_text(row.get("account_code"))
         if not account_code:
             continue
 
         voucher_date = _parse_date_val(row.get("voucher_date"))
-        voucher_no = str(row.get("voucher_no", "")).strip()
+        voucher_no = code_text(row.get("voucher_no"))
         if not voucher_date or not voucher_no:
             continue
 
@@ -1177,7 +1178,7 @@ def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]
         # 多列格式：辅助类型 + 辅助编码
         if not aux_dim_str:
             aux_type_val = str(row.get("aux_type", "")).strip()
-            aux_code_val = str(row.get("aux_code", "")).strip()
+            aux_code_val = code_text(row.get("aux_code"))
             if aux_type_val and aux_code_val:
                 aux_name_val = str(row.get("aux_name", "")).strip() or aux_code_val
                 aux_dim_str = f"{aux_type_val}:{aux_code_val},{aux_name_val}"
@@ -1190,7 +1191,7 @@ def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]
             for dim in dims:
                 aux_stats[dim["aux_type"]] = aux_stats.get(dim["aux_type"], 0) + 1
 
-        company_code = str(row.get("company_code", "")).strip() or "default"
+        company_code = code_text(row.get("company_code")) or "default"
 
         ledger_rows.append({
             "account_code": account_code,

@@ -105,6 +105,29 @@ async def get_trial_balance(
     return result
 
 
+@router.get("/standard-view")
+async def get_standard_balance_view(
+    project_id: UUID,
+    year: int = Query(...),
+    company_code: str = Query("001"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """标准科目余额视图（全部标准科目含零行）：期初 / 本期借贷 / 借贷方审计调整 / 期末，借正贷负。
+
+    供试算平衡表页的「审定科目余额表」「底稿取数余额表」；只读、读时计算，不落库。
+    受限成员按有效循环过滤（与试算表 GET 同口径）。
+    """
+    from app.services.standard_balance_view_service import build_standard_balance_view
+
+    rows = await build_standard_balance_view(db, project_id, year, company_code)
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        rows = [r for r in rows if r["standard_account_code"] in allowed_codes]
+    return rows
+
+
 @router.post("/recalc")
 async def recalc_trial_balance(
     project_id: UUID,

@@ -1,0 +1,23 @@
+{
+  "code": "3-04-06",
+  "parts": [
+    {
+      "source": "3-04-06",
+      "rows": [
+        [{"text":"发行永续债利息支出审核表","kind":"title","colSpan":8}],
+        [{},{},{},{},{},{"text":"索引号：3-04-06","kind":"meta","colSpan":3}],
+        [{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":3}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":2,"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"F4","role":"f"},{"text":"编制日期"},{"ref":"H4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":2,"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"F5","role":"f"},{"text":"复核日期"},{"ref":"H5","role":"f"}],
+        [{"text":"行次","kind":"header"},{"text":"情形","kind":"header","colSpan":2},{"text":"账载金额","kind":"header"},{"text":"税收金额","kind":"header"},{"text":"纳税调增金额","kind":"header"},{"text":"纳税调减金额","kind":"header"},{"text":"备注","kind":"header"}],
+        [{"text":"1"},{"text":"会计上按照债务核算，税收上适用股息、红利企业所得税政策","colSpan":2},{"kind":"input","ref":"D7","role":"e","fmt":"money"},{"kind":"input","ref":"E7","role":"e","fmt":"money"},{"kind":"number","ref":"F7","role":"f","fmt":"money"},{"kind":"number","ref":"G7","role":"f","fmt":"money"},{"ref":"H7","role":"e"}],
+        [{"text":"2"},{"text":"会计上按照权益核算，税收上按照债券利息适用企业所得税政策","colSpan":2},{"kind":"input","ref":"D8","role":"e","fmt":"money"},{"kind":"input","ref":"E8","role":"e","fmt":"money"},{"kind":"number","ref":"F8","role":"f","fmt":"money"},{"kind":"number","ref":"G8","role":"f","fmt":"money"},{"ref":"H8","role":"e"}],
+        [{"text":"合     计","kind":"total","colSpan":3},{"kind":"number","ref":"D9","role":"f","fmt":"money"},{"kind":"number","ref":"E9","role":"f","fmt":"money"},{"kind":"number","ref":"F9","role":"f","fmt":"money"},{"kind":"number","ref":"G9","role":"f","fmt":"money"},{"ref":"H9","role":"e"}],
+        [{"text":"一、审核项目说明：","colSpan":8}],
+        [{"colSpan":8,"ref":"A11","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":8}],
+        [{"colSpan":8,"ref":"A13","role":"e"}]
+      ]
+    }
+  ]
+}

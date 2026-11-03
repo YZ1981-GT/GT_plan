@@ -1,0 +1,33 @@
+{
+  "code": "3-05",
+  "parts": [
+    {
+      "source": "3-05",
+      "rows": [
+        [{"text":"特别纳税调整应税所得审核表","kind":"title","colSpan":6}],
+        [{"text":"索引号：3-05","kind":"meta","colSpan":6}],
+        [{"colSpan":4},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"关联交易","kind":"header","rowSpan":2},{"text":"税务机关调整情况","kind":"header","colSpan":5}],
+        [{"text":"调整文件","kind":"header"},{"text":"纳税调增金额","kind":"header","colSpan":2},{"text":"纳税调减金额","kind":"header","colSpan":2}],
+        [{"text":"材料（商品）购入"},{"ref":"B8","role":"e"},{"kind":"input","colSpan":2,"ref":"C8","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E8","role":"e","fmt":"money"}],
+        [{"text":"商品(材料)销售"},{"ref":"B9","role":"e"},{"kind":"input","colSpan":2,"ref":"C9","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E9","role":"e","fmt":"money"}],
+        [{"text":"劳务收入"},{"ref":"B10","role":"e"},{"kind":"input","colSpan":2,"ref":"C10","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E10","role":"e","fmt":"money"}],
+        [{"text":"劳务支出"},{"ref":"B11","role":"e"},{"kind":"input","colSpan":2,"ref":"C11","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E11","role":"e","fmt":"money"}],
+        [{"text":"受让无形资产"},{"ref":"B12","role":"e"},{"kind":"input","colSpan":2,"ref":"C12","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E12","role":"e","fmt":"money"}],
+        [{"text":"出让无形资产"},{"ref":"B13","role":"e"},{"kind":"input","colSpan":2,"ref":"C13","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E13","role":"e","fmt":"money"}],
+        [{"text":"受让固定资产"},{"ref":"B14","role":"e"},{"kind":"input","colSpan":2,"ref":"C14","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E14","role":"e","fmt":"money"}],
+        [{"text":"出让固定资产"},{"ref":"B15","role":"e"},{"kind":"input","colSpan":2,"ref":"C15","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E15","role":"e","fmt":"money"}],
+        [{"text":"融资应计利息收入"},{"ref":"B16","role":"e"},{"kind":"input","colSpan":2,"ref":"C16","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E16","role":"e","fmt":"money"}],
+        [{"text":"融资应计利息支出"},{"ref":"B17","role":"e"},{"kind":"input","colSpan":2,"ref":"C17","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E17","role":"e","fmt":"money"}],
+        [{"text":"其他"},{"ref":"B18","role":"e"},{"kind":"input","colSpan":2,"ref":"C18","role":"e","fmt":"money"},{"kind":"input","colSpan":2,"ref":"E18","role":"e","fmt":"money"}],
+        [{"text":"合  计","kind":"total"},{"text":"*","kind":"total"},{"kind":"number","colSpan":2,"ref":"C19","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E19","role":"f","fmt":"money"}],
+        [{"text":"一、审核项目说明：","colSpan":6}],
+        [{"colSpan":6,"ref":"A21","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":6}],
+        [{"colSpan":6,"ref":"A23","role":"e"}]
+      ]
+    }
+  ]
+}

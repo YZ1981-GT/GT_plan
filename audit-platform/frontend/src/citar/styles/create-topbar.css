@@ -1,0 +1,45 @@
+/* 移植自 CITAR screens/part1/project-create-screen.css（仅顶栏）。color / background / font-size 的字面量换成 citar-tokens.css 中的同值变量（stylelint 卡点），其余原样。 */
+/*
+ * 节点 1.2.1 新建项目页。
+ * 版式参照用户提供的创建界面:左右双栏分板块,右下角确认创建。
+ * 配色与登录页同一套紫色系,采用浅底以便长表单久看不累。
+ */
+
+.create-screen {
+  min-height: 100vh;
+  background: var(--citar-c-f5f6fa);
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  color: var(--citar-c-1f1f1f);
+}
+
+/* 顶栏与项目列表界面一致,浅底配深色 LOGO。 */
+.create-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  padding: 0 24px;
+  background: var(--citar-c-ffffff);
+  border-bottom: 1px solid #e8e8ec;
+}
+
+.create-topbar__logo {
+  height: 28px;
+  width: auto;
+}
+
+.create-topbar__back {
+  margin-left: auto;
+  padding: 6px 14px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4a4a55);
+  cursor: pointer;
+}
+
+.create-topbar__back:hover {
+  border-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+}

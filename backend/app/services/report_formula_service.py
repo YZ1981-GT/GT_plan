@@ -21,6 +21,7 @@ from app.models.report_models import FinancialReportType, ReportConfig
 from app.services.four_table.report_config_account_names import (
     DERIVED_ROW_NAMES_WITHOUT_ACCOUNT,
 )
+from app.services.report_total_formulas import fix_for as _total_fix_for
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +60,11 @@ _BS_SPECIAL: dict[str, str] = {
     "应收账款": "TB('1122','期末余额')-TB('1231','期末余额')",
     "应收款项融资": "TB('1124','期末余额')",
     "预付款项": "TB('1123','期末余额')",
-    "其他应收款": "TB('1221','期末余额')",
-    "存货": "SUM_TB('1400~1499','期末余额')",
+    # 现行报表格式：应收利息 / 应收股利并入其他应收款（报表「其中」是它的子集；真源 report_total_formulas）
+    "其他应收款": "TB('1221','期末余额')+TB('1131','期末余额')+TB('1132','期末余额')",
+    # 🔴 不用 SUM_TB(1400~1499)：试算表存自然正数，区间求和把 1407 商品进销差价 / 1461 存货跌价准备两个
+    #    贷方备抵当正数加上（真源 report_total_formulas.INVENTORY_FORMULA，守卫逐字比对）
+    "存货": "TB('1401','期末余额')+TB('1402','期末余额')+TB('1403','期末余额')+TB('1404','期末余额')+TB('1405','期末余额')+TB('1406','期末余额')-TB('1407','期末余额')+TB('1408','期末余额')+TB('1411','期末余额')+TB('1421','期末余额')+TB('1431','期末余额')+TB('1441','期末余额')+TB('1451','期末余额')-TB('1461','期末余额')+TB('1471','期末余额')+TB('1472','期末余额')",
     "合同资产": "TB('1141','期末余额')",
     "持有待售资产": "TB('1481','期末余额')",
     # 🔴 一年内到期的非流动资产 / 其他流动资产：重分类/「其他」性质汇总派生行，
@@ -115,7 +119,7 @@ _BS_SPECIAL: dict[str, str] = {
     "合同负债": "TB('2205','期末余额')",
     "应付职工薪酬": "TB('2211','期末余额')",
     "应交税费": "TB('2221','期末余额')",
-    "其他应付款": "TB('2241','期末余额')",
+    "其他应付款": "TB('2241','期末余额')+TB('2231','期末余额')+TB('2232','期末余额')",
     "应付利息": "TB('2231','期末余额')",
     "应付股利": "TB('2232','期末余额')",
     "持有待售负债": "TB('2245','期末余额')",
@@ -135,7 +139,6 @@ _BS_SPECIAL: dict[str, str] = {
     "预计负债": "TB('2801','期末余额')",
     "递延收益": "TB('2401','期末余额')",
     "递延所得税负债": "TB('2901','期末余额')",
-    "其他非流动负债": "TB('2901','期末余额')",
     "长期应付职工薪酬": "TB('2711','期末余额')",
     "专项应付款": "TB('2721','期末余额')",
     # ===== 所有者权益 =====
@@ -173,12 +176,9 @@ _IS_SPECIAL: dict[str, str] = {
     "管理费用": "TB('6602','本期发生额')",
     "研发费用": "TB('6604','本期发生额')",
     "财务费用": "TB('6603','本期发生额')",
-    "利息费用": "TB('6603','本期发生额')",
-    "利息收入": "TB('6603','本期发生额')",
     # ===== 收益类 =====
     "投资收益": "TB('6111','本期发生额')",
     "其中对联营企业和合营企业的投资收益": "TB('6111','本期发生额')",
-    "以摊余成本计量的金融资产终止确认收益": "TB('6111','本期发生额')",
     "净敞口套期收益": "TB('6113','本期发生额')",
     "公允价值变动收益": "TB('6101','本期发生额')",
     # 🔴 6701=资产减值损失 / 6702=信用减值损失（account_chart 零分歧，V137 已在
@@ -187,7 +187,6 @@ _IS_SPECIAL: dict[str, str] = {
     "资产减值损失": "TB('6701','本期发生额')",
     "资产处置收益": "TB('6115','本期发生额')",
     "其他收益": "TB('6117','本期发生额')",
-    "汇兑收益": "TB('6603','本期发生额')",
     # ===== 营业外 =====
     "营业外收入": "TB('6301','本期发生额')",
     "营业外支出": "TB('6711','本期发生额')",
@@ -196,10 +195,7 @@ _IS_SPECIAL: dict[str, str] = {
     "所得税费用": "TB('6801','本期发生额')",
     # ===== 其他综合收益 =====
     "其他综合收益的税后净额": "TB('3102','本期发生额')",
-    "综合收益总额": "TB('6801','本期发生额')",
     # ===== 每股收益 =====
-    "基本每股收益": "TB('6901','本期发生额')",
-    "稀释每股收益": "TB('6902','本期发生额')",
 }
 
 _EQ_SPECIAL: dict[str, str] = {
@@ -461,7 +457,6 @@ _NAME_TO_ACCOUNT: dict[str, str] = {
     "预计负债": "2801",
     "递延收益": "2401",
     "递延所得税负债": "2901",
-    "其他非流动负债": "2901",
     # ===== 权益类 =====
     "实收资本": "4001",
     "股本": "4001",
@@ -709,13 +704,25 @@ class ReportFormulaService:
                     formula: str | None = None
                     source: str | None = None
 
-                    # 策略 1: 特殊公式表（最高优先级）
-                    formula = _get_special(row_name, report_type)
-                    if formula:
-                        source = "special"
+                    # 策略 0: 四套模板合计行 / 取错科目的明细行的逐行公式（真源 report_total_formulas）。
+                    # 命中且公式为空 = 本行有意不填（不再落到后面的按名 / 合计关键词策略）
+                    hit, fixed = _total_fix_for(std, report_type, cfg.row_code, row_name)
+                    if hit:
+                        if fixed:
+                            formula, source = fixed, "total_fix"
+                        else:
+                            stats["no_formula"] += 1
+                            continue
 
-                    # 策略 2: CAS 标准公式
-                    if not formula and norm in cas_map:
+                    # 策略 1: 特殊公式表
+                    if not formula:
+                        formula = _get_special(row_name, report_type)
+                        if formula:
+                            source = "special"
+
+                    # 策略 2: CAS 标准公式。🔴 含 ROW() 的不套用：CAS 公式里的行号是 CAS 模板自己的
+                    # （CAS「资产总计 = ROW(BS-009)+ROW(BS-014)」在国企模板指向应收款项融资 + 应收资金集中管理款）
+                    if not formula and norm in cas_map and "ROW(" not in (cas_map[norm] or ""):
                         raw = cas_map[norm]
                         formula = _convert_formula(raw, col)
                         if formula:

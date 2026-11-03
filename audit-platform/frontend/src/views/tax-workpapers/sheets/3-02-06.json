@@ -1,0 +1,35 @@
+{
+  "code": "3-02-06",
+  "parts": [
+    {
+      "source": "3-02-06",
+      "rows": [
+        [{"text":"罚金、罚款、被没收财物的损失审核表","kind":"title","colSpan":7}],
+        [{},{},{},{},{},{},{"text":"索引号：3-02-06","kind":"meta"}],
+        [{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta"}],
+        [{"text":"被审核人"},{"colSpan":2,"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"E4","role":"f"},{"text":"编制日期"},{"ref":"G4","role":"f"}],
+        [{"text":"会计期间"},{"colSpan":2,"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"E5","role":"f"},{"text":"复核日期"},{"ref":"G5","role":"f"}],
+        [{"text":"一、罚金、罚款和被没收财物的损失纳税调整计算","colSpan":7}],
+        [{"text":"项目","kind":"header","colSpan":3},{"text":"账载金额","kind":"header","colSpan":2},{"text":"纳税调增金额","kind":"header"},{"text":"备注","kind":"header"}],
+        [{"text":"罚金、罚款和被没收财物的损失合计","colSpan":3},{"kind":"number","colSpan":2,"ref":"D8","role":"f","fmt":"money"},{"kind":"number","ref":"F8","role":"f","fmt":"money"},{"ref":"G8","role":"e"}],
+        [{"text":"二、罚金、罚款和被没收财物的损失明细","colSpan":7}],
+        [{"text":"行次","kind":"header"},{"text":"日期","kind":"header"},{"text":"凭证号","kind":"header"},{"text":"摘要","kind":"header"},{"text":"金额","kind":"header"},{"text":"处罚单位","kind":"header"},{"text":"备注","kind":"header"}],
+        [{"text":"1"},{"ref":"B11","role":"e"},{"ref":"C11","role":"e"},{"ref":"D11","role":"e"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"ref":"F11","role":"e"},{"ref":"G11","role":"e"}],
+        [{"text":"2"},{"ref":"B12","role":"e"},{"ref":"C12","role":"e"},{"ref":"D12","role":"e"},{"kind":"input","ref":"E12","role":"e","fmt":"money"},{"ref":"F12","role":"e"},{"ref":"G12","role":"e"}],
+        [{"text":"3"},{"ref":"B13","role":"e"},{"ref":"C13","role":"e"},{"ref":"D13","role":"e"},{"kind":"input","ref":"E13","role":"e","fmt":"money"},{"ref":"F13","role":"e"},{"ref":"G13","role":"e"}],
+        [{"text":"4"},{"ref":"B14","role":"e"},{"ref":"C14","role":"e"},{"ref":"D14","role":"e"},{"kind":"input","ref":"E14","role":"e","fmt":"money"},{"ref":"F14","role":"e"},{"ref":"G14","role":"e"}],
+        [{"text":"5"},{"ref":"B15","role":"e"},{"ref":"C15","role":"e"},{"ref":"D15","role":"e"},{"kind":"input","ref":"E15","role":"e","fmt":"money"},{"ref":"F15","role":"e"},{"ref":"G15","role":"e"}],
+        [{"text":"6"},{"ref":"B16","role":"e"},{"ref":"C16","role":"e"},{"ref":"D16","role":"e"},{"kind":"input","ref":"E16","role":"e","fmt":"money"},{"ref":"F16","role":"e"},{"ref":"G16","role":"e"}],
+        [{"text":"7"},{"ref":"B17","role":"e"},{"ref":"C17","role":"e"},{"ref":"D17","role":"e"},{"kind":"input","ref":"E17","role":"e","fmt":"money"},{"ref":"F17","role":"e"},{"ref":"G17","role":"e"}],
+        [{"text":"8"},{"ref":"B18","role":"e"},{"ref":"C18","role":"e"},{"ref":"D18","role":"e"},{"kind":"input","ref":"E18","role":"e","fmt":"money"},{"ref":"F18","role":"e"},{"ref":"G18","role":"e"}],
+        [{"text":"9"},{"ref":"B19","role":"e"},{"ref":"C19","role":"e"},{"ref":"D19","role":"e"},{"kind":"input","ref":"E19","role":"e","fmt":"money"},{"ref":"F19","role":"e"},{"ref":"G19","role":"e"}],
+        [{"text":"10"},{"ref":"B20","role":"e"},{"ref":"C20","role":"e"},{"ref":"D20","role":"e"},{"kind":"input","ref":"E20","role":"e","fmt":"money"},{"ref":"F20","role":"e"},{"ref":"G20","role":"e"}],
+        [{"text":"合计","kind":"total","colSpan":3},{"text":"*","kind":"total"},{"kind":"number","ref":"E21","role":"f","fmt":"money"},{"text":"*","kind":"total"},{"text":"*","kind":"total"}],
+        [{"text":"三、审核项目说明：","colSpan":7}],
+        [{"colSpan":7,"ref":"A23","role":"e"}],
+        [{"text":"四、审核工作记录：","colSpan":7}],
+        [{"colSpan":7,"ref":"A25","role":"e"}]
+      ]
+    }
+  ]
+}

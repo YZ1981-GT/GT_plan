@@ -15,12 +15,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date
 from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
+from .converter import parse_date_val
 from .detection_types import (
     KEY_COLUMNS,
     RECOMMENDED_COLUMNS,
@@ -179,14 +180,6 @@ _NON_FORCEABLE_CODES: frozenset[str] = frozenset({
     "L2_LEDGER_YEAR_OUT_OF_RANGE",
 })
 
-# 日期解析格式列表
-_DATE_FORMATS: list[str] = [
-    "%Y-%m-%d",
-    "%Y/%m/%d",
-    "%Y%m%d",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y/%m/%d %H:%M:%S",
-]
 
 
 # ---------------------------------------------------------------------------
@@ -207,34 +200,14 @@ def _try_parse_numeric(value: object) -> Optional[float]:
         return None
 
 
-def _try_parse_date(value: object) -> Optional[datetime]:
-    """尝试将值解析为日期，支持多种格式和 Excel 序列号。"""
-    if value is None:
-        return None
-    # 如果已经是 datetime 对象
-    if isinstance(value, datetime):
-        return value
-    s = str(value).strip()
-    if s == "":
-        return None
-    # 尝试标准格式
-    for fmt in _DATE_FORMATS:
-        try:
-            return datetime.strptime(s, fmt)
-        except ValueError:
-            continue
-    # 尝试 Excel 序列号（纯数字，范围 1-100000 大致覆盖 1900-2173）
-    try:
-        serial = float(s)
-        if 1 <= serial <= 100000:
-            # Excel 序列号：1 = 1900-01-01（Excel 有 1900 闰年 bug，这里简化处理）
-            from datetime import timedelta
+def _try_parse_date(value: object) -> Optional[date]:
+    """尝试将值解析为日期，失败返回 None。
 
-            base = datetime(1899, 12, 30)
-            return base + timedelta(days=int(serial))
-    except (ValueError, TypeError, OverflowError):
-        pass
-    return None
+    与写库时的 ``converter.parse_date_val`` 同一实现：校验放行的格式必须与
+    实际入库能解析的格式一致。曾各自维护一份格式清单，校验侧漏了
+    ``YYYY.MM.DD``，导致转换器能解析的整本序时账在 L1 全部判为阻塞错误。
+    """
+    return parse_date_val(value)
 
 
 def _is_empty(value: object) -> bool:
@@ -436,7 +409,7 @@ def validate_l1(
                         formula=f"parse_date({field_name}) -> datetime",
                         formula_cn=(
                             f"将关键列 {field_name} 的字符串解析为日期"
-                            f"（支持 YYYY-MM-DD / YYYY/MM/DD / YYYYMMDD / Excel 序列号）"
+                            f"（支持 YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD / YYYYMMDD / Excel 序列号）"
                         ),
                         inputs={"raw_value": actual_value_str},
                         computed={"parse_result": None},

@@ -1,0 +1,33 @@
+{
+  "code": "1-23",
+  "parts": [
+    {
+      "source": "1-23",
+      "rows": [
+        [{"text":"交换意见记录表","kind":"title","colSpan":7}],
+        [{"text":"交换意见日期："},{},{},{"text":"索引号：1-23","kind":"meta","colSpan":4}],
+        [{"text":"委托方名称（盖章）：","colSpan":7}],
+        [{"text":"委托方","kind":"header","colSpan":2},{"text":"姓名","kind":"header"},{"text":"职务","kind":"header"},{"text":"受托方","kind":"header"},{"text":"姓名","kind":"header"},{"text":"职务","kind":"header"}],
+        [{"text":"参加人员","kind":"header","colSpan":2,"rowSpan":2},{"ref":"C5","role":"e"},{"ref":"D5","role":"e"},{"text":"参加人员","kind":"header","rowSpan":2},{"ref":"F5","role":"e"},{"ref":"G5","role":"e"}],
+        [{"ref":"C6","role":"e"},{"ref":"D6","role":"e"},{"ref":"F6","role":"e"},{"ref":"G6","role":"e"}],
+        [{"text":"一、需要纳税调整事项审核说明","colSpan":7}],
+        [{"colSpan":7,"rowSpan":3,"ref":"A8","role":"e"}],
+        [],
+        [],
+        [{"text":"二、需要规范或关注事项","colSpan":7}],
+        [{"colSpan":7,"ref":"A12","role":"e"}],
+        [{"colSpan":7,"ref":"A13","role":"e"}],
+        [{"colSpan":7,"ref":"A14","role":"e"}],
+        [{"colSpan":7,"ref":"A15","role":"e"}],
+        [{"colSpan":7,"ref":"A16","role":"e"}],
+        [{"colSpan":7,"ref":"A17","role":"e"}],
+        [{"colSpan":7,"ref":"A18","role":"e"}],
+        [{"colSpan":7,"ref":"A19","role":"e"}],
+        [{"colSpan":7,"ref":"A20","role":"e"}],
+        [{"text":"三、交换意见处理意见","colSpan":7}],
+        [{"colSpan":7,"ref":"A22","role":"e"}],
+        [{"text":"委托方、被审核人签字：","kind":"header","colSpan":3},{"ref":"D23","role":"e"},{"text":"受托方、审核人签字：","kind":"header","colSpan":2},{"ref":"G23","role":"e"}]
+      ]
+    }
+  ]
+}

@@ -490,7 +490,7 @@ async def import_client_chart(
     by_category: dict[str, int] = {}
 
     for i, row in enumerate(normalized_rows, start=2):  # row 2+ (header is row 1)
-        code = str(row.get("account_code", "")).strip()
+        code = code_text(row.get("account_code"))
         name = str(row.get("account_name", "")).strip()
 
         if not code or not name:
@@ -1051,6 +1051,7 @@ _COLUMN_MAP = {
 
 
 import re as _re
+from app.core.code_text import code_text
 
 def _clean_header(h: str) -> str:
     """清洗列名：去掉方括号、圆括号、空格、星号等特殊字符。"""

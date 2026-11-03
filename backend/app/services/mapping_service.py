@@ -32,6 +32,7 @@ from app.services.event_bus import event_bus
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.dataset_query import get_active_filter
 from app.services.dataset_service import DatasetService
+from app.services.legacy_pl_crosswalk import crosswalk_target, detect_legacy_pl_crosswalk
 
 logger = logging.getLogger(__name__)
 
@@ -182,10 +183,16 @@ async def auto_suggest(
     std_by_code: dict[str, AccountChart] = {a.account_code: a for a in standard_accounts}
     std_by_name: dict[str, AccountChart] = {a.account_name: a for a in standard_accounts}
 
+    # 旧编码体系的损益科目按对照表映射到新准则 6xxx（整张客户科目表判定一次）
+    detected = detect_legacy_pl_crosswalk(c.account_code for c in client_accounts)
+    pl_crosswalk = detected[1] if detected else None
+    if detected:
+        logger.info("auto_suggest: project=%s 损益科目按 %s 对照新准则映射", project_id, detected[0])
+
     suggestions: list[MappingSuggestion] = []
 
     for client in client_accounts:
-        suggestion = _match_single(client, std_by_code, std_by_name, standard_accounts)
+        suggestion = _match_single(client, std_by_code, std_by_name, standard_accounts, pl_crosswalk)
         if suggestion:
             suggestions.append(suggestion)
 
@@ -535,6 +542,7 @@ def _match_single(
     std_by_code: dict[str, AccountChart],
     std_by_name: dict[str, AccountChart],
     standard_accounts: list[AccountChart],
+    pl_crosswalk: dict[str, str] | None = None,
 ) -> MappingSuggestion | None:
     """Try to match a single client account against standard accounts."""
     code = client.account_code
@@ -545,6 +553,19 @@ def _match_single(
 
     # 计算 prefix(后续多处用到)
     prefix = normalized[:4] if len(normalized) >= 4 else normalized
+
+    # Priority -2: 旧编码体系损益科目按对照表到新准则 6xxx（目标码不在标准科目表 ⇒ 走原逻辑）
+    target = crosswalk_target(code, pl_crosswalk)
+    if target and target in std_by_code:
+        std = std_by_code[target]
+        return MappingSuggestion(
+            original_account_code=code,
+            original_account_name=name,
+            suggested_standard_code=std.account_code,
+            suggested_standard_name=std.account_name,
+            confidence=0.99,
+            match_method="legacy_pl_crosswalk",
+        )
 
     # Priority -1 (最高优先级): 1231 系列优先按名称关键词匹配二级标准科目
     # 必须前置于"完整编码精确匹配",否则会被被污染的 1231 总分类抢走优先级

@@ -1,0 +1,58 @@
+/*
+ * CITAR 配色与字号令牌：值即 CITAR 原样式里的字面量，按值命名（不是语义令牌）。
+ * 只在 .citar-root 下生效；styles/*.css 由转写脚本把字面量换成这里的变量，渲染结果与 CITAR 一致。
+ */
+.citar-root {
+  --citar-c-0b5e8a: #0b5e8a;
+  --citar-c-0b6e4f: #0b6e4f;
+  --citar-c-1f1f1f: #1f1f1f;
+  --citar-c-3f3f4a: #3f3f4a;
+  --citar-c-4a4a55: #4a4a55;
+  --citar-c-4c1273: #4c1273;
+  --citar-c-5b1a8c: #5b1a8c;
+  --citar-c-5b2a86: #5b2a86;
+  --citar-c-5c5c68: #5c5c68;
+  --citar-c-6b6b76: #6b6b76;
+  --citar-c-6e0ba6: #6e0ba6;
+  --citar-c-8a5300: #8a5300;
+  --citar-c-8a7a9b: #8a7a9b;
+  --citar-c-8a8a96: #8a8a96;
+  --citar-c-8b3fd0: #8b3fd0;
+  --citar-c-8c8c96: #8c8c96;
+  --citar-c-9a9aa4: #9a9aa4;
+  --citar-c-a0a0aa: #a0a0aa;
+  --citar-c-a3262a: #a3262a;
+  --citar-c-a79bb5: #a79bb5;
+  --citar-c-a855f7: #a855f7;
+  --citar-c-b4a8c2: #b4a8c2;
+  --citar-c-c4c4cf: #c4c4cf;
+  --citar-c-e3f5ee: #e3f5ee;
+  --citar-c-e4d8f3: #e4d8f3;
+  --citar-c-e4f1f9: #e4f1f9;
+  --citar-c-e5484d: #e5484d;
+  --citar-c-f1e7fb: #f1e7fb;
+  --citar-c-f1f1f5: #f1f1f5;
+  --citar-c-f3e9fd: #f3e9fd;
+  --citar-c-f3edfa: #f3edfa;
+  --citar-c-f5f6fa: #f5f6fa;
+  --citar-c-f7f1fe: #f7f1fe;
+  --citar-c-f7f7fa: #f7f7fa;
+  --citar-c-faf6ff: #faf6ff;
+  --citar-c-fbf9fe: #fbf9fe;
+  --citar-c-fdeaea: #fdeaea;
+  --citar-c-fdf0dc: #fdf0dc;
+  --citar-c-fdf3f3: #fdf3f3;
+  --citar-c-fdfcff: #fdfcff;
+  --citar-c-fffaf2: #fffaf2;
+  --citar-c-ffffff: #ffffff;
+  --citar-fs-9: 9px;
+  --citar-fs-11: 11px;
+  --citar-fs-12: 12px;
+  --citar-fs-13: 13px;
+  --citar-fs-14: 14px;
+  --citar-fs-15: 15px;
+  --citar-fs-16: 16px;
+  --citar-fs-17: 17px;
+  --citar-fs-18: 18px;
+  --citar-fs-20: 20px;
+}

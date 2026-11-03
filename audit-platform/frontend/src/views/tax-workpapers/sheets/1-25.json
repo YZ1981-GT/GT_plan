@@ -1,0 +1,31 @@
+{
+  "code": "1-25",
+  "parts": [
+    {
+      "source": "1-25",
+      "rows": [
+        [{"text":"其他事项明细表","kind":"title","colSpan":6}],
+        [{},{"text":"索引号：1-25","kind":"meta","colSpan":5}],
+        [{"ref":"A3","role":"e"},{"text":"金额单位：元","kind":"meta","colSpan":5}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"序号","kind":"header"},{"text":"事项","kind":"header","colSpan":4},{"text":"备注","kind":"header"}],
+        [{"text":"1"},{"colSpan":4,"ref":"B7","role":"e"},{"ref":"F7","role":"e"}],
+        [{"text":"2"},{"colSpan":4,"ref":"B8","role":"e"},{"ref":"F8","role":"e"}],
+        [{"text":"3"},{"colSpan":4,"ref":"B9","role":"e"},{"ref":"F9","role":"e"}],
+        [{"text":"4"},{"colSpan":4,"ref":"B10","role":"e"},{"ref":"F10","role":"e"}],
+        [{"text":"5"},{"colSpan":4,"ref":"B11","role":"e"},{"ref":"F11","role":"e"}],
+        [{"text":"6"},{"colSpan":4,"ref":"B12","role":"e"},{"ref":"F12","role":"e"}],
+        [{"text":"7"},{"colSpan":4,"ref":"B13","role":"e"},{"ref":"F13","role":"e"}],
+        [{"text":"8"},{"colSpan":4,"ref":"B14","role":"e"},{"ref":"F14","role":"e"}],
+        [{"text":"9"},{"colSpan":4,"ref":"B15","role":"e"},{"ref":"F15","role":"e"}],
+        [{"text":"10"},{"colSpan":4,"ref":"B16","role":"e"},{"ref":"F16","role":"e"}],
+        [{"text":"11"},{"colSpan":4,"ref":"B17","role":"e"},{"ref":"F17","role":"e"}],
+        [{"text":"12"},{"colSpan":4,"ref":"B18","role":"e"},{"ref":"F18","role":"e"}],
+        [{"text":"13"},{"colSpan":4,"ref":"B19","role":"e"},{"ref":"F19","role":"e"}],
+        [{"text":"14"},{"colSpan":4,"ref":"B20","role":"e"},{"ref":"F20","role":"e"}],
+        [{"text":"15"},{"colSpan":4,"ref":"B21","role":"e"},{"ref":"F21","role":"e"}]
+      ]
+    }
+  ]
+}

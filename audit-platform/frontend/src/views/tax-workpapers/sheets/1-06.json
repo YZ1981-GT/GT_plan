@@ -1,0 +1,47 @@
+{
+  "code": "1-06",
+  "parts": [
+    {
+      "source": "1-06",
+      "rows": [
+        [{"text":"审核业务工作计划","kind":"title","colSpan":6}],
+        [{"text":"索引号：1-06","kind":"meta","colSpan":6}],
+        [{"text":"被审核人"},{"colSpan":2,"ref":"B3","role":"f"},{"text":"省市"},{"text":"北京市","colSpan":2}],
+        [{"text":"会计年度"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"业务约定书编号","kind":"header"},{"ref":"B5","role":"e"},{"text":"审核报告编号","kind":"header"},{"ref":"D5","role":"e"},{"text":"备案号","kind":"header"},{"ref":"F5","role":"e"}],
+        [{"text":"财务报表审核单位名称","kind":"header","colSpan":2},{"colSpan":2,"ref":"C6","role":"e"},{"text":"报表审核报告号","kind":"header"},{"ref":"F6","role":"e"}],
+        [{"text":"一、审核项目","colSpan":6}],
+        [{"colSpan":6,"ref":"A8","role":"f"}],
+        [{"colSpan":6,"ref":"A9","role":"e"}],
+        [{"text":"二、审核类型","colSpan":6}],
+        [{"text":"企业所得税年度纳税申报审核","kind":"header","colSpan":6}],
+        [{"text":"三、审核目标","colSpan":6}],
+        [{"colSpan":6,"ref":"A13","role":"f"}],
+        [{"colSpan":6,"ref":"A14","role":"e"}],
+        [{"text":"四、审核业务完成时间","colSpan":6}],
+        [{"text":"2026年5月31日前","colSpan":6}],
+        [{"colSpan":6,"ref":"A17","role":"e"}],
+        [{"text":"五、计划审核日期","colSpan":6}],
+        [{"text":"约定工作开始日"},{"colSpan":5,"ref":"B19","role":"e"}],
+        [{"text":"外勤工作日自"},{"colSpan":2,"ref":"B20","role":"e"},{"text":"至"},{"colSpan":2,"ref":"E20","role":"e"}],
+        [{"text":"编写报告自"},{"colSpan":2,"ref":"B21","role":"e"},{"text":"至"},{"colSpan":2,"ref":"E21","role":"e"}],
+        [{"text":"审核截止日期"},{"text":"2026.5.31前","colSpan":2},{"text":"底稿归档日期"},{"colSpan":2,"ref":"E22","role":"e"}],
+        [{"text":"六、审核小组组成及人员分工：","colSpan":6}],
+        [{"text":"分工","kind":"header"},{"text":"姓  名","kind":"header"},{"text":"职务或名称","kind":"header"},{"text":"工作内容","kind":"header","colSpan":2},{"text":"备注","kind":"header"}],
+        [{"text":"项目合伙人"},{"ref":"B25","role":"e"},{"text":"合伙人"},{"text":"负责项目计划的制定、人员管理、进度控制、资源协调、项目的实现和成果的保质按时交付等管理工作","colSpan":2},{"ref":"F25","role":"e"}],
+        [{"text":"项目负责人","rowSpan":2},{"ref":"B26","role":"e"},{"ref":"C26","role":"e"},{"text":"负责对整个项目工作的实施及人员安排，以及二级复核工作，按时提交工作成果","colSpan":2},{"text":"项目负责人"}],
+        [{"ref":"B27","role":"e"},{"ref":"C27","role":"e"},{"text":"负责对整个项目工作的具体实施，根据项目进度进行各项工作及一级复核工作，按时提交工作成果","colSpan":2},{"text":"现场负责人"}],
+        [{"text":"项目组人员","rowSpan":5},{"ref":"B28","role":"e"},{"ref":"C28","role":"e"},{"text":"完成现场负责人安排的工作，以及后期档案归集、整理等辅助性工作","colSpan":2,"rowSpan":5},{"ref":"F28","role":"e"}],
+        [{"ref":"B29","role":"e"},{"ref":"C29","role":"e"},{"ref":"F29","role":"e"}],
+        [{"ref":"B30","role":"e"},{"ref":"C30","role":"e"},{"ref":"F30","role":"e"}],
+        [{"ref":"B31","role":"e"},{"ref":"C31","role":"e"},{"ref":"F31","role":"e"}],
+        [{"ref":"B32","role":"e"},{"ref":"C32","role":"e"},{"ref":"F32","role":"e"}],
+        [{"text":"公司（所）领导意见：","colSpan":6}],
+        [{"colSpan":6,"ref":"A34","role":"e"}],
+        [{},{},{},{},{},{}],
+        [{},{},{},{},{},{}],
+        [{},{},{},{},{},{}]
+      ]
+    }
+  ]
+}

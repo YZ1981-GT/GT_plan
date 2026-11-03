@@ -114,13 +114,32 @@ class TestL1KeyColumnDateInvalid:
 
     def test_voucher_date_valid_formats(self):
         """多种合法日期格式都应通过。"""
-        valid_dates = ["2025-01-15", "2025/01/15", "20250115", "2025-01-15 10:30:00"]
+        valid_dates = ["2025-01-15", "2025/01/15", "20250115", "2025-01-15 10:30:00", "2025.01.15"]
         for d in valid_dates:
             rows = [{"voucher_date": d, "voucher_no": "记-001",
                      "account_code": "1001", "debit_amount": "100", "credit_amount": "0"}]
             findings, _ = validate_l1(rows, "ledger", column_mapping={})
             date_errors = [f for f in findings if "DATE" in f.code]
             assert len(date_errors) == 0, f"Date '{d}' should be valid"
+
+    @pytest.mark.parametrize(
+        "raw",
+        ["2025.01.01", "2025-01-01", "2025/01/01", "20250101",
+         "2025-01-01 08:00:00", "2025/01/01 08:00:00", "45658", "not-a-date", "2025年1月1日"],
+    )
+    def test_l1_date_verdict_matches_converter(self, raw):
+        """L1 放行的日期必须与写库转换器能解析的完全一致。
+
+        曾各自维护格式清单：转换器认 ``YYYY.MM.DD``、校验器不认 ⇒ 整本序时账
+        （14107 行 ``2025.01.01``）全判阻塞，导入失败。
+        """
+        from app.services.ledger_import.converter import parse_date_val
+
+        rows = [{"voucher_date": raw, "voucher_no": "记-001",
+                 "account_code": "1001", "debit_amount": "100", "credit_amount": "0"}]
+        findings, _ = validate_l1(rows, "ledger", column_mapping={})
+        l1_rejects = any(f.code == "DATE_INVALID_KEY" for f in findings)
+        assert l1_rejects == (parse_date_val(raw) is None), raw
 
     def test_voucher_date_excel_serial(self):
         """Excel 序列号（如 45678）应被解析为日期。"""

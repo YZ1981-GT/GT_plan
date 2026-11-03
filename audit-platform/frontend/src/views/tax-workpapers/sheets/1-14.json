@@ -1,0 +1,26 @@
+{
+  "code": "1-14",
+  "parts": [
+    {
+      "source": "1-14",
+      "rows": [
+        [{"text":"从业人数和资产总额调查表","kind":"title","colSpan":10}],
+        [{"text":"索引号：1-14","kind":"meta","colSpan":10}],
+        [{"text":"金额单位:万元","kind":"meta","colSpan":10}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":3,"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"G4","role":"f"},{"text":"编制日期"},{"colSpan":2,"ref":"I4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":3,"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"G5","role":"f"},{"text":"复核日期"},{"colSpan":2,"ref":"I5","role":"f"}],
+        [{"text":"季度","kind":"header","rowSpan":3},{"text":"104从业人数","kind":"header","colSpan":5},{"text":"103资产总额","kind":"header","colSpan":3},{"text":"备注","kind":"header","rowSpan":3}],
+        [{"text":"季度初值","kind":"header","colSpan":2},{"text":"季度末值","kind":"header","colSpan":2},{"text":"季平均值","kind":"header","rowSpan":2},{"text":"季度初值","kind":"header","rowSpan":2},{"text":"季度末值","kind":"header","rowSpan":2},{"text":"季平均值","kind":"header","rowSpan":2}],
+        [{"text":"建立劳动关系人数","kind":"header"},{"text":"劳务派遣人数","kind":"header"},{"text":"建立劳动关系人数","kind":"header"},{"text":"劳务派遣人数","kind":"header"}],
+        [{"text":"1"},{"ref":"B9","role":"e"},{"ref":"C9","role":"e"},{"ref":"D9","role":"e"},{"ref":"E9","role":"e"},{"ref":"F9","role":"f"},{"kind":"input","ref":"G9","role":"e","fmt":"money"},{"kind":"input","ref":"H9","role":"e","fmt":"money"},{"kind":"number","ref":"I9","role":"f","fmt":"money"},{"ref":"J9","role":"e"}],
+        [{"text":"2"},{"ref":"B10","role":"e"},{"ref":"C10","role":"e"},{"ref":"D10","role":"e"},{"ref":"E10","role":"e"},{"ref":"F10","role":"f"},{"kind":"input","ref":"G10","role":"e","fmt":"money"},{"kind":"input","ref":"H10","role":"e","fmt":"money"},{"kind":"number","ref":"I10","role":"f","fmt":"money"},{"ref":"J10","role":"e"}],
+        [{"text":"3"},{"ref":"B11","role":"e"},{"ref":"C11","role":"e"},{"ref":"D11","role":"e"},{"ref":"E11","role":"e"},{"ref":"F11","role":"f"},{"kind":"input","ref":"G11","role":"e","fmt":"money"},{"kind":"input","ref":"H11","role":"e","fmt":"money"},{"kind":"number","ref":"I11","role":"f","fmt":"money"},{"ref":"J11","role":"e"}],
+        [{"text":"4"},{"ref":"B12","role":"e"},{"ref":"C12","role":"e"},{"ref":"D12","role":"e"},{"ref":"E12","role":"e"},{"ref":"F12","role":"f"},{"kind":"input","ref":"G12","role":"e","fmt":"money"},{"kind":"input","ref":"H12","role":"e","fmt":"money"},{"kind":"number","ref":"I12","role":"f","fmt":"money"},{"ref":"J12","role":"e"}],
+        [{"text":"合计","kind":"total"},{"ref":"B13","role":"f"},{"ref":"C13","role":"f"},{"ref":"D13","role":"f"},{"ref":"E13","role":"f"},{"ref":"F13","role":"f"},{"kind":"number","ref":"G13","role":"f","fmt":"money"},{"kind":"number","ref":"H13","role":"f","fmt":"money"},{"kind":"number","ref":"I13","role":"f","fmt":"money"},{"ref":"J13","role":"e"}],
+        [{"text":"全年季平均值","colSpan":2},{"colSpan":4,"ref":"C14","role":"f"},{"colSpan":4,"ref":"G14","role":"f"}],
+        [{"text":"审核工作记录：","colSpan":10}],
+        [{"colSpan":10,"ref":"A16","role":"e"}]
+      ]
+    }
+  ]
+}

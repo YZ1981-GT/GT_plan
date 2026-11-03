@@ -1,0 +1,243 @@
+/* 移植自 CITAR screens/part2/adjustment-screen.css。color / background / font-size 的字面量换成 citar-tokens.css 中的同值变量（stylelint 卡点），其余原样。 */
+/*
+ * 节点 2.3 调整分录。
+ *
+ * 一条分录一张卡片,内含若干借方行与贷方行。
+ * 不用表格:多借多贷时行合并的跨度随借贷行数变化,视觉上容易错乱。
+ */
+
+.adj-screen {
+  max-width: 1040px;
+}
+
+.adj-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #5b1a8c 0%, #8b3fd0 100%);
+}
+
+.adj-header__title {
+  margin: 0;
+  font-size: var(--citar-fs-18);
+  font-weight: 700;
+  color: var(--citar-c-ffffff);
+}
+
+.adj-header__count {
+  margin-left: auto;
+  font-size: var(--citar-fs-12);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* 工具条:导入导出在列表上方,本期只开按钮。 */
+.adj-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.adj-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4a4a55);
+  cursor: pointer;
+}
+
+.adj-button:hover:not(:disabled) {
+  border-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+}
+
+.adj-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.adj-button--primary {
+  margin-left: auto;
+  border: none;
+  color: var(--citar-c-ffffff);
+  font-weight: 700;
+  background: linear-gradient(90deg, #6e0ba6 0%, #a855f7 100%);
+}
+
+/* 分录卡片。 */
+.adj-entry {
+  margin-top: 14px;
+  padding: 14px 16px 12px;
+  background: var(--citar-c-ffffff);
+  border: 1px solid #e8e8ec;
+  border-left: 3px solid #a855f7;
+  border-radius: 8px;
+}
+
+.adj-entry__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.adj-entry__seq {
+  font-size: var(--citar-fs-14);
+  font-weight: 700;
+  color: var(--citar-c-4c1273);
+}
+
+.adj-entry__remove {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid #e8e8ec;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-6b6b76);
+  cursor: pointer;
+}
+
+.adj-entry__remove:hover {
+  border-color: #e5484d;
+  color: var(--citar-c-e5484d);
+}
+
+/* 列头与数据行共用同一套网格,保证对齐。 */
+.adj-grid {
+  display: grid;
+  grid-template-columns: 76px 1fr 1fr 150px 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.adj-grid--head {
+  margin-bottom: 6px;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-8c8c96);
+}
+
+.adj-grid + .adj-grid {
+  margin-top: 6px;
+}
+
+/* 方向标签:借方与贷方用不同色,一眼可辨。 */
+.adj-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border-radius: 6px;
+  font-size: var(--citar-fs-13);
+  font-weight: 700;
+}
+
+.adj-side--debit {
+  color: var(--citar-c-0b5e8a);
+  background: var(--citar-c-e4f1f9);
+}
+
+.adj-side--credit {
+  color: var(--citar-c-8a5300);
+  background: var(--citar-c-fdf0dc);
+}
+
+.adj-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-1f1f1f);
+  box-sizing: border-box;
+}
+
+.adj-input:focus {
+  outline: none;
+  border-color: #6e0ba6;
+}
+
+.adj-input::placeholder {
+  color: var(--citar-c-c4c4cf);
+}
+
+/* 金额右对齐,等宽数字使小数点成列。 */
+.adj-input--amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行级删除:只在该侧多于一行时可用。 */
+.adj-row-remove {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-size: var(--citar-fs-16);
+  line-height: 1;
+  color: var(--citar-c-c4c4cf);
+  cursor: pointer;
+}
+
+.adj-row-remove:hover:not(:disabled) {
+  color: var(--citar-c-e5484d);
+  background: var(--citar-c-fdeaea);
+}
+
+.adj-row-remove:disabled {
+  cursor: default;
+  opacity: 0;
+}
+
+/* 卡片底部:增加借方行与贷方行。 */
+.adj-entry__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #eeeef2;
+}
+
+.adj-add-row {
+  padding: 5px 12px;
+  border: 1px dashed #c9b3e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-6e0ba6);
+  cursor: pointer;
+}
+
+.adj-add-row:hover {
+  background: var(--citar-c-faf6ff);
+}
+
+/* 底部追加分录。 */
+.adj-footer {
+  margin-top: 16px;
+}
+
+.adj-add-entry {
+  width: 100%;
+  padding: 11px;
+  border: 1px dashed #c9b3e0;
+  border-radius: 8px;
+  background: var(--citar-c-fdfcff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-6e0ba6);
+  cursor: pointer;
+}
+
+.adj-add-entry:hover {
+  background: var(--citar-c-f7f1fe);
+  border-color: #a855f7;
+}

@@ -132,7 +132,8 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     "account_code": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
     "account_name": ["科目名称", "科目全名", "账户名称", "Account Name"],
     # 期初（月度维度）；「年初余额」净额单列无独立年度净额字段，按 R1.5 并入 opening_balance
-    "opening_balance": ["期初余额", "年初余额"],
+    # 「未审期初数 / 未审期末数」= 账面数 + 账表差异，是试算表「未审数」口径（用户 2026-11-02 定）
+    "opening_balance": ["期初余额", "年初余额", "未审期初数"],
     "opening_debit": ["期初借方", "期初借方余额"],
     "opening_credit": ["期初贷方", "期初贷方余额"],
     # 年初（年度维度）
@@ -145,13 +146,15 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     "debit_amount": [
         "借方金额", "本期借方", "借方发生额", "借方本期",
         "借方本期发生额", "本期借方发生额", "借方", "Debit", "DR",
+        "未审借方发生额",
     ],
     "credit_amount": [
         "贷方金额", "本期贷方", "贷方发生额", "贷方本期",
         "贷方本期发生额", "本期贷方发生额", "贷方", "Credit", "CR",
+        "未审贷方发生额",
     ],
     # 期末
-    "closing_balance": ["期末余额"],
+    "closing_balance": ["期末余额", "未审期末数"],
     "closing_debit": ["期末借方", "期末借方余额"],
     "closing_credit": ["期末贷方", "期末贷方余额"],
     # 凭证定位
@@ -427,6 +430,14 @@ def _match_merged_header(header: str) -> tuple[Optional[str], int, str]:
     return None, 0, ""
 
 
+#: 表头含这些词 ⇒ 不是本期未审口径的余额 / 发生额（调整额、差异、审定数、上期数），
+#: 禁止编辑距离兜底：两个字的限定词恰好在容差内，「审定期末数」「上期期初数」
+#: 与别名「未审期末数」「未审期初数」只差 2 个字。
+_LEVENSHTEIN_BLOCK_MARKERS: tuple[str, ...] = (
+    "调整", "重分类", "差异", "滚调", "审定", "上期",
+)
+
+
 def _match_header(header: str) -> tuple[Optional[str], int, str]:
     """把单个列名映射到 standard_field。
 
@@ -471,6 +482,12 @@ def _match_header(header: str) -> tuple[Optional[str], int, str]:
                     best_match = (std_field, len(alias))
     if best_match[0] is not None:
         return best_match[0], fuzzy_conf, "header_fuzzy"
+
+    # 调整 / 审定 / 上期类表头不走编辑距离兜底：「期初调整借方」曾被吸成
+    # opening_debit、「期末调整贷方」吸成 closing_credit，而借贷分列优先于净额列，
+    # 导入后期初 / 期末全变成调整额（多为 0）。
+    if any(marker in normalized for marker in _LEVENSHTEIN_BLOCK_MARKERS):
+        return None, 0, "header_fuzzy"
 
     # Fuzzy: Levenshtein
     max_d = MATCHING_CONFIG.get("levenshtein_max_distance", 2)
@@ -620,6 +637,18 @@ def _detect_by_headers(
                 already_mapped.add(best[0])
 
         header_mappings.append((header, std, conf, source))
+
+    # 同一字段已有精确命中的列 ⇒ 其余模糊命中的列不再映射该字段（留在 raw_extra）。
+    # 多列映射同一字段时取值是「首个非空列」，按列序模糊列会抢在精确列前面：
+    # 「账面期末数」排在「未审期末数」前、「上级科目名称」排在「科目名称」前。
+    exact_fields = {
+        std for _h, std, _c, src in header_mappings
+        if std is not None and src != "header_fuzzy"
+    }
+    header_mappings = [
+        (h, None, 0, src) if (std in exact_fields and src == "header_fuzzy") else (h, std, c, src)
+        for h, std, c, src in header_mappings
+    ]
 
     matched_std_fields: set[str] = {
         std for _h, std, _c, _s in header_mappings if std is not None

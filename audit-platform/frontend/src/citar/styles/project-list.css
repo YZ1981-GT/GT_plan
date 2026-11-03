@@ -1,0 +1,366 @@
+/* 移植自 CITAR screens/part1/project-list-screen.css。color / background / font-size 的字面量换成 citar-tokens.css 中的同值变量（stylelint 卡点），其余原样。 */
+/*
+ * 节点 1.2 项目选择界面。
+ *
+ * 经确认的版式:顶栏左侧 LOGO、右侧登录人与退出登录;
+ * 原「项目负责人行」清空,一级与二级侧边栏在此界面不显示;
+ * 主体只有项目列表与三个功能按钮。
+ */
+
+.list-screen {
+  min-height: 100vh;
+  background: var(--citar-c-f5f6fa);
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  color: var(--citar-c-1f1f1f);
+}
+
+.list-topbar {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 24px;
+  background: var(--citar-c-ffffff);
+  border-bottom: 1px solid #e8e8ec;
+}
+
+.list-topbar__logo {
+  height: 28px;
+  width: auto;
+}
+
+.list-topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4a4a55);
+}
+
+.list-topbar__logout {
+  padding: 6px 14px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4a4a55);
+  cursor: pointer;
+}
+
+.list-topbar__logout:hover {
+  border-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+}
+
+.list-main {
+  padding: 24px;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.list-toolbar__title {
+  margin: 0;
+  font-size: var(--citar-fs-20);
+  font-weight: 700;
+  color: var(--citar-c-6e0ba6);
+}
+
+.list-toolbar__count {
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-8c8c96);
+}
+
+.list-toolbar__actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.list-button {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4a4a55);
+  cursor: pointer;
+}
+
+.list-button:hover:not(:disabled) {
+  border-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+}
+
+.list-button--primary {
+  border: none;
+  color: var(--citar-c-ffffff);
+  font-weight: 700;
+  background: linear-gradient(90deg, #6e0ba6 0%, #a855f7 100%);
+}
+
+/* 导入导出本期只开按钮不实装,置灰并以 title 说明。 */
+.list-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 列表用卡片而非表格:每行要放多个标签,表格单元格里排标签会挤。 */
+.list-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.list-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--citar-c-ffffff);
+  border: 1px solid #e8e8ec;
+  border-left: 3px solid #a855f7;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.list-card:hover {
+  border-color: #c9a2e8;
+  border-left-color: #6e0ba6;
+}
+
+.list-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.list-card__name {
+  font-size: var(--citar-fs-15);
+  font-weight: 700;
+}
+
+.list-tag {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: var(--citar-fs-12);
+  line-height: 18px;
+}
+
+/* 小微企业与税收优惠用不同色相,便于一眼区分。 */
+.list-tag--small {
+  color: var(--citar-c-0b6e4f);
+  background: var(--citar-c-e3f5ee);
+}
+
+.list-tag--benefit {
+  color: var(--citar-c-8a5300);
+  background: var(--citar-c-fdf0dc);
+}
+
+.list-tag--type {
+  color: var(--citar-c-5b2a86);
+  background: var(--citar-c-f1e7fb);
+}
+
+.list-card__meta {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-6b6b76);
+}
+
+.list-card__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-9a9aa4);
+}
+
+.list-card__node {
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--citar-c-4a4a55);
+  background: var(--citar-c-f1f1f5);
+}
+
+/* 空列表与加载态。 */
+.list-empty {
+  padding: 56px 24px;
+  text-align: center;
+  background: var(--citar-c-ffffff);
+  border: 1px dashed #d9d9e0;
+  border-radius: 8px;
+  color: var(--citar-c-8c8c96);
+}
+
+.list-empty__title {
+  margin: 0 0 8px;
+  font-size: var(--citar-fs-15);
+  color: var(--citar-c-4a4a55);
+}
+
+.list-empty__hint {
+  margin: 0;
+  font-size: var(--citar-fs-13);
+}
+
+.list-notice {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-8a5300);
+  background: var(--citar-c-fdf0dc);
+}
+/* ── 删除模式 ───────────────────────────────── */
+
+.list-button--danger {
+  border-color: #e5484d;
+  color: var(--citar-c-e5484d);
+}
+
+.list-button--danger:hover:not(:disabled) {
+  color: var(--citar-c-ffffff);
+  background: var(--citar-c-e5484d);
+  border-color: #e5484d;
+}
+
+/* 删除模式下卡片左侧让出勾选框的位置。 */
+.list-card--selected {
+  border-color: #e5484d;
+  border-left-color: #e5484d;
+  background: var(--citar-c-fdf3f3);
+}
+
+.list-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 2px 4px 0 0;
+  border: 1px solid #c4c4cf;
+  border-radius: 4px;
+  background: var(--citar-c-ffffff);
+  color: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-12);
+  line-height: 1;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.list-check--on {
+  border-color: #e5484d;
+  background: var(--citar-c-e5484d);
+}
+
+/*
+ * 删除模式下卡片是三列:勾选框、内容、右侧信息。
+ * 用 :has 让有勾选框时自动切换列数,免得在 TSX 里另加一个类名。
+ */
+.list-card:has(.list-check) {
+  grid-template-columns: auto 1fr auto;
+}
+
+/* ── 确认弹层 ───────────────────────────────── */
+
+.list-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(31, 31, 40, 0.45);
+}
+
+.list-dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 22px 24px 18px;
+  background: var(--citar-c-ffffff);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(31, 31, 40, 0.18);
+}
+
+.list-dialog__title {
+  margin: 0 0 14px;
+  font-size: var(--citar-fs-16);
+  font-weight: 700;
+  color: var(--citar-c-1f1f1f);
+}
+
+/* 项目多时弹层不无限变高,超出部分滚动。 */
+.list-dialog__items {
+  margin: 0 0 14px;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.list-dialog__items li {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: var(--citar-c-f7f7fa);
+  font-size: var(--citar-fs-13);
+}
+
+.list-dialog__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-8c8c96);
+}
+
+.list-dialog__warning {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: var(--citar-fs-12);
+  line-height: 1.6;
+  color: var(--citar-c-a3262a);
+  background: var(--citar-c-fdeaea);
+}
+
+.list-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+/* 修改模式。用紫色区别于删除的红色,避免两种模式看起来一样。 */
+.list-card--picked {
+  border-color: #a855f7;
+  border-left-color: #6e0ba6;
+  background: var(--citar-c-faf6ff);
+}
+
+.list-check--single {
+  border-radius: 50%;
+}
+
+.list-check--single.list-check--on {
+  border-color: #6e0ba6;
+  background: var(--citar-c-6e0ba6);
+}
+
+/* 修改模式的提示条用紫色,删除模式沿用橙色警示。 */
+.list-notice--info {
+  color: var(--citar-c-5b2a86);
+  background: var(--citar-c-f3e9fd);
+}

@@ -1,0 +1,45 @@
+{
+  "code": "3-02-03",
+  "parts": [
+    {
+      "source": "3-02-03",
+      "rows": [
+        [{"text":"广告费和业务宣传费跨年度纳税调整审核表","kind":"title","colSpan":8}],
+        [{},{},{},{},{},{},{"text":"索引号：3-02-03","kind":"meta","colSpan":2}],
+        [{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":2,"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"F4","role":"f"},{"text":"编制日期"},{"ref":"H4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":2,"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"F5","role":"f"},{"text":"复核日期"},{"ref":"H5","role":"f"}],
+        [{"text":"行次","kind":"header"},{"text":"项   目","kind":"header","colSpan":3},{"text":"账载金额","kind":"header"},{"text":"审核调整额","kind":"header"},{"text":"审核确认额","kind":"header"},{"text":"备注","kind":"header"}],
+        [{"text":"1","rowSpan":4},{"text":"销售（营业）费用中列支额","colSpan":3},{"kind":"number","ref":"E7","role":"f","fmt":"money"},{"kind":"input","ref":"F7","role":"e","fmt":"money"},{"kind":"number","ref":"G7","role":"f","fmt":"money"},{"ref":"H7","role":"e"}],
+        [{"text":"管理费用（含研发费用）中列支额","colSpan":3},{"kind":"number","ref":"E8","role":"f","fmt":"money"},{"kind":"input","ref":"F8","role":"e","fmt":"money"},{"kind":"number","ref":"G8","role":"f","fmt":"money"},{"ref":"H8","role":"e"}],
+        [{"text":"在其他成本、费用中列支额","colSpan":3},{"kind":"number","ref":"E9","role":"f","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"},{"kind":"number","ref":"G9","role":"f","fmt":"money"},{"ref":"H9","role":"e"}],
+        [{"text":"广告费和业务宣传费合计","colSpan":3},{"kind":"number","ref":"E10","role":"f","fmt":"money"},{"kind":"number","ref":"F10","role":"f","fmt":"money"},{"kind":"number","ref":"G10","role":"f","fmt":"money"},{"ref":"H10","role":"e"}],
+        [{"text":"2"},{"text":"其中：不允许扣除的广告费和业务宣传费支出","colSpan":3},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"},{"kind":"number","ref":"G11","role":"f","fmt":"money"},{"ref":"H11","role":"e"}],
+        [{"text":"3"},{"text":"本年度符合条件的广告费和业务宣传费支出（1－2）","colSpan":3},{"kind":"number","ref":"E12","role":"f","fmt":"money"},{"kind":"number","ref":"F12","role":"f","fmt":"money"},{"kind":"number","ref":"G12","role":"f","fmt":"money"},{"ref":"H12","role":"e"}],
+        [{"text":"4"},{"text":"本年计算广告费和业务宣传费扣除限额的销售（营业）收入","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G13","role":"f","fmt":"money"},{"ref":"H13","role":"e"}],
+        [{"text":"5"},{"text":"税收规定的扣除率","colSpan":3},{"text":"*"},{"text":"*"},{"text":"0.00","kind":"number"},{"ref":"H14","role":"e"}],
+        [{"text":"6"},{"text":"本企业计算的广告费和业务宣传费扣除限额（4×5）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G15","role":"f","fmt":"money"},{"ref":"H15","role":"e"}],
+        [{"text":"7"},{"text":"本年结转以后年度扣除额（3＞6，本行＝3－6；3≤6，本行＝0）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G16","role":"f","fmt":"money"},{"ref":"H16","role":"e"}],
+        [{"text":"8"},{"text":"加：以前年度累计结转扣除额","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"input","ref":"G17","role":"e","fmt":"money"},{"ref":"H17","role":"e"}],
+        [{"text":"9"},{"text":"减：本年扣除的以前年度结转额[3＞6，本行=0；3≤6，本行=8或（6-3）孰小值]","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G18","role":"f","fmt":"money"},{"ref":"H18","role":"e"}],
+        [{"text":"10"},{"text":"按照分摊协议归集至其他关联方的广告费和业务宣传费（10≤3或6孰小值）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"input","ref":"G19","role":"e","fmt":"money"},{"ref":"H19","role":"e"}],
+        [{"text":"11"},{"text":"按照分摊协议从其他关联方归集至本企业的广告费和业务宣传费","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"input","ref":"G20","role":"e","fmt":"money"},{"ref":"H20","role":"e"}],
+        [{"text":"12"},{"text":"本年广告费和业务宣传费支出纳税调整金额（3＞6，本行=2+3-6+10-11；3≤6，本行=2+10-11-9）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G21","role":"f","fmt":"money"},{"ref":"H21","role":"e"}],
+        [{"text":"13"},{"text":"累计结转以后年度扣除额（7+8-9）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G22","role":"f","fmt":"money"},{"ref":"H22","role":"e"}],
+        [{"text":"收入项目","kind":"header","colSpan":4,"rowSpan":2},{"text":"金额","kind":"header","colSpan":3},{"text":"备注","kind":"header"}],
+        [{"text":"账载金额","kind":"header"},{"text":"税收金额","kind":"header","colSpan":2},{"ref":"H24","role":"e"}],
+        [{"text":"1"},{"text":"主营业务收入","colSpan":3},{"kind":"number","ref":"E25","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F25","role":"f","fmt":"money"},{"ref":"H25","role":"e"}],
+        [{"text":"2"},{"text":"其他业务收入","colSpan":3},{"kind":"number","ref":"E26","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F26","role":"f","fmt":"money"},{"ref":"H26","role":"e"}],
+        [{"text":"3"},{"text":"视同销售收入","colSpan":3},{"kind":"number","ref":"E27","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F27","role":"f","fmt":"money"},{"ref":"H27","role":"e"}],
+        [{"text":"4"},{"text":"销售未完工开发产品取得的收入","colSpan":3},{"kind":"number","ref":"E28","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F28","role":"f","fmt":"money"},{"ref":"H28","role":"e"}],
+        [{"text":"5"},{"text":"减：销售未完工产品转完工产品确认的销售收入","colSpan":3},{"kind":"number","ref":"E29","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F29","role":"f","fmt":"money"},{"ref":"H29","role":"e"}],
+        [{"text":"6"},{"text":"减：不征税收入","colSpan":3},{"kind":"number","ref":"E30","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F30","role":"f","fmt":"money"},{"ref":"H30","role":"e"}],
+        [{"text":"本年计算广告费和业务宣传费扣除限额的销售（营业）收入","colSpan":4},{"kind":"number","ref":"E31","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"F31","role":"f","fmt":"money"},{"ref":"H31","role":"e"}],
+        [{"text":"一、审核项目说明：","colSpan":8}],
+        [{"colSpan":8,"ref":"A33","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":8}],
+        [{"colSpan":8,"ref":"A35","role":"e"}]
+      ]
+    }
+  ]
+}

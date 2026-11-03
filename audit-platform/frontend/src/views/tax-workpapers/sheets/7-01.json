@@ -1,0 +1,39 @@
+{
+  "code": "7-01",
+  "parts": [
+    {
+      "source": "7-01",
+      "rows": [
+        [{"text":"企业重大事项披露表","kind":"title","colSpan":6}],
+        [{"text":"索引号：7-01","kind":"meta","colSpan":6}],
+        [{"text":"金额单位：元","kind":"meta","colSpan":6}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"行次","kind":"header","rowSpan":2},{"text":"重大交易事项","kind":"header","rowSpan":2},{"text":"事项描述","kind":"header","rowSpan":2},{"text":"证据资料","kind":"header","colSpan":2,"rowSpan":2},{"text":"备注","kind":"header","rowSpan":2}],
+        [],
+        [{"text":"1","kind":"header"},{"text":"对外投资","kind":"header"},{"ref":"C8","role":"e"},{"colSpan":2,"ref":"D8","role":"e"},{"ref":"F8","role":"e"}],
+        [{"text":"2","kind":"header"},{"text":"股权转让","kind":"header"},{"ref":"C9","role":"e"},{"colSpan":2,"ref":"D9","role":"e"},{"ref":"F9","role":"e"}],
+        [{"text":"3","kind":"header"},{"text":"涉及企业经营发展战略的重大生产经营行为、事件","kind":"header"},{"ref":"C10","role":"e"},{"colSpan":2,"ref":"D10","role":"e"},{"ref":"F10","role":"e"}],
+        [{"text":"4"},{"ref":"B11","role":"e"},{"ref":"C11","role":"e"},{"colSpan":2,"ref":"D11","role":"e"},{"ref":"F11","role":"e"}],
+        [{"text":"5"},{"ref":"B12","role":"e"},{"ref":"C12","role":"e"},{"colSpan":2,"ref":"D12","role":"e"},{"ref":"F12","role":"e"}],
+        [{"text":"6"},{"ref":"B13","role":"e"},{"ref":"C13","role":"e"},{"colSpan":2,"ref":"D13","role":"e"},{"ref":"F13","role":"e"}],
+        [{"text":"7"},{"ref":"B14","role":"e"},{"ref":"C14","role":"e"},{"colSpan":2,"ref":"D14","role":"e"},{"ref":"F14","role":"e"}],
+        [{"text":"8"},{},{"ref":"C15","role":"e"},{"colSpan":2,"ref":"D15","role":"e"},{"ref":"F15","role":"e"}],
+        [{"text":"9"},{"ref":"B16","role":"e"},{"ref":"C16","role":"e"},{"colSpan":2,"ref":"D16","role":"e"},{"ref":"F16","role":"e"}],
+        [{"text":"10"},{"ref":"B17","role":"e"},{"ref":"C17","role":"e"},{"colSpan":2,"ref":"D17","role":"e"},{"ref":"F17","role":"e"}],
+        [{"text":"11"},{"ref":"B18","role":"e"},{"ref":"C18","role":"e"},{"colSpan":2,"ref":"D18","role":"e"},{"ref":"F18","role":"e"}],
+        [{"text":"12"},{"ref":"B19","role":"e"},{"ref":"C19","role":"e"},{"colSpan":2,"ref":"D19","role":"e"},{"ref":"F19","role":"e"}],
+        [{"text":"13"},{"ref":"B20","role":"e"},{"ref":"C20","role":"e"},{"colSpan":2,"ref":"D20","role":"e"},{"ref":"F20","role":"e"}],
+        [{"text":"14"},{"ref":"B21","role":"e"},{"ref":"C21","role":"e"},{"colSpan":2,"ref":"D21","role":"e"},{"ref":"F21","role":"e"}],
+        [{"text":"15"},{"ref":"B22","role":"e"},{"ref":"C22","role":"e"},{"colSpan":2,"ref":"D22","role":"e"},{"ref":"F22","role":"e"}],
+        [{"text":"16"},{"ref":"B23","role":"e"},{"ref":"C23","role":"e"},{"colSpan":2,"ref":"D23","role":"e"},{"ref":"F23","role":"e"}],
+        [{"text":"17"},{"ref":"B24","role":"e"},{"ref":"C24","role":"e"},{"colSpan":2,"ref":"D24","role":"e"},{"ref":"F24","role":"e"}],
+        [{"text":"18"},{"ref":"B25","role":"e"},{"ref":"C25","role":"e"},{"colSpan":2,"ref":"D25","role":"e"},{"ref":"F25","role":"e"}],
+        [{"text":"一、审核项目说明：","colSpan":6}],
+        [{"colSpan":6,"ref":"A27","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":6}],
+        [{"colSpan":6,"ref":"A29","role":"e"}]
+      ]
+    }
+  ]
+}

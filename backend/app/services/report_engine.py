@@ -32,6 +32,7 @@ from app.models.report_models import (
     ReportConfig,
 )
 from app.services.amount_resolver import AmountResolver
+from app.services.report_row_order import evaluation_order
 
 logger = logging.getLogger(__name__)
 
@@ -534,6 +535,14 @@ def _attach_is_derived_movement(
 # （保留导出名以兼容 test_formula_engine_baseline / test_consol_report_formula_eval 的 import）
 # ---------------------------------------------------------------------------
 from app.services.formula_engine import FormulaResult, safe_eval_expr as _safe_eval_expr  # noqa: E402
+
+
+def _in_row_number_order(rows: list[dict], configs) -> list[dict]:
+    """按依赖顺序算完后，输出恢复成行号顺序（前端 / 导出按列表顺序展示）。"""
+    rank: dict[str, int] = {}
+    for i, c in enumerate(sorted(configs, key=lambda r: r.row_number)):
+        rank.setdefault(c.row_code, i)
+    return sorted(rows, key=lambda r: rank.get(r["row_code"], len(rank)))
 
 
 class ReportFormulaParser:
@@ -1363,7 +1372,8 @@ class ReportEngine:
         # Req 16.5: 公式解析失败行收集（标注失败行，不产出空报表）
         failed_rows: list[dict] = []
 
-        for config in sorted(config_rows, key=lambda r: r.row_number):
+        # 依赖在前求值（合计行排在明细前时按行号算会读到空缓存得 0），返回仍按行号排
+        for config in evaluation_order(config_rows):
             total_rows += 1
             fallback_applied = False
             formula_error: str | None = None
@@ -1540,6 +1550,7 @@ class ReportEngine:
         }
         if warnings:
             type_coverage["warnings"] = warnings
+        report_rows = _in_row_number_order(report_rows, config_rows)
         # Req 16.5: 汇报失败行（报表仍含全部行，不产出空报表）
         if failed_rows:
             type_coverage["failed_rows"] = failed_rows
@@ -1759,7 +1770,7 @@ class ReportEngine:
         row_values: dict[str, Decimal] = {}
         computed_at = datetime.now(timezone.utc)
 
-        for cfg in sorted(configs, key=lambda r: r.row_number):
+        for cfg in evaluation_order(configs):
             formula_error: str | None = None
             try:
                 current_amount = await parser_current.execute(cfg.formula, row_values)
@@ -1806,7 +1817,7 @@ class ReportEngine:
                 # Req 16.5: 失败标注
                 "formula_error": formula_error,
             })
-        return rows
+        return _in_row_number_order(rows, configs)
 
     _UNADJUSTED_TYPE_ORDER: list[FinancialReportType] = [
         FinancialReportType.balance_sheet,
@@ -2067,7 +2078,7 @@ class ReportEngine:
             if mode == "unadjusted":
                 parser._use_unadjusted = True
 
-            for config in sorted(configs.get(report_type, []), key=lambda r: r.row_number):
+            for config in evaluation_order(configs.get(report_type, [])):
                 key = (report_type, config.row_code)
                 row = stale_by_key.get(key)
                 if row is None:
@@ -2218,7 +2229,7 @@ class ReportEngine:
             config_rows = configs.get(report_type, [])
             parser_current = ReportFormulaParser(self.db, project_id, year)
 
-            for config in sorted(config_rows, key=lambda r: r.row_number):
+            for config in evaluation_order(config_rows):
                 if config.row_code in affected_codes:
                     # Req 15.5：先经 ACNR full_resolve 探测本行 ROW() 引用是否悬空，
                     # 悬空记入 Issue_List 但**不跳过**——仍继续重算本行及其余行。

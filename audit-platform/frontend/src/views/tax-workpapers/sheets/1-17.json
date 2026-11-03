@@ -1,0 +1,37 @@
+{
+  "code": "1-17",
+  "parts": [
+    {
+      "source": "1-17",
+      "rows": [
+        [{"text":"股权投资的投资收益利润分配情况表","kind":"title","colSpan":6}],
+        [{},{},{},{},{},{"text":"索引号：1-17","kind":"meta"}],
+        [{"ref":"A3","role":"e"},{"ref":"B3","role":"e"},{"ref":"C3","role":"e"},{"ref":"D3","role":"e"},{"ref":"E3","role":"e"},{"text":"金额单位：元","kind":"meta"}],
+        [{"text":"被投资企业名称","kind":"header","rowSpan":2},{"text":"会计科目","kind":"header","rowSpan":2},{"text":"本纳税年度作出利润分配决定情况","kind":"header","colSpan":3},{"text":"按权益法核算的本纳税年度投资收益/损失账载金额","kind":"header","rowSpan":2}],
+        [{"text":"是否作出利润分配决定","kind":"header"},{"text":"作出利润分配决定日期","kind":"header"},{"text":"决定分回投资收益额","kind":"header"}],
+        [{"ref":"A6","role":"e"},{"ref":"B6","role":"e"},{"ref":"C6","role":"e"},{"ref":"D6","role":"e"},{"kind":"input","ref":"E6","role":"e","fmt":"money"},{"kind":"input","ref":"F6","role":"e","fmt":"money"}],
+        [{"ref":"A7","role":"e"},{"ref":"B7","role":"e"},{"ref":"C7","role":"e"},{"ref":"D7","role":"e"},{"kind":"input","ref":"E7","role":"e","fmt":"money"},{"kind":"input","ref":"F7","role":"e","fmt":"money"}],
+        [{"ref":"A8","role":"e"},{"ref":"B8","role":"e"},{"ref":"C8","role":"e"},{"ref":"D8","role":"e"},{"kind":"input","ref":"E8","role":"e","fmt":"money"},{"kind":"input","ref":"F8","role":"e","fmt":"money"}],
+        [{"ref":"A9","role":"e"},{"ref":"B9","role":"e"},{"ref":"C9","role":"e"},{"ref":"D9","role":"e"},{"kind":"input","ref":"E9","role":"e","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"}],
+        [{"ref":"A10","role":"e"},{"ref":"B10","role":"e"},{"ref":"C10","role":"e"},{"ref":"D10","role":"e"},{"kind":"input","ref":"E10","role":"e","fmt":"money"},{"kind":"input","ref":"F10","role":"e","fmt":"money"}],
+        [{"ref":"A11","role":"e"},{"ref":"B11","role":"e"},{"ref":"C11","role":"e"},{"ref":"D11","role":"e"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"}],
+        [{"ref":"A12","role":"e"},{"ref":"B12","role":"e"},{"ref":"C12","role":"e"},{"ref":"D12","role":"e"},{"kind":"input","ref":"E12","role":"e","fmt":"money"},{"kind":"input","ref":"F12","role":"e","fmt":"money"}],
+        [{"ref":"A13","role":"e"},{"ref":"B13","role":"e"},{"ref":"C13","role":"e"},{"ref":"D13","role":"e"},{"kind":"input","ref":"E13","role":"e","fmt":"money"},{"kind":"input","ref":"F13","role":"e","fmt":"money"}],
+        [{"ref":"A14","role":"e"},{"ref":"B14","role":"e"},{"ref":"C14","role":"e"},{"ref":"D14","role":"e"},{"kind":"input","ref":"E14","role":"e","fmt":"money"},{"kind":"input","ref":"F14","role":"e","fmt":"money"}],
+        [{"ref":"A15","role":"e"},{"ref":"B15","role":"e"},{"ref":"C15","role":"e"},{"ref":"D15","role":"e"},{"kind":"input","ref":"E15","role":"e","fmt":"money"},{"kind":"input","ref":"F15","role":"e","fmt":"money"}],
+        [{"ref":"A16","role":"e"},{"ref":"B16","role":"e"},{"ref":"C16","role":"e"},{"ref":"D16","role":"e"},{"kind":"input","ref":"E16","role":"e","fmt":"money"},{"kind":"input","ref":"F16","role":"e","fmt":"money"}],
+        [{"ref":"A17","role":"e"},{"ref":"B17","role":"e"},{"ref":"C17","role":"e"},{"ref":"D17","role":"e"},{"kind":"input","ref":"E17","role":"e","fmt":"money"},{"kind":"input","ref":"F17","role":"e","fmt":"money"}],
+        [{"ref":"A18","role":"e"},{"ref":"B18","role":"e"},{"ref":"C18","role":"e"},{"ref":"D18","role":"e"},{"kind":"input","ref":"E18","role":"e","fmt":"money"},{"kind":"input","ref":"F18","role":"e","fmt":"money"}],
+        [{"ref":"A19","role":"e"},{"ref":"B19","role":"e"},{"ref":"C19","role":"e"},{"ref":"D19","role":"e"},{"kind":"input","ref":"E19","role":"e","fmt":"money"},{"kind":"input","ref":"F19","role":"e","fmt":"money"}],
+        [{"ref":"A20","role":"e"},{"ref":"B20","role":"e"},{"ref":"C20","role":"e"},{"ref":"D20","role":"e"},{"kind":"input","ref":"E20","role":"e","fmt":"money"},{"kind":"input","ref":"F20","role":"e","fmt":"money"}],
+        [{"ref":"A21","role":"e"},{"ref":"B21","role":"e"},{"ref":"C21","role":"e"},{"ref":"D21","role":"e"},{"kind":"input","ref":"E21","role":"e","fmt":"money"},{"kind":"input","ref":"F21","role":"e","fmt":"money"}],
+        [{"ref":"A22","role":"e"},{"ref":"B22","role":"e"},{"ref":"C22","role":"e"},{"ref":"D22","role":"e"},{"kind":"input","ref":"E22","role":"e","fmt":"money"},{"kind":"input","ref":"F22","role":"e","fmt":"money"}],
+        [{"ref":"A23","role":"e"},{"ref":"B23","role":"e"},{"ref":"C23","role":"e"},{"ref":"D23","role":"e"},{"kind":"input","ref":"E23","role":"e","fmt":"money"},{"kind":"input","ref":"F23","role":"e","fmt":"money"}],
+        [{"ref":"A24","role":"e"},{"ref":"B24","role":"e"},{"ref":"C24","role":"e"},{"ref":"D24","role":"e"},{"kind":"input","ref":"E24","role":"e","fmt":"money"},{"kind":"input","ref":"F24","role":"e","fmt":"money"}],
+        [{"ref":"A25","role":"e"},{"ref":"B25","role":"e"},{"ref":"C25","role":"e"},{"ref":"D25","role":"e"},{"kind":"input","ref":"E25","role":"e","fmt":"money"},{"kind":"input","ref":"F25","role":"e","fmt":"money"}],
+        [{"ref":"A26","role":"e"},{"ref":"B26","role":"e"},{"ref":"C26","role":"e"},{"ref":"D26","role":"e"},{"kind":"input","ref":"E26","role":"e","fmt":"money"},{"kind":"input","ref":"F26","role":"e","fmt":"money"}],
+        [{"text":"合    计","kind":"total"},{"ref":"B27","role":"e"},{"text":"*","kind":"total"},{"text":"*","kind":"total"},{"text":"0.00","kind":"number"},{"text":"0.00","kind":"number"}]
+      ]
+    }
+  ]
+}

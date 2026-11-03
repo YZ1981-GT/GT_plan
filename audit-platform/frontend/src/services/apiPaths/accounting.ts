@@ -6,10 +6,21 @@
 
 export const trialBalance = {
   get: (pid: string) => `/api/projects/${pid}/trial-balance`,
+  /** 标准科目余额视图：期初 / 本期借贷 / 借贷方审计调整 / 期末（借正贷负，全部标准科目） */
+  standardView: (pid: string) => `/api/projects/${pid}/trial-balance/standard-view`,
   recalc: (pid: string) => `/api/projects/${pid}/trial-balance/recalc`,
   consistencyCheck: (pid: string) => `/api/projects/${pid}/trial-balance/consistency-check`,
   export: (pid: string) => `/api/projects/${pid}/trial-balance/export`,
   summaryWithAdjustments: (pid: string) => `/api/projects/${pid}/trial-balance/summary-with-adjustments`,
+} as const
+
+// ─── 税审底稿（取数 + 公式计算 + 手工值） ────────────────────────────────────
+
+export const taxWorkpapers = {
+  /** GET 取数与计算后的本表值 / PUT 保存手工值（?year=） */
+  sheet: (pid: string, code: string) => `/api/projects/${pid}/tax-workpapers/sheets/${encodeURIComponent(code)}`,
+  /** GET / PUT 表头参数（被审核单位、编制人等，?year=） */
+  params: (pid: string) => `/api/projects/${pid}/tax-workpapers/params`,
 } as const
 
 // ─── 调整分录 ───────────────────────────────────────────────────────────────
@@ -94,6 +105,8 @@ export const aging = {
 export const ledger = {
   balance: (pid: string) => `/api/projects/${pid}/ledger/balance`,
   entries: (pid: string, code: string) => `/api/projects/${pid}/ledger/entries/${encodeURIComponent(code)}`,
+  /** 全年全部分录（不限科目，页码分页） */
+  entriesAll: (pid: string) => `/api/projects/${pid}/ledger/entries-all`,
   openingBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/opening-balance/${encodeURIComponent(code)}`,
   voucher: (pid: string, voucherNo: string) => `/api/projects/${pid}/ledger/voucher/${encodeURIComponent(voucherNo)}`,
   // 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）

@@ -1,0 +1,27 @@
+{
+  "code": "5-02-03",
+  "parts": [
+    {
+      "source": "5-02-03",
+      "rows": [
+        [{"text":"民族自治地区企业所得税地方减免审核表","kind":"title","colSpan":6}],
+        [{"text":"索引号：5-02-03","kind":"meta","colSpan":6}],
+        [{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":3}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"被审核单位所在地","colSpan":2},{"colSpan":4,"ref":"C6","role":"e"}],
+        [{"text":"企业类型","colSpan":2},{"colSpan":4,"ref":"C7","role":"e"}],
+        [{"text":"跨地区转移类型","colSpan":2},{"colSpan":4,"ref":"C8","role":"e"}],
+        [{"text":"税审优惠类型","colSpan":2},{"colSpan":4,"ref":"C9","role":"e"}],
+        [{"text":"优惠类型","kind":"header","colSpan":2},{"text":"非跨地区经营企业","kind":"header","colSpan":2},{"text":"跨地区经营汇总纳税企业总机构","kind":"header","colSpan":2}],
+        [{"text":"免征","rowSpan":3},{"text":"本年度免征的地方分享部分金额"},{"kind":"number","colSpan":2,"ref":"C11","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E11","role":"f","fmt":"money"}],
+        [{"text":"本年度预缴申报累计已免的地方分享部分金额"},{"kind":"number","colSpan":2,"ref":"C12","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E12","role":"f","fmt":"money"}],
+        [{"text":"本年度汇算清缴申报免征的地方分享部分金额"},{"kind":"number","colSpan":2,"ref":"C13","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E13","role":"f","fmt":"money"}],
+        [{"text":"减征","rowSpan":4},{"text":"减征幅度"},{"kind":"input","colSpan":2,"ref":"C14","role":"e","fmt":"pct"},{"kind":"input","colSpan":2,"ref":"E14","role":"e","fmt":"pct"}],
+        [{"text":"本年度减征的地方分享部分金额"},{"kind":"number","colSpan":2,"ref":"C15","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E15","role":"f","fmt":"money"}],
+        [{"text":"本年度预缴申报累计已减免的地方分享部分金额"},{"kind":"number","colSpan":2,"ref":"C16","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E16","role":"f","fmt":"money"}],
+        [{"text":"本年度汇算清缴申报减征的地方分享部分金额"},{"kind":"number","colSpan":2,"ref":"C17","role":"f","fmt":"money"},{"kind":"number","colSpan":2,"ref":"E17","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

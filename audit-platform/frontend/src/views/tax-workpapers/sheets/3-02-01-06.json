@@ -1,0 +1,39 @@
+{
+  "code": "3-02-01-06",
+  "parts": [
+    {
+      "source": "3-02-01-06",
+      "rows": [
+        [{"text":"补充养老保险、补充医疗保险支出审核表","kind":"title","colSpan":10},{},{},{},{}],
+        [{},{},{},{},{},{},{},{},{"text":"索引号：3-02-01-06","kind":"meta"},{},{},{},{},{}],
+        [{},{},{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta"},{},{},{},{},{}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":5,"ref":"C4","role":"f"},{"text":"编制人"},{"colSpan":2,"ref":"I4","role":"f"},{"text":"编制日期"},{"colSpan":3,"ref":"L4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":5,"ref":"C5","role":"f"},{"text":"复核人"},{"colSpan":2,"ref":"I5","role":"f"},{"text":"复核日期"},{"colSpan":3,"ref":"L5","role":"f"}],
+        [{"text":"一、账载情况检查","colSpan":14}],
+        [{"text":"项目","kind":"header","colSpan":2,"rowSpan":3},{"text":"缴纳范围","kind":"header","rowSpan":3},{"text":"账载金额","kind":"header","rowSpan":2},{"text":"审核调整额","kind":"header","rowSpan":2},{"text":"审核确认金额","kind":"header","rowSpan":2},{"text":"税收金额","kind":"header","colSpan":5},{"text":"纳税调增金额","kind":"header","rowSpan":2},{"text":"纳税调减金额","kind":"header","rowSpan":2},{"text":"备注","kind":"header","rowSpan":3}],
+        [{"text":"工资薪金税收金额","kind":"header"},{"text":"允许扣除比例","kind":"header"},{"text":"按扣除率计算的扣除限额","kind":"header"},{"text":"实际支付金额","kind":"header"},{"text":"税收金额","kind":"header"}],
+        [{"text":"1"},{"text":"2"},{"text":"3=1+2"},{"text":"4"},{"text":"5"},{"text":"6=4*5"},{"text":"7"},{"text":"8(3\\6\\7的最小值）"},{"text":"9","kind":"number"},{"text":"10","kind":"number"}],
+        [{"text":"补充养老保险","colSpan":2},{"ref":"C10","role":"e"},{"kind":"number","ref":"D10","role":"f","fmt":"money"},{"kind":"input","ref":"E10","role":"e","fmt":"money"},{"kind":"number","ref":"F10","role":"f","fmt":"money"},{"kind":"number","ref":"G10","role":"f","fmt":"money"},{"text":"5%","kind":"number"},{"kind":"number","ref":"I10","role":"f","fmt":"money"},{"kind":"number","ref":"J10","role":"f","fmt":"money"},{"kind":"number","ref":"K10","role":"f","fmt":"money"},{"kind":"number","ref":"L10","role":"f","fmt":"money"},{"kind":"number","ref":"M10","role":"f","fmt":"money"},{"ref":"N10","role":"e"}],
+        [{"text":"补充医疗保险","colSpan":2},{"ref":"C11","role":"e"},{"kind":"number","ref":"D11","role":"f","fmt":"money"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"number","ref":"F11","role":"f","fmt":"money"},{"kind":"number","ref":"G11","role":"f","fmt":"money"},{"text":"5%","kind":"number"},{"kind":"number","ref":"I11","role":"f","fmt":"money"},{"kind":"number","ref":"J11","role":"f","fmt":"money"},{"kind":"number","ref":"K11","role":"f","fmt":"money"},{"kind":"number","ref":"L11","role":"f","fmt":"money"},{"kind":"number","ref":"M11","role":"f","fmt":"money"},{"ref":"N11","role":"e"}],
+        [{"text":"二、缴款支出明细"},{"ref":"B12","role":"e"},{"ref":"C12","role":"e"},{"text":"类目","colSpan":4},{"text":"补充养老保险","colSpan":4},{"text":"补充医疗保险","colSpan":3}],
+        [{"text":"1","kind":"number","rowSpan":7},{"text":"通过应付职工薪酬-社会保险科目支出的职工补充社会保险","colSpan":2,"rowSpan":7},{"text":"年初余额","colSpan":4},{"kind":"input","colSpan":4,"ref":"H13","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L13","role":"e","fmt":"money"}],
+        [{"text":"借方发生额","colSpan":4},{"kind":"input","colSpan":4,"ref":"H14","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L14","role":"e","fmt":"money"}],
+        [{"text":"其中：不属于实际支付补充保险金额","colSpan":4},{"kind":"input","colSpan":4,"ref":"H15","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L15","role":"e","fmt":"money"}],
+        [{"text":"贷方发生额","colSpan":4},{"kind":"input","colSpan":4,"ref":"H16","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L16","role":"e","fmt":"money"}],
+        [{"text":"年末余额","colSpan":4},{"kind":"number","colSpan":4,"ref":"H17","role":"f","fmt":"money"},{"kind":"number","colSpan":3,"ref":"L17","role":"f","fmt":"money"}],
+        [{"text":"汇算清缴期支付","colSpan":4},{"kind":"input","colSpan":4,"ref":"H18","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L18","role":"e","fmt":"money"}],
+        [{"text":"实际支付小计","colSpan":4},{"kind":"number","colSpan":4,"ref":"H19","role":"f","fmt":"money"},{"kind":"number","colSpan":3,"ref":"L19","role":"f","fmt":"money"}],
+        [{"text":"2","kind":"number","rowSpan":5},{"text":"未通过应付职工薪酬-社会保险科目支出的职工补充社会保险","colSpan":2,"rowSpan":5},{"colSpan":4,"ref":"D20","role":"e"},{"kind":"input","colSpan":4,"ref":"H20","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L20","role":"e","fmt":"money"}],
+        [{"colSpan":4,"ref":"D21","role":"e"},{"kind":"input","colSpan":4,"ref":"H21","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L21","role":"e","fmt":"money"}],
+        [{"colSpan":4,"ref":"D22","role":"e"},{"kind":"input","colSpan":4,"ref":"H22","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L22","role":"e","fmt":"money"}],
+        [{"colSpan":4,"ref":"D23","role":"e"},{"kind":"input","colSpan":4,"ref":"H23","role":"e","fmt":"money"},{"kind":"input","colSpan":3,"ref":"L23","role":"e","fmt":"money"}],
+        [{"text":"实际支付小计","colSpan":4},{"kind":"number","colSpan":4,"ref":"H24","role":"f","fmt":"money"},{"kind":"number","colSpan":3,"ref":"L24","role":"f","fmt":"money"}],
+        [{"text":"实际支付合计","colSpan":7},{"kind":"number","colSpan":4,"ref":"H25","role":"f","fmt":"money"},{"kind":"number","colSpan":3,"ref":"L25","role":"f","fmt":"money"}],
+        [{"text":"三、审核项目说明：","colSpan":14}],
+        [{"colSpan":14,"ref":"A27","role":"e"}],
+        [{"text":"四、审核工作记录：","colSpan":14}],
+        [{"colSpan":14,"ref":"A29","role":"e"}]
+      ]
+    }
+  ]
+}

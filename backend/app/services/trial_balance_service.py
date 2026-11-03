@@ -25,6 +25,7 @@ from app.models.audit_platform_models import (
 from app.models.audit_platform_schemas import EventPayload
 from app.services.dataset_query import get_active_filter
 from app.services.ledger_import.direction_resolver import resolve_account_direction
+from app.services.tb_mapping_sql import leaf_condition, resolved_standard_code, signed_balance
 
 logger = logging.getLogger(__name__)
 
@@ -80,75 +81,19 @@ class TrialBalanceService:
         # C-4: 收集损益类科目因余额表缺发生额列而 fallback 到 closing_balance 的科目
         _income_expense_fallback: list[str] = []
 
-        # 叶子节点过滤：客户科目表是多级树（1122 父级 / 1122.01 子级），
-        # 父级余额 = 子级之和。account_mapping 把每一级 original_account_code 都
-        # 映射到标准科目，若汇总时父子全加会重复计算（父级被算两遍）→ 试算表翻倍、
-        # 资产≠负债+权益。因此只汇总叶子节点（没有被映射子科目的最明细行），
-        # 既消除父子双计，又保留二级明细（如坏账准备 1231-01/02/03）的备抵映射。
-        child = bal.alias("tb_child")
-        leaf_cond = ~sa.exists(
-            sa.select(sa.literal(1))
-            .select_from(child)
-            .where(
-                child.c.project_id == bal.c.project_id,
-                child.c.year == bal.c.year,
-                child.c.is_deleted == sa.false(),
-                child.c.account_code != bal.c.account_code,
-                child.c.account_code.like(bal.c.account_code.concat(".%")),
-                # 子级须与父级同数据集才算其子科目（active dataset 已由 balance_filter 锁定 bal）
-                sa.or_(
-                    child.c.dataset_id == bal.c.dataset_id,
-                    sa.and_(child.c.dataset_id.is_(None), bal.c.dataset_id.is_(None)),
-                ),
-            )
-        )
-
-        # 1. 汇总查询：客户余额 → 映射 → 标准科目（仅叶子节点）
-        # 🔴 方向符号修复：tb_balance.closing_balance/opening_balance 在部分账套里存的是
-        #    "无符号绝对值"(贷方也是正数)，方向在 closing_direction/opening_direction 里。
-        #    若直接 SUM(closing_balance) 再对贷方类 abs()，同一父科目下"借方性质挂账"
-        #    (如 其他应付款-应付利润，direction='debit') 会被同号累加而非冲减 → 负债/资产虚增、
-        #    资产≠负债+权益。这里按方向归一到"借正贷负"有符号口径再求和：
-        #      debit  → +ABS(balance)   credit → -ABS(balance)   方向缺失 → 原值(兼容已有符号存储)。
-        #    下游 `if direction=='credit': closing=abs(closing)` 不变即自洽。
-        signed_closing = sa.case(
-            (bal.c.closing_direction == "credit", -sa.func.abs(bal.c.closing_balance)),
-            (bal.c.closing_direction == "debit", sa.func.abs(bal.c.closing_balance)),
-            else_=bal.c.closing_balance,
-        )
-        signed_opening = sa.case(
-            (bal.c.opening_direction == "credit", -sa.func.abs(bal.c.opening_balance)),
-            (bal.c.opening_direction == "debit", sa.func.abs(bal.c.opening_balance)),
-            else_=bal.c.opening_balance,
-        )
-
-        # 🔴 映射口径根治（2026-07）：未映射叶子继承最近已映射父科目标准码。
-        #    根因：account_mapping 由 auto_match 生成，常出现「父科目已映射、部分子科目漏映射」
-        #    （如 1651 使用权资产→1641 已映射，但叶子 1651.02 使用权资产_房屋及建筑物 漏映射）。
-        #    原实现用 INNER JOIN 精确匹配 original_account_code == account_code，漏映射叶子被
-        #    静默丢弃 → 丢的资产≠丢的负债 → 报表资产≠负债+权益。
-        #    修复：按「最长前缀匹配」解析每个叶子的标准码——叶子自身有映射用自身，否则回退到
-        #    最近的已映射祖先（1651.02 → 祖先 1651 → 1641）。账户层级下子科目天然属于父科目
-        #    同一标准科目，此继承会计正确；无任何已映射祖先的叶子仍返回 NULL（保持原丢弃行为）。
-        mp_anc = AccountMapping.__table__.alias("mp_anc")
+        # 叶子过滤 / 标准码解析 / 借正贷负归一 —— 口径说明见 tb_mapping_sql（与标准科目余额视图共用）：
+        # - 只汇总叶子：父子全加会重复计算 → 试算表翻倍、资产≠负债+权益
+        # - 最长前缀匹配：漏映射的子科目继承最近已映射父科目的标准码，不被静默丢弃
+        # - 余额按方向归一到借正贷负：部分账套存无符号绝对值，直接 SUM 会让借方性质挂账同号累加
+        #   下游 `if direction=='credit': closing=abs(closing)` 不变即自洽。
+        leaf_cond = leaf_condition(bal)
+        signed_closing = signed_balance(bal.c.closing_balance, bal.c.closing_direction)
+        signed_opening = signed_balance(bal.c.opening_balance, bal.c.opening_direction)
 
         def _resolved_std_subq():
-            return (
-                sa.select(mp_anc.c.standard_account_code)
-                .where(
-                    mp_anc.c.project_id == bal.c.project_id,
-                    mp_anc.c.is_deleted == sa.false(),
-                    sa.or_(
-                        bal.c.account_code == mp_anc.c.original_account_code,
-                        bal.c.account_code.like(mp_anc.c.original_account_code.concat(".%")),
-                    ),
-                )
-                .order_by(sa.func.length(mp_anc.c.original_account_code).desc())
-                .limit(1)
-                .correlate(bal)
-                .scalar_subquery()
-            )
+            return resolved_standard_code(bal)
 
+        # 1. 汇总查询：客户余额 → 映射 → 标准科目（仅叶子节点）
         agg_sub = (
             sa.select(
                 _resolved_std_subq().label("std"),

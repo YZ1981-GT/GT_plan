@@ -8,7 +8,9 @@ export const notesRoutes: RouteRecordRaw[] = [
 {
           path: 'projects/:projectId/disclosure-notes',
           name: 'DisclosureNotes',
-          component: () => import('@/views/DisclosureEditor.vue'),
+          // 税审 demo：CITAR「税审报告」在 CITAR 里尚未开发，照搬其待开发页；原页面 @/views/DisclosureEditor.vue
+          component: () => import('@/citar/CitarPendingNode.vue'),
+          meta: { citarTitle: '税审报告' },
         },
 {
           path: 'projects/:projectId/annotations',

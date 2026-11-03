@@ -1,0 +1,27 @@
+{
+  "code": "1-18",
+  "parts": [
+    {
+      "source": "1-18",
+      "rows": [
+        [{"text":"承接情况表","kind":"title","colSpan":6}],
+        [{"text":"索引号：1-18","kind":"meta","colSpan":6}],
+        [{"text":"被审核人","rowSpan":2},{"rowSpan":2,"ref":"B3","role":"f"},{"text":"编制人"},{"ref":"D3","role":"f"},{"text":"编制日期"},{"ref":"F3","role":"f"}],
+        [{"text":"复核人"},{"ref":"D4","role":"f"},{"text":"复核日期"},{"ref":"F4","role":"f"}],
+        [{"text":"承接情况","kind":"header","colSpan":2},{"text":"承接原因","kind":"header","colSpan":2},{"text":"是否符合（√或×）","kind":"header","colSpan":2}],
+        [{"text":"（一）同意承接","colSpan":2,"rowSpan":5},{"text":"1.属于本事务所涉税审核业务范围。","colSpan":2},{"colSpan":2,"ref":"E6","role":"e"}],
+        [{"text":"2.委托审核事项的用途及审核要求合法。","colSpan":2},{"colSpan":2,"ref":"E7","role":"e"}],
+        [{"text":"3.能够提供真实、合法、完整、充分的审核材料。","colSpan":2},{"colSpan":2,"ref":"E8","role":"e"}],
+        [{"text":"4.对提供的审核材料不完整、不充分的，委托人能够补充齐全。","colSpan":2},{"colSpan":2,"ref":"E9","role":"e"}],
+        [{"text":"5.委托人能够出具对审核材料的真实性、合法性、完整性负责的书面声明。","colSpan":2},{"colSpan":2,"ref":"E10","role":"e"}],
+        [{"text":"（二）拒决承接","colSpan":2,"rowSpan":5},{"text":"1.审核材料不真实、不完整、不充分或者取得方式不合法的；","colSpan":2},{"colSpan":2,"ref":"E11","role":"e"}],
+        [{"text":"2.审核事项的用途不合法或者违背社会公德的；","colSpan":2},{"colSpan":2,"ref":"E12","role":"e"}],
+        [{"text":"3.审核要求不符合涉税审核执业规则或者相关审核技术规范的；","colSpan":2},{"colSpan":2,"ref":"E13","role":"e"}],
+        [{"text":"4.审核要求超出本事务所技术条件和审核能力的；","colSpan":2},{"colSpan":2,"ref":"E14","role":"e"}],
+        [{"text":"5.不符合执业准则规定的可以接受委托进行重新审核条件的；","colSpan":2},{"colSpan":2,"ref":"E15","role":"e"}],
+        [{"text":"备注：","colSpan":6}],
+        [{"colSpan":6,"ref":"A17","role":"e"}]
+      ]
+    }
+  ]
+}

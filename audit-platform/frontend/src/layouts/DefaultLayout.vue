@@ -1,5 +1,16 @@
 <template>
+  <!-- 税审 demo：项目列表与项目内六个菜单改用 CITAR 版式（路径判定见 @/citar/citarRoutes）。
+       其余页面仍走下方三栏布局。CITAR 无页面过渡动画，这里也不加。 -->
+  <CitarLayout v-if="citarMode">
+    <router-view v-slot="{ Component, route: viewRoute }">
+      <ErrorBoundary :key="viewRoute.fullPath">
+        <component :is="Component" :key="viewRoute.fullPath" />
+      </ErrorBoundary>
+    </router-view>
+  </CitarLayout>
+
   <ThreeColumnLayout
+    v-else
     :hide-middle="hideMiddle"
     :catalog-title="catalogTitle"
     :hide-sidebar="isBrowseMode && !fourCol && !!selectedProject"
@@ -112,6 +123,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeColumnLayout from './ThreeColumnLayout.vue'
+import CitarLayout from '@/citar/CitarLayout.vue'
+import { citarLayoutMode } from '@/citar/citarRoutes'
 import MiddleProjectList from '@/components/layout/MiddleProjectList.vue'
 import MiddlePlaceholder from '@/components/layout/MiddlePlaceholder.vue'
 import DetailProjectPanel from '@/components/layout/DetailProjectPanel.vue'
@@ -135,6 +148,9 @@ import { eventBus } from '@/utils/eventBus'
 const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
+
+/** 当前路由是否归 CITAR 版式管（项目列表 / 建项 / 项目内六个菜单） */
+const citarMode = computed(() => citarLayoutMode(route.path) !== null)
 
 // UI-1: 方向性页面过渡动画（前进 slide-left，后退 slide-right）
 const transitionName = ref('slide-left')

@@ -87,6 +87,10 @@ def register_system_routers(app: FastAPI) -> None:
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])
 
+    # 税审底稿取数 / 公式计算 / 手工值保存（spec tax-workpaper-data-fetch）
+    from app.routers.tax_workpapers import router as tax_workpapers_router
+    app.include_router(tax_workpapers_router, tags=["税审底稿"])
+
     # ═══ §3b. 通用 auto_data_source resolver API ═══
     from app.routers.auto_data import router as auto_data_router
     app.include_router(auto_data_router, tags=["auto-data"])

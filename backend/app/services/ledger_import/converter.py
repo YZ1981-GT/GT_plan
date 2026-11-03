@@ -24,6 +24,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from .aux_dimension import parse_aux_dimension
+from app.core.code_text import code_text
 from .direction_resolver import resolve_account_direction
 from .sign_convention_types import CURRENT_SIGN_CONVENTION
 
@@ -46,6 +47,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
+
+
 
 
 def safe_decimal(val) -> Optional[Decimal]:
@@ -356,12 +359,12 @@ def convert_balance_rows(
     groups: dict[tuple[str, str], dict] = {}
 
     for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
+        account_code = code_text(row.get("account_code"))
         if not account_code:
             continue
 
         account_name = str(row.get("account_name", "")).strip() or None
-        company_code = str(row.get("company_code", "")).strip() or default_company
+        company_code = code_text(row.get("company_code")) or default_company
 
         # ── 期初：年度优先（年初 → 期初分列），月度兜底 ──
         # 年度审计口径：优先取年初借/贷（year_opening_*），缺失才用期初借/贷（月度）。
@@ -441,7 +444,7 @@ def convert_balance_rows(
         if not aux_dim_str:
             # 多列格式
             aux_type_val = str(row.get("aux_type", "")).strip()
-            aux_code_val = str(row.get("aux_code", "")).strip()
+            aux_code_val = code_text(row.get("aux_code"))
             if aux_type_val and aux_code_val:
                 aux_name_val = str(row.get("aux_name", "")).strip() or aux_code_val
                 aux_dim_str = f"{aux_type_val}:{aux_code_val} {aux_name_val}"
@@ -568,12 +571,12 @@ def convert_ledger_rows(
     aux_stats: dict[str, int] = {}
 
     for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
+        account_code = code_text(row.get("account_code"))
         if not account_code:
             continue
 
         voucher_date = parse_date_val(row.get("voucher_date"))
-        voucher_no = str(row.get("voucher_no", "")).strip()
+        voucher_no = code_text(row.get("voucher_no"))
         if not voucher_date or not voucher_no:
             continue
 
@@ -595,7 +598,7 @@ def convert_ledger_rows(
         aux_dim_str = str(row.get("aux_dimensions", "")).strip()
         if not aux_dim_str:
             aux_type_val = str(row.get("aux_type", "")).strip()
-            aux_code_val = str(row.get("aux_code", "")).strip()
+            aux_code_val = code_text(row.get("aux_code"))
             if aux_type_val and aux_code_val:
                 aux_name_val = str(row.get("aux_name", "")).strip() or aux_code_val
                 aux_dim_str = f"{aux_type_val}:{aux_code_val} {aux_name_val}"
@@ -612,7 +615,7 @@ def convert_ledger_rows(
             "credit_amount": credit_amount,
             "summary": str(row.get("summary", "")).strip() or None,
             "preparer": str(row.get("preparer", "")).strip() or None,
-            "company_code": str(row.get("company_code", "")).strip() or default_company,
+            "company_code": code_text(row.get("company_code")) or default_company,
             "currency_code": row.get("currency_code") or "CNY",
             # 方向标记（v2 符号约定，复用 V064 entry_direction 列）
             "entry_direction": entry_direction,

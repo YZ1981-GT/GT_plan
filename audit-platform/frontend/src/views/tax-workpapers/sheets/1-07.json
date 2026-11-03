@@ -1,0 +1,27 @@
+{
+  "code": "1-07",
+  "parts": [
+    {
+      "source": "1-07",
+      "rows": [
+        [{"text":"预计时间进度表","kind":"title","colSpan":7}],
+        [{"text":"索引号：1-07","kind":"meta","colSpan":7}],
+        [{"text":"被审核人"},{"colSpan":2,"ref":"B3","role":"f"},{"text":"编制人"},{"ref":"E3","role":"f"},{"text":"编制日期"},{"ref":"G3","role":"f"}],
+        [{"text":"会计期间"},{"colSpan":2,"ref":"B4","role":"f"},{"text":"复核人"},{"ref":"E4","role":"f"},{"text":"复核日期"},{"ref":"G4","role":"f"}],
+        [{"text":"预计日期","kind":"header","colSpan":3},{"text":"工作内容","kind":"header"},{"text":"实际执行日期","kind":"header","colSpan":3}],
+        [{"ref":"A6","role":"e"},{"text":"至"},{"ref":"C6","role":"e"},{"text":"前期调查"},{"ref":"E6","role":"e"},{"text":"至"},{"ref":"G6","role":"e"}],
+        [{"ref":"A7","role":"e"},{"text":"至"},{"ref":"C7","role":"e"},{"text":"编写项目可行性报告及风险评估报告"},{"ref":"E7","role":"e"},{"text":"至"},{"ref":"G7","role":"e"}],
+        [{"ref":"A8","role":"e"},{"text":"至"},{"ref":"C8","role":"e"},{"text":"对被审核单位进行详细调查"},{"ref":"E8","role":"e"},{"text":"至"},{"ref":"G8","role":"e"}],
+        [{"ref":"A9","role":"e"},{"text":"至"},{"ref":"C9","role":"e"},{"text":"编写审核计划"},{"ref":"E9","role":"e"},{"text":"至"},{"ref":"G9","role":"e"}],
+        [{"ref":"A10","role":"e"},{"text":"至"},{"ref":"C10","role":"e"},{"text":"现场审核工作"},{"ref":"E10","role":"e"},{"text":"至"},{"ref":"G10","role":"e"}],
+        [{"ref":"A11","role":"e"},{"text":"至"},{"ref":"C11","role":"e"},{"text":"汇总审核结果，编写审核小结"},{"ref":"E11","role":"e"},{"text":"至"},{"ref":"G11","role":"e"}],
+        [{"ref":"A12","role":"e"},{"text":"至"},{"ref":"C12","role":"e"},{"text":"部门负责人复核工作底稿"},{"ref":"E12","role":"e"},{"text":"至"},{"ref":"G12","role":"e"}],
+        [{"ref":"A13","role":"e"},{"text":"至"},{"ref":"C13","role":"e"},{"text":"与客户交换意见"},{"ref":"E13","role":"e"},{"text":"至"},{"ref":"G13","role":"e"}],
+        [{"ref":"A14","role":"e"},{"text":"至"},{"ref":"C14","role":"e"},{"text":"主任会计师或主任税务师复核工作底稿"},{"ref":"E14","role":"e"},{"text":"至"},{"ref":"G14","role":"e"}],
+        [{"ref":"A15","role":"e"},{"text":"至"},{"ref":"C15","role":"e"},{"text":"撰写审核报告"},{"ref":"E15","role":"e"},{"text":"至"},{"ref":"G15","role":"e"}],
+        [{"ref":"A16","role":"e"},{"text":"至"},{"ref":"C16","role":"e"},{"text":"工作底稿装订归档"},{"ref":"E16","role":"e"},{"text":"至"},{"ref":"G16","role":"e"}],
+        [{"text":"备注:","colSpan":7}]
+      ]
+    }
+  ]
+}

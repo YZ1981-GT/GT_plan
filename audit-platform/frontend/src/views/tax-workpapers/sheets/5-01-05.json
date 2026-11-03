@@ -1,0 +1,39 @@
+{
+  "code": "5-01-05",
+  "parts": [
+    {
+      "source": "5-01-05",
+      "rows": [
+        [{"text":"抵扣应纳税所得额审核表","kind":"title","colSpan":7}],
+        [{},{},{},{},{},{"text":"索引号：5-01-05","kind":"meta","colSpan":2}],
+        [{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人","colSpan":2},{"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"E4","role":"f"},{"text":"编制日期"},{"ref":"G4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"E5","role":"f"},{"text":"复核日期"},{"ref":"G5","role":"f"}],
+        [{"text":"行次","kind":"header","rowSpan":2},{"text":"项目","kind":"header","colSpan":3,"rowSpan":2},{"text":"合计金额","kind":"header"},{"text":"投资于未上市中小高新技术企业","kind":"header"},{"text":"投资于种子期、初创期科技型企业","kind":"header"}],
+        [{"text":"1=2+3"},{"text":"2","kind":"number"},{"text":"3","kind":"number"}],
+        [{"text":"一、创业投资企业直接投资按投资额一定比例抵扣应纳税所得额","colSpan":7}],
+        [{"text":"1"},{"text":"本年新增的符合条件的股权投资额","colSpan":3},{"kind":"number","ref":"E9","role":"f","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"},{"kind":"input","ref":"G9","role":"e","fmt":"money"}],
+        [{"text":"2"},{"text":"税收规定的抵扣率","colSpan":3},{"ref":"E10","role":"e"},{"ref":"F10","role":"e"},{"ref":"G10","role":"e"}],
+        [{"text":"3"},{"text":"本年新增的可抵扣的股权投资额（1×2）","colSpan":3},{"kind":"number","ref":"E11","role":"f","fmt":"money"},{"kind":"number","ref":"F11","role":"f","fmt":"money"},{"kind":"number","ref":"G11","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"以前年度结转的尚未抵扣的股权投资余额","colSpan":3},{"kind":"input","ref":"E12","role":"e","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"5"},{"text":"本年可抵扣的股权投资额（3+4）","colSpan":3},{"kind":"number","ref":"E13","role":"f","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"6"},{"text":"本年可用于抵扣的应纳税所得额","colSpan":3},{"kind":"number","ref":"E14","role":"f","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"7"},{"text":"本年实际抵扣应纳税所得额","colSpan":3},{"kind":"number","ref":"E15","role":"f","fmt":"money"},{"kind":"input","ref":"F15","role":"e","fmt":"money"},{"kind":"input","ref":"G15","role":"e","fmt":"money"}],
+        [{"text":"8"},{"text":"结转以后年度抵扣的股权投资余额","colSpan":3},{"kind":"number","ref":"E16","role":"f","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"二、通过有限合伙制创业投资企业投资按一定比例抵扣分得的应纳税所得额","colSpan":7}],
+        [{"text":"9"},{"text":"本年从有限合伙创投企业应分得的应纳税所得额","colSpan":3},{"kind":"number","ref":"E18","role":"f","fmt":"money"},{"kind":"input","ref":"F18","role":"e","fmt":"money"},{"kind":"input","ref":"G18","role":"e","fmt":"money"}],
+        [{"text":"10"},{"text":"本年新增的可抵扣投资额","colSpan":3},{"kind":"number","ref":"E19","role":"f","fmt":"money"},{"kind":"input","ref":"F19","role":"e","fmt":"money"},{"kind":"input","ref":"G19","role":"e","fmt":"money"}],
+        [{"text":"11"},{"text":"以前年度结转的可抵扣投资额余额","colSpan":3},{"kind":"input","ref":"E20","role":"e","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"12"},{"text":"本年可抵扣投资额（10+11）","colSpan":3},{"kind":"number","ref":"E21","role":"f","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"13"},{"text":"本年实际抵扣应分得的应纳税所得额","colSpan":3},{"kind":"number","ref":"E22","role":"f","fmt":"money"},{"kind":"input","ref":"F22","role":"e","fmt":"money"},{"kind":"input","ref":"G22","role":"e","fmt":"money"}],
+        [{"text":"14"},{"text":"结转以后年度抵扣的投资额余额","colSpan":3},{"kind":"number","ref":"E23","role":"f","fmt":"money"},{"text":"*"},{"text":"*"}],
+        [{"text":"三、抵扣应纳税所得额合计","colSpan":7}],
+        [{"text":"15"},{"text":"合计（7+13）","colSpan":3},{"kind":"number","ref":"E25","role":"f","fmt":"money"},{"kind":"number","ref":"F25","role":"f","fmt":"money"},{"kind":"number","ref":"G25","role":"f","fmt":"money"}],
+        [{"text":"一、审核项目说明：","colSpan":7}],
+        [{"colSpan":7,"ref":"A27","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":7}],
+        [{"colSpan":7,"ref":"A29","role":"e"}]
+      ]
+    }
+  ]
+}

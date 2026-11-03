@@ -1,0 +1,28 @@
+{
+  "code": "1-02",
+  "parts": [
+    {
+      "source": "1-02",
+      "rows": [
+        [{"text":"致同（北京）税务师事务所业务报告签发稿纸","kind":"title","colSpan":7}],
+        [{},{},{},{},{},{},{"text":"索引号1-02","kind":"meta"}],
+        [{"text":"委托人名称："},{"ref":"B3","role":"f"},{"text":"业务委托书编号：","colSpan":5}],
+        [{"text":"企业性质："},{"ref":"B4","role":"e"},{"text":"行        业："},{"ref":"D4","role":"e"},{"colSpan":3,"ref":"E4","role":"e"}],
+        [{"text":"签  发  人："},{},{"text":"项目合伙人核稿：","colSpan":5}],
+        [{"ref":"A6","role":"e"},{},{"text":"项目负责人核稿：","colSpan":5}],
+        [{"ref":"A7","role":"e"},{},{"text":"拟稿部门：","colSpan":5}],
+        [{"ref":"A8","role":"e"},{"ref":"B8","role":"e"},{"text":"拟稿人：                          年  月   日","colSpan":5}],
+        [{"text":"标     题："},{"colSpan":6,"ref":"B9","role":"f"}],
+        [{"colSpan":7,"ref":"A10","role":"f"}],
+        [{"text":"附    送："},{"colSpan":6,"ref":"B11","role":"e"}],
+        [{"text":"客户需要：       份"},{"text":"所内留存  1  份"},{"text":"是否翻译外文","colSpan":3},{"ref":"F12","role":"e"},{"ref":"G12","role":"e"}],
+        [{"text":"打字：                校对：                     复印：                      盖章：","colSpan":7}],
+        [{"text":"文号：致同税审字（    ）第          号            年      月      日   发","colSpan":7}],
+        [{"text":"已签发报告的修改： 1、修改原因：","colSpan":7}],
+        [{"ref":"A16","role":"e"},{"ref":"B16","role":"e"},{"ref":"C16","role":"e"},{"ref":"D16","role":"e"},{"ref":"E16","role":"e"},{"ref":"F16","role":"e"},{"ref":"G16","role":"e"}],
+        [{"text":"2、责任人：                                日期：","colSpan":7}],
+        [{"text":"3、批准人：                                日期：","colSpan":7}]
+      ]
+    }
+  ]
+}

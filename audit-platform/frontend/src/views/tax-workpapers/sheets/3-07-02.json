@@ -1,0 +1,53 @@
+{
+  "code": "3-07-02",
+  "parts": [
+    {
+      "source": "3-07-02",
+      "rows": [
+        [{"text":"应收账款审核表","kind":"title","colSpan":6}],
+        [{},{},{},{"text":"索引号：3-07-02","kind":"meta","colSpan":3}],
+        [{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":3}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"债务单位及内容","kind":"header"},{"text":"账载金额","kind":"header"},{"text":"审核调整额","kind":"header"},{"text":"审核确认额","kind":"header"},{"text":"备注","kind":"header","colSpan":2}],
+        [{"ref":"A7","role":"e"},{"ref":"B7","role":"e","fmt":"money"},{"kind":"input","ref":"C7","role":"e","fmt":"money"},{"kind":"number","ref":"D7","role":"f","fmt":"money"},{"colSpan":2,"ref":"E7","role":"e"}],
+        [{"ref":"A8","role":"e"},{"ref":"B8","role":"e","fmt":"money"},{"kind":"input","ref":"C8","role":"e","fmt":"money"},{"kind":"number","ref":"D8","role":"f","fmt":"money"},{"colSpan":2,"ref":"E8","role":"e"}],
+        [{"ref":"A9","role":"e"},{"ref":"B9","role":"e","fmt":"money"},{"kind":"input","ref":"C9","role":"e","fmt":"money"},{"kind":"number","ref":"D9","role":"f","fmt":"money"},{"colSpan":2,"ref":"E9","role":"e"}],
+        [{"ref":"A10","role":"e"},{"ref":"B10","role":"e","fmt":"money"},{"kind":"input","ref":"C10","role":"e","fmt":"money"},{"kind":"number","ref":"D10","role":"f","fmt":"money"},{"colSpan":2,"ref":"E10","role":"e"}],
+        [{"ref":"A11","role":"e"},{"ref":"B11","role":"e","fmt":"money"},{"kind":"input","ref":"C11","role":"e","fmt":"money"},{"kind":"number","ref":"D11","role":"f","fmt":"money"},{"colSpan":2,"ref":"E11","role":"e"}],
+        [{"ref":"A12","role":"e"},{"ref":"B12","role":"e","fmt":"money"},{"kind":"input","ref":"C12","role":"e","fmt":"money"},{"kind":"number","ref":"D12","role":"f","fmt":"money"},{"colSpan":2,"ref":"E12","role":"e"}],
+        [{"ref":"A13","role":"e"},{"ref":"B13","role":"e","fmt":"money"},{"kind":"input","ref":"C13","role":"e","fmt":"money"},{"kind":"number","ref":"D13","role":"f","fmt":"money"},{"colSpan":2,"ref":"E13","role":"e"}],
+        [{"ref":"A14","role":"e"},{"ref":"B14","role":"e","fmt":"money"},{"kind":"input","ref":"C14","role":"e","fmt":"money"},{"kind":"number","ref":"D14","role":"f","fmt":"money"},{"colSpan":2,"ref":"E14","role":"e"}],
+        [{"ref":"A15","role":"e"},{"ref":"B15","role":"e","fmt":"money"},{"kind":"input","ref":"C15","role":"e","fmt":"money"},{"kind":"number","ref":"D15","role":"f","fmt":"money"},{"colSpan":2,"ref":"E15","role":"e"}],
+        [{"ref":"A16","role":"e"},{"ref":"B16","role":"e","fmt":"money"},{"kind":"input","ref":"C16","role":"e","fmt":"money"},{"kind":"number","ref":"D16","role":"f","fmt":"money"},{"colSpan":2,"ref":"E16","role":"e"}],
+        [{"ref":"A17","role":"e"},{"ref":"B17","role":"e","fmt":"money"},{"kind":"input","ref":"C17","role":"e","fmt":"money"},{"kind":"number","ref":"D17","role":"f","fmt":"money"},{"colSpan":2,"ref":"E17","role":"e"}],
+        [{"ref":"A18","role":"e"},{"ref":"B18","role":"e","fmt":"money"},{"kind":"input","ref":"C18","role":"e","fmt":"money"},{"kind":"number","ref":"D18","role":"f","fmt":"money"},{"colSpan":2,"ref":"E18","role":"e"}],
+        [{"ref":"A19","role":"e"},{"ref":"B19","role":"e","fmt":"money"},{"kind":"input","ref":"C19","role":"e","fmt":"money"},{"kind":"number","ref":"D19","role":"f","fmt":"money"},{"colSpan":2,"ref":"E19","role":"e"}],
+        [{"ref":"A20","role":"e"},{"ref":"B20","role":"e","fmt":"money"},{"kind":"input","ref":"C20","role":"e","fmt":"money"},{"kind":"number","ref":"D20","role":"f","fmt":"money"},{"colSpan":2,"ref":"E20","role":"e"}],
+        [{"ref":"A21","role":"e"},{"ref":"B21","role":"e","fmt":"money"},{"kind":"input","ref":"C21","role":"e","fmt":"money"},{"kind":"number","ref":"D21","role":"f","fmt":"money"},{"colSpan":2,"ref":"E21","role":"e"}],
+        [{"ref":"A22","role":"e"},{"ref":"B22","role":"e","fmt":"money"},{"kind":"input","ref":"C22","role":"e","fmt":"money"},{"kind":"number","ref":"D22","role":"f","fmt":"money"},{"colSpan":2,"ref":"E22","role":"e"}],
+        [{"ref":"A23","role":"e"},{"ref":"B23","role":"e","fmt":"money"},{"kind":"input","ref":"C23","role":"e","fmt":"money"},{"kind":"number","ref":"D23","role":"f","fmt":"money"},{"colSpan":2,"ref":"E23","role":"e"}],
+        [{"ref":"A24","role":"e"},{"ref":"B24","role":"e","fmt":"money"},{"kind":"input","ref":"C24","role":"e","fmt":"money"},{"kind":"number","ref":"D24","role":"f","fmt":"money"},{"colSpan":2,"ref":"E24","role":"e"}],
+        [{"ref":"A25","role":"e"},{"ref":"B25","role":"e","fmt":"money"},{"kind":"input","ref":"C25","role":"e","fmt":"money"},{"kind":"number","ref":"D25","role":"f","fmt":"money"},{"colSpan":2,"ref":"E25","role":"e"}],
+        [{"ref":"A26","role":"e"},{"ref":"B26","role":"e","fmt":"money"},{"kind":"input","ref":"C26","role":"e","fmt":"money"},{"kind":"number","ref":"D26","role":"f","fmt":"money"},{"colSpan":2,"ref":"E26","role":"e"}],
+        [{"ref":"A27","role":"e"},{"ref":"B27","role":"e","fmt":"money"},{"kind":"input","ref":"C27","role":"e","fmt":"money"},{"kind":"number","ref":"D27","role":"f","fmt":"money"},{"colSpan":2,"ref":"E27","role":"e"}],
+        [{"ref":"A28","role":"e"},{"ref":"B28","role":"e","fmt":"money"},{"kind":"input","ref":"C28","role":"e","fmt":"money"},{"kind":"number","ref":"D28","role":"f","fmt":"money"},{"colSpan":2,"ref":"E28","role":"e"}],
+        [{"ref":"A29","role":"e"},{"ref":"B29","role":"e","fmt":"money"},{"kind":"input","ref":"C29","role":"e","fmt":"money"},{"kind":"number","ref":"D29","role":"f","fmt":"money"},{"colSpan":2,"ref":"E29","role":"e"}],
+        [{"ref":"A30","role":"e"},{"ref":"B30","role":"e","fmt":"money"},{"kind":"input","ref":"C30","role":"e","fmt":"money"},{"kind":"number","ref":"D30","role":"f","fmt":"money"},{"colSpan":2,"ref":"E30","role":"e"}],
+        [{"ref":"A31","role":"e"},{"ref":"B31","role":"e","fmt":"money"},{"kind":"input","ref":"C31","role":"e","fmt":"money"},{"kind":"number","ref":"D31","role":"f","fmt":"money"},{"colSpan":2,"ref":"E31","role":"e"}],
+        [{"ref":"A32","role":"e"},{"ref":"B32","role":"e","fmt":"money"},{"kind":"input","ref":"C32","role":"e","fmt":"money"},{"kind":"number","ref":"D32","role":"f","fmt":"money"},{"colSpan":2,"ref":"E32","role":"e"}],
+        [{"ref":"A33","role":"e"},{"ref":"B33","role":"e","fmt":"money"},{"kind":"input","ref":"C33","role":"e","fmt":"money"},{"kind":"number","ref":"D33","role":"f","fmt":"money"},{"colSpan":2,"ref":"E33","role":"e"}],
+        [{"ref":"A34","role":"e"},{"ref":"B34","role":"e","fmt":"money"},{"kind":"input","ref":"C34","role":"e","fmt":"money"},{"kind":"number","ref":"D34","role":"f","fmt":"money"},{"colSpan":2,"ref":"E34","role":"e"}],
+        [{"ref":"A35","role":"e"},{"ref":"B35","role":"e","fmt":"money"},{"kind":"input","ref":"C35","role":"e","fmt":"money"},{"kind":"number","ref":"D35","role":"f","fmt":"money"},{"colSpan":2,"ref":"E35","role":"e"}],
+        [{"ref":"A36","role":"e"},{"ref":"B36","role":"e","fmt":"money"},{"kind":"input","ref":"C36","role":"e","fmt":"money"},{"kind":"number","ref":"D36","role":"f","fmt":"money"},{"colSpan":2,"ref":"E36","role":"e"}],
+        [{"ref":"A37","role":"e"},{"ref":"B37","role":"e","fmt":"money"},{"kind":"input","ref":"C37","role":"e","fmt":"money"},{"kind":"number","ref":"D37","role":"f","fmt":"money"},{"colSpan":2,"ref":"E37","role":"e"}],
+        [{"ref":"A38","role":"e"},{"ref":"B38","role":"e","fmt":"money"},{"kind":"input","ref":"C38","role":"e","fmt":"money"},{"kind":"number","ref":"D38","role":"f","fmt":"money"},{"colSpan":2,"ref":"E38","role":"e"}],
+        [{"ref":"A39","role":"e"},{"ref":"B39","role":"e","fmt":"money"},{"kind":"input","ref":"C39","role":"e","fmt":"money"},{"kind":"number","ref":"D39","role":"f","fmt":"money"},{"colSpan":2,"ref":"E39","role":"e"}],
+        [{"ref":"A40","role":"e"},{"ref":"B40","role":"e","fmt":"money"},{"kind":"input","ref":"C40","role":"e","fmt":"money"},{"kind":"number","ref":"D40","role":"f","fmt":"money"},{"colSpan":2,"ref":"E40","role":"e"}],
+        [{"text":"合  计","kind":"total"},{"kind":"number","ref":"B41","role":"f","fmt":"money"},{"kind":"number","ref":"C41","role":"f","fmt":"money"},{"kind":"number","ref":"D41","role":"f","fmt":"money"},{"colSpan":2,"ref":"E41","role":"e"}],
+        [{"text":"审核工作记录：","colSpan":6}],
+        [{"colSpan":6,"ref":"A43","role":"e"}]
+      ]
+    }
+  ]
+}

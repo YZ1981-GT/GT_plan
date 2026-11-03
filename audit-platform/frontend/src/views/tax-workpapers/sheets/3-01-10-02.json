@@ -1,0 +1,31 @@
+{
+  "code": "3-01-10-02",
+  "parts": [
+    {
+      "source": "3-01-10-02",
+      "rows": [
+        [{"text":"接受捐赠收入审核表","kind":"title","colSpan":10}],
+        [{},{},{},{},{},{},{},{},{"text":"索引号：3-01-10-02","kind":"meta","colSpan":2}],
+        [{},{},{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":4,"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"H4","role":"f"},{"text":"编制日期"},{"ref":"J4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":4,"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"H5","role":"f"},{"text":"复核日期"},{"ref":"J5","role":"f"}],
+        [{"text":"行次","kind":"header"},{"text":"资产类别","kind":"header"},{"text":"捐赠单位","kind":"header"},{"text":"捐赠资产名称","kind":"header"},{"text":"接受捐赠的日期","kind":"header"},{"text":"数量","kind":"header"},{"text":"单价","kind":"header"},{"text":"公允价值","kind":"header"},{"text":"纳税调整金额（依照税收规定应确认收入）","kind":"header"},{"text":"备注","kind":"header"}],
+        [{"text":"1"},{"text":"货币性捐赠","rowSpan":3},{"ref":"C7","role":"e"},{"ref":"D7","role":"e"},{"ref":"E7","role":"e"},{"ref":"F7","role":"e"},{"kind":"input","ref":"G7","role":"e","fmt":"money"},{"kind":"input","ref":"H7","role":"e","fmt":"money"},{"kind":"number","ref":"I7","role":"f","fmt":"money"},{"ref":"J7","role":"e"}],
+        [{"text":"2"},{"ref":"C8","role":"e"},{"ref":"D8","role":"e"},{"ref":"E8","role":"e"},{"ref":"F8","role":"e"},{"kind":"input","ref":"G8","role":"e","fmt":"money"},{"kind":"input","ref":"H8","role":"e","fmt":"money"},{"kind":"number","ref":"I8","role":"f","fmt":"money"},{"ref":"J8","role":"e"}],
+        [{"text":"3"},{"text":"小计"},{"text":"*"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"H9","role":"f","fmt":"money"},{"kind":"number","ref":"I9","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"4"},{"text":"存货类捐赠","rowSpan":3},{"ref":"C10","role":"e"},{"ref":"D10","role":"e"},{"ref":"E10","role":"e"},{"ref":"F10","role":"e"},{"kind":"input","ref":"G10","role":"e","fmt":"money"},{"kind":"input","ref":"H10","role":"e","fmt":"money"},{"kind":"number","ref":"I10","role":"f","fmt":"money"},{"ref":"J10","role":"e"}],
+        [{"text":"5"},{"ref":"C11","role":"e"},{"ref":"D11","role":"e"},{"ref":"E11","role":"e"},{"ref":"F11","role":"e"},{"kind":"input","ref":"G11","role":"e","fmt":"money"},{"kind":"input","ref":"H11","role":"e","fmt":"money"},{"kind":"number","ref":"I11","role":"f","fmt":"money"},{"ref":"J11","role":"e"}],
+        [{"text":"6"},{"text":"小计"},{"text":"*"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"H12","role":"f","fmt":"money"},{"kind":"number","ref":"I12","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"7"},{"text":"固定资产捐赠","rowSpan":3},{"ref":"C13","role":"e"},{"ref":"D13","role":"e"},{"ref":"E13","role":"e"},{"ref":"F13","role":"e"},{"kind":"input","ref":"G13","role":"e","fmt":"money"},{"kind":"input","ref":"H13","role":"e","fmt":"money"},{"kind":"number","ref":"I13","role":"f","fmt":"money"},{"ref":"J13","role":"e"}],
+        [{"text":"8"},{"ref":"C14","role":"e"},{"ref":"D14","role":"e"},{"ref":"E14","role":"e"},{"ref":"F14","role":"e"},{"kind":"input","ref":"G14","role":"e","fmt":"money"},{"kind":"input","ref":"H14","role":"e","fmt":"money"},{"kind":"number","ref":"I14","role":"f","fmt":"money"},{"ref":"J14","role":"e"}],
+        [{"text":"9"},{"text":"小计"},{"text":"*"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"H15","role":"f","fmt":"money"},{"kind":"number","ref":"I15","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"10"},{"text":"无形资产捐赠","rowSpan":3},{"ref":"C16","role":"e"},{"ref":"D16","role":"e"},{"ref":"E16","role":"e"},{"ref":"F16","role":"e"},{"kind":"input","ref":"G16","role":"e","fmt":"money"},{"kind":"input","ref":"H16","role":"e","fmt":"money"},{"kind":"number","ref":"I16","role":"f","fmt":"money"},{"ref":"J16","role":"e"}],
+        [{"text":"11"},{"ref":"C17","role":"e"},{"ref":"D17","role":"e"},{"ref":"E17","role":"e"},{"ref":"F17","role":"e"},{"kind":"input","ref":"G17","role":"e","fmt":"money"},{"kind":"input","ref":"H17","role":"e","fmt":"money"},{"kind":"number","ref":"I17","role":"f","fmt":"money"},{"ref":"J17","role":"e"}],
+        [{"text":"12"},{"text":"小计"},{"text":"*"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"H18","role":"f","fmt":"money"},{"kind":"number","ref":"I18","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"13"},{"text":"合        计","colSpan":6},{"kind":"number","ref":"H19","role":"f","fmt":"money"},{"kind":"number","ref":"I19","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"审核工作记录：","colSpan":10}],
+        [{"colSpan":10,"ref":"A21","role":"e"}]
+      ]
+    }
+  ]
+}

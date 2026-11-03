@@ -254,12 +254,14 @@ function matchMethodLabel(method: string): string {
     exact_name: '名称精确',
     base_name: '名称基础',
     fuzzy_name: '模糊匹配',
+    legacy_pl_crosswalk: '旧制度对照',
+    bad_debt_sub_account: '坏账二级',
   }
   return labels[method] || method
 }
 
 function matchTagType(method: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  if (method === 'exact_code' || method === 'prefix' || method === 'level1_prefix') return 'success'
+  if (method === 'exact_code' || method === 'prefix' || method === 'level1_prefix' || method === 'legacy_pl_crosswalk') return 'success'
   if (method === 'exact_name' || method === 'base_name') return ''
   if (method === 'fuzzy_name') return 'warning'
   return 'info'

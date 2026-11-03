@@ -1,0 +1,31 @@
+{
+  "code": "2-10",
+  "parts": [
+    {
+      "source": "2-10",
+      "rows": [
+        [{"text":"财务费用审核表","kind":"title","colSpan":8}],
+        [{"text":"索引号：2-10","kind":"meta","colSpan":8}],
+        [{"text":"金额单位：元","kind":"meta","colSpan":8}],
+        [{"text":"被审核人","colSpan":2},{"ref":"C4","role":"f"},{"ref":"D4","role":"e"},{"text":"编制人"},{"ref":"F4","role":"f"},{"text":"编制日期"},{"ref":"H4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"ref":"C5","role":"f"},{"ref":"D5","role":"e"},{"text":"复核人"},{"ref":"F5","role":"f"},{"text":"复核日期"},{"ref":"H5","role":"f"}],
+        [{"text":"序号","kind":"header","rowSpan":2},{"text":"项     目","kind":"header","colSpan":2,"rowSpan":2},{"text":"账载金额","kind":"header","rowSpan":2},{"text":"审计调整","kind":"header","rowSpan":2},{"text":"审核调整额","kind":"header","rowSpan":2},{"text":"审核确认额","kind":"header","rowSpan":2},{"text":"其中：境外支付","kind":"header","rowSpan":2}],
+        [],
+        [{"text":"1"},{"text":"佣金和手续费","colSpan":2},{"kind":"input","ref":"D8","role":"e","fmt":"money"},{"kind":"input","ref":"E8","role":"e","fmt":"money"},{"kind":"input","ref":"F8","role":"e","fmt":"money"},{"kind":"number","ref":"G8","role":"f","fmt":"money"},{"kind":"input","ref":"H8","role":"e","fmt":"money"}],
+        [{"text":"2"},{"text":"利息收支","colSpan":2},{"kind":"input","ref":"D9","role":"e","fmt":"money"},{"kind":"input","ref":"E9","role":"e","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"},{"kind":"number","ref":"G9","role":"f","fmt":"money"},{"kind":"input","ref":"H9","role":"e","fmt":"money"}],
+        [{"text":"3"},{"text":"汇兑差额","colSpan":2},{"kind":"input","ref":"D10","role":"e","fmt":"money"},{"kind":"input","ref":"E10","role":"e","fmt":"money"},{"kind":"input","ref":"F10","role":"e","fmt":"money"},{"kind":"number","ref":"G10","role":"f","fmt":"money"},{"kind":"input","ref":"H10","role":"e","fmt":"money"}],
+        [{"text":"4"},{"text":"现金折扣","colSpan":2},{"kind":"input","ref":"D11","role":"e","fmt":"money"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"},{"kind":"number","ref":"G11","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"5"},{"text":"其他","colSpan":2},{"kind":"number","ref":"D12","role":"f","fmt":"money"},{"kind":"number","ref":"E12","role":"f","fmt":"money"},{"kind":"number","ref":"F12","role":"f","fmt":"money"},{"kind":"number","ref":"G12","role":"f","fmt":"money"},{"kind":"number","ref":"H12","role":"f","fmt":"money"}],
+        [{"ref":"A13","role":"e"},{"text":"其中："},{"ref":"C13","role":"e"},{"kind":"input","ref":"D13","role":"e","fmt":"money"},{"kind":"input","ref":"E13","role":"e","fmt":"money"},{"kind":"input","ref":"F13","role":"e","fmt":"money"},{"kind":"number","ref":"G13","role":"f","fmt":"money"},{"kind":"input","ref":"H13","role":"e","fmt":"money"}],
+        [{"ref":"A14","role":"e"},{"text":"其中："},{"ref":"C14","role":"e"},{"kind":"input","ref":"D14","role":"e","fmt":"money"},{"kind":"input","ref":"E14","role":"e","fmt":"money"},{"kind":"input","ref":"F14","role":"e","fmt":"money"},{"kind":"number","ref":"G14","role":"f","fmt":"money"},{"kind":"input","ref":"H14","role":"e","fmt":"money"}],
+        [{"ref":"A15","role":"e"},{"text":"其中："},{"ref":"C15","role":"e"},{"kind":"input","ref":"D15","role":"e","fmt":"money"},{"kind":"input","ref":"E15","role":"e","fmt":"money"},{"kind":"input","ref":"F15","role":"e","fmt":"money"},{"kind":"number","ref":"G15","role":"f","fmt":"money"},{"kind":"input","ref":"H15","role":"e","fmt":"money"}],
+        [{"ref":"A16","role":"e"},{"text":"其中："},{"ref":"C16","role":"e"},{"kind":"input","ref":"D16","role":"e","fmt":"money"},{"kind":"input","ref":"E16","role":"e","fmt":"money"},{"kind":"input","ref":"F16","role":"e","fmt":"money"},{"kind":"number","ref":"G16","role":"f","fmt":"money"},{"kind":"input","ref":"H16","role":"e","fmt":"money"}],
+        [{"text":"合     计","kind":"total","colSpan":3},{"kind":"number","ref":"D17","role":"f","fmt":"money"},{"kind":"number","ref":"E17","role":"f","fmt":"money"},{"kind":"number","ref":"F17","role":"f","fmt":"money"},{"kind":"number","ref":"G17","role":"f","fmt":"money"},{"kind":"number","ref":"H17","role":"f","fmt":"money"}],
+        [{"text":"一、审核项目说明：","colSpan":8}],
+        [{"colSpan":8,"ref":"A19","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":8}],
+        [{"colSpan":8,"ref":"A21","role":"e"}]
+      ]
+    }
+  ]
+}

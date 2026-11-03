@@ -8,7 +8,8 @@ export const reportsRoutes: RouteRecordRaw[] = [
 {
           path: 'projects/:projectId/reports',
           name: 'Reports',
-          component: () => import(/* webpackPrefetch: true */ '@/views/ReportView.vue'),
+          // 税审 demo：CITAR「审定报表」（资产负债表 / 利润表，接平台报表生成）；原页面 @/views/ReportView.vue
+          component: () => import('@/citar/screens/CitarAuditedReports.vue'),
         },
 {
           path: 'projects/:projectId/report-config',

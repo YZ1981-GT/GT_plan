@@ -127,7 +127,7 @@ ERROR_HINTS: dict[str, ErrorHint] = {
         title="关键日期列格式错误",
         description="凭证日期列中的值无法解析为日期",
         suggestions=[
-            "检查日期格式：YYYY-MM-DD / YYYY/MM/DD / YYYYMMDD 都可识别",
+            "检查日期格式：YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD / YYYYMMDD 都可识别",
             "Excel 中全选日期列，设置单元格格式为'日期'",
             "去掉日期列中的汉字（如'2024年1月1日'改成 2024-01-01）",
         ],

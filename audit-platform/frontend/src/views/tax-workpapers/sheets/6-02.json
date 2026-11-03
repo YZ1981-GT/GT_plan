@@ -1,0 +1,46 @@
+{
+  "code": "6-02",
+  "parts": [
+    {
+      "source": "6-02",
+      "rows": [
+        [{"text":"跨地区经营汇总纳税企业年度分摊企业所得税审核表","kind":"title","colSpan":7}],
+        [{},{},{},{},{},{"text":"索引号：6-02","kind":"meta","colSpan":2}],
+        [{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人","colSpan":2},{"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"E4","role":"f"},{"text":"编制日期"},{"ref":"G4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"E5","role":"f"},{"text":"复核日期"},{"ref":"G5","role":"f"}],
+        [{"text":"行次","kind":"header"},{"text":"项        目","kind":"header","colSpan":5},{"text":"金    额","kind":"header"}],
+        [{"text":"1"},{"text":"一、实际应纳所得税额","colSpan":5},{"kind":"number","ref":"G7","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"减：境外所得应纳所得税额","colSpan":5},{"kind":"number","ref":"G8","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"加：境外所得抵免所得税额","colSpan":5},{"kind":"number","ref":"G9","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"二、本年实际应纳所得税额（1－2＋3）","colSpan":5},{"kind":"number","ref":"G10","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"其中：总机构直接管理建筑项目部预分所得税额","colSpan":5},{"kind":"input","ref":"G11","role":"e","fmt":"money"}],
+        [{"text":"6"},{"text":"总机构实际应分摊所得税额[（4－5）×总机构分摊比例    %]","colSpan":5},{"kind":"number","ref":"G12","role":"f","fmt":"pct"}],
+        [{"text":"7"},{"text":"财政集中实际应分配所得税额[（4－5）×财政集中分摊比例    %]","colSpan":5},{"kind":"number","ref":"G13","role":"f","fmt":"pct"}],
+        [{"text":"8"},{"text":"分支机构实际应分摊所得税额[（4－5）×分支机构分摊比例    %]","colSpan":5},{"kind":"number","ref":"G14","role":"f","fmt":"pct"}],
+        [{"text":"9"},{"text":"其中：总机构主体生产经营部门实际应分摊所得税额[（8×总机构主体生产经营部门分摊比例    %）]","colSpan":5},{"kind":"number","ref":"G15","role":"f","fmt":"pct"}],
+        [{"text":"10"},{"text":"三、本年累计已预分、已分摊所得税额（（11＋12＋13＋14）","colSpan":5},{"kind":"number","ref":"G16","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"（一）总机构直接管理建筑项目部已预分所得税额","colSpan":5},{"kind":"number","ref":"G17","role":"f","fmt":"money"}],
+        [{"text":"12"},{"text":"（二）总机构已分摊所得税额","colSpan":5},{"kind":"number","ref":"G18","role":"f","fmt":"money"}],
+        [{"text":"13"},{"text":"（三）财政集中已分配所得税额","colSpan":5},{"kind":"number","ref":"G19","role":"f","fmt":"money"}],
+        [{"text":"14"},{"text":"（四）分支机构已分摊所得税额","colSpan":5},{"kind":"number","ref":"G20","role":"f","fmt":"money"}],
+        [{"text":"15"},{"text":"其中：总机构主体生产经营部门已分摊所得税额","colSpan":5},{"kind":"number","ref":"G21","role":"f","fmt":"money"}],
+        [{"text":"16"},{"text":"四、本年度应分摊的应补（退）的所得税额（4-10）","colSpan":5},{"kind":"number","ref":"G22","role":"f","fmt":"money"}],
+        [{"text":"17"},{"text":"（一）总机构分摊本年应补（退）的所得税额（6－12）","colSpan":5},{"kind":"number","ref":"G23","role":"f","fmt":"money"}],
+        [{"text":"18"},{"text":"（二）财政集中分配本年应补（退）的所得税额（7－13）","colSpan":5},{"kind":"number","ref":"G24","role":"f","fmt":"money"}],
+        [{"text":"19"},{"text":"（三）分支机构分摊本年应补（退）的所得税额（8－14）","colSpan":5},{"kind":"number","ref":"G25","role":"f","fmt":"money"}],
+        [{"text":"20"},{"text":"其中：总机构主体生产经营部门分摊本年应补（退）的所得税额（9－15）","colSpan":5},{"kind":"number","ref":"G26","role":"f","fmt":"money"}],
+        [{"text":"21"},{"text":"五、境外所得抵免后的应纳所得税额（2-3）","colSpan":5},{"kind":"number","ref":"G27","role":"f","fmt":"money"}],
+        [{"text":"22"},{"text":"六、总机构本年应补（退）的所得税额（17+18+20+21）","colSpan":5},{"kind":"number","ref":"G28","role":"f","fmt":"money"}],
+        [{"text":"23"},{"text":"七、总机构应享受民族地方优惠金额","colSpan":5},{"kind":"number","ref":"G29","role":"f","fmt":"money"}],
+        [{"text":"24"},{"text":"总机构全年累计已享受民族地方优惠金额","colSpan":5},{"kind":"number","ref":"G30","role":"f","fmt":"money"}],
+        [{"text":"25"},{"text":"总机构因民族地方优惠调整分配金额（23-24）","colSpan":5},{"kind":"number","ref":"G31","role":"f","fmt":"money"}],
+        [{"text":"26"},{"text":"八、总机构本年实际应补（退）所得税额（22-25)","colSpan":5},{"kind":"number","ref":"G32","role":"f","fmt":"money"}],
+        [{"text":"一、审核项目说明：","colSpan":7}],
+        [{"colSpan":7,"ref":"A34","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":7}],
+        [{"colSpan":7,"ref":"A36","role":"e"}]
+      ]
+    }
+  ]
+}

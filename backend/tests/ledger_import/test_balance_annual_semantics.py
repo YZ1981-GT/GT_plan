@@ -563,3 +563,79 @@ def test_year_opening_net_single_column_explicit_alias():
     assert field == "opening_balance"
     assert source == "header_exact"
     assert conf >= 90
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["期初调整借方", "期初调整贷方", "期末调整借方", "期末调整贷方",
+     "期初重分类借方", "期末重分类贷方", "账表差异期末调整借方"],
+)
+def test_adjustment_headers_not_absorbed_into_balance_fields(header):
+    """调整 / 重分类列不得经编辑距离兜底认成期初 / 期末借贷。
+
+    真实案例（重庆医药集团四川医药 2025 余额表）：「期初调整借方」→ opening_debit、
+    「期末调整借方」→ closing_debit；借贷分列优先于净额列，287 个科目期末全为 0，
+    试算平衡表随之全 0。
+    """
+    field, _conf, _source = _match_header(header)
+    assert field not in {
+        "opening_debit", "opening_credit", "closing_debit", "closing_credit",
+        "opening_balance", "closing_balance",
+    }, f"{header} → {field}"
+
+
+def test_plain_balance_split_headers_still_match():
+    """收窄只针对调整类表头：正常的期初 / 期末借贷列照旧识别。"""
+    assert _match_header("期初借方")[0] == "opening_debit"
+    assert _match_header("期末贷方余额")[0] == "closing_credit"
+
+
+#: 真实表头（重庆医药集团四川医药 2025「科目余额表-六部案例」，58 列，顺序照原文件）。
+_SW_BALANCE_HEADERS = [
+    "№", "上级科目名称", "科目编号", "科目名称", "科目类别", "借贷方向", "是否明细科目", "科目级次",
+    "账面期初数", "账面借方发生额", "账面贷方发生额", "账面期末数",
+    "账表差异期初调整借方", "账面上期发生额", "账表差异期初调整贷方", "账表差异期初调整数",
+    "账表差异期末调整借方", "账表差异期末调整贷方", "账表差异期末调整数",
+    "未审上期借方发生额", "未审上期贷方发生额", "未审借方发生额", "未审期末数",
+    "期初重分类借方", "账面发生额", "期初重分类贷方", "期初重分类调整数",
+    "账表差异滚调影响期末数借方", "账表差异滚调影响期末数贷方",
+    "期初调整借方", "期初调整贷方", "期初调整调整数", "未审期初数", "期初调整数",
+    "期末重分类借方", "期末重分类贷方", "期末重分类调整数", "上期期初数",
+    "期末调整借方", "账面上期借方发生额", "期末调整贷方", "账面上期贷方发生额",
+    "期末调整调整数", "期末调整数", "审定期初数", "审定借方发生额",
+    "调整分录滚调影响期末数借方", "调整分录滚调影响期末数贷方", "审定贷方发生额",
+    "科目附加信息", "审定上期发生额", "审定上期贷方发生额", "审定上期借方发生额",
+    "审定发生额", "审定期末数", "未审贷方发生额", "未审上期发生额", "未审发生额",
+]
+
+
+def test_unaudited_columns_are_the_only_balance_source():
+    """余额 / 发生额只取「未审」口径的列，每个字段恰好一列（用户 2026-11-02 定口径）。
+
+    多列映射同一字段时取「首个非空列」，所以只要有第二列映射进来，
+    按列序排在前面的账面 / 审定 / 上期列就会顶替未审列。
+    """
+    from app.services.ledger_import.identifier import _detect_by_headers
+
+    table_type, _conf, matches, _ev = _detect_by_headers(_SW_BALANCE_HEADERS)
+    assert table_type == "balance"
+
+    by_field: dict[str, list[str]] = {}
+    for m in matches:
+        if m.standard_field:
+            by_field.setdefault(m.standard_field, []).append(m.column_header)
+
+    assert by_field.get("opening_balance") == ["未审期初数"], by_field.get("opening_balance")
+    assert by_field.get("closing_balance") == ["未审期末数"], by_field.get("closing_balance")
+    assert by_field.get("debit_amount") == ["未审借方发生额"], by_field.get("debit_amount")
+    assert by_field.get("credit_amount") == ["未审贷方发生额"], by_field.get("credit_amount")
+    assert by_field.get("account_code") == ["科目编号"], by_field.get("account_code")
+    assert by_field.get("account_name") == ["科目名称"], by_field.get("account_name")
+    for split in ("opening_debit", "opening_credit", "closing_debit", "closing_credit"):
+        assert split not in by_field, (split, by_field.get(split))
+
+
+@pytest.mark.parametrize("header", ["审定期末数", "上期期初数", "审定期初数"])
+def test_audited_and_prior_period_headers_not_levenshtein_matched(header):
+    """只有审定 / 上期列、没有未审列的文件：不得经编辑距离把它们当成未审余额。"""
+    assert _match_header(header)[0] is None, header

@@ -1,0 +1,167 @@
+/*
+ * CITAR 版式接入真实数据后新增的通用件：表上方工具条、搜索框、分页、可点行、状态标签。
+ * CITAR 原型没有这些（它只有表头），配色与字号沿用 citar-tokens.css。
+ */
+
+.citar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-6b6b76);
+}
+
+.citar-toolbar__count {
+  color: var(--citar-c-4c1273);
+}
+
+.citar-toolbar__hint {
+  margin-left: auto;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-9a9aa4);
+}
+
+.citar-search {
+  width: 240px;
+  padding: 6px 10px;
+  border: 1px solid #d8cfe6;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-1f1f1f);
+  background: var(--citar-c-ffffff);
+}
+
+.citar-search:focus {
+  outline: none;
+  border-color: #8b3fd0;
+}
+
+.citar-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.citar-btn {
+  padding: 6px 14px;
+  border: 1px solid #d8cfe6;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font: inherit;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4c1273);
+  cursor: pointer;
+}
+
+.citar-btn:hover:not(:disabled) {
+  border-color: #8b3fd0;
+  color: var(--citar-c-6e0ba6);
+}
+
+.citar-btn:disabled {
+  cursor: not-allowed;
+  color: var(--citar-c-b4a8c2);
+}
+
+.citar-btn--primary {
+  border-color: transparent;
+  background: linear-gradient(90deg, #6e0ba6 0%, #a855f7 100%);
+  color: var(--citar-c-ffffff);
+  font-weight: 700;
+}
+
+.citar-btn--primary:hover:not(:disabled) {
+  color: var(--citar-c-ffffff);
+  opacity: 0.92;
+}
+
+.citar-btn--primary:disabled {
+  opacity: 0.45;
+  color: var(--citar-c-ffffff);
+}
+
+.citar-btn--danger:hover:not(:disabled) {
+  border-color: #e5484d;
+  color: var(--citar-c-e5484d);
+}
+
+.citar-center {
+  text-align: center;
+}
+
+.citar-row--link {
+  cursor: pointer;
+}
+
+.citar-row--link:hover td {
+  background: var(--citar-c-faf6ff);
+}
+
+.citar-row--parent td {
+  font-weight: 700;
+}
+
+.citar-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-6b6b76);
+}
+
+/* 提示条：未生成报表、数据过期等 */
+.citar-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid #f0d9b5;
+  border-radius: 8px;
+  background: var(--citar-c-fffaf2);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-8a5300);
+}
+
+.citar-notice .citar-btn {
+  margin-left: auto;
+}
+
+.citar-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: var(--citar-fs-12);
+  white-space: nowrap;
+}
+
+.citar-tag--draft {
+  background: var(--citar-c-f1f1f5);
+  color: var(--citar-c-5c5c68);
+}
+
+.citar-tag--pending_review {
+  background: var(--citar-c-fdf0dc);
+  color: var(--citar-c-8a5300);
+}
+
+.citar-tag--approved {
+  background: var(--citar-c-e3f5ee);
+  color: var(--citar-c-0b6e4f);
+}
+
+.citar-tag--rejected {
+  background: var(--citar-c-fdeaea);
+  color: var(--citar-c-a3262a);
+}
+
+.citar-tag--type {
+  background: var(--citar-c-f1e7fb);
+  color: var(--citar-c-5b2a86);
+}

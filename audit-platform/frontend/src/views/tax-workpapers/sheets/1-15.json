@@ -1,0 +1,35 @@
+{
+  "code": "1-15",
+  "parts": [
+    {
+      "source": "1-15",
+      "rows": [
+        [{"text":"分支机构基本情况调查表","kind":"title","colSpan":9}],
+        [{},{},{},{},{},{},{"text":"索引号：1-15","kind":"meta","colSpan":3}],
+        [{"ref":"A3","role":"e"},{"ref":"B3","role":"e"},{"ref":"C3","role":"e"},{"ref":"D3","role":"e"},{"ref":"E3","role":"e"},{"ref":"F3","role":"e"},{"text":"金额单位：元","kind":"meta","colSpan":3}],
+        [{"text":"境内分支机构概况","kind":"header","colSpan":9}],
+        [{"text":"分支机构名称","kind":"header"},{"text":"统一社会信用代码","kind":"header"},{"text":"注册地址","kind":"header"},{"text":"设立时间","kind":"header"},{"text":"经营范围","kind":"header"},{"text":"跨地区（跨省、跨市、跨区(县)）","kind":"header"},{"text":"分级情况（二级、三级、……）","kind":"header"},{"text":"是否就地预缴所得税","kind":"header"},{"text":"适用所得税税率","kind":"header"}],
+        [{"ref":"A6","role":"e"},{"ref":"B6","role":"e"},{"ref":"C6","role":"e"},{"ref":"D6","role":"e"},{"ref":"E6","role":"e"},{"ref":"F6","role":"e"},{"ref":"G6","role":"e"},{"ref":"H6","role":"e"},{"kind":"input","ref":"I6","role":"e","fmt":"pct"}],
+        [{"ref":"A7","role":"e"},{"ref":"B7","role":"e"},{"ref":"C7","role":"e"},{"ref":"D7","role":"e"},{"ref":"E7","role":"e"},{"ref":"F7","role":"e"},{"ref":"G7","role":"e"},{"ref":"H7","role":"e"},{"kind":"input","ref":"I7","role":"e","fmt":"pct"}],
+        [{"ref":"A8","role":"e"},{"ref":"B8","role":"e"},{"ref":"C8","role":"e"},{"ref":"D8","role":"e"},{"ref":"E8","role":"e"},{"ref":"F8","role":"e"},{"ref":"G8","role":"e"},{"ref":"H8","role":"e"},{"kind":"input","ref":"I8","role":"e","fmt":"pct"}],
+        [{"ref":"A9","role":"e"},{"ref":"B9","role":"e"},{"ref":"C9","role":"e"},{"ref":"D9","role":"e"},{"ref":"E9","role":"e"},{"ref":"F9","role":"e"},{"ref":"G9","role":"e"},{"ref":"H9","role":"e"},{"kind":"input","ref":"I9","role":"e","fmt":"pct"}],
+        [{"ref":"A10","role":"e"},{"ref":"B10","role":"e"},{"ref":"C10","role":"e"},{"ref":"D10","role":"e"},{"ref":"E10","role":"e"},{"ref":"F10","role":"e"},{"ref":"G10","role":"e"},{"ref":"H10","role":"e"},{"kind":"input","ref":"I10","role":"e","fmt":"pct"}],
+        [{"ref":"A11","role":"e"},{"ref":"B11","role":"e"},{"ref":"C11","role":"e"},{"ref":"D11","role":"e"},{"ref":"E11","role":"e"},{"ref":"F11","role":"e"},{"ref":"G11","role":"e"},{"ref":"H11","role":"e"},{"kind":"input","ref":"I11","role":"e","fmt":"pct"}],
+        [{"ref":"A12","role":"e"},{"ref":"B12","role":"e"},{"ref":"C12","role":"e"},{"ref":"D12","role":"e"},{"ref":"E12","role":"e"},{"ref":"F12","role":"e"},{"ref":"G12","role":"e"},{"ref":"H12","role":"e"},{"kind":"input","ref":"I12","role":"e","fmt":"pct"}],
+        [{"ref":"A13","role":"e"},{"ref":"B13","role":"e"},{"ref":"C13","role":"e"},{"ref":"D13","role":"e"},{"ref":"E13","role":"e"},{"ref":"F13","role":"e"},{"ref":"G13","role":"e"},{"ref":"H13","role":"e"},{"kind":"input","ref":"I13","role":"e","fmt":"pct"}],
+        [{"ref":"A14","role":"e"},{"ref":"B14","role":"e"},{"ref":"C14","role":"e"},{"ref":"D14","role":"e"},{"ref":"E14","role":"e"},{"ref":"F14","role":"e"},{"ref":"G14","role":"e"},{"ref":"H14","role":"e"},{"kind":"input","ref":"I14","role":"e","fmt":"pct"}],
+        [{"ref":"A15","role":"e"},{"ref":"B15","role":"e"},{"ref":"C15","role":"e"},{"ref":"D15","role":"e"},{"ref":"E15","role":"e"},{"ref":"F15","role":"e"},{"ref":"G15","role":"e"},{"ref":"H15","role":"e"},{"kind":"input","ref":"I15","role":"e","fmt":"pct"}],
+        [{"text":"境外分支机构概况","kind":"header","colSpan":9}],
+        [{"text":"分支（营业）机构名称","kind":"header"},{"text":"所在国家\n（地区）名称","kind":"header"},{"text":"注册地址","kind":"header"},{"text":"经营范围","kind":"header","colSpan":3},{"text":"本年度营业利润（亏损）额","kind":"header"},{"text":"在所在国已缴所得税","kind":"header"},{"text":"所在国适用所得税税率","kind":"header"}],
+        [{"ref":"A18","role":"e"},{"ref":"B18","role":"e"},{"ref":"C18","role":"e"},{"colSpan":3,"ref":"D18","role":"e"},{"kind":"input","ref":"G18","role":"e","fmt":"money"},{"kind":"input","ref":"H18","role":"e","fmt":"money"},{"kind":"input","ref":"I18","role":"e","fmt":"pct"}],
+        [{"ref":"A19","role":"e"},{"ref":"B19","role":"e"},{"ref":"C19","role":"e"},{"colSpan":3,"ref":"D19","role":"e"},{"kind":"input","ref":"G19","role":"e","fmt":"money"},{"kind":"input","ref":"H19","role":"e","fmt":"money"},{"kind":"input","ref":"I19","role":"e","fmt":"pct"}],
+        [{"ref":"A20","role":"e"},{"ref":"B20","role":"e"},{"ref":"C20","role":"e"},{"colSpan":3,"ref":"D20","role":"e"},{"kind":"input","ref":"G20","role":"e","fmt":"money"},{"kind":"input","ref":"H20","role":"e","fmt":"money"},{"kind":"input","ref":"I20","role":"e","fmt":"pct"}],
+        [{"ref":"A21","role":"e"},{"ref":"B21","role":"e"},{"ref":"C21","role":"e"},{"colSpan":3,"ref":"D21","role":"e"},{"kind":"input","ref":"G21","role":"e","fmt":"money"},{"kind":"input","ref":"H21","role":"e","fmt":"money"},{"kind":"input","ref":"I21","role":"e","fmt":"pct"}],
+        [{"ref":"A22","role":"e"},{"ref":"B22","role":"e"},{"ref":"C22","role":"e"},{"colSpan":3,"ref":"D22","role":"e"},{"kind":"input","ref":"G22","role":"e","fmt":"money"},{"kind":"input","ref":"H22","role":"e","fmt":"money"},{"kind":"input","ref":"I22","role":"e","fmt":"pct"}],
+        [{"ref":"A23","role":"e"},{"ref":"B23","role":"e"},{"ref":"C23","role":"e"},{"colSpan":3,"ref":"D23","role":"e"},{"kind":"input","ref":"G23","role":"e","fmt":"money"},{"kind":"input","ref":"H23","role":"e","fmt":"money"},{"kind":"input","ref":"I23","role":"e","fmt":"pct"}],
+        [{"ref":"A24","role":"e"},{"ref":"B24","role":"e"},{"ref":"C24","role":"e"},{"colSpan":3,"ref":"D24","role":"e"},{"kind":"input","ref":"G24","role":"e","fmt":"money"},{"kind":"input","ref":"H24","role":"e","fmt":"money"},{"kind":"input","ref":"I24","role":"e","fmt":"pct"}],
+        [{"ref":"A25","role":"e"},{"ref":"B25","role":"e"},{"ref":"C25","role":"e"},{"colSpan":3,"ref":"D25","role":"e"},{"kind":"input","ref":"G25","role":"e","fmt":"money"},{"kind":"input","ref":"H25","role":"e","fmt":"money"},{"kind":"input","ref":"I25","role":"e","fmt":"pct"}]
+      ]
+    }
+  ]
+}

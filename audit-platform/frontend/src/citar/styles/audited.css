@@ -1,0 +1,135 @@
+/* 移植自 CITAR screens/part2/audited-screen.css。color / background / font-size 的字面量换成 citar-tokens.css 中的同值变量（stylelint 卡点），其余原样。 */
+/*
+ * 节点 2.4 与 2.5 审定科目余额表、审定报表。
+ *
+ * 与未审界面同一套版式,差别在科目余额表:
+ * 13 列按期初、本期、期末分组,两层表头;
+ * 调整列用底色区分,标明哪些值由调整分录驱动。
+ */
+
+.aud-screen {
+  max-width: 1180px;
+}
+
+.aud-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #5b1a8c 0%, #8b3fd0 100%);
+}
+
+.aud-header__title {
+  margin: 0;
+  font-size: var(--citar-fs-18);
+  font-weight: 700;
+  color: var(--citar-c-ffffff);
+}
+
+.aud-header__note {
+  margin-left: auto;
+  font-size: var(--citar-fs-12);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.aud-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 18px;
+  border-bottom: 1px solid #e4d8f3;
+}
+
+.aud-tab {
+  padding: 9px 18px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: var(--citar-fs-14);
+  color: var(--citar-c-6b6b76);
+  cursor: pointer;
+}
+
+.aud-tab:hover {
+  color: var(--citar-c-6e0ba6);
+}
+
+.aud-tab--active {
+  border-bottom-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+  font-weight: 700;
+}
+
+.aud-panel {
+  margin-top: 16px;
+  padding: 20px 22px 24px;
+  background: var(--citar-c-ffffff);
+  border: 1px solid #e8e8ec;
+  border-radius: 10px;
+}
+
+/* 两层表头。上层是分组,下层是具体列。 */
+.aud-table thead .group-row th {
+  background: var(--citar-c-f1e7fb);
+  color: var(--citar-c-4c1273);
+  font-weight: 700;
+  text-align: center;
+}
+
+/* 分组之间加一道竖线,三组的边界才看得出来。 */
+.aud-table thead .group-row th + th {
+  border-left: 2px solid #d9c4ee;
+}
+
+.aud-table tbody td.group-start {
+  border-left: 2px solid #ede1f8;
+}
+
+.aud-table thead .column-row th.group-start {
+  border-left: 2px solid #d9c4ee;
+}
+
+/* 调整列:浅橙底,与原值列区分。 */
+.aud-table th.is-adjustment {
+  background: var(--citar-c-fdf0dc);
+  color: var(--citar-c-8a5300);
+}
+
+.aud-table td.is-adjustment {
+  background: var(--citar-c-fffaf2);
+}
+
+/* 列宽:科目名称与「调整后」两列给足,其余压缩。 */
+.aud-table th.col-seq {
+  width: 56px;
+}
+
+.aud-table th.col-code {
+  width: 110px;
+}
+
+.aud-table th.col-name {
+  min-width: 170px;
+}
+
+.aud-table th.col-direction {
+  width: 78px;
+}
+
+.aud-table th.col-amount {
+  min-width: 118px;
+}
+/* 底稿取数余额表的科目列。633 行,序号与编码要窄。 */
+.sheet-table td.is-seq {
+  width: 56px;
+  text-align: right;
+  color: var(--citar-c-8a8a96);
+}
+
+.sheet-table td.is-code {
+  width: 110px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

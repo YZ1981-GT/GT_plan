@@ -1,0 +1,258 @@
+<template>
+  <div class="aud-screen">
+    <header class="aud-header">
+      <h1 class="aud-header__title">试算平衡表</h1>
+      <span class="aud-header__note">标准科目口径：未审数 + 已批准的调整分录 = 审定数</span>
+    </header>
+
+    <nav class="aud-tabs">
+      <button
+        v-for="item in TABS"
+        :key="item.key"
+        type="button"
+        class="aud-tab"
+        :class="{ 'aud-tab--active': tab === item.key }"
+        @click="tab = item.key"
+      >{{ item.label }}</button>
+    </nav>
+
+    <section class="aud-panel">
+      <p v-if="!year" class="sheet-empty">{{ yearLoading ? '正在读取项目信息…' : '项目未设置审核年度，请先在项目信息里填写' }}</p>
+      <template v-else>
+        <div class="sheet-caption">
+          <h2 class="sheet-caption__title">{{ tab === 'audited' ? '审定科目余额表' : '底稿取数余额表' }}</h2>
+          <p class="sheet-caption__period">所属期间：{{ year }}年1月—12月</p>
+          <div class="sheet-caption__meta"><span>编制单位：{{ entityName }}</span><span>单位：元</span></div>
+        </div>
+
+        <div class="citar-toolbar">
+          <input v-model.trim="keyword" class="citar-search" type="search" placeholder="按科目编码或名称筛选" />
+          <label v-if="tab === 'source'" class="citar-check"><input v-model="nonZeroOnly" type="checkbox" /> 只看有数科目</label>
+          <span class="citar-toolbar__count">共 {{ shown.length }} 个科目</span>
+          <button class="citar-btn" type="button" :disabled="loading || recalcing" @click="load">刷新</button>
+          <button class="citar-btn citar-btn--primary" type="button" :disabled="recalcing" @click="recalc">
+            {{ recalcing ? '重算中…' : '重算试算表' }}
+          </button>
+        </div>
+
+        <div class="sheet-scroll">
+          <!-- 审定科目余额表：两层表头，看得出「原值 + 调整 = 调整后」 -->
+          <table v-if="tab === 'audited'" class="sheet-table aud-table">
+            <thead>
+              <tr class="group-row">
+                <th v-for="g in AUDITED_TRIAL_BALANCE_GROUPS" :key="g.label" :colspan="g.columns.length">{{ g.label }}</th>
+              </tr>
+              <tr class="column-row">
+                <template v-for="g in AUDITED_TRIAL_BALANCE_GROUPS" :key="g.label">
+                  <th v-for="(c, i) in g.columns" :key="c.key" :class="columnClass(c, i)">{{ c.label }}</th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in shown" :key="r.code">
+                <td class="is-seq">{{ i + 1 }}</td>
+                <td class="is-code">{{ r.code }}</td>
+                <td>{{ r.name }}</td>
+                <td class="group-start citar-center">{{ r.opening.dir }}</td>
+                <td class="is-numeric">{{ fmtMoney(r.opening.amount) }}</td>
+                <td class="is-numeric is-adjustment" title="平台暂无期初调整分录">-</td>
+                <td class="is-numeric">{{ fmtMoney(r.opening.amount) }}</td>
+                <td class="group-start is-numeric">{{ fmtMoney(r.periodDebit) }}</td>
+                <td class="is-numeric is-adjustment">{{ fmtMoney(r.adjDebit) }}</td>
+                <td class="is-numeric">{{ fmtMoney(r.periodCredit) }}</td>
+                <td class="is-numeric is-adjustment">{{ fmtMoney(r.adjCredit) }}</td>
+                <td class="group-start citar-center">{{ r.adjClosing.dir }}</td>
+                <td class="is-numeric" :title="r.wp ? `含底稿发布调整 ${fmtMoney(r.wp)}` : undefined">
+                  {{ fmtMoney(r.adjClosing.amount) }}<sup v-if="r.wp" class="citar-mark">底稿</sup>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 底稿取数余额表：全部标准科目，本期发生额含审计调整，期末为审定数 -->
+          <table v-else class="sheet-table">
+            <thead>
+              <tr><th v-for="c in TRIAL_BALANCE_COLUMNS" :key="c.key">{{ c.label }}</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in shown" :key="r.code">
+                <td class="is-seq">{{ i + 1 }}</td>
+                <td class="is-code">{{ r.code }}</td>
+                <td>{{ r.name }}</td>
+                <td class="citar-center">{{ r.opening.dir }}</td>
+                <td class="is-numeric">{{ fmtMoney(r.opening.amount) }}</td>
+                <td class="is-numeric">{{ fmtMoney(r.periodDebit + r.adjDebit) }}</td>
+                <td class="is-numeric">{{ fmtMoney(r.periodCredit + r.adjCredit) }}</td>
+                <td class="citar-center">{{ r.audited.dir }}</td>
+                <td class="is-numeric">{{ fmtMoney(r.audited.amount) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p v-if="loading" class="sheet-empty">正在读取试算平衡表…</p>
+        <p v-else-if="error" class="sheet-empty">{{ error }}</p>
+        <p v-else-if="!shown.length" class="sheet-empty">{{ rows.length ? '没有符合筛选条件的科目' : '本年度还没有试算表数据，请先导入账套' }}</p>
+        <ul v-else class="citar-footnotes">
+          <li v-if="tab === 'audited'">只列有发生额、余额或调整的科目。审计调整只计已批准的调整分录；期初调整平台暂无来源，按 0 列示。</li>
+          <li v-else>按平台标准科目表列示（{{ rows.length }} 个科目，含零余额）。本期借方 / 贷方含已批准的审计调整；期末余额是试算表审定数，底稿取数读的就是这一列（损益类为本期发生额）。</li>
+          <li>标「底稿」的科目含从底稿审定表发布的调整。</li>
+        </ul>
+      </template>
+    </section>
+  </div>
+</template>
+
+<script setup lang="ts">
+/**
+ * 试算平衡表（CITAR「审定科目余额表 / 底稿取数余额表」版式，接平台试算表）。
+ * 数据：GET /trial-balance/standard-view（借正贷负）；重算：POST /trial-balance/recalc。
+ */
+import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { trialBalance as P_tb } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
+import { AUDITED_TRIAL_BALANCE_GROUPS, TRIAL_BALANCE_COLUMNS, type AuditedColumnGroup } from '../data/reportLines'
+import { fmtMoney, splitDirection, useCitarProject } from '../useCitarProject'
+
+defineOptions({ name: 'CitarTrialBalance' })
+
+interface ViewRow {
+  standard_account_code: string
+  account_name: string
+  opening_balance: string
+  period_debit: string
+  period_credit: string
+  adjustment_debit: string
+  adjustment_credit: string
+  wp_adjustment: string
+  adjusted_closing_balance: string
+  /** 平台审定数（自然正数口径）：底稿取数读的就是它 */
+  audited_amount: string | null
+  direction: 'debit' | 'credit'
+}
+
+type TabKey = 'audited' | 'source'
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'audited', label: '审定科目余额表' },
+  { key: 'source', label: '底稿取数余额表' },
+]
+
+const { projectId, year, yearLoading, entityName } = useCitarProject()
+
+const tab = ref<TabKey>('audited')
+const rows = ref<ViewRow[]>([])
+const loading = ref(false)
+const recalcing = ref(false)
+const error = ref('')
+const keyword = ref('')
+const nonZeroOnly = ref(false)
+
+const prepared = computed(() =>
+  rows.value.map(r => {
+    const periodDebit = Number(r.period_debit) || 0
+    const periodCredit = Number(r.period_credit) || 0
+    const adjDebit = Number(r.adjustment_debit) || 0
+    const adjCredit = Number(r.adjustment_credit) || 0
+    const wp = Number(r.wp_adjustment) || 0
+    const opening = splitDirection(r.opening_balance)
+    const adjClosing = splitDirection(r.adjusted_closing_balance)
+    // 审定数是自然正数口径：贷方科目转成借正贷负再分方向
+    const audited = splitDirection(
+      r.audited_amount === null ? r.adjusted_closing_balance : (r.direction === 'credit' ? -1 : 1) * (Number(r.audited_amount) || 0),
+    )
+    const hasValue = [opening.amount, periodDebit, periodCredit, adjDebit, adjCredit, wp, adjClosing.amount, audited.amount].some(v => Math.abs(v) >= 0.005)
+    return {
+      audited,
+      code: r.standard_account_code,
+      name: r.account_name,
+      opening,
+      periodDebit,
+      periodCredit,
+      adjDebit,
+      adjCredit,
+      wp,
+      adjClosing,
+      hasValue,
+    }
+  }),
+)
+
+const shown = computed(() => {
+  const kw = keyword.value
+  return prepared.value.filter(r => {
+    if (kw && !r.code.includes(kw) && !r.name.includes(kw)) return false
+    // 审定科目余额表只列有数科目；底稿取数余额表默认全列
+    if ((tab.value === 'audited' || nonZeroOnly.value) && !r.hasValue) return false
+    return true
+  })
+})
+
+/** 按列性质给宽度类名；每组第一列加左边界，三组的分界才看得出 */
+function columnClass(c: AuditedColumnGroup['columns'][number], index: number) {
+  let width = ''
+  if (c.key === 'seq') width = 'col-seq'
+  else if (c.key === 'accountCode') width = 'col-code'
+  else if (c.key === 'accountName') width = 'col-name'
+  else if (c.key.endsWith('Direction')) width = 'col-direction'
+  else if (c.numeric) width = 'col-amount'
+  return [width, c.adjustment ? 'is-adjustment' : '', index === 0 ? 'group-start' : ''].filter(Boolean)
+}
+
+async function load() {
+  if (!year.value) return
+  loading.value = true
+  error.value = ''
+  try {
+    const data = await api.get(P_tb.standardView(projectId.value), { params: { year: year.value } })
+    rows.value = Array.isArray(data) ? (data as ViewRow[]) : []
+  } catch (e: any) {
+    rows.value = []
+    error.value = e?.response?.data?.detail || e?.message || '读取试算平衡表失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function recalc() {
+  if (!year.value) return
+  recalcing.value = true
+  try {
+    // _silent：错误由 handleApiError 提示一次（含前置条件「请先完成科目映射」等）
+    await api.post(P_tb.recalc(projectId.value), null, {
+      params: { year: year.value },
+      _silent: true,
+      timeout: 300000,
+    } as any)
+    ElMessage.success('试算表已重算')
+    await load()
+  } catch (e) {
+    handleApiError(e, '重算试算表')
+  } finally {
+    recalcing.value = false
+  }
+}
+
+watch([projectId, year], load, { immediate: true })
+</script>
+
+<style scoped src="../styles/unaudited.css"></style>
+<style scoped src="../styles/audited.css"></style>
+<style scoped src="../styles/citar-data.css"></style>
+
+<style scoped>
+.citar-mark {
+  margin-left: 2px;
+  font-size: var(--citar-fs-9);
+  color: var(--citar-c-8a5300);
+}
+
+.citar-footnotes {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: var(--citar-fs-12);
+  line-height: 1.8;
+  color: var(--citar-c-8c8c96);
+}
+</style>

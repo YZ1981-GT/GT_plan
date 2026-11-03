@@ -16,6 +16,7 @@ from .direction_derivation import (
     NORMAL_DIRECTION_BY_CATEGORY,
 )
 from .sign_convention_types import SignAnomaly
+from app.core.code_text import code_text
 
 __all__ = [
     "detect_sign_anomalies",
@@ -44,7 +45,7 @@ def detect_sign_anomalies(
     anomalies: list[SignAnomaly] = []
 
     for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
+        account_code = code_text(row.get("account_code"))
         if not account_code:
             continue
 

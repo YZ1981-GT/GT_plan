@@ -1,0 +1,22 @@
+{
+  "code": "1-05",
+  "parts": [
+    {
+      "source": "1-05",
+      "rows": [
+        [{"text":"审核总结","kind":"title","colSpan":8}],
+        [{"text":"索引号：1-05","kind":"meta","colSpan":8}],
+        [{"text":"被审核人"},{"colSpan":3,"ref":"B3","role":"f"},{"text":"编制人"},{"ref":"F3","role":"f"},{"text":"编制日期"},{"ref":"H3","role":"f"}],
+        [{"text":"会计期间"},{"colSpan":3,"ref":"B4","role":"f"},{"text":"复核人"},{"ref":"F4","role":"f"},{"text":"复核日期"},{"ref":"H4","role":"f"}],
+        [{"text":"一、审核基本情况","colSpan":8}],
+        [{"colSpan":8,"ref":"A6","role":"e"}],
+        [{"text":"二、审核过程中发现的重大事项及其处理（包括但不限于重大事项概要汇总表的事项）","colSpan":8}],
+        [{"colSpan":8,"ref":"A8","role":"e"}],
+        [{"text":"三、审核结论","colSpan":8}],
+        [{"colSpan":8,"ref":"A10","role":"e"}],
+        [{"text":"四、对下年度审核工作及今后相关业务的建议","colSpan":8}],
+        [{"colSpan":8,"ref":"A12","role":"e"}]
+      ]
+    }
+  ]
+}

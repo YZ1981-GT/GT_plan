@@ -11,6 +11,7 @@ export {
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
   ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
+  taxWorkpapers,
 } from './accounting'
 
 export {
@@ -68,6 +69,7 @@ import {
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
   ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
+  taxWorkpapers,
 } from './accounting'
 import {
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
@@ -103,7 +105,7 @@ import {
 } from './system'
 
 export const API = {
-  projects, trialBalance, adjustments, materiality, misstatements,
+  projects, trialBalance, taxWorkpapers, adjustments, materiality, misstatements,
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
   cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,

@@ -7,9 +7,17 @@ import { useAuthStore } from '@/stores/auth'
  */
 export const projectsRoutes: RouteRecordRaw[] = [
 {
+          // 税审 demo：项目列表与项目内六个菜单改用 CITAR 版式（spec citar-layout-full-port）。
+          // 路由名不变；原页面文件保留，改回 component 即恢复。
           path: 'projects',
           name: 'Projects',
-          component: () => import('@/views/Projects.vue'),
+          component: () => import('@/citar/CitarProjectList.vue'),
+        },
+{
+          // CITAR 流程：从项目列表点进来先到项目空页，再由左侧一级栏进入各环节
+          path: 'projects/:projectId/home',
+          name: 'CitarProjectHome',
+          component: () => import('@/citar/CitarProjectHome.vue'),
         },
 {
           path: 'projects/full',
@@ -29,12 +37,33 @@ export const projectsRoutes: RouteRecordRaw[] = [
 {
           path: 'projects/:projectId/trial-balance',
           name: 'TrialBalance',
-          component: () => import(/* webpackPrefetch: true */ '@/views/TrialBalance.vue'),
+          // CITAR「试算平衡表」（审定科目余额表 / 底稿取数余额表，接试算表）；原页面 @/views/TrialBalance.vue
+          component: () => import('@/citar/screens/CitarTrialBalance.vue'),
+        },
+{
+          // CITAR「账务查询」：科目余额表 / 序时账 / 未审资产负债表 / 未审利润表
+          path: 'projects/:projectId/ledger-query',
+          name: 'CitarLedgerQuery',
+          component: () => import('@/citar/screens/CitarLedgerQuery.vue'),
         },
 {
           path: 'projects/:projectId/adjustments',
           name: 'Adjustments',
-          component: () => import('@/views/Adjustments.vue'),
+          // CITAR「调整分录」（接平台调整分录与复核流程）；原页面 @/views/Adjustments.vue
+          component: () => import('@/citar/screens/CitarAdjustment.vue'),
+        },
+{
+          // 平台暂无对应功能的三个菜单：CITAR 待开发页
+          path: 'projects/:projectId/report-analysis',
+          name: 'CitarReportAnalysis',
+          component: () => import('@/citar/CitarPendingNode.vue'),
+          meta: { citarTitle: '报表分析' },
+        },
+{
+          path: 'projects/:projectId/tax-return',
+          name: 'CitarTaxReturn',
+          component: () => import('@/citar/CitarPendingNode.vue'),
+          meta: { citarTitle: '纳税申报表' },
         },
 {
           path: 'projects/:projectId/materiality',
@@ -118,12 +147,14 @@ export const projectsRoutes: RouteRecordRaw[] = [
 {
           path: 'projects/:projectId/mapping',
           name: 'AccountMapping',
-          component: () => import('@/views/AccountMappingPage.vue'),
+          // CITAR「底稿映射」（客户科目 → 标准科目）；原页面 @/views/AccountMappingPage.vue
+          component: () => import('@/citar/screens/CitarAccountMapping.vue'),
         },
 {
           path: 'projects/:projectId/ledger-import',
           name: 'LedgerImport',
-          component: () => import('@/views/LedgerImportPage.vue'),
+          // CITAR「账套导入」；原页面 @/views/LedgerImportPage.vue
+          component: () => import('@/citar/screens/CitarDataImport.vue'),
         },
 {
           path: 'projects/:projectId/ledger/import-history',

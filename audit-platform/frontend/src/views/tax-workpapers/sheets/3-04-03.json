@@ -1,0 +1,44 @@
+{
+  "code": "3-04-03",
+  "parts": [
+    {
+      "source": "3-04-03",
+      "rows": [
+        [{"text":"政策性搬迁审核表","kind":"title","colSpan":7}],
+        [{},{},{},{},{"text":"索引号：3-04-03","kind":"meta","colSpan":3}],
+        [{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":3}],
+        [{"text":"被审核人","colSpan":2},{"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"E4","role":"f"},{"text":"编制日期"},{"ref":"G4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"E5","role":"f"},{"text":"复核日期"},{"ref":"G5","role":"f"}],
+        [{"text":"行次","kind":"header"},{"text":"项        目","kind":"header","colSpan":5},{"text":"金额","kind":"header"}],
+        [{"text":"1"},{"text":"一、搬迁收入（2+8）","colSpan":5},{"kind":"number","ref":"G7","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"（一）搬迁补偿收入（3+4+5+6+7）","colSpan":5},{"kind":"number","ref":"G8","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"1.对被征用资产价值的补偿","colSpan":5},{"kind":"input","ref":"G9","role":"e","fmt":"money"}],
+        [{"text":"4"},{"text":"2.因搬迁、安置而给予的补偿","colSpan":5},{"kind":"input","ref":"G10","role":"e","fmt":"money"}],
+        [{"text":"5"},{"text":"3.对停产停业形成的损失而给予的补偿","colSpan":5},{"kind":"input","ref":"G11","role":"e","fmt":"money"}],
+        [{"text":"6"},{"text":"4.资产搬迁过程中遭到毁损而取得的保险赔款","colSpan":5},{"kind":"input","ref":"G12","role":"e","fmt":"money"}],
+        [{"text":"7"},{"text":"5.其他补偿收入","colSpan":5},{"kind":"input","ref":"G13","role":"e","fmt":"money"}],
+        [{"text":"8"},{"text":"（二）搬迁资产处置收入","colSpan":5},{"kind":"input","ref":"G14","role":"e","fmt":"money"}],
+        [{"text":"9"},{"text":"二、搬迁支出（10+16）","colSpan":5},{"kind":"number","ref":"G15","role":"f","fmt":"money"}],
+        [{"text":"10"},{"text":"（一）搬迁费用支出（11+12+13+14+15）","colSpan":5},{"kind":"number","ref":"G16","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"1.安置职工实际发生的费用","colSpan":5},{"kind":"input","ref":"G17","role":"e","fmt":"money"}],
+        [{"text":"12"},{"text":"2.停工期间支付给职工的工资及福利费","colSpan":5},{"kind":"input","ref":"G18","role":"e","fmt":"money"}],
+        [{"text":"13"},{"text":"3.临时存放搬迁资产而发生的费用","colSpan":5},{"kind":"input","ref":"G19","role":"e","fmt":"money"}],
+        [{"text":"14"},{"text":"4.各类资产搬迁安装费用","colSpan":5},{"kind":"input","ref":"G20","role":"e","fmt":"money"}],
+        [{"text":"15"},{"text":"5.其他与搬迁相关的费用","colSpan":5},{"kind":"input","ref":"G21","role":"e","fmt":"money"}],
+        [{"text":"16"},{"text":"（二）搬迁资产处置支出","colSpan":5},{"kind":"input","ref":"G22","role":"e","fmt":"money"}],
+        [{"text":"17"},{"text":"三、搬迁所得或损失（1-9）","colSpan":5},{"kind":"number","ref":"G23","role":"f","fmt":"money"}],
+        [{"text":"18"},{"text":"四、应计入本年应纳税所得额的搬迁所得或损失（19+20+21）","colSpan":5},{"kind":"number","ref":"G24","role":"f","fmt":"money"}],
+        [{"text":"19"},{"text":"其中：搬迁所得","colSpan":5},{"kind":"input","ref":"G25","role":"e","fmt":"money"}],
+        [{"text":"20"},{"text":"搬迁损失一次性扣除","colSpan":5},{"kind":"input","ref":"G26","role":"e","fmt":"money"}],
+        [{"text":"21"},{"text":"搬迁损失分期扣除","colSpan":5},{"kind":"input","ref":"G27","role":"e","fmt":"money"}],
+        [{"text":"22"},{"text":"五、计入当期损益的搬迁收益或损失","colSpan":5},{"kind":"input","ref":"G28","role":"e","fmt":"money"}],
+        [{"text":"23"},{"text":"六、以前年度搬迁损失当期扣除金额","colSpan":5},{"kind":"input","ref":"G29","role":"e","fmt":"money"}],
+        [{"text":"24"},{"text":"七、纳税调整金额（18-22-23）","colSpan":5},{"kind":"number","ref":"G30","role":"f","fmt":"money"}],
+        [{"text":"一、审核项目说明：","colSpan":7}],
+        [{"colSpan":7,"ref":"A32","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":7}],
+        [{"colSpan":7,"ref":"A34","role":"e"}]
+      ]
+    }
+  ]
+}

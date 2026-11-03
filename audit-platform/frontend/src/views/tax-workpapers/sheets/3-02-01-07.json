@@ -1,0 +1,39 @@
+{
+  "code": "3-02-01-07",
+  "parts": [
+    {
+      "source": "3-02-01-07",
+      "rows": [
+        [{"text":"住房公积金支出审核表","kind":"title","colSpan":11},{},{}],
+        [{},{},{},{},{},{},{},{},{},{},{},{"text":"索引号：3-02-01-07","kind":"meta","colSpan":2}],
+        [{},{},{},{},{},{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人","colSpan":3},{"colSpan":4,"ref":"D4","role":"f"},{"text":"编制人"},{"colSpan":3,"ref":"I4","role":"f"},{"text":"编制日期"},{"ref":"M4","role":"f"}],
+        [{"text":"会计期间","colSpan":3},{"colSpan":4,"ref":"D5","role":"f"},{"text":"复核人"},{"colSpan":3,"ref":"I5","role":"f"},{"text":"复核日期"},{"ref":"M5","role":"f"}],
+        [{"text":"一、纳税调整情况检查","colSpan":13}],
+        [{"text":"行次","kind":"header"},{"text":"企业总人数","kind":"header"},{"text":"缴存人数","kind":"header"},{"text":"上年本地区月平均工资","kind":"header","colSpan":2},{"text":"单位负担部分允许扣除比例","kind":"header"},{"text":"本年缴存期数","kind":"header"},{"text":"税收金额","kind":"header"},{"text":"账载金额","kind":"header"},{"text":"审核调整额","kind":"header"},{"text":"审核确认金额","kind":"header"},{"text":"纳税调增金额","kind":"header"},{"text":"纳税调减金额","kind":"header"}],
+        [{"text":"上半年"},{"ref":"B8","role":"e"},{"ref":"C8","role":"e"},{"kind":"input","colSpan":2,"ref":"D8","role":"e","fmt":"money"},{"kind":"input","ref":"F8","role":"e","fmt":"pct"},{"kind":"input","ref":"G8","role":"e","fmt":"money"},{"kind":"number","rowSpan":2,"ref":"H8","role":"f","fmt":"money"},{"kind":"number","rowSpan":2,"ref":"I8","role":"f","fmt":"money"},{"kind":"input","rowSpan":2,"ref":"J8","role":"e","fmt":"money"},{"kind":"number","rowSpan":2,"ref":"K8","role":"f","fmt":"money"},{"kind":"number","rowSpan":2,"ref":"L8","role":"f","fmt":"money"},{"kind":"number","rowSpan":2,"ref":"M8","role":"f","fmt":"money"}],
+        [{"text":"下半年"},{"ref":"B9","role":"e"},{"ref":"C9","role":"e"},{"kind":"input","colSpan":2,"ref":"D9","role":"e","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"pct"},{"kind":"input","ref":"G9","role":"e","fmt":"money"}],
+        [{"text":"合                计","kind":"total","colSpan":7},{"kind":"number","ref":"H10","role":"f","fmt":"money"},{"kind":"number","ref":"I10","role":"f","fmt":"money"},{"kind":"number","ref":"J10","role":"f","fmt":"money"},{"kind":"number","ref":"K10","role":"f","fmt":"money"},{"kind":"number","ref":"L10","role":"f","fmt":"money"},{"kind":"number","ref":"M10","role":"f","fmt":"money"}],
+        [{"text":"二、实际支出情况检查","colSpan":13}],
+        [{"text":"行次","kind":"header"},{"text":"项目","kind":"header","colSpan":3},{"text":"明细项目","kind":"header","colSpan":4},{"text":"金额","kind":"header","colSpan":4},{"text":"备注","kind":"header"}],
+        [{"text":"1","rowSpan":7},{"text":"通过应付职工薪酬-住房公积金科目支出的住房公积金","colSpan":3,"rowSpan":7},{"text":"年初余额","colSpan":4},{"kind":"input","colSpan":4,"ref":"I13","role":"e","fmt":"money"},{"text":"借方余额用负数表示"}],
+        [{"text":"借方发生额","colSpan":4},{"kind":"input","colSpan":4,"ref":"I14","role":"e","fmt":"money"},{"ref":"M14","role":"e"}],
+        [{"text":"其中：不属于实际支付金额","colSpan":4},{"kind":"input","colSpan":4,"ref":"I15","role":"e","fmt":"money"},{"ref":"M15","role":"e"}],
+        [{"text":"贷方发生额","colSpan":4},{"kind":"input","colSpan":4,"ref":"I16","role":"e","fmt":"money"},{"ref":"M16","role":"e"}],
+        [{"text":"年末余额","colSpan":4},{"kind":"number","colSpan":4,"ref":"I17","role":"f","fmt":"money"},{"ref":"M17","role":"e"}],
+        [{"text":"汇算清缴期支付","colSpan":4},{"kind":"input","colSpan":4,"ref":"I18","role":"e","fmt":"money"},{"ref":"M18","role":"e"}],
+        [{"text":"实际支出额小计","colSpan":4},{"kind":"number","colSpan":4,"ref":"I19","role":"f","fmt":"money"},{"ref":"M19","role":"e"}],
+        [{"text":"2","kind":"header","rowSpan":5},{"text":"未通过应付职工薪酬-住房公积金科目支出的住房公积金","kind":"header","colSpan":3,"rowSpan":5},{"colSpan":4,"ref":"E20","role":"e"},{"kind":"input","colSpan":4,"ref":"I20","role":"e","fmt":"money"},{"ref":"M20","role":"e"}],
+        [{"colSpan":4,"ref":"E21","role":"e"},{"kind":"input","colSpan":4,"ref":"I21","role":"e","fmt":"money"},{"ref":"M21","role":"e"}],
+        [{"colSpan":4,"ref":"E22","role":"e"},{"kind":"input","colSpan":4,"ref":"I22","role":"e","fmt":"money"},{"ref":"M22","role":"e"}],
+        [{"colSpan":4,"ref":"E23","role":"e"},{"kind":"input","colSpan":4,"ref":"I23","role":"e","fmt":"money"},{"ref":"M23","role":"e"}],
+        [{"text":"实际支出额小计","colSpan":4},{"kind":"number","colSpan":4,"ref":"I24","role":"f","fmt":"money"},{"ref":"M24","role":"e"}],
+        [{"text":"实际支出额合计","colSpan":8},{"kind":"number","colSpan":4,"ref":"I25","role":"f","fmt":"money"},{"ref":"M25","role":"e"}],
+        [{"text":"三、审核项目说明：","colSpan":13}],
+        [{"colSpan":13,"ref":"A27","role":"e"}],
+        [{"text":"四、审核工作记录：","colSpan":13}],
+        [{"colSpan":13,"ref":"A29","role":"e"}]
+      ]
+    }
+  ]
+}

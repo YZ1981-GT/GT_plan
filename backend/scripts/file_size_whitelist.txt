@@ -1675,3 +1675,14 @@ audit-platform/frontend/src/components/workpaper/__tests__/WorkpaperWordEditor.s
 #     入册而不拆：拆分会动判据实现本身，变异证明要重做。拆分方向：模板层（openpyxl 事实）/
 #     源码层（域文件、行身份、import 图）两个模块，入口模块保留 re-export。
 backend/scripts/analyze/n_cycle_scanner.py  977
+#   smart_import_engine.py / import_engine/parsers.py —— 历史大文件（HEAD 已 3155 / 954 行且未登记，任何改动都会被门禁拒）。
+#     2026-11-02 citar-pages-data-wiring：科目编码 / 凭证号 / 组织编码 / 辅助编码改走 ledger_import.converter.code_text
+#     （Excel 数字编码读成 float ⇒ 「1001.0」，科目上下级认不出、父子重复汇总），各只加一行 import。
+#     拆分方向：smart_import_engine 按识别 / 转换 / 写库拆模块；parsers 按四表各一个解析器拆。
+backend/app/services/smart_import_engine.py  3156
+backend/app/services/import_engine/parsers.py  955
+#   mapping_service.py —— 历史大文件（HEAD 已 1014 行且未登记，任何改动都会被门禁拒）。
+#     2026-11-02 legacy-pl-account-crosswalk-mapping：旧编码体系损益科目按对照表到新准则 6xxx，
+#     对照表与判定放新模块 legacy_pl_crosswalk.py，这里只加接线（+21 行）。
+#     拆分方向：自动匹配（auto_suggest / _match_single / 坏账二级）与映射 CRUD / 完成率拆两个模块。
+backend/app/services/mapping_service.py  1035

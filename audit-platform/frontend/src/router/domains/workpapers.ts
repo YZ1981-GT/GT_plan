@@ -6,9 +6,12 @@ import type { RouteRecordRaw } from 'vue-router'
  */
 export const workpapersRoutes: RouteRecordRaw[] = [
 {
+          // 税审 demo：「税务底稿」改用 CITAR 版式（底稿目录 + 紫色横幅 + 页签 + 卡片）。
+          // 路由名沿用 WorkpaperList，既有 router.push({ name: 'WorkpaperList' }) 无需改；
+          // 原审计底稿管理页 WorkpaperList.vue 保留未删，恢复时把 component 改回即可。
           path: 'projects/:projectId/workpapers',
           name: 'WorkpaperList',
-          component: () => import(/* webpackPrefetch: true */ '@/views/WorkpaperList.vue'),
+          component: () => import(/* webpackPrefetch: true */ '@/views/tax-workpapers/TaxWorkpaperView.vue'),
         },
 {
           path: 'projects/:projectId/workpapers/:wpId/edit',

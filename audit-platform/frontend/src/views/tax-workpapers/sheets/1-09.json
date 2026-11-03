@@ -1,0 +1,28 @@
+{
+  "code": "1-09",
+  "parts": [
+    {
+      "source": "1-09",
+      "rows": [
+        [{"text":"企业内部控制调查表","kind":"title","colSpan":6}],
+        [{"colSpan":6}],
+        [{"colSpan":2,"ref":"A3","role":"e"},{"ref":"C3","role":"e"},{"ref":"D3","role":"e"},{"text":"索引号：1-09","kind":"meta","colSpan":2}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"受托方","kind":"header"},{"text":"职务","kind":"header"},{"text":"委托方","kind":"header","colSpan":2},{"text":"职务","kind":"header","colSpan":2}],
+        [{"ref":"A7","role":"e"},{"ref":"B7","role":"e"},{"colSpan":2,"ref":"C7","role":"e"},{"colSpan":2,"ref":"E7","role":"e"}],
+        [{"ref":"A8","role":"e"},{"ref":"B8","role":"e"},{"colSpan":2,"ref":"C8","role":"e"},{"colSpan":2,"ref":"E8","role":"e"}],
+        [{"ref":"A9","role":"e"},{"ref":"B9","role":"e"},{"colSpan":2,"ref":"C9","role":"e"},{"colSpan":2,"ref":"E9","role":"e"}],
+        [{"text":"调查内容","kind":"header","colSpan":2,"rowSpan":2},{"text":"是否建立","kind":"header","rowSpan":2},{"text":"运行情况（√）","kind":"header","colSpan":3}],
+        [{"text":"好","kind":"header"},{"text":"良好","kind":"header"},{"text":"一般","kind":"header"}],
+        [{"text":"不相容职务分离控制","colSpan":2},{"ref":"C12","role":"e"},{"ref":"D12","role":"e"},{"ref":"E12","role":"e"},{"ref":"F12","role":"e"}],
+        [{"text":"授权审批控制","colSpan":2},{"ref":"C13","role":"e"},{"ref":"D13","role":"e"},{"ref":"E13","role":"e"},{"ref":"F13","role":"e"}],
+        [{"text":"会计系统控制","colSpan":2},{"ref":"C14","role":"e"},{"ref":"D14","role":"e"},{"ref":"E14","role":"e"},{"ref":"F14","role":"e"}],
+        [{"text":"财产保护控制","colSpan":2},{"ref":"C15","role":"e"},{"ref":"D15","role":"e"},{"ref":"E15","role":"e"},{"ref":"F15","role":"e"}],
+        [{"text":"预算控制","colSpan":2},{"ref":"C16","role":"e"},{"ref":"D16","role":"e"},{"ref":"E16","role":"e"},{"ref":"F16","role":"e"}],
+        [{"text":"运营分析控制","colSpan":2},{"ref":"C17","role":"e"},{"ref":"D17","role":"e"},{"ref":"E17","role":"e"},{"ref":"F17","role":"e"}],
+        [{"text":"绩效考评控制","colSpan":2},{"ref":"C18","role":"e"},{"ref":"D18","role":"e"},{"ref":"E18","role":"e"},{"ref":"F18","role":"e"}]
+      ]
+    }
+  ]
+}

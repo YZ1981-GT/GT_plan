@@ -1,0 +1,30 @@
+{
+  "code": "3-01-01-02",
+  "parts": [
+    {
+      "source": "3-01-01-02",
+      "rows": [
+        [{"text":"视同销售成本审核表","kind":"title","colSpan":9}],
+        [{},{},{},{},{},{},{"text":"索引号：3-01-01-02","kind":"meta","colSpan":3}],
+        [{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":3}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":2,"ref":"C4","role":"f"},{"text":"编制人"},{"colSpan":2,"ref":"F4","role":"f"},{"text":"编制日期"},{"ref":"I4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":2,"ref":"C5","role":"f"},{"text":"复核人"},{"colSpan":2,"ref":"F5","role":"f"},{"text":"复核日期"},{"ref":"I5","role":"f"}],
+        [{"text":"行次","kind":"header"},{"text":"项  目","kind":"header"},{"text":"交易内容","kind":"header"},{"text":"数量","kind":"header"},{"text":"成本单价","kind":"header"},{"text":"应确认成本金额","kind":"header"},{"text":"审核调整额","kind":"header"},{"text":"纳税调整金额（应调整成本）","kind":"header"},{"text":"会计核算科目","kind":"header"}],
+        [{"text":"1"},{"text":"非货币性资产交换视同销售成本"},{"ref":"C7","role":"f"},{"ref":"D7","role":"f"},{"kind":"input","ref":"E7","role":"e","fmt":"money"},{"kind":"input","ref":"F7","role":"e","fmt":"money"},{"kind":"input","ref":"G7","role":"e","fmt":"money"},{"kind":"number","ref":"H7","role":"f","fmt":"money"},{"ref":"I7","role":"e"}],
+        [{"text":"2"},{"text":"用于市场推广或销售视同销售成本"},{"ref":"C8","role":"f"},{"ref":"D8","role":"f"},{"kind":"input","ref":"E8","role":"e","fmt":"money"},{"kind":"input","ref":"F8","role":"e","fmt":"money"},{"kind":"input","ref":"G8","role":"e","fmt":"money"},{"kind":"number","ref":"H8","role":"f","fmt":"money"},{"ref":"I8","role":"e"}],
+        [{"text":"3"},{"text":"用于交际应酬视同销售成本"},{"ref":"C9","role":"f"},{"ref":"D9","role":"f"},{"kind":"input","ref":"E9","role":"e","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"},{"kind":"input","ref":"G9","role":"e","fmt":"money"},{"kind":"number","ref":"H9","role":"f","fmt":"money"},{"ref":"I9","role":"e"}],
+        [{"text":"4"},{"text":"用于职工奖励或福利视同销售成本"},{"ref":"C10","role":"f"},{"ref":"D10","role":"f"},{"kind":"input","ref":"E10","role":"e","fmt":"money"},{"kind":"input","ref":"F10","role":"e","fmt":"money"},{"kind":"input","ref":"G10","role":"e","fmt":"money"},{"kind":"number","ref":"H10","role":"f","fmt":"money"},{"ref":"I10","role":"e"}],
+        [{"text":"5"},{"text":"用于股息分配视同销售成本"},{"ref":"C11","role":"f"},{"ref":"D11","role":"f"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"},{"kind":"input","ref":"G11","role":"e","fmt":"money"},{"kind":"number","ref":"H11","role":"f","fmt":"money"},{"ref":"I11","role":"e"}],
+        [{"text":"6"},{"text":"用于对外捐赠视同销售成本"},{"ref":"C12","role":"f"},{"ref":"D12","role":"f"},{"kind":"input","ref":"E12","role":"e","fmt":"money"},{"kind":"input","ref":"F12","role":"e","fmt":"money"},{"kind":"input","ref":"G12","role":"e","fmt":"money"},{"kind":"number","ref":"H12","role":"f","fmt":"money"},{"ref":"I12","role":"e"}],
+        [{"text":"7"},{"text":"用于对外投资项目视同销售成本"},{"ref":"C13","role":"f"},{"ref":"D13","role":"f"},{"kind":"input","ref":"E13","role":"e","fmt":"money"},{"kind":"input","ref":"F13","role":"e","fmt":"money"},{"kind":"input","ref":"G13","role":"e","fmt":"money"},{"kind":"number","ref":"H13","role":"f","fmt":"money"},{"ref":"I13","role":"e"}],
+        [{"text":"8"},{"text":"提供劳务视同销售成本"},{"ref":"C14","role":"f"},{"ref":"D14","role":"f"},{"kind":"input","ref":"E14","role":"e","fmt":"money"},{"kind":"input","ref":"F14","role":"e","fmt":"money"},{"kind":"input","ref":"G14","role":"e","fmt":"money"},{"kind":"number","ref":"H14","role":"f","fmt":"money"},{"ref":"I14","role":"e"}],
+        [{"text":"9"},{"text":"其他"},{"ref":"C15","role":"f"},{"ref":"D15","role":"f"},{"kind":"input","ref":"E15","role":"e","fmt":"money"},{"kind":"input","ref":"F15","role":"e","fmt":"money"},{"kind":"input","ref":"G15","role":"e","fmt":"money"},{"kind":"number","ref":"H15","role":"f","fmt":"money"},{"ref":"I15","role":"e"}],
+        [{"text":"10"},{"text":"合  计"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"F16","role":"f","fmt":"money"},{"kind":"number","ref":"G16","role":"f","fmt":"money"},{"kind":"number","ref":"H16","role":"f","fmt":"money"},{"text":"*"}],
+        [{"text":"一、审核项目说明：","colSpan":9}],
+        [{"colSpan":9,"ref":"A18","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":9}],
+        [{"colSpan":9,"ref":"A20","role":"e"}]
+      ]
+    }
+  ]
+}

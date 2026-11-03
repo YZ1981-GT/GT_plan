@@ -1,0 +1,30 @@
+{
+  "code": "5-02-01-01",
+  "parts": [
+    {
+      "source": "5-02-01-01",
+      "rows": [
+        [{"text":"符合条件的小型微利企业减免企业所得税","kind":"title","colSpan":6}],
+        [{},{},{},{},{},{"text":"索引号：5-02-01-01","kind":"meta"}],
+        [{},{},{},{},{},{"text":"金额单位：元","kind":"meta"}],
+        [{"text":"被审核人"},{"ref":"B4","role":"f"},{"text":"编制人"},{"ref":"D4","role":"f"},{"text":"编制日期"},{"ref":"F4","role":"f"}],
+        [{"text":"会计期间"},{"ref":"B5","role":"f"},{"text":"复核人"},{"ref":"D5","role":"f"},{"text":"复核日期"},{"ref":"F5","role":"f"}],
+        [{"text":"满足条件","kind":"header","colSpan":2,"rowSpan":3},{"text":"从事国家非限制和禁止行业","kind":"header"},{"text":"年度应纳税所得额","kind":"header"},{"text":"从业人数","kind":"header"},{"text":"资产总额（万元）","kind":"header"}],
+        [{"ref":"C7","role":"f"},{"kind":"number","ref":"D7","role":"f","fmt":"money"},{"ref":"E7","role":"f"},{"kind":"number","ref":"F7","role":"f","fmt":"money"}],
+        [{"ref":"C8","role":"f"},{"ref":"D8","role":"f"},{"ref":"E8","role":"f"},{"ref":"F8","role":"f"}],
+        [{"text":"1"},{"text":"满足条件的应纳税所得额","colSpan":4},{"kind":"number","ref":"F9","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"应纳所得税额","colSpan":4},{"kind":"number","ref":"F10","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"不超过100万元的部分","colSpan":4},{"kind":"number","ref":"F11","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"减按25%计入应纳税所得额","colSpan":4},{"kind":"number","ref":"F12","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"税率","colSpan":4},{"text":"20%","kind":"number"}],
+        [{"text":"6"},{"text":"应纳税额","colSpan":4},{"kind":"number","ref":"F14","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"超过100万元但不超过300万元的部分","colSpan":4},{"kind":"number","ref":"F15","role":"f","fmt":"money"}],
+        [{"text":"8"},{"text":"减按25%计入应纳税所得额","colSpan":4},{"kind":"number","ref":"F16","role":"f","fmt":"money"}],
+        [{"text":"9"},{"text":"税率","colSpan":4},{"text":"20%","kind":"number"}],
+        [{"text":"10"},{"text":"应纳税额","colSpan":4},{"kind":"number","ref":"F18","role":"f","fmt":"money"}],
+        [{"text":"11"},{"text":"应纳税额合计","colSpan":4},{"kind":"number","ref":"F19","role":"f","fmt":"money"}],
+        [{"text":"12"},{"text":"减免所得税额","colSpan":4},{"kind":"number","ref":"F20","role":"f","fmt":"money"}]
+      ]
+    }
+  ]
+}

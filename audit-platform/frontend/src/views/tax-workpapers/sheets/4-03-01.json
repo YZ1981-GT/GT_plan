@@ -1,0 +1,27 @@
+{
+  "code": "4-03-01",
+  "parts": [
+    {
+      "source": "4-03-01",
+      "rows": [
+        [{"text":"前五年境外所得已缴税款未抵扣余额审核表","kind":"title","colSpan":11}],
+        [{},{},{},{},{},{},{},{},{},{},{"text":"索引号：4-03-01","kind":"meta"}],
+        [{"colSpan":4},{"colSpan":3},{},{},{},{"text":"金额单位：元","kind":"meta"}],
+        [{"text":"被审核人","colSpan":3},{"colSpan":2,"ref":"D4","role":"f"},{"text":"编制人","colSpan":2},{"colSpan":2,"ref":"H4","role":"f"},{"text":"编制日期"},{"ref":"K4","role":"f"}],
+        [{"text":"会计期间","colSpan":3},{"colSpan":2,"ref":"D5","role":"f"},{"text":"复核人","colSpan":2},{"colSpan":2,"ref":"H5","role":"f"},{"text":"复核日期"},{"ref":"K5","role":"f"}],
+        [{"text":"国家（地区）：","colSpan":11}],
+        [{"text":"行次","kind":"header"},{"text":"项目","kind":"header"},{"text":"年份","kind":"header"},{"text":"盈利或亏损额","kind":"header"},{"text":"弥补境内亏损","kind":"header"},{"text":"境内应纳税额","kind":"header"},{"text":"境外已缴税额","kind":"header"},{"text":"当年境外已缴税抵免额","kind":"header"},{"text":"5年内\n已缴税抵免额","kind":"header"},{"text":"境内补缴税额","kind":"header"},{"text":"可结转下年度抵免的境外税额","kind":"header"}],
+        [{"text":"1","kind":"header"},{"text":"不能抵扣","kind":"header"},{"ref":"C8","role":"e"},{"kind":"input","ref":"D8","role":"e","fmt":"money"},{"kind":"input","ref":"E8","role":"e","fmt":"money"},{"kind":"input","ref":"F8","role":"e","fmt":"money"},{"kind":"input","ref":"G8","role":"e","fmt":"money"},{"kind":"input","ref":"H8","role":"e","fmt":"money"},{"kind":"input","ref":"I8","role":"e","fmt":"money"},{"kind":"input","ref":"J8","role":"e","fmt":"money"},{"kind":"input","ref":"K8","role":"e","fmt":"money"}],
+        [{"text":"2"},{"text":"前五年"},{"ref":"C9","role":"f"},{"kind":"input","ref":"D9","role":"e","fmt":"money"},{"kind":"input","ref":"E9","role":"e","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"},{"kind":"input","ref":"G9","role":"e","fmt":"money"},{"kind":"input","ref":"H9","role":"e","fmt":"money"},{"kind":"input","ref":"I9","role":"e","fmt":"money"},{"kind":"input","ref":"J9","role":"e","fmt":"money"},{"kind":"input","ref":"K9","role":"e","fmt":"money"}],
+        [{"text":"3"},{"text":"前四年"},{"ref":"C10","role":"f"},{"kind":"input","ref":"D10","role":"e","fmt":"money"},{"kind":"input","ref":"E10","role":"e","fmt":"money"},{"kind":"input","ref":"F10","role":"e","fmt":"money"},{"kind":"input","ref":"G10","role":"e","fmt":"money"},{"kind":"input","ref":"H10","role":"e","fmt":"money"},{"kind":"input","ref":"I10","role":"e","fmt":"money"},{"kind":"input","ref":"J10","role":"e","fmt":"money"},{"kind":"input","ref":"K10","role":"e","fmt":"money"}],
+        [{"text":"4"},{"text":"前三年"},{"ref":"C11","role":"f"},{"kind":"input","ref":"D11","role":"e","fmt":"money"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"},{"kind":"input","ref":"G11","role":"e","fmt":"money"},{"kind":"input","ref":"H11","role":"e","fmt":"money"},{"kind":"input","ref":"I11","role":"e","fmt":"money"},{"kind":"input","ref":"J11","role":"e","fmt":"money"},{"kind":"input","ref":"K11","role":"e","fmt":"money"}],
+        [{"text":"5"},{"text":"前二年"},{"ref":"C12","role":"f"},{"kind":"input","ref":"D12","role":"e","fmt":"money"},{"kind":"input","ref":"E12","role":"e","fmt":"money"},{"kind":"input","ref":"F12","role":"e","fmt":"money"},{"kind":"input","ref":"G12","role":"e","fmt":"money"},{"kind":"input","ref":"H12","role":"e","fmt":"money"},{"kind":"input","ref":"I12","role":"e","fmt":"money"},{"kind":"input","ref":"J12","role":"e","fmt":"money"},{"kind":"input","ref":"K12","role":"e","fmt":"money"}],
+        [{"text":"6"},{"text":"前一年"},{"ref":"C13","role":"f"},{"kind":"input","ref":"D13","role":"e","fmt":"money"},{"kind":"input","ref":"E13","role":"e","fmt":"money"},{"kind":"input","ref":"F13","role":"e","fmt":"money"},{"kind":"input","ref":"G13","role":"e","fmt":"money"},{"kind":"input","ref":"H13","role":"e","fmt":"money"},{"kind":"input","ref":"I13","role":"e","fmt":"money"},{"kind":"input","ref":"J13","role":"e","fmt":"money"},{"kind":"input","ref":"K13","role":"e","fmt":"money"}],
+        [{"text":"7"},{"text":"本年"},{"ref":"C14","role":"f"},{"kind":"input","ref":"D14","role":"e","fmt":"money"},{"kind":"input","ref":"E14","role":"e","fmt":"money"},{"kind":"input","ref":"F14","role":"e","fmt":"money"},{"kind":"input","ref":"G14","role":"e","fmt":"money"},{"kind":"input","ref":"H14","role":"e","fmt":"money"},{"kind":"input","ref":"I14","role":"e","fmt":"money"},{"kind":"input","ref":"J14","role":"e","fmt":"money"},{"kind":"input","ref":"K14","role":"e","fmt":"money"}],
+        [{"ref":"A15","role":"e"},{"text":"可结转下一年度抵免的境外已缴税额合计","colSpan":9},{"kind":"number","ref":"K15","role":"f","fmt":"money"}],
+        [{"text":"审核工作记录：","colSpan":11}],
+        [{"colSpan":11,"ref":"A17","role":"e"}]
+      ]
+    }
+  ]
+}

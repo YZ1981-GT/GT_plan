@@ -1,0 +1,218 @@
+/* 移植自 CITAR screens/part2/data-import-screen.css。color / background / font-size 的字面量换成 citar-tokens.css 中的同值变量（stylelint 卡点），其余原样。 */
+/*
+ * 节点 2.1 账套导入。
+ *
+ * 版式参照用户提供的参考图,按确认忽略步骤条与深色底,
+ * 改为平台白紫色调。
+ */
+
+.import-screen {
+  max-width: 880px;
+}
+
+/* 页头:渐变紫条,与登录页封面区同一套色。 */
+.import-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #5b1a8c 0%, #8b3fd0 100%);
+}
+
+.import-header__title {
+  margin: 0;
+  font-size: var(--citar-fs-18);
+  font-weight: 700;
+  color: var(--citar-c-ffffff);
+}
+
+.import-header__doc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-5b1a8c);
+  cursor: pointer;
+}
+
+/* 使用文档本期不实装,置灰并以 title 说明。 */
+.import-header__doc:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.import-card {
+  margin-top: 18px;
+  padding: 22px 24px 24px;
+  background: var(--citar-c-ffffff);
+  border: 1px solid #e8e8ec;
+  border-radius: 10px;
+}
+
+/* 拖拽区。虚线框,悬停与拖入时变紫。 */
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  padding: 24px;
+  border: 1.5px dashed #cfc3e0;
+  border-radius: 10px;
+  background: var(--citar-c-fbf9fe);
+  cursor: pointer;
+  text-align: center;
+}
+
+.import-drop:hover {
+  border-color: #a855f7;
+  background: var(--citar-c-f7f1fe);
+}
+
+/* 拖入时的反馈。没有这个状态,使用者不知道松手会不会生效。 */
+.import-drop--over {
+  border-color: #6e0ba6;
+  border-style: solid;
+  background: var(--citar-c-f3e9fd);
+}
+
+.import-drop__icon {
+  color: var(--citar-c-a855f7);
+}
+
+.import-drop__text {
+  margin: 0;
+  font-size: var(--citar-fs-14);
+  color: var(--citar-c-4a4a55);
+}
+
+.import-drop__link {
+  color: var(--citar-c-6e0ba6);
+  text-decoration: underline;
+}
+
+/* 已选文件的呈现。按用户确认显示文件名与大小。 */
+.import-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  padding: 12px 14px;
+  border: 1px solid #e4d8f3;
+  border-radius: 8px;
+  background: var(--citar-c-ffffff);
+  text-align: left;
+}
+
+.import-file__icon {
+  flex: 0 0 auto;
+  color: var(--citar-c-6e0ba6);
+}
+
+.import-file__meta {
+  min-width: 0;
+}
+
+.import-file__name {
+  margin: 0 0 2px;
+  font-size: var(--citar-fs-14);
+  font-weight: 700;
+  color: var(--citar-c-1f1f1f);
+  overflow-wrap: anywhere;
+}
+
+.import-file__size {
+  margin: 0;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-8c8c96);
+}
+
+.import-file__clear {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-6b6b76);
+  cursor: pointer;
+}
+
+.import-file__clear:hover {
+  border-color: #e5484d;
+  color: var(--citar-c-e5484d);
+}
+
+/* 格式说明。 */
+.import-notes {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--citar-fs-12);
+  line-height: 1.9;
+  color: var(--citar-c-8c8c96);
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #f0f0f4;
+}
+
+.import-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #d9d9e0;
+  border-radius: 6px;
+  background: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-4a4a55);
+  cursor: pointer;
+}
+
+.import-pick:hover {
+  border-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+}
+
+.import-actions__hint {
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-a0a0aa);
+}
+
+.import-submit {
+  margin-left: auto;
+  height: 36px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 6px;
+  color: var(--citar-c-ffffff);
+  font-size: var(--citar-fs-14);
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(90deg, #6e0ba6 0%, #a855f7 100%);
+}
+
+/* 开始预检本期不实装。 */
+.import-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 隐藏真实的 file input,由拖拽区与按钮触发。 */
+.import-input {
+  display: none;
+}

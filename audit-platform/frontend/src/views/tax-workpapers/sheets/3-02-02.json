@@ -1,0 +1,40 @@
+{
+  "code": "3-02-02",
+  "parts": [
+    {
+      "source": "3-02-02",
+      "rows": [
+        [{"text":"业务招待费支出审核表","kind":"title","colSpan":8}],
+        [{},{},{},{},{},{},{"text":"索引号：3-02-02","kind":"meta","colSpan":2}],
+        [{},{},{},{},{},{},{"text":"金额单位：元","kind":"meta","colSpan":2}],
+        [{"text":"被审核人","colSpan":2},{"colSpan":2,"ref":"C4","role":"f"},{"text":"编制人"},{"ref":"F4","role":"f"},{"text":"编制日期"},{"ref":"H4","role":"f"}],
+        [{"text":"会计期间","colSpan":2},{"colSpan":2,"ref":"C5","role":"f"},{"text":"复核人"},{"ref":"F5","role":"f"},{"text":"复核日期"},{"ref":"H5","role":"f"}],
+        [{"text":"业务招待费纳税调整计算","kind":"header","colSpan":8}],
+        [{"text":"项目","kind":"header","colSpan":2},{"text":"销售费用","kind":"header"},{"text":"管理费用（含研发费用）","kind":"header"},{"text":"制造费用","kind":"header"},{"text":"其他成本费用","kind":"header"},{"text":"合计","kind":"header"},{"text":"备注","kind":"header"}],
+        [{"text":"1"},{"text":"账载金额"},{"kind":"number","ref":"C8","role":"f","fmt":"money"},{"kind":"number","ref":"D8","role":"f","fmt":"money"},{"kind":"number","ref":"E8","role":"f","fmt":"money"},{"kind":"number","ref":"F8","role":"f","fmt":"money"},{"kind":"number","ref":"G8","role":"f","fmt":"money"},{"ref":"H8","role":"e"}],
+        [{"text":"2"},{"text":"审核调整额"},{"kind":"input","ref":"C9","role":"e","fmt":"money"},{"kind":"input","ref":"D9","role":"e","fmt":"money"},{"kind":"input","ref":"E9","role":"e","fmt":"money"},{"kind":"input","ref":"F9","role":"e","fmt":"money"},{"kind":"number","ref":"G9","role":"f","fmt":"money"},{"ref":"H9","role":"e"}],
+        [{"text":"3"},{"text":"其中：与收入无关的业务招待费"},{"kind":"input","ref":"C10","role":"e","fmt":"money"},{"kind":"input","ref":"D10","role":"e","fmt":"money"},{"kind":"input","ref":"E10","role":"e","fmt":"money"},{"kind":"input","ref":"F10","role":"e","fmt":"money"},{"kind":"number","ref":"G10","role":"f","fmt":"money"},{"text":"“扣除类-与取得收入无关的支出”行次调增"}],
+        [{"text":"4"},{"text":"其中：未取得合法票据支出"},{"kind":"input","ref":"C11","role":"e","fmt":"money"},{"kind":"input","ref":"D11","role":"e","fmt":"money"},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"},{"kind":"number","ref":"G11","role":"f","fmt":"money"},{"text":"“扣除类-其他”行次调增"}],
+        [{"text":"5"},{"text":"审核确认额"},{"kind":"number","ref":"C12","role":"f","fmt":"money"},{"kind":"number","ref":"D12","role":"f","fmt":"money"},{"kind":"number","ref":"E12","role":"f","fmt":"money"},{"kind":"number","ref":"F12","role":"f","fmt":"money"},{"kind":"number","ref":"G12","role":"f","fmt":"money"},{"ref":"H12","role":"e"}],
+        [{"text":"6"},{"text":"税收金额"},{"text":"*"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G13","role":"f","fmt":"money"},{"ref":"H13","role":"e"}],
+        [{"text":"7"},{"text":"业务招待费纳税调整金额"},{"text":"*"},{"text":"*"},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G14","role":"f","fmt":"money"},{"ref":"H14","role":"e"}],
+        [{"text":"业务招待费税收金额计算","kind":"header","colSpan":8}],
+        [{"text":"收 入 项 目","kind":"header","colSpan":3,"rowSpan":2},{"text":"金额","kind":"header","colSpan":2},{"text":"按5‰计算\n扣除限额","kind":"header"},{"text":"按业务招待费60%计算扣除限额","kind":"header"},{"text":"税收金额","kind":"header"}],
+        [{"text":"账载金额","kind":"header"},{"text":"税收金额","kind":"header"},{"text":"①","kind":"header"},{"text":"②","kind":"header"},{"text":"=MIN(①,②)","kind":"header"}],
+        [{"text":"1"},{"text":"主营业务收入","colSpan":2},{"kind":"number","ref":"D18","role":"f","fmt":"money"},{"kind":"number","ref":"E18","role":"f","fmt":"money"},{"kind":"number","rowSpan":8,"ref":"F18","role":"f","fmt":"money"},{"kind":"number","rowSpan":8,"ref":"G18","role":"f","fmt":"money"},{"kind":"number","rowSpan":8,"ref":"H18","role":"f","fmt":"money"}],
+        [{"text":"2"},{"text":"其他业务收入","colSpan":2},{"kind":"number","ref":"D19","role":"f","fmt":"money"},{"kind":"number","ref":"E19","role":"f","fmt":"money"}],
+        [{"text":"3"},{"text":"视同销售收入","colSpan":2},{"kind":"number","ref":"D20","role":"f","fmt":"money"},{"kind":"number","ref":"E20","role":"f","fmt":"money"}],
+        [{"text":"4"},{"text":"从被投资企业所分配的股息、红利以及股权转让收入","colSpan":2},{"kind":"input","ref":"D21","role":"e","fmt":"money"},{"kind":"number","ref":"E21","role":"f","fmt":"money"}],
+        [{"text":"5"},{"text":"销售未完工开发产品取得的收入","colSpan":2},{"kind":"number","ref":"D22","role":"f","fmt":"money"},{"kind":"number","ref":"E22","role":"f","fmt":"money"}],
+        [{"text":"6"},{"text":"减：销售未完工产品转完工产品确认的销售收入","colSpan":2},{"kind":"number","ref":"D23","role":"f","fmt":"money"},{"kind":"number","ref":"E23","role":"f","fmt":"money"}],
+        [{"text":"7"},{"text":"减：不征税收入","colSpan":2},{"kind":"input","ref":"D24","role":"e","fmt":"money"},{"kind":"number","ref":"E24","role":"f","fmt":"money"}],
+        [{"text":"本年计算业务招待费扣除限额的销售（营业）收入","colSpan":3},{"kind":"number","ref":"D25","role":"f","fmt":"money"},{"kind":"number","ref":"E25","role":"f","fmt":"money"}],
+        [{"text":"一、审核项目说明：","colSpan":8}],
+        [{"colSpan":8,"ref":"A27","role":"e"}],
+        [{"text":"二、审核工作记录：","colSpan":8}],
+        [{"colSpan":8,"ref":"A29","role":"e"}],
+        [{"text":"备注：以投资为主的企业及房地产企业按国家具体规定税前扣除业务招待费","colSpan":8}]
+      ]
+    }
+  ]
+}

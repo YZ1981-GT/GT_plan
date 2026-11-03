@@ -1,0 +1,217 @@
+/* 移植自 CITAR screens/part2/unaudited-screen.css。color / background / font-size 的字面量换成 citar-tokens.css 中的同值变量（stylelint 卡点），其余原样。 */
+/*
+ * 节点 2.2 未审账套、报表。
+ *
+ * 五张表用标签页切换。账套两张只渲染表头,
+ * 报表三张带完整行次与会计数字格式,数据列留空。
+ */
+
+.unaudited-screen {
+  max-width: 1180px;
+}
+
+.unaudited-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #5b1a8c 0%, #8b3fd0 100%);
+}
+
+.unaudited-header__title {
+  margin: 0;
+  font-size: var(--citar-fs-18);
+  font-weight: 700;
+  color: var(--citar-c-ffffff);
+}
+
+.unaudited-header__note {
+  margin-left: auto;
+  font-size: var(--citar-fs-12);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* 标签页。账套与报表之间留一道间隔,两类表的性质不同。 */
+.unaudited-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 18px;
+  border-bottom: 1px solid #e4d8f3;
+}
+
+.unaudited-tab {
+  padding: 9px 18px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: var(--citar-fs-14);
+  color: var(--citar-c-6b6b76);
+  cursor: pointer;
+}
+
+.unaudited-tab:hover {
+  color: var(--citar-c-6e0ba6);
+}
+
+.unaudited-tab--active {
+  border-bottom-color: #6e0ba6;
+  color: var(--citar-c-6e0ba6);
+  font-weight: 700;
+}
+
+/* 账套与报表的分隔。 */
+.unaudited-tabs__divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 8px;
+  background: var(--citar-c-e4d8f3);
+}
+
+.unaudited-panel {
+  margin-top: 16px;
+  padding: 20px 22px 24px;
+  background: var(--citar-c-ffffff);
+  border: 1px solid #e8e8ec;
+  border-radius: 10px;
+}
+
+/* 表页眉:标题、编制单位、所属期间、单位,照原表四行。 */
+.sheet-caption {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.sheet-caption__title {
+  margin: 0 0 4px;
+  font-size: var(--citar-fs-17);
+  font-weight: 700;
+  color: var(--citar-c-1f1f1f);
+}
+
+.sheet-caption__period {
+  margin: 0;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-6b6b76);
+}
+
+.sheet-caption__meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-6b6b76);
+}
+
+/* 横向滚动容器。科目余额表九列、序时账十列,窄屏放不下。 */
+.sheet-scroll {
+  overflow-x: auto;
+}
+
+.sheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--citar-fs-13);
+}
+
+.sheet-table th,
+.sheet-table td {
+  padding: 7px 10px;
+  border: 1px solid #e8e8ec;
+  white-space: nowrap;
+}
+
+.sheet-table thead th {
+  background: var(--citar-c-f7f1fe);
+  font-weight: 700;
+  color: var(--citar-c-4c1273);
+  text-align: center;
+}
+
+/* 金额列右对齐,等宽数字使小数点在视觉上成列。 */
+.sheet-table .is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行层级。缩进与字重照原表的呈现意图。 */
+.sheet-table .level-group td:first-child {
+  font-weight: 700;
+  color: var(--citar-c-1f1f1f);
+}
+
+.sheet-table .level-item td:first-child {
+  padding-left: 22px;
+}
+
+.sheet-table .level-subtotal {
+  background: var(--citar-c-fbf9fe);
+}
+
+.sheet-table .level-subtotal td {
+  font-weight: 700;
+}
+
+.sheet-table .level-subtotal td:first-child {
+  padding-left: 34px;
+}
+
+.sheet-table .level-total {
+  background: var(--citar-c-f3edfa);
+}
+
+.sheet-table .level-total td {
+  font-weight: 700;
+  color: var(--citar-c-4c1273);
+}
+
+.sheet-table .level-total td:first-child {
+  padding-left: 46px;
+}
+
+/* 留白行:保留高度但无边框,与原表的排版空行对应。 */
+.sheet-table .is-spacer td {
+  height: 22px;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  background: var(--citar-c-ffffff);
+}
+
+/* 资产负债表左右两栏。 */
+.balance-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .balance-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.balance-columns__side {
+  min-width: 0;
+}
+
+.balance-columns__heading {
+  margin: 0 0 8px;
+  font-size: var(--citar-fs-13);
+  font-weight: 700;
+  color: var(--citar-c-6e0ba6);
+}
+
+/* 空表提示:账套两张本期只有表头。 */
+.sheet-empty {
+  padding: 28px 16px;
+  border: 1px dashed #e4d8f3;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  text-align: center;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-9a9aa4);
+  background: var(--citar-c-fdfcff);
+}
