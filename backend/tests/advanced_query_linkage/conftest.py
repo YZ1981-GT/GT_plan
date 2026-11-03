@@ -77,6 +77,51 @@ async def pg_rollback_session(request: pytest.FixtureRequest) -> AsyncIterator[A
 
 
 @pytest_asyncio.fixture
+async def new_project(request: pytest.FixtureRequest, pg_rollback_session: AsyncSession):
+    """回滚事务里自建【测试】项目的工厂（取代 ``gold.py`` 的 UA / UB / UP 三个可写项目，它们现算已不存在）。
+
+    返回 ``async make(name_suffix, *, audit_year=2025, report_scope="standalone", template_type=None,
+    status="created") -> Pick``。插入走 ``writable_projects`` 的显式列裸 SQL（不经 ORM）；
+    行只在本事务里可见 —— 金标准要读它们必须用同一会话，换连接读到的是 0。
+    """
+    require_pg_only(request.node)
+
+    async def make(
+        name_suffix: str = "可写项目",
+        *,
+        audit_year: int | None = 2025,
+        report_scope: str | None = "standalone",
+        template_type: str | None = None,
+        status: str = "created",
+    ) -> Pick:
+        pid, name = await insert_test_project(
+            pg_rollback_session,
+            name_suffix=name_suffix,
+            audit_year=audit_year,
+            report_scope=report_scope,
+            template_type=template_type,
+            status=status,
+        )
+        return Pick(
+            id=pid,
+            name=name,
+            audit_year=audit_year,
+            report_scope=report_scope,
+            template_type=template_type,
+            capability="selfbuilt",
+            metric=0,
+        )
+
+    return make
+
+
+@pytest_asyncio.fixture
+async def writable_project(new_project) -> Pick:
+    """一个默认的自建【测试】项目（审计年度 2025、单体、无任何业务数据）。"""
+    return await new_project("可写项目")
+
+
+@pytest_asyncio.fixture
 async def no_active_dataset_project(request: pytest.FixtureRequest, pg_rollback_session: AsyncSession) -> Pick:
     """回滚事务里自建「该年度没有 active 数据集」的【测试】项目（带几行余额表）。
 
@@ -91,8 +136,8 @@ async def no_active_dataset_project(request: pytest.FixtureRequest, pg_rollback_
     require_pg_only(request.node)
     session = pg_rollback_session
     year = 2025
-    # 🔴 不能用 `session.add(Project(...))`：ORM 已声明共享库还没有的 `amount_unit`（V250 未落库），
-    #    ORM 的 INSERT 会带上它而当场 UndefinedColumnError。见 `writable_projects` 模块说明。
+    # 🔴 不用 `session.add(Project(...))`：ORM 声明的列可以领先于共享库（2026-11-01 缺 `amount_unit` 时
+    #    ORM 的 INSERT 当场 UndefinedColumnError），见 `writable_projects` 模块说明。
     pid, name = await insert_test_project(session, name_suffix="无生效数据集", audit_year=year)
     for index, code in enumerate(("1001", "1002", "1122")):
         session.add(

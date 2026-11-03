@@ -2,26 +2,36 @@
 变异 #2、#5、#16、B3-a、B3-b）。
 
 请求经生产注册的 query_builder router 真发（夹具 ``builder``：真库回滚事务会话，见 ``builder_client``）；金标准一律在
-测试内用独立 SQL 现算（``gold``），数值随真库变化，不写死。写入只在回滚事务里、只写【UAT】项目；报表配置副本行的用例在
-真 PG 临时 schema（``pg_world``）里造身份与数据。
+测试内用独立 SQL 现算（``gold``），数值随真库变化，不写死。写入只在回滚事务里、只写自建【测试】项目；报表配置副本行的
+用例在真 PG 临时 schema（``pg_world``）里造身份与数据。
 
-e2e_manager / u_011 的金标准按 design §10.2：OwnershipGuard 可访问 − 已删项目 − 对其设有审计循环范围的项目（任务 23，B6；
-现库 e2e_manager 只经委派访问一个项目、没有成员行 ⇒ 链路不唯一 ⇒ 受限 ⇒ 0 行 + 排除提示）。
+受限 / 主管身份的金标准按 design §10.2：OwnershipGuard 可访问 − 已删项目 − 对其设有审计循环范围的项目（任务 23，B6）。
+
+🔴 2026-11-03 阶段 0 改造：原先读真实账号 e2e_manager（系统经理，只经委派访问一个项目、没有成员行 ⇒ 链路不唯一 ⇒
+受限）与 u_011abb97dd2d4101（系统 auditor、成员行 manager / edit + 经理委派 ⇒ 本项目主管），并写死华氏 / 宜宾临港店 /
+【UAT】子公司A 三个项目 UUID；两个账号与三个项目现算都已不存在。身份改为在回滚事务里按同一形态自建
+（``insert_member``，另加「成员行审计员 + 审计员委派 D 循环」这种按循环委派的受限形态）；真实分布判据按能力解析
+（``tb_detail`` / ``balance_with_narrowing_active_dataset``）；结构分支（已删行不可见、LEFT JOIN 无匹配保留基表行）
+在自建项目上造行。自建行只在本事务里可见 ⇒ 可访问集合等前置一律走被测会话现算，不走 ``gold``（换连接读到的是 0 行）。
 """
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from contextlib import asynccontextmanager
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 
 from app import deps
 from app.models.audit_platform_models import AccountCategory, TbBalance, TrialBalance
+from app.models.dataset_models import DatasetStatus, LedgerDataset
 from app.models.report_models import ReportConfig
 from app.models.workpaper_models import WpIndex
 from app.routers import query_builder
-from tests.advanced_query_linkage.gold import AUDIT_YEAR, HS, UA, YB, active_sql
+from tests.advanced_query_linkage.gold import active_sql
+from tests.advanced_query_linkage.writable_projects import insert_member
 from tests.authz_world import OTHER_PROJECT_ID, TARGET_PROJECT_ID, pg_world
 
 pytestmark = pytest.mark.pg_only
@@ -36,9 +46,39 @@ JOIN projects p ON p.id = a.pid AND NOT p.is_deleted
 """
 _PROJECTS = {"table": "projects", "fields": ["id", "name"], "limit": 1000}
 
+#: 自建身份形态（``insert_member`` 的参数）→ 是否被排除出构建器作用域（对本人设有审计循环范围）
+IDENTITIES: dict[str, tuple[dict, bool]] = {
+    # 原 e2e_manager 的形态：系统经理、只经委派访问、没有成员行 ⇒ 链路不唯一 ⇒ 受限（范围为空列表）
+    "assignment_only_manager": ({"system_role": "manager", "member_role": None, "assignment_role": "manager"}, True),
+    # 按循环委派的受限形态（与 test_aql_cycle_scope_pg 同形）：系统经理（过构建器角色门；系统 auditor 且非任一项目经理
+    # 会先被 ROLE_FORBIDDEN 挡掉、走不到作用域）、成员行审计员 + 审计员委派勾选 D 循环 ⇒ 受限（范围 ["D"]）
+    "cycle_scoped_member": (
+        {"system_role": "manager", "member_role": "auditor", "assignment_role": "auditor", "assigned_cycles": ["D"]},
+        True,
+    ),
+    # 原 u_011abb97dd2d4101 的形态：系统 auditor、成员行经理 / edit + 经理委派 ⇒ 链路唯一的本项目主管 ⇒ 不受限
+    "member_manager": ({"system_role": "auditor", "member_role": "manager", "assignment_role": "manager"}, False),
+}
+
+_INSERT_ACCOUNT = sa.text(
+    "INSERT INTO account_chart (id, project_id, account_code, account_name, direction, level, category, source) "
+    "VALUES (gen_random_uuid(), :pid, :code, :name, CAST('debit' AS account_direction), 1, "
+    "CAST('asset' AS account_category), CAST(:source AS account_source))"
+)
+
 
 def _ids(data: dict, column: str = "id") -> set[str]:
     return {str(row[column]) for row in data["rows"]}
+
+
+async def _identity(builder, project, identity: str):
+    spec, _excluded = IDENTITIES[identity]
+    return await insert_member(builder.session, project_id=project.id, **spec)
+
+
+async def _accessible(session, user) -> set[str]:
+    """被测会话里现算的可访问未删项目（自建身份只在本事务里可见）。"""
+    return {r[0] for r in await session.execute(sa.text(ACCESSIBLE_LIVE_SQL), {"uid": user.id})}
 
 
 # ─── projects 与人员表（AQ-06；变异 #5、B3-a）──────────────────────────────────
@@ -63,16 +103,17 @@ async def test_admin_rows_exclude_deleted_projects(builder, gold) -> None:
     assert data["rows"][0]["n"] == live, f"应只数未删项目的 {live} 行（含已删项目为 {live + on_deleted}）"
 
 
-@pytest.mark.parametrize(("username", "excluded"), [("e2e_manager", True), ("u_011abb97dd2d4101", False)])
-async def test_scoped_identity_sees_only_accessible_live_projects(builder, gold, username: str, excluded: bool) -> None:
-    """e2e_manager（系统经理，只经委派访问一个项目、没有成员行 ⇒ 受限）⇒ 0 行 + 排除提示；u_011abb97dd2d4101（系统 auditor、
-    人员记录 1 + 成员行 manager / edit + 经理委派 ⇒ 本项目主管）⇒ 只见其项目（任务 23，变异 #19 / #36 的构建器侧）。"""
-    user = await builder.real_user(username)
-    accessible = {r[0] for r in await gold.rows(ACCESSIBLE_LIVE_SQL, uid=user.id)}
-    assert accessible, f"前置：{username} 至少能访问一个未删项目（否则「只含 X」对空集恒真）"
+@pytest.mark.parametrize("identity", sorted(IDENTITIES))
+async def test_scoped_identity_sees_only_accessible_live_projects(builder, writable_project, identity: str) -> None:
+    """受限身份（只经委派的系统经理、按循环委派的成员）⇒ 0 行 + 排除提示；链路唯一的本项目主管 ⇒ 只见其项目
+    （任务 23，变异 #19 / #36 的构建器侧）。"""
+    excluded = IDENTITIES[identity][1]
+    user = await _identity(builder, writable_project, identity)
+    accessible = await _accessible(builder.session, user)
+    assert accessible == {str(writable_project.id)}, f"前置：{identity} 恰好能访问自建项目，现算 {sorted(accessible)}"
     restricted = {pid for pid in accessible
                   if await deps.get_user_scope_cycles(user, uuid.UUID(pid), builder.session) is not None}
-    assert bool(restricted) is excluded, f"前置（现库身份事实）：{username} 受限 = {excluded}，现算 {sorted(restricted)}"
+    assert bool(restricted) is excluded, f"前置（身份形态）：{identity} 受限 = {excluded}，现算 {sorted(restricted)}"
     expected = accessible - restricted
     data = await builder.ok(user, _PROJECTS)
     assert _ids(data) == expected and data["total"] == len(expected)
@@ -87,8 +128,10 @@ async def test_scoped_identity_sees_only_accessible_live_projects(builder, gold,
     {"table": "work_hours", "joins": [{"table": "staff_members", "type": "left"}],
      "fields": ["work_hours.hours", "staff_members.name"]},
 ], ids=["base", "join-target"])
-async def test_manager_cannot_read_staff_members(builder, body: dict) -> None:
-    response = await builder.execute(await builder.real_user("e2e_manager"), body)
+async def test_manager_cannot_read_staff_members(builder, writable_project, body: dict) -> None:
+    manager = await _identity(builder, writable_project, "assignment_only_manager")
+    assert manager.role.value == "manager"
+    response = await builder.execute(manager, body)
     assert response.status_code == 403, response.text
     assert response.json()["detail"]["error_code"] == "TABLE_ROLE_FORBIDDEN"
 
@@ -96,17 +139,20 @@ async def test_manager_cannot_read_staff_members(builder, body: dict) -> None:
 # ─── 指定项目（AQ-18）──────────────────────────────────────────────────────────
 
 
-async def test_explicit_project_limits_scope(builder, gold) -> None:
+async def test_explicit_project_limits_scope(builder, gold, picks) -> None:
+    project = await picks.resolve("tb_detail")
     expected = await gold.scalar(
         "SELECT count(*) FROM trial_balance WHERE project_id = :pid AND year = :year AND NOT is_deleted",
-        pid=HS, year=AUDIT_YEAR)
-    data = await builder.ok(builder.admin, {"table": "trial_balance", "fields": ["project_id", "standard_account_code"],
-                                            "project_id": str(HS), "year": AUDIT_YEAR, "limit": 1000})
-    assert expected > 0 and data["total"] == expected and _ids(data, "project_id") == {str(HS)}
-    assert data["scope"]["requested_project_id"] == str(HS) and data["scope"]["project_count"] == 1
+        pid=project.id, year=project.audit_year)
+    data = await builder.ok(builder.admin, {
+        "table": "trial_balance", "fields": ["project_id", "standard_account_code"], "project_id": str(project.id),
+        "year": project.audit_year, "limit": 1000})
+    assert expected > 0 and data["total"] == expected and _ids(data, "project_id") == {str(project.id)}, project
+    assert data["scope"]["requested_project_id"] == str(project.id) and data["scope"]["project_count"] == 1
 
 
-async def test_inaccessible_or_deleted_project_is_403_and_not_executed(builder, gold, monkeypatch) -> None:
+async def test_inaccessible_or_deleted_project_is_403_and_not_executed(builder, gold, picks, writable_project,
+                                                                       monkeypatch) -> None:
     entered: list[int] = []
     real = query_builder.cancellable_query
 
@@ -115,32 +161,32 @@ async def test_inaccessible_or_deleted_project_is_403_and_not_executed(builder, 
         return real(db, timeout_ms)
 
     monkeypatch.setattr(query_builder, "cancellable_query", _spy)
-    manager = await builder.real_user("e2e_manager")
-    accessible = {r[0] for r in await gold.rows(ACCESSIBLE_LIVE_SQL, uid=manager.id)}
-    assert str(HS) not in accessible, "前置：e2e_manager 不能访问华氏"
+    member = await _identity(builder, writable_project, "member_manager")
+    foreign = await picks.resolve("tb_detail")
+    assert str(foreign.id) not in await _accessible(builder.session, member), f"前置：自建成员不能访问 {foreign}"
     deleted = (await gold.rows("SELECT id::text FROM projects WHERE is_deleted ORDER BY created_at LIMIT 1"))[0][0]
-    for user, project in ((manager, str(HS)), (builder.admin, deleted)):
+    for user, project in ((member, str(foreign.id)), (builder.admin, deleted)):
         response = await builder.execute(user, {"table": "trial_balance", "fields": ["id"], "project_id": project})
         assert response.status_code == 403, response.text
         assert response.json()["detail"]["error_code"] == "FORBIDDEN_PROJECT"
     assert entered == [], "403 之前不得执行任何查询"
-    await builder.ok(manager, {"table": "trial_balance", "fields": ["id"]})
+    await builder.ok(member, {"table": "trial_balance", "fields": ["id"]})
     assert len(entered) == 1, "反向对照：放行的请求确实经过执行这一层"
 
 
 # ─── 数据集口径与已删行（AQ-02；变异 #2）──────────────────────────────────────
 
 
-async def test_tb_balance_uses_the_active_dataset(builder, gold) -> None:
+async def test_tb_balance_uses_the_active_dataset(builder, gold, picks) -> None:
+    project = await picks.resolve("balance_with_narrowing_active_dataset")
+    params = {"pid": project.id, "year": project.audit_year}
     count, closing = (await gold.rows(
-        f"SELECT count(*), coalesce(sum(closing_balance), 0) FROM tb_balance t WHERE {active_sql('t')}",
-        pid=YB, year=AUDIT_YEAR))[0]
+        f"SELECT count(*), coalesce(sum(closing_balance), 0) FROM tb_balance t WHERE {active_sql('t')}", **params))[0]
     undeleted = await gold.scalar(
-        "SELECT count(*) FROM tb_balance WHERE project_id = :pid AND year = :year AND NOT is_deleted",
-        pid=YB, year=AUDIT_YEAR)
-    assert 0 < count < undeleted, "前置：宜宾临港店有非生效数据集的行"
+        "SELECT count(*) FROM tb_balance WHERE project_id = :pid AND year = :year AND NOT is_deleted", **params)
+    assert 0 < count < undeleted, f"前置：{project} 有非生效数据集的行"
     data = await builder.ok(builder.admin, {
-        "table": "tb_balance", "project_id": str(YB), "year": AUDIT_YEAR,
+        "table": "tb_balance", "project_id": str(project.id), "year": project.audit_year,
         "aggregates": [{"func": "count", "field": "*", "alias": "n"}, {"func": "sum", "field": "closing_balance",
                                                                         "alias": "s"}]})
     (row,) = data["rows"]
@@ -148,17 +194,23 @@ async def test_tb_balance_uses_the_active_dataset(builder, gold) -> None:
     assert abs(Decimal(str(row["s"])) - closing) < Decimal("0.01")
 
 
-async def test_deleted_rows_are_invisible(builder, gold) -> None:
-    active = await gold.rows("SELECT id FROM ledger_datasets WHERE project_id = :pid AND year = :year "
-                             "AND status = 'active' ORDER BY activated_at DESC NULLS LAST, created_at DESC LIMIT 1",
-                             pid=UA, year=AUDIT_YEAR)
-    dataset_id = active[0][0] if active else None
+@pytest.mark.parametrize("with_active_dataset", [False, True], ids=["no-active-dataset", "active-dataset"])
+async def test_deleted_rows_are_invisible(builder, writable_project, with_active_dataset: bool) -> None:
+    """自建项目上一行未删、一行软删：有 / 没有 active 数据集两条口径分支都只见未删的那一行。"""
+    project, session = writable_project, builder.session
+    dataset_id = None
+    if with_active_dataset:
+        dataset = LedgerDataset(project_id=project.id, year=project.audit_year, status=DatasetStatus.active,
+                                activated_at=dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc))
+        session.add(dataset)
+        await session.flush()
+        dataset_id = dataset.id
     for code, deleted in (("AQLB3-LIVE", False), ("AQLB3-DELETED", True)):
-        builder.session.add(TbBalance(project_id=UA, year=AUDIT_YEAR, company_code="001", account_code=code,
-                                      account_name="【UAT】B3 回滚事务造行", dataset_id=dataset_id, is_deleted=deleted))
-    await builder.session.flush()
+        session.add(TbBalance(project_id=project.id, year=project.audit_year, company_code="001", account_code=code,
+                              account_name="【测试】B3 回滚事务造行", dataset_id=dataset_id, is_deleted=deleted))
+    await session.flush()
     data = await builder.ok(builder.admin, {
-        "table": "tb_balance", "fields": ["account_code"], "project_id": str(UA), "year": AUDIT_YEAR,
+        "table": "tb_balance", "fields": ["account_code"], "project_id": str(project.id), "year": project.audit_year,
         "filters": [{"field": "account_code", "op": "like", "value": "AQLB3-"}]})
     assert [r["account_code"] for r in data["rows"]] == ["AQLB3-LIVE"] and data["total"] == 1
 
@@ -166,19 +218,25 @@ async def test_deleted_rows_are_invisible(builder, gold) -> None:
 # ─── JOIN 目标的作用域在 ON（变异 #16）──────────────────────────────────────────
 
 
-async def test_left_join_without_match_keeps_the_base_row(builder) -> None:
-    builder.session.add(TrialBalance(
-        project_id=UA, year=AUDIT_YEAR, company_code="001", standard_account_code="AQLB3-NOMATCH",
-        account_name="【UAT】B3 无对应标准科目", account_category=AccountCategory.asset, audited_amount=Decimal("1.00")))
-    await builder.session.flush()
-    base = {"table": "trial_balance", "project_id": str(UA), "year": AUDIT_YEAR, "limit": 1000}
+async def test_left_join_without_match_keeps_the_base_row(builder, writable_project) -> None:
+    """自建项目：两行试算有标准科目、一行没有；1001 另有一行客户科目（登记只认标准科目，不得放大、不得取错名称）。"""
+    project, session = writable_project, builder.session
+    for code, name in (("1001", "库存现金"), ("1002", "银行存款"), ("AQLB3-NOMATCH", "【测试】B3 无对应标准科目")):
+        session.add(TrialBalance(project_id=project.id, year=project.audit_year, company_code="001",
+                                 standard_account_code=code, account_name=name,
+                                 account_category=AccountCategory.asset, audited_amount=Decimal("1.00")))
+    await session.flush()
+    for code, name, source in (("1001", "【测试】标准 库存现金", "standard"), ("1001", "【测试】客户 库存现金", "client"),
+                               ("1002", "【测试】标准 银行存款", "standard")):
+        await session.execute(_INSERT_ACCOUNT, {"pid": project.id, "code": code, "name": name, "source": source})
+    base = {"table": "trial_balance", "project_id": str(project.id), "year": project.audit_year, "limit": 1000}
     plain = await builder.ok(builder.admin, {**base, "fields": ["trial_balance.standard_account_code"]})
     joined = await builder.ok(builder.admin, {**base, "joins": [{"table": "account_chart", "type": "left"}],
                                               "fields": ["trial_balance.standard_account_code",
                                                          "account_chart.account_name"]})
-    assert plain["total"] > 1 and joined["total"] == plain["total"]
-    (row,) = [r for r in joined["rows"] if r["trial_balance.standard_account_code"] == "AQLB3-NOMATCH"]
-    assert row["account_chart.account_name"] is None
+    assert plain["total"] == joined["total"] == 3, (plain["total"], joined["total"])
+    names = {r["trial_balance.standard_account_code"]: r["account_chart.account_name"] for r in joined["rows"]}
+    assert names == {"1001": "【测试】标准 库存现金", "1002": "【测试】标准 银行存款", "AQLB3-NOMATCH": None}, names
 
 
 # ─── 报表配置的项目副本行（变异 B3-b）────────────────────────────────────────────

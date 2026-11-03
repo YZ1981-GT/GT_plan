@@ -4,7 +4,8 @@
 在附注页只见 D 循环章节；在高级查询里全部可见，构建器还能跨项目按表查。现在业务视图的试算表、调整分录、附注目录 / 章节 /
 指标树附注分支与这三个页面同口径（平台唯一入口 ``deps.get_user_scope_cycles``），构建器把本人受限的项目排除出作用域。
 
-全部写入在回滚事务里：新建【测试】项目，复制华氏（只读）的试算表与附注、造两组调整分录，再建临时用户（系统经理）、
+全部写入在回滚事务里：新建【测试】项目，复制来源项目（按能力 ``tb_and_notes_copy_source`` 解析，只读；原先写死华氏，
+其 UUID 现算已不存在）的试算表与附注、造两组调整分录，再建临时用户（系统经理）、
 一条人员记录、项目成员行（``scope_cycles`` 为空）与委派（角色 auditor、``assigned_cycles=['D']``）。金标准 = 平台入口的
 返回值经 ``mapping_service`` 映射出的科目 / 章节集合，按独立 SQL 现算。
 """
@@ -86,8 +87,8 @@ async def _seed_adjustments(
 async def world(pg_rollback_session, picks):
     session = pg_rollback_session
     # 来源项目按能力解析（审计年度同时有试算表与附注），不再写死华氏的 UUID —— 它现算已不存在。
-    # 🔴 也不能 `session.get(Project, ...)` 取 template_type：那是全列 ORM 投影，共享库缺
-    #    `projects.amount_unit`（V250 未落库）时当场 500；`Pick` 自带 template_type。
+    # 🔴 也不用 `session.get(Project, ...)` 取 template_type：那是全列 ORM 投影，ORM 领先于共享库时当场 500
+    #    （2026-11-01 缺 `projects.amount_unit` 时实测）；`Pick` 自带 template_type。
     source = await picks.resolve("tb_and_notes_copy_source")
     year = source.audit_year
     pid, _name = await insert_test_project(
@@ -111,9 +112,9 @@ async def world(pg_rollback_session, picks):
     await session.flush()
     d_codes = await get_codes_by_cycles(pid, ["D"])
     d_sections = await get_sections_by_cycles(pid, ["D"])
-    assert tb > 0 and notes > 0 and d_codes and d_sections, "前置：华氏有试算表与附注、D 循环有科目与章节"
+    assert tb > 0 and notes > 0 and d_codes and d_sections, f"前置：{source} 有试算表与附注、D 循环有科目与章节"
     assert "1001" not in d_codes and "1002" not in d_codes, "前置：库存现金 / 银行存款不是 D 循环科目"
-    # 让 D 循环的一个章节在本项目存在（华氏是国企编号，D 循环章节是映射表登记的编号，原本交集可能为空）
+    # 让 D 循环的一个章节在本项目存在（来源项目的章节编号体系与映射表登记的 D 循环章节编号可能对不上，交集可能为空）
     d_section = sorted(d_sections)[0]
     if not (await session.execute(sa.select(DisclosureNote.id).where(
             DisclosureNote.project_id == pid, DisclosureNote.note_section == d_section))).first():

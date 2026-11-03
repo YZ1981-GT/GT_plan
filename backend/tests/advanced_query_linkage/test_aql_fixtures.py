@@ -37,8 +37,8 @@ def test_require_pg_only_fails_unmarked_node_and_passes_marked_one() -> None:
 
 @pytest.mark.pg_only
 async def test_rollback_session_commit_only_releases_a_savepoint(pg_rollback_session, gold) -> None:
-    # 插入走显式列裸 SQL：ORM 已声明共享库还没有的 `projects.amount_unit`（V250 未落库），
-    # `session.add(Project(...))` 会当场 UndefinedColumnError（见 `writable_projects` 模块说明）。
+    # 插入走显式列裸 SQL：ORM 声明的列可以领先于共享库（2026-11-01 缺 `projects.amount_unit` 时
+    # `session.add(Project(...))` 当场 UndefinedColumnError），见 `writable_projects` 模块说明。
     pid, _name = await insert_test_project(pg_rollback_session, name_suffix="夹具自检")
     await pg_rollback_session.commit()
     seen_inside = (await pg_rollback_session.execute(select(func.count()).where(Project.id == pid))).scalar_one()
