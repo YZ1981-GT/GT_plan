@@ -23,6 +23,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 import sqlalchemy as sa
+from sqlalchemy import orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
@@ -908,8 +909,15 @@ class DisclosureEngine:
         return tb
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
+        # 🔴 只取 `wizard_state`（加主键），不做全列 ORM 投影：ORM 声明的列可以领先于库
+        #    （现算共享库缺 `projects.amount_unit`，远端迁移 V250 未落库），全列 SELECT 会
+        #    `UndefinedColumnError` ⇒ 本函数整体失败，而调用方的 fail-open 只会把它变成
+        #    「静默退化 + 事务 aborted」。`load_only` 保留 ORM 实体，下面对 `wizard_state`
+        #    的回写与 flush 行为不变（UPDATE 只写该列）。
         result = await self.db.execute(
-            sa.select(Project).where(
+            sa.select(Project)
+            .options(orm.load_only(Project.wizard_state))
+            .where(
                 Project.id == project_id,
                 Project.is_deleted == sa.false(),
             )
@@ -2502,12 +2510,30 @@ class DisclosureEngine:
 
         fail-open 的理由：这是**读**侧过滤，失败时退回原行为（全量返回）不会丢数据；
         反过来若把异常当成「全部不适用」会让目录树整棵变空。
+
+        🔴 fail-open 必须连事务一起降级：PG 上一条语句失败后事务进入 aborted，
+        只吞异常不回滚到保存点的话，**同一请求后续每条语句都会
+        `InFailedSQLTransactionError`** —— 调用方看到的不是「降级后照常返回」，而是 500。
+        （实测形态：共享库缺 `projects.amount_unit` 时，附注目录树整条请求 500。）
+        所以这里把读取放进 `begin_nested()`，失败回滚到保存点再降级。
+
+        `begin_nested` 按能力取：本函数有若干调用方传的是只实现了 ``execute`` 的测试替身
+        （`SimpleNamespace`），它们背后没有事务、也就没有需要保护的东西；真实
+        ``AsyncSession`` 一定有这个方法。保存点真的起作用这件事由真库用例
+        ``test_aql_notes_tree_savepoint_pg.py`` 钉住（去掉保存点即打红）。
         """
+        begin_nested = getattr(self.db, "begin_nested", None)
+        savepoint = await begin_nested() if begin_nested is not None else None
         try:
             basic_info = await self._get_project_basic_info(project_id)
         except Exception as err:  # pragma: no cover - 读侧降级
+            if savepoint is not None:
+                await savepoint.rollback()
             logger.warning("notes tree: resolve project scope failed for %s: %s", project_id, err)
             return None, None
+        else:
+            if savepoint is not None:
+                await savepoint.commit()
         if not isinstance(basic_info, dict):
             return None, None
         template_type = basic_info.get("template_type")
