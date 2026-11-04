@@ -21,6 +21,11 @@
           <el-select v-model="scope" size="small" style="width: 180px" data-testid="fgs-scope" @change="loadSlots">
             <el-option v-for="s in currentDomain?.scopes || []" :key="s.value" :value="s.value" :label="s.label" />
           </el-select>
+          <!-- spec formula-management-repair-closure R5：按报表类型 / 底稿编码 / 附注章节 / 科目大类分组筛选 -->
+          <el-select v-model="groupKey" size="small" clearable filterable placeholder="全部分组" style="width: 200px"
+            data-testid="fgs-group">
+            <el-option v-for="g in groupOptions" :key="g.value" :value="g.value" :label="`${g.label}（${g.count}）`" />
+          </el-select>
           <el-input v-model="keyword" size="small" clearable placeholder="搜索公式位 / 公式" style="width: 220px" />
           <el-button size="small" :loading="loading" @click="loadSlots">刷新</el-button>
           <span class="gt-fgs-spacer" />
@@ -31,9 +36,9 @@
               data-testid="fgs-preview" @click="onPreview">预览并发布</el-button>
           </template>
         </div>
-        <el-alert v-if="currentDomain && !currentDomain.wired" type="warning" :closable="false" show-icon class="gt-fgs-gap"
-          title="该公式域尚未接入运行时：改动会保存，但暂不参与计算。" />
-        <el-table v-loading="loading" :data="filteredSlots" size="small" border max-height="calc(100vh - 330px)"
+        <el-alert v-if="notWiredText" type="warning" :closable="false" show-icon class="gt-fgs-gap"
+          data-testid="fgs-not-wired" :title="notWiredText" />
+        <el-table v-loading="loading" :data="pagedSlots" size="small" border max-height="calc(100vh - 370px)"
           row-key="slot_key" empty-text="该作用范围下暂无公式">
           <el-table-column prop="label" label="公式位" min-width="240" show-overflow-tooltip />
           <el-table-column label="定义" min-width="320">
@@ -57,6 +62,10 @@
             </template>
           </el-table-column>
         </el-table>
+        <div v-if="filteredSlots.length > PAGE_SIZE" class="gt-pagination gt-fgs-pager">
+          <el-pagination v-model:current-page="page" :page-size="PAGE_SIZE" :total="filteredSlots.length"
+            layout="total, prev, pager, next" background small data-testid="fgs-pager" />
+        </div>
       </el-tab-pane>
       <el-tab-pane label="发布记录" name="records" lazy>
         <FormulaPublishRecords ref="recordsRef" :domains="domains" :is-admin="isAdmin" @published="loadSlots" />
@@ -79,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -89,7 +98,8 @@ import FormulaPublishRecords from '@/components/formula/settings/FormulaPublishR
 import FormulaTemplateManager from '@/components/formula/settings/FormulaTemplateManager.vue'
 import FormulaCheckCatalog from '@/components/formula/settings/FormulaCheckCatalog.vue'
 import {
-  definitionText, formulaSettingsApi, isPresetSlot, newRequestId, scopeLabel, showFormulaError,
+  definitionText, domainNotWiredText, formulaSettingsApi, isPresetSlot, newRequestId, scopeLabel, showFormulaError,
+  slotGroupKey, slotGroupLabel,
   type ConflictChoice, type Decisions, type Definition, type FormulaDomainInfo, type GlobalSlot, type SlotChange,
   type SyncPreview,
 } from '@/composables/formula/useFormulaSettings'
@@ -120,11 +130,32 @@ const recordsRef = ref<InstanceType<typeof FormulaPublishRecords> | null>(null)
 let requestId = ''
 
 const currentDomain = computed(() => domains.value.find((d) => d.key === domainKey.value) || null)
+/** 未接入计算的域：显示后端说明（spec formula-management-repair-closure R3.1） */
+const notWiredText = computed(() => domainNotWiredText(currentDomain.value))
+
+// spec formula-management-repair-closure R5：分组筛选 + 分页（报表一个准则就有上千个公式位，原先一张表全铺开）
+const PAGE_SIZE = 50
+const groupKey = ref('')
+const page = ref(1)
+const groupOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const s of slots.value) {
+    const g = slotGroupKey(domainKey.value, s.slot_key)
+    counts.set(g, (counts.get(g) || 0) + 1)
+  }
+  return [...counts].map(([value, count]) => ({ value, count, label: slotGroupLabel(domainKey.value, value) }))
+})
 const filteredSlots = computed(() => {
   const kw = keyword.value.trim()
-  if (!kw) return slots.value
-  return slots.value.filter((s) => s.label.includes(kw) || s.slot_key.includes(kw)
-    || definitionText(s.definition, s.structure).includes(kw))
+  return slots.value.filter((s) => (!groupKey.value || slotGroupKey(domainKey.value, s.slot_key) === groupKey.value)
+    && (!kw || s.label.includes(kw) || s.slot_key.includes(kw) || definitionText(s.definition, s.structure).includes(kw)))
+})
+const pagedSlots = computed(() => filteredSlots.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
+// 换筛选条件回到第一页；换域 / 作用范围后旧分组可能不存在 ⇒ 清掉
+watch([keyword, groupKey], () => { page.value = 1 })
+watch(slots, () => {
+  if (groupKey.value && !groupOptions.value.some((g) => g.value === groupKey.value)) groupKey.value = ''
+  page.value = 1
 })
 
 /** 暂存过的显示暂存值（删除显示原值，标签区分） */
@@ -233,4 +264,5 @@ onMounted(async () => {
 .gt-fgs-spacer { flex: 1; }
 .gt-fgs-muted { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .gt-fgs-code { font-size: var(--gt-font-size-xs); word-break: break-all; white-space: normal; }
+.gt-fgs-pager { margin-top: 8px; display: flex; justify-content: flex-end; }
 </style>

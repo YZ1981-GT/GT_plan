@@ -1,70 +1,56 @@
 /**
- * CI 适配版 — formula-manager-runtime-gate
+ * 运行时基线 — 种子清单与库对得上；全局公式设置页如实提示「未接入计算」的公式域
  *
- * 原文件：e2e/formula-manager-runtime-gate.spec.ts
- * 适配：项目 ID 和账号从清单读取，去掉环境不就绪即 skip。
- *
- * formula-e2e-ci-gate Task 3 / ADR-FEC-03
+ * 其余用例的项目 / 底稿 id 都取自种子清单：清单和库对不上，后面的断言就不是针对种子数据了。所以先逐项核对：
+ * 两个项目都在，名称、报表口径、年度与清单一致；清单里每个底稿编码在库里对应的底稿 id 与清单相等。
+ * 界面：全局公式设置页打开「试算表科目明细公式」显示「目前只保存、不参与计算」，报表域不显示这条提示
+ * （spec formula-management-repair-closure R3.1）。原用例打开不存在的 `/formula-management` 页面，只看标题非空。
  */
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
-import { loadManifest, defaultCredentials } from './manifest'
+import { test, expect } from '@playwright/test'
+import { api, apiToken, loginAndInstall } from './helpers'
+import { loadManifest } from './manifest'
 
-const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:9980'
+test.describe('种子清单与运行时', () => {
+  for (const key of ['standalone', 'consolidated'] as const) {
+    test(`${key === 'standalone' ? '单体' : '合并'}项目：项目与底稿和种子清单一致`, async ({ request }) => {
+      const token = await apiToken(request)
+      const manifest = loadManifest()
+      const m = manifest[key]
+      const p = await api(request, token, 'GET', `/api/projects/${m.project_id}`)
+      expect(p.status, JSON.stringify(p.error)).toBe(200)
+      expect(p.data.id).toBe(m.project_id)
+      expect(p.data.name).toBe(m.project_name)
+      expect(p.data.report_scope).toBe(key)
+      expect(p.data.audit_year).toBe(manifest.year)
 
-async function loginToken(request: APIRequestContext) {
-  const { username, password } = defaultCredentials()
-  const response = await request.post(`${BACKEND}/api/auth/login`, {
-    data: { username, password },
-  })
-  expect(response.ok(), `登录失败 ${response.status()}`).toBeTruthy()
-  const body = await response.json()
-  const data = body?.data ?? body
-  expect(data?.access_token).toBeTruthy()
-  return data
-}
+      const codes = Object.keys(m.wp_ids)
+      expect(codes.length, '种子清单没有底稿').toBeGreaterThan(0)
+      const wps = await api(request, token, 'GET', `/api/projects/${m.project_id}/working-papers`, {
+        params: { page: 1, page_size: 100 },
+      })
+      expect(wps.status, JSON.stringify(wps.error)).toBe(200)
+      const byCode = new Map((wps.data.items as any[]).map((w) => [w.wp_code, w.wp_id]))
+      expect(Object.fromEntries(codes.map((c) => [c, byCode.get(c)]))).toEqual(m.wp_ids)
+    })
+  }
 
-async function installAuth(page: Page, auth: any) {
-  await page.addInitScript((value) => {
-    sessionStorage.setItem('token', value.access_token)
-    if (value.refresh_token) sessionStorage.setItem('refreshToken', value.refresh_token)
-    if (value.user) sessionStorage.setItem('user', JSON.stringify(value.user))
-    localStorage.setItem('token', value.access_token)
-  }, auth)
-}
+  test('全局公式设置：试算表科目明细提示未接入计算，报表域不提示', async ({ page, request }) => {
+    await loginAndInstall(page, request)
+    const domainsLoaded = () => page.waitForResponse(
+      (r) => r.url().includes('/api/formula-settings/domains') && r.status() === 200, { timeout: 30_000 })
 
-test.describe('公式管理运行时门禁（CI 适配）', () => {
-  let auth: any
-  let projectId: string
+    let loaded = domainsLoaded()
+    await page.goto('/settings/formula-global?domain=tb_detail')
+    await expect(page).not.toHaveURL(/\/login/)
+    await loaded
+    await expect(page.getByTestId('fgs-not-wired')).toContainText('试算表科目明细公式目前只保存、不参与计算',
+      { timeout: 20_000 })
 
-  test.beforeAll(async ({ request }) => {
-    auth = await loginToken(request)
-    projectId = loadManifest().standalone.project_id
-  })
-
-  test('项目存在且可访问', async ({ request }) => {
-    const headers = { Authorization: `Bearer ${auth.access_token}` }
-    const resp = await request.get(`${BACKEND}/api/projects/${projectId}`, { headers })
-    expect(resp.ok(), `项目不存在或不可访问 ${resp.status()}`).toBeTruthy()
-  })
-
-  test('底稿列表可获取', async ({ request }) => {
-    const headers = { Authorization: `Bearer ${auth.access_token}` }
-    const resp = await request.get(
-      `${BACKEND}/api/projects/${projectId}/working-papers`,
-      { headers, params: { page: '1', page_size: '100' } },
-    )
-    expect(resp.ok(), `底稿列表失败 ${resp.status()}`).toBeTruthy()
-    const body = await resp.json()
-    const items = body?.data?.items ?? body?.items ?? []
-    expect(items.length, '种子项目应至少有 1 份底稿').toBeGreaterThan(0)
-  })
-
-  test('公式管理页可渲染', async ({ page }) => {
-    await installAuth(page, auth)
-    await page.goto(`/projects/${projectId}/formula-management`)
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-    if (page.url().includes('/login')) return
-    const title = await page.title()
-    expect(title).toBeTruthy()
+    // 报表域已接入计算 ⇒ 不提示。先等域清单到达再判断「提示不存在」，否则在响应回来之前就会判定通过
+    loaded = domainsLoaded()
+    await page.goto('/settings/formula-global?domain=report')
+    await loaded
+    await expect(page.getByTestId('fgs-group')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('fgs-not-wired')).toHaveCount(0)
   })
 })

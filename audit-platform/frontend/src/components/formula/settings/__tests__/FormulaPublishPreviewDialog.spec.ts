@@ -111,6 +111,23 @@ describe('FormulaPublishPreviewDialog', () => {
     })
   }
 
+  // spec formula-management-repair-closure R4：不会写入的（项目 × 公式位）连同原因列出，超过 5 处给条数
+  it('列出不会写入的项目与原因；没有时不显示', async () => {
+    const reason = '该项目没有底稿 D2，无处写入（建这张底稿时按全局 / 系统预设预填）'
+    const skipped = Array.from({ length: 6 }, (_, i) => ({
+      project_id: `p${i}`, project_name: `丙${i}`, slot_key: 'D2|审定表D2-1|E8', reason }))
+    const w = open({ preview: { ...PREVIEW, skipped } as any })
+    const alert = w.find('[data-testid="fpp-skipped"]')
+    expect(alert.text()).toContain('6 处不会写入')
+    expect(alert.text()).toContain(`丙0（D2|审定表D2-1|E8）：${reason}`)
+    expect(alert.text()).not.toContain('丙5')
+    expect(alert.text()).toContain('另有 1 处')
+    w.unmount()
+    const plain = open()
+    expect(plain.find('[data-testid="fpp-skipped"]').exists()).toBe(false)
+    plain.unmount()
+  })
+
   it('默认：冲突交项目确认、项目全部应用；提交后关窗', async () => {
     const w = open()
     await w.find('[data-testid="formula-publish-submit"]').trigger('click')

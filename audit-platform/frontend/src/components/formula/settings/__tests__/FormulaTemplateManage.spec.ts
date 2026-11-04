@@ -3,7 +3,8 @@
  *
  * FormulaTemplateSaveDialog：从本项目保存（默认只取本项目自己的公式，不传公式位；「全部有效公式」显式列出）、
  *   项目组 / 集团模板归属当前项目、事务所模板只给管理员、从全局保存须选适用范围。
- * FormulaTemplateDetailDrawer：并入全局提示 → 暂存 → 发布新版本（带模板版本号、同一请求号）；
+ * FormulaTemplateDetailDrawer：「全局已变」提示按四类处理（spec formula-management-repair-closure R6）——同步全局 / 移出模板
+ *   = 暂存 → 发布新版本（带模板版本号、同一请求号）；保留模板 = 只更新基线（带模板版本 + 全局版本，不发新版本）；
  *   非管理员「设为全局」= 确认后提交候选（不预览）；删除先确认。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -16,6 +17,7 @@ const { api, msg, confirm } = vi.hoisted(() => ({
     domains: vi.fn(), effective: vi.fn(), createTemplate: vi.fn(), template: vi.fn(), templateVersions: vi.fn(),
     templateSubscribers: vi.fn(), templatePublishPreview: vi.fn(), templatePublish: vi.fn(),
     templatePromotePreview: vi.fn(), templatePromote: vi.fn(), deleteTemplate: vi.fn(), updateTemplate: vi.fn(),
+    templateKeepBaseline: vi.fn(),
   },
   msg: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
   confirm: { confirmDelete: vi.fn(), confirmDangerous: vi.fn() },
@@ -53,10 +55,22 @@ const DETAIL = {
   version: 3, status: 'active', can_manage: true, updated_at: null, subscriber_count: 1,
   definitions: { report: [{ slot_key: 'balance_sheet:BS-002', label: '货币资金', definition: { formula: 'A' }, structure: {}, version: 3 }] },
   global_hints: [{
-    domain: 'report', slot_key: 'balance_sheet:BS-002', label: '货币资金', template_definition: { formula: 'A' },
-    base_definition: { formula: 'A0' }, global_definition: { formula: 'G' }, global_version: 5, same_as_template: false,
+    domain: 'report', slot_key: 'balance_sheet:BS-002', label: '货币资金', kind: 'conflict', template_definition: { formula: 'A' },
+    base_definition: { formula: 'A0' }, base_version: 4, global_definition: { formula: 'G' }, global_version: 5,
+    same_as_template: false,
   }],
 }
+/** 四类提示各一条（spec formula-management-repair-closure R6.1） */
+const HINTS = [
+  { domain: 'report', slot_key: 'balance_sheet:BS-001', label: '甲', kind: 'follow', template_definition: { formula: 'A0' },
+    base_definition: { formula: 'A0' }, base_version: 1, global_definition: { formula: 'G1' }, global_version: 2, same_as_template: false },
+  { domain: 'report', slot_key: 'balance_sheet:BS-002', label: '乙', kind: 'same', template_definition: { formula: 'M' },
+    base_definition: { formula: 'B0' }, base_version: 1, global_definition: { formula: 'M' }, global_version: 2, same_as_template: true },
+  { domain: 'report', slot_key: 'balance_sheet:BS-003', label: '丙', kind: 'conflict', template_definition: { formula: 'X' },
+    base_definition: { formula: 'C0' }, base_version: 1, global_definition: { formula: 'G3' }, global_version: 2, same_as_template: false },
+  { domain: 'report', slot_key: 'balance_sheet:BS-004', label: '丁', kind: 'deleted', template_definition: { formula: 'D0' },
+    base_definition: { formula: 'D0' }, base_version: 1, global_definition: null, global_version: null, same_as_template: false },
+]
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -163,11 +177,11 @@ function mountDrawer(isAdmin = false) {
 }
 
 describe('FormulaTemplateDetailDrawer', () => {
-  it('并入全局：暂存当前全局定义 → 发布新版本带模板版本号与同一请求号', async () => {
+  it('同步全局：暂存当前全局定义 → 发布新版本带模板版本号与同一请求号', async () => {
     const w = mountDrawer()
     await flushPromises()
     const vm = w.vm as any
-    vm.mergeAll()
+    vm.syncHint(vm.hints[0])
     expect(vm.stagedCount).toBe(1)
     await vm.onPublishPreview()
     expect(api.templatePublishPreview).toHaveBeenCalledWith('t1', {
@@ -182,6 +196,61 @@ describe('FormulaTemplateDetailDrawer', () => {
     expect(second.request_id).toBe(first.request_id)
     expect(vm.stagedCount).toBe(0)
     expect(w.emitted('changed')).toHaveLength(1)
+    w.unmount()
+  })
+
+  // spec formula-management-repair-closure R6：按分类处理
+  it('四类提示：一键同步只暂存「模板没改过」的；已一致的走保留模板；全局已删的不能同步、可移出', async () => {
+    api.template.mockResolvedValue({ ...JSON.parse(JSON.stringify(DETAIL)), global_hints: HINTS })
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.hintSummary).toBe('模板未改，可直接同步 1 处、模板已与新全局一致 1 处、模板与新全局都改了 1 处、全局已删除该公式位 1 处')
+    expect(w.find('[data-testid="ftd-sync-follow"]').text()).toContain('同步未改动的 1 处')
+    expect(w.find('[data-testid="ftd-keep-same"]').text()).toContain('更新已一致的 1 处基线')
+    vm.syncFollowHints()
+    expect(vm.stagedChanges()).toEqual([{ domain: 'report', slot_key: 'balance_sheet:BS-001', definition: { formula: 'G1' } }])
+    vm.syncHint(HINTS[3])
+    expect(vm.stagedCount).toBe(1)
+    vm.removeHint(HINTS[3])
+    expect(vm.stagedChanges()).toContainEqual({ domain: 'report', slot_key: 'balance_sheet:BS-004', definition: null })
+    w.unmount()
+  })
+
+  it('保留模板：带模板版本 + 各处看到的全局版本，不发新版本；成功后重取、去掉同一处的暂存', async () => {
+    api.template.mockResolvedValue({ ...JSON.parse(JSON.stringify(DETAIL)), global_hints: HINTS })
+    api.templateKeepBaseline.mockResolvedValue({ template_id: 't1', version: 3, kept: [] })
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    vm.syncHint(HINTS[2])
+    const loads = api.template.mock.calls.length
+    await vm.keepHints([HINTS[1], HINTS[2], HINTS[3]])
+    expect(api.templateKeepBaseline).toHaveBeenCalledWith('t1', { expected_version: 3, items: [
+      { domain: 'report', slot_key: 'balance_sheet:BS-002', expected_global_version: 2 },
+      { domain: 'report', slot_key: 'balance_sheet:BS-003', expected_global_version: 2 },
+      { domain: 'report', slot_key: 'balance_sheet:BS-004', expected_global_version: null }] })
+    expect(api.templatePublish).not.toHaveBeenCalled()
+    expect(vm.stagedCount).toBe(0)
+    expect(api.template.mock.calls.length).toBe(loads + 1)
+    expect(msg.success).toHaveBeenCalledWith('已保留模板定义，3 处提示已消除（未发新版本，订阅项目不受影响）')
+    expect(w.emitted('changed')).toHaveLength(1)
+    w.unmount()
+  })
+
+  it('保留模板时模板或全局又变了（409）：提示按最新情况重新确认并重取，不当成功', async () => {
+    api.template.mockResolvedValue({ ...JSON.parse(JSON.stringify(DETAIL)), global_hints: HINTS })
+    api.templateKeepBaseline.mockRejectedValueOnce({ response: { status: 409, data: { detail: {
+      error_code: 'FORMULA_VERSION_CONFLICT', message: '「乙」的全局定义已再次变化，请刷新后重新确认' } } } })
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    const loads = api.template.mock.calls.length
+    await vm.keepHints([HINTS[1]])
+    expect(msg.warning).toHaveBeenCalledWith(expect.stringContaining('全局定义已再次变化'))
+    expect(msg.success).not.toHaveBeenCalled()
+    expect(api.template.mock.calls.length).toBe(loads + 1)
+    expect(vm.keeping).toBe(false)
     w.unmount()
   })
 

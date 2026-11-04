@@ -12,7 +12,8 @@ import {
 } from '@/services/apiPaths'
 import type {
   ApplyTarget, ApplyTargetKind, CheckRuleSource, Decisions, Definition, EffectiveResult, FormulaDomainInfo,
-  FormulaTemplateInfo, GlobalSlot, PendingItem, PublishRecord, Resolution, SlotChange, SyncPreview, TemplateDetail,
+  FormulaTemplateInfo, GlobalSlot, PendingItem, PropagationStatus, PublishRecord, Resolution, SlotChange, SyncPreview,
+  TemplateDetail,
   TemplateSubscriber, TemplateSubscription, TemplateVersion, TemplateDiff, TemplateDiffChange,
 } from '@/composables/formula/useFormulaSettings'
 
@@ -42,6 +43,8 @@ export const formulaSettingsApi = {
 
   pending: (pid: string) =>
     api.get<{ project_id: string; count: number; items: PendingItem[] }>(PP.pending(pid), silent({ _dedupe: false })),
+  /** 联动状态轮询：不去重（同页别的组件不会请求它，去重只会取消上一轮） */
+  propagation: (pid: string) => api.get<PropagationStatus>(PP.propagation(pid), silent({ _dedupe: false })),
   /** `recalc_domains`：有效定义真的变了（会重算）的域；全选「保留本项目」时为空 */
   resolve: (pid: string, resolutions: Resolution[]) =>
     api.post<{ resolved: Array<Record<string, any>>; recalc_domains?: string[] }>(PP.resolve(pid), { resolutions }, silent()),
@@ -89,6 +92,11 @@ export const formulaSettingsApi = {
     api.post<SyncPreview>(PT.promotePreview(id), body, silent()),
   templatePromote: (id: string, body: { domain: string; slot_keys?: string[] | null; decisions?: Decisions; request_id: string; note?: string }) =>
     api.post<Record<string, any>>(PT.promote(id), body, silent()),
+  /** 保留模板（spec formula-management-repair-closure R6.2）：模板版本 + 提示里看到的全局版本都要对上，否则 409 */
+  templateKeepBaseline: (id: string, body: {
+    expected_version: number; items: Array<{ domain: string; slot_key: string; expected_global_version: number | null }>
+  }) => api.post<{ template_id: string; version: number; kept: Array<{ domain: string; slot_key: string; base_version: number | null }> }>(
+    PT.keepBaseline(id), body, silent()),
 
   subscriptions: (pid: string) => api.get<{ items: TemplateSubscription[] }>(PPT.subscriptions(pid), silent()),
   subscribePreview: (pid: string, body: { template_id: string; domain: string }) =>

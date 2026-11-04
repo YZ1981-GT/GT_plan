@@ -6,7 +6,7 @@
  */
 import { ref, type Ref } from 'vue'
 import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
-import { layerLabel } from '@/composables/formula/useFormulaSettings'
+import { domainNotWiredText, formulaSettingsApi, layerLabel } from '@/composables/formula/useFormulaSettings'
 
 export interface TbDetailDeps {
   projectId: Ref<string>
@@ -25,8 +25,20 @@ export function useTbDetailFormulas(deps: TbDetailDeps) {
   const added = ref<any[]>([])
   const loaded = ref<Record<string, string>>({})
   const fallbackAccounts = ref<Array<{ code: string; name: string }>>([])
+  /** 本域未接入计算时的说明（后端 `/domains` 的 wired_reason，spec formula-management-repair-closure R3.1） */
+  const notWired = ref('')
+
+  /** 取一次即可（接入状态随后端版本，不随项目变）；取不到不提示 */
+  async function loadNotWired() {
+    if (notWired.value) return
+    try {
+      const info = (await formulaSettingsApi.domains())?.domains?.find((d) => d.key === 'tb_detail')
+      notWired.value = domainNotWiredText(info)
+    } catch { /* 域清单拿不到：不提示 */ }
+  }
 
   async function load() {
+    void loadNotWired()
     // 切项目或重试时先清旧状态，失败后宁可显示错误，也不能继续展示上一项目的公式。
     overrides.value = {}
     added.value = []
@@ -114,5 +126,5 @@ export function useTbDetailFormulas(deps: TbDetailDeps) {
     return rows
   }
 
-  return { overrides, added, loaded, fallbackAccounts, load, persist, buildRows }
+  return { overrides, added, loaded, fallbackAccounts, notWired, load, persist, buildRows }
 }

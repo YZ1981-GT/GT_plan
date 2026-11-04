@@ -802,7 +802,7 @@
     <!-- 公式管理弹窗（template-type 必传：否则恒按国企版加载 report_config） -->
     <FormulaManagerDialog
       v-if="formulaManagerMounted"
-      v-model="showFormulaManager"
+      v-model="showFormulaManager" :read-only="!canEdit"
       :rows="rows"
       :project-id="projectId"
       :year="year ?? undefined"

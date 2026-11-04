@@ -7,6 +7,9 @@
   <el-dialog v-model="visible" title="应用范围" width="560px" append-to-body destroy-on-close
     data-testid="formula-apply-scope">
     <p class="gt-fas-lead">已保存 {{ slotKeys.length }} 处公式到本项目。是否同时应用到其他地方？</p>
+    <!-- spec formula-management-repair-closure R3.1：未接入计算的域（试算表科目明细）照样能应用，但要说清不参与计算 -->
+    <el-alert v-if="notWiredText" type="warning" :closable="false" show-icon class="gt-fas-not-wired"
+      data-testid="fas-not-wired" :title="notWiredText" />
     <el-radio-group v-model="target" class="gt-fas-options">
       <el-radio value="project">仅本项目</el-radio>
       <el-radio v-if="canEditGlobal" value="global">设为全局，并应用到全部项目</el-radio>
@@ -40,7 +43,7 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FormulaPublishPreviewDialog from './FormulaPublishPreviewDialog.vue'
 import {
-  formulaErrorText, formulaSettingsApi, newRequestId,
+  domainNotWiredText, formulaErrorText, formulaSettingsApi, newRequestId,
   type ApplyTarget, type ApplyTargetKind, type ConflictChoice, type Decisions, type SyncPreview,
 } from '@/composables/formula/useFormulaSettings'
 
@@ -69,7 +72,10 @@ const targetsLoading = ref(false)
 const preview = ref<SyncPreview | null>(null)
 const previewVisible = ref(false)
 const previewLoading = ref(false)
+const notWiredText = ref('')
 let requestId = ''
+/** 每次打开递增：关掉再打开另一个域时，上一次晚到的域信息不覆盖本次 */
+let openSeq = 0
 
 watch(() => props.modelValue, (open) => {
   if (!open) return
@@ -77,7 +83,17 @@ watch(() => props.modelValue, (open) => {
   projectIds.value = []
   preview.value = null
   requestId = ''
+  notWiredText.value = ''
+  void loadNotWired(++openSeq, props.domain)
 })
+
+/** 该域是否接入计算：取不到域信息时不提示（不挡应用） */
+async function loadNotWired(seq: number, domain: string) {
+  try {
+    const info = (await formulaSettingsApi.domains())?.domains?.find((d) => d.key === domain)
+    if (seq === openSeq) notWiredText.value = domainNotWiredText(info)
+  } catch { /* 域清单拿不到：不提示 */ }
+}
 
 watch(target, async (t) => {
   if (t !== 'projects' || targets.value.length || !props.projectId) return
@@ -126,7 +142,12 @@ async function onSubmit(payload: { decisions: Decisions; note: string }): Promis
     })
     if (t === 'candidate') ElMessage.success('已提交为全局候选，管理员审核通过后发布到全部项目')
     else if (t === 'global') ElMessage.success(`已设为全局并发布，${result?.changed_project_count ?? 0} 个项目的有效公式随之更新`)
-    else ElMessage.success(`已应用到 ${projectIds.value.length} 个项目`)
+    else {
+      // 计划里真有可写条目的项目数；不会写入的（域不适用 / 没有这张底稿）单列，不算「已应用」（R4）
+      const applied = result?.summary?.target_count ?? projectIds.value.length
+      const skipped = result?.skipped?.length || 0
+      ElMessage.success(`已应用到 ${applied} 个项目${skipped ? `，${skipped} 处未写入（原因见预览）` : ''}`)
+    }
     visible.value = false
     emit('done', t)
     return true
@@ -139,6 +160,7 @@ async function onSubmit(payload: { decisions: Decisions; note: string }): Promis
 
 <style scoped>
 .gt-fas-lead { margin: 0 0 10px; font-size: var(--gt-font-size-sm); }
+.gt-fas-not-wired { margin-bottom: 10px; }
 .gt-fas-options { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .gt-fas-projects { margin-top: 10px; }
 .gt-fas-muted { margin-top: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }

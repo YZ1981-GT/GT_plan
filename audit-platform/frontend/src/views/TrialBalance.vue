@@ -1144,6 +1144,7 @@
       v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       scope="tb"
+      :read-only="!canEdit"
       :initial-report-type="tbViewMode === 'summary' ? tbSummaryType : undefined"
       :rows="rows"
       :project-id="projectId"

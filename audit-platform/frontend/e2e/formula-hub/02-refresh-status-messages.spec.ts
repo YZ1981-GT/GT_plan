@@ -1,63 +1,35 @@
 /**
- * 浏览器检查 ② — 全局刷新各 status 文案
+ * 浏览器检查 ② — 全局一键刷新的状态文案
  *
- * 验证：全局刷新（draft-refresh）端点返回结构化状态，
- * 前端对各状态显示正确的中文文案。
+ * `POST /api/workpapers/draft-refresh`：种子项目没有余额表与试算表 ⇒ 前置校验阻断，422 + 中文原因 + 缺哪张表；
+ * 空 scopes ⇒ 422（不再隐式全量刷新）。原用例打不存在的 `/formula-management/refresh-all` 并把 404 当通过。
  *
- * formula-e2e-ci-gate Task 2 / R3 第 2 项
+ * formula-e2e-ci-gate Task 2 / R3 第 2 项；spec formula-management-repair-closure R7 重写
  */
 import { test, expect } from '@playwright/test'
-import { loginAndInstall, standaloneProjectId } from './helpers'
-
-const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:9980'
+import { api, apiToken, seedYear, standaloneProjectId } from './helpers'
 
 test.describe('全局刷新状态文案', () => {
-  test.beforeEach(async ({ page, request }) => {
-    await loginAndInstall(page, request)
-  })
+  let token = ''
+  test.beforeAll(async ({ request }) => { token = await apiToken(request) })
 
-  test('刷新端点返回结构化状态（非空）', async ({ request }) => {
-    const projectId = standaloneProjectId()
-    const resp = await request.post(
-      `${BACKEND}/api/projects/${projectId}/formula-management/refresh-all`,
-      {
-        data: {},
-        headers: { Authorization: `Bearer ${process.env.FH_E2E_TOKEN || ''}` },
-      },
-    )
-    // 200 或 202 均可（SSE / 同步两种实现）
-    expect([200, 202, 404]).toContain(resp.status())
-    if (resp.ok()) {
-      const body = await resp.json()
-      const data = body?.data ?? body
-      // 至少有 status 字段
-      expect(data).toBeTruthy()
-    }
-  })
-
-  test('公式管理页可导航且无控制台错误', async ({ page }) => {
-    const projectId = standaloneProjectId()
-    const errors: string[] = []
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') errors.push(msg.text())
+  test('四表库缺数据：阻断并说明缺哪张表（不写任何数据）', async ({ request }) => {
+    const r = await api(request, token, 'POST', '/api/workpapers/draft-refresh', {
+      data: { project_id: standaloneProjectId(), year: seedYear(), scopes: ['report'] },
     })
+    expect(r.status).toBe(422)
+    expect(r.error.message).toBe('四表库数据不完整，无法一键刷新')
+    expect(r.error.can_refresh).toBe(false)
+    const blocking = Object.fromEntries((r.error.blocking as any[]).map((b) => [b.table, b.message]))
+    expect(Object.keys(blocking).sort()).toEqual(['tb_balance', 'trial_balance'])
+    expect(blocking.tb_balance).toContain('科目余额表无该项目')
+  })
 
-    await page.goto(`/projects/${projectId}/formula-management`)
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-
-    // 页面加载后不崩溃即可；种子项目可能无公式管理路由（页面显示 404 或重定向）
-    // 核心断言是 API 行为（在上一个测试里已验证），此处验证前端不崩
-    const url = page.url()
-    // 如果被重定向到登录页，说明 token 未生效（前端 SPA 路由守卫）
-    if (url.includes('/login')) {
-      console.warn('公式管理页被重定向到登录页（token 可能未注入 SPA 路由守卫），跳过 UI 断言')
-      return
-    }
-
-    // 过滤已知无害的控制台错误
-    const realErrors = errors.filter(
-      (e) => !e.includes('ResizeObserver') && !e.includes('favicon') && !e.includes('404'),
-    )
-    expect(realErrors.length, `页面有控制台错误: ${realErrors.slice(0, 3).join('; ')}`).toBeLessThanOrEqual(3)
+  test('空 scopes：422 校验失败（不再隐式全量刷新）', async ({ request }) => {
+    const r = await api(request, token, 'POST', '/api/workpapers/draft-refresh', {
+      data: { project_id: standaloneProjectId(), year: seedYear(), scopes: [] },
+    })
+    expect(r.status).toBe(422)
+    expect(r.error).toBe('请求参数校验失败')
   })
 })

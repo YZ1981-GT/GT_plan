@@ -32,10 +32,16 @@
           <el-button v-if="detail.can_manage" size="small" type="danger" plain @click="onDelete">删除模板</el-button>
         </div>
 
+        <!-- spec formula-management-repair-closure R6：按分类处理 —— 模板没改过的可一键同步；已与新全局一致的只更新基线；
+             真冲突 / 全局已删的在「与全局不一致」页逐条选（同步全局 / 保留模板 / 移出模板） -->
         <el-alert v-if="hints.length" type="warning" :closable="false" show-icon class="gt-ftd-gap"
-          :title="`全局设置已更新：模板里有 ${hints.length} 处与当前全局不一致（模板写入后全局又改了）`">
-          <el-button v-if="detail.can_manage" size="small" type="warning" plain data-testid="ftd-merge-all"
-            @click="mergeAll">全部并入模板（暂存后发布新版本）</el-button>
+          :title="`全局设置已更新：模板里有 ${hints.length} 处与当前全局不一致（${hintSummary}）`">
+          <template v-if="detail.can_manage">
+            <el-button v-if="followHints.length" size="small" type="warning" plain data-testid="ftd-sync-follow"
+              @click="syncFollowHints">同步未改动的 {{ followHints.length }} 处（暂存后发布新版本）</el-button>
+            <el-button v-if="sameHints.length" size="small" plain :loading="keeping" data-testid="ftd-keep-same"
+              @click="keepHints(sameHints)">更新已一致的 {{ sameHints.length }} 处基线（不发新版本）</el-button>
+          </template>
         </el-alert>
 
         <el-tabs v-model="tab">
@@ -66,6 +72,12 @@
           <el-tab-pane :label="`与全局不一致（${hints.length}）`" name="hints">
             <el-table :data="hints" size="small" border max-height="calc(100vh - 380px)" empty-text="模板与当前全局一致">
               <el-table-column prop="label" label="公式位" min-width="180" show-overflow-tooltip />
+              <el-table-column label="情况" width="150">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.kind === 'conflict' ? 'danger' : row.kind === 'deleted' ? 'warning' : 'info'"
+                    effect="plain">{{ TEMPLATE_HINT_LABELS[row.kind as TemplateHintKind] || row.kind }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="模板定义" min-width="160">
                 <template #default="{ row }"><code class="gt-ftd-code">{{ definitionText(row.template_definition) }}</code></template>
               </el-table-column>
@@ -73,11 +85,20 @@
                 <template #default="{ row }"><code class="gt-ftd-code">{{ definitionText(row.base_definition) }}</code></template>
               </el-table-column>
               <el-table-column label="当前全局" min-width="160">
-                <template #default="{ row }"><code class="gt-ftd-code gt-ftd-new">{{ definitionText(row.global_definition) }}</code></template>
-              </el-table-column>
-              <el-table-column v-if="detail.can_manage" label="操作" width="100" align="center">
                 <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="mergeHint(row)">并入模板</el-button>
+                  <code v-if="row.global_definition" class="gt-ftd-code gt-ftd-new">{{ definitionText(row.global_definition) }}</code>
+                  <span v-else class="gt-ftd-muted">（全局已删除）</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="detail.can_manage" label="处理" width="200" align="center">
+                <template #default="{ row }">
+                  <!-- 同步全局 / 移出模板 = 暂存后发布新版本（订阅项目走预览与待确认）；保留模板 = 只更新基线 -->
+                  <el-button v-if="row.kind === 'follow' || row.kind === 'conflict'" link type="primary" size="small"
+                    @click="syncHint(row)">同步全局</el-button>
+                  <el-button link size="small" :loading="keeping" @click="keepHints([row])">
+                    {{ row.kind === 'same' ? '更新基线' : '保留模板' }}</el-button>
+                  <el-button v-if="row.kind === 'conflict' || row.kind === 'deleted'" link type="danger" size="small"
+                    @click="removeHint(row)">移出模板</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -190,9 +211,11 @@ import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import FormulaDefinitionEditDialog from './FormulaDefinitionEditDialog.vue'
 import FormulaPublishPreviewDialog from './FormulaPublishPreviewDialog.vue'
 import {
-  SHARE_SCOPE_OPTIONS, definitionText, formulaErrorText, formulaSettingsApi, newRequestId, scopeLabel,
+  SHARE_SCOPE_OPTIONS, TEMPLATE_HINT_LABELS, definitionText, formulaErrorText, formulaSettingsApi, newRequestId,
+  scopeLabel,
   type ConflictChoice, type Decisions, type Definition, type FormulaDomainInfo, type ShareScope, type SyncPreview,
-  type TemplateDetail, type TemplateDiff, type TemplateGlobalHint, type TemplateSubscriber, type TemplateVersion,
+  type TemplateDetail, type TemplateDiff, type TemplateGlobalHint, type TemplateHintKind, type TemplateSubscriber,
+  type TemplateVersion,
 } from '@/composables/formula/useFormulaSettings'
 
 defineOptions({ name: 'FormulaTemplateDetailDrawer' })
@@ -240,6 +263,13 @@ let promoteDomain = ''
 let requestId = ''
 
 const hints = computed<TemplateGlobalHint[]>(() => detail.value?.global_hints || [])
+const followHints = computed(() => hints.value.filter((h) => h.kind === 'follow'))
+const sameHints = computed(() => hints.value.filter((h) => h.kind === 'same'))
+/** 「可直接同步 2 处、已一致 1 处、…」 */
+const hintSummary = computed(() => (Object.keys(TEMPLATE_HINT_LABELS) as TemplateHintKind[])
+  .map((k) => [k, hints.value.filter((h) => h.kind === k).length] as const)
+  .filter(([, n]) => n > 0).map(([k, n]) => `${TEMPLATE_HINT_LABELS[k]} ${n} 处`).join('、'))
+const keeping = ref(false)
 const previewTitle = computed(() => {
   if (previewKind.value === 'publish') return `发布模板新版本 v${(detail.value?.version || 0) + 1}：订阅项目影响预览`
   if (previewKind.value === 'rollback') return `回滚到 v${rollbackVersion.value || ''} 并发布新版本：订阅项目影响预览`
@@ -372,12 +402,42 @@ function onEditSave(definition: Definition) {
 function stageDelete(row: { slot_key: string; label: string }) {
   staged.set(`${activeDomain.value}|${row.slot_key}`, { domain: activeDomain.value, slot_key: row.slot_key, label: row.label, definition: null })
 }
-function mergeHint(h: TemplateGlobalHint) {
+/** 同步全局：模板这一处改成当前全局（暂存，发布新版本时订阅项目走预览与待确认） */
+function syncHint(h: TemplateGlobalHint) {
+  if (!h.global_definition) return  // 全局已删：没有可同步的定义（用「保留模板」或「移出模板」）
   staged.set(`${h.domain}|${h.slot_key}`, { domain: h.domain, slot_key: h.slot_key, label: h.label, definition: h.global_definition })
 }
-function mergeAll() {
-  for (const h of hints.value) mergeHint(h)
-  ElMessage.info(`已暂存 ${hints.value.length} 处，点「发布新版本」预览订阅项目的影响后发布`)
+/** 移出模板：发布新版本时去掉这一处（订阅项目回到全局 / 系统预设） */
+function removeHint(h: TemplateGlobalHint) {
+  staged.set(`${h.domain}|${h.slot_key}`, { domain: h.domain, slot_key: h.slot_key, label: h.label, definition: null })
+}
+function syncFollowHints() {
+  for (const h of followHints.value) syncHint(h)
+  ElMessage.info(`已暂存 ${followHints.value.length} 处（模板没改过，直接跟随新全局），点「发布新版本」预览订阅项目的影响后发布`)
+}
+/** 保留模板：模板定义不动，只把基线换成当前全局 —— 不发新版本、订阅项目不受影响，之后提示消失 */
+async function keepHints(list: TemplateGlobalHint[]) {
+  if (!detail.value || !list.length || keeping.value) return
+  keeping.value = true
+  try {
+    await formulaSettingsApi.templateKeepBaseline(detail.value.id, {
+      expected_version: detail.value.version,
+      items: list.map((h) => ({ domain: h.domain, slot_key: h.slot_key, expected_global_version: h.global_version })),
+    })
+    for (const h of list) staged.delete(`${h.domain}|${h.slot_key}`)
+    ElMessage.success(`已保留模板定义，${list.length} 处提示已消除（未发新版本，订阅项目不受影响）`)
+    emit('changed')
+    await load()
+  } catch (e: any) {
+    if (e?.response?.status === 409 || e?.response?.status === 428) {
+      ElMessage.warning(formulaErrorText(e, '模板或全局已变化，请按最新情况重新确认'))
+      await load()
+      return
+    }
+    ElMessage.error(formulaErrorText(e, '保留模板失败'))
+  } finally {
+    keeping.value = false
+  }
 }
 
 function stagedChanges() {
@@ -529,4 +589,5 @@ async function onMetaSave() {
 .gt-ftd-spacer { flex: 1; }
 .gt-ftd-code { font-size: var(--gt-font-size-xs); word-break: break-all; white-space: normal; }
 .gt-ftd-new { color: var(--gt-color-primary); }
+.gt-ftd-muted { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 </style>

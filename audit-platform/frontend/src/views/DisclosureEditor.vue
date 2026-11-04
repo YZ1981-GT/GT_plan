@@ -849,7 +849,7 @@
          默认停在「报表 > 资产负债表」而不是本页章节 -->
     <FormulaManagerDialog
       v-if="noteFormulaManagerMounted"
-      v-model="showNoteFormulaManager"
+      v-model="showNoteFormulaManager" :read-only="!noteEdit.canWrite.value"
       :rows="currentNoteFormulaRows"
       :project-id="projectId"
       :year="year"

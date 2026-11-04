@@ -13,23 +13,26 @@
     <!-- spec formula-governance-coverage-closure R4：本项目公式包（导出本项目适配 / 导入为本项目适配） -->
     <FormulaImportExportDropdown mode="package" :project-id="projectId" :can-edit-project="canEditProject"
       @package-applied="onPackageApplied" />
+    <!-- spec formula-management-repair-closure R1.4：公式变更推到下游的结果（处理中 / 失败原因 / 已完成） -->
+    <FormulaPropagationStatus ref="propagationRef" :project-id="projectId" />
   </template>
   <FormulaTemplateSaveDialog v-model="showSave" :project-id="projectId" :default-domain="domain"
     :default-scope="defaultScope" :can-edit-project="canEditProject" />
   <FormulaTemplateSubscribeDialog v-model="showSubscribe" :project-id="projectId" :default-domain="domain"
     :initial-template-id="initialTemplateId" :initial-template-action="initialTemplateAction"
     :initial-template-domain="initialTemplateDomain"
-    @changed="(d: string) => emit('changed', d)" />
+    @changed="(d: string) => changed(d)" />
   <FormulaApplyScopeDialog v-model="apply.visible" :project-id="projectId" :domain="apply.domain"
-    :slot-keys="apply.slotKeys" :can-edit-global="canEditGlobal" @done="() => emit('changed', apply.domain)" />
+    :slot-keys="apply.slotKeys" :can-edit-global="canEditGlobal" @done="() => changed(apply.domain)" />
 </template>
 
 <script lang="ts">
 /**
  * 支持「应用范围」的域白名单（单一来源）——域不在列表内点应用范围按钮时禁用并提示。
- * 生产调用方只有 report / tb_detail / cross_check 三个域调 askApplyScope。
+ * 生产调用方：公式管理中心的 report / tb_detail / cross_check / wp（底稿公式保存后按后端回执的公式位问，
+ * spec formula-management-repair-closure R4）。附注 / 合并附注 / 推送规则的保存入口在各自弹窗里，暂不接。
  */
-export const APPLY_SCOPE_DOMAINS: ReadonlyArray<string> = ['report', 'tb_detail', 'cross_check'] as const
+export const APPLY_SCOPE_DOMAINS: ReadonlyArray<string> = ['report', 'tb_detail', 'cross_check', 'wp'] as const
 </script>
 
 <script setup lang="ts">
@@ -39,6 +42,7 @@ import { ElMessage } from 'element-plus'
 import FormulaTemplateSaveDialog from './FormulaTemplateSaveDialog.vue'
 import FormulaTemplateSubscribeDialog from './FormulaTemplateSubscribeDialog.vue'
 import FormulaApplyScopeDialog from './FormulaApplyScopeDialog.vue'
+import FormulaPropagationStatus from './FormulaPropagationStatus.vue'
 import FormulaImportExportDropdown from '../FormulaImportExportDropdown.vue'
 
 defineOptions({ name: 'FormulaSettingsToolbar' })
@@ -65,6 +69,18 @@ const router = useRouter()
 const showSave = ref(false)
 const showSubscribe = ref(false)
 const apply = reactive({ visible: false, domain: 'report', slotKeys: [] as string[] })
+const propagationRef = ref<InstanceType<typeof FormulaPropagationStatus> | null>(null)
+
+/** 宿主保存公式后调用（订阅 / 应用 / 公式包在本组件内已自动刷新） */
+function refreshPropagation() {
+  void propagationRef.value?.refresh?.()
+}
+
+/** 本项目有效定义变了：通知宿主重取，并刷新联动状态 */
+function changed(domain: string) {
+  emit('changed', domain)
+  refreshPropagation()
+}
 
 watch(() => [props.initialTemplateId, props.initialTemplateAction, props.canEditProject] as const,
   ([templateId, action, canEdit]) => {
@@ -81,7 +97,7 @@ function openGlobalSettings() {
 
 /** 公式包写入了若干类公式：通知宿主刷新一次（当前类别有写入就报当前类别） */
 function onPackageApplied(domains: string[]) {
-  if (domains.length) emit('changed', domains.includes(props.domain) ? props.domain : domains[0])
+  if (domains.length) changed(domains.includes(props.domain) ? props.domain : domains[0])
 }
 
 /** 本项目保存成功后调用：选择仅本项目 / 设为全局（或提交候选）/ 应用到指定项目。 */
@@ -96,5 +112,5 @@ function askApplyScope(domain: string, slotKeys: string[]) {
   apply.visible = true
 }
 
-defineExpose({ askApplyScope })
+defineExpose({ askApplyScope, refreshPropagation })
 </script>
