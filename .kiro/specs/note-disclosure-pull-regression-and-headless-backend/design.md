@@ -602,11 +602,14 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
 15. 真库验证批（§5.5）另见、未改：
     - 同一 Selector 循环问题：`ai_chat/dsh_process.py`（拉起与 taskkill 共 2 处）、`libreoffice_pool.py`、`mineru_service.py`
       （2 处）都用 `asyncio.create_subprocess_exec`，Windows 开发服务器上会 `NotImplementedError`。
-    - **主工作树 125 个已修改文件里 44 个等于某历史提交原样副本**（磁盘没跟上 HEAD 前移），含本链路 `formula_push/persistence.py`
-      （= `85caab386`）、`triggers.py` / `note_followup.py`（= `50736413a` 安全快照）、`note_formula_generator.py`（= `85caab386`）、
-      `note_workpaper_pull_service.py`。主实例 9980 跑的是这些旧版：`engine.run_and_commit` 传 `_skip_note_followup`、旧
-      `persistence` 不认 ⇒ 事件推送恒 `TypeError`（16:06 / 16:31 对【测试】公式同步甲失败 8 次）。谁从主工作树整树提交，这些旧版
-      就会再覆盖一次（§3.0 同一机理）。D7。
+    - **主工作树已修改文件里 42 个等于某历史提交原样副本**（磁盘没跟上 HEAD 前移；初扫记 44，多算的 2 个是本 spec 自己写进主
+      工作区、等于已推送版的 design / tasks），含本链路 `formula_push/persistence.py`（= `85caab386`）、`triggers.py` /
+      `note_followup.py`（= `50736413a` 安全快照）、`note_formula_generator.py`（= `85caab386`）、`note_workpaper_pull_service.py`。
+      主实例 9980 跑的是这些旧版：`engine.run_and_commit` 传 `_skip_note_followup`、旧 `persistence` 不认 ⇒ 事件推送恒
+      `TypeError`（16:06 / 16:31 对【测试】公式同步甲失败 8 次）。谁从主工作树整树提交，这些旧版就会再覆盖一次（§3.0 同一
+      机理）。D7。真库验证批推送后主工作区前移到推送提交：26 个路径换成推送版；INDEX.md 有并发
+      会话的编辑，只换 index；`note_formula_generator.py` / `test_formula_push_note_followup.py` 两个陈旧副本与本批改动重叠，
+      同样只换 index、磁盘不动 ⇒ 它们现在的 diff 会回退本批的 `kept` 修复，主实例上该修复也未生效。
     - `update_note_values` 对没有科目引用的模板章节不跳过：每次审定数变化都重并 119 节（本批只修合并结果，不收窄范围）。
     - 同一格两个写入方取数口径不同：E1 推送按底稿审定表、离屏刷新回填按试算表；E1 明细与试算表不一致时以最后写入方为准。
       属已登记的「附注权威源」待拍板。
