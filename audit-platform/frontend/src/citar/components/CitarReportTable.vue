@@ -18,8 +18,7 @@
           <tbody>
             <tr v-for="r in side.rows" :key="r.row_code" :class="rowClass(r)">
               <td :style="indentStyle(r)">{{ r.row_name }}</td>
-              <td class="is-numeric">{{ fmtMoney(r.current_period_amount) }}</td>
-              <td class="is-numeric">{{ fmtMoney(r.prior_period_amount) }}</td>
+              <CitarAmountCell v-for="col in COLUMNS" :key="col" v-bind="cellProps(r, col)" @edit="v => emit('edit', r.row_code, col, v)" @restore="emit('restore', r.row_code, col)" />
             </tr>
           </tbody>
         </table>
@@ -37,8 +36,7 @@
       <tbody>
         <tr v-for="r in rows" :key="r.row_code" :class="rowClass(r)">
           <td :style="indentStyle(r)">{{ r.row_name }}</td>
-          <td class="is-numeric">{{ fmtMoney(r.current_period_amount) }}</td>
-          <td class="is-numeric">{{ fmtMoney(r.prior_period_amount) }}</td>
+          <CitarAmountCell v-for="col in COLUMNS" :key="col" v-bind="cellProps(r, col)" @edit="v => emit('edit', r.row_code, col, v)" @restore="emit('restore', r.row_code, col)" />
         </tr>
       </tbody>
     </table>
@@ -50,9 +48,12 @@
  * 资产负债表 / 利润表（CITAR 报表版式，数据来自平台 /api/reports）。
  * 行次、缩进、合计行都按平台报表配置返回的 indent_level / is_total_row 呈现。
  * 金额：null（未生成）留空，0 显示「-」—— 合计算成 0 要看得见，不能和「没数」混在一起。
+ * ``editable``（审定报表页）：金额格可改、可恢复，改动经 edit / restore 交回父组件（spec citar-table-manual-edit R6）。
  */
 import { computed } from 'vue'
-import { fmtMoney } from '../useCitarProject'
+import CitarAmountCell from './CitarAmountCell.vue'
+
+export type CitarAmountColumn = 'current' | 'prior'
 
 export interface CitarReportRow {
   row_code: string
@@ -61,6 +62,8 @@ export interface CitarReportRow {
   prior_period_amount: string | number | null
   indent_level?: number | null
   is_total_row?: boolean | null
+  /** 手工值 {current|prior: {value, auto}} */
+  manual_amounts?: Partial<Record<CitarAmountColumn, { value: string | null; auto: string | null }>> | null
 }
 
 const props = defineProps<{
@@ -70,7 +73,31 @@ const props = defineProps<{
   entityName: string
   loading?: boolean
   error?: string
+  editable?: boolean
+  /** 草稿取值：undefined = 无草稿 */
+  draftOf?: (rowCode: string, column: CitarAmountColumn) => number | null | undefined
+  isRestored?: (rowCode: string, column: CitarAmountColumn) => boolean
 }>()
+
+const emit = defineEmits<{
+  edit: [rowCode: string, column: CitarAmountColumn, value: number | null]
+  restore: [rowCode: string, column: CitarAmountColumn]
+}>()
+
+const COLUMNS: CitarAmountColumn[] = ['current', 'prior']
+
+function cellProps(r: CitarReportRow, col: CitarAmountColumn) {
+  const manual = r.manual_amounts?.[col]
+  return {
+    value: col === 'current' ? r.current_period_amount : r.prior_period_amount,
+    manual: Boolean(manual),
+    auto: manual?.auto ?? null,
+    draft: props.draftOf?.(r.row_code, col),
+    restored: props.isRestored?.(r.row_code, col) ?? false,
+    editable: Boolean(props.editable),
+    label: `${r.row_name} ${col === 'current' ? '本期' : '上期'}`,
+  }
+}
 
 const periodText = computed(() => {
   if (!props.year) return ''

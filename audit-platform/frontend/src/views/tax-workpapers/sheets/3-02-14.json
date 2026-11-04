@@ -34,7 +34,7 @@
         [{"text":"三、纳税调整情况","colSpan":7}],
         [{"text":"行次","kind":"header"},{"text":"项目","kind":"header","colSpan":2},{"text":"金额","kind":"header"},{"text":"备注","kind":"header","colSpan":3}],
         [{"text":"19"},{"text":"工资薪金税收金额","colSpan":2},{"kind":"input","ref":"D30","role":"f","fmt":"money"},{"text":"本年工资","colSpan":3}],
-        [{"text":"20"},{"text":"税收规定的扣除率","colSpan":2},{"text":"1%","kind":"number"},{"colSpan":3,"ref":"E31","role":"e"}],
+        [{"text":"20"},{"text":"税收规定的扣除率","colSpan":2},{"text":"1%","kind":"number","ref":"D31","role":"c","fmt":"pct"},{"colSpan":3,"ref":"E31","role":"e"}],
         [{"text":"21"},{"text":"按扣除率计算的扣除限额（19*20）","colSpan":2},{"kind":"number","ref":"D32","role":"f","fmt":"money"},{"colSpan":3,"ref":"E32","role":"e"}],
         [{"text":"22"},{"text":"留存党费","colSpan":2},{"kind":"input","ref":"D33","role":"e","fmt":"money"},{"colSpan":3,"ref":"E33","role":"e"}],
         [{"text":"23"},{"text":"税收金额（当22行=0时，9行、18行、21行取小值，否则取9行、18行、21行取小值后减22行的值与零值相比较大的金额）","colSpan":2},{"kind":"number","ref":"D34","role":"f","fmt":"money"},{"colSpan":3,"ref":"E34","role":"e"}],

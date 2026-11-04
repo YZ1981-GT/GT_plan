@@ -650,6 +650,7 @@ class TestPriorPeriod:
         values, reason = await prior_node_values(db, group["G"].id, Y, "G:consol", "balance_sheet",
                                                  standard="soe_consolidated")
         assert values is None and "报表口径" in reason, "上年口径不同 ⇒ 行次对不上，不硬套"
+        assert "上市合并" in reason and "国企合并" in reason and "consolidated" not in reason, reason
 
     @pytest.mark.asyncio
     async def test_endpoint_rows_carry_prior_and_reason(self, db, group, client_for):

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_platform_models import AccountChart, AccountSource
 from app.models.core import Project
 from app.models.tax_workpaper_models import PARAMS_SHEET_CODE, RESERVED_SHEET_CODES, TaxWorkpaperInput
+from app.services.manual_edit_permission import denied_cells_message
 from app.services.tax_formula_engine import XlError, number_text
 from app.services.tax_workbook import Key, TaxWorkbook, json_to_value, load_workbook, parse_a1, to_a1
 from app.services.tax_workpaper_fetch import AccountBook, load_account_book
@@ -109,9 +110,12 @@ class Evaluation:
         return self.wb.cell_value((sheet, *parse_a1(ref)), self.inputs, self.rule_values, self.computed)
 
     def calc_value(self, sheet: str, ref: str) -> Any:
-        """计算值（与 Excel 一致：引用空格的公式得 0）；审核说明的占位用它，「账载金额{0}元」不会成「账载金额元」。"""
+        """计算值（与 Excel 一致：引用空格的公式得 0）；审核说明的占位用它，「账载金额{0}元」不会成「账载金额元」。
+        公式格有手工值时 ``computed`` 里就是手工值。"""
         key = (sheet, *parse_a1(ref))
         if key in self.wb.formulas:
+            if key in self.inputs and key not in self.computed:
+                return self.inputs[key]
             return self.computed.get(key)
         return self.value(sheet, ref)
 
@@ -143,7 +147,7 @@ def _make_runner(wb: TaxWorkbook, book: AccountBook, inputs: dict[Key, Any]) -> 
         v = wb.consts.get(key)
         return str(v).strip() if v not in (None, "") else None
 
-    runner = RuleRunner(book, wb.model["lists"], label_text, wb.model["rules"])
+    runner = RuleRunner(book, wb.model["lists"], label_text, wb.model["rules"], wb.model.get("classify_groups"))
     return runner
 
 
@@ -207,7 +211,9 @@ async def compute_sheet(db: AsyncSession, project_id: UUID, year: int, code: str
     version = own.version if own else 0
     updated_at = own.updated_at.isoformat() if own and own.updated_at else None
     ev = await evaluate_keys(db, project_id, year, [k for s in sheets for k in wb.print_keys(s)], rows)
-    inputs, rule_values, computed, results_meta, notices = ev.inputs, ev.rule_values, ev.computed, ev.results_meta, ev.notices
+    inputs, rule_values, computed, results_meta = ev.inputs, ev.rule_values, ev.computed, ev.results_meta
+    # 整表说明（需人工填写的内容、按名称归类的口径；spec citar-audited-balance-and-workpaper-coverage R5）
+    notices = list(ev.notices) + list((wb.model.get("sheet_notes") or {}).get(code, []))
 
     parts = []
     issues = []
@@ -227,11 +233,17 @@ async def compute_sheet(db: AsyncSession, project_id: UUID, year: int, code: str
                     cell["origin"] = "input"
                     cell["auto"] = encode_value(meta.value)
                 cells[ref] = cell
+            elif key in wb.formulas and key in inputs:
+                # 公式格手工覆盖：auto = 按公式算出的值（spec citar-table-manual-edit R1）
+                cells[ref] = {"origin": "input", "auto": encode_value(getattr(computed, "auto", {}).get(key))}
         for key, v in inputs.items():
             if key[0] == sheet and key not in wb.formulas:
                 ref = to_a1(key[1], key[2])
                 values[ref] = encode_value(v)
-                cells.setdefault(ref, {"origin": "input"})
+                cell = cells.setdefault(ref, {"origin": "input"})
+                # 样表预置数字被改过：auto = 样表原值
+                if key not in wb.rules and wb.consts.get(key) is not None and "auto" not in cell:
+                    cell["auto"] = encode_value(wb.consts[key])
         parts.append({"source": sheet, "values": values, "cells": cells})
 
     return {
@@ -371,8 +383,11 @@ async def _upsert(db: AsyncSession, project_id: UUID, year: int, code: str, vers
 
 async def save_sheet_inputs(
     db: AsyncSession, project_id: UUID, year: int, code: str, version: int, inputs: dict, user_id: UUID,
-    domain: str = WORKPAPER_DOMAIN,
+    domain: str = WORKPAPER_DOMAIN, allow_manual_edit: bool = True,
 ) -> None:
+    """整表替换本表手工值。``allow_manual_edit`` 为假（账号未开通「允许修改」）时，自动生成的格子
+    （公式格、自动取数格、样表预置数字）必须与已存值一致：他人手工值原样保留可以，新增 / 改值 / 恢复都拒收
+    （spec citar-manual-edit-permission R2 / R4）。"""
     wb = load_workbook()
     sheets = _sheets_in_domain(wb, code, domain)
     if code in (wb.model.get("readonly_codes") or []):
@@ -391,13 +406,49 @@ async def save_sheet_inputs(
                 raise HTTPException(status_code=422, detail=f"单元格地址无效：{ref}") from None
             if area and not (area[0] <= row <= area[2] and area[1] <= col <= area[3]):
                 raise HTTPException(status_code=422, detail=f"{ref} 不在底稿范围内")
-            if (sheet, row, col) in wb.formulas:
-                raise HTTPException(status_code=422, detail=f"{ref} 是公式格，不能填写")
+            # 公式格也可填写：手工值盖过公式结果，键不提交即恢复公式（spec citar-table-manual-edit R1）
             clean.setdefault(sheet, {})[to_a1(row, col)] = _validate_value(raw)
             total += 1
     if total > MAX_REFS:
         raise HTTPException(status_code=422, detail="填写的单元格过多")
+    if not allow_manual_edit:
+        own = (await _rows(db, project_id, year)).get(code)
+        changed = _auto_cell_changes(wb, (own.inputs or {}) if own else {}, clean, set(sheets))
+        if changed:
+            raise HTTPException(status_code=403, detail=denied_cells_message(changed))
     await _upsert(db, project_id, year, code, version, clean, user_id)
+
+
+def is_auto_cell(wb: TaxWorkbook, key: Key) -> bool:
+    """自动生成的格子：公式格、按规则自动取数的格（「需人工填写」除外）、样表预置数字。
+    与前端 ``TaxWorkpaperGrid`` 的「未开通允许修改时可点范围」同一口径。"""
+    if key in wb.formulas or key in wb.formula_text:  # 解析失败的公式格同样算公式格
+        return True
+    rule = wb.rules.get(key)
+    if rule is not None:
+        return rule.get("status") != "manual"
+    return isinstance(wb.consts.get(key), Decimal)
+
+
+def _auto_cell_changes(wb: TaxWorkbook, old: dict, new: dict, sheets: set[str]) -> list[str]:
+    """自动生成的格子里，提交值与已存值不同（新增手工值、改值、恢复自动值）的格，按 sheet!A1 列出。"""
+    def flat(inputs: dict) -> dict[Key, Any]:
+        out: dict[Key, Any] = {}
+        for sheet, cells in (inputs or {}).items():
+            if sheet not in sheets:
+                continue
+            for ref, raw in (cells or {}).items():
+                out[(sheet, *parse_a1(ref))] = json_to_value(raw)
+        return out
+
+    before, after = flat(old), flat(new)
+    changed = []
+    for key in sorted(set(before) | set(after)):
+        if not is_auto_cell(wb, key):
+            continue
+        if (key in before) != (key in after) or before.get(key) != after.get(key):
+            changed.append(f"{key[0].strip()}!{to_a1(key[1], key[2])}")
+    return changed
 
 
 async def get_params(db: AsyncSession, project_id: UUID, year: int) -> dict:

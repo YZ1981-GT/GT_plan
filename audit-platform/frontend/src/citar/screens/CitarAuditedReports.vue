@@ -2,7 +2,7 @@
   <div class="aud-screen">
     <header class="aud-header">
       <h1 class="aud-header__title">审定报表</h1>
-      <span class="aud-header__note">按试算表审定数生成；调整分录批准后需重新生成</span>
+      <span class="aud-header__note">按试算表审定数生成；调整分录批准后需重新生成；金额可手工修改</span>
     </header>
 
     <nav class="aud-tabs">
@@ -26,9 +26,27 @@
           <button v-if="prerequisite?.segment" class="citar-btn" type="button" @click="goSegment(prerequisite.segment)">
             去{{ prerequisite.label }}
           </button>
-          <button class="citar-btn citar-btn--primary" type="button" :disabled="generating" @click="generate">
+          <button
+            class="citar-btn citar-btn--primary"
+            type="button"
+            :disabled="generating || saving || edits.dirty.value"
+            :title="edits.dirty.value ? '有未保存的金额修改，请先保存或放弃' : undefined"
+            @click="generate"
+          >
             {{ generating ? '生成中…' : generated ? '重新生成' : '生成报表' }}
           </button>
+        </div>
+
+        <div v-if="generated && !canManualEdit" class="citar-toolbar">
+          <span class="citar-toolbar__hint">{{ MANUAL_EDIT_DENIED_TIP }}</span>
+        </div>
+        <div v-else-if="generated" class="citar-toolbar">
+          <button class="citar-btn" type="button" :disabled="!edits.dirty.value || saving" @click="edits.clear">放弃修改</button>
+          <button class="citar-btn citar-btn--primary" type="button" :disabled="!edits.dirty.value || saving" @click="saveManual">
+            {{ saving ? '保存中…' : '保存修改' }}
+          </button>
+          <span v-if="edits.dirty.value" class="citar-toolbar__count">有 {{ edits.count.value }} 处未保存的修改</span>
+          <span class="citar-toolbar__hint">点金额可修改；改过的金额重新生成后保留（合计按改后的数重算），点开可「恢复」</span>
         </div>
 
         <CitarReportTable
@@ -38,6 +56,11 @@
           :entity-name="entityName"
           :loading="loading"
           :error="error"
+          :editable="generated && !saving && canManualEdit"
+          :draft-of="(code, col) => edits.draftOf(cellKey(code, col))"
+          :is-restored="(code, col) => edits.isRestored(cellKey(code, col))"
+          @edit="(code, col, v) => edits.edit(cellKey(code, col), v)"
+          @restore="(code, col) => edits.restore(cellKey(code, col), Boolean(rowOf(code)?.manual_amounts?.[col]))"
         />
       </template>
     </section>
@@ -51,10 +74,15 @@
  * 生成：POST /api/reports/generate（平台既有前置条件：已导入账套、已映射、已重算试算表）
  */
 import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { getReport } from '@/services/auditPlatformApi'
-import CitarReportTable, { type CitarReportRow } from '../components/CitarReportTable.vue'
+import { handleApiError } from '@/utils/errorHandler'
+import CitarReportTable, { type CitarAmountColumn, type CitarReportRow } from '../components/CitarReportTable.vue'
+import { saveReportManualValues, type ManualReportItem } from '../citarReportManual'
+import { useCitarAmountDrafts } from '../useCitarAmountDrafts'
 import { useCitarProject } from '../useCitarProject'
 import { useCitarReportGenerate } from '../useCitarReportGenerate'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'CitarAuditedReports' })
 
@@ -66,11 +94,15 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const { projectId, year, yearLoading, entityName, goSegment } = useCitarProject()
 const { generating, prerequisite, generate: runGenerate } = useCitarReportGenerate(projectId, year)
+const { canManualEdit } = useManualEditPermission()
 
 const tab = ref<TabKey>('balance_sheet')
 const rows = ref<CitarReportRow[]>([])
 const loading = ref(false)
 const error = ref('')
+/** 金额手工修改（spec citar-table-manual-edit R6） */
+const edits = useCitarAmountDrafts()
+const saving = ref(false)
 
 /** 未生成时后端返回模板行次、金额全空 */
 const generated = computed(() =>
@@ -95,6 +127,40 @@ async function generate() {
   if (await runGenerate()) await load()
 }
 
+function rowOf(code: string) {
+  return rows.value.find(r => r.row_code === code)
+}
+
+/** 草稿键带报表类型：切页签不串 */
+function cellKey(code: string, col: CitarAmountColumn) {
+  return `${tab.value}|${code}|${col}`
+}
+
+async function saveManual() {
+  if (!year.value) return
+  const items: ManualReportItem[] = []
+  for (const [key, value] of Object.entries(edits.drafts.value)) {
+    const [reportType, rowCode, column] = key.split('|')
+    items.push({ report_type: reportType, row_code: rowCode, column: column as CitarAmountColumn, value })
+  }
+  for (const key of edits.restored.value) {
+    const [reportType, rowCode, column] = key.split('|')
+    items.push({ report_type: reportType, row_code: rowCode, column: column as CitarAmountColumn, restore: true })
+  }
+  saving.value = true
+  try {
+    await saveReportManualValues(projectId.value, year.value, items)
+    edits.clear()
+    ElMessage.success('已保存，报表已按修改后的金额重算')
+    await load()
+  } catch (e) {
+    handleApiError(e, '保存报表修改')
+  } finally {
+    saving.value = false
+  }
+}
+
+watch([projectId, year], () => edits.clear())
 watch([projectId, year, tab], load, { immediate: true })
 </script>
 

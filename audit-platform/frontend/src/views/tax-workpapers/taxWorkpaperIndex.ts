@@ -5,6 +5,7 @@
  * 索引 sheet 校正（2-01(2)-2/-3 对调、2-15~2-19 顺移、补 2-09-01 / 2-13-01）。
  * 每个编号对应的表格结构由 backend/scripts/gen/gen_tax_workpaper_sheets.py 从样表生成到 sheets/。
  * 目录栏、索引页、单表页的页签都读这一份，增删表只改这里。
+ * 底稿页只显示其中一部分（SHOWN_TAX_WORKPAPER_INDEX，见下方 SHOWN_SHEET_CODES）。
  */
 
 export interface TaxWorkpaperSheet {
@@ -277,15 +278,42 @@ export const TAX_WORKPAPER_INDEX: TaxWorkpaperGroup[] = [
   },
 ]
 
-/** 全部表的扁平清单 */
+/**
+ * 底稿页显示的表（用户 2026-11-04）：一类全部 + 下列编号，其余隐藏。
+ * 只影响底稿页的目录栏、索引页、页签与底稿映射里的跳转；表结构、取数与公式计算照旧，
+ * 隐藏表的值仍参与被保留表的计算。恢复某张表：把编号加进 SHOWN_SHEET_CODES。
+ */
+const SHOWN_GROUP_PREFIXES = ['1-']
+const SHOWN_SHEET_CODES: ReadonlySet<string> = new Set([
+  '2-01', '2-02', '2-03', '2-04', '2-06', '2-07', '2-08', '2-09', '2-10',
+  '3-02-01-01', '3-02-01-02', '3-02-01-03', '3-02-01-04', '3-02-01-05', '3-02-01-07',
+  '3-02-02', '3-02-03', '3-02-13', '3-02-15',
+  '3-03-01', '3-03-04', '3-03-08',
+  '5-01-06',
+])
+
+/** 该表是否在底稿页显示 */
+export function isTaxWorkpaperShown(code: string): boolean {
+  return SHOWN_SHEET_CODES.has(code) || SHOWN_GROUP_PREFIXES.some(p => code.startsWith(p))
+}
+
+/** 底稿页显示的分组（只含显示的表；没有表的分组整组不显示，分组标题保留样表原编号） */
+export const SHOWN_TAX_WORKPAPER_INDEX: TaxWorkpaperGroup[] = TAX_WORKPAPER_INDEX
+  .map(g => ({ title: g.title, sheets: g.sheets.filter(s => isTaxWorkpaperShown(s.code)) }))
+  .filter(g => g.sheets.length > 0)
+
+/** 全部表的扁平清单（含隐藏的表） */
 export const ALL_TAX_WORKPAPER_SHEETS: TaxWorkpaperSheet[] = TAX_WORKPAPER_INDEX.flatMap(g => g.sheets)
 
-/** 按编号找表；不在索引里返回 undefined */
+/** 底稿页显示的表的扁平清单 */
+export const SHOWN_TAX_WORKPAPER_SHEETS: TaxWorkpaperSheet[] = SHOWN_TAX_WORKPAPER_INDEX.flatMap(g => g.sheets)
+
+/** 按编号找表；不在索引里返回 undefined（隐藏的表也能找到，供表名显示用） */
 export function findTaxWorkpaperSheet(code: string): TaxWorkpaperSheet | undefined {
   return ALL_TAX_WORKPAPER_SHEETS.find(s => s.code === code)
 }
 
-/** 按编号找它所属的分组 */
+/** 按编号找它所属的分组（原分组，含隐藏的表） */
 export function findTaxWorkpaperGroup(code: string): TaxWorkpaperGroup | undefined {
   return TAX_WORKPAPER_INDEX.find(g => g.sheets.some(s => s.code === code))
 }
@@ -302,7 +330,8 @@ const ACTIVE_PREFIX = 'gt.tax-workpaper-active.'
 export function loadActiveTaxSheet(projectId: string): string {
   try {
     const saved = sessionStorage.getItem(ACTIVE_PREFIX + projectId)
-    if (saved && (saved === TAX_INDEX_CODE || findTaxWorkpaperSheet(saved))) return saved
+    // 上次打开的表已被隐藏时回到索引页
+    if (saved && (saved === TAX_INDEX_CODE || (findTaxWorkpaperSheet(saved) && isTaxWorkpaperShown(saved)))) return saved
   } catch {
     // sessionStorage 不可用时回到索引页
   }

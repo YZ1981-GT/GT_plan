@@ -17,7 +17,7 @@
         [{"text":"2"},{"text":"其中：不允许扣除的支出","colSpan":3},{"kind":"input","ref":"E11","role":"e","fmt":"money"},{"kind":"input","ref":"F11","role":"e","fmt":"money"},{"kind":"number","ref":"G11","role":"f","fmt":"money"},{"ref":"H11","role":"e"}],
         [{"text":"3"},{"text":"本年度符合条件的佣金和手续费支出（1－2）","colSpan":3},{"kind":"number","ref":"E12","role":"f","fmt":"money"},{"kind":"number","ref":"F12","role":"f","fmt":"money"},{"kind":"number","ref":"G12","role":"f","fmt":"money"},{"ref":"H12","role":"e"}],
         [{"text":"4"},{"text":"本年计算扣除限额的基数","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G13","role":"f","fmt":"money"},{"ref":"H13","role":"e"}],
-        [{"text":"5"},{"text":"税收规定的扣除率","colSpan":3},{"text":"*"},{"text":"*"},{"text":"18%","kind":"number"},{"ref":"H14","role":"e"}],
+        [{"text":"5"},{"text":"税收规定的扣除率","colSpan":3},{"text":"*"},{"text":"*"},{"text":"18%","kind":"number","ref":"G14","role":"c","fmt":"pct"},{"ref":"H14","role":"e"}],
         [{"text":"6"},{"text":"本企业计算的扣除限额（4×5）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G15","role":"f","fmt":"money"},{"ref":"H15","role":"e"}],
         [{"text":"7"},{"text":"本年结转以后年度扣除额（3＞6，本行＝3－6；3≤6，本行＝0）","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"number","ref":"G16","role":"f","fmt":"money"},{"ref":"H16","role":"e"}],
         [{"text":"8"},{"text":"加：以前年度累计结转扣除额","colSpan":3},{"text":"*"},{"text":"*"},{"kind":"input","ref":"G17","role":"e","fmt":"money"},{"ref":"H17","role":"e"}],

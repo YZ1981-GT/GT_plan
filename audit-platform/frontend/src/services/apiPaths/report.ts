@@ -12,6 +12,8 @@ export const reports = {
   relatedWorkpapers: (pid: string, year: number, type: string, rowCode: string) =>
     `/api/reports/${pid}/${year}/${type}/${rowCode}/related-workpapers`,
   consistencyCheck: (pid: string, year: number) => `/api/reports/${pid}/${year}/consistency-check`,
+  /** PUT 审定报表手工值（改 / 恢复后随即重新生成，spec citar-table-manual-edit R6） */
+  manual: (pid: string, year: number) => `/api/reports/${pid}/${year}/manual`,
   exportExcel: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}/export-excel`,
   /** 全部报表 Excel 导出（POST，统一走项目级导出端点） */
   exportAllExcel: (pid: string) => `/api/projects/${pid}/reports/export-excel`,

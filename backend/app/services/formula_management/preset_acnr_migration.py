@@ -88,6 +88,7 @@ _FALLBACK_KNOWN_FUNCS: frozenset[str] = frozenset(
         "IF", "ABS", "ROUND", "MAX", "MIN",
         # unified-formula-registry（45a216848）登记进内核时漏同步的 5 个（formula-fetch-followup-defect-closure 6.6 补）
         "TB_AUX", "LEDGER", "COUNT_LEDGER", "LEDGER_DETAIL", "PLACEHOLDER",
+        "PL_UNCLOSED",  # 2026-11-04 单体报表未分配利润（citar-audited-balance-and-workpaper-coverage R1）
     }
 )
 

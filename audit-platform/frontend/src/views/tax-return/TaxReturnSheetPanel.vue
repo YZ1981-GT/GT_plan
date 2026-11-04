@@ -21,9 +21,10 @@
 
     <div v-if="definition && result" class="tw-legend" aria-label="单元格说明">
       <span class="tw-legend__item tw-legend__item--formula">公式计算（取自底稿）</span>
-      <span class="tw-legend__item tw-legend__item--input">手工填写</span>
-      <span class="tw-legend__tip">白底带框的格可点击填写</span>
+      <span class="tw-legend__item tw-legend__item--input">手工修改</span>
+      <span class="tw-legend__tip">点击任一金额格可修改；改过公式格后该格不再随底稿更新，编辑时可「恢复自动值」</span>
     </div>
+    <div v-if="!canManualEdit" class="tw-alert">{{ MANUAL_EDIT_DENIED_TIP }}；手填格照常可填。</div>
 
     <div v-if="valuesError" class="tw-alert tw-alert--error">{{ valuesError }}</div>
     <div v-for="n in result?.notices ?? []" :key="n" class="tw-alert">{{ n }}</div>
@@ -37,8 +38,11 @@
           :values="partValues(part.source).values"
           :cells="partValues(part.source).cells"
           :drafts="drafts[part.source] ?? {}"
+          :restored="restoredOf(part.source)"
           :readonly="!year || saving"
+          :manual-edit="canManualEdit"
           @edit="(ref, value) => setDraft(part.source, ref, value)"
+          @restore="(ref) => restore(part.source, ref)"
         />
       </div>
       <div v-else class="tw-pending">
@@ -59,6 +63,7 @@ import type { TaxWorkpaperSheetDefinition } from '@/views/tax-workpapers/taxWork
 import { useTaxSheetEditor } from '@/views/tax-workpapers/useTaxSheetEditor'
 import { fetchTaxReturnSheet, saveTaxReturnSheet } from './taxReturnApi'
 import { TAX_RETURN_INDEX, loadTaxReturnSheet, taxReturnName } from './taxReturnSheets'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 const props = defineProps<{
   code: string
@@ -69,13 +74,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'export'): void }>()
+const { canManualEdit } = useManualEditPermission()
 
 const definition = shallowRef<TaxWorkpaperSheetDefinition>()
 const loadState = ref<'loading' | 'ready' | 'missing' | 'error'>('loading')
 
 const {
   result, loadingValues, valuesError, drafts, saving, draftCount, dirty,
-  partValues, loadValues, reset, setDraft, save, discard,
+  partValues, loadValues, reset, setDraft, restore, restoredOf, save, discard,
 } = useTaxSheetEditor({
   projectId: () => props.projectId,
   year: () => props.year,
@@ -105,7 +111,7 @@ watch(
 )
 
 watch(() => [props.projectId, props.year], () => {
-  drafts.value = {}
+  discard()
   if (definition.value) void loadValues()
 })
 

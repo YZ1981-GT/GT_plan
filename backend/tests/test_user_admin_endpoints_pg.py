@@ -305,3 +305,35 @@ async def test_password_and_active_state_changes_are_audited(db, monkeypatch):
     assert calls[0]["object_id"] == target.id
     assert calls[0]["details"]["password_reset"] is True
     assert calls[0]["details"]["is_active"] == {"from": True, "to": False}
+
+
+# ---------------------------------------------------------------------------
+# 账号权限「允许修改」（spec citar-manual-edit-permission R1 / R5）
+# ---------------------------------------------------------------------------
+async def test_allow_manual_edit_toggle_is_admin_only_listed_and_audited(db, monkeypatch):
+    admin = await _user(db, "admin")
+    auditor = await _user(db, "auditor")
+    target = await _user(db, "auditor")
+    assert target.allow_manual_edit is True  # 默认允许：已有账号与新建账号行为不变
+    from app.services.audit_logger_enhanced import audit_logger
+
+    calls: list[dict] = []
+
+    async def _capture(_self, **payload):
+        calls.append(payload)
+        return payload
+
+    monkeypatch.setattr(type(audit_logger), "log_action", _capture)
+    url = f"/api/users/{target.id}"
+    async with _client(db) as c:
+        assert (await c.put(url, json={"allow_manual_edit": False}, headers=_auth(auditor))).status_code == 403
+        r = await c.put(url, json={"allow_manual_edit": False}, headers=_auth(admin))
+        assert r.status_code == 200 and _data(r)["allow_manual_edit"] is False, r.text
+        rows = {u["id"]: u for u in _data(await c.get("/api/users/", headers=_auth(admin)))}
+        assert rows[str(target.id)]["allow_manual_edit"] is False and rows[str(admin.id)]["allow_manual_edit"] is True
+        # 本人重新读账号信息即拿到新值，不必重新登录
+        assert _data(await c.get("/api/users/me", headers=_auth(target)))["allow_manual_edit"] is False
+        # 显式 null 视为不改
+        assert (await c.put(url, json={"allow_manual_edit": None}, headers=_auth(admin))).status_code == 200
+    assert (await _reload(db, target.id)).allow_manual_edit is False
+    assert [x["details"] for x in calls] == [{"allow_manual_edit": {"from": True, "to": False}}]

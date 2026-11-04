@@ -30,7 +30,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 os.environ.setdefault("DB_DISABLE_SSL", "True")
 
-from app.services.report_total_formulas import FIXES, STANDARD_FAMILY  # noqa: E402
+from app.services.report_total_formulas import FIXES, STANDARD_FAMILY, fixes_for  # noqa: E402
 
 DOMAIN = "report"
 STANDARDS = tuple(STANDARD_FAMILY)
@@ -52,7 +52,7 @@ def targets(standard: str) -> dict[str, tuple[str, dict]]:
     return {
         slot: (prefix, {"formula": formula, "formula_description": desc,
                         "formula_source": "total_fix" if formula else None})
-        for slot, (prefix, formula, desc) in FIXES[STANDARD_FAMILY[standard]].items()
+        for slot, (prefix, formula, desc) in fixes_for(standard).items()
     }
 
 

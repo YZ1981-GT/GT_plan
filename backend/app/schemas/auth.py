@@ -49,6 +49,8 @@ class UserUpdate(BaseModel):
     role: UserRole | None = None
     office_code: str | None = None
     is_active: bool | None = None
+    #: 账号权限「允许修改」：能否人工修改自动生成的数据（spec citar-manual-edit-permission）
+    allow_manual_edit: bool | None = None
     password: str | None = None
 
     @field_validator("password")
@@ -85,6 +87,8 @@ class UserResponse(BaseModel):
     role: UserRole
     office_code: str | None = None
     is_active: bool
+    #: 能否人工修改自动生成的数据；旧库行缺列时按允许（与迁移默认值一致）
+    allow_manual_edit: bool = True
     created_at: datetime
     permissions: list[str] = []  # 角色对应的权限列表，供前端权限检查使用
 

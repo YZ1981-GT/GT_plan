@@ -32,6 +32,7 @@ from app.models.report_models import (
     ReportConfig,
 )
 from app.services.amount_resolver import AmountResolver
+from app.services.report_manual_values import apply_auto, effective, load_manual, manual_value
 from app.services.report_row_order import evaluation_order
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ from app.services.formula_grammar import (
     WP_PATTERN as _WP_PATTERN,
     PREV_PATTERN as _PREV_PATTERN,
     AUX_PATTERN as _AUX_PATTERN,
+    PL_UNCLOSED_PATTERN as _PL_UNCLOSED_PATTERN,
 )
 
 # Column name mapping: Chinese → TrialBalance field
@@ -578,6 +580,8 @@ class ReportFormulaParser:
         # 🔴 必须缓存：`evaluate_formula` 是**逐行**调用的（每个 report_config 行一次），
         # 不缓存会让 `adj_net_batch` 按行数重复执行 —— 而它存在的理由正是避免 N+1。
         self._adj_data: dict[str, dict[str, Decimal]] | None = None
+        # PL_UNCLOSED() 按口径（审定 / 未审）缓存：逐行求值，同一次生成只算一次
+        self._pl_unclosed: dict[bool, Decimal] = {}
 
     async def _get_tb_row(self, account_code: str) -> TrialBalance | None:
         """从缓存或数据库获取试算表行"""
@@ -708,6 +712,22 @@ class ReportFormulaParser:
             self._tb_cache[row.standard_account_code] = row
 
         return total
+
+    async def resolve_pl_unclosed(self) -> Decimal | None:
+        """``PL_UNCLOSED()``：未结转损益（利润为正）。期初口径 0（损益类没有期初）；注入了合并 resolver 时返回 None
+        （合并报表不走本口径）。spec citar-audited-balance-and-workpaper-coverage R1。"""
+        if self.resolver is not None:
+            return None
+        if self._use_opening:
+            return Decimal("0")
+        adjusted = not self._use_unadjusted
+        if adjusted not in self._pl_unclosed:
+            from app.services.standard_balance_view_service import unclosed_pl_amount
+
+            self._pl_unclosed[adjusted] = await unclosed_pl_amount(
+                self.db, self.project_id, self.year, adjusted=adjusted,
+            )
+        return self._pl_unclosed[adjusted]
 
     async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
         """AmountResolver Protocol 公开方法：委托内部 _resolve_tb。"""
@@ -865,6 +885,17 @@ async def evaluate_formula_result(
 
     # Step 1: 预替换所有数据 token 为 Decimal 值（经 resolver 取数，保持原有取数语义）
     expression = formula
+
+    # PL_UNCLOSED()（未结转损益）：单体 resolver 按试算表求值代入；没有该口径的 resolver（合并）严格模式报错、否则按 0
+    if _PL_UNCLOSED_PATTERN.search(formula):
+        getter = getattr(resolver, "resolve_pl_unclosed", None)
+        pl_value = await getter() if getter is not None else None
+        if pl_value is None:
+            if strict_context:
+                raise ValueError("PL_UNCLOSED()：本取数口径（合并 / 非单体报表）没有未结转损益")
+            logger.info("PL_UNCLOSED() 在不支持的取数口径下按 0 计（%s）", type(resolver).__name__)
+            pl_value = Decimal("0")
+        expression = _PL_UNCLOSED_PATTERN.sub(f"({pl_value})", expression)
 
     # SUM_TB（必须在 TB 之前替换，避免部分匹配）
     for match in _SUM_TB_PATTERN.finditer(formula):
@@ -1371,6 +1402,8 @@ class ReportEngine:
         warnings: list[dict] = []
         # Req 16.5: 公式解析失败行收集（标注失败行，不产出空报表）
         failed_rows: list[dict] = []
+        # 手工值（spec citar-table-manual-edit R6）：未审口径（不落库的读时计算）不读
+        manual_rows = await load_manual(self.db, project_id, year, report_type) if mode == "audited" else {}
 
         # 依赖在前求值（合计行排在明细前时按行号算会读到空缓存得 0），返回仍按行号排
         for config in evaluation_order(config_rows):
@@ -1402,20 +1435,17 @@ class ReportEngine:
                     config.row_code, config.row_name, e,
                 )
 
-            # Task 1.5: 公式 fallback 取数机制
-            # 当公式计算结果为 0 但 TB 中该科目有余额时，使用 TB 余额作为 fallback
-            if current_amount == Decimal("0") and config.formula:
-                tb_fallback_value = await self._check_tb_fallback(
-                    parser_current, config.formula, mode,
-                )
-                if tb_fallback_value is not None and tb_fallback_value != Decimal("0"):
-                    current_amount = tb_fallback_value
-                    fallback_applied = True
+            # 公式结果为 0 时只提醒、不改值（spec citar-audited-balance-and-workpaper-coverage）：原「改用公式里第一个
+            # TB 科目的余额」把合法的 0 改错 —— 原值 − 备抵（无形资产 87,000 − 累计摊销 87,000）被报成 87,000，
+            # 资产负债表因此不平（激光项目）。只有单个 TB 的公式结果为 0 而该科目有余额才值得提醒（取数口径可能不对）。
+            if current_amount == Decimal("0") and config.formula and not formula_error:
+                tb_balance = await self._check_tb_fallback(parser_current, config.formula, mode)
+                if tb_balance is not None:
                     warnings.append({
                         "row_code": config.row_code,
                         "row_name": config.row_name,
-                        "type": "fallback_applied",
-                        "message": f"公式结果为0但TB有余额({tb_fallback_value})，已使用TB余额",
+                        "type": "zero_with_balance",
+                        "message": f"公式结果为 0，但引用的科目有余额（{tb_balance}），请核对公式取数口径",
                     })
 
             # 上期 / 期初（spec deliverable-trio-generation-accuracy §1.3）：资产负债表取本年
@@ -1429,8 +1459,13 @@ class ReportEngine:
                 )
                 prior_amount = None
 
+            # 手工值（spec citar-table-manual-edit R6）：本期进 ROW() 缓存、上期进上期缓存 ⇒ 合计按手工值算
+            manual = manual_rows.get(config.row_code)
+            if manual_value(manual, "prior")[0]:
+                prior_resolver.override(config.row_code, effective(manual, "prior", prior_amount))
+
             # Update global row_cache for ROW() references
-            global_row_cache[config.row_code] = current_amount
+            global_row_cache[config.row_code] = effective(manual, "current", current_amount) or Decimal("0")
 
             # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化
             row_refs_meta, dangling_refs = await self._resolve_row_refs_via_acnr(
@@ -1483,8 +1518,9 @@ class ReportEngine:
             row = existing.scalar_one_or_none()
             if row:
                 row.row_name = config.row_name
-                row.current_period_amount = current_amount
-                row.prior_period_amount = prior_amount
+                # 有手工值的列只刷新 auto（report_manual_values）
+                apply_auto(row, "current", current_amount)
+                apply_auto(row, "prior", prior_amount)
                 row.formula_used = config.formula
                 row.source_accounts = source_accounts if source_accounts else None
                 row.generated_at = generated_at
@@ -1520,11 +1556,13 @@ class ReportEngine:
                     "error": formula_error,
                 })
 
+            eff_current = row.current_period_amount
+            eff_prior = row.prior_period_amount
             row_dict = {
                 "row_code": config.row_code,
                 "row_name": config.row_name,
-                "current_period_amount": str(current_amount),
-                "prior_period_amount": str(prior_amount) if prior_amount is not None else None,
+                "current_period_amount": str(eff_current) if eff_current is not None else None,
+                "prior_period_amount": str(eff_prior) if eff_prior is not None else None,
                 "indent_level": config.indent_level,
                 "is_total_row": config.is_total_row,
                 # Req 16.4: 每单元记来源公式 + 最近计算时间
@@ -1931,15 +1969,14 @@ class ReportEngine:
         formula: str,
         mode: str,
     ) -> Decimal | None:
-        """检查公式引用的 TB 科目是否有非零余额，用于 fallback。
+        """公式只引用一个 TB 科目且该科目有非零余额时返回余额（供「结果为 0」提醒），否则 None。
 
-        当公式结果为 0 时，检查公式中引用的第一个 TB 科目是否有余额。
-        如果有，返回该余额作为 fallback 值。
+        多项公式（原值 − 备抵、各项相加）结果为 0 是正常的，不提醒，也绝不拿来替换结果。
         """
-        # 提取公式中的第一个 TB 引用
-        tb_match = _TB_PATTERN.search(formula)
-        if not tb_match:
+        matches = list(_TB_PATTERN.finditer(formula))
+        if len(matches) != 1 or _SUM_TB_PATTERN.search(formula):
             return None
+        tb_match = matches[0]
 
         account_code = tb_match.group(1)
         tb_row = await parser._get_tb_row(account_code)
@@ -2111,14 +2148,17 @@ class ReportEngine:
                     continue
 
                 # 先写入金额及其来源元数据；stale 标记在 flush 成功后再清除。
-                row.current_period_amount = formula_result.value
+                # 有手工值的列只刷新 auto，ROW() 缓存读生效值（spec citar-table-manual-edit R6）
+                apply_auto(row, "current", formula_result.value)
                 row.row_name = config.row_name
                 row.formula_used = config.formula
                 row.source_accounts = parser.extract_account_codes(config.formula) or None
                 row.generated_at = now
                 row.indent_level = config.indent_level
                 row.is_total_row = config.is_total_row
-                row_cache[config.row_code] = formula_result.value
+                row_cache[config.row_code] = (
+                    row.current_period_amount if row.current_period_amount is not None else Decimal("0")
+                )
                 successful_models.append(row)
                 recalculated_rows.append({
                     "report_type": report_type.value,
@@ -2265,7 +2305,10 @@ class ReportEngine:
                     )
                     row = existing.scalar_one_or_none()
                     if row:
-                        row.current_period_amount = current_amount
+                        # 手工值只刷新 auto；合计 / ROW() 引用读生效值（spec citar-table-manual-edit R6）
+                        apply_auto(row, "current", current_amount)
+                        if row.current_period_amount is not None:
+                            global_row_cache[config.row_code] = row.current_period_amount
                         # 任务 15：仅本次实际增量重算的行清除过期标记。
                         row.is_stale = False
                         # Req 15.3：更新受影响报表单元的最近计算时间
@@ -2296,6 +2339,9 @@ class ReportEngine:
         """判断公式是否引用了变更的科目"""
         if not formula:
             return False
+        # 未结转损益：任一损益科目变动都影响
+        if _PL_UNCLOSED_PATTERN.search(formula) and any(a and a[0] in ("5", "6") for a in changed_accounts):
+            return True
         for account in changed_accounts:
             # Direct TB reference
             if f"TB('{account}'" in formula:

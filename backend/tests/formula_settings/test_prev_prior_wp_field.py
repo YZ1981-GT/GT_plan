@@ -135,6 +135,8 @@ async def test_ambiguous_prior_projects_are_not_guessed():
         await db.commit()
         found = await find_prior_project(db, cur, YEAR)
         assert found.project_id is None and "不唯一" in found.reason and "C001" in found.reason
+        # 原因文字给用户看：报表类型写中文，不露库里的英文代码
+        assert "报表类型 单户报表" in found.reason and "standalone" not in found.reason, found.reason
         source = await resolve_prior_source(db, cur, YEAR)
         assert source.project_id is None and "本项目没有 2024 年试算表" in source.reason and "不唯一" in source.reason
 

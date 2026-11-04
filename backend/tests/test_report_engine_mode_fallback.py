@@ -195,12 +195,15 @@ class TestReportModeSelection:
 # ===========================================================================
 
 
-class TestFormulaFallback:
-    """Task 1.5: 公式 fallback 取数机制"""
+class TestZeroResultKept:
+    """公式结果为 0 照写 0（spec citar-audited-balance-and-workpaper-coverage）。
+
+    原「Task 1.5 fallback」把结果为 0 的行改成公式里第一个 TB 科目的余额：原值 − 备抵合法为 0（已摊完的无形资产
+    87,000 − 87,000）被报成 87,000，资产负债表不平。现在只对「单个 TB 的公式结果为 0 而该科目有余额」给提醒，不改值。
+    """
 
     @pytest.mark.asyncio
-    async def test_fallback_applied_when_formula_zero_but_tb_has_balance(self, seeded_db: AsyncSession):
-        """公式结果为 0 但 TB 有余额时，使用 TB 余额作为 fallback"""
+    async def test_multi_term_zero_is_kept_without_warning(self, seeded_db: AsyncSession):
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
@@ -208,44 +211,46 @@ class TestFormulaFallback:
             mode="audited",
         )
         bs_rows = result.get("balance_sheet", [])
-        # BS-002 公式 = TB('1101','期末余额') - TB('1101','期末余额') = 0
-        # 但 1101 有 audited_amount = 200000，应 fallback
+        # BS-002 = TB('1101') - TB('1101') = 0（1101 审定 200000）：照写 0，合计不被抬高
         fa_row = next((r for r in bs_rows if r["row_code"] == "BS-002"), None)
         assert fa_row is not None
-        assert Decimal(fa_row["current_period_amount"]) == Decimal("200000")
-        assert fa_row.get("fallback_applied") is True
+        assert Decimal(fa_row["current_period_amount"]) == Decimal("0")
+        total = next(r for r in bs_rows if r["row_code"] == "BS-003")
+        assert Decimal(total["current_period_amount"]) == Decimal("1150000")
+        warnings = result["coverage_stats"]["by_type"]["balance_sheet"].get("warnings", [])
+        assert not any(w["row_code"] == "BS-002" for w in warnings)
 
     @pytest.mark.asyncio
-    async def test_fallback_not_applied_when_formula_nonzero(self, seeded_db: AsyncSession):
-        """公式结果非 0 时不触发 fallback"""
+    async def test_single_tb_zero_with_balance_only_warns(self, seeded_db: AsyncSession):
+        """单个 TB 的公式结果为 0、该科目审定数却不为 0（取数口径与审定数不一致）⇒ 提醒，值仍是公式结果。"""
+        from app.models.report_models import FinancialReportType, ReportConfig
+
+        seeded_db.add(ReportConfig(report_type=FinancialReportType.balance_sheet, row_code="BS-007", row_number=7,
+                                   row_name="交易性金融资产期初", indent_level=0, formula="TB('1101','RJE调整')",
+                                   applicable_standard="soe_standalone", is_total_row=False))
+        await seeded_db.flush()
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
             applicable_standard="soe_standalone",
             mode="audited",
         )
-        bs_rows = result.get("balance_sheet", [])
-        # BS-001 公式结果 = 1150000 (非零)，不应 fallback
-        cash_row = next((r for r in bs_rows if r["row_code"] == "BS-001"), None)
-        assert cash_row is not None
-        assert cash_row.get("fallback_applied") is False
+        row = next(r for r in result["balance_sheet"] if r["row_code"] == "BS-007")
+        assert Decimal(row["current_period_amount"]) == Decimal("0")
+        warnings = result["coverage_stats"]["by_type"]["balance_sheet"].get("warnings", [])
+        hit = [w for w in warnings if w["row_code"] == "BS-007"]
+        assert hit and hit[0]["type"] == "zero_with_balance" and "200000" in hit[0]["message"]
 
     @pytest.mark.asyncio
-    async def test_fallback_marked_in_coverage_warnings(self, seeded_db: AsyncSession):
-        """fallback 应用时在 coverage_stats 中标记为 warning"""
+    async def test_nonzero_formula_has_no_warning(self, seeded_db: AsyncSession):
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
             applicable_standard="soe_standalone",
             mode="audited",
         )
-        coverage = result.get("coverage_stats", {})
-        bs_coverage = coverage.get("by_type", {}).get("balance_sheet", {})
-        warnings = bs_coverage.get("warnings", [])
-        # 应该有 BS-002 的 fallback warning
-        fallback_warnings = [w for w in warnings if w["type"] == "fallback_applied"]
-        assert len(fallback_warnings) >= 1
-        assert any(w["row_code"] == "BS-002" for w in fallback_warnings)
+        warnings = result["coverage_stats"]["by_type"]["balance_sheet"].get("warnings", [])
+        assert not any(w["row_code"] == "BS-001" for w in warnings)
 
 
 # ===========================================================================
@@ -311,8 +316,8 @@ class TestCoverageStats:
         )
         bs_stats = result["coverage_stats"]["by_type"]["balance_sheet"]
         # BS-001: 1150000 (有数据) ✓
-        # BS-002: 200000 (fallback, 有数据) ✓
-        # BS-003: 1350000 (合计, 有数据) ✓
+        # BS-002: 0（原值 − 自身，有公式）✓
+        # BS-003: 1150000 (合计, 有数据) ✓
         # BS-004: 无公式, 0 (无数据) ✗
         # BS-005: 300000 (有数据) ✓
         # BS-006: 错误公式, 0 但有公式 ✓
@@ -372,8 +377,8 @@ class TestDebugMode:
         assert "1000000" in bs001_debug["substituted_expression"]
 
     @pytest.mark.asyncio
-    async def test_debug_info_shows_fallback(self, seeded_db: AsyncSession):
-        """调试信息标记 fallback_applied"""
+    async def test_debug_info_keeps_zero_result(self, seeded_db: AsyncSession):
+        """调试信息的结果就是公式结果（不再有 fallback 改值）"""
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
@@ -383,7 +388,7 @@ class TestDebugMode:
         debug_rows = result["debug_info"]["balance_sheet"]
         bs002_debug = next((d for d in debug_rows if d["row_code"] == "BS-002"), None)
         assert bs002_debug is not None
-        assert bs002_debug["fallback_applied"] is True
+        assert Decimal(bs002_debug["result"]) == Decimal("0") and bs002_debug["fallback_applied"] is False
 
     @pytest.mark.asyncio
     async def test_formula_error_recorded_as_warning(self, seeded_db: AsyncSession):

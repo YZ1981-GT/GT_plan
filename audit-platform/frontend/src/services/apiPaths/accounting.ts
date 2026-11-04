@@ -33,7 +33,11 @@ export const taxAssurance = {
   taxReturnExport: (pid: string) => `/api/projects/${pid}/tax-assurance/tax-return/export`,
   /** GET 报告正文 / PUT 报告日期 */
   reportBody: (pid: string) => `/api/projects/${pid}/tax-assurance/report-body`,
+  /** PUT 摘录表 25 行金额手工值 */
+  reportBodyAmounts: (pid: string) => `/api/projects/${pid}/tax-assurance/report-body/amounts`,
   reportBodyExport: (pid: string) => `/api/projects/${pid}/tax-assurance/report-body/export`,
+  /** GET 网页预览：导出的 Word 经 OnlyOffice 转成 PDF */
+  reportBodyPreviewPdf: (pid: string) => `/api/projects/${pid}/tax-assurance/report-body/preview.pdf`,
   reviewNotes: (pid: string) => `/api/projects/${pid}/tax-assurance/review-notes`,
   reviewNotesExport: (pid: string) => `/api/projects/${pid}/tax-assurance/review-notes/export`,
   financialStatements: (pid: string) => `/api/projects/${pid}/tax-assurance/financial-statements`,
@@ -121,6 +125,15 @@ export const aging = {
 
 export const ledger = {
   balance: (pid: string) => `/api/projects/${pid}/ledger/balance`,
+  /** PUT 改末级科目余额行（上级同步、试算表随即重算，spec citar-table-manual-edit R3） */
+  balanceRow: (pid: string, rowId: string) => `/api/projects/${pid}/ledger/balance-rows/${rowId}`,
+  /** PUT 改序时账分录（不回写余额表，R4） */
+  entryRow: (pid: string, rowId: string) => `/api/projects/${pid}/ledger/entries/${rowId}`,
+  /** POST 恢复导入原值（table = balance / ledger，R5） */
+  restoreRow: (pid: string, table: 'balance' | 'ledger', rowId: string) => `/api/projects/${pid}/ledger/${table}/${rowId}/restore`,
+  /** GET 当前数据集里改过的行（?table=balance|ledger&year=）/ 两张表改过的行数 */
+  manualEdits: (pid: string) => `/api/projects/${pid}/ledger/manual-edits`,
+  manualEditsSummary: (pid: string) => `/api/projects/${pid}/ledger/manual-edits/summary`,
   entries: (pid: string, code: string) => `/api/projects/${pid}/ledger/entries/${encodeURIComponent(code)}`,
   /** 全年全部分录（不限科目，页码分页） */
   entriesAll: (pid: string) => `/api/projects/${pid}/ledger/entries-all`,

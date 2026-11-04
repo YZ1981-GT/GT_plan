@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.services.tax_formula_engine import FormulaSyntaxError, iter_functions, iter_refs, parse_formula  # noqa: E402
 from tax_workpaper_rules import ParsedRules, RuleParser  # noqa: E402
+from tax_workpaper_supplements import apply_supplements  # noqa: E402
 
 PARAMS_SHEET = "填写参数（无需打印）"
 RULE_HEADER = "取数规则"
@@ -120,6 +121,10 @@ def build_model(
         return next((s for s in wb_fx.sheetnames if code_key(s) == key), None)
 
     rules = RuleParser(cell_text, column_texts, resolve_sheet).parse_all(collect_raw_rules(wb_fx, code_sheets))
+    # 样表没有取数规则区的表：按行标签分类 / 税收默认值 / 整表说明（tax_workpaper_supplements）
+    supplements = apply_supplements(
+        rules, cell_text, lambda sheet, ref: formula_text(wb_fx[sheet][ref]) is not None,
+    )
     rule_keys = {(i["sheet"], i["ref"]) for i in rules.items}
     injected = {(s, ref): f for s, ref, f in rules.formulas}
     injected.update(extra_formulas or {})
@@ -212,6 +217,8 @@ def build_model(
         "corrections": rules.corrections,
         "lists": rules.lists,
         "rules": sorted(rules.items, key=lambda i: (wb_fx.sheetnames.index(i["sheet"]), _sort_ref(i["ref"]))),
+        "classify_groups": supplements["classify_groups"],
+        "sheet_notes": supplements["sheet_notes"],
         "sheets": sheets,
     }
     return model, rules

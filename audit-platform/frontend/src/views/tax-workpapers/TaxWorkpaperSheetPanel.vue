@@ -37,18 +37,19 @@
         <button type="button" class="tw-button tw-button--primary" :disabled="!dirty || saving || !year" @click="save">
           {{ saving ? '保存中…' : '保存' }}
         </button>
-        <button type="button" class="tw-button" :disabled="loadingValues || !year" @click="loadValues">重新取数</button>
+        <button type="button" class="tw-button" :disabled="loadingValues || !year" @click="loadValues">{{ loadingValues ? '取数中…' : '智能取数' }}</button>
         <span v-if="dirty" class="tw-toolbar__hint">有 {{ draftCount }} 处未保存的修改</span>
       </div>
 
       <div v-if="definition && result" class="tw-legend" aria-label="单元格说明">
-        <span class="tw-legend__item tw-legend__item--rule">按规则取数</span>
+        <span class="tw-legend__item tw-legend__item--rule">智能取数</span>
         <span class="tw-legend__item tw-legend__item--confirm">取数待确认</span>
         <span class="tw-legend__item tw-legend__item--manual-rule">需人工填写</span>
         <span class="tw-legend__item tw-legend__item--input">手工修改</span>
         <span class="tw-legend__item tw-legend__item--formula">公式计算</span>
-        <span class="tw-legend__tip">悬停单元格查看取数规则；点击可填写的格子直接修改</span>
+        <span class="tw-legend__tip">悬停单元格查看取数规则；取数格、公式格、预置数字都可点击修改，编辑时可「恢复自动值」</span>
       </div>
+      <div v-if="!canManualEdit" class="tw-alert">{{ MANUAL_EDIT_DENIED_TIP }}；手填格与「需人工填写」的格子照常可填。</div>
 
       <div v-if="valuesError" class="tw-alert tw-alert--error">{{ valuesError }}</div>
       <div v-for="n in result?.notices ?? []" :key="n" class="tw-alert">{{ n }}</div>
@@ -72,8 +73,11 @@
               :values="partValues(part.source).values"
               :cells="partValues(part.source).cells"
               :drafts="drafts[part.source] ?? {}"
+              :restored="restoredOf(part.source)"
               :readonly="!year || saving"
+              :manual-edit="canManualEdit"
               @edit="(ref, value) => setDraft(part.source, ref, value)"
+              @restore="(ref) => restore(part.source, ref)"
             />
           </template>
         </div>
@@ -106,10 +110,11 @@
  */
 import { computed, ref, shallowRef, watch } from 'vue'
 import TaxWorkpaperGrid from './TaxWorkpaperGrid.vue'
-import { findTaxWorkpaperGroup, findTaxWorkpaperSheet } from './taxWorkpaperIndex'
+import { findTaxWorkpaperGroup, findTaxWorkpaperSheet, isTaxWorkpaperShown } from './taxWorkpaperIndex'
 import { loadTaxWorkpaperSheet, type TaxWorkpaperSheetDefinition } from './taxWorkpaperSheets'
 import { fetchTaxSheet, saveTaxSheet } from './taxWorkpaperApi'
 import { useTaxSheetEditor } from './useTaxSheetEditor'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 const props = defineProps<{
   code: string
@@ -119,6 +124,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'open', code: string): void }>()
+const { canManualEdit } = useManualEditPermission()
 
 const sheet = computed(() => findTaxWorkpaperSheet(props.code))
 const group = computed(() => findTaxWorkpaperGroup(props.code))
@@ -130,7 +136,7 @@ const loadState = ref<'loading' | 'ready' | 'missing' | 'error'>('loading')
 /** 后端取数 + 计算结果、草稿与保存（与汇算申报表共用） */
 const {
   result, loadingValues, valuesError, drafts, saving, draftCount, dirty,
-  partValues, loadValues, reset, setDraft, save, discard,
+  partValues, loadValues, reset, setDraft, restore, restoredOf, save, discard,
 } = useTaxSheetEditor({
   projectId: () => props.projectId,
   year: () => props.year,
@@ -160,7 +166,7 @@ watch(
 )
 
 watch(() => [props.projectId, props.year], () => {
-  drafts.value = {}
+  discard()
   if (definition.value) void loadValues()
 })
 
@@ -172,9 +178,10 @@ function openOther(code: string) {
 /** 父组件切表前读它判断是否需要确认 */
 defineExpose({ dirty })
 
-/** 页签：当前表即使被标为「无」也留着 */
+/** 页签：只列底稿页显示的表；当前表即使被标为「无」也留着 */
 const tabSheets = computed(() =>
-  (group.value?.sheets ?? []).filter(s => s.code === props.code || !props.hiddenCodes.has(s.code)),
+  (group.value?.sheets ?? []).filter(s =>
+    isTaxWorkpaperShown(s.code) && (s.code === props.code || !props.hiddenCodes.has(s.code))),
 )
 </script>
 

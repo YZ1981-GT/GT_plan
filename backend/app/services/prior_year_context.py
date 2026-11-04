@@ -19,6 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
+# 报表类型中文名（与项目信息表单「报表类型」选项同名）：原因文字会展示给用户，不写库里的英文代码
+_REPORT_SCOPE_LABELS = {"standalone": "单户报表", "consolidated": "合并报表"}
+
+
+def report_scope_label(report_scope: str | None) -> str:
+    """``standalone`` ⇒「单户报表」、``consolidated`` ⇒「合并报表」；其他值原样返回。"""
+    value = (report_scope or "").strip()
+    return _REPORT_SCOPE_LABELS.get(value.lower(), value)
+
 
 @dataclass(frozen=True)
 class PriorProject:
@@ -68,7 +77,8 @@ async def find_prior_project(db: AsyncSession, project_id: uuid.UUID, year: int)
     ids = (await db.execute(sa.select(Project.id).where(*conds))).scalars().all()
     if len(ids) == 1:
         return PriorProject(ids[0])
-    where = f"企业代码 {code}、审计年度 {year - 1}" + (f"、报表口径 {proj.report_scope}" if proj.report_scope else "")
+    where = f"企业代码 {code}、审计年度 {year - 1}" + (
+        f"、报表类型 {report_scope_label(proj.report_scope)}" if proj.report_scope else "")
     if not ids:
         return PriorProject(None, f"没有上年项目（{where}）")
     logger.info("上年项目不唯一（%d 个）project=%s", len(ids), project_id)

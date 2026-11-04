@@ -242,6 +242,7 @@ class FinancialReport(Base):
     is_stale: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     # V173：留空原因（合并报表公式取数超出口径时金额为 NULL 并写明原因；有值的行为 NULL）
     blank_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manual_amounts: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)  # V260 手工值（citar-table-manual-edit R6）；none_as_null：恢复后存 SQL NULL
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

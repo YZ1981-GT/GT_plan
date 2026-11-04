@@ -557,6 +557,10 @@ services:
       # 自定义插件挂载（审计标注 + 取数联动，仅 cell 编辑器可见，不影响交付模块 Word）
       - ./backend/onlyoffice_plugins/audit-legend:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-legend:ro
       - ./backend/onlyoffice_plugins/tb-fetch:/var/www/onlyoffice/documentserver/sdkjs-plugins/tb-fetch:ro
+      # 中文 / Arial Narrow 字体（微软字体不入库，gitignore）：由 backend/scripts/ops/install_onlyoffice_fonts.py
+      # 从服务器字体目录拷来；缺了仿宋 / 黑体，报告正文等 Word 的预览与在线编辑行距、分页都与 Word 不同。
+      # 不加 :ro —— 安装脚本 docker cp 进同一目录；容器启动时会按这里的字体重建字体表
+      - ./docker/onlyoffice-fonts:/usr/share/fonts/truetype/custom
 
     depends_on:
 

@@ -54,6 +54,8 @@ desktop.ini
 storage/
 backend/data/sessions/
 backend/*.db
+# OnlyOffice 用的微软字体（install_onlyoffice_fonts.py 从服务器字体目录拷来，有版权不入库）
+docker/onlyoffice-fonts/
 
 # Build artifacts
 *.exe

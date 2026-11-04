@@ -2,8 +2,8 @@
   <div>
     <div class="citar-toolbar">
       <span class="citar-toolbar__count">{{ summary }}</span>
-      <button class="citar-btn" type="button" :disabled="loading" @click="load">{{ loading ? '核对中…' : '重新核对' }}</button>
-      <span class="citar-toolbar__hint">按审定报表核对；报表重新生成后请重新核对</span>
+      <button class="citar-btn" type="button" :disabled="loading" @click="load">{{ loading ? '核对中…' : '重新智能核对' }}</button>
+      <span class="citar-toolbar__hint">按审定报表做跨表勾稽核对；报表重新生成后请重新核对</span>
     </div>
 
     <p v-if="loading && !rows.length" class="sheet-empty">正在核对…</p>

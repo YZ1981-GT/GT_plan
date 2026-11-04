@@ -24,7 +24,7 @@ async def list_users(
 ):
     """获取用户列表（用于底稿分配、复核人选择等下拉框；须登录，原先不鉴权）。
 
-    带 ``is_active``：用户管理页显示状态、下拉框可据此排除停用账号。
+    带 ``is_active``：用户管理页显示状态、下拉框可据此排除停用账号；带 ``allow_manual_edit``：账号权限页「允许修改」列。
     """
     from sqlalchemy import select
     result = await db.execute(
@@ -39,6 +39,7 @@ async def list_users(
             "email": u.email,
             "role": u.role.value if hasattr(u.role, "value") else u.role,
             "is_active": bool(u.is_active),
+            "allow_manual_edit": bool(u.allow_manual_edit),
         }
         for u in users
     ]
@@ -64,7 +65,7 @@ async def update_user(
     current_user: User = Depends(require_role(["admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
-    """修改用户（仅 admin）：邮箱 / 角色 / 启用状态 / 重置密码。不能停用或降级自己；至少保留一个启用的管理员。"""
+    """修改用户（仅 admin）：邮箱 / 角色 / 启用状态 / 「允许修改」/ 重置密码。不能停用或降级自己；至少保留一个启用的管理员。"""
     updated = await auth_service.update_user(db, actor_id=current_user.id, user_id=user_id, data=body)
     await db.commit()
     return updated

@@ -39,6 +39,10 @@ class User(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     office_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     language: Mapped[str] = mapped_column(String(10), server_default=text("'zh-CN'"), nullable=False)
+    # V261：是否允许人工修改自动生成的数据（账号权限页「允许修改」，判定见 services/manual_edit_permission.py）
+    allow_manual_edit: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
 
     __table_args__ = (
         Index("idx_users_active", "is_active", postgresql_where=text("is_deleted = false")),

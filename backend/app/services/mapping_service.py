@@ -247,8 +247,8 @@ async def _generate_client_accounts_from_balance(
 ) -> int:
     """从 tb_balance 自动生成客户科目到 account_chart。
 
-    当 account_chart 为空时调用，从已导入的余额表中提取唯一科目编码+名称，
-    按编码规则推断 category（1xxx=资产/2xxx=负债/3xxx=权益/5xxx=收入/6xxx=费用）。
+    增量补齐：从有效余额表中提取科目编码+名称，客户科目表里还没有的（按剥「.0」后的编码比较）才新建，
+    按编码规则推断 category（1xxx=资产/2xxx=负债/3xxx=权益/5xxx=收入/6xxx=费用）。返回新建行数。
     """
     import uuid as _uuid
     from app.models.audit_platform_models import AccountCategory
@@ -301,25 +301,30 @@ async def _generate_client_accounts_from_balance(
             return 2
         return 3
 
+    # 已存在的客户科目（account_chart 唯一约束 uq_account_chart_project_code_source
+    # = (project_id, account_code, source)，不含 dataset_id → client 科目为项目全局
+    # 唯一，禁止按 dataset 分身；此处 dataset 无关地跳过已存在行，避免唯一约束冲突）。
+    # 按剥「.0」后的编码比较：旧导入的「1133.0」与新导入的「1133」是同一科目，不再建第二行
+    # （否则客户科目数虚增、完成率被拉低）。一次查出，不逐行查。
+    existing_codes = {
+        _strip_dot_zero(c) for c in (await db.execute(
+            select(AccountChart.account_code).where(
+                AccountChart.project_id == project_id,
+                AccountChart.source == AccountSource.client,
+                AccountChart.is_deleted == False,  # noqa: E712
+            )
+        )).scalars().all() if c
+    }
+
     count = 0
     for row in balance_accounts:
         code = row.account_code
         name = row.account_name or code
         cat = _infer_category_canonical(code, name)  # 编码+名称双保险（AccountCategory 枚举）
 
-        # 检查是否已存在（account_chart 唯一约束 uq_account_chart_project_code_source
-        # = (project_id, account_code, source)，不含 dataset_id → client 科目为项目全局
-        # 唯一，禁止按 dataset 分身；此处 dataset 无关地跳过已存在行，避免唯一约束冲突）。
-        existing = await db.execute(
-            select(AccountChart.id).where(
-                AccountChart.project_id == project_id,
-                AccountChart.account_code == code,
-                AccountChart.source == AccountSource.client,
-                AccountChart.is_deleted == False,  # noqa: E712
-            ).limit(1)
-        )
-        if existing.scalar_one_or_none():
+        if not code or _strip_dot_zero(code) in existing_codes:
             continue
+        existing_codes.add(_strip_dot_zero(code))
 
         db.add(AccountChart(
             id=_uuid.uuid4(),
@@ -424,15 +429,15 @@ async def auto_match(
     如果没有标准科目，自动从客户科目的一级编码生成标准科目。
     然后运行 auto_suggest + 保存映射。
     """
-    # 先检查是否有客户科目，没有则从 tb_balance 自动生成
+    # 客户科目表按有效余额表补齐（每次都补，不只在为空时）：重新导入后新出现的科目原先进不了客户科目表，
+    # auto_suggest 看不到它们 ⇒ 永远没有映射、静默不进试算表（辽宁 11-04 重导 13 个末级 1.44 亿，
+    # spec citar-audited-balance-and-workpaper-coverage R2）。补齐是增量的：已有编码（含「.0」写法）不动。
+    await _generate_client_accounts_from_balance(project_id, db, year=year)
+    # 重新统计：生成客户科目后 total_client 必须刷新，否则下方标准科目
+    # 补充生成的启发式 (std_count < total_client // 5) 会因 total_client 仍为 0
+    # 而恒不触发 → 标准科目空 → auto_suggest 返回空 → 静默产不出映射
+    # （真·全新单次导入且未预加载标准科目表时的隐性 bug）。
     total_client = await _count_client_accounts(project_id, db, year=year)
-    if total_client == 0:
-        await _generate_client_accounts_from_balance(project_id, db, year=year)
-        # 重新统计：生成客户科目后 total_client 必须刷新，否则下方标准科目
-        # 补充生成的启发式 (std_count < total_client // 5) 会因 total_client 仍为 0
-        # 而恒不触发 → 标准科目空 → auto_suggest 返回空 → 静默产不出映射
-        # （真·全新单次导入且未预加载标准科目表时的隐性 bug）。
-        total_client = await _count_client_accounts(project_id, db, year=year)
 
     # 检查是否有标准科目，不足则从客户科目的一级编码自动生成
     # 注意：可能有其他流程（如报表映射模板）预写入少量 standard 科目，

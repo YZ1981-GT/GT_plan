@@ -124,6 +124,12 @@ class PriorPeriodResolver:
             self._has_opening = hit is not None
         return self._has_opening
 
+    def override(self, row_code: str, value: Decimal | None) -> None:
+        """手工上期值：写进各条上期来源的 ROW() 缓存，上期合计按手工值算（spec citar-table-manual-edit R6）。"""
+        amount = value if value is not None else Decimal("0")
+        for cache in (self._opening_cache, self._same_prior_cache, self._prior_tb_cache):
+            cache[row_code] = amount
+
     async def _same_project_has_prior_tb(self) -> bool:
         if self._same_has_prior_tb is None:
             self._same_has_prior_tb = await self._has_tb(self.project_id, self.year - 1)

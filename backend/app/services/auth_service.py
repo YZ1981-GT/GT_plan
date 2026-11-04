@@ -250,7 +250,7 @@ async def update_user(
     - 不能停用自己、不能把自己降成非管理员（防止误操作把自己关在门外）；
     - 停用 / 降级一个启用中的管理员时，锁住全部启用中的管理员行再计数：改完必须仍有至少一个（并发两个管理员互相停用也挡得住）；
     - 邮箱唯一约束是全表的（含已删除用户），按全表查重；
-    - 密码重置 / 启用状态变化经统一审计 logger 留痕。
+    - 密码重置 / 启用状态 / 角色 / 「允许修改」变化经统一审计 logger 留痕。
     停用后该用户下一次请求即 401（``get_current_user`` 每次请求都校验 ``is_active``），登录和 refresh 也会被拒。
     """
     user = (await db.execute(
@@ -261,7 +261,11 @@ async def update_user(
 
     fields = data.model_dump(exclude_unset=True)
     password = fields.pop("password", None)
+    # 显式 null 视为不改（列 NOT NULL）
+    if fields.get("allow_manual_edit") is None:
+        fields.pop("allow_manual_edit", None)
     old_active = bool(user.is_active)
+    old_manual_edit = bool(user.allow_manual_edit)
     old_role = user.role.value if hasattr(user.role, "value") else str(user.role)
     new_role = fields.get("role", user.role)
     new_active = fields.get("is_active", user.is_active)
@@ -302,6 +306,8 @@ async def update_user(
         security_changes["password_reset"] = True
     if old_active != bool(user.is_active):
         security_changes["is_active"] = {"from": old_active, "to": bool(user.is_active)}
+    if old_manual_edit != bool(user.allow_manual_edit):
+        security_changes["allow_manual_edit"] = {"from": old_manual_edit, "to": bool(user.allow_manual_edit)}
     new_role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
     if old_role != new_role_value:
         security_changes["role"] = {"from": old_role, "to": new_role_value}

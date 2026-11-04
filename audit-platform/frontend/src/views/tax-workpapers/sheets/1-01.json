@@ -58,7 +58,7 @@
         [{"text":"9","kind":"number"},{"text":"减：弥补以前年度亏损","colSpan":4},{"kind":"number","colSpan":2,"ref":"F25","role":"f","fmt":"money"}],
         [{"text":"10","kind":"number"},{"text":"减：抵扣应纳税所得额","colSpan":4},{"kind":"number","colSpan":2,"ref":"F26","role":"f","fmt":"money"}],
         [{"text":"11","kind":"number"},{"text":"三、应纳税所得额","colSpan":4},{"kind":"number","colSpan":2,"ref":"F27","role":"f","fmt":"money"}],
-        [{"text":"12","kind":"number"},{"text":"税率","colSpan":4},{"text":"25%","kind":"number","colSpan":2}],
+        [{"text":"12","kind":"number"},{"text":"税率","colSpan":4},{"text":"25%","kind":"number","colSpan":2,"ref":"F28","role":"c","fmt":"pct"}],
         [{"text":"13","kind":"number"},{"text":"四、应纳所得税额","colSpan":4},{"kind":"number","colSpan":2,"ref":"F29","role":"f","fmt":"money"}],
         [{"text":"14","kind":"number"},{"text":"减：减免所得税额","colSpan":4},{"kind":"number","colSpan":2,"ref":"F30","role":"f","fmt":"money"}],
         [{"text":"15","kind":"number"},{"text":"减：抵免所得税额","colSpan":4},{"kind":"number","colSpan":2,"ref":"F31","role":"f","fmt":"money"}],

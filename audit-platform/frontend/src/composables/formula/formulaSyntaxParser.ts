@@ -58,6 +58,8 @@ const KNOWN_FUNCTIONS = new Set([
   'TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
   'ADJ', 'AUX', 'PREV', 'PRIOR',
   'LEDGER', 'LEDGER_DETAIL', 'TB_AUX', 'COUNT_LEDGER', 'PLACEHOLDER',
+  // 未结转损益：单体报表未分配利润行用（spec citar-audited-balance-and-workpaper-coverage）
+  'PL_UNCLOSED',
   'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
 ])
 
@@ -80,6 +82,7 @@ const FUNCTION_ARITY: Record<string, [number, number]> = {
   // COUNT_LEDGER('科目'[,'范围'])：与后端 _REGISTRY 一致（原写成 3 参「科目, 方向, 范围」，后端按第二参取期间，3 参恒取不到）
   COUNT_LEDGER: [1, 2],
   PLACEHOLDER: [0, 0],
+  PL_UNCLOSED: [0, 0],
   ABS: [1, 1],
   ROUND: [2, 2],
   MAX: [2, 2],
@@ -337,6 +340,7 @@ export function knownFunctions(): Array<{ name: string; minArgs: number; maxArgs
     { name: 'TB_AUX', minArgs: 3, maxArgs: 3, description: "辅助维度汇总 TB_AUX('科目','维度','列名')" },
     { name: 'COUNT_LEDGER', minArgs: 1, maxArgs: 2, description: "序时账笔数 COUNT_LEDGER('科目','范围')" },
     { name: 'PLACEHOLDER', minArgs: 0, maxArgs: 0, description: "预留占位 PLACEHOLDER()" },
+    { name: 'PL_UNCLOSED', minArgs: 0, maxArgs: 0, description: "未结转损益 PL_UNCLOSED()（单体报表未分配利润用）" },
     { name: 'ABS', minArgs: 1, maxArgs: 1, description: "绝对值 ABS(值)" },
     { name: 'ROUND', minArgs: 2, maxArgs: 2, description: "四舍五入 ROUND(值, 位数)" },
     { name: 'MAX', minArgs: 2, maxArgs: 2, description: "最大值 MAX(值1, 值2)" },

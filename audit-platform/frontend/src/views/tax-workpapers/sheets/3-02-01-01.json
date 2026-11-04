@@ -30,7 +30,7 @@
         [{"text":"15"},{"text":"其中：其他不属于实付工资的金额"},{"kind":"input","ref":"D24","role":"e","fmt":"money"},{"colSpan":2,"ref":"E24","role":"e"}],
         [{"text":"16"},{"text":"贷方发生额"},{"kind":"input","ref":"D25","role":"e","fmt":"money"},{"colSpan":2,"ref":"E25","role":"e"}],
         [{"text":"17"},{"text":"年末余额"},{"kind":"number","ref":"D26","role":"f","fmt":"money"},{"text":"借方余额用负数表示","colSpan":2}],
-        [{"text":"18"},{"text":"汇算清缴期间发放额"},{"kind":"input","ref":"D27","role":"e","fmt":"money"},{"colSpan":2,"ref":"E27","role":"e"}],
+        [{"text":"18"},{"text":"汇算清缴期间发放额"},{"kind":"input","ref":"D27","role":"f","fmt":"money"},{"colSpan":2,"ref":"E27","role":"e"}],
         [{"text":"19"},{"text":"实际发放额小计"},{"kind":"number","ref":"D28","role":"f","fmt":"money"},{"colSpan":2,"ref":"E28","role":"e"}],
         [{"text":"20"},{"text":"未通过应付工资或应付职工薪酬-工资科目直接发放的工资薪金","rowSpan":5},{"text":"股权激励"},{"kind":"input","ref":"D29","role":"e","fmt":"money"},{"text":"未行权时无需填写","colSpan":2}],
         [{"text":"21"},{"ref":"C30","role":"e"},{"kind":"input","ref":"D30","role":"e","fmt":"money"},{"colSpan":2,"ref":"E30","role":"e"}],

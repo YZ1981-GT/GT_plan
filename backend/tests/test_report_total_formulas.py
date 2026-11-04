@@ -17,7 +17,14 @@ from pathlib import Path
 import pytest
 
 from app.services import report_formula_service as svc
-from app.services.report_total_formulas import FIXES, INVENTORY_FORMULA, STANDARD_FAMILY, fix_for
+from app.services.report_total_formulas import (
+    FIXES,
+    INVENTORY_FORMULA,
+    STANDALONE_OVERRIDES,
+    STANDARD_FAMILY,
+    fix_for,
+    fixes_for,
+)
 from tests._pg_shared_engine import run_and_dispose
 
 _ROW_REF = re.compile(r"(?<!SUM_)ROW\('([A-Z]+-\d+)'\)")
@@ -26,9 +33,10 @@ _SVC_SRC = Path(svc.__file__).read_text(encoding="utf-8")
 
 
 def _all_entries():
-    for family, slots in FIXES.items():
-        for slot, (prefix, formula, desc) in slots.items():
-            yield family, slot, prefix, formula, desc
+    for table in (FIXES, STANDALONE_OVERRIDES):
+        for family, slots in table.items():
+            for slot, (prefix, formula, desc) in slots.items():
+                yield family, slot, prefix, formula, desc
 
 
 # ─── 纯函数 ──────────────────────────────────────────────────────────────────
@@ -88,6 +96,25 @@ def test_fix_for_checks_row_name_prefix():
     # 有意置空的行：命中、公式为空
     assert fix_for("soe_standalone", "balance_sheet", "BS-097", "其他非流动负债") == (True, None)
     assert fix_for("unknown_standard", "balance_sheet", "BS-053", "资产总计") == (False, None)
+
+
+@pytest.mark.parametrize(("standard", "slot"), [
+    ("soe_standalone", "balance_sheet:BS-125"), ("listed_standalone", "balance_sheet:BS-084"),
+])
+def test_standalone_retained_earnings_include_unclosed_pl(standard, slot):
+    """单体未分配利润含未结转损益（SAP 账套不结转、损益类调整不联动 3104 / 3201 ⇒ 不含则资产负债表差本年利润）；
+    合并准则不含（合并试算表 resolver 没有这个口径）。spec citar-audited-balance-and-workpaper-coverage R1。"""
+    assert fixes_for(standard)[slot][1].endswith("+PL_UNCLOSED()")
+    consolidated = standard.replace("_standalone", "_consolidated")
+    assert "PL_UNCLOSED" not in (fixes_for(consolidated)[slot][1] or "")
+    assert fix_for(standard, "balance_sheet", slot.split(":")[1], "未分配利润")[1].endswith("+PL_UNCLOSED()")
+
+
+def test_pl_unclosed_is_registered_function():
+    """新函数必须在 L1 白名单里，否则保存 / 发布按「未注册函数」拦截（blocked）。"""
+    from app.services.formula_engine import _REGISTRY
+
+    assert "PL_UNCLOSED" in _REGISTRY.known_function_names()
 
 
 def test_balance_identity_rows_present():
@@ -189,7 +216,7 @@ def test_directly_below():
 @pytest.mark.parametrize("standard", sorted(STANDARD_FAMILY))
 def test_db_targets_and_references(standard):
     problems = []
-    for slot, (prefix, formula, _desc) in FIXES[STANDARD_FAMILY[standard]].items():
+    for slot, (prefix, formula, _desc) in fixes_for(standard).items():
         report_type, code = slot.split(":", 1)
         name = _ROWS.get((standard, report_type, code))
         if name is None or not name.startswith(prefix):

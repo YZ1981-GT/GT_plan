@@ -1114,6 +1114,17 @@ _REGISTRY.register("COUNT_LEDGER", _handle_count_ledger, arity=2, description="�
 _REGISTRY.register("PLACEHOLDER", lambda a, c, t: Decimal("0"), arity=0, description="预留占位", syntax="PLACEHOLDER()", category="底稿取数")
 
 
+def _handle_pl_unclosed(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """PL_UNCLOSED() — 未结转损益（利润为正）。只在单体报表生成路径有值：``report_engine.evaluate_formula_result``
+    按本项目试算表求值后代入（spec citar-audited-balance-and-workpaper-coverage R1）；走到这里说明本路径没有代入，
+    报错不代 0（未分配利润静默少算本年利润，正是这条要修的缺陷）。"""
+    raise FormulaColumnError("PL_UNCLOSED()：未结转损益只在单体报表生成时取数，本路径不支持")
+
+
+_REGISTRY.register("PL_UNCLOSED", _handle_pl_unclosed, arity=0, description="未结转损益（损益科目未结平余额 + 已批准损益调整，利润为正）",
+                   syntax="PL_UNCLOSED()", category="取数")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 公式 Token 解析（Regex）
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -3,7 +3,7 @@
     <header class="tw-header">
       <span class="tw-header__code">索引</span>
       <h1 class="tw-header__title">税务底稿索引</h1>
-      <span class="tw-header__note">{{ ALL_TAX_WORKPAPER_SHEETS.length }} 张 · 有 {{ presentCount }} · 无 {{ absentCount }}</span>
+      <span class="tw-header__note">{{ SHOWN_TAX_WORKPAPER_SHEETS.length }} 张 · 有 {{ presentCount }} · 无 {{ absentCount }}</span>
     </header>
 
     <div class="tw-toolbar">
@@ -40,7 +40,7 @@
             </tr>
           </thead>
           <tbody>
-            <template v-for="group in TAX_WORKPAPER_INDEX" :key="group.title">
+            <template v-for="group in SHOWN_TAX_WORKPAPER_INDEX" :key="group.title">
               <!-- 分类行：不给勾选格，给整类批量按钮（按类粗刷再微调最省事） -->
               <tr class="tw-index__group">
                 <td colspan="3">
@@ -78,10 +78,11 @@
 <script setup lang="ts">
 /**
  * 税务底稿索引页（移植自 CITAR WorkpaperIndexScreen）。
- * 永远列全部表（含标为「无」的）：隐藏只作用于目录栏与页签，在这里藏掉就没法改回来了。
+ * 列底稿页显示的全部表（含标为「无」的）：「无」的隐藏只作用于目录栏与页签，在这里藏掉就没法改回来了。
+ * 不在底稿页显示的表（taxWorkpaperIndex 的 SHOWN_SHEET_CODES 之外）这里也不列。
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ALL_TAX_WORKPAPER_SHEETS, TAX_WORKPAPER_INDEX, type TaxWorkpaperSheet } from './taxWorkpaperIndex'
+import { SHOWN_TAX_WORKPAPER_INDEX, SHOWN_TAX_WORKPAPER_SHEETS, isTaxWorkpaperShown, type TaxWorkpaperSheet } from './taxWorkpaperIndex'
 import type { TaxWorkpaperMark, TaxWorkpaperMarkMap } from './taxWorkpaperMarks'
 
 /** null = 单击模式（点一下循环三态） */
@@ -109,8 +110,11 @@ const emit = defineEmits<{
 const brush = ref<Brush>(null)
 const painting = ref(false)
 
-const presentCount = computed(() => Object.values(props.marks).filter(m => m === 'present').length)
-const absentCount = computed(() => Object.values(props.marks).filter(m => m === 'absent').length)
+/** 只数显示的表：隐藏表以前打过的标记不计入 */
+const countMarks = (mark: TaxWorkpaperMark) =>
+  Object.keys(props.marks).filter(code => props.marks[code] === mark && isTaxWorkpaperShown(code)).length
+const presentCount = computed(() => countMarks('present'))
+const absentCount = computed(() => countMarks('absent'))
 
 function paint(code: string) {
   if (brush.value === null) return

@@ -12,7 +12,7 @@
           <button class="wpmap-link" type="button" @click="emit('go-standard')">去映射</button>
         </span>
         <span v-if="hiddenSheets.length" :title="hiddenSheets.map(c => `${c} ${sheetName(c)}`).join('\n')">
-          已隐藏税审底稿目录里标为「无」的 {{ hiddenSheets.length }} 张底稿
+          已隐藏 {{ hiddenSheets.length }} 张底稿（底稿页不显示，或税审底稿目录里标为「无」）
         </span>
       </div>
 
@@ -88,7 +88,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { taxWorkpapers as P_tw } from '@/services/apiPaths'
-import { findTaxWorkpaperSheet, saveActiveTaxSheet } from '@/views/tax-workpapers/taxWorkpaperIndex'
+import { findTaxWorkpaperSheet, isTaxWorkpaperShown, saveActiveTaxSheet } from '@/views/tax-workpapers/taxWorkpaperIndex'
 import { loadMarks } from '@/views/tax-workpapers/taxWorkpaperMarks'
 import { fmtMoney, splitDirection } from '../useCitarProject'
 
@@ -135,7 +135,7 @@ const activeOnly = ref(true)
 
 const sheetName = (code: string) => findTaxWorkpaperSheet(code)?.name || ''
 
-/** 税审底稿目录里标为「无」的底稿（本项目不适用，如民非 / 金融业专用表）：不在这里列出 */
+/** 税审底稿目录里标为「无」的底稿（本项目不适用，如民非 / 金融业专用表） */
 const absentCodes = ref<ReadonlySet<string>>(new Set())
 
 function refreshMarks() {
@@ -143,23 +143,24 @@ function refreshMarks() {
   absentCodes.value = new Set(Object.keys(marks).filter(code => marks[code] === 'absent'))
 }
 
-/** 去掉标为「无」的底稿后的科目行 */
-const visible = computed(() => {
-  const absent = absentCodes.value
-  return accounts.value.map(a => ({
-    ...a,
-    workpapers: a.workpapers.filter(c => !absent.has(c)),
-    pending: a.pending.filter(p => !absent.has(p.code)),
-  }))
-})
+/** 不在这里列出的底稿：底稿页不显示的表（点了打不开），以及标为「无」的表 */
+const isHiddenSheet = (code: string) => !isTaxWorkpaperShown(code) || absentCodes.value.has(code)
 
-/** 本项目出现过、但因标为「无」而不显示的底稿 */
+/** 去掉隐藏底稿后的科目行 */
+const visible = computed(() =>
+  accounts.value.map(a => ({
+    ...a,
+    workpapers: a.workpapers.filter(c => !isHiddenSheet(c)),
+    pending: a.pending.filter(p => !isHiddenSheet(p.code)),
+  })),
+)
+
+/** 本项目出现过、但被隐藏而不显示的底稿 */
 const hiddenSheets = computed(() => {
-  const absent = absentCodes.value
   const codes = new Set<string>()
   for (const a of accounts.value) {
-    a.workpapers.forEach(c => absent.has(c) && codes.add(c))
-    a.pending.forEach(p => absent.has(p.code) && codes.add(p.code))
+    a.workpapers.forEach(c => isHiddenSheet(c) && codes.add(c))
+    a.pending.forEach(p => isHiddenSheet(p.code) && codes.add(p.code))
   }
   return [...codes].sort((x, y) => x.localeCompare(y, 'zh-CN', { numeric: true }))
 })

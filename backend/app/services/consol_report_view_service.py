@@ -67,6 +67,16 @@ TRIAL_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 DRILL_MEASURES = frozenset({MEASURE_ELIM_EQUITY, MEASURE_ELIM_TRADE, MEASURE_ADJUSTMENT, MEASURE_CONSOLIDATED})
 
+# 报表口径中文名（原因文字给用户看，不写英文代码；与公式管理的口径名称一致）
+_STANDARD_LABELS = {
+    "soe_standalone": "国企单体", "soe_consolidated": "国企合并",
+    "listed_standalone": "上市单体", "listed_consolidated": "上市合并",
+}
+
+
+def _standard_label(standard: str | None) -> str:
+    return _STANDARD_LABELS.get(standard or "", standard or "")
+
 
 class ViewError(LookupError):
     """视图参数与企业树不匹配（节点不存在 / 不是汇总节点 / 行次不存在）；路由转 404 / 400。"""
@@ -463,7 +473,8 @@ async def prior_node_values(
     if prior_ctx is None:
         return None, "合并上期留空：上年项目不是合并项目，或无法确定其审计年度"
     if standard is not None and prior_ctx.standard != standard:
-        return None, f"合并上期留空：上年合并项目报表口径（{prior_ctx.standard}）与本年（{standard}）不同"
+        return None, (f"合并上期留空：上年合并项目报表口径（{_standard_label(prior_ctx.standard)}）"
+                      f"与本年（{_standard_label(standard)}）不同")
     node_ms = node_measures(prior_ctx.basis).get(node_key)
     if node_ms is None:
         return None, f"合并上期留空：上年企业树没有节点「{node_key}」"

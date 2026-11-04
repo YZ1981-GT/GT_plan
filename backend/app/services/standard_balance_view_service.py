@@ -176,3 +176,42 @@ async def build_standard_balance_view(
             "in_trial_balance": tb is not None,
         })
     return result
+
+
+def is_pl_standard_code(code: str | None) -> bool:
+    """损益类标准科目（5xxx / 6xxx，与试算表 ``recalc_unadjusted`` 同一判据）。"""
+    return bool(code) and code[0] in ("5", "6")
+
+
+async def unclosed_pl_amount(
+    db: AsyncSession, project_id: UUID, year: int, *, adjusted: bool, company_code: str = "001",
+) -> Decimal:
+    """未结转损益（利润为正）：损益类标准科目期末未结平的余额，审定口径再加已批准调整与底稿发布调整。
+
+    资产负债表的未分配利润 = 本年利润 + 利润分配 + 本值（spec citar-audited-balance-and-workpaper-coverage R1）：
+    - 账套每期结转损益：损益科目期末余额为 0，本值只剩损益类审计调整（调整分录只改损益科目、不联动 3104 / 3201，
+      不加这一项审定资产负债表差的正是调整对利润的影响）；
+    - SAP 等不结转的账套：损益科目留有余额，本值 = 本年利润；
+    - ``adjusted=False``（未审报表）：只取余额，不含调整。
+
+    口径与 ``build_standard_balance_view`` 的 ``adjusted_closing_balance`` 相同（叶子余额借正贷负 + 调整借 − 调整贷
+    + 底稿发布调整），汇总后取反。期初口径由调用方处理（损益类没有期初，恒为 0）。
+    """
+    period = await _period_by_standard(db, project_id, year)
+    total = sum((v["closing"] for code, v in period.items() if is_pl_standard_code(code)), _ZERO)
+    if adjusted:
+        adjustments = await _adjustments_by_standard(db, project_id, year)
+        total += sum((v["debit"] - v["credit"] for code, v in adjustments.items() if is_pl_standard_code(code)), _ZERO)
+        rows = (await db.execute(
+            sa.select(TrialBalance.standard_account_code, TrialBalance.account_name, TrialBalance.wp_adjustment).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.company_code == company_code,
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )).all()
+        for code, name, wp in rows:
+            if is_pl_standard_code(code) and wp:
+                direction, _ = resolve_account_direction(code, name or "")
+                total += _signed_natural(_d(wp), direction)
+    return -total

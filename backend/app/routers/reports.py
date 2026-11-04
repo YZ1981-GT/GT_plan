@@ -19,6 +19,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -101,6 +102,52 @@ async def generate_reports(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"报表生成失败: {str(e)}")
+
+
+class _ManualItem(BaseModel):
+    report_type: str
+    row_code: str
+    column: str  # current | prior
+    value: float | str | None = None
+    restore: bool = False
+
+
+class _ManualBody(BaseModel):
+    items: list[_ManualItem]
+
+
+@router.put("/{project_id}/{year}/manual")
+async def save_report_manual_values(
+    project_id: UUID,
+    year: int,
+    body: _ManualBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """审定报表手工值：改 / 恢复一批格，随即重新生成报表（合计按手工值重算），手工值在重新生成后保留。
+
+    spec citar-table-manual-edit R6；报表未生成返回 409。账号未开通「允许修改」返回 403（spec citar-manual-edit-permission）。
+    """
+    from app.services.manual_edit_permission import assert_manual_edit
+    from app.services.report_manual_values import save_manual
+
+    assert_manual_edit(current_user)
+    await check_consol_lock(project_id=project_id, db=db)
+    changed = await save_manual(db, project_id, year, [i.model_dump() for i in body.items], current_user.id)
+    if changed:
+        engine = ReportEngine(db)
+        try:
+            await engine.generate_all_reports(project_id, year, await _resolve_applicable_standard(db, project_id))
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"报表重算失败: {e}") from e
+    await db.commit()
+    if changed:
+        await event_bus.publish_immediate(EventPayload(
+            event_type=EventType.REPORTS_UPDATED, project_id=project_id, year=year,
+            extra={"report_types": sorted({i.report_type for i in body.items}), "manual": True},
+        ))
+    return {"changed": changed}
 
 
 # NOTE: consistency-check MUST be defined BEFORE /{report_type} to avoid

@@ -19,8 +19,8 @@ export interface TaxWorkpaperCell {
   rowSpan?: number
   /** 样表单元格地址（合并区取左上角）：值由后端接口按此地址给出 */
   ref?: string
-  /** f 公式格（只读）/ e 可填写（含取数格） */
-  role?: 'f' | 'e'
+  /** f 公式格 / e 填写格（含取数格）/ c 样表预置数字；三种都可手工修改，手工值盖过公式与预置值 */
+  role?: 'f' | 'e' | 'c'
   /** 数值显示口径 */
   fmt?: 'money' | 'pct' | 'int'
 }

@@ -138,6 +138,54 @@ def test_list_numbering_only_for_two_or_more():
     ]
 
 
+def _list_rules():
+    return [
+        R(1, "亏损", fmt="5", mark="﹟", number_fmt=2),
+        R(2, "实际弥补{0}元，具体计算过程如下：", values=[D(9)]),
+        R(3, "前二年度弥补{0}元；", fmt="文本2", number_fmt=3, values=[D(4)]),
+        R(4, "前一年度弥补{0}元；", fmt="文本2", number_fmt=3, values=[D(5)]),
+        R(5, "本年度弥补{0}元；", fmt="文本2", number_fmt=3, values=[D(6)]),
+    ]
+
+
+def test_edit_replaces_body_and_keeps_auto_number():
+    """改过的段用人工正文、编号照旧自动（spec citar-table-manual-edit R8）。"""
+    paras = layout(_list_rules(), {"r3": {"text": "前二年度弥补 4 元（已核对）；", "auto": "前二年度弥补4.00元；"}})
+    p3 = next(p for p in paras if p["key"] == "r3")
+    assert p3["text"] == "1、前二年度弥补 4 元（已核对）；"
+    assert p3["number"] == "1、" and p3["edited"] is True and p3["auto_changed"] is False
+    assert p3["auto_body"] == "前二年度弥补4.00元；"
+
+
+def test_deleted_paragraph_renumbers_and_fixes_list_end():
+    paras = layout(_list_rules(), {"r4": {"text": None, "auto": "前一年度弥补5.00元；"}})
+    assert [p["text"] for p in paras] == [
+        "（一）亏损", "实际弥补9.00元，具体计算过程如下：", "1、前二年度弥补4.00元；", "2、本年度弥补6.00元。",
+    ]
+
+
+def test_auto_changed_and_orphan_and_deleted_lists():
+    from app.services.tax_assurance.review_notes import layout_with_edits
+
+    edits = {
+        "r3": {"text": "改过的", "auto": "前二年度弥补3.00元；"},   # 改后数据变了
+        "r5": {"text": None, "auto": "本年度弥补6.00元。"},
+        "r99": {"text": "不再显示的段", "auto": "旧文字"},
+    }
+    out = layout_with_edits(_list_rules(), edits)
+    p3 = next(p for p in out["paragraphs"] if p["key"] == "r3")
+    assert p3["auto_changed"] is True
+    assert [d["key"] for d in out["deleted"]] == ["r5"]
+    assert out["deleted"][0]["auto_text"] == "3、本年度弥补6.00元。"
+    assert [o["key"] for o in out["orphans"]] == ["r99"]
+
+
+def test_none_placeholder_has_own_key():
+    rules = [R(1, "重大事项", fmt="4", mark="※", number_fmt=1), R(2, "{0}", values=["0"])]
+    paras = layout(rules, {"r1-none": {"text": "本期无重大事项。", "auto": "无。"}})
+    assert [(p["key"], p["text"]) for p in paras] == [("r1", "一、重大事项"), ("r1-none", "本期无重大事项。")]
+
+
 def test_money_only_counts_yuan_slots():
     # 人数、万元不算金额：小微企业减免 0 元 ⇒ 不显示
     rules = [
@@ -207,3 +255,18 @@ def test_config_formulas_reference_existing_rows():
                 assert int(lo) in rows and int(hi) in rows, (stmt["key"], r["r"])
             for n in re.findall(r"(?<![:(\d])(\d+)(?![:\d])", re.sub(r"SUM\(\d+:\d+\)", "", r.get("formula", ""))):
                 assert int(n) in rows, (stmt["key"], r["r"], n)
+
+
+def test_manual_override_drives_totals_and_headings_stay_blank():
+    """单体报表手工值（spec citar-table-manual-edit R7）：明细改后合计重算；合计行改后不再按公式算。"""
+    from app.services.tax_assurance.fs_rows import editable_rows
+
+    cf = statement_def("cash_flow_statement")
+    vals = {"销售商品、提供劳务收到的现金": D(10), "支付给职工及为职工支付的现金": D(4)}
+    out = compute_statement(cf, None, cf_values=vals, overrides={6: D(30)})
+    assert out[6] == D(30) and out[15] == D(26)
+    out = compute_statement(cf, None, cf_values=vals, overrides={15: D(1)})
+    assert out[15] == D(1)
+    headings = {r["r"] for r in cf["rows"] if r.get("heading") or r.get("note")}
+    assert headings and not (headings & editable_rows(cf))
+    assert all(compute_statement(cf, None, cf_values=vals, overrides={h: D(9) for h in headings})[h] is None for h in headings)

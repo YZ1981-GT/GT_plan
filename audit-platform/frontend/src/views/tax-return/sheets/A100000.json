@@ -64,7 +64,7 @@
         [{"text":"26","kind":"number"},{"text":"减：弥补以前年度亏损（填写A106000）"},{"kind":"number","ref":"D58","role":"f","fmt":"money"}],
         [{"text":"27","kind":"number"},{"text":"减：抵扣应纳税所得额（填写A107030）"},{"kind":"number","ref":"D59","role":"f","fmt":"money"}],
         [{"text":"28","kind":"number"},{"text":"五、应纳税所得额（24－25－26－27）"},{"kind":"number","ref":"D60","role":"f","fmt":"money"}],
-        [{"text":"29","kind":"number"},{"text":"应纳税额计算","rowSpan":47},{"text":"税率（25%）"},{"text":"25%","kind":"number"}],
+        [{"text":"29","kind":"number"},{"text":"应纳税额计算","rowSpan":47},{"text":"税率（25%）"},{"text":"25%","kind":"number","ref":"D61","role":"c","fmt":"pct"}],
         [{"text":"30","kind":"number"},{"text":"六、应纳所得税额（28×29）"},{"kind":"number","ref":"D62","role":"f","fmt":"money"}],
         [{"text":"31","kind":"number"},{"text":"减：减免所得税额（31.1＋31.2＋…）"},{"kind":"number","ref":"D63","role":"f","fmt":"money"}],
         [{"ref":"A64","role":"e"},{"text":"符合条件的小型微利企业减免企业所得税"},{"kind":"number","ref":"D64","role":"f","fmt":"money"}],

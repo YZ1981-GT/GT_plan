@@ -43,6 +43,9 @@ GROUP_ALIASES: dict[str, list[str]] = {
 # 明细名称同义词：规则里的名称 → 客户科目表常见写法
 SYNONYMS: dict[str, list[str]] = {
     "应付福利费": ["职工福利费", "福利费"],
+    # 工资薪金：平铺科目表（SAP）的工资、奖金分科目，股权激励属工资薪金（国家税务总局公告 2012 年第 18 号）
+    "工资": ["应付工资", "应付工资津贴补贴", "工资津贴补贴", "应付奖金", "奖金", "股份支付", "应付股份支付",
+             "工资、奖金、津贴和补贴", "工资奖金津贴和补贴"],
     "职工教育经费": ["教育经费"],
     "工会经费": ["工会会费"],
     "企业年金": ["补充养老保险", "年金"],
@@ -346,6 +349,9 @@ class AccountBook:
                 total += max(n.closing, _ZERO)
             elif measure == "closing_credit":
                 total += max(-n.closing, _ZERO)
+            elif measure == "paid_opening":
+                # 本年支付以前年度金额 = min(年初余额, 本年借方)（职工薪酬类审核表；spec citar-audited-balance-and-workpaper-coverage）
+                total += max(_ZERO, min(max(n.opening * self.natural_sign(n), _ZERO), n.debit))
             else:
                 raise ValueError(f"未知口径 {measure}")
         return total

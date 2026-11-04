@@ -13,16 +13,18 @@ import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
 import Schema from 'async-validator'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn() }))
+const refresh = vi.hoisted(() => vi.fn())
 vi.mock('@/services/commonApi', () => ({ listUsers: api.list, createUser: api.create, updateUser: api.update }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ userId: 'u-admin' }) }))
+vi.mock('@/composables/useManualEditPermission', () => ({ refreshCurrentUser: refresh }))
 vi.mock('@/components/common/GtPageHeader.vue', () => ({ default: { name: 'GtPageHeader', template: '<div><slot /></div>' } }))
 
 import UserManagement from '../UserManagement.vue'
 
 const USERS = [
-  { id: 'u-admin', username: 'admin', email: 'admin@example.com', role: 'admin', is_active: true },
-  { id: 'u-a', username: 'auditor_a', email: 'a@example.com', role: 'auditor', is_active: true },
-  { id: 'u-b', username: 'reader_b', email: 'b@example.com', role: 'readonly', is_active: false },
+  { id: 'u-admin', username: 'admin', email: 'admin@example.com', role: 'admin', is_active: true, allow_manual_edit: true },
+  { id: 'u-a', username: 'auditor_a', email: 'a@example.com', role: 'auditor', is_active: true, allow_manual_edit: true },
+  { id: 'u-b', username: 'reader_b', email: 'b@example.com', role: 'readonly', is_active: false, allow_manual_edit: false },
 ]
 
 const RowScope = defineComponent({
@@ -74,6 +76,7 @@ beforeEach(() => {
   api.list.mockReset()
   api.create.mockReset().mockResolvedValue({})
   api.update.mockReset().mockResolvedValue({})
+  refresh.mockReset().mockResolvedValue(undefined)
   vi.spyOn(ElMessage, 'success').mockImplementation((() => undefined) as any)
   vi.spyOn(ElMessage, 'info').mockImplementation((() => undefined) as any)
 })
@@ -169,5 +172,31 @@ describe('用户管理 — 重置密码', () => {
     await vm.submitResetPassword()
     await flushPromises()
     expect(api.update).toHaveBeenCalledWith('u-a', { password: 'Abc#5678' })
+  })
+})
+
+describe('用户管理 — 允许修改（spec citar-manual-edit-permission R1 / R5）', () => {
+  it('开关显示当前值；切换只发 allow_manual_edit，成功才翻转', async () => {
+    const { vm, row } = await mountPage()
+    const sw = (id: string) => row(id).find('[data-label="允许修改"] .el-switch')
+    expect(sw('u-a').classes()).toContain('is-checked')
+    expect(sw('u-b').classes()).not.toContain('is-checked')
+
+    await expect(vm.toggleManualEdit(vm.users[1])).resolves.toBe(true)
+    expect(api.update).toHaveBeenLastCalledWith('u-a', { allow_manual_edit: false })
+    expect(vm.users[1].allow_manual_edit).toBe(false)
+    expect(refresh).not.toHaveBeenCalled()
+
+    api.update.mockRejectedValueOnce(new Error('403'))
+    await expect(vm.toggleManualEdit(vm.users[2])).resolves.toBe(false)
+    expect(api.update).toHaveBeenLastCalledWith('u-b', { allow_manual_edit: true })
+    expect(vm.users[2].allow_manual_edit).toBe(false)
+  })
+
+  it('改的是自己 ⇒ 重读本人账号信息（各页修改入口随之变化）', async () => {
+    const { vm } = await mountPage()
+    await vm.toggleManualEdit(vm.users[0])
+    expect(api.update).toHaveBeenCalledWith('u-admin', { allow_manual_edit: false })
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 })

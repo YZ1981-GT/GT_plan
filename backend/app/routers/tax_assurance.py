@@ -3,24 +3,31 @@
 前缀 ``/api/projects/{project_id}/tax-assurance``；读项目只读权限、写项目编辑权限。
 
 - 汇算申报表：``tax-return/sheets/{code}``（GET 取值 / PUT 保存手工值与「是否填报」）、``tax-return/export``
-- 报告正文：``report-body``（GET / PUT 报告日期）、``report-body/export``
-- 审核说明：``review-notes``、``review-notes/export``
-- 单体财务报表：``financial-statements``、``financial-statements/export``
+- 报告正文：``report-body``（GET / PUT 报告日期）、``report-body/amounts``（PUT 摘录表金额手工值）、``report-body/export``、
+  ``report-body/preview.pdf``（网页预览：OnlyOffice 转 PDF）
+- 审核说明：``review-notes``（GET / PUT 段落人工修改）、``review-notes/export``
+- 单体财务报表：``financial-statements``（GET / PUT 企业会计制度格式手工值）、``financial-statements/export``
+
+人工修改自动生成的数据（申报表公式格、摘录表金额、审核说明段落、单体报表金额）另需账号开通「允许修改」
+（``manual_edit_permission``，spec citar-manual-edit-permission）。
 """
 
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_user_scope_cycles, require_project_access
 from app.models.core import User
+from app.services import onlyoffice_pdf
 from app.services import tax_workpaper_service as tws
+from app.services.manual_edit_permission import assert_manual_edit, manual_edit_allowed
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.tax_assurance import exports, financial_statements, report_body, review_notes
 from app.services.tax_assurance.common import DOCX_MEDIA, XLSX_MEDIA, download
@@ -39,6 +46,24 @@ class SheetSaveBody(BaseModel):
 class ReportBodySaveBody(BaseModel):
     version: int = Field(..., ge=0)
     report_date: str | None = Field(None, max_length=10)
+
+
+class ReviewNotesSaveBody(BaseModel):
+    """``edits`` = {段落键: {"text": 正文 | null(删除), "auto": 修改时的自动正文}}。"""
+    version: int = Field(..., ge=0)
+    edits: dict[str, Any] = Field(default_factory=dict)
+
+
+class FsSaveBody(BaseModel):
+    """``values`` = {表 key: {行号: {current|prior: 金额 | null}}}。"""
+    version: int = Field(..., ge=0)
+    values: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReportBodyAmountsBody(BaseModel):
+    """``version`` = 底稿 1-01 那一行的版本（``amounts_version``）；``values`` = {摘录表行号: 数字 | null}。"""
+    version: int = Field(..., ge=0)
+    values: dict[str, Any] = Field(default_factory=dict)
 
 
 async def _client_name(db: AsyncSession, project_id: UUID, year: int) -> str:
@@ -65,7 +90,8 @@ async def put_tax_return_sheet(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    await tws.save_sheet_inputs(db, project_id, year, code, body.version, body.inputs, current_user.id, domain=TAX_RETURN)
+    await tws.save_sheet_inputs(db, project_id, year, code, body.version, body.inputs, current_user.id, domain=TAX_RETURN,
+                                allow_manual_edit=manual_edit_allowed(current_user))
     await db.commit()
     return await tws.compute_sheet(db, project_id, year, code, domain=TAX_RETURN)
 
@@ -102,6 +128,19 @@ async def put_report_body(
     return await report_body.build(db, project_id, year)
 
 
+@router.put("/report-body/amounts")
+async def put_report_body_amounts(
+    project_id: UUID, body: ReportBodyAmountsBody, year: int = YearQuery,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """摘录表 25 行金额手工值（整份替换；不在 values 里的行恢复为公式值）。"""
+    assert_manual_edit(current_user)
+    await report_body.save_amounts(db, project_id, year, body.version, body.values, current_user.id)
+    await db.commit()
+    return await report_body.build(db, project_id, year)
+
+
 @router.get("/report-body/export")
 async def export_report_body(
     project_id: UUID, year: int = YearQuery,
@@ -113,6 +152,33 @@ async def export_report_body(
     return download(content, f"{data['cover']['client'] or '被审核单位'}_{year}年度企业所得税年度纳税申报审核报告.docx", DOCX_MEDIA)
 
 
+@router.get("/report-body/preview.pdf")
+async def preview_report_body_pdf(
+    project_id: UUID, year: int = YearQuery,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """网页预览：导出的 Word 经 OnlyOffice 转成 PDF，版式与 Word 一致。
+
+    ``X-Preview-Missing-Fonts``：OnlyOffice 缺的字体（URL 编码、逗号分隔；空 = 齐全）。
+    转换不可用返回 503，原因在 ``message``。
+    """
+    data = await report_body.build(db, project_id, year)
+    try:
+        result = await report_body.preview_pdf(data)
+    except onlyoffice_pdf.ConvertError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(
+        content=result.pdf,
+        media_type="application/pdf",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Preview-Cache": "hit" if result.cached else "miss",
+            "X-Preview-Missing-Fonts": ",".join(quote(f, safe="") for f in result.missing_fonts),
+        },
+    )
+
+
 # ── 审核说明 ──
 @router.get("/review-notes")
 async def get_review_notes(
@@ -120,6 +186,19 @@ async def get_review_notes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
+    return await review_notes.build(db, project_id, year)
+
+
+@router.put("/review-notes")
+async def put_review_notes(
+    project_id: UUID, body: ReviewNotesSaveBody, year: int = YearQuery,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """段落人工修改整份替换（text = null 即删除本段；不在 edits 里的段恢复自动文字）。"""
+    assert_manual_edit(current_user)
+    await review_notes.save_edits(db, project_id, year, body.version, body.edits, current_user.id)
+    await db.commit()
     return await review_notes.build(db, project_id, year)
 
 
@@ -153,13 +232,26 @@ async def get_financial_statements(
     return await financial_statements.build(db, project_id, year, await _scope_codes(current_user, project_id, db))
 
 
+@router.put("/financial-statements")
+async def put_financial_statements(
+    project_id: UUID, body: FsSaveBody, year: int = YearQuery,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """企业会计制度格式手工值整份替换（企业会计准则格式改审定报表手工值 PUT /api/reports/{pid}/{year}/manual）。"""
+    assert_manual_edit(current_user)
+    await financial_statements.save_values(db, project_id, year, body.version, body.values, current_user.id)
+    await db.commit()
+    return await financial_statements.build(db, project_id, year, await _scope_codes(current_user, project_id, db))
+
+
 @router.get("/financial-statements/export")
 async def export_financial_statements(
     project_id: UUID, year: int = YearQuery,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    data = await financial_statements.build(db, project_id, year, await _scope_codes(current_user, project_id, db))
+    data = await financial_statements.build(db, project_id, year, await _scope_codes(current_user, project_id, db), diagnose=False)
     content = exports.export_financial_statements(data)
     name = data.get("entity_name") or "被审核单位"
     return download(content, f"{name}_{year}年度财务报表.xlsx", XLSX_MEDIA)

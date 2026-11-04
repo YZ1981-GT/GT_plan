@@ -23,7 +23,7 @@
         [{"text":"年末余额","colSpan":4},{"kind":"number","colSpan":4,"ref":"I17","role":"f","fmt":"money"},{"ref":"M17","role":"e"}],
         [{"text":"汇算清缴期支付","colSpan":4},{"kind":"input","colSpan":4,"ref":"I18","role":"e","fmt":"money"},{"ref":"M18","role":"e"}],
         [{"text":"实际支出额小计","colSpan":4},{"kind":"number","colSpan":4,"ref":"I19","role":"f","fmt":"money"},{"ref":"M19","role":"e"}],
-        [{"text":"2","kind":"header","rowSpan":5},{"text":"未通过应付职工薪酬-住房公积金科目支出的住房公积金","kind":"header","colSpan":3,"rowSpan":5},{"colSpan":4,"ref":"E20","role":"e"},{"kind":"input","colSpan":4,"ref":"I20","role":"e","fmt":"money"},{"ref":"M20","role":"e"}],
+        [{"text":"2","kind":"header","rowSpan":5},{"text":"未通过应付职工薪酬-住房公积金科目支出的住房公积金","kind":"header","colSpan":3,"rowSpan":5},{"colSpan":4,"ref":"E20","role":"e"},{"kind":"input","colSpan":4,"ref":"I20","role":"f","fmt":"money"},{"ref":"M20","role":"e"}],
         [{"colSpan":4,"ref":"E21","role":"e"},{"kind":"input","colSpan":4,"ref":"I21","role":"e","fmt":"money"},{"ref":"M21","role":"e"}],
         [{"colSpan":4,"ref":"E22","role":"e"},{"kind":"input","colSpan":4,"ref":"I22","role":"e","fmt":"money"},{"ref":"M22","role":"e"}],
         [{"colSpan":4,"ref":"E23","role":"e"},{"kind":"input","colSpan":4,"ref":"I23","role":"e","fmt":"money"},{"ref":"M23","role":"e"}],

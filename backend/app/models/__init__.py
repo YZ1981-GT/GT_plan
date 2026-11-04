@@ -152,6 +152,8 @@ from app.models.note_content_template_models import (  # noqa: F401
 )
 # 税审底稿手工填写值（迁移 V230）
 from app.models.tax_workpaper_models import TaxWorkpaperInput  # noqa: F401
+# 科目余额表 / 序时账人工修改日志（迁移 V260）
+from app.models.ledger_edit_models import LedgerManualEdit  # noqa: F401
 # 公式推送引擎目标级状态 / 运行记录（迁移 V169）
 from app.models.formula_push_models import (  # noqa: F401
     FormulaPushRun,

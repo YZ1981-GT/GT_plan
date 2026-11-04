@@ -133,6 +133,15 @@
   margin-left: auto;
 }
 
+/* 从「数据源头」跳来定位到的行（?locate=，useCitarRowLocate） */
+.sheet-table tr.citar-located > td {
+  background: #fff6db;
+}
+
+.sheet-table tr.citar-located > td:first-child {
+  box-shadow: inset 3px 0 0 #e0a100;
+}
+
 .citar-tag {
   display: inline-block;
   padding: 1px 8px;

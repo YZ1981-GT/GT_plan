@@ -108,8 +108,12 @@ async function openSheet(code: string) {
   activeCode.value = code
   saveActiveTaxSheet(projectId.value, code)
   await nextTick()
-  // 整页滚动由外层容器负责，换表后回到内容区顶部
-  contentRef.value?.scrollIntoView({ block: 'start' })
+  // 换表后回到顶部：CITAR 框架里内容区自己滚动（归零 scrollTop）；不在该框架时由外层滚动（scrollIntoView）
+  const content = contentRef.value
+  if (content) {
+    content.scrollTop = 0
+    content.scrollIntoView({ block: 'start' })
+  }
 }
 
 function commitMarks(next: TaxWorkpaperMarkMap) {
@@ -149,14 +153,17 @@ function toggleHide() {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   background: var(--tw-page-bg);
   font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
 }
 
+/* CITAR 框架定高一屏：目录栏与右侧内容各自滚动，往下翻表时目录留在原处 */
 .tw-view__content {
   flex: 1 1 auto;
   min-width: 0;
   padding: 20px 24px;
+  overflow-y: auto;
 }
 
 .tw-view__params {

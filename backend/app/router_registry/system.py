@@ -81,10 +81,12 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.tb_sync import router as tb_sync_router
     from app.routers.data_validation import router as dv_router
     from app.routers.consistency import router as consistency_router
+    # 科目余额表 / 序时账人工修改（spec citar-table-manual-edit R3~R5）
+    from app.routers.ledger_edits import router as ledger_edits_router
 
     for r in [drilldown_router, ledger_router, tb_router, adj_router,
               mat_router, mis_router, events_router, tb_sync_router,
-              dv_router, consistency_router]:
+              dv_router, consistency_router, ledger_edits_router]:
         app.include_router(r, tags=["查账与试算"])
 
     # 税审底稿取数 / 公式计算 / 手工值保存（spec tax-workpaper-data-fetch）
@@ -93,6 +95,9 @@ def register_system_routers(app: FastAPI) -> None:
     app.include_router(tax_workpapers_router, tags=["税审底稿"])
     # 鉴证报告：报告正文 / 审核说明 / 汇算申报表 / 单体财务报表（spec citar-assurance-report-menus）
     app.include_router(tax_assurance_router, tags=["税审鉴证报告"])
+    # OnlyOffice 转 PDF 回来取待转换文件（报告正文网页预览；签名鉴权，OnlyOffice 不带用户令牌）
+    from app.routers.onlyoffice_pdf import router as onlyoffice_pdf_router
+    app.include_router(onlyoffice_pdf_router, tags=["OnlyOffice 转 PDF"])
 
     # ═══ §3b. 通用 auto_data_source resolver API ═══
     from app.routers.auto_data import router as auto_data_router

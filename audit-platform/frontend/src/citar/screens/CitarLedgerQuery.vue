@@ -26,6 +26,7 @@
           :project-id="projectId"
           :year="year"
           :entity-name="entityName"
+          :locate-code="locateCode"
           @open-account="openAccount"
         />
         <CitarJournalTab
@@ -55,7 +56,7 @@
  * 账务查询（CITAR「未审账套、报表」版式，接平台真实数据）。
  * 报表两张：GET /api/reports/{pid}/{year}/{type}?unadjusted=true —— 按试算表未审数读时计算，不落库。
  */
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getReport } from '@/services/auditPlatformApi'
 import CitarBalanceTab from '../components/CitarBalanceTab.vue'
@@ -81,22 +82,29 @@ const { projectId, year, yearLoading, entityName } = useCitarProject()
 /** 当前标签记在 ?tab=，刷新与返回不丢 */
 const tab = ref<TabKey>(TABS.some(t => t.key === route.query.tab) ? (route.query.tab as TabKey) : 'balance')
 const journalCode = ref(typeof route.query.account === 'string' ? route.query.account : '')
+/** 从「数据源头」跳来：科目余额表定位到该客户科目行（?locate=，spec citar-fs-issue-source-locate） */
+const locateCode = computed(() => (typeof route.query.locate === 'string' ? route.query.locate : ''))
+
+/** 换页签不带 locate：定位只对跳来时的科目余额表有效 */
+function queryWithout(...keys: string[]) {
+  return Object.fromEntries(Object.entries(route.query).filter(([k]) => !keys.includes(k)))
+}
 
 function setTab(key: TabKey) {
   tab.value = key
-  router.replace({ query: { ...route.query, tab: key } })
+  router.replace({ query: { ...queryWithout('locate'), tab: key } })
 }
 
 function setJournalCode(code: string) {
   journalCode.value = code
-  const { account: _drop, ...rest } = route.query
+  const rest = queryWithout('account')
   router.replace({ query: code ? { ...rest, account: code } : rest })
 }
 
 function openAccount(code: string) {
   journalCode.value = code
   tab.value = 'journal'
-  router.replace({ query: { ...route.query, tab: 'journal', account: code } })
+  router.replace({ query: { ...queryWithout('locate'), tab: 'journal', account: code } })
 }
 
 const reportRows = ref<CitarReportRow[]>([])

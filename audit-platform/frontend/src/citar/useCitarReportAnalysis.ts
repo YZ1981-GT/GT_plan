@@ -26,7 +26,7 @@ export const TABS: TabDef[] = [
   { key: 'equity_statement', label: '权益变动表', group: 'report', hidden: true },
   { key: 'cash_flow_supplement', label: '现金流附表', group: 'report', hidden: true },
   { key: 'impairment_provision', label: '减值准备表', group: 'report', hidden: true },
-  { key: 'cross_check', label: '跨表核对', group: 'analysis' },
+  { key: 'cross_check', label: '智能核对', group: 'analysis' },
   { key: 'multi_year', label: '多年对比', group: 'analysis' },
   { key: 'trend', label: '变动分析', group: 'analysis' },
   { key: 'indicators', label: '财务指标', group: 'analysis' },

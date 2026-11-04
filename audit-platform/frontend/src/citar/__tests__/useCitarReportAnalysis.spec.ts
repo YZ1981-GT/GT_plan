@@ -23,12 +23,12 @@ describe('报表分析标签', () => {
       'balance_sheet', 'income_statement', 'cash_flow_statement',
       'equity_statement', 'cash_flow_supplement', 'impairment_provision',
     ])
-    expect(TABS.filter(t => t.group === 'analysis').map(t => t.label)).toEqual(['跨表核对', '多年对比', '变动分析', '财务指标'])
+    expect(TABS.filter(t => t.group === 'analysis').map(t => t.label)).toEqual(['智能核对', '多年对比', '变动分析', '财务指标'])
   })
 
   it('页面只显示资产负债表、利润表与分析组（其余四张表隐藏）', () => {
     expect(VISIBLE_TABS.map(t => t.label)).toEqual([
-      '资产负债表', '利润表', '跨表核对', '多年对比', '变动分析', '财务指标',
+      '资产负债表', '利润表', '智能核对', '多年对比', '变动分析', '财务指标',
     ])
   })
 

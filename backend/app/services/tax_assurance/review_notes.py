@@ -3,6 +3,9 @@
 规则表每行一段：A 标记（※ 必显 / ﹟ 无数据整节隐藏）、B 内容（``{0}{1}…`` 占位）、C 格式（2~9 标题层级、
 文本1 / 文本2 正文）、E 是否加粗、G 编号格式（1~7）、H 缩进（厘米，「左,首行」）、I 占位数、J~X 占位值。
 显示规则由案例 1 的缓存值与案例报告逐段对照反推（design §4），``layout`` 是不读库的纯函数，单测直接构造规则行。
+
+人工修改（spec citar-table-manual-edit R8）：每段正文可改、可删除、可恢复；存 ``tax_workpaper_inputs`` 保留编号
+``__review_notes__``；编号照旧自动（删段后重新编号），预览与 Word 用同一份段落。
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from docx.shared import Cm
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.tax_workpaper_models import REVIEW_NOTES_SHEET_CODE
 from app.services import tax_workpaper_service as tws
 from app.services.tax_assurance.common import DATA_DIR, replace_in_document, save_docx, value_text, year_text
 from app.services.tax_formula_engine import XlError
@@ -93,6 +97,8 @@ class Rule:
     number_fmt: int | None = None
     indent: tuple[float | None, float | None] = (None, None)
     values: list[Any] = field(default_factory=list)
+    #: ※ 标题下补的「无。」（不是规则表里的行；段落键带 -none）
+    synthetic: bool = False
 
     @property
     def level(self) -> int | None:
@@ -231,7 +237,7 @@ def _flatten(node: _Node, out: list[tuple[Rule, int | None]], parent_level: int 
         _flatten(child, out, rule.level)
         # 有下文规则但一条都不显示的 ※ 标题（重大事项、其他事项披露）：补「无。」；本身没有下文的（附件1）不补
         if rule.mark == MARK_ALWAYS and child.children and not any(r.level is None for r, _ in out[start:]):
-            out.append((Rule(row=rule.row, mark=MARK_ALWAYS, template=NONE_TEXT, fmt="文本1"), rule.level))
+            out.append((Rule(row=rule.row, mark=MARK_ALWAYS, template=NONE_TEXT, fmt="文本1", synthetic=True), rule.level))
 
 
 def _cut_zero_calculation(flat: list[tuple[Rule, int | None]]) -> list[tuple[Rule, int | None, str]]:
@@ -270,13 +276,36 @@ def _list_lengths(items: list[tuple[Rule, int | None, str]]) -> list[int]:
     return lengths
 
 
-def layout(rules: list[Rule]) -> list[dict]:
-    """规则行 → 段落：显示判断、编号、句末标点。"""
+def paragraph_key(rule: Rule) -> str:
+    """段落键：规则表行号；※ 标题下补的「无。」带 -none。人工修改按它存。"""
+    return f"r{rule.row}-none" if rule.synthetic else f"r{rule.row}"
+
+
+def _visible_items(rules: list[Rule]) -> list[tuple[Rule, int | None, str]]:
     root = _build_tree(rules)
     _resolve(root, True)
     flat: list[tuple[Rule, int | None]] = []
     _flatten(root, flat)
-    items = _cut_zero_calculation(flat)
+    return _cut_zero_calculation(flat)
+
+
+def _same_text(a: Any, b: Any) -> bool:
+    """比自动文字是否变化：不计句末标点（删掉相邻段会改「；」/「。」）。"""
+    return str(a or "").strip().rstrip("。；，：") == str(b or "").strip().rstrip("。；，：")
+
+
+def layout(rules: list[Rule], edits: dict[str, dict] | None = None) -> list[dict]:
+    """规则行 → 段落：显示判断、编号、句末标点。
+
+    ``edits``：人工修改 {段落键: {"text": 正文 | None(删除本段), "auto": 修改时的自动正文}}（spec citar-table-manual-edit R8）。
+    显示判断不受影响；删除的段不出、不占编号；改过的段用人工正文（编号前缀照旧自动、不再做句末标点处理）。
+    """
+    return _layout_items(_visible_items(rules), edits or {})
+
+
+def _layout_items(all_items: list[tuple[Rule, int | None, str]], edits: dict[str, dict]) -> list[dict]:
+    deleted = {k for k, e in edits.items() if e.get("text") is None}
+    items = [it for it in all_items if paragraph_key(it[0]) not in deleted]
     list_lengths = _list_lengths(items)
 
     paragraphs: list[dict] = []
@@ -301,15 +330,78 @@ def layout(rules: list[Rule]) -> list[dict]:
             for k in [k for k in counters if k > rule.number_fmt]:
                 del counters[k]
             prefix = number_text(rule.number_fmt, n)
+        key = paragraph_key(rule)
+        edit = edits.get(key)
+        body = edit["text"] if edit is not None else text
         paragraphs.append({
+            "key": key,
             "row": rule.row,
-            "text": prefix + text,
+            "text": prefix + body,
+            "number": prefix,
+            "body": body,
+            "auto_body": text,
+            "edited": edit is not None,
+            # 改过的段：自动文字（数据）在修改之后又变了
+            "auto_changed": edit is not None and not _same_text(edit.get("auto"), text),
             "style": rule.fmt,
             "level": rule.level,
             "bold": rule.bold,
             "indent": list(rule.indent),
         })
     return paragraphs
+
+
+def layout_with_edits(rules: list[Rule], edits: dict[str, dict]) -> dict:
+    """段落 + 已删除的段（本该显示，可恢复）+ 数据变化后不再显示的修改（可丢弃）。"""
+    items = _visible_items(rules)
+    paragraphs = _layout_items(items, edits)
+    auto = {p["key"]: p for p in _layout_items(items, {})}
+    deleted = [
+        {"key": k, "row": auto[k]["row"], "auto_text": auto[k]["text"]}
+        for k in auto if k in edits and edits[k].get("text") is None
+    ]
+    orphans = [
+        {"key": k, "text": e.get("text"), "auto": e.get("auto")}
+        for k, e in edits.items() if k not in auto
+    ]
+    return {"paragraphs": paragraphs, "deleted": deleted, "orphans": orphans}
+
+
+# ── 人工修改的存储（tax_workpaper_inputs 保留编号 __review_notes__） ──
+_KEY_RE = re.compile(r"^r\d{1,5}(-none)?$")
+MAX_EDITS = 2000
+MAX_EDIT_TEXT = 2000
+
+
+def _stored_edits(row) -> dict[str, dict]:
+    raw = (row.inputs or {}).get(REVIEW_NOTES_SHEET_CODE, {}) if row else {}
+    return {k: v for k, v in raw.items() if isinstance(v, dict)}
+
+
+def _clean_edits(edits: dict[str, Any]) -> dict[str, dict]:
+    if len(edits or {}) > MAX_EDITS:
+        raise HTTPException(status_code=422, detail="修改的段落过多")
+    clean: dict[str, dict] = {}
+    for key, raw in (edits or {}).items():
+        if not _KEY_RE.match(str(key)) or not isinstance(raw, dict):
+            raise HTTPException(status_code=422, detail=f"段落键无效：{key}")
+        text, auto = raw.get("text"), raw.get("auto")
+        for label, v in (("正文", text), ("自动文字", auto)):
+            if v is not None and not isinstance(v, str):
+                raise HTTPException(status_code=422, detail=f"{label}只能是文字")
+            if isinstance(v, str) and len(v) > MAX_EDIT_TEXT:
+                raise HTTPException(status_code=422, detail=f"{label}超过 {MAX_EDIT_TEXT} 字")
+        if isinstance(text, str) and not text.strip():
+            raise HTTPException(status_code=422, detail="段落文字不能为空；不要这一段请点「删除本段」")
+        clean[str(key)] = {"text": text.strip() if isinstance(text, str) else None, "auto": auto}
+    return clean
+
+
+async def save_edits(db: AsyncSession, project_id: UUID, year: int, version: int, edits: dict[str, Any], user_id: UUID) -> None:
+    """整份替换本项目本年度审核说明的人工修改；不在 ``edits`` 里的段恢复自动文字。"""
+    await tws._project(db, project_id)
+    clean = _clean_edits(edits)
+    await tws._upsert(db, project_id, year, REVIEW_NOTES_SHEET_CODE, version, {REVIEW_NOTES_SHEET_CODE: clean}, user_id)
 
 
 # ── 读规则表 ──
@@ -374,7 +466,12 @@ def blank_text_slots(rules: list[Rule], blank_keys) -> None:
 async def build(db: AsyncSession, project_id: UUID, year: int) -> dict:
     wb = tws.load_workbook()
     seeds = [k for k in wb.formulas if k[0] in (RULES_SHEET, HEADER_SHEET)]
-    ev = await tws.evaluate_keys(db, project_id, year, seeds)
+    rows = await tws._rows(db, project_id, year)
+    # 人工修改与版本立即取成普通值（之后取数查询失败时会话里的 ORM 对象会过期）
+    own = rows.get(REVIEW_NOTES_SHEET_CODE)
+    version = own.version if own else 0
+    edits = _stored_edits(own)
+    ev = await tws.evaluate_keys(db, project_id, year, seeds, rows)
     rules = read_rules(wb, lambda ref: ev.calc_value(RULES_SHEET, ref))
     blank_text_slots(rules, getattr(ev.computed, "blank", set()))
     for rule in rules:
@@ -382,11 +479,16 @@ async def build(db: AsyncSession, project_id: UUID, year: int) -> dict:
         rule.values = [year_text(v, year) if isinstance(v, str) else v for v in rule.values]
     header = [year_text(value_text(ev.value(HEADER_SHEET, f"A{r}")), year) for r in (2, 3)]
     footer = [value_text(ev.value(HEADER_SHEET, f"B{r}")) for r in (2, 3, 4)]
+    laid = layout_with_edits(rules, edits)
     return {
         "year": year,
+        "version": version,
         "header": [h for h in header if h],
         "footer": [f for f in footer if f],
-        "paragraphs": layout(rules),
+        "paragraphs": laid["paragraphs"],
+        "edits": edits,
+        "deleted": laid["deleted"],
+        "orphans": laid["orphans"],
         "notices": ev.notices,
     }
 

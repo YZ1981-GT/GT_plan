@@ -49,21 +49,26 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(r, i) in shown" :key="r.code">
+              <tr v-for="(r, i) in shown" :key="r.code" :data-locate="r.code" :class="{ 'citar-located': isLocated(r.code) }">
                 <td class="is-seq">{{ i + 1 }}</td>
                 <td class="is-code">{{ r.code }}</td>
                 <td>{{ r.name }}</td>
                 <td class="group-start citar-center">{{ r.opening.dir }}</td>
-                <td class="is-numeric">{{ fmtMoney(r.opening.amount) }}</td>
+                <td class="is-numeric" title="期初余额请在「账务查询 → 科目余额表」修改">{{ fmtMoney(r.opening.amount) }}</td>
                 <td class="is-numeric is-adjustment" title="平台暂无期初调整分录">-</td>
                 <td class="is-numeric">{{ fmtMoney(r.opening.amount) }}</td>
-                <td class="group-start is-numeric">{{ fmtMoney(r.periodDebit) }}</td>
+                <td class="group-start is-numeric" title="本期发生额请在「账务查询 → 科目余额表」修改">{{ fmtMoney(r.periodDebit) }}</td>
                 <td class="is-numeric is-adjustment">{{ fmtMoney(r.adjDebit) }}</td>
-                <td class="is-numeric">{{ fmtMoney(r.periodCredit) }}</td>
+                <td class="is-numeric" title="本期发生额请在「账务查询 → 科目余额表」修改">{{ fmtMoney(r.periodCredit) }}</td>
                 <td class="is-numeric is-adjustment">{{ fmtMoney(r.adjCredit) }}</td>
                 <td class="group-start citar-center">{{ r.adjClosing.dir }}</td>
-                <td class="is-numeric" :title="r.wp ? `含底稿发布调整 ${fmtMoney(r.wp)}` : undefined">
-                  {{ fmtMoney(r.adjClosing.amount) }}<sup v-if="r.wp" class="citar-mark">底稿</sup>
+                <td
+                  class="is-numeric"
+                  :class="{ 'citar-tb__editable': canManualEdit }"
+                  :title="auditedTitle(r)"
+                  @click="openAdjust(r)"
+                >
+                  {{ fmtMoney(r.adjClosing.amount) }}<sup v-if="r.wp" class="citar-mark">底稿</sup><sup v-if="pending.get(r.code)" class="citar-mark citar-mark--pending">待批 {{ pending.get(r.code) }}</sup>
                 </td>
               </tr>
             </tbody>
@@ -75,7 +80,7 @@
               <tr><th v-for="c in TRIAL_BALANCE_COLUMNS" :key="c.key">{{ c.label }}</th></tr>
             </thead>
             <tbody>
-              <tr v-for="(r, i) in shown" :key="r.code">
+              <tr v-for="(r, i) in shown" :key="r.code" :data-locate="r.code" :class="{ 'citar-located': isLocated(r.code) }">
                 <td class="is-seq">{{ i + 1 }}</td>
                 <td class="is-code">{{ r.code }}</td>
                 <td>{{ r.name }}</td>
@@ -84,7 +89,9 @@
                 <td class="is-numeric">{{ fmtMoney(r.periodDebit + r.adjDebit) }}</td>
                 <td class="is-numeric">{{ fmtMoney(r.periodCredit + r.adjCredit) }}</td>
                 <td class="citar-center">{{ r.audited.dir }}</td>
-                <td class="is-numeric">{{ fmtMoney(r.audited.amount) }}</td>
+                <td class="is-numeric" :class="{ 'citar-tb__editable': canManualEdit }" :title="auditedTitle(r)" @click="openAdjust(r)">
+                  {{ fmtMoney(r.audited.amount) }}<sup v-if="pending.get(r.code)" class="citar-mark citar-mark--pending">待批 {{ pending.get(r.code) }}</sup>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -97,9 +104,20 @@
           <li v-if="tab === 'audited'">只列有发生额、余额或调整的科目。审计调整只计已批准的调整分录；期初调整平台暂无来源，按 0 列示。</li>
           <li v-else>按平台标准科目表列示（{{ rows.length }} 个科目，含零余额）。本期借方 / 贷方含已批准的审计调整；期末余额是试算表审定数，底稿取数读的就是这一列（损益类为本期发生额）。</li>
           <li>标「底稿」的科目含从底稿审定表发布的调整。</li>
+          <li v-if="canManualEdit">点审定数可修改：按差额生成调整分录草稿（标「待批」），复核批准后进入试算表；期初与本期发生额请在「账务查询 → 科目余额表」修改。</li>
+          <li v-else>{{ MANUAL_EDIT_DENIED_TIP }}</li>
         </ul>
       </template>
     </section>
+
+    <CitarTbAdjustDialog
+      :account="adjusting"
+      :project-id="projectId"
+      :year="year ?? 0"
+      :account-names="accountNames"
+      @close="adjusting = null"
+      @created="onAdjustCreated"
+    />
   </div>
 </template>
 
@@ -107,14 +125,19 @@
 /**
  * 试算平衡表（CITAR「审定科目余额表 / 底稿取数余额表」版式，接平台试算表）。
  * 数据：GET /trial-balance/standard-view（借正贷负）；重算：POST /trial-balance/recalc。
+ * 审定数可点开修改（spec citar-table-manual-edit R2）：按差额生成调整分录草稿，不直接改试算表。
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { trialBalance as P_tb } from '@/services/apiPaths'
+import { accountChart as P_chart, adjustments as P_adj, trialBalance as P_tb } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { ADJUSTMENT_STATUS } from '@/constants/statusEnum'
+import CitarTbAdjustDialog, { type TbAdjustAccount } from '../components/CitarTbAdjustDialog.vue'
 import { AUDITED_TRIAL_BALANCE_GROUPS, TRIAL_BALANCE_COLUMNS, type AuditedColumnGroup } from '../data/reportLines'
 import { fmtMoney, splitDirection, useCitarProject } from '../useCitarProject'
+import { normCode, useCitarRowLocate } from '../useCitarRowLocate'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'CitarTrialBalance' })
 
@@ -140,6 +163,7 @@ const TABS: { key: TabKey; label: string }[] = [
 ]
 
 const { projectId, year, yearLoading, entityName } = useCitarProject()
+const { canManualEdit } = useManualEditPermission()
 
 const tab = ref<TabKey>('audited')
 const rows = ref<ViewRow[]>([])
@@ -200,6 +224,69 @@ function columnClass(c: AuditedColumnGroup['columns'][number], index: number) {
   return [width, c.adjustment ? 'is-adjustment' : '', index === 0 ? 'group-start' : ''].filter(Boolean)
 }
 
+// ── 改审定数 → 调整分录草稿（spec citar-table-manual-edit R2） ──
+type PreparedRow = (typeof prepared.value)[number]
+
+const adjusting = ref<TbAdjustAccount | null>(null)
+/** 科目 → 未批准（草稿 / 待复核 / 驳回）的调整分录组数 */
+const pending = ref<Map<string, number>>(new Map())
+const accountNames = ref<Map<string, string>>(new Map())
+const SILENT = { _silent: true } as any
+const PENDING_STATUSES = new Set<string>([ADJUSTMENT_STATUS.DRAFT, ADJUSTMENT_STATUS.PENDING_REVIEW, ADJUSTMENT_STATUS.REJECTED])
+
+/** 审定数（借正贷负）：审定科目余额表取调整后期末，底稿取数余额表取期末余额 */
+function auditedSigned(r: PreparedRow): number {
+  const side = tab.value === 'audited' ? r.adjClosing : r.audited
+  return side.dir === '贷' ? -side.amount : side.amount
+}
+
+function auditedTitle(r: PreparedRow): string {
+  const lines = [canManualEdit.value ? '点击修改：按差额生成调整分录草稿' : MANUAL_EDIT_DENIED_TIP]
+  if (r.wp) lines.push(`含底稿发布调整 ${fmtMoney(r.wp)}`)
+  const n = pending.value.get(r.code)
+  if (n) lines.push(`有 ${n} 张未批准的调整分录涉及本科目（批准后才进入试算表）`)
+  return lines.join('\n')
+}
+
+function openAdjust(r: PreparedRow) {
+  if (!canManualEdit.value) return
+  adjusting.value = { code: r.code, name: r.name, audited: auditedSigned(r) }
+}
+
+async function onAdjustCreated() {
+  adjusting.value = null
+  await loadPending()
+}
+
+async function loadPending() {
+  if (!year.value) return
+  const counts = new Map<string, number>()
+  try {
+    for (let page = 1; page < 50; page += 1) {
+      const res: any = await api.get(P_adj.list(projectId.value), { params: { year: year.value, page, page_size: 200 }, ...SILENT })
+      const items = res?.items || []
+      for (const item of items) {
+        if (!PENDING_STATUSES.has(item.review_status)) continue
+        const codes = new Set<string>((item.line_items || []).map((li: any) => li.standard_account_code).filter(Boolean))
+        for (const code of codes) counts.set(code, (counts.get(code) || 0) + 1)
+      }
+      if (items.length < 200) break
+    }
+  } catch {
+    // 只是标记，读不到不影响试算表
+  }
+  pending.value = counts
+}
+
+async function loadAccountNames() {
+  try {
+    const list: any = await api.get(P_chart.standard(projectId.value), SILENT)
+    accountNames.value = new Map((Array.isArray(list) ? list : []).map((a: any) => [a.account_code, a.account_name]))
+  } catch {
+    accountNames.value = new Map()
+  }
+}
+
 async function load() {
   if (!year.value) return
   loading.value = true
@@ -213,6 +300,26 @@ async function load() {
   } finally {
     loading.value = false
   }
+  if (!error.value) await locateRow()
+}
+
+// ── 从「数据源头」跳来定位到标准科目行（?locate=，spec citar-fs-issue-source-locate） ──
+const { code: locateCode, isLocated, apply: applyLocate } = useCitarRowLocate()
+
+async function locateRow() {
+  await applyLocate(
+    code => prepared.value.some(r => normCode(r.code) === code),
+    () => {
+      keyword.value = ''
+      // 审定科目余额表只列有数科目：零余额行切到底稿取数余额表（全部科目）
+      const hit = prepared.value.find(r => normCode(r.code) === locateCode.value)
+      if (hit && !hit.hasValue) {
+        tab.value = 'source'
+        nonZeroOnly.value = false
+      }
+    },
+    `试算平衡表里没有标准科目 ${locateCode.value}`,
+  )
 }
 
 async function recalc() {
@@ -234,7 +341,11 @@ async function recalc() {
   }
 }
 
-watch([projectId, year], load, { immediate: true })
+watch([projectId, year], () => {
+  void load()
+  void loadPending()
+  void loadAccountNames()
+}, { immediate: true })
 </script>
 
 <style scoped src="../styles/unaudited.css"></style>
@@ -246,6 +357,19 @@ watch([projectId, year], load, { immediate: true })
   margin-left: 2px;
   font-size: var(--citar-fs-9);
   color: var(--citar-c-8a5300);
+}
+
+.citar-mark--pending {
+  color: var(--citar-c-6e0ba6);
+}
+
+.citar-tb__editable {
+  cursor: pointer;
+}
+
+.citar-tb__editable:hover {
+  outline: 1px solid #c9a8ea;
+  outline-offset: -1px;
 }
 
 .citar-footnotes {

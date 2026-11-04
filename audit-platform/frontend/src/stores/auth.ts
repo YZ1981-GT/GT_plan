@@ -23,6 +23,8 @@ export interface UserProfile {
   role: string
   office_code: string | null
   is_active: boolean
+  /** 账号权限「允许修改」：能否人工修改自动生成的数据；缺省按允许（spec citar-manual-edit-permission） */
+  allow_manual_edit?: boolean
   created_at: string
   /** 后端下发的权限列表（从 /api/users/me 获取），供 usePermission 使用 */
   permissions?: string[]

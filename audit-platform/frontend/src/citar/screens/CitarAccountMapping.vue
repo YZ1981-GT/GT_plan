@@ -34,7 +34,7 @@
           <span v-if="unmapped.length" class="citar-map__warn">有余额未映射 {{ unmapped.length }} 个：不映射就不会进入试算表</span>
           <button class="citar-btn" type="button" :disabled="loading || busy" @click="load">刷新</button>
           <button class="citar-btn citar-btn--primary" type="button" :disabled="busy" @click="autoMatch">
-            {{ busy ? '处理中…' : '自动匹配' }}
+            {{ busy ? '匹配中…' : '智能匹配' }}
           </button>
         </div>
 
@@ -50,7 +50,12 @@
               <tr><th>客户科目编码</th><th>客户科目名称</th><th>期末余额</th><th>映射到标准科目</th><th /></tr>
             </thead>
             <tbody>
-              <tr v-for="u in unmapped" :key="u.account_code">
+              <tr
+                v-for="u in unmapped"
+                :key="u.account_code"
+                :data-locate="normCode(u.account_code)"
+                :class="{ 'citar-located': isLocated(u.account_code) }"
+              >
                 <td>{{ u.account_code }}</td>
                 <td>{{ u.account_name }}</td>
                 <td class="is-numeric">{{ fmtMoney(u.closing_balance) }}</td>
@@ -77,7 +82,12 @@
               <tr><th>客户科目编码</th><th>客户科目名称</th><th>标准科目编码</th><th>标准科目名称</th><th>映射方式</th><th /></tr>
             </thead>
             <tbody>
-              <tr v-for="m in shown" :key="m.id">
+              <tr
+                v-for="m in shown"
+                :key="m.id"
+                :data-locate="normCode(m.original_account_code)"
+                :class="{ 'citar-located': isLocated(m.original_account_code) }"
+              >
                 <td>{{ m.original_account_code }}</td>
                 <td>{{ m.original_account_name }}</td>
                 <td>
@@ -105,7 +115,7 @@
         </div>
         <p v-if="loading" class="sheet-empty">正在读取映射…</p>
         <p v-else-if="error" class="sheet-empty">{{ error }}</p>
-        <p v-else-if="!mappings.length" class="sheet-empty">还没有映射。导入账套后会自动匹配一次，也可点「自动匹配」。</p>
+        <p v-else-if="!mappings.length" class="sheet-empty">还没有映射。导入账套后会智能匹配一次，也可点「智能匹配」。</p>
       </div>
     </section>
   </div>
@@ -125,8 +135,12 @@ import { accountChart as P_chart, accountMapping as P_map } from '@/services/api
 import { handleApiError } from '@/utils/errorHandler'
 import CitarWorkpaperMapTab from '../components/CitarWorkpaperMapTab.vue'
 import { fmtMoney, useCitarProject } from '../useCitarProject'
+import { normCode, useCitarRowLocate } from '../useCitarRowLocate'
 
 defineOptions({ name: 'CitarAccountMapping' })
+
+/** 从「数据源头」跳来：?tab=standard&locate=客户科目（spec citar-fs-issue-source-locate） */
+const { code: locateCode, isLocated, apply: applyLocate } = useCitarRowLocate()
 
 type TabKey = 'workpaper' | 'standard'
 const TABS: { key: TabKey; label: string }[] = [
@@ -137,7 +151,7 @@ const TAB_NOTES: Record<TabKey, string> = {
   workpaper: '客户科目进入哪些税审底稿：按税审底稿取数规则推算',
   standard: '客户科目 → 标准科目：试算平衡表、审定报表与底稿取数都按标准科目汇总',
 }
-const tab = ref<TabKey>('workpaper')
+const tab = ref<TabKey>(locateCode.value ? 'standard' : 'workpaper')
 /** 标准科目映射改动后 +1，「科目 → 底稿」重新读取 */
 const refreshKey = ref(0)
 
@@ -156,7 +170,7 @@ interface UnmappedRow {
 }
 
 const DATALIST_ID = 'citar-map-standards'
-const MAPPING_TYPE_LABELS: Record<string, string> = { auto_exact: '自动（精确）', auto_fuzzy: '自动（模糊）', manual: '手工' }
+const MAPPING_TYPE_LABELS: Record<string, string> = { auto_exact: '智能（精确）', auto_fuzzy: '智能（模糊）', manual: '手工' }
 const SILENT = { _silent: true } as any
 
 const { projectId, year, yearLoading } = useCitarProject()
@@ -209,6 +223,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+  if (!error.value) {
+    await applyLocate(
+      code => unmapped.value.some(u => normCode(u.account_code) === code)
+        || mappings.value.some(m => normCode(m.original_account_code) === code),
+      () => {
+        tab.value = 'standard'
+        keyword.value = ''
+      },
+      `底稿映射里没有客户科目 ${locateCode.value}（「有余额未映射」只列期末有余额的科目）`,
+    )
+  }
 }
 
 async function loadStandards() {
@@ -250,9 +275,9 @@ function autoMatch() {
     const res: any = await api.post(P_map.autoMatch(projectId.value), { year: year.value }, SILENT)
     const saved = res?.saved_count ?? 0
     return saved
-      ? `自动匹配新增 ${saved} 条映射，试算表将按新映射重算；仍未匹配 ${res?.unmatched_count ?? 0} 个`
-      : `没有可自动匹配的新科目（仍未匹配 ${res?.unmatched_count ?? 0} 个，请手工映射）`
-  }, '自动匹配', '自动匹配完成')
+      ? `智能匹配新增 ${saved} 条映射，试算表将按新映射重算；仍未匹配 ${res?.unmatched_count ?? 0} 个`
+      : `没有可智能匹配的新科目（仍未匹配 ${res?.unmatched_count ?? 0} 个，请手工映射）`
+  }, '智能匹配', '智能匹配完成')
 }
 
 function createMapping(u: UnmappedRow) {

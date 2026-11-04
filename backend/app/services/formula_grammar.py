@@ -34,6 +34,9 @@ WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'(?:,'([^']+)')?\)")
 PREV_PATTERN = re.compile(r"PREV\('([^']+)','([^']+)'(?:,'([^']+)')?\)")
 AUX_PATTERN = re.compile(r"AUX\('([^']+)','([^']*?)','([^']+)'\)")
 ADJ_PATTERN = re.compile(r"ADJ\('([^']+)','([^']+)'\)")
+# 未结转损益（零参）：只在单体报表生成路径由 report_engine 代入数值；不进 TOKEN_PATTERNS（下标契约），
+# 其余求值路径走 L1 handler 报错（spec citar-audited-balance-and-workpaper-coverage R1）
+PL_UNCLOSED_PATTERN = re.compile(r"PL_UNCLOSED\(\s*\)")
 
 # 有序 token 列表（SUM_ROW/SUM_TB 必须在 ROW/TB 之前以避免部分匹配）
 #

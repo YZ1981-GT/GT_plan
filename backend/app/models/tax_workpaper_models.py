@@ -20,7 +20,10 @@ from app.models.base import Base
 PARAMS_SHEET_CODE = "__params__"
 # 鉴证报告自己的填写项（报告日期等，spec citar-assurance-report-menus），不进底稿计算
 ASSURANCE_SHEET_CODE = "__assurance__"
-RESERVED_SHEET_CODES = frozenset({PARAMS_SHEET_CODE, ASSURANCE_SHEET_CODE})
+# 审核说明段落的人工修改 {段落键: {"text", "auto"}}、单体财务报表的手工金额（spec citar-table-manual-edit R8 / R7），不进底稿计算
+REVIEW_NOTES_SHEET_CODE = "__review_notes__"
+FS_SHEET_CODE = "__fs__"
+RESERVED_SHEET_CODES = frozenset({PARAMS_SHEET_CODE, ASSURANCE_SHEET_CODE, REVIEW_NOTES_SHEET_CODE, FS_SHEET_CODE})
 
 
 class TaxWorkpaperInput(Base):

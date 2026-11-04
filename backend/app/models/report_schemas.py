@@ -55,6 +55,8 @@ class ReportRow(BaseModel):
     is_total_row: bool = False
     formula_used: str | None = None
     source_accounts: dict | list | None = None
+    # V260 手工值 {current|prior: {value, auto}, by, at}（spec citar-table-manual-edit R6）
+    manual_amounts: dict | None = None
 
 
 class ReportResponse(BaseModel):

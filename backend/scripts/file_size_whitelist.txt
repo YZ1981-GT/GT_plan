@@ -1701,3 +1701,8 @@ backend/app/routers/import_templates.py  808
 #     表头别名、amount / counterpart_account 字段）。拆分方向（按职责）：别名表与归一化 / 表头匹配
 #     （_match_header 系列）/ 表类型打分 / 三级识别编排，属独立重构。baseline = 当前真实行数。
 backend/app/services/ledger_import/identifier.py  1211
+
+#   models/report_models.py —— HEAD 800 行（贴着 800 上限）。
+#     spec citar-table-manual-edit 给 FinancialReport 加 V260 列 manual_amounts（+1 行）。
+#     拆分方向：附注模型（DisclosureNote / NoteTemplate 系列）与报表模型（FinancialReport / ReportConfig）分两个模块。
+backend/app/models/report_models.py  801

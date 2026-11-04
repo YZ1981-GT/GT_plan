@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
 from app.services import tax_workpaper_service as svc
+from app.services.manual_edit_permission import manual_edit_allowed
 
 router = APIRouter(prefix="/api/projects/{project_id}/tax-workpapers", tags=["税审底稿"])
 
@@ -89,6 +90,7 @@ async def put_sheet(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    await svc.save_sheet_inputs(db, project_id, year, code, body.version, body.inputs, current_user.id)
+    await svc.save_sheet_inputs(db, project_id, year, code, body.version, body.inputs, current_user.id,
+                                allow_manual_edit=manual_edit_allowed(current_user))
     await db.commit()
     return await svc.compute_sheet(db, project_id, year, code)

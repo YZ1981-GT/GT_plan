@@ -14,6 +14,12 @@ export interface CitarNavItem {
   segment: string
   /** Element Plus 图标组件名（CitarLayout 内按名取组件） */
   icon: string
+  /**
+   * 菜单名后的小角标（如「智能」）。
+   * 只给有自动识别 / 匹配 / 取数 / 核对 / 生成能力的环节标；这些都是规则实现，不写「AI」——
+   * 接入大模型的功能才用「AI」字样（用户 2026-11-04 选方案 A）。
+   */
+  badge?: string
 }
 
 /** 菜单分组（按用户 2026-11-02 给的分组图） */
@@ -26,7 +32,7 @@ export const CITAR_NAV_GROUPS: CitarNavGroup[] = [
   {
     title: '数据导入与账务查询',
     items: [
-      { key: 'import', label: '数据导入', segment: 'ledger-import', icon: 'Upload' },
+      { key: 'import', label: '数据导入', segment: 'ledger-import', icon: 'Upload', badge: '智能' },
       { key: 'ledger-query', label: '账务查询', segment: 'ledger-query', icon: 'Search' },
     ],
   },
@@ -36,14 +42,14 @@ export const CITAR_NAV_GROUPS: CitarNavGroup[] = [
       { key: 'trial-balance', label: '试算平衡表', segment: 'trial-balance', icon: 'Grid' },
       { key: 'adjustments', label: '调整分录', segment: 'adjustments', icon: 'EditPen' },
       { key: 'reports', label: '审定报表', segment: 'reports', icon: 'Tickets' },
-      { key: 'report-analysis', label: '报表分析', segment: 'report-analysis', icon: 'DocumentChecked' },
+      { key: 'report-analysis', label: '报表分析', segment: 'report-analysis', icon: 'DocumentChecked', badge: '智能' },
     ],
   },
   {
     title: '税审底稿',
     items: [
-      { key: 'mapping', label: '底稿映射', segment: 'mapping', icon: 'Connection' },
-      { key: 'workpapers', label: '税审底稿', segment: 'workpapers', icon: 'Notebook' },
+      { key: 'mapping', label: '底稿映射', segment: 'mapping', icon: 'Connection', badge: '智能' },
+      { key: 'workpapers', label: '税审底稿', segment: 'workpapers', icon: 'Notebook', badge: '智能' },
     ],
   },
   {
@@ -51,7 +57,7 @@ export const CITAR_NAV_GROUPS: CitarNavGroup[] = [
     title: '鉴证报告',
     items: [
       { key: 'report-body', label: '报告正文', segment: 'report-body', icon: 'DocumentChecked' },
-      { key: 'review-notes', label: '审核说明', segment: 'review-notes', icon: 'Notebook' },
+      { key: 'review-notes', label: '审核说明', segment: 'review-notes', icon: 'Notebook', badge: '智能' },
       { key: 'tax-return', label: '汇算申报表', segment: 'tax-return', icon: 'Document' },
       { key: 'financial-statements', label: '单体财务报表', segment: 'financial-statements', icon: 'Tickets' },
     ],

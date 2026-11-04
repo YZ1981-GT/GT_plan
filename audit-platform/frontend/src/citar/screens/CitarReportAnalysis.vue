@@ -2,7 +2,7 @@
   <div class="unaudited-screen">
     <header class="unaudited-header">
       <h1 class="unaudited-header__title">报表分析</h1>
-      <span class="unaudited-header__note">资产负债表、利润表的审定 / 未审 / 对比，及跨表核对、多年对比、变动分析、财务指标</span>
+      <span class="unaudited-header__note">资产负债表、利润表的审定 / 未审 / 对比，及智能核对（跨表勾稽）、多年对比、变动分析、财务指标</span>
     </header>
 
     <nav class="unaudited-tabs">

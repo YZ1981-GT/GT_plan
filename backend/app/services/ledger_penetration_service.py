@@ -148,11 +148,12 @@ class LedgerPenetrationService:
         self, project_id: UUID, year: int,
         account_code: str | None = None,
     ) -> list[dict]:
-        """第一层：科目余额汇总（自动补齐缺失的父级汇总行）"""
+        """第一层：科目余额汇总（自动补齐缺失的父级汇总行）。行带 ``id``（合成的上级行没有），人工修改按它定位。"""
         tbl = TbBalance.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
             sa.select(
+                tbl.c.id,
                 tbl.c.account_code,
                 tbl.c.account_name,
                 tbl.c.level,

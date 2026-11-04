@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable
 
+from app.services.tax_workpaper_classify import Assignment, Category, classify, grouped_entries
 from app.services.tax_workpaper_fetch import SYNONYMS, AccountBook, Node, display_name, name_key
 
 
@@ -45,6 +46,7 @@ class _Entry:
 
 #: 分类表的余项类别名（按 ``name_key`` 口径）
 OTHERS_KEY = "其他"
+_MEASURE_LABEL = {"debit": "借方发生额", "credit": "贷方发生额", "closing": "期末余额", "opening": "期初余额"}
 #: 事业单位 / 民间非营利组织专用表（sheet 名带「（3)」）：规则里混有企业科目同名项（投资收益、管理费用），
 #: 企业账套照样取得到，会把企业的投资收益填进事业单位收入表、算进广告费扣除基数。
 _ENTITY_SHEET_RE = re.compile(r"[（(]3[)）]")
@@ -80,10 +82,14 @@ class RuleRunner:
         lists: dict[str, dict],
         label_text: Callable[[str, str], str | None],
         rules: list[dict] | None = None,
+        groups: dict[str, dict] | None = None,
     ) -> None:
         self.book = book
         self.lists = lists
         self.label_text = label_text
+        #: 按行标签分类的组（model.classify_groups，spec citar-audited-balance-and-workpaper-coverage R3）
+        self.groups = groups or {}
+        self._assignments: dict[str, tuple[Assignment | None, str | None]] = {}
         self._entries: dict[str, tuple[list[_Entry], str | None]] = {}
         self._siblings = sibling_categories(rules or [])
         self._entity_tops: dict[str, set[str]] = {}
@@ -124,11 +130,60 @@ class RuleRunner:
         rest = [leaf for b in base for leaf in self.book.leaves(b) if leaf.code not in taken]
         return rest, None
 
+    # ── 按行标签分类 ──
+    def assignment(self, group_id: str) -> tuple[Assignment | None, str | None]:
+        """一组的分类结果（每组只算一次）；一级科目取不到时 (None, 原因)。末级合计与一级科目不等时给原因。"""
+        if group_id in self._assignments:
+            return self._assignments[group_id]
+        g = self.groups[group_id]
+        base, issue = self.book.resolve(g["path"])
+        if not base:
+            self._assignments[group_id] = (None, issue)
+            return self._assignments[group_id]
+        cats = [Category(c["index"], c["label"], tuple(c.get("exact") or ()), tuple(c.get("contains") or ()),
+                         tuple(c.get("not_contains") or ())) for c in g["categories"]]
+        result = classify(self.book, base, cats, set(g.get("base_names") or ()) | set(g["path"]))
+        leaves = [n for ns in result.by_category.values() for n in ns] + result.rest
+        diff = self.book.measure(base, g["measure"]) - self.book.measure(leaves, g["measure"])
+        if abs(diff) >= Decimal("0.005"):
+            result.issue = (f"「{g['path'][0]}」一级科目的{_MEASURE_LABEL.get(g['measure'], '')}与末级明细合计相差 {diff}，"
+                            "各行按末级明细取数，请核对余额表上下级")
+        self._assignments[group_id] = (result, None)
+        return self._assignments[group_id]
+
+    def _classify(self, item: dict) -> RuleResult:
+        status, rule = item["status"], item["rule"]
+        group = self.groups[item["group"]]
+        result, issue = self.assignment(item["group"])
+        first = item["category"] == group["categories"][0]["index"]
+        if result is None:
+            return RuleResult(None, status, rule, issue if first else None)
+        nodes = result.by_category.get(item["category"]) or []
+        if not nodes:
+            return RuleResult(None, status, rule, result.issue if first else None)
+        return RuleResult(self.book.measure(nodes, group["measure"]), status, rule, result.issue if first else None, nodes)
+
+    def _classified_entries(self, spec: dict) -> tuple[list[_Entry], str | None]:
+        result, issue = self.assignment(spec["group"])
+        if result is None:
+            return [], issue
+        cat = spec.get("category")
+        leaves = result.rest if cat is None else (result.by_category.get(cat) or [])
+        return [_Entry(name, nodes) for name, nodes in grouped_entries(self.book, result.base, leaves)], None
+
     # ── 列表 ──
     def entries(self, list_id: str) -> tuple[list[_Entry], str | None]:
         if list_id in self._entries:
             return self._entries[list_id]
         spec = self.lists[list_id]
+        if spec["mode"] == "classified":
+            entries, issue = self._classified_entries(spec)
+            slots = len(spec["refs"])
+            if len(entries) > slots:
+                keep, rest = entries[: slots - 1], entries[slots - 1:]
+                entries = keep + [_Entry(f"其他（共 {len(rest)} 个科目）", [n for e in rest for n in e.nodes], bundled=True)]
+            self._entries[list_id] = (entries, issue)
+            return self._entries[list_id]
         base, issue = self.book.resolve(spec["path"])
         candidates: list[Node] = []
         itself = False
@@ -206,6 +261,8 @@ class RuleRunner:
         res = self._run(item)
         if res.issue and not res.nodes and res.status != "manual" and not self.book.empty:
             path = item.get("path") or (self.lists[item["list"]]["path"] if item.get("list") else None)
+            if not path and item.get("group"):
+                path = self.groups[item["group"]]["path"]
             if path:
                 res.scope = self.book.tops(path[0])
         return res
@@ -229,6 +286,8 @@ class RuleRunner:
             return self._list_amount(item)
         if op == "others_sum":
             return self._others_sum(item)
+        if op == "classify":
+            return self._classify(item)
         path = list(item["path"])
         if item.get("label"):
             label = self.label_text(item["sheet"], item["label"])

@@ -1,0 +1,26 @@
+# 任务：审定报表平衡与税审底稿取数补全
+
+- [x] 1 现状核查（只读）：三个项目审定报表不平原因、底稿无规则的表、申报表 / 报告差异（证据见 requirements 现状表）
+- [x] 2 R1 审定报表未分配利润含未结转损益
+  - [x] 2.1 `standard_balance_view_service.unclosed_pl_amount`（余额 + 已批准调整 + 底稿发布调整，利润为正）
+  - [x] 2.2 `PL_UNCLOSED()`：L1 登记（其他路径报错）、`report_engine` 单体 resolver 代入（期初 0、合并严格报错否则 0）、`_is_affected` 认损益科目；`preset_acnr_migration._FALLBACK_KNOWN_FUNCS` 同步
+  - [x] 2.3 `report_total_formulas.STANDALONE_OVERRIDES` + `fixes_for`；发布脚本 / 填公式 / 守卫改用 `fixes_for`
+  - [x] 2.4 前端公式解析器登记 `PL_UNCLOSED`（0 参）
+  - [x] 2.5 测试 `tests/test_report_unclosed_pl.py` + `test_report_total_formulas.py` 单体覆盖
+  - [x] 2.6 （实施中发现）报表引擎「公式结果为 0 改用第一个 TB 科目余额」把合法 0 改错（激光无形资产 87,000 − 累计摊销 87,000 报成 87,000）⇒ 只提醒不改值；`test_report_engine_mode_fallback.py` 按新行为改
+- [x] 3 R2 重导后新科目进客户科目表：`auto_match` 每次补齐、按剥「.0」去重
+- [x] 4 R3~R5 底稿补充取数
+  - [x] 4.1 `tax_workpaper_classify`（按行标签分类）+ `RuleRunner` op `classify` / 列表 `classified`
+  - [x] 4.2 生成器 `tax_workpaper_supplements.py`：2-07 / 2-08 / 2-09 / 2-10 行别名、3-03-04 类别、3-03-01~04 税收默认值、整表说明
+  - [x] 4.3 `compute_sheet` 追加 `sheet_notes`
+  - [x] 4.4 （实施中发现）职工薪酬类审核表实际发放 / 支出部分无规则 ⇒ 整笔薪酬被当未支付全额调增（案例 1 调增 1,235 万）：应付科目取数（`paid_opening` 口径、「工资」同义词含奖金 / 股份支付）+ 汇算清缴期 / 未通过应付科目 / 社保实际支付默认公式（可手工改）
+  - [x] 4.5 （实施中发现）广告费和业务宣传费扣除率样表空白 ⇒ 限额 0、全额调增：默认 15% + 行业说明
+  - [x] 4.6 测试 `tests/test_tax_workpaper_classify.py`（案例 1 营业费用逐行、SAP 平铺、辽宁长名称、税金 / 财务费用、上下级不等、3-03-04、税收默认、职工薪酬案例 1 全 0 调整、SAP 平铺工资）
+- [x] 5 回归：后端 18 个文件 511 passed；生成器 `--check` OK（取数项 2166、列表 37）；前端 `formulaSyntaxParser.spec.ts` 44 passed。另 4 个失败（lazy import 3 处缺模块、`auto_suggest` 返回 exact_code）HEAD 干净检出同样失败，与本 spec 无关
+- [x] 6 数据处理（R6）
+  - [x] 6.1 报表公式全局发布（留底 `backend/backups/report_total_formulas_pl_unclosed_20261104.json`，3 个项目各重算 4~6 行、失败 0）
+  - [x] 6.2 激光重导（3 个 SAP 文件：余额 85 / 序时账 9,459）、ABC 重导（余额 287 / 序时账 14,107）；旧数据集保留为 superseded
+  - [x] 6.3 辽宁自动匹配补映射（saved 539，完成率 96.31%）
+  - [x] 6.4 三个项目重新生成报表（先补跑并发会话的待跑迁移 V260，与启动同一路径 `MigrationRunner.run_pending`）：辽宁差 0；激光差 −12,622.30 = 1485010000 应收退货成本未映射（标准科目表无对应科目，待拍板）；ABC 差 −11,340.42 = 账套本身借贷不平（5801 以前年度损益调整单边）
+- [x] 7 验收：案例 1（ABC）2-07 / 2-08 / 2-10 / 3-02-01-01~07 / 3-02-02 / 3-02-03 / A104000 / A105050 与案例逐格一致，A100000 利润总额一致；浏览器实测审定报表、税审底稿 2-08、汇算申报表有数（截图 `D:\gtt\fp\shot`，仓库外）。差异逐条见 design §7
+- [x] 8 收尾：`citar-case-chain-fetch-fixes` tasks 追加勘误；memory；探针清理

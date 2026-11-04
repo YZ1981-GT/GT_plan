@@ -21,7 +21,7 @@
         [{"ref":"A15","role":"e"},{"ref":"B15","role":"e"},{"kind":"input","ref":"C15","role":"e","fmt":"money"},{"kind":"input","ref":"D15","role":"e","fmt":"money"},{"colSpan":2,"ref":"E15","role":"e"}],
         [{"ref":"A16","role":"e"},{"ref":"B16","role":"e"},{"kind":"input","ref":"C16","role":"e","fmt":"money"},{"kind":"input","ref":"D16","role":"e","fmt":"money"},{"colSpan":2,"ref":"E16","role":"e"}],
         [{"ref":"A17","role":"e"},{"ref":"B17","role":"e"},{"kind":"input","ref":"C17","role":"e","fmt":"money"},{"kind":"input","ref":"D17","role":"e","fmt":"money"},{"colSpan":2,"ref":"E17","role":"e"}],
-        [{"text":"合计","kind":"total"},{"text":"0","kind":"number"},{"text":"0.00","kind":"number"},{"text":"0.00","kind":"number"},{"colSpan":2,"ref":"E18","role":"e"}]
+        [{"text":"合计","kind":"total"},{"text":"0","kind":"number","ref":"B18","role":"c"},{"text":"0.00","kind":"number","ref":"C18","role":"c","fmt":"money"},{"text":"0.00","kind":"number","ref":"D18","role":"c","fmt":"money"},{"colSpan":2,"ref":"E18","role":"e"}]
       ]
     }
   ]

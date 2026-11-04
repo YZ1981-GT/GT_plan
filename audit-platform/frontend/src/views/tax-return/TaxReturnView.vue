@@ -157,14 +157,17 @@ watch([projectId, year], loadMarks, { immediate: true })
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   background: var(--tw-page-bg);
   font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
 }
 
+/* CITAR 框架定高一屏：目录栏与右侧申报表各自滚动 */
 .tw-view__content {
   flex: 1 1 auto;
   min-width: 0;
   padding: 20px 24px;
+  overflow-y: auto;
 }
 
 .tr-empty {

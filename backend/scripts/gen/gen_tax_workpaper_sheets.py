@@ -29,9 +29,11 @@ from pathlib import Path
 
 import openpyxl
 from openpyxl.utils import range_boundaries
+from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tax_workpaper_model import build_model  # noqa: E402
+from app.services.tax_formula_engine import iter_refs, parse_formula  # noqa: E402  （tax_workpaper_model 已把 backend 加进 sys.path）
 
 ROOT = Path(__file__).resolve().parents[3]
 FRONT_DIR = ROOT / "audit-platform" / "frontend" / "src" / "views" / "tax-workpapers"
@@ -139,11 +141,46 @@ def value_format(fmt: str | None) -> str | None:
     return "int"
 
 
-def convert_sheet(ws_val, ws_fx, model_sheet: dict | None = None, rule_refs: dict[str, str] | None = None) -> list[list[dict]]:
-    """``model_sheet``：计算模型里本 sheet 的 cells（判公式格）；``rule_refs``：本 sheet 取数目标格 → op。"""
+#: 不被公式引用、但由鉴证报告直接读取的预置数字（报告正文摘录表金额列，税率行是常量 25%）
+DIRECT_READ_CONSTANTS = {("1-01报告正文", f"F{r}") for r in range(17, 42)}
+
+
+def editable_constants(model: dict) -> dict[str, set[str]]:
+    """样表预置数字里可改的格：被公式引用的（税率、扣除比例等，改了参与计算）+ 值为 0 的（占位）。
+
+    另加 ``DIRECT_READ_CONSTANTS``。行次 / 序号这类不被引用的非 0 整数不开放（spec citar-table-manual-edit R1）。sheet → {A1 地址}。
+    """
+    numeric: dict[str, dict[tuple[int, int], str]] = {}
+    for name, sheet in model["sheets"].items():
+        for ref, raw in sheet["cells"].items():
+            if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+                col, row = coordinate_from_string(ref)
+                numeric.setdefault(name, {})[(row, column_index_from_string(col))] = ref
+    out: dict[str, set[str]] = {
+        name: {ref for ref in cells.values() if model["sheets"][name]["cells"][ref] == 0 or (name, ref) in DIRECT_READ_CONSTANTS}
+        for name, cells in numeric.items()
+    }
+    for name, sheet in model["sheets"].items():
+        for raw in sheet["cells"].values():
+            if not isinstance(raw, dict):
+                continue
+            for _, ref_sheet, r1, c1, r2, c2 in iter_refs(parse_formula(raw["f"], name)):
+                for (row, col), ref in numeric.get(ref_sheet, {}).items():
+                    if r1 <= row <= r2 and c1 <= col <= c2:
+                        out.setdefault(ref_sheet, set()).add(ref)
+    return out
+
+
+def convert_sheet(
+    ws_val, ws_fx, model_sheet: dict | None = None, rule_refs: dict[str, str] | None = None,
+    const_refs: set[str] | None = None,
+) -> list[list[dict]]:
+    """``model_sheet``：计算模型里本 sheet 的 cells（判公式格）；``rule_refs``：本 sheet 取数目标格 → op；
+    ``const_refs``：可改的样表预置数字（``editable_constants``）。"""
     model_cells = (model_sheet or {}).get("cells", {})
     rule_ops = rule_refs or {}
     rule_refs = set(rule_ops)
+    const_refs = const_refs or set()
     min_row, min_col, max_row, max_col = print_bounds(ws_val)
     rows_idx = [r for r in range(min_row, max_row + 1) if not ws_val.row_dimensions[r].hidden]
     cols_idx = [
@@ -187,6 +224,8 @@ def convert_sheet(ws_val, ws_fx, model_sheet: dict | None = None, rule_refs: dic
             elif isinstance(raw, dict) and "f" in raw:
                 info["_ref"], info["_role"] = ref, "f"
                 info.pop("text", None)  # 值由后端计算给出（含 ="文字"&... 的前导文字）
+            elif ref in const_refs:
+                info["_ref"], info["_role"] = ref, "c"  # 样表预置数字：照常显示原文，可改
             elif info.get("text") is None and info["_border"] and not info["_formula"]:
                 info["_ref"], info["_role"] = ref, "e"
             fmt = value_format(src_cell.number_format)
@@ -205,7 +244,7 @@ def convert_sheet(ws_val, ws_fx, model_sheet: dict | None = None, rule_refs: dic
     for row in grid:
         for cell in row:
             # 表名、索引号、表头这类格子不可填写
-            if cell.get("_role") == "e" and cell.get("kind") in ("title", "meta", "header") and cell["_ref"] not in rule_refs:
+            if cell.get("_role") in ("e", "c") and cell.get("kind") in ("title", "meta", "header") and cell["_ref"] not in rule_refs:
                 del cell["_ref"], cell["_role"]
                 cell.pop("_fmt", None)
     return [[strip_private(c) for c in row] for row in grid]
@@ -329,8 +368,8 @@ def render_model(model: dict) -> str:
             for j, item in enumerate(value):
                 lines.append(f"    {dump(item)}" + ("," if j < len(value) - 1 else ""))
             lines.append("  ]" + sep)
-        elif key == "lists" and value:
-            lines.append('  "lists": {')
+        elif key in ("lists", "classify_groups", "sheet_notes") and value:
+            lines.append(f"  {dump(key)}: {{")
             ids = list(value)
             for j, list_id in enumerate(ids):
                 lines.append(f"    {dump(list_id)}: {dump(value[list_id])}" + ("," if j < len(ids) - 1 else ""))
@@ -395,11 +434,15 @@ def build(src: Path) -> tuple[dict[str, str], str, dict]:
     rule_refs: dict[str, dict[str, str]] = {}
     for item in rules.items:
         rule_refs.setdefault(item["sheet"], {})[item["ref"]] = item["op"]
+    const_refs = editable_constants(model)
 
     def render_code(code: str, sources: list[tuple[str, str | None]]) -> str:
         parts = []
         for sheet_name, title in sources:
-            rows = convert_sheet(wb_val[sheet_name], wb_fx[sheet_name], model["sheets"].get(sheet_name), rule_refs.get(sheet_name))
+            rows = convert_sheet(
+                wb_val[sheet_name], wb_fx[sheet_name], model["sheets"].get(sheet_name), rule_refs.get(sheet_name),
+                const_refs.get(sheet_name),
+            )
             # source 用模型里的 sheet 名原样（含尾部空格），前端按它对接口返回的值
             part = {"source": sheet_name, "rows": rows}
             if title:

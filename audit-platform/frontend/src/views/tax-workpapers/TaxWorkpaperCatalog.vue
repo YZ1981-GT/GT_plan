@@ -47,7 +47,7 @@
  * 分组默认全部收起；当前打开的表所在分组自动展开，否则从索引点进来后目录里看不到高亮项。
  */
 import { computed, ref, watch } from 'vue'
-import { TAX_WORKPAPER_INDEX, findTaxWorkpaperGroup } from './taxWorkpaperIndex'
+import { SHOWN_TAX_WORKPAPER_INDEX, findTaxWorkpaperGroup } from './taxWorkpaperIndex'
 
 const props = defineProps<{
   /** 当前打开的表编号；索引页传 indexCode */
@@ -80,9 +80,12 @@ watch(
   { immediate: true },
 )
 
-/** 当前表即使被标为「无」也留在目录里：它正开着，消失会让人以为点错了 */
+/**
+ * 只列底稿页显示的表（SHOWN_TAX_WORKPAPER_INDEX）；
+ * 当前表即使被标为「无」也留在目录里：它正开着，消失会让人以为点错了
+ */
 const visibleGroups = computed(() =>
-  TAX_WORKPAPER_INDEX.map(group => ({
+  SHOWN_TAX_WORKPAPER_INDEX.map(group => ({
     title: group.title,
     sheets: group.sheets.filter(s => s.code === props.activeCode || !props.hiddenCodes.has(s.code)),
   })),

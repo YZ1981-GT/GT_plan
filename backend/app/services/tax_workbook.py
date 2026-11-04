@@ -36,11 +36,13 @@ Key = tuple[str, int, int]
 
 
 class Results(dict):
-    """公式计算结果；``blank`` = 只引用一个空格的公式（计算按 0，显示为空白）。"""
+    """公式计算结果；``blank`` = 只引用一个空格的公式（计算按 0，显示为空白）；
+    ``auto`` = 有手工值的公式格按公式算出的值（结果取手工值，悬停显示原值用，spec citar-table-manual-edit R1）。"""
 
     def __init__(self) -> None:
         super().__init__()
         self.blank: set[Key] = set()
+        self.auto: dict[Key, Value] = {}
 
 
 def parse_a1(ref: str) -> tuple[int, int]:
@@ -165,9 +167,13 @@ class TaxWorkbook:
         inputs: dict[Key, Value],
         rule_values: dict[Key, Value],
     ) -> dict[Key, Value]:
-        """按拓扑序求 ``needed`` 里的公式格；取数格取 ``rule_values``，手工值优先于取数与常量。"""
+        """按拓扑序求 ``needed`` 里的公式格；取数格取 ``rule_values``，手工值优先于公式、取数与常量。
+
+        公式格有手工值（含 null = 手工清空）时结果取手工值，下游公式按手工值算；公式照算一次记进 ``results.auto``。
+        """
         results = Results()
         wb = self
+        overridden = {k for k in needed if k in self.formulas and k in inputs}
 
         class _Ctx:
             current: tuple[int, int] | None = None
@@ -188,6 +194,11 @@ class TaxWorkbook:
         for key in needed:
             if key in self.cyclic:
                 results[key] = CIRC
+        # 手工值先就位：环上的格有手工值也取手工值；拓扑序在后的公式读到的都是手工值
+        for key in overridden:
+            if key in self.cyclic:
+                results.auto[key] = CIRC
+            results[key] = inputs[key]
         pending = sorted((k for k in needed if k in self.order), key=self.order.__getitem__)
         for key in pending:
             ctx.current = (key[1], key[2])  # 隐式交集按公式所在格
@@ -195,6 +206,9 @@ class TaxWorkbook:
             value = evaluate(ast, ctx)
             # 公式结果为空按 Excel 一律算 0（下游 MIN / SUM 才与 Excel 一致：MIN 忽略空格、不忽略 0）。
             # 只引用一个空格的公式（表头 ='填写参数'!B11 这类）显示时保持空白（页面上显示 0 不合适），见 cell_value
+            if key in overridden:
+                results.auto[key] = None if value is None and ast[0] == "ref" else (Decimal(0) if value is None else value)
+                continue
             if value is None:
                 if ast[0] == "ref":
                     results.blank.add(key)
@@ -203,13 +217,13 @@ class TaxWorkbook:
         return results
 
     def cell_value(self, key: Key, inputs: dict[Key, Value], rule_values: dict[Key, Value], results: dict[Key, Value]) -> Value:
-        """显示值：公式格取计算结果；只引用一个空格的公式显示空白（参与计算时是 0）。"""
+        """显示值：手工值优先；公式格取计算结果，只引用一个空格的公式显示空白（参与计算时是 0）。"""
+        if key in inputs:
+            return inputs[key]
         if key in self.formulas:
             if key in getattr(results, "blank", ()):
                 return None
             return results.get(key)
-        if key in inputs:
-            return inputs[key]
         if key in rule_values:
             return rule_values[key]
         return self.consts.get(key)

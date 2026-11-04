@@ -11,10 +11,16 @@
       </button>
     </header>
 
-    <!-- 三步提示：选文件 → 识别与列映射 → 导入 -->
+    <!-- 三步提示：选文件 → 智能识别与映射 → 导入 -->
+    <!-- 识别是表头别名 / 编辑距离 / 历史映射复用的规则实现，没有大模型，故写「智能」不写「AI」（用户 2026-11-04 方案 A） -->
     <ol class="citar-import__steps">
       <li v-for="(s, i) in STEPS" :key="s" :class="{ 'is-active': step === i, 'is-done': step > i }">{{ i + 1 }}. {{ s }}</li>
     </ol>
+
+    <!-- 当前账套有人工修改：重新导入生成新数据集，这些修改不会带过去（spec citar-table-manual-edit R5） -->
+    <p v-if="manualCount && step === 0" class="citar-import__warn" role="status">
+      当前账套有人工修改（科目余额表 {{ manualSummary.balance }} 行、序时账 {{ manualSummary.ledger }} 行）。重新导入后这些修改不会保留。
+    </p>
 
     <section class="import-card">
       <!-- 第 1 步：选文件（CITAR 拖拽区） -->
@@ -55,12 +61,12 @@
 
         <ul class="import-notes">
           <li>支持 .xlsx / .xlsm / .csv / .tsv / .zip，可一次选多个文件（最多 20 个，合计 500MB）</li>
-          <li>系统自动识别科目余额表、序时账、辅助余额表与辅助明细账，识别后可逐列确认</li>
+          <li>系统智能识别科目余额表、序时账、辅助余额表与辅助明细账，并自动匹配列；识别后可逐列确认</li>
         </ul>
 
         <div v-if="detecting" class="citar-import__progress">
           <el-progress :percentage="uploadPercent" :stroke-width="8" />
-          <span>{{ uploadPercent < 90 ? '正在上传…' : '正在识别表格结构，大文件需要几分钟…' }}</span>
+          <span>{{ uploadPercent < 90 ? '正在上传…' : '正在智能识别表格结构，大文件需要几分钟…' }}</span>
         </div>
 
         <div class="import-actions">
@@ -72,7 +78,7 @@
           </button>
           <span class="import-actions__hint">若上方拖拽区点击无反应，请用此按钮选择文件</span>
           <button class="import-submit" type="button" :disabled="!files.length || detecting || !year" @click="runDetect">
-            {{ detecting ? '预检中…' : '开始预检' }}
+            {{ detecting ? '智能预检中…' : '开始智能预检' }}
           </button>
         </div>
       </template>
@@ -134,7 +140,7 @@
  * 规模警告强制继续、关键列必须映射都在组件里），本页只换外观与编排。
  * 差异：按项目审核年度导入（detect 带 year_override、submit 用项目年度），完成后进「账务查询」。
  */
-import { defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import DetectionPreview from '@/components/ledger-import/DetectionPreview.vue'
@@ -151,6 +157,7 @@ import type { ConfirmedMapping } from '@/types/ledger-import'
 import { ledger as P_ledger } from '@/services/apiPaths'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { fetchManualEditsSummary } from '../citarLedgerEdits'
 import { useCitarProject } from '../useCitarProject'
 
 const LedgerImportGuideDialog = defineAsyncComponent(
@@ -159,7 +166,7 @@ const LedgerImportGuideDialog = defineAsyncComponent(
 
 defineOptions({ name: 'CitarDataImport' })
 
-const STEPS = ['选择文件', '识别与列映射', '导入']
+const STEPS = ['选择文件', '智能识别与映射', '导入']
 const ACCEPTED_EXTENSIONS = '.xlsx,.xlsm,.csv,.tsv,.zip'
 const MAX_FILES = 20
 
@@ -181,6 +188,19 @@ const lastMappings = ref<ConfirmedMapping[] | null>(null)
 const errors = ref<ImportError[]>([])
 const errorVisible = ref(false)
 const guideVisible = ref(false)
+
+/** 当前账套人工修改行数（重新导入前提示） */
+const manualSummary = ref({ balance: 0, ledger: 0 })
+const manualCount = computed(() => manualSummary.value.balance + manualSummary.value.ledger)
+watch([projectId, year], async ([pid, y]) => {
+  manualSummary.value = { balance: 0, ledger: 0 }
+  if (!pid || !y) return
+  try {
+    manualSummary.value = await fetchManualEditsSummary(pid, y)
+  } catch {
+    // 只是提示，读不到不影响导入
+  }
+}, { immediate: true })
 
 function pick() {
   if (!detecting.value) inputRef.value?.click()
@@ -320,6 +340,16 @@ function formatSize(bytes: number): string {
 <style scoped src="../styles/data-import.css"></style>
 
 <style scoped>
+
+.citar-import__warn {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid #f0d9a8;
+  border-radius: 6px;
+  background: #fff8e8;
+  font-size: var(--citar-fs-13);
+  color: var(--citar-c-8a5300);
+}
 
 .citar-import__year {
   margin-left: 16px;

@@ -2,7 +2,7 @@
   <div class="aud-screen">
     <header class="aud-header">
       <h1 class="aud-header__title">报告正文</h1>
-      <span class="aud-header__note">取税审底稿 1-01 与申报主表 A100000；正文为法定文书表述，不改措辞</span>
+      <span class="aud-header__note">取税审底稿 1-01 与申报主表 A100000；摘录表金额可修改，正文为法定文书表述，不改措辞</span>
     </header>
 
     <section class="aud-panel">
@@ -26,15 +26,22 @@
         <p v-if="loading && !data" class="sheet-empty">正在生成报告正文…</p>
         <p v-else-if="error" class="sheet-empty">{{ error }}</p>
 
-        <div v-if="data" ref="previewContainer" class="rb-preview" aria-label="报告正文 Word 预览" :aria-busy="previewLoading">
-          <p v-if="previewLoading" class="sheet-empty">正在载入报告版式…</p>
+        <CitarReportBodyAmounts v-if="data" :data="data" :project-id="projectId" :year="year" @saved="onAmountsSaved" />
+
+        <div v-if="data" class="rb-preview" aria-label="报告正文 Word 版式预览" :aria-busy="previewLoading">
+          <p v-if="previewLoading" class="sheet-empty">正在生成报告版式…</p>
           <p v-if="previewError" class="sheet-empty" role="alert">{{ previewError }}</p>
-          <VueOfficeDocx
+          <div v-if="missingFonts.length" class="citar-notice" role="status">
+            OnlyOffice 服务器缺少{{ missingFonts.join('、') }}字体，预览的字形、行距和分页与 Word 有差异，导出的 Word 不受影响；请联系管理员安装字体
+          </div>
+          <VueOfficePdf
             v-if="documentSource"
             :key="documentRevision"
+            class="rb-preview__pdf"
             :src="documentSource"
-            :options="previewOptions"
-            @rendered="onPreviewRendered"
+            :options="PDF_OPTIONS"
+            :static-file-url="PDF_STATIC_URL"
+            @rendered="previewLoading = false"
             @error="onPreviewError"
           />
         </div>
@@ -47,16 +54,31 @@
 /**
  * 报告正文（CITAR 鉴证报告 · 报告正文）：报告封面 + 正文，数据取税审底稿 1-01 与申报主表 A100000。
  * 报告日期可填写保存；导出 Word 以案例报告为模板，只替换单位、年度、报告号、日期与 25 个金额。
+ * 网页预览 = 导出的同一份 Word 经 OnlyOffice 转成 PDF（浏览器端 docx 预览排不准这份模板的空段高、
+ * 文档网格与固定行高，版式与 Word 不一致）。
  */
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import VueOfficeDocx from '@vue-office/docx'
-import '@vue-office/docx/lib/index.css'
+import VueOfficePdf from '@vue-office/pdf'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
-import { downloadTaxAssurance, fetchReportBody, fetchReportBodyDocument, saveReportDate, type ReportBodyData } from '../taxAssuranceApi'
+import {
+  downloadTaxAssurance, fetchReportBody, fetchReportBodyPreview, previewErrorReason, saveReportDate, type ReportBodyData,
+} from '../taxAssuranceApi'
+import CitarReportBodyAmounts from '../components/CitarReportBodyAmounts.vue'
 import { useCitarProject } from '../useCitarProject'
 
 defineOptions({ name: 'CitarReportBody' })
+
+/**
+ * pdf.js 静态文件目录（组件默认取 unpkg，内网打不开）。OnlyOffice 转出的 PDF 字体全部内嵌、
+ * 编码 Identity-H，不读 cmaps，这里只是不让它去外网。
+ */
+const PDF_STATIC_URL = `${import.meta.env.BASE_URL}pdfjs/`
+/**
+ * 页面显示宽度：A4 宽 210mm 在 96dpi 下约 794px，即 Word「100% 显示比例」。
+ * 不设时组件按容器撑满（内容区约 1150px 宽 ⇒ 放大到约 140%）；容器比它窄时组件自动缩小。
+ */
+const PDF_OPTIONS = { width: 794 }
 
 const { projectId, year, yearLoading } = useCitarProject()
 const data = ref<ReportBodyData | null>(null)
@@ -69,11 +91,7 @@ const documentSource = shallowRef<ArrayBuffer>()
 const documentRevision = ref(0)
 const previewLoading = ref(false)
 const previewError = ref('')
-const previewContainer = ref<HTMLElement>()
-const previewOptions = {
-  breakPages: true, ignoreLastRenderedPageBreak: false,
-  renderHeaders: true, renderFooters: true, useBase64URL: true,
-}
+const missingFonts = ref<string[]>([])
 
 let seq = 0
 let previewSeq = 0
@@ -81,34 +99,27 @@ async function loadPreview() {
   const mine = ++previewSeq
   documentSource.value = undefined
   previewError.value = ''
+  missingFonts.value = []
   previewLoading.value = false
   if (!year.value) return
   previewLoading.value = true
   try {
-    const source = await fetchReportBodyDocument(projectId.value, year.value)
+    const res = await fetchReportBodyPreview(projectId.value, year.value)
     if (mine !== previewSeq) return
+    missingFonts.value = res.missingFonts
     documentRevision.value++
-    documentSource.value = source
-  } catch {
+    documentSource.value = res.pdf
+  } catch (e) {
     if (mine !== previewSeq) return
-    onPreviewError()
+    onPreviewError(e)
   }
 }
 
-function onPreviewRendered() {
-  // 同一位置同时有显式分页和 Word 缓存分页时，预览器会多生成一张空白页。
-  for (const page of previewContainer.value?.querySelectorAll('section.docx') ?? []) {
-    const body = page.querySelector('article')
-    if (body && !body.textContent?.trim() && !body.querySelector('img, table, svg, canvas')) {
-      page.remove()
-    }
-  }
+function onPreviewError(e?: unknown) {
   previewLoading.value = false
-}
-
-function onPreviewError() {
-  previewLoading.value = false
-  previewError.value = '报告版式加载失败，请点击刷新重试，或导出 Word 查看'
+  documentSource.value = undefined
+  const reason = previewErrorReason(e)
+  previewError.value = `报告版式预览生成失败${reason ? `：${reason}` : ''}。可点击刷新重试，或导出 Word 查看`
 }
 
 async function load() {
@@ -152,6 +163,12 @@ async function saveDate() {
   }
 }
 
+/** 摘录表金额保存后：用返回的新数据，重载 Word 预览 */
+async function onAmountsSaved(res: ReportBodyData) {
+  data.value = res
+  await loadPreview()
+}
+
 async function exportWord() {
   if (!year.value || !data.value) return
   exporting.value = true
@@ -176,17 +193,12 @@ onBeforeUnmount(() => { seq++; previewSeq++ })
 <style scoped>
 .rb-preview {
   min-width: 0;
-  overflow-x: auto;
 }
-.rb-preview :deep(.vue-office-docx) {
-  height: auto;
-  overflow: visible;
-}
-.rb-preview :deep(.docx-wrapper) {
-  min-width: fit-content;
-}
-/* 案例封面无页眉；预览器在首页未定义页眉时会误用正文页眉。 */
-.rb-preview :deep(section.docx:first-of-type > header) {
-  visibility: hidden;
+/* 组件自带竖向滚动 + 懒渲染页面，必须给定高度；灰底与 Word「页面视图」一致 */
+.rb-preview__pdf {
+  height: calc(100vh - 220px);
+  min-height: 480px;
+  border: 1px solid #e4d8f3;
+  border-radius: 6px;
 }
 </style>

@@ -19,6 +19,7 @@
       <span class="citar-toolbar__count">
         {{ activeCode ? `科目 ${activeCode} 及下级` : '全部科目' }}{{ total !== null ? `，共 ${total} 条分录` : '' }}
       </span>
+      <span class="citar-toolbar__hint">{{ canManualEdit ? '每条分录可「修改」；序时账的修改不回写科目余额表' : MANUAL_EDIT_DENIED_TIP }}</span>
     </div>
 
     <div class="sheet-scroll">
@@ -27,21 +28,48 @@
           <tr>
             <th v-for="c in JOURNAL_COLUMNS" :key="c.key">{{ c.label }}</th>
             <th v-if="activeCode">余额</th>
+            <th class="citar-journal__ops-head" />
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(r, i) in items" :key="r.id">
+          <tr v-for="(r, i) in items" :key="r.id" :class="{ 'citar-journal__row--edited': editedIds.has(r.id) }">
             <td class="is-numeric">{{ offset + i + 1 }}</td>
-            <td>{{ r.voucher_date }}</td>
-            <td>{{ r.voucher_no }}</td>
-            <td class="citar-journal__summary" :title="r.summary || ''">{{ r.summary }}</td>
-            <td>{{ r.account_code }}</td>
-            <td class="citar-journal__summary" :title="r.account_name || ''">{{ r.account_name }}</td>
-            <td>{{ pickExtra(r, AUX_KEYS) }}</td>
-            <td>{{ pickExtra(r, CURRENCY_KEYS) }}</td>
-            <td class="is-numeric">{{ fmtMoney(r.debit_amount, '') }}</td>
-            <td class="is-numeric">{{ fmtMoney(r.credit_amount, '') }}</td>
-            <td v-if="activeCode" class="is-numeric">{{ fmtMoney(r.running_balance) }}</td>
+            <template v-if="editingId === r.id">
+              <td><input v-model="draft.voucher_date" class="citar-search citar-journal__input" type="date" aria-label="凭证日期" /></td>
+              <td><input v-model="draft.voucher_no" class="citar-search citar-journal__input" aria-label="凭证号" /></td>
+              <td><input v-model="draft.summary" class="citar-search citar-journal__input citar-journal__input--wide" aria-label="摘要" /></td>
+              <td><input v-model="draft.account_code" class="citar-search citar-journal__input" aria-label="科目编码" /></td>
+              <td><input v-model="draft.account_name" class="citar-search citar-journal__input" aria-label="科目名称" /></td>
+              <td>{{ pickExtra(r, AUX_KEYS) }}</td>
+              <td>{{ pickExtra(r, CURRENCY_KEYS) }}</td>
+              <td><input v-model="draft.debit_amount" class="citar-search citar-journal__input citar-journal__input--num" aria-label="借方金额" /></td>
+              <td><input v-model="draft.credit_amount" class="citar-search citar-journal__input citar-journal__input--num" aria-label="贷方金额" /></td>
+              <td v-if="activeCode" class="is-numeric">{{ fmtMoney(r.running_balance) }}</td>
+              <td class="citar-center citar-journal__ops">
+                <button class="citar-btn citar-btn--primary" type="button" :disabled="saving" @click="saveEdit(r)">{{ saving ? '保存中…' : '保存' }}</button>
+                <button class="citar-btn" type="button" :disabled="saving" @click="editingId = ''">取消</button>
+              </td>
+            </template>
+            <template v-else>
+              <td>{{ r.voucher_date }}</td>
+              <td>{{ r.voucher_no }}</td>
+              <td class="citar-journal__summary" :title="r.summary || ''">{{ r.summary }}</td>
+              <td>{{ r.account_code }}</td>
+              <td class="citar-journal__summary" :title="r.account_name || ''">
+                {{ r.account_name }}<span v-if="editedIds.has(r.id)" class="citar-journal__tag" :title="editedTitle(r.id)">已修改</span>
+              </td>
+              <td>{{ pickExtra(r, AUX_KEYS) }}</td>
+              <td>{{ pickExtra(r, CURRENCY_KEYS) }}</td>
+              <td class="is-numeric">{{ fmtMoney(r.debit_amount, '') }}</td>
+              <td class="is-numeric">{{ fmtMoney(r.credit_amount, '') }}</td>
+              <td v-if="activeCode" class="is-numeric">{{ fmtMoney(r.running_balance) }}</td>
+              <td class="citar-center citar-journal__ops">
+                <template v-if="canManualEdit">
+                  <button class="citar-btn" type="button" :disabled="saving" @click="startEdit(r)">修改</button>
+                  <button v-if="editedIds.has(r.id)" class="citar-btn" type="button" :disabled="saving" @click="restore(r)">恢复</button>
+                </template>
+              </td>
+            </template>
           </tr>
         </tbody>
       </table>
@@ -68,12 +96,17 @@
  * - 全部科目：GET /ledger/entries-all（页码分页；总数只在第 1 页返回）
  * - 指定科目：GET /ledger/entries/{code}*（含下级，游标分页，带累计余额）
  * 辅助核算 / 币种：平台没有专列，取导入时保留的额外列（extra_fields）里名字匹配的那一列。
+ * 每条分录可人工修改、恢复导入原值（spec citar-table-manual-edit R4 / R5）；修改不回写余额表。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 import { JOURNAL_COLUMNS } from '../data/reportLines'
+import { editLedgerEntry, fetchManualEdits, restoreLedgerRow, type ManualEditInfo } from '../citarLedgerEdits'
 import { fmtMoney } from '../useCitarProject'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 interface JournalRow {
   id: string
@@ -93,6 +126,7 @@ const AUX_KEYS = ['辅助核算', '核算维度', '辅助项', '辅助']
 const CURRENCY_KEYS = ['币种', '币别', '货币']
 
 const props = defineProps<{ projectId: string; year: number; entityName: string; accountCode?: string }>()
+const { canManualEdit } = useManualEditPermission()
 /** 筛选科目变化时通知父组件写回 ?account=，刷新不丢、也不残留旧筛选 */
 const emit = defineEmits<{ 'update:accountCode': [code: string] }>()
 
@@ -178,6 +212,97 @@ function prevPage() {
   if (pageIndex.value > 0) void loadPage(pageIndex.value - 1)
 }
 
+// ── 人工修改（spec citar-table-manual-edit R4 / R5） ──
+const edits = ref<ManualEditInfo[]>([])
+const editedIds = computed(() => new Set(edits.value.map(e => e.row_id)))
+const editingId = ref('')
+const saving = ref(false)
+const draft = reactive({ voucher_date: '', voucher_no: '', summary: '', account_code: '', account_name: '', debit_amount: '', credit_amount: '' })
+
+async function loadEdits() {
+  try {
+    edits.value = await fetchManualEdits(props.projectId, props.year, 'ledger')
+  } catch {
+    edits.value = []
+  }
+}
+
+function editedTitle(id: string): string {
+  const e = edits.value.find(x => x.row_id === id)
+  if (!e) return ''
+  const o = e.original
+  const when = e.edited_at ? e.edited_at.slice(0, 16).replace('T', ' ') : ''
+  return `导入原值：${o.voucher_date ?? ''} ${o.voucher_no ?? ''} ${o.summary ?? ''} 借 ${fmtMoney(o.debit_amount, '0')} 贷 ${fmtMoney(o.credit_amount, '0')}\n最后修改：${when}`
+}
+
+function startEdit(r: JournalRow) {
+  editingId.value = r.id
+  draft.voucher_date = (r.voucher_date || '').slice(0, 10)
+  draft.voucher_no = r.voucher_no || ''
+  draft.summary = r.summary || ''
+  draft.account_code = r.account_code || ''
+  draft.account_name = r.account_name || ''
+  draft.debit_amount = r.debit_amount ? String(r.debit_amount) : ''
+  draft.credit_amount = r.credit_amount ? String(r.credit_amount) : ''
+}
+
+function money(text: string): number | null | undefined {
+  const t = text.replace(/,/g, '').trim()
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isFinite(n) ? n : undefined
+}
+
+async function saveEdit(r: JournalRow) {
+  const debit = money(draft.debit_amount)
+  const credit = money(draft.credit_amount)
+  if (debit === undefined || credit === undefined) {
+    ElMessage.warning('金额只能填数字')
+    return
+  }
+  if (!draft.voucher_date || !draft.voucher_no.trim() || !draft.account_code.trim()) {
+    ElMessage.warning('凭证日期、凭证号、科目编码不能为空')
+    return
+  }
+  saving.value = true
+  try {
+    await editLedgerEntry(props.projectId, props.year, r.id, {
+      voucher_date: draft.voucher_date,
+      voucher_no: draft.voucher_no.trim(),
+      summary: draft.summary.trim() || null,
+      account_code: draft.account_code.trim(),
+      account_name: draft.account_name.trim() || null,
+      debit_amount: debit,
+      credit_amount: credit,
+    })
+    editingId.value = ''
+    ElMessage.success('分录已修改')
+    await Promise.all([loadPage(pageIndex.value), loadEdits()])
+  } catch (e) {
+    handleApiError(e, '修改序时账')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function restore(r: JournalRow) {
+  try {
+    await ElMessageBox.confirm('恢复这条分录导入时的原值？', '恢复原值', { confirmButtonText: '恢复', cancelButtonText: '取消', type: 'warning' })
+  } catch {
+    return
+  }
+  saving.value = true
+  try {
+    await restoreLedgerRow(props.projectId, props.year, 'ledger', r.id)
+    ElMessage.success('已恢复导入原值')
+    await Promise.all([loadPage(pageIndex.value), loadEdits()])
+  } catch (e) {
+    handleApiError(e, '恢复分录')
+  } finally {
+    saving.value = false
+  }
+}
+
 // 从科目余额表点科目进来：父组件改 accountCode（本组件自己发出的变更值相同，不重复加载）
 watch(
   () => props.accountCode,
@@ -189,7 +314,11 @@ watch(
   },
 )
 
-watch(() => [props.projectId, props.year], reset, { immediate: true })
+watch(() => [props.projectId, props.year], () => {
+  editingId.value = ''
+  reset()
+  void loadEdits()
+}, { immediate: true })
 </script>
 
 <style scoped src="../styles/unaudited.css"></style>
@@ -200,5 +329,39 @@ watch(() => [props.projectId, props.year], reset, { immediate: true })
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.citar-journal__row--edited td {
+  background: #f6efff;
+}
+
+.citar-journal__tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid #d7c3ee;
+  border-radius: 3px;
+  font-size: var(--citar-fs-11);
+  color: var(--citar-c-6e0ba6);
+}
+
+.citar-journal__ops {
+  white-space: nowrap;
+}
+
+.citar-journal__ops-head {
+  width: 120px;
+}
+
+.citar-journal__input {
+  width: 110px;
+}
+
+.citar-journal__input--wide {
+  width: 200px;
+}
+
+.citar-journal__input--num {
+  width: 110px;
+  text-align: right;
 }
 </style>

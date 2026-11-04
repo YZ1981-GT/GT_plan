@@ -54,6 +54,10 @@ _OTHER_EQUITY_INSTRUMENTS = "TB('3003','期末余额')"
 _SURPLUS_RESERVE = "TB('3101','期末余额')"
 #: 未分配利润 = 本年利润 + 利润分配（未结账时本年利润挂在 3104，结账后转入 3201，两者相加不重复）
 _RETAINED_EARNINGS = "TB('3104','期末余额')+TB('3201','期末余额')"
+#: 单体报表另加未结转损益（spec citar-audited-balance-and-workpaper-coverage R1）：SAP 等年末不结转的账套损益留在
+#: 损益科目、3104 没有数；已批准的损益类审计调整也只改损益科目 ⇒ 不加这一项资产负债表差的正是本年利润 / 调整对利润的影响。
+#: 合并报表走合并试算表 resolver，没有这个口径，仍用上面的公式。
+_RETAINED_EARNINGS_STANDALONE = _RETAINED_EARNINGS + "+PL_UNCLOSED()"
 _NO_ACCOUNT = "平台标准科目表没有对应科目（企业有此业务时须新增科目）"
 
 #: {准则家族: {公式位: (行名前缀, 公式, 说明)}}；家族：soe = 国企单体 / 合并，listed = 上市单体 / 合并
@@ -151,11 +155,27 @@ STANDARD_FAMILY = {
     "listed_consolidated": "listed",
 }
 
+#: 只用于单体准则的公式位（覆盖 FIXES 里同家族的同一位）
+STANDALONE_OVERRIDES: dict[str, dict[str, tuple[str, str | None, str]]] = {
+    "soe": {"balance_sheet:BS-125": ("未分配利润", _RETAINED_EARNINGS_STANDALONE, "3104 本年利润 + 3201 利润分配 + 未结转损益")},
+    "listed": {"balance_sheet:BS-084": ("未分配利润", _RETAINED_EARNINGS_STANDALONE, "3104 本年利润 + 3201 利润分配 + 未结转损益")},
+}
+
+
+def fixes_for(standard: str) -> dict[str, tuple[str, str | None, str]]:
+    """某个准则的全部公式位（家族公式 + 单体覆盖）；未知准则为空。"""
+    family = STANDARD_FAMILY.get(standard)
+    if family is None:
+        return {}
+    out = dict(FIXES[family])
+    if standard.endswith("_standalone"):
+        out.update(STANDALONE_OVERRIDES.get(family, {}))
+    return out
+
 
 def fix_for(standard: str, report_type: str, row_code: str, row_name: str) -> tuple[bool, str | None]:
     """新库填公式用：(是否命中, 公式)。行名前缀不符视为未命中（行号体系不同的模板不套用）。"""
-    family = STANDARD_FAMILY.get(standard)
-    entry = FIXES.get(family or "", {}).get(f"{report_type}:{row_code}")
+    entry = fixes_for(standard).get(f"{report_type}:{row_code}")
     if entry is None:
         return False, None
     prefix, formula, _desc = entry

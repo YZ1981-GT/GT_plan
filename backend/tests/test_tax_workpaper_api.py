@@ -97,7 +97,8 @@ async def env() -> AsyncGenerator[dict, None]:
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = lambda: current["actor"]
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        yield {"client": client, "as": lambda k: current.update(actor=ACTORS[k])}
+        yield {"client": client, "as": lambda k: current.update(actor=ACTORS[k]),
+               "use": lambda actor: current.update(actor=actor)}
     await engine.dispose()
 
 
@@ -145,8 +146,21 @@ async def test_stale_version_conflicts(env):
 
 
 @pytest.mark.asyncio
+async def test_formula_cell_override_and_restore(env):
+    """公式格可手工修改：手工值盖过公式、带原公式值；键不再提交即恢复公式（spec citar-table-manual-edit R1）。"""
+    c = env["client"]
+    r = await c.put(f"{URL}/sheets/2-02", params={"year": YEAR}, json={"version": 0, "inputs": {"2-02": {"G10": 5}}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert _values(body)["G10"] == {"n": "5"}
+    assert body["parts"][0]["cells"]["G10"] == {"origin": "input", "auto": {"n": "1000"}}
+    restored = await c.put(f"{URL}/sheets/2-02", params={"year": YEAR}, json={"version": 1, "inputs": {"2-02": {}}})
+    assert _values(restored.json())["G10"] == {"n": "1000"}
+    assert "G10" not in restored.json()["parts"][0]["cells"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("inputs, fragment", [
-    ({"2-02": {"G10": 5}}, "公式格"),
     ({"2-02": {"Z999": 5}}, "范围"),
     ({"2-03": {"D8": 5}}, "不属于"),
     ({"2-02": {"F10": {"x": 1}}}, "数字、文字"),
@@ -266,3 +280,40 @@ def test_rule_workpaper_codes_exist_in_frontend_index():
     index_codes = set(re.findall(r"code: '([^']+)'", index_ts.read_text(encoding="utf-8")))
     assert len(rule_codes) >= 30  # 判据抽不到值时不空转
     assert rule_codes <= index_codes, sorted(rule_codes - index_codes)
+
+
+@pytest.mark.asyncio
+async def test_account_without_manual_edit_keeps_auto_cells(env):
+    """账号未开通「允许修改」（spec citar-manual-edit-permission R2 / R4）：
+    - 手填格（F10）、「需人工填写」的取数格（D9）照常可填；
+    - 公式格（G10）、自动取数格（D10）新增手工值 403，点名格子，数据不动；
+    - 别人保存过的公式格手工值原样提交可以保存，改值 / 恢复（不再提交）都 403。
+    """
+    c = env["client"]
+    url, y = f"{URL}/sheets/2-02", {"year": YEAR}
+    saved = await c.put(url, params=y, json={"version": 0, "inputs": {"2-02": {"G10": 5}}})  # 有权限的人先改公式格
+    assert saved.status_code == 200, saved.text
+    locked = _Actor(EDITOR)
+    locked.allow_manual_edit = False
+    env["use"](locked)
+
+    ok = await c.put(url, params=y, json={"version": 1, "inputs": {"2-02": {"G10": 5, "F10": 100, "D9": 7}}})
+    assert ok.status_code == 200, ok.text
+    assert _values(ok.json())["F10"] == {"n": "100"} and _values(ok.json())["G10"] == {"n": "5"}
+
+    keep = {"G10": 5, "F10": 100, "D9": 7}
+    for bad, cell in (({**keep, "D10": 1}, "D10"), ({**keep, "G10": 6}, "G10"), ({"F10": 100, "D9": 7}, "G10")):
+        r = await c.put(url, params=y, json={"version": 2, "inputs": {"2-02": bad}})
+        assert r.status_code == 403, bad
+        assert "允许修改" in r.text and f"2-02!{cell}" in r.text, r.text
+    after = (await c.get(url, params=y)).json()
+    assert after["version"] == 2 and _values(after)["G10"] == {"n": "5"} and _values(after)["D10"] == {"n": "1000"}
+    # 手工清空成空白（null）也是修改：新增 null、去掉别人存的 null 都要拦（只比值的话 None == 缺省会放过）
+    r = await c.put(url, params=y, json={"version": 2, "inputs": {"2-02": {**keep, "G9": None}}})
+    assert r.status_code == 403 and "2-02!G9" in r.text, r.text
+    env["use"](ACTORS["editor"])
+    assert (await c.put(url, params=y, json={"version": 2, "inputs": {"2-02": {**keep, "G9": None}}})).status_code == 200
+    env["use"](locked)
+    r = await c.put(url, params=y, json={"version": 3, "inputs": {"2-02": keep}})
+    assert r.status_code == 403 and "2-02!G9" in r.text, r.text
+    assert (await c.put(url, params=y, json={"version": 3, "inputs": {"2-02": {**keep, "G9": None}}})).status_code == 200

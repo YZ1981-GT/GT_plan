@@ -56,6 +56,19 @@
             </el-tag>
           </template>
         </el-table-column>
+        <!-- 允许修改：能否人工修改自动生成的数据（公式 / 取数格、报表金额、审核说明、余额表等）；后端同样按此拒收 -->
+        <el-table-column prop="allow_manual_edit" label="允许修改" width="100" align="center">
+          <template #default="{ row }">
+            <el-switch
+              :model-value="row.allow_manual_edit !== false"
+              :loading="manualEditSaving === row.id"
+              :before-change="() => toggleManualEdit(row)"
+              :aria-label="`${row.username} 允许修改`"
+              :title="row.allow_manual_edit !== false ? '可人工修改自动生成的数据，点击关闭' : '只能查看与填写手填项，点击开启修改'"
+              v-permission="'admin'"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="editUser(row)" v-permission="'admin'">编辑</el-button>
@@ -126,6 +139,7 @@ import { rules, makeRules } from '@/utils/formRules'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { buildUserUpdateBody } from '@/utils/userUpdateBody'
 import { useAuthStore } from '@/stores/auth'
+import { refreshCurrentUser } from '@/composables/useManualEditPermission'
 
 const currentUserId = computed(() => useAuthStore().userId)
 
@@ -253,6 +267,24 @@ async function toggleActive(row: any) {
     ElMessage.success(enable ? '已启用' : '已停用')
     await loadUsers()
   } catch { /* 原因已由请求拦截器提示 */ }
+}
+
+// 允许修改：切换即保存（成功才翻转开关）；改的是自己时重读本人账号信息，各页修改入口随之变化
+const manualEditSaving = ref('')
+async function toggleManualEdit(row: any): Promise<boolean> {
+  const next = row.allow_manual_edit === false
+  manualEditSaving.value = row.id
+  try {
+    await updateUser(row.id, { allow_manual_edit: next })
+    row.allow_manual_edit = next
+    ElMessage.success(next ? `已允许「${row.username}」修改` : `已关闭「${row.username}」的修改权限`)
+    if (row.id === currentUserId.value) await refreshCurrentUser()
+    return true
+  } catch {
+    return false /* 原因已由请求拦截器提示 */
+  } finally {
+    manualEditSaving.value = ''
+  }
 }
 
 // 重置密码：只发 password（8-64 位，与后端 UserUpdate 同一下限；两次一致）

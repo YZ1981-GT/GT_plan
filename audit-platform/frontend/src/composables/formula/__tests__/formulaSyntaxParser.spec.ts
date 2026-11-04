@@ -294,6 +294,11 @@ describe('底稿专用函数识别（unified-formula-registry P1-T4）', () => {
     expect(validate("COUNT_LEDGER('1001','借','全年')").valid).toBe(false)
   })
 
+  it('PL_UNCLOSED 被识别且参数 = 0（单体报表未分配利润公式）', () => {
+    expect(validate("TB('3104','期末余额')+TB('3201','期末余额')+PL_UNCLOSED()").valid).toBe(true)
+    expect(validate("PL_UNCLOSED('6001')").valid).toBe(false)
+  })
+
   it('PLACEHOLDER 被识别且参数 = 0', () => {
     expect(validate("PLACEHOLDER()").valid).toBe(true)
     expect(validate("PLACEHOLDER('arg')").valid).toBe(false)

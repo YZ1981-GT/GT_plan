@@ -16,6 +16,9 @@ from app.services.tax_assurance.common import DATA_DIR
 
 CONFIG_PATH = DATA_DIR / "fs_enterprise_system.json"
 PL_CLOSE = "PL_CLOSE"
+#: 平衡校验的两行：资产负债表「资产总计」、续表「负债和所有者权益总计」（行键）
+ASSETS_TOTAL = ("balance_sheet", 47)
+LIAB_EQUITY_TOTAL = ("balance_sheet_liabilities", 46)
 _ZERO = Decimal(0)
 _SUM_RE = re.compile(r"SUM\((\d+):(\d+)\)")
 _TERM_RE = re.compile(r"([+-]?)\s*(SUM\(\d+:\d+\)|\d+)")
@@ -73,17 +76,22 @@ def compute_statement(
     pl_close: Decimal = _ZERO,
     cf_values: dict[str, Decimal] | None = None,
     from_values: dict[str, dict[int, Decimal | None]] | None = None,
+    overrides: dict[int, Decimal | None] | None = None,
 ) -> dict[int, Decimal | None]:
     """一列（本期或上期）的行值。``balances`` 为 None ⇒ 取数行全空（合计仍按 0 加，便于看出缺数）。
 
     ``cf_values``：平台现金流量表 / 补充资料行名（已规范化）→ 金额；``from_values``：其他表已算出的行值。
+    ``overrides``：手工值 {行: 金额 | None}，取数行与合计行都可改；合计在手工明细之上重算（spec citar-table-manual-edit R7）。
     """
     out: dict[int, Decimal | None] = {}
+    overrides = overrides or {}
     flip = Decimal(-1) if stmt["side"] == "credit" else Decimal(1)
     for row in stmt["rows"]:
         r = row["r"]
         if row.get("heading") or row.get("note"):
             out[r] = None
+        elif r in overrides:
+            out[r] = overrides[r]
         elif "accounts" in row:
             if balances is None:
                 out[r] = None
@@ -101,11 +109,16 @@ def compute_statement(
             out[r] = (from_values or {}).get(key, {}).get(int(line))
         else:
             out[r] = None
-    # 合计行按行序依次算（下方合计可引用上方合计）
+    # 合计行按行序依次算（下方合计可引用上方合计）；手工改过的合计行不算
     for row in stmt["rows"]:
-        if "formula" in row:
+        if "formula" in row and row["r"] not in overrides:
             out[row["r"]] = _formula(row["formula"], out)
     return out
+
+
+def editable_rows(stmt: dict) -> set[int]:
+    """可手工修改的行：标题行、说明行之外的全部行。"""
+    return {row["r"] for row in stmt["rows"] if not (row.get("heading") or row.get("note"))}
 
 
 _NAME_STRIP_RE = re.compile(r"[\s△▲*＊]")
