@@ -218,7 +218,17 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
 
     submitting.value = true
     try {
-      await httpApi.put(P_wp.status(opts.projectId.value, opts.wpId.value), { status: 'pending_review' })
+      // 只能走专用提交入口：后端在此统一执行 edit_complete、SoD、QC、批注、AI 等门禁，
+      // 不能再直接把状态改成 pending_review，否则会绕过 fail-closed 的复核编排。
+      const result = await httpApi.post<{
+        can_submit?: boolean
+        blocking_reasons?: string[]
+      }>(P_wp.submitReview(opts.projectId.value, opts.wpId.value))
+      if (result?.can_submit === false) {
+        const reason = result.blocking_reasons?.filter(Boolean).join('；')
+        ElMessage.warning(reason || '当前底稿未满足提交复核条件')
+        return
+      }
       ElMessage.success('已提交复核，等待复核人审阅')
       await refreshDetail()
     } catch (err: any) {

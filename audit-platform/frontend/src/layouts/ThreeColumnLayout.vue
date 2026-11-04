@@ -323,11 +323,19 @@
         </slot>
       </section>
 
-      <!-- AI 助手面板（dsh） -->
-      <DshPanel
-        v-if="dshPanelMounted"
+      <!-- AI 助手面板（dsh）：首次打开才动态加载，成功后关闭仅隐藏以保留会话状态。 -->
+      <component
+        :is="dshPanelComponent"
+        v-if="dshPanelMounted && dshPanelComponent"
         v-model="showDshPanel"
         @message-count="onDshMessageCount"
+      />
+      <!-- async errorComponent 不转发外层 v-model；宿主显式渲染错误态，关闭后下次打开可重试。 -->
+      <DshPanelLoadError
+        v-else-if="dshPanelMounted && dshPanelLoadError && showDshPanel"
+        :model-value="showDshPanel"
+        :error="dshPanelLoadError"
+        @update:model-value="onDshLoadErrorVisibilityChange"
       />
     </div>
 
@@ -386,7 +394,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch, provide } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch, provide, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -429,12 +437,6 @@ import DegradedBanner from '@/components/DegradedBanner.vue'
 
 // 这些组件只在用户首次打开时下载和挂载；挂载后保留实例，避免关闭再开丢局部状态。
 const CustomQueryDialog = defineAsyncComponent(() => import('@/components/query/CustomQueryDialog.vue'))
-const DshPanel = defineAsyncComponent({
-  loader: () => import('@/components/ai/DshPanel.vue'),
-  errorComponent: DshPanelLoadError,
-  delay: 0,
-  suspensible: false,
-})
 
 const route = useRoute()
 const router = useRouter()
@@ -588,6 +590,43 @@ const middleWidth = ref(340)
 const middleCollapsed = ref(false)
 const showDshPanel = ref(false)
 const dshPanelMounted = useMountOnFirstOpen(showDshPanel)
+type DshPanelComponent = (typeof import('@/components/ai/DshPanel.vue'))['default']
+const dshPanelComponent = shallowRef<DshPanelComponent | null>(null)
+const dshPanelLoadError = ref<Error | null>(null)
+let dshPanelLoad: Promise<void> | null = null
+
+/** 显式持有 AI 加载错误：async errorComponent 不转发 v-model，关闭后下次打开需允许重试。 */
+async function loadDshPanel(): Promise<void> {
+  if (dshPanelComponent.value || dshPanelLoad) {
+    await dshPanelLoad
+    return
+  }
+  dshPanelLoadError.value = null
+  const pending = import('@/components/ai/DshPanel.vue')
+    .then(({ default: component }) => {
+      dshPanelComponent.value = component
+    })
+    .catch((error: unknown) => {
+      dshPanelLoadError.value = error instanceof Error
+        ? error
+        : new Error('AI 助手模块加载失败')
+    })
+  dshPanelLoad = pending
+  try {
+    await pending
+  } finally {
+    if (dshPanelLoad === pending) dshPanelLoad = null
+  }
+}
+
+function onDshLoadErrorVisibilityChange(visible: boolean) {
+  showDshPanel.value = visible
+}
+
+watch(showDshPanel, (visible) => {
+  if (visible) void loadDshPanel()
+}, { immediate: true })
+
 const dshUnreadCount = ref(0)
 
 const dshAssistBridge: DshAssistBridge = {

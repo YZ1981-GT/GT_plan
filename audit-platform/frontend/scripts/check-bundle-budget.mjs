@@ -18,7 +18,7 @@ const DEFAULT_BASELINE = resolve(ROOT, 'scripts/bundle-budget.baseline.json')
 export const SCHEMA_VERSION = 2
 export const GROWTH_RATIO = 1.05
 export const LARGE_CHUNK_GZIP_BYTES = 500 * 1024
-export const HEAVY_PATTERN = /(?:univer|vue-office|exceljs|xlsx|formula.?manager|onlyoffice|deliverable.?preview)/i
+export const HEAVY_PATTERN = /(?:heavy-(?:univer|office|excel)|univer|vue-office|exceljs|xlsx|formula.?manager|onlyoffice|deliverable.?preview)/i
 
 function cliOptions(argv) {
   const value = (flag, fallback) => {

@@ -22,12 +22,18 @@
 
 - [x] 3. 修复 AI 笔记导出契约；DshPanel 改首次打开再加载并提供局部失败态
   - 证据：`DshPanelLoadError.vue`、`useMountOnFirstOpen.ts`、`ThreeColumnLayout.vue`
-    的 `defineAsyncComponent` 均在 HEAD 完好；`ThreeColumnLayout.dshLazy.spec.ts`、
-    `useMountOnFirstOpen.spec.ts` 在库。🔴 前端 vitest 未在本轮重跑（任务 20 如实标注）
+    的按需 `import('@/components/ai/DshPanel.vue')` 均在 HEAD；本轮修复 async
+    `errorComponent` 不转发外层 `v-model` 的死路：由宿主显式持有模块/错误状态，错误面板
+    的「关闭」真正收起，下一次打开会重新加载。`ThreeColumnLayout.dshLazy.spec.ts`、
+    `useMountOnFirstOpen.spec.ts` 已在本轮前端选集通过
 - [x] 4. 修复 Univer 非 2xx 假成功、冲突覆盖语义和业务回执校验
-  - 证据：`useEditorUniver.ts` / `useEditorToolbar.ts` 改动在 HEAD；配套 spec 在库（同上未重跑）
+  - 证据：`useEditorUniver.ts` / `useEditorToolbar.ts` 改动在 HEAD；
+    `useEditorUniver.spec.ts` / `useEditorToolbar.spec.ts` 已在本轮前端选集通过
 - [x] 5. 自动保存增加 boolean 失败与编辑代际，保存期间新编辑不得被旧回执清除
-  - 证据：`useWorkpaperAutoSave.ts`（+92 行代际逻辑）在 HEAD，`useWorkpaperAutoSave.spec.ts` 在库（同上未重跑）
+  - 证据：`useWorkpaperAutoSave.ts`（+92 行代际逻辑）在 HEAD；
+    `useWorkpaperAutoSave.spec.ts` 与 `UniverEditorCore.sheet-context.spec.ts` 已在本轮前端选集通过。
+    后者原测试 mock 错把 `onSave` 设成另一个 `vi.fn`，使 `false` 的失败回执永远到不了
+    自动保存回调；现已改为同一 spy，真实验证失败保持 false
 
 ## C. 复核主链
 
@@ -36,8 +42,11 @@
     与 `wp_batch_router.py` 均 import 同一服务（单笔/批量共用已接线）。
     `test_workpaper_review_submission_service.py` **本轮实测 passed**
 - [x] 7. 编辑器与底稿列表切到唯一提交入口；两条旧提交接口返回 410
-  - 证据：`reviewSubmissionPaths.spec.ts`、`workpaperApi.ts`、`WorkpaperList.vue` 改动在 HEAD；
-    410 退役断言在 `test_release_output_guards.py`（**本轮实测 passed**）
+  - 🔴 **本轮修复前端绕过门禁**：`useEditorSave.onSubmitForReview` 原直接 PUT
+    `P_wp.status(..., { status: 'pending_review' })`，绕过后端专用 `submit-review` 的
+    edit_complete、SoD、QC、批注与 AI fail-closed 检查。现改 POST `P_wp.submitReview(...)`；
+    `can_submit === false` 时显示具体阻断原因、不刷新详情。`reviewSubmissionPaths.spec.ts` 已在本轮前端选集通过，
+    旧状态字面量已为 0
 - [ ] 8. 退回→修改→编制完成→重提闭环；复核层级角色真正参与授权
   - 未实测：需真实 PG + 多角色端到端，留待任务 22
 - [ ] 9. 复核通过/归档后的所有底稿写入口统一后端锁定
@@ -108,7 +117,15 @@
     （verified 构建就会设）时会**检查错目录**。处置 = 让它优先认 `--dir`、保留 `--dist` 兼容。
     守卫同步改为 `--dir` 与 `smoke-built`（platform-perf 已把
     `smoke-built-dist.mjs` 演进为 `smoke-built-artifact.mjs`）。
-    证据：`test_release_frontend_pipeline.py` **4 passed**
+  - 🔴 **本轮再修两处发布链真缺陷**：①`HEAVY_PATTERN` 漏 `heavy-office` /
+    `heavy-excel`（Vite 的真实 manualChunks 名），预算守卫无法发现 Office/Excel 重块被静态拉进入口；
+    现纳入模式并以 CLI fixture 覆盖。②`build-verified-dist.mjs` 仍调用旧
+    `smoke-built-dist.mjs --dist`，而当前权威 smoke 是 `smoke-built-artifact.mjs --dir`；
+    同时 `current.json` 直接覆盖写会暴露截断 JSON。现改走权威 smoke、统一 `--dir`，
+    并将指针改为临时文件写全后 `renameSync` 原子切换。
+  - 证据：`test_release_frontend_pipeline.py` **4 passed**；前端构建管线/预算选集
+    **13 passed**；`npm run build:verify` 完整通过（Vite 14,747 modules、预算通过、
+    构建产物 smoke 通过、verified artifact 已原子发布）
 - [x] 19. CI 覆盖 spec/**，将本批安全、runtime import、迁移完整性测试接成阻断门
   - 证据：`ci.yml` / `governance-checks.yml` 的 `'spec/**'` 触发在 HEAD，
     `test_ci_push_runs_for_spec_branches` passed；`test_release_runtime_import_closure.py`、
@@ -118,9 +135,13 @@
 
 - [ ] 20. 后端相关单元/端点测试、前端相关 vitest、类型与 runtime import 通过
   - 后端已过：本轮 10 个文件 **71 passed**；`import app.main` 成功（**2628** 条路由）
-  - 🔴 未做：**前端 vitest 与 vue-tsc 本轮未跑**（worktree 无 `node_modules`，
-    独立 `npm ci` 约 40 s 未执行）。10 个前端 spec 的改动均在 HEAD、未被本轮触碰，
-    但「在当前 HEAD 上仍全绿」没有本轮证据
+  - 前端已过：release-blocker 相关 10 个前端用例 + 2 个构建管线用例，
+    **12 files / 101 passed**；`npm run build:verify` 完整通过。
+  - 类型检查：本轮文件无新增错误。`typecheck-region` 仍报 **12 条 HEAD 既有错误**：
+    `ConsolFormulaManagementPanel` 2、`FormulaManagerDialog` 4、`FormulaRefPicker` 1、
+    `useEntrySyncReadiness` 2、`usePlatformAiChat` 2、`ThreeColumnLayout` 的
+    `sync.completed` 事件联合类型 1。后者在本轮基线 `989010f42` 已存在；本轮动态 Dsh
+    组件首次引入的类型错误已修复。因全量类型检查未全绿，本项保持未勾
 - [ ] 21. 一次性 PostgreSQL 从空库跑全迁移并验证 V229/readiness；不写共享库
   - 未做。注：迁移磁盘现为 **252 个文件 / 最高 V263**（design 写的 V229 已过时）
 - [ ] 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链

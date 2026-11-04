@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const VITE = resolve(ROOT, 'node_modules/vite/bin/vite.js')
 const BUDGET = resolve(ROOT, 'scripts/check-bundle-budget.mjs')
-const SMOKE = resolve(ROOT, 'scripts/smoke-built-dist.mjs')
+const SMOKE = resolve(ROOT, 'scripts/smoke-built-artifact.mjs')
 const BASELINE = resolve(ROOT, 'scripts/bundle-budget.baseline.json')
 const CANDIDATE = resolve(ROOT, `.dist-verify-${process.pid}`)
 const VERIFIED_ROOT = resolve(ROOT, '.verified-dist')
@@ -32,6 +32,21 @@ function artifactValid(target, marker) {
       && sha256(manifest) === marker.manifestSha256
   } catch { return false }
 }
+function writeCurrentPointer(marker) {
+  // current.json 是 stable preview 的唯一切换点。临时文件写全后再 rename，读取者只会看到
+  // 旧的完整指针或新的完整指针，绝不能读到 writeFileSync 直接覆盖时的截断 JSON。
+  const temporary = `${POINTER}.${process.pid}.tmp`
+  try {
+    writeFileSync(
+      temporary,
+      `${JSON.stringify({ schemaVersion: 1, artifactName: marker.manifestSha256, ...marker }, null, 2)}\n`,
+      'utf8',
+    )
+    renameSync(temporary, POINTER)
+  } finally {
+    if (existsSync(temporary)) rmSync(temporary, { force: true })
+  }
+}
 function publish(marker) {
   mkdirSync(VERIFIED_ROOT, { recursive: true })
   const target = resolve(VERIFIED_ROOT, marker.manifestSha256)
@@ -40,7 +55,7 @@ function publish(marker) {
     cpSync(CANDIDATE, target, { recursive: true, errorOnExist: true })
     if (!artifactValid(target, marker)) throw new Error('版本化前端产物复制后摘要不一致')
   }
-  writeFileSync(POINTER, `${JSON.stringify({ schemaVersion: 1, artifactName: marker.manifestSha256, ...marker }, null, 2)}\n`, 'utf8')
+  writeCurrentPointer(marker)
   return target
 }
 function main() {
@@ -49,8 +64,8 @@ function main() {
   run(VITE, ['build', '--mode', 'production'], {
     ...process.env, GT_FRONTEND_OUT_DIR: CANDIDATE, NODE_OPTIONS: '--max-old-space-size=16384',
   })
-  run(BUDGET, ['--check', '--dist', CANDIDATE])
-  run(SMOKE, ['--dist', CANDIDATE])
+  run(BUDGET, ['--check', '--dir', CANDIDATE])
+  run(SMOKE, ['--dir', CANDIDATE])
   const marker = {
     manifestSha256: sha256(resolve(CANDIDATE, '.vite/manifest.json')),
     budgetBaselineSha256: sha256(BASELINE),
