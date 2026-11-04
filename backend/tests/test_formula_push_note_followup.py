@@ -40,11 +40,16 @@ def _td(table):
 
 
 @pytest_asyncio.fixture
-async def env():
+async def env(request):
+    """``env`` 参数为真时另建 ``note_formula_run``：有运行记录表（PG 上恒有）才写附注公式来源信封。"""
+    from app.models.note_formula_models import NoteFormulaRun
+
+    tables = [User.__table__, Project.__table__, DisclosureNote.__table__]
+    if getattr(request, "param", False):
+        tables.append(NoteFormulaRun.__table__)
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
-        await conn.run_sync(lambda c: Base.metadata.create_all(
-            c, tables=[User.__table__, Project.__table__, DisclosureNote.__table__]))
+        await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     pid = uuid.uuid4()
     async with factory() as s:
@@ -117,6 +122,37 @@ async def test_push_owned_total_is_kept_but_user_formula_overrides(env, monkeypa
         await execute_note_formulas(s, env.pid, YEAR, SECTION)
         await s.commit()
     assert (await env.stored())["_tables"][0]["rows"][2]["values"][0] == 1000.0, "用户公式照常覆盖"
+
+
+@pytest.mark.parametrize("env", [True], indirect=True)
+async def test_push_owned_cell_is_recorded_as_kept_in_provenance(env, monkeypatch):
+    """有运行记录表时来源信封真写：推送拥有格保留推送值记 ``value_state=kept``（与底稿投影表保留底稿值同一态）。
+
+    执行结果状态 ``kept_push`` 不能原样进信封 —— ``ProvenanceValueState`` 不认 ⇒ ValidationError，整节附注公式回滚
+    （2026-11-04 【测试】公式同步甲 五、1 真库离屏刷新实测）。上一例的库里没有运行记录表、信封不写，测不出。
+    """
+    from typing import get_args
+
+    from app.services import note_formula_push_guard
+    from app.services.formula_provenance import ProvenanceValueState
+    from app.services.note_formula_generator import execute_note_formulas
+
+    async def owned(*_a, **_k):
+        return {(0, 2, 0)}
+
+    monkeypatch.setattr(note_formula_push_guard, "push_owned_cells", owned)
+    await env.add(_td(_aging(total=999.0)))
+    async with env.factory() as s:
+        res = await execute_note_formulas(s, env.pid, YEAR, SECTION)
+        await s.commit()
+    assert res.get("run_id"), "运行记录开着（来源信封真写）"
+    assert [r["status"] for r in res["results"] if r["cell"] == "2:0"] == ["kept_push"]
+    td = await env.stored()
+    assert td["_tables"][0]["rows"][2]["values"] == [999.0, 650.0], "推送值保留，另一列照算"
+    provenance = td["_formula_provenance"]
+    assert provenance[f"note:{SECTION}!2:0"]["value_state"] == "kept"
+    assert provenance[f"note:{SECTION}!2:1"]["value_state"] == "auto"
+    assert {p["value_state"] for p in provenance.values()} <= set(get_args(ProvenanceValueState))
 
 
 async def test_push_owned_cells_maps_push_state_to_stored_cell(monkeypatch):

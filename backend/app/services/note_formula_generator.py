@@ -645,10 +645,12 @@ async def _execute_note_formulas_body(
                     "reason": ("这一格由公式推送按试算表审定数写入，预设公式不改写" if state == "kept_push"
                                else "当前值不是本执行器上次写入值，按人工值保留"),
                 })
+                # 来源信封只认 ProvenanceValueState：推送拥有格保留推送值 = kept（同底稿投影表保留底稿值）；
+                # kept_push 只是执行结果状态，原样进信封即 ValidationError、整节公式回滚
                 provenance_changed |= provenance_recorder.record(
                     key=key, formula_def=formula_def, addr_id=cell_addr_id,
                     value=_quantize_amount(value), status="succeeded", error_code=None,
-                    inputs=formula_inputs, value_state=state, applied=False,
+                    inputs=formula_inputs, value_state="kept" if state == "kept_push" else state, applied=False,
                 )
                 continue
             if value is None:
