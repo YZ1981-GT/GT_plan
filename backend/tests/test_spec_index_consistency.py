@@ -54,7 +54,8 @@ _UNINDEXED_ACTIVE_SPEC_BASELINE = {
     "adjustment-practice-linkage-integrity-closure",
     "attachment-platform-cross-module-closure",
     "consolidation-run-and-workpaper-lifecycle-closure",
-    "note-table-structure-formula-pull-closure",
+    # note-table-structure-formula-pull-closure：速递行被 85caab386 的 INDEX 整文件覆盖丢掉，
+    # 2026-11-04 随 note-disclosure-pull-regression-and-headless-backend 三方恢复回来，已收录
     "platform-heavy-jobs-and-capacity-closure",
     "platform-release-blocker-closure",
 }

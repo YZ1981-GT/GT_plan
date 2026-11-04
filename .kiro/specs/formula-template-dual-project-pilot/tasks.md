@@ -52,7 +52,7 @@
     - 既有端点权限测试（`test_template_endpoints.py::test_manage_publish_subscribe_permissions`、`test_visibility_matrix_list_detail_versions_same_rule`）覆盖订阅/退订/发布/删除的真实鉴权链。新增 `test_diff_and_rollback_keep_template_visibility` 验证 diff/rollback 不可见返回 404。
     - 既有服务层测试（`test_save_subscribe_publish_unsubscribe_end_to_end`）覆盖完整链路（建模板 → 订阅含冲突 → 全局发布跳过模板位 → 发版含跟随/冲突/暂缓 → 处理待确认 → 退订两种 → 删除）。新增 `test_template_diff_and_rollback_creates_new_version` 在该链路上追加 diff + rollback + 幂等。
 
-- [ ] 4. 【测试】项目双项目登录态 UAT（R1 第一阶段，ADR-FTP-05）
+- [x] 4. 【测试】项目双项目登录态 UAT（R1 第一阶段，ADR-FTP-05）
   - S4 浏览器传播验收通过后，经平台正常路径创建来源项目 A、订阅项目 B/C（B 有本项目适配，C 没有），使用真实登录态完成设计 §7.2 流程。
   - 每个 HTTP 步骤用浏览器 + 独立 GET / 刷新双证；截图和回执放 `tmp_formula_template_pilot/screenshots/`，用完停到 `about:blank`。
   - 清理走平台删除路径，逐表对账模板、版本、订阅、设置、同步项、发布记录、outbox / propagation；审计只登记数量。
@@ -76,6 +76,24 @@
     共享库权威编号是 V235）、`users.py` / `pm_dashboard.py` 等引用 6 个未入库模块。
     均属并发会话（批量建项授权等）「已推代码引用未推改动」，memory 已记为范围外。
     本 spec 只在 tmp UAT worktree 做了最小可运行修补（不提交、不改主工作树），界面逐屏验证待该破损修复后补。
+  - **2026-11-01 浏览器双证补验完成**（候选提交 `ada4c3451b`；前端 `127.0.0.1:3032` → 后端 `127.0.0.1:9983`；
+    后端 `/api/health` HTTP 200，PostgreSQL / Redis 均 ok；`status=degraded` 仅来自既有 3 条 checksum drift）：
+    - 先在同一候选环境重放 API 全链 **29/29**，再保留 v4 中间态：A 来源、B 有适配、C 无适配；B/C 两条 active subscription，
+      C 的 BS-001 / BS-002 均为 template 层且公式逐字为 `TB('1001','期末余额')*3` / `ROW('BS-001')`，B 有 1 条 pending。
+    - C 项目深链 `formulaTemplateId + formulaAction=subscribe + formulaDomain=report` 浏览器直达，实测同时打开「ƒx 公式管理中心」和
+      「公式模板订阅」；证明刷新后深链消费不是只测路由参数。
+    - 全局公式 → 公式模板：浏览器显示该模板 **v4 / 2 个订阅**；详情显示 BS-001 与新增 BS-002 两个定义；版本历史显示 v1~v4，
+      历史版本均有「与当前对比 / 回滚到此版本」。
+    - 浏览器点击 v3「与当前对比」真实发出 `GET .../diff?from=3&to=4` → **200**；界面显示 2 处变化：BS-001 changed、BS-002 added。
+    - 浏览器点击「回滚到 v3」真实发出 `POST .../rollback-preview` → **200**；预览显示自动跟随 3、冲突 1、受影响项目 2 个。
+      点取消后独立 GET 对账仍为 v4、版本行 4，证明 preview 零写入。
+    - B 项目打开即显示「公式待确认 1 处」：同一行逐字展示基线 `TB('1001','期末余额')`、模板新版
+      `TB('1001','期末余额')*3`、本项目当前 `TB('1001','期末余额')*2`；点「稍后处理」后硬刷新，角标仍为 1。
+    - 补验页控制台 **0 error**；唯一 warning 是既有 `NotificationCenter` 多根组件 directive 告警，与本链无关。
+    - 证据：`screenshots/01`~`09`、`uat/browser_prep_11011153.json`、`uat/browser_verify_11011153.json`。
+    - 清理全走平台端点 **6/6**（退订 2、删模板 1、软删项目 3）。真库逐表对账：存活项目 0 / 软删项目 3、存活模板 0 /
+      软删模板 1、历史版本 4、active subscription 0、项目层 / 模板层存活设置 0、pending 0、发布记录 3；
+      本轮 `formula_config.changed` outbox 13 条全部 published、max_attempts=1。
 
 - [x] 5. 真实项目试点（R1 第二阶段，design §7.3）
   - 依赖用户明确指定来源 / 订阅项目、执行时间和真实写入授权；未获授权保持 `[ ]`，不以测试项目结果代替。
