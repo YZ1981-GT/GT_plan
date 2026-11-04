@@ -1695,3 +1695,9 @@ backend/app/services/import_queue_service.py  971
 #     2026-11-03：导入端点原先只校验登录、任意用户可往他人项目导入 ⇒ 补项目级鉴权（调整分录 edit + 合并锁，其余类型 readonly）（+9 行）。
 #     拆分方向：_import_adjustments（约 360 行）等七个 _import_* 写库函数移到 service 模块，路由只留四个端点。
 backend/app/routers/import_templates.py  808
+
+#   ledger_import/identifier.py —— **改动前即 1193 行已超 800 上限且未登记**（HEAD 现状）。
+#     spec citar-case-chain-fetch-fixes 净增 18 行（编辑距离按长度收紧 + 取最小距离、SAP / 审计软件
+#     表头别名、amount / counterpart_account 字段）。拆分方向（按职责）：别名表与归一化 / 表头匹配
+#     （_match_header 系列）/ 表类型打分 / 三级识别编排，属独立重构。baseline = 当前真实行数。
+backend/app/services/ledger_import/identifier.py  1211

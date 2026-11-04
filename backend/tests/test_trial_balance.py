@@ -206,6 +206,8 @@ async def seeded_db(db_session: AsyncSession):
             project_id=pid, year=2025, company_code="001",
             account_code="C2202", account_name="应付账款",
             opening_balance=Decimal("6000"), closing_balance=Decimal("8000"),
+            # 导入写入的口径：自然正数 + 实际方向（不带方向的正数按借方读，spec citar-case-chain-fetch-fixes R5）
+            opening_direction="credit", closing_direction="credit",
             debit_amount=Decimal("0"), credit_amount=Decimal("2000"),
         )
     )

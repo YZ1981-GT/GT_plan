@@ -27,10 +27,9 @@ from .aux_dimension import parse_aux_dimension
 from app.core.code_text import code_text
 from .direction_resolver import resolve_account_direction
 from .sign_convention_types import CURRENT_SIGN_CONVENTION
-
-# 显式方向列 token（借/贷/D/C），与 direction_derivation 口径一致
-_DEBIT_DIR_TOKENS = frozenset(["借", "借方", "D", "d", "debit", "Debit", "DEBIT"])
-_CREDIT_DIR_TOKENS = frozenset(["贷", "贷方", "C", "c", "credit", "Credit", "CREDIT"])
+from .single_amount import CREDIT_DIR_TOKENS as _CREDIT_DIR_TOKENS
+from .single_amount import DEBIT_DIR_TOKENS as _DEBIT_DIR_TOKENS
+from .single_amount import credit_amounts_negated, split_single_amount
 
 __all__ = [
     "convert_balance_rows",
@@ -106,18 +105,40 @@ def parse_date_val(val) -> Optional[date]:
     return None
 
 
+#: 期间写法：2025.011 / 2025.11 / 2025-11 / 2025/11（SAP「会计年度/期间」是 3 位期间号）
+_YEAR_PERIOD_RE = re.compile(r"^(\d{4})[./-](\d{1,3})$")
+_YEAR_MONTH_COMPACT_RE = re.compile(r"^(\d{4})(\d{2})$")
+_MONTH_RE = re.compile(r"^(\d{1,2})\s*月$")
+
+
+def _month_of_period(n: int) -> Optional[int]:
+    """期间号 → 月份：1~12 照取；13~16（SAP 年末特殊期间，调整 / 结账）并入 12 月。"""
+    if 1 <= n <= 12:
+        return n
+    if 13 <= n <= 16:
+        return 12
+    return None
+
+
 def parse_period_str(val) -> Optional[int]:
-    """解析期间字符串为月份。如 '2025年1期' → 1。"""
+    """解析期间字符串为月份。如 '2025年1期' → 1、'2025.011' → 11、'202511' → 11、'11月' → 11。"""
     if val is None:
         return None
     s = str(val).strip()
     m = re.search(r"(\d+)\s*期", s)
     if m:
         return int(m.group(1))
+    for pattern in (_YEAR_PERIOD_RE, _YEAR_MONTH_COMPACT_RE):
+        m = pattern.match(s)
+        if m:
+            return _month_of_period(int(m.group(2)))
+    m = _MONTH_RE.match(s)
+    if m:
+        return _month_of_period(int(m.group(1)))
     try:
-        v = int(s)
-        if 1 <= v <= 12:
-            return v
+        v = int(float(s)) if re.fullmatch(r"\d+(\.0+)?", s) else int(s)
+        if 1 <= v <= 16:
+            return _month_of_period(v)
     except (ValueError, TypeError):
         pass
     return None
@@ -138,14 +159,20 @@ def infer_level(code: str) -> int:
 
 
 def _resolve_direction(direction_raw, amount: Optional[Decimal]) -> Optional[Decimal]:
-    """根据方向字段调整金额符号。"""
+    """「余额 + 方向」→ 借正贷负。
+
+    方向是科目（余额）方向、金额相对该方向带符号：贷方科目余额 -8,690 表示借方余额 8,690。
+    贷 → ``-amount``、借 → ``amount``，保留金额自身的符号（原 ``-abs`` / ``abs`` 会把反向余额翻成正常方向，
+    案例 1 住房公积金 / 进项税额 / 利润分配因此反向、父子科目对不上，spec citar-case-chain-fetch-fixes R4）。
+    无符号的金额两种写法结果相同。
+    """
     if amount is None or direction_raw is None:
         return amount
     d = str(direction_raw).strip()
-    if d in ("贷", "贷方", "C", "c", "credit", "Credit"):
-        return -abs(amount)
-    if d in ("借", "借方", "D", "d", "debit", "Debit"):
-        return abs(amount)
+    if d in _CREDIT_DIR_TOKENS:
+        return -amount
+    if d in _DEBIT_DIR_TOKENS:
+        return amount
     return amount
 
 
@@ -395,7 +422,7 @@ def convert_balance_rows(
             )
             # 有显式方向列→直接用
             if _is_known_direction_token(opening_dir):
-                opening_source_direction = "credit" if opening_dir in ("贷", "贷方", "C", "c", "credit", "Credit", "CR", "cr") else "debit"
+                opening_source_direction = "credit" if str(opening_dir).strip() in _CREDIT_DIR_TOKENS else "debit"
             else:
                 opening_source_direction = None  # 无来源信息，交后续推断
         else:
@@ -427,7 +454,7 @@ def convert_balance_rows(
                 "explicit_direction" if _is_known_direction_token(closing_dir) else None
             )
             if _is_known_direction_token(closing_dir):
-                closing_source_direction = "credit" if closing_dir in ("贷", "贷方", "C", "c", "credit", "Credit", "CR", "cr") else "debit"
+                closing_source_direction = "credit" if str(closing_dir).strip() in _CREDIT_DIR_TOKENS else "debit"
             else:
                 closing_source_direction = None
         else:
@@ -569,6 +596,7 @@ def convert_ledger_rows(
     ledger_rows: list[dict] = []
     aux_ledger_rows: list[dict] = []
     aux_stats: dict[str, int] = {}
+    credit_amount_negated = credit_amounts_negated(rows)
 
     for row in rows:
         account_code = code_text(row.get("account_code"))
@@ -582,6 +610,12 @@ def convert_ledger_rows(
 
         debit_amount = safe_decimal(row.get("debit_amount"))
         credit_amount = safe_decimal(row.get("credit_amount"))
+        if debit_amount is None and credit_amount is None:
+            debit_amount, credit_amount = split_single_amount(
+                safe_decimal(row.get("amount")),
+                row.get("direction") or row.get("entry_direction"),
+                credit_amount_negated,
+            )
 
         # 分录行方向标记（需求 4.2、5.2）：方向由借贷分列哪边非零决定，
         # 显式方向列优先，两侧皆非零/皆空时按科目类别推断。
@@ -615,6 +649,7 @@ def convert_ledger_rows(
             "credit_amount": credit_amount,
             "summary": str(row.get("summary", "")).strip() or None,
             "preparer": str(row.get("preparer", "")).strip() or None,
+            "counterpart_account": str(row.get("counterpart_account") or "").strip() or None,
             "company_code": code_text(row.get("company_code")) or default_company,
             "currency_code": row.get("currency_code") or "CNY",
             # 方向标记（v2 符号约定，复用 V064 entry_direction 列）

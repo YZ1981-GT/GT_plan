@@ -213,11 +213,11 @@ async def test_account_map_lists_workpapers_via_parent_and_child(env):
     assert cash["workpapers"] == [] and cash["pending"] == [] and cash["has_activity"] is True
     assert cash["standard_code"] is None and cash["closing"] == "100"
     assert rows["605101"]["pending"] == []  # 已取到的底稿不重复列为「未取到」
-    # 主营业务成本：规则指向 2-04 但没有明细可取 ⇒ 未取到 + 原因
+    # 主营业务成本没有明细：2-04「其他」= 不属于任何具名类别的部分，即科目本身 ⇒ 取到，不再列为未取到
+    # （spec citar-case-chain-fetch-fixes R6：原按名字找叫「其他」的明细，整笔成本漏掉）
     cost = rows["6401"]
-    assert cost["workpapers"] == []
-    assert [p["code"] for p in cost["pending"]] == ["2-04"]
-    assert any("销售商品" in reason for reason in cost["pending"][0]["reasons"])
+    assert cost["direct"] == ["2-04"] and cost["workpapers"] == ["2-04"]
+    assert cost["pending"] == []
     assert body["notices"] == []
 
 

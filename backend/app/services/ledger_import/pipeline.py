@@ -238,7 +238,7 @@ async def execute_pipeline(
         job_id: ImportJob UUID（仅用于日志 trace）
         project_id: 目标项目
         year: 会计年度（None 则 fallback 2025）
-        custom_mapping: {"confirmed_mappings": [{file_name, sheet_name, mappings}]}
+        custom_mapping: {"confirmed_mappings": [{file_name, sheet_name, table_type, mapping_entries}]}（旧格式 mappings 字典兼容）
         created_by: 激活者 UUID
         file_sources: [(filename, Path), ...]，已由 Worker 加载
         force_activate: 跳过 L2/L3 校验强制激活
@@ -270,6 +270,7 @@ async def execute_pipeline(
     from .parsers.csv_parser import iter_csv_rows_from_path
     from .parsers.excel_parser import iter_excel_rows_from_path
     from .parsers.excel_parser_calamine import iter_excel_rows_from_path_calamine
+    from .sheet_mapping import ForwardFill, resolve_sheet_mapping
     from .validator import evaluate_activation, validate_l1
     from .writer import activate_dataset, bulk_write_staged, prepare_rows_with_raw_extra
 
@@ -406,12 +407,8 @@ async def execute_pipeline(
         detections[str(filepath)] = fd
     _mark("detect_identify_done")
 
-    # Resolve confirmed mappings
-    confirmed = {}
-    if custom_mapping and "confirmed_mappings" in custom_mapping:
-        for m in custom_mapping["confirmed_mappings"]:
-            sheet_key = f"{m.get('file_name', '')}!{m.get('sheet_name', '')}"
-            confirmed[sheet_key] = m.get("mappings", {})
+    # 确认映射（列映射页提交的 mapping_entries）按 sheet 解析，见 sheet_mapping.resolve_sheet_mapping
+    confirmed_list: list[dict] = list((custom_mapping or {}).get("confirmed_mappings") or [])
 
     import_year = year or 2025
 
@@ -497,48 +494,39 @@ async def execute_pipeline(
         ext = os.path.splitext(filename)[1].lower()
 
         for sheet in fd.sheets:
-            if sheet.table_type == "unknown":
+            plan = resolve_sheet_mapping(sheet, filename, confirmed_list)
+            table_type = plan.table_type
+            if table_type == "unknown":
                 logger.info(
                     "Pipeline %s skipping unknown sheet: %s!%s",
                     job_id, filename, sheet.sheet_name,
                 )
                 continue
 
-            sheet_key = f"{filename}!{sheet.sheet_name}"
-            col_mapping = confirmed.get(sheet_key) or {}
-            if not col_mapping:
-                for cm in sheet.column_mappings:
-                    if cm.standard_field and cm.confidence >= 50:
-                        col_mapping[cm.column_header] = cm.standard_field
-                logger.info(
-                    "Pipeline %s %s!%s: auto-detected mapping (%d cols)",
-                    job_id, filename, sheet.sheet_name, len(col_mapping),
-                )
-
-            headers = sheet.detection_evidence.get("header_cells", [])
-            if not headers and sheet.preview_rows:
-                headers = [str(c) for c in sheet.preview_rows[0]] if sheet.preview_rows else []
+            col_mapping = plan.col_mapping
+            headers = plan.headers
+            logger.info(
+                "Pipeline %s %s!%s: %s mapping (%d cols)",
+                job_id, filename, sheet.sheet_name, plan.source, len(col_mapping),
+            )
 
             logger.info(
                 "Pipeline %s processing sheet %s!%s: type=%s est=%d cols=%d mapped=%d",
                 job_id, filename, sheet.sheet_name,
-                sheet.table_type, sheet.row_count_estimate,
+                table_type, sheet.row_count_estimate,
                 len(headers), len(col_mapping),
             )
 
-            # forward-fill cols (S6-12)
-            ff_cols = [
-                cm.column_index for cm in sheet.column_mappings
-                if cm.standard_field in ("account_code", "account_name")
-            ]
+            # forward-fill cols (S6-12)：按实际使用的映射（确认映射优先）；合计 / 小计行不填（ForwardFill）
+            forward_fill = None
 
             if ext in (".xlsx", ".xlsm"):
+                forward_fill = ForwardFill(plan)
                 _excel_iter = _choose_excel_iter(sheet.row_count_estimate)
                 row_iter = _excel_iter(
                     str(filepath), sheet.sheet_name,
                     data_start_row=sheet.data_start_row,
                     chunk_size=current_chunk_size,
-                    forward_fill_cols=ff_cols or None,
                 )
             elif ext in (".csv", ".tsv"):
                 encoding = fd.encoding or "utf-8"
@@ -552,7 +540,7 @@ async def execute_pipeline(
 
             chunk_count = 0
             balance_cleaned_accumulated: list[dict] = []
-            is_balance_sheet = sheet.table_type in ("balance", "aux_balance")
+            is_balance_sheet = table_type in ("balance", "aux_balance")
             # 百万行优化：余额表分批写入阈值（避免全量累积 OOM）
             BALANCE_FLUSH_THRESHOLD = 100_000
 
@@ -578,6 +566,8 @@ async def execute_pipeline(
                         else:
                             row_dict[f"col_{i}"] = val
                     dict_rows.append(row_dict)
+                if forward_fill is not None:
+                    forward_fill.apply(dict_rows)
                 _t_dict += _time.time() - _t
 
                 _t = _time.time()
@@ -589,7 +579,7 @@ async def execute_pipeline(
 
                 _t = _time.time()
                 findings, cleaned = validate_l1(
-                    std_rows, sheet.table_type, column_mapping=col_mapping,
+                    std_rows, table_type, column_mapping=col_mapping,
                     file_name=filename, sheet_name=sheet.sheet_name,
                 )
                 _t_validate += _time.time() - _t
@@ -607,7 +597,7 @@ async def execute_pipeline(
                             "Memory usage may be elevated.",
                             job_id, len(balance_cleaned_accumulated), BALANCE_FLUSH_THRESHOLD,
                         )
-                elif sheet.table_type in ("ledger", "aux_ledger"):
+                elif table_type in ("ledger", "aux_ledger"):
                     _t = _time.time()
                     ledger_result_v2 = convert_ledger_rows_v2(cleaned)
                     ledger = ledger_result_v2.rows

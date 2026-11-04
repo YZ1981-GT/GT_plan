@@ -62,7 +62,11 @@ REVIEW_NOTES_CODES = {
 PARAMS_REF = "'填写参数（无需打印）'"
 # 样表笔误（逐条登记，原文对不上即失败）：(sheet, 格, 原文片段, 改为, 说明)。
 # 案例 1 底稿（CITRv1.0）J594 的「2024年度」笔误在 10.16 样表里已改正，无需登记。
-TEXT_FIXES: list[tuple[str, str, str, str, str]] = []
+TEXT_FIXES: list[tuple[str, str, str, str, str]] = [
+    ("审核报告说明", "B249", "本年损益金额XX元", "本年损益金额{0}元",
+     "资产损失段金额写死「XX元」；J249（=A105090!C32 资产损失账载金额）即该占位 {0}，"
+     "案例报告同段写的就是该金额（spec citar-case-chain-fetch-fixes R11）"),
+]
 INJECTED_FORMULAS = {
     ("1-01报告封面", "A8"): ("2025年度", f"={PARAMS_REF}!B10"),
     ("1-01报告正文", "E3"): ("手动粘贴报告号", f"={PARAMS_REF}!B15"),

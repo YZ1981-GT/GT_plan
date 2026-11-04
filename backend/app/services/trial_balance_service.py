@@ -85,7 +85,7 @@ class TrialBalanceService:
         # - 只汇总叶子：父子全加会重复计算 → 试算表翻倍、资产≠负债+权益
         # - 最长前缀匹配：漏映射的子科目继承最近已映射父科目的标准码，不被静默丢弃
         # - 余额按方向归一到借正贷负：部分账套存无符号绝对值，直接 SUM 会让借方性质挂账同号累加
-        #   下游 `if direction=='credit': closing=abs(closing)` 不变即自洽。
+        #   下游 `if direction=='credit': closing=-closing` 存自然正数，反方向余额保留负号。
         leaf_cond = leaf_condition(bal)
         signed_closing = signed_balance(bal.c.closing_balance, bal.c.closing_direction)
         signed_opening = signed_balance(bal.c.opening_balance, bal.c.opening_direction)
@@ -124,11 +124,15 @@ class TrialBalanceService:
         # 1b. 损益类科目额外汇总本期发生额（debit_amount - credit_amount）
         # 损益类期末余额通常为 0（已结转），审计需要看本期发生额
         # 同样只取叶子节点，避免父子科目发生额重复累加。
+        # 期末没结平的末级（SAP 等不做损益结转的账套）：对方发生额是冲减，单独汇总以便扣除（R12）
+        unclosed = sa.func.abs(sa.func.coalesce(signed_closing, 0)) >= Decimal("0.005")
         period_sub = (
             sa.select(
                 _resolved_std_subq().label("std"),
                 bal.c.debit_amount.label("dr"),
                 bal.c.credit_amount.label("cr"),
+                sa.case((unclosed, bal.c.debit_amount), else_=0).label("odr"),
+                sa.case((unclosed, bal.c.credit_amount), else_=0).label("ocr"),
             )
             .select_from(bal)
             .where(balance_filter)
@@ -140,6 +144,8 @@ class TrialBalanceService:
                 period_sub.c.std.label("standard_account_code"),
                 sa.func.coalesce(sa.func.sum(period_sub.c.dr), 0).label("total_debit"),
                 sa.func.coalesce(sa.func.sum(period_sub.c.cr), 0).label("total_credit"),
+                sa.func.coalesce(sa.func.sum(period_sub.c.odr), 0).label("open_debit"),
+                sa.func.coalesce(sa.func.sum(period_sub.c.ocr), 0).label("open_credit"),
             )
             .where(period_sub.c.std.isnot(None))
             .group_by(period_sub.c.std)
@@ -238,28 +244,35 @@ class TrialBalanceService:
                 if period:
                     total_dr = Decimal(str(period.total_debit))
                     total_cr = Decimal(str(period.total_credit))
+                    # 期末没结平的末级：对方发生额是冲减（成本冲回 / 销售退回），不是结转额，要扣掉；
+                    # 已结转的末级对方发生额是结转额，照旧只取本方向（spec citar-case-chain-fetch-fixes R12）
+                    open_dr = Decimal(str(getattr(period, "open_debit", 0) or 0))
+                    open_cr = Decimal(str(getattr(period, "open_credit", 0) or 0))
                     direction, _source = resolve_account_direction(code, name or "")
                     if direction == "credit":
                         # 收入类（贷方正常）：取贷方发生额，存自然正数
-                        closing = total_cr
+                        closing = total_cr - open_dr
                     else:
                         # 费用/成本类（借方正常）：取借方发生额，存自然正数
-                        closing = total_dr
+                        closing = total_dr - open_cr
                 else:
-                    # 无序时账发生额时 fallback 到 tb_balance.closing_balance abs
+                    # 无序时账发生额时 fallback 到 tb_balance.closing_balance（借正贷负）：
+                    # 贷方科目取反存自然正数，反方向余额保留负号（不取绝对值）
                     direction, _source = resolve_account_direction(code, name or "")
-                    closing = abs(closing) if direction == "credit" else closing
+                    closing = -closing if direction == "credit" else closing
                     # C-4: 有余额但发生额列为空 → 记录以供 warning
                     if closing != Decimal("0"):
                         _income_expense_fallback.append(code)
                 opening = Decimal("0")  # 损益类无期初余额
             else:
-                # 资产负债权益类：tb_balance.closing_balance 是"借正贷负"原始口径，
-                # 贷方类（负债/权益）需取绝对值转为 v2 自然正数。
+                # 资产负债权益类：tb_balance.closing_balance 归一为"借正贷负"，
+                # 贷方类（负债/权益）取反存 v2 自然正数；借方余额的贷方科目（累计亏损、增值税留抵）
+                # 存负数，不取绝对值（spec citar-case-chain-fetch-fixes R5：取绝对值会把
+                # 利润分配借方余额 5,010,411.91 记成未分配利润正数，资产负债表差 1,946 万）
                 direction, _source = resolve_account_direction(code, name or "")
                 if direction == "credit":
-                    closing = abs(closing)
-                    opening = abs(opening)
+                    closing = -closing
+                    opening = -opening
 
             row = existing_rows.get(code)
             if row:

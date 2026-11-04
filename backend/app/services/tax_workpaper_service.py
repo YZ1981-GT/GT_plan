@@ -143,7 +143,7 @@ def _make_runner(wb: TaxWorkbook, book: AccountBook, inputs: dict[Key, Any]) -> 
         v = wb.consts.get(key)
         return str(v).strip() if v not in (None, "") else None
 
-    runner = RuleRunner(book, wb.model["lists"], label_text)
+    runner = RuleRunner(book, wb.model["lists"], label_text, wb.model["rules"])
     return runner
 
 

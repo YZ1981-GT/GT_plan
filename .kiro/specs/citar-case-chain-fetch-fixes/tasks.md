@@ -1,0 +1,26 @@
+# 任务：两个税审案例全链路取数修复
+
+- [x] 1 基线：离线链路探针（导入 → 取数 → 模型）跑两个案例改前结果并存档
+- [x] 2 批 A 导入
+  - [x] 2.1 `sheet_mapping.resolve_sheet_mapping` + pipeline 接线（R1；mapping_entries / 文件名前缀 / 确认表类型 / canonical 表头）
+  - [x] 2.2 识别：编辑距离按长度收紧 + 取最小距离；SAP / 审计软件别名；amount / counterpart_account 字段；序时账金额替代；点分日期（R2 / R3）
+  - [x] 2.3 转换：方向 token、保留符号、单金额列拆借贷、期间格式、对方科目透传（R3 / R4）
+  - [x] 2.4 前端列映射下拉补「对方科目」（「金额」已有）
+  - [x] 2.5 合计行不向下填充 `ForwardFill`（R3b，实施中发现）
+  - [x] 2.6 单测 `tests/ledger_import/test_case_chain_import_fixes.py`
+- [x] 3 批 B 试算表：`recalc_unadjusted` 贷方类保留符号（R5）+ 未结转损益扣对方发生额（R12）
+- [x] 4 批 C 底稿取数
+  - [x] 4.1 `build_account_book` 纯函数 + 平铺科目 local 名 / 平铺路径匹配（R7）
+  - [x] 4.2 「其他」余项（R6）
+  - [x] 4.3 无下级回退本身 + 金额路径同取本身（R8）
+  - [x] 4.4 工会经费 / 职工教育经费回退其他应付款 + 同义词（R9 / R10）
+  - [x] 4.5 未结转损益取净额（R12）、事业单位 / 民非专用表只对相应账套取数（R13）
+  - [x] 4.6 单测 `tests/test_tax_workpaper_case_chain_fixes.py`
+- [x] 5 批 E 审核说明「XX元」占位（R11）+ 生成脚本 `TEXT_FIXES` 登记
+- [ ] 6 验收
+  - [x] 6.1 V1 导入行数 / 借贷合计 / 父子一致（离线）
+  - [x] 6.2 V2 申报表 / 正文 / 审核说明对照（离线，改后 vs 改前）
+  - [x] 6.3 V3 资产负债表（回滚事务内【测试】项目）：案例 1 平衡差 -19,469,933.96 → -11,340.42，残差为案例账套「以前年度损益调整」未审期末单边的账表差异；案例 2 残差 -12,622.30 为 1485010000 应收退货成本未映射
+  - [x] 6.4 V4 回归：导入全量 + 试算表 + 报表引擎 + 标准科目余额视图 + 税审底稿 / 鉴证报告 + 公式推送 e2e + 事件总线 990 passed / 22 skipped / 0 failed。3 个夹具按导入口径补写余额方向（原依赖取绝对值），1 个断言按 R6 更新（主营业务成本经「其他」取到）。另 15 个（test_audit_report / test_cfs_worksheet / test_p1_chain_wiring_acceptance）HEAD 干净检出同样失败，与本 spec 无关
+  - [ ]* 6.5 用户重导两个项目后在线核对（案例 2 只传 3 个 SAP 文件）——待用户操作
+- [x] 7 收尾：探针都在仓库外（`D:\gtt\probe`），登记 INDEX / memory；identifier.py 改前已超 800 行未登记，按现行数登记白名单；单金额拆分抽到 `single_amount.py`，converter 回到 770 行（不提交）

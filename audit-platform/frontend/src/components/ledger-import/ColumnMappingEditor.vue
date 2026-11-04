@@ -322,6 +322,7 @@ const availableStandardFields: StandardField[] = [
   { value: 'amount', label: '金额' },
   { value: 'direction', label: '借贷方向' },
   { value: 'entry_seq', label: '分录序号' },
+  { value: 'counterpart_account', label: '对方科目' },
 ]
 
 // ─── Computed ───────────────────────────────────────────────────────────────

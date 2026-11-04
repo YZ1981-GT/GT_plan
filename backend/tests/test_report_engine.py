@@ -141,8 +141,9 @@ async def seeded_db(db_session: AsyncSession):
     # 与公式引擎无关（`_resolve_tb` / `evaluate_formula` 经实测均正常）。
     #
     # 口径必须与 `recalc_unadjusted` 严格对齐，否则重算值 ≠ 上面种的期望值：
-    #   - 资产/负债/权益类：取 `tb_balance.closing_balance`（v1 借正贷负），
-    #     贷方类再 `abs()` 转 v2 自然正数 ⇒ 这里直接存自然正数即可
+    #   - 资产/负债/权益类：`tb_balance.closing_balance` 按 `closing_direction` 归一为借正贷负，
+    #     贷方类取反转 v2 自然正数（不再取绝对值，spec citar-case-chain-fetch-fixes R5）
+    #     ⇒ 这里存自然正数 + 科目方向（与导入写入的口径一致）
     #   - 损益类（5xxx/6xxx）：**不看 closing_balance**，从
     #     `debit_amount`/`credit_amount` 取**单边**发生额（收入取贷方、费用取借方），
     #     且 `opening` 被强制置 0
@@ -169,6 +170,8 @@ async def seeded_db(db_session: AsyncSession):
             project_id=FAKE_PROJECT_ID, year=2025, company_code="001",
             account_code=code, account_name=name,
             opening_balance=opening_bal, closing_balance=closing,
+            # 与导入后 tb_balance 同口径：自然正数 + 实际方向（真库全部行都带方向）
+            opening_direction=direction, closing_direction=direction,
             debit_amount=dr, credit_amount=cr,
         ))
         # 1:1 自映射（客户科目码 == 标准科目码）。没有映射时

@@ -250,6 +250,8 @@ FIELD_LABELS = {
     "company_code": "组织编码",
     "level": "科目级次",
     "direction": "借贷方向",
+    "amount": "金额",
+    "counterpart_account": "对方科目",
 }
 
 _REQUIRED_FIELD_GROUPS: dict[str, list[tuple[str, set[str]]]] = {

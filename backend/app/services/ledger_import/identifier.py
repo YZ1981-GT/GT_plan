@@ -129,11 +129,13 @@ _FUZZY_L1_PATTERNS: frozenset[str] = frozenset(
 # 原始别名表：standard_field → 中文 / 英文别名列表（未归一化）。
 _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     # 科目
-    "account_code": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
-    "account_name": ["科目名称", "科目全名", "账户名称", "Account Name"],
+    # SAP 导出（FS10N / 行项目）：总账科目 = 科目编码，短文本 / 总账科目：长文本 = 科目名称
+    "account_code": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code", "总账科目"],
+    "account_name": ["科目名称", "科目全名", "账户名称", "Account Name", "短文本", "总账科目：长文本"],
     # 期初（月度维度）；「年初余额」净额单列无独立年度净额字段，按 R1.5 并入 opening_balance
     # 「未审期初数 / 未审期末数」= 账面数 + 账表差异，是试算表「未审数」口径（用户 2026-11-02 定）
-    "opening_balance": ["期初余额", "年初余额", "未审期初数"],
+    # SAP 余额表：已结转余额 = 期初，累计余额 = 期末（已结转 + 借 - 贷 = 累计，案例 2 逐行核对）
+    "opening_balance": ["期初余额", "年初余额", "未审期初数", "已结转余额"],
     "opening_debit": ["期初借方", "期初借方余额"],
     "opening_credit": ["期初贷方", "期初贷方余额"],
     # 年初（年度维度）
@@ -146,26 +148,26 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     "debit_amount": [
         "借方金额", "本期借方", "借方发生额", "借方本期",
         "借方本期发生额", "本期借方发生额", "借方", "Debit", "DR",
-        "未审借方发生额",
+        "未审借方发生额", "在制表期间的借方余额",
     ],
     "credit_amount": [
         "贷方金额", "本期贷方", "贷方发生额", "贷方本期",
         "贷方本期发生额", "本期贷方发生额", "贷方", "Credit", "CR",
-        "未审贷方发生额",
+        "未审贷方发生额", "报表期间的贷方余额",
     ],
     # 期末
-    "closing_balance": ["期末余额", "未审期末数"],
+    "closing_balance": ["期末余额", "未审期末数", "累计余额"],
     "closing_debit": ["期末借方", "期末借方余额"],
     "closing_credit": ["期末贷方", "期末贷方余额"],
     # 凭证定位
-    "voucher_date": ["日期", "记账日期", "凭证日期", "制单日期", "业务日期"],
+    "voucher_date": ["日期", "记账日期", "凭证日期", "制单日期", "业务日期", "记账时间"],
     "voucher_no": ["凭证号", "凭证字号", "凭证编号"],
-    "voucher_type": ["凭证类型", "凭证字", "字"],
+    "voucher_type": ["凭证类型", "凭证字", "字", "凭证种类"],
     # 描述
-    "summary": ["摘要", "凭证摘要", "摘要说明", "Description"],
+    "summary": ["摘要", "凭证摘要", "摘要说明", "Description", "业务说明", "文本"],
     "preparer": ["制单人", "制单", "经办人"],
     # 辅助
-    "currency_code": ["币种", "币别", "Currency"],
+    "currency_code": ["币种", "币别", "Currency", "货币"],
     "entry_seq": ["分录号", "序号", "Line", "Line No", "Line Number"],
     "level": ["级次", "科目级别", "Level"],
     # 辅助核算（混合维度列 = 单列含多维度字符串）
@@ -176,10 +178,13 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     "aux_name": ["辅助名称", "核算项目名称", "辅助项目名称"],
     # 科目表
     "category": ["类别", "科目类别"],
-    "direction": ["方向", "余额方向", "科目方向"],
+    "direction": ["方向", "余额方向", "科目方向", "借贷方向", "借贷", "借/贷标识", "借贷标志"],
     # 其他
     "company_code": ["公司代码", "公司编码", "组织编码", "核算组织", "Company Code"],
-    "accounting_period": ["会计期间", "期间", "Period"],
+    "accounting_period": ["会计期间", "期间", "Period", "会计年度/期间", "会计月"],
+    # 序时账单金额列（借正贷负，或配合借贷方向列）：转换时按方向 / 符号拆成借贷两列
+    "amount": ["金额", "公司代码货币价值"],
+    "counterpart_account": ["对方科目", "对方科目名称", "对方科目编码"],
 }
 
 
@@ -436,6 +441,8 @@ def _match_merged_header(header: str) -> tuple[Optional[str], int, str]:
 _LEVENSHTEIN_BLOCK_MARKERS: tuple[str, ...] = (
     "调整", "重分类", "差异", "滚调", "审定", "上期",
 )
+#: 编辑距离兜底：较短一方不超过此长度时容差收紧为 1
+_SHORT_HEADER_LEN = 5
 
 
 def _match_header(header: str) -> tuple[Optional[str], int, str]:
@@ -489,14 +496,25 @@ def _match_header(header: str) -> tuple[Optional[str], int, str]:
     if any(marker in normalized for marker in _LEVENSHTEIN_BLOCK_MARKERS):
         return None, 0, "header_fuzzy"
 
-    # Fuzzy: Levenshtein
+    # Fuzzy: Levenshtein —— 取全部别名里距离最小的一个（同距离先到先得）；
+    # 较短一方 ≤ 5 字时容差只给 1：中文 4 字表头差 2 个字已是另一回事
+    # （「过账代码」≠「科目代码」、「业务范围」≠「业务日期」、「累计余额」≠「期初余额」）。
     max_d = MATCHING_CONFIG.get("levenshtein_max_distance", 2)
+    best: tuple[int, Optional[str]] = (max_d + 1, None)
     for std_field, aliases in HEADER_ALIASES.items():
         for alias in aliases:
             if len(alias) < min_lev or len(normalized) < min_lev:
                 continue
-            if _levenshtein_leq(normalized, alias, max_d=max_d):
-                return std_field, fuzzy_conf, "header_fuzzy"
+            limit = min(max_d, 1) if min(len(alias), len(normalized)) <= _SHORT_HEADER_LEN else max_d
+            limit = min(limit, best[0] - 1)
+            if limit < 0:
+                continue
+            for d in range(limit + 1):
+                if _levenshtein_leq(normalized, alias, max_d=d):
+                    best = (d, std_field)
+                    break
+    if best[1] is not None:
+        return best[1], fuzzy_conf, "header_fuzzy"
 
     return None, 0, "header_fuzzy"
 

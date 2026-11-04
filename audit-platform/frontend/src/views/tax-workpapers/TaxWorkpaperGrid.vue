@@ -71,7 +71,9 @@ function display(cell: TaxWorkpaperCell): string {
 function cellClass(cell: TaxWorkpaperCell) {
   const meta = cell.ref ? props.cells[cell.ref] : undefined
   const v = currentValue(cell)
+  const isEditing = Boolean(cell.ref) && editing.value === cell.ref
   return [
+    !isEditing && display(cell).trim() === '' ? 'tw-cell--blank' : '',
     cell.kind ? `tw-cell--${cell.kind}` : '',
     cell.ref && cell.fmt ? 'tw-cell--number' : '',
     cell.role === 'f' ? 'tw-cell--formula' : '',
@@ -137,6 +139,14 @@ function cancel() {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--tw-text);
+}
+
+/*
+ * 空格子照样占一行字高：没有字的格子只剩内边距，整行全空时压成一条细线，与有字的行不一样高。
+ * 放一个零宽空格撑出行框（生成内容不进复制、不改 textContent），空格子与有字格子同高。
+ */
+.tw-grid .tw-cell--blank::before {
+  content: "\200b";
 }
 
 .tw-grid .tw-cell--title {

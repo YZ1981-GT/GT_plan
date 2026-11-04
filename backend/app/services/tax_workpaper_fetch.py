@@ -20,7 +20,9 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
+from typing import Callable
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -31,6 +33,7 @@ from app.services.dataset_query import get_active_filter
 from app.services.ledger_import.direction_resolver import resolve_account_direction
 
 _ZERO = Decimal(0)
+_CENT = Decimal("0.005")
 _CHART = Path(__file__).resolve().parents[2] / "data" / "standard_account_chart.json"
 
 # 一级名称别名组：规则里的名称 → 多个标准科目（资产负债表「存货」项目口径）
@@ -52,6 +55,16 @@ SYNONYMS: dict[str, list[str]] = {
     "电子设备": ["电子产品", "计算机设备", "电脑设备"],
     "土地使用权": ["土地"],
     "软件": ["软件使用权", "计算机软件"],
+    # 企业会计制度科目写法（字序不同）
+    "非流动资产处置损失": ["处置非流动资产损失"],
+    "非流动资产处置利得": ["处置非流动资产利得", "处置非流动资产收益", "非流动资产处置收益"],
+}
+# 规则路径 (一级, 二级) 取不到时改在另一个一级科目下找：企业会计制度把工会经费、职工教育经费
+# 计提在「其他应付款」（应付工资 / 应付福利费没有这两项）。住房公积金不回退：其他应付款-住房公积金
+# 是代扣职工个人部分，不是单位缴纳的公积金。
+FALLBACK_PATHS: dict[tuple[str, str], str] = {
+    ("应付职工薪酬", "工会经费"): "其他应付款",
+    ("应付职工薪酬", "职工教育经费"): "其他应付款",
 }
 
 
@@ -89,6 +102,31 @@ class Node:
     debit: Decimal = _ZERO
     credit: Decimal = _ZERO
     closing: Decimal = _ZERO  # 借正贷负
+    # 平铺科目表（SAP 10 位码、无上级行，名称「一级-明细」）去掉一级名称后的明细名；其余同 name
+    local: str = ""
+
+    @property
+    def label(self) -> str:
+        return self.local or self.name
+
+
+#: 平铺科目名称的分段符（「应付职工薪酬-应付工会经费」「应收票据_银行承兑汇票」）
+_FLAT_SEP = re.compile(r"\s*[-_－—]\s*")
+
+
+def flat_local_name(name: str, top_names: set[str]) -> str:
+    """平铺科目名称去掉打头的一级科目名：首段是本科目的标准一级科目名（``top_names``）才去掉，
+    否则原样（「福利费-宿舍费用」映射到销售费用，首段不是一级名称，不能丢）。"""
+    parts = [p for p in _FLAT_SEP.split(name or "") if p]
+    if len(parts) >= 2 and name_key(parts[0]) in top_names:
+        return "-".join(parts[1:])
+    return name
+
+
+def flat_segment(label: str, depth: int) -> str:
+    """平铺科目明细名的第 ``depth`` 段（「应交增值税-进项税额」第 0 段「应交增值税」、第 1 段「进项税额」）。"""
+    parts = [p for p in _FLAT_SEP.split(label or "") if p]
+    return parts[depth] if depth < len(parts) else ""
 
 
 def _signed(amount, direction: str | None) -> Decimal:
@@ -102,15 +140,37 @@ def _signed(amount, direction: str | None) -> Decimal:
 
 def _standard_chart() -> tuple[dict[str, list[str]], dict[str, str]]:
     """名称 → 标准码列表（同名的 6xxx 新码排在前）；标准码 → 方向。"""
-    chart = json.loads(_CHART.read_text(encoding="utf-8"))
     by_name: dict[str, list[str]] = defaultdict(list)
     direction: dict[str, str] = {}
-    for a in chart["accounts"]:
+    for a in _chart_accounts():
         by_name[a["name"]].append(a["code"])
         direction[a["code"]] = a["direction"]
     for codes in by_name.values():
         codes.sort(key=lambda c: (not c.startswith("6"), c))
     return by_name, direction
+
+
+@lru_cache(maxsize=1)
+def _chart_accounts() -> tuple[dict, ...]:
+    return tuple(json.loads(_CHART.read_text(encoding="utf-8"))["accounts"])
+
+
+@lru_cache(maxsize=1)
+def _pl_codes() -> frozenset[str]:
+    return frozenset(a["code"] for a in _chart_accounts() if a.get("category") in ("revenue", "expense"))
+
+
+def is_pl_standard(standard: str | None) -> bool:
+    """标准科目是否损益类（标准科目表 category = revenue / expense；「6601-01」类带后缀的码取主码）。"""
+    return bool(standard) and standard.split("-")[0] in _pl_codes()
+
+
+def _chart_top_names(standard: str | None) -> set[str]:
+    """标准科目（含「1231-02」这类带后缀的码取其主码）的名称，按 ``name_key`` 口径。"""
+    if not standard:
+        return set()
+    codes = {standard, standard.split("-")[0]}
+    return {name_key(a["name"]) for a in _chart_accounts() if a["code"] in codes}
 
 
 class AccountBook:
@@ -160,23 +220,31 @@ class AccountBook:
         return False
 
     # ── 名称匹配 ──
-    def match(self, candidates: list[Node], target: str, *, contains_ok: bool = True) -> list[Node]:
-        """先全等，再同义词全等，再包含（较短一方 ≥ 2 字；``contains_ok=False`` 时不做包含）。"""
-        key = name_key(target)
-        if not key:
+    def match(
+        self, candidates: list[Node], target: str, *, contains_ok: bool = True,
+        key: Callable[[Node], str] | None = None,
+    ) -> list[Node]:
+        """先全等，再同义词全等，再包含（较短一方 ≥ 2 字；``contains_ok=False`` 时不做包含）。
+
+        比较的是节点的 ``label``（平铺科目去掉一级名称后的明细名），``key`` 可换成别的取名方式。
+        """
+        get = key or (lambda n: n.label)
+        target_key = name_key(target)
+        if not target_key:
             return []
-        hits = [n for n in candidates if name_key(n.name) == key]
+        keyed = [(n, name_key(get(n))) for n in candidates]
+        hits = [n for n, k in keyed if k == target_key]
         if hits:
             return hits
         synonyms = {name_key(s) for s in SYNONYMS.get(display_name(target), [])}
-        hits = [n for n in candidates if name_key(n.name) in synonyms]
+        hits = [n for n, k in keyed if k in synonyms]
         if hits or not contains_ok:
             return hits
 
         def contains(a: str, b: str) -> bool:
             short, long_ = sorted((a, b), key=len)
             return len(short) >= 2 and short in long_
-        return [n for n in candidates if name_key(n.name) and contains(name_key(n.name), key)]
+        return [n for n, k in keyed if k and contains(k, target_key)]
 
     def _std_tops(self, std: str) -> list[Node]:
         """映射到标准科目 std、且上级不映射到 std 的客户科目（该标准科目在客户科目树里的最高层）。"""
@@ -201,7 +269,7 @@ class AccountBook:
                 return sorted(hits, key=lambda n: n.code)
         if std_codes:
             return []
-        return sorted(self.match(self.roots(), name, contains_ok=False), key=lambda n: n.code)
+        return sorted(self.match(self.roots(), name, contains_ok=False, key=lambda n: n.name), key=lambda n: n.code)
 
     def top_issue(self, name: str) -> str:
         """一级科目取不到时的原因。"""
@@ -211,7 +279,20 @@ class AccountBook:
         return f"未找到科目「{name}」"
 
     def resolve(self, path: list[str]) -> tuple[list[Node], str | None]:
-        """科目路径 → 节点；取不到返回 ([], 原因)。"""
+        """科目路径 → 节点；取不到返回 ([], 原因)。
+
+        原路径取不到、且 (一级, 二级) 在 ``FALLBACK_PATHS`` 里时，按回退的一级科目再找一次（原因仍报原路径）。
+        """
+        nodes, issue = self._resolve(path)
+        if not nodes and len(path) > 1:
+            fallback = FALLBACK_PATHS.get((path[0], path[1]))
+            if fallback:
+                alt, _ = self._resolve([fallback, *path[1:]])
+                if alt:
+                    return alt, None
+        return nodes, issue
+
+    def _resolve(self, path: list[str]) -> tuple[list[Node], str | None]:
         nodes = self.tops(path[0])
         if not nodes:
             return [], self.top_issue(path[0])
@@ -223,6 +304,11 @@ class AccountBook:
                 # 中间级没有这一层时在全部下级里找（客户科目表层级与规则不完全一致）
                 hits = self.match([d for n in nodes for d in self.descendants(n)], part)
             if not hits:
+                # 平铺科目表（无上级行，名称「一级-明细-…」）：在本组没有下级的节点里按名称第 d 段找
+                depth = len(walked) - 1
+                hits = self.match([n for n in nodes if not n.children], part,
+                                  key=lambda n, d=depth: flat_segment(n.label, d))
+            if not hits:
                 return [], f"「{'-'.join(walked)}」下未找到明细科目「{part}」"
             nodes = hits
             walked.append(part)
@@ -232,13 +318,26 @@ class AccountBook:
     def natural_sign(self, node: Node) -> int:
         return -1 if node.direction == "credit" else 1
 
+    def _unclosed_pl_leaves(self, node: Node, measure: str) -> list[Node]:
+        """损益类科目取「本方向发生额」（费用借方 / 收入贷方）时，期末没结平的末级明细。
+
+        账套每期把损益结转到本年利润时，对方发生额就是结转额，本方向发生额即本年发生额；
+        没结转的账套（SAP 等，损益科目留有余额）对方发生额是冲减（成本冲回、销售退回），
+        本方向发生额要减掉它（spec citar-case-chain-fetch-fixes R12：案例 2 主营业务成本借方
+        14,502,719.31，贷方冲减 2,109,933.76，底稿年末未审数 12,392,785.55）。
+        """
+        natural = "debit" if node.direction == "debit" else "credit"
+        if measure != natural or not is_pl_standard(node.standard):
+            return []
+        return [leaf for leaf in self.leaves(node) if abs(leaf.closing) >= _CENT]
+
     def measure(self, nodes: list[Node], measure: str) -> Decimal:
         total = _ZERO
         for n in nodes:
             if measure == "debit":
-                total += n.debit
+                total += n.debit - sum((leaf.credit for leaf in self._unclosed_pl_leaves(n, measure)), _ZERO)
             elif measure == "credit":
-                total += n.credit
+                total += n.credit - sum((leaf.debit for leaf in self._unclosed_pl_leaves(n, measure)), _ZERO)
             elif measure == "opening":
                 total += n.opening * self.natural_sign(n)
             elif measure == "closing":
@@ -259,6 +358,10 @@ class AccountBook:
             for code in [n.code] + [d.code for d in self.descendants(n)]:
                 dr, cr = self.monthly.get(code, {}).get(month, (_ZERO, _ZERO))
                 total += dr if measure == "debit" else cr
+            # 没结转的损益明细：本月对方发生额是冲减，扣掉（口径同 measure）
+            for leaf in self._unclosed_pl_leaves(n, measure):
+                dr, cr = self.monthly.get(leaf.code, {}).get(month, (_ZERO, _ZERO))
+                total -= cr if measure == "debit" else dr
         return total
 
     def has_activity(self, node: Node) -> bool:
@@ -274,14 +377,6 @@ async def load_account_book(db: AsyncSession, project_id: UUID, year: int, *, wi
         ).where(await get_active_filter(db, bal, project_id, year))
     )).fetchall()
 
-    picked: dict[str, tuple] = {}
-    for row in rows:
-        code = normalize_code(row.account_code)
-        prev = picked.get(code)
-        # 同码多行：优先名字不以「\」开头的行（真库错位导入时另一行挂的是相邻科目名）
-        if prev is None or (str(prev.account_name or "").startswith("\\") and not str(row.account_name or "").startswith("\\")):
-            picked[code] = row
-
     mapping: dict[str, str] = {}
     mp = AccountMapping.__table__
     for orig, std in (await db.execute(
@@ -290,6 +385,26 @@ async def load_account_book(db: AsyncSession, project_id: UUID, year: int, *, wi
         )
     )).fetchall():
         mapping[normalize_code(orig)] = std
+
+    monthly = await _load_monthly(db, project_id, year) if with_ledger else None
+    return build_account_book(rows, mapping, monthly)
+
+
+def build_account_book(
+    rows, mapping: dict[str, str], monthly: dict[str, dict[int, tuple[Decimal, Decimal]]] | None = None,
+) -> AccountBook:
+    """余额行（带 account_code / account_name / opening_balance / opening_direction / debit_amount /
+    credit_amount / closing_balance / closing_direction 属性）+ 客户科目 → 标准科目映射 → 科目树。
+
+    不读库：离线验收（导入转换结果直接建树）与 ``load_account_book`` 共用。
+    """
+    picked: dict[str, tuple] = {}
+    for row in rows:
+        code = normalize_code(row.account_code)
+        prev = picked.get(code)
+        # 同码多行：优先名字不以「\」开头的行（真库错位导入时另一行挂的是相邻科目名）
+        if prev is None or (str(prev.account_name or "").startswith("\\") and not str(row.account_name or "").startswith("\\")):
+            picked[code] = row
 
     _, chart_direction = _standard_chart()
     nodes: dict[str, Node] = {}
@@ -307,14 +422,26 @@ async def load_account_book(db: AsyncSession, project_id: UUID, year: int, *, wi
         node.parent = next((code[:i] for i in range(len(code) - 1, 0, -1) if code[:i] in codes), None)
         node.standard = next((mapping[code[:i]] for i in range(len(code), 0, -1) if code[:i] in mapping), None)
         node.direction = chart_direction.get(node.standard or "") or resolve_account_direction(code, node.name)[0]
+        node.local = flat_local_name(node.name, _chart_top_names(node.standard)) if node.parent is None else node.name
     for node in nodes.values():
         if node.parent:
             nodes[node.parent].children.append(node.code)
     for node in nodes.values():
         node.children.sort()
 
-    monthly = await _load_monthly(db, project_id, year) if with_ledger else None
     return AccountBook(nodes, monthly)
+
+
+def monthly_totals(rows) -> dict[str, dict[int, tuple[Decimal, Decimal]]]:
+    """(account_code, m, dr, cr) 行 → 科目 → 月 → (借, 贷)。"""
+    out: dict[str, dict[int, tuple[Decimal, Decimal]]] = defaultdict(dict)
+    for row in rows:
+        if row.m is None:
+            continue
+        code, m = normalize_code(row.account_code), int(row.m)
+        dr, cr = out[code].get(m, (_ZERO, _ZERO))
+        out[code][m] = (dr + Decimal(str(row.dr or 0)), cr + Decimal(str(row.cr or 0)))
+    return dict(out)
 
 
 async def _load_monthly(db: AsyncSession, project_id: UUID, year: int) -> dict[str, dict[int, tuple[Decimal, Decimal]]]:
@@ -327,11 +454,4 @@ async def _load_monthly(db: AsyncSession, project_id: UUID, year: int) -> dict[s
             sa.func.coalesce(sa.func.sum(led.c.credit_amount), 0).label("cr"),
         ).where(await get_active_filter(db, led, project_id, year)).group_by(led.c.account_code, month)
     )).fetchall()
-    out: dict[str, dict[int, tuple[Decimal, Decimal]]] = defaultdict(dict)
-    for row in rows:
-        if row.m is None:
-            continue
-        code, m = normalize_code(row.account_code), int(row.m)
-        dr, cr = out[code].get(m, (_ZERO, _ZERO))
-        out[code][m] = (dr + Decimal(str(row.dr)), cr + Decimal(str(row.cr)))
-    return dict(out)
+    return monthly_totals(rows)

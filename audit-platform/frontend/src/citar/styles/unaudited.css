@@ -124,6 +124,12 @@
   white-space: nowrap;
 }
 
+/* 空格子照样占一行字高（零宽空格撑出行框），整行全空时与有字的行同高；留白行另有高度，不撑 */
+.sheet-table tr:not(.is-spacer) > td:empty::before,
+.sheet-table tr:not(.is-spacer) > th:empty::before {
+  content: "\200b";
+}
+
 .sheet-table thead th {
   background: var(--citar-c-f7f1fe);
   font-weight: 700;
