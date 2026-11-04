@@ -24,6 +24,7 @@ inclusion: always
 - 功能收敛停加新功能，核心 6-8 页做到极致，空壳标 developing；前后端必须联动；删除二次确认+先进回收站；一次性脚本用完即删
 - **文档/文件夹级 LLM 对话是最实用核心功能（2026-05-31 用户强调）**：平台任意文档/文件夹都能发起 AI 对话，自动注入当前文档+关联知识库（同行业/同模板/同科目）作 RAG 上下文；把知识库从"存文件"变"随时可问的专家"；详见 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` §二十二（spec 名 `doc-level-ai-chat`）
 - git 单 commit 提交所有变更；**push 前必先 fetch 同步**（stash → fetch --prune → 评估 ahead/behind → 决策 → pop → commit/push）
+- 🔴 **每次推送都推两个远端**（用户 2026-11-04）：origin（baijiazi555）+ upstream（YZ1981-GT）都要推，推完核对两边与 HEAD 一致；upstream 须在地址里指定 YZ1981-GT 账号（做法见 CITAR 节「📦 2026-11-04」条）
 - 🔴 **不要新建分支**（用户 2026-10-25）：工作直接提交并推送到当前分支 `spec/disclosure-note-doc-upload-and-batch-fill`（仍不直推 main）；一周以内的分支都合进当前分支后删掉，**一周以上的旧分支不动**（当天误删过 30 本地 + 33 远端旧分支，已按备份 `C:\Users\Administrator\gt_branch_backup\` 原样恢复、被连带关闭的 9 个 PR 已重开）；主工作树有并发会话的脏文件时 pre-push 拒推 ⇒ 用临时分离头 worktree 推 `HEAD:<当前分支>`（钩子对分离头跳过检查，推前手工跑 `backend/scripts/check/check_staged_tree_self_consistency.py`）；GitHub 默认分支实为 `master`
 - 提建议前先验证不引用过时记录；完整复盘诚实暴露问题不粉饰；PDCA：建议→spec→实施→复盘；5 角色轮转（合伙人/项目经理/质控/审计助理/EQCR）
 - 目标并发 6000 人；底稿编码致同 2025 修订版（`backend/data/wp_account_mapping.json` 206 条 v2025-R5）
