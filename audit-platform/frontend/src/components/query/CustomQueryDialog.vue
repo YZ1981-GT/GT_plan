@@ -436,11 +436,6 @@ const queryEntry = useQueryEntry({
     return executeQuery()
   },
 })
-// 打开弹窗时套用入口并立即执行；关闭时丢弃（下次打开按那次带来的 entry 重新计算）
-watch([visible, () => props.entry], ([open, entry]) => {
-  if (!open) { queryEntry.clear(); return }
-  if (entry) void queryEntry.applyEntry(entry)
-}, { immediate: true })
 
 function onEntrySwitch(item: QueryEntrySwitch) { void queryEntry.switchSource(item) }
 function onEntryBack() { void queryEntry.goBack() }
@@ -1308,6 +1303,13 @@ watch(() => [visible.value, props.openRevision, props.initialSource, props.initi
   if (!open) { entryNotice.value = null; return }
   entryNotice.value = source && notice ? { source, text: notice } : null
   if (source) revealSource(source)
+}, { immediate: true })
+// W6 入口：打开弹窗时套用入口并立即执行；关闭时丢弃（下次打开按那次带来的 entry 重新计算）。
+// 🔴 必须注册在全部状态声明之后：immediate 回调在注册当时同步执行，而布局首次打开才挂载本弹窗（挂载即可见且带 entry），
+// 原先写在 templateRun 等声明之前 ⇒ executeQuery 抛 TDZ ReferenceError、被 void 吞掉，首次点入口只套上下文不查询。
+watch([visible, () => props.entry], ([open, entry]) => {
+  if (!open) { queryEntry.clear(); return }
+  if (entry) void queryEntry.applyEntry(entry)
 }, { immediate: true })
 
 function revealSource(source: string) {
