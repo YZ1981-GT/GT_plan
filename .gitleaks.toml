@@ -63,4 +63,6 @@ regexes = [
   '''M10JudgmentDimension''',
   '''M2-M2-5-verify-rows''',
   '''perpetual-bond-[0-9]+''',
+  # AI 模型预设标识（公开配置，非密钥；V262 迁移 `preset_key = '…'` 被 generic-api-key 误报）
+  '''^gt_qwen3_reranker_4b$''',
 ]
