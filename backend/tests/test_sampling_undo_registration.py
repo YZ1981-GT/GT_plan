@@ -15,6 +15,7 @@ Properties: Property 1, Property 2, Property 3, Property 4
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from uuid import UUID, uuid4
@@ -53,6 +54,10 @@ class _FakeSession:
 
     async def flush(self):
         self.flushed += 1
+
+    def begin_nested(self):
+        # 撤销投影在保存点里写（voucher-runtime-integrity R4）；替身的保存点不做事
+        return contextlib.nullcontext()
 
 
 # ─── Property 2：撤销不越界 ──────────────────────────────────────────────────

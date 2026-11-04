@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.wp_chat_service import WpChatService
 
@@ -53,9 +53,9 @@ async def generate_ledger_analysis(
     project_id: UUID,
     req: LedgerAnalysisRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """台账分析底稿生成"""
+    """台账分析底稿生成（读项目序时账：要求项目成员；原先只校验登录，spec voucher-workflow-linkage-lineage-closure R9.2）"""
     svc = WpChatService()
     return await svc.generate_ledger_analysis(
         db, project_id, req.account_codes, req.year

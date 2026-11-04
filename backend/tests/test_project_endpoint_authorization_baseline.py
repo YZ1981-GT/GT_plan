@@ -462,7 +462,10 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 补 readonly 门，共降 12。
 #: 2026-10-31 现算 152（改前 153）：spec platform-performance-residual-findings-closure R12 —— batch_review 从
 #: readonly 提升到 review（项目级），不再算「仅登录不校项目」。
-_IDENTITY_ONLY_BASELINE = 152
+#: 2026-11-04 现算 148（远端头 33d1aa5a2 现算 154，已高出原基线 2）：spec voucher-workflow-linkage-lineage-closure
+#: R4.5 / R9 —— 抽样增强三端点（截止测试 / 账龄分析 / 月度明细）、报告复核溯源两端点（章节溯源 / 发现汇总）、
+#: 底稿序时账分析一端点补项目只读门，降 6；远端头那 2 个新增的仅登录端点不在本 spec 范围，仍计在 148 里。
+_IDENTITY_ONLY_BASELINE = 148
 
 
 def test_identity_only_endpoints_do_not_grow():

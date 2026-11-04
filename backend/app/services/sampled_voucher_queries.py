@@ -19,6 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_phase_models import InterimSurvivalCheck
+from app.models.dataset_models import LedgerDataset
 from app.models.workpaper_models import SampledVoucher, SamplingRecord, WorkingPaper, WpIndex
 from app.services.dataset_service import DatasetService
 from app.services.voucher_identity import (
@@ -162,10 +163,40 @@ async def cross_workpaper_duplicate_vouchers(
         return []
 
 
-async def project_sampling_coverage(db: AsyncSession, project_id: UUID, year: int) -> dict[str, Any]:
+def _record_in_year(year: int, project_year: int | None) -> sa.ColumnElement:
+    """抽样记录属于 ``year`` 的条件（记录表没有年度列）：
+
+    1. 本批次登记的已抽凭证的年度（同一批次只有一个年度）；
+    2. 没有已抽凭证登记的（「审计抽样」页手工记录、凭证登记失败的批次）按抽样框账套的年度；
+    3. 两者都没有的算项目审计年度 ``project_year``（一个项目审一个年度）；项目年度也不知道时不计入任何年度。
+    """
+    sv = _SV.alias("sv_of_record")
+    batch_vouchers = sa.and_(
+        SamplingRecord.batch_id.isnot(None),
+        sv.c.batch_id == SamplingRecord.batch_id,
+        sv.c.project_id == SamplingRecord.project_id,
+        sv.c.is_deleted == sa.false(),
+    )
+    dataset_year = (
+        sa.select(LedgerDataset.year).where(LedgerDataset.id == SamplingRecord.dataset_id).scalar_subquery()
+    )
+    without_vouchers = [dataset_year == year]
+    if project_year is not None and project_year == year:
+        without_vouchers.append(dataset_year.is_(None))
+    return sa.or_(
+        sa.exists().where(batch_vouchers, sv.c.year == year),
+        sa.and_(~sa.exists().where(batch_vouchers), sa.or_(*without_vouchers)),
+    )
+
+
+async def project_sampling_coverage(
+    db: AsyncSession, project_id: UUID, year: int, *, project_year: int | None = None,
+) -> dict[str, Any]:
     """项目级抽样登记概览（R5.6）。
 
-    - by_workpaper：按底稿汇总批次数 / 样本数
+    - by_workpaper：按底稿汇总**该年度**的批次数 / 样本数（年度认法见 ``_record_in_year``；原先不看年度，
+      抽样增强页把年度改成别的年仍列本年的批次，而同一结果里的重复抽凭、存续核对都按年度 —— spec
+      voucher-workflow-linkage-lineage-closure 浏览器实测发现）
     - duplicated：被 ≥2 个底稿抽取的凭证（按凭证键；旧行按凭证号单独成组，标 legacy）
     """
     by_wp_rows = (
@@ -175,7 +206,11 @@ async def project_sampling_coverage(db: AsyncSession, project_id: UUID, year: in
                 sa.func.count(sa.distinct(SamplingRecord.batch_id)).label("batch_count"),
                 sa.func.coalesce(sa.func.sum(SamplingRecord.sample_size), 0).label("sample_count"),
             )
-            .where(SamplingRecord.project_id == project_id, SamplingRecord.is_deleted == sa.false())
+            .where(
+                SamplingRecord.project_id == project_id,
+                SamplingRecord.is_deleted == sa.false(),
+                _record_in_year(year, project_year),
+            )
             .group_by(SamplingRecord.working_paper_id)
         )
     ).all()
@@ -184,7 +219,9 @@ async def project_sampling_coverage(db: AsyncSession, project_id: UUID, year: in
     wp_count = sa.func.count(sa.distinct(_SV.c.working_paper_id))
     dup_rows = (
         await db.execute(
-            sa.select(*key_cols, wp_count.label("wp_count"))
+            # 取一个登记科目：序时账凭证层地址必须带科目（抽样增强页「序时账」入口，spec
+            # voucher-workflow-linkage-lineage-closure R4.5）；凭证层展示整张凭证，取哪一行的科目都一样
+            sa.select(*key_cols, wp_count.label("wp_count"), sa.func.min(_SV.c.account_code).label("account_code"))
             .where(*_engine_rows(project_id, year))
             .group_by(*key_cols)
             .having(wp_count >= 2)
@@ -195,7 +232,7 @@ async def project_sampling_coverage(db: AsyncSession, project_id: UUID, year: in
 
     duplicated = []
     for r in dup_rows:
-        company, vdate, vtype, vno, count = r
+        company, vdate, vtype, vno, count, account = r
         vk = None if vdate is None else VoucherKey.of(
             year=year, company_code=company, voucher_date=vdate, voucher_type=vtype, voucher_no=vno,
         )
@@ -204,6 +241,7 @@ async def project_sampling_coverage(db: AsyncSession, project_id: UUID, year: in
             "voucher_no": vno,
             "voucher_date": vdate.isoformat() if vdate else None,
             "voucher_type": vtype if vk else None,
+            "account_code": account or None,
             "workpaper_count": int(count or 0),
             "legacy": vk is None,
         })

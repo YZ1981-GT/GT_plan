@@ -1,7 +1,7 @@
 """挂凭按凭证键并记阶段（spec voucher-identity-writeback-and-audit-phase 任务 6，需求 2.5）
 
 SQLite 真 ORM 行 + 端点级请求（只挂 voucher_links 与 ledger_penetration 两个路由；覆盖内层 get_db /
-get_current_user，让真实的项目成员判定跑）：
+get_current_user，让真实的项目成员判定跑；底稿级读写门按放行处理，门本身见 test_voucher_links_ownership.py）：
 
 - 同日同号两种凭证字分别挂同一底稿 → 两条记录，各记凭证字 / 主体 / 阶段；回拉按记录的凭证键只取各自分录；
 - 只给日期 + 号却命中两张 → 409 + 候选，不落库；只给号且唯一 → 后端补全凭证键；找不到 → 404；
@@ -27,8 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.models.audit_platform_models import TbLedger
 from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, ProjectUser, User
-from app.models.workpaper_models import SampledVoucher
+from app.models.workpaper_models import SampledVoucher, WorkingPaper, WpIndex, WpSourceType, WpStatus
 from app.services.voucher_identity import VoucherKey
+from tests._voucher_links_gates import allow_wp_gates
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -72,9 +73,25 @@ async def db():
         session.add_all([_row(x) for x in FY + ZZ])
         session.add_all([_row(x, voucher_date="2025-02-07") for x in ZZ[:2]])  # 同号别月（ZZ）
         session.add_all([_row(x, voucher_no="0046", voucher_type=None) for x in FY])  # 凭证字为空、号唯一
+        add_workpapers(session, PROJECT, {WP_A: "E1", WP_B: "J1"})  # 挂凭要校底稿在本项目
         await session.commit()
         yield session
     await engine.dispose()
+
+
+def add_workpapers(session, project_id, wps: dict) -> None:
+    """本项目已生成的底稿（挂凭端点校验目标底稿属于本项目）。"""
+    for wp_id, code in wps.items():
+        idx = WpIndex(id=uuid.uuid4(), project_id=project_id, wp_code=code, wp_name=f"{code} 底稿",
+                      audit_cycle=code[0], status=WpStatus.not_started)
+        session.add(idx)
+        session.add(WorkingPaper(id=wp_id, project_id=project_id, wp_index_id=idx.id, file_path=f"{code}.xlsx",
+                                 source_type=WpSourceType.template, file_version=1))
+
+
+@pytest.fixture(autouse=True)
+def _allow_wp_gates(monkeypatch):
+    allow_wp_gates(monkeypatch)
 
 
 @pytest_asyncio.fixture
@@ -167,7 +184,7 @@ async def test_unique_number_is_completed_from_the_ledger(client, db):
 
 
 async def test_voucher_not_in_ledger_is_404(client, db):
-    resp = await _attach(client, voucher_no="9999", voucher_date="2025-01-07")
+    resp = await _attach(client, voucher_no="9999", voucher_date="2025-01-07", working_paper_id=str(WP_A))
     assert resp.status_code == 404 and resp.json()["detail"]["error_code"] == "VOUCHER_NOT_FOUND"
     assert await _rows(db) == []
 

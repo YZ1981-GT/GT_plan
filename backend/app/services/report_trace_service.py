@@ -21,6 +21,27 @@ from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
+#: 序时账取多少笔、按什么排（写进结果的 ledger_basis，前端照原样显示）
+TOP_LEDGER_LIMIT = 10
+
+
+def _section_account_codes(wp_codes: tuple[str, ...]) -> list[str]:
+    """章节对应底稿 → 底稿科目映射表（wp_account_mapping.json）里的标准科目，按出现顺序去重。
+
+    读法用报表域的 ``report_stale_service.account_codes_for_wp_code``：报表域不得依赖底稿域
+    （docs/architecture/domain-boundaries.json，``WpMappingService`` 属底稿域）；两者读同一份映射，
+    1025 个编码逐个同值（2026-11-04 核对）。
+    """
+    from app.services.report_stale_service import account_codes_for_wp_code
+
+    codes: list[str] = []
+    for wp_code in wp_codes:
+        for code in account_codes_for_wp_code(wp_code):
+            code = str(code).strip()
+            if code and code not in codes:
+                codes.append(code)
+    return codes
+
 
 class ReportTraceService:
     """报告复核溯源"""
@@ -29,93 +50,103 @@ class ReportTraceService:
         self, db: AsyncSession, project_id: UUID, section_number: str,
         year: int | None = None,
     ) -> dict[str, Any]:
-        """溯源查询：附注科目 → 底稿 → 试算表 → 序时账"""
-        trace = {
+        """溯源查询：附注章节 → 底稿 → 试算表 → 序时账（spec voucher-workflow-linkage-lineage-closure R8.2，design §10.2）。
+
+        - 章节 → 底稿：附注同步注册表（项目自定义映射优先）；章节 → 科目：对应底稿在底稿科目映射表里的科目；
+        - 试算表：按年度（缺省项目审计年度）+ 这些科目取，全部主体合计；原先不分年度、不分科目任取 5 行；
+        - 序时账：按年度当前账套 + 科目前缀取 |借 − 贷| 最大的前 10 笔（原先不分科目、只按借方排）；
+        - 取数口径写进 ``trial_balance_basis`` / ``ledger_basis``；章节没有映射、映射没有科目、项目没有审计年度时
+          不取，口径里写明原因（不是「没有数据」）；
+        - 查询失败照常抛出（``/report-review`` 返回 500，统一溯源记 partial），不吞成空结果（原先每段都 ``except: pass``）。
+        """
+        from app.services.note_readiness_service import resolve_section_workpapers
+
+        trace: dict[str, Any] = {
             "section_number": section_number,
             "note_data": None,
             "workpaper_data": None,
             "trial_balance_data": None,
             "top_ledger_entries": [],
+            "year": None,
+            "account_codes": [],
+            "trial_balance_basis": "",
+            "ledger_basis": "",
         }
 
-        # 1. 查附注-底稿映射（S5 R2：统一读取注册表）
-        try:
-            from app.services.note_readiness_service import (
-                NoteRegistryUnavailable,
-                ProjectNoteMappingInvalid,
-                resolve_section_workpapers,
-            )
-            resolved = await resolve_section_workpapers(db, project_id, section_number)
-            if resolved.status == "mapped" and resolved.wp_codes:
-                trace["note_data"] = {
-                    "wp_code": resolved.wp_codes[0],
-                    "wp_codes": list(resolved.wp_codes),
-                    "note_title": section_number,
-                }
-                # 2. 查底稿 parsed_data
-                wp_result = await db.execute(sa.text(
-                    "SELECT wp.parsed_data FROM working_paper wp "
-                    "JOIN wp_index wi ON wp.wp_index_id = wi.id "
-                    "WHERE wi.project_id = :pid AND wi.wp_code = :code "
-                    "LIMIT 1"
-                ), {"pid": str(project_id), "code": resolved.wp_codes[0]})
-                wp_row = wp_result.first()
-                if wp_row and wp_row.parsed_data:
-                    trace["workpaper_data"] = wp_row.parsed_data
-        except (NoteRegistryUnavailable, ProjectNoteMappingInvalid) as e:
-            logger.warning("溯源映射查询失败: %s", e)
-        except Exception as e:
-            logger.warning("溯源映射查询失败: %s", e)
+        # 1. 附注 → 底稿（S5 R2：统一读取注册表；注册表不可用 / 项目自定义映射非法照常抛出）
+        resolved = await resolve_section_workpapers(db, project_id, section_number)
+        if resolved.status != "mapped" or not resolved.wp_codes:
+            trace["trial_balance_basis"] = trace["ledger_basis"] = "章节没有对应底稿，未取试算表与序时账"
+            return trace
+        trace["note_data"] = {
+            "wp_code": resolved.wp_codes[0],
+            "wp_codes": list(resolved.wp_codes),
+            "note_title": section_number,
+        }
 
-        # 3. 查试算表
-        try:
-            tb_result = await db.execute(
-                sa.select(TrialBalance)
-                .where(TrialBalance.project_id == project_id, TrialBalance.is_deleted == sa.false())
-                .limit(5)
-            )
-            tb_rows = tb_result.scalars().all()
-            if tb_rows:
-                trace["trial_balance_data"] = [
-                    {
-                        "account_code": t.standard_account_code,
-                        "account_name": t.account_name,
-                        "opening": float(t.opening_balance or 0),
-                        "audited": float(t.audited_amount or 0) if hasattr(t, "audited_amount") else 0,
-                    }
-                    for t in tb_rows[:5]
-                ]
-        except Exception:
-            pass
+        # 2. 底稿 parsed_data（本项目未删除的那一张）
+        from app.models.workpaper_models import WorkingPaper, WpIndex
 
-        # 4. 查大额序时账
-        try:
-            if year:
-                ledger_conditions = [
-                    await get_active_filter(db, TbLedger.__table__, project_id, year),
-                ]
-            else:
-                ledger_conditions = [
-                    TbLedger.project_id == project_id,
-                    TbLedger.is_deleted == sa.false(),
-                ]
-            ledger_result = await db.execute(
-                sa.select(TbLedger)
-                .where(*ledger_conditions)
-                .order_by(TbLedger.debit_amount.desc().nullslast())
-                .limit(10)
-            )
-            for r in ledger_result.scalars().all():
-                trace["top_ledger_entries"].append({
-                    "voucher_no": r.voucher_no,
-                    "date": r.voucher_date.isoformat() if r.voucher_date else None,
-                    "debit": float(r.debit_amount or 0),
-                    "credit": float(r.credit_amount or 0),
-                    "summary": r.summary or "",
-                })
-        except Exception:
-            pass
+        trace["workpaper_data"] = (await db.execute(
+            sa.select(WorkingPaper.parsed_data)
+            .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+            .where(WpIndex.project_id == project_id, WpIndex.wp_code == resolved.wp_codes[0],
+                   WorkingPaper.is_deleted == sa.false())
+            .order_by(WorkingPaper.id)
+            .limit(1)
+        )).scalar_one_or_none() or None
 
+        codes = _section_account_codes(tuple(resolved.wp_codes))
+        trace["account_codes"] = codes
+        if not codes:
+            trace["trial_balance_basis"] = trace["ledger_basis"] = "章节对应底稿没有映射科目，未取试算表与序时账"
+            return trace
+        if year is None:
+            from app.services.project_audit_year import fetch_project_audit_year
+
+            year = await fetch_project_audit_year(db, project_id)
+        if year is None:
+            trace["trial_balance_basis"] = trace["ledger_basis"] = "项目未设置审计年度，未取试算表与序时账"
+            return trace
+        trace["year"] = year
+        scope = "、".join(codes)
+
+        # 3. 试算表：本年度、这些科目，全部主体合计
+        tb = TrialBalance
+        tb_rows = (await db.execute(
+            sa.select(
+                tb.standard_account_code, sa.func.max(tb.account_name), sa.func.sum(tb.opening_balance),
+                sa.func.sum(tb.unadjusted_amount), sa.func.sum(tb.audited_amount),
+            )
+            .where(tb.project_id == project_id, tb.year == year, tb.is_deleted == sa.false(),
+                   tb.standard_account_code.in_(codes))
+            .group_by(tb.standard_account_code)
+            .order_by(tb.standard_account_code)
+        )).all()
+        trace["trial_balance_data"] = [
+            {"account_code": code, "account_name": name, "opening": float(opening or 0),
+             "unadjusted": float(unadjusted or 0), "audited": float(audited or 0)}
+            for code, name, opening, unadjusted, audited in tb_rows
+        ]
+        trace["trial_balance_basis"] = f"{year} 年度试算表，科目 {scope}，全部主体合计"
+
+        # 4. 序时账：本年度当前账套、科目以这些科目开头，按 |借 − 贷| 降序前 10 笔
+        lg = TbLedger
+        net = sa.func.abs(sa.func.coalesce(lg.debit_amount, 0) - sa.func.coalesce(lg.credit_amount, 0))
+        ledger_rows = (await db.execute(
+            sa.select(lg)
+            .where(await get_active_filter(db, lg.__table__, project_id, year, strict=True),
+                   sa.or_(*[lg.account_code.startswith(c, autoescape=True) for c in codes]))
+            .order_by(net.desc(), lg.voucher_date, lg.voucher_no, lg.id)
+            .limit(TOP_LEDGER_LIMIT)
+        )).scalars().all()
+        trace["top_ledger_entries"] = [
+            {"voucher_no": r.voucher_no, "date": r.voucher_date.isoformat() if r.voucher_date else None,
+             "account_code": r.account_code, "debit": float(r.debit_amount or 0),
+             "credit": float(r.credit_amount or 0), "summary": r.summary or ""}
+            for r in ledger_rows
+        ]
+        trace["ledger_basis"] = f"{year} 年度当前账套序时账，科目以 {scope} 开头，按金额（借贷差的绝对值）降序前 {TOP_LEDGER_LIMIT} 笔"
         return trace
 
     async def get_findings_summary(

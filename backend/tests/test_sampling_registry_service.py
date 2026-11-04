@@ -11,6 +11,7 @@ Properties: Property 11, Property 12, Property 14
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 from dataclasses import dataclass, field
@@ -178,6 +179,10 @@ class _BoomDB:
 
     def add(self, *a, **k):
         raise RuntimeError("boom")
+
+    def begin_nested(self):
+        # 投影在保存点里写（voucher-runtime-integrity R4）：保存点本身照常进入，失败发生在里面的 execute
+        return contextlib.nullcontext()
 
 
 class TestFailOpenLeavesWarning:

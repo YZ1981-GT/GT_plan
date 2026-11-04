@@ -206,14 +206,26 @@ async def test_project_detail_carries_phase_fields(db):
     assert (out.current_audit_phase, out.interim_cutoff_date) == ("preliminary", date(2025, 8, 31))
 
 
-async def test_attach_without_phase_takes_project_phase(client, db):
+async def test_attach_without_phase_takes_project_phase(client, db, monkeypatch):
+    from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType, WpStatus
+    from tests._voucher_links_gates import allow_wp_gates
+
+    allow_wp_gates(monkeypatch)  # 底稿级门见 test_voucher_links_ownership.py；这里只看阶段
+    wp_a, wp_b = uuid.uuid4(), uuid.uuid4()  # 挂凭须指定本项目底稿（spec voucher-workflow-linkage-lineage-closure R1.1）
+    for wp_id, code in ((wp_a, "E1"), (wp_b, "J1")):
+        idx = WpIndex(id=uuid.uuid4(), project_id=PROJECT, wp_code=code, wp_name=code, audit_cycle=code[0],
+                      status=WpStatus.not_started)
+        db.add(idx)
+        db.add(WorkingPaper(id=wp_id, project_id=PROJECT, wp_index_id=idx.id, file_path=f"{code}.xlsx",
+                            source_type=WpSourceType.template, file_version=1))
+    await db.commit()
     await client.put(_url(), json={"current_audit_phase": "preliminary"})
     resp = await client.post(f"/api/projects/{PROJECT}/ledger/sample-voucher",
-                             json={"year": YEAR, "voucher_no": "0007"})
+                             json={"year": YEAR, "voucher_no": "0007", "working_paper_id": str(wp_a)})
     assert resp.status_code == 200, resp.text
     assert resp.json()["phase"] == "preliminary"
     explicit = await client.post(f"/api/projects/{PROJECT}/ledger/sample-voucher",
-                                 json={"year": YEAR, "voucher_no": "0007", "working_paper_id": str(uuid.uuid4()),
+                                 json={"year": YEAR, "voucher_no": "0007", "working_paper_id": str(wp_b),
                                        "phase": "final"})
     assert explicit.json()["phase"] == "final"
     db.expire_all()

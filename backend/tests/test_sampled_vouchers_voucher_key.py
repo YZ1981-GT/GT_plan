@@ -9,7 +9,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
+import sys
 import uuid
 from datetime import date
 from pathlib import Path
@@ -29,7 +31,7 @@ from app.services.voucher_identity import VoucherKey
 _MIG = Path(__file__).resolve().parents[1] / "migrations"
 V210 = (_MIG / "V210__voucher_identity_sampled_vouchers.sql").read_text(encoding="utf-8")
 R210 = (_MIG / "R210__rollback_voucher_identity_sampled_vouchers.sql").read_text(encoding="utf-8")
-#: 四川物流（真实项目，只在回滚事务里写；sampled_vouchers.project_id 有外键）
+#: 单元用例的占位项目；pg_only 用例由 ``pg`` 夹具换成库里现存的项目（sampled_vouchers.project_id 有外键）
 PROJECT = uuid.UUID("f4b778ad-23b3-49ab-b3c8-ee62a5f82226")
 COMPANY = "重庆医药集团四川物流有限公司"
 
@@ -111,6 +113,10 @@ class _CaptureDB:
     async def flush(self):
         return None
 
+    def begin_nested(self):
+        # 登记在保存点里写（voucher-runtime-integrity R4）；替身的保存点不做事
+        return contextlib.nullcontext()
+
 
 def _rows_of(log) -> list[dict]:
     db = _CaptureDB()
@@ -164,13 +170,19 @@ def test_conflict_target_compiles_to_expression_index():
 
 
 @pytest.fixture
-async def pg():
+async def pg(monkeypatch):
     if not str(settings.DATABASE_URL).startswith("postgresql"):
         pytest.skip("需要真实 PostgreSQL")
     engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         try:
+            # sampled_vouchers.project_id 有外键：写死的四川物流项目已从共享库删除（2026-11 实测外键报错），
+            # 改取库里任一现存项目；只在本回滚事务里写
+            pid = (await session.execute(sa.text("SELECT id FROM projects ORDER BY created_at LIMIT 1"))).scalar()
+            if pid is None:
+                pytest.skip("库里没有项目，无法满足 sampled_vouchers 外键")
+            monkeypatch.setattr(sys.modules[__name__], "PROJECT", pid)
             yield session
         finally:
             await session.rollback()

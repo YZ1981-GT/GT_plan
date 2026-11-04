@@ -67,13 +67,23 @@ async def evidence_governance_error_handler(request: Request, exc):
 
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """处理未捕获异常，返回 500 通用消息，堆栈记录到日志文件。"""
+    """处理未捕获异常，返回 500 通用消息，堆栈记录到日志文件。
+
+    例外：异常是「表 / 列不存在」且磁盘上确有未执行的迁移 ⇒ 503 ``MIGRATION_PENDING``，说明数据库结构落后于程序
+    （spec voucher-workflow-linkage-lineage-closure R2）。没有待执行迁移时照旧 500。
+    """
     logger.error(
         "Unhandled exception on %s %s\n%s",
         request.method,
         request.url.path,
         traceback.format_exc(),
     )
+    from app.core.migration_pending import is_missing_schema_error, pending_migration_info
+
+    if is_missing_schema_error(exc):
+        pending = await pending_migration_info()
+        if pending is not None:
+            return JSONResponse(status_code=503, content={"code": 503, "message": pending.detail()})
     return JSONResponse(
         status_code=500,
         content={"code": 500, "message": "服务器内部错误"},

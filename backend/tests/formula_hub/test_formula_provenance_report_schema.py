@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
@@ -96,10 +97,60 @@ async def test_invalid_project_override_is_explicit_error(monkeypatch):
         await resolve_section_workpapers(_Db(project), UUID(int=1), "八、4")
 
 
+#: S5 R2 换掉的旧写法（df64196e3 之前的 report_trace_service）：直接查旧表、取行上的 account_codes
+_LEGACY_REPORT_TRACE_SNIPPET = '''
+async def trace_section(db, project_id, section_number):
+    mapping_result = await db.execute(sa.text(
+        "SELECT wp_code, account_codes, note_title "
+        "FROM note_wp_mapping "
+        "WHERE project_id = :pid AND note_section = :sec "
+        "LIMIT 1"
+    ), {"pid": str(project_id), "sec": section_number})
+    mapping = mapping_result.fetchone()
+    return {"wp_code": mapping.wp_code, "account_codes": mapping.account_codes}
+'''
+
+
+def _legacy_mapping_hits(source: str) -> list[str]:
+    """旧映射表读法的命中（按 AST，不按文本）：任何字符串常量提到 ``note_wp_mapping``、SQL 字符串常量
+    （同时含 SELECT 与 FROM）里取 ``account_codes``、读行对象的 ``.account_codes`` 属性。
+
+    科目码本身是合法概念（spec voucher-workflow-linkage-lineage-closure R8.2：章节 → 底稿 → 底稿科目映射表的科目，
+    回执带 ``account_codes``），函数名、字典键里出现不算 —— 原判据按全文搜 ``account_codes`` 会把它误判成旧写法。
+    """
+    hits: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value
+            if "note_wp_mapping" in text:
+                hits.append(f"字符串提到 note_wp_mapping：{text[:60]!r}")
+            if re.search(r"\bSELECT\b[\s\S]*\bFROM\b", text, re.I) and "account_codes" in text:
+                hits.append(f"SQL 取 account_codes：{text[:60]!r}")
+        elif isinstance(node, ast.Attribute) and node.attr == "account_codes":
+            hits.append(f"读行属性 .account_codes（第 {node.lineno} 行）")
+    return hits
+
+
+def test_legacy_mapping_checker_flags_the_old_code():
+    """反向自检：判据对 S5 R2 之前的旧写法三类都报出，对合法的科目码命名不报，否则下一条是空转。"""
+    hits = _legacy_mapping_hits(_LEGACY_REPORT_TRACE_SNIPPET)
+    assert any("note_wp_mapping" in h for h in hits)
+    assert any("SQL 取 account_codes" in h for h in hits)
+    assert any(".account_codes" in h for h in hits)
+    assert _legacy_mapping_hits('x = sa.text("SELECT account_codes FROM other_table")')  # 单独一类也能报
+    legit = (
+        'def _section_account_codes(wp_codes):\n'
+        '    """章节对应底稿的科目（account_codes_for_wp_code）"""\n'
+        '    trace = {"account_codes": []}\n'
+        '    trace["account_codes"] = account_codes_for_wp_code(wp_codes[0])\n'
+    )
+    assert _legacy_mapping_hits(legit) == []
+
+
 def test_report_trace_source_has_no_legacy_mapping_table_sql():
     source = (ROOT / "app" / "services" / "report_trace_service.py").read_text(encoding="utf-8")
     assert "note_wp_mapping" not in source
-    assert "account_codes" not in source
+    assert _legacy_mapping_hits(source) == []
     tree = ast.parse(source)
     assert any(
         isinstance(node, ast.Call)

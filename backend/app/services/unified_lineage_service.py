@@ -24,6 +24,7 @@ from app.services.attachment_lineage_schema import (
     lineage_project_column_ready,
 )
 from app.services.report_trace_service import ReportTraceService, report_trace_to_locate_targets
+from app.services.tb_row_lineage import TbLineageYearRequired, tb_row_upstream
 from app.services.version_line_service import version_line_service
 from app.services.wp_trace_service import trace_downstream, trace_upstream
 
@@ -34,7 +35,8 @@ ObjectType = Literal["wp_cell", "report_row", "note_cell", "deliverable_section"
 Direction = Literal["both", "upstream", "downstream"]
 _T = TypeVar("_T")
 
-#: 只有这三类对象有 wp_trace 来源；tb_row / adjustment 没有可委托的溯源来源（ADR-FHIC-16）。
+#: 只有这三类对象有 wp_trace 来源（ADR-FHIC-16）；tb_row 另有自己的试算表行子源（``tb_row_lineage``，
+#: spec voucher-workflow-linkage-lineage-closure R8.1），adjustment 没有可委托的溯源来源。
 _SOURCE_BY_OBJECT_TYPE: dict[ObjectType, str] = {
     "wp_cell": "workpaper",
     "report_row": "report",
@@ -53,6 +55,7 @@ _SOURCE_LABELS = {
     "report_trace": "附注报表溯源",
     "version_line": "版本链溯源",
     "attachments": "附件溯源",
+    "tb_row": "试算表行溯源",
 }
 
 
@@ -89,6 +92,15 @@ class UnifiedLineageService:
             upstream.extend(await self._run_source(
                 "wp_trace_upstream",
                 lambda: self._query_wp_upstream(project_id, source, identifier),
+                errors,
+                [],
+            ))
+
+        # 试算表行：构成 / 已批准调整 / 发布底稿 / 抽凭挂凭（spec voucher-workflow-linkage-lineage-closure R8.1）
+        if object_type == "tb_row" and direction in ("both", "upstream"):
+            upstream.extend(await self._run_source(
+                "tb_row",
+                lambda: tb_row_upstream(self.db, project_id, object_id, year),
                 errors,
                 [],
             ))
@@ -160,6 +172,9 @@ class UnifiedLineageService:
     def _source_error(source_name: str, exc: Exception) -> dict[str, Any]:
         if isinstance(exc, AttachmentLineageMigrationPending):
             return {"source": source_name, "status": exc.status_code, **exc.to_detail()}
+        if isinstance(exc, TbLineageYearRequired):
+            return {"source": source_name, "status": exc.status_code, "error_code": exc.error_code,
+                    "message": exc.message}
         detail = str(exc).strip() or type(exc).__name__
         label = _SOURCE_LABELS.get(source_name, source_name)
         return {
@@ -213,11 +228,12 @@ class UnifiedLineageService:
     ) -> list[LocateTarget]:
         """仅为 note_cell 委托 ``ReportTraceService.trace_section``。
 
-        使用无 ``join_transaction_mode`` 的裸会话调 ``trace_section``：trace service 会吞掉
-        PG 异常，而原会话的 ``join_transaction_mode="create_savepoint"`` 把每条 SQL 包在
-        隐式保存点里——吞掉的异常被完全隔离，``_run_source`` 的 ``begin_nested()`` commit
-        不会失败。改用裸会话后，PG 异常直接使 ``begin_nested()`` 的保存点进入 aborted 状态，
-        commit 失败 → rollback → 报告 ``partial``（ADR-FHIC-16）。
+        使用无 ``join_transaction_mode`` 的裸会话调 ``trace_section``：原会话的
+        ``join_transaction_mode="create_savepoint"`` 把每条 SQL 包在隐式保存点里，下层（如章节映射
+        ``resolve_section_workpapers`` 取报表行映射那一段）吞掉的异常会被完全隔离，``_run_source`` 的
+        ``begin_nested()`` commit 不会失败。改用裸会话后，PG 异常直接使 ``begin_nested()`` 的保存点进入
+        aborted 状态，commit 失败 → rollback → 报告 ``partial``（ADR-FHIC-16）。``trace_section`` 自身
+        不再吞异常（spec voucher-workflow-linkage-lineage-closure R8.2），失败照常上抛到 ``_run_source``。
         """
         conn = await self.db.connection()
         bare = AsyncSession(bind=conn, join_transaction_mode="rollback_only")

@@ -31,14 +31,20 @@ async def trace_section(
     project_id: UUID, section_number: str,
     year: int | None = None,
     db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
+    """附注章节溯源（读项目的试算表与序时账：要求项目成员；原先只校验登录，spec voucher-workflow-linkage-lineage-closure R9.1）。"""
     svc = ReportTraceService()
     return await svc.trace_section(db, project_id, section_number, year=year)
 
 
 @router.get("/api/projects/{project_id}/findings-summary")
-async def findings_summary(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def findings_summary(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """项目发现汇总（要求项目成员；原先只校验登录，R9.1）。"""
     svc = ReportTraceService()
     return await svc.get_findings_summary(db, project_id)
 
