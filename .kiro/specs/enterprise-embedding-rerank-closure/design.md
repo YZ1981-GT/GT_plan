@@ -248,3 +248,76 @@ V → R → V，确认扩展缺失分支与存在分支都不报错，再放进 
   文案）保持通过：vector 不归一、所有 UDT 都当 vector、采集口绕过归一、超时吞成 []、异常吞成 []、扫描异常正文进 health、
   scan_failure 不算 critical、写库失败中断、读快照失败返回 []、读快照异常正文进 health、未知审计链结果进缓存、已知结果不缓存。
 - ruff 相对 HEAD 新增 0。
+
+## 11 共享库【测试】文档端到端走查（2026-11-04 15:17~15:31 UTC，任务 7 / 8）
+
+### 11.1 前置：用户录入 Key 并启用
+
+- 用户 15:06 在模型配置页录入两条预设的 Key（与 qwen3.8 同一个）并启用。库里现状：`wemm-embedding-4b`
+  （embedding / server）与 `qwen3-reranker-4b`（rerank / server）均 `is_active=true` 且有密文；本机向量行
+  `Kbenkhaled/Qwen3.5-27B-NVFP4` 按「向量只启用一条」被自动停用。
+- 审计：4 条 `ai_model_config_changed`（v2 哈希）—— 每条预设各一条录 Key（`credential_changed=true`）与一条启用
+  （`=false`）。审计链写入恢复后不再 fail-closed，这正是第二批解除阻断的直接效果。
+- `GET /api/ai-models/routes`（配置页「调用路由」面板的数据源）：向量 = 服务器 `wemm-embedding-4b`，`status=available`
+  1702 ms；重排 = 服务器 `qwen3-reranker-4b`，`status=available` 1686 ms。此前分别是「模型或 API 路径不存在」与
+  「未启用重排模型」。
+
+### 11.2 入索引
+
+- 经真实上传端点 `POST /api/knowledge-library/folders/{id}/upload` 往新建的【测试】全所公开目录传 4 篇 txt：
+  一篇四段综合（坏账准备 / 存货 / 折旧 / 收入确认），三篇单主题（存货、固定资产、收入确认）。只发会计概念短句。
+- 索引由后台 `run_indexing_pipeline` 写入（公开目录 ⇒ 全局哨兵分区 `00000000-…`；文档级 `project_ids` 为空时
+  `trigger_index_update` 按设计直接返回，不重复索引）。
+- 4 篇 `index_status=indexed`；`knowledge_index` 4 行，每行 `embedding_model='wemm-embedding-4b@1024'`、
+  `embedding_vec` 非空、`vector_dims=1024`、L2 范数 1.0000（与网关 MRL 归一化输出一致）。
+- 分块：单篇正文 349 字 < `_CHUNK_SIZE=500` ⇒ 每篇 1 块。
+
+### 11.3 检索与重排
+
+三条查询，`semantic_search`（普通）与 `semantic_search_strict`（DSH 口径）各跑一遍，首位均为预期文档：
+
+| 查询 | 首位 | 重排分 | 召回分 |
+| --- | --- | --- | --- |
+| 坏账准备怎么按预期信用损失模型计量 | 综合篇 | 0.9425 | 0.7881 |
+| 存货期末按成本与可变现净值较低者计量 | 存货篇 | 0.9998 | 0.9007 |
+| 固定资产折旧方法有哪些，改变折旧方法怎么处理 | 固定资产篇 | 0.9999 | 0.9038 |
+
+重排**确实改变顺序**（同一函数，只把重排路由注入为空作对照，不改库、不停用模型行）：
+
+| 查询 | 纯向量顺序 | 开重排顺序 |
+| --- | --- | --- |
+| 资产负债表日要重新评估的那个减值准备怎么算 | 存货 → 验收 → 固定资产 → 收入确认 | **验收** → 存货 → 固定资产 → 收入确认 |
+| 改变计提方式属于会计估计变更还是会计政策变更 | 固定资产 → 验收 → 存货 → 收入确认 | 固定资产 → **存货 → 验收** → 收入确认 |
+| 数量繁多单价较低的那类资产怎么按类别计提准备 | 存货 → 验收 → 固定资产 → 收入确认 | 顺序不变（本来就对） |
+
+第一条是决定性的：问法只命中综合篇正文里的「在资产负债表日重新评估」，纯向量把「存货」排首位，重排纠正成综合篇。
+开重排时每条都有 `rerank_score` 且 `recall_score` 保留原召回分；关重排时 `rerank_score` 全为 None。
+
+DSH 严格检索走 MCP 工具本体 `mcp_tools.tool_kb_search`（只替换授权，检索与重排都是生产代码）：4 条结果，
+综合篇 0.9882 居首，其余 0.3788 / 0.0059 / 0.0008。
+
+### 11.4 两条边界行为（真实栈，非单测）
+
+- **重排失败 fail-open**：把 `AIService.rerank` 注入抛错 ⇒ 结果非空、顺序与纯向量一致、无 `rerank_score`，
+  日志「重排失败，保持召回顺序：RuntimeError」。语义召回本身成功，不因重排失败报成不可用。
+- **其他向量模型签名不混比**：把本次查询的签名改成 `other-embed-model@1024` ⇒ 普通检索的向量命中全部被过滤
+  （只剩 lexical），严格检索抛「语义检索不可用：知识库索引需按当前向量模型重建」而不是「没搜到」。
+- **DSH 向量健康（R12）**：`embedding_route_health` 与启动自检 `_check_embedding_route` 同一函数，均
+  `available=true`、`endpoint=https://ai.gt-china.com.cn:10010`、消息「向量模型「wemm-embedding-4b」（服务器）
+  已配置（未检测连通性）」，`violations` 为空（网关在 DSH 受信清单内，不报 `local_only_violation`）。
+
+### 11.5 清理与对账
+
+- 走查前 `knowledge_index` 全表 0 行（清点时全表计数恰等于本次 4 行，可据此确认）。
+- 先走平台删除接口 `DELETE /api/knowledge-library/folders/{id}`：目录 + 4 篇文档 + 4 行索引条目全部
+  `is_deleted=true`；目录树与知识库搜索（4 个关键词）均 0 命中。
+- 平台软删不清磁盘文件与 `asset_blobs`。随后在一个事务里彻底删除本次测试行：先写可还原备份（含索引向量文本），
+  再校验「4 篇文档与目录都带【测试】前缀且已软删」、「blob 未被其他文档 / 附件版本 / AI 会话资源 / 证据提升引用」、
+  「无证据提升引用这些文档」，然后按外键顺序删 index → documents → folders → asset_blobs，**同事务内**核验
+  `knowledge_index` 全表 0 行、前缀命中 0、blob 残留 0 才提交（先 dry-run 回滚验证一遍）。
+- 磁盘 4 个文件先备份再删除目录。备份都在 `backend/backups/enterprise-embedding-rerank-20261104/`（gitignore）：
+  可还原行备份、走查状态、上传的 4 个文件，以及第二批的死信与 `ai_model_config` 快照。
+- 保留不动：6 条 `logs` HTTP 操作日志（5 次 create + 1 次 delete，本次操作的留痕）。这两个知识库端点不写审计链，
+  故审计链三项仍为 0。
+- 走查后 `/api/health`：`audit_chain` 三项 0；`schema_drift` 11 项、critical 2 项仍只有别的会话的 V233 / V234
+  checksum 漂移（健康端点因此仍 degraded，与本 spec 无关）。
