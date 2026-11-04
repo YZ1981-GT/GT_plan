@@ -22,7 +22,7 @@
 - 历史只有弹窗有：`QUERY_HISTORY_KEY = 'gt:cq:history'`，`pushQueryHistory` 存项目 / 年度 / 源 / 本页筛选文字 / 选区，最多 10 条；页面版与构建器没有历史。
 - 四表是 B' 架构：可见性只由 `ledger_datasets.status` 决定（`DatasetService._set_dataset_visibility` 已是空操作），数据集内的行不改写 ⇒ 生效数据集编号是强信号。共享库 `tb_ledger` 共 6,971,441 行，只能靠数据集编号。
 - `updated_at` 只由 ORM `onupdate` 维护（`models/base.py`），裸 SQL 不经过它。AST 口径（字符串常量含 `UPDATE <表>`、排除 docstring）不写 `updated_at` 的执行语句：试算表 4 处（`n1`~`n4` 四个税费服务改 `audited_amount`）、底稿 10 处、报表 1 处、附注 1 处 ⇒ 不能用 `max(updated_at)` 当版本。
-- 报表运行记录 `financial_report.run_id` 当前写不进去（§12.1），报表版本不能依赖它。
+- 报表运行记录 `financial_report.run_id` 在 v1.0.107 之前写不进去（§12.1）；修复后也只有之后生成的行带 `run_id`，报表版本仍不依赖它。
 - 附注指标树已有 `X-Notes-Version`（`resolve_notes_context`：行数 + `max(updated_at)` + 循环章节），口径同样受裸 SQL 影响；本 spec 不改它，只在 §12 登记。
 
 ### 0.3 实测：分量摘要的成本（共享库，各表最大作用域，5 次的中位数 / 最大值，两次结果一致）
@@ -572,7 +572,10 @@ generated_at     generated_by {user_id, username}
 - `report_provenance.generation_context`（由 `install_report_generation_provenance` 在导入 `report_engine.py` 时装到 `generate_all_reports`、`recalculate_stale_rows`、`regenerate_affected` 三条路径上）写入 `status = "running"`、`calc_version = "report:2"`；`finish_generation` 再写 `status = "partial"` 与 ORM 里不存在的 `error_summary`。
 - 回滚事务实测（【测试】项目；探针 `tmp_aq_phase0/probes/p1_report_run_probe.py`）：调用 `generation_context` → asyncpg `DataError: invalid input for query argument $11: 'report:2'`；手工插入 `status = 'running'`、`calc_version = 2` → `CheckViolationError: ck_report_generation_run_status`。表在探针前后都是 0 行。
 - 影响：三条报表生成 / 重算路径在 PostgreSQL 上一进入运行上下文就失败。守卫 `test_report_provenance_migration_matches_model_surface` 只检查迁移文本里的字符串，没有对数据库实际插入，所以一直是绿的。
-- 处置待用户决定（requirements D4）。
+- 处置（用户 2026-11-04 裁决，requirements D4）：采用并发会话的修复口径，本 spec 不另修。开始写 `building`、结束写 `succeeded`（部分行失败时失败行数记 `failed_rows`、原因写 `error`），`calc_version` 存整数 `CALC_VERSION`，来源接口读 `run.error`（响应键仍为 `error_summary`），不加迁移。
+- 落地情况（写入本条时）：生成失败已由 v1.0.107 的 `ddcde5244`（spec `note-disclosure-pull-regression-and-headless-backend` R2.5 / ADR-NPR-07）按同一口径修复，另加对外状态换算 `run_display_status`（`building` 显示 running，`succeeded` 且 `failed_rows > 0` 显示 partial）。`formula-management-repair-closure` R0.1 也做了同样的修复（未推送）；其中 R251 的更正（只撤销 V251 实际新增的外键与两个索引）远端还没有：远端的 R251 仍会删掉 V246 的表与 `run_id` / `provenance` 两列。
+- 共享库回滚事务实测（2026-11-04，表前后都是 0 行、CHECK 不变）：`59e1e3bca` 上「全部成功」与「含一行失败」两次生成都报 `DataError`（`'report:2'` 写进整数列）；v1.0.107（`6046ebab4`）两次都写入成功，含失败行的那次 `failed_rows = 1`、`error` 有原因。`59e1e3bca` 上 14 个报表相关测试目标共 209 条红，其中 101 条的失败原因就是本漂移。
+- 本会话另做过「新增迁移把 `partial` 加进 CHECK」的方案，未提交、已作废：要改合并 spec 的 `REPORT_RUN_STATUSES` 与 CHECK，还要共享库迁移放行；而读取方只有合并模块按状态过滤（且内连接合并操作表，单体报表的运行记录不受影响），`partial` 没有消费方。
 
 ### 12.2 其他
 
