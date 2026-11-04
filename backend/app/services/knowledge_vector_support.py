@@ -54,6 +54,29 @@ def chunk_vector_values(
     return values
 
 
+def score_text_vector_chunks(
+    chunks: list[Any], query_vector: Any, *, parse_vector: Any, cosine_similarity: Any
+) -> list[tuple[float, Any]]:
+    """给只有文本向量的分块评分（pgvector 可用但该分块的 ``embedding_vec`` 仍为空时的兼容路径）。
+
+    V263 加列前、或当时列不可用时写入的同签名分块只有 ``embedding_vector`` 文本列；若 ANN 路径仅加
+    ``embedding_vec IS NOT NULL``，启用 pgvector 后它们会静默消失，也不会触发「其他签名」词法兜底。
+    """
+    scored: list[tuple[float, Any]] = []
+    for chunk in chunks:
+        raw = getattr(chunk, "embedding_vector", None)
+        if not raw:
+            continue
+        try:
+            vector = parse_vector(raw)
+            if vector.shape != query_vector.shape:
+                continue
+            scored.append((float(cosine_similarity(query_vector, vector)), chunk))
+        except Exception as exc:  # noqa: BLE001 - 单个历史坏向量不得让整次召回失败
+            logger.warning("文本向量分块无法评分，跳过：%s", type(exc).__name__)
+    return scored
+
+
 async def has_foreign_signature(
     db: AsyncSession, conditions: list[Any], signature: str
 ) -> bool:

@@ -48,6 +48,7 @@ from app.services.knowledge_vector_support import (
     recall_size,
     rerank_hits,
     resolve_rerank_route,
+    score_text_vector_chunks,
 )
 from app.services.vector_store import get_vector_store, PgTextStore
 
@@ -785,7 +786,21 @@ class KnowledgeIndexService:
                             .limit(top_k)
                         )
                     ).all()
-                return [_chunk_hit(chunk, float(score), "vector") for chunk, score in rows]
+                # V263 加列前 / 列暂不可用时的同签名分块没有 embedding_vec，不能因 ANN 启用而静默消失。
+                async with self._db.begin_nested():
+                    text_only = (
+                        await self._db.execute(
+                            select(KnowledgeIndex)
+                            .options(defer(KnowledgeIndex.embedding_vec))
+                            .where(*conditions, KnowledgeIndex.embedding_vec.is_(None))
+                        )
+                    ).scalars().all()
+                scored = [(float(score), chunk) for chunk, score in rows]
+                scored.extend(score_text_vector_chunks(
+                    text_only, query_vec, parse_vector=self._str_to_vector, cosine_similarity=self._cosine_similarity,
+                ))
+                scored.sort(key=lambda item: item[0], reverse=True)
+                return [_chunk_hit(chunk, score, "vector") for score, chunk in scored[:top_k]]
             except Exception as pgvec_err:  # noqa: BLE001 - 退到内存计算
                 logger.warning("pgvector 检索失败，改用内存向量计算：%s", pgvec_err)
 
@@ -798,15 +813,10 @@ class KnowledgeIndexService:
                 )
             ).scalars().all()
 
-        scored = []
-        for chunk in chunks:
-            if not chunk.embedding_vector:
-                continue
-            chunk_vec = self._str_to_vector(chunk.embedding_vector)
-            if chunk_vec.shape != query_vec.shape:
-                continue  # 未记录签名的旧分块可能是另一维度：跳过而不是让整次召回报错
-            scored.append((self._cosine_similarity(query_vec, chunk_vec), chunk))
-        scored.sort(key=lambda x: x[0], reverse=True)
+        scored = score_text_vector_chunks(
+            chunks, query_vec, parse_vector=self._str_to_vector, cosine_similarity=self._cosine_similarity,
+        )
+        scored.sort(key=lambda item: item[0], reverse=True)
         return [_chunk_hit(chunk, score, "vector") for score, chunk in scored[:top_k]]
 
     async def _lexical_doc_hits(self, req: DocSearchRequest) -> list[dict[str, Any]]:

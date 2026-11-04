@@ -209,7 +209,8 @@ async def test_embedding_keeps_one_enabled_model_and_says_there_is_no_fallback(a
     assert (await admin_client.post(f"/api/ai-models/{server_id}/activate")).status_code == 200
     response = await admin_client.post(f"/api/ai-models/{local_id}/activate")
     assert response.status_code == 200
-    assert response.json()["warning"].endswith("向量模型不跨模型兜底，本机恢复前向量检索不可用")
+    # spec enterprise-embedding-rerank-closure R11.1：措辞写明恢复条件与检索降级去向
+    assert response.json()["warning"].endswith("向量模型不跨模型兜底，本机服务恢复前语义检索不可用，知识检索改用词法召回")
     assert await _active(session_factory) == {("Qwen3.5-embed", "local")}
 
 

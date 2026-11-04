@@ -30,8 +30,10 @@ from app.services.ai_model_presets import (
 from app.services.knowledge_vector_support import (
     INDEX_VECTOR_DIM,
     chunk_vector_values,
+    has_foreign_signature,
     recall_size,
     rerank_hits,
+    score_text_vector_chunks,
 )
 from app.services.llm_provider_registry import provider_profile
 from app.services.llm_runtime import (
@@ -469,3 +471,66 @@ async def test_route_status_lists_the_rerank_route_and_probes_it(session_factory
     assert route["effective"]["model_name"] == "qwen3-reranker-4b"
     probe.assert_awaited_once()
     assert [item["kind"] for item in result["routes"]] == ["chat", "embedding", "rerank", "ocr", "layout_parsing"]
+
+
+# ── R5 补口：pgvector 可用但历史同签名分块的 embedding_vec 为空 ───────────────────
+
+
+def test_text_only_same_signature_vectors_are_scored_and_bad_values_are_skipped():
+    """纯 helper：不让单条历史坏值阻断同批文本向量评分。"""
+    import numpy as np
+
+    chunks = [
+        SimpleNamespace(embedding_vector="1,0"),
+        SimpleNamespace(embedding_vector="bad"),
+        SimpleNamespace(embedding_vector="1,0,0"),
+        SimpleNamespace(embedding_vector=None),
+    ]
+    values = score_text_vector_chunks(
+        chunks, np.array([1.0, 0.0]),
+        parse_vector=lambda raw: np.array([float(v) for v in raw.split(",")]),
+        cosine_similarity=lambda _q, v: float(v[0]),
+    )
+    assert len(values) == 1 and values[0][1] is chunks[0]
+
+
+@pytest.mark.asyncio
+async def test_pgvector_path_also_scores_same_signature_text_only_rows(monkeypatch):
+    """ANN 查询只看 embedding_vec；V263 加列前写入的同签名文本向量仍须参加排序，不能静默消失。"""
+    from app.models.ai_models import KnowledgeSourceType
+    from app.services.knowledge_index_service import KnowledgeIndexService
+
+    class _Result:
+        def __init__(self, *, rows=None, scalar_rows=None):
+            self._rows = rows or []
+            self._scalar_rows = scalar_rows or []
+
+        def all(self):
+            return self._rows
+
+        def scalars(self):
+            return SimpleNamespace(all=lambda: self._scalar_rows)
+
+    query_values = [1.0] + [0.0] * 1023
+    pg_row = SimpleNamespace(
+        source_type=KnowledgeSourceType.knowledge_doc, source_id=uuid4(), content_text="ANN 分块",
+        chunk_index=0, doc_version=None, is_stale=False, embedding_vector=",".join("0" for _ in query_values),
+    )
+    text_row = SimpleNamespace(
+        source_type=KnowledgeSourceType.knowledge_doc, source_id=uuid4(), content_text="历史文本向量分块",
+        chunk_index=0, doc_version=None, is_stale=False, embedding_vector=",".join(str(v) for v in query_values),
+    )
+    db = make_retrieval_session()
+    db.execute = AsyncMock(side_effect=[_Result(rows=[(pg_row, 0.5)]), _Result(scalar_rows=[text_row])])
+    service = KnowledgeIndexService(db)
+
+    async def fake_embedding(_query: str, model: str | None = None) -> list[float]:
+        service._ai_svc.last_embedding_signature = "wemm-embedding-4b@1024"
+        return query_values
+
+    service._ai_svc.embedding = fake_embedding  # type: ignore[method-assign]
+    service._pgvector_column_available = AsyncMock(return_value=True)  # type: ignore[method-assign]
+    monkeypatch.setattr("app.services.knowledge_index_service.has_foreign_signature", AsyncMock(return_value=False))
+    hits = await service._vector_search(uuid4(), "坏账", 2, "knowledge_doc")
+    assert [h["content"] for h in hits] == ["历史文本向量分块", "ANN 分块"]
+    assert db.execute.await_count == 2, "ANN 查询后还要取 embedding_vec 为空的同签名分块"

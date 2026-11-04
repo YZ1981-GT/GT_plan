@@ -428,7 +428,7 @@ class AIService:
     ) -> list[float]:
         """使用启用的向量模型生成向量（单一模型、不跨模型兜底），并记录签名。"""
         try:
-            route = await self._client_data_route(AIModelType.embedding, requested_model=model)
+            route = await self.embedding_route(requested_model=model)
             config = next((c.config for c in route if c.config is not None), None)
             if config is None:
                 raise (route[0].error if route and route[0].error else LLMRuntimeError(
@@ -439,6 +439,15 @@ class AIService:
             raise AIServiceUnavailableError(str(exc)) from exc
         self.last_embedding_signature = embedding_signature(config.model_name, len(vector))
         return vector
+
+    async def embedding_route(
+        self, *, requested_model: str | None = None
+    ) -> list[RouteCandidate]:
+        """与 :meth:`embedding` 同口径的向量候选（库里启用行，没有则 ``.env`` 兜底；只留允许客户数据的）；不发请求。"""
+        try:
+            return await self._client_data_route(AIModelType.embedding, requested_model=requested_model)
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
     # Rerank 重排（可选增强：未启用 = 不重排）
