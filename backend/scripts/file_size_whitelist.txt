@@ -1361,7 +1361,15 @@ backend/tests/workpaper_sync/test_phase5_e1_sheet_specs.py  902
 backend/tests/test_event_bus.py 979
 backend/app/services/report_config_service.py 803
 backend/app/services/formula_push/engine.py 951
-audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 3263
+#   ConsolNoteTab.vue —— HEAD 已 3439 行（超基线 3263 +5% = 3426，是并发会话的增长）。2026-11-04
+#     note-disclosure-pull-regression-and-headless-backend 批 1 只把 6 处 validateStatus < 600 换回 _silent
+#     （被 03496b1f3 覆盖丢失；错误响应原先会被当成功），净 0 行；基线取当前真实行数。
+#     拆分方向：单元格汇总、批量导入、附注审核三块各抽成 composable。
+audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 3439
+#   consolidationApi.ts —— 历史大文件（HEAD 已 1627 行、超 1500 上限且未登记，任何改动都会被门禁拒）。
+#     2026-11-04 批 1 只恢复明细映射建议 / 来源状态 / 预览三个接口类型的字段（被 03496b1f3 覆盖丢失，+1 行）。
+#     拆分方向：合并附注明细映射的类型与请求函数抽成独立模块。
+audit-platform/frontend/src/services/consolidationApi.ts 1628
 audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板

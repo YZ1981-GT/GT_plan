@@ -293,7 +293,9 @@ export function resolveD42PeriodUnadjustedTotal(
   return calcSubtotal(
     rows.map((row) => {
       if (row.periodTotal != null && row.periodTotal !== '') return parseNum(row.periodTotal as any)
-      const months = Array.isArray(row.months) ? (row.months as unknown[]).map(parseNum) : []
+      const months = Array.isArray(row.months)
+        ? (row.months as Array<string | number | null | undefined>).map(parseNum)
+        : []
       return calcMonthlyTotal(months)
     }),
   )

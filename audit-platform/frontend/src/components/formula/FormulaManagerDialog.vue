@@ -652,6 +652,8 @@ const props = withDefaults(defineProps<{
   initialTemplateId?: string
   initialTemplateAction?: 'subscribe'
   initialTemplateDomain?: string
+  /** 每次活动打开请求递增；同 project/year 只变域或目标时也重新定位。 */
+  openRevision?: number
 }>(), {
   scope: 'report',
   readOnly: false,
@@ -2330,8 +2332,8 @@ async function applyConsolNoteTarget() {
   }
 }
 
-// 初始加载当前报表的数据
-watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
+// 打开 / 换上下文时的初始加载；监听注册在 <script setup> 末尾（见那里的说明）。
+async function onOpenContextChange([v]: readonly unknown[]) {
   ++dialogSession
   ++wpRequest
   wpFormulaLoading.value = false
@@ -2506,7 +2508,7 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     // 没有目标且停在报表节点时补加载当前报表（打开时已清报表行缓存）
     if (!(await applyTargetNode()) && activeReportType.value && !allRowsMap.value[activeReportType.value]) await loadRowsForNode(selectedNodeKey.value)
   }
-})
+}
 
 function onTreeNodeClick(data: any) {
   // 外链节点: 跳转到独立页面
@@ -3876,6 +3878,12 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
   }
   emit('saved')
 }
+
+// 初始加载当前报表的数据（打开 / 换项目、年度、底稿、页 / 同上下文再开一次都重走 onOpenContextChange）。
+// 异步宿主可能在模块下载完成时已是打开态，必须 immediate，否则首次打开不会执行任何加载。
+// 注册必须在全部声明之后：immediate 首轮同步执行，放在中段会读到尚未初始化的 activeCategory 等 ref
+// （暂时性死区 ReferenceError，打开流程在第一处赋值就整段中断 —— 挂载即打开时什么都不加载）。
+watch([visible, () => props.openRevision, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], onOpenContextChange, { immediate: true })
 </script>
 
 <style scoped>
