@@ -3,7 +3,7 @@
 > 以 requirements.md / design.md 为准。临时产物放仓库根 `tmp_note_pull_doc/`。
 > 标完成必须有：真实代码 + 测试通过 + 至少一条磁盘变异打红（红在本判据自己的用例上）+ 生产调用方 / 挂载证据；
 > 回归修复另需「由红转绿」的前后对比。共享库写操作一律先经用户放行。
-> 批 1 = 任务 1~4、4a、4b、7、8a、14（本次推送）；批 2 = 任务 5 / 6；批 3 = 任务 10~13。
+> 批 1 = 任务 1~4、4a、4b、7、8a、14（v1.0.107 已推送）；批 2 = 任务 5 / 6（本次推送）；批 3 = 任务 10~13。
 
 ## A. 验证面解阻
 
@@ -54,13 +54,23 @@
 
 ## C. 权威源固化与门禁修真（R3，裁定①，批 2）
 
-- [ ] 5. Word 同步门禁修真 + 反向断言（R3.2，design §4.2）
-  - `--check` 下各 phase 改 `deepcopy` 内存副本再比较，改动集中在 `main()`。
-  - Verify：注入一处不一致 ⇒ exit 2 并点名；不注入 ⇒ exit 0。
+- [x] 5. Word 同步门禁修真 + 反向断言（R3.2，design §4.2）
+  - 各 phase 一律改内存副本（`json.loads` 新读），只有写盘看 `--check`；漂移时 `report_changed_sections()` 按章节点名。
+  - 门禁修真后暴露 Phase 6（单体 text_after 按位置对 Word）在现有数据上会改 81 / 116 张表（拆表后整体错位）⇒ 退役。
+  - Verify：现有数据 `--check` exit 0；种子丢一张 Word 里有的表 ⇒ exit 2 并点名（`test_sync_note_templates_check_gate.py`
+    4 例）；变异 T5-M1（Phase 2 照旧传 dry_run）/ T5-M2'（Phase 6 仍改模板）/ T5-M3（不点名）全红（T5-M2 首轮只改第一个
+    章节、而它没有表 ⇒ 变异什么都没改，GREEN 不算数，改写后红）。生产调用方：CI `governance-checks.yml` 的
+    「Check note template sync」步骤。
 
-- [ ] 6. 白名单可解释声明 + 表名判据（R3.3 / R3.4，design §4.3）
-  - 每条加 `category` 与可伪证的 `reason`，应收账款族优先；`todo` 类只许减少；已配对表补表名一致判据。
-  - Verify：加一条无 reason 的条目须红；改一个模板表名须红。
+- [x] 6. 白名单可解释声明 + 表名判据（R3.3 / R3.4，design §4.3 / §4.4）
+  - Word 白名单 689 条按证据现算类别（`note_word_allowlist`）：workpaper_authority 482 / todo 198 / word_placeholder 7 /
+    user_decision 2；应收账款族 132 条全部有底稿配对证据；todo 守卫钉住只许减少；缺类别 / 理由即报错；手工条目核出处原话。
+  - 表名判据：已配对单元首表比过 381 张，33 张不一致逐条登记 `names`（synonym 13 / workpaper_no_name 10 /
+    workpaper_placeholder 5 / workpaper_typo 2 / todo 3）；比过张数钉住，配对退化或候选表名抽不到即红。
+  - Verify：变异 T6-M1~M12 全红、各红在本判据的用例上，其中「加一条无理由条目」（M7 Word / M10 names）与「改一个
+    模板表名」（M11：上市 五、1 t0 货币资金 → 受限制的货币资金）即任务原定的两条。生产调用方：
+    `check_note_template_word_tree.py --check`、`gen_note_word_table_allowlist.py --check`，守卫
+    `test_note_template_word_tree_alignment` / `test_note_template_workpaper_alignment`（CI backend-tests）。
 
 ## D. 共享库迁移（R1，裁定②）
 
