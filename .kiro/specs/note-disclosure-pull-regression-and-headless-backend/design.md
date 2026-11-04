@@ -345,22 +345,79 @@ Tab 不同、写进附注是错数而于 2026-10-27 删除）。用户要的是�
 `primeAgingConfig` 三处，是 Node 侧唯一要注入的边界。
 
 ### 5.2 形态与分期
-
 ```
-手工触发 / 期 3 的 TRIAL_BALANCE_UPDATED ──► Node 执行器（project_id, year, wp_codes[]，服务端令牌，只连 127.0.0.1）
-   复用 registry.ts 的 HEADLESS_PROVIDERS ──► 与浏览器逐字节相同的载荷
-   ──► POST /disclosure-notes/sync-from-workpaper（现有端点，不改）──► 推送 → 回填 → 附注公式（§3.3）
+手工触发（端点 / 命令行）──► 后端拉起 Node 执行器 run.mjs refresh（触发人本人的短期令牌，只连 127.0.0.1）
+   附注页「全部刷新」的同一套代码：prepare ─► runHeadlessDisclosure（HEADLESS_PROVIDERS，各底稿披露 Tab 同一个 builder）
+   ─► sync-from-workpaper / sync-batch-from-workpaper（现有端点，不改）─► push ─► refresh-from-workpapers（后端重算）
 ```
-
+- 执行器在 `audit-platform/frontend/tools/headless-disclosure/`（与前端同目录，解析前端 `node_modules`；原写「仓库根
+  `tools/`」作废）。`vite build --ssr` 打包 `entry.ts`，构建别名只把 `@/utils/http` 换成 `nodeHttp.ts`，自动导入与前端相同
+  （vue / vue-router / pinia），源码不为 Node 改一行。产物 `dist/` 不入库。
 - 不新建写入端点：四层人工保护、owner 差集、推送 ownership 重放原样生效。前端「刷新」保留为降级路径，两条路径跑
   同一份 builder ⇒ 不存在双写。
-- 期 1（本 spec）：①现算 provider 依赖闭包（浏览器专有物分可移植 / 需注入 / 无法剥离）②执行器骨架 + 取数注入
-  （模块解析用 `vite build --ssr` 或 `tsx` + alias，禁止改源码适配 Node；令牌按 DSH 范式 HMAC 派生自
-  `JWT_SECRET_KEY`）③D2 + E1 浏览器载荷与 Node 载荷 canonical JSON 相等，不相等不扩面④手工触发端点 + CLI，
-  跑通「不开任何页面 → 附注被更新」。
+- 期 1（本 spec）：①现算 provider 依赖闭包 ②执行器骨架 + 取数注入 ③D2 + E1 浏览器载荷与 Node 载荷 canonical JSON
+  相等 ④手工触发端点 + 命令行。①~③结果见 §5.3，④见 §5.4。
 - 期 2（扩面到全部 provider，逐组对拍、清单只许变短）与期 3（事件接入 `platform_jobs`、运行记录 `note_formula_run`、
   刷新按钮改触发后端任务）另立 spec。
-- 降级：期 1 可移植性证明失败时转 C 路线作过渡，并在本节追加说明。
+- 降级：可移植性已证（§5.3），不转 C 路线。
+
+### 5.3 期 1 实测（任务 10 / 12，2026-11-04）
+- 可移植性（任务 10）。静态闭包扫描以 `@/utils/http` 与 apiProxy 为注入边界；78 个 provider 在 Node 里对真实后端实跑
+  （只读取数，写请求全部拦下，零写入）：
+  - 不加垫片 76/78 通过。F2 / F3 国企披露 composable 在 setup 里 `window.addEventListener('substantive:adjudicated', …)`，
+    报 `window is not defined`。
+  - 给一个只在本进程内转发事件的 EventTarget 作 `window`（不模拟 DOM / 存储 / 导航）：78/78 通过，70 个 provider 产出
+    载荷，共 73 条；其余 76 个加不加垫片结果逐字节相同。
+  - 写请求只有两种端点：`sync-from-workpaper` 71 条、`sync-batch-from-workpaper` 2 条（§5.4 写请求名单据此定）。
+  - 静态分类：需注入 57（只经 http 客户端取数）、闭包里有 element-plus 21（composable 里的提示框，静态判 blocker）。
+    实跑 78/78 都没走到提示框；若某种数据走到，该章节报失败（`document is not defined`），不会静默写错数。无法剥离 0。
+  - 收尾全量复跑一次：77/78，F4 遇共享后端瞬断（`fetch failed`），单独复跑通过。产物
+    `tmp_note_pull_doc/provider_portability.json`（静态扫描 + 实跑合并，含不加垫片一轮的结果）。
+- 对拍（任务 12）。真实 Chromium（Vite 开发服务、真实 axios）跑同一 provider vs Node，载荷 canonical JSON（键排序、
+  紧凑分隔）逐字节比：
+
+  | 底稿@项目 | 字节 | sha256 前 16 位 | 章节 |
+  |---|---|---|---|
+  | D2@和平药房 | 8261 | 9036611e14251404 | 八、5 |
+  | E1@和平药房 | 1348 | b7caa66e71e36e8e | 八、1、八、93 |
+  | D2@【测试】公式同步甲 | 8135 | 66d8bf802db4a9b4 | 五、5 |
+  | E1@【测试】公式同步甲 | — | — | 两侧都 0 条 |
+
+  结论相等。变异（只把 Node 侧 D2 的 variant 翻转）⇒ 不相等、退出 1，只红在两条 D2 上。任务 13 加固执行器（写请求名单、
+  构建清单）后重跑 D2@【测试】公式同步甲：8135 字节，sha 不变。
+
+### 5.4 手工触发（任务 13）
+- 端点 `POST /api/disclosure-notes/{project_id}/{year}/headless-refresh[?note_section=]`（`routers/note_headless_refresh.py`，
+  router_registry §109）。门禁与刷新链路的 `pull-from-workpapers` 相同：附注编辑门禁，不判合并锁；附注写端点清册覆盖集合
+  +1，配方 C1 跑五种身份。先结束门禁查询事务再拉起子进程（跑几十秒，期间不占连接）。同步执行，返回执行器逐章节结果
+  与 `elapsed_ms`；409 = 本项目本年度正在跑或已达并发上限，503 = 无 Node / 未构建 / 构建过期，504 = 超时已终止，502 = 执行器出错。
+- 命令行 `backend/scripts/ops/note_headless_refresh.py --project --year --user [--section]`：同一服务函数；先按用户名过同一个
+  门禁；回连正在运行的后端；本身不写库。
+- 服务 `note_headless_refresh_service.run_headless_refresh`：
+  - 身份：触发人本人的 access 令牌。`create_access_token` 加 `expires_delta`，有效期 = 超时 300 秒 + 60 秒，带
+    `purpose=headless_disclosure`。令牌只经子进程 env 传入，不进命令行、日志、返回值；stderr 里出现也抹成 `***`。跑完进黑名单
+    （`blacklist_token`，与 `get_current_user` 查同一个键）。子进程的每个请求再过各端点自己的门禁 ⇒ 不提权。原写「令牌按
+    DSH 范式 HMAC 派生」不采用：DSH 的 run 令牌只有 DSH 转发端点认，这里调的是附注 / 底稿的现有端点，只认 access 令牌；
+    另设令牌类型要改鉴权层。
+  - env 从零构造（PATH / SYSTEMROOT / TEMP 等系统变量 + 令牌 + 回连地址），平台的数据库 / 密钥变量不进子进程。回连地址只认
+    `http://127.0.0.1|[::1]|localhost:端口`，端口取接收请求的那个服务。
+  - 并发：本进程内同一项目年度一个、全进程最多 2 个，超出即 409（不排队）。超时或客户端断开时按进程树终止子进程
+    （Windows `taskkill /T`）。多 worker 之间的互斥留给期 3。
+- 执行器加固：
+  - 写请求名单 `headlessWriteAllowlist`（`entry.ts`）：只放行本次运行项目 / 年度 / 章节的五个现有端点（取数 prepare / push、
+    披露同步单条 / 批量、全部或单章节重算）。`nodeHttp` 的 `allowWrite` 必填（fail-closed）：名单外的写请求不发出，该章节报
+    失败。调用方改不了令牌头；请求带 `User-Agent: gt-headless-disclosure/1`，写请求带窗口编号头。
+  - 构建新鲜度：构建时写 `dist/source-manifest.json`（打进包的 575 个源文件的 sha256）。`run.mjs` 运行前逐个核对，源码改了
+    没重新构建 ⇒ 退出码 3、拒绝运行，后端报 503。不拿旧版 builder 算出的数写附注。
+- 保护（R4.5）：执行器只经现有端点写入，四层人工保护与推送 ownership 重放都在这些端点里。用执行器真实产出的载荷
+  （D2@【测试】公式同步甲，夹具 `backend/tests/fixtures/headless_disclosure/d2_listed_payload.json`）逐层钉住：
+  - 整章 `_manual_override`：拦下，表格一格不动，留一条冲突；
+  - 正文 `is_local_override`：表格照常随底稿刷新，正文不被底稿叙述覆盖（对照组：不带标记即被覆盖）；
+  - 推送 ownership 重放：推送拥有的格恢复推送值并回报 `push_kept`；
+  - 格级 `_cell_modes`：全部 / 单章节重算都以 `skip_manual=True` 调 `refill_sections`（重算跳过人工格由
+    `services/test_note_manual_protect_pbt.py` 覆盖）；
+  - 首次同步保护在执行器侧（同一个 `runHeadlessDisclosure`）：前端用例钉住「从未同步、已有 3 格人工填写」的章节不发同步请求。
+- 「不开页面也更新」的真实写库跑通（【测试】项目）待用户放行（D5）。
 
 ## §6　验证（2026-11-04）
 
@@ -396,6 +453,22 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
 | 磁盘变异 | — | T5 3 条 + T6 12 条全红，各红在本判据的用例上 | T5-M2 首轮无效（只改了没有表的第一个章节）不算数，改写后红 |
 | 行数门 / ruff | — | 行数门 rc 0；ruff 只有同步脚本 2 条预存（HEAD 同样两条：未用的 `deepcopy` import、E402） | — |
 
+### 6.3 批 3（2026-11-04）
+候选 = `33d1aa5a2` + 任务 10~13 改动（`tmp_note_pull_doc/verify_wt`）；基线 = 同一提交的干净 worktree（`b2_wt`）。后端选集 =
+本批新增用例 + 引用了本批改动模块（令牌 / 黑名单、附注编辑门禁与清册、路由注册与遮蔽、披露同步、重算）的既有用例，共 36 个文件。
+
+| 面 | 基线 | 候选 | 结论 |
+|---|---|---|---|
+| 后端选集 | 1223 passed / 22 failed | 1257 passed / 20 failed | **candidate-only red 0**；修好 2（附注写端点清册 `--check` 与两次生成一致：清册随 HEAD 现状重生成）；两边都红 20 条失败信息逐条相同（edit 级影响清单 6 项无法静态定级 2 条、披露同步 characterization 的 mock 查询次序 12 条、函数全局名棘轮 1 条、仅登录基线 4 条、请求体鉴权缺口 1 条，均为 HEAD 预存）；新增节点 32 |
+| 前端 | — | `tools/headless-disclosure/executor.spec.ts` 11 passed | src 无改动；CI `npm run test:unit` 收集该文件 |
+| 区域 vue-tsc | — | tools 下文件 0 错 | 闭包里 src 的既有类型债不计 |
+| 磁盘变异 | — | T13-M1~M24 全红 | M4 首轮用例挂死被手工终止，不算数；用例改限时等待后复跑红。前端各条按失败用例名核对，无套件级报错 |
+| 执行器实跑（只读） | — | 收尾全量 77/78 + F4 单独复跑通过；D2@【测试】公式同步甲载荷 8135 字节、sha 不变 | §5.3 |
+| ruff / 行数门 | — | 新文件 0 条；触及的两个旧文件 11 条与 HEAD 相同；行数门 rc 0 | — |
+| 变基后回归（基线 = 远端头 `ec777f0fa`，19 个文件） | 640 passed / 9 failed | 674 passed / 7 failed | candidate-only red 0；修好 2（同上）；两边都红 7 条失败信息相同 |
+| 变基后实测 | — | 远端前移 6 个提交，其中改了闭包里的 `src/services/apiPaths/formulaSettings.ts`：执行器拒绝运行（退出码 3）并点名 3 个文件（另两个是检出时换成 CRLF 的 `entry.ts` / `nodeHttp.ts`） | 构建清单按设计生效；跑 13b 前重新构建 |
+| shebang | — | 变基检出成 CRLF 后，vitest 导入 `run.mjs` 报语法错（转换时剥不掉 `#!…\r`）；去掉 shebang 后 11 passed | `run.mjs` 一律 `node run.mjs …` 调用 |
+
 ## §7　风险登记
 
 | # | 风险 | 处置 |
@@ -406,7 +479,9 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
 | 4 | 种子基线被当绿灯开关 | 逐格依据 + 钉死断言 + 变异 M15 |
 | 5 | V235 由其他进程执行，本会话无执行前快照 | 如实登记（§2.3），不补造对账 |
 | 6 | 并发会话在共享终端里注入 ^C / 改主工作树 | 长跑一律后台独立进程 + UTF-8 日志；只在分离头 worktree 提交 |
-| 7 | R4 期 1 可移植性证明失败 | 降级 C 路线并在 §5 追加 |
+| 7 | R4 期 1 可移植性证明失败 | 已证（§5.3：78/78，注入边界只有 http 客户端与 window 事件垫片），不降级 |
+| 8 | 离屏执行器用旧构建算数写附注 | 构建清单逐文件 sha256 核对，不一致拒绝运行（§5.4）；变异 T13-M21 / M24 |
+| 9 | 子进程拿到的令牌被滥用 | 触发人本人身份、有效期 6 分钟、只经 env、只连环回、写请求名单、跑完吊销（§5.4） |
 
 ## §8　ADR
 
@@ -427,6 +502,10 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
   没有底稿披露表的节不在 US-8 裁定里，记 `todo` 并钉住只许减少。否决「有标记即放行」（新差异重跑生成器即被吸收）。
 - **ADR-NPR-12**：表名判据另设比较键 `table_name_key`（在 `base_name` 之上去写法噪声），不改配对用的 `name_key` /
   `base_name`；意思相同的写法逐条登记 `synonym`，不做同义词替换（否决：替换规则会把真差异一起归一，且难以审）。
+- **ADR-NPR-13**：离屏执行器以触发人本人的短期 access 令牌回连本机后端，写请求只发名单里的现有端点。否决：新令牌类型
+  （要改鉴权层）；后端进程内直接调服务函数（provider 是前端代码，HTTP 是它唯一的取数 / 写入边界）。
+- **ADR-NPR-14**：执行器运行前核对构建清单，源码与构建不一致即拒绝（503）。否决：请求里自动重新构建（写仓库文件、
+  耗时 20~40 秒）；不核对（静默用旧版 builder 算出的数写附注）。
 
 ## §9　本 spec 不纳入（已登记）
 

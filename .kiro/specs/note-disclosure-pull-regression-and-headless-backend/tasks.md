@@ -3,7 +3,7 @@
 > 以 requirements.md / design.md 为准。临时产物放仓库根 `tmp_note_pull_doc/`。
 > 标完成必须有：真实代码 + 测试通过 + 至少一条磁盘变异打红（红在本判据自己的用例上）+ 生产调用方 / 挂载证据；
 > 回归修复另需「由红转绿」的前后对比。共享库写操作一律先经用户放行。
-> 批 1 = 任务 1~4、4a、4b、7、8a、14（v1.0.107 已推送）；批 2 = 任务 5 / 6（本次推送）；批 3 = 任务 10~13。
+> 批 1 = 任务 1~4、4a、4b、7、8a、14；批 2 = 任务 5 / 6；批 3 = 任务 10~13（13b 待放行）。各批已推送，版本号见推送标签。
 
 ## A. 验证面解阻
 
@@ -93,10 +93,34 @@
 
 ## E. builder 后端化期 1（R4，裁定④，批 3）
 
-- [ ] 10. 可移植性现算：provider 依赖闭包按可移植 / 需注入 / 无法剥离三类，产出 `tmp_note_pull_doc/provider_portability.json`。
-- [ ] 11. Node 执行器骨架 + 取数注入（`tools/headless-disclosure/`，复用 `HEADLESS_PROVIDERS`；服务端令牌只连 127.0.0.1）。
-- [ ] 12. D2 + E1 浏览器载荷 vs Node 载荷 canonical JSON 相等；变异（改 Node 侧一个取数参数）须红；不相等不进任务 13。
-- [ ] 13. 手工触发端点 + CLI，跑通「不开页面也更新」；四层人工保护与推送 ownership 重放各一条用例。
+- [x] 10. 可移植性现算（design §5.3）
+  - 静态闭包扫描（注入边界 = `@/utils/http` 与 apiProxy）+ 78 个 provider 在 Node 里对真实后端实跑（只读取数，写请求全部拦下）。
+  - 不加垫片 76/78；F2 / F3 在 setup 里往 `window` 挂事件监听。加只在本进程内转发的 EventTarget 垫片后 78/78，其余 76 个两次
+    结果逐字节相同。70 个 provider 产出 73 条载荷，写请求只有 `sync-from-workpaper` 71 / `sync-batch-from-workpaper` 2。
+  - 静态判 blocker 的 21 个都是闭包里有 element-plus（composable 的提示框），实跑都没走到；无法剥离 0。
+  - 产物：`tmp_note_pull_doc/provider_portability.json`（静态扫描 + 实跑结果合并）。
+- [x] 11. Node 执行器骨架 + 取数注入（design §5.2）
+  - `audit-platform/frontend/tools/headless-disclosure/`：`vite build --ssr`，构建别名只换 `@/utils/http` → `nodeHttp.ts`；
+    `entry.ts`（bootstrap / runProvider / refreshNotes，复用 `HEADLESS_PROVIDERS` 与 `runHeadlessDisclosure`）；`run.mjs`
+    （probe / capture / refresh）。源码不为 Node 改一行。
+- [x] 12. D2 + E1 浏览器载荷 vs Node 载荷 canonical JSON 相等（design §5.3 表）
+  - 真实 Chromium（Vite 开发服务、真实 axios）vs Node：三组有载荷的逐字节相同，第四组两侧都 0 条。
+  - Verify：变异（Node 侧 D2 翻转 variant）⇒ 不相等、退出 1，只红在两条 D2 上。
+- [x] 13. 手工触发端点 + 命令行 + 保护用例（design §5.4）
+  - 端点 `POST /api/disclosure-notes/{project_id}/{year}/headless-refresh`（附注编辑门禁，清册覆盖集合 +1、配方 C1 五种身份）；
+    命令行 `backend/scripts/ops/note_headless_refresh.py`；服务 `note_headless_refresh_service`（触发人本人的 6 分钟令牌只经 env、
+    env 从零构造、只连环回、项目年度互斥、超时 / 断开终止进程树、跑完吊销）。
+  - 执行器加固：写请求名单（五个现有端点、限本次项目 / 年度 / 章节，`allowWrite` 必填）；构建清单逐文件 sha256 核对，过期拒绝运行。
+  - 保护：执行器真实载荷（D2@【测试】公式同步甲）过整章 `_manual_override` / 正文 `is_local_override`（带对照组）/ 推送 ownership
+    重放；全部与单章节重算都 `skip_manual=True`；首次同步保护在执行器侧由前端用例钉住。
+  - 用例：后端 `test_note_headless_refresh_service.py` 20 条 + `test_note_headless_refresh_protections.py` 6 条；前端
+    `tools/headless-disclosure/executor.spec.ts` 11 条（CI `npm run test:unit` 收集）。
+  - Verify：变异 T13-M1~M24 全红，各红在本判据的用例上（M4 首轮把用例挂死、手工终止不算数，用例改限时等待后复跑红；
+    前端各条按失败用例名核对，无套件级报错）。
+  - 顺带：附注写端点清册随 HEAD 现状重生成（`note_templates.py` 4 个端点 I → X、`validate` 补登录，是
+    formula-management-residual-closure 改门禁后没重生成，`test_authz_inventories_check_mode` 在 HEAD 即红）。
+- [ ] 13b. 【测试】项目真实写库跑通「不开页面也更新」（R4.6；待用户放行，D5）
+  - 候选后端（`GT_BOOTSTRAP_DONE=1`，不跑迁移）上调端点：改审定数前后附注三层值对比，写入走平台路径清理并对账。
 
 ## F. 回归与收尾
 
