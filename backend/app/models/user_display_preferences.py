@@ -121,14 +121,16 @@ class UserDisplayPreferences(Base):
             "revision >= 0",
             name="ck_udp_revision_nonneg",
         ),
-        # NOTE: `ck_udp_fixed_columns_is_object`（`jsonb_typeof(fixed_columns) = 'object'`）
-        # 只登记在真表的迁移 SQL（V250__display_preferences_and_project_amount_unit.sql
-        # 第 64~65 行），**不放进 ORM 的 __table_args__**：
-        # `jsonb_typeof` 是 PG 专用函数，SQLite 在 CREATE TABLE 校验 CHECK 表达式时
-        # 直接报 `no such function: jsonb_typeof` ⇒ 任何
-        # `Base.metadata.create_all(sqlite)` 的测试在 setup 阶段 ERROR
-        # （2026-10-31 实测辐射面：合并建树 + 批量导入 8 个文件 67 例）。
-        # 真实约束在 PG 上由迁移保证，ORM 的 __table_args__ 只影响 DDL 生成。
+        # `jsonb_typeof(fixed_columns) = 'object'` 用 `.ddl_if(dialect="postgresql")` 限定
+        # 只在 PostgreSQL DDL 生成：PG 由该 CHECK 保证 fixed_columns 是 JSON object；
+        # SQLite 的 `create_all` 不生成它（`jsonb_typeof` 是 PG 专用函数，直接放进
+        # __table_args__ 会让 `create_all(sqlite)` 在校验 CHECK 时报 `no such function`），
+        # 因此对 SQLite 建表的测试零影响。真实约束仍由迁移 V250 保证；本条使 ORM DDL 与
+        # 迁移口径一致（platform-release-blocker Task 16 守卫）。
+        CheckConstraint(
+            "jsonb_typeof(fixed_columns) = 'object'",
+            name="ck_udp_fixed_columns_is_object",
+        ).ddl_if(dialect="postgresql"),
     )
 
     def __repr__(self) -> str:

@@ -25,8 +25,15 @@ function cliOptions(argv) {
     const index = argv.indexOf(flag)
     return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback
   }
+  // 产物目录优先认 `--dir`（全仓约定：smoke-built-artifact.mjs / update-bundle-budget.mjs /
+  // package.json 的 bundle:check 与 smoke:built 都用 `--dir`），`--dist` 保留向后兼容。
+  // 原先只认 `--dist` ⇒ `bundle:check` 传的 `--dir dist` 被静默忽略、落到环境变量兜底，
+  // 设了 GT_FRONTEND_OUT_DIR（verified 构建会设）时会检查错目录。
   return {
-    dist: resolve(ROOT, value('--dist', process.env.GT_FRONTEND_OUT_DIR || 'dist')),
+    dist: resolve(
+      ROOT,
+      value('--dir', value('--dist', process.env.GT_FRONTEND_OUT_DIR || 'dist')),
+    ),
     baseline: resolve(ROOT, value('--baseline', relative(ROOT, DEFAULT_BASELINE))),
     write: argv.includes('--write-baseline'),
     json: argv.includes('--json'),

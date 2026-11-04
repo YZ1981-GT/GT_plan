@@ -14,15 +14,19 @@ from fastapi import HTTPException
 async def test_report_generation_stops_when_trial_balance_recalc_fails():
     from app.services.report_engine import ReportEngine
 
+    # generate_all_reports 现由 report_provenance 包裹（advisory lock + building run）。
+    # get_bind 返回同步非 PG bind 以跳过 advisory lock；核心仍是：TB recalc 失败必须在
+    # 报表生成（_generate_report）开始前传播、不 fail-open。
     db = AsyncMock()
+    db.get_bind = lambda: SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
     failure = RuntimeError("TB recalc failed")
     with patch(
         "app.services.trial_balance_service.TrialBalanceService.full_recalc",
         new=AsyncMock(side_effect=failure),
-    ):
+    ), patch.object(ReportEngine, "_generate_report", new=AsyncMock()) as gen:
         with pytest.raises(RuntimeError, match="TB recalc failed"):
             await ReportEngine(db).generate_all_reports(uuid.uuid4(), 2025)
-    db.flush.assert_not_awaited()
+    gen.assert_not_awaited()
 
 
 @pytest.mark.asyncio
