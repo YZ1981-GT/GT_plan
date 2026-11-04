@@ -224,8 +224,9 @@ V → R → V，确认扩展缺失分支与存在分支都不报错，再放进 
   （可能含连接串）只进服务端日志；快照写库失败只记日志，扫描结果照常返回。否决：继续返回 `[]`；把异常正文放进 health。
 - 共享库只读扫描（候选代码，只 `scan` 不写快照）：11 项，`embedding_vec` 不再出现；9 条 CHAR/VARCHAR、BIGINT/INTEGER 是
   WARN 级、属其他 spec 的表；critical 2 条是 V233 / V234 checksum 漂移（`project_creation_grants`，其他会话的迁移，未改，
-  健康端点因此仍 degraded）。9980 的健康端点仍显示旧快照：`schema_drift_log` 由连到共享库的各后端覆盖写，要等运行新代码的
-  后端启动扫描后才更新。
+  健康端点因此仍 degraded）。`schema_drift_log` 由连到共享库的各后端覆盖写，要等运行新代码的后端启动扫描后才更新：v1.0.120
+  推送、主工作区前移后 9980 热重载（2026-11-04 15:00:07 UTC）重新扫描，健康端点漂移 12 → 11 项，`embedding_vec` 不再出现，
+  `audit_chain` 三项仍为 0。
 
 ### 10.2 审计链健康缓存（R15）
 

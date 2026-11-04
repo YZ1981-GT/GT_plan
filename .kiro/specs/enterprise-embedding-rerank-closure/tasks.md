@@ -58,7 +58,8 @@
 
 - [x] 18. schema 漂移检测：`db_compare_type` 只把 `public.vector` 归一成 `VECTOR`；整次扫描超时 / 抛错与读快照失败记
   critical `scan_failure`（只带异常类型）；快照写库失败不抛错（R14）
-  - 共享库只读扫描：`knowledge_index.embedding_vec` 不再报 type_mismatch（9980 健康端点要等新代码后端启动扫描后更新）
+  - 共享库只读扫描：`knowledge_index.embedding_vec` 不再报 type_mismatch；v1.0.120 推送后 9980 热重载重新扫描，健康端点
+    漂移 12 → 11 项、不再列出这一列（剩余 critical 2 条是其他会话的 V233 / V234 checksum 漂移）
 - [x] 19. 审计链健康只缓存已知结果；既有健康用例显式声明审计链干净（R15）
 - [x] 20. 第三批验证：124 个相关文件逐节点回归（基线 = 远端头去掉第二批），新增红 4 个全部归因并处理；修后 121 passed、
   真 PG 11 passed；磁盘变异 12 / 12 全红 + 1 条阴性对照；ruff 新增 0；按端拆提交并推送
