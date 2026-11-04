@@ -82,3 +82,20 @@
   - INDEX.md 已更新
   - 迁移落共享库与推送按 design §7 Y4（待用户放行）
   - 勘误（2026-10-31 只读核对，不改上文）：「V221 已落共享库……max schema_version=221」与现状不符。共享库 `schema_version` 现在没有 221（最大 230）；当时的 221 登记按 git 记录应是调整分录会话的 `V221__adjustment_client_booking.sql`（`c7d08e596` 新增，`ab080d19e` 改号为 V222；共享库 222 现登记该文件，2026-10-30 10:23），改号后 221 无登记。本 spec 的 DDL 对象都在，与 V221 定义一致：`audit_chain_head` 表（0 行）、`idx_audit_log_entries_prev_hash`、`idx_audit_log_entries_chain`；据 `tmp_audit_chain/apply_v221.py`，这些对象是直接执行 DDL 建的，没有经 MigrationRunner 登记（任务 5 的同一句同此）。V221 只有 `CREATE … IF NOT EXISTS`，可重跑：下次 `run_pending`（含共享环境重启时的启动迁移）会执行一遍并登记 221，无副作用。本轮不运行 `run_pending`
+
+
+## 2026-11-04 pull 到 v1.0.119 后二次核对（append-only，不改上文勘误）
+
+- 原任务 5 / 6 的「未入库」勘误（2026-10-31）**不再成立**：远端 `b59193ede`「修复多分叉审计链确认与队列死信」已把写链内核与 worker 隔离区入库。静态核实（git grep，HEAD=`ffab9d86a` / v1.0.119）：
+  - `AuditChainHead` 模型在 `backend/app/models/audit_log_models.py`
+  - `audit_chain/head.py` 有 `append_entry`
+  - `audit_chain/worker.py` 有 `QUARANTINE` 隔离区
+  - `audit_chain/forks.py` 的 `scan_forks` 已 `.where(prev_hash != GENESIS_HASH)` 排除创世哈希，并按分叉点推导 `chain_key`（修了原「每条链首算成分叉」与「chain_key 过滤恒真」两处）
+  ⇒ 任务 5 / 6 的代码在库成立；任务 4 勘误里「`scan_forks` 把创世哈希算成分叉」的代码前置已修复。
+- 任务 4 仍保持 `[ ]`：代码前置已就绪，剩「用户放行共享库写 → 真实库执行 `audit_chain_fork_ack.py`（默认只读演示 → `--apply`）→ `scan_forks=0` 且 `/api/health` 的 `audit_chain.unacknowledged_forks=0`」运维验证，需用户操作，本会话未写共享库。
+- 本次只做静态符号核实，未起环境跑 `test_audit_chain_*` 套件（需 PG + 预存 `Table 'users'` 冲突处置）。
+
+- 勘误（2026-11-04 代推时追加，不改上文）：上一条「任务 4 仍保持 `[ ]`」写于 v1.0.119，当时成立；v1.0.120 起不再成立 ——
+  任务 4 已由 spec `enterprise-embedding-rerank-closure` 第二批在共享库执行并按本文件自己写的勾选条件改勾（执行前只读演示、
+  `--apply` 写 11 条 v2 确认条目、`scan_forks` 与 `/api/health` 的 `audit_chain.unacknowledged_forks` 均为 0），
+  执行记录见本文件任务 4 条目与该 spec 的 design §9.6。本文件里「任务 4 未完成」的表述一律以任务 4 条目为准。

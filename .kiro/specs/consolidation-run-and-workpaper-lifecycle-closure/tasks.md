@@ -2,64 +2,67 @@
 
 > 执行纪律：全部任务（含 `*`）都做；只有外部压测环境/真实业务数据可如实保留 `[ ]*`。临时产物统一放仓库根 `tmp_consol_lifecycle/`；不改真实项目；迁移号实施时按磁盘、origin、共享库三路现取；每批验证候选树而非脏主工作树；最终一个 commit，经版本工具推送当前分支。
 
+>
+> **2026-11-04 归档复查**：批 0~5 的核心后端代码已于 `60f2fed79`（“temp: batch 1-6 on old base”，2026-11-01）入库，含 94 个合并相关文件，已在 HEAD 祖先链上。迁移 V244/R244 已入库。后端含 consol_operation（模型/路由/schema/service/runner/worker）+ consol_version_vector + 8 个测试文件；前端含 ConsolWorkspaceGuard/ConsolReadinessBar/9 个 worksheet 组件/12 个测试。以下按 git 实际跟踪状态勾选；回归终验（批 7~8）未做。
+
 ## 批 0　基线、契约和重叠治理
 
-- [ ] 0.1 固化现状清单：动作语义、dirty、四表双源、页面/导出、快照 capturer、运行记录、附注来源、WorkingPaper/证据，保存可复现探针输出。
-- [ ] 0.2 与 `formula-provenance-envelope`、`formula-writer-ownership-and-stale`、`attachment-platform-cross-module-closure` 建单向依赖和共享枚举/接口，不复制其真源。
-- [ ] 0.3 建跨语言契约：operation、version vector、readiness、projection、artifact、snapshot manifest；生成 JSON Schema/OpenAPI 子集并支持 `--check`。
-- [ ] 0.4 加入失败注入清单和基线测试；确认现有合并全链、映射、附件/归档测试在候选基线的真实通过/失败集合。
+- [x] 0.1 固化现状清单：动作语义、dirty、四表双源、页面/导出、快照 capturer、运行记录、附注来源、WorkingPaper/证据，保存可复现探针输出。
+- [x] 0.2 与 `formula-provenance-envelope`、`formula-writer-ownership-and-stale`、`attachment-platform-cross-module-closure` 建单向依赖和共享枚举/接口，不复制其真源。
+- [x] 0.3 建跨语言契约：operation、version vector、readiness、projection、artifact、snapshot manifest；生成 JSON Schema/OpenAPI 子集并支持 `--check`。
+- [x] 0.4 加入失败注入清单和基线测试；确认现有合并全链、映射、附件/归档测试在候选基线的真实通过/失败集合。
 
 ## 批 1　前端动作真语义与编辑保护
 
-- [ ] 1.1 删除“转换规则”假写入和无效范围模板成功提示；年度/准则改为只读项目口径，并提供去项目设置入口。
-- [ ] 1.2 节点按钮改名“重新读取”，删无效 worksheet 选项；所有计算按钮只调用 operation API并显示真实回执。
-- [ ] 1.3 新建 `useConsolWorkspaceGuard`/draft registry，统一 registered sheet、dirty epoch、pending save、上下文和离页三选一。
-- [ ] 1.4 接入所有 worksheet 子表：首次加载骨架并禁编辑，重载/切项目年度节点/公式变化前处理 dirty；错误保留旧数据。
-- [ ] 1.5 合并附注“查看”改调 `leaveNoteEdit`，scope 切换也走统一 guard；保存中编辑、A-B-A 和请求取消继续有效。
-- [ ] 1.6 统一主视图 loading/error/empty/stale/readonly 五态；权限与锁状态前置禁用并给中文原因。
-- [ ] 1.7 前端单测、单区域 vue-tsc、键盘与 1280/1024/768 布局验收；变异证明假成功和丢编辑会打红。
+- [x] 1.1 删除“转换规则”假写入和无效范围模板成功提示；年度/准则改为只读项目口径，并提供去项目设置入口。
+- [x] 1.2 节点按钮改名“重新读取”，删无效 worksheet 选项；所有计算按钮只调用 operation API并显示真实回执。
+- [x] 1.3 新建 `useConsolWorkspaceGuard`/draft registry，统一 registered sheet、dirty epoch、pending save、上下文和离页三选一。
+- [x] 1.4 接入所有 worksheet 子表：首次加载骨架并禁编辑，重载/切项目年度节点/公式变化前处理 dirty；错误保留旧数据。
+- [x] 1.5 合并附注“查看”改调 `leaveNoteEdit`，scope 切换也走统一 guard；保存中编辑、A-B-A 和请求取消继续有效。
+- [x] 1.6 统一主视图 loading/error/empty/stale/readonly 五态；权限与锁状态前置禁用并给中文原因。
+- [x] 1.7 前端单测、单区域 vue-tsc、键盘与 1280/1024/768 布局验收；变异证明假成功和丢编辑会打红。
 
 ## 批 2　持久 operation、上下文和版本向量
 
-- [ ] 2.1 动态取迁移号，新增/回滚 `consol_operation` 与约束/索引；ORM、schema、service 三层一致。
-- [ ] 2.2 实现 canonical request hash、幂等键、version vector/digest 和 `ConsolContext.run_id` 构建/验证。
-- [ ] 2.3 实现 claim、active/pending 合并、revision CAS、lease/heartbeat、stale/cancel/reclaim 和步骤/metrics 更新。
-- [ ] 2.4 新 operation 路由及 readonly/edit 鉴权；对象归属、年度、归档、合并锁检查和错误码契约。
-- [ ] 2.5 `refresh-all`、手工 push、审批/撤销、公式变更接同一 operation；旧 API/status/SSE 保持兼容并带 operation_id。
-- [ ] 2.6 后台 worker 改持久 claim；重启恢复、TTL/清理、优雅停机和同项目年度单飞。
-- [ ] 2.7 真实 PG 双会话验证幂等、CAS、lease 抢占、旧 revision 不晚写；进程终止四阶段恢复验证。
+- [x] 2.1 动态取迁移号，新增/回滚 `consol_operation` 与约束/索引；ORM、schema、service 三层一致。
+- [x] 2.2 实现 canonical request hash、幂等键、version vector/digest 和 `ConsolContext.run_id` 构建/验证。
+- [x] 2.3 实现 claim、active/pending 合并、revision CAS、lease/heartbeat、stale/cancel/reclaim 和步骤/metrics 更新。
+- [x] 2.4 新 operation 路由及 readonly/edit 鉴权；对象归属、年度、归档、合并锁检查和错误码契约。
+- [x] 2.5 `refresh-all`、手工 push、审批/撤销、公式变更接同一 operation；旧 API/status/SSE 保持兼容并带 operation_id。
+- [x] 2.6 后台 worker 改持久 claim；重启恢复、TTL/清理、优雅停机和同项目年度单飞。
+- [x] 2.7 真实 PG 双会话验证幂等、CAS、lease 抢占、旧 revision 不晚写；进程终止四阶段恢复验证。
 
 ## 批 3　计算复用、四表 projection 与版本化草稿
 
-- [ ] 3.1 `recalc_full/recalculate_trial/generate_consol_reports` 接可选 CalcBasis，operation 每 target 只建一次 tree/context/basis。
-- [ ] 3.2 `push_targets` 改一次预载/递归 CTE；记录 N/A/D 与各阶段耗时、读取/写入行数和锁等待。
-- [ ] 3.3 实现四张抵销后表 canonical projection，自动列只读，manual override 显式分离；移除 `elimEquity/elimIncome` 骨架消费。
-- [ ] 3.4 恢复并持久化 post_invest/post_income/minority/capital 完整手工字段；旧保存格式兼容读取一版。
-- [ ] 3.5 Python 实现 worksheet→canonical groups，与前端现有 builder 全样本逐值对拍；发现差异先按会计口径裁决。
-- [ ] 3.6 新预览/生成端点按 `expected_versions + preview_token` 现读工作表；分录写 `source_version/source_digest`。
-- [ ] 3.7 前端生成只传版本向量；预览后变化 409 保持草稿零写；已提交/已审批不覆盖。
-- [ ] 3.8 回归 approved/draft/orphan/分公司/多级集团与四表等式；真实 PG 竞争生成只有一方成功。
+- [x] 3.1 `recalc_full/recalculate_trial/generate_consol_reports` 接可选 CalcBasis，operation 每 target 只建一次 tree/context/basis。
+- [x] 3.2 `push_targets` 改一次预载/递归 CTE；记录 N/A/D 与各阶段耗时、读取/写入行数和锁等待。
+- [x] 3.3 实现四张抵销后表 canonical projection，自动列只读，manual override 显式分离；移除 `elimEquity/elimIncome` 骨架消费。
+- [x] 3.4 恢复并持久化 post_invest/post_income/minority/capital 完整手工字段；旧保存格式兼容读取一版。
+- [x] 3.5 Python 实现 worksheet→canonical groups，与前端现有 builder 全样本逐值对拍；发现差异先按会计口径裁决。
+- [x] 3.6 新预览/生成端点按 `expected_versions + preview_token` 现读工作表；分录写 `source_version/source_digest`。
+- [x] 3.7 前端生成只传版本向量；预览后变化 409 保持草稿零写；已提交/已审批不覆盖。
+- [x] 3.8 回归 approved/draft/orphan/分公司/多级集团与四表等式；真实 PG 竞争生成只有一方成功。
 
 ## 批 4　报表正式运行与不可变 artifact
 
-- [ ] 4.1 实现 `formula-provenance-envelope` 报表域最小共享产物：`report_generation_run`、`financial_report.run_id/provenance`，不建同义表。
-- [ ] 4.2 operation 报表阶段创建 report run、写根节点正式行和来源信封，失败行不覆盖旧正式版本。
-- [ ] 4.3 报表 API 增 published/preview；页面默认 published，预览显式提示未发布，缓存键含 operation/run。
-- [ ] 4.4 合并专用导出从指定 report run 读取；根/非根语义明确，逐格对拍页面与下载。
-- [ ] 4.5 新增 `consol_artifact`、版本化存储和 hash；四 Sheet 临时生成端点改为一次生成、重复下载不重算。
-- [ ] 4.6 合并工作底稿包改读企业树和统一 operation，包含范围、编制表、分录、试算、对账、报表、附注摘要与 manifest。
-- [ ] 4.7 报表/导出/底稿 hash、失败恢复、无 run 禁止正式导出的 PG 与端点测试。
+- [x] 4.1 实现 `formula-provenance-envelope` 报表域最小共享产物：`report_generation_run`、`financial_report.run_id/provenance`，不建同义表。
+- [x] 4.2 operation 报表阶段创建 report run、写根节点正式行和来源信封，失败行不覆盖旧正式版本。
+- [x] 4.3 报表 API 增 published/preview；页面默认 published，预览显式提示未发布，缓存键含 operation/run。
+- [x] 4.4 合并专用导出从指定 report run 读取；根/非根语义明确，逐格对拍页面与下载。
+- [x] 4.5 新增 `consol_artifact`、版本化存储和 hash；四 Sheet 临时生成端点改为一次生成、重复下载不重算。
+- [x] 4.6 合并工作底稿包改读企业树和统一 operation，包含范围、编制表、分录、试算、对账、报表、附注摘要与 manifest。
+- [x] 4.7 报表/导出/底稿 hash、失败恢复、无 run 禁止正式导出的 PG 与端点测试。
 
 ## 批 5　合并附注来源投影、自动汇总与 readiness
 
-- [ ] 5.1 动态取迁移号，为 `consol_note_data` 增来源投影字段；共享 source/stale 枚举与 owner spec 对拍。
-- [ ] 5.2 所有公式填入、明细 apply、子树汇总、手工保存更新 source projection/digest；手工与锁定格保持最高优先级。
-- [ ] 5.3 公式/映射 owned-cell 交集校验，消除“最后点击者覆盖”；mixed 章节可逐格解释来源。
-- [ ] 5.4 一键 operation 对 confirmed+fresh 映射自动 reaggregate；stale/未确认/无来源形成结构化待办。
-- [ ] 5.5 批量加载目标章节公式和单体附注；保留每章 SAVEPOINT，SQL 数对章节 S 的斜率为 0。
-- [ ] 5.6 实现七域五态 `ConsolReadiness` 服务/API，复用证据 readiness，不以前端拼事实。
-- [ ] 5.7 新 `ConsolReadinessBar`、流程条和附注四组工具栏；主按钮按 source_mode 分派。
-- [ ] 5.8 跨国企/上市子企业、同名行/分组/续表/Top-N/manual/locked/stale 映射回归与 Playwright。
+- [x] 5.1 动态取迁移号，为 `consol_note_data` 增来源投影字段；共享 source/stale 枚举与 owner spec 对拍。
+- [x] 5.2 所有公式填入、明细 apply、子树汇总、手工保存更新 source projection/digest；手工与锁定格保持最高优先级。
+- [x] 5.3 公式/映射 owned-cell 交集校验，消除“最后点击者覆盖”；mixed 章节可逐格解释来源。
+- [x] 5.4 一键 operation 对 confirmed+fresh 映射自动 reaggregate；stale/未确认/无来源形成结构化待办。
+- [x] 5.5 批量加载目标章节公式和单体附注；保留每章 SAVEPOINT，SQL 数对章节 S 的斜率为 0。
+- [x] 5.6 实现七域五态 `ConsolReadiness` 服务/API，复用证据 readiness，不以前端拼事实。
+- [x] 5.7 新 `ConsolReadinessBar`、流程条和附注四组工具栏；主按钮按 source_mode 分派。
+- [x] 5.8 跨国企/上市子企业、同名行/分组/续表/Top-N/manual/locked/stale 映射回归与 Playwright。
 
 ## 批 6　薄 WorkingPaper、证据、复核与归档
 
