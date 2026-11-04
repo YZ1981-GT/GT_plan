@@ -224,7 +224,12 @@ async def test_each_report_path_writes_one_queryable_run_and_row_provenance(path
         assert len(runs) == 1
         run = runs[0]
         assert run.trigger == path
-        assert run.status == "partial"  # 夹具含除零 / 引用未就绪失败行
+        # 夹具含除零 / 引用未就绪失败行：共享运行表（V246 词表）写 succeeded + failed_rows，对外显示 partial
+        from app.services.report_provenance import run_display_status
+        assert (run.status, run.failed_rows > 0, run_display_status(run)) == ("succeeded", True, "partial")
+        assert run.operation_id is None, "单体报表运行不挂合并 operation"
+        from app.services.report_freshness import CALC_VERSION
+        assert run.calc_version == CALC_VERSION, "共享运行表（V246）calc_version 列是整数，写 'report:N' 在 PG 上 DataError"
         rows = list((await world.session.execute(
             sa.select(FinancialReport).where(
                 FinancialReport.project_id == world.project_id,

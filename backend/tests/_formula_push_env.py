@@ -160,6 +160,12 @@ async def make_env(monkeypatch, extra_tables=()):
     # （spec formula-governance-coverage-closure R2.4）
     tables = [Project.__table__, DisclosureNote.__table__, FormulaPushRun.__table__, FormulaPushState.__table__,
               FormulaSetting.__table__, FormulaSyncItem.__table__, *extra_tables]
+    # V235 起读调整数（adj_net_batch → effective_excluded_group_ids）按财务处理事件与客户已入账标记筛分录组：
+    # 有调整分录表就要有这两张表，否则 binding 报缺表、整张底稿回滚、运行记 partial
+    from app.models.adjustment_review_models import AdjustmentClientBooking, AdjustmentTreatmentEvent
+
+    if any(getattr(t, "name", None) == "adjustments" for t in tables):
+        tables += [m.__table__ for m in (AdjustmentTreatmentEvent, AdjustmentClientBooking) if m.__table__ not in tables]
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
         await conn.execute(sa.text(

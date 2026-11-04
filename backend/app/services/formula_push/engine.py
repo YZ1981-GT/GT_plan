@@ -36,7 +36,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
 from app.services.formula_warnings import collect as collect_formula_warnings, messages as formula_warning_messages
-from app.services.formula_push import note_writer
+from app.services.formula_push import note_total_push, note_writer
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
 from app.services.formula_push.persistence import (
     execute_and_commit as _execute_and_commit,
@@ -75,12 +75,9 @@ FROZEN_WP_STATUSES: Mapping[str, str] = {
     "review_level1_passed": "一级复核通过", "review_level2_passed": "二级复核通过",
 }
 FROZEN_NOTE_STATUSES: frozenset[str] = frozenset({"confirmed"})
-PERIOD_LABELS: Mapping[str, str] = {"end": "期末", "prior": "期初"}
-#: 分「账面余额 / 减值准备 / 账面价值」三列写的字段：旧格式表（按列序存数）只认得出期末 / 期初金额列，这几列不按位置猜
-SPLIT_FIELD_LABELS: Mapping[str, str] = {
-    "end_gross": "期末账面余额", "end_impairment": "期末减值准备", "end_net": "期末账面价值",
-    "prior_gross": "期初账面余额", "prior_impairment": "期初减值准备", "prior_net": "期初账面价值",
-}
+#: 期间 / 分列字段的中文名与附注写入都在 note_total_push（engine 超行数门，ADR-9 抽出）；这里重新导出兼容既有引用
+PERIOD_LABELS: Mapping[str, str] = note_total_push.PERIOD_LABELS
+SPLIT_FIELD_LABELS: Mapping[str, str] = note_total_push.SPLIT_FIELD_LABELS
 
 
 @dataclass
@@ -188,21 +185,52 @@ def frozen_reason(status: Any) -> str | None:
     return f"底稿已{label}，公式推送不改写（重新打开编辑后下次推送纳入）" if label else None
 
 
-async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
-    """裸 SQL 按编码找底稿；一个项目一个编码至多一张（多于一张直接报错）。"""
+async def _find_workpapers_for_codes(
+    db,
+    project_id: UUID,
+    wp_codes: Iterable[str],
+) -> dict[str, list[_Paper]]:
+    """一次查询定位全部目标编码；每个项目/编码仍强制至多一张底稿。"""
+    codes = list(dict.fromkeys(str(code) for code in wp_codes if str(code)))
+    if not codes:
+        return {}
+    stmt = sa.text(
+        "SELECT wp.id, wp.status, wi.wp_code FROM working_paper wp "
+        "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+        "WHERE wp.project_id = :pid AND wi.project_id = :pid "
+        "AND wi.wp_code IN :codes "
+        "AND wp.is_deleted = false AND wi.is_deleted = false "
+        "ORDER BY wi.wp_code, wp.id"
+    ).bindparams(sa.bindparam("codes", expanding=True))
     rows = (await db.execute(
-        sa.text(
-            "SELECT wp.id, wp.status FROM working_paper wp "
-            "JOIN wp_index wi ON wi.id = wp.wp_index_id "
-            "WHERE wp.project_id = :pid AND wi.project_id = :pid AND wi.wp_code = :code "
-            "AND wp.is_deleted = false AND wi.is_deleted = false "
-            "ORDER BY wp.id"
-        ),
-        {"pid": str(project_id), "code": wp_code},
+        stmt,
+        {"pid": str(project_id), "codes": codes},
     )).all()
-    if len(rows) > 1:
-        raise RuntimeError(f"项目 {project_id} 有 {len(rows)} 张 {wp_code} 底稿，违反唯一约束，公式推送中止")
-    return [_Paper(id=UUID(str(r[0])), status=_enum_value(r[1]), paper_code=wp_code) for r in rows]
+    grouped: dict[str, list[_Paper]] = {code: [] for code in codes}
+    for row in rows:
+        code = str(row[2])
+        grouped.setdefault(code, []).append(
+            _Paper(
+                id=UUID(str(row[0])),
+                status=_enum_value(row[1]),
+                paper_code=code,
+            )
+        )
+    for code, papers in grouped.items():
+        if len(papers) > 1:
+            raise RuntimeError(
+                f"项目 {project_id} 有 {len(papers)} 张 {code} 底稿，"
+                "违反唯一约束，公式推送中止"
+            )
+    return grouped
+
+
+async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
+    """兼容单编码调用；运行计划使用批量定位。"""
+    return (await _find_workpapers_for_codes(db, project_id, [wp_code])).get(
+        wp_code,
+        [],
+    )
 
 
 async def _read_entries(
@@ -332,7 +360,8 @@ async def _execute(
         if codes is None or code_of.get(rid) in codes:
             result.add_warning(msg)
     pick = MANUAL if trigger == FORMULA_CONFIG_CHANGED else trigger
-    plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper], list[str]]] = []
+    candidates: list[tuple[str, Any, tuple[PushRule, ...], tuple[str, ...]]] = []
+    all_paper_codes: list[str] = []
     for code in supported_wp_codes():
         if codes is not None and code not in codes:
             continue
@@ -341,14 +370,18 @@ async def _execute(
             continue
         binding = get_binding(code)
         paper_codes = tuple(getattr(binding, "paper_codes", None) or (code,))
-        papers: list[_Paper] = []
-        missing: list[str] = []
-        for pc in paper_codes:
-            found = await _find_workpapers(db, project_id, pc)
-            if found:
-                papers.extend(found)
-            else:
-                missing.append(pc)
+        candidates.append((code, binding, code_rules, paper_codes))
+        all_paper_codes.extend(paper_codes)
+
+    located = await _find_workpapers_for_codes(
+        db,
+        project_id,
+        all_paper_codes,
+    )
+    plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper], list[str]]] = []
+    for code, binding, code_rules, paper_codes in candidates:
+        papers = [paper for pc in paper_codes for paper in located.get(pc, [])]
+        missing = [pc for pc in paper_codes if not located.get(pc)]
         if wp_id is not None:
             # 事件指向具体底稿：只推命中的那一张（分册也算命中），其余册本次不动
             papers = [p for p in papers if p.id == wp_id]
@@ -589,22 +622,24 @@ async def _write_entries(
     if not changed:
         return None
     adapter = WorkpaperMutationAdapter(ctx.db)
+    mutations: list[FormulaMutation] = []
+    for item_id in changed:
+        before, version = snapshot.get(item_id, (None, _version_from_timestamp(None)))
+        target = CanonicalFormulaTarget(
+            domain="workpaper", project_id=ctx.project_id, year=ctx.year,
+            addr_id=f"{paper_code}/*/{item_id}",
+            locator={
+                "wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL,
+                "storage_field": storage_field,
+            },
+            wp_id=wp_id,
+        )
+        mutations.append(FormulaMutation(
+            target=target, before_value=before, after_value=overlay[item_id], expected_version=version,
+        ))
     savepoint = await ctx.db.begin_nested()
     try:
-        for item_id in changed:
-            before, version = snapshot.get(item_id, (None, _version_from_timestamp(None)))
-            target = CanonicalFormulaTarget(
-                domain="workpaper", project_id=ctx.project_id, year=ctx.year,
-                addr_id=f"{paper_code}/*/{item_id}",
-                locator={
-                    "wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL,
-                    "storage_field": storage_field,
-                },
-                wp_id=wp_id,
-            )
-            await adapter.apply_many([FormulaMutation(
-                target=target, before_value=before, after_value=overlay[item_id], expected_version=version,
-            )])
+        await adapter.apply_many(mutations)
     except VersionConflict as exc:
         await savepoint.rollback()
         return str(exc.target.locator.get("item"))
@@ -727,7 +762,7 @@ async def _push_note(
     data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
     # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
     targets = [
-        _find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
+        note_total_push.find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
         else note_writer.find_row(table.rows, [r["note_label"], r["label"]])
         for r in data_rows
     ]
@@ -777,16 +812,10 @@ async def _push_note(
     fallback_ambiguity: str | None = None
     unresolved_fields: dict[str, str] = {}
     if not any_data_row_matched:
-        candidates = note_writer.total_row_candidates(table.rows)
-        total_idx = candidates[0] if len(candidates) == 1 else None
-        if len(candidates) > 1:
-            # 多个汇总行：分段合计（「一、账面原值合计 / … / 五、账面价值合计」）或「小计 / 减：减值准备 / 合计」。
-            # 取数只有科目余额，是哪一段由科目决定（主科目余额是原值 / 小计，长期借款审定数是重分类后的合计），
-            # 引擎不知道 ⇒ 不兜底、也不按上方各行重算（上方明细一个都没取到）。2026-10-31 真库：按「最终合计」兜底
-            # 把长期股权投资 / 投资性房地产 / 使用权资产的原值写进了账面价值合计（和平 八、26 账面价值
-            # 176,203,072.87，应为 66,389,073.02）。spec disclosure-note-template-word-realignment Task 34/35。
-            labels = "、".join(note_writer.row_label(table.rows[i]) or "（无名）" for i in candidates)
-            fallback_ambiguity = f"表里有 {len(candidates)} 个合计行（{labels}），不知道科目余额该写哪一行，不兜底"
+        # 多汇总行的取舍见 note_total_push.pick_fallback_total（有「减：…准备」行时科目余额写它之前的账面余额合计；
+        # 分段合计表仍不兜底）。spec note-table-structure-formula-pull-closure R12 / ADR-8。
+        total_idx, fallback_ambiguity = note_total_push.pick_fallback_total(table.rows)
+        if fallback_ambiguity:
             skip_total_recalc = True
         if total_idx is not None:
             # 单科目：用唯一数据行（is_total=False）的值
@@ -885,73 +914,19 @@ def _expected_section_title(rule: PushRule, template_type: str | None, table_nam
     return note_writer.template_section_title(template_type, section) or rule.target.table
 
 
-def _find_total_by_label(rows: Any, label: str) -> int | None:
-    """分段合计表：按行名精确、唯一地对上合计行（不做包含匹配）。"""
-    hits = [
-        index for index, row in enumerate(rows)
-        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
-        and note_writer.row_label(row) == label
-    ]
-    return hits[0] if len(hits) == 1 else None
-
-
 def _push_note_cell(
     ctx: _Ctx, *, rule: PushRule, section: str, addr: str, table: note_writer.NoteTable,
     row: dict, field_name: str, value: float, paper: _Paper,
 ) -> bool:
-    ok, current, cell_mode = note_writer.read_cell(row, field_name, table.value_keys)
-    if not ok:
-        period = note_writer.NOTE_FIELDS[field_name][1]
-        detail = f"：{table.column_note}" if table.column_note else ""
-        reason = f"附注表缺少「{PERIOD_LABELS[period]}」列{detail}"
-        if field_name in SPLIT_FIELD_LABELS and isinstance(row.get("values"), list):
-            reason = (f"附注表是旧格式（按列序存数），表头只认得出期末 / 期初金额列，找不到唯一的"
-                      f"「{SPLIT_FIELD_LABELS[field_name]}」列，不按位置猜，附注保持原值")
-        ctx.skip(rule.rule_id, "note", "note", addr, reason)
-        return False
-    mode = note_writer.external_mode(table.section_locked, cell_mode)
-    decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
-    if decision.writes:
-        note_writer.write_cell(row, field_name, value, table.value_keys)
-    _record_note(ctx, rule, section, addr, decision, value, current, paper, _note_keep_reason(mode, decision))
-    return decision.writes
-
-
-def _note_keep_reason(mode: str | None, decision: Decision) -> str | None:
-    if not decision.kept:
-        return None
-    return "附注中该单元格被标记为锁定（或整节人工覆盖），保留原值" if mode == "locked" else \
-        "附注中该单元格被标记为人工填写，保留原值"
+    return note_total_push.push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table, row=row,
+                                          field_name=field_name, value=value, paper=paper, record=_record_note)
 
 
 def _push_note_total(
     ctx: _Ctx, *, rule: PushRule, section: str, table_name: str, table: note_writer.NoteTable, paper: _Paper,
 ) -> bool:
-    """合计 = 合计行之前各行之和（人工行一并计入）；上方各行这一列都没有数则不重算（不写 0）。"""
-    index = note_writer.find_total_row(table.rows)
-    if index is None:
-        return False
-    total_row = table.rows[index]
-    label = note_writer.row_label(total_row) or "合计"
-    wrote = False
-    for field_name in rule.target.fields:
-        _, period = note_writer.NOTE_FIELDS[field_name]
-        ok, current, cell_mode = note_writer.read_cell(total_row, field_name, table.value_keys)
-        if not ok:
-            continue
-        value = note_writer.total_formula(table.rows, index, field_name, table.value_keys)
-        addr = note_addr_id(section, table_name, label, period)
-        if value is None:
-            ctx.skip(rule.rule_id, "note", "note", addr,
-                     f"合计行「{label}」上方各行这一列都没有数，合计不按 0 重算，附注保持原值")
-            continue
-        mode = note_writer.external_mode(table.section_locked, cell_mode)
-        decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
-        if decision.writes:
-            note_writer.write_cell(total_row, field_name, value, table.value_keys)
-            wrote = True
-        _record_note(ctx, rule, section, addr, decision, value, current, paper, _note_keep_reason(mode, decision))
-    return wrote
+    return note_total_push.push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table,
+                                           paper=paper, record=_record_note, note_addr_id=note_addr_id)
 
 
 def _record_note(
@@ -987,11 +962,17 @@ async def run_and_commit(
     codes: Iterable[str] | None = None,
     dry_run: bool = False,
     force_addr_ids: Iterable[str] = (),
+    skip_note_followup: bool = False,
 ) -> RunResult:
-    """执行并提交；dry_run 只回滚不提交。"""
+    """执行并提交；dry_run 只回滚不提交。
+
+    提交后对写入的附注章节执行一次附注公式（R20，在 ``persistence.execute_and_commit`` 里，调用方不要再调）；
+    ``skip_note_followup=True`` 跳过这一步 —— 只给附注刷新链路用：它在回填之后自己最后执行公式。
+    """
     return await _execute_and_commit(
         run, PushActionError, db, project_id=project_id, year=year, trigger=trigger,
         triggered_by=triggered_by, wp_id=wp_id, codes=codes,
         dry_run=dry_run, force_addr_ids=force_addr_ids,
+        _skip_note_followup=skip_note_followup,
     )
 

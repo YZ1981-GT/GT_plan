@@ -12,7 +12,24 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from app.models.report_models import ReportGenerationRun
+from app.models.report_generation_models import ReportGenerationRun
+
+#: 单体报表运行与合并运行共用 ``report_generation_run``（V246 建表：status building / succeeded / failed / stale，
+#: calc_version 为整数；V251 的同名建表因 IF NOT EXISTS 不生效）。单体运行开始写 building、结束写 succeeded，
+#: 有失败行时 failed_rows > 0，对外显示为 partial（:func:`run_display_status`）。合并侧读取方都按 operation_id
+#: 关联，单体运行（operation_id 为空）不会被当成合并运行。
+RUN_BUILDING = "building"
+RUN_SUCCEEDED = "succeeded"
+
+
+def run_display_status(run: Any) -> str:
+    """运行状态的对外口径：running / succeeded / partial / failed / stale。"""
+    status = str(getattr(run, "status", "") or "")
+    if status == RUN_BUILDING:
+        return "running"
+    if status == RUN_SUCCEEDED and int(getattr(run, "failed_rows", 0) or 0) > 0:
+        return "partial"
+    return status
 
 
 @dataclass(frozen=True)
@@ -62,12 +79,14 @@ async def generation_context(
     triggered_by: UUID | None, calc_version: str,
 ) -> AsyncIterator[ReportGenerationContext]:
     """创建与本事务同生共死的 run，并在当前协程暴露其 fence。"""
+    from app.services.report_freshness import CALC_VERSION
+
     async with _lock(project_id, year):
         await _advisory_lock(db, project_id, year)
         now = datetime.now(timezone.utc)
         run = ReportGenerationRun(
             project_id=project_id, year=year, trigger=trigger, triggered_by=triggered_by,
-            started_at=now, status="running", calc_version=calc_version,
+            started_at=now, status=RUN_BUILDING, calc_version=CALC_VERSION,  # 共享表列是整数；信封里的 calc_version 仍是 'report:N'
         )
         db.add(run)
         await db.flush()
@@ -88,8 +107,8 @@ async def finish_generation(db: Any, ctx: ReportGenerationContext, summary: Any)
     run.recomputed_rows = len(getattr(summary, "recomputed_rows", ()))
     run.failed_rows = len(getattr(summary, "failed_rows", ()))
     errors = [str(row.get("error") or "") for row in getattr(summary, "failed_rows", ())]
-    run.error_summary = "；".join(error for error in errors if error)[:4000] or None
-    run.status = "partial" if run.failed_rows else "succeeded"
+    run.error = "；".join(error for error in errors if error)[:4000] or None
+    run.status = RUN_SUCCEEDED  # 有失败行时 run_display_status 显示 partial
     run.finished_at = datetime.now(timezone.utc)
     await db.flush()
 

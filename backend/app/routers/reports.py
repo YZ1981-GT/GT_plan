@@ -26,6 +26,7 @@ from app.deps import assert_project_permission, require_project_access, require_
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType, ReportGenerationRun
+from app.services.report_provenance import run_display_status
 from app.models.report_schemas import (
     ReportGenerateRequest,
     ReportProvenanceResponse,
@@ -249,11 +250,11 @@ async def get_report_row_provenance(
                 "triggered_by": str(run.triggered_by) if run.triggered_by else None,
                 "started_at": run.started_at.isoformat() if run.started_at else None,
                 "finished_at": run.finished_at.isoformat() if run.finished_at else None,
-                "status": run.status,
+                "status": run_display_status(run),
                 "changed_rows": run.changed_rows,
                 "recomputed_rows": run.recomputed_rows,
                 "failed_rows": run.failed_rows,
-                "error_summary": run.error_summary,
+                "error_summary": run.error,
                 "calc_version": run.calc_version,
             }
             if run.triggered_by:

@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Literal, Sequence
 
 from app.core import startup_deferred as _deferred
+from app.core import startup_migrations as _migrations
 
 Criticality = Literal["critical", "best_effort"]
 TaskStatus = Literal["ok", "skipped", "failed", "deferred"]
@@ -281,38 +282,9 @@ def _task_setup_logging(ctx: StartupContext) -> None:
     setup_logging(level=ctx.log_level, json_format=False)
 
 
-async def _task_run_migrations(_ctx: StartupContext) -> None:
-    """Database versioned migrations (best-effort; failures recorded in DB/health)."""
-    from app.core.config import settings
-    from app.core.migration_runner import MigrationRunner
-
-    log = logging.getLogger("audit_platform")
-    try:
-        runner = MigrationRunner(database_url=settings.DATABASE_URL)
-        result = await runner.run_pending()
-        if result.executed:
-            log.info("[启动] 数据库迁移完成，执行了版本: %s", result.executed)
-        if result.failed:
-            for f in result.failed:
-                log.error(
-                    "[启动] 迁移 %s 失败 (%s): %s",
-                    f.filename, f.error_type, f.error_message[:200],
-                )
-            log.error(
-                "[启动] 共 %d 个迁移失败，已写入 schema_migration_failures 表 / health=degraded",
-                len(result.failed),
-            )
-        await runner.close()
-    except Exception as mig_err:
-        log.warning(
-            "[启动] 数据库迁移调度失败（应用仍继续启动）: %s", mig_err
-        )
-
-
-def _task_migration_mark_complete(_ctx: StartupContext) -> None:
-    from app.core.runtime_state import migration_state
-
-    migration_state.mark_complete()
+# 迁移两步（执行 + 只读完整性核验）的实现在 app/core/startup_migrations.py（2026-11-04 抽出，原名保留）
+_task_run_migrations = _migrations.run_migrations
+_task_migration_mark_complete = _migrations.migration_mark_complete
 
 
 async def _task_acnr_redis_inject(_ctx: StartupContext) -> None:
@@ -342,6 +314,7 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
     from app.services.gate_rules_cross_check import register_cross_check_rules
     from app.services.gate_rules_chain import register_consistency_gate_rule
     import app.services.gate_rules_round6  # noqa: F401
+    import app.services.gate_rules_evidence  # noqa: F401
     import app.services.gate_rules_b60  # noqa: F401
     import app.services.gate_rules_ai_content  # noqa: F401
     import app.services.gate_rules_cross_module_conflict  # noqa: F401
@@ -751,6 +724,7 @@ def _start_import_job_runner(ctx: StartupContext) -> None:
 #: 或用 ``@with_leader_lock``（``app.workers._leader_lock``）。
 _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("sla_worker", "app.workers.sla_worker"),
+    ("event_loop_lag_worker", "app.workers.event_loop_lag_worker"),
     ("import_recover_worker", "app.workers.import_recover_worker"),
     ("outbox_replay_worker", "app.workers.outbox_replay_worker"),
     ("audit_log_writer_worker", "app.workers.audit_log_writer_worker"),
@@ -767,16 +741,21 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("invalidation_dispatcher_worker", "app.workers.invalidation_dispatcher_worker"),
     # 知识库扫描件后台 OCR（dsh-kb-ocr-local-first-routing；受 KNOWLEDGE_OCR_WORKER_ENABLED 控制）。
     ("knowledge_ocr_worker", "app.workers.knowledge_ocr_worker"),
+    # 耐久 AI 批任务（附注预填 / 底稿复核）：DB 租约围栏、重启自动接管。
+    ("ai_task_worker", "app.workers.ai_task_worker"),
+    # 平台通用重任务：DB claim/lease/attempt fence，首个迁移对象为 bulk-tab import。
+    ("platform_job_worker", "app.workers.platform_job_worker"),
     # OO→HTML apply 中断后的重驱（writeback-followup-issue-closure R3.2；选主，一轮一条）。
     ("oo_apply_redrive_worker", "app.workers.oo_apply_redrive_worker"),
     # V240：持久合并 operation，数据库 claim + lease 使重启后可恢复。
     ("consol_operation_worker", "app.workers.consol_operation_worker"),
 )
 
-# Stable worker names (13 always-on + 1 conditional ImportJobRunner) — pinned contract,
+# Stable worker names (15 always-on + 1 conditional ImportJobRunner) — pinned contract,
 # tests assert it equals the worker phase of ``STARTUP_TASKS`` in order.
 WORKER_TASK_NAMES: tuple[str, ...] = (
     "sla_worker",
+    "event_loop_lag_worker",
     "import_recover_worker",
     "outbox_replay_worker",
     "audit_log_writer_worker",
@@ -788,6 +767,8 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "procedure_dispatcher_worker",
     "invalidation_dispatcher_worker",
     "knowledge_ocr_worker",
+    "ai_task_worker",
+    "platform_job_worker",
     "oo_apply_redrive_worker",
     "consol_operation_worker",
     "ImportJobRunner.run_forever",

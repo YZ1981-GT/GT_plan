@@ -55,53 +55,25 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E4
 from app.core.database import get_db  # noqa: E402
 from app.core.redis import get_redis  # noqa: E402
 from app.models.base import Base  # noqa: E402
-import app.models.core  # noqa: E402, F401
-import app.models.audit_platform_models  # noqa: E402, F401
-import app.models.dataset_models  # noqa: E402, F401
-import app.models.report_models  # noqa: E402, F401
-import app.models.workpaper_models  # noqa: E402, F401
-import app.models.consolidation_models  # noqa: E402, F401
-import app.models.staff_models  # noqa: E402, F401  — Phase 9: must be before collaboration_models
-import app.models.collaboration_models  # noqa: E402, F401
-import app.models.ai_models  # noqa: E402, F401
-import app.models.extension_models  # noqa: E402, F401
-import app.models.gt_coding_models  # noqa: E402, F401
-import app.models.t_account_models  # noqa: E402, F401
-import app.models.attachment_models  # noqa: E402, F401
-# 证据治理模型（含 ServiceIdentity）——必须在 attachment_models 之后注册，
-# 因 attachments.actor_service_identity_id FK → service_identities，否则
-# create_all 解析 FK 失败（NoReferencedTableError），阻断全套 DB 集成测试。
-import app.models.evidence_governance_models  # noqa: E402, F401
-import app.models.phase13_models  # noqa: E402, F401  — Phase 13: Word导出
-import app.models.phase10_models  # noqa: E402, F401  — Phase 10: 批注/报告溯源（R1 QC 依赖）
-import app.models.phase12_models  # noqa: E402, F401  — Phase 12: AI generation 等
-import app.models.phase14_enums  # noqa: E402, F401  — Phase 14: Gate 引擎枚举
-import app.models.phase14_models  # noqa: E402, F401  — Phase 14: Gate 引擎模型
-import app.models.phase15_enums  # noqa: E402, F401  — Phase 15: 任务树枚举
-import app.models.phase15_models  # noqa: E402, F401  — Phase 15: 任务树模型
-import app.models.phase16_enums  # noqa: E402, F401  — Phase 16: 证据包枚举
-import app.models.phase16_models  # noqa: E402, F401  — Phase 16: 证据包模型
-import app.models.archive_models  # noqa: E402, F401  — R1 归档作业
-import app.models.knowledge_models  # noqa: E402, F401
-import app.models.note_trim_models  # noqa: E402, F401
-import app.models.procedure_models  # noqa: E402, F401
-import app.models.shared_config_models  # noqa: E402, F401
-import app.models.template_library_models  # noqa: E402, F401
-import app.models.eqcr_models  # noqa: E402, F401  — Round 5
-import app.models.related_party_models  # noqa: E402, F401  — Round 5
-import app.models.independence_models  # noqa: E402, F401  — Round 5
-import app.models.audit_log_models  # noqa: E402, F401
-import app.models.handover_models  # noqa: E402, F401
-import app.models.rotation_models  # noqa: E402, F401
-import app.models.qc_rating_models  # noqa: E402, F401
-import app.models.qc_case_library_models  # noqa: E402, F401
-import app.models.qc_inspection_models  # noqa: E402, F401
-import app.models.qc_rule_models  # noqa: E402, F401  — Round 6
-import app.models.wp_optimization_models  # noqa: E402, F401  — 底稿深度优化
-import app.models.custom_query_models  # noqa: E402, F401  — template-library-coordination Sprint 6
-import app.models.v3_refinement_models  # noqa: E402, F401  — V3 收官增强：ai_content_log / cross_module_conflicts / time_machine_snapshots
-import app.models.share_change_event_models  # noqa: E402, F401  — 动态股比变动事件
-import app.models.consol_note_mapping_models  # noqa: E402, F401  — V186 合并附注明细模板与映射
+
+# ─── 模型注册：自动导入 app.models 全部子模块 ────────────────────────────────────
+# 🔴 原先是 44 行显式 import 清单，漏一个模块就让 `Base.metadata.create_all` 在解析跨模块外键时
+#    抛 NoReferencedTableError，而报错指向的是**引用方**的表，根因（被引用模块没注册）不在信息里。
+#    实测代价：清单漏 `asset_blob_models` ⇒ `attachment_versions.blob_id → asset_blobs.id` 解析失败
+#    ⇒ 合并附注子树汇总等 22 个用例全部 ERROR。清单里第 71 行原本就留着同类事故的注释
+#    （evidence_governance_models 漏序曾阻断全套 DB 集成测试）—— 同一个坑踩了两次。
+#    现算对比：显式清单 44 模块 / 332 表（无 asset_blobs）；本写法 111 模块 / 365 表，是严格超集。
+#
+# 故意不加 try/except：某个模型模块 import 失败时必须当场炸，静默跳过就是重现「漏注册」本身。
+# 仓库已有同写法先例（test_model_server_default_portability.py 等）。
+# spec: note-disclosure-pull-regression-and-headless-backend 任务 1（R2.4）
+import importlib  # noqa: E402
+import pkgutil  # noqa: E402
+
+import app.models as _models_pkg  # noqa: E402
+
+for _model_module in pkgutil.walk_packages(_models_pkg.__path__, prefix="app.models."):
+    importlib.import_module(_model_module.name)
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 if hasattr(SQLiteTypeCompiler, "visit_uuid"):

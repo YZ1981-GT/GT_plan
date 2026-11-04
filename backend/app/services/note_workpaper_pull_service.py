@@ -96,7 +96,7 @@ async def _push(db: AsyncSession, project_id: UUID, year: int, codes: list[str],
     try:
         result = await engine.run_and_commit(
             db, project_id=project_id, year=year, trigger=engine.MANUAL, triggered_by=user_id, codes=codes,
-            _skip_note_followup=True,  # 刷新链路自己最后执行公式，不需要中间 follow-up（R20）
+            skip_note_followup=True,  # 刷新链路自己最后执行公式，不需要中间 follow-up（R20）
         )
     except engine.PushActionError as exc:
         return None, str(exc)

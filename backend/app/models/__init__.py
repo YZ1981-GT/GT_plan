@@ -95,6 +95,7 @@ from app.models.workpaper_lifecycle_models import WorkpaperLifecycleEvent
 from app.models.project_wp_sheet_override import ProjectWorkpaperSheetOverride
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
+from app.models.ai_task_job_models import AiTaskItem, AiTaskJob
 from app.models.archive_models import ArchiveJob
 from app.models.eqcr_models import (
     EqcrDisagreementResolution,
@@ -222,6 +223,8 @@ from app.models.workpaper_sync_models import (  # noqa: F401
     WorkpaperSyncScopeIndex,
     WorkpaperSyncTestRun,
 )
+# V241：跨领域不可变字节与显式桥接记录
+from app.models.asset_blob_models import AssetBlob, AiChatRunResource, KnowledgeEvidencePromotion  # noqa: F401
 # V250（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
 from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
 
@@ -298,10 +301,15 @@ __all__ = [
     # --- attachment models ---
     "Attachment",
     "AttachmentWorkingPaper",
+    "AssetBlob",
+    "AiChatRunResource",
+    "KnowledgeEvidencePromotion",
     # --- ai enums/models ---
     "AIModelType",
     "AIProvider",
     "AIModelConfig",
+    "AiTaskJob",
+    "AiTaskItem",
     # --- workpaper enums ---
     "WpTemplateStatus",
     "RegionType",

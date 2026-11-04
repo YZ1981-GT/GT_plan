@@ -23,9 +23,11 @@ from app.models.formula_setting_models import (  # noqa: E402
     FormulaTemplateVersion,
 )
 from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig  # noqa: E402
+from app.models.report_generation_models import ReportGenerationRun  # noqa: E402
 
-MODELS = [User, Project, ProjectUser, ReportConfig, FinancialReport, FormulaSetting, FormulaSyncItem, FormulaPublish,
-          FormulaTemplate, FormulaTemplateVersion, FormulaTemplateSubscription, AuditLogEntry,
+# 报表重算（propagate_report → ReportEngine）每次都写一条运行记录（S5），测试库要有 report_generation_run
+MODELS = [User, Project, ProjectUser, ReportConfig, ReportGenerationRun, FinancialReport, FormulaSetting, FormulaSyncItem,
+          FormulaPublish, FormulaTemplate, FormulaTemplateVersion, FormulaTemplateSubscription, AuditLogEntry,
           AuditChainHead]
 STD = "soe_standalone"
 BS = FinancialReportType.balance_sheet

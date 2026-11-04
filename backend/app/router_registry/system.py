@@ -138,13 +138,9 @@ def register_system_routers(app: FastAPI) -> None:
               cndt_router]:
         app.include_router(r, tags=["合并报表"])
 
-    # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══
-    # 🔴 custom_query.py 只 re-export 了 writeback_preview / writeback_confirm 两个**函数**
-    #    （给契约测试直调与 monkeypatch 用），并未 include 伴生模块自己的 APIRouter。
-    #    结果 POST /api/custom-query/writeback-preview|writeback-confirm 从未挂上路由树，
-    #    `WritebackPreviewService`（30KB）+ `WritebackConfirmationGate` 对用户仍是 404 —— 
-    #    与该模块 docstring 自称的「本模块是其唯一生产入口」相矛盾。此处补注册。
-    #    tags 保留 router 自身声明的 ["custom-query"]（不套用「合并报表」）。
+    # ═══ §7.1 高级查询：退役写入口的 410 兼容桩 ═══
+    # 路由保留只为让旧客户端得到稳定、可诊断的 410；桩无数据库、认证或请求体依赖，
+    # 不会触达 SnapshotWriter、审计或 outbox。实际编辑统一进入来源业务页面。
     from app.routers.custom_query_writeback import router as cqw_router
     app.include_router(cqw_router)
 

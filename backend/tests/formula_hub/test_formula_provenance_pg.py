@@ -107,7 +107,10 @@ async def test_report_full_run_persists_success_and_failed_attempts_pg(pg_tx):
     runs = list((await pg_tx.execute(sa.select(ReportGenerationRun).where(
         ReportGenerationRun.project_id == project.id,
     ))).scalars())
-    assert len(runs) == 1 and runs[0].status == "partial"
+    from app.services.report_freshness import CALC_VERSION
+    from app.services.report_provenance import run_display_status
+    assert len(runs) == 1 and (runs[0].status, run_display_status(runs[0])) == ("succeeded", "partial")
+    assert runs[0].failed_rows == 1 and runs[0].calc_version == CALC_VERSION
     rows = {row.row_code: row for row in (await pg_tx.execute(sa.select(FinancialReport).where(
         FinancialReport.project_id == project.id,
     ))).scalars()}

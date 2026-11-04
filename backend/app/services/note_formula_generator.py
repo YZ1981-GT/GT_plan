@@ -47,6 +47,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote
+# REGION 同表动态区域聚合在伴生模块（2026-11-04 抽出），原名保留给既有引用
+from app.services.note_formula_region import exec_with_region, resolve_region_token  # noqa: F401
 from app.services.note_formula_provenance import (
     NoteProvenanceRecorder,
     as_decimal as _as_decimal,
@@ -545,14 +547,8 @@ async def _execute_note_formulas_body(
     resolve = (lambda token: _resolve_single_cross_ref(token, cross_data or {})) if need_cross else None
 
     tables = dict(iter_note_tables(view))
-    # R20.3 / ADR-15：存储表上推送拥有的格，预设公式不改写（用户公式照常覆盖）
-    from app.services.note_formula_push_guard import push_owned_cells
-
-    _push_owned: set[tuple[int, int, int]] = set()
-    try:
-        _push_owned = await push_owned_cells(db, project_id=project_id, year=year, section=note_section, td=td, view=view)
-    except Exception:  # noqa: BLE001 — 保护层读取失败不阻断执行
-        logger.warning("附注公式：推送拥有格加载失败 section=%s", note_section, exc_info=True)
+    # R20.3 / ADR-15：存储表上推送拥有的格，预设公式不改写（用户公式照常覆盖）；查询放保存点，失败不让事务中止
+    owned_cells = await _push_owned_cells(db, project_id, year, note_section, td, view)
     by_table: dict[int, dict[tuple[int, int], tuple[str, dict]]] = {}
     exec_results: list[dict] = []
     checks: list[dict[str, Any]] = []
@@ -589,6 +585,11 @@ async def _execute_note_formulas_body(
                 continue
             ftype = formula_def.get("type")
             category = str(formula_def.get("category") or "auto_calc")
+            if category == "auto_calc" and _required_blank(formula_def, rows):
+                # 比例 / 损失率：分子为空不算、不写 0（R2.1）
+                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": None, "new": None,
+                                     "status": "skipped", "reason": "本行金额为空，不算比例"})
+                continue
             expression = formula_def.get("expression", "")
             if ftype not in ("vertical_sum", "horizontal_balance", "book_value") and CROSS_REF_RE.search(str(expression)):
                 resolved_refs = await _resolve_cross_refs_via_acnr(expression, project_id, db)
@@ -621,23 +622,28 @@ async def _execute_note_formulas_body(
                 )
                 continue
 
-            if value is not None and (
-                cell_mode in {"manual", "locked"}
-                or (t, row_idx, col_idx) in _push_owned and key not in user_keys  # R20.3：推送拥有格不被预设公式改写
-                or (
-                    not is_projected_table(tables[t])
-                    and not explicit_mode
-                    and old_value not in (None, "")
-                    and not _matches_last_value(td, key, old_value, formula_def)
-                )
-            ):
+            push_owned = (t, row_idx, col_idx) in owned_cells
+            push_kept = push_owned and key not in user_keys  # R20.3：推送拥有格不被预设公式改写
+            # 「没有单元格模式、有值、不是本执行器上次写的 ⇒ 按人工值保留」只管来路不明的值。推送拥有格来路确定
+            # （推送写格不设单元格模式，不排除就会被这条当人工值挡住，用户公式也覆盖不了），归上一行管：
+            # 预设公式保留推送值、用户公式照常覆盖。
+            foreign_value = (
+                not push_owned
+                and not is_projected_table(tables[t])
+                and not explicit_mode
+                and old_value not in (None, "")
+                and not _matches_last_value(td, key, old_value, formula_def)
+            )
+            if value is not None and (cell_mode in {"manual", "locked"} or push_kept or foreign_value):
                 state = ("locked" if cell_mode == "locked"
-                         else "kept_push" if (t, row_idx, col_idx) in _push_owned and key not in user_keys
+                         else "kept_push" if push_kept
                          else "manual")
                 exec_results.append({
                     "cell": key, "table_index": t, "type": ftype, "old": old_value,
-                    "new": float(value), "status": "skipped_manual",
-                    "reason": "当前值不是本执行器上次写入值，按人工值保留",
+                    "new": float(value),
+                    "status": "kept_push" if state == "kept_push" else "skipped_manual",
+                    "reason": ("这一格由公式推送按试算表审定数写入，预设公式不改写" if state == "kept_push"
+                               else "当前值不是本执行器上次写入值，按人工值保留"),
                 })
                 provenance_changed |= provenance_recorder.record(
                     key=key, formula_def=formula_def, addr_id=cell_addr_id,
@@ -722,6 +728,28 @@ async def _execute_note_formulas_body(
                    "message": r["reason"]} for r in exec_results if r["status"] == "kept_workpaper"]
     return {"executed": executed, "updated": updated, "results": exec_results,
             "checks": checks, "anomalies": anomalies}
+
+
+def _required_blank(formula_def: dict, rows: list) -> bool:
+    """预设公式声明的必填格（``requires``：比例的分子）有一格为空。"""
+    from app.services.note_formula_tables import _cell
+
+    need = formula_def.get("requires")
+    return isinstance(need, list) and any(
+        isinstance(rc, (list, tuple)) and len(rc) == 2 and _cell(rows, int(rc[0]), int(rc[1])) is None for rc in need)
+
+
+async def _push_owned_cells(db: AsyncSession, project_id: UUID, year: int, section: str, td: Any,
+                            view: Any) -> set[tuple[int, int, int]]:
+    """存储表上推送拥有的格（``note_formula_push_guard``）；查询失败按没有处理（保存点隔离，不让事务中止）。"""
+    from app.services.note_formula_push_guard import push_owned_cells
+
+    try:
+        async with db.begin_nested():
+            return await push_owned_cells(db, project_id=project_id, year=year, section=section, td=td, view=view)
+    except Exception:  # noqa: BLE001 —— 守卫取不到不阻断公式执行
+        logger.warning("附注公式：推送拥有格查询失败 project=%s section=%s", project_id, section, exc_info=True)
+        return set()
 
 
 # ---------------------------------------------------------------------------
@@ -1204,199 +1232,6 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> Decimal
         return sum(values, Decimal("0")) if values else None
 
     return None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Sprint A.3.1：REGION('region_name','col_id', agg='sum') — 同表动态区域聚合
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-_REGION_AGG_FUNCS = {
-    "sum": lambda xs: sum(xs, Decimal("0")),
-    "count": lambda xs: Decimal(len(xs)),
-    "max": lambda xs: max(xs) if xs else None,
-    "min": lambda xs: min(xs) if xs else None,
-    "avg": lambda xs: (sum(xs, Decimal("0")) / Decimal(len(xs))) if xs else None,
-}
-
-
-def resolve_region_token(
-    token: str,
-    table_data: dict | None,
-) -> Decimal | None:
-    """解析 REGION('region_name','col_id', agg='sum'|'count'|'max'|'min'|'avg') token.
-
-    引用同表内的动态区域 ``_dynamic_regions[name=region_name]`` 在指定 col_id
-    的聚合值（仅 axis=row 区域 + row_type=dynamic_data 行参与聚合）。
-
-    Args:
-        token: 形如 "REGION('客户','col_amount_end', agg='sum')"
-        table_data: 含 _dynamic_regions / _columns_meta / rows 的 dict
-
-    Returns:
-        聚合值（Decimal），无匹配 region / col / 数据时返 None；
-        agg='count' 始终返非负 Decimal（无数据返 Decimal("0")）。
-
-    支持 agg：sum / count / max / min / avg；默认 sum。
-
-    无效输入（None / 非字符串 / 解析失败 / 缺 region / 缺 col_id）→ 返 None。
-    """
-    import re
-
-    if not token or not isinstance(token, str):
-        return None
-    if not isinstance(table_data, dict):
-        return None
-
-    s = token.strip()
-    # REGION('name','col', agg='sum')   或   REGION('name','col')
-    m = re.fullmatch(
-        r"\s*REGION\("
-        r"\s*'([^']+)'\s*,"
-        r"\s*'([^']+)'"
-        r"(?:\s*,\s*agg\s*=\s*['\"]([^'\"]+)['\"]\s*)?"
-        r"\)\s*",
-        s,
-    )
-    if not m:
-        return None
-
-    region_name = m.group(1)
-    col_id = m.group(2)
-    agg_raw = (m.group(3) or "sum").strip().lower()
-    agg = _REGION_AGG_FUNCS.get(agg_raw)
-    if agg is None:
-        return None
-
-    # 1. 找到匹配 region（axis=row）
-    regions = table_data.get("_dynamic_regions") or []
-    target_region = None
-    for r in regions:
-        if not isinstance(r, dict):
-            continue
-        if r.get("axis") != "row":
-            continue
-        if r.get("name") == region_name:
-            target_region = r
-            break
-    if target_region is None:
-        return None
-
-    start_idx = target_region.get("start_idx")
-    end_idx = target_region.get("end_idx")
-    if not isinstance(start_idx, int) or not isinstance(end_idx, int):
-        return None
-    if end_idx < start_idx:
-        return None
-
-    # 2. 找到 col_id 在 _columns_meta 中的位置
-    columns_meta = table_data.get("_columns_meta") or []
-    col_pos: int | None = None
-    for idx, col in enumerate(columns_meta):
-        if isinstance(col, dict) and col.get("id") == col_id:
-            col_pos = idx
-            break
-    if col_pos is None:
-        return None
-
-    # 3. 在 [start_idx, end_idx] 范围内迭代 dynamic_data 行
-    rows = table_data.get("rows") or []
-    if not isinstance(rows, list):
-        return None
-
-    nums: list[Decimal] = []
-    for i in range(start_idx, min(end_idx + 1, len(rows))):
-        r = rows[i]
-        if not isinstance(r, dict):
-            continue
-        if r.get("row_type") != "dynamic_data":
-            continue
-        vals = r.get("values")
-        if not isinstance(vals, list) or col_pos >= len(vals):
-            continue
-        v = vals[col_pos]
-        if v is None:
-            continue
-        value = _as_decimal(v)
-        if value is not None:
-            nums.append(value)
-
-    if agg_raw == "count":
-        # count 始终返非负数；无数据返 Decimal("0")
-        return Decimal(len(nums))
-
-    if not nums:
-        return None
-
-    try:
-        result = agg(nums)
-    except (TypeError, ValueError, ZeroDivisionError):
-        return None
-    return result if result is not None else None
-
-
-def exec_with_region(
-    expression: Any,
-    cross_data: dict[str, Any],
-    table_data: dict | None,
-) -> Decimal | None:
-    """REGION-aware 表达式解析：直接迭代 +/- 组合的 REGION + 其他跨表 token.
-
-    支持组合：``REGION('A','col_x') + TB('1001','期末') - REGION('B','col_y')``
-
-    Args:
-        expression: 含 REGION + 其他 token 的表达式
-        cross_data: 跨表数据（TB / WP / REPORT / NOTE / PRIOR / AGING）
-        table_data: 同表内 _dynamic_regions / _columns_meta / rows
-
-    Returns:
-        - 数值（所有 token 解析成功）
-        - None（任一 token 解析失败 / 表达式不合法）
-    """
-    import re
-
-    if expression is None or not isinstance(expression, str):
-        return None
-    s = expression.strip()
-    if not s:
-        return None
-
-    # 整体单 REGION 直接走 resolver（避免 +/- 拆分）
-    region_pattern = re.compile(
-        r"REGION\(\s*'[^']+'\s*,\s*'[^']+'(?:\s*,\s*agg\s*=\s*['\"][^'\"]+['\"])?\s*\)"
-    )
-    if region_pattern.fullmatch(s):
-        return resolve_region_token(s, table_data)
-
-    # 表达式由 +/- 拼接的 token 组成（REGION / TB / REPORT / WP / NOTE / PRIOR / AGING）
-    token_pattern = re.compile(
-        r"([+-]?)\s*("
-        r"REGION\(\s*'[^']+'\s*,\s*'[^']+'(?:\s*,\s*agg\s*=\s*['\"][^'\"]+['\"])?\s*\)"
-        r"|"
-        r"(?:TB|REPORT|WP|NOTE|PRIOR|AGING)\([^)]*\)"
-        r")"
-    )
-    matches = token_pattern.findall(s)
-    if not matches:
-        return None
-
-    # 校验整体由这些 token + +/- 组成（不能混入未识别字符）
-    rebuilt = "".join(f"{sign or '+'}{token}" for sign, token in matches)
-    s_no_space = re.sub(r"\s+", "", s)
-    rec_no_space = re.sub(r"\s+", "", rebuilt)
-    if rec_no_space.lstrip("+") != s_no_space.lstrip("+"):
-        return None
-
-    total = Decimal("0")
-    for sign, token in matches:
-        if token.startswith("REGION("):
-            val = resolve_region_token(token, table_data)
-        else:
-            val = _resolve_single_cross_ref(token, cross_data)
-        if val is None:
-            return None
-        total += -val if sign == "-" else val
-    return total
 
 
 def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> Decimal | None:

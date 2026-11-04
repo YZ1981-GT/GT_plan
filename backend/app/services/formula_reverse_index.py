@@ -480,7 +480,7 @@ _last_version_check: float = 0.0
 async def _remote_version() -> int | None:
     """从 Redis 读版本号；不可用返回 None（降级为定时重建）。"""
     try:
-        from app.core.redis_client import get_redis
+        from app.core.redis import get_redis
         redis = await get_redis()
         if redis is None:
             return None
@@ -493,7 +493,7 @@ async def _remote_version() -> int | None:
 async def _incr_remote_version() -> None:
     """INCR Redis 版本号；失败只记日志。"""
     try:
-        from app.core.redis_client import get_redis
+        from app.core.redis import get_redis
         redis = await get_redis()
         if redis is not None:
             await redis.incr(_REDIS_VERSION_KEY)

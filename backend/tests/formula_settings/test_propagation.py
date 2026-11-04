@@ -222,21 +222,35 @@ async def test_propagate_wp_marks_prefill_stale_only_for_that_code():
         assert (flags[d2], flags[e1], flags[a_d2]) == (True, False, False)
 
 
-async def test_event_without_year_is_backfilled_and_reaches_consol_note_refill(monkeypatch):
+async def test_event_without_year_is_backfilled_and_reaches_consol_note_operation(monkeypatch):
     """端到端：publish_events 不带 year → 事件总线按项目审计年度补齐（FORMULA_CONFIG_CHANGED 在
-    YEAR_SCOPED_EVENT_TYPES）→ 合并附注传播拿到年度并按章节重新填数（不是恒「no_year」跳过）。"""
+    YEAR_SCOPED_EVENT_TYPES）→ 合并附注传播拿到年度（不是恒「no_year」跳过），按合并运行统一入口排一次
+    push operation（含附注步）并唤醒 worker —— 公式变更与一键更新、审批推送共用持久 consol_operation
+    （consolidation-run-and-workpaper-lifecycle-closure R4.1），不在事件里旁路直接刷附注。"""
+    import inspect
+
     import app.core.database as database
     from app.models.audit_platform_schemas import EventType
     from app.services import consol_note_formula_service as cnfs
+    from app.services import consol_operation_service
     from app.services import event_bus as event_bus_module
+    from app.workers import consol_operation_worker
 
-    fills = []
+    requests, woken, fills = [], [], []
+    real_request = consol_operation_service.request_operation
 
-    async def fake_fill(db, project_id, year, sections):
-        fills.append((project_id, year, list(sections)))
-        return {"filled": len(sections)}
+    async def recording_request(db, **kwargs):
+        inspect.signature(real_request).bind(db, **kwargs)  # 参数与真实签名可绑定（不是只验接线）
+        requests.append(kwargs)
+        return SimpleNamespace(operation=SimpleNamespace(id=uuid.uuid4(), status="queued"), disposition="created")
 
-    monkeypatch.setattr(cnfs, "fill_note_sections", fake_fill)
+    async def bypass_fill(*_a, **_k):
+        fills.append(_a)
+        return {}
+
+    monkeypatch.setattr(consol_operation_service, "request_operation", recording_request)
+    monkeypatch.setattr(consol_operation_worker, "wake", lambda: woken.append(True))
+    monkeypatch.setattr(cnfs, "fill_note_sections", bypass_fill)
     async with make_db() as factory:
         async with factory() as db:
             pid = await add_project(db, "合并附注传播", report_scope="consolidated")  # audit_year=2025
@@ -255,4 +269,7 @@ async def test_event_without_year_is_backfilled_and_reaches_consol_note_refill(m
         finally:
             propagation.set_session_factory(None)
     assert sent == 1
-    assert fills == [(pid, 2025, ["五、1", "五、7"])]
+    assert [(r["project_id"], r["year"], r["operation_type"], r["trigger_source"], tuple(r["requested_actions"]))
+            for r in requests] == [(pid, 2025, "push", "formula_changed", ("notes",))]
+    assert woken == [True], "提交后唤醒 worker"
+    assert fills == [], "不再在事件处理里旁路直接刷附注"

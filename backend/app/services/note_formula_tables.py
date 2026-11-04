@@ -261,7 +261,24 @@ def table_preset_formulas(table: dict, table_index: int) -> tuple[dict[str, dict
                 continue  # 合计行已按明细之和算
             formulas[key] = _preset(table_index, "book_value", f"cell({r},{gross_col})" + expr_tail.format(r=r),
                                     "账面价值 = 账面余额 − 准备", "preset.book_value")
+    _ratio_presets(table, table_index, rows, formulas, notes)
     return formulas, notes
+
+
+def _ratio_presets(table: dict, table_index: int, rows: list[Any], formulas: dict[str, dict], notes: list[dict]) -> None:
+    """比例 / 损失率（``note_formula_ratios``，与合并拉数后派生同一判定）：分子格为空不算（``requires``）、不写 0。"""
+    from app.services.note_formula_ratios import expression, ratio_plans, ratio_rows
+
+    plans, why = ratio_plans(table, rows)
+    notes.extend({"table_index": table_index, "row": None, "reason": text} for text in why)
+    describe = {"share": "比例 = 本行金额 ÷ 合计行金额 × 100", "rate": "损失率 = 准备 ÷ 账面余额 × 100"}
+    for plan in plans:
+        for r in ratio_rows(rows):
+            key = formula_key(table_index, r, plan.column)
+            if key in formulas:
+                continue
+            formulas[key] = {**_preset(table_index, "ratio", expression(plan, r), describe[plan.kind],
+                                       f"preset.ratio_{plan.kind}"), "requires": [[r, plan.numerator]]}
 
 
 def section_preset_formulas(td: Any) -> tuple[dict[str, dict], list[dict]]:

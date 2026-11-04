@@ -135,7 +135,9 @@ async def run_push(
         )
     except engine.PushActionError as exc:
         raise _bad_request(exc) from exc
-    return {**result.summary(), "items": [i.as_dict() for i in result.items]}
+    return {**result.summary(), "items": [i.as_dict() for i in result.items],
+            # 规则已不存在的附注推送状态行（R10）：推送不自动清，界面提示用修复脚本
+            "orphan_push_states": await panel.orphan_state_count(db, project_id=project_id, year=body.year)}
 
 
 @router.get("/latest")
@@ -150,6 +152,8 @@ async def latest(
     return {
         "run": panel.run_view(run, wp_code=wp_code),
         "state_counts": await panel.state_counts(db, project_id=project_id, year=year, wp_code=wp_code),
+        # 规则已不存在、格里还留着推送值的附注单元格（R10）：只报数，清理走修复脚本
+        "orphan_push_states": await panel.orphan_state_count(db, project_id=project_id, year=year),
     }
 
 

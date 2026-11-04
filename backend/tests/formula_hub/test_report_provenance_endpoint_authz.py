@@ -41,7 +41,7 @@ async def _seed(world, actor_id: uuid.UUID) -> FinancialReport:
         finished_at=now,
         status="succeeded",
         changed_rows=1,
-        calc_version="report:2",
+        calc_version=2,  # 共享运行表（V246）的 calc_version 是整数；信封里的 calc_version 仍是 'report:2'
     )
     world.db.add(run)
     await world.db.flush()
