@@ -253,46 +253,49 @@ async def test_mark_sections_stale_noop_on_empty_list():
     assert await mod.mark_sections_stale(None, PID, []) == 0  # type: ignore[arg-type]
 
 
+class _CaptureDb:
+    """记下 UPDATE 语句；只 flush 不 commit（统一入口 stale_state 的事务约定）。"""
+
+    def __init__(self, rowcount: int) -> None:
+        self.rowcount, self.stmt, self.flushed = rowcount, None, 0
+
+    async def execute(self, stmt, params=None):
+        self.stmt = stmt
+
+        class _Res:
+            rowcount = self.rowcount
+
+        return _Res()
+
+    async def flush(self) -> None:
+        self.flushed += 1
+
+
 @pytest.mark.asyncio
 async def test_mark_sections_stale_sql_only_touches_stale_columns(monkeypatch: pytest.MonkeyPatch):
-    """Property 5：只改 is_stale / stale_source，绝不动 table_data。"""
-    captured: dict[str, Any] = {}
+    """Property 5：只改 is_stale / stale_source，绝不动 table_data。
 
-    class _Res:
-        rowcount = 2
-
-    class _Db:
-        async def execute(self, stmt, params=None):
-            captured["sql"] = str(stmt)
-            captured["params"] = params
-            return _Res()
-
-    n = await mod.mark_sections_stale(_Db(), PID, ["五、9", "八、10"], year=2025)  # type: ignore[arg-type]
-    assert n == 2
-    sql = captured["sql"]
-    assert "is_stale = true" in sql
-    assert "stale_source" in sql
+    2026-11-01 起委托统一入口 ``stale_state.mark_note_stale``（spec formula-writer-ownership-and-stale R2）：ORM UPDATE。
+    """
+    db = _CaptureDb(rowcount=2)
+    n = await mod.mark_sections_stale(db, PID, ["五、9", "八、10"], year=2025)  # type: ignore[arg-type]
+    assert n == 2 and db.flushed == 1
+    sql = str(db.stmt)
+    params = db.stmt.compile().params
+    assert sql.startswith("UPDATE disclosure_notes SET is_stale=:is_stale, stale_source=:stale_source WHERE")
     assert "table_data" not in sql, "兜底标记不得触碰 table_data"
-    assert "year = :year" in sql
-    assert captured["params"]["secs"] == ["五、9", "八、10"]
+    assert params["is_stale"] is True and params["stale_source"] == mod.STALE_SOURCE
+    assert [v for k, v in params.items() if k.startswith("year")] == [2025]
+    assert [list(v) for k, v in params.items() if k.startswith("note_section")] == [["五、9", "八、10"]]
 
 
 @pytest.mark.asyncio
 async def test_mark_sections_stale_without_year_omits_clause(monkeypatch: pytest.MonkeyPatch):
-    captured: dict[str, Any] = {}
-
-    class _Res:
-        rowcount = 1
-
-    class _Db:
-        async def execute(self, stmt, params=None):
-            captured["sql"] = str(stmt)
-            captured["params"] = params
-            return _Res()
-
-    await mod.mark_sections_stale(_Db(), PID, ["五、9"])  # type: ignore[arg-type]
-    assert "year = :year" not in captured["sql"]
-    assert "year" not in captured["params"]
+    db = _CaptureDb(rowcount=1)
+    await mod.mark_sections_stale(db, PID, ["五、9"])  # type: ignore[arg-type]
+    params = db.stmt.compile().params
+    assert "disclosure_notes.year" not in str(db.stmt)
+    assert not [k for k in params if k.startswith("year")]
 
 
 # ════════════════════════════════════════════════════════════════════

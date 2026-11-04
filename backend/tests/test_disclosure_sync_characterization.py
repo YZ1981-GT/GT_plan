@@ -76,6 +76,13 @@ def _no_push_states() -> MagicMock:
     return res
 
 
+def _stale_cleared() -> MagicMock:
+    """更新已有章节后经统一入口清过期（spec formula-writer-ownership-and-stale R2：stale_state.clear_note_stale 一条 UPDATE）。"""
+    res = MagicMock()
+    res.rowcount = 1
+    return res
+
+
 def _make_db(note: DisclosureNote | None, *, entity_type: str = "soe") -> MagicMock:
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
@@ -89,7 +96,7 @@ def _make_db(note: DisclosureNote | None, *, entity_type: str = "soe") -> MagicM
     if note is None:
         sequence.append(_scalar_result(None))
     else:
-        sequence.append(_no_push_states())
+        sequence += [_no_push_states(), _stale_cleared()]
     db.execute = AsyncMock(side_effect=sequence)
     return db
 

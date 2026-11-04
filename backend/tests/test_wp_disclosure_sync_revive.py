@@ -78,9 +78,16 @@ def _make_db(
     if active is None:
         sequence.append(_scalar_result(deleted))
     if active is not None or deleted is not None:
-        sequence.append(_no_push_states())
+        # 推送状态 + 清过期（spec formula-writer-ownership-and-stale R2：stale_state.clear_note_stale 一条 UPDATE）
+        sequence += [_no_push_states(), _stale_cleared()]
     db.execute = AsyncMock(side_effect=sequence)
     return db
+
+
+def _stale_cleared() -> MagicMock:
+    res = MagicMock()
+    res.rowcount = 1
+    return res
 
 
 def _deleted_note() -> DisclosureNote:
@@ -172,6 +179,7 @@ async def test_active_note_path_unchanged():
     assert result["created"] is False
     assert result["revived"] is False
     db.add.assert_not_called()
-    # audit_year + active + 推送状态查询共 3 次；没有软删查询（软删分支未触达）
-    assert db.execute.await_count == 3
+    # audit_year + active + 推送状态查询 + 清过期共 4 次；没有软删查询（软删分支未触达）
+    assert db.execute.await_count == 4
     assert "formula_push_state" in str(db.execute.await_args_list[2].args[0]), "第 3 次是推送状态查询，不是软删查询"
+    assert str(db.execute.await_args_list[3].args[0]).startswith("UPDATE disclosure_notes"), "第 4 次是清过期"

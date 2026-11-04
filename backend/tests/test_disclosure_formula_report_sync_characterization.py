@@ -66,6 +66,22 @@ def _result_all(rows):
     return res
 
 
+def _rowcount(n: int):
+    res = MagicMock()
+    res.rowcount = n
+    return res
+
+
+def _assert_stale_cleared_via_unified_entry(db, sections: list[str]) -> None:
+    """清过期走统一入口 ``stale_state.clear_note_stale``：一条 UPDATE（is_stale=False、来源清空），不改内存里的对象
+    （spec formula-writer-ownership-and-stale R2）。"""
+    stmt = db.execute.await_args_list[-1].args[0]
+    params = stmt.compile().params
+    assert str(stmt).startswith("UPDATE disclosure_notes")
+    assert params["is_stale"] is False and params["stale_source"] is None
+    assert [list(v) for k, v in params.items() if k.startswith("note_section")] == [sections]
+
+
 def _note_obj(section="五、1", table_data=None, is_stale=True):
     n = MagicMock()
     n.note_section = section
@@ -150,13 +166,14 @@ class TestSyncReportToNotesStub:
         db.execute.side_effect = [
             _result_scalars([report_row]),  # report rows
             _result_scalars([note]),        # notes
+            _rowcount(1),                   # 清过期（统一入口一条 UPDATE）
         ]
 
         svc = ReportNoteSyncService(db)
         result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
 
-        # 仅把 is_stale 清为 False
-        assert note.is_stale is False
+        # 仅把 is_stale 清为 False（经统一入口）
+        _assert_stale_cleared_via_unified_entry(db, ["五、1"])
         # 从不改写 note.table_data（不把报表金额写进单元格）
         assert note.table_data == original_table_data
         # 硬编码统计：validation_run 恒 True、skipped_sections 恒 0
@@ -199,6 +216,7 @@ class TestSyncReportToNotesStub:
         db.execute.side_effect = [
             _result_scalars([MagicMock()]),
             _result_scalars([note]),
+            _rowcount(0),  # 没有过期章节：清过期 UPDATE 命中 0 行
         ]
         svc = ReportNoteSyncService(db)
         result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
