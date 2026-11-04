@@ -62,7 +62,9 @@ async function loginAsAdmin(page: Page) {
   await page.fill('input[placeholder*="用户名"]', 'admin')
   await page.fill('input[type="password"]', 'admin123')
   await page.click('button:has-text("登录")')
-  await page.waitForURL(/\/(dashboard|projects)/, { timeout: 15000 })
+  // 登录后落点现为「/」（2026-11-04 候选栈实测），原写的 /dashboard|/projects 等不到 ⇒ 本 spec 6 例全在登录上超时。
+  // 与 advanced-query-consolidation-critical-path 同口径：离开登录页即算登录成功。
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
 }
 
 /** 在业务视图选择第一个可用项目 + 第一个可用数据源（若存在） */
