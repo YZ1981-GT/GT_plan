@@ -19,6 +19,13 @@ from .head import (
     lock_chain,
     read_head,
 )
+from .forks import (
+    append_fork_ack,
+    append_fork_acks,
+    blocked_chains,
+    plan_chain_forks,
+    scan_forks,
+)
 from .lock_order import (
     AuditLockOrderViolation,
     record_chain_lock,
@@ -40,6 +47,11 @@ __all__ = [
     "AuditChainError",
     "AuditChainForked",
     "AuditChainBypassed",
+    "append_fork_ack",
+    "append_fork_acks",
+    "blocked_chains",
+    "plan_chain_forks",
+    "scan_forks",
     "AuditLockOrderViolation",
     "record_chain_lock",
     "record_non_chain_advisory_lock",

@@ -303,3 +303,29 @@ def _drop_singleton_method_shadows():
             continue
         for method in methods:
             singleton.__dict__.pop(method, None)
+
+
+# ─── 测试里的审计日志不进开发环境共享 Redis ─────────────────────────────────────────
+# `audit_logger.log_action` 把条目推进 Redis 队列，由共享后端（9980）的审计 worker 写进共享库审计链。测试默认连的
+# 正是那个 Redis ⇒ 测试条目被写进共享库的项目链，或因 user_id 不是 UUID 永久滞留隔离区、让健康端点一直 degraded
+# （2026-11-04 实测两条假项目链 39 条 `user_id='user-001'`；spec enterprise-embedding-rerank-closure R9.3）。
+# 这里把 `_get_redis` 包一层：用例把 `app.core.redis.redis_client` 换成 fakeredis 时照旧走原逻辑（可测队列），
+# 否则返回 None（降级到进程内队列），一条都不进共享 Redis。用例自己按实例 / 类替换 `_get_redis` 的照旧优先。
+def _is_fake_redis(client: object) -> bool:
+    return type(client).__module__.split(".")[0] == "fakeredis"
+
+
+@pytest.fixture(autouse=True)
+def _audit_queue_stays_out_of_shared_redis(monkeypatch):
+    from app.services.audit_logger_enhanced import AuditLoggerEnhanced
+
+    original = AuditLoggerEnhanced._get_redis
+
+    async def _guarded(self):
+        import app.core.redis as core_redis
+
+        if not _is_fake_redis(core_redis.redis_client):
+            return None
+        return await original(self)
+
+    monkeypatch.setattr(AuditLoggerEnhanced, "_get_redis", _guarded)

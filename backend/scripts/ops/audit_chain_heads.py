@@ -1,6 +1,7 @@
 """审计链链尾列表工具
 
-默认只读：列出每条链的链尾条目与统计。
+默认只读：列出每条链的条目数、未确认链尾数（与写链内核 ``head.read_head`` 同一定义：
+同链内没有后继、且未被 ``audit.fork_ack`` 确认为死端）与链尾 ID。
 
 用法:
     python -m scripts.ops.audit_chain_heads
@@ -10,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+import uuid
 from collections import defaultdict
 
 from pathlib import Path
@@ -17,71 +19,52 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 async def _list_heads() -> None:
-    from sqlalchemy import func, select
+    from sqlalchemy import select
 
     from app.core.database import async_session
     from app.models.audit_log_models import AuditLogEntry
+    from app.services.audit_chain.forks import FORK_ACK_ACTION, ChainRow, _tail_ids
     from app.services.audit_chain.head import chain_key_of
 
-    ALE = AuditLogEntry
-
+    ale = AuditLogEntry
     async with async_session() as db:
-        # 取全部条目的 id, entry_hash, prev_hash, payload->project_id
-        stmt = select(ALE.id, ALE.entry_hash, ALE.prev_hash, ALE.payload)
-        rows = (await db.execute(stmt)).all()
+        rows = (
+            await db.execute(select(ale.id, ale.entry_hash, ale.prev_hash, ale.action_type, ale.payload))
+        ).all()
 
-        if not rows:
-            print("📭 审计链为空")
-            return
+    if not rows:
+        print("📭 审计链为空")
+        return
 
-        # 按链键分组
-        chains: dict[str, list] = defaultdict(list)
-        for row in rows:
-            payload = row.payload or {}
-            pid = payload.get("project_id") if isinstance(payload, dict) else None
-            ck = chain_key_of(pid)
-            chains[ck].append({
-                "id": str(row.id),
-                "entry_hash": row.entry_hash,
-                "prev_hash": row.prev_hash,
-            })
+    chains: dict[str, list[ChainRow]] = defaultdict(list)
+    dead: dict[str, set[uuid.UUID]] = defaultdict(set)
+    for row in rows:
+        payload = row.payload if isinstance(row.payload, dict) else {}
+        key = chain_key_of(payload.get("project_id") or None)
+        chains[key].append(ChainRow(row.id, row.entry_hash, row.prev_hash, None, row.action_type))
+        raw = payload.get("dead_entry_id") if row.action_type == FORK_ACK_ACTION else None
+        if raw:
+            try:
+                dead[key].add(uuid.UUID(str(raw)))
+            except (TypeError, ValueError):
+                continue
 
-        # 找每条链的链尾
-        print(f"📊 共 {len(chains)} 条链, {len(rows)} 个条目\n")
-        print(f"{'链键':<50} {'条目数':>6} {'链尾数':>6} {'链尾 ID'}")
-        print("-" * 120)
-
-        for ck in sorted(chains.keys()):
-            entries = chains[ck]
-            all_hashes = {e["entry_hash"] for e in entries}
-            referenced = {e["prev_hash"] for e in entries if e["prev_hash"] in all_hashes}
-            tails = [e for e in entries if e["entry_hash"] not in referenced]
-
-            tail_ids = ", ".join(e["id"][:12] + "…" for e in tails[:5])
-            if len(tails) > 5:
-                tail_ids += f" (+{len(tails) - 5})"
-
-            status = "⚠️" if len(tails) > 1 else "✅"
-            ck_display = ck if len(ck) <= 48 else ck[:45] + "…"
-            print(f"{status} {ck_display:<48} {len(entries):>6} {len(tails):>6}  {tail_ids}")
-
-        total_tails = sum(
-            1 for ck, entries in chains.items()
-            for e in entries
-            if e["entry_hash"] not in {
-                ee["prev_hash"] for ee in entries if ee["prev_hash"] in {eee["entry_hash"] for eee in entries}
-            }
-        )
-        multi = sum(
-            1 for ck, entries in chains.items()
-            if sum(
-                1 for e in entries
-                if e["entry_hash"] not in {
-                    ee["prev_hash"] for ee in entries if ee["prev_hash"] in {eee["entry_hash"] for eee in entries}
-                }
-            ) > 1
-        )
-        print(f"\n合计链尾: {total_tails}, 多链尾链: {multi}")
+    print(f"📊 共 {len(chains)} 条链, {len(rows)} 个条目\n")
+    print(f"{'链键':<50} {'条目数':>6} {'链尾数':>6} {'链尾 ID'}")
+    print("-" * 120)
+    total_tails = 0
+    blocked = 0
+    for key in sorted(chains):
+        tails = sorted(str(t) for t in _tail_ids(chains[key], dead[key]))
+        total_tails += len(tails)
+        blocked += len(tails) != 1
+        shown = ", ".join(t[:12] + "…" for t in tails[:5])
+        if len(tails) > 5:
+            shown += f" (+{len(tails) - 5})"
+        status = "✅" if len(tails) == 1 else "⚠️"
+        key_display = key if len(key) <= 48 else key[:45] + "…"
+        print(f"{status} {key_display:<48} {len(chains[key]):>6} {len(tails):>6}  {shown}")
+    print(f"\n合计未确认链尾: {total_tails}, 写入被拒的链（未确认链尾 ≠ 1）: {blocked}")
 
 
 def main() -> None:

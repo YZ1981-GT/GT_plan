@@ -66,6 +66,7 @@ from app.core.openapi_runtime import fastapi_docs_kwargs, install_deferred_docs
 from app.core.startup_registry import start_all_workers as _start_workers  # noqa: F401
 from app.core.tracing import setup_tracing
 from app.middleware.audit_log import AuditLogMiddleware
+from app.middleware.audit_chain_error_handler import audit_chain_error_handler
 from app.middleware.error_handler import (
     evidence_governance_error_handler,
     generic_exception_handler,
@@ -88,6 +89,7 @@ from app.services.acnr.http_errors import (
 )
 from app.services.acnr.project_registry_lock import RegistryLockError
 from app.services.acnr.resolver import VersionInvalidError, VersionNotFoundError
+from app.services.audit_chain.head import AuditChainError as _AuditChainError
 
 
 @asynccontextmanager
@@ -195,6 +197,8 @@ app.add_exception_handler(VersionInvalidError, version_invalid_error_handler)
 # 证据治理稳定错误 → 脱敏 4xx/5xx（design §7.2）。必须先于泛型 Exception 处理器注册，
 # 否则 SCOPE_NOT_FOUND_OR_FORBIDDEN 等会被 generic_exception_handler 误报为 500。
 app.add_exception_handler(_EvidenceGovernanceError, evidence_governance_error_handler)
+# 审计链 fail-closed 拒绝写入 → 503 + 中文原因（不再是笼统的 500）；同样须先于泛型处理器注册。
+app.add_exception_handler(_AuditChainError, audit_chain_error_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # --- 中间件（LIFO：最后添加的最先执行=洋葱最外层） ---

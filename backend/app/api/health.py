@@ -121,8 +121,10 @@ async def health_check(
     elif (
         migration_blocks_readiness(migration_info)
         or critical_schema_drift(drift_info)
+        or audit_chain_info["unacknowledged_forks"] is None
         or audit_chain_info["unacknowledged_forks"] > 0
         or (audit_chain_info["quarantined_entries"] or 0) > 0
+        or (audit_chain_info.get("dead_letter_entries") or 0) > 0
         or reload_degraded
         or int(audit_state.get("failed_count") or 0) > 0
     ):
@@ -179,7 +181,11 @@ _AUDIT_CHAIN_CACHE_TTL = 300  # 秒
 
 
 async def _query_audit_chain_health(db) -> dict:
-    """查询未确认分叉数（带进程级 300s 缓存）。"""
+    """查询写链会被拒的链数（带进程级 300s 缓存）。
+
+    必须和 ``head.read_head`` 的口径一致：未确认链尾数不是 1 就不能安全续写。扫描失败不是 0，
+    返回 null 并让健康状态 degraded，避免「健康检查坏了 = 审计链健康」的假绿。
+    """
     now = time.monotonic()
     if (
         _audit_chain_cache["data"] is not None
@@ -190,25 +196,29 @@ async def _query_audit_chain_health(db) -> dict:
     from datetime import datetime, timezone
 
     try:
-        from app.services.audit_chain.forks import scan_forks
+        from app.services.audit_chain.forks import blocked_chains
 
-        forks = await scan_forks(db)
-        unack = sum(1 for f in forks if len(f.get("survivors", [])) > 1)
-    except Exception:
-        unack = 0
+        # 字段名为历史 API 合约；值现在是「会拒绝写入的链数」，覆盖多创世根 / 成环等 scan_forks 看不到的状态。
+        unack: int | None = len(await blocked_chains(db))
+    except Exception:  # noqa: BLE001 - 不能把未知伪装为 0
+        unack = None
 
     try:
         from app.core.redis import redis_client
-        from app.services.audit_chain.worker import quarantine_count
+        from app.services.audit_chain.worker import dead_letter_count, quarantine_count
 
         quarantined: int | None = await quarantine_count(redis_client)
+        # 死信 = 条目本身不合法、永远写不进链的审计记录（不丢弃，但必须可见）
+        dead_letters: int | None = await dead_letter_count(redis_client)
     except Exception:
         # Redis 不可达时不能把未知说成 0；按 ADR-ALC-10 返回 null。
         quarantined = None
+        dead_letters = None
 
     result = {
         "unacknowledged_forks": unack,
         "quarantined_entries": quarantined,
+        "dead_letter_entries": dead_letters,
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     _audit_chain_cache["data"] = result
