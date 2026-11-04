@@ -9,18 +9,21 @@ from jose import JWTError, jwt
 from app.core.config import settings
 
 
-def create_access_token(data: dict) -> str:
-    """创建 access token（默认 2h 过期）。
+def create_access_token(data: dict, *, expires_delta: timedelta | None = None) -> str:
+    """创建 access token（默认按 ``JWT_ACCESS_TOKEN_EXPIRE_MINUTES`` 过期；``expires_delta`` 给出时按它）。
 
     JWT payload 包含:
       - sub: 用户 ID（字符串）
       - exp: 过期时间
       - type: "access"
       - jti: 唯一标识（确保每次生成不同）
+
+    ``expires_delta``：服务端替用户发起的短任务（离屏披露执行器）用短有效期令牌，不与登录令牌同寿命。
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = datetime.now(timezone.utc) + (
+        expires_delta if expires_delta is not None
+        else timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire, "type": "access", "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)

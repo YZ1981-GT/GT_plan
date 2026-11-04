@@ -47,6 +47,11 @@ async def is_token_blacklisted(token: str, redis: Redis) -> bool:
     return bool(await redis.exists(bl_key))
 
 
+async def blacklist_token(token: str, redis: Redis, ttl_seconds: int) -> None:
+    """把 token 加入黑名单 ``ttl_seconds`` 秒（离屏披露执行器的短期令牌用完即吊销）。"""
+    await redis.set(_blacklist_key(token), "1", ex=max(1, int(ttl_seconds)))
+
+
 # ---------------------------------------------------------------------------
 # login
 # ---------------------------------------------------------------------------

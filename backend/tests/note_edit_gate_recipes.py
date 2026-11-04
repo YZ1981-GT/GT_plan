@@ -508,6 +508,14 @@ _B3_DETACH_GROUP_TEMPLATE = Recipe(
 )
 
 
+# C1: POST /api/disclosure-notes/{project_id}/{year}/headless-refresh（离屏披露手工触发，spec
+# note-disclosure-pull-regression-and-headless-backend 任务 13）—— 业务桩 = 拉起 Node 执行器的服务函数（不起子进程）
+_C1_HEADLESS_REFRESH = Recipe(
+    method="POST",
+    path_template="/api/disclosure-notes/{project_id}/{year}/headless-refresh",
+    url=f"/api/disclosure-notes/{TARGET_PROJECT_ID}/{_YEAR}/headless-refresh",
+    stubs=(StubTarget("app.services.note_headless_refresh_service", "run_headless_refresh"),),
+)
 # ---------------------------------------------------------------------------
 # 配方注册表
 # ---------------------------------------------------------------------------
@@ -522,5 +530,6 @@ for _recipe in [_A1, _A2, _A3, _A4, _A5, _A6, _A7, _A8, _A9, _A10, _A11, _A12,
                 _B2_CUSTOM_SECTION_CREATE, _B2_CUSTOM_SECTION_SAVE_AS_TEMPLATE,
                 _B2_CUSTOM_SECTION_APPLY_TEMPLATE,
                 _B3_ACQUIRE_LOCK, _B3_HEARTBEAT, _B3_SNAPSHOT,
-                _B3_SAVE_GROUP_TEMPLATE, _B3_DETACH_GROUP_TEMPLATE]:
+                _B3_SAVE_GROUP_TEMPLATE, _B3_DETACH_GROUP_TEMPLATE,
+                _C1_HEADLESS_REFRESH]:
     ALL_RECIPES[_recipe.key] = _recipe

@@ -77,6 +77,7 @@ from app.routers import note_custom_section  # noqa: E402
 from app.routers import note_custom_template  # noqa: E402
 from app.routers import note_data_lock  # noqa: E402
 from app.routers import note_group_template  # noqa: E402
+from app.routers import note_headless_refresh  # noqa: E402
 from app.routers import note_offline  # noqa: E402
 from app.routers import note_section_lock  # noqa: E402
 from app.routers import note_text_batch  # noqa: E402
@@ -87,7 +88,7 @@ from app.routers import note_wp_mapping  # noqa: E402
 _ALL_ROUTERS = (
     disclosure_notes.router, group_note_baseline.router, note_advanced.router,
     note_content_templates.router, note_custom_section.router, note_custom_template.router,
-    note_data_lock.router, note_group_template.router,
+    note_data_lock.router, note_group_template.router, note_headless_refresh.router,
     note_offline.router, note_section_lock.router, note_text_batch.router,
     note_trim.router, note_wp_mapping.router,
 )
