@@ -19,9 +19,11 @@ from uuid import UUID
 from app.core.config import settings
 from app.services.llm_runtime import (
     LLMRuntimeError,
+    RerankScore,
     RouteCandidate,
     chat_stream,
     chat_sync,
+    rerank,
 )
 
 logger = logging.getLogger(__name__)
@@ -293,4 +295,43 @@ async def route_chat_stream(
             continue
         _record_success(route, planned, candidate, failures)
         return
+    raise _exhausted(failures, cooling_notes(route, planned))
+
+
+async def route_rerank(
+    route: list[RouteCandidate],
+    query: str,
+    documents: list[str],
+    *,
+    top_n: int | None = None,
+    timeout: float = 20.0,
+) -> list[RerankScore]:
+    """重排按路由顺序调用：可转移错误换下一个候选并冷却，其余错误原样抛出。
+
+    不写 ``_OUTCOME``：那是「对话由谁回答」的记录，生成留痕读它；重排模型不能冒充回答者。
+    """
+    planned = plan_attempts(route)
+    failures: list[tuple[RouteCandidate, LLMRuntimeError]] = []
+    for candidate in planned:
+        if candidate.config is None:
+            failures.append((candidate, _invalid_error(candidate)))
+            continue
+        try:
+            scores = await rerank(
+                candidate.config, query, documents, top_n=top_n, timeout=timeout
+            )
+        except LLMRuntimeError as exc:
+            if not exc.failover:
+                raise
+            _record_failure(candidate, exc)
+            failures.append((candidate, exc))
+            continue
+        mark_available(candidate.identity)
+        if failures:
+            logger.warning(
+                "重排路由兜底：%s 不可用，本次由 %s 重排",
+                "、".join(item.label for item, _ in failures),
+                candidate.label,
+            )
+        return scores
     raise _exhausted(failures, cooling_notes(route, planned))

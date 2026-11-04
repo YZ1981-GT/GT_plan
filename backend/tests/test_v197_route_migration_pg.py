@@ -31,6 +31,7 @@ NEW_INDEXES = {
     "uq_ai_model_config_active_ocr_route",
 }
 OLD_INDEXES = {"uq_ai_model_config_active_non_ocr", "uq_ai_model_config_active_ocr_capability"}
+RERANK_INDEX = "uq_ai_model_config_active_rerank_route"
 
 # (名称, 类型, 提供商, 端点, OCR 能力, OCR 协议, 部署位置) —— V197 之后的形态，全部启用
 _DUAL_ACTIVE = [
@@ -186,8 +187,9 @@ def test_v197_r197_roundtrip_on_real_postgres():
 
     out = asyncio.run(_scenario())
 
-    # ORM 与迁移同一组索引名（SQLite 测试建表用 ORM，真库用迁移：两边必须一致）
-    assert {index.name for index in active_route_indexes()} == NEW_INDEXES
+    # ORM 与迁移同一组索引名（SQLite 测试建表用 ORM，真库用迁移：两边必须一致）；
+    # 重排那一条来自 V262（spec enterprise-embedding-rerank-closure），不归 V197 / R197 管
+    assert {index.name for index in active_route_indexes()} == NEW_INDEXES | {RERANK_INDEX}
     assert NEW_INDEXES <= out["indexes_before_rollback"]
 
     # R197：同类型（OCR 同能力槽）本机 + 服务器都启用时只保留服务器；向量本来只有一条，保留

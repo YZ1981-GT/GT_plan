@@ -57,9 +57,8 @@ async def check_embedding_health(db: AsyncSession) -> bool:
     try:
         from app.services.ai_service import AIService
 
-        ai_svc = AIService()
-        # 尝试生成一个测试 embedding
-        result = await ai_svc.get_embedding("embedding health check")
+        # 🔴 旧实现 AIService() 不传 db、调用不存在的 get_embedding ⇒ 每次都抛错被吞，恒 False。
+        result = await AIService(db).embedding("embedding health check")
         if result is not None and len(result) > 0:
             return True
         logger.warning("embedding health check 返回空结果")

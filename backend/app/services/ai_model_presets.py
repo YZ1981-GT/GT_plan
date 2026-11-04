@@ -28,6 +28,8 @@ class AIModelPreset:
     api_path: str | None = None
     auth_scheme: str | None = None
     request_timeout_seconds: int | None = None
+    # 向量预设要求网关按 MRL 输出的维度（非 DB 列）：与知识库索引 vector(1024) 一致；None = 不发送。
+    embedding_dimensions: int | None = None
     performance_notes: str = ""
 
     def orm_values(self) -> dict[str, object]:
@@ -100,6 +102,32 @@ GT_PADDLEOCR_V6 = AIModelPreset(
     performance_notes="致同企业文字识别预设；只需录入 API Key",
 )
 
-ENTERPRISE_MODEL_PRESETS = (GT_QWEN38, GT_PADDLEOCR_VL16, GT_PADDLEOCR_V6)
+# 与 qwen3.8 同一网关、同一 Key（2026-11-04 实测 /v1/models 同时列出三个模型）。
+GT_WEMM_EMBEDDING_4B = AIModelPreset(
+    "gt_wemm_embedding_4b",
+    UUID("71d00d01-a5b3-4ad7-9f2a-000000000004"),
+    "致同企业向量模型 wemm-embedding-4b",
+    "wemm-embedding-4b",
+    AIModelType.embedding,
+    AIProvider.custom,
+    "https://ai.gt-china.com.cn:10010/v1",
+    # 原生 2560 维；网关接受 dimensions=1024 并返回已归一化的 1024 维（实测），与索引列同维。
+    embedding_dimensions=1024,
+    performance_notes="致同企业向量模型预设（输出 1024 维，与知识库索引一致）；只需录入 API Key",
+)
+GT_QWEN3_RERANKER_4B = AIModelPreset(
+    "gt_qwen3_reranker_4b",
+    UUID("71d00d01-a5b3-4ad7-9f2a-000000000005"),
+    "致同企业重排模型 qwen3-reranker-4b",
+    "qwen3-reranker-4b",
+    AIModelType.rerank,
+    AIProvider.custom,
+    "https://ai.gt-china.com.cn:10010/v1",
+    performance_notes="致同企业重排模型预设（知识检索结果二次排序）；只需录入 API Key",
+)
+
+ENTERPRISE_MODEL_PRESETS = (
+    GT_QWEN38, GT_PADDLEOCR_VL16, GT_PADDLEOCR_V6, GT_WEMM_EMBEDDING_4B, GT_QWEN3_RERANKER_4B,
+)
 BUILTIN_TRUSTED_ENDPOINTS = frozenset(p.endpoint_url for p in ENTERPRISE_MODEL_PRESETS)
 PRESET_BY_KEY = {p.preset_key: p for p in ENTERPRISE_MODEL_PRESETS}
