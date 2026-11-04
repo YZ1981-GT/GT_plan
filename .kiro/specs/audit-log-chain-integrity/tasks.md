@@ -26,7 +26,7 @@
   - 候选树 vs 基线 HEAD 全量后端失败集合对比；只读探针结果贴入本任务
   - Verify: 只候选红 = 0；推送带版本号与主要变动
 
-- [ ] 4. 用户执行分叉确认（design §7 Y1）
+- [x] 4. 用户执行分叉确认（design §7 Y1）
   - 执行前 `audit_chain_fork_ack.py` 只读演示贴记录；用户放行后 `--apply`；执行后 `scan_forks` = 0、健康端点该项为 0
   - Verify: 两次扫描输出贴入本任务；未执行前批 B 不得合入
   - 核对记录（2026-10-31 10:25~10:29 北京；共享库只读会话，代码为 worktree HEAD `434e87972`；原始输出在 `tmp_spec_closure/item_b/`）：**保留 `[ ]`**，验收不满足，且缺执行前演示与放行记录
@@ -35,6 +35,16 @@
     - 缺放行记录：没找到用户对 Y1 的放行原话；INDEX.md 的「任务 4 用户已执行分叉确认」与 v1.0.48 标签说明的「scan_forks=0」是会话自述
     - 执行后扫描：工具默认模式输出「发现 2 处分叉」。真实分叉 `9f4c6bb42517…` 已确认（survivors 1 / dead_acknowledged 1）；另一处是创世哈希 0×64，survivors 403（403 条链各自的首条，不是分叉），按 survivors > 1 计未确认 = 1。`GET :9980/api/health` 的 `audit_chain` = `{unacknowledged_forks: 1, quarantined_entries: 0}`。原因：HEAD 的 `forks.scan_forks` 跨链按 `prev_hash` 分组，没有排除创世哈希（批 B 时改过，见 `tmp_audit_chain/review-ab.md` 文件表，没有入库）
     - 勾选条件：`scan_forks` 不再把创世哈希算成分叉后，扫描与健康端点的未确认数为 0；执行前演示与放行记录补齐，或由用户确认以基线探针和确认条目代替
+  - 执行记录（2026-11-04，由 spec `enterprise-embedding-rerank-closure` 第二批执行；放行：用户 2026-11-04「把你所有发现的问题和建议逐一修复，按你建议来」）：
+    - 执行前现状（共享库只读）：被阻断的链两条 —— `__global__` 1856 条、10 个未确认链尾、8 个分叉点（2026-08-22 AI 对话并发写 8 个单条侧枝 +
+      2026-08-06「下载」侧枝 3 条）；`project:0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49` 106 条、2 个链尾（2026-10-17 交付件）。上面 10-30 的确认条目
+      `25aeb13a…` 及其 survivor / dead 在这个库里都不存在
+    - 执行前演示（`audit_chain_fork_ack.py` 默认模式，已改为支持多死端）：两条链各给出建议主链尾（时间最新的链尾）、死端与侧枝摘要、将写的确认条数（10 / 1）与可执行命令
+    - `--apply`（操作人 admin）：`__global__` 写 10 条 v2 确认条目（9 个死端 + 1 个侧枝根，最后一条 `81b55994-b60f-4853-8f84-00a5b838798d`）；
+      项目链写 1 条（`ffed5464-eb39-4bd6-b4ff-bc7d9a2cfb7d`）
+    - 执行后：`scan_forks` 未确认 0（创世哈希不计）、`blocked_chains` 空、两条链各 1 个链尾、`verify_chain` valid；隔离区 45 条重放写入；
+      `GET :9980/api/health` 的 `audit_chain` = `{unacknowledged_forks: 0, quarantined_entries: 0, dead_letter_entries: 0}`（详见该 spec design §9.6）
+    - 按上面的勾选条件改勾：扫描与健康端点为 0，执行前演示与放行均有记录
 
 ## 批 B　fail-closed 写入
 
