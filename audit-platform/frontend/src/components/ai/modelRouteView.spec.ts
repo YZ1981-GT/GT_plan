@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { AIModel, AIRoute, AIRouteCandidate } from '@/services/aiModelApi'
 import {
-  activeTagText, candidateName, candidatePolicyText, chainOf, deactivateConsequence, effectiveClass, effectiveText, statusText,
+  activeTagText, candidateName, candidatePolicyText, chainOf, deactivateConsequence, effectiveClass, effectiveText,
+  emptyText, statusText,
 } from './modelRouteView'
 
 function candidate(overrides: Partial<AIRouteCandidate> = {}): AIRouteCandidate {
@@ -97,5 +98,43 @@ describe('模型表格启用标签与停用提示', () => {
     const layout = model({ id: 'o2', model_type: 'ocr', ocr_capability: 'layout_parsing', model_name: 'paddleocrvl-1.6' })
     expect(deactivateConsequence(layout, [text, layout])).toBe('停用后版面解析没有启用模型，调用会提示「未配置」。')
     expect(deactivateConsequence(text, [text, layout])).toContain('本机内置 OCR 引擎')
+  })
+})
+
+describe('重排模型（spec enterprise-embedding-rerank-closure）', () => {
+  const serverRerank = model({ id: 'r1', model_type: 'rerank', model_name: 'qwen3-reranker-4b', deployment: 'server' })
+
+  it('重排与对话同样本机优先：只有服务器一条时补出未启用的本机端', () => {
+    const chain = chainOf(route([candidate({ model_name: 'qwen3-reranker-4b' })], { kind: 'rerank', label: '重排模型' }))
+    expect(chain.map(slot => [slot.deployment, slot.candidate?.model_name ?? null])).toEqual([
+      ['local', null], ['server', 'qwen3-reranker-4b'],
+    ])
+    expect(activeTagText(serverRerank, [serverRerank])).toBe('已启用 · 服务器')
+  })
+
+  it('停用后说明不再重排、没有 .env 兜底；未启用时空态说明按召回分数排序', () => {
+    expect(deactivateConsequence(serverRerank, [serverRerank])).toBe(
+      '停用后知识检索不再重排，按向量 / 词法召回分数排序（重排没有 .env 兜底）。',
+    )
+    const localRerank = model({ id: 'r2', model_type: 'rerank', model_name: 'local-reranker', deployment: 'local' })
+    // 同类型另一条启用的重排承担调用（与对话同口径），不会误报「不再重排」
+    expect(deactivateConsequence(localRerank, [localRerank, serverRerank])).toBe(
+      '停用后由服务器模型「qwen3-reranker-4b」承担调用。',
+    )
+    expect(emptyText(route([], { kind: 'rerank', label: '重排模型' }))).toBe('未启用重排模型，知识检索按召回分数排序')
+    expect(emptyText(route([], { kind: 'chat' }))).toBe('未启用模型')
+  })
+
+  it('重排未启用不是故障：当前生效显示「未启用」且不标红；启用后不可用照常标红', () => {
+    const empty = route([], { kind: 'rerank', label: '重排模型' })
+    expect(effectiveText(empty)).toBe('未启用（不重排）')
+    expect(effectiveClass(empty)).toBe('unknown')
+    // 对话 / 版面解析没有启用行仍按原口径
+    expect(effectiveText(route([], { kind: 'layout_parsing' }))).toBe('不可用')
+    const down = route([candidate({ model_name: 'qwen3-reranker-4b', status: 'unavailable', reason: 'x' })], { kind: 'rerank' })
+    expect(effectiveText(down)).toBe('不可用')
+    expect(effectiveClass(down)).toBe('err')
+    // 读配置出错（error 非空）不能被当成「未启用」
+    expect(effectiveClass(route([], { kind: 'rerank', error: '读取重排配置失败（DBAPIError）' }))).toBe('err')
   })
 })

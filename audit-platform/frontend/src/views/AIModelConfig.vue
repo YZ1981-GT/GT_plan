@@ -13,8 +13,8 @@
 
     <el-alert
       class="security-tip" type="info" :closable="false" show-icon
-      title="已内置 qwen3.8、PaddleOCR-VL 1.6、PaddleOCR v6 三条企业预设；点击“录入 Key”即可，qwen3.8 的思考强度可在同一窗口选择（默认未指定）。Key 密文存储，服务端需先配置 ENCRYPTION_KEY。"
-      description="调用按「本机 → 服务器」顺序：对话与 OCR 的本机、服务器模型各可启用一条，本机不可用时自动改用服务器模型；向量模型只启用一条，不跨模型兜底。"
+      title="已内置 qwen3.8、wemm-embedding-4b（向量）、qwen3-reranker-4b（重排）、PaddleOCR-VL 1.6、PaddleOCR v6 五条企业预设；点击“录入 Key”即可，qwen3.8 的思考强度可在同一窗口选择（默认未指定）。Key 密文存储，服务端需先配置 ENCRYPTION_KEY。"
+      description="调用按「本机 → 服务器」顺序：对话、重排与 OCR 的本机、服务器模型各可启用一条，本机不可用时自动改用服务器模型；向量模型只启用一条，不跨模型兜底（换向量模型后知识库需重新入索引）；未启用重排时知识检索按召回分数排序。"
     />
 
     <ModelRoutePanel :routes="routes" :loading="routesLoading" :checked-at="routesCheckedAt" />
@@ -40,7 +40,7 @@
         <el-form-item label="模型类型" prop="model_type">
           <el-select v-model="form.model_type" :disabled="!!editingModel" style="width:100%" @change="onModelTypeChange">
             <el-option label="对话模型" value="chat" /><el-option label="嵌入模型" value="embedding" />
-            <el-option label="OCR 引擎" value="ocr" />
+            <el-option label="重排模型" value="rerank" /><el-option label="OCR 引擎" value="ocr" />
           </el-select>
         </el-form-item>
         <el-form-item label="供应商" prop="provider">
@@ -171,7 +171,8 @@ interface ModelForm {
 }
 
 const tabs: Array<{ name: AIModelType; label: string }> = [
-  { name: 'chat', label: '对话模型' }, { name: 'embedding', label: '嵌入模型' }, { name: 'ocr', label: 'OCR 引擎' },
+  { name: 'chat', label: '对话模型' }, { name: 'embedding', label: '嵌入模型' },
+  { name: 'rerank', label: '重排模型' }, { name: 'ocr', label: 'OCR 引擎' },
 ]
 const loading = ref(false)
 const routesLoading = ref(false)
@@ -200,6 +201,7 @@ const form = ref<ModelForm>(emptyForm())
 const modelsByType = computed<Record<AIModelType, AIModel[]>>(() => ({
   chat: models.value.filter(item => item.model_type === 'chat'),
   embedding: models.value.filter(item => item.model_type === 'embedding'),
+  rerank: models.value.filter(item => item.model_type === 'rerank'),
   ocr: models.value.filter(item => item.model_type === 'ocr'),
 }))
 const availableProviders = computed(() => providers.value.filter(item => item.supported_types.includes(form.value.model_type)))
