@@ -55,6 +55,7 @@
       <VoucherSurvivalBanner
         :project-id="runtimeProjectId" :workpaper-id="wpId" :year="preparationYear" :readonly="effectiveReadonly"
       />
+      <VoucherAttachPendingBanner :project-id="runtimeProjectId" :workpaper-id="wpId" :year="preparationYear" />
       <el-alert
         v-if="schemaFallbackBanner"
         type="info"
@@ -415,6 +416,7 @@ import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 import WorkpaperBackgroundMergeBanner from '@/components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue'
 import VoucherSurvivalBanner from '@/components/workpaper/voucher-sampling/VoucherSurvivalBanner.vue'
+import VoucherAttachPendingBanner from '@/components/workpaper/voucher-sampling/VoucherAttachPendingBanner.vue'
 import { isBackgroundMerging } from '@/components/workpaper/sync/backgroundMergeRegistry'
 
 // ─── Types ───

@@ -45,7 +45,7 @@
       <!-- 底稿标题栏（HTML 渲染器路径）。导出/导入移至各 sheet 内工具栏；
            底稿切换由 GtWpRenderer 内「🗂️ 切换底稿」树形弹窗承载，此处不再冗余。 -->
       <div v-if="useHtmlRenderer && wpDetail && projectYear != null" class="gt-wp-io-toolbar">
-        <el-button text @click="goBack">← 返回</el-button>
+        <el-button text data-testid="wp-editor-back" @click="goBack">{{ returnLabelOf(route.query.returnTo) }}</el-button>
         <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name">{{ displayWpName }}</span>
         <div class="gt-wp-io-toolbar__actions">
@@ -95,7 +95,7 @@
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
-        <el-button text @click="goBack">← 返回</el-button>
+        <el-button text data-testid="wp-editor-back" @click="goBack">{{ returnLabelOf(route.query.returnTo) }}</el-button>
         <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name" v-if="wpDetail">{{ displayWpName }}</span>
         <el-tag v-if="wpDetail" :type="(statusTagType(wpDetail.status)) || undefined" size="small">
@@ -455,6 +455,7 @@ import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
+import { returnLabelOf, safeReturnTo } from '@/utils/voucherLedgerRoute'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 import AuditYearMissingResult from '@/components/common/AuditYearMissingResult.vue'
@@ -1165,11 +1166,9 @@ function onOpenLedgerWindow() {
   openLedgerWindow(projectId.value, projectYear.value ?? undefined)
 }
 
+// 从序时账打开（带本站返回地址）时回原穿透现场（R3.5）；未保存确认只走 onBeforeRouteLeave（原先这里先弹原生 confirm，要确认两遍）
 function goBack() {
-  if (dirty.value) {
-    if (!confirm('有未保存的修改，确定离开？')) return
-  }
-  router.push({ name: 'WorkpaperList', params: { projectId: projectId.value } })
+  router.push(safeReturnTo(route.query.returnTo) ?? { name: 'WorkpaperList', params: { projectId: projectId.value } })
 }
 
 // ─── onBeforeRouteLeave dirty 检查 ──────────────────────────────────────────

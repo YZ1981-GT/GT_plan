@@ -571,7 +571,7 @@
               <el-table-column prop="label" label="描述" min-width="200" />
               <el-table-column label="操作" width="80">
                 <template #default="{ row }">
-                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                  <el-button v-if="row.wp_code" size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -582,7 +582,7 @@
               <el-table-column prop="label" label="描述" min-width="200" />
               <el-table-column label="操作" width="80">
                 <template #default="{ row }">
-                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                  <el-button v-if="row.wp_code" size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -639,6 +639,7 @@ import {
   type CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { api } from '@/services/apiProxy'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { projects as P_proj, reportConfig as P_rc, consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
@@ -1892,14 +1893,14 @@ async function onConsolCtxCellTrace() {
   try {
     const data: any = await api.get(
       `/api/projects/${projectId.value}/lineage`,
-      { params: { object_type: objectType, object_id: objectId, direction: 'both' } },
+      { params: { object_type: objectType, object_id: objectId, direction: 'both', ...(objectType === 'tb_row' && year.value != null ? { year: year.value } : {}) } },
     )
     const upstream = data?.upstream || []
     const downstream = data?.downstream || []
     consolTraceResult.value = { upstream, downstream }
     if (!upstream.length && !downstream.length) {
       consolTraceDialogVisible.value = false
-      ElMessage.info('该数字暂无溯源信息')
+      ElMessage[data?.errors?.length ? 'warning' : 'info'](data?.errors?.[0]?.message || '该数字暂无溯源信息') // 子源失败如实说（R8.3）
     }
   } catch (e: any) {
     consolTraceDialogVisible.value = false
@@ -1909,15 +1910,11 @@ async function onConsolCtxCellTrace() {
   }
 }
 
-function onConsolTraceLocate(node: any) {
+// 本页没有底稿渲染器，定位事件无人接收：按编码取本项目底稿实例打开编辑器（deepLinkEntryGuard）；非底稿节点不出「定位」
+async function onConsolTraceLocate(node: any) {
   consolTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
+  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+  if (reason) ElMessage.warning(reason)
 }
 
 function onConsolCtxFormula() {

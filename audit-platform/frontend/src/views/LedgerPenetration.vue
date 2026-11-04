@@ -777,10 +777,12 @@
           v-if="!voucherAmbiguity && voucherItems.length"
           :links="voucherLinks.linksOfKey(currentVoucherEvidenceKey)"
           :evidence-status="voucherLinks.evidenceStatusOf(currentVoucherEvidenceKey)"
+          :link-status="voucherLinks.linkStatusOf(currentVoucherEvidenceKey)"
           @retry="voucherLinks.retryEvidence(currentVoucherEvidenceKey)"
+          @retry-links="voucherLinks.refresh([currentVoucherEvidenceKey])"
+          @open-wp="(id: string) => onNavigateToWp({ workpaperId: id }, false)"
         />
         <el-button size="small" plain :disabled="!!voucherAmbiguity" @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
-        <el-button size="small" type="primary" plain :disabled="!!voucherAmbiguity" @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
         <el-button size="small" type="warning" plain :disabled="!!voucherAmbiguity" @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表（同号多张凭证时先在下方选定一张）">挂凭到底稿</el-button>
         <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportVoucherExcel">导出Excel</el-button>
@@ -1446,7 +1448,7 @@ import { buildExtraColumns, buildClipboardTable, fmtExtraCell } from '@/views/le
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import LedgerWindowPager from '@/components/ledger/LedgerWindowPager.vue'
 import AttachVoucherToWpDialog from '@/views/ledger/AttachVoucherToWpDialog.vue'
-import { attachFailureReason, attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import { workpaperRouteFromLedger } from '@/utils/voucherLedgerRoute'
 import VoucherKeyCandidates from '@/views/ledger/VoucherKeyCandidates.vue'
 import VoucherLinkTags from '@/views/ledger/VoucherLinkTags.vue'
 import { useVoucherLinkTags } from '@/views/ledger/useVoucherLinkTags'
@@ -2668,12 +2670,12 @@ function attachCurrentVoucher() {
 
 /** 挂凭后只重查这几张凭证的已挂标识 */
 const onVouchersAttached = (p: { voucherKeys: string[] }) => void voucherLinks.refresh(p.voucherKeys)
-/** 挂凭成功后用户选择跳转到目标底稿 */
-function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: string }) {
-  router.push({
-    name: 'WorkpaperEditor',
-    params: { projectId: projectId.value, wpId: payload.workpaperId },
-  })
+/**
+ * 打开底稿（挂凭结果「打开底稿」/ 已挂标签）：带返回地址（当前穿透现场在地址里），挂凭结果打开时再带来源标记，
+ * 底稿顶部的待导入提示据此默认展开（spec voucher-workflow-linkage-lineage-closure R3.2 / R3.3）
+ */
+function onNavigateToWp(payload: { workpaperId: string }, fromAttach = true) {
+  router.push(workpaperRouteFromLedger(projectId.value, payload.workpaperId, { returnTo: route.fullPath, fromAttach }))
 }
 
 /** 复制/导出排除的内部字段（含 raw_extra / extra_fields 对象本身，避免 [object Object]）。 */
@@ -2704,24 +2706,8 @@ async function copyCurrentVoucher() {
   })
 }
 
-/** 抽中本凭证：标记为抽样凭证（用于审计抽凭） */
-async function sampleCurrentVoucher() {
-  const auditYear = year.value
-  if (!currentVoucher.value || auditYear == null) return
-  try {
-    await attachVoucher(projectId.value, {
-      year: auditYear,
-      voucherNo: currentVoucher.value,
-      voucherDate: currentVoucherDate.value || null,
-      voucherType: currentVoucherType.value,
-      companyCode: currentVoucherCompany.value,
-      accountCode: currentAccount.value || null,
-    })
-    ElMessage.success(`已将凭证 ${voucherLabel(currentVoucherType.value, currentVoucher.value)} 加入抽样`)
-  } catch (e: any) {
-    ElMessage.warning(`抽样登记失败：${attachFailureReason(e)}`)
-  }
-}
+// 「抽中本凭证」已删除（spec voucher-workflow-linkage-lineage-closure R3.1）：它登记的凭证不属于任何底稿，没有后续落点；
+// 挂凭只经「挂凭到底稿」
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
 const currentLevel = ref<Level>('balance')
 const currentAccount = ref('')

@@ -26,12 +26,5 @@
     "owner": "wp-evidence-collection（未接入任何页面）",
     "reason": "零挂载；接入页面时按附件编号加小眼睛",
     "verify": { "type": "zeroMounts", "component": "ContractConfirmDialog" }
-  },
-  {
-    "file": "components/workpaper/actions/DocumentRecognizeDialog.vue",
-    "kind": "dormant",
-    "owner": "wp-evidence-collection（未接入任何页面）",
-    "reason": "零挂载；接入页面时按附件编号加小眼睛",
-    "verify": { "type": "zeroMounts", "component": "DocumentRecognizeDialog" }
   }
 ]

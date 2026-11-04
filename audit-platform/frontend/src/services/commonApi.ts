@@ -1747,14 +1747,15 @@ export async function likePost(postId: string): Promise<void> {
 }
 
 // ── 溯源 ──
+// 调用方（报告复核溯源页）自己用 handleApiError 提示失败原因：请求带 _silent，免得全局拦截器先弹一次
 
 export async function traceSection(projectId: string, sectionNumber: string): Promise<any> {
-  const { data } = await http.get(P_rr.trace(projectId, sectionNumber))
+  const { data } = await http.get(P_rr.trace(projectId, sectionNumber), { _silent: true } as any)
   return data
 }
 
 export async function findingsSummary(projectId: string): Promise<any> {
-  const { data } = await http.get(P_proj.findingsSummary(projectId))
+  const { data } = await http.get(P_proj.findingsSummary(projectId), { _silent: true } as any)
   return data
 }
 

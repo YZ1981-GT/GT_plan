@@ -232,3 +232,72 @@ describe('凭证层并入凭证证据（spec attachment-voucher-evidence-binding
     expect(wrapper.findAll('.eye').map((eye) => eye.attributes('data-id'))).toEqual(['a1', 'a2'])
   })
 })
+
+describe('凭证层：查询状态、可点标签、导入状态（spec voucher-workflow-linkage-lineage-closure R3.3 / R3.4）', () => {
+  it('linkStatusOf：查询中 → 失败（不当成没挂）→ 重试成功后有结果', async () => {
+    const slow = deferred<unknown>()
+    post.mockImplementationOnce(() => slow.promise)
+    const tags = useVoucherLinkTags(ref(PID), ref(2025))
+    const key = keyOf('0012')
+    const loading = tags.loadForRows([line('0012')])
+    expect(tags.linkStatusOf(key)).toBe('loading')
+    slow.reject(new Error('网络'))
+    await loading
+    expect(tags.linkStatusOf(key)).toBe('error')
+    expect(tags.linksOfRow(line('0012'))).toEqual([])
+    post.mockResolvedValueOnce({ data: { links: { [key]: [link()] } } })
+    await tags.refresh([key])
+    expect(tags.linkStatusOf(key)).toBe('ready')
+    expect(tags.linkStatusOf(null)).toBe('idle')
+  })
+
+  it('查过、没有记录也是 ready（显示「尚未挂到底稿」）', async () => {
+    post.mockResolvedValueOnce({ data: { links: {} } })
+    const tags = useVoucherLinkTags(ref(PID), ref(2025))
+    await tags.loadForRows([line('0012')])
+    expect(tags.linkStatusOf(keyOf('0012'))).toBe('ready')
+  })
+
+  it('标签：失败显示「挂接状态未知」+ 重试，不说「尚未挂到底稿」', async () => {
+    const wrapper = mount(VoucherLinkTags, {
+      props: { links: [], linkStatus: 'error', evidenceStatus: 'error' },
+      global: { stubs: { AttachmentEyeButton: true } },
+    })
+    expect(wrapper.find('[data-testid="voucher-links-unknown"]').text()).toContain('挂接状态未知')
+    expect(wrapper.text()).not.toContain('尚未挂到底稿')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('retry-links')).toHaveLength(1)
+  })
+
+  it('标签：有底稿的可点打开；底稿已删除 / 未指定底稿的不可点', async () => {
+    const wrapper = mount(VoucherLinkTags, {
+      props: { links: [
+        link(),
+        link({ working_paper_id: 'wp-gone', wp_code: null, wp_name: null, wp_missing: true }),
+        link({ working_paper_id: null, wp_code: null, wp_name: null }),
+      ] },
+      global: { stubs: { AttachmentEyeButton: true } },
+    })
+    const opens = wrapper.findAll('[data-testid="voucher-link-open"]')
+    expect(opens).toHaveLength(1)
+    expect(opens[0].attributes('aria-label')).toContain('打开底稿')
+    await opens[0].trigger('click')
+    expect(wrapper.emitted('open-wp')).toEqual([['wp-j1']])
+  })
+
+  it('标签：手工挂凭带「已导入 / 未导入」，判断不了与抽凭登记不写', () => {
+    const ElTag = { props: ['type'], template: '<i class="tag"><slot /></i>' }
+    const wrapper = mount(VoucherLinkTags, {
+      props: { links: [
+        link({ imported: true }),
+        link({ wp_code: 'E1', working_paper_id: 'wp-e1', imported: false }),
+        link({ wp_code: 'K9', working_paper_id: 'wp-k9', imported: null }),
+        link({ wp_code: 'D2', working_paper_id: 'wp-d2', source: 'sampling_engine', imported: false }),
+      ] },
+      global: { stubs: { 'el-tag': ElTag, AttachmentEyeButton: true } },
+    })
+    expect(wrapper.findAll('.tag').map(t => t.text())).toEqual([
+      'J1 · 挂凭 · 年审 · 已导入', 'E1 · 挂凭 · 年审 · 未导入', 'K9 · 挂凭 · 年审', 'D2 · 抽凭 · 年审',
+    ])
+  })
+})

@@ -37,10 +37,11 @@ describe('attachVoucher 请求体', () => {
 
   it('空凭证字照传空串；阶段缺省时不发（后端按项目阶段取）', async () => {
     post.mockResolvedValueOnce({ data: {} })
-    await attachVoucher(PID, { year: 2025, voucherNo: '0046', voucherType: '' })
+    await attachVoucher(PID, { year: 2025, voucherNo: '0046', voucherType: '', workpaperId: WP })
     const body = post.mock.calls[0][1] as Record<string, unknown>
     expect(body.voucher_type).toBe('')
     expect('phase' in body).toBe(false)
+    expect(body.working_paper_id).toBe(WP)
   })
 })
 
@@ -56,6 +57,10 @@ describe('attachFailureReason', () => {
   it('404 / 403 / 其他', () => {
     expect(attachFailureReason({ response: { status: 404 } })).toContain('当前账套里没有这张凭证')
     expect(attachFailureReason({ response: { status: 403 } })).toBe('没有本项目的编辑权限')
+    // 底稿级写门（WP_NOT_WRITABLE）带后端说明时照说明讲
+    expect(attachFailureReason({ response: { status: 403, data: { detail: {
+      error_code: 'WP_NOT_WRITABLE', message: '你不能编辑这张底稿：挂凭和取消挂凭只限底稿编制人与项目主管' } } } }))
+      .toBe('你不能编辑这张底稿：挂凭和取消挂凭只限底稿编制人与项目主管')
     expect(attachFailureReason(new Error('网络'))).toBe('挂凭失败，请稍后重试')
   })
 })

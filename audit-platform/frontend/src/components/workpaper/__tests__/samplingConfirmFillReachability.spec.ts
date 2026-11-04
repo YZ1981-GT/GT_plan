@@ -74,13 +74,24 @@ function functionBody(src: string, name: string): string {
 
 // ─── 判定纯函数（供反向自检拿替身源码复现修复前行为） ────────────────────────
 
-/** P1：预览弹窗的确认按钮已按门控原因 disabled，且 tooltip 展示原因 */
+/**
+ * P1：预览弹窗的确认按钮已按门控原因 disabled，且 tooltip 展示原因。
+ *
+ * 只读（spec voucher-workflow-linkage-lineage-closure R4.3）并进同一个按钮与 tooltip：
+ * 按钮 `isConfirmBlocked || readonly`、tooltip `!isConfirmBlocked && !readonly`，提示文案改由
+ * `confirmDisabledReason` 给出 —— 它必须在非只读时回落到 confirmBlockedReason（门控原因照旧可见）。
+ */
 function previewGatesConfirmUpfront(src: string): boolean {
   const hasProp = /confirmBlockedReason\??\s*:/.test(src)
-  const hasDisabled = /:disabled="isConfirmBlocked"/.test(src)
-  const hasTooltip =
-    /<el-tooltip[\s\S]{0,240}:disabled="!isConfirmBlocked"[\s\S]{0,240}:content="confirmBlockedReason/.test(src)
-  return hasProp && hasDisabled && hasTooltip
+  const hasDisabled = /:disabled="isConfirmBlocked(?:\s*\|\|\s*readonly)?"/.test(src)
+  const tooltip =
+    /<el-tooltip[\s\S]{0,240}:disabled="!isConfirmBlocked(?:\s*&&\s*!readonly)?"[\s\S]{0,240}:content="(confirmBlockedReason|confirmDisabledReason)/.exec(src)
+  if (!tooltip) return false
+  if (tooltip[1] === 'confirmDisabledReason') {
+    const reason = /const confirmDisabledReason = computed\(\(\) =>([\s\S]*?)\n\)/.exec(src)
+    if (!reason || !/props\.confirmBlockedReason/.test(reason[1])) return false
+  }
+  return hasProp && hasDisabled
 }
 
 /** P1b：弹窗自身也兜住（旧调用点不传 prop 时不能照旧 emit） */
@@ -123,7 +134,14 @@ describe('Property 22：结论确认门禁前置为 disabled + tooltip', () => {
   })
 
   it('反向自检：删掉 disabled 绑定后判定必须为违规', () => {
-    const mutated = previewSrc.replace(':disabled="isConfirmBlocked"', '')
+    const mutated = previewSrc.replace(/:disabled="isConfirmBlocked[^"]*"/, '')
+    expect(mutated).not.toBe(previewSrc)
+    expect(previewGatesConfirmUpfront(mutated)).toBe(false)
+  })
+
+  it('反向自检：提示文案不再回落门控原因后判定必须为违规', () => {
+    const mutated = previewSrc.replace(/(const confirmDisabledReason = computed\(\(\) =>[\s\S]*?)\(props\.confirmBlockedReason \|\| ''\)/, "$1''")
+    expect(mutated).not.toBe(previewSrc)
     expect(previewGatesConfirmUpfront(mutated)).toBe(false)
   })
 

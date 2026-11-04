@@ -412,7 +412,6 @@ declare module 'vue' {
     DisclosureSyncCoveragePanel: typeof import('./components/disclosure/DisclosureSyncCoveragePanel.vue')['default']
     DocStructureTree: typeof import('./components/deliverable/DocStructureTree.vue')['default']
     DocumentOCRPanel: typeof import('./components/ai/DocumentOCRPanel.vue')['default']
-    DocumentRecognizeDialog: typeof import('./components/workpaper/actions/DocumentRecognizeDialog.vue')['default']
     DraftWatermark: typeof import('./components/deliverable/DraftWatermark.vue')['default']
     DrilldownBreadcrumb: typeof import('./components/common/DrilldownBreadcrumb.vue')['default']
     DrillDownNavigator: typeof import('./components/extension/DrillDownNavigator.vue')['default']

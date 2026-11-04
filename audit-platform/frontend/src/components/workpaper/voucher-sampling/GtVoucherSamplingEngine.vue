@@ -99,16 +99,8 @@ interface Props {
    */
   wpCode?: string
   /**
-   * 只读态（底稿已归档/锁定/复核通过，R10.3）。
-   *
-   * `true` 时禁用抽样配置、执行抽样、回填与全部行内录入 —— 已归档底稿的抽样结果
-   * 不应被改动。默认 `false` 与改造前逐位一致（零回归）。
-   *
-   * **当前 78 个抽凭宿主均未传该 prop**（实测零字面量传参），故运行态恒为可编辑。
-   * 接口先就位，宿主批量接线归 `voucher-check-shared-layer`。
-   *
-   * 注：`wpCode` 同样零宿主传参，但它已改为回落 `WorkpaperRuntimeContext.wpCode`
-   * （见上），故不再是死 prop；`readonly` 无同款运行时来源，仍需宿主显式传。
+   * 只读态（R10.3）：禁用自动抽凭、回填、撤销与全部行内录入。78 个宿主都没传；实际只读另取底稿运行时上下文
+   * （归档 / 编辑锁 / 复核身份 / 后台合并），两者取或，见 `isReadonly`（spec voucher-workflow-linkage-lineage-closure R4.1）。
    */
   readonly?: boolean
 }
@@ -180,6 +172,8 @@ const workpaperRuntime = inject(WorkpaperRuntimeContextKey, null)
 const effectiveWpCode = computed(
   () => props.wpCode || workpaperRuntime?.wpCode?.value || '',
 )
+const isReadonly = computed(() => !!props.readonly || !!workpaperRuntime?.readonly?.value)
+const confirming = ref(false) // 确认回填进行中：再点不重复登记批次（R4.2）
 
 // ─── Composable: useVoucherSampling ───────────────────────────────────────────
 
@@ -397,6 +391,7 @@ const confirmBlockedReason = computed<string | null>(() => {
 
 /** 确认填充后 emit */
 async function handleConfirmFill() {
+  if (confirming.value || isReadonly.value) return
   // 双保险：预览弹窗已按 confirmBlockedReason 前置 disabled，这里兜住其它调用路径。
   // 🔴 命中门控必须**先关闭预览弹窗** —— 它带遮罩，不关则提示指向的
   // 「错报推断与总体结论」区既看不到也点不到，那条提示就是死信。
@@ -410,7 +405,8 @@ async function handleConfirmFill() {
     return
   }
   // 合并进底稿归宿主的共享回填函数（追加按分录指纹去重；替换只动本阶段抽凭行，ADR-VK-07）
-  const result = await confirmFill()
+  confirming.value = true
+  const result = await confirmFill().finally(() => { confirming.value = false })
   if (result.length > 0) {
     const methodology: SamplingFilledMethodology = {
       samplingMethod: config.value.samplingMethod,
@@ -450,7 +446,7 @@ async function runSampling(): Promise<void> {
 
 // ─── 撤销抽凭：宿主按批次删行（ADR-VK-08），年审阶段不撤销预审批次（需求 6.3）──────
 const { handleUndo } = useEngineUndo({
-  instance: engineInstance, historyList, projectPhase, undoLastExtraction,
+  instance: engineInstance, historyList, projectPhase, undoLastExtraction, readonly: isReadonly,
   emitUndoRequest: payload => emit('undo-request', payload),
 })
 
@@ -622,7 +618,7 @@ function handleActualMisstatementChange(row: SampledVoucher, val: string) {
  * 「年审阶段预审行只读」在宿主的底稿行上做（shared/voucherCheckFill 的 rowClass / guardPersist）。
  */
 function canEditRow(_row: SampledVoucher): boolean {
-  return !props.readonly
+  return !isReadonly.value
 }
 
 const samplingSectionPrefix = computed(() =>
@@ -705,6 +701,7 @@ const hasSessionSamples = computed(() => sampledVouchers.value.length > 0)
 
 /** 可否推送：会话内有样本 且 结论已确认 且 推断错报 > 0（R3.5） */
 const canPushProjected = computed(() => {
+  if (isReadonly.value) return false
   if (!misstatementResult.value) return false
   if (!hasSessionSamples.value) return false
   if (!conclusionConfirmed.value) return false
@@ -713,6 +710,7 @@ const canPushProjected = computed(() => {
 
 /** 不可推送时的原因（tooltip 明示，避免"按钮灰着不知为何"） */
 const pushProjectedDisabledReason = computed(() => {
+  if (isReadonly.value) return '底稿只读，不能记入错报汇总'
   if (!misstatementResult.value) return '尚未推断错报：请先录入样本实际错报并执行推断'
   if (!hasSessionSamples.value) {
     return '当前数字读自上一批次评价，本会话未执行抽样：如需记入错报汇总请先「自动抽凭」取回样本（否则留痕里的样本量与随机种子会与实际批次不符）'
@@ -882,7 +880,7 @@ async function handleResample() {
           <span class="reconcile-label">手工录入账面（借+贷发生额合计）</span>
           <el-input
             v-model="bookAmountInput"
-            :disabled="props.readonly"
+            :disabled="isReadonly"
             size="small"
             :placeholder="reconcileInfo?.available ? '留空即用上方科目余额表核对' : '未取到余额表，可手工录入核对'"
             style="width: 220px"
@@ -895,7 +893,7 @@ async function handleResample() {
           <span class="reconcile-label">可容忍差异</span>
           <el-select
             v-model="reconcileThresholdPct"
-            :disabled="props.readonly"
+            :disabled="isReadonly"
             size="small"
             style="width: 100px"
           >
@@ -942,7 +940,7 @@ async function handleResample() {
         </div>
         <el-input
           v-model="reconcileOverrideReason"
-          :disabled="props.readonly"
+          :disabled="isReadonly"
           type="textarea"
           :autosize="{ minRows: 2 }"
           maxlength="500"
@@ -989,7 +987,7 @@ async function handleResample() {
 
     <!-- ═══ 操作栏 ═══ -->
     <div class="action-bar">
-      <el-button type="primary" size="small" :loading="loading" @click="handleOpenConfig">
+      <el-button type="primary" size="small" :loading="loading" :disabled="isReadonly" @click="handleOpenConfig">
         自动抽凭
       </el-button>
       <el-button size="small" @click="handleShowHistory">
@@ -1276,7 +1274,7 @@ async function handleResample() {
                 size="small"
                 type="primary"
                 plain
-                :disabled="props.readonly || !hasSessionSamples"
+                :disabled="isReadonly || !hasSessionSamples"
                 @click="handleInferMisstatement"
               >
                 重新推断
@@ -1428,7 +1426,7 @@ async function handleResample() {
               <el-button
                 size="small"
                 type="primary"
-                :disabled="props.readonly || !!conclusionBlockedReason"
+                :disabled="isReadonly || !!conclusionBlockedReason"
                 @click="handleConfirmConclusion"
               >
                 确认采用此结论
@@ -1513,6 +1511,7 @@ async function handleResample() {
       :reconcile-issue="reconcileIssue"
       :reconcile-override-reason="reconcileOverrideReason"
       :reconcile-presets="activeReconcilePresets"
+      :readonly="isReadonly" :confirming="confirming"
       @update:reconcile-override-reason="(v: string) => reconcileOverrideReason = v"
       @update:fill-mode="(v: FillMode) => fillMode = v"
       @confirm="handleConfirmFill"

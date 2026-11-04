@@ -58,7 +58,8 @@ export interface AttachVoucherPayload {
   /** 审计阶段；缺省由后端按项目阶段取 */
   phase?: 'preliminary' | 'final'
   accountCode?: string | null
-  workpaperId?: string | null
+  /** 目标底稿（必填：没有底稿的挂凭没有落点，后端 422 WP_REQUIRED） */
+  workpaperId: string
   source?: string
   note?: string
 }
@@ -69,7 +70,7 @@ function unwrap<T = any>(res: any): T {
 }
 
 /**
- * 挂凭（单张）：把一张凭证记录到抽样清单，可关联一张目标底稿（凭证层「抽中本凭证」不指定底稿）。
+ * 挂凭（单张）：把一张凭证挂到一张目标底稿的抽样清单（必须指定底稿，且要能编辑该底稿，否则 403 WP_NOT_WRITABLE）。
  * 同一凭证（凭证键）挂同一底稿只有一条：再挂 = 更新说明与意图科目，阶段保持当初挂凭时的；挂到不同底稿各一条。
  * 挂多张底稿用 {@link attachVouchersBatch}。后端按当前账套定位凭证：命中多张 409 VOUCHER_KEY_AMBIGUOUS（带候选），
  * 找不到 404 VOUCHER_NOT_FOUND —— 原样抛出，由调用方把原因告诉用户。`_silent`：不弹全局提示。
@@ -85,7 +86,7 @@ export async function attachVoucher(
     voucher_type: payload.voucherType ?? null,
     company_code: payload.companyCode ?? null,
     account_code: payload.accountCode ?? null,
-    working_paper_id: payload.workpaperId ?? null,
+    working_paper_id: payload.workpaperId,
     source: payload.source ?? 'ledger',
     note: payload.note ?? null,
   }
@@ -102,9 +103,10 @@ export function attachFailureReason(err: unknown): string {
     return `对应多张凭证（${names.join('、')}${ambiguity.candidates.length > 3 ? ' 等' : ''}），请在凭证层选定一张再挂`
   }
   const res = (err as { response?: { status?: number; data?: { detail?: unknown } } } | null)?.response
-  if (res?.status === 404) return '当前账套里没有这张凭证（可能账套已重导）'
-  if (res?.status === 403) return '没有本项目的编辑权限'
   const detail = res?.data?.detail as { message?: unknown } | undefined
+  if (res?.status === 404) return '当前账套里没有这张凭证（可能账套已重导）'
+  // 403 两种：底稿级（WP_NOT_WRITABLE，后端给了说明）与项目级（没有编辑权限）
+  if (res?.status === 403) return typeof detail?.message === 'string' ? detail.message : '没有本项目的编辑权限'
   if (res?.status === 422 && typeof detail?.message === 'string') return detail.message
   return '挂凭失败，请稍后重试'
 }
@@ -195,6 +197,11 @@ export interface VoucherLink {
   count: number
   /** 旧登记没记凭证字或主体：同日同号的另一张凭证也会显示它 */
   legacy: boolean
+  /**
+   * 手工挂凭是否已导入该底稿的凭证检查表（后端按检查行的凭证身份判）：true 已导入 / false 未导入 /
+   * null 判断不了（引擎登记、底稿不可见、检查表读取失败）。spec voucher-workflow-linkage-lineage-closure R3.4
+   */
+  imported?: boolean | null
 }
 
 /**
