@@ -19,11 +19,20 @@ from app.core.redis import get_redis
 # 旧测试默认 mock 为干净状态（无失败 / 无漂移）保持原有 healthy / unhealthy 语义
 _CLEAN_MIGRATION = AsyncMock(return_value={"applied_count": 0, "failures": []})
 # 🔴 `critical_count` 不是可选字段：`_query_schema_drift` 无条件返回
-#    {count, critical_count, items} 三键（内部 query_drift 已吞异常返回空 list），
+#    {count, critical_count, items} 三键（内部 query_drift 读取失败时返回一条 scan_failure，不抛异常），
 #    而 health_check 的 degraded 判定直接读 `drift_info["critical_count"]`。
 #    此前 mock 漏了这一键 → test_all_healthy 在 healthy 分支 KeyError；
 #    另三个用例走 `not all_healthy` 短路，没触到该行，所以只 1 例红。
 _CLEAN_DRIFT = AsyncMock(return_value={"count": 0, "critical_count": 0, "items": []})
+
+
+@pytest.fixture(autouse=True)
+def _clean_audit_chain():
+    """审计链同样默认干净：mock 会话跑不了分叉扫描，扫描失败按「未知」处理会让 status=degraded
+    （spec enterprise-embedding-rerank-closure R15.2）。"""
+    clean = {"unacknowledged_forks": 0, "quarantined_entries": 0, "dead_letter_entries": 0, "checked_at": "test"}
+    with patch("app.api.health._query_audit_chain_health", new=AsyncMock(return_value=clean)):
+        yield
 
 
 def _create_app(

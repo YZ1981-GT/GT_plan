@@ -221,8 +221,11 @@ async def _query_audit_chain_health(db) -> dict:
         "dead_letter_entries": dead_letters,
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    _audit_chain_cache["data"] = result
-    _audit_chain_cache["ts"] = now
+    # 未知（扫描失败 / Redis 不可达）不进缓存：否则一次瞬时失败会把 degraded 钉住 300 秒，
+    # 恢复后也要等缓存过期才转回 healthy。只缓存三项都读到的已知结果。
+    if unack is not None and quarantined is not None and dead_letters is not None:
+        _audit_chain_cache["data"] = result
+        _audit_chain_cache["ts"] = now
     return result
 
 
@@ -287,9 +290,9 @@ async def _query_migration_status() -> dict:
 async def _query_schema_drift() -> dict:
     """查询 schema_drift_log。
 
-    ``critical_count`` 只统计 ``CRITICAL_DRIFT_TYPES``（单一真源：orm_extra / enum_mismatch /
-    checksum_drift —— 会导致运行时 500 / 插入失败、或已应用迁移的编辑静默丢失），用于 health
-    degraded 判定；``count`` 是总数（含 INFO 级 db_extra），仅作可观测展示。
+    ``critical_count`` 只统计 ``CRITICAL_DRIFT_TYPES``（单一真源，成员与含义见
+    ``app.core.schema_drift_detector``：运行时 500 / 插入失败、已应用迁移的编辑静默丢失、扫描本身
+    失败），用于 health degraded 判定；``count`` 是总数（含 INFO 级 db_extra），仅作可观测展示。
     """
     from app.core.database import engine
     from app.core.schema_drift_detector import SchemaDriftDetector, count_critical

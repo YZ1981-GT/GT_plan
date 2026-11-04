@@ -239,6 +239,40 @@ async def test_replay_moves_malformed_raw_entry_to_dead_letter_and_keeps_valid(t
 
 
 @pytest.mark.asyncio
+async def test_health_does_not_cache_unknown_audit_chain_state(fake_redis) -> None:
+    """未知（扫描失败 / Redis 不可达）不进 300 秒缓存：一次瞬时失败不能把 degraded 钉住，已知结果照旧缓存。"""
+    from app.api import health as health_mod
+
+    class DownRedis:
+        async def scan_iter(self, *_args, **_kwargs):
+            raise ConnectionError("redis unavailable")
+            yield  # pragma: no cover - 让它成为异步生成器
+
+    def _probe(**blocked):
+        return patch("app.services.audit_chain.forks.blocked_chains", AsyncMock(**blocked))
+
+    health_mod._audit_chain_cache.update(data=None, ts=0.0)
+    try:
+        with patch("app.core.redis.redis_client", fake_redis):
+            with _probe(side_effect=RuntimeError("db read failed")):
+                assert (await health_mod._query_audit_chain_health(AsyncMock()))["unacknowledged_forks"] is None
+            with _probe(return_value=[]):
+                assert (await health_mod._query_audit_chain_health(AsyncMock()))["unacknowledged_forks"] == 0
+            # 已知结果照旧缓存：缓存期内再失败也返回上一次读到的已知值
+            with _probe(side_effect=RuntimeError("again")):
+                assert (await health_mod._query_audit_chain_health(AsyncMock()))["unacknowledged_forks"] == 0
+
+        health_mod._audit_chain_cache.update(data=None, ts=0.0)
+        with _probe(return_value=[]):
+            with patch("app.core.redis.redis_client", DownRedis()):
+                assert (await health_mod._query_audit_chain_health(AsyncMock()))["quarantined_entries"] is None
+            with patch("app.core.redis.redis_client", fake_redis):
+                assert (await health_mod._query_audit_chain_health(AsyncMock()))["quarantined_entries"] == 0
+    finally:
+        health_mod._audit_chain_cache.update(data=None, ts=0.0)
+
+
+@pytest.mark.asyncio
 async def test_health_treats_audit_chain_scan_failure_as_unknown_and_degraded(fake_redis, monkeypatch) -> None:
     """不能把扫描失败伪装为 0（旧实现 health 反而报 healthy，审计写入仍会 fail-closed）。"""
     from types import SimpleNamespace
