@@ -139,36 +139,48 @@ def _runner_script(runner_dir: Path) -> Path:
     return script
 
 
-async def _spawn(*args: str, **kwargs: Any) -> asyncio.subprocess.Process:
-    """拉起执行器子进程（测试在这一层换成假进程）。"""
-    return await asyncio.create_subprocess_exec(*args, **kwargs)
-
-
 def _process_group_kwargs() -> dict[str, Any]:
     if os.name == "nt":
         return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
     return {"start_new_session": True}
 
 
-async def _kill_tree(proc: asyncio.subprocess.Process) -> None:
-    """Windows 用 ``taskkill /T``（TerminateProcess 不连带子进程）；POSIX 向进程组发信号。"""
-    if proc.returncode is not None:
-        return
+def _popen(args: list[str], env: dict[str, str], cwd: str) -> subprocess.Popen:
+    return subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=cwd,
+                            **_process_group_kwargs())
+
+
+async def _spawn(args: list[str], *, env: dict[str, str], cwd: str) -> subprocess.Popen:
+    """拉起执行器子进程（测试在这一层换成假进程）。
+
+    在线程里用 ``subprocess.Popen``，不用 ``asyncio.create_subprocess_exec``：Windows 开发服务器（``run_uvicorn.py``）
+    跑在 SelectorEventLoop 上，它不支持子进程（``NotImplementedError``）。等待也放线程（``communicate``），
+    任何事件循环下行为一致。
+    """
+    return await asyncio.to_thread(_popen, args, env, cwd)
+
+
+def _kill_tree_blocking(proc: subprocess.Popen) -> None:
     try:
         if os.name == "nt":
-            killer = await asyncio.create_subprocess_exec(
-                "taskkill", "/PID", str(proc.pid), "/T", "/F",
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-            await asyncio.wait_for(killer.wait(), timeout=10)
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=10, check=False)
         else:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        await asyncio.wait_for(proc.wait(), timeout=5)
-    except (asyncio.TimeoutError, ProcessLookupError, OSError) as exc:
+        proc.wait(timeout=5)
+    except (subprocess.TimeoutExpired, ProcessLookupError, OSError) as exc:
         logger.warning("headless refresh child kill failed pid=%s: %s", proc.pid, exc)
         try:
             proc.kill()
         except (ProcessLookupError, OSError):
             pass
+
+
+async def _kill_tree(proc: subprocess.Popen) -> None:
+    """Windows 用 ``taskkill /T``（TerminateProcess 不连带子进程）；POSIX 向进程组发信号。"""
+    if proc.poll() is not None:
+        return
+    await asyncio.to_thread(_kill_tree_blocking, proc)
 
 
 def _tail(raw: bytes, token: str) -> str:
@@ -215,13 +227,9 @@ async def run_headless_refresh(
             if section is not None:
                 args += ["--section", section]
             args += ["--out", str(out)]
-            proc = await _spawn(
-                *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-                env=child_env(token=token, api_base=api_base), cwd=str(runner_dir.parents[1]),
-                **_process_group_kwargs(),
-            )
+            proc = await _spawn(args, env=child_env(token=token, api_base=api_base), cwd=str(runner_dir.parents[1]))
             try:
-                _stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                _stdout, stderr = await asyncio.wait_for(asyncio.to_thread(proc.communicate), timeout=timeout)
             except asyncio.TimeoutError:
                 await _kill_tree(proc)
                 raise HeadlessRefreshTimeout(f"离屏刷新超过 {int(timeout)} 秒未完成，已终止") from None
