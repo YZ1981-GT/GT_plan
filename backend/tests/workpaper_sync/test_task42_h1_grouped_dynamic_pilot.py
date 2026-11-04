@@ -161,8 +161,20 @@ EXPECTED_DUPLICATE_LEAF_LABELS: Mapping[str, int] = {
     "金额": 2,
 }
 #: 本任务修掉的三条缺陷各自的影响面（`backend/wp_templates/` 工作簿里的命中数）。
-#: 这个数是**结论本身**，保持等式：形态命中多一个少一个都要打红。
-EXPECTED_LEGACY_WRITER_WORKBOOKS = 10
+#:
+#: 🔴 2026-11-04 改口径：原先写成等式 `== 10` 并注明「这个数是结论本身」。但本条要锁的
+#: 结论是「legacy writer 这个形态不是孤例，且本 pilot 的权威册属于它」——「恰好 10 本」
+#: 不是结论，而是 2026-09-06 的一次普查数。模板库合法增长后现算 **24**，等式于是每次
+#: 入库都打一次假红，而假红掩盖的正是它本该守住的那条真判据（与同文件 `MIN_TOTAL_WORKBOOKS`
+#: 当初改成下界的理由逐字相同 —— 那次只改了分母，漏了这个分子）。
+#: 改成：下界（冻结普查数）+ 本册必须在集合里 + 原文点名的两本样板仍在 + **真子集**
+#: （集合不得等于语料全体，否则检测器退化成「全都算」）。
+LEGACY_WRITER_WORKBOOK_FLOOR = 10
+#: 冻结时点点名的样板册：证明「不是孤例」靠的是它们，不是计数。
+LEGACY_WRITER_NAMED_EXEMPLARS = (
+    "B60-1 审计项目工时预算与控制表.xlsx",
+    "G7 长期股权投资.xlsx",
+)
 #: 语料总量只是「判据没在空集上跑」的自检，用**下界**：模板库会合法增长。
 #: 2026-09-06 冻结时 369；2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ 370。
 #: 写成等式时每次合法入库都打一次假红，而假红掩盖的正是上面那条真判据。
@@ -3011,11 +3023,11 @@ class TestUpstreamRelsAndNamespaceDefectsAreFixed:
         assert not re.search(r'Id="[^"]+"[^>]*Target="[^"]+"', rels)
 
     def test_ten_of_the_authoritative_workbooks_share_this_shape(self) -> None:
-        """影响面实测：语料（≥369 个工作簿）里 **10 个**是这种顺序，且含 B60 与 G7。
+        """影响面实测：语料（≥369 个工作簿）里有一族是这种顺序，且含本册与 B60 / G7。
 
-        「10」是结论，保持等式；「369」是分母自检，用下界（理由见
-        :data:`MIN_TOTAL_WORKBOOKS`）。语料口径见 :data:`WORKBOOK_SUFFIXES`
-        —— 只数真工作簿，不数 `.preclean.bak` 这类同名备份。
+        四条并列（理由见 :data:`LEGACY_WRITER_WORKBOOK_FLOOR` 的注释）：族规模不低于冻结
+        普查数、本 pilot 的权威册在族里、原文点名的两本样板仍在族里、族是语料的**真子集**。
+        语料口径见 :data:`WORKBOOK_SUFFIXES` —— 只数真工作簿，不数 `.preclean.bak` 这类同名备份。
         """
         root = P.authoritative_template_path().parent.parent
         target_first: list[str] = []
@@ -3041,10 +3053,20 @@ class TestUpstreamRelsAndNamespaceDefectsAreFixed:
             f"语料只扫到 {total} 个工作簿，少于冻结下界 {MIN_TOTAL_WORKBOOKS} —— "
             "语料缩水或 glob 失配，两者都会让下面那条影响面判据在残缺集合上跑"
         )
-        assert len(target_first) == EXPECTED_LEGACY_WRITER_WORKBOOKS, target_first
+        assert len(target_first) >= LEGACY_WRITER_WORKBOOK_FLOOR, (
+            f"legacy writer 形态只命中 {len(target_first)} 本，低于冻结普查数 "
+            f"{LEGACY_WRITER_WORKBOOK_FLOOR} ⇒ 形态检测退化或语料缩水"
+        )
+        assert len(target_first) < total, (
+            f"legacy writer 命中 {len(target_first)} == 语料全体 {total} ⇒ "
+            "检测器把所有册子都算进来了，判据退化成恒真"
+        )
         assert P.authoritative_template_path().name in target_first
-        assert "B60-1 审计项目工时预算与控制表.xlsx" in target_first
-        assert "G7 长期股权投资.xlsx" in target_first
+        for exemplar in LEGACY_WRITER_NAMED_EXEMPLARS:
+            assert exemplar in target_first, (
+                f"冻结时点点名的样板册 {exemplar!r} 不再是这个形态 ⇒ "
+                "「不是孤例」这一结论的依据变了，必须重新取证而不是改数字"
+            )
 
     def test_sheet_part_resolution_is_attribute_order_independent(self) -> None:
         """缺陷 ① 已修：顺序无关地解析 sheet part。"""

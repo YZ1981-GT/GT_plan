@@ -42,6 +42,9 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     WP_COMPOSABLES,
     cached_text,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    spec_dir,
+)
 from tests.workpaper_sync.k_lane1_facts import (  # noqa: E402
     LANE1_DEFINED_NAMES_BY_ENTRY,
     LANE1_INDEXES,
@@ -49,7 +52,15 @@ from tests.workpaper_sync.k_lane1_facts import (  # noqa: E402
 
 K_TEMPLATE_DIR = ROOT / "backend" / "wp_templates" / "K"
 CONTRACT_DIR = DATA / "workpaper_sync_contracts"
-K1_CONTRACT = CONTRACT_DIR / "k1.baddebt_reversal_writeoff_check.candidate.json"
+# 🔴 2026-11-05：K1 草案已被 reviewed 生产契约取代（c7a93a630 晋级），草案原件归档到 lane1 spec 的
+#    `evidence/superseded-candidate-contracts/`（spec 本身又随 `_archive/26-…` 归档）⇒ 契约目录里
+#    已没有 `*.candidate.json`。本文件的判据读的是**草案阶段**的事实（模板怪癖清册等，历史事实不变）
+#    ⇒ 路径改读归档件；K2 仍是 candidate，照旧读契约目录。
+K1_CONTRACT = (
+    spec_dir("k1-k7-inlined-iife-hosts-and-orphan-cleanup")
+    / "evidence" / "superseded-candidate-contracts"
+    / "k1.baddebt_reversal_writeoff_check.candidate.json"
+)
 K2_CONTRACT = CONTRACT_DIR / "k2.adjudication_derived.candidate.json"
 
 LANE1_BOOKS: dict[int, str] = {

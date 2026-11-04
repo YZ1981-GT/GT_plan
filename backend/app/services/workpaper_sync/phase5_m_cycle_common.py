@@ -485,6 +485,11 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
         build_matcher=orch.build_matcher,
         build_registration=orch.build_registration,
         register_adapter=orch.register_adapter,
+        # 🔴 已发布冻结身份：`orch.attach_adapters` 内部就是 await 这一个函数做「观测 + 契约
+        #    digest 比对」，但这一面原先没转发出来 ⇒ 5 个 M provider 在 Task 75 的四条判据上
+        #    没有分母（判据只看 provider 模块的属性）。转发它不改变运行期行为（attach 用的是
+        #    同一个对象），只是把唯一真源暴露成和 D/E/F/G/H/I/J/L 各 provider 一致的面。
+        resolve_published_frozen_definitions=orch.resolve_published_frozen_definitions,
         attach_adapters=orch.attach_adapters,
         manifest_capability_enabled=orch.manifest_capability_enabled,
         assert_manifest_capability_enabled=orch.assert_manifest_capability_enabled,

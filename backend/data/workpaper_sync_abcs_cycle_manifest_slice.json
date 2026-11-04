@@ -2996,7 +2996,7 @@
     "resolver": "backend/app/services/wp_template_finder.py::find_template_file_any",
     "workbook": "A/A5-1 现金流量表审计.xlsx",
     "workbook_format": "xlsx",
-    "size": 60894,
+    "size": 46790,
     "sha256": "9999f5b6511c5230e52732c10bf2eef86ee1238b9e0678e498ed2fffda9f503d"
    },
    "mount_count": 1,

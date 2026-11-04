@@ -39,6 +39,10 @@ from tests.workpaper_sync.k_foundation_facts import (
     contract_dir_split,
     is_fixed_slot_exempt,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    contract_owner,
+    spec_dir,
+)
 from tests.workpaper_sync.test_task53_k_cycle_migration import (
     DELETION_PLAN_PATH,
     FULL_MANIFEST_PATH,
@@ -65,8 +69,7 @@ from tests.workpaper_sync.test_task53_k_cycle_migration import (
 
 #: K10 / K1-9 / K2 草案原件归档处（晋级的 6 份草案已从契约目录移走）
 ARCHIVED_DRAFT_DIR = (
-    ROOT / ".kiro" / "specs"
-    / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
     / "evidence" / "superseded-candidate-contracts"
 )
 #: K 循环仍是草案的契约（未晋级）
@@ -125,7 +128,7 @@ class TestPromotionLedger:
         owners: set[str] = set()
         k_owned: dict[str, str] = {}
         for name, doc in contracts.items():
-            owner = (doc.get("review") or {}).get("entry_id")
+            owner = contract_owner(name, doc)
             if doc.get("review_status") == "candidate":
                 cand.append(name)
                 assert owner is None, f"{name} 是 candidate 却带 entry_id"

@@ -1,8 +1,8 @@
 {
   "generated_from": "backend/data/workpaper_writer_inventory.json",
-  "inventory_digest": "5444efac28d102bf51a2f0cce3a3455b9f24a8e2d6fe4b466c734f3587d6d4a7",
-  "inventory_source_digest": "c4f87a8eaaa7cb4636307e51a7f2b347a0a10b4dc5c6d4b6eeb02484e5355be8",
-  "matrix_digest": "74b3175e146f4447768684f5ee5e0a4f9f2b6fdf740b79c0e0f832a7a256590c",
+  "inventory_digest": "ab57506e1d688614e2ea2286895732c1055c89a385f379d4cfb675a2f01e8bad",
+  "inventory_source_digest": "a9081392702692b8d6df4d0b64dbed87c78482890dd51713ca61a5331eb4b0ea",
+  "matrix_digest": "4e99d918cd0a5aea85771be7bb6df88619b78bff382879fc0604652db1b32eba",
   "policy_modules": [
     "app.routers.excel_html",
     "app.routers.wp_onlyoffice_router",

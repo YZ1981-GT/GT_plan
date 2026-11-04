@@ -22501,7 +22501,7 @@
       "facts": {
         "ad_hoc_paths": [
           {
-            "line": 585,
+            "line": 588,
             "literal": "wp_templates"
           }
         ],
@@ -22523,7 +22523,7 @@
       },
       "is_async": false,
       "kind": "resolver",
-      "line": 580,
+      "line": 583,
       "module": "app.services.workpaper_sync.phase5_c_control_test",
       "qualname": "_template_abs_path",
       "resolver_identities": [
@@ -24922,7 +24922,7 @@
       "adjudication": {
         "domain": "export_storage_resolver",
         "status": "adjudicated",
-        "version_domain_note": "`find_template_file_any` in `backend/app/services/wp_template_finder.py` (resolver), no other inventory row delegates to it, so it is an entry point of its own. Lane: A template-library lookup: it answers 'which template file backs this wp_code', which is the resolver lane `wp_export.wp_file_resolver::_template_fallback` already occupies -- not a content write. Measured: reaches the workpaper/template file through `<ad_hoc_path_construction>`; builds the path from the literals `wp_templates`. Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`. Requirement 9.11 wants one canonical resolver for the *workpaper* file; template lookup is a second, legitimate namespace, so convergence here means the finder stays the only entry into it instead of every caller re-globbing `wp_templates`. Characterization call sites resolve in `backend/tests/test_generate_from_codes_endpoint.py`, `backend/tests/test_whole_excel_tab_document_identity.py`, `backend/tests/test_wp_template_finder_d4_prefix.py`, `backend/tests/workpaper_sync/test_h_foundation_hc_guards.py`, `backend/tests/workpaper_sync/test_task48_f_cycle_migration.py`, `backend/tests/workpaper_sync/test_task49_g_cycle_migration.py`, `backend/tests/workpaper_sync/test_task52_j_cycle_migration.py`, `backend/tests/workpaper_sync/test_task53_k_cycle_migration.py`, `backend/tests/workpaper_sync/test_task58_word_canonical_resolver.py`, `backend/tests/workpaper_sync/test_template_override_resolution.py`."
+        "version_domain_note": "`find_template_file_any` in `backend/app/services/wp_template_finder.py` (resolver), no other inventory row delegates to it, so it is an entry point of its own. Lane: A template-library lookup: it answers 'which template file backs this wp_code', which is the resolver lane `wp_export.wp_file_resolver::_template_fallback` already occupies -- not a content write. Measured: reaches the workpaper/template file through `<ad_hoc_path_construction>`; builds the path from the literals `wp_templates`. Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`. Requirement 9.11 wants one canonical resolver for the *workpaper* file; template lookup is a second, legitimate namespace, so convergence here means the finder stays the only entry into it instead of every caller re-globbing `wp_templates`. Characterization call sites resolve in `backend/tests/test_generate_from_codes_endpoint.py`, `backend/tests/test_whole_excel_tab_document_identity.py`, `backend/tests/test_wp_template_finder_d4_prefix.py`, `backend/tests/workpaper_sync/test_h_foundation_hc_guards.py`, `backend/tests/workpaper_sync/test_task48_f_cycle_migration.py`, `backend/tests/workpaper_sync/test_task49_g_cycle_migration.py`, `backend/tests/workpaper_sync/test_task52_j_cycle_migration.py`, `backend/tests/workpaper_sync/test_task53_k_cycle_migration.py`, `backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py`, `backend/tests/workpaper_sync/test_task58_word_canonical_resolver.py`, `backend/tests/workpaper_sync/test_template_override_resolution.py`."
       },
       "canonical_resolver": null,
       "characterization_tests": [
@@ -24934,6 +24934,7 @@
         "backend/tests/workpaper_sync/test_task49_g_cycle_migration.py",
         "backend/tests/workpaper_sync/test_task52_j_cycle_migration.py",
         "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py",
         "backend/tests/workpaper_sync/test_task58_word_canonical_resolver.py",
         "backend/tests/workpaper_sync/test_template_override_resolution.py"
       ],
@@ -25519,8 +25520,8 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "5444efac28d102bf51a2f0cce3a3455b9f24a8e2d6fe4b466c734f3587d6d4a7",
-  "overlay_digest": "689c1d5f6124bb55b617cf01c9f23f6131444bd9668eae4262ec50369dc7cabb",
+  "inventory_digest": "ab57506e1d688614e2ea2286895732c1055c89a385f379d4cfb675a2f01e8bad",
+  "overlay_digest": "9a2b569719f00f2828a8f3c0515c0a06d76bedc6b07a888689060279bb4b3e15",
   "representation_upgrade_lane": [
     {
       "candidate_calls": [
@@ -25838,7 +25839,7 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "c4f87a8eaaa7cb4636307e51a7f2b347a0a10b4dc5c6d4b6eeb02484e5355be8",
+  "source_digest": "a9081392702692b8d6df4d0b64dbed87c78482890dd51713ca61a5331eb4b0ea",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {

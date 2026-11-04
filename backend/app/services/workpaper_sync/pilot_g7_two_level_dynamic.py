@@ -1000,32 +1000,82 @@ def assert_no_implicit_template_fallback(
 def assert_matcher_domain_is_exclusive(
     *, manifest: Mapping[str, Any] | None = None
 ) -> Mapping[str, tuple[str, ...]]:
-    """本 entry 的 matcher 码必须**只属它自己**；同类另外两个候选必须共用一个码。
+    """本 entry 的 matcher 码**不得被别的 entry 用上**；同类另外两个候选必须共用一个码。
 
     这是把三个 G7 候选收敛到一个的决定性判据（模块 docstring §一第 2 条第四点）。两侧都要
     断言，缺任一侧都会让判据退化：
 
-    * 只断言「`G7L` 独占」 ⇒ 万一将来 `G7E` 也变独占，「为什么当初没选它」就无从复核；
-    * 只断言「`G7E` 被共用」 ⇒ 万一 `G7L` 也被别的 entry 用上，本 pilot 的 matcher
+    * 只断言「本 pilot 的码独占」 ⇒ 万一将来 `G7E` 也变独占，「为什么当初没选它」就无从复核；
+    * 只断言「`G7E` 被共用」 ⇒ 万一本 pilot 的码也被别的 entry 用上，matcher
       会在 registry RG-3 上撞车而这里却放行。
+
+    🔴 2026-11-04 改口径（原判据要求「使用者恰为本 entry」，现算为 `[]` ⇒ 恒失败）：`wp_code`
+    裁决表（`projection_target_resolution.WP_CODE_ADJUDICATION`，reviewed）把本 entry 的真码裁为
+    `G7` 并由 manifest 生成器覆盖启发式，于是 manifest 里是 `['G7']`，启发式产物 `G7L`（`wp_index`
+    0 命中的幻影码）不再被任何 entry 声明。但真码**不能**当 matcher 域：裁决行 `basis.blocked_note`
+    写着「只供 provisioning 定位宿主，不得直接当 EntryMatcher 的域」，`matcher_domain_conflict`
+    记着三个 G7 entry 真码同为 `G7`、以 wp_code 为域必撞 RG-3，解法是改按 entry 路由（独立设计
+    决策，不在本 spec 范围）。⇒ 判据按裁决表分支，既不放宽也不假装问题不存在：
+
+    1. matcher 域里的每个码，使用者必须 ⊆ {本 entry}（RG-3 安全性，与环境无关）；
+    2. 使用者为空（幻影码当域）**只在**裁决行记着 `matcher_domain_conflict` 时允许，且要同时
+       成立：域与真码不相交（真码明令不得当域）、真码在 manifest 里确实指向本 entry、冲突
+       点名的那些 entry 仍在 manifest 里；
+    3. 没有记冲突却用幻影码当域 ⇒ 打红（那就是纯粹的接不上，必须换成真码）。
 
     返回 `wp_code → 使用它的 entry_id 元组`（只含 G7 类的码）。
     """
+    from app.services.workpaper_sync.projection_target_resolution import (
+        adjudicated_wp_codes,
+        load_wp_code_adjudication,
+    )
+
     payload = manifest if manifest is not None else load_entry_manifest()
     entries = manifest_entries_by_id(payload)
     by_code: dict[str, list[str]] = {}
     for entry_id, entry in sorted(entries.items()):
         for code in (entry.get("wp_match") or {}).get("wp_code_patterns") or ():
             by_code.setdefault(str(code), []).append(entry_id)
+    adjudication = load_wp_code_adjudication()
+    real_codes = frozenset(adjudicated_wp_codes(PILOT_ENTRY_ID, adjudication=adjudication))
+    conflict = (adjudication.get(PILOT_ENTRY_ID) or {}).get("matcher_domain_conflict")
 
     for code in sorted(PILOT_WP_CODES):
         owners = tuple(by_code.get(code, ()))
-        if owners != (PILOT_ENTRY_ID,):
+        if owners not in ((), (PILOT_ENTRY_ID,)):
             raise PilotSelectionError(
-                f"matcher 码 {code!r} 的使用者实测为 {list(owners)}，要求恰为 "
+                f"matcher 码 {code!r} 的使用者实测为 {list(owners)}，要求 ⊆ "
                 f"[{PILOT_ENTRY_ID!r}] —— `EntryMatcher.wp_codes` 被两个 entry 共用时，"
                 "registry RG-3 会以 MatcherOverlapError 拒绝第二个 adapter，"
                 "`resolve()` 也会抛 AmbiguousAdapterError；共用码的 entry 不能当 pilot"
+            )
+        if owners:
+            continue
+        if not conflict:
+            raise PilotSelectionError(
+                f"matcher 码 {code!r} 在 manifest 里没有任何使用者，而裁决表没记"
+                " `matcher_domain_conflict` ⇒ 这不是「真码不可用」而是接不上，"
+                f"必须把域换成裁决真码 {sorted(real_codes)}"
+            )
+        if not real_codes:
+            raise PilotSelectionError(f"裁决表没给 {PILOT_ENTRY_ID!r} 真码 ⇒ 「幻影码当域」没有可复核的依据")
+        if code in real_codes:
+            raise PilotSelectionError(
+                f"matcher 域里的 {code!r} 正是裁决真码，而裁决行明令真码不得当 "
+                "EntryMatcher 的域（三个 G7 entry 真码相同，必撞 RG-3）"
+            )
+        real_owners = {owner for real in real_codes for owner in by_code.get(real, ())}
+        if PILOT_ENTRY_ID not in real_owners:
+            raise PilotSelectionError(
+                f"裁决真码 {sorted(real_codes)} 在 manifest 里的使用者是 "
+                f"{sorted(real_owners)}，不含本 entry ⇒ 裁决表与 manifest 脱钩，"
+                "「幻影码当域」的前提失效，必须重新裁决"
+            )
+        gone = conflict.get("conflicting_entries") or ()
+        if missing := [entry_id for entry_id in gone if entry_id not in entries]:
+            raise PilotSelectionError(
+                f"裁决记的冲突 entry {missing} 已不在 manifest 里 ⇒ 「真码三方共用」"
+                "这一冲突可能已消失，matcher 域必须重新裁决而不是继续用幻影码"
             )
     for sibling, shared_code in sorted(SIBLING_G7_CANDIDATES.items()):
         owners = tuple(by_code.get(shared_code, ()))
@@ -1291,17 +1341,31 @@ def assert_pilot_entry_selectable(
             "（AC 12.1「每个独立 entry」）"
         )
     codes = {str(code) for code in (entry.get("wp_match") or {}).get("wp_code_patterns") or ()}
-    if codes != set(PILOT_WP_CODES):
+    # 🔴 2026-11-04：原判据是「manifest 的 wp_code_patterns 与冻结 matcher 域逐值相等」。裁决表
+    #    （reviewed）把本 entry 真码裁为 `G7` 并覆盖启发式 ⇒ 等式恒不成立；而真码**不得**当 matcher
+    #    域（`matcher_domain_conflict`：三个 G7 entry 真码相同，按 wp_code 路由必撞 RG-3）。
+    #    ⇒ 等式只在「没记冲突」时成立；记了冲突就把域的合法性交给 ②-c
+    #    `assert_matcher_domain_is_exclusive`（它按裁决表逐条验幻影码的前提）—— 判据只放一处。
+    from app.services.workpaper_sync.projection_target_resolution import load_wp_code_adjudication
+
+    _adjudication = load_wp_code_adjudication()
+    _conflict = (_adjudication.get(PILOT_ENTRY_ID) or {}).get("matcher_domain_conflict")
+    if not _conflict and codes != set(PILOT_WP_CODES):
         raise PilotSelectionError(
             f"{PILOT_ENTRY_ID!r} 的 wp_code_patterns={sorted(codes)} 与冻结的 matcher 域 "
             f"{sorted(PILOT_WP_CODES)} 不一致 —— matcher 必须覆盖该 entry 的全部 wp_code，"
             "不得多也不得少"
         )
-
     # ── ②-a 冻结的码是名字提取产物（不是真 wp_code）────────────────────────
     assert_wp_code_pattern_is_a_name_extraction_artifact(resolution)
     # ── ②-b 运行时**没有**任何隐式回退；码族精确唯一落在权威模板 ──────────────
-    assert_no_implicit_template_fallback(resolution, wp_codes=frozenset(codes))
+    #
+    # 🔴 零回退这一条的对象是**冻结的 matcher 域**（docstring §一第 2 条：`find_template_file("G7L")`
+    #    三个入口实测 None / None / []），不是 manifest 的 `wp_code_patterns`。两者在裁决表覆盖前
+    #    恒等，原先传 `codes` 看不出区别；覆盖后 manifest 给真码 `G7`，而真码**本该**解析到权威模板
+    #    （②-b 下半的码族判据就在证这件事）⇒ 继续传 `codes` 会要求真码也零回退、自相矛盾，且
+    #    `observe_template_resolution()` 没观测过真码（生成器会报「缺少 wp_code ['G7'] 的实测结果」）。
+    assert_no_implicit_template_fallback(resolution, wp_codes=frozenset(PILOT_WP_CODES))
     # ── ②-c matcher 域必须独占（把三个候选收敛到一个的那一条）───────────────
     assert_matcher_domain_is_exclusive(manifest=payload)
 

@@ -66,11 +66,13 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     positional_identity_hits,
     strip_comments,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    spec_dir,
+)
 
 SLICE_PATH = DATA / "workpaper_sync_k_cycle_manifest_slice.json"
 SPEC_DIR = (
-    ROOT / ".kiro" / "specs"
-    / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
 )
 
 #: 本 lane 的 5 条 entry 序号

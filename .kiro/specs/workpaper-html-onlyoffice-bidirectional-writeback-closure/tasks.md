@@ -1096,3 +1096,63 @@
 - **6.3**：验收账本仍为 0；67 条 bidirectional entry 尚未完成逐 entry required scenarios，
   D2 阻断态证据只证明 AC 1.4。
 - **7.5**：依赖前三项与最新候选树终验；满足 design §15 后再登记 INDEX 并归档。
+
+## 第二批收口（2026-11-05，v1.0.127 之后）
+
+本批不新开任务，只做「仍在红的判据」收口：把冻结快照类判据改成可伪证的棘轮，并补齐三处 provider
+真缺口。逐项证据与变异结果见下；未完成项仍以上节索引为准（0.5 / 2.8 / 6.3 / 7.5 不变）。
+
+### 本批交付
+
+- **task57（A/B/C/S 与跨循环共享 entry 普查）100 → 0 红**。判据从「快照登记值 == 现算值」改成棘轮：
+  漂移必须在 `backend/tests/workpaper_sync/_test_task57_slice_drift_ledger.py` 点名并连现算值一起钉住
+  （291 个 key / 33 单项 + 16 组，方向 pinned·grow·shrink·superset·subset）。四种后果都会打红：
+  未登记的新漂移 / 已登记项又变了 / 漂移消失（条目成死条目必须删）/ 条目所属测试类跑完却从没被查过。
+  能机械核对的理由另记 `claim`，由 `_DRIFT_CLAIMS` 四个函数逐键现场核（载体已换共享同步宿主 /
+  持久化搬到闭包深度 4 / 写调用搬进 `useProgramOverrideTarget` / sheet 名改传纯码且 resolver 真解析）。
+  路径常量与源码读法拆到 `_test_task57_slice_scanners.py`。
+- **顺带修好三处判据自身的缺陷**：①持久化通道扫描器把接口路径登记表（`services/apiPaths/**`，只声明
+  路径不发请求）算成 HTTP 站点 ⇒ a173 多出 custom_cells；②`parent_duplicate` 把挂共享同步宿主的子 Tab
+  与 legacy 重复入口混成一类（52 vs 12）；③内容锚点对「同文件可有多处」的形态硬分 moved/ambiguous。
+- **Task 75 四条判据的分母补齐**（provider 侧真缺口，不是放宽判据）：`phase5_m_cycle_common` 与
+  M2/M3/M4/M7/M10 转发 `resolve_published_frozen_definitions`；G4/G6 ECL 补该 resolver 与
+  `attach_pilot_adapters`；C 控制测试把观测 + digest 比对抽成同名函数。交付台账 25 条 `pilot_class`
+  占位值改成各 provider 自己声明的值。
+- **A/C 域守卫按 pending 裁决制重写**（6 红）：A 域 capability 现在一律 null（本 spec task 1.1）
+  ⇒ 判据改成「不该有任何 bidirectional + 三字段齐备 + canary 仍是唯一有契约的那条」；canary 注册计划
+  改成「只许被 capability 未裁决这一条挡住」；a3-console 有 HTML 对端 ⇒ 不能再裁 single_onlyoffice；
+  A5-1 两条 definition digest 改成「磁盘 == provider 现算」且都不等于模板修订前的旧值。
+- **归档路径与晋级账本对账**（K 循环 102 个 setup ERROR 清零，59 → 25 红）：新增
+  `sync_artifact_paths.py` 的 `spec_dir()`（活跃优先、归档兜底）；`K_REVIEWED_CONTRACTS` /
+  `K_BIDIRECTIONAL_ENTRIES` 补 K2~K7；`contract_owner()` 让没写 `review` 块的 a51 契约按
+  `contract_id` 查交付台账（补 `review` 块会改 canonical digest、让已发布底稿脱钩，属该 lane 的重发布）。
+- **行数门按交付单元拆模块**：`_test_task75_impl_lookup.py` / `_test_task43_workbook_helpers.py` /
+  上述两个 task57 模块。`test_c_cycle_baseline.py` 入白名单（HEAD 就已 1386 > 800，本轮只改两处判据），
+  按真实行数登记并写明拆分方向与归属 lane。
+
+### 验证（隔离库，口径与 CI 同）
+
+| 选集 | base（= 本提交的父 `ebb29beee`） | 候选 |
+| --- | --- | --- |
+| task57 | 100 failed | **136 passed** |
+| A/B/C 兄弟守卫 + ACNR + 已知失败清册自检 | 10 failed | **536 passed / 3 skipped** |
+| pilots（task39~43） | — | **540 passed / 5 xfailed** |
+| task75（共享 PG） | — | **514 passed** |
+| K 全家 | 59 failed + 102 errors | **25 failed / 1115 passed** |
+
+- 变异（`plans/t57.json` 12 组）：9 RED + 3 GREEN 阴性对照。RED 覆盖「钉住值改错 / 单调方向写反 /
+  superset 丢元素 / 组键换族 / 漂移消失却不删条目 / claim 去真核 / 跳过规则撤掉 / 例外清单清空 /
+  判据键写成别的测试类名」。阴性对照（组名改写 / 集合等式放成下界 / 判据改恒真）必须保持 GREEN，
+  用来证明这些自检不是对任何改动都红。
+- ruff 相对 base 新增 0 / 解决 4；行数门 `rc=0`；九个生成物 `--check` 全过（writer 清册 / resolver
+  矩阵 / 里程碑三件按依赖序重算，diff 只有 digest 传播与一处调用点新增）。
+- `KNOWN_FAILING` 删掉 `test_task57…::test_ad1_scope_arithmetic_closes`（棘轮生效后不再假红）。
+
+### 本批未完成（如实登记）
+
+- **K 循环剩余 25 条红属其 lane 自己的冻结事实漂移**（OCR 两种 URL 形态的收敛账、端点命中文件数、
+  BP-8 基线、`wp_code_patterns` 启发式 vs 裁决值等），每条都要独立取证，不在本批范围。
+- **6.3 的 capability 终裁仍要真实 OnlyOffice 证据**：台账里 46 条 `mirror_capability` / 17 条
+  `sheet_literal` / 17 条 `verdict` 的组都写明「裁完后整组删除」，裁决本身须用户放行后才能做。
+- **A5-1 已发布 artifact 仍是按模板修订前的 digest 发的**：判据已把旧值留作反向钉子，重发布属 6.3。
+- 本批未启动服务、未执行迁移、未写任何真实项目数据。

@@ -1911,3 +1911,21 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/useWorkpaperSync
 #   并把 `b22aReference.ts` 式的预置参考文本继续留在数据模块里。
 audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue  2746
 audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue  2826
+
+# 本轮（workpaper-html-onlyoffice-bidirectional-writeback-closure 收口）触到的一个
+# **HEAD 就已远超上限**的历史守卫（入册时 HEAD 1386 行，上限 800）：
+#   backend/tests/workpaper_sync/test_c_cycle_baseline.py  +29 行
+#   改动内容只有两处判据更正，都是**本 spec 自己的交付物**造成的事实变化：
+#     ① `test_notice_sync_zero` → `test_notice_sync_is_now_mounted_in_both_hosts`：
+#        task 3.5 把 AC-14 的 `GtEntrySyncCapabilityNotice` 接到全部宿主（含 C 域这 2 个），
+#        CC-12 冻结的「2 宿主都没挂」已被有意改掉 ⇒ 断言方向反转（保留 `== 0` 等于固化假事实）；
+#     ② `test_a_program_console_32_codes`：S 循环检查表组件接进渲染管线后 9 个码改派，
+#        32 这个下界不再成立 ⇒ 判据改成「横跨 ≥4 字母 + 仍是 pattern_less 里码数最多的」。
+#   🔴 这 1386 行不是本轮写出来的体量 —— C 轮 baseline 本来就是 14 维逐项对照 + 结构性零普查
+#   的普查型守卫。为它做结构拆分不属于本轮交付单元，也会把 C 轮 spec 的拆分责任转移过来；
+#   拆分还会改 test 节点 id（现算：KNOWN_FAILING 与 CI 工作流都没点名本文件的节点，所以**可以**
+#   拆，只是不该由本轮拆）。以真实行数登记，只许下调；bloat 门（baseline × 1.05）继续守着它。
+#   拆分方向（归 C 轮 lane）：`TestEntryContrast14Dims`（14 维逐项相反）与 `TestStructuralZeros`
+#   （两宿主结构性零）各自抽成 `test_c_cycle_contrast.py` / `test_c_cycle_structural_zeros.py`，
+#   公共 fixtures（`c_entries` / `host_files` / `overrides`）落到 `_test_c_cycle_facts.py`。
+backend/tests/workpaper_sync/test_c_cycle_baseline.py  1415
