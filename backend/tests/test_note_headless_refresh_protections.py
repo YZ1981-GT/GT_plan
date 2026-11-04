@@ -150,9 +150,8 @@ async def test_refresh_steps_called_by_the_executor_skip_manual_cells(env, monke
 
     async def refill(self, project_id, year, sections, **kw):
         calls.append({"sections": list(sections), **kw})
-        return SimpleNamespace(cells_updated=0, requested_sections=list(sections), recomputed_sections=[],
-                               changed_sections=[], failed_sections=[], cleared_sections=[], text_only_sections=[],
-                               errors=[], error_details=[])
+        # 用真实报告类型（字段随 RefillReport 走，如写入归属的 blocked_writes；spec formula-writer-ownership-and-stale §13）
+        return disclosure_engine.RefillReport(requested_sections=list(sections))
 
     async def finalize(db, project_id, year, report):  # 收尾（附注公式）与本判据无关
         return {}

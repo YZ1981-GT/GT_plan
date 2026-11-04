@@ -655,6 +655,8 @@ class RefillReport:
     records: list[CellRefillRecord] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     error_details: list[dict[str, str]] = field(default_factory=list)
+    #: 写入归属被拒的格（spec formula-writer-ownership-and-stale design §13）
+    blocked_writes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def recomputed_sections(self) -> list[str]:
@@ -667,6 +669,8 @@ class DisclosureEngine:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        #: 生成 / 报表更新合并时写入归属被拒的格（spec formula-writer-ownership-and-stale design §13）
+        self.blocked_writes: list[dict[str, Any]] = []
         self._wp_cache: dict = {}
         self._wp_account_cache: dict = {}
         self._tb_cache: dict = {}
@@ -1379,7 +1383,9 @@ class DisclosureEngine:
     # Sprint 1 Task 1.3 / 1.4 — binding 驱动的新路径
     # ------------------------------------------------------------------
     @staticmethod
-    def _backfill_totals(rows: list[dict], num_value_cols: int, table: dict | None = None) -> None:
+    def _backfill_totals(rows: list[dict], num_value_cols: int, table: dict | None = None, *,
+                         protected: set[tuple[int, int]] | None = None,
+                         held: list[tuple[int, int, float]] | None = None) -> None:
         """合计 / 小计行回填：按合计构成（``note_total_terms``，单体 / 合并 / 前端同一判定）只写判得准的合计行、
         金额列（标题行库判为比例 / 说明的列不加）、自动格；构成里的格全空不写。
 
@@ -1391,7 +1397,7 @@ class DisclosureEngine:
 
         info = dict(table) if isinstance(table, dict) else {}
         info["rows"] = rows
-        recalc_table_totals(info, value_columns=num_value_cols)
+        recalc_table_totals(info, value_columns=num_value_cols, protected=protected, held=held)
 
     async def _build_with_binding(
         self,
@@ -1742,10 +1748,14 @@ class DisclosureEngine:
 
         Validates: Requirements 4.2, 4.3, 4.8, 4.9, 21.3
         """
+        from app.services.note_formula_push_guard import PushOwnershipCache
+        from app.services.note_write_ownership import WriteGate, merge_holding_pushed_cells
+
         templates = await self._load_templates(project_id, template_type)
         if only_sections is not None:
             templates = [t for t in templates if t["note_section"] in only_sections]
         source_template = self._persist_source_template(template_type)
+        push_cache = PushOwnershipCache(self.db, project_id, year)
         results = []
 
         # ── 统一入口：公式灰度按项目解析一次传下游（避免逐格查库）──
@@ -1920,12 +1930,11 @@ class DisclosureEngine:
                     else:
                         from sqlalchemy.orm.attributes import flag_modified
 
-                        from app.services.note_cell_merge import (
-                            merge_table_data_preserving_cell_modes,
-                        )
-                        note.table_data = merge_table_data_preserving_cell_modes(
-                            note.table_data, table_data,
-                        )
+                        # 写入归属：推送写定的格归公式推送（design §13.4；刷新链路先推送后生成，原来生成把推送值改回绑定值）
+                        gate = WriteGate("generate_notes", template_type, note_section, note.table_data)
+                        owned = await push_cache.cells(note_section, note.table_data) if gate.governed else {}
+                        note.table_data = merge_holding_pushed_cells(note.table_data, table_data, owned, gate)
+                        self.blocked_writes.extend(gate.blocked_writes)
                         flag_modified(note, "table_data")
                 else:
                     note.table_data = table_data
@@ -2019,12 +2028,12 @@ class DisclosureEngine:
         """
         from sqlalchemy.orm.attributes import flag_modified
 
-        from app.services.note_cell_merge import (
-            merge_table_data_preserving_cell_modes,
-        )
+        from app.services.note_formula_push_guard import PushOwnershipCache
+        from app.services.note_write_ownership import WriteGate, merge_holding_pushed_cells
 
         template_type = await self._get_active_template_type(project_id)
         templates = await self._load_templates(project_id, template_type)
+        push_cache = PushOwnershipCache(self.db, project_id, year)
         updated = 0
 
         for tmpl in templates:
@@ -2068,7 +2077,11 @@ class DisclosureEngine:
                         # 不覆盖底稿同步的表格结构，但追加模板新增的子表
                         _append_missing_template_tables(old_td, new_td)
                     else:
-                        note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
+                        # 写入归属：推送写定的格归公式推送（design §13.4），其余照三态合并
+                        gate = WriteGate("update_note_values", template_type, note_section, old_td)
+                        owned = await push_cache.cells(note_section, old_td) if gate.governed else {}
+                        note.table_data = merge_holding_pushed_cells(old_td, new_td, owned, gate)
+                        self.blocked_writes.extend(gate.blocked_writes)
                 else:
                     note.table_data = new_td
                 # JSONB 字段需要显式标记，确保嵌套字段持久化
@@ -2109,7 +2122,14 @@ class DisclosureEngine:
             get_binding_for_section,
         )
 
+        from app.services.note_formula_push_guard import PushOwnershipCache
+        from app.services.note_write_ownership import (
+            ANY_TABLE, BINDING_WRITER, FIELD_ROWS, FIELD_SUB_TABLE, WriteGate,
+        )
+
         report = RefillReport()
+        template_type = await self._get_active_template_type(project_id)
+        push_cache = PushOwnershipCache(self.db, project_id, year)
 
         # 1. 预加载缓存
         self._wp_cache = {}
@@ -2158,14 +2178,14 @@ class DisclosureEngine:
                 report.text_only_sections.append(section)
                 continue
 
-            # 4a. 底稿同步来源（_source=workpaper/workpaper_html）的章节：
-            # 表格结构（sub_table_data 推送的 rows/headers）由底稿披露表拥有，
-            # 刷新不得覆盖其 cell 值——底稿是该章节表格数据的唯一真源。
-            # 但对有 binding sidecar（_cell_meta/semantic）的单元格仍允许重算
-            # （如合计行、试算表引用格），没有 sidecar 的行自然跳过。
-            # 同时标记来源以便 refill 循环中做更细粒度的保护。
-            _note_source = td.get("_source")
-            _is_workpaper_source = _note_source in ("workpaper", "workpaper_html")
+            # 4a. 写入归属（spec formula-writer-ownership-and-stale design §13）：交接章节里底稿披露容器生效 ⇒ 模板表格
+            # 已被投影遮住，不再写（原来照写隐藏的 _tables 并计入「已更新」）；推送写定的格归公式推送，模板绑定不改。
+            gate = WriteGate(BINDING_WRITER, template_type, section, td)
+            if gate.governed and gate.container == FIELD_SUB_TABLE:
+                gate.record(gate.check(table=ANY_TABLE, field=FIELD_ROWS), table=ANY_TABLE, field=FIELD_ROWS)
+                report.blocked_writes.extend(gate.blocked_writes)
+                continue
+            owned = await push_cache.cells(section, td) if gate.governed else {}
 
             # 4. 获取 binding + 计算待刷新的表清单
             sec_binding = get_binding_for_section(section)
@@ -2314,6 +2334,20 @@ class DisclosureEngine:
                             if not self._values_differ(old_val, new_val):
                                 continue
 
+                            # 写入归属：推送写定的格归公式推送（design §13.3 第 6 步），其余按基础条目
+                            owned_cell = owned.get((table_index, row_idx, col_idx))
+                            verdict = gate.check(
+                                table=owned_cell.table if owned_cell else ANY_TABLE, field=FIELD_ROWS,
+                                column=owned_cell.field if owned_cell else None, pushed=owned_cell is not None,
+                            )
+                            if not verdict.allowed:
+                                gate.record(
+                                    verdict, table=owned_cell.table if owned_cell else ANY_TABLE,
+                                    field=f"table.cell:{owned_cell.field}" if owned_cell else FIELD_ROWS,
+                                    row=label or None, incoming=new_val, kept=old_val,
+                                )
+                                continue
+
                             # 写回
                             values[col_idx] = new_val
                             # legacy 单元格重算后归一为 auto，使后续刷新走正常自动路径
@@ -2342,9 +2376,23 @@ class DisclosureEngine:
                     if section_had_error:
                         break
 
-                    # 重算合计行（逐表）
+                    # 重算合计行（逐表）；推送写定的合计格（兜底写入的科目合计等）归公式推送，不重算
                     if table_touched:
-                        self._backfill_totals(rows, num_value_cols, table_obj)
+                        pushed_totals = {
+                            (r_i, c_i): cell for (t_i, r_i, c_i), cell in owned.items() if t_i == table_index
+                            and not gate.check(table=cell.table, field=FIELD_ROWS, column=cell.field,
+                                               pushed=True).allowed
+                        }
+                        held_totals: list[tuple[int, int, float]] = []
+                        self._backfill_totals(rows, num_value_cols, table_obj,
+                                              protected=set(pushed_totals), held=held_totals)
+                        for r_i, c_i, new_total in held_totals:
+                            cell = pushed_totals[(r_i, c_i)]
+                            gate.record(
+                                gate.check(table=cell.table, field=FIELD_ROWS, column=cell.field, pushed=True),
+                                table=cell.table, field=f"table.cell:{cell.field}", row=cell.label,
+                                incoming=new_total, kept=rows[r_i]["values"][c_i],
+                            )
                         if table_index == 0:
                             table0_touched = True
 
@@ -2362,6 +2410,7 @@ class DisclosureEngine:
                         section, table_index, err,
                     )
 
+            report.blocked_writes.extend(gate.blocked_writes)
             if section_had_error:
                 if section not in report.failed_sections:
                     report.failed_sections.append(section)

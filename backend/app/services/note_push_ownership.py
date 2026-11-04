@@ -64,23 +64,31 @@ def _locate(rows: list, label: str) -> int | None:
     return note_writer.find_row(rows, [label]) if label else None
 
 
-async def _owned_states(db: AsyncSession, project_id: UUID, year: int, section: str) -> list[Any]:
+async def _owned_states(db: AsyncSession, project_id: UUID, year: int, section: str | None) -> list[Any]:
+    """推送写定（状态 auto、有推送值）的附注格；``section=None`` 取本项目年度全部章节（批量写入一次查完）。"""
     from app.models.formula_push_models import FormulaPushState
 
-    return list((await db.execute(sa.select(FormulaPushState).where(
+    where = [
         FormulaPushState.project_id == project_id,
         FormulaPushState.year == year,
         FormulaPushState.domain == "note",
-        FormulaPushState.note_section == section,
         FormulaPushState.state == "auto",
         FormulaPushState.last_pushed_value.is_not(None),
-    ))).scalars().all())
+    ]
+    if section is not None:
+        where.append(FormulaPushState.note_section == section)
+    return list((await db.execute(sa.select(FormulaPushState).where(*where))).scalars().all())
 
 
 async def reapply_pushed_cells(
     db: AsyncSession, *, project_id: UUID, year: int, section: str, table_data: dict, touched: Iterable[str],
+    gate: Any = None,
 ) -> list[dict[str, Any]]:
-    """把本次同步写过的表里、推送拥有的格恢复为推送值；返回逐格差异（``kind``：cell / fallback_total / total）。"""
+    """把本次同步写过的表里、推送拥有的格恢复为推送值；返回逐格差异（``kind``：cell / fallback_total / total）。
+
+    ``gate``（``note_write_ownership.WriteGate``，底稿披露同步传入）：治理域内只恢复矩阵声明归推送的格，并把每一格记进
+    ``gate.blocked_writes``（底稿披露同步对这一格的写入被拒）；域外与不传时沿用 ADR-3 交接（推送写定即归推送）。
+    """
     sub = table_data.get("sub_table_data")
     touched = {str(t) for t in touched}
     if not (isinstance(sub, dict) and touched) or note_writer.detect_manual_override(table_data):
@@ -108,6 +116,8 @@ async def reapply_pushed_cells(
         index = _locate(rows, label)
         if len(fields) != 1 or index is None:
             continue
+        if gate is not None and not gate.protects_pushed(table, fields[0]):
+            continue  # 治理域内矩阵没有声明这一格归推送：按基础条目归底稿披露同步，不恢复
         (totals if _is_total(rows[index]) else cells).append(
             (table, index, fields[0], period, label, state.last_pushed_value))
     data_tables = {c[0] for c in cells}
@@ -140,4 +150,11 @@ async def reapply_pushed_cells(
                 note_writer.write_cell(rows[index], field, total, keys)
                 kept.append({"table": table, "row": label, "period": period, "field": field, "kind": "total",
                              "pushed": total, "incoming": incoming})
+    if gate is not None and gate.governed:
+        from app.services.note_write_ownership import FIELD_SUB_TABLE
+
+        for item in kept:  # 每一格都是底稿披露同步被拒的写入（运行时对拍：底稿值 incoming / 保留的推送值 pushed）
+            gate.record(gate.check(table=item["table"], field=FIELD_SUB_TABLE, column=item["field"], pushed=True),
+                        table=item["table"], field=f"table.cell:{item['field']}", row=item["row"],
+                        incoming=item["incoming"], kept=item["pushed"], kind=item["kind"])
     return kept

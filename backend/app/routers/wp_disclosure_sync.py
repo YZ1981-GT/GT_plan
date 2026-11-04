@@ -107,8 +107,12 @@ class SyncFromWorkpaperResponse(BaseModel):
         default_factory=list,
         description="公式推送写过、本次同步来的值与之不同而保持推送值的格（以试算表审定数为准）",
     )
-    skipped: bool = Field(False, description="章节不适用于本项目口径（单体项目的合并专属章节等），未写入")
-    reason: str | None = Field(None, description="跳过原因")
+    skipped: bool = Field(False, description="未写入：章节不适用于本项目口径，或从未由底稿同步、已有人工填写（见 reason）")
+    reason: str | None = Field(None, description="跳过原因（section_not_applicable_to_report_scope / manual_values_never_synced）")
+    blocked_writes: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="写入归属被拒的格（spec formula-writer-ownership-and-stale design §13）",
+    )
 
 
 class SyncBatchItem(BaseModel):
@@ -386,6 +390,7 @@ class SyncFromHtmlResponse(BaseModel):
     row_scope_unresolved: list[str] = Field(default_factory=list)
     row_scope_unresolved_reasons: dict[str, str] = Field(default_factory=dict)
     push_kept: list[dict[str, Any]] = Field(default_factory=list)
+    blocked_writes: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ConflictDetail(BaseModel):

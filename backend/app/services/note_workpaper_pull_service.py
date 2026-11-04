@@ -62,9 +62,12 @@ def _section_of(addr_id: str | None) -> str | None:
 
 
 def summarize_push(result: Any, sections: list[str]) -> dict[str, dict[str, Any]]:
-    """推送结果按附注章节汇总：写入 / 未变 / 保留（人工、锁定）/ 跳过 + 前几条跳过原因。"""
-    per: dict[str, dict[str, Any]] = {s: {"written": 0, "unchanged": 0, "kept": 0, "skipped": 0, "reasons": []}
-                                      for s in sections}
+    """推送结果按附注章节汇总：写入 / 未变 / 保留（人工、锁定）/ 跳过 + 前几条跳过原因。
+
+    归属矩阵拒写（``blocked``，spec formula-writer-ownership-and-stale §13）计入跳过，另单列 ``blocked``。
+    """
+    per: dict[str, dict[str, Any]] = {s: {"written": 0, "unchanged": 0, "kept": 0, "skipped": 0, "blocked": 0,
+                                          "reasons": []} for s in sections}
     reasons: dict[str, Counter] = defaultdict(Counter)
     for item in getattr(result, "items", None) or []:
         if getattr(item, "domain", None) != "note":
@@ -79,8 +82,10 @@ def summarize_push(result: Any, sections: list[str]) -> dict[str, dict[str, Any]
             per[sec]["unchanged"] += 1
         elif action in ("keep_locked", "keep_manual", "keep_pending"):
             per[sec]["kept"] += 1
-        elif action in ("skipped", "conflict"):
+        elif action in ("skipped", "conflict", "blocked"):
             per[sec]["skipped"] += 1
+            if action == "blocked":
+                per[sec]["blocked"] += 1
             if item.reason:
                 reasons[sec][item.reason] += 1
     for sec, counter in reasons.items():
@@ -329,7 +334,7 @@ async def pull_sections(
             **(states.get(sec) or {"exists": False, "synced_before": False, "manual_values": 0}),
             "push_wp_codes": [c for c in sec_codes if c in supported],
             "unsupported_wp_codes": [c for c in sec_codes if c not in supported],
-            **(per.get(sec) or {"written": 0, "unchanged": 0, "kept": 0, "skipped": 0, "reasons": []}),
+            **(per.get(sec) or {"written": 0, "unchanged": 0, "kept": 0, "skipped": 0, "blocked": 0, "reasons": []}),
             "formula_updated": (formula_runs.get(sec) or {}).get("updated", 0),
         })
     summary = result.summary() if result is not None else None
@@ -352,8 +357,10 @@ async def pull_sections(
             "written": sum(r["written"] for r in rows),
             "kept": sum(r["kept"] for r in rows),
             "skipped": sum(r["skipped"] for r in rows),
+            "blocked": sum(r["blocked"] for r in rows),
             "run_id": (summary or {}).get("run_id"),
             "warnings": (summary or {}).get("warnings") or ([push_error] if push_error else []),
+            "blocked_writes": (summary or {}).get("blocked_writes") or [],
         },
         "sections": rows,
     }

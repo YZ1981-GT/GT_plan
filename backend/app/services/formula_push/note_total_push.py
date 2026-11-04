@@ -10,15 +10,17 @@ spec: note-table-structure-formula-pull-closure R12 · ADR-8 / ADR-9
 """
 from __future__ import annotations
 
+import dataclasses
 import re
 from typing import Any, Callable, Protocol
 
 from app.services.formula_push import note_writer
 from app.services.formula_push.policy import Decision, decide_note
+from app.services.formula_push.results import BLOCKED, PushItem
 from app.services.formula_push.rules import PushRule
 
 __all__ = ["PERIOD_LABELS", "SPLIT_FIELD_LABELS", "find_total_by_label", "note_keep_reason", "pick_fallback_total",
-           "push_note_cell", "push_note_total"]
+           "push_note_cell", "push_note_total", "with_ownership"]
 
 PERIOD_LABELS: dict[str, str] = {"end": "期末", "prior": "期初"}
 #: 分「账面余额 / 减值准备 / 账面价值」三列写的字段：旧格式表（按列序存数）只认得出期末 / 期初金额列，这几列不按位置猜
@@ -31,7 +33,40 @@ _PROVISION_RE = re.compile(r"^减[:：]\s*.{0,8}准备$")
 
 
 class _SkipCtx(Protocol):
+    result: Any
+
     def skip(self, rule_id: str, domain: str, kind: str, addr: str, reason: str) -> Any: ...
+
+
+def with_ownership(table: note_writer.NoteTable, *, template_type: Any, section: str, table_key: str,
+                   table_data: Any) -> note_writer.NoteTable:
+    """把写入归属判定挂到定位到的表上：推送只写矩阵声明的审定主表格（spec formula-writer-ownership-and-stale §13）。
+
+    ``section`` 用最终落笔的章节（按标题改投之后），``table_key`` 用规则表名（与矩阵、推送地址同一个名字）。
+    """
+    from app.services.note_write_ownership import PUSH_WRITER, WriteGate
+
+    gate = WriteGate(PUSH_WRITER, template_type, section, table_data)
+    return dataclasses.replace(table, ownership=gate, table_key=table_key)
+
+
+def _blocked(ctx: _SkipCtx, rule: PushRule, addr: str, table: note_writer.NoteTable, row: dict,
+             field_name: str, value: Any, current: Any) -> bool:
+    """归属判定拒写 ⇒ 该格记 ``blocked`` 动作与结构化回报、不写，返回 True；放行（或未挂判定）返回 False。"""
+    gate = table.ownership
+    if gate is None:
+        return False
+    table_key = table.table_key or ""
+    verdict = gate.check(table=table_key, field=gate.container, column=field_name)
+    if verdict.allowed:
+        return False
+    entry = gate.record(verdict, table=table_key, field=f"table.cell:{field_name}",
+                        row=note_writer.row_label(row) or None, incoming=value, current=current)
+    ctx.result.items.append(PushItem(rule.rule_id, "note", "note", addr, BLOCKED, formula=value, current=current,
+                                     reason=entry["reason"] if entry else verdict.code))
+    if entry is not None:
+        ctx.result.blocked_writes.append(entry)
+    return True
 
 
 def find_total_by_label(rows: Any, label: str) -> int | None:
@@ -93,6 +128,8 @@ def push_note_cell(
                       f"「{SPLIT_FIELD_LABELS[field_name]}」列，不按位置猜，附注保持原值")
         ctx.skip(rule.rule_id, "note", "note", addr, reason)
         return False
+    if _blocked(ctx, rule, addr, table, row, field_name, value, current):
+        return False
     mode = note_writer.external_mode(table.section_locked, cell_mode)
     decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
     if decision.writes:
@@ -122,6 +159,8 @@ def push_note_total(
         if value is None:
             ctx.skip(rule.rule_id, "note", "note", addr,
                      f"合计行「{label}」上方各行这一列都没有数，合计不按 0 重算，附注保持原值")
+            continue
+        if _blocked(ctx, rule, addr, table, total_row, field_name, value, current):
             continue
         mode = note_writer.external_mode(table.section_locked, cell_mode)
         decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)

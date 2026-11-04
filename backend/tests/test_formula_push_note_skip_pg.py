@@ -83,7 +83,12 @@ _MAX_SKIPPED = 133
 _MIN_COVERAGE = 204
 
 # ── 分类别棘轮（spec: formula-push-note-row-matching · 需求 3） ────────
+#: 计入 skipped_count 的动作，与 ``RunResult.skipped_count`` 同口径（blocked = 写入归属矩阵拒写，2026-11-04 起计入）；
+#: 两边不一致时末尾「分类别总计 ≠ skipped_count」会打红
+_SKIP_ACTIONS = ("skipped", "conflict", "blocked")
 _SKIP_CATEGORIES: dict[str, re.Pattern[str]] = {
+    # 写入归属矩阵拒写（动作 blocked，计入 skipped_count；spec formula-writer-ownership-and-stale §13，2026-11-04 起）
+    "B": re.compile(r"写入归属矩阵"),
     # 子表规则只按表名精确定位：章节里没有这张表（2026-10-27 起，spec note-pull-followup-closure R2.3）；排在 A 前 ——
     # 表名里可能带「行」（银行承兑汇票…），按 A 的「没有.*行」会认错类
     "S": re.compile(r"子表规则只按表名精确定位"),
@@ -122,6 +127,8 @@ def _categorize(reason: str) -> str:
 #: 2026-10-31 现算（spec disclosure-note-template-word-realignment Task 34/35）：S=0 / P=20 / T=23 / Y=15 / Z=6 / A=4 / C=32 /
 #: D=5 / G=6 / I=2 / K=8 / L=12 / M=0 / other=0，合计 133
 _MAX_SKIPPED_BY_CATEGORY: dict[str, int] = {
+    "B": 0,      # real=0（2026-11-04 现算：候选树与 HEAD 逐项 373 条相同、拒写 0）。矩阵推送条目 = 附注推送规则目标，
+                 # 真实项目上非 0 = 按标题改投到未声明的章节、或规则表名与矩阵不一致 —— 先查原因再动矩阵，不调高本值
     "S": 4,      # real=0，子表规则：章节里没有这张表
     "P": 22,     # real=20，binding 分册在本项目不存在（131 张已裁底稿移入回收站）
     "T": 23,     # real=23（2026-10-31 新增 15），多汇总行不兜底：长期股权投资 3 / 投资性房地产 / 长期借款 / 应付债券 /
@@ -212,7 +219,7 @@ async def _scenario() -> dict:
     # 汇总跳过原因分布（诊断用，非断言）
     skip_reasons: dict[str, int] = {}
     for item in result1.items:
-        if item.action in ("skipped", "conflict"):
+        if item.action in _SKIP_ACTIONS:
             reason = (item.reason or "unknown")[:60]
             skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
     out["skip_reasons"] = skip_reasons
@@ -220,7 +227,7 @@ async def _scenario() -> dict:
     # 分类别统计（用于 per-category 棘轮断言）
     cat_counts: dict[str, int] = {}
     for item in result1.items:
-        if item.action in ("skipped", "conflict"):
+        if item.action in _SKIP_ACTIONS:
             reason = item.reason or ""
             cat = _categorize(reason)
             cat_counts[cat] = cat_counts.get(cat, 0) + 1
@@ -342,6 +349,10 @@ def test_categorize_known_patterns():
     assert _categorize("合计行「合计」上方各行这一列都没有数，合计不按 0 重算，附注保持原值") == "Z"
     # L: 表有表头但缺该期间列（无表头说明时只有这一句）
     assert _categorize("附注表缺少「期初」列") == "L"
+    # B: 写入归属矩阵拒写（原因文本取自生产判定，不手抄）
+    from app.services.note_write_ownership import Verdict, reason_text
+
+    assert _categorize(reason_text(Verdict(False, "unknown_entry"), "formula_push")) == "B"
     # other: 未知模式
     assert _categorize("附注章节已确认，公式推送不改写") == "other"
     assert _categorize("something completely unknown") == "other"

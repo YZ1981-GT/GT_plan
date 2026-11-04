@@ -469,6 +469,7 @@ class _WorkpaperCheckpoint:
     note_section_count: int
     wp_id_count: int
     state_write_count: int
+    blocked_write_count: int = 0
 
 
 def _workpaper_checkpoint(ctx: _Ctx) -> _WorkpaperCheckpoint:
@@ -481,6 +482,7 @@ def _workpaper_checkpoint(ctx: _Ctx) -> _WorkpaperCheckpoint:
         note_section_count=len(result.note_sections),
         wp_id_count=len(result.wp_ids),
         state_write_count=len(ctx.state_writes),
+        blocked_write_count=len(result.blocked_writes),
     )
 
 
@@ -493,6 +495,7 @@ def _restore_workpaper_checkpoint(ctx: _Ctx, checkpoint: _WorkpaperCheckpoint) -
     del result.note_sections[checkpoint.note_section_count:]
     del result.wp_ids[checkpoint.wp_id_count:]
     del ctx.state_writes[checkpoint.state_write_count:]
+    del result.blocked_writes[checkpoint.blocked_write_count:]
 
 
 def _workpaper_failure_reason(wp_code: str, error: BaseException) -> str:
@@ -752,6 +755,8 @@ async def _push_note(
     if table is None:
         ctx.skip(rule.rule_id, "note", "note", section_addr, reason or "附注表格无法定位")
         return None
+    table = note_total_push.with_ownership(table, template_type=template_type, section=section, table_key=table_name,
+                                           table_data=table_data)
 
     wrote = False
     any_data_row_matched = False

@@ -261,6 +261,8 @@ async def generate_notes(
             "message": "附注生成成功",
             "note_count": len(results),
             "notes": results,
+            # 写入归属被拒的格：生成合并没有改写公式推送写定的格（spec formula-writer-ownership-and-stale §13）
+            "blocked_writes": engine.blocked_writes,
         }
 
     def _event(_response: dict[str, Any]) -> EventPayload:

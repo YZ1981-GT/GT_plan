@@ -310,11 +310,16 @@ def section_preset_formulas(td: Any) -> tuple[dict[str, dict], list[dict]]:
     return formulas, notes
 
 
-def recalc_table_totals(table: dict, *, value_columns: int | None = None) -> int:
+def recalc_table_totals(table: dict, *, value_columns: int | None = None,
+                        protected: set[tuple[int, int]] | None = None,
+                        held: list[tuple[int, int, float]] | None = None) -> int:
     """按合计构成回填一张表的合计 / 小计行 → 改了几格。
 
     只写判得准的合计行、金额列、自动格（``_cell_modes`` 手工 / 锁定格不动）；构成里的格全空不写（不写 0）。没有表头的
     旧表（表头读时才投影）按 ``value_columns`` 列全算。
+
+    ``protected``：不归调用方写的 ``(行, 列)``（推送写定的合计格，spec formula-writer-ownership-and-stale §13）—— 不写，
+    重算结果与现值不同时记进 ``held``（``(行, 列, 重算值)``）供调用方回报。
     """
     rows = table.get("rows") if isinstance(table, dict) else None
     if not isinstance(rows, list) or not rows:
@@ -344,6 +349,10 @@ def recalc_table_totals(table: dict, *, value_columns: int | None = None) -> int
             new = float(total)
             old = to_decimal(values[c])
             if old is not None and abs(old - total) < Decimal("0.005"):
+                continue
+            if protected and (r, c) in protected:
+                if held is not None:
+                    held.append((r, c, new))
                 continue
             values[c] = new
             changed += 1

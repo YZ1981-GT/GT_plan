@@ -163,19 +163,26 @@ class ReportNoteSyncService:
             if isinstance(rc, str) and rc and amt is not None:
                 report_data[rc] = amt  # 同 row_code 后者覆盖（跨 report_type 罕见）
 
+        from app.services.note_write_ownership import WriteGate, note_template_type
+
         linkage = ReportNoteLinkage()
         synced_sections = 0
         cells_updated = 0
         matched_rows: set[str] = set()
+        # 写入归属（spec formula-writer-ownership-and-stale §13）：交接章节的数值由取数链路写，报表同步不改
+        blocked_writes: list[dict] = []
 
         for note in notes:
             try:
                 targets = linkage.report_targets_in_note(note)
                 if not targets:
                     continue
+                gate = WriteGate("report_sync", note_template_type(note), getattr(note, "note_section", None),
+                                 note.table_data)
                 new_td, written, matched = self._apply_report_values(
-                    note, targets, report_data
+                    note, targets, report_data, gate=gate,
                 )
+                blocked_writes.extend(gate.blocked_writes)
                 matched_rows |= matched
                 if written > 0:
                     # note_cell_merge 保留 manual/locked（Req3.2，双保险）
@@ -222,6 +229,7 @@ class ReportNoteSyncService:
             "skipped_sections": skipped_sections,
             "cells_updated": cells_updated,
             "validation_run": validation_run,
+            "blocked_writes": blocked_writes,
         }
 
     @staticmethod
@@ -229,13 +237,19 @@ class ReportNoteSyncService:
         note: Any,
         targets: list[LinkTarget],
         report_data: dict[str, float],
+        *,
+        gate: Any = None,
     ) -> tuple[dict[str, Any], int, set[str]]:
         """把报表金额写入 note 的 REPORT 目标单元格（返回新 table_data，不就地改）。
 
         - 仅写 Cell_Mode 非 manual/locked 的公式单元格（manual/locked 跳过，Req3.2）。
         - 坐标越界 / 表越界 → 跳过（不写非目标单元格，Req4.3）。
         - matched：成功定位到有效目标单元格的 row_code（无论是否写入，用于 skipped 判定）。
+        - ``gate``（``note_write_ownership.WriteGate``）：locked / manual 与写入归属一并由它判；交接章节里报表同步不是
+          所有者 ⇒ 不写、记进 ``gate.blocked_writes``（值本来就相同的格不记）。不传时只按格模式判（旧行为）。
         """
+        from app.services.formula_push.policy import values_equal
+        from app.services.note_write_ownership import FIELD_ROWS
         td: dict[str, Any] = (
             deepcopy(note.table_data) if isinstance(note.table_data, dict) else {}
         )
@@ -261,8 +275,17 @@ class ReportNoteSyncService:
             # 有效目标已定位（无论 manual/locked）→ 该报表行视为有 linkage（不计 skipped）
             matched.add(rc)
             mode = (row.get("_cell_modes") or {}).get(str(t.col_idx))
-            if mode in ("manual", "locked"):
-                continue
+            if gate is None:
+                if mode in ("manual", "locked"):
+                    continue
+            else:
+                table_name = str(tbl.get("name") or "*")
+                verdict = gate.check(table=table_name, field=FIELD_ROWS, cell_mode=mode)
+                if not verdict.allowed:
+                    if not values_equal(values[t.col_idx], report_data[rc]):
+                        gate.record(verdict, table=table_name, field=FIELD_ROWS, row=str(row.get("label") or "") or None,
+                                    incoming=report_data[rc], kept=values[t.col_idx])
+                    continue
             values[t.col_idx] = report_data[rc]
             written += 1
 

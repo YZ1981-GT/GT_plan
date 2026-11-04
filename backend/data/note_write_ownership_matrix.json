@@ -1,0 +1,909 @@
+{
+ "_source": "backend/scripts/gen/gen_note_write_ownership_matrix.py",
+ "_doc": ".kiro/specs/formula-writer-ownership-and-stale/design.md §13",
+ "decision": "D1（2026-11-04 用户拍板）：已接「从底稿拉取 / 离屏同步」的章节由后端取数链路唯一写入，其余章节暂留前端同步，加前后端对拍守卫",
+ "identity": {"generate_notes": "binding_refill", "update_note_values": "binding_refill", "workpaper_html_sync": "workpaper_sync"},
+ "manual_policy": {"writer": "workpaper_sync", "rule": "never_synced_with_manual_values", "cases": [{"synced_before": false, "manual_values": 0, "blocked": false}, {"synced_before": false, "manual_values": 1, "blocked": true}, {"synced_before": false, "manual_values": 3, "blocked": true}, {"synced_before": true, "manual_values": 0, "blocked": false}, {"synced_before": true, "manual_values": 2, "blocked": false}]},
+ "chapters": [
+  {"template_type": "listed", "note_section": "五、1", "wp_codes": ["E1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "货币资金", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["E1.note.main_rows"]},
+   {"table_key": "货币资金", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["E1.note.main_rows"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、2", "wp_codes": ["G1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "交易性金融资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G1.note.main"]},
+   {"table_key": "交易性金融资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、3", "wp_codes": ["G1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、4", "wp_codes": ["D1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应收票据", "field_key": "table.cell:end_balance", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据", "field_key": "table.cell:end_book_value", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据", "field_key": "table.cell:end_provision", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据", "field_key": "table.cell:prior_balance", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据", "field_key": "table.cell:prior_book_value", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据", "field_key": "table.cell:prior_provision", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、5", "wp_codes": ["D2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "按账龄披露", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D2.note.main"]},
+   {"table_key": "按账龄披露", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、6", "wp_codes": ["D5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、7", "wp_codes": ["F1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "预付款项", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F1.note.main"]},
+   {"table_key": "预付款项", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、8", "wp_codes": ["G2", "G3", "K1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他应收款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K1.note.main"]},
+   {"table_key": "其他应收款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K1.note.main"]},
+   {"table_key": "应收利息", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G2.note.main"]},
+   {"table_key": "应收利息", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G2.note.main"]},
+   {"table_key": "应收股利", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G3.note.main"]},
+   {"table_key": "应收股利", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、9", "wp_codes": ["F2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "存货分类", "field_key": "table.cell:end_gross", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:end_impairment", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:end_net", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:prior_gross", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:prior_impairment", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:prior_net", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、10", "wp_codes": ["D6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "合同资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D6.note.main"]},
+   {"table_key": "合同资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D6.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、11", "wp_codes": ["K6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "持有待售资产和持有待售负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K6.note.main"]},
+   {"table_key": "持有待售资产和持有待售负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K6.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、13", "wp_codes": ["K2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他流动资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K2.note.main"]},
+   {"table_key": "其他流动资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、14", "wp_codes": ["G4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "债权投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G4.note.main"]},
+   {"table_key": "债权投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、15", "wp_codes": ["G6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他债权投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G6.note.main"]},
+   {"table_key": "其他债权投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G6.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、16", "wp_codes": ["G5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期应收款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G5.note.main"]},
+   {"table_key": "长期应收款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G5.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、18", "wp_codes": ["G7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期股权投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G7.note.main"]},
+   {"table_key": "长期股权投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G7.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、19", "wp_codes": ["G8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他权益工具投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G8.note.main"]},
+   {"table_key": "其他权益工具投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G8.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、20", "wp_codes": ["G9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他非流动金融资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G9.note.main"]},
+   {"table_key": "其他非流动金融资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G9.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、21", "wp_codes": ["H3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "投资性房地产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H3.note.main"]},
+   {"table_key": "投资性房地产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、22", "wp_codes": ["H1", "H6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "固定资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H1.note.main"]},
+   {"table_key": "固定资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、23", "wp_codes": ["H2", "H4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "在建工程", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H2.note.main"]},
+   {"table_key": "在建工程", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H2.note.main"]},
+   {"table_key": "工程物资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H4.note.main"]},
+   {"table_key": "工程物资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、24", "wp_codes": ["H7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "生产性生物资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H7.note.main"]},
+   {"table_key": "生产性生物资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H7.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、25", "wp_codes": ["H8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "使用权资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H8.note.main"]},
+   {"table_key": "使用权资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H8.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、26", "wp_codes": ["I1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "无形资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I1.note.main"]},
+   {"table_key": "无形资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、27", "wp_codes": ["I2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "开发支出", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I2.note.main"]},
+   {"table_key": "开发支出", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、28", "wp_codes": ["I3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "商誉账面原值", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I3.note.main"]},
+   {"table_key": "商誉账面原值", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、29", "wp_codes": ["I4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期待摊费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I4.note.main"]},
+   {"table_key": "长期待摊费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、30", "wp_codes": ["N1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "递延所得税资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N1.note.main"]},
+   {"table_key": "递延所得税资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、31", "wp_codes": ["I5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、33", "wp_codes": ["L1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "短期借款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L1.note.main"]},
+   {"table_key": "短期借款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L1.note.main"]},
+   {"table_key": "短期借款分类", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L1.note.subtable_0"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、34", "wp_codes": ["G10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "交易性金融负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G10.note.main"]},
+   {"table_key": "交易性金融负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G10.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、35", "wp_codes": ["G10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、36", "wp_codes": ["F3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付票据", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F3.note.main"]},
+   {"table_key": "应付票据", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、37", "wp_codes": ["F4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付账款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F4.note.main"]},
+   {"table_key": "应付账款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、38", "wp_codes": ["D3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "预收款项", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D3.note.main"]},
+   {"table_key": "预收款项", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、39", "wp_codes": ["D7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "合同负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D7.note.main"]},
+   {"table_key": "合同负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D7.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、40", "wp_codes": ["J1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付职工薪酬", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J1.note.main"]},
+   {"table_key": "应付职工薪酬", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、41", "wp_codes": ["N2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应交税费", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N2.note.main"]},
+   {"table_key": "应交税费", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、42", "wp_codes": ["K3", "L2", "M1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他应付款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.main"]},
+   {"table_key": "其他应付款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.main"]},
+   {"table_key": "其他应付款（按款项性质列示）", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.subtable_4"]},
+   {"table_key": "其他应付款（按款项性质列示）", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.subtable_4"]},
+   {"table_key": "应付利息", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L2.note.main"]},
+   {"table_key": "应付利息", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L2.note.main"]},
+   {"table_key": "应付股利", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M1.note.main"]},
+   {"table_key": "应付股利", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M1.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、44", "wp_codes": ["K4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、45", "wp_codes": ["L3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期借款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L3.note.main"]},
+   {"table_key": "长期借款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、46", "wp_codes": ["L4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付债券", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L4.note.main"]},
+   {"table_key": "应付债券", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、47", "wp_codes": ["H9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "租赁负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H9.note.main"]},
+   {"table_key": "租赁负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H9.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、48", "wp_codes": ["L5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期应付款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L5.note.main"]},
+   {"table_key": "长期应付款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L5.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、49", "wp_codes": ["J2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期应付职工薪酬", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J2.note.main"]},
+   {"table_key": "长期应付职工薪酬", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、50", "wp_codes": ["K5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "预计负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K5.note.main"]},
+   {"table_key": "预计负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K5.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、51", "wp_codes": ["K7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "递延收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K7.note.main"]},
+   {"table_key": "递延收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K7.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、52", "wp_codes": ["L7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、53", "wp_codes": ["M2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "实收资本", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M2.note.main"]},
+   {"table_key": "实收资本", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M2.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、54", "wp_codes": ["M10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他权益工具", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M10.note.main"]},
+   {"table_key": "其他权益工具", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M10.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、55", "wp_codes": ["M4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "资本公积", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M4.note.main"]},
+   {"table_key": "资本公积", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、56", "wp_codes": ["M3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "库存股", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M3.note.main"]},
+   {"table_key": "库存股", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M3.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、57", "wp_codes": ["M9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他综合收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M9.note.main"]},
+   {"table_key": "其他综合收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M9.note.main"]},
+   {"table_key": "利润表中归属于母公司的其他综合收益：", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M9.note.subtable_1"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、58", "wp_codes": ["M7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "专项储备", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M7.note.main"]},
+   {"table_key": "专项储备", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M7.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、59", "wp_codes": ["M5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "盈余公积", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M5.note.main"]},
+   {"table_key": "盈余公积", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M5.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、60", "wp_codes": ["M8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "listed", "note_section": "五、61", "wp_codes": ["M6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "未分配利润", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M6.note.main"]},
+   {"table_key": "未分配利润", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M6.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、62", "wp_codes": ["D4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "营业收入和营业成本", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D4.note.main"]},
+   {"table_key": "营业收入和营业成本", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、63", "wp_codes": ["N4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "税金及附加", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N4.note.main"]},
+   {"table_key": "税金及附加", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N4.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、64", "wp_codes": ["K8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "销售费用（按费用性质列示）", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K8.note.main"]},
+   {"table_key": "销售费用（按费用性质列示）", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K8.note.main", "K8.note.subtable_0"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、65", "wp_codes": ["K9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "管理费用（按费用性质列示）", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K9.note.main"]},
+   {"table_key": "管理费用（按费用性质列示）", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K9.note.main", "K9.note.subtable_0"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、66", "wp_codes": ["I6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "研发费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I6.note.main"]},
+   {"table_key": "研发费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I6.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、67", "wp_codes": ["L8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "财务费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L8.note.main"]},
+   {"table_key": "财务费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L8.note.main"]},
+   {"table_key": "财务费用（按费用性质列示）", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L8.note.subtable_0"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、68", "wp_codes": ["K10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K10.note.main"]},
+   {"table_key": "其他收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K10.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、69", "wp_codes": ["G11"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "投资收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G11.note.main"]},
+   {"table_key": "投资收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G11.note.main"]},
+   {"table_key": "项  目", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G11.note.subtable_1"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、70", "wp_codes": ["G12"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "净敞口套期收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G12.note.main"]},
+   {"table_key": "净敞口套期收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G12.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、75", "wp_codes": ["G13"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "产生公允价值变动收益的来源", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.subtable_0"]},
+   {"table_key": "公允价值变动收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.main"]},
+   {"table_key": "公允价值变动收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.main"]},
+   {"table_key": "项  目", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.subtable_1"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、76", "wp_codes": ["G14"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "信用减值损失", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G14.note.main"]},
+   {"table_key": "信用减值损失", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G14.note.main"]},
+   {"table_key": "项  目", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G14.note.subtable_0"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、77", "wp_codes": ["K11"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "资产减值损失", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K11.note.main"]},
+   {"table_key": "资产减值损失", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K11.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、78", "wp_codes": ["H10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "资产处置收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H10.note.main"]},
+   {"table_key": "资产处置收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H10.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、79", "wp_codes": ["K12"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "营业外收入", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K12.note.main"]},
+   {"table_key": "营业外收入", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K12.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、80", "wp_codes": ["K13"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "营业外支出", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K13.note.main"]},
+   {"table_key": "营业外支出", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K13.note.main"]}
+  ]},
+  {"template_type": "listed", "note_section": "五、81", "wp_codes": ["N5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "所得税费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N5.note.main"]},
+   {"table_key": "所得税费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、1", "wp_codes": ["E1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "货币资金", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["E1.note.main_rows"]},
+   {"table_key": "货币资金", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["E1.note.main_rows"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、2", "wp_codes": ["G1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "交易性金融资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G1.note.main"]},
+   {"table_key": "交易性金融资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G1.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、3", "wp_codes": ["G1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、4", "wp_codes": ["D1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应收票据分类", "field_key": "table.cell:end_balance", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据分类", "field_key": "table.cell:end_book_value", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据分类", "field_key": "table.cell:end_provision", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据分类", "field_key": "table.cell:prior_balance", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据分类", "field_key": "table.cell:prior_book_value", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]},
+   {"table_key": "应收票据分类", "field_key": "table.cell:prior_provision", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D1.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、5", "wp_codes": ["D2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "（1）按账龄披露应收账款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D2.note.main"]},
+   {"table_key": "（1）按账龄披露应收账款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、6", "wp_codes": ["D5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、7", "wp_codes": ["F1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "预付款项", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F1.note.main"]},
+   {"table_key": "预付款项", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F1.note.main"]},
+   {"table_key": "预付款项按账龄列示", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F1.note.subtable_0"]},
+   {"table_key": "预付款项按账龄列示", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F1.note.subtable_0"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、9", "wp_codes": ["G2", "G3", "K1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他应收款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K1.note.main"]},
+   {"table_key": "其他应收款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K1.note.main"]},
+   {"table_key": "应收利息", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G2.note.main"]},
+   {"table_key": "应收利息", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G2.note.main"]},
+   {"table_key": "应收股利", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G3.note.main"]},
+   {"table_key": "应收股利", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G3.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、10", "wp_codes": ["F2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "存货分类", "field_key": "table.cell:end_gross", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:end_impairment", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:end_net", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:prior_gross", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:prior_impairment", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]},
+   {"table_key": "存货分类", "field_key": "table.cell:prior_net", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、11", "wp_codes": ["D6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "合同资产情况", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D6.note.main"]},
+   {"table_key": "合同资产情况", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D6.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、12", "wp_codes": ["K6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "持有待售资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K6.note.main"]},
+   {"table_key": "持有待售资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K6.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、14", "wp_codes": ["K2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他流动资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K2.note.main"]},
+   {"table_key": "其他流动资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、15", "wp_codes": ["G4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "债权投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G4.note.main"]},
+   {"table_key": "债权投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、16", "wp_codes": ["G6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他债权投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G6.note.main"]},
+   {"table_key": "其他债权投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G6.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、17", "wp_codes": ["G5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期应收款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G5.note.main"]},
+   {"table_key": "长期应收款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、18", "wp_codes": ["G7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期股权投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G7.note.main"]},
+   {"table_key": "长期股权投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G7.note.main"]},
+   {"table_key": "长期股权投资分类", "field_key": "table.cell:opening", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G7.note.subtable_0"]},
+   {"table_key": "长期股权投资明细", "field_key": "table.cell:opening", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G7.note.subtable_1"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、19", "wp_codes": ["G8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他权益工具投资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G8.note.main"]},
+   {"table_key": "其他权益工具投资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G8.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、20", "wp_codes": ["G9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他非流动金融资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G9.note.main"]},
+   {"table_key": "其他非流动金融资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G9.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、21", "wp_codes": ["H3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "投资性房地产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H3.note.main"]},
+   {"table_key": "投资性房地产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H3.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、22", "wp_codes": ["H1", "H6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "固定资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H1.note.main"]},
+   {"table_key": "固定资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H1.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、23", "wp_codes": ["H2", "H4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "在建工程", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H2.note.main"]},
+   {"table_key": "在建工程", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H2.note.main"]},
+   {"table_key": "工程物资", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H4.note.main"]},
+   {"table_key": "工程物资", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、24", "wp_codes": ["H7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "生产性生物资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H7.note.main"]},
+   {"table_key": "生产性生物资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H7.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、25", "wp_codes": ["H5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "油气资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H5.note.main"]},
+   {"table_key": "油气资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、26", "wp_codes": ["H8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "使用权资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H8.note.main"]},
+   {"table_key": "使用权资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H8.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、27", "wp_codes": ["I1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "无形资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I1.note.main"]},
+   {"table_key": "无形资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I1.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、28", "wp_codes": ["I2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "开发支出", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I2.note.main"]},
+   {"table_key": "开发支出", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、29", "wp_codes": ["I3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "（1）商誉账面价值", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I3.note.main"]},
+   {"table_key": "（1）商誉账面价值", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I3.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、30", "wp_codes": ["I4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期待摊费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I4.note.main"]},
+   {"table_key": "长期待摊费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、31", "wp_codes": ["N1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "递延所得税资产", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N1.note.main"]},
+   {"table_key": "递延所得税资产", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N1.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、32", "wp_codes": ["I5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、33", "wp_codes": ["L1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "短期借款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L1.note.main"]},
+   {"table_key": "短期借款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L1.note.main"]},
+   {"table_key": "短期借款分类", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L1.note.subtable_0"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、34", "wp_codes": ["G10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "交易性金融负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G10.note.main"]},
+   {"table_key": "交易性金融负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G10.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、35", "wp_codes": ["G10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、36", "wp_codes": ["F3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付票据", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F3.note.main"]},
+   {"table_key": "应付票据", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F3.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、37", "wp_codes": ["F4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付账款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F4.note.main"]},
+   {"table_key": "应付账款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["F4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、38", "wp_codes": ["D3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "预收款项", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D3.note.main"]},
+   {"table_key": "预收款项", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D3.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、39", "wp_codes": ["D7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "合同负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D7.note.main"]},
+   {"table_key": "合同负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D7.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、40", "wp_codes": ["J1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付职工薪酬", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J1.note.main"]},
+   {"table_key": "应付职工薪酬", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J1.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、41", "wp_codes": ["N2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应交税费", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N2.note.main"]},
+   {"table_key": "应交税费", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、42", "wp_codes": ["K3", "L2", "M1"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他应付款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.main"]},
+   {"table_key": "其他应付款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.main"]},
+   {"table_key": "应付利息", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L2.note.main"]},
+   {"table_key": "应付利息", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L2.note.main"]},
+   {"table_key": "应付股利", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M1.note.main"]},
+   {"table_key": "应付股利", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M1.note.main"]},
+   {"table_key": "按款项性质列示", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.subtable_4"]},
+   {"table_key": "按款项性质列示", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K3.note.subtable_4"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、45", "wp_codes": ["L3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、48", "wp_codes": ["K4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、49", "wp_codes": ["L3"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期借款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L3.note.main"]},
+   {"table_key": "长期借款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L3.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、50", "wp_codes": ["L4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "应付债券", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L4.note.main"]},
+   {"table_key": "应付债券", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、52", "wp_codes": ["H9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "租赁负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H9.note.main"]},
+   {"table_key": "租赁负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H9.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、53", "wp_codes": ["L5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期应付款", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L5.note.main"]},
+   {"table_key": "长期应付款", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、54", "wp_codes": ["J2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "长期应付职工薪酬", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J2.note.main"]},
+   {"table_key": "长期应付职工薪酬", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["J2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、55", "wp_codes": ["K5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "预计负债", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K5.note.main"]},
+   {"table_key": "预计负债", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、56", "wp_codes": ["K7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "递延收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K7.note.main"]},
+   {"table_key": "递延收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K7.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、57", "wp_codes": ["L7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]},
+  {"template_type": "soe", "note_section": "八、58", "wp_codes": ["M2"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "实收资本", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M2.note.main"]},
+   {"table_key": "实收资本", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M2.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、59", "wp_codes": ["M10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他权益工具", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M10.note.main"]},
+   {"table_key": "其他权益工具", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M10.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、60", "wp_codes": ["M4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "资本公积", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M4.note.main"]},
+   {"table_key": "资本公积", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、61", "wp_codes": ["M7"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "专项储备", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M7.note.main"]},
+   {"table_key": "专项储备", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M7.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、62", "wp_codes": ["M5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "盈余公积", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M5.note.main"]},
+   {"table_key": "盈余公积", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、63", "wp_codes": ["M6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "未分配利润", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M6.note.main"]},
+   {"table_key": "未分配利润", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M6.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、64", "wp_codes": ["D4"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "营业收入、营业成本", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D4.note.main"]},
+   {"table_key": "营业收入、营业成本", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["D4.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、65", "wp_codes": ["K8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "销售费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K8.note.main"]},
+   {"table_key": "销售费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K8.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、66", "wp_codes": ["K9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "管理费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K9.note.main"]},
+   {"table_key": "管理费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K9.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、67", "wp_codes": ["I6"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "研发费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I6.note.main"]},
+   {"table_key": "研发费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["I6.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、68", "wp_codes": ["L8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "财务费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L8.note.main"]},
+   {"table_key": "财务费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["L8.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、69", "wp_codes": ["K10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K10.note.main"]},
+   {"table_key": "其他收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K10.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、70", "wp_codes": ["G11"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "投资收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G11.note.main"]},
+   {"table_key": "投资收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G11.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、71", "wp_codes": ["G12"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "净敞口套期收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G12.note.main"]},
+   {"table_key": "净敞口套期收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G12.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、72", "wp_codes": ["G13"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "产生公允价值变动收益的来源", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.subtable_0"]},
+   {"table_key": "公允价值变动收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.main"]},
+   {"table_key": "公允价值变动收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G13.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、73", "wp_codes": ["G14"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "信用减值损失", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G14.note.main"]},
+   {"table_key": "信用减值损失", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["G14.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、74", "wp_codes": ["K11"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "资产减值损失", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K11.note.main"]},
+   {"table_key": "资产减值损失", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K11.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、75", "wp_codes": ["H10"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "资产处置收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H10.note.main"]},
+   {"table_key": "资产处置收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H10.note.main"]},
+   {"table_key": "资产处置收益（损失以“-”号填列）", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["H10.note.subtable_0"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、76", "wp_codes": ["K12"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "营业外收入", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K12.note.main"]},
+   {"table_key": "营业外收入", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K12.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、77", "wp_codes": ["K13"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "营业外支出", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K13.note.main"]},
+   {"table_key": "营业外支出", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["K13.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、78", "wp_codes": ["N5"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "所得税费用", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N5.note.main"]},
+   {"table_key": "所得税费用", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["N5.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、79", "wp_codes": ["M9"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"},
+   {"table_key": "其他综合收益", "field_key": "table.cell:end_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M9.note.main"]},
+   {"table_key": "其他综合收益", "field_key": "table.cell:prior_amount", "owner": "formula_push", "scope": "pushed_cells", "rules": ["M9.note.main"]}
+  ]},
+  {"template_type": "soe", "note_section": "八、94", "wp_codes": ["M8"], "entries": [
+   {"table_key": "*", "field_key": "table.sub_table_data", "owner": "workpaper_sync", "scope": "cells"},
+   {"table_key": "*", "field_key": "table.rows.values", "owner": "binding_refill", "scope": "cells"}
+  ]}
+ ]
+}

@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from app.services.formula_push.results import CONFLICT, SKIPPED, PushItem, RunResult
+from app.services.formula_push.results import BLOCKED, CONFLICT, SKIPPED, PushItem, RunResult
 
 BACKEND = Path(__file__).resolve().parents[1]
 PID = uuid.UUID("94a40b23-21a2-4d7a-a38d-9fd059d57717")
@@ -154,6 +154,15 @@ async def test_dry_run_only_previews(push_env):
     report = await go(apply=False)
     assert log == [("run", True), "rollback"]
     assert "backup" not in report and report["attention"]["unresolved"] == 1
+
+
+def test_ownership_blocked_cells_are_reported_for_manual_handling():
+    """写入归属拒写（blocked）也是推送不到的目标，进待人工报告（spec formula-writer-ownership-and-stale §13）。"""
+    mod = _script()
+    result = _result(writes=1)
+    result.items.append(PushItem("r", "note", "note", "note://b0", BLOCKED, reason="写入归属矩阵没有这一格"))
+    attention = mod._push_attention(result)
+    assert attention["unresolved"] == 1 and attention["by_reason"] == {"note:写入归属矩阵没有这一格": 1}
 
 
 def test_exit_code_precedence():
