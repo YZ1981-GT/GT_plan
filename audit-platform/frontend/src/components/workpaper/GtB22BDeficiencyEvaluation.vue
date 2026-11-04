@@ -34,7 +34,6 @@ import GtWpVersionTrail from './version-trail/GtWpVersionTrail.vue'
 import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'
 import { useB22BSyncMode, B22B_DE_ENTRY_ID } from './composables/useB22BSyncMode'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
-import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 

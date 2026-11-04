@@ -97,18 +97,3 @@ export interface SearchMatch {
   item: ChecklistItem
   matchField: 'content' | 'standard_ref' | 'child'
 }
-
-/**
- * 空核对表（GtChecklistTable 的 htmlData 默认值）。放在这里而不是组件的 `<script setup>` 里：
- * defineProps 的默认值会被提升到 setup() 之外，引用本地变量编译期即报错（组件整页加载失败）。
- */
-export const EMPTY_CHECKLIST_HTML_DATA: ChecklistHtmlData = {
-  template: {
-    wp_code: '',
-    title: '',
-    sections: [],
-    toc: [],
-    stats: { total_actionable: 0, total_guidance: 0, total_sections: 0 },
-  },
-  responses: {},
-}

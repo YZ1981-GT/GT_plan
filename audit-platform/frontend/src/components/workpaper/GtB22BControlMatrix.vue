@@ -32,7 +32,6 @@ import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMo
 // B22B 真双向改线（spec: b-class-shared-base-carrier-lanes Task 2）
 import { useB22BSyncMode, B22B_CM_ENTRY_ID } from './composables/useB22BSyncMode'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
-import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 

@@ -19,18 +19,65 @@ export function GridCellAdapterResolver() {
   }
 }
 
-export function heavyFeatureChunk(id: string): string | undefined {
+// element-plus package.json 的 dependencies（含其传递依赖 @vueuse/shared、@floating-ui/core|utils）
+const ELEMENT_PLUS_RUNTIME_DEPS =
+  /\/node_modules\/(?:@vueuse\/|@floating-ui\/(?:dom|core|utils)\/|@popperjs\/core\/|@ctrl\/tinycolor\/|async-validator\/|dayjs\/|lodash\/|lodash-es\/|lodash-unified\/|memoize-one\/|normalize-wheel-es\/)/
+
+type ChunkMeta = {
+  getModuleInfo: (id: string) => { importers: readonly string[]; dynamicImporters: readonly string[] } | null
+}
+
+const inheritedChunkMemo = new Map<string, string | undefined>()
+
+// 只被某个 heavy-* 块内模块静态引用的 node_modules 依赖（如 Univer 的 redi / ot-json1 / numfmt）
+// 跟随进该块；否则它们落进引用 heavy-univer 的页面块（WorkpaperEditor），
+// 形成 WorkpaperEditor ⇄ heavy-univer 循环，与 vendor-core 同样会在加载时触发 TDZ。
+function inheritedHeavyChunk(id: string, meta: ChunkMeta, path: Set<string>): string | undefined {
+  if (inheritedChunkMemo.has(id)) return inheritedChunkMemo.get(id)
+  const own = explicitChunk(id)
+  if (own !== undefined) return own
+  if (!id.replace(/\\/g, '/').includes('/node_modules/') || path.has(id)) return undefined
+  const info = meta.getModuleInfo(id)
+  if (!info || info.importers.length === 0 || info.dynamicImporters.length > 0) return undefined
+  path.add(id)
+  let owner: string | undefined
+  for (const importer of info.importers) {
+    const chunk = inheritedHeavyChunk(importer, meta, path)
+    if (!chunk || !chunk.startsWith('heavy-') || (owner && owner !== chunk)) {
+      owner = undefined
+      break
+    }
+    owner = chunk
+  }
+  path.delete(id)
+  inheritedChunkMemo.set(id, owner)
+  return owner
+}
+
+export function heavyFeatureChunk(id: string, meta?: ChunkMeta): string | undefined {
+  const own = explicitChunk(id)
+  if (own !== undefined || !meta) return own
+  return inheritedHeavyChunk(id, meta, new Set())
+}
+
+function explicitChunk(id: string): string | undefined {
   const moduleId = id.replace(/\\/g, '/')
+  // dayjs 等 CJS 包依赖的 Rollup 虚拟模块；留在 index 会让 vendor-core 反向 import index
+  if (moduleId === '\0commonjsHelpers.js') return 'vendor-core'
   if (!moduleId.includes('/node_modules/')) return undefined
 
   // 先固定全站共享运行时。Vue 与 Element Plus 必须放在同一个 vendor-core；
   // 拆成 core/ui 会形成 Element Plus → Vue 与自动组件注册 → Element Plus 的循环 chunk。
   // 若只给重功能命名，Rollup 又会把公共运行时吸进 heavy-*，首屏为取得 Vue
   // 反而静态加载整个 Univer/Office 重块。
+  // Element Plus 自己的运行时依赖也必须同块：onlyExplicitManualChunks 下它们留在 index，
+  // vendor-core 顶层（如 `isClient && useEventListener(document, …)`）反向 import index，
+  // 形成 index ⇄ vendor-core 循环，生产包加载即「Cannot access 'X' before initialization」白屏。
   if (/\/node_modules\/(?:vue|vue-router|pinia)\//.test(moduleId)
     || moduleId.includes('/node_modules/@vue/')
     || moduleId.includes('/node_modules/element-plus/')
-    || moduleId.includes('/node_modules/@element-plus/')) return 'vendor-core'
+    || moduleId.includes('/node_modules/@element-plus/')
+    || ELEMENT_PLUS_RUNTIME_DEPS.test(moduleId)) return 'vendor-core'
 
   if (moduleId.includes('/@univerjs/')) return 'heavy-univer'
   if (moduleId.includes('/@vue-office/') || moduleId.includes('/pdfjs-dist/') || moduleId.includes('/mammoth/')) {
