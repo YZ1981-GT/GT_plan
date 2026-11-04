@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -83,6 +84,54 @@ def index_lines() -> list[str]:
 
 #: spec 三件套文件名（用来区分"归档的 spec 目录"与"归档分类目录"）
 _SPEC_DOCS = ("tasks.md", "design.md", "requirements.md")
+
+
+def _tracked_spec_paths() -> list[str] | None:
+    """`.kiro/specs/` 下**已入库**的文件路径（repo 相对、posix）。git 不可用返回 None。
+
+    统计行要跟它对账而不是跟磁盘：磁盘上可能有并发会话还没提交的归档目录（现场就有 4 个），
+    按磁盘数对账会在别人有在办归档时变红，且报错指向统计行、指不到真因。
+    """
+    try:
+        proc = subprocess.run(["git", "-C", str(REPO_ROOT), "ls-files", "--", ".kiro/specs/"],
+                              capture_output=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    out = proc.stdout.decode("utf-8", errors="replace").splitlines()
+    return [p.strip() for p in out if p.strip()] or None
+
+
+def _specs_from_paths(paths: list[str]) -> tuple[set[str], dict[str, str]]:
+    """按路径集合算出（活跃 spec 名（带 tasks.md），归档 spec 名 -> `_archive` 下相对目录）。
+
+    与 `archived_specs` 走同一条「自身含三件套即 spec 目录、否则是分类目录」的规则，只是输入从磁盘换成 git。
+    """
+    prefix, arch = ".kiro/specs/", ".kiro/specs/_archive/"
+    active: set[str] = set()
+    arch_docs: dict[str, set[str]] = defaultdict(set)
+    for p in paths:
+        if p.startswith(arch):
+            rest = p[len(arch):].split("/")
+            if len(rest) >= 2:
+                arch_docs["/".join(rest[:1])].add("/".join(rest[1:]))
+            continue
+        rest = p[len(prefix):].split("/")
+        if len(rest) == 2 and rest[1] == "tasks.md":
+            active.add(rest[0])
+    archived: dict[str, str] = {}
+    for top, rels in arch_docs.items():
+        if any(r in _SPEC_DOCS for r in rels):  # 自身就是一个归档的 spec
+            m = _ARCHIVE_NAME.match(top)
+            archived[m.group(2) if m else top] = top
+            continue
+        for r in rels:  # 分类目录 ⇒ 再下一层才是 spec（分类目录里直接放的说明文件不是 spec）
+            if "/" not in r:
+                continue
+            sub = r.split("/")[0]
+            archived.setdefault(sub, f"{top}/{sub}")
+    return active, archived
 
 
 @pytest.fixture(scope="module")
@@ -472,13 +521,28 @@ def test_statistics_line_matches_the_live_counts(
     assert len(hits) == 1, f"统计行应恰好一条（现算 {len(hits)} 条）：{[h[0] for h in hits]}"
     lineno, m = hits[0]
     active_n, archived_n = int(m.group(1)), int(m.group(2))
-    expected_active = len({d for d in active_spec_dirs if (SPECS_DIR / d / "tasks.md").exists()})
-    expected_archived = len(archived_specs)
+    paths = _tracked_spec_paths()
+    if paths is None:
+        pytest.skip("git 不可用，无法按入库口径对账统计行（见 test_tracked_spec_paths_is_available_here）")
+    tracked_active, tracked_archived = _specs_from_paths(paths)
+    expected_active, expected_archived = len(tracked_active), len(tracked_archived)
+    untracked_archive = sorted(set(archived_specs) - set(tracked_archived))
     assert (active_n, archived_n) == (expected_active, expected_archived), (
-        f"统计行（行 {lineno}）与现扫不一致：Active {active_n} vs {expected_active}、"
-        f"Archived {archived_n} vs {expected_archived}。口径：Active = `.kiro/specs/*/tasks.md`，"
-        f"Archived = `_archive/` 递归去重名的 spec 目录数"
+        f"统计行（行 {lineno}）与已入库口径不一致：Active {active_n} vs {expected_active}、"
+        f"Archived {archived_n} vs {expected_archived}。口径：Active = 已入库的 `.kiro/specs/*/tasks.md`，"
+        f"Archived = 已入库的 `_archive/` 递归去重名 spec 目录数"
+        + (f"。另注：磁盘上还有 {len(untracked_archive)} 个未入库的归档目录（不参与对账，"
+           f"但归档没提交本身就是半截动作）：{untracked_archive[:5]}" if untracked_archive else "")
     )
+
+
+def test_tracked_spec_paths_is_available_here() -> None:
+    """反向断言：本仓库里 git 必须可用，否则上面那条判据会长期静默 skip。"""
+    paths = _tracked_spec_paths()
+    assert paths, "`git ls-files .kiro/specs/` 取不到已入库路径：统计行判据会被 skip 掉"
+    assert any(p.endswith("/tasks.md") for p in paths)
+    active, archived = _specs_from_paths(paths)
+    assert active and archived, f"入库口径算出的集合不该为空：active={len(active)} archived={len(archived)}"
 
 
 def test_statistics_line_pattern_matches_the_wording_actually_used() -> None:
