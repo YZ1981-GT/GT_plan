@@ -1,6 +1,6 @@
 """SQL Schema 漂移检测器（migration-runner-resilience spec / Sprint 2）
 
-启动时对比 ORM `Base.metadata` 与实际 PG schema，发现以下 5 类漂移并写入
+启动时对比 ORM `Base.metadata` 与实际 PG schema，发现以下漂移并写入
 `schema_drift_log` 表：
 
 - ``orm_extra``：ORM 定义了但 DB 缺失的列/表（最高优先，业务接口运行时会 500）
@@ -8,13 +8,14 @@
 - ``type_mismatch``：列存在但类型/可空性不一致（WARN 级，可能数据不一致）
 - ``enum_mismatch``：ORM 原生枚举列与 public 实际列类型 / 标签不符（运行时查询或插入会爆）
 - ``checksum_drift``：已应用迁移被事后编辑且未在 ``migration_drift_ledger`` 逐条登记
+- ``scan_failure``：整次扫描超时或抛错，结果不可信（只带异常类型，不带异常正文）
 
 `/api/health` 端点消费 `schema_drift_log`，critical 漂移（:data:`CRITICAL_DRIFT_TYPES`，
 单一真源）>0 → status=degraded → 前端 DegradedBanner 暴露给运维（避免业务 500 才发现）。
 
 设计原则：
 - 纯检测，不自动修复（避免误删 / 误改）
-- 失败不阻塞启动（异常吞掉 + WARN 日志）
+- 失败不阻塞启动，但不吞成「没有漂移」：超时 / 异常写一条 critical 的 ``scan_failure``
 - 60s timeout（防止漏接表卡住启动）
 - KNOWN_ALLOWLIST 屏蔽系统/历史残留表
 """
@@ -32,12 +33,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger("audit_platform.schema_drift")
 
-DriftType = Literal["orm_extra", "db_extra", "type_mismatch", "enum_mismatch", "checksum_drift"]
+DriftType = Literal["orm_extra", "db_extra", "type_mismatch", "enum_mismatch", "checksum_drift", "scan_failure"]
 
 #: 会让业务接口运行时失败（或让「已应用迁移的编辑」静默丢失）的漂移类型 —— health degraded 判定与
 #: 启动日志的 critical 计数**只**引用这里（spec migration-integrity-and-enum-drift-closure 3.3）。
 #: INFO 级 db_extra 与 WARN 级 type_mismatch 只作可观测展示，否则共库残留噪音会让 health 永远 degraded。
-CRITICAL_DRIFT_TYPES: frozenset[str] = frozenset({"orm_extra", "enum_mismatch", "checksum_drift"})
+#: scan_failure 表示扫描本身不可信，绝不伪装成「没有漂移」。
+CRITICAL_DRIFT_TYPES: frozenset[str] = frozenset({"orm_extra", "enum_mismatch", "checksum_drift", "scan_failure"})
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,18 @@ async def fetch_public_enum_catalog(conn) -> tuple[
     for typname, label in label_rows:
         labels.setdefault(typname, set()).add(label)
     return db_columns, {k: frozenset(v) for k, v in labels.items()}
+
+
+def db_compare_type(data_type: str | None, udt_schema: str | None, udt_name: str | None) -> str:
+    """把 information_schema 原始类型转成 schema drift 的粗粒度比较类型。
+
+    pgvector 扩展类型在 information_schema 中是 ``USER-DEFINED``。只接受 public.vector：
+    不能把所有未知 UDT（业务 enum / 自建 domain / 未来 halfvec）都误判成 VECTOR。
+    """
+    raw = (data_type or "").upper()
+    if raw == "USER-DEFINED" and udt_schema == "public" and udt_name == "vector":
+        return "VECTOR"
+    return raw
 
 
 class SchemaDriftDetector:
@@ -441,7 +455,11 @@ class SchemaDriftDetector:
 
     @classmethod
     async def query_drift(cls, engine: AsyncEngine) -> list[DriftItem]:
-        """查询 schema_drift_log（health endpoint 使用）。表不存在返回空列表。"""
+        """查询 schema_drift_log（health endpoint 使用）。
+
+        非 PG 返回空列表；读取失败（含表不存在）返回一条 critical 的 ``scan_failure`` ——
+        读不出快照不等于没有漂移，过去这里返回 []，health 会照常报 healthy。
+        """
         if engine.dialect.name != "postgresql":
             return []
         try:
@@ -454,8 +472,12 @@ class SchemaDriftDetector:
                     DriftItem(table=r[0], column=r[1], drift_type=r[2], detail=r[3] or "")
                     for r in rows.fetchall()
                 ]
-        except Exception:
-            return []
+        except Exception as exc:  # noqa: BLE001 - health 只带异常类型，不带可能含连接串的正文
+            logger.warning("[SchemaDrift] 读取 schema_drift_log 失败: %s", exc)
+            return [DriftItem(
+                table="(schema_drift_log)", column=None, drift_type="scan_failure",
+                detail=f"schema 漂移结果读取失败，结果不可信：{type(exc).__name__}",
+            )]
 
     # ------------------------------------------------------------------
     # 内部方法
@@ -526,7 +548,7 @@ class SchemaDriftDetector:
         result: dict[str, dict] = {}
         async with self._engine.begin() as conn:
             rows = await conn.execute(text("""
-                SELECT table_name, column_name, data_type, is_nullable
+                SELECT table_name, column_name, data_type, udt_schema, udt_name, is_nullable
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                 ORDER BY table_name, ordinal_position
@@ -537,8 +559,8 @@ class SchemaDriftDetector:
                 if table not in result:
                     result[table] = {}
                 result[table][col] = {
-                    "type": (row[2] or "").upper(),
-                    "nullable": row[3] == "YES",
+                    "type": db_compare_type(row[2], row[3], row[4]),
+                    "nullable": row[5] == "YES",
                 }
         return result
 
@@ -724,15 +746,24 @@ async def run_drift_check_with_timeout(
     engine: AsyncEngine,
     timeout_seconds: float = 60.0,
 ) -> list[DriftItem]:
-    """启动时调用：执行 drift 扫描 + 写库，超时不阻塞启动。"""
+    """启动时调用：执行 drift 扫描 + 写库，超时不阻塞启动但必须留下 critical 可观测项。"""
     detector = SchemaDriftDetector(engine)
     try:
         items = await asyncio.wait_for(detector.scan(), timeout=timeout_seconds)
-        await detector.write_log(items)
-        return items
     except asyncio.TimeoutError:
-        logger.warning("[SchemaDrift] 扫描超时 %ds，跳过", timeout_seconds)
-        return []
-    except Exception as e:
-        logger.warning("[SchemaDrift] 扫描失败（不阻塞启动）: %s", e)
-        return []
+        logger.warning("[SchemaDrift] 扫描超时 %ds，写入 scan_failure", timeout_seconds)
+        items = [DriftItem(
+            table="(schema_scan)", column=None, drift_type="scan_failure",
+            detail=f"schema 漂移扫描超时（>{timeout_seconds:.0f}s），结果不可信",
+        )]
+    except Exception as exc:  # noqa: BLE001 - exception 细节仅写日志，health 不泄露连接 / 凭证文本
+        logger.warning("[SchemaDrift] 扫描失败，写入 scan_failure: %s", exc)
+        items = [DriftItem(
+            table="(schema_scan)", column=None, drift_type="scan_failure",
+            detail=f"schema 漂移扫描失败，结果不可信：{type(exc).__name__}",
+        )]
+    try:
+        await detector.write_log(items)
+    except Exception as exc:  # noqa: BLE001 - DB 本身不可写时 health 的 postgres 探针会变 unhealthy
+        logger.warning("[SchemaDrift] 漂移结果写入失败: %s", exc)
+    return items

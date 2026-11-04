@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.core.schema_drift_detector import (
     DriftItem,
     SchemaDriftDetector,
+    db_compare_type,
     run_drift_check_with_timeout,
 )
 
@@ -304,26 +305,55 @@ class TestNonPgSkip:
 
 
 class TestRunDriftCheckWithTimeout:
-    """run_drift_check_with_timeout：超时和异常隔离。"""
+    """run_drift_check_with_timeout：超时和异常不阻塞启动，但必须留下 critical 的 scan_failure。
 
-    async def test_timeout_returns_empty(self, sqlite_engine):
-        """超时后返回空列表，不抛异常。"""
+    过去这两种情况返回 []，启动与 /api/health 会把「扫描坏了」读成「没有漂移」
+    （spec enterprise-embedding-rerank-closure R14.2）。
+    """
+
+    async def test_timeout_reports_scan_failure_without_raising(self, sqlite_engine):
+        """真实超时（wait_for 取消慢扫描）：不抛异常，写入并返回一条超时的 scan_failure。"""
         async def slow_scan(self):
             await asyncio.sleep(2)
             return []
 
-        with patch.object(SchemaDriftDetector, "scan", new=slow_scan):
+        with patch.object(SchemaDriftDetector, "scan", new=slow_scan), \
+                patch.object(SchemaDriftDetector, "write_log", new=AsyncMock()) as write:
             items = await run_drift_check_with_timeout(sqlite_engine, timeout_seconds=0.1)
-            assert items == []
+        assert [(item.table, item.column, item.drift_type) for item in items] == [
+            ("(schema_scan)", None, "scan_failure"),
+        ]
+        assert "超时" in items[0].detail
+        write.assert_awaited_once_with(items)
+        assert count_critical(items) == 1
 
-    async def test_exception_returns_empty(self, sqlite_engine):
-        """scan 抛异常后返回空列表，不阻塞启动。"""
+    async def test_exception_reports_scan_failure_without_leaking_text(self, sqlite_engine):
+        """scan 抛异常：不阻塞启动；结果只带异常类型，不带异常正文（可能含连接串 / 凭证）。"""
         async def boom_scan(self):
-            raise RuntimeError("simulated failure")
+            raise RuntimeError("postgresql://secret@host/hidden")
 
-        with patch.object(SchemaDriftDetector, "scan", new=boom_scan):
+        with patch.object(SchemaDriftDetector, "scan", new=boom_scan), \
+                patch.object(SchemaDriftDetector, "write_log", new=AsyncMock()) as write:
             items = await run_drift_check_with_timeout(sqlite_engine)
-            assert items == []
+        assert [(item.table, item.column, item.drift_type) for item in items] == [
+            ("(schema_scan)", None, "scan_failure"),
+        ]
+        assert "RuntimeError" in items[0].detail
+        assert "secret@host" not in items[0].detail
+        write.assert_awaited_once_with(items)
+        assert count_critical(items) == 1
+
+    async def test_write_failure_still_returns_scan_result_without_raising(self, sqlite_engine):
+        """快照写库失败只记日志：扫描结果照常返回给启动日志，不能吞成 []，也不能让启动任务抛错。"""
+        sample_items = [DriftItem(table="t1", column="c1", drift_type="orm_extra", detail="test")]
+
+        async def good_scan(self):
+            return sample_items
+
+        with patch.object(SchemaDriftDetector, "scan", new=good_scan), \
+                patch.object(SchemaDriftDetector, "write_log", new=AsyncMock(side_effect=RuntimeError("db down"))):
+            items = await run_drift_check_with_timeout(sqlite_engine)
+        assert items == sample_items
 
     async def test_normal_returns_items(self, sqlite_engine):
         """正常 scan + write_log 走通。"""
@@ -441,7 +471,7 @@ def _referenced_names(path: Path) -> set[str]:
 
 class TestCriticalTypesSingleSource:
     def test_critical_set(self):
-        assert CRITICAL_DRIFT_TYPES == {"orm_extra", "enum_mismatch", "checksum_drift"}
+        assert CRITICAL_DRIFT_TYPES == {"orm_extra", "enum_mismatch", "checksum_drift", "scan_failure"}
         assert CRITICAL_DRIFT_TYPES <= set(typing.get_args(DriftType))
 
     @pytest.mark.parametrize("rel", ["api/health.py", "core/startup_registry.py"])
@@ -494,3 +524,90 @@ class TestScanWiring:
             ("V999", None, "checksum_drift"),
         }
         assert count_critical(items) == 3
+
+
+# ── pgvector 的 information_schema 类型归一（spec enterprise-embedding-rerank-closure R14.1） ──
+
+
+def test_public_pgvector_udt_is_compared_as_vector_not_user_defined(sqlite_engine):
+    """pgvector 的 information_schema.data_type 固定是 USER-DEFINED；只 public.vector 能归一，未知 UDT 不得被隐藏。"""
+    assert db_compare_type("USER-DEFINED", "public", "vector") == "VECTOR"
+    assert db_compare_type("USER-DEFINED", "public", "halfvec") == "USER-DEFINED"
+    assert db_compare_type("USER-DEFINED", "custom", "vector") == "USER-DEFINED"
+    assert db_compare_type("USER-DEFINED", "public", "business_enum") == "USER-DEFINED"
+
+    det = SchemaDriftDetector(sqlite_engine)
+    orm = {"knowledge_index": {"embedding_vec": {"type": "VECTOR(1024)", "nullable": True}}}
+    real_pgvector = {"knowledge_index": {"embedding_vec": {
+        "type": db_compare_type("USER-DEFINED", "public", "vector"), "nullable": True,
+    }}}
+    assert det._diff_columns(orm, real_pgvector) == []
+
+    unknown_udt = {"knowledge_index": {"embedding_vec": {
+        "type": db_compare_type("USER-DEFINED", "public", "halfvec"), "nullable": True,
+    }}}
+    mismatch = det._diff_columns(orm, unknown_udt)
+    assert len(mismatch) == 1 and mismatch[0].drift_type == "type_mismatch"
+
+
+class _FakeColumnsEngine:
+    """只够 ``_collect_db_tables`` 用的引擎替身：``begin()`` → ``execute()`` → ``fetchall()``。"""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.sql: list[str] = []
+
+    def begin(self):
+        engine = self
+
+        class _Conn:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def execute(self, statement):
+                engine.sql.append(str(statement))
+
+                class _Result:
+                    def fetchall(self_inner):
+                        return list(engine._rows)
+
+                return _Result()
+
+        return _Conn()
+
+
+async def test_collect_db_tables_routes_information_schema_rows_through_db_compare_type():
+    """生产采集口必须经 db_compare_type：只测纯函数时，采集口照旧用 data_type 也会全绿。"""
+    engine = _FakeColumnsEngine([
+        ("knowledge_index", "embedding_vec", "USER-DEFINED", "public", "vector", "YES"),
+        ("knowledge_index", "kind", "USER-DEFINED", "public", "business_enum", "NO"),
+        ("knowledge_index", "title", "character varying", "pg_catalog", "varchar", "NO"),
+    ])
+    collected = await SchemaDriftDetector(engine)._collect_db_tables()
+    assert collected == {"knowledge_index": {
+        "embedding_vec": {"type": "VECTOR", "nullable": True},
+        "kind": {"type": "USER-DEFINED", "nullable": False},
+        "title": {"type": "CHARACTER VARYING", "nullable": False},
+    }}
+    assert "udt_schema" in engine.sql[0] and "udt_name" in engine.sql[0]
+
+
+async def test_query_drift_read_failure_is_critical_not_empty():
+    """PG 上读不出快照：返回 critical scan_failure（只带异常类型），health 不能因此报 healthy。"""
+    class _BrokenPgEngine:
+        class dialect:  # noqa: N801 - 模拟 AsyncEngine.dialect.name
+            name = "postgresql"
+
+        def begin(self):
+            raise RuntimeError("postgresql://secret@host/hidden")
+
+    items = await SchemaDriftDetector.query_drift(_BrokenPgEngine())
+    assert [(i.table, i.column, i.drift_type) for i in items] == [
+        ("(schema_drift_log)", None, "scan_failure"),
+    ]
+    assert "RuntimeError" in items[0].detail
+    assert "secret@host" not in items[0].detail
+    assert count_critical(items) == 1
