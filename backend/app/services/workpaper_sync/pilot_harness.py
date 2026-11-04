@@ -78,7 +78,7 @@ from app.services.workpaper_sync.contracts import SyncContract
 from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import (
     Capability,
-    capability_of,
+    effective_capability,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -1787,10 +1787,12 @@ def assess_pilot_classes(
     out: dict[PilotClass, PilotClassAssessment] = {}
     for pilot_class in PilotClass:
         candidates = tuple(special.get(pilot_class, ()))
+        # 候选里有 Task 1.1 的 pending entry（`capability=null`）：它们「还不是 bidirectional」，
+        # 不是清册错误。原先直调 `capability_of()` ⇒ 一条 pending 就让整个评估抛异常。
         bidirectional = tuple(
             eid
             for eid in candidates
-            if capability_of(entries[eid]) is Capability.bidirectional
+            if effective_capability(entries[eid]) is Capability.bidirectional
         )
         verified = tuple(eid for eid in bidirectional if eid in verified_entry_ids)
         reasons: list[str] = []

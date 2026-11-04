@@ -53,9 +53,14 @@ STORAGE = "backend/app/services/wp_storage_service.py"
 T20 = "test_task20_writer_gate"
 INV = "test_workpaper_writer_inventory"
 
-TASKS_MD = (
-    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md"
+#: 🔴 2026-11-04：守卫把 Wave 6 文档派生判据按内容标记绑定到**冻结快照**
+#: （`_test_task20_writer_gate_criteria._FROZEN_MARKERS`）；active tasks.md / design.md 已在
+#: 2026-11-01 重写、不再含 M20 / M21 的锚点 ⇒ 变异必须打在守卫真正读的那份快照上。
+FROZEN_SPEC_DIR = (
+    ".kiro/specs/_archive/17-2026-10-03-verified-batch/"
+    "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 )
+TASKS_MD = f"{FROZEN_SPEC_DIR}/tasks.md"
 #: tasks.md「14 条准则的归属」**整行**（M21 的锚点）。行级唯一（实测全文出现 1 次、600 字符）。
 #:
 #: 🔴 必须逐字整行：`_mutation_kit` 的 `replace` 是行级替换。M21 的 `new` 由本常量
@@ -286,7 +291,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M20", side="be",
-        path=".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/design.md",
+        path=f"{FROZEN_SPEC_DIR}/design.md",
         kind="replace",
         anchor="### Property 61: 所有 writer 进入唯一 revision 域",
         new="### Property 61: 清册内 writer 进入唯一 revision 域",
@@ -362,6 +367,10 @@ if __name__ == "__main__":
             # 的判据面 —— 基线非空时 kit 会直接 ABORT（`allow_dirty_baseline` 未开），所以本
             # 常量记的是**全绿时的 passed 数 = 收集总数 71**，等那 2 条红被其 owner 修掉后
             # 基线自然对上。
-            baseline_backend_passed=71,
+            #
+            # 71 → 73（2026-11-04）：`test_task20_writer_gate.py` 新增「Wave 6 文档必须解析到冻结
+            # 快照」一条，清册守卫新增「另一聚合根的 revision 计数器不是底稿版本写入」四向一条。
+            # 实测（verify worktree，`-p no:randomly`）73 passed。
+            baseline_backend_passed=73,
         )
     )

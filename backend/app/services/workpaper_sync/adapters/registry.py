@@ -83,6 +83,7 @@ from app.services.workpaper_sync.entry_profile import (
     assert_profile_consistent_with_descriptor,
     assert_profile_consistent_with_room,
     capability_of,
+    effective_capability,
     extract_entry_profile,
     manifest_entries_by_id,
 )
@@ -668,7 +669,16 @@ class WorkpaperSyncAdapterRegistry:
                 f"{entry.get('parent_entry_id')!r}）—— 只能复用其独立 entry 的 adapter，"
                 "不得重复注册（Requirement 1.6 / 12.4）"
             )
-        capability = capability_of(entry)
+        # pending（Task 1.1 schema）与注册计划同一口径拒绝：原先直调 `capability_of` 时
+        # 它抛「capability 未登记」，把待办状态报成清册损坏，且挡在 RG-14~18 之前。
+        capability = effective_capability(entry)
+        if capability is None:
+            raise RegistrationError(
+                f"entry {entry_id} 尚未完成逐项 capability 裁决（capability=null，"
+                f"stage={entry.get('capability_verdict_stage')!r}，"
+                f"target={entry.get('capability_target')!r}）—— 未裁决入口不得注册 adapter"
+                "（AC 1.3 / 12.1）"
+            )
         if capability is Capability.unreachable:
             raise RegistrationError(
                 f"entry {entry_id} 已裁决为 unreachable —— 不可达旧桩应删除，"
@@ -836,10 +846,13 @@ class WorkpaperSyncAdapterRegistry:
         entry = self._entries.get(entry_id)
         if entry is None:
             raise StaleAdapterError(f"entry {entry_id!r} 不在 source-backed manifest 中")
-        capability = capability_of(entry)
+        # pending 也是「不是 bidirectional」，答案同为 FakeBidirectionalError（原先直调
+        # `capability_of` 时它抛的是「capability 未登记」，把待办状态报成了清册损坏）。
+        capability = effective_capability(entry)
         if capability is not Capability.bidirectional:
+            shown = "pending" if capability is None else capability.value
             raise FakeBidirectionalError(
-                f"entry {entry_id}: capability={capability.value} 不是 bidirectional，"
+                f"entry {entry_id}: capability={shown} 不是 bidirectional，"
                 "不得按双向验收"
             )
         registration = self.resolve_for_entry(entry_id)

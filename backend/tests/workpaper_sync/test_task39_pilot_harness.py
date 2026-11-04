@@ -63,7 +63,7 @@ from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     EntryProfile,
     RoomModel,
     ScenarioProfile,
-    capability_of,
+    effective_capability,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -1837,8 +1837,9 @@ class TestPilotClassCoverage:
 
         **不变量一个字都没变**：`capability=bidirectional` 这个旗标本身**不产生**
         verified —— 只有 `verified_entry_ids` 非空（= 服务端 evidence 重算真通过）才算。
-        因此 bidirectional 集合改成**活体双源派生**（测试侧直接用 `capability_of` 现读
-        manifest，与生产的 `assess_pilot_classes` 互为对照），牙齿落在
+        因此 bidirectional 集合改成**活体双源派生**（测试侧直接用 `effective_capability` 现读
+        manifest —— Task 1.1 起候选里有 pending entry，`capability_of` 会对它们抛 —— 与生产的
+        `assess_pilot_classes` 互为对照），牙齿落在
         `verified_entry_ids == ()` 这条真正的判据上：谁把 `status` 接到 capability 旗标
         上，这条立刻打红。
         """
@@ -1850,7 +1851,7 @@ class TestPilotClassCoverage:
             assert assessment.bidirectional_entry_ids == tuple(
                 eid
                 for eid in assessment.candidate_entry_ids
-                if capability_of(entries[eid]) is Capability.bidirectional
+                if effective_capability(entries[eid]) is Capability.bidirectional
             ), assessment
             # 🔴 真正的牙齿：一条都没通过服务端重算 ⇒ 四类必须全 UNVERIFIABLE
             assert assessment.verified_entry_ids == (), assessment

@@ -265,6 +265,24 @@ POLICY_BY_WRITER: Final[dict[str, dict[str, Any]]] = {
             "与 wp_onlyoffice_router 同一条阻塞，归属 Task 71"
         ),
     },
+    # ── 2026-11-04：Wave 6 归档之后才出现的多 resolver 行 ─────────────────────────
+    "app.services.wp_generation_staging::_source_paths": {
+        "intended_status": "deferred",
+        "group": "template_provisioning",
+        "blocking_task": "36",
+        "adjudication_owner_task": "71",
+        "reason": (
+            "生成两阶段 operation（trim-generation-plan-followup R1）新增的 staging 模板来源解析："
+            "有 library_file 走 resolve_wp_file，否则 find_template_file_any + "
+            "find_all_template_files（xlsx 多文件底稿）⇒ 一个函数抵达多个 resolver，是 "
+            "multi_resolver 的第 4 行。HEAD 上 writer 清册过期（source digest 不符），门只报 3 行；"
+            "清册重生成后现形。收敛方式与 find_all_template_files 同一条：xlsx 多文件模板换成统一 "
+            "resolver 需要该 entry 已有 published representation（Task 36 供给），故 blocking 同为 "
+            "36、裁决归属同为 legacy_delete gate 的 Task 71。重写后的 active 计划由 2.8 承接（里程碑 "
+            "SYNC-MULTI-RESOLVER 的 producer）。登记进 Wave 6 编号空间只为与同表其余行一致，"
+            "不代表它出现在 Wave 6"
+        ),
+    },
 }
 
 #: 追加的模块级裁决（与上方 `POLICY` 同一张表，分两段只为可读性）。

@@ -444,7 +444,7 @@
         "producer": "workpaper-page-formula-toolbar-closure:13"
       }
     ],
-    "internal_edge_count": 182,
+    "internal_edge_count": 186,
     "node_count": 236
   },
   "database_probe_digest": "fac2c53b411d784ea21690d2a2077a7d9610fef9127682b9cec9b12d4391f405",
@@ -485,15 +485,8 @@
     "schema_version": "workpaper-sync-program-database-probe/v1",
     "status": "ok"
   },
-  "definition_digest": "3e1b3b0b39542c69be41da3b30ae3c75e387e9e1c372f220704c29e528432ac5",
+  "definition_digest": "3b42907f9b269d3c20892d9c66572200690a4ac457358dac397d9622ca17e75d",
   "diagnostics": [
-    {
-      "code": "archive_bypasses_writer_debt",
-      "missing_dependency": "74",
-      "severity": "blocker",
-      "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
-      "task": "72"
-    },
     {
       "code": "natural_language_producer_placeholder",
       "consumer_spec": "custom-workpaper-template-ingestion-and-sync-closure",
@@ -547,7 +540,7 @@
     ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/editor-config.json": "24594e536907afa63fdf8eed93ff3a1d912f4023af4868ad28ed5d5907c522bc",
     ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/network.json": "377c1229255bb933fed334bf3758c81d75d4b34d5caf24c9a78a5d21c45f756c",
     ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/index.json": "61db3d288a1b69eac3e61d31b6c0432500a75b97143556d9efe6f1d2226a5a7b",
-    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3",
+    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2",
     "audit-platform/frontend/scripts/discover-workpaper-sync-mounts.mjs": "511567d6aa9877ee3cb79b614124c2b2243fe988579e9ee757d4aea2134a7994",
     "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue": "a7cc234203faecc33c9d67c796961e6f75eac224a5a1d3b4f0d0b70ac73a65b2",
     "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "e05ee5d22e8d994075ef3e61ba5cf8fc26c06e4516040388b834b5cb1bb33cb7",
@@ -558,7 +551,7 @@
     "backend/app/routers/wp_sync_router.py": "886d8ee54be3b523c49a7cb4e07ee80d5f9870ae30fd4f9538b93a7b9533a5a5",
     "backend/app/services/guidance_gid.py": "1a1538ce4760c6195bfaa8d358989a6bd686ecd11d232260ace5fc9037645ba1",
     "backend/app/services/guidance_handoff_consumer_service.py": "99bb29b2321796419a9bad07109f57ea018bb2d9ec1f65595c93f2ed4f955c5f",
-    "backend/app/services/workpaper_sync/adapters/registry.py": "e1547c3bcc4200beb87c8c6d7103f7bd8da16c9f13ab5df8ca959777d51fb0fc",
+    "backend/app/services/workpaper_sync/adapters/registry.py": "4d31b1ace8a6fd9fe25e6a1faba346ba0784e5acf15f12292b6dfdf248b40e39",
     "backend/app/services/workpaper_sync/callback_delivery.py": "42d79cf1f8f4728ba0991135e4a5d58c3964e150bc93d143378b907393d2e6d4",
     "backend/app/services/workpaper_sync/callback_route.py": "79bf2d7ac2085814ac0144e3221d3b52a3567c9aa40d1ff4ed6a9b94ad02c496",
     "backend/app/services/workpaper_sync/command_service.py": "b453f85831be5de217c7e85e3852fba23419c10f15413db0fc0f4c536e1cd80c",
@@ -587,22 +580,22 @@
     "backend/data/guidance/contracts/gc0/schema.json": "6d447d3242365619481b2d1c12305859eafdc7023094f0f033d216795eb51d72",
     "backend/data/guidance/contracts/ghandoff/evidence/ghandoff_consumer_evidence.json": "5a8d6b4cfd27cf0235ca408a19fcef1295805386d93bbb45ceaa70f7c2a870d6",
     "backend/data/guidance/contracts/gid/evidence/gid_evidence.json": "58ac9e0923854e1b04d599d12e68008622e89c4402cf237bf7606a91f15c7b85",
-    "backend/data/workpaper_sync_entry_manifest.json": "17ec789bf2dce53298893238ce92ca616378ad04789dc5d8010b7bfd1db61bfb",
-    "backend/data/workpaper_sync_entry_overlay.json": "828971c980b191f1170c65dca85755c08ef67a0ca6e942d86ece353d4a975b74",
-    "backend/data/workpaper_sync_program_milestone_definitions.json": "60daff5f582db257b94e099aa98a52961b2c0eea58fdbc414a4b7a46836cd384",
-    "backend/data/workpaper_writer_inventory.json": "a8a77cb0686aa386600ab7f71c7bbd93eea7e5f212019f3589be7ed7e89c6ead",
+    "backend/data/workpaper_sync_entry_manifest.json": "f9ebdf976c0b5586d7d627747f95b15603a277bd348f350db848edb004268032",
+    "backend/data/workpaper_sync_entry_overlay.json": "d814116187a04f65db5a3fa972fb59d1869b0023211a40a0cf469f7bfd09792e",
+    "backend/data/workpaper_sync_program_milestone_definitions.json": "21988137c70a59b316902aaa37129c0c6f7644ebe9916f654c7bbaddd3a33e89",
+    "backend/data/workpaper_writer_inventory.json": "7d520fddabf31ba30d95b495e051d8eea90ca9dc2ca70bd3c66a276b7dc8424b",
     "backend/scripts/check/check_workpaper_writer_revision_gate.py": "ec06b9a62e75164fd9d17216917ccf2b17eae801501ae4354986e0ac5a83c734",
     "backend/scripts/gen/generate_workpaper_sync_manifest.py": "c2dec7f7a028e7f83c403daa9fd9fd57ca0c4d911f48121d2994136ba765ccd5",
     "docs/operations/workpaper-html-onlyoffice-bidirectional-writeback-master-control.md": "b67ab929ceb16cf315a87a7da39706e21c4c5c71258d84e609e7471170588154"
   },
-  "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
+  "manifest_digest": "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582",
   "manifest_facts": {
     "capability_counts": {
       "bidirectional": 111
     },
     "entry_count": 197,
     "independent_entry_count": 145,
-    "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
+    "manifest_digest": "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582",
     "profile_consistent": true,
     "reviewed_entries": {
       "xlsx/b60/gt-b60-bundle": {
@@ -3990,7 +3983,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3"
+              "sha256": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2"
             }
           ]
         },
@@ -9186,7 +9179,7 @@
             },
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3"
+              "sha256": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2"
             }
           ]
         },
@@ -9197,7 +9190,7 @@
             },
             "entry_count": 197,
             "independent_entry_count": 145,
-            "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
+            "manifest_digest": "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582",
             "profile_consistent": true,
             "reviewed_entries": {
               "xlsx/b60/gt-b60-bundle": {
@@ -9259,7 +9252,7 @@
           "source_refs": [
             {
               "path": "backend/data/workpaper_sync_entry_manifest.json",
-              "sha256": "17ec789bf2dce53298893238ce92ca616378ad04789dc5d8010b7bfd1db61bfb"
+              "sha256": "f9ebdf976c0b5586d7d627747f95b15603a277bd348f350db848edb004268032"
             }
           ]
         },
@@ -9277,7 +9270,7 @@
             },
             {
               "path": "backend/app/services/workpaper_sync/adapters/registry.py",
-              "sha256": "e1547c3bcc4200beb87c8c6d7103f7bd8da16c9f13ab5df8ca959777d51fb0fc"
+              "sha256": "4d31b1ace8a6fd9fe25e6a1faba346ba0784e5acf15f12292b6dfdf248b40e39"
             }
           ]
         },
@@ -9430,7 +9423,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3"
+              "sha256": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2"
             }
           ]
         },
@@ -9528,7 +9521,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3"
+              "sha256": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2"
             }
           ]
         },
@@ -9539,7 +9532,7 @@
             },
             "entry_count": 197,
             "independent_entry_count": 145,
-            "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
+            "manifest_digest": "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582",
             "profile_consistent": true,
             "reviewed_entries": {
               "xlsx/b60/gt-b60-bundle": {
@@ -9601,7 +9594,7 @@
           "source_refs": [
             {
               "path": "backend/data/workpaper_sync_entry_manifest.json",
-              "sha256": "17ec789bf2dce53298893238ce92ca616378ad04789dc5d8010b7bfd1db61bfb"
+              "sha256": "f9ebdf976c0b5586d7d627747f95b15603a277bd348f350db848edb004268032"
             }
           ]
         },
@@ -9615,7 +9608,7 @@
           "source_refs": [
             {
               "path": "backend/app/services/workpaper_sync/adapters/registry.py",
-              "sha256": "e1547c3bcc4200beb87c8c6d7103f7bd8da16c9f13ab5df8ca959777d51fb0fc"
+              "sha256": "4d31b1ace8a6fd9fe25e6a1faba346ba0784e5acf15f12292b6dfdf248b40e39"
             }
           ]
         },
@@ -9650,8 +9643,8 @@
         },
         {
           "predicate_id": "multi-resolver.writer-gate-zero",
-          "reason_code": "writer_inventory_source_check_failed:WriterInventoryError",
-          "result": "stale"
+          "reason_code": "writer_gate_multi_resolver_nonzero",
+          "result": "blocked"
         }
       ],
       "consumers": [
@@ -9684,28 +9677,29 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3"
+              "sha256": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2"
             }
           ]
         },
         {
           "details": {
-            "count": 3,
-            "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
+            "count": 4,
+            "inventory_digest": "5444efac28d102bf51a2f0cce3a3455b9f24a8e2d6fe4b466c734f3587d6d4a7",
             "issue": "multi_resolver",
             "sample": [
               "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
               "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
-              "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
+              "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback",
+              "app.services.wp_generation_staging::_source_paths"
             ]
           },
           "id": "multi-resolver.writer-gate-zero",
-          "reason_code": "writer_inventory_source_check_failed:WriterInventoryError",
-          "result": "stale",
+          "reason_code": "writer_gate_multi_resolver_nonzero",
+          "result": "blocked",
           "source_refs": [
             {
               "path": "backend/data/workpaper_writer_inventory.json",
-              "sha256": "a8a77cb0686aa386600ab7f71c7bbd93eea7e5f212019f3589be7ed7e89c6ead"
+              "sha256": "7d520fddabf31ba30d95b495e051d8eea90ca9dc2ca70bd3c66a276b7dc8424b"
             }
           ]
         },
@@ -9734,7 +9728,7 @@
         }
       ],
       "scope": "global",
-      "state": "STALE"
+      "state": "BLOCKED"
     },
     {
       "blockers": [
@@ -9778,7 +9772,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3"
+              "sha256": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2"
             }
           ]
         },
@@ -10140,12 +10134,12 @@
       "state": "BLOCKED"
     }
   ],
-  "program_digest": "e82a5009274aeb3aeba80829a904c2f873cf3b8c0a706c74ae36c2f7c469f36c",
+  "program_digest": "74b53d5de86a1d0aca2ffb9098438b2c7d61dad936c96ef728ed01cee91fcdf0",
   "program_id": "workpaper-html-onlyoffice-bidirectional-writeback",
   "program_state": "STALE",
   "schema_version": "workpaper-sync-program-milestones/v1",
   "source_commit": null,
-  "source_digest": "13caa0786a604307da5df884114fb011683ff02ba64c918db97a4483bc8c1e9f",
+  "source_digest": "1b889076a8570273d37163964e14cafcf1b24645cb498bb990dfce3267d6bcfa",
   "source_state": "digest_bound_without_common_commit",
   "specs": {
     "custom-workpaper-template-ingestion-and-sync-closure": {
@@ -10836,10 +10830,15 @@
         "7.2": [],
         "7.3": [],
         "7.4": [],
-        "7.5": []
+        "7.5": [
+          "0.5",
+          "2.8",
+          "6.3",
+          "7.4"
+        ]
       },
       "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-      "source_digest": "b56db641fec88aad1d6ff512e300c1c8efb456e4f93cc422db569e3b971549b3",
+      "source_digest": "3546fcd2969efe0827676d1b4c8017e99a426aa6c99d3b703fe86d83531f03c2",
       "state_counts": {
         "blocked": 0,
         "completed": 46,
@@ -11006,16 +11005,16 @@
     }
   },
   "stats": {
-    "blocking_diagnostic_count": 6,
-    "diagnostic_count": 6,
+    "blocking_diagnostic_count": 5,
+    "diagnostic_count": 5,
     "milestone_count": 16,
     "milestone_state_counts": {
-      "BLOCKED": 5,
+      "BLOCKED": 6,
       "CLOSED": 0,
       "IMPLEMENTED": 3,
       "ONLYOFFICE_VERIFIED": 0,
       "REQUEST_PATH_VERIFIED": 0,
-      "STALE": 8
+      "STALE": 7
     },
     "spec_count": 8,
     "task_count": 236,
@@ -11064,21 +11063,21 @@
     ]
   },
   "writer_gate_facts": {
-    "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
+    "inventory_digest": "5444efac28d102bf51a2f0cce3a3455b9f24a8e2d6fe4b466c734f3587d6d4a7",
     "issue_counts": {
       "after_save_still_increments_revision": 0,
       "artifact_snapshot_writer_not_verifiable": 0,
-      "bypasses_unified_commit": 303,
+      "bypasses_unified_commit": 350,
       "keeps_legacy_write_path_beside_unified_commit": 0,
       "missing_required_domain": 0,
-      "multi_resolver": 3,
-      "non_canonical_resolver_only": 76,
-      "owns_direct_commit": 124,
+      "multi_resolver": 4,
+      "non_canonical_resolver_only": 77,
+      "owns_direct_commit": 136,
       "representation_upgrade_increments_business_revision": 0,
       "retired_writer_not_verifiable": 0,
       "unadjudicated_resolver": 0,
       "unadjudicated_writer": 0,
-      "writer_without_characterization_test": 239,
+      "writer_without_characterization_test": 261,
       "writes_legacy_version_field": 5
     },
     "issue_samples": {
@@ -11092,14 +11091,15 @@
       "multi_resolver": [
         "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
         "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
-        "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
+        "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback",
+        "app.services.wp_generation_staging::_source_paths"
       ],
       "non_canonical_resolver_only": [
-        "app.routers.attachments::download_attachment",
-        "app.routers.attachments::preview_attachment",
         "app.routers.completion_phase::export_workpaper_word",
         "app.routers.d2_sync_router::_load_context",
-        "app.routers.excel_html::confirm_as_template"
+        "app.routers.excel_html::confirm_as_template",
+        "app.routers.excel_html::diff_file_versions",
+        "app.routers.excel_html::download_file"
       ],
       "owns_direct_commit": [
         "app.routers.a17_summary::independence_import_b3_periods",
@@ -11123,8 +11123,8 @@
         "app.services.working_paper_service::WorkingPaperService.upload_offline_edit"
       ]
     },
-    "source_current": false,
-    "source_digest": "a84c5dba4f26740632815e3476eb1942a2e04c2e7c724b88c7ff3008ecf9447a",
-    "source_reason": "writer_inventory_source_check_failed:WriterInventoryError"
+    "source_current": true,
+    "source_digest": "c4f87a8eaaa7cb4636307e51a7f2b347a0a10b4dc5c6d4b6eeb02484e5355be8",
+    "source_reason": null
   }
 }

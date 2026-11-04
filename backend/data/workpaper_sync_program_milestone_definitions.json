@@ -50,6 +50,16 @@
     "workpaper-guidance-content-closure",
     "workpaper-page-formula-toolbar-closure"
   ],
+  "archive_dependency_guards": [
+    {
+      "id": "G0-3-ARCHIVE-DEPENDS-ON-WRITER-DEBT",
+      "code": "archive_bypasses_writer_debt",
+      "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+      "archive_task": "7.5",
+      "requires": ["2.8"],
+      "why": "最终归档（7.5）必须显式依赖 SYNC-MULTI-RESOLVER 的 producer（2.8）：writer gate 的 multi_resolver 未清零前不得归档。原判据把任务号 72/74 硬编码在生成器里，核心 spec 改成两级任务号后它对一个不存在的任务恒报 blocker，真正的 7.5 → 2.8 依赖反而无人检查。"
+    }
+  ],
   "database_probes": [
     {
       "id": "durable-application-schema",

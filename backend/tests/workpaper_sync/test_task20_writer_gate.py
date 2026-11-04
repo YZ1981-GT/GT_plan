@@ -101,150 +101,24 @@ _GATE_CRITERIA = {
 _RELOCATED_CRITERIA = {
     "多 resolver writer": "multi_resolver",
 }
-#: 当前归属方正文点名的、必须清零的那 4 条 resolver 行（`wp_onlyoffice_router`）。从 tasks.md
-#: 现场解析，不在这里抄；解析结果与门实测报出的行逐个比对。
-_TASKS_MD = (
-    _REPO
-    / ".kiro"
-    / "specs"
-    / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-    / "tasks.md"
+
+#: 三件套（Wave 6 冻结快照 + active）与里程碑定义的定位 / 解析 helper 在同目录的判据层模块里
+#: （本文件 2026-11-04 超过行数门后拆出，见那边的模块 docstring）。
+from tests.workpaper_sync._test_task20_writer_gate_criteria import (  # noqa: E402
+    _FROZEN_MARKERS,
+    _FROZEN_SPEC_DIR,
+    _REQUIREMENTS_MD,
+    _DESIGN_MD,
+    _ACTIVE_TASKS_MD,
+    _MILESTONE_REGISTRY_PATH,
+    _frozen_red_baseline_from_tasks_md,
+    _task20_criteria_labels_from_tasks_md,
+    _gate_criteria_homing_from_tasks_md,
+    _gate_issue_key_homing,
+    _criterion_owner_task,
+    _active_owner_task,
+    _active_owner_rows_from_tasks_md,
 )
-_REQUIREMENTS_MD = _TASKS_MD.parent / "requirements.md"
-_DESIGN_MD = _TASKS_MD.parent / "design.md"
-_TASK_HEAD_RE = re.compile(r"^- \[[ x~\-]\] (\d+)\.\s")
-#: `**`多 resolver writer=0`（gate issue key `multi_resolver`…` —— 门内 key 的文档侧字面量。
-_GATE_ISSUE_KEY_RE = re.compile(r"gate issue key `([a-z_]+)`")
-#: 「已移交 Task N」= 本任务**放手**；「自 Task M 移交至本门」= 本任务**接手**。
-#:
-#: 🔴 两条措辞都只描述**本任务自己的**交接动作。追述别人那一跳时 tasks.md 用的是
-#: 「已**再**移交 Task 71」/「移交链 Task 20 → Task 30 → Task 71」，两者都不匹配这两个
-#: 正则 —— 否则一句历史注解会改写归属推导。移交链因此由**放手/接手事件的文档顺序**
-#: 拼出来（见 `_gate_issue_key_homing`），而不是从散文里读一条箭头串。
-_RELINQUISH_RE = re.compile(r"已移交 Task (\d+)")
-_ASSUME_RE = re.compile(r"自 Task (\d+) 移交至本门")
-#: Task 20「当期红基线（冻结）」那行里的 `标签=计数` 串（`生产写路径未裁决=236、…=0、…`）。
-#:
-#: 🔴 计数从 `=0` 放宽到 `=(\d+)` 是本轮整改的另一半：旧形态只能表达「已归零」，于是 Task 20
-#: 的正文与实测（236 / 261）自相矛盾，而正文第 4 条又写着「本门未过」。现在正文冻结的是**实测
-#: 红基线**，`test_the_frozen_red_baseline_is_derived_from_the_live_gate` 把它和门现算的计数
-#: 逐条比对 —— 数字不再是手抄常量（否则源码一变就与文档静默分叉，平台假绿第③源）。
-_CRITERION_LABEL_RE = re.compile(r"([^、；;]+)=(\d+)")
-#: 基线行末尾的 `合计 N 条 blocking facts` —— 与 14 条之和交叉验证，防「逐条对了总数写错」。
-_BASELINE_TOTAL_RE = re.compile(r"合计 (\d+) 条 blocking facts")
-#: 归属行的分段：`归属 Task 74：`a`、`b`；`。分段边界用 `；`/`。`，段内只有反引号包住的 key。
-_HOMING_SEGMENT_RE = re.compile(r"归属 Task (\d+)：([^；。]+)")
-#: 反引号里的门内 issue key 字面量（与 `_GATE_ISSUE_KEY_RE` 不同：本条**不要求**
-#: `gate issue key` 前缀，只在归属行的分段内使用，故不会把散文里的其他反引号词收进来）。
-_BACKTICKED_KEY_RE = re.compile(r"`([a-z_]+)`")
-
-
-def _task_bodies() -> dict[str, list[str]]:
-    """tasks.md → {任务号: 该任务正文的行列表}。行首锚定，不用字符窗口。"""
-    bodies: dict[str, list[str]] = {}
-    current: list[str] | None = None
-    for line in _TASKS_MD.read_bytes().decode("utf-8").split("\n"):
-        head = _TASK_HEAD_RE.match(line)
-        if head:
-            current = bodies.setdefault(head.group(1), [])
-            current.append(line)
-            continue
-        if line.startswith("#") or line.startswith("- "):
-            current = None
-            continue
-        if current is not None:
-            current.append(line)
-    assert bodies, "tasks.md 一个任务都没解析出来 —— 本文件的 doc 派生判据会全部空跑"
-    return bodies
-
-
-def _frozen_red_baseline_from_tasks_md() -> tuple[dict[str, int], int]:
-    """Task 20 冻结的当期红基线 → ``({准则标签: 计数}, 合计)``。
-
-    锚在「当期红基线（冻结）」上，行首锚定 + 现场解析，不抄常量。返回的计数由
-    `test_the_frozen_red_baseline_is_derived_from_the_live_gate` 与 `evaluate_gate()` 的实测
-    结果逐条比对，所以这里解析出的每一个数字都必须能被门反驳。
-    """
-    for line in _task_bodies()["20"]:
-        if "当期红基线（冻结）" not in line:
-            continue
-        baseline = {
-            m.group(1).strip(): int(m.group(2)) for m in _CRITERION_LABEL_RE.finditer(line)
-        }
-        assert baseline, f"基线行解析不出任何「标签=计数」：{line[:160]}"
-        total = _BASELINE_TOTAL_RE.search(line)
-        assert total, f"基线行没有「合计 N 条 blocking facts」：{line[:160]}"
-        return baseline, int(total.group(1))
-    raise AssertionError("Task 20 正文里找不到「当期红基线（冻结）」那一行")
-
-
-def _task20_criteria_labels_from_tasks_md() -> set[str]:
-    """Task 20 正文点名的准则标签集 —— 现在等于冻结基线那一行点名的 14 条。"""
-    return set(_frozen_red_baseline_from_tasks_md()[0])
-
-
-def _gate_criteria_homing_from_tasks_md() -> dict[str, str]:
-    """Task 20「14 条准则的归属」行 → ``{门内 issue key: 归属任务号}``。
-
-    与 `_gate_issue_key_homing()` 是**两套独立派生**，故意的：后者只认两句显式交接语
-    （`已移交 Task N` / `自 Task M 移交至本门`），描述的是**交接事件**；本函数读的是一张
-    全量归属表，描述的是**当前状态**。两者在同一个 key 上不一致即红（见
-    `test_the_criteria_homing_agrees_with_tasks_md`）—— 一份「谁负责清零」的答案有两个来源
-    且都能各自解析成功、谁都不红，正是第一跳漂移的形态。
-    """
-    for line in _task_bodies()["20"]:
-        if "14 条准则的归属" not in line:
-            continue
-        homing: dict[str, str] = {}
-        for task, segment in _HOMING_SEGMENT_RE.findall(line):
-            keys = _BACKTICKED_KEY_RE.findall(segment)
-            assert keys, f"「归属 Task {task}」这一段里没有任何 issue key：{segment[:120]}"
-            for key in keys:
-                assert key not in homing, (
-                    f"`{key}` 在归属行里出现两次（Task {homing[key]} 与 Task {task}）—— "
-                    "「谁负责清零」不可有两个答案"
-                )
-                homing[key] = task
-        assert homing, f"归属行解析不出任何 `归属 Task N：` 分段：{line[:160]}"
-        return homing
-    raise AssertionError("Task 20 正文里找不到「14 条准则的归属」那一行")
-
-
-def _gate_issue_key_homing() -> tuple[dict[str, str], dict[str, list[str]], dict[str, list[str]]]:
-    """从 tasks.md 派生每个门内 issue key 的**归属**与**整条移交链**。
-
-    返回 ``(homed, relinquished, assumed)``：``homed[key]`` 是该 key 当前归属的任务号；
-    ``relinquished[key]`` 是按文档顺序放手过它的任务号**列表**；``assumed[key]`` 同理是
-    接手过它的任务号列表。
-
-    判别只看两句显式交接语（`已移交 Task N` / `自 Task M 移交至本门`），因为「Task 20、
-    Task 30、Task 71 都提到了 `multi_resolver`」本身分不出谁在守它 —— 这正是第一跳漂移的
-    形态。
-
-    🔴 三个返回值都是**列表而不是单值**：这条 criterion 已经移交两次（20 → 30 → 71），
-    单值 dict 会被第二跳静默覆盖成 `relinquished={key: "30"}`，第一跳从判据里消失，
-    于是「移交链」这件事在守卫里再也不可核对 —— 而它正是下一轮复盘最先要问的东西。
-    """
-    homed: dict[str, str] = {}
-    relinquished: dict[str, list[str]] = {}
-    assumed: dict[str, list[str]] = {}
-    for task, body in _task_bodies().items():
-        for line in body:
-            keys = _GATE_ISSUE_KEY_RE.findall(line)
-            if not keys:
-                continue
-            hand_off = _RELINQUISH_RE.search(line)
-            take_over = _ASSUME_RE.search(line)
-            for key in keys:
-                if hand_off:
-                    relinquished.setdefault(key, []).append(task)
-                    homed[key] = hand_off.group(1)
-                elif take_over:
-                    assumed.setdefault(key, []).append(task)
-                    homed.setdefault(key, task)
-                else:
-                    homed.setdefault(key, task)
-    return homed, relinquished, assumed
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
@@ -1002,10 +876,29 @@ def test_the_gate_evaluates_exactly_the_criteria_the_spec_names(
     )
 
 
+def test_the_wave6_documents_resolve_to_the_frozen_snapshot() -> None:
+    """本文件读的 Wave 6 三件套必须真的是冻结快照，且 active 不含这些形态。
+
+    两边都含的话「按内容选快照」就选不出东西；active 若回到 Wave 6 形态，本文件 active / 冻结
+    的分工要重判，不能默默通过。
+    """
+    assert "_archive" in _FROZEN_SPEC_DIR.parts, _FROZEN_SPEC_DIR
+    active = _ACTIVE_TASKS_MD.read_text(encoding="utf-8")
+    assert not re.search(_FROZEN_MARKERS["tasks.md"][1], active), (
+        "active tasks.md 里出现了 Task 20 的冻结红基线行 —— 它应只在冻结快照里"
+    )
+
+
 def test_the_frozen_red_baseline_is_derived_from_the_live_gate(
     gate: ModuleType, inventory: dict[str, Any], regenerated: dict[str, Any]
 ) -> None:
     """**Validates: Requirements 2.1, 2.2, 2.12, 9.11** · Property 61
+
+    🔴 2026-11-04 改写：Task 20 正文随 Wave 6 冻结进归档快照，那一行的 14 个数字永远停在
+    当时 —— 拿它和今天的门逐条比只会恒红，改归档文档又违背 append-only。「基线由门现算派生、
+    源码变了没同步就红」这件事改由**当前发布的基线**承担：里程碑注册表的
+    `writer_gate_facts.issue_counts`（生成物，带 digest，`--check` 守新鲜度）。两侧仍都能打红：
+    冻结那一行自身不自洽 ⇒ 红；门实测与当前发布的基线不一致 ⇒ 红。下面保留原 docstring。
 
     Task 20 的完成语义是「门可信 + **当期红基线冻结**」。冻结的那 14 个数字如果是手抄常量，
     源码一变就与文档静默分叉（平台假绿第③源），于是「基线」退化成一句陈述。所以这里现场解析
@@ -1024,23 +917,30 @@ def test_the_frozen_red_baseline_is_derived_from_the_live_gate(
         f"基线行逐条之和 {sum(baseline.values())} ≠ 它自己声明的合计 {declared_total}"
     )
 
+    registry = json.loads(_MILESTONE_REGISTRY_PATH.read_text(encoding="utf-8"))
+    facts = registry["writer_gate_facts"]
+    assert facts["source_current"], (
+        f"里程碑注册表记录的 writer 清册不新鲜：{facts.get('source_reason')}"
+    )
+    assert facts["inventory_digest"] == inventory["inventory_digest"], (
+        "里程碑注册表登记的清册 digest 与磁盘清册不同 —— 清册重生成后没重跑注册表 --apply"
+    )
+    published = dict(facts["issue_counts"])
+    assert set(published) == set(_GATE_CRITERIA.values()), (
+        f"发布的基线与 14 条准则不是同一组 key：{sorted(set(published) ^ set(_GATE_CRITERIA.values()))}"
+    )
     for label, source in (("磁盘清册", inventory), ("现场重推的清册", regenerated)):
         issues = gate.evaluate_gate(source)
         measured = {key: len(values) for key, values in issues.items()}
-        frozen = {_GATE_CRITERIA[name]: count for name, count in baseline.items()}
         drift = {
-            key: (frozen[key], measured[key])
-            for key in sorted(frozen)
-            if frozen[key] != measured[key]
+            key: (published[key], measured[key])
+            for key in sorted(published)
+            if published[key] != measured[key]
         }
         assert not drift, (
-            f"{label}：Task 20 冻结的红基线与门实测不一致 "
-            f"{{key: (文档, 实测)}} = {drift} —— 要么文档里的数字写错了，要么源码动了而正文"
-            "没同步更新。两种都必须改到一致，不许只改一边"
-        )
-        assert sum(measured.values()) == declared_total, (
-            f"{label}：blocking facts 合计实测 {sum(measured.values())}，"
-            f"正文冻结 {declared_total}"
+            f"{label}：当前发布的红基线与门实测不一致 "
+            f"{{key: (注册表, 实测)}} = {drift} —— 源码 / 谓词动了而注册表没重生成"
+            "（generate_workpaper_sync_program_milestones.py --apply），或者反过来"
         )
 
     # 反重言式：基线不能是「全零」——那样它既不描述现状，也无法证明这条判据在干活。
@@ -1159,47 +1059,6 @@ async def get_sheet_onlyoffice_config(self, wp_id):
 _MULTI_RESOLVER_ROW_ID = "app.routers.demo_oo_router::get_sheet_onlyoffice_config"
 
 
-def _criterion_owner_task() -> str:
-    """当前持有 `multi_resolver` 的任务号 —— 从 tasks.md 的显式接手语现场解析。
-
-    🔴 不硬写任务号：归属已移交两次，硬写的常量会在第三次移交时与文档静默分叉。
-    """
-    homed, _, assumed = _gate_issue_key_homing()
-    owners = assumed.get("multi_resolver") or []
-    assert len(owners) == 1, (
-        f"tasks.md 里接手 `multi_resolver` 的任务不是恰一个：{owners}"
-        "（0 = 无人守，>1 = 两个门都自称归属）"
-    )
-    assert homed.get("multi_resolver") == owners[0], (
-        f"放手侧指向 Task {homed.get('multi_resolver')}，接手侧却是 Task {owners[0]}"
-    )
-    return owners[0]
-
-
-def _task71_multi_resolver_rows_from_tasks_md() -> tuple[int, set[str]]:
-    """当前归属方正文点名的「N 条 resolver 行」→ ``(N, {函数名})``。
-
-    锚在 `resolver 行（…）` 这个短语上而不是抄一份名单：名单一旦在文档里改了（迁走一行、
-    换个函数名），这里解析出来的集合就跟着变，和门实测报出的行比对即可发现不一致。
-
-    归属任务号同样是派生的 —— 第二跳（30 → 71）之前这里读的是 Task 30 的正文，硬写号会让
-    「文档已经改了归属、判据还在读旧任务」这种漂移变成静默通过。
-    """
-    owner = _criterion_owner_task()
-    for line in _task_bodies()[owner]:
-        if "gate issue key `multi_resolver`" not in line:
-            continue
-        count = re.search(r"(\d+) 条 resolver 行", line)
-        listed = re.search(r"resolver 行（([^）]+)）", line)
-        assert count and listed, (
-            f"Task {owner} 的 multi_resolver 那条正文形态变了：{line[:160]}"
-        )
-        return int(count.group(1)), set(re.findall(r"`([a-z_]+)`", listed.group(1)))
-    raise AssertionError(
-        f"Task {owner}（当前归属）正文里找不到 gate issue key `multi_resolver` 那条准则"
-    )
-
-
 def test_the_gate_still_evaluates_the_relocated_criterion(
     generator: ModuleType, gate: ModuleType, inventory: dict[str, Any]
 ) -> None:
@@ -1253,19 +1112,24 @@ def test_the_gate_names_exactly_the_rows_the_owner_must_clear(
     doc ↔ 门实测双向对齐：当前归属方正文点名的那几条 resolver 行，必须就是门今天报出的行。
     一侧先动（文档里划掉一行、或某行真的迁走了）都会红，于是「移交后还剩几行要清」这件事
     不会只活在散文里。
+
+    🔴 2026-11-04：Wave 6 Task 71 正文的名单冻结在快照里（含此后已收敛的
+    `get_whole_excel_grid`），改读 active 计划里当前归属任务的现算名单。原先「全在
+    `wp_onlyoffice_router`」那条断言删掉：第 4 行 `wp_generation_staging::_source_paths` 是
+    真实新增（清册过期时看不见），模块现在逐行比，比那条集合断言更紧。
     """
-    count, names = _task71_multi_resolver_rows_from_tasks_md()
-    assert names and len(names) == count, (
-        f"Task {_criterion_owner_task()} 自称 {count} 条，却列了 {sorted(names)}"
-    )
+    owner = _active_owner_task()
+    count, names = _active_owner_rows_from_tasks_md(owner)
+    assert names and len(names) == count, f"任务 {owner} 自称 {count} 条，却列了 {sorted(names)}"
 
     reported = gate.evaluate_gate(inventory)["multi_resolver"]
-    assert {writer_id.split("::")[-1] for writer_id in reported} == names, (
-        f"门报出的多 resolver 行与 Task 30 点名的不一致：门={sorted(reported)} doc={sorted(names)}"
+    measured = {
+        f"{writer_id.split('::', 1)[0].rsplit('.', 1)[-1]}::{writer_id.split('::', 1)[1]}"
+        for writer_id in reported
+    }
+    assert measured == names, (
+        f"门报出的多 resolver 行与任务 {owner} 点名的不一致：门={sorted(measured)} doc={sorted(names)}"
     )
-    assert {writer_id.split("::")[0] for writer_id in reported} == {
-        "app.routers.wp_onlyoffice_router"
-    }, f"多 resolver 行不再全在 wp_onlyoffice_router：{sorted(reported)}"
 
 
 def test_the_criteria_homing_agrees_with_tasks_md() -> None:

@@ -515,7 +515,39 @@ def load_definitions(path: Path = _DEFINITIONS_PATH) -> dict[str, Any]:
         if len(set(predicate_ids)) != len(predicate_ids):
             raise ProgramMilestoneError(f"{milestone['id']}: predicate ids must be unique")
     _validate_host_path_definition(definitions)
+    _validate_archive_dependency_guards(definitions)
     return definitions
+
+
+def _validate_archive_dependency_guards(definitions: Mapping[str, Any]) -> None:
+    """归档依赖守卫的**结构**校验；任务号是否存在由 :func:`validate_program_dag` 按现算任务图判。"""
+    guards = definitions.get("archive_dependency_guards")
+    if not isinstance(guards, list) or not guards:
+        raise ProgramMilestoneError("definitions.archive_dependency_guards must be a non-empty array")
+    seen: set[str] = set()
+    for guard in guards:
+        if not isinstance(guard, dict):
+            raise ProgramMilestoneError("archive dependency guard must be an object")
+        missing_keys = {"id", "code", "spec", "archive_task", "requires", "why"} - guard.keys()
+        if missing_keys:
+            raise ProgramMilestoneError(f"archive dependency guard {guard.get('id')!r} lacks {sorted(missing_keys)}")
+        guard_id = guard["id"]
+        if not isinstance(guard_id, str) or not guard_id or guard_id in seen:
+            raise ProgramMilestoneError(f"archive dependency guard id invalid or duplicated: {guard_id!r}")
+        seen.add(guard_id)
+        if not str(guard["code"]).startswith("archive_bypasses_"):
+            raise ProgramMilestoneError(f"{guard_id}: code must start with 'archive_bypasses_'")
+        if guard["spec"] not in definitions["specs"]:
+            raise ProgramMilestoneError(f"{guard_id}: spec {guard['spec']!r} is not a program spec")
+        archive_task = _task_id(guard["archive_task"], source=f"{guard_id} archive_task")
+        requires = guard["requires"]
+        if not isinstance(requires, list) or not requires:
+            raise ProgramMilestoneError(f"{guard_id}: requires must be a non-empty array")
+        required = {_task_id(item, source=f"{guard_id} requires") for item in requires}
+        if archive_task in required:
+            raise ProgramMilestoneError(f"{guard_id}: archive task cannot require itself")
+        if not str(guard["why"]).strip():
+            raise ProgramMilestoneError(f"{guard_id}: why must explain the dependency")
 
 
 def parse_tasks(text: str, *, source: str = "tasks.md") -> dict[str, dict[str, Any]]:
@@ -857,17 +889,25 @@ def validate_program_dag(
                         f"{spec}: invalid external consumer reference {raw_ref!r}"
                     )
 
-    core = spec_facts["workpaper-html-onlyoffice-bidirectional-writeback-closure"]
-    archive_dependencies = set(core["graph"]["dependencies"].get("72") or [])
-    if "74" not in archive_dependencies:
-        diagnostics.append(
-            _diagnostic(
-                "archive_bypasses_writer_debt",
-                spec="workpaper-html-onlyoffice-bidirectional-writeback-closure",
-                task="72",
-                missing_dependency="74",
+    # 🔴 归档依赖守卫按 definitions 声明逐条判。原先硬编码「72 必须直接依赖 74」，两级任务号后
+    #    `dependencies.get("72")` 恒空 ⇒ 每次生成都冒出指向不存在任务的幻影 blocker，真正的归档
+    #    依赖反而没人查。声明的任务号在现算任务图里不存在 ⇒ fail closed；缺直接依赖 ⇒ 按 code 出诊断。
+    for guard in definitions["archive_dependency_guards"]:
+        gid, guard_spec, guard_facts = guard["id"], guard["spec"], spec_facts.get(guard["spec"])
+        if guard_facts is None:
+            raise ProgramMilestoneError(f"archive dependency guard {gid}: spec {guard_spec!r} has no task facts")
+        archive_task = _task_id(guard["archive_task"], source=f"{gid} archive_task")
+        required = [_task_id(item, source=f"{gid} requires") for item in guard["requires"]]
+        unknown = sorted({archive_task, *required} - set(guard_facts["task_states"]), key=_task_order_key)
+        if unknown:
+            raise ProgramMilestoneError(
+                f"archive dependency guard {gid}: references tasks that no longer exist in {guard_spec}: {unknown}"
             )
-        )
+        declared = set(guard_facts["graph"]["dependencies"].get(archive_task) or [])
+        for missing in sorted(set(required) - declared, key=_task_order_key):
+            diagnostics.append(
+                _diagnostic(guard["code"], spec=guard_spec, task=archive_task, missing_dependency=missing)
+            )
 
     cycle = _find_cycle(nodes, dependencies)
     if cycle:

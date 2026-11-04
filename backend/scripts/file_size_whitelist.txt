@@ -442,11 +442,6 @@ backend/scripts/diagnose/mutate_task71_chaos_guards.py  878
 backend/scripts/diagnose/probe_oo94_excel_identity.py  1429
 backend/scripts/diagnose/probe_oo94_word_sdt.py  1980
 backend/scripts/diagnose/probe_task7_staged_artifact_boundaries.py  2345
-#   adjudicate_task74_writer_domains.py —— 2026-09-21 D4-13 rematerialize 修复 7 处
-#     provider（build_store_projection 未转换 value_type/mode 枚举）后，Task 74 逐行
-#     裁决规则表随 overlay 新裁决行增加而增长（净新增必要裁决记录，非无意义膨胀）；
-#     887 → 1030 按真实态登记。
-backend/scripts/gen/adjudicate_task74_writer_domains.py  1030
 backend/scripts/gen/generate_task60_f2_word_contracts.py  1388
 backend/scripts/gen/generate_task62_generic_docx_adjudication.py  1096
 backend/scripts/gen/generate_task64_dedicated_word_chain.py  1230
@@ -816,7 +811,19 @@ backend/app/routers/wp_render_strategies/_k1_import_export.py  1482
 #   其结构需与生成器的 AST/变异锚点保持同文件可见；拆分会破坏可复现投影和变异判据。
 #   spec: workpaper-page-formula-toolbar-closure Task 13/15
 backend/scripts/gen/generate_workpaper_sync_program_milestones.py  2744
-backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
+#   test_workpaper_sync_program_milestones.py —— 2026-11-04：HEAD 已 857 行（> 803 + 5%，触碰即红，
+#     非本次造成）。本次把 BLOCKED / 诊断两条计数上限改成逐条点名、补归档守卫的语义判据与
+#     multi_resolver ⇔ 阻塞互证后到 1051 行；解析层、点名名单与 fixture 已拆到同目录
+#     `_test_workpaper_sync_program_milestones_criteria.py`，剩下 931 行是用例与 `source` fixture。不再拆用例文件：
+#     CI（governance-checks.yml）与里程碑定义的 targeted_tests 都按本文件路径跑。下一步拆分轴 =
+#     数据库探针 5 条用例（`test_database_*`，约 150 行）整组移走，需同步改 CI 与 targeted_tests，
+#     并把 `source` fixture 改成进程内缓存（否则两个模块各建一次 registry、各做一次真库探测）。
+backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  931
+#   test_b_cycle_baseline.py —— 2026-11-04：HEAD 已 1988 行（> 800 且未登记，触碰即红，非本次造成）。
+#     本次只把 BC-12 由「notice ≤5」改成 10 条逐条点名（umbrella 3.5 之后 B 域宿主全挂 notice），+9 行。
+#     拆分方向：按 §-章节把判据类拆到同目录 `_test_b_cycle_baseline_*.py`，模块级 fixture 与
+#     `b_cycle_scanner` / task57 解析器的 import 留在本文件，各章节用例文件只 import fixture。
+backend/tests/workpaper_sync/test_b_cycle_baseline.py  1997
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: workpaper-page-formula-toolbar-closure（2026-09-13 入库，gc0 dup 修复同批）

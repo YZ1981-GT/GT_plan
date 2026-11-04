@@ -48,13 +48,13 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582"
 
-export const WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST = "3382b0a961727e5826372683a2db995eff201a2535b886014d4d44f5eee6ae6e"
+export const WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST = "d51c5dfd2b3cdd806b8d179ea3ffe6cae6ef0707bc2f7e561e19d33d68b26c1b"
 
 export const WORKPAPER_SYNC_WP_CODE_ADJUDICATION_DIGEST = "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "0308e3609b064f6547bfdc0448610c13c2036ca6857d73053df60e0d35f57f10"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "5362c3d62d1d3debf29ce0accac3bb5b572652992bb8e64f32d4d889e10c7b75"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
@@ -2377,7 +2377,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
     "htmlCounterpartSourceRefs": [
-      "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L463",
+      "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L470",
       "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L101",
       "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L127"
     ],
@@ -2549,7 +2549,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
     "htmlCounterpartSourceRefs": [
-      "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L362",
+      "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L376",
       "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L212",
       "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L239"
     ],
@@ -3073,7 +3073,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
     "htmlCounterpartSourceRefs": [
-      "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L386",
+      "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L385",
       "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L106"
     ],
     "htmlCounterpartVerdict": "exists",
@@ -3122,7 +3122,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
     "htmlCounterpartSourceRefs": [
-      "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L198",
+      "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L197",
       "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L282"
     ],
     "htmlCounterpartVerdict": "exists",

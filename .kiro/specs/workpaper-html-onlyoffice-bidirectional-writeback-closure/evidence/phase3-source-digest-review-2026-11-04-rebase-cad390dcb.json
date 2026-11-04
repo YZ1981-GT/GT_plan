@@ -1,0 +1,85 @@
+{
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "owner_task": "3.5",
+  "purpose": "零能力损失复核（推送前变基）：2026-11-04 审计整改（上一条复核 phase3-source-digest-review-2026-11-04-audit-fix.json，919d66ad… → 8d0a8718…）推送前变基到远端头 cad390dcb（v1.0.116）。远端提交 7ea68c30f（feat(web-voucher)：序时账与底稿联动、抽凭只读分页与溯源界面）在 GtWpRenderer.vue 模板里 VoucherSurvivalBanner 之后插入 <VoucherAttachPendingBanner>，并在 <script setup> 加一行 import；宿主源码变化使 discovery.sourceDigest 变更，不得改变任何 entry 的能力事实。",
+  "method": "按完整 manifest 现 build（overlay 副本里放行 digest 门，仅内存）与磁盘 manifest 逐 entry 比 ['capability', 'migration_state', 'adapter_id', 'html_store', 'canonical_resolver', 'independent_entry', 'html_counterpart_verdict', 'effective_entry_id', 'capability_verdict_stage', 'capability_target', 'document_type', 'parent_entry_id', 'host_path', 'adjudication_state']，并比 entry 集合、stats、per-entry mount 数，以及每个 entry 的挂点语义多重集合（file/component/condition/sheetExpression/documentType/runtimeCardinality/loop）。",
+  "base_commit": "cad390dcb",
+  "origin_commits_in_scope": [
+    "7ea68c30f feat(web-voucher): 序时账与底稿联动、抽凭只读分页与溯源界面"
+  ],
+  "digest": {
+    "disk_source": "8d0a8718df882c92e9cb1488e82ffecbf84f135012819354701c4c89cabea5ea",
+    "built_source": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
+    "disk_manifest": "e7de789674ce5f094f5329328dbc1198c52c37da4ceba41bf06aa6484fd5d6c9",
+    "built_manifest": "589e5b43bd131c82181da3b6f15e3ae45243b988248bfc22f85e3bbe6eaa8b09",
+    "note": "built_manifest 是复核时在内存里只替换 approved_source_digest 后现 build 的结果；overlay 写入复核记录（approved_source_digest / review_basis / source_review_ref）后 overlay_digest 随之变化，落盘 manifest 的 manifest_digest 以 generate_workpaper_sync_artifacts.py --write 的结果为准（written_manifest），entries 与 stats 不变。",
+    "written_manifest": "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582"
+  },
+  "entry_set": {
+    "disk": 197,
+    "built": 197,
+    "only_disk": [],
+    "only_built": []
+  },
+  "stats_diff": {},
+  "changed_entries": {},
+  "mount_count_changes": {},
+  "mount_semantic_changes": {},
+  "mount_identity": {
+    "reidentified_mounts": 1,
+    "same_id_span_only_changes": 1,
+    "reidentified": [
+      {
+        "entry_id": "xlsx/gt-wp-renderer",
+        "component": "GtOnlyOfficeSheet",
+        "mount_id_before": "mount_12389c3dfc6e1404a58a",
+        "mount_id_after": "mount_c560096be152660fe648",
+        "template_node_ordinal": [56, 57],
+        "source_start_line": [239, 240]
+      }
+    ],
+    "span_only": [
+      {
+        "entry_id": "docx/gt-wp-renderer",
+        "mount_id": "mount_d4b8a91cbb8386a448b3",
+        "source_start_line": [201, 202]
+      }
+    ],
+    "why": "mountId 的身份输入含 templateNodeOrdinal（模板元素先序序号）。远端把 VoucherAttachPendingBanner 插在 GtOnlyOfficeSheet 载体之前 ⇒ 载体序号 56→57 ⇒ 新 mountId；挂点语义多重集合逐 entry 相等（见 mount_semantic_changes 为空）。docx 挂点是 registry_ast（经 HTML_RENDERER_REGISTRY 分发的 WorkpaperWordEditor，templateNodeOrdinal 恒为 0），位于模板里 banner 插入点之后 ⇒ 行号后移 1、id 不变。旧 mountId 只被 manifest 自身引用（overlay、legacy baseline、spec evidence 均无引用），随 manifest 重生成更新。"
+  },
+  "discovery_layers": {
+    "before": {
+      "L1": 49,
+      "L2": 23,
+      "L3": 36
+    },
+    "after": {
+      "L1": 49,
+      "L2": 23,
+      "L3": 36
+    },
+    "sync_host_entry_rules_hits_unchanged": true
+  },
+  "changed_hosts": [
+    "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue"
+  ],
+  "verdict": "zero_capability_loss",
+  "schema_version": "workpaper-sync-source-review:v1",
+  "reviewed_at": "2026-11-04",
+  "reviewed_by": "workpaper-html-onlyoffice-bidirectional-writeback-closure:audit-fix-2026-11-04-rebase",
+  "generator": "backend/scripts/gen/generate_workpaper_sync_manifest.py::discover_source+build_manifest",
+  "previous_review_ref": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/phase3-source-digest-review-2026-11-04-audit-fix.json",
+  "approved_source_digest_before": "8d0a8718df882c92e9cb1488e82ffecbf84f135012819354701c4c89cabea5ea",
+  "approved_source_digest_after": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
+  "decision": "approved",
+  "safety_checks": {
+    "authoritative_templates_modified_for_review": false,
+    "manual_manifest_edits_allowed": false,
+    "rebuilt_manifest_available": true,
+    "rebuild_error": null
+  },
+  "next_actions": [
+    "只通过 generate_workpaper_sync_artifacts.py --write 重建四件生成物",
+    "重建后重跑下游生成物与 generate_workpaper_sync_program_milestones.py --apply / --check"
+  ]
+}

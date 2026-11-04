@@ -4,7 +4,7 @@
   "owner_task": "6.1",
   "description": "每条 independent entry 的 required scenario set digest + evidence 要求。4.2~4.8 / 6.3 消费本产物判断「哪些 entry 需要哪些 scenario evidence」。",
   "generator": "backend/scripts/gen/generate_required_scenario_set.py",
-  "manifest_digest": "17ec789bf2dce53298893238ce92ca616378ad04789dc5d8010b7bfd1db61bfb",
+  "manifest_digest": "f9ebdf976c0b5586d7d627747f95b15603a277bd348f350db848edb004268032",
   "summary": {
     "independent_entry_count": 145,
     "unique_scenario_profiles": 11,

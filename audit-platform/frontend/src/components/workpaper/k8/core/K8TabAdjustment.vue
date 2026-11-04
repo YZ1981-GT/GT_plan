@@ -2,7 +2,7 @@
   <div class="k8-tab-adjustment">
     <!-- ═══ K8-3 真双向：结构化视图 ↔ 在线编辑（平台 sync bridge，非裸 GtOnlyOfficeSheet）═══ -->
     <div class="k-sync-bar">
-      <el-segmented v-model="kEditorMode" :options="kModeOptions" size="small" />
+      <el-segmented v-if="showModeSwitch" v-model="kEditorMode" :options="kModeOptions" size="small" /><GtEntrySyncCapabilityNotice :entry-id="K_SYNC_ENTRY_ID" />
       <el-tag size="small" :type="kSyncStateTag.type">{{ kSyncStateTag.text }}</el-tag>
     </div>
     <template v-if="kEditorMode === K_ONLINE_EDIT_LABEL">
@@ -168,6 +168,8 @@ import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentra
  */
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useKAdjustmentSync, K_ONLINE_EDIT_LABEL } from '../../composables/kAdjustmentSync'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -412,11 +414,28 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 // 🔴 sheetKey 走具名常量：跨语言契约守卫按常量声明反查后端 sheet_key 是否漂移。
 const K8_3_SHEET_KEY = 'k803-managed'
 const ITEM = `${ITEM_PREFIX}-entries`
-const {
+/** 本表的 entry（父 entry）：门与 notice（K 包装若收 entryId 也用它）共用这一处字面量。模板用绑定、不写静态 entry-id ——
+ *  静态字面量会被挂点发现器当作 L2 身份声明，overlay 的 L3 规则（sync_host_entry_rules）随即零命中。 */
+const K_SYNC_ENTRY_ID = 'xlsx/gt-k8-selling-expenses'
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：「在线编辑」选项与模式开关的可见性来自 entry 级三层事实，
+ * 经 K 包装透传给 `useD4SyncMode` 的 `entrySync` 生效，不由本表的局部判断决定。
+ *
+ * 🔴 必须声明在 `props` 之后、包装调用之前：内部 `watch(..., { immediate: true })`
+ * 会在 setup 期立即读下面三个 getter，组合式也要在创建时拿到它。
+ */
+const kEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => K_SYNC_ENTRY_ID,
+})
+const { showModeSwitch,
   syncBridge: kSyncBridge, descriptor: kSyncDescriptor, editorMode: kEditorMode,
   modeOptions: kModeOptions, syncStateTag: kSyncStateTag, syncHostRef: kSyncHostRef,
 } = useKAdjustmentSync({
-  entryId: 'xlsx/gt-k8-selling-expenses',
+  entrySync: kEntrySync,
+  entryId: K_SYNC_ENTRY_ID,
   sheetKey: K8_3_SHEET_KEY,
   itemId: ITEM,
   wpId: computed(() => props.wpId),

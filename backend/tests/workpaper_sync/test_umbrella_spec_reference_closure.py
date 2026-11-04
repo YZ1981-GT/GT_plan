@@ -284,8 +284,9 @@ SPEC_NAME = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 _DOC_NAMES = ("requirements.md", "tasks.md", "design.md")
 _DISCOVERY_ROOTS = ("backend/scripts", "backend/app", "backend/tests")
 _ALLOWED_STATUS = {"ok", "retired", "registered_unreviewed"}
-#: `registered_unreviewed` 只许变少。写下它时现算 26 条。
-_UNREVIEWED_CEILING = 26
+#: `registered_unreviewed` 只许变少。写下它时现算 26 条；2026-11-04 test_task20 / test_task30 /
+#: 里程碑用例的判据层拆出并逐个复核（换成 3 条 ok），里程碑生成器移到 `outside_discovery` ⇒ 23。
+_UNREVIEWED_CEILING = 23
 
 
 def _non_docstring_str_constants(source: str) -> set[str]:

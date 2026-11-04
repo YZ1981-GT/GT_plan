@@ -23,6 +23,32 @@
 >   产生 operation；因此不能用一次“被正确拦截”替代 AC 12.1 的真实 OO operation 与验收态。
 > - **7.5 退回** `[x] → [ ]`：本 spec 仍在 active 目录，且当前有 4 个未完成任务；design §15
 >   的归档条件尚未全部满足。既有五角色材料保留为阶段复核，不能标作“最终归档”。
+> 🔴 2026-11-04 审计整改勘误（复选框不变，净 0）：
+> - **3.5 的「全域零宿主自行决定」是假绿**：棘轮只认英文 / 小写枚举的模式值，中文标签当值与
+>   组合式给选项两种形态从未进分母；补识别后现算 **48 个**宿主仍自行决定，已全部接单源，
+>   棘轮回到 0（见 3.5 正文同日条目）。
+> - **3.5 的批量接线让 B22B×2 / B22C 三个宿主编译失败**（同一组件 import 了两次），全仓 `.vue`
+>   语法守卫自那次提交起一直红，3.5 仍标了完成；已删掉重复行（见 3.5 正文同日条目）。
+> - **5.4** 的「前端失败与本次删除无关」不成立：只测被删模块的 `usePilotBridgeAdapter.spec.ts`
+>   随删除整份采集失败，已删掉这份孤儿用例（见 5.4 正文同日条目）。
+> - **writer 清册**看不见先赋给局部变量再 `text(…)` 执行的写库 SQL，公式运行时适配器写
+>   `checklist_responses` 的路径因此从分母里消失；已修发现谓词（见 2.8 正文同日条目）。
+> - **D4 子 Tab 在线编辑落地后不重载表单**：D4-4 没传 `reloadHtml`（桥里 TypeError ⇒ reload 失败态、
+>   lease 不释放），D4-5 / D4-13 / D4-16 / D4-35 派发的 `d4:reload-responses` 全仓无人监听；已改走父级
+>   `reloadWorkpaperData`（见 3.5 正文同日条目）。
+> - **终验**（候选树 = 远端头 `33d1aa5a2` + 本次整改，与远端头干净检出逐节点比较）：后端
+>   `tests/workpaper_sync` + writer 清册 / legacy baseline / `tests/formula_runtime`（17,846 例，隔离库）
+>   新增失败 0、修复 72；前端 `src/components/workpaper` + `.vue` 语法守卫（31,705 例）新增失败 0、
+>   修复 15（另 2 条 PBT 偶发红按失败种子在基线上同样复现：G7 辅助抽取 Persist_First、A3-8 商誉分摊
+>   守恒，属既有缺陷）；改动区 vue-tsc 新增 0、消除 7；行数门、ruff A/B 无新增。基线已红的用例原样保留。
+>   推送前远端头前移到 `165599b60`（与本次改动零文件交集）：在新头上重生成 writer 清册 / resolver 矩阵 /
+>   生成物 / 里程碑后，定向 A/B（后端 1,450 例、前端 1,685 例）同样新增失败 0。推送时再逐次变基到当时的
+>   远端头（最终远端头见提交说明）：变基到 `00dca531d`、`98332962c` 时与本次改动零文件交集；变基到
+>   `cad390dcb` 时 `components.d.ts` 两侧各删一条陈旧登记（不同行，自动合并），且远端提交 `7ea68c30f`
+>   改了 `GtWpRenderer.vue` 的挂点，补做一次 source digest 复核（见 3.5 同日条目）。每次变基后清册 /
+>   矩阵 / 生成物 / 里程碑 `--check` 全部通过；最终远端头上重跑定向 A/B，新增失败 0。
+> - **1.1** 的 pending schema 让 4 个消费方在 pending entry 上崩溃而不是回答「未裁决」，已改成
+>   显式回答（见 1.1 正文同日条目）；**0.5** 复核 3 个消费方（未复核 26 → 23）；**2.8** 现算 4 条。
 > - 文末“未完成项实况”保留为 2026-11-01 开工快照；当前状态只以复选框和文末
 >   “当前未完成项索引”为准。
 >
@@ -111,6 +137,12 @@
     * **仍缺**（这就是它退回 `[ ]` 的原因）：① `registered_unreviewed` 的解析形态未逐个
       复核，「每个都能在当前文档形态下跑通」对它们尚未成立；② 任务要求的那两组变异
       （改 AC 编号 / 改 Phase 标题形态必须有判据打红）未做。
+    * 🔴 **2026-11-04**：test_task20 / test_task30 / 里程碑用例为过行数门把解析常量拆到同目录的
+      `_test_*_criteria.py`，发现集合随之换成这 3 个判据层模块，逐个复核后登记 `ok`（前两个按
+      内容标记绑定冻结快照，第三个读 active 两级任务图）。里程碑生成器的归档依赖守卫改由
+      定义 JSON 声明后不再硬编码 spec 名，AST 发现看不见它 ⇒ 如实移到登记表的
+      `outside_discovery`（它仍按定义 JSON 解析各 spec 的 tasks.md，由判据层模块覆盖）。
+      现算 `ok 11 / retired 1 / registered_unreviewed 23`，上限同步收到 23。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
 - [x] 0.6 修复被 spec 文档重写打坏的 7 个机器消费方
@@ -204,6 +236,23 @@
     `entry_profile.capability_of` 对 null 抛 `EntryProfileError`（封闭四态）；registry 的
     `build_report` / `build_manifest_registration_plan` 把 pending 单列为 `unadjudicated`
     并拒绝注册；lane registry 对 pending 判 `undecided`（L4）。现算 pending=78。
+  - 🔴 **2026-11-04 更正**：「对 null 抛 `EntryProfileError`」让 4 个消费方在 pending entry 上
+    **崩溃**而不是回答「未裁决」：`pilot_harness.assess_pilot_classes`、
+    `pilot_simple_checklist.assert_manifest_capability_enabled`、`registry.assert_bidirectional_ready`、
+    `registry.register`。新增 `entry_profile.is_pending_entry` / `effective_capability`
+    （`capability_of` 行为不变，Wave 6 报告里记录的异常文本因此不漂）；四处改成显式 pending
+    回答，`register()` 对 pending 抛「未裁决入口不得注册 adapter」。守卫
+    `backend/tests/workpaper_sync/test_entry_profile_pending.py`。
+  - 修好后暴露一条被崩溃掩盖的真实漂移：B60 bundle 的 reviewed wp_code 裁决是 `['B60-1']`
+    （真库 wp_index 证据），Task 40 pilot 冻结的 matcher 域仍是 `{B60, B60B}`。已用
+    `xfail(strict=True, raises=PilotSelectionError)` 钉住，随 6.3 对这条 entry 的终裁一起重判
+    （它是 6.2 点名的「真库跑通双向、裁决没跟上」5 条之一）；修好即 XPASS 打红、删标记。
+  - 同一族在 Task 41~43 的 pilot 上也成立（全量回归与远端头逐节点比对时现形）：reviewed 裁决把 D2 / H1 /
+    G7 判为 `['D2']` / `['H1']` / `['G7']`，冻结 matcher 域仍是名字提取产物 `{D2A}` / `{H1F}` / `{G7L}`；
+    以前同样被 pending 崩溃挡着。真实 manifest 上的选型同样以 strict xfail 钉住；测 render schema 分支的
+    合成用例先把 wp_code 对齐冻结域（否则被漂移检查抢先拦下、测不到自己的分支）；三份 pilot 里「required
+    set digest 与 checklist pilot 不同」的用例要拿 B60 的 required set，B60 是 pending ⇒ 同样 strict xfail。
+    G7 另有 3 条直接调 `assert_matcher_domain_is_exclusive` 的用例在基线上就以同样文案红着，未改。
   - _AC: 1.3_
 
 - [x] 1.2 收敛 parent duplicate 的能力与计数语义
@@ -315,6 +364,14 @@
 - [ ] 2.8 承接 SYNC-MULTI-RESOLVER 里程碑的 writer gate 与 CanonicalResolutionService 收口
   - 本任务是方案 A 新增：里程碑定义 `SYNC-MULTI-RESOLVER` 的判据是 `writer_gate_issue_zero(multi_resolver)` + `CanonicalResolutionService` 符号存在性。旧 producer 是 Wave 6 的 Task 12/71/74（已不在当前 tasks.md 里），新计划里没有专任承接项，硬塞给复验类任务等于伪造归属。
   - writer gate 现算 `multi_resolver` 待清 **3 条**：`get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `post_sheet_onlyoffice_callback`（全在 `wp_onlyoffice_router`）。`CanonicalResolutionService` 已存在于 `backend/app/services/workpaper_sync/resolution.py`。
+  - 🔴 **2026-11-04 现算更正（取代上一条的 3 条）**：writer gate（gate issue key `multi_resolver`）待清 4 条 resolver 行（`wp_onlyoffice_router::get_sheet_onlyoffice_config`、`wp_onlyoffice_router::get_sheet_wopi_contents`、`wp_onlyoffice_router::post_sheet_onlyoffice_callback`、`wp_generation_staging::_source_paths`）。
+    第 4 行是生成两阶段 operation（trim-generation-plan-followup R1）新增的 staging 模板来源解析：
+    有 `library_file` 走 `resolve_wp_file`，否则 `find_template_file_any` + `find_all_template_files`。
+    上一条只数到 3，是因为 writer 清册的 source digest 早已过期（清册停在 2026-09-24），门读的是旧账；
+    重生成后现形。它与 OO 三行不同族（模板供给，不是 room / callback），收敛条件与
+    `find_all_template_files` 相同：xlsx 多文件模板换成统一 resolver 需要该 entry 已有 published
+    representation。矩阵登记见 `backend/data/workpaper_resolver_migration_matrix.json`（`template_provisioning`）。
+    本行由 `test_task20_writer_gate.py` / `test_task30_closure_gate.py` 各自解析，与门报出的行双向比对。
   - 🔴 **接手语无法写进 tasks.md**：`test_task30_closure_gate.py` 的 `_ASSUME_RE = r"自 Task (\d+) 移交至本门"`
     只认纯数字任务号，`2.8` 匹配不上；后续 `int(owner)` 对两级编号会 ValueError。这是
     task68/69 同类的「锚点断开」问题，归 7.2 前置（改 test_task30 的解析器适配两级编号）。
@@ -344,6 +401,21 @@
     依赖图要求 `gates` 键、`_BULK_ADAPTER_LANE_TASK="46"`），且
     `test_workpaper_writer_inventory.py` 把当前债 `len(multi_resolver) == 3` 冻成了**期望值**
     —— 真清零那天它会反过来打红拦人，必须同批改成「只许下降 / 完成时必须为 0」。
+  - 🔴 **2026-11-04 已处理上一条点名的两处**：① `test_workpaper_writer_inventory.py` 改成具名集合的
+    双向棘轮（新增行红、已清行留在集合里也红，清零时集合随之清空）；② `test_task30_closure_gate.py` /
+    `test_task20_writer_gate.py` 不再从本文解析「接手语」：Wave 6 的移交链（20 → 30 → 71）、依赖图
+    gates、冻结红基线改绑归档快照（按内容标记定位，与 0.6 同一实现）；**当前**归属从里程碑定义里
+    `writer_gate_issue_zero(multi_resolver)` 的 producer 现读（即本任务），待清行名单读上面那条现算更正。
+  - 🔴 **2026-11-04 清册事实盲区（writer gate 的分母，与上面 4 条 multi_resolver 不同族）**：
+    `_record_sql_text` 只认 `text("…")` 的字面量实参，SQL 先赋给局部变量再 `text(update_sql)` 的写库
+    路径整条看不见。公式运行时底稿适配器 `WorkpaperMutationAdapter.restore_many`（基线 `8352d7b38` 上还有
+    `apply_many`）正是按列名分支这样写 `checklist_responses.remark / conclusion`：重生成清册时这条写入
+    从事实里消失，行被当成「只委派 parsed_data」，本轮整改的第一版裁决还据此把两行改判成
+    dedicated_router（提交前已更正）。修在发现谓词里（`writer_inventory_sql_bindings.py`：同函数内对该
+    名字的全部字面量赋值都算，嵌套函数不串），restore_many 回到 checklist_response_store；远端头的
+    apply_many 已把 checklist 一半拆进 `_apply_checklist_group`（新行，checklist_response_store），自身只写
+    parsed_data，裁决文字按此改写。守卫 `test_writer_inventory_sql_bindings.py`（合成正反例 + 真实行 +
+    全仓独立现算对账），3 组磁盘变异全红。
   - _AC: 12.1_
 
 ## Phase 3：前端模式与可操作原因单一来源
@@ -386,6 +458,50 @@
     轨迹 126 → 125 → 113 → 110 → 102 → 59 → 32 → **0**；现算已接单源 **137 个宿主 /
     152 个 `el-segmented` 标签**（结构核验 `tmp_workpaper_sync_impl/verify_wired_structure.py`
     三条全通过：TDZ 顺序 / 逐标签对账 / 门控表达式引用）。
+  - 🔴 **2026-11-04 审计更正：上一条的「全域零宿主自行决定」是假绿**。棘轮只认英文 / 小写
+    枚举的模式值，两种真实形态从未进分母：① 中文标签直接当值（`'在线编辑'`、带 emoji 前缀的
+    `'📊 在线编辑'`）② 选项由组合式给出、宿主文件里一个选项字面量都没有（`useD4SyncMode` 的
+    `D4_ONLINE_EDIT_LABEL`、K 表的 `kModeOptions`）。补这两种识别后现算 **48 个**宿主仍自行
+    决定（D4 子 Tab 33 / K 子 Tab 6 / GtA3 / GtB1×3 / GtB14 / J1 通用检查 /
+    WorkpaperWordEditor / GtA177 / I1 裁决 Tab），已全部接单源：`useD4SyncMode` 新增可选
+    `entrySync`（K 包装透传，`useD4SyncMode.spec.ts` 4 例 + 4 组磁盘变异全红），其余宿主各接
+    `useEntrySyncReadiness` + 门 + notice；I1 的开关是死开关（选项恒只有一个），直接删除。
+    棘轮识别补了正反用例（业务分段器、注释里的模式值、已接单源的中文标签都不得误纳），
+    现算回到 0。
+  - 🔴 同批踩到的坑：第一版接线给 36 个 D4 / K 子 Tab 的 notice 写了静态 `entry-id`。挂点
+    发现器把模板里的静态 `entry-id` 当作 L2 身份声明 ⇒ 36 个 L3 宿主被推成 L2，overlay 的
+    7 条 `sync_host_entry_rules` 全部零命中（生成器 stale-rule 门 fail closed），L3 清空还会
+    让三层分解契约失锚；反过来把 GtA3 原有的静态字面量改成绑定，它的载体 documentType 就
+    解析成 null。现在 D4 / K 子 Tab 用 `:entry-id` 绑定本文件常量（接线契约 ② / ③ 的
+    literalOf 认得），GtA3 保持静态字面量；三层分布 L1 49 / L2 23 / L3 36 与 HEAD 相同。
+  - 🔴 **2026-11-04 审计更正：3.5 的批量接线让 3 个宿主编译失败**。B22B 控制矩阵 / B22B 缺陷
+    评价 / B22C 设计有效性原本就在 `WorkpaperSyncEditorHost` 之后 import 了
+    `GtEntrySyncCapabilityNotice`，批量脚本又在 vue import 之后插了一行同样的 import ⇒
+    `<script setup>` 重复绑定，babel 报 `Identifier … has already been declared`，三页打不开、
+    `vite build` 失败。全仓 `.vue` 语法守卫 `src/__tests__/vueSfcSyntax.spec.ts` 自 `b337042ca`
+    起一直红（基线 `8352d7b38` 与远端头 `59e1e3bca` 都复现），挂载这些组件的 P10 只读封锁
+    用例也随之红。已删掉插入的那一行，同一判据全仓现算 3 → 0；指向这三个文件的 15 个数据
+    锚点按行对应平移（两份 slice 逐条核对行文字相同）。
+  - 🔴 **2026-11-04 审计更正：D4 子 Tab 的重载钩子有两处坏形态**（3.5 的 D4 批次接了模式开关的门，
+    没核对桥的另一端）。在线编辑落地（applied）后桥调 `reloadHtml(revision)` 让表单读回新值：
+    D4-4 调整分录根本没传，桥里 `await options.reloadHtml(revision)` 抛 TypeError ⇒ 进 reload 失败态、
+    participant lease 不释放、表单停在 OO 改动之前的旧值（vue-tsc 报过 TS2345，但全量类型检查不是门禁）；
+    D4-5 / D4-13 / D4-16 / D4-35 在 `reloadHtml` 里派发 `d4:reload-responses`，全仓没有一个监听方 ⇒
+    静默空操作。五处都改成父级 `GtD4OperatingRevenue` 提供的 `reloadWorkpaperData`（与 D4-1 / D4-14 等
+    兄弟 Tab 同一入口）。新增接线契约 `sync/__tests__/syncReloadWiringContract.spec.ts`：每个
+    `useD4SyncMode` / `useWorkpaperSyncBridge` 调用都传 `reloadHtml`、`reloadHtml` 派发的事件必须有监听方
+    （含判据自检与防空转），磁盘变异两组全红。
+  - source digest 复核（`919d66ad… → 8d0a8718…`，含 B22 重复 import 与 D4 重载钩子两处修复）：
+    `evidence/phase3-source-digest-review-2026-11-04-audit-fix.json` —— entry 197→197、stats
+    相同、14 个能力字段零变化、每个 entry 的挂点语义多重集合相等（42 个挂点因 notice 插在
+    载体之前、模板序号后移而重新编号，8 个同 id 只变行号）；四件生成物 `--write` 后 reverify 全 OK，里程碑
+    `PUBLISHED-ENTRY-READY` / `SYNC-ENTRY-NAMESPACE` 随复核从 STALE 回到 IMPLEMENTED。
+  - 推送前变基到远端头 `cad390dcb`（v1.0.116）后再做一次 source digest 复核（`8d0a8718… → f4bdfe88…`）：
+    远端提交 `7ea68c30f` 在 `GtWpRenderer.vue` 模板里 VoucherSurvivalBanner 之后插入
+    `<VoucherAttachPendingBanner>`。`evidence/phase3-source-digest-review-2026-11-04-rebase-cad390dcb.json`
+    —— entry 197→197、stats 相同、14 个能力字段零变化、挂点语义多重集合逐 entry 相等（`xlsx/gt-wp-renderer`
+    的 GtOnlyOfficeSheet 挂点模板序号 56→57 重新编号，`docx/gt-wp-renderer` 的 registry 挂点只变行号），
+    发现器三层分布 L1 49 / L2 23 / L3 36 不变；四件生成物、下游生成物与里程碑随之重生成。
   - **最后两批**：批 6 的 27 个 + 批 7 的 24 个（A51 / B22A·B22B×2·B22C / B23 / B50 / C22 /
     CControlTest / CustomWpEditor / E1 / G7×2 / H1 / H3 / H7 / I1~I5 / N1~N3 / B60 ×2 /
     D4TabContract / H4×2 / H8 / J1 / J2 / S 循环 10 个 / `CycleStandaloneProcedureShell`）。
@@ -702,6 +818,11 @@
     `bridgeMaterializeDriven.spec.ts` 改 `existsSync → false`。
   - 后端 34 passed；前端 4 failed / 7 passed（与基线逐条相同，added 0 / resolved 0，预存失败，
     与本次删除无关）。
+  - 🔴 **2026-11-04 审计更正**：上一条的「与本次删除无关」不成立。
+    `sync/__tests__/usePilotBridgeAdapter.spec.ts` 只测被删的模块，删除后整份采集失败（文件级红），
+    正是这次删除造成的，只是它没进上面那组用例。已删掉这份孤儿用例；迁移范式 step 4 / step 7 仍写着
+    `usePilotBridgeAdapter`，`/paradigm` 是字节冻结块，勘误登记在 `workpaper_sync_migration_paradigm.json`
+    的 `errata`（step 7 回归改跑 `test_task45_pilot_legacy_deletion.py` 与 `useWorkpaperSyncBridge.spec.ts`）。
   - _AC: 1.4, 1.7_
 
 - [x] 5.5 把 Task 66 删除计划升级为可收缩执行账
@@ -875,7 +996,8 @@
     { "wave": 19, "tasks": ["7.5"] }
   ],
   "dependencies": {
-    "0.5": ["0.6"]
+    "0.5": ["0.6"],
+    "7.5": ["0.5", "2.8", "6.3", "7.4"]
   }
 }
 ```
@@ -886,6 +1008,11 @@
   现读它。键名必须是 `wave`（不是 `id`），且 wave 覆盖的任务集合必须与本文任务号**恰好相等**
   —— 加任务忘了进 wave 会报 `wave/task denominator differs`。同 wave 内不得依赖编号不更小的任务，
   也不得依赖更后 wave 的任务；`0.6` 因此排在 wave 0（它是 `0.5` 的前置）。
+- `7.5` 的依赖（`0.5` / `2.8` / `6.3` / `7.4`）是归档的真实前置，不是排版：
+  `backend/data/workpaper_sync_program_milestone_definitions.json` 的
+  `archive_dependency_guards` 要求最终归档任务**直接**依赖 writer 债任务（SYNC-MULTI-RESOLVER
+  的 producer），删掉这条依赖会让里程碑注册表出 `archive_bypasses_writer_debt` blocker；
+  任务重编号而不改声明，生成器直接拒绝生成。
 - 3.* 可在 lane 未完成时先上线 fail-closed UI，但必须显示真实 blocker。
 - 5.3/5.4/5.5 依赖对应 4.* 与 6.1/6.2 的 replacement evidence，不能提前删除。
 - 6.3/6.4 写【测试】数据前须确认环境与测试项目；无环境时保持未完成，不改成静态替代证据。
@@ -959,12 +1086,13 @@
   evidence：后端 added 0 / 前端 added 0），但 7.1 的全量变异矩阵、7.3 的 schema 边界结论、
   7.4 的 clean-checkout 复验与 7.5 的五角色复核均未完成。
 
-## 当前未完成项索引（2026-11-02）
+## 当前未完成项索引（2026-11-04）
 
-- **0.5**：35 个文档消费方中仍有 26 个 `registered_unreviewed`，且 AC 编号 / Phase 标题两组
-  规定的变异尚未完成。
-- **2.8**：`multi_resolver` writer gate 仍有 3 条旧路径；须按“统一 room descriptor → 前端
-  同批改线 → legacy doc key drain → 删除 direct-write”顺序收口。
+- **0.5**：35 个文档消费方中仍有 23 个 `registered_unreviewed`（另 1 个在 `outside_discovery`），
+  且 AC 编号 / Phase 标题两组规定的变异尚未完成。
+- **2.8**：`multi_resolver` writer gate 现算 4 条（`wp_onlyoffice_router` 3 条旧路径 +
+  `wp_generation_staging::_source_paths`）；须按“统一 room descriptor → 前端同批改线 →
+  legacy doc key drain → 删除 direct-write”顺序收口。
 - **6.3**：验收账本仍为 0；67 条 bidirectional entry 尚未完成逐 entry required scenarios，
   D2 阻断态证据只证明 AC 1.4。
 - **7.5**：依赖前三项与最新候选树终验；满足 design §15 后再登记 INDEX 并归档。

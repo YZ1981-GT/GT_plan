@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { readStoreProjection } from '../sync/workpaperSyncApi'
-import { useD4SyncMode } from '../d4/composables/useD4SyncMode'
+import { useD4SyncMode, type UseD4SyncModeOptions } from '../d4/composables/useD4SyncMode'
 
 const ENTRY_ID = 'xlsx/gt-k1-other-receivables'
 const SHEET_KEY = 'k109-managed'
@@ -13,12 +13,15 @@ export interface UseK1WriteoffSyncOptions {
   isReadonly: Ref<boolean>
   snapshotRemark: () => string
   onReloaded: (minimumRevision: number) => Promise<void>
+  /** 同步能力单源（task 3.5 / AC 1.4），原样转给 `useD4SyncMode`；不传保持改线前行为。 */
+  entrySync?: UseD4SyncModeOptions['entrySync']
 }
 
 /** K1-9 dict store 的真双向接桥；派生 total 键不进入受管 projection。 */
 export function useK1WriteoffSync(options: UseK1WriteoffSyncOptions) {
   return useD4SyncMode({
     entryId: ENTRY_ID,
+    entrySync: options.entrySync,
     sheetKey: SHEET_KEY,
     wpId: options.wpId,
     projectId: options.projectId,

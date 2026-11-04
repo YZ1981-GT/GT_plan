@@ -2108,10 +2108,15 @@ class TestProperties:
         另保留一条反向命中：任取一条**非** bidirectional entry，`assert_bidirectional_ready`
         必抛 `FakeBidirectionalError`（证明「capability 门」真的在拦，而不是恒不抛）。
         """
+        from app.services.workpaper_sync.entry_profile import effective_capability
+
         registry = RG.build_production_registry()
         entries = registry.manifest_entries
+        # Task 1.1 起 manifest 里有 pending entry（`capability=null`）：「是不是 bidirectional」
+        # 对它的答案是「不是」，`capability_of` 却会抛 ⇒ 用 effective_capability 判。
         bidirectional = [
-            eid for eid, e in entries.items() if RG.capability_of(e) is Capability.bidirectional
+            eid for eid, e in entries.items()
+            if effective_capability(e) is Capability.bidirectional
         ]
         assert bidirectional, "manifest 一条 bidirectional entry 都没有 ⇒ Property 3 分母为空"
         for eid in sorted(bidirectional):
@@ -2128,7 +2133,7 @@ class TestProperties:
         # 反向命中：非 bidirectional entry 必被 capability 门拦下（FakeBidirectionalError）。
         non_bi = next(
             eid for eid in sorted(entries)
-            if RG.capability_of(entries[eid]) is not Capability.bidirectional
+            if effective_capability(entries[eid]) is not Capability.bidirectional
         )
         with pytest.raises(RG.FakeBidirectionalError):
             registry.assert_bidirectional_ready(non_bi)

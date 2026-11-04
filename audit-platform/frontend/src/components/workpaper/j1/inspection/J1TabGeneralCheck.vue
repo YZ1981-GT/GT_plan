@@ -24,7 +24,9 @@
     <div class="section-head">
       <h3 class="sheet-title">J1-8 应付职工薪酬检查表</h3>
       <div class="head-actions">
-        <el-segmented v-model="viewMode" :options="viewOptions" size="small" />
+        <!-- 卡片 / 矩阵是 HTML 视图切换，始终可用；「在线编辑」由同步能力单源放行 -->
+        <el-segmented v-if="showModeSwitch" v-model="viewMode" :options="viewOptions" size="small" />
+        <GtEntrySyncCapabilityNotice :entry-id="J1_GENERAL_CHECK_ENTRY_ID" />
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -305,7 +307,7 @@
  */
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { fetchTrialBalanceRows, tbRowsUnder, tbSumUnder } from '@/services/trialBalanceRows'
-import { ref, reactive, computed, onMounted, defineAsyncComponent, inject } from 'vue'
+import { ref, reactive, computed, onMounted, defineAsyncComponent, inject, watch } from 'vue'
 import type { Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -322,6 +324,8 @@ import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { useProjectStore } from '@/stores/project'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
 
 /**
  * 抽凭科目码取自单一真源 `jAccountScope`（J1 应付职工薪酬）。原为模板内字面量；
@@ -366,12 +370,33 @@ const yearNum = computed(() => {
 })
 
 // 视图模式
+/** 本 Tab 的同步 entry（inherited 自 J1 主 entry）；开关与 notice 共用这一个常量。 */
+const J1_GENERAL_CHECK_ENTRY_ID = 'xlsx/j1/inspection/j1-tab-general-check'
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => J1_GENERAL_CHECK_ENTRY_ID,
+})
 const viewMode = ref<'card' | 'matrix' | 'excel'>('card')
-const viewOptions = [
+const ALL_VIEW_OPTIONS = [
   { label: '📇 卡片视图', value: 'card' },
   { label: '▦ 矩阵视图', value: 'matrix' },
   { label: '📊 在线编辑', value: 'excel' },
-]
+] as const
+/** 「在线编辑」只在单源放行时出现；卡片 / 矩阵不受影响。 */
+const viewOptions = computed(() =>
+  ALL_VIEW_OPTIONS.filter(
+    (option) => option.value !== 'excel' || entrySync.presentation.value.canSwitchToOnlyOffice,
+  ),
+)
+/** 与 `useD4SyncMode` 同口径：多视图宿主有两个以上选项就画分段器（卡片 / 矩阵恒在）。 */
+const showModeSwitch = computed(() => viewOptions.value.length > 1)
+watch(
+  () => entrySync.presentation.value.canSwitchToOnlyOffice,
+  (allowed) => {
+    if (!allowed && viewMode.value === 'excel') viewMode.value = 'card'
+  },
+)
 
 // ─── 本地 allResponses Map（自持久化） ────────────────────────────────────────
 const localAllResponses = ref(new Map<string, any>())

@@ -68,27 +68,28 @@ _GENERATOR_PATH = _BACKEND / "scripts" / "gen" / "generate_workpaper_writer_inve
 _GATE_PATH = _BACKEND / "scripts" / "check" / "check_workpaper_writer_revision_gate.py"
 _MATRIX_PATH = _BACKEND / "data" / "workpaper_resolver_migration_matrix.json"
 _INVENTORY_PATH = _BACKEND / "data" / "workpaper_writer_inventory.json"
-_SPEC_DIR = (
-    _REPO
-    / ".kiro"
-    / "specs"
-    / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+
+#: tasks.md（Wave 6 冻结快照 + active）与里程碑定义的解析 helper 在同目录的判据层模块里
+#: （本文件 2026-11-04 超过 800 行门禁后拆出，见那边的模块 docstring）。
+from tests.workpaper_sync._test_task30_closure_gate_criteria import (  # noqa: E402
+    _CRITERION_KEY,
+    _active_owner_task,
+    _active_owner_named_rows,
+    _module_leaf_and_function,
+    _task_bodies,
+    _criterion_owner_task,
+    _owner_named_rows,
+    _dependency_graph,
 )
-_TASKS_MD = _SPEC_DIR / "tasks.md"
+
 _MIGRATION = (
     _BACKEND / "migrations" / "V151__workpaper_sync_content_application_bundle_scope.sql"
 )
 
-#: 那一条 criterion 的门内 key。**不抄名单**（4 条行名与归属任务号都从 tasks.md 解析，
-#: 与 `test_task20_writer_gate.py` 同源），只固定这一个 key。
-_CRITERION_KEY = "multi_resolver"
 
 #: 承接 `wp_onlyoffice_router` 那 4 行的矩阵分组（矩阵 POLICY 的单一真源里就是这个值）。
 _OO_GROUP = "oo_room"
 
-_TASK_HEAD_RE = re.compile(r"^- \[[ x~\-]\] (\d+)\.\s")
-#: 「自 Task M 移交至本门」= 该任务**接手**这条 criterion，即当前裁决归属。
-_ASSUME_RE = re.compile(r"自 Task (\d+) 移交至本门")
 #: bulk adapter 迁移 lane 里的一个代表任务号（Wave 5）。归属任务的 wave 必须晚于它 ——
 #: 这正是「相同措辞若被原样搬到 Task 71 就会让 Wave 5 依赖 Wave 7」那条成环的算术形式。
 _BULK_ADAPTER_LANE_TASK = "46"
@@ -127,108 +128,6 @@ def inventory(gate: ModuleType) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def matrix() -> dict[str, Any]:
     return json.loads(_MATRIX_PATH.read_text(encoding="utf-8"))
-
-
-def _tasks_md_text() -> str:
-    """tasks.md 文本，**换行符归一化**后返回。
-
-    🔴 不能用 `read_bytes().decode("utf-8")`：`.gitattributes` 没有对 `*.md` 强制
-    `eol=lf`，所以 Windows 工作树里 tasks.md 是 **CRLF**。裸 decode 会把 `\\r` 留在
-    行尾，于是 `re.M` 下的 `^…$` 锚点全部失配 —— `## Task Dependency Graph` 明明在
-    文件里（第 17 行），判据却报「找不到 json 块」，把一个**解析缺陷**伪装成
-    「文档缺章节」。同 spec 的 `generate_workpaper_sync_program_milestones.py` 一直用
-    `read_text()`（universal newlines）读同一个文件，本处与之对齐。
-    """
-    return _TASKS_MD.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
-
-
-def _task_bodies() -> dict[str, list[str]]:
-    """tasks.md → {任务号: 正文行}。行首锚定，不用字符窗口。"""
-    bodies: dict[str, list[str]] = {}
-    current: list[str] | None = None
-    for line in _tasks_md_text().split("\n"):
-        head = _TASK_HEAD_RE.match(line)
-        if head:
-            current = bodies.setdefault(head.group(1), [])
-            current.append(line)
-            continue
-        if line.startswith("#") or line.startswith("- "):
-            current = None
-            continue
-        if current is not None:
-            current.append(line)
-    assert bodies, "tasks.md 一个任务都没解析出来 ⇒ 本文件的 doc 派生判据会全部空跑"
-    return bodies
-
-
-def _criterion_owner_task() -> str:
-    """当前持有这条 criterion 的任务号 —— 从 tasks.md 的显式接手语现场解析。
-
-    🔴 不硬写 `"71"`：归属已经移交过两次（20 → 30 → 71），下一次移交时硬写的常量会和
-    文档静默分叉。判别只认 `自 Task M 移交至本门`（接手），因为「好几个任务都提到了
-    `multi_resolver`」本身分不出谁在守它 —— 那正是第一跳漂移的形态。
-    """
-    owners = [
-        task
-        for task, body in _task_bodies().items()
-        for line in body
-        if f"gate issue key `{_CRITERION_KEY}`" in line and _ASSUME_RE.search(line)
-    ]
-    assert len(owners) == 1, (
-        f"tasks.md 里接手 `{_CRITERION_KEY}` 的任务不是恰一个：{owners}（0 = 无人守，"
-        ">1 = 两个门都自称归属，两种都让「谁负责清零」不可判）"
-    )
-    return owners[0]
-
-
-def _owner_named_rows() -> tuple[int, set[str]]:
-    """归属任务正文点名的「N 条 resolver 行」→ ``(N, {函数名})``。
-
-    与 `test_task20_writer_gate.py::_task71_multi_resolver_rows_from_tasks_md` 同一锚点。
-    两个文件各自解析同一句话是**故意的**：任一侧改了措辞，两处都得同时改，
-    「还剩几行要清」不会只活在散文里。
-
-    额外守一件事：**放手方不得同时留着名单**。移交若被写成「复制」，两个任务的正文会同时
-    点名这 4 行，于是「归属」在文档里有两个答案，而两处都能各自解析成功、谁都不红。
-    """
-    owner = _criterion_owner_task()
-    bodies = _task_bodies()
-    for other, body in bodies.items():
-        if other == owner:
-            continue
-        for line in body:
-            if f"gate issue key `{_CRITERION_KEY}`" in line:
-                assert "条 resolver 行（" not in line, (
-                    f"Task {other} 已放手 `{_CRITERION_KEY}`，却仍在正文里列着待清行名单 —— "
-                    f"移交被写成了复制：{line[:160]}"
-                )
-    for line in bodies[owner]:
-        if f"gate issue key `{_CRITERION_KEY}`" not in line:
-            continue
-        count = re.search(r"(\d+) 条 resolver 行", line)
-        listed = re.search(r"resolver 行（([^）]+)）", line)
-        if not (count and listed):
-            continue
-        return int(count.group(1)), set(re.findall(r"`([a-z_]+)`", listed.group(1)))
-    raise AssertionError(
-        f"Task {owner}（当前归属）正文里找不到 gate issue key `{_CRITERION_KEY}` 的待清行名单"
-    )
-
-
-def _dependency_graph() -> dict[str, Any]:
-    """tasks.md `## Task Dependency Graph` 里的 waves/dependencies/gates JSON。
-
-    行首锚定 + 结构断言，不用字符窗口（本 spec 三个文档都在被并发会话改）。
-    """
-    text = _tasks_md_text()
-    block = re.search(
-        r"^## Task Dependency Graph$\n\n^```json$\n(.*?)^```$", text, re.M | re.S
-    )
-    assert block, "tasks.md 里找不到 `## Task Dependency Graph` 的 json 块"
-    graph = json.loads(block.group(1))
-    for key in ("waves", "dependencies", "gates"):
-        assert graph.get(key), f"依赖图缺 `{key}`"
-    return graph
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -549,16 +448,33 @@ def test_owner_named_rows_match_the_gate_report(
 ) -> None:
     """**Validates: Requirements 9.11**
 
-    归属任务正文点名的行名，必须就是门今天报出的行（doc ↔ 实测双向）。
+    当前归属任务正文点名的行，必须就是门今天报出的行（doc ↔ 实测双向）。
+
+    🔴 2026-11-04 改读 active 计划：归属 = 里程碑定义的 producer，名单 = 该任务正文的
+    「N 条 resolver 行（`module::function`、…）」。行身份带模块叶名 —— 第 4 行
+    `wp_generation_staging::_source_paths` 不在 `wp_onlyoffice_router` 里，只比函数名会让
+    「同名函数换了模块」看不见。
     """
-    count, names = _owner_named_rows()
+    owner = _active_owner_task()
+    count, names = _active_owner_named_rows(owner)
     assert names and len(names) == count, (
-        f"Task {_criterion_owner_task()} 自称 {count} 条，却列了 {sorted(names)}"
+        f"任务 {owner} 自称 {count} 条，却列了 {sorted(names)}"
     )
     reported = gate.evaluate_gate(inventory)[_CRITERION_KEY]
-    assert {wid.split("::")[-1] for wid in reported} == names, (
-        f"门={sorted(reported)} doc={sorted(names)}"
-    )
+    measured = {_module_leaf_and_function(wid) for wid in reported}
+    assert measured == names, f"门={sorted(measured)} doc={sorted(names)}"
+
+
+def test_the_frozen_handoff_lists_rows_only_at_its_owner() -> None:
+    """**Validates: Requirements 9.11**
+
+    冻结历史的内部一致性：Wave 6 只有接手方（Task 71）列待清名单，放手方（20 / 30）不得
+    同时留着名单（`_owner_named_rows` 里的断言），且自称条数与所列行数相等。这份名单不再
+    与今天的门比（见上一条）。
+    """
+    count, names = _owner_named_rows()
+    assert _criterion_owner_task() == "71", _criterion_owner_task()
+    assert names and len(names) == count, f"Task 71 自称 {count} 条，却列了 {sorted(names)}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

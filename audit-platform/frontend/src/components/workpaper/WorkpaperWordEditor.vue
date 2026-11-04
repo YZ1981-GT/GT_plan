@@ -193,7 +193,7 @@
           </el-alert>
         </div>
 
-        <!-- 双模式切换 (Task 5.1 + 5.4: tooltip when OO unavailable) -->
+        <!-- 双模式切换 (Task 5.1 + 5.4: tooltip when OO unavailable)；开关可见性来自同步能力单源 useEntrySyncReadiness -->
         <div v-else class="gt-wp-word-editor__mode-switch">
           <el-tooltip
             :content="'OnlyOffice 不可用'"
@@ -201,12 +201,14 @@
             placement="top"
           >
             <el-segmented
+              v-if="entrySync.presentation.value.showModeSwitch"
               v-model="genericViewMode"
               :options="genericModeOptions"
               size="small"
               @change="onModeSwitch"
             />
           </el-tooltip>
+          <GtEntrySyncCapabilityNotice :entry-id="WORD_EDITOR_ENTRY_ID" />
           <span class="gt-wp-word-editor__save-indicator" :class="`save-status--${structuredSaveStatus}`">
             {{ structuredSaveStatus === 'saved' ? '✓ 已保存' : structuredSaveStatus === 'saving' ? '保存中…' : '● 未保存' }}
           </span>
@@ -362,6 +364,8 @@ import { resolveAuditYearFromProject, resolveAuditYearOrNull } from '@/utils/res
 import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
 import GtWordTemplateStructuredView from './GtWordTemplateStructuredView.vue'
 import { useWordTemplateStructured } from './composables/useWordTemplateStructured'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 
 const props = defineProps<{
   wpId: string
@@ -426,6 +430,17 @@ const carrierAbsenceReason = computed(() => {
 // ─── Generic Mode: Dual-mode switch (Task 5.1) ───
 const genericViewMode = ref<'结构化视图' | '在线编辑'>('结构化视图')
 const genericModeOptions = ['结构化视图', '在线编辑']
+/**
+ * 本组件自己的 manifest entry（inherited 自 `docx/gt-a16-bundle`），开关与 notice 共用。🔴 已知限制：A10 / A12 / A16 / A17
+ * 四个 bundle 共用本组件，manifest 只为本文件生成这一条 entry；按挂载方区分要由 prop 传入，而宿主接线契约的静态解析
+ * 认不出 prop 表达式 ⇒ 四个 bundle 暂共用本 entry 的裁决（它们今天同为 pending）。
+ */
+const WORD_EDITOR_ENTRY_ID = 'docx/workpaper-word-editor'
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(projectId.value ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => WORD_EDITOR_ENTRY_ID,
+})
 
 // ─── Structured View (useWordTemplateStructured composable) ───
 const {
@@ -529,6 +544,10 @@ async function onImportData() {
 
 // ─── Mode Switch Logic (Task 5.3 + 5.4) ───
 async function onModeSwitch(newMode: string) {
+  if (newMode === '在线编辑' && !entrySync.presentation.value.canSwitchToOnlyOffice) {
+    genericViewMode.value = '结构化视图'
+    return
+  }
   if (newMode === '在线编辑') {
     // Task 5.4: Guard — prevent switching when OnlyOffice unavailable
     if (!onlyofficeAvailable.value) {

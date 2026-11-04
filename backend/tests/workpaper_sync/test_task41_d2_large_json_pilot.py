@@ -77,6 +77,7 @@ from app.services.workpaper_sync.contracts import (  # noqa: E402
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     Capability,
+    EntryProfileError,
     capability_of,
     load_entry_manifest,
     manifest_entries_by_id,
@@ -451,6 +452,26 @@ def store_rows(count: int, *, start: int = 0) -> list[dict[str, Any]]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+#: 2026-11-04（umbrella tasks.md 1.1）：Task 76 的 reviewed wp_code 裁决（真库 wp_index 证据）把本 entry 判为
+#: ['D2']，冻结 matcher 域 {D2A}（名字提取产物）随之失效，与 Task 40 的 B60 同一族，随 6.3 对 pilot matcher 域的
+#: 重判处理。真实 manifest 上的选型以 strict xfail 钉住（XPASS 即红 ⇒ 删标记）；测别的 fail-closed 分支的合成
+#: 用例先把 wp_code 对齐冻结域，免得被漂移检查抢先拦下（原先被 pending entry 的崩溃挡着，一直没跑到这一步）。
+_MATCHER_DRIFT = pytest.mark.xfail(strict=True, raises=P.PilotSelectionError, reason=(
+    "Task 76 reviewed wp_code 裁决把本 entry 判为 ['D2']，冻结 matcher 域 {D2A} 已失效（tasks.md 1.1 / 6.3）"))
+#: Task 40 的 checklist pilot entry（B60 bundle）现为 pending（capability=null），按设计 fail-closed。
+_B60_PENDING = pytest.mark.xfail(strict=True, raises=EntryProfileError, reason=(
+    "B60 bundle 现为 pending（capability=null），derive_for_manifest_entry 对它 fail-closed；随 6.3 终裁"))
+
+
+def _frozen_matcher_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    """把本 pilot entry 的 wp_code 对齐冻结 matcher 域（只给测别的分支的合成用例用）。"""
+    patched = json.loads(json.dumps(manifest))
+    for item in patched["entries"]:
+        if item["entry_id"] == P.PILOT_ENTRY_ID:
+            item["wp_match"]["wp_code_patterns"] = sorted(P.PILOT_WP_CODES)
+    return patched
+
+
 class TestFrozenEntrySelection:
     """**Validates: Requirements 12.1 / 12.2**
 
@@ -467,6 +488,7 @@ class TestFrozenEntrySelection:
     3. 父码 `D2` 的 canonical resolver 落在**同一份**文件上（声明没指向别的底稿）。
     """
 
+    @_MATCHER_DRIFT
     def test_entry_is_frozen_from_the_source_backed_manifest(
         self, manifest: dict[str, Any], resolution: Any
     ) -> None:
@@ -581,6 +603,7 @@ class TestFrozenEntrySelection:
         assert required.substituted is False
         assert len(required.scenario_ids) == 24, required.scenario_ids
 
+    @_B60_PENDING
     def test_required_set_digest_is_this_entry_own_not_the_checklist_pilot(
         self, manifest: dict[str, Any]
     ) -> None:
@@ -642,7 +665,7 @@ class TestFrozenEntrySelection:
     ) -> None:
         with pytest.raises(P.PilotSelectionError, match="template_path"):
             P.assert_pilot_entry_selectable(
-                manifest=manifest,
+                manifest=_frozen_matcher_manifest(manifest),
                 resolution=resolution,
                 declared_template_path="backend/wp_templates/D/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
             )

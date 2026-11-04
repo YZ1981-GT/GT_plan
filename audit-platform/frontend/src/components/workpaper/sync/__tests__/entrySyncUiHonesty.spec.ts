@@ -249,6 +249,14 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
     'html', 'onlyoffice', 'oo', 'online-edit', 'structured', 'docx', 'excel',
     'HTML', 'OnlyOffice',
   ])
+  /**
+   * 中文标签直接当值（`['结构化视图', '在线编辑']`，可带 emoji 前缀）。
+   *
+   * 🔴 2026-11-04：与棘轮 2026-11-03 补的是同一形态（A 轮 AC-41）。这里原先只认英文 / 小写
+   *    枚举 ⇒ `WorkpaperWordEditor.vue` 接单源后，它的 `genericModeOptions` 被解析成两个中文值、
+   *    一个都不在上面的集合里 ⇒ 判成「不是模式开关」⇒ 本判据对这个宿主报「算不出模式开关」。
+   */
+  const ZH_ONLINE_EDIT_VALUE = /^[^'"\n]{0,8}在线编辑$/
 
   function walkVue(dir: string, out: string[]): string[] {
     for (const name of readdirSync(dir)) {
@@ -329,6 +337,8 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
     if (values) {
       let hit = 0
       for (const v of values) if (MODE_OPTION_VALUES.has(v)) hit += 1
+      // 「在线编辑」+ 至少一个别的视图 ⇒ 模式开关（中文标签当值的写法）
+      if (values.size >= 2 && [...values].some((v) => ZH_ONLINE_EDIT_VALUE.test(v))) return true
       return hit >= 2
     }
     if (opts !== null && /mode/i.test(opts)) return true
@@ -403,6 +413,12 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
     const a51Text =
       "const modeOptions = [{ label: '结构化', value: 'structured' }, { label: 'Excel', value: 'excel' }]\nconst segOpts = modeOptions\n"
     expect(isModeSwitchTag(a51, a51Text), '别名链没跟上').toBe(true)
+    // ⑥ 中文标签直接当值（WorkpaperWordEditor 的 `genericModeOptions`；可带 emoji 前缀）
+    const zh = '<el-segmented v-model="genericViewMode" :options="genericModeOptions" />'
+    expect(isModeSwitchTag(zh, "const genericModeOptions = ['结构化视图', '在线编辑']"), '中文标签当值认不出').toBe(true)
+    expect(isModeSwitchTag(zh, "const genericModeOptions = ['结构化视图', '📊 在线编辑']")).toBe(true)
+    // 反例：中文业务选项（没有「在线编辑」）不得被纳入
+    expect(isModeSwitchTag(zh, "const genericModeOptions = ['按客户', '按产品']"), '中文业务分段器被误纳').toBe(false)
   })
 
   // 🔴 钉住标签截取方式：换回 `/<el-segmented[\s\S]{0,400}?>/` 一类正则会在属性值里的

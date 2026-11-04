@@ -1189,7 +1189,6 @@ declare module 'vue' {
     GtG4BondInvestmentMain: typeof import('./components/workpaper/GtG4BondInvestmentMain.vue')['default']
     GtG4BondInvestmentSppi: typeof import('./components/workpaper/GtG4BondInvestmentSppi.vue')['default']
     GtG5LongTermReceivable: typeof import('./components/workpaper/GtG5LongTermReceivable.vue')['default']
-    GtG6OtherBondEcl: typeof import('./components/workpaper/GtG6OtherBondEcl.vue')['default']
     GtG6OtherBondInvestmentEcl: typeof import('./components/workpaper/GtG6OtherBondInvestmentEcl.vue')['default']
     GtG6OtherBondMain: typeof import('./components/workpaper/GtG6OtherBondMain.vue')['default']
     GtG6OtherBondSppi: typeof import('./components/workpaper/GtG6OtherBondSppi.vue')['default']

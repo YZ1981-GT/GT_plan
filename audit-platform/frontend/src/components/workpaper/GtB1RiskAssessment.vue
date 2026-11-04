@@ -13,7 +13,14 @@
   <div class="gt-b1risk">
     <!-- Toolbar -->
     <div class="gt-b1risk__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <!-- 模式开关可见性 / 可用性来自同步能力单源，不由宿主自行决定 -->
+      <el-segmented
+        v-if="entrySync.presentation.value.showModeSwitch"
+        v-model="mode"
+        :options="modeOptions"
+        size="small"
+      />
+      <GtEntrySyncCapabilityNotice :entry-id="B1_RISK_ENTRY_ID" />
       <el-tag :type="variant === 'retention' ? 'warning' : 'success'" effect="plain" size="small">
         {{ variant === 'retention' ? '业务保持' : '业务承接' }}
       </el-tag>
@@ -306,6 +313,8 @@ const B1_RISK_ENTRY_ID = 'xlsx/gt-b1-risk-assessment'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import GtReviewTrigger from './GtReviewTrigger.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
@@ -347,9 +356,20 @@ const b1Sync = useB1OrphanSyncMode({
   flushHtml: async () => { await flushPendingSaves(); return { expectedRevision: 0, projection: null, sheetKey: 'b1-risk-managed' } },
   reloadHtml: async () => { await loadData() },
 })
+/** 开关与 notice 共用的同步能力单源（静态裁决 + 运行时 readiness）。 */
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => B1_RISK_ENTRY_ID,
+})
 const mode = computed<string>({
   get: () => (b1Sync.descriptorReady.value ? b1Sync.mode.value : legacyMode.value),
-  set: (v: string) => { if (b1Sync.descriptorReady.value) b1Sync.switchMode(v); else legacyMode.value = v },
+  set: (v: string) => {
+    // 单源不放行在线编辑时忽略切换（开关隐藏后仍可能被程序化地切过去）
+    if (v === '在线编辑' && !entrySync.presentation.value.canSwitchToOnlyOffice) return
+    if (b1Sync.descriptorReady.value) b1Sync.switchMode(v)
+    else legacyMode.value = v
+  },
 })
 const modeOptions = computed(() => (b1Sync.descriptorReady.value ? b1Sync.modeOptions.value.map(o => o.value) : legacyModeOptions.value))
 

@@ -71,6 +71,17 @@ export interface UseD4SyncModeOptions {
   readonly reloadHtml: (minimumRevision: number) => Promise<void>
   /** 覆盖 entryId（默认 D4 共享 entry）；测试或特殊 entry 用。 */
   readonly entryId?: string
+  /**
+   * 同步能力单源（`useEntrySyncReadiness()` 的返回值，spec
+   * workpaper-html-onlyoffice-bidirectional-writeback-closure · task 3.5 / AC 1.4）。
+   *
+   * 传了它，「在线编辑」选项是否出现由**单源**决定（静态裁决 + 运行时 readiness 三层事实），
+   * 宿主不再自行判断这条 entry 能不能双向；不传则选项照旧恒在（供尚未接单源的调用方渐进迁移）。
+   * 与 `useGRenderModeSwitch` 同一接口。
+   */
+  readonly entrySync?: {
+    readonly presentation: { readonly value: { readonly showModeSwitch: boolean } }
+  }
 }
 
 export function useD4SyncMode(options: UseD4SyncModeOptions) {
@@ -130,11 +141,30 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
     set: (target: string) => { void switchMode(target) },
   })
 
+  /**
+   * 单源说这条 entry 不该露出在线编辑时，选项里就没有「在线编辑」。
+   *
+   * 🔴 已经在 OO 里时保留该选项：运行时复核中途失败（或单源重取变 false）不能把正在编辑的人
+   *    留在一个「当前值不在选项里」的分段器上 —— 他得能看见自己在哪，并从 HTML 视图那一侧
+   *    正常退出（退出仍走 switchMode 的保存 / clean close）。
+   */
+  const allowOnlineEdit = computed(() =>
+    !options.entrySync
+    || options.entrySync.presentation.value.showModeSwitch
+    || syncBridge.mode.value === 'oo',
+  )
+
+  /**
+   * 分段器该不该出现：有在线编辑可切，或者本宿主本身就有多个 HTML 视图（卡片 / 矩阵）要切。
+   * 只有一个 HTML 视图且不能在线编辑时，一个选项的分段器没有意义，直接不画。
+   */
+  const showModeSwitch = computed(() => views.length > 1 || allowOnlineEdit.value)
+
   // 🔴 不用 `disabled: !ooHealthy`：健康检查是 mount 期异步（端点 ~20ms 但仍可能晚于点击），
   //    disabled 在未就绪时锁死切换器 → 点击被忽略、switchMode 根本不触发（bug ③）。健康门禁
   //    移进 switchMode（await 兜底），切换器保持可点；OO 真不可用时由桥/后端 fail-visible。
   const modeOptions = computed(() =>
-    [...views, D4_ONLINE_EDIT_LABEL].map(value => ({
+    [...views, ...(allowOnlineEdit.value ? [D4_ONLINE_EDIT_LABEL] : [])].map(value => ({
       label: value,
       value,
       disabled:
@@ -149,6 +179,8 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
     if (target === D4_ONLINE_EDIT_LABEL) {
       if (options.isReadonly.value) return
       if (syncBridge.mode.value === 'oo') return
+      // 选项被单源藏起来时，程序化切换（快捷键 / 旧 localStorage 恢复）同样不放行。
+      if (!allowOnlineEdit.value) return
       // 🔴 竞态兜底（bug ②）：点击可能早于 mount 期 checkOoHealth() 响应到达，此时
       //    ooHealthy 仍为初始 false。健康未就绪则**当场 await 一次**再判定，OO 真不可用
       //    才 return（fail-visible 由桥/后端给），绝不因「健康还没探到」静默吞掉点击。
@@ -214,6 +246,7 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
     checkOoHealth,
     editorMode,
     modeOptions,
+    showModeSwitch,
     switchMode,
     busy,
     feedback,

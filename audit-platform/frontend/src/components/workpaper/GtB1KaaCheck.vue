@@ -8,7 +8,14 @@
 <template>
   <div class="gt-b1kaa">
     <div class="gt-b1kaa__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <!-- 模式开关可见性 / 可用性来自同步能力单源，不由宿主自行决定 -->
+      <el-segmented
+        v-if="entrySync.presentation.value.showModeSwitch"
+        v-model="mode"
+        :options="modeOptions"
+        size="small"
+      />
+      <GtEntrySyncCapabilityNotice :entry-id="B1_KAA_ENTRY_ID" />
       <el-tag type="info" effect="plain" size="small">KAA 关键业务承接检查</el-tag>
       <span class="gt-b1kaa__spacer" />
       <span class="gt-b1kaa__save-status">
@@ -172,6 +179,8 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import GtReviewTrigger from './GtReviewTrigger.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 
 // 版本快照由 Runtime Boundary(GtWpRenderer) 提供的运行时上下文承载；复核对话由 GtReviewTrigger 自行 inject
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
@@ -207,9 +216,20 @@ const b1Sync = useB1OrphanSyncMode({
   flushHtml: async () => { await flushPendingSaves(); return { expectedRevision: 0, projection: null, sheetKey: 'b1-kaa-managed' } },
   reloadHtml: async () => { await loadData() },
 })
+/** 开关与 notice 共用的同步能力单源（静态裁决 + 运行时 readiness）。 */
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => B1_KAA_ENTRY_ID,
+})
 const mode = computed<string>({
   get: () => (b1Sync.descriptorReady.value ? b1Sync.mode.value : legacyMode.value),
-  set: (v: string) => { if (b1Sync.descriptorReady.value) b1Sync.switchMode(v); else legacyMode.value = v },
+  set: (v: string) => {
+    // 单源不放行在线编辑时忽略切换（开关隐藏后仍可能被程序化地切过去）
+    if (v === '在线编辑' && !entrySync.presentation.value.canSwitchToOnlyOffice) return
+    if (b1Sync.descriptorReady.value) b1Sync.switchMode(v)
+    else legacyMode.value = v
+  },
 })
 const modeOptions = computed(() => (b1Sync.descriptorReady.value ? b1Sync.modeOptions.value.map(o => o.value) : legacyModeOptions.value))
 
