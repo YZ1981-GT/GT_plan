@@ -90,7 +90,10 @@ HARD_CAPS = {
     # 2026-10-29：3228→3170（HEAD 已是 3168 —— 上一批没同步下调，test_hard_cap_ratchet 在 HEAD 上就红；
     #   note-chain-followup-optimizations R2 单元格来源诊断弹窗传表序号 / 存储坐标 / 项目年度章节 +2 行，R5 校验提示
     #   与批注提示改为不嵌套、行数不变；按「每完成一批瘦身必须同步下调」不留余量）。
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3170,
+    # 2026-11-04：3170→3273（HEAD 已是 3273 —— a6c1fa93a 把它从 3161 加到 3273 而 cap 未同步，a81387be1 合并带回；
+    #   test_hard_cap_ratchet 在 HEAD 上就红，任何触碰该文件的提交都被拒）。formula-management-repair-closure R9.1
+    #   给公式管理弹窗传只读，属性并进 v-model 同一行、行数不变；填真实值作为只许变小的棘轮，不留余量。
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3273,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：
