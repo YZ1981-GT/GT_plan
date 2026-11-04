@@ -14,6 +14,7 @@ import {
   type HeadlessProviderLoader,
 } from '@/components/workpaper/headless/headlessFramework'
 import { HEADLESS_PROVIDERS } from '@/components/workpaper/headless/registry'
+import { MANUAL_TAKEOVER_ADVICE } from '@/utils/noteWriteOwnership'
 import type { HeadlessSyncOutcome, NotePullResult, NotePullSection, NotePullSectionState } from './noteWorkpaperPull'
 
 export {
@@ -29,9 +30,15 @@ export function headlessDisclosureWpCodes(): string[] {
   return Object.keys(PROVIDERS)
 }
 
-function manualSkipMessage(section: string, state: NotePullSectionState): string | null {
+/**
+ * 从未由底稿同步、已有人工填写的章节不拿底稿披露表覆盖。与后端写入归属 manual 策略
+ * （`note_write_ownership.never_synced_manual_block`）同一判据：对拍用例在
+ * `backend/data/note_write_ownership_matrix.json` 的 `manual_policy.cases`，守卫 `noteWriteOwnershipParity.spec.ts`。
+ * 2026-11-04 起底稿附注披露页的同步也按这一判据被后端拒绝，所以建议不再是「去底稿附注披露页同步」。
+ */
+export function manualSkipMessage(section: string, state: NotePullSectionState): string | null {
   if (state.synced_before || !(state.manual_values > 0)) return null
-  return `附注 ${section} 已有 ${state.manual_values} 格人工填写，未用底稿披露表覆盖（如需改用底稿数据，请在底稿附注披露页同步）`
+  return `附注 ${section} 已有 ${state.manual_values} 格人工填写，未用底稿披露表覆盖（${MANUAL_TAKEOVER_ADVICE}）`
 }
 
 /**

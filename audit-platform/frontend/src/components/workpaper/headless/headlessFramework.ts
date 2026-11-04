@@ -18,6 +18,7 @@
  */
 import { effectScope, nextTick } from 'vue'
 import http from '@/utils/http'
+import { MANUAL_TAKEOVER_ADVICE, MANUAL_TAKEOVER_REASON } from '@/utils/noteWriteOwnership'
 import { primeAgingConfig } from '@/composables/useAgingConfig'
 import type { ChecklistResponse } from '@/components/workpaper/composables/useD2FormData'
 
@@ -121,6 +122,8 @@ export async function loadRenderConfig(wpId: string): Promise<any | null> {
 
 const SKIP_REASON: Record<string, string> = {
   section_not_applicable_to_report_scope: '章节不适用于本项目口径（单体项目的合并专属章节等），未写入',
+  // 写入归属 manual 策略（spec formula-writer-ownership-and-stale §13）：后端与离屏同步 sectionGuard 同一判据
+  [MANUAL_TAKEOVER_REASON]: `章节从未由底稿同步、已有人工填写，未用底稿披露表覆盖（${MANUAL_TAKEOVER_ADVICE}）`,
 }
 
 /** 经 `sync-from-workpaper` 发一条载荷（静默：离屏同步自己汇总提示）。 */

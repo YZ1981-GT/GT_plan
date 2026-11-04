@@ -3,10 +3,11 @@
  *
  * 公式推送写过的附注主表格（试算表审定数），底稿披露同步写入后保持推送值，后端在响应 `push_kept` 里逐格回报。
  * 披露 Tab 有 90 多个、各自发 `sync-from-workpaper`，提示放在 http 响应拦截器一处做（与 `noteEditRequestGuard` 同一装法）；
- * 请求带 `_silent`（附注页离屏同步自己汇总结果）时不弹。
+ * 请求带 `_silent`（附注页离屏同步自己汇总结果）时不弹。写入归属 manual 策略没写入的章节同样在这里提示。
  */
 import type { AxiosInstance, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
+import { MANUAL_TAKEOVER_ADVICE, MANUAL_TAKEOVER_REASON } from './noteWriteOwnership'
 
 export interface PushKeptCell {
   table: string
@@ -60,6 +61,21 @@ export function pushKeptMessage(group: PushKeptGroup): string | null {
   return `附注 ${group.section || ''}：${sample}${more}由公式推送维护，已保持试算表审定数（披露表里的数与之不同，以试算表审定数为准）`
 }
 
+/** 响应体 → 按 manual 策略没写入的章节（批量同步的 `results[]` 逐项读） */
+export function manualTakeoverSkippedSections(data: unknown): string[] {
+  if (!data || typeof data !== 'object') return []
+  const d = data as Record<string, unknown>
+  const items = Array.isArray(d.results) ? d.results : [d]
+  return items
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .filter((item) => item.skipped === true && item.reason === MANUAL_TAKEOVER_REASON)
+    .map((item) => String(item.section_id || ''))
+}
+
+export function manualTakeoverMessage(section: string): string {
+  return `附注 ${section}：从未由底稿同步、已有人工填写，本次没有用底稿披露表覆盖（${MANUAL_TAKEOVER_ADVICE}）`
+}
+
 /** 装到 http 实例上；返回卸载函数 */
 export function installPushKeptNotice(http: AxiosInstance, notify: (msg: string) => void = (msg) => {
   ElMessage({ type: 'warning', message: msg, duration: 6000, showClose: true })
@@ -71,6 +87,8 @@ export function installPushKeptNotice(http: AxiosInstance, notify: (msg: string)
         const msg = pushKeptMessage(group)
         if (msg) notify(msg)
       }
+      // 披露 Tab 各自的提示把这类回执当成功（「已更新…0 行」），这里补一句为什么没写入
+      for (const section of manualTakeoverSkippedSections(response.data)) notify(manualTakeoverMessage(section))
     }
     return response
   })
