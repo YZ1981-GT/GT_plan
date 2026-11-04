@@ -5,8 +5,9 @@
 | 批 | 内容 | 状态 |
 |---|---|---|
 | 批 1 | R1 迁移补执行 + 执行器修复；R2 三方恢复 + 阻碍验证面的 HEAD 缺陷（R2.5） | 已推送（v1.0.107） |
-| 批 2 | R3.2 Word 门禁修真 + R3.3 / R3.4 白名单与表名判据（任务 5 / 6） | 代码与验证完成，本次推送（§6.2） |
-| 批 3 | R4 期 1：可移植性现算、Node 执行器、D2 / E1 逐字节对拍、手工触发（任务 10~13） | 未开始 |
+| 批 2 | R3.2 Word 门禁修真 + R3.3 / R3.4 白名单与表名判据（任务 5 / 6） | 已推送（§6.2） |
+| 批 3 | R4 期 1：可移植性现算、Node 执行器、D2 / E1 逐字节对拍、手工触发（任务 10~13） | 已推送（§6.3） |
+| 真库验证 | 13b「不开页面也更新」、任务 8 余项、任务 9 推送→附注端到端；期间修三处（执行器子进程、推送拥有格来源信封、重生成合并） | 本次推送（§5.5 / §6.4） |
 
 **凡本文档给出的数字都是某次现扫的快照，实施期须重扫，不得引用。**
 
@@ -56,8 +57,19 @@
 - `ai_chat_runs.context_request_snapshot`、`formula_push_state.provenance` 列与 `note_formula_run` 表由无变有。
 - 三行 checksum 与磁盘一致；`schema_version` 247 → 250；`VERIFY OK`。
 
-未做（任务 8 余项，如实登记）：`/api/health` 启动报告复核、合并附注三条生产路径在【测试】项目各跑一次、
-V235 前后 `adjustments` / `adjustment_entries` 行数对账（V235 由其他进程执行，本会话没有执行前快照）。
+任务 8 余项（2026-11-04，候选后端 9985 连共享库，用户放行）：
+
+- `/api/health`：启动报告 45 项、失败 0；`run_migrations` 因 `GT_BOOTSTRAP_DONE=1` 跳过、25 项因 `GT_NEVER_PRIMARY=1` 延后
+  （本实例不跑常驻任务）；迁移 applied 250 / 磁盘 248 / pending 0 / 失败 0。schema 漂移 11 项，critical 2 项是 V233 / V234
+  应用后被编辑（其他 spec 的迁移），其余是类型不符（含 V247 `consol_note_data.source_digest` ORM VARCHAR / 库 CHAR）。
+- V248：13b / 任务 9 的真实推送跑完，`formula_push_state.provenance` 34/34 由空变有。
+- V249：真实刷新与事件推送共写 `note_formula_run` 17 条（五、1 / 五、42），首跑就因 `kept_push` 进来源信封整节失败（§5.5）。
+- V247（【测试】公式同步集团 五-5-6）：重新汇总 → 叶子 甲 按已确认映射拉数，行写出 `source_mode=detail_mapping` +
+  `source_digest`、待更新清除；按公式填入写出 `source_mode=formula` + `source_digest`。子树汇总跑不到：下级乙没有单体附注，
+  上级本章不汇总 —— 只由 `test_consol_note_subtree_reaggregate.py` 覆盖。按公式填入调用时没带 `node_key`，多写了一行
+  node_key 为空的兼容行（空数据；界面恒带节点，平台没有删除入口）。
+- V235：没有执行前快照，改核不变量：两列 + 一列、四个约束（NOT VALID）、唯一索引齐全；存量 0 条违反四个约束、0 组重复明细行；
+  任务 9 实际走了 `content_revision`（删除带 expected_revision=1）与 `adjustment_review_tasks`。
 
 ### 2.4 归属清单
 
@@ -326,7 +338,7 @@ pre-commit 行数门拦下 7 个文件：其中 5 个在 HEAD 上就已超基线
 条目带 `workpaper`（登记时底稿那边的原字），底稿改了字即失效；`name` 必须等于该序号的模板表名（既有守卫）。改模板表名牵涉
 附注读时增强与标题行库，3 条 `todo` 本批只登记。
 
-## §5　R4　详细披露 builder 后端化（批 3，未开始）
+## §5　R4　详细披露 builder 后端化（批 3）
 
 ### 5.1 与既有裁定的关系
 
@@ -417,7 +429,51 @@ Tab 不同、写进附注是错数而于 2026-10-27 删除）。用户要的是�
   - 格级 `_cell_modes`：全部 / 单章节重算都以 `skip_manual=True` 调 `refill_sections`（重算跳过人工格由
     `services/test_note_manual_protect_pbt.py` 覆盖）；
   - 首次同步保护在执行器侧（同一个 `runHeadlessDisclosure`）：前端用例钉住「从未同步、已有 3 格人工填写」的章节不发同步请求。
-- 「不开页面也更新」的真实写库跑通（【测试】项目）待用户放行（D5）。
+- 子进程用 `subprocess.Popen`，拉起与等待都放线程（`asyncio.to_thread`）：Windows 开发服务器（`run_uvicorn.py`）跑在
+  SelectorEventLoop 上，`asyncio.create_subprocess_exec` 在那里 `NotImplementedError`，端点恒 500。单测换了假进程、
+  pytest-asyncio 默认又是 Proactor 循环，两层都测不出 ⇒ 补两例真子进程用例，显式跑在 SelectorEventLoop 上（拉起读结果、
+  中文章节号原样到达；超时终止整棵进程树、孙进程不残留）。变异 T13-M25~M28 红。
+
+### 5.5 真库验证（任务 13b / 9，【测试】公式同步甲，2026-11-04 用户放行）
+
+候选后端 9985（verify_wt 代码、主实例同一 cwd 与 `.env`，`GT_BOOTSTRAP_DONE=1` 不跑迁移、`GT_NEVER_PRIMARY=1` 不跑常驻任务）。
+先核环境等价：同一执行器对 D2@甲 / E1@甲 只读取数，9985 与 9980 载荷逐字节相同，D2 sha 与任务 12 相同。每步前后全量快照
+（附注 199 节、试算表、底稿、responses、推送状态、运行记录）逐项对比，脚本 `tmp_note_pull_doc/live.py`。
+
+- 13b 离屏刷新（admin 触发）：1.5~3 秒跑完。D2 → 五、5 被首次同步保护挡下（已有 2 格人工填写，原样保留）；E1 上市口径没有
+  披露表（加载标准科目表后改为同步 0 行）；推送写 3 格、保留人工格 库存现金；底稿 / 试算表 / responses 零写入。
+  首跑 refresh 回报 `formula_failed_sections=['五、1']`：附注公式对推送拥有格保留推送值时，把执行结果状态 `kept_push`
+  原样传进来源信封，`ProvenanceValueState` 只认 6 态 ⇒ ValidationError，整节附注公式回滚。刷新链路与推送后自动运算同一函数，
+  PG 上凡有推送拥有格且有预设公式的章节都这样；用例库没建 `note_formula_run`、信封不写，测不出。修：信封记 `kept`；补「建运行
+  记录表」的用例；变异 T13-M29 红。修后再跑：五、1 附注公式成功、运行记录落库、待更新清除。
+- 任务 9（改审定数 → 事件推送 → 附注）：甲没有科目表 ⇒ 建分录被「科目编码不存在于标准科目表中」挡下，经平台
+  `GET /account-chart/standard` 加载 174 行标准科目（打开科目表页时平台本就这样加载）。测试经理 `test_npr_e2e_mgr`
+  （用户接口建、本人档案、委派进甲）复核通过 AJE-001（借 1002 / 贷 2241 各 10）：
+
+  | 层 | 前 | 审批后（事件链，无人开页面） | 再跑离屏刷新 |
+  |---|---|---|---|
+  | 试算表 1002 调整 / 审定 | 0 / 200 | 10 / 210（另新建 2241 行 10 / 10） | 不变 |
+  | 底稿 E1：大厅调整银行存款 / 审定合计 1002 / 试算金额 | 0 / 0 / 350 | 10 / 10 / 360 | 不变 |
+  | 附注 五、1 银行存款 / 其他货币资金 / 合计（期末） | 200 / 50 / 350 | 10 / 0 / 110 | 210 / 50 / 360 |
+  | 附注 五、1 库存现金（人工格） | 100 | 100（保留） | 100 |
+
+  事件链：outbox `adjustment.approved` → 审批重算 → `trial_balance.updated` → 推送（写 6 格）+ 推送后附注公式；同时附注全标
+  待更新、后台 `refresh_stale_sections`。甲的 E1 明细是空的，E1 审定数 = 0 + 调整 ⇒ 推送按底稿写 10 / 0 / 110，离屏刷新的
+  回填再按试算表写回 210 / 50 / 360：同一格两个写入方取数口径不同（推送 = 底稿审定表、回填 = 试算表），数据一致时两者相等，
+  不一致时以最后一个写入方为准（§9.1）。撤回复核 → 删除分录 → 离屏刷新后三层逐值回到写入前（五、1 15 行逐格相同）。
+- 审批另触发 REPORTS_UPDATED → `DisclosureEngine.update_note_values` 重并 119 节，发现两处静默改数：
+  ①合并从 new 起步，old 独有字段被删 —— 83 节的 `_validation_rules` 没了（同一处还会删 `_user_formulas`、来源信封等；
+  共享库现扫 2042 节里带这三个键的分别 603 / 0 / 1 节）。链路：试算表更新 → 报表重算 → REPORTS_UPDATED →
+  `on_reports_updated`，即每次审定数变化都会重并；
+  ②五、5「组合计提项目：应收中央企业客户」手工明细 100 / 80 保留了，合计却取模板值（按不含手工值的明细算）⇒ 清空。回滚事务里
+  对审批前快照复现。修 `note_cell_merge`：old 独有字段保留（结构字段只认 new）；明细保留了手工 / 锁定格时合计自动格按合并后的
+  明细重算（`recalc_table_totals`，判不准 / 全空不写）。变异 T13-M30~M34 红；同一快照修后合计 100 / 80、rules 保留。
+  五、5 经附注保存接口写回审批前快照（hash 与写入前相同）。
+- 清理与残留：经理先「团队保存清空」—— 委派撤了、成员行没撤（R2，已知）；再按平台路径重走委派 → 删人员带
+  `revoke_assignments` 才撤掉，账号停用。残留（无平台删除入口或属事件副作用，逐项登记）：标准科目表 174 行；试算表 2241 零行；
+  197 节附注与 D2 / E1 底稿 `prefill_stale` 仍标待更新（审批 / 撤回把全部附注标待更新，刷新只清重算成功的章节）；83 节
+  `_validation_rules`（D6）；复核任务停在 `approved`（撤回、删除都不改它）；运行记录 / 通知 / outbox 作为历史保留；
+  集团 五-5-6 节点空兼容行 1 行。
 
 ## §6　验证（2026-11-04）
 
@@ -469,6 +525,17 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
 | 变基后实测 | — | 远端前移 6 个提交，其中改了闭包里的 `src/services/apiPaths/formulaSettings.ts`：执行器拒绝运行（退出码 3）并点名 3 个文件（另两个是检出时换成 CRLF 的 `entry.ts` / `nodeHttp.ts`） | 构建清单按设计生效；跑 13b 前重新构建 |
 | shebang | — | 变基检出成 CRLF 后，vitest 导入 `run.mjs` 报语法错（转换时剥不掉 `#!…\r`）；去掉 shebang 后 11 passed | `run.mjs` 一律 `node run.mjs …` 调用 |
 
+### 6.4 真库验证批的三处修复（2026-11-04）
+
+候选 = `165599b60`（v1.0.112）+ 三个修复提交（verify_wt）；基线 = 同一提交（被改文件临时换回 HEAD 版跑同一选集，逐字节恢复）。
+
+| 面 | 结果 |
+|---|---|
+| 执行器子进程改线程方式 | 离屏刷新服务 / 保护 / 端点门禁 34 passed（含两例真子进程、显式 SelectorEventLoop）；变异 T13-M25（改回 asyncio 子进程，红在 `NotImplementedError`）/ M26（等待放回事件循环）/ M27（终止不带 `/T`，孙进程残留）/ M28（终止函数空转）全红，形态逐条核对；原 M1~M15 复跑 15/15 红；跑完无残留进程 |
+| 推送拥有格来源信封 | 推送后附注公式用例 16 passed；新用例修复前红在与真库同一个 ValidationError；附注公式相关 10 个文件 3 条红在 HEAD 同样红（缺 `formula_push_state` 表的夹具 2 条、未知科目取数 1 条）；变异 T13-M29 红 |
+| 重生成合并 | 合并新用例 4 例；附注相关 452 个用例文件 11940 节点：candidate-only red 0、修好 0、两边都红 235 条逐条相同（多为隔离模式下连不上库的 `_pg` 用例）；变异 T13-M30~M34 全红；回滚事务对审批前快照复现：修前合计清空、rules 删掉，修后合计 100 / 80、rules 保留 |
+| ruff / 行数门 | 新改动 0 条（`note_formula_generator.py` 8 条与 HEAD 相同）；行数门 rc 0 |
+
 ## §7　风险登记
 
 | # | 风险 | 处置 |
@@ -506,6 +573,12 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
   （要改鉴权层）；后端进程内直接调服务函数（provider 是前端代码，HTTP 是它唯一的取数 / 写入边界）。
 - **ADR-NPR-14**：执行器运行前核对构建清单，源码与构建不一致即拒绝（503）。否决：请求里自动重新构建（写仓库文件、
   耗时 20~40 秒）；不核对（静默用旧版 builder 算出的数写附注）。
+- **ADR-NPR-15**：执行器子进程在线程里 `subprocess.Popen` 拉起、在线程里 `communicate`。否决：`asyncio.create_subprocess_exec`
+  （Windows 开发服务器的 Selector 循环不支持）；把服务器换成 Proactor 循环（`run_uvicorn.py` 选 Selector 是为了 SQLAlchemy，
+  影响整个服务）。
+- **ADR-NPR-16**：重生成三态合并保留 old 独有字段（结构字段 `_tables` / `rows` / `headers` / `name` 只认 new）；明细保留了
+  手工 / 锁定格时合计自动格按合并后的明细重算，否则合计照 new。否决：每次都重算合计（模板合计可能另有取数来源，会被改掉）；
+  `update_note_values` 单独补注入 `_validation_rules`（只补一个键，其余 sidecar 照样丢）。
 
 ## §9　本 spec 不纳入（已登记）
 
@@ -526,6 +599,21 @@ worktree（`head_wt`）。选集按附注 / 公式 / 合并 / 迁移关键字取
 13. **S5 真缺陷**：`DisclosureEngine.update_note` 保存时丢掉 `_formula_provenance` 旁注（从未实现），
     `test_s5_editor_save_preserves_formula_provenance_sidecar` 两边都红。
 14. 恢复链之外的丢失（§3.9）。
+15. 真库验证批（§5.5）另见、未改：
+    - 同一 Selector 循环问题：`ai_chat/dsh_process.py`（拉起与 taskkill 共 2 处）、`libreoffice_pool.py`、`mineru_service.py`
+      （2 处）都用 `asyncio.create_subprocess_exec`，Windows 开发服务器上会 `NotImplementedError`。
+    - **主工作树 125 个已修改文件里 44 个等于某历史提交原样副本**（磁盘没跟上 HEAD 前移），含本链路 `formula_push/persistence.py`
+      （= `85caab386`）、`triggers.py` / `note_followup.py`（= `50736413a` 安全快照）、`note_formula_generator.py`（= `85caab386`）、
+      `note_workpaper_pull_service.py`。主实例 9980 跑的是这些旧版：`engine.run_and_commit` 传 `_skip_note_followup`、旧
+      `persistence` 不认 ⇒ 事件推送恒 `TypeError`（16:06 / 16:31 对【测试】公式同步甲失败 8 次）。谁从主工作树整树提交，这些旧版
+      就会再覆盖一次（§3.0 同一机理）。D7。
+    - `update_note_values` 对没有科目引用的模板章节不跳过：每次审定数变化都重并 119 节（本批只修合并结果，不收窄范围）。
+    - 同一格两个写入方取数口径不同：E1 推送按底稿审定表、离屏刷新回填按试算表；E1 明细与试算表不一致时以最后写入方为准。
+      属已登记的「附注权威源」待拍板。
+    - 审批 / 撤回把项目全部附注标待更新，刷新只清重算成功的章节 ⇒ 会计政策等纯文本节一直挂着待更新。
+    - 撤回复核、删除分录都不改 `adjustment_review_tasks.status`，任务停在 `approved`。
+    - 后台推送后附注公式（`_apply_note_formulas`）的运行记录 `trigger` 恒为 `manual`。
+    - 刷新回报把「本项目没有该科目」记成错误：甲 28 节「数据解析器未返回结果」共 106 条。
 
 ### 9.2 两边都红的预存失败（本批不修，未归因者如实标注）
 
@@ -574,3 +662,11 @@ INDEX 守卫：`test_spec_index_consistency::test_unindexed_active_specs_only_sh
    再判是「数据漂移」还是「这个 phase 本身错了、该退役」，不能直接把现状写成新基线。
 10. **过程标记不是证据**：`_aligned_by` 只说明某个脚本改过这一节；白名单按它放行，会把没有底稿披露表的节（154 条）也
    算成「以底稿为准」，新差异重跑生成器即被吸收。证据要能在现算里核对（配对结果、Word 原文、出处文档原话）。
+11. **单测换掉的那一层要在真实运行环境里补一例**：子进程换成假进程、pytest-asyncio 默认 Proactor 循环 ⇒ 开发服务器
+    Selector 循环上的 `NotImplementedError` 两层都测不出；真库首跑前读启动入口（`run_uvicorn.py`）才发现。
+12. **「只在某张表存在时才做」的分支，用例要把那张表建出来**：来源信封只在有 `note_formula_run` 时写，SQLite 用例库没建它，
+    `kept_push` 进信封的 ValidationError 在 PG 上每次都发生、用例却一直绿。
+13. **真库验证的快照要存所有可能被写的内容，不只存预期目标的哈希**：审批顺带重并了 119 节，只有预先存了全文的 五、5 能逐格
+    还原；其余节只能现算推断（`_validation_rules` 按模板现算缺 83 节）。
+14. **验证用的后端要从零构造环境**：共享终端里别的会话设的 `DATABASE_URL` 一路带进子进程，第二次起候选后端连到了
+    `gt_no_such_db`；起服务、签令牌的脚本都显式重置库 / Redis / 密钥变量。
