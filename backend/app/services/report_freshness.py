@@ -98,8 +98,10 @@ def row_status(row: Any, effective_formula: str | None, definition_hash: str | N
                 old_hash = applied.get("definition_hash")
                 if old_hash and old_hash != definition_hash:
                     stale = True
+    # formula-hub-release-blockers R4.1：必须返回已经含 definition_hash 分支结果的 stale 变量，
+    # 不能重新调用 is_effectively_stale（它不知道 hash 漂移）。
     return {
-        "is_stale": is_effectively_stale(row, effective_formula),
+        "is_stale": stale,
         "calc_error": _get(row, "calc_error") or None,
         "blank_reason": _get(row, "blank_reason") or None,
     }

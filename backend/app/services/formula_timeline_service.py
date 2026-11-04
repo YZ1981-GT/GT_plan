@@ -94,6 +94,10 @@ async def _audit_log_events(
         sa.select(AuditLogEntry).where(
             AuditLogEntry.action_type == "formula.changed",
             AuditLogEntry.payload["project_id"].astext == str(project_id),
+            # formula-hub-release-blockers R11.1：按年度过滤，使 /formula-timeline/{project}/{year}
+            # 只返回指定年度的公式变更。旧条目 payload 没有 year 字段 → astext 为 NULL，
+            # NULL == str(year) 在 SQL 里是 UNKNOWN，被排除，符合预期。
+            AuditLogEntry.payload["year"].astext == str(year),
         ).order_by(AuditLogEntry.ts.desc()).limit(limit)
     )).scalars().all()
 

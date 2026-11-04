@@ -8,8 +8,11 @@
 * 推送规则：受影响底稿重新推送（``propagate_push``，触发来源「公式规则变更」）。
 * 试算表明细 / 表间审核：事件本身即通知前端刷新（SSE），下次执行即用新定义。
 
-事件 ``extra.row_code`` 置空，旧 handler 只做反向索引失效（不再按单行 BFS）。handler 失败只记降级日志，
-不影响已提交的定义（R8.4）。
+事件 ``extra.row_code`` 置空，旧 handler 只做反向索引失效（不再按单行 BFS）。handler 失败不影响已提交的定义（R8.4）。
+
+报表重算整体失败、表间审核重跑失败时：过期标记照常落库、记降级日志，再抛 :class:`PropagationIncomplete`
+（spec formula-management-repair-closure R1.1）—— outbox 投递据此不标 published，交重放 worker 重试，耗尽后进死信，
+传播状态接口可见。此前这两处返回 ``{"error": …}`` 不抛，投递照样标 published：失败既不重试也无人可见。
 """
 from __future__ import annotations
 
@@ -24,6 +27,15 @@ from app.services.formula_grammar import ROW_PATTERN, SUM_ROW_PATTERN
 logger = logging.getLogger(__name__)
 ORIGIN = "formula_settings"
 _session_factory: Callable[[], Any] | None = None
+
+
+class PropagationIncomplete(RuntimeError):
+    """传播没有做完（重算 / 重跑整体失败）：已提交的过期标记保留，本次投递判失败、交重放重试。"""
+
+    def __init__(self, domain: str, message: str, detail: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.domain = domain
+        self.detail = dict(detail or {})
 
 
 def set_session_factory(factory: Callable[[], Any] | None) -> None:
@@ -146,12 +158,13 @@ async def propagate_report(project_id: uuid.UUID, year: int | None, slot_keys: l
                 recalculated = await ReportEngine(db).recalculate_stale_rows(project_id, year,
                                                                               applicable_standard=standard)
                 await db.commit()
-            except Exception as exc:  # noqa: BLE001 —— 定义已提交（R8.4），过期标记已落库，记可见降级
+            except Exception as exc:  # noqa: BLE001 —— 定义已提交（R8.4），过期标记已落库，记可见降级后判本次未完成
                 await db.rollback()
                 logger.exception("[formula_settings] 报表重算失败 project=%s year=%s", project_id, year)
                 _degraded("report_recalc", project_id, str(exc), {"year": year, "rows": sorted(closure)[:50]})
-                return {"closure": sorted(closure), "marked": int(marked), "recalculated": None,
-                        "error": str(exc)[:500]}
+                raise PropagationIncomplete(
+                    "report", f"报表重算失败（过期标记已保留，将自动重试）：{str(exc)[:300]}",
+                    {"closure": sorted(closure), "marked": int(marked), "year": year}) from exc
     if recalculated and recalculated.get("failed_rows"):
         # 单行失败：这些行保留原金额与过期标记（recalculate_stale_rows 只清成功行），另记降级日志可查
         _degraded("report_recalc_rows", project_id, f"{recalculated.get('failed_count')} 行重算失败",
@@ -262,13 +275,15 @@ async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_ke
                 "failed": sum(1 for o in result.outcomes if not o.passed),
                 "issues": len(result.issues),
             }
-        except Exception as exc:  # noqa: BLE001 —— R8.4：不回滚已提交定义
+        except Exception as exc:  # noqa: BLE001 —— R8.4：不回滚已提交定义；记降级后判本次未完成（交重放）
             await db.rollback()
             logger.warning("[formula_settings] 表间审核重算失败 project=%s year=%s: %s",
                            project_id, year, exc)
             _degraded("cross_check_rerun", project_id, str(exc),
                       {"year": year, "slot_keys": slot_keys[:50]})
-            return {"slot_keys": slot_keys, "error": str(exc)[:500]}
+            raise PropagationIncomplete(
+                "cross_check", f"表间审核重跑失败（将自动重试）：{str(exc)[:300]}",
+                {"year": year, "slot_keys": slot_keys[:50]}) from exc
 
 
 async def propagate_tb_detail(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
@@ -339,6 +354,8 @@ async def on_formula_config_changed(payload: Any) -> None:
         return
     try:
         await handler(project_id, getattr(payload, "year", None), slots)
+    except PropagationIncomplete as exc:  # 处理器内已记降级日志，这里不重复记
+        logger.warning("[formula_settings] 传播未完成 domain=%s project=%s: %s", domain, project_id, exc)
     except Exception as exc:  # noqa: BLE001 —— R8.4：不回滚已提交定义，记可见降级
         logger.exception("[formula_settings] 传播失败 domain=%s project=%s", domain, project_id)
         _degraded(domain or "", project_id, str(exc), {"slot_keys": slots[:50], "year": getattr(payload, "year", None)})

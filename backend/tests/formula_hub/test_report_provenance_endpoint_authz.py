@@ -41,6 +41,8 @@ async def _seed(world, actor_id: uuid.UUID) -> FinancialReport:
         finished_at=now,
         status="succeeded",
         changed_rows=1,
+        failed_rows=1,
+        error="BS-099：除数为 0",
         calc_version=2,  # 共享运行表（V246）的 calc_version 是整数；信封里的 calc_version 仍是 'report:2'
     )
     world.db.add(run)
@@ -119,5 +121,8 @@ async def test_readonly_member_can_read_current_provenance(provenance_world, mon
     assert payload["row_code"] == "BS-001"
     assert payload["legacy"] is False
     assert payload["envelope"]["calculation_applied"] is True
-    assert payload["run"]["status"] == "succeeded"
+    # 库里 succeeded + failed_rows=1 ⇒ 对外显示 partial（run_display_status）；失败原因来自共享表的 error 列
+    assert payload["run"]["status"] == "partial"
+    assert (payload["run"]["failed_rows"], payload["run"]["error_summary"], payload["run"]["calc_version"]) == (
+        1, "BS-099：除数为 0", 2)
     assert payload["computed_by_label"] == identity.user.username

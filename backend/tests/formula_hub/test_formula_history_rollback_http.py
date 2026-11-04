@@ -20,14 +20,23 @@ SLOT = "balance_sheet:BS-001"
 
 @pytest.fixture
 def events(monkeypatch):
-    """提交后的变更事件（只记次数，不出进程）。"""
+    """回滚端点登记的变更（只记下来，不入队、不出进程）。
+
+    S4 之后端点在事务内调 ``outbox.record_changes``、提交后 ``outbox.publish_pending``（函数体内导入，调用时取模块属性）；
+    原先替换已不被调用的 ``propagation.publish_events`` ⇒ 两条用例在 ``import_event_outbox`` 缺表上报错
+    （spec formula-management-repair-closure）。
+    """
     sent: list[dict] = []
 
-    async def _publish(evts, *, domain, source, token=None):
-        sent.append({"events": list(evts), "domain": domain, "source": source})
-        return len(sent[-1]["events"])
+    async def _record(db, *, domain="", events=(), source="", publish_id=None):
+        sent.append({"events": list(events), "domain": domain, "source": source})
+        return []
 
-    monkeypatch.setattr("app.services.formula_settings.propagation.publish_events", _publish)
+    async def _publish(db):
+        return {"queued": 0}
+
+    monkeypatch.setattr("app.services.formula_settings.outbox.record_changes", _record)
+    monkeypatch.setattr("app.services.formula_settings.outbox.publish_pending", _publish)
     return sent
 
 

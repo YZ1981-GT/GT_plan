@@ -132,17 +132,6 @@ def _custom_fn_state(_ctx: Ctx) -> tuple[bool, bool]:
     return _CUSTOM_FN in get_custom_registry(), formula_engine._REGISTRY.get(_CUSTOM_FN) is not None
 
 
-def _check_custom_fn(ctx: Ctx, _identity: str, response: Response) -> None:
-    from app.services.formula_custom_functions import unregister_custom_function
-
-    try:
-        assert response.json() == {"registered": True, "name": _CUSTOM_FN}, response.text
-        assert _custom_fn_state(ctx) == (True, True)
-    finally:
-        unregister_custom_function(_CUSTOM_FN)  # 进程内全局注册表：放行用例结束即注销
-    assert _custom_fn_state(ctx) == (False, False)
-
-
 async def _prep_report_execute(session, world: World) -> Req:
     pid = await _with_year(session, world)
     return Req("POST", "/api/report-config/execute-formula", json={"project_id": str(pid), "year": YEAR,
@@ -441,10 +430,11 @@ RECIPES_R2: tuple[RecipeR2, ...] = (
              _prep_batch, "get_current_user + 体内 assert_project_permission(readonly)", check=_ok_json, gate=_PERM),
     RecipeR2("debug", "POST", "/api/formula/debug", _routers("formula_debug"), _RO_PLUS, _RO_DENIED, _prep_debug,
              "get_current_user + 体内 assert_project_permission(readonly)", check=_ok_json, gate=_PERM),
-    RecipeR2("custom-function", "POST", "/api/formula/custom-functions", _routers("formula"), frozenset({"admin"}),
-             {i: c for i, c in _LOGGED_IN_DENIED.items() if i != "admin"}, _prep_custom_fn,
-             "require_role(['admin'])（全局能力，无项目维度）", check=_check_custom_fn, role_first=True,
-             state=_custom_fn_state),
+    # spec formula-management-repair-closure R3.3：写接口停用 ⇒ 管理员过了角色门也只得 501、注册表不变（无放行身份）
+    RecipeR2("custom-function", "POST", "/api/formula/custom-functions", _routers("formula"), frozenset(),
+             {**{i: c for i, c in _LOGGED_IN_DENIED.items() if i != "admin"}, "admin": 501}, _prep_custom_fn,
+             "require_role(['admin'])（全局能力，无项目维度）；管理员过门后 501：自定义函数只存进程内存，写接口停用",
+             role_first=True, state=_custom_fn_state),
     RecipeR2("report-execute", "POST", "/api/report-config/execute-formula", _routers("report_config"), _RO_PLUS,
              _RO_DENIED, _prep_report_execute, "get_current_user + 体内 assert_project_permission(readonly)",
              check=_check_report_execute, gate=_PERM),

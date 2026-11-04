@@ -38,19 +38,22 @@ async def api(monkeypatch):
             await db.commit()
             ids = {"global": g.id, "conflict_row": pr.id}
         events: list = []
+        sent = events  # 打桩函数的参数也叫 events，会遮蔽外层清单 —— 经别名写入
 
         async def fake_record_changes(db, *, domain="", events=(), source="", publish_id=None):
-            pass  # S4: record_changes 打桩，不实际入队
+            # S4 之后写入方登记变化走 record_changes（入队 + 标过期），这里只记下「哪些项目的哪些公式位变了」。
+            # 🔴 S4 曾把桩写成 pass：断言 api["events"] 的用例因此恒得空清单（spec formula-management-repair-closure）
+            sent.extend(dict(ev) for ev in events)
 
         async def fake_publish_pending(db):
             return {"queued": 0}  # S4: publish_pending 打桩
 
-        for mod in (report_config, report_config_baseline):
+        import app.services.formula_settings.outbox as fs_outbox
+
+        # 历史回滚端点在函数体内从 outbox 模块导入（调用时取模块属性），在模块上打桩
+        for mod in (report_config, report_config_baseline, fs_outbox):
             monkeypatch.setattr(mod, "record_changes", fake_record_changes)
             monkeypatch.setattr(mod, "publish_pending", fake_publish_pending)
-        import app.services.formula_settings.propagation as prop
-
-        # S4: propagation.publish_events 保留给旧路径，不需要在路由级打桩
         app = FastAPI()
         for r in (report_config.router, report_config_baseline.router, formula_audit_log.router):
             app.include_router(r)

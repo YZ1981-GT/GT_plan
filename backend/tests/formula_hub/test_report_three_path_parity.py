@@ -230,6 +230,11 @@ async def test_each_report_path_writes_one_queryable_run_and_row_provenance(path
         assert run.operation_id is None, "单体报表运行不挂合并 operation"
         from app.services.report_freshness import CALC_VERSION
         assert run.calc_version == CALC_VERSION, "共享运行表（V246）calc_version 列是整数，写 'report:N' 在 PG 上 DataError"
+        # 状态在 V246 词表内；失败行数与原因写进 failed_rows / error（spec formula-management-repair-closure R0.1）
+        from app.models.report_generation_models import REPORT_RUN_STATUSES
+        assert run.status in REPORT_RUN_STATUSES and run.finished_at is not None
+        assert run.failed_rows >= 4, run.failed_rows  # DIV0 / A / T / S（全量另有 NEW）
+        assert "除数为 0" in (run.error or "") and "引用行未就绪" in (run.error or ""), run.error
         rows = list((await world.session.execute(
             sa.select(FinancialReport).where(
                 FinancialReport.project_id == world.project_id,

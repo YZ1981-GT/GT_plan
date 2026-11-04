@@ -293,9 +293,11 @@ async def _rows_state(session, scenario: Scenario) -> dict[str, str]:
 
 @pytest.mark.pg_only
 def test_resolve_endpoint_revision_contract_pg(monkeypatch: pytest.MonkeyPatch) -> None:
-    _assert_stubbable(formula_settings_router, "publish_events")
-    events = ServiceStub(target="app.routers.formula_settings.publish_events", returns=0)
-    monkeypatch.setattr(formula_settings_router, "publish_events", events)
+    # S4 之后路由在事务内 record_changes（入队 + 标过期，真实运行、随用例事务回滚），提交后 publish_pending 交后台投递：
+    # 数投递调用次数（原先数已删除的 publish_events，该用例一直 AttributeError —— spec formula-management-repair-closure）
+    _assert_stubbable(formula_settings_router, "publish_pending")
+    events = ServiceStub(target="app.routers.formula_settings.publish_pending", returns={"queued": 0})
+    monkeypatch.setattr(formula_settings_router, "publish_pending", events)
     with _endpoint() as (client, session, api):
         def call(fn, *args):
             return client.portal.call(fn, session, *args)

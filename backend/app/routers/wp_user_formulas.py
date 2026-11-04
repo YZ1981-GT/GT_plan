@@ -53,6 +53,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.deps import authorize_wp_edit, authorize_wp_read, get_current_user, get_db
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpFormula
+from app.services.formula_settings import wp_changes
 from app.services.wp_formula_service import (
     FormulaVersionConflict,
     FormulaVersionRequired,
@@ -435,6 +436,7 @@ async def update_user_formulas(
     # 复用既有 `wp_formula_service.save()`（已具备 upsert / definition_version 递增 /
     # definition_hash / lifecycle_state / 悬空引用校验 / 归属校验），**不新写 upsert**。
     save_issues: list[dict] = []
+    changed_cells: list[tuple[str, str]] = []  # 有效定义变了的格（R2：登记到公式设置同步内核）
     for cell_key, formula in payload.formulas.items():
         sheet_name, target_cell = split_cell_key(cell_key)
         if not formula:
@@ -449,6 +451,8 @@ async def update_user_formulas(
                 )
             ).scalar_one_or_none()
             if existing_row is not None:
+                if wp_changes.is_project_layer(existing_row):
+                    changed_cells.append((sheet_name, target_cell))
                 await db.delete(existing_row)
             continue
 
@@ -461,6 +465,7 @@ async def update_user_formulas(
                 )
             )
         ).scalar_one_or_none()
+        old_exec = wp_changes.exec_def(existing_row)  # 普通值快照：save 会 refresh 同一 ORM 对象
         try:
             saved, issues = await wp_formula_service.save(
                 db,
@@ -498,6 +503,8 @@ async def update_user_formulas(
             ) from exc
         if saved is None:
             save_issues.extend(issues or [])
+        elif wp_changes.changed(old_exec, wp_changes.exec_def(saved)):
+            changed_cells.append((saved.sheet_name, saved.target_cell))
 
     if save_issues:
         # 与既有 422 语义一致：整批拒绝，不留半落状态
@@ -583,7 +590,12 @@ async def update_user_formulas(
                 },
             })
 
+    # spec formula-management-repair-closure R2：同事务登记（标过期 + 入队），提交后投递
+    if changed_cells:
+        await wp_changes.record_cells(db, project_id=wp.project_id,
+                                      wp_code=await wp_changes.wp_code_of(db, wp.wp_index_id), cells=changed_cells)
     await db.commit()
+    await wp_changes.publish(db)
 
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
@@ -634,6 +646,7 @@ async def restore_preset_formula(
         wp.parsed_data = parsed_data
         sa.orm.attributes.flag_modified(wp, "parsed_data")
 
+    restored_cell = (sheet_name, target_cell) if wp_changes.is_project_layer(row) else None
     if row is not None:
         # `original_preset` 在表侧不存，回落遗留键（无则 None）
         removed.setdefault("formula", row.expression)
@@ -663,7 +676,11 @@ async def restore_preset_formula(
         },
     })
 
+    if restored_cell:  # R2：本项目层删了这一格 ⇒ 有效定义回到全局 / 预设，同事务登记
+        await wp_changes.record_cells(db, project_id=wp.project_id,
+                                      wp_code=await wp_changes.wp_code_of(db, wp.wp_index_id), cells=[restored_cell])
     await db.commit()
+    await wp_changes.publish(db)
 
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 

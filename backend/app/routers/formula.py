@@ -69,44 +69,37 @@ async def list_custom_functions(redis=Depends(get_redis), current_user: User = D
     return engine.list_custom_functions()
 
 
+#: 自定义函数写接口停用说明（spec formula-management-repair-closure R3.3）
+_CUSTOM_FUNCTION_NOT_PERSISTED = {
+    "error_code": "FORMULA_CUSTOM_FUNCTION_NOT_PERSISTED",
+    "message": "自定义函数暂不支持新增或删除：注册只存在当前服务进程的内存里，重启即丢失、多个进程之间互不相同，"
+               "已停用写入。需要时请在公式里直接写完整表达式。",
+}
+
+
 @router.post("/custom-functions")
 async def register_custom_function(
     body: RegisterFunctionRequest,
-    redis=Depends(get_redis),
-    # Task 5.3 / ADR-FMC-06：自定义函数是**全局**能力（注册后对所有项目/用户生效，
-    # FormulaEngine 的自定义函数表无项目维度）。此前仅 `get_current_user` =
-    # 任意登录用户可注册/篡改全局函数、污染所有项目取数 → 坐实「全局写无 admin 门控」。
-    # 收紧为 admin-only：非 admin 注册返回 403（require_role 内层 get_current_user 判角色）。
+    # Task 5.3 / ADR-FMC-06：自定义函数是**全局**能力（无项目维度）⇒ 门控保持 admin-only（非 admin 403）。
     current_user: User = Depends(require_role(["admin"])),
 ):
-    """注册自定义公式函数（全局能力，限 admin）"""
-    engine = FormulaEngine(redis_client=redis)
-    try:
-        return engine.register_custom_function(
-            name=body.name,
-            expression=body.expression,
-            description=body.description,
-            param_names=body.param_names,
-        )
-    except ValueError as e:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail=str(e))
+    """注册自定义公式函数 —— 停用（501）。
+
+    注册表 ``formula_custom_functions._custom_registry`` 是进程内 dict：没有落库、重启丢失、多 worker 各自一份，
+    而前端没有任何入口 ⇒ 写进去的函数在别的进程里不认识，同一公式时好时坏（spec formula-management-repair-closure
+    R3.3）。服务层函数保留（单测与内部调用不受影响）；落库方案另立需求。
+    """
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=_CUSTOM_FUNCTION_NOT_PERSISTED)
 
 
 @router.delete("/custom-functions/{name}")
 async def unregister_custom_function(
     name: str,
-    redis=Depends(get_redis),
     # Task 5.3 / ADR-FMC-06：注销同注册，全局写操作限 admin（见上）。
     current_user: User = Depends(require_role(["admin"])),
 ):
-    """注销自定义函数（全局能力，限 admin）"""
-    engine = FormulaEngine(redis_client=redis)
-    removed = engine.unregister_custom_function(name)
-    if not removed:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail=f"自定义函数 '{name}' 不存在")
-    return {"name": name, "removed": True}
+    """注销自定义函数 —— 停用（501），原因同注册。"""
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=_CUSTOM_FUNCTION_NOT_PERSISTED)
 
 
 @router.post("/execute", response_model=FormulaResult)

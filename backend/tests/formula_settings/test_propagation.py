@@ -5,6 +5,7 @@ import uuid
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
 import sqlalchemy as sa
 
 from app.models.base import ProjectStatus
@@ -141,7 +142,10 @@ async def test_recalc_failure_keeps_stale_marks_and_logs_degraded(monkeypatch):
     """R8.2：重算整体失败（抛异常）时，闭包行的过期标记仍落库可见；记降级日志；不发 REPORTS_UPDATED。
 
     修复前标过期与重算同一事务，重算一抛整笔回滚 ⇒ 过期标记一起消失，报表看起来「已是最新」。
+    spec formula-management-repair-closure R1.1：随后抛 ``PropagationIncomplete``（此前返回 error 字典，
+    投递照样标 published ⇒ 失败不重试也不可见）。
     """
+    from app.services.formula_settings.propagation import PropagationIncomplete
     from app.services.event_bus import event_bus
     from app.services.report_engine import ReportEngine
     import app.services.stale_degraded_logger as sdl
@@ -161,10 +165,12 @@ async def test_recalc_failure_keeps_stale_marks_and_logs_degraded(monkeypatch):
         pid = await _seed_one(factory)
         propagation.set_session_factory(factory)
         try:
-            out = await propagation.propagate_report(pid, 2025, ["balance_sheet:BS-001"])
+            with pytest.raises(PropagationIncomplete) as caught:
+                await propagation.propagate_report(pid, 2025, ["balance_sheet:BS-001"])
         finally:
             propagation.set_session_factory(None)
-        assert (out["marked"], out["recalculated"]) == (2, None) and "注入" in out["error"]
+        assert caught.value.domain == "report" and caught.value.detail["marked"] == 2
+        assert "注入" in str(caught.value) and "将自动重试" in str(caught.value)
         assert await _stale_flags(factory) == {"BS-001": True, "BS-002": True}
     assert published == []
     assert [d["source"] for d in degraded] == ["formula_settings:report_recalc"]

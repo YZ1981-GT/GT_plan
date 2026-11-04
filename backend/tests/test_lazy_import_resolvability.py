@@ -58,7 +58,8 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 # - ChecklistResponse ×2（原 ×3，adjustments.py 那条 2026-10-31 随协作回写删除）：`checklist_responses` 表**无 ORM 模型**（SQLAlchemy 注册表
 #   权威确认，该表走裸 SQL）⇒ 需新建模型或改裸 SQL
 # - TbAccount / TbAdjustment：全仓无定义，同模块无相近名
-# - save_formula_batch：同上
+# - save_formula_batch（2026-11-03）：✅ 旧 Excel 公式导入下线（导入返回 410），调用它的 ``_import_formulas`` 已删除，
+#   已从基线删除（spec formula-management-repair-closure R3.2）。
 # - populate_parsed_data（2026-10-22）/ static_sheet_payload_for_adjudication ×3（2026-10-07）：✅ 已修，已从基线删除。
 # - 末 8 条（2026-10-24，formula-fetch-followup 6.6）：包在 ``try / except Exception`` 里、原先被豁免扫描；该段业务代码
 #   每次执行都在 import 处失败、只留一条日志。目标不存在（6 条）或在别的模块且取的列待核（D4 / 时间线 2 条）。
@@ -73,7 +74,6 @@ _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/services/wp_scripts/registry.py", "app.services.tsj_prompt_service", "get_review_points"),
     # adjustments.py 的 ChecklistResponse（协作确认回写，从未执行）：2026-10-31 随回写一并删除
     # （spec adjustment-hall-entry-review-closure 需求 6.3），已从基线删除。
-    ("app/routers/import_templates.py", "app.services.cell_formula_evaluator", "save_formula_batch"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAccount"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAdjustment"),
     ("app/services/m8_general_risk_reserve_service.py", "app.models.audit_platform_models", "ChecklistResponse"),

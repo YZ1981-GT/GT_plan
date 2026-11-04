@@ -115,7 +115,19 @@ def test_report_provenance_migration_matches_model_surface():
     assert "CREATE TABLE IF NOT EXISTS report_generation_run" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS run_id" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS provenance" in migration
-    assert "DROP TABLE IF EXISTS report_generation_run" in rollback
+    # 共享表与两列由排在前面的 V246 建立（V251 的同名语句是空操作），归 R246 回滚；R251 只撤销 V251 实际新增的
+    # 三个对象，不能把 V246 的表 / 列一起删掉（spec formula-management-repair-closure R0.1）
+    for owned_by_v246 in ("DROP TABLE IF EXISTS report_generation_run", "DROP COLUMN IF EXISTS run_id",
+                          "DROP COLUMN IF EXISTS provenance"):
+        assert owned_by_v246 not in rollback, owned_by_v246
+    for added_by_v251 in ("idx_financial_report_project_year_run", "fk_financial_report_run",
+                          "idx_report_generation_run_project_year_started"):
+        assert added_by_v251 in migration and added_by_v251 in rollback, added_by_v251
+    v246 = (ROOT / "migrations" / "V246__report_generation_run_and_consol_artifact.sql").read_text(encoding="utf-8")
+    r246 = (ROOT / "migrations" / "R246__rollback_report_generation_run_and_consol_artifact.sql").read_text(
+        encoding="utf-8")
+    assert "CREATE TABLE IF NOT EXISTS report_generation_run" in v246
+    assert "DROP TABLE IF EXISTS report_generation_run" in r246
     push_migration = (ROOT / "migrations" / "V248__formula_push_provenance.sql").read_text(encoding="utf-8")
     push_rollback = (ROOT / "migrations" / "R248__rollback_formula_push_provenance.sql").read_text(encoding="utf-8")
     assert "formula_push_state ADD COLUMN IF NOT EXISTS provenance" in push_migration

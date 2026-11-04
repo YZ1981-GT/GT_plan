@@ -467,6 +467,65 @@ async def _write_rows(db: AsyncSession, tpl: FormulaTemplate, effective, current
     return {d: await template_rows(db, tpl.id, d) for d in domains}
 
 
+async def keep_template_baseline(db: AsyncSession, tpl: FormulaTemplate, *, expected_version: int | None,
+                                 items: list[Mapping[str, Any]], user_id: uuid.UUID | None) -> dict[str, Any]:
+    """「保留模板」：模板定义不动，只把这些公式位的基线换成当前全局（spec formula-management-repair-closure R6.2）。
+
+    之后「全局已变」提示消失。不升模板版本、不写版本记录、不碰订阅项目（模板定义没变，订阅方的有效定义不变）。
+    并发：模板版本（``expected_version``）+ 每个公式位当时看到的全局版本（``expected_global_version``；全局已删为
+    ``None``）都要对上，否则 409 —— 全局在提示之后又改了，用户是对着旧的全局做的决定。全部或全不（只 flush）。
+    """
+    await _lock_template(db, tpl.id)
+    await db.refresh(tpl)
+    if expected_version is None:
+        raise VersionRequired("保留模板必须带模板当前版本号，请刷新后重试")
+    if int(expected_version) != tpl.version:
+        raise VersionConflict("模板已被他人修改，请刷新后重试",
+                              detail={"expected_version": expected_version, "current_version": tpl.version})
+    if not items:
+        raise FormulaSettingError("请选择要保留模板的公式位")
+    rows: dict[str, dict[str, FormulaSetting]] = {}
+    globs: dict[str, dict[str, SlotRecord]] = {}
+    checked: list[tuple[str, str, FormulaSetting, SlotRecord | None]] = []
+    for item in items:  # 先全部校验，任何一处对不上都不改任何行
+        domain, slot = str(item.get("domain") or ""), str(item.get("slot_key") or "")
+        if domain not in (tpl.domains or []):
+            raise FormulaSettingError(f"模板不含该公式域：{domain}")
+        if domain not in rows:
+            scope = global_scope(domain, tpl.applicable_scope)
+            if scope is None:
+                raise FormulaSettingError(f"模板的适用范围不适用该公式域：{domain}")
+            rows[domain] = await template_rows(db, tpl.id, domain)
+            globs[domain] = await get_store(domain).list_global(db, scope)
+        row = rows[domain].get(slot)
+        if row is None:
+            raise NotFound(f"模板里没有公式位 {slot}")
+        now = globs[domain].get(slot)
+        now_version = now.version if now is not None else None
+        if item.get("expected_global_version") != now_version:
+            raise VersionConflict(f"「{row.slot_label or slot}」的全局定义已再次变化，请刷新后重新确认",
+                                  detail={"slot_key": slot, "expected_global_version": item.get("expected_global_version"),
+                                          "current_global_version": now_version})
+        checked.append((domain, slot, row, now))
+    kept: list[dict[str, Any]] = []
+    for domain, slot, row, now in checked:
+        old_base, old_base_version = row.base_definition, row.base_version
+        row.base_definition = {k: v for k, v in now.definition.items() if k != "_structure"} if now else None
+        row.base_version, row.base_origin = (now.version, "global") if now else (None, None)
+        row.updated_by, row.updated_at = user_id, _now()
+        kept.append({"domain": domain, "slot_key": slot, "old_base": old_base, "old_base_version": old_base_version,
+                     "new_base": row.base_definition, "new_base_version": row.base_version})
+    await db.flush()
+    await audit_global(db, user_id=user_id, domain=",".join(sorted(rows)), scope=tpl.applicable_scope or "",
+                       action="formula.template_baseline_kept", resource_id=tpl.id,
+                       details={"template_id": str(tpl.id), "version": tpl.version,
+                                "changes": [change_entry(k["domain"], k["slot_key"], k["old_base"], k["new_base"])
+                                            for k in kept]})
+    return {"template_id": str(tpl.id), "version": tpl.version,
+            "kept": [{"domain": k["domain"], "slot_key": k["slot_key"], "base_version": k["new_base_version"]}
+                     for k in kept]}
+
+
 async def refresh_subscription(db: AsyncSession, project_id: uuid.UUID, domain: str,
                                template_id: uuid.UUID | None) -> None:
     """暂缓的订阅处理完全部模板待确认后跟上模板当前版本（处理待确认时调用）。"""
