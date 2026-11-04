@@ -50,11 +50,16 @@
 
 ## 第三阶段　D1 后唯一写方
 
-- [ ] 6. 章节 × 字段唯一写方强制（R1b，ADR-WOS-04，依赖 D1）
+- [x] 6. 章节 × 字段唯一写方强制（R1b，ADR-WOS-04，依赖 D1）
   - D1 未拍板时保持 `[ ]`，不得以默认意见代替用户决策；先把决议写入 design §11.10，再生成矩阵。
   - 矩阵键至少为 `(template_type, note_section, table_key, field_key)`，值为唯一自动 writer 和 manual/locked 策略；未知矩阵项 fail-closed。
   - 非所有者自动写入跳过该字段但继续合法字段，记录结构化 `blocked_write`，响应带 `blocked_writes`；手工入口仍需权限/项目锁，自动 writer 不得覆盖 locked 单元格。
   - Verify：每个受限 writer 至少一条“该字段被拒、其他字段照写”用例；矩阵缺行、错误 template_type、locked/manual 变异均须红。
+  - D1（2026-11-04 用户「按建议来」）：已接「从底稿拉取 / 离屏同步」的章节由后端取数链路唯一写入，其余章节暂留前端同步，加前后端对拍守卫；口径见 design §11.10 与 §13。
+  - Evidence（2026-11-04，详见 design §13.8）：矩阵 `backend/data/note_write_ownership_matrix.json`（146 章 608 条，其中推送条目 316；生成器 `--check` 幂等、推送目标出域即拒绝生成）+ 判定 `note_write_ownership.WriteGate`；8 个受限 writer 各有「该字段被拒、其他字段照写」用例（`tests/formula_writer_ownership/` 37 例）+ 前后端对拍 5 例；locked / manual 统一由判定第 1、2 步处理（全域、所有条目同一策略，不进 `blocked_writes`），底稿披露容器接管的 manual 策略写在矩阵 `manual_policy`。候选（远端头 98332962c + 本任务）逐节点 589 个测试文件 13387 节点，候选新增红 0、修复 49（远端两次前移后各重跑一次；新头上 1 个离屏刷新用例替身缺新字段已改用真实报告类型，2 条合并用例的合计期望随远端合并改动按明细重算）；S3 遗留 48 个红用例（测试替身没跟上统一清过期）一并修好；真库推送预演候选与 HEAD 逐项 373 条相同、拒写 0；前端 13 个 spec 候选新增红 0、区域 vue-tsc added 0、ESLint / Ruff 新增 0；磁盘变异 46 条全红 + 阴性对照 3 条绿、逐字节还原；浏览器（共享库零写）刷新提示与披露 Tab 同步提示均按预期。
+  - 推送前复核（2026-11-04）：远端两次前移（→ cad390dcb / v1.0.116 → 2dbc68ea0，后者大改 workpaper_sync 写方清册与若干全仓扫描守卫），两次都 rebase 无冲突（`range-diff` 四条补丁逐条 `=`、与远端改动文件零交集），并在最终头上整套重跑：后端 676 个测试文件逐节点基线 15934 / 506 红、候选 15973 / 456 红，候选新增红 0、新增 39 节点全绿、修复 50；前端 158 个 spec 候选新增红 0；区域 vue-tsc / ESLint / Ruff 新增 0；46 条磁盘变异全红 + 3 条阴性对照全绿、逐字节还原；矩阵 `--check`、暂存树自洽 2 门、行数门、离屏执行器新鲜度通过；浏览器走查 6/6 复跑通过。
+  - 两边都红但形态变了的用例（逐条交代，详见 design §13.8）：`test_wp_disclosure_sync_html_audit::test_audit_log_contains_correct_payload`（本轮替身修复让它越过 `FakeNote` 缺 `year`，露出原有的审计日志口径问题）、`test_formula_push_note_skip::TestTotalRecomputeNeedsANumber` 两例（用例里的章节 × 表名是臆造组合，被 fail-closed 拒写）。另反向核对 318 个「真实规则 × 准则 × 字段」组合全部在矩阵里且登记了规则号，fail-closed 不会打到任何真实规则。
+  - 合入后：离屏披露 Node 执行器须按 `BUILD_HINT` 重新构建（新鲜度核对按源文件 sha256，本任务改了它打包的三个前端文件）。
 
 ## 第四阶段　回归与收尾
 

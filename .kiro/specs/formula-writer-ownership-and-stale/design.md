@@ -268,7 +268,7 @@ S4 已完成的代码不在本 spec 中重新设计，但 S3 实施必须完成�
 
 | # | 事项 | 当前状态 |
 |---|---|---|
-| D1 | 附注权威源按章节交接：前端同步 vs 公式管理/底稿拉取 | 未拍板；只允许 R1a，禁止 R1b 强制 |
+| D1 | 附注权威源按章节交接：前端同步 vs 公式管理/底稿拉取 | 2026-11-04 用户拍板「按建议来」：已接「从底稿拉取 / 离屏同步」的章节由后端取数链路唯一写入，其余章节暂留前端同步，加前后端对拍守卫。可执行口径与矩阵见 §13（任务 6） |
 | D2 | 历史 227 行无来源 stale 是否回填 | 默认不回填，显示「来源未记录」 |
 | D3 | 试算表保存后是否要求即时 GET 反读 | 本 spec 默认不要求；页面刷新读回为验收口径 |
 | D4 | `consol_note_data` 与底稿预填是否新增来源列 | 不在本 spec，另立迁移需求 |
@@ -324,3 +324,123 @@ S4 已完成的代码不在本 spec 中重新设计，但 S3 实施必须完成�
 - 附注就绪度原只识别 4 个来源且其余都显示“待刷新”：新增 16 个来源映射，与后端 `StaleSource/STALE_SOURCE_LABELS` 逐成员对拍；刷新提示接入 recomputed / failed / cleared 结果集合。
 
 浏览器首次启动时发现的 5 个 batch-project 缺失 service 已由并发提交 `86005b6b6` 连同模型/测试正式补入，未并入 S3 提交。该提交后干净树仍有两处启动断裂，本轮按用户“逐一修复”收口：`cd0a8fe1f` 删除绕过配置驱动复核状态机的 `pm_service.BatchReviewService` 时漏删 `pm_dashboard` 旧重复端点，现移除旧端点后 `app.main` 可干净导入，运行期 `/api/projects/{project_id}/batch-review` 唯一指向 `app.routers.batch_review.batch_review`；`audit_log.py` 调用缺失的 `_redact_if_display_prefs` 导致所有非跳过写请求在审计收尾时报 NameError，现补只保留 revision + changed_fields 的脱敏函数及 3 个测试。全量 route shadow 守卫仍有 14 条父提交预存红，与本轮两处修复无关，未扩散处理。
+
+## 13. D1 拍板后的唯一写方矩阵（任务 6，2026-11-04）
+
+### 13.1 拍板内容与可执行口径
+
+用户 2026-11-04 拍板 D1「按建议来」。落成以下口径（本节是 ADR-WOS-04 的执行依据，§2 原文「矩阵按拍板结论设计」即指本节）：
+
+- **交接章节（矩阵治理域）**：`note_workpaper_sync_registry.json` 按准则登记的章节（`note_readiness_service.registry_sections`：主章节 + `{准则}_sections`）。现算上市 73、国企 73，两套章节号不相交；78 个底稿编码全部有离屏 provider，从底稿拉取覆盖全部登记章节 ⇒ 登记章节全部算「已接」。域外章节不受矩阵约束、保持现状，即「其余章节暂留前端同步」。运行时的域取自登记表，不取自矩阵文件：矩阵漏生成某章时，该章的自动写入一律被拒（fail-closed），由生成器 `--check` 守卫在 CI 先报红。
+- **「后端唯一写方」的落点**：域内章节的数值格只由后端取数链路写入。链路内的分工沿用 `note-pull-header-formula-closure` ADR-2 与 `note-pull-followup-closure` ADR-3，本任务不改分工，只把它从约定变成强制：
+  - 审定主表金额（附注推送规则的目标表 × 规则字段）归 `formula_push`（试算表审定数）。推送已写定的格（推送状态 `auto`、规则在用）其他自动写方不得改；推送还没写定前，该格所在容器的基础写方可以临时填写，推送一旦写定即接管（ADR-3 的交接）。
+  - 底稿披露容器（`sub_table_data`；章节 `_source` 为 workpaper / workpaper_html 且至少有一张表时生效，与读时投影 `project_sub_tables` 同判据）归 `workpaper_sync`。底稿披露 Tab 自动同步与离屏同步是同一写方：同一 builder、同一端点；HTML 入口 `workpaper_html_sync` 是同一写方的另一个入口。
+  - 模板容器（`_tables` / 顶层 `rows`；底稿披露容器不生效时）归 `binding_refill`（模板绑定取数）。`update_note_values`（报表更新事件）与 `generate_notes`（生成 / 重生成的合并）是同一写方的另两个触发入口。
+  - 域内的非所有者：`report_sync`（报表同步附注）、`formula_runtime_apply`（公式运行）；模板身份的写方写已被底稿披露容器遮住的 `_tables` 也被拒（原来这类写入用户看不见，却计入「已更新」）。
+- **底稿披露 Tab 自动同步不停用。** 它与离屏同步是同一写方，停用只会让底稿改动等到附注刷新才进附注，写方数量不变。需要停用时另行拍板。
+
+### 13.2 矩阵
+
+- 文件 `backend/data/note_write_ownership_matrix.json`，由 `backend/scripts/gen/gen_note_write_ownership_matrix.py` 生成；输出不含时间戳（内容不变则字节不变），`--check` 漂移时退出 2 并点名。输入是登记表章节与 `formula_push.engine.load_push_rules()` 的附注规则；推送规则目标不在登记章节内时生成器拒绝生成（与 D1 矛盾，须先拍板）。推送规则的目标不随项目变（项目层只能改公式与启停），所以矩阵可以静态生成；停用的规则在运行时不再拥有已写定的格。
+- 键 `(template_type, note_section, table_key, field_key)`：
+  - 基础条目每章两条：`(准则, 章节, "*", "table.sub_table_data") → workpaper_sync`、`(准则, 章节, "*", "table.rows.values") → binding_refill`；
+  - 推送条目：`(准则, 章节, 规则表名, "table.cell:<字段>") → formula_push`，`scope = pushed_cells`，`rules` 列出来源规则。推送写定前，该格按所在容器的基础条目判定（基础写方可临时填写）。字段即推送规则字段：底稿披露容器里是业务键，模板容器里是按表头认出的列（`note_writer.legacy_value_keys`），两处同名。规则表名取 `resolve_table(准则)`。
+  - 现算：146 章 × 2 条基础条目，加 316 条推送条目（86 条附注规则覆盖 131 章）。
+- 写方身份：`workpaper_html_sync ≡ workpaper_sync`，`update_note_values ≡ generate_notes ≡ binding_refill`，登记在矩阵的 `identity` 里；守卫要求身份只能指向登记表里的 writer。
+
+### 13.3 判定 `note_write_ownership.WriteGate`
+
+一次写入按以下顺序判定（前一步拒绝即不往下）：
+
+1. 单元格 `locked` 或整节人工覆盖（`_manual_override`）⇒ 拒（`locked`）；全域生效，不论章节是否在治理域。
+2. 单元格 `manual` ⇒ 拒（`manual`）；`refill_sections` 修复旧生成器占位格的例外（`_is_legacy_auto_cell`）不变。
+3. 写方是 `formula_push`：只能写矩阵声明的推送条目 `(章节, 规则表名, table.cell:字段)`，没有该条目 ⇒ 拒（`unknown_entry`），不论章节是否在域内（推送按标题改投到另一章、或矩阵缺行，都会落到这里）。
+4. 章节不在治理域 ⇒ 放行。
+5. 写模板容器而该章底稿披露容器生效 ⇒ 拒（`inactive_container`）。
+6. 该格属于推送条目且已由推送写定 ⇒ 拒（`pushed_cell`，所有者 `formula_push`）。
+7. 查基础条目：没有 ⇒ 拒（`unknown_entry`）；写方身份等于所有者 ⇒ 放行；否则拒（`owner_mismatch`）。
+
+被拒的字段不写，其他字段照写。第 3~7 步的拒绝记结构化日志 `note_write_blocked`（`extra["blocked_write"]`），并进响应的 `blocked_writes[{section, table, field, writer_id, owner_id, reason_code, reason, row}]`。第 1、2 步是现有的「保留人工 / 锁定」口径，不进 `blocked_writes`（推送照旧记 `keep_manual` / `keep_locked`）。
+
+判定用的准则取各写方本来就用来选章节的那一个，不另起口径：公式推送用取数上下文的 `template_type`；底稿披露同步用请求的 `current_standard`；HTML 入口用章节记下的 `_current_standard` / `source_template`，都没有时用项目准则；模板绑定三个入口用引擎的 `_get_active_template_type`（生成用请求的准则）；报表同步与公式运行用附注记录自己的 `_current_standard` / `source_template`（不查库）。两套准则在治理域内的章节号不相交（上市 五、N / 国企 八、N），准则取错时章节不在域内，推送全部按未登记拒绝，其余写方失去交接保护；对应的用例与磁盘变异见 §13.7。
+
+**manual 策略（底稿披露容器接管）**：域内章节从未由底稿同步过（`table_data` 没有 `_last_sync_wp_id`）、模板表格里已有人工 / 锁定且有值的格（`note_workpaper_pull_service.manual_value_count > 0`）⇒ `workpaper_sync` 整节不写，返回 `skipped=true, reason="manual_values_never_synced"`。这与离屏同步 `sectionGuard` 是同一判据、同一组输入；原来只有离屏同步在前端拦，底稿 Tab 自动同步照写，现在后端两条路都拦。真库现算受影响 1 章（1 个项目、2 格）。
+
+### 13.4 接入点（受限 writer 8 个）
+
+| writer | 接入位置 | 被拒时 | 回报 |
+|---|---|---|---|
+| `formula_push` | `note_total_push.push_note_cell` / `push_note_total`（`_push_note` 把判定挂在定位到的表上） | 该格记 `blocked` 动作，不写 | `RunResult.blocked_writes`（进 `summary()` / `detail()`）；取数结果 `push.blocked_writes` 与逐章 `blocked` |
+| `workpaper_sync` / `workpaper_html_sync` | manual 策略；`note_push_ownership.reapply_pushed_cells` 只为矩阵声明的推送条目恢复推送值 | 整节不写 / 恢复推送值 | 响应 `blocked_writes`（`push_kept` 照旧保留） |
+| `binding_refill` | `refill_sections` 逐格（先算推送写定格） | 跳过该格 | `RefillReport.blocked_writes` → 三个刷新端点 |
+| `update_note_values` / `generate_notes` | 三态合并之后按推送写定格恢复旧值 | 恢复旧值 | `engine.blocked_writes`；生成端点响应带上 |
+| `report_sync` | `_apply_report_values` 逐格 | 跳过 | 结果 `blocked_writes` |
+| `formula_runtime_apply` | `NoteMutationAdapter.apply_many` 逐目标 | 不写、不进已应用清单 | `adapter.blocked_writes` 与日志 |
+
+### 13.5 不进矩阵的写方（登记 `role`）
+
+- `manual`：编辑器保存、Excel HTML、三格式、切换格模式、清除公式、恢复自动、AI 采纳 / 草稿确认 / 撤销、交付件正文回写。它们经 `note_edit_gate`（归档 423 / 成员 / EQCR / `note:edit` / 合并锁）放行后写入，不受矩阵限制。
+- `derived`：附注公式执行器、绑定刷新后的公式二次求值、读时修复空表。它们按表内其他格计算，不是数据来源，沿用现有规则：只写 auto 格、推送拥有格 `kept_push`、底稿投影表只补空格。
+- `structural`：集团基线 / 模板下发、合并模板下推、上年导入 / 继承、离线导入、正文批量、交叉引用、模板重排、结构重对齐、准则切换、自动裁剪、公式设置物化、拉取后记来源。这些是用户发起的整批操作，各有自己的确认流程。
+- `stale`：`stale_mark` / `stale_clear`（R2 状态机）。
+- 守卫：每个 writer 都有 role；role 为 `automatic` 的 writer，其入口函数或入口直接调用的写函数必须引用 `note_write_ownership`（AST 判定）。
+
+### 13.6 前后端对拍
+
+- 后端：矩阵域与登记表章节双向相等；推送条目与附注推送规则目标双向相等；每个域内章节两条基础条目都在；生成器 `--check` 通过。
+- 前后端：矩阵文件附 `manual_policy.cases`（由后端判据算出期望结果）；前端 vitest 用离屏同步的同一判据（导出的 `manualSkipMessage`）跑同一组用例，结论必须逐条一致。同一 spec 断言离屏 provider 编码集合等于矩阵各章 `wp_codes` 的并集。
+- 运行时：推送写定格被拒时，回报带底稿值与保留的推送值（即 `push_kept` 的差值），前端照旧提示「以试算表审定数为准」。
+
+### 13.7 测试与变异
+
+- 每个受限 writer 至少一条「该字段被拒、其他字段照写」用例。
+- 磁盘变异（独立 worktree，SHA-256 恢复）：矩阵删一条推送条目；判定改用错误准则；判定去掉 locked；判定去掉 manual；去掉 manual 策略。全部须红。
+
+### 13.8 实施与验收记录（2026-11-04）
+
+**实施**（接入点见 §13.4，补充实施中定下的细节）：
+
+- 公式推送：判定挂在最终落笔的表上（按标题改投之后的章节、规则表名），拒写记动作 `blocked`，计入 `skipped_count`（健康度的 total = 写入 + 未变 + 保留 + 跳过仍等于项数）；`RunResult.blocked_writes` 进 `summary()` / `detail()`；取数结果带 `push.blocked` / `push.blocked_writes` 与逐章 `blocked`。真库守卫 `test_formula_push_note_skip_pg` 加类别 B（写入归属拒写，棘轮 0），对齐脚本 `realign_project_notes` 的待人工清单含 `blocked`。
+- 底稿披露同步：manual 策略拒绝接管时与口径跳过同形（`skipped=true`、`reason=manual_values_never_synced`），中文原因在 `blocked_writes`；批量严格模式整批回滚时对外原因写中文；HTML 入口章节没记准则时按项目准则。
+- 提示：附注页刷新提示单列一句「公式推送有 N 格不在它负责的范围，未改（如 章节 表「行」）」并按告警显示；离屏同步认 `manual_values_never_synced`；披露 Tab 自己的提示把跳过回执当成功（「已更新…0 行」），全局拦截器 `disclosureSyncPushNotice` 补一句原因与处理建议。处理建议前后端同一句（前端 `utils/noteWriteOwnership.ts` ↔ 后端 `note_write_ownership.MANUAL_TAKEOVER_ADVICE`，对拍守卫读后端源码比对）：「如需改用底稿数据，先在附注编辑器里把人工填写的格恢复为自动」。离屏同步原来的建议是「去底稿附注披露页同步」，那条路现在同样被拒，已改。
+
+**S3 遗留红用例（本轮一并修）**：任务 1 把清过期改走 `stale_state`（一条 UPDATE + flush，不再改内存里的对象）后，11 个测试文件的 48 个用例的测试替身没跟上——`side_effect` 少一条、FakeDB 不认 UPDATE、FakeNote 缺 `year`、断言内存对象 `is_stale`；HEAD 上一直红，任务 7 的回归选集没有覆盖到。本轮只改测试替身与断言口径（改为断言统一入口的那条 UPDATE），生产代码不动；base 套同样的替身修复后 196 个节点两侧同为 1 红（`test_audit_log_contains_correct_payload`：审计日志已改走 `append_audit_log`（ADR-ALC-07/08），该用例仍 patch `AuditLogEntry`，与本 spec 无关，未改）。`integration/test_disclosure_sync.py` HEAD 已 814 行（超行数门、未登记），FakeDB 挪到 `tests/integration/_disclosure_sync_fakes.py` 后 749 行。
+
+**验证**（候选 = 远端头 98332962c + 本任务改动；基线 = 远端头）：
+
+- 后端逐节点（隔离库）：589 个测试文件（附注 / 披露 / 过期 / 公式推送 / 公式运行 / 离屏 / 写入归属），基线 13348 节点 341 红、候选 13387 节点 292 红，候选新增红 0，新增 39 节点全绿，修复 49（S3 遗留 48 + 写方登记守卫 1）。中途远端两次前移（ec777f0fa → 165599b60 → 98332962c，与本任务的代码文件零交集），每次移到新头重跑：165599b60 新加的 `test_note_headless_refresh_protections::test_refresh_steps_called_by_the_executor_skip_manual_cells` 用 `SimpleNamespace` 冒充 `RefillReport`、缺新字段 `blocked_writes`，改用真实 `RefillReport`；98332962c 带来的 6db64f2fa 让三态合并在明细有保留值时按合并后的明细重算合计的自动格——推送写定格在合并里按 locked 语义保留，同样触发，生成 / 报表更新两条用例的合计期初期望随之改为按明细重算（与保留的推送明细一致，正是该提交的用意）。
+- 真库（只读效果）：重药安徽 2025 公式推送预演（引擎在 savepoint 里执行后回滚，外层显式 rollback），候选与 HEAD 逐项 373 条（规则、地址、动作、公式值、当前值）完全相同、拒写 0；真库守卫 3 passed。
+- 前端：vitest 13 个 spec 候选新增红 0（新增 8 例）；区域 vue-tsc added 0（探针 TS2322 报出，排除 OOM 假零）；ESLint 9 个文件 0；Ruff 40 个文件新增 0；行数门 exit 0；离屏披露 Node 执行器（远端头新增）在候选上构建通过，构建清单 576 个源文件比基线多 `utils/noteWriteOwnership.ts`、新鲜度核对通过。
+- 磁盘变异（独立 worktree，SHA-256 逐字节还原）：46 条全红且红在预期用例上（矩阵缺推送 / 基础条目、空章节 / 缺基础条目放行、准则对调与三个入口写死准则、去掉 locked / manual、公式运行不传格模式、manual 策略恒放行 / 判据不看同步过 / 两个入口不调、推送不查声明 / 不挂判定 / 明细与合计两条路径不判、跳过数不含拒写、容器判据、模板绑定写被遮住的容器 / 不跳推送格 / 重算推送合计、报表更新与生成合并不取推送格、合并不加保留、域内推送格一律归推送、恢复推送值不问矩阵 / 不回报 / 不带判定、报表同步与公式运行不看判定、拒写不回报、`--check` 不比对、推送目标出域不拒绝、对齐脚本漏 blocked、批量原因写代码、前后端处理建议分叉、前端判据不看同步过、刷新提示不写 / 丢行名、离屏跳过原因缺失、披露 Tab 不提示）；阴性对照 3 条（只改措辞 / 日志格式 / 取法）保持绿。
+- 浏览器（候选前端 3032 → 共享后端 9980 只读，令牌按共享后端配置签发、不登录；4 个写请求全部在浏览器里拦截回模拟响应，共享库零写）：【测试】公式同步甲有限公司_2025 附注页 五、1「🔄 刷新」，推送回执 blocked=3 ⇒ 提示含「公式推送有 3 格不在它负责的范围，未改（如 五、1 货币资金「库存现金」）」且为告警；经应用里装好的全局 http 实例发非静默同步、回执 manual 策略跳过 ⇒ 全局拦截器提示原因与处理建议；pageerror 0、console error 0。截图与 JSON 是临时产物（`tmp_writer_ownership/task6/browser/`），清理后以本节摘要为准。
+
+- 推送前复核（远端头两次前移：→ cad390dcb / v1.0.116 → 2dbc68ea0「双向回写闭环审计整改」，后者改了 125 个文件、
+  其中 `workpaper_writer_inventory.json` 等写方清册与多个全仓扫描守卫）：两次 rebase 都无冲突，`git range-diff` 四条补丁
+  逐条 `=`（内容逐字节未变），与远端改动文件交集为空（本任务 56 个 / 远端 125 个）。最终头上整套重跑：
+  后端逐节点 676 个测试文件（附注 / 披露 / 过期 / 公式推送 / 公式运行 / 离屏 / 写入归属 589 个 + 43 个全仓扫描守卫
+  + 远端新改的 44 个），基线 15934 节点 506 红、候选 15973 节点 456 红，**候选新增红 0**、新增 39 节点全绿、修复 50；
+  前端 158 个 spec（本任务 13 个 + 全仓扫描类守卫 + 远端新改的 6 个）基线 3222 例 49 红、候选 3230 例 49 红，候选新增红 0、
+  新增 8 例全绿；区域 vue-tsc added 0（TS2322 探针报出）；ESLint 9 文件 / Ruff 41 文件新增 0；46 条磁盘变异全红 +
+  3 条阴性对照全绿、`mut_wt` 与候选逐字节一致；矩阵 `--check`、暂存树自洽 2 门、行数门 exit 0、离屏执行器重新构建后
+  新鲜度核对通过；浏览器走查 6/6 复跑通过（console error 0、4 个写请求全部在浏览器拦截、共享库零写）。
+- 「两边都红」不等于没变化：456 个同红用例里 52 个失败全文有差异，按「行号 / `MagicMock` id / 内存地址 / 临时目录 /
+  `frozenset` 顺序 / 随机种子 / 摘要哈希 / 每次新签的 JWT / 随机 UUID」归一后 50 个属装饰性差异，剩 2 个逐条查清：
+  (1) `test_wp_disclosure_sync_html_audit::test_audit_log_contains_correct_payload`——基线红在 `FakeNote` 没有 `year`
+  （替身没跟上统一清过期），本轮把替身补齐后它越过这一步，露出原有的那条（审计日志已改走 `append_audit_log`、用例仍
+  `patch AuditLogEntry`），仍不是本 spec 的问题；
+  (2) `test_formula_push_note_skip::TestTotalRecomputeNeedsANumber` 两例——基线红在 `TypeError: 来源摘要不支持 MagicMock
+  类型`，候选红在断言（`section` 为 None、合计没重算）。探针查明：用例的 `_make_rule()` 把章节 `五、22` 和表名「应交税费」
+  配在一起，而真实登记里上市 `五、22` 是固定资产（`H1.note.main`）、应交税费在 `五、41` / `八、41`（`N2.note.main`）
+  ——这是臆造组合，判定按「矩阵没有这一格」fail-closed 拒写，正是 R1b 要的行为；该用例在 HEAD 上本来就红（另一个原因），
+  本轮不改它，修法是把用例换成已登记的组合（后续谁修那条 `MagicMock` 类型红时一并改）。
+- 反向核对（不靠生成器自说自话）：按真实推送规则反查矩阵，318 个「规则 × 准则 × 字段」组合全部有 `formula_push` 条目
+  且条目 `rules` 里登记了规则号，出域章节 0 个 ⇒ fail-closed 不会打到任何真实推送规则。
+- 另外按本任务的专有标识（新模块名 / `WriteGate` / `blocked_write` / `manual_values_never_synced` / 新中文文案等）
+  扫候选侧全部 456 条失败全文：命中 0 ⇒ 没有任何全仓清册 / 摘要类守卫因为本任务新增的文件而变红。
+**合入后须知**：远端头新增的离屏披露 Node 执行器按源文件 sha256 核对构建新鲜度，本任务改了它打包的 `noteHeadlessDisclosure.ts` / `noteWorkpaperPull.ts` / `headlessFramework.ts`，各环境要按 `BUILD_HINT` 重新构建一次，否则执行器拒绝运行（设计如此，不是故障）。
+
+**发现（未修，登记）**：
+
+- `formula_runtime` 附注适配器的行形状与真实附注不符、`wp_formula` 0 行（实际从未执行）；`_set_cell_value` 找不到行时追加假行。
+- 披露 Tab 对 `skipped` 回执当成功：提示「已更新…0 行」并记已同步表名，口径跳过（`section_not_applicable_to_report_scope`）同样如此；本轮只在全局拦截器补提示，没改 90 多个 Tab。
+- 批量严格模式对口径跳过的对外原因仍是代码 `section_not_applicable_to_report_scope`（本轮只改了 manual 策略这一种）。
