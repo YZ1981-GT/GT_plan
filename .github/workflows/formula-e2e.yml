@@ -4,6 +4,9 @@ name: Formula Hub E2E
 # 独立工作流：起 PG + Redis + 后端 + 前端，跑公式链路 Playwright 规格。
 # 不改 ci.yml / governance-checks.yml 的任何现有 job。
 
+# 触发路径：用例直接调用的接口 / 页面，push 与 pull_request 两份保持一致
+# （spec formula-management-repair-closure R7.3：原先漏了 routers/formula.py、底稿公式、报表配置、
+#  地址库与全局设置页，PR 一侧只有 6 条）。
 on:
   push:
     branches: [master, main, 'work/**', 'spec/**']
@@ -13,13 +16,30 @@ on:
       - 'backend/app/services/formula_management/**'
       - 'backend/app/services/consistency_gate/**'
       - 'backend/app/services/report_*'
-      - 'backend/app/routers/formula_*'
+      - 'backend/app/services/address_registry*'
+      - 'backend/app/routers/formula*'
       - 'backend/app/routers/draft_refresh*'
+      - 'backend/app/routers/wp_formula*'
+      - 'backend/app/routers/wp_user_formulas*'
+      - 'backend/app/routers/report_config*'
+      - 'backend/app/routers/import_templates.py'
+      - 'backend/app/routers/address_registry*'
+      - 'backend/app/routers/qc_vr_heatmap.py'
+      - 'backend/app/routers/lineage.py'
+      - 'backend/app/routers/wp_render_config*'
       - 'audit-platform/frontend/src/components/formula/**'
+      - 'audit-platform/frontend/src/composables/formula/**'
+      - 'audit-platform/frontend/src/views/FormulaGlobalSettings.vue'
+      - 'audit-platform/frontend/src/views/WorkpaperEditor.vue'
+      - 'audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue'
+      - 'audit-platform/frontend/src/services/formulaSettingsApi.ts'
+      - 'audit-platform/frontend/src/services/apiPaths/formula*.ts'
       - 'audit-platform/frontend/e2e/formula-hub/**'
       - 'audit-platform/frontend/playwright.formula-e2e.config.ts'
       - '.github/workflows/formula-e2e.yml'
-      - 'backend/scripts/e2e/seed_formula_e2e.py'
+      - 'backend/scripts/e2e/**'
+      - 'backend/scripts/seed/init_tables.py'
+      - 'backend/data/e2e_formula_manifest.json'
   pull_request:
     branches: [master, main]
     paths:
@@ -27,8 +47,31 @@ on:
       - 'backend/app/services/formula_settings/**'
       - 'backend/app/services/formula_management/**'
       - 'backend/app/services/consistency_gate/**'
+      - 'backend/app/services/report_*'
+      - 'backend/app/services/address_registry*'
+      - 'backend/app/routers/formula*'
+      - 'backend/app/routers/draft_refresh*'
+      - 'backend/app/routers/wp_formula*'
+      - 'backend/app/routers/wp_user_formulas*'
+      - 'backend/app/routers/report_config*'
+      - 'backend/app/routers/import_templates.py'
+      - 'backend/app/routers/address_registry*'
+      - 'backend/app/routers/qc_vr_heatmap.py'
+      - 'backend/app/routers/lineage.py'
+      - 'backend/app/routers/wp_render_config*'
+      - 'audit-platform/frontend/src/components/formula/**'
+      - 'audit-platform/frontend/src/composables/formula/**'
+      - 'audit-platform/frontend/src/views/FormulaGlobalSettings.vue'
+      - 'audit-platform/frontend/src/views/WorkpaperEditor.vue'
+      - 'audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue'
+      - 'audit-platform/frontend/src/services/formulaSettingsApi.ts'
+      - 'audit-platform/frontend/src/services/apiPaths/formula*.ts'
       - 'audit-platform/frontend/e2e/formula-hub/**'
+      - 'audit-platform/frontend/playwright.formula-e2e.config.ts'
       - '.github/workflows/formula-e2e.yml'
+      - 'backend/scripts/e2e/**'
+      - 'backend/scripts/seed/init_tables.py'
+      - 'backend/data/e2e_formula_manifest.json'
   workflow_dispatch:
 
 jobs:
@@ -38,7 +81,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        # pgvector 镜像：ORM 建表里有 VECTOR(1024) 列，裸 postgres:16 上 create_all 报
+        # `type "vector" does not exist`（governance-checks.yml 同一引导已实测）
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -93,17 +138,26 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: audit-platform/frontend
 
-      # ── 迁移 ──
-      - name: Run database migrations
-        run: |
-          python -c "
-          import asyncio
-          from app.core.migration_runner import MigrationRunner
-          asyncio.run(MigrationRunner(
-            database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/gt_e2e_formula'
-          ).run_pending())
-          "
+      # ── 建库：ORM 建基础表 → 删 V147 自建的 4 张表 → 迁移（有失败即停）──
+      # 平台基础 schema 由 ORM create_all 建，迁移多是 ALTER 增量：空库直接跑迁移会有上百条失败，
+      # run_pending() 却照样返回（原先这一步就是这样，接着种子在没有 users / projects 表的库上报错）。
+      # 顺序与 governance-checks.yml「Bootstrap schema」一致（那边的长注释写了为什么不能换序）。
+      - name: Bootstrap schema (create_all → drop V147-owned tables → migrations)
         working-directory: backend
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+          # init_tables 建完表会登录这个地址调种子端点：指向不存在的地址 ⇒ 只建表
+          API_BASE_URL: http://127.0.0.1:1
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d gt_e2e_formula -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          # create_all 只建 ORM 侧（Python）默认值、不建库级默认：V106 往 service_identities 插行不带 id，
+          # 它自带 DEFAULT gen_random_uuid() 的 CREATE TABLE IF NOT EXISTS 又因表已存在被跳过 ⇒ 不补就 NOT NULL 失败
+          psql -h localhost -U postgres -d gt_e2e_formula -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
+          psql -h localhost -U postgres -d gt_e2e_formula -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
+          python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/gt_e2e_formula').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
 
       # ── 种子 ──
       - name: Seed formula E2E data
@@ -120,10 +174,12 @@ jobs:
           echo $! > /tmp/backend.pid
         working-directory: backend
 
+      # healthy / degraded 都是 200（PG、Redis 可用，degraded 只说明有漂移等需关注项），与用例里 assertHealthy 同口径；
+      # 冷启动要跑启动任务，给 180 秒
       - name: Wait for backend healthy
         run: |
-          echo "等待后端 /api/health 返回 healthy …"
-          for i in $(seq 1 60); do
+          echo "等待后端 /api/health 返回 healthy / degraded …"
+          for i in $(seq 1 180); do
             STATUS=$(curl -sf http://127.0.0.1:9980/api/health | python -c "
           import sys, json
           try:
@@ -131,15 +187,15 @@ jobs:
             print((d.get('data') or d).get('status', ''))
           except: print('')
           " 2>/dev/null || echo "")
-            if [ "$STATUS" = "healthy" ]; then
-              echo "✅ 后端 healthy（第 ${i} 秒）"
+            if [ "$STATUS" = "healthy" ] || [ "$STATUS" = "degraded" ]; then
+              echo "✅ 后端 ${STATUS}（第 ${i} 次探测）"
               exit 0
             fi
             sleep 1
           done
-          echo "❌ 后端 60 秒内未 healthy"
+          echo "❌ 后端 180 次探测内未就绪"
           cat /tmp/backend.log || true
-          curl -sf http://127.0.0.1:9980/api/health || true
+          curl -s http://127.0.0.1:9980/api/health || true
           exit 1
 
       # ── 运行 Playwright ──
