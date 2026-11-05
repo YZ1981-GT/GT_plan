@@ -725,6 +725,8 @@ def _start_import_job_runner(ctx: StartupContext) -> None:
 _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("sla_worker", "app.workers.sla_worker"),
     ("event_loop_lag_worker", "app.workers.event_loop_lag_worker"),
+    # 耐久任务队列深度 / 排队年龄采样：health 不在请求里扫任务表，只读本 worker 写的快照。
+    ("capacity_queue_worker", "app.workers.capacity_queue_worker"),
     ("import_recover_worker", "app.workers.import_recover_worker"),
     ("outbox_replay_worker", "app.workers.outbox_replay_worker"),
     ("audit_log_writer_worker", "app.workers.audit_log_writer_worker"),
@@ -751,11 +753,12 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("consol_operation_worker", "app.workers.consol_operation_worker"),
 )
 
-# Stable worker names (15 always-on + 1 conditional ImportJobRunner) — pinned contract,
-# tests assert it equals the worker phase of ``STARTUP_TASKS`` in order.
+# Stable worker names (always-on workers plus the conditional ImportJobRunner) — pinned
+# contract, tests assert it equals the worker phase of ``STARTUP_TASKS`` in order.
 WORKER_TASK_NAMES: tuple[str, ...] = (
     "sla_worker",
     "event_loop_lag_worker",
+    "capacity_queue_worker",
     "import_recover_worker",
     "outbox_replay_worker",
     "audit_log_writer_worker",

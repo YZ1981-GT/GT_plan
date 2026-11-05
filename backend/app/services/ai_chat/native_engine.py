@@ -43,10 +43,10 @@ Properties: 7（Run 唯一终态）、24（引擎能力与 UI 一致）、33（�
 
 ## 容量边界（实测记录，供 Task 5/12 收口）
 
-模型调用整段持有 ``llm_client._llm_semaphore``（现值 5）。这是 Req 10.7 要求复用的
-既有并发限制，也意味着**平台级同时最多 5 个流式回答**；run 级的有界队列与
-per-user active 上限由 Task 5 / Task 12 在其之上叠加。若要提高对话并发，应调整
-``llm_client._LLM_MAX_CONCURRENCY``（一处），不要在本模块另开一个信号量。
+模型调用整段持有 ``capacity_slots.LLM_SLOT``（其 semaphore 即 ``llm_client._llm_semaphore``，
+现值 5）。这是 Req 10.7 要求复用的既有并发限制，也意味着**平台级同时最多 5 个流式回答**；
+run 级的有界队列与 per-user active 上限由 Task 5 / Task 12 在其之上叠加。若要提高对话并发，
+应调整 ``capacity_slots.LLM_MAX_CONCURRENCY``（一处），不要在本模块另开一个信号量。
 """
 
 from __future__ import annotations
@@ -602,12 +602,12 @@ class NativeEngine:
     ) -> AsyncIterator[ChatEvent]:
         """按平台模型路由（本机优先）调用模型，把 chunk 转成 ``delta`` 事件。
 
-        复用既有基础设施（Req 10.7）：
-        ``llm_client._breaker`` 同一实例（读 + 记录成功/失败）、
-        ``llm_client._llm_semaphore`` 同一实例（并发限制）、
+        复用既有基础设施（Req 10.7）：``llm_client._breaker`` 同一实例（读 + 记录成功/失败）、
+        ``capacity_slots.LLM_SLOT``（并发限制，其 semaphore 即 ``_llm_semaphore``，经 slot 取用才计量）、
         ``llm_client._LLM_TIMEOUT_STREAM`` 同一超时值。
         """
-        from app.services.llm_client import _breaker, _llm_semaphore
+        from app.services.capacity_slots import LLM_SLOT
+        from app.services.llm_client import _breaker
 
         # 熔断中直接 typed error —— 不调模型、不产出任何 delta（Req 12.4）。
         if _breaker.is_open:
@@ -619,7 +619,7 @@ class NativeEngine:
         outcome.model = model_name
         deadline = self._deadline or ModelDeadline.default()
 
-        async with _llm_semaphore:
+        async with LLM_SLOT.use():
             await self._abort_if_cancelled(cancel, "取得模型并发许可后")
             stream = self._model.stream_chat(messages, model=model_name)
             model_started = time.monotonic()

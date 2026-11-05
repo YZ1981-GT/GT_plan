@@ -164,14 +164,20 @@ def _capacity_snapshot() -> dict[str, object]:
     from app.core.database import engine
     from app.core.db_pool_metrics import pool_capacity_snapshot
     from app.services.bulk_tab.bulk_async_runner import get_import_capacity_snapshot
+    from app.services.capacity_slots import slot_snapshots
     from app.services.libreoffice_pool import get_capacity_snapshot
-    from app.services.platform_metrics import event_loop_snapshot
+    from app.services.platform_metrics import durable_queue_snapshot, event_loop_snapshot
 
+    now = time.monotonic()
     return {
         "db_pool": pool_capacity_snapshot(engine.sync_engine.pool),
-        "event_loop": event_loop_snapshot(time.monotonic()),
+        "event_loop": event_loop_snapshot(now),
         "libreoffice": get_capacity_snapshot(),
         "bulk_import": get_import_capacity_snapshot(),
+        # LLM / OCR 通道的排队与在飞数；OCR 无准入队列，快照自带 bounded=False 声明。
+        "slots": slot_snapshots(),
+        # 耐久任务队列由 capacity_queue_worker 周期采样；这里只读，不扫任务表。
+        "durable_queues": durable_queue_snapshot(now),
     }
 
 

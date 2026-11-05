@@ -5,9 +5,30 @@
 ## 批 0 基线与观测
 
 - [ ] 0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。
-- [ ] 0.2 增加 pool checkout wait/hold/timeout、event-loop lag、任务 queue age 与 Office/OCR/LLM 排队指标。
-  - 已完成：DB pool wait/hold/timeout、event-loop lag、LibreOffice 与 bulk import 深度/年龄；待 OCR、LLM slot、AI durable queue 统一暴露。
-- [ ] 0.3 建立不会写共享 PG 的性能测试选择器与专用数据库硬闸门。
+- [x] 0.2 增加 pool checkout wait/hold/timeout、event-loop lag、任务 queue age 与 Office/OCR/LLM 排队指标。
+  - DB pool wait/hold/timeout、event-loop lag、LibreOffice 与 bulk import 深度/年龄此前已有。
+  - 本轮补齐统一暴露面 `capacity_slots`（`platform_slot_*` 排队/执行 Histogram + `health.capacity.slots`）：
+    LLM 绑定 `llm_client._llm_semaphore` 这个**同一个**信号量（`native_engine` 流式回答也持它，
+    经 slot 取用才被计量）；AST 守卫钉住「不得绕过 slot 直接 `async with _llm_semaphore`」。
+  - 🔴 OCR **没有**准入队列（`unified_ocr_service` 走默认线程池、`ocr_service_v2` 自带 4 线程池），
+    故只计在飞数与执行时长，快照用 `bounded=False` 显式声明，不伪造 queue depth；守卫反向钉住该声明。
+  - AI 耐久队列（`platform_jobs` + `ai_task_items`）由新 `capacity_queue_worker` 周期采样
+    （两条队列各用独立 session，PG 上一条失败不拖垮另一条）；health 只读快照、不在请求里扫任务表。
+    采样失败标 `available=false` 并保留上次已知深度，**绝不发布 0**（读不到 ≠ 队列空）。
+  - 验证：`test_capacity_slots_and_queues.py`(15) + `test_platform_capacity_metrics.py` 全绿；
+    8 条磁盘变异全 RED；真库单跑 `test_shared_llm_semaphore_is_held_during_streaming` 通过（生产调用点）。
+- [x] 0.3 建立不会写共享 PG 的性能测试选择器与专用数据库硬闸门。
+  - 压测发起闸门 `tests/load/load_guard.py`（单一来源）：写压测除 `GT_LOAD_ALLOW_WRITES=1`
+    + `GT_LOAD_DISPOSABLE_ENV=YES` 外，必须显式声明 `GT_LOAD_DISPOSABLE_DB_URL`，且该库不在
+    共享/默认库黑名单（audit_platform/postgres/gt_plan/metabase）、不等于当前 `DATABASE_URL`。
+    接入 run_baseline / run_final 的 main **以及 locustfile `on_test_start`**——无论用哪个 runner
+    或裸 `locust` 命令发起，发任何请求前都过闸门，不通过退出码 2。
+  - 性能测试选择器闸门 `tests/_perf_gate.py`（接入根 conftest 收集期）：选中「`perf` ∧ `pg_only`」
+    的写真库用例（如 `test_procedure_performance` 会插 5000 行）而 `DATABASE_URL` 是 PG 时，
+    必须 `GT_PERF_DISPOSABLE_DB=YES` 且库名非黑名单，否则 `pytest.UsageError` 整次失败；
+    纯内存 perf（`-m 'perf and not pg_only'`）与非 PG 环境不触发。
+  - 验证：`test_load_guard.py`(7) + `test_perf_write_gate.py`(5) + 既有 load_config/evidence_gate 全绿（21）；
+    真实收集路径三态实证——未声明库硬失败 / 声明非黑名单库放行 7 collected / 声明但 `audit_platform` 硬失败。
 
 ## 批 A 事件循环与文件内存止血
 

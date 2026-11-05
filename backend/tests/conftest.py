@@ -144,6 +144,7 @@ def pytest_collection_modifyitems(config, items):
     spec procedure-chain-hardening-and-java-contracts R20：PG 判定认 ``postgres://``（原先只认含 ``postgresql`` 的地址）；
     设 ``GT_REQUIRE_PG=1`` 时地址不是 PG 而收集到了 pg_only 用例 ⇒ ``UsageError``，不再静默跳过。
     """
+    from tests._perf_gate import perf_write_gate_error
     from tests._pg_url import is_pg_url, pg_requirement_error
 
     db_url = os.getenv("DATABASE_URL", "sqlite")
@@ -151,6 +152,15 @@ def pytest_collection_modifyitems(config, items):
                                  [item.nodeid for item in items if "pg_only" in item.keywords])
     if error:
         raise pytest.UsageError(error)
+    # 任务 0.3：选中「写真库的性能用例」却未声明可销毁库时整次运行失败，绝不静默写共享 PG。
+    perf_error = perf_write_gate_error(
+        db_url,
+        os.environ,
+        [item.nodeid for item in items
+         if "perf" in item.keywords and "pg_only" in item.keywords],
+    )
+    if perf_error:
+        raise pytest.UsageError(perf_error)
     skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
     tag_pg = not is_pg_url(db_url)
     for item in items:

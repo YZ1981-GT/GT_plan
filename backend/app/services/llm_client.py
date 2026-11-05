@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -19,6 +18,7 @@ from app.services.llm_route import (
     route_chat_sync,
     route_identity,
 )
+from app.services.capacity_slots import LLM_MAX_CONCURRENCY, LLM_SLOT
 from app.services.llm_runtime import (
     LLMRuntimeError,
     ResolvedLLMConfig,
@@ -30,8 +30,11 @@ from app.services.llm_runtime import (
 
 logger = logging.getLogger(__name__)
 
-_LLM_MAX_CONCURRENCY = 5
-_llm_semaphore = asyncio.Semaphore(_LLM_MAX_CONCURRENCY)
+# 并发许可的唯一来源是 capacity_slots.LLM_SLOT：这里与 ai_chat.native_engine 的流式回答
+# 持同一个信号量实例，排队 / 执行时长由该 slot 统一计量（spec platform-heavy-jobs-and-capacity-closure
+# 任务 0.2）。下面两个名字保留给既有调用方与守卫，语义不变。
+_LLM_MAX_CONCURRENCY = LLM_MAX_CONCURRENCY
+_llm_semaphore = LLM_SLOT.semaphore
 _CIRCUIT_FAILURE_THRESHOLD = 3
 _CIRCUIT_COOLDOWN_SECONDS = 60
 _LLM_TIMEOUT_SYNC = 30.0
@@ -282,7 +285,7 @@ async def _sync_completion_result(
             masked_value_count=masked_value_count,
         )
 
-    async with _llm_semaphore:
+    async with LLM_SLOT.use():
         try:
             text = await route_chat_sync(
                 route,
@@ -409,7 +412,7 @@ async def _stream_completion(
         yield "[LLM 服务熔断中，请稍后重试]"
         return
 
-    async with _llm_semaphore:
+    async with LLM_SLOT.use():
         try:
             async for chunk in route_chat_stream(
                 route,

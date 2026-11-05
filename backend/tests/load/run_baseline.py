@@ -306,6 +306,16 @@ def main():
     print("=" * 60)
     print()
 
+    # 专用库硬闸门：写压测未指向显式声明的可销毁库时，绝不发起（R1.2）。
+    from tests.load.load_guard import LoadGuardError, require_safe_load_target
+
+    try:
+        decision = require_safe_load_target()
+    except LoadGuardError as exc:
+        print(f"[ABORT] {exc}")
+        sys.exit(2)
+    print(f"[GUARD] {decision.reason}")
+
     # 检查 locustfile 存在
     if not LOCUSTFILE.exists():
         print(f"[ERROR] 未找到压测脚本: {LOCUSTFILE}")

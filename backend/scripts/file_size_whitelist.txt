@@ -1911,3 +1911,7 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/useWorkpaperSync
 #   并把 `b22aReference.ts` 式的预置参考文本继续留在数据模块里。
 audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue  2746
 audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue  2826
+# platform-heavy-jobs-and-capacity-closure（2026-11-05）：ai_chat/native_engine.py —— 历史大文件。
+#   HEAD 已 834 行超 800；本轮 0.2 只把 _llm_semaphore 换成 capacity_slots.LLM_SLOT（净零行）。
+#   入册基线=当前真实行数，不虚高；拆分责任归 ai_chat 引擎 lane，届时连带删本条。
+backend/app/services/ai_chat/native_engine.py  834

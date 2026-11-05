@@ -68,9 +68,14 @@ def on_request(request_type, name, response_time, response_length, exception, **
 def on_test_start(environment, **kwargs):
     global _CONFIG
     try:
+        # 专用库硬闸门：无论用哪个 runner / 裸 locust 命令发起，写压测都必须指向
+        # 显式声明的可销毁库，否则在发任何请求之前就退出（R1.2）。
+        from tests.load.load_guard import require_safe_load_target
+
+        require_safe_load_target()
         _CONFIG = load_config()
     except Exception as exc:
-        logger.error("容量测试配置无效：%s", exc)
+        logger.error("容量测试启动校验失败：%s", exc)
         environment.process_exit_code = 2
         if environment.runner is not None:
             environment.runner.quit()
