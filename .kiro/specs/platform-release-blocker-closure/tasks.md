@@ -155,17 +155,23 @@
     **200** `{"status":"ready","degraded":false}`。finally 已 terminate 临时库连接并
     `DROP DATABASE` 成功；全程不触达 `audit_platform`
 - [ ] 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链
-  - 未做，且**被任务 24 阻断**：共享库停在 V234，`projects.amount_unit`（V250）缺列
-    使 `GET /api/projects/{id}` 恒 500 ⇒ 前端年度闸门不渲染
+  - [x] 22.1 无写入页面烟测（2026-11-05）：以【E2E】公式管理运行时门禁_2025
+    (`b71db997-0bca-4528-9a03-0b92e6a6b4e0`，2025) 登录后完成项目、TB、底稿列表、报表、
+    附注和交付中心加载。每次导航前拦截非 `GET/HEAD/OPTIONS` 请求；平台业务 API 实际请求均为
+    GET，无 POST/PUT/PATCH/DELETE。TB 0 个科目、底稿列表 2 张、报表 129 行、交付中心完整性
+    缺失空态均可见。附注无数据时 404 被页面接住，提示生成附注；已取消确认框，未生成。
+  - [ ] 22.2 HTML 编辑、保存失败注入、OnlyOffice 往返、复核和 trio 生成会写入共享库【测试】项目；
+    V250 迁移前置已解除，但仍须先取得用户明确授权。
 - [ ] 23. 五角色复核、语义审查、INDEX 登记；同步最新远端后单 commit 与版本化推送
   - 本轮完成「单 commit + 版本化推送」与本文件回填；五角色复核与语义审查未做
 
 ## 外部停点
 
-- [ ]* 24. 共享库执行待迁移、调查审计链 10 个分叉、重建膨胀索引与验证 invalid constraints——执行前单独取得用户批准
-  - 现算待执行区间 **V235~V263**（原记 V235~V251 已过时）。与
-    `workpaper-writeback-data-loss-and-mirror-consistency-closure` 任务 9.3 是同一件事，
-    两个 spec 的浏览器验收都卡在这里。**仍待用户批准**
+- [ ]* 24. 调查审计链 10 个分叉、重建膨胀索引与验证 invalid constraints（迁移应用部分已销案）
+  - 2026-11-05 只读预检确认共享库 `schema_version` 已有 V235~V251、V261~V263，
+    `schema_migration_failures=[]`，V250 相关列/约束与 vector 扩展均存在；**无需申请或执行共享库迁移写入**。
+  - 发现既有 V233/V234 checksum 与候选树规范化 checksum 不同（登记保留旧值）；未修改共享
+    `schema_version` 或 schema。若要校正这两条共享记账记录，须另备份、写回退 SQL 并单独取得用户批准。
 
 ## 范围外（本轮查证但未改，留给对应 owner）
 
