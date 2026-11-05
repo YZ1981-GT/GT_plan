@@ -1606,6 +1606,31 @@ representation」的 reason 挪到了「artifact 文件不在本工作树」的 
 是个真实的取舍；它们目前由 `radiation_surface.referencing_test_files`（census，不进锁）
 覆盖。这条不是本批引入，原设计就只锁那四件。
 
+### 5.13 ⚠️ 分母从 3290 降到 1608、`upstream_implementation_gap` 从 274 降到 0 —— **不是进展**
+
+本批刷新报告后，与上一份已提交报告（第三批时生成）逐量对比：
+
+| 量 | 上一份（HEAD~1） | 本批 | 真因 |
+| --- | ---: | ---: | --- |
+| 独立 entry | 142 | **145** | manifest 增长 |
+| required scenario 行 | 3290 | **1608** | 见下 |
+| `upstream_implementation_gap` | 274 | **0** | 见下 |
+| 贡献 0 条 required scenario 的 entry | 5 | **78** | capability 转 pending |
+| entry 的 capability 分布 | `single_onlyoffice` 137 / `single_html` 5 | **`pending` 78 / `bidirectional` 67** | 上游 task 1.1 引入 pending 态 |
+
+🔴 **两个下降都是口径变化，不是修好了**：145 条独立 entry 里 **78 条**的 capability 现在
+是 pending，而 pending 推不出 required scenario 集合 ⇒ 它们贡献 0 行、整体退出分母。
+原来落在这些 entry 上的 274 行 `upstream_implementation_gap` 就这样**随 entry 一起离开
+分母**，不是被实现补齐了。
+
+门禁本来就把这件事记在 `BP-70-7`（`derivation_error_histogram: {EntryProfileError: 86}`，
+disposition「仍阻塞（分母缺口，如实计入）」），所以它**不是**一个被隐藏的事实；但只看
+`verdict` 那两个数字会读成进展，故在此显式登记。两份报告也不同代际（上一份是 142 条
+entry、pending 态还不存在时生成的），不能直接当前后对比。
+
+真实待办分母因此是 **1608 + 86 条未裁决 entry 的缺口**，而不是 1608。86 条裁决属 4.*，
+本批未动。
+
 ### 本批未完成（如实登记）
 
 - **真实 OO 场景执行与 evidence 落库仍未做**（6.3 的剩余本体）。
