@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/components/workpaper/sync/workpaperSyncDto.ts",
+    "src/components/workpaper/sync/workpaperSyncPresentation.ts",
+    "src/components/workpaper/sync/workpaperSyncApi.ts",
+    "src/components/workpaper/sync/useWorkpaperSyncBridge.ts",
+    "src/components/workpaper/sync/workpaperSyncOperationTracker.ts",
+    "src/components/workpaper/sync/workpaperSyncOperationFollowUp.ts",
+    "src/components/workpaper/sync/bridgeBackgroundMerge.ts",
+    "src/components/workpaper/sync/workpaperSyncBridgeMachine.ts",
+    "src/components/workpaper/sync/__tests__/workpaperSyncUiHarness.ts",
+    "src/components/workpaper/sync/__tests__/roomDurableFenceReadPath.spec.ts",
+    "src/components/workpaper/sync/__tests__/workpaperSyncPresentation.spec.ts",
+    "src/components/workpaper/sync/__tests__/backgroundMerge.spec.ts",
+    "src/components/workpaper/sync/__tests__/consecutiveSessionsFenceReset.spec.ts",
+    "src/components/workpaper/sync/__tests__/editorHostTimeoutFollowUp.spec.ts",
+    "src/components/workpaper/sync/__tests__/reloadAfterAppliedReleasesLease.spec.ts",
+    "src/components/workpaper/sync/__tests__/useWorkpaperSyncBridge.spec.ts",
+    "src/components/workpaper/sync/__tests__/workpaperSyncBridgeMachine.spec.ts",
+    "src/components/workpaper/sync/__tests__/workpaperSyncOperationTracker.spec.ts",
+    "src/components/workpaper/sync/__tests__/workpaperSyncOperationTrackerSingleFlight.spec.ts",
+    "src/env.d.ts"
+  ]
+}

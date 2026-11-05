@@ -1083,13 +1083,17 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   }
 
   /**
-   * 提交冲突裁决。fence 六项由调用方（Task 34 的冲突面板）**完整**给出。
+   * 提交冲突裁决。fence 八项由调用方（Task 34 的冲突面板）**完整**给出。
    *
-   * 🔴 `room_latest_durable_application_id` / `room_latest_durable_sequence` 在当前
-   * 16 条用户路由里**没有**任何读取面（conflict preview 只给 `canonical_application_id`
-   * 与 `incoming_sequence`）。桥因此**拒绝**替调用方编这两项 —— 用 canonical application
-   * 顶替 room 的 latest durable 等于客户端断言了一个它观测不到的 room 事实，
-   * 而服务端会照着这个断言做 fence 裁决。这是一处已登记的上游缺口。
+   * 桥**拒绝**替调用方编任何一项 —— 用 canonical application 顶替 room 的 latest
+   * durable 等于客户端断言了一个它没观测到的 room 事实，而服务端会照着这个断言做
+   * fence 裁决。
+   *
+   * 🔴 room 侧两项的读取面：后端 `get_operation` 随 `app_facts` 返回
+   * `room_latest_durable_application_id` / `room_latest_durable_sequence`，面板经
+   * `roomDurableFenceFromOperation()` 从 `operation` 快照投影。此处原先的注释写着
+   * 「这两项没有任何读取面」—— 那条注释在 Task 32 补上投影后就已过期，却让冲突面板
+   * 一直按「拿不到」处理，于是**任何** entry 的冲突都提交不了裁决。
    */
   async function resolveConflicts(input: {
     readonly fence: WorkpaperSyncResolveFence

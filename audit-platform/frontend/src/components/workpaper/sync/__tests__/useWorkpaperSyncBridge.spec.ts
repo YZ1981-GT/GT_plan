@@ -118,6 +118,8 @@ function snapshot(
     authorityModelDefinitionSha256: null,
     durableAt: null,
     finishedAt: null,
+    roomLatestDurableApplicationId: null,
+    roomLatestDurableSequence: null,
     terminal: false,
     ...over,
   }

@@ -13,9 +13,11 @@
   2. **批量必须点出范围**（AC 8.3）。范围来自 `WP_SYNC_BULK_SCOPES` 封闭域，
      目标集由纯函数 `bulkScopeTargets` 算出，确认文案由 `describeBulkScope` 逐字点出
      「范围 + 条数 + 裁决」，并且要**再点一次**才真正落到选择上（二次确认）。
-  3. **fence 齐备或可见失败**。`room_latest_durable_application_id/sequence` 无读取面，
-     桥拒绝替调用方编造，因此本面板要求宿主显式提供；提供不了就禁用提交并逐项列出
-     阻断原因 —— 绝不用 canonical application 顶替 room 的 latest durable。
+  3. **fence 齐备或可见失败**。`room_latest_durable_application_id/sequence` 由
+     `roomDurableFenceFromOperation()` 从桥持有的 operation 快照投影（后端
+     `get_operation` 随 `app_facts` 返回这两项）；宿主也可用 `roomDurableFence` prop
+     显式覆盖。投影不出来就禁用提交并逐项列出阻断原因 —— 桥与本面板都绝不用
+     canonical application 顶替 room 的 latest durable。
 
   ═══ 覆盖层为什么不用 el-dialog ═══
 
@@ -355,6 +357,7 @@ import {
   WP_SYNC_FENCE_MISSING_TEXT,
   bulkScopeTargets,
   buildResolveFence,
+  roomDurableFenceFromOperation,
   describeBulkScope,
   formatConflictValue,
   parseConflictPreview,
@@ -372,10 +375,13 @@ const props = withDefaults(
     bridge: WorkpaperSyncBridge
     visible: boolean
     /**
-     * room 最新耐久 application / sequence。
+     * room 最新耐久 application / sequence 的**显式覆盖**（可选）。
      *
-     * 🔴 两项都**没有读取面**（见 `WP_SYNC_TRACE_GAPS`），桥明文拒绝替调用方编造。
-     * 因此必须由宿主显式提供；为 null 时提交禁用并逐项列出阻断原因。
+     * 缺省时从 `bridge.operation` 快照投影（后端 `get_operation` 随 `app_facts` 返回
+     * 这两项）。宿主只有在持有比桥更新的快照时才需要传。
+     *
+     * 🔴 投影不出来 ⇒ 提交禁用 + 逐项列出阻断原因。桥明文拒绝替调用方编造，本组件
+     * 同样不得用 canonical application 顶替 room 的 latest durable。
      */
     roomDurableFence?: WorkpaperSyncRoomDurableFence | null
   }>(),
@@ -577,11 +583,24 @@ const undecidedCount = computed(() => {
     ).length
 })
 
+/**
+ * room 侧 fence：宿主显式覆盖优先，否则从桥持有的 operation 快照投影。
+ *
+ * 🔴 `props.roomDurableFence` 是 Vue 的可选 prop，宿主不传时为 `null`（withDefaults
+ * 的缺省值），不是 `undefined` —— 所以这里必须判 `null` 而不是用 `??` 串联 undefined。
+ */
+const roomDurable = computed<WorkpaperSyncRoomDurableFence | null>(() => {
+  if (props.roomDurableFence !== null && props.roomDurableFence !== undefined) {
+    return props.roomDurableFence
+  }
+  return roomDurableFenceFromOperation(props.bridge.operation.value)
+})
+
 const fenceDraft = computed(() => {
   if (preview.value === null) return { fence: null, missing: [] as readonly string[] }
   return buildResolveFence({
     preview: preview.value,
-    roomDurable: props.roomDurableFence,
+    roomDurable: roomDurable.value,
   })
 })
 

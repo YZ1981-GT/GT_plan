@@ -143,6 +143,7 @@ from app.services.workpaper_sync.conflicts import (
     ResolutionChoice,
     ResolveFenceRequest,
     RoomDurableFence,
+    SchemaAnomalyKind,
     SuggestedAction,
     assert_all_conflicts_resolved,
     evaluate_resolve_fence,
@@ -671,15 +672,42 @@ class ConflictPreviewItem:
     client_edit_epoch: int
     incoming_sequence: int | None
     resolved: bool
+    #: `schema` 冲突的成因（`SchemaAnomalyKind`）。`None` 有两种含义，靠 `kind` 区分：
+    #: 非 schema 冲突（本就没有成因）、或 V264 之前落的历史 schema 冲突（成因已丢失）。
+    schema_anomaly: SchemaAnomalyKind | None = None
 
     @property
     def is_protected(self) -> bool:
         return self.protection_policy.is_protected
 
     @property
+    def schema_anomaly_known(self) -> bool:
+        """schema 冲突是否带得出成因 —— 区分「成因未知」与「成因不可裁决」（R1.4）。
+
+        两者都不可按值裁决，但含义完全不同：前者是 V264 之前的历史行（数据缺失，
+        重新观测一次冲突即可补上），后者是行身份类异常（必须先修结构）。读侧若不把它们
+        分开，本缺陷修完也看不出修没修。
+        """
+        return self.kind is not ConflictKind.schema or self.schema_anomaly is not None
+
+    @property
     def adjudicable_by_value_choice(self) -> bool:
-        """能否靠「选一侧 / 输入合并值」收敛（结构类冲突不能）。"""
-        return self.kind is not ConflictKind.schema
+        """能否靠「选一侧 / 输入合并值」收敛。
+
+        🔴 **委派域内判据，不在这里自己算**。此处原来是
+        `return self.kind is not ConflictKind.schema` —— 把**全部** schema 冲突一律判成
+        不可裁决，而域内 `ConflictRecord.adjudicable_by_value_choice` 是按
+        `SchemaAnomalyKind` 分两类的（类型规范化失败与「同 key 多位置异值」可由人选一个值
+        收敛）。两份实现口径分叉的后果：前端把这些项从所有批量范围排除、单条也不给选边，
+        真调 resolve 会撞 `StructuralConflictNotAdjudicableError` ⇒ 任何 schema 冲突都成死路。
+
+        成因未知（历史行）时 fail closed —— 不拿「不知道」当「可以」。
+        """
+        if self.kind is not ConflictKind.schema:
+            return True
+        if self.schema_anomaly is None:
+            return False
+        return self.schema_anomaly.adjudicable_by_value_choice
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -704,6 +732,12 @@ class ConflictPreviewItem:
             "resolved": self.resolved,
             "is_protected": self.is_protected,
             "adjudicable_by_value_choice": self.adjudicable_by_value_choice,
+            # 暴露成因与「成因是否已知」：前端据此把「要先修结构」与「这是条历史行、
+            # 重新观测即可补上成因」说清楚，而不是都显示成一句「不可裁决」。
+            "schema_anomaly": (
+                None if self.schema_anomaly is None else self.schema_anomaly.value
+            ),
+            "schema_anomaly_known": self.schema_anomaly_known,
         }
 
 
@@ -994,6 +1028,22 @@ class ConflictResolutionService:
             ),
         )
 
+    @staticmethod
+    def _schema_anomaly_of(row: WorkpaperSyncConflict) -> SchemaAnomalyKind | None:
+        """读回 V264 落的成因列。空值与**无法识别的值**都按「成因未知」处理。
+
+        不用 `SchemaAnomalyKind(row.schema_anomaly)` 裸转：那样一行脏数据就让整个冲突
+        预览 500，用户连其余可裁决的冲突都看不到。未知值归 `None` 即 fail closed
+        （`adjudicable_by_value_choice` 对 `None` 返回 False），既不放行也不炸整页。
+        """
+        raw = row.schema_anomaly
+        if not raw:
+            return None
+        try:
+            return SchemaAnomalyKind(raw)
+        except ValueError:
+            return None
+
     def _preview_item(
         self, row: WorkpaperSyncConflict, *, index: ContractIndex
     ) -> ConflictPreviewItem:
@@ -1025,6 +1075,7 @@ class ConflictResolutionService:
                 else int(row.effective_request_sequence)
             ),
             resolved=row.resolved_at is not None,
+            schema_anomaly=self._schema_anomaly_of(row),
         )
 
     # ─────────────────────────────────────────────────────────────────

@@ -1365,6 +1365,12 @@ class TestProperty32WordDuplicateInstances:
 # ═══════════════════════════════════════════════════════════════════════════
 
 #: AC 8.1 要求的九个要素在 `working_paper_sync_conflict` 上的列名。
+#:
+#: `schema_anomaly`（V264）是 spec wp-sync-conflict-adjudication-and-d4-32-modeling §1
+#: 补的成因列：`ConflictRecord.adjudicable_by_value_choice` 读它来判这条冲突能否靠
+#: 「选一侧 / 输入合并值」收敛，此前列投影漏了它 ⇒ 成因在写库那一刻丢失，读侧只能把
+#: 全部 schema 冲突一刀切判成不可裁决。本集合同时被下面两条断言使用，所以它也是
+#: 「该列必须在 ORM 上存在」的守卫。
 AC81_COLUMNS = {
     "stable_field_key",
     "business_label",
@@ -1377,6 +1383,7 @@ AC81_COLUMNS = {
     "protection_policy",
     "suggested_action",
     "conflict_kind",
+    "schema_anomaly",
     "base_value",
     "current_value",
     "incoming_value",

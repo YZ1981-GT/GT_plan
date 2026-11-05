@@ -233,8 +233,8 @@ describe('close 仲裁三种结局逐一可辨', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('追溯缺口登记表', () => {
-  it('五项已登记缺口都有 id/label/reason，且 id 唯一', () => {
-    expect(WP_SYNC_TRACE_GAPS.length).toBe(5)
+  it('每项已登记缺口都有 id/label/reason，且 id 唯一', () => {
+    expect(WP_SYNC_TRACE_GAPS.length).toBeGreaterThan(0)
     const ids = WP_SYNC_TRACE_GAPS.map((gap) => gap.id)
     expect(new Set(ids).size).toBe(ids.length)
     for (const gap of WP_SYNC_TRACE_GAPS) {
@@ -243,12 +243,20 @@ describe('追溯缺口登记表', () => {
     }
   })
 
-  it('两个 room durable fence 字段与 origin sequence 都在登记表里', () => {
+  it('仍无读取面的几项必须留在登记表里', () => {
     const ids = WP_SYNC_TRACE_GAPS.map((gap) => gap.id)
-    expect(ids).toContain('room_latest_durable_application_id')
-    expect(ids).toContain('room_latest_durable_sequence')
     expect(ids).toContain('application_origin_request_sequence')
     expect(ids).toContain('incoming_artifact_sha256')
+    expect(ids).toContain('room_opened_base_revision')
+  })
+
+  it('room durable fence 两项已有读取面，不得再登记成缺口', () => {
+    // 这两项原先登记为「无读取面」，而后端 get_operation 自 Task 32 起就随 app_facts
+    // 投影它们 —— 过期的登记让冲突面板一直按「拿不到」处理，于是**任何** entry 的
+    // 冲突都提交不了裁决。本条是反向判据：谁把它们加回登记表，这里立刻打红。
+    const ids = WP_SYNC_TRACE_GAPS.map((gap) => gap.id)
+    expect(ids).not.toContain('room_latest_durable_application_id')
+    expect(ids).not.toContain('room_latest_durable_sequence')
   })
 
   it('占位符不是空串也不是 0/—（空白会被读成「值就是空」）', () => {
