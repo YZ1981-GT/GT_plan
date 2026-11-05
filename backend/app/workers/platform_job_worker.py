@@ -147,6 +147,7 @@ async def run(stop_event: asyncio.Event) -> None:
     """启动时自动消费 queued/过期 running；停机后租约负责恢复。"""
     # 延迟导入 executor 模块，避免 registry 与业务服务循环依赖。
     from app.services.bulk_tab import durable_job_executor  # noqa: F401
+    from app.services import export_pack_executor  # noqa: F401
 
     while not stop_event.is_set():
         try:

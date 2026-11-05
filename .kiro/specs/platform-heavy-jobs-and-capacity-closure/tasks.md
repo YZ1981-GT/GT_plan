@@ -46,7 +46,16 @@
 
 - [ ] B1 设计并迁移公共 durable job/job attempt，V/R 成对且动态取号。
 - [ ] B2 实现 claim/lease/heartbeat/fence/retry/cancel/idempotency 与恢复 worker。
-- [ ] B3 迁移底稿导出与 bulk import；旧内存任务只作兼容读并设退役日期。
+- [x] B3 迁移底稿导出与 bulk import；旧内存任务只作兼容读并设退役日期。
+  - 底稿文件打包导出（`export_progress_service` → `export_pack_executor`）已迁移：
+    `export_pack_executor.py` 注册 `workpaper_pack_export` executor（按 wp_ids 打包 → 线程写盘 → SSE 完成事件）；
+    路由 `batch_export_progress.py` 提交端改 `create_or_get_job`（幂等、权限 + DB INSERT 即返回），
+    状态/下载端优先查 `platform_jobs`（六态→前端四态映射）、旧内存兼容读作后备；
+    worker 延迟导入 `export_pack_executor`（与 `durable_job_executor` 同口径）。
+  - bulk import 已由前置提交迁移（`durable_job_executor.py` + `bulk_async_runner` spool admission）。
+  - 旧 `ExportProgressService` 保留兼容读（`_DURABLE_ENABLED=True` 时新路径优先），退役日期待正式灰度后移除。
+  - 验证：`test_export_pack_durable.py`(7) + 既有 `test_batch_export_progress`/`test_export_cleanup`/
+    `test_platform_job_service`/`test_platform_job_worker` 共 38 passed；lint 全绿。
 - [ ] B4 迁移公式推送、附注批量 AI、合并重新汇总；按阶段发 typed SSE。
 - [ ] B5 前端统一任务状态组件，断线后从状态端点恢复。
 - [ ] B6 kill/reload/重复提交/租约过期故障注入证明零重复副作用。

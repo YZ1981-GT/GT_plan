@@ -22,12 +22,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user, get_current_user_stream, require_project_access
 from app.models.core import User
 from app.services.export_progress_service import export_progress_service
+
+# 延迟导入以避免循环（executor 在 worker 启动时注册）
+_DURABLE_ENABLED = True  # 灰度开关；设 False 回退旧内存态
 
 
 # 项目级路由（接受 wp_ids 触发任务）
@@ -66,8 +70,40 @@ class ExportTaskStatus(BaseModel):
     download_url: str | None = None
 
 
-def _owned_task(task_id: str, current_user: User):
-    """任务不存在和非本人统一 404，避免通过 task id 枚举导出状态或文件。"""
+async def _owned_durable_snapshot(
+    task_id: str,
+    current_user: User,
+) -> dict | None:
+    """查 platform_jobs 并校验归属（只校验 actor_id）；找不到返回 None（留给旧路径）。"""
+    if not _DURABLE_ENABLED:
+        return None
+    try:
+        job_uuid = UUID(task_id)
+    except ValueError:
+        return None
+    from app.core.database import async_session
+    from app.models.platform_job_models import PlatformJob
+    from app.services.platform_job_service import job_snapshot
+
+    try:
+        async with async_session() as db:
+            job = (
+                await db.execute(
+                    sa.select(PlatformJob).where(
+                        PlatformJob.id == job_uuid,
+                        PlatformJob.actor_id == current_user.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if job is None:
+                return None
+            return job_snapshot(job)
+    except Exception:  # noqa: BLE001 — 查旧任务失败不阻断
+        return None
+
+
+def _owned_legacy_task(task_id: str, current_user: User):
+    """旧内存态兼容读。"""
     task = export_progress_service.get_task(task_id)
     if task is None or task.user_id != str(current_user.id):
         raise HTTPException(status_code=404, detail="导出任务不存在或已过期")
@@ -83,14 +119,11 @@ async def batch_export_async(
 ) -> BatchExportAsyncResponse:
     """触发批量导出任务，立即返回 task_id；ZIP 通过后台异步生成。
 
-    进度通过 SSE 事件 export.progress 推送，完成时推送 export.complete
-    （含 download_url），失败推送 export.failed。
+    迁移后提交端只做权限 + job INSERT，不再 asyncio.create_task。worker 认领后执行。
     """
     if not body.wp_ids:
         raise HTTPException(status_code=400, detail="wp_ids 不能为空")
 
-    # Wp_Bound_Gate（Task 4 / R3）：调度后台打包前预过滤可见集（make_bulk_visible_filter）；
-    # 不可见/跨项目/未委派/scope 外底稿静默剔除，后台 worker 仅打包可见集。
     from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
 
     _visible = make_bulk_visible_filter(
@@ -99,6 +132,29 @@ async def batch_export_async(
     )
     visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
 
+    if _DURABLE_ENABLED:
+        from app.services.export_pack_executor import OPERATION
+        from app.services import platform_job_service as jobs
+
+        idempotency_key = f"pack-{project_id}-{'-'.join(sorted(visible_wp_ids))}"
+        job, created = await jobs.create_or_get_job(
+            db,
+            operation=OPERATION,
+            project_id=project_id,
+            actor_id=current_user.id,
+            idempotency_key=idempotency_key,
+            payload_ref={"wp_ids": visible_wp_ids},
+            progress_total=len(visible_wp_ids),
+        )
+        await db.commit()
+        snapshot = jobs.job_snapshot(job)
+        return BatchExportAsyncResponse(
+            task_id=str(job.id),
+            total=int(snapshot.get("progress_total") or len(visible_wp_ids)),
+            status=snapshot.get("status", "queued"),
+        )
+
+    # 旧路径（灰度 fallback，_DURABLE_ENABLED=False 时使用）
     task = export_progress_service.create_task(
         project_id=str(project_id),
         user_id=str(current_user.id),
@@ -116,8 +172,38 @@ async def get_export_status(
     task_id: str,
     current_user: User = Depends(get_current_user),
 ) -> ExportTaskStatus:
-    """查询导出任务状态"""
-    task = _owned_task(task_id, current_user)
+    """查询导出任务状态——优先查耐久任务（platform_jobs），旧内存态作兼容后备。"""
+    durable = await _owned_durable_snapshot(task_id, current_user)
+    if durable is not None:
+        status = durable["status"]
+        done = int(durable.get("progress_current") or 0)
+        total = int(durable.get("progress_total") or 0)
+        percent = int(done * 100 / max(total, 1))
+        download_url = (
+            (durable.get("result_ref") or {}).get("download_url")
+            if status == "succeeded"
+            else None
+        )
+        # 前端 ExportProgressBar 认 complete/failed/running/pending，映射耐久任务六态
+        mapped_status = {
+            "queued": "pending",
+            "running": "running",
+            "retry_wait": "pending",
+            "succeeded": "complete",
+            "failed": "failed",
+            "cancelled": "failed",
+        }.get(status, status)
+        return ExportTaskStatus(
+            task_id=task_id,
+            status=mapped_status,
+            done=done,
+            total=total,
+            percent=percent,
+            error=durable.get("error_message"),
+            download_url=download_url,
+        )
+
+    task = _owned_legacy_task(task_id, current_user)
     download_url = (
         f"/api/exports/{task.task_id}"
         if task.status == "complete" and task.file_path
@@ -140,8 +226,24 @@ async def download_export(
     task_id: str,
     current_user: User = Depends(get_current_user_stream),
 ):
-    """下载已生成的 ZIP 文件"""
-    task = _owned_task(task_id, current_user)
+    """下载已生成的 ZIP 文件——优先查耐久任务，旧内存态作兼容后备。"""
+    durable = await _owned_durable_snapshot(task_id, current_user)
+    if durable is not None:
+        if durable["status"] != "succeeded":
+            raise HTTPException(
+                status_code=409,
+                detail=f"任务尚未完成（状态：{durable['status']}）",
+            )
+        zip_path = (durable.get("result_ref") or {}).get("zip_path")
+        if not zip_path or not Path(zip_path).exists():
+            raise HTTPException(status_code=404, detail="导出文件已被清理")
+        return FileResponse(
+            path=zip_path,
+            media_type="application/zip",
+            filename=f"workpapers_export_{task_id[:8]}.zip",
+        )
+
+    task = _owned_legacy_task(task_id, current_user)
     if task.status != "complete":
         raise HTTPException(status_code=409, detail=f"任务尚未完成（状态：{task.status}）")
     if not task.file_path or not Path(task.file_path).exists():
