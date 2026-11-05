@@ -1250,3 +1250,124 @@ p7 回到 637 行。顺带把搬过去的两处 `E741`（`l` 作循环变量）�
 - **6.3 的 capability 终裁仍要真实 OnlyOffice 证据**，须用户放行后才能做（与上一节同）。
 - **A5-1 已发布 artifact 仍是按模板修订前的 digest 发的**，重发布属 6.3。
 - 0.5 / 2.8 / 7.5 不变，仍以总索引为准。
+
+## 第四批：攻三个卡点（2026-11-05，用户放行真实环境后）
+
+环境：`audit-postgres` / `audit-redis` / `audit-onlyoffice`（documentserver，healthcheck=true）
+全部 healthy，后端 9980、前端 3030 在跑。本批**只读真库**，未写任何业务数据、未执行迁移。
+
+### 卡点一：t75 的 1 failed + 14 errors —— **已解除**（无需改代码）
+
+`TestNonEmptyRunOnRealSupply` 自建 `tmp_task75_observer_*` 临时 schema，隔离库下只能报
+环境失败。真库跑一次：**514 passed / 0 failed**。隔离库下的残留与 base 逐节点比
+`added=0 / resolved=85`（base 86 failed + 14 errors ⇒ 候选 1 failed + 14 errors），
+即第二批的 provider 补齐真实有效，余下的是「这组用例必须在真 PG 上跑」这一事实本身。
+
+### 卡点二：v1.0.129 带出去的 stale 生成物 —— 已修（commit 1）
+
+依赖链比「四件生成物 host」管的范围更深：manifest ⇒ required_scenario_set /
+residual_lane_ledger ⇒ runtime_evidence_projection / cycle_reconciliation ⇒ 里程碑。
+第三批只重算了 host 的四件 + 里程碑，而**全量 `--check` 跑在重算之前** ⇒ 两件 stale 没被
+看见。本批按依赖序迭代到不动点（第 1 轮即收敛），9 个生成物 `--check` 全 rc=0。
+`runtime_evidence_projection` 由**可达真库**产出（`pg: connected / total_test_runs=0`），
+不是隔离库的 `degraded:*` 降级版。
+
+### 卡点三：6.3 的真实 OnlyOffice —— 从「测不了」推进到「可测、并测出真实供给图」
+
+#### 3.1 🔴 任务 70 门禁此前**整体崩**，连报告都生成不出来（三个独立崩点，修一个才看见下一个）
+
+| 崩点 | 根因 | 处置 |
+| --- | --- | --- |
+| `EntryProfileError: entry 'docx/gt-a10-bundle': capability 未登记: None` | `build_scenario_denominator()` / `derive_all_entries()` 用 `capability_of`（pending 一律抛）统计**含未裁决 entry** 的分母。生产函数文档明写「只问是否已启用某能力时用 `effective_capability`，pending 的答案是『还没有』，不是异常」。自 task 1.1 引入 pending 态起本门必崩，现算 197 条里 86 条 pending | 改用 `effective_capability`，pending 归 `pending` 桶 |
+| `Task70GateError: tasks.md 里找不到任务 70` | 本 spec 目录**换过代**：任务 70 的正文在 `_archive/17-2026-10-03-verified-batch/<spec>/tasks.md`，活跃目录已重编号成 0.x~7.x | 路径按**内容**择路（活跃优先、归档兜底）。只看文件存在性会继续选中那份没有任务 70 的 |
+| `Task70GateError: design.md 里找不到 \`### Property 20\`` | design.md 同代际问题 | 同上，判别串用第一条已声明 Property |
+
+修完三处后本门**跑通到底**，并带真实 OO 跑完 live probe（`ONLYOFFICE_URL=http://127.0.0.1:8080`
++ 容器密钥；push_wt 里没有 `.env`，不显式注入时本门按契约
+`command_service.jwt.required=true` **fail-closed** 在「ONLYOFFICE_JWT_SECRET 缺失」，
+不降级成不鉴权探测 —— 这条行为是对的，保留）。
+
+#### 3.2 🔴 `storage/` 不入库 ⇒ 注册数字在任何干净检出里都是**环境事实**，不是供给事实
+
+`storage/` 与 `backend/storage/` 都在 .gitignore 里，真实项目的 `.versions/**`
+**从不入库**。于是干净检出 / CI / 临时 worktree 里 provider 侧必然以
+`artifact_publish_failed: published artifact 指针指向的文件不存在` 整批失败。
+同一份代码、同一个库、只换工作树的 A/B：
+
+| 环境 | registered | failures | 分型 |
+| --- | ---: | ---: | --- |
+| 临时 worktree（无 storage 内容） | **0** | 59 | `artifact_publish_failed` 59 |
+| 主工作树（有 storage） | **32** | 27 | `published_identity_observed_drift` 16 + `sync_contract_structure_drift` 11 |
+
+⇒ 冻结描述里的「planned=186 / registered=0，逐 entry 原因是还没有 current published
+representation」**在有 storage 的环境里不成立**。门禁现在把这件事记成
+`artifact_environment` + `measurement_is_environment_limited`，并且 registered=0 时
+**不再**宣称一个未经核对的归因（原文写死「全部 planned entry 都缺 current published
+representation 或 per-entry 契约」）。
+
+两个触发条件都要：storage 根不存在，**或**根在但本轮真有 `artifact_publish_failed`。
+只看根是否存在会漏掉「目录在、里面是空的」—— 临时 worktree 实测正是这种
+（`storage_root_exists=true` 而 `project_dirs=0`，59 条全失败）。
+
+#### 3.3 🔴 记账等式漏了一项，于是「无 entry 被静默跳过」这条判据恒假
+
+registry 的三个集合各有独立来源（`registered_entry_ids` 实录 / `reasons` 供给不足 /
+`failures` typed 故障），等式是**三边之和 == planned**。门禁与守卫都只加前两项
+（`assert 197 == (138 + 0)`）⇒ 任何一条 entry 走到 typed failure 就让等式恒假，而它只是
+个 detail 字段、没人看。现在三项都记、都比，并把公式字符串一起钉住。
+
+#### 3.4 🔴 顺带抓到一条**恒绿**守卫
+
+`test_checkbox_flip_does_not_change_body_digest` 写死活跃目录的 tasks.md，那份里一条
+`70.` 都没有 ⇒ `re.sub(count=1)` 零命中、文件内容不变、digest 自然一字不变 ⇒ 这条判据
+**测不到任何东西**（它在崩点修好后「恢复通过」，其实是恢复成恒绿）。已改成取
+`gate.tasks_md()` 并补「变异真的落盘了」的反向断言；同组的反向自检改为**从正文自己取锚点**
+（原来写死一句中文，spec 换代即失锚）。
+
+#### 3.5 6.3 的真实供给图（现算，主工作树 + 真库）
+
+197 条 entry / 111 条 bidirectional：
+
+| 分类 | 条数 | 下一步 |
+| --- | ---: | --- |
+| 供给齐备、`register_from_manifest` 真注册成功 | **32** | `harness.plan()` 对这 32 条**全部成功**，各 24 条 required scenario ⇒ 已可执行真实 OO 场景 |
+| `published_identity_observed_drift` | 16 | 重新投影产出新 representation |
+| `sync_contract_structure_drift` | 11 | 契约结构对齐（逐不一致位置已给 sheet/table/field） |
+| 无该 entry 自己的 approved per-entry 契约 | 44 | 逐 entry 发布（Tasks 46~57 / 62~64 承接） |
+| 还没有 current published representation | 8 | representation 管道 |
+| capability 未裁决（pending） | 86 | 4.* 逐项裁决 |
+
+🔴 这张图**取代**此前「59 条从未真实跑过 / 5 条只跑通单向 / 1 条全失败 / 5 条跑通但裁决
+没跟上」那个分类 —— 那是在 145 条 entry / 67 条 bidirectional 的 manifest 上算的，
+manifest 已增长到 197 / 111。
+
+### 本批未完成（如实登记）
+
+- **真实 OO 场景执行与 evidence 落库仍未做。** `working_paper_sync_test_run` 与
+  `working_paper_entry_evidence_scenario` 现算仍是 **0 行**。写一条合法 test_run 需要
+  `onlyoffice_build` / `browser_build` / `environment_digest` / `run_manifest_artifact_id`
+  —— 即一个真正驱动 OO + 浏览器并上传 run manifest 的 runner。32 条候选 entry 已就位，
+  runner 本身仍待实现，属 6.3 剩余工作。
+- **任务 70 的已提交报告仍 stale**（`backend/data/workpaper_sync_task70_oo_scenario_refresh.json`
+  预期 `--check` 红）。刻意**不**在本批刷新：①报告内容与环境强耦合（registered 数字随
+  `storage/` 有无而变），在无 storage 的工作树上 `--write` 会把一份**更差**的快照
+  （registered=0）冻进仓库；②在主工作树 `--write` 会写进别的会话的工作树。
+  正确做法是先把环境相关字段从逐字节锁里剔出去（照本门已有的 `CENSUS_KEYS` /
+  `VOLATILE_KEYS` 范式「剔除 ≠ 不管」，改为现算 + 语义断言），再在有 storage + 真 OO 的
+  环境里刷新一次。这是独立的一件事，本批不夹带。
+- 任务 70 守卫文件剩 8 failed + 2 errors（junit 逐节点 A/B：base 21 ⇒ 候选 10，`added=0 / resolved=11`），
+  全部来自上一条的 stale 报告与 pytest 进程里没有 OO 环境变量。
+- **A5-1 重发布**仍属 6.3，未动。
+
+### 验证
+
+| 项 | 结果 |
+| --- | --- |
+| t75（真库 `--db shared`） | **514 passed / 0 failed** |
+| 9 个生成物 `--check` | **9/9 rc=0**（按依赖序迭代到不动点） |
+| 任务 70 门禁 | 由「崩在 `EntryProfileError`」→ **跑通到底**（含真实 OO live probe） |
+| 任务 70 守卫 | junit 逐节点 A/B：21 → **10**，added **0** / resolved **11** |
+| t57 / 兄弟守卫 / pilots / K 全家 | 136 / 536 / 540 / **1143** 全绿，与第三批一致 |
+| ruff（改动文件 A/B） | 新增 **0** |
+| 行数门 | `rc=0` —— 门禁文件补完判据后 3317 行超白名单 +5%，按「拆模块不抬白名单」把环境/路径解析三件拆到 `backend/scripts/check/_task70_gate_env.py`，主文件回到 3230 行 |
+| CRLF churn | 无 |

@@ -175,11 +175,17 @@ class TestTaskBodyDigestIgnoresCheckboxState:
 
         这是 BP-70-6 的**正向**判据：任务 69 的门在这里失守（`- [-] 69.` → `- [x] 69.` 让它
         的逐字节锁必红，而正文零变化）。本条对四个合法状态各算一次。
+
+        🔴 2026-11-05：路径必须取 `gate.tasks_md()` —— 本 spec 目录换过代，任务 70 的正文
+        现在在 `_archive/17-…/<spec>/tasks.md`。原来写死活跃目录，那份里一条 `70.` 都没有
+        ⇒ `re.sub(count=1)` 零命中、文件内容不变、digest 自然一字不变 ⇒ **这条判据恒绿、
+        测不到任何东西**。所以同时补「变异真的落盘了」的反向断言。
         """
-        tasks_md = REPO / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md"
+        tasks_md = gate.tasks_md()
         original = tasks_md.read_text(encoding="utf-8")
         baseline = gate.task_body()
         digests = {baseline: "as-is"}
+        applied = 0
         try:
             for marker in (" ", "x", "~", "-"):
                 mutated = re.sub(
@@ -189,27 +195,42 @@ class TestTaskBodyDigestIgnoresCheckboxState:
                     count=1,
                     flags=re.M,
                 )
+                if mutated != original:
+                    applied += 1
                 tasks_md.write_text(mutated, encoding="utf-8")
                 digests[gate.task_body()] = marker
         finally:
             tasks_md.write_text(original, encoding="utf-8")
+        assert applied >= 3, (
+            f"四个状态里只有 {applied} 个真的改到了文件 —— 锚点没命中，本条是恒绿重言式"
+            f"（tasks_md={tasks_md}）"
+        )
         assert len(digests) == 1, (
             f"复选框翻牌改变了 body digest（得到 {len(digests)} 个不同 digest）—— "
             "编排器一翻牌本门的锁就会假红，正是 BP-70-6 的形态"
         )
 
     def test_body_digest_still_reacts_to_real_text_change(self, gate: Any) -> None:
-        """反向自检：正文**内容**变了 digest 必须变（否则归一化把锁归一化没了）。"""
-        tasks_md = REPO / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md"
+        """反向自检：正文**内容**变了 digest 必须变（否则归一化把锁归一化没了）。
+
+        🔴 2026-11-05：锚点改成**从正文自己取**。原来写死一句中文（"本任务负责真实刷新但
+        不执行删除判断"）+ 写死活跃目录路径，spec 换代后两者都失配 ⇒ 这条红在
+        "反向自检的锚点没命中 —— 判据本身失效" 上。锚点从 `gate.task_body()` 里现取一行
+        非空正文，spec 文案怎么改都不会让判据失锚。
+        """
+        tasks_md = gate.tasks_md()
         original = tasks_md.read_text(encoding="utf-8")
         baseline = gate.task_body()
+        anchor = next(
+            line.strip()
+            for line in baseline.split("\n")[1:]
+            if len(line.strip()) > 12 and "[" not in line
+        )
         try:
-            mutated = original.replace(
-                "本任务负责真实刷新但不执行删除判断",
-                "本任务负责真实刷新但不执行删除判断（守卫反向自检插入）",
-                1,
+            mutated = original.replace(anchor, anchor + "（守卫反向自检插入）", 1)
+            assert mutated != original, (
+                f"反向自检的锚点没命中 —— 判据本身失效（anchor={anchor[:40]!r}）"
             )
-            assert mutated != original, "反向自检的锚点没命中 —— 判据本身失效"
             tasks_md.write_text(mutated, encoding="utf-8")
             assert gate.task_body() != baseline, (
                 "正文内容变了但 body digest 没变 —— 归一化把整条锁抹掉了"
@@ -972,20 +993,33 @@ class TestSupplyChainWalk:
     def test_register_from_manifest_accounting_identity_holds(
         self, live_db: Mapping[str, Any], report: Mapping[str, Any]
     ) -> None:
-        """planned = registered + reasons 必须逐条成立（Property 62：无 entry 被静默跳过）。
+        """planned = registered + reasons + **failures** 必须逐条成立（Property 62）。
 
         两侧都查：报告只读产物对实现改动不敏感（教训 17），把 `accounting_identity_holds`
         写死成 True 时磁盘报告不会变。
+
+        🔴 2026-11-05：原判据漏了 `failures` 这一项。registry 的三个集合各有独立来源
+        （`registered_entry_ids` 实录 / `reasons` 供给不足 / `failures` typed 故障），
+        等式是**三边之和**；只加前两项时，任何一条 entry 走到 typed failure（契约漂移 /
+        观测器拒绝）就让等式恒假。实测 `assert 197 == (138 + 0)` —— 库里 59 条
+        `artifact_publish_failed` 全落在 failures 里，原等式因此永远对不上，而它当时在
+        `accounting_identity_holds` 恒 False 的报告上「红得理所当然」，没人追到这一层。
         """
         for source in (live_db["supply_chain_walk"], report["supply_chain_walk"]):
             s6 = next(step for step in source["steps"] if step["step"] == "S6")
             detail = s6["detail"]
             assert detail["accounting_identity_holds"] is True
             # 🔴 独立重算等式本身：只信 `accounting_identity_holds` 会让它被写死后无人察觉。
-            assert detail["planned"] == detail["unregistered_count"] + len(
-                detail["registered_entry_ids"]
+            assert detail["planned"] == (
+                detail["unregistered_count"]
+                + detail["failure_count"]
+                + len(detail["registered_entry_ids"])
             )
             assert detail["planned"] > 0
+            # 等式的三项都必须真被记下来（少记一项即回到「两边之和」那种恒假形态）
+            assert detail["accounting_identity_formula"] == (
+                "registered + reasons + failures == planned"
+            )
 
         # 🔴 结构判据：该字段必须是**算出来**的比较表达式，不能是字面量。
         #    等式今天恰好成立 ⇒ 把它写死成 True 是**等价变异**，值层判据抓不到

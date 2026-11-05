@@ -97,8 +97,46 @@ OWNER_TASK: Final[str] = "70"
 SPEC: Final[str] = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 SCHEMA_VERSION: Final[str] = "task70-oo94-full-entry-scenario-refresh:v1"
 
-TASKS_MD: Final[Path] = REPO / ".kiro/specs" / SPEC / "tasks.md"
-DESIGN_MD: Final[Path] = REPO / ".kiro/specs" / SPEC / "design.md"
+from scripts.check._task70_gate_env import (  # noqa: E402
+    SpecDocNotFoundError,
+    artifact_environment,
+    capability_bucket,
+    measurement_is_environment_limited,
+    spec_doc,
+)
+
+#: 🔴 惰性解析：常量在 import 期求值会让「找不到」变成 import 崩溃，
+#: 诊断信息比 `Task70GateError` 差得多（也无法被判据捕获）。
+_SPEC_DOC_CACHE: dict[str, Path] = {}
+
+
+def _resolve_spec_doc(name: str, *, must_contain: str | None = None) -> Path:
+    """包一层：把拆出去那个模块的异常翻成本门自己的错误类型。"""
+    try:
+        return spec_doc(REPO, SPEC, name, must_contain=must_contain)
+    except SpecDocNotFoundError as exc:
+        raise Task70GateError(str(exc)) from exc
+
+
+def tasks_md() -> Path:
+    """任务 70 正文所在的 tasks.md（活跃优先、归档兜底，按内容择路）。"""
+    if "tasks" not in _SPEC_DOC_CACHE:
+        _SPEC_DOC_CACHE["tasks"] = _resolve_spec_doc(
+            "tasks.md", must_contain=rf"^\s*-\s\[[ x~\-]\]\s+{TASK_NUMBER}\."
+        )
+    return _SPEC_DOC_CACHE["tasks"]
+
+
+def design_md() -> Path:
+    """本门声明的 Property 定义所在的 design.md（判别串用第一条已声明 Property）。"""
+    if "design" not in _SPEC_DOC_CACHE:
+        first = min(DECLARED_PROPERTIES)
+        _SPEC_DOC_CACHE["design"] = _resolve_spec_doc(
+            "design.md", must_contain=rf"^###\s+Property\s+{first}\b"
+        )
+    return _SPEC_DOC_CACHE["design"]
+
+
 OUTPUT_PATH: Final[Path] = BACKEND / "data/workpaper_sync_task70_oo_scenario_refresh.json"
 
 T67_REPORT: Final[Path] = BACKEND / "data/workpaper_sync_task67_structural_pre_reconcile.json"
@@ -387,7 +425,7 @@ def task_body(task_number: str = TASK_NUMBER) -> str:
     `[-]` 后逐字节相等 ⇒ 正文一个字都没变）。归一化成 `[?]` 让锁只对**正文内容**敏感，
     而任务状态翻牌不再制造假红。
     """
-    lines = read_text(TASKS_MD).split("\n")
+    lines = read_text(tasks_md()).split("\n")
     start = next(
         (
             index
@@ -442,7 +480,7 @@ def task_declarations() -> dict[str, Any]:
 
 def design_property_titles() -> dict[str, str]:
     """design.md 里本门声明的 29 条 Property 的标题（正文可能与标题同行）。"""
-    text = read_text(DESIGN_MD)
+    text = read_text(design_md())
     out: dict[str, str] = {}
     for number in DECLARED_PROPERTIES:
         match = re.search(rf"^###\s+Property\s+{number}\b[:：]?\s*(.*)$", text, re.M)
@@ -654,7 +692,11 @@ def build_scenario_denominator() -> dict[str, Any]:
         "task_text_ids_not_in_production": unmapped_in_task_text,
         "manifest_entry_count": len(entries),
         "capability_distribution": dict(
-            sorted(Counter(entry_profile.capability_of(e).value for e in entries.values()).items())
+            sorted(
+                Counter(
+                    capability_bucket(entry_profile, e) for e in entries.values()
+                ).items()
+            )
         ),
         "independent_entry_count": sum(
             1 for e in entries.values() if e.get("independent_entry")
@@ -756,7 +798,13 @@ def derive_all_entries() -> tuple[EntryDerivation, ...]:
     out: list[EntryDerivation] = []
     for entry_id in sorted(entries):
         entry = entries[entry_id]
-        capability = entry_profile.capability_of(entry)
+        # 🔴 与 `capability_bucket` 同一个理由：分母含未裁决 entry ⇒ 用
+        #    `effective_capability`（pending → None → 桶名 'pending'），不用
+        #    `capability_of`（pending 一律抛、整门崩在第一条 pending 上）。
+        #    pending entry 仍然**逐条推导**（下面的 `derive_for_manifest_entry` 照跑）：
+        #    它要么给出 required set，要么把失败转成可归因的 `derivation_error`，
+        #    两种都比「整门崩掉」有信息量。
+        capability_value = capability_bucket(entry_profile, entry)
         profile_payload = entry.get("scenario_profile") or {}
         per_model: dict[str, dict[str, Any]] = {}
         derivation_error: str | None = None
@@ -787,7 +835,7 @@ def derive_all_entries() -> tuple[EntryDerivation, ...]:
         out.append(
             EntryDerivation(
                 entry_id=entry_id,
-                capability=capability.value,
+                capability=capability_value,
                 editable=editable,
                 editability=editability,
                 room_model=room_model,
@@ -1219,6 +1267,42 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
     # ── 6. register_from_manifest 真跑
     try:
         outcome = await registry.register_from_manifest(session=session)
+        failures = dict(outcome.failures or {})
+        reasons = dict(outcome.reasons or {})
+        # 🔴 `failures` 必须进记账：registry 自己的三集合（registered / reasons / failures）
+        #    各有独立来源，等式是 **三边之和 == planned**。原实现只加 registered + reasons，
+        #    于是任何一条 entry 走到 typed failure（契约漂移 / 观测器拒绝）时这个「记账等式」
+        #    就恒为 False，而它只是个 detail 字段、没人看 ⇒ 等于没有判据。
+        accounting_holds = (
+            len(outcome.registered_entry_ids) + len(reasons) + len(failures)
+            == len(outcome.planned_entry_ids)
+        )
+        # 🔴 本环境能不能解析 published artifact，是读这组数字的前提。
+        #    `storage/` 与 `backend/storage/` 都在 .gitignore 里 ⇒ **任何干净检出 / CI /
+        #    临时 worktree 都没有真实项目版本文件**。那种环境下 provider 侧会以
+        #    `artifact_publish_failed: published artifact 指针指向的文件不存在` 整批失败，
+        #    registered 被系统性压低（实测：无 storage 的 worktree 0 条注册 / 59 条
+        #    artifact_publish_failed；主工作树同一代码 32 条注册 / 27 条真实漂移）。
+        #    不区分的话，「registered=0」会被当成供给事实，而它只是环境事实。
+        artifact_env = artifact_environment(BACKEND, failures)
+        env_limited = measurement_is_environment_limited(artifact_env)
+        if outcome.registered_entry_ids:
+            blocked = None
+        elif env_limited:
+            blocked = (
+                "registered=0 **不可解读为供给事实**：本环境无法解析 published artifact"
+                f"（storage_root_exists={artifact_env['storage_root_exists']}，"
+                f"artifact_publish_failed={artifact_env['artifact_publish_failed_count']}）。"
+                "storage 不入库 ⇒ 干净检出里恒缺；要测真实供给须在有 storage 的工作树上跑"
+            )
+        else:
+            # 真的能解析 artifact 还 0 条注册 ⇒ 才是供给结论，且原因按**现算直方图**给，
+            # 不写死「都缺 representation 或 per-entry 契约」这种未经核对的归因。
+            blocked = (
+                "registered=0：artifact 可解析但无一 entry 满足准入，原因分布见 "
+                f"reason_kind_histogram / failure_code_histogram（reasons={len(reasons)}，"
+                f"failures={len(failures)}）"
+            )
         record(
             "S6",
             "register_from_manifest(session) [REAL]",
@@ -1227,12 +1311,13 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
                 "planned": len(outcome.planned_entry_ids),
                 "registered_entry_ids": list(outcome.registered_entry_ids),
                 "registered_adapter_ids": list(outcome.registered_adapter_ids),
-                "unregistered_count": len(outcome.reasons),
-                "accounting_identity_holds": (
-                    len(outcome.registered_entry_ids) + len(outcome.reasons)
-                    == len(outcome.planned_entry_ids)
-                ),
-                "pilot_reason": str(outcome.reasons.get(PILOT_ENTRY_ID, ""))[:420],
+                "unregistered_count": len(reasons),
+                "failure_count": len(failures),
+                "accounting_identity_holds": accounting_holds,
+                "accounting_identity_formula": "registered + reasons + failures == planned",
+                "artifact_environment": artifact_env,
+                "measurement_is_environment_limited": env_limited,
+                "pilot_reason": str(reasons.get(PILOT_ENTRY_ID, ""))[:420],
                 "reason_kind_histogram": dict(
                     sorted(
                         Counter(
@@ -1240,15 +1325,23 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
                             if "current published representation" in reason
                             else "no_per_entry_contract"
                             if "DELIVERED_PER_ENTRY_CONTRACTS" in reason
+                            else "capability_unadjudicated"
+                            if "capability 裁决" in reason
                             else "other"
-                            for reason in outcome.reasons.values()
+                            for reason in reasons.values()
+                        ).items()
+                    )
+                ),
+                "failure_code_histogram": dict(
+                    sorted(
+                        Counter(
+                            str(getattr(fail, "error_code", "") or "unknown")
+                            for fail in failures.values()
                         ).items()
                     )
                 ),
             },
-            None
-            if outcome.registered_entry_ids
-            else "registered=0：全部 planned entry 都缺 current published representation 或 per-entry 契约",
+            blocked,
         )
     except Exception as exc:  # noqa: BLE001
         record("S6", "register_from_manifest(session) [REAL]", True, None, f"{type(exc).__name__}: {exc}")
