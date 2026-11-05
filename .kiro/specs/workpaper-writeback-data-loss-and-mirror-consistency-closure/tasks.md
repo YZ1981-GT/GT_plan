@@ -74,8 +74,22 @@
   - [x] 9.7 第三件残留 3 / 4 / 6 / 7：`FOR UPDATE` 合并为一条 `ANY(:ids)`（46 item 时
         92 → 47 次往返）而 advisory lock 保持逐条有序 · 屏障文案摊进真实原因并暴露 `reasons` ·
         14 个文件 15 处裸 PUT 补 `_dedupe: false` · F2 保存事件加同步 `accept()` 回执
-  - [ ] 9.8 第三件残留 5（14 个 G formData 迁 strict CAS）—— **未做**：R1.3 明文允许 LWW，
-        且已有"只许缩短 + 与 strict 清单互斥"的单向棘轮；属独立一轮的改动面
+  - [x] 9.8 第三件残留 5（14 个 G formData 迁 strict CAS）
+        - 14 家（G1 / G3 / G4 ECL / G4 SPPI / G5 / G6 main+SPPI / G8~G14）全部接入
+          `createChecklistCasClient`：GET 回执先 `remember` 版本，所有 checklist 保存经 helper 带
+          `require_if_match=true`、已有行带 `if_match`、成功只从服务端回执推进版本；直连
+          `api/http.put(...checklist-responses)` 为 0。
+        - 五家有网络退避的 formData 对 4xx（409 / 428 / 423 / 422）先停止并抛出，不再把同一
+          陈旧版本重试三次；网络/5xx 保留原退避。`isNonRetryableChecklistSaveError` 单测覆盖。
+        - R1.3 的 14 项 LWW 豁免清单已清零；strict 覆盖守卫扩到全部调用面，pending 屏障守卫
+          同时反查 helper / remember / 零直连 PUT / 4xx 先于退避，防止任一调用方退回兼容写法。
+        - 证据（2026-11-05 最终复核）：前端 strict/pending + 草稿身份边界 **12 files / 153 passed**；
+          后端 strict CAS / render-snapshot 契约 **17 passed**；相关 Python Ruff 通过；ESLint **0 error**
+          （4 条既有 warning）。语义审查 High / Medium / Low 均为 **0**；`git diff --check` 通过。
+          区域 `tsc` 仅报 2 个未改 G7 依赖文件的 3 条既有类型债，本轮改动路径零新增；
+          浏览器验收仍归任务 6（受 9.3 共享库迁移阻断）。
+        - 顺带收口草稿会话边界：G7 main / 子公司 / 权益法、H10、存货与固定资产监盘均改为
+          `sessionStorage.user.id` 分区；本地与真实跨窗口 logout 同步清理新旧敏感键。
   - [x] 9.9 顺带解决两条预存红：`migration_drift_ledger` 的 V200 / V201 条目对应文件已按裁决
         移除，台账加可伪证的 `file_removed` 并断言"确实不在磁盘上"（原判据对已移除条目恒红）
   - [x] 9.10 回归与变异（重放树 = 最新远端 + 本轮）：前端 rc=0、后端 488 passed、

@@ -19,6 +19,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { checklistDraftKey, checklistDraftPrefix } from '@/composables/workpaper/checklistDraftStorage'
 import type { ChecklistResponse } from './useF1FormData'
 import type { G7BasicInfoRow } from '../g7-long-term-equity-method/info/g7BasicInfoModel'
 import type { G7FinancialInfoRow } from '../g7-long-term-equity-method/info/g7FinancialInfoModel'
@@ -29,8 +30,8 @@ const DRAFT_PREFIX = 'g7-equity-method-draft'
 const MAX_RETRIES = 3
 const BASE_DELAY_MS = 500
 
-function draftKey(wpId: string, itemId: string): string {
-  return `${DRAFT_PREFIX}:${wpId}:${itemId}`
+function draftKey(wpId: string, itemId: string): string | null {
+  return checklistDraftKey(DRAFT_PREFIX, wpId, itemId)
 }
 
 // ─── Content Types ───────────────────────────────────────────────────────────
@@ -271,9 +272,9 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
 
   /** 恢复 localStorage 中暂存的草稿数据并尝试重新保存 */
   function restoreDrafts(): void {
-    if (!wpId.value) return
-    const prefix = `${DRAFT_PREFIX}:${wpId.value}:`
-    for (let i = 0; i < localStorage.length; i++) {
+    const prefix = checklistDraftPrefix(DRAFT_PREFIX, wpId.value)
+    if (!prefix) return
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
       const key = localStorage.key(i)
       if (!key?.startsWith(prefix)) continue
       try {
@@ -425,7 +426,8 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
         })
         // 成功 → 清除本地暂存
         try {
-          localStorage.removeItem(draftKey(wpId.value, itemId))
+          const key = draftKey(wpId.value, itemId)
+          if (key) localStorage.removeItem(key)
         } catch { /* ignore */ }
         try {
           const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
@@ -446,7 +448,8 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
 
     // 全部重试失败 → localStorage 暂存
     try {
-      localStorage.setItem(draftKey(wpId.value, itemId), JSON.stringify(updated))
+      const key = draftKey(wpId.value, itemId)
+      if (key) localStorage.setItem(key, JSON.stringify(updated))
       ElMessage.warning(`G7(权益法) 数据暂存本地（${itemId}），网络恢复后将自动同步`)
     } catch { /* ignore quota exceeded */ }
   }
@@ -490,7 +493,10 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
         })
         // 成功 → 清除所有相关本地暂存
         for (const item of toSave) {
-          try { localStorage.removeItem(draftKey(wpId.value, item.item_id)) } catch { /* ignore */ }
+          try {
+            const key = draftKey(wpId.value, item.item_id)
+            if (key) localStorage.removeItem(key)
+          } catch { /* ignore */ }
         }
         try {
           const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
@@ -512,7 +518,8 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
     // 全部重试失败 → localStorage 逐项暂存
     for (const item of toSave) {
       try {
-        localStorage.setItem(draftKey(wpId.value, item.item_id), JSON.stringify(item))
+        const key = draftKey(wpId.value, item.item_id)
+        if (key) localStorage.setItem(key, JSON.stringify(item))
       } catch { /* ignore */ }
     }
     ElMessage.warning('G7(权益法) 数据暂存本地，网络恢复后将自动同步')
@@ -612,7 +619,8 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
     }
     // 全部失败 → localStorage 暂存整体 content
     try {
-      localStorage.setItem(`${DRAFT_PREFIX}:${wpId.value}:__content__`, JSON.stringify(content))
+      const key = draftKey(wpId.value, '__content__')
+      if (key) localStorage.setItem(key, JSON.stringify(content))
       ElMessage.warning('G7(权益法) 内容暂存本地，网络恢复后将自动同步')
     } catch { /* ignore */ }
   }

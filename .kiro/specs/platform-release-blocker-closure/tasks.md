@@ -142,8 +142,18 @@
     `useEntrySyncReadiness` 2、`usePlatformAiChat` 2、`ThreeColumnLayout` 的
     `sync.completed` 事件联合类型 1。后者在本轮基线 `989010f42` 已存在；本轮动态 Dsh
     组件首次引入的类型错误已修复。因全量类型检查未全绿，本项保持未勾
-- [ ] 21. 一次性 PostgreSQL 从空库跑全迁移并验证 V229/readiness；不写共享库
-  - 未做。注：迁移磁盘现为 **252 个文件 / 最高 V263**（design 写的 V229 已过时）
+- [x] 21. 一次性 PostgreSQL 从空库跑全迁移并验证 V229/readiness；不写共享库
+  - 证据（2026-11-05，随机临时库 `gt_stage0_mig_<12hex>`）：先按历史 V001 基线执行
+    全部 ORM `create_all`（**365** 张表），再补 `service_identities.id` 的
+    `gen_random_uuid()` default，最后由当前 worktree 的 `MigrationRunner` 执行全部增量。
+    严格递归导入 `app.models.*`，不把 `import app.models` 误当作全量注册：首次失败发现
+    `extension_models.AccountingStandard` 未被聚合包导入，`Project.accounting_standard_id`
+    的 FK 在 `create_all` 报 `NoReferencedTableError`；改为 `pkgutil.walk_packages` +
+    `importlib.import_module` fail-closed 后通过。结果：磁盘 **251**、执行 **250**
+    （V001 是 create_all 基线）、失败 **0**、pending `[]`、failure `[]`、checksum drift `[]`、
+    `MigrationReadiness.is_complete=True`。进程 migration_state 标完成后真实调用 `/readyz`：
+    **200** `{"status":"ready","degraded":false}`。finally 已 terminate 临时库连接并
+    `DROP DATABASE` 成功；全程不触达 `audit_platform`
 - [ ] 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链
   - 未做，且**被任务 24 阻断**：共享库停在 V234，`projects.amount_unit`（V250）缺列
     使 `GET /api/projects/{id}` 恒 500 ⇒ 前端年度闸门不渲染

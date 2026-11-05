@@ -20,6 +20,7 @@ import pytest
 
 from app.routers.checklist_responses import _version_of
 from app.routers.wp_render_strategies import _d2_accounts_receivable as d2
+from app.routers.wp_render_strategies import _g1_trading_financial_assets as g1
 from app.routers.wp_render_strategies import _k1_other_receivables as k1
 from app.routers.wp_render_strategies import _k2_other_current_assets as k2
 from app.services.checklist_response_cas import (
@@ -128,6 +129,14 @@ def test_d2_inline_snapshot_carries_version(monkeypatch):
     out = asyncio.run(d2.render(_ctx(db)))
     assert db.checklist_sql, "没有执行 checklist 查询"
     assert out["responses_snapshot"]["D2-vc-current-rows"]["version"] == VERSION
+
+
+def test_g1_inline_snapshot_carries_version():
+    """G1 在 checklist GET 降级到 render 快照时也必须保留 strict CAS 基线。"""
+    db = _SnapshotSession(["G1-1-adjudicated-amount"])
+    out = asyncio.run(g1.render(_ctx(db)))
+    assert db.checklist_sql, "没有执行 checklist 查询"
+    assert out["responses_snapshot"]["G1-1-adjudicated-amount"]["version"] == VERSION
 
 
 # ── seed 不丢编辑基线 ──────────────────────────────────────────────────────
