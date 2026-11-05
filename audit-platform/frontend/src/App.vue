@@ -1,5 +1,13 @@
 <template>
-  <div id="app">
+  <!-- 🔴 根元素不要再写 id="app"：`main.ts` 挂的就是 index.html 里的 `<div id="app">`，
+       Vue 只替换挂载点的**内容**，所以这里再写一遍会在 DOM 里留下两个同 id 的元素
+       （外层带 `data-v-app`、内层是本组件根）。重复 id 是非法 HTML，且会让按 `#app`
+       取节点的工具拿到歧义结果 —— 2026-11-06 真实项目只读走查（spec
+       trim-generation-plan-followup-optimizations R5.5）就因此在 Playwright strict mode
+       上失败（`locator('#app') resolved to 2 elements`）。无任何 CSS / JS 依赖内层这个 id
+       （现算全仓 `#app` 只有挂载、e2e 夹具自己的页面和这条走查）。
+       守卫：`src/__tests__/appRootHasNoDuplicateId.spec.ts`。 -->
+  <div>
     <!-- Element Plus 内置文案（空表格、分页、日期面板、下拉无匹配等）统一走中文语言包；
          未配置时默认英文（空表格显示「No Data」）。ElMessageBox 等命令式组件经全局配置同样生效。 -->
     <ElConfigProvider :locale="zhCn">

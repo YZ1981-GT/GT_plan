@@ -40,12 +40,20 @@
   - [x] 4.5 生成/模板/本次触达 IPO 判断改用 resolver；客户端分类 query 下线；旧直读 AST 棘轮只许减少（后端 + 前端各一道）
   - [x] 4.6 分类 × 场景 × project/template type 矩阵、迁移/R 冲突保护、API 422 与浏览器回读测试
 
-- [ ] 5. 只读 UAT 安全基座（R5）
+- [x] 5. 只读 UAT 安全基座（R5）<!-- 2026-11-06：5.1~5.6 全部完成（5.5 为用户放行后实跑） -->
   - [x] 5.1 `provision_readonly_uat_user.py`：dry-run、双确认 apply、环境/交互密码、幂等创建与精确 revoke（另加 `--scope-cycles`，见 design §5 补记）
   - [x] 5.2 工具拒绝角色/权限升级、删除/归档项目和确认错配；事务失败零部分写，零 Staff/Assignment/业务表写（PG 用例在 docker 网络内跑，原因见验收记录）
   - [x] 5.3 `usePermissionMatrix` 显式 readonly/未知角色最小权限，补正反向测试
   - [x] 5.4 独立 readonly Playwright config + BrowserContext HTTP/WS/ServiceWorker fail-closed guard
-  - [ ]* 5.5 真实 UAT spec 只认显式环境变量，登录/权限/页面读/attemptedWrites/logs 双证；不自动 apply 共享库账号（代码已写、无环境变量时跳过；未实跑：需用户指定项目并放行建账号）
+  - [x] 5.5 真实 UAT spec 只认显式环境变量，登录/权限/页面读/attemptedWrites/logs 双证；不自动 apply 共享库账号
+    - **2026-11-06 用户放行后实跑通过**（项目由执行方选定：重药控股安徽有限公司_2025 `0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49`，存活 / execution / audit_year=2025 / 196 TB 行，是库里数据最全的真实项目）。
+      账号经 `provision_readonly_uat_user.py` 先 dry-run（0 拒绝）再 `--apply --confirm-project-id` 建号（`scope_cycles=ALL`），密码在同一个 shell 进程内随机生成、不回显不落盘，走查后立即 `--revoke --apply`。
+      结果 `1 passed (8.4s)`：登录 200 且 `user.role=readonly`、项目详情 200、`permission-matrix` 的 `system_role=readonly` 且 `operations=[]`、`/projects/{pid}/procedures` 与 `/projects/{pid}/workpapers` 均渲染且未被重定向、浏览器防火墙 `attemptedWrites=[]`、服务端 `check_readonly_uat_writes.py` 的 `logs=0`（双证）。
+      库内复核：4 个只读专用号全部 `is_active=false`、活成员行 0、`logs` 行 0。
+    - 🔴 实跑过程抓到并修了**两个真缺陷**（不是改判据绕开）：
+      ① `App.vue` 模板根元素重复声明 `id="app"`，而 `main.ts` 挂载的就是 `index.html` 的 `#app` ⇒ 运行期 DOM 里两个同 id（登录页即复现，与项目 / 权限无关），`locator('#app')` 在 Playwright strict mode 下直接报 `resolved to 2 elements`，把「页面渲染了」这条有效断言变成恒红。改为根元素不带 id（现算全仓无任何 CSS / JS 依赖内层那个 id），浏览器复验 `#app` 数量 1、全页无重复 id；守卫 `src/__tests__/appRootHasNoDuplicateId.spec.ts`（5 例，含剥注释与双向自检 —— 第一版被本文件自己说明注释里的字面量误命中）。
+      ② 防火墙 `isViteHmrSocket` 按 host 字符串严格相等判 HMR，而 Vite 客户端有两条地址：`socketHost`（按页面 hostname 拼）和**构建期硬编码**的 `directSocketHost`（`server.host='0.0.0.0'` 时固定 `localhost:<port>/`）。第一条被防火墙按 infra 正确拦下并 `close(1008)` 后 Vite 回退到第二条 ⇒ 页面开在 `127.0.0.1`、HMR 连 `localhost` ⇒ 回退那条被记成 `attemptedWrites`，使「零写入」断言在开发模式下恒红。判据改为「同端口 + 根路径 + 带 Vite `token` + 主机名同源或回环」，并在 R5.6 变异测试里补 6 条反向断言（换端口 / 换路径 / 缺 token / 非回环非同源 / 非法 URL 仍记写入），4 例全绿。
+    - 如实标注：走查跑在共享开发服务（3030 + 9980）上，该服务加载的是主工作树，当时有并发会话 78 个已改 + 约 80 个未跟踪文件在飞 ⇒ 这份证据对应「当时的工作树」，不对应某个已提交的树；只读防火墙与零写入双证不依赖在飞的功能代码。残留 4 个已停用的只读专用号（`--revoke` 的设计终态，工具不提供硬删）。
   - [x] 5.6 对 POST/PUT/PATCH/DELETE/beacon/popup/WS/未知 GET 做防火墙变异测试
 
 - [x] 6. 明细性能裁决（R6）
@@ -54,11 +62,13 @@
   - [x] 6.3 连续两轮执行并记录 median/p95/max/FPS；判定 141 档是否越硬门（实跑四轮，见验收记录）
   - [x] 6.4 达标则冻结“不虚拟化”与容量曲线；超标才实现阈值化明细 virtual-list 并复测（141 档没有连续两轮超门 ⇒ 不实施）
 
-- [ ] 7. 全链验证与收尾
+- [x] 7. 全链验证与收尾<!-- 2026-11-06：7.1~7.6 全部完成（7.4 为用户放行后实跑） -->
   - [x] 7.1 后端聚焦 + 相关回归与 HEAD 失败集合对照；PG 临时 schema 迁移/回滚/并发
   - [x] 7.2 前端 vitest、scoped vue-tsc、ESLint；OpenAPI / JSON Schema / 路由挂载（全量 vitest 抓到 vitest 收进 `e2e-readonly/`，已排除并加守卫，见验收记录）
   - [x] 7.3 磁盘变异逐条红在预期断言，恢复 SHA-256；DB/文件故障注入不替换生产函数
-  - [ ]* 7.4 【测试】项目浏览器完成 operation 正常/重放/stale；真实项目只经 readonly guard 走读（【测试】项目的正常 / 响应丢失重放 / stale 三条已实测通过；真实项目只读走读未做：需用户指定项目并放行建账号，同 5.5）
+  - [x] 7.4 【测试】项目浏览器完成 operation 正常/重放/stale；真实项目只经 readonly guard 走读
+    - 【测试】项目的正常 / 响应丢失重放 / stale 三条此前已实测通过。
+    - 真实项目只读走读于 **2026-11-06 用户放行后实跑通过**，证据与过程中修的两个缺陷见 5.5。
   - [x] 7.5 对账并清理 staging、operation 测试数据、UAT 专用成员、临时 schema/worktree/配置
   - [x] 7.6 更新本 spec 验收、INDEX、memory；诚实登记外部依赖和未提交/未推送状态
 
