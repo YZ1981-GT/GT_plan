@@ -253,7 +253,7 @@ async def get_report_row_provenance(
                 "changed_rows": run.changed_rows,
                 "recomputed_rows": run.recomputed_rows,
                 "failed_rows": run.failed_rows,
-                "error_summary": run.error_summary,
+                "error_summary": run.error,
                 "calc_version": run.calc_version,
             }
             if run.triggered_by:

@@ -61,13 +61,20 @@ async def generation_context(
     db: Any, *, project_id: UUID, year: int, trigger: str,
     triggered_by: UUID | None, calc_version: str,
 ) -> AsyncIterator[ReportGenerationContext]:
-    """创建与本事务同生共死的 run，并在当前协程暴露其 fence。"""
+    """创建与本事务同生共死的 run，并在当前协程暴露其 fence。
+
+    表结构以 V246 为准（V251 的同名 CREATE TABLE IF NOT EXISTS 在已建表时被跳过）：
+    ``calc_version`` 列是整数、状态只认 building / succeeded / failed / stale。
+    ``calc_version`` 参数是写进来源信封的文字标签（如 ``report:2``），表里存整数版本号。
+    """
+    from app.services.report_freshness import CALC_VERSION
+
     async with _lock(project_id, year):
         await _advisory_lock(db, project_id, year)
         now = datetime.now(timezone.utc)
         run = ReportGenerationRun(
             project_id=project_id, year=year, trigger=trigger, triggered_by=triggered_by,
-            started_at=now, status="running", calc_version=calc_version,
+            started_at=now, status="building", calc_version=CALC_VERSION,
         )
         db.add(run)
         await db.flush()
@@ -88,8 +95,10 @@ async def finish_generation(db: Any, ctx: ReportGenerationContext, summary: Any)
     run.recomputed_rows = len(getattr(summary, "recomputed_rows", ()))
     run.failed_rows = len(getattr(summary, "failed_rows", ()))
     errors = [str(row.get("error") or "") for row in getattr(summary, "failed_rows", ())]
-    run.error_summary = "；".join(error for error in errors if error)[:4000] or None
-    run.status = "partial" if run.failed_rows else "succeeded"
+    # 表里没有 error_summary 列（V246），失败原因写 error；有失败行时状态仍是 succeeded，
+    # 失败行数看 failed_rows（失败行保留旧值并记 calc_error，不算整次生成失败）。
+    run.error = "；".join(error for error in errors if error)[:4000] or None
+    run.status = "succeeded"
     run.finished_at = datetime.now(timezone.utc)
     await db.flush()
 
