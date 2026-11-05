@@ -122,6 +122,27 @@ export function deriveEntrySyncPresentation(
       ENTRY_SYNC_NOTICE_SUMMARY, readiness.reason,
     )
   }
+  if (
+    readiness.capability === 'bidirectional'
+    && readiness.reason?.code === 'REPRESENTATION_MISSING'
+  ) {
+    // 首版尚未发布不是不可恢复的运行时故障。桥会先调用 first-publication，
+    // 成功后再按新 revision 创建 materialize；把入口藏掉会让首版路径永远不可达。
+    return notice(
+      {
+        ...base,
+        showHtml: true,
+        showOnlyOffice: true,
+        showModeSwitch: true,
+        canSwitchToHtml: true,
+        canSwitchToOnlyOffice: true,
+      },
+      'warning',
+      '首次在线编辑将发布版本',
+      '该底稿尚未发布在线编辑版本；切换后将先创建首版并进入在线编辑',
+      readiness.reason,
+    )
+  }
   if (!readiness.runtime.ready) {
     return notice(
       { ...base, showHtml: true, showOnlyOffice: false, canSwitchToHtml: true },

@@ -81,6 +81,7 @@ export interface UseD4SyncModeOptions {
    */
   readonly entrySync?: {
     readonly presentation: { readonly value: { readonly showModeSwitch: boolean } }
+    readonly refresh?: () => Promise<void>
   }
 }
 
@@ -110,6 +111,7 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
     capability: capabilityForEntry(entryId),
     flushHtml: options.flushHtml,
     reloadHtml: options.reloadHtml,
+    onFirstPublication: options.entrySync?.refresh,
   })
 
   const descriptor = computed(() => syncBridge.descriptor.value)

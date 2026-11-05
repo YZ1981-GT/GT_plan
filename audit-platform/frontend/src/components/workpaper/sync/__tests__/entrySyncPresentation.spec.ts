@@ -45,6 +45,29 @@ describe('deriveEntrySyncPresentation', () => {
     expect(got).toMatchObject({ showHtml: true, showOnlyOffice: false, canSwitchToOnlyOffice: false })
   })
 
+  it('首版 representation 缺失时保留在线编辑入口以触发首次发布', () => {
+    const got = deriveEntrySyncPresentation(value({
+      allowed_modes: ['html'],
+      can_claim_bidirectional: false,
+      runtime: { ...value().runtime, ready: false, representation_id: null, representation_generation: null },
+      acceptance: { state: 'missing', stale: false, run_id: null, required_scenario_set_digest: null },
+      reason: {
+        code: 'REPRESENTATION_MISSING',
+        message: '当前底稿尚未发布可用于在线编辑的版本。',
+        next_action: '先完成该底稿的首版 representation 发布，再重新检查。',
+      },
+    }), 'ready')
+    expect(got).toMatchObject({
+      showHtml: true,
+      showOnlyOffice: true,
+      showModeSwitch: true,
+      canSwitchToOnlyOffice: true,
+      canClaimBidirectional: false,
+      noticeKind: 'warning',
+      noticeLabel: '首次在线编辑将发布版本',
+    })
+  })
+
   it('runtime ready 才显示双向切换；evidence 缺失只告警不禁用', () => {
     const verified = deriveEntrySyncPresentation(value(), 'ready')
     expect(verified).toMatchObject({ showModeSwitch: true, canSwitchToOnlyOffice: true, noticeKind: 'none' })

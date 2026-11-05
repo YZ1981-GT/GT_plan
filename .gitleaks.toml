@@ -34,6 +34,20 @@ paths = [
   '''(?i)\.venv/''',
   # 后端测试目录（fixture 可能含假密钥）
   '''(?i)backend/tests/''',
+  # 同步引擎 definition store：**内容寻址生成产物**（文件名 = payload 的 canonical
+  # sha256），内容只有契约结构声明（sheet_key / table_key / column_key / 单元格坐标 /
+  # digest），由 `definitions.validate_definition_payload` 约束，按设计不含任何凭据。
+  #
+  # 豁免理由是实测的，不是"相信它干净"：`generic-api-key` 对本目录是**系统性误报** ——
+  # 它把 `table_key":"d4_32_groups"` / `column_key":"group_label"` 这种业务键当成
+  # `key":"<secret>"`。抽样已入库 blob（HEAD 版本）同样命中，即 286 个 contracts +
+  # 216 个 instrumentation 入库时这道门就没拦住过，不是某次提交的特例。
+  #
+  # 🔴 本条豁免**可伪证**，不是"加一行就变绿"：
+  #   `backend/tests/test_definition_store_secret_shapes.py` 对本目录全量跑严格锚定的
+  #   凭据形态扫描（OpenAI sk- / PEM / GitHub PAT / AWS AKID / Slack / 带密码的 PG URI），
+  #   并断言分母非空。实测 1030 个文件 0 命中。真塞进凭据时那条守卫会红。
+  '''(?i)backend/definition_store/''',
   # 前端测试目录（业务 fixture key，非真实密钥）
   '''(?i)audit-platform/frontend/.*/__tests__/''',
   # gitleaks 自身配置（本文件含规则示例字符串）

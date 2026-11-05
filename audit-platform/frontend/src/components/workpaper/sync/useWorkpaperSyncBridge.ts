@@ -151,6 +151,8 @@ export interface WorkpaperSyncBridgeOptions {
   readonly flushHtml: () => Promise<WorkpaperSyncFlushResult>
   /** 宿主的重载钩子：**必须**加载到不低于 `minimumRevision` 的内容（Property 14）。 */
   readonly reloadHtml: (minimumRevision: number) => Promise<void>
+  /** 首版发布成功后通知宿主刷新其运行时 readiness 展示；失败不影响已完成的发布。 */
+  readonly onFirstPublication?: () => void | Promise<void>
   /** 注入点：默认 `workpaperSyncApi`（测试注入 stub，不 mock 模块）。 */
   readonly api?: WorkpaperSyncApiSurface
   /** 注入点：localStorage（测试注入内存实现）。 */
@@ -463,13 +465,38 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
           return fail('readiness', error)
         }
         if (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo')) {
-          const reason = readiness.reason
-          refuse(
-            'bridge_runtime_not_ready',
-            reason
-              ? `${reason.message} ${reason.next_action}`
-              : '当前底稿未通过运行时双向回写校验',
-          )
+          const recoverableFirstPublication =
+            readiness.capability === 'bidirectional'
+            && readiness.reason?.code === 'REPRESENTATION_MISSING'
+            && typeof api.ensureFirstPublication === 'function'
+          if (!recoverableFirstPublication) {
+            const reason = readiness.reason
+            refuse(
+              'bridge_runtime_not_ready',
+              reason
+                ? `${reason.message} ${reason.next_action}`
+                : '当前底稿未通过运行时双向回写校验',
+            )
+          }
+          // 先把当前 HTML 防抖/在途保存落入 store，再发布首版。不能先发布旧 store，
+          // 也不能先读 store-projection：无 representation 时它尚无法绑定 target adapter。
+          try {
+            await flushPendingWrites()
+          } catch (error) {
+            return fail('flush', error)
+          }
+          try {
+            await api.ensureFirstPublication(scope())
+          } catch (error) {
+            return fail('first_publication', error)
+          }
+          try {
+            await options.onFirstPublication?.()
+          } catch {
+            // 展示刷新失败不撤销已成功的首版；下一次页面加载会重取 readiness。
+          }
+          // 首版推进 revision；用新 revision 重新读 store-projection 并创建唯一 mutation。
+          return attemptSwitchToOnlyOffice(false)
         }
       }
       return attemptSwitchToOnlyOffice(true)
@@ -657,6 +684,11 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       await ensureFirstPublication(scope())
     } catch (publishError) {
       return fail('first_publication', publishError)
+    }
+    try {
+      await options.onFirstPublication?.()
+    } catch {
+      // 展示刷新失败不撤销已成功的首版；下一次页面加载会重取 readiness。
     }
     return attemptSwitchToOnlyOffice(false)
   }

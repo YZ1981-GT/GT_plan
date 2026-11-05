@@ -108,11 +108,84 @@
         但页面均接住为空态；附注展示“附注数据不存在”并弹出“生成附注”确认框，已点击取消，
         未触发生成。平台业务 API 实际请求均为 GET，未观察到 POST/PUT/PATCH/DELETE；拦截日志中的
         POST 仅为浏览器注入的 Kaspersky 外部遥测。Element Plus 两条既有 warning 未影响页面。
-  - [ ] 6.1 【测试】项目在 HTML 修改后立即切在线编辑，OO 显示新值
-  - [ ] 6.2 注入一次保存失败，确认保持 HTML、错误中文可见且零 materialize；恢复后可重试
+  - [x] 6.1 【测试】项目在 HTML 修改后立即切在线编辑，OO 显示新值（2026-11-05）
+        —— 候选 3032 / 9981，【测试】公式同步乙有限公司_2025 的 D4
+        (`d7fa0522-12b3-4e43-b7d4-5242562e6fd3`，entry `xlsx/gt-d4-operating-revenue`)。
+        该 entry 原无 representation，首版经 `ensure_first_publication` 正式发布
+        (`content_revision=1`)，definition 链经 `fix_task76_provision_projection_definitions.py
+        --apply` 正式 provision（+3 artifact / +1 bundle，非手工插表）。
+        HTML 侧把 D4-8 产品A 1月销量改为 202 后切在线编辑，在 OnlyOffice iframe 内以
+        `#ce-cell-name` 定位 `B16`、`#ce-cell-content` 读回 **202**，证实 HTML 值进入 OO。
+  - [x] 6.2 注入一次保存失败，确认保持 HTML、错误中文可见且零 materialize；恢复后可重试（2026-11-05）
+        —— 四条判据逐条实测通过（D4-8，产品A 1月销量）：
+        ① 中文错误可见：`el-message el-message--error`、文案「保存失败，请稍后重试」；
+        ② HTML 保留：失败后单元格仍是新值 210，未回滚、未清空；
+        ③ 零 materialize：整个失败窗口内 `materialize` 请求 **0** 次（只有 1 次
+           `PUT …/checklist-responses` 且其 `error` 事件确凿触发）；
+        ④ 恢复后可重试：恢复网络、再次编辑即成功落库（`revQty=211`，10:21:06）。
+        🔴 **两条测量纪律（本轮各踩一次，判据差点写反）**：
+        · **假注入**：`xhr.dispatchEvent(new ProgressEvent('error'))` **不被 axios 消费**
+          （console 零 Network Error、前端无任何反应）⇒ 用它得出的「无错误提示」是假结论。
+          真实失败必须用 CDP `Network.emulateNetworkConditions` Offline。
+        · **读太晚**：`ElMessage` 3 秒自动消失，事后查 DOM 必然查不到 ⇒ 提示类判据必须用
+          `MutationObserver` 从操作前开始录，不能操作后再查快照。
   - [ ] 6.3 OO 修改后回表单并刷新，HTML / API / 已发布 representation 三方一致；恢复验收数据
-  - [ ] 6.4 后端侧 OO 往返浏览器实测（V250 缺列阻断已于 9.3 只读预检确认解除；仍待写入型【测试】项目验收）
-  - [ ] 6.5 D4-8 / D4-33 / D4-34 / D4-36 四表浏览器必测（同上，待写入型【测试】项目验收）
+        🔴 **现无任何路径可通**（2026-11-05 实测，非「等环境」）：在 OO 内把 `B16` 改成 303
+        并 forcesave 后，`oo_to_html` operation `11809f53-a34e-44fc-8182-efc5bc68e019` 落
+        `state=conflict` / `conflict_count=24`，303 回不到 HTML。两个缺陷叠加，见 6.6 / 6.7。
+        该 operation **按决策不裸改**（裸 SQL 结算会破坏版本链与审计链），如实留在测试项目
+        作缺陷证据。
+  - [ ] 6.4 后端侧 OO 往返浏览器实测
+        🔴 被 6.3 同一条链挡住：OO→HTML 的 merge 跑的是**整 entry 的 combined projection**，
+        D4-32 必产生的 24 条冲突对本 entry 任何 sheet 的回写都成立。
+  - [ ] 6.5 D4-8 / D4-33 / D4-34 / D4-36 四表浏览器必测
+        🔴 同上 —— 四表都在 `xlsx/gt-d4-operating-revenue` 内，共用同一次 merge。
+        （四表各自的**非破坏性 merge** 判据已由 9.4 的 17 例离线守卫覆盖，不受此阻断影响。）
+
+- [ ] 6.6 缺陷登记：D4-32 同步建模三面皆错（阻断 6.3/6.4/6.5 之一）
+  - openpyxl 逐格实测 `D/D4 收入底稿.xlsx` 的 `客户、供应商等资金流水检查D4-32`：
+    `A11` 表头逐字是**序号**；`A13..A46` 里 **24** 格是整数、5 格是「……」、5 格是组标题行空格
+    （6 组数据槽 5/5/2/2/5/5 = 24，与 24 条冲突逐一对应）；6 个分组标题在 **B 列**
+    (`B12/B19/B26/B30/B34/B41`)，不在数据行上。
+  - 面 A（OO→HTML 恒冲突）：`phase5_d4_ipo_interview_sheets._SHEETS['D4-32'].fields` 把 A 列
+    声明为 `("group_label", "A", "editable", "text", "groupLabel", "分组")` —— `header_text`
+    与模板的「序号」不符，且那 24 个整数在 `value_type=text` 下 `merge.normalize_value` 抛
+    `ValueNormalizationError` ⇒ 每次保存恒产 24 条 `type_normalization_failure`，而三侧
+    (base/current/incoming) 同为整数、本该判 `kept_current`。
+  - 面 B（HTML→OO 清空模板序号）：六组业务行的 store 无 `groupLabel` 键（前端 `FlowRow` 只有
+    id/name/amount/ratio/bank/account/method/hasAnomaly/indexRef）⇒ 投影恒 `None` ⇒
+    materialize 把 A 列序号写空。
+  - 面 C（一有数据就打挂整个 entry）：真实 store 是六段分组 `[{key, rows}]`，而 `_rows()`
+    按扁平行数组解析 ⇒ 实测抛 `ValueError: D4-32 缺稳定身份` ⇒ store-projection 422 ⇒
+    **整个 D4 entry 进不了在线编辑**；回写侧 `merge_projection_into_store` 又返回扁平数组，
+    前端 `D4TabFundFlow.loadData` 的 `!Array.isArray(group.rows)` 会把六组全判空 ⇒ 镜像一次
+    清空 D4-32。**当前未炸只因测试底稿的 D4-32 是空表。**
+  - 影响面已现算：共享库里 `xlsx/gt-d4-operating-revenue` **只有**上述测试底稿有已发布
+    representation，真实业务项目 **0** 条 ⇒ 修它在数据层只需重 provision + 重发布这一张。
+  - 🔴 本轮**未改**：正确修法要重做投影/回写、按模板基线区分「模板内容」与「用户填在模板空行
+    的内容」（否则 `B19='主要客户'` 这类组标题会被当业务行写进 store）、未归属新行落
+    `__unknown__` 走前端已有人工映射，并连带刷新契约 / `_sync_provider_golden_digest.json` /
+    单趟反证基线（`TEXT_VICTIM=d4_32_groups`、`TEXT_VICTIM_CHANGED_FIELDS=24`、
+    `EXTRACTED_FIELD_COUNT=218`）与 harness `_text_safe` 退役。按「>3 组件 / 跨前后端 / 改冻结
+    契约先写 spec 三件套」的铁律，应另立 spec。试探性改动已逐字节回退（契约 digest 仍
+    `75fca57d9d2c9bf1…`）。
+
+- [ ] 6.7 缺陷登记：**平台级** —— schema 冲突一律无法人工裁决（阻断 6.3/6.4/6.5 之二）
+  - 实测（候选 3032，经真实前端 `workpaperSyncApi.getOperationConflicts`）：同一条冲突 item 上
+    `suggested_action: "manual_merge"`（让人工合并）与 `adjudicable_by_value_choice: false`
+    （不许按值裁决）**同时成立**，且 payload 里没有 `schema_anomaly`。
+  - 三处合成死路：
+    ① `working_paper_sync_conflict` 表**无 `schema_anomaly` 列** —— merge 判定的 anomaly 落库即丢；
+    ② `conflict_resolution.py:680` 的 preview 判据是 `return self.kind is not ConflictKind.schema`
+       —— 把**所有** schema 冲突一律判为不可裁决；
+    ③ 而域内 `conflicts.py:165` 是按 anomaly 分两类的，`type_normalization_failure` /
+       `multi_location_divergence` 明确「可以由人选一个值收敛」。
+  - 后果：前端面板把这些项从所有批量范围排除、单条也不给选边，真去 resolve 会撞
+    `StructuralConflictNotAdjudicableError`。**与 D4-32 无关，对任何 entry 的任何 schema
+    冲突都成立** —— 一旦落库就再也救不回来。同一判据两份实现、口径分叉。
+  - 顺带：`useWorkpaperSyncBridge.resolveConflicts` 的注释称 `room_latest_durable_*`
+    「在当前 16 条用户路由里没有任何读取面」**已过期** —— `GET /operations/{id}` 自 Task 32
+    起就返回这两项（`_fold_observability_facts`），缺口在冲突面板没去读。
 
 - [ ] 7. 收尾
   - [x] 7.1 语义审查并修复高优先级发现（第一轮 P0/P1 已闭合；第二轮 P1-1~P1-3 见任务 8）
