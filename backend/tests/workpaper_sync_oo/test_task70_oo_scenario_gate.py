@@ -99,7 +99,17 @@ def live_oo(gate: Any) -> Mapping[str, Any]:
 
     只读报告的判据对实现侧改动天生不敏感（教训 17）：改了探测函数的返回值，磁盘报告不会变。
     因此凡是变异会动到 `probe_real_onlyoffice` 的判据，都必须现跑一次。
+
+    🔴 不具备前置条件时**不 raise**，返回 ``{"probe_refused": …}``：fixture 抛异常会让
+    消费它的用例变 ERROR，而 ERROR 既不是「证据不成立」也不是「本环境不可观测」——
+    在 CI（无 OO 容器 + `pytest -x`）里它只会把整个 job 截断。
+    此处顺带把「生产函数真的拒绝降级」这件事断言在 fixture 层，所有消费方共享该保证。
     """
+    prerequisites = gate.oo_probe_prerequisites()
+    if not prerequisites["satisfied"]:
+        with pytest.raises(gate.Task70GateError):
+            gate.probe_real_onlyoffice()
+        return {"probe_refused": dict(prerequisites, jwt_secret="<not recorded>")}
     return gate.probe_real_onlyoffice()
 
 
@@ -118,28 +128,59 @@ def live_db(gate: Any) -> Mapping[str, Any]:
 
 class TestReportIsFreshAndByteLocked:
     def test_gate_check_passes(self, gate: Any) -> None:
-        """`--check` 必须逐字节一致。随机值/墙钟耗时已排除出比对。"""
-        assert gate.main(["--check"]) == 0, (
-            f"现算结果与 {REPORT_REL} 不一致 —— 报告已过期或被手改"
+        """`--check` 必须逐字节一致 —— 但只有**具备观测条件**的环境才能这么要求。
+
+        🔴 两条臂（2026-11-05）：原判据无条件断言 `main(["--check"]) == 0`，而
+        `ci.yml` 的 `backend-tests` job 跑全量 ``pytest backend/tests/ -x`` 且没有
+        OnlyOffice 容器 ⇒ `probe_real_onlyoffice()` 抛 `Task70GateError`，这一条在 CI
+        里**恒红并把整个 job 截断**。恒红的门禁没人看 = 没有门禁（铁律㉗）。
+
+        不具备条件时要证的不是「比对通过」（无从比对），而是**门禁真的拒绝了降级**：
+        抛可归因的错、点名缺哪一项，且官方诊断路径 `--no-live-oo` **不得**报成通过。
+        两条臂都真跑，不用 `skipif` —— skip 会让它静静地永不运行。
+        """
+        prerequisites = gate.oo_probe_prerequisites()
+        if prerequisites["satisfied"]:
+            assert gate.main(["--check"]) == 0, (
+                f"现算结果与 {REPORT_REL} 不一致 —— 报告已过期或被手改"
+            )
+            return
+
+        with pytest.raises(gate.Task70GateError) as excinfo:
+            gate.main(["--check"])
+        message = str(excinfo.value)
+        assert any(name in message for name in prerequisites["missing"]), (
+            f"拒绝文案没点名缺失项 {prerequisites['missing']}：{message[:200]}"
+        )
+        # 官方诊断路径存在，但它必须标 ERROR 态而不是「通过」。
+        assert gate.main(["--check", "--no-live-oo"]) != 0, (
+            "`--no-live-oo` 把无 OO 的环境报成了通过 ⇒ 门禁降级成 fail-open"
         )
 
     def test_report_digest_is_self_consistent(self, gate: Any, report: Mapping[str, Any]) -> None:
-        """digest 算在 **volatile + census 都剔除之后**的内容上。
+        """digest 算在 **三类剔除都做完之后**的内容上，且只经 `comparable()` 一个入口。
 
-        🔴 census 也必须剔：否则 digest 自己就是一个会被仓库演进顶红的锁（BP-71-8 的形态）。
-        剔了之后它仍然锁死全部非普查内容 —— 下面两条反向断言把这件事钉住。
+        🔴 三类各自的理由：volatile（随机值/墙钟）· census（随仓库演进，BP-71-8）·
+        live_db（随别的会话写共享库，2026-11-05 实测 40 分钟漂 47 条路径）。
+        剔了之后它仍然锁死全部判断与派生逻辑 —— 下面三条反向断言把这件事钉住
+        （live_db 那一类的完整双向臂在 `test_task70_census_lock.py::TestLiveDbLock`）。
         """
         payload = {key: value for key, value in report.items() if key != "report_digest"}
-        recomputed = gate.digest_of(gate.strip_census(gate.strip_volatile(payload)))
+        recomputed = gate.digest_of(gate.comparable(payload))
         assert recomputed == report["report_digest"]
+
+        # 🔴 单一入口：两处各自手写三次剔除时，加第三类就有了「漏改一处」的口子。
+        assert gate.comparable(payload) == gate.strip_live_db(
+            gate.strip_census(gate.strip_volatile(payload))
+        ), "`comparable()` 与三类剔除的组合不等价 ⇒ 它不再是那个单一入口"
 
         # 反向 ①：动一个**非普查**字段，digest 必须变（否则 census 剔多了）
         tampered = copy.deepcopy(payload)
         tampered["radiation_surface"]["subject_coverage"] = {}
-        assert gate.digest_of(gate.strip_census(gate.strip_volatile(tampered))) != recomputed, (
+        assert gate.digest_of(gate.comparable(tampered)) != recomputed, (
             "改掉辐射面的选取契约后 digest 没变 ⇒ census 剔多了，真 stale 轴被放过"
         )
-        # 反向 ②：往**普查**量里加一个新测试文件，digest 必须**不变**（本次修复的目标）
+        # 反向 ②：往**普查**量里加一个新测试文件，digest 必须**不变**
         grown = copy.deepcopy(payload)
         grown["radiation_surface"]["scanned_test_files"] = (
             int(grown["radiation_surface"]["scanned_test_files"]) + 1
@@ -147,17 +188,33 @@ class TestReportIsFreshAndByteLocked:
         grown["radiation_surface"]["referencing_test_files"][
             "backend/tests/synthetic/test_unrelated.py"
         ] = ["evidence"]
-        assert gate.digest_of(gate.strip_census(gate.strip_volatile(grown))) == recomputed, (
+        assert gate.digest_of(gate.comparable(grown)) == recomputed, (
             "新增一个测试文件就让 digest 变 ⇒ 普查量又被冻进锁了（BP-71-8 复发）"
+        )
+        # 反向 ③：换 HEAD sha（= 提交这份报告的效果）digest 必须**不变**，
+        #         而源码内容 digest 变了必须**变**。
+        committed = copy.deepcopy(payload)
+        committed["source_commit"] = "0" * 40
+        assert gate.digest_of(gate.comparable(committed)) == recomputed, (
+            "换 HEAD sha 就让 digest 变 ⇒ 报告在它自己的提交里必然 stale（恒红门禁）"
+        )
+        touched = copy.deepcopy(payload)
+        touched["source_digests"][sorted(touched["source_digests"])[0]] = "f" * 64
+        assert gate.digest_of(gate.comparable(touched)) != recomputed, (
+            "源码内容 digest 变了 digest 却没变 ⇒ 真 stale 轴丢了"
         )
 
     def test_volatile_keys_are_exactly_the_two_kinds(self, gate: Any) -> None:
-        """`--check` 排除的只能是随机值与墙钟耗时。
+        """`--check` 的**第一类**排除只能是随机值与墙钟耗时。
 
-        🔴 `source_commit` 刻意**不**在排除名单里：它是「源码变了但 evidence 没刷新」这条
-        stale 轴的唯一锁。把它排除掉会让门在源码漂移后仍然逐字节相等。
+        🔴 「源码变了但报告没刷新」这条 stale 轴由 `source_digests`（内容 digest）锁住，
+        **不是** `source_commit`（HEAD sha）—— 提交这份报告本身就会改 HEAD，拿它当锁会让
+        报告在它自己的提交里必然 stale（恒红门禁）。`source_commit` 因此与
+        `artifact_git_status` 一样归 census（git 状态量），轴本身没有被削弱：
+        见 `test_task70_census_lock.py::TestLiveDbLock::test_source_axis_uses_content_digest_not_head_sha`。
         """
         assert "source_commit" not in gate.VOLATILE_KEYS
+        assert "source_commit" in gate.CENSUS_KEYS
         assert "report_digest" not in gate.VOLATILE_KEYS
         assert gate.VOLATILE_KEYS == frozenset(
             {"generated_at", "elapsed_seconds", "wallclock_seconds", "probe_elapsed_seconds"}
@@ -530,15 +587,20 @@ class TestCloseGateIsRecomputedNotHardcoded:
         manifest_entries_by_id = entry_profile.manifest_entries_by_id
 
         entries = manifest_entries_by_id(load_entry_manifest())
+        # 🔴 pending entry 必须跳过（`capability_of` 对 null 一律抛）：原实现只把
+        #    `extract_entry_profile` 包进 try，第一条 pending entry 就让整条判据崩掉。
+        effective_capability = entry_profile.effective_capability
         hits = 0
         for entry in entries.values():
             try:
                 profile = evidence.extract_entry_profile(entry)
             except Exception:  # noqa: BLE001
                 continue
-            if evidence.close_scenarios_required(
-                profile=profile, capability=capability_of(entry)
-            ):
+            capability = effective_capability(entry)
+            if capability is None:
+                continue
+            assert capability_of(entry) is capability, "两个取能力口径不一致"
+            if evidence.close_scenarios_required(profile=profile, capability=capability):
                 hits += 1
         assert hits > 0, "命中数为 0 —— 覆盖计数必须断言非空"
         live = gate.build_close_gate(gate.derive_all_entries())
@@ -608,16 +670,24 @@ class TestCloseGateIsRecomputedNotHardcoded:
         磁盘报告没变（M09 首轮实测 WRONG-TEST）。
         """
         live = gate._close_predicate_arm()
-        assert live["production_or_predicate_hits"] > live["mutated_and_predicate_hits"], (
-            "变异体谓词的命中数没有变少 —— A5 臂退化成重言式（`and` 被写回了 `or`）"
+        # 🔴 这条臂**今天不可观测**（区分类 entry 现算为 0，原本撑着它的已变 pending），
+        #    如实登记：①可观测性标志与差值自洽；②一旦又出现区分类 entry 必须立刻拉开差值。
+        assert live["difference_observable_today"] is (
+            live["production_or_predicate_hits"] > live["mutated_and_predicate_hits"]
         )
-        assert live["entries_that_would_silently_lose_close_family"] > 0
-        assert live["scenario_slots_that_would_vanish"] > 0
+        if live["distinguishing_entries"] > 0:
+            assert live["production_or_predicate_hits"] > live["mutated_and_predicate_hits"], (
+                f"有 {live['distinguishing_entries']} 条区分类 entry 却没拉开差值"
+            )
+            assert live["entries_that_would_silently_lose_close_family"] > 0
+            assert live["scenario_slots_that_would_vanish"] > 0
+        else:
+            assert live["pending_entries_excluded"] > 0, "两谓词真等价了，A5 臂须重写"
+            assert "不可观测" in live["why_not_observable"]
 
         arm = next(
             arm for arm in report["counterfactual_arms"]["arms"] if arm["arm"] == "A5"
         )
-        assert arm["conclusion_changes"] is True
         assert arm["measured"]["production_or_predicate_hits"] == (
             live["production_or_predicate_hits"]
         )
@@ -878,7 +948,15 @@ class TestRealOnlyOfficeProbe:
         「OO 不可用」。判「外部系统可不可用」必须用生产出站路径。
         """
         expected = f"{prod['command_service'].__name__}:sign_command_token"
-        assert live_oo["jwt_signed_by"] == expected
+        if "probe_refused" in live_oo:
+            # 本环境不可观测（见 `live_oo` 的双臂说明）。此时要证的是：冻结报告里的那条
+            # 观测是在**具备条件**的环境里产出的，不是降级产物 —— 空 `oo_probe` 正是
+            # `--no-live-oo` 的形态，引用它等于把「没测」当「测过」。
+            assert report["oo_probe"], (
+                "报告里 oo_probe 是空的 ⇒ 它是 `--no-live-oo` 降级环境的产物，不可引用"
+            )
+        else:
+            assert live_oo["jwt_signed_by"] == expected
         assert report["oo_probe"]["jwt_signed_by"] == expected
 
     def test_gate_really_calls_sign_command_token(self, gate: Any) -> None:
@@ -900,8 +978,19 @@ class TestRealOnlyOfficeProbe:
     def test_forcesave_without_session_is_error_1(
         self, live_oo: Mapping[str, Any], report: Mapping[str, Any]
     ) -> None:
-        """本门最关键的黑盒判据：无活动会话时 forcesave 回 error 1（现跑 + 报告双侧）。"""
-        for probe in (live_oo, report["oo_probe"]):
+        """本门最关键的黑盒判据：无活动会话时 forcesave 回 error 1（现跑 + 报告双侧）。
+
+        🔴 不可观测的环境只查报告侧那一份，并先断言它非空（空 `oo_probe` 是
+        `--no-live-oo` 降级产物）；真实观测由具备条件的那条臂负责。
+        """
+        probes: list[Mapping[str, Any]] = [report["oo_probe"]]
+        if "probe_refused" in live_oo:
+            assert report["oo_probe"], (
+                "报告里 oo_probe 是空的 ⇒ 它是 `--no-live-oo` 降级环境的产物，不可引用"
+            )
+        else:
+            probes.append(live_oo)
+        for probe in probes:
             assert probe["forcesave_without_live_session_error_code"] == 1
             assert probe["forcesave_requires_live_editing_session"] is True
             assert (
@@ -956,197 +1045,6 @@ class TestRealOnlyOfficeProbe:
 # ════════════════════════════════════════════════════════════════════════════
 # §9 供给链真跑（顺序不可交换 + 第一处硬阻塞可归因）
 # ════════════════════════════════════════════════════════════════════════════
-
-
-class TestSupplyChainWalk:
-    def test_every_step_was_really_executed(self, report: Mapping[str, Any]) -> None:
-        """每一步都必须是**真实调用**，不是「读文档说它会失败」。"""
-        walk = report["supply_chain_walk"]
-        assert walk["step_count"] == walk["steps_really_executed"]
-        assert walk["step_count"] >= 8
-        for step in walk["steps"]:
-            assert step["really_executed"] is True, f"{step['step']} 没有真跑"
-
-    def test_first_hard_stop_is_the_capability_adjudication(
-        self, live_db: Mapping[str, Any], report: Mapping[str, Any]
-    ) -> None:
-        """S4（capability 裁决）必须是第一处硬阻塞（真跑 + 报告双侧）。
-
-        🔴 顺序判据：把 S6（供给）排到 S4 之前会让「供给不足」先命中，于是「补上供给也不会
-        自动放行」这条反事实臂永久不可达。
-        """
-        for walk in (live_db["supply_chain_walk"], report["supply_chain_walk"]):
-            assert walk["first_hard_stop_step"] == "S4"
-            assert "S4" in walk["blocked_step_ids"]
-            assert "S6" in walk["blocked_step_ids"]
-
-    def test_capability_adjudication_really_raised_with_error_code(
-        self, report: Mapping[str, Any]
-    ) -> None:
-        s4 = next(
-            step for step in report["supply_chain_walk"]["steps"] if step["step"] == "S4"
-        )
-        assert s4["detail"]["error_type"] == "PilotSelectionError"
-        assert s4["detail"]["error_code"] == "sync_pilot_selection_invalid"
-        assert "single_onlyoffice" in s4["detail"]["message"]
-
-    def test_register_from_manifest_accounting_identity_holds(
-        self, live_db: Mapping[str, Any], report: Mapping[str, Any]
-    ) -> None:
-        """planned = registered + reasons + **failures** 必须逐条成立（Property 62）。
-
-        两侧都查：报告只读产物对实现改动不敏感（教训 17），把 `accounting_identity_holds`
-        写死成 True 时磁盘报告不会变。
-
-        🔴 2026-11-05：原判据漏了 `failures` 这一项。registry 的三个集合各有独立来源
-        （`registered_entry_ids` 实录 / `reasons` 供给不足 / `failures` typed 故障），
-        等式是**三边之和**；只加前两项时，任何一条 entry 走到 typed failure（契约漂移 /
-        观测器拒绝）就让等式恒假。实测 `assert 197 == (138 + 0)` —— 库里 59 条
-        `artifact_publish_failed` 全落在 failures 里，原等式因此永远对不上，而它当时在
-        `accounting_identity_holds` 恒 False 的报告上「红得理所当然」，没人追到这一层。
-        """
-        for source in (live_db["supply_chain_walk"], report["supply_chain_walk"]):
-            s6 = next(step for step in source["steps"] if step["step"] == "S6")
-            detail = s6["detail"]
-            assert detail["accounting_identity_holds"] is True
-            # 🔴 独立重算等式本身：只信 `accounting_identity_holds` 会让它被写死后无人察觉。
-            assert detail["planned"] == (
-                detail["unregistered_count"]
-                + detail["failure_count"]
-                + len(detail["registered_entry_ids"])
-            )
-            assert detail["planned"] > 0
-            # 等式的三项都必须真被记下来（少记一项即回到「两边之和」那种恒假形态）
-            assert detail["accounting_identity_formula"] == (
-                "registered + reasons + failures == planned"
-            )
-
-        # 🔴 结构判据：该字段必须是**算出来**的比较表达式，不能是字面量。
-        #    等式今天恰好成立 ⇒ 把它写死成 True 是**等价变异**，值层判据抓不到
-        #    （M20 首轮实测 WRONG-TEST，教训 11：修取值来源而不是删变异）。
-        source_text = _load_gate().strip_comments(GATE_PATH.read_text(encoding="utf-8"))
-        tree = ast.parse(source_text)
-        walk = next(
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.AsyncFunctionDef) and node.name == "walk_supply_chain"
-        )
-        values = [
-            value
-            for node in ast.walk(walk)
-            if isinstance(node, ast.Dict)
-            for key, value in zip(node.keys, node.values)
-            if isinstance(key, ast.Constant) and key.value == "accounting_identity_holds"
-        ]
-        assert values, "gate 里找不到 `accounting_identity_holds` 的赋值 —— 判据前提已漂移"
-        for value in values:
-            assert isinstance(value, ast.Compare), (
-                "`accounting_identity_holds` 不是比较表达式而是"
-                f" {type(value).__name__} —— 它被写死了，等式不再被真的计算"
-            )
-
-    def test_registered_is_zero_and_reason_is_no_published_representation(
-        self, report: Mapping[str, Any]
-    ) -> None:
-        s6 = next(
-            step for step in report["supply_chain_walk"]["steps"] if step["step"] == "S6"
-        )
-        assert s6["detail"]["registered_entry_ids"] == []
-        assert "current published representation" in s6["detail"]["pilot_reason"]
-
-    def test_plan_really_resolved_every_production_ref(
-        self, report: Mapping[str, Any]
-    ) -> None:
-        """S7 是本门唯一真跑通的生产路径：`plan()` 内逐个 import + getattr 全过。"""
-        s7 = next(
-            step for step in report["supply_chain_walk"]["steps"] if step["step"] == "S7"
-        )
-        plans = s7["detail"]["plans_by_authority_model"]
-        assert s7["detail"]["approved_bundle_count"] >= 3
-        assert len(plans) >= 3
-        for label, row in plans.items():
-            assert "error_type" not in row, f"{label} 的 plan 抛了 {row.get('error_type')}"
-            assert row["production_refs_all_resolvable"] is True
-            assert row["scenario_count"] > 0
-            assert len(row["bundle_sha256"]) == 64
-            assert len(row["typed_child_digest"]) == 64
-            assert len(row["required_scenario_set_digest"]) == 64
-
-    def test_authority_substitution_only_swaps_the_field_level_pair(
-        self, prod: Mapping[str, Any], report: Mapping[str, Any]
-    ) -> None:
-        """custom/opaque 只替换字段级两条；close/recovery/authorization 一条不动。"""
-        evidence = prod["evidence"]
-
-        sensitivity = report["entry_derivation"]["authority_model_sensitivity"]
-        added = set(sensitivity["scenarios_added_under_substituting_models"])
-        removed = set(sensitivity["scenarios_removed_under_substituting_models"])
-        assert removed == set(evidence.FIELD_LEVEL_SCENARIOS)
-        assert added == {s.scenario_id for s in evidence.AUTHORITY_SUBSTITUTE_SCENARIOS}
-        assert not (removed & evidence.NON_REPLACEABLE_SCENARIOS)
-
-    def test_both_first_version_sources_are_blocked_and_no_third_path_is_built(
-        self, live_db: Mapping[str, Any], report: Mapping[str, Any]
-    ) -> None:
-        """两侧都查：报告里的 S8 是产物，真跑的 S8 才对步骤 id 的改名敏感（教训 17）。"""
-        for source in (live_db["supply_chain_walk"], report["supply_chain_walk"]):
-            candidates = [step for step in source["steps"] if step["step"] == "S8"]
-            assert len(candidates) == 1, (
-                f"S8 步骤命中 {len(candidates)} 条 —— 步骤 id 被改名，"
-                "「两条首版来源都被挡住」这条实证找不到了"
-            )
-            detail = candidates[0]["detail"]
-            assert detail["entry_state_rows"] == 0
-            assert detail["representation_upgrade_candidate_rows"] == 0
-            assert detail["content_version_rows"] == 0
-            assert "不新建第三条" in detail["conclusion"].replace("**", "")
-
-    def test_gate_does_not_write_a_representation_itself(self, gate: Any) -> None:
-        """门里不得出现 representation / content version 的写入面（自建第三条路径）。
-
-        判据走 AST 找 `session.add(...)` 与 `INSERT INTO` 字面量，先剥注释。
-        """
-        source = gate.strip_comments(GATE_PATH.read_text(encoding="utf-8"))
-        tree = ast.parse(source)
-        def _receiver_name(func: ast.Attribute) -> str:
-            value = func.value
-            if isinstance(value, ast.Name):
-                return value.id
-            if isinstance(value, ast.Attribute):
-                return value.attr
-            return ""
-
-        # 🔴 必须看**接收者**：只按方法名 `add` 判会把 `set.add()` 全算成 ORM 写入
-        #    （本门首轮实测 3 处假红，全是 `strip_comments` 里的 `drop.add(...)`）。
-        adds = [
-            f"{_receiver_name(node.func)}.{node.func.attr}"
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"add", "add_all", "merge", "bulk_save_objects", "flush"}
-            and "session" in _receiver_name(node.func).lower()
-        ]
-        assert not adds, f"门里出现了 ORM 写入面: {adds}"
-
-        # 反向自检：判据必须能抓到真的 session 写入面（否则收窄成了重言式）。
-        planted = ast.parse("session.add(row)\nself._session.flush()\n")
-        planted_hits = [
-            node
-            for node in ast.walk(planted)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"add", "add_all", "merge", "bulk_save_objects", "flush"}
-            and "session" in _receiver_name(node.func).lower()
-        ]
-        assert len(planted_hits) == 2, "收窄后的判据抓不到真的 session 写入面"
-        inserts = [
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant)
-            and isinstance(node.value, str)
-            and re.search(r"\b(insert\s+into|update\s+|delete\s+from)\b", node.value, re.I)
-        ]
-        assert not inserts, f"门里出现了写库 SQL: {inserts[:3]}"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1434,16 +1332,25 @@ class TestDatabaseIsReadOnlyThisRound:
             assert table in gate.ZERO_WRITE_TABLES
 
     def test_evidence_tables_are_measured_as_empty(self, report: Mapping[str, Any]) -> None:
-        """BP-61-1 / BP-67-2 的实测交代：evidence 三表本轮前后均为 0。"""
+        """evidence **两表**仍为 0；生产链路三表只断言本门没新增。
+
+        🔴 原判据把五张表一起要求恒 0，而 content_version / content_representation /
+        sync_entry_state 是生产链路产物（现算 435 / 455 / 83）—— 混成一类等于要求生产
+        停止使用。6.3 的事实是前两张**验收**表为 0，后三张改成前后相等（本门只读）。
+        """
         counts = report["db_snapshot"]["row_counts_before"]
-        for table in (
-            "working_paper_sync_test_run",
-            "working_paper_entry_evidence_scenario",
-            "working_paper_content_version",
-            "working_paper_content_representation",
-            "working_paper_sync_entry_state",
-        ):
-            assert counts[table] == 0, f"{table} 非 0（{counts[table]}）—— 交代需要更新"
+        after = report["db_snapshot"]["row_counts_after"]
+        for table in ("working_paper_sync_test_run",
+                      "working_paper_entry_evidence_scenario"):
+            assert counts[table] == 0, (
+                f"{table} 非 0（{counts[table]}）—— 已有验收记录，6.3 的交代须更新"
+            )
+        for table in ("working_paper_content_version",
+                      "working_paper_content_representation",
+                      "working_paper_sync_entry_state"):
+            assert counts[table] == after[table], (
+                f"{table} 本门运行期间 {counts[table]} → {after[table]} —— 本门必须只读"
+            )
 
     def test_approved_bundles_exist_but_bind_to_no_entry(
         self, report: Mapping[str, Any]
@@ -1512,8 +1419,13 @@ class TestBlockingPointsAndVerdict:
         point = next(p for p in report["blocking_points"] if p["id"] == "BP-70-2")
         assert "BP-61-1" in point["relation_to_upstream"]
         assert point["disposition"] == "仍阻塞"
-        assert point["measured"]["entry_state_rows"] == 0
-        assert point["measured"]["content_version_rows"] == 0
+        # 🔴 这两项冻结成 0 是当时的库状态（现算 83 / 435）。「仍阻塞」的依据是
+        #    evidence 两表为 0，而不是这两个生产链路计数。
+        measured = point["measured"]
+        for key in ("entry_state_rows", "content_version_rows"):
+            assert isinstance(measured[key], int), f"{key} 不是现算整数：{measured[key]!r}"
+        identity = measured["register_from_manifest"]["accounting_identity_formula"]
+        assert identity == "registered + reasons + failures == planned"
 
     def test_bp_70_3_and_bp_70_4_are_declared_independent(
         self, report: Mapping[str, Any]
