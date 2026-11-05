@@ -5,8 +5,8 @@
   "description": "residual lane 交接清册：每条 independent entry 一行，含 owner / capability / representation / evidence / 回滚与解除条件。4.2~4.8 逐循环消费本清册做对账。",
   "generator": "backend/scripts/gen/generate_residual_lane_ledger.py",
   "input_digests": {
-    "current_state": "9bf5dcb43eeb8cb2af2d0090f346dc8084d260ee956eb3552faea0a7bf8ba0cc",
-    "manifest": "f9ebdf976c0b5586d7d627747f95b15603a277bd348f350db848edb004268032",
+    "current_state": "e313bc6d9caf5dff3b52ed7dea33a237fb245538e21bf7f157d41aba88dcbbb1",
+    "manifest": "5ea36d79123735264b29fb4c4525fb3c7a93079f6917e09cc79ebb1604ad397f",
     "representation_preflight_available": true
   },
   "summary": {

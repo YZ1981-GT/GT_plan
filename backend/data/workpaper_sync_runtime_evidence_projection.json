@@ -4,7 +4,7 @@
   "owner_task": "6.2",
   "description": "runtime evidence current projection：从 PG test_run + required scenario set 现算每条 entry 的 acceptance 状态。",
   "generator": "backend/scripts/gen/generate_runtime_evidence_projection.py",
-  "scenario_set_digest": "b260a442dbed633469fef28211592d37f4e14d040985681cf2b5f5e66caafd90",
+  "scenario_set_digest": "03279925818c55731e6728a179df7acab542f102f54b4b9e4d03c9c7a5a34cab",
   "pg_facts": {
     "status": "connected",
     "total_test_runs": 0,
