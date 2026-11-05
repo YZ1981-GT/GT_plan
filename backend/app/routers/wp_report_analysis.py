@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import assert_project_permission, require_project_access
 from app.models.core import User
 from app.services.trial_balance_full_view_service import TrialBalanceFullViewService
 from app.services.report_trend_analysis_service import ReportTrendAnalysisService
@@ -58,6 +58,9 @@ async def get_opening_reconcile(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, Any]:
+    # 指定的上年项目也要有只读权限（原先只校验本项目，可借此读任意项目的余额，spec citar-cell-source-hover R7）
+    if prior_project_id is not None and prior_project_id != project_id:
+        await assert_project_permission(db, _user, prior_project_id, "readonly")
     svc = TrialBalanceFullViewService(db)
     return await svc.reconcile_opening_balance(project_id, year, prior_project_id)
 

@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, require_operation, check_consol_lock
+from app.deps import assert_project_permission, require_project_access, require_operation, check_consol_lock
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType
@@ -52,9 +52,14 @@ async def generate_reports(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operation("report:edit")),
 ):
-    """生成/重新生成四张报表"""
+    """生成/重新生成四张报表
+
+    鉴权：``require_operation`` 只看系统角色（project_id 在请求体，它取不到）⇒ 经理 / 合伙人能给自己不在的项目生成并写库；
+    函数体先按请求体的项目校验成员（review 级：项目成员里谁能生成仍由权限矩阵决定，spec citar-cell-source-hover R7）。
+    """
     from app.services.prerequisite_checker import PrerequisiteChecker
 
+    await assert_project_permission(db, current_user, data.project_id, "review")
     # 合并锁定检查（project_id 在 body，显式调用反查）— Phase 1 Task 5
     await check_consol_lock(project_id=data.project_id, db=db)
 
@@ -209,9 +214,12 @@ async def get_report(
     unadjusted: bool = Query(False, description="是否返回未审报表数据"),
     applicable_standard: str | None = Query(None, description="报表标准，如 soe_consolidated"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取指定报表数据（支持未审/已审切换+国企/上市切换）"""
+    """获取指定报表数据（支持未审/已审切换+国企/上市切换）。
+
+    鉴权：项目只读（原先只校验登录，任意登录用户可读任意项目的报表金额，spec citar-cell-source-hover R7）。
+    """
     # 确定标准
     std = applicable_standard
     if not std:
@@ -285,9 +293,9 @@ async def drilldown_report_row(
     report_type: FinancialReportType,
     row_code: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """报表行穿透查询"""
+    """报表行穿透查询（项目只读，spec citar-cell-source-hover R7）"""
     engine = ReportEngine(db)
     result = await engine.drilldown(project_id, year, report_type, row_code)
     if "error" in result:
@@ -301,9 +309,9 @@ async def export_report_excel(
     year: int,
     report_type: FinancialReportType,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """导出单张报表为 Excel"""
+    """导出单张报表为 Excel（项目只读，spec citar-cell-source-hover R7）"""
     import logging
     logger = logging.getLogger(__name__)
     logger.info(

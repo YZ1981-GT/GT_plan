@@ -16,7 +16,7 @@
         <table class="sheet-table">
           <thead><tr><th>项　目</th><th>期末数</th><th>期初数</th></tr></thead>
           <tbody>
-            <tr v-for="r in side.rows" :key="r.row_code" :class="rowClass(r)">
+            <tr v-for="r in side.rows" :key="r.row_code" :class="[rowClass(r), { 'citar-located': located === r.row_code }]" :data-locate="r.row_code">
               <td :style="indentStyle(r)">{{ r.row_name }}</td>
               <CitarAmountCell v-for="col in COLUMNS" :key="col" v-bind="cellProps(r, col)" @edit="v => emit('edit', r.row_code, col, v)" @restore="emit('restore', r.row_code, col)" />
             </tr>
@@ -34,7 +34,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="r in rows" :key="r.row_code" :class="rowClass(r)">
+        <tr v-for="r in rows" :key="r.row_code" :class="[rowClass(r), { 'citar-located': located === r.row_code }]" :data-locate="r.row_code">
           <td :style="indentStyle(r)">{{ r.row_name }}</td>
           <CitarAmountCell v-for="col in COLUMNS" :key="col" v-bind="cellProps(r, col)" @edit="v => emit('edit', r.row_code, col, v)" @restore="emit('restore', r.row_code, col)" />
         </tr>
@@ -77,6 +77,10 @@ const props = defineProps<{
   /** 草稿取值：undefined = 无草稿 */
   draftOf?: (rowCode: string, column: CitarAmountColumn) => number | null | undefined
   isRestored?: (rowCode: string, column: CitarAmountColumn) => boolean
+  /** 悬浮来源键前缀：格子键为 `${srcPrefix}${row_code}:${列}`（不传不挂来源） */
+  srcPrefix?: string
+  /** 从来源链接跳来高亮的行 */
+  located?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -96,6 +100,7 @@ function cellProps(r: CitarReportRow, col: CitarAmountColumn) {
     restored: props.isRestored?.(r.row_code, col) ?? false,
     editable: Boolean(props.editable),
     label: `${r.row_name} ${col === 'current' ? '本期' : '上期'}`,
+    srcKey: props.srcPrefix === undefined ? undefined : `${props.srcPrefix}${r.row_code}:${col}`,
   }
 }
 
@@ -129,3 +134,4 @@ function indentStyle(r: CitarReportRow) {
 </script>
 
 <style scoped src="../styles/unaudited.css"></style>
+<style scoped src="../styles/citar-data.css"></style>

@@ -41,10 +41,13 @@
           :class="{ 'citar-nav--collapsed': navCollapsed }"
           aria-label="项目菜单"
         >
-          <!-- 栏高 = 窗口高减顶部两行；菜单区放不下时自己滚，开合按钮固定在栏底 -->
+          <!-- 栏高 = 窗口高减顶部两行；行距由 flex 按栏高分配，压到最小仍放不下时菜单区自己滚，开合按钮固定在栏底 -->
+          <!-- 组标题与菜单项平铺为菜单区的直接子元素，才能统一参与行距分配 -->
           <div class="citar-nav__menu">
-            <section v-for="(group, gi) in CITAR_NAV_GROUPS" :key="group.title" class="citar-nav__group">
-              <div v-if="!navCollapsed" class="citar-nav__title">{{ group.title }}</div>
+            <template v-for="(group, gi) in CITAR_NAV_GROUPS" :key="group.title">
+              <div v-if="!navCollapsed" class="citar-nav__title">
+                <span class="citar-nav__title-text">{{ group.title }}</span>
+              </div>
               <div v-else-if="gi > 0" class="citar-nav__divider" role="separator" />
               <button
                 v-for="item in group.items"
@@ -64,7 +67,7 @@
                   <span v-if="item.segment === CITAR_WORKPAPER_SEGMENT" class="shell-nav__caret">{{ subnavOpen && segment === item.segment ? '▾' : '▸' }}</span>
                 </template>
               </button>
-            </section>
+            </template>
           </div>
           <button
             type="button"
@@ -101,7 +104,7 @@ import { getProject } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
 import type { Component } from 'vue'
 import {
-  Connection, DArrowLeft, DArrowRight, Document, DocumentChecked, EditPen, Grid, Notebook, Search, Tickets, Upload,
+  Connection, DArrowLeft, DArrowRight, Document, DocumentChecked, EditPen, Grid, List, Notebook, Search, Tickets, Upload,
 } from '@element-plus/icons-vue'
 import {
   CITAR_FLUSH_SEGMENTS,
@@ -181,7 +184,7 @@ const projectFields = computed(() => {
 // ── 一级栏 ──
 /** 菜单图标：citarRoutes 里按名字登记，这里映射到组件 */
 const NAV_ICONS: Record<string, Component> = {
-  Upload, Search, Grid, EditPen, Tickets, DocumentChecked, Connection, Notebook, Document,
+  Upload, Search, Grid, EditPen, Tickets, DocumentChecked, Connection, Notebook, Document, List,
 }
 
 /** 一级栏收起状态：记在本机（localStorage），换页 / 刷新后保持 */
@@ -272,11 +275,17 @@ async function logout() {
   transition: flex-basis 0.2s ease, padding 0.2s ease;
 }
 
-/* 菜单区占满栏高，放不下（窗口矮）时自己滚；开合按钮在其下方固定于栏底 */
+/*
+ * 菜单区占满栏高。组标题与菜单项都按「紧凑高度」起算，多出的高度由 flex 平均分给每一行（上限即宽松行距），
+ * 菜单在 1080p 下铺满栏高、窗口变矮时自动收紧行距，最后一项不会被栏底按钮挡住；
+ * 收紧到最紧凑仍放不下（窗口矮于约 700px）才由菜单区自己滚动。开合按钮在其下方固定于栏底。
+ */
 .citar-nav__menu {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-height: 0;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -284,6 +293,7 @@ async function logout() {
 
 /* 收起后组标题换成分隔线，保留分组层次 */
 .citar-nav__divider {
+  flex: 0 0 auto;
   margin: 8px 6px;
   border-top: 1px solid #e8e8ec;
 }
@@ -312,28 +322,29 @@ async function logout() {
   color: var(--citar-c-6e0ba6);
 }
 
-.citar-nav__group + .citar-nav__group {
-  margin-top: 6px;
-}
-
 /*
- * 行距随窗口高度放宽，菜单尽量铺满栏高、不在底部留一大块白：
- * 菜单原样（组标题 14px / 菜单项 10px）连同顶部两行和栏底按钮约需 850px 高；
- * 窗口每多出 28px，组标题上边距与菜单项上下边距（共 28 处）各加 1px，上限 20px / 16px。
- * 矮于约 870px 时保持原行距，放不下由菜单区自己滚动。
+ * 行距随栏高伸缩（替代原先按窗口高度估算的 clamp：估算没算准，900px 窗口下最后一项「单体财务报表」被栏底按钮挡掉一半）：
+ * 组标题紧凑 30px / 宽松 48px，菜单项紧凑 34px / 宽松 54px，宽松值即原 1080p 下的行距。
+ * 栏高够时每行平均放宽、到宽松值为止；不够时停在紧凑值，由菜单区滚动。
  */
 .citar-nav__title {
-  padding: clamp(14px, 14px + (100vh - 870px) / 28, 20px) 10px 6px;
+  display: flex;
+  flex: 1 0 30px;
+  align-items: flex-end;
+  max-height: 48px;
+  padding: 0 10px 6px;
   font-size: var(--citar-fs-12);
   color: var(--citar-c-9a9aa4);
 }
 
 .citar-nav__item {
   display: flex;
+  flex: 1 0 34px;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: clamp(10px, 10px + (100vh - 870px) / 28, 16px) 10px;
+  max-height: 54px;
+  padding: 0 10px;
   border: none;
   border-radius: 8px;
   background: none;
@@ -367,7 +378,7 @@ async function logout() {
 
 /* 不折行：展开动画过程中宽度逐步变大，折行会让菜单上下跳动 */
 .citar-nav__label,
-.citar-nav__title {
+.citar-nav__title-text {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;

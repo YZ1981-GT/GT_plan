@@ -3,7 +3,7 @@
     <TaxReturnCatalog
       :active-code="activeCode"
       :filed="filed"
-      :readonly="!year"
+      :readonly="!year || !canManualEdit"
       :saving="marksSaving"
       @open="openSheet"
       @toggle="toggleFiled"
@@ -20,6 +20,7 @@
         :year="year"
         :filed="activeCode === TAX_RETURN_INDEX.cover.code || !!filed[activeCode]"
         :exporting="exporting"
+        :locate="locate"
         @export="exportXlsx"
       />
     </main>
@@ -31,8 +32,9 @@
  * 汇算申报表（CITAR 鉴证报告 · 汇算申报表）：左为「表单」目录（是否填报），右为单表。
  * 「是否填报」存为样表「表单」页 C 列（√ / □），与申报表其他手工值同一保存机制（编号 TR-FORMS）。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { TAX_CELL_LOCATE_EVENT, takePendingTaxLocate, type TaxCellLocate } from '@/citar/cellSource'
 import { useCitarProject } from '@/citar/useCitarProject'
 import { downloadTaxAssurance } from '@/citar/taxAssuranceApi'
 import { handleApiError } from '@/utils/errorHandler'
@@ -41,11 +43,13 @@ import TaxReturnCatalog from './TaxReturnCatalog.vue'
 import TaxReturnSheetPanel from './TaxReturnSheetPanel.vue'
 import { fetchTaxReturnSheet, saveTaxReturnSheet } from './taxReturnApi'
 import { FILED_MARK, TAX_RETURN_INDEX, UNFILED_MARK } from './taxReturnSheets'
+import { useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'TaxReturnView' })
 
 const ACTIVE_PREFIX = 'gt.tax-return-active.'
 const { projectId, year, yearLoading } = useCitarProject()
+const { canManualEdit } = useManualEditPermission()
 const panelRef = ref<{ dirty: boolean } | null>(null)
 const activeCode = ref(TAX_RETURN_INDEX.cover.code)
 const exporting = ref(false)
@@ -115,15 +119,16 @@ function loadActive(pid: string): string {
   return TAX_RETURN_INDEX.cover.code
 }
 
-async function openSheet(code: string) {
-  if (code === activeCode.value) return
+/** 切表；返回是否已在该表（未保存确认里选「留下」时 false） */
+async function openSheet(code: string): Promise<boolean> {
+  if (code === activeCode.value) return true
   if (panelRef.value?.dirty) {
     try {
       await ElMessageBox.confirm('本表有未保存的修改，离开后修改会丢失。', '提示', {
         confirmButtonText: '离开', cancelButtonText: '留下', type: 'warning',
       })
     } catch {
-      return
+      return false
     }
   }
   activeCode.value = code
@@ -132,7 +137,36 @@ async function openSheet(code: string) {
   } catch {
     // 记不住上次的表不影响使用
   }
+  return true
 }
+
+// ── 来源链接定位到格子（spec citar-cell-source-hover R2） ──
+const locate = ref<(TaxCellLocate & { seq: number }) | null>(null)
+let locateSeq = 0
+
+function knownCode(code: string): boolean {
+  return code === TAX_RETURN_INDEX.cover.code || TAX_RETURN_INDEX.forms.some(f => f.code === code)
+}
+
+async function goLocate(target: TaxCellLocate, confirm = true) {
+  if (!knownCode(target.code)) {
+    ElMessage.info(`申报表目录里没有 ${target.code}`)
+    return
+  }
+  if (confirm) {
+    if (!(await openSheet(target.code))) return
+  } else {
+    activeCode.value = target.code
+  }
+  locate.value = { ...target, seq: ++locateSeq }
+}
+
+function onLocateEvent(e: Event) {
+  const target = (e as CustomEvent<TaxCellLocate>).detail
+  if (target?.domain === 'tax_return') void goLocate(target)
+}
+window.addEventListener(TAX_CELL_LOCATE_EVENT, onLocateEvent)
+onBeforeUnmount(() => window.removeEventListener(TAX_CELL_LOCATE_EVENT, onLocateEvent))
 
 async function exportXlsx() {
   if (!year.value) return
@@ -146,7 +180,12 @@ async function exportXlsx() {
   }
 }
 
-watch(projectId, (pid) => { activeCode.value = loadActive(pid) }, { immediate: true })
+watch(projectId, (pid) => {
+  activeCode.value = loadActive(pid)
+  // 从别的页的来源链接跳来：切到目标表，读完值后定位
+  const pending = takePendingTaxLocate(pid, 'tax_return')
+  if (pending) void goLocate(pending, false)
+}, { immediate: true })
 watch([projectId, year], loadMarks, { immediate: true })
 </script>
 

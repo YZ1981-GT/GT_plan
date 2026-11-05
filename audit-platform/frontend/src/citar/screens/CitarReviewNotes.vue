@@ -2,7 +2,7 @@
   <div class="aud-screen">
     <header class="aud-header">
       <h1 class="aud-header__title">审核说明</h1>
-      <span class="aud-header__note">按样表「审核报告说明」规则从税审底稿与申报表智能生成；每段可直接修改、删除，改过的段可恢复自动文字</span>
+      <span class="aud-header__note">按样表「审核报告说明」规则从税审底稿与申报表智能生成{{ canManualEdit ? '；每段可直接修改、删除，改过的段可恢复自动文字' : '' }}</span>
     </header>
 
     <section class="aud-panel">

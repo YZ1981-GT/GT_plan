@@ -23,3 +23,9 @@
 
 - 不改项目成员权限级别与角色矩阵；不按项目单独配置（账号级一个开关）。
 - 调整分录、科目映射、导入、生成报表不受本开关控制（R3）。
+
+## 5 修订：整表只读（需求 R2′ / R2″ / R3′）
+
+- 后端：去掉 `save_sheet_inputs` 的按格比对（`is_auto_cell` / `_auto_cell_changes` / `allow_manual_edit` 参数），改为路由层整表拦截。新增拦截点：`PUT tax-workpapers/sheets/{code}`、`PUT tax-workpapers/params`、`PUT tax-assurance/tax-return/sheets/{code}`（含 TR-FORMS 是否填报）、`PUT tax-assurance/report-body`（报告日期）、`POST/PUT/DELETE adjustments`、`POST adjustments/batch-delete`、`POST import-templates/adjustments/import`、`POST/PUT mapping`、`POST mapping/batch-confirm`、`POST mapping/auto-match`。复核 / 撤回复核、账套导入内部的自动匹配（走 service，不经接口）不拦。
+- 前端：`TaxWorkpaperGrid.canEdit = manualEdit && !readonly && 有 ref`（不再分格子类型），关闭时提示只保留数据来源说明；底稿 / 申报表工具栏隐藏导入 / 放弃修改 / 保存，图例去掉「可点击修改」；表头信息不给「编辑」按钮只显示摘要；是否填报勾选框换成 √；报告日期显示文字；摘录表金额去掉文本光标；调整分录隐藏导入 / 增加 / 编辑 / 删除（`CitarAdjustmentCard.canEdit`，`withDefaults` 默认 true）；科目映射隐藏智能匹配 / 保存 / 修改、未映射行显示「未映射」；各页头部说明里的「可修改」字样随开关隐藏。
+- 范围外：主平台（非 CITAR）调整分录 / 科目映射页面未做界面隐藏，未开通账号在那里点保存会收到 403 提示。

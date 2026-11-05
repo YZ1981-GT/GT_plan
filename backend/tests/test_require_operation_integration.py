@@ -135,7 +135,10 @@ class TestReportsGenerateAuth:
         app = _make_app_with_router(router, ADMIN_USER)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            with patch("app.deps._resolve_project_role", new_callable=AsyncMock, return_value=None):
+            # 生成报表另按请求体的项目校验成员（spec citar-cell-source-hover R7），admin 分支会设 RLS 上下文：
+            # mock db 的 get_bind 是 AsyncMock（真会话是同步方法），RLS 设置一并替换
+            with patch("app.deps._resolve_project_role", new_callable=AsyncMock, return_value=None), \
+                    patch("app.deps.set_rls_context", new_callable=AsyncMock):
                 resp = await client.post(
                     "/api/reports/generate",
                     json={

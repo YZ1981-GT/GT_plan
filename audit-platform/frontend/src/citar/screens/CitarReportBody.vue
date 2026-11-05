@@ -2,24 +2,28 @@
   <div class="aud-screen">
     <header class="aud-header">
       <h1 class="aud-header__title">报告正文</h1>
-      <span class="aud-header__note">取税审底稿 1-01 与申报主表 A100000；摘录表金额可修改，正文为法定文书表述，不改措辞</span>
+      <span class="aud-header__note">取税审底稿 1-01 与申报主表 A100000；{{ canManualEdit ? '摘录表金额可修改，' : '' }}正文为法定文书表述，不改措辞</span>
     </header>
 
     <section class="aud-panel">
       <p v-if="!year" class="sheet-empty">{{ yearLoading ? '正在读取项目信息…' : '项目未设置审核年度，请先在项目信息里填写' }}</p>
       <template v-else>
         <div class="citar-toolbar">
-          <label class="rb-date">报告日期
-            <input v-model="dateDraft" class="citar-search rb-date__input" type="date" :disabled="!data || saving" />
-          </label>
-          <button class="citar-btn" type="button" :disabled="!data || saving || dateDraft === (data?.report_date || '')" @click="saveDate">
-            {{ saving ? '保存中…' : '保存日期' }}
-          </button>
+          <template v-if="canManualEdit">
+            <label class="rb-date">报告日期
+              <input v-model="dateDraft" class="citar-search rb-date__input" type="date" :disabled="!data || saving" />
+            </label>
+            <button class="citar-btn" type="button" :disabled="!data || saving || dateDraft === (data?.report_date || '')" @click="saveDate">
+              {{ saving ? '保存中…' : '保存日期' }}
+            </button>
+          </template>
+          <span v-else class="rb-date">报告日期 {{ data?.report_date || '未填' }}</span>
           <button class="citar-btn" type="button" :disabled="loading" @click="load">刷新</button>
           <button class="citar-btn citar-btn--primary" type="button" :disabled="!data || exporting" @click="exportWord">
             {{ exporting ? '导出中…' : '导出 Word' }}
           </button>
-          <span class="citar-toolbar__hint">报告号在「税审底稿 → 索引 → 填写参数」填写</span>
+          <span v-if="canManualEdit" class="citar-toolbar__hint">报告号在「税审底稿 → 索引 → 填写参数」填写</span>
+          <span v-else class="citar-toolbar__hint">{{ MANUAL_EDIT_DENIED_TIP }}</span>
         </div>
 
         <div v-for="n in data?.notices ?? []" :key="n" class="citar-notice">{{ n }}</div>
@@ -66,6 +70,7 @@ import {
 } from '../taxAssuranceApi'
 import CitarReportBodyAmounts from '../components/CitarReportBodyAmounts.vue'
 import { useCitarProject } from '../useCitarProject'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'CitarReportBody' })
 
@@ -81,6 +86,7 @@ const PDF_STATIC_URL = `${import.meta.env.BASE_URL}pdfjs/`
 const PDF_OPTIONS = { width: 794 }
 
 const { projectId, year, yearLoading } = useCitarProject()
+const { canManualEdit } = useManualEditPermission()
 const data = ref<ReportBodyData | null>(null)
 const loading = ref(false)
 const saving = ref(false)

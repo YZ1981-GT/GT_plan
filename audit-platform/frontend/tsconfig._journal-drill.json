@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/citar/citarLedgerExtra.ts",
+    "src/citar/journalDrillMemory.ts",
+    "src/citar/components/CitarJournalTab.vue",
+    "src/citar/screens/CitarLedgerQuery.vue",
+    "src/citar/__tests__/journalDrilldown.spec.ts",
+    "src/env.d.ts"
+  ]
+}

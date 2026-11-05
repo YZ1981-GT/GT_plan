@@ -45,12 +45,15 @@ def _signed_natural(amount: Decimal, direction: str) -> Decimal:
     return -amount if direction == "credit" else amount
 
 
-async def _period_by_standard(db: AsyncSession, project_id: UUID, year: int) -> dict[str, dict]:
-    """标准科目 → {debit, credit, closing}（tb_balance 叶子行经映射汇总）。"""
+async def _leaf_select(db: AsyncSession, project_id: UUID, year: int):
+    """tb_balance 叶子行经映射到标准科目（借正贷负）。``_period_by_standard`` 对它求和，单元格来源逐行列出 —— 同一条 SQL。"""
     bal = TbBalance.__table__
-    sub = (
+    return (
         sa.select(
+            bal.c.account_code.label("code"),
+            bal.c.account_name.label("name"),
             resolved_standard_code(bal).label("std"),
+            signed_balance(bal.c.opening_balance, bal.c.opening_direction).label("so"),
             bal.c.debit_amount.label("dr"),
             bal.c.credit_amount.label("cr"),
             signed_balance(bal.c.closing_balance, bal.c.closing_direction).label("sc"),
@@ -58,7 +61,23 @@ async def _period_by_standard(db: AsyncSession, project_id: UUID, year: int) -> 
         .select_from(bal)
         .where(await get_active_filter(db, bal, project_id, year))
         .where(leaf_condition(bal))
-    ).subquery("period_sub")
+    )
+
+
+async def leaf_balance_rows(db: AsyncSession, project_id: UUID, year: int) -> list[dict]:
+    """末级客户科目行（已映射到标准科目的）：code / name / std / opening / debit / credit / closing（借正贷负）。"""
+    sub = (await _leaf_select(db, project_id, year)).subquery("leaf_rows")
+    rows = (await db.execute(sa.select(sub).where(sub.c.std.isnot(None)).order_by(sub.c.code))).fetchall()
+    return [
+        {"code": r.code, "name": r.name, "std": r.std, "opening": _d(r.so), "debit": _d(r.dr),
+         "credit": _d(r.cr), "closing": _d(r.sc)}
+        for r in rows
+    ]
+
+
+async def _period_by_standard(db: AsyncSession, project_id: UUID, year: int) -> dict[str, dict]:
+    """标准科目 → {debit, credit, closing}（tb_balance 叶子行经映射汇总）。"""
+    sub = (await _leaf_select(db, project_id, year)).subquery("period_sub")
     q = (
         sa.select(
             sub.c.std,
@@ -73,6 +92,42 @@ async def _period_by_standard(db: AsyncSession, project_id: UUID, year: int) -> 
     return {r.std: {"debit": _d(r.dr), "credit": _d(r.cr), "closing": _d(r.sc)} for r in rows}
 
 
+async def approved_adjustment_lines(db: AsyncSession, project_id: UUID, year: int) -> list[dict]:
+    """已批准、非底稿来源的调整分录明细行（与 ``_adjustments_by_standard`` 同一条件；单元格来源逐组列出，
+    spec citar-cell-source-hover）。每行：group / no / description / code / debit / credit。"""
+    adj = Adjustment.__table__
+    ae = AdjustmentEntry.__table__
+    q = (
+        sa.select(
+            adj.c.entry_group_id.label("group"),
+            adj.c.adjustment_no.label("no"),
+            adj.c.description,
+            ae.c.standard_account_code.label("code"),
+            ae.c.debit_amount.label("dr"),
+            ae.c.credit_amount.label("cr"),
+        )
+        .select_from(ae.join(adj, ae.c.adjustment_id == adj.c.id))
+        .where(*_approved_adjustment_conditions(adj, project_id, year))
+        .order_by(adj.c.adjustment_no, ae.c.line_no)
+    )
+    return [
+        {"group": str(r.group), "no": r.no, "description": r.description, "code": r.code,
+         "debit": _d(r.dr), "credit": _d(r.cr)}
+        for r in (await db.execute(q)).fetchall() if r.code
+    ]
+
+
+def _approved_adjustment_conditions(adj, project_id: UUID, year: int) -> tuple:
+    return (
+        adj.c.project_id == project_id,
+        adj.c.year == year,
+        adj.c.is_deleted == sa.false(),
+        adj.c.review_status == "approved",
+        # 底稿来源已由审定表发布体现在 wp_adjustment，再计入会双计（同 recalc_adjustments）
+        sa.or_(adj.c.origin.is_(None), adj.c.origin != "workpaper"),
+    )
+
+
 async def _adjustments_by_standard(db: AsyncSession, project_id: UUID, year: int) -> dict[str, dict]:
     """标准科目 → {debit, credit}：已批准、非底稿来源的调整分录（借贷分别汇总，不轧差）。"""
     adj = Adjustment.__table__
@@ -84,14 +139,7 @@ async def _adjustments_by_standard(db: AsyncSession, project_id: UUID, year: int
             sa.func.coalesce(sa.func.sum(ae.c.credit_amount), 0).label("cr"),
         )
         .select_from(ae.join(adj, ae.c.adjustment_id == adj.c.id))
-        .where(
-            adj.c.project_id == project_id,
-            adj.c.year == year,
-            adj.c.is_deleted == sa.false(),
-            adj.c.review_status == "approved",
-            # 底稿来源已由审定表发布体现在 wp_adjustment，再计入会双计（同 recalc_adjustments）
-            sa.or_(adj.c.origin.is_(None), adj.c.origin != "workpaper"),
-        )
+        .where(*_approved_adjustment_conditions(adj, project_id, year))
         .group_by(ae.c.standard_account_code)
     )
     rows = (await db.execute(q)).fetchall()

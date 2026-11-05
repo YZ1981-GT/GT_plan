@@ -7,30 +7,33 @@
     </header>
 
     <div class="tw-toolbar">
-      <button type="button" class="tw-button" :disabled="!dirty || saving" @click="discard">放弃修改</button>
-      <button type="button" class="tw-button tw-button--primary" :disabled="!dirty || saving || !year" @click="save">
-        {{ saving ? '保存中…' : '保存' }}
-      </button>
+      <template v-if="canManualEdit">
+        <button type="button" class="tw-button" :disabled="!dirty || saving" @click="discard">放弃修改</button>
+        <button type="button" class="tw-button tw-button--primary" :disabled="!dirty || saving || !year" @click="save">
+          {{ saving ? '保存中…' : '保存' }}
+        </button>
+      </template>
       <button type="button" class="tw-button" :disabled="loadingValues || !year" @click="loadValues">重新计算</button>
       <button type="button" class="tw-button" :disabled="exporting || !year" @click="emit('export')">
         {{ exporting ? '导出中…' : '导出申报表（Excel）' }}
       </button>
       <span v-if="dirty" class="tw-toolbar__hint">有 {{ draftCount }} 处未保存的修改</span>
       <span v-if="!filed" class="tw-toolbar__hint">本表未勾选填报，导出时隐藏</span>
+      <span v-if="!canManualEdit" class="tw-toolbar__hint">{{ MANUAL_EDIT_DENIED_TIP }}</span>
     </div>
 
     <div v-if="definition && result" class="tw-legend" aria-label="单元格说明">
       <span class="tw-legend__item tw-legend__item--formula">公式计算（取自底稿）</span>
       <span class="tw-legend__item tw-legend__item--input">手工修改</span>
-      <span class="tw-legend__tip">点击任一金额格可修改；改过公式格后该格不再随底稿更新，编辑时可「恢复自动值」</span>
+      <span v-if="canManualEdit" class="tw-legend__tip">悬停单元格查看数据来源；点击任一金额格可修改，改过公式格后该格不再随底稿更新，编辑时可「恢复自动值」</span>
+      <span v-else class="tw-legend__tip">悬停单元格查看数据来源</span>
     </div>
-    <div v-if="!canManualEdit" class="tw-alert">{{ MANUAL_EDIT_DENIED_TIP }}；手填格照常可填。</div>
 
     <div v-if="valuesError" class="tw-alert tw-alert--error">{{ valuesError }}</div>
     <div v-for="n in result?.notices ?? []" :key="n" class="tw-alert">{{ n }}</div>
 
     <section class="tw-panel">
-      <div v-if="definition" class="tw-scroll" :class="{ 'tw-scroll--loading': loadingValues }">
+      <div v-if="definition" ref="scrollRef" class="tw-scroll" :class="{ 'tw-scroll--loading': loadingValues }">
         <TaxWorkpaperGrid
           v-for="part in definition.parts"
           :key="part.source"
@@ -41,6 +44,8 @@
           :restored="restoredOf(part.source)"
           :readonly="!year || saving"
           :manual-edit="canManualEdit"
+          :sheet="part.source"
+          :located-ref="sources.locatedRefOf(part.source)"
           @edit="(ref, value) => setDraft(part.source, ref, value)"
           @restore="(ref) => restore(part.source, ref)"
         />
@@ -49,6 +54,14 @@
         <p class="tw-pending__title">{{ loadState === 'error' ? '申报表加载失败，请刷新重试' : loadState === 'missing' ? '该表结构未生成' : '正在加载申报表…' }}</p>
       </div>
     </section>
+
+    <CitarSourceCard
+      :state="sources.card.value"
+      :label="sources.cardLabel.value"
+      @open="sources.open"
+      @enter="sources.onCardEnter"
+      @leave="sources.onCardLeave"
+    />
   </div>
 </template>
 
@@ -58,9 +71,12 @@
  * 手填格（如 A000000 投资方比例）点击即改，保存带版本号。
  */
 import { ref, shallowRef, watch } from 'vue'
+import CitarSourceCard from '@/citar/components/CitarSourceCard.vue'
+import type { TaxCellLocate } from '@/citar/cellSource'
 import TaxWorkpaperGrid from '@/views/tax-workpapers/TaxWorkpaperGrid.vue'
 import type { TaxWorkpaperSheetDefinition } from '@/views/tax-workpapers/taxWorkpaperSheets'
 import { useTaxSheetEditor } from '@/views/tax-workpapers/useTaxSheetEditor'
+import { useTaxSheetSources } from '@/views/tax-workpapers/useTaxSheetSources'
 import { fetchTaxReturnSheet, saveTaxReturnSheet } from './taxReturnApi'
 import { TAX_RETURN_INDEX, loadTaxReturnSheet, taxReturnName } from './taxReturnSheets'
 import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
@@ -71,6 +87,8 @@ const props = defineProps<{
   year: number | null
   filed: boolean
   exporting: boolean
+  /** 从来源链接跳来要定位的格子（seq 变化即重新定位） */
+  locate?: (TaxCellLocate & { seq: number }) | null
 }>()
 
 const emit = defineEmits<{ (e: 'export'): void }>()
@@ -116,6 +134,31 @@ watch(() => [props.projectId, props.year], () => {
 })
 
 defineExpose({ dirty })
+
+// ── 悬浮数据来源（spec citar-cell-source-hover） ──
+const scrollRef = ref<HTMLElement | null>(null)
+const sources = useTaxSheetSources({
+  domain: 'tax_return',
+  projectId: () => props.projectId,
+  year: () => props.year,
+  code: () => props.code,
+  definition: () => definition.value,
+  result: () => result.value,
+  partValues,
+  drafts: () => drafts.value,
+  restoredOf,
+  manualEdit: () => canManualEdit.value,
+  readonly: () => !props.year || saving.value,
+  dirty: () => dirty.value,
+  container: scrollRef,
+})
+
+let locatedSeq = -1
+watch(() => [props.locate, result.value] as const, ([target, res]) => {
+  if (!target || !res || target.code !== props.code || target.seq === locatedSeq) return
+  locatedSeq = target.seq
+  void sources.locate(target.sheet, target.ref)
+})
 </script>
 
 <style scoped src="../tax-workpapers/taxWorkpaperScreen.css"></style>

@@ -27,6 +27,7 @@
         :hidden-codes="hiddenCodes"
         :project-id="projectId"
         :year="year"
+        :locate="locate"
         @open="openSheet"
       />
     </main>
@@ -43,15 +44,16 @@
  * 当前表编号不进路由 query：DefaultLayout 按 fullPath 给页面加 key，
  * 改 query 会整页重建、目录展开状态丢失。改记 sessionStorage，刷新后回到上次的表。
  */
-import { computed, inject, nextTick, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { CITAR_SUBNAV_OPEN_KEY } from '@/citar/citarRoutes'
+import { TAX_CELL_LOCATE_EVENT, takePendingTaxLocate, type TaxCellLocate } from '@/citar/cellSource'
 import { useCitarProject } from '@/citar/useCitarProject'
 import TaxWorkpaperCatalog from './TaxWorkpaperCatalog.vue'
 import TaxWorkpaperIndexPanel from './TaxWorkpaperIndexPanel.vue'
 import TaxWorkpaperParamsPanel from './TaxWorkpaperParamsPanel.vue'
 import TaxWorkpaperSheetPanel from './TaxWorkpaperSheetPanel.vue'
-import { TAX_INDEX_CODE, loadActiveTaxSheet, saveActiveTaxSheet } from './taxWorkpaperIndex'
+import { TAX_INDEX_CODE, isTaxWorkpaperShown, loadActiveTaxSheet, saveActiveTaxSheet } from './taxWorkpaperIndex'
 import {
   loadHideAbsent,
   loadMarks,
@@ -76,6 +78,10 @@ const contentRef = ref<HTMLElement | null>(null)
 /** 目录栏开合：CITAR 框架点「税务底稿」时切换；不在该框架下（inject 不到）时常开 */
 const catalogOpen = inject(CITAR_SUBNAV_OPEN_KEY, ref(true))
 
+/** 来源链接要定位的格子；seq 每次加一，同一格再点也会重新定位（须声明在下方 immediate watch 之前：进页时就会用到） */
+const locate = ref<(TaxCellLocate & { seq: number }) | null>(null)
+let locateSeq = 0
+
 // 切项目时重读该项目的标记与上次打开的表
 watch(
   projectId,
@@ -83,9 +89,35 @@ watch(
     marks.value = loadMarks(pid)
     hideAbsent.value = loadHideAbsent(pid)
     activeCode.value = loadActiveTaxSheet(pid)
+    // 从别的页的来源链接跳来：切到目标表，读完值后定位格子（spec citar-cell-source-hover R2）
+    const pending = takePendingTaxLocate(pid, 'workpaper')
+    if (pending) void goLocate(pending, false)
   },
   { immediate: true },
 )
+
+async function goLocate(target: TaxCellLocate, confirm = true) {
+  if (!isTaxWorkpaperShown(target.code)) {
+    ElMessage.info(`${target.code} 不在底稿目录中显示，只能经取数或手填`)
+    return
+  }
+  if (confirm ? !(await openSheet(target.code)) : !switchTo(target.code)) return
+  locate.value = { ...target, seq: ++locateSeq }
+}
+
+function onLocateEvent(e: Event) {
+  const target = (e as CustomEvent<TaxCellLocate>).detail
+  if (target?.domain === 'workpaper') void goLocate(target)
+}
+window.addEventListener(TAX_CELL_LOCATE_EVENT, onLocateEvent)
+onBeforeUnmount(() => window.removeEventListener(TAX_CELL_LOCATE_EVENT, onLocateEvent))
+
+/** 不确认直接切（进页时用） */
+function switchTo(code: string): boolean {
+  activeCode.value = code
+  saveActiveTaxSheet(projectId.value, code)
+  return true
+}
 
 /** 标为「无」且开了隐藏的表：不进目录栏与页签（索引页照常列出） */
 const hiddenCodes = computed<ReadonlySet<string>>(() => {
@@ -93,8 +125,9 @@ const hiddenCodes = computed<ReadonlySet<string>>(() => {
   return new Set(Object.keys(marks.value).filter(code => marks.value[code] === 'absent'))
 })
 
-async function openSheet(code: string) {
-  if (code === activeCode.value) return
+/** 切表；返回是否已在该表（用户在未保存确认里选「留下」时 false） */
+async function openSheet(code: string): Promise<boolean> {
+  if (code === activeCode.value) return true
   // 切表（目录栏、页签、索引页都走这里）：单表页有未保存修改时先确认
   if (sheetPanelRef.value?.dirty) {
     try {
@@ -102,7 +135,7 @@ async function openSheet(code: string) {
         confirmButtonText: '离开', cancelButtonText: '留下', type: 'warning',
       })
     } catch {
-      return
+      return false
     }
   }
   activeCode.value = code
@@ -114,6 +147,7 @@ async function openSheet(code: string) {
     content.scrollTop = 0
     content.scrollIntoView({ block: 'start' })
   }
+  return true
 }
 
 function commitMarks(next: TaxWorkpaperMarkMap) {

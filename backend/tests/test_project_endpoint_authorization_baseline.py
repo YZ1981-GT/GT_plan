@@ -422,7 +422,8 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: materialize-jobs，原先任何登录用户都能给任意项目物化）挂 ``require_project_delegator`` 后降 2。
 #: 2026-11-03 现算 183：spec citar-report-analysis 给 wp_report_analysis 6 个报表分析端点改项目级只读
 #: 鉴权后降 6（另 2 个是并发会话此前已补、基线未同步下调）。
-_IDENTITY_ONLY_BASELINE = 183
+#: 2026-11-05 现算 179：spec citar-cell-source-hover R7 给报表 GET / 穿透 / 单表导出 / 关联底稿 4 个端点改项目级只读后降 4。
+_IDENTITY_ONLY_BASELINE = 179
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -592,8 +593,9 @@ _PREFIXED_SELF_AUTH: dict[str, str] = {
 _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
 #: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
-#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277
-_PREFIXED_IDENTITY_ONLY_BASELINE = 270
+#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277。
+#: 2026-11-05 现算 259：spec citar-cell-source-hover R7 给报表批量导出 Excel 改项目级只读（降 1，其余为此前并发会话补的、未同步下调）。
+_PREFIXED_IDENTITY_ONLY_BASELINE = 259
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:

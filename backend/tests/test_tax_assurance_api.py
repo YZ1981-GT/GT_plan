@@ -470,8 +470,8 @@ async def test_authorization(env):
 
 @pytest.mark.asyncio
 async def test_account_without_manual_edit(env):
-    """账号未开通「允许修改」（spec citar-manual-edit-permission R2 / R3）：
-    摘录表金额、审核说明、单体报表手工值、申报表公式格 403；是否填报、报告日期、查看与导出照常。"""
+    """账号未开通「允许修改」（spec citar-manual-edit-permission R2，2026-11-04 改为整表只读）：
+    摘录表金额、审核说明、单体报表手工值、申报表格子、是否填报、报告日期一律 403；查看与导出照常。"""
     c = env["client"]
     locked = _Actor(EDITOR, UserRole.partner)
     locked.allow_manual_edit = False
@@ -481,12 +481,12 @@ async def test_account_without_manual_edit(env):
         ("review-notes", {"version": 0, "edits": {}}),
         ("financial-statements", {"version": 0, "values": {}}),
         ("tax-return/sheets/A000000", {"version": 0, "inputs": {"A000000": {"F6": 100}}}),
+        ("tax-return/sheets/TR-FORMS", {"version": 0, "inputs": {"表单": {"C7": "□"}}}),
+        ("report-body", {"version": 0, "report_date": "2026-03-01"}),
     ]
     for path, body in denied:
         r = await c.put(f"{URL}/{path}", params=Y, json=body)
         assert r.status_code == 403 and "允许修改" in r.text, (path, r.text)
-    assert (await c.put(f"{URL}/tax-return/sheets/TR-FORMS", params=Y,
-                        json={"version": 0, "inputs": {"表单": {"C7": "□"}}})).status_code == 200
-    assert (await c.put(f"{URL}/report-body", params=Y, json={"version": 0, "report_date": "2026-03-01"})).status_code == 200
-    for path in ("report-body", "review-notes", "financial-statements", "tax-return/export"):
+    assert (await c.get(f"{URL}/report-body", params=Y)).json()["report_date"] in (None, "")
+    for path in ("report-body", "review-notes", "financial-statements", "tax-return/export", "tax-return/sheets/TR-FORMS"):
         assert (await c.get(f"{URL}/{path}", params=Y)).status_code == 200, path

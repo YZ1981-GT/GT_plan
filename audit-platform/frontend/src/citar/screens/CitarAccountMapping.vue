@@ -33,9 +33,10 @@
           </div>
           <span v-if="unmapped.length" class="citar-map__warn">有余额未映射 {{ unmapped.length }} 个：不映射就不会进入试算表</span>
           <button class="citar-btn" type="button" :disabled="loading || busy" @click="load">刷新</button>
-          <button class="citar-btn citar-btn--primary" type="button" :disabled="busy" @click="autoMatch">
+          <button v-if="canManualEdit" class="citar-btn citar-btn--primary" type="button" :disabled="busy" @click="autoMatch">
             {{ busy ? '匹配中…' : '智能匹配' }}
           </button>
+          <span v-else class="citar-map__readonly">{{ MANUAL_EDIT_DENIED_TIP }}</span>
         </div>
 
         <datalist :id="DATALIST_ID">
@@ -47,7 +48,7 @@
           <h3 class="citar-map__heading">有余额未映射的客户科目</h3>
           <table class="sheet-table citar-map__table">
             <thead>
-              <tr><th>客户科目编码</th><th>客户科目名称</th><th>期末余额</th><th>映射到标准科目</th><th /></tr>
+              <tr><th>客户科目编码</th><th>客户科目名称</th><th>期末余额</th><th>映射到标准科目</th><th v-if="canManualEdit" /></tr>
             </thead>
             <tbody>
               <tr
@@ -59,11 +60,12 @@
                 <td>{{ u.account_code }}</td>
                 <td>{{ u.account_name }}</td>
                 <td class="is-numeric">{{ fmtMoney(u.closing_balance) }}</td>
-                <td>
+                <td v-if="canManualEdit">
                   <input v-model.trim="pending[u.account_code]" class="citar-search citar-map__input" :list="DATALIST_ID" placeholder="标准科目编码" />
                   <span class="citar-map__name">{{ standardName(pending[u.account_code]) }}</span>
                 </td>
-                <td class="citar-center">
+                <td v-else class="citar-map__name">未映射</td>
+                <td v-if="canManualEdit" class="citar-center">
                   <button class="citar-btn" type="button" :disabled="busy || !pending[u.account_code]" @click="createMapping(u)">保存</button>
                 </td>
               </tr>
@@ -79,7 +81,7 @@
         <div class="sheet-scroll">
           <table class="sheet-table citar-map__table">
             <thead>
-              <tr><th>客户科目编码</th><th>客户科目名称</th><th>标准科目编码</th><th>标准科目名称</th><th>映射方式</th><th /></tr>
+              <tr><th>客户科目编码</th><th>客户科目名称</th><th>标准科目编码</th><th>标准科目名称</th><th>映射方式</th><th v-if="canManualEdit" /></tr>
             </thead>
             <tbody>
               <tr
@@ -102,7 +104,7 @@
                 </td>
                 <td>{{ standardName(editingId === m.id ? editingCode : m.standard_account_code) }}</td>
                 <td class="citar-center">{{ MAPPING_TYPE_LABELS[m.mapping_type] || m.mapping_type }}</td>
-                <td class="citar-center citar-map__ops">
+                <td v-if="canManualEdit" class="citar-center citar-map__ops">
                   <template v-if="editingId === m.id">
                     <button class="citar-btn" type="button" :disabled="busy" @click="editingId = ''">取消</button>
                     <button class="citar-btn citar-btn--primary" type="button" :disabled="busy || !editingCode" @click="saveEdit(m)">保存</button>
@@ -115,7 +117,7 @@
         </div>
         <p v-if="loading" class="sheet-empty">正在读取映射…</p>
         <p v-else-if="error" class="sheet-empty">{{ error }}</p>
-        <p v-else-if="!mappings.length" class="sheet-empty">还没有映射。导入账套后会智能匹配一次，也可点「智能匹配」。</p>
+        <p v-else-if="!mappings.length" class="sheet-empty">还没有映射。导入账套后会智能匹配一次{{ canManualEdit ? '，也可点「智能匹配」' : '' }}。</p>
       </div>
     </section>
   </div>
@@ -136,8 +138,11 @@ import { handleApiError } from '@/utils/errorHandler'
 import CitarWorkpaperMapTab from '../components/CitarWorkpaperMapTab.vue'
 import { fmtMoney, useCitarProject } from '../useCitarProject'
 import { normCode, useCitarRowLocate } from '../useCitarRowLocate'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'CitarAccountMapping' })
+
+const { canManualEdit } = useManualEditPermission()
 
 /** 从「数据源头」跳来：?tab=standard&locate=客户科目（spec citar-fs-issue-source-locate） */
 const { code: locateCode, isLocated, apply: applyLocate } = useCitarRowLocate()
@@ -357,6 +362,11 @@ watch(
 
 .citar-map__warn {
   color: var(--citar-c-8a5300);
+}
+
+.citar-map__readonly {
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-8c8c96);
 }
 
 /* 页签上的「有余额未映射」数 */

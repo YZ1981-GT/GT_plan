@@ -101,7 +101,7 @@ import {
   emptyLine, formatAmountInput, lineTotals, validateEntry, type AdjEntry, type AdjLine, type ReviewTarget, type Side,
 } from '../useCitarAdjustments'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entry: AdjEntry
   editing: boolean
   busy: boolean
@@ -109,7 +109,9 @@ const props = defineProps<{
   /** 科目编号 → 名称（选编号后带出名称） */
   accountNames: Map<string, string>
   canReview: boolean
-}>()
+  /** 账号「允许修改」（spec citar-manual-edit-permission）；布尔 prop 不传即 false，故给默认值 true */
+  canEdit?: boolean
+}>(), { canEdit: true })
 
 const emit = defineEmits<{
   edit: []
@@ -123,8 +125,8 @@ const emit = defineEmits<{
 const saveError = ref('')
 
 const statusLabel = computed(() => ADJUSTMENT_STATUS_LABELS[props.entry.status]?.label || props.entry.status)
-/** 平台规则：只有草稿与驳回的分录能改、能删 */
-const editable = computed(() => props.entry.status === S.DRAFT || props.entry.status === S.REJECTED)
+/** 平台规则：只有草稿与驳回的分录能改、能删；账号未开通「允许修改」时一律不能 */
+const editable = computed(() => props.canEdit && (props.entry.status === S.DRAFT || props.entry.status === S.REJECTED))
 
 const totals = computed(() => lineTotals(props.entry))
 const balanced = computed(() => totals.value.debit === totals.value.credit)

@@ -635,53 +635,44 @@ class ReportFormulaParser:
             return await self.resolver.resolve_tb(account_code, column_name)
 
         rows = await self._get_tb_rows_prefix(account_code)
-        if not rows:
-            return Decimal("0")
+        return self._sum_rows(rows, column_name)
 
-        field = _COLUMN_MAP.get(column_name)
-        if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
-            field = "opening_balance"
-        # Phase 9 未审模式：期末/审定列直接取未审数（无需列名映射）
-        unadjusted_end = (
-            self._use_unadjusted
-            and not self._use_opening
-            and column_name in ("期末余额", "审定数")
-        )
-        if not unadjusted_end and field is None:
-            logger.warning("Unknown column name: %s", column_name)
-            return Decimal("0")
+    def _row_amount(self, row: TrialBalance, column_name: str) -> Decimal | None:
+        """一行试算表在本口径（审定 / 未审 / 期初）下该列的金额；列名未登记返回 None。
 
-        total = Decimal("0")
-        for row in rows:
-            if unadjusted_end:
-                total += row.unadjusted_amount or Decimal("0")
-            elif field == "_period_amount":
-                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-                opening = row.opening_balance or Decimal("0")
-                total += amount - opening
-            else:
-                val = getattr(row, field, None)
-                total += val if val is not None else Decimal("0")
-        return total
-
-    async def _resolve_sum_tb(self, code_range: str, column_name: str) -> Decimal:
-        """解析 SUM_TB('start~end','column_name') → Decimal 值"""
-        # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
-        if self.resolver is not None:
-            return await self.resolver.resolve_sum(code_range, column_name)
-        parts = code_range.split("~")
-        if len(parts) != 2:
-            logger.warning("Invalid SUM_TB range: %s", code_range)
-            return Decimal("0")
-        start_code, end_code = parts[0].strip(), parts[1].strip()
-
+        TB() / SUM_TB() 求值与单元格来源逐科目拆分共用（spec citar-cell-source-hover），口径只写这一处。
+        """
         field = _COLUMN_MAP.get(column_name)
         if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
             field = "opening_balance"
         if field is None:
-            logger.warning("Unknown column name: %s", column_name)
-            return Decimal("0")
+            return None
+        # Phase 9 未审模式：期末/审定列直接取未审数
+        if self._use_unadjusted and not self._use_opening and column_name in ("期末余额", "审定数"):
+            return row.unadjusted_amount or Decimal("0")
+        if field == "_period_amount":
+            amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
+            return amount - (row.opening_balance or Decimal("0"))
+        val = getattr(row, field, None)
+        return val if val is not None else Decimal("0")
 
+    def _sum_rows(self, rows: list[TrialBalance], column_name: str) -> Decimal:
+        total = Decimal("0")
+        for row in rows:
+            amount = self._row_amount(row, column_name)
+            if amount is None:
+                logger.warning("Unknown column name: %s", column_name)
+                return Decimal("0")
+            total += amount
+        return total
+
+    async def _sum_tb_rows(self, code_range: str) -> list[TrialBalance] | None:
+        """SUM_TB 区间（字符串比较 start ≤ 码 ≤ end）内的试算表行；区间写法不对返回 None。"""
+        parts = code_range.split("~")
+        if len(parts) != 2:
+            logger.warning("Invalid SUM_TB range: %s", code_range)
+            return None
+        start_code, end_code = parts[0].strip(), parts[1].strip()
         result = await self.db.execute(
             sa.select(TrialBalance).where(
                 TrialBalance.project_id == self.project_id,
@@ -691,27 +682,18 @@ class ReportFormulaParser:
                 TrialBalance.is_deleted == sa.false(),
             )
         )
-        rows = result.scalars().all()
-
-        total = Decimal("0")
+        rows = list(result.scalars().all())
         for row in rows:
-            if (
-                self._use_unadjusted
-                and not self._use_opening
-                and column_name in ("期末余额", "审定数")
-            ):
-                total += row.unadjusted_amount or Decimal("0")
-            elif field == "_period_amount":
-                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-                opening = row.opening_balance or Decimal("0")
-                total += amount - opening
-            else:
-                val = getattr(row, field, None)
-                total += val if val is not None else Decimal("0")
-            # Cache for later use
             self._tb_cache[row.standard_account_code] = row
+        return rows
 
-        return total
+    async def _resolve_sum_tb(self, code_range: str, column_name: str) -> Decimal:
+        """解析 SUM_TB('start~end','column_name') → Decimal 值"""
+        # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
+        if self.resolver is not None:
+            return await self.resolver.resolve_sum(code_range, column_name)
+        rows = await self._sum_tb_rows(code_range)
+        return self._sum_rows(rows, column_name) if rows is not None else Decimal("0")
 
     async def resolve_pl_unclosed(self) -> Decimal | None:
         """``PL_UNCLOSED()``：未结转损益（利润为正）。期初口径 0（损益类没有期初）；注入了合并 resolver 时返回 None

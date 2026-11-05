@@ -59,6 +59,12 @@ export const projectsRoutes: RouteRecordRaw[] = [
           component: () => import('@/citar/screens/CitarReportAnalysis.vue'),
         },
 {
+          // CITAR「纳税调整汇总表」：二~五类税审底稿的纳税调整逐项汇总 + 纳税调整后所得验算（只读）
+          path: 'projects/:projectId/tax-adjustment-summary',
+          name: 'CitarTaxAdjustmentSummary',
+          component: () => import('@/citar/screens/CitarTaxAdjustmentSummary.vue'),
+        },
+{
           // CITAR「鉴证报告」四个菜单（spec citar-assurance-report-menus）
           path: 'projects/:projectId/report-body',
           name: 'CitarReportBody',

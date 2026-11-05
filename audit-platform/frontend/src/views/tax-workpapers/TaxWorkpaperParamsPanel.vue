@@ -3,12 +3,12 @@
     <header class="tw-params__head">
       <h2 class="tw-params__title">表头信息</h2>
       <span class="tw-params__hint">全部底稿的被审核单位、期间、编制人、复核人等取自这里；未填的默认取项目信息</span>
-      <button type="button" class="tw-button" @click="open = !open">{{ open ? '收起' : '编辑' }}</button>
+      <button v-if="canManualEdit" type="button" class="tw-button" @click="open = !open">{{ open ? '收起' : '编辑' }}</button>
     </header>
 
     <p v-if="!year" class="tw-params__empty">项目未设置审核年度，无法编辑表头信息。</p>
     <p v-else-if="error" class="tw-params__empty">{{ error }}</p>
-    <div v-else-if="open && params.length" class="tw-params__form">
+    <div v-else-if="open && canManualEdit && params.length" class="tw-params__form">
       <label v-for="p in params" :key="p.ref" class="tw-params__field">
         <span class="tw-params__label">{{ p.label }}</span>
         <select v-if="p.options.length" v-model="form[p.ref]" :disabled="saving">
@@ -23,7 +23,7 @@
         </button>
       </div>
     </div>
-    <p v-else-if="!open && summary" class="tw-params__summary">{{ summary }}</p>
+    <p v-else-if="(!open || !canManualEdit) && summary" class="tw-params__summary">{{ summary }}</p>
   </section>
 </template>
 
@@ -36,8 +36,10 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { fetchTaxParams, saveTaxParams, type TaxParam } from './taxWorkpaperApi'
+import { useManualEditPermission } from '@/composables/useManualEditPermission'
 
 const props = defineProps<{ projectId: string; year: number | null }>()
+const { canManualEdit } = useManualEditPermission()
 
 const open = ref(false)
 const params = ref<TaxParam[]>([])

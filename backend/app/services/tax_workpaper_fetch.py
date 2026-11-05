@@ -295,6 +295,13 @@ class AccountBook:
                     return alt, None
         return nodes, issue
 
+    def fallback_top(self, path: list[str]) -> str | None:
+        """``resolve(path)`` 是否经 ``FALLBACK_PATHS`` 改用了别的一级科目：是则返回该一级科目名（单元格来源写明，spec citar-cell-source-hover）。"""
+        if len(path) < 2 or self._resolve(path)[0]:
+            return None
+        fallback = FALLBACK_PATHS.get((path[0], path[1]))
+        return fallback if fallback and self._resolve([fallback, *path[1:]])[0] else None
+
     def _resolve(self, path: list[str]) -> tuple[list[Node], str | None]:
         nodes = self.tops(path[0])
         if not nodes:

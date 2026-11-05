@@ -8,7 +8,7 @@
           :class="cellClass(cell)"
           :colspan="cell.colSpan"
           :rowspan="cell.rowSpan"
-          :title="tooltip(cell)"
+          :data-src="cell.ref && sheet ? `${sheet}!${cell.ref}` : undefined"
           @click="startEdit(cell)"
         >
           <span v-if="editing && cell.ref && editing === cell.ref" class="tw-grid__editor">
@@ -43,8 +43,9 @@
  * 税审底稿单段表格：按单元格矩阵渲染；有 ref 的格子显示后端值，可点开填写（spec citar-table-manual-edit R1）：
  * - e 填写格 / 取数格、f 公式格、c 样表预置数字都可改；手工值盖过取数、公式与预置值；
  * - 改过的格（已保存或草稿）编辑时可「恢复自动值」，经 restore 事件交回，保存时不再提交该格；
- * - `manualEdit` 为 false（账号未开通「允许修改」，spec citar-manual-edit-permission）：只有手填格与「需人工填写」的取数格可点。
+ * - `manualEdit` 为 false（账号未开通「允许修改」，spec citar-manual-edit-permission）：整张表只读，不显示任何编辑效果与「可修改」提示。
  * 本组件不发请求：值、来源说明、草稿都由父组件传入，改动经 edit / restore 事件交回。
+ * 数据来源：格子带 `data-src="{sheet}!{ref}"`，悬浮卡片由父组件挂（spec citar-cell-source-hover；原生 title 已去掉，操作提示见 taxCellHint）。
  */
 import { nextTick, ref } from 'vue'
 import type { TaxWorkpaperCell } from './taxWorkpaperSheets'
@@ -59,9 +60,13 @@ const props = withDefaults(defineProps<{
   /** 已点「恢复自动值」、尚未保存的格 */
   restored?: ReadonlySet<string>
   readonly: boolean
-  /** 账号「允许修改」：false 时只能填手填格与「需人工填写」的取数格（与后端 is_auto_cell 同口径）。
+  /** 账号「允许修改」：false 时整张表只读，不显示任何编辑效果（spec citar-manual-edit-permission）。
    *  🔴 布尔 prop 不传会被 Vue 转成 false ⇒ 必须给默认值 true，否则不传的调用方全变成只读 */
   manualEdit?: boolean
+  /** 本段的 sheet 名：格子的来源键 `{sheet}!{ref}`（不传则不挂悬浮来源） */
+  sheet?: string
+  /** 从来源链接跳来要高亮的格子 */
+  locatedRef?: string | null
 }>(), { manualEdit: true })
 
 const emit = defineEmits<{
@@ -102,17 +107,9 @@ function isManual(cell: TaxWorkpaperCell): boolean {
   return props.cells[cell.ref]?.origin === 'input' && !isRestored(cell)
 }
 
-/** 自动生成的格：公式格、样表预置数字、按规则自动取数的格（「需人工填写」除外） */
-function isAutoCell(cell: TaxWorkpaperCell): boolean {
-  if (cell.role === 'f' || cell.role === 'c') return true
-  const meta = cell.ref ? props.cells[cell.ref] : undefined
-  return Boolean(meta?.status && meta.status !== 'manual')
-}
-
-/** 本格可否点开填写：账号未开通「允许修改」时自动生成的格只读 */
+/** 本格可否点开填写：账号未开通「允许修改」时整张表只读（手填格也不能填） */
 function canEdit(cell: TaxWorkpaperCell): boolean {
-  if (props.readonly || !cell.role || !cell.ref) return false
-  return props.manualEdit !== false || !isAutoCell(cell)
+  return props.manualEdit && !props.readonly && Boolean(cell.role && cell.ref)
 }
 
 function display(cell: TaxWorkpaperCell): string {
@@ -136,28 +133,8 @@ function cellClass(cell: TaxWorkpaperCell) {
     manual ? 'tw-cell--manual' : '',
     meta?.issue && meta.origin === 'rule' && !manual ? 'tw-cell--issue' : '',
     v && 'e' in v ? 'tw-cell--error' : '',
+    cell.ref && props.locatedRef === cell.ref ? 'tw-cell--located' : '',
   ].filter(Boolean)
-}
-
-const STATUS_TEXT: Record<string, string> = { auto: '智能取数（按取数规则）', confirm: '智能取数（按取数规则），待确认', manual: '需人工填写' }
-const AUTO_LABEL: Record<string, string> = { f: '原公式值', c: '样表原值', e: '原取数值' }
-
-function tooltip(cell: TaxWorkpaperCell): string | undefined {
-  if (!cell.ref) return undefined
-  const meta = props.cells[cell.ref]
-  const lines: string[] = []
-  if (isRestored(cell)) lines.push('已恢复自动值，保存后生效')
-  else if (isManual(cell)) {
-    const auto = meta?.auto ?? (cell.role === 'c' && cell.text ? { s: cell.text } : undefined)
-    const label = AUTO_LABEL[cell.role ?? 'e'] ?? '原值'
-    lines.push(auto !== undefined ? `已手工修改，${label}：${formatTaxValue(auto, cell.fmt) || '空'}` : '已手工修改')
-  } else if (cell.role === 'f') lines.push('公式计算，可手工修改（改后不再随公式更新）')
-  else if (cell.role === 'c') lines.push('样表预置值，可修改')
-  if (props.manualEdit === false && isAutoCell(cell)) lines.push('账号未开通「允许修改」，此格只读')
-  if (meta?.status) lines.push(STATUS_TEXT[meta.status] ?? '')
-  if (meta?.issue) lines.push(`说明：${meta.issue}`)
-  if (meta?.rule) lines.push(`取数规则：${meta.rule}`)
-  return lines.length ? lines.join('\n') : undefined
 }
 
 /** 编辑框初值：预置数字没有接口值，取样表原文 */
@@ -294,6 +271,12 @@ function cancel() {
 
 .tw-grid .tw-cell--error {
   color: var(--tw-mark-absent);
+}
+
+/* 从来源链接跳来定位到的格子（spec citar-cell-source-hover R2） */
+.tw-grid td.tw-cell--located {
+  background: #ffe9a8;
+  box-shadow: inset 0 0 0 2px #e0a100;
 }
 
 .tw-grid__editor {

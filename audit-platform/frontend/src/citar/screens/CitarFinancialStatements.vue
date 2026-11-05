@@ -134,6 +134,7 @@
                       :restored="edits.isRestored(cellKey(current, r, col))"
                       :editable="!saving && !r.note && canManualEdit"
                       :label="r.label"
+                      :src-key="`${current.key}:${r.r}:${col}`"
                       @edit="v => edits.edit(cellKey(current!, r, col), v)"
                       @restore="edits.restore(cellKey(current!, r, col), Boolean(r.manual?.[col]))"
                     />
@@ -145,6 +146,14 @@
         </template>
       </template>
     </section>
+
+    <CitarSourceCard
+      :state="sources.card.value"
+      :label="sources.cardLabel.value"
+      @open="sources.open"
+      @enter="sources.onCardEnter"
+      @leave="sources.onCardLeave"
+    />
   </div>
 </template>
 
@@ -159,6 +168,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import CitarAmountCell from '../components/CitarAmountCell.vue'
 import CitarFsIssueSources, { type FsSourceOpen } from '../components/CitarFsIssueSources.vue'
+import CitarSourceCard from '../components/CitarSourceCard.vue'
+import { api } from '@/services/apiProxy'
+import { cellSources as P_src } from '@/services/apiPaths'
+import type { CellSourceLink, CellSourceResponse } from '../cellSource'
+import { useCitarSourceCard } from '../useCitarSourceCard'
 import { saveReportManualValues, type ManualReportItem } from '../citarReportManual'
 import { sourceLink } from '../fsIssueSources'
 import {
@@ -333,6 +347,39 @@ async function exportXlsx() {
 
 type FsCol = 'current' | 'prior'
 const FS_COLS: FsCol[] = ['current', 'prior']
+
+// ── 悬浮数据来源（spec citar-cell-source-hover R5.6）：本页格子的链接在本页定位，其余跳页 ──
+const sources = useCitarSourceCard({
+  container: scrollRef,
+  async load() {
+    const res = (await api.get(P_src.financialStatements(projectId.value), {
+      params: { year: year.value }, _silent: true,
+    } as any)) as CellSourceResponse
+    return res?.cells ?? {}
+  },
+  label(key) {
+    const [stmtKey, r, col] = key.split(':')
+    const s = data.value?.statements.find(x => x.key === stmtKey)
+    const row = s?.rows.find(x => String(x.r) === r)
+    const colText = s?.columns[FS_COLS.indexOf(col as FsCol)] ?? ''
+    return `${s?.title ?? ''}「${row?.label.trim() ?? ''}」${colText}`
+  },
+  locate(l: CellSourceLink) {
+    let target: FsTarget | null = null
+    if (l.page === 'statement' && l.sheet && l.row != null) {
+      target = { statement: l.sheet, r: Number(l.row), column: (l.column as FsCol) ?? null }
+    } else if (l.page === 'reports' && l.report_type && l.code) {
+      // 企业会计准则格式即审定报表：本页就有这一行
+      const row = data.value?.statements.find(s => s.key === l.report_type)?.rows.find(x => x.row_code === l.code)
+      if (row) target = { statement: l.report_type, r: row.r, column: null }
+    }
+    if (!target || !visibleStatements.value.some(s => s.key === target!.statement)) return false
+    void locate(`src|${target.statement}|${target.r}|${target.column ?? ''}`, [target])
+    return true
+  },
+  dirty: () => edits.dirty.value,
+})
+watch(data, () => sources.invalidate())
 
 /** 草稿键：来源|表|行（企业会计准则格式用行次编码）|列 */
 function cellKey(stmt: FsStatement, r: FsRow, col: FsCol): string {

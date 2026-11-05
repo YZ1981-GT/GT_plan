@@ -70,6 +70,49 @@ export function saveTaxParams(projectId: string, year: number, version: number, 
   return api.put(P_tw.params(projectId), { version, values }, { params: { year }, _silent: true } as any) as Promise<TaxParamsResult>
 }
 
+/** 纳税调整汇总表一项；金额为两位小数字符串，方向决定加减；没有调整的项金额 0、方向空 */
+export interface TaxAdjustmentItem {
+  index: number
+  name: string
+  /** 调整账载科目；三~五类为「不适用」 */
+  account: string
+  direction: '' | '调增' | '调减' | '免税' | '减计' | '加计' | '抵免'
+  amount: string
+  /** 调整底稿位置（domain=tax_return 时是申报表格子） */
+  location: { domain: 'workpaper' | 'tax_return'; code: string; sheet: string; ref: string } | null
+  /** 取数出处（审核调整额 / 申报表行次） */
+  source: string
+  /** 只列出、不计入验算（境外所得，现阶段暂未包含） */
+  excluded?: boolean
+}
+
+export interface TaxAdjustmentSummary {
+  year: number
+  items: TaxAdjustmentItem[]
+  check: {
+    profit: string
+    profit_declared: string
+    foreign: string
+    increase: string
+    decrease: string
+    exempt: string
+    reduce: string
+    plus: string
+    offset: string
+    result: string
+    declared: string
+    declared_domestic: string
+    diff: string
+    /** 申报表 A100000 行次（利润总额 / 纳税调整后所得等） */
+    lines: Record<string, string>
+  }
+  notices: string[]
+}
+
+export function fetchTaxAdjustmentSummary(projectId: string, year: number): Promise<TaxAdjustmentSummary> {
+  return api.get(P_tw.adjustmentSummary(projectId), { params: { year } }) as Promise<TaxAdjustmentSummary>
+}
+
 const MONEY = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const INT = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 })
 

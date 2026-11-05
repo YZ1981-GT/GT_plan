@@ -141,7 +141,11 @@ function fig(f: any): string {
   return n === null ? '—' : fmtMoney(n, '0.00')
 }
 
+/** 只有最新一次读取写回页面：快速切换时，同参数的旧请求会被 GET 去重取消，晚到的错误不得盖住新结果 */
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   error.value = ''
   const pid = props.projectId
@@ -149,21 +153,26 @@ async function load() {
   try {
     if (section.value === 'ratios') {
       const data = await api.get(P_rpt.analysis.ratios(pid, y), { params: { mode: mode.value }, ...silent })
+      if (seq !== loadSeq) return
       ratios.value = Array.isArray(data) ? data : []
     } else if (section.value === 'opening') {
-      opening.value = await api.get(P_rpt.analysis.openingReconcile(pid, y), silent)
+      const data = await api.get(P_rpt.analysis.openingReconcile(pid, y), silent)
+      if (seq !== loadSeq) return
+      opening.value = data
     } else {
       const [view, check] = await Promise.all([
         api.get(P_rpt.analysis.fullTb(pid, y), silent),
         api.get(P_rpt.analysis.balanceCheck(pid, y), silent),
       ])
+      if (seq !== loadSeq) return
       fullTb.value = Array.isArray(view) ? view : []
       balance.value = check
     }
   } catch (e: any) {
+    if (seq !== loadSeq) return
     error.value = errorText(e, '读取失败')
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 

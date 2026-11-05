@@ -22,6 +22,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.models.core import User
 from app.services import mapping_service
+from app.services.manual_edit_permission import assert_manual_edit
 
 router = APIRouter(prefix="/api/projects", tags=["mapping"])
 
@@ -55,11 +56,12 @@ async def auto_match(
 ) -> AutoMatchResult:
     """自动匹配并直接保存映射结果。
 
-    已映射的科目不会被覆盖，返回完整匹配详情供用户确认。
+    已映射的科目不会被覆盖，返回完整匹配详情供用户确认。账号须开通「允许修改」（spec citar-manual-edit-permission）。
 
     手动触发同样回写 active 数据集的 ``validation_summary.auto_map``：否则入库时自动映射
     失败留下的红色提示，在用户点「重新映射」修好之后仍然挂着（状态只写不清）。
     """
+    assert_manual_edit(current_user)
     result = await mapping_service.auto_match(project_id, db, year=body.year if body else None)
     try:
         from app.services.event_handlers._impl import record_auto_map_outcome
@@ -104,6 +106,7 @@ async def save_mapping(
 
     Validates: Requirements 3.3
     """
+    assert_manual_edit(current_user)
     record = await mapping_service.save_mapping(project_id, mapping, db)
     return MappingResponse.model_validate(record)
 
@@ -123,6 +126,7 @@ async def update_mapping(
 
     Validates: Requirements 3.7
     """
+    assert_manual_edit(current_user)
     record = await mapping_service.update_mapping(
         project_id, mapping_id, body.standard_account_code, db, year=body.year
     )
@@ -143,6 +147,7 @@ async def batch_confirm(
 
     Validates: Requirements 3.5
     """
+    assert_manual_edit(current_user)
     return await mapping_service.batch_confirm(project_id, mappings, db)
 
 

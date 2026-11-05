@@ -1,12 +1,9 @@
 <template>
   <details class="rb-amounts" :open="dirty || undefined">
     <summary>
-      摘录表金额（{{ canManualEdit ? '可修改' : '只读' }}）<span v-if="manualCount" class="rb-amounts__badge">{{ manualCount }} 项手工修改</span>
+      摘录表金额{{ canManualEdit ? '（可修改）' : '' }}<span v-if="manualCount" class="rb-amounts__badge">{{ manualCount }} 项手工修改</span>
     </summary>
-    <div v-if="!canManualEdit" class="citar-toolbar">
-      <span class="citar-toolbar__hint">{{ MANUAL_EDIT_DENIED_TIP }}</span>
-    </div>
-    <div v-else class="citar-toolbar">
+    <div v-if="canManualEdit" class="citar-toolbar">
       <button class="citar-btn" type="button" :disabled="!dirty || saving" @click="discard">放弃修改</button>
       <button class="citar-btn citar-btn--primary" type="button" :disabled="!dirty || saving" @click="save">
         {{ saving ? '保存中…' : '保存金额' }}
@@ -19,7 +16,7 @@
         <tr v-for="line in lines" :key="line.row" :class="{ 'rb-amounts__row--manual': isManual(line) }">
           <td class="citar-center">{{ line.no }}</td>
           <td>{{ line.item }}</td>
-          <td class="is-numeric rb-amounts__cell" @click="startEdit(line)">
+          <td class="is-numeric rb-amounts__cell" :class="{ 'rb-amounts__cell--editable': canManualEdit }" @click="startEdit(line)">
             <input
               v-if="editing === line.row"
               ref="inputRef"
@@ -55,7 +52,7 @@ import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { formatTaxValue, parseTaxInput, type TaxValue } from '@/views/tax-workpapers/taxWorkpaperApi'
 import { numberOf, saveReportBodyAmounts, type ReportBodyData, type ReportBodyLine } from '../taxAssuranceApi'
-import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
+import { useManualEditPermission } from '@/composables/useManualEditPermission'
 
 const props = defineProps<{ data: ReportBodyData; projectId: string; year: number }>()
 const emit = defineEmits<{ saved: [data: ReportBodyData] }>()
@@ -216,6 +213,9 @@ async function save() {
 
 .rb-amounts__cell {
   min-width: 160px;
+}
+
+.rb-amounts__cell--editable {
   cursor: text;
 }
 

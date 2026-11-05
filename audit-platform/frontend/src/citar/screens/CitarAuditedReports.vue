@@ -2,7 +2,7 @@
   <div class="aud-screen">
     <header class="aud-header">
       <h1 class="aud-header__title">审定报表</h1>
-      <span class="aud-header__note">按试算表审定数生成；调整分录批准后需重新生成；金额可手工修改</span>
+      <span class="aud-header__note">按试算表审定数生成；调整分录批准后需重新生成{{ canManualEdit ? '；金额可手工修改' : '' }}</span>
     </header>
 
     <nav class="aud-tabs">
@@ -16,7 +16,7 @@
       >{{ item.label }}</button>
     </nav>
 
-    <section class="aud-panel">
+    <section ref="panelRef" class="aud-panel">
       <p v-if="!year" class="sheet-empty">{{ yearLoading ? '正在读取项目信息…' : '项目未设置审核年度，请先在项目信息里填写' }}</p>
       <template v-else>
         <div class="citar-notice" :class="{ 'citar-notice--plain': generated }">
@@ -59,11 +59,21 @@
           :editable="generated && !saving && canManualEdit"
           :draft-of="(code, col) => edits.draftOf(cellKey(code, col))"
           :is-restored="(code, col) => edits.isRestored(cellKey(code, col))"
+          src-prefix=""
+          :located="locatedRow"
           @edit="(code, col, v) => edits.edit(cellKey(code, col), v)"
           @restore="(code, col) => edits.restore(cellKey(code, col), Boolean(rowOf(code)?.manual_amounts?.[col]))"
         />
       </template>
     </section>
+
+    <CitarSourceCard
+      :state="sources.card.value"
+      :label="sources.cardLabel.value"
+      @open="sources.open"
+      @enter="sources.onCardEnter"
+      @leave="sources.onCardLeave"
+    />
   </div>
 </template>
 
@@ -73,15 +83,21 @@
  * 读：GET /api/reports/{pid}/{year}/{type}（读已生成的 financial_report；未生成时返回金额为空的模板行次）
  * 生成：POST /api/reports/generate（平台既有前置条件：已导入账套、已映射、已重算试算表）
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getReport } from '@/services/auditPlatformApi'
+import { api } from '@/services/apiProxy'
+import { cellSources as P_src } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import CitarReportTable, { type CitarAmountColumn, type CitarReportRow } from '../components/CitarReportTable.vue'
+import CitarSourceCard from '../components/CitarSourceCard.vue'
+import type { CellSourceLink, CellSourceResponse } from '../cellSource'
 import { saveReportManualValues, type ManualReportItem } from '../citarReportManual'
 import { useCitarAmountDrafts } from '../useCitarAmountDrafts'
 import { useCitarProject } from '../useCitarProject'
 import { useCitarReportGenerate } from '../useCitarReportGenerate'
+import { useCitarSourceCard } from '../useCitarSourceCard'
 import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'CitarAuditedReports' })
@@ -91,12 +107,18 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
 ]
+const isTab = (v: unknown): v is TabKey => TABS.some(t => t.key === v)
 
+const route = useRoute()
 const { projectId, year, yearLoading, entityName, goSegment } = useCitarProject()
 const { generating, prerequisite, generate: runGenerate } = useCitarReportGenerate(projectId, year)
 const { canManualEdit } = useManualEditPermission()
 
-const tab = ref<TabKey>('balance_sheet')
+// 从数据来源链接跳来：?tab=报表 &locate=行次（spec citar-cell-source-hover R2）
+const tab = ref<TabKey>(isTab(route.query.tab) ? route.query.tab : 'balance_sheet')
+const pendingLocate = ref<string | null>(typeof route.query.locate === 'string' ? route.query.locate : null)
+const locatedRow = ref<string | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
 const rows = ref<CitarReportRow[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -121,6 +143,47 @@ async function load() {
   } finally {
     loading.value = false
   }
+  await locateRow()
+}
+
+// ── 悬浮数据来源（spec citar-cell-source-hover R5） ──
+const sources = useCitarSourceCard({
+  container: panelRef,
+  async load() {
+    const res = (await api.get(P_src.report(projectId.value, tab.value), {
+      params: { year: year.value, mode: 'audited' }, _silent: true,
+    } as any)) as CellSourceResponse
+    return res?.cells ?? {}
+  },
+  label(key) {
+    const [code, col] = key.split(':')
+    const r = rowOf(code)
+    const colText = col === 'current' ? (tab.value === 'balance_sheet' ? '期末数' : '本期金额') : (tab.value === 'balance_sheet' ? '期初数' : '上期金额')
+    return `${code} ${r?.row_name?.trim() ?? ''} · ${colText}`
+  },
+  locate(l: CellSourceLink) {
+    if (l.page !== 'reports' || !l.code) return false
+    pendingLocate.value = l.code
+    if (l.report_type && isTab(l.report_type) && l.report_type !== tab.value) tab.value = l.report_type
+    else void locateRow()
+    return true
+  },
+  dirty: () => edits.dirty.value,
+})
+watch(rows, () => sources.invalidate())
+
+async function locateRow() {
+  const code = pendingLocate.value
+  if (!code || !rows.value.length) return
+  pendingLocate.value = null
+  if (!rowOf(code)) {
+    ElMessage.info(`本表没有行次 ${code}`)
+    return
+  }
+  locatedRow.value = code
+  await nextTick()
+  panelRef.value?.querySelector<HTMLElement>(`[data-locate="${code.replace(/["\\]/g, '\\$&')}"]`)
+    ?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
 }
 
 async function generate() {

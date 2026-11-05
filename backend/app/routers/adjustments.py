@@ -53,6 +53,7 @@ from app.services.adjustment_collaboration_service import (
 )
 from app.services.adjustment_impact_service import preview_impact as preview_impact_service
 from app.services.formula_management.delivery_export import content_disposition_attachment
+from app.services.manual_edit_permission import assert_manual_edit
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.misstatement_service import UnadjustedMisstatementService
 
@@ -357,7 +358,8 @@ async def create_adjustment(
     user=Depends(require_operation("wp:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """创建调整分录（合并锁定期间禁止，需编辑权限）"""
+    """创建调整分录（合并锁定期间禁止，需编辑权限；账号须开通「允许修改」）"""
+    assert_manual_edit(user)
     svc = AdjustmentService(db)
     try:
         result = await svc.create_entry(project_id, data, user.id, batch_mode=batch_mode)
@@ -705,7 +707,8 @@ async def update_adjustment(
     user=Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """修改调整分录（合并锁定期间禁止，需编辑权限）"""
+    """修改调整分录（合并锁定期间禁止，需编辑权限；账号须开通「允许修改」）"""
+    assert_manual_edit(user)
     svc = AdjustmentService(db)
     try:
         result = await svc.update_entry(project_id, entry_group_id, data, user.id)
@@ -723,7 +726,8 @@ async def delete_adjustment(
     _lock_check=Depends(check_consol_lock),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """软删除调整分录（合并锁定期间禁止，需编辑权限）"""
+    """软删除调整分录（合并锁定期间禁止，需编辑权限；账号须开通「允许修改」）"""
+    assert_manual_edit(current_user)
     svc = AdjustmentService(db)
     try:
         await svc.delete_entry(project_id, entry_group_id)
@@ -741,7 +745,8 @@ async def batch_delete_adjustments(
     _lock_check=Depends(check_consol_lock),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """批量软删除调整分录（合并锁定期间禁止，需编辑权限）"""
+    """批量软删除调整分录（合并锁定期间禁止，需编辑权限；账号须开通「允许修改」）"""
+    assert_manual_edit(current_user)
     svc = AdjustmentService(db)
 
     async def _delete_one(_db, _row):

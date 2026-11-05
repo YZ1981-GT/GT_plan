@@ -28,6 +28,7 @@
           :entity-name="entityName"
           :locate-code="locateCode"
           @open-account="openAccount"
+          @open-source="openSource"
         />
         <CitarJournalTab
           v-else-if="tab === 'journal'"
@@ -35,7 +36,10 @@
           :year="year"
           :entity-name="entityName"
           :account-code="journalCode"
-          @update:account-code="setJournalCode"
+          :voucher-no="voucherNo"
+          :voucher-date="voucherDate"
+          @update:view="setJournalView"
+          @open-source="openSource"
         />
         <CitarReportTable
           v-else
@@ -62,6 +66,8 @@ import { getReport } from '@/services/auditPlatformApi'
 import CitarBalanceTab from '../components/CitarBalanceTab.vue'
 import CitarJournalTab from '../components/CitarJournalTab.vue'
 import CitarReportTable, { type CitarReportRow } from '../components/CitarReportTable.vue'
+import { cellSourceLink, type CellSourceLink } from '../cellSource'
+import { forgetDrill, type JournalView } from '../journalDrillMemory'
 import { useCitarProject } from '../useCitarProject'
 
 defineOptions({ name: 'CitarLedgerQuery' })
@@ -77,11 +83,21 @@ const TABS: { key: TabKey; label: string; group: 'ledger' | 'report' }[] = [
 
 const route = useRoute()
 const router = useRouter()
-const { projectId, year, yearLoading, entityName } = useCitarProject()
+const { projectId, year, yearLoading, entityName, goSegment } = useCitarProject()
+
+/** 卡片里点来源链接（导入记录的某列映射等）：两个页签已先挡下正在修改的行（spec citar-cell-source-hover R9） */
+function openSource(l: CellSourceLink) {
+  const link = cellSourceLink(l)
+  if (link) goSegment(link.segment, link.query)
+}
 
 /** 当前标签记在 ?tab=，刷新与返回不丢 */
 const tab = ref<TabKey>(TABS.some(t => t.key === route.query.tab) ? (route.query.tab as TabKey) : 'balance')
-const journalCode = ref(typeof route.query.account === 'string' ? route.query.account : '')
+const queryText = (k: string) => (typeof route.query[k] === 'string' ? (route.query[k] as string) : '')
+/** 序时账当前级别：?account= 科目级（含下级）；?voucher=&vdate= 凭证级 */
+const journalCode = ref(queryText('account'))
+const voucherNo = ref(queryText('voucher'))
+const voucherDate = ref(queryText('vdate'))
 /** 从「数据源头」跳来：科目余额表定位到该客户科目行（?locate=，spec citar-fs-issue-source-locate） */
 const locateCode = computed(() => (typeof route.query.locate === 'string' ? route.query.locate : ''))
 
@@ -91,20 +107,35 @@ function queryWithout(...keys: string[]) {
 }
 
 function setTab(key: TabKey) {
+  // 从别的页签进序时账算新进入：不接着上次的穿透历史
+  forgetDrill(projectId.value, year.value ?? 0)
   tab.value = key
-  router.replace({ query: { ...queryWithout('locate'), tab: key } })
+  router.replace({ query: { ...queryWithout('locate', 'voucher', 'vdate'), tab: key } })
 }
 
-function setJournalCode(code: string) {
-  journalCode.value = code
-  const rest = queryWithout('account')
-  router.replace({ query: code ? { ...rest, account: code } : rest })
+/** 序时账换级别：科目级写 ?account=，凭证级写 ?voucher=&vdate=（另一种清掉） */
+function setJournalView(v: JournalView) {
+  const rest = queryWithout('account', 'voucher', 'vdate')
+  if (v.kind === 'voucher') {
+    journalCode.value = ''
+    voucherNo.value = v.no
+    voucherDate.value = v.date ?? ''
+    router.replace({ query: { ...rest, voucher: v.no, ...(v.date ? { vdate: v.date } : {}) } })
+    return
+  }
+  journalCode.value = v.code
+  voucherNo.value = ''
+  voucherDate.value = ''
+  router.replace({ query: v.code ? { ...rest, account: v.code } : rest })
 }
 
 function openAccount(code: string) {
+  forgetDrill(projectId.value, year.value ?? 0)
   journalCode.value = code
+  voucherNo.value = ''
+  voucherDate.value = ''
   tab.value = 'journal'
-  router.replace({ query: { ...queryWithout('locate'), tab: 'journal', account: code } })
+  router.replace({ query: { ...queryWithout('locate', 'voucher', 'vdate'), tab: 'journal', account: code } })
 }
 
 const reportRows = ref<CitarReportRow[]>([])

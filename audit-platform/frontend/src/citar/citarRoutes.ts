@@ -50,6 +50,9 @@ export const CITAR_NAV_GROUPS: CitarNavGroup[] = [
     items: [
       { key: 'mapping', label: '底稿映射', segment: 'mapping', icon: 'Connection', badge: '智能' },
       { key: 'workpapers', label: '税审底稿', segment: 'workpapers', icon: 'Notebook', badge: '智能' },
+      // 用户 2026-11-05：二~五类底稿的纳税调整逐项汇总 + 纳税调整后所得验算。
+      // 不加「智能」角标：7 个字加角标在一级栏放不下、名字被截成「纳税调整汇…」
+      { key: 'tax-adjustment-summary', label: '纳税调整汇总表', segment: 'tax-adjustment-summary', icon: 'List' },
     ],
   },
   {

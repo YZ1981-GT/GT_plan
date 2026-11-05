@@ -321,6 +321,25 @@ async def get_import_job(
     }
 
 
+@router.get("/jobs/{job_id}/mappings")
+async def get_import_job_mappings(
+    project_id: UUID,
+    job_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """导入记录详情：这次导入确认的列映射（文件 → sheet → 原表头 → 字段）。
+
+    账务查询来源卡片点「文件 · sheet ·「表头」」跳到这里（spec citar-cell-source-hover R9）；作业须属于本项目。
+    """
+    from app.services.ledger_import.job_mapping_view import job_mapping_view
+
+    view = await job_mapping_view(db, project_id, job_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="导入记录不存在")
+    return view
+
+
 @router.post("/jobs/{job_id}/retry")
 async def retry_import_job(
     project_id: UUID,

@@ -107,6 +107,10 @@ async def import_data(
         if import_type == ImportType.adjustments:
             await assert_project_permission(db, current_user, project_id, "edit")
             await check_consol_lock(project_id=project_id, db=db)
+            # 导入调整分录 = 批量新增 / 覆盖分录：账号须开通「允许修改」（spec citar-manual-edit-permission）
+            from app.services.manual_edit_permission import assert_manual_edit
+
+            assert_manual_edit(current_user)
         else:
             await assert_project_permission(db, current_user, project_id, "readonly")
 

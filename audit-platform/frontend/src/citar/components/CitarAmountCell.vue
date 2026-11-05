@@ -2,7 +2,8 @@
   <td
     class="is-numeric citar-amount"
     :class="{ 'citar-amount--editable': editable, 'citar-amount--manual': isManual, 'citar-amount--restored': restored }"
-    :title="tip"
+    :data-src="srcKey || undefined"
+    :data-hint="tip"
     @click="startEdit"
   >
     <span v-if="editing" class="citar-amount__editor">
@@ -33,6 +34,7 @@
 /**
  * 报表金额格（审定报表 / 单体财务报表共用，spec citar-table-manual-edit R6 / R7）。
  * 点开改 → edit 事件交回草稿（null = 清空成空白）；有手工值时可「恢复」→ restore 事件。本组件不发请求。
+ * 数据来源：`srcKey` 写进 data-src，操作提示写进 data-hint，由页面的悬浮来源卡片读取（spec citar-cell-source-hover；原生 title 已去掉）。
  */
 import { computed, nextTick, ref } from 'vue'
 import { fmtMoney } from '../useCitarProject'
@@ -50,6 +52,8 @@ const props = defineProps<{
   restored?: boolean
   editable?: boolean
   label?: string
+  /** 悬浮来源的键（不传不挂） */
+  srcKey?: string
 }>()
 
 const emit = defineEmits<{ edit: [value: number | null]; restore: [] }>()

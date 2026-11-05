@@ -21,14 +21,17 @@
       :class="{ 'tr-catalog__row--unfiled': !filed[form.code], 'tr-catalog__row--active': activeCode === form.code }"
     >
       <input
+        v-if="!readonly"
         type="checkbox"
         class="tr-catalog__check"
         :checked="filed[form.code]"
-        :disabled="readonly || saving"
+        :disabled="saving"
         :title="filed[form.code] ? '已勾选填报（取消后导出时隐藏此表）' : '未填报（勾选后导出时包含此表）'"
         :aria-label="`${form.code} 是否填报`"
         @change="toggle(form.code, ($event.target as HTMLInputElement).checked)"
       />
+      <!-- 只读（未设年度 / 账号未开通「允许修改」）：只显示是否填报，不给勾选框 -->
+      <span v-else class="tr-catalog__mark" :title="filed[form.code] ? '已填报' : '未填报'">{{ filed[form.code] ? '√' : '' }}</span>
       <button type="button" class="tw-catalog__sheet tr-catalog__sheet" @click="emit('open', form.code)">
         <span class="tw-catalog__sheet-code">{{ form.code }}</span>{{ form.name }}
       </button>
@@ -105,6 +108,14 @@ function toggle(code: string, value: boolean) {
   flex: 0 0 auto;
   margin: 9px 0 0 10px;
   accent-color: var(--tw-accent);
+}
+
+/* 只读时的「是否填报」：与勾选框同宽，只显示 √ */
+.tr-catalog__mark {
+  flex: 0 0 13px;
+  margin: 7px 0 0 10px;
+  text-align: center;
+  color: var(--tw-accent);
 }
 
 .tr-catalog__row--active {

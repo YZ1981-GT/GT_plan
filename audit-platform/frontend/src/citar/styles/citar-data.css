@@ -105,6 +105,29 @@
   font-weight: 700;
 }
 
+/* 格子里可穿透的值（序时账凭证号、科目编码）：平时同正文、紫色字，悬停加下划线 */
+.citar-drill {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--citar-c-6e0ba6);
+  text-align: left;
+  cursor: pointer;
+}
+
+.citar-drill:hover:not(:disabled),
+.citar-drill:focus-visible {
+  color: var(--citar-c-4c1273);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.citar-drill:disabled {
+  cursor: default;
+  color: var(--citar-c-b4a8c2);
+}
+
 .citar-pager {
   display: flex;
   align-items: center;

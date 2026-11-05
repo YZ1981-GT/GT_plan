@@ -45,16 +45,21 @@ def _matches(code: str, prefix: str) -> bool:
     return code == prefix or (code.startswith(prefix) and len(code) > len(prefix))
 
 
-def account_total(balances: dict[str, Decimal], term: str, pl_close: Decimal = _ZERO) -> Decimal:
-    """一个科目项的借正贷负合计：``2211!221102`` = 2211 及下级，剔除 221102 及其下级。"""
+def account_terms(balances: dict[str, Decimal], term: str, pl_close: Decimal = _ZERO) -> list[tuple[str, Decimal]]:
+    """一个科目项命中的各标准科目及金额（借正贷负）：``2211!221102`` = 2211 及下级，剔除 221102 及其下级。
+
+    ``account_total`` 对它求和；单元格来源逐科目列出（spec citar-cell-source-hover），口径只写这一处。
+    """
     if term == PL_CLOSE:
-        return pl_close
+        return [(PL_CLOSE, pl_close)]
     prefix, *excludes = term.split("!")
-    total = _ZERO
-    for code, amount in balances.items():
-        if _matches(code, prefix) and not any(_matches(code, ex) for ex in excludes):
-            total += amount
-    return total
+    return [(code, amount) for code, amount in balances.items()
+            if _matches(code, prefix) and not any(_matches(code, ex) for ex in excludes)]
+
+
+def account_total(balances: dict[str, Decimal], term: str, pl_close: Decimal = _ZERO) -> Decimal:
+    """一个科目项的借正贷负合计（见 ``account_terms``）。"""
+    return sum((amount for _, amount in account_terms(balances, term, pl_close)), _ZERO)
 
 
 def _formula(expr: str, values: dict[int, Decimal | None]) -> Decimal:

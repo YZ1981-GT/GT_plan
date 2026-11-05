@@ -23,6 +23,8 @@ export const taxWorkpapers = {
   params: (pid: string) => `/api/projects/${pid}/tax-workpapers/params`,
   /** GET 客户科目 → 取数用到它的税审底稿（底稿映射页，?year=） */
   accountMap: (pid: string) => `/api/projects/${pid}/tax-workpapers/account-map`,
+  /** GET 纳税调整汇总表：二~五类底稿的纳税调整逐项 + 纳税调整后所得验算（?year=） */
+  adjustmentSummary: (pid: string) => `/api/projects/${pid}/tax-workpapers/adjustment-summary`,
 } as const
 
 // ─── 税审鉴证报告（报告正文 / 审核说明 / 汇算申报表 / 单体财务报表，?year=） ────────────────
@@ -42,6 +44,20 @@ export const taxAssurance = {
   reviewNotesExport: (pid: string) => `/api/projects/${pid}/tax-assurance/review-notes/export`,
   financialStatements: (pid: string) => `/api/projects/${pid}/tax-assurance/financial-statements`,
   financialStatementsExport: (pid: string) => `/api/projects/${pid}/tax-assurance/financial-statements/export`,
+} as const
+
+// ─── 表格单元格来源（悬浮溯源卡片，?year=；spec citar-cell-source-hover） ───────────────
+
+export const cellSources = {
+  /** 税审底稿 / 汇算申报表一张表（?domain=workpaper|tax_return） */
+  taxSheet: (pid: string, code: string) => `/api/projects/${pid}/cell-sources/tax-sheet/${encodeURIComponent(code)}`,
+  trialBalance: (pid: string) => `/api/projects/${pid}/cell-sources/trial-balance`,
+  /** 审定报表 / 报表分析（?mode=audited|unadjusted） */
+  report: (pid: string, reportType: string) => `/api/projects/${pid}/cell-sources/report/${encodeURIComponent(reportType)}`,
+  financialStatements: (pid: string) => `/api/projects/${pid}/cell-sources/financial-statements`,
+  ledgerBalance: (pid: string) => `/api/projects/${pid}/cell-sources/ledger/balance`,
+  ledgerJournal: (pid: string) => `/api/projects/${pid}/cell-sources/ledger/journal`,
+  ledgerJournalRow: (pid: string, rowId: string) => `/api/projects/${pid}/cell-sources/ledger/journal-row/${encodeURIComponent(rowId)}`,
 } as const
 
 // ─── 调整分录 ───────────────────────────────────────────────────────────────
@@ -165,6 +181,8 @@ export const ledger = {
     datasetRollback: (pid: string, dsId: string) => `/api/projects/${pid}/ledger-import/datasets/${dsId}/rollback`,
     jobs: (pid: string) => `/api/projects/${pid}/ledger-import/jobs`,
     jobDetail: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}`,
+    /** 导入记录详情：这次导入确认的列映射（spec citar-cell-source-hover R9） */
+    jobMappings: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/mappings`,
     jobRetry: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/retry`,
     jobCancel: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/cancel`,
     activationRecords: (pid: string) => `/api/projects/${pid}/ledger-import/activation-records`,

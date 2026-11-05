@@ -14,7 +14,7 @@
       <span class="citar-toolbar__hint">{{ canManualEdit ? '点科目行查看该科目序时账；末级科目可「修改」，上级随之汇总、试算表随之重算' : `点科目行查看该科目序时账；${MANUAL_EDIT_DENIED_TIP}` }}</span>
     </div>
 
-    <div class="sheet-scroll">
+    <div ref="scrollRef" class="sheet-scroll">
       <table class="sheet-table">
         <thead>
           <tr><th v-for="c in TRIAL_BALANCE_COLUMNS" :key="c.key">{{ c.label }}</th><th class="citar-balance__ops-head" /></tr>
@@ -33,8 +33,8 @@
             @click="editingId !== r.id && emit('open-account', r.account_code)"
           >
             <td class="is-numeric">{{ i + 1 }}</td>
-            <td>{{ r.account_code }}</td>
-            <td :style="{ paddingLeft: `${10 + Math.max(0, (r.level || 1) - 1) * 12}px` }">
+            <td :data-src="srcKey(r, 'account_code')">{{ r.account_code }}</td>
+            <td :style="{ paddingLeft: `${10 + Math.max(0, (r.level || 1) - 1) * 12}px` }" :data-src="srcKey(r, 'account_name')">
               {{ r.account_name }}
               <span v-if="editedIds.has(r.id ?? '')" class="citar-balance__tag" :title="editedTitle(r)">已修改</span>
               <span v-else-if="childEdited(r)" class="citar-balance__tag citar-balance__tag--muted">下级已修改</span>
@@ -53,12 +53,12 @@
             </template>
             <template v-else>
               <td class="citar-center">{{ r.opening.dir }}</td>
-              <td class="is-numeric">{{ fmtMoney(r.opening.amount) }}</td>
+              <td class="is-numeric" :data-src="srcKey(r, 'opening')">{{ fmtMoney(r.opening.amount) }}</td>
               <!-- 后端补齐的父级行发生额为 0 时返回 null：与 0 同样显示「-」 -->
-              <td class="is-numeric">{{ fmtMoney(r.debit_amount ?? 0) }}</td>
-              <td class="is-numeric">{{ fmtMoney(r.credit_amount ?? 0) }}</td>
+              <td class="is-numeric" :data-src="srcKey(r, 'debit')">{{ fmtMoney(r.debit_amount ?? 0) }}</td>
+              <td class="is-numeric" :data-src="srcKey(r, 'credit')">{{ fmtMoney(r.credit_amount ?? 0) }}</td>
               <td class="citar-center">{{ r.closing.dir }}</td>
-              <td class="is-numeric">{{ fmtMoney(r.closing.amount) }}</td>
+              <td class="is-numeric" :data-src="srcKey(r, 'closing')">{{ fmtMoney(r.closing.amount) }}</td>
               <td class="citar-center citar-balance__ops" @click.stop>
                 <template v-if="canEdit(r)">
                   <button class="citar-btn" type="button" :disabled="saving" @click="startEdit(r)">修改</button>
@@ -74,6 +74,14 @@
     <p v-if="loading" class="sheet-empty">正在读取科目余额表…</p>
     <p v-else-if="error" class="sheet-empty">{{ error }}</p>
     <p v-else-if="!rows.length" class="sheet-empty">本年度还没有导入账套。请先在「数据导入」上传科目余额表与序时账。</p>
+
+    <CitarSourceCard
+      :state="hover.card.value"
+      :label="cardLabel"
+      @open="openSource"
+      @enter="hover.onCardEnter"
+      @leave="hover.onCardLeave"
+    />
   </div>
 </template>
 
@@ -87,9 +95,12 @@
 import { computed, reactive, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { ledger as P_ledger } from '@/services/apiPaths'
+import { cellSources as P_src, ledger as P_ledger } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { TRIAL_BALANCE_COLUMNS } from '../data/reportLines'
+import CitarSourceCard from './CitarSourceCard.vue'
+import { localSource, mergeLedgerSources, type CellSource, type CellSourceLink, type CellSourceResponse } from '../cellSource'
+import { useCellSourceHover } from '../useCellSourceHover'
 import { editBalanceRow, fetchManualEdits, parseMoneyInput, restoreLedgerRow, type ManualEditInfo } from '../citarLedgerEdits'
 import { fmtMoney } from '../useCitarProject'
 import { normCode, useCitarRowLocate } from '../useCitarRowLocate'
@@ -113,7 +124,7 @@ interface BalanceRow {
 /** locateCode：从「数据源头」跳来时要定位的客户科目（spec citar-fs-issue-source-locate） */
 const props = defineProps<{ projectId: string; year: number; entityName: string; locateCode?: string }>()
 const { canManualEdit } = useManualEditPermission()
-const emit = defineEmits<{ 'open-account': [code: string]; changed: [] }>()
+const emit = defineEmits<{ 'open-account': [code: string]; 'open-source': [link: CellSourceLink]; changed: [] }>()
 const { isLocated, apply: applyLocate } = useCitarRowLocate(toRef(props, 'locateCode'))
 
 const rows = ref<BalanceRow[]>([])
@@ -185,6 +196,68 @@ const shown = computed(() => {
 function canEdit(r: BalanceRow): boolean {
   if (!canManualEdit.value) return false
   return Boolean(r.id) && !r._is_synthetic && !parents.value.has(r.account_code)
+}
+
+// ── 悬浮数据来源（spec citar-cell-source-hover R6）：列取自导入文件哪个表头 + 行上的特殊情况；页面补出的上级行按下级合计 ──
+type BalanceCol = 'account_code' | 'account_name' | 'opening' | 'debit' | 'credit' | 'closing'
+const COL_LABELS: Record<BalanceCol, string> = {
+  account_code: '科目编码', account_name: '科目名称', opening: '期初余额', debit: '本期借方', credit: '本期贷方', closing: '期末余额',
+}
+
+function srcKey(r: BalanceRow, col: BalanceCol): string {
+  return `${r.id ?? `syn:${r.account_code}`}|${col}`
+}
+
+function amountOf(r: BalanceRow, col: BalanceCol): number {
+  if (col === 'opening') return signedOf(r.opening_balance, r.opening_direction)
+  if (col === 'closing') return signedOf(r.closing_balance, r.closing_direction)
+  return Number((col === 'debit' ? r.debit_amount : r.credit_amount) ?? 0)
+}
+
+/** 页面补出的上级行：下级末级科目（后端按下级合计生成，不在导入文件里） */
+function syntheticSource(r: BalanceRow, col: BalanceCol): CellSource {
+  const kids = rows.value.filter(x => x.account_code !== r.account_code && x.account_code.startsWith(r.account_code) && !parents.value.has(x.account_code))
+  const numeric = col !== 'account_code' && col !== 'account_name'
+  return localSource('synthetic', '导入文件里没有这一行：按下级末级科目合计补出', numeric ? String(amountOf(r, col)) : null, {
+    items: numeric ? kids.map(k => ({ label: `${k.account_code} ${k.account_name}`, detail: null, amount: String(amountOf(k, col)), sign: '1', link: null })) : [],
+    linear: numeric,
+    total: numeric ? String(kids.reduce((s, k) => s + amountOf(k, col), 0)) : null,
+    notes: numeric ? ['金额借正贷负'] : [],
+  })
+}
+
+const scrollRef = ref<HTMLElement | null>(null)
+const hover = useCellSourceHover(scrollRef, {
+  async load() {
+    const res = (await api.get(P_src.ledgerBalance(props.projectId), { params: { year: props.year }, _silent: true } as any)) as CellSourceResponse
+    return res?.cells ?? {}
+  },
+  resolve(key, sources) {
+    const [id, col] = key.split('|') as [string, BalanceCol]
+    const r = id.startsWith('syn:') ? rows.value.find(x => x.account_code === id.slice(4)) : rows.value.find(x => x.id === id)
+    if (!r) return null
+    if (r._is_synthetic || !r.id) return syntheticSource(r, col)
+    if (!sources) return null
+    const numeric = col !== 'account_code' && col !== 'account_name'
+    return mergeLedgerSources(sources[`col:${col}`], sources[`row:${r.id}`], numeric ? String(amountOf(r, col)) : null)
+  },
+  disabled: () => Boolean(editingId.value),
+})
+const cardLabel = computed(() => {
+  const [id, col] = hover.card.value.key.split('|') as [string, BalanceCol]
+  const r = id?.startsWith('syn:') ? rows.value.find(x => x.account_code === id.slice(4)) : rows.value.find(x => x.id === id)
+  return r ? `${r.account_code} ${r.account_name} · ${COL_LABELS[col] ?? ''}` : ''
+})
+watch(rows, () => hover.invalidate())
+
+/** 卡片里点来源链接（如导入记录的某列映射）：有正在修改的行先保存或取消，再交给账务查询页跳转（R9.5） */
+function openSource(link: CellSourceLink) {
+  hover.close()
+  if (editingId.value) {
+    ElMessage.warning('有科目正在修改，请先保存或取消')
+    return
+  }
+  emit('open-source', link)
 }
 
 function editedTitle(r: BalanceRow): string {

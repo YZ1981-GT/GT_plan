@@ -8,7 +8,7 @@
 - 审核说明：``review-notes``（GET / PUT 段落人工修改）、``review-notes/export``
 - 单体财务报表：``financial-statements``（GET / PUT 企业会计制度格式手工值）、``financial-statements/export``
 
-人工修改自动生成的数据（申报表公式格、摘录表金额、审核说明段落、单体报表金额）另需账号开通「允许修改」
+任何写接口（申报表格子与是否填报、报告日期、摘录表金额、审核说明段落、单体报表金额）另需账号开通「允许修改」
 （``manual_edit_permission``，spec citar-manual-edit-permission）。
 """
 
@@ -27,7 +27,7 @@ from app.deps import get_user_scope_cycles, require_project_access
 from app.models.core import User
 from app.services import onlyoffice_pdf
 from app.services import tax_workpaper_service as tws
-from app.services.manual_edit_permission import assert_manual_edit, manual_edit_allowed
+from app.services.manual_edit_permission import assert_manual_edit
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.tax_assurance import exports, financial_statements, report_body, review_notes
 from app.services.tax_assurance.common import DOCX_MEDIA, XLSX_MEDIA, download
@@ -90,8 +90,8 @@ async def put_tax_return_sheet(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    await tws.save_sheet_inputs(db, project_id, year, code, body.version, body.inputs, current_user.id, domain=TAX_RETURN,
-                                allow_manual_edit=manual_edit_allowed(current_user))
+    assert_manual_edit(current_user)
+    await tws.save_sheet_inputs(db, project_id, year, code, body.version, body.inputs, current_user.id, domain=TAX_RETURN)
     await db.commit()
     return await tws.compute_sheet(db, project_id, year, code, domain=TAX_RETURN)
 
@@ -123,6 +123,7 @@ async def put_report_body(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
+    assert_manual_edit(current_user)
     await report_body.save_report_date(db, project_id, year, body.version, body.report_date, current_user.id)
     await db.commit()
     return await report_body.build(db, project_id, year)

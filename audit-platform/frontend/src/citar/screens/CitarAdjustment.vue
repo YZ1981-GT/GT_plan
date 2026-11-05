@@ -11,6 +11,7 @@
     <template v-else>
       <div class="adj-toolbar">
         <button
+          v-if="canManualEdit"
           class="adj-button"
           type="button"
           :disabled="!!editingKey || busy"
@@ -21,6 +22,7 @@
           {{ exporting ? '导出中…' : '导出分录' }}
         </button>
         <button class="adj-button" type="button" :disabled="loading" @click="load">刷新</button>
+        <span v-if="!canManualEdit" class="citar-adj__readonly">{{ MANUAL_EDIT_DENIED_TIP }}</span>
       </div>
 
       <p v-if="loading && !entries.length" class="citar-adj__empty">正在读取调整分录…</p>
@@ -30,26 +32,33 @@
         <option v-for="a in accounts" :key="a.code" :value="a.code">{{ a.name }}</option>
       </datalist>
 
-      <CitarAdjustmentCard
+      <div
         v-for="entry in visibleEntries"
         :key="entry.groupId || 'new'"
-        :entry="entry"
-        :editing="editingKey === keyOf(entry)"
-        :busy="busy"
-        :datalist-id="DATALIST_ID"
-        :account-names="accountNames"
-        :can-review="canReview"
-        @edit="startEdit(entry)"
-        @cancel="cancelEdit"
-        @save="onSave(entry)"
-        @remove="onRemove(entry)"
-        @review="(status) => onReview(entry, status)"
-        @revoke="onRevoke(entry)"
-      />
+        class="citar-adj__entry"
+        :class="{ 'citar-adj__entry--located': entry.groupId && isLocated(entry.groupId) }"
+        :data-locate="entry.groupId || undefined"
+      >
+        <CitarAdjustmentCard
+          :entry="entry"
+          :editing="editingKey === keyOf(entry)"
+          :busy="busy"
+          :datalist-id="DATALIST_ID"
+          :account-names="accountNames"
+          :can-review="canReview"
+          :can-edit="canManualEdit"
+          @edit="startEdit(entry)"
+          @cancel="cancelEdit"
+          @save="onSave(entry)"
+          @remove="onRemove(entry)"
+          @review="(status) => onReview(entry, status)"
+          @revoke="onRevoke(entry)"
+        />
+      </div>
 
       <p v-if="!loading && !error && !visibleEntries.length" class="citar-adj__empty">本年度还没有调整分录。</p>
 
-      <div class="adj-footer">
+      <div v-if="canManualEdit" class="adj-footer">
         <button class="adj-add-entry" type="button" :disabled="!!editingKey || busy" @click="startNew">+ 增加一条分录</button>
       </div>
 
@@ -85,12 +94,15 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import CitarAdjustmentCard from '../components/CitarAdjustmentCard.vue'
 import { newEntry, useCitarAdjustments, type AdjEntry, type ReviewTarget } from '../useCitarAdjustments'
 import { useCitarProject } from '../useCitarProject'
+import { useCitarRowLocate } from '../useCitarRowLocate'
+import { MANUAL_EDIT_DENIED_TIP, useManualEditPermission } from '@/composables/useManualEditPermission'
 
 defineOptions({ name: 'CitarAdjustment' })
 
 const DATALIST_ID = 'citar-adj-accounts'
 
 const { projectId, year, yearLoading } = useCitarProject()
+const { canManualEdit } = useManualEditPermission()
 const { entries, loading, error, load, save, remove, review, revoke } = useCitarAdjustments(
   () => projectId.value,
   () => year.value,
@@ -254,6 +266,13 @@ watch(
   },
   { immediate: true },
 )
+
+// ── 从数据来源链接跳来定位到某组分录（?locate=分录组 id，spec citar-cell-source-hover R2） ──
+const { isLocated, apply: applyLocate } = useCitarRowLocate()
+watch(entries, (list) => {
+  if (!list.length) return
+  void applyLocate(code => list.some(e => e.groupId === code), undefined, '本年度调整分录里没有这组分录（可能已删除）')
+})
 </script>
 
 <style scoped src="../styles/adjustment.css"></style>
@@ -270,8 +289,21 @@ watch(
   background: var(--citar-c-fdfcff);
 }
 
+.citar-adj__readonly {
+  align-self: center;
+  font-size: var(--citar-fs-12);
+  color: var(--citar-c-8c8c96);
+}
+
 .adj-add-entry:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+/* 从数据来源链接跳来定位到的分录组 */
+.citar-adj__entry--located {
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px #e0a100;
+  background: #fff6db;
 }
 </style>

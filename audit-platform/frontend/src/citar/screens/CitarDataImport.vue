@@ -11,18 +11,28 @@
       </button>
     </header>
 
+    <!-- 导入记录详情（?job=，账务查询来源卡片点映射项跳来；spec citar-cell-source-hover R9） -->
+    <CitarImportJobDetail
+      v-if="detailJob"
+      :project-id="projectId"
+      :job-id="detailJob"
+      :locate="detailLocate"
+      @back="backToLedger"
+      @new-import="goSegment('ledger-import')"
+    />
+
     <!-- 三步提示：选文件 → 智能识别与映射 → 导入 -->
     <!-- 识别是表头别名 / 编辑距离 / 历史映射复用的规则实现，没有大模型，故写「智能」不写「AI」（用户 2026-11-04 方案 A） -->
-    <ol class="citar-import__steps">
+    <ol v-if="!detailJob" class="citar-import__steps">
       <li v-for="(s, i) in STEPS" :key="s" :class="{ 'is-active': step === i, 'is-done': step > i }">{{ i + 1 }}. {{ s }}</li>
     </ol>
 
     <!-- 当前账套有人工修改：重新导入生成新数据集，这些修改不会带过去（spec citar-table-manual-edit R5） -->
-    <p v-if="manualCount && step === 0" class="citar-import__warn" role="status">
+    <p v-if="!detailJob && manualCount && step === 0" class="citar-import__warn" role="status">
       当前账套有人工修改（科目余额表 {{ manualSummary.balance }} 行、序时账 {{ manualSummary.ledger }} 行）。重新导入后这些修改不会保留。
     </p>
 
-    <section class="import-card">
+    <section v-if="!detailJob" class="import-card">
       <!-- 第 1 步：选文件（CITAR 拖拽区） -->
       <template v-if="step === 0">
         <div
@@ -141,6 +151,7 @@
  * 差异：按项目审核年度导入（detect 带 year_override、submit 用项目年度），完成后进「账务查询」。
  */
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import DetectionPreview from '@/components/ledger-import/DetectionPreview.vue'
@@ -158,6 +169,7 @@ import { ledger as P_ledger } from '@/services/apiPaths'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { fetchManualEditsSummary } from '../citarLedgerEdits'
+import CitarImportJobDetail from '../components/CitarImportJobDetail.vue'
 import { useCitarProject } from '../useCitarProject'
 
 const LedgerImportGuideDialog = defineAsyncComponent(
@@ -171,6 +183,18 @@ const ACCEPTED_EXTENSIONS = '.xlsx,.xlsm,.csv,.tsv,.zip'
 const MAX_FILES = 20
 
 const { projectId, year, goSegment } = useCitarProject()
+const route = useRoute()
+const router = useRouter()
+
+/** ?job= 打开某次导入的记录详情（只读），?locate= 高亮其中一列的映射 */
+const detailJob = computed(() => (typeof route.query.job === 'string' ? route.query.job : ''))
+const detailLocate = computed(() => (typeof route.query.locate === 'string' ? route.query.locate : ''))
+
+/** 从账务查询卡片跳来 ⇒ 回到原页签与定位；直接打开的链接没有上一页 ⇒ 进账务查询 */
+function backToLedger() {
+  if (window.history.state?.back) router.back()
+  else goSegment('ledger-query')
+}
 
 const step = ref(0)
 const subStep = ref<'preview' | 'mapping'>('preview')

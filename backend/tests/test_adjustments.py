@@ -1022,3 +1022,27 @@ async def test_wp_summary_asset_debit_increases_audited(
     # 借方类借记 300 → +300（不取反）
     assert summary.aje_total == Decimal("300")
     assert summary.audited_amount == Decimal("12300")
+
+
+@pytest.mark.asyncio
+async def test_api_write_requires_allow_manual_edit(client: AsyncClient, seeded_db, monkeypatch):
+    """账号未开通「允许修改」：新增 / 修改 / 删除 / 批量删除调整分录都 403，查看照常（spec citar-manual-edit-permission R2）。"""
+    pid = seeded_db
+    body = {"adjustment_type": "aje", "year": 2025, "line_items": [
+        {"standard_account_code": "1001", "debit_amount": "100"},
+        {"standard_account_code": "6001", "credit_amount": "100"},
+    ]}
+    created = (await client.post(f"/api/projects/{pid}/adjustments", json=body)).json()
+    gid = created["entry_group_id"]
+    monkeypatch.setattr(TEST_USER, "allow_manual_edit", False, raising=False)
+    calls = [
+        ("post", f"/api/projects/{pid}/adjustments", body),
+        ("put", f"/api/projects/{pid}/adjustments/{gid}", {"description": "改", "line_items": body["line_items"]}),
+        ("delete", f"/api/projects/{pid}/adjustments/{gid}", None),
+        ("post", f"/api/projects/{pid}/adjustments/batch-delete", {"ids": [gid]}),
+    ]
+    for method, url, payload in calls:
+        r = await (client.request(method.upper(), url, json=payload) if payload is not None else client.request(method.upper(), url))
+        assert r.status_code == 403 and "允许修改" in r.text, (method, url, r.text)
+    listed = await client.get(f"/api/projects/{pid}/adjustments?year=2025")
+    assert listed.status_code == 200 and listed.json()["total"] == 1

@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import Project, User
 from app.services.formula_management.delivery_export import (
     content_disposition_attachment,
@@ -48,11 +48,11 @@ async def export_excel(
     project_id: UUID,
     body: ExportExcelRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出报表 Excel 文件
 
-    返回 xlsx 文件流（Content-Disposition attachment）。
+    返回 xlsx 文件流（Content-Disposition attachment）。鉴权：项目只读（原先只校验登录，spec citar-cell-source-hover R7）。
 
     Requirements: 3.13, 3.14, 3.15
     """

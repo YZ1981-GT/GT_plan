@@ -38,6 +38,14 @@ def strip_store_prefix(name: str) -> str:
     return _STORE_PREFIX.sub("", name or "", count=1)
 
 
+def mapping_locate_key(file_name: str | None, sheet_name: str | None, column_index: Any) -> str:
+    """确认映射里某一列的定位键（文件 | sheet | 列序号）：账务查询来源卡片的链接与导入记录详情的行用同一个键。
+
+    ``file_name`` 新旧导入有带 / 不带 ``NN_`` 存储前缀两种写法，先剥前缀（spec citar-cell-source-hover R9）。
+    """
+    return f"{strip_store_prefix(file_name or '')}|{sheet_name or ''}|{'' if column_index is None else column_index}"
+
+
 def find_confirmed(filename: str, sheet_name: str, confirmed: list[dict[str, Any]] | None) -> dict | None:
     items = [m for m in (confirmed or []) if (m.get("sheet_name") or "") == sheet_name]
     if not items:
@@ -134,4 +142,7 @@ class ForwardFill:
                     self.prev[h] = row[h]
 
 
-__all__ = ["SheetPlan", "ForwardFill", "find_confirmed", "resolve_sheet_mapping", "strip_store_prefix", "AUTO_MIN_CONFIDENCE"]
+__all__ = [
+    "SheetPlan", "ForwardFill", "find_confirmed", "mapping_locate_key", "resolve_sheet_mapping", "strip_store_prefix",
+    "AUTO_MIN_CONFIDENCE",
+]

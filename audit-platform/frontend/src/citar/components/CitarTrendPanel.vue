@@ -104,7 +104,11 @@ const shown = computed(() =>
   }),
 )
 
+/** 只有最新一次读取写回页面：快速切换口径时，同参数的旧请求会被 GET 去重取消，晚到的错误不得盖住新结果 */
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   error.value = ''
   try {
@@ -112,12 +116,14 @@ async function load() {
       ? P_rpt.analysis.bsTrend(props.projectId, props.year)
       : P_rpt.analysis.plTrend(props.projectId, props.year)
     const data = await api.get(path, { params: { mode: mode.value }, ...silent })
+    if (seq !== loadSeq) return
     rows.value = Array.isArray(data) ? (data as TrendRow[]) : []
   } catch (e: any) {
+    if (seq !== loadSeq) return
     rows.value = []
     error.value = errorText(e, '读取变动分析失败')
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 

@@ -95,6 +95,10 @@ def register_system_routers(app: FastAPI) -> None:
     app.include_router(tax_workpapers_router, tags=["税审底稿"])
     # 鉴证报告：报告正文 / 审核说明 / 汇算申报表 / 单体财务报表（spec citar-assurance-report-menus）
     app.include_router(tax_assurance_router, tags=["税审鉴证报告"])
+
+    # 表格单元格来源（悬浮溯源卡片，spec citar-cell-source-hover）
+    from app.routers.cell_sources import router as cell_sources_router
+    app.include_router(cell_sources_router, tags=["单元格来源"])
     # OnlyOffice 转 PDF 回来取待转换文件（报告正文网页预览；签名鉴权，OnlyOffice 不带用户令牌）
     from app.routers.onlyoffice_pdf import router as onlyoffice_pdf_router
     app.include_router(onlyoffice_pdf_router, tags=["OnlyOffice 转 PDF"])
