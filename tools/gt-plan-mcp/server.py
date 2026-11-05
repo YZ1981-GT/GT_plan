@@ -30,18 +30,54 @@ def _load_overrides() -> dict[str, str]:
     return data
 
 
-def _parse_tasks(tasks_path: Path) -> dict[str, int]:
+#: 任务复选框行：可缩进（子任务），状态字符 x / ~ / 空格，允许紧跟 `*`（可选任务标记）。
+#
+# 🔴 2026-11-06 修三处漏算（原实现 `^- \[x\]` / `^- \[ \]\*` / `^- \[ \][^*]`）：
+#   ① 只认行首无缩进 ⇒ 所有缩进子任务（`  - [x] 5.1 …`）不计入任何一类；
+#   ② 完全不认 `[~]`（进行中）⇒ 既不进 done 也不进 total，于是「10 个 [x] + 18 个 [~]」
+#      被算成 10/10 = **100%**（`platform-global-display-settings-closure` 实测即此，
+#      它的阶段 B / C 全部未做却显示已完成）；
+#   ③ `pending` 用 `[^*]` 吃掉了状态后的一个字符，`- [ ]` 独占一行（无后续内容）时漏算。
+# 分母必须含 `[~]`：否则「把未完成项改成进行中」就能让完成率上升，这是个会自己变绿的后门。
+_TASK_LINE = re.compile(r"^[ \t]*- \[([ x~])\](\*?)", re.MULTILINE)
+
+
+def _parse_tasks(tasks_path: Path) -> dict[str, object]:
+    """统计 tasks.md 的复选框分布。
+
+    返回键向后兼容（total / done / pending / optional），另加 `in_progress` 与
+    `by_marker`（逐标记计数，便于核对分母）。`optional` 是「带 `*` 的未完成项」，
+    与 `pending` 互斥；`[x]*`（已完成的可选任务）计入 done，不计入 optional。
+    """
     if not tasks_path.exists():
-        return {"total": 0, "done": 0, "pending": 0, "optional": 0}
+        return {
+            "total": 0,
+            "done": 0,
+            "pending": 0,
+            "optional": 0,
+            "in_progress": 0,
+            "by_marker": {"x": 0, "~": 0, " ": 0},
+        }
     text = tasks_path.read_text(encoding="utf-8")
-    done = len(re.findall(r"^- \[x\]", text, re.MULTILINE))
-    optional = len(re.findall(r"^- \[ \]\*", text, re.MULTILINE))
-    pending = len(re.findall(r"^- \[ \][^*]", text, re.MULTILINE))
+    done = pending = optional = in_progress = 0
+    by_marker = {"x": 0, "~": 0, " ": 0}
+    for marker, star in _TASK_LINE.findall(text):
+        by_marker[marker] += 1
+        if marker == "x":
+            done += 1
+        elif marker == "~":
+            in_progress += 1
+        elif star:
+            optional += 1
+        else:
+            pending += 1
     return {
-        "total": done + pending + optional,
+        "total": done + pending + optional + in_progress,
         "done": done,
         "pending": pending,
         "optional": optional,
+        "in_progress": in_progress,
+        "by_marker": by_marker,
     }
 
 
@@ -131,8 +167,10 @@ def spec_status(spec_name: str) -> str:
             "has_design": design.exists(),
             "has_tasks": tasks.exists(),
             "tasks": progress,
+            # 分母 = done + pending + optional + in_progress（见 `_parse_tasks`）：
+            # `[~]` 必须进分母，否则「未完成改成进行中」会让完成率自己上升。
             "completion_pct": round(
-                100 * progress["done"] / progress["total"], 1
+                100 * int(progress["done"]) / int(progress["total"]), 1
             )
             if progress["total"]
             else None,
