@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Index, Integer, String, text
+from sqlalchemy import Boolean, CHAR, CheckConstraint, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -49,7 +49,7 @@ class ConsolNoteData(Base):
     source_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
     source_operation_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     source_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    source_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_digest: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

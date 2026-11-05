@@ -213,6 +213,23 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         " uq_procedure_instances_active_identity_norm、备份表 procedure_instance_identity_v217_backup 全部存在，"
         "效果与当前文件一致，无需补迁移；粗裁确认投影另立 V218。",
     ),
+    KnownChecksumDrift(
+        "233",
+        "cb12947fa431634403b406ca50922f7bf6fa58f0a26b82f2c8dc2a69b9e6bc62",
+        "cce787f129ef51a8576d7d84c0a8979576abd59f9708550f501338c65874538b",
+        "2026-11-05 只读核验 public.project_creation_grants：15 列、两个迁移声明的 "
+        "CHECK 约束、主键/FK 及两个部分索引均存在且定义与当前 V233 一致；按当前 "
+        "V233 条件复算可回填的有效经理-USCC 组合为 0。无需补迁移，未改写共享 "
+        "schema_version 的应用时 checksum。",
+    ),
+    KnownChecksumDrift(
+        "234",
+        "b33179f1db5eb97b70d6e950198d0266bfe554d3297704bd4b734096ec33167f",
+        "967b69addb71bab7b4ca8dce2ea3f67f480f157cc7ff8a634fb04f4ec4db40f0",
+        "2026-11-05 只读核验 public.gt_is_valid_uscc(text) 函数体与当前 V234 一致，"
+        "ck_project_creation_grants_code_checksum 约束存在；project_creation_grants 当前 "
+        "无未撤销授权，故无遗漏的校验码清理。无需补迁移，未改写共享 schema_version 的应用时 checksum。",
+    ),
 )
 
 

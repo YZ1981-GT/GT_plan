@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import CHAR, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,7 +20,7 @@ class PlatformJob(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
     payload_ref: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default=text("'queued'"))
     stage: Mapped[str | None] = mapped_column(String(64))
