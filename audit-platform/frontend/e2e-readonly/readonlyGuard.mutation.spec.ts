@@ -120,6 +120,17 @@ test.describe('只读 UAT 防火墙（R5.6）', () => {
     expect(isViteHmrSocket(`${WS_ORIGIN}/?token=abc`, ORIGIN)).toBe(true)
     expect(isViteHmrSocket(`${WS_ORIGIN}/api/ws?token=abc`, ORIGIN)).toBe(false)
     expect(isViteHmrSocket('ws://other.invalid/?token=abc', ORIGIN)).toBe(false)
+
+    // 2026-11-06 真实走查实测：第一条 HMR socket 被拦下后 Vite 回退到硬编码的 `localhost:<port>`，
+    // 页面却开在 127.0.0.1 ⇒ 判据必须认回环等价，否则「零写入」断言在开发模式下恒红。
+    expect(isViteHmrSocket('ws://localhost:39999/?token=abc', ORIGIN), 'localhost 回退').toBe(true)
+    expect(isViteHmrSocket('ws://[::1]:39999/?token=abc', ORIGIN), 'IPv6 回环回退').toBe(true)
+    // 反向：放宽只限「同端口 + 根路径 + 带 token」，其余一律仍记为写入尝试
+    expect(isViteHmrSocket('ws://localhost:40000/?token=abc', ORIGIN), '换端口').toBe(false)
+    expect(isViteHmrSocket('ws://localhost:39999/ws?token=abc', ORIGIN), '换路径').toBe(false)
+    expect(isViteHmrSocket('ws://localhost:39999/', ORIGIN), '缺 token').toBe(false)
+    expect(isViteHmrSocket('ws://192.168.20.60:39999/?token=abc', ORIGIN), '非回环且非同源主机').toBe(false)
+    expect(isViteHmrSocket('not-a-url', ORIGIN), '非法 URL').toBe(false)
   })
 
   test('每一类写入都被拦下并记录，桩服务器收不到任何写入', async ({ browser }) => {
