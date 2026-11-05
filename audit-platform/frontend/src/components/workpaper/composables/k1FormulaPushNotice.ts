@@ -51,3 +51,13 @@ export function k1PushedRows(
   const wanted = new Set(itemIds)
   return rows.filter((row) => wanted.has(row.item_id))
 }
+
+/**
+ * 交给共享持久化层 `reloadItems` 的 key 清单（去重、去空）。
+ *
+ * 🔴 读路径收口后宿主不再自己发请求，所以「只要这几条」这件事要在交给持久化层之前表达清楚：
+ * 这个函数就是 `k1PushedRows` 的对偶 —— 前者过滤服务端返回的行，后者过滤要问服务端的 key。
+ */
+export function k1PushedItemIds(itemIds: readonly string[]): string[] {
+  return [...new Set(itemIds.filter((id) => typeof id === 'string' && id))]
+}

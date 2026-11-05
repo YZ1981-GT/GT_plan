@@ -82,6 +82,19 @@ def _file(ref: str) -> str:
     return ref.split("#L")[0]
 
 
+def _adjudicated_codes(entry_id: str) -> tuple[str, ...]:
+    """`wp_code` 裁决表给这条 entry 裁的真码（没有条目就返回空元组）。"""
+    from app.services.workpaper_sync.projection_target_resolution import (
+        adjudicated_wp_codes,
+        load_wp_code_adjudication,
+    )
+
+    adjudication = load_wp_code_adjudication()
+    if entry_id not in adjudication:
+        return ()
+    return tuple(adjudicated_wp_codes(entry_id, adjudication=adjudication))
+
+
 def _n_of(entry_id: str) -> int:
     m = re.match(r"^xlsx/gt-k(1[0-3]|[1-9])-", entry_id)
     assert m, entry_id
@@ -184,7 +197,11 @@ class TestPromotionLedger:
                 assert live["capability"] == "bidirectional", e["entry_id"]
                 assert live["adapter_id"] == K_REVIEWED_CONTRACTS[n]
             else:
-                assert live["capability"] == mirror["capability"], e["entry_id"]
+                # 🔴 2026-11-05：未晋级的不再是 overlay 默认值（mirror 那个），而是 pending
+                #    （capability=null + 三字段齐备，umbrella task 1.1 / AC 1.3）。要求它等于
+                #    mirror 就是要求把组件默认值写回去当裁决。
+                assert live["capability"] is None, e["entry_id"]
+                assert live.get("capability_target"), e["entry_id"]
                 assert live["html_store"] == mirror["html_store"]
                 assert live["adapter_id"] is None
             if mirror["capability"] != e["capability"]:
@@ -192,7 +209,10 @@ class TestPromotionLedger:
         assert diverged == 13
         assert any(b["id"] == "BP-9" for b in manifest_slice["blocking_preconditions"])
         for n in K_PUBLISH_BLOCKED:
-            assert by_id[K_ENTRY_ID_BY_INDEX[n]]["capability"] == "single_onlyoffice"
+            # 发布被安全门拒的那条仍未裁决（null + 目标），不是 single_onlyoffice
+            blocked = by_id[K_ENTRY_ID_BY_INDEX[n]]
+            assert blocked["capability"] is None, (n, blocked["capability"])
+            assert blocked.get("capability_target") == "bidirectional", n
 
     def test_entry_profile_fields_mirror_the_manifest(
         self, manifest_slice: dict, full_manifest: dict
@@ -206,8 +226,25 @@ class TestPromotionLedger:
             assert e["room_model"] == live["room_model"]
             assert e["mount_count"] == len(live["mounts"])
             assert e["host_path"] == live["host_path"]
-            assert e["wp_code_pattern"] in (live.get("wp_match") or {}).get(
-                "wp_code_patterns", [])
+            # 🔴 2026-11-05：slice 冻结的是**启发式**码（`K1O` / `K8S` / `K10O`…）。`wp_code` 裁决表
+            #    （reviewed，`projection_target_resolution.WP_CODE_ADJUDICATION`）给 7 条 K entry 裁了
+            #    真码，manifest 生成器对独立 entry 用裁决值覆盖启发式 ⇒ 「slice 的值在 live 列表里」
+            #    对这 7 条恒不成立。判据按裁决表分支：有裁决的必须等于裁决真码，没裁决的照旧等于
+            #    启发式值（两边都不许随便漂）。
+            live_patterns = (live.get("wp_match") or {}).get("wp_code_patterns") or []
+            ruled = _adjudicated_codes(e["entry_id"])
+            if ruled:
+                assert sorted(live_patterns) == sorted(ruled), (
+                    f"{e['entry_id']}: manifest 的 {live_patterns} 与裁决真码 {sorted(ruled)} 不符"
+                )
+                assert e["wp_code_pattern"] not in ruled, (
+                    f"{e['entry_id']}: slice 冻结的启发式码与裁决真码相同 ⇒ 这条裁决已无意义，应退役"
+                )
+            else:
+                assert e["wp_code_pattern"] in live_patterns, (
+                    f"{e['entry_id']}: 没有 wp_code 裁决，manifest 的 {live_patterns} 却不含 slice 的 "
+                    f"{e['wp_code_pattern']!r}"
+                )
             if n in K_BIDIRECTIONAL_ENTRIES:
                 assert e["canonical_resolver"] == "legacy_sheet_onlyoffice_router"
                 assert live["canonical_resolver"] == "workpaper_sync_published_representation"

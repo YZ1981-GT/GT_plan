@@ -3880,8 +3880,8 @@
     }
   },
   "independent_entry_count": 145,
-  "manifest_digest": "003c5e9bab91d85b6e9f2e6bde6d1c39e032b9112210d2824445d49e88d65582",
-  "projection_digest": "f598f55f0607878bff68322536739c200bf5c247da7cd8507761339b211db08f",
+  "manifest_digest": "a45714deb833e624b43faa0eaa44785027c24148784a2156ffe0c25f22fa7be6",
+  "projection_digest": "0b9605d71468be2c775eb25a24e8921420ad498eb55563e6273641f1b2172f32",
   "schema_version": "workpaper-sync-cycle-current-projection:v1",
   "snapshot_date": "2026-11-04",
   "source_digest": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",

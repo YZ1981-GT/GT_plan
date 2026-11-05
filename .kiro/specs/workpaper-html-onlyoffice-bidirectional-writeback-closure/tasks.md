@@ -1156,3 +1156,97 @@
   `sheet_literal` / 17 条 `verdict` 的组都写明「裁完后整组删除」，裁决本身须用户放行后才能做。
 - **A5-1 已发布 artifact 仍是按模板修订前的 digest 发的**：判据已把旧值留作反向钉子，重发布属 6.3。
 - 本批未启动服务、未执行迁移、未写任何真实项目数据。
+
+## 第三批收口（2026-11-05，v1.0.128 之后）
+
+本批把上一节「如实登记」的 K 循环 25 条红清零，并把前端 sync 目录里 8 条**预存红**
+（在 `ebb29beee` 上同样红，逐条经 base worktree 复跑确认）一起修完。本批抓到 **3 个真实生产缺陷**
+与 **4 处判据口径缺陷**，两类都如实分开记。
+
+### 本批修的生产缺陷（不是改判据）
+
+- **`WorkpaperSyncEditorHost.vue`：已被服务端拒绝的 descriptor 身份会被重挂一次。**
+  confirm 回 409 `launch_descriptor_stale_identity` 之后桥把 mode 打回 html、宿主销毁编辑器并把
+  `mountedKey` 清成 null，但 `props.descriptor` 还是那个陈旧 descriptor。于是再次进入 OO 模式时
+  挂载 watch 只比 `mountedKey === key`（已是 null）⇒ 又把**同一个已被拒的身份**挂了一次：白闪一个
+  编辑器、多打一次必然再 409 的 confirm、还给桥上报了一次 `notifyEditorMounted`（代际已死）。
+  修法：记住被拒的挂载身份（判据取桥自己的 `lastError.staleIdentity`，即 `classifySyncFailure`
+  的单一真源，宿主不自认错误码），同一 key 不再挂；页面 materialize 出新代际后 key 变了自然放行。
+- **`GtB22AControlMatrix.vue` 的 `.oo-container` 没有 CSS 规则。** 模板早就写着
+  `class="oo-container"`，全文件只出现这一次 —— scoped 下未定义的类名等于没给高度，
+  `WorkpaperSyncEditorHost` 根元素是 `height:100%` + flex 列 ⇒ OnlyOffice 在页面上只剩一条
+  （与 2026-09-22 D4 那次真栈缺陷同型）。
+- **`GtH6AssetDisposalClearing.vue` 同款。** 它更隐蔽：文件里那句 `height: calc(100vh - 180px)`
+  是 `v-else-if` 分支上 legacy `GtOnlyOfficeSheet` 的内联样式，与同步宿主的容器无关
+  ⇒ 「文件里有没有 vh 高度」这种全文匹配判据看不到它。
+
+### 本批修的判据口径缺陷（含两处会让判据恒红/恒绿的）
+
+- **`workpaperSyncEditorHostSizing.spec.ts` 只认 `calc(100vh …)`**，把 M1/M5/M8/M9 四个宿主的
+  `height: 80vh` 判成假红（`80vh` 同样是视口相关的确定高度，缺陷类别不成立）⇒ 按共同特征收口成
+  「`height` 的值里出现 `<数字>vh`」。同时**新增**一条判据：包住挂载点的元素用到的类名必须真的有
+  CSS 规则 —— 这条才是抓住上面两个生产缺陷的那把尺子。类名必须**整词**比：首版按子串匹配把
+  `k-oo-container` / `cct-oo-container`（各自都有规则）误报了 6 处（`-` 不是 `\w`，
+  `\boo-container\b` 会在 `k-oo-container` 里命中）。
+- **`WorkpaperSyncStatusBar.spec.ts` 用 `split('\n')` 判「顶层无缩进」**。仓库 `core.autocrlf=true`，
+  Windows 工作区里那四个文件全是 CRLF ⇒ 每行尾部留一个 `\r`、`row === line` 恒不成立
+  ⇒ 该判据**在 Windows 上恒红、在 LF 检出的 CI 上恒绿**。同一条判据两个平台两个结论，比没有判据更糟。
+- **`test_k_lane1_p2…::TestKAP13NoticeMounted` 的模块名口径数的是原始文本（含注释）**。它声称
+  「BP-6 的 6 个宿主引了 `workpaperEntrySyncNotice` 模块」，现读那 6 个宿主：该模块名**只出现在
+  HTML 注释里**，没有任何 import。判据之所以绿，是注释把它骗绿的（㉖「判断代码是否真做了 X 禁用
+  文本匹配」的反向形态）。
+- **`test_k_foundation_p7…::test_component_symbol_is_the_dominant_platform_caliber`** 要求模块名
+  全平台命中 `>= 1`。`eaa655686`（readiness 单源改造）把提示链路改成
+  `GtEntrySyncCapabilityNotice.vue` → `useEntrySyncReadiness` → `deriveEntrySyncPresentation`
+  之后，那个模块**生产侧 0 调用方**，命中归零。
+
+### `workpaperEntrySyncNotice.ts` 的处置（0 调用方但不删）
+
+- 仓库常规铁律是「grep 0 调用方 ⇒ 删」，但 Task 57 的冻结件
+  `workpaper_sync_abcs_cycle_deletion_plan.json` 把它列在 `must_not_delete`（理由写的是
+  「AC 1.4 文案的单一真源」）⇒ **不删**，并把「不删的依据」写成判据直接读那份计划，而不是留在注释里。
+- 真正要修的是**文案有两个声明点**：`eaa655686` 把两句中文又抄了一份进
+  `entrySyncPresentation.ts` 的 `capability === null` 分支，改一处另一处静默不动、
+  用户看到的和兼容面说的能对不上。现在声明点在活路径（presentation），兼容模块
+  `export { … } from` 再导出 ⇒ 声明点只剩一个、兼容面与界面由同一个绑定保证。
+- 16 个宿主注释原先指着那个死模块（「文案真源在 sync/workpaperEntrySyncNotice.ts」），
+  一并改指活真源 `sync/entrySyncPresentation.ts`。只改注释文字，行数不变。
+- 判据改成比原来**更强**的三条：模块名生产命中恒等 0（重新接线即红）／文案只许一个声明点
+  （兼容模块里再声明一次即红）／冻结计划仍把它列在 `must_not_delete`（被移出即红）。
+
+### K 循环剩余 25 条的逐条处置
+
+| 判据 | 原状 | 处置 |
+| --- | --- | --- |
+| `TestKAP20BareK19IsASheetCode` ×3 | 期望 14/13，现算 15/14 | 第 15 处是 `attachment-voucher-evidence-binding`（`7954c575d`，**不是本 spec**）加的 `const EVIDENCE_SHEET = 'K1-9'`。它反而是新证据（变量名就是「哪张 sheet」）⇒ 逐文件登记 `BARE_K1_9_PER_FILE` + 把该常量写成可伪证断言；两口径差异改成「逐文件比 per-occurrence 与 per-line，只有 `K1TabIndex.vue` 两者不等」（原来用「其余合计 11」间接表达，且 11 恰好等于 slice 那个错数，纯巧合却读着像有语义） |
+| `test_template_sha256_is_unchanged` | 磁盘 `c071af1b…` vs 登记 `4abf0590…` | 比的是**已归档的草案契约**。`13120d6d6`（2026-10-26，`oo-writeback-template-parity-closure` 第一批「285 格公式错误按会计口径修复」）改了权威模板；**现行 reviewed 生产契约已跟着改到 `c071af1b…`** ⇒ 比对对象换成在册契约（运行时读的就是它），草案值留作历史钉子并断言它正好等于改动前那个提交的字节 |
+| `test_non_k_consuming_k_keys_count` | 期望 57，现算 87 | 先排除「口径不同」：16 种排除组合（生成物／测试文件／stories 全组合）**没有任何一种得到 57 或 design 里那个 70**（最接近 55 与 60）。回到冻结提交 `9c325aea4` 逐文件重算恰好 **57**，增长全来自那时还不存在的两个文件：`generated/formulaPushOwnedKeys.ts` 27 键、`renderSnapshotCasBaseline.spec.ts` 3 键，且与冻结键集合**不相交** ⇒ 改成「冻结值 + 逐源登记增量」，未登记的增长打红 |
+| `test_lane1_bare_form_remains_for_its_own_spec` | 期望 lane 1 还剩 2 处裸形态，现算 0 | 那 2 处已被 `attachment-inline-preview`（`ab0ccb400` / `a39c94827`）改成含 `wpId` 的形态 ⇒ 方向反转：全 K 域 bare == 0；「没有越界改」的证据改成「lane 1 的 OCR 站点全是 wpId 形态且 entry 集合 == {1,3,5}」（为 0 说明是被删而不是改好，两者必须分开） |
+| `test_no_manifest_entry_has_parent_in_k_set` | 现算 6 条子入口 | 全是 `ae318ce9d`（2026-10-07）起挂共享同步宿主的子 Tab：`mount_components == ['WorkpaperSyncEditorHost']` ∧ `independent_entry is False` ∧ `adjudication_state == 'inherited'` ∧ `adapter_id is None` ⇒ 与 KD-5 说的 legacy 重复面不是一回事。口径与 `test_task57…::global_parent_duplicate_count` **一致**（同一平台现象两处同一把尺子），并逐条断言「继承父裁决 + 不冒充已迁移 adapter」 |
+
+### 行数门
+
+`test_k_foundation_p7_gates_and_storage.py` 补完三条判据后 846 行 > 上限 800 ⇒ 按「拆模块不抬白名单」
+把 notice 符号那节整体搬到新文件 `test_k_foundation_p9_notice_symbols.py`（判据内容一字未改），
+p7 回到 637 行。顺带把搬过去的两处 `E741`（`l` 作循环变量）改名，使 ruff 新增保持 0。
+
+### 验证（隔离库，口径与 CI 同）
+
+| 选集 | base（`ebb29beee`） | 候选 |
+| --- | --- | --- |
+| K 全家（`test_k_*.py`） | 59 failed + 102 errors | **1143 passed / 0 failed** |
+| 前端 `components/workpaper/sync/__tests__` | 8 failed / 1442 passed | **1558 passed / 0 failed** |
+
+- 变异 18 组：**14 RED + 4 GREEN 阴性对照**（`plans/k3.json` 后端 7+1、`plans/k3fe*.json` 前端 7+3）。
+  RED 覆盖：文案声明点挪走／字面量抄回分支／给死模块重新接生产 import／把它从冻结 `must_not_delete`
+  移走／`EVIDENCE_SHEET` 出处改掉／增量键数写错／同步宿主子页清单漏登一条／两处 `.oo-container`
+  规则改名／高度口径收回只认 `calc(100vh)`／拦截分支去掉／不记录被拒身份／去掉 R13c 自动回表单／
+  `displayPrefs` 写进函数体。阴性对照（只改注释措辞）全部 SURVIVED。
+- ruff 相对 base 新增 0 / 解决 4；行数门 `rc=0`；CRLF churn 普查「疑似 churn：无」。
+- 本批未启动服务、未执行迁移、未写任何真实项目数据。
+
+### 本批未完成（如实登记）
+
+- **6.3 的 capability 终裁仍要真实 OnlyOffice 证据**，须用户放行后才能做（与上一节同）。
+- **A5-1 已发布 artifact 仍是按模板修订前的 digest 发的**，重发布属 6.3。
+- 0.5 / 2.8 / 7.5 不变，仍以总索引为准。

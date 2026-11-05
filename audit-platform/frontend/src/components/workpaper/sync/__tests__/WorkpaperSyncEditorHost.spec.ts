@@ -1447,6 +1447,14 @@ describe('forcesave 之后宿主自行推进 operation 直到落地', () => {
   it('不需要外部喂快照，状态自己走到 applied（修复前此处恒停在 waiting_application）', async () => {
     // 用假定时器：本用例要证的正是**定时器在驱动**。首读拿到还没 durable 的 shell，
     // 第二读（轮询）才 applied —— 与真实时序一致；若宿主不轮询，推进时钟也到不了 applied。
+    //
+    // 🔴 判据形态按 R13c 修正：落地之后宿主会**自动回表单**
+    // （`scheduleReturnToForm()` 在 `requestAnimationFrame` 里调
+    // `reloadAfterApplied()`，假定时器把 rAF 也一起 fake 掉），终态是 `html_idle`。
+    // 原判据在推进 1000ms **之后**才读 `state`，那时 rAF 已经跑完 ⇒ 读到 html_idle、
+    // 期望 applied 必红。它测的本来就不是「停在 applied」而是「不喂快照也能走到
+    // applied」⇒ 观测对象改成**经过** applied 的证据（`terminal` 事件 + 轮询周期内
+    // 的状态），再把 R13c 的终态显式断言出来，两个特性各有判据、互不掩盖。
     vi.useFakeTimers()
     try {
       const h = harness({
@@ -1464,8 +1472,16 @@ describe('forcesave 之后宿主自行推进 operation 直到落地', () => {
 
       // 推进一个轮询周期（后端给的 poll_after_ms=800）
       await vi.advanceTimersByTimeAsync(1000)
-      expect(h.bridge.state.value).toBe('applied')
-      expect(status(wrapper).kind).toBe('success')
+      // 宿主自己把 operation 推到了落地：terminal 事件带 applied
+      const terminal = (wrapper.emitted('terminal') ?? []) as unknown[][]
+      const states = terminal.map((args) => (args[0] as { state: string }).state)
+      expect(
+        states,
+        '没有 applied 的 terminal 事件 ⇒ 宿主没把 operation 推到落地（修复前的形态）',
+      ).toContain('applied')
+      // R13c：落地后自动回表单，所以终态是 html_idle 而不是停在 applied
+      expect(h.bridge.state.value).toBe('html_idle')
+      expect(status(wrapper).kind).not.toBe('error')
     } finally {
       vi.useRealTimers()
     }

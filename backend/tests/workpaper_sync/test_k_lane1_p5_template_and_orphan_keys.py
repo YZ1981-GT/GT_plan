@@ -81,6 +81,13 @@ FOUNDATION_DEFINED_NAMES_REF = 65
 K1_LISTED = "附注披露信息(上市公司）"
 K1_SOE = "附注披露信息（国企）"
 
+#: 🔴 K1 权威模板在 `13120d6d6`（2026-10-26，`oo-writeback-template-parity-closure`
+#: 第一批「285 格公式错误按会计口径修复」）**之前**的字节 sha256，等于 `71ca5f233`
+#: （2026-05-15）那一版。已归档的草案契约登记的就是这个值。
+#: 现行磁盘字节与 reviewed 生产契约都已是改动后的值，故本常量只用于钉住历史出处。
+TEMPLATE_SHA_BEFORE_PARITY_FIX = (
+    "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab"
+)
 #: 覆盖层影响面（现算校验对象，不作为唯一真源）
 REF_CELLS_PER_VARIANT = 35
 REF_ROWS_PER_VARIANT = 8
@@ -381,14 +388,49 @@ class TestKAP28OverlayIsDeclaredAndTemplateBytesAreUntouched:
                 assert isinstance(v, str) and v.startswith("="), (sheet, coord, v)
                 assert not _REF_RX.search(v), (sheet, coord, v)
 
-    def test_template_sha256_is_unchanged(self, k1_contract: dict) -> None:
-        """🔴 模板字节不变的硬判据：契约登记的 sha256 == 现算。"""
+    def test_template_sha256_matches_the_contract_in_force(
+        self, k1_contract: dict
+    ) -> None:
+        """🔴 模板字节必须与**现行**契约登记一致（草案那份是历史值，已被取代）。
+
+        原判据拿现算去比 `k1_contract`（= 已归档的**草案**契约）。草案登记的是
+        `71ca5f233`（2026-05-15）那版字节 `4abf0590…`；`13120d6d6`（2026-10-26，
+        **`oo-writeback-template-parity-closure` 第一批**，不是本 spec）按会计口径
+        改了权威模板的公式错误 ⇒ 字节变成 `c071af1b…`，草案那份自那天起就对不上了。
+
+        覆盖层真正需要的前提是「**在册生产契约**登记的 sha256 == 磁盘」—— 对不上
+        才意味着 source_ref 失效。现行 reviewed 契约已经跟着改到 `c071af1b…`，
+        前提成立。所以：
+          · 比对对象换成现行 reviewed 契约（这才是运行时读的那份）；
+          · 草案值作为历史事实单独断言，并钉住「它等于改模板前那个提交的字节」，
+            使「模板被谁改的」这件事可伪证，而不是把草案值重新基线化掉。
+        """
         book = K_TEMPLATE_DIR / LANE1_BOOKS[1]
         got = hashlib.sha256(book.read_bytes()).hexdigest()
-        assert got == k1_contract["template"]["template_sha256"], (
-            "模板字节被改过 ⇒ 覆盖层前提破裂，本册全部 source_ref 失效"
+
+        live = [
+            json.loads(p.read_text(encoding="utf-8"))
+            for p in sorted(CONTRACT_DIR.glob("*.json"))
+        ]
+        in_force = [
+            d for d in live
+            if str((d.get("template") or {}).get("relative_path", "")).endswith(book.name)
+            and d.get("review_status") == "reviewed"
+        ]
+        assert len(in_force) == 1, (
+            f"K1 册的 reviewed 生产契约应恰好 1 份，实得 {len(in_force)}"
+        )
+        assert got == in_force[0]["template"]["template_sha256"], (
+            "模板字节与**现行**契约登记不一致 ⇒ 覆盖层前提破裂，"
+            "本册全部 source_ref 失效（须重新发布，不是改判据）"
         )
         assert k1_contract["template"]["relative_path"].endswith(book.name)
+        # 草案那份是改模板**之前**的历史值：既不等于磁盘，也必须正好是那一版字节。
+        draft = k1_contract["template"]["template_sha256"]
+        assert draft != got, "草案 sha 竟与现算相等 ⇒ 本条记载的漂移已不存在，须重写"
+        assert draft == TEMPLATE_SHA_BEFORE_PARITY_FIX, (
+            f"草案登记值 {draft[:12]}… 与登记的「改动前字节」不符 ⇒ 出处须重算"
+        )
 
     def test_overlay_does_not_fabricate_cross_sheet_references(
         self, k1_contract: dict

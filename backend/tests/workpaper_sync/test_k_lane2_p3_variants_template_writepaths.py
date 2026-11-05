@@ -980,20 +980,38 @@ class TestKBP40OcrTwoContractFacesUnified:
             f"命中 entry {sorted(per)} —— K11 无 OCR 是实况"
         )
 
-    def test_lane1_bare_form_remains_for_its_own_spec(
+    def test_lane1_bare_form_is_now_converged_too(
         self, k_files: list[pathlib.Path]
     ) -> None:
-        """🔴 反向对照：lane 1 的 2 处裸形态**还在**（归 lane 1 spec 处置）。
+        """🔴 方向反转：lane 1 的裸形态**也已清零**，全 K 域 bare == 0。
 
-        这条是「本 lane 没有越界改」的正向证明。
+        原判据是「lane 1 的 2 处裸形态还在」，用来正向证明本 lane 没有越界改。
+        那 2 处已被 `attachment-inline-preview`（`ab0ccb400` / `a39c94827`，
+        2026-10-28，把底稿内上传与 26 个 OCR 端点统一走 `workpaper_evidence_intake`）
+        改成含 `wpId` 的形态 —— **不是本 lane 动的**。
+
+        「没有越界改」的证据改成等价且更强的两条：
+          ① 全 K 域 bare 形态为 0（收敛彻底，不留 404 面）；
+          ② lane 1 的 OCR 站点全部是 wpId 形态、且 entry 集合 == {1, 3, 5}
+             —— 是**被改好**的，不是被删掉的（删掉也能让 bare 归零，得区分开）。
+        站点出处写进断言消息，哪天 bare 形态回来直接点名。
         """
-        lane1 = [
-            p.name
+        bare = sorted(
+            p.name for p in k_files
+            if OCR_BARE_RX.search(strip_comments(cached_text(p)))
+        )
+        assert bare == [], f"裸形态（后端未注册 ⇒ 404）回来了：{bare}"
+
+        lane1_sites = {
+            entry_of_path(p): p.name
             for p in k_files
             if entry_of_path(p) in LANE1
-            and OCR_BARE_RX.search(strip_comments(cached_text(p)))
-        ]
-        assert len(lane1) == 2, f"lane 1 裸形态期望 2 处，实得 {sorted(lane1)}"
+            and OCR_WPID_RX.search(strip_comments(cached_text(p)))
+        }
+        assert set(lane1_sites) == {1, 3, 5}, (
+            f"lane 1 的 OCR 站点 entry 集合 {sorted(lane1_sites)}，期望 {{1, 3, 5}}"
+            "（为 0 说明是被删掉而不是改好 ⇒ 收敛结论须重算）"
+        )
 
     def test_the_two_faces_were_one_capability(
         self, k_files: list[pathlib.Path]

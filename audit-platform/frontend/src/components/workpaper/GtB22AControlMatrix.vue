@@ -1892,6 +1892,21 @@ const b22AEntrySync = useEntrySyncReadiness({
 </template>
 
 <style scoped>
+/* ═══ OnlyOffice 容器（必须给确定高度）═══
+ * 🔴 模板里早就写了 `class="oo-container"`，但本文件**从来没有这条规则** ——
+ * scoped 样式下未定义的类名等于没给高度。`WorkpaperSyncEditorHost` 根元素是
+ * `height: 100%` + flex 列，父级高度为 auto 时 `height:100%` 解析成 auto，
+ * 编辑区（`flex:1; min-height:0`）随之退化 ⇒ OnlyOffice 在页面上只剩一条。
+ * 与 2026-09-22 D4 那次真栈缺陷同型（同一模式多个落点、漏一个没人发现）。
+ * 数值照 `b60/GtB60Bundle.vue` 同款（B22A 同样有模式工具栏占位）。
+ */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 320px);
+  overflow: hidden;
+  border-radius: 8px;
+}
+
 /* ═══ 双模式工具栏 ═══ */
 .b22-mode-toolbar {
   display: flex;
