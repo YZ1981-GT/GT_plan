@@ -62,6 +62,10 @@
 
 ## D. 客户已入账与未更正错报单源
 
+> **承接关系（2026-11-06 登记）**：本批吸收 `adjustment-client-booking-status` 的全部任务，该 spec 不再
+> 单独推进。D1~D8 对应其 Task 1~8（已入库 `3cd7352a6`）；其 **Task 9「验收与收尾」由下面的 D9 与 F4 承载**。
+> ⇒ D9 / F4 勾选时，须把证据同时写回该 spec 的 Task 9，再由其 tasks.md 收口（两处不各跑一遍验收）。
+
 - [x] D1. 执行 `adjustment-client-booking-status` Task 1：迁移、模型与阶段
   - 证据：`3cd7352a6` 新建 `adjustment_client_booking.py`、路由、测试
 - [x] D2. 执行其 Task 2：唯一生效判定与三处计算接入
@@ -79,6 +83,7 @@
 - [x] D8. treatment 历史与"纳入/已入账/不予更正/撤销"界面
   - 证据：`3cd7352a6` 新建 `adjustment_treatment_service.py`、`AdjustmentTreatmentDialog.vue`
 - [ ] D9. D 批真 PG、账套回滚、错报/声明书/签发门和浏览器验收
+  - 同时承载 `adjustment-client-booking-status` Task 9 的 pg_only 全流程与【测试】项目浏览器全流程（见本节页头）
 
 ## E. 重要性、证据与专业工作台
 
@@ -104,6 +109,7 @@
 - [ ] F2. 当前 HEAD 与候选树后端/前端失败集合逐节点对比，只候选红为 0
 - [ ] F3. 真 PG + 真 HTTP + 真 EventBus 全链验收，不 mock 相邻层
 - [ ] F4. 并发、故障恢复、RLS、签发/交付门、客户入账回滚验收
+  - 「客户入账回滚」一并作为 `adjustment-client-booking-status` Task 9 的回滚验收证据（见 D 批页头）
 - [ ] F5. 五角色 Playwright、刷新回读、通知深链、来源底稿、窄屏与键盘验收
 - [ ] F6. 共享库 migration 与测试数据写入经用户放行后执行；逐表清理对账
 - [ ] F7. 磁盘变异汇总、临时产物清理、诊断与文档更新

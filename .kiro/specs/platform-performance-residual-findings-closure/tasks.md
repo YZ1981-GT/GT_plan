@@ -1,5 +1,6 @@
 # 任务：平台性能收口的范围外发现
 
+> 需求编号 `R1`~`R13` 的定义见 `requirements.md`（2026-11-06 回填；本 spec 立项时缺该文件，`R*` 被引用却无定义处）。
 > 规则：标完成须有代码 + 测试证据；未实测标 `[ ]*`；不提交不推送；只改本 spec 拥有的改动块。
 > 证据口径：「HEAD 红」= 在 HEAD（841166b57）干净 worktree 上跑同一用例打红；「变异」= 进程内替换被测模块源码（不改磁盘）。
 
@@ -45,7 +46,7 @@
 - [x] 25. 工时页「预算对比」下拉恒空：工时页与「我的填报」同时取 `/api/projects/my/assignments`，utils/http 去重取消了先发的那次 ⇒ `staffApi.getMyAssignments` 改经 apiProxy 共享在途、各拿数组副本（+ `staffApiMyAssignmentsShared.spec.ts` 含机制自检，HEAD 红）；浏览器：下拉默认首个项目、预算对比 200
 - [x] 26. 少 /api 前缀的请求 15 处全部修复：A18-2 读写 / 建议 / 表头带出（检查表改走 `/api/workpapers/{wp}/checklist-responses`、请求体 `{project_id, items}`、未选适用性存 null、年度取 `audit_year`、先取签字合伙人）、I1/I3~I6 健康检查改用统一探针 `fetchOnlyOfficeHealthy`、H3 两处勾稽取对方底稿（静默 404）、K10 两处识别（按底稿调 D4、读 `ocr_text`、附件挂本行 + 小眼睛）、H5 自取渲染配置、侧栏 PBC、凭证识别弹窗（未挂载）
 - [x] 27. 守卫 `apiPathPrefixGuard.spec.ts`（全仓字面量调用须带 /api、apiPaths 字面量须带前缀、扫描面 ≥ 2000、自检 4 例）+ `GtRegulatoryLetter.requests.spec.ts` / `iCycleDualModeHealth.spec.ts` / `k10OcrContract.spec.ts`（跨语言取后端响应字段）；四个文件在 HEAD 上均打红
-- [ ]* 28. 批 F 界面走查：PBC 页签已实测（200、空态）；A18-2、I 循环在线编辑切换、H3 勾稽、K10 识别所需底稿在存活的【测试】项目里都没有（真实项目打开 A18-2 会自动保存写库），只有单测 / 契约证据
+- [ ]* 28. 批 F 界面走查（**本 spec 界面走查的唯一承载处**，见 requirements R13.1）：PBC 页签已实测（200、空态）；A16 推荐标记、A18-2（检查 / 导出 / 读写）、I 循环在线编辑切换、H3 勾稽、K10 识别五项所需底稿在存活的【测试】项目里都没有（真实项目打开 A18-2 会占编辑锁），只有单测 / 契约证据。解除条件：在【测试】项目里按平台路径生成这五类底稿（R13.2）
 
 ## 批 G §8 裁决项（R8~R12，design §9）
 
@@ -60,12 +61,12 @@
   - [x] 34.3 前端 ReviewWorkbench：`approveCurrent` / `rejectCurrent` 改发当前级的 `levelN_passed` / `levelN_rejected`；`reviewStatusLabel` 补 L3/L4；批量通过改调 `batchReview()`；删 `api` 直调
   - [x] 34.4 前端项目设置：底稿配置 tab 加「复核层级」卡片（2/3/4 + 各级角色 + 保存），onMounted 加载 review-config，409 提示
   - [x] 34.5 测试：`test_review_state_machine.py` 19 passed（转换表 8 + 状态机集成 6 + 批量端点 5）；回归 386 passed 0 failed；_IDENTITY_ONLY_BASELINE 153→152（batch_review 从 readonly 提升到 review）；route_shadow_guard fixed case 改 /ai-batch-review
-  - [ ]* 34.5 浏览器实测：复核配置入口正常、接口端到端 3 项全通过；提交→通过→退回全流程因无 pending_level1 底稿未实测
+  - [ ]* 34.6 浏览器实测：复核配置入口正常、接口端到端 3 项全通过；提交→通过→退回全流程因无 pending_level1 底稿未实测（编号原与 34.5 重复，2026-11-06 按 requirements R13.3 改为 34.6；前置条件见 R13.2）
 - [x] 35. §8.2 另立 spec `project-pid-path-authz-coverage` 并登记 INDEX — 三件套已写（tasks 1-6），INDEX 第 7 行，Active 14
 
 ## 收尾
 
 - [x] 22. 回归：后端 42 个文件 488 passed / 11 failed（均 HEAD 同红：workhour_batch_approve 5、workhour_list 2、version_trail_integration 3、task9 checklist_put_allow_admin 1）/ 5 skipped（已归档 spec 的永红守卫）；前端最终合并选集 212 个文件 2929 passed / 6 failed，6 例均在 HEAD worktree 上同样失败（gCycleProcedureConsole、GtAuditSheet 行数、rawRequestAuth 的 GtA51 原生 fetch、controlledInputCommitRatchet 的 HEAD 已 1749 > 1748、hostSheetDispatchChain 的 GtH10 ×2）；单区域类型检查三组相对 HEAD 新增 0（1488→1477、24→22、0）；ESLint 0 error、warning 相对 HEAD 新增 0；行数门 99 个文件通过（ReportView 上限压低 1 的对照组打红）
 - [x] 23. 浏览器实测（127.0.0.1:3030）：报表页 /api 全 200、附注列编号、切年度写 `?year=&tab=` 并按新年度取数、console error 0；项目树标签无 warn；版本链抽屉 5 条快照、「历史版本」页签走 `/version-archives`（全库 `wp_version_archive` 0 行，空数组为真实状态）；工时预算对比；公式管理四宿主首次打开才加载；D2 能力快照 1 次请求
-- [ ]* 23a. A16 推荐标记、A18-2 导出的界面走查：只在页面内调接口验证（A16 推荐 A16-1、A18-2 检查 4 项未填、导出 17,965 字节 docx）；打开真实项目底稿会占编辑锁，未做界面层
+- [ ]* 23a. A16 推荐标记、A18-2 导出的界面走查：只在页面内调接口验证（A16 推荐 A16-1、A18-2 检查 4 项未填、导出 17,965 字节 docx）；打开真实项目底稿会占编辑锁，未做界面层。**不单独验收**，结论引用任务 28（requirements R13.1）
 - [x] 24. 更新本 spec 证据、INDEX（第 6 行）、memory（1 行，共 300 行）；删仓库外探针目录与基线 worktree；待裁决项见 design §8
