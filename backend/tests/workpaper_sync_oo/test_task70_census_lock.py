@@ -284,10 +284,32 @@ class TestLiveDbLock:
         for path, digest in report["source_digests"].items():
             assert len(str(digest)) == 64, f"{path} 的 digest 不是 sha256：{digest!r}"
         touched = copy.deepcopy(payload)
-        first = sorted(touched["source_digests"])[0]
-        touched["source_digests"][first] = "f" * 64
+        touched["source_digests"][sorted(touched["source_digests"])[0]] = "f" * 64
         assert gate.comparable(touched) != base, (
             "源码内容 digest 变了投影却没变 ⇒ 「源码改了但报告没刷新」这条轴丢了"
+        )
+
+    def test_source_digest_is_line_ending_normalized(self, gate: Any, tmp_path: Path) -> None:
+        """🔴 digest 必须按 LF 归一后再算，否则锁的是表示形式而不是内容。
+
+        本仓 `core.autocrlf=true`：一次 rebase / checkout 就把工作树重新物化成 CRLF，而入库
+        内容是 LF ⇒ 对原始字节哈希时，同一份已提交内容在 Windows 工作树与干净 Linux 检出上
+        得出两个不同 digest，报告在其中一边必然 stale（2026-11-05 变基后实测，两项同时漂移
+        而 `git show HEAD:<path>` 内容逐字节未变）。与「拿 HEAD sha 当源码轴」同一类缺陷。
+
+        判据做成**平台无关**的：在临时目录里把同一份内容写成 CRLF 与 LF 两版，两者的 digest
+        必须相等（在 Linux CI 上直接比工作树字节会恒等，抓不到这件事）。
+        """
+        content = "# -*- coding: utf-8 -*-\nalpha = 1\nbeta = 2\n"
+        (tmp_path / "lf.py").write_bytes(content.encode("utf-8"))
+        (tmp_path / "crlf.py").write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+        digests = gate.source_digests(tmp_path, ["lf.py", "crlf.py"])
+        assert digests["lf.py"] == digests["crlf.py"], (
+            "CRLF 与 LF 两版得到不同 digest ⇒ 锁住了行尾表示形式，跨检出必 stale"
+        )
+        missing = gate.source_digests(tmp_path, ["nope.py"])
+        assert missing["nope.py"] == "missing-on-disk", (
+            "产物不在磁盘上时必须显式报 missing-on-disk —— 静默跳过会让轴悄悄缺项"
         )
 
     def test_live_db_semantics_are_asserted_not_merely_skipped(

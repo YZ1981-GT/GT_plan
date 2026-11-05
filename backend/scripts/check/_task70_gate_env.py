@@ -279,6 +279,12 @@ def source_digests(repo: Path, paths: Any) -> dict[str, str]:
     ⇒ digest 变、报告必须重新 `--write`。
 
     🔴 调用方**不要**把报告自己传进来：报告内容包含本 digest，自指算不出不动点。
+
+    🔴 **先按 LF 归一再哈希**。本仓 `core.autocrlf=true`：一次 rebase / checkout 就把工作树
+    重新物化成 CRLF，而入库内容是 LF ⇒ 对原始字节哈希时，同一份已提交内容在 Windows 工作树
+    与干净 Linux 检出上得出**两个不同的 digest**，报告在其中一边必然 stale。实测（2026-11-05
+    变基后）：门禁与宿主守卫两项 digest 同时漂移，而 `git show HEAD:<path>` 的内容逐字节未变。
+    这与「拿 HEAD sha 当源码轴」是同一类缺陷 —— 锁住了表示形式而不是内容。
     """
     import hashlib
 
@@ -288,7 +294,8 @@ def source_digests(repo: Path, paths: Any) -> dict[str, str]:
         if not target.is_file():
             out[path] = "missing-on-disk"
             continue
-        out[path] = hashlib.sha256(target.read_bytes()).hexdigest()
+        normalized = target.read_bytes().replace(b"\r\n", b"\n")
+        out[path] = hashlib.sha256(normalized).hexdigest()
     return out
 
 

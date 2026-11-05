@@ -1,9 +1,9 @@
 {
   "artifact_git_status": {
     "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "M",
-    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "M",
+    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "tracked-clean",
     "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "tracked-clean",
-    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "M"
+    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "tracked-clean"
   },
   "artifact_git_status_semantics": {
     "every_product_is_on_disk": true,
@@ -621,9 +621,9 @@
     "changed_tables": {},
     "pg_version": "PostgreSQL 16.14 (Debian 16.14-1.pgdg12+1)",
     "row_counts_after": {
-      "working_paper_artifact": 2332,
-      "working_paper_callback_delivery": 501,
-      "working_paper_callback_recovery_case": 161,
+      "working_paper_artifact": 2333,
+      "working_paper_callback_delivery": 502,
+      "working_paper_callback_recovery_case": 162,
       "working_paper_content_application": 145,
       "working_paper_content_representation": 456,
       "working_paper_content_version": 436,
@@ -637,13 +637,13 @@
       "working_paper_sync_definition_bundle": 264,
       "working_paper_sync_entry_state": 84,
       "working_paper_sync_operation": 1198,
-      "working_paper_sync_scope_index": 4604,
+      "working_paper_sync_scope_index": 4606,
       "working_paper_sync_test_run": 0
     },
     "row_counts_before": {
-      "working_paper_artifact": 2332,
-      "working_paper_callback_delivery": 501,
-      "working_paper_callback_recovery_case": 161,
+      "working_paper_artifact": 2333,
+      "working_paper_callback_delivery": 502,
+      "working_paper_callback_recovery_case": 162,
       "working_paper_content_application": 145,
       "working_paper_content_representation": 456,
       "working_paper_content_version": 436,
@@ -657,7 +657,7 @@
       "working_paper_sync_definition_bundle": 264,
       "working_paper_sync_entry_state": 84,
       "working_paper_sync_operation": 1198,
-      "working_paper_sync_scope_index": 4604,
+      "working_paper_sync_scope_index": 4606,
       "working_paper_sync_test_run": 0
     },
     "zero_write_proof": {
@@ -1329,9 +1329,9 @@
       },
       "registered_entry_count": 32,
       "row_counts_after": {
-        "working_paper_artifact": 2332,
-        "working_paper_callback_delivery": 501,
-        "working_paper_callback_recovery_case": 161,
+        "working_paper_artifact": 2333,
+        "working_paper_callback_delivery": 502,
+        "working_paper_callback_recovery_case": 162,
         "working_paper_content_application": 145,
         "working_paper_content_representation": 456,
         "working_paper_content_version": 436,
@@ -1345,7 +1345,7 @@
         "working_paper_sync_definition_bundle": 264,
         "working_paper_sync_entry_state": 84,
         "working_paper_sync_operation": 1198,
-        "working_paper_sync_scope_index": 4604,
+        "working_paper_sync_scope_index": 4606,
         "working_paper_sync_test_run": 0
       },
       "unregistered_count": 137
@@ -3553,7 +3553,7 @@
     "backend/data/workpaper_sync_task68_backend_chain_regression.json",
     "backend/data/workpaper_sync_task69_frontend_regression.json"
   ],
-  "report_digest": "bac42c4fdd1b45080811fe0559487380512aad2684e916fb6c9d17175f78bfa2",
+  "report_digest": "df082a909f8c4e7e897f02796482744ef6b81c118c769fa2fed80d9ceee71e3c",
   "result_declaration_scan": {
     "forbidden_keys": [
       "aggregate_result",
@@ -47323,10 +47323,10 @@
     }
   },
   "schema_version": "task70-oo94-full-entry-scenario-refresh:v1",
-  "source_commit": "fd0f5db75e7f675201faeb4790e8746da698bac1",
+  "source_commit": "a4054136e54506433b372b6c4875552b1d9bee62",
   "source_digests": {
     "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "24ef0a9551a680e9bf88f3a05dfd914b49b40010f7bf50b9eeacc8c45825c084",
-    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "766208444ccd61aa3de7e277b13e8c8537581799d54669f7d946383f0b19f6d5",
+    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "e50ff73375137809fd9162150cd016f3c2f6734d1379735170c6f06923c1b079",
     "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "a01d10ad6f812e73935da217eb44b3d340ca774af76415243ce44c76e4b0dfb9"
   },
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
