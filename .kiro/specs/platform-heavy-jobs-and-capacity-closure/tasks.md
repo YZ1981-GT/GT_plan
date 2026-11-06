@@ -43,11 +43,15 @@
 - [x] A4 bulk import 先落 spool，只传路径；增加全局/用户/项目并发与内存预算。
 - [x] A5 LibreOffice 唯一 profile、communicate、排队上限/acquire timeout、Retry-After 与指标。
 - [ ] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
-  - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session；本轮补
+  - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session、
     `wp_chat`（请求内 prepare_chat + 项目权限，流期纯 LLM）、`working_paper`/`wp_download`
     的单件 `FileResponse` 与打包下载、`wp_template_download`、`wp_xlsx_export`、
-    `wp_template_files` 的 function-scope DB/stream gate。`test_streaming_db_scope.py` 14 passed。
-  - 🔴 仍有大量低频历史导出路由尚未迁移，必须逐个确认响应生成器不再读 DB 后才能改 scope，保持未完成。
+    `wp_template_files` 的 function-scope DB/stream gate；本轮第二波补 `wp_render_config.export_template`
+    与 `wp_export_import_router.export_with_metadata` / `batch_export_enhanced` 三条下载路由
+    `function-scope DB + require_project_access_stream`。`test_streaming_db_scope.py` 15 passed。
+  - 🔴 仍有大量低频历史导出路由尚未迁移（含 `wp_render_strategies/*_import_export.py` 约 20 条、
+    `wp_onlyoffice_router` 机对机 WOPI 路径、部分 wp_sync 路由），必须逐个确认响应生成器不再读 DB
+    后才能改 scope，保持未完成。
 - [x] A7 同输入验证文件 SHA/ZIP 清单/导入摘要不变，并测并发时 health/event-loop lag。
 
 ## 批 B 耐久任务
@@ -100,15 +104,27 @@
   - 🔴 完整 run 基线需专用可销毁 PG + 真实项目数据（10000 公式单元），本机无法伪造，保持阻塞。
 - [ ] C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。
   - 已完成：目标底稿单次批取、同底稿 mutation 一次锁读 + 批量 CAS；`test_formula_push_engine_locate` /
-    batch-c-note / batch-c-k-cycle / reaggregate 选集 53 passed。
-  - 🔴 未完成：附注写入方尚无“每章节一次 advisory lock + 一次 deepcopy + 一次写”的统一内核；
-    真实 PG 并发 barrier 也未在专用环境执行，保持未勾。
+    batch-c-note / batch-c-k-cycle / reaggregate 选集 53 passed。本轮新增统一写入内核骨架
+    `app/services/disclosure/note_section_write_kernel.py`（`mutate_note_section` + `stable_hash`）：
+    PG 下取 `pg_advisory_xact_lock` + `FOR UPDATE`，非 PG 自动降级；一次 `copy.deepcopy` 隔离工作副本；
+    按 JSON canonical 哈希判 changed，变才 `flag_modified` + 一次 UPDATE；mutator 允许改 note
+    的 `text_content` / `status` / `guidance_text` 等字段，退出前无条件 flush。6 单测全绿。
+  - 🔴 未完成：`disclosure_engine.update_note` / `note_followup` / 合并附注写入方尚未切到新内核；
+    真实 PG 并发 barrier 必须在专用环境里跑双连接重叠章节用例验证，保持未勾。
 - [ ] C3 合并附注一次预取记录/公式、内存后序、批量写；修正空 section_ids 语义。
   - 已完成：空数组零工作、记录/公式预取、内存后序和章节 SAVEPOINT/flush；53 个相关回归通过。
+    C2 的统一写入内核骨架同时可服务合并附注章节级写入（见上条）。
   - 🔴 未完成：差额节点仍经 `fill_by_formula(...)`，不能把它写成不存在的 `_compute_elimination`
     “纯内存内核”；叶子来源整章批取与真实 PG 并发对拍仍需专门收口。
 - [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
-  - 🔴 当前尚无 rows/s、WAL、COPY、索引/激活阶段 profiler；实现后仍需真实大项目数据 + 专用 PG 验收。
+  - 本轮完成 profiler 骨架 `app/services/ledger_import/profiler.py`（`StagedProfiler` + `StageRecord`）：
+    PG 下 `pg_current_wal_lsn()` + `pg_wal_lsn_diff` 自动采集每阶段 WAL 增量字节，非 PG 环境
+    `wal_bytes=None`；`rows/sec = rows / duration_s`，支持 `record_rows()` 对 COPY 真实返回行数
+    事后补记；mutator 抛异常时记 `error` 后原样向上抛，不吞异常；`to_dict()` 产 JSON 可序列化的
+    stage/total 摘要，供 pipeline / progress / API 直接消费。7 单测全绿。
+  - 🔴 未完成：pipeline（`services/ledger_import/pipeline.py` / smart_import_engine）尚未接入
+    `StagedProfiler`，需要让 staging / COPY / index / activation 四阶段都走 context manager；且
+    rows/s、WAL、COPY 真实基线须在专用可销毁 PG + 真实大项目数据上跑，本机无法伪造，保持阻塞。
 - [ ]* C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
   - 🔴 需真实文档量级（万级分块）+ 专用 PG 做 EXPLAIN 对比，本机无法伪造，保持阻塞。
   - V263 向量扩展 + HNSW 索引已建；tsvector/GIN 路径代码已有；量级基准与索引选择待证据。
@@ -163,6 +179,12 @@
     通过 · `smoke-built-artifact.mjs` 通过（SPA 深链、动态 chunk、`/api` 与 `/wopi` 代理齐全）·
     内网 `http://192.168.20.60:3030` 浏览器实测 D4/D7（披露自动同步 latest=2 + SSE 1/6/12 标签页
     均单连接）。
+  - 2026-11-06 增量：A6 第二波 3 条路由（`wp_render_config.export_template` /
+    `wp_export_import_router.export_with_metadata` / `batch_export_enhanced`）接入 function-scope DB
+    + `require_project_access_stream`，`test_streaming_db_scope.py` 13→15 passed；C4 profiler 骨架
+    `app/services/ledger_import/profiler.py` + 7 单测全绿；C2/C3 附注章节原子写入内核骨架
+    `app/services/disclosure/note_section_write_kernel.py` + 6 单测全绿；全部 owned 文件 Ruff /
+    Diagnostics 清零。接入 pipeline 与真实 PG 并发 barrier 等验收仍留在对应 `[ ]` / `[ ]*` 项下。
   - 仍阻塞且本机无法伪造：①`check-bundle-budget.mjs` 按匿名排名比对，heavy-office/heavy-excel/
     WorkpaperEditor 的历史分类误判与 WIP 无关，须另立预算工具收口（详见该脚本注释与 design
     §7）②真实 PG 计划 / 大项目公式 run 基线 / 底稿编辑器 Playwright 在共享 PG 禁跑，须

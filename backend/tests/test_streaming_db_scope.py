@@ -31,6 +31,8 @@ from app.routers.wp_template_download import (
 from app.routers.wp_template_files import get_workpaper_xlsx
 from app.routers.wp_download import download_pack, download_single
 from app.routers.wp_xlsx_export import export_xlsx
+from app.routers.wp_render_config import export_template
+from app.routers.wp_export_import_router import batch_export_enhanced, export_with_metadata
 
 
 def _depends(function, parameter: str) -> Depends:
@@ -169,3 +171,24 @@ def test_xlsx_export_uses_function_scoped_auth_and_database():
     assert database.dependency is get_db
     assert database.scope == "function"
     assert auth.dependency is get_current_user_stream
+
+
+def test_render_config_export_template_uses_short_lived_session():
+    """A6 第二波：模板文件下载提前释放 DB。"""
+    database = _depends(export_template, "db")
+    auth = _depends(export_template, "current_user")
+    assert database.dependency is get_db
+    assert database.scope == "function"
+    assert auth.dependency is get_current_user_stream
+
+
+def test_enhanced_export_routes_release_db_before_streaming():
+    """A6 第二波：单份/批量增强导出 StreamingResponse 发出前 commit 并释放 DB。"""
+    for endpoint in (export_with_metadata, batch_export_enhanced):
+        database = _depends(endpoint, "db")
+        gate = _depends(endpoint, "current_user")
+        assert database.dependency is get_db
+        assert database.scope == "function"
+        gate_database = _depends(gate.dependency, "db")
+        assert gate_database.dependency is get_db
+        assert gate_database.scope == "function"

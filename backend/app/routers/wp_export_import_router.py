@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import require_project_access, require_project_access_stream
 from app.models.core import User
 from app.models.wp_export_models import WpExportSnapshot, WpVersionArchive
 from app.schemas.wp_export_schemas import ConflictResolution
@@ -75,10 +75,10 @@ class ImportResolveRequest(BaseModel):
 async def export_with_metadata(
     project_id: UUID,
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
-    """导出单份底稿（嵌入元数据 + 记录快照哈希）
+    """导出单份底稿（嵌入元数据 + 记录快照哈希）— 流式路径：响应体发送前 commit 并释放 DB 会话。
 
     区别于 download-file：本端点嵌入 MetadataBundle 元数据并记录
     wp_export_snapshot，供后续导入时冲突检测使用。
@@ -126,8 +126,8 @@ async def export_with_metadata(
 async def batch_export_enhanced(
     project_id: UUID,
     body: BatchExportEnhancedRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """批量增强导出为 ZIP（含 manifest.json + SHA-256 + 元数据嵌入）
 
