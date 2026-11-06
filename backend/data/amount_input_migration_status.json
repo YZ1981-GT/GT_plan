@@ -1,11 +1,11 @@
 {
-  "scanned_files": 1887,
+  "scanned_files": 1895,
   "totals": {
-    "el_input_number": 3029,
+    "el_input_number": 3036,
     "el_input_number_with_formatter": 18,
-    "wp_amount_input": 1917
+    "wp_amount_input": 1920
   },
-  "column_classified_total": 3735,
+  "column_classified_total": 3744,
   "confirmed_violation": [
     {
       "file": "d2/D2TabDetail.vue",
@@ -152,7 +152,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 410,
+      "line": 430,
       "label": "未审数",
       "full_label": "本期 / 未审数",
       "control": "el-input-number",
@@ -165,7 +165,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 451,
+      "line": 471,
       "label": "账项调整",
       "full_label": "本期 / 账项调整",
       "control": "el-input-number",
@@ -178,7 +178,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 464,
+      "line": 484,
       "label": "重分类调整",
       "full_label": "本期 / 重分类调整",
       "control": "el-input-number",
@@ -191,7 +191,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 486,
+      "line": 506,
       "label": "未审数",
       "full_label": "上期 / 未审数",
       "control": "el-input-number",
@@ -204,7 +204,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 526,
+      "line": 546,
       "label": "账项调整",
       "full_label": "上期 / 账项调整",
       "control": "el-input-number",
@@ -217,7 +217,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 539,
+      "line": 559,
       "label": "重分类调整",
       "full_label": "上期 / 重分类调整",
       "control": "el-input-number",
@@ -438,7 +438,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 521,
+      "line": 527,
       "label": "收入",
       "full_label": "银行对账单/流水 / 收入",
       "control": "el-input-number",
@@ -451,7 +451,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 527,
+      "line": 533,
       "label": "支出",
       "full_label": "银行对账单/流水 / 支出",
       "control": "el-input-number",
@@ -464,7 +464,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 533,
+      "line": 539,
       "label": "余额",
       "full_label": "银行对账单/流水 / 余额",
       "control": "el-input-number",
@@ -477,7 +477,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 541,
+      "line": 547,
       "label": "借方发生额",
       "full_label": "银行日记账 / 借方发生额",
       "control": "el-input-number",
@@ -490,7 +490,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 547,
+      "line": 553,
       "label": "贷方发生额",
       "full_label": "银行日记账 / 贷方发生额",
       "control": "el-input-number",
@@ -503,7 +503,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 553,
+      "line": 559,
       "label": "余额",
       "full_label": "银行日记账 / 余额",
       "control": "el-input-number",
@@ -516,7 +516,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 627,
+      "line": 633,
       "label": "金额",
       "full_label": "金额",
       "control": "el-input-number",
@@ -529,7 +529,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 688,
+      "line": 694,
       "label": "借方",
       "full_label": "借方",
       "control": "el-input-number",
@@ -542,7 +542,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 694,
+      "line": 700,
       "label": "贷方",
       "full_label": "贷方",
       "control": "el-input-number",
@@ -555,7 +555,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 778,
+      "line": 784,
       "label": "借方",
       "full_label": "记账凭证 / 借方",
       "control": "el-input-number",
@@ -568,7 +568,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 784,
+      "line": 790,
       "label": "贷方",
       "full_label": "记账凭证 / 贷方",
       "control": "el-input-number",
@@ -581,7 +581,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 810,
+      "line": 816,
       "label": "金额",
       "full_label": "银行对账单 / 金额",
       "control": "el-input-number",
@@ -594,7 +594,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 922,
+      "line": 928,
       "label": "金额",
       "full_label": "银行对账单 / 金额",
       "control": "el-input-number",
@@ -607,7 +607,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 954,
+      "line": 960,
       "label": "借方",
       "full_label": "记账凭证 / 借方",
       "control": "el-input-number",
@@ -620,7 +620,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 960,
+      "line": 966,
       "label": "贷方",
       "full_label": "记账凭证 / 贷方",
       "control": "el-input-number",
@@ -1179,7 +1179,7 @@
     },
     {
       "file": "GtB50RiskAssessment.vue",
-      "line": 1599,
+      "line": 1627,
       "label": "余额/金额",
       "full_label": "余额/金额",
       "control": "el-input-number",
@@ -1192,7 +1192,7 @@
     },
     {
       "file": "h5/core/H5TabAdjustment.vue",
-      "line": 79,
+      "line": 72,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -1205,7 +1205,7 @@
     },
     {
       "file": "h5/core/H5TabAdjustment.vue",
-      "line": 86,
+      "line": 79,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -1270,7 +1270,7 @@
     },
     {
       "file": "i1/core/I1TabAdjustment.vue",
-      "line": 247,
+      "line": 240,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -1283,7 +1283,7 @@
     },
     {
       "file": "i1/core/I1TabAdjustment.vue",
-      "line": 262,
+      "line": 255,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -1556,7 +1556,7 @@
     },
     {
       "file": "i2/core/I2TabAdjustment.vue",
-      "line": 233,
+      "line": 226,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -1569,7 +1569,7 @@
     },
     {
       "file": "i2/core/I2TabAdjustment.vue",
-      "line": 248,
+      "line": 241,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -1777,7 +1777,7 @@
     },
     {
       "file": "i3/core/I3TabAdjustment.vue",
-      "line": 301,
+      "line": 294,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -1790,7 +1790,7 @@
     },
     {
       "file": "i3/core/I3TabAdjustment.vue",
-      "line": 316,
+      "line": 309,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -1985,7 +1985,7 @@
     },
     {
       "file": "i4/core/I4TabAdjustment.vue",
-      "line": 285,
+      "line": 278,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -1998,7 +1998,7 @@
     },
     {
       "file": "i4/core/I4TabAdjustment.vue",
-      "line": 300,
+      "line": 293,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -2050,7 +2050,7 @@
     },
     {
       "file": "i5/core/I5TabAdjustment.vue",
-      "line": 300,
+      "line": 293,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -2063,7 +2063,7 @@
     },
     {
       "file": "i5/core/I5TabAdjustment.vue",
-      "line": 315,
+      "line": 308,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -2102,7 +2102,7 @@
     },
     {
       "file": "i6/core/I6TabAdjustment.vue",
-      "line": 251,
+      "line": 244,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -2115,7 +2115,7 @@
     },
     {
       "file": "i6/core/I6TabAdjustment.vue",
-      "line": 266,
+      "line": 259,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -2323,7 +2323,7 @@
     },
     {
       "file": "k1/core/K1TabAdjustment.vue",
-      "line": 221,
+      "line": 214,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -2336,7 +2336,7 @@
     },
     {
       "file": "k1/core/K1TabAdjustment.vue",
-      "line": 237,
+      "line": 230,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -2843,7 +2843,7 @@
     },
     {
       "file": "k10/core/K10TabAdjustment.vue",
-      "line": 173,
+      "line": 166,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -2856,7 +2856,7 @@
     },
     {
       "file": "k10/core/K10TabAdjustment.vue",
-      "line": 188,
+      "line": 181,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -3077,7 +3077,7 @@
     },
     {
       "file": "k11/core/K11TabAdjustment.vue",
-      "line": 159,
+      "line": 152,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -3090,7 +3090,7 @@
     },
     {
       "file": "k11/core/K11TabAdjustment.vue",
-      "line": 173,
+      "line": 166,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -3233,7 +3233,7 @@
     },
     {
       "file": "k12/core/K12TabAdjustment.vue",
-      "line": 165,
+      "line": 158,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -3246,7 +3246,7 @@
     },
     {
       "file": "k12/core/K12TabAdjustment.vue",
-      "line": 180,
+      "line": 173,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -3363,7 +3363,7 @@
     },
     {
       "file": "k13/core/K13TabAdjustment.vue",
-      "line": 211,
+      "line": 204,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -3376,7 +3376,7 @@
     },
     {
       "file": "k13/core/K13TabAdjustment.vue",
-      "line": 226,
+      "line": 219,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -3584,7 +3584,7 @@
     },
     {
       "file": "k2/core/K2TabAdjustment.vue",
-      "line": 89,
+      "line": 82,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -3597,7 +3597,7 @@
     },
     {
       "file": "k2/core/K2TabAdjustment.vue",
-      "line": 103,
+      "line": 96,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -3805,7 +3805,7 @@
     },
     {
       "file": "k3/core/K3TabAdjustment.vue",
-      "line": 103,
+      "line": 96,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -3818,7 +3818,7 @@
     },
     {
       "file": "k3/core/K3TabAdjustment.vue",
-      "line": 110,
+      "line": 103,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -4052,7 +4052,7 @@
     },
     {
       "file": "k4/core/K4TabAdjustment.vue",
-      "line": 119,
+      "line": 112,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -4065,7 +4065,7 @@
     },
     {
       "file": "k4/core/K4TabAdjustment.vue",
-      "line": 126,
+      "line": 119,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -4429,7 +4429,7 @@
     },
     {
       "file": "k5/core/K5TabAdjustment.vue",
-      "line": 134,
+      "line": 127,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -4442,7 +4442,7 @@
     },
     {
       "file": "k5/core/K5TabAdjustment.vue",
-      "line": 150,
+      "line": 143,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -4572,7 +4572,7 @@
     },
     {
       "file": "k6/core/K6TabAdjustment.vue",
-      "line": 151,
+      "line": 144,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -4585,7 +4585,7 @@
     },
     {
       "file": "k6/core/K6TabAdjustment.vue",
-      "line": 164,
+      "line": 157,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -5001,7 +5001,7 @@
     },
     {
       "file": "k7/core/K7TabAdjustment.vue",
-      "line": 110,
+      "line": 103,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -5014,7 +5014,7 @@
     },
     {
       "file": "k7/core/K7TabAdjustment.vue",
-      "line": 117,
+      "line": 110,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -5131,7 +5131,7 @@
     },
     {
       "file": "k8/core/K8TabAdjustment.vue",
-      "line": 106,
+      "line": 99,
       "label": "借方",
       "full_label": "借方",
       "control": "el-input-number",
@@ -5144,7 +5144,7 @@
     },
     {
       "file": "k8/core/K8TabAdjustment.vue",
-      "line": 112,
+      "line": 105,
       "label": "贷方",
       "full_label": "贷方",
       "control": "el-input-number",
@@ -5352,7 +5352,7 @@
     },
     {
       "file": "k9/core/K9TabAdjustment.vue",
-      "line": 150,
+      "line": 143,
       "label": "借方调整金额",
       "full_label": "借方调整金额",
       "control": "el-input-number",
@@ -5365,7 +5365,7 @@
     },
     {
       "file": "k9/core/K9TabAdjustment.vue",
-      "line": 156,
+      "line": 149,
       "label": "贷方调整金额",
       "full_label": "贷方调整金额",
       "control": "el-input-number",
@@ -5560,7 +5560,7 @@
     },
     {
       "file": "l1/core/L1TabAdjustment.vue",
-      "line": 162,
+      "line": 155,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -5573,7 +5573,7 @@
     },
     {
       "file": "l1/core/L1TabAdjustment.vue",
-      "line": 179,
+      "line": 172,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -11335,7 +11335,7 @@
     },
     {
       "file": "d4/ipo/D4TabCustomerChecklist.vue",
-      "line": 192,
+      "line": 212,
       "label": "seg.cols[0].label",
       "full_label": "seg.cols[0].label",
       "control": "WpAmountInput",
@@ -11348,7 +11348,7 @@
     },
     {
       "file": "d4/ipo/D4TabDealer.vue",
-      "line": 177,
+      "line": 197,
       "label": "col.label",
       "full_label": "col.label",
       "control": "WpAmountInput",
@@ -11361,7 +11361,7 @@
     },
     {
       "file": "d4/ipo/D4TabOverseas.vue",
-      "line": 193,
+      "line": 213,
       "label": "seg.cols[0].label",
       "full_label": "seg.cols[0].label",
       "control": "WpAmountInput",
@@ -11374,7 +11374,7 @@
     },
     {
       "file": "d4/ipo/D4TabUndisclosedRp.vue",
-      "line": 182,
+      "line": 202,
       "label": "col.label",
       "full_label": "col.label",
       "control": "WpAmountInput",
@@ -11517,7 +11517,7 @@
     },
     {
       "file": "e1/E1TabAnalysis.vue",
-      "line": 102,
+      "line": 116,
       "label": "period === 'prior' ? '上期金额' : '前期金额'",
       "full_label": "period === 'prior' ? '上期金额' : '前期金额'",
       "control": "el-input-number",
@@ -11530,7 +11530,7 @@
     },
     {
       "file": "e1/E1TabAnalysis.vue",
-      "line": 112,
+      "line": 126,
       "label": "period === 'current' ? '本期金额' : period === 'prior' ? '上期金额' : '前期金额'",
       "full_label": "period === 'current' ? '本期金额' : period === 'prior' ? '上期金额' : '前期金额'",
       "control": "el-input-number",
@@ -11543,7 +11543,7 @@
     },
     {
       "file": "e1/E1TabAnalysis.vue",
-      "line": 124,
+      "line": 138,
       "label": "period === 'current' ? '本期' : period === 'prior' ? '上期' : '前期'",
       "full_label": "period === 'current' ? '本期' : period === 'prior' ? '上期' : '前期'",
       "control": "el-input-number",
@@ -11556,7 +11556,7 @@
     },
     {
       "file": "e1/E1TabAnalysis.vue",
-      "line": 148,
+      "line": 162,
       "label": "field === 'opening' ? '期初余额' : field === 'increase' ? '本期增加' : '本期减少'",
       "full_label": "field === 'opening' ? '期初余额' : field === 'increase' ? '本期增加' : '本期减少'",
       "control": "el-input-number",
@@ -11569,7 +11569,7 @@
     },
     {
       "file": "e1/E1TabAnalysis.vue",
-      "line": 158,
+      "line": 172,
       "label": "field === 'ending' ? '期末余额' : '期初余额'",
       "full_label": "field === 'ending' ? '期末余额' : '期初余额'",
       "control": "el-input-number",
@@ -11582,7 +11582,7 @@
     },
     {
       "file": "e1/E1TabAnalysis.vue",
-      "line": 168,
+      "line": 182,
       "label": "field === 'ending' ? '期末金额' : '期初金额'",
       "full_label": "field === 'ending' ? '期末金额' : '期初金额'",
       "control": "el-input-number",
@@ -11660,7 +11660,7 @@
     },
     {
       "file": "e1/E1TabDisclosure.vue",
-      "line": 1507,
+      "line": 1400,
       "label": "openingLabel",
       "full_label": "openingLabel",
       "control": "WpAmountInput",
@@ -11673,7 +11673,7 @@
     },
     {
       "file": "e1/E1TabDisclosure.vue",
-      "line": 1518,
+      "line": 1411,
       "label": "endingLabel",
       "full_label": "endingLabel",
       "control": "WpAmountInput",
@@ -11699,7 +11699,7 @@
     },
     {
       "file": "e1/E1TabLargeCheck.vue",
-      "line": 422,
+      "line": 429,
       "label": "col.label",
       "full_label": "col.label",
       "control": "el-input-number",
@@ -13129,7 +13129,7 @@
     },
     {
       "file": "j1/inspection/J1TabGeneralCheck.vue",
-      "line": 190,
+      "line": 192,
       "label": "grp.key === 'credit' ? '贷方金额' : '借方/支付金额'",
       "full_label": "grp.key === 'credit' ? '贷方金额' : '借方/支付金额'",
       "control": "el-input-number",
@@ -13349,6 +13349,84 @@
       "batch": 3
     },
     {
+      "file": "m10/core/M10TabDisclosureListed.vue",
+      "line": 46,
+      "label": "期初数量",
+      "full_label": "期初数量",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "m10/core/M10TabDisclosureListed.vue",
+      "line": 65,
+      "label": "本期增加数量",
+      "full_label": "本期增加数量",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "m10/core/M10TabDisclosureListed.vue",
+      "line": 89,
+      "label": "本期减少数量",
+      "full_label": "本期减少数量",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "m10/core/M10TabDisclosureSoe.vue",
+      "line": 46,
+      "label": "期初数量",
+      "full_label": "期初数量",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "m10/core/M10TabDisclosureSoe.vue",
+      "line": 65,
+      "label": "本期增加数量",
+      "full_label": "本期增加数量",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "m10/core/M10TabDisclosureSoe.vue",
+      "line": 89,
+      "label": "本期减少数量",
+      "full_label": "本期减少数量",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
       "file": "s35-refinance-bundle/GtS35DetailTable.vue",
       "line": 351,
       "label": "col.label",
@@ -13388,5 +13466,5 @@
       "batch": 3
     }
   ],
-  "ok_count": 2706
+  "ok_count": 2709
 }
