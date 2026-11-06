@@ -44,7 +44,7 @@ async def get_display_preferences(
 
     无记录时返回平台默认值，不写库。
     """
-    return await get_preferences(db, str(current_user.id))
+    return await get_preferences(db, current_user.id)
 
 
 @router.patch("", response_model=DisplayPreferencesResponse)
@@ -61,7 +61,7 @@ async def patch_display_preferences(
     """
     try:
         result, changed_fields = await patch_preferences(
-            db, str(current_user.id), body,
+            db, current_user.id, body,
         )
         # 把 changed_fields 写入 request.state 供审计日志脱敏用
         request.state.audit_changed_fields = changed_fields

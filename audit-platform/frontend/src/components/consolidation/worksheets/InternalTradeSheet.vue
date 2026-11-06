@@ -4,6 +4,8 @@
       ref="editableTableRef"
       v-model="rows"
       :columns="columns"
+      fixed-page-key="consolidation:worksheet:internal-trade"
+      :mandatory-fixed-columns="['sellerCompany']"
       :editable="true"
       :show-selection="true"
       :lazy-edit="false"

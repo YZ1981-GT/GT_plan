@@ -5,7 +5,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
+
+// 偏好改为绑账号 + 分区缓存（spec platform-global-display-settings-closure R2/R3）后，
+// loadForUser 会真发一次 GET；这里只测本机持久化，服务端按不可用处理。
+vi.mock('@/services/displayPreferencesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/displayPreferencesApi')>()),
+  getDisplayPreferences: vi.fn().mockRejectedValue(new Error('offline')),
+  patchDisplayPreferences: vi.fn().mockRejectedValue(new Error('offline')),
+}))
+
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DISPLAY_PREFERENCES_CACHE_PREFIX } from '@/utils/displayPreferencesNormalizer'
 import { isInputFocused, shortcutManager } from '@/utils/shortcuts'
 import { flushPendingWrites } from '@/components/workpaper/sync/pendingWrites'
 import { gridPlugin } from '../plugin'
@@ -14,17 +24,35 @@ import { activeInput, cell, click, key, mountGrid, settle, sink, typeInSink, unm
 afterEach(() => unmountAll())
 
 describe('编辑方式设置（R1）', () => {
-  it('默认 Excel；切换后持久化；非法值忽略；读到非法存档回到默认', () => {
+  it('默认 Excel；切换后持久化到本账号分区；非法值忽略；读到非法存档回到默认', async () => {
     const prefs = useDisplayPrefsStore()
     expect(prefs.gridEditMode).toBe('excel')
+
+    await prefs.loadForUser('u-grid')
     prefs.setGridEditMode('click')
-    expect(JSON.parse(localStorage.getItem('gt_display_prefs')!).gridEditMode).toBe('click')
+    const key = `${DISPLAY_PREFERENCES_CACHE_PREFIX}u-grid`
+    const cached = JSON.parse(localStorage.getItem(key)!)
+    expect(cached.pendingScalars.gridEditMode.value).toBe('click')
+
     prefs.setGridEditMode('bogus' as never)
-    expect(prefs.gridEditMode).toBe('click')
-    localStorage.setItem('gt_display_prefs', JSON.stringify({ gridEditMode: 'nope', _v: 2 }))
+    expect(prefs.gridEditMode, '非法值必须忽略，不能回落默认把当前选择清掉').toBe('click')
+
+    localStorage.setItem(key, JSON.stringify({
+      version: 3, prefs: { grid_edit_mode: 'nope' }, revision: 1, cachedAt: Date.now(),
+    }))
     setActivePinia(createPinia())
-    expect(useDisplayPrefsStore().gridEditMode).toBe('excel')
-    expect(useDisplayPrefsStore().gridEditModeOptions.map((o) => o.label)).toEqual(['Excel', '单击编辑', '经典'])
+    const reloaded = useDisplayPrefsStore()
+    await reloaded.loadForUser('u-grid')
+    expect(reloaded.gridEditMode).toBe('excel')
+    expect(reloaded.gridEditModeOptions.map((o) => o.label)).toEqual(['Excel', '单击编辑', '经典'])
+  })
+
+  it('未登录不落盘（偏好绑账号）', () => {
+    localStorage.clear()
+    const prefs = useDisplayPrefsStore()
+    prefs.setGridEditMode('classic')
+    expect(prefs.gridEditMode).toBe('classic')
+    expect(Object.keys(localStorage).filter((k) => k.startsWith(DISPLAY_PREFERENCES_CACHE_PREFIX))).toEqual([])
   })
 })
 

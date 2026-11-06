@@ -32,14 +32,15 @@ describe('usePermissionMatrix - P0-5', () => {
   })
 
   describe('P0-5.4: operation code 前后端快照一致', () => {
-    it('should have exactly 7 operation codes', () => {
-      expect(OPERATION_CODES).toHaveLength(7)
+    it('should have exactly 8 operation codes', () => {
+      expect(OPERATION_CODES).toHaveLength(8)
     })
 
     it('should match backend operation codes snapshot', () => {
       // 这些 code 必须与后端 permission_matrix_service.py 完全一致
       const expectedCodes: OperationCode[] = [
         'project:view',
+        'project:edit',
         'wp:edit',
         'wp:review',
         'report:edit',

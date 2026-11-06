@@ -1484,6 +1484,20 @@ const voucherLinks = useVoucherLinkTags(projectId, year) // 已挂 / 已抽于�
 
 // 金额单位（从 active dataset 的 source_summary.amount_unit 读取）
 const amountUnit = ref<string>('')
+// 数据集来源摘要（供 useDatasetUnitPresentation 消费）
+const datasetSourceSummary = ref<Record<string, unknown> | null>(null)
+
+// ─── 数据集单位三态 presenter ──────────────────────────────────────────
+import { classifyDatasetUnit } from '@/composables/classifyDatasetUnit'
+import { useDatasetUnitPresentation, type DatasetUnitClass } from '@/composables/useDatasetUnitPresentation'
+
+const _ledgerDatasetClassification = computed<DatasetUnitClass>(() =>
+  classifyDatasetUnit(datasetSourceSummary.value),
+)
+const { label: datasetUnitLabel } = useDatasetUnitPresentation(
+  _ledgerDatasetClassification,
+  datasetSourceSummary,
+)
 // 显示单位切换 — 直接操作 displayPrefs store（全局持久化）
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 const displayPrefs = useDisplayPrefsStore()
@@ -3429,16 +3443,16 @@ async function loadBalance() {
 
 /** 从 active dataset 读取金额单位 */
 async function loadAmountUnit() {
-  if (year.value == null) { amountUnit.value = ''; return }
+  if (year.value == null) { amountUnit.value = ''; datasetSourceSummary.value = null; return }
   try {
     const ds = await getActiveLedgerDataset(projectId.value, year.value)
     const unit = ds?.source_summary?.amount_unit || ''
     amountUnit.value = unit
-    // 默认始终"原样显示"（不换算），单位标签只是告知用户数据本身的单位
-    // 用户可手动切换到其他单位做换算查看
-    displayUnit.value = 'yuan'
+    datasetSourceSummary.value = ds?.source_summary ?? null
+    // 显示单位由全局 effective displayPrefs 驱动，不随数据集加载重置
   } catch {
     amountUnit.value = ''
+    datasetSourceSummary.value = null
   }
 }
 

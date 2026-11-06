@@ -15,6 +15,12 @@
       </template>
       <template #right>
         <slot name="toolbar-right" />
+        <GtTableDisplaySettings
+          v-if="fixedPageKey"
+          :page-key="fixedPageKey"
+          :columns="fixedSettingColumns"
+          :mandatory-keys="mandatoryFixedColumns"
+        />
         <el-button-group v-if="editable" size="small">
           <el-button :type="editMode.isEditing.value ? '' : 'primary'" @click="handleExitEdit">
             📋 查看
@@ -73,8 +79,9 @@
         :label="col.label"
         :width="col.width"
         :min-width="col.minWidth || 120"
+        :column-key="col.prop"
         :sortable="col.sortable ?? (defaultSortable ? 'custom' : false)"
-        :fixed="col.fixed || false"
+        :fixed="col.fixed === 'right' ? 'right' : preferredFixed.fixedFor(col.prop) || col.fixed || false"
         :align="col.align || 'left'"
         :filters="col.filterOptions"
         :filter-method="col.filterOptions ? ((value: any, row: any) => row[col.prop] === value) : undefined"
@@ -195,6 +202,8 @@ import SelectionBar from '@/components/common/SelectionBar.vue'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import GtTableDisplaySettings from '@/components/common/GtTableDisplaySettings.vue'
+import { usePreferredFixedColumns } from '@/composables/usePreferredFixedColumns'
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 export interface GtColumn {
@@ -228,12 +237,17 @@ const props = withDefaults(defineProps<{
   defaultRow?: () => Record<string, any>
   getComment?: (rowIdx: number, colIdx: number) => any
   cellClassName?: (params: { rowIndex: number; columnIndex: number }) => string
+  /** 固定列持久化身份；空字符串表示本表不开放用户固定列。动态表须把 table/mode 身份放进 key。 */
+  fixedPageKey?: string
+  /** 不可取消的身份列；必须同时存在于当前叶子 columns。 */
+  mandatoryFixedColumns?: string[]
   /** 分组折叠字段 [R10.4] */
   groupBy?: string
   /** 排序筛选默认开启 [R10.5] */
   defaultSortable?: boolean
 }>(), {
-  editable: false, showSelection: false, lazyEdit: true, sheetKey: '',
+  editable: false, showSelection: false, lazyEdit: true, sheetKey: '', fixedPageKey: '',
+  mandatoryFixedColumns: () => [],
   maxHeight: 'calc(100vh - 260px)', showToolbar: true, showSelectionBar: true,
   showFooter: true, showSummary: false, defaultSortable: true,
 })
@@ -260,8 +274,8 @@ const toolbar = useTableToolbar(tableDataRef)
 const containerRef = ref<HTMLElement | null>(null)
 const tableRef = ref<any>(null)
 
-// Phase 1 F2: 字号切换后重新计算列宽
-watch(() => displayPrefs.fontSize, () => {
+// 字号 / 密度切换后重新计算列宽与固定列位置
+watch([() => displayPrefs.fontSize, () => displayPrefs.density], () => {
   nextTick(() => tableRef.value?.doLayout?.())
 })
 
@@ -278,6 +292,14 @@ watch(() => fullscreen.isFullscreen.value, () => {
 
 // ── 计算属性 ──────────────────────────────────────────────────────────────────
 const visibleColumns = computed(() => props.columns.filter(c => !c.hidden))
+const fixedSettingColumns = computed(() => visibleColumns.value
+  .filter((column) => column.fixed !== 'right')
+  .map((column) => ({ key: column.prop, label: column.label })))
+const preferredFixed = usePreferredFixedColumns({
+  pageKey: () => props.fixedPageKey,
+  allowedColumns: () => fixedSettingColumns.value.map((column) => column.key),
+  mandatoryColumns: () => props.mandatoryFixedColumns,
+})
 
 // 全屏时用 '100%' 字符串让 el-table 跟父 flex 容器同高
 // （父容器走 .gt-fullscreen flex column + el-table flex:1 撑满剩余空间，
@@ -336,10 +358,10 @@ function groupRowClassName({ row }: { row: any }) {
 }
 
 const mergedHeaderStyle = computed(() => ({
-  background: '#f0edf5', fontSize: '12px', color: '#333', padding: '4px 0', ...props.headerCellStyle,
+  background: '#f0edf5', color: 'var(--gt-color-text-primary, #303133)', fontSize: 'var(--gt-display-font-size, 12px)', padding: '4px 0', ...props.headerCellStyle,
 }))
 const mergedCellStyle = computed(() => ({
-  padding: '2px 6px', fontSize: '12px', lineHeight: '1.4', ...props.cellStyle,
+  padding: '2px 6px', fontSize: 'var(--gt-display-font-size, 12px)', lineHeight: '1.4', ...props.cellStyle,
 }))
 
 // 列 prop → 列索引映射
@@ -367,7 +389,10 @@ cellSelection.setupTableDrag(tableRef, (rowIdx: number, colIdx: number) => {
 setupPasteListener(tableRef, (event: ClipboardEvent) => {
   if (!editMode.isEditing.value) return
   const cols = visibleColumns.value.map(c => ({ key: c.prop, label: c.label }))
-  const written = pasteToSelection(event, cellSelection.selectedCells.value, props.modelValue, cols, () => editMode.markDirty())
+  const written = pasteToSelection(
+    event, cellSelection.selectedCells.value, props.modelValue, cols,
+    { onCellChange: () => editMode.markDirty() },
+  )
   if (written > 0) emit('update:modelValue', [...props.modelValue])
 })
 

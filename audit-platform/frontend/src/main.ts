@@ -30,6 +30,13 @@ import { startSessionHandoff } from './utils/crossWindowAuth'
 import { advanceRequestIdentityEpoch } from './services/requestIdentityEpoch'
 import { claimClientInstanceId } from './utils/clientInstance'
 
+// 候选验证实例的构建身份。普通开发 / 正式构建未注入常量时不写任何 marker。
+if (typeof __GT_CANDIDATE_TREE_EXPECTED__ !== 'undefined'
+  && typeof __GT_CANDIDATE_TREE_ACTUAL__ !== 'undefined') {
+  document.documentElement.dataset.gtCandidateTreeExpected = __GT_CANDIDATE_TREE_EXPECTED__
+  document.documentElement.dataset.gtCandidateTreeActual = __GT_CANDIDATE_TREE_ACTUAL__
+}
+
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
 // 必须在任何组件挂载前安装，确保所有生产者/消费者互通。

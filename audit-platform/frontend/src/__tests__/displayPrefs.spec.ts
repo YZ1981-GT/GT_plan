@@ -3,10 +3,17 @@
  * 覆盖：density/fontSize/amountUnit/fixedColumns 扩展
  *
  * Validates: Requirements 6.1, 6.2, 6.3
+ *
+ * 2026-11-05（platform-global-display-settings-closure 任务 4）：偏好改为服务端权威 +
+ * 按账号分区缓存，未分区的旧键 `gt_display_prefs` 只删除不读写，所以原先三条
+ * 「持久化 / 恢复到 gt_display_prefs」的断言改为断言该键不再被使用；零值占位统一
+ * 为 '-'（与 GtAmountCell 的审计惯例一致）。跨账号缓存、epoch 与冲突重放见
+ * `src/stores/__tests__/displayPrefsSync.spec.ts`。
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useDisplayPrefsStore, TABLE_DENSITIES } from '@/stores/displayPrefs'
+import { DISPLAY_PREFERENCES_LEGACY_KEY } from '@/utils/displayPreferencesNormalizer'
 
 describe('useDisplayPrefsStore', () => {
   beforeEach(() => {
@@ -25,14 +32,13 @@ describe('useDisplayPrefsStore', () => {
   })
 
   describe('density 密度', () => {
-    it('setDensity 切换密度并持久化', () => {
+    it('setDensity 切换密度，且不写未分区的旧缓存键', () => {
       const store = useDisplayPrefsStore()
       store.setDensity('compact')
       expect(store.density).toBe('compact')
 
-      // 验证持久化
-      const raw = JSON.parse(localStorage.getItem('gt_display_prefs')!)
-      expect(raw.density).toBe('compact')
+      // 旧键不再是偏好的存储位置（按账号分区的缓存由 displayPrefsSync.spec.ts 覆盖）
+      expect(localStorage.getItem(DISPLAY_PREFERENCES_LEGACY_KEY)).toBeNull()
     })
 
     it('tableDensity 返回 el-table size 值', () => {
@@ -72,12 +78,12 @@ describe('useDisplayPrefsStore', () => {
       expect(store.getFixedColumns('nonexistent')).toEqual([])
     })
 
-    it('fixedColumns 持久化到 localStorage', () => {
+    it('fixedColumns 生效于当前屏幕，且不写未分区的旧缓存键', () => {
       const store = useDisplayPrefsStore()
-      store.setFixedColumns('report-view', ['row_name'])
+      expect(store.setFixedColumns('report-view', ['row_name'])).toBe(true)
+      expect(store.getFixedColumns('report-view')).toEqual(['row_name'])
 
-      const raw = JSON.parse(localStorage.getItem('gt_display_prefs')!)
-      expect(raw.fixedColumns['report-view']).toEqual(['row_name'])
+      expect(localStorage.getItem(DISPLAY_PREFERENCES_LEGACY_KEY)).toBeNull()
     })
 
     it('多页面固定列互不干扰', () => {
@@ -156,9 +162,9 @@ describe('useDisplayPrefsStore', () => {
   })
 
   describe('localStorage 恢复', () => {
-    it('从 localStorage 恢复偏好', () => {
-      localStorage.setItem('gt_display_prefs', JSON.stringify({
-        amountUnit: 'yuan',
+    it('未分区的旧键不迁移、不读取，store 保持平台默认', () => {
+      localStorage.setItem(DISPLAY_PREFERENCES_LEGACY_KEY, JSON.stringify({
+        amountUnit: 'wan',
         fontSize: 'lg',
         density: 'comfortable',
         showZero: true,
@@ -170,11 +176,11 @@ describe('useDisplayPrefsStore', () => {
 
       const store = useDisplayPrefsStore()
       expect(store.amountUnit).toBe('yuan')
-      expect(store.fontSize).toBe('lg')
-      expect(store.density).toBe('comfortable')
-      expect(store.showZero).toBe(true)
-      expect(store.decimals).toBe(4)
-      expect(store.getFixedColumns('test-page')).toEqual(['col1'])
+      expect(store.fontSize).toBe('sm')
+      expect(store.density).toBe('default')
+      expect(store.showZero).toBe(false)
+      expect(store.decimals).toBe(2)
+      expect(store.getFixedColumns('test-page')).toEqual([])
     })
   })
 })
@@ -217,9 +223,10 @@ describe('displayPrefs 格式化统一出口', () => {
       expect(store.fmt(10000, { rawUnit: true })).toBe('10,000.00')
     })
 
-    it('rawUnit + showZero=false + 值为0 → "—"', () => {
+    it('rawUnit + showZero=false + 值为0 → "-"（与非 rawUnit、GtAmountCell 同一占位）', () => {
       const store = useDisplayPrefsStore()
-      expect(store.fmt(0, { rawUnit: true })).toBe('—')
+      expect(store.fmt(0, { rawUnit: true })).toBe('-')
+      expect(store.fmt(0)).toBe('-')
     })
   })
 

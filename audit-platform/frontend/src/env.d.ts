@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 
+declare global {
+  /** 仅候选验证构建由 vite.config.ts 注入；main.ts 先用 typeof 判定再读取。 */
+  const __GT_CANDIDATE_TREE_EXPECTED__: string
+  const __GT_CANDIDATE_TREE_ACTUAL__: string
+}
+
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
   readonly VITE_DEV_PORT?: string

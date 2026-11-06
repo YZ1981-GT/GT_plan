@@ -739,6 +739,12 @@ class ExportTask(Base):
         nullable=False,
     )
     document_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    # V265：正式导出请求只写复数字段；旧单数字段仅供历史任务回读兼容。
+    export_year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    document_types: Mapped[list[str]] = mapped_column(
+        sa.JSON().with_variant(JSONB, "postgresql"), nullable=False, default=list, server_default=text("'[]'")
+    )
+    unit_policy_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[ExportTaskStatus] = mapped_column(
         sa.Enum(ExportTaskStatus, name="export_task_status", create_type=False),
         server_default=text("'queued'"),

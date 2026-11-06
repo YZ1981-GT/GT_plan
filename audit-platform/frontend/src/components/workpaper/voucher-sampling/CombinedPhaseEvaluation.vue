@@ -20,33 +20,33 @@
           <span class="cpe-value" data-testid="combined-interim">{{ interimText }}</span>
         </div>
         <div class="cpe-item">
-          <span class="cpe-label">年审推断错报 / 错报上限</span>
-          <span class="cpe-value">{{ c.finalProjected }} / {{ c.finalUpperLimit }} 元</span>
+          <span class="cpe-label">年审推断错报 / 错报上限（{{ unitLabel }}）</span>
+          <span class="cpe-value"><GtAmountCell :value="c.finalProjected" /> / <GtAmountCell :value="c.finalUpperLimit" /></span>
         </div>
         <div class="cpe-item">
-          <span class="cpe-label">全年推断错报</span>
-          <span class="cpe-value" data-testid="combined-projected">{{ c.projected }} 元</span>
+          <span class="cpe-label">全年推断错报（{{ unitLabel }}）</span>
+          <GtAmountCell class="cpe-value" data-testid="combined-projected" :value="c.projected" />
         </div>
         <div class="cpe-item">
-          <span class="cpe-label">全年错报上限</span>
-          <span class="cpe-value cpe-value--emphasis" data-testid="combined-upper">{{ c.upperLimit }} 元</span>
+          <span class="cpe-label">全年错报上限（{{ unitLabel }}）</span>
+          <GtAmountCell class="cpe-value cpe-value--emphasis" data-testid="combined-upper" :value="c.upperLimit" />
         </div>
       </div>
       <el-table v-if="view.interim.length" :data="view.interim" size="small" border class="cpe-table">
         <el-table-column label="预审批次" width="110">
           <template #default="{ row }">第 {{ row.seq }} 个</template>
         </el-table-column>
-        <!-- 固定按元显示：与上方分量、抽样评价卡片的「元」一致，不随全局万元偏好换算 -->
+        <!-- 金额展示只走账号 effective unit；表头随之显示，不能用组件级 unit 覆盖制造第二单位。 -->
         <template v-if="view.mode === 'remaining'">
-          <el-table-column label="推断错报（元）" align="right">
-            <template #default="{ row }"><GtAmountCell :value="row.projected" unit="yuan" /></template>
+          <el-table-column :label="`推断错报（${unitLabel}）`" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.projected" /></template>
           </el-table-column>
-          <el-table-column label="错报上限（元）" align="right">
-            <template #default="{ row }"><GtAmountCell :value="row.upperLimit" unit="yuan" /></template>
+          <el-table-column :label="`错报上限（${unitLabel}）`" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.upperLimit" /></template>
           </el-table-column>
         </template>
-        <el-table-column v-else label="样本实际错报合计（元）" align="right">
-          <template #default="{ row }"><GtAmountCell :value="row.sampleErrorTotal" unit="yuan" /></template>
+        <el-table-column v-else :label="`样本实际错报合计（${unitLabel}）`" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.sampleErrorTotal" /></template>
         </el-table-column>
       </el-table>
       <el-alert
@@ -78,6 +78,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { FINAL_POPULATION_MODE_LABELS } from '../composables/useFinalPopulationMode'
 import { loadPhaseEvaluation, type PhaseEvaluationView } from '../composables/samplingPhaseEvaluation'
 
@@ -93,6 +94,8 @@ const props = defineProps<{
 }>()
 
 const view = ref<PhaseEvaluationView | null>(null)
+const displayPrefs = useDisplayPrefsStore()
+const unitLabel = computed(() => displayPrefs.unitSuffix)
 const loadFailed = ref(false)
 let latest = 0
 

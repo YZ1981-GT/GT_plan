@@ -58,7 +58,8 @@ def _call_lines(node: ast.AST, name: str) -> list[int]:
     ("app/services/project_subsidiary_attachment_service.py", "attach_subsidiaries", "apply_group_values"),
     ("app/routers/project_wizard.py", "delete_project", "soft_delete"),
     ("app/routers/project_wizard.py", "batch_delete_projects", "soft_delete"),
-    ("app/routers/project_config.py", "update_project_config", "flush"),
+    # 项目配置的读写自 platform-global-display-settings-closure 起收进 ProjectConfigService（路由只管提交）
+    ("app/services/project_config_service.py", "update_config", "flush"),
     ("app/services/standard_unification_service.py", "set_standard", "_read_standard"),
 ])
 def test_topology_writers_lock_before_sensitive_work(relative: str, symbol: str, first_sensitive: str):
@@ -78,7 +79,7 @@ def test_project_restore_locks_before_clearing_deleted_flag():
 
 def test_all_group_link_recompute_callers_are_explicitly_reviewed():
     expected = {
-        ("app/routers/project_config.py", "update_project_config"),
+        ("app/services/project_config_service.py", "update_config"),
         ("app/services/project_subsidiary_attachment_service.py", "attach_subsidiaries"),
         ("app/routers/project_wizard.py", "delete_project"),
         ("app/routers/project_wizard.py", "batch_delete_projects"),
@@ -123,7 +124,7 @@ _CALLER_LOCKED_HELPERS = {
     ("app/services/project_wizard_service.py", "_sync_basic_info_to_project"): "_sync_basic_info_to_project",
 }
 _PROJECT_TOPOLOGY_WRITERS = {
-    ("app/routers/project_config.py", "update_project_config"),
+    ("app/services/project_config_service.py", "ProjectConfigService.update_config"),
     ("app/routers/project_wizard.py", "update_parent_code"),
     ("app/services/batch_project_execution.py", "apply_validation_plan"),
     ("app/services/continuous_audit_service.py", "ContinuousAuditService.create_next_year"),
@@ -316,16 +317,25 @@ async def write(db, actor):
 
 
 def test_project_purge_rechecks_deleted_state_under_restore_lock():
+    """三个彻底删除入口都先拿恢复用的年度锁，再交统一 purge service；service 锁行后复核仍在回收站。
+
+    2026-11-01 合并 a61fa626e 曾把单条删除改回已不存在的 ``_cascade_delete_project``、批量删除改成
+    ``bulk_hard_delete`` 直删项目行 —— 写入方必须是 purge service，名字写死在这里。
+    """
     source = (ROOT / "app/routers/recycle_bin.py").read_text(encoding="utf-8")
     _hits, calls = _scan_source(source, "app/routers/recycle_bin.py")
     for owner, writer in (
-        ("permanently_delete", "_cascade_delete_project"),
-        ("batch_permanently_delete", "bulk_hard_delete"),
-        ("empty_recycle_bin", "_cascade_delete_project"),
+        ("permanently_delete", "_purge_project_in_current_transaction"),
+        ("batch_permanently_delete", "_batch_purge_projects"),
+        ("empty_recycle_bin", "_batch_purge_projects"),
     ):
         site_calls = calls[("app/routers/recycle_bin.py", owner)]
         locks = [line for name, line in site_calls if name == "_lock_deleted_projects_for_purge"]
         writes = [line for name, line in site_calls if name == writer]
         assert locks and writes and min(locks) < min(writes), owner
-    cascade = source.split("async def _cascade_delete_project(", 1)[1].split("\nasync def ", 1)[0]
-    assert "DELETE FROM projects WHERE id = $1::uuid AND is_deleted = true" in cascade
+    called = {name for site in calls.values() for name, _line in site}
+    assert "_cascade_delete_project" not in called  # 按 AST 调用判，注释里提到旧名不算
+    purge = (ROOT / "app/services/project_purge_service.py").read_text(encoding="utf-8")
+    lock_project = re.split(r"\n    (?:@|async def |def )", purge.split("async def _lock_project(", 1)[1], maxsplit=1)[0]
+    assert "with_for_update()" in lock_project
+    assert "project.is_deleted is not True" in lock_project

@@ -101,8 +101,9 @@ export function relayoutAllElTables(): number {
 export function useGlobalTableLayout(): void {
   const displayPrefs = useDisplayPrefsStore()
 
+  // 字号与密度都会改变单元格尺寸（根变量由显示偏好运行时写入），两者变化后都要重排已挂载的表
   watch(
-    () => displayPrefs.fontSize,
+    [() => displayPrefs.fontSize, () => displayPrefs.density],
     () => {
       nextTick(() => {
         relayoutAllElTables()

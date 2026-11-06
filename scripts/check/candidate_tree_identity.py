@@ -35,7 +35,7 @@ def _repo_root() -> Path:
     """返回 git 仓库根目录（绝对路径）。"""
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
     )
     return Path(result.stdout.strip())
 

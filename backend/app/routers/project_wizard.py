@@ -59,6 +59,7 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         scenario=classification.scenario,
         project_classification=classification.as_dict(),
         report_scope=project.report_scope,
+        amount_unit=project.amount_unit,
         parent_company_name=project.parent_company_name,
         parent_company_code=project.parent_company_code,
         relation_to_parent=project.relation_to_parent,

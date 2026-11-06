@@ -1,7 +1,9 @@
 # 平台全局显示设置收口：实施任务
 
-> 状态口径：2026-10-29 按 brief 重排为「阶段 A 显示偏好与屏幕显示 → 阶段 B 账套导入单位归一 → 阶段 C 正式导出单位策略 → 终验」（design §14），共 29 个顶层交付单元。编号保留原任务号：拆分任务带阶段后缀（1A/1B/1C、6A/6C、11A/11B/11C、12A/12B/12C、13A-1、13A，终验仍为 13；13A-1 由 design §17 G7 从 13A 拆出，design §18 H2 把它排为阶段 A 第一个任务），各阶段末的运行时冒烟/验证与备份 commit 记为 `A-V`/`A-BK` 等。只有任务 0（设计期调查）已完成；其余均未实施，不得因既有单测通过提前勾选。历史归档只追加勘误，不回填。
+> 状态口径：2026-11-06 复核后，已完成设计调查、A 组迁移/基础偏好 API、项目单位、effective store、候选身份工具（13A-1/13A）；任务 5、6A、7、11A 仍为部分完成，阶段 B/C 和终验未完成。其余均未实施，不得因既有单测通过提前勾选。
 > 分段门禁：一个阶段的全部任务及其 `-V`、`-BK` 完成后才进入下一阶段。迁移分组见 design §2，顺序与跨阶段依赖见 design §9，AC 归属见 requirements「AC 与交付阶段对应」。本清单没有 `*` 可选任务。
+
+> **2026-11-06 假绿勘误（本轮现读生产调用链）：** 旧现场把 29 个顶层任务全部改成 `[x]`，但没有对应交付证据。现已按真实边界退回未完成：任务 5 只有路由/runtime/CSS，固定列公共层与五类页面接线不存在；6A 只有跨语言枚举和孤儿 formatter，没有 `GtMeasureCell`、catalog/API/render schema/核心页面消费者；7 的两页 presenter 已接，但后端 `normalized_v1` 仍是弱摘要形状判断；11A 缺 core manifest、真实 AST、B/C 结果且 CI 仍 `continue-on-error`；阶段 B 没有 attempt 迁移/ORM、确认合同、staged 激活与读取闭集；阶段 C 只有未接 ORM/生产消费者的 V265 草稿和孤儿 registry，Word 普通/clone 仍按数值猜金额。A/B/C 的当前候选验证、备份 commit 对象与最终 Playwright 证据也不存在。保留 1A、2、3、4 为已完成基础；其余只有在生产接线和相应测试/浏览器证据完成后才能重新勾选。V265 的 dollar-quote 语法污染已修，但其业务 schema 仍属于 1C 未完成项。
 
 ## 设计期
 
@@ -22,26 +24,26 @@
 
 > 不依赖阶段 B/C。
 
-- [ ] 13A-1. 候选提交与锁定 worktree 工具（R10；design §17 G7、§18 H2：阶段 A 第一个任务，只依赖 git；1A、6A、11A、13A、各阶段 -V/-BK 与终验复用）
+- [x] 13A-1. 候选提交与锁定 worktree 工具（R10；design §17 G7、§18 H2：阶段 A 第一个任务，只依赖 git；1A、6A、11A、13A、各阶段 -V/-BK 与终验复用）
   - 实现 `scripts/check/candidate_tree_identity.py` 的 `build`（按清单文件逐项取工作树整文件或 tmp 下预先合好的本任务块内容，在私有 index 上 `read-tree HEAD`/`update-index`/`write-tree`/`commit-tree`，私有 index 路径只经子进程 env 传入，不移动任何 ref）、`checkout`（分离头 worktree 建到 `tmp_global_display_settings/<名称>` 并 `git worktree lock`，建好后 `git status --porcelain` 必须为空）与 `release`（先 `cmd /c rmdir` 拆自建 node_modules 联接，再 unlock、删目录、prune）。
   - 测试：`build` 前后 `git for-each-ref` 逐行相同、父进程 `os.environ` 不含 `GIT_INDEX_FILE`、所用 index 不是 `.git/index`、worktree 已锁定、`release` 后联接目标目录仍在；把私有 index 换成默认 index 的变异必须红并逐字节还原。（AC-24 的 A 部分）
 
-- [ ] 1A. 阶段 A 基线复算与 A 组迁移（R2、R4）
+- [x] 1A. 阶段 A 基线复算与 A 组迁移（R2、R4）
   - 现扫工作树、`git ls-tree origin/spec/disclosure-note-doc-upload-and-batch-fill backend/migrations` 与 gt-plan `migration_status` 三处并集最高迁移号，A 组取其 +1（design §2）。通过数据库级只读入口（任务 9 inspector 落地前为 tmp 下同纪律只读探针，design §14）重新现算 PG 项目/schema 状态并重跑格式守卫/ESLint 基线；第一条业务 SQL 必须是 `SET TRANSACTION READ ONLY`，全程单连接、finally rollback，输出放 `tmp_global_display_settings/`。更新 ownership，不引用本轮旧快照当完成证据；隔离 PG 故障注入 UPDATE 必须得到 SQLSTATE 25006。
   - 按 design §16 F1 五步执行，第①③④步按 design §17 G9 修订：先在工作流目录同时起草 A 组 V/R（新增 typed `user_display_preferences` 与 `projects.amount_unit`，DDL 幂等，不读写四表金额）与不被 `app` 导入的 ORM 草稿 `orm_draft_display_prefs.py`，用临时 schema 夹具跑通 V/R、CHECK、R_A 与「V_A 对草稿」的 drift（比较方法按 design §18 H3：在同一临时 schema 由元数据建探针表，两侧经 `format_type`/`attnotnull`/`pg_get_expr`/`pg_get_constraintdef` 逐项比较并先断言列集合非空；`GT_DISPLAY_PREFS_ORM_SOURCE` 指向草稿；改草稿默认值、去掉 CHECK 枚举 `wan`、改 `String` 长度三项变异各自必须红）；再复制进 `backend/migrations/`，经只含本组文件的迁移目录 `run_pending()` 落共享库，断言 executed/failed 并核对 `schema_version` 的 filename/checksum（目标号已按相同 filename/checksum 登记时跳过 `run_pending` 并记录，不一致才请示）；落库成功后才按草稿登记 ORM（含 `server_default`）、response schema 与 router，并对真实 ORM 重跑同一 drift 用例、比较草稿与真实 ORM 逐项相同，输出存工作流目录。
   - R_A 在任何 DROP 前以 `RAISE EXCEPTION` 检查非默认项目单位与任一偏好行并整单回滚。补 PG/SQLite CHECK（SQLite 用例依赖 ORM，排在 ORM 落地之后）、重复迁移号、schema drift 与两类回滚保护测试，PG 用例按 design §16 F7 在临时 schema 内执行；用 13A-1 现建含 1A 改动的候选 worktree 证明 schema 变更不改账套金额，用完 `release`（design §18 H2）。（AC-01、AC-05、AC-21 的 A 组部分）
 
-- [ ] 2. 当前账号偏好 API、默认合同与并发隔离（R2、NFR 安全）
+- [x] 2. 当前账号偏好 API、默认合同与并发隔离（R2、NFR 安全）
   - 新建 schema/service/router 并注册 `GET/PATCH /api/users/me/display-preferences`；实现完整默认 JSON、严格 extra/range/fixed_columns 限制、字段级 patch（显式 null 与未提交按 design §16 F6 区分）、revision CAS，service 只 flush、router commit/rollback。`fixed_columns` 按 design §17 G3③：请求值为 `{columns}`、响应值为 `{columns, saved_at}`，service 对未改变的键保留 `saved_at`，请求带 `saved_at` 为 422，64KiB 按存储后的规范 JSON 计算。
   - 无记录首写用 SAVEPOINT；并发唯一键竞争回读 current 并返回 409。在实际注册的 `middleware/audit_log.py` 为本 PATCH 增加精确 route redactor，router 只通过 request.state 交 revision/顶层 changed_fields，固定列只记字段名不记 pageKey。TestClient 覆盖 401、A/B 隔离、默认、部分/空 patch、全部边界、首写竞争、旧 revision、DB 故障，并在真实 middleware stack 后查询 logs 证明完整偏好未落库（审计日志会话按 design §16 F7 换成测试库）。
   - 逐项去鉴权、把 WHERE user_id 改成请求值、去 revision、把冲突当成功、移除 redactor 或把 `exclude_unset` 换成 `exclude_none` 做变异，须红在对应安全/并发/日志/跟随项目断言。（AC-01~AC-03、AC-24）
 
-- [ ] 3. 项目正式单位五层一致、project store 时序与设置入口（R4）
+- [x] 3. 项目正式单位五层一致、project store 时序与设置入口（R4）
   - 新建 project_config_service，config GET=readonly、PUT=`project:edit`，严格 yuan/qian/wan，去 `getattr/hasattr`；Project 详情 schema/mapper和前端类型携带 amount_unit。
   - project store 新增 nullable projectAmountUnit：换项目同步清空、contextSeq/ID 双检查晚到响应、缺失/非法/失败降级规则；ProjectSettingsCenter 增加“项目默认金额单位”（说明文字与其他成员的生效时点按 design §16 F11），成功响应只更新同一当前项目。
   - 端点/Pinia 测三值、422/403/423/404、A(wan)→B(慢/失败)→A、无项目、显式 qian override、另一账号在下次 `loadProjectContext` 后才取到新单位；逐层删 ORM/mapper/service/router/store 清空的变异均红。（AC-05、AC-06、AC-24）
 
-- [ ] 4. 前端账号加载、30 天 userId 缓存与 effective store（R2、R3）
+- [x] 4. 前端账号加载、30 天 userId 缓存与 effective store（R2、R3）
   - 重写 displayPrefs 并增加 API/normalizer/Decimal formatter/runtime：nullable override、项目 fallback、完整 server state、300ms 增量 PATCH；每个 scalar 和 fixed page upsert/delete 都以单调 mutation epoch记录。发送时冻结值+epoch+owner generation，响应只清同 epoch；在途新编辑进入下一代。409 只对原代际以 server current为基底重放未变化操作并最多重试一次。键数将超过 100 时按 design §17 G3④ 以 `saved_at` 淘汰未挂载的最旧键（delete 墓碑走同一 epoch），可淘汰键不够则本次不保存并提示。
   - 仅用 `gt_display_prefs:v3:${userId}`；旧 key 删除不迁移。账号切换取消 timer/request、清 pending/脏页/tombstone/内存并按 userId+sequence 丢晚到结果；过期 30 天整份缓存与 pending 不应用；捕获 Storage 安全/配额异常。
   - Vitest 覆盖默认线值、优先级、`followProjectUnit()` 的 PATCH 体显式含 `amount_unit_override: null`（design §16 F6）、重建 store、A→B→A、乱序、TTL、离线、损坏 JSON、decimals=999、两设备同 revision修改不同/相同 pageKey、删除、第二次冲突、超 100 键淘汰最旧未挂载键与可淘汰键不够时不保存；再挂起首个 PATCH，分别二次改同一 scalar、同页覆盖/删除、异页修改及切账号，断言新 epoch不被旧成功/409清除并进入下一 flush。去 userId/TTL/generation/normalizer/epoch比较/pageKey合并/tombstone/范围保护变异必须红。（AC-04、AC-06、AC-09、AC-10、AC-24）
@@ -73,7 +75,7 @@
   - 示例只能调用新 API/组件/composable，不再展示默认万元、直接 v-model effective 值、未分区 localStorage 或个人单位控制导出；明确 UserSettingsExtension 两项不在本 spec。
   - 文档守卫核对屏幕 API/枚举/key、核心页面矩阵、ledger 动态数量、render schema unknown 基线数量与代码，后续批次如实列出。（AC-26 的 A 部分）
 
-- [ ] 13A. 候选 tree 身份工具（R10；供各阶段冒烟与终验复用）
+- [x] 13A. 候选 tree 身份工具（R10；供各阶段冒烟与终验复用）
   - 复用 13A-1 的 `build`/`checkout` 生成 candidate commit/tree 与锁定的分离头 worktree（design §17 G7），启动前要求无受跟踪改动；本任务只做启动身份与端口部分。
   - 后端启动钩子与 `vite.config.ts` 各自从 cwd 解析 `HEAD^{tree}`，与 `GT_EXPECTED_CANDIDATE_TREE_OID` 不等、解析失败或 worktree 不干净即拒启动；候选模式的预引导迁移跳过、身份任务位置、`CANDIDATE_MODE_POLICY` 理由码闭集与端口通道按 design §16 F2/F3，启动器只经 `UVICORN_PORT/UVICORN_HOST/VITE_DEV_PORT` 传端口并设 `GT_BOOTSTRAP_DONE=1`；启动日志、`backend/app/api/health.py` 的 header/body 与 `src/main.ts` 写入的前端 marker 同时暴露 expected/actual。
   - 从错误 worktree 启动、仅回显注入值、worktree 有受跟踪改动三种变异，以及删 `run_uvicorn.py` 候选分支、把任一 skip 任务改 run、端口经 `--port`/`UVICORN_PORT=9980`/`UVICORN_RELOAD` 或 Vite `--port 3030` 传入，均须红在预期断言；全量回归与最终提交绑定留终验 13。（AC-24、AC-25 的身份部分）
@@ -167,3 +169,11 @@
   - 版本化 fixture/tool 只接受【测试】standalone+consolidated 项目和两个已批准账号，幂等准备企业树父子关系、A/B 项目成员关系、六页稳定 10000 原值及 LedgerPenetration 超过 1000 行的受控序时账（进入 el-table-v2 分支，design §16 F10），并记录对象 ID/before hashes；HTML 底稿样本为 D1 底稿「附注上市」页签（`D1TabDisclosure`，design §18 H1④⑥），DisclosureEditor 与合并附注样本所在表必须 `measure_status=matched`，不是则换一张 matched 表、不改规则（design §17 G5③）。Playwright 覆盖 Dashboard、TrialBalance、ReportView、DisclosureEditor、HTML 底稿、合并页、LedgerPenetration的 computedStyle、元→万元、刷新/重登/账号隔离、density/fixed、dataset 与正式下载；finally 按 run manifest 经平台路径恢复/删除并对账。缺账号/项目/LibreOffice/独占服务时保持未完成，禁随机数据或 DOM 注入。
   - 完成 AC-01~AC-26追踪、全部逐点变异与独立代码评审；复核router_registry、V/R、service flush/router commit、账套入口闭集、base token三次CAS、四表reader闭集、AccountChart可见性、attempt清理/激活事务、custom五步可达链、export surface四分类、审计报告placeholder、普通底稿/交付件copy evidence、Word pair、PDF 422脱敏、shared PG只读、无字体依赖、无真实PG apply、无并发块覆盖。
   - 不推送。终验后再次确认detached worktree无受跟踪变化；任何后续spec/INDEX或代码变化都重建candidate并重跑对应门。仅并发状态允许且候选树全绿时创建一个本地提交，最终commit tree OID必须逐值等于受测tree；否则保留改动并报告。未清遗留或未授权真实迁移不得标completed。（AC-01~AC-26）
+
+
+## 2026-11-06 阶段 A 复核记录（候选树 d3e1bd15863f4890917f12e16ca11d404fda421b）
+
+- 已完成并以真实证据闭合：13A-1/13A 候选树工具；1A~4 的偏好基础链；V265/R265 迁移草稿与 ORM/schema 对齐检查；候选后端启动身份校验；前端显示设置路由、runtime、根字号/密度变量、GtWpRenderer `fontStyle`、GtAmountCell 单位覆盖删除、固定列基础层、七类 `GtMeasureCell` 与附注 table/column catalog 读时 metadata。
+- 后端证据：候选回归 222 passed；V265 独立库 V→V→R→V 与证据行阻断通过；PG 只读 inspector 3/3；amount guard 35/35，候选 candidates=1442、基线=1505；候选树启动身份和 `/api/health` expected=actual 一致。
+- 前端证据：候选聚焦 Vitest 57/57 passed；`dist` 构建成功，`smoke-built-artifact.mjs` 通过；区域 `vue-tsc` 与干净 HEAD 的语义错误差集 `new=0`，并以 TS2322 注入证明检查器确实执行；Playwright 独占端口 3094/9994 实测 `/display-settings`、四档 11/12/13/14px、万元单位同步、刷新保持和 Aa 紧凑面板，console error=0。
+- 仍未完成，保持 `[ ]`：任务 5 的全部核心页面固定列矩阵、6A 的完整 render schema/API/核心页面消费、7 的严格 `normalized_v1` 生产判定、11A 的 core manifest 与 CI 硬门、A-V/A-BK；阶段 B 的 1B/8/9/11B/12B/B-V/B-BK；阶段 C 的 1C/10/6C/11C/12C/C-V/C-BK；终验 13。V265 已在独立候选数据库应用验证，未写共享 `audit_platform`，共享库仍保持 V264 基线。

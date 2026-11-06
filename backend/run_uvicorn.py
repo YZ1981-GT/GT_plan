@@ -35,9 +35,20 @@ def _bootstrap_before_uvicorn() -> None:
     Windows 下 uvicorn 的 lifespan 运行在嵌套 greenlet 上下文中，
     SQLAlchemy async 引擎 ``connect()`` 会触发 maximum recursion depth exceeded。
     在独立 ``asyncio.run()`` 中先完成迁移，lifespan 内跳过重复执行。
+
+    Candidate mode (GT_EXPECTED_CANDIDATE_TREE_OID set):
+      - The launcher must already set GT_BOOTSTRAP_DONE=1; otherwise exit 2 before migration.
+      - Skip pre-bootstrap migration entirely.
+      - Port is taken from UVICORN_PORT/UVICORN_HOST (not --port).
     """
     if os.environ.get("GT_BOOTSTRAP_DONE") == "1":
         return
+
+    # 候选模式：启动器必须先显式设置 GT_BOOTSTRAP_DONE=1；否则拒绝启动，而不是在这里补写。
+    # 这样从错误 worktree / 错误启动脚本拉起候选实例，也不会先跑迁移或偷偷绕过启动协议。
+    if os.environ.get("GT_EXPECTED_CANDIDATE_TREE_OID"):
+        print("候选模式要求启动器预先设置 GT_BOOTSTRAP_DONE=1，启动期不得执行迁移", file=sys.stderr)
+        raise SystemExit(2)
 
     async def _run() -> None:
         import logging

@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
+import { execFileSync } from 'node:child_process'
+import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -40,8 +41,65 @@ export function heavyFeatureChunk(id: string): string | undefined {
   return undefined
 }
 
+export interface CandidateFrontendIdentity {
+  expected: string
+  actual: string
+}
+
+const TREE_OID = /^[0-9a-f]{40}$/
+
+/** 候选模式只在 defineConfig 回调内读 git；普通开发模式不调用 git。 */
+export function resolveCandidateFrontendIdentity(
+  env: Record<string, string | undefined> = process.env,
+  argv: string[] = process.argv.slice(2),
+  cwd = process.cwd(),
+): CandidateFrontendIdentity | null {
+  const expected = env.GT_EXPECTED_CANDIDATE_TREE_OID
+  if (!expected) return null
+  if (!TREE_OID.test(expected)) throw new Error('GT_EXPECTED_CANDIDATE_TREE_OID 必须是 40 位小写十六进制')
+  const devPort = Number(env.VITE_DEV_PORT)
+  if (!Number.isInteger(devPort) || devPort <= 0 || devPort === 3030) {
+    throw new Error('候选前端要求 VITE_DEV_PORT 为非 3030 的有效端口')
+  }
+  const apiBase = env.VITE_API_BASE_URL
+  if (!apiBase) throw new Error('候选前端要求显式设置 VITE_API_BASE_URL')
+  let apiPort: string
+  try {
+    const parsed = new URL(apiBase)
+    apiPort = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
+  } catch {
+    throw new Error('候选前端的 VITE_API_BASE_URL 不是有效 URL')
+  }
+  if (apiPort === '9980') throw new Error('候选前端不得代理到共享后端 9980')
+  const forbidden = argv.map((arg) => arg.split('=', 1)[0]).filter((arg) => arg === '--port' || arg === '--host')
+  if (forbidden.length) throw new Error(`候选前端端口/地址只经环境变量传入，不允许参数：${[...new Set(forbidden)].join('、')}`)
+  const actual = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd, encoding: 'utf8' }).trim()
+  if (!TREE_OID.test(actual)) throw new Error(`无法解析候选前端 HEAD^{tree}：${actual}`)
+  const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd, encoding: 'utf8' }).trim()
+  if (dirty) throw new Error(`候选前端 worktree 有受跟踪改动：\n${dirty}`)
+  if (actual !== expected) throw new Error(`候选前端树身份不符：期望 ${expected}，实际 ${actual}`)
+  return { expected, actual }
+}
+
+export function candidatePortGuard(expectedPort: number): Plugin {
+  return {
+    name: 'gt-candidate-port-guard',
+    configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const address = server.httpServer?.address()
+        const actual = typeof address === 'object' && address ? address.port : null
+        if (actual !== expectedPort || actual === 3030) {
+          console.error(`候选前端监听端口不符：期望 ${expectedPort}，实际 ${actual}`)
+          process.exit(1)
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const candidate = resolveCandidateFrontendIdentity({ ...env, ...process.env })
   // 用 127.0.0.1 而非 localhost：后端 uvicorn 仅监听 IPv4（0.0.0.0），
   // Windows 上 localhost 先解析 ::1 → 连接失败回退，每个代理请求固定 +2s
   const apiTarget = process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
@@ -75,19 +133,24 @@ export default defineConfig(({ mode }) => {
     cacheDir: '.vite',
     plugins: [
       vue(),
+      ...(candidate ? [candidatePortGuard(devPort)] : []),
       // 不在 AutoImport 中挂 ElementPlusResolver：
       // 与显式 `import { ElMessage } from 'element-plus'` 冲突时会生成不存在的 ElMessage2。
-      // ElMessage / ElMessageBox 由业务代码显式导入；样式已在 main.ts 全量引入。
+      // 候选 worktree 关闭 dts，避免开发服务器改写受跟踪的声明文件而破坏树身份。
       AutoImport({
         imports: ['vue', 'vue-router', 'pinia'],
-        dts: 'src/auto-imports.d.ts',
+        dts: candidate ? false : 'src/auto-imports.d.ts',
       }),
       Components({
         // 先于 ElementPlusResolver：第一个返回结果的解析器生效
         resolvers: [GridCellAdapterResolver(), ElementPlusResolver({ importStyle: false })],
-        dts: 'src/components.d.ts',
+        dts: candidate ? false : 'src/components.d.ts',
       }),
     ],
+    define: candidate ? {
+      __GT_CANDIDATE_TREE_EXPECTED__: JSON.stringify(candidate.expected),
+      __GT_CANDIDATE_TREE_ACTUAL__: JSON.stringify(candidate.actual),
+    } : {},
     build: {
       // manifest 是包体预算、built smoke 和 verified snapshot 的共同事实源。
       outDir,

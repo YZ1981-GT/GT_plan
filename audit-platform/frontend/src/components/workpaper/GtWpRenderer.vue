@@ -9,7 +9,13 @@
   Validates: Requirements 1.2（9 类路由分发）
 -->
 <template>
-  <div class="gt-wp-renderer" :class="{ 'gt-wp-renderer--fullscreen': isWpFullscreen }" ref="containerRef">
+  <!-- :style 绑的是解构出来的 fontStyle：模板只自动解包顶层 ref，写 runtime.fontStyle 会把 ComputedRef 本身当样式对象 -->
+  <div
+    class="gt-wp-renderer"
+    :class="{ 'gt-wp-renderer--fullscreen': isWpFullscreen }"
+    :style="fontStyle"
+    ref="containerRef"
+  >
     <!-- Loading overlay -->
     <GtLoadingOverlay
       :visible="loading"
@@ -939,6 +945,9 @@ const runtime = useWorkpaperScaffold({
   contextReady: runtimeContextReady,
   applicableStandards: runtimeApplicableStandards,
 })
+
+// 账号表格字号：底稿正文统一由根元素的 --wp-font-size 承载（spec platform-global-display-settings-closure 任务 5 / A7①）
+const { fontStyle } = runtime
 
 // 外层编辑器的版本按钮委托给 Runtime Boundary，避免同一 HTML 底稿挂载第二个版本 Host。
 // renderConfig / loading 给外壳侧栏 decision_trace 与编制说明闸门读（外壳不再自带一份 render-config，spec platform-perf-hotspots R4）。

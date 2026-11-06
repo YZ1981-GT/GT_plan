@@ -12,7 +12,7 @@
         :template-options="deTemplateOptions"
         :badges="[
           { value: noteList.length + ' 个章节' },
-          { label: '金额单位', value: noteUnitSuffix },
+          { label: '金额单位', value: displayPrefs.unitSuffix },
         ]"
         @unit-change="onProjectChange"
         @year-change="(v: number) => { selectedYear = v; onYearChange(v) }"
@@ -82,18 +82,6 @@
               <!-- 公式管理 -->
               <el-tooltip content="配置附注取数公式规则" placement="bottom" :show-after="400">
                 <el-button size="small" @click="showNoteFormulaManager = true">⚙️ 公式管理</el-button>
-              </el-tooltip>
-              <!-- 金额单位（附注模块级，默认元） -->
-              <el-tooltip content="附注金额展示单位（默认元，仅影响附注模块）" placement="bottom" :show-after="400">
-                <el-select
-                  :model-value="noteUnit"
-                  size="small"
-                  style="width: 96px"
-                  aria-label="附注金额单位"
-                  @change="onNoteUnitChange"
-                >
-                  <el-option v-for="opt in displayPrefs.unitOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-                </el-select>
               </el-tooltip>
               <!-- 全屏 -->
               <el-tooltip :content="deFullscreen ? '退出全屏（ESC）' : '全屏查看'" placement="bottom" :show-after="400">
@@ -547,6 +535,21 @@
               <div v-if="currentNoteTables.length === 1 && singleTableTitle" class="gt-de-single-table-title">
                 {{ singleTableTitle }}
               </div>
+              <div class="gt-de-table-display-settings">
+                <GtTableDisplaySettings
+                  :page-key="disclosureFixedPageKey"
+                  :columns="disclosureFixedColumns"
+                  :mandatory-keys="disclosureMandatoryKeys"
+                  :disabled="activeTableData?.measure_status !== 'matched'"
+                  @change="onDisclosureFixedColumnsChange"
+                />
+              </div>
+              <el-alert
+                v-if="activeTableData?.measure_status && activeTableData.measure_status !== 'matched'"
+                type="warning" :closable="false" show-icon
+                title="当前表格的列语义尚未登记，数值按元口径原样显示，固定列暂不可用"
+                class="gt-de-measure-warning"
+              />
               <el-table ref="deTableRef" v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
                 border size="small" class="gt-de-note-table gt-compact-table" style="margin-bottom: 12px"
                 :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -559,7 +562,13 @@
                 <!-- 序号列：显式标记 auto_index 或表名含"前五名/前十名"时自动显示 -->
                 <el-table-column v-if="showAutoIndex" label="序号" type="index" width="50" align="center" />
                 <!-- ━━━ 列树（任意层表头；单元格模板只此一份，spec note-pull-header-formula-closure R4） ━━━ -->
-                <NoteTableColumnNode v-for="(node, ni) in activeTableColumns" :key="`${activeTableTab}-${ni}-${node.label}`" :node="node">
+                <NoteTableColumnNode
+                  v-for="(node, ni) in activeTableColumns"
+                  :key="`${activeTableTab}-${ni}-${node.label}`"
+                  :node="node"
+                  :column-key-for="disclosureColumnKey"
+                  :fixed-for="disclosureFixedFor"
+                >
                   <template #cell="{ row, $index, headerIdx, label }">
                     <template v-if="headerIdx === 0">
                       <GtGridCell
@@ -594,19 +603,34 @@
                         <GtGridCell
                           :editable="editMode && !row.is_total"
                           :value="getCellValue(row, headerIdx - 1)"
-                          kind="number"
+                          :kind="disclosureMeasureKind(headerIdx) === 'text' ? 'text' : 'number'"
                         >
                           <template #display>
                             <span v-if="editMode && !row.is_total" class="gt-cell-editable"
                               :aria-label="`${label || '列'} 行${$index + 1}：${getCellValue(row, headerIdx - 1) ?? '空'}`">
-                              <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
+                              <GtMeasureCell
+                                :value="getCellValue(row, headerIdx - 1)"
+                                :kind="disclosureMeasureKind(headerIdx)"
+                                :ratio-scale="disclosureRatioScale(headerIdx)"
+                              />
                             </span>
                             <span v-else :class="['gt-amt', { 'total-val': row.is_total, 'gt-formula-mismatch': row.is_total && isFormulaMismatch(row, headerIdx - 1) }]">
-                              <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
+                              <GtMeasureCell
+                                :value="getCellValue(row, headerIdx - 1)"
+                                :kind="disclosureMeasureKind(headerIdx)"
+                                :ratio-scale="disclosureRatioScale(headerIdx)"
+                              />
                             </span>
                           </template>
+                          <ElInput
+                            v-if="disclosureMeasureKind(headerIdx) === 'text'"
+                            :model-value="String(getCellValue(row, headerIdx - 1) ?? '')"
+                            size="small" style="width: 100%; height: 22px"
+                            :aria-label="`${label || '列'} 行${$index + 1} 编辑`"
+                            @change="onCellTextChange($index, headerIdx - 1, $event)"
+                          />
                           <ElInputNumber
-                            :model-value="getCellValue(row, headerIdx - 1)" :controls="false" :precision="2"
+                            v-else :controls="false" :precision="2"
                             size="small" style="width: 100%; height: 22px"
                             :aria-label="`${label || '列'} 行${$index + 1} 编辑`"
                             @change="onCellValueChange($index, headerIdx - 1, $event)" />
@@ -1245,7 +1269,9 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
-import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtMeasureCell from '@/components/common/GtMeasureCell.vue'
+import GtTableDisplaySettings from '@/components/common/GtTableDisplaySettings.vue'
+import { useNoteTableMeasureDisplay } from '@/views/composables/useNoteTableMeasureDisplay'
 import GtGridCell from '@/components/grid/GtGridCell.vue'
 import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
@@ -1266,7 +1292,7 @@ import { resolveActiveTableGuidance, isGuidanceVisible, guidanceDismissKey } fro
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
-import { fmtAmount, unitLabel, type AmountUnit } from '@/utils/formatters'
+import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
@@ -1277,7 +1303,13 @@ import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
-import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/views/composables/disclosureEmptyTable'
+import {
+  getSingleTableTitle,
+  shouldShowTableAutoIndex,
+  getTableTabFullName,
+  getTableTabLabel,
+  isDisclosureTableEmpty,
+} from '@/views/composables/disclosureTableLabels'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { DisclosureNoteContentTools, NoteSourceBadge } from '@/components/disclosure/noteContentTools'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
@@ -2010,8 +2042,20 @@ async function goAdoptSection(row: AiTaskItem) {
 
 // ─── 多表投影 + 两级分组表头（useNoteTableProjection composable）───────────
 import { useNoteTableProjection } from '@/views/composables/useNoteTableProjection'
+const deTableRef = ref<any>(null)
 const { activeTableTab, currentNoteTables, activeTableData, activeTableColumns, resolveProjectedTableIndex } =
   useNoteTableProjection({ currentNote, projectSubTablesClient, deriveLegacyTableHeaders })
+
+const {
+  measureKind: disclosureMeasureKind,
+  ratioScale: disclosureRatioScale,
+  columnKey: disclosureColumnKey,
+  fixedPageKey: disclosureFixedPageKey,
+  fixedColumns: disclosureFixedColumns,
+  mandatoryKeys: disclosureMandatoryKeys,
+  fixedFor: disclosureFixedFor,
+  onFixedColumnsChange: onDisclosureFixedColumnsChange,
+} = useNoteTableMeasureDisplay(activeTableData, deTableRef)
 
 // 注：per-tab 说明文本框（activeTabNoteText/activeTabNoteTextEditable）已移除。
 // 底稿披露表「表格下面的文本框」经同步写入 note.text_content（_note_texts→_format_note_texts），
@@ -2110,61 +2154,14 @@ const noteTableStructure = useNoteTableStructure({
 })
 
 /** 单表场景的表名标题（表名有意义时显示，无意义则不显示） */
-const singleTableTitle = computed<string>(() => {
-  if (currentNoteTables.value.length !== 1) return ''
-  const tbl = currentNoteTables.value[0]
-  if (!tbl) return ''
-  const name = (tbl.name || '').trim()
-  if (!name) return ''
-  // 跳过与章节标题相同的表名（避免重复显示）
-  const sectionTitle = (currentNote.value?.section_title || '').trim()
-  if (name === sectionTitle) return ''
-  // 跳过无意义的表头名
-  const genericNames = new Set(['项  目', '项 目', '项目', '类  别', '类 别', '类别', '账  龄', '账 龄', '账龄', '债务人名称', '组合名称'])
-  if (genericNames.has(name)) return ''
-  return name
-})
+const singleTableTitle = computed(() =>
+  getSingleTableTitle(currentNoteTables.value, currentNote.value?.section_title || ''),
+)
 
-/** 序号列：显式 auto_index 标记或表名含"前五名/前十名"关键词时自动显示 */
-const _AUTO_INDEX_RE = /前[五十5]名|前\d+名/
-const showAutoIndex = computed<boolean>(() => {
-  const td = activeTableData.value
-  if (!td) return false
-  if (td.auto_index) return true
-  const name = (td.name || '').trim()
-  return _AUTO_INDEX_RE.test(name)
-})
-
-// 表格Tab标签：避免显示无意义的"项 目"等表头值
-const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类 别', '类别', '账  龄', '账 龄', '账龄', '债务人名称', '组合名称', ''])
-const _TABLE_SUFFIX_RE = /[（(]表\d+[）)]/
-
-/** 完整表格名称（用于 tooltip） */
-function getTableTabFullName(tbl: any, idx: number): string {
-  const name = (tbl.name || '').trim()
-  if (name && !_GENERIC_NAMES.has(name) && !_TABLE_SUFFIX_RE.test(name)) {
-    return name
-  }
-  const headers = tbl.headers || []
-  if (headers.length > 1) {
-    const h1 = String(headers[1] || '').trim()
-    if (h1 && h1.length <= 8 && !_GENERIC_NAMES.has(h1.replace(/\s+/g, ''))) return `表${idx + 1}·${h1}`
-  }
-  return `表${idx + 1}`
-}
-
-/** 截断的 Tab 标签显示文字 */
-function getTableTabLabel(tbl: any, idx: number): string {
-  const full = getTableTabFullName(tbl, idx)
-  return full.length > 14 ? full.slice(0, 14) + '…' : full
-}
-
-/** 空表判定：灰度开关关闭时恒返回 false（Property 10）。 */
-const EMPTY_TABLE_COLLAPSE_ENABLED: boolean =
-  import.meta.env.VITE_DISCLOSURE_EMPTY_TABLE_COLLAPSE !== 'false' // 默认开（开发环境可见）
+const showAutoIndex = computed(() => shouldShowTableAutoIndex(activeTableData.value))
+const EMPTY_TABLE_COLLAPSE_ENABLED = import.meta.env.VITE_DISCLOSURE_EMPTY_TABLE_COLLAPSE !== 'false'
 function isTableEmpty(tbl: any): boolean {
-  if (!EMPTY_TABLE_COLLAPSE_ENABLED) return false
-  return isEmptyTable(tbl?.rows as EmptyTableRow[], tbl?.columns as EmptyTableColumnDef[] ?? null)
+  return isDisclosureTableEmpty(tbl, EMPTY_TABLE_COLLAPSE_ENABLED)
 }
 
 /** 当前活跃表是否为空表 */
@@ -2254,6 +2251,15 @@ function onRestoreCellAuto(rowIndex: number, colIndex: number) {
   } catch (error) {
     if (error instanceof NoteTableWritebackError) ElMessage.error(error.message)
   }
+}
+
+function onCellTextChange(rowIndex: number, colIndex: number, newValue: string | null | undefined) {
+  const table = activeTableData.value
+  if (!table || !currentNote.value) return
+  markEditDirty()
+  autoSave.markDirty()
+  // text 列不参与合计 / 横向金额公式；只将本格按人工覆盖写回投影源。
+  commitProjectedCellValue(table, rowIndex, colIndex, newValue ?? '', { markManual: true })
 }
 
 function onCellValueChange(rowIndex: number, colIndex: number, newValue: number | null | undefined) {
@@ -3155,7 +3161,6 @@ async function copyNoteTable() {
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const deCtx = useCellSelection()
 const penetrate = usePenetrate()
-const deTableRef = ref<any>(null)
 deCtx.setupTableDrag(deTableRef, (rowIdx: number, colIdx: number) => {
   const tableRows = activeTableData.value?.rows || []
   const row = tableRows[rowIdx]
@@ -3168,22 +3173,7 @@ const deComments = useCellComments(() => projectId.value, () => year.value, 'dis
 
 const displayPrefs = useDisplayPrefsStore()
 
-// ─── 附注模块金额单位（模块级，默认「元」，不污染全局 displayPrefs） ──────────
-// 附注属财务报表呈现，惯例以「元」披露；用独立 localStorage 键，可在附注内切换。
-const NOTE_UNIT_STORAGE_KEY = 'gt_note_amount_unit'
-function loadNoteUnit(): AmountUnit {
-  try {
-    const raw = localStorage.getItem(NOTE_UNIT_STORAGE_KEY)
-    if (raw === 'yuan' || raw === 'wan' || raw === 'qian') return raw
-  } catch { /* ignore */ }
-  return 'yuan'
-}
-const noteUnit = ref<AmountUnit>(loadNoteUnit())
-const noteUnitSuffix = computed(() => unitLabel(noteUnit.value))
-function onNoteUnitChange(v: AmountUnit) {
-  noteUnit.value = v
-  try { localStorage.setItem(NOTE_UNIT_STORAGE_KEY, v) } catch { /* ignore */ }
-}
+// ─── 附注金额单位现在直接跟随全局 effective displayPrefs ──────────
 
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
 const deSearch = useTableSearch(

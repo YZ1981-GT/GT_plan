@@ -40,11 +40,14 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { api } from '@/services/apiProxy'
+import { useDisplayPreferencesRuntime } from '@/composables/useDisplayPreferencesRuntime'
 import LedgerPenetration from '@/views/LedgerPenetration.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
+// 独立查账窗口不经 DefaultLayout，同样要按账号加载显示偏好（design §15 A3）
+useDisplayPreferencesRuntime()
 
 const projectId = computed(() => route.params.projectId as string)
 const projectName = ref('')

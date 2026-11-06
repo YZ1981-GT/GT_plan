@@ -204,6 +204,9 @@ class WordExportTaskVersion(Base):
     #   {"diffs": [...]}          = 已比对；非空即有手工改动 → 拒绝；空数组 → 放行
     # 🔴 判据不是「非空即拒绝」——`{"diffs": []}` 非空但表示已比对且一致。
     drift_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V265：所有正式附注文件版本保存可重算的单位策略 pair；两列必须同时空或同时非空。
+    unit_policy_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    unit_policy_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         Index(

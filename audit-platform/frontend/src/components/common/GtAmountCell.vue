@@ -29,7 +29,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import type { CellComment } from '@/composables/useCellComments'
 import { toDecimal } from '@/utils/decimal'
-import { AMOUNT_UNITS, type AmountUnit } from '@/utils/formatters'
+import { AMOUNT_UNITS } from '@/utils/formatters'
 
 const props = withDefaults(
   defineProps<{
@@ -41,17 +41,11 @@ const props = withDefaults(
     comment?: CellComment | null
     /** 上期金额（用于变动高亮对比） */
     priorValue?: number | string | null
-    /**
-     * 模块级单位覆盖（传入则忽略全局 displayPrefs.amountUnit，不污染全局偏好）。
-     * 用于附注等以「元」为惯例的财务报表呈现场景。
-     */
-    unit?: AmountUnit
   }>(),
   {
     clickable: false,
     comment: undefined,
     priorValue: undefined,
-    unit: undefined,
   },
 )
 
@@ -100,7 +94,7 @@ const formattedDisplay = computed<string>(() => {
   if (d === null) return '-'
   if (d.isZero() && !displayPrefs.showZero) return '-'
 
-  const effectiveUnit = props.unit ?? displayPrefs.amountUnit
+  const effectiveUnit = displayPrefs.amountUnit
   const unitCfg = AMOUNT_UNITS[effectiveUnit] ?? AMOUNT_UNITS.yuan
   // Decimal 除法替代 n / cfg.divisor 的浮点除法
   const converted = d.dividedBy(unitCfg.divisor)
@@ -163,7 +157,8 @@ function handleClick() {
 .gt-amount-cell {
   font-variant-numeric: tabular-nums;
   font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: var(--gt-font-size-sm);
+  /* 不写死字号：跟随所在单元格（表格字号由显示偏好 --gt-display-font-size 统一控制） */
+  font-size: inherit;
   padding: 2px 8px;
   color: var(--gt-color-text-regular);
   display: inline-block;

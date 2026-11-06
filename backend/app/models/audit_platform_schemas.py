@@ -195,6 +195,8 @@ class ProjectCreateResponse(BaseModel):
     scenario: str = "normal"
     project_classification: dict[str, Any] | None = None
     report_scope: str | None = None
+    # V250：项目默认金额单位。项目详情和项目上下文必须携带三值合同，不能靠前端猜默认值。
+    amount_unit: Literal["yuan", "qian", "wan"] = "yuan"
     # 集团架构（consol-tree-three-code-autobuild 需求 1.6）：详情回填与树视图用
     parent_company_name: str | None = None
     parent_company_code: str | None = None
