@@ -590,9 +590,10 @@ class TestAdoptHashChainAudit:
             ).first()
             assert row is not None, "采纳未写哈希链审计（Req 8.9）"
             payload, prev_hash, entry_hash, user_id, object_id, object_type = row
-            assert set(payload) == ADOPT_AUDIT_DETAIL_KEYS | {"project_id"}, (
+            _RESERVED_AUDIT_CHAIN_KEYS = {"_hash_v", "_resource_id", "_year"}
+            assert set(payload) - _RESERVED_AUDIT_CHAIN_KEYS == ADOPT_AUDIT_DETAIL_KEYS | {"project_id"}, (
                 "审计字段集合漂移：\n"
-                f"  多出 {sorted(set(payload) - ADOPT_AUDIT_DETAIL_KEYS - {'project_id'})}\n"
+                f"  多出 {sorted(set(payload) - _RESERVED_AUDIT_CHAIN_KEYS - ADOPT_AUDIT_DETAIL_KEYS - {'project_id'})}\n"
                 f"  缺少 {sorted(ADOPT_AUDIT_DETAIL_KEYS - set(payload))}"
             )
             assert payload["message_id"] == str(msg.id)
@@ -1129,7 +1130,7 @@ class TestServerIssuedDraftIsAdoptable:
             assert row[0] == draft
             assert row[1] == persistence.content_hash(draft)
             assert row[2] == "pending"
-            assert row[3] == f"note:{fx.note_a.id}"
+            assert row[3] == f"note:{fx.note_a.id}:text_content"
 
         run_with_fixture(scenario)
 

@@ -331,7 +331,7 @@ async def load_authoritative_message(
             .join(AIChatSession, AIChatSession.id == AIChatMessage.session_id)
             .outerjoin(AIChatRun, AIChatRun.id == AIChatMessage.run_id)
             .where(AIChatMessage.id == message_id)
-            .with_for_update()
+            .with_for_update(of=AIChatMessage)
         )
     ).first()
     if row is None:

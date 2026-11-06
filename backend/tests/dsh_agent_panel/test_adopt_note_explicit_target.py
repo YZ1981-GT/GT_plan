@@ -187,7 +187,7 @@ class TestAdoptExplicitTarget:
                 "SELECT payload FROM audit_log_entries WHERE action_type = :a "
                 "AND payload->>'ai_content_log_id' = :i"),
                 {"a": ADOPT_AUDIT_ACTION, "i": str(outcome.ai_content_log_id)})).scalar_one()
-            assert set(payload) == ADOPT_AUDIT_DETAIL_KEYS | {"project_id"}
+            assert set(payload) - {"_hash_v", "_resource_id", "_year"} == ADOPT_AUDIT_DETAIL_KEYS | {"project_id"}
             assert payload["source_host_type"] == "global_knowledge"
             assert payload["source_host_id"] == GLOBAL_KNOWLEDGE_HOST_ID
             assert payload["host_type"] == "workpaper"
@@ -209,7 +209,7 @@ class TestAdoptExplicitTarget:
             cell = (await fx.session.execute(sa.text(
                 "SELECT target_cell FROM ai_content_log WHERE id = :i"),
                 {"i": outcome.ai_content_log_id})).scalar_one()
-            assert cell == f"note:{fx.note_a.id}"
+            assert cell == f"note:{fx.note_a.id}:text_content"
 
         run_with_fixture(scenario)
 
