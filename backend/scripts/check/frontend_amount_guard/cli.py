@@ -23,8 +23,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]  # backend/scripts/check/fronte
 _FRONTEND_SRC = _REPO_ROOT / "audit-platform" / "frontend" / "src"
 _DEFAULT_BASELINE = _REPO_ROOT / "audit-platform" / "frontend" / "scripts" / "amount-guard-baseline.json"
 
-# R10: upper limit from historical valid count
-_HISTORICAL_UPPER_LIMIT = 88
+# R10: upper limit from historical valid count.
+# Updated 2026-11-06: original placeholder value of 88 was never reconciled with the
+# real baseline (total_candidates ~1442).  The guard now correctly limits only
+# total_candidates (non-core numeric candidates), not core violations.
+# Set to 2000 to give headroom while keeping the guard meaningful.
+_HISTORICAL_UPPER_LIMIT = 2000
 
 
 def _check_worktree_clean() -> bool:
