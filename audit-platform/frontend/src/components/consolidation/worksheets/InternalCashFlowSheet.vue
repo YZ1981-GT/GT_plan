@@ -4,6 +4,8 @@
       ref="editableTableRef"
       v-model="rows"
       :columns="columns"
+      fixed-page-key="consolidation:worksheet:internal-cash-flow"
+      :mandatory-fixed-columns="['payerCompany']"
       :editable="true"
       :show-selection="true"
       :lazy-edit="false"

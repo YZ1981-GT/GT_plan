@@ -1,0 +1,173 @@
+{
+  "total_eligible": 5709,
+  "total_parsed": 5709,
+  "total_skipped": 0,
+  "total_candidates": 1505,
+  "total_core_violations": 64,
+  "scopes": {
+    "components": {
+      "eligible": 4945,
+      "parsed": 4945,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 1454,
+      "core_violations": 41
+    },
+    "composables": {
+      "eligible": 317,
+      "parsed": 317,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 16,
+      "core_violations": 12
+    },
+    "config": {
+      "eligible": 1,
+      "parsed": 1,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "constants": {
+      "eligible": 5,
+      "parsed": 5,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "directives": {
+      "eligible": 2,
+      "parsed": 2,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "generated": {
+      "eligible": 5,
+      "parsed": 5,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "i18n": {
+      "eligible": 1,
+      "parsed": 1,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "layouts": {
+      "eligible": 3,
+      "parsed": 3,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "permissions": {
+      "eligible": 1,
+      "parsed": 1,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "router": {
+      "eligible": 12,
+      "parsed": 12,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "services": {
+      "eligible": 69,
+      "parsed": 69,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "shared": {
+      "eligible": 3,
+      "parsed": 3,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "shell": {
+      "eligible": 34,
+      "parsed": 34,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "src:root": {
+      "eligible": 2,
+      "parsed": 2,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "stores": {
+      "eligible": 11,
+      "parsed": 11,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 1,
+      "core_violations": 0
+    },
+    "types": {
+      "eligible": 14,
+      "parsed": 14,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 0,
+      "core_violations": 0
+    },
+    "utils": {
+      "eligible": 83,
+      "parsed": 83,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 6,
+      "core_violations": 0
+    },
+    "views": {
+      "eligible": 201,
+      "parsed": 201,
+      "skipped": 0,
+      "skipped_files": [],
+      "exempted": 0,
+      "candidates": 28,
+      "core_violations": 11
+    }
+  },
+  "parser_exemptions": {},
+  "errors": []
+}

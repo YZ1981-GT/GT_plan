@@ -130,6 +130,21 @@
 
         <!-- 当前表格 -->
         <div v-if="selectedNoteSection.headers?.length" class="gt-note-table-wrap">
+          <div class="gt-consol-note-display-settings">
+            <GtTableDisplaySettings
+              :page-key="consolFixedPageKey"
+              :columns="consolFixedColumns"
+              :mandatory-keys="consolMandatoryKeys"
+              :disabled="selectedNoteSection.measureStatus !== 'matched'"
+              @change="onConsolFixedColumnsChange"
+            />
+          </div>
+          <el-alert
+            v-if="selectedNoteSection.measureStatus && selectedNoteSection.measureStatus !== 'matched'"
+            type="warning" :closable="false" show-icon
+            title="当前合并附注表的列语义尚未登记，数值按元口径原样显示，固定列暂不可用"
+            class="gt-consol-note-measure-warning"
+          />
           <el-table ref="noteTableRef" :data="noteEditMode ? selectedNoteSection.editRows : trimTrailingEmptyRows(selectedNoteSection.editRows || [])" border size="small"
             :max-height="noteFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 260px)'"
             style="width:100%" class="gt-note-compact-table"
@@ -146,11 +161,13 @@
             <template v-if="parsedMultiHeader">
               <template v-for="(col, ci) in parsedMultiHeader" :key="'mh-' + ci">
                 <!-- 叶子列（独立列，无 children）；:prop=原始叶子列下标，供 @cell-click 列身份与拖选映射 -->
-                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
+                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)"
+                  :column-key="consolColumnKey(col.colIndex)" :fixed="consolFixedFor(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
                     <ConsolNoteGridCell
                       :value="row[col.colIndex]" :label="col.label" :editable="noteEditMode" :manual="isManual(row, col.colIndex)"
                       :left="col.colIndex === 0"
+                      :measure-kind="consolMeasureKind(col.colIndex)" :ratio-scale="consolRatioScale(col.colIndex)"
                       :comment="col.colIndex > 0 ? cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, col.colIndex) : undefined"
                       @commit="onNoteCellCommit(row, col.colIndex, $event)"
                     />
@@ -160,10 +177,12 @@
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'mhc-' + ci + '-' + chi">
                     <!-- 二级叶子 -->
-                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
+                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)"
+                      :column-key="consolColumnKey(child.colIndex)" :fixed="consolFixedFor(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
                         <ConsolNoteGridCell
                           :value="row[child.colIndex]" :label="child.label" :editable="noteEditMode" :manual="isManual(row, child.colIndex)"
+                          :measure-kind="consolMeasureKind(child.colIndex)" :ratio-scale="consolRatioScale(child.colIndex)"
                           :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, child.colIndex)"
                           @commit="onNoteCellCommit(row, child.colIndex, $event)"
                         />
@@ -172,10 +191,12 @@
                     <!-- 三级嵌套（3 行表头场景） -->
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'mhl-' + ci + '-' + chi + '-' + li"
-                        :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
+                        :label="leaf.label" :prop="String(leaf.colIndex)"
+                        :column-key="consolColumnKey(leaf.colIndex)" :fixed="consolFixedFor(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
                           <ConsolNoteGridCell
                             :value="row[leaf.colIndex]" :label="leaf.label" :editable="noteEditMode" :manual="isManual(row, leaf.colIndex)"
+                            :measure-kind="consolMeasureKind(leaf.colIndex)" :ratio-scale="consolRatioScale(leaf.colIndex)"
                             :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, leaf.colIndex)"
                             @commit="onNoteCellCommit(row, leaf.colIndex, $event)"
                           />
@@ -188,10 +209,12 @@
             </template>
             <!-- 扁平表头（无 multi_header 的章节，走原逻辑） -->
             <template v-else>
-            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
+            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)"
+              :column-key="consolColumnKey(hi)" :fixed="consolFixedFor(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <ConsolNoteGridCell
                   :value="row[hi]" :label="h" :editable="noteEditMode" :manual="isManual(row, hi)" :left="hi === 0"
+                  :measure-kind="consolMeasureKind(hi)" :ratio-scale="consolRatioScale(hi)"
                   :comment="hi > 0 ? cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, hi) : undefined"
                   @commit="onNoteCellCommit(row, hi, $event)"
                 />
@@ -317,30 +340,36 @@
             <!-- 全屏模式：多行合并表头 -->
             <template v-if="parsedMultiHeader">
               <template v-for="(col, ci) in parsedMultiHeader" :key="'fs-mh-' + ci">
-                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
+                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)"
+                  :column-key="consolColumnKey(col.colIndex)" :fixed="consolFixedFor(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
                     <ConsolNoteGridCell
                       :value="row[col.colIndex]" :label="col.label" :editable="noteEditMode" :manual="isManual(row, col.colIndex)"
-                      :left="col.colIndex === 0" @commit="onNoteCellCommit(row, col.colIndex, $event)"
+                      :left="col.colIndex === 0"
+                      :measure-kind="consolMeasureKind(col.colIndex)" :ratio-scale="consolRatioScale(col.colIndex)" @commit="onNoteCellCommit(row, col.colIndex, $event)"
                     />
                   </template>
                 </el-table-column>
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'fs-mhc-' + ci + '-' + chi">
-                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
+                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)"
+                      :column-key="consolColumnKey(child.colIndex)" :fixed="consolFixedFor(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
                         <ConsolNoteGridCell
                           :value="row[child.colIndex]" :label="child.label" :editable="noteEditMode" :manual="isManual(row, child.colIndex)"
+                          :measure-kind="consolMeasureKind(child.colIndex)" :ratio-scale="consolRatioScale(child.colIndex)"
                           @commit="onNoteCellCommit(row, child.colIndex, $event)"
                         />
                       </template>
                     </el-table-column>
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'fs-mhl-' + ci + '-' + chi + '-' + li"
-                        :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
+                        :label="leaf.label" :prop="String(leaf.colIndex)"
+                        :column-key="consolColumnKey(leaf.colIndex)" :fixed="consolFixedFor(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
                           <ConsolNoteGridCell
                             :value="row[leaf.colIndex]" :label="leaf.label" :editable="noteEditMode" :manual="isManual(row, leaf.colIndex)"
+                            :measure-kind="consolMeasureKind(leaf.colIndex)" :ratio-scale="consolRatioScale(leaf.colIndex)"
                             @commit="onNoteCellCommit(row, leaf.colIndex, $event)"
                           />
                         </template>
@@ -352,10 +381,12 @@
             </template>
             <!-- 全屏模式：扁平表头 -->
             <template v-else>
-            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
+            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)"
+              :column-key="consolColumnKey(hi)" :fixed="consolFixedFor(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <ConsolNoteGridCell
                   :value="row[hi]" :label="h" :editable="noteEditMode" :manual="isManual(row, hi)" :left="hi === 0"
+                  :measure-kind="consolMeasureKind(hi)" :ratio-scale="consolRatioScale(hi)"
                   @commit="onNoteCellCommit(row, hi, $event)"
                 />
               </template>
@@ -723,7 +754,7 @@
 
 <script setup lang="ts">
 import { copyRichText, copyText } from '@/utils/clipboard'
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -775,6 +806,9 @@ import ConsolNoteTopnNotice from '@/components/consolidation/ConsolNoteTopnNotic
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import ConsolNoteGridCell from '@/components/consolidation/ConsolNoteGridCell.vue'
+import GtTableDisplaySettings from '@/components/common/GtTableDisplaySettings.vue'
+import { usePreferredFixedColumns } from '@/composables/usePreferredFixedColumns'
+import type { DisplayMeasureKind, RatioScale } from '@/types/displayMeasure'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useEditMode } from '@/composables/useEditMode'
@@ -856,6 +890,46 @@ async function jumpToNoteSection(sectionId?: string, title?: string) {
 // 当前请求目标章节独立于已渲染章节；切换章节后旧响应不得写入新章节。
 const requestedSectionId = ref('')
 const selectedNoteSection = ref<any>(null)
+
+const CONSOL_MEASURE_KINDS = new Set<DisplayMeasureKind>([
+  'amount', 'quantity', 'count', 'ratio', 'exchange_rate', 'unit_price', 'text',
+])
+const CONSOL_RATIO_SCALES = new Set<RatioScale>(['fraction', 'percent_points'])
+function consolMeasureKind(index: number): DisplayMeasureKind | null {
+  if (selectedNoteSection.value?.measureStatus !== 'matched') return null
+  const value = selectedNoteSection.value?.columnKinds?.[index]
+  return CONSOL_MEASURE_KINDS.has(value) ? value : null
+}
+function consolRatioScale(index: number): RatioScale | null {
+  if (consolMeasureKind(index) !== 'ratio') return null
+  const value = selectedNoteSection.value?.columnRatioScales?.[index]
+  return CONSOL_RATIO_SCALES.has(value) ? value : null
+}
+function consolColumnKey(index: number): string {
+  if (index === 0) return 'label'
+  return String(selectedNoteSection.value?.columnIds?.[index] || '')
+}
+const consolFixedPageKey = computed(() => (
+  selectedNoteSection.value?.measureStatus === 'matched' && selectedNoteSection.value?.tableId
+    ? `consolidation:note:${selectedNoteSection.value.tableId}`
+    : ''
+))
+const consolFixedColumns = computed(() => (selectedNoteSection.value?.headers || [])
+  .map((label: unknown, index: number) => ({ key: consolColumnKey(index), label: String(label || `第${index + 1}列`) }))
+  .filter((column: { key: string }) => !!column.key))
+const consolMandatoryKeys = computed(() => consolFixedColumns.value.length ? ['label'] : [])
+const consolFixed = usePreferredFixedColumns({
+  pageKey: consolFixedPageKey,
+  allowedColumns: () => consolFixedColumns.value.map((column: { key: string; label: string }) => column.key),
+  mandatoryColumns: consolMandatoryKeys,
+})
+function consolFixedFor(index: number): 'left' | false {
+  const key = consolColumnKey(index)
+  return key ? consolFixed.fixedFor(key) : false
+}
+function onConsolFixedColumnsChange(): void {
+  nextTick(() => noteTableRef.value?.doLayout?.())
+}
 
 // text_after_table 折叠控制
 const textAfterExpanded = ref(false)
@@ -2995,6 +3069,11 @@ async function onNoteNodeClick(
       section_id: sec.section_id,
       title: sec.title,
       parent_section: sec.parent_section,
+      tableId: sec.table_id || sec.id || null,
+      columnIds: Array.isArray(sec.column_ids) ? [...sec.column_ids] : [],
+      columnKinds: Array.isArray(sec.column_kinds) ? [...sec.column_kinds] : [],
+      columnRatioScales: Array.isArray(sec.column_ratio_scales) ? [...sec.column_ratio_scales] : [],
+      measureStatus: sec.measure_status || 'unmatched',
       headers,
       multiHeader: sec.multi_header || null,
       columnGroups: sec._column_groups || null,
@@ -3443,4 +3522,6 @@ defineExpose({
   font-size: var(--gt-font-size-xs, 12px);
   cursor: pointer;
 }
+.gt-consol-note-display-settings { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.gt-consol-note-measure-warning { margin-bottom: 8px; }
 </style>

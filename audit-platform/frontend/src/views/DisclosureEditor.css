@@ -244,3 +244,13 @@
   font-size: var(--gt-font-size-xs, 12px);
   cursor: pointer;
 }
+
+.gt-de-table-display-settings {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.gt-de-measure-warning {
+  margin-bottom: 8px;
+}

@@ -25,6 +25,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Literal, Sequence
 
+from app.core import candidate_identity as _candidate
 from app.core import startup_deferred as _deferred
 from app.core import startup_migrations as _migrations
 
@@ -160,7 +161,6 @@ def startup_report_as_dict(
 # ---------------------------------------------------------------------------
 # Serial executor
 # ---------------------------------------------------------------------------
-
 async def run_startup_tasks(
     tasks: Sequence[StartupTaskSpec] | None = None,
     *,
@@ -184,6 +184,11 @@ async def run_startup_tasks(
     deferred: list[StartupTaskSpec] = []
 
     for spec in specs:
+        try: candidate_reason = _candidate.candidate_skip_reason(spec.name)
+        except Exception as exc:
+            results.append(StartupTaskResult(spec.name, spec.phase, "failed", 0, desensitize_detail(str(exc)))); report and _set_runtime_report(results); raise
+        if candidate_reason:
+            results.append(StartupTaskResult(spec.name, spec.phase, "skipped", 0, candidate_reason)); continue
         if spec.singleton and reload_handoff.defers_singletons():
             deferred.append(spec)
             results.append(StartupTaskResult(spec.name, spec.phase, "deferred", 0, reload_handoff.deferred_detail()))
@@ -792,6 +797,7 @@ def start_all_workers(stop_event: asyncio.Event) -> list[asyncio.Task]:
     """
     ctx = StartupContext(stop_event=stop_event)
     for spec in _worker_specs():
+        if _candidate.candidate_skip_reason(spec.name): continue
         if spec.skip_condition is not None and spec.skip_condition(ctx):
             continue
         spec.run(ctx)
@@ -833,6 +839,8 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         criticality="critical",
         run=_task_setup_logging,
     ),
+    StartupTaskSpec(name="verify_candidate_tree_identity", phase="bootstrap", criticality="critical",
+                    run=lambda _ctx: _candidate.verify_candidate_identity()),
     StartupTaskSpec(
         name="run_migrations",
         phase="migration",

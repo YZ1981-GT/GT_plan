@@ -15,6 +15,8 @@
  import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
  import type { TrialBalanceRow } from '@/services/trialBalanceRows'
 
+ export type ProjectAmountUnit = 'yuan' | 'qian' | 'wan'
+
  export interface ProjectListItem {
    id: string
    name?: string | null
@@ -22,6 +24,8 @@
    audit_year?: number | string | null
    audit_period_end?: string | null
    audit_period_start?: string | null
+   /** 项目正式输出默认金额单位；旧后端缺失时 store 按元降级。 */
+   amount_unit?: ProjectAmountUnit | null
  }
 
  export async function listProjects(): Promise<ProjectListItem[]> {

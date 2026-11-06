@@ -30,7 +30,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import { getProject, type ProjectListItem } from '@/services/auditPlatformApi'
+import { getProject, type ProjectAmountUnit, type ProjectListItem } from '@/services/auditPlatformApi'
 import { parseAuditYear, resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -47,6 +47,22 @@ const currentYear = new Date().getFullYear()
  */
 export type ProjectYearStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
+function isProjectAmountUnit(value: unknown): value is ProjectAmountUnit {
+  return value === 'yuan' || value === 'qian' || value === 'wan'
+}
+
+/**
+ * 项目详情是项目正式单位的唯一输入。旧响应、非法值按元显示但保留开发期告警；
+ * 请求失败则由调用方保留 null，避免把上一项目的单位泄露到当前项目。
+ */
+function normalizeProjectAmountUnit(value: unknown): ProjectAmountUnit {
+  if (isProjectAmountUnit(value)) return value
+  if (import.meta.env.DEV) {
+    console.warn('[project] 项目详情缺少或含非法 amount_unit，按元显示')
+  }
+  return 'yuan'
+}
+
 // ─── P0-2: ProjectContext 类型定义 ───────────────────────────────────────────
 export interface ProjectContextData {
   projectId: string
@@ -57,11 +73,15 @@ export interface ProjectContextData {
   auditScope: 'standalone' | 'consolidated'
   projectStatus: string
   roleInProject: string | null
+  /** 项目正式输出默认金额单位；null 表示详情尚未确定或请求失败。 */
+  projectAmountUnit: ProjectAmountUnit | null
 }
 
 export const useProjectStore = defineStore('project', () => {
   // ─── 核心状态 ───
   const projectId = ref('')
+  // null 表示项目详情尚未确定或读取失败；不能沿用上一项目的单位。
+  const projectAmountUnit = ref<ProjectAmountUnit | null>(null)
   // 不给初值：原先初值是去年、换到没填年度的项目也不清，页面就静默按去年 / 上一个项目的年度取数
   const year = ref<number | null>(null)
   const yearStatus = ref<ProjectYearStatus>('idle')
@@ -107,6 +127,17 @@ export const useProjectStore = defineStore('project', () => {
     clientName.value = p?.client_name || p?.name || ''
     projectStatus.value = p?.status || ''
     auditScope.value = p?.audit_scope || (p?.project_type === 'consolidated' ? 'consolidated' : 'standalone')
+    projectAmountUnit.value = normalizeProjectAmountUnit(p?.amount_unit)
+  }
+
+  /**
+   * 只接收仍属于当前项目的配置保存响应，避免路由切换后旧请求覆盖新项目单位。
+   * 返回 false 表示响应已过期，调用方不应更新本地表单状态。
+   */
+  function applyProjectAmountUnit(pid: string, amountUnit: unknown): boolean {
+    if (!pid || projectId.value !== pid) return false
+    projectAmountUnit.value = normalizeProjectAmountUnit(amountUnit)
+    return true
   }
 
   /**
@@ -117,6 +148,7 @@ export const useProjectStore = defineStore('project', () => {
     const proj = await fetchProjectDetail(pid)
     if (seq !== contextSeq || projectId.value !== pid) return
     if (!proj) {
+      projectAmountUnit.value = null
       if (yearStatus.value !== 'ready') yearStatus.value = 'failed'
       return
     }
@@ -134,6 +166,7 @@ export const useProjectStore = defineStore('project', () => {
       // 非项目页面，清空（年度也清：没有项目就没有审计年度，下一个项目页不会先拿到这个年度）
       contextSeq++
       projectId.value = ''
+      projectAmountUnit.value = null
       clientName.value = ''
       auditYear.value = null
       year.value = null
@@ -202,8 +235,11 @@ export const useProjectStore = defineStore('project', () => {
         // 重载回到项目审计年度（原行为）；换项目且没填年度 ⇒ null，不沿用上一个项目的
         if (resolved != null || changed) year.value = resolved
         yearStatus.value = 'ready'
-      } else if (yearStatus.value === 'loading') {
-        yearStatus.value = 'failed'
+      } else {
+        projectAmountUnit.value = null
+        if (yearStatus.value === 'loading') {
+          yearStatus.value = 'failed'
+        }
       }
     }
     // Load project role
@@ -219,6 +255,7 @@ export const useProjectStore = defineStore('project', () => {
   function resetProjectScopedState(reason: string) {
     // 清空项目域状态
     clientName.value = ''
+    projectAmountUnit.value = null
     projectStatus.value = ''
     auditScope.value = 'standalone'
     roleInProject.value = null
@@ -320,11 +357,13 @@ export const useProjectStore = defineStore('project', () => {
     auditScope: auditScope.value,
     projectStatus: projectStatus.value || 'draft',
     roleInProject: roleInProject.value,
+    projectAmountUnit: projectAmountUnit.value,
   }))
 
   return {
     // 状态
     projectId,
+    projectAmountUnit,
     year,
     yearStatus,
     standard,
@@ -342,6 +381,7 @@ export const useProjectStore = defineStore('project', () => {
     syncFromRoute,
     retryProjectContext,
     loadProjectContext,
+    applyProjectAmountUnit,
     resetProjectScopedState,
     changeYear,
     setCurrentYear,

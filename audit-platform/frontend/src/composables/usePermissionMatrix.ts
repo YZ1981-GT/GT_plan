@@ -42,6 +42,7 @@ export type { Role, Action, Resource, PermissionContext } from '@/permissions/pe
 // ─── 首批 7 个 Operation Codes（与后端保持一致） ─────────────────────────────
 export const OPERATION_CODES = [
   'project:view',
+  'project:edit',
   'wp:edit',
   'wp:review',
   'report:edit',
@@ -57,6 +58,7 @@ const ROLE_OPERATIONS: Record<string, Set<string>> = {
   admin: new Set(OPERATION_CODES),
   partner: new Set([
     'project:view',
+    'project:edit',
     'wp:edit',
     'wp:review',
     'report:edit',
@@ -66,6 +68,7 @@ const ROLE_OPERATIONS: Record<string, Set<string>> = {
   ]),
   manager: new Set([
     'project:view',
+    'project:edit',
     'wp:edit',
     'wp:review',
     'report:edit',
@@ -91,7 +94,7 @@ const ROLE_OPERATIONS: Record<string, Set<string>> = {
 const PROJECT_ROLE_OPERATIONS: Record<string, Set<string>> = {
   preparer: new Set(['project:view', 'wp:edit', 'note:edit']),
   reviewer: new Set(['project:view', 'wp:review', 'report:edit']),
-  manager: new Set(['project:view', 'wp:edit', 'wp:review', 'report:edit', 'note:edit']),
+  manager: new Set(['project:view', 'project:edit', 'wp:edit', 'wp:review', 'report:edit', 'note:edit']),
   partner: new Set(OPERATION_CODES),
   eqcr: new Set(['project:view', 'wp:review']),
 }

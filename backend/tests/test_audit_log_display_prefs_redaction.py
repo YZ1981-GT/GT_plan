@@ -45,7 +45,7 @@ def test_display_preferences_trailing_slash_and_invalid_state_fail_closed():
         {"data": {"revision": 8, "page_key": "trial_balance"}},
         RequestStub("not-a-list"),
     )
-    assert redacted == {"revision": 8, "changed_fields": []}
+    assert redacted == {"redacted": True, "changed_fields": []}
 
 
 def test_other_write_responses_are_unchanged():

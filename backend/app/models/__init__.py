@@ -227,6 +227,8 @@ from app.models.workpaper_sync_models import (  # noqa: F401
 from app.models.asset_blob_models import AssetBlob, AiChatRunResource, KnowledgeEvidencePromotion  # noqa: F401
 # V250（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
 from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
+# V265（同 spec 任务 1C）：自定义工作簿不可变单位 authority
+from app.models.custom_workbook_unit_authority import CustomWorkbookUnitAuthority  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -395,8 +397,9 @@ __all__ = [
     # --- 公式推送引擎 (chain-closure-phase2-formula-push-engine / V169) ---
     "FormulaPushRun",
     "FormulaPushState",
-    # --- 显示偏好 (platform-global-display-settings-closure / V250) ---
+    # --- 显示偏好 / 正式导出单位 authority (platform-global-display-settings-closure) ---
     "UserDisplayPreferences",
+    "CustomWorkbookUnitAuthority",
 ]
 
 # 调整分录持久化复核、处理历史与客户已入账（迁移 V235）

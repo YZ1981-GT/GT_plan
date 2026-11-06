@@ -67,6 +67,13 @@ export const systemRoutes: RouteRecordRaw[] = [
           meta: { permission: 'admin' },
         },
 {
+          // 当前账号的显示偏好（spec platform-global-display-settings-closure R3）：所有登录用户可进；
+          // 系统配置 /settings 仍只对管理员开放
+          path: 'display-settings',
+          name: 'DisplaySettings',
+          component: () => import('@/views/DisplaySettingsView.vue'),
+        },
+{
           path: 'consolidation',
           name: 'ConsolidationHub',
           component: () => import('@/views/ConsolidationHub.vue'),

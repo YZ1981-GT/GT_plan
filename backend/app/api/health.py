@@ -17,7 +17,7 @@ Validates: Requirements 4.8, 4.9
 
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -46,6 +46,7 @@ def critical_schema_drift(info: dict) -> bool:
 @router.get("/health")
 async def health_check(
     ctx: ServiceContainer = Depends(get_container),
+    request: Request = None,  # type: ignore[assignment]  # FastAPI 注入；测试直接调用时为 None
 ) -> JSONResponse:
     """检查 PostgreSQL / Redis / 迁移状态 / schema 漂移。
 
@@ -134,6 +135,7 @@ async def health_check(
         status = "healthy"
         status_code = 200
 
+    candidate_tree = _candidate_tree_info(request)
     return JSONResponse(
         status_code=status_code,
         content={
@@ -155,8 +157,32 @@ async def health_check(
             "gc": get_last_freeze_report(),
             # 热重载交接：本进程模式 + 最近一次重载结果（读父进程写的小文件；不参与 status 判定）
             "reload": reload_info,
+            # 候选树身份（platform-global-display-settings-closure 13A）：非候选模式为 null、不加 header
+            "candidate_tree": candidate_tree,
         },
+        headers=_candidate_tree_headers(candidate_tree),
     )
+
+
+def _candidate_tree_info(request: Request | None) -> dict[str, object] | None:
+    """候选模式下返回启动时缓存的身份 + 实际监听端口；非候选模式返回 None。"""
+    from app.core.candidate_identity import get_candidate_tree_info
+
+    info = get_candidate_tree_info()
+    if info is None:
+        return None
+    server = request.scope.get("server") if request is not None else None
+    info["server_port"] = server[1] if server else None
+    return info
+
+
+def _candidate_tree_headers(info: dict[str, object] | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    if info and info.get("expected"):
+        headers["X-GT-Candidate-Tree-Expected"] = str(info["expected"])
+    if info and info.get("actual"):
+        headers["X-GT-Candidate-Tree-Actual"] = str(info["actual"])
+    return headers
 
 
 def _capacity_snapshot() -> dict[str, object]:

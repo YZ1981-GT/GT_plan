@@ -1,34 +1,46 @@
-"""账号级显示偏好 Pydantic 线协议。
-
-GET 返回完整归一偏好（无记录时为平台默认）。
-PATCH 仅改提交字段，revision+1，返回完整归一结果。
-
-design §2：线协议固定 snake_case，PATCH extra='forbid'。
-"""
+﻿"""Display preferences wire protocol - strict version."""
 from __future__ import annotations
-
+import json, math
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
-
-from pydantic import BaseModel, Field, model_validator
-
-
-# ---------------------------------------------------------------------------
-# 共享枚举与类型
-# ---------------------------------------------------------------------------
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator, model_validator
 
 AmountUnitOverride = Literal["yuan", "qian", "wan"] | None
 FontSize = Literal["xs", "sm", "md", "lg"]
 Density = Literal["compact", "default", "comfortable"]
 GridEditMode = Literal["excel", "click", "classic"]
 
+BUSINESS_FIELD_NAMES = (
+    "amount_unit_override", "font_size", "show_zero", "decimals",
+    "negative_red", "highlight_threshold", "density", "grid_edit_mode", "fixed_columns",
+)
+_NON_NULLABLE = frozenset(BUSINESS_FIELD_NAMES) - {"amount_unit_override"}
+_MAX_FC_PAGES = 100
+_MAX_FC_COLS = 20
+_MAX_FC_BYTES = 64 * 1024
+_SA_PLACEHOLDER = "9999-12-31T23:59:59.999999+00:00"
 
-# ---------------------------------------------------------------------------
-# GET 响应（完整归一偏好）
-# ---------------------------------------------------------------------------
+class FixedColumnsPatchEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    columns: list[StrictStr]
+    @field_validator("columns")
+    @classmethod
+    def _v(cls, v):
+        if len(v) > _MAX_FC_COLS:
+            raise ValueError("\u6bcf\u4e2a pageKey \u6700\u591a 20 \u4e2a\u56fa\u5b9a\u5217")
+        if any(not 1 <= len(c) <= 100 for c in v):
+            raise ValueError("\u5217 key \u957f\u5ea6\u987b\u5728 1~100")
+        if len(set(v)) != len(v):
+            raise ValueError("\u56fa\u5b9a\u5217\u4e0d\u80fd\u91cd\u590d")
+        return v
+
+class FixedColumnsResponseEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    columns: list[StrictStr]
+    saved_at: datetime
 
 class DisplayPreferencesResponse(BaseModel):
-    """GET /api/users/me/display-preferences 的完整响应。"""
     amount_unit_override: AmountUnitOverride = None
     font_size: FontSize = "sm"
     show_zero: bool = False
@@ -37,114 +49,74 @@ class DisplayPreferencesResponse(BaseModel):
     highlight_threshold: float = 0.2
     density: Density = "default"
     grid_edit_mode: GridEditMode = "excel"
-    fixed_columns: dict[str, Any] = Field(default_factory=dict)
+    fixed_columns: dict[StrictStr, FixedColumnsResponseEntry] = Field(default_factory=dict)
     revision: int = 0
     updated_at: datetime | None = None
 
+def fixed_columns_storage_size(fc):
+    s = {}
+    for pk, item in fc.items():
+        raw = item.model_dump(mode="json") if isinstance(item, BaseModel) else dict(item)
+        s[pk] = {"columns": list(raw["columns"]), "saved_at": raw.get("saved_at", _SA_PLACEHOLDER)}
+    return len(json.dumps(s, ensure_ascii=False, sort_keys=True, separators=(",",":")).encode("utf-8"))
 
-# ---------------------------------------------------------------------------
-# PATCH 请求
-# ---------------------------------------------------------------------------
-
-# design §16 F6：显式 null 与未提交的区分
-# 用 sentinel 表示"字段未出现在请求中"
-_UNSET = object()
-
+def assert_fixed_columns_storage_size(fc):
+    if fixed_columns_storage_size(fc) > _MAX_FC_BYTES:
+        raise ValueError("fixed_columns \u89c4\u8303 JSON \u4e0d\u5f97\u8d85\u8fc7 64KiB")
 
 class DisplayPreferencesPatch(BaseModel):
-    """PATCH /api/users/me/display-preferences 的请求体。
+    model_config = ConfigDict(extra="forbid")
+    base_revision: StrictInt = Field(..., ge=0)
+    amount_unit_override: AmountUnitOverride = None
+    font_size: FontSize | None = None
+    show_zero: StrictBool | None = None
+    decimals: StrictInt | None = Field(default=None, ge=0, le=6)
+    negative_red: StrictBool | None = None
+    highlight_threshold: float | None = Field(default=None, ge=0, le=1)
+    density: Density | None = None
+    grid_edit_mode: GridEditMode | None = None
+    fixed_columns: dict[StrictStr, FixedColumnsPatchEntry] | None = None
 
-    extra='forbid' 拒绝额外字段。
-    base_revision 必填（CAS），至少一个业务字段。
-    """
-    model_config = {"extra": "forbid"}
-
-    base_revision: int = Field(..., ge=0, description="乐观锁版本号")
-
-    # 所有业务字段可选；显式传 null 表示"跟随项目"（amount_unit_override）
-    amount_unit_override: AmountUnitOverride | None = _UNSET  # type: ignore[assignment]
-    font_size: FontSize | None = _UNSET  # type: ignore[assignment]
-    show_zero: bool | None = _UNSET  # type: ignore[assignment]
-    decimals: int | None = _UNSET  # type: ignore[assignment]
-    negative_red: bool | None = _UNSET  # type: ignore[assignment]
-    highlight_threshold: float | None = _UNSET  # type: ignore[assignment]
-    density: Density | None = _UNSET  # type: ignore[assignment]
-    grid_edit_mode: GridEditMode | None = _UNSET  # type: ignore[assignment]
-    fixed_columns: dict[str, Any] | None = _UNSET  # type: ignore[assignment]
-
-    @model_validator(mode="after")
-    def _at_least_one_business_field(self) -> "DisplayPreferencesPatch":
-        """至少一个除 base_revision 外的业务字段。"""
-        business_fields = [
-            "amount_unit_override", "font_size", "show_zero", "decimals",
-            "negative_red", "highlight_threshold", "density",
-            "grid_edit_mode", "fixed_columns",
-        ]
-        has_any = False
-        for name in business_fields:
-            val = getattr(self, name, _UNSET)
-            if val is not _UNSET:
-                has_any = True
-                break
-        if not has_any:
-            raise ValueError("至少需要一个业务字段")
-        return self
+    @field_validator("highlight_threshold", mode="before")
+    @classmethod
+    def _ht(cls, v):
+        if v is None: return None
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError("highlight_threshold \u5fc5\u987b\u662f JSON \u6570\u5b57")
+        n = float(v)
+        if not math.isfinite(n):
+            raise ValueError("highlight_threshold \u5fc5\u987b\u662f\u6709\u9650\u6570\u5b57")
+        try:
+            d = Decimal(str(v))
+        except (InvalidOperation, ValueError) as e:
+            raise ValueError("invalid") from e
+        if d.as_tuple().exponent < -4:
+            raise ValueError("highlight_threshold \u6700\u591a\u4fdd\u7559 4 \u4f4d\u5c0f\u6570")
+        return n
 
     @model_validator(mode="after")
-    def _validate_ranges(self) -> "DisplayPreferencesPatch":
-        """校验 decimals/threshold/fixed_columns 边界。"""
-        if self.decimals is not _UNSET and self.decimals is not None:
-            if not (0 <= self.decimals <= 6):
-                raise ValueError("decimals 必须在 0~6 之间")
-
-        if self.highlight_threshold is not _UNSET and self.highlight_threshold is not None:
-            if not (0 <= self.highlight_threshold <= 1):
-                raise ValueError("highlight_threshold 必须在 0~1 之间")
-
-        if self.fixed_columns is not _UNSET and self.fixed_columns is not None:
+    def _shape(self):
+        submitted = self.model_fields_set
+        biz = submitted & set(BUSINESS_FIELD_NAMES)
+        if not biz:
+            raise ValueError("\u81f3\u5c11\u9700\u8981\u4e00\u4e2a\u4e1a\u52a1\u5b57\u6bb5")
+        for name in _NON_NULLABLE:
+            if name in submitted and getattr(self, name) is None:
+                raise ValueError(f"{name} \u4e0d\u5141\u8bb8\u4e3a null")
+        if "fixed_columns" in submitted:
             fc = self.fixed_columns
-            if len(fc) > 100:
-                raise ValueError("fixed_columns 最多 100 个 pageKey")
-            for page_key, page_val in fc.items():
-                if not (1 <= len(page_key) <= 100):
-                    raise ValueError(f"pageKey 长度须在 1~100：{page_key!r}")
-                if not isinstance(page_val, dict):
-                    raise ValueError(f"pageKey {page_key!r} 的值必须是对象")
-                columns = page_val.get("columns")
-                if columns is not None:
-                    if not isinstance(columns, list):
-                        raise ValueError(f"pageKey {page_key!r} 的 columns 必须是数组")
-                    if len(columns) > 20:
-                        raise ValueError(f"pageKey {page_key!r} 最多 20 个固定列")
-                    seen = set()
-                    for col in columns:
-                        if not isinstance(col, str) or not (1 <= len(col) <= 100):
-                            raise ValueError(f"列 key 长度须在 1~100")
-                        if col in seen:
-                            raise ValueError(f"重复列 key：{col!r}")
-                        seen.add(col)
-                # 请求不得带 saved_at
-                if "saved_at" in page_val:
-                    raise ValueError("fixed_columns 请求不得包含 saved_at")
-
+            if fc is None:
+                raise ValueError("fixed_columns \u4e0d\u5141\u8bb8\u4e3a null")
+            if len(fc) > _MAX_FC_PAGES:
+                raise ValueError("fixed_columns \u6700\u591a 100 \u4e2a pageKey")
+            if any(not 1 <= len(pk) <= 100 for pk in fc):
+                raise ValueError("pageKey \u957f\u5ea6\u987b\u5728 1~100")
+            assert_fixed_columns_storage_size(fc)
         return self
 
-    def business_fields_dict(self) -> dict[str, Any]:
-        """只返回显式提交的业务字段（不含 base_revision 和 _UNSET）。"""
-        result = {}
-        for name in [
-            "amount_unit_override", "font_size", "show_zero", "decimals",
-            "negative_red", "highlight_threshold", "density",
-            "grid_edit_mode", "fixed_columns",
-        ]:
-            val = getattr(self, name, _UNSET)
-            if val is not _UNSET:
-                result[name] = val
-        return result
-
-
-# ---------------------------------------------------------------------------
-# 平台默认值（作为常量导出，service/test 共用）
-# ---------------------------------------------------------------------------
+    def business_fields_dict(self):
+        v = self.model_dump(exclude_unset=True)
+        v.pop("base_revision", None)
+        return v
 
 PLATFORM_DEFAULTS = DisplayPreferencesResponse()
