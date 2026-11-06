@@ -117,19 +117,7 @@
                 </span>
               </el-tooltip>
               <span style="flex:1" />
-              <el-dropdown v-if="queryHistory.length" size="small" trigger="click" @command="applyHistory">
-                <el-button size="small">🕘 历史</el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item v-for="(h, i) in queryHistory" :key="i" :command="h">
-                      {{ h.sourceLabel }} · {{ h.projectLabel }}（{{ h.year }}）{{ h.filterText ? ' · ' + h.filterText : '' }}
-                    </el-dropdown-item>
-                    <el-dropdown-item v-if="queryHistory.length" divided :command="'__clear__'">
-                      🗑️ 清空历史
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button size="small" @click="evidenceDrawerVisible = true">🕘 历史与证据</el-button>
               <el-button size="small" aria-label="查询模板" data-testid="cq-templates" title="载入或执行已保存的查询模板"
                 @click="templatesVisible = true">📑 模板</el-button>
               <el-tooltip :disabled="!saveBlockedReason" :content="saveBlockedReason" placement="top">
@@ -292,6 +280,13 @@
     <MyTemplatesDialog v-model="templatesVisible" allow-run :project-id="localProjectId" :year="localYear"
       :run-blocked-reason="localProjectId ? '' : '请先选择项目'"
       @load="onTemplateLoad" @save-as="onTemplateSaveAs" @run="onTemplateRun" />
+  <QueryEvidenceDrawer
+    v-model="evidenceDrawerVisible"
+    entry="business"
+    :project-id="localProjectId || undefined"
+    :evidence="evidence"
+    @replay="onEvidenceReplay"
+  />
   </el-dialog>
 </template>
 
@@ -481,43 +476,14 @@ function onSortChange({ prop, order }: { prop?: string | null; order?: string | 
   void executeQuery() // 模板执行端点不收排序：改排序即回到普通查询（载入的条件照常带上）
 }
 
-// 查询历史（最近 10 次，localStorage 持久，点击回填并重查）
-interface QueryHistoryItem {
-  // 年度：查询时用的是什么就记什么（模板浏览 / 项目没填年度时为 null，回填后照样不带年度查）
-  projectId: string; projectLabel: string; year: number | null
-  source: string; sourceLabel: string; filterText: string; cellRange: string; ts: number
-}
-const QUERY_HISTORY_KEY = 'gt:cq:history'
-const queryHistory = ref<QueryHistoryItem[]>([])
-function loadQueryHistory() {
-  try { queryHistory.value = JSON.parse(localStorage.getItem(QUERY_HISTORY_KEY) || '[]') } catch { queryHistory.value = [] }
-}
-function pushQueryHistory() {
-  const item: QueryHistoryItem = {
-    projectId: localProjectId.value, projectLabel: currentProjectLabel.value, year: localYear.value,
-    source: selectedSource.value, sourceLabel: currentSourceLabel.value,
-    filterText: filterText.value, cellRange: sheetCellRange.value, ts: Date.now(),
-  }
-  const key = (h: QueryHistoryItem) => `${h.projectId}|${h.year}|${h.source}|${h.filterText}|${h.cellRange}`
-  const dedup = queryHistory.value.filter(h => key(h) !== key(item))
-  queryHistory.value = [item, ...dedup].slice(0, 10)
-  try { localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(queryHistory.value)) } catch { /* ignore quota */ }
-}
-async function applyHistory(item: QueryHistoryItem | string) {
-  if (item === '__clear__') {
-    queryHistory.value = []
-    try { localStorage.removeItem(QUERY_HISTORY_KEY) } catch { /* ignore */ }
-    ElMessage.success('查询历史已清空')
-    return
-  }
-  const h = item as QueryHistoryItem
-  if (h.projectId) localProjectId.value = h.projectId
-  localYear.value = h.year
-  selectedSource.value = h.source
-  filterText.value = h.filterText || ''
-  sheetCellRange.value = h.cellRange || ''
-  await executeQuery()
-}
+// AQF §8：服务端历史与证据（替代本地 localStorage 历史）
+import { useQueryRunEvidence } from './useQueryRunEvidence'
+import QueryEvidenceDrawer from './QueryEvidenceDrawer.vue'
+const evidence = useQueryRunEvidence('business')
+const evidenceDrawerVisible = ref(false)
+// 首次加载删除旧的本地历史键（R5.5）
+try { localStorage.removeItem('gt:cq:history') } catch { /* ignore */ }
+
 const filterReportType = ref('balance_sheet')
 const resultRows = ref<any[]>([])
 const resultColumns = ref<string[]>([])
@@ -1192,7 +1158,7 @@ async function executeQuery(resetPage = true, viaTemplate = false) {
     if (typeof data?.count_token === 'string' && data.count_token) countToken.value = data.count_token
     resultMeta.value = data?.meta && typeof data.meta === 'object' ? data.meta : null
     lastRun.value = run
-    pushQueryHistory()
+    evidence.setFromExecuteResult(data as Record<string, unknown>)
     void rowLinks.validateRefs(resultRows.value)
   } catch (err: unknown) {
     if (generation !== queryGeneration) return
@@ -1293,8 +1259,7 @@ watch([localProjectId, localYear], () => {
   invalidateQueryResult()
   if (visible.value) void loadIndicators(localProjectId.value || undefined)
 }, { flush: 'sync' })
-// 加载查询历史（localStorage 持久）
-loadQueryHistory()
+// 加载查询历史（服务端，AQF §5.5）——首次打开时由 evidenceDrawer 的 onOpen 加载
 
 // ─── 入口预选（R10.3 / R10.5）：每次打开都套用 initialSource（原先只在它变化时套用：同一页再开一次、或用户换过源后再开，
 // 预选不生效）；数据源立即选中，树里的高亮与展开等树加载完再做（原先连选中也等树，树取不到时预选整个丢失）──
@@ -1345,6 +1310,21 @@ function revealSource(source: string) {
       }
     })
   }
+}
+
+/** AQF §8.2：从历史记录回放（把定义写回宿主状态后执行）*/
+async function onEvidenceReplay(run: unknown) {
+  const r = run as Record<string, unknown>
+  const def = (r.definition as Record<string, unknown>) || {}
+  if (r.project_id) localProjectId.value = String(r.project_id)
+  if (r.year) localYear.value = Number(r.year)
+  if (def.source) selectedSource.value = String(def.source)
+  if (typeof def.filters === 'object' && def.filters) {
+    const f = def.filters as Record<string, unknown>
+    filterText.value = String(f.filter_text || f.filterText || '')
+    sheetCellRange.value = String(f.cell_range || f.cellRange || '')
+  }
+  await executeQuery()
 }
 </script>
 

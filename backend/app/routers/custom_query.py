@@ -915,6 +915,8 @@ async def execute_query(
     response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _origin: str = "direct",
+    _template_id: uuid.UUID | None = None,
 ):
     """执行自定义查询 —— 经 ExecuteCompatibilityAdapter 的唯一执行路径。
 
@@ -935,26 +937,16 @@ async def execute_query(
         response.headers["X-Index-Status"] = "building"
 
     from app.services.custom_query.audit_helper import record_query_rejected
-    from app.services.custom_query.business_fetchers import business_fetcher
-    from app.services.custom_query.execute_compatibility import (
-        ExecuteCompatibilityAdapter,
-    )
+    from app.services.custom_query.business_execute import execute_business_query
 
     source = body.source
     pid = body.project_id
-    year = body.year
-    filters = body.filters
 
-    # 当前用户绑进取数钩子：试算表 / 调整分录 / 附注按其循环范围过滤（R3.8）；模板执行也经本函数
-    adapter = ExecuteCompatibilityAdapter(business_fetcher=partial(business_fetcher, user=current_user))
     try:
-        result = await adapter.execute(body, user=current_user, db=db)
+        result = await execute_business_query(
+            body, user=current_user, db=db, origin=_origin, template_id=_template_id
+        )
     except HTTPException as http_exc:
-        # 领域 4xx（FORBIDDEN_PROJECT / TARGET_UNRESOLVABLE / UNKNOWN_SOURCE /
-        # INVALID_SORT_FIELD …）原样上抛：不 rollback（编排链只读，无脏事务），
-        # 也不降级为 2xx。
-        # 超时 / 预算超限 / PII 越权额外记一条可区分审计（R5.5）——
-        # record_query_rejected 内部吞异常，审计失败不会掩盖这里的原始错误。
         detail = http_exc.detail if isinstance(http_exc.detail, dict) else {}
         await record_query_rejected(
             user_id=current_user.id,
@@ -974,8 +966,6 @@ async def execute_query(
             "custom_query execute 失败 [correlation_id=%s source=%s project=%s]",
             correlation_id, source, pid,
         )
-        # 追踪号同时进响应头：异常响应体可能被网关/前端拦截改写，响应头是用户能
-        # 稳定复制给支持人员的那一份。
         response.headers["X-Correlation-ID"] = correlation_id
         raise HTTPException(
             status_code=500,
@@ -988,36 +978,6 @@ async def execute_query(
 
     if result.get("cache_hit"):
         response.headers["X-Cache"] = "HIT"
-
-    # 原「触达取数硬上限」warning 已删（advanced-query-linkage-closure 任务 7）：它拿本页行数比 5,000，
-    # 永不触发；现在 SQL 源的 total 来自数据库 COUNT，内存源超过上限直接 400，不再返回截断结果。
-
-    # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
-    # 查询执行按 60s 窗口节流为 1 条（advanced-query-module R14.4，audit_helper 单点接线）
-    _SENSITIVE_PREFIXES = ("workpaper:", "consol_unit:", "disclosure_note:", "adj_", "disclosure")
-    if source.startswith(_SENSITIVE_PREFIXES) or source in ("workpaper", "adjustment", "disclosure"):
-        try:
-            from app.core.redis import get_redis
-            from app.services.custom_query.audit_helper import record_query_execution
-
-            redis = await get_redis()
-            await record_query_execution(
-                redis=redis,
-                user_id=current_user.id,
-                source=source,
-                filters=filters,
-                project_id=pid,
-                action="custom_query.execute",
-                details={
-                    "source": source,
-                    "year": year,
-                    "filters": {k: v for k, v in filters.items() if not isinstance(v, (dict, list)) or len(str(v)) < 200},
-                    "row_count": result.get("total", 0),
-                    "has_error": "error" in result,
-                },
-            )
-        except Exception as audit_e:
-            logger.warning("audit_log enqueue failed for custom_query: %s", audit_e)
 
     return result
 
@@ -1489,7 +1449,8 @@ async def execute_template(
         raise template_config_rejected(exc) from None
     except ValueError as exc:  # 条件里还有未取值的参数占位
         raise HTTPException(status_code=400, detail={"error_code": "TEMPLATE_INVALID", "message": str(exc)}) from None
-    return await execute_query(query_body, response, db, current_user)
+    return await execute_query(query_body, response, db, current_user,
+                               _origin="template", _template_id=tpl.id)
 
 
 # ─── Cell Writeback Endpoint (Req 2, Req 13) ────────────────────────────────

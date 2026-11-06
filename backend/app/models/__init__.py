@@ -227,6 +227,8 @@ from app.models.workpaper_sync_models import (  # noqa: F401
 from app.models.asset_blob_models import AssetBlob, AiChatRunResource, KnowledgeEvidencePromotion  # noqa: F401
 # V250（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
 from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
+# V267（advanced-query-artifact-and-freshness 任务 1）：查询运行记录与查询证据
+from app.models.query_evidence_models import QueryArtifact, QueryRun  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -397,6 +399,9 @@ __all__ = [
     "FormulaPushState",
     # --- 显示偏好 (platform-global-display-settings-closure / V250) ---
     "UserDisplayPreferences",
+    # --- 高级查询运行记录与证据 (advanced-query-artifact-and-freshness / V267) ---
+    "QueryRun",
+    "QueryArtifact",
 ]
 
 # 调整分录持久化复核、处理历史与客户已入账（迁移 V235）

@@ -676,6 +676,18 @@ export const customQuery = {
   templatePresetResolve: (id: string) => `/api/custom-query/template-presets/${id}/resolve`,
   /** 「保存为模板」里「指定项目共享」可选的项目（与保存时逐项目 edit 鉴权同一口径，AQ-39） */
   templateShareTargets: '/api/custom-query/template-share-targets',
+  // AQF §8.1 — 查询历史与证据接口（10 个端点）
+  /** 本人运行历史列表（按定义去重） */
+  runs: '/api/custom-query/runs',
+  runDetail: (id: string) => `/api/custom-query/runs/${id}`,
+  runFreshness: (id: string) => `/api/custom-query/runs/${id}/freshness`,
+  runsClear: '/api/custom-query/runs/clear',
+  /** 本人证据列表 */
+  artifacts: '/api/custom-query/artifacts',
+  artifactDetail: (id: string) => `/api/custom-query/artifacts/${id}`,
+  artifactDownload: (id: string) => `/api/custom-query/artifacts/${id}/download`,
+  artifactManifest: (id: string) => `/api/custom-query/artifacts/${id}/manifest`,
+  artifactFreshness: (id: string) => `/api/custom-query/artifacts/${id}/freshness`,
 } as const
 
 // ─── 高级查询构建器（advanced-query-linkage-closure 任务 30） ───────────────────────
