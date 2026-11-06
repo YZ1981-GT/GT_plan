@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   analyzeBundle,
   checkBudget,
@@ -12,6 +13,7 @@ import {
 } from './check-bundle-budget.mjs'
 
 const roots = []
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
@@ -79,7 +81,7 @@ describe('check-bundle-budget', () => {
     expect(checkBudget(report, policy())).toContainEqual(expect.stringContaining('基线尚未建立'))
   })
 
-  it('新增超过 500 KiB 的普通 chunk 时按体积名次打红，不依赖 hash 文件名', async () => {
+  it('新增超过 500 KiB 的普通 chunk 时按稳定身份打红，不依赖 hash 文件名', async () => {
     const report = await analyzeBundle(await fixture())
     report.ordinaryLargeChunks = [{ label: 'new-[hash].js', rawBytes: 700_000, gzipBytes: 600_000 }]
     const baseline = { entryIds: report.entryIds, entry: report.entry, total: report.total, ordinaryLargeChunks: [] }
@@ -95,5 +97,32 @@ describe('check-bundle-budget', () => {
     expect(second.chunks.map((chunk) => chunk.label)).toEqual(first.chunks.map((chunk) => chunk.label))
     expect(Math.abs(second.entry.gzipBytes - first.entry.gzipBytes)).toBeLessThanOrEqual(8)
     expect(Math.abs(second.total.gzipBytes - first.total.gzipBytes)).toBeLessThanOrEqual(8)
+  })
+
+  it('普通大 chunk 按 id 与自身基线比较，不再按 gzip 名次错配', async () => {
+    const report = await analyzeBundle(await fixture())
+    report.ordinaryLargeChunks = [
+      { id: 'WorkpaperEditor', rawBytes: 700_000, gzipBytes: 550_000 },
+      { id: 'SecondEditor', rawBytes: 650_000, gzipBytes: 530_000 },
+    ]
+    const baseline = {
+      entryIds: report.entryIds,
+      entry: report.entry,
+      total: report.total,
+      ordinaryLargeChunks: [
+        // 故意反向排列；按名次比较会把两者配错，按 id 应保持通过。
+        { id: 'SecondEditor', rawBytes: 650_000, gzipBytes: 530_000 },
+        { id: 'WorkpaperEditor', rawBytes: 700_000, gzipBytes: 550_000 },
+      ],
+    }
+    expect(checkBudget(report, policy(baseline))).toEqual([])
+  })
+
+  it('构建、预览和更新脚本统一读取 bundle-budget.json，不再引用匿名旧基线', async () => {
+    for (const name of ['build-verified-dist.mjs', 'preview-verified-dist.mjs', 'update-bundle-budget.mjs']) {
+      const source = await readFile(resolve(SCRIPT_DIR, name), 'utf8')
+      expect(source).toContain('bundle-budget.json')
+      expect(source).not.toContain('bundle-budget.baseline.json')
+    }
   })
 })

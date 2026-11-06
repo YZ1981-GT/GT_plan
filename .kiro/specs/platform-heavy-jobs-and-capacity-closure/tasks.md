@@ -6,6 +6,11 @@
 
 - [ ]* 0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。
   - 🔴 需运行真实后端 + 前端正式构建 + 真实数据项目做 A/B 对照度量；本机无法伪造有意义的基线，保持阻塞。
+  - 2026-11-06 工具增量（测量与门禁纠偏批，不改勾选）：`run_final.py --baseline <上一轮 summary.json>`
+    真正参与对比（此前参数只解析不使用）——路径无效在发压前退出；按聚合 / 同名端点 / 同并发阶段给差值，
+    只展示、不进 PASS 门。运行期 `ResourceSampler` 每 15 秒采 `/api/health`、`/metrics` 与负载机
+    CPU / 内存写 `resource_samples.json`，读不到记 error、不写 0。`business_hashes` 尚无生产者，
+    相等性恒为 None —— 业务恒等式探针仍待 E4 容量环境。
 - [x] 0.2 增加 pool checkout wait/hold/timeout、event-loop lag、任务 queue age 与 Office/OCR/LLM 排队指标。
   - DB pool wait/hold/timeout、event-loop lag、LibreOffice 与 bulk import 深度/年龄此前已有。
   - 本轮补齐统一暴露面 `capacity_slots`（`platform_slot_*` 排队/执行 Histogram + `health.capacity.slots`）：
@@ -56,6 +61,9 @@
   - 🔴 仍有历史导出路由尚未迁移（`wp_onlyoffice_router` 机对机 WOPI 路径、部分 wp_sync 路由、
     `_x3_adjustment_import_export._register_shape_a` 的 export 闭包、各 `_g*_bond_investment_*`
     独立实现），须逐个确认响应生成器不再读 DB 后才能改 scope，保持未完成。
+  - 勘误（2026-11-06 整体复核，AST 现扫，现算值禁写死）：返回 StreamingResponse / FileResponse 的路由共 213 个，
+    已 function-scope 21、不取 DB 51，**仍为请求级 `Depends(get_db)` 的候选 141 个**——上条「少量历史路由」
+    低估了规模，余量是跨 100+ 路由的系统性迁移，每条都要先判响应期是否仍读 DB。
 - [x] A7 同输入验证文件 SHA/ZIP 清单/导入摘要不变，并测并发时 health/event-loop lag。
 
 ## 批 B 耐久任务
@@ -106,6 +114,9 @@
 - [ ]* C1 公式推送现状 statement counter 与 10/1000/10000 单元基线。
   - adapter 级 10/1000/10000 计数守卫已完成（现为固定 3 次 cursor execute）。
   - 🔴 完整 run 基线需专用可销毁 PG + 真实项目数据（10000 公式单元），本机无法伪造，保持阻塞。
+  - 守卫位置（2026-11-06 复核）：`tests/formula_runtime/test_workpaper_adapter.py::
+    test_apply_many_statement_count_is_constant_for_existing_rows`；完整 `FormulaPushEngine` run 的
+    statement count 与真 PG 基线仍缺。
 - [ ] C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。
   - 已完成：目标底稿单次批取、同底稿 mutation 一次锁读 + 批量 CAS；`test_formula_push_engine_locate` /
     batch-c-note / batch-c-k-cycle / reaggregate 选集 53 passed。统一写入内核骨架
@@ -118,6 +129,12 @@
     + module_attr + disclosure_notes_hardening）。
   - 🔴 未完成：`note_followup` / 合并附注写入方尚未切到新内核；真实 PG 并发 barrier 必须在专用环境里
     跑双连接重叠章节用例验证，保持未勾。
+  - 2026-11-06 复核：未接内核的写入链具体是 `formula_push.note_followup →
+    note_workpaper_pull_service._apply_note_formulas → note_formula_generator.execute_note_formulas`，
+    仍直接改 `DisclosureNote.table_data` + `flag_modified` / flush，无章节 advisory lock。
+    `test_note_formula_execute_tables.py` 的 2 例红（SQLite 缺 `formula_push_state` 表 /
+    `KeyError: '_formula_provenance'`）在 `update_note` 切内核**之前**的提交 4c66d8ef2 的临时 worktree
+    里同样复现（同两种错误），确认不是 C2 引入；上条「git stash 回滚验证」的说法不严谨，以此为准。
 - [ ] C3 合并附注一次预取记录/公式、内存后序、批量写；修正空 section_ids 语义。
   - 已完成：空数组零工作、记录/公式预取、内存后序和章节 SAVEPOINT/flush；53 个相关回归通过。
     C2 的统一写入内核骨架同时可服务合并附注章节级写入（见上条）。
@@ -135,15 +152,22 @@
   - 🔴 未完成：pipeline 还没有 PG 上的 WAL 探针（骨架默认每阶段 `wal_bytes=None`，需要在
     `async_session()` 边界内读 lsn 后再写回 profiler）；rows/s、WAL、COPY 真实基线须在专用可销毁
     PG + 真实大项目数据上跑，本机无法伪造，保持阻塞。
+  - 勘误（2026-11-06 整体复核）：上条「由 worker 塞进 `ImportJob.metadata`」不实——现扫 worker /
+    ImportJob 均无 `profiler_report` 消费方，报告只存在于 `PipelineResult`；WAL 在 pipeline 里恒 None。
 - [ ]* C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
   - 🔴 需真实文档量级（万级分块）+ 专用 PG 做 EXPLAIN 对比，本机无法伪造，保持阻塞。
   - V263 向量扩展 + HNSW 索引已建；tsvector/GIN 路径代码已有；量级基准与索引选择待证据。
+  - 勘误（2026-11-06 整体复核）：「tsvector/GIN 路径代码已有」不实——权威词法链
+    `KnowledgeDocSearch._candidates` 仍是 name / content_text / tags 的 `%ILIKE%` + 候选上限，
+    没有 tsvector 列、GIN / pg_trgm 索引。
 
 ## 批 D 前端大表与请求反馈
 
 - [ ] D1 TB 1000/5000 行虚拟化 canary，保持编辑、选区、右键、注释、公式和可访问性。
   - 现有 GtVirtualTable 不支持离屏逻辑选区/编辑，未在交互契约齐全前冒险切生产路径。
   - 🔴 需先补齐虚拟化表的编辑/选区/右键/公式/注释交互契约（约 1000 行前端），属独立 spec 工作量。
+  - 2026-11-06 复核：`GtVirtualTable` 只做只读行虚拟化，生产页零接入；GridKernel 依赖真实 td，
+    缺离屏逻辑选区、编辑器回收、稳定行 / 列 key、公式 / 批注 / 无障碍协议。D3 硬依赖本项。
 - [x] D2 TrialBalance 全表 deep watch 改行级增量重算。
 - [ ] D3 附注与合并表按 canary 结果接虚拟化；活动格才挂编辑器。
   - 🔴 依赖 D1 canary 结果（虚拟化交互契约齐全后才能扩展到附注/合并），保持未完成。
@@ -158,6 +182,7 @@
   - 代码层优化已完成（普通 JSON 写请求只 stringify 一次、完整正文指纹、single-flight follower 单次
     structuredClone、TB debounce 到 drain 才冻结）。浏览器 1/10/50MB generic serialization+clone 探针为
     3.8/19.2/87.0ms，但这不是生产 GET/保存热路径的 A/B 证据，保持专用环境阻塞。
+    另：50MB 的 87.0ms 已超过 50ms 长任务线，即使按通用探针也不能算通过。
 - [x] D7 内网 HTTP 多标签 SSE 围栏选主；1/6/12 标签始终单项目一条连接。
   - `projectEventStreamShare` 保留 Web Locks 优先；HTTP 无 locks 时以 BroadcastChannel + localStorage
     lease 选主，确定性冲突让位关闭旧连接，leader 关闭后 follower 接手并 replay。Vitest 模拟独立标签
@@ -168,6 +193,8 @@
 
 - [ ]* E1 PgBouncer transaction 模式契约与 2%→25%→100% 灰度脚本；连接预算按副本计算。
   - 🔴 需部署环境（PgBouncer 进程 + 真实后端 + RLS/SET LOCAL 验证），本机无法伪造，保持阻塞。
+  - 2026-11-06 复核：仓库里没有灰度脚本；Compose 的 backend 仍直连 PG、单 worker，PgBouncer 服务存在但
+    不在默认数据路径上。
 - [ ] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
   - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
     尚未完成跨 worker 外置和 2/4/8 worker 验证。2026-11-06 增量：接口骨架落地
@@ -176,11 +203,30 @@
     `reset_event_bus_state_adapter` 注入 hook）：debounce pending + per-project SSE quota 两面可注入；
     内存默认实现与当前 `EventBus._pending` 行为等价。11 单测全绿。EventBus / platform_jobs 真实切到
     adapter 以及 2/4/8 worker 验证仍待专用容量环境。
+  - 2026-11-06 复核：adapter 在生产代码里零调用，`EventBus` 仍直接读写 `_pending` / `_sse_queues`；
+    骨架只是可注入接口，不能算外置。
 - [x] E3 修正 Locust UUID/信封/账号池/端点；6000 阶段无样本强制 FAIL。
 - [ ] E4 构建可销毁大数据容量环境与分布式负载机。
   - 🔴 Docker PgBouncer transaction 配置和连接预算契约已在库；尚无独立容量 DB、种子数据和分布式 Locust 启动编排。
+  - 分布式负载机落地时须把各 worker 的 `stage_stats.json` 按阶段 / 端点 / 桶计数相加后再判定（格式已按
+    可相加设计，合并步骤未实现）；E6 六类安全计数也要在这里建外部不变量探针。
 - [ ]* E5 100→1000→3000→6000 VU，6000 稳态 30 分钟；提交原始 CSV/JSON/摘要。
+  - 2026-11-06 工具对齐（测量与门禁纠偏批，未在容量环境实跑，不改勾选）：梯度单一来源
+    `tests/load/load_contract.py`，删掉 500 VU 正式阶段，6000 VU 稳态 300→1800 秒，Locust 形状与稳态窗口共用
+    `stage_timeline()`。🔴 修了一处判定口径错误：开 `--csv-full-history` 后 history CSV 的分位列是最近约 10 秒
+    的滚动值、计数列是全程累计，原先取「阶段最后一行」等于只看最后 10 秒、错误率被前面阶段稀释。改为
+    `locustfile.py` 在 `events.request` 上按稳态窗口（标称加压结束 + 5 秒起）逐请求累计直方图，写
+    `stage_stats.json`，runner 从桶里复算分位；稳态覆盖时长按合同现算（不读文件自报），短跑判失败；
+    `summary.json` 改严格 JSON（无穷大写 null）。验证：`tests/load` 74 passed；11 组隔离副本变异全部红在预期
+    用例、1 组改日志文案的阴性对照全绿；真实 Locust 进程 + 本机假后端冒烟（2 个短阶段）写出窗口统计，
+    窗口内最低并发 = 目标、覆盖秒数 = 要求、500 响应计为失败、加压期请求不计入。
 - [ ]* E6 达成核心读 p95≤300ms、p99≤1s、核心错误率<0.1%，零泄露/超时/事件丢失/数据损坏。
+  - 2026-11-06 判定对齐（未实跑，不改勾选）：原 runner 用聚合 p95≤2s / p99≤5s 且 p99 不进
+    `overall_pass`。现改为 6000 稳态窗口内 `trial-balance` / `working-papers` / `ledger/window/{account_code}`
+    逐端点 p95≤300ms、p99≤1s、错误率<0.1%（缺样本或缺分位即失败）；全场景错误率取全程与 6000 窗口较差值
+    <1%；`--safety-evidence` 必须给齐 `unauthorized_successes` / `connection_leaks` / `connection_timeouts` /
+    `event_loss` / `duplicate_side_effects` / `data_corruption` 六键且全为 0，缺失即失败。🔴 这六个计数的
+    生产者（越权回放、连接池对账、事件序号对账、幂等重复、业务恒等式）尚不存在，runner 只校验不生成。
 
 ## 收尾
 
@@ -206,6 +252,16 @@
     `GT_LOAD_DISPOSABLE_DB_URL` 专用库 + 真实数据 ③6000 VU 梯度与 30 分钟稳态（见 E5/E6
     `[ ]*`）④PgBouncer transaction 灰度与跨 worker EventBus/配额外置（E1/E2）。本条保持 `[ ]*`
     至最终容量环境验收完成。
+  - 2026-11-06 测量与门禁纠偏批：上条①已修——包体预算只读 `scripts/bundle-budget.json` 一份策略
+    （删 `bundle-budget.baseline.json`），普通大块按 manifest 稳定名比对，不再按带 hash 文件名或 gzip 名次；
+    三个豁免重块按名计数，并检查不得进入入口静态依赖；`build-verified-dist` 快照指针改临时文件 + rename
+    原子切换。`build-pipeline-contract.spec.mjs` 有 1 例在 HEAD 上恒红（按注释原文切片，公式管理 / 高级查询
+    两个弹窗的注释与写法被其他会话正常改动后切片为空），改为按 `watch(...)` 调用本身判 immediate、注册位置
+    与晚到响应丢弃，内存变异 5 组全红、只改注释的对照仍绿。本轮证据：预算 7 + 构建契约 7 tests passed；
+    `vite build --mode production` 3m11s 通过；`bundle:check` 通过（入口 gzip 563,691 B、总 gzip
+    20,825,727 B、普通块 2,673 个、三个豁免重块各 1）；`smoke:built` 通过；`build:verify` 端到端通过并发布
+    `.verified-dist/c68fba13…`，`current.json` 的 `budgetBaselineSha256` 等于 `bundle-budget.json` 的 sha256。
+    仍阻塞：②③④。
 - [x] F2 更新 6000 前置文档，勘误历史零样本假绿，不改 append-only 历史记录。
   - `backend/tests/load/README.md` 写清可销毁 DB 三重闸门、perf+pg_only 专用库、原始 CSV/summary.json
     归档要求和零样本禁止外推；`run_final.py` 不再删除 Locust CSV，新增 `--evidence-dir` 与机器可读
