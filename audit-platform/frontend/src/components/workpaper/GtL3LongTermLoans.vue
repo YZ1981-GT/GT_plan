@@ -15,7 +15,7 @@
           size="small"
           @change="procedureDualMode.onModeChange"
         />
-        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/entrySyncPresentation.ts，
              已注册 bidirectional 的 entry 自动返 null 不渲染 ⇒ 无需本地条件。 -->
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l3-long-term-loans" />
         <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>

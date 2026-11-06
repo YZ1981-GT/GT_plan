@@ -1,7 +1,9 @@
-#!/usr/bin/env node
 /**
  * 正式构建包体预算：按 Vite manifest 的稳定 chunk 身份比较，不按带 hash 文件名或体积名次比较。
  * 单一策略真源：scripts/bundle-budget.json。
+ *
+ * 不写 shebang：本模块会被 vitest 直接导入，Windows 按 CRLF 检出时首行 `#!…\r` 让导入报
+ * 「Invalid or unexpected token」。一律用 `node scripts/check-bundle-budget.mjs` 调用。
  */
 import { createHash } from 'node:crypto'
 import {
@@ -40,8 +42,11 @@ function parseCli(argv) {
     if (!known.has(item)) throw new Error(`未知参数：${item}`)
     if (['--dir', '--dist', '--policy', '--baseline'].includes(item)) index += 1
   }
+  // 产物目录优先认 `--dir`（全仓约定：smoke-built-artifact.mjs / package.json 的 bundle:check
+  // 与 smoke:built 都用它），`--dist` 保留兼容；显式参数一律优先于 GT_FRONTEND_OUT_DIR，
+  // 否则 verified 构建设了该变量时会检查错目录。
   return {
-    dist: resolve(ROOT, value('--dist', '--dir') || process.env.GT_FRONTEND_OUT_DIR || 'dist'),
+    dist: resolve(ROOT, value('--dir', '--dist') || process.env.GT_FRONTEND_OUT_DIR || 'dist'),
     policy: resolve(ROOT, value('--policy', '--baseline') || relative(ROOT, DEFAULT_POLICY_FILE)),
     update: argv.includes('--update') || argv.includes('--write-baseline'),
     json: argv.includes('--json'),

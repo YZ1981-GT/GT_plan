@@ -12,6 +12,18 @@ import type { EntrySyncReadiness, EntrySyncReadinessReason } from './workpaperSy
  */
 export type EntrySyncLoadState = 'loading' | 'revalidating' | 'ready' | 'error'
 
+/**
+ * 「尚未裁决」提示的文案真源。
+ *
+ * 🔴 为什么声明在这里：`eaa655686` 把提示链路改成 `useEntrySyncReadiness` →
+ * `deriveEntrySyncPresentation` 之后，活路径上的文案只由本文件产出，而原来的真源
+ * `workpaperEntrySyncNotice.ts` 退化成 0 调用方的兼容入口。当时把两句中文**又抄了
+ * 一份**进下面的 `capability === null` 分支 ⇒ 同一句话有两个声明点，改一处另一处静默
+ * 不动。现在反过来：本文件声明、兼容入口再导出，声明点只剩一个。
+ */
+export const ENTRY_SYNC_NOTICE_LABEL = '两侧数据未互通'
+export const ENTRY_SYNC_NOTICE_SUMMARY = '结构化视图与在线编辑尚未形成已验收的双向链路'
+
 export interface EntrySyncPresentation {
   readonly showHtml: boolean
   readonly showOnlyOffice: boolean
@@ -106,8 +118,29 @@ export function deriveEntrySyncPresentation(
   if (readiness.capability === null) {
     return notice(
       { ...base, showModeSwitch: false },
-      'warning', '两侧数据未互通',
-      '结构化视图与在线编辑尚未形成已验收的双向链路', readiness.reason,
+      'warning', ENTRY_SYNC_NOTICE_LABEL,
+      ENTRY_SYNC_NOTICE_SUMMARY, readiness.reason,
+    )
+  }
+  if (
+    readiness.capability === 'bidirectional'
+    && readiness.reason?.code === 'REPRESENTATION_MISSING'
+  ) {
+    // 首版尚未发布不是不可恢复的运行时故障。桥会先调用 first-publication，
+    // 成功后再按新 revision 创建 materialize；把入口藏掉会让首版路径永远不可达。
+    return notice(
+      {
+        ...base,
+        showHtml: true,
+        showOnlyOffice: true,
+        showModeSwitch: true,
+        canSwitchToHtml: true,
+        canSwitchToOnlyOffice: true,
+      },
+      'warning',
+      '首次在线编辑将发布版本',
+      '该底稿尚未发布在线编辑版本；切换后将先创建首版并进入在线编辑',
+      readiness.reason,
     )
   }
   if (!readiness.runtime.ready) {

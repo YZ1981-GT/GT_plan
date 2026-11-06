@@ -41,6 +41,16 @@ export interface UseChecklistPersistenceOptions {
 export interface ChecklistPersistence {
   responses: Ref<Map<string, ChecklistResponse>>
   load(): Promise<void>
+  /**
+   * 只重载点名的那几个 item（其余格保持当前值，含用户尚未保存的编辑）。
+   *
+   * 🔴 为什么要有它：后端推送（公式推送 / 系统值）只改一小批后端独占键，宿主需要「只替换这几条」
+   * 而不是整表 `load()`（整表会把用户正在编辑、还没保存的别处内容静默盖掉）。原先 K1 宿主自己
+   * 发 `GET /api/workpapers/{id}/checklist-responses` 来做这件事 —— 那就是 K 轮收敛掉的「宿主层
+   * 裸端点」：读写各自一份、CAS 版本与 committed 快照两处记账。读路径收口到这里之后，宿主只说
+   * 「重载这几个 key」。
+   */
+  reloadItems(itemIds: readonly string[]): Promise<string[]>
   hydrate(source: unknown): void
   save(itemId: string, patch: Partial<ChecklistResponse>): Promise<void>
   saveDebounced(itemId: string, patch: Partial<ChecklistResponse>): void
@@ -265,6 +275,29 @@ export function useChecklistPersistence(
     hydrate(await api.get<unknown>(`/api/workpapers/${wpId.value}/checklist-responses`))
   }
 
+  async function reloadItems(itemIds: readonly string[]): Promise<string[]> {
+    const wanted = new Set(itemIds.filter((id) => typeof id === 'string' && id));
+    if (!wpId.value || !wanted.size) return []
+    const items = sourceItems(await api.get<unknown>(`/api/workpapers/${wpId.value}/checklist-responses`))
+    const picked = items.filter((raw) => {
+      const id = (raw as Partial<ChecklistResponse> | null)?.item_id
+      return typeof id === 'string' && wanted.has(id)
+    })
+    cas.remember(picked)
+    const next = new Map(responses.value)
+    const reloaded: string[] = []
+    for (const raw of picked) {
+      const item = raw as Partial<ChecklistResponse>
+      const normalized = normalizedItem(item.item_id as string, item)
+      next.set(normalized.item_id, normalized)
+      committed.set(normalized.item_id, normalized)
+      setState(normalized.item_id, { status: 'saved', serverVersion: versionOf(normalized) })
+      reloaded.push(normalized.item_id)
+    }
+    responses.value = next
+    return reloaded
+  }
+
   async function save(itemId: string, patch: Partial<ChecklistResponse>): Promise<void> {
     const timer = timers.get(itemId)
     if (timer) clearTimeout(timer)
@@ -320,7 +353,7 @@ export function useChecklistPersistence(
 
   if (getCurrentScope()) onScopeDispose(() => { void flush().catch(() => undefined) })
 
-  return { responses, load, hydrate, save, saveDebounced, flush, cancel, stateOf }
+  return { responses, load, reloadItems, hydrate, save, saveDebounced, flush, cancel, stateOf }
 }
 
 export default useChecklistPersistence

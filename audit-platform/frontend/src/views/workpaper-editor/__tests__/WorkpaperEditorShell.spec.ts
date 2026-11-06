@@ -60,20 +60,24 @@ vi.mock('@/components/time_machine/TimeMachineDrawer.vue', () => ({
 const mockNext = vi.fn()
 let routeLeaveGuard: ((to: any, from: any, next: any) => any) | null = null
 
-vi.mock('vue-router', () => ({
-  useRoute: () => ({
-    params: { projectId: 'proj-1', wpId: 'wp-1' },
-    query: {},
-  }),
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn().mockReturnValue(Promise.resolve()),
-    back: vi.fn(),
-  }),
-  onBeforeRouteLeave: (guard: any) => {
-    routeLeaveGuard = guard
-  },
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRoute: () => ({
+      params: { projectId: 'proj-1', wpId: 'wp-1' },
+      query: {},
+    }),
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn().mockReturnValue(Promise.resolve()),
+      back: vi.fn(),
+    }),
+    onBeforeRouteLeave: (guard: any) => {
+      routeLeaveGuard = guard
+    },
+  }
+})
 
 // ─── Mock confirmLeave ───────────────────────────────────────────────────────
 const mockConfirmLeave = vi.fn().mockResolvedValue(undefined)
@@ -85,6 +89,7 @@ vi.mock('@/utils/confirm', () => ({
 vi.mock('@/composables/useAuditContext', () => ({
   useAuditContext: () => ({
     canEdit: computed(() => true),
+    isArchived: computed(() => false),
     onContextChange: vi.fn(),
   }),
 }))
@@ -107,6 +112,15 @@ vi.mock('@/stores/project', () => ({
       projectStatus: 'active',
       roleInProject: null,
     },
+  }),
+}))
+
+vi.mock('@/views/workpaper-editor/useWorkpaperProjectMeta', () => ({
+  useWorkpaperProjectMeta: () => ({
+    projectMeta: ref({ audit_year: 2025 }),
+    projectYear: ref(2025),
+    projectMetaFailed: ref(false),
+    loadProjectMeta: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 
@@ -221,6 +235,7 @@ vi.mock('@/composables/useEditingLock', () => ({
   useEditingLock: () => ({
     locked: ref(false),
     lockedBy: ref(null),
+    forcedReadonly: ref(false),
     acquire: vi.fn(),
     release: vi.fn(),
   }),
@@ -271,7 +286,9 @@ vi.mock('@/composables/useWorkpaperReviewMarkers', () => ({
 
 // ─── Mock services ───────────────────────────────────────────────────────────
 vi.mock('@/services/workpaperApi', () => ({
-  getWorkpaper: vi.fn().mockResolvedValue(null),
+  getWorkpaper: vi.fn().mockResolvedValue({
+    wp_code: 'D2', wp_name: 'Test', status: 'draft', year: 2025,
+  }),
 }))
 
 vi.mock('@/services/apiProxy', () => ({

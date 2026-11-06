@@ -403,7 +403,11 @@ async def _do_batch_save(
         ON CONFLICT (wp_id, item_id) DO UPDATE SET
             conclusion = EXCLUDED.conclusion,
             remark = EXCLUDED.remark,
-            wp_ref = EXCLUDED.wp_ref,
+            -- 缺省字段是局部编辑，不得把既有交叉引用静默清空；显式 null 才清除。
+            wp_ref = CASE
+                WHEN :wp_ref_provided THEN EXCLUDED.wp_ref
+                ELSE checklist_responses.wp_ref
+            END,
             updated_by = EXCLUDED.updated_by,
             updated_at = EXCLUDED.updated_at
         RETURNING id, item_id, conclusion, remark, wp_ref, updated_by, updated_at
@@ -734,6 +738,7 @@ async def _do_batch_save(
                     "conclusion": item.conclusion,
                     "remark": item.remark,
                     "wp_ref": item.wp_ref,
+                    "wp_ref_provided": "wp_ref" in item.model_fields_set,
                     "updated_by": str(current_user.id),
                     "now": now,
                 },

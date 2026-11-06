@@ -14,7 +14,7 @@
  * （见 `bridgeFailureRealEnvelope.spec.ts` 的说明：mock `detail` 是生产上不存在的形状）。
  */
 import { describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { effectScope, ref } from 'vue'
 
 import {
   SUBSTRATE_NOT_PUBLISHED_CODE,
@@ -22,6 +22,7 @@ import {
   type WorkpaperSyncApiSurface,
 } from '../useWorkpaperSyncBridge'
 import { WP_SYNC_REJECTION_STATUS, WP_SYNC_ROUTES } from '../workpaperSyncContract.generated'
+import { registerPendingFlusher } from '../pendingWrites'
 import type { WorkpaperSyncEditorLaunchDescriptor } from '../workpaperSyncDto'
 
 const UUID = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -62,7 +63,43 @@ function wireError(status: number, errorCode: string, message: string) {
 
 const NOT_PUBLISHED = () => wireError(422, SUBSTRATE_NOT_PUBLISHED_CODE, '该底稿尚无已发布版本')
 
-function harness(api: Partial<Record<keyof WorkpaperSyncApiSurface, unknown>>) {
+function readinessWithoutFirstPublication() {
+  return {
+    entry_id: SCOPE.entryId,
+    effective_entry_id: SCOPE.entryId,
+    capability: 'bidirectional' as const,
+    adjudication_state: 'terminal' as const,
+    allowed_modes: ['html'] as const,
+    can_claim_bidirectional: false,
+    runtime: {
+      ready: false,
+      adapter_id: null,
+      authority_model: null,
+      definition_bundle_id: null,
+      definition_bundle_sha256: null,
+      typed_slots_complete: false,
+      typed_slots: [],
+      representation_id: null,
+      representation_generation: null,
+    },
+    acceptance: {
+      state: 'missing' as const,
+      stale: false,
+      run_id: null,
+      required_scenario_set_digest: null,
+    },
+    reason: {
+      code: 'REPRESENTATION_MISSING',
+      message: '当前底稿尚未发布可用于在线编辑的版本。',
+      next_action: '先完成该底稿的首版 representation 发布，再重新检查。',
+    },
+  }
+}
+
+function harness(
+  api: Partial<Record<keyof WorkpaperSyncApiSurface, unknown>>,
+  options: { onFirstPublication?: () => void | Promise<void> } = {},
+) {
   let revision = 0
   const full = {
     createPendingMutation: vi.fn(async () => ({
@@ -85,6 +122,7 @@ function harness(api: Partial<Record<keyof WorkpaperSyncApiSurface, unknown>>) {
     capability: 'bidirectional',
     flushHtml,
     reloadHtml: async () => {},
+    onFirstPublication: options.onFirstPublication,
     api: full as unknown as WorkpaperSyncApiSurface,
     storage: null,
     installBeforeUnload: false,
@@ -98,6 +136,55 @@ function harness(api: Partial<Record<keyof WorkpaperSyncApiSurface, unknown>>) {
     },
   }
 }
+
+describe('readiness 报首版缺失时允许进入首版重试链', () => {
+  it('先冲刷 HTML 防抖，再发布首版，最后按新 revision 只跑一轮 materialize', async () => {
+    let h!: ReturnType<typeof harness>
+    const ensureFirstPublication = vi.fn(async () => {
+      h.bumpRevision()
+      return {
+        status: 'published' as const,
+        representationId: UUID(24),
+        representationGeneration: 1,
+        contentRevision: 1,
+      }
+    })
+    const onFirstPublication = vi.fn(async () => {})
+    const materialize = vi.fn(async () => descriptor())
+    const readEntrySyncReadiness = vi.fn(async () => readinessWithoutFirstPublication())
+    const pendingFlush = vi.fn(async () => {})
+    const scope = effectScope()
+    scope.run(() => registerPendingFlusher(pendingFlush))
+    try {
+      h = harness(
+        { readEntrySyncReadiness, ensureFirstPublication, materialize },
+        { onFirstPublication },
+      )
+
+      const received = await h.bridge.switchToOnlyOffice()
+
+      expect(received.roomId).toBe(UUID(21))
+      expect(readEntrySyncReadiness).toHaveBeenCalledTimes(1)
+      expect(ensureFirstPublication).toHaveBeenCalledTimes(1)
+      expect(onFirstPublication).toHaveBeenCalledTimes(1)
+      // 首版前冲刷一次，重走时 no-op flusher 再被调用一次；真实组件第二次不会重发 PUT。
+      expect(pendingFlush).toHaveBeenCalledTimes(2)
+      expect(h.flushHtml).toHaveBeenCalledTimes(1)
+      expect(h.api.createPendingMutation).toHaveBeenCalledTimes(1)
+      expect(materialize).toHaveBeenCalledTimes(1)
+      expect(pendingFlush.mock.invocationCallOrder[0]).toBeLessThan(
+        ensureFirstPublication.mock.invocationCallOrder[0],
+      )
+      expect(ensureFirstPublication.mock.invocationCallOrder[0]).toBeLessThan(
+        h.flushHtml.mock.invocationCallOrder[0],
+      )
+      expect(materialize.mock.calls[0][1].expectedRevision).toBe(1)
+      expect(h.bridge.state.value).toBe('oo_loading')
+    } finally {
+      scope.stop()
+    }
+  })
+})
 
 describe('materialize 报 substrate_not_published ⇒ 发一次首版并整链重走', () => {
   it('首版成功：flush/pending/materialize 各两次、首版恰一次，第二轮用新 revision 并进 oo_loading', async () => {

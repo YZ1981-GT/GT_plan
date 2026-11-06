@@ -14,7 +14,7 @@
         的局部健康，两者是不同层面，必须合取而不是互相顶替。
       -->
       <el-segmented v-if="dualMode.ooAvailable.value && j1EntrySync.presentation.value.showModeSwitch" :model-value="dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'" @change="(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')" :options="['HTML', 'OnlyOffice']" size="small" />
-      <!-- 能力诚实披露：文案真源在 sync/workpaperEntrySyncNotice.ts，宿主不得内联提示中文；
+      <!-- 能力诚实披露：文案真源在 sync/entrySyncPresentation.ts，宿主不得内联提示中文；
            已注册 bidirectional 的 entry 由组件自己返 null 不渲染 ⇒ 无需本地条件。 -->
       <GtEntrySyncCapabilityNotice entry-id="xlsx/j1/gt-j1-employee-compensation" />
       <el-tag v-if="dualMode.ooAvailable.value" size="small" type="success">OnlyOffice 就绪</el-tag>

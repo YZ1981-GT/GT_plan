@@ -21,12 +21,14 @@ export function isK1BackendOwnedKey(itemId: string): boolean {
   return _K1_BACKEND_OWNED_PATTERNS.some((re) => re.test(itemId))
 }
 
-/** K1 宿主保存集合：按生成文件过滤独占键（K1 接入前生成文件无 K1 → 不过滤）。 */
-export function k1SaveItemIds(itemIds: Iterable<string>): string[] {
-  return [...itemIds].filter((id) => !isOwnedKey('K1', id))
-}
-
-/** K1-1 审定表保存集合：同上口径。 */
-export function k1AdjudicationSaveItemIds(itemIds: Iterable<string>): string[] {
-  return [...itemIds].filter((id) => !isOwnedKey('K1', id))
-}
+// 🔴 2026-11-05 删除 `k1SaveItemIds` / `k1AdjudicationSaveItemIds`（原按生成文件过滤独占键）。
+//
+// 它们与 K1 的产品裁决相反：**K1 宿主保留完整保存集合**，后端独占键的分类只用于提示条接线
+// （裁决记在 `__tests__/k1FormulaPushHost.spec.ts` 的文件头与「根宿主保存入口把原始 itemId 交给
+// persistence.save」那条源码级判据里）。两个函数的注释自己写着「K1 接入前生成文件无 K1 → 不过滤」
+// —— 那正是它们当初能与裁决共存的原因；`formula-push-all-subjects-rollout` 把 K1 binding 接进生成
+// 文件后过滤真的生效了，于是三条「保留完整集合」的判据一起打红，而生产代码一个调用方都没有
+// （现算：只有测试文件 import 它们）。删掉而不是改成恒等：恒等函数会让下一个人以为这里有口径。
+//
+// E1 的同形函数（`e1AdjudicationSaveItemIds`）**不要**跟着删 —— 它有生产调用方
+// `useE1Adjudication.ts`，且 E1 的裁决恰好相反（独占键前端只在内存算、不保存）。

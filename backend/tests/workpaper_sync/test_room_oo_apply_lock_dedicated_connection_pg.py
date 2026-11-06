@@ -54,7 +54,7 @@ async def _collect() -> dict[str, Any]:
         warm = [await engine.connect() for _ in range(3)]
         for c in warm:
             await c.close()
-        ns = R._ADVISORY_NAMESPACE
+        ns = R.WORKPAPER_SYNC_ADVISORY_NAMESPACE
         room = uuid.uuid4()
         key = f"oo_apply:{room}"
         async with AsyncSession(engine) as session:

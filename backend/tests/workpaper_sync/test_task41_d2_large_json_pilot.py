@@ -1681,11 +1681,19 @@ class TestUpstreamDebtsAreVisibleFacts:
         assert name not in (P.__all__ or ())
         source = Path(inspect.getsourcefile(P) or "").read_text(encoding="utf-8")
         assert name not in source
+        # 🔴 2026-11-04：本 pilot 的 resolver 已改为从编排闭包转发（pilot 文件里没有同名
+        #    `def`）⇒ 原先在 pilot 源码里 `next(...)` 找函数会抛 `StopIteration`（本轮实测）。
+        #    按运行期对象定位实现所在文件与首行，再回到那一层做同样的 AST 判据。
+        resolver = P.resolve_published_frozen_definitions
+        impl_file = inspect.getsourcefile(resolver)
+        assert impl_file, "取不到 resolver 的实现文件"
+        impl_first_line = resolver.__code__.co_firstlineno
         node = next(
             n
-            for n in ast.walk(ast.parse(source))
+            for n in ast.walk(ast.parse(Path(impl_file).read_text(encoding="utf-8")))
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
             and n.name == "resolve_published_frozen_definitions"
+            and n.lineno <= impl_first_line <= (n.end_lineno or n.lineno)
         )
         assert [s for s in node.body if isinstance(s, ast.Raise)] == [], (
             "欠账登记删了但函数顶层仍 raise ⇒ 中间形态①"
@@ -2053,7 +2061,22 @@ class TestOrderingGate:
         assert str(entry.get("migration_state") or "") == "adapter_registered"
         P.assert_manifest_capability_enabled()  # 不抛即放行
         # ② 顺序门仍可打红：退回 finalize 之前的形态 ⇒ 必须照旧拒绝
-        with pytest.raises(P.PilotSelectionError, match="manifest capability"):
+        #
+        # 🔴 2026-11-04 改期望类（属性没换）：`assert_manifest_capability_enabled` 已改为从
+        #    `phase5_entry_orchestration.build_orchestration` 转发，抛的是编排闭包自己的
+        #    `EntrySelectionError`（本模块按 `P.EntrySelectionError` 导出），不是本模块
+        #    自定义的 `PilotSelectionError`。原先写 `PilotSelectionError` ⇒ `pytest.raises`
+        #    捕不到、异常原样冒出（本轮实测）。两个类的分工与为什么不合并见 pilot 模块里
+        #    `EntrySelectionError = _orch.EntrySelectionError` 处的注释。
+        assert P.EntrySelectionError is not P.PilotSelectionError, (
+            "两个错误类合并了 ⇒ 要么 d2 的选型错误码与另外三个 pilot 分叉，"
+            "要么编排闭包的 per-entry 码丢失，两种都要先改取证方再改这里"
+        )
+        from app.services.workpaper_sync.models import SyncDomainError
+
+        assert issubclass(P.EntrySelectionError, SyncDomainError)
+        assert issubclass(P.PilotSelectionError, SyncDomainError)
+        with pytest.raises(P.EntrySelectionError, match="manifest capability"):
             P.assert_manifest_capability_enabled(manifest=_manifest_before_enablement())
 
     def test_capability_predicate_agrees_with_the_ordering_gate(self) -> None:
@@ -2070,7 +2093,8 @@ class TestOrderingGate:
         # 退回 finalize 之前：谓词 False，顺序门抛 —— 同一套判据的另一侧
         before = _manifest_before_enablement()
         assert P.manifest_capability_enabled(manifest=before) is False
-        with pytest.raises(P.PilotSelectionError, match="manifest capability"):
+        # 期望类同上条：forwarded 入口抛编排闭包的 `EntrySelectionError`
+        with pytest.raises(P.EntrySelectionError, match="manifest capability"):
             P.assert_manifest_capability_enabled(manifest=before)
 
     def test_attach_is_a_no_op_before_enablement_and_never_raises(
@@ -2089,10 +2113,19 @@ class TestOrderingGate:
         换成退回 finalize 之前的 manifest —— 判据链路全程仍是生产的
         （`attach_pilot_adapters` → `manifest_capability_enabled` →
         `assert_manifest_capability_enabled` → `load_entry_manifest`），只有输入被替换。
+
+        🔴 2026-11-04 换 patch 落点（属性仍没换）：本 pilot 的 `attach_pilot_adapters` /
+        `manifest_capability_enabled` 已改为从 `phase5_entry_orchestration.build_orchestration`
+        转发，闭包里调的是**编排模块**自己的 `load_entry_manifest`。继续只 patch `P` 上的同名
+        符号等于没 patch ⇒ 活体 manifest（已启用）让 attach 走到读库那一步、`session=None`
+        抛 `AttributeError`（本轮实测）。改成 patch 生产路径真正调用的那一个。
         """
         import asyncio
 
+        from app.services.workpaper_sync import phase5_entry_orchestration as _orch
+
         before = _manifest_before_enablement()
+        monkeypatch.setattr(_orch, "load_entry_manifest", lambda *a, **k: before)
         monkeypatch.setattr(P, "load_entry_manifest", lambda *a, **k: before)
         registry = RG.WorkpaperSyncAdapterRegistry(manifest=before)
         assert asyncio.run(P.attach_pilot_adapters(registry, session=None)) == ()
@@ -2195,20 +2228,41 @@ class TestProductionWiring:
 
         🔴 Task 40 实测（M26）：判据若只是「守卫自己调那把锁」，把生产路径换成
         `load_pilot_contract()` 后整组测试仍全绿 —— 判据与生产路径脱钩。
+
+        🔴 2026-11-04 改成按**运行期对象**定位实现（判据强度不变）：这两个入口已改为从
+        `phase5_entry_orchestration.build_orchestration` 转发，pilot 文件里不再有同名
+        `def` ⇒ 原先按 pilot 文件 AST 找函数得到空集合，`set(sources) == {...}` 打红；
+        更糟的形态是「两边集合都空、差集恒空」会让判据悄悄恒真（本 spec 反复点名）。
+        现在先用 `inspect` 拿到实现所在文件与首行，再回到**那一层**做同样的 AST 判据，
+        并显式断言调用集合非空（防空转）。
         """
-        tree = ast.parse(Path(P.__file__).read_text(encoding="utf-8"))
+        import inspect
+
         sources: dict[str, set[str]] = {}
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name not in {"publish_pilot_definitions", "attach_pilot_adapters"}:
-                continue
-            sources[node.name] = {
+        for public_name, fn in (
+            ("publish_pilot_definitions", P.publish_pilot_definitions),
+            ("attach_pilot_adapters", P.attach_pilot_adapters),
+        ):
+            impl_file = inspect.getsourcefile(fn)
+            assert impl_file, public_name
+            first_line = fn.__code__.co_firstlineno
+            impl_tree = ast.parse(Path(impl_file).read_text(encoding="utf-8"))
+            node = next(
+                n
+                for n in ast.walk(impl_tree)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and n.name == fn.__name__
+                and n.lineno <= first_line <= (n.end_lineno or n.lineno)
+            )
+            sources[public_name] = {
                 inner.func.id
                 for inner in ast.walk(node)
                 if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)
             }
         assert set(sources) == {"publish_pilot_definitions", "attach_pilot_adapters"}, sources
+        assert all(calls for calls in sources.values()), (
+            f"取到了空的调用集合 ⇒ 判据会恒真：{sources}"
+        )
         for name, calls in sorted(sources.items()):
             assert "assert_contract_file_matches_source" in calls, (name, sorted(calls))
             assert "load_pilot_contract" not in calls, (

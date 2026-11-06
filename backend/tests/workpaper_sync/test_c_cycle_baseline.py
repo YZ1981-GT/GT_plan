@@ -214,9 +214,24 @@ class TestPatternLessAttribution:
     def test_a_program_console_32_codes(
         self, overrides: dict[str, str]
     ) -> None:
-        """CC-68 补充: a-program-console 得 32 码，横跨多字母。"""
+        """CC-68 补充: a-program-console 横跨多字母（原记 32 码，现算 23）。
+
+        🔴 2026-11-05：下界 32 已不成立 —— S 循环检查表组件接进渲染管线后（655faa7c4 FEAT-002 /
+        40561d2c6），S9-1 / S9-2 / S10-1 / S10-2 / S17-1 / S17-2 / S17-3 / S17-11 / S17-21 九个码
+        从程序表壳改派到各自的检查表组件，a-program-console 只剩 23 码。CC-68 的论点是
+        「`pattern_less` 宿主的码只能靠 override 反查看见、且横跨多个循环」，与具体码数无关 ⇒
+        判据改成「横跨 ≥4 个字母」+「码数仍在 20 量级（不许静默塌成个位数）」。
+
+        🔴 不写成「码数最多的 pattern_less 宿主」：现算 `c-control-test` 28 > 23，那种写法会把
+        「谁最多」这件与 CC-68 无关的事实变成判据（本轮第一版就这么写、当场打红）。
+        """
         codes = override_reverse_lookup(overrides, "a-program-console")
-        assert len(codes) >= 32, f"a-program-console codes={len(codes)}"
+        letters = {c[0].upper() for c in codes if c[:1].isascii() and c[:1].isalpha()}
+        assert len(letters) >= 4, f"a-program-console 只横跨 {sorted(letters)} ⇒ 「跨循环共享宿主」的事实漂移"
+        assert len(codes) >= 20, (
+            f"a-program-console 现算 {len(codes)} 码（横跨 {sorted(letters)}）⇒ 规模塌了一个量级，"
+            "「一个宿主服务一大批码」这条事实须重新取证"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -387,9 +402,23 @@ class TestStructuralZeros:
         """CC-54: count 键在 2 宿主为 0。"""
         assert zeros.get("count_key", 0) == 0
 
-    def test_notice_sync_zero(self, zeros: dict[str, int]) -> None:
-        """CC-12: GtEntrySyncCapabilityNotice 在 2 宿主为 0。"""
-        assert zeros.get("notice_sync", 0) == 0
+    def test_notice_sync_is_now_mounted_in_both_hosts(
+        self, zeros: dict[str, int], host_files: list[Path]
+    ) -> None:
+        """原 `test_notice_sync_zero`（CC-12）—— 🔴 断言方向已反转。
+
+        CC-12 冻结的是「C 域 2 个宿主都没挂同步能力提示」。umbrella spec
+        `workpaper-html-onlyoffice-bidirectional-writeback-closure` 的 task 3.5 把 AC-14 的
+        `GtEntrySyncCapabilityNotice` 接到了全部宿主上（本 spec 的交付物），这 2 个宿主也在内
+        ⇒ 现算 2 而不是 0。**保留 `== 0` 断言 = 把一个已被有意改掉的事实继续固化**，所以改成
+        正向断言：两个宿主都挂上了，且挂的是单源那一个组件。
+        """
+        assert zeros.get("notice_sync", 0) == len(host_files) == 2, (
+            f"C 域宿主挂 notice 的数现算 {zeros.get('notice_sync', 0)}，应等于宿主数 {len(host_files)}"
+        )
+        for host in host_files:
+            text = host.read_text(encoding="utf-8", errors="replace")
+            assert "GtEntrySyncCapabilityNotice" in text, host.name
 
     def test_resolve_procedure_sheet_key_zero(
         self, zeros: dict[str, int]

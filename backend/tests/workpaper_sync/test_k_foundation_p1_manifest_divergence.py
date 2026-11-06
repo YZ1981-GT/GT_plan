@@ -64,6 +64,13 @@ def _load(path: pathlib.Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _n_of_entry(entry_id: str) -> int:
+    """`xlsx/gt-k{n}-…` → n（与 `TestKFP2ManifestOriginalValues._split` 同一提取口径）。"""
+    m = re.match(r"^xlsx/gt-k(1[0-3]|[1-9])-", entry_id)
+    assert m, entry_id
+    return int(m.group(1))
+
+
 def _k_prefixed_xlsx_independent(full_manifest: dict) -> list[dict]:
     """按 slice 的 selection_rule 从 manifest 现算 K 前缀 xlsx 独立 entry。"""
     out = []
@@ -156,17 +163,27 @@ class TestKFP2ManifestOriginalValues:
     def test_all_13_capability_is_single_onlyoffice_in_manifest(
         self, full_manifest: dict
     ) -> None:
-        """未晋级 8 条仍 single_onlyoffice；晋级 5 条恰为 bidirectional。"""
+        """晋级的恰为 bidirectional；未晋级的是**待裁决**（capability=null + 三字段齐备）。
+
+        🔴 2026-11-05：原判据要求未晋级的仍是 `single_onlyoffice`。umbrella spec
+        `workpaper-html-onlyoffice-bidirectional-writeback-closure` 的 task 1.1 把未逐项裁决的
+        entry 统一落成 `capability=null` + pending 三字段（AC 1.3：拒绝继续用组件默认值当裁决）
+        ⇒ 剩下的 K10 现算 null，原判据恒红。**保留 `== "single_onlyoffice"` 等于要求把 overlay
+        默认值写回去当裁决**，那正是 AP-3 明禁的。判据改成验 pending 态本身。
+        """
         from tests.workpaper_sync.k_foundation_facts import K_BIDIRECTIONAL_ENTRIES
 
         ks = _k_prefixed_xlsx_independent(full_manifest)
         assert len(ks) == 13
         promoted, rest = self._split(full_manifest)
         assert sorted(promoted) == sorted(K_BIDIRECTIONAL_ENTRIES)
+        assert rest, "没有未晋级的 entry ⇒ 本判据的 pending 分母空了，K 循环已全部晋级，判据要改写"
         for n, e in rest.items():
-            assert e["capability"] == "single_onlyoffice", (
-                f"K{n}: manifest capability={e['capability']!r}"
+            assert e["capability"] is None, (
+                f"K{n}: manifest capability={e['capability']!r} —— 未逐项裁决的 entry 只能是 null"
             )
+            for field in ("capability_target", "capability_verdict_stage", "capability_target_blocked_by"):
+                assert e.get(field), f"K{n} 的 pending 三字段缺 {field}"
         bidir = sorted(
             n for n, e in {**promoted, **rest}.items()
             if e["capability"] == "bidirectional"
@@ -209,27 +226,42 @@ class TestKFP2ManifestOriginalValues:
     def test_zero_entries_have_capability_target_field_in_manifest(
         self, full_manifest: dict
     ) -> None:
-        """🔴 KC-1 关键判据：manifest 原值里 0 条有 capability_target 字段。"""
-        ks = _k_prefixed_xlsx_independent(full_manifest)
-        has_ct = [
-            e["entry_id"] for e in ks if "capability_target" in e
-        ]
-        assert has_ct == [], (
-            f"manifest 原值里出现了 capability_target 字段：{has_ct}"
+        """原 KC-1：manifest 原值里 0 条带 capability_target —— 🔴 断言已按 pending 裁决制重写。
+
+        KC-1 当初的论点是「manifest 给的是 overlay 默认值，不是逐项裁决，所以**没有** target 这种
+        裁决产物」。task 1.1 之后恰好相反：没裁决的 entry **必须**带 target（pending 三字段），
+        带 target 的那条正是「还没裁」的标记。⇒ 判据翻面并带上分界：pending 的带 target，
+        已晋级的不带（晋级就是裁决完成，再留 target 会让人以为还没裁）。
+        """
+        promoted, rest = TestKFP2ManifestOriginalValues._split(full_manifest)
+        assert [e["entry_id"] for e in rest.values() if "capability_target" not in e] == [], (
+            "有未晋级的 entry 不带 capability_target ⇒ pending 态没有记录目标，无法复核"
         )
+        leftover = [e["entry_id"] for e in promoted.values() if "capability_target" in e]
+        assert leftover == [], f"已晋级的 entry 还留着 capability_target：{leftover}"
 
     def test_these_values_come_from_overlay_defaults_not_per_entry_ruling(
         self, full_manifest: dict, overlay: dict
     ) -> None:
-        """overlay 的 defaults_by_component.GtOnlyOfficeSheet 驱动了这些默认值。"""
+        """overlay 仍声明组件默认值，但未晋级的 entry **不再**采用它（AC 1.3 的落点）。
+
+        🔴 2026-11-05：原判据是「未晋级的 7 条 capability / html_store 逐值等于 overlay 默认值」。
+        两件事都变了：晋级后 rest 只剩 K10 一条；且 task 1.1 让它走 pending（capability=null）而
+        不是默认值。默认值声明本身仍是事实、仍要验（它是「默认值存在但不被当裁决」的前提）⇒
+        判据改成：默认值照旧声明 `single_onlyoffice` / `unresolved`，而未晋级的 entry 的 capability
+        **不等于**该默认值 —— 这正是 AC 1.3 要求的「拒绝用组件默认值当裁决」。
+        """
         defaults = overlay.get("defaults_by_component", {}).get("GtOnlyOfficeSheet", {})
         assert defaults.get("capability") == "single_onlyoffice"
         assert defaults.get("html_store") == "unresolved"
-        # 晋级的 6 条由 overlay 的逐 entry override 驱动（不再是默认值），其余 7 条仍是默认值
         _promoted, rest = TestKFP2ManifestOriginalValues._split(full_manifest)
-        assert len(rest) == 7
+        assert rest, "pending 分母空了 ⇒ 本判据失去对象"
         for e in rest.values():
-            assert e["capability"] == defaults["capability"]
+            assert e["capability"] != defaults["capability"], (
+                f"{e['entry_id']} 的 capability 又回到 overlay 默认值 {defaults['capability']!r} "
+                "⇒ 组件默认值被当成了逐项裁决（AC 1.3 / AP-3 明禁）"
+            )
+            # html_store 仍是默认值：它描述的是「HTML 侧落点尚未解析」，与 capability 裁决无关
             assert e["html_store"] == defaults["html_store"]
 
 
@@ -263,17 +295,25 @@ class TestKFP3SliceManifestDivergence:
     def test_manifest_and_slice_are_not_equal_and_point_to_bp9(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
-        """🔴 断言两者不相等且分歧已登记为 BP-9。"""
+        """🔴 分歧集合必须恰是「已晋级」那一批，且分歧已登记为 BP-9。
+
+        🔴 2026-11-05：原判据写死「13/13 全不一致」。那是晋级前的状态（slice 冻结 null、manifest
+        给 overlay 默认值 single_onlyoffice）。现在两侧都变了：晋级的 12 条 live 已是
+        bidirectional（仍与 slice 的 null 不等），未晋级的 K10 走 pending、live 也是 null ⇒ 与
+        slice **相等**。写死 13 会把「K10 的分歧已消除」报成判据失败 ⇒ 改成「分歧集合 == 晋级集合」：
+        少一条（有人把晋级的写回 null）或多一条（pending 的被塞成默认值）都打红。
+        """
+        from tests.workpaper_sync.k_foundation_facts import K_BIDIRECTIONAL_ENTRIES
+
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
-        diverged = 0
-        for e in manifest_slice["independent_entries"]:
-            live_cap = by_id[e["entry_id"]]["capability"]
-            slice_cap = e["capability"]
-            if live_cap != slice_cap:
-                diverged += 1
-        assert diverged == 13, (
-            f"期望 13/13 不一致，实得 {diverged}/13 —— "
-            "断言相等就是把 overlay 默认值当裁决（AP-3 明禁）"
+        diverged = sorted(
+            _n_of_entry(e["entry_id"])
+            for e in manifest_slice["independent_entries"]
+            if by_id[e["entry_id"]]["capability"] != e["capability"]
+        )
+        assert diverged == sorted(K_BIDIRECTIONAL_ENTRIES), (
+            f"capability 分歧集合现算 K{diverged}，期望恰是已晋级的 K{sorted(K_BIDIRECTIONAL_ENTRIES)} —— "
+            "断言全部相等就是把 overlay 默认值当裁决（AP-3 明禁），断言全部不等则会把已消除的分歧算进来"
         )
         # BP-9 必须存在于阻断项列表
         bp_ids = {b["id"] for b in manifest_slice["blocking_preconditions"]}
@@ -299,17 +339,68 @@ class TestKFP3SliceManifestDivergence:
 class TestKFP4ParentDuplicateZero:
     """KD-5: parent_duplicate == 0，且 slice 顶层无 parent_duplicate_summary。"""
 
+    #: 🔴 2026-10-07（`ae318ce9d`）起 K 的 5 张调整子 Tab + K1 核销检查子 Tab 各自挂
+    #: 共享同步宿主 `WorkpaperSyncEditorHost` 并声明父 entry 身份。它们与 KD-5 说的
+    #: 「legacy parent_duplicate」不是一回事（冻结时还不存在），逐条登记。
+    SYNC_HOST_SUBTABS = (
+        "xlsx/k1/inspection/k1-tab-writeoff-check",
+        "xlsx/k11/core/k11-tab-adjustment",
+        "xlsx/k12/core/k12-tab-adjustment",
+        "xlsx/k13/core/k13-tab-adjustment",
+        "xlsx/k8/core/k8-tab-adjustment",
+        "xlsx/k9/core/k9-tab-adjustment",
+    )
+
     def test_no_manifest_entry_has_parent_in_k_set(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
+        """🔴 KD-5 要的是 **legacy** parent_duplicate 为 0；同步宿主子页逐条登记。
+
+        原判据是「任何以 K entry 为 parent 的子入口都不许有」。`ae318ce9d`
+        （2026-10-07）之后，K 的 6 张子 Tab 开始挂共享同步宿主并声明父 entry 身份，
+        这条就红在那 6 条上。它们**不是** legacy 重复面：
+          · `mount_components == ['WorkpaperSyncEditorHost']`（统一同步宿主，
+            不是 `GtOnlyOfficeSheet` / `OnlyOfficeWordDialog` 那类 legacy 面）；
+          · `independent_entry is False` 且 `adjudication_state == 'inherited'`
+            ⇒ 不产生独立裁决，裁决只在父 entry 上；
+          · `adapter_id is None` ⇒ 不会被当成「已迁移 adapter」重复计数（AC 1.6 的实质）。
+
+        口径与 `test_task57_abcs_and_shared_migration.py` 的
+        `global_parent_duplicate_count`（legacy 52 中剔除挂同步宿主的 40 条）**一致** ——
+        同一个平台现象在两处用同一把尺子，不是各自放宽。
+        """
         k_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
         children = [
-            e["entry_id"] for e in full_manifest["entries"]
+            e for e in full_manifest["entries"]
             if e.get("parent_entry_id") in k_ids
         ]
-        assert children == [], (
-            f"manifest 里有 K 的 parent_duplicate 子入口：{children}"
+        legacy = [
+            e["entry_id"] for e in children
+            if "WorkpaperSyncEditorHost" not in (e.get("mount_components") or [])
+        ]
+        assert legacy == [], (
+            f"manifest 里有 K 的 legacy parent_duplicate 子入口：{legacy}"
         )
+        assert sorted(e["entry_id"] for e in children) == sorted(
+            self.SYNC_HOST_SUBTABS
+        ), (
+            "同步宿主子页清单对不上（左=现算，右=登记）："
+            f"{sorted(e['entry_id'] for e in children)} vs {sorted(self.SYNC_HOST_SUBTABS)}"
+        )
+        # 逐条结构判据：登记它们的前提是「继承父裁决 + 不冒充已迁移 adapter」
+        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        for e in children:
+            eid = e["entry_id"]
+            assert e.get("independent_entry") is False, f"{eid} 变成独立入口了"
+            assert e.get("adjudication_state") == "inherited", (
+                f"{eid} 的 adjudication_state={e.get('adjudication_state')!r}"
+                " ⇒ 子页开始自己裁决，须重新登记"
+            )
+            assert e.get("adapter_id") is None, f"{eid} 被当成已迁移 adapter 计数了"
+            parent = by_id.get(e["parent_entry_id"])
+            assert parent is not None and parent.get("independent_entry") is True, (
+                f"{eid} 的父 entry {e['parent_entry_id']!r} 不是独立入口"
+            )
 
     def test_overlay_has_no_k_parent_rules(self, overlay: dict) -> None:
         k_rules = [

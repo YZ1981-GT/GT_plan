@@ -1096,3 +1096,569 @@
 - **6.3**：验收账本仍为 0；67 条 bidirectional entry 尚未完成逐 entry required scenarios，
   D2 阻断态证据只证明 AC 1.4。
 - **7.5**：依赖前三项与最新候选树终验；满足 design §15 后再登记 INDEX 并归档。
+
+## 第二批收口（2026-11-05，v1.0.127 之后）
+
+本批不新开任务，只做「仍在红的判据」收口：把冻结快照类判据改成可伪证的棘轮，并补齐三处 provider
+真缺口。逐项证据与变异结果见下；未完成项仍以上节索引为准（0.5 / 2.8 / 6.3 / 7.5 不变）。
+
+### 本批交付
+
+- **task57（A/B/C/S 与跨循环共享 entry 普查）100 → 0 红**。判据从「快照登记值 == 现算值」改成棘轮：
+  漂移必须在 `backend/tests/workpaper_sync/_test_task57_slice_drift_ledger.py` 点名并连现算值一起钉住
+  （291 个 key / 33 单项 + 16 组，方向 pinned·grow·shrink·superset·subset）。四种后果都会打红：
+  未登记的新漂移 / 已登记项又变了 / 漂移消失（条目成死条目必须删）/ 条目所属测试类跑完却从没被查过。
+  能机械核对的理由另记 `claim`，由 `_DRIFT_CLAIMS` 四个函数逐键现场核（载体已换共享同步宿主 /
+  持久化搬到闭包深度 4 / 写调用搬进 `useProgramOverrideTarget` / sheet 名改传纯码且 resolver 真解析）。
+  路径常量与源码读法拆到 `_test_task57_slice_scanners.py`。
+- **顺带修好三处判据自身的缺陷**：①持久化通道扫描器把接口路径登记表（`services/apiPaths/**`，只声明
+  路径不发请求）算成 HTTP 站点 ⇒ a173 多出 custom_cells；②`parent_duplicate` 把挂共享同步宿主的子 Tab
+  与 legacy 重复入口混成一类（52 vs 12）；③内容锚点对「同文件可有多处」的形态硬分 moved/ambiguous。
+- **Task 75 四条判据的分母补齐**（provider 侧真缺口，不是放宽判据）：`phase5_m_cycle_common` 与
+  M2/M3/M4/M7/M10 转发 `resolve_published_frozen_definitions`；G4/G6 ECL 补该 resolver 与
+  `attach_pilot_adapters`；C 控制测试把观测 + digest 比对抽成同名函数。交付台账 25 条 `pilot_class`
+  占位值改成各 provider 自己声明的值。
+- **A/C 域守卫按 pending 裁决制重写**（6 红）：A 域 capability 现在一律 null（本 spec task 1.1）
+  ⇒ 判据改成「不该有任何 bidirectional + 三字段齐备 + canary 仍是唯一有契约的那条」；canary 注册计划
+  改成「只许被 capability 未裁决这一条挡住」；a3-console 有 HTML 对端 ⇒ 不能再裁 single_onlyoffice；
+  A5-1 两条 definition digest 改成「磁盘 == provider 现算」且都不等于模板修订前的旧值。
+- **归档路径与晋级账本对账**（K 循环 102 个 setup ERROR 清零，59 → 25 红）：新增
+  `sync_artifact_paths.py` 的 `spec_dir()`（活跃优先、归档兜底）；`K_REVIEWED_CONTRACTS` /
+  `K_BIDIRECTIONAL_ENTRIES` 补 K2~K7；`contract_owner()` 让没写 `review` 块的 a51 契约按
+  `contract_id` 查交付台账（补 `review` 块会改 canonical digest、让已发布底稿脱钩，属该 lane 的重发布）。
+- **行数门按交付单元拆模块**：`_test_task75_impl_lookup.py` / `_test_task43_workbook_helpers.py` /
+  上述两个 task57 模块。`test_c_cycle_baseline.py` 入白名单（HEAD 就已 1386 > 800，本轮只改两处判据），
+  按真实行数登记并写明拆分方向与归属 lane。
+
+### 验证（隔离库，口径与 CI 同）
+
+| 选集 | base（= 本提交的父 `ebb29beee`） | 候选 |
+| --- | --- | --- |
+| task57 | 100 failed | **136 passed** |
+| A/B/C 兄弟守卫 + ACNR + 已知失败清册自检 | 10 failed | **536 passed / 3 skipped** |
+| pilots（task39~43） | — | **540 passed / 5 xfailed** |
+| task75（共享 PG） | — | **514 passed** |
+| K 全家 | 59 failed + 102 errors | **25 failed / 1115 passed** |
+
+- 变异（`plans/t57.json` 12 组）：9 RED + 3 GREEN 阴性对照。RED 覆盖「钉住值改错 / 单调方向写反 /
+  superset 丢元素 / 组键换族 / 漂移消失却不删条目 / claim 去真核 / 跳过规则撤掉 / 例外清单清空 /
+  判据键写成别的测试类名」。阴性对照（组名改写 / 集合等式放成下界 / 判据改恒真）必须保持 GREEN，
+  用来证明这些自检不是对任何改动都红。
+- ruff 相对 base 新增 0 / 解决 4；行数门 `rc=0`；九个生成物 `--check` 全过（writer 清册 / resolver
+  矩阵 / 里程碑三件按依赖序重算，diff 只有 digest 传播与一处调用点新增）。
+- `KNOWN_FAILING` 删掉 `test_task57…::test_ad1_scope_arithmetic_closes`（棘轮生效后不再假红）。
+
+### 本批未完成（如实登记）
+
+- **K 循环剩余 25 条红属其 lane 自己的冻结事实漂移**（OCR 两种 URL 形态的收敛账、端点命中文件数、
+  BP-8 基线、`wp_code_patterns` 启发式 vs 裁决值等），每条都要独立取证，不在本批范围。
+- **6.3 的 capability 终裁仍要真实 OnlyOffice 证据**：台账里 46 条 `mirror_capability` / 17 条
+  `sheet_literal` / 17 条 `verdict` 的组都写明「裁完后整组删除」，裁决本身须用户放行后才能做。
+- **A5-1 已发布 artifact 仍是按模板修订前的 digest 发的**：判据已把旧值留作反向钉子，重发布属 6.3。
+- 本批未启动服务、未执行迁移、未写任何真实项目数据。
+
+## 第三批收口（2026-11-05，v1.0.128 之后）
+
+本批把上一节「如实登记」的 K 循环 25 条红清零，并把前端 sync 目录里 8 条**预存红**
+（在 `ebb29beee` 上同样红，逐条经 base worktree 复跑确认）一起修完。本批抓到 **3 个真实生产缺陷**
+与 **4 处判据口径缺陷**，两类都如实分开记。
+
+### 本批修的生产缺陷（不是改判据）
+
+- **`WorkpaperSyncEditorHost.vue`：已被服务端拒绝的 descriptor 身份会被重挂一次。**
+  confirm 回 409 `launch_descriptor_stale_identity` 之后桥把 mode 打回 html、宿主销毁编辑器并把
+  `mountedKey` 清成 null，但 `props.descriptor` 还是那个陈旧 descriptor。于是再次进入 OO 模式时
+  挂载 watch 只比 `mountedKey === key`（已是 null）⇒ 又把**同一个已被拒的身份**挂了一次：白闪一个
+  编辑器、多打一次必然再 409 的 confirm、还给桥上报了一次 `notifyEditorMounted`（代际已死）。
+  修法：记住被拒的挂载身份（判据取桥自己的 `lastError.staleIdentity`，即 `classifySyncFailure`
+  的单一真源，宿主不自认错误码），同一 key 不再挂；页面 materialize 出新代际后 key 变了自然放行。
+- **`GtB22AControlMatrix.vue` 的 `.oo-container` 没有 CSS 规则。** 模板早就写着
+  `class="oo-container"`，全文件只出现这一次 —— scoped 下未定义的类名等于没给高度，
+  `WorkpaperSyncEditorHost` 根元素是 `height:100%` + flex 列 ⇒ OnlyOffice 在页面上只剩一条
+  （与 2026-09-22 D4 那次真栈缺陷同型）。
+- **`GtH6AssetDisposalClearing.vue` 同款。** 它更隐蔽：文件里那句 `height: calc(100vh - 180px)`
+  是 `v-else-if` 分支上 legacy `GtOnlyOfficeSheet` 的内联样式，与同步宿主的容器无关
+  ⇒ 「文件里有没有 vh 高度」这种全文匹配判据看不到它。
+
+### 本批修的判据口径缺陷（含两处会让判据恒红/恒绿的）
+
+- **`workpaperSyncEditorHostSizing.spec.ts` 只认 `calc(100vh …)`**，把 M1/M5/M8/M9 四个宿主的
+  `height: 80vh` 判成假红（`80vh` 同样是视口相关的确定高度，缺陷类别不成立）⇒ 按共同特征收口成
+  「`height` 的值里出现 `<数字>vh`」。同时**新增**一条判据：包住挂载点的元素用到的类名必须真的有
+  CSS 规则 —— 这条才是抓住上面两个生产缺陷的那把尺子。类名必须**整词**比：首版按子串匹配把
+  `k-oo-container` / `cct-oo-container`（各自都有规则）误报了 6 处（`-` 不是 `\w`，
+  `\boo-container\b` 会在 `k-oo-container` 里命中）。
+- **`WorkpaperSyncStatusBar.spec.ts` 用 `split('\n')` 判「顶层无缩进」**。仓库 `core.autocrlf=true`，
+  Windows 工作区里那四个文件全是 CRLF ⇒ 每行尾部留一个 `\r`、`row === line` 恒不成立
+  ⇒ 该判据**在 Windows 上恒红、在 LF 检出的 CI 上恒绿**。同一条判据两个平台两个结论，比没有判据更糟。
+- **`test_k_lane1_p2…::TestKAP13NoticeMounted` 的模块名口径数的是原始文本（含注释）**。它声称
+  「BP-6 的 6 个宿主引了 `workpaperEntrySyncNotice` 模块」，现读那 6 个宿主：该模块名**只出现在
+  HTML 注释里**，没有任何 import。判据之所以绿，是注释把它骗绿的（㉖「判断代码是否真做了 X 禁用
+  文本匹配」的反向形态）。
+- **`test_k_foundation_p7…::test_component_symbol_is_the_dominant_platform_caliber`** 要求模块名
+  全平台命中 `>= 1`。`eaa655686`（readiness 单源改造）把提示链路改成
+  `GtEntrySyncCapabilityNotice.vue` → `useEntrySyncReadiness` → `deriveEntrySyncPresentation`
+  之后，那个模块**生产侧 0 调用方**，命中归零。
+
+### `workpaperEntrySyncNotice.ts` 的处置（0 调用方但不删）
+
+- 仓库常规铁律是「grep 0 调用方 ⇒ 删」，但 Task 57 的冻结件
+  `workpaper_sync_abcs_cycle_deletion_plan.json` 把它列在 `must_not_delete`（理由写的是
+  「AC 1.4 文案的单一真源」）⇒ **不删**，并把「不删的依据」写成判据直接读那份计划，而不是留在注释里。
+- 真正要修的是**文案有两个声明点**：`eaa655686` 把两句中文又抄了一份进
+  `entrySyncPresentation.ts` 的 `capability === null` 分支，改一处另一处静默不动、
+  用户看到的和兼容面说的能对不上。现在声明点在活路径（presentation），兼容模块
+  `export { … } from` 再导出 ⇒ 声明点只剩一个、兼容面与界面由同一个绑定保证。
+- 16 个宿主注释原先指着那个死模块（「文案真源在 sync/workpaperEntrySyncNotice.ts」），
+  一并改指活真源 `sync/entrySyncPresentation.ts`。只改注释文字，行数不变。
+- 判据改成比原来**更强**的三条：模块名生产命中恒等 0（重新接线即红）／文案只许一个声明点
+  （兼容模块里再声明一次即红）／冻结计划仍把它列在 `must_not_delete`（被移出即红）。
+
+### K 循环剩余 25 条的逐条处置
+
+| 判据 | 原状 | 处置 |
+| --- | --- | --- |
+| `TestKAP20BareK19IsASheetCode` ×3 | 期望 14/13，现算 15/14 | 第 15 处是 `attachment-voucher-evidence-binding`（`7954c575d`，**不是本 spec**）加的 `const EVIDENCE_SHEET = 'K1-9'`。它反而是新证据（变量名就是「哪张 sheet」）⇒ 逐文件登记 `BARE_K1_9_PER_FILE` + 把该常量写成可伪证断言；两口径差异改成「逐文件比 per-occurrence 与 per-line，只有 `K1TabIndex.vue` 两者不等」（原来用「其余合计 11」间接表达，且 11 恰好等于 slice 那个错数，纯巧合却读着像有语义） |
+| `test_template_sha256_is_unchanged` | 磁盘 `c071af1b…` vs 登记 `4abf0590…` | 比的是**已归档的草案契约**。`13120d6d6`（2026-10-26，`oo-writeback-template-parity-closure` 第一批「285 格公式错误按会计口径修复」）改了权威模板；**现行 reviewed 生产契约已跟着改到 `c071af1b…`** ⇒ 比对对象换成在册契约（运行时读的就是它），草案值留作历史钉子并断言它正好等于改动前那个提交的字节 |
+| `test_non_k_consuming_k_keys_count` | 期望 57，现算 87 | 先排除「口径不同」：16 种排除组合（生成物／测试文件／stories 全组合）**没有任何一种得到 57 或 design 里那个 70**（最接近 55 与 60）。回到冻结提交 `9c325aea4` 逐文件重算恰好 **57**，增长全来自那时还不存在的两个文件：`generated/formulaPushOwnedKeys.ts` 27 键、`renderSnapshotCasBaseline.spec.ts` 3 键，且与冻结键集合**不相交** ⇒ 改成「冻结值 + 逐源登记增量」，未登记的增长打红 |
+| `test_lane1_bare_form_remains_for_its_own_spec` | 期望 lane 1 还剩 2 处裸形态，现算 0 | 那 2 处已被 `attachment-inline-preview`（`ab0ccb400` / `a39c94827`）改成含 `wpId` 的形态 ⇒ 方向反转：全 K 域 bare == 0；「没有越界改」的证据改成「lane 1 的 OCR 站点全是 wpId 形态且 entry 集合 == {1,3,5}」（为 0 说明是被删而不是改好，两者必须分开） |
+| `test_no_manifest_entry_has_parent_in_k_set` | 现算 6 条子入口 | 全是 `ae318ce9d`（2026-10-07）起挂共享同步宿主的子 Tab：`mount_components == ['WorkpaperSyncEditorHost']` ∧ `independent_entry is False` ∧ `adjudication_state == 'inherited'` ∧ `adapter_id is None` ⇒ 与 KD-5 说的 legacy 重复面不是一回事。口径与 `test_task57…::global_parent_duplicate_count` **一致**（同一平台现象两处同一把尺子），并逐条断言「继承父裁决 + 不冒充已迁移 adapter」 |
+
+### 行数门
+
+`test_k_foundation_p7_gates_and_storage.py` 补完三条判据后 846 行 > 上限 800 ⇒ 按「拆模块不抬白名单」
+把 notice 符号那节整体搬到新文件 `test_k_foundation_p9_notice_symbols.py`（判据内容一字未改），
+p7 回到 637 行。顺带把搬过去的两处 `E741`（`l` 作循环变量）改名，使 ruff 新增保持 0。
+
+### 验证（隔离库，口径与 CI 同）
+
+| 选集 | base（`ebb29beee`） | 候选 |
+| --- | --- | --- |
+| K 全家（`test_k_*.py`） | 59 failed + 102 errors | **1143 passed / 0 failed** |
+| 前端 `components/workpaper/sync/__tests__` | 8 failed / 1442 passed | **1558 passed / 0 failed** |
+
+- 变异 18 组：**14 RED + 4 GREEN 阴性对照**（`plans/k3.json` 后端 7+1、`plans/k3fe*.json` 前端 7+3）。
+  RED 覆盖：文案声明点挪走／字面量抄回分支／给死模块重新接生产 import／把它从冻结 `must_not_delete`
+  移走／`EVIDENCE_SHEET` 出处改掉／增量键数写错／同步宿主子页清单漏登一条／两处 `.oo-container`
+  规则改名／高度口径收回只认 `calc(100vh)`／拦截分支去掉／不记录被拒身份／去掉 R13c 自动回表单／
+  `displayPrefs` 写进函数体。阴性对照（只改注释措辞）全部 SURVIVED。
+- ruff 相对 base 新增 0 / 解决 4；行数门 `rc=0`；CRLF churn 普查「疑似 churn：无」。
+- 本批未启动服务、未执行迁移、未写任何真实项目数据。
+
+### 本批未完成（如实登记）
+
+- **6.3 的 capability 终裁仍要真实 OnlyOffice 证据**，须用户放行后才能做（与上一节同）。
+- **A5-1 已发布 artifact 仍是按模板修订前的 digest 发的**，重发布属 6.3。
+- 0.5 / 2.8 / 7.5 不变，仍以总索引为准。
+
+## 第四批：攻三个卡点（2026-11-05，用户放行真实环境后）
+
+环境：`audit-postgres` / `audit-redis` / `audit-onlyoffice`（documentserver，healthcheck=true）
+全部 healthy，后端 9980、前端 3030 在跑。本批**只读真库**，未写任何业务数据、未执行迁移。
+
+### 卡点一：t75 的 1 failed + 14 errors —— **已解除**（无需改代码）
+
+`TestNonEmptyRunOnRealSupply` 自建 `tmp_task75_observer_*` 临时 schema，隔离库下只能报
+环境失败。真库跑一次：**514 passed / 0 failed**。隔离库下的残留与 base 逐节点比
+`added=0 / resolved=85`（base 86 failed + 14 errors ⇒ 候选 1 failed + 14 errors），
+即第二批的 provider 补齐真实有效，余下的是「这组用例必须在真 PG 上跑」这一事实本身。
+
+### 卡点二：v1.0.129 带出去的 stale 生成物 —— 已修（commit 1）
+
+依赖链比「四件生成物 host」管的范围更深：manifest ⇒ required_scenario_set /
+residual_lane_ledger ⇒ runtime_evidence_projection / cycle_reconciliation ⇒ 里程碑。
+第三批只重算了 host 的四件 + 里程碑，而**全量 `--check` 跑在重算之前** ⇒ 两件 stale 没被
+看见。本批按依赖序迭代到不动点（第 1 轮即收敛），9 个生成物 `--check` 全 rc=0。
+`runtime_evidence_projection` 由**可达真库**产出（`pg: connected / total_test_runs=0`），
+不是隔离库的 `degraded:*` 降级版。
+
+### 卡点三：6.3 的真实 OnlyOffice —— 从「测不了」推进到「可测、并测出真实供给图」
+
+#### 3.1 🔴 任务 70 门禁此前**整体崩**，连报告都生成不出来（三个独立崩点，修一个才看见下一个）
+
+| 崩点 | 根因 | 处置 |
+| --- | --- | --- |
+| `EntryProfileError: entry 'docx/gt-a10-bundle': capability 未登记: None` | `build_scenario_denominator()` / `derive_all_entries()` 用 `capability_of`（pending 一律抛）统计**含未裁决 entry** 的分母。生产函数文档明写「只问是否已启用某能力时用 `effective_capability`，pending 的答案是『还没有』，不是异常」。自 task 1.1 引入 pending 态起本门必崩，现算 197 条里 86 条 pending | 改用 `effective_capability`，pending 归 `pending` 桶 |
+| `Task70GateError: tasks.md 里找不到任务 70` | 本 spec 目录**换过代**：任务 70 的正文在 `_archive/17-2026-10-03-verified-batch/<spec>/tasks.md`，活跃目录已重编号成 0.x~7.x | 路径按**内容**择路（活跃优先、归档兜底）。只看文件存在性会继续选中那份没有任务 70 的 |
+| `Task70GateError: design.md 里找不到 \`### Property 20\`` | design.md 同代际问题 | 同上，判别串用第一条已声明 Property |
+
+修完三处后本门**跑通到底**，并带真实 OO 跑完 live probe（`ONLYOFFICE_URL=http://127.0.0.1:8080`
++ 容器密钥；push_wt 里没有 `.env`，不显式注入时本门按契约
+`command_service.jwt.required=true` **fail-closed** 在「ONLYOFFICE_JWT_SECRET 缺失」，
+不降级成不鉴权探测 —— 这条行为是对的，保留）。
+
+#### 3.2 🔴 `storage/` 不入库 ⇒ 注册数字在任何干净检出里都是**环境事实**，不是供给事实
+
+`storage/` 与 `backend/storage/` 都在 .gitignore 里，真实项目的 `.versions/**`
+**从不入库**。于是干净检出 / CI / 临时 worktree 里 provider 侧必然以
+`artifact_publish_failed: published artifact 指针指向的文件不存在` 整批失败。
+同一份代码、同一个库、只换工作树的 A/B：
+
+| 环境 | registered | failures | 分型 |
+| --- | ---: | ---: | --- |
+| 临时 worktree（无 storage 内容） | **0** | 59 | `artifact_publish_failed` 59 |
+| 主工作树（有 storage） | **32** | 27 | `published_identity_observed_drift` 16 + `sync_contract_structure_drift` 11 |
+
+⇒ 冻结描述里的「planned=186 / registered=0，逐 entry 原因是还没有 current published
+representation」**在有 storage 的环境里不成立**。门禁现在把这件事记成
+`artifact_environment` + `measurement_is_environment_limited`，并且 registered=0 时
+**不再**宣称一个未经核对的归因（原文写死「全部 planned entry 都缺 current published
+representation 或 per-entry 契约」）。
+
+两个触发条件都要：storage 根不存在，**或**根在但本轮真有 `artifact_publish_failed`。
+只看根是否存在会漏掉「目录在、里面是空的」—— 临时 worktree 实测正是这种
+（`storage_root_exists=true` 而 `project_dirs=0`，59 条全失败）。
+
+#### 3.3 🔴 记账等式漏了一项，于是「无 entry 被静默跳过」这条判据恒假
+
+registry 的三个集合各有独立来源（`registered_entry_ids` 实录 / `reasons` 供给不足 /
+`failures` typed 故障），等式是**三边之和 == planned**。门禁与守卫都只加前两项
+（`assert 197 == (138 + 0)`）⇒ 任何一条 entry 走到 typed failure 就让等式恒假，而它只是
+个 detail 字段、没人看。现在三项都记、都比，并把公式字符串一起钉住。
+
+#### 3.4 🔴 顺带抓到一条**恒绿**守卫
+
+`test_checkbox_flip_does_not_change_body_digest` 写死活跃目录的 tasks.md，那份里一条
+`70.` 都没有 ⇒ `re.sub(count=1)` 零命中、文件内容不变、digest 自然一字不变 ⇒ 这条判据
+**测不到任何东西**（它在崩点修好后「恢复通过」，其实是恢复成恒绿）。已改成取
+`gate.tasks_md()` 并补「变异真的落盘了」的反向断言；同组的反向自检改为**从正文自己取锚点**
+（原来写死一句中文，spec 换代即失锚）。
+
+#### 3.5 6.3 的真实供给图（现算，主工作树 + 真库）
+
+197 条 entry / 111 条 bidirectional：
+
+| 分类 | 条数 | 下一步 |
+| --- | ---: | --- |
+| 供给齐备、`register_from_manifest` 真注册成功 | **32** | `harness.plan()` 对这 32 条**全部成功**，各 24 条 required scenario ⇒ 已可执行真实 OO 场景 |
+| `published_identity_observed_drift` | 16 | 重新投影产出新 representation |
+| `sync_contract_structure_drift` | 11 | 契约结构对齐（逐不一致位置已给 sheet/table/field） |
+| 无该 entry 自己的 approved per-entry 契约 | 44 | 逐 entry 发布（Tasks 46~57 / 62~64 承接） |
+| 还没有 current published representation | 8 | representation 管道 |
+| capability 未裁决（pending） | 86 | 4.* 逐项裁决 |
+
+🔴 这张图**取代**此前「59 条从未真实跑过 / 5 条只跑通单向 / 1 条全失败 / 5 条跑通但裁决
+没跟上」那个分类 —— 那是在 145 条 entry / 67 条 bidirectional 的 manifest 上算的，
+manifest 已增长到 197 / 111。
+
+### 本批未完成（如实登记）
+
+- **真实 OO 场景执行与 evidence 落库仍未做。** `working_paper_sync_test_run` 与
+  `working_paper_entry_evidence_scenario` 现算仍是 **0 行**。写一条合法 test_run 需要
+  `onlyoffice_build` / `browser_build` / `environment_digest` / `run_manifest_artifact_id`
+  —— 即一个真正驱动 OO + 浏览器并上传 run manifest 的 runner。32 条候选 entry 已就位，
+  runner 本身仍待实现，属 6.3 剩余工作。
+- **任务 70 的已提交报告仍 stale**（`backend/data/workpaper_sync_task70_oo_scenario_refresh.json`
+  预期 `--check` 红）。刻意**不**在本批刷新：①报告内容与环境强耦合（registered 数字随
+  `storage/` 有无而变），在无 storage 的工作树上 `--write` 会把一份**更差**的快照
+  （registered=0）冻进仓库；②在主工作树 `--write` 会写进别的会话的工作树。
+  正确做法是先把环境相关字段从逐字节锁里剔出去（照本门已有的 `CENSUS_KEYS` /
+  `VOLATILE_KEYS` 范式「剔除 ≠ 不管」，改为现算 + 语义断言），再在有 storage + 真 OO 的
+  环境里刷新一次。这是独立的一件事，本批不夹带。
+- 任务 70 守卫文件剩 8 failed + 2 errors（junit 逐节点 A/B：base 21 ⇒ 候选 10，`added=0 / resolved=11`），
+  全部来自上一条的 stale 报告与 pytest 进程里没有 OO 环境变量。
+- **A5-1 重发布**仍属 6.3，未动。
+
+### 验证
+
+| 项 | 结果 |
+| --- | --- |
+| t75（真库 `--db shared`） | **514 passed / 0 failed** |
+| 9 个生成物 `--check` | **9/9 rc=0**（按依赖序迭代到不动点） |
+| 任务 70 门禁 | 由「崩在 `EntryProfileError`」→ **跑通到底**（含真实 OO live probe） |
+| 任务 70 守卫 | junit 逐节点 A/B：21 → **10**，added **0** / resolved **11** |
+| t57 / 兄弟守卫 / pilots / K 全家 | 136 / 536 / 540 / **1143** 全绿，与第三批一致 |
+| ruff（改动文件 A/B） | 新增 **0** |
+| 行数门 | `rc=0` —— 门禁文件补完判据后 3317 行超白名单 +5%，按「拆模块不抬白名单」把环境/路径解析三件拆到 `backend/scripts/check/_task70_gate_env.py`，主文件回到 3230 行 |
+| CRLF churn | 无 |
+
+## 第五批：证据档位假绿、三条恒红守卫、第五批判据补门禁（2026-11-05，v1.0.130 之后）
+
+环境同第四批（`audit-postgres` / `audit-redis` / `audit-onlyoffice` 全 healthy，
+后端 9980、前端 3030 在跑）。本批**只读真库**，未写业务数据、未执行迁移。
+
+### 5.1 🔴 把环境修好之后，门禁自己产出了一个假绿 —— `executed_end_to_end` 不看证据
+
+第四批把三个崩点修好、又给工作树补上 storage 副本之后，`oo_available` 与
+`application_chain_available` 同时变 true。于是 `classify_scenario_execution` 的五层逐层
+排除（schema / 上游 / 黑盒 / application 链 / recovery）**再也排不掉任何东西**，
+**1206 / 1608 行瞬间落到 `executed_end_to_end`**，而两张证据表都是 0 行：
+
+| 轮次 | oo_available | application_chain | executed / unrun | test_run 行数 |
+| --- | --- | --- | ---: | ---: |
+| 第四批（无 storage） | true | false | 0 / 1608 | 0 |
+| 本批补上 storage 之后（修复前） | true | **true** | **1206** / 402 | **0** |
+| 本批修复后 | true | true | **0** / 1608 | 0 |
+
+档位自己声明的语义是「本轮端到端真跑并有可重算证据」，而分类函数**全程不查证据行** ——
+正是本门文件头点名要防的「接了 OO 就自动变绿」。它此前不可见，只是因为前两层恰好一直
+关着；环境一具备，假绿立刻显形。
+
+处置：新增 `recorded_evidence(session)`（只认 `result='passed'` 的
+`working_paper_entry_evidence_scenario`，并经 `run_id` 回到 `working_paper_sync_test_run`
+取 `entry_id`），逐 `(entry_id, scenario_id)` 比对；无通过证据即降档为
+`unrunnable_today` + `blocked_by="evidence_not_recorded"`，并把证据索引
+（`test_run_rows` / `evidence_scenario_rows` / `passed_pair_count`）一起写进报告 ——
+**可伪证**：真把 6.3 跑出 evidence 之后档位自然放行，不是改成恒降档。
+
+### 5.2 🔴 第四批登记的「报告仍 stale，刻意不刷新」—— 本批已满足前置条件并刷新
+
+第四批不刷新的两条理由都已不成立：①环境相关字段的问题，本批已按
+`measurement_is_environment_limited` 分型（见 4.3.2），registered 数字旁边带着它是环境
+产物还是供给结论；②「在主工作树 `--write` 会写进别的会话的工作树」——本批改为**把 59 份
+缺失的 published artifact 按文件复制进 push_wt**（7.1 MB；不做目录联接：别的会话曾用
+`Remove-Item -Recurse` 顺着联接删掉过真实 storage；也不整体复制 640 MB 的 `.versions`）。
+复制后 push_wt 复现主工作树的供给图：**registered 32 / failures 27 / reasons 138**。
+在这个具备条件的工作树上 `--write` 一次，`--check` rc=0。
+
+`backend/storage/**` 在 .gitignore 里 ⇒ 那 59 份副本**永远不会入库**，它们只是让本批的
+测量发生在一个有观测条件的环境里。
+
+### 5.3 🔴 三条守卫在无 OnlyOffice 的环境里恒红，而 CI 正是这种环境
+
+`ci.yml` 的 `backend-tests` job 跑全量 `pytest backend/tests/ -x` 且**没有 OnlyOffice
+容器**。`probe_real_onlyoffice()` 按契约 `command_service.jwt.required=true` fail-closed
+抛 `Task70GateError`（这条行为是对的，保留），于是：
+
+- `test_gate_check_passes` —— 1 failed（`--check` 连报告都生成不出来）
+- `TestRealOnlyOfficeProbe` 两条用 `live_oo` fixture 的 —— 2 errors（fixture 抛异常）
+
+带 `-x` ⇒ **整个 job 被截断**。恒红的门禁没人看 = 没有门禁（与 `--write` + `git diff`
+那类永假门禁同形）。这三条在 HEAD 上就是这样，不带 `pytestmark`、不带 skip。
+
+处置**不是** `skipif`（skip 会让它静静地永不运行），也**不是**放宽探测，而是改成两条臂 ——
+两种环境都真跑，各断言各自该成立的事：
+
+| 环境 | 断言 |
+| --- | --- |
+| 具备条件 | `main(["--check"]) == 0`；live probe 的 `jwt_signed_by` / `forcesave error 1` 逐项 |
+| 不具备条件 | 门禁**真的拒绝了降级**：抛可归因错误且**点名缺哪一项**；官方诊断路径 `--no-live-oo` **不得**报成通过；冻结报告的 `oo_probe` 非空（空的就是 `--no-live-oo` 降级产物，引用它等于把「没测」当「测过」） |
+
+前置条件做成单一来源 `oo_probe_prerequisites()`（本体 `_task70_gate_env.oo_probe_prerequisites_of`，
+settings 的纯函数），守卫经 `gate.oo_probe_prerequisites()` 查询。实测：
+
+| 环境 | 本批前 | 本批后 |
+| --- | --- | --- |
+| 带 OO 环境变量 | 88 passed | **88 passed** |
+| 不带（= CI 的形态） | 1 failed + 2 errors + 85 passed | **88 passed** |
+
+### 5.4 🔴 第五批的四条判据**守卫侧零覆盖** —— 补了一个守卫文件
+
+交付时 grep 全树 `backend/tests/workpaper_sync_oo/**`：`evidence_not_recorded` /
+`PENDING_CAPABILITY_BUCKET` / `measurement_is_environment_limited` / `spec_doc(`
+**一条断言都没有**。即第 5.1 节那条修复本身没有任何门禁守着，下一个人改回去不会有人知道。
+按铁律⑳补 `backend/tests/workpaper_sync_oo/test_task70_evidence_and_environment.py`
+（22 条，0 skipped）。不并进宿主是因为宿主 1565 行已贴着行数门白名单基线。
+
+四条里**三条今天恰好「不触发」**（证据 0 行 / 没有区分类 entry / storage 已补齐），
+只断言「现在的值」= 把环境快照冻进判据。所以每条都配反向控制：
+
+| 判据 | 触发态断言 | 反向控制（不触发态） |
+| --- | --- | --- |
+| 证据档位 | 零证据 ⇒ 全部降档且理由为 `evidence_not_recorded` | **有** `result='passed'` 证据对 ⇒ 该场景**放行**（否则退化成恒降档 = 另一种恒红门禁）；证据按 `(entry_id, scenario_id)` 二元组匹配，换 entry 不得蹭到放行 |
+| 能力分桶 | pending ⇒ `pending` 桶；已裁决 ⇒ 封闭四态的值 | `capability_of` 对同一条 entry **真的抛**（不抛则这条修复本身是空的）；`pending` 不得混进 `Capability` 成员 |
+| 文档择路 | `tasks_md()` / `design_md()` 指向的文件**真的含**要找的正文 | 活跃目录那份**真的不含**任务 70 正文（两代内容一样则按内容择路是空转）；找不到时点名候选路径 |
+| 环境分型 | 根不存在 ⇒ 受限；根在但有 `artifact_publish_failed` ⇒ **受限** | 根在 + 零失败 ⇒ **不受限**（恒真就等于没分型）；契约漂移等 typed failure **不得**算成环境受限（否则真实供给缺口被环境理由盖掉） |
+
+直方图与 pending 计数一律**现算对比**，不冻结「86 条 pending」—— 那是裁决进度，冻结它等于
+要求上游停下来（与第四批对 S8 三项计数做的改正同一口径）。
+
+#### 5.4.1 写守卫自己踩的两个坑（都已修）
+
+1. **模糊查找 + `pytest.skip` = 恒绿空转。** 首版按「键里同时含 `capability` 与
+   `histogram`」找直方图，而真实键是 `capability_distribution`（不含 `histogram`）⇒ 一处
+   都找不到、`pytest.skip` 把整条判据变成空转。改为按路径收集并**断言分母非空**。
+2. **返回值的 key 名靠猜。** 首版写 `result["rows"]`，`build_scenario_execution` 实际返回
+   `entries`。铁律㉑同款：首次接触的接口先现读再动笔。
+
+### 5.5 九条冻结阻塞态的守卫重述
+
+第四批把环境修好后，一批守卫冻结的是**当时的环境产物**而不是不变式。逐条改成「现算 +
+不变式」（改动理由逐条写在守卫的 docstring 里）：
+
+| 守卫 | 原来冻结了什么 | 改成什么 |
+| --- | --- | --- |
+| `test_first_hard_stop_is_the_capability_adjudication` | 要求 S6 也在阻塞清单里（无 storage ⇒ registered=0 ⇒ S6 必阻塞） | 顺序不可交换（S4 是第一处硬阻塞）；S6 阻塞时须有具名原因 |
+| `test_capability_adjudication_really_raised_with_error_code` | 文案里的 `single_onlyoffice`（当时的裁决值，现已 pending） | 文案须点名当下的 capability 态，词表封闭 |
+| `test_every_unregistered_entry_has_a_named_reason_or_typed_failure` | `registered_entry_ids == []` | 三集合之和 == planned（没有 entry 被静默跳过）+ 直方图加总等于各自计数 |
+| `test_plan_really_resolved_every_production_ref` | 每条 plan 都不抛 | 抛错的必须落在合法拒绝的封闭集合（`EntryProfileError` / `HarnessRejected`）且有原因文案；解析成功的 ≥ 3 条 |
+| `test_both_first_version_sources_are_blocked_…` | 三项计数冻结成 0（现算 83 / 435 / 1） | 「不新建第三条首版路径」这个结构结论 + 计数是现算整数 |
+| `test_and_instead_of_or_would_lose_the_close_family` | `or` 命中数 > `and` 命中数 | 见 5.6（A5 臂已不可观测） |
+| `test_gate_check_passes` 等三条 | 无条件要求具备 OO 观测条件 | 见 5.3（两条臂） |
+
+### 5.6 A5 反事实臂**今天不可观测**，如实记而不是硬断言
+
+A5 臂要证的是「把 close 族谓词的 `or` 换成 `and` 会少掉多少 entry」。区分力全靠
+「editable ∧ shared ∧ ¬bidirectional」这一类 entry —— 而 86 条 entry 转为 pending 后
+该类**现算为 0**，于是两个谓词在现有数据上命中数相同（111 == 111）。
+
+不再断言旧的 `or > and` 不等式（那会在「数据让它不可区分」时红在错误的理由上），改为记
+`distinguishing_entries` / `difference_observable_today` / `why_not_observable`，并断言
+**有区分类 entry 时必须拉开差值**（区分类为 0 时该臂如实标不可观测）。这是「不可观测」
+而不是「谓词等价」—— 两者结论完全不同，混成一句话会让后续裁决走错。
+
+### 5.7 S7 必须 plan 一条**已裁决**的 entry
+
+S7 原来固定 plan pilot entry，而 pilot 的 capability 现已 pending ⇒ 每个 bundle 都抛
+`EntryProfileError`，这一步什么也证明不了。改为取 S6 `registered_entry_ids` 的第一条
+（取不到才回落 pilot），并把实际用的 entry 记成 `plan_entry_id`。
+
+### 5.8 变异跑手自己有一个假红源（本轮实测）
+
+`-k` 写错时 pytest 退 **5**「no tests ran」，而「rc != 0 即 RED」会把它记成变异证明成立
+—— 判据其实一条都没跑。本轮实测 `-k close_predicate` 对
+`test_and_instead_of_or_would_lose_the_close_family` 零命中。已给跑手加
+`--collect-only` 预检（零用例记 `NO_TESTS`，不记 RED），并把判定从「是否全 RED」改成
+「是否与各自预期一致」—— 阴性对照的 `expect=GREEN` 必须保持绿，否则证明不了判据不是对
+任何改动都红。
+
+### 5.9 行数门：又搬出两个函数（仍不抬白名单）
+
+门禁主文件在白名单基线 3126 行（+5% = 3282）。本批补完判据后 3306 行、抽出前置条件后
+3300 行，两次都超。按「拆模块不抬白名单」继续搬到 `_task70_gate_env.py`：
+`close_predicate_arm`（54 行）与 `oo_probe_prerequisites_of`（本体）。
+主文件 **3269** 行，环境模块 270 行，行数门 rc=0。
+同批把 `TestSupplyChainWalk` 拆到
+`backend/tests/workpaper_sync_oo/test_task70_supply_chain.py`（宿主 1795 → 1565 行）。
+
+### 5.10 🔴 逐字节锁对**活着的共享库**立不住 —— 补第三类剔除
+
+5.2 把报告在具备观测条件的环境里刷新、`--check` 当场 rc=0。约 **40 分钟后**再跑，**47 条
+叶子路径**漂移 —— 另一个会话给 `xlsx/gt-d4-operating-revenue` 发布了一条新的 content
+representation：
+
+| 量 | 刷新时 | 40 分钟后 |
+| --- | ---: | ---: |
+| `working_paper_content_representation` | 455 | 456 |
+| `working_paper_content_version` | 435 | 436 |
+| `working_paper_sync_entry_state` | 83 | 84 |
+| S6 `failure_count` | 27 | 28 |
+| S6 `unregistered_count` | 138 | 137 |
+| `measurement_is_environment_limited` | false | **true** |
+
+（`registered_entry_ids` 仍是 32、三集合恒等式仍成立 —— 那条 entry 只是从「没有
+representation」的 reason 挪到了「artifact 文件不在本工作树」的 failure。）
+
+把这些冻进锁，等于**要求共享库停止写入** ⇒ 这条锁恒红 = 没有锁，与 BP-71-8（要求仓库停止
+演进）是同一笔账。第四批已点名过该怎么修（「照本门已有的 `CENSUS_KEYS` / `VOLATILE_KEYS`
+范式『剔除 ≠ 不管』，改为现算 + 语义断言」），本批做了那一步：
+
+- 新增**第三类**剔除 `LIVE_DB_KEYS`（本体 `backend/scripts/check/_task70_live_db_lock.py`），
+  逐条路径都来自实测漂移清单，**不是**预防性地整棵子树剔掉 —— `register_from_manifest`
+  下的 `planned` / `accounting_identity_holds` / `accounting_identity_formula` 三项继续
+  锁死（分别来自 manifest、恒等式本身、公式字符串，不随别人写库而变，而它们正是本门最
+  关键的三项结论）。
+- 三类只经 **`comparable()` 一个入口**：`report_digest` 与 `--check` 的比对必须剔同一批
+  东西，少一类 digest 就重新变成会自己过期的锁。原来两处各自手写
+  `strip_census(strip_volatile(...))`，加第三类时就有了「漏改一处」的口子。
+- 剔除 ≠ 不管：`live_db_semantics()` 现算并逐条断言 —— 快照前后覆盖同一批表 / 行数都是
+  非负整数 / 注册分母非空 / 三集合之和 == planned / 两个直方图各自加总等于对应计数 /
+  环境分型可按同一函数重算。语义性质不随别人写库而变，因此继续锁死。
+- 🔴 `LIVE_DB_KEYS` **自己也进锁**（写进 `live_db_contract.census_keys`）：否则这个集合就
+  是个静默逃生口，往里加一条路径就能让任意漂移「合法」地绕过锁。加路径会改报告内容
+  ⇒ 必须显式 `--write` ⇒ review 里看得见。
+
+三条臂逐条实测（**16/16 符合预期**，已写成仓库里的守卫
+`test_task70_census_lock.py::TestLiveDbLock`，不是一次性探针）：
+
+| 臂 | 输入 | 期望 | 实测 |
+| --- | --- | --- | --- |
+| A | 某表行数 +N / S6 `failure_count`+1 / `registered_entry_ids` 少一条 / 环境分型取反 / 直方图换内容 | 投影**不变** | 5/5 |
+| B | `verdict.state` / `verdict.executed_end_to_end` / `tier_histogram` / `accounting_identity_holds` / `accounting_identity_formula` / `planned` / `first_hard_stop_step` / `live_db_contract.census_keys` / `live_db_contract.semantics.all_hold` | 投影**变** | 9/9 |
+| C | 换 HEAD sha / 改源码内容 digest | 不变 / **变** | 2/2 |
+
+### 5.11 🔴 「源码变了」这条 stale 轴原来靠 HEAD sha —— 报告在它自己的提交里必然 stale
+
+守卫 `test_volatile_keys_are_exactly_the_two_kinds` 的原注释写着「`source_commit` 刻意
+**不**在排除名单里：它是『源码变了但 evidence 没刷新』这条 stale 轴的唯一锁」。
+但 `source_commit = git rev-parse HEAD`，而**提交这份报告本身就会改 HEAD**：
+
+```
+在 HEAD=A 生成报告 ⇒ source_commit=A
+提交 ⇒ HEAD=B，报告里还写着 A
+在 B 上 --check ⇒ 现算 source_commit=B ≠ A ⇒ stale
+```
+
+⇒ 这份报告在**任何**包含它的提交里都是 stale，`test_gate_check_passes` 落地即红。
+第四批如实登记的「已提交报告仍 stale（预期 `--check` 红）」有一半就是这个机制，而它和
+「`--write` + `git diff --exit-code`」那类永假门禁同形。
+
+处置：轴换成**内容** digest（`source_digests`，本体 `_task70_gate_env.source_digests`）——
+提交前后文件内容一致 ⇒ digest 一致；源码真改了 ⇒ digest 变、报告必须重新 `--write`。
+`source_commit` 保留作溯源但归入 census（与 `artifact_git_status` 同类：git 状态量，
+提交动作本身就让它变）。🔴 `source_digests` **不含报告自己**（报告内容包含该 digest，
+自指算不出不动点）。
+
+### 5.12 🔴 变异又抓到一处真实守卫缺口：只读报告的判据对实现侧改动不敏感
+
+5.11 的源码轴判据首版只读磁盘报告里的 `source_digests`。于是把门里的产物清单改成 `[]`、
+或改成「含报告自己」，**两个变异都 GREEN** —— 磁盘报告没变，判据自然看不见。
+这正是本门文件头写的教训 17 的现场。
+
+处置：把内联清单抽成 `source_digest_targets()`，守卫改为**现调**它并与报告登记的键集合
+对拍（非空 / 不含报告自己 / 与报告键集合相等）。改完三个变异（清空 / 含报告自己 /
+只保门自己丢掉守卫与变异脚本）全部 RED。
+
+⚠️ 已知限界（如实登记）：源码轴只覆盖门声明的三件产物（门自己 + 宿主守卫 +
+变异脚本）。拆出去的三个守卫文件（`test_task70_census_lock.py` /
+`test_task70_supply_chain.py` / `test_task70_evidence_and_environment.py`）**不在**
+`source_digest_targets()` 里 —— 把它们加进去会让任何一次守卫编辑都强制重刷报告，
+是个真实的取舍；它们目前由 `radiation_surface.referencing_test_files`（census，不进锁）
+覆盖。这条不是本批引入，原设计就只锁那四件。
+
+### 5.13 ⚠️ 分母从 3290 降到 1608、`upstream_implementation_gap` 从 274 降到 0 —— **不是进展**
+
+本批刷新报告后，与上一份已提交报告（第三批时生成）逐量对比：
+
+| 量 | 上一份（HEAD~1） | 本批 | 真因 |
+| --- | ---: | ---: | --- |
+| 独立 entry | 142 | **145** | manifest 增长 |
+| required scenario 行 | 3290 | **1608** | 见下 |
+| `upstream_implementation_gap` | 274 | **0** | 见下 |
+| 贡献 0 条 required scenario 的 entry | 5 | **78** | capability 转 pending |
+| entry 的 capability 分布 | `single_onlyoffice` 137 / `single_html` 5 | **`pending` 78 / `bidirectional` 67** | 上游 task 1.1 引入 pending 态 |
+
+🔴 **两个下降都是口径变化，不是修好了**：145 条独立 entry 里 **78 条**的 capability 现在
+是 pending，而 pending 推不出 required scenario 集合 ⇒ 它们贡献 0 行、整体退出分母。
+原来落在这些 entry 上的 274 行 `upstream_implementation_gap` 就这样**随 entry 一起离开
+分母**，不是被实现补齐了。
+
+门禁本来就把这件事记在 `BP-70-7`（`derivation_error_histogram: {EntryProfileError: 86}`，
+disposition「仍阻塞（分母缺口，如实计入）」），所以它**不是**一个被隐藏的事实；但只看
+`verdict` 那两个数字会读成进展，故在此显式登记。两份报告也不同代际（上一份是 142 条
+entry、pending 态还不存在时生成的），不能直接当前后对比。
+
+真实待办分母因此是 **1608 + 86 条未裁决 entry 的缺口**，而不是 1608。86 条裁决属 4.*，
+本批未动。
+
+### 本批未完成（如实登记）
+
+- **真实 OO 场景执行与 evidence 落库仍未做**（6.3 的剩余本体）。
+  `working_paper_sync_test_run` / `working_paper_entry_evidence_scenario` 现算仍是
+  **0 行**，报告 `executed / unrun = 0 / 1608`、verdict 仍 `unverifiable`。
+  写一条合法 test_run 需要 `onlyoffice_build` / `browser_build` / `environment_digest` /
+  `run_manifest_artifact_id` —— 即一个真正驱动 OO + 浏览器并上传 run manifest 的 runner。
+  32 条候选 entry 已就位（`harness.plan()` 全部成功、各 24 条 required scenario），
+  runner 本身仍待实现。本批把**判据侧**准备好了：真跑出 evidence 之后档位会自然放行
+  （5.4 的可伪证方向已实测）。
+- **A5-1 重发布**仍属 6.3，未动。
+- 27 条真实漂移（16 `published_identity_observed_drift` + 11
+  `sync_contract_structure_drift`）与 86 条 pending 裁决，均属 4.* / 46~57 / 62~64 承接，
+  本批未动。
+- `BP-70-1` 的 `approved_source_digest` 与 `current_source_digest` 仍不一致（门禁源码本批
+  又改过）—— 按既有处置「如实报告，不修」。
+
+### 验证
+
+| 项 | 结果 |
+| --- | --- |
+| 任务 70 守卫（带 OO 环境） | **93 passed / 0 failed** |
+| 任务 70 守卫（不带 OO = CI 形态） | **93 passed / 0 failed**（本批前 1 failed + 2 errors；两条臂同数同绿） |
+| 第五批新守卫 | **22 passed / 0 skipped** |
+| 报告 `--check` | **rc=0**；普查快照 3914 → 3915 / 553 → 554（新增的守卫文件）而锁仍成立 —— 现场验证「普查量不进锁」 |
+| 第五批判据变异 | **26 RED + 5 阴性对照 GREEN，31/31 符合预期**（另 3 组作废并记原因：1 组靶点分支在本机不可达、2 组靶点在只读报告看不见的实现侧 —— 见 5.8 / 5.12） |
+| 9 个生成物 `--check` | **9/9 rc=0** |
+| t57 / 兄弟守卫 / pilots / t75 / K 全家 | 136 / 536+3 skipped / 540+5 xfailed / 真库 514 · 隔离库 1 failed+14 errors（与基线逐节点一致）/ **1143** 全绿 |
+| ruff（改动文件 A/B） | 新增 **0** |
+| 行数门 | **rc=0**（搬模块，未抬白名单） |
+| CRLF churn | 无 |

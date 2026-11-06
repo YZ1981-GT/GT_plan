@@ -97,8 +97,54 @@ OWNER_TASK: Final[str] = "70"
 SPEC: Final[str] = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 SCHEMA_VERSION: Final[str] = "task70-oo94-full-entry-scenario-refresh:v1"
 
-TASKS_MD: Final[Path] = REPO / ".kiro/specs" / SPEC / "tasks.md"
-DESIGN_MD: Final[Path] = REPO / ".kiro/specs" / SPEC / "design.md"
+from scripts.check._task70_live_db_lock import (  # noqa: E402,F401  后两项供守卫经门取用
+    LIVE_DB_KEYS, build_live_db_contract, live_db_semantics, strip_live_db,
+)
+from scripts.check._task70_gate_env import (  # noqa: E402
+    SpecDocNotFoundError,
+    git_porcelain_of,
+    source_digests,
+    oo_probe_prerequisites_of,
+    close_predicate_arm,
+    recorded_evidence,
+    artifact_environment,
+    capability_bucket,
+    measurement_is_environment_limited,
+    spec_doc,
+)
+
+#: 🔴 惰性解析：常量在 import 期求值会让「找不到」变成 import 崩溃，
+#: 诊断信息比 `Task70GateError` 差得多（也无法被判据捕获）。
+_SPEC_DOC_CACHE: dict[str, Path] = {}
+
+
+def _resolve_spec_doc(name: str, *, must_contain: str | None = None) -> Path:
+    """包一层：把拆出去那个模块的异常翻成本门自己的错误类型。"""
+    try:
+        return spec_doc(REPO, SPEC, name, must_contain=must_contain)
+    except SpecDocNotFoundError as exc:
+        raise Task70GateError(str(exc)) from exc
+
+
+def tasks_md() -> Path:
+    """任务 70 正文所在的 tasks.md（活跃优先、归档兜底，按内容择路）。"""
+    if "tasks" not in _SPEC_DOC_CACHE:
+        _SPEC_DOC_CACHE["tasks"] = _resolve_spec_doc(
+            "tasks.md", must_contain=rf"^\s*-\s\[[ x~\-]\]\s+{TASK_NUMBER}\."
+        )
+    return _SPEC_DOC_CACHE["tasks"]
+
+
+def design_md() -> Path:
+    """本门声明的 Property 定义所在的 design.md（判别串用第一条已声明 Property）。"""
+    if "design" not in _SPEC_DOC_CACHE:
+        first = min(DECLARED_PROPERTIES)
+        _SPEC_DOC_CACHE["design"] = _resolve_spec_doc(
+            "design.md", must_contain=rf"^###\s+Property\s+{first}\b"
+        )
+    return _SPEC_DOC_CACHE["design"]
+
+
 OUTPUT_PATH: Final[Path] = BACKEND / "data/workpaper_sync_task70_oo_scenario_refresh.json"
 
 T67_REPORT: Final[Path] = BACKEND / "data/workpaper_sync_task67_structural_pre_reconcile.json"
@@ -290,35 +336,19 @@ def git_head() -> str:
 
 
 def git_porcelain(paths: Sequence[str]) -> dict[str, str]:
-    """逐产物的 `git status --porcelain`。
+    """逐产物的 `git status --porcelain`（本体在 `_task70_gate_env.git_porcelain_of`）。"""
+    return git_porcelain_of(REPO, paths)
 
-    🔴 「spec 全绿 ≠ 产物已入库」：挂进 CI 的 job 在干净 checkout 下会因文件不存在必挂。
-    因此本门把自己每个产物的跟踪状态写进报告，`??` 一眼可见。
+
+def source_digest_targets() -> list[str]:
+    """参与「源码变了但报告没刷新」这条 stale 轴的产物清单。
+
+    🔴 报告自己**不**在内：报告内容包含该 digest，自指算不出不动点。
+    🔴 做成函数而不是在 `build_report` 里内联：守卫必须能**现调**它。只读报告的判据对
+    实现侧改动天生不敏感（教训 17）—— 实测把内联清单改成 `[]` 或改成「含报告自己」，
+    两个变异都 GREEN，因为守卫只看磁盘上那份报告里已有的值。
     """
-    out: dict[str, str] = {}
-    for path in paths:
-        # 🔴 先判存在：`git status --porcelain -- <不存在的路径>` 输出为空，与「已跟踪且干净」
-        #    长得一模一样。不分开就会把「产物还没写出来」报成 `tracked-clean` —— 而那正是
-        #    「挂进 CI 的 job 在干净 checkout 下必挂」这条判据要抓的东西。
-        if not (REPO / path).exists():
-            out[path] = "missing-on-disk"
-            continue
-        try:
-            proc = subprocess.run(
-                ["git", "status", "--porcelain", "--", path],
-                cwd=REPO,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-            line = proc.stdout.strip().split("\n")[0] if proc.stdout.strip() else ""
-            out[path] = line[:2].strip() if line else "tracked-clean"
-        except Exception as exc:  # noqa: BLE001
-            out[path] = f"error:{type(exc).__name__}"
-    return out
-
-
+    return [rel(Path(__file__)), GUARD_TEST_REL, MUTATE_REL]
 def read_json(path: Path) -> Mapping[str, Any]:
     if not path.is_file():
         raise Task70GateError(f"上游报告缺失: {rel(path)} —— 本门必须消费它，不得跳过")
@@ -387,7 +417,7 @@ def task_body(task_number: str = TASK_NUMBER) -> str:
     `[-]` 后逐字节相等 ⇒ 正文一个字都没变）。归一化成 `[?]` 让锁只对**正文内容**敏感，
     而任务状态翻牌不再制造假红。
     """
-    lines = read_text(TASKS_MD).split("\n")
+    lines = read_text(tasks_md()).split("\n")
     start = next(
         (
             index
@@ -442,7 +472,7 @@ def task_declarations() -> dict[str, Any]:
 
 def design_property_titles() -> dict[str, str]:
     """design.md 里本门声明的 29 条 Property 的标题（正文可能与标题同行）。"""
-    text = read_text(DESIGN_MD)
+    text = read_text(design_md())
     out: dict[str, str] = {}
     for number in DECLARED_PROPERTIES:
         match = re.search(rf"^###\s+Property\s+{number}\b[:：]?\s*(.*)$", text, re.M)
@@ -654,7 +684,11 @@ def build_scenario_denominator() -> dict[str, Any]:
         "task_text_ids_not_in_production": unmapped_in_task_text,
         "manifest_entry_count": len(entries),
         "capability_distribution": dict(
-            sorted(Counter(entry_profile.capability_of(e).value for e in entries.values()).items())
+            sorted(
+                Counter(
+                    capability_bucket(entry_profile, e) for e in entries.values()
+                ).items()
+            )
         ),
         "independent_entry_count": sum(
             1 for e in entries.values() if e.get("independent_entry")
@@ -756,7 +790,13 @@ def derive_all_entries() -> tuple[EntryDerivation, ...]:
     out: list[EntryDerivation] = []
     for entry_id in sorted(entries):
         entry = entries[entry_id]
-        capability = entry_profile.capability_of(entry)
+        # 🔴 与 `capability_bucket` 同一个理由：分母含未裁决 entry ⇒ 用
+        #    `effective_capability`（pending → None → 桶名 'pending'），不用
+        #    `capability_of`（pending 一律抛、整门崩在第一条 pending 上）。
+        #    pending entry 仍然**逐条推导**（下面的 `derive_for_manifest_entry` 照跑）：
+        #    它要么给出 required set，要么把失败转成可归因的 `derivation_error`，
+        #    两种都比「整门崩掉」有信息量。
+        capability_value = capability_bucket(entry_profile, entry)
         profile_payload = entry.get("scenario_profile") or {}
         per_model: dict[str, dict[str, Any]] = {}
         derivation_error: str | None = None
@@ -787,7 +827,7 @@ def derive_all_entries() -> tuple[EntryDerivation, ...]:
         out.append(
             EntryDerivation(
                 entry_id=entry_id,
-                capability=capability.value,
+                capability=capability_value,
                 editable=editable,
                 editability=editability,
                 room_model=room_model,
@@ -822,11 +862,18 @@ def build_close_gate(derivations: Sequence[EntryDerivation]) -> dict[str, Any]:
 
     recomputed: dict[str, bool] = {}
     predicate_errors: dict[str, str] = {}
+    pending_entries: list[str] = []
+    pending_entries: list[str] = []
     for row in derivations:
         entry = entries[row.entry_id]
         try:
             profile = evidence.extract_entry_profile(entry)
-            capability = entry_profile.capability_of(entry)
+            # 🔴 pending 不是「谓词出错」：谓词对它还不适用；混进 predicate_errors
+            #    会让「谓词零错误」被 86 条 pending 顶红，真错误反而被淹。
+            capability = entry_profile.effective_capability(entry)
+            if capability is None:
+                pending_entries.append(row.entry_id)
+                continue
             recomputed[row.entry_id] = bool(
                 evidence.close_scenarios_required(profile=profile, capability=capability)
             )
@@ -945,6 +992,16 @@ def _authority_sensitivity(derivations: Sequence[EntryDerivation]) -> dict[str, 
 # ════════════════════════════════════════════════════════════════════════════
 
 
+def oo_probe_prerequisites() -> dict[str, Any]:
+    """真调 OO 的前置条件（本体在 `_task70_gate_env.oo_probe_prerequisites`）。
+
+    守卫经 `gate.oo_probe_prerequisites()` 查询，据此走两条臂 —— 见本体的 docstring。
+    """
+    from app.core.config import settings
+
+    return oo_probe_prerequisites_of(settings)
+
+
 def probe_real_onlyoffice() -> dict[str, Any]:
     """真调 OO 9.4 CommandService。签名走**生产** signer，不抄第二份。
 
@@ -970,23 +1027,17 @@ def probe_real_onlyoffice() -> dict[str, Any]:
     """
     import httpx
 
-    from app.core.config import settings
-
     prod = _production()
     command_service = prod["command_service"]
     policy = command_service.load_command_service_policy()
 
-    oo_url = str(getattr(settings, "ONLYOFFICE_URL", "") or "").strip()
-    secret = str(getattr(settings, "ONLYOFFICE_JWT_SECRET", "") or "")
-    if not oo_url:
-        raise Task70GateError(
-            "ONLYOFFICE_URL 为空 —— 本门必须真调 OO，不得回退到「由 payload 决定 host」"
-        )
-    if not secret:
-        raise Task70GateError(
-            "ONLYOFFICE_JWT_SECRET 缺失 —— 契约 `command_service.jwt.required=true`，"
-            "不得在无密钥时降级成不鉴权探测"
-        )
+    # 🔴 settings 只经 `oo_probe_prerequisites()` 读一次（单一来源）：本函数自己再读一遍
+    #    就又有了第二个「本环境有没有密钥」的答案，两处判断会漂。
+    prerequisites = oo_probe_prerequisites()
+    if not prerequisites["satisfied"]:
+        raise Task70GateError(prerequisites["why_not"])
+    oo_url = str(prerequisites["onlyoffice_url"])
+    secret = str(prerequisites["jwt_secret"])
     base = oo_url.rstrip("/")
     endpoint = f"{base}/coauthoring/CommandService.ashx"
 
@@ -1219,6 +1270,34 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
     # ── 6. register_from_manifest 真跑
     try:
         outcome = await registry.register_from_manifest(session=session)
+        failures = dict(outcome.failures or {})
+        reasons = dict(outcome.reasons or {})
+        # 🔴 `failures` 必须进记账：三集合各有独立来源，等式是**三边之和 == planned**；
+        #    原实现只加前两项 ⇒ 任何 typed failure 下恒假，而它只是 detail 字段、没人看。
+        # 🔴 这个值必须是**就地算出来的比较表达式**：守卫用 AST 查它是不是 `ast.Compare`，
+        #    因为「把它写死成 True」是等价变异、值层判据抓不到（M20 的教训）。
+        #    所以不能先赋给局部变量再塞进 dict —— 那样 AST 看到的是 `ast.Name`。
+        # 🔴 本环境能否解析 published artifact 是读这组数字的前提：storage 不入库 ⇒
+        #    干净检出里 registered 被系统性压到 0（细节见 `_task70_gate_env` 的模块文档）。
+        artifact_env = artifact_environment(BACKEND, failures)
+        env_limited = measurement_is_environment_limited(artifact_env)
+        if outcome.registered_entry_ids:
+            blocked = None
+        elif env_limited:
+            blocked = (
+                "registered=0 **不可解读为供给事实**：本环境无法解析 published artifact"
+                f"（storage_root_exists={artifact_env['storage_root_exists']}，"
+                f"artifact_publish_failed={artifact_env['artifact_publish_failed_count']}）。"
+                "storage 不入库 ⇒ 干净检出里恒缺；要测真实供给须在有 storage 的工作树上跑"
+            )
+        else:
+            # 真的能解析 artifact 还 0 条注册 ⇒ 才是供给结论，且原因按**现算直方图**给，
+            # 不写死「都缺 representation 或 per-entry 契约」这种未经核对的归因。
+            blocked = (
+                "registered=0：artifact 可解析但无一 entry 满足准入，原因分布见 "
+                f"reason_kind_histogram / failure_code_histogram（reasons={len(reasons)}，"
+                f"failures={len(failures)}）"
+            )
         record(
             "S6",
             "register_from_manifest(session) [REAL]",
@@ -1227,12 +1306,16 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
                 "planned": len(outcome.planned_entry_ids),
                 "registered_entry_ids": list(outcome.registered_entry_ids),
                 "registered_adapter_ids": list(outcome.registered_adapter_ids),
-                "unregistered_count": len(outcome.reasons),
+                "unregistered_count": len(reasons),
+                "failure_count": len(failures),
                 "accounting_identity_holds": (
-                    len(outcome.registered_entry_ids) + len(outcome.reasons)
+                    len(outcome.registered_entry_ids) + len(reasons) + len(failures)
                     == len(outcome.planned_entry_ids)
                 ),
-                "pilot_reason": str(outcome.reasons.get(PILOT_ENTRY_ID, ""))[:420],
+                "accounting_identity_formula": "registered + reasons + failures == planned",
+                "artifact_environment": artifact_env,
+                "measurement_is_environment_limited": env_limited,
+                "pilot_reason": str(reasons.get(PILOT_ENTRY_ID, ""))[:420],
                 "reason_kind_histogram": dict(
                     sorted(
                         Counter(
@@ -1240,15 +1323,23 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
                             if "current published representation" in reason
                             else "no_per_entry_contract"
                             if "DELIVERED_PER_ENTRY_CONTRACTS" in reason
+                            else "capability_unadjudicated"
+                            if "capability 裁决" in reason
                             else "other"
-                            for reason in outcome.reasons.values()
+                            for reason in reasons.values()
+                        ).items()
+                    )
+                ),
+                "failure_code_histogram": dict(
+                    sorted(
+                        Counter(
+                            str(getattr(fail, "error_code", "") or "unknown")
+                            for fail in failures.values()
                         ).items()
                     )
                 ),
             },
-            None
-            if outcome.registered_entry_ids
-            else "registered=0：全部 planned entry 都缺 current published representation 或 per-entry 契约",
+            blocked,
         )
     except Exception as exc:  # noqa: BLE001
         record("S6", "register_from_manifest(session) [REAL]", True, None, f"{type(exc).__name__}: {exc}")
@@ -1263,6 +1354,16 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
         )
     ).all()
     harness = harness_module.SyncTestRunHarness(session)
+    # 🔴 plan 的 entry 必须是**已裁决**的那一条：pilot entry 现在是 capability=pending，
+    #    对它 plan() 一律抛 ⇒ 本步对每个 bundle 只记 error，而它的职责正是证明 plan()
+    #    的生产路径能跑通。取 S6 实录的首条已注册 entry，没有则退回 pilot 并记明用了哪条。
+    s6_registered = sorted(
+        step["detail"].get("registered_entry_ids") or []
+        for step in steps
+        if step["step"] == "S6" and isinstance(step.get("detail"), dict)
+    )
+    plan_entry_id = (s6_registered[0][0] if s6_registered and s6_registered[0]
+                     else PILOT_ENTRY_ID)
     plans: dict[str, Any] = {}
     for row in bundles:
         bundle_id = row[0]
@@ -1271,7 +1372,7 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
                 bundle_id if isinstance(bundle_id, uuid.UUID) else uuid.UUID(str(bundle_id))
             )
             plan = await harness.plan(
-                entry_id=PILOT_ENTRY_ID,
+                entry_id=plan_entry_id,
                 bundle_id=bundle_id if isinstance(bundle_id, uuid.UUID) else uuid.UUID(str(bundle_id)),
             )
             plans[identity.authority_model.value] = {
@@ -1299,6 +1400,11 @@ async def walk_supply_chain(session: Any) -> dict[str, Any]:
         True,
         {
             "approved_bundle_count": len(bundles),
+            "plan_entry_id": plan_entry_id,
+            "plan_entry_is_pilot": plan_entry_id == PILOT_ENTRY_ID,
+            "plan_entry_why": (
+                "取 S6 实录的首条已注册 entry；pilot 当下 capability=pending，对它 plan() 必抛"
+            ),
             "plans_by_authority_model": plans,
             "note": (
                 "plan() 内部逐条 `resolve_production_refs()` —— 全部通过意味着每个场景在生产上"
@@ -1492,11 +1598,19 @@ def build_scenario_execution(
     oo_available: bool,
     browser_available: bool,
     application_chain_available: bool,
+    recorded_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """逐 entry 逐 scenario 的结构化执行结果。**不是一句结论。**
 
     行数 = Σ(独立 entry × 该 entry 在 `projection_contract` 下的 required set 大小)。父入口
     （`independent_entry=False`）**不重复计数** —— 它们只复用其独立 entry 的 adapter。
+
+    🔴 `executed_end_to_end` 必须有**证据**，不是「今天能跑」：该档位自己声明的语义是
+    「本轮端到端真跑并有可重算证据」，而 :func:`classify_scenario_execution` 只逐层排除
+    schema / 上游 / 黑盒 / application 链 / recovery，排不掉就落 `TIER_EXECUTED` ——
+    全程不查证据行。实测（见 spec tasks.md 第五批）：黑盒与链路两层一解除，1206/1608 行
+    瞬间变「已执行」而证据两表是 0 行 —— 正是本门文件头要防的「接了 OO 就自动变绿」。
+    处置：逐 (entry_id, scenario_id) 查 `recorded_evidence`，无 `result='passed'` 即降档。
     """
     classification_cache: dict[str, dict[str, Any]] = {}
 
@@ -1509,6 +1623,13 @@ def build_scenario_execution(
                 application_chain_available=application_chain_available,
             )
         return classification_cache[scenario_id]
+
+    evidence_facts: Mapping[str, Any] = dict(recorded_evidence or {})
+    passed_pairs = {
+        (str(pair[0]), str(pair[1]))
+        for pair in (evidence_facts.get("passed_pairs") or ())
+        if isinstance(pair, (list, tuple)) and len(pair) >= 2
+    }
 
     rows: list[dict[str, Any]] = []
     tier_counter: Counter[str] = Counter()
@@ -1523,6 +1644,18 @@ def build_scenario_execution(
         scenario_rows: list[dict[str, Any]] = []
         for scenario_id in scenario_ids:
             classified = dict(classify(scenario_id))
+            if classified["execution_tier"] == TIER_EXECUTED and (
+                (entry.entry_id, scenario_id) not in passed_pairs
+            ):
+                # 🔴 「能跑」不是「跑过」：没有 result='passed' 的证据行一律降档。
+                classified["execution_tier"] = TIER_UNRUNNABLE
+                classified["blocked_by"] = "evidence_not_recorded"
+                classified["blocked_owner_task"] = OWNER_TASK
+                classified["blocked_detail"] = (
+                    "无 result='passed' 的证据行（现算 test_run="
+                    f"{evidence_facts.get('test_run_rows')} / evidence_scenario="
+                    f"{evidence_facts.get('evidence_scenario_rows')}）⇒ 不得记成已执行。"
+                )
             tier_counter[classified["execution_tier"]] += 1
             entry_tiers[classified["execution_tier"]] += 1
             scenario_rows.append(classified)
@@ -1559,6 +1692,16 @@ def build_scenario_execution(
         "parent_duplicates_excluded": True,
         "scenario_row_total": sum(len(row["scenarios"]) for row in rows),
         "tier_histogram": dict(sorted(tier_counter.items())),
+        # 🔴 证据索引一起记进报告 ⇒ 判据可伪证（真跑出 evidence 后档位自然放行）。
+        "recorded_evidence": {
+            "test_run_rows": evidence_facts.get("test_run_rows"),
+            "evidence_scenario_rows": evidence_facts.get("evidence_scenario_rows"),
+            "passed_pair_count": len(passed_pairs),
+            "why_tier_executed_needs_it": (
+                "档位语义是「真跑并有可重算证据」，而分类函数只排除五层阻塞、不查证据 ⇒"
+                "黑盒与链路一解除就会有上千行瞬间变「已执行」，而证据表是 0 行。"
+            ),
+        },
         "tier_semantics": {
             TIER_EXECUTED: "本轮端到端真跑并有可重算证据",
             TIER_STRUCTURAL: "只有结构侧判据（无真实 OO/浏览器/DB 实体）",
@@ -1740,36 +1883,12 @@ def build_counterfactual_arms(
 
 
 def _close_predicate_arm() -> dict[str, Any]:
-    """A5 的实测：把 `or` 换成 `and` 会少掉多少 entry 的 close 族。"""
-    prod = _production()
-    evidence = prod["evidence"]
-    entry_profile = prod["entry_profile"]
-    Capability = entry_profile.Capability
-    RoomModel = evidence.RoomModel
+    """A5 的实测：把 `or` 换成 `and` 会少掉多少 entry 的 close 族。
 
-    manifest = entry_profile.load_entry_manifest()
-    entries = entry_profile.manifest_entries_by_id(manifest)
-    real_hits = 0
-    and_hits = 0
-    for entry in entries.values():
-        try:
-            profile = evidence.extract_entry_profile(entry)
-            capability = entry_profile.capability_of(entry)
-        except Exception:  # noqa: BLE001
-            continue
-        if evidence.close_scenarios_required(profile=profile, capability=capability):
-            real_hits += 1
-        if profile.editable and (
-            capability is Capability.bidirectional and profile.room_model is RoomModel.shared
-        ):
-            and_hits += 1
-    return {
-        "production_or_predicate_hits": real_hits,
-        "mutated_and_predicate_hits": and_hits,
-        "entries_that_would_silently_lose_close_family": real_hits - and_hits,
-        "close_scenarios_per_entry": len(evidence.CLOSE_SCENARIOS),
-        "scenario_slots_that_would_vanish": (real_hits - and_hits) * len(evidence.CLOSE_SCENARIOS),
-    }
+    本体在 `_task70_gate_env.close_predicate_arm()`（行数门：主文件已在白名单基线上，
+    按「拆模块不抬白名单」搬出；调用面 `gate._close_predicate_arm()` 不变）。
+    """
+    return close_predicate_arm(_production())
 
 
 def build_forward_recompute() -> dict[str, Any]:
@@ -2559,6 +2678,9 @@ def radiation_surface() -> dict[str, Any]:
 # §14.1 普查派生量：现算、断言语义性质、**不进冻结基线**
 # ════════════════════════════════════════════════════════════════════════════
 
+#: ═══ 三类剔除：`VOLATILE_KEYS`（随机值/墙钟）· `CENSUS_KEYS`（仓库演进，见下）·
+#: `LIVE_DB_KEYS`（别的会话写共享库，说理在 `_task70_live_db_lock`）；三者只经
+#: `comparable()` 一个入口（少一类 digest 就重新变成会自己过期的锁）═══
 #: 🔴 **普查派生量（census-derived）** —— 逐字节锁必须剔除的**第二类**字段。
 #:
 #: :data:`VOLATILE_KEYS` 剔的是「每轮都变的随机值 / 墙钟」；本集合剔的是「随**仓库演进**而变
@@ -2588,6 +2710,9 @@ CENSUS_KEYS: Final[frozenset[str]] = frozenset(
         "radiation_surface.referencing_test_file_count",
         "radiation_surface.referencing_test_files",
         "radiation_surface.digest",
+        # 🔴 `source_commit` 与 `artifact_git_status` 同类：git 状态量，**提交动作本身**
+        #    就让它变。源码轴由 `source_digests`（内容 digest）承担，见那里的说理。
+        "source_commit",
         "artifact_git_status",
         "census_contract.measured",
     }
@@ -2599,6 +2724,11 @@ def strip_census(node: Any, *, path: str = "") -> Any:
     报告里另有十余处正当的 `digest` 同名量（`typed_child_digest` / `manifest_source_digest`）。
     """
     return _census_lock.strip_census(node, CENSUS_KEYS, path=path)
+
+
+def comparable(node: Any) -> Any:
+    """参与逐字节锁的内容 = 三类剔除都做完之后的样子。**单一入口**（说理见 §「三类剔除」）。"""
+    return strip_live_db(strip_census(strip_volatile(node)))
 
 
 def census_semantics(surface: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -2638,7 +2768,9 @@ def build_census_contract(surface: Mapping[str, Any]) -> dict[str, Any]:
             "剔除 ≠ 不管：`census_semantics` 逐条现算并断言语义性质，语义性质本身继续进锁。"
         ),
         still_locked=[
-            "source_commit（源码变了但 evidence 没刷新 —— 唯一的真 stale 轴）",
+            "source_digests（源码变了但报告没刷新 —— 真 stale 轴，用**内容** digest 而不是 "
+            "`source_commit`：提交这份报告本身就会改 HEAD ⇒ 报告在自己的提交里必然 stale，"
+            "那是恒红门禁。说理见 `_task70_gate_env.source_digests`）",
             "radiation_surface.production_subjects / subject_coverage / own_guard_* / how"
             "（辐射面**选取契约**：scanner 退化或 subject 名单被删立刻变红）",
             "scenario_execution 的逐项判定与 blocked_by 码分布",
@@ -2827,6 +2959,7 @@ async def _gather_db_facts() -> dict[str, Any]:
         async with maker() as session:
             before = await snapshot_tables(session)
             supply = await walk_supply_chain(session)
+            evidence_facts = await recorded_evidence(session)
             after = await snapshot_tables(session)
     finally:
         await engine.dispose()
@@ -2866,6 +2999,7 @@ async def _gather_db_facts() -> dict[str, Any]:
             },
         },
         "supply_chain_walk": supply,
+        "recorded_evidence": evidence_facts,
     }
 
 
@@ -2902,6 +3036,7 @@ def build_report(
         oo_available=oo_available,
         browser_available=browser_available,
         application_chain_available=application_chain_available,
+        recorded_evidence=db.get("recorded_evidence"),
     )
     hit_paths = assert_no_result_declarations(execution["entries"])
 
@@ -2992,10 +3127,12 @@ def build_report(
         "db_snapshot": snapshot,
         "radiation_surface": surface,
         "census_contract": build_census_contract(surface),
+        "live_db_contract": build_live_db_contract(db),
         "upstream_lock_reruns": (
             dict(upstream_locks) if upstream_locks is not None else rerun_upstream_locks(run_locks)
         ),
         "artifact_git_status": artifact_status,
+        "source_digests": source_digests(REPO, source_digest_targets()),
         "artifact_git_status_semantics": _census_lock.artifact_status_semantics(artifact_status),
         "production_code_touched": {
             "backend_production_files": [],
@@ -3032,11 +3169,8 @@ def build_report(
     # 🔴 digest 算在 **census 剔除之后**的内容上：于是它继续锁死「非普查内容」（要求原文），
     #    而不再被仓库演进顶红。`strip_volatile` 与 `strip_census` 的顺序无关（两者剔的键不交叉），
     #    但**必须都做** —— 少任何一个，digest 就重新变成一个会自己过期的锁。
-    report["report_digest"] = digest_of(
-        strip_census(
-            strip_volatile({key: value for key, value in report.items() if key != "report_digest"})
-        )
-    )
+    payload = {key: value for key, value in report.items() if key != "report_digest"}
+    report["report_digest"] = digest_of(comparable(payload))
     return report
 
 
@@ -3097,7 +3231,7 @@ def main(argv: list[str] | None = None) -> int:
     fresh = json.loads(rendered)
     # 🔴 逐字节比对**在 census 剔除之后**做：仓库级普查量（全树 test 计数 / 引用者清单 /
     #    它们的 digest）随仓库演进，冻进锁里等于要求仓库停止演进（BP-71-8）。
-    if strip_census(strip_volatile(on_disk)) != strip_census(strip_volatile(fresh)):
+    if comparable(on_disk) != comparable(fresh):
         print(
             f"[任务70] 现算结果与 {rel(OUTPUT_PATH)} 不一致 —— 报告已过期或被手改"
             "（已剔除 census 与 volatile，剩下的都是真 stale 轴）",
@@ -3105,6 +3239,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     # 🔴 剔除 ≠ 不管：普查量现算并断言语义性质。少了这一段，第一条就退化成「不看了」。
+    live = report["live_db_contract"]["semantics"]
+    if not live["all_hold"]:
+        print(f"[任务70] 活库语义断言不成立: {live['failing_checks']}", file=sys.stderr)
+        return 1
     semantics = report["census_contract"]["semantics"]
     if not semantics["all_hold"]:
         print(

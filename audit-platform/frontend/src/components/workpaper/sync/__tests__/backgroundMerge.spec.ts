@@ -70,6 +70,7 @@ function snapshot(over: Partial<WorkpaperSyncOperationSnapshot> = {}): Workpaper
     operationFinishedAt: null, resultRevision: null, conflictCount: null, logicalResultCode: null,
     definitionBundleId: null, definitionBundleSha256: null, authorityModelDefinitionSha256: null,
     durableAt: '2026-10-25T00:00:00Z', finishedAt: null, terminal: false,
+    roomLatestDurableApplicationId: null, roomLatestDurableSequence: null,
     ...over,
   }
 }

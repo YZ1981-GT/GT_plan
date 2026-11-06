@@ -3,6 +3,7 @@ import axios from 'axios'
 import http from '@/utils/http'
 import { API } from '@/services/apiPaths'
 import { clearOnLogout } from '@/utils/aiChatCacheCleanup'
+import { clearChecklistDraftsOnLogout } from '@/composables/workpaper/checklistDraftStorage'
 import { advanceRequestIdentityEpoch } from '@/services/requestIdentityEpoch'
 import {
   broadcastTokenUpdate,
@@ -100,6 +101,7 @@ export const useAuthStore = defineStore('auth', {
       sessionStorage.removeItem('user')
       // Task 10: 清理 AI 聊天敏感缓存
       clearOnLogout()
+      clearChecklistDraftsOnLogout()
       // 多窗口：广播登出事件给其他窗口（multi-window-ledger-workbench Task 10）
       broadcastLogout()
       try {
@@ -178,6 +180,7 @@ if (typeof window !== 'undefined') {
           sessionStorage.removeItem('refreshToken')
           sessionStorage.removeItem('user')
           clearOnLogout()
+          clearChecklistDraftsOnLogout()
           window.location.href = '/login'
         },
         onSessionRequest: () => {

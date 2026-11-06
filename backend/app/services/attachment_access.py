@@ -36,3 +36,23 @@ async def require_attachment_permission(
     att = await load_attachment(db, attachment_id, include_deleted=include_deleted)
     await assert_project_permission(db, user, att.project_id, min_permission)
     return att
+
+
+async def assert_linked_workpapers_writable(
+    db: AsyncSession,
+    attachment_id: UUID,
+) -> tuple[UUID, ...]:
+    """附件内容/版本变化前锁定全部关联底稿；任一终态即整次拒绝。"""
+    from app.services.workpaper_content_freeze import (
+        WorkpaperContentFrozenError,
+        assert_workpaper_content_writable,
+    )
+    from app.services.wp_visibility.entry_integration import linked_attachment_wp_ids
+
+    wp_ids = tuple(sorted(await linked_attachment_wp_ids(db, attachment_id), key=str))
+    for wp_id in wp_ids:
+        try:
+            await assert_workpaper_content_writable(db, wp_id, for_update=True)
+        except WorkpaperContentFrozenError as exc:
+            raise HTTPException(status_code=423, detail=exc.detail) from exc
+    return wp_ids

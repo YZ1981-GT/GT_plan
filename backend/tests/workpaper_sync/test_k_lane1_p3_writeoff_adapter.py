@@ -87,11 +87,31 @@ GUESSED_KEYS = (
 )
 
 #: 裸 `'K1-9'` 的两个口径
-BARE_K1_9_PER_OCCURRENCE = 14
-BARE_K1_9_PER_LINE = 13
+BARE_K1_9_PER_OCCURRENCE = 15
+BARE_K1_9_PER_LINE = 14
 BARE_K1_9_FILES = 6
 #: slice 里那个**错**的数
 BARE_K1_9_SLICE_WRONG = 11
+#: 逐文件「每处都计」—— 现算值，**禁按总数推算**。
+#:
+#: 轨迹 13 → 14 → 15（每处都计）/ 12 → 13 → 14（每行至多一次）：
+#:   · 13/12 = KA-P20 首次裁决时（lane 1 晋级前）；
+#:   · +1 = `c7a93a630` K 真双向晋级给 `GtK1OtherReceivables.vue` 加
+#:     `isSyncManagedSheet === 'K1-9'`，让 legacy OO 在受管页让位；
+#:   · +1 = `7954c575d`（`attachment-voucher-evidence-binding`，**不是本 spec**）
+#:     给 `K1TabWriteoffCheck.vue` 加 `const EVIDENCE_SHEET = 'K1-9'`，
+#:     把行级证据附件挂到 K1-9 这张 sheet 上。
+#:
+#: 🔴 第二笔增量不削弱 KA-P20，反而是新证据：它的变量名就叫 `EVIDENCE_SHEET`，
+#: 用途是「哪张 sheet」，与 item_id 无关 ⇒「裸 K1-9 是 sheet 码」再得一例。
+BARE_K1_9_PER_FILE = {
+    "k1SheetProgress.ts": 1,
+    "useK1ImportExport.ts": 2,
+    "useK1WriteoffImportExport.ts": 2,
+    "GtK1OtherReceivables.vue": 2,
+    "K1TabIndex.vue": 3,
+    "K1TabWriteoffCheck.vue": 5,
+}
 
 #: OO 对端 sheet 的几何
 K1_9_GEOMETRY = {"r": 25, "c": 8, "merged": 2, "formulas": 9, "bare_if": 0}
@@ -141,19 +161,24 @@ def k1_9_sheet():
     return snap
 
 
-def _bare_k1_9_counts() -> tuple[int, int, dict[str, int]]:
-    """返回 (每处都计, 每行至多一次, 逐文件[每处都计])。"""
+def _bare_k1_9_counts() -> tuple[int, int, dict[str, int], dict[str, int]]:
+    """返回 (每处都计, 每行至多一次, 逐文件[每处都计], 逐文件[每行至多一次])。
+
+    🔴 逐文件的**两份**计数都返回：原实现只有「每处都计」是逐文件的，「每行至多一次」
+    只有总数 ⇒ 两个口径差在哪个文件无法由判据自己定位，只能靠断言里写死「其余文件
+    合计 == N」间接表达，任何文件一变都红在同一句上、看不出是谁变的。
+    """
     rx = re.compile(r"""['"`]K1-9['"`]""")
     per_occ: dict[str, int] = {}
-    per_line_total = 0
+    per_line: dict[str, int] = {}
     for p in k_domain_files():
         src = strip_comments(cached_text(p))
         for line in src.split("\n"):
             ms = rx.findall(line)
             if ms:
                 per_occ[p.name] = per_occ.get(p.name, 0) + len(ms)
-                per_line_total += 1
-    return sum(per_occ.values()), per_line_total, per_occ
+                per_line[p.name] = per_line.get(p.name, 0) + 1
+    return sum(per_occ.values()), sum(per_line.values()), per_occ, per_line
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -364,15 +389,25 @@ class TestKAP20BareK19IsASheetCode:
     """🔴 裸 `'K1-9'` 是 **sheet 码**不是 item_id；两个口径都对。"""
 
     def test_both_calibers_recompute(self) -> None:
-        """🔴 晋级后：宿主 `GtK1OtherReceivables.vue` 新增 `isSyncManagedSheet === 'K1-9'`
-        让 legacy OO 在受管页让位，`K1TabWriteoffCheck.vue` 新增受管页门控 ⇒ 每处口径
-        13→**14**、每行口径 12→**13**（增量全落在 `K1TabWriteoffCheck.vue`：3→4）。"""
-        per_occ, per_line, detail = _bare_k1_9_counts()
-        assert per_occ == BARE_K1_9_PER_OCCURRENCE == 14, (
-            f"每处都计口径期望 14，实得 {per_occ}（{detail}）"
+        """🔴 两个口径现算 **15 / 14**，且逐文件分布必须逐条对上。
+
+        轨迹与每笔增量的出处写在 `BARE_K1_9_PER_FILE` 的注释里（13/12 → 14/13 →
+        15/14）。原断言只钉总数，`attachment-voucher-evidence-binding` 往
+        `K1TabWriteoffCheck.vue` 加一个 `EVIDENCE_SHEET = 'K1-9'` 就让它红在
+        「期望 14 实得 15」上 —— 看不出是哪个文件、也看不出是别的 spec 加的。
+        现在逐文件比，红的时候直接点名。
+        """
+        per_occ, per_line, detail, lines = _bare_k1_9_counts()
+        assert detail == BARE_K1_9_PER_FILE, (
+            "逐文件分布变了（左=现算，右=登记）："
+            f"{ {k: v for k, v in detail.items() if BARE_K1_9_PER_FILE.get(k) != v} } "
+            f"vs { {k: v for k, v in BARE_K1_9_PER_FILE.items() if detail.get(k) != v} }"
         )
-        assert per_line == BARE_K1_9_PER_LINE == 13, (
-            f"每行至多一次口径期望 13，实得 {per_line}"
+        assert per_occ == BARE_K1_9_PER_OCCURRENCE == 15, (
+            f"每处都计口径期望 15，实得 {per_occ}（{detail}）"
+        )
+        assert per_line == BARE_K1_9_PER_LINE == 14, (
+            f"每行至多一次口径期望 14，实得 {per_line}（{lines}）"
         )
         assert len(detail) == BARE_K1_9_FILES == 6, f"文件数 {sorted(detail)}"
 
@@ -384,26 +419,35 @@ class TestKAP20BareK19IsASheetCode:
           · 12 = 每行至多一次（slice 一处用的）
           · 11 = 不属任何口径 ⇒ 唯一的错
         """
-        per_occ, per_line, _ = _bare_k1_9_counts()
+        per_occ, per_line, _detail, _lines = _bare_k1_9_counts()
         assert BARE_K1_9_SLICE_WRONG not in (per_occ, per_line), (
             "11 竟对应上某个口径 ⇒ 本裁定须撤"
         )
         assert {per_occ, per_line} == {BARE_K1_9_PER_OCCURRENCE, BARE_K1_9_PER_LINE}
 
     def test_the_two_calibers_differ_only_on_one_file(self) -> None:
-        """🔴 差异全在 `K1TabIndex.vue`（一行里出现两次）。"""
-        _occ, _line, detail = _bare_k1_9_counts()
-        assert detail["K1TabIndex.vue"] == 3, (
-            f"K1TabIndex.vue 每处都计期望 3，实得 {detail['K1TabIndex.vue']}"
+        """🔴 两个口径的差只来自 `K1TabIndex.vue`（它有一行写了两次）。
+
+        这才是「只差一个文件」的真内容：逐文件比 per-occurrence 与 per-line，
+        只有一个文件两者不等。原断言用「K1TabIndex 是 3 且其余合计 11」间接表达，
+        其余任一文件变动都会红在那句上，而且 11 恰好等于 `BARE_K1_9_SLICE_WRONG`
+        （slice 那个错数）—— 纯巧合，读起来却像有语义关联。
+        """
+        _occ, _line, detail, lines = _bare_k1_9_counts()
+        differ = {k for k in detail if detail[k] != lines.get(k)}
+        assert differ == {"K1TabIndex.vue"}, (
+            f"两口径不等的文件集合 {sorted(differ)}，期望只有 K1TabIndex.vue"
         )
-        others = {k: v for k, v in detail.items() if k != "K1TabIndex.vue"}
-        assert sum(others.values()) == 11, others
+        assert (detail["K1TabIndex.vue"], lines["K1TabIndex.vue"]) == (3, 2), (
+            f"K1TabIndex.vue 期望 3 处 / 2 行，实得 "
+            f"{detail['K1TabIndex.vue']} / {lines['K1TabIndex.vue']}"
+        )
 
     def test_the_hosts_are_sheet_level_consumers(
         self, k_files: list[pathlib.Path]
     ) -> None:
-        """🔴 判 sheet 码的依据：命中处的上下文是 sheet 清单/进度/导入导出。"""
-        _occ, _line, detail = _bare_k1_9_counts()
+        """🔴 判 sheet 码的依据：命中处的上下文是 sheet 清单/进度/导入导出/证据 sheet。"""
+        _occ, _line, detail, _lines = _bare_k1_9_counts()
         assert set(detail) == {
             "k1SheetProgress.ts",
             "useK1ImportExport.ts",
@@ -414,6 +458,13 @@ class TestKAP20BareK19IsASheetCode:
         }, sorted(detail)
         # 其中三个文件名本身就说明是 sheet 级用途
         assert {"k1SheetProgress.ts", "useK1ImportExport.ts"} <= set(detail)
+        # 🔴 第 15 处（别的 spec 加的）也是 sheet 级：变量名就叫 EVIDENCE_SHEET。
+        # 这条把 `BARE_K1_9_PER_FILE` 注释里的出处说明变成可伪证的断言 ——
+        # 哪天它被改成 item_id 用途，KA-P20 的裁定就得重新论证。
+        tab = next(x for x in k_files if x.name == "K1TabWriteoffCheck.vue")
+        assert re.search(
+            r"const\s+EVIDENCE_SHEET\s*=\s*'K1-9'", strip_comments(cached_text(tab))
+        ), "K1TabWriteoffCheck.vue 的 EVIDENCE_SHEET = 'K1-9' 不见了 ⇒ 增量出处须重算"
 
     def test_it_is_not_in_the_five_transport_keys(self) -> None:
         assert "K1-9" not in FIVE_KEYS_EXACT

@@ -84,19 +84,22 @@ from tests.workpaper_sync.test_single_pass_materialize import (
 
 #: 两条路径 `extract` 出来的受管字段数（真库实测）。钉住它是**非空转**判据：两边都变成
 #: 空 projection 时「逐字段相等」也成立，那种绿是假的。契约受管表集合变了要同步刷新。
-EXTRACTED_FIELD_COUNT = 218
+#: 218 → 189：ADR-D432-001 把 D4-32 的 A 列（模板序号，被错声明成 text）移出受管字段集。
+EXTRACTED_FIELD_COUNT = 189
 #: 产物 zip 的 entry 数（真库实测）。同上，防「两边都只剩几个 entry 也算相等」。
 ARTIFACT_ZIP_ENTRIES = 142
 
 #: 变异反证的两个受害 binding。刻意挑**两类**：
-#: * `d4_32_groups`：34 处全是 `inline_text`，且模板里那些格存的是**数字** ⇒ 漏写之后反读
-#:   回 int 而不是 str ⇒ 反读判据直接红（这是 design P2 写的那条反证）；
+#: * `undisclosed_rp_rows`：模板存 `1`、`boolean` 归一写 `True` ⇒ 漏写后反读回 `1` ⇒ 反读判据红；
 #: * `d4_10_rows`：49 处写入（28 `inline_text` + 21 `number_literal`），漏写之后反读**全等**
 #:   ⇒ 只有字节判据看得见。它是本文件坚持保留字节判据的理由。
-TEXT_VICTIM = "d4_32_groups"
-TEXT_VICTIM_PART = "xl/worksheets/sheet41.xml"
-#: 漏写 `d4_32_groups` 的 34 处写入后，反读出来发生变化的字段数（真库实测）。
-TEXT_VICTIM_CHANGED_FIELDS = 24
+#: 🔴 从 `d4_32_groups` **重选**而来：它当初的选中理由（「那些格存的是数字」）正是被错声明成
+#: text 的 D4-32 A 列，A 列移出后它漏写的反读差异现算为 0 ⇒ 不能只把 24 改成 0。重选依据与
+#: 逐 binding 实测见 spec wp-sync-conflict-adjudication-and-d4-32-modeling 的 tasks.md。
+TEXT_VICTIM = "undisclosed_rp_rows"
+TEXT_VICTIM_PART = "xl/worksheets/sheet35.xml"
+#: 漏写 `undisclosed_rp_rows` 的写入后，反读出来发生变化的字段数（现算实测）。
+TEXT_VICTIM_CHANGED_FIELDS = 4
 SILENT_VICTIM = "d4_10_rows"
 SILENT_VICTIM_PART = "xl/worksheets/sheet15.xml"
 
@@ -483,9 +486,9 @@ def test_dropping_a_text_bindings_writes_turns_the_extract_judgement_red(
 ) -> None:
     """**Validates: Requirements 1.2**　design 五 P2 的反证：「故意漏写一个 binding ⇒ 红」。
 
-    受害者 `d4_32_groups`（34 处 `inline_text`）：模板里那些格存的是**数字**，materialize 的
-    `text` 归一会把它们写成字符串。漏写之后反读回 int ⇒ 24 个字段的 `repr` 从 `'1'` 变成 `1`
-    ⇒ 反读判据红。
+    受害者 `undisclosed_rp_rows`：模板里那几格存的是 `1`，materialize 的 `boolean` 归一会
+    写成 `True`。漏写之后反读回 `1` ⇒ 4 个字段的 `repr` 变化 ⇒ 反读判据红。
+    为什么不再是 `d4_32_groups`：见 `TEXT_VICTIM` 注释。
 
     🔴 实测更正了 design P2 反证措辞里的一个细节：漏写一个 binding 在这里表现为
     「**字段值/类型变了**」而不是「字段缺失」。原因是 projection 取自 substrate 自身 ——

@@ -157,6 +157,9 @@ instrumentation_specs = _P.instrumentation_specs
 build_matcher = _P.build_matcher
 build_registration = _P.build_registration
 register_adapter = _P.register_adapter
+# 已发布冻结身份：唯一实现在 `phase5_entry_orchestration`（本 entry 的编排闭包），
+# `attach_adapters` 内部就 await 它；转发出来让 Task 75 的四条判据在本 entry 上有分母。
+resolve_published_frozen_definitions = _P.resolve_published_frozen_definitions
 attach_adapters = _P.attach_adapters
 manifest_capability_enabled = _P.manifest_capability_enabled
 assert_manifest_capability_enabled = _P.assert_manifest_capability_enabled

@@ -46,13 +46,19 @@ class ConfirmTemplateRequest(BaseModel):
     audit_cycle: str | None = None
 
 
+# 底稿绑定门抽到伴生模块（行数门：优先抽模块不抬 whitelist）。保留本地别名，调用点与守卫不变。
+from app.routers._excel_html_write_guard import (  # noqa: E402
+    guard_bound_workpaper_write as _guard_bound_workpaper_write,
+)
+
+
 @router.post("/upload-parse")
 async def upload_and_parse(
     project_id: UUID,
     file: UploadFile = File(...),
     max_rows: int = Query(default=5000, ge=100, le=50000),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """上传 Excel → 解析为 structure.json + 返回 HTML 预览
 
@@ -163,7 +169,7 @@ async def save_edits(
     file_stem: str,
     data: EditRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """保存在线编辑结果 → 更新 structure.json + 回写 Excel
 
@@ -173,6 +179,14 @@ async def save_edits(
     3. 保存版本快照（保留最近20个）
     4. 回写 Excel + 更新 HTML
     """
+    await _guard_bound_workpaper_write(
+        db,
+        current_user,
+        project_id,
+        file_stem,
+        route_name="/api/projects/{project_id}/excel-html/save-edits/{file_stem}",
+    )
+
     from app.services.excel_html_converter import (
         get_lock_status, save_version_snapshot,
     )
@@ -238,12 +252,20 @@ async def confirm_as_template(
     file_stem: str,
     data: ConfirmTemplateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """确认为正式模板（编辑完成后）
 
     将编辑确认后的文件注册为项目模板，双格式保存到正式目录。
     """
+    await _guard_bound_workpaper_write(
+        db,
+        current_user,
+        project_id,
+        data.wp_code or file_stem,
+        route_name="/api/projects/{project_id}/excel-html/confirm-template/{file_stem}",
+    )
+
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
     structure_path = project_dir / f"{file_stem}.structure.json"
     excel_path = project_dir / f"{file_stem}.xlsx"
@@ -287,7 +309,7 @@ async def sync_from_onlyoffice(
     project_id: UUID,
     file_stem: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """编辑器保存后同步 structure.json（向后兼容端点）
 
@@ -295,33 +317,13 @@ async def sync_from_onlyoffice(
     调用此接口重新解析 Excel 更新 structure.json（保留取数规则绑定）。
     注：底稿编辑已迁移至 Univer，此端点保留向后兼容。
     """
-    # Wp_Bound_Gate（Task 4 / R3）：file_stem 通常即 wp_code；解析到底稿后、在重新解析
-    # 并写入 structure.json / HTML 底稿正文之前 enforce_wp_gate(save_parsed_data) 校验
-    # 可见性+写权限；不可见/跨项目/未委派/scope 外 → ExternalNotFound(404)，先于任何副作用。
-    import sqlalchemy as sa
-
-    from app.models.workpaper_models import WorkingPaper, WpIndex
-    from app.routers._wp_gate import enforce_wp_gate
-
-    _wp_id = (
-        await db.execute(
-            sa.select(WorkingPaper.id)
-            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(
-                WorkingPaper.project_id == project_id,
-                WpIndex.wp_code == file_stem,
-                WorkingPaper.is_deleted == sa.false(),
-            )
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-    if _wp_id is not None:
-        await enforce_wp_gate(
-            db, current_user,
-            entrypoint="workpaper.parsed_data_write", action="save_parsed_data",
-            method="POST", wp_id=_wp_id, project_id=project_id, entry_family="file",
-            route_name="/api/projects/{project_id}/excel-html/sync-from-onlyoffice/{file_stem}",
-        )
+    await _guard_bound_workpaper_write(
+        db,
+        current_user,
+        project_id,
+        file_stem,
+        route_name="/api/projects/{project_id}/excel-html/sync-from-onlyoffice/{file_stem}",
+    )
 
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
     excel_path = project_dir / f"{file_stem}.xlsx"
@@ -632,9 +634,18 @@ async def rollback_file_version(
     project_id: UUID,
     file_stem: str,
     version: int,
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """回滚到指定版本"""
+    await _guard_bound_workpaper_write(
+        db,
+        current_user,
+        project_id,
+        file_stem,
+        route_name="/api/projects/{project_id}/excel-html/versions/{file_stem}/rollback/{version}",
+    )
+
     from app.services.excel_html_converter import rollback_to_version, save_version_snapshot
     storage_dir = str(Path("storage") / "projects" / str(project_id) / "excel_html" / "versions")
     structure = rollback_to_version(storage_dir, file_stem, version)
@@ -713,6 +724,14 @@ async def execute_formulas(
     任何登录用户可对任意项目执行公式并写回结果。改为 require_project_access("edit")——
     该端点写回 structure.json / xlsx / html 三份文件，属编辑类操作。
     """
+    await _guard_bound_workpaper_write(
+        db,
+        current_user,
+        project_id,
+        file_stem,
+        route_name="/api/projects/{project_id}/excel-html/execute-formulas/{file_stem}",
+    )
+
     from app.services.cell_formula_evaluator import execute_formula
     from app.services.excel_html_converter import save_version_snapshot
 

@@ -40,6 +40,10 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     k_domain_files,
     strip_comments,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    contract_owner,
+    spec_dir,
+)
 
 MANIFEST_SLICE_PATH = DATA / "workpaper_sync_k_cycle_manifest_slice.json"
 DELETION_PLAN_PATH = DATA / "workpaper_sync_k_cycle_deletion_plan.json"
@@ -172,8 +176,10 @@ class TestKFP53Property20EmptyContractDenominator:
                     f"{name} 是 candidate 却带 entry_id"
                 )
                 continue
-            owner = (doc.get("review") or {}).get("entry_id")
-            assert owner, f"{name} 的 review.entry_id 缺失"
+            owner = contract_owner(name, doc)
+            assert owner, (
+                f"{name} 的归属取不到（既无 review.entry_id，也不在 CONTRACTS_WITHOUT_REVIEW_BLOCK 里）"
+            )
 
     def test_premise_direction_2_registry_has_zero_k_adapter(self) -> None:
         """前提方向②：registry 里 K adapter 数 == 0。"""
@@ -609,9 +615,12 @@ class TestKFP62SharedBaseZeroContribution:
 # Task 29 / KF-P52：交接给两份 lane spec
 # ════════════════════════════════════════════════════════════════════════════
 SPECS_DIR = ROOT / ".kiro" / "specs"
-LANE1_SPEC = SPECS_DIR / "k1-k7-inlined-iife-hosts-and-orphan-cleanup"
-LANE2_SPEC = SPECS_DIR / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
-FOUNDATION_SPEC = SPECS_DIR / "k-cycle-sync-foundation-and-first-canary"
+# 🔴 三份 spec 已归档到 `_archive/26-workpaper-sync-cycle-lanes-kln/` ⇒ 路径经 `spec_dir`
+#    解析（活跃优先、归档兜底）。归档不改变交接清单的存在性，写死活跃路径会把「spec 目录
+#    不存在」报成交接证据丢了。
+LANE1_SPEC = spec_dir("k1-k7-inlined-iife-hosts-and-orphan-cleanup")
+LANE2_SPEC = spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
+FOUNDATION_SPEC = spec_dir("k-cycle-sync-foundation-and-first-canary")
 
 
 class TestKFP52HandoffToTwoLanes:

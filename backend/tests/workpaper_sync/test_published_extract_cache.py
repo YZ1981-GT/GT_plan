@@ -33,7 +33,7 @@ from app.services.workpaper_sync.models import DefinitionState
 from app.services.workpaper_sync.projection_first_publication import (
     overlay_store_on_baseline_projection,
 )
-from tests.workpaper_sync.d4_materialize_harness import D4World, _text_safe, build_world
+from tests.workpaper_sync.d4_materialize_harness import D4World, build_world
 from tests.workpaper_sync.test_single_pass_artifact_equivalence import projection_differences
 
 
@@ -266,7 +266,7 @@ def test_merge_and_overlay_do_not_rewrite_the_cached_value(world: D4World) -> No
     snapshot = copy.deepcopy(cached)
     value = next(iter(PC.PUBLISHED_EXTRACT_CACHE._store.values()))
     pair_snapshot = copy.deepcopy(value.primary_pair)
-    incoming = _text_safe(cached)
+    incoming = cached
     merge_projections(base=cached, current=cached, incoming=incoming, contract=world.contract)
     overlay_store_on_baseline_projection(baseline=cached, store_projection=incoming)
     assert projection_differences(cached, snapshot, left_label="after", right_label="before") == ()

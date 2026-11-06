@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, text
+from sqlalchemy import BigInteger, Boolean, CHAR, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -82,18 +82,18 @@ class AiContentLog(Base, TimestampMixin):
     context_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     target_locator: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     baseline_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    before_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    before_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
     before_content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    proposed_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    proposed_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
     preview_diff: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     artifact_version: Mapped[int] = mapped_column(
-        server_default=text("0"), nullable=False
+        BigInteger, server_default=text("0"), nullable=False
     )
     writeback_status: Mapped[str] = mapped_column(
         String(20), server_default=text("'pending'"), nullable=False
     )
     applied_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    applied_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    applied_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
     writeback_receipt: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     undone_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True

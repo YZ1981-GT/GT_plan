@@ -62,9 +62,15 @@ async function selectSnapshot(artifactId, fullDigest) {
       }
     } catch { /* 损坏指针由本次原子替换修复 */ }
   }
+  // current.json 是 stable preview 的唯一切换点：临时文件写全再 rename，读取者只会看到旧的或新的
+  // 完整指针；rename 失败时删掉临时文件，不在 .verified-dist 里留半截产物。
   const temporary = `${CURRENT_FILE}.${process.pid}.tmp`
-  await writeFile(temporary, `${JSON.stringify(pointer, null, 2)}\n`, 'utf8')
-  await rename(temporary, CURRENT_FILE)
+  try {
+    await writeFile(temporary, `${JSON.stringify(pointer, null, 2)}\n`, 'utf8')
+    await rename(temporary, CURRENT_FILE)
+  } finally {
+    await rm(temporary, { force: true })
+  }
   return target
 }
 

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createChecklistCasClient } from './checklistCas'
+import {
+  createChecklistCasClient,
+  isChecklistDraftAccessDenied,
+  isNonRetryableChecklistSaveError,
+  makeChecklistDraft,
+  readChecklistDraft,
+} from './checklistCas'
 
 describe('checklistCas', () => {
   it('sends the remembered version and advances only from server receipts', async () => {
@@ -24,13 +30,32 @@ describe('checklistCas', () => {
         project_id: 'project-1',
         require_if_match: true,
         items: [{
-          item_id: 'row-1', conclusion: null, remark: 'first', wp_ref: null, if_match: 'v1',
+          item_id: 'row-1', conclusion: null, remark: 'first', if_match: 'v1',
         }],
       },
       { _dedupe: false },
     )
     expect((put.mock.calls[1][1] as any).items[0].if_match).toBe('v2')
     expect(cas.version('row-1')).toBe('v3')
+  })
+
+  it('只在调用方显式传入时发送 wp_ref，保留“省略”与“清空”的语义差异', async () => {
+    const put = vi.fn().mockResolvedValue({ data: [] })
+    const cas = createChecklistCasClient(put)
+
+    await cas.save({
+      wpId: 'wp-1',
+      items: [{ item_id: 'row-1', remark: '只改备注' }],
+    })
+    await cas.save({
+      wpId: 'wp-1',
+      items: [{ item_id: 'row-1', wp_ref: null }],
+    })
+
+    const omitted = (put.mock.calls[0][1] as any).items[0]
+    const explicitNull = (put.mock.calls[1][1] as any).items[0]
+    expect(omitted).not.toHaveProperty('wp_ref')
+    expect(explicitNull).toMatchObject({ item_id: 'row-1', wp_ref: null })
   })
 
   it('allows a new item without fabricating a version but keeps strict mode enabled', async () => {
@@ -58,5 +83,41 @@ describe('checklistCas', () => {
     })).rejects.toBe(conflict)
 
     expect(cas.version('row-1')).toBe('v1')
+  })
+
+  it('identifies deterministic 4xx rejections that must not be retried', () => {
+    for (const status of [409, 428, 423, 422, '403']) {
+      expect(isNonRetryableChecklistSaveError({ response: { status } })).toBe(true)
+    }
+    expect(isNonRetryableChecklistSaveError({ response: { status: 500 } })).toBe(false)
+    expect(isNonRetryableChecklistSaveError(new Error('网络断开'))).toBe(false)
+  })
+
+  it('identifies authentication failures that must not restore local drafts', () => {
+    expect(isChecklistDraftAccessDenied({ response: { status: 401 } })).toBe(true)
+    expect(isChecklistDraftAccessDenied({ response: { status: '403' } })).toBe(true)
+    expect(isChecklistDraftAccessDenied({ response: { status: 409 } })).toBe(false)
+    expect(isChecklistDraftAccessDenied(new Error('network'))).toBe(false)
+  })
+
+  it('保留被原子拒绝批次的人工确认标记，页面重建后仍禁止自动重放', () => {
+    const draft = makeChecklistDraft(
+      { item_id: 'row-1', conclusion: 'Y', remark: '待处理' },
+      'version-before-conflict',
+      true,
+    )
+    expect(readChecklistDraft<typeof draft.item>(JSON.parse(JSON.stringify(draft)))).toEqual(draft)
+  })
+
+  it('serializes the local payload together with its original CAS baseline', () => {
+    const draft = makeChecklistDraft(
+      { item_id: 'row-1', conclusion: 'Y', remark: '本地修改' },
+      'version-before-conflict',
+    )
+    expect(readChecklistDraft<typeof draft.item>(JSON.parse(JSON.stringify(draft)))).toEqual(draft)
+    // 旧格式没有基线时不能凭空伪造版本，调用方应避免自动覆盖当前服务器行。
+    expect(readChecklistDraft({ item_id: 'legacy', remark: '旧草稿' })).toEqual({
+      item: { item_id: 'legacy', remark: '旧草稿' },
+    })
   })
 })

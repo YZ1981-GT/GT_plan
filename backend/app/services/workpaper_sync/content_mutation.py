@@ -684,6 +684,10 @@ class ContentCommitPlan:
     application_id: uuid.UUID | None = None
     pending_mutation_id: uuid.UUID | None = None
     idempotency_key: str | None = None
+    #: 首版从尚未经 openpyxl 重序列化的 instrumented 模板起步；未管理区域比较前需以
+    #: 同 adapter 的零业务覆盖产物规范化 before，避免 styles.xml 的无语义重排造成假漂移。
+    #: 后续已发布 representation 均为稳态字节，保持 False 并继续原始严格比较。
+    normalize_unmanaged_baseline: bool = False
     reason: str = "content_commit"
 
     def __post_init__(self) -> None:
@@ -1805,44 +1809,88 @@ class ContentMutationService:
         output: Path,
     ) -> tuple[Any, Any, Any, str]:
         """:meth:`_stage_cpu_segment` 的本体（拆出只为让作用域包住整段，判据不变）。"""
-        materialized = adapter.materialize(
-            substrate=plan.substrate_path,
-            projection=projection,
-            output=output,
-            contract=plan.contract,
-        )
-        if not isinstance(materialized, MaterializeResult):
-            raise ContentMutationError(
-                f"adapter.materialize 必须返回 MaterializeResult，实得 {type(materialized)!r}"
-            )
+        unmanaged_baseline: Path | None = None
+        before_for_unmanaged = plan.substrate_path
+        try:
+            if plan.normalize_unmanaged_baseline:
+                # 首版的 substrate 是刚插桩的权威模板。Excel 写入器会经 openpyxl 重序列化整簿，
+                # raw template 与任何产物的 workbook/styles 字节都不等；先用同一 adapter 把原始
+                # 投影写成稳态 before，随后仍按既有未管理区域规则比较真实业务产物。
+                raw_baseline_projection = adapter.extract(
+                    artifact=plan.substrate_path, contract=plan.contract
+                )
+                # 首版叠加与正式首版路径共用同一 overlay：模板脚手架里的 1/0 经 openpyxl
+                # 读成数值，而 text 契约要求写回字符串。手写转换会和首版 projection 漂移。
+                from app.services.workpaper_sync.projection_first_publication import (
+                    overlay_store_on_baseline_projection,
+                )
 
-        # 骨架槽位复用退役的身份只在本次反读里豁免保留门；非空才传，
-        # 未复用路径与 Word adapter 的调用形态不变。
-        retired = tuple(getattr(materialized, "retired_row_identities", ()) or ())
-        extracted = (
-            adapter.extract(
-                artifact=output, contract=plan.contract, retired_row_identities=retired
+                baseline_projection = overlay_store_on_baseline_projection(
+                    baseline=raw_baseline_projection,
+                    store_projection=Projection(
+                        contract_id=raw_baseline_projection.contract_id,
+                        semantic_version=raw_baseline_projection.semantic_version,
+                        document_type=raw_baseline_projection.document_type,
+                        values={},
+                    ),
+                )
+                unmanaged_baseline = output.with_name(
+                    f"{output.stem}.unmanaged-baseline{output.suffix}"
+                )
+                normalized = adapter.materialize(
+                    substrate=plan.substrate_path,
+                    projection=baseline_projection,
+                    output=unmanaged_baseline,
+                    contract=plan.contract,
+                )
+                if not isinstance(normalized, MaterializeResult):
+                    raise ContentMutationError(
+                        "adapter.materialize 必须返回 MaterializeResult，"
+                        f"实得 {type(normalized)!r}"
+                    )
+                before_for_unmanaged = unmanaged_baseline
+
+            materialized = adapter.materialize(
+                substrate=plan.substrate_path,
+                projection=projection,
+                output=output,
+                contract=plan.contract,
             )
-            if retired
-            else adapter.extract(artifact=output, contract=plan.contract)
-        )
-        self._assert_roundtrip_equivalent(
-            intended=projection, extracted=extracted, contract=plan.contract
-        )
-        unmanaged = adapter.verify_unmanaged_regions(
-            before=plan.substrate_path,
-            after=output,
-            contract=plan.contract,
-            row_shift=materialized.row_shift,
-            total_formula_rows=materialized.total_formula_rows,
-            propagation=materialized.workbook_row_change,
-            per_table_shift=materialized.per_table_shift,
-        )
-        unmanaged.assert_equivalent()
-        structure_hash = self._projection_structure_hash(
-            plan=plan, output=output, materialized=materialized
-        )
-        return materialized, extracted, unmanaged, structure_hash
+            if not isinstance(materialized, MaterializeResult):
+                raise ContentMutationError(
+                    f"adapter.materialize 必须返回 MaterializeResult，实得 {type(materialized)!r}"
+                )
+
+            # 骨架槽位复用退役的身份只在本次反读里豁免保留门；非空才传，
+            # 未复用路径与 Word adapter 的调用形态不变。
+            retired = tuple(getattr(materialized, "retired_row_identities", ()) or ())
+            extracted = (
+                adapter.extract(
+                    artifact=output, contract=plan.contract, retired_row_identities=retired
+                )
+                if retired
+                else adapter.extract(artifact=output, contract=plan.contract)
+            )
+            self._assert_roundtrip_equivalent(
+                intended=projection, extracted=extracted, contract=plan.contract
+            )
+            unmanaged = adapter.verify_unmanaged_regions(
+                before=before_for_unmanaged,
+                after=output,
+                contract=plan.contract,
+                row_shift=materialized.row_shift,
+                total_formula_rows=materialized.total_formula_rows,
+                propagation=materialized.workbook_row_change,
+                per_table_shift=materialized.per_table_shift,
+            )
+            unmanaged.assert_equivalent()
+            structure_hash = self._projection_structure_hash(
+                plan=plan, output=output, materialized=materialized
+            )
+            return materialized, extracted, unmanaged, structure_hash
+        finally:
+            if unmanaged_baseline is not None:
+                unmanaged_baseline.unlink(missing_ok=True)
 
     def _projection_structure_hash(
         self, *, plan: ContentCommitPlan, output: Path, materialized: Any

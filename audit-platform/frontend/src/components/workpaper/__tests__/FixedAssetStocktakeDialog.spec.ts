@@ -42,6 +42,7 @@ beforeEach(() => {
   mockGet.mockReset()
   mockPost.mockReset()
   mockPatch.mockReset()
+  sessionStorage.setItem('user', JSON.stringify({ id: 'user-1' }))
   try {
     localStorage.clear()
   } catch {
@@ -211,4 +212,22 @@ describe('FixedAssetStocktakeDialog — H-F5 烟测', () => {
 
     expect(mockPatch).not.toHaveBeenCalled()
   })
+})
+
+
+it('不同登录用户不能恢复前一用户的固定资产监盘草稿', async () => {
+  sessionStorage.setItem('user', JSON.stringify({ id: 'user-1' }))
+  localStorage.setItem(
+    'gt:h-stocktake-draft:user-1:proj-1:wp-1:h_stocktake_H1',
+    JSON.stringify({ location: '前一用户厂房', conclusion: '前一用户结论' }),
+  )
+  sessionStorage.setItem('user', JSON.stringify({ id: 'user-2' }))
+  const wrapper = makeWrapper({ visible: false, wpCode: 'H1' })
+
+  await wrapper.setProps({ visible: true })
+  await Promise.resolve()
+  await Promise.resolve()
+
+  expect((wrapper.vm as any).form.location).not.toBe('前一用户厂房')
+  expect(mockGet).toHaveBeenCalledOnce()
 })

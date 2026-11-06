@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest'
 
 describe('WorkpaperEditor readonly for review-level users', () => {
   /**
-   * 复现 WorkpaperEditor 中 GtWpRenderer 接收到的 readonly 表达式：
-   *   :readonly="editLock.forcedReadonly.value || isArchived || !canEdit"
+   * 复现 WorkpaperEditor 的 effectiveCanEdit 反值：
+   *   !canEdit || forcedReadonly || isArchived || status ∈ {review_passed, archived}
    *
    * 直接测表达式语义，避免挂载整个编辑器页面（重依赖太多）。
    */
@@ -21,10 +21,14 @@ describe('WorkpaperEditor readonly for review-level users', () => {
     forcedReadonly: boolean
     isArchived: boolean
     canEdit: boolean
+    wpStatus?: string
   }
 
   function computeEffectiveReadonly(inputs: ReadonlyInputs): boolean {
-    return inputs.forcedReadonly || inputs.isArchived || !inputs.canEdit
+    return inputs.forcedReadonly
+      || inputs.isArchived
+      || !inputs.canEdit
+      || ['review_passed', 'archived'].includes(inputs.wpStatus || '')
   }
 
   it('review-level user (canEdit=false) → readonly=true', () => {
@@ -69,6 +73,16 @@ describe('WorkpaperEditor readonly for review-level users', () => {
       forcedReadonly: true,
       isArchived: true,
       canEdit: false,
+    })
+    expect(result).toBe(true)
+  })
+
+  it.each(['review_passed', 'archived'])('底稿状态 %s → readonly=true', (wpStatus) => {
+    const result = computeEffectiveReadonly({
+      forcedReadonly: false,
+      isArchived: false,
+      canEdit: true,
+      wpStatus,
     })
     expect(result).toBe(true)
   })

@@ -14,7 +14,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/entrySyncPresentation.ts，
              宿主里**不得**内联任何提示中文；已注册 bidirectional 的 entry
              由组件自己返 null 不渲染 ⇒ 无需本地 v-if。 -->
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k13-non-operating-expense" />

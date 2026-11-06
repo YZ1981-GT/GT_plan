@@ -261,7 +261,12 @@ class TestKFP12EndpointUniverse:
         by_file, _ = endpoints
         expected = {
             EP_AI_TEXT: 47,
-            EP_TB: 28,
+            # 🔴 2026-11-05：EP_TB 由 28 改 0 —— 平台把试算表读取收口到唯一入口
+            #    `services/trialBalanceRows.ts`（spec post-push-residual-defect-closure R1），
+            #    K 域不再有任何文件直调该端点。收敛不是「判据失去对象」：下面
+            #    `test_tb_reads_go_through_the_single_entry` 把那 28 个文件改成「import 唯一入口」
+            #    逐个数，端点本体的归属也在那里验。
+            EP_TB: 0,
             EP_DISCLOSURE: 26,
             # 🔴 三段账全走完：20 −6(BP-6 收敛) −7(BP-5 删除) −7(宿主收敛) = 0
             EP_HEALTH: BP5_HEALTH_AFTER_HOST_CONVERGENCE,
@@ -274,6 +279,19 @@ class TestKFP12EndpointUniverse:
         for ep, count in expected.items():
             actual = len(by_file.get(ep, set()))
             assert actual == count, f"{ep}: 期望 {count} 文件，实得 {actual}"
+
+    def test_tb_reads_go_through_the_single_entry(self, k_files: list[pathlib.Path]) -> None:
+        """试算表读取收口：K 域 0 处直调端点，28 个文件 import 唯一入口，端点只在入口里。
+
+        🔴 这条是上面 `EP_TB: 0` 的对偶。只把期望值从 28 改成 0 会让「K 域怎么读试算表」失去判据
+        —— 端点消失有两种可能：收口到唯一入口（对），或者读取整条没了（错）。两侧都验才分得开。
+        """
+        entry = ROOT / "audit-platform" / "frontend" / "src" / "services" / "trialBalanceRows.ts"
+        assert entry.is_file(), f"试算表唯一入口不存在：{entry}"
+        entry_src = strip_comments(cached_text(entry))
+        assert "/trial-balance" in entry_src, "唯一入口里没有 trial-balance 端点 ⇒ 读取真的没了"
+        users = sorted(p.name for p in k_files if "trialBalanceRows" in strip_comments(cached_text(p)))
+        assert len(users) == 28, f"K 域 import 唯一入口的文件现算 {len(users)}（期望 28）：{users}"
 
 
 class TestKFP14EndpointAnomalies:

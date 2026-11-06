@@ -46,13 +46,16 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     k_domain_files,
     strip_comments,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    spec_dir,
+)
 
 CONTRACT_DIR = DATA / "workpaper_sync_contracts"
 #: 🔴 2026-10-01 草案已被 reviewed 生产契约取代（K8/K9/K11/K12/K13 已真双向发布）。
 #:    草案本体作为 Task 18/22「草案阶段」的交付证据归档在 spec evidence 目录，本文件的
 #:    草案判据改读归档（历史事实不变）；生产契约的判据见 `test_k_cycle_reviewed_contracts.py`。
 DRAFT_ARCHIVE_DIR = (
-    ROOT / ".kiro" / "specs" / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
     / "evidence" / "superseded-candidate-contracts"
 )
 DRAFT_PATH = DRAFT_ARCHIVE_DIR / "k10.other_income_adjustment.candidate.json"

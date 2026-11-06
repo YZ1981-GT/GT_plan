@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import CHAR, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,7 +22,7 @@ class AiTaskJob(Base):
     task_kind: Mapped[str] = mapped_column(String(40), nullable=False)
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
     request_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="queued", server_default=text("'queued'"))
     cancel_requested_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
@@ -55,8 +55,8 @@ class AiTaskItem(Base):
     generation_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, default=uuid.uuid4)
     message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ai_chat_message.id", ondelete="SET NULL"))
     baseline_version: Mapped[str | None] = mapped_column(String(80))
-    before_hash: Mapped[str | None] = mapped_column(String(64))
-    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    before_hash: Mapped[str | None] = mapped_column(CHAR(64))
+    request_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
     request_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
     result_summary: Mapped[dict | None] = mapped_column(JSONB)
     attempt_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default=text("0"))

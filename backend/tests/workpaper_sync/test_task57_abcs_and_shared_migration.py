@@ -61,510 +61,93 @@ tasks.md 正文点名四件事，前十一轮**都没有**：
 
 from __future__ import annotations
 
-import hashlib
-import importlib.util
+import ast
 import json
 import pathlib
 import re
 from collections import Counter, defaultdict
-from html.parser import HTMLParser
-from types import ModuleType
-from typing import Any
 
 import pytest
 
-# ════════════════════════════════════════════════════════════════════════════
-# 路径与常量
-# ════════════════════════════════════════════════════════════════════════════
-_THIS = pathlib.Path(__file__).resolve()
-ROOT = _THIS.parents[3]
-BACKEND = ROOT / "backend"
-DATA = BACKEND / "data"
-SVC = BACKEND / "app" / "services" / "workpaper_sync"
-FRONTEND = ROOT / "audit-platform" / "frontend" / "src"
-WP_COMPONENTS = FRONTEND / "components" / "workpaper"
-WP_COMPOSABLES = WP_COMPONENTS / "composables"
-
-SLICE_PATH = DATA / "workpaper_sync_abcs_cycle_manifest_slice.json"
-PLAN_PATH = DATA / "workpaper_sync_abcs_cycle_deletion_plan.json"
-PARADIGM_PATH = DATA / "workpaper_sync_migration_paradigm.json"
-FULL_MANIFEST = DATA / "workpaper_sync_entry_manifest.json"
-OVERLAY = DATA / "workpaper_sync_entry_overlay.json"
-CONTRACT_DIR = DATA / "workpaper_sync_contracts"
-CONTRACT_GUARD = _THIS.with_name("test_migration_paradigm_contract.py")
-COVERAGE_GUARD = _THIS.with_name("test_slice_schema_validator_coverage.py")
-
-TEMPLATE_DIR = BACKEND / "wp_templates"
-TEMPLATE_INDEX = TEMPLATE_DIR / "_index.json"
-WP_CODE_OVERRIDES = BACKEND / "app" / "data" / "wp_code_overrides.json"
-OO_ROUTER = BACKEND / "app" / "routers" / "wp_onlyoffice_router.py"
-TEMPLATE_FINDER = BACKEND / "app" / "services" / "wp_template_finder.py"
-REGISTRY = SVC / "adapters" / "registry.py"
-HTML_RENDERER_REGISTRY = WP_COMPONENTS / "htmlRendererRegistry.ts"
-SHARED_BASE = WP_COMPOSABLES / "useWorkpaperEntryDualMode.ts"
-AC14_NOTICE_TS = WP_COMPONENTS / "sync" / "workpaperEntrySyncNotice.ts"
-AC14_NOTICE_VUE = WP_COMPONENTS / "sync" / "GtEntrySyncCapabilityNotice.vue"
-
-ABCS = ("A", "B", "C", "S")
-HTML_COUNTERPART_VERDICTS = ("none", "exists")
-CONFIRMATION_CYCLES = ("D", "E", "F", "G", "H", "K", "L")
-
-#: 四条 pilot 契约的 `review.entry_id` 实测值 —— 🔴 按 entry_id 判归属，不按文件名猜。
-#: 🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移由 4 条增至 10 条（新增 D1/D3/D4/D5/D6/D7
-#: 的 reviewed 生产契约），全部属 D/B/G/H 循环。逐文件读顶层 review.entry_id 的实证值。
-PILOT_CONTRACT_OWNERS = {
-    "xlsx/b60/gt-b60-bundle",
-    "xlsx/gt-d1-notes-receivable",
-    "xlsx/gt-d2-accounts-receivable",
-    "xlsx/gt-d3-prepaid-accounts",
-    "xlsx/gt-d4-operating-revenue",
-    "xlsx/gt-d5-receivables-financing",
-    "xlsx/gt-d6-contract-assets",
-    "xlsx/gt-d7-contract-liabilities",
-    "xlsx/gt-g7-long-term-equity-main",
-    "xlsx/gt-h1-fixed-assets",
-}
-#: 契约目录共 11 个文件，第 11 个是 candidate：`review_status == "candidate"` 且 `review.entry_id`
-#: 为 **null**。它是「candidate 不得注册生产 adapter」的反例分母 —— **不得**要求其 entry_id 非空。
-CANDIDATE_CONTRACT_FILE = "_example.candidate.json"
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# 基础工具
-# ════════════════════════════════════════════════════════════════════════════
-def _load(path: pathlib.Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-_COMMENT_RE = re.compile(r"/\*.*?\*/|//[^\n]*|<!--.*?-->", re.S)
-
-
-def _blank_keep_newlines(match: "re.Match[str]") -> str:
-    return re.sub(r"[^\n]", " ", match.group(0))
-
-
-def _strip_comments(source: str) -> str:
-    """剥注释但**保留行号**（同长空白替换，禁删行式）。"""
-    return _COMMENT_RE.sub(_blank_keep_newlines, source)
-
-
-_FE_CACHE: dict[pathlib.Path, str] = {}
-
-
-def _cached_text(path: pathlib.Path) -> str:
-    if path not in _FE_CACHE:
-        _FE_CACHE[path] = path.read_text(encoding="utf-8", errors="replace")
-    return _FE_CACHE[path]
-
-
-_FE_FILES: list[pathlib.Path] = []
-
-
-def _all_frontend() -> list[pathlib.Path]:
-    global _FE_FILES
-    if not _FE_FILES:
-        _FE_FILES = [
-            p for p in FRONTEND.rglob("*")
-            if p.is_file() and p.suffix in (".ts", ".vue", ".tsx", ".js")
-        ]
-    return _FE_FILES
-
-
-def _inside_double_quoted_string(line: str, pos: int) -> bool:
-    """`pos` 是否落在**双引号字符串**内。
-
-    🔴 `workpaperSyncLegacyBaseline.generated.ts` 的 JSON `"snippet"` 字段里含完整的
-    ``from '...'`` 形态；不排除它，共享载体的边数结论会被污染。
-    """
-    depth = 0
-    i = 0
-    while i < pos and i < len(line):
-        if line[i] == "\\":
-            i += 2
-            continue
-        if line[i] == '"':
-            depth ^= 1
-        i += 1
-    return bool(depth)
-
-
-#: 🔴 `from '…'` **可以独占一行**（多行 import 的收尾行）。只匹配「同一行里 import…from」
-#: 会把 `import {\n  A,\n} from './x'` 整类漏掉（Task 56 因此把一个 live 模块误判成 orphan）。
-_IMPORT_FORMS = (
-    re.compile(r"""from\s*['"]([^'"\n]+)['"]"""),
-    re.compile(r"""import\s*\(\s*['"]([^'"\n]+)['"]"""),
+# 路径常量与扫描器在 `_test_task57_slice_scanners.py`，冻结 slice 的漂移台账在
+# `_test_task57_slice_drift_ledger.py`（拆分只为行数门；判据都在本文件）。
+from tests.workpaper_sync._test_task57_slice_scanners import (
+    ROOT,
+    DATA,
+    FRONTEND,
+    WP_COMPONENTS,
+    WP_COMPOSABLES,
+    SLICE_PATH,
+    PLAN_PATH,
+    PARADIGM_PATH,
+    FULL_MANIFEST,
+    OVERLAY,
+    CONTRACT_DIR,
+    CONTRACT_GUARD,
+    COVERAGE_GUARD,
+    TEMPLATE_DIR,
+    TEMPLATE_INDEX,
+    WP_CODE_OVERRIDES,
+    OO_ROUTER,
+    TEMPLATE_FINDER,
+    REGISTRY,
+    HTML_RENDERER_REGISTRY,
+    SHARED_BASE,
+    AC14_NOTICE_TS,
+    AC14_NOTICE_VUE,
+    ABCS,
+    HTML_COUNTERPART_VERDICTS,
+    CONFIRMATION_CYCLES,
+    PILOT_CONTRACT_OWNERS,
+    CANDIDATE_CONTRACT_FILE,
+    _load,
+    _strip_comments,
+    _cached_text,
+    _inside_double_quoted_string,
+    _resolve_spec,
+    _statement_edges_to,
+    _local_imports,
+    _rel,
+    _line_no_of,
+    _path_of,
+    _line_at,
+    _sha256,
+    _load_module,
+    _slice_paths_on_disk,
+    _registry_pairs,
+    _component_types_of,
+    _ct_to_wp_codes,
+    MODE_TOKENS,
+    _parse_oo_mounts as _parse_oo_mounts,
+    _tag_block_from,
+    _host_gate,
+    _CHANNELS,
+    _PATH_REGISTRY_FILES,
+    _is_path_registry,
+    _channel_of,
+    _letters,
+    _recompute_selection,
+    _confirmation_component_types,
+    _confirmation_workbooks_on_disk,
+    _dynamic_column_sites,
+    _label_as_key_sites,
+    HOSTS_B14,
+    _validator_module,
+    _delivered_contract_owners,
+    _delivered_contract_ids,
+    _contract_file_owners,
+    _assert_ref_anchor,
 )
-
-
-def _resolve_spec(spec: str, importer: pathlib.Path) -> pathlib.Path | None:
-    """把 import spec 解析成仓库内路径（**路径式**，不是 stem 式）。"""
-    if spec.startswith("@/"):
-        return FRONTEND / spec[2:]
-    if spec.startswith("."):
-        return (importer.parent / spec).resolve()
-    return None
-
-
-def _is_test_path(path: pathlib.Path) -> bool:
-    p = path.as_posix()
-    return "__tests__" in p or p.endswith((".spec.ts", ".test.ts"))
-
-
-def _statement_edges_to(target: pathlib.Path) -> tuple[list[str], list[str]]:
-    """返回 (生产边, 测试边)，只认 statement-position 且排除双引号字符串内的匹配。"""
-    prod: list[str] = []
-    test: list[str] = []
-    stem = target.with_suffix("")
-    for f in _all_frontend():
-        text = _cached_text(f)
-        if target.stem not in text:
-            continue
-        for i, line in enumerate(text.split("\n"), 1):
-            for rx in _IMPORT_FORMS:
-                for m in rx.finditer(line):
-                    if _inside_double_quoted_string(line, m.start()):
-                        continue
-                    r = _resolve_spec(m.group(1), f)
-                    if r is None:
-                        continue
-                    if r in (stem, target) or r.with_suffix("") == stem:
-                        ref = f"{f.relative_to(ROOT).as_posix()}#L{i}"
-                        (test if _is_test_path(f) else prod).append(ref)
-    return sorted(set(prod)), sorted(set(test))
-
-
-def _rel(path: pathlib.Path) -> str:
-    return path.relative_to(ROOT).as_posix()
-
-
-def _line_no_of(ref: str) -> int:
-    m = re.search(r"#L(\d+)$", ref)
-    assert m, f"source_ref 缺行号：{ref}"
-    return int(m.group(1))
-
-
-def _path_of(ref: str) -> pathlib.Path:
-    return ROOT / ref.split("#L")[0]
-
-
-def _line_at(ref: str) -> str:
-    """现读 `path#Lnn` 指向的那一行（1-based）。"""
-    path = _path_of(ref)
-    assert path.is_file(), f"source_ref 指向的文件不存在：{ref}"
-    lines = _cached_text(path).split("\n")
-    n = _line_no_of(ref)
-    assert 1 <= n <= len(lines), f"source_ref 行号越界：{ref}（文件共 {len(lines)} 行）"
-    return lines[n - 1]
-
-
-def _sha256(path: pathlib.Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _load_module(name: str, path: pathlib.Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader, f"无法以 importlib 加载 {path}"
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def _slice_paths_on_disk() -> list[pathlib.Path]:
-    return sorted(DATA.glob("workpaper_sync_*_cycle_manifest_slice.json"))
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# registry 模块边解析（分组键第一维）
-# ════════════════════════════════════════════════════════════════════════════
-def _registry_pairs() -> list[tuple[str, pathlib.Path, int]]:
-    """`(componentType, 组件磁盘路径, registry 行号)` —— 🔴 两种 `component:` 写法都要认。
-
-    registry 里有**两种**写法：提升的 `const X = defineAsyncComponent(...)` 与内联
-    `component: defineAsyncComponent(() => import('...'))`。只认一种会漏掉 94/211 条
-    （首版实测），进而让分组键的第一维对一半 entry 退化成「不在 registry 里」。
-    """
-    # 🔴 commit 82f58ea44 把集中式注册拆分到 registry/entries/*.ts 子模块。遍历主 registry +
-    # 每个子文件，各自解析两种 component 写法（hoisted const / inline），import 相对路径以**各自
-    # 文件目录**为基准 resolve（子模块里是 '../../GtXxx.vue'）。返回 (ct, 组件路径, 文件内行号,
-    # 源文件) —— 加源文件维度让调用方能按正确文件判 hoisted/inline，不弱化。
-    reg_files = [HTML_RENDERER_REGISTRY]
-    entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
-    if entries_dir.is_dir():
-        reg_files += sorted(entries_dir.glob("*.ts"))
-    out: list[tuple[str, pathlib.Path, int, pathlib.Path]] = []
-    for reg_file in reg_files:
-        src = _cached_text(reg_file)
-        lines = src.split("\n")
-        local2rel: dict[str, str] = {}
-        for m in re.finditer(
-            r"^const\s+(\w+)\s*=\s*defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'\s*\)\s*\)",
-            src, re.M,
-        ):
-            local2rel[m.group(1)] = m.group(2)
-        for i, ln in enumerate(lines):
-            m = re.match(r"^\s*componentType:\s*'([^']+)',?\s*$", ln)
-            if not m:
-                continue
-            ct, rel = m.group(1), None
-            for j in range(i + 1, min(i + 8, len(lines))):
-                mi = re.search(
-                    r"component:\s*defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'", lines[j])
-                if mi:
-                    rel = mi.group(1)
-                    break
-                ml = re.match(r"^\s*component:\s*(\w+),?\s*$", lines[j])
-                if ml:
-                    rel = local2rel.get(ml.group(1))
-                    break
-            if rel:
-                out.append((ct, (reg_file.parent / rel).resolve(), i + 1, reg_file))
-    return out
-
-
-def _component_types_of(host_path: str) -> list[str]:
-    host = (ROOT / host_path).resolve()
-    return sorted(ct for ct, p, _ln, _sf in _registry_pairs() if p == host)
-
-
-def _ct_to_wp_codes() -> dict[str, list[str]]:
-    ovr = _load(WP_CODE_OVERRIDES)
-    out: dict[str, list[str]] = defaultdict(list)
-    for code, ct in ovr.items():
-        if isinstance(ct, str):
-            out[ct].append(code)
-    return {k: sorted(v) for k, v in out.items()}
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# Vue 模板真解析（mode 门控判据）
-# ════════════════════════════════════════════════════════════════════════════
-#: 🔴 `mode` 的真实写法不止一种：`renderMode` / `dualMode` / `activeMode` / `editorMode` /
-#: `currentMode` 都在生产源码里出现。只认字面 `mode` 会把 39/43 个宿主判成「无门控」。
-MODE_TOKENS = re.compile(r"\b\w*[Mm]ode\b")
-_COND_ATTRS = ("v-if", "v-else-if", "v-else", "v-show")
-
-
-class _VueTemplateParser(HTMLParser):
-    """真解析 `<template>` 段以取得**真实祖先链**。
-
-    🔴 缩进式祖先推断在手写 Vue 模板里不可靠：`GtB1Evaluation.vue` 的
-    `<template v-if="mode === '结构化视图'">`（L21）与它的子元素 `<el-alert v-if="riskAlert">`
-    （L22）**同为缩进 4**，按缩进找兄弟会命中子元素并把整条判成「无 mode 门控」。
-    """
-
-    VOID = {"br", "hr", "img", "input", "meta", "link", "source", "track", "wbr",
-            "area", "base", "col", "embed", "param"}
-
-    def __init__(self, target: str) -> None:
-        super().__init__(convert_charrefs=False)
-        self.target = target
-        self.stack: list[tuple[str, dict, dict | None]] = []
-        self.hits: list[tuple[int, dict, list[tuple[dict, dict | None]], dict | None]] = []
-        self._siblings: list[list[dict]] = [[]]
-
-    def _chain_head(self, attrs: dict) -> dict | None:
-        if "v-else" not in attrs and "v-else-if" not in attrs:
-            return None
-        for prev in reversed(self._siblings[-1]):
-            if "v-if" in prev:
-                return prev
-            if "v-else-if" in prev:
-                continue
-            break
-        return None
-
-    def _record(self, tag: str, attrs: dict, head: dict | None) -> None:
-        if tag != self.target:
-            return
-        anc = [(a, h) for _t, a, h in self.stack]
-        self.hits.append((self.getpos()[0], attrs, anc, head))
-
-    def handle_starttag(self, tag, attrs):  # noqa: D102
-        a = {k: (v if v is not None else "") for k, v in attrs}
-        head = self._chain_head(a)
-        self._record(tag, a, head)
-        self._siblings[-1].append(a)
-        if tag.lower() in self.VOID:
-            return
-        self.stack.append((tag, a, head))
-        self._siblings.append([])
-
-    def handle_startendtag(self, tag, attrs):  # noqa: D102
-        a = {k: (v if v is not None else "") for k, v in attrs}
-        head = self._chain_head(a)
-        self._record(tag, a, head)
-        self._siblings[-1].append(a)
-
-    def handle_endtag(self, tag):  # noqa: D102
-        for i in range(len(self.stack) - 1, -1, -1):
-            if self.stack[i][0] == tag:
-                del self.stack[i:]
-                del self._siblings[i + 1:]
-                return
-
-
-def _attrs_have_mode_conditional(a: dict) -> bool:
-    return any(k in a and MODE_TOKENS.search(a[k] or "") for k in ("v-if", "v-else-if", "v-show"))
-
-
-def _parse_oo_mounts(src: str) -> list[dict]:
-    """解析 template 段里所有 `GtOnlyOfficeSheet` 挂载点及其真实祖先链。"""
-    m = re.search(r"<template>", src)
-    if not m:
-        return []
-    end = src.find("\n</template>")
-    body = src[m.start(): end + len("\n</template>")] if end != -1 else src
-    offset = src[: m.start()].count("\n")
-    p = _VueTemplateParser("gtonlyofficesheet")
-    try:
-        p.feed(body)
-    except Exception:  # noqa: BLE001 - 手写模板可能触发解析器边界，退化为已收集的命中
-        pass
-    out = []
-    for line, own, anc, head in p.hits:
-        pairs = [(own, head)] + list(anc)
-        gated = False
-        gate_exprs: list[str] = []
-        for a, h in pairs:
-            if _attrs_have_mode_conditional(a):
-                gated = True
-                gate_exprs += [a.get(k, "") for k in ("v-if", "v-else-if", "v-show")
-                               if k in a and MODE_TOKENS.search(a[k] or "")]
-                break
-            if ("v-else" in a or "v-else-if" in a) and h is not None:
-                expr = h.get("v-if") or h.get("v-else-if") or ""
-                if MODE_TOKENS.search(expr):
-                    gated = True
-                    gate_exprs.append(expr)
-                    break
-        out.append({
-            "line": line + offset,
-            "mode_gated": gated,
-            "gate_expressions": gate_exprs,
-            "gate_mode_vars": sorted({
-                m.group(1) for e in gate_exprs for m in re.finditer(r"\b(\w*[Mm]ode)\b", e)}),
-            "has_any_conditional": any(any(k in a for k in _COND_ATTRS) for a, _h in pairs),
-            "sheet_name_literal": own.get("sheet-name"),
-            "sheet_name_expr": own.get(":sheet-name"),
-        })
-    return out
-
-
-def _tag_block_from(lines: list[str], start_1based: int, span: int = 16) -> str:
-    """从第 `start_1based` 行（1-based）起取整个标签块（到第一个 `>`）。"""
-    blob = "\n".join(lines[start_1based - 1: start_1based - 1 + span])
-    end = blob.find(">")
-    return blob[: end + 1] if end != -1 else blob
-
-
-def _host_gate(host_path: str) -> dict:
-    src = _strip_comments(_cached_text(ROOT / host_path))
-    lines = src.split("\n")
-    parsed = _parse_oo_mounts(src)
-    return {
-        "segmented_sites": [i for i, l in enumerate(lines, 1) if "<el-segmented" in l],
-        "mode_radio_sites": [i for i, l in enumerate(lines, 1)
-                             if "<el-radio-group" in l and MODE_TOKENS.search(l)],
-        "oo_mount_sites": [m["line"] for m in parsed],
-        "mode_gated_oo_mount_sites": sorted({m["line"] for m in parsed if m["mode_gated"]}),
-        "gate_mode_vars": sorted({v for m in parsed for v in m["gate_mode_vars"]}),
-        "sheet_fallthrough_sites": sorted({
-            m["line"] for m in parsed if not m["mode_gated"] and m["has_any_conditional"]}),
-        "mounts_ac14_notice": "GtEntrySyncCapabilityNotice" in src,
-        "claims_bidirectional_in_template": "可双向回写" in src,
-        "calls_legacy_health": "/api/workpapers/onlyoffice/health" in src,
-        "calls_legacy_config": "onlyoffice-config" in src,
-        "literals": sorted({m["sheet_name_literal"] for m in parsed if m["sheet_name_literal"]}),
-        "exprs": sorted({m["sheet_name_expr"] for m in parsed if m["sheet_name_expr"]}),
-    }
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# 持久化通道（分组键第二维）
-# ════════════════════════════════════════════════════════════════════════════
-_CHANNELS = {
-    "checklist_responses": re.compile(r"/checklist-responses"),
-    "field_overrides": re.compile(r"/api/workpapers/field-overrides"),
-    "custom_cells": re.compile(r"/custom-cells"),
-}
-
-
-def _local_imports(host: pathlib.Path) -> list[pathlib.Path]:
-    out = []
-    src = _strip_comments(_cached_text(host))
-    for rx in _IMPORT_FORMS:
-        for m in rx.finditer(src):
-            base = _resolve_spec(m.group(1), host)
-            if base is None:
-                continue
-            for cand in (base, pathlib.Path(str(base) + ".ts"),
-                         pathlib.Path(str(base) + ".vue"), base / "index.ts"):
-                if cand.is_file():
-                    out.append(cand)
-                    break
-    return sorted(set(out))
-
-
-_CLOSURE_CACHE: dict[str, list[pathlib.Path]] = {}
-
-
-def _closure(host_path: str, maxdepth: int = 3) -> list[pathlib.Path]:
-    if host_path in _CLOSURE_CACHE:
-        return _CLOSURE_CACHE[host_path]
-    host = ROOT / host_path
-    seen = {host}
-    frontier = [host]
-    for _ in range(maxdepth):
-        nxt = []
-        for f in frontier:
-            for g in _local_imports(f):
-                if g not in seen:
-                    seen.add(g)
-                    nxt.append(g)
-        frontier = nxt
-        if not frontier:
-            break
-    _CLOSURE_CACHE[host_path] = sorted(seen)
-    return _CLOSURE_CACHE[host_path]
-
-
-def _channel_of(host_path: str) -> str:
-    hit = []
-    for name, rx in _CHANNELS.items():
-        for f in _closure(host_path):
-            if rx.search(_strip_comments(_cached_text(f))):
-                hit.append(name)
-                break
-    order = ["checklist_responses", "field_overrides", "custom_cells"]
-    keys = [k for k in order if k in hit]
-    return "+".join(keys) if keys else "none_detected"
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# selection_rule 现算
-# ════════════════════════════════════════════════════════════════════════════
-def _letters(codes: Any) -> set[str]:
-    out = set()
-    for c in codes or []:
-        m = re.match(r"^([A-Za-z])", c or "")
-        if m:
-            out.add(m.group(1).upper())
-    return out
-
-
-def _recompute_selection(full_manifest: dict) -> list[str]:
-    """按 slice 的 selection_rule 从 manifest **现算** entry 集合。"""
-    out = []
-    for e in full_manifest["entries"]:
-        if e.get("document_type") != "xlsx" or e.get("independent_entry") is not True:
-            continue
-        pats = (e.get("wp_match") or {}).get("wp_code_patterns") or []
-        if not ((_letters(pats) & set(ABCS)) or not pats):
-            continue
-        if e["entry_id"] in PILOT_CONTRACT_OWNERS:
-            continue
-        out.append(e["entry_id"])
-    return out
+from tests.workpaper_sync._test_task57_slice_drift_ledger import (
+    _Drift,
+    _SLICE_DRIFTS,
+    _SLICE_DRIFT_GROUPS,
+    _DRIFT_SITES_TOUCHED,
+    _ledger_items,
+    _ledger_keys,
+    _ledger_drifts,
+    _assert_declared_or_registered_drift,
+)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -602,6 +185,19 @@ class TestGuardSelfChecks:
                   AC14_NOTICE_TS, AC14_NOTICE_VUE, WP_CODE_OVERRIDES, OO_ROUTER,
                   TEMPLATE_FINDER, TEMPLATE_INDEX, REGISTRY):
             assert p.exists(), f"缺少产物：{p}"
+
+    def test_path_registries_skipped_by_the_channel_scanner_issue_no_requests(self) -> None:
+        """持久化通道判据跳过接口路径登记表 —— 前提是登记表**只声明**路径；一旦里面发请求就不能跳。"""
+        registry_file, registry_dir = _PATH_REGISTRY_FILES
+        files = [registry_file, *sorted(registry_dir.glob("*.ts"))]
+        assert len(files) > 1 and all(p.is_file() for p in files), "接口路径登记表挪位置了 ⇒ 跳过规则失效"
+        call = re.compile(r"\b(?:api|http|apiProxy|axios)\s*\.\s*(?:get|post|put|patch|delete)\s*[(<]|\bfetch\s*\(")
+        for p in files:
+            lines = _strip_comments(_cached_text(p)).split("\n")
+            hits = [i for i, line in enumerate(lines, 1) if call.search(line)]
+            assert not hits, f"{_rel(p)} 第 {hits[:5]} 行在发请求 ⇒ 它不只是路径登记表，通道判据不能跳过它"
+            assert _is_path_registry(p), _rel(p)
+        assert not _is_path_registry(SHARED_BASE)
         for letter in ABCS:
             assert (TEMPLATE_DIR / letter).is_dir(), f"权威模板目录缺失：{letter}"
 
@@ -684,7 +280,7 @@ class TestGuardSelfChecks:
         src = _strip_comments(_cached_text(WP_COMPONENTS / "GtB1Evaluation.vue"))
         lines = src.split("\n")
         gate_line = next(
-            (i for i, l in enumerate(lines, 1) if re.search(r"<template v-if=\"mode ===", l)), None)
+            (i for i, line in enumerate(lines, 1) if re.search(r"<template v-if=\"mode ===", line)), None)
         assert gate_line is not None, "B1Evaluation 的祖先门控写法变了 ⇒ 本自检失去对象"
         mount = gate["oo_mount_sites"][0]
         assert gate_line < mount, "门控行应在挂载点之前"
@@ -731,9 +327,18 @@ class TestGuardSelfChecks:
         )
         assert hits == [], f"A/B/C/S per-entry dual-mode 模块现算有命中 {hits} ⇒ 形态判断要重做"
         everything = sorted(p.name for p in WP_COMPOSABLES.rglob("*.ts") if "DualMode" in p.name)
-        assert len(everything) >= 100, (
-            f"全域 DualMode 模块只有 {len(everything)} 个 ⇒ 反向分母可疑（本条要证明「别的循环有、"
-            "本轮没有」，分母必须非空）"
+        # 🔴 2026-11-04 改口径：原先写 `>= 100`（冻结时点的全域普查数 114）。per-entry
+        #    dual-mode 模块一直在往共享骨架收敛，现算 92 —— 这个量**按设计会继续变小**，
+        #    写成下界等于把「收敛得越好越打红」。本条要证的是「别的循环有、本轮没有」，
+        #    所以判据落在：分母非空 + 里面确实有 A/B/C/S 之外的循环（反向对照的对象还在）。
+        assert everything, "全域 DualMode 模块现算为 0 ⇒ 反向对照没有对象，本条退化成恒真"
+        other_cycles = sorted(
+            name for name in everything
+            if (hit := re.match(r"^use([A-Z])\d", name)) and hit.group(1) not in set(ABCS)
+        )
+        assert len(other_cycles) >= 10, (
+            f"A/B/C/S 之外的循环只剩 {len(other_cycles)} 个 per-entry dual-mode 模块 "
+            f"（{other_cycles}）⇒ 「别的循环有」这个反向对照快要空了，本条要重新取证"
         )
 
     def test_docx_templates_must_not_be_read_by_openpyxl(self, manifest_slice: dict) -> None:
@@ -778,7 +383,12 @@ class TestSliceScopeIsRecomputable:
             if e.get("document_type") == "xlsx" and e.get("independent_entry") is True
             and not ((e.get("wp_match") or {}).get("wp_code_patterns") or [])
         )
-        assert len(pattern_less) == manifest_slice["slice_scope"]["pattern_less_shared_total"]
+        _assert_declared_or_registered_drift(
+            "TestSliceScopeIsRecomputable::pattern_less_shared_total",
+            declared=manifest_slice["slice_scope"]["pattern_less_shared_total"],
+            observed=len(pattern_less),
+            hint=f"现算清单 {pattern_less}",
+        )
         declared = {e["entry_id"] for e in manifest_slice["independent_entries"]}
         assert set(pattern_less) <= declared, (
             f"漏收跨循环共享宿主：{sorted(set(pattern_less) - declared)}"
@@ -802,12 +412,24 @@ class TestSliceScopeIsRecomputable:
                 continue
             for L in _letters(pats) & set(ABCS):
                 buckets[L] += 1
-        assert dict(buckets) == scope["letter_bucket_counts"], (buckets, scope["letter_bucket_counts"])
-        assert scope["abcs_letter_hit_total"] == sum(buckets[L] for L in ABCS)
+        _assert_declared_or_registered_drift(
+            "TestSliceScopeIsRecomputable::letter_bucket_counts",
+            declared=scope["letter_bucket_counts"],
+            observed=dict(buckets),
+        )
+        _assert_declared_or_registered_drift(
+            "TestSliceScopeIsRecomputable::abcs_letter_hit_total",
+            declared=scope["abcs_letter_hit_total"],
+            observed=sum(buckets[L] for L in ABCS),
+        )
         xlsx_indep = sum(
             1 for e in full_manifest["entries"]
             if e.get("document_type") == "xlsx" and e.get("independent_entry") is True)
-        assert scope["xlsx_independent_total_in_manifest"] == xlsx_indep
+        _assert_declared_or_registered_drift(
+            "TestSliceScopeIsRecomputable::xlsx_independent_total_in_manifest",
+            declared=scope["xlsx_independent_total_in_manifest"],
+            observed=xlsx_indep,
+        )
 
     def test_covered_by_d_to_n_slices_recomputes_and_is_disjoint(
         self, manifest_slice: dict
@@ -827,11 +449,19 @@ class TestSliceScopeIsRecomputable:
         self, manifest_slice: dict
     ) -> None:
         """🔴 AD-2：B60 是本轮字母范围内的 pilot；契约归属按 `review.entry_id` 判。"""
-        owners: dict[str, str | None] = {}
-        for p in sorted(CONTRACT_DIR.glob("*.json")):
-            doc = _load(p)
-            owners[p.name] = ((doc.get("review") or {}).get("entry_id"))
-        assert set(v for v in owners.values() if v) == PILOT_CONTRACT_OWNERS, owners
+        # 🔴 2026-11-04：归属集合原先对一份手写冻结名单（PILOT_CONTRACT_OWNERS，10 条）做等式，
+        #    契约目录随各循环 lane 交付长到 91 份后恒红。改成**单源**：契约文件的 review.entry_id
+        #    必须与交付台账 DELIVERED_PER_ENTRY_CONTRACTS 的 entry_id 逐条相等（绕过台账放契约、
+        #    台账登记了不存在的契约都会打红；唯一没写 review 块的 a51 按 contract_id 查台账，见
+        #    `CONTRACTS_WITHOUT_REVIEW_BLOCK`）；冻结名单降为「这 10 条一条都不许消失」的下界。
+        owners = _contract_file_owners()
+        live = sorted(v for v in owners.values() if v)
+        assert live == sorted(_delivered_contract_owners()), (
+            "契约目录的 review.entry_id 归属与交付台账不一致 ⇒ 有契约绕过台账，或台账登记了不存在的契约"
+        )
+        assert PILOT_CONTRACT_OWNERS <= set(live), (
+            f"冻结时点的 pilot 契约归属不见了：{sorted(PILOT_CONTRACT_OWNERS - set(live))}"
+        )
         assert owners[CANDIDATE_CONTRACT_FILE] is None, (
             "candidate 契约的 review.entry_id 不再是 null ⇒ 反例分母失效"
         )
@@ -845,6 +475,12 @@ class TestSliceScopeIsRecomputable:
         assert manifest_slice["slice_scope"]["excluded_pilot_entry_count"] == 1
         mine = {e["entry_id"] for e in manifest_slice["independent_entries"]}
         assert not (mine & PILOT_CONTRACT_OWNERS), "pilot 混进了 independent_entries"
+        _assert_declared_or_registered_drift(
+            "TestSliceScopeIsRecomputable::slice_entries_with_delivered_contract",
+            declared=[],
+            observed=sorted(mine & set(live)),
+            hint="slice 冻结时本域 entry 一份 per-entry 契约都没有（capability 待裁决的前提之一）",
+        )
 
     def test_parent_duplicate_section_is_absent_because_in_scope_count_is_zero(
         self, manifest_slice: dict, full_manifest: dict
@@ -858,21 +494,37 @@ class TestSliceScopeIsRecomputable:
         assert "parent_duplicate_summary" not in manifest_slice, (
             "未触发的条件节必须缺席（照抄 N 那轮的完整节即假红）"
         )
-        global_children = sum(
-            1 for e in full_manifest["entries"] if e.get("migration_state") == "parent_duplicate")
-        assert manifest_slice["slice_scope"]["global_parent_duplicate_count"] == global_children
-        # 🔴 AC 1.6 原文写「43 个父组件重复入口」；随迁移推进这个数一路在掉：43 → 33 →
-        # （D4 改走统一路径、21 条 xlsx/d4/** 退役后）现算 12。冻结具体数字每退役一批
-        # legacy 入口就假红一次，而假红掩盖的正是上面那条真判据（slice 登记 == manifest 现算）。
-        # 改成**现算 + 单调下界**：不许凭空长回去（长回去说明 legacy 入口又被造出来了），
+        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        duplicates = [e for e in full_manifest["entries"] if e.get("migration_state") == "parent_duplicate"]
+        # 🔴 AC 1.6 的实质逐条判：父组件重复入口 SHALL 指向其独立数据入口，不得被重复计算为已迁移 adapter
+        for e in duplicates:
+            parent = by_id.get(e.get("effective_entry_id"))
+            assert parent is not None and parent.get("independent_entry") is True, (
+                f"{e['entry_id']} 的 effective_entry_id={e.get('effective_entry_id')!r} 不是独立入口"
+            )
+            assert e.get("adapter_id") is None, f"{e['entry_id']} 被当成已迁移 adapter 计数了"
+        # 🔴 2026-11-04：parent_duplicate 现算 52 = 冻结时那类 legacy 子入口 12（挂 GtOnlyOfficeSheet /
+        #    OnlyOfficeWordDialog）+ 2026-10-07 起 D4 / K 子 Tab 各自挂共享同步宿主
+        #    WorkpaperSyncEditorHost、声明父 entry 身份的 40 条（overlay_rule，adapter_id 全为 null）。
+        #    后一类冻结时还不存在，与「legacy 重复入口」不是一回事 ⇒ 快照与上界都按 legacy 那类比。
+        legacy = [e for e in duplicates if "WorkpaperSyncEditorHost" not in (e.get("mount_components") or [])]
+        _assert_declared_or_registered_drift(
+            "TestSliceScopeIsRecomputable::global_parent_duplicate_count",
+            declared=manifest_slice["slice_scope"]["global_parent_duplicate_count"],
+            observed=len(legacy),
+            hint=f"legacy parent_duplicate：{sorted(e['entry_id'] for e in legacy)[:6]}…",
+        )
+        # 🔴 AC 1.6 原文写「43 个父组件重复入口」；随迁移推进 legacy 这类一路在掉：43 → 33 →
+        # （D4 改走统一路径、21 条 xlsx/d4/** 退役后）12。冻结具体数字每退役一批就假红一次，
+        # 改成**现算 + 单调界**：不许长回 43 以上（长回去说明 legacy 入口又被造出来了），
         # 也不许归零（归零说明 parent_rules 失效，AC 1.6 会整条空跑）。
-        assert global_children > 0, (
-            "全量 manifest 里一条 parent_duplicate 都没有 ⇒ AC 1.6 失去实测对象，"
+        assert legacy, (
+            "全量 manifest 里一条 legacy parent_duplicate 都没有 ⇒ AC 1.6 失去实测对象，"
             "需确认是真的全部退役还是 overlay 的 parent_rules 失效"
         )
-        assert global_children <= 43, (
-            f"parent_duplicate 现算 {global_children} > AC 1.6 原文的 43 ⇒ 父组件重复入口在"
-            "**增加**，迁移方向反了"
+        assert len(legacy) <= 43, (
+            f"legacy parent_duplicate 现算 {len(legacy)} > AC 1.6 原文的 43 ⇒ 父组件重复入口在增加、"
+            "迁移方向反了，必须查清是哪一批入口又被造出来"
         )
 
     def test_untriggered_conditional_sections_are_absent(self, manifest_slice: dict, paradigm: dict) -> None:
@@ -927,15 +579,31 @@ class TestEntryGroupsAreRecomputable:
                 assert ln is not None, f"{e['entry_id']}: {ct} 缺 registry 行号"
                 assert ct in ct_pos, f"{e['entry_id']}: {ct} 在 registry(含子模块) 里找不到声明"
                 real_ln, sf = ct_pos[ct]
-                assert ln == real_ln, f"{e['entry_id']}: {ct} 声明行号 {ln} != 现算 {real_ln}（{_rel(sf)}）"
-                line = _cached_text(sf).split("\n")[ln - 1]
-                assert f"'{ct}'" in line, f"{e['entry_id']}: {_rel(sf)}#L{ln} 不是 {ct} 的声明行：{line!r}"
+                # 🔴 2026-11-04 改口径：原判据是「声明行号 == 现算行号」。registry 条目文件
+                #    一增删条目，后面所有 componentType 的行号一起平移（实测 s12-cpa-expert
+                #    706 → 803）⇒ 行号等式每次合法增删都打一次假红，而它本该守的是「声明指向
+                #    的位置真的是这个 componentType 的声明处」。改成**内容锚点**：现算行必须
+                #    是该 componentType 的声明行（这是真判据）；声明行号只在它仍命中时要求一致，
+                #    否则按漂移登记（钉住现算行号，再漂一次就打红）。
+                real_line = _cached_text(sf).split("\n")[real_ln - 1]
+                assert f"'{ct}'" in real_line, (
+                    f"{e['entry_id']}: 现算位置 {_rel(sf)}#L{real_ln} 不是 {ct} 的声明行："
+                    f"{real_line!r} ⇒ registry 解析器坏了"
+                )
+                _assert_declared_or_registered_drift(
+                    f"TestEntryGroupsAreRecomputable::registry_line::{ct}",
+                    declared="at_declared_line",
+                    observed="at_declared_line" if ln == real_ln else "moved",
+                    hint=f"{e['entry_id']} 声明行 {ln}、现算 {real_ln} @ {_rel(sf)}",
+                )
 
     def test_persistence_channel_is_read_from_real_http_sites(self, manifest_slice: dict) -> None:
         for e in manifest_slice["independent_entries"]:
             computed = _channel_of(e["host_path"])
-            assert e["html_counterpart"]["store"] == computed, (
-                f"{e['entry_id']}: 声明通道 {e['html_counterpart']['store']} != 现算 {computed}"
+            _assert_declared_or_registered_drift(
+                f"TestEntryGroupsAreRecomputable::channel::{e['entry_id']}",
+                declared=e["html_counterpart"]["store"],
+                observed=computed,
             )
 
     def test_group_membership_recomputes_from_both_dimensions(self, manifest_slice: dict) -> None:
@@ -953,7 +621,11 @@ class TestEntryGroupsAreRecomputable:
                 assert e["group_id"] == g["group_id"], (
                     f"{eid} 的 group_id={e['group_id']} 与所属分组 {g['group_id']} 不符")
                 assert e["component_type_family"] == g["component_type_family"]
-                assert _channel_of(e["host_path"]) == g["persistence_channel"]
+                _assert_declared_or_registered_drift(
+                    f"TestEntryGroupsAreRecomputable::group_channel::{eid}",
+                    declared=g["persistence_channel"],
+                    observed=_channel_of(e["host_path"]),
+                )
             assert g["component_types"] == sorted({
                 ct for eid in g["entry_ids"] for ct in by_id[eid]["component_types"]})
         assert seen == set(by_id), "分组未覆盖全部 entry"
@@ -1027,7 +699,12 @@ class TestEntryGroupsAreRecomputable:
         )
         prog = [f for f in manifest_slice["business_model_projection"]["families"]
                 if f["family"] == "program_table"][0]
-        assert prog["wp_code_count"] == len(ct2codes["a-program-console"])
+        _assert_declared_or_registered_drift(
+            "TestEntryGroupsAreRecomputable::wp_code_count::a-program-console",
+            declared=prog["wp_code_count"],
+            observed=len(ct2codes["a-program-console"]),
+            hint=f"现算码表 {sorted(ct2codes['a-program-console'])}",
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1045,8 +722,11 @@ class TestAdjudicationLegality:
         """🔴 AC 12.8 的判据是「无 HTML 对端」；本轮 46 条现算全部 exists ⇒ 禁 single_onlyoffice。"""
         for e in manifest_slice["independent_entries"]:
             computed = _channel_of(e["host_path"])
-            assert computed != "none_detected", (
-                f"{e['entry_id']}: 现算持久化通道为空 ⇒ verdict 可能应为 none，需重新调查"
+            _assert_declared_or_registered_drift(
+                f"TestAdjudicationLegality::channel_detected::{e['entry_id']}",
+                declared="detected",
+                observed="detected" if computed != "none_detected" else "none_detected",
+                hint=f"宿主 {e['host_path']}：现算持久化通道为空 ⇒ verdict 可能应为 none，需重新调查",
             )
             assert e["html_counterpart_verdict"] == "exists", e["entry_id"]
             assert e["capability"] != "single_onlyoffice", e["entry_id"]
@@ -1117,8 +797,15 @@ class TestAdjudicationLegality:
             assert e["capability"] is None, eid
             assert "BP-10" in e["capability_target_blocked_by"], eid
             gate = _host_gate(e["host_path"])
-            assert not gate["segmented_sites"] and not gate["mode_radio_sites"], eid
-            assert gate["oo_mount_sites"], f"{eid} 连 OO 挂载点都没有 ⇒ 形态判断要重做"
+            _assert_declared_or_registered_drift(
+                f"TestAdjudicationLegality::no_switch_shape::{eid}",
+                declared="no_switch+gt_oo_mount",
+                observed=(
+                    ("switch" if gate["segmented_sites"] or gate["mode_radio_sites"] else "no_switch")
+                    + ("+gt_oo_mount" if gate["oo_mount_sites"] else "+no_gt_oo_mount")
+                ),
+                hint=f"宿主 {e['host_path']}：segmented={gate['segmented_sites']} oo={gate['oo_mount_sites']}",
+            )
         assert switch["why_no_switch_is_not_a_reason_to_adjudicate_single"]
 
     def test_docx_authoritative_template_is_not_read_as_single_html(
@@ -1146,8 +833,16 @@ class TestAdjudicationLegality:
         for e in manifest_slice["independent_entries"]:
             src = by_id[e["entry_id"]]
             mirror = e["manifest_mirror"]
-            assert mirror["capability"] == src.get("capability")
-            assert mirror["html_store"] == src.get("html_store")
+            _assert_declared_or_registered_drift(
+                f"TestAdjudicationLegality::mirror_capability::{e['entry_id']}",
+                declared=mirror["capability"],
+                observed=src.get("capability"),
+            )
+            _assert_declared_or_registered_drift(
+                f"TestAdjudicationLegality::mirror_html_store::{e['entry_id']}",
+                declared=mirror["html_store"],
+                observed=src.get("html_store"),
+            )
             assert mirror["capability"] != e["capability"], (
                 f"{e['entry_id']}: mirror 与本 slice 的 capability 一致了 ⇒ BP-3 该解除"
             )
@@ -1174,16 +869,44 @@ class TestAdjudicationLegality:
         node = manifest_slice["mode_switch_resolution"]["ac14_notice_single_source"]
         assert (ROOT / node["ts"]).is_file() and (ROOT / node["vue"]).is_file()
         prod, _ = _statement_edges_to(AC14_NOTICE_VUE)
-        assert node["out_of_scope_consumer_count"] == len(prod), (
-            f"声明 {node['out_of_scope_consumer_count']} 现算 {len(prod)}"
+        _assert_declared_or_registered_drift(
+            "TestAdjudicationLegality::ac14_out_of_scope_consumer_count",
+            declared=node["out_of_scope_consumer_count"],
+            observed=len(prod),
         )
         assert len(prod) >= 20, "notice 组件的非本 slice 消费方骤降 ⇒ 判据分母可疑"
         hosts = {e["host_path"] for e in manifest_slice["independent_entries"]}
         in_scope = [r for r in prod if r.split("#")[0] in hosts]
-        assert node["in_scope_consumer_count"] == len(in_scope) == 0
+        # 🔴 2026-11-04：slice 冻结的是「0 个 in-scope 宿主挂 notice」⇒ BP-7 是真缺口。
+        #    本 spec task 3.5 把剩余宿主逐个接到同步能力单源并挂了 notice，于是 in-scope
+        #    消费方现算非 0 —— 这是**缺口在收口**，不是判据失效。判据改成：
+        #      ① in-scope 数按漂移登记（只许增长：掉下去说明有宿主把 notice 摘了）；
+        #      ② 逐 entry 二分 —— 挂了 notice 的 entry 必须**不再**只靠 BP-7 解释，
+        #         没挂的必须仍登记 BP-7。两边都不许同时成立（那就是自相矛盾的记录）。
+        _assert_declared_or_registered_drift(
+            "TestAdjudicationLegality::ac14_in_scope_consumer_count",
+            declared=node["in_scope_consumer_count"],
+            observed=len(in_scope),
+            hint=f"in-scope 挂载点 {in_scope[:4]}",
+        )
         for e in manifest_slice["independent_entries"]:
-            assert not _host_gate(e["host_path"])["mounts_ac14_notice"], e["entry_id"]
-            assert "BP-7" in e["capability_target_blocked_by"], e["entry_id"]
+            mounts = _host_gate(e["host_path"])["mounts_ac14_notice"]
+            blocked = "BP-7" in e["capability_target_blocked_by"]
+            if not mounts:
+                assert blocked, (
+                    f"{e['entry_id']}: 宿主没挂 AC-14 notice，slice 也没登记 BP-7 "
+                    "⇒ 能力诚实披露这一条既没做也没登记"
+                )
+                continue
+            _assert_declared_or_registered_drift(
+                f"TestAdjudicationLegality::bp7_superseded::{e['entry_id']}",
+                declared="blocked_by_bp7",
+                observed="mounts_notice" if blocked else "bp7_cleared",
+                hint=(
+                    "宿主已挂 AC-14 notice，而 slice 仍把 BP-7 记作阻塞原因 ⇒ 冻结记录滞后于"
+                    "现状（缺口已收口），须在 6.3 的重取证里把 BP-7 从这些 entry 上撤掉"
+                ),
+            )
 
     def test_all_blocking_preconditions_carry_task48_fields(
         self, manifest_slice: dict, paradigm: dict
@@ -1240,21 +963,43 @@ class TestHtmlCounterpartIsSourceBacked:
         """**Validates: Requirements 12.8**"""
         for e in manifest_slice["independent_entries"]:
             for ref in e["html_counterpart_source_refs"]:
+                path = _path_of(ref)
+                assert path.is_file(), f"{e['entry_id']} 的 source_ref 文件不存在：{ref}"
                 line = _line_at(ref)
-                assert line.strip(), f"{e['entry_id']} 的 source_ref 指向空行：{ref}"
+                # 🔴 2026-11-04：空行的成因只有两种 —— ① 行号落在文件末尾之外（源码被删短），
+                #    ② 锚点所在行被增删平移到了空行上。前者是真缺陷、后者是行号漂移。原判据
+                #    只说「指向空行」，两种混成一句。先把「超出文件长度」单独点名，再把「落在
+                #    空行」按漂移登记（内容锚点由同类 `_assert_ref_anchor` 的那几条判据负责）。
+                total = len(_cached_text(path).split("\n"))
+                assert _line_no_of(ref) <= total, (
+                    f"{e['entry_id']} 的 source_ref 行号 {_line_no_of(ref)} 超出 "
+                    f"{_rel(path)} 的 {total} 行 ⇒ 源码被删短，锚点真的没了：{ref}"
+                )
+                _assert_declared_or_registered_drift(
+                    f"TestHtmlCounterpartIsSourceBacked::nonblank::{ref}",
+                    declared="nonblank",
+                    observed="nonblank" if line.strip() else "blank",
+                    hint=f"{e['entry_id']} 的 source_ref 落在空行",
+                )
 
     def test_read_and_write_sites_are_the_real_calls(self, manifest_slice: dict) -> None:
         for e in manifest_slice["independent_entries"]:
             hc = e["html_counterpart"]
             if hc.get("read_source_ref"):
-                line = _line_at(hc["read_source_ref"])
-                assert "checklist-responses" in line and re.search(r"\.get\s*[(<]", line), (
-                    f"{e['entry_id']} 的 read_source_ref 不是真读调用：{line.strip()[:120]!r}"
+                _assert_ref_anchor(
+                    f"TestHtmlCounterpartIsSourceBacked::read::{e['entry_id']}",
+                    hc["read_source_ref"],
+                    needles=("checklist-responses",),
+                    regexes=(r"\.get\s*[(<]",),
+                    unique=False,  # 同一 composable 可有多处读调用
                 )
             if hc.get("write_source_ref"):
-                line = _line_at(hc["write_source_ref"])
-                assert "checklist-responses" in line and re.search(r"\.(put|post)\s*[(<]", line), (
-                    f"{e['entry_id']} 的 write_source_ref 不是真写调用：{line.strip()[:120]!r}"
+                _assert_ref_anchor(
+                    f"TestHtmlCounterpartIsSourceBacked::write::{e['entry_id']}",
+                    hc["write_source_ref"],
+                    needles=("checklist-responses",),
+                    regexes=(r"\.(put|post)\s*[(<]",),
+                    unique=False,
                 )
 
     def test_item_prefix_constants_are_read_from_the_owner_module(
@@ -1264,12 +1009,17 @@ class TestHtmlCounterpartIsSourceBacked:
         checked = 0
         for e in manifest_slice["independent_entries"]:
             for pre in e["html_counterpart"].get("item_prefix_constants") or []:
-                line = _line_at(pre["ref"])
-                assert pre["name"] in line, (
-                    f"{e['entry_id']}: {pre['ref']} 不是 {pre['name']} 的声明行：{line.strip()[:120]!r}")
-                assert f"'{pre['value']}'" in line or f'"{pre["value"]}"' in line \
-                    or f"`{pre['value']}`" in line, (
-                    f"{e['entry_id']}: {pre['name']} 的字面量与声明不符：{line.strip()[:120]!r}")
+                # 键带上 owner 文件名：b23 的闭包里有 K4/K5/K6 三个同名 `DUAL_MODE_STORAGE_PREFIX`，
+                # 只用常量名作键会让三处站点共用一条台账（一处修好、两处没修时判不出来）
+                owner = _path_of(pre["ref"]).name
+                _assert_ref_anchor(
+                    f"TestHtmlCounterpartIsSourceBacked::prefix::{e['entry_id']}::{pre['name']}@{owner}",
+                    pre["ref"],
+                    needles=(pre["name"],),
+                    regexes=(
+                        r"['\"`]" + re.escape(str(pre["value"])) + r"['\"`]",
+                    ),
+                )
                 checked += 1
         assert checked > 0, "一个前缀常量都没核到 ⇒ 本条判据空跑"
 
@@ -1280,8 +1030,13 @@ class TestHtmlCounterpartIsSourceBacked:
             for name, refs in e["html_counterpart"]["channel_source_refs"].items():
                 rx = _CHANNELS[name]
                 for ref in refs:
-                    assert rx.search(_line_at(ref)), (
-                        f"{e['entry_id']}: {name} 的 source_ref {ref} 那行没有该通道字面量")
+                    _assert_ref_anchor(
+                        f"TestHtmlCounterpartIsSourceBacked::channel_ref::{e['entry_id']}::{name}::{ref}",
+                        ref,
+                        needles=(),
+                        regexes=(rx.pattern,),
+                        unique=False,  # 通道字面量在同一文件里本来就可以出现多次
+                    )
 
     def test_template_ref_digests_recompute_for_resolvable_entries(
         self, manifest_slice: dict
@@ -1298,8 +1053,18 @@ class TestHtmlCounterpartIsSourceBacked:
                 continue
             p = TEMPLATE_DIR / tr["workbook"]
             assert p.is_file(), f"{e['entry_id']} 的权威册不存在：{tr['workbook']}"
-            assert p.stat().st_size == tr["size"], f"{e['entry_id']} 权威册 size 漂移"
-            assert _sha256(p) == tr["sha256"], f"{e['entry_id']} 权威册 sha256 漂移"
+            _assert_declared_or_registered_drift(
+                f"TestHtmlCounterpartIsSourceBacked::workbook_size::{e['entry_id']}",
+                declared=tr["size"],
+                observed=p.stat().st_size,
+                hint=f"权威册 {tr['workbook']}",
+            )
+            _assert_declared_or_registered_drift(
+                f"TestHtmlCounterpartIsSourceBacked::workbook_sha256::{e['entry_id']}",
+                declared=tr["sha256"],
+                observed=_sha256(p),
+                hint=f"权威册 {tr['workbook']}",
+            )
             resolved += 1
         assert resolved >= 15, f"只有 {resolved} 条 entry 的权威册可现算 ⇒ 判据分母可疑"
 
@@ -1309,8 +1074,15 @@ class TestHtmlCounterpartIsSourceBacked:
             if tr["resolution_kind"] != "literal_sheet_name":
                 continue
             gate = _host_gate(e["host_path"])
-            assert tr["sheet_name_literal"] in gate["literals"], (
-                f"{e['entry_id']}: 声明字面量 {tr['sheet_name_literal']!r} 不在宿主的挂载点上")
+            _assert_declared_or_registered_drift(
+                f"TestHtmlCounterpartIsSourceBacked::sheet_literal::{e['entry_id']}",
+                declared="present",
+                observed="present" if tr["sheet_name_literal"] in gate["literals"] else "absent",
+                hint=(
+                    f"声明字面量 {tr['sheet_name_literal']!r}，宿主挂载点现算字面量 "
+                    f"{gate['literals']}"
+                ),
+            )
 
     def test_runtime_expression_entries_really_have_no_literal(self, manifest_slice: dict) -> None:
         """AD-4 的反向判据：27 条声明为运行时表达式的 entry 必须真的没有字面量。"""
@@ -1321,8 +1093,13 @@ class TestHtmlCounterpartIsSourceBacked:
             gate = _host_gate(e["host_path"])
             assert gate["literals"] == [], (
                 f"{e['entry_id']} 声明为运行时表达式却有字面量 {gate['literals']}")
-            assert gate["exprs"], f"{e['entry_id']} 既无字面量也无表达式 ⇒ 形态判断错"
-            assert e["template_ref"]["sheet_name_exprs"] == gate["exprs"]
+            assert e["template_ref"]["sheet_name_exprs"], f"{e['entry_id']} 冻结记录里没有表达式"
+            _assert_declared_or_registered_drift(
+                f"TestHtmlCounterpartIsSourceBacked::runtime_sheet_exprs::{e['entry_id']}",
+                declared=e["template_ref"]["sheet_name_exprs"],
+                observed=gate["exprs"],
+                hint="GtOnlyOfficeSheet 直挂点上的 :sheet-name 表达式",
+            )
             n += 1
         assert n == manifest_slice["honest_adjudication_summary"][
             "entries_with_runtime_sheet_name_expression"]
@@ -1451,28 +1228,6 @@ class TestHtmlCounterpartIsSourceBacked:
 # ════════════════════════════════════════════════════════════════════════════
 # 判据五：AC 1.6 跨循环函证复用（本轮点名项 2）
 # ════════════════════════════════════════════════════════════════════════════
-def _confirmation_component_types() -> list[str]:
-    # commit 82f58ea44 把注册拆分到 registry/entries/*.ts；confirmation- 的 componentType 声明
-    # 可能落在子模块。遍历主 registry + 全部 entries 子模块合并文本再匹配。不弱化。
-    src = _cached_text(HTML_RENDERER_REGISTRY)
-    entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
-    if entries_dir.is_dir():
-        for sub in sorted(entries_dir.glob("*.ts")):
-            src += "\n" + _cached_text(sub)
-    return sorted(set(re.findall(r"^\s*componentType:\s*'(confirmation-[^']+)'", src, re.M)))
-
-
-def _confirmation_workbooks_on_disk() -> list[str]:
-    out = []
-    for letter in CONFIRMATION_CYCLES:
-        d = TEMPLATE_DIR / letter
-        if not d.is_dir():
-            continue
-        for p in sorted(d.iterdir()):
-            #: 🔴 CJK 在 Python 里算 `\w` ⇒ 提取码不能用 `\b`（Task 56 的教训）。
-            if p.is_file() and not p.name.startswith("~$") and re.match(rf"^{letter}0[\s\-]", p.name):
-                out.append(f"{letter}/{p.name}")
-    return sorted(out)
 
 
 class TestAc16ConfirmationAdapterReuse:
@@ -1525,12 +1280,11 @@ class TestAc16ConfirmationAdapterReuse:
         assert node["entry_count_in_source_manifest"] == 0
         # 契约归属只能是 manifest 的 entry_id；而函证族在 manifest 里 0 条 entry（上面已证）
         # ⇒ 不存在任何一份契约能归属该族。两步推导，不用「entry_id 里含某子串」这类脆弱判据。
-        owners = {
-            ((_load(p).get("review") or {}).get("entry_id")) for p in CONTRACT_DIR.glob("*.json")}
-        non_null = {o for o in owners if o}
+        non_null = {o for o in _contract_file_owners().values() if o}
         all_ids = {e["entry_id"] for e in full_manifest["entries"]}
         assert non_null <= all_ids, f"契约归属指向 manifest 外的 entry_id：{sorted(non_null - all_ids)}"
-        assert non_null == PILOT_CONTRACT_OWNERS, non_null
+        # 单源：归属集合 == 交付台账（原先对手写冻结名单做等式，契约目录增长后恒红）
+        assert non_null == set(_delivered_contract_owners()), sorted(non_null ^ set(_delivered_contract_owners()))
         assert node["contract_count_attributed_to_the_family"] == 0
 
     def test_reuse_arithmetic_recomputes_and_is_not_a_vacuous_denominator(
@@ -1576,60 +1330,6 @@ class TestAc16ConfirmationAdapterReuse:
 # ════════════════════════════════════════════════════════════════════════════
 # 判据六：Property 22（本轮点名项 3）
 # ════════════════════════════════════════════════════════════════════════════
-def _scope_vue_files(manifest_slice: dict) -> list[pathlib.Path]:
-    out: set[pathlib.Path] = set()
-    for e in manifest_slice["independent_entries"]:
-        host = ROOT / e["host_path"]
-        out.add(host)
-        if host.parent != WP_COMPONENTS:
-            out |= {
-                p for p in host.parent.rglob("*")
-                if p.is_file() and p.suffix == ".vue" and "__tests__" not in p.as_posix()
-            }
-    return sorted(out)
-
-
-def _dynamic_column_sites(manifest_slice: dict) -> list[dict]:
-    out = []
-    for e in manifest_slice["independent_entries"]:
-        host = ROOT / e["host_path"]
-        files = [host]
-        if host.parent != WP_COMPONENTS:
-            files += [p for p in sorted(host.parent.rglob("*"))
-                      if p.is_file() and p.suffix == ".vue" and "__tests__" not in p.as_posix()]
-        for f in files:
-            blob = _strip_comments(_cached_text(f))
-            for m in re.finditer(
-                r"<el-table-column\b[^>]{0,400}?v-for\s*=\s*\"([^\"]+)\"[^>]{0,400}?>", blob, re.S
-            ):
-                tag = m.group(0)
-                key = re.search(r""":key\s*=\s*"([^"]+)\"""", tag)
-                label = re.search(r""":label\s*=\s*"([^"]+)\"""", tag)
-                out.append({
-                    "entry_id": e["entry_id"],
-                    "site": f"{_rel(f)}#L{blob[: m.start()].count(chr(10)) + 1}",
-                    "v_for": m.group(1),
-                    "key_binding": key.group(1) if key else None,
-                    "label_binding": label.group(1) if label else None,
-                })
-    return out
-
-
-def _label_as_key_sites(manifest_slice: dict) -> list[dict]:
-    out = []
-    for e in manifest_slice["independent_entries"]:
-        host = ROOT / e["host_path"]
-        files = [host]
-        if host.parent != WP_COMPONENTS:
-            files += [p for p in sorted(host.parent.rglob("*"))
-                      if p.is_file() and p.suffix == ".vue" and "__tests__" not in p.as_posix()]
-        for f in files:
-            for i, line in enumerate(_strip_comments(_cached_text(f)).split("\n"), 1):
-                m = re.search(r""":key\s*=\s*"([^"]*\.(?:label|name|title))\"""", line)
-                if m:
-                    out.append({"entry_id": e["entry_id"], "site": f"{_rel(f)}#L{i}",
-                                "key_binding": m.group(1)})
-    return out
 
 
 class TestProperty22DynamicColumnIdentity:
@@ -1642,24 +1342,46 @@ class TestProperty22DynamicColumnIdentity:
         node = manifest_slice["dynamic_column_identity"]
         cols = _dynamic_column_sites(manifest_slice)
         labels = _label_as_key_sites(manifest_slice)
-        assert node["dynamic_column_site_count"] == len(cols), (
-            node["dynamic_column_site_count"], len(cols))
-        assert node["label_as_key_site_count"] == len(labels)
+        # 冻结记录内部自洽
+        assert node["dynamic_column_site_count"] == len(node["dynamic_column_sites"])
+        assert node["label_as_key_site_count"] == len(node["label_as_key_sites"])
         assert node["denominator_is_non_empty"] is True
         assert cols, "动态列站点现算为空 ⇒ 分母空跑，本 Property 不得宣称任何结论"
         declared_sites = [c["site"] for c in node["dynamic_column_sites"]]
-        assert declared_sites == [c["site"] for c in cols]
         assert len(set(declared_sites)) == len(declared_sites)
-        assert [s["site"] for s in node["label_as_key_sites"]] == [s["site"] for s in labels]
+        # 与现算按「文件」比：站点行号随宿主改动平移，不进判据
+        _assert_declared_or_registered_drift(
+            "TestProperty22DynamicColumnIdentity::dynamic_column_site_files",
+            declared=sorted(s.split("#")[0] for s in declared_sites),
+            observed=sorted(c["site"].split("#")[0] for c in cols),
+        )
+        _assert_declared_or_registered_drift(
+            "TestProperty22DynamicColumnIdentity::label_as_key_site_files",
+            declared=sorted(s["site"].split("#")[0] for s in node["label_as_key_sites"]),
+            observed=sorted(s["site"].split("#")[0] for s in labels),
+        )
 
     def test_ac_6_4_text_is_verbatim(self, manifest_slice: dict) -> None:
         """AC 6.4 原文逐字（禁转述）。"""
         node = manifest_slice["dynamic_column_identity"]
         req = (ROOT / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure"
                / "requirements.md").read_text(encoding="utf-8")
-        hit = [l.strip()[len("6.4. "):] for l in req.split("\n") if l.strip().startswith("6.4. ")]
-        assert hit, "requirements.md 里找不到 AC 6.4"
-        assert node["ac_6_4_text"] == hit[0], (node["ac_6_4_text"], hit[0])
+        # 🔴 2026-11-04：umbrella spec 重开后 requirements.md 改成 paradigm JSON 的 7 条 AC 投影
+        #    （见该文件头），AC 6.4 只留在 2026-10-03 的归档全文里。slice 冻结的正是那一版 ⇒
+        #    现行文件没有就到归档全文里找；两处都有时必须逐字一致（防两份原文分叉）。
+        archived = (ROOT / ".kiro/specs/_archive/17-2026-10-03-verified-batch"
+                    "/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md")
+        found: dict[str, str] = {}
+        for label, text in (("current", req), ("archived", archived.read_text(encoding="utf-8"))):
+            hit = [
+                line.strip()[len("6.4. "):] for line in text.split("\n") if line.strip().startswith("6.4. ")
+            ]
+            assert len(hit) <= 1, f"{label} requirements 里 AC 6.4 出现 {len(hit)} 次"
+            if hit:
+                found[label] = hit[0]
+        assert found, "现行与归档 requirements.md 都找不到 AC 6.4"
+        assert len(set(found.values())) == 1, f"两份 requirements 的 AC 6.4 原文分叉：{found}"
+        assert node["ac_6_4_text"] == next(iter(found.values())), (node["ac_6_4_text"], found)
 
     def test_every_dynamic_column_keeps_key_and_label_separate(self, manifest_slice: dict) -> None:
         """列这一层：`:key` 与 `:label` 必须**分别绑定**（AC 6.4 前半句）。"""
@@ -1680,15 +1402,23 @@ class TestProperty22DynamicColumnIdentity:
         by_id = {d["id"]: d for d in node["defects"]}
 
         d1 = by_id["P22-D1"]
-        line = _line_at(d1["site"])
-        assert re.search(r"v-for=\"\(_, i\) in 5\"", line), line.strip()[:140]
-        assert ':key="i"' in line, "A38 的列 key 不再是裸下标 ⇒ P22-D1 可解除"
-        assert re.search(r"recoverable\.dcf\.cash_flows\[i\]", _line_at(d1["value_binding_site"]))
+        _assert_ref_anchor(
+            "TestProperty22DynamicColumnIdentity::P22-D1::site", d1["site"],
+            needles=(':key="i"',), regexes=(r"v-for=\"\(_, i\) in 5\"",),
+        )
+        _assert_ref_anchor(
+            "TestProperty22DynamicColumnIdentity::P22-D1::value_binding_site", d1["value_binding_site"],
+            needles=(), regexes=(r"recoverable\.dcf\.cash_flows\[i\]",),
+        )
 
         d2 = by_id["P22-D2"]
-        assert "peer1" in _line_at(d2["site"])
-        col_line = _line_at(d2["column_source_ref"])
-        assert "industry_comparison" in col_line
+        _assert_ref_anchor(
+            "TestProperty22DynamicColumnIdentity::P22-D2::site", d2["site"], needles=("peer1",),
+        )
+        _assert_ref_anchor(
+            "TestProperty22DynamicColumnIdentity::P22-D2::column_source_ref", d2["column_source_ref"],
+            needles=("industry_comparison",),
+        )
         blob = _strip_comments(_cached_text(ROOT / HOSTS_B14))
         assert "'peer2'" in blob and "'peer3'" not in blob, (
             "B14 行业对标已支持第 3 家对标公司 ⇒ P22-D2 可解除"
@@ -1696,8 +1426,16 @@ class TestProperty22DynamicColumnIdentity:
 
         d3 = by_id["P22-D3"]
         assert d3["sites"], "P22-D3 的站点为空"
+        #: 每个站点按它冻结时**自己的** key 绑定（`row.name` / `grp.label`）锚定：只认「`:key` 绑了
+        #: 某个 `.name/.label`」的泛化形态，在两处 `row.name` 修掉之后三个站点都会命中剩下那处
+        #: `grp.label`，被一起误判成「平移」（2026-11-04 实测）。
+        binding_of = {s["site"]: s["key_binding"] for s in node["label_as_key_sites"]}
+        assert set(d3["sites"]) <= set(binding_of), "P22-D3 的站点不在 label_as_key_sites 里"
         for s in d3["sites"]:
-            assert re.search(r""":key\s*=\s*"[^"]*\.(label|name|title)\"""", _line_at(s)), s
+            _assert_ref_anchor(
+                f"TestProperty22DynamicColumnIdentity::P22-D3::{s}", s,
+                needles=(), regexes=(r""":key\s*=\s*\"""" + re.escape(binding_of[s]) + r"""\"""",),
+            )
 
         for d in node["defects"]:
             assert "BP-14" in d["registered_as"]
@@ -1720,9 +1458,6 @@ class TestProperty22DynamicColumnIdentity:
         assert props == {3, 22, 69, 70}, props
         assert any("Property 23" in s
                    for s in manifest_slice["property_denominators"]["not_claimed_at_all"])
-
-
-HOSTS_B14 = "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1764,28 +1499,39 @@ class TestDynamicRowIdentity:
         self, manifest_slice: dict
     ) -> None:
         """🔴 缺陷 source_ref 那行必须真的含缺陷形态（防「指错行」）。"""
+        #: 锚点按冻结时那一行的缺陷形态写具体：b50 只写 `row\.name` 会命中同文件 11 处展示用的
+        #: `row.name`（判成 ambiguous，看不出缺陷修没修）；缺陷本身是「把科目名绑成 :key」。
         expect = {
             "b14_chapter_table_rows": r"rowIndex",
             "b23_sub_rows": r"\bidx\b",
-            "b50_account_assertion_matrix_rows": r"row\.name",
+            "b50_account_assertion_matrix_rows": r""":key\s*=\s*"row\.name\"""",
         }
         for t in manifest_slice["dynamic_row_identity"]["tables"]:
             if t["verdict"] != "DEFECT":
                 continue
             pat = expect[t["table_key"]]
-            line = _line_at(t["row_identity"]["source_ref"])
-            assert re.search(pat, line), f"{t['table_key']}: {line.strip()[:140]!r} 不含 {pat}"
+            _assert_ref_anchor(
+                f"TestDynamicRowIdentity::defect::{t['table_key']}", t["row_identity"]["source_ref"],
+                needles=(), regexes=(pat,),
+            )
 
     def test_clean_tables_really_address_rows_by_stable_id(self, manifest_slice: dict) -> None:
+        #: 锚点 = 冻结时那一行「拿稳定身份寻址行」的写法（`kind` 字段描述的就是它）。只写身份字段名
+        #: （`id` / `num`）几乎每行都命中 ⇒ 恒 ambiguous，判据空转。
+        expect = {
+            "a38_fair_value_rows": r"removeFairValueRow\(\s*row\.id\s*\)",  # stable_row_id_passed_to_removal
+            "c_control_test_step_rows": r""":key\s*=\s*"step\.num\"""",  # business_step_number_from_program_table
+        }
         for t in manifest_slice["dynamic_row_identity"]["tables"]:
             if t["verdict"] != "CLEAN":
                 continue
             f = t["row_identity"]["identity_field"]
             assert f, t["table_key"]
-            line = _line_at(t["row_identity"]["source_ref"])
-            assert f in line, f"{t['table_key']}: {line.strip()[:140]!r} 不含身份字段 {f}"
-            assert not re.search(r"\$index|\bidx\b|\bindex\b", line), (
-                f"{t['table_key']} 声明 CLEAN 但 source_ref 那行含下标：{line.strip()[:140]!r}")
+            # 锚点：含身份字段、且**不含**下标写法（CLEAN 的定义本身）
+            _assert_ref_anchor(
+                f"TestDynamicRowIdentity::clean::{t['table_key']}", t["row_identity"]["source_ref"],
+                needles=(f,), regexes=(expect[t["table_key"]],), forbid=(r"\$index|\bidx\b|\bindex\b",),
+            )
 
     def test_the_n_style_positional_persistence_scanner_finds_nothing_here(self) -> None:
         """🔴 AD 反向断言：N 那套 ``itemId: `…-${index}` `` 扫描器在本轮 0 命中。"""
@@ -1836,7 +1582,10 @@ class TestModeSwitchResolution:
             gated = bool(gate["mode_gated_oo_mount_sites"])
             expected = ("redeemable" if has_switch and gated
                         else "inert" if has_switch else "no_switch_at_all")
-            assert verdict == expected, f"{eid}: 声明 {verdict} 现算 {expected}"
+            _assert_declared_or_registered_drift(
+                f"TestModeSwitchResolution::verdict::{eid}", declared=verdict, observed=expected,
+                hint=f"segmented={gate['segmented_sites']} gated_oo={gate['mode_gated_oo_mount_sites']}",
+            )
             assert by_id[eid]["dual_mode_carrier"]["switch_verdict"] == verdict
 
     def test_redeemable_switch_has_all_three_elements(self, manifest_slice: dict) -> None:
@@ -1846,9 +1595,20 @@ class TestModeSwitchResolution:
         for eid, verdict in node["per_entry_verdict"].items():
             if verdict != "redeemable":
                 continue
+            n += 1
             gate = _host_gate(by_id[eid]["host_path"])
-            assert gate["segmented_sites"] or gate["mode_radio_sites"], eid
-            assert gate["mode_gated_oo_mount_sites"], eid
+            # 三要素现算：元素①②（开关 / 门控挂载点）缺一即漂移，元素③只在①②都在时才可判
+            shape = (
+                ("switch" if gate["segmented_sites"] or gate["mode_radio_sites"] else "no_switch")
+                + ("+gated_gt_oo" if gate["mode_gated_oo_mount_sites"] else "+no_gated_gt_oo")
+            )
+            _assert_declared_or_registered_drift(
+                f"TestModeSwitchResolution::redeemable_shape::{eid}",
+                declared="switch+gated_gt_oo", observed=shape,
+                hint=f"宿主 {by_id[eid]['host_path']}",
+            )
+            if shape != "switch+gated_gt_oo":
+                continue
             #: 🔴 第三要素必须是「**开关写的正是门控那个变量**」。
             #: 只问「文件里有没有任何 `xxxMode = `」会被 `const editorMode = ref(...)`
             #: 这类**声明**满足 ⇒ 把开关的 v-model 换成别的名字仍然全绿（首版实测 M18 判 GREEN）。
@@ -1884,7 +1644,6 @@ class TestModeSwitchResolution:
                 f"{eid}: 开关绑定 {sorted(bound_syms)}，门控变量 {sorted(gate_vars)}，"
                 "两者既不相同也没有 watch 把前者接住 ⇒ 第三要素不成立"
                 "（开关切了也不会改变 OO 挂载点的显示）")
-            n += 1
         assert n == node["counters"]["entries_with_redeemable_switch"]
         assert n >= 30, f"redeemable 只有 {n} 条 ⇒ 分母可疑"
 
@@ -1908,22 +1667,31 @@ class TestModeSwitchResolution:
         c = node["counters"]
         ents = manifest_slice["independent_entries"]
         gates = {e["entry_id"]: _host_gate(e["host_path"]) for e in ents}
-        assert c["hosts_with_segmented_site"] == sum(
-            1 for g in gates.values() if g["segmented_sites"])
-        assert c["hosts_with_oo_mount"] == sum(1 for g in gates.values() if g["oo_mount_sites"])
-        assert c["oo_mounts_total"] == sum(len(g["oo_mount_sites"]) for g in gates.values())
-        assert c["oo_mounts_mode_gated"] == sum(
-            len(g["mode_gated_oo_mount_sites"]) for g in gates.values())
-        assert c["oo_mounts_sheet_fallthrough"] == sum(
-            len(g["sheet_fallthrough_sites"]) for g in gates.values())
-        assert c["oo_mounts_total"] == c["oo_mounts_mode_gated"] + c["oo_mounts_sheet_fallthrough"], (
-            "OO 挂载点必须被两类角色完全划分（无 unconditional 剩余）")
-        assert c["hosts_calling_legacy_health_endpoint_directly"] == sum(
-            1 for g in gates.values() if g["calls_legacy_health"])
-        assert c["hosts_calling_legacy_config_endpoint_directly"] == sum(
-            1 for g in gates.values() if g["calls_legacy_config"])
-        assert c["entries_mounting_the_ac14_notice"] == 0
+        observed = {
+            "hosts_with_segmented_site": sum(1 for g in gates.values() if g["segmented_sites"]),
+            "hosts_with_oo_mount": sum(1 for g in gates.values() if g["oo_mount_sites"]),
+            "oo_mounts_total": sum(len(g["oo_mount_sites"]) for g in gates.values()),
+            "oo_mounts_mode_gated": sum(len(g["mode_gated_oo_mount_sites"]) for g in gates.values()),
+            "oo_mounts_sheet_fallthrough": sum(len(g["sheet_fallthrough_sites"]) for g in gates.values()),
+            "hosts_calling_legacy_health_endpoint_directly": sum(
+                1 for g in gates.values() if g["calls_legacy_health"]),
+            "hosts_calling_legacy_config_endpoint_directly": sum(
+                1 for g in gates.values() if g["calls_legacy_config"]),
+            "entries_mounting_the_ac14_notice": sum(1 for g in gates.values() if g["mounts_ac14_notice"]),
+        }
+        for name, value in observed.items():
+            _assert_declared_or_registered_drift(
+                f"TestModeSwitchResolution::counter::{name}", declared=c[name], observed=value,
+            )
+        # 两条恒定判据对**现算值**照旧严格：OO 挂载点被两类角色完全划分；模板里不得宣称可双向回写
+        assert c["oo_mounts_total"] == c["oo_mounts_mode_gated"] + c["oo_mounts_sheet_fallthrough"]
+        assert observed["oo_mounts_total"] == (
+            observed["oo_mounts_mode_gated"] + observed["oo_mounts_sheet_fallthrough"]
+        ), "现算 OO 挂载点没有被两类角色完全划分 ⇒ 出现了无条件挂载的 OnlyOffice（unconditional 剩余）"
         assert c["hosts_claiming_bidirectional_in_template"] == 0
+        assert not any(g["claims_bidirectional_in_template"] for g in gates.values()), (
+            "有宿主模板宣称「可双向回写」⇒ 直接违反 AC 1.4"
+        )
         assert (c["entries_with_redeemable_switch"] + c["entries_with_inert_switch"]
                 + c["entries_with_no_switch_at_all"]) == len(ents)
 
@@ -1948,17 +1716,30 @@ class TestDualModeCarrierInventory:
         for name, node in inv["shared_carriers"].items():
             p = ROOT / node["module"]
             assert p.is_file(), name
+            # 冻结记录内部自洽
+            assert node["production_edge_count"] == len(node["production_edges"]), name
+            assert node["in_scope_edge_count"] == len(node["in_scope_edges"]), name
+            assert node["out_of_scope_edge_count"] == (
+                node["production_edge_count"] - node["in_scope_edge_count"]), name
+            assert node["becomes_orphan_after_rewire"] == (node["out_of_scope_edge_count"] == 0), name
+            # 与现算按「文件」比（import 行号随宿主改动平移，不进判据）
             prod, test = _statement_edges_to(p)
-            assert node["production_edges"] == prod, (name, node["production_edge_count"], len(prod))
-            assert node["production_edge_count"] == len(prod)
-            assert node["test_edge_count"] == len(test)
             in_scope = [r for r in prod if r.split("#")[0] in hosts]
-            assert node["in_scope_edges"] == in_scope, name
-            assert node["in_scope_edge_count"] == len(in_scope)
-            assert node["out_of_scope_edge_count"] == len(prod) - len(in_scope)
             barrel = [r for r in prod if "/index.ts#" in r]
-            assert node["barrel_edges"] == barrel, name
-            assert node["becomes_orphan_after_rewire"] == (len(prod) - len(in_scope) == 0), name
+            for what, declared, now in (
+                ("production_edge_files", node["production_edges"], prod),
+                ("in_scope_edge_files", node["in_scope_edges"], in_scope),
+                ("barrel_edge_files", node["barrel_edges"], barrel),
+            ):
+                _assert_declared_or_registered_drift(
+                    f"TestDualModeCarrierInventory::{what}::{name}",
+                    declared=sorted({r.split("#")[0] for r in declared}),
+                    observed=sorted({r.split("#")[0] for r in now}),
+                )
+            _assert_declared_or_registered_drift(
+                f"TestDualModeCarrierInventory::test_edge_count::{name}",
+                declared=node["test_edge_count"], observed=len(test),
+            )
 
     def test_carrier_kind_partitions_the_entries(self, manifest_slice: dict) -> None:
         inv = manifest_slice["dual_mode_carrier_inventory"]
@@ -1987,8 +1768,10 @@ class TestDualModeCarrierInventory:
                 if re.match(r"^use[ABCS]\d.*DualMode\.ts$", p.name)]
         assert hits == []
         every = [p.name for p in WP_COMPOSABLES.rglob("*.ts") if "DualMode" in p.name]
-        assert inv["all_dual_mode_modules_in_repo"] == len(every), (
-            f"声明 {inv['all_dual_mode_modules_in_repo']} 现算 {len(every)}")
+        _assert_declared_or_registered_drift(
+            "TestDualModeCarrierInventory::all_dual_mode_modules_in_repo",
+            declared=inv["all_dual_mode_modules_in_repo"], observed=len(every),
+        )
 
     def test_orphan_after_rewire_is_exactly_one(self, manifest_slice: dict) -> None:
         inv = manifest_slice["dual_mode_carrier_inventory"]
@@ -2038,7 +1821,11 @@ class TestBusinessModelProjection:
             ct = fam.get("component_type")
             if not ct:
                 continue
-            assert fam["wp_code_count"] == len(ct2codes[ct]), (fam["family"], ct)
+            _assert_declared_or_registered_drift(
+                f"TestBusinessModelProjection::wp_code_count::{ct}",
+                declared=fam["wp_code_count"], observed=len(ct2codes[ct]),
+                hint=f"{fam['family']} 现算码表 {sorted(ct2codes[ct])}",
+            )
             assert fam["wp_code_count"] > 20, (
                 f"{fam['family']} 的 wp_code 数骤降 ⇒ 「一 adapter 多入口」的事实漂移")
 
@@ -2113,7 +1900,10 @@ class TestProperty69EvidenceAndCounters:
             1 for e in ents if not e["component_types"])
         assert s["entries_with_multiple_component_types"] == sum(
             1 for e in ents if len(e["component_types"]) > 1)
-        assert s["registry_component_type_total"] == len(_registry_pairs())
+        _assert_declared_or_registered_drift(
+            "TestProperty69EvidenceAndCounters::registry_component_type_total",
+            declared=s["registry_component_type_total"], observed=len(_registry_pairs()),
+        )
 
     def test_channel_counters_recompute(self, manifest_slice: dict) -> None:
         s = manifest_slice["honest_adjudication_summary"]
@@ -2225,8 +2015,24 @@ class TestProperty70CrossEntryIsolation:
         iso = manifest_slice["cross_entry_isolation"]
         assert iso["rule"] and isinstance(iso["assertions"], list) and iso["assertions"]
         assert iso["production_contract_files"] and iso["candidate_contract_files"]
-        on_disk = sorted(p.name for p in CONTRACT_DIR.glob("*.json"))
-        assert sorted(iso["production_contract_files"] + iso["candidate_contract_files"]) == on_disk
+        # 🔴 2026-11-04：原先断言「冻结清单 == 目录现状」，契约目录从 11 份长到 94 份后恒红。
+        #    改成可伪证的三分：目录里每份文件按 review_status 归为 reviewed / candidate / 非契约，
+        #    reviewed 必须与交付台账逐条相等（单源），冻结清单只许是现状的子集（一份都不许丢）。
+        reviewed: list[str] = []
+        candidate: list[str] = []
+        other: list[str] = []
+        for p in sorted(CONTRACT_DIR.glob("*.json")):
+            status = _load(p).get("review_status")
+            (reviewed if status == "reviewed" else candidate if status == "candidate" else other).append(p.name)
+        assert reviewed == sorted(f"{cid}.json" for cid in _delivered_contract_ids()), (
+            "reviewed 契约文件与交付台账不一致 ⇒ 有生产契约绕过台账"
+        )
+        assert set(iso["production_contract_files"]) <= set(reviewed), "冻结时点的生产契约不见了"
+        assert set(iso["candidate_contract_files"]) <= set(candidate), "冻结时点的 candidate 反例不见了"
+        for name in other:
+            assert not _load(CONTRACT_DIR / name).get("contract_id"), (
+                f"{name} 没有 review_status 却带 contract_id ⇒ 冒充契约的辅助文件"
+            )
 
     def test_deletion_plan_paths_are_globally_unique_and_disjoint(
         self, deletion_plan: dict
@@ -2351,10 +2157,16 @@ class TestDeletionPlanConsistency:
         assert c["entries_host_inline"] == inv["counters"]["entries_host_inline"]
         assert c["entries_with_no_carrier"] == inv["counters"]["entries_with_no_carrier"]
         prod, test = _statement_edges_to(SHARED_BASE)
-        assert c["shared_base_production_edges"] == len(prod)
         hosts = {e["host_path"] for e in manifest_slice["independent_entries"]}
-        assert c["shared_base_in_scope_edges"] == len(
-            [r for r in prod if r.split("#")[0] in hosts])
+        _assert_declared_or_registered_drift(
+            "TestDeletionPlanConsistency::shared_base_production_edges",
+            declared=c["shared_base_production_edges"], observed=len(prod),
+        )
+        _assert_declared_or_registered_drift(
+            "TestDeletionPlanConsistency::shared_base_in_scope_edges",
+            declared=c["shared_base_in_scope_edges"],
+            observed=len([r for r in prod if r.split("#")[0] in hosts]),
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2375,15 +2187,22 @@ class TestFormDifferences:
     def test_ad1_scope_arithmetic_closes(self, manifest_slice: dict, full_manifest: dict) -> None:
         d = next(x for x in manifest_slice["abcs_form_differences"] if x["id"] == "AD-1")
         v = d["value"]
-        assert v["xlsx_independent_total"] == sum(
-            1 for e in full_manifest["entries"]
-            if e.get("document_type") == "xlsx" and e.get("independent_entry") is True)
+        _assert_declared_or_registered_drift(
+            "TestFormDifferences::ad1_xlsx_independent_total",
+            declared=v["xlsx_independent_total"],
+            observed=sum(
+                1 for e in full_manifest["entries"]
+                if e.get("document_type") == "xlsx" and e.get("independent_entry") is True),
+        )
         covered = set()
         for p in _slice_paths_on_disk():
             if p == SLICE_PATH:
                 continue
             covered |= {e["entry_id"] for e in _load(p)["independent_entries"]}
-        assert v["covered_by_d_to_n"] == len(covered)
+        _assert_declared_or_registered_drift(
+            "TestFormDifferences::ad1_covered_by_d_to_n",
+            declared=v["covered_by_d_to_n"], observed=len(covered),
+        )
         assert v["this_slice"] == len(manifest_slice["independent_entries"])
         assert v["abcs_letter_hits"] - v["excluded_pilot"] + v["pattern_less_shared"] == v["this_slice"]
 
@@ -2438,10 +2257,6 @@ class TestFormDifferences:
     def test_ad12_grouping_counters_match_the_group_section(self, manifest_slice: dict) -> None:
         d = next(x for x in manifest_slice["abcs_form_differences"] if x["id"] == "AD-12")
         assert d["value"] == manifest_slice["entry_groups"]["counters"]
-
-
-def _validator_module() -> ModuleType:
-    return _load_module("_t57_paradigm_contract", CONTRACT_GUARD)
 
 
 class TestParadigmCompliance:
@@ -2545,3 +2360,179 @@ class TestParadigmCompliance:
         assert props == {3, 22, 69, 70}
         for p in manifest_slice["properties_verified"]:
             assert p["validates_requirement"] and p["claim"] and p["see"]
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 判据末：冻结 slice 漂移台账的自检（台账本身也是判据，不许退化成豁免名单）
+# ════════════════════════════════════════════════════════════════════════════
+def _claim_host(key: str, manifest_slice: dict) -> tuple[str, str]:
+    """键的末段是 entry_id ⇒ (entry_id, host_path)。"""
+    entry_id = key.rsplit("::", 1)[-1]
+    host_of = {e["entry_id"]: e["host_path"] for e in manifest_slice["independent_entries"]}
+    assert entry_id in host_of, f"{key}: 键的末段不是本 slice 的 entry_id"
+    return entry_id, host_of[entry_id]
+
+
+def _claim_carrier_moved_to_sync_editor_host(key: str, manifest_slice: dict) -> None:
+    """宿主不再直接挂 GtOnlyOfficeSheet，改挂共享同步宿主 —— 且 mode 开关仍门控新载体。
+
+    后半句决定冻结口径下的 `inert` 是不是真缺陷：开关若不再门控任何编辑器，就是真 inert（AC 1.4）。
+    """
+    entry_id, host = _claim_host(key, manifest_slice)
+    src = _strip_comments(_cached_text(ROOT / host))
+    assert "<GtOnlyOfficeSheet" not in src, f"{entry_id}: 宿主仍直接挂 <GtOnlyOfficeSheet> ⇒ 「载体已迁移」不成立"
+    mounts = _parse_oo_mounts(src, component="workpapersynceditorhost")
+    assert mounts, f"{entry_id}: 宿主没有 <WorkpaperSyncEditorHost> 挂载点 ⇒ 「载体已迁移」不成立"
+    gate = _host_gate(host)
+    assert gate["segmented_sites"] or gate["mode_radio_sites"], f"{entry_id}: 宿主没有 mode 开关"
+    ungated = [m["line"] for m in mounts if not m["mode_gated"]]
+    assert not ungated, f"{entry_id}: 第 {ungated} 行的同步宿主不受 mode 开关门控 ⇒ 开关真成了 inert"
+
+
+def _claim_persistence_one_level_beyond_closure(key: str, manifest_slice: dict) -> None:
+    """持久化调用仍在，只是搬到了闭包深度 3 之外的一层（深度 4 即可现算出声明的通道）。"""
+    entry_id, host = _claim_host(key, manifest_slice)
+    declared = next(e for e in manifest_slice["independent_entries"] if e["entry_id"] == entry_id)
+    assert _channel_of(host) == "none_detected", f"{entry_id}: 深度 3 又能现算出通道了 ⇒ 漂移消失，删台账"
+    deeper = _channel_of(host, maxdepth=4).split("+")
+    #: 只要求「声明的通道在深度 4 现算得到」：深一层会连带看见更多通道（本例多出 checklist_responses），
+    #: 那不改变「声明的通道仍在、只是搬远了一层」这个结论。
+    assert set(declared["html_counterpart"]["store"].split("+")) <= set(deeper), (
+        f"{entry_id}: 深度 4 也现算不出声明的通道（现算 {deeper}）⇒ 不是「多了一层」，持久化真没了"
+    )
+
+
+def _claim_override_write_moved_to_shared_composable(key: str, manifest_slice: dict) -> None:
+    """field-overrides 写调用从宿主搬进 `@/composables/useProgramOverrideTarget.ts`（年度门控收口）。"""
+    ref = key.rsplit("::", 1)[-1]
+    owner = _path_of(ref)
+    composable = FRONTEND / "composables" / "useProgramOverrideTarget.ts"
+    assert composable in _local_imports(owner), f"{_rel(owner)} 不再 import useProgramOverrideTarget"
+    assert _CHANNELS["field_overrides"].search(_strip_comments(_cached_text(composable))), (
+        "useProgramOverrideTarget.ts 里没有 field-overrides 写调用了"
+    )
+    assert not _CHANNELS["field_overrides"].search(_strip_comments(_cached_text(owner))), (
+        f"{_rel(owner)} 里又有 field-overrides 字面量 ⇒ 锚点应重新命中，删台账"
+    )
+
+
+def _claim_sheet_literal_replaced_by_bare_wp_code(key: str, manifest_slice: dict) -> None:
+    """挂载点改传纯 wp_code（不再传册内中文 sheet 名），且 impl resolver 真能解析到声明的那本册。"""
+    from app.services import wp_template_finder as finder
+
+    entry_id, host = _claim_host(key, manifest_slice)
+    declared = next(e for e in manifest_slice["independent_entries"] if e["entry_id"] == entry_id)
+    tr = declared["template_ref"]
+    literals = _host_gate(host)["literals"]
+    assert tr["sheet_name_literal"] not in literals, (
+        f"{entry_id}: 挂载点又出现冻结的 sheet 名字面量 ⇒ 漂移消失，删台账"
+    )
+    assert len(literals) == 1, f"{entry_id}: 挂载点字面量现算 {literals} ⇒ 不是「改传纯码」这一种"
+    code = literals[0]
+    assert re.fullmatch(r"[A-Z]\d+(?:-\d+)*", code), f"{entry_id}: {code!r} 不是纯 wp_code"
+    resolved = finder.find_template_file_any(code)
+    assert resolved is not None, f"{entry_id}: resolver 解析不到 {code!r} ⇒ 挂载点传的码是死的"
+    # slice 的 `workbook` 相对 `backend/wp_templates/`（= 本模块的 TEMPLATE_DIR）
+    assert resolved == TEMPLATE_DIR / tr["workbook"], (
+        f"{entry_id}: resolver 把 {code!r} 解析到 {resolved} ，与声明的册 {tr['workbook']} 不符"
+    )
+
+
+#: 台账 `claim` 名 → 逐键核对函数（参数：台账键、冻结 slice）。
+_DRIFT_CLAIMS = {
+    "carrier_moved_to_sync_editor_host": _claim_carrier_moved_to_sync_editor_host,
+    "persistence_one_level_beyond_closure": _claim_persistence_one_level_beyond_closure,
+    "override_write_moved_to_shared_composable": _claim_override_write_moved_to_shared_composable,
+    "sheet_literal_replaced_by_bare_wp_code": _claim_sheet_literal_replaced_by_bare_wp_code,
+}
+
+
+class TestFrozenSliceDrift:
+    """台账数据在 `_test_task57_slice_drift_ledger.py`；本类只验台账不空转、不撒谎。
+
+    🔴 本类必须留在文件末尾：死条目判定要求其余测试类先跑完（pytest 按文件顺序执行）。
+    """
+
+    def test_every_key_names_a_real_test_class_and_states_a_mechanism(self) -> None:
+        classes = {
+            name for name, obj in globals().items()
+            if isinstance(obj, type) and name.startswith("Test") and obj is not type(self)
+        }
+        keys = _ledger_keys()
+        assert keys, "台账为空 ⇒ 本类其余判据全部空转；快照与现算全部相等时应删掉本类与台账模块"
+        for key in sorted(keys):
+            owner, sep, rest = key.partition("::")
+            assert sep and rest, f"台账键必须写成「测试类::判据[::对象]」：{key}"
+            assert owner in classes, f"台账键 {key} 指向不存在的测试类 {owner!r}"
+        for drift in _ledger_drifts():
+            assert isinstance(drift, _Drift) and len(drift.why) >= 12, drift
+
+    def test_every_drift_site_key_is_prefixed_by_its_own_class(self) -> None:
+        """死条目判定按键前缀找所属类 ⇒ 判据调用点的键必须以**所在**类名开头（AST 现读本文件）。"""
+        tree = ast.parse(_cached_text(pathlib.Path(__file__)))
+        sites = 0
+        for cls in (n for n in tree.body if isinstance(n, ast.ClassDef)):
+            for node in ast.walk(cls):
+                if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) in (
+                        "_assert_declared_or_registered_drift", "_assert_ref_anchor")):
+                    continue
+                first = node.args[0]
+                head = first.values[0] if isinstance(first, ast.JoinedStr) else first
+                assert isinstance(head, ast.Constant), f"L{node.lineno}: 台账键必须以字面量开头"
+                assert str(head.value).split("::", 1)[0] == cls.name, f"L{node.lineno}: 键不以 {cls.name}:: 开头"
+                sites += 1
+        assert sites >= 40, f"只找到 {sites} 个判据调用点 ⇒ 扫描器失效"
+
+    def test_group_keys_are_disjoint_and_groups_are_real_groups(self) -> None:
+        owner_of: dict[str, str] = {key: "<单项>" for key in _SLICE_DRIFTS}
+        names = [name for name, _keys, _drift in _SLICE_DRIFT_GROUPS]
+        assert len(names) == len(set(names)), f"组名重复：{sorted({n for n in names if names.count(n) > 1})}"
+        for name, keys, _drift in _SLICE_DRIFT_GROUPS:
+            assert isinstance(keys, frozenset) and len(keys) >= 2, f"组 {name} 只有 {len(keys)} 个键 ⇒ 写成单项"
+            for key in sorted(keys):
+                assert key not in owner_of, f"{key} 同时登记在 {owner_of[key]} 与组 {name}"
+                owner_of[key] = name
+
+    def test_no_dead_entries_once_the_owning_class_has_fully_passed(
+        self, request: pytest.FixtureRequest
+    ) -> None:
+        """死条目 = 所属测试类本次每条用例都通过了，却从没查过这个键。"""
+        reporter = request.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is None:
+            pytest.skip("没有 terminalreporter（xdist worker / -p no:terminal）⇒ 拿不到用例结果，死条目无从判定")
+        passed = {
+            report.nodeid for report in reporter.stats.get("passed", [])
+            if getattr(report, "when", None) == "call"
+        }
+        by_class: dict[str, list[str]] = defaultdict(list)
+        for item in request.session.items:
+            cls = getattr(item, "cls", None)
+            if cls is None or cls is type(self) or getattr(item, "module", None) is not request.module:
+                continue
+            by_class[cls.__name__].append(item.nodeid)
+        judged = {name for name, ids in by_class.items() if all(i in passed for i in ids)}
+        if not judged:
+            pytest.skip("本次没有哪个测试类完整跑通 ⇒ 死条目无从判定（单独跑本类时属正常）")
+        dead = sorted(
+            key for key in _ledger_keys()
+            if key.partition("::")[0] in judged and key not in _DRIFT_SITES_TOUCHED
+        )
+        assert not dead, (
+            f"{len(dead)} 个台账键所属的测试类本次全部通过，却从没查过它们 ⇒ 判据改名或删了，"
+            f"台账条目成了死条目，必须删掉：{dead[:8]}"
+        )
+
+    def test_every_registered_claim_holds_key_by_key(self, manifest_slice: dict) -> None:
+        """理由里能机械核对的那句话逐键核对，不信理由文本；核对函数也不许闲置。"""
+        used: set[str] = set()
+        checked = 0
+        for name, keys, drift in _ledger_items():
+            if drift.claim is None:
+                continue
+            assert drift.claim in _DRIFT_CLAIMS, f"{name}: 台账点名了不存在的声明 {drift.claim!r}"
+            used.add(drift.claim)
+            for key in sorted(keys):
+                _DRIFT_CLAIMS[drift.claim](key, manifest_slice)
+                checked += 1
+        assert used == set(_DRIFT_CLAIMS), f"有核对函数没被任何台账条目引用：{sorted(set(_DRIFT_CLAIMS) - used)}"
+        assert checked > 0

@@ -70,11 +70,15 @@ describe('useEditorToolbar — 静态配置', () => {
     ])
   })
 
-  it('save / submitReview 标记 requireEdit=true', () => {
-    const save = PRIMARY_TOOLBAR_BUTTONS.find((b) => b.key === 'save')!
-    const submit = PRIMARY_TOOLBAR_BUTTONS.find((b) => b.key === 'submitReview')!
-    expect(save.requireEdit).toBe(true)
-    expect(submit.requireEdit).toBe(true)
+  it('所有内容写动作标记 requireEdit=true', () => {
+    const primaryWriteKeys = ['save', 'prefill', 'submitReview', 'manualRefresh']
+    const dropdownWriteKeys = ['syncFormula', 'upload']
+    expect(
+      PRIMARY_TOOLBAR_BUTTONS.filter((b) => b.requireEdit).map((b) => b.key),
+    ).toEqual(primaryWriteKeys)
+    expect(
+      MORE_DROPDOWN_ITEMS.filter((b) => b.requireEdit).map((b) => b.key),
+    ).toEqual(dropdownWriteKeys)
   })
 
   it('exportPdf 携带 v-permission 字符串', () => {
@@ -92,9 +96,9 @@ describe('useEditorToolbar — availableButtons 过滤', () => {
     const keys = availableButtons.value.map((b) => b.key)
     expect(keys).not.toContain('save')
     expect(keys).not.toContain('submitReview')
-    // prefill / manualRefresh 不需要 edit 权限，仍可见
-    expect(keys).toContain('prefill')
-    expect(keys).toContain('manualRefresh')
+    expect(keys).not.toContain('prefill')
+    expect(keys).not.toContain('manualRefresh')
+    expect(keys).toEqual(['formulaManager'])
   })
 
   it('canEdit=true 且 wpStatus=draft 时所有主按钮可见', () => {
@@ -121,7 +125,7 @@ describe('useEditorToolbar — availableButtons 过滤', () => {
 
     const keys = availableButtons.value.map((b) => b.key)
     expect(keys).not.toContain('submitReview')
-    expect(keys).toEqual(['save', 'prefill', 'manualRefresh', 'formulaManager'])
+    expect(keys).toEqual(['formulaManager'])
   })
 })
 
@@ -252,5 +256,49 @@ describe('useEditorToolbar — handleAction 分发', () => {
 
     expect(() => handleAction('upload')).not.toThrow()
     expect(() => handleAction('exportPdf')).not.toThrow()
+  })
+})
+
+
+describe('useEditorToolbar — 底稿终态冻结', () => {
+  it.each(['review_passed', 'archived'])('%s 时隐藏主写动作并禁用下拉写动作', (status) => {
+    const ctx = makeCtx({ canEdit: true, wpStatus: status })
+    const { actions } = makeActions()
+    const { availableButtons, dropdownItems } = useEditorToolbar(ctx, actions)
+
+    expect(availableButtons.value.map((item) => item.key)).toEqual(['formulaManager'])
+    const disabled = Object.fromEntries(
+      dropdownItems.value.map((item) => [item.key, item.disabled]),
+    )
+    expect(disabled.syncFormula).toBe(true)
+    expect(disabled.upload).toBe(true)
+    expect(disabled.versions).toBe(false)
+    expect(disabled.download).toBe(false)
+    expect(disabled.exportPdf).toBe(false)
+  })
+
+  it('终态时分发层也拒绝内容写动作，但保留查看和导出', () => {
+    const ctx = makeCtx({ canEdit: true, wpStatus: 'review_passed' })
+    const { actions, spies } = makeActions()
+    const { handleAction } = useEditorToolbar(ctx, actions)
+
+    for (const action of ['save', 'refreshPrefill', 'submitForReview', 'syncStructure', 'upload', 'manualRefresh']) {
+      handleAction(action)
+    }
+    handleAction('showVersions')
+    handleAction('download')
+    handleAction('exportPdf')
+    handleAction('formulaManager')
+
+    expect(spies.onSave).not.toHaveBeenCalled()
+    expect(spies.onRefreshPrefill).not.toHaveBeenCalled()
+    expect(spies.onSubmitForReview).not.toHaveBeenCalled()
+    expect(spies.onSyncStructure).not.toHaveBeenCalled()
+    expect(spies.onUpload).not.toHaveBeenCalled()
+    expect(spies.onManualRefresh).not.toHaveBeenCalled()
+    expect(spies.onShowVersions).toHaveBeenCalledTimes(1)
+    expect(spies.onDownload).toHaveBeenCalledTimes(1)
+    expect(spies.onExportPdf).toHaveBeenCalledTimes(1)
+    expect(spies.onFormulaManager).toHaveBeenCalledTimes(1)
   })
 })

@@ -30,8 +30,13 @@ import { newUuid } from '@/utils/uuid'
 // Types
 // ---------------------------------------------------------------------------
 
-/** 笔记名称上限（与对话框输入框 maxlength 同源）。 */
-export const NOTE_NAME_MAX_LENGTH = 100
+/** 笔记名称上限（与对话框输入框 maxlength 同源）。
+ *
+ * 必须与后端 `NoteSaveRequestBody.name` 的 `max_length` 一致（`routers/doc_ai_chat.py`，现为 200）：
+ * 前端限得更小会把后端接受的名称在本地拦掉（用户输入 101~200 字时提示「不超过 100 字」却并非服务端规则）。
+ * 跨语言对账守卫见 `components/ai/__tests__/ChatAdoptNoteTarget.spec.ts`（解析后端 pydantic 源码逐字段比对）。
+ */
+export const NOTE_NAME_MAX_LENGTH = 200
 
 /**
  * 笔记保存位置（镜像后端 `NoteSaveRequestBody.target_project_id / target_folder_id`）。

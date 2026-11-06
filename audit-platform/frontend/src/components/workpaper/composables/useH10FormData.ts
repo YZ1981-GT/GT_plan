@@ -5,14 +5,15 @@ import { fetchTrialBalanceRows, tbProfitLossUnder } from '@/services/trialBalanc
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { checklistDraftKey, checklistDraftPrefix } from '@/composables/workpaper/checklistDraftStorage'
 import { H10_ACCOUNT_CODE } from './h10Constants'
 import { parseNum } from './useH10FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 
 const DRAFT_PREFIX = 'h10-draft'
 
-function draftKey(wpId: string, itemId: string): string {
-  return `${DRAFT_PREFIX}:${wpId}:${itemId}`
+function draftKey(wpId: string, itemId: string): string | null {
+  return checklistDraftKey(DRAFT_PREFIX, wpId, itemId)
 }
 
 export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
@@ -46,7 +47,11 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
       pendingDraftCount.value = 0
       return
     }
-    const prefix = `${DRAFT_PREFIX}:${opts.wpId.value}:`
+    const prefix = checklistDraftPrefix(DRAFT_PREFIX, opts.wpId.value)
+    if (!prefix) {
+      pendingDraftCount.value = 0
+      return
+    }
     let n = 0
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -57,12 +62,13 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   }
 
   function restoreDrafts(): void {
-    if (!opts.wpId.value) return
-    for (let i = 0; i < localStorage.length; i++) {
+    const prefix = checklistDraftPrefix(DRAFT_PREFIX, opts.wpId.value)
+    if (!prefix) return
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
       const key = localStorage.key(i)
-      if (!key?.startsWith(`${DRAFT_PREFIX}:${opts.wpId.value}:`)) continue
+      if (!key?.startsWith(prefix)) continue
       try {
-        const itemId = key.slice(`${DRAFT_PREFIX}:${opts.wpId.value}:`.length)
+        const itemId = key.slice(prefix.length)
         const updated = JSON.parse(localStorage.getItem(key) || '') as ChecklistResponse
         if (itemId && updated?.item_id) {
           allResponses.value.set(itemId, updated)
@@ -130,7 +136,8 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
           items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
         })
         try {
-          localStorage.removeItem(draftKey(opts.wpId.value, itemId))
+          const key = draftKey(opts.wpId.value, itemId)
+          if (key) localStorage.removeItem(key)
         } catch { /* ignore */ }
         refreshPendingDraftCount()
         return
@@ -147,7 +154,8 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
       return
     }
     try {
-      localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
+      const key = draftKey(opts.wpId.value, itemId)
+      if (key) localStorage.setItem(key, JSON.stringify(updated))
       ElMessage.warning(`H10 数据暂存本地（${itemId}），网络恢复后将自动同步`)
       refreshPendingDraftCount()
     } catch { /* ignore */ }

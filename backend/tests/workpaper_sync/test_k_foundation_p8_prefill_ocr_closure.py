@@ -205,19 +205,21 @@ class TestKFP40OcrTwoUrlForms:
     #: 无 wpId 调用统一到含 wpId 形态 —— 那 5 处后端**没有注册路由**，是 404。
     BASELINE_NO_WPID_FILES = 7
     BASELINE_WITH_WPID_FILES = 3
-    #: 已收敛（lane 2 的 5 个文件：K8 ×2 · K12 ×2 · K13 ×1）
-    CONVERGED_FILES = 5
+    #: 已收敛的文件数。🔴 2026-11-05 由 5 改 7（= 全部）：lane 1 余下的 2 处也统一到含 wpId 形态
+    #: 了（现算无 wpId 形态 0 文件、含 wpId 形态 10 文件 = 3 + 7，守恒仍成立）。收敛**完成**不是
+    #: 判据失效 —— 下面三条判据按「已完成」重写，并保留守恒等式与「裸形态后端无路由」的依据。
+    CONVERGED_FILES = 7
 
     def test_no_wpid_form_follows_the_convergence_ledger(
         self, k_files: list[pathlib.Path]
     ) -> None:
-        """现算 == 基线 7 − 已收敛 5 == 2（余下 2 处在 lane 1，归其 spec）。"""
+        """现算 == 基线 7 − 已收敛 7 == 0（KC-19 的裸形态已清零）。"""
         by_file, _hits = endpoint_index(k_files)
-        live = len(by_file.get(EP_OCR_NO_WPID, set()))
+        live = sorted(by_file.get(EP_OCR_NO_WPID, set()))
         expected = self.BASELINE_NO_WPID_FILES - self.CONVERGED_FILES
-        assert live == expected, (
+        assert len(live) == expected, (
             f"无 wpId 段：基线 {self.BASELINE_NO_WPID_FILES} − 已收敛 "
-            f"{self.CONVERGED_FILES} = {expected}，实得 {live}"
+            f"{self.CONVERGED_FILES} = {expected}，实得 {len(live)}（{live}）"
         )
 
     def test_with_wpid_form_grew_by_the_converged_count(
@@ -276,17 +278,21 @@ class TestKFP40OcrTwoUrlForms:
         assert len(literal_hits(k_files, "runOcr")) == 4
         assert len(literal_hits(k_files, "OcrConfirm")) == 0
 
-    def test_inconsistency_itself_is_the_defect(
+    def test_the_inconsistency_that_was_the_defect_is_gone(
         self, k_files: list[pathlib.Path]
     ) -> None:
-        """🔴 两种 URL 形态并存本身是缺陷（同一能力两个契约面）。"""
+        """原 `test_inconsistency_itself_is_the_defect` —— 🔴 断言方向已反转。
+
+        KC-19 的缺陷是「同一能力两个契约面并存」。它已被统一：现算只剩含 wpId 这一种形态，
+        而且是**后端唯一注册**的那一种（同类 `test_the_bare_form_has_no_backend_route` 验路由）。
+        保留 `assert a and b`（要求两种形态都还在）等于要求缺陷不许被修掉 ⇒ 改成断言统一已完成，
+        裸形态回来即打红。
+        """
         by_file, _ = endpoint_index(k_files)
-        a = by_file.get(EP_OCR_NO_WPID, set())
-        b = by_file.get(EP_OCR_WITH_WPID, set())
-        assert a and b, (
-            "只剩一种形态 ⇒ KC-19 的缺陷已被统一，登记须更新"
-        )
-        assert len(a) + len(b) == 10
+        bare = sorted(by_file.get(EP_OCR_NO_WPID, set()))
+        scoped = by_file.get(EP_OCR_WITH_WPID, set())
+        assert bare == [], f"裸形态（无 wpId）又出现了：{bare} ⇒ KC-19 的缺陷回归"
+        assert len(scoped) == 10, f"含 wpId 形态现算 {len(scoped)} 文件（期望 10，= 基线 3 + 迁入 7）"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -648,12 +654,21 @@ class TestKFP63FourTableBranchByBalanceOrPl:
         assert len(with_sl) + len(with_pl) == 13
 
     def test_13_frontend_account_scope_files_exist(self) -> None:
-        """13 个 `k{n}AccountScope.ts` 全存。"""
-        scopes = sorted(WP_COMPOSABLES.glob("k*AccountScope.ts"))
-        names = {p.name for p in scopes}
-        assert len(names) == 13, f"AccountScope 期望 13 个，实得 {sorted(names)}"
+        """13 个 `k{n}AccountScope.ts` 全存；另有一个循环级共享模块。
+
+        🔴 2026-11-05：原判据是「`k*AccountScope.ts` 恰好 13 个」。现算 14 —— 多出来的是循环级
+        共享模块 `kCycleAccountScope.ts`（不是第 14 个科目范围）。写死总数会把「抽了个共享模块」
+        报成判据失败 ⇒ 改成「13 个逐个点名必须在」+「额外的那些必须在显式白名单里」，第 15 个
+        不在名单的文件照旧打红。
+        """
+        names = {p.name for p in WP_COMPOSABLES.glob("k*AccountScope.ts")}
         for n in K_INDEXES:
             assert f"k{n}AccountScope.ts" in names, f"缺 k{n}AccountScope.ts"
+        extra = names - {f"k{n}AccountScope.ts" for n in K_INDEXES}
+        assert extra == {"kCycleAccountScope.ts"}, (
+            f"除 13 个逐科目模块外，AccountScope 还有 {sorted(extra)} —— 只允许循环级共享模块"
+            " `kCycleAccountScope.ts`，多出来的要查清是不是又造了一份逐科目副本"
+        )
 
     def test_account_scope_uses_tb_source_codes_at_runtime(self) -> None:
         """范式：运行态取 render 下发的 `tb_source_codes.gross_standard`。"""

@@ -6,8 +6,8 @@
  * 「门在、可 `draftsSuspended` 从来没被置真」这种接线断裂。这里直接跑真逻辑：
  * 让 PUT 必失败，再分别在挂起 / 未挂起两种状态下断言草稿有没有落盘。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref } from 'vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { effectScope, ref } from 'vue'
 
 const putMock = vi.fn()
 const getMock = vi.fn()
@@ -23,7 +23,9 @@ vi.mock('element-plus', () => ({
 }))
 
 const WP = 'wp-h10-test'
-const PREFIX = `h10-draft:${WP}:`
+const USER = 'user-h10'
+const PREFIX = `h10-draft:${USER}:${WP}:`
+const scopes: Array<ReturnType<typeof effectScope>> = []
 
 function countDrafts(): number {
   let n = 0
@@ -35,12 +37,20 @@ function countDrafts(): number {
 
 async function makeComposable() {
   const { useH10FormData } = await import('../useH10FormData')
-  return useH10FormData({ wpId: ref(WP), projectId: ref('proj-1') })
+  const scope = effectScope()
+  scopes.push(scope)
+  return scope.run(() => useH10FormData({ wpId: ref(WP), projectId: ref('proj-1') }))!
 }
+
+afterEach(() => {
+  for (const scope of scopes.splice(0)) scope.stop()
+})
 
 describe('useH10FormData 草稿存储归口', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
+    sessionStorage.setItem('user', JSON.stringify({ id: USER }))
     putMock.mockReset()
     getMock.mockReset()
     getMock.mockResolvedValue([])
@@ -102,5 +112,22 @@ describe('useH10FormData 草稿存储归口', () => {
     fd.refreshPendingDraftCount()
 
     expect(fd.pendingDraftCount.value).toBe(1)
+  })
+})
+
+describe('H10 草稿身份隔离', () => {
+  it('其他用户的 H10 草稿不会计数、回显或自动保存', async () => {
+    localStorage.setItem(`${PREFIX}H10-foreign`, JSON.stringify({
+      item_id: 'H10-foreign', remark: '前一用户草稿',
+    }))
+    sessionStorage.setItem('user', JSON.stringify({ id: 'other-user' }))
+    const fd = await makeComposable()
+
+    await fd.loadAll()
+    fd.refreshPendingDraftCount()
+
+    expect(fd.pendingDraftCount.value).toBe(0)
+    expect(fd.allResponses.value.has('H10-foreign')).toBe(false)
+    expect(putMock).not.toHaveBeenCalled()
   })
 })

@@ -52,12 +52,17 @@ describe('正式前端构建契约', () => {
 
   it('verified snapshot 仅在预算和 smoke 都通过后原子切换', () => {
     const source = read('scripts/build-verified-dist.mjs')
-    const budget = source.indexOf("check-bundle-budget.mjs")
-    const smoke = source.indexOf("smoke-built-artifact.mjs")
+    expect(source).toContain("resolve(ROOT, 'scripts/check-bundle-budget.mjs')")
+    expect(source).toContain("resolve(ROOT, 'scripts/smoke-built-artifact.mjs')")
+    expect(source).toContain("resolve(ROOT, 'scripts/bundle-budget.json')")
+    // 顺序：预算 → smoke → 切换指针；三处都按调用点定位，不按常量声明位置。
+    const budget = source.indexOf('run(BUDGET')
+    const smoke = source.indexOf('run(SMOKE')
     const select = source.indexOf('await selectSnapshot(artifactId, fullDigest)')
     expect(budget).toBeGreaterThan(0)
     expect(smoke).toBeGreaterThan(budget)
     expect(select).toBeGreaterThan(smoke)
+    expect(source).toContain('artifactValid')
     expect(source).toContain('await rename(temporary, CURRENT_FILE)')
     expect(source).toContain('当前快照指针未改变')
   })
@@ -96,12 +101,10 @@ describe('正式前端构建契约', () => {
     expect(openWatcher.index).toBeGreaterThan(declarations.at(-1).index)
 
     const dsh = read('src/components/ai/DshPanel.vue')
-    const dshWatcher = dsh.slice(
-      dsh.indexOf('// 打开时：锁定背景滚动'),
-      dsh.indexOf('// layoutMode 变化时'),
-    )
-    expect(dshWatcher).toContain('}, { immediate: true })')
-    expect(dshWatcher).toContain('if (!props.modelValue) return')
+    const dshWatcher = watchCalls(dsh).find((call) => call.text.startsWith('watch(() => props.modelValue'))
+    expect(dshWatcher, 'DSH 面板必须监听打开状态').toBeDefined()
+    expect(isImmediate(dshWatcher), '按需下载后可能已是打开态，必须 immediate').toBe(true)
+    expect(dshWatcher.text).toContain('if (!props.modelValue) return')
 
     const customQuery = read('src/components/query/CustomQueryDialog.vue')
     const customWatchers = watchCalls(customQuery)
@@ -115,6 +118,10 @@ describe('正式前端构建契约', () => {
     )).toBe(true)
     // 换项目 / 年度后晚到的指标树响应必须丢弃。
     expect(customQuery).toMatch(/generation\s*===\s*indicatorGeneration/)
+    // 查询结果同理：响应和异常都先比代际，旧请求不能覆盖新查询的结果或 loading 状态。
+    expect(customQuery).toContain('const generation = ++queryGeneration')
+    expect(customQuery.match(/if \(generation !== queryGeneration\) return/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(customQuery).toContain('function invalidateQueryResult()')
   })
 
   it('Nginx 提供 SPA 回退、缓存策略和 API/WOPI 代理', () => {

@@ -57,7 +57,7 @@ import sys
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pytest
 
@@ -125,7 +125,6 @@ from app.services.workpaper_sync.resolution import DefinitionBundleSnapshot  # n
 #    之前」那条假设，而本任务的权威模板恰恰是 `Type` → `Target` → `Id` 顺序。
 from test_task37_excel_extract import (  # noqa: E402
     _read_entries,
-    _write_entries,
     patch_cells,
 )
 
@@ -146,8 +145,6 @@ EXPECTED_MERGE_COUNT = 187
 EXPECTED_TEMPLATE_SLOT_COUNT = 5
 #: 动态列总数 = 5 槽 × 2 子列。
 EXPECTED_DYNAMIC_COLUMN_COUNT = 10
-#: 记录表公式格数（6 列 × 5 行，逐格实测）。
-EXPECTED_RECORD_FORMULA_CELLS = 30
 #: `g7_column_source_facts.json` 的三个计数（归档 spec 的成果，本任务现推复核）。
 EXPECTED_FACTS_TABLE_COUNT = 38
 EXPECTED_FACTS_TWO_LEVEL = 24
@@ -159,214 +156,23 @@ EXPECTED_FACTS_TWO_LEVEL_RENDERED = 24
 #: 同类候选数（`assess_pilot_classes()` 实测）。
 EXPECTED_G7_CANDIDATES = 3
 
-FIRST = P.RECORD_FIRST_ROW
-LAST = P.RECORD_LAST_ROW
-#: 记录表的六个公式列（`A` 是 auto_source 字面量）。
-RECORD_FORMULA_COLUMNS = tuple(
-    column for _key, column, mode, *_rest in P.RECORD_COLUMNS if mode == "formula"
+
+from tests.workpaper_sync._test_task43_workbook_helpers import (  # noqa: E402
+    EXPECTED_RECORD_FORMULA_CELLS,
+    FIRST,
+    LAST,
+    RECORD_FORMULA_COLUMNS,
+    _d,
+    uid,
+    _non_docstring_literals,
+    function_body_code,
+    observe_template_resolution,
+    sheet_part_of,
+    add_row,
+    uuid_cell_occurrences,
+    assert_uuid_cells_are_unique,
+    fill_record_formula_cache,
 )
-
-
-def _d(label: str) -> str:
-    return hashlib.sha256(label.encode("utf-8")).hexdigest()
-
-
-def uid(row: int) -> str:
-    """instrumentation 预生成的行 UUID 字面量（与 `spec.row_uuid` 同形态）。"""
-    return f"GTROW-{P.TEMPLATE_ID}-{row:04d}"
-
-
-def _non_docstring_literals(path: Path) -> list[str]:
-    """模块里的**非 docstring** 字符串字面量。
-
-    docstring 必须剥掉：本任务的生产模块 docstring 里刻意写着「参考副本一次都不读」
-    「不借用 B60/D2/H1 的 identity」这类**说明**，纯字面量判据会把说明本身判成违规。
-    """
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    docstrings: set[int] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            first = (node.body or [None])[0]
-            if (
-                isinstance(first, ast.Expr)
-                and isinstance(first.value, ast.Constant)
-                and isinstance(first.value.value, str)
-            ):
-                docstrings.add(id(first.value))
-    return [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and id(node) not in docstrings
-    ]
-
-
-def function_body_code(path: Path, name: str) -> str:
-    """某个函数的**可执行体**源码（剥掉 docstring 与注释）。
-
-    🔴 必须剥：本任务的生产函数 docstring 里刻意写着「不写死 5，也不写死 10」「在这里重写
-    一遍 ``f"{slot}_{seq}"`` 的后果……」这类**说明**，纯字面量/正则判据会把说明本身判成
-    违规（首轮实测就是这么打红的两条）。`ast.unparse` 只输出语句，注释与 docstring 天然
-    不在其中。
-    """
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
-            body = list(node.body)
-            first = body[0] if body else None
-            if (
-                isinstance(first, ast.Expr)
-                and isinstance(first.value, ast.Constant)
-                and isinstance(first.value.value, str)
-            ):
-                body = body[1:]
-            assert body, f"{name} 的函数体只有 docstring"
-            return "\n".join(ast.unparse(stmt) for stmt in body)
-    raise AssertionError(f"{path.name} 里找不到函数 {name}")
-
-
-def observe_template_resolution() -> Any:
-    """借用契约生成器里的**同一个**观测器（不抄第二份）。
-
-    观测器住在 `backend/scripts/gen/` 而不是 `backend/app/`：`find_template_file*` 是
-    Task 19 清册登记的 non-canonical resolver 符号，生产模块里出现它们会给收口门增债
-    （见 `P.TemplateResolutionFacts` 的 docstring）。
-    """
-    import importlib.util
-
-    path = _BACKEND / "scripts" / "gen" / "generate_pilot_g7_two_level_dynamic_contract.py"
-    spec = importlib.util.spec_from_file_location("_t43_contract_gen", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.observe_template_resolution()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# fixtures：真实 manifest / 真实权威模板 / 真实注入产物（不手搓 xlsx）
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def sheet_part_of(data: bytes, sheet_name: str) -> str:
-    """sheet 展示名 → sheet part 路径（**属性顺序无关**）。
-
-    🔴 不复用 `test_task37_excel_extract._sheet_part_of`：它写的是
-    ``Id="{rid}"[^>]*Target="..."``，隐含「Id 必须排在 Target 之前」，而本任务的权威模板
-    实测是 `Type` → `Target` → `Id` 顺序（生产侧 `excel_instrumentation._sheet_part_for`
-    的同一条缺陷已由 Task 42 修掉，本文件的
-    `TestUpstreamRelsAndNamespaceShapesStillHold` 对它做反向自检）。
-    """
-    entries = _read_entries(data)
-    workbook = entries["xl/workbook.xml"].decode("utf-8")
-    match = re.search(
-        r'<sheet [^>]*name="' + re.escape(sheet_name) + r'"[^>]*r:id="(rId\d+)"', workbook
-    )
-    assert match, sheet_name
-    rid = match.group(1)
-    rels = entries["xl/_rels/workbook.xml.rels"].decode("utf-8")
-    for candidate in re.finditer(r"<Relationship\b[^>]*?/?>", rels):
-        if re.search(r'\bId="' + re.escape(rid) + r'"', candidate.group(0)):
-            target = re.search(r'\bTarget="([^"]+)"', candidate.group(0))
-            assert target, candidate.group(0)
-            path = target.group(1).lstrip("/")
-            return path if path.startswith("xl/") else f"xl/{path}"
-    raise AssertionError(f"rels 里找不到 {rid}")
-
-
-def grow_table_to(data: bytes, last_row: int) -> bytes:
-    """把 Excel Table 的 ref 行区间扩到 `last_row`（模拟 OO 插行）。"""
-    entries = _read_entries(data)
-    part = next(name for name in entries if name.startswith("xl/tables/"))
-    xml = entries[part].decode("utf-8")
-    grown, count = re.subn(
-        r'ref="A\d+:([A-Z]+)\d+"', rf'ref="A{FIRST}:\g<1>{last_row}"', xml, count=1
-    )
-    assert count == 1 and grown != xml, "Table ref 未扩 —— fixture 会变成无效变异"
-    entries[part] = grown.encode("utf-8")
-    return _write_entries(entries)
-
-
-def add_row(data: bytes, part: str, *, row: int, cells: Mapping[str, Any]) -> bytes:
-    """在受管区域**末尾追加一行**：先扩 Table ref，再写该行的格。
-
-    🔴 这是「OO 新增行」的正确 fixture 形态。改**已有行**（清空/换重复 UUID）在语义上是
-    「原有 identity 消失」⇒ 先被保留门（Property 66）拦住，身份分类分支根本走不到 ——
-    「真实数据上分支不可达 = 永久 GREEN」的典型（Task 37 实测踩过）。
-    """
-    return patch_cells(grow_table_to(data, row), part, cells)
-
-
-def uuid_cell_occurrences(data: bytes, part: str) -> dict[str, int]:
-    """UUID 列每个坐标在 sheet XML 里出现几次（正常必须恰 1 次）。
-
-    🔴 这条 helper 存在的理由是**本任务修掉的第 4 条生产缺陷**：
-    `_add_uuid_cells` 原来无条件在 `</row>` 前追加，而本 sheet 的 `N79..N83` 在模板里已有
-    「有样式、无值」的格 ⇒ 同一行出现两个相同 `r` 的 `<c>`（非法 OOXML）。首轮实测时
-    `patch_cells` 因此改到了**前一个**（模板那一个），三条结构操作 fixture 静默失效。
-    """
-    xml = _read_entries(data)[part].decode("utf-8")
-    return {
-        f"{P.UUID_COL}{row}": len(
-            re.findall(rf'<c r="{P.UUID_COL}{row}"(?:\s|/|>)', xml)
-        )
-        for row in range(FIRST, LAST + 2)
-    }
-
-
-def assert_uuid_cells_are_unique(data: bytes, part: str) -> None:
-    counts = uuid_cell_occurrences(data, part)
-    duplicated = {coord: n for coord, n in counts.items() if n > 1}
-    assert not duplicated, f"UUID 格重复出现 {duplicated} —— 非法 OOXML，fixture 会改错格"
-
-
-def fill_record_formula_cache(data: bytes, part: str) -> bytes:
-    """给记录表六个公式列补缓存值 `<v>`（并按列的 `value_type` 给对的载体）。
-
-    🔴 为什么必须补：权威模板里公式格是 ``<f>…</f><v></v>`` —— **缓存值是空的**（模板从未
-    被计算过）。`excel_extract` 按 Task 14 语义把读到 `None` 的格当 MISSING
-    （`if not present: continue`），于是公式字段既不进 projection、也不进
-    `formula_inventory`。真实 OO 往返回来的工作簿一定带缓存值，所以 fixture 必须补上，
-    否则「公式范围」判据会在一个恒空的集合上通过（假绿第⑤源）。
-
-    🔴 文本列必须补 `t="str"`：源格没有 `t` 属性（数值型），直接塞文本会让 openpyxl 在
-    `_cast_number` 抛 `ValueError`（实测踩过一次）。模板自身那个「缓存值为空」的事实由
-    `TestAuthoritativeTemplate::test_record_formula_cells_ship_without_cached_values`
-    单独钉住。
-    """
-    numeric_columns = {
-        column
-        for _key, column, mode, value_type, *_rest in P.RECORD_COLUMNS
-        if mode == "formula" and value_type != "text"
-    }
-    entries = _read_entries(data)
-    xml = entries[part].decode("utf-8")
-    filled = 0
-    for column in RECORD_FORMULA_COLUMNS:
-        numeric = column in numeric_columns
-        for row in range(FIRST, LAST + 1):
-            pattern = re.compile(
-                r'<c r="' + column + str(row) + r'"([^>]*)>(<f>[^<]*</f>)<v></v>'
-            )
-
-            def repl(match: re.Match[str], _col: str = column, _row: int = row,
-                     _numeric: bool = numeric) -> str:
-                attrs = match.group(1)
-                if _numeric:
-                    return f'<c r="{_col}{_row}"{attrs}>{match.group(2)}<v>{_row}</v>'
-                if 't="' not in attrs:
-                    attrs = f'{attrs} t="str"'
-                return f'<c r="{_col}{_row}"{attrs}>{match.group(2)}<v>V{_col}{_row}</v>'
-
-            xml, count = pattern.subn(repl, xml, count=1)
-            filled += count
-    assert filled == EXPECTED_RECORD_FORMULA_CELLS, (
-        f"只补了 {filled} 个公式缓存值（期望 {EXPECTED_RECORD_FORMULA_CELLS}）—— "
-        "模板的公式格形态已变，公式范围判据会退化成空集"
-    )
-    entries[part] = xml.encode("utf-8")
-    return _write_entries(entries)
-
 
 @pytest.fixture(scope="module")
 def resolution() -> Any:
@@ -635,10 +441,11 @@ def store_state(
 
 #: 2026-11-04（umbrella tasks.md 1.1）：Task 76 的 reviewed wp_code 裁决（真库 wp_index 证据）把本 entry 判为
 #: ['G7']，冻结 matcher 域 {G7L}（名字提取产物）与两个孪生 entry 共用的 G7E 随之失效，与 Task 40 的 B60 同一族，
-#: 随 6.3 对 pilot matcher 域的重判处理。真实 manifest 上的正路径以 strict xfail 钉住（XPASS 即红 ⇒ 删标记）；
-#: 测 render schema 分支的合成用例先把三个 entry 的 wp_code 对齐冻结域（原先被 pending entry 的崩溃挡着）。
-_MATCHER_DRIFT = pytest.mark.xfail(strict=True, raises=P.PilotSelectionError, reason=(
-    "Task 76 reviewed wp_code 裁决把本 entry 判为 ['G7']，冻结 matcher 域 {G7L} 已失效（tasks.md 1.1 / 6.3）"))
+#: 2026-11-04 收口：matcher 域已按裁决表重判完毕 —— 裁决行记着 `matcher_domain_conflict`
+#: （三个 G7 entry 真码同为 `G7`，按 wp_code 路由必撞 RG-3），故**真码不得当 matcher 域**，
+#: 域保持幻影码 `G7L`，其合法性由 `assert_matcher_domain_is_exclusive` 按裁决表逐条验。
+#: 原先钉在正路径上的 strict xfail 已随之删除（它当时记的是「域失效、待重判」）。
+#: 测 render schema 分支的合成用例仍把三个 entry 的 wp_code 对齐冻结域（见下面的 helper）。
 #: Task 40 的 checklist pilot entry（B60 bundle）现为 pending（capability=null），按设计 fail-closed。
 _B60_PENDING = pytest.mark.xfail(strict=True, raises=EntryProfileError, reason=(
     "B60 bundle 现为 pending（capability=null），derive_for_manifest_entry 对它 fail-closed；随 6.3 终裁"))
@@ -710,9 +517,21 @@ class TestFrozenEntrySelection:
     def test_matcher_domain_is_exclusive_and_siblings_share_one_code(
         self, manifest: dict[str, Any]
     ) -> None:
-        """🔴 决定性事实：`G7L` 独属本 entry，`G7E` 被另外两个共用。"""
+        """🔴 决定性事实：matcher 域不被别的 entry 占用，`G7E` 被另外两个候选共用。
+
+        2026-11-04 现算：`wp_code` 裁决表（reviewed）把本 entry 的真码裁为 `G7`，manifest
+        生成器对独立 entry 用裁决值覆盖启发式，于是启发式产物 `G7L` 已不被任何 entry 声明
+        （`wp_index` 0 命中的幻影码）。裁决行同时记着 `matcher_domain_conflict`：三个 G7 entry
+        真码相同，真码**不得**当 EntryMatcher 的域。判据因此落在「域没被别人占」+「真码确实
+        指向本 entry」+「排除两个候选的理由（共用 `G7E`）仍成立」三条上。
+        """
         by_code = P.assert_matcher_domain_is_exclusive(manifest=manifest)
-        assert by_code["G7L"] == (P.PILOT_ENTRY_ID,)
+        assert by_code.get("G7L", ()) == (), (
+            "`G7L` 又被某个 entry 声明了 ⇒ 幻影码变成真域，matcher 会在 RG-3 上撞车"
+        )
+        assert by_code["G7"] == (P.PILOT_ENTRY_ID,), (
+            "裁决真码 `G7` 在 manifest 里不再独指本 entry ⇒ 裁决表与 manifest 脱钩"
+        )
         assert by_code["G7E"] == tuple(sorted(P.SIBLING_G7_CANDIDATES))
         assert len(by_code["G7E"]) == 2
 
@@ -738,7 +557,6 @@ class TestFrozenEntrySelection:
         with pytest.raises(P.PilotSelectionError):
             P.assert_pilot_entry_selectable(resolution=resolution, manifest=patched)
 
-    @_MATCHER_DRIFT
     def test_selection_passes_on_the_real_manifest(self, resolution: Any) -> None:
         """正路径：真实 manifest + 真实 resolver + 真实两份配置下选型必须**通过**。
 
@@ -949,12 +767,36 @@ class TestFrozenEntrySelection:
     def test_selection_fails_closed_on_wp_code_drift(
         self, manifest: dict[str, Any], resolution: Any
     ) -> None:
-        patched = json.loads(json.dumps(manifest))
-        for item in patched["entries"]:
-            if item["entry_id"] == P.PILOT_ENTRY_ID:
-                item["wp_match"]["wp_code_patterns"] = ["G7L", "G7X"]
-        with pytest.raises(P.PilotSelectionError, match="wp_code_patterns"):
+        """wp_code 漂移必须 fail closed。
+
+        🔴 2026-11-04 换取证形态（属性没换）：裁决行记着 `matcher_domain_conflict` 之后，
+        「manifest 的 patterns 必须等于冻结域」这条等式按设计不再成立（真码 `G7` 本就与
+        幻影域 `G7L` 不等），于是往本 entry 的 patterns 里塞 `G7X` 已不会被拦 —— 那条路
+        不再是本设计下的「漂移」。当前设计真正要拦的两种漂移各取证一次：
+
+        1. **matcher 域被别人占用**（RG-3 撞车的那一种）：把域码 `G7L` 塞给另一个 entry；
+        2. **裁决真码不再指向本 entry**（裁决表与 manifest 脱钩）：把本 entry 的 patterns 清空。
+        """
+        # ① 域码被别的 entry 占用
+        patched = _frozen_matcher_manifest(manifest)
+        other = next(
+            item
+            for item in patched["entries"]
+            if item["entry_id"] != P.PILOT_ENTRY_ID
+            and item["entry_id"] not in P.SIBLING_G7_CANDIDATES
+        )
+        other["wp_match"]["wp_code_patterns"] = sorted(
+            {*(other["wp_match"].get("wp_code_patterns") or ()), *P.PILOT_WP_CODES}
+        )
+        with pytest.raises(P.PilotSelectionError, match="matcher 码"):
             P.assert_pilot_entry_selectable(resolution=resolution, manifest=patched)
+        # ② 裁决真码不再指向本 entry
+        orphaned = json.loads(json.dumps(manifest))
+        for item in orphaned["entries"]:
+            if item["entry_id"] == P.PILOT_ENTRY_ID:
+                item["wp_match"]["wp_code_patterns"] = []
+        with pytest.raises(P.PilotSelectionError, match="裁决真码"):
+            P.assert_pilot_entry_selectable(resolution=resolution, manifest=orphaned)
 
     def test_selection_fails_closed_when_a_render_schema_points_elsewhere(
         self, resolution: Any, manifest: dict[str, Any]
@@ -1894,10 +1736,25 @@ class TestFourthEdgeRenderLayer:
         assert pairs == expected, (pairs, expected)
 
     def test_store_item_id_comes_from_the_real_tab(self) -> None:
+        """store 身份三件（item_id / sheet 名 / 状态版本）必须与真实 Tab 源码一致。
+
+        🔴 2026-11-04 改口径：版本门原先按整句字面量 `if (saved.version !== 2) return` 匹配，
+        而该 Tab 已把解析抽成 `parseSavedRemark`，现写法是 `if (parsed?.version !== 2) return false`
+        ⇒ 字面量判据假红。改成「比较的右值必须是 `STORE_STATE_VERSION`」的形态判据（谁持有
+        左值不属本判据管），并配反向断言：换成别的版本号就匹配不到。
+        """
         tab = (_REPO / P.RENDER_TAB_RELATIVE_PATH).read_text(encoding="utf-8")
         assert f"const RESPONSE_KEY = '{P.STORE_ITEM_ID}'" in tab
         assert f"const SHEET_NAME = '{P.MANAGED_SHEET}'" in tab
-        assert f"if (saved.version !== {P.STORE_STATE_VERSION}) return" in tab
+        gate = re.compile(rf"version\s*!==\s*{P.STORE_STATE_VERSION}\b")
+        assert gate.search(tab), (
+            f"Tab 里没有对 store 状态版本 {P.STORE_STATE_VERSION} 的版本门 ⇒ "
+            "旧版本载荷会被当成当前版本读进去"
+        )
+        other = re.compile(rf"version\s*!==\s*{P.STORE_STATE_VERSION + 1}\b")
+        assert not other.search(tab), (
+            "Tab 里同时存在对别的版本号的门 ⇒ 版本门有两个真源，判据失去唯一性"
+        )
 
     def test_host_really_mounts_the_soe_disclosure_tab(self) -> None:
         """渲染层必须有**宿主**：G7 主入口真的分发到国企披露 Tab（不是孤立组件）。"""
@@ -3269,12 +3126,18 @@ class TestUpstreamRelsAndNamespaceShapesStillHold:
         * 2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ `.xlsx` 352，合计 370。
 
         写成等式的后果是每次合法入库都打一次假红，而假红掩盖的恰恰是 `legacy_writer`
-        这条真判据。所以总量用下界 + 扩展名集合用等式（新出现第四种扩展名仍要打红），
-        `legacy_writer` 保持**等式**—— 它是本条的结论本身，实测仍为 10，一份不多一份不少。
+        这条真判据。所以总量用下界 + 扩展名集合用等式（新出现第四种扩展名仍要打红）。
+
+        🔴 2026-11-04 更正：`legacy_writer` 当初也写成了等式 `== 10`，理由是「它是本条的
+        结论本身」。那句话站不住 —— 本条的结论是「本模板不是孤例」，而「恰好 10 本」只是
+        2026-09-06 的一次普查数，它和同一段里被改成下界的总量**同样**会随模板合法入库增长
+        （现算 24）。等式于是每次入库打一次假红，掩盖的正是它要守的那条判据。改成下界 +
+        本册在族里 + 真子集（不得等于语料全体，否则检测器退化成「全都算」）。
         """
         root = _BACKEND / "wp_templates"
         by_extension: dict[str, int] = {}
         legacy_writer = 0
+        legacy_writer_names: list[str] = []
         for path in sorted(root.rglob("*")):
             if not path.is_file() or path.name.startswith("~$"):
                 continue
@@ -3291,6 +3154,7 @@ class TestUpstreamRelsAndNamespaceShapesStillHold:
             if first and "Id=" in first.group(0) and "Target=" in first.group(0):
                 if first.group(0).index("Target=") < first.group(0).index("Id="):
                     legacy_writer += 1
+                    legacy_writer_names.append(path.name)
         #: 冻结时点（2026-09-06）实测下界；新增模板只会让这些数变大。
         frozen_floor = {".xlsx": 351, ".xlsm": 17, ".xls": 1}
         assert set(by_extension) == set(frozen_floor), (
@@ -3302,7 +3166,18 @@ class TestUpstreamRelsAndNamespaceShapesStillHold:
                 "语料缩水或 glob 失配，两者都会让下面那条判据在残缺集合上跑"
             )
         assert sum(by_extension.values()) >= sum(frozen_floor.values())
-        assert legacy_writer == 10, legacy_writer
+        #: 2026-09-06 普查数，作下界；现算 24。
+        legacy_writer_floor = 10
+        assert legacy_writer >= legacy_writer_floor, (
+            f"legacy writer 形态只命中 {legacy_writer} 本，低于冻结普查数 "
+            f"{legacy_writer_floor} ⇒ 形态检测退化或语料缩水"
+        )
+        assert legacy_writer < sum(by_extension.values()), (
+            f"legacy writer 命中 {legacy_writer} == 语料全体 ⇒ 检测器把所有册子都算进来了"
+        )
+        assert P.authoritative_template_path().name in legacy_writer_names, (
+            "本 pilot 的权威册不是这个形态 ⇒ 「本模板不是孤例」这句话失去对象"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3523,8 +3398,20 @@ class TestProductionWiring:
         assert raw == rendered
 
     def test_generator_check_mode_passes(self) -> None:
+        """生成器 `--check` 必须通过，并且**真的读到**它的输出。
+
+        🔴 2026-11-04 修：原先 `capture_output=True, text=True` 不传编码环境 ——
+        Windows 下子进程 piped stdout 默认 gbk，生成器打印的中文按 utf-8 解码必炸，
+        `subprocess.run` 不因此失败，只把 `result.stdout` 变成 `None`。于是
+        `result.stdout + result.stderr` 抛 `TypeError`（本轮实测），而更糟的情形是
+        「只断言 returncode」时它会**静默假绿**。处置三件套：传 `PYTHONIOENCODING=utf-8`、
+        `errors="replace"`、并断言 stdout 里有预期内容。
+        """
+        import os
         import subprocess
 
+        env = dict(os.environ)
+        env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run(
             [
                 sys.executable,
@@ -3538,10 +3425,16 @@ class TestProductionWiring:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
             cwd=str(_REPO),
         )
+        assert result.stdout is not None and result.stderr is not None, (
+            "子进程输出解码失败 ⇒ 只看 returncode 的判据会假绿"
+        )
         assert result.returncode == 0, result.stdout + result.stderr
-        assert "OK g7.soe_subsidiary_disclosure.json" in result.stdout
+        assert "OK g7.soe_subsidiary_disclosure.json" in result.stdout, result.stdout
 
 
 class TestPilotIntroducesNoResolverDebt:

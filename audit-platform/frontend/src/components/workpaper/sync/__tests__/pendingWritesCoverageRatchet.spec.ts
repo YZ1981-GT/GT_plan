@@ -338,8 +338,8 @@ const G_SWITCH_HOSTS: readonly string[] = [
   'components/workpaper/GtG9OtherNoncurrentFinancial.vue',
 ]
 
-/** 14 个仍按 LWW 保存、但必须 await + 接入屏障的 formData（strict CAS 迁移见 R1.3 递减清单）。 */
-const G_AWAIT_ONLY_FORM_DATA: readonly string[] = [
+/** 14 个 G formData：保持 pending 屏障，并全部迁入 strict CAS（R1.3 LWW 清单已清零）。 */
+const G_FORM_DATA: readonly string[] = [
   'components/workpaper/composables/useG10FormData.ts',
   'components/workpaper/composables/useG11FormData.ts',
   'components/workpaper/composables/useG12FormData.ts',
@@ -456,14 +456,14 @@ describe('G 共享切换器宿主的过渡静止点', () => {
     expect(invalid).toEqual([])
   })
 
-  it('14 个 await-only formData 的 flushPending 是 Promise、已接入屏障且被导出', () => {
-    expect(G_AWAIT_ONLY_FORM_DATA).toHaveLength(14)
-    const invalid = G_AWAIT_ONLY_FORM_DATA.filter((rel) => {
+  it('14 个 strict CAS formData 的 flushPending 是 Promise、已接入屏障且被导出', () => {
+    expect(G_FORM_DATA).toHaveLength(14)
+    const invalid = G_FORM_DATA.filter((rel) => {
       const text = sourceOf(rel)
       const isAsync = /async function _?flushPending\(\): Promise<void>/.test(text)
       const registered = /registerPendingFlusher\(_?flushPending\)/.test(text)
-      // 真正 await 下层写入：批量型 await _doSave，逐项型 await Promise.all(inFlight)
-      const awaits = /await _doSave\(items\)/.test(text) || /await Promise\.all\(inFlight\)/.test(text)
+      // 真实 HTTP 一律经 queue；flush 必须 await queue，不能只等已清掉的 timer 集合。
+      const awaits = /await queue\.flush\(\)/.test(text)
       const exported = /flushPending(?:,|: _flushPending,)/.test(text)
       return !isAsync || !registered || !awaits || !exported
     })
@@ -494,7 +494,7 @@ describe('G 共享切换器宿主的过渡静止点', () => {
 
   it('两种失败传递形态的清单合起来恰好是那 14 个，不重不漏', () => {
     expect([...G_FORM_DATA_EXPLICIT_THROW, ...G_FORM_DATA_NATURAL_PROPAGATION].sort())
-      .toEqual([...G_AWAIT_ONLY_FORM_DATA].sort())
+      .toEqual([...G_FORM_DATA].sort())
     const overlap = G_FORM_DATA_EXPLICIT_THROW
       .filter((rel) => G_FORM_DATA_NATURAL_PROPAGATION.includes(rel))
     expect(overlap).toEqual([])
@@ -503,24 +503,41 @@ describe('G 共享切换器宿主的过渡静止点', () => {
   it('显式重抛组：写入失败真的 throw 出来', () => {
     const invalid = G_FORM_DATA_EXPLICIT_THROW.filter((rel) => {
       const text = sourceOf(rel)
-      // 判据只认「ElMessage 之后、同一个 catch 块里 throw err」这件事本身；
-      // 不把中间的注释行写进正则——删注释会让判据变红而语义没变，那种脆会训练人去改判据。
-      const rethrowsInDoSave = /ElMessage\.error\('[^']*'\)[\s\S]{0,200}?throw err/.test(text)
-      const throwsAfterDraft = /throw new Error\(`\u4fdd\u5b58\u672a\u843d\u5e93/.test(text)
-      return !rethrowsInDoSave && !throwsAfterDraft
+      const caught = text.indexOf('catch (error: unknown)')
+      const rethrow = text.indexOf('throw error', caught)
+      return caught < 0 || rethrow < caught
     })
     expect(invalid).toEqual([])
   })
 
-  // R1.3「迁移清单只许减少」：固定长度断言看不出方向（迁一家红、退一家也红）。
-  // 这里用单向上限 + 与 strict CAS 清单互斥，保证 LWW 这边只能变短。
-  it('await-only（仍 LWW）清单只许缩短，且与 strict CAS 调用面互斥', () => {
-    expect(G_AWAIT_ONLY_FORM_DATA.length).toBeLessThanOrEqual(14)
-    expect(new Set(G_AWAIT_ONLY_FORM_DATA).size).toBe(G_AWAIT_ONLY_FORM_DATA.length)
-    const strict = G_AWAIT_ONLY_FORM_DATA.filter((rel) => (
-      /createChecklistCasClient|createChecklistWriteQueue/.test(sourceOf(rel))
-    ))
-    expect(strict).toEqual([])
+  // R1.3 收口：这 14 个此前允许暂存 LWW 的 formData 已全部迁入 strict CAS。
+  // 空列表 + 完整扫描双断言，防止有人把任一调用方退回兼容写法。
+  it('G formData 的 LWW 豁免清单已清零，14 个调用面均走 strict CAS', () => {
+    const legacyLww: readonly string[] = []
+    expect(legacyLww).toEqual([])
+    expect(G_FORM_DATA).toHaveLength(14)
+    expect(new Set(G_FORM_DATA).size).toBe(G_FORM_DATA.length)
+    const notStrict = G_FORM_DATA.filter((rel) => {
+      const text = sourceOf(rel)
+      return !text.includes('createChecklistCasClient')
+        || !text.includes('createChecklistWriteQueue')
+        || !text.includes('checklistCas.remember(responses)')
+        || !text.includes('blockOnError: isNonRetryableChecklistSaveError')
+        || /(?:api|http)\.put\(`\/api\/workpapers\/\$\{[^}]+\}\/checklist-responses/.test(text)
+    })
+    expect(notStrict).toEqual([])
+  })
+
+  it('14 个 formData 输入即按 generation 持久化草稿，成功才清除，4xx 不会覆盖更新一代', () => {
+    const invalid = G_FORM_DATA.filter((rel) => {
+      const text = sourceOf(rel)
+      const writesStaleFailureSnapshot = /catch\s*\([^)]*\)\s*\{[\s\S]{0,300}?(?:drafts\.store|storeDrafts)\(items\)/.test(text)
+      return !/onPending:\s*(?:drafts\.store|storeDrafts)/.test(text)
+        || !/onSettled:\s*(?:drafts\.clear|clearDrafts)/.test(text)
+        || !text.includes('queue.mark(itemId)')
+        || writesStaleFailureSnapshot
+    })
+    expect(invalid).toEqual([])
   })
 
   it('自然冒泡组：saveImmediate 体内没有 try，PUT rejection 无处被吞', () => {
@@ -537,39 +554,35 @@ describe('G 共享切换器宿主的过渡静止点', () => {
       }
       if (end < 0) return true
       const body = text.slice(start, end)
-      return !/await api\.put\(/.test(body) || /\btry\s*\{/.test(body) || /\bcatch\b/.test(body)
+      return !/await _doSave\(\[updated\]\)/.test(body) || /\btry\s*\{/.test(body) || /\bcatch\b/.test(body)
     })
     expect(invalid).toEqual([])
   })
 
-  // 🔴 必须全文件扫，不能只看 flushPending 之后的若干字符：debouncedSave 与 restoreDrafts
-  //    里的 `void saveImmediate(...)` 正是「计时器已触发、PUT 已在途」的来源，它们在
-  //    flushPending 之前或很远处，窗口式扫描看不到（design §2.3「在途型」）。
-  it('14 个 formData 全文件无裸 fire-and-forget 保存：在途 PUT 一律交给屏障', () => {
-    const invalid = G_AWAIT_ONLY_FORM_DATA.flatMap((rel) => {
+  it('14 个 formData 的实际 PUT 只由 queue 追踪，裸调用不会绕开 pending 屏障', () => {
+    const invalid = G_FORM_DATA.flatMap((rel) => {
       const text = sourceOf(rel)
-      const bare = [...text.matchAll(/void\s+(?:_doSave|saveImmediate)\(/g)]
-      const tracked = [...text.matchAll(/void trackPendingWrite\((?:_doSave|saveImmediate)\(/g)]
       const failures: string[] = []
-      if (bare.length > 0) failures.push(`${rel}:bare=${bare.length}`)
-      if (tracked.length === 0) failures.push(`${rel}:untracked`)
-      if (!/import \{ registerPendingFlusher, trackPendingWrite \} from/.test(text)) {
-        failures.push(`${rel}:import`)
-      }
+      if (!text.includes('createChecklistWriteQueue')) failures.push(`${rel}:queue`)
+      if (!text.includes('blockOnError: isNonRetryableChecklistSaveError')) failures.push(`${rel}:block-on-4xx`)
+      if (!text.includes('await queue.flush()')) failures.push(`${rel}:flush`)
+      // createChecklistWriteQueue 内部唯一调用 trackPendingWrite；formData 再包一层会在失败后
+      // 提前从外层 in-flight 移除，重新制造「已结算冲突可越过 bridge」的时序漏洞。
+      if (/\btrackPendingWrite\(/.test(text)) failures.push(`${rel}:duplicate-tracking`)
       return failures
     })
     expect(invalid).toEqual([])
   })
 
-  it('在途调用点总数与现算一致（19 处），少了就是有人改回 fire-and-forget', () => {
-    const total = G_AWAIT_ONLY_FORM_DATA.reduce((sum, rel) => (
-      sum + [...sourceOf(rel).matchAll(/void trackPendingWrite\((?:_doSave|saveImmediate)\(/g)].length
+  it('G formData 不再声明旧的 19 处直接 in-flight 追踪，统一由 queue 维护', () => {
+    const directTracking = G_FORM_DATA.reduce((sum, rel) => (
+      sum + [...sourceOf(rel).matchAll(/\btrackPendingWrite\(/g)].length
     ), 0)
-    expect(total).toBe(19)
+    expect(directTracking).toBe(0)
   })
 
   it('卸载路径不得静默吞失败：要么有草稿兜底/ElMessage，要么留下日志', () => {
-    const invalid = G_AWAIT_ONLY_FORM_DATA.filter((rel) => {
+    const invalid = G_FORM_DATA.filter((rel) => {
       const text = sourceOf(rel)
       const dispose = text.indexOf('onScopeDispose(')
       if (dispose < 0) return true
