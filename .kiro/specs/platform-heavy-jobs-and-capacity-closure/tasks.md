@@ -103,6 +103,11 @@
     `platformJobs.ts` 统一六态、SSE 唤醒 + 1.5s 状态轮询、断线恢复；`PlatformJobProgress.vue`
     复用 `AsyncJobProgress`，提供进度、取消、重试、终态事件。
   - 已接入公式推送面板和合并总览重新汇总；任务状态 API/组件测试 20 passed。
+  - 勘误（2026-11-06 推送前合并核查）：`app/routers/platform_jobs.py` 随 a813aede4 入库，但没在
+    `router_registry` 注册 ⇒ 三个端点在应用里恒 404，本条此前的 `[x]` 是假绿；既有守卫
+    `test_router_modules_mounted.py` 自那次提交起一直红，而当时的回归选集没带它（只测了自建 app 的
+    router 单测）。已在 `router_registry/system.py` 注册；`app.main` 实际挂上 3 条路由，
+    挂载守卫 + 路由遮蔽守卫 + router 单测 28 passed。
 - [x] B6 kill/reload/重复提交/租约过期故障注入证明零重复副作用。
   - `test_platform_job_fault_injection.py`(5)：kill 后恢复（lease 过期 → 新 worker 接管 + 旧 claim fence 拒写 +
     attempt 记录 lost_lease/succeeded）、重复提交幂等（3 次同键只建 1 个 job）、attempt 耗尽终态（max_attempts=1

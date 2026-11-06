@@ -235,6 +235,12 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.user_display_preferences import router as display_prefs_router
     app.include_router(display_prefs_router, tags=["display-preferences"])
 
+    # ═══ §234. platform-heavy-jobs-and-capacity-closure B5：通用耐久任务状态 / 取消 / 重试 ═══
+    # 前端 platformJobs.ts 断线、刷新后从这里恢复。router 自带完整前缀；此前文件已入库却漏了
+    # 这一行，三个端点在应用里恒 404（test_router_modules_mounted 因此红）。
+    from app.routers.platform_jobs import router as platform_jobs_router
+    app.include_router(platform_jobs_router, tags=["platform-jobs"])
+
     # ═══ §53b. 项目级账龄配置（AgingConfigService 增强版） ═══
     from app.routers.aging_config import router as aging_config_router
     app.include_router(aging_config_router, tags=["aging-config"])
