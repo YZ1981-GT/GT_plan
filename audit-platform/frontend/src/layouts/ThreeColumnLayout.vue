@@ -28,16 +28,58 @@
         <slot name="nav-notifications" />
 
         <!-- 显示设置 Aa -->
-        <el-popover placement="bottom" :width="360" trigger="click" :teleported="true">
+        <el-popover placement="bottom" :width="300" trigger="click" :teleported="true">
           <template #reference>
             <div class="gt-topbar-btn" title="显示设置">
               <span class="gt-topbar-text-icon">Aa</span>
             </div>
           </template>
-          <!-- 与 /display-settings、管理员系统设置同一个面板（spec platform-global-display-settings-closure AC-07） -->
-          <DisplayPreferencesPanel compact />
-          <div class="gt-dp-more">
-            <el-button link type="primary" size="small" data-testid="dp-open-settings" @click="router.push('/display-settings')">更多显示设置</el-button>
+          <div class="gt-display-prefs-panel">
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">金额单位</span>
+              <el-radio-group v-model="displayPrefs.amountUnit" size="small" @change="(v: any) => displayPrefs.setUnit(v)">
+                <el-radio-button v-for="opt in displayPrefs.unitOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">表格字号</span>
+              <el-radio-group v-model="displayPrefs.fontSize" size="small" @change="(v: any) => displayPrefs.setFontSize(v)">
+                <el-radio-button v-for="opt in displayPrefs.fontOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">小数位数</span>
+              <el-radio-group v-model="displayPrefs.decimals" size="small" @change="(v: any) => displayPrefs.setDecimals(v)">
+                <el-radio-button :value="0">整数</el-radio-button>
+                <el-radio-button :value="2">2位</el-radio-button>
+                <el-radio-button :value="4">4位</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">零值显示</span>
+              <el-switch v-model="displayPrefs.showZero" size="small" active-text="0.00" inactive-text="—" @change="(v: any) => displayPrefs.setShowZero(v)" />
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">负数红色</span>
+              <el-switch v-model="displayPrefs.negativeRed" size="small" @change="(v: any) => displayPrefs.setNegativeRed(v)" />
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">变动高亮</span>
+              <el-radio-group v-model="displayPrefs.highlightThreshold" size="small" @change="(v: any) => displayPrefs.setHighlightThreshold(v)">
+                <el-radio-button :value="0">关</el-radio-button>
+                <el-radio-button :value="0.1">10%</el-radio-button>
+                <el-radio-button :value="0.2">20%</el-radio-button>
+                <el-radio-button :value="0.5">50%</el-radio-button>
+              </el-radio-group>
+            </div>
+            <!-- 表格编辑方式（spec excel-style-table-editing R1） -->
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">表格编辑</span>
+              <el-radio-group :model-value="displayPrefs.gridEditMode" size="small" data-testid="grid-edit-mode" @change="(v: any) => displayPrefs.setGridEditMode(v)">
+                <el-radio-button v-for="opt in displayPrefs.gridEditModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-hint">{{ gridEditModeHint }}</div>
           </div>
         </el-popover>
 
@@ -356,7 +398,6 @@ import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch, pro
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import DisplayPreferencesPanel from '@/components/settings/DisplayPreferencesPanel.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { parseAuditYear } from '@/utils/resolveAuditYear'
@@ -401,6 +442,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
+const gridEditModeHint = computed(() => displayPrefs.gridEditModeOptions.find((o) => o.value === displayPrefs.gridEditMode)?.hint ?? '')
 const { isDark, toggle: toggleTheme } = useTheme()
 
 /** formula-toolbar Task 5 — primary outlet owner epoch (bumped on workpaper route change). */
@@ -1596,10 +1638,32 @@ onUnmounted(() => {
   transform: translateX(-4px);
 }
 
-/* ── 显示设置面板（面板本体样式在 DisplayPreferencesPanel.vue） ── */
-.gt-dp-more {
-  margin-top: 8px;
-  text-align: right;
+/* ── 显示设置面板 ── */
+.gt-display-prefs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gt-dp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-dp-hint {
+  margin-top: -6px;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.5;
+  color: var(--gt-color-text-tertiary);
+}
+.gt-dp-label {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+  min-width: 56px;
+  flex-shrink: 0;
+}
+.gt-dp-row :deep(.el-radio-button__inner) {
+  padding: 4px 10px;
+  font-size: var(--gt-font-size-xs);
 }
 
 /* 进度面板高亮闪烁 */

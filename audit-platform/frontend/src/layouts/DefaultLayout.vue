@@ -137,17 +137,11 @@ import { getGlobalReviewInbox } from '@/services/pmApi'
 import { eventBus } from '@/utils/eventBus'
 import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import { useDisplayPreferencesRuntime } from '@/composables/useDisplayPreferencesRuntime'
-import { useGlobalTableLayout } from '@/composables/useGlobalTableLayout'
 import { routeViewKey } from '@/utils/routeViewKey'
 
 const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
-// 账号显示偏好：按当前登录账号从服务端加载并保存（本机缓存只作降级），字号 / 密度写到根变量；
-// 字号或密度变化后重排全部已挂载的 el-table
-useDisplayPreferencesRuntime()
-useGlobalTableLayout()
 
 // UI-1: 方向性页面过渡动画（前进 slide-left，后退 slide-right）
 const transitionName = ref('slide-left')
@@ -321,7 +315,7 @@ const FULLWIDTH_PATHS = [
   '/my-procedures',
 ]
 // '/workpapers/'：底稿短链（定位后替换到编辑器）不是项目子路径，不加则落进浏览模式、路由内容不渲染（acnr T16）
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/display-settings', '/dashboard/', '/eqcr/', '/workpapers/']
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/', '/workpapers/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true

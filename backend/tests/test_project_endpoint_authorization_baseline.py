@@ -648,10 +648,7 @@ _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 #: spec project-pid-path-authz-coverage：项目段认 ``{pid}`` 后，HEAD 9791805c8 现算 235（截止测试 4 + 抽凭历史 / 对比 2
 #: 进视野，原先这 6 个只校验登录）；本 spec 把这 6 个改成项目级、R1.4 降 2 ⇒ 227。主工作树另含并发会话未入库的
 #: continuous_audit 1 + 调整分录锁 / 重分类 / 关联底稿 7 个改动，现算 219（随那些改动入库再下调）。
-#: 2026-11-06 远端头 ad8c32492 现算 195：自 cd0a8fe1f 起 32 个端点改挂项目级（调整分录锁 / 重分类 / 关联底稿、
-#: continuous_audit、未更正错报 10 个、excel_html 4 个、角色 AI 4 个、工时 2 个、底稿批量状态等），逐条对账均落到
-#: project 档、没有一条是从扫描视野里消失（同一扫描器对两个提交的路由 blob 各扫一遍逐条比对）⇒ 锁住成果。
-_PREFIXED_IDENTITY_ONLY_BASELINE = 195
+_PREFIXED_IDENTITY_ONLY_BASELINE = 227
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:

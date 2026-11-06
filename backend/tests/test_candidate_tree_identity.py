@@ -40,7 +40,7 @@ def _run_tool(
     result = subprocess.run(
         [_PYTHON, str(_SCRIPT), *args],
         capture_output=True,
-        text=True, encoding="utf-8", errors="replace",
+        text=True,
         check=False,
         cwd=str(_REPO_ROOT),
         timeout=300,  # 单次 worktree 操作最多 5 分钟
@@ -60,7 +60,7 @@ def _git(args: list[str], *, cwd: Path | None = None) -> str:
     """简单 git 调用并返回 stdout。"""
     return subprocess.run(
         ["git", *args],
-        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+        capture_output=True, text=True, check=True,
         cwd=str(cwd or _REPO_ROOT),
     ).stdout
 

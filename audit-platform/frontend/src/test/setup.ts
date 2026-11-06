@@ -73,27 +73,19 @@ afterAll(() => {
 // 重置之后再取模块实例，保证与本测试文件随后 import 到的是同一份
 // （静态 import 会先于上面的重置求值，拿到的是上一个文件留下的旧实例）。
 const { createPinia, setActivePinia } = await import('pinia')
+const { useDisplayPrefsStore } = await import('@/stores/displayPrefs')
 
 /**
  * 用例边界：
  * - 激活 Pinia（对话框/审定表依赖 useDisplayPrefsStore）
  * - 金额单位默认「元」、showZero=true，避免默认「万元」/零值隐藏导致断言漂移
- *
- * 🔴 应用 store 只能在 beforeEach 里按需 import，不能在本文件顶层 import：
- * 顶层 import 发生在测试文件自己的 `vi.mock` 生效之前，会把被 import 的那条依赖链
- * （displayPrefs → project → services/auditPlatformApi）以真实实现塞进模块注册表，
- * 之后测试文件里 mock 同一个模块就不再生效（spy 零调用、组件真发请求）。
  */
-beforeEach(async () => {
+beforeEach(() => {
   try {
-    // 旧未分区键 + 按账号分区的缓存都清掉：留着会让下一个用例读到上一个用例的偏好
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('gt_display_prefs')) localStorage.removeItem(key)
-    }
+    localStorage.removeItem('gt_display_prefs')
   } catch { /* ignore */ }
   setActivePinia(createPinia())
   try {
-    const { useDisplayPrefsStore } = await import('@/stores/displayPrefs')
     const prefs = useDisplayPrefsStore()
     prefs.setUnit('yuan')
     prefs.setShowZero(true)

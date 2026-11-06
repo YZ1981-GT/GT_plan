@@ -2,7 +2,7 @@
   "total_eligible": 5709,
   "total_parsed": 5709,
   "total_skipped": 0,
-  "total_candidates": 1505,
+  "total_candidates": 1442,
   "total_core_violations": 64,
   "scopes": {
     "components": {

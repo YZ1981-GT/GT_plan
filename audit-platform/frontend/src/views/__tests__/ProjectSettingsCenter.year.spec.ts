@@ -29,7 +29,6 @@ const STUBS = {
   GtPageShell: { template: '<div class="shell"><slot name="context" /><slot /></div>' },
   ProjectContextBar: true,
   AgingConfigDialog: true,
-  ProjectAuditPhaseSection: true,
 }
 
 function deferred<T>() {

@@ -19,6 +19,7 @@ from app.schemas.display_preferences import (
     PLATFORM_DEFAULTS,
     DisplayPreferencesPatch,
     DisplayPreferencesResponse,
+    _UNSET,
 )
 
 logger = logging.getLogger(__name__)
@@ -164,19 +165,12 @@ async def _update_existing(
             existing.fixed_columns = {}
         else:
             old_fc = existing.fixed_columns or {}
-            replacement = {}
-            iso_now = now.isoformat()
-            for pk, pv in new_fc.items():
-                entry = dict(pv) if isinstance(pv, dict) else {}
-                columns = entry.get('columns', [])
-                old_entry = old_fc.get(pk)
-                old_cols = old_entry.get('columns') if isinstance(old_entry, dict) else None
-                old_saved = old_entry.get('saved_at') if isinstance(old_entry, dict) else None
-                replacement[pk] = {
-                    'columns': columns,
-                    'saved_at': old_saved if old_cols == columns and isinstance(old_saved, str) else iso_now,
-                }
-            existing.fixed_columns = replacement
+            merged = dict(old_fc)
+            stamped = _stamp_fixed_columns(new_fc, now)
+            # 只更新本次提交的 pageKey，保留其他
+            for pk, pv in stamped.items():
+                merged[pk] = pv
+            existing.fixed_columns = merged
 
     existing.revision += 1
     existing.updated_at = now

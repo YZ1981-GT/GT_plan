@@ -295,7 +295,7 @@ const showRestorePreset = computed(
 )
 
 const monoInputStyle = {
-  fontSize: '12px',
+  fontSize: 'var(--gt-display-font-size)',
   fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace',
   lineHeight: '1.5',
 }

@@ -292,10 +292,10 @@ function rowTotal(row: any): number {
   return row.values.reduce((s: number, v: any) => s + n(v), 0)
 }
 
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
-const cellStyle = { padding: '2px 4px', fontSize: '11px' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '3px 0' }
+const cellStyle = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
 function compareCellStyle({ row }: any) {
-  const base: any = { padding: '4px 8px', fontSize: '12px' }
+  const base: any = { padding: '4px 8px', fontSize: 'var(--gt-display-font-size)' }
   if (row.key === 'diff') { base.fontWeight = '700' }
   if (row.key === 'end_invest' || row.key === 'net_asset_share') { base.background = '#f8f6fb' }
   return base

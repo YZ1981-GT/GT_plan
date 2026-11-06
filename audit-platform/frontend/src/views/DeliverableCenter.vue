@@ -704,7 +704,7 @@ async function onNotesSelectionConfirm({ selectedSections }: { selectedSections:
       if (issues.length > 0) {
         const msg = `<p style="margin-bottom:8px;font-weight:600;">📋 附注质量检查发现以下问题：</p>` +
           issues.map(i => `<p style="color:#e74c3c;margin:2px 0;">• ${i}</p>`).join('') +
-          `<p style="margin-top:10px;color:#666;font-size:12px;">仍可继续生成，但导出文档可能存在缺失或未通过校验的内容。</p>`
+          `<p style="margin-top:10px;color:#666;font-size:var(--gt-display-font-size);">仍可继续生成，但导出文档可能存在缺失或未通过校验的内容。</p>`
         await ElMessageBox.confirm(msg, '附注质量检查', {
           confirmButtonText: '仍然生成',
           cancelButtonText: '返回检查',

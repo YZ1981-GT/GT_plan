@@ -2974,7 +2974,7 @@ function onTbSumCtxFormula() {
   const detail = `【${row.row_code} ${row.row_name}】\n\n公式：${formula}\n\n未审数：${fmt(row.unadjusted)}\n审定数：${fmt(row.audited)}`
   ElMessageBox.alert(detail, '公式详情', {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)' },
   })
 }
 
@@ -2997,14 +2997,14 @@ function onTbSumCtxDetail() {
     detail += `\n━━━━━━━━━━━━━━━━\n合计 = ${fmt(row.unadjusted)}`
     ElMessageBox.alert(detail, '汇总明细', {
       confirmButtonText: '确定',
-      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)', maxHeight: '70vh', overflow: 'auto' },
     })
   } else {
     // 普通行：展示取数来源
     const detail = `【${row.row_code} ${row.row_name}】\n\n取数来源：通过映射规则从科目明细汇总\n未审数 = Σ 映射到该行次的所有科目余额\n\n当前值：${fmt(row.unadjusted)}`
     ElMessageBox.alert(detail, '取数明细', {
       confirmButtonText: '确定',
-      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px' },
+      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)' },
     })
   }
 }
@@ -3030,7 +3030,7 @@ function onTbSumShowFormula(row: any) {
   const detail = `【${row.row_code} ${row.row_name}】\n\n公式：${formula}\n\n未审数：${fmt(row.unadjusted)}\n审定数：${fmt(row.audited)}`
   ElMessageBox.alert(detail, '公式详情', {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: 'var(--gt-display-font-size)' },
   })
 }
 
@@ -3348,7 +3348,7 @@ function _showNetProfitDetail() {
 
   ElMessageBox.alert(detail, '净利润计算明细', {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)', maxHeight: '70vh', overflow: 'auto' },
   })
 }
 
@@ -3388,7 +3388,7 @@ function _showSubtotalDetail(row: any) {
 
   ElMessageBox.alert(detail, `${catLabel}类汇总明细`, {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)', maxHeight: '70vh', overflow: 'auto' },
   })
 }
 
@@ -3505,7 +3505,7 @@ function onTbCtxFormula() {
 
   ElMessageBox.alert(formulaDesc, `公式详情`, {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '13px' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)' },
   })
 }
 

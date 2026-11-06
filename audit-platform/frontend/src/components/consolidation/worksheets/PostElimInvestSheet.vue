@@ -276,8 +276,8 @@ async function exportData() {
 }
 function _calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
-function rowCellStyle() { return { padding: '4px 8px', fontSize: '12px' } }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '3px 0' }
+function rowCellStyle() { return { padding: '4px 8px', fontSize: 'var(--gt-display-font-size)' } }
 function rowClassName({ row }: any) { return n(row.postElimTotal) !== 0 ? 'ws-row-warn' : '' }
 
 function getSummary({ columns, data }: any) {

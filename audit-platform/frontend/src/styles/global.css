@@ -38,9 +38,7 @@
   --el-color-danger: var(--gt-color-coral);
   --el-color-info: var(--gt-color-teal);
   --el-border-radius-base: var(--gt-radius-sm);
-  /* 账号显示字号（spec platform-global-display-settings-closure R5）：根变量由 useDisplayPreferencesRuntime 写入，
-     首帧尚未写入时按默认 sm=12px。标题等语义层级仍用 --gt-font-size-* 固定 token。 */
-  --el-font-size-base: var(--gt-display-font-size, 12px);
+  --el-font-size-base: var(--gt-font-size-base);
   --el-font-family: var(--gt-font-family);
   --el-border-color: var(--gt-color-border);
   --el-border-color-light: var(--gt-color-border-light);

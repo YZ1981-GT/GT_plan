@@ -407,7 +407,7 @@ export function renderG9OcrPreview(
   const confPct = (confidence * 100).toFixed(0)
   const confColor = confidence >= G9_OCR_CONFIDENCE_THRESHOLD ? '#67c23a' : '#e6a23c'
   return `
-    <div style="font-size:13px">
+    <div style="font-size:var(--gt-display-font-size)>
       <div style="margin-bottom:8px;color:${confColor}">
         整体置信度：${confPct}%${confidence < G9_OCR_CONFIDENCE_THRESHOLD ? '（建议人工核对）' : ''}
       </div>

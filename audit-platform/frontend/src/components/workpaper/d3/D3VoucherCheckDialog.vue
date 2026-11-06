@@ -230,7 +230,7 @@ async function onOcrUpload(file: File): Promise<boolean> {
       .map(([k, v]) => `${k}: ${v}${lowConfidence.includes(k as keyof VoucherCheckRow) ? ' ⚠需复核' : ''}`)
       .join('<br/>')
     await ElMessageBox.confirm(
-      `<div style="font-size:13px">整体置信度：${(confidence * 100).toFixed(0)}%<br/>${preview}</div>`,
+      `<div style="font-size:var(--gt-display-font-size)>整体置信度：${(confidence * 100).toFixed(0)}%<br/>${preview}</div>`,
       'OCR 识别结果',
       { confirmButtonText: '填入', cancelButtonText: '取消', dangerouslyUseHTMLString: true,
         type: confidence < CONFIDENCE_THRESHOLD ? 'warning' : 'info' },

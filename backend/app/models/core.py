@@ -240,12 +240,6 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
             "status",
             postgresql_where=text("is_deleted = false"),
         ),
-        # V250（platform-global-display-settings-closure 任务 1A）：与迁移同名，
-        # 防止 ORM metadata 漂移后 create_all 漏掉项目金额单位的三值约束。
-        CheckConstraint(
-            "amount_unit IN ('yuan', 'qian', 'wan')",
-            name="ck_projects_amount_unit",
-        ),
         # V219（trim-generation-plan-followup-optimizations R4）：分类只放质控业务分类码、场景只放登记值。
         # 登记值与 app.services.project_classification / V219 迁移逐值同步（tests/test_project_classification.py）。
         CheckConstraint(

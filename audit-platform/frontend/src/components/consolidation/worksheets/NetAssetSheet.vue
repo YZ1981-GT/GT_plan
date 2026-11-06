@@ -233,10 +233,10 @@ function calcRowTotal(row: NetAssetRow): number {
 
 function _calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
-const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '2px 0' }
 
 function rowCellStyle({ row }: any) {
-  const base: any = { padding: '2px 4px', fontSize: '12px' }
+  const base: any = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
   if (row.isHeader) { base.background = '#f8f6fb'; base.fontWeight = '600' }
   if (row.bold) { base.fontWeight = '600' }
   return base

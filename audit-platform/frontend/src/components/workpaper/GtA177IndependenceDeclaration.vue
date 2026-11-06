@@ -385,7 +385,7 @@ async function handleMemberSign(index: number) {
         <p><strong>操作</strong>：签署独立性声明确认</p>
         <p><strong>签署人</strong>：${userName}</p>
         <p><strong>声明内容</strong>：本人已阅读并确认遵守上述独立性承诺事项</p>
-        <p style="color:#E6A23C;font-size:12px">⚠️ 此操作不可撤销</p>
+        <p style="color:#E6A23C;font-size:var(--gt-display-font-size)>⚠️ 此操作不可撤销</p>
       </div>`,
       '独立性声明签字确认',
       { confirmButtonText: '确认签字', cancelButtonText: '取消', type: 'warning', dangerouslyUseHTMLString: true },
@@ -409,7 +409,7 @@ async function handlePartnerSignConfirm(key: string) {
         <p><strong>操作</strong>：审查确认签字</p>
         <p><strong>角色</strong>：${role}</p>
         <p><strong>签字人</strong>：${userName}</p>
-        <p style="color:#E6A23C;font-size:12px">⚠️ 此操作不可撤销</p>
+        <p style="color:#E6A23C;font-size:var(--gt-display-font-size)>⚠️ 此操作不可撤销</p>
       </div>`,
       '审查确认签字',
       { confirmButtonText: '确认签字', cancelButtonText: '取消', type: 'warning', dangerouslyUseHTMLString: true },

@@ -154,12 +154,6 @@ def _patch_runner(monkeypatch, events: list[str], readiness: MigrationReadiness)
     )
 
 
-def _migration_tasks() -> tuple[startup.StartupTaskSpec, ...]:
-    """按名字取迁移两步（注册表前部会插入新任务，按下标切片会错位）。"""
-    by_name = {spec.name: spec for spec in startup.STARTUP_TASKS}
-    return (by_name["run_migrations"], by_name["migration_mark_complete"])
-
-
 def _complete_readiness() -> MigrationReadiness:
     return MigrationReadiness(
         disk_versions=("001", "229"),
@@ -177,7 +171,9 @@ async def test_initial_worker_runs_then_read_only_verifies(monkeypatch):
     migration_state.mark_incomplete()
     ctx = startup.StartupContext()
 
-    results = await startup.run_startup_tasks(_migration_tasks(), context=ctx)
+    results = await startup.run_startup_tasks(
+        startup.STARTUP_TASKS[1:3], context=ctx
+    )
 
     assert [item.status for item in results] == ["ok", "ok"]
     assert events == ["run_pending", "close", "inspect_readiness", "close"]
@@ -201,7 +197,7 @@ async def test_reload_worker_skips_execution_but_still_verifies(monkeypatch):
     startup.reset_startup_report()
 
     with pytest.raises(RuntimeError, match=r"pending_versions=\['229'\]"):
-        await startup.run_startup_tasks(_migration_tasks())
+        await startup.run_startup_tasks(startup.STARTUP_TASKS[1:3])
 
     report = startup.get_startup_report()
     assert report is not None

@@ -4,8 +4,6 @@
       ref="editableTableRef"
       v-model="rows"
       :columns="columns"
-      fixed-page-key="consolidation:worksheet:internal-cash-flow"
-      :mandatory-fixed-columns="['payerCompany']"
       :editable="true"
       :show-selection="true"
       :lazy-edit="false"
@@ -268,8 +266,8 @@ async function onCfFileSelected(e: Event) {
 }
 
 // ── 合计行 ────────────────────────────────────────────────────────────────────
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
-const cellStyle = { padding: '2px 4px', fontSize: '11px' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '3px 0' }
+const cellStyle = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
 
 function getSummary({ columns: cols, data }: any) {
   const sums: string[] = []

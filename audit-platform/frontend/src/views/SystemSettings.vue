@@ -155,11 +155,6 @@
       <el-tab-pane v-if="isAdmin" label="日志查看" name="logs">
         <LogViewerPanel v-if="activeTab === 'logs'" />
       </el-tab-pane>
-
-      <!-- ═══ Tab 4: 当前账号的显示偏好（与 /display-settings 同一面板） ═══ -->
-      <el-tab-pane label="显示偏好" name="display-preferences">
-        <DisplayPreferencesPanel v-if="activeTab === 'display-preferences'" />
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -173,7 +168,6 @@ import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import EnumDictManager from '@/components/system/EnumDictManager.vue'
 import LogViewerPanel from '@/components/system/LogViewerPanel.vue'
-import DisplayPreferencesPanel from '@/components/settings/DisplayPreferencesPanel.vue'
 
 const authStore = useAuthStore()
 const isAdmin = computed(() => (authStore.user?.role || '') === 'admin')
