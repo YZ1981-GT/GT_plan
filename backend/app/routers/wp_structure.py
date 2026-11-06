@@ -36,7 +36,12 @@ async def get_structure(
 
     from app.services.wp_structure_bridge import get_workpaper_structure
     structure = get_workpaper_structure(
-        wp.file_path, idx.wp_code, str(project_id), 0, force_rebuild
+        wp.file_path,
+        idx.wp_code,
+        str(project_id),
+        0,
+        force_rebuild,
+        persist_generated=False,
     )
     if not structure:
         raise HTTPException(status_code=404, detail="无法生成 structure.json")
@@ -149,7 +154,12 @@ async def get_structure_html(
     wp, idx = await _get_wp_with_index(db, project_id, wp_id)
 
     from app.services.wp_structure_bridge import get_workpaper_structure
-    structure = get_workpaper_structure(wp.file_path, idx.wp_code, str(project_id))
+    structure = get_workpaper_structure(
+        wp.file_path,
+        idx.wp_code,
+        str(project_id),
+        persist_generated=False,
+    )
     if not structure:
         raise HTTPException(status_code=404, detail="无法获取 structure")
 
@@ -174,7 +184,21 @@ async def batch_generate(
     current_user: User = Depends(require_project_access("edit")),
 ):
     """批量为项目所有底稿生成 structure.json"""
+    from app.routers._wp_gate import raise_if_workpaper_frozen
     from app.services.wp_structure_bridge import batch_generate_structures
+
+    wp_ids = list(
+        (
+            await db.execute(
+                sa.select(WorkingPaper.id).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                )
+            )
+        ).scalars().all()
+    )
+    for target_wp_id in sorted(wp_ids, key=str):
+        await raise_if_workpaper_frozen(db, target_wp_id)
     result = await batch_generate_structures(db, str(project_id))
     return result
 

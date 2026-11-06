@@ -320,3 +320,117 @@ def test_display_preferences_json_constraint_is_pg_only_but_default_is_portable(
     assert "jsonb_typeof(fixed_columns) = 'object'" in pg_sql
     assert "jsonb_typeof" not in sqlite_sql
     assert "::jsonb" not in sqlite_sql
+
+
+@pytest.mark.asyncio
+async def test_adjustment_digest_tracks_amount_with_same_group_count(monkeypatch):
+    """分录组数量不变时，任一行金额变化仍必须推进 trio snapshot。"""
+    service = DeliverableReadinessService()
+    project_id = uuid4()
+    stable_id = uuid4()
+
+    async def count_groups(_db, _project_id, _year, *, review_statuses=None):
+        return 0 if review_statuses is not None else 1
+
+    monkeypatch.setattr(
+        "app.services.wp_adjustment_helpers.count_adjustment_groups",
+        count_groups,
+    )
+
+    def row(amount: str):
+        return SimpleNamespace(
+            id=stable_id,
+            company_code="001",
+            adjustment_no="AJE-001",
+            adjustment_type="audit",
+            description="调整应收账款",
+            account_code="1122",
+            account_name="应收账款",
+            debit_amount=Decimal(amount),
+            credit_amount=Decimal("0"),
+            entry_group_id=uuid4(),
+            review_status="approved",
+            reviewer_id=uuid4(),
+            rejection_reason=None,
+            passed_reason="复核通过",
+            origin="manual",
+            source_ref=None,
+        )
+
+    first_row = row("100.00")
+    second_row = row("101.00")
+    second_row.entry_group_id = first_row.entry_group_id
+    second_row.reviewer_id = first_row.reviewer_id
+
+    first = await service._check_adjustments(
+        SimpleNamespace(execute=AsyncMock(return_value=_RowsResult([first_row]))),
+        project_id,
+        2025,
+        [],
+        [],
+    )
+    second = await service._check_adjustments(
+        SimpleNamespace(execute=AsyncMock(return_value=_RowsResult([second_row]))),
+        project_id,
+        2025,
+        [],
+        [],
+    )
+
+    assert first.count == second.count == 1
+    assert first.detail["line_count"] == second.detail["line_count"] == 1
+    assert first.detail["content_digest"] != second.detail["content_digest"]
+
+
+@pytest.mark.asyncio
+async def test_report_digest_tracks_amount_with_same_row_count(monkeypatch):
+    """报表行数和 calc_version 不变时，金额变化仍必须推进 trio snapshot。"""
+    service = DeliverableReadinessService()
+    project_id = uuid4()
+    stable_id = uuid4()
+
+    async def count_summary(_db, _project_id, _year):
+        return SimpleNamespace(total=1, stale=0, calc_error=0, blank=0)
+
+    monkeypatch.setattr("app.services.report_freshness.count_summary", count_summary)
+
+    def row(amount: str):
+        return SimpleNamespace(
+            id=stable_id,
+            report_type="balance_sheet",
+            row_code="A001",
+            row_name="货币资金",
+            current_period_amount=Decimal(amount),
+            prior_period_amount=Decimal("80.00"),
+            formula_used="TB('1001')",
+            source_accounts=["1001"],
+            indent_level=0,
+            is_total_row=False,
+            is_stale=False,
+            blank_reason=None,
+            calc_version=3,
+            calc_error=None,
+        )
+
+    first = await service._check_reports(
+        SimpleNamespace(execute=AsyncMock(return_value=_RowsResult([row("100.00")]))),
+        project_id,
+        2025,
+        [],
+    )
+    second = await service._check_reports(
+        SimpleNamespace(execute=AsyncMock(return_value=_RowsResult([row("101.00")]))),
+        project_id,
+        2025,
+        [],
+    )
+
+    assert first.count == second.count == 1
+    assert first.detail["version_id"] == second.detail["version_id"] == "calc:3"
+    assert first.detail["content_digest"] != second.detail["content_digest"]
+
+
+def test_readiness_service_does_not_shadow_shared_content_digest_sources():
+    """调整与报表不得再在子类复制一份无 content_digest 的旧实现。"""
+    assert "_check_adjustments" not in DeliverableReadinessService.__dict__
+    assert "_check_reports" not in DeliverableReadinessService.__dict__

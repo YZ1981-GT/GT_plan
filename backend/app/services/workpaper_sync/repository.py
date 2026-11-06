@@ -120,7 +120,7 @@ from app.services.workpaper_sync.models import (
 )
 
 #: advisory lock 的命名空间（第一个 int4），避免与平台其他 advisory 用途撞 key。
-_ADVISORY_NAMESPACE: int = 0x5753  # 'WS' = Workpaper Sync
+WORKPAPER_SYNC_ADVISORY_NAMESPACE: int = 0x5753  # 'WS' = Workpaper Sync
 
 #: close-capture partial unique 覆盖的 open 状态（与 V151 的 WHERE 子句同集合）。
 _OPEN_CAPTURE_STATES: tuple[str, ...] = ("frozen", "pending", "accepted", "correlated")
@@ -236,18 +236,24 @@ class WorkpaperSyncRepository:
         """
         await self._session.execute(
             sa.text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
-            {"ns": _ADVISORY_NAMESPACE, "key": f"workpaper_sync:{wp_id}"},
+            {"ns": WORKPAPER_SYNC_ADVISORY_NAMESPACE, "key": f"workpaper_sync:{wp_id}"},
         )
         row = (
             await self._session.execute(
                 sa.text(
-                    "SELECT content_revision FROM working_paper WHERE id = :wp FOR UPDATE"
+                    "SELECT content_revision, to_jsonb(working_paper)->>'status' AS status "
+                    "FROM working_paper WHERE id = :wp FOR UPDATE"
                 ),
                 {"wp": str(wp_id)},
             )
         ).first()
         if row is None:
             raise ScopeIntegrityError(f"working_paper 不存在: {wp_id}")
+        # status 与 revision 在同一行锁下读取，保持 advisory→row 的既有锁顺序。V151 隔离桩只建
+        # revision 列时 to_jsonb 缺键返回 NULL（非终态放行）；终态判定复用内容写门禁的单一定义。
+        from app.services.workpaper_content_freeze import raise_if_status_text_frozen
+
+        raise_if_status_text_frozen(str(row[1] or ""))
         return int(row[0])
 
     async def try_lock_workpaper(self, wp_id: uuid.UUID) -> bool:
@@ -255,7 +261,7 @@ class WorkpaperSyncRepository:
         got = (
             await self._session.execute(
                 sa.text("SELECT pg_try_advisory_xact_lock(:ns, hashtext(:key))"),
-                {"ns": _ADVISORY_NAMESPACE, "key": f"workpaper_sync:{wp_id}"},
+                {"ns": WORKPAPER_SYNC_ADVISORY_NAMESPACE, "key": f"workpaper_sync:{wp_id}"},
             )
         ).scalar_one()
         return bool(got)
@@ -332,7 +338,7 @@ class WorkpaperSyncRepository:
         解锁在同一条上做、做完关掉（同 `migration_runner` 写法）；同一仓储内可重入。
         非 PostgreSQL（SQLite 测试库）没有 advisory lock，不加锁。
 
-        与 `lock_workpaper` 共用 :data:`_ADVISORY_NAMESPACE` 但 key 前缀不同
+        与 `lock_workpaper` 共用 :data:`WORKPAPER_SYNC_ADVISORY_NAMESPACE` 但 key 前缀不同
         （`oo_apply:` vs `workpaper_sync:`）⇒ 两把锁互不阻塞。
         """
         held = self._oo_apply_locks.get(room_id)
@@ -347,7 +353,7 @@ class WorkpaperSyncRepository:
         try:
             await conn.execute(
                 sa.text("SELECT pg_advisory_lock(:ns, hashtext(:key))"),
-                {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
+                {"ns": WORKPAPER_SYNC_ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
             )
             await conn.commit()  # 会话级锁不随事务结束；持锁期间连接不挂着未结束的事务
         except BaseException:
@@ -371,7 +377,7 @@ class WorkpaperSyncRepository:
         try:
             await conn.execute(
                 sa.text("SELECT pg_advisory_unlock(:ns, hashtext(:key))"),
-                {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
+                {"ns": WORKPAPER_SYNC_ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
             )
             await conn.commit()
         except BaseException:
@@ -3452,6 +3458,7 @@ class WorkpaperSyncRepository:
 
 
 __all__ = [
+    "WORKPAPER_SYNC_ADVISORY_NAMESPACE",
     "WorkpaperSyncRepository",
     "ForcesaveRequestOutcome",
     "CorrelationOutcome",

@@ -60,3 +60,127 @@
 ## 8. 验证
 
 验证分四层：纯函数/服务单测、FastAPI 端点测试、一次性 PG 迁移与状态机、独立端口浏览器 smoke。候选与基线按测试节点比对；已有红项不得归因给本批。所有写真库动作留到单独批准点。
+
+---
+
+## 9. 实施勘误（2026-11-05，platform-release-blocker-closure 收口）
+
+> design §1~§8 写于 spec 起草时，基线记为 `a142627c9`。实施时发现本地落后远端 13 个提交，
+> 若在旧基线重做会重复实现远端 `bb29a49f6`(v1.0.80) 起已交付、并经 v1.0.126/127 修复的内容。
+> 故**候选改基于远端最新 `65709f0b2`（tag v1.0.136）**，在仓库根锁定 detached worktree
+> `tmp_platform_release_blocker_closure/verify_wt` 实施；基线 worktree `base_wt` 同一 commit。
+
+### 9.1 已在远端交付、非本批 2/24 假红（实测确认）
+§2（DshPanel 异步 + 局部失败态 / useAiNoteCapture 常量与 DTO / 自动保存 boolean+代际 / useEditorSave
+删 `status<600`）、§3（`workpaper_review_submission_service` 单一入口 + 批量 SAVEPOINT + 旧两端点 410）、
+§4（Metabase 鉴权 / debug route 删除 / SSE 绑 project / 复核意见 actor 取登录用户 / review-config 门 /
+user-formulas v2 410）、§5 的交付中心 trio 切换与旧 full endpoint 410 —— 这些对应 tasks 3-7、10-14、
+17-19，实测均已在 `65709f0b2` 存在，本批仅复核不重做。
+
+### 9.2 本批实际新增/补齐
+- **Task 9 终态冻结（新增）**：原 §3「末级通过后写保护集中到 wp gate 写动作判据」只覆盖部分路由。
+  本批新增纯判据 service `workpaper_content_freeze`（`WorkpaperContentFrozenError` 继承 HTTPException→423、
+  `assert_workpaper_content_writable` / `load_workpaper_status` / `acquire_project_bulk_content_lock`），
+  并接入多个写入适配点（`_wp_gate.raise_if_workpaper_frozen`、`wp_sync_router._enforce_entry_edit_lock` +
+  `WpGateVisibilityProbe` 真读 `WorkingPaper.status`、`repository.lock_workpaper` 同 `FOR UPDATE` 行读
+  `to_jsonb(working_paper)->>'status'`、`excel_html` 5 处 legacy 写、attachments 5 个 OCR/删除/回滚端点经
+  `attachment_access.assert_linked_workpapers_writable`、`entry_integration.make_bulk_preflight`、
+  `formula_settings/domain_stores.WpStore`、`wp_structure.batch_generate`、OnlyOffice 回调协议例外返 200+error:1）。
+  前端终态只读：`WorkpaperEditor.vue` 的 `effectiveCanEdit` 纳入 `review_passed/archived` +
+  `useEditorToolbar.ts` 写动作 `requireEdit` + 新建 `WorkpaperFrozenBanner.vue`（因行数门从 EditorBanners 抽出）。
+  **裁定：内容写端点统一 423（`SyncWorkflowLockedError` 映射 423）；`ActionNotPermittedError` 仍 403。**
+  按此更新 3 个旧测试口径（403→423），拒绝把实现降级回 403。
+- **Task 15/16 补齐**：删 `DeliverableReadinessService` 的 `_check_adjustments`/`_check_reports` 子类 override，
+  六源统一走 `deliverable_readiness_sources.ReadinessSourceChecks.content_digest`；`_check_adjustments` 改
+  按分录组计数 + 全行摘要 + `line_count`。§5 的 `consol_note_export_adapter` 已在远端存在。
+
+### 9.3 §3 口径裁定：edit_complete vs draft 直提
+§3 写「要求 `edit_complete`」。实测远端 `workpaper_review_submission_service` 即按此：提交复核前底稿须
+`edit_complete`，退回（rejected）在同一动作归一到 `not_submitted` 后方可重提。**保留 edit_complete 前置**，
+不放开 draft 直提（draft 直提会绕过编制完成这一必要状态）。`test_workpaper_review_lifecycle_pg.py` 覆盖
+退回→编制完成→重提→L1 manager→L2 partner→L3 qc、EQCR 被拒、并发内容写与终态按锁串行。
+
+### 9.4 §6 口径裁定：Task 21「当前全部迁移」
+§6 写「V229 本身不改号，本批在一次性 PG 验证」。实测远端迁移已推进到磁盘 252 / 库登记 254，V229 早已落库，
+当前最高 V264。故 Task 21 的一次性 PG 验证口径改为**从空库跑「当前全部迁移」**（CREATE_ALL 365 表、
+磁盘迁移 252 执行 251 失败 0、pending=[]、failures=[]、checksum drift 全部已登记解释、V229+V264 均登记、
+readiness.is_complete=True、/readyz=200），而非只验 V229 单条。一次性库 `gt_release_blocker_*` 用后即 DROP，
+**未写共享库**。
+
+### 9.5 Task 24 外部停点（调查完成，执行待批准）
+审计链「10 个分叉」实测已于 2026-11-04 由 11 条 `audit.fork_ack` 全部确认（当前每条链恰一个未确认链尾、
+无阻断），**无待办**。迁移 pending=0/failures=0/漂移全部已登记解释（本批新登记 V233/V234 两条 checksum
+漂移，逐对象核验在库全部生效、仅 V234 函数注释版本号文字未生效，纯文档不补迁移）。10 条 NOT VALID 约束
+现有数据 0 违反（VALIDATE 安全）、3 个膨胀索引（invalid index=0）。VALIDATE 与 REINDEX 属共享库 DDL 写，
+整理为 `task24-change-order.md` 待用户逐项批准，本批不执行。
+
+### 9.6 Task 22 诚实状态
+- Dev 模式渲染正常：共享 dev server（127.0.0.1:3030，vite dev）登录页表单完整（用户名 / 密码 / 登录按钮齐全）。
+- 🔴 **生产构建 `build:verify` 产物浏览器白屏（既有发布阻断项，非本批引入）**：用 `preview:verified` 预览
+  候选 `.verified-dist` 登录页，`vendor-core-*.js:30:11317` 抛 `Uncaught ReferenceError: Cannot access 'Rt'
+  before initialization`，根组件未挂载即白屏。**在干净 base worktree（远端 HEAD、无本批改动）重建 `build:verify`
+  并以同样方式预览，登录页报完全相同的错**（chunk hash 不同，符号 `Rt` 与位置 `30:11317` 一致）⇒ 远端 HEAD
+  65709f0b2/b05f12995 既有的生产构建 vendor-core 分块（TDZ 循环初始化）缺陷，与本批 35 个改动文件无关
+  （均不触及 vendor-core = vue/element-plus/pinia/vue-router，`vite.config.ts` 与 base 逐字节相同）。
+  `build:verify` 的 smoke（`smoke-built-artifact.mjs`）只校验产物文件 / 动态块 / 代理可达、不在浏览器执行 JS，
+  故未捕获此运行时错误。修复须重排 `heavyFeatureChunk` 的 vendor-core 分组，而 `vite.config.ts` 注释已明确
+  「拆成 core/ui 会形成 Element Plus → Vue 的循环 chunk」⇒ 高 blast radius，属独立聚焦工作，不在本批 24 项
+  （Task 18 口径 = build:verify / preview / package scripts 与 Vite outDir **存在且可运行**，这些已满足）内冒险改。
+  **建议另立 spec 修 vendor-core 分块并给 smoke 增加无头浏览器执行步**（否则生产白屏对 smoke 不可见会复发）。
+- 因上条，生产构建的只读浏览器 smoke（登录 / 项目 / TB / 底稿 / 复核 / 报表 / 附注 / trio readiness）无法在
+  候选 verified-dist 上执行；终态冻结（本批核心）由后端真 PG `test_workpaper_review_lifecycle_pg.py` +
+  一次性库 `PARTIAL_STATUS_STUB=OK` + 守卫 `test_workpaper_terminal_freeze_guard.py`（17 passed）覆盖，前端
+  只读 / 冻结横幅由 vitest（`WorkpaperFrozenBanner.spec.ts` / `WorkpaperEditorShell.spec.ts` / `useEditorToolbar.spec.ts`
+  隔离 54 passed）覆盖。
+- 写入型（复核 / trio / HTML 保存）需用户授权写共享库【测试】项目后才做。
+- OO→HTML 往返依赖上游 `wp-sync-conflict-adjudication-and-d4-32-modeling`：其代码已在 v1.0.136，但 Task 12
+  真库 UAT 与 definition re-provision 未执行 ⇒ 仍无可通路径。本项如实标未完成 + 登记依赖。
+
+### 9.7 终态冻结读取对 V151 隔离桩的兼容（收尾修复）
+`workpaper_content_freeze.load_workpaper_status` 初版用 `sa.select(WorkingPaper.status)`，而
+`workpaper_sync` 的隔离测试桩手工 `CREATE TABLE working_paper (...)` 常刻意只建 id/project_id/revision
+（`aos8_endpoint_world`、`test_first_publication_on_demand_pg` 等），缺 status / is_deleted 列 ⇒ 运行时
+`UndefinedColumn`。已与 `repository.lock_workpaper` 统一为安全读法：PostgreSQL 走
+`to_jsonb(working_paper)->>'status'` / `->>'is_deleted'`（缺键返回 NULL，按非终态 / 未删除处理），SQLite
+仍走 ORM `select(status)` 路径（普通单测 schema 含该列、且 PG 专有 `to_jsonb` 不能进 SQLite）。新增四条回归：
+mock 缺列桩可写、SQLite 不走 to_jsonb、已删除行在冻结判据外、真 PG 一次性库建缺列桩实测可写
+（`PARTIAL_STATUS_STUB=OK`）。
+
+---
+
+## 10. 五角色复核与语义审查（2026-11-05 收口）
+
+### 10.1 语义审查（主会话执行；semantic_reviewer 子代理工具当次报错 `e.filter is not a function`，改由主会话逐关注点审）
+本批语义审查是实质产出，按关注点组织，抓到并处置如下（非语法级）：
+1. **终态冻结读取对隔离桩缺列不安全（已修）**：`load_workpaper_status` 初版 `sa.select(WorkingPaper.status)`，
+   而 `workpaper_sync` 隔离桩手工建的 `working_paper` 常缺 status/is_deleted 列 ⇒ 运行时 UndefinedColumn。
+   改为与 `repository.lock_workpaper` 同口径：PG 走 `to_jsonb(working_paper)->>…`（缺键 NULL=非终态/未删除），
+   SQLite 走 ORM。真 PG 一次性库建缺列桩实测 `PARTIAL_STATUS_STUB=OK`。
+2. **终态集合比平台既有冻结定义更窄（已修，铁律㉗）**：平台 `formula_push.engine.FROZEN_WP_STATUSES` +
+   bulk_tab / workhour_approval / wp_prerequisite_status / wp_mapping 共 5 处把 **4 个**值当冻结 / 完成态
+   （review_passed / archived / review_level1_passed / review_level2_passed），我的 `TERMINAL_CONTENT_STATUSES`
+   与 `lock_workpaper` 只用 2 个 ⇒ 被 formula_push 视为冻结的旧值底稿仍可经内容写端点改写。已把 4 值冻结定义
+   收敛为基础模块 `workpaper_content_freeze` 的**单一来源**（方向正确：formula_push 等是上层），`lock_workpaper`
+   引用之，并加跨模块一致性守卫 `test_terminal_set_matches_platform_frozen_status_definition`（断言本集合值集
+   == `FROZEN_WP_STATUSES` 键集，任一侧漂移即红）。现查共享库活跃底稿全 3820 draft、无这 4 态，故今日零行为变化、
+   只消除潜在越写。
+3. **生产构建 vendor-core TDZ（既有，非本批，已记 §9.6）**：base worktree 重建复现，honest 登记而非掩盖。
+4. 锁顺序：`load_workpaper_status(for_update)` 与 `lock_workpaper` 都按 advisory(`workpaper_sync:{wp_id}`)→row
+   FOR UPDATE；批量 `acquire_project_bulk_content_lock(workpaper_bulk:{project_id})` 在逐稿锁之前，WpStore 多目标
+   按 `sorted(wp_ids, key=str)` 固定序，无交叉死锁。
+5. 绕过面：内容写入口（dedicated 路由 / legacy excel_html 5 处 / attachments OCR 5 端点 / formula 项目写 /
+   batch_generate / sync 编辑入口 / OO 回调）全部经冻结判据，守卫 `test_all_primary_content_choke_points_*`
+   / `test_attachment_content_mutations_*` / `test_legacy_excel_html_*` 逐处 AST 断言。
+6. 状态码分型：终态 423（`SyncWorkflowLockedError`）、权限不足 403（`ActionNotPermittedError`）、不可见 404
+   三者清晰分型；OO 回调按协议例外返 200+error:1。
+
+### 10.2 五角色复核
+- **业务合伙人**：复核通过 / 归档后内容冻结符合审计底稿完整性；423 文案「请先按流程创建新修订」给出正确出路。
+- **现场经理**：仅终态触发，draft/edit_complete/under_review/revision_required 仍可写；退回（revision_required）
+  重开编辑，不阻断在途工作。
+- **质控（QC）**：所有内容写入口 fail-closed；advisory+row 锁串行化「冻结判定」与「状态流转」，无竞态；
+  跨模块一致性守卫防冻结集合漂移。
+- **审计助理 / 现场**：由真 PG 生命周期（退回→编制完成→重提→L1/L2/L3 + EQCR 拒）+ 一次性库 + 守卫覆盖，
+  证据可复现；迁移漂移 V233/V234 逐对象核验在库全生效。
+- **EQCR 技术复核**：to_jsonb 安全读 / 方言分支 / 单一来源终态集合 / 无 import 环（freeze 为基础层）；
+  既有 vendor-core TDZ 诚实暴露并建议另立 spec，不在本批高 blast radius 冒险改。

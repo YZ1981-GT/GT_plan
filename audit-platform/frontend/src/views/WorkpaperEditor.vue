@@ -16,13 +16,11 @@
     @jump-to-prereq="onJumpToPrereq"
     @update:show-stale-impact-panel="showStaleImpactPanel = $event"
   />
-
   <!-- useStaleRefresh：上游变更事件横幅 -->
   <div v-if="wpStaleRefresh.isStale.value" class="gt-stale-banner" style="margin: 4px 12px 8px">
     <span class="gt-stale-text">上游数据已变更，底稿取数可能过时</span>
-    <el-button size="small" type="primary" @click="wpStaleRefresh.refresh()">刷新数据</el-button>
+    <el-button size="small" type="primary" :disabled="!effectiveCanEdit" @click="wpStaleRefresh.refresh()">刷新数据</el-button>
   </div>
-
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
@@ -77,7 +75,7 @@
         v-if="useHtmlRenderer && projectYear != null"
         :wp-id="wpId"
         :audit-year="projectYear"
-        :readonly="editLock.forcedReadonly.value || isArchived || !canEdit"
+        :readonly="!effectiveCanEdit"
         :initial-sheet="initialSheetFromQuery"
         :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
         @save-success="onChildSaved"
@@ -128,7 +126,7 @@
           button-type=""
           label="导出"
         />
-        <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
+        <el-button size="small" :disabled="!effectiveCanEdit" @click="showWpImportEnhanced = true">导入</el-button>
         <!-- 关键操作组：保存 / 一键填充 / 提交复核 — V3 Req 12.1.1 配置驱动 -->
         <el-button-group class="gt-wp-toolbar-primary">
           <el-tooltip
@@ -158,13 +156,13 @@
               <template v-for="item in toolbarDropdownItems" :key="item.key">
                 <el-dropdown-item
                   v-if="item.permission"
-                  :divided="item.divided"
+                  :divided="item.divided" :disabled="item.disabled"
                   v-permission="item.permission"
                   @click="handleToolbarAction(item.action)"
                 >{{ item.label }}</el-dropdown-item>
                 <el-dropdown-item
                   v-else
-                  :divided="item.divided"
+                  :divided="item.divided" :disabled="item.disabled"
                   @click="handleToolbarAction(item.action)"
                 >{{ item.label }}</el-dropdown-item>
               </template>
@@ -692,9 +690,8 @@ const editLock = useEditingLock({
   enabled: canEdit, // 只读身份不取锁（取锁被拒会留拒绝记录、还可能把要编辑的人挤成只读，R2）
 })
 
-// 多窗口门禁（spec: multi-window-ledger-workbench Phase 3 Task 18）：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
-const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
-
+// 多窗口门禁 + 底稿终态：复核通过/归档后所有内容编辑入口统一只读。
+const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value && !isArchived.value && !['review_passed', 'archived'].includes(String(wpDetail.value?.status || '')))
 // ─── 前置状态横幅 ────────────────────────────────────────────────────────────
 // 按当前底稿编码请求：详情加载 / 换底稿后重取，没有前置环节的循环不请求（原先 setup 时取值 ⇒ 恒按 E1，R9）
 const prerequisiteStatus = usePrerequisiteStatus(() => projectId.value, () => prerequisiteWpCode(wpDetail.value?.wp_code))

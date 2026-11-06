@@ -57,6 +57,7 @@ __all__ = [
     "gate_wp",
     "try_gate_wp",
     "enforce_attachment_wp_visibility",
+    "linked_attachment_wp_ids",
     "gate_attachment_associate",
     "make_bulk_preflight",
     "make_bulk_visible_filter",
@@ -180,7 +181,7 @@ async def try_gate_wp(
 # ---------------------------------------------------------------------------
 # 附件 wp-link 可见性隔离（additive；不替换既有项目级授权）
 # ---------------------------------------------------------------------------
-async def _linked_wp_ids(db: AsyncSession, attachment_id: UUID) -> list[UUID]:
+async def linked_attachment_wp_ids(db: AsyncSession, attachment_id: UUID) -> list[UUID]:
     """附件关联的底稿 wp_id 列表（未软删的关联；Design attachment→links→wp）。
 
     整稿关联 ∪ 行级证据链接（spec attachment-evidence-intake 需求 3.7）：只挂在某一行上的证据同样按其所在底稿隔离，
@@ -228,7 +229,7 @@ async def enforce_attachment_wp_visibility(
     调用方须在本函数之前完成既有项目级授权（如 ``_ensure_project_access``），本层只 **收紧**
     到「关联底稿可见」，不替换项目级检查。
     """
-    linked = await _linked_wp_ids(db, attachment_id)
+    linked = await linked_attachment_wp_ids(db, attachment_id)
     if not linked:
         return None  # 项目级证据：既有项目级授权已足够
 
@@ -455,6 +456,8 @@ def make_bulk_preflight(
     整请求失败（原子）。不 fail-soft 跳过，不泄露存在性（统一 404）。wp_id 缺失/非法 → 拒绝。
     """
 
+    locked_projects: set[UUID] = set()
+
     async def _preflight(wp_id: str | UUID | None, sheet_code: str | None) -> None:
         wid = _coerce_uuid(wp_id)
         resp = responder if responder is not None else DenialResponder()
@@ -467,7 +470,7 @@ def make_bulk_preflight(
                 action=action,
                 actor_user_id=getattr(current_user, "id", None),
             )
-        await gate_wp(
+        ctx = await gate_wp(
             db,
             current_user,
             entrypoint=entrypoint,
@@ -479,6 +482,24 @@ def make_bulk_preflight(
             entry_family=entry_family,
             responder=resp,
         )
+        from app.services.workpaper_content_freeze import (
+            WorkpaperContentFrozenError,
+            acquire_project_bulk_content_lock,
+            assert_workpaper_content_writable,
+        )
+
+        project_id = UUID(str(ctx.project_id))
+        if project_id not in locked_projects:
+            await acquire_project_bulk_content_lock(db, project_id)
+            locked_projects.add(project_id)
+        try:
+            await assert_workpaper_content_writable(db, wid, for_update=True)
+        except WorkpaperContentFrozenError as exc:
+            if entry_kind != "http":
+                raise
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=423, detail=exc.detail) from exc
 
     return _preflight
 

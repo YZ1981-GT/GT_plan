@@ -25,7 +25,10 @@ from app.deps import assert_project_permission, authorize_wp_edit, get_current_u
 from app.models.core import User
 from app.routers._wp_gate import enforce_edit_lock_for_content_write
 from app.services import attachment_destructive_guard as destructive_guard
-from app.services.attachment_access import load_attachment
+from app.services.attachment_access import (
+    assert_linked_workpapers_writable,
+    load_attachment,
+)
 from app.services.attachment_ocr_text import OcrTextConflict, assert_base_matches, confirm_ocr_text, full_text_payload
 from app.services.attachment_service import AttachmentService
 from app.services.attachment_upload_policy import UploadRejected
@@ -387,6 +390,7 @@ async def confirm_ocr(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="POST", entrypoint="attachment.read",
     )
+    await assert_linked_workpapers_writable(db, attachment_id)
     try:
         result = confirm_ocr_text(att, base_sha256=body.base_sha256, ocr_text=body.ocr_text, actor_id=current_user.id)
     except OcrTextConflict as exc:
@@ -410,6 +414,7 @@ async def update_ocr_status(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="GET", entrypoint="attachment.read",
     )
+    await assert_linked_workpapers_writable(db, attachment_id)
     if body.ocr_text is not None:
         # 改写文本必须基于当前全文（原先确认弹窗拿 200 字预览整体写回 ⇒ 全文被截断）
         try:
@@ -798,6 +803,7 @@ async def retry_ocr(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="GET", entrypoint="attachment.read",
     )
+    await assert_linked_workpapers_writable(db, attachment_id)
     att.ocr_status = "pending"
     await db.flush()
     body, status_code = await OcrFieldsService(db).get_or_trigger_ocr_fields(attachment_id)
@@ -829,6 +835,7 @@ async def delete_attachment(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="DELETE", entrypoint="attachment.delete",
     )
+    await assert_linked_workpapers_writable(db, attachment_id)
     await destructive_guard.assert_destructible(db, current_user, att, operation="delete")
 
     att.is_deleted = True
@@ -892,6 +899,7 @@ async def rollback_attachment_version(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="POST", entrypoint="attachment.rollback",
     )
+    await assert_linked_workpapers_writable(db, attachment_id)
     svc = _svc(db)
     chain = await svc.list_versions(attachment_id)
     target = next((row for row in chain if row["id"] == str(version_id)), None)

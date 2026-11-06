@@ -233,8 +233,9 @@ class ReadinessSourceChecks:
         blockers: list[ReadinessBlocker],
         warnings: list[ReadinessBlocker],
     ) -> SourceStatus:
-        """调整分录确认检查 — draft 状态的调整是硬阻断。"""
+        """按分录组判就绪，同时把全部分录行纳入内容摘要。"""
         from app.models.audit_platform_models import Adjustment
+        from app.services.wp_adjustment_helpers import count_adjustment_groups
 
         rows = list(
             (
@@ -247,11 +248,12 @@ class ReadinessSourceChecks:
                 )
             ).scalars().all()
         )
-        total_count = len(rows)
-        unconfirmed = sum(
-            getattr(row.review_status, "value", row.review_status)
-            in {"draft", "pending_review"}
-            for row in rows
+        total_count = await count_adjustment_groups(db, project_id, year)
+        unconfirmed = await count_adjustment_groups(
+            db,
+            project_id,
+            year,
+            review_statuses=("draft", "pending_review", "rejected"),
         )
 
         status = SourceStatus(
@@ -259,6 +261,7 @@ class ReadinessSourceChecks:
             count=total_count,
             detail={
                 "unconfirmed_count": unconfirmed,
+                "line_count": len(rows),
                 "source_kind": "adjustments",
                 "content_digest": content_digest(
                     {
@@ -287,7 +290,10 @@ class ReadinessSourceChecks:
         if unconfirmed > 0:
             blockers.append(ReadinessBlocker(
                 code="upstream_not_ready",
-                message=f"有 {unconfirmed} 条调整分录尚未确认（draft/pending_review），出具前需全部确认或删除",
+                message=(
+                    f"有 {unconfirmed} 笔调整分录尚未确认（草稿/待复核/已驳回），"
+                    "出具前需全部确认或删除"
+                ),
                 evidence={
                     "component": "adjustments",
                     "unconfirmed_count": unconfirmed,

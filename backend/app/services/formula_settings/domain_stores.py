@@ -153,6 +153,14 @@ class WpStore(SettingStore):
             WorkingPaper.project_id == project_id, WpIndex.wp_code == wp_code,
             WorkingPaper.is_deleted == sa.false()))).scalars().all())
 
+    @staticmethod
+    async def _assert_wps_writable(db: AsyncSession, wp_ids: list[uuid.UUID]) -> None:
+        """多目标公式先按稳定顺序锁定并预检，禁止一半写入后才遇到冻结稿。"""
+        from app.services.workpaper_content_freeze import assert_workpaper_content_writable
+
+        for wp_id in sorted(wp_ids, key=str):
+            await assert_workpaper_content_writable(db, wp_id, for_update=True)
+
     async def _cell_rows(self, db: AsyncSession, wp_ids: list[uuid.UUID], sheet: str, cell: str):
         from app.models.workpaper_models import WpFormula
 
@@ -177,6 +185,7 @@ class WpStore(SettingStore):
             if pinned:
                 logger.warning("底稿域：项目 %s 无底稿 %s，暂缓固定行无处落地（建底稿后将按新全局预填）", project_id, code)
             return
+        await self._assert_wps_writable(db, wp_ids)
         expression, ftype = checked_wp_definition(definition, label or slot_key)
         follow = base_definition is not None and same_exec("wp", definition, base_definition)
         stable = derive_stable_key(sheet, cell)
@@ -211,6 +220,8 @@ class WpStore(SettingStore):
 
         code, sheet, cell = split_wp_slot(slot_key)
         wp_ids = await self._project_wps(db, project_id, code)
+        if wp_ids:
+            await self._assert_wps_writable(db, wp_ids)
         rows = [r for r in await self._cell_rows(db, wp_ids, sheet, cell) if r.formula_source in WP_SOURCES] \
             if wp_ids else []
         for row in rows:

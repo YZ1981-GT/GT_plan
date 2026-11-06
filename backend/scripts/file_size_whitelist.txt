@@ -1228,7 +1228,11 @@ backend/app/services/trial_balance_service.py  1243
 backend/app/routers/adjustments.py  1671
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
 # HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
-backend/app/routers/attachments.py  821
+# platform-release-blocker-closure：基线 821 早已 stale —— 本批改动前 HEAD 实测已 914 行
+# （前序提交把它从 821 长到 914 却未更新本表，pre-commit 只检查暂存文件故未触发）。本批 Task 9
+# 给 5 个 OCR/删除/回滚端点各加一行 assert_linked_workpapers_writable 终态预检（+8 行 = 922）；
+# 这 8 行无法消化已有的 52 行欠账，按「baseline 必须填当前真实行数」更新为 922。
+backend/app/routers/attachments.py  922
 
 # ledger-penetration 凭证穿透 / 挂凭链路 —— V166 凭证日期消歧
 # （spec voucher-sampling-account-scope-and-attach-closure）。

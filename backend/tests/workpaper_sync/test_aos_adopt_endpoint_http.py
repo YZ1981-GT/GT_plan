@@ -440,7 +440,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             finally:
                 current["user"] = SimpleNamespace(id=user)
 
-            # ── 8.1 ② 403 workflow_locked（写 action 在锁定下被拒；与 404 分型）
+            # ── 8.1 ② 423 workflow_locked（写 action 在锁定下被拒；与 404/403 分型）
             try:
                 board.workflow_locked = True
                 await _run("workflow_locked", body={"dry_run": True})
@@ -742,9 +742,9 @@ class TestFiveBranchesOverRealHttp:
         assert obs["status"] == 401, obs["body"]
         assert obs["store_writes"] == 0 and obs["commits"] == 0
 
-    def test_403_when_workflow_locked(self, snap: dict[str, Any]) -> None:
+    def test_423_when_workflow_locked(self, snap: dict[str, Any]) -> None:
         obs = snap["scenarios"]["workflow_locked"]
-        assert obs["status"] == 403, obs["body"]
+        assert obs["status"] == 423, obs["body"]
         assert error_code(obs["body"]) == "sync_workflow_locked", obs["body"]
 
     def test_409_when_expected_revision_does_not_match(self, snap: dict[str, Any]) -> None:

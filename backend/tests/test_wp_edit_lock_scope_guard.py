@@ -34,7 +34,8 @@ from app.routers._wp_edit_lock_scope import (
 )
 
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-LOCK_CALLS = {"enforce_edit_lock_for_content_write", "raise_if_edit_locked", "_enforce_entry_edit_lock"}
+LOCK_CALLS = {"enforce_edit_lock_for_content_write", "_enforce_entry_edit_lock"}
+FREEZE_CALLS = {"raise_if_workpaper_frozen", "enforce_edit_lock_for_content_write", "_enforce_entry_edit_lock"}
 _SESSION_WRITES = {"commit", "flush", "add", "add_all", "merge", "delete"}
 _SESSION_NAMES = {"db", "session", "sess", "s"}
 _FILE_WRITES = {
