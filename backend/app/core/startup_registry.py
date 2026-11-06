@@ -658,6 +658,12 @@ async def _task_acnr_catalog_snapshot_gc(_ctx: StartupContext) -> None:
     from app.services.acnr.catalog_snapshot_gc import run_db_aware_gc
 
     gc_report = await run_db_aware_gc(keep_recent=10)
+    failures = gc_report.get("failed", [])
+    if failures:
+        # 这条任务是 best_effort：抛出只会让 startup report 如实标 failed，不阻断服务。
+        # 若在这里吞掉，unlink OSError 虽写进 report，健康页却仍显示 ok，形成假成功。
+        versions = ", ".join(str(item.get("version", "?")) for item in failures[:5])
+        raise RuntimeError(f"ACNR snapshot GC 删除失败 {len(failures)} 项：{versions}")
     logging.getLogger("audit_platform").info(
         "ACNR snapshot GC: total=%s deleted=%s status=%s",
         gc_report.get("total_snapshots"),

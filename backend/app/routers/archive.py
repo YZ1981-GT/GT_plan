@@ -26,6 +26,7 @@ from app.deps import require_operation, require_project_access
 from app.models.archive_models import ArchiveJob
 from app.models.core import User
 from app.routers.password_confirm import require_confirmation_token
+from app.services.acnr.project_registry_lock import RegistryLockError
 from app.services.archive_orchestrator import ArchiveOrchestrator
 
 router = APIRouter(
@@ -62,14 +63,20 @@ async def orchestrate_archive(
 ):
     """启动归档编排（需二次密码确认）：gate → package → push_to_cloud? → lock → purge_local?。"""
     orchestrator = ArchiveOrchestrator(db)
-    job = await orchestrator.orchestrate(
-        project_id=project_id,
-        scope=body.scope,
-        push_to_cloud=body.push_to_cloud,
-        purge_local=body.purge_local,
-        gate_eval_id=body.gate_eval_id,
-        initiated_by=current_user.id,
-    )
+    try:
+        job = await orchestrator.orchestrate(
+            project_id=project_id,
+            scope=body.scope,
+            push_to_cloud=body.push_to_cloud,
+            purge_local=body.purge_local,
+            gate_eval_id=body.gate_eval_id,
+            initiated_by=current_user.id,
+        )
+    except RegistryLockError:
+        # 编排器已把 job 标为 failed 并 flush。先持久化失败作业，便于审计 / 重试，
+        # 再让全局 ACNR handler 返回稳定 409；普通步骤失败仍沿用 200 + failed job 契约。
+        await db.commit()
+        raise
     await db.commit()
     return ArchiveOrchestrator._job_to_dict(job)
 
@@ -97,6 +104,9 @@ async def retry_archive_job(
     await _job_of_project(db, project_id, job_id)
     try:
         job = await ArchiveOrchestrator(db).retry(job_id=job_id, initiated_by=current_user.id)
+    except RegistryLockError:
+        await db.commit()  # 持久化本次 lock 步骤的失败状态，再由全局 handler 返回稳定 409
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     await db.commit()

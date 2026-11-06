@@ -86,10 +86,28 @@ async def test_strays_equal_what_runtime_gc_would_delete(tmp_path, monkeypatch):
     directory = _repo(tmp_path, committed=_COMMITTED[:12], untracked=[locked, stray])
     _, _, strays = guard.lifecycle_problems(directory, keep_recent=10, referenced_versions={locked})
 
-    async def _verified():
+    async def _verified(operation=None):
+        if operation is None:
+            return {locked}
+
+        class _Dialect:
+            name = "sqlite"
+
+        class _Bind:
+            dialect = _Dialect()
+
+        class _Db:
+            @staticmethod
+            def get_bind():
+                return _Bind()
+
+        return await operation(_Db())
+
+    async def _refs(_db):
         return {locked}
 
     monkeypatch.setenv("ACNR_SNAPSHOTS_DIR", str(directory))
+    monkeypatch.setattr(gc_mod, "referenced_registry_versions", _refs)
     monkeypatch.setattr(gc_mod, "_referenced_versions_with_own_session", _verified)
     report = await gc_mod.run_db_aware_gc(keep_recent=10, dry_run=True)
     assert report["reference_status"] == "verified"

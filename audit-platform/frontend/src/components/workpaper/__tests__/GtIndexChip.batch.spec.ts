@@ -33,14 +33,23 @@ const components = {
     props: ['content', 'disabled', 'placement'],
     template: '<div class="el-tooltip-stub" :data-content="content"><slot /></div>',
   },
-  'el-dropdown': { template: '<div><slot /><slot name="dropdown" /></div>' },
+  'el-dropdown': defineComponent({
+    name: 'ElDropdownStub',
+    emits: ['command'],
+    template: '<div class="el-dropdown-stub"><slot /><slot name="dropdown" /></div>',
+  }),
   'el-dropdown-menu': { template: '<div><slot /></div>' },
   'el-dropdown-item': { template: '<div><slot /></div>' },
 }
 
-function mountChips(chips: Array<{ value: string; disabled?: boolean }>) {
+function mountChips(chips: Array<{ value: string; disabled?: boolean; preventNavigate?: boolean }>) {
   const Parent = defineComponent({
-    render: () => h('div', chips.map((c, i) => h(GtIndexChip, { key: i, value: c.value, disabled: c.disabled ?? false }))),
+    render: () => h('div', chips.map((c, i) => h(GtIndexChip, {
+      key: i,
+      value: c.value,
+      disabled: c.disabled ?? false,
+      preventNavigate: c.preventNavigate ?? false,
+    }))),
   })
   return mount(Parent, { global: { components } })
 }
@@ -109,6 +118,72 @@ describe('GtIndexChip × resolveIndexBatched', () => {
     await flushPromises()
     expect(http.post).toHaveBeenCalledTimes(2)
   })
+
+  it('项目中任一批次返回治理 409 后，已解析成功的同页 chip 也立即禁用', async () => {
+    okBatch()
+    const existing = mountChips([{ value: 'E1-1' }])
+    await flushPromises()
+    expect(types(existing)).toEqual(['primary'])
+
+    const reason = '项目锁定快照缺失，无法按归档时的目录解析'
+    http.post.mockRejectedValue(Object.assign(new Error('HTTP 409'), {
+      response: {
+        status: 409,
+        data: { code: 409, error_code: 'ACNR_REGISTRY_SNAPSHOT_MISSING', message: reason },
+      },
+    }))
+    mountChips([{ value: 'D2-1' }])
+    await flushPromises()
+
+    expect(types(existing)).toEqual(['info'])
+    expect(existing.find('.el-tag-stub').attributes('tabindex')).toBe('-1')
+    expect(existing.find('.el-tooltip-stub').attributes('data-content')).toBe(reason)
+    await existing.find('.el-tag-stub').trigger('click')
+    expect(existing.findComponent(GtIndexChip).emitted('click')).toBeUndefined()
+  })
+
+  it('目录治理 409 保留中文终态：chip fail-closed，不伪装成可继续跳转的批失败，也不缓存', async () => {
+    const reason = '项目锁定的地址目录版本 20261001000000 快照内容损坏，请联系管理员恢复快照'
+    http.post.mockRejectedValue(Object.assign(new Error('HTTP 409'), {
+      response: {
+        status: 409,
+        data: { code: 409, error_code: 'ACNR_REGISTRY_SNAPSHOT_INVALID', message: reason },
+      },
+    }))
+    const w = mountChips([{ value: 'E1-1' }, { value: 'E1-2' }])
+    await flushPromises()
+
+    // 终态走 not_exists（灰显、不可点击）且 tooltip 原样给后端中文原因；普通 5xx 才走 danger / 可重试。
+    expect(types(w)).toEqual(['info', 'info'])
+    expect(w.findAll('.el-tooltip-stub').map((t) => t.attributes('data-content'))).toEqual([reason, reason])
+    expect(w.findAll('.el-tag-stub').map((t) => t.attributes('tabindex'))).toEqual(['-1', '-1'])
+
+    // preventNavigate 原本无条件可点击，Adj 普通 miss 也有可点击例外；治理终态必须优先于两者。
+    const inline = mount(GtIndexChip, {
+      props: { value: 'Adj:AJ-1', preventNavigate: true },
+      global: { components },
+    })
+    await flushPromises()
+    await inline.find('.el-tag-stub').trigger('click')
+    expect(inline.emitted('click')).toBeUndefined()
+    expect(inline.find('.el-tag-stub').attributes('tabindex')).toBe('-1')
+
+    // 多目标由 el-dropdown 的 command 进入另一条 handler；同一终态门禁也必须挡住。
+    const multi = mount(GtIndexChip, {
+      props: { value: 'E1-1/E1-2' },
+      global: { components },
+    })
+    await flushPromises()
+    multi.findComponent({ name: 'ElDropdownStub' }).vm.$emit('command', 'E1-2')
+    await flushPromises()
+    expect(multi.emitted('click')).toBeUndefined()
+
+    okBatch()
+    mountChips([{ value: 'E1-1' }])
+    await flushPromises()
+    // 初始 E1/E2 一批 + inline Adj + multi + 重新请求 E1：终态均不缓存。
+    expect(http.post).toHaveBeenCalledTimes(4)
+  })
 })
 
 describe('resolveIndexBatched', () => {
@@ -130,6 +205,41 @@ describe('resolveIndexBatched', () => {
     release()
     expect(await a).toEqual({ found: true, addr_id: 'A' })
     expect(await c).toEqual({ found: false, error: BATCH_RESOLVE_FAILED })
+  })
+
+  it('同项目旧批量成功晚于另一批 409 到达时，等待者只收到治理终态', async () => {
+    let releaseOld!: () => void
+    let markStarted!: () => void
+    const gate = new Promise<void>((resolve) => { releaseOld = resolve })
+    const started = new Promise<void>((resolve) => { markStarted = resolve })
+    const terminal = Object.assign(new Error('HTTP 409'), {
+      response: {
+        status: 409,
+        data: { code: 409, error_code: 'ACNR_REGISTRY_SNAPSHOT_INVALID', message: '锁定快照损坏' },
+      },
+    })
+    http.post.mockImplementation(async (_url: string, body: { items: Array<{ index_ref: string }> }) => {
+      if (body.items[0]?.index_ref === 'wp:E1') {
+        markStarted()
+        await gate
+        return { data: [{ found: true, addr_id: 'E1/old', jump_route: '/old' }] }
+      }
+      throw terminal
+    })
+
+    const oldRequest = resolveIndexBatched('wp:E1', 'p1')
+    await started
+    await expect(resolveIndexBatched('wp:D2', 'p1')).resolves.toEqual({
+      found: false, error: 'snapshot_invalid', reason: '锁定快照损坏',
+    })
+    releaseOld()
+    await expect(oldRequest).resolves.toEqual({
+      found: false, error: 'snapshot_invalid', reason: '锁定快照损坏',
+    })
+
+    okBatch()
+    await expect(resolveIndexBatched('wp:E1', 'p1')).resolves.toMatchObject({ found: true })
+    expect(http.post).toHaveBeenCalledTimes(3)
   })
 
   it('不合法的索引不排队、不请求', async () => {

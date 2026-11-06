@@ -35,7 +35,7 @@ from app.services.address_registry import (
     formula_ref_to_uri,
 )
 from app.services.acnr.catalog import CatalogIntegrityError
-from app.services.acnr.resolver import VersionNotFoundError
+from app.services.acnr.resolver import VersionInvalidError, VersionNotFoundError
 from app.services.formula_grammar import RELAXED_FORMULA_PATTERNS
 
 logger = logging.getLogger(__name__)
@@ -135,8 +135,11 @@ async def validate_refs_via_acnr(
                 wp_issues.append(_make_wp_issue(ref_text, result))
             elif result.deprecated:  # 停用条目：接受保存，记 INFO 与指标（design §3.3）
                 _record_deprecated_ref_saved(pid, ref_text, result)
-    except (VersionNotFoundError, CatalogIntegrityError):
-        # 治理错误（锁定快照缺失 / 目录完整性失败）不是「resolver 暂不可用」，不回退 legacy（design §6.5）
+    except (VersionNotFoundError, VersionInvalidError, CatalogIntegrityError):
+        # 治理错误（锁定快照缺失 / 锁定快照损坏 / 当前目录完整性失败）不是
+        # 「resolver 暂不可用」，不回退 legacy。VersionInvalidError 是独立异常，
+        # 不继承 CatalogIntegrityError；漏列它会把损坏的归档快照静默按当前 V1
+        # 目录校验并放行（ACNR Task 18 / design §8.3）。
         raise
     except Exception as exc:  # noqa: BLE001 — fail-open：resolver 故障不阻断保存
         logger.warning(

@@ -57,16 +57,24 @@ def _remaining(d: Path) -> list[str]:
 
 
 def _db_verified(monkeypatch, refs: set[str]) -> None:
-    """数据库已证实引用集。
-
-    两个入口都要替换：带会话走 `referenced_registry_versions`，不带会话（启动任务）走
-    `_referenced_versions_with_own_session` 自开短会话 —— 只替换前者，后者会真去连库、
-    在测试环境连不上就返回 None，用例会变成「不可验证」而不是本函数想模拟的「已证实」。
-    """
+    """数据库已证实引用集；无会话入口的 fake 会话覆盖完整锁生命周期。"""
     async def _fake(_db):
         return set(refs)
 
-    async def _fake_own():
+    class _SqliteDialect:
+        name = "sqlite"
+
+    class _SqliteBind:
+        dialect = _SqliteDialect()
+
+    class _FakeDb:
+        @staticmethod
+        def get_bind():
+            return _SqliteBind()
+
+    async def _fake_own(operation=None):
+        if operation is not None:
+            return await operation(_FakeDb())
         return set(refs)
 
     monkeypatch.setattr(gc_mod, "referenced_registry_versions", _fake)
@@ -78,7 +86,20 @@ def _db_unverifiable(monkeypatch) -> None:
     async def _none(_db):
         return None
 
-    async def _none_own():
+    class _SqliteDialect:
+        name = "sqlite"
+
+    class _SqliteBind:
+        dialect = _SqliteDialect()
+
+    class _FakeDb:
+        @staticmethod
+        def get_bind():
+            return _SqliteBind()
+
+    async def _none_own(operation=None):
+        if operation is not None:
+            return await operation(_FakeDb())
         return None
 
     monkeypatch.setattr(gc_mod, "referenced_registry_versions", _none)
@@ -113,6 +134,12 @@ async def test_no_session_opens_own_session_and_verifies(tmp_path, monkeypatch):
 
     opened: list[str] = []
 
+    class _Dialect:
+        name = "sqlite"
+
+    class _Bind:
+        dialect = _Dialect()
+
     class _FakeSession:
         async def __aenter__(self):
             opened.append("open")
@@ -120,6 +147,9 @@ async def test_no_session_opens_own_session_and_verifies(tmp_path, monkeypatch):
 
         async def __aexit__(self, *_exc):
             return False
+
+        def get_bind(self):
+            return _Bind()
 
         async def execute(self, _stmt):
             class _R:
