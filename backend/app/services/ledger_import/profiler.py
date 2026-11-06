@@ -115,6 +115,33 @@ class StagedProfiler:
         )
         self._total_rows += rows
 
+    def record_stage_manual(
+        self,
+        name: str,
+        *,
+        duration_s: float,
+        rows: int = 0,
+        wal_bytes: Optional[int] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """不走 ``stage()`` context manager 的旁路登记：适合**事后**把 pipeline
+        已经测好的 per-phase 时长折算进 profiler。``rows/sec`` 由 ``rows`` 与
+        ``duration_s`` 推导；``wal_bytes`` / ``error`` 原样记录。
+
+        用于：legacy pipeline 里 ``_mark("phase_done")`` + ``_perf`` 字典已经测
+        好所有阶段耗时，调用方只需把这些已有数据平移进 profiler 做统一报告。
+        """
+        rps = (rows / duration_s) if (rows > 0 and duration_s > 0) else None
+        self._stages[name] = StageRecord(
+            duration_s=duration_s,
+            rows=rows,
+            rows_per_sec=rps,
+            wal_bytes=wal_bytes,
+            error=error,
+        )
+        if rows > 0:
+            self._total_rows += rows
+
     def to_dict(self) -> dict[str, Any]:
         """返回可塞进 ImportJob metadata / API response 的纯 dict。"""
         return {

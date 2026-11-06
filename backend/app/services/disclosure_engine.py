@@ -2733,44 +2733,49 @@ class DisclosureEngine:
     ) -> DisclosureNote | None:
         """更新附注章节内容；有字段要改就盖「最近一次编辑」（``note_edit_stamp``，第 24 组）。
 
+        2026-11-06 起经 ``mutate_note_by_id`` 统一内核写入（C2 收口）：PG 下
+        ``pg_advisory_xact_lock`` + ``FOR UPDATE`` + ``deepcopy(table_data)`` +
+        按稳定 hash 判 changed，一处 flag_modified + 一次 UPDATE；外部签名、
+        pushed_row_violations 409 语义、note_edit_stamp 戳章行为完全不变。
+
         Validates: Requirements 4.10
         """
+        from app.services.disclosure.note_section_write_kernel import mutate_note_by_id
         from app.services.note_edit_stamp import stamp_note_edit
+        from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
 
-        result = await self.db.execute(
-            sa.select(DisclosureNote).where(
-                DisclosureNote.id == note_id,
-                DisclosureNote.is_deleted == sa.false(),
-            )
-        )
-        note = result.scalar_one_or_none()
-        if note is None:
+        captured: dict[str, DisclosureNote | None] = {"note": None}
+
+        def _mutator(note: DisclosureNote, workspace: dict[str, Any]) -> None:
+            captured["note"] = note
+            # 集团下推固定行保护：在**原 note.table_data** 与**传入 new table_data**
+            # 之间比较，和历史口径保持一致（workspace 是 note.table_data 的 deepcopy，
+            # 这里刻意**不**用 workspace 比，避免 mutator 本身的 deepcopy 隔离影响判定）。
+            if table_data is not None:
+                if bad := pushed_row_violations(note.table_data, table_data):
+                    raise HTTPException(status_code=409, detail={
+                        "error_code": PUSHED_ROW_PROTECTED, "rows": bad,
+                        "message": "集团下推的固定行不能删除、改名或去掉下推标记：" + "、".join(
+                            f"「{v['table']}」{v['row']}（{v['problem']}）" for v in bad[:5]) + (" 等" if len(bad) > 5 else "")})
+
+            if any(v is not None for v in (table_data, text_content, guidance_text, status)):
+                stamp_note_edit(note, user_id)
+
+            if table_data is not None:
+                # 内核按 workspace 的新旧 hash 比较；直接把 workspace 内容替换成 new table_data
+                workspace.clear()
+                workspace.update(table_data)
+            if text_content is not None:
+                note.text_content = text_content
+            if guidance_text is not None:
+                note.guidance_text = guidance_text
+            if status is not None:
+                note.status = status
+
+        result = await mutate_note_by_id(self.db, note_id=note_id, mutator=_mutator)
+        if result is None:
             return None
-        if table_data is not None:  # 集团下推的固定行不能删 / 改名 / 去标记（R13）
-            from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
-
-            if bad := pushed_row_violations(note.table_data, table_data):
-                raise HTTPException(status_code=409, detail={
-                    "error_code": PUSHED_ROW_PROTECTED, "rows": bad,
-                    "message": "集团下推的固定行不能删除、改名或去掉下推标记：" + "、".join(
-                        f"「{v['table']}」{v['row']}（{v['problem']}）" for v in bad[:5]) + (" 等" if len(bad) > 5 else "")})
-
-        if any(v is not None for v in (table_data, text_content, guidance_text, status)):
-            stamp_note_edit(note, user_id)
-        if table_data is not None:
-            note.table_data = table_data
-            # JSONB 字段需要显式标记为已修改，确保 _tables 等嵌套字段被持久化
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(note, "table_data")
-        if text_content is not None:
-            note.text_content = text_content
-        if guidance_text is not None:
-            note.guidance_text = guidance_text
-        if status is not None:
-            note.status = status
-
-        await self.db.flush()
-        return note
+        return captured["note"]
 
     # ------------------------------------------------------------------
     # 事件处理器

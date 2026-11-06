@@ -173,6 +173,42 @@ def test_xlsx_export_uses_function_scoped_auth_and_database():
     assert auth.dependency is get_current_user_stream
 
 
+def test_cycle_import_export_common_exports_use_function_scope_and_stream_auth():
+    """A6 第二波：L/M/N/K 等循环共用的 `_cycle_import_export_common.py` 一处收口。
+
+    `register_cycle_import_export_endpoints` 内部注册的 `export_template` / `export_data`
+    是闭包函数，只能从 `router.routes` 动态获取；本断言按闭包源码文本验证两处 Depends
+    均已切 function-scope + stream auth，`import_data` 保留请求级 session（写路径不迁）。
+    """
+    import re
+    from pathlib import Path
+
+    source = Path(
+        inspect.getsourcefile(
+            __import__(
+                "app.routers.wp_render_strategies._cycle_import_export_common",
+                fromlist=["_cycle_import_export_common"],
+            )
+        )
+    ).read_text(encoding="utf-8")
+    # 粗切闭包块
+    export_template_block = source.split("async def export_template(")[1].split("async def export_data(")[0]
+    export_data_block = source.split("async def export_data(")[1].split("async def import_data(")[0]
+    import_data_block = source.split("async def import_data(")[1][:400]
+    for block, name in (
+        (export_template_block, "export_template"),
+        (export_data_block, "export_data"),
+    ):
+        assert re.search(
+            r"Depends\(get_db,\s*scope=\"function\"\)", block
+        ), f"{name} 应迁到 function-scope DB"
+        assert "Depends(get_current_user_stream)" in block, f"{name} 应用 stream 认证"
+    # import_data 走写路径，保留 request-scope（防止回归时顺手改坏）
+    assert "Depends(get_db)" in import_data_block
+    assert "Depends(get_current_user)" in import_data_block
+    assert "scope=\"function\"" not in import_data_block
+
+
 def test_render_config_export_template_uses_short_lived_session():
     """A6 第二波：模板文件下载提前释放 DB。"""
     database = _depends(export_template, "db")

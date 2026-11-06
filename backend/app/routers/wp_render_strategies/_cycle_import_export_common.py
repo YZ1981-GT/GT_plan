@@ -17,7 +17,7 @@ from openpyxl.utils import get_column_letter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_user_stream
 from app.models.core import User
 
 ROW_LIMIT = 500
@@ -721,9 +721,11 @@ def create_cycle_import_export_router(
     async def export_template(
         wp_id: str,
         sheet: str = Query(...),
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db, scope="function"),
+        current_user: User = Depends(get_current_user_stream),
     ) -> StreamingResponse:
+        # A6 第二波：db 仅用于读 headers，workbook_to_response 之后不再访问 DB；
+        # 迁到 function-scope session 让慢客户端下载不再占用请求级连接。
         _validate(sheet)
         sp = _spec(sheet)
         build_wb = sp.get("build_workbook")
@@ -745,9 +747,11 @@ def create_cycle_import_export_router(
     async def export_data(
         wp_id: str,
         sheet: str = Query(...),
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db, scope="function"),
+        current_user: User = Depends(get_current_user_stream),
     ) -> StreamingResponse:
+        # A6 第二波：db 仅在构造 workbook 前读取数据，返回 StreamingResponse 时字节已在
+        # BytesIO buf 里，不再触达连接池；function-scope session 对慢客户端更友好。
         _validate(sheet)
         sp = _spec(sheet)
         item_id = sp.get("item_id", f"{sheet}-rows")

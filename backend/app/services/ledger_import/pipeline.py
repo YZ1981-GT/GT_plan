@@ -24,15 +24,11 @@ from uuid import UUID
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "PipelineResult",
-    "ProgressCallback",
-    "CancelChecker",
-    "PhaseMarker",
-    "ProgressState",
-    "execute_pipeline",
-    "_handle_cancel",
-    "_detect_memory_pressure",
+    "PipelineResult", "ProgressCallback", "CancelChecker", "PhaseMarker",
+    "ProgressState", "execute_pipeline", "_handle_cancel", "_detect_memory_pressure",
 ]
+# C4 伴生 `profiler_report.py`：pipeline `_perf` → StagedProfiler.to_dict()。
+from app.services.ledger_import.profiler_report import _build_profiler_report  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +96,8 @@ class PipelineResult:
     blocking_messages: list[str] = field(default_factory=list)
     append_report: dict[str, Any] | None = None
     voucher_diff_report: dict[str, Any] | None = None
+    # C4：StagedProfiler.to_dict()；详见 profiler_report.py。可塞 ImportJob.metadata。
+    profiler_report: dict[str, Any] | None = None
 
 
 # Callback types
@@ -784,6 +782,11 @@ async def execute_pipeline(
     logger.info("[perf] %s phases: %s | total=%.1fs",
                 job_id, " → ".join(lines[1:]), _time.time() - _perf_t0)
 
+    profiler = _build_profiler_report(
+        _perf, _perf_t0, staging_rows=total_rows_parsed,
+        rebuild_rows=total_balance_written + total_aux_balance_written,
+    )
+
     return PipelineResult(
         success=True,
         dataset_id=staging_dataset_id,
@@ -797,4 +800,5 @@ async def execute_pipeline(
         year=import_year,
         append_report=append_report,
         voucher_diff_report=voucher_diff_report,
+        profiler_report=profiler,
     )

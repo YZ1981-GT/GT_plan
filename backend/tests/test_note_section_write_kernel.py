@@ -27,6 +27,7 @@ from app.models.base import Base
 from app.models.core import Project
 from app.models.report_models import DisclosureNote
 from app.services.disclosure.note_section_write_kernel import (
+    mutate_note_by_id,
     mutate_note_section,
     stable_hash,
 )
@@ -212,3 +213,56 @@ def test_stable_hash_is_canonical_and_order_insensitive():
     assert stable_hash({"a": 1}) != stable_hash({"a": "1"})
     # 非 JSON 可序列化对象走 default=str
     assert isinstance(stable_hash({"d": object()}), str)
+
+
+# ---------------------------------------------------------------------------
+# mutate_note_by_id：按 note.id 定位的旧 API
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mutate_by_id_returns_none_when_missing(db):
+    assert await mutate_note_by_id(
+        db,
+        note_id=uuid.uuid4(),
+        mutator=lambda note, ws: None,
+    ) is None
+
+
+@pytest.mark.asyncio
+async def test_mutate_by_id_writes_through_and_isolates_workspace(db, project):
+    seeded = await _seed_note(
+        db,
+        project.id,
+        table_data={"_tables": {"table_a": {"rows": [{"name": "A"}]}}},
+    )
+
+    def _mutator(note, ws):
+        ws["_tables"]["table_a"]["rows"].append({"name": "B"})
+        note.text_content = "手工"
+
+    result = await mutate_note_by_id(db, note_id=seeded.id, mutator=_mutator)
+    assert result is not None
+    assert result.note_id == seeded.id
+    assert result.changed is True
+    await db.refresh(seeded)
+    assert seeded.table_data["_tables"]["table_a"]["rows"] == [{"name": "A"}, {"name": "B"}]
+    assert seeded.text_content == "手工"
+
+
+@pytest.mark.asyncio
+async def test_mutate_by_id_propagates_mutator_exception(db, project):
+    """mutator 抛 HTTPException 要原样向上传播，kernel 不吞。"""
+    from fastapi import HTTPException
+
+    seeded = await _seed_note(db, project.id, table_data={"_tables": {}})
+
+    def _bad(note, ws):
+        raise HTTPException(status_code=409, detail="pushed_row_protected")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await mutate_note_by_id(db, note_id=seeded.id, mutator=_bad)
+    assert exc_info.value.status_code == 409
+    # 抛异常 ⇒ workspace 写入未落库
+    await db.refresh(seeded)
+    assert seeded.table_data == {"_tables": {}}

@@ -38,6 +38,7 @@ from sqlalchemy.orm.attributes import flag_modified
 __all__ = [
     "SectionMutateResult",
     "mutate_note_section",
+    "mutate_note_by_id",
     "stable_hash",
 ]
 
@@ -126,6 +127,54 @@ async def mutate_note_section(
     )
 
 
+async def mutate_note_by_id(
+    db: AsyncSession,
+    *,
+    note_id: UUID,
+    mutator: Callable[[Any, dict[str, Any]], None],
+) -> Optional[SectionMutateResult]:
+    """按 ``DisclosureNote.id`` 定位并走统一内核的 mutator 入口。
+
+    与 ``mutate_note_section`` 等价，只是定位维度从 `(project_id, year, section_id)`
+    换成 ``note_id``：advisory lock key 用 ``note:id:<uuid>``，同一 note 串行、不同
+    note 并行；FOR UPDATE / deepcopy / stable-hash diff / 无条件 flush 行为一致。
+
+    用于：`disclosure_engine.update_note(note_id=...)` 等**按 id 定位**的旧 API。
+    """
+    from app.models.report_models import DisclosureNote
+
+    await _acquire_note_lock(db, note_id)
+
+    is_pg = db.bind is not None and db.bind.dialect.name == "postgresql"
+    stmt = sa.select(DisclosureNote).where(
+        DisclosureNote.id == note_id,
+        DisclosureNote.is_deleted == sa.false(),
+    )
+    if is_pg:
+        stmt = stmt.with_for_update()
+    note = (await db.execute(stmt)).scalar_one_or_none()
+    if note is None:
+        return None
+
+    workspace: dict[str, Any] = copy.deepcopy(note.table_data) if note.table_data is not None else {}
+    before = stable_hash(workspace)
+
+    mutator(note, workspace)
+
+    after = stable_hash(workspace)
+    changed = before != after
+    if changed:
+        note.table_data = workspace
+        flag_modified(note, "table_data")
+    await db.flush()
+    return SectionMutateResult(
+        note_id=note.id,
+        changed=changed,
+        before_hash=before,
+        after_hash=after,
+    )
+
+
 async def _acquire_section_lock(
     db: AsyncSession,
     project_id: UUID,
@@ -143,6 +192,16 @@ async def _acquire_section_lock(
     await db.execute(
         sa.text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
         {"ns": _ADVISORY_NAMESPACE, "key": key},
+    )
+
+
+async def _acquire_note_lock(db: AsyncSession, note_id: UUID) -> None:
+    """按 note.id 的 advisory 锁；与 _acquire_section_lock 等价、只是 key 换成 note id。"""
+    if db.bind is None or db.bind.dialect.name != "postgresql":
+        return
+    await db.execute(
+        sa.text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
+        {"ns": _ADVISORY_NAMESPACE, "key": f"note:id:{note_id}"},
     )
 
 

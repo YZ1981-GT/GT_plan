@@ -1379,6 +1379,12 @@ audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 3439
 audit-platform/frontend/src/services/consolidationApi.ts 1628
 audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
+#   ledger_import/pipeline.py —— 2026-11-05 `platform-heavy-jobs-and-capacity-closure` C4 骨架：
+#     把 `_perf` 字典平移进 `StagedProfiler.to_dict()`（伴生 `profiler_report.py`，不改原
+#     `_mark` / observe_phase_duration 链路），PipelineResult 增 profiler_report 字段，HEAD
+#     800 → 804。拆分方向：parse_write_streaming 的内部循环（~250 行）抽到
+#     `pipeline_streaming.py`，pipeline.py 只保留 execute_pipeline 编排骨架。
+backend/app/services/ledger_import/pipeline.py 804
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
 #     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。2026-11-05 `platform-heavy-jobs-and-capacity-closure` B4/B5
 #     把合并附注重新汇总改走 durable job：新增 PlatformJobProgress 嵌入、`reaggregateJobId`、`onReaggregateCompleted`/`onReaggregateFailed`

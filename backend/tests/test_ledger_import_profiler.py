@@ -95,6 +95,22 @@ async def test_profiler_stages_property_is_isolated_copy():
 
 
 @pytest.mark.asyncio
+async def test_record_stage_manual_logs_phase_without_context_manager():
+    """旁路登记：pipeline 有自己的 _perf 字典，record_stage_manual 允许事后转移。"""
+    profiler = StagedProfiler()
+    profiler.record_stage_manual("parse_write_streaming", duration_s=1.5, rows=12_000)
+    profiler.record_stage_manual("rebuild_aux_summary", duration_s=0.4, rows=0, wal_bytes=2_048)
+    report = profiler.to_dict()
+    assert set(report["stages"].keys()) == {"parse_write_streaming", "rebuild_aux_summary"}
+    assert report["stages"]["parse_write_streaming"]["rows"] == 12_000
+    assert report["stages"]["parse_write_streaming"]["rows_per_sec"] == pytest.approx(8_000.0)
+    assert report["stages"]["rebuild_aux_summary"]["rows_per_sec"] is None
+    assert report["stages"]["rebuild_aux_summary"]["wal_bytes"] == 2_048
+    assert report["total_rows"] == 12_000
+    assert report["total_duration_s"] == pytest.approx(1.9)
+
+
+@pytest.mark.asyncio
 async def test_profiler_to_dict_fields_are_json_serializable():
     """to_dict 结果必须能被 json.dumps 处理（供 progress / metadata 使用）。"""
     import json
@@ -106,3 +122,46 @@ async def test_profiler_to_dict_fields_are_json_serializable():
     loaded = json.loads(dumped)
     assert loaded["stages"]["export"]["rows"] == 42
     assert loaded["total_rows"] == 42
+
+
+# ---------------------------------------------------------------------------
+# pipeline._build_profiler_report：把 _perf 字典翻译成 profiler report
+# ---------------------------------------------------------------------------
+
+
+def test_build_profiler_report_translates_perf_dict_into_stage_records():
+    """`execute_pipeline` 结尾调用的翻译函数：接入 `_perf` 字典但不重测时间。"""
+    from app.services.ledger_import.profiler_report import _build_profiler_report
+
+    perf = {
+        "start": 100.0,
+        "detect_identify_done": 100.5,
+        "create_staged_done": 101.0,
+        "parse_write_streaming_done": 103.5,
+        "activation_gate_done": 103.7,
+        "activate_dataset_done": 104.0,
+        "rebuild_aux_summary_done": 104.4,
+    }
+    report = _build_profiler_report(perf, 100.0, staging_rows=12_000, rebuild_rows=50)
+    assert report is not None
+    stages = report["stages"]
+    assert set(stages.keys()) == set(perf.keys())
+    # 关键：parse_write_streaming 的 rows / rate 对得上
+    assert stages["parse_write_streaming_done"]["rows"] == 12_000
+    assert stages["parse_write_streaming_done"]["rows_per_sec"] == pytest.approx(12_000 / 2.5)
+    # rebuild 是 balance+aux_balance 的汇总行数
+    assert stages["rebuild_aux_summary_done"]["rows"] == 50
+    # 非业务 phase 不带 rows
+    for phase in ("start", "detect_identify_done", "create_staged_done",
+                  "activation_gate_done", "activate_dataset_done"):
+        assert stages[phase]["rows"] == 0
+        assert stages[phase]["rows_per_sec"] is None
+    assert report["total_rows"] == 12_050
+    assert report["total_duration_s"] == pytest.approx(4.4)
+
+
+def test_build_profiler_report_empty_perf_returns_none():
+    """_perf 空的时候（pipeline 还没 _mark 到任何 phase）返回 None。"""
+    from app.services.ledger_import.profiler_report import _build_profiler_report
+
+    assert _build_profiler_report({}, 123.0) is None
