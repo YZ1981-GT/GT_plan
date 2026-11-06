@@ -65,7 +65,7 @@ def _mock_db_for_admin(project_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Property 2a: Admin/partner visibility — sees all projects (3.6)
+# Property 2a: Admin visibility — sees all projects (3.6)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -117,7 +117,7 @@ async def test_admin_execute_returns_result(project_id, source):
 
 
 # ---------------------------------------------------------------------------
-# Property 2b: Partner visibility — same as admin (3.6)
+# Property 2b: Partner visibility — 只对自己名下的项目放行
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -128,11 +128,9 @@ async def test_admin_execute_returns_result(project_id, source):
 )
 @example(project_id=str(uuid.UUID(int=1)), source="report")
 async def test_partner_execute_returns_result(project_id, source):
-    """Property 2b: Preservation — partner user on any project returns query results.
+    """Property 2b: partner 查询自己名下的项目 → 正常返回结果。
 
-    **Validates: Requirements 3.6**
-
-    EXPECTED: This test PASSES on both unfixed and fixed code.
+    合伙人不再全局可见：可见集由 ``partner_visible_project_ids`` 给出，本用例把目标项目放进去。
     """
     from app.routers.custom_query import execute_query
 
@@ -148,17 +146,53 @@ async def test_partner_execute_returns_result(project_id, source):
     response = MagicMock()
     response.headers = {}
 
-    db = _mock_db_for_admin(project_id)  # partner also gets all projects
+    db = _mock_db_for_admin(project_id)
 
     with patch("app.services.gin_index_monitor.is_index_building", return_value=False), \
          patch("app.services.query_cache.compute_cache_key", return_value="test_key"), \
          patch("app.services.query_cache.get_cached_result", new_callable=AsyncMock, return_value=None), \
-         patch("app.services.query_cache.set_cached_result", new_callable=AsyncMock):
+         patch("app.services.query_cache.set_cached_result", new_callable=AsyncMock), \
+         patch(
+             "app.services.partner_visibility_service.partner_visible_project_ids",
+             new_callable=AsyncMock, return_value={uuid.UUID(project_id)},
+         ):
 
         result = await execute_query(body=body, response=response, db=db, current_user=user)
         assert isinstance(result, dict), (
             f"Partner execute should return a dict result, got {type(result)}"
         )
+
+
+@pytest.mark.asyncio
+async def test_partner_execute_other_project_is_403():
+    """partner 查询不在自己名下的项目 → 403（不再全局放行）。"""
+    from fastapi import HTTPException
+
+    from app.routers.custom_query import execute_query
+
+    project_id = str(uuid.uuid4())
+    user = _make_user(role="partner")
+    body = MagicMock()
+    body.project_id = project_id
+    body.source = "trial_balance"
+    body.year = 2024
+    body.filters = {}
+    body.limit = 100
+    response = MagicMock()
+    response.headers = {}
+    db = _mock_db_for_admin(project_id)
+
+    with patch("app.services.gin_index_monitor.is_index_building", return_value=False), \
+         patch("app.services.query_cache.compute_cache_key", return_value="test_key"), \
+         patch("app.services.query_cache.get_cached_result", new_callable=AsyncMock, return_value=None), \
+         patch("app.services.query_cache.set_cached_result", new_callable=AsyncMock), \
+         patch(
+             "app.services.partner_visibility_service.partner_visible_project_ids",
+             new_callable=AsyncMock, return_value=set(),
+         ):
+        with pytest.raises(HTTPException) as exc:
+            await execute_query(body=body, response=response, db=db, current_user=user)
+    assert exc.value.status_code == 403
 
 
 # ---------------------------------------------------------------------------

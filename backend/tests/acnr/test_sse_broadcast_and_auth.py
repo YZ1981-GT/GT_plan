@@ -86,11 +86,20 @@ async def test_p7_check_project_access_allows_admin():
 
 @pytest.mark.asyncio
 async def test_p7_check_project_access_allows_partner():
+    """partner 只对自己名下的项目放行（不再任意项目放行）。"""
+    from unittest.mock import patch
+
     from app.services.acnr.auth import check_project_access
 
+    pid = uuid.uuid4()
     session = AsyncMock()
-    await check_project_access(_mk_user("partner"), str(uuid.uuid4()), session)
-    session.execute.assert_not_called()
+    target = "app.services.partner_visibility_service.partner_visible_project_ids"
+    with patch(target, AsyncMock(return_value={pid})):
+        await check_project_access(_mk_user("partner"), str(pid), session)
+    with patch(target, AsyncMock(return_value=set())):
+        with pytest.raises(HTTPException) as exc:
+            await check_project_access(_mk_user("partner"), str(pid), session)
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio

@@ -17,8 +17,8 @@
   全局 auditor+manager、全局 qc+合伙人委派 → 各测一次。
 **需求 9.3**：qc / 质控 / eqcr / 独立复核合伙人 / 观察员 各一次拒绝；
   改派从 (manager, edit) → eqcr / 质控 / 未登记 → 拒绝。
-**需求 9.6**：全局 partner 无成员行 → authorize_wp_edit 放行；
-  全局 qc + (manager, edit) 成员行 → 「无底稿编辑权限」。
+**需求 9.6**：全局 partner 与项目无关系 → authorize_wp_edit 拒绝（合伙人只操作自己名下的项目）；
+  是签字合伙人 → 放行；全局 qc + (manager, edit) 成员行 → 「无底稿编辑权限」。
 """
 from __future__ import annotations
 
@@ -360,11 +360,27 @@ class TestReassignmentFromEditDenied:
 
 class TestGlobalRoleEdgeCases:
 
-    async def test_global_partner_no_member_wp_edit_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """需求 9.6：全局 partner、没有成员行 → authorize_wp_edit 放行（partner 全局放行）。"""
+    async def test_global_partner_no_member_wp_edit_denied(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """全局 partner、与项目无任何关系（非创建人 / 非签字 / 无底稿 / 无委派 / 无成员行）→ 拒绝。
+
+        合伙人只能操作自己名下的项目（partner_visibility_service），不再全局放行。
+        """
         async with _extended_sqlite_world(monkeypatch) as world:
             user = await _user(world.db, global_role=UserRole.partner)
             # 不建成员行，不做委派
+            wp = await _workpaper(world.db, PROJECT_ID)
+
+            allowed, detail = await _check_wp_edit(world.db, user, wp.id)
+            assert allowed is False
+            assert "无底稿编辑权限" in detail
+
+    async def test_global_partner_signing_wp_edit_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """全局 partner 是该项目签字合伙人（projects.partner_id）→ 放行（即使没有成员行）。"""
+        async with _extended_sqlite_world(monkeypatch) as world:
+            user = await _user(world.db, global_role=UserRole.partner)
+            project = await world.db.get(Project, PROJECT_ID)
+            project.partner_id = user.id
+            await world.db.flush()
             wp = await _workpaper(world.db, PROJECT_ID)
 
             allowed, _ = await _check_wp_edit(world.db, user, wp.id)

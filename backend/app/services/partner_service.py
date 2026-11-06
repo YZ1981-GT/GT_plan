@@ -30,32 +30,33 @@ class PartnerOverviewService:
         - 跨项目风险预警
         - 待我签字的项目
         """
-        # 获取合伙人关联的项目（通过 project_assignments 或 project_users）
-        assignment_q = (
-            select(ProjectAssignment.project_id)
-            .where(
-                ProjectAssignment.staff_id.in_(
-                    select(StaffMember.id).where(StaffMember.user_id == user_id)
-                ),
-                ProjectAssignment.is_deleted == False,
+        # 合伙人只看名下项目；admin 看全部；其余角色按委派 ∪ 创建（与原口径一致）
+        user = (await self.db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+        role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
+        if role == "admin":
+            all_pids = [r[0] for r in (await self.db.execute(
+                select(Project.id).where(Project.is_deleted == False)  # noqa: E712
+            )).all()]
+        elif role == "partner":
+            from app.services.partner_visibility_service import partner_visible_project_ids
+
+            all_pids = list(await partner_visible_project_ids(user, self.db))
+        else:
+            assignment_q = (
+                select(ProjectAssignment.project_id)
+                .where(
+                    ProjectAssignment.staff_id.in_(
+                        select(StaffMember.id).where(StaffMember.user_id == user_id)
+                    ),
+                    ProjectAssignment.is_deleted == False,
+                )
             )
-        )
-        assigned_pids = [r[0] for r in (await self.db.execute(assignment_q)).all()]
-
-        # 也查 project 表的 created_by（合伙人可能是项目创建者）
-        created_q = select(Project.id).where(
-            Project.created_by == user_id, Project.is_deleted == False,
-        )
-        created_pids = [r[0] for r in (await self.db.execute(created_q)).all()]
-
-        all_pids = list(set(assigned_pids + created_pids))
-
-        if not all_pids:
-            # 如果是 admin，返回所有项目
-            user = (await self.db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-            if user and user.role == "admin":
-                all_pids_q = select(Project.id).where(Project.is_deleted == False).limit(50)
-                all_pids = [r[0] for r in (await self.db.execute(all_pids_q)).all()]
+            assigned_pids = [r[0] for r in (await self.db.execute(assignment_q)).all()]
+            created_q = select(Project.id).where(
+                Project.created_by == user_id, Project.is_deleted == False,
+            )
+            created_pids = [r[0] for r in (await self.db.execute(created_q)).all()]
+            all_pids = list(set(assigned_pids + created_pids))
 
         projects = []
         risk_alerts = []
@@ -505,19 +506,28 @@ class TeamEfficiencyService:
         - 退回率
         - 工时利用率
         """
-        # 获取合伙人负责的项目
-        staff_q = select(StaffMember.id).where(StaffMember.user_id == user_id)
-        staff_id = (await self.db.execute(staff_q)).scalar()
+        # 获取负责的项目：admin 全部；partner 名下项目；其余角色按委派。
+        # （原逻辑把「没有人员档案」一律当 admin，返回前 50 个项目 —— 无档案的合伙人会看到别人的数据）
+        user = (await self.db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+        role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
+        if role == "admin":
+            pids = [r[0] for r in (await self.db.execute(
+                select(Project.id).where(Project.is_deleted == False)  # noqa: E712
+            )).all()]
+        elif role == "partner":
+            from app.services.partner_visibility_service import partner_visible_project_ids
 
-        if staff_id:
-            pid_q = select(ProjectAssignment.project_id).where(
-                ProjectAssignment.staff_id == staff_id, ProjectAssignment.is_deleted == False,
-            )
+            pids = list(await partner_visible_project_ids(user, self.db))
         else:
-            # admin 看全部
-            pid_q = select(Project.id).where(Project.is_deleted == False).limit(50)
-
-        pids = [r[0] for r in (await self.db.execute(pid_q)).all()]
+            staff_q = select(StaffMember.id).where(
+                StaffMember.user_id == user_id, StaffMember.is_deleted == False,  # noqa: E712
+            )
+            staff_ids = [r[0] for r in (await self.db.execute(staff_q)).all()]
+            pids = [r[0] for r in (await self.db.execute(
+                select(ProjectAssignment.project_id).where(
+                    ProjectAssignment.staff_id.in_(staff_ids), ProjectAssignment.is_deleted == False,  # noqa: E712
+                )
+            )).all()] if staff_ids else []
         if not pids:
             return {"staff_metrics": [], "summary": {}}
 

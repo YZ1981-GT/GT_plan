@@ -79,12 +79,19 @@ async def _check_project_access(db: AsyncSession, user: User, project_id: UUID) 
     """验证用户对项目有权限。
 
     与 deps.require_project_access 对齐：
-    - admin / partner 跳过委派检查（可访问全部项目）
+    - admin 跳过委派检查（可访问全部项目）；partner 只放行自己名下的项目
     - 其余用户：project_users 或 staff_members→project_assignments 任一命中即可
     """
     role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
-    if role_val in ("admin", "partner"):
+    if role_val == "admin":
         return
+    if role_val == "partner":
+        # 合伙人只放行自己名下的项目（与项目列表同一可见集）
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id in await partner_visible_project_ids(user, db):
+            return
+        raise HTTPException(status_code=403, detail="无权访问该项目")
 
     uid, pid = str(user.id), str(project_id)
 

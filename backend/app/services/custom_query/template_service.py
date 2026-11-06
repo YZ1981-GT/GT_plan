@@ -315,7 +315,7 @@ class TemplateService:
         """判定模板对当前用户是否可见可执行（R13.3 / R13.4；R9.2）。
 
         复用 ``OwnershipGuard.get_accessible_project_ids`` 计算用户可访问项目集合
-        （project_users ∪ project_assignments，admin / partner → 全部），再交
+        （project_users ∪ project_assignments；admin → 全部；partner → 名下项目），再交
         ``TemplateScopeAdapter.is_visible`` 判定（列表、详情、执行同一判定）。
         """
         g = guard or ownership_guard

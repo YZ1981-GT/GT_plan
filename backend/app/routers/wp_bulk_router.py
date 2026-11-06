@@ -359,9 +359,15 @@ async def _require_manager_role(
     """
     role = current_user.role.value
 
-    # admin / partner 全局放行
-    if role in ("admin", "partner"):
+    # admin 全局放行；partner 只放行自己名下的项目
+    if role == "admin":
         return current_user
+    if role == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id in await partner_visible_project_ids(current_user, db):
+            return current_user
+        raise HTTPException(status_code=403, detail="权限不足：需要项目经理角色")
 
     # 查询项目角色
     from sqlalchemy import select

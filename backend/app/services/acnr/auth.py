@@ -2,7 +2,7 @@
 
 check_project_access(user, project_id, session):
     校验当前用户对 project 有访问权（经 project_assignments 或角色）。
-    admin / partner 跳过委派检查。
+    admin 跳过委派检查；partner 只放行自己名下的项目。
 
 verify_wp_binding(wp_id, project_id, sheet_code, session):
     校验 wp_id 属于 project_id 且 WpIndex.parent_wp_code 与 sheet_code 匹配。
@@ -26,15 +26,25 @@ logger = logging.getLogger(__name__)
 async def check_project_access(user, project_id: str | UUID, session: AsyncSession) -> None:
     """Req-3.1: 校验当前用户对项目有访问权。
 
-    - admin / partner 角色直接放行（可访问全部项目）
+    - admin 角色直接放行（可访问全部项目）；partner 只放行自己名下的项目
     - 其余用户：project_users 或 staff_members→project_assignments 任一命中即可
     - 无权限 → raise HTTPException 403
 
     与 review_dialog._check_project_access / deps.require_project_access 对齐。
     """
     role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
-    if role_val in ("admin", "partner"):
+    if role_val == "admin":
         return
+    if role_val == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        try:
+            pid_uuid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+        except ValueError:
+            raise HTTPException(status_code=403, detail="无权访问该项目")
+        if pid_uuid in await partner_visible_project_ids(user, session):
+            return
+        raise HTTPException(status_code=403, detail="无权访问该项目")
 
     uid = str(user.id)
     pid = str(project_id)

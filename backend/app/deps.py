@@ -409,7 +409,7 @@ async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -
 
     判定口径同 require_wp_edit_permission：
     1. 角色须具 WORKPAPER_WRITE（qc/readonly → 403）。
-    2. admin/partner 全局放行。
+    2. admin 全局放行；partner 只放行自己名下的项目（``partner_visible_project_ids``）。
     3. 其余角色须为目标底稿所属项目成员且具 edit 权（project_users）。
 
     Returns:
@@ -439,9 +439,17 @@ async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -
     if project_id is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    # ② admin/partner 全局放行（在确认底稿存在后返回其 project_id）
-    if role in ("admin", "partner"):
+    # ② admin 全局放行（在确认底稿存在后返回其 project_id）
+    if role == "admin":
         return project_id
+
+    # ②b partner 只对自己名下的项目放行（与项目列表同一可见集）
+    if role == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id in await partner_visible_project_ids(current_user, db):
+            return project_id
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
 
     # ④ 项目成员编辑权（project_users edit 级；每次直接查库）
     level = await _load_member_level(db, current_user.id, project_id)
@@ -462,7 +470,7 @@ async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -
     非项目成员放行（否则任意登录用户可拉取他人项目底稿数据）。
 
     判定口径：
-    1. admin/partner 全局放行（在确认底稿存在后返回其 project_id）。
+    1. admin 全局放行；partner 只放行自己名下的项目（在确认底稿存在后返回其 project_id）。
     2. 其余角色须为目标底稿所属项目成员（``project_users`` 任一权限级 ≥ readonly）。
 
     Returns:
@@ -486,8 +494,16 @@ async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -
     if project_id is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    if role in ("admin", "partner"):
+    if role == "admin":
         return project_id
+
+    # partner 只对自己名下的项目放行（与项目列表同一可见集）
+    if role == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id in await partner_visible_project_ids(current_user, db):
+            return project_id
+        raise HTTPException(status_code=403, detail="无底稿访问权限")
 
     level = await _load_member_level(db, current_user.id, project_id)
     if level is None:
@@ -592,14 +608,18 @@ async def get_visible_project_ids(
 ) -> list[UUID]:
     """返回当前用户可见的项目 ID 列表。
 
-    admin/partner 可见所有项目，其他角色只能看到自己参与的项目。
+    admin 可见所有项目；partner 只见自己名下的项目（``partner_visible_project_ids``）；
+    其他角色只能看到自己参与的项目。
     """
-    if current_user.role.value in ("admin", "partner"):
-        from app.models.core import Project
+    if current_user.role.value == "admin":
         result = await db.execute(
             select(Project.id).where(Project.is_deleted == False)  # noqa: E712
         )
         return [r[0] for r in result.all()]
+    if current_user.role.value == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        return list(await partner_visible_project_ids(current_user, db))
 
     result = await db.execute(
         select(ProjectUser.project_id).where(
@@ -616,17 +636,22 @@ async def _project_level_visible_ids(
 ) -> list[UUID]:
     """项目级可见 ID（data_scope_service scope=6「我参与的」专用）。
 
-    admin/partner → 全部未删除项目；其余角色 → 参与项目（project_users）∪
-    担任经理/合伙人的项目 ∪ 创建的项目（DROP ProjectMember：本项目无该模型）。
+    admin → 全部未删除项目；partner → 自己名下的项目（``partner_visible_project_ids``）；
+    其余角色 → 参与项目（project_users）∪ 担任经理/合伙人的项目 ∪ 创建的项目
+    （DROP ProjectMember：本项目无该模型）。
     """
     from sqlalchemy import or_
 
     role_str = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
-    if role_str in ("admin", "partner"):
+    if role_str == "admin":
         result = await db.execute(
             select(Project.id).where(Project.is_deleted == False)  # noqa: E712
         )
         return [r[0] for r in result.all()]
+    if role_str == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        return list(await partner_visible_project_ids(current_user, db))
 
     member_ids = (await db.execute(
         select(ProjectUser.project_id).where(

@@ -81,15 +81,28 @@ async def list_projects(
 ) -> list[ProjectCreateResponse]:
     """获取项目列表（按用户可见性过滤）
 
-    admin/partner 可见所有项目，其他角色只能看到自己参与的项目。
+    admin 可见所有项目；partner 只见自己名下的项目；其他角色只能看到自己参与的项目。
     """
     from sqlalchemy import select
     from app.models.core import ProjectUser
 
-    if current_user.role.value in ("admin", "partner"):
-        # 管理员和合伙人可见所有项目
+    if current_user.role.value == "admin":
+        # 管理员可见所有项目
         result = await db.execute(
             select(Project).where(Project.is_deleted == False)  # noqa: E712
+        )
+    elif current_user.role.value == "partner":
+        # 合伙人只见自己名下的项目（本人创建 / 下属创建 / 签字 / 持有底稿 / 团队委派）
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        pids = await partner_visible_project_ids(current_user, db)
+        if not pids:
+            return []
+        result = await db.execute(
+            select(Project).where(
+                Project.id.in_(pids),
+                Project.is_deleted == False,  # noqa: E712
+            )
         )
     else:
         # 其他角色只能看到自己参与的项目
@@ -136,9 +149,21 @@ async def list_projects_with_progress(
     from app.models.workpaper_models import WorkingPaper
 
     # 1. 项目可见性过滤
-    if current_user.role.value in ("admin", "partner"):
+    if current_user.role.value == "admin":
         proj_result = await db.execute(
             select(Project).where(Project.is_deleted == False)  # noqa: E712
+        )
+    elif current_user.role.value == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        pids = await partner_visible_project_ids(current_user, db)
+        if not pids:
+            return []
+        proj_result = await db.execute(
+            select(Project).where(
+                Project.id.in_(pids),
+                Project.is_deleted == False,  # noqa: E712
+            )
         )
     else:
         my_pids = await db.execute(
@@ -236,7 +261,12 @@ async def get_project(
         Project.id == project_id,
         Project.is_deleted == False,  # noqa: E712
     )
-    if current_user.role.value not in ("admin", "partner"):
+    if current_user.role.value == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id not in await partner_visible_project_ids(current_user, db):
+            raise HTTPException(status_code=404, detail="项目不存在")
+    elif current_user.role.value != "admin":
         query = query.join(ProjectUser, ProjectUser.project_id == Project.id).where(
             ProjectUser.user_id == current_user.id,
             ProjectUser.is_deleted == False,  # noqa: E712
@@ -310,7 +340,14 @@ async def list_available_subsidiaries(
             Project.parent_project_id == project_id,
         ),
     )
-    if current_user.role.value not in ("admin", "partner"):
+    if current_user.role.value == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        partner_pids = await partner_visible_project_ids(current_user, db)
+        if not partner_pids:
+            return []
+        query = query.where(Project.id.in_(partner_pids))
+    elif current_user.role.value != "admin":
         query = query.join(ProjectUser, ProjectUser.project_id == Project.id).where(
             ProjectUser.user_id == current_user.id,
             ProjectUser.is_deleted == False,  # noqa: E712
