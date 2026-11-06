@@ -76,7 +76,8 @@
   - 临时库 `gt_release_blocker_*`：CREATE_ALL 365 表、磁盘迁移 252 执行 251 失败 0、pending=[]、failures=[]、
     checksum drift=[]、V229+V264 已登记、is_complete=True、/readyz=200、90 passed、DROP=OK。口径「当前全部迁移」
     （V229 早已落库，见 design §9.4）。
-- [ ] 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链
+- [ ]* 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链
+  - 写入型主链已完成（见下 ✅）；浏览器生产构建 smoke 与 OO→HTML 往返仍外部阻断，故整条标 `[ ]*`。
   - Dev 模式渲染正常：共享 dev server（127.0.0.1:3030）登录页表单完整。
   - 🔴 生产构建 `build:verify` 产物浏览器白屏（`vendor-core:30:11317` TDZ `Cannot access 'Rt' before
     initialization`）= **远端 HEAD 既有缺陷**，干净 base worktree 重建后同样白屏（符号 / 位置一致），非本批
@@ -84,15 +85,32 @@
     建议另立 spec 修 vendor-core 分块 + smoke 加无头浏览器步（见 design §9.6）。
   - 终态冻结（本批核心）由真 PG `test_workpaper_review_lifecycle_pg.py` + 一次性库 `PARTIAL_STATUS_STUB=OK`
     + 守卫 `test_workpaper_terminal_freeze_guard.py`（17 passed）覆盖；前端只读 / 冻结横幅由 vitest 隔离 54 passed 覆盖。
-  - 写入型（复核/trio/HTML 保存）需用户授权写共享库【测试】项目。
+  - ✅ 写入型主链（复核→终态→内容写 423）已在用户授权后于候选代码（v1.0.139）验证，四重证据（design §11）：
+    ① aos8 真 HTTP（`test_aos_adopt_endpoint_http.py` 13 passed，共享 PG 隔离 scratch schema，真 router +
+    ResponseWrapperMiddleware）——workflow_locked→**423** + digest 正向采纳成功写审计链（修前 4 failed：我的
+    下游漏改 2 处 403→423 断言 + 既有 harness 漏建 `audit_chain_head` 伴生表 2 处，均已修）；
+    ② freeze 逻辑 `test_workpaper_terminal_freeze_guard` + `test_release_readiness_content_snapshot` 31 passed；
+    ③ 共享库 public schema freeze 探针（回滚事务、零残留、零审计污染）：真 `working_paper` 表 / 真 `WpFileStatus`
+    PG 枚举，4 个终态（review_passed/archived/review_level1_passed/review_level2_passed）全 423、draft 放行、
+    走 for_update=True 完整路径（advisory xact lock + FOR UPDATE），回滚后状态复原 draft；
+    ④ 全复核链→终态→423 由一次性库 lifecycle 覆盖（Task 21 的 90 passed 含 lifecycle）；
+    `test_workpaper_review_lifecycle_pg` 自带 `_require_disposable_database` 守卫，禁止对共享库跑（防追加型
+    `audit_log_entries` 哈希链被测试数据污染）——故不对共享库做完整复核链 UAT，是设计意图而非遗漏。
   - OO→HTML 往返依赖上游 `wp-sync-conflict-adjudication-and-d4-32-modeling`（代码在 v1.0.136，但其 Task 12
     真库 UAT + definition re-provision 未执行）⇒ 无可通路径。如实标未完成 + 登记依赖。
-- [ ] 23. 五角色复核、语义审查、INDEX 登记；同步最新远端后单 commit 与版本化推送（进行中）
+- [x] 23. 五角色复核、语义审查、INDEX 登记；同步最新远端后单 commit 与版本化推送
+  - 两阶段版本化推送：阶段一 v1.0.138（commit f73449c3b，Task 1–21 + Task 24 调查 + Task 22 非写入证据）；
+    阶段二 v1.0.139（本 commit，Task 22 写入型 UAT 的 2 文件下游收口 + Task 24 执行结果 + 本翻牌）。
+  - 阶段二推送前 ls-remote 核对远端分支头 = f73449c3b（阶段一头，无并发漂移），干净快进。
 
 ## 外部停点
 
-- [ ]* 24. 共享库执行待迁移、调查审计链分叉、重建膨胀索引与验证 invalid constraints——执行前单独取得用户批准
+- [x]* 24. 共享库执行待迁移、调查审计链分叉、重建膨胀索引与验证 invalid constraints——执行前单独取得用户批准
   - 调查完成（design §9.5 + `task24-change-order.md`）：审计链 9 分叉点/10+1 确认条目已于 11-04 全部确认、无待办；
     迁移 pending=0/failures=0/漂移全部已登记（本批新登记 V233/V234，逐对象核验在库全生效）；10 条 NOT VALID 约束
-    现有数据 0 违反（VALIDATE 安全）；3 个膨胀索引 invalid=0。VALIDATE 与 REINDEX 属共享库 DDL 写，整理为变更单
-    待用户逐项批准，本批不执行。
+    现有数据 0 违反（VALIDATE 安全）；3 个膨胀索引 invalid=0。
+  - ✅ 用户已授权，变更单已对共享库 `audit_platform` 执行并复核（Python asyncpg 写连接，脚本在
+    `tmp_release_blocker_apply/`，执行证据见 design §11）：
+    ① VALIDATE 10 条 NOT VALID 约束逐条成功，convalidated 全 True，public schema 剩余 NOT VALID 约束归零；
+    ② REINDEX INDEX CONCURRENTLY（autocommit、非事务块）3 个膨胀索引——`tb_aux_ledger_pkey` 602→470MB
+    （回收 132MB），两个 window 索引基本无变化（原膨胀估算偏乐观，重建无害）；无 `*_ccnew` 残留、全部 valid/ready。

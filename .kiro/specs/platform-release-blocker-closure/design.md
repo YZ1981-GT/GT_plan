@@ -184,3 +184,60 @@ mock 缺列桩可写、SQLite 不走 to_jsonb、已删除行在冻结判据外�
   证据可复现；迁移漂移 V233/V234 逐对象核验在库全生效。
 - **EQCR 技术复核**：to_jsonb 安全读 / 方言分支 / 单一来源终态集合 / 无 import 环（freeze 为基础层）；
   既有 vendor-core TDZ 诚实暴露并建议另立 spec，不在本批高 blast radius 冒险改。
+
+## 11. Task 24 执行与 Task 22 写入型 UAT（2026-11-05，用户授权后执行）
+
+> 证据分级：**【第一手】**=本会话（v1.0.139 这一轮）亲自跑 / 查到的输出；**【引用】**=前序 turn / Task 21
+> 的结果，本会话未重跑，不冒充亲验。
+
+### 11.1 Task 24 共享库 DDL —— 已执行，本会话第一手复核
+VALIDATE 10 约束 + REINDEX 3 索引由 apply 脚本（`tmp_release_blocker_apply/apply_validate.py`、
+`apply_reindex.py`；Python asyncpg 写连接，REINDEX 走 autocommit 非事务块）在前序 turn 执行。本会话用
+**只读** MCP 现查复核（2026-11-05）：
+
+- **【第一手】** 10 条目标约束（`ck_adjustment_entries_nonnegative` / `_one_side`、
+  `ck_adjustments_audit_phase` / `_content_revision`、`fk_evidence_links_wp` / `_attachment`、
+  `chk_extraction_log_fill_mode` / `_status` / `_type`、`fk_extraction_log_user`）全部 `convalidated = True`；
+  public schema 剩余 NOT VALID 约束 = 0。
+- **【第一手】** 3 索引 `indisvalid = indisready = True`；public schema `*_ccnew` 残留 = 0、invalid 索引 = 0。
+- **【第一手·尺寸真相，不粉饰】** `tb_aux_ledger_pkey` 现 **470 MB**（变更单实测基线 602 MB，回收约 132 MB，
+  但**未达**变更单 pgstattuple **估算**的 183 MB）；`idx_tb_aux_ledger_active_window` 现 **1799 MB**、
+  `idx_tb_ledger_active_window` 现 **660 MB** —— 两个 window 索引**基本原地不变**（变更单估算要降到
+  368 / 129 MB 属乐观估计，实际并不膨胀）。
+  ⇒ 诚实结论：REINDEX 三条都成功执行且无 `*_ccnew` 残留、索引全有效；但**只有主键索引有实质回收，
+  两个 window 索引重建无害、几乎零收益**。不写成「膨胀整体下降」。
+
+### 11.2 Task 22 写入型主链 UAT —— 四重证据（分级）
+- **【第一手】①** aos8 真 HTTP：`test_aos_adopt_endpoint_http.py` **13 passed**（共享 PG 隔离 scratch schema，
+  真 `wp_sync_router` + `ResponseWrapperMiddleware`）。workflow_locked → **423** `sync_workflow_locked`，
+  digest 正向采纳成功写审计链。修前 4 failed 分两类：**我的下游漏改 2 处**（可达码集合断言 + 五分支码序断言
+  仍写 403，而本批 Task 9 已把 `SyncWorkflowLockedError` 的 guard 映射 403→423）；**既有 harness 2 处**
+  （`aos8_endpoint_world.py` 的 `STUB_DDL` 由 spec `workpaper-multi-window-lock-gaps`（commit 6de7b67dd）
+  维护、漏建 `audit_chain_head` 伴生表，digest 正向路径写审计哈希链时 UndefinedTable）。两类均在本 commit 修。
+- **【第一手】②** freeze 逻辑：`test_workpaper_terminal_freeze_guard` + `test_release_readiness_content_snapshot`
+  **31 passed**（无需 DB）。
+- **【第一手】③** 共享库 public schema freeze 探针（`tmp_release_blocker_apply/freeze_probe.py`，回滚事务）：
+  对现有【测试】项目一个 draft 底稿，逐个翻成 4 个终态调真 `assert_workpaper_content_writable(for_update=True)`
+  —— 全部抛 **423**（中文冻结消息正确）、draft 放行；走完整 advisory xact lock + FOR UPDATE 路径；
+  **回滚后状态复原 draft，零残留、零审计链写入**（全程不经复核服务）。验证的是真 `working_paper` 表 /
+  真 `WpFileStatus` PG 枚举（aos8 用 STUB schema，此探针补上真实 public schema 维度）。
+- **【引用·本会话未重跑】④** 全复核链→终态→423：依据 Task 21 一次性库回归「90 passed 含 lifecycle」
+  （前序 turn 记录，本会话未复现其输出）；`test_workpaper_review_lifecycle_pg.py` 自带
+  `_require_disposable_database` 守卫，**禁止对共享库跑**（防追加型 `audit_log_entries` 哈希链被测试数据
+  污染）。本会话未重建一次性库重跑，理由：本 commit 的 5 处改动全是测试文件（aos8）+ 1 处 endpoint_guard
+  消息字符串（cosmetic），**均不触及复核服务 / freeze 服务的生产逻辑**，该链行为相对预推送未变。
+
+### 11.3 本 commit（v1.0.139）的 2 个代码文件改动
+- `app/services/workpaper_sync/endpoint_guard.py`：`SyncWorkflowLockedError` raise 消息里的「403」→
+  「423 Locked」（Task 9 把 guard 映射改 423 后遗留的陈旧文案；其余「403，与 404 分型」是真正的 403
+  授权拒绝 = ConflictResolution / Materialize / ScopeAuthorization，保持不动——grep 确认无测试断言该文案）。
+- `tests/workpaper_sync/test_aos_adopt_endpoint_http.py`：① 可达码 `named` {401,403,409,422}→
+  {401,409,422,423}、`extra` [404,500,503]→[403,404,500,503]（403 从命名 AC 退为通用
+  `SyncActionForbiddenError` 一支）；② 五分支码序 [401,403,…]→[401,423,…]；③ import + 建 `AuditChainHead`
+  伴生表（修既有 harness 缺陷，使 digest 正向控制真正跑通）。
+
+### 11.4 诚实登记：仍未完成（非假绿）
+- 浏览器**生产构建** smoke：vendor-core TDZ（`Rt before initialization`）既有缺陷阻断（§9.6），Task 22 标 `[ ]*`。
+- OO→HTML 往返：上游 `wp-sync-conflict-adjudication-and-d4-32-modeling` Task 12 真库 UAT 未执行，无通路。
+- Task 22 字面目标是**浏览器**验证主链；本会话完成的是**后端写入型 HTTP + 探针**维度，浏览器维度仅 dev
+  登录页可渲染、生产构建受阻，故整条仍标 `[ ]*`。

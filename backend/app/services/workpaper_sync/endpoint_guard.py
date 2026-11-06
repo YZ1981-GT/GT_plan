@@ -838,7 +838,7 @@ class SyncEndpointGuard:
             self.refused += 1
             raise SyncWorkflowLockedError(
                 f"wp {wp_id} 的 workflow 已锁定（复核锁定/归档）—— "
-                f"scope 可见但写 action={request.action!r} 不被允许（403，与 404 分型）；"
+                f"scope 可见但写 action={request.action!r} 不被允许（423 Locked，与 404 分型）；"
                 f"只读 action（{sorted(self._read_only_actions)}）仍放行，"
                 "否则归档底稿连冲突/timeline 都看不了"
             )
