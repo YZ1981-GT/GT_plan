@@ -12,10 +12,10 @@
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import check_consol_lock, require_project_access
@@ -39,6 +39,89 @@ class ReaggregateRequest(BaseModel):
     standard: str | None = None
     template_type: str | None = None
     force: bool = False  # True = 忽略 stale 状态强制重算（共享公式内核始终按请求执行）
+    operation_id: str | None = Field(None, max_length=100)  # B4：同一用户操作的网络重试复用 durable job
+
+
+class ReaggregateAccepted(BaseModel):
+    """耐久重新汇总提交回执；前端经 platform-jobs 状态端点恢复。"""
+
+    accepted: bool = True
+    job_id: UUID
+    status: str
+    project_id: UUID
+    year: int
+
+
+def _reaggregate_operation_key(operation_id: str | None) -> str:
+    """操作 id 为空时生成新 id，避免以后相同选项误复用旧重新汇总任务。"""
+    from app.services import platform_job_service as jobs
+
+    raw = (operation_id or "").strip() or uuid4().hex
+    return f"consol-note:{jobs.canonical_hash({'operation_id': raw})}"
+
+
+@router.post(
+    "/{project_id}/{year}/reaggregate-async",
+    response_model=ReaggregateAccepted,
+)
+async def reaggregate_consol_notes_async(
+    project_id: UUID,
+    year: int,
+    request: ReaggregateRequest | None = None,
+    node_key: str | None = Query(None, description="企业树节点；与 body.node_key 同时传入时必须一致"),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """提交耐久重新汇总任务；实际执行时 worker 会重新校验权限、合并锁、节点范围和 DAG。"""
+    from app.services import platform_job_service as jobs
+    from app.services.consol_node_scope import resolve_requested_node_key
+    from app.services.consol_note_formula_service import NoteFormulaError, note_template_type
+    from app.services.consol_note_reaggregate_executor import OPERATION
+
+    request = request or ReaggregateRequest()
+    try:
+        resolved_node_key = resolve_requested_node_key(
+            node_key, request.model_dump(exclude_none=True),
+        )
+        if request.standard and request.template_type and (
+            note_template_type(request.standard) != note_template_type(request.template_type)
+        ):
+            raise NoteFormulaError("standard 与 template_type 指向不同附注模板")
+    except (NoteFormulaError, ValueError) as exc:
+        raise HTTPException(status_code=getattr(exc, "status", 400), detail=str(exc)) from exc
+
+    sections = request.section_ids
+    if sections is not None and len(sections) > 500:
+        raise HTTPException(status_code=422, detail="section_ids 超过 500 项上限")
+    payload = {
+        "year": year,
+        "section_ids": sections,
+        "node_key": resolved_node_key,
+        "standard": request.standard,
+        "template_type": request.template_type,
+        "force": request.force,
+    }
+    try:
+        job, _created = await jobs.create_or_get_job(
+            db,
+            operation=OPERATION,
+            project_id=project_id,
+            actor_id=user.id,
+            idempotency_key=_reaggregate_operation_key(request.operation_id),
+            payload_ref=payload,
+            progress_total=len(sections) if sections is not None else 0,
+        )
+        await db.commit()
+    except jobs.PlatformJobConflict as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return ReaggregateAccepted(
+        job_id=job.id,
+        status=job.status,
+        project_id=project_id,
+        year=year,
+    )
 
 
 class ReaggregateResponse(BaseModel):

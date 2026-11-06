@@ -24,7 +24,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any, Awaitable, Callable, Sequence
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -78,7 +78,12 @@ from app.services.consol_tree_service import TreeNode, build_tree, find_node_by_
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["WRITE_SOURCE", "reaggregate_subtree"]
+__all__ = ["ReaggregateCancelled", "WRITE_SOURCE", "reaggregate_subtree"]
+
+
+class ReaggregateCancelled(RuntimeError):
+    """耐久任务在章节边界收到取消/lease fence 拒绝；外层事务必须整体回滚。"""
+
 
 #: 汇总节点写入来源标记（ConsolNoteTab 据此显示「🔄 子树汇总」）
 WRITE_SOURCE = "subtree_aggregate"
@@ -99,10 +104,12 @@ async def reaggregate_subtree(
     section_ids: Sequence[str] | None = None,
     template_type: str | None = None,
     tree: TreeNode | None = None,
+    progress: Callable[[int, int, str], Awaitable[bool]] | None = None,
 ) -> dict[str, Any]:
-    """所选节点（缺省 = 根合并节点）子树逐节点更新并自下而上汇总；返回逐节点 / 逐章节结果。
+    """所选节点子树逐节点更新并自下而上汇总；返回逐节点 / 逐章节结果。
 
-    ``tree``：调用方已按本项目本年度建好的企业树（路由校验节点时建过），不传则现建。
+    ``progress`` 由耐久任务传入：每章开始/完成时返回 False 即在章节边界抛
+    :class:`ReaggregateCancelled`。路由同步调用不传，原有语义不变。
     """
     from app.services.consol_push_service import _advisory_lock, _process_lock
 
@@ -112,8 +119,13 @@ async def reaggregate_subtree(
             db, project_id, year, node_key=node_key, section_ids=section_ids, template_type=template_type,
             tree=tree,
         )
-        for section_id in run.section_ids:
+        total = len(run.section_ids)
+        for index, section_id in enumerate(run.section_ids, start=1):
+            if progress is not None and not await progress(index - 1, total, f"正在重新汇总 {section_id}"):
+                raise ReaggregateCancelled("重新汇总任务已取消或租约已失效")
             await run.process_section(section_id)
+            if progress is not None and not await progress(index, total, f"已重新汇总 {section_id}"):
+                raise ReaggregateCancelled("重新汇总任务已取消或租约已失效")
         return run.result()
 
 

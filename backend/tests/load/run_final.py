@@ -29,9 +29,9 @@
 
 import argparse
 import csv
+import json
 import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -44,6 +44,8 @@ LOCUSTFILE = SCRIPT_DIR / "locustfile.py"
 DEFAULT_HOST = "http://localhost:9980"
 DEFAULT_OUTPUT = SCRIPT_DIR / "final_report.md"
 DEFAULT_BASELINE = SCRIPT_DIR / "baseline_report.md"
+REPO_ROOT = SCRIPT_DIR.parents[2]
+DEFAULT_EVIDENCE_ROOT = REPO_ROOT / "tmp_capacity_evidence"
 
 # 梯度阶段定义（与 locustfile.py LOAD_STAGES 一致）
 STAGES = [
@@ -69,17 +71,19 @@ def parse_args():
     parser.add_argument("--host", default=DEFAULT_HOST, help="目标主机地址")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="最终报告输出路径")
     parser.add_argument("--baseline", default=str(DEFAULT_BASELINE), help="基线报告路径（用于对比）")
+    parser.add_argument(
+        "--evidence-dir",
+        default=None,
+        help="原始 Locust CSV 与机器可读 JSON 的目录；缺省写入仓库根 tmp_capacity_evidence/（已忽略）",
+    )
     return parser.parse_args()
 
 
-def run_locust_full_shape(host: str) -> dict:
-    """以无头模式运行 Locust StepLoadShape，返回统计数据。
-
-    StepLoadShape 在 locustfile.py 中定义，自动控制梯度加压。
-    Locust 会在所有阶段完成后自动停止。
-    """
-
-    csv_prefix = SCRIPT_DIR / f"_final_{int(time.time())}"
+def run_locust_full_shape(host: str, evidence_dir: Path) -> dict:
+    """以无头模式运行 Locust StepLoadShape，并保留原始 CSV 证据。"""
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    # 同一 run 的所有 CSV 固定在独立证据目录，失败/超时也保留现场而不 cleanup。
+    csv_prefix = evidence_dir / "locust"
 
     cmd = [
         sys.executable, "-m", "locust",
@@ -93,7 +97,7 @@ def run_locust_full_shape(host: str) -> dict:
     # 计算超时（总运行时间 + 120s 缓冲）
     timeout_seconds = int(ESTIMATED_TOTAL_SECONDS) + 120
 
-    print(f"[INFO] 启动 Locust 目标压测 (StepLoadShape)...")
+    print("[INFO] 启动 Locust 目标压测 (StepLoadShape)...")
     print(f"[INFO] 命令: {' '.join(cmd)}")
     print(f"[INFO] 目标: {host}")
     print(f"[INFO] 梯度: {' → '.join(str(s['users']) for s in STAGES)} 用户")
@@ -119,12 +123,9 @@ def run_locust_full_shape(host: str) -> dict:
         print("[ERROR] 未找到 locust 命令，请确认已安装: pip install locust")
         sys.exit(1)
 
-    # 解析结果
+    # 解析结果；原始 CSV 必须保留给 E5/E6 复核，不能像旧版一样 cleanup 后只剩摘要。
     stats = parse_csv_results(csv_prefix)
-
-    # 清理临时文件
-    cleanup_csv(csv_prefix)
-
+    stats["evidence_dir"] = str(evidence_dir)
     return stats
 
 
@@ -231,12 +232,33 @@ def _extract_stage_snapshots(history_file: Path) -> list:
 
 
 def cleanup_csv(csv_prefix: Path):
-    """清理 Locust 生成的临时 CSV 文件。"""
+    """显式清理一次性 Locust CSV（自动 runner 不再调用，以保留 E5/E6 证据）。"""
     suffixes = ["_stats.csv", "_failures.csv", "_stats_history.csv", "_exceptions.csv"]
     for suffix in suffixes:
         f = Path(f"{csv_prefix}{suffix}")
         if f.exists():
             f.unlink()
+
+
+def write_evidence_json(evidence_dir: Path, stats: dict, evaluation: dict, *, host: str) -> Path:
+    """写机器可读摘要；不写 token/密码，只记可复算的统计与判定。"""
+    path = evidence_dir / "summary.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "host": host,
+                "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "stats": stats,
+                "evaluation": evaluation,
+                "raw_csv": sorted(item.name for item in evidence_dir.glob("locust_*.csv")),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def evaluate_results(stats: dict) -> dict:
@@ -292,14 +314,8 @@ def generate_final_report(stats: dict, args) -> str:
     stages = stats.get("stages", [])
     timestamp = stats.get("timestamp", "[未知]")
 
-    # 计算全局错误率
-    total_requests = total.get("requests", 0)
-    total_failures = total.get("failures", 0)
-    error_rate = (total_failures / total_requests * 100) if total_requests > 0 else 0
-
     # 判定统一走证据门：任何阶段零样本/未达到目标并发均不得以 0ms 假绿。
     evaluation = evaluate_results(stats)
-    stage_6000 = evaluation["stage_6000"]
     p95_6000 = evaluation["p95_6000"]
     error_rate_6000 = evaluation["error_rate_6000"]
     samples_pass = evaluation["samples_pass"]
@@ -557,8 +573,13 @@ def main():
         print(f"[ERROR] 未找到压测脚本: {LOCUSTFILE}")
         sys.exit(1)
 
-    # 运行压测
-    stats = run_locust_full_shape(args.host)
+    # 运行压测。默认证据目录在仓库根 tmp_*（已忽略）；正式运行可显式指定可归档目录。
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    evidence_dir = Path(args.evidence_dir) if args.evidence_dir else DEFAULT_EVIDENCE_ROOT / f"run_{stamp}"
+    stats = run_locust_full_shape(args.host, evidence_dir)
+    evaluation = evaluate_results(stats)
+    summary_path = write_evidence_json(evidence_dir, stats, evaluation, host=args.host)
+    print(f"[OK] 原始 CSV/JSON 证据已保留: {evidence_dir}（摘要: {summary_path.name}）")
 
     # 生成报告
     total = stats.get("total", {})
@@ -580,7 +601,6 @@ def main():
         total_failures = total.get("failures", 0)
         error_rate = (total_failures / total_requests * 100) if total_requests > 0 else 0
 
-        evaluation = evaluate_results(stats)
         p95_6000 = evaluation["p95_6000"]
         error_rate_6000 = evaluation["error_rate_6000"]
         samples_pass = evaluation["samples_pass"]

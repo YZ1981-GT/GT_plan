@@ -20,12 +20,12 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import require_project_access, check_consol_lock
+from app.deps import require_project_access, require_project_access_stream, check_consol_lock
 from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest
 from app.services.working_paper_service import WorkingPaperService
@@ -230,8 +230,8 @@ async def list_my_lead_workpapers(
 async def download_workpaper_pack(
     project_id: UUID,
     body: DownloadPackRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤 wp_ids
     # （make_bulk_visible_filter）；不可见/跨项目/未委派/scope 外底稿静默剔除，
@@ -296,8 +296,8 @@ async def get_workpaper(
 async def download_workpaper(
     project_id: UUID,
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """下载底稿（需项目成员权限）"""
     svc = WpDownloadService()
@@ -313,8 +313,8 @@ async def download_workpaper(
         utf8_name = quote(file_name, safe="")
         disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
-        return StreamingResponse(
-            open(file_path, "rb"),
+        return FileResponse(
+            path=str(file_path),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": disposition,

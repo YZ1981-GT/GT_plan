@@ -727,6 +727,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { waitForPlatformJob } from '@/services/platformJobs'
+import { newUuid } from '@/utils/uuid'
 import { consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
 import {
   fillConsolNoteByFormula,
@@ -2221,11 +2223,16 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
       node_key: context.nodeKey || null,
       standard: props.standard,
       template_type: props.standard,
+      operation_id: newUuid(),
     }
-    const result = (await api.post(
-      P_consol.notes.reaggregate(context.projectId, context.year),
+    const accepted: any = await api.post(
+      P_consol.notes.reaggregateAsync(context.projectId, context.year),
       body,
-    )) as Partial<ConsolNoteReaggregateResult> | null
+    )
+    if (!accepted?.accepted || !accepted?.job_id) throw new Error('重新汇总任务未返回 job_id')
+    const job = await waitForPlatformJob(context.projectId, String(accepted.job_id))
+    if (job.status !== 'succeeded') throw new Error(job.error_message || '重新汇总任务失败')
+    const result = (job.result_ref?.result ?? null) as Partial<ConsolNoteReaggregateResult> | null
     const summary = reaggregateSummary(result)
     // reaggregate 成功只说明服务端编排完成；当前章节仍必须通过独立 GET 证明已持久化。
     const reloadResult = await reloadCurrentSectionAfterRefresh(context)

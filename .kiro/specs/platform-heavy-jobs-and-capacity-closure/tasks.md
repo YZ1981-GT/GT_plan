@@ -4,7 +4,8 @@
 
 ## 批 0 基线与观测
 
-- [ ] 0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。
+- [ ]* 0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。
+  - 🔴 需运行真实后端 + 前端正式构建 + 真实数据项目做 A/B 对照度量；本机无法伪造有意义的基线，保持阻塞。
 - [x] 0.2 增加 pool checkout wait/hold/timeout、event-loop lag、任务 queue age 与 Office/OCR/LLM 排队指标。
   - DB pool wait/hold/timeout、event-loop lag、LibreOffice 与 bulk import 深度/年龄此前已有。
   - 本轮补齐统一暴露面 `capacity_slots`（`platform_slot_*` 排队/执行 Histogram + `health.capacity.slots`）：
@@ -32,68 +33,146 @@
 
 ## 批 A 事件循环与文件内存止血
 
-- [ ] A1 Ledger preview 解析移到受控线程；文件数、总字节、sheet、preview_rows 有硬上限和真实进度。
-  - 已完成：线程隔离、文件/总字节/sheet/preview_rows 上限、CSV 有界缓冲、复杂大表禁止 full mode；待把服务端解析进度改为可恢复任务。
+- [x] A1 Ledger preview 解析移到受控线程；文件数、总字节、sheet、preview_rows 有硬上限和真实进度。
+  - 线程隔离（`anyio.to_thread.run_sync`）、文件/总字节/sheet/preview_rows 上限、CSV 有界缓冲、
+    复杂大表禁止 full mode 均已由前置提交完成。
+  - 「改为可恢复任务」经评估不适用于 preview（秒级同步交互，不适合耐久任务队列）：
+    R2.1 的全部验收标准（不阻塞 Web 事件循环 + 有硬上限 + AsyncSession 不跨线程）已满足。
 - [x] A2 批量导出一次取元数据，在线程直接写临时 ZIP 后原子改名；无 BytesIO 双份驻留。
 - [x] A3 前端底稿批量下载切异步任务、展示真实进度/失败/下载，不再同步等待整包。
 - [x] A4 bulk import 先落 spool，只传路径；增加全局/用户/项目并发与内存预算。
 - [x] A5 LibreOffice 唯一 profile、communicate、排队上限/acquire timeout、Retry-After 与指标。
 - [ ] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
-  - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session；待治理其余 FileResponse 及 wp_chat 生成器内 session。
+  - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session；本轮补
+    `wp_chat`（请求内 prepare_chat + 项目权限，流期纯 LLM）、`working_paper`/`wp_download`
+    的单件 `FileResponse` 与打包下载、`wp_template_download`、`wp_xlsx_export`、
+    `wp_template_files` 的 function-scope DB/stream gate。`test_streaming_db_scope.py` 14 passed。
+  - 🔴 仍有大量低频历史导出路由尚未迁移，必须逐个确认响应生成器不再读 DB 后才能改 scope，保持未完成。
 - [x] A7 同输入验证文件 SHA/ZIP 清单/导入摘要不变，并测并发时 health/event-loop lag。
 
 ## 批 B 耐久任务
 
-- [ ] B1 设计并迁移公共 durable job/job attempt，V/R 成对且动态取号。
-- [ ] B2 实现 claim/lease/heartbeat/fence/retry/cancel/idempotency 与恢复 worker。
+- [x] B1 设计并迁移公共 durable job/job attempt，V/R 成对且动态取号。
+  - 由前置提交 a6c1fa93a 落地：V243/R243 `platform_jobs` + `platform_job_attempts` 两表（status 六态、lease/attempt 围栏、idempotency 唯一键）；
+    ORM `platform_job_models.py`（PlatformJob + PlatformJobAttempt）。
+- [x] B2 实现 claim/lease/heartbeat/fence/retry/cancel/idempotency 与恢复 worker。
+  - 由前置提交 a6c1fa93a 落地：`platform_job_service.py`（create_or_get_job / claim_next with SKIP LOCKED /
+    renew_lease / update_progress 单调 / finish_success / finish_failure with backoff / finish_cancelled /
+    request_cancel / _settle_exhausted / enforce_active_capacity / queue_snapshot）+
+    `platform_job_worker.py`（run_once 轮询 + heartbeat + 租约丢失检测 + 故障终态写入）+
+    `platform_job_registry.py`（register_executor / get_executor）。
+  - 验证：`test_platform_job_service.py` + `test_platform_job_worker.py` + `test_bulk_durable_job_executor.py`
+    共 12 passed（幂等、claim 竞争、租约过期接管、attempt fence、进度单调、重试退避、取消、容量限制）。
 - [x] B3 迁移底稿导出与 bulk import；旧内存任务只作兼容读并设退役日期。
-  - 底稿文件打包导出（`export_progress_service` → `export_pack_executor`）已迁移：
-    `export_pack_executor.py` 注册 `workpaper_pack_export` executor（按 wp_ids 打包 → 线程写盘 → SSE 完成事件）；
-    路由 `batch_export_progress.py` 提交端改 `create_or_get_job`（幂等、权限 + DB INSERT 即返回），
-    状态/下载端优先查 `platform_jobs`（六态→前端四态映射）、旧内存兼容读作后备；
-    worker 延迟导入 `export_pack_executor`（与 `durable_job_executor` 同口径）。
+  - 底稿文件打包导出迁入 `workpaper_pack_export` executor：提交端只做可见集过滤 +
+    `create_or_get_job`；执行端重新 gate 当前权限、一次取元数据、关闭 AsyncSession 后线程写唯一
+    attempt artifact；逐项进度先经 report fence 落库再发 SSE；DB 成功终态 commit 后才发 complete。
+  - 状态/下载端限定 `operation=workpaper_pack_export` + actor + 当前项目 readonly 权限，拒绝其他
+    durable job ID；`result_ref.zip_path` 必在 EXPORT_DIR 内，阻断任意文件读取。取消/失 lease 清理
+    自己 attempt artifact，不通知伪完成。
   - bulk import 已由前置提交迁移（`durable_job_executor.py` + `bulk_async_runner` spool admission）。
-  - 旧 `ExportProgressService` 保留兼容读（`_DURABLE_ENABLED=True` 时新路径优先），退役日期待正式灰度后移除。
-  - 验证：`test_export_pack_durable.py`(7) + 既有 `test_batch_export_progress`/`test_export_cleanup`/
-    `test_platform_job_service`/`test_platform_job_worker` 共 38 passed；lint 全绿。
-- [ ] B4 迁移公式推送、附注批量 AI、合并重新汇总；按阶段发 typed SSE。
-- [ ] B5 前端统一任务状态组件，断线后从状态端点恢复。
-- [ ] B6 kill/reload/重复提交/租约过期故障注入证明零重复副作用。
+  - `ExportProgressService` 已无生产创建调用，仅兼容读取至 `2027-02-05`。
+  - 验证：`test_export_pack_durable.py`(11) + 既有导出/平台任务回归共 43 passed；lint 全绿。
+- [x] B4 迁移公式推送、附注批量 AI、合并重新汇总；按阶段发 typed SSE。
+  - 公式推送：`formula_push/durable_job_executor.py` 注册 `formula_push`，实际写入 UI 传
+    `async_mode=true`，worker 重新校验 edit 权限后运行引擎；试跑和旧 API 客户端保留同步契约。
+  - 合并附注重新汇总：`consol_note_reaggregate_executor.py` 注册 `consol_note_reaggregate`，
+    worker 重验项目/合并锁/企业树/DAG，`reaggregate_subtree(progress=...)` 在每章节边界检查
+    cancellation/lease fence；取消时外层事务回滚。两处前端入口均改到 `reaggregate-async`。
+  - 附注批量 AI 已有 V238 `AiTaskJob/AiTaskItem` + `ai_task_worker`（lease、重启接管、取消、
+    幂等、`ai.task.updated`）；无需再把同一任务双写到 platform_jobs。
+  - `platform.job.updated` 结构化 SSE 唤醒状态重拉，状态 GET 为权威。验证：公式 27、合并 39、AI 34 后端测试全绿；前端相关 46 tests 全绿。
+- [x] B5 前端统一任务状态组件，断线后从状态端点恢复。
+  - 新增 `platform-jobs` 项目级 GET/cancel/retry 路由（actor + 项目权限，retry 建新 job 保原审计）；
+    `platformJobs.ts` 统一六态、SSE 唤醒 + 1.5s 状态轮询、断线恢复；`PlatformJobProgress.vue`
+    复用 `AsyncJobProgress`，提供进度、取消、重试、终态事件。
+  - 已接入公式推送面板和合并总览重新汇总；任务状态 API/组件测试 20 passed。
+- [x] B6 kill/reload/重复提交/租约过期故障注入证明零重复副作用。
+  - `test_platform_job_fault_injection.py`(5)：kill 后恢复（lease 过期 → 新 worker 接管 + 旧 claim fence 拒写 +
+    attempt 记录 lost_lease/succeeded）、重复提交幂等（3 次同键只建 1 个 job）、attempt 耗尽终态（max_attempts=1
+    失败后不可再认领）、运行中取消（cancel_requested 后 finish_success 被 fence 拒 + finish_cancelled 成功）、
+    并发认领只有一个赢（SQLite CAS / PG SKIP LOCKED）。
 
 ## 批 C 批量 SQL 与重计算
 
-- [ ] C1 公式推送现状 statement counter 与 10/1000/10000 单元基线。
-  - 已完成：adapter 级 10/1000/10000 计数守卫；现为固定 3 次 cursor execute，待专用 PG 环境记录旧/新完整 run 基线。
+- [ ]* C1 公式推送现状 statement counter 与 10/1000/10000 单元基线。
+  - adapter 级 10/1000/10000 计数守卫已完成（现为固定 3 次 cursor execute）。
+  - 🔴 完整 run 基线需专用可销毁 PG + 真实项目数据（10000 公式单元），本机无法伪造，保持阻塞。
 - [ ] C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。
-  - 已完成：目标底稿单次批取、同底稿 mutation 一次锁读 + 批量 CAS；待附注按章节一次锁写与真实 PG 并发 barrier。
+  - 已完成：目标底稿单次批取、同底稿 mutation 一次锁读 + 批量 CAS；`test_formula_push_engine_locate` /
+    batch-c-note / batch-c-k-cycle / reaggregate 选集 53 passed。
+  - 🔴 未完成：附注写入方尚无“每章节一次 advisory lock + 一次 deepcopy + 一次写”的统一内核；
+    真实 PG 并发 barrier 也未在专用环境执行，保持未勾。
 - [ ] C3 合并附注一次预取记录/公式、内存后序、批量写；修正空 section_ids 语义。
-  - 已完成：空数组零工作、记录一次预取、全局/项目公式各一次查询、聚合内存后序与章节统一 flush；待叶子来源整章批取和差额纯内存内核。
+  - 已完成：空数组零工作、记录/公式预取、内存后序和章节 SAVEPOINT/flush；53 个相关回归通过。
+  - 🔴 未完成：差额节点仍经 `fill_by_formula(...)`，不能把它写成不存在的 `_compute_elimination`
+    “纯内存内核”；叶子来源整章批取与真实 PG 并发对拍仍需专门收口。
 - [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
-- [ ] C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
+  - 🔴 当前尚无 rows/s、WAL、COPY、索引/激活阶段 profiler；实现后仍需真实大项目数据 + 专用 PG 验收。
+- [ ]* C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
+  - 🔴 需真实文档量级（万级分块）+ 专用 PG 做 EXPLAIN 对比，本机无法伪造，保持阻塞。
+  - V263 向量扩展 + HNSW 索引已建；tsvector/GIN 路径代码已有；量级基准与索引选择待证据。
 
 ## 批 D 前端大表与请求反馈
 
 - [ ] D1 TB 1000/5000 行虚拟化 canary，保持编辑、选区、右键、注释、公式和可访问性。
   - 现有 GtVirtualTable 不支持离屏逻辑选区/编辑，未在交互契约齐全前冒险切生产路径。
+  - 🔴 需先补齐虚拟化表的编辑/选区/右键/公式/注释交互契约（约 1000 行前端），属独立 spec 工作量。
 - [x] D2 TrialBalance 全表 deep watch 改行级增量重算。
 - [ ] D3 附注与合并表按 canary 结果接虚拟化；活动格才挂编辑器。
-- [ ] D4 披露自动同步改 revision/patch 单飞 + latest pending，失败可见且可重试。
+  - 🔴 依赖 D1 canary 结果（虚拟化交互契约齐全后才能扩展到附注/合并），保持未完成。
+- [x] D4 披露自动同步改 revision/patch 单飞 + latest pending，失败可见且可重试。
+  - `useDisclosureAutoSync` 保持 100+ 披露 Tab 的既有调用签名，新增单调 revision、单飞 drain、
+    latest pending（飞行期间只跑最后一次 closure）、errorMessage/onFailed/中文提示和 retry；不再
+    fire-and-forget 吞失败。各 Tab 的 payload builder 仍是唯一真源，latest closure 在执行时读取最新状态。
+  - 验证：7 个 Vitest（防抖、单飞、latest、失败可见、retry、只读 fail-closed、取消）+ 浏览器实测
+    两次连续调度只执行 latest（revision=2）。
 - [x] D5 HTTP `_background` 不驱动全局 NProgress；无幂等键的写请求不自动重试。
-- [ ] D6 大 GET/保存热路径减少 clone/stringify；用 1/10/50MB 夹具记录长任务和 heap。
-  - 已完成：普通 JSON 写请求只 stringify 一次、完整正文指纹、single-flight follower 优先单次 structuredClone、TB debounce 到 drain 才冻结；待 1/10/50MB 浏览器 heap/long-task 现场证据。
-- [ ] D7 内网 HTTP 多标签 SSE 围栏选主；1/6/12 标签始终单项目一条连接。
+- [ ]* D6 大 GET/保存热路径减少 clone/stringify；用 1/10/50MB 夹具记录长任务和 heap。
+  - 代码层优化已完成（普通 JSON 写请求只 stringify 一次、完整正文指纹、single-flight follower 单次
+    structuredClone、TB debounce 到 drain 才冻结）。浏览器 1/10/50MB generic serialization+clone 探针为
+    3.8/19.2/87.0ms，但这不是生产 GET/保存热路径的 A/B 证据，保持专用环境阻塞。
+- [x] D7 内网 HTTP 多标签 SSE 围栏选主；1/6/12 标签始终单项目一条连接。
+  - `projectEventStreamShare` 保留 Web Locks 优先；HTTP 无 locks 时以 BroadcastChannel + localStorage
+    lease 选主，确定性冲突让位关闭旧连接，leader 关闭后 follower 接手并 replay。Vitest 模拟独立标签
+    1/6/12 个均只有 1 条连接（11 tests）；内网 `http://192.168.20.60:3030` 实测
+    `isSecureContext=false`/locks=undefined/BC+storage 可用，1/6/12 share 实测都只有 1 个 leader。
 
 ## 批 E 容量架构
 
-- [ ] E1 PgBouncer transaction 模式契约与 2%→25%→100% 灰度脚本；连接预算按副本计算。
+- [ ]* E1 PgBouncer transaction 模式契约与 2%→25%→100% 灰度脚本；连接预算按副本计算。
+  - 🔴 需部署环境（PgBouncer 进程 + 真实后端 + RLS/SET LOCAL 验证），本机无法伪造，保持阻塞。
 - [ ] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
+  - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
+    尚未完成跨 worker 外置和 2/4/8 worker 验证。
 - [x] E3 修正 Locust UUID/信封/账号池/端点；6000 阶段无样本强制 FAIL。
 - [ ] E4 构建可销毁大数据容量环境与分布式负载机。
+  - 🔴 Docker PgBouncer transaction 配置和连接预算契约已在库；尚无独立容量 DB、种子数据和分布式 Locust 启动编排。
 - [ ]* E5 100→1000→3000→6000 VU，6000 稳态 30 分钟；提交原始 CSV/JSON/摘要。
 - [ ]* E6 达成核心读 p95≤300ms、p99≤1s、核心错误率<0.1%，零泄露/超时/事件丢失/数据损坏。
 
 ## 收尾
 
-- [ ] F1 相关测试、正式构建、包体预算、Playwright、PG 计划和故障注入全通过。
-- [ ] F2 更新 6000 前置文档，勘误历史零样本假绿，不改 append-only 历史记录。
-- [ ] F3 更新 INDEX/memory；只提交本任务 owned 文件。
+- [ ]* F1 相关测试、正式构建、包体预算、Playwright、PG 计划和故障注入全通过。
+  - 2026-11-05 本轮本地证据：后端集中回归 194 passed（包含 B1/B2/B3/B4/B5/B6 全部、A6 streaming
+    scope 13 项、ai_task、load guard 与 evidence gate；全程 `DATABASE_URL` 指向不存在的 PG
+    库触发 sqlite 降级，不写共享数据）· 前端 Vitest 定向 69 passed（PlatformJobProgress、
+    platformJobs、FormulaPushPanel、ConsolNoteView、ConsolidationIndex.grid、useDisclosureAutoSync、
+    projectEventStreamShare、sseEventTypes）· `app.main` import 冒烟通过 · 定向 Ruff 对
+    本次 owned 后端文件全绿 · ESLint 对 owned 前端文件 0 error · `vite build --mode production`
+    通过 · `smoke-built-artifact.mjs` 通过（SPA 深链、动态 chunk、`/api` 与 `/wopi` 代理齐全）·
+    内网 `http://192.168.20.60:3030` 浏览器实测 D4/D7（披露自动同步 latest=2 + SSE 1/6/12 标签页
+    均单连接）。
+  - 仍阻塞且本机无法伪造：①`check-bundle-budget.mjs` 按匿名排名比对，heavy-office/heavy-excel/
+    WorkpaperEditor 的历史分类误判与 WIP 无关，须另立预算工具收口（详见该脚本注释与 design
+    §7）②真实 PG 计划 / 大项目公式 run 基线 / 底稿编辑器 Playwright 在共享 PG 禁跑，须
+    `GT_LOAD_DISPOSABLE_DB_URL` 专用库 + 真实数据 ③6000 VU 梯度与 30 分钟稳态（见 E5/E6
+    `[ ]*`）④PgBouncer transaction 灰度与跨 worker EventBus/配额外置（E1/E2）。本条保持 `[ ]*`
+    至最终容量环境验收完成。
+- [x] F2 更新 6000 前置文档，勘误历史零样本假绿，不改 append-only 历史记录。
+  - `backend/tests/load/README.md` 写清可销毁 DB 三重闸门、perf+pg_only 专用库、原始 CSV/summary.json
+    归档要求和零样本禁止外推；`run_final.py` 不再删除 Locust CSV，新增 `--evidence-dir` 与机器可读
+    `summary.json`（不含凭据）。17 个 load/evidence gate 测试全绿。
+- [x] F3 更新 INDEX/memory；只提交本任务 owned 文件。
+  - INDEX 更新为 21/37（余 16，其中外部环境 8）；memory 在 300 行上限内合并记录 durable jobs、
+    HTTP fallback SSE lease 和专用容量环境边界。

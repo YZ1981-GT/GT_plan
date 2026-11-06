@@ -41,6 +41,7 @@ describe('SSEEventType', () => {
       'workpaper.review_passed',
       'workpaper.stale_detected',
       'cross_check.failed',
+      'platform.job.updated',
       'formula.pushed',
       'consol.pushed',
       'consol.push_stale',
@@ -50,9 +51,9 @@ describe('SSEEventType', () => {
     // If SSEEventType is a proper union, all these assignments compile without error
     // This test verifies the type covers all known events at runtime
     expect(knownEvents.length).toBeGreaterThanOrEqual(29)
-    // Each event follows domain.action format
+    // 事件名可有多层域（如 platform.job.updated），但每段必须是稳定小写标识。
     knownEvents.forEach(event => {
-      expect(event).toMatch(/^[a-z_]+\.[a-z_]+$/)
+      expect(event).toMatch(/^[a-z_]+(?:\.[a-z_]+)+$/)
     })
   })
 

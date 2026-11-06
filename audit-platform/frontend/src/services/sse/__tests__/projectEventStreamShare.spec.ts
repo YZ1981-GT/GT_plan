@@ -108,6 +108,14 @@ class FakeChannel {
   }
 }
 
+// HTTP 无 Web Locks 时的 fallback 共享此 storage（浏览器真实标签页同样共享 localStorage）。
+class FakeStorage {
+  static values = new Map<string, string>()
+  getItem(key: string) { return FakeStorage.values.get(key) ?? null }
+  setItem(key: string, value: string) { FakeStorage.values.set(key, value) }
+  removeItem(key: string) { FakeStorage.values.delete(key) }
+}
+
 type Bus = typeof import('../projectEventStream')
 
 async function openTab(user = 'u-1'): Promise<Bus> {
@@ -127,8 +135,10 @@ beforeEach(() => {
   sse.apiGet.mockReset()
   sse.apiGet.mockResolvedValue([])
   FakeChannel.open = []
+  FakeStorage.values.clear()
   Object.defineProperty(globalThis.navigator, 'locks', { value: new FakeLocks(), configurable: true })
   vi.stubGlobal('BroadcastChannel', FakeChannel)
+  vi.stubGlobal('localStorage', new FakeStorage())
 })
 
 afterEach(() => {
@@ -263,14 +273,35 @@ describe('不共用的情形', () => {
     expect(seenB).toEqual([])
   })
 
-  it('浏览器不支持 Web Locks ⇒ 退回每个标签页各自一条', async () => {
+  it.each([1, 6, 12])('浏览器不支持 Web Locks 时，%i 个标签页仍只建一条连接', async (count) => {
+    delete (globalThis.navigator as unknown as { locks?: unknown }).locks
+    const subs: Array<{ close(): void }> = []
+    for (let index = 0; index < count; index++) {
+      const tab = await openTab()
+      subs.push(tab.subscribeProjectEvent(PID, 'e', () => {}))
+    }
+    await flush()
+    expect(sse.Conn.all).toHaveLength(1)
+    for (const sub of subs) sub.close()
+    await flush()
+  })
+
+  it('HTTP fallback 的领导关闭后，跟随标签页接手并建立一条新连接', async () => {
     delete (globalThis.navigator as unknown as { locks?: unknown }).locks
     const tabA = await openTab()
-    tabA.subscribeProjectEvent(PID, 'e', () => {})
+    const subA = tabA.subscribeProjectEvent(PID, 'e', () => {})
+    await flush()
     const tabB = await openTab()
-    tabB.subscribeProjectEvent(PID, 'e', () => {})
+    const subB = tabB.subscribeProjectEvent(PID, 'e', () => {})
+    await flush()
+    expect(sse.Conn.all).toHaveLength(1)
+
+    subA.close()
     await flush()
     expect(sse.Conn.all).toHaveLength(2)
+    expect(sse.Conn.all[0].closed).toBe(true)
+    expect(sse.Conn.all[1].closed).toBe(false)
+    subB.close()
   })
 
   it('拿不到用户 id ⇒ 不共用', async () => {

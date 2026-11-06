@@ -352,6 +352,8 @@ export const consolidation = {
   notes: {
     // 重新汇总：所选节点子树逐节点拉数（单体附注）/ 差额 / 自下而上汇总 → ReaggregateResponse
     reaggregate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate`,
+    // B4 耐久任务：提交即返回 job_id，状态走 /api/projects/{pid}/platform-jobs/{job_id}
+    reaggregateAsync: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate-async`,
     // 集团明细模板下推到子企业（预生成行骨架）→ PushTemplateResponse
     pushTemplate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/push-template`,
     // GET / PUT 试算表变动后自动按公式刷新合并附注的项目级开关（后端路由沿用 V2 时期名 consol-note-gray）

@@ -66,3 +66,20 @@ def test_complete_fast_run_passes_and_report_records_evidence_gate():
     assert "样本完整性" in report
     assert "所有阶段均有真实样本" in report
     assert "最终结果:  PASS" in report
+
+
+def test_machine_readable_evidence_keeps_raw_csv_manifest(tmp_path):
+    from tests.load.run_final import write_evidence_json
+    import json
+
+    (tmp_path / "locust_stats.csv").write_text("Name,Type\nAggregated,\n", encoding="utf-8")
+    (tmp_path / "locust_stats_history.csv").write_text("Timestamp\n", encoding="utf-8")
+    stats = {"total": {"requests": 1}, "stages": [], "evidence_dir": str(tmp_path)}
+    evaluation = {"overall_pass": False, "evidence_errors": ["缺少阶段"]}
+    path = write_evidence_json(tmp_path, stats, evaluation, host="http://capacity.invalid")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert payload["host"] == "http://capacity.invalid"
+    assert payload["raw_csv"] == ["locust_stats.csv", "locust_stats_history.csv"]
+    assert payload["evaluation"] == evaluation

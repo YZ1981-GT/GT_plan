@@ -1380,8 +1380,11 @@ audit-platform/frontend/src/services/consolidationApi.ts 1628
 audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
-#     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。拆分方向：企业树侧栏连同搜索、收起状态与样式抽成独立组件。
-audit-platform/frontend/src/views/ConsolidationIndex.vue 2368
+#     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。2026-11-05 `platform-heavy-jobs-and-capacity-closure` B4/B5
+#     把合并附注重新汇总改走 durable job：新增 PlatformJobProgress 嵌入、`reaggregateJobId`、`onReaggregateCompleted`/`onReaggregateFailed`
+#     与同步 `handlePlatformJobRetry`，2368 → 2513。拆分方向：企业树侧栏（搜索 / 收起 / 样式）抽成独立组件；再把耐久任务提交 / 完成 / 失败
+#     接线挪进 `useConsolReaggregateJob.ts` composable，页面只留模板与事件绑定。
+audit-platform/frontend/src/views/ConsolidationIndex.vue 2513
 backend/tests/test_module_cell_resolver.py 115
 audit-platform/frontend/src/views/DisclosureEditor.vue 3281
 #   ConsolWorksheetTabs.vue —— 2026-10-23 同上：合并工作底稿新增只读「分录汇总表」页签（D-1，读 /api/consolidation/worksheet/entry-summary），

@@ -98,3 +98,17 @@ describe('ConsolidationIndex 表格选区接线', () => {
     expect(source).toMatch(/onUnmounted\(\(\) => \{[\s\S]*?resetConsolDrillDown\(\)/)
   })
 })
+
+
+describe('ConsolidationIndex 耐久重新汇总', () => {
+  it('提交 async job 并由统一进度组件完成后再重读当前章节', () => {
+    const submit = withoutComments(bodyOf('onReaggregateNotes'))
+    const completed = withoutComments(bodyOf('onReaggregateCompleted'))
+    expect(raw).toContain('<PlatformJobProgress')
+    expect(submit).toContain('P_consol.notes.reaggregateAsync(')
+    expect(submit).toContain('operation_id: newUuid()')
+    expect(submit).toContain('reaggregateJobId.value')
+    expect(completed).toContain('job.result_ref?.result')
+    expect(completed).toContain('await reloadNoteForRefresh(context)')
+  })
+})

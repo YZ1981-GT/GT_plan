@@ -39,6 +39,7 @@ export const RAW_EVENT_REPLAY_DEGRADED = [
   'export.failed',
   'export.progress',
   'formula.pushed',
+  'platform.job.updated',
   'note.synced',
   'procedure_task.event',
   'report.stale',
@@ -78,6 +79,7 @@ export const RAW_CONSUMER_RECOVERY = {
   'consol.push_stale': 'on_reconnect_full_refresh',
   'consol.refresh.*': 'status_poll',
   'formula.pushed': 'manual_dirty_safe_reload',
+  'platform.job.updated': 'status_poll',
   'LINKAGE_STALE_CHANGED': 'on_reconnect_full_refresh',
   'workpaper.content.updated': 'typed_replay',
 } as const
