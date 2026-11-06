@@ -203,6 +203,11 @@ class WorkpaperContentVersion(Base):
     )
     actor_id: Mapped[uuid.UUID | None] = mapped_column(_UUID, ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=sa.func.now())
+    # V265：底稿内容版本的正式导出/数据交换单位证据。
+    export_surface_class: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
+    unit_policy_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    unit_policy_digest: Mapped[str | None] = mapped_column(_DIGEST, nullable=True)
+    source_storage_unit: Mapped[str | None] = mapped_column(sa.String(16), nullable=True)
 
 
 class WorkpaperContentRepresentation(Base):

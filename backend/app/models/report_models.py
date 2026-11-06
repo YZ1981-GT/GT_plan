@@ -739,6 +739,12 @@ class ExportTask(Base):
         nullable=False,
     )
     document_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    # V265：正式导出单位策略证据。
+    export_year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    document_types: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+    unit_policy_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[ExportTaskStatus] = mapped_column(
         sa.Enum(ExportTaskStatus, name="export_task_status", create_type=False),
         server_default=text("'queued'"),

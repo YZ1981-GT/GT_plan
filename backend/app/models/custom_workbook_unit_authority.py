@@ -19,7 +19,7 @@ class CustomWorkbookUnitAuthority(Base):
         PG_UUID(as_uuid=True), sa.ForeignKey("working_paper.id", ondelete="RESTRICT"), nullable=False
     )
     workbook_sha256: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
-    manifest: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB, "postgresql"), nullable=False)
+    manifest: Mapped[dict] = mapped_column(JSONB, nullable=False)
     manifest_digest: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
