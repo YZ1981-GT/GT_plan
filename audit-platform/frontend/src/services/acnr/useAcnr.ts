@@ -36,7 +36,7 @@ import {
 } from '@/services/sse/projectEventStream'
 import { isValidUri, isValidIndexRef } from './resolveUri'
 import { groupHeaderLabel, sortSheetsForGroup } from './sheetDisplayName'
-import { parseAcnrRegistryFailure } from './registryLockFailure'
+import { isAcnrRegistryFailure, parseAcnrRegistryFailure } from './registryLockFailure'
 import { isListedCell } from './cellListing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -295,6 +295,65 @@ function _resolveCacheSet(key: string, result: AcnrResolveResult): void {
 /** 缓存纪元：每次失效递增，用于判断缓存是否已过期 */
 let _cacheEpoch = 0
 
+interface _ProjectResolveBarrier {
+  generation: number
+  /** 最近一次治理 409 推进后的 generation；区分「治理终态」与普通手动缓存失效。 */
+  failureGeneration: number
+  /** 当前页面已知的项目级治理终态；成功重取后清空。 */
+  activeFailure: AcnrResolveResult | null
+  /** 留给旧 generation 的晚到响应：即使新请求已恢复，也不能让旧成功复活。 */
+  latestFailure: AcnrResolveResult | null
+}
+
+const _projectResolveBarriers = new Map<string, _ProjectResolveBarrier>()
+const _globalResolveBarrier: _ProjectResolveBarrier = {
+  generation: 0,
+  failureGeneration: 0,
+  activeFailure: null,
+  latestFailure: null,
+}
+/** 让已完成解析的同页 chip 也响应项目级终态，而不是只拦下一次请求。 */
+const _registryFailureEpoch = shallowRef(0)
+
+function _resolveBarrier(projectId?: string): _ProjectResolveBarrier {
+  if (!projectId) return _globalResolveBarrier
+  let barrier = _projectResolveBarriers.get(projectId)
+  if (!barrier) {
+    barrier = { generation: 0, failureGeneration: 0, activeFailure: null, latestFailure: null }
+    _projectResolveBarriers.set(projectId, barrier)
+  }
+  return barrier
+}
+
+/** 供 chip 等消费方响应式读取当前项目已知的目录治理终态。 */
+export function getProjectRegistryFailure(projectId?: string): AcnrResolveResult | null {
+  void _registryFailureEpoch.value // 建立 Vue computed 依赖
+  return _resolveBarrier(projectId).activeFailure
+}
+
+function _settleResolveSuccess(
+  result: AcnrResolveResult,
+  cacheKey: string,
+  barrier: _ProjectResolveBarrier,
+  requestGeneration: number,
+  cacheResult = true,
+): AcnrResolveResult {
+  if (barrier.generation !== requestGeneration) {
+    // 只有「请求发出后发生治理 409」才把晚到成功替换成终态；普通 invalidateModuleCache
+    // 维持既有契约：结果交给原等待者，但 cacheResult=false / epoch 不同使它不写缓存。
+    if (barrier.failureGeneration > requestGeneration && barrier.latestFailure) {
+      return { ...barrier.latestFailure }
+    }
+    return result
+  }
+  if (barrier.activeFailure) {
+    barrier.activeFailure = null
+    _registryFailureEpoch.value++
+  }
+  if (cacheResult) _resolveCacheSet(cacheKey, result)
+  return result
+}
+
 // ─── 项目级 SSE 订阅（acnr-invalidation-overlay-hardening R1 + 连接去重）──────
 // 迁移到项目事件流单例总线（frontend-sse-connection-consolidation）：订阅共享连接的
 // `acnr:invalidate` 事件，不再自建 SSE 连接（每项目仅一条共享连接，token 经 Authorization
@@ -327,6 +386,15 @@ export function invalidateModuleCache(): void {
   _sheetsCache.clear()
   _cellsCache.clear()
   _resolveCache.clear()
+  // 手动刷新 / 目录版本事件允许重新探测治理终态，但也要推进项目 generation：刷新前发出的
+  // 成功响应不能在刷新后写回。latestFailure 保留给这些晚到响应作 fail-closed 回执。
+  for (const barrier of _projectResolveBarriers.values()) {
+    barrier.generation++
+    barrier.activeFailure = null
+  }
+  _globalResolveBarrier.generation++
+  _globalResolveBarrier.activeFailure = null
+  _registryFailureEpoch.value++
 }
 
 /**
@@ -341,6 +409,28 @@ function _clearResolveCacheForProject(projectId: string): void {
       _resolveCache.delete(key)
     }
   }
+}
+
+/**
+ * 解析目录版本治理 409，并使同项目的旧成功结果立即失效。
+ *
+ * 三类 409 表示项目的**整份锁定目录**不可用，不是当前地址 miss。只让本次失败键不进缓存仍不够：
+ * 同项目兄弟地址可能继续从 LRU 取 300 秒内的旧 jump_route。推进全局 epoch 可阻止已经在途的旧请求
+ * 回写，项目 id 可用时只清该项目既有结果；没有项目上下文时保守清空全部 resolve 缓存。
+ */
+function _parseAndInvalidateRegistryFailure(error: unknown, projectId?: string): AcnrResolveResult | null {
+  const failure = parseAcnrRegistryFailure(error)
+  if (!failure || !isAcnrRegistryFailure(failure)) return null
+  const barrier = _resolveBarrier(projectId)
+  barrier.generation++
+  barrier.failureGeneration = barrier.generation
+  barrier.latestFailure = { ...failure }
+  barrier.activeFailure = { ...failure }
+  _registryFailureEpoch.value++
+  _cacheEpoch++
+  if (projectId) _clearResolveCacheForProject(projectId)
+  else _resolveCache.clear()
+  return failure
 }
 
 /**
@@ -428,6 +518,17 @@ export const RESOLVE_BATCH_LIMIT = 50
 /** 整批请求失败（网络 / 权限 / 服务异常）时每项的错误码 —— 与「引用不存在」区分，调用方显示「暂时无法校验」 */
 export const BATCH_RESOLVE_FAILED = 'batch_resolve_failed'
 
+/**
+ * 批量入口与单点入口共用目录版本治理终态。
+ *
+ * 三类 409 不能抹成普通 `batch_resolve_failed`：后者表示暂时不可校验、chip 仍允许继续跳转；
+ * 目录快照缺失 / 损坏或版本锁失败则必须 fail-closed，保留中文原因且不按当前目录继续。
+ */
+function _resolveBatchFailure(error: unknown, projectId?: string): AcnrResolveResult {
+  return _parseAndInvalidateRegistryFailure(error, projectId)
+    ?? { found: false, error: BATCH_RESOLVE_FAILED }
+}
+
 type _ResolveWaiter = (r: AcnrResolveResult) => void
 /** 待发队列：项目 id（无项目为空串）→ index_ref → 等待者（失效前后各有一个在途时可能多于一个） */
 const _batchQueue = new Map<string, Map<string, _ResolveWaiter[]>>()
@@ -441,7 +542,10 @@ function _resolveCacheKey(indexRef: string, projectId?: string): string {
 async function _sendResolveBatch(projectKey: string, chunk: Array<[string, _ResolveWaiter[]]>): Promise<void> {
   const epoch = _cacheEpoch
   const pid = projectKey || undefined
+  const barrier = _resolveBarrier(pid)
+  const requestGeneration = barrier.generation
   let results: unknown[] | null = null
+  let requestFailure: AcnrResolveResult | null = null
   try {
     const { data } = await http.post(
       ACNR_PATHS.resolveBatch,
@@ -449,15 +553,23 @@ async function _sendResolveBatch(projectKey: string, chunk: Array<[string, _Reso
       { _silent: true } as any,
     )
     results = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : null)
-  } catch {
-    results = null
+  } catch (error) {
+    requestFailure = _resolveBatchFailure(error, pid)
   }
   chunk.forEach(([indexRef, waiters], i) => {
     const r = results?.[i] as AcnrResolveResult | undefined
-    const result: AcnrResolveResult = r && typeof r === 'object' ? r : { found: false, error: BATCH_RESOLVE_FAILED }
-    // 在途期间缓存被整体失效 ⇒ 结果照样给等待者，但不写进缓存
-    if (r && epoch === _cacheEpoch) _resolveCacheSet(_resolveCacheKey(indexRef, pid), result)
-    waiters.forEach((done) => done(result))
+    // 每个等待者拿独立对象，避免某个 chip 补字段时污染同批其他结果。治理 409 不缓存，
+    // 目录恢复后下一次调用必须重新向后端确认。
+    const result: AcnrResolveResult = r && typeof r === 'object'
+      ? _settleResolveSuccess(
+        r,
+        _resolveCacheKey(indexRef, pid),
+        barrier,
+        requestGeneration,
+        epoch === _cacheEpoch,
+      )
+      : requestFailure ? { ...requestFailure } : { found: false, error: BATCH_RESOLVE_FAILED }
+    waiters.forEach((done) => done({ ...result }))
   })
 }
 
@@ -661,17 +773,19 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
     const cacheKey = `resolve:${JSON.stringify({ formula_ref: formulaRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
+    const barrier = _resolveBarrier(pid)
+    const requestGeneration = barrier.generation
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
         params: { formula_ref: formulaRef, ...(pid ? { project_id: pid } : {}) },
       })
       const result = data as AcnrResolveResult
-      _resolveCacheSet(cacheKey, result)
-      return result
+      return _settleResolveSuccess(result, cacheKey, barrier, requestGeneration)
     } catch (e) {
-      // 目录版本治理错误是终态：上层不得把归档项目改按当前目录或 V1 解析。
-      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
+      // 目录版本治理错误是终态：上层不得把归档项目改按当前目录或 V1 解析；
+      // 同时驱逐该项目旧命中，防止兄弟地址继续使用缓存的旧 jump_route。
+      return _parseAndInvalidateRegistryFailure(e, pid) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -688,16 +802,17 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
     const cacheKey = `resolve:${JSON.stringify({ uri, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
+    const barrier = _resolveBarrier(pid)
+    const requestGeneration = barrier.generation
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
         params: { uri, ...(pid ? { project_id: pid } : {}) },
       })
       const result = data as AcnrResolveResult
-      _resolveCacheSet(cacheKey, result)
-      return result
+      return _settleResolveSuccess(result, cacheKey, barrier, requestGeneration)
     } catch (e) {
-      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
+      return _parseAndInvalidateRegistryFailure(e, pid) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -713,16 +828,17 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
     const cacheKey = `resolve:${JSON.stringify({ addr_id: addrId })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
+    const barrier = _resolveBarrier()
+    const requestGeneration = barrier.generation
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
         params: { addr_id: addrId },
       })
       const result = data as AcnrResolveResult
-      _resolveCacheSet(cacheKey, result)
-      return result
+      return _settleResolveSuccess(result, cacheKey, barrier, requestGeneration)
     } catch (e) {
-      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
+      return _parseAndInvalidateRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -740,6 +856,8 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
     const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
+    const barrier = _resolveBarrier(pid)
+    const requestGeneration = barrier.generation
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
@@ -750,10 +868,9 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
         _silent: true,
       } as any)
       const result = data as AcnrResolveResult
-      _resolveCacheSet(cacheKey, result)
-      return result
+      return _settleResolveSuccess(result, cacheKey, barrier, requestGeneration)
     } catch (e) {
-      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
+      return _parseAndInvalidateRegistryFailure(e, pid) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -840,16 +957,26 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
   ): Promise<AcnrResolveResult[]> {
     if (!inputs || inputs.length === 0) return []
     const pid = projectIdArg ?? (currentProjectId() || undefined)
+    const barrier = _resolveBarrier(pid)
+    const requestGeneration = barrier.generation
     try {
       const { data } = await http.post(ACNR_PATHS.resolveBatch, {
         items: inputs,
         ...(pid ? { project_id: pid } : {}),
       })
       const results: AcnrResolveResult[] = Array.isArray(data) ? data : (data?.results ?? [])
-      return results
-    } catch {
-      // 网络错误时返回等长失败数组
-      return inputs.map(() => ({ found: false, error: 'batch_resolve_failed' }))
+      return results.map((result, index) => _settleResolveSuccess(
+        result,
+        `batch:${index}`,
+        barrier,
+        requestGeneration,
+        false,
+      ))
+    } catch (error) {
+      const failure = _resolveBatchFailure(error, pid)
+      // 目录治理 409 保留终态与中文原因；普通网络 / 5xx 才是可重试的整批失败。
+      // 每项独立对象，避免调用方就地扩展结果时污染同批兄弟项。
+      return inputs.map(() => ({ ...failure }))
     }
   }
 
