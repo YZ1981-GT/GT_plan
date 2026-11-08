@@ -19,6 +19,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 AUDIT_CATEGORIES = ("logic_check", "reasonability")
 _LABELS = {"logic_check": "🔍 逻辑审核", "reasonability": "💡 提示性审核"}
+#: 审核类别的门禁严重度：逻辑勾稽仍属 blocking，合理性审核仅提示。
+_AUDIT_SEVERITY = {"logic_check": "blocking", "reasonability": "warning"}
+#: 内置报表平衡检查属于 blocking 勾稽。
+_BUILTIN_SEVERITY = "blocking"
+#: 这些严重度的未通过项计入「提示」；其余（含缺省 blocking）计入「失败」（ADR-CCN-05，fail-closed）
+_HINT_SEVERITIES = ("warning", "info")
+
+
+def split_by_severity(checks: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """报表审核汇总：未通过项拆成 ``(失败, 提示)``。通过的项两边都不计。"""
+    failures: list[dict[str, Any]] = []
+    hints: list[dict[str, Any]] = []
+    for c in checks:
+        if c.get("passed"):
+            continue
+        (hints if c.get("severity") in _HINT_SEVERITIES else failures).append(c)
+    return failures, hints
 
 
 async def run_report_audit(db: AsyncSession, project_id: uuid.UUID, year: int, standard: str) -> list[dict[str, Any]]:
@@ -32,6 +49,7 @@ async def run_report_audit(db: AsyncSession, project_id: uuid.UUID, year: int, s
         "name": c["check_name"], "category": "logic_check", "category_label": _LABELS["logic_check"],
         "passed": c["passed"], "expected": c["expected_value"], "actual": c["actual_value"],
         "diff": c["difference"], "formula": None, "source": "内置校验",
+        "severity": _BUILTIN_SEVERITY,
     } for c in await ReportEngine(db).check_balance(project_id, year)]
     results.extend(await config_audit_checks(db, project_id, year, standard))
     return results
@@ -52,7 +70,10 @@ async def config_audit_checks(db: AsyncSession, project_id: uuid.UUID, year: int
     reports = (await db.execute(sa.select(FinancialReport.row_code, FinancialReport.current_period_amount).where(
         FinancialReport.project_id == project_id, FinancialReport.year == year,
         FinancialReport.is_deleted == sa.false()))).all()
-    row_cache = {code: Decimal(str(amount or 0)) for code, amount in reports if code}
+    row_cache: dict[str, Decimal | None] = {
+        code: (Decimal(str(amount)) if amount is not None else None)
+        for code, amount in reports if code
+    }
     resolver = TrialBalanceResolver(db, project_id, year)
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -75,5 +96,6 @@ async def config_audit_checks(db: AsyncSession, project_id: uuid.UUID, year: int
             "diff": None,
             "formula": row.formula,
             "source": f"{row.row_code} {row.formula_source or ''}".strip(),
+            "severity": _AUDIT_SEVERITY[category],
         })
     return out

@@ -5,6 +5,8 @@ import { useRouter } from 'vue-router'
 import { handleApiError } from '@/utils/errorHandler'
 import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import type { useCellSelection } from '@/composables/useCellSelection'
+import { reportChecksToCsv } from '@/services/reportCheckPresentation'
+import { useReportRequestFence } from './useReportRequestFence'
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -73,6 +75,11 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
     projectId: string
   } | null>(null)
 
+  const lineageFence = useReportRequestFence(
+    () => [projectId.value, year.value, activeTab.value],
+    () => { rvTraceDialogVisible.value = false; rvTraceResult.value = null; rvTraceLoading.value = false },
+  )
+
   async function onRvCtxCellTrace() {
     rvCtx.closeContextMenu()
     const row = rvCtx.contextMenu.rowData
@@ -80,31 +87,36 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
       ElMessage.info('请在数据行上右键')
       return
     }
+    const request = lineageFence.begin('lineage')
+    const pid = projectId.value
+    const rowCode = row.row_code
     rvTraceDialogVisible.value = true
     rvTraceLoading.value = true
     rvTraceResult.value = null
     try {
       const data: any = await api.get(
-        `/api/projects/${projectId.value}/lineage`,
-        { params: { object_type: 'report_row', object_id: row.row_code, direction: 'both' } },
+        `/api/projects/${pid}/lineage`,
+        { params: { object_type: 'report_row', object_id: rowCode, direction: 'both' } },
       )
+      if (!request.isCurrent()) return
       const upstream = data?.upstream || []
       const downstream = data?.downstream || []
       const attachments = data?.attachments || []
       rvTraceResult.value = {
         upstream, downstream, attachments,
-        objectId: row.row_code,
-        projectId: projectId.value,
+        objectId: rowCode,
+        projectId: pid,
       }
       if (!upstream.length && !downstream.length && !attachments.length) {
         rvTraceDialogVisible.value = false
         ElMessage.info('该数字暂无溯源信息')
       }
     } catch (e: any) {
+      if (!request.isCurrent()) return
       rvTraceDialogVisible.value = false
       handleApiError(e, '数字溯源')
     } finally {
-      rvTraceLoading.value = false
+      if (request.isCurrent()) rvTraceLoading.value = false
     }
   }
 
@@ -132,19 +144,7 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
       return
     }
     const BOM = '\uFEFF'
-    const header = '结果,审核项目,期望值,实际值,差额,类型,公式/来源\n'
-    const csvRows = checks.map((c: any) =>
-      [
-        c.passed ? '通过' : '未通过',
-        `"${(c.name || '').replace(/"/g, '""')}"`,
-        c.expected || '',
-        c.actual || '',
-        c.diff || '',
-        c.category_label || '',
-        `"${(c.formula || c.source || '').replace(/"/g, '""')}"`,
-      ].join(',')
-    ).join('\n')
-    const blob = new Blob([BOM + header + csvRows], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([BOM + reportChecksToCsv(checks)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -173,9 +173,22 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
   const traceSelectCheck = ref<any>(null)
   const isTracing = ref(false)
   const traceFromTab = ref('')
+  const auditFence = useReportRequestFence(() => [projectId.value, year.value, consistencyResult.value], () => {
+    showAuditDialog.value = false
+    showTraceSelectDialog.value = false
+    traceSelectOptions.value = []
+    traceSelectCheck.value = null
+    isTracing.value = false
+    traceFromTab.value = ''
+  })
+  let traceSession: ReturnType<typeof auditFence.begin> | null = null
 
   function onTraceJump(loc: TraceLocation) {
-    traceFromTab.value = activeTab.value
+    if (!consistencyResult.value) return
+    if (!isTracing.value) {
+      traceFromTab.value = activeTab.value
+      traceSession = auditFence.begin('trace')
+    }
     activeTab.value = loc.tab
     showTraceSelectDialog.value = false
     showAuditDialog.value = false
@@ -184,6 +197,7 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
   }
 
   function onTraceReturn() {
+    if (!isTracing.value || !traceSession?.isCurrent() || !consistencyResult.value) return
     isTracing.value = false
     showAuditDialog.value = true
     if (traceFromTab.value) {

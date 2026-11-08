@@ -4,7 +4,8 @@
 :func:`execute_batch`：
 
 - 请求体是 pydantic 模型，``year`` 必填（缺失 ⇒ 422；原实现 ``body.get("year", 2024)`` 静默按 2024 年取数）；
-- 有项目时走报表路径（``report_engine.evaluate_formula_result`` + ``TrialBalanceResolver``，严格上下文）**一次**求值，
+- 有项目时走报表路径（``report_engine.evaluate_formula_result`` + ``ReportFormulaParser``，严格上下文）**一次**求值，
+  复用同一冻结项目年度的 TB 与惰性 ADJ 来源，不把缺失调整额上下文冒充零；
   ``value`` 与 ``trace`` 出自同一次：报表路径把 ``TB`` / ``SUM_TB`` 预替换成数值，:class:`_TracingResolver` 把取到的每个值
   按 L1 同一写法（``TB('1001','期末余额') = 100``）记进 trace，后接 L1 trace（原实现 value 走报表路径、trace 另跑一次
   空上下文的 L1，trace 里的 TB 全是 0）；L1 失败 ⇒ ``value=None``、``error`` 写原因（原实现照样返回 0 且不报错）；
@@ -128,10 +129,9 @@ def _failed(message: str) -> dict[str, Any]:
 async def _evaluate(db: AsyncSession, project_id: uuid.UUID, year: int, formula: str,
                     row_values: dict[str, Decimal]) -> dict[str, Any]:
     """报表路径一次求值（严格上下文）：value 与 trace 同源。"""
-    from app.services.amount_resolver import TrialBalanceResolver
-    from app.services.report_engine import evaluate_formula_result
+    from app.services.report_engine import ReportFormulaParser, evaluate_formula_result
 
-    resolver = _TracingResolver(TrialBalanceResolver(db, project_id, year))
+    resolver = _TracingResolver(ReportFormulaParser(db, project_id, year))
     result = await evaluate_formula_result(formula, resolver=resolver, row_cache=row_values, strict_context=True)
     return _payload(result, [*resolver.trace, *result.trace])
 

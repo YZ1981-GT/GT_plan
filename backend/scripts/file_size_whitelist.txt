@@ -1257,7 +1257,10 @@ backend/app/services/ledger_penetration_service.py  942
 #   登记为待办：report_engine 的 ReportFormulaParser（取数缓存 + 列名映射）
 #   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
 #   formula-hub-integrity-closure（2026-10-30）：按实测下调 2693 → 2479（本 spec 净减），只许再降。
-backend/app/services/report_engine.py  2479
+#   formula-integrity-and-propagation-closure（2026-11-09）：审核 strict 五态贯通 +227 行，
+#     三入口加 strict/on_technical_failure + evaluate_formula_result 内 IF 仅实际分支 + ADJ 惰性加载。
+#     拆分方向不变：ReportFormulaParser（取数缓存+列名映射）与 evaluate_formula（L2 编排）分文件。
+backend/app/services/report_engine.py  2706
 backend/app/services/consol_report_service.py  1008
 
 # ── 2026-09-28 spec d1-sync-row-table-engine-and-d1-coverage · X2 ────────────
