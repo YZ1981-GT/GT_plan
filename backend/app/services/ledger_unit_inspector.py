@@ -1,4 +1,4 @@
-﻿"""共享库只读的账套单位巡检（platform-global-display-settings-closure R8 / AC-18 的只读纪律）。
+"""共享库只读的账套单位巡检（platform-global-display-settings-closure R8 / AC-18 的只读纪律）。
 
 单连接；第一条业务语句是 ``SET TRANSACTION READ ONLY`` 并核验生效；结束时显式 rollback，从不写库，
 报告只写到调用方给的目录。巡检对象是四表（余额表 / 序时账 / 辅助余额 / 辅助明细）的本位币金额列。

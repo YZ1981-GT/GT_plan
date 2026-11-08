@@ -1,4 +1,4 @@
-﻿"""
+"""
 数据集单位合同分类器。
 
 将 LedgerDataset.source_summary 归一为三类：

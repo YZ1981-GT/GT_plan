@@ -1,4 +1,4 @@
-﻿"""账号显示偏好 API、CAS 与审计脱敏集成测试。
+"""账号显示偏好 API、CAS 与审计脱敏集成测试。
 
 所有写入都落在 pytest 临时 SQLite 文件；审计测试使用真实 AuditLogMiddleware 和
 真实 Log ORM 表，不连接共享开发库。
