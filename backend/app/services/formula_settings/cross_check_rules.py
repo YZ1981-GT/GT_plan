@@ -25,10 +25,19 @@ logger = logging.getLogger(__name__)
 import hashlib
 
 DOMAIN = "cross_check"
-RULE_FIELDS = ("label", "left_ref", "operator", "right_ref", "description", "tolerance")
+RULE_FIELDS = ("label", "left_ref", "operator", "right_ref", "description", "tolerance", "severity")
 OPERATORS = ("=", "<=", ">=")
 DEFAULT_TOLERANCE = Decimal("0.01")
 FORMULA_ID_PREFIX = "user:"
+#: 表间审核严重度（ADR-CCN-05）：缺省 warning = 只提示。blocking 仅作为可表达的取值保留，
+#: 签字 / 导出门禁不读表间审核结果，所以即使标 blocking 也不会阻断签字。
+SEVERITIES = ("blocking", "warning", "info")
+DEFAULT_SEVERITY = "warning"
+
+
+def severity_of(raw: Any) -> str:
+    """规则的严重度；缺省或认不出的值一律按 warning 处理（不冒充阻断）。"""
+    return raw if raw in SEVERITIES else DEFAULT_SEVERITY
 
 
 def new_rule_id() -> str:
@@ -54,6 +63,11 @@ def split_slot(slot_key: str) -> tuple[str, str]:
 def _definition(rule: Mapping[str, Any]) -> dict[str, Any]:
     d = {f: rule.get(f) for f in RULE_FIELDS}
     d["operator"] = d["operator"] if d["operator"] in OPERATORS else "="
+    # 缺省 warning 不写进定义：旧定义（无此键）与缺省定义逐字段相等，原样保存不会被当成「改动」
+    # 而在本项目层生成覆盖（否则读出的全局规则一保存就分叉成项目层）。只有显式非缺省值才落库。
+    sev = severity_of(d.pop("severity"))
+    if sev != DEFAULT_SEVERITY:
+        d["severity"] = sev
     return d
 
 
@@ -72,6 +86,7 @@ async def load(db: AsyncSession, project_id: uuid.UUID) -> dict[str, Any]:
             "operator": d.get("operator") if d.get("operator") in OPERATORS else "=",
             "right_ref": d.get("right_ref") or "",
             "description": d.get("description") or "", "tolerance": d.get("tolerance"),
+            "severity": severity_of(d.get("severity")),
             "layer": e.layer, "pending": e.pending, "version_token": token,
         })
         layers[slot] = e.layer
@@ -119,7 +134,8 @@ def compare(left: Decimal, right: Decimal, operator: str, tolerance: Decimal) ->
     return abs(diff) < tolerance
 
 
-async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal]) -> tuple[Decimal | None, str]:
+async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal | None],
+                    *, strict: bool = False) -> tuple[Decimal | None, str]:
     from app.services.formula_management.function_support_matrix import (
         Executor,
         FormulaSupportViolation,
@@ -139,13 +155,17 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
     # report_engine 对 PREV / AUX 只会置 0，所以必须先在这里代入（代入后表达式里已没有 PREV / AUX）。
     try:
         text, missing = await _substitute_strict(text, resolver)
-    except Exception as exc:  # noqa: BLE001 —— 取数失败如实记为不通过
+    except Exception as exc:  # noqa: BLE001 —— 兼容预览；耐久传播技术异常必须重试
+        if strict:
+            raise
         return None, f"上年 / 辅助核算取数失败：{exc}"[:200]
     if missing:
         return None, "；".join(missing)[:200]
     try:
         result = await evaluate_formula_result(text, resolver=resolver, row_cache=row_cache, strict_context=True)
-    except Exception as exc:  # noqa: BLE001 —— 取不到数如实记为不通过
+    except Exception as exc:  # noqa: BLE001 —— 兼容预览；严格模式不伪装技术失败
+        if strict:
+            raise
         return None, str(exc)[:200]
     if not result.ok or result.value is None:
         reason = "；".join(result.errors)[:200] if result.errors else "公式执行未返回数值"
@@ -179,7 +199,8 @@ async def _report_rows(db: AsyncSession, project_id: uuid.UUID, year: int) -> li
 
 
 async def run_user_rules(db: AsyncSession, *, project_id: uuid.UUID, year: int,
-                         report_rows: Iterable[Any] | None = None) -> tuple[list[Any], list[Any]]:
+                         report_rows: Iterable[Any] | None = None,
+                         strict: bool = False) -> tuple[list[Any], list[Any]]:
     """执行本项目生效的全部用户规则（全局 + 本项目），返回 ``(outcomes, issues)``。
 
     ``ROW('行次')`` / ``REPORT(...)`` 取本项目本年度已生成的全部报表行（六类报表）。
@@ -192,8 +213,11 @@ async def run_user_rules(db: AsyncSession, *, project_id: uuid.UUID, year: int,
     if not rules:
         return [], []
     rows = list(report_rows) if report_rows is not None else await _report_rows(db, project_id, year)
-    row_cache = {r.row_code: Decimal(str(r.current_period_amount or 0)) for r in rows
-                 if getattr(r, "row_code", None)}
+    row_cache: dict[str, Decimal | None] = {
+        r.row_code: (Decimal(str(r.current_period_amount))
+                     if r.current_period_amount is not None else None)
+        for r in rows if getattr(r, "row_code", None)
+    }
     resolver = TrialBalanceResolver(db, project_id, year)
     outcomes, issues = [], []
     for slot, e in rules:
@@ -202,9 +226,10 @@ async def run_user_rules(db: AsyncSession, *, project_id: uuid.UUID, year: int,
         fid = result_rule_id(slot)  # 按整个公式位取，避免不同节点同规则号撞 rule_id
         op = d.get("operator") if d.get("operator") in OPERATORS else "="
         label = d.get("label") or rid
+        sev = severity_of(d.get("severity"))
         expression = f"{d.get('left_ref') or ''} {op} {d.get('right_ref') or ''}".strip()
-        left, left_err = await _evaluate(d.get("left_ref") or "", resolver, row_cache)
-        right, right_err = await _evaluate(d.get("right_ref") or "", resolver, row_cache)
+        left, left_err = await _evaluate(d.get("left_ref") or "", resolver, row_cache, strict=strict)
+        right, right_err = await _evaluate(d.get("right_ref") or "", resolver, row_cache, strict=strict)
         if left is None or right is None:
             passed = False
             reason = "；".join(x for x in (f"左侧{left_err}" if left is None else "",
@@ -213,8 +238,9 @@ async def run_user_rules(db: AsyncSession, *, project_id: uuid.UUID, year: int,
         else:
             passed = compare(left, right, op, _tolerance(d.get("tolerance")))
             message = f"{label}：左侧 {left} {op} 右侧 {right} 不成立"
-        outcomes.append(CrossCheckOutcome(formula_id=fid, description=label, expression=expression, passed=passed))
+        outcomes.append(CrossCheckOutcome(formula_id=fid, description=label, expression=expression, passed=passed,
+                                          severity=sev))
         if not passed:
             issues.append(IssueItem(formula_id=fid, addr_id=None, description=message, left_value=left,
-                                    right_value=right))
+                                    right_value=right, severity=sev))
     return outcomes, issues
