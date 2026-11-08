@@ -1,4 +1,4 @@
-﻿-- V249: 附注公式执行可查询运行记录（S5 / ADR-FPE-08、13、14）。
+-- V249: 附注公式执行可查询运行记录（S5 / ADR-FPE-08、13、14）。
 CREATE TABLE IF NOT EXISTS note_formula_run (
     id UUID PRIMARY KEY,
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

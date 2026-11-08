@@ -429,7 +429,7 @@ class MigrationRunner:
         for f in sorted(self._migrations_dir.iterdir()):
             m = _VERSION_RE.match(f.name)
             if m and f.is_file():
-                content = f.read_text(encoding="utf-8")
+                content = f.read_text(encoding="utf-8-sig")
                 checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
                 result.append(MigrationFile(
                     version=m.group(1),   # "001", "002", ...
@@ -467,7 +467,7 @@ class MigrationRunner:
         for f in sorted(self._migrations_dir.iterdir()):
             m = _ROLLBACK_RE.match(f.name)
             if m and f.is_file():
-                content = f.read_text(encoding="utf-8")
+                content = f.read_text(encoding="utf-8-sig")
                 checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
                 result.append(MigrationFile(
                     version=m.group(1),   # "001", "002", ...
@@ -759,7 +759,7 @@ class MigrationRunner:
 
     async def _execute_rollback_script(self, mig: MigrationFile) -> None:
         """执行单个回滚脚本。"""
-        sql_content = mig.path.read_text(encoding="utf-8")
+        sql_content = mig.path.read_text(encoding="utf-8-sig")
         logger.info("[Migration] 执行回滚 %s (version=%s) ...", mig.filename, mig.version)
 
         statements = self._split_sql_statements(sql_content)
@@ -1045,7 +1045,7 @@ class MigrationRunner:
         ``exec_driver_sql`` 直接传给 dbapi 不做参数解析，彻底规避问题。
         仅 ``INSERT INTO schema_version`` 这条仍用 ``text + bind``（系统语句，可控）。
         """
-        sql_content = mig.path.read_text(encoding="utf-8")
+        sql_content = mig.path.read_text(encoding="utf-8-sig")
         logger.info("[Migration] 执行 %s (version=%s) ...", mig.filename, mig.version)
 
         statements = self._split_sql_statements(sql_content)

@@ -1,4 +1,4 @@
-﻿"""ConsolNoteData ORM 模型 — 合并附注用户数据存储
+"""ConsolNoteData ORM 模型 — 合并附注用户数据存储
 
 三层一致：V041 迁移（+ V172 is_stale + V182 cell_state）+ 本 ORM + routers/consol_note_sections.py service
 """

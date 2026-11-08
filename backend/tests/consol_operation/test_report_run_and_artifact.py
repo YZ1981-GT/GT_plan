@@ -1,4 +1,4 @@
-﻿"""批 4：正式 report run 与不可变 artifact 的 SQLite / 纯函数闭环。"""
+"""批 4：正式 report run 与不可变 artifact 的 SQLite / 纯函数闭环。"""
 from __future__ import annotations
 
 import hashlib
