@@ -33,7 +33,7 @@
     <el-table-column label="本期增加额">
       <el-table-column v-for="col in impIncCols" :key="'inc-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
         <template #default="{ row }">
-          <ReportMatrixCell :value="col.sum ? groupSum(row, impIncCols) : impVal(row, col.key)" :editable="!col.sum && canEdit(row)" @commit="(v) => onCommit(row, col.key, v)" />
+          <ReportMatrixCell :value="col.sum ? groupSum(row, impIncCols) : impVal(row, col.key)" :editable="!col.sum && canEdit(row)" @commit="(v: number | null) => onCommit(row, col.key, v)" />
         </template>
       </el-table-column>
     </el-table-column>
@@ -41,7 +41,7 @@
     <el-table-column label="本期减少额">
       <el-table-column v-for="col in impDecCols" :key="'dec-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
         <template #default="{ row }">
-          <ReportMatrixCell :value="col.sum ? groupSum(row, impDecCols) : impVal(row, col.key)" :editable="!col.sum && canEdit(row)" @commit="(v) => onCommit(row, col.key, v)" />
+          <ReportMatrixCell :value="col.sum ? groupSum(row, impDecCols) : impVal(row, col.key)" :editable="!col.sum && canEdit(row)" @commit="(v: number | null) => onCommit(row, col.key, v)" />
         </template>
       </el-table-column>
     </el-table-column>
