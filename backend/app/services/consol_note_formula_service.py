@@ -748,6 +748,51 @@ async def ensure_seeded(db: AsyncSession, template_type: str) -> SeedResult | No
     return result
 
 
+async def ensure_seeded_readonly(db: AsyncSession, template_type: str) -> SeedResult | None:
+    """只读路径（GET 列公式）的按需种子化：**只补齐库里缺失的种子行（create-only），从不更新 / 删除**已有行。
+
+    与 ``ensure_seeded`` 的区别 ——
+    * ``ensure_seeded``（求值 / 写上下文用）会按模板文件 mtime + 报表配置签名判断漂移，缺失则 create、规则
+      变了则 update、规则不再产出则 delete，是完整的"配置 → 种子"同步；
+    * 本函数（GET 只读用）只按**库内状态**判断：计划的种子位里凡库中没有活动记录、也没有被人工删除过的，才
+      在一个 SAVEPOINT 内 create 补齐；**绝不** update 或 delete 已有行。
+
+    这样既保持了"打开面板能看到齐全的种子公式"这一契约（测试 / 前端依赖），又消除了读路径因配置漂移而改写
+    模板级全局表的副作用（只读用户也能触发、违反 HTTP 语义），且判据是库内状态而非进程内 ``_SEEDED`` 缓存
+    （多 worker 下不可靠）。"配置漂移 ⇒ update/delete 种子"的职责仍由求值路径（``_view_context`` /
+    ``consol_note_subtree_reaggregate``，写上下文、调用方会提交）与显式 ``POST .../seed``（admin）承担。
+
+    库里种子已齐 ⇒ 返回 None（纯只读、不写、不提交）。
+    """
+    tt = _check_template(template_type)
+    rows = await load_report_rows(db, f"{tt}_consolidated")
+    plan = plan_seed(tt, consol_note_tables(tt), single_note_sections(tt), rows)
+    existing = (await db.execute(sa.select(ConsolNoteFormula).where(
+        ConsolNoteFormula.template_type == tt,
+    ))).scalars().all()
+    present = {(f.section_id, f.row_index, f.col_index) for f in existing}  # 含人工删除的软删行：不补回
+    missing = [c for c in plan.cells
+               if c.kind != KIND_SUB_TABLE_TOTAL  # 子表合计不落库（运行时 / 前端算），与 seed_note_formulas 一致
+               and (c.section_id, c.row_index, c.col_index) not in present]
+    if not missing:
+        return None
+    now = datetime.now(timezone.utc)
+    result = SeedResult(tt)
+    try:
+        async with db.begin_nested():
+            for cell in missing:
+                db.add(ConsolNoteFormula(
+                    template_type=tt, section_id=cell.section_id, row_index=cell.row_index,
+                    col_index=cell.col_index, formula=cell.formula, source="seed",
+                    description=cell.description, created_at=now, updated_at=now,
+                ))
+                result.created += 1
+            await db.flush()
+    except IntegrityError:
+        return None   # 并发种子化：另一请求已写入
+    return result
+
+
 # ─────────────────────────────── 公式增删改 ───────────────────────────────
 
 
@@ -803,8 +848,9 @@ def _check_cell(template_type: str, section_id: str, row_index: int, col_index: 
 
 
 async def list_note_formulas(db: AsyncSession, template_type: str, section_id: str | None = None) -> dict:
+    # GET 只读：仅库全空时自举一次，已有记录纯只读（不因配置变化在读路径写全局表 / commit）。
     tt = _check_template(template_type)
-    await ensure_seeded(db, tt)
+    await ensure_seeded_readonly(db, tt)
     stmt = sa.select(ConsolNoteFormula).where(
         ConsolNoteFormula.template_type == tt, ConsolNoteFormula.is_deleted == sa.false(),
     )
