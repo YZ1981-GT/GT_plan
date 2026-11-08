@@ -53,7 +53,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { confirmationAIApi } from '@/api'
+
+// 桩实现 — 函证 AI 审核后端端点尚未就绪
+const confirmationAIApi = {
+  runChecks: (_listId: string | null, _types: string[]) => Promise.resolve({ data: [] as any[] }),
+  confirm: (_checkId: string, _payload: { confirmed: boolean }) => Promise.resolve({ data: {} }),
+}
 
 const props = defineProps({
   projectId: { type: String, required: true },

@@ -261,7 +261,8 @@ def managed_row_table_specs() -> tuple[Any, ...]:
 
         specs.append(_f402.SPEC_F402)
     if _INCLUDE_F409:
-        from app.services.workpaper_sync import phase5_f4_09_supplier_financing as _f409
+        # F4-9 模块尚未创建，启用前需先实现 phase5_f4_09_supplier_financing
+        from app.services.workpaper_sync import phase5_f4_09_supplier_financing as _f409  # noqa: F811
 
         specs.append(_f409.SPEC_F409)
     if _INCLUDE_F401:

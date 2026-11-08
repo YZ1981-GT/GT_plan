@@ -107,15 +107,17 @@ class ReviewNotificationService:
 
         # Dispatch via event bus (if available)
         try:
-            from app.services.event_handlers import dispatch_event
+            from app.services.event_bus import event_bus
 
-            await dispatch_event(
+            event_bus.broadcast_raw(
                 event_type=event_type,
-                target_user_id=str(target_user_id),
-                payload=payload,
+                extra={
+                    "target_user_id": str(target_user_id),
+                    **payload.get("data", {}),
+                },
             )
         except ImportError:
-            logger.debug("Event dispatch not available, notification logged only")
+            logger.debug("Event bus not available, notification logged only")
         except Exception as e:
             logger.warning(f"Failed to dispatch SSE notification: {e}")
 

@@ -323,21 +323,24 @@ class IssueTicketService:
         # 发送升级通知到签字合伙人
         try:
             from app.models.core import Project
-            from app.services.notification_service import notification_service
+            from app.services.notification_service import NotificationService
 
             project = (await db.execute(
                 select(Project).where(Project.id == ticket.project_id)
             )).scalar_one_or_none()
 
             if project and project.created_by:
-                await notification_service.create_notification(
-                    db,
+                ns = NotificationService()
+                await ns.send_notification(
                     user_id=project.created_by,
                     notification_type="qc_sla_breach",
                     title=f"质控整改单逾期：{ticket.title[:50]}",
                     content=f"工单已逾期 {int(hours_overdue)} 小时，请督促整改",
-                    related_object_type="issue_ticket",
-                    related_object_id=str(ticket.id),
+                    metadata={
+                        "related_object_type": "issue_ticket",
+                        "related_object_id": str(ticket.id),
+                    },
+                    db=db,
                 )
         except Exception as e:
             logger.warning("[Q-SLA] notification failed: %s", e)

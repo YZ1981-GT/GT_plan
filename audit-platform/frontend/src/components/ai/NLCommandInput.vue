@@ -36,7 +36,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { nlCommandApi } from '@/api'
+
+// 桩实现 — 自然语言指令后端端点尚未就绪
+const nlCommandApi = {
+  execute: (_projectId: string, _query: string) =>
+    Promise.resolve({ data: { status: 'error', message: '自然语言指令功能开发中' } }),
+}
 
 const props = defineProps({ projectId: { type: String, required: true } })
 const emit = defineEmits(['action-confirmed', 'action-cancelled'])

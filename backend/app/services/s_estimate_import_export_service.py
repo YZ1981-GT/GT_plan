@@ -146,7 +146,6 @@ async def export_data(
     从 checklist_responses 查询 S 类行数据，写入 xlsx。
     """
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     wb = Workbook()
     wb.remove(wb.active)  # type: ignore[arg-type]
@@ -167,15 +166,16 @@ async def export_data(
             cell.fill = _HEADER_FILL
             cell.alignment = _HEADER_ALIGN
 
-        # 查询 checklist_responses 中的行数据
+        # 查询 checklist_responses 中的行数据（该表无 ORM 模型，走裸 SQL）
         item_prefix = f"s-estimate-{sheet_key}-row-"
-        stmt = sa.select(ChecklistResponse).where(
-            ChecklistResponse.wp_id == wp_id,
-            ChecklistResponse.item_id.like(f"{item_prefix}%"),
-        ).order_by(ChecklistResponse.item_id)
+        stmt = sa.text(
+            "SELECT item_id, remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix "
+            "ORDER BY item_id"
+        )
 
-        result = await db.execute(stmt)
-        responses = result.scalars().all()
+        result = await db.execute(stmt, {"wp_id": wp_id, "prefix": f"{item_prefix}%"})
+        responses = result.mappings().all()
 
         if cfg["type"] == "grid":
             # S21-2: 行=类目，列=1-12月+合计
@@ -202,10 +202,10 @@ def _export_grid_data(ws: Any, responses: list) -> None:
     category_data: dict[str, list[float]] = {cat: [0.0] * 12 for cat in _S21_CATEGORIES}
 
     for resp in responses:
-        if not resp.remark:
+        if not resp["remark"]:
             continue
         try:
-            data = json.loads(resp.remark)
+            data = json.loads(resp["remark"])
         except (json.JSONDecodeError, TypeError):
             continue
 
@@ -234,10 +234,10 @@ def _export_dynamic_rows(ws: Any, responses: list, fields: list[str]) -> None:
     """导出 S20 动态行明细"""
     row_num = 2
     for resp in responses:
-        if not resp.remark:
+        if not resp["remark"]:
             continue
         try:
-            data = json.loads(resp.remark)
+            data = json.loads(resp["remark"])
         except (json.JSONDecodeError, TypeError):
             continue
 
@@ -267,7 +267,6 @@ async def import_data(
         { imported_count: int, warnings: list[str] }
     """
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     target_sheet = sheet or "S21-2"
     if target_sheet not in _SHEET_CONFIGS:
@@ -316,18 +315,15 @@ async def _import_grid_data(
 ) -> dict[str, Any]:
     """导入 S21-2 网格数据（按行=类目，列=1~12月）"""
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     warnings: list[str] = []
     imported_count = 0
 
-    # 先删除旧数据
+    # 先删除旧数据（checklist_responses 无 ORM 模型，走裸 SQL）
     item_prefix = f"s-estimate-{sheet_key}-row-"
     await db.execute(
-        sa.delete(ChecklistResponse).where(
-            ChecklistResponse.wp_id == wp_id,
-            ChecklistResponse.item_id.like(f"{item_prefix}%"),
-        )
+        sa.text("DELETE FROM checklist_responses WHERE wp_id = :wp_id AND item_id LIKE :prefix"),
+        {"wp_id": wp_id, "prefix": f"{item_prefix}%"},
     )
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=1):
@@ -359,11 +355,13 @@ async def _import_grid_data(
             "monthly": monthly,
         }, ensure_ascii=False)
 
-        db.add(ChecklistResponse(
-            wp_id=wp_id,
-            item_id=item_id,
-            remark=data_json,
-        ))
+        await db.execute(
+            sa.text(
+                "INSERT INTO checklist_responses (wp_id, item_id, remark) "
+                "VALUES (:wp_id, :item_id, :remark)"
+            ),
+            {"wp_id": wp_id, "item_id": item_id, "remark": data_json},
+        )
         imported_count += 1
 
     await db.flush()
@@ -379,7 +377,6 @@ async def _import_dynamic_rows(
 ) -> dict[str, Any]:
     """导入 S20 动态行明细"""
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     warnings: list[str] = []
     imported_count = 0
@@ -387,10 +384,8 @@ async def _import_dynamic_rows(
     # 先删除旧数据
     item_prefix = f"s-estimate-{sheet_key}-row-"
     await db.execute(
-        sa.delete(ChecklistResponse).where(
-            ChecklistResponse.wp_id == wp_id,
-            ChecklistResponse.item_id.like(f"{item_prefix}%"),
-        )
+        sa.text("DELETE FROM checklist_responses WHERE wp_id = :wp_id AND item_id LIKE :prefix"),
+        {"wp_id": wp_id, "prefix": f"{item_prefix}%"},
     )
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=1):
@@ -417,11 +412,13 @@ async def _import_dynamic_rows(
         item_id = f"{item_prefix}{row_idx:04d}"
         data_json = json.dumps(row_data, ensure_ascii=False)
 
-        db.add(ChecklistResponse(
-            wp_id=wp_id,
-            item_id=item_id,
-            remark=data_json,
-        ))
+        await db.execute(
+            sa.text(
+                "INSERT INTO checklist_responses (wp_id, item_id, remark) "
+                "VALUES (:wp_id, :item_id, :remark)"
+            ),
+            {"wp_id": wp_id, "item_id": item_id, "remark": data_json},
+        )
         imported_count += 1
 
     await db.flush()

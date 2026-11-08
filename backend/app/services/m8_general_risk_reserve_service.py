@@ -254,7 +254,6 @@ async def export_data(
     从 checklist_responses 查询 M8 行数据，写入 xlsx。
     """
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     wb = Workbook()
     wb.remove(wb.active)  # type: ignore[arg-type]
@@ -275,22 +274,24 @@ async def export_data(
             cell.fill = _HEADER_FILL
             cell.alignment = _HEADER_ALIGN
 
-        # 查询 checklist_responses 中的行数据
+        # 查询 checklist_responses 中的行数据（该表无 ORM 模型，走裸 SQL）
         item_prefix = f"M8-{sheet_key.split('-')[1]}-row-"
-        stmt = sa.select(ChecklistResponse).where(
-            ChecklistResponse.wp_id == wp_id,
-            ChecklistResponse.item_id.like(f"{item_prefix}%-data"),
-        ).order_by(ChecklistResponse.item_id)
+        stmt = sa.text(
+            "SELECT item_id, remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix "
+            "ORDER BY item_id"
+        )
 
-        result = await db.execute(stmt)
-        responses = result.scalars().all()
+        result = await db.execute(stmt, {"wp_id": wp_id, "prefix": f"{item_prefix}%-data"})
+        responses = result.mappings().all()
 
         row_num = 2
         for resp in responses:
-            if not resp.remark:
+            remark = resp["remark"]
+            if not remark:
                 continue
             try:
-                data = json.loads(resp.remark)
+                data = json.loads(remark)
             except (json.JSONDecodeError, TypeError):
                 continue
 
@@ -326,7 +327,6 @@ async def import_data(
         { imported_count: int, warnings: list[str] }
     """
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     target_sheet = sheet or "M8-2"
     if target_sheet not in _SHEET_CONFIGS:
@@ -407,26 +407,28 @@ async def import_data(
     for idx, row_data in enumerate(items_to_save, start=1):
         item_id = f"M8-{sheet_num}-row-{idx}-data"
 
-        # Upsert: 查询是否存在
-        stmt = sa.select(ChecklistResponse).where(
-            ChecklistResponse.wp_id == wp_id,
-            ChecklistResponse.item_id == item_id,
+        # Upsert: checklist_responses 无 ORM 模型，走裸 SQL
+        existing_result = await db.execute(
+            sa.text("SELECT id FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"),
+            {"wp_id": wp_id, "item_id": item_id},
         )
-        result = await db.execute(stmt)
-        existing = result.scalar_one_or_none()
+        existing_row = existing_result.first()
 
         remark_json = json.dumps(row_data, ensure_ascii=False)
 
-        if existing:
-            existing.remark = remark_json
-        else:
-            new_resp = ChecklistResponse(
-                wp_id=wp_id,
-                item_id=item_id,
-                conclusion=None,
-                remark=remark_json,
+        if existing_row:
+            await db.execute(
+                sa.text("UPDATE checklist_responses SET remark = :remark WHERE wp_id = :wp_id AND item_id = :item_id"),
+                {"remark": remark_json, "wp_id": wp_id, "item_id": item_id},
             )
-            db.add(new_resp)
+        else:
+            await db.execute(
+                sa.text(
+                    "INSERT INTO checklist_responses (wp_id, item_id, conclusion, remark) "
+                    "VALUES (:wp_id, :item_id, NULL, :remark)"
+                ),
+                {"wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+            )
 
     return {"imported_count": imported_count, "warnings": warnings}
 
@@ -451,25 +453,26 @@ async def validate_risk_provision(
         { valid: bool, checks: [...] }
     """
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ChecklistResponse
 
     checks: list[dict[str, Any]] = []
     all_valid = True
 
-    # 检查M8-4测试表行数据
-    stmt = sa.select(ChecklistResponse).where(
-        ChecklistResponse.wp_id == wp_id,
-        ChecklistResponse.item_id.like("M8-4-row-%-data"),
-    ).order_by(ChecklistResponse.item_id)
+    # 检查M8-4测试表行数据（checklist_responses 无 ORM 模型，走裸 SQL）
+    stmt = sa.text(
+        "SELECT item_id, remark FROM checklist_responses "
+        "WHERE wp_id = :wp_id AND item_id LIKE 'M8-4-row-%-data' "
+        "ORDER BY item_id"
+    )
 
-    result = await db.execute(stmt)
-    m8_4_rows = result.scalars().all()
+    result = await db.execute(stmt, {"wp_id": wp_id})
+    m8_4_rows = result.mappings().all()
 
     for resp in m8_4_rows:
-        if not resp.remark:
+        remark = resp["remark"]
+        if not remark:
             continue
         try:
-            data = json.loads(resp.remark)
+            data = json.loads(remark)
         except (json.JSONDecodeError, TypeError):
             continue
 
