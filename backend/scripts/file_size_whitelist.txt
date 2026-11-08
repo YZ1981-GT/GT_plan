@@ -1949,3 +1949,6 @@ backend/app/services/ai_chat/native_engine.py  834
 #   （两宿主结构性零）各自抽成 `test_c_cycle_contrast.py` / `test_c_cycle_structural_zeros.py`，
 #   公共 fixtures（`c_entries` / `host_files` / `overrides`）落到 `_test_c_cycle_facts.py`。
 backend/tests/workpaper_sync/test_c_cycle_baseline.py  1415
+
+# 工作台门面，拆分方向：按角色抽子 facade
+backend/app/services/role_workbench_facade.py  961

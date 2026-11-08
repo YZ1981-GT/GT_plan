@@ -39,12 +39,14 @@ async def mark_wp_stale(
     idx = sa.select(WpIndex.id).where(
         WpIndex.project_id == project_id,
         WpIndex.wp_code.in_(codes),
+        WpIndex.is_deleted == sa.false(),
     )
     result = await db.execute(
         sa.update(WorkingPaper)
         .where(
             WorkingPaper.project_id == project_id,
             WorkingPaper.wp_index_id.in_(idx),
+            WorkingPaper.is_deleted == sa.false(),
         )
         .values(prefill_stale=True)
         .execution_options(synchronize_session=False)
@@ -85,7 +87,7 @@ async def mark_consol_note_stale(
 ) -> int:
     """合并附注：受影响章节的 ``consol_note_data.is_stale = true``。只 flush 不 commit。"""
     try:
-        from app.models.consol_note_models import ConsolNoteData
+        from app.models.consol_note_data_models import ConsolNoteData
     except ImportError:
         logger.debug("consol_note_models 不可用，跳过合并附注标过期")
         return 0

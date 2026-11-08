@@ -197,7 +197,7 @@ async def seal_artifact(
     """
     from app.services.custom_query.export_service import export_service
     from app.services.custom_query.query_runs import canonical_json
-    from app.attachment_upload_policy import ensure_within_root
+    from app.services.attachment_upload_policy import ensure_within_root
 
     artifact_id = uuid.uuid4()
     now = datetime.now(timezone.utc)

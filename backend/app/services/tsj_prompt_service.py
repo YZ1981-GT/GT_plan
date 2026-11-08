@@ -160,3 +160,25 @@ class TsjPromptService:
     def list_available(self) -> list[str]:
         """列出所有可用的 TSJ 文件"""
         return sorted(self._all.keys())
+
+
+# ── 模块级便利函数 ──────────────────────────────────────────
+# wp_scripts/registry.py 以 `from app.services.tsj_prompt_service import get_review_points` 引用
+
+_singleton: TsjPromptService | None = None
+
+
+def get_review_points(wp_code: str) -> list[dict] | None:
+    """根据底稿编码获取复核要点清单。
+
+    返回 ``[{"text": "...", "level": "..."}]`` 或 None（无匹配 TSJ）。
+    """
+    global _singleton
+    if _singleton is None:
+        _singleton = TsjPromptService()
+    result = _singleton.get_for_account(wp_code)
+    if result is None:
+        return None
+    checklist = result.get("checklist", [])
+    risk_areas = result.get("risk_areas", [])
+    return risk_areas if risk_areas else [{"text": item, "level": "info"} for item in checklist]

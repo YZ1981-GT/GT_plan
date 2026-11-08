@@ -111,6 +111,19 @@ fi
 #
 # push 前暂存区通常已清空（index == HEAD），所以这一步实质是在验「即将推送的代码自洽」。
 # 用 `git checkout-index` 把 index 物化到临时目录后跑门，约 35~40 秒；push 频率低，可接受。
+# 4b. import 健康检查（2026-11-08 新增）—— 拦截缺失模块 / 不存在的导入名 / 前端死注册
+#
+# 后端：AST 扫描 from app.xxx import yyy，验证模块存在且名字可达
+# 前端：components.d.ts 注册的组件文件必须存在
+echo "[pre-push] 执行 import 健康检查..."
+if ! "$PYTHON" backend/scripts/check/check_import_health.py --root .; then
+    echo ""
+    echo "[pre-push] ❌ import 健康检查失败 —— 推上去协作者拉取会报红"
+    echo "          排查：python backend/scripts/check/check_import_health.py --root ."
+    echo "          紧急救急：git push --no-verify"
+    exit 1
+fi
+
 echo "[pre-push] 执行暂存树自洽检查（物化 index 后跑零回归门，约 40s）..."
 if ! "$PYTHON" backend/scripts/check/check_staged_tree_self_consistency.py; then
     echo ""

@@ -99,7 +99,14 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { workpaperFillApi } from '@/api'
+
+// 桩实现 — AI 底稿填充后端端点尚未就绪
+const workpaperFillApi = {
+  startFill: (_projectId: string, _opts: Record<string, unknown>) =>
+    Promise.resolve({ data: { jobId: null } }),
+  getStatus: (_jobId: string) =>
+    Promise.resolve({ data: { progress: 0, status: 'pending', steps: [], results: [] } }),
+}
 
 const props = defineProps({
   projectId: { type: String, required: true },

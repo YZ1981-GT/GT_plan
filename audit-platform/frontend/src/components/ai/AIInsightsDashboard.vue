@@ -30,7 +30,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { aiContentApi } from '@/api'
+
+// 桩实现 — 后端端点尚未就绪，返回空数据保证编译和运行时不崩溃
+const aiContentApi = {
+  listInsights: (_projectId: string) => Promise.resolve({ data: [] as any[] }),
+}
 
 const props = defineProps({ projectId: { type: String, required: true } })
 const insights = ref([])

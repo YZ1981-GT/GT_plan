@@ -57,7 +57,7 @@ export async function showWorkflowGuide(config: GuideConfig): Promise<boolean> {
     t,
   ]))
 
-  const tipItems = (config.tips || []).map(t => h('li', { style: 'margin-bottom: 4px; color: #909399; font-size: var(--gt-display-font-size) }, [
+  const tipItems = (config.tips || []).map(t => h('li', { style: 'margin-bottom: 4px; color: #909399; font-size: var(--gt-display-font-size)' }, [
     h('span', { style: 'margin-right: 4px' }, '💡'),
     t,
   ]))
@@ -66,11 +66,11 @@ export async function showWorkflowGuide(config: GuideConfig): Promise<boolean> {
     h('p', { style: 'margin-bottom: 8px; font-size: var(--gt-display-font-size); color: #606266' }, config.action),
     items.length > 0 ? h('div', { style: 'margin-bottom: 8px' }, [
       h('div', { style: 'font-size: var(--gt-display-font-size); color: #909399; margin-bottom: 4px' }, '请确认以下准备工作已完成：'),
-      h('ul', { style: 'margin: 0; padding-left: 16px; font-size: var(--gt-display-font-size) }, items),
+      h('ul', { style: 'margin: 0; padding-left: 16px; font-size: var(--gt-display-font-size)' }, items),
     ]) : null,
     effectItems.length > 0 ? h('div', { style: 'margin-bottom: 8px' }, [
       h('div', { style: 'font-size: var(--gt-display-font-size); color: #909399; margin-bottom: 4px' }, '操作完成后：'),
-      h('ul', { style: 'margin: 0; padding-left: 16px; font-size: var(--gt-display-font-size) }, effectItems),
+      h('ul', { style: 'margin: 0; padding-left: 16px; font-size: var(--gt-display-font-size)' }, effectItems),
     ]) : null,
     tipItems.length > 0 ? h('ul', { style: 'margin: 8px 0 0; padding-left: 16px; border-top: 1px solid #f0f0f0; padding-top: 8px' }, tipItems) : null,
   ])
