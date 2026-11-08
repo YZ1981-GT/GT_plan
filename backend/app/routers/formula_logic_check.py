@@ -36,7 +36,10 @@ _CROSS_CHECK_RULES_KEY = "cross_check_user_rules"
 
 
 def _serialize(result: CrossCheckResult) -> dict[str, Any]:
-    """把执行结果序列化为可 JSON 化的响应（Issue_List + 逐条结果）。"""
+    """把执行结果序列化为可 JSON 化的响应（Issue_List + 逐条结果 + 五态）。"""
+    issue_by_formula: dict[str, Any] = {}
+    for issue in result.issues:
+        issue_by_formula.setdefault(issue.formula_id, issue)
     return {
         "issue_list": [
             {
@@ -49,6 +52,8 @@ def _serialize(result: CrossCheckResult) -> dict[str, Any]:
                 "right_value": (
                     str(issue.right_value) if issue.right_value is not None else None
                 ),
+                "severity": getattr(issue, "severity", "warning"),
+                "reason": issue.description,
             }
             for issue in result.issues
         ],
@@ -58,6 +63,31 @@ def _serialize(result: CrossCheckResult) -> dict[str, Any]:
                 "description": o.description,
                 "expression": o.expression,
                 "passed": o.passed,
+                "severity": o.severity,
+                # 五态：passed → 'passed'；not passed → 'failed'；后续扩展 not_executed / error
+                "status": "passed" if o.passed else "failed",
+                "reason": (
+                    issue_by_formula[o.formula_id].description
+                    if o.formula_id in issue_by_formula else ""
+                ),
+                # 通过项也保留左右金额（便于前端展示差额=0）
+                "left_value": (
+                    str(issue_by_formula[o.formula_id].left_value)
+                    if o.formula_id in issue_by_formula and issue_by_formula[o.formula_id].left_value is not None
+                    else None
+                ),
+                "right_value": (
+                    str(issue_by_formula[o.formula_id].right_value)
+                    if o.formula_id in issue_by_formula and issue_by_formula[o.formula_id].right_value is not None
+                    else None
+                ),
+                "diff": (
+                    str(issue_by_formula[o.formula_id].left_value - issue_by_formula[o.formula_id].right_value)
+                    if o.formula_id in issue_by_formula
+                    and issue_by_formula[o.formula_id].left_value is not None
+                    and issue_by_formula[o.formula_id].right_value is not None
+                    else None
+                ),
             }
             for o in result.outcomes
         ],
