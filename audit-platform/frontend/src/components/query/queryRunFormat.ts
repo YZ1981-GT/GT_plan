@@ -66,6 +66,6 @@ export function currentMessage(weak: boolean): string {
 }
 
 /** 过期原因摘要（取第一条）*/
-export function staleReason(changes: Array<{ reason?: string }>): string {
+export function staleReason(changes: ReadonlyArray<{ reason?: string }>): string {
   return changes?.[0]?.reason ?? '来源数据已变化'
 }

@@ -88,7 +88,7 @@ import type { VersionComponent, FreshnessResult, RunInfo } from './useQueryRunEv
 
 interface Props {
   runInfo?: RunInfo | null
-  version?: { components?: VersionComponent[]; weak?: boolean } | null
+  version?: { components?: ReadonlyArray<VersionComponent>; weak?: boolean } | null
   capturedAt?: string | null
   freshness?: FreshnessResult | null
   checking?: boolean
@@ -123,6 +123,7 @@ const freshnessStatus = computed(() => props.freshness?.status ?? (props.runInfo
 const staleReasonText = computed(() => staleReason(props.freshness?.changes ?? []))
 const hasContent = computed(() =>
   props.scopeText || components.value.length > 0 || props.capturedAt || props.runInfo || props.freshness
+    || props.unavailable || props.pageChanged
 )
 </script>
 

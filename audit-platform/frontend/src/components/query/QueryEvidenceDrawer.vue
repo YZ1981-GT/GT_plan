@@ -58,13 +58,18 @@
         </div>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 清单 JSON 弹窗 -->
+    <el-dialog v-model="manifestVisible" title="证据清单" width="640px" append-to-body>
+      <pre class="qed__manifest-json">{{ manifestJson }}</pre>
+    </el-dialog>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { fmtBeijingTime, fmtRows } from './queryRunFormat'
-import type { ReturnType } from 'typescript'
 
 interface Props {
   modelValue: boolean
@@ -72,7 +77,7 @@ interface Props {
   projectId?: string
   evidence: Pick<
     ReturnType<typeof import('./useQueryRunEvidence').useQueryRunEvidence>,
-    'runs' | 'artifacts' | 'loadRuns' | 'loadArtifacts' | 'hideRun' | 'clearRuns' | 'downloadArtifact' | 'fetchManifest'
+    'runs' | 'artifacts' | 'loadRuns' | 'loadArtifacts' | 'hideRun' | 'clearRuns' | 'downloadArtifact' | 'fetchManifest' | 'fetchRunDetail'
   >
 }
 
@@ -87,6 +92,8 @@ watch(() => props.modelValue, v => { visible.value = v })
 watch(visible, v => emit('update:modelValue', v))
 
 const activeTab = ref('history')
+const manifestVisible = ref(false)
+const manifestJson = ref('')
 const runs = props.evidence.runs
 const artifacts = props.evidence.artifacts
 
@@ -97,9 +104,16 @@ async function onOpen() {
   ])
 }
 
-function onReplay(run: unknown) {
-  emit('replay', run)
-  visible.value = false
+async function onReplay(run: unknown) {
+  const runId = String((run as Record<string, unknown>)?.id ?? '')
+  if (!runId) return
+  try {
+    const detail = await props.evidence.fetchRunDetail(runId)
+    emit('replay', detail)
+    visible.value = false
+  } catch {
+    ElMessage.warning('加载查询详情失败，请稍后重试')
+  }
 }
 
 async function onHideRun(id: string) {
@@ -115,8 +129,13 @@ async function onDownload(id: string) {
 }
 
 async function onViewManifest(id: string) {
-  const manifest = await props.evidence.fetchManifest(id)
-  alert(JSON.stringify(manifest, null, 2))
+  try {
+    const manifest = await props.evidence.fetchManifest(id)
+    manifestJson.value = JSON.stringify(manifest, null, 2)
+    manifestVisible.value = true
+  } catch {
+    ElMessage.warning('加载清单失败，请稍后重试')
+  }
 }
 </script>
 
@@ -129,4 +148,5 @@ async function onViewManifest(id: string) {
 .qed__item-actions { display: flex; gap: 6px; margin-top: 6px; }
 .qed__source { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qed__count { font-size: 11px; color: #868e96; white-space: nowrap; }
+.qed__manifest-json { white-space: pre-wrap; word-break: break-all; font-size: 12px; max-height: 60vh; overflow: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; }
 </style>
