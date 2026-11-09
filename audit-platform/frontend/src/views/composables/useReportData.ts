@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
-import { projects as P_proj, reportConfig as P_rc } from '@/services/apiPaths'
+import { projects as P_proj, reportConfig as P_rc, disclosureNotes as P_dn } from '@/services/apiPaths'
 import {
   generateReports, getReport, getReportConsistencyCheck,
   type ReportRow, type ReportConsistencyCheck,
@@ -22,10 +22,10 @@ import { useReportRequestFence, type ReportRequest } from './useReportRequestFen
 export async function fetchNoteSectionsWithData(projectId: string, year: number | null): Promise<Set<string> | null> {
   if (year == null) return null // 不拼 /null/ 路径
   try {
-    const { data } = await http.get(
-      `/api/disclosure-notes/${projectId}/${year}/notes-tree`,
-      { _silent: true } as any
-    )
+    // 附注目录端点是 GET /api/disclosure-notes/{pid}/{year}（每项带 note_section / has_data）。
+    // 原先拼的 …/{year}/notes-tree 后端没有，被章节详情路由当成章节号「notes-tree」⇒ 恒 404「附注章节不存在」，
+    // 报表「附注」列标与「金额为 0 但附注有内容」的行显示从未生效（2026-11-09 浏览器实测）。
+    const { data } = await http.get(P_dn.tree(projectId, year), { _silent: true } as any)
     const sections = data?.data || data || []
     const set = new Set<string>()
     for (const node of (Array.isArray(sections) ? sections : [])) {
