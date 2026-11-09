@@ -1,0 +1,97 @@
+# ============================================================
+# gt-sj-plan — sj-dev1.0 分支的独立容器环境 override
+#
+# 目的：sj-dev1.0 与其他分支不共用容器、数据卷、数据库。
+#       写法照 docker-compose.sw-plan.yml；改名只放在本文件里，不改基础 docker-compose.yml
+#       （基础文件会随合并进入 dev1.0，改那里会把其他分支的容器也改名）。
+#
+# 用法（在仓库根执行，推荐用脚本，参数已固定）：
+#   .\scripts\sj-plan.ps1 up      # 启动 postgres + redis + onlyoffice
+#   .\scripts\sj-plan.ps1 down    # 停止并移除容器（数据卷保留）
+#   .\scripts\sj-plan.ps1 ps      # 查看状态
+# 手敲须同时带 -p / --env-file / 两个 -f：
+#   docker compose -p gt-sj-plan --env-file .env.sj-plan \
+#     -f docker-compose.yml -f docker-compose.sj-plan.yml \
+#     --profile onlyoffice up -d postgres redis onlyoffice
+#
+# ============================================================
+# 隔离点
+# ============================================================
+# 1. 项目名   gt-sj-plan（-p 与下方 name 双保险）⇒ Docker Desktop 里独立成组
+# 2. 容器名   gt-sj-* 前缀；后端容器 gt-sj-plan（基础文件里是 gt-plan）
+# 3. 数据卷   下方 volumes 段全部独立，不复用 gt_workplan_pg_data
+# 4. 端口     见 .env.sj-plan，全部高于 15000（本机 Hyper-V 动态端口段 1024–15000
+#             会被随机保留，5432 / 6379 / 8080 都可能绑不上）
+# 5. 网络     项目名不同 ⇒ 自动得到独立的 gt-sj-plan_default 网络
+# 6. 镜像     后端镜像改标签 gt-sj-plan-backend，避免与其他分支构建互相覆盖
+#
+# 🔴 漏掉 --env-file .env.sj-plan 会套用根 .env 的端口，与其他分支的容器抢端口。
+# 🔴 volumes 按整列表写全：基础文件的条目逐条照抄，挂载点逐字一致。
+# ============================================================
+
+name: gt-sj-plan
+
+services:
+  postgres:
+    container_name: gt-sj-postgres
+    volumes:
+      - sj_pg_data:/var/lib/postgresql/data
+
+  pgbouncer:
+    container_name: gt-sj-pgbouncer
+
+  redis:
+    container_name: gt-sj-redis
+    volumes:
+      - sj_redis_data:/data
+
+  onlyoffice:
+    container_name: gt-sj-onlyoffice
+    volumes:
+      - sj_office_data:/var/lib/onlyoffice
+      - sj_office_logs:/var/log/onlyoffice
+      - sj_office_data_certs:/var/www/onlyoffice/Data
+      # 插件为宿主机只读挂载（非命名卷），各分支共用同一份源码
+      - ./backend/onlyoffice_plugins/audit-legend:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-legend:ro
+      - ./backend/onlyoffice_plugins/tb-fetch:/var/www/onlyoffice/documentserver/sdkjs-plugins/tb-fetch:ro
+
+  metabase:
+    container_name: gt-sj-metabase
+    volumes:
+      - sj_metabase_data:/metabase-data
+
+  ollama:
+    container_name: gt-sj-ollama
+    volumes:
+      - sj_ollama_data:/root/.ollama
+
+  # 后端容器（profile docker-backend，日常开发仍用 start-dev.bat 在宿主机跑）。
+  # 与基础设施同在本项目网络内，按服务名 postgres / redis / onlyoffice 互访，
+  # 不需要 docker-compose.gt-plan.yml 那样接入外部网络。
+  backend:
+    image: gt-sj-plan-backend:latest
+    container_name: gt-sj-plan
+    environment:
+      # room_launch / OO Command Service fail closed，容器内没有 .env ⇒ 显式注入，须与 OnlyOffice 容器一致
+      ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-onlyoffice-dev-secret-2026}
+    volumes:
+      - ./storage:/app/storage
+      - ./backend/app:/app/app
+      # 以下几条的原因见 docker-compose.gt-plan.yml：workpaper-sync 按仓库根相对路径读宿主文件，
+      # 模板 / 数据以宿主为准，definition_store 必须可写
+      - ./audit-platform:/audit-platform:ro
+      - ./.kiro:/.kiro:ro
+      - ./backend:/backend:ro
+      - ./backend/wp_templates:/app/wp_templates:ro
+      - ./backend/data:/app/data:ro
+      - ./backend/definition_store:/app/definition_store
+
+# 不写 external/name ⇒ compose 按项目名加前缀，实际卷名为 gt-sj-plan_sj_pg_data 等
+volumes:
+  sj_pg_data:
+  sj_redis_data:
+  sj_office_data:
+  sj_office_logs:
+  sj_office_data_certs:
+  sj_metabase_data:
+  sj_ollama_data:
