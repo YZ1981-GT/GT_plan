@@ -34,7 +34,7 @@
       </div>
       <div class="ch-stat-item">
         <span class="ch-stat-num">{{ subsidiaryCount }}</span>
-        <span class="ch-stat-label">子公司</span>
+        <span class="ch-stat-label">下属企业</span>
       </div>
       <div class="ch-stat-item">
         <span class="ch-stat-num">{{ executingCount }}</span>
@@ -331,8 +331,14 @@ const batchImportRoots = computed(() => trees.value
 
 /** 合并项目数 = 含合并根项目的集团树数量 */
 const consolidatedCount = computed(() => trees.value.filter((t) => t.rootProjectId).length)
-/** 子公司数 = 森林成员节点总数 */
-const subsidiaryCount = computed(() => totalTreeNodes.value)
+/**
+ * 下属企业数 = 森林成员节点总数 − 集团根节点数。
+ * 后端 group_forest 在集团本身有项目时把根企业放在 children[0]（其余企业挂在它下面），
+ * 直接用 totalTreeNodes 会把集团自己也算成一家下属企业（2026-11-09 实测：1 家下属显示 3）。
+ */
+const subsidiaryCount = computed(() =>
+  Math.max(0, totalTreeNodes.value - trees.value.filter((t) => t.rootProjectId).length),
+)
 const executingCount = computed(
   () => allTreeNodes.value.filter((n) => n.status === 'execution').length,
 )
