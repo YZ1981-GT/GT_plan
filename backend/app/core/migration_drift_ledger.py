@@ -230,6 +230,24 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         "ck_project_creation_grants_code_checksum 约束存在；project_creation_grants 当前 "
         "无未撤销授权，故无遗漏的校验码清理。无需补迁移，未改写共享 schema_version 的应用时 checksum。",
     ),
+    KnownChecksumDrift(
+        "248",
+        "22035e24020956e3515f7da763d1b132744b239ce79ccfdfcb6c3e38236c8c6f",
+        "7d62b4a5f7049cbcfed6f9a215164d4fa4cebc9ce3209784bda86a694c3c1c1c",
+        "应用后被编辑（S5 双层来源信封字段，formula_push_provenance spec）；2026-11-09 只读核验"
+        " public.formula_push_state 的 provenance 列（jsonb, nullable）已存在，"
+        "非空行 281 条，编辑效果已在库中生效。无需补迁移，未改写共享 schema_version 的应用时 checksum。",
+    ),
+    KnownChecksumDrift(
+        "249",
+        "d0978998e02360f7ee64967b8ee9f658cb3d29091433f329abd35df84ba1b643",
+        "881602792bb0285b04bc55698000785f5de516eab7d7607a7cdce491fbbdf853",
+        "应用后被编辑（附注公式执行可查询运行记录，ADR-FPE-08/13/14）；2026-11-09 只读核验"
+        " public.note_formula_run 表 13 列（id/project_id/year/note_section/trigger/triggered_by/"
+        "started_at/finished_at/status/executed_count/updated_count/failed_count/error_summary）与"
+        " idx_note_formula_run_project_year_section 索引均存在且定义与当前文件一致，效果已在库中生效。"
+        "无需补迁移，未改写共享 schema_version 的应用时 checksum。",
+    ),
 )
 
 
