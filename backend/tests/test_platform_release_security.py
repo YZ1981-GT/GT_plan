@@ -168,3 +168,27 @@ def test_review_config_dependencies_are_project_scoped():
     assert project_permission(get_route) == "readonly"
     assert project_permission(put_route) == "edit"
     assert review_config.DEFAULT_REVIEW_CONFIG["level_roles"] == {"L1": "manager", "L2": "partner"}
+
+
+def test_review_level_roles_match_wp_gate_supervisors():
+    """复核层级只能配给底稿门按主管放行的角色。
+
+    复核状态 PUT 经 dedicated_wp_gate 映射为 dedicated_write：主管全权放行，审计员只有作为编制人（lead）才有写权
+    （= 自复核），作为行复核人（reviewer grant）写动作不在白名单 ⇒ 404。原校验放行 auditor，按此配置审计员复核必定失败。
+    """
+    import pytest
+    from pydantic import ValidationError
+
+    from app.routers.review_config import REVIEW_LEVEL_ROLES, ReviewConfigUpdate
+    from app.services.assignment_service import ROLE_MAP
+    from app.services.wp_visibility.effective_scope import SUPERVISOR_ROLES
+
+    assert REVIEW_LEVEL_ROLES == {"manager", "partner", "qc", "eqcr"}
+    # 每个可配角色作为委派角色时都被底稿门判为主管（eqcr 经 ROLE_MAP 映射为 partner）
+    for role in REVIEW_LEVEL_ROLES:
+        assert role in ROLE_MAP and role.lower() in SUPERVISOR_ROLES, role
+
+    ReviewConfigUpdate(levels=4, level_roles={"L1": "manager", "L2": "partner", "L3": "eqcr", "L4": "qc"})
+    for bad in ("auditor", "readonly"):
+        with pytest.raises(ValidationError, match="非法角色"):
+            ReviewConfigUpdate(levels=2, level_roles={"L1": bad, "L2": "partner"})
