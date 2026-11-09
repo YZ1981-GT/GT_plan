@@ -1,0 +1,359 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "6.1 动态取迁移号，新建 `consol_workpaper_instance`、artifact 关联；幂等创建 `A3-CONSOL` 的 WpIndex/WorkingPaper 壳。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616273
+      },
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154632062
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240314
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155265349
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155978795
+      }
+    ],
+    "6.2 壳接负责人、复核、回收站和项目权限；业务 JSON 不复制进 parsed_data。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616326
+      },
+      {
+        "executionId": "c7ed1edb-7de4-4c30-8ce9-ed34b1c88d45",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154912033
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240345
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155985381
+      }
+    ],
+    "6.3 设计稳定 sheet/row/cell identity，接通附件上传、引用、小眼睛预览和 EvidenceLink；插删行身份不漂移。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616381
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240371
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794157132457
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794158218396
+      }
+    ],
+    "6.4 readiness 接证据充分性和复核状态；角色视图分别展示编制、审批、重大判断和质控待办。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616428
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240400
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794158226532
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794159085020
+      }
+    ],
+    "6.5 archive inventory/provider 纳入成功 operation、artifact、snapshot、附件和审计清单；缺件 fail-closed。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616461
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240432
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794159091504
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794160136037
+      }
+    ],
+    "6.6 端点权限配方、证据跨项目隔离、回收站恢复、复核状态转换和归档包 hash 验证。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616514
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240457
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794160143848
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794161107822
+      }
+    ],
+    "7.1 升级快照 v2 manifest：11 类分片、分片 hash、根 hash、operation/version refs；兼容读取旧快照。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616557
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240480
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794161114318
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794162175088
+      }
+    ],
+    "7.2 manual 快照允许 partial 并列明失败；sign/lock required source、readiness、artifact 任一失败即拒绝。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616590
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240505
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794162181457
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794163248144
+      }
+    ],
+    "7.3 快照 service 改只 flush；签字路由在一致事务边界写 snapshot、签字记录、operation terminal 和 `consol_lock`。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616645
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240530
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794163254300
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794164165516
+      }
+    ],
+    "7.4 主工作台接快照列表、完整性、比较和下载；旧 developing 快照页退役或重定向。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616683
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240563
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794164171843
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794165133149
+      }
+    ],
+    "7.5 故障注入逐个摘 capturer、篡改分片/hash、并发改数据，证明签字失败关闭与签字后还原。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616721
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240602
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794165139386
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794165908899
+      }
+    ],
+    "8.1 10/100/500 节点斜率基准：tree/basis 调用、SQL、CPU、内存、连接、附注章节；候选与 HEAD 对照。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616757
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240630
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794165915934
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794166811561
+      }
+    ],
+    "8.2 完整【测试】集团 Playwright：单体 TB→工作底稿→草稿→审批→operation→报表/导出→附注→证据/复核→签字锁定，写入逐表恢复。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616799
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240655
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794166819367
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794168993448
+      }
+    ],
+    "8.3 127.0.0.1 与内网 HTTP 各验一次；SSE 正常/断线/轮询、并发点击、超过 6 分钟和 worker 重启均有证据。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616850
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240679
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794169000278
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794171657486
+      }
+    ],
+    "8.6 全量相关回归、候选树相对 HEAD 新增失败 0、语义复审、INDEX/memory/dev-history 收尾、清理 tmp，单 commit 并版本化推送。": [
+      {
+        "executionId": "cf17fe48-6c1e-4cdb-8022-378b4479e23b",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794154616897
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794155240710
+      },
+      {
+        "executionId": "6eac4761-6df8-4e79-8363-0673d0961d00",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794193807774
+      }
+    ],
+    "8.4 交付 6000 并发 Locust/PgBouncer 场景、阈值和看板；仅在专用环境授权后实跑，未授权如实标“代码已改但未实测”。": [
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794171687199
+      },
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794172593086
+      }
+    ],
+    "8.5 真实业务集团只读/dry-run 对账需用户再次授权；未授权不写库、不假绿。": [
+      {
+        "executionId": "e07e83ac-1610-4dd3-a4ad-33d1a1c4331b",
+        "chatSessionId": "sess_07316a19-9f30-4bb4-aaae-262e7a686b1a",
+        "timestamp": 1794172600357
+      },
+      {
+        "executionId": "6eac4761-6df8-4e79-8363-0673d0961d00",
+        "chatSessionId": "sess_fb36dcb1-ce3a-46c1-a2fb-5bdbc1e4c7a6",
+        "timestamp": 1794193654620
+      }
+    ]
+  }
+}

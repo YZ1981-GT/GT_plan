@@ -1,0 +1,191 @@
+{
+  "spec": "consolidation-run-and-workpaper-lifecycle-closure",
+  "task": "8.4",
+  "requirements": [
+    "R10",
+    "R11"
+  ],
+  "target_virtual_users": 6000,
+  "steady_state_seconds": 1800,
+  "burst_seconds": 600,
+  "load_profile": [
+    {
+      "name": "warmup-1k",
+      "users": 1000,
+      "spawn_rate": 100,
+      "duration_s": 120,
+      "kind": "warmup"
+    },
+    {
+      "name": "warmup-3k",
+      "users": 3000,
+      "spawn_rate": 200,
+      "duration_s": 120,
+      "kind": "warmup"
+    },
+    {
+      "name": "steady-6k",
+      "users": 6000,
+      "spawn_rate": 300,
+      "duration_s": 1800,
+      "kind": "steady"
+    },
+    {
+      "name": "burst-7.2k",
+      "users": 7200,
+      "spawn_rate": 400,
+      "duration_s": 600,
+      "kind": "burst"
+    }
+  ],
+  "traffic_model": [
+    {
+      "name": "open_workbench",
+      "weight_pct": 45,
+      "description": "打开集团合并工作台：readiness 七域 + 节点金额/试算只读 + 操作列表",
+      "slo_ops": [
+        "readiness",
+        "operation_list",
+        "trial_read"
+      ]
+    },
+    {
+      "name": "role_views_and_post_elim",
+      "weight_pct": 25,
+      "description": "角色视图（编制/审批/质控待办）+ 四表抵销后 canonical projection 只读",
+      "slo_ops": [
+        "role_views",
+        "post_elimination"
+      ]
+    },
+    {
+      "name": "operation_poll",
+      "weight_pct": 18,
+      "description": "轮询持久 operation 状态/步骤/metrics（回执 1 秒内，R10.4）",
+      "slo_ops": [
+        "operation_status"
+      ]
+    },
+    {
+      "name": "operation_trigger",
+      "weight_pct": 9,
+      "description": "触发一键刷新 refresh-all（创建/合并持久 operation，返回 operation_id）",
+      "slo_ops": [
+        "operation_create"
+      ]
+    },
+    {
+      "name": "manual_snapshot",
+      "weight_pct": 3,
+      "description": "创建手工诊断快照（manual，允许 partial；非 sign/lock）",
+      "slo_ops": [
+        "manual_snapshot"
+      ]
+    }
+  ],
+  "slo_table": [
+    {
+      "op": "readiness",
+      "p50_ms": 120,
+      "p95_ms": 300,
+      "p99_ms": 1000,
+      "basis": "七域五态 readiness；复用证据 readiness，不在请求内重算"
+    },
+    {
+      "op": "role_views",
+      "p50_ms": 150,
+      "p95_ms": 400,
+      "p99_ms": 1200,
+      "basis": "角色视图聚合待办；读 readiness + 复核/映射计数"
+    },
+    {
+      "op": "post_elimination",
+      "p50_ms": 150,
+      "p95_ms": 400,
+      "p99_ms": 1200,
+      "basis": "四表抵销后 canonical projection 只读；一次预载/递归 CTE"
+    },
+    {
+      "op": "trial_read",
+      "p50_ms": 120,
+      "p95_ms": 300,
+      "p99_ms": 1000,
+      "basis": "合并试算只读五列；读 consol_report_values，不重算"
+    },
+    {
+      "op": "operation_list",
+      "p50_ms": 100,
+      "p95_ms": 250,
+      "p99_ms": 800,
+      "basis": "operation 列表（默认 limit<=50）"
+    },
+    {
+      "op": "operation_status",
+      "p50_ms": 80,
+      "p95_ms": 200,
+      "p99_ms": 500,
+      "basis": "单 operation 状态/步骤/metrics；回执 1 秒内（R10.4）"
+    },
+    {
+      "op": "operation_create",
+      "p50_ms": 300,
+      "p95_ms": 1000,
+      "p99_ms": 3000,
+      "basis": "创建/合并持久 operation；只持久+入队返回 operation_id，重任务在 worker"
+    },
+    {
+      "op": "manual_snapshot",
+      "p50_ms": 500,
+      "p95_ms": 2000,
+      "p99_ms": 5000,
+      "basis": "手工诊断快照 create；序列化分片+hash，允许 partial，只 flush 一次"
+    }
+  ],
+  "acceptance": {
+    "max_error_rate_pct": 1.0,
+    "min_throughput_rps": 1200.0,
+    "max_cross_project_leakage": 0,
+    "max_duplicate_operation_effects": 0,
+    "max_forbidden_terminal_states": 0,
+    "max_lost_persisted_operations": 0
+  },
+  "chaos_faults": [
+    {
+      "dependency": "redis",
+      "mode": "unavailable",
+      "expected_behaviour": "同步创建 queued operation 并持久；前端显示'等待工作进程'；不在请求内跑重任务；已发布结果只读不变",
+      "unaffected_slo_ops": [
+        "readiness",
+        "post_elimination",
+        "trial_read"
+      ]
+    },
+    {
+      "dependency": "worker",
+      "mode": "unavailable",
+      "expected_behaviour": "operation 停在 queued/running 并可被重启恢复；不伪装 succeeded；不降级为无版本旧计算",
+      "unaffected_slo_ops": [
+        "readiness",
+        "role_views",
+        "operation_list",
+        "operation_status"
+      ]
+    },
+    {
+      "dependency": "db",
+      "mode": "slow",
+      "expected_behaviour": "读路径按 pool/queue 退避并保持 SLO 隔离；写阶段用 revision CAS，旧输入不晚写覆盖新输入",
+      "unaffected_slo_ops": [
+        "operation_status"
+      ]
+    }
+  ],
+  "canary": {
+    "name": "cross_project_canary",
+    "description": "以项目 A 身份尝试读取项目 B 的 readiness / post-elimination；任一非 denied(403/404) 响应或泄露目标元数据即计为泄露",
+    "denied_statuses": [
+      403,
+      404
+    ]
+  }
+}

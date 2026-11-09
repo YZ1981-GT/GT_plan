@@ -5,7 +5,10 @@ import {
   type EntrySyncReadiness,
   type WorkpaperSyncEntryScope,
 } from './workpaperSyncApi'
-import { WORKPAPER_SYNC_MANIFEST } from './workpaperSyncManifest.generated'
+import { WORKPAPER_SYNC_MANIFEST, type WorkpaperSyncManifestEntry } from './workpaperSyncManifest.generated'
+
+// 消费完整能力合同，不把生成清单当前快照的字面量联合作为永久能力边界。
+const manifestEntries: readonly WorkpaperSyncManifestEntry[] = WORKPAPER_SYNC_MANIFEST
 import {
   deriveEntrySyncPresentation,
   type EntrySyncLoadState,
@@ -43,7 +46,7 @@ function modes(capability: EntrySyncReadiness['capability'], counterpart: string
 }
 
 function staticReadiness(entryId: string): EntrySyncReadiness | null {
-  const entry = WORKPAPER_SYNC_MANIFEST.find((row) => row.entryId === entryId)
+  const entry = manifestEntries.find((row) => row.entryId === entryId)
   if (!entry) return null
   const pending = entry.capability === null
   const runtimeReady = entry.capability === 'single_html' || entry.capability === 'single_onlyoffice'

@@ -103,14 +103,11 @@ async def _load_runtime(
         db, claim.project_id, claim.year, tree=tree, seed=stored_context
     )
     validate_context(context, claim.project_id, claim.year, tree=tree)
-    current_vector = await build_version_vector(
-        db,
-        claim.project_id,
-        claim.year,
-        tree=tree,
-        tree_fingerprint=context.tree_fingerprint,
-        template_type=context.template_type,
-    )
+    # 必须传已解析的 context（含 report_scope/period_end），与请求路径
+    # consol_operation_service._snapshot 的 build_version_vector(context=context) 同源；
+    # 否则 bare context 的 report_scope=None 会让 template_digest 恒不相等，
+    # 把本应 succeeded 的运行永远判成 stale（INPUT_VERSION_CHANGED）。
+    current_vector = await build_version_vector(db, context=context, tree=tree)
     return operation, context, tree, current_vector
 
 
@@ -160,14 +157,8 @@ async def execute_claim(db: AsyncSession, claim: OperationClaim) -> ExecutionRes
 
 
 async def _post_vector(db: AsyncSession, claim: OperationClaim, context: ConsolContext, tree: Any):
-    return await build_version_vector(
-        db,
-        claim.project_id,
-        claim.year,
-        tree=tree,
-        tree_fingerprint=context.tree_fingerprint,
-        template_type=context.template_type,
-    )
+    # 同 _load_runtime：传已解析 context 以与请求路径摘要同源，否则运行后对比恒判输入已变化。
+    return await build_version_vector(db, context=context, tree=tree)
 
 
 async def _execute_push(

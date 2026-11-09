@@ -386,6 +386,57 @@ async def test_snapshot_http_orm_create_restore_compare_and_project_isolation(ta
     }]
 
 
+@pytest.mark.asyncio
+async def test_sign_snapshot_route_rejects_with_409_and_structured_detail(task15_factory):
+    """批 7 任务 7.2：sign 快照在未就绪环境下经真实 HTTP 路由返回 409 + 结构化 detail，且零落库。
+
+    SQLite 环境无正式报表运行 / artifact / readiness ⇒ sign/lock 门 fail-closed；
+    路由把 ConsolSnapshotRejected 转成 409 {code, message, failures}。manual 则放行（对照）。
+    """
+    from app.models.phase10_models import ConsolSnapshot
+    from app.routers.report_trace import router
+
+    actor = _admin()
+    project = _project("签字拒绝")
+    await _persist_projects(task15_factory, project)
+    async with task15_factory() as db:
+        db.add(User(
+            id=actor.id, username=actor.username,
+            email=f"{actor.id.hex}@task15.local", hashed_password="x", role=UserRole.admin,
+        ))
+        await db.commit()
+
+    app = _app_for(task15_factory, router, user=actor)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        rejected = await client.post(
+            f"/api/consolidation/{project.id}/snapshots",
+            params={"year": Y, "reason": "sign"},
+        )
+        assert rejected.status_code == 409, rejected.text
+        detail = rejected.json()["detail"]
+        assert detail["code"] in (
+            "artifact_missing", "readiness_not_ready",
+            "required_source_missing", "sign_lock_gate_failed",
+        )
+        assert detail["message"]
+        assert isinstance(detail["failures"], list) and detail["failures"]
+
+        # manual 对照：同环境允许创建（partial 允许）
+        ok = await client.post(
+            f"/api/consolidation/{project.id}/snapshots",
+            params={"year": Y, "reason": "manual"},
+        )
+        assert ok.status_code == 200, ok.text
+
+    # 被拒的 sign 快照零落库；只有 manual 那条
+    async with task15_factory() as db:
+        rows = (await db.execute(
+            sa.select(ConsolSnapshot).where(ConsolSnapshot.project_id == project.id)
+        )).scalars().all()
+        assert len(rows) == 1
+        assert (rows[0].trigger_reason or "") == "manual"
+
+
 def test_snapshot_migration_declares_runtime_table():
     """V174/R174、ORM 与运行时表的列集、可空性和索引必须三层一致。"""
     from app.models.phase10_models import ConsolSnapshot

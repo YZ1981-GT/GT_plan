@@ -151,19 +151,22 @@ async def _find_idempotent(
     year: int,
     key: str,
 ) -> tuple[ConsolOperation, str] | None:
-    rows = (await db.execute(
+    # JSONB 下标访问在 SQLite 编译成 JSON_EXTRACT，在 PostgreSQL 编译成 ->>；
+    # 原 incoming hash 非空，精确按键取值即可判断别名，不扫描最近 N 条或模糊匹配文本。
+    alias_hash = ConsolOperation.idempotency_keys[key].as_string()
+    row = (await db.execute(
         sa.select(ConsolOperation).where(
             ConsolOperation.project_id == project_id,
             ConsolOperation.year == year,
-        ).order_by(ConsolOperation.created_at.desc()).limit(100)
-    )).scalars().all()
-    for row in rows:
-        keys = dict(row.idempotency_keys or {})
-        if key == row.idempotency_key:
-            return row, keys.get(key) or row.request_hash
-        if key in keys:
-            return row, keys[key]
-    return None
+            sa.or_(ConsolOperation.idempotency_key == key, alias_hash.is_not(None)),
+        ).order_by(ConsolOperation.created_at.desc()).limit(1)
+    )).scalar_one_or_none()
+    if row is None:
+        return None
+    keys = dict(row.idempotency_keys or {})
+    if key == row.idempotency_key:
+        return row, keys.get(key) or row.request_hash
+    return row, keys[key]
 
 
 async def _request_lock(db: AsyncSession, project_id: UUID, year: int) -> None:
@@ -421,6 +424,49 @@ async def complete_operation(
         updated_at=now,
     ))
     return result.rowcount == 1
+
+
+async def seal_operation_for_signoff(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    snapshot_id: str,
+    snapshot_hash: str,
+    signed_by: UUID | None,
+) -> ConsolOperation | None:
+    """签字/锁定时把产出本次合并数的 operation 标记为已封存（terminal / sealed）。
+
+    批 7 任务 7.3：签字路由在一致事务边界内调用。只认已成功的最近一次 operation
+    （sign/lock 门已保证存在成功 operation），通过 batch 2 的 `result_refs` 输出通道
+    写 `sealed` 标记——不新增列、不改状态机枚举（`succeeded` 本就是终态），
+    使 operation 与签字快照/锁定互相引用、可追溯。只 flush，commit 由路由层负责。
+
+    返回被封存的 operation（无成功 operation 时返回 None）。
+    """
+    operation = (await db.execute(
+        sa.select(ConsolOperation).where(
+            ConsolOperation.project_id == project_id,
+            ConsolOperation.year == year,
+            ConsolOperation.status == "succeeded",
+        ).order_by(ConsolOperation.finished_at.desc().nullslast()).limit(1)
+        .with_for_update()
+    )).scalar_one_or_none()
+    if operation is None:
+        return None
+
+    refs = dict(operation.result_refs or {})
+    refs["sealed"] = {
+        "snapshot_id": snapshot_id,
+        "snapshot_hash": snapshot_hash,
+        "signed_by": str(signed_by) if signed_by else None,
+        "sealed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    # 原地改 JSONB 再赋回同一对象 ORM 不发 UPDATE（#conventions 教训）⇒ 赋新 dict。
+    operation.result_refs = refs
+    operation.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return operation
 
 
 async def cancel_operation(

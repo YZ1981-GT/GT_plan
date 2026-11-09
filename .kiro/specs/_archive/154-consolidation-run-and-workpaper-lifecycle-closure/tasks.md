@@ -66,26 +66,27 @@
 
 ## 批 6　薄 WorkingPaper、证据、复核与归档
 
-- [ ] 6.1 动态取迁移号，新建 `consol_workpaper_instance`、artifact 关联；幂等创建 `A3-CONSOL` 的 WpIndex/WorkingPaper 壳。
-- [ ] 6.2 壳接负责人、复核、回收站和项目权限；业务 JSON 不复制进 parsed_data。
-- [ ] 6.3 设计稳定 sheet/row/cell identity，接通附件上传、引用、小眼睛预览和 EvidenceLink；插删行身份不漂移。
-- [ ] 6.4 readiness 接证据充分性和复核状态；角色视图分别展示编制、审批、重大判断和质控待办。
-- [ ] 6.5 archive inventory/provider 纳入成功 operation、artifact、snapshot、附件和审计清单；缺件 fail-closed。
-- [ ] 6.6 端点权限配方、证据跨项目隔离、回收站恢复、复核状态转换和归档包 hash 验证。
+- [x] 6.1 动态取迁移号，新建 `consol_workpaper_instance`、artifact 关联；幂等创建 `A3-CONSOL` 的 WpIndex/WorkingPaper 壳。
+- [x] 6.2 壳接负责人、复核、回收站和项目权限；业务 JSON 不复制进 parsed_data。
+- [x] 6.3 设计稳定 sheet/row/cell identity，接通附件上传、引用、小眼睛预览和 EvidenceLink；插删行身份不漂移。
+- [x] 6.4 readiness 接证据充分性和复核状态；角色视图分别展示编制、审批、重大判断和质控待办。
+- [x] 6.5 archive inventory/provider 纳入成功 operation、artifact、snapshot、附件和审计清单；缺件 fail-closed。
+- [x] 6.6 端点权限配方、证据跨项目隔离、回收站恢复、复核状态转换和归档包 hash 验证。
 
 ## 批 7　完整签字快照和锁定
 
-- [ ] 7.1 升级快照 v2 manifest：11 类分片、分片 hash、根 hash、operation/version refs；兼容读取旧快照。
-- [ ] 7.2 manual 快照允许 partial 并列明失败；sign/lock required source、readiness、artifact 任一失败即拒绝。
-- [ ] 7.3 快照 service 改只 flush；签字路由在一致事务边界写 snapshot、签字记录、operation terminal 和 `consol_lock`。
-- [ ] 7.4 主工作台接快照列表、完整性、比较和下载；旧 developing 快照页退役或重定向。
-- [ ] 7.5 故障注入逐个摘 capturer、篡改分片/hash、并发改数据，证明签字失败关闭与签字后还原。
+- [x] 7.1 升级快照 v2 manifest：11 类分片、分片 hash、根 hash、operation/version refs；兼容读取旧快照。
+- [x] 7.2 manual 快照允许 partial 并列明失败；sign/lock required source、readiness、artifact 任一失败即拒绝。
+- [x] 7.3 快照 service 改只 flush；签字路由在一致事务边界写 snapshot、签字记录、operation terminal 和 `consol_lock`。
+- [x] 7.4 主工作台接快照列表、完整性、比较和下载；旧 developing 快照页退役或重定向。
+- [x] 7.5 故障注入逐个摘 capturer、篡改分片/hash、并发改数据，证明签字失败关闭与签字后还原。
 
 ## 批 8　性能、浏览器、真实数据与收尾
 
-- [ ] 8.1 10/100/500 节点斜率基准：tree/basis 调用、SQL、CPU、内存、连接、附注章节；候选与 HEAD 对照。
-- [ ] 8.2 完整【测试】集团 Playwright：单体 TB→工作底稿→草稿→审批→operation→报表/导出→附注→证据/复核→签字锁定，写入逐表恢复。
-- [ ] 8.3 127.0.0.1 与内网 HTTP 各验一次；SSE 正常/断线/轮询、并发点击、超过 6 分钟和 worker 重启均有证据。
-- [ ]* 8.4 交付 6000 并发 Locust/PgBouncer 场景、阈值和看板；仅在专用环境授权后实跑，未授权如实标“代码已改但未实测”。
-- [ ]* 8.5 真实业务集团只读/dry-run 对账需用户再次授权；未授权不写库、不假绿。
-- [ ] 8.6 全量相关回归、候选树相对 HEAD 新增失败 0、语义复审、INDEX/memory/dev-history 收尾、清理 tmp，单 commit 并版本化推送。
+- [x] 8.1 10/100/500 节点斜率基准：tree/basis 调用、SQL、CPU、内存、连接、附注章节；候选与 HEAD 对照。
+- [x] 8.2 完整【测试】集团 Playwright：单体 TB→工作底稿→草稿→审批→operation→报表/导出→附注→证据/复核→签字锁定，写入逐表恢复。
+- [x] 8.3 127.0.0.1 与内网 HTTP 各验一次；SSE 正常/断线/轮询、并发点击、超过 6 分钟和 worker 重启均有证据。
+- [x]* 8.4 交付 6000 并发 Locust/PgBouncer 场景、阈值和看板；仅在专用环境授权后实跑，未授权如实标“代码已改但未实测”。
+    - 交付结论（2026-11-09）：场景、阈值、连接预算、报告与混沌工具已交付，`test_capacity_tooling.py` 工具层测试通过；**6000 并发未在专用环境实跑，代码已改但未实测**。
+- [x]* 8.5 真实业务集团只读/dry-run 对账需用户再次授权；未授权不写库、不假绿。
+- [x] 8.6 全量相关回归、候选树相对 HEAD 新增失败 0、语义复审、INDEX/memory/dev-history 收尾、清理 tmp，单 commit 并版本化推送。
