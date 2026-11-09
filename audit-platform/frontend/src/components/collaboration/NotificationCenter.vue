@@ -1,20 +1,30 @@
 <template>
   <div class="gt-notification-center">
+    <!--
+      非受控弹层：传 :visible 会让 Element Plus 进入受控模式、不再处理点外关闭（实测点空白处关不掉）。
+      状态经 @before-enter / @before-leave 同步到 popoverVisible（ElPopover 不发 show / hide 事件），
+      程序化关闭走 popoverRef.hide()。
+      reference 外包一层 span：ElTooltip 没有单一根元素，直接作 reference 时 Popover 的触发器指令挂不上
+      （控制台 "Runtime directive used on component with non-element root node"）。
+    -->
     <el-popover
-      :visible="popoverVisible"
+      ref="popoverRef"
       placement="bottom-end"
       :width="300"
       trigger="click"
-      @update:visible="popoverVisible = $event"
+      @before-enter="popoverVisible = true"
+      @before-leave="popoverVisible = false"
     >
       <template #reference>
-        <el-tooltip content="通知中心" placement="bottom">
-          <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99">
-            <el-icon class="bell-icon" :size="18" @click="popoverVisible = true">
-              <Bell />
-            </el-icon>
-          </el-badge>
-        </el-tooltip>
+        <span class="notif-trigger">
+          <el-tooltip content="通知中心" placement="bottom">
+            <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99">
+              <el-icon class="bell-icon" :size="18">
+                <Bell />
+              </el-icon>
+            </el-badge>
+          </el-tooltip>
+        </span>
       </template>
 
       <div class="notif-header">
@@ -57,7 +67,7 @@
       </div>
 
       <div class="notif-footer">
-        <el-button size="small" text @click="popoverVisible = false">关闭</el-button>
+        <el-button size="small" text @click="closePopover">关闭</el-button>
       </div>
     </el-popover>
   </div>
@@ -78,6 +88,14 @@ const collaborationStore = useCollaborationStore()
 const router = useRouter()
 
 const popoverVisible = ref(false)
+const popoverRef = ref<{ hide?: () => void } | null>(null)
+
+/** 程序化关闭：非受控弹层只能经组件实例 hide()，状态由 @before-leave 回写（这里先同步置 false）。 */
+function closePopover() {
+  popoverRef.value?.hide?.()
+  popoverVisible.value = false
+}
+
 const notifications = ref<any[]>([])
 const unreadCount = ref(0)
 const activeTab = ref('all')
@@ -200,7 +218,7 @@ async function handleClick(n: any) {
   }
   const route = getNotificationJumpRoute(n.notification_type, n.metadata)
   if (route) {
-    popoverVisible.value = false
+    closePopover()
     try {
       await router.push(route)
     } catch { /* 导航被取消（重复路由等）忽略 */ }
@@ -248,6 +266,7 @@ function formatTime(iso: string) {
 
 <style scoped>
 .gt-notification-center { display: inline-flex; align-items: center; }
+.notif-trigger { display: inline-flex; align-items: center; }
 .gt-notification-center :deep(.el-badge) { display: inline-flex; align-items: center; }
 .gt-notification-center :deep(.el-popover.el-popper) { padding: 12px 16px !important; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
 .bell-icon {
