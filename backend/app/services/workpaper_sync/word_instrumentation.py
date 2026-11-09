@@ -343,21 +343,17 @@ class WordSdtCarrierGate:
                 raise WordProbeEvidenceStaleError(
                     f"stale 判据引用的文件不存在: {item['path']}（role={item.get('role')}）"
                 )
-            # 🔴 这里**刻意保留 raw hash**，不要"顺手"改成 `_sha256_text_source`。
-            # 实测（2026-06-01）`onlyoffice_word_instrumentation_gate.json` 在 **HEAD 里**
-            # 登记的 7 条文本 digest 全部等于 CRLF 工作树的 raw 值（carrier_contract
-            # bb8290 / fingerprint_module 6d321a / probe_script 2809b4 / operation_matrix
-            # 55b9fa / instrumentation_report 00af03 / independent_recompute c84d78 /
-            # oo_build 1725f2），即这份基线是在 Windows 工作树上采的。
-            #
-            # 后果：单独在这里归一 ⇒ 实测值变成 LF digest、与基线的 CRLF 值不符 ⇒ 本门
-            # 立刻 fail closed，所有 `WordSdtCarrierGate.load()` 调用方全红。而归一**也
-            # 救不了 Linux**：LF 工作树无论归一与否都算不出 CRLF digest，基线值在 Linux
-            # 上不可达。要真正做到平台无关，必须「归一读」+「基线重采成 LF 值」**同时**
-            # 改 —— 后者是改 `backend/data/` 下的 fail-closed 基线产物，属独立决策，
-            # 不在本次修复范围（详见 docs/operations/evidence/suite-triage/
-            # generated-artifact-drift.md §EOL 根因修复）。
-            observed = _sha256_bytes(target.read_bytes())
+            # 🔴 文本源必须归一后 hash（平台无关），且基线已同步重采成 LF 值。
+            # 本仓库 `core.autocrlf=true`，`backend/data/*.json` 没有 `eol=lf` 属性，
+            # 于是同一内容在 Windows 工作树是 CRLF、Linux/CI 是 LF，raw sha256 随平台
+            # 分叉。单独归一读会与「仍登记 CRLF 值」的旧基线不符而误判 stale；单独
+            # 重采基线会把 Windows-only digest 焊死、CI 必红。正解是「归一读」+
+            # 「基线重采成 LF 值」**同时**改（见
+            # docs/operations/evidence/suite-triage/generated-artifact-drift.md
+            # §EOL 根因修复）。行尾不是「载体裁决」事实的一部分，故归一后再 hash。
+            # 本循环只遍历**文本**文件（carrier_contract JSON / fingerprint_module py，
+            # 均无 NUL）；probed_templates（DOCX，含 NUL）在下方循环里保持 `_sha256_bytes`。
+            observed = _sha256_text_source(target.read_bytes())
             if observed != item["sha256"]:
                 raise WordProbeEvidenceStaleError(
                     f"{item['path']}（role={item.get('role')}）digest 漂移："

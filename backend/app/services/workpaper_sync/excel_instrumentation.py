@@ -343,6 +343,33 @@ def _sha256_path(path: Path) -> str:
     return _sha256_bytes(path.read_bytes())
 
 
+def _normalize_eol(raw: bytes) -> bytes:
+    """行尾归一（CRLF/CR → LF），供**文本**源做平台无关的 digest。"""
+    return raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def _sha256_text_source(raw: bytes) -> str:
+    """文本源的**平台无关** sha256：先行尾归一再 hash。
+
+    🔴 为什么不能直接 `_sha256_bytes(path.read_bytes())`：本仓库
+    `core.autocrlf=true`，而 `backend/data/*.json` 没有 `eol=lf` 属性（`.gitattributes`
+    只给 `backend/data/workpaper_sync_contracts/*.json` 配了）。于是同一份内容在
+    Windows 工作树是 CRLF、在 Linux/CI 是 LF，raw sha256 **随平台分叉**。实测
+    `onlyoffice_excel_identity_carrier_contract.json` raw=`350b7659e7d5…`（495 处 CRLF、
+    0 处裸 LF）而归一后=`c88df6d7c2a1…`，且归一结果与服务器 Linux 工作树 `sha256sum`
+    **逐字节相等** —— 100% 的差异就是行尾，内容一个字节都没变。
+
+    `carrier_contract_sha256` 已写进 candidate 证据（Requirement 14.16 记录清单），
+    登记的是 LF 值 `c88d…`。用 raw hash 会让这些产物在 Windows 上必红。
+
+    同型修法见 `word_instrumentation._sha256_text_source`（2026-06-01 已验收）。
+
+    ⚠️ 只对**文本**源用。xlsx 等二进制源必须走 `_sha256_path()`：对二进制做
+    CRLF→LF 替换会破坏字节流，把"内容漂移"判据变成假绿。
+    """
+    return _sha256_bytes(_normalize_eol(raw))
+
+
 def normalized_structure_hash(data: bytes) -> str:
     """workbook 的 normalized structure hash（Requirement 9.1 / 9.8 的漂移判据）。
 
@@ -432,7 +459,7 @@ class ExcelIdentityCarrierGate:
         hidden = carriers.get("hidden_sheet") or {}
         uuid_carrier = carriers.get("hidden_uuid_column") or {}
         return cls(
-            contract_sha256=_sha256_path(contract_file),
+            contract_sha256=_sha256_text_source(contract_file.read_bytes()),
             onlyoffice_build=str(baseline["tier_a_runtime"]["onlyoffice_build"]),
             allowed_carriers=passed_carriers,
             allowed_anchors=passed_anchors,
@@ -464,7 +491,9 @@ class ExcelIdentityCarrierGate:
                 raise ProbeEvidenceStaleError(
                     f"stale 门输入缺失: {item['role']} → {path}"
                 )
-            observed = _sha256_path(path)
+            # Tier A files 是**文本**真源（carrier contract / fingerprint 模块）：
+            # 必须行尾归一再 hash，否则 CRLF 工作树与 LF（Linux/CI/服务器）分叉。
+            observed = _sha256_text_source(path.read_bytes())
             if observed != item["sha256"]:
                 raise ProbeEvidenceStaleError(
                     f"{item['role']} digest 漂移：基线 {item['sha256'][:12]}… ≠ 实测 "
