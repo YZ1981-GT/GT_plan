@@ -61,7 +61,6 @@ const CALENDAR_YEAR_EXEMPT: Record<string, { count: number; reason: string }> = 
   'components/wizard/MaterialityStep.vue': { count: 1, reason: '向导重要性步骤年度初始值' },
   'composables/useProjectSelector.ts': { count: 1, reason: 'yearOptions 年度下拉选项（[cur-2, cur-1, cur, cur+1]）上限' },
   'stores/project.ts': { count: 1, reason: '项目 store 的 yearOptions 年度下拉选项（今年前后 + 有数据的年度）；年度本身初值 null' },
-  'views/ConsolidationIndex.vue': { count: 1, reason: 'const currentYear 用于年度选择器选项生成' },
   'views/LedgerImportHistory.vue': { count: 1, reason: 'yearOptions 数组生成（年度下拉上限）' },
   'views/LedgerPenetration.vue': { count: 1, reason: 'yearOptions 计算（年度下拉上限）' },
   'views/Materiality.vue': { count: 1, reason: '重要性水平页面年度选择器' },

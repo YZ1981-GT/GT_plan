@@ -67,32 +67,9 @@ import {
 // 一旦有人给它们接上消费方，必须先修 import，不能继续躺在这里。
 // ---------------------------------------------------------------------------
 
-const KNOWN_DEAD_MODULE_FILES: ReadonlyArray<{ file: string; reason: string }> = [
-  {
-    file: 'components/ai/index.js',
-    reason: '旧 AI barrel，导出的 7 个组件文件均已删除（含本 spec 删掉的 AIChatPanel.vue）；零生产消费方',
-  },
-  {
-    file: 'components/ai/AIInsightsDashboard.vue',
-    reason: '旧 AI 组件，import 的 @/api 目录不存在（加载即报错）；唯一引用方是死 barrel 与自动生成的 components.d.ts',
-  },
-  {
-    file: 'components/ai/ConfirmationAIAssistant.vue',
-    reason: '旧 AI 组件，import 的 @/api 目录不存在（加载即报错）；唯一引用方是死 barrel 与自动生成的 components.d.ts',
-  },
-  {
-    file: 'components/ai/NLCommandInput.vue',
-    reason: '旧 AI 组件，import 的 @/api 目录不存在（加载即报错）；唯一引用方是死 barrel 与自动生成的 components.d.ts',
-  },
-  {
-    file: 'components/ai/WorkpaperAIFill.vue',
-    reason: '旧 AI 组件，import 的 @/api 目录不存在（加载即报错）；唯一引用方是死 barrel 与自动生成的 components.d.ts',
-  },
-  {
-    file: 'views/ai/AIWorkpaperView.vue',
-    reason: 'Phase 11 已移除其路由，import 的 AIWorkpaperFill.vue 也已删除；router 里只剩注释提及',
-  },
-]
+// 2026-11-09 清零：原登记的 6 个旧 AI 文件（components/ai/index.js、AIInsightsDashboard、ConfirmationAIAssistant、
+// NLCommandInput、WorkpaperAIFill、views/ai/AIWorkpaperView）的坏 import 已在 v1.0.153 修掉，判据报「已无坏 import」。
+const KNOWN_DEAD_MODULE_FILES: ReadonlyArray<{ file: string; reason: string }> = []
 
 const DEAD_FILE_SET = new Set(KNOWN_DEAD_MODULE_FILES.map((d) => d.file))
 
@@ -200,9 +177,8 @@ describe('§1 模块引用完整性', () => {
   })
 
   it('判据自检：死清单本身不空洞，且每条都给了原因', () => {
-    // 没有这条，清单被清空后 §1 第一条判据会退化成「零坏 import」的空断言 ——
-    // 而实际上那 6 个文件仍在仓库里带着坏 import。
-    expect(KNOWN_DEAD_MODULE_FILES.length).toBeGreaterThan(0)
+    // 清单允许为空（2026-11-09 已清零）：扫描器的判断力由下一条「坏 import 必须被检出」用真实文件自检，
+    // 清空后 §1 第一条「零坏 import」仍是真判据，不会退化成空断言。
     expect(KNOWN_DEAD_MODULE_FILES.every((d) => d.reason.trim().length > 10)).toBe(true)
     // 清单里的每个文件必须**确实**有坏 import（否则它不该在豁免桶里）
     const brokenFiles = new Set(broken.map((b) => b.file))
