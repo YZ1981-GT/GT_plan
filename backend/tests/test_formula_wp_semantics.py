@@ -14,6 +14,7 @@ formula-fetch-followup-defect-closure 6.5 按收敛后的现状改写。
 from __future__ import annotations
 
 import ast
+import re
 import uuid
 from decimal import Decimal
 from pathlib import Path
@@ -232,8 +233,10 @@ class TestKnownDifferencesRegistered:
         specs_dir = BACKEND.parent / ".kiro" / "specs"
         for diff in WP_KNOWN_DIFFERENCES:
             archived = specs_dir / "_archive"
-            exists = (specs_dir / diff.owner_spec).exists() or (
-                archived.exists() and any(p.name == diff.owner_spec for p in archived.rglob("*") if p.is_dir()))
+            # 归档目录带序号前缀（``_archive/83-<spec>``）
+            archived_names = {re.sub(r"^\d+-", "", p.name) for p in archived.rglob("*") if p.is_dir()} \
+                if archived.exists() else set()
+            exists = (specs_dir / diff.owner_spec).exists() or diff.owner_spec in archived_names
             assert exists, f"归属 spec 不存在: {diff.owner_spec}"
 
     def test_arg_count_difference_matches_reality(self) -> None:

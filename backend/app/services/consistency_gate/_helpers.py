@@ -115,6 +115,9 @@ def _guarded(check_id: str):
     check_id 必须是字符串字面量（AST 守卫验证）。
     """
     def decorator(fn):
+        # 返回 list[CheckItem] 的多规则检查：异常也返回列表（调用方 ``checks.extend``，单个 CheckItem 会 TypeError）
+        returns_list = str(getattr(fn, "__annotations__", {}).get("return", "")).startswith("list")
+
         @functools.wraps(fn)
         async def wrapper(self, *args, **kwargs):
             try:
@@ -127,12 +130,13 @@ def _guarded(check_id: str):
                     check_id, type(exc).__name__, str(exc)[:200],
                 )
                 check_name = check_id.replace("_", " ").strip()
-                return _error(
+                item = _error(
                     check_name,
                     branch_id=f"{check_id}.exception",
                     reason=f"检查异常：{type(exc).__name__}：{str(exc)[:200]}",
                     severity="warning",
                 )
+                return [item] if returns_list else item
         wrapper._guarded_check_id = check_id  # AST 守卫读取
         return wrapper
     return decorator

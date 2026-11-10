@@ -3246,10 +3246,9 @@ async function onApplyFormulas() {
 
   applying.value = true
   try {
-    const formulas = formulaRows.map((r: any) => ({
-      row_code: r.row_code || r.id,
-      formula: r.formula,
-    }))
+    // 未配置公式的行也带上（公式为空）：后端按报表生成同口径记 0，供 ROW() 引用，不进结果
+    const formulas = [...formulaRows, ...currentRows.value.filter((r: any) => !r.formula)]
+      .map((r: any) => ({ row_code: r.row_code || r.id, formula: r.formula || '' }))
 
     const data = await api.post(P_rc.executeFormulasBatch, {
       project_id: props.projectId,

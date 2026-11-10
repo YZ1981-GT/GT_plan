@@ -63,21 +63,16 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 # - populate_parsed_data（2026-10-22）/ static_sheet_payload_for_adjudication ×3（2026-10-07）：✅ 已修，已从基线删除。
 # - 末 8 条（2026-10-24，formula-fetch-followup 6.6）：包在 ``try / except Exception`` 里、原先被豁免扫描；该段业务代码
 #   每次执行都在 import 处失败、只留一条日志。目标不存在（6 条）或在别的模块且取的列待核（D4 / 时间线 2 条）。
+# 2026-11-10：unified_graph_builder / issue_ticket_service / role_workbench_facade / wp_scripts.registry / m8 / s_estimate
+# 六条已不再是缺陷（守卫 test_baseline_has_no_zombie_entries 点名），已从基线删除。
 _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/routers/wp_formula.py", "app.routers.wp_render_strategies._e1_monetary_fund", "_build_four_table_prefill"),
     ("app/routers/wp_render_strategies/_d4_operating_revenue.py", "app.models.audit_platform_models", "FinancialReport"),
     ("app/services/ai_chat/startup_health.py", "app.services.ai_chat.audit", "audit_event"),
-    ("app/services/evidence_governance/unified_graph_builder.py", "app.services.workpaper_trace_stale_integration",
-     "get_registry_edges"),
-    ("app/services/issue_ticket_service.py", "app.services.notification_service", "notification_service"),
-    ("app/services/role_workbench_facade.py", "app.models.collaboration_models", "PBCItem"),
-    ("app/services/wp_scripts/registry.py", "app.services.tsj_prompt_service", "get_review_points"),
     # adjustments.py 的 ChecklistResponse（协作确认回写，从未执行）：2026-10-31 随回写一并删除
     # （spec adjustment-hall-entry-review-closure 需求 6.3），已从基线删除。
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAccount"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAdjustment"),
-    ("app/services/m8_general_risk_reserve_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
-    ("app/services/s_estimate_import_export_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
     # ── F 循环：flag=True 但模块不存在（从 _FLAG_GATED_PLACEHOLDERS 移入，2026-10-07）
     # 🔴 phase5_f4_01_adjudication 已由 5cb7ebe70 入库 ⇒ 僵尸条目，2026-10-20 删除。
     ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_09_supplier_financing"),

@@ -207,8 +207,11 @@ async def _run_batch(items: list[BatchFormula], evaluate: Evaluator) -> tuple[li
     """按依赖拓扑序逐条串行求值；解析失败 / 循环依赖的行如实报错，算出的值供后续行引用。"""
     results: list[dict[str, Any]] = []
     parsed: list[tuple[str, str, set[str], list[tuple[str, str]]]] = []
+    #: 本批里未配置公式的行：报表生成对空公式行记 0（``ReportFormulaParser.execute_result``），试算同口径，
+    #: 供 ``ROW('X')`` 引用；这类行本身不进 results（没有可试算的公式）
+    unconfigured = {item.row_code for item in items if item.row_code and not (item.formula or "").strip()}
     for item in items:
-        if not item.formula:
+        if not (item.formula or "").strip():
             continue
         try:
             rows, ranges = _row_refs(parse_to_ast(item.formula))
@@ -218,7 +221,7 @@ async def _run_batch(items: list[BatchFormula], evaluate: Evaluator) -> tuple[li
         parsed.append((item.row_code, item.formula, rows, ranges))
     batch_codes = {code for code, *_ in parsed}
     pending = [(code, formula, _waiting_for(code, rows, ranges, batch_codes)) for code, formula, rows, ranges in parsed]
-    row_values: dict[str, Decimal] = {}
+    row_values: dict[str, Decimal] = {code: Decimal("0") for code in unconfigured - batch_codes}
     done: set[str] = set()
     progressed = True
     while progressed:
