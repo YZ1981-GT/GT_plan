@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"D:/java/GT_plan/.venv/Scripts/python.exe\" \"D:/java/GT_plan/.claude/kb/kb_search.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
