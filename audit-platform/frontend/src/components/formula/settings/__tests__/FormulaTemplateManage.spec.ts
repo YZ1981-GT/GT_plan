@@ -7,9 +7,10 @@
  *   = 暂存 → 发布新版本（带模板版本号、同一请求号）；保留模板 = 只更新基线（带模板版本 + 全局版本，不发新版本）；
  *   非管理员「设为全局」= 确认后提交候选（不预览）；删除先确认。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { defineComponent } from 'vue'
+import { defineComponent, nextTick } from 'vue'
+import { copyTemplateValue, formulaTemplateCasApi, TemplatePreviewEvidenceError } from '@/services/formulaTemplateCas'
 import ElementPlus from 'element-plus'
 
 const { api, msg, confirm } = vi.hoisted(() => ({
@@ -17,7 +18,7 @@ const { api, msg, confirm } = vi.hoisted(() => ({
     domains: vi.fn(), effective: vi.fn(), createTemplate: vi.fn(), template: vi.fn(), templateVersions: vi.fn(),
     templateSubscribers: vi.fn(), templatePublishPreview: vi.fn(), templatePublish: vi.fn(),
     templatePromotePreview: vi.fn(), templatePromote: vi.fn(), deleteTemplate: vi.fn(), updateTemplate: vi.fn(),
-    templateKeepBaseline: vi.fn(),
+    templateKeepBaseline: vi.fn(), templateRollbackPreview: vi.fn(), templateRollback: vi.fn(),
   },
   msg: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
   confirm: { confirmDelete: vi.fn(), confirmDangerous: vi.fn() },
@@ -73,7 +74,7 @@ const HINTS = [
 ]
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  for (const mock of [...Object.values(api), ...Object.values(msg), ...Object.values(confirm)]) mock.mockReset()
   api.domains.mockResolvedValue({ domains: DOMAINS, is_admin: false })
   api.effective.mockResolvedValue({ slots: [
     { slot_key: 'balance_sheet:BS-002', definition: { formula: 'A' }, disabled: false },
@@ -83,7 +84,11 @@ beforeEach(() => {
   api.template.mockResolvedValue(JSON.parse(JSON.stringify(DETAIL)))
   api.templateVersions.mockResolvedValue({ items: [] })
   api.templateSubscribers.mockResolvedValue({ items: [] })
-  api.templatePublishPreview.mockResolvedValue({ template_id: 't1', version: 3, next_version: 4, changes: [], summary: {}, items: [] })
+  api.templatePublishPreview.mockResolvedValue({ template_id: 't1', version: 3, next_version: 4,
+    preview_fingerprint: 'a'.repeat(64), changes: [], summary: {}, items: [] })
+  api.templateRollbackPreview.mockResolvedValue({ template_id: 't1', version: 3, target_version: 1,
+    preview_fingerprint: 'b'.repeat(64), changes: [], summary: {}, items: [] })
+  api.templateRollback.mockResolvedValue({ version: 4 })
   api.templatePublish.mockResolvedValue({ version: 4 })
   api.templatePromote.mockResolvedValue({ candidate: { id: 'c1' } })
   confirm.confirmDangerous.mockResolvedValue(undefined)
@@ -169,11 +174,15 @@ describe('FormulaTemplateSaveDialog', () => {
   })
 })
 
+const casDrawers: Array<{ unmount: () => void }> = []
+afterEach(() => { for (const w of casDrawers.splice(0)) w.unmount() })
 function mountDrawer(isAdmin = false) {
-  return mount(FormulaTemplateDetailDrawer, {
+  const w = mount(FormulaTemplateDetailDrawer, {
     props: { modelValue: true, templateId: 't1', domains: DOMAINS as any, isAdmin },
     global: { plugins: [ElementPlus], stubs: { ElDrawer: DrawerStub, ElDialog: DialogStub, FormulaPublishPreviewDialog: PreviewStub } },
   })
+  casDrawers.push(w)
+  return w
 }
 
 describe('FormulaTemplateDetailDrawer', () => {
@@ -296,5 +305,457 @@ describe('FormulaTemplateDetailDrawer', () => {
     expect(api.template.mock.calls.length).toBe(before + 1)
     expect(w.emitted('changed')).toBeUndefined()
     w.unmount()
+  })
+})
+
+// API 下一层 mock：Drawer、CAS helper 与 Vue watchers 均使用真实生产实现；不是 HTTP/PG 证据。
+function deferred<T = any>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((ok, fail) => { resolve = ok; reject = fail })
+  return { promise, resolve, reject }
+}
+function previewEvidence(extra: Record<string, unknown> = {}) {
+  return { template_id: 't1', version: 3, preview_fingerprint: 'a'.repeat(64),
+    changes: [], summary: { projects: [], counts: {} }, items: [], ...extra }
+}
+function decisionsPayload() {
+  return { decisions: { project_choices: { p1: 'defer' as const },
+    conflict_choices: { 'report|p1|balance_sheet:BS-002': 'keep' as const }, default_conflict: 'ask' as const }, note: '合成测试说明' }
+}
+function previewSubmit(w: ReturnType<typeof mountDrawer>) {
+  return w.getComponent(PreviewStub).props('submit') as (payload: ReturnType<typeof decisionsPayload>) => Promise<boolean>
+}
+async function preparedDrawer() {
+  const w = mountDrawer()
+  await flushPromises()
+  const vm = w.vm as any
+  vm.syncHint(vm.hints[0])
+  await vm.onPublishPreview()
+  await nextTick()
+  expect(vm.previewVisible).toBe(true)
+  expect(w.getComponent(PreviewStub).props('modelValue')).toBe(true)
+  return { w, vm, submit: previewSubmit(w) }
+}
+function secondTemplate() {
+  return { ...copyTemplateValue(DETAIL), id: 't2', name: '第二模板', version: 8 }
+}
+
+describe('模板 CAS helper 的真实证据校验与载荷透传', () => {
+  it('有效 publish/rollback fingerprint 和完整提交体逐字段透传', async () => {
+    const changes = [{ domain: 'report', slot_key: 's1', definition: { formula: '10' } }]
+    const preview = await formulaTemplateCasApi.publishPreview('t1', { expected_version: 3, changes })
+    const rollback = await formulaTemplateCasApi.rollbackPreview('t1', { expected_version: 3, target_version: 1 })
+    const body = { expected_version: 3, changes, preview_fingerprint: preview.preview_fingerprint,
+      ...decisionsPayload(), request_id: 'synthetic-request' }
+    await formulaTemplateCasApi.publish('t1', body)
+    expect(api.templatePublish).toHaveBeenCalledWith('t1', body)
+    const { changes: _changes, ...common } = body
+    const rollbackBody = { ...common, target_version: 1, preview_fingerprint: rollback.preview_fingerprint }
+    await formulaTemplateCasApi.rollback('t1', rollbackBody)
+    expect(api.templateRollback).toHaveBeenCalledWith('t1', rollbackBody)
+    expect(api.templatePublishPreview).toHaveBeenCalledWith('t1', { expected_version: 3, changes })
+    expect(api.templateRollbackPreview).toHaveBeenCalledWith('t1', { expected_version: 3, target_version: 1 })
+  })
+
+  it.each([
+    ['无返回值', undefined], ['无指纹', previewEvidence({ preview_fingerprint: undefined })],
+    ['短指纹', previewEvidence({ preview_fingerprint: 'abc' })],
+    ['大写指纹', previewEvidence({ preview_fingerprint: 'A'.repeat(64) })],
+    ['非十六进制', previewEvidence({ preview_fingerprint: 'g'.repeat(64) })],
+    ['错误模板', previewEvidence({ template_id: 't2' })], ['错误版本', previewEvidence({ version: 4 })],
+    ['字符串版本', previewEvidence({ version: '3' })],
+  ])('%s：拒绝无效 publish 证据而非建立会话', async (_name, value) => {
+    api.templatePublishPreview.mockResolvedValueOnce(value)
+    const pending = formulaTemplateCasApi.publishPreview('t1', { expected_version: 3, changes: [] })
+    await expect(pending).rejects.toBeInstanceOf(TemplatePreviewEvidenceError)
+    await expect(pending).rejects.toThrow('模板预览缺少有效的版本证据')
+    expect(api.templatePublish).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['版本证据', previewEvidence({ version: 4, target_version: 1 })],
+    ['回滚目标', previewEvidence({ target_version: 2 })],
+  ])('rollback %s 错误有专用类型且不触达写接口', async (reason, value) => {
+    api.templateRollbackPreview.mockResolvedValueOnce(value)
+    const pending = formulaTemplateCasApi.rollbackPreview('t1', { expected_version: 3, target_version: 1 })
+    await expect(pending).rejects.toBeInstanceOf(TemplatePreviewEvidenceError)
+    await expect(pending).rejects.toThrow(reason)
+    expect(api.templateRollback).not.toHaveBeenCalled()
+  })
+
+  it('深复制嵌套 JSON，副本修改不改原定义和数组', () => {
+    const original = { definitions: [{ formula: '10', metadata: { flags: ['a'] } }], removed: null }
+    const copied = copyTemplateValue(original)
+    expect(copied).toEqual(original)
+    copied.definitions[0].metadata.flags.push('b')
+    copied.definitions[0].formula = '20'
+    expect(original).toEqual({ definitions: [{ formula: '10', metadata: { flags: ['a'] } }], removed: null })
+  })
+})
+
+describe('真实 Drawer 的模板 preview → publish/rollback', () => {
+  it('从真实发布按钮经 submit prop 发布，冻结指纹和版本且复制 decisions', async () => {
+    const evidence = previewEvidence()
+    api.templatePublishPreview.mockResolvedValueOnce(evidence)
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    vm.syncHint(vm.hints[0])
+    await nextTick()
+    await w.get('[data-testid="ftd-publish"]').trigger('click')
+    await flushPromises()
+    evidence.preview_fingerprint = 'f'.repeat(64)
+    const payload = decisionsPayload()
+    const gate = deferred()
+    api.templatePublish.mockReturnValueOnce(gate.promise)
+    const pending = previewSubmit(w)(payload)
+    payload.decisions.project_choices.p1 = 'apply' as any
+    payload.decisions.conflict_choices['report|p1|balance_sheet:BS-002'] = 'adopt' as any
+    expect(api.templatePublish).toHaveBeenCalledWith('t1', expect.objectContaining({
+      expected_version: 3, preview_fingerprint: 'a'.repeat(64), request_id: expect.any(String),
+      decisions: decisionsPayload().decisions, changes: [
+        { domain: 'report', slot_key: 'balance_sheet:BS-002', definition: { formula: 'G' } },
+      ], note: '合成测试说明',
+    }))
+    api.template.mockResolvedValueOnce({ ...copyTemplateValue(DETAIL), version: 4 })
+    gate.resolve({ version: 4 })
+    expect(await pending).toBe(true)
+    expect(vm.detail.version).toBe(4)
+    expect(vm.previewVisible).toBe(false)
+    expect(vm.previewSession).toBeNull()
+    expect(vm.stagedCount).toBe(0)
+    expect(w.emitted('changed')).toHaveLength(1)
+  })
+
+  it.each(['publish', 'rollback'] as const)('%s 预览无效时旧会话也作废，不能提交', async (kind) => {
+    const { w, vm, submit } = await preparedDrawer()
+    if (kind === 'publish') api.templatePublishPreview.mockResolvedValueOnce(previewEvidence({ version: 4 }))
+    else api.templateRollbackPreview.mockResolvedValueOnce(previewEvidence({ target_version: 2 }))
+    await (kind === 'publish' ? vm.onPublishPreview() : vm.openRollback({ version: 1 }))
+    expect(vm.previewVisible).toBe(false)
+    expect(vm.previewSession).toBeNull()
+    expect(await submit(decisionsPayload())).toBe(false)
+    expect(api.templatePublish).not.toHaveBeenCalled()
+    expect(api.templateRollback).not.toHaveBeenCalled()
+    expect(msg.error).toHaveBeenCalledWith(expect.stringMatching(/版本证据|回滚目标/))
+    expect(w.emitted('changed')).toBeUndefined()
+  })
+})
+
+describe('真实 Drawer 的预览错误分类', () => {
+  it.each([
+    ['publish', '网络', { message: 'synthetic-offline' }, '发布预览失败：网络不通，请检查连接'],
+    ['rollback', '网络', { message: 'synthetic-offline' }, '回滚预览失败：网络不通，请检查连接'],
+    ['publish', '服务端', { response: { status: 400, data: { detail: { message: '合成发布预览拒绝' } } } },
+      '发布预览失败：合成发布预览拒绝'],
+    ['rollback', '服务端', { response: { status: 400, data: { detail: { message: '合成回滚预览拒绝' } } } },
+      '回滚预览失败：合成回滚预览拒绝'],
+  ] as const)('%s 的%s错误不误归为本地证据异常', async (kind, _source, error, message) => {
+    const { w, vm, submit } = await preparedDrawer()
+    const read = kind === 'publish' ? api.templatePublishPreview : api.templateRollbackPreview
+    read.mockRejectedValueOnce(error)
+    await (kind === 'publish' ? vm.onPublishPreview() : vm.openRollback({ version: 1 }))
+    expect(msg.error).toHaveBeenCalledWith(message)
+    expect(vm.previewVisible).toBe(false)
+    expect(vm.previewSession).toBeNull()
+    expect(await submit(decisionsPayload())).toBe(false)
+    expect(api.templatePublish).not.toHaveBeenCalled()
+    expect(api.templateRollback).not.toHaveBeenCalled()
+    expect(w.emitted('changed')).toBeUndefined()
+  })
+})
+
+describe('真实 Drawer 的编辑上下文与暂存快照', () => {
+  it('编辑开始时冻结 domain，保存定义和预览请求都深复制', async () => {
+    api.template.mockResolvedValueOnce({ ...copyTemplateValue(DETAIL), domains: ['report', 'note'] })
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    const row = vm.domainRows[0]
+    vm.openEdit(row)
+    row.definition.formula = 'SOURCE-LATER'
+    expect(vm.editing.definition.formula).toBe('A')
+    const input = { formula: '10', metadata: { fields: ['x'] } }
+    vm.activeDomain = 'note'
+    vm.onEditSave(input)
+    input.formula = '20'
+    input.metadata.fields.push('y')
+    expect(vm.staged.has('note|balance_sheet:BS-002')).toBe(false)
+    expect(vm.stagedChanges()).toEqual([{ domain: 'report', slot_key: 'balance_sheet:BS-002',
+      definition: { formula: '10', metadata: { fields: ['x'] } } }])
+    await vm.onPublishPreview()
+    const sent = api.templatePublishPreview.mock.calls[0][1]
+    const detached = vm.stagedChanges()
+    detached[0].definition.formula = 'DETACHED'
+    expect(vm.stagedChanges()[0].definition.formula).toBe('10')
+    vm.staged.get('report|balance_sheet:BS-002').definition.metadata.fields.push('z')
+    expect(sent.changes[0].definition).toEqual({ formula: '10', metadata: { fields: ['x'] } })
+    expect(vm.previewVisible).toBe(false)
+  })
+
+  it('同步全局定义不持有 hint 原引用，后续预览使用原暂存副本', async () => {
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    vm.hints[0].global_definition.metadata = { flags: ['a'] }
+    vm.syncHint(vm.hints[0])
+    vm.hints[0].global_definition.formula = 'CHANGED'
+    vm.hints[0].global_definition.metadata.flags.push('b')
+    await vm.onPublishPreview()
+    expect(api.templatePublishPreview.mock.calls[0][1].changes[0].definition)
+      .toEqual({ formula: 'G', metadata: { flags: ['a'] } })
+  })
+})
+
+describe('真实 Drawer 的预览失效边界', () => {
+  it.each(['暂存嵌套变化', '放弃暂存', '移除公式', '取消预览', '关闭抽屉', '切换模板'])(
+    '%s 使旧 preview 会话不可提交', async (action) => {
+      const { w, vm, submit } = await preparedDrawer()
+      const previousRequest = vm.previewSession.requestId
+      if (action === '暂存嵌套变化') vm.staged.get('report|balance_sheet:BS-002').definition.formula = '30'
+      if (action === '放弃暂存') vm.clearStaged()
+      if (action === '移除公式') vm.stageDelete(vm.domainRows[0])
+      if (action === '取消预览') w.getComponent(PreviewStub).vm.$emit('update:modelValue', false)
+      if (action === '关闭抽屉') await w.setProps({ modelValue: false })
+      if (action === '切换模板') {
+        api.template.mockResolvedValueOnce(secondTemplate())
+        await w.setProps({ templateId: 't2' })
+      }
+      await flushPromises()
+      expect(vm.previewVisible).toBe(false)
+      expect(vm.previewSession).toBeNull()
+      expect(await submit(decisionsPayload())).toBe(false)
+      expect(api.templatePublish).not.toHaveBeenCalled()
+      expect(api.templateRollback).not.toHaveBeenCalled()
+      if (action === '取消预览') {
+        await vm.onPublishPreview()
+        expect(vm.previewSession.requestId).not.toBe(previousRequest)
+      }
+    },
+  )
+
+  it.each(['version', 'applicable_scope'])('详情 %s 改变后拒绝旧会话', async (key) => {
+    const { vm, submit } = await preparedDrawer()
+    vm.detail[key] = key === 'version' ? 4 : 'listed_standalone'
+    expect(await submit(decisionsPayload())).toBe(false)
+    expect(vm.previewSession).toBeNull()
+    expect(api.templatePublish).not.toHaveBeenCalled()
+    expect(msg.warning).toHaveBeenCalledWith(expect.stringContaining('重新预览'))
+  })
+})
+
+describe('真实 Drawer 的迟到 load/preview 结果隔离', () => {
+  it.each(['详情', '历史与订阅'])('旧模板的%s晚到不覆盖新模板', async (stage) => {
+    const late = deferred()
+    if (stage === '详情') api.template.mockReturnValueOnce(late.promise)
+    else api.templateVersions.mockReturnValueOnce(late.promise)
+    const w = mountDrawer()
+    await flushPromises()
+    api.template.mockResolvedValueOnce(secondTemplate())
+    api.templateVersions.mockResolvedValueOnce({ items: [{ version: 8, note: '第二模板历史' }] })
+    api.templateSubscribers.mockResolvedValueOnce({ items: [{ project_id: 'p2', project_name: '第二订阅' }] })
+    await w.setProps({ templateId: 't2' })
+    await flushPromises()
+    late.resolve(stage === '详情' ? copyTemplateValue(DETAIL) : { items: [{ version: 1, note: '旧历史' }] })
+    await flushPromises()
+    const vm = w.vm as any
+    expect(vm.detail.id).toBe('t2')
+    expect(vm.detail.version).toBe(8)
+    expect(vm.versions).toEqual([{ version: 8, note: '第二模板历史' }])
+    expect(vm.subscribers).toEqual([{ project_id: 'p2', project_name: '第二订阅' }])
+    expect(vm.loading).toBe(false)
+    expect(api.templateVersions.mock.calls.every(([id]) => id === 't1' || id === 't2')).toBe(true)
+  })
+
+  it.each(['publish', 'rollback'] as const)('%s 预览晚到不替换新模板的已打开预览', async (kind) => {
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    vm.syncHint(vm.hints[0])
+    const late = deferred()
+    if (kind === 'publish') api.templatePublishPreview.mockReturnValueOnce(late.promise)
+    else api.templateRollbackPreview.mockReturnValueOnce(late.promise)
+    const pending = kind === 'publish' ? vm.onPublishPreview() : vm.openRollback({ version: 1 })
+    api.template.mockResolvedValueOnce(secondTemplate())
+    await w.setProps({ templateId: 't2' })
+    await flushPromises()
+    vm.syncHint(vm.hints[0])
+    api.templatePublishPreview.mockResolvedValueOnce(previewEvidence({ template_id: 't2', version: 8 }))
+    await vm.onPublishPreview()
+    const request = vm.previewSession.requestId
+    late.resolve(previewEvidence({ target_version: 1 }))
+    await pending
+    expect(vm.previewSession).toMatchObject({ templateId: 't2', version: 8, requestId: request, kind: 'publish' })
+    expect(vm.preview.template_id).toBe('t2')
+    expect(vm.previewVisible).toBe(true)
+    expect(msg.error).not.toHaveBeenCalled()
+  })
+})
+
+describe('真实 Drawer 的预览请求序号', () => {
+  it('同模板先发预览晚到，仍保留后发预览的 fingerprint/requestId', async () => {
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    vm.syncHint(vm.hints[0])
+    const late = deferred()
+    api.templatePublishPreview.mockReturnValueOnce(late.promise)
+    const first = vm.onPublishPreview()
+    api.templatePublishPreview.mockResolvedValueOnce(previewEvidence({ preview_fingerprint: 'c'.repeat(64) }))
+    await vm.onPublishPreview()
+    const request = vm.previewSession.requestId
+    late.resolve(previewEvidence())
+    await first
+    expect(vm.previewSession).toMatchObject({ fingerprint: 'c'.repeat(64), requestId: request })
+    await previewSubmit(w)(decisionsPayload())
+    expect(api.templatePublish.mock.calls[0][1].preview_fingerprint).toBe('c'.repeat(64))
+  })
+
+  it.each(['暂存变化', '关闭抽屉'])('%s 后晚到的 preview 不重新开窗', async (action) => {
+    const w = mountDrawer()
+    await flushPromises()
+    const vm = w.vm as any
+    vm.syncHint(vm.hints[0])
+    const late = deferred()
+    api.templatePublishPreview.mockReturnValueOnce(late.promise)
+    const pending = vm.onPublishPreview()
+    if (action === '暂存变化') vm.staged.get('report|balance_sheet:BS-002').definition.formula = '40'
+    else await w.setProps({ modelValue: false })
+    late.resolve(previewEvidence())
+    await pending
+    expect(vm.previewSession).toBeNull()
+    expect(vm.previewVisible).toBe(false)
+    expect(vm.previewLoading).toBe(false)
+    expect(await previewSubmit(w)(decisionsPayload())).toBe(false)
+    expect(api.templatePublish).not.toHaveBeenCalled()
+  })
+})
+
+describe('真实 Drawer 的回滚快照与可重试错误', () => {
+  it('rollback 冻结 target/version/fingerprint，不携带 publish changes，成功保留暂存', async () => {
+    const { w, vm } = await preparedDrawer()
+    const row = { version: 1 }
+    await vm.openRollback(row)
+    row.version = 2
+    vm.preview.target_version = 2
+    vm.preview.preview_fingerprint = 'd'.repeat(64)
+    await nextTick()
+    expect(await previewSubmit(w)(decisionsPayload())).toBe(true)
+    expect(api.templateRollback).toHaveBeenCalledWith('t1', expect.objectContaining({
+      target_version: 1, expected_version: 3, preview_fingerprint: 'b'.repeat(64),
+      request_id: expect.any(String), decisions: decisionsPayload().decisions,
+    }))
+    expect(api.templateRollback.mock.calls[0][1]).not.toHaveProperty('changes')
+    expect(api.templatePublish).not.toHaveBeenCalled()
+    expect(vm.stagedCount).toBe(1)
+    expect(vm.previewVisible).toBe(false)
+    expect(w.emitted('changed')).toHaveLength(1)
+  })
+
+  it.each(['publish', 'rollback'] as const)('%s 的 500 保留同 requestId/版本/指纹重试', async (kind) => {
+    const { w, vm } = await preparedDrawer()
+    if (kind === 'rollback') await vm.openRollback({ version: 1 })
+    await nextTick()
+    const write = kind === 'publish' ? api.templatePublish : api.templateRollback
+    const loads = api.template.mock.calls.length
+    write.mockRejectedValueOnce({ response: { status: 500 } })
+    const submit = previewSubmit(w)
+    expect(await submit(decisionsPayload())).toBe(false)
+    expect(vm.previewVisible).toBe(true)
+    expect(vm.submitting).toBe(false)
+    expect(w.emitted('changed')).toBeUndefined()
+    expect(api.template).toHaveBeenCalledTimes(loads)
+    expect(await submit({ ...decisionsPayload(), note: '再次提交' })).toBe(true)
+    const [first, retry] = write.mock.calls.map((call) => call[1])
+    expect(retry).toEqual({ ...first, note: '再次提交' })
+    expect(retry.request_id).toBeTruthy()
+    expect(retry.preview_fingerprint).toBe((kind === 'publish' ? 'a' : 'b').repeat(64))
+    expect(write).toHaveBeenCalledTimes(2)
+    expect(w.emitted('changed')).toHaveLength(1)
+  })
+})
+
+describe('真实 Drawer 的 CAS 拒绝后重读', () => {
+  it.each([
+    ['publish', 409], ['publish', 428], ['rollback', 409], ['rollback', 428],
+  ] as const)('%s 返回 %s 作废会话并重读，重新预览才可再写', async (kind, status) => {
+    const { w, vm } = await preparedDrawer()
+    if (kind === 'rollback') await vm.openRollback({ version: 1 })
+    const oldRequest = vm.previewSession.requestId
+    const write = kind === 'publish' ? api.templatePublish : api.templateRollback
+    write.mockRejectedValueOnce({ response: { status, data: { detail: { message: '版本证据失效' } } } })
+    api.template.mockResolvedValueOnce({ ...copyTemplateValue(DETAIL), version: 4 })
+    const loads = api.template.mock.calls.length
+    const submit = previewSubmit(w)
+    expect(await submit(decisionsPayload())).toBe(false)
+    expect(api.template).toHaveBeenCalledTimes(loads + 1)
+    expect(vm.detail.version).toBe(4)
+    expect(vm.previewVisible).toBe(false)
+    expect(vm.previewSession).toBeNull()
+    expect(vm.stagedCount).toBe(1)
+    expect(w.emitted('changed')).toBeUndefined()
+    expect(msg.success).not.toHaveBeenCalled()
+    expect(msg.warning).toHaveBeenCalledWith(expect.stringContaining('版本证据失效'))
+    expect(await submit(decisionsPayload())).toBe(false)
+    expect(write).toHaveBeenCalledTimes(1)
+    const evidence = previewEvidence({ version: 4, target_version: 1, preview_fingerprint: 'e'.repeat(64) })
+    if (kind === 'publish') api.templatePublishPreview.mockResolvedValueOnce(evidence)
+    else api.templateRollbackPreview.mockResolvedValueOnce(evidence)
+    await (kind === 'publish' ? vm.onPublishPreview() : vm.openRollback({ version: 1 }))
+    expect(vm.previewSession.requestId).not.toBe(oldRequest)
+    expect(await submit(decisionsPayload())).toBe(true)
+    expect(write.mock.calls[1][1]).toMatchObject({ expected_version: 4, preview_fingerprint: 'e'.repeat(64) })
+  })
+})
+
+describe('真实 Drawer 的迟到 submit 与提交互斥', () => {
+  it.each([
+    ['publish', '成功'], ['publish', '409'], ['rollback', '成功'], ['rollback', '500'],
+  ] as const)('%s 提交%s晚到不改新模板、不发 changed 或重读', async (kind, outcome) => {
+    const { w, vm } = await preparedDrawer()
+    if (kind === 'rollback') await vm.openRollback({ version: 1 })
+    const late = deferred()
+    const write = kind === 'publish' ? api.templatePublish : api.templateRollback
+    write.mockReturnValueOnce(late.promise)
+    const pending = previewSubmit(w)(decisionsPayload())
+    api.template.mockResolvedValueOnce(secondTemplate())
+    await w.setProps({ templateId: 't2' })
+    await flushPromises()
+    const loads = api.template.mock.calls.length
+    if (outcome === '成功') late.resolve({ version: 4 })
+    else late.reject({ response: { status: Number(outcome) } })
+    expect(await pending).toBe(false)
+    expect(vm.detail.id).toBe('t2')
+    expect(vm.detail.version).toBe(8)
+    expect(vm.previewVisible).toBe(false)
+    expect(vm.stagedCount).toBe(0)
+    expect(vm.submitting).toBe(false)
+    expect(api.template).toHaveBeenCalledTimes(loads)
+    expect(w.emitted('changed')).toBeUndefined()
+    expect(msg.success).not.toHaveBeenCalled()
+    expect(msg.error).not.toHaveBeenCalled()
+    expect(msg.warning).not.toHaveBeenCalled()
+  })
+
+  it.each(['publish', 'rollback'] as const)('%s 在途时拒绝第二次提交与所有暂存写操作', async (kind) => {
+    const { w, vm } = await preparedDrawer()
+    if (kind === 'rollback') await vm.openRollback({ version: 1 })
+    const write = kind === 'publish' ? api.templatePublish : api.templateRollback
+    const late = deferred()
+    write.mockReturnValueOnce(late.promise)
+    const before = vm.stagedChanges()
+    const submit = previewSubmit(w)
+    const pending = submit(decisionsPayload())
+    expect(vm.submitting).toBe(true)
+    expect(await submit(decisionsPayload())).toBe(false)
+    vm.clearStaged(); vm.stageDelete(vm.domainRows[0]); vm.removeHint(vm.hints[0]); vm.syncHint(vm.hints[0])
+    vm.onEditSave({ formula: 'MUST-NOT-WRITE' })
+    await vm.openRollback({ version: 1 })
+    await vm.onPublishPreview()
+    expect(vm.stagedChanges()).toEqual(before)
+    expect(write).toHaveBeenCalledTimes(1)
+    late.resolve({ version: 4 })
+    expect(await pending).toBe(true)
   })
 })

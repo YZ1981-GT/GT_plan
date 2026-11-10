@@ -398,7 +398,7 @@ async def evaluate_wp_formula_expression(
                     errors.append(f"{match.group(0)}：{tr.read.reason}")
             else:
                 val = await WPExecutor.execute(
-                    db, project_id, wp_code, sheet_name, field=field
+                    db, project_id, wp_code, sheet_name, field=field, year=year
                 )
         except Exception as e:
             logger.warning("WP 三参求值失败 %s: %s", match_text, e)
@@ -423,7 +423,7 @@ async def evaluate_wp_formula_expression(
             errors.append(f"严格模式：WP('{wp_code}',…) 取值失败")
             continue
         try:
-            val = await WPExecutor.execute(db, project_id, wp_code, col)
+            val = await WPExecutor.execute(db, project_id, wp_code, col, year=year)
         except Exception as e:
             logger.warning("WP 求值失败 %s: %s", match_text, e)
             val = None

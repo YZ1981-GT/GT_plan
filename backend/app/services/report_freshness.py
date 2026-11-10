@@ -73,33 +73,37 @@ def is_flag_stale(row: Any, current_version: int = CALC_VERSION) -> bool:
     return is_marked_stale(row) or _get(row, "calc_version") != current_version
 
 
-def is_effectively_stale(row: Any, effective_formula: str | None) -> bool:
-    """逐行读者的过期判据：:func:`stale_clause` 的两条之一成立，或 ``formula_used`` 与生效公式规范化后不同。
+def _stored_definition_hash(row: Any) -> str | None:
+    """生成时信封里记下的定义哈希（S5 ``provenance.applied_attempt.definition_hash``）；存量行没有 ⇒ None。"""
+    provenance = _get(row, "provenance")
+    if not isinstance(provenance, Mapping):
+        return None
+    applied = provenance.get("applied_attempt")
+    if not isinstance(applied, Mapping):
+        return None
+    return applied.get("definition_hash") or None
+
+
+def is_effectively_stale(row: Any, effective_formula: str | None, definition_hash: str | None = None) -> bool:
+    """逐行读者的过期判据：:func:`stale_clause` 的两条之一成立，或生成时定义与当前生效定义不同。
 
     ``row`` = ``FinancialReport`` 或含同名键的映射；``effective_formula`` = 该行在当前有效定义里的 ``formula``
     （:func:`formula_for`；有效定义里没有该行 ⇒ None，按空公式比较）。
+
+    ``definition_hash``（当前生效定义的哈希，S5 ADR-FPE-06）：行上有生成时的定义哈希时以哈希为准 ——
+    公式文本相同而其他执行字段变了也算过期；存量行没有哈希、或调用方不给 ⇒ 退回按 ``formula_used`` 文本比较。
     """
     if is_flag_stale(row):
         return True
+    stored = _stored_definition_hash(row) if definition_hash is not None else None
+    if stored is not None:
+        return stored != definition_hash
     return normalize_formula(_get(row, "formula_used")) != normalize_formula(effective_formula)
 
 
 def row_status(row: Any, effective_formula: str | None, definition_hash: str | None = None) -> dict[str, Any]:
-    """逐行读者展示用：``is_stale``（:func:`is_effectively_stale`）+ ``calc_error`` + ``blank_reason``（两者都给）。
-
-    ``definition_hash`` 不为 None 时优先比较信封中的 ``definition_hash``（S5 ADR-FPE-06）。
-    """
-    stale = is_effectively_stale(row, effective_formula)
-    if not stale and definition_hash is not None:
-        provenance = _get(row, "provenance")
-        if isinstance(provenance, Mapping):
-            applied = provenance.get("applied_attempt")
-            if isinstance(applied, Mapping):
-                old_hash = applied.get("definition_hash")
-                if old_hash and old_hash != definition_hash:
-                    stale = True
-    # formula-hub-release-blockers R4.1：必须返回已经含 definition_hash 分支结果的 stale 变量，
-    # 不能重新调用 is_effectively_stale（它不知道 hash 漂移）。
+    """逐行读者展示用：``is_stale``（:func:`is_effectively_stale`，含定义哈希）+ ``calc_error`` + ``blank_reason``。"""
+    stale = is_effectively_stale(row, effective_formula, definition_hash)
     return {
         "is_stale": stale,
         "calc_error": _get(row, "calc_error") or None,

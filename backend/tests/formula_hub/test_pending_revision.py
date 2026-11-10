@@ -185,8 +185,11 @@ async def test_three_origins_create_at_one_and_overwrite_to_two(origin: str) -> 
                 await template_sync.subscribe(db, project_id=target, tpl=tpl, domain=DOMAIN, decisions=None,
                                               user_id=admin.id)
             elif origin == "template":
-                await template_sync.publish_template(db, tpl, expected_version=1, user_id=admin.id, changes=[
-                    {"domain": DOMAIN, "slot_key": SLOT, "definition": definition}])
+                # 发布必须带本次预览的指纹（旧预览不能默默获得覆盖权）
+                changes = [{"domain": DOMAIN, "slot_key": SLOT, "definition": definition}]
+                preview = await template_sync.publish_preview(db, tpl, changes=changes, expected_version=1)
+                await template_sync.publish_template(db, tpl, expected_version=1, user_id=admin.id, changes=changes,
+                                                     preview_fingerprint=preview["preview_fingerprint"])
             else:
                 await push(db, scenario, scenario.src_a if step == 1 else scenario.src_b)
             await db.commit()

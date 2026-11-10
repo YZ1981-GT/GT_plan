@@ -45,7 +45,7 @@ FRESHNESS_READERS: dict[str, str] = {
     "app/routers/reports.py::get_report": "报表视图：逐行 row_status（含生成时公式与生效公式比较）",
     "app/routers/reports.py::get_report_row_provenance": "S5 本期最终值来源：同一 row_status 判 stale / legacy",
     "app/routers/reports.py::export_report_excel": "单表 Excel 导出：「说明」列 status_note(row_status)",
-    "app/services/deliverable_readiness_service.py::DeliverableReadinessService._check_reports": "F38 交付就绪",
+    "app/services/deliverable_readiness_sources.py::ReadinessSourceChecks._check_reports": "F38 交付就绪",
     "app/services/report_export_checks.py::_check_freshness": "F38 导出前检查（过期 / 计算失败 / 留空三条提示）",
     "app/services/stale_summary_aggregate.py::get_full_summary": "F38 过期汇总（签发清单 / 合伙人 / EQCR 复用）",
     "app/services/formula_health_service.py::_stale_stats": "F38 公式健康度",
@@ -54,6 +54,10 @@ FRESHNESS_READERS: dict[str, str] = {
         "stale 重算选行：只选已标过期（is_marked_stale；不因 D13-A 自动重算存量行，ADR-FHIC-05 / X3）",
     "app/services/report_row_compute.py::build_row_cache":
         "报表依赖缓存：库中行只有未标过期且计算版本为当前版本才作输入（is_flag_stale，ADR-FHIC-05）",
+    # 交付就绪检查拆分（deliverable_readiness_service → deliverable_readiness_sources 的 ReadinessSourceChecks mixin），
+    # 判据仍是 count_summary（stale_clause），只是限定名变了
+    "app/services/consol_report_run_service.py::_definition_hash":
+        "合并报表正式运行的定义指纹：生效公式先经 normalize_formula（与判过期同一规范化口径）再取哈希",
     "app/services/formula_management/refresh_idempotency_store.py::report_basis":
         "Draft Refresh 幂等计划指纹的报表四项：本项目年度 stale_clause() 过期行数（另取生效报表定义与 CALC_VERSION）",
 }
@@ -71,7 +75,7 @@ RAW_READERS: dict[str, str] = {
 
 #: 需求 5.1 / F38 + 报表视图 / 导出：必须经 report_freshness
 REQUIRED = (
-    "app/services/deliverable_readiness_service.py::DeliverableReadinessService._check_reports",
+    "app/services/deliverable_readiness_sources.py::ReadinessSourceChecks._check_reports",
     "app/services/report_export_checks.py::_check_freshness",
     "app/services/stale_summary_aggregate.py::get_full_summary",
     "app/services/formula_health_service.py::_stale_stats",

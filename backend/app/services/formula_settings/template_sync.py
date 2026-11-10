@@ -11,7 +11,12 @@
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import uuid
+from copy import deepcopy
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -26,6 +31,7 @@ from app.models.formula_setting_models import (
     FormulaTemplateSubscription,
     FormulaTemplateVersion,
 )
+from app.models.report_models import ReportConfig
 from app.services.formula_settings.audit import audit_global, audit_project, change_entry
 from app.services.formula_settings.definitions import exec_hash, get_spec, normalize, same_exec
 from app.services.formula_settings.domain_stores import validate_definition
@@ -302,9 +308,11 @@ async def _publish_plan(db: AsyncSession, tpl: FormulaTemplate, raw: list[Mappin
                 effective.setdefault(domain, {})[slot] = merged
             elif row is not None:
                 effective.setdefault(domain, {})[slot] = None
-    subs = (await db.execute(sa.select(FormulaTemplateSubscription).where(
+    subscriptions = sa.select(FormulaTemplateSubscription).where(
         FormulaTemplateSubscription.template_id == tpl.id, FormulaTemplateSubscription.is_active == sa.true(),
-        FormulaTemplateSubscription.domain.in_(list(effective) or [""])))).scalars().all()
+        FormulaTemplateSubscription.domain.in_(list(effective) or [""]),
+    ).execution_options(populate_existing=True)
+    subs = (await db.execute(subscriptions)).scalars().all()
     domain_items: dict[str, list[PlanItem]] = {}
     projects: dict[uuid.UUID, ProjectInfo] = {}
     for domain, domain_effective in effective.items():
@@ -368,21 +376,82 @@ def _check_version(tpl: FormulaTemplate, expected_version: int | None) -> None:
 async def publish_preview(db: AsyncSession, tpl: FormulaTemplate, *, changes: list[Mapping[str, Any]],
                           expected_version: int | None) -> dict[str, Any]:
     _check_version(tpl, expected_version)
-    effective, current, _, projects, domain_items = await _publish_plan(db, tpl, changes)
+    effective, current, subs, projects, domain_items = await _publish_plan(db, tpl, changes)
     return {"template_id": str(tpl.id), "version": tpl.version, "next_version": tpl.version + 1,
+            "preview_fingerprint": await _preview_fingerprint(db, tpl, effective, current, subs, projects, domain_items),
             "changes": _change_rows(effective, current), **_result(domain_items, projects)}
 
 
 def _change_rows(effective, current) -> list[dict[str, Any]]:
+    """冻结定义值，避免后续 ORM 写入或嵌套载荷修改污染审计快照。"""
     return [{"domain": d, "slot_key": s, "label": (current[d].get(s).slot_label if current[d].get(s) else None) or s,
-             "old": (current[d][s].definition if s in current[d] else None), "new": new, "deleted": new is None}
+             "old": deepcopy(current[d][s].definition) if s in current[d] else None,
+             "new": deepcopy(new), "deleted": new is None}
             for d, slots in effective.items() for s, new in sorted(slots.items())]
+
+
+def _publish_state(subs, projects, domain_items) -> dict:
+    """复制锁前状态；后续 ORM 刷新不能原地改变比较基线。"""
+    return {
+        "subscriptions": {str(s.id): (s.project_id, s.domain, s.template_version, s.pinned) for s in subs},
+        "projects": {str(p.id): asdict(p) for p in projects},
+        "items": {it.key: asdict(it) for items in domain_items.values() for it in items},
+    }
+
+
+async def _preview_fingerprint(db, tpl, effective, current, subs, projects, domain_items) -> str:
+    """绑定真实上游；模板仍拥有公式位或没有订阅者时，上游也会影响新基线。"""
+    upstream_state = {}
+    for domain, slots in effective.items():
+        scopes = {global_scope(domain, tpl.applicable_scope)} | {
+            it.project.scope for it in domain_items.get(domain, [])
+        }
+        scope_state = {}
+        for scope in sorted(s for s in scopes if s is not None):
+            upstream = await upstream_records(db, get_store(domain), scope)
+            scope_state[scope] = {
+                slot: asdict(upstream[slot]) if slot in upstream else None for slot in slots
+            }
+        upstream_state[domain] = scope_state
+    template_slots = {
+        domain: {slot: ({"version": row.version, "definition": row.definition,
+                         "base_definition": row.base_definition, "base_version": row.base_version,
+                         "base_origin": row.base_origin} if (row := current[domain].get(slot)) else None)
+                 for slot in slots}
+        for domain, slots in effective.items()
+    }
+    state = {"schema": 2, "template_id": str(tpl.id), "template_version": tpl.version,
+             "scope": tpl.applicable_scope, "changes": effective, "template_slots": template_slots,
+             "upstream": upstream_state, "plan": _publish_state(subs, projects, domain_items)}
+    encoded = json.dumps(state, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+                         default=str, allow_nan=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+async def _refresh_publish_inputs(db: AsyncSession, tpl: FormulaTemplate, projects, effective) -> None:
+    """取锁后定向刷新存储模型；无订阅者时也必须刷新模板写入所用的上游。"""
+    await db.flush()
+    ids = [p.id for p in projects]
+    domains = list(effective)
+    (await db.execute(sa.select(FormulaSetting).where(
+        FormulaSetting.domain.in_(domains), sa.or_(
+            FormulaSetting.layer == "global", FormulaSetting.template_id == tpl.id,
+            FormulaSetting.project_id.in_(ids),
+        ),
+    ).execution_options(populate_existing=True))).scalars().all()
+    if "report" in domains:
+        standards = ({f"project:{pid}" for pid in ids} | {p.scope for p in projects if p.scope}
+                     | {global_scope("report", tpl.applicable_scope)}) - {None}
+        (await db.execute(sa.select(ReportConfig).where(
+            ReportConfig.applicable_standard.in_(standards),
+        ).execution_options(populate_existing=True))).scalars().all()
 
 
 async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: list[Mapping[str, Any]],
                            expected_version: int | None, user_id: uuid.UUID | None,
                            decisions: Decisions | None = None, request_id: str | None = None,
-                           note: str | None = None, publish_source: str = "template_publish",
+                           note: str | None = None, preview_fingerprint: str | None = None,
+                           publish_source: str = "template_publish",
                            item_action: str = "template_sync",
                            audit_action: str = "formula.template_published",
                            audit_details: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -401,12 +470,22 @@ async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: l
     if not effective:
         raise FormulaSettingError("模板没有任何改动")
     decisions = decisions or Decisions()
-    for pid in sorted({it.project.id for its in domain_items.values() for it in its}, key=str):
-        for d in domain_items:
-            await lock_project(db, d, pid)
+    before = _publish_state(subs, projects, domain_items)
+    lock_keys = {(it.domain, it.project.id) for its in domain_items.values() for it in its}
+    for domain, pid in sorted(lock_keys, key=lambda key: (key[0], str(key[1]))):
+        await lock_project(db, domain, pid)
+    await _refresh_publish_inputs(db, tpl, projects, effective)
+    effective, current, subs, projects, domain_items = await _publish_plan(db, tpl, changes)
+    if before != _publish_state(subs, projects, domain_items):
+        raise VersionConflict("订阅项目公式或订阅状态已变化，请重新预览后发布")
+    if not preview_fingerprint:
+        raise VersionRequired("缺少模板预览证据，请重新预览后发布")
+    actual = await _preview_fingerprint(db, tpl, effective, current, subs, projects, domain_items)
+    if not hmac.compare_digest(actual, preview_fingerprint):
+        raise VersionConflict("模板预览已失效，项目、公式位或上游基线已变化，请重新预览后发布")
     new_version, publish_id = tpl.version + 1, uuid.uuid4()
-    rows = await _write_rows(db, tpl, effective, current, user_id)
     change_rows = _change_rows(effective, current)
+    rows = await _write_rows(db, tpl, effective, current, user_id)
     outcomes, events = await _apply(db, domain_items, decisions, publish_id=publish_id, user_id=user_id,
                                     action=item_action, source=publish_source)
     tpl.version, tpl.updated_by, tpl.updated_at = new_version, user_id, _now()
@@ -419,7 +498,11 @@ async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: l
         if decisions.project(sub.project_id) is ProjectChoice.DEFER:
             sub.pinned = True  # 暂缓：固定在旧版本（读旧版本快照）
         elif not frozen:
-            sub.template_version, sub.pinned = new_version, False
+            if sub.pinned:
+                # 本次只改 B 时，A 的旧待确认仍有效；全部逐位结案后才能解除订阅固定。
+                await refresh_subscription(db, sub.project_id, sub.domain, tpl.id)
+            else:
+                sub.template_version = new_version
     summary = _result(domain_items, projects, outcomes)["summary"]
     summary_record = {**summary, "template_version": new_version}
     record_domain = next(iter(effective)) if len(effective) == 1 else "template"  # 列 32 字符：多域记 template

@@ -1,6 +1,6 @@
 """变更传播（R8，design §8）：有效定义变化 → 事务提交后每项目一次 ``FORMULA_CONFIG_CHANGED`` → 新 handler 失效 / 重算。
 
-* 报表：变化行 ∪ 经 ROW / SUM_ROW 直接或间接引用它们的行 → ``financial_report.is_stale``（该项目全部年度）；
+* 报表：变化行 ∪ 经 ROW / SUM_ROW 直接或间接引用它们的行 → 冻结年度的 ``financial_report.is_stale``；
   有审计年度且未归档时 ``recalculate_stale_rows``，随后发 ``REPORTS_UPDATED``。
 * 底稿：用到该底稿编码的底稿标 ``prefill_stale``。
 * 附注：对应章节 ``is_stale``。
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from contextvars import ContextVar
 from typing import Any, Awaitable, Callable, Iterable
 
 import sqlalchemy as sa
@@ -27,6 +28,8 @@ from app.services.formula_grammar import ROW_PATTERN, SUM_ROW_PATTERN
 logger = logging.getLogger(__name__)
 ORIGIN = "formula_settings"
 _session_factory: Callable[[], Any] | None = None
+# 保持处理器三参接口；耐久投递在当前异步上下文中带入事件主键，不能用发布批次号替代。
+_delivery_event_id: ContextVar[str | None] = ContextVar("formula_delivery_event_id", default=None)
 
 
 class PropagationIncomplete(RuntimeError):
@@ -131,12 +134,66 @@ async def _is_consolidated(db, project_id: uuid.UUID) -> bool:
     return rs == "consolidated"
 
 
+async def _matches_project_year(db, project_id: uuid.UUID, year: int | None,
+                                *, lock: bool = False) -> bool:
+    """实际项目级写入传 lock=True；跨会话调用前的预检不持锁。"""
+    from app.services.formula_settings.project_year_guard import matches_project_year
+
+    return await matches_project_year(db, project_id, year, lock=lock)
+
+
+async def mark_in_year(db, domain: str, project_id: uuid.UUID, year: int | None,
+                       slot_keys: list[str]) -> dict[str, Any]:
+    """入队同事务标过期；年度行显式限定 year，项目级底稿先核对年度。只 flush。"""
+    if year is None:
+        return {"domain": domain, "marked": 0, "skipped": "no_year"}
+    if await _is_frozen(db, project_id) is not False:
+        return {"domain": domain, "marked": 0, "skipped": "frozen_or_missing"}
+    if domain == "report":
+        from app.models.report_models import FinancialReport
+        from app.services.formula_settings.effective_report import load_effective_report_configs
+        from app.services.report_config_service import ReportConfigService
+
+        standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
+        configs = await load_effective_report_configs(db, standard=standard, project_id=project_id)
+        closure = report_closure(configs, {s.partition(":")[2] for s in slot_keys if ":" in s})
+        result = await db.execute(sa.update(FinancialReport).where(
+            FinancialReport.project_id == project_id, FinancialReport.year == year,
+            FinancialReport.row_code.in_(sorted(closure)), FinancialReport.is_deleted == sa.false(),
+        ).values(is_stale=True).execution_options(synchronize_session=False))
+        return {"domain": domain, "marked": int(result.rowcount or 0), "closure": sorted(closure)}
+    if domain == "wp":
+        from app.services.formula_settings.stale_marks import mark_wp_stale
+
+        if not await _matches_project_year(db, project_id, year, lock=True):
+            return {"domain": domain, "marked": 0, "skipped": "year_mismatch"}
+        return {"domain": domain, "marked": await mark_wp_stale(db, project_id, slot_keys)}
+    sections = sorted({s.split("|", 1)[0] for s in slot_keys if s})
+    if domain == "note":
+        from app.services.stale_state import StaleSource, mark_note_stale
+
+        n = await mark_note_stale(db, project_id, source=StaleSource.FORMULA_SETTINGS,
+                                 sections=sections, year=year)
+        return {"domain": domain, "marked": n}
+    if domain == "consol_note":
+        from app.models.consol_note_data_models import ConsolNoteData
+
+        result = await db.execute(sa.update(ConsolNoteData).where(
+            ConsolNoteData.project_id == project_id, ConsolNoteData.year == year,
+            ConsolNoteData.section_id.in_(sections),
+        ).values(is_stale=True).execution_options(synchronize_session=False))
+        return {"domain": domain, "marked": int(result.rowcount or 0)}
+    return {"domain": domain, "marked": 0, "reason": "no_stale_mark_for_domain"}
+
+
 async def propagate_report(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
     from app.models.report_models import FinancialReport
     from app.services.formula_settings.effective_report import load_effective_report_configs
     from app.services.report_config_service import ReportConfigService
     from app.services.report_engine import ReportEngine
 
+    if year is None:
+        return {"skipped": "no_year"}
     changed = {s.partition(":")[2] for s in slot_keys if ":" in s}
     async with _factory()() as db:
         frozen = await _is_frozen(db, project_id)
@@ -147,6 +204,7 @@ async def propagate_report(project_id: uuid.UUID, year: int | None, slot_keys: l
         closure = report_closure(configs, changed)
         marked = (await db.execute(sa.update(FinancialReport).where(
             FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
             FinancialReport.row_code.in_(sorted(closure)),
             FinancialReport.is_deleted == sa.false(),
         ).values(is_stale=True).execution_options(synchronize_session=False))).rowcount or 0
@@ -185,9 +243,14 @@ async def propagate_wp(project_id: uuid.UUID, year: int | None, slot_keys: list[
     async with _factory()() as db:
         if await _is_frozen(db, project_id) is not False:
             return {"skipped": True}
-        idx = sa.select(WpIndex.id).where(WpIndex.project_id == project_id, WpIndex.wp_code.in_(codes))
+        if not await _matches_project_year(db, project_id, year, lock=True):
+            return {"skipped": "no_year" if year is None else "year_mismatch"}
+        idx = sa.select(WpIndex.id).where(
+            WpIndex.project_id == project_id, WpIndex.wp_code.in_(codes),
+            WpIndex.is_deleted == sa.false())
         n = (await db.execute(sa.update(WorkingPaper).where(
             WorkingPaper.project_id == project_id, WorkingPaper.wp_index_id.in_(idx),
+            WorkingPaper.is_deleted == sa.false(),
         ).values(prefill_stale=True).execution_options(synchronize_session=False))).rowcount or 0
         await db.commit()
     return {"wp_codes": codes, "marked": int(n)}
@@ -199,10 +262,12 @@ async def propagate_note(project_id: uuid.UUID, year: int | None, slot_keys: lis
     from app.services.stale_state import StaleSource, mark_note_stale
 
     sections = sorted({s.split("|", 1)[0] for s in slot_keys if s})
+    if year is None:
+        return {"skipped": "no_year", "sections": sections}
     async with _factory()() as db:
         if await _is_frozen(db, project_id) is not False:
             return {"skipped": True}
-        materialized = await materialize(db, project_id, sections)
+        materialized = await materialize(db, project_id, sections, year=year)
         n = await mark_note_stale(
             db,
             project_id,
@@ -233,7 +298,7 @@ async def propagate_consol_note(project_id: uuid.UUID, year: int | None, slot_ke
             project_id=project_id,
             year=year,
             operation_type="push",
-            idempotency_key=f"formula:{uuid.uuid4().hex}",
+            idempotency_key=f"formula:{_delivery_event_id.get() or uuid.uuid4().hex}",
             trigger_source=TRIGGER_FORMULA,
             requested_actions=("notes",),
         )
@@ -251,8 +316,9 @@ async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_ke
     """表间审核规则变更 → 重新执行全部勾稽（内置 7 条 + 用户规则）并落库结果。
 
     ``execute_report_cross_checks`` 内部已集成 ``run_user_rules``（R10.2），
-    结果 upsert 进 ``cross_check_results`` 表（fail-open）。此处只需按传播约定
-    提供独立会话与冻结检查。无审计年度则跳过（勾稽需要报表行做 row_cache）。
+    严格执行并完整落库 ``cross_check_results``，技术异常或短写回滚并交耐久重试。
+    正常缺数、比较不平仍返回业务失败回执，不冒充技术异常。
+    此处提供独立会话、保存点与冻结检查；无审计年度则跳过。
     """
     if year is None:
         return {"skipped": "no_year", "slot_keys": slot_keys}
@@ -265,7 +331,7 @@ async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_ke
 
             async with db.begin_nested():
                 result = await execute_report_cross_checks(
-                    db, project_id=project_id, year=year, persist=True,
+                    db, project_id=project_id, year=year, persist=True, strict=True,
                 )
             await db.commit()
             return {
@@ -324,8 +390,12 @@ async def propagate_push(project_id: uuid.UUID, year: int | None, slot_keys: lis
                                           codes=codes)
         except PushActionError as exc:  # 业务上不可推（如年度不符），与推送事件同口径：不算故障
             return {"skipped": "not_pushable", "reason": str(exc), "wp_codes": codes}
-    return {"wp_codes": codes, "run_id": str(result.run_id) if result.run_id else None,
-            "written": result.written_count, "skipped": result.skipped_count}
+    return {
+        "wp_codes": codes, "run_id": str(result.run_id) if result.run_id else None,
+        "status": result.status, "written": result.written_count, "skipped": result.skipped_count,
+        "warnings": list(result.warnings), "workpapers": list(result.workpapers),
+        "blocked_writes": list(result.blocked_writes),
+    }
 
 
 async def _notify_only(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:

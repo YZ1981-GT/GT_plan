@@ -258,7 +258,8 @@ class StalePropagationEngine:
         year: int,
         *,
         source_uri: str | None = None,
-    ) -> dict[str, int]:
+        strict: bool = False,
+    ) -> dict[str, Any]:
         """按 URI 前缀分发写 DB：
 
         - WP:* → UPDATE working_paper SET prefill_stale=true WHERE wp_code=...
@@ -303,17 +304,22 @@ class StalePropagationEngine:
 
         async with async_session_factory() as session:
             try:
-                # Mark workpapers stale (working_paper 通过 wp_index 关联 wp_code)
+                # 项目级底稿无年度列：必须在本次实际写事务内锁定并重读项目。
                 if wp_codes:
-                    result = await session.execute(
-                        text(
-                            "UPDATE working_paper SET prefill_stale = true "
-                            "WHERE project_id = :pid AND wp_index_id IN ("
-                            "  SELECT id FROM wp_index WHERE wp_code = ANY(:codes)"
-                            ")"
-                        ),
-                        {"pid": pid, "codes": wp_codes},
-                    )
+                    import sqlalchemy as sa
+                    from app.models.workpaper_models import WorkingPaper, WpIndex
+                    from app.services.formula_settings.project_year_guard import matches_project_year
+
+                    if not await matches_project_year(session, project_id, year, lock=True):
+                        raise RuntimeError("项目审计年度已变化或项目不可写，未执行项目级依赖图写入")
+                    project_uuid = UUID(pid)
+                    idx = sa.select(WpIndex.id).where(
+                        WpIndex.project_id == project_uuid,
+                        WpIndex.wp_code.in_(wp_codes), WpIndex.is_deleted == sa.false())
+                    result = await session.execute(sa.update(WorkingPaper).where(
+                        WorkingPaper.project_id == project_uuid,
+                        WorkingPaper.wp_index_id.in_(idx), WorkingPaper.is_deleted == sa.false(),
+                    ).values(prefill_stale=True).execution_options(synchronize_session=False))
                     counts["wp"] = result.rowcount or 0
 
                 # Mark reports stale
@@ -366,6 +372,10 @@ class StalePropagationEngine:
             except Exception as e:
                 await session.rollback()
                 logger.warning("[StalePropagation] _mark_stale_by_uri failed: %s", e)
+                if strict:
+                    raise
+                # 整个事务已回滚，不能把失败前累计的 rowcount 当成成功。
+                return {**dict.fromkeys(counts, 0), "error": str(e)}
 
         return counts
 
@@ -470,7 +480,7 @@ class StalePropagationEngine:
     # ─── Unified Entry Point (Task 2.5) ──────────────────────────────────
 
     async def on_change(
-        self, source_uri: str, project_id: UUID | str, year: int
+        self, source_uri: str, project_id: UUID | str, year: int, *, strict: bool = False
     ) -> dict[str, Any]:
         """统一入口：变更 → BFS → 写 DB → SSE 推送。
 
@@ -485,16 +495,24 @@ class StalePropagationEngine:
         project_id : UUID | str
             项目 ID
         year : int
-            年度
+            冻结审计年度；strict=True 时必须为大于 2000 的整数。
+        strict : bool
+            耐久传播显式开启：拒绝无年度降级，写事务失败上抛，失败不发送成功通知或审计。
+            默认兼容模式在写入回滚后返回 degraded/error，不把回滚前计数当成成功。
 
         Returns
         -------
-        dict with keys: affected (list[str]), total (int), degraded (bool)
+        affected/total 为图命中范围，不代表数据库写入数量；有影响且写入成功时，
+        written 返回四类实际事务计数，marked 为其合计。空影响与身份未解析沿用原回执。
         """
-        # 降级模式检查：如果图未加载，尝试重新加载
+        if strict and (type(year) is not int or year <= 2000):
+            raise ValueError("严格依赖图传播需要冻结审计年度")
+        # 严格执行自身拒绝无年度 fallback，预览正常也不能替代本次检查。
         if self._degraded:
             self._load_graph()
             if self._degraded:
+                if strict:
+                    raise RuntimeError("依赖图不可用，未执行不限定年度的降级写入")
                 return await self._fallback_mark_stale(project_id)
 
         start_time = time.time()
@@ -515,15 +533,22 @@ class StalePropagationEngine:
         if not affected_uris:
             return {"affected": [], "total": 0, "degraded": False}
 
-        # 写 DB stale 标记
-        await self._mark_stale_by_uri(
-            affected_uris,
-            project_id,
-            year,
-            source_uri=source_uri,
+        # 图命中数量不代表数据库写入成功；严格调用必须消费实际事务结果。
+        kwargs = {"strict": True} if strict else {}
+        written = await self._mark_stale_by_uri(
+            affected_uris, project_id, year, source_uri=source_uri, **kwargs,
         )
+        keys = ("wp", "report", "note", "deliverable")
+        valid = (isinstance(written, dict) and not written.get("error")
+                 and all(type(written.get(k)) is int and written[k] >= 0 for k in keys))
+        if not valid:
+            message = (written.get("error") if isinstance(written, dict) else None) or "依赖图未返回有效写入结果"
+            if strict:
+                raise RuntimeError(message)
+            return {"affected": affected_uris, "total": len(affected_uris),
+                    "degraded": True, "error": message, "written": written}
 
-        # SSE 推送前端
+        # SSE 推送前端（仅在 stale 事务成功之后）
         await self._notify_frontend(project_id, affected_uris)
 
         # 审计日志
@@ -541,6 +566,8 @@ class StalePropagationEngine:
             "affected": affected_uris,
             "total": len(affected_uris),
             "degraded": False,
+            "written": written,
+            "marked": sum(written[k] for k in keys),
             "duration_ms": duration_ms,
         }
 

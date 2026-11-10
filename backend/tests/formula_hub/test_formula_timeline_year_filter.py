@@ -83,3 +83,33 @@ async def test_timeline_excludes_entries_without_year():
             result = await build_timeline(db, pid, 2025, limit=100)
             formula_events = [e for e in result["events"] if e["type"] == "formula_changed"]
             assert formula_events == [], "没有 year 字段的旧条目不应出现"
+
+
+@pytest.mark.asyncio
+async def test_timeline_shows_operator_name_not_user_id():
+    """操作人显示人员档案姓名（无档案退登录名），不把用户 id 交给界面当名字。"""
+    from app.models.audit_log_models import AuditLogEntry
+    from app.models.staff_models import StaffMember
+    from app.services.formula_timeline_service import build_timeline
+    from tests.formula_settings._env import add_user
+
+    async with make_db(extra_models=(StaffMember,)) as factory:
+        async with factory() as db:
+            pid = uuid.uuid4()
+            with_staff = await add_user(db, "timeline_staff_user")
+            login_only = await add_user(db, "timeline_login_only")
+            db.add(StaffMember(id=uuid.uuid4(), user_id=with_staff.id, name="张三"))
+            for user in (with_staff, login_only):
+                db.add(AuditLogEntry(
+                    id=uuid.uuid4(), user_id=user.id, action_type="formula.changed",
+                    object_type="formula_setting", object_id=None,
+                    payload={"project_id": str(pid), "year": "2025", "module": "report",
+                             "action": "update", "row_code": "BS-001"},
+                    prev_hash="", entry_hash=uuid.uuid4().hex, ts=datetime.now(timezone.utc),
+                ))
+            await db.commit()
+
+        async with factory() as db:
+            events = (await build_timeline(db, pid, 2025, limit=100))["events"]
+            names = {e["user_id"]: e.get("user_name") for e in events if e["type"] == "formula_changed"}
+            assert names == {str(with_staff.id): "张三", str(login_only.id): "timeline_login_only"}

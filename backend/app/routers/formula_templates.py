@@ -69,6 +69,7 @@ class TemplateChange(BaseModel):
 
 class PublishBody(BaseModel):
     expected_version: int | None = None
+    preview_fingerprint: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     changes: list[TemplateChange] = Field(min_length=1, max_length=5000)
     decisions: DecisionsIn = Field(default_factory=DecisionsIn)
     request_id: str | None = Field(None, max_length=64)
@@ -78,6 +79,7 @@ class PublishBody(BaseModel):
 class RollbackBody(BaseModel):
     target_version: int = Field(ge=1)
     expected_version: int | None = None
+    preview_fingerprint: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     decisions: DecisionsIn = Field(default_factory=DecisionsIn)
     request_id: str | None = Field(None, max_length=64)
     note: str | None = Field(None, max_length=2000)
@@ -303,6 +305,7 @@ async def rollback(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession 
     result = await _run(db, sync.publish_template(
         db, tpl, changes=changes, expected_version=body.expected_version, user_id=current_user.id,
         decisions=body.decisions.to_decisions(), request_id=body.request_id, note=body.note,
+        preview_fingerprint=body.preview_fingerprint,
         publish_source="template_rollback", item_action="template_rollback",
         audit_action="template_rollback",
         audit_details={"source_version": body.target_version},
@@ -317,7 +320,7 @@ async def publish(template_id: uuid.UUID, body: PublishBody, db: AsyncSession = 
     result = await _run(db, sync.publish_template(
         db, tpl, changes=[c.model_dump() for c in body.changes], expected_version=body.expected_version,
         user_id=current_user.id, decisions=body.decisions.to_decisions(), request_id=body.request_id,
-        note=body.note))
+        note=body.note, preview_fingerprint=body.preview_fingerprint))
     return await _emit(db, result, "template_publish")
 
 

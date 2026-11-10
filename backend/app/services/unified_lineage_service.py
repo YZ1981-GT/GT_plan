@@ -177,6 +177,15 @@ class UnifiedLineageService:
                     "message": exc.message}
         detail = str(exc).strip() or type(exc).__name__
         label = _SOURCE_LABELS.get(source_name, source_name)
+        # 附注 → 底稿映射的两类配置错误要和「查询失败」分开：前者需要修注册表 / 项目映射，重试没有用
+        from app.services.note_readiness_service import NoteRegistryUnavailable, ProjectNoteMappingInvalid
+
+        if isinstance(exc, NoteRegistryUnavailable):
+            return {"source": source_name, "status": 503, "error_code": "REGISTRY_UNAVAILABLE",
+                    "message": f"{label}不可用：附注与底稿对应注册表无法读取：{detail[:200]}"}
+        if isinstance(exc, ProjectNoteMappingInvalid):
+            return {"source": source_name, "status": 422, "error_code": "PROJECT_MAPPING_INVALID",
+                    "message": f"{label}不可用：{detail[:200]}"}
         return {
             "source": source_name,
             "status": 500,

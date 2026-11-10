@@ -257,14 +257,20 @@ def report_trace_to_locate_targets(
             if isinstance(sheets, list) and sheets:
                 sheet_name = sheets[0].get("name") if isinstance(sheets[0], dict) else None
 
-    targets.append(LocateTarget(
-        wp_code=base_wp_code,
-        wp_id=None,
-        sheet_name=sheet_name,
-        cell_ref=None,  # sheet 级降级：无 cell 精度
-        component_type=None,
-        value=None,
-        label=note_data.get("note_title"),
-    ))
+    # 一个章节可对应多张底稿（注册表复数章节 / 项目自定义映射）：每张底稿一个 sheet 级目标，
+    # 不能只给第一张（原先 G1 / G10 这类复数章节只能跳到第一张）。披露 sheet 只从首张底稿的数据里取得到。
+    wp_codes = [c for c in (note_data.get("wp_codes") or [base_wp_code]) if c]
+    if base_wp_code not in wp_codes:
+        wp_codes.insert(0, base_wp_code)
+    for code in dict.fromkeys(wp_codes):
+        targets.append(LocateTarget(
+            wp_code=code,
+            wp_id=None,
+            sheet_name=sheet_name if code == base_wp_code else None,
+            cell_ref=None,  # sheet 级降级：无 cell 精度
+            component_type=None,
+            value=None,
+            label=note_data.get("note_title"),
+        ))
 
     return targets

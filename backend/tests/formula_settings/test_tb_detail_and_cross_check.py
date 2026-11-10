@@ -106,7 +106,8 @@ async def test_cross_check_rules_layers_and_definition_fields():
         again = (await cross_check_rules.load(db, pid))["rules"]["cross_report_note"]
         assert [(r["label"], r["layer"]) for r in again] == [("全局规则", "global"), ("本项目规则", "project")]
         row = (await db.execute(sa.select(FormulaSetting).where(FormulaSetting.layer == "project"))).scalar_one()
-        assert set(row.definition) == set(cross_check_rules.RULE_FIELDS)  # 瞬态字段不进定义
+        # 瞬态字段不进定义；缺省 warning 的 severity 不落库（见 cross_check_rules._definition）
+        assert set(row.definition) == set(cross_check_rules.RULE_FIELDS) - {"severity"}
         with pytest.raises(VersionRequired):  # 已有生效规则却不带令牌：不许整表覆盖
             await cross_check_rules.save(db, pid, rules={}, loaded=None, user_id=None)
         await db.rollback()

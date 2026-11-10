@@ -78,7 +78,8 @@ def test_adj_registered_in_registry():
 def test_adj_registry_metadata():
     meta = [m for m in _REGISTRY.list_all() if m.get("name") == "ADJ"]
     assert len(meta) == 1, f"ADJ 元数据应恰 1 条，实得 {len(meta)}"
-    assert meta[0]["arity"] == 2, "ADJ 是双参函数"
+    # 参数个数以函数目录为单一真源（S1 ADR-FGR-01）：调整类型必填（禁止静默省略 aje / rje 过滤）
+    assert (meta[0]["arity"], meta[0]["arity_max"]) == (2, 2), "ADJ 是双参函数"
     assert meta[0]["category"] == "取数", "ADJ 属取数类（与 TB/SUM_TB/AUX 同组）"
 
 
@@ -439,40 +440,39 @@ def test_regex_path_reports_error_on_bad_adj_type(ctx):
     assert r.errors, "降级路径静默吞掉了第二参错误"
 
 
-def test_adj_not_in_report_engine_zero_substitution_list():
-    """🔴 反向断言：ADJ **不得**被加进 report_engine 的「一律置 0」列表。
+def test_adj_is_really_evaluated_in_report_engine_not_zeroed():
+    """🔴 反向断言：报表路径的 ADJ 必须取到调整额，不得静默为 0（spec tasks 1.7 的显式警告）。
 
-    spec tasks 1.7 的显式警告。`report_engine.evaluate_formula` 对
-    PREV/NOTE/WP/AUX 做 `expression.replace(match.group(0), "0", 1)` ——
-    那是报表域的有意行为（这些数据源在报表路径上不可用）。
-    ADJ 走 `ctx.adj_data`（由 L2 经 `adj_net_batch` 填充），
-    若被加进置 0 列表则报表域调整额恒 0，且**不报错**、无 trace 线索。
+    旧实现对 PREV/NOTE/WP/AUX 做 ``expression.replace(…, "0")``，守卫原先按 AST 查 ADJ 没进那张置 0 列表。
+    v1.0.149 起报表求值不再有置 0 循环（PREV/AUX 明确拒绝，NOTE/WP 按项目取数），ADJ 在访问到 ADJ 节点时
+    经 resolver 的 ``_get_adj_data`` 惰性加载 ⇒ 守卫改为按行为判定：加载到的调整额必须进结果，且只加载一次。
     """
-    import ast
-    import textwrap
+    import asyncio
 
     from app.services import report_engine as _re_mod
 
-    # 求值主体在 evaluate_formula_result（evaluate_formula 只是返回 Decimal 的兼容入口；原先查兼容入口的源码，
-    # 拆分后恒找不到列表 —— formula-fetch-followup-defect-closure 6.6 改为查主体、按 AST 认列表 / 元组两种写法）
-    src = inspect.getsource(_re_mod.evaluate_formula_result)
-    zero_loops: list[list[str]] = []
-    for node in ast.walk(ast.parse(textwrap.dedent(src))):
-        if not (isinstance(node, ast.For) and isinstance(node.iter, (ast.List, ast.Tuple))):
-            continue
-        names = [e.id for e in node.iter.elts if isinstance(e, ast.Name)]
-        body = ast.unparse(node)
-        if names and all(n.endswith("_PATTERN") for n in names) and ".replace(" in body and "'0'" in body:
-            zero_loops.append(names)
-    assert zero_loops, "未找到 report_engine 的置 0 pattern 列表（结构变了，需复核本守卫）"
-    listed = [name for loop in zero_loops for name in loop]
-    assert "_ADJ_PATTERN" not in listed and "ADJ_PATTERN" not in listed, (
-        f"ADJ 被加进了 report_engine 的置 0 列表 ⇒ 报表域调整额会恒 0：{listed}"
-    )
-    # 同时确认 PREV 的单独置 0 循环里也没混入 ADJ
-    assert "_ADJ_PATTERN.finditer" not in src or "adj_data" in src, (
-        "ADJ 在 report_engine 里被 finditer 置 0 而未走 adj_data"
-    )
+    class _Resolver:
+        calls = 0
+
+        async def _get_adj_data(self, *, strict: bool = False):
+            type(self).calls += 1
+            return {"1122": {"aje_net": Decimal("30"), "rje_net": Decimal("5")}}
+
+    resolver = _Resolver()
+    result = asyncio.run(_re_mod.evaluate_formula_result(
+        "ADJ('1122','aje_net') + ADJ('1122','rje_net') + ADJ('1122','AJE')", resolver=resolver))
+    assert result.ok and result.value == Decimal("65"), result
+    assert _Resolver.calls == 1, "调整额应按实例只加载一次（避免逐行 N+1）"
+
+    # 省略调整类型不得静默取某一类：整式失败、写明原因
+    missing_type = asyncio.run(_re_mod.evaluate_formula_result("ADJ('1122')", resolver=_Resolver()))
+    assert (missing_type.ok, missing_type.value) == (False, None), missing_type
+    assert any("ADJ" in e for e in missing_type.errors), missing_type.errors
+
+    # 期初模式的兼容入口把本年调整记 0 —— 那是唯一允许的 0，且必须显式开启
+    with _re_mod.report_evaluation(adj_zero=True):
+        zeroed = asyncio.run(_re_mod.evaluate_formula_result("ADJ('1122','aje_net')", resolver=resolver))
+    assert zeroed.value == Decimal("0")
 
 
 def test_adj_ref_produces_no_uri():

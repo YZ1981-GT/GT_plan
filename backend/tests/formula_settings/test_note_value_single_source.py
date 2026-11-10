@@ -124,18 +124,26 @@ async def test_report_engine_strict_entry_takes_real_value_and_reports_reason(db
     ok = await evaluate_formula_result("NOTE('五、1','银行存款','期初') + 1", resolver=_resolver(db),
                                        strict_context=True)
     assert ok.ok and ok.value == Decimal("21"), ok
-    with pytest.raises(ValueError) as exc:
-        await evaluate_formula_result("NOTE('货币资金','合计','期末')", resolver=_resolver(db), strict_context=True)
-    assert "NOTE('货币资金','合计','期末')" in str(exc.value) and "附注没有章节 货币资金" in str(exc.value)
+    # 缺数是业务失败（spec formula-integrity-and-propagation-closure R1）：strict 只对技术异常上抛，
+    # 业务失败返回无值结果并写明原因
+    missing = await evaluate_formula_result("NOTE('货币资金','合计','期末')", resolver=_resolver(db),
+                                            strict_context=True)
+    assert (missing.ok, missing.value, missing.failure_kind) == (False, None, "business"), missing
+    reason = "；".join(missing.errors)
+    assert "NOTE('货币资金','合计','期末')" in reason and "附注没有章节 货币资金" in reason, reason
 
 
 @pytest.mark.asyncio
-async def test_report_engine_lenient_path_zeroes_only_what_is_missing(db):
+async def test_report_engine_lenient_path_does_not_zero_missing_note(db):
+    """非严格路径同样不把缺的附注按 0 计入（原先 11 + 0 = 11 冒充成功）：整式失败、原因写明。"""
     from app.services.report_engine import evaluate_formula_result
 
     res = await evaluate_formula_result("NOTE('五、1','合计','期末余额') + NOTE('货币资金','合计','期末')",
                                         resolver=_resolver(db))
-    assert res.ok and res.value == Decimal("11"), res
+    assert (res.ok, res.value) == (False, None), res
+    assert any("附注没有章节 货币资金" in e for e in res.errors), res.errors
+    present = await evaluate_formula_result("NOTE('五、1','合计','期末余额')", resolver=_resolver(db))
+    assert present.ok and present.value == Decimal("11"), present
 
 
 @pytest.mark.asyncio

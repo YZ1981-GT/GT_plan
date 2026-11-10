@@ -14,6 +14,7 @@
         <el-option label="修改" value="update" />
         <el-option label="删除" value="delete" />
         <el-option label="执行" value="execute" />
+        <el-option label="回滚" value="rollback" />
       </el-select>
       <el-button size="small" :loading="loading" @click="loadHistory">🔄 刷新</el-button>
       <span class="gt-fh-count">共 {{ filteredEntries.length }} 条记录</span>
@@ -41,7 +42,7 @@
               <span class="gt-fh-module">{{ moduleLabel(entry.module) }}</span>
               <span v-if="operationLabel(entry.operation)" class="gt-fh-module">· {{ operationLabel(entry.operation) }}</span>
             </div>
-            <div v-if="entry.action === 'update' || entry.action === 'create' || entry.action === 'delete'" class="gt-fh-entry-body">
+            <div v-if="FORMULA_DIFF_ACTIONS.has(entry.action)" class="gt-fh-entry-body">
               <div v-if="entry.old_formula" class="gt-fh-formula-diff">
                 <span class="gt-fh-label">旧公式：</span>
                 <code class="gt-fh-old" v-html="diffOld(entry.old_formula, entry.new_formula)"></code>
@@ -273,16 +274,20 @@ function formatTime(ts: string | null): string {
   }
 }
 
+/** 这些操作带新旧公式，正文展示公式变化 */
+const FORMULA_DIFF_ACTIONS = new Set(['create', 'update', 'delete', 'rollback'])
+
 function actionLabel(action: string): string {
   const map: Record<string, string> = {
-    create: '新增', update: '修改', delete: '删除', execute: '执行',
+    create: '新增', update: '修改', delete: '删除', execute: '执行', rollback: '回滚',
   }
-  return map[action] || action
+  // 未登记的操作类型不把英文原值露给用户
+  return map[action] || '其他操作'
 }
 
 function actionTagType(action: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
   const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
-    create: 'success', update: 'warning', delete: 'danger', execute: 'info',
+    create: 'success', update: 'warning', delete: 'danger', execute: 'info', rollback: 'warning',
   }
   return map[action] || undefined
 }

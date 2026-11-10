@@ -302,12 +302,18 @@ async def get_pending(project_id: uuid.UUID, domain: str | None = Query(None, ma
 
 
 @project_router.get("/propagation")
-async def get_propagation(project_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+async def get_propagation(project_id: uuid.UUID, year: int | None = Query(None, ge=1900, le=9999),
+                          domain: str | None = Query(None, max_length=32),
+                          publish_token: str | None = Query(None, min_length=1, max_length=200),
+                          outbox_id: uuid.UUID | None = Query(None), db: AsyncSession = Depends(get_db),
                           current_user: User = Depends(require_project_access("readonly"))):
-    """本项目公式变更的传播状态：处理中 / 失败（含原因、是否已放弃）/ 已完成、未处理死信数（R1.3）。"""
+    """项目级只读：派发状态与业务回执分开，可按年度、域或耐久事件身份精确查询。"""
     from app.services.formula_settings.propagation_status import propagation_status
 
-    return await propagation_status(db, project_id)
+    if domain is not None:
+        _domain(domain)
+    return await propagation_status(db, project_id, year=year, domain=domain,
+                                    publish_token=publish_token, outbox_id=outbox_id)
 
 
 @project_router.post("/pending/resolve")

@@ -250,7 +250,8 @@ def test_put_strips_transient_fields(db: AsyncSession, seed: User):
     rules = data.get("rules", data.get("data", {}).get("rules"))
     stored = rules["cross_report_note"][0]
     # 读接口 = 契约字段 + 服务端元数据（规则编号 / 公式位 / 层级 / 待确认 / 版本令牌，2026-10-20 起）
-    assert set(stored) == {"label", "left_ref", "operator", "right_ref", "description", "tolerance",
+    # severity（ADR-CCN-05，缺省 warning）随读接口返回，界面据此显示「提示」而非「未通过」
+    assert set(stored) == {"label", "left_ref", "operator", "right_ref", "description", "tolerance", "severity",
                            "rule_id", "slot_key", "layer", "pending", "version_token"}, (
         f"读出应只含契约字段与服务端元数据，实得 {set(stored)}（瞬态字段未被剔除 = 缺陷）"
     )

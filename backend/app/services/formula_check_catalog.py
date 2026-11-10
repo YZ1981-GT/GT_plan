@@ -17,6 +17,7 @@ import logging
 import uuid
 from collections import Counter
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
 
@@ -43,7 +44,9 @@ Rule = dict[str, Any]
 
 def _rule(rid: Any, label: Any, expression: Any, *, severity: Any = "", scope: Any = "",
           fields: dict[str, Any] | None = None) -> Rule:
-    sev = str(severity or "")
+    # 严重级可能是 (str, Enum)（如 GateSeverity）：str() 会得到「GateSeverity.blocking」、标签查不到 ⇒ 取 .value
+    sev = severity.value if isinstance(severity, Enum) else severity
+    sev = "" if sev is None else f"{sev}"
     out: Rule = {"id": str(rid or ""), "label": str(label or "").strip(), "expression": str(expression or "").strip(),
                  "severity": sev, "severity_label": _SEVERITY_LABEL.get(sev, sev), "scope": str(scope or "").strip()}
     if fields is not None:

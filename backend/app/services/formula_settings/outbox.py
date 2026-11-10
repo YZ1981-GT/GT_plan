@@ -13,8 +13,10 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_schemas import EventType
@@ -30,6 +32,9 @@ ORIGIN = "formula_settings_outbox"
 
 #: Session.info 上的待发布清单键（与底稿同步域各自独立）
 PENDING_SESSION_KEY = "formula_settings.outbox.pending"
+
+#: 回执存于原 outbox payload，必须整体赋回，不能原地修改普通 JSONB。
+RECEIPT_KEY = "formula_propagation_receipt_v1"
 
 #: 后台投递的并发信号量（进程内）
 _semaphore: asyncio.Semaphore | None = None
@@ -77,7 +82,7 @@ async def record_changes(
 
     只 flush 不 commit。返回待发布句柄列表。
     """
-    from app.services.formula_settings.stale_marks import mark_in_txn
+    from app.services.formula_settings.propagation import HANDLERS, mark_in_year
 
     publications: list[PendingPublication] = []
     events_list = list(events)
@@ -103,16 +108,19 @@ async def record_changes(
             continue
         project_id = uuid.UUID(str(project_id_raw))
 
-        # 同事务标过期（ADR-SDO-03）
-        await mark_in_txn(db, d, project_id, slots)
+        if d not in HANDLERS:
+            raise ValueError(f"未知公式传播域：{d}")
+        # 冻结入队年度；没有年度仍留耐久行，投递失败可见，绝不借用未来的新年度。
+        year = await _fetch_project_year(db, project_id)
+        marked = await mark_in_year(db, d, project_id, year, slots)
 
-        # 构造 payload
         payload: dict[str, Any] = {
             "origin": ORIGIN,
             "domain": d,
-            "slot_keys": slots[:200],  # 限制大小
+            "slot_keys": slots,
             "source": source,
             "publish_token": publish_id or uuid.uuid4().hex,
+            "stale_mark": marked,
         }
         if d == "report":
             payload["row_codes"] = sorted({s.partition(":")[2] for s in slots if ":" in s})
@@ -122,7 +130,7 @@ async def record_changes(
             db,
             event_type=EventType.FORMULA_CONFIG_CHANGED,
             project_id=project_id,
-            year=None,  # year 由投递时现取
+            year=year,
             payload=payload,
             remember=False,  # 我们用自己的 session key
         )
@@ -196,44 +204,61 @@ async def publish_pending(db: AsyncSession) -> dict[str, Any]:
 
 
 async def deliver(db: AsyncSession, pub: PendingPublication) -> dict[str, Any]:
-    """执行一条公式变更事件的传播：直接调用传播处理器，不经事件总线。
+    """唯一派发口已持有消费权；这里只执行、写回执，不再 claim，不 commit。
 
-    只由唯一派发口 ``ImportEventOutboxService._deliver``（对 FORMULA_CONFIG_CHANGED 分派）调用 —— 立即投递
-    （``publish_pending``）与 worker 重放都经 ``ImportEventOutboxService.publish_one`` 走到这里。消费闸门
-    （at-most-once）与发布状态（published / failed + 次数 + 原因）都归派发口；这里只读载荷、取年度、调处理器，
-    处理器失败原样上抛 ⇒ 派发口归还消费权、行记 failed，worker 重放。
-
-    🔴 此前这里自己再抢一次 fan-out 消费权：派发口已抢过同一把（同 event_id、同 handler 键）⇒ 第二次必失败 ⇒
-    返回 ``already_delivered``、处理器一次都不跑，派发口照样标 published —— 所有重放都是空操作
-    （spec formula-management-repair-closure R1，``test_outbox_delivery_semantics``）。
+    保存点隔离传播和回执的数据库错误，失败回执留在外层事务，随后由唯一派发口
+    归还消费权并记录 failed。派发 published 仅表示执行完本次动作，不表示业务完成。
     """
-    from app.services.formula_settings.propagation import HANDLERS
+    from app.services.formula_settings.propagation import HANDLERS, PropagationIncomplete, _delivery_event_id
     from app.services.import_event_outbox_service import ImportEventOutboxService
 
     row = await ImportEventOutboxService.get(db, pub.outbox_id)
     if row is None:
-        return {"skipped": "row_not_found"}
-
-    payload = row.payload or {}
-    domain = payload.get("domain", "")
-    slot_keys = payload.get("slot_keys", [])
-    project_id = row.project_id
-    if not domain or not slot_keys:
-        return {"skipped": "empty_payload"}  # 空变更：派发口标 published，不重试
-
-    year = await _fetch_project_year(db, project_id)
-    handler = HANDLERS.get(domain)
+        raise ValueError("公式传播 outbox 行不存在")
+    payload = dict(row.payload) if isinstance(row.payload, dict) else {}
+    domain = str(payload.get("domain") or "")
+    project_id, year = row.project_id, row.year
     result: dict[str, Any] = {}
-    if handler is None:
-        logger.warning("[formula_settings.outbox] 未知公式域的传播事件 outbox_id=%s domain=%s", pub.outbox_id, domain)
-    else:
-        result = await handler(project_id, year, slot_keys)
-
-    # stale_engine（反向索引失效 + 依赖图标下游过期）
-    row_codes = payload.get("row_codes", [])
-    if row_codes:
-        await _stale_engine_for_formula_change(db, project_id, year, row_codes)
-    return {"delivered": True, "domain": domain, "handler_result": result}
+    token = _delivery_event_id.set(str(pub.outbox_id))
+    try:
+        try:
+            async with db.begin_nested():
+                slots = payload.get("slot_keys")
+                if not isinstance(slots, list) or not slots or any(not isinstance(s, str) or not s for s in slots):
+                    raise ValueError("公式传播载荷缺少完整槽位列表")
+                handler = HANDLERS.get(domain)
+                if handler is None:
+                    raise ValueError(f"未知公式传播域：{domain}")
+                if year is None:
+                    raise PropagationIncomplete(domain, "公式传播没有冻结审计年度，不能借用项目当前年度")
+                result = await handler(project_id, year, slots)
+                if not isinstance(result, dict):
+                    raise TypeError("公式传播处理器未返回结构化回执")
+                row_codes = payload.get("row_codes") or []
+                if domain == "report" and row_codes:
+                    await _stale_engine_for_formula_change(db, project_id, year, row_codes)
+                receipt = _receipt(pub, payload, domain, result)
+                row.payload = {**payload, RECEIPT_KEY: receipt}
+                await db.flush()
+        except Exception as exc:
+            # ROLLBACK TO SAVEPOINT 可能使修改过的 ORM 行过期；显式刷新后再写失败回执，
+            # 防止外层 abort_fanout 读取 item.id 时触发隐式异步 I/O。
+            await db.refresh(row)
+            detail = getattr(exc, "detail", None)
+            failure_result = result if isinstance(result, dict) and result else detail
+            failure_result = failure_result if isinstance(failure_result, dict) else {}
+            receipt = _receipt(pub, payload, domain, failure_result, error=str(exc))
+            try:
+                async with db.begin_nested():
+                    row.payload = {**payload, RECEIPT_KEY: receipt}
+                    await db.flush()
+            except Exception:
+                await db.refresh(row)
+                raise  # 回执本身写失败也不能吞掉；外层事务仍可记 failed / 归还消费权。
+            raise
+    finally:
+        _delivery_event_id.reset(token)
+    return {"delivered": True, "domain": domain, "handler_result": result, "receipt": receipt}
 
 
 async def _fetch_project_year(db: AsyncSession, project_id: uuid.UUID) -> int | None:
@@ -275,11 +300,81 @@ async def _stale_engine_for_formula_change(
     if not row_codes or year is None:
         return
 
+    from app.services.formula_settings.propagation import PropagationIncomplete, _matches_project_year
     from app.services.stale_propagation_engine import stale_engine
 
+    # 图内 WP 行没有年度列；项目已经换年度时不能把旧事件作用于当前底稿。
+    if not await _matches_project_year(db, project_id, year):
+        raise PropagationIncomplete("report", "项目审计年度已变化，未执行项目级依赖图写入")
     for row_code in sorted(set(row_codes)):
-        await stale_engine.on_change(
-            f"REPORT:{row_code}::",
-            project_id,
-            year,
-        )
+        # 执行自身负责拒绝无年度降级，并在实际写事务内重新核验项目年度。
+        result = await stale_engine.on_change(f"REPORT:{row_code}::", project_id, year, strict=True)
+        if not isinstance(result, dict) or result.get("degraded") or result.get("error"):
+            raise PropagationIncomplete("report", "依赖图传播未完成", result if isinstance(result, dict) else {})
+
+
+def _is_count(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def action_status(domain: str, result: dict[str, Any]) -> str:
+    """只认可结构化证据；坏类型不抛二次异常，也不能被当成业务成功。"""
+    if not isinstance(result, dict):
+        return "unknown"
+    action = "unknown"
+    if domain == "report" and isinstance(result.get("recalculated"), dict):
+        recalculated = result["recalculated"]
+        failed_rows = recalculated.get("failed_rows", [])
+        failed_count = recalculated.get("failed_count")
+        count = recalculated.get("recalculated_count")
+        if isinstance(failed_rows, list) and failed_rows or _is_count(failed_count) and failed_count:
+            action = "partial"
+        elif isinstance(failed_rows, list) and _is_count(failed_count) and _is_count(count):
+            action = "succeeded" if count else "skipped"
+    elif domain == "wp" and _is_count(result.get("marked")) and isinstance(result.get("wp_codes"), list):
+        action = "marked_stale"
+    elif domain == "note" and all(_is_count(result.get(k)) for k in ("materialized", "marked")):
+        action = "marked_stale"
+    elif domain == "consol_note" and isinstance(result.get("operation_id"), str) and result["operation_id"]:
+        status = result.get("status")
+        if isinstance(status, str) and status in {"queued", "running", "succeeded", "partial", "failed", "stale", "cancelled"}:
+            action = status
+    elif domain == "cross_check" and all(_is_count(result.get(k)) for k in ("executed", "passed", "failed", "issues")):
+        if result["failed"] or result["issues"]:
+            action = "check_failed"
+        elif result["executed"] == result["passed"]:
+            action = "succeeded" if result["executed"] else "skipped"
+    elif domain == "push":
+        workpapers, blocked = result.get("workpapers", []), result.get("blocked_writes", [])
+        failed = isinstance(workpapers, list) and any(
+            isinstance(wp, dict) and wp.get("status") == "failed" for wp in workpapers)
+        status = result.get("status")
+        if status == "failed":
+            action = "failed"
+        elif status == "partial" or failed or isinstance(blocked, list) and blocked:
+            action = "partial"
+        elif (status == "succeeded" and isinstance(result.get("run_id"), str) and result["run_id"]
+              and isinstance(workpapers, list) and all(isinstance(wp, dict) for wp in workpapers)
+              and isinstance(blocked, list)):
+            action = "succeeded"
+    # 明确失败证据优先于混入的 skipped；数字 skipped 是计数，不是跳过动作。
+    if action in {"failed", "partial", "check_failed"}:
+        return action
+    skipped = result.get("skipped")
+    if skipped is True or isinstance(skipped, str) and skipped:
+        return "no_consumer" if skipped == "no_consumer" else "skipped"
+    return action
+
+
+def _receipt(pub: PendingPublication, payload: dict[str, Any], domain: str, result: dict[str, Any],
+             *, error: str | None = None) -> dict[str, Any]:
+    operation_id = result.get("operation_id") if domain == "consol_note" else None
+    return jsonable_encoder({
+        "schema_version": 1, "outbox_id": str(pub.outbox_id), "domain": domain,
+        "year": pub.year, "publish_token": payload.get("publish_token"),
+        "delivery_status": "failed" if error is not None else "published",
+        "action_status": "failed" if error is not None else action_status(domain, result),
+        "handler_result": result, "operation_id": operation_id,
+        "operation_status": result.get("status") if operation_id else None,
+        "last_error": error, "recorded_at": datetime.now(timezone.utc).isoformat(),
+    })

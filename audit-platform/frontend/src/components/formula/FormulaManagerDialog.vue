@@ -196,7 +196,7 @@
             <template #label>💡 提示合理性 ({{ categoryCounts.reasonability }})</template>
           </el-tab-pane>
           <el-tab-pane name="no_formula">
-            <template #label>⬜ 未配置 ({{ currentRows.filter(r => !r.formula && _rowNeedsFormula(r)).length }})</template>
+            <template #label>⬜ 未配置 ({{ missingFormulaCount }})</template>
           </el-tab-pane>
           <!-- E1 Sprint 2 Task 2.34: 用户自定义公式 Tab -->
           <el-tab-pane name="user_formulas">
@@ -384,7 +384,7 @@
           <el-table-column label="引用方" width="70" align="center">
             <template #default="{ row }">
               <el-badge v-if="row._ref_count > 0" :value="row._ref_count" :max="99" type="info"
-                style="cursor: pointer;" @click.native="depPanelRef.value?.load(`report:${selectedReportType.value}:${row.row_code || row.id}`)" title="点击查看依赖关系" />
+                style="cursor: pointer;" @click="depPanelRef?.load(`report:${activeReportType}:${row.row_code || row.id}`)" title="点击查看依赖关系" />
               <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">0</span>
             </template>
           </el-table-column>
@@ -405,7 +405,7 @@
         </el-table>
 
         <div v-if="!isConsolFormulaNode" class="gt-fm-footer">
-          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
+          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ configuredFormulaCount }} 个公式{{ computedFormulaCount ? `，${computedFormulaCount} 个已计算` : '' }}</span>
         </div>
 
         <FormulaDependencyPanel v-if="!isConsolFormulaNode" ref="depPanelRef" :project-id="props.projectId" />
@@ -2624,6 +2624,16 @@ const currentRows = computed(() => {
   }
   return []
 })
+
+const missingFormulaCount = computed<number>(() => currentRows.value.filter(
+  (row: { formula?: string | null }) => !row.formula && _rowNeedsFormula(row),
+).length)
+const configuredFormulaCount = computed<number>(() => currentRows.value.filter(
+  (row: { formula?: string | null }) => row.formula,
+).length)
+const computedFormulaCount = computed<number>(() => Object.values(formulaResults.value).filter(
+  (result: FormulaExecutionResult) => result.value != null,
+).length)
 
 // ── cross_check CRUD + 执行（委托 composable，原 ~311 行） ──
 const isCrossCheckMode = cc.isCrossCheckMode

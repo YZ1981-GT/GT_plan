@@ -153,7 +153,7 @@
   </el-drawer>
 
   <FormulaDefinitionEditDialog v-model="editVisible" :title="`编辑模板公式：${editing?.label || ''}`"
-    :exec-fields="fieldsOf(activeDomain).exec" :desc-fields="fieldsOf(activeDomain).desc"
+    :exec-fields="fieldsOf(editing?.domain || activeDomain).exec" :desc-fields="fieldsOf(editing?.domain || activeDomain).desc"
     :definition="editing?.definition || null" @save="onEditSave" />
   <FormulaPublishPreviewDialog v-model="previewVisible" :preview="preview" :loading="previewLoading" :title="previewTitle"
     :submit="onSubmitPreview" :submit-text="previewKind === 'publish' ? '发布新版本' : previewKind === 'rollback' ? '回滚并发布新版本' : '确认发布'"
@@ -211,6 +211,10 @@ import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import FormulaDefinitionEditDialog from './FormulaDefinitionEditDialog.vue'
 import FormulaPublishPreviewDialog from './FormulaPublishPreviewDialog.vue'
 import {
+  copyTemplateValue, formulaTemplateCasApi, TemplatePreviewEvidenceError,
+  type TemplatePreviewContext, type TemplatePreviewSession,
+} from '@/services/formulaTemplateCas'
+import {
   SHARE_SCOPE_OPTIONS, TEMPLATE_HINT_LABELS, definitionText, formulaErrorText, formulaSettingsApi, newRequestId,
   scopeLabel,
   type ConflictChoice, type Decisions, type Definition, type FormulaDomainInfo, type ShareScope, type SyncPreview,
@@ -243,13 +247,15 @@ const activeDomain = ref('')
 /** 暂存的改动：`{域|公式位 → 新定义（null = 移除）}` */
 const staged = reactive(new Map<string, { domain: string; slot_key: string; label: string; definition: Definition | null }>())
 const stagedCount = computed(() => staged.size)
-const editing = ref<{ slot_key: string; label: string; definition: Definition | null } | null>(null)
+const editing = ref<{
+  templateId: string; generation: number; domain: string
+  slot_key: string; label: string; definition: Definition | null
+} | null>(null)
 const editVisible = ref(false)
 const preview = ref<SyncPreview | null>(null)
 const previewVisible = ref(false)
 const previewLoading = ref(false)
 const previewKind = ref<'publish' | 'promote' | 'rollback'>('publish')
-const rollbackVersion = ref<number | null>(null)
 const diff = ref<TemplateDiff | null>(null)
 const diffVisible = ref(false)
 const diffLoading = ref(false)
@@ -259,8 +265,38 @@ const newSlotDomain = ref('')
 const newSlotKey = ref('')
 const newSlotLabel = ref('')
 const promoting = ref('')
-let promoteDomain = ''
-let requestId = ''
+const previewSession = ref<TemplatePreviewSession | null>(null)
+const submitting = ref(false)
+let generation = 0
+let loadSequence = 0
+let previewSequence = 0
+let diffSequence = 0
+let stagedRevision = 0
+
+function currentTarget(context: Pick<TemplatePreviewContext, 'templateId' | 'generation'>): boolean {
+  return props.modelValue && props.templateId === context.templateId && generation === context.generation
+}
+function invalidatePreview() {
+  previewSequence += 1
+  previewSession.value = null
+  previewVisible.value = false
+  previewLoading.value = false
+  preview.value = null
+}
+function currentContext(context: TemplatePreviewContext): boolean {
+  return props.modelValue && props.templateId === context.templateId
+    && detail.value?.id === context.templateId && detail.value.version === context.version
+    && detail.value.applicable_scope === context.scope && generation === context.generation
+    && stagedRevision === context.revision
+}
+function previewContext(kind: TemplatePreviewContext['kind'], targetVersion: number | null = null, domain = '') {
+  const d = detail.value
+  if (!d || d.id !== props.templateId || !props.modelValue || submitting.value) return null
+  return copyTemplateValue<TemplatePreviewContext>({
+    templateId: d.id, version: d.version, scope: d.applicable_scope, generation,
+    revision: stagedRevision, requestId: newRequestId(), kind, changes: stagedChanges(), targetVersion, domain,
+  })
+}
 
 const hints = computed<TemplateGlobalHint[]>(() => detail.value?.global_hints || [])
 const followHints = computed(() => hints.value.filter((h) => h.kind === 'follow'))
@@ -271,8 +307,9 @@ const hintSummary = computed(() => (Object.keys(TEMPLATE_HINT_LABELS) as Templat
   .filter(([, n]) => n > 0).map(([k, n]) => `${TEMPLATE_HINT_LABELS[k]} ${n} 处`).join('、'))
 const keeping = ref(false)
 const previewTitle = computed(() => {
-  if (previewKind.value === 'publish') return `发布模板新版本 v${(detail.value?.version || 0) + 1}：订阅项目影响预览`
-  if (previewKind.value === 'rollback') return `回滚到 v${rollbackVersion.value || ''} 并发布新版本：订阅项目影响预览`
+  const session = previewSession.value
+  if (previewKind.value === 'publish') return `发布模板新版本 v${(session?.version || 0) + 1}：订阅项目影响预览`
+  if (previewKind.value === 'rollback') return `回滚到 v${session?.targetVersion || ''} 并发布新版本：订阅项目影响预览`
   return '设为全局：发布前影响预览'
 })
 const domainRows = computed(() => (detail.value?.definitions[activeDomain.value] || []).map((r) => {
@@ -290,7 +327,15 @@ function fieldsOf(key: string): { exec: string[]; desc: string[] } {
 function fmtTime(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString('zh-CN', { hour12: false }) : '—'
 }
-function clearStaged() { staged.clear() }
+function touchStaged() {
+  stagedRevision += 1
+  invalidatePreview()
+}
+function clearStaged() {
+  if (submitting.value) return
+  touchStaged()
+  staged.clear()
+}
 
 function openNewSlot() {
   newSlotDomain.value = activeDomain.value || detail.value?.domains[0] || ''
@@ -300,6 +345,7 @@ function openNewSlot() {
 }
 
 function beginNewSlot() {
+  if (!detail.value?.can_manage || submitting.value) return
   const domain = newSlotDomain.value
   const slotKey = newSlotKey.value.trim()
   if (!domain || !slotKey) {
@@ -313,43 +359,38 @@ function beginNewSlot() {
     return
   }
   activeDomain.value = domain
-  editing.value = { slot_key: slotKey, label: newSlotLabel.value.trim() || slotKey, definition: {} }
+  invalidatePreview()
+  editing.value = { templateId: detail.value.id, generation, domain,
+    slot_key: slotKey, label: newSlotLabel.value.trim() || slotKey, definition: {} }
   newSlotVisible.value = false
   editVisible.value = true
 }
 
 async function openDiff(row: TemplateVersion) {
-  if (!detail.value) return
+  const context = previewContext('rollback', row.version)
+  if (!context) return
+  const sequence = ++diffSequence
+  const current = () => currentTarget(context) && sequence === diffSequence
   diffVersion.value = row.version
   diffLoading.value = true
   try {
-    diff.value = await formulaSettingsApi.templateDiff(detail.value.id, {
-      from: row.version, to: detail.value.version,
+    const result = await formulaSettingsApi.templateDiff(context.templateId, {
+      from: row.version, to: context.version,
     })
+    if (!current()) return
+    diff.value = result
     diffVisible.value = true
   } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, '加载版本差异失败'))
+    if (current()) ElMessage.error(formulaErrorText(e, '加载版本差异失败'))
   } finally {
-    diffLoading.value = false
+    if (current()) diffLoading.value = false
   }
 }
 
 async function openRollback(row: TemplateVersion) {
   if (!detail.value || row.version >= detail.value.version) return
-  previewKind.value = 'rollback'
-  rollbackVersion.value = row.version
-  previewLoading.value = true
-  try {
-    preview.value = await formulaSettingsApi.templateRollbackPreview(detail.value.id, {
-      target_version: row.version, expected_version: detail.value.version,
-    })
-    requestId = newRequestId()
-    previewVisible.value = true
-  } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, '回滚预览失败'))
-  } finally {
-    previewLoading.value = false
-  }
+  const context = previewContext('rollback', row.version)
+  if (context) await showTemplatePreview(context)
 }
 
 async function goSubscribe(row: TemplateSubscriber) {
@@ -367,48 +408,60 @@ async function goSubscribe(row: TemplateSubscriber) {
 }
 
 async function load() {
-  if (!props.templateId) return
+  const id = props.templateId, epoch = generation, sequence = ++loadSequence
+  if (!id || !props.modelValue) return
+  const current = () => props.modelValue && props.templateId === id
+    && generation === epoch && loadSequence === sequence
   loading.value = true
   try {
-    const d = await formulaSettingsApi.template(props.templateId)
-    detail.value = d
+    const d = await formulaSettingsApi.template(id)
+    if (!current()) return
+    const [history, followers] = await Promise.all([
+      formulaSettingsApi.templateVersions(id),
+      d.can_manage ? formulaSettingsApi.templateSubscribers(id) : Promise.resolve({ items: [] }),
+    ])
+    if (!current()) return
+    detail.value = copyTemplateValue(d)
     if (!activeDomain.value || !d.domains.includes(activeDomain.value)) activeDomain.value = d.domains[0] || ''
-    versions.value = (await formulaSettingsApi.templateVersions(props.templateId))?.items || []
-    subscribers.value = d.can_manage ? (await formulaSettingsApi.templateSubscribers(props.templateId))?.items || [] : []
+    versions.value = history?.items || []
+    subscribers.value = followers?.items || []
   } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, '加载模板失败'))
+    if (current()) ElMessage.error(formulaErrorText(e, '加载模板失败'))
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 
-watch(() => [props.modelValue, props.templateId] as const, ([open]) => {
-  if (!open) return
-  staged.clear()
-  tab.value = 'defs'
-  activeDomain.value = ''
-  void load()
-}, { immediate: true })
-
 function openEdit(row: { slot_key: string; label: string; definition: Definition | null }) {
-  editing.value = row
+  if (!detail.value?.can_manage || submitting.value) return
+  invalidatePreview()
+  editing.value = copyTemplateValue({ ...row, templateId: detail.value.id, generation, domain: activeDomain.value })
   editVisible.value = true
 }
 function onEditSave(definition: Definition) {
-  if (!editing.value) return
-  const { slot_key, label } = editing.value
-  staged.set(`${activeDomain.value}|${slot_key}`, { domain: activeDomain.value, slot_key, label, definition })
+  const edit = editing.value
+  if (!edit || edit.templateId !== props.templateId || edit.generation !== generation || submitting.value) return
+  const { domain, slot_key, label } = edit
+  touchStaged()
+  staged.set(`${domain}|${slot_key}`, { domain, slot_key, label, definition: copyTemplateValue(definition) })
 }
 function stageDelete(row: { slot_key: string; label: string }) {
+  if (!detail.value?.can_manage || submitting.value) return
+  touchStaged()
   staged.set(`${activeDomain.value}|${row.slot_key}`, { domain: activeDomain.value, slot_key: row.slot_key, label: row.label, definition: null })
 }
 /** 同步全局：模板这一处改成当前全局（暂存，发布新版本时订阅项目走预览与待确认） */
 function syncHint(h: TemplateGlobalHint) {
-  if (!h.global_definition) return  // 全局已删：没有可同步的定义（用「保留模板」或「移出模板」）
-  staged.set(`${h.domain}|${h.slot_key}`, { domain: h.domain, slot_key: h.slot_key, label: h.label, definition: h.global_definition })
+  if (!h.global_definition || submitting.value) return
+  touchStaged()
+  staged.set(`${h.domain}|${h.slot_key}`, copyTemplateValue({
+    domain: h.domain, slot_key: h.slot_key, label: h.label, definition: h.global_definition,
+  }))
 }
 /** 移出模板：发布新版本时去掉这一处（订阅项目回到全局 / 系统预设） */
 function removeHint(h: TemplateGlobalHint) {
+  if (submitting.value) return
+  touchStaged()
   staged.set(`${h.domain}|${h.slot_key}`, { domain: h.domain, slot_key: h.slot_key, label: h.label, definition: null })
 }
 function syncFollowHints() {
@@ -417,19 +470,29 @@ function syncFollowHints() {
 }
 /** 保留模板：模板定义不动，只把基线换成当前全局 —— 不发新版本、订阅项目不受影响，之后提示消失 */
 async function keepHints(list: TemplateGlobalHint[]) {
-  if (!detail.value || !list.length || keeping.value) return
+  const context = previewContext('publish')
+  if (!context || !list.length || keeping.value) return
+  const items = copyTemplateValue(list)
+  const saved = new Map(items.map((h) => {
+    const key = `${h.domain}|${h.slot_key}`
+    return [key, JSON.stringify(staged.get(key))] as const
+  }))
+  invalidatePreview()
   keeping.value = true
   try {
-    await formulaSettingsApi.templateKeepBaseline(detail.value.id, {
-      expected_version: detail.value.version,
-      items: list.map((h) => ({ domain: h.domain, slot_key: h.slot_key, expected_global_version: h.global_version })),
+    await formulaSettingsApi.templateKeepBaseline(context.templateId, {
+      expected_version: context.version,
+      items: items.map((h) => ({ domain: h.domain, slot_key: h.slot_key, expected_global_version: h.global_version })),
     })
-    for (const h of list) staged.delete(`${h.domain}|${h.slot_key}`)
-    ElMessage.success(`已保留模板定义，${list.length} 处提示已消除（未发新版本，订阅项目不受影响）`)
+    if (!currentTarget(context)) return
+    for (const [key, value] of saved) if (JSON.stringify(staged.get(key)) === value) staged.delete(key)
+    ElMessage.success(`已保留模板定义，${items.length} 处提示已消除（未发新版本，订阅项目不受影响）`)
     emit('changed')
     await load()
   } catch (e: any) {
+    if (!currentTarget(context)) return
     if (e?.response?.status === 409 || e?.response?.status === 428) {
+      invalidatePreview()
       ElMessage.warning(formulaErrorText(e, '模板或全局已变化，请按最新情况重新确认'))
       await load()
       return
@@ -441,111 +504,151 @@ async function keepHints(list: TemplateGlobalHint[]) {
 }
 
 function stagedChanges() {
-  return [...staged.values()].map(({ domain, slot_key, definition }) => ({ domain, slot_key, definition }))
+  return copyTemplateValue([...staged.values()].map(({ domain, slot_key, definition }) => ({ domain, slot_key, definition })))
 }
 
-async function onPublishPreview() {
-  if (!detail.value || !staged.size) return
-  previewKind.value = 'publish'
+async function showTemplatePreview(context: TemplatePreviewContext) {
+  invalidatePreview()
+  const sequence = previewSequence
+  previewKind.value = context.kind
   previewLoading.value = true
   try {
-    preview.value = await formulaSettingsApi.templatePublishPreview(detail.value.id, {
-      expected_version: detail.value.version, changes: stagedChanges(),
-    })
-    requestId = newRequestId()
+    const result = context.kind === 'rollback'
+      ? await formulaTemplateCasApi.rollbackPreview(context.templateId, {
+        expected_version: context.version, target_version: context.targetVersion!,
+      })
+      : await formulaTemplateCasApi.publishPreview(context.templateId, {
+        expected_version: context.version, changes: context.changes,
+      })
+    if (!currentContext(context) || sequence !== previewSequence) return
+    preview.value = copyTemplateValue(result)
+    previewSession.value = Object.freeze({ ...context, fingerprint: result.preview_fingerprint })
     previewVisible.value = true
   } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, '发布预览失败'))
+    if (currentContext(context) && sequence === previewSequence) {
+      const fallback = context.kind === 'rollback' ? '回滚预览失败' : '发布预览失败'
+      ElMessage.error(e instanceof TemplatePreviewEvidenceError
+        ? `${fallback}：${e.message}` : formulaErrorText(e, fallback))
+    }
   } finally {
-    previewLoading.value = false
+    if (sequence === previewSequence) previewLoading.value = false
   }
 }
 
+async function onPublishPreview() {
+  if (!staged.size) return
+  const context = previewContext('publish')
+  if (context) await showTemplatePreview(context)
+}
+
 async function onPromote(domain: string) {
-  if (!detail.value) return
+  const context = previewContext('promote', null, domain)
+  if (!context) return
+  const name = detail.value!.name
   if (!props.isAdmin) {
     try {
       await confirmDangerous({
         title: '提交为全局候选',
-        message: `把模板「${detail.value.name}」的${domainLabel(domain)}提交给管理员审核，通过后发布到使用该准则的全部项目。`,
+        message: `把模板「${name}」的${domainLabel(domain)}提交给管理员审核，通过后发布到使用该准则的全部项目。`,
         confirmText: '提交候选',
       })
     } catch { return }
+    if (!currentContext(context)) return
     promoting.value = domain
     try {
-      await formulaSettingsApi.templatePromote(detail.value.id, { domain, request_id: newRequestId() })
-      ElMessage.success('已提交为全局候选，管理员审核通过后发布')
+      await formulaSettingsApi.templatePromote(context.templateId, { domain, request_id: context.requestId })
+      if (currentContext(context)) ElMessage.success('已提交为全局候选，管理员审核通过后发布')
     } catch (e: any) {
-      ElMessage.error(formulaErrorText(e, '提交候选失败'))
+      if (currentContext(context)) ElMessage.error(formulaErrorText(e, '提交候选失败'))
     } finally {
-      promoting.value = ''
+      if (currentContext(context)) promoting.value = ''
     }
     return
   }
+  invalidatePreview()
+  const sequence = previewSequence
   previewKind.value = 'promote'
-  promoteDomain = domain
   promoting.value = domain
   try {
-    preview.value = await formulaSettingsApi.templatePromotePreview(detail.value.id, { domain })
-    requestId = newRequestId()
+    const result = await formulaSettingsApi.templatePromotePreview(context.templateId, { domain })
+    if (!currentContext(context) || sequence !== previewSequence) return
+    preview.value = copyTemplateValue(result)
+    previewSession.value = Object.freeze({ ...context, fingerprint: '' })
     previewVisible.value = true
   } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, '设为全局预览失败'))
+    if (currentContext(context) && sequence === previewSequence) ElMessage.error(formulaErrorText(e, '设为全局预览失败'))
   } finally {
-    promoting.value = ''
+    if (currentContext(context) && sequence === previewSequence) promoting.value = ''
   }
+}
+
+async function submitSession(session: TemplatePreviewSession, payload: { decisions: Decisions; note: string }) {
+  const common = { expected_version: session.version, decisions: copyTemplateValue(payload.decisions),
+    request_id: session.requestId, note: payload.note || undefined }
+  if (session.kind === 'publish') return formulaTemplateCasApi.publish(session.templateId, {
+    ...common, changes: copyTemplateValue(session.changes), preview_fingerprint: session.fingerprint,
+  })
+  if (session.kind === 'rollback') return formulaTemplateCasApi.rollback(session.templateId, {
+    ...common, target_version: session.targetVersion!, preview_fingerprint: session.fingerprint,
+  })
+  return formulaSettingsApi.templatePromote(session.templateId, { ...common, domain: session.domain })
 }
 
 async function onSubmitPreview(payload: { decisions: Decisions; note: string }): Promise<boolean> {
-  if (!detail.value) return false
-  try {
-    if (previewKind.value === 'publish') {
-      const r = await formulaSettingsApi.templatePublish(detail.value.id, {
-        expected_version: detail.value.version, changes: stagedChanges(), decisions: payload.decisions,
-        request_id: requestId || newRequestId(), note: payload.note || undefined,
-      })
-      ElMessage.success(`已发布 v${r?.version ?? detail.value.version + 1}，订阅项目按所选处理`)
-      staged.clear()
-    } else if (previewKind.value === 'rollback' && rollbackVersion.value !== null) {
-      const r = await formulaSettingsApi.templateRollback(detail.value.id, {
-        target_version: rollbackVersion.value, expected_version: detail.value.version,
-        decisions: payload.decisions, request_id: requestId || newRequestId(), note: payload.note || undefined,
-      })
-      ElMessage.success(`已回滚到 v${rollbackVersion.value}，并发布新版本 v${r?.version ?? detail.value.version + 1}`)
-      rollbackVersion.value = null
-    } else {
-      await formulaSettingsApi.templatePromote(detail.value.id, {
-        domain: promoteDomain, decisions: payload.decisions, request_id: requestId || newRequestId(),
-        note: payload.note || undefined,
-      })
-      ElMessage.success('已设为全局并发布')
-    }
-    emit('changed')
-    await load()
-    return true
-  } catch (e: any) {
-    ElMessage.error(formulaErrorText(e,
-      previewKind.value === 'publish' ? '发布失败' : previewKind.value === 'rollback' ? '回滚失败' : '设为全局失败'))
+  const session = previewSession.value
+  if (!session || submitting.value || !previewVisible.value) return false
+  if (!currentContext(session)) {
+    invalidatePreview()
+    ElMessage.warning('模板或暂存定义已变化，请重新预览后发布')
     return false
   }
+  submitting.value = true
+  try {
+    const result = await submitSession(session, payload)
+    if (!currentContext(session) || previewSession.value?.requestId !== session.requestId) return false
+    ElMessage.success(session.kind === 'publish'
+      ? `已发布 v${result?.version ?? session.version + 1}，订阅项目按所选处理`
+      : session.kind === 'rollback'
+        ? `已回滚到 v${session.targetVersion}，并发布新版本 v${result?.version ?? session.version + 1}` : '已设为全局并发布')
+    invalidatePreview()
+    if (session.kind === 'publish') staged.clear()
+    emit('changed')
+    await load()
+    return props.modelValue && generation === session.generation && props.templateId === session.templateId
+  } catch (e: any) {
+    if (!currentContext(session) || previewSession.value?.requestId !== session.requestId) return false
+    if (e?.response?.status === 409 || e?.response?.status === 428) {
+      invalidatePreview()
+      ElMessage.warning(formulaErrorText(e, '模板预览已失效，请重新预览后发布'))
+      await load()
+    } else ElMessage.error(formulaErrorText(e,
+      session.kind === 'publish' ? '发布失败' : session.kind === 'rollback' ? '回滚失败' : '设为全局失败'))
+    return false
+  } finally { submitting.value = false }
 }
 
 async function onDelete() {
-  if (!detail.value) return
-  try { await confirmDelete(`模板「${detail.value.name}」`) } catch { return }
+  const context = previewContext('publish')
+  if (!context) return
+  try { await confirmDelete(`模板「${detail.value!.name}」`) } catch { return }
+  if (!currentContext(context)) return
+  invalidatePreview()
+  submitting.value = true
   try {
-    await formulaSettingsApi.deleteTemplate(detail.value.id, detail.value.version)
+    await formulaSettingsApi.deleteTemplate(context.templateId, context.version)
+    if (!currentTarget(context)) return
     ElMessage.success('模板已删除')
     emit('changed')
     visible.value = false
   } catch (e: any) {
+    if (!currentTarget(context)) return
     if (e?.response?.status === 409 || e?.response?.status === 428) {
       ElMessage.warning(formulaErrorText(e, '模板已被修改，请刷新后重试'))
       await load()
       return
     }
     ElMessage.error(formulaErrorText(e, '删除模板失败'))
-  }
+  } finally { submitting.value = false }
 }
 
 // ── 改名 / 共享范围 ──
@@ -558,26 +661,63 @@ const metaShareOptions = computed(() => SHARE_SCOPE_OPTIONS.filter((o) => (o.val
   && ((o.value !== 'team' && o.value !== 'group') || !!detail.value?.owner_project_id)))
 
 function openMeta() {
-  if (!detail.value) return
+  if (!detail.value || submitting.value) return
+  invalidatePreview()
   Object.assign(meta, { name: detail.value.name, description: detail.value.description || '', share_scope: detail.value.share_scope })
   metaVisible.value = true
 }
 async function onMetaSave() {
-  if (!detail.value || !(await metaFormRef.value?.validate().catch(() => false))) return
+  const context = previewContext('publish')
+  if (!context || metaSaving.value || !(await metaFormRef.value?.validate().catch(() => false))) return
+  if (!currentContext(context)) return
+  const body = copyTemplateValue({ name: meta.name.trim(), description: meta.description.trim() || null,
+    share_scope: meta.share_scope })
+  invalidatePreview()
   metaSaving.value = true
+  submitting.value = true
   try {
-    detail.value = await formulaSettingsApi.updateTemplate(detail.value.id, {
-      name: meta.name.trim(), description: meta.description.trim() || null, share_scope: meta.share_scope,
-    })
+    const result = await formulaSettingsApi.updateTemplate(context.templateId, body)
+    if (!currentTarget(context)) return
+    detail.value = copyTemplateValue(result)
     ElMessage.success('已保存')
     metaVisible.value = false
     emit('changed')
   } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, '保存失败'))
+    if (currentTarget(context)) ElMessage.error(formulaErrorText(e, '保存失败'))
   } finally {
     metaSaving.value = false
+    submitting.value = false
   }
 }
+
+// 先声明全部状态再注册立即监听，避免首次打开命中尚未初始化的引用。
+watch(staged, () => touchStaged(), { deep: true, flush: 'sync' })
+watch(previewVisible, (open) => {
+  if (!open) invalidatePreview()
+}, { flush: 'sync' })
+watch(() => [props.modelValue, props.templateId] as const, ([open]) => {
+  generation += 1
+  loadSequence += 1
+  diffSequence += 1
+  invalidatePreview()
+  staged.clear()
+  detail.value = null
+  versions.value = []
+  subscribers.value = []
+  tab.value = 'defs'
+  activeDomain.value = ''
+  editing.value = null
+  editVisible.value = false
+  metaVisible.value = false
+  newSlotVisible.value = false
+  diffVisible.value = false
+  diffLoading.value = false
+  diffVersion.value = null
+  diff.value = null
+  promoting.value = ''
+  loading.value = false
+  if (open) void load()
+}, { immediate: true, flush: 'sync' })
 </script>
 
 <style scoped>
