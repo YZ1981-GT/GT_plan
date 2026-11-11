@@ -29,6 +29,12 @@ export const systemRoutes: RouteRecordRaw[] = [
           component: () => import('@/views/StaffManagement.vue'),
         },
 {
+          path: 'settings/departments',
+          name: 'DepartmentManagement',
+          component: () => import('@/views/DepartmentManagement.vue'),
+          meta: { permission: 'admin' },
+        },
+{
           path: 'work-hours',
           name: 'WorkHours',
           component: () => import('@/views/WorkHoursPage.vue'),

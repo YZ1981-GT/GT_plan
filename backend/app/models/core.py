@@ -33,18 +33,20 @@ class Department(Base, SoftDeleteMixin, TimestampMixin):
     __tablename__ = "sys_dept"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="部门名称")
-    code: Mapped[str] = mapped_column(String(50), nullable=False, comment="部门编码")
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="部门名称（未软删范围内唯一）")
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("sys_dept.id"), nullable=True, comment="父部门ID"
+    )
+    head_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, comment="部门负责人，引用 users(id)"
     )
     sort_order: Mapped[int] = mapped_column(server_default=text("0"), nullable=False, comment="排序顺序")
     description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="部门描述")
 
     __table_args__ = (
         Index(
-            "uq_sys_dept_code",
-            "code",
+            "uq_sys_dept_name",
+            "name",
             unique=True,
             postgresql_where=text("is_deleted = false"),
         ),
