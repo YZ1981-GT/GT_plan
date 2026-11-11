@@ -147,6 +147,14 @@ export async function smokeBuiltArtifact(artifactDir) {
     ensure(health?.marker === 'built-smoke-health', '/api/health 没有经过 preview 代理')
     const wopi = await (await fetchChecked(`${base}/wopi/smoke`)).text()
     ensure(wopi === 'built-smoke-wopi', '/wopi 没有经过 preview 代理')
+    // 真实浏览器执行产物 JS：chunk 循环初始化导致的白屏只有这里看得到。
+    // 显式跳过（如 CI 镜像没有 chromium）必须设置 GT_SMOKE_SKIP_BROWSER=1，并打印告警。
+    if (process.env.GT_SMOKE_SKIP_BROWSER === '1') {
+      console.warn('[WARN] 已跳过浏览器首屏冒烟（GT_SMOKE_SKIP_BROWSER=1），白屏类缺陷不会被发现')
+    } else {
+      const { assertAppMounts } = await import('./smoke-browser-mount.mjs')
+      await assertAppMounts(`${base}/login`)
+    }
   } finally {
     if (previewServer?.close) await previewServer.close()
     else if (previewServer?.httpServer) await closeServer(previewServer.httpServer)

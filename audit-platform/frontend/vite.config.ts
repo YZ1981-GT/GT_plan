@@ -22,6 +22,9 @@ export function GridCellAdapterResolver() {
 
 export function heavyFeatureChunk(id: string): string | undefined {
   const moduleId = id.replace(/\\/g, '/')
+  // CJS 互操作辅助（getDefaultExportFromCjs 等）被 vendor-core 里的 CJS 依赖使用，
+  // 留在入口会让 vendor-core 反向 import index。
+  if (moduleId.includes('commonjsHelpers')) return 'vendor-core'
   if (!moduleId.includes('/node_modules/')) return undefined
 
   // 先固定全站共享运行时。Vue 与 Element Plus 必须放在同一个 vendor-core；
@@ -33,6 +36,24 @@ export function heavyFeatureChunk(id: string): string | undefined {
     || moduleId.includes('/node_modules/element-plus/')
     || moduleId.includes('/node_modules/@element-plus/')) return 'vendor-core'
 
+  // element-plus 的传递依赖必须同属 vendor-core。onlyExplicitManualChunks 下它们不会被自动吸入，
+  // 会落进入口 index，而 vendor-core 又反向 import index、index 静态 import vendor-core，
+  // 形成循环 chunk，生产白屏 `Cannot access 'Rt' before initialization`
+  // （spec frontend-prod-build-white-screen-closure；由 scripts/check-chunk-cycles.mjs 守卫）。
+  if (/\/node_modules\/(?:lodash-es|lodash-unified|dayjs|async-validator|memoize-one|normalize-wheel-es|escape-html|vue-demi)\//.test(moduleId)
+    || moduleId.includes('/node_modules/@vueuse/')
+    || /\/node_modules\/@floating-ui\/(?:core|dom|utils|vue)\//.test(moduleId) // 不含 react-dom，否则 vendor-core 反向依赖 React
+    || moduleId.includes('/node_modules/@popperjs/')
+    || moduleId.includes('/node_modules/@ctrl/tinycolor/')
+    || moduleId.includes('/node_modules/@sxzz/')) return 'vendor-core'
+
+  // Univer 的第三方依赖（rxjs / numfmt / React 全家 / radix 等；应用源码不直接引用）。
+  // onlyExplicitManualChunks 下它们不会跟着 @univerjs 走，会落进 WorkpaperEditor 块，
+  // 而 heavy-univer 反向 import 该块（108 个名字），形成 WorkpaperEditor ↔ heavy-univer 环，
+  // 生产构建打开底稿编辑器报 `Cannot access 'Kp' before initialization`
+  // （spec frontend-prod-build-white-screen-closure 任务 6；由 check-chunk-cycles --strict 守卫）。
+  if (/\/node_modules\/(?:@wendellhu|@radix-ui|@flatten-js|@babel\/runtime|rxjs|numfmt|react|react-dom|scheduler|react-remove-scroll|react-remove-scroll-bar|react-style-singleton|react-transition-group|dom-helpers|use-callback-ref|use-sidecar|aria-hidden|get-nonce|ot-json1|ot-text-unicode|franc-min|async-lock|cjk-regex|collapse-white-space|fast-diff|kdbush|quickselect|rbush|n-gram|opentype\.js|regexp-util|trigram-utils|unicode-regex|unicount|clsx|class-variance-authority|tailwind-merge|localforage|sonner)\//.test(moduleId)
+    || /\/node_modules\/@floating-ui\/react-dom\//.test(moduleId)) return 'heavy-univer'
   if (moduleId.includes('/@univerjs/')) return 'heavy-univer'
   if (moduleId.includes('/@vue-office/') || moduleId.includes('/pdfjs-dist/') || moduleId.includes('/mammoth/')) {
     return 'heavy-office'

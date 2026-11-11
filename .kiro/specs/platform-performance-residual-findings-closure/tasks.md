@@ -55,7 +55,7 @@
 - [x] 31. R10 附注编辑页切年度写路由、自动生成交给重挂后的挂载流程、未保存拦截挂离开 + 更新；`yearSwitchUpdatesRoute.spec.ts` `KNOWN_GAPS={}` + 附注页 4 断言；DisclosureEditor 3160/3164；变异 R10a-c 红
 - [x] 32. R11 GET 共享在途：抽内核 `utils/getSingleFlight.ts`；utils/http 包装 `get`、GET 不进去重表、写请求与项目事件推进屏障；apiProxy 改用内核；`httpGetShare.spec.ts` 19 例 + 改写旧语义用例 6 + apiProxy 2 + projectEventStream 1；变异 M1-M8+M5 全红
 - [x] 33. 批 G 回归：后端 428 passed 0 failed；前端 53/54（1 红是并发会话改 WorkpaperEditor.vue 尾部换行，HEAD 复现同红）；ESLint 全通过；8 个前端文件行数全在门限；单区域 tsc TS2307 是 include 不全的已知局限。浏览器：附注页正常加载（199 节），R10/R8/R9/R11 因无多年度项目 / 无【测试】底稿无法实测，标 `[ ]*`
-- [ ] 34. R12 复核工作台（用户选方案 A：F8 配置驱动状态机）
+- [x] 34. R12 复核工作台（用户选方案 A：F8 配置驱动状态机；34.1~34.5 已完成，34.6 为可选浏览器实测，缺 pending_level1 底稿，另见任务 28）
   - [x] 34.1 后端：`update_review_status` 的 `REVIEW_TRANSITIONS` 改为按项目 `review_config.levels` 动态生成（`pending_levelN` / `levelN_in_progress` 都可直接通过或退回；非末级通过自动推下一级待复核；末级通过标 `review_passed`；退回标 `revision_required` + 必填原因 + ReviewRecord）；删零调用的 `ReviewStateMachine`
   - [x] 34.2 后端：`POST /api/projects/{pid}/batch-review`（逐张走同一状态机，接受 action=approve/reject，跳过不符合的并写原因回报）；AI 批量复核改路径 `/ai-batch-review` 消除冲突
   - [x] 34.3 前端 ReviewWorkbench：`approveCurrent` / `rejectCurrent` 改发当前级的 `levelN_passed` / `levelN_rejected`；`reviewStatusLabel` 补 L3/L4；批量通过改调 `batchReview()`；删 `api` 直调

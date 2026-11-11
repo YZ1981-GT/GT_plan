@@ -10,6 +10,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const VITE = resolve(ROOT, 'node_modules/vite/bin/vite.js')
 const BUDGET = resolve(ROOT, 'scripts/check-bundle-budget.mjs')
 const SMOKE = resolve(ROOT, 'scripts/smoke-built-artifact.mjs')
+const CHUNK_CYCLES = resolve(ROOT, 'scripts/check-chunk-cycles.mjs')
 const BUDGET_POLICY = resolve(ROOT, 'scripts/bundle-budget.json')
 const CANDIDATE = resolve(ROOT, `.dist-verify-${process.pid}`)
 const VERIFIED_ROOT = resolve(ROOT, '.verified-dist')
@@ -83,6 +84,8 @@ async function main() {
     NODE_OPTIONS: '--max-old-space-size=16384',
   })
   run(BUDGET, ['--check', '--dir', CANDIDATE])
+  // 任何静态 import 环都会让对应路由或首屏在生产构建里 TDZ 失败（--strict：一律失败）；vendor-* 的环导致首屏白屏，smoke 不执行 JS 看不到，须单独卡
+  run(CHUNK_CYCLES, ['--strict', '--dir', CANDIDATE])
   run(SMOKE, ['--dir', CANDIDATE])
 
   const fullDigest = {

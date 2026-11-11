@@ -241,3 +241,8 @@ VALIDATE 10 约束 + REINDEX 3 索引由 apply 脚本（`tmp_release_blocker_app
 - OO→HTML 往返：上游 `wp-sync-conflict-adjudication-and-d4-32-modeling` Task 12 真库 UAT 未执行，无通路。
 - Task 22 字面目标是**浏览器**验证主链；本会话完成的是**后端写入型 HTTP + 探针**维度，浏览器维度仅 dev
   登录页可渲染、生产构建受阻，故整条仍标 `[ ]*`。
+
+### 9.6 追加（2026-11-11）：生产构建白屏已由后续 spec 修复
+- 白屏根因与修复见 `frontend-prod-build-white-screen-closure`：①`vendor-core` 反向 import 入口 `index`（element-plus 传递依赖与 CJS 辅助落在 index）②`WorkpaperEditor ↔ heavy-univer` 懒加载环（Univer 第三方依赖落在编辑器块，打开底稿编辑器报 `Cannot access 'Kp' before initialization`）。两处均已改 `heavyFeatureChunk` 分组修复。
+- 修复后 `build:verify` 通过（预算、严格无环、浏览器首屏 smoke），并在独立端口对【测试】项目只读走查登录 / 试算表 / 报表 / 附注 / 底稿列表 / 底稿 E1 编辑器，console error 为 0。
+- 本 spec Task 22 仍保持 `[ ]*`：复核→终态链的浏览器写入型走查、OO→HTML 往返依赖上游 UAT，未执行。
