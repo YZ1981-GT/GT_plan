@@ -317,10 +317,20 @@ async def assert_project_permission(
     # 查询 project_users 表（只取级别一列，每次直接查库）
     level_value = await _load_member_level(db, current_user.id, project_id)
 
-    if level_value is None:
-        raise HTTPException(status_code=403, detail="权限不足")
+    # 成员级别判定；成员行缺失或级别不足时，尝试「部门负责人只读」兜底。
+    member_rank = PERMISSION_HIERARCHY.get(level_value, 0) if level_value is not None else 0
+    effective_rank = member_rank
 
-    if PERMISSION_HIERARCHY.get(level_value, 0) < required_level:
+    if member_rank < required_level:
+        # 部门负责人对本部门（含子部门）项目有只读可见权（需求：看见本部门所有项目）。
+        # 仅授予 readonly：更高操作（review/edit）仍需真实成员行，避免越权写。
+        from app.services.dept_head_visibility_service import dept_head_visible_project_ids
+
+        dept_pids = await dept_head_visible_project_ids(current_user, db)
+        if project_id in dept_pids:
+            effective_rank = max(effective_rank, PERMISSION_HIERARCHY["readonly"])
+
+    if effective_rank < required_level:
         raise HTTPException(status_code=403, detail="权限不足")
 
     # 设置 RLS context（SET LOCAL 仅当前事务有效）
@@ -619,15 +629,21 @@ async def get_visible_project_ids(
     if current_user.role.value == "partner":
         from app.services.partner_visibility_service import partner_visible_project_ids
 
-        return list(await partner_visible_project_ids(current_user, db))
-
-    result = await db.execute(
-        select(ProjectUser.project_id).where(
-            ProjectUser.user_id == current_user.id,
-            ProjectUser.is_deleted == False,  # noqa: E712
+        pids = set(await partner_visible_project_ids(current_user, db))
+    else:
+        result = await db.execute(
+            select(ProjectUser.project_id).where(
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
         )
-    )
-    return [r[0] for r in result.all()]
+        pids = {r[0] for r in result.all()}
+
+    # 部门负责人并集：本部门（含子部门）成员参与的项目（与系统角色无关）
+    from app.services.dept_head_visibility_service import dept_head_visible_project_ids
+
+    pids |= await dept_head_visible_project_ids(current_user, db)
+    return list(pids)
 
 
 async def _project_level_visible_ids(

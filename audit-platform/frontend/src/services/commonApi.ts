@@ -1094,6 +1094,20 @@ export async function getDepartment(deptId: string): Promise<any> {
   return data
 }
 
+export async function createDepartment(payload: any): Promise<any> {
+  const { data } = await http.post(P_dept.list, payload)
+  return data
+}
+
+export async function updateDepartment(deptId: string, payload: any): Promise<any> {
+  const { data } = await http.put(P_dept.detail(deptId), payload)
+  return data
+}
+
+export async function deleteDepartment(deptId: string): Promise<void> {
+  await http.delete(P_dept.detail(deptId))
+}
+
 // ── 系统设置 ──
 
 export async function getSystemSettings(): Promise<any> {

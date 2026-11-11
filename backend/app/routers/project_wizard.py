@@ -82,37 +82,35 @@ async def list_projects(
     """获取项目列表（按用户可见性过滤）
 
     admin 可见所有项目；partner 只见自己名下的项目；其他角色只能看到自己参与的项目。
+    此外，部门负责人可见本部门（含子部门）成员参与的项目。
     """
     from sqlalchemy import select
     from app.models.core import ProjectUser
+    from app.services.dept_head_visibility_service import dept_head_visible_project_ids
 
     if current_user.role.value == "admin":
         # 管理员可见所有项目
         result = await db.execute(
             select(Project).where(Project.is_deleted == False)  # noqa: E712
         )
-    elif current_user.role.value == "partner":
-        # 合伙人只见自己名下的项目（本人创建 / 下属创建 / 签字 / 持有底稿 / 团队委派）
-        from app.services.partner_visibility_service import partner_visible_project_ids
-
-        pids = await partner_visible_project_ids(current_user, db)
-        if not pids:
-            return []
-        result = await db.execute(
-            select(Project).where(
-                Project.id.in_(pids),
-                Project.is_deleted == False,  # noqa: E712
-            )
-        )
     else:
-        # 其他角色只能看到自己参与的项目
-        my_project_ids = await db.execute(
-            select(ProjectUser.project_id).where(
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,  # noqa: E712
+        if current_user.role.value == "partner":
+            # 合伙人：自己名下的项目（本人创建 / 下属创建 / 签字 / 持有底稿 / 团队委派 / 成员行）
+            from app.services.partner_visibility_service import partner_visible_project_ids
+
+            pids = set(await partner_visible_project_ids(current_user, db))
+        else:
+            # 其他角色：自己参与的项目
+            rows = await db.execute(
+                select(ProjectUser.project_id).where(
+                    ProjectUser.user_id == current_user.id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                )
             )
-        )
-        pids = [r[0] for r in my_project_ids.all()]
+            pids = {r[0] for r in rows.all()}
+
+        # 部门负责人并集
+        pids |= await dept_head_visible_project_ids(current_user, db)
         if not pids:
             return []
         result = await db.execute(
@@ -149,30 +147,27 @@ async def list_projects_with_progress(
     from app.models.workpaper_models import WorkingPaper
 
     # 1. 项目可见性过滤
+    from app.services.dept_head_visibility_service import dept_head_visible_project_ids
+
     if current_user.role.value == "admin":
         proj_result = await db.execute(
             select(Project).where(Project.is_deleted == False)  # noqa: E712
         )
-    elif current_user.role.value == "partner":
-        from app.services.partner_visibility_service import partner_visible_project_ids
-
-        pids = await partner_visible_project_ids(current_user, db)
-        if not pids:
-            return []
-        proj_result = await db.execute(
-            select(Project).where(
-                Project.id.in_(pids),
-                Project.is_deleted == False,  # noqa: E712
-            )
-        )
     else:
-        my_pids = await db.execute(
-            select(ProjectUser.project_id).where(
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,  # noqa: E712
+        if current_user.role.value == "partner":
+            from app.services.partner_visibility_service import partner_visible_project_ids
+
+            pids = set(await partner_visible_project_ids(current_user, db))
+        else:
+            my_pids = await db.execute(
+                select(ProjectUser.project_id).where(
+                    ProjectUser.user_id == current_user.id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                )
             )
-        )
-        pids = [r[0] for r in my_pids.all()]
+            pids = {r[0] for r in my_pids.all()}
+
+        pids |= await dept_head_visible_project_ids(current_user, db)
         if not pids:
             return []
         proj_result = await db.execute(

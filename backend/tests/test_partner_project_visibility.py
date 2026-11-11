@@ -33,7 +33,7 @@ from app.deps import (
     get_visible_project_ids,
 )
 from app.models.base import PermissionLevel, ProjectUserRole, UserRole
-from app.models.core import Project, ProjectUser, User
+from app.models.core import Department, Project, ProjectUser, User
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.partner_visibility_service import partner_visible_project_ids, subordinate_ids
@@ -43,7 +43,7 @@ pytestmark = pytest.mark.asyncio
 _TABLES = (
     User.__table__, Project.__table__, ProjectUser.__table__,
     StaffMember.__table__, ProjectAssignment.__table__,
-    WpIndex.__table__, WorkingPaper.__table__,
+    WpIndex.__table__, WorkingPaper.__table__, Department.__table__,
 )
 
 
