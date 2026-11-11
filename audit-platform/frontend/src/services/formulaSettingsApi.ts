@@ -11,7 +11,7 @@ import {
   formulaTemplates as PT, projectFormulaTemplates as PPT,
 } from '@/services/apiPaths'
 import type {
-  ApplyTarget, ApplyTargetKind, CheckRuleSource, Decisions, Definition, EffectiveResult, FormulaDomainInfo,
+  ApplyTarget, ApplyTargetKind, CheckCatalogQuery, CheckRuleSource, Decisions, Definition, EffectiveResult, FormulaDomainInfo,
   FormulaTemplateInfo, GlobalSlot, PendingItem, PropagationStatus, PublishRecord, Resolution, SlotChange, SyncPreview,
   TemplateDetail,
   TemplateSubscriber, TemplateSubscription, TemplateVersion, TemplateDiff, TemplateDiffChange,
@@ -38,7 +38,7 @@ export const formulaSettingsApi = {
   candidatePreview: (id: string) => api.post<SyncPreview>(P.candidatePreview(id), {}, silent()),
   reviewCandidate: (id: string, body: { approve: boolean; decisions?: Decisions; note?: string }) =>
     api.post<Record<string, any>>(P.candidateReview(id), body, silent()),
-  checkRules: (params: { source?: string; q?: string } = {}) =>
+  checkRules: (params: CheckCatalogQuery = {}) =>
     api.get<{ sources: CheckRuleSource[]; total: number }>(P.checkRules, silent({ params })),
 
   pending: (pid: string) =>

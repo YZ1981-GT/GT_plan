@@ -1,0 +1,122 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "0. 现状复核": [
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978281617
+      },
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978289619
+      },
+      {
+        "executionId": "36686945-583a-4872-97d3-935ec7aca4fd",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978624787
+      }
+    ],
+    "1. 校对结果五态契约（ADR-CCN-01）": [
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978281678
+      },
+      {
+        "executionId": "36686945-583a-4872-97d3-935ec7aca4fd",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978631592
+      },
+      {
+        "executionId": "36686945-583a-4872-97d3-935ec7aca4fd",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978737762
+      }
+    ],
+    "2. 附注执行器按类别分流（R1，ADR-CCN-02，design §4 D3）": [
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978281739
+      },
+      {
+        "executionId": "36686945-583a-4872-97d3-935ec7aca4fd",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978746869
+      },
+      {
+        "executionId": "89e1a06c-ad2c-4e39-abd3-76b1a84ba6eb",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982673846
+      },
+      {
+        "executionId": "89e1a06c-ad2c-4e39-abd3-76b1a84ba6eb",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982685929
+      }
+    ],
+    "3. 校对目录执行状态（R2，ADR-CCN-03）": [
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978281771
+      },
+      {
+        "executionId": "12c7d481-9f0e-44d9-a15a-cb955f554e63",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982276460
+      },
+      {
+        "executionId": "12c7d481-9f0e-44d9-a15a-cb955f554e63",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982282920
+      },
+      {
+        "executionId": "89e1a06c-ad2c-4e39-abd3-76b1a84ba6eb",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982673910
+      }
+    ],
+    "4. 表间审核严重度与门禁规则异常收口（R4、R6，ADR-CCN-05/07）": [
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978281820
+      },
+      {
+        "executionId": "12c7d481-9f0e-44d9-a15a-cb955f554e63",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982276490
+      },
+      {
+        "executionId": "12c7d481-9f0e-44d9-a15a-cb955f554e63",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982283232
+      },
+      {
+        "executionId": "89e1a06c-ad2c-4e39-abd3-76b1a84ba6eb",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982673954
+      }
+    ],
+    "7. 回归、浏览器实测与收尾": [
+      {
+        "executionId": "ee2a655c-ad4f-4452-ae9f-eaaedaf89498",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793978281845
+      },
+      {
+        "executionId": "12c7d481-9f0e-44d9-a15a-cb955f554e63",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982276513
+      },
+      {
+        "executionId": "89e1a06c-ad2c-4e39-abd3-76b1a84ba6eb",
+        "chatSessionId": "sess_6fe1593a-982f-41ec-8196-d7cbc775c513",
+        "timestamp": 1793982674018
+      }
+    ]
+  }
+}

@@ -258,7 +258,7 @@ const filteredWpCells = computed<WpCellRow[]>(() => {
         display_label: e.label || e.cell || e.uri,
         formula_ref: e.formula_ref,
         parent_wp_code: e.wp_code || '',
-        sheet_code: e.sheet_code || '',
+        sheet_code: e.path || '',
       }))
   }
   if (!kw) return rows

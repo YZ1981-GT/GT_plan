@@ -35,8 +35,18 @@ class ConsistencyDiff:
 class ConsistencyLayer:
     from_table: str
     to_table: str
-    status: str = "consistent"  # consistent / inconsistent
+    status: str = "consistent"  # consistent / inconsistent / not_executed
     diffs: list = field(default_factory=list)
+    reason: str = ""  # status == not_executed 时写明原因（不再冒充一致）
+    #: True = 执行时出错（会阻断签字门禁）；False = 该层尚未实现（只在报告中标明，不阻断）
+    errored: bool = False
+
+
+def _not_executed_layer(layer: ConsistencyLayer, reason: str, *, errored: bool = False) -> ConsistencyLayer:
+    layer.status = "not_executed"
+    layer.reason = reason
+    layer.errored = errored
+    return layer
 
 
 @dataclass
@@ -155,7 +165,8 @@ class ConsistencyReplayEngine:
             if layer.diffs:
                 layer.status = "inconsistent"
         except Exception as e:
-            logger.debug(f"[CONSISTENCY] Layer 1 skipped: {e}")
+            logger.exception(f"[CONSISTENCY] Layer 1 not executed: {e}")
+            _not_executed_layer(layer, f"层1 未能执行：{type(e).__name__}：{str(e)[:200]}", errored=True)
         return layer
 
     async def _check_layer2(self, db, project_id, year) -> ConsistencyLayer:
@@ -203,21 +214,22 @@ class ConsistencyReplayEngine:
             if layer.diffs:
                 layer.status = "inconsistent"
         except Exception as e:
-            logger.debug(f"[CONSISTENCY] Layer 2 skipped: {e}")
+            logger.exception(f"[CONSISTENCY] Layer 2 not executed: {e}")
+            _not_executed_layer(layer, f"层2 未能执行：{type(e).__name__}：{str(e)[:200]}", errored=True)
         return layer
 
     async def _check_layer3(self, db, project_id, year) -> ConsistencyLayer:
         """Layer 3: financial_report → disclosure_notes"""
         layer = ConsistencyLayer(from_table="financial_report", to_table="disclosure_notes")
         # 简化实现：检查附注关键科目金额与报表一致
-        # 完整实现需要 note_wp_mapping 关联
-        return layer
+        # 完整实现需要 note_wp_mapping 关联（尚未实现 ⇒ 未执行，不冒充一致）
+        return _not_executed_layer(layer, "报表→附注层尚未实现（需要 note_wp_mapping 关联）")
 
     async def _check_layer4(self, db, project_id, year) -> ConsistencyLayer:
         """Layer 4: disclosure_notes → working_papers"""
         layer = ConsistencyLayer(from_table="disclosure_notes", to_table="working_papers")
-        # 简化实现：检查底稿 parsed_data.audited_amount 与附注一致
-        return layer
+        # 简化实现：检查底稿 parsed_data.audited_amount 与附注一致（尚未实现 ⇒ 未执行）
+        return _not_executed_layer(layer, "附注→底稿层尚未实现")
 
     async def _check_layer5(self, db, project_id, year) -> ConsistencyLayer:
         """Layer 5: working_papers → trial_balance (反向校验)
@@ -225,10 +237,13 @@ class ConsistencyReplayEngine:
         说明：底稿↔标准科目映射在 DB 层无对应表 —— ``wp_account_mapping`` 表不存在，
         ``note_account_mappings`` 是模板级配置(无 project_id/account_code)，真实映射
         在 ``backend/data/wp_account_mapping.json`` (206 条 v2025-R5) + wp_mapping 服务层。
-        因此本层无法用纯 SQL 实现，返回空 layer（consistent）占位；需经服务层映射后
+        因此本层无法用纯 SQL 实现，返回 not_executed（不再以空 layer 冒充一致）；需经服务层映射后
         在应用层比对，留待 wp-mapping 服务接入（避免执行注定失败的 SQL 污染事务）。
         """
-        return ConsistencyLayer(from_table="working_papers", to_table="trial_balance")
+        return _not_executed_layer(
+            ConsistencyLayer(from_table="working_papers", to_table="trial_balance"),
+            "底稿→试算表层尚未实现（需经 wp-mapping 服务映射后比对）",
+        )
 
     async def generate_consistency_report(
         self,
@@ -249,6 +264,7 @@ class ConsistencyReplayEngine:
                     "from": l.from_table,
                     "to": l.to_table,
                     "status": l.status,
+                    "reason": l.reason,
                     "diffs": [
                         {
                             "object_type": d.object_type,

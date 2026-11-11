@@ -42,7 +42,9 @@ class B60AttachmentMatrixRule(GateRule):
             )
         except Exception as e:
             logger.error("[B60-ATTACH-MATRIX] check error: %s", e)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class B60MaterialityRefRule(GateRule):
@@ -73,7 +75,9 @@ class B60MaterialityRefRule(GateRule):
             )
         except Exception as e:
             logger.error("[B60-MATERIALITY-REF] check error: %s", e)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class B60dVersionConsistencyRule(GateRule):
@@ -108,7 +112,9 @@ class B60dVersionConsistencyRule(GateRule):
             )
         except Exception as e:
             logger.error("[B60D-VERSION-CONSISTENCY] check error: %s", e)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 def register_b60_rules():

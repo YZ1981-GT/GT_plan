@@ -57,7 +57,9 @@ class CrossModuleConflictUnresolvedRule(GateRule):
             logger.error(
                 f"[V3-CROSS-MODULE-CONFLICT-UNRESOLVED] check error: {e}"
             )
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 def register_cross_module_conflict_rules():

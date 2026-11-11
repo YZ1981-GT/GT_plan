@@ -1958,3 +1958,7 @@ backend/app/services/role_workbench_facade.py  961
 #   HEAD 384 行，本 spec 加快照 v2 manifest、签字 / 锁定门、版本向量与故障注入路径后 1276 行。
 #   拆分方向：manifest 构建、签字锁定事务、快照读取三块各抽成独立模块，本文件保留同名导出薄壳。
 backend/app/services/consol_snapshot_service.py 1276
+# gate_rules_phase14.py —— spec check-contract-and-note-executor 收尾 2026-11-11 登记。HEAD 已 1139 行（超 800 未登记的历史大文件），
+#   本 spec 把 9 个规则的异常分支改为「检查异常，未执行」后 1176 行。
+#   拆分方向：IndependenceDeclarationCompleteRule（约 270 行）与 EventCascadeHealthRule（约 125 行）各抽独立模块，本文件保留注册与再导出。
+backend/app/services/gate_rules_phase14.py 1176

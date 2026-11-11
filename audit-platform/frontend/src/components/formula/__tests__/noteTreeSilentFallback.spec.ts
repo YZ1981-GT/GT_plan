@@ -78,6 +78,8 @@ describe('附注目录：本项目附注未生成', () => {
       const u = String(url)
       if (u.endsWith('/api/note-templates/soe')) return TEMPLATE_SECTIONS
       if (u.includes('report-config/types')) return []
+      // 表间审核规则：有效空集合（无效响应会按 S2 严格读取报「规则读取失败」，与本用例要看的附注目录无关）
+      if (u.includes('/formula/cross-check-rules')) return { rules: {}, loaded: {} }
       return {}
     })
     scopeLoad.mockResolvedValue([])

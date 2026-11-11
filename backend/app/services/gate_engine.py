@@ -51,18 +51,30 @@ class GateRule(ABC):
         """检查规则，命中返回 GateRuleHit，未命中返回 None"""
         ...
 
-    def not_executed(self, message: str) -> GateRuleHit:
-        """快捷方法：返回「未执行」命中，severity 按 observe/enforce 模式决定"""
+    def not_executed(self, reason: str) -> GateRuleHit:
+        """检查异常或数据无法取到、规则未能执行：返回命中，不放行。
+
+        severity 按 observe/enforce 模式决定：observe 为 warning，enforce 为 blocking
+        （design D2，与 ADR-CCN-07 一致；enforce 下可逐项确认，见 gate_acknowledgement）。
+        """
         severity = (
             GateSeverity.blocking
             if _enforcement_mode() == "enforce"
             else GateSeverity.warning
         )
+        return self._hit(severity, reason, via="not_executed")
+
+    def not_applicable(self, reason: str) -> GateRuleHit:
+        """结构性不适用（表或列不存在、本项目没有该类数据）：warning 命中，任何模式都不阻断。"""
+        return self._hit(GateSeverity.warning, reason, via="not_applicable")
+
+    def _hit(self, severity: str, reason: str, *, via: str) -> GateRuleHit:
         return GateRuleHit(
             rule_code=self.rule_code,
             error_code=self.error_code,
             severity=severity,
-            message=message,
+            message=reason,
+            location={"via": via},
         )
 
 
@@ -204,6 +216,8 @@ class GateEngine:
                         f"[GATE_RULE_POISON] rule={rule.rule_code} 吞掉 SQL 异常致事务中止，"
                         f"已回滚 savepoint 恢复（gate_type={gate_type}）"
                     )
+                    # ADR-CCN-07：规则结论未知，记为未执行（不再静默丢弃，避免放行）
+                    hit_rules.append(rule.not_executed("规则执行中数据库事务中止，结果未知，未执行"))
                     continue
                 if hit:
                     hit_rules.append(hit)
@@ -216,6 +230,10 @@ class GateEngine:
                 logger.error(
                     f"[GATE_RULE_ERROR] rule={rule.rule_code} "
                     f"gate_type={gate_type} wp_id={wp_id} error={e}"
+                )
+                # ADR-CCN-07：规则抛出的异常不再静默放行，记为「未执行」命中
+                hit_rules.append(
+                    rule.not_executed(f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}")
                 )
 
         # 排序：blocking > warning > info

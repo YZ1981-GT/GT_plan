@@ -249,6 +249,23 @@ export interface FormulaTemplateInfo {
   /** 列表接口附带：在用订阅数（模板列表按它排序） */
   subscriber_count?: number
 }
+/** 规则能力；wired 只表示入口可调用，不代表项目已经执行或通过。 */
+export type CheckExecutionStatus = 'wired' | 'display_only' | 'not_executable'
+/** 来源历史只读摘要：可能跨多次运行；QC / 门禁不按年度过滤。 */
+export interface CheckLastRun {
+  /** 汇总中最新记录的时间，不是整组规则同一次运行的时间。 */
+  at: string | null
+  status: string
+  counts: Record<string, number>
+  /** 仅 cross_check_results 提供；QC / 门禁没有年度能力。 */
+  year?: number
+}
+export interface CheckCatalogQuery {
+  source?: string
+  q?: string
+  project_id?: string
+  year?: number
+}
 /** 全平台校对规则目录的一条规则（后端 formula_check_catalog，spec formula-governance-coverage-closure R3） */
 export interface CheckRule {
   id: string
@@ -259,6 +276,8 @@ export interface CheckRule {
   scope: string
   /** 表间审核预置：原始字段（「从预置选用」填表用） */
   fields?: Record<string, any>
+  /** 所属来源的执行状态（与来源一致；带 source 或 q 查询时才有） */
+  execution?: CheckExecutionStatus
 }
 export interface CheckRuleSource {
   key: string
@@ -276,6 +295,17 @@ export interface CheckRuleSource {
   /** 带 source 或 q 查询时才有 */
   matched?: number
   rules?: CheckRule[]
+  /** 执行状态：wired 已接入 / display_only 仅展示 / not_executable 不可执行（后端按执行器登记判定） */
+  execution?: CheckExecutionStatus
+  /** 状态的一句话说明（目录页展示） */
+  execution_reason?: string
+  /** 执行器入口「模块.符号」；无执行器为 null */
+  executor?: string | null
+  /** 结果落库的表；null = 本类结果不落库 */
+  result_table?: string | null
+  /** 带 project_id 时才有：最近一次执行结果（只读；不落库的来源为 null） */
+  last_run?: CheckLastRun | null
+  last_run_note?: string
 }
 export interface TemplateSlot {
   slot_key: string

@@ -70,7 +70,9 @@ class EqcrDomainCoverageRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[EQCR-GATE] domain coverage check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class EqcrNoUnresolvedDisagreementRule(GateRule):
@@ -125,7 +127,9 @@ class EqcrNoUnresolvedDisagreementRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[EQCR-GATE] unresolved disagreement check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 def register_eqcr_gate_rules():
