@@ -1,0 +1,597 @@
+{
+  "ias_ds": {
+    "source_sha256": "2c35c77e52f5ae5f585dd4e92af9e51fc9181617c8538f77a1e1bc4590b5d88a",
+    "locators": {
+      "dynamic-model": {
+        "lines": [
+          150
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "missing-model": {
+        "lines": [
+          147
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "query-procedure-dispatch": {
+        "lines": [
+          181,
+          187,
+          222
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "negative-top": {
+        "lines": [
+          188,
+          190
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "procedure-error-boundary": {
+        "lines": [
+          259
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      }
+    }
+  },
+  "ias_sql": {
+    "source_sha256": "1477d98251201709b116d6995efe6fc1a38e859b0bdb194a1310ac473f80113d",
+    "locators": {
+      "direction-operation": {
+        "lines": [
+          3766,
+          3773
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "balance-net-turnover": {
+        "lines": [
+          3802,
+          3877
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "debit-credit-columns": {
+        "lines": [
+          3801,
+          3877
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "prior-report-code": {
+        "lines": [
+          3838,
+          3904,
+          3918,
+          5209
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "sum-level": {
+        "lines": [
+          3852
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "parent-child-override": {
+        "lines": [
+          3975,
+          4043
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "branch-and-sum-expansion": {
+        "lines": [
+          4004,
+          4072
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "receivable-advance-pair": {
+        "lines": [
+          3655
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "prepay-payable-pair": {
+        "lines": [
+          3658
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "other-receivable-payable-pair": {
+        "lines": [
+          3663
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "auxiliary-match": {
+        "lines": [
+          2400
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "carry-forward": {
+        "lines": [
+          2346,
+          2693
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "carry-delete-suspect": {
+        "lines": [
+          2357
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      }
+    }
+  },
+  "ias_model": {
+    "source_sha256": "4acfd9e894e0da0309ad58cd683e230451984ec112266b7227cce66ecb5c8e5d",
+    "locators": {
+      "QCYE": {
+        "lines": [
+          35,
+          105,
+          107
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QMYE": {
+        "lines": [
+          39,
+          106,
+          108
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QCWSS": {
+        "lines": [
+          43,
+          107
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QCSDS": {
+        "lines": [
+          53
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "WSS": {
+        "lines": [
+          43,
+          57,
+          107,
+          108
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "SDS": {
+        "lines": [
+          53,
+          67,
+          104
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "LJFSE": {
+        "lines": [
+          36,
+          37,
+          38,
+          68,
+          72,
+          82,
+          88,
+          89,
+          90,
+          100,
+          107,
+          108
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "WSLJFSE": {
+        "lines": [
+          72,
+          90,
+          107,
+          108
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "SDLJFSE": {
+        "lines": [
+          82,
+          100
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "JFLJFSE": {
+        "lines": [
+          36,
+          88
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "DFLJFSE": {
+        "lines": [
+          37,
+          89
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "WSJFLJFSE": {
+        "lines": [
+          88
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "WSDFLJFSE": {
+        "lines": [
+          89
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QCLJFSE": {
+        "lines": [
+          68
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QCWSLJFSE": {
+        "lines": [
+          72,
+          107
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QCSDLJFSE": {
+        "lines": [
+          82
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QYQCYE": {
+        "lines": [
+          105,
+          107
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "QYQMYE": {
+        "lines": [
+          106,
+          108
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "FX": {
+        "lines": [
+          33,
+          112
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "Code": {
+        "lines": [
+          14,
+          21,
+          31,
+          115,
+          116
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      },
+      "model-001": {
+        "lines": [
+          19
+        ],
+        "verified": true,
+        "note": "人工摘要保留；原件锚点命中不等于运行验证"
+      }
+    }
+  },
+  "filltb_ah": {
+    "source_sha256": "6887daf3adb35122b6f8e70585667400790adf075045b1df18134cc3df679110",
+    "locators": {
+      "[\"货币资金\",\"1001\"]": {
+        "lines": [
+          2
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"应收账款\",\"1122\"]": {
+        "lines": [
+          7
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"其他应收款\",\"1221\"]": {
+        "lines": [
+          25
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"减：应收账款坏账准备\",\"1231\"]": {
+        "lines": [
+          10
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"减：其他应收款坏账准备\",\"1232\"]": {
+        "lines": [
+          27
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"交易性金融资产\",\"1101\"]": {
+        "lines": [
+          5
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"减：累计折旧和累计摊销\",\"1523\"]": {
+        "lines": [
+          48
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"减累计折旧和累计摊销\",\"1524\"]": {
+        "lines": [
+          49
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"其他综合收益\",\"4005\"]": {
+        "lines": [
+          129
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"专项储备\",\"4102\"]": {
+        "lines": [
+          130
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"盈余公积\",\"4101\"]": {
+        "lines": [
+          131
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"未分配利润\",\"4103\"]": {
+        "lines": [
+          132
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"研发费用\",\"6605\"]": {
+        "lines": [
+          177
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"信用减值损失\",\"6691\"]": {
+        "lines": [
+          181
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"其他收益\",\"6201\"]": {
+        "lines": [
+          192
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"资产处置收益\",\"6811\"]": {
+        "lines": [
+          194
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"销售商品提供劳务收到的现金\",\"8001\"]": {
+        "lines": [
+          210
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"收到的税费返还\",\"8011\"]": {
+        "lines": [
+          211
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"取得借款收到的现金\",\"8171\"]": {
+        "lines": [
+          239
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      },
+      "[\"购买商品接受劳务支付的现金\",\"8031\"]": {
+        "lines": [
+          215
+        ],
+        "columns": [
+          "科目名称",
+          "科目码"
+        ],
+        "verified": true
+      }
+    }
+  },
+  "filltb_f": {
+    "source_sha256": "a2624f4cc7a6bffcffe88d98e78cafe5f1b29486490aacbc6e46f5f20bd1adee",
+    "locators": {
+      "[\"科目代码\",\"1-A\"]": {
+        "lines": [
+          2
+        ],
+        "columns": [
+          "科目余额名称",
+          "行列号"
+        ],
+        "verified": true
+      },
+      "[\"科目名称\",\"2-B\"]": {
+        "lines": [
+          4
+        ],
+        "columns": [
+          "科目余额名称",
+          "行列号"
+        ],
+        "verified": true
+      },
+      "[\"期初余额(借方)\",\"4-D\"]": {
+        "lines": [
+          9
+        ],
+        "columns": [
+          "科目余额名称",
+          "行列号"
+        ],
+        "verified": true
+      },
+      "[\"年初余额(借方)\",\"4-D\"]": {
+        "lines": [
+          15
+        ],
+        "columns": [
+          "科目余额名称",
+          "行列号"
+        ],
+        "verified": true
+      },
+      "[\"本年累计发生额(借方)\",\"6-F\"]": {
+        "lines": [
+          33
+        ],
+        "columns": [
+          "科目余额名称",
+          "行列号"
+        ],
+        "verified": true
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "catalog_version": "707d2e9c5f557e3f165b969be150f466b837bd01ae0206c5e5e95b2cc3b1c8e2",
+  "outputs": {
+    "规则目录_审阅稿.xlsx": {
+      "sha256": "ba213f73f23631222705583105207ec425d978eecb1adf5ddc65cb30c020fae6",
+      "sheets": 24,
+      "bytes": 1198249
+    },
+    "编码对照表_审阅稿.xlsx": {
+      "sha256": "4e4e958a7c9e6c067568623deb27918c1f90433b9bcb0612a0c4d1291ebe2fd1",
+      "sheets": 20,
+      "bytes": 2519686
+    }
+  },
+  "checks": {
+    "final_readback": true,
+    "comparison_columns_side_by_side": true,
+    "source_hashes": true,
+    "snapshot_catalog_replay": true,
+    "external_unconfirmed": true,
+    "no_excel_formulas_external_links_macros": true
+  },
+  "limitations": [
+    "完整多轮重建验证在300秒时超时；不将旧版本独立验证报告用于最终版本",
+    "最终生成器自身已逐格读回并验证重复生成hash/mtime不变",
+    "本脚本不运行平台或真实数据导入"
+  ]
+}
