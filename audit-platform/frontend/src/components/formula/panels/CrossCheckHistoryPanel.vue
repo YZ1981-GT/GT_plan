@@ -50,6 +50,7 @@
 <script setup lang="ts">
 import { ref, watch, onScopeDispose } from 'vue'
 import api from '@/services/apiProxy'
+import { formulaPanels } from '@/services/apiPaths/formula'
 import { fmtDateTime } from '@/utils/formatters'
 import { checkStatusLabel, checkReasonOf } from '@/utils/consistencyCheckStatus'
 import { formulaOutcomeStatus, formulaCheckNumber, formulaCheckSeverity } from '../formulaIssueHint'
@@ -66,7 +67,7 @@ async function load() {
   const current = () => alive && token === generation && pid === props.projectId && year === props.year
   loading.value = true
   try {
-    const data: any = await api.get(`/api/projects/${pid}/formula/cross-check-history`, { params: { year }, _silent: true })
+    const data: any = await api.get(formulaPanels.crossCheckHistory(pid), { params: { year }, _silent: true })
     if (current()) runs.value = Array.isArray(data?.runs) ? data.runs : []
   } catch (e) { if (current()) error.value = formulaErrorText(e, '执行历史读取失败，请重试') }
   finally { if (current()) loading.value = false }

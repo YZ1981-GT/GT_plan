@@ -1348,9 +1348,9 @@ import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import { api } from '@/services/apiProxy'
 import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
+import { resolveProjectLedgerYear } from '@/services/ledgerDefaultYear'
 import {
-  getTrialBalance, recalcTrialBalance, checkConsistency,
-  getProjectAuditYear, listAdjustments,
+  getTrialBalance, recalcTrialBalance, checkConsistency, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, listWorkpapers, type WpAccountMapping, type WorkpaperDetail } from '@/services/workpaperApi'
@@ -2383,7 +2383,7 @@ async function ensureProjectYear() {
       return
     }
     try {
-      projectYear.value = await getProjectAuditYear(projectId.value)
+      projectYear.value = await resolveProjectLedgerYear(projectId.value) // 审计年度没数据而别的年度有 ⇒ 最近有数据的年度
     } catch {
       projectYear.value = null
     }

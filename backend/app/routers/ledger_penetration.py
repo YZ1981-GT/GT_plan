@@ -32,6 +32,7 @@ from app.core.redis import get_redis
 from app.services.dataset_query import get_active_filter
 from app.services.ledger_penetration_service import LedgerPenetrationService
 from app.schemas.ledger_window import LedgerWindowQuery, LedgerWindowResponse
+from app.services.ledger_window_cache import fetch_window_cached
 from app.services.ledger_window_service import LedgerWindowService
 from app.services.ledger_window_export import build_ledger_export
 
@@ -119,14 +120,17 @@ async def get_ledger_window(
     cursor: str | None = Query(None, max_length=16384),
     limit: int = Query(200, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """普通序时账窗口：签名 keyset 游标，首窗精确摘要，后窗不重复 COUNT。"""
+    """普通序时账窗口：签名 keyset 游标，首窗精确摘要，后窗不重复 COUNT；整页响应读 Redis 缓存。"""
     query = LedgerWindowQuery(
         year=year, account_code=account_code, date_from=date_from, date_to=date_to,
         keyword=keyword, amount_dir=amount_dir, cursor=cursor, limit=limit,
     )
-    return await LedgerWindowService(db).fetch("ledger", project_id, str(current_user.id), query)
+    return await fetch_window_cached(
+        redis, LedgerWindowService(db), "ledger", project_id, str(current_user.id), query,
+    )
 
 
 @router.get("/aux-window/{account_code}", response_model=LedgerWindowResponse)
@@ -143,15 +147,18 @@ async def get_aux_ledger_window(
     cursor: str | None = Query(None, max_length=16384),
     limit: int = Query(200, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """辅助明细窗口；aux_type 必填，防止同一凭证跨辅助维度重复累计。"""
+    """辅助明细窗口；不选 aux_type 为浏览模式（不累计期初）；整页响应读 Redis 缓存。"""
     query = LedgerWindowQuery(
         year=year, account_code=account_code, aux_type=aux_type, aux_code=aux_code,
         date_from=date_from, date_to=date_to, keyword=keyword, amount_dir=amount_dir,
         cursor=cursor, limit=limit,
     )
-    return await LedgerWindowService(db).fetch("aux_ledger", project_id, str(current_user.id), query)
+    return await fetch_window_cached(
+        redis, LedgerWindowService(db), "aux_ledger", project_id, str(current_user.id), query,
+    )
 
 
 @router.get("/window-export/{account_code}")
@@ -649,6 +656,28 @@ async def smart_import(
         append_strategy=append_strategy,
         balance_carry_confirmed=balance_carry_confirmed,
     )
+
+
+@router.get("/account-workpapers")
+async def get_account_workpapers(
+    project_id: UUID,
+    account_code: str = Query(..., min_length=1, max_length=100, description="余额表科目编码（含子科目）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """科目 → 对应底稿清单（审定表优先），供查账页右键「跳转到底稿」；``wp_id`` 为空 = 本项目尚未生成。"""
+    from app.services.ledger_account_workpapers import resolve_account_workpapers
+
+    matched, items = await resolve_account_workpapers(db, project_id, account_code)
+    return {
+        "account_code": account_code,
+        "mapped_account_code": matched,
+        "items": [
+            {"wp_code": i.wp_code, "wp_name": i.wp_name, "kind": i.kind,
+             "host_wp_code": i.host_wp_code, "wp_id": i.wp_id}
+            for i in items
+        ],
+    }
 
 
 @router.get("/years")

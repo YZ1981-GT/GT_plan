@@ -41,6 +41,8 @@ export function formatMeasure(
 ): string {
   // 处理空值
   if (value == null || value === '') {
+    // 文本列的空值就是空，不能补成 0.00
+    if (options.kind === MeasureKind.TEXT) return '';
     const { showZero = true } = options;
     if (showZero) {
       // 根据 kind 决定零值格式

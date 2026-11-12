@@ -429,10 +429,18 @@
           style="width: 260px"
           @change="loadTabLedger"
         />
+        <LedgerBrowseFilters
+          v-model:keyword="tabLedgerKeyword"
+          v-model:amount-dir="tabLedgerAmountDir"
+          placeholder="搜索摘要 / 凭证号 / 对方科目..."
+          @search="loadTabLedgerLedger()"
+        />
         <div class="gt-filter-spacer" />
-        <el-tag v-if="tabLedgerAccount" type="info" size="small">{{ tabLedgerAccount }} 序时账</el-tag>
+        <el-tooltip v-if="!tabLedgerAccount" content="浏览全部科目时不显示余额；选择具体科目后显示期初、累计余额和月合计" placement="bottom">
+          <el-tag type="warning" size="small" effect="plain">浏览模式 · 无余额</el-tag>
+        </el-tooltip>
+        <el-tag type="info" size="small">{{ tabLedgerAccount ? `${tabLedgerAccount} 序时账` : '全部科目序时账' }}</el-tag>
         <LedgerWindowPager
-          v-if="tabLedgerAccount"
           :range-text="tabLedgerWindow.rangeText.value"
           :has-previous="tabLedgerWindow.hasPrevious.value"
           :has-next="tabLedgerWindow.hasNext.value"
@@ -440,16 +448,13 @@
           @previous="moveTabLedgerWindow('previous')"
           @next="moveTabLedgerWindow('next')"
         />
-        <el-button size="small" @click="loadTabLedger(true)" :loading="loading" :disabled="!tabLedgerAccount">刷新</el-button>
+        <el-button size="small" @click="loadTabLedger(true)" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
-        <el-button size="small" plain @click="exportTabLedgerExcel" :disabled="!tabLedgerAccount">导出Excel</el-button>
+        <el-button size="small" plain @click="exportTabLedgerExcel">导出Excel</el-button>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
-      <div v-if="!tabLedgerAccount" class="gt-empty-state">
-        <el-empty description="请在上方选择一个科目查看序时账" :image-size="80" />
-      </div>
       <el-table-v2
-        v-else-if="tabLedgerDisplay.length > 1000"
+        v-if="tabLedgerDisplay.length > 1000"
         :columns="tabLedgerVirtualColumns"
         :data="tabLedgerDisplay"
         :width="tableWidth"
@@ -461,7 +466,8 @@
         fixed
       />
       <el-table
-        v-else-if="tabLedgerAccount"
+        v-else
+        v-loading="loading"
         :data="tabLedgerDisplay"
         border
         size="small"
@@ -486,6 +492,9 @@
             <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucherFromTab(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
+        <el-table-column v-if="!tabLedgerAccount" prop="account_code" label="科目" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.account_code }} {{ row.account_name }}</template>
+        </el-table-column>
         <el-table-column prop="summary" label="摘要" min-width="280" class-name="gt-summary-col">
           <template #default="{ row }"><span class="gt-summary-cell">{{ row.summary }}</span></template>
         </el-table-column>
@@ -495,7 +504,7 @@
         <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
           <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="160" align="right">
+        <el-table-column v-if="tabLedgerAccount" prop="balance" label="余额" width="160" align="right">
           <template #default="{ row }"><GtAmountCell :value="row.balance" /></template>
         </el-table-column>
       </el-table>
@@ -527,10 +536,9 @@
           placeholder="辅助类型"
           size="small"
           style="width: 160px"
-          :disabled="!tabAuxAccount"
           @change="onTabAuxTypeChange"
         >
-          <el-option v-for="t in tabAuxTypeOptions" :key="t" :label="t" :value="t" />
+          <el-option v-for="t in (tabAuxAccount ? tabAuxTypeOptions : tabAuxProjectTypes)" :key="t" :label="t" :value="t" />
         </el-select>
         <el-select
           v-model="tabAuxCode"
@@ -549,10 +557,18 @@
             :value="item.aux_code"
           />
         </el-select>
+        <LedgerBrowseFilters
+          v-model:keyword="tabAuxKeyword"
+          v-model:amount-dir="tabAuxAmountDir"
+          placeholder="搜索摘要 / 凭证号 / 辅助名称..."
+          @search="loadTabAuxLedger()"
+        />
         <div class="gt-filter-spacer" />
-        <el-tag v-if="tabAuxAccount" type="info" size="small">{{ tabAuxAccount }}{{ tabAuxType ? ' / ' + tabAuxType : '' }}{{ tabAuxCode ? ' / ' + tabAuxCode : '' }} 辅助明细</el-tag>
+        <el-tooltip v-if="!(tabAuxAccount && tabAuxType)" content="未同时选定科目和辅助类型时不显示余额，且同一凭证可能因多个维度重复出现，合计仅供浏览" placement="bottom">
+          <el-tag type="warning" size="small" effect="plain">浏览模式 · 无余额</el-tag>
+        </el-tooltip>
+        <el-tag type="info" size="small">{{ tabAuxAccount || '全部科目' }}{{ tabAuxType ? ' / ' + tabAuxType : '' }}{{ tabAuxCode ? ' / ' + tabAuxCode : '' }} 辅助明细</el-tag>
         <LedgerWindowPager
-          v-if="tabAuxType"
           :range-text="tabAuxWindow.rangeText.value"
           :has-previous="tabAuxWindow.hasPrevious.value"
           :has-next="tabAuxWindow.hasNext.value"
@@ -560,19 +576,13 @@
           @previous="moveTabAuxWindow('previous')"
           @next="moveTabAuxWindow('next')"
         />
-        <el-button size="small" @click="loadTabAuxLedger(true)" :loading="loading" :disabled="!tabAuxAccount">刷新</el-button>
+        <el-button size="small" @click="loadTabAuxLedger(true)" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
-        <el-button size="small" plain @click="exportTabAuxLedgerExcel" :disabled="!tabAuxType">导出Excel</el-button>
+        <el-button size="small" plain @click="exportTabAuxLedgerExcel">导出Excel</el-button>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
-      <div v-if="!tabAuxAccount" class="gt-empty-state">
-        <el-empty description="请在上方选择一个科目查看辅助明细账" :image-size="80" />
-      </div>
-      <div v-else-if="!tabAuxType" class="gt-empty-state">
-        <el-empty description="请继续选择一个辅助类型，避免跨维度重复累计" :image-size="80" />
-      </div>
       <el-table-v2
-        v-else-if="tabAuxLedgerDisplay.length > 1000"
+        v-if="tabAuxLedgerDisplay.length > 1000"
         :columns="tabAuxVirtualColumns"
         :data="tabAuxLedgerDisplay"
         :width="tableWidth"
@@ -584,7 +594,8 @@
         fixed
       />
       <el-table
-        v-else-if="tabAuxAccount"
+        v-else
+        v-loading="loading"
         :data="tabAuxLedgerDisplay"
         border
         size="small"
@@ -609,6 +620,10 @@
             <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucherFromTab(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
+        <el-table-column v-if="!tabAuxAccount" prop="account_code" label="科目" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.account_code }} {{ row.account_name }}</template>
+        </el-table-column>
+        <el-table-column v-if="!tabAuxType" prop="aux_type" label="辅助类型" width="110" show-overflow-tooltip />
         <el-table-column prop="aux_name" label="辅助名称" width="150" show-overflow-tooltip />
         <el-table-column prop="summary" label="摘要" min-width="200" class-name="gt-summary-col">
           <template #default="{ row }"><span class="gt-summary-cell">{{ row.summary }}</span></template>
@@ -619,7 +634,7 @@
         <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
           <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="160" align="right">
+        <el-table-column v-if="tabAuxAccount && tabAuxType" prop="balance" label="余额" width="160" align="right">
           <template #default="{ row }"><GtAmountCell :value="row.balance" /></template>
         </el-table-column>
       </el-table>
@@ -990,6 +1005,9 @@
     >
       <div class="gt-context-menu__item" @click="onContextAction('drill')">
         穿透到明细
+      </div>
+      <div v-if="contextMenu.row?.account_code" class="gt-context-menu__item" @click="onContextAction('workpaper')">
+        跳转到底稿（审定表）
       </div>
       <div class="gt-context-menu__item" @click="onContextAction('copy')">
         复制选中行
@@ -1421,6 +1439,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLedgerUrlSync } from '@/composables/useLedgerUrlSync'
 import { Search, Upload, Loading, Warning, Setting, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { openAccountWorkpaper } from '@/composables/useLedgerAccountWorkpaper'
+import LedgerBrowseFilters from '@/components/ledger/LedgerBrowseFilters.vue'
+import { ALL_ACCOUNTS, onlyBusinessRows } from '@/utils/ledgerBrowse'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
@@ -1588,7 +1609,9 @@ async function loadCurrentProject() {
       name: basicInfo.client_name ? `${basicInfo.client_name}_${basicInfo.audit_year || ''}` : projectId.value,
       client_name: basicInfo.client_name || '',
     }
-    selectedYear.value = basicInfo.audit_year || year.value
+    // 选择器显示当前实际查看的年度（路由 / 默认有数据年度），项目审计年度只作兜底：
+    // 原先反过来优先用审计年度，查看 2026 年数据时选择器却显示 2098
+    selectedYear.value = year.value ?? (basicInfo.audit_year || null)
   } catch {
     // 回退：从项目列表中找
     const found = projectList.value.find(p => p.id === projectId.value)
@@ -2530,11 +2553,17 @@ onContextChange(() => {
     tabAuxType.value = ''
     tabAuxCode.value = ''
     tabAuxLedgerItems.value = []
+    tabLedgerKeyword.value = ''
+    tabAuxKeyword.value = ''
+    tabLedgerAmountDir.value = 'all'
+    tabAuxAmountDir.value = 'all'
+    tabAuxProjectTypes.value = []
     loadCurrentProject()
     loadAvailableYears()
     currentLevel.value = 'balance'
     breadcrumbs.value = [{ label: '账簿查询', level: 'balance' }]
     loadBalance()
+    loadActiveBrowseTab()
   }
 })
 
@@ -2589,6 +2618,8 @@ function onContextAction(action: string) {
     copySelectedRows(row)
   } else if (action === 'voucher') {
     openAttachToWorkpaper(row)
+  } else if (action === 'workpaper') {
+    void openAccountWorkpaper(router, projectId.value, row?.account_code)
   }
 }
 
@@ -4116,14 +4147,17 @@ function switchToAuxTab() {
 // ── 序时账 Tab 状态 ──
 const tabLedgerAccount = ref('')
 const tabLedgerDateRange = ref<string[] | null>(null)
+const tabLedgerKeyword = ref('')
+const tabLedgerAmountDir = ref<'all' | 'debit' | 'credit'>('all')
 const tabLedgerItems = ref<any[]>([])
 const tabLedgerOpening = ref(0)
-const tabLedgerDisplay = computed(() =>
+const tabLedgerDisplay = computed(() => onlyBusinessRows(
   materializeLedgerWindow(tabLedgerWindow.response.value, {
     includeOpening: tabLedgerWindow.position.value === 0,
     syntheticExtra: { account_code: '' },
   }),
-)
+  !!tabLedgerAccount.value,
+))
 
 // 窗口加载由 useLedgerWindow 管理；不再显示“全量加载 x/total”的误导性进度。
 
@@ -4189,6 +4223,10 @@ const tabLedgerVirtualColumns = computed(() => [
     },
   },
   { key: 'voucher_no', dataKey: 'voucher_no', title: '凭证号', width: 90 },
+  ...(tabLedgerAccount.value ? [] : [{
+    key: 'account_code', dataKey: 'account_code', title: '科目', width: 220,
+    cellRenderer: ({ rowData }: any) => h('span', {}, `${rowData.account_code ?? ''} ${rowData.account_name ?? ''}`),
+  }]),
   {
     key: 'summary', dataKey: 'summary', title: '摘要', width: 360, flexGrow: 1,
     cellRenderer: ({ cellData }: any) =>
@@ -4196,7 +4234,9 @@ const tabLedgerVirtualColumns = computed(() => [
   },
   { key: 'debit_amount', dataKey: 'debit_amount', title: '借方', width: 140, align: 'right', cellRenderer: amountCellRenderer },
   { key: 'credit_amount', dataKey: 'credit_amount', title: '贷方', width: 140, align: 'right', cellRenderer: amountCellRenderer },
-  { key: 'balance', dataKey: 'balance', title: '余额', width: 140, align: 'right', cellRenderer: amountCellRenderer },
+  ...(tabLedgerAccount.value
+    ? [{ key: 'balance', dataKey: 'balance', title: '余额', width: 140, align: 'right', cellRenderer: amountCellRenderer }]
+    : []),
 ])
 
 // 辅助明细账 Tab 虚拟滚动列定义
@@ -4227,6 +4267,11 @@ const tabAuxVirtualColumns = computed(() => [
     },
   },
   { key: 'voucher_no', dataKey: 'voucher_no', title: '凭证号', width: 90 },
+  ...(tabAuxAccount.value ? [] : [{
+    key: 'account_code', dataKey: 'account_code', title: '科目', width: 200,
+    cellRenderer: ({ rowData }: any) => h('span', {}, `${rowData.account_code ?? ''} ${rowData.account_name ?? ''}`),
+  }]),
+  ...(tabAuxType.value ? [] : [{ key: 'aux_type', dataKey: 'aux_type', title: '辅助类型', width: 110 }]),
   { key: 'aux_name', dataKey: 'aux_name', title: '辅助名称', width: 150 },
   {
     key: 'summary', dataKey: 'summary', title: '摘要', width: 360, flexGrow: 1,
@@ -4235,7 +4280,9 @@ const tabAuxVirtualColumns = computed(() => [
   },
   { key: 'debit_amount', dataKey: 'debit_amount', title: '借方', width: 140, align: 'right', cellRenderer: amountCellRenderer },
   { key: 'credit_amount', dataKey: 'credit_amount', title: '贷方', width: 140, align: 'right', cellRenderer: amountCellRenderer },
-  { key: 'balance', dataKey: 'balance', title: '余额', width: 140, align: 'right', cellRenderer: amountCellRenderer },
+  ...(tabAuxAccount.value && tabAuxType.value
+    ? [{ key: 'balance', dataKey: 'balance', title: '余额', width: 140, align: 'right', cellRenderer: amountCellRenderer }]
+    : []),
 ])
 
 const tabVirtualRowEventHandlers = {
@@ -4249,22 +4296,46 @@ function switchToLedgerTab() {
   tabSelectedKeys.value = new Set()
   selectedRows.value = []
   _syncLedgerToUrl()
+  if (!tabLedgerWindow.response.value) void loadTabLedger()
+}
+
+/** 当前停在序时账 / 辅助明细账页签时，按当前筛选（默认全部）加载第一窗。 */
+function loadActiveBrowseTab() {
+  if (balanceTab.value === 'ledger') void loadTabLedger()
+  else if (balanceTab.value === 'aux_detail') {
+    void loadTabAuxLedger()
+    void loadTabAuxProjectTypes()
+  }
+}
+
+/** 全部科目下的辅助类型下拉：取项目内所有辅助维度类型（轻量接口，只返回类型列表） */
+async function loadTabAuxProjectTypes() {
+  if (!projectId.value || year.value == null || tabAuxProjectTypes.value.length) return
+  try {
+    const data: any = await api.get(P_ledger.auxBalanceSummary(projectId.value), {
+      params: { year: year.value, dim_type: '__types_only__' },
+      validateStatus: (s: number) => s === 200 || s === 404,
+    })
+    tabAuxProjectTypes.value = ((data?.dim_types ?? []) as any[]).map((d) => String(d.type)).filter(Boolean)
+  } catch { tabAuxProjectTypes.value = [] }
 }
 
 function onTabLedgerAccountChange() {
   tabLedgerWindow.clear()
   tabLedgerItems.value = []
   tabLedgerOpening.value = 0
-  if (tabLedgerAccount.value) loadTabLedger()
+  loadTabLedger()
 }
 
 function tabLedgerQuery(): LedgerWindowQuery | null {
-  if (!projectId.value || !year.value || !tabLedgerAccount.value) return null
+  if (!projectId.value || !year.value) return null
   return {
     kind: 'ledger', projectId: projectId.value, year: year.value,
-    accountCode: tabLedgerAccount.value, limit: 200,
+    accountCode: tabLedgerAccount.value || ALL_ACCOUNTS, limit: 200,
     dateFrom: tabLedgerDateRange.value?.[0] || null,
     dateTo: tabLedgerDateRange.value?.[1] || null,
+    keyword: tabLedgerKeyword.value.trim() || null,
+    amountDir: tabLedgerAmountDir.value,
   }
 }
 
@@ -4300,16 +4371,21 @@ async function moveTabLedgerWindow(direction: 'previous' | 'next') {
 const tabAuxAccount = ref('')
 const tabAuxType = ref('')
 const tabAuxCode = ref('')
+const tabAuxKeyword = ref('')
+const tabAuxAmountDir = ref<'all' | 'debit' | 'credit'>('all')
+/** 未选科目时辅助类型下拉的选项：项目内所有辅助维度类型 */
+const tabAuxProjectTypes = ref<string[]>([])
 const tabAuxTypeOptions = ref<string[]>([])
 const tabAuxCodeOptions = ref<any[]>([])
 const tabAuxLedgerItems = ref<any[]>([])
 const tabAuxOpening = ref(0)
-const tabAuxLedgerDisplay = computed(() =>
+const tabAuxLedgerDisplay = computed(() => onlyBusinessRows(
   materializeLedgerWindow(tabAuxWindow.response.value, {
     includeOpening: tabAuxWindow.position.value === 0,
     syntheticExtra: { aux_name: '', account_code: '' },
   }),
-)
+  !!tabAuxAccount.value && !!tabAuxType.value,
+))
 // 明细表 / 凭证层读入后按行上凭证键补查已挂标识（查过的键不再查）
 watch([ledgerItems, auxLedgerItems, tabLedgerItems, tabAuxLedgerItems, voucherItems], lists => lists.forEach(l => void voucherLinks.loadForRows(l)))
 
@@ -4320,6 +4396,8 @@ function switchToAuxDetailTab() {
   tabSelectedKeys.value = new Set()
   selectedRows.value = []
   _syncLedgerToUrl()
+  if (!tabAuxWindow.response.value) void loadTabAuxLedger()
+  void loadTabAuxProjectTypes()
 }
 
 async function onTabAuxAccountChange() {
@@ -4329,6 +4407,7 @@ async function onTabAuxAccountChange() {
   tabAuxCodeOptions.value = []
   tabAuxLedgerItems.value = []
   tabAuxWindow.clear()
+  loadTabAuxLedger()
   if (!tabAuxAccount.value) return
   // 拉取该科目的辅助余额，提取辅助类型列表
   try {
@@ -4349,7 +4428,7 @@ function onTabAuxTypeChange() {
   tabAuxCode.value = ''
   tabAuxLedgerItems.value = []
   tabAuxWindow.clear()
-  if (tabAuxType.value) loadTabAuxLedger()
+  loadTabAuxLedger()
 }
 
 const tabAuxCodeFiltered = computed(() =>
@@ -4357,11 +4436,13 @@ const tabAuxCodeFiltered = computed(() =>
 )
 
 function tabAuxQuery(): LedgerWindowQuery | null {
-  if (!projectId.value || !year.value || !tabAuxAccount.value || !tabAuxType.value) return null
+  if (!projectId.value || !year.value) return null
   return {
     kind: 'aux_ledger', projectId: projectId.value, year: year.value,
-    accountCode: tabAuxAccount.value, auxType: tabAuxType.value,
+    accountCode: tabAuxAccount.value || ALL_ACCOUNTS, auxType: tabAuxType.value || null,
     auxCode: tabAuxCode.value || null, limit: 200,
+    keyword: tabAuxKeyword.value.trim() || null,
+    amountDir: tabAuxAmountDir.value,
   }
 }
 
@@ -4401,7 +4482,7 @@ async function moveTabAuxWindow(direction: 'previous' | 'next') {
 function drillToVoucherFromTab(row: any) {
   if (!row.voucher_no || row._type !== 'normal') return
   // 切换到穿透模式
-  const acct = tabLedgerAccount.value || tabAuxAccount.value || ''
+  const acct = tabLedgerAccount.value || tabAuxAccount.value || String(row.account_code || '')
   currentAccount.value = acct
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
@@ -4506,18 +4587,15 @@ async function exportLedgerExcel() {
 async function exportTabLedgerExcel() {
   const query = tabLedgerQuery()
   if (!query) return
-  await exportWindowQuery(query, `序时账_${tabLedgerAccount.value}_${year.value}.xlsx`)
+  await exportWindowQuery(query, `序时账_${tabLedgerAccount.value || '全部科目'}_${year.value}.xlsx`)
 }
 
 /** 导出辅助明细 Tab 的完整查询结果；不依赖当前窗口。 */
 async function exportTabAuxLedgerExcel() {
   const query = tabAuxQuery()
-  if (!query) {
-    ElMessage.warning('请先选择辅助类型')
-    return
-  }
+  if (!query) return
   const suffix = tabAuxCode.value ? `_${tabAuxCode.value}` : ''
-  await exportWindowQuery(query, `辅助明细账_${tabAuxAccount.value}${suffix}_${year.value}.xlsx`)
+  await exportWindowQuery(query, `辅助明细账_${tabAuxAccount.value || '全部科目'}${suffix}_${year.value}.xlsx`)
 }
 
 /** 导出凭证明细为 Excel */
@@ -4668,6 +4746,9 @@ function normalizeVoucherDate(raw: unknown): string {
 
 /** 行上带了凭证字列就算已知（NULL = 凭证字为空，按空串）；没有这一列返回 null，交给后端判歧义。 */
 function rowVoucherType(row: any): string | null {
+  // 辅助明细账行（带 aux_type）常常没有凭证字列，空值不代表「凭证字为空的那张」：
+  // 按空串去查会查不到主序时账里凭证字为「记账凭证」的同一张凭证，返回 null 交给后端按凭证号+日期定位。
+  if (row && 'aux_type' in row && !String(row.voucher_type ?? '').trim()) return null
   return row && 'voucher_type' in row ? String(row.voucher_type ?? '').trim() : null
 }
 /** 行上的主体编码；没有这一列或为空返回 null（= 不限主体，交给后端判歧义）。 */
@@ -4750,8 +4831,8 @@ function navigateTo(index: number) {
 function refresh() {
   if (currentLevel.value === 'balance') {
     loadBalance()
-    if (balanceTab.value === 'ledger' && tabLedgerAccount.value) loadTabLedger()
-    else if (balanceTab.value === 'aux_detail' && tabAuxType.value) loadTabAuxLedger(true)
+    if (balanceTab.value === 'ledger') loadTabLedger(true)
+    else if (balanceTab.value === 'aux_detail') loadTabAuxLedger(true)
   }
   else if (currentLevel.value === 'ledger') loadLedger()
   else if (currentLevel.value === 'voucher') loadVoucher()
@@ -4787,8 +4868,15 @@ onMounted(async () => {
   await loadProjectList()
   await loadCurrentProject()
   await loadAvailableYears()
+  // 入口没带 ?year=（仪表盘 / 导入完成 / 报表空态等）且默认年度（项目审计年度）没有账套数据：
+  // 改用最近一个有数据的年度，避免一进来就是「暂无账套数据」。显式带了年度的入口不动。
+  const dataYears = availableYears.value.filter((y) => Number.isFinite(y))
+  if (route.query.year == null && year.value != null && dataYears.length && !dataYears.includes(year.value)) {
+    await router.replace({ path: route.path, query: { ...route.query, year: String(Math.max(...dataYears)) } })
+  }
   await loadBalance()
   _initialized = true
+  loadActiveBrowseTab()
   if (route.query.import === '1') {
     openImportDialogFromRoute()
   }

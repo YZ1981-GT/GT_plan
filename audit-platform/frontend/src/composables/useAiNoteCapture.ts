@@ -25,6 +25,7 @@ import type { ChatMessage } from '@/composables/usePlatformAiChat'
 import type { AiHostRef } from '@/composables/useAiHostContext'
 import { readAiChatErrorResponse } from '@/composables/aiChatWireError'
 import { newUuid } from '@/utils/uuid'
+import { copyText } from '@/utils/clipboard'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -242,28 +243,13 @@ export function useAiNoteCapture(options: UseAiNoteCaptureOptions) {
     // 按原始列表顺序拼接（messages 本身就是服务端顺序）
     const text = msgs.map((m) => m.text).join('\n\n---\n\n')
 
-    try {
-      await navigator.clipboard.writeText(text)
+    // 统一走 utils/clipboard（含非安全上下文的 textarea 回退）
+    if (await copyText(text)) {
       ElMessage.success(`已复制 ${msgs.length} 条 AI 回复`)
       return true
-    } catch {
-      // fallback: textarea copy
-      try {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-        ElMessage.success(`已复制 ${msgs.length} 条 AI 回复`)
-        return true
-      } catch {
-        ElMessage.error('复制失败，请手动选择文本复制')
-        return false
-      }
     }
+    ElMessage.error('复制失败，请手动选择文本复制')
+    return false
   }
 
   // ---------------------------------------------------------------------------

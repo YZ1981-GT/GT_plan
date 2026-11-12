@@ -621,6 +621,7 @@ import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, attachments as P_att, accountChart as P_ac, adjustments as P_adj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { resolveLedgerDefaultYear } from '@/services/ledgerDefaultYear'
 import { creationDeniedMessage } from '@/services/projectCreationGrantApi'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
@@ -946,17 +947,24 @@ watch(() => props.project?.id, async (newId) => {
   }
 }, { immediate: true })
 
-function goTo(page: string, extraQuery?: Record<string, string>) {
+/** 直接读取账套四表衍生数据的页面：审计年度没有账套数据时，默认进入最近有数据的年度，而不是一个空年度 */
+const LEDGER_DATA_PAGES = new Set(['ledger', 'trial-balance', 'adjustments', 'reports', 'disclosure-notes'])
+
+async function goTo(page: string, extraQuery?: Record<string, string>) {
   if (!props.project) return
+  const year = LEDGER_DATA_PAGES.has(page) && !extraQuery?.year
+    ? await resolveLedgerDefaultYear(props.project.id, projectYear.value)
+    : projectYear.value
   router.push({
     path: `/projects/${props.project.id}/${page}`,
-    query: { ...(projectYear.value != null ? { year: String(projectYear.value) } : {}), ...extraQuery },
+    query: { ...(year != null ? { year: String(year) } : {}), ...extraQuery },
   })
 }
 
 function onOpenLedgerWindow() {
   if (!props.project) return
-  openLedgerWindow(props.project.id, projectYear.value ?? undefined)
+  // 不带年度：交给查账窗口按「有数据的年度」兜底（审计年度不一定有账套数据）
+  openLedgerWindow(props.project.id)
 }
 
 /**

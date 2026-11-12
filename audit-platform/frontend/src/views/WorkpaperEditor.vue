@@ -1158,9 +1158,10 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 
-// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）；年度 = 本底稿所属项目的审计年度，没有就不带（查账窗口按项目审计年度取）
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）。
+// 不带年度：项目审计年度不一定有账套数据，由查账窗口自己取「审计年度有数据就用它，否则最近有数据的年度」。
 function onOpenLedgerWindow() {
-  openLedgerWindow(projectId.value, projectYear.value ?? undefined)
+  openLedgerWindow(projectId.value)
 }
 
 // 从序时账打开（带本站返回地址）时回原穿透现场（R3.5）；未保存确认只走 onBeforeRouteLeave（原先这里先弹原生 confirm，要确认两遍）

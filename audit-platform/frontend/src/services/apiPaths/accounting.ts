@@ -133,6 +133,8 @@ export const ledger = {
   attachedVoucherStatus: (pid: string, wpId: string) =>
     `/api/projects/${pid}/ledger/workpapers/${encodeURIComponent(wpId)}/attached-voucher-status`,
   years: (pid: string) => `/api/projects/${pid}/ledger/years`,
+  /** 余额表科目 → 对应底稿（审定表优先）；wp_id 为空 = 本项目尚未生成 */
+  accountWorkpapers: (pid: string) => `/api/projects/${pid}/ledger/account-workpapers`,
   validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
   smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,
   smartImport: (pid: string) => `/api/projects/${pid}/ledger/smart-import`,

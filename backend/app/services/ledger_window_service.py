@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal, ROUND_HALF_EVEN
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -30,6 +30,14 @@ from app.services.ledger_penetration_service import _attach_extra_fields
 from app.services import ledger_window_cursor
 
 Kind = Literal["ledger", "aux_ledger"]
+
+
+class SummaryCache(Protocol):
+    """首窗摘要的长效缓存（Redis 实现见 ledger_window_cache.RedisSummaryCache）。"""
+
+    async def get(self, key: str) -> dict[str, Any] | None: ...
+
+    async def set(self, key: str, value: dict[str, Any]) -> None: ...
 _MONEY = Decimal("0.01")
 _V2_SIGN = "v2_category_natural_positive"
 
@@ -52,6 +60,9 @@ def _escape_like(value: str) -> str:
 
 
 def _account_condition(table: sa.Table, account_code: str) -> sa.ColumnElement:
+    if account_code == "*":
+        # 全部科目：不加任何科目谓词（LIKE '%' 会迫使每行回表读 account_code，也挡住仅索引扫描）
+        return sa.true()
     if account_code.endswith("*"):
         return table.c.account_code.like(_escape_like(account_code[:-1]) + "%", escape="\\")
     return table.c.account_code == account_code
@@ -73,10 +84,20 @@ def _scope_conditions(
         _account_condition(table, query.account_code),
     ]
     if auxiliary:
-        conditions.append(table.c.aux_type == query.aux_type)
+        # 不指定辅助类型 = 浏览该科目（或全部科目）下所有维度的明细行
+        if query.aux_type:
+            conditions.append(table.c.aux_type == query.aux_type)
         if query.aux_code is not None:
             conditions.append(table.c.aux_code == query.aux_code)
     return conditions
+
+
+ALL_ACCOUNTS = "*"
+
+
+def _is_browse_all(query: LedgerWindowQuery, *, auxiliary: bool) -> bool:
+    """浏览模式：未限定科目，或辅助明细未限定维度类型。此模式下余额类数字不具备会计含义。"""
+    return query.account_code == ALL_ACCOUNTS or (auxiliary and not query.aux_type)
 
 
 def _range_conditions(table: sa.Table, query: LedgerWindowQuery) -> list[sa.ColumnElement]:
@@ -170,8 +191,9 @@ def _query_identity(kind: Kind, project_id: UUID, query: LedgerWindowQuery) -> d
 
 
 class LedgerWindowService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, summary_cache: "SummaryCache | None" = None):
         self.db = db
+        self.summary_cache = summary_cache
 
     async def _active_dataset(self, project_id: UUID, year: int) -> UUID:
         try:
@@ -196,6 +218,9 @@ class LedgerWindowService:
         *,
         auxiliary: bool,
     ) -> Decimal:
+        if _is_browse_all(query, auxiliary=auxiliary):
+            # 全部科目 / 跨维度浏览：把各科目（含父子级）或各维度期初加总没有会计意义，且会重复计入
+            return Decimal(0)
         table = TbAuxBalance.__table__ if auxiliary else TbBalance.__table__
         conditions = _scope_conditions(table, project_id, dataset_id, query, auxiliary=auxiliary)
         value = (await self.db.execute(
@@ -238,6 +263,15 @@ class LedgerWindowService:
         scope = _scope_conditions(table, project_id, dataset_id, query, auxiliary=auxiliary)
         in_range = [*scope, *_range_conditions(table, query)]
         visible = _visible_condition(table.c, query, auxiliary=auxiliary)
+        if _is_browse_all(query, auxiliary=auxiliary):
+            # 浏览模式没有会计意义的累计余额：显示条件（关键字 / 借贷方向）直接下推到 WHERE，
+            # 只统计命中行，不再对每个扫描行求值 FILTER（实测 149 万行关键字汇总 2.4s → 1.0s）
+            in_range = [*in_range, visible]
+            visible = sa.true()
+        if _is_browse_all(query, auxiliary=auxiliary) and self.db.bind.dialect.name == "postgresql":
+            # 浏览全部的汇总要扫百万级行：并行聚合会占用 /dev/shm，容器默认 64MB 时直接
+            # DiskFullError（实测 430 万行辅助明细 500）。本事务内关闭并行，顺序扫描不占共享内存。
+            await self.db.execute(sa.text("SET LOCAL max_parallel_workers_per_gather = 0"))
         movement = sa.func.coalesce(table.c.debit_amount, 0) - sa.func.coalesce(table.c.credit_amount, 0)
         year_part = sa.extract("year", table.c.voucher_date)
         month_part = sa.extract("month", table.c.voucher_date)
@@ -304,14 +338,20 @@ class LedgerWindowService:
         base_conditions = [
             *_scope_conditions(table, project_id, dataset_id, query, auxiliary=auxiliary),
             *_range_conditions(table, query),
-            _visible_condition(table.c, query, auxiliary=auxiliary),
         ]
-        source = sa.select(
+        if not _is_browse_all(query, auxiliary=auxiliary):
+            # 浏览模式只抽样前 2000 行推断额外列，不带关键字条件（稀有关键字会让抽样扫完整个范围）
+            base_conditions.append(_visible_condition(table.c, query, auxiliary=auxiliary))
+        source_stmt = sa.select(
             sa.case(
                 (sa.func.jsonb_typeof(table.c.raw_extra) == "object", table.c.raw_extra),
                 else_=sa.cast(sa.literal("{}"), JSONB),
             ).label("raw_extra")
-        ).where(*base_conditions).subquery("extra_source")
+        ).where(*base_conditions)
+        if _is_browse_all(query, auxiliary=auxiliary):
+            # 全量扫描上百万行的 raw_extra 键代价过高：浏览模式只抽样前 2000 行推断额外列
+            source_stmt = source_stmt.limit(2000)
+        source = source_stmt.subquery("extra_source")
         keys = (sa.func.jsonb_object_keys(source.c.raw_extra)
                 .table_valued("key").render_derived().lateral("extra_keys"))
         stmt = (sa.select(keys.c.key).select_from(source.join(keys, sa.true()))
@@ -348,10 +388,15 @@ class LedgerWindowService:
         if key is not None:
             conditions.append(_after_cursor(table, key, nullable=auxiliary))
         base = sa.select(*columns, movement).where(*conditions).cte("ledger_window_base")
-        running = (
-            sa.literal(anchor, type_=sa.Numeric(38, 2))
-            + sa.func.sum(base.c._movement).over(order_by=_order(base.c), rows=(None, 0))
-        ).label("running_balance_signed")
+        if _is_browse_all(query, auxiliary=auxiliary):
+            # 浏览模式没有会计意义的运行余额（前端不展示）：跳过全量窗口累计，
+            # 让 ORDER BY ... LIMIT 直接走排序索引取前 N 行。
+            running = sa.literal(Decimal(0), type_=sa.Numeric(38, 2)).label("running_balance_signed")
+        else:
+            running = (
+                sa.literal(anchor, type_=sa.Numeric(38, 2))
+                + sa.func.sum(base.c._movement).over(order_by=_order(base.c), rows=(None, 0))
+            ).label("running_balance_signed")
         ranked = sa.select(*[base.c[col.key] for col in columns], running).cte("ledger_window_ranked")
         stmt = (sa.select(ranked)
                 .where(_visible_condition(ranked.c, query, auxiliary=auxiliary))
@@ -391,6 +436,55 @@ class LedgerWindowService:
                 ))
         return subtotals
 
+    async def _first_page_state(
+        self,
+        kind: Kind,
+        table: sa.Table,
+        project_id: UUID,
+        dataset_id: UUID,
+        query: LedgerWindowQuery,
+        *,
+        auxiliary: bool,
+    ) -> tuple[LedgerWindowSummary, Decimal, list[str]]:
+        """首窗需要的精确摘要 / 范围期初 / 额外列。
+
+        浏览模式（全部科目）的摘要要扫百万行，且与用户、每页条数无关，只取决于
+        数据集 + 筛选条件：命中 ``summary_cache`` 时直接复用（键含数据集 ID，重新导入自然失效）。
+        """
+        browse = _is_browse_all(query, auxiliary=auxiliary)
+        cache = self.summary_cache if browse else None
+        cache_key = None
+        if cache is not None:
+            identity = {**_query_identity(kind, project_id, query), "limit": 0, "dataset": str(dataset_id)}
+            cache_key = f"{kind}:{project_id}:{dataset_id}:{ledger_window_cursor.query_fingerprint(identity)[:32]}"
+            hit = await cache.get(cache_key)
+            if hit is not None:
+                try:
+                    return (LedgerWindowSummary.model_validate(hit["summary"]),
+                            Decimal(str(hit["anchor"])), list(hit["extra_columns"]))
+                except (KeyError, TypeError, ValueError):
+                    pass  # 缓存内容损坏 ⇒ 重算
+
+        annual_opening = await self._opening(project_id, dataset_id, query, auxiliary=auxiliary)
+        range_opening = await self._range_opening(
+            table, project_id, dataset_id, query, annual_opening, auxiliary=auxiliary,
+        )
+        summary = await self._summary(
+            table, project_id, dataset_id, query, annual_opening, range_opening, auxiliary=auxiliary,
+        )
+        extra_columns = await self._extra_columns(table, project_id, dataset_id, query, auxiliary=auxiliary)
+        if browse and auxiliary:
+            summary.warnings = [*summary.warnings,
+                                "当前为浏览模式：未限定科目/辅助类型，余额列不适用；"
+                                "辅助明细同一凭证可能因多个维度重复出现，合计仅供浏览"]
+        if cache is not None and cache_key is not None:
+            await cache.set(cache_key, {
+                "summary": summary.model_dump(mode="json"),
+                "anchor": str(range_opening),
+                "extra_columns": extra_columns,
+            })
+        return summary, range_opening, extra_columns
+
     async def fetch(
         self,
         kind: Kind,
@@ -399,11 +493,6 @@ class LedgerWindowService:
         query: LedgerWindowQuery,
     ) -> LedgerWindowResponse:
         auxiliary = kind == "aux_ledger"
-        if auxiliary and not query.aux_type:
-            raise HTTPException(status_code=422, detail={
-                "error_code": "AUX_TYPE_REQUIRED",
-                "message": "辅助明细窗口必须先选择辅助类型，避免跨维度重复累计",
-            })
         table = TbAuxLedger.__table__ if auxiliary else TbLedger.__table__
         dataset_id = await self._active_dataset(project_id, query.year)
         fingerprint = ledger_window_cursor.query_fingerprint(_query_identity(kind, project_id, query))
@@ -414,18 +503,8 @@ class LedgerWindowService:
             )
 
         if cursor_payload is None:
-            annual_opening = await self._opening(
-                project_id, dataset_id, query, auxiliary=auxiliary,
-            )
-            range_opening = await self._range_opening(
-                table, project_id, dataset_id, query, annual_opening, auxiliary=auxiliary,
-            )
-            summary = await self._summary(
-                table, project_id, dataset_id, query, annual_opening, range_opening,
-                auxiliary=auxiliary,
-            )
-            extra_columns = await self._extra_columns(
-                table, project_id, dataset_id, query, auxiliary=auxiliary,
+            summary, range_opening, extra_columns = await self._first_page_state(
+                kind, table, project_id, dataset_id, query, auxiliary=auxiliary,
             )
             anchor, key, page_index, start = range_opening, None, 0, 1
         else:

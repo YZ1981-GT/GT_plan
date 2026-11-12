@@ -8,6 +8,10 @@
  */
 import router from '@/router'
 
+/**
+ * @param year 仅在「用户明确正在查看的年度」时传（如试算表当前年度）。
+ *   项目审计年度不要传：它不一定有账套数据，不带年度时查账页会自己选有数据的年度。
+ */
 export function openLedgerWindow(projectId: string, year?: number): void {
   if (!projectId) return
 
