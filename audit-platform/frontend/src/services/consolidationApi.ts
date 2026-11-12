@@ -624,6 +624,7 @@ export interface ConsolNoteFillResult {
   kept_manual: Array<{ row_index: number; col_index: number; target_row: number; current: string; formula_value: string | null }>
   blank: Array<{ row_index: number; col_index: number; target_row: number | null; reason: string }>
   is_stale: boolean
+  data_digest?: string | null
   data: { headers: any[]; rows: string[][]; manual_cells?: Array<{ row: number; col: number }>; [k: string]: any }
 }
 

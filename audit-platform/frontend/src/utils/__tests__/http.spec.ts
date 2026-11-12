@@ -14,7 +14,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 测试需要直接操作内部缓冲区，所以引入完整 http 模块
-import { recent5xxRate, getRecentNetworkStats, _resetNetworkStats } from '../http'
+import { recent5xxRate, getRecentNetworkStats, shouldRetry5xx, _resetNetworkStats } from '../http'
 
 // 因为 http.ts 内部 _last100Requests 是模块级私有状态，这里手动模拟请求
 // 通过启动 axios mock 触发 interceptor，但更简单直接：暴露一个 helper 通过 monkey-patch
@@ -101,5 +101,24 @@ describe('http.ts 5xx 环形缓冲', () => {
     for (let i = 0; i < 150; i++) fakePush(200)
     // 5xx 应该是 0
     expect(getRecentNetworkStats().total).toBeLessThanOrEqual(100)
+  })
+
+  it('合并附注保存 PUT 遇 500 不进入全局 5xx 自动重试', () => {
+    const saveConfig = {
+      method: 'put',
+      url: '/api/consol-note-sections/data/project/2025/五-5-2',
+      _silent: true,
+    }
+
+    expect(shouldRetry5xx(saveConfig, 500)).toBe(false)
+    expect(shouldRetry5xx(saveConfig, 502)).toBe(false)
+    expect(shouldRetry5xx(saveConfig, 503)).toBe(false)
+  })
+
+  it('带明确幂等凭证的写请求仍保留安全重试能力', () => {
+    expect(shouldRetry5xx({
+      method: 'put',
+      headers: { 'Idempotency-Key': 'note-import-1' },
+    }, 500)).toBe(true)
   })
 })

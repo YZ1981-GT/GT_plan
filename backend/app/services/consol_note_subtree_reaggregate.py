@@ -40,13 +40,17 @@ from app.services.consol_calc_basis import node_measures
 from app.services.consol_group_tree import KIND_AGGREGATE, KIND_ELIM, ROLE_CONSOL
 from app.services.consol_note_detail_apply_service import (
     ApplyError,
-    _parse_locked_cells,
-    _parse_manual_cells,
     apply_detail_refresh,
     placeholder_rows,
     remap_protected,
 )
 from app.services.consol_note_detail_source_service import _row_type
+from app.services.consol_note_protection import (
+    parse_locked_cells,
+    parse_manual_cells,
+    protected_cells,
+    section_locked,
+)
 from app.services.consol_note_formula_service import (
     NoteFormulaError,
     _first_cell,
@@ -424,6 +428,10 @@ class _Run:
                 scope_leaves=[node], template_type=self.template_type,
             )
         except ApplyError as exc:  # 全部在写库前抛出
+            if exc.code == "PROTECTED_CELLS_INVALID":
+                # 保护元数据损坏必须走章节 SAVEPOINT 的失败通道，不能降级成跳过，
+                # 否则同章节此前已写入的节点会在错误数据旁边提交。
+                raise
             return skip(exc.message, pending=exc.code in _PENDING_APPLY_CODES)
         if res.get("status") == "skipped_locked":
             return skip("整节锁定，未覆盖")
@@ -492,7 +500,7 @@ class _Run:
                             f"下级「{_label(broken[0])}」本章没算出，本节点不汇总", incomplete=True)
         is_root = node is self.tree
         source = self._source_record(sid, node, allow_legacy=is_root)
-        if source is not None and getattr(source, "cell_state", "auto") == "locked":
+        if source is not None and section_locked(source):
             return skip("整节锁定，未覆盖")
         topn = section_topn_limit(self.template_type, sid)
         if topn:
@@ -545,11 +553,12 @@ class _Run:
         existing_rows = data.get("rows") if isinstance(data.get("rows"), list) else []
         if existing_rows and isinstance(existing_rows[0], (list, tuple)):
             width = max(width, len(existing_rows[0]))
-        manual, locked = _parse_manual_cells(data), _parse_locked_cells(record)
+        manual, locked = parse_manual_cells(data), parse_locked_cells(record)
+        protected = protected_cells(record, data)
         for i in verbatim:
             amounts.pop(i, None)
         # 「……」占位行没有下级数、也没有手填值就不写；手工 / 锁定格按行名对到新行号（R15）
-        built = build_note_rows(skeleton, amounts, width=width, protected=manual | locked,
+        built = build_note_rows(skeleton, amounts, width=width, protected=protected,
                                 existing_rows=existing_rows, placeholders=placeholders,
                                 table=consol_table if headers else None)
         new_rows, filled, kept = built.rows, built.filled, built.kept

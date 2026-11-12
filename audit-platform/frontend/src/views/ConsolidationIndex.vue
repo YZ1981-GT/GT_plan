@@ -450,6 +450,21 @@
           />
         </div>
       </el-tab-pane>
+
+      <!-- Tab 7: 签字锁定（批 7 任务 7.4：快照列表 / 完整性 / 对比 / 下载 + 签字锁定）-->
+      <el-tab-pane label="签字锁定" name="consol_snapshot">
+        <div class="gt-tab-content">
+          <ConsolSnapshotPanel
+            ref="consolSnapshotPanelRef"
+            :project-id="projectId"
+            :year="effectiveConsolYear()"
+            :readonly-reason="workspaceReadonlyReason"
+            data-testid="consol-snapshot-tab"
+            @locked="onSnapshotLocked"
+            @created="onSnapshotCreated"
+          />
+        </div>
+      </el-tab-pane>
     </el-tabs>
     </div><!-- .gt-consol-content -->
 
@@ -660,6 +675,7 @@ import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
 import ConsolReportBreakdownView from '@/components/consolidation/ConsolReportBreakdownView.vue'
 import ConsolReadinessBar from '@/components/consolidation/ConsolReadinessBar.vue'
+import ConsolSnapshotPanel from '@/components/consolidation/ConsolSnapshotPanel.vue'
 import PlatformJobProgress from '@/components/common/PlatformJobProgress.vue'
 import OrgNode from '@/components/consolidation/OrgNode.vue'
 import ConsolElimNodePanel from '@/components/consolidation/ConsolElimNodePanel.vue'
@@ -744,6 +760,22 @@ const year = computed<number | null>(() => {
 const workspaceGuard = provideConsolWorkspaceGuard()
 const workspaceAccess = useConsolWorkspaceAccess(projectId)
 const workspaceReadonlyReason = workspaceAccess.readonlyReason
+
+// 批 7 任务 7.4：签字锁定 Tab（快照面板）与 readiness 栏引用
+const consolReadinessBarRef = ref<InstanceType<typeof ConsolReadinessBar> | null>(null)
+const consolSnapshotPanelRef = ref<InstanceType<typeof ConsolSnapshotPanel> | null>(null)
+
+/** 签字锁定成功：刷新项目锁状态（工作区立即转只读）+ 重算 readiness 栏 */
+function onSnapshotLocked() {
+  void workspaceAccess.refreshLockStatus()
+  eventBus.emit('consol-lock:detected')
+  consolReadinessBarRef.value?.load()
+}
+
+/** 创建任意快照后（含诊断）：readiness 的 lifecycle 域可能变化，刷新 readiness 栏 */
+function onSnapshotCreated() {
+  consolReadinessBarRef.value?.load()
+}
 
 function openProjectSettings() {
   router.push(`/projects/${projectId.value}/settings`)

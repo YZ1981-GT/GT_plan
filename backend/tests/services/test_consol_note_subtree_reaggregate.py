@@ -467,6 +467,29 @@ class TestProtectionAndSkips:
         assert [(f["node_key"], "manual_cells" in f["error"]) for f in result["failures"]] == [("A:consol_elim", True)]
         assert await _rec(db, group, "A:consol") is None and await _rec(db, group, "G:consol") is None
         assert (await _rec(db, group, "B:subsidiary")).data["_last_write_source"] == "detail_mapping"
+    @pytest.mark.asyncio
+    async def test_invalid_protection_metadata_rolls_back_whole_section(self, db, user, group):
+        """汇总节点的坏保护元数据走章节 SAVEPOINT 失败通道，不保留同章先前写入。"""
+        await _setup(db, user, group)
+        original = {"rows": [], "manual_cells": "坏了"}
+        db.add(ConsolNoteData(
+            project_id=group["G"].id, year=_YEAR, section_id=_SECTION, node_key="G:consol",
+            data=original.copy(),
+        ))
+        await db.flush()
+
+        result = await reaggregate_subtree(
+            db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_SECTION],
+        )
+
+        assert result["status"] == "failed"
+        assert len(result["failures"]) == 1
+        failure = result["failures"][0]
+        assert failure["section_id"] == _SECTION and failure["node_key"] == "G:consol"
+        assert "manual_cells" in failure["error"]
+        assert await _rec(db, group, "A:parent") is None
+        assert await _rec(db, group, "A:consol_elim") is None
+        assert (await _rec(db, group, "G:consol")).data == original
 
 
 class TestSectionIsolation:

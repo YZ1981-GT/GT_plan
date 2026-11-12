@@ -99,8 +99,9 @@ function isOverdue(item: any) {
 async function fetchItems() {
   loading.value = true
   try {
+    // 原先少 /api 前缀（拿到首页 HTML ⇒ 侧栏「证据收集」恒空）
     const data = await apiProxy.get(
-      `/projects/${props.projectId}/pbc/by-workpaper/${props.wpId}`
+      `/api/projects/${props.projectId}/pbc/by-workpaper/${props.wpId}`
     )
     items.value = Array.isArray(data) ? data : []
   } catch {

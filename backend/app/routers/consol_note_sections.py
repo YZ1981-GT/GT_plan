@@ -7,6 +7,8 @@ GET /api/consol-note-sections/{project_id}/{year}/{section_id}/data — 加载�
 """
 
 import json
+import logging
+import re
 from dataclasses import replace as _replace
 from decimal import Decimal
 from pathlib import Path
@@ -23,6 +25,8 @@ from app.models.core import User
 from app.services.consol_node_scope import (
     NodeScope,
     NodeScopeError,
+    NoteSaveConflict,
+    digest_of,
     load_scoped_note_record,
     load_scoped_note_records,
     resolve_node_scope,
@@ -33,8 +37,11 @@ from app.services.consol_note_table_totals import rollforward_balance
 from app.services.note_table_header_library import column_keys, column_role, rollforward_columns
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
+logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_NOTE_DIGEST_UNCHECKED = object()
+_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 # 内存缓存 (mtime, data)
 _cache: dict[str, tuple[float, list[dict]]] = {}
@@ -86,6 +93,24 @@ def _load_sections(standard: str) -> list[dict]:
 def _note_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=getattr(exc, "status", 400), detail=str(exc))
 
+def _note_save_error(status: int, error_code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=status, detail={"error_code": error_code, "message": message})
+
+def _parse_note_save_options(body: dict) -> tuple[str | None, bool]:
+    has_expected = "expected_digest" in body
+    has_force = "force_overwrite" in body
+    if not has_expected and not has_force:
+        raise _note_save_error(428, "CONSOL_NOTE_DIGEST_REQUIRED", "保存附注必须提供 expected_digest 或 force_overwrite=true")
+    if has_expected and has_force:
+        raise _note_save_error(422, "CONSOL_NOTE_SAVE_INVALID", "expected_digest 与 force_overwrite 只能二选一")
+    if has_expected:
+        expected = body["expected_digest"]
+        if expected is not None and (not isinstance(expected, str) or _DIGEST_RE.fullmatch(expected) is None):
+            raise _note_save_error(422, "CONSOL_NOTE_SAVE_INVALID", "expected_digest 必须是 64 位小写十六进制字符串或 null")
+        return expected, False
+    if body["force_overwrite"] is not True:
+        raise _note_save_error(422, "CONSOL_NOTE_SAVE_INVALID", "force_overwrite 必须为 true")
+    return None, True
 
 def _requested_note_template(body: dict) -> str | None:
     """读取标准/模板请求，并拒绝两个字段指向不同模板。"""
@@ -163,6 +188,7 @@ async def fill_note_by_formula(
     except NoteFormulaError as e:
         await db.rollback()
         raise _note_error(e) from e
+    result["data_digest"] = digest_of(result.get("data"))
     await db.commit()
     return result
 
@@ -282,10 +308,24 @@ async def _save_note_record(
     data: dict,
     *,
     now=None,
+    expected_digest: str | None | object = _NOTE_DIGEST_UNCHECKED,
 ) -> ConsolNoteData:
-    """按已验证作用域写入附注行，统一处理 legacy 复制与并发。"""
     try:
-        return await save_scoped_note_record(db, scope, data, now=now)
+        kwargs = {"now": now}
+        if expected_digest is not _NOTE_DIGEST_UNCHECKED:
+            kwargs["expected_digest"] = expected_digest
+        return await save_scoped_note_record(db, scope, data, **kwargs)
+    except NoteSaveConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "CONSOL_NOTE_CONFLICT",
+                "current_digest": exc.current_digest,
+                "updated_at": str(exc.updated_at) if exc.updated_at else None,
+                "last_write_source": exc.last_write_source,
+                "message": str(exc),
+            },
+        ) from exc
     except NodeScopeError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
@@ -364,11 +404,12 @@ async def get_note_data(
     except HTTPException:
         raise
     if record is None:
-        return {"content": {}, "updated_at": None, "node_key": node_key}
+        return {"content": {}, "updated_at": None, "node_key": node_key, "data_digest": None}
     return {
         "content": record.data if isinstance(record.data, dict) else {},
         "updated_at": str(record.updated_at) if record.updated_at else None,
         "node_key": record.node_key if record.node_key is not None else node_key,
+        "data_digest": digest_of(record),
     }
 
 
@@ -389,6 +430,7 @@ async def save_note_data(
     payload = body.get("data", {})
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="附注数据格式无效")
+    expected_digest, force_overwrite = _parse_note_save_options(body)
 
     # 自动回填合计行（对用户保存的数据，合计行空值自动求和）
     from app.services.consol_note_formula_service import backfill_total_rows
@@ -398,15 +440,40 @@ async def save_note_data(
 
     now = datetime.now(timezone.utc)
     try:
-        await _save_note_record(db, scope, payload, now=now)
+        if force_overwrite:
+            record = await _save_note_record(db, scope, payload, now=now)
+        else:
+            record = await _save_note_record(
+                db,
+                scope,
+                payload,
+                now=now,
+                expected_digest=expected_digest,
+            )
         await db.commit()
-        return {"ok": True, "updated_at": str(now), "node_key": scope.node_key}
+        return {
+            "ok": True, "updated_at": str(now), "node_key": scope.node_key,
+            "data_digest": digest_of(record),
+        }
     except HTTPException:
         await db.rollback()
         raise
-    except Exception as e:
+    except Exception as exc:  # noqa: BLE001
         await db.rollback()
-        return {"ok": False, "error": str(e), "node_key": scope.node_key}
+        logger.exception(
+            "合并附注保存失败 project_id=%s year=%s section_id=%s node_key=%s",
+            project_id,
+            year,
+            section_id,
+            scope.node_key,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "CONSOL_NOTE_SAVE_FAILED",
+                "message": "合并附注保存失败，请稍后重试",
+            },
+        ) from exc
 
 
 # ─── 逐列角色（表头识别统一走标题行库，spec consol-note-header-library-and-node-reaggregate R5） ───

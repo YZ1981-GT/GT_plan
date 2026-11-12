@@ -47,6 +47,20 @@
 - [x] 26. 少 /api 前缀的请求 15 处全部修复：A18-2 读写 / 建议 / 表头带出（检查表改走 `/api/workpapers/{wp}/checklist-responses`、请求体 `{project_id, items}`、未选适用性存 null、年度取 `audit_year`、先取签字合伙人）、I1/I3~I6 健康检查改用统一探针 `fetchOnlyOfficeHealthy`、H3 两处勾稽取对方底稿（静默 404）、K10 两处识别（按底稿调 D4、读 `ocr_text`、附件挂本行 + 小眼睛）、H5 自取渲染配置、侧栏 PBC、凭证识别弹窗（未挂载）
 - [x] 27. 守卫 `apiPathPrefixGuard.spec.ts`（全仓字面量调用须带 /api、apiPaths 字面量须带前缀、扫描面 ≥ 2000、自检 4 例）+ `GtRegulatoryLetter.requests.spec.ts` / `iCycleDualModeHealth.spec.ts` / `k10OcrContract.spec.ts`（跨语言取后端响应字段）；四个文件在 HEAD 上均打红
 - [ ]* 28. 批 F 界面走查（**本 spec 界面走查的唯一承载处**，见 requirements R13.1）：PBC 页签已实测（200、空态）；A16 推荐标记、A18-2（检查 / 导出 / 读写）、I 循环在线编辑切换、H3 勾稽、K10 识别五项所需底稿在存活的【测试】项目里都没有（真实项目打开 A18-2 会占编辑锁），只有单测 / 契约证据。解除条件：在【测试】项目里按平台路径生成这五类底稿（R13.2）
+  - 2026-11-11 联合浏览器验证（`127.0.0.1:3030` + 共享后端，【测试】公式同步甲有限公司_2025 已生成 A16 / A18-2 / H3 / I1 / I3 / K10，前置条件 R13.2 已满足）：
+    - ✅ **A18-2 读写**：选「1. 舞弊 · 适用」→ 自动保存 `PUT /api/workpapers/{wp}/checklist-responses` 落库 `a182-matter1-applicability.remark='Y'` → F5 回读仍选中，console error 0；随后经同一端点写回 null 复原。
+    - ⚠️ **A18-2 检查 / 导出**：界面上没有入口。该底稿 render-config 的 componentType 是 `a18-2-regulatory-communication`（`GtA182RegulatoryCommunication.vue`），任务 26 修的是另一个组件 `GtRegulatoryLetter.vue`（`regulatory-letter`，工具栏里才有「导出 Word」与 `check-incomplete`）。后端 `GET …/export-word/check-incomplete` 接口单独调用 200（`{"incomplete":[],"count":0}`）。⇒ 修复落在了用户看不到的组件上。
+    - 🔴 **A16 推荐标记**：编辑器只显示工具栏，正文空白、无报错。`GtA16Bundle` 只显示 wp_index 里存在 `A16-1`~`A16-7` 子底稿的页签，而该项目只有 `A16` 一张 ⇒ 页签全空；推荐标记无从显示。
+    - 🔴 **I 循环在线编辑切换**：I1 页面没有「在线编辑」切换。实测 OnlyOffice `GET /api/workpapers/onlyoffice/health` = `healthy: true`，但 `useI1DualMode.ts` 仍请求 `/workpapers/onlyoffice/health`（无 /api）⇒ 拿到首页 HTML（200 text/html）⇒ 判为不健康 ⇒ 切换被隐藏。
+    - 🔴 **H3 勾稽**：`h3TransferReconcile.ts` / `h3MortgageReconcile.ts` 仍请求 `/custom-query/wp-id-by-code`（无 /api），实测返回首页 HTML，取不到对方底稿。
+    - 🔴 **K10 识别**：`K10TabOtherIncomeCheck.vue` / `K10TabReceivableGrant.vue` 仍 `POST /d4/contract-ocr`，实测 404。
+  - 结论：任务 28 **不能勾选**。原因不是缺数据，而是下一条勘误：任务 26 / 27 的产物不在当前分支。
+
+> **2026-11-11 勘误（任务 26 / 27 假绿，append-only，原勾选文字不改）**：联合浏览器验证发现两项交付不在当前分支 `spec/disclosure-note-doc-upload-and-batch-fill`（HEAD `8655d07ee` / v1.0.165）。
+> - 守卫 `src/__tests__/apiPathPrefixGuard.spec.ts`、`k10OcrContract.spec.ts`、`iCycleDualModeHealth.spec.ts` 在 HEAD 与工作区都不存在；统一探针 `fetchOnlyOfficeHealthy` 全仓 0 处。`GtRegulatoryLetter.requests.spec.ts` 在库（随批 G 提交 `cd0a8fe1f` 进入）。
+> - `git log --all -S` 只在 4 个快照提交里找到它们：`8eed682ec`（10-31 gt-sync backup）、`227dfb429` / `dceb889c1` / `50736413a`（11-01 SAFETY SNAPSHOT before pull），四者都**不是 HEAD 的祖先**、也不在任何远端分支上。⇒ 产物只在当时的工作区里，主工作区同步时没有带进分支。
+> - HEAD 现扫仍不带 /api 的字面量请求 7 组 / 13 处（扫描脚本口径：`api|http|apiProxy` 的 `get/post/put/delete/patch` 首参以 `/` 开头且首段不是 `api`，排除测试）：`/custom-query/wp-id-by-code`（H3 两处）、`/d4/contract-ocr`（K10 两处）、`/workpapers/onlyoffice/health`（I1、I3~I6 五处）、`/workpapers/${wpId}/render-config`（H5）、`/projects/${pid}/pbc/by-workpaper/${wpId}`（侧栏 PBC）、`/projects/{pid}/trial-balance/writeback`（`useE1Adjudication.ts`）、`/items`（`useFirstLoad.ts`）。逐个实测：PBC / H5 / H3 / I 健康检查都返回首页 HTML（200），K10 POST 404。最后两组未判定是否为死代码。
+> - 处置建议：另立恢复 spec，从快照 `50736413a` 按文件三方合并恢复任务 26 / 27（不整文件 checkout：快照之后这些文件可能已被改过），并补「A18-2 实际组件是 `GtA182RegulatoryCommunication`」与「A16 子底稿缺失时的空态」两处。恢复前任务 26 / 27 / 28 都不应计入完成度。
 
 ## 批 G §8 裁决项（R8~R12，design §9）
 

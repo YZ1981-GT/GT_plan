@@ -3,6 +3,10 @@
 # repo-git-workflow-unification spec / Task 2.1
 #
 # 检查项：
+# 0a. INDEX.md 归档路径自动修复（所有模式，在工作树干净硬门之前）：spec 归档后 INDEX 的链接 /
+#     活跃表行 / 统计数常漂移。本门先自动修可安全修的部分（链接改向 _archive/、删已归档行、重算统计数），
+#     有改动或有需人工项即拒推并给出针对性提示 —— 规则和修复工具在
+#     backend/scripts/check/fix_spec_index_archive_paths.py
 # 0. push 前工作树完整性硬门（所有模式）
 # 0b. 版本标记硬门（所有模式，分离头 worktree 推送也查）：推送新提交时，最新提交上必须有随本次
 #     推送的附注标签 vX.Y.Z，说明里写「主要变动：」—— 规则和打标签工具都在 .git-hooks/push_version.py
@@ -17,6 +21,58 @@ set -e
 # 版本标记门用；后面的检查脚本都不读标准输入。
 PUSH_REFS="$(cat)"
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# 找 Python 路径（Windows + Linux 兼容；临时 worktree 里没有 .venv 时用主工作树的）
+# 放在工作树干净硬门之前：归档路径自动修复门（0a）要先用到它。
+MAIN_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo .git)")"
+if [ -f ".venv/Scripts/python.exe" ]; then
+    PYTHON=".venv/Scripts/python.exe"
+elif [ -f ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+elif [ -f "$MAIN_ROOT/.venv/Scripts/python.exe" ]; then
+    PYTHON="$MAIN_ROOT/.venv/Scripts/python.exe"
+elif [ -f "$MAIN_ROOT/.venv/bin/python" ]; then
+    PYTHON="$MAIN_ROOT/.venv/bin/python"
+elif command -v python > /dev/null; then
+    PYTHON="python"
+else
+    PYTHON=""
+fi
+
+# 0a. INDEX.md 归档路径自动修复硬门（2026-11-08 用户要求：推送时自动修复归档路径变更问题，避免出错）
+#
+# spec 归档时目录从 `.kiro/specs/<name>/` 移进 `_archive/NNN-<name>/`，但 INDEX.md 的速递区链接 /
+# 活跃表行 / 统计数常常没跟着改。本门**先自动修**可安全修的三类漂移（链接改向 / 删已归档行 / 重算统计数），
+# 修完后若工作树产生了改动（或仍有需人工处理的项），就拒推并给出针对性提示 —— 而不是让它掉进下面
+# 的「工作树干净」硬门报一句笼统的「有未提交文件」。自动改动经用户 git add + commit 后随本次推送上去：
+# 工具替你改好字节，你只需提交，既不自动改 HEAD/版本标签，也不会把漂移推上去。
+#
+# 分离头临时 worktree 推送（并发会话常用）不跑这道门：那里不一定有本工具、也不该在推送瞬间改 INDEX。
+FIX_TOOL="backend/scripts/check/fix_spec_index_archive_paths.py"
+if [ -n "$PYTHON" ] && [ -f "$FIX_TOOL" ] && [ -f ".kiro/specs/INDEX.md" ]; then
+    INDEX_BEFORE="$(git hash-object .kiro/specs/INDEX.md 2>/dev/null || echo before)"
+    set +e
+    PYTHONIOENCODING=utf-8 "$PYTHON" "$FIX_TOOL" --apply
+    ARCHIVE_RC=$?
+    set -e
+    INDEX_AFTER="$(git hash-object .kiro/specs/INDEX.md 2>/dev/null || echo after)"
+    if [ "$INDEX_BEFORE" != "$INDEX_AFTER" ]; then
+        echo ""
+        echo "[pre-push] ❌ 已自动修复 INDEX.md 的归档路径漂移（链接 / 活跃表行 / 统计数），拒绝本次 push"
+        echo "          修好的内容还在工作树里，请提交后重新推送："
+        echo "            git add .kiro/specs/INDEX.md && git commit -m \"chore(spec): 归档路径自动修复\""
+        echo "          紧急救急：git push --no-verify"
+        exit 1
+    fi
+    if [ "$ARCHIVE_RC" -ne 0 ]; then
+        echo ""
+        echo "[pre-push] ❌ INDEX.md 仍有需人工处理的归档 / 登记项（见上），拒绝 push"
+        echo "          （新建 spec 要在活跃表登记一行 / mojibake 需显式 UTF-8 还原 / 速递区无记录的归档行先补记）"
+        echo "          紧急救急：git push --no-verify"
+        exit 1
+    fi
+    echo "[pre-push] ✅ INDEX.md 归档路径一致"
+fi
 
 # 0. 交付防丢硬门：push 时工作树必须完全干净。
 #
@@ -34,21 +90,23 @@ if [ -n "$WORKTREE_STATUS" ]; then
     exit 1
 fi
 
-# 找 Python 路径（Windows + Linux 兼容；临时 worktree 里没有 .venv 时用主工作树的）
-MAIN_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo .git)")"
-if [ -f ".venv/Scripts/python.exe" ]; then
-    PYTHON=".venv/Scripts/python.exe"
-elif [ -f ".venv/bin/python" ]; then
-    PYTHON=".venv/bin/python"
-elif [ -f "$MAIN_ROOT/.venv/Scripts/python.exe" ]; then
-    PYTHON="$MAIN_ROOT/.venv/Scripts/python.exe"
-elif [ -f "$MAIN_ROOT/.venv/bin/python" ]; then
-    PYTHON="$MAIN_ROOT/.venv/bin/python"
-elif command -v python > /dev/null; then
-    PYTHON="python"
-else
-    echo "[pre-push] ❌ 未找到 Python，无法校验版本标签，拒绝 push"
-    exit 1
+# Python 路径：0a 已尝试解析（$PYTHON）。这里只在 0a 没找到（真的缺 Python）时按同一顺序再解析一次，
+# 以触发原有的「未找到 Python 拒推」致命分支 —— 版本标记门（0b）必须有 Python 才能跑。
+if [ -z "$PYTHON" ]; then
+    if [ -f ".venv/Scripts/python.exe" ]; then
+        PYTHON=".venv/Scripts/python.exe"
+    elif [ -f ".venv/bin/python" ]; then
+        PYTHON=".venv/bin/python"
+    elif [ -f "$MAIN_ROOT/.venv/Scripts/python.exe" ]; then
+        PYTHON="$MAIN_ROOT/.venv/Scripts/python.exe"
+    elif [ -f "$MAIN_ROOT/.venv/bin/python" ]; then
+        PYTHON="$MAIN_ROOT/.venv/bin/python"
+    elif command -v python > /dev/null; then
+        PYTHON="python"
+    else
+        echo "[pre-push] ❌ 未找到 Python，无法校验版本标签，拒绝 push"
+        exit 1
+    fi
 fi
 
 # 0b. 版本标记硬门（2026-10-27 用户要求：推送时要标记版本号和变动的主要内容）

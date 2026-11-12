@@ -1,66 +1,76 @@
 <template>
   <span
-    class="gt-measure-cell"
-    :class="cssClass"
-    :data-gt-value="rawValue"
-    :data-measure-kind="kind || 'unknown'"
-    :data-ratio-scale="ratioScale || undefined"
-    @click="onClick"
-  >{{ formatted }}</span>
+    :class="[
+      'gt-measure-cell',
+      {
+        'text-red-500': props.negativeRed && numericValue < 0
+      }
+    ]"
+    :data-gt-value="props.value"
+    :style="{ fontVariantNumeric: 'tabular-nums' }"
+  >
+    {{ formattedValue }}
+  </span>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { formatMeasure, measureRawValue, measureSupportsHighlight } from '@/utils/displayMeasure'
-import type { DisplayMeasureKind, RatioScale } from '@/types/displayMeasure'
+import { computed } from 'vue';
+import { MeasureKind, RatioScale, validateRatioScale } from '@/types/measureKind';
+import { formatMeasure } from '@/utils/formatMeasure';
 
-const props = withDefaults(defineProps<{
-  value: unknown
-  kind?: DisplayMeasureKind | null
-  ratioScale?: RatioScale | null
-  priorValue?: unknown
-  clickable?: boolean
-}>(), { kind: null, ratioScale: null, priorValue: undefined, clickable: false })
-
-const emit = defineEmits<{ click: [value: unknown] }>()
-const prefs = useDisplayPrefsStore()
-
-const formatted = computed(() => formatMeasure(props.value, {
-  amountUnit: prefs.amountUnit,
-  decimals: prefs.decimals,
-  showZero: prefs.showZero,
-  kind: props.kind,
-  ratioScale: props.ratioScale,
-}))
-const rawValue = computed(() => props.kind === 'text' ? String(props.value ?? '') : measureRawValue(props.value))
-const cssClass = computed(() => {
-  const classes: string[] = []
-  const number = Number(props.value)
-  if (props.clickable) classes.push('gt-measure-cell--clickable')
-  if (props.kind !== 'text' && prefs.negativeRed && Number.isFinite(number) && number < 0) {
-    classes.push('gt-amount--negative')
-  }
-  if (measureSupportsHighlight(props.kind)) {
-    classes.push(...prefs.amountClass(props.value, props.priorValue).split(' ').filter(Boolean))
-  }
-  return classes
-})
-function onClick(): void {
-  if (props.clickable) emit('click', props.value)
+export interface GtMeasureCellProps {
+  /** 原始值 */
+  value: number | string | null | undefined;
+  /** 度量类型 */
+  kind?: MeasureKind | null;
+  /** 比例刻度（仅 ratio 时必须） */
+  ratioScale?: RatioScale | null;
+  /** 账号小数位（amount 和未登记类型使用） */
+  decimals?: number;
+  /** 是否显示零值 */
+  showZero?: boolean;
+  /** 负数是否显示为红色 */
+  negativeRed?: boolean;
 }
+
+const props = withDefaults(defineProps<GtMeasureCellProps>(), {
+  kind: null,
+  ratioScale: null,
+  decimals: 2,
+  showZero: true,
+  negativeRed: false
+});
+
+// 校验 ratioScale 使用规则
+if (import.meta.env.DEV) {
+  try {
+    validateRatioScale(props.kind, props.ratioScale);
+  } catch (error) {
+    console.error('[GtMeasureCell] 校验失败:', error);
+  }
+}
+
+// 格式化后的值
+const formattedValue = computed(() => {
+  return formatMeasure(props.value, {
+    kind: props.kind,
+    ratioScale: props.ratioScale,
+    decimals: props.decimals,
+    showZero: props.showZero,
+    negativeRed: props.negativeRed
+  });
+});
+
+// 数值部分（用于判断正负）
+const numericValue = computed(() => {
+  if (props.value == null || props.value === '') return 0;
+  const num = Number(props.value);
+  return isNaN(num) ? 0 : num;
+});
 </script>
 
 <style scoped>
 .gt-measure-cell {
-  display: inline-block;
-  padding: 2px 8px;
-  white-space: nowrap;
-  color: var(--gt-color-text-regular);
-  font-family: 'Arial Narrow', Arial, sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-size: inherit;
+  font-family: var(--gt-font-numeric, inherit);
 }
-.gt-measure-cell--clickable { cursor: pointer; color: var(--gt-color-text-primary); font-weight: 500; }
-.gt-measure-cell--clickable:hover { color: var(--gt-color-primary, #4b2d77); }
 </style>

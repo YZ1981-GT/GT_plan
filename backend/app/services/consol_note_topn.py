@@ -27,6 +27,13 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.consol_note_protection import (
+    ProtectionMetadataError,
+    parse_locked_cells,
+    parse_manual_cells,
+    protected_cells,
+    section_locked,
+)
 from app.services.consol_note_table_totals import fmt_amount, to_decimal
 
 __all__ = [
@@ -256,14 +263,11 @@ def write_topn(record: Any, *, headers: Sequence[Any], result: TopNResult, limit
                denominator: Decimal | None, denominator_note: str, data_updates: dict[str, Any] | None = None,
                ) -> dict[str, Any]:
     """把重排结果写进合并附注记录；手工 / 锁定格按单位名称对到新行（对不上的回报）。返回写入摘要。"""
-    from app.services.consol_note_detail_apply_service import (
-        _parse_locked_cells,
-        _parse_manual_cells,
-        remap_protected,
-    )
+    from app.services.consol_note_detail_apply_service import remap_protected
 
     data = dict(record.data) if isinstance(record.data, dict) else {}
-    manual, locked = _parse_manual_cells(data), _parse_locked_cells(record)
+    manual, locked = parse_manual_cells(data), parse_locked_cells(record)
+    protected = protected_cells(record, data)
     old_rows = data.get("rows") if isinstance(data.get("rows"), list) else []
     old_index = {}
     for i, row in enumerate(old_rows):
@@ -273,7 +277,7 @@ def write_topn(record: Any, *, headers: Sequence[Any], result: TopNResult, limit
     old_to_new = {old: new_index[key] for key, old in old_index.items() if key in new_index}
     kept: list[dict[str, Any]] = []
     guard: set[tuple[int, int]] = set()
-    for r, c in sorted(manual | locked):
+    for r, c in sorted(protected):
         new = old_to_new.get(r)
         if new is None or r >= len(old_rows) or not isinstance(old_rows[r], (list, tuple)) or c >= len(old_rows[r]):
             continue
@@ -384,16 +388,19 @@ async def apply_topn_refresh(db: AsyncSession, *, project_id: UUID, section_id: 
         entries.extend(topn_entries(rows, leaf.node_key))
 
     record = await _load_or_create_note_data(db, project_id, year, section_id, node_key)
-    if getattr(record, "cell_state", "auto") == "locked":
+    if section_locked(record):
         return {"status": "skipped_locked", "reason": "整节被锁定（cell_state=locked），不覆盖", "section_id": section_id}
     denominator, note = await topn_denominator(db, project_id=project_id, year=year, template_type=template_type,
                                                section_id=section_id, node_key=node_key)
     result = rerank(entries, columns=columns, limit=limit, width=max(len(headers), 2),
                     exclude=group_unit_names(tree), denominator=denominator, denominator_reason=note)
-    summary = write_topn(record, headers=headers, result=result, limit=limit, approximate=False,
-                         denominator=denominator, denominator_note=note, data_updates={
-                             "_last_write_source": WRITE_SOURCE, "_detail_entity_count": len(applied),
-                             "_detail_applied_at": datetime.now(timezone.utc).isoformat()})
+    try:
+        summary = write_topn(record, headers=headers, result=result, limit=limit, approximate=False,
+                             denominator=denominator, denominator_note=note, data_updates={
+                                 "_last_write_source": WRITE_SOURCE, "_detail_entity_count": len(applied),
+                                 "_detail_applied_at": datetime.now(timezone.utc).isoformat()})
+    except ProtectionMetadataError as exc:
+        raise ApplyError(422, "PROTECTED_CELLS_INVALID", str(exc)) from exc
     for stale_key in ("_detail_provenance",):
         record.data.pop(stale_key, None)
     await db.flush()

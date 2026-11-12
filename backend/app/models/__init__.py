@@ -145,6 +145,7 @@ from app.models.report_generation_models import (  # noqa: F401
     ConsolArtifact,
     ReportGenerationRun,
 )
+from app.models.consol_workpaper_instance_models import ConsolWorkpaperInstance  # noqa: F401
 from app.models.batch_project_models import ProjectBatchImportPlan  # noqa: F401
 from app.models.wp_visibility_models import (  # noqa: F401
     WorkpaperDelegationHistory,

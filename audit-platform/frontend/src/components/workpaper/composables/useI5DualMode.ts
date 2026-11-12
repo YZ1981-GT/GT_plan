@@ -13,7 +13,7 @@
  * Requirements: 1.1-1.10 (双模式)
  */
 import { ref, onMounted, type Ref } from 'vue'
-import http from '@/utils/http'
+import { fetchOnlyOfficeHealthy } from '../sync/onlyOfficeHealth'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -71,22 +71,16 @@ export function useI5DualMode(options: UseI5DualModeOptions) {
   // ─── OO 健康检查 ──────────────────────────────────────────────────────────
 
   /**
-   * GET /api/workpapers/onlyoffice/health
-   * 双层兼容: result.data?.data?.healthy 或 result.data?.healthy 或 result.healthy
+   * 平台统一的 OnlyOffice 健康探针（sync/onlyOfficeHealth：唯一端点与字段、TTL 缓存、并发去重）。
+   * 原先本地直调 `/workpapers/onlyoffice/health`（少 /api 前缀，拿到首页 HTML ⇒ 恒判不可用、在线编辑入口从不出现）。
    * 如果 OO 不健康，隐藏 toggle，强制 HTML 模式。
    */
   async function checkOOHealth(): Promise<boolean> {
     checking.value = true
     try {
-      const res = await http.get('/workpapers/onlyoffice/health', { _silent: true } as any)
-      const result = res.data
-      // 双层兼容: result.data?.healthy 或 result.healthy
-      const healthy = result?.data?.healthy ?? result?.healthy ?? false
+      const healthy = await fetchOnlyOfficeHealthy()
       isOoAvailable.value = healthy
       return healthy
-    } catch {
-      isOoAvailable.value = false
-      return false
     } finally {
       checking.value = false
     }

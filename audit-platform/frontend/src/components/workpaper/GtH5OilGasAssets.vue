@@ -503,8 +503,8 @@ async function selfLoad(): Promise<void> {
       _mergeResponses(map, props.htmlData.responses_snapshot)
       if (map.size > 0) allResponses.value = map
     } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      // selfLoad: 自行调用 render-config（原先少 /api 前缀，拿到首页 HTML ⇒ 父级没透传 htmlData 时恒空）
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h5-oil-gas-assets' },
         _silent: true,
       } as any)

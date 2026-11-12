@@ -212,6 +212,7 @@ declare module 'vue' {
     ConsolReadinessBar: typeof import('./components/consolidation/ConsolReadinessBar.vue')['default']
     ConsolReportBreakdownView: typeof import('./components/consolidation/ConsolReportBreakdownView.vue')['default']
     ConsolScopeConfigDialog: typeof import('./components/wizard/ConsolScopeConfigDialog.vue')['default']
+    ConsolSnapshotPanel: typeof import('./components/consolidation/ConsolSnapshotPanel.vue')['default']
     ConsolTrialBalanceTab: typeof import('./components/consolidation/ConsolTrialBalanceTab.vue')['default']
     ConsolWorksheetTabs: typeof import('./components/consolidation/worksheets/ConsolWorksheetTabs.vue')['default']
     ConsolWorkspaceGuardDialog: typeof import('./components/consolidation/ConsolWorkspaceGuardDialog.vue')['default']

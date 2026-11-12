@@ -60,6 +60,11 @@ from app.services.consol_report_values import (
 )
 from app.services.consol_tree_service import iter_nodes
 from app.services.note_table_header_library import ColumnKey, column_keys, load_vocabulary, movement_kind
+from app.services.consol_note_protection import (
+    ProtectionMetadataError,
+    protected_cells,
+    section_locked,
+)
 
 # 模板表结构工具（多级表头分组 / 列元数据 / 行类型 / 合计回填）在伴生模块（2026-11-04 抽出），原名保留给既有引用
 from app.services.consol_note_template_utils import (  # noqa: F401
@@ -1099,39 +1104,6 @@ async def note_breakdown(
 # ─────────────────────────────── 按公式填入 ───────────────────────────────
 
 
-def _manual_cells(data: dict) -> set[tuple[int, int]]:
-    """解析人工保护坐标；保护元数据损坏时必须让调用方可观察。"""
-    raw = data.get("manual_cells")
-    if raw is None:
-        return set()
-    if not isinstance(raw, list):
-        raise NoteFormulaError("manual_cells 必须是数组")
-
-    out: set[tuple[int, int]] = set()
-    for index, item in enumerate(raw):
-        try:
-            if isinstance(item, dict):
-                if "row" not in item or "col" not in item:
-                    raise ValueError("缺少 row 或 col")
-                row_value, col_value = item["row"], item["col"]
-            elif isinstance(item, (list, tuple)) and len(item) == 2:
-                row_value, col_value = item
-            elif isinstance(item, str) and item.count(":") == 1:
-                row_value, col_value = item.split(":", 1)
-            else:
-                raise ValueError("应为 {row, col}、[row, col] 或 row:col")
-
-            if isinstance(row_value, bool) or isinstance(col_value, bool):
-                raise ValueError("行列坐标不能是布尔值")
-            row, col = int(row_value), int(col_value)
-            if row < 0 or col < 0:
-                raise ValueError("行列坐标不能为负数")
-        except (KeyError, TypeError, ValueError) as exc:
-            raise NoteFormulaError(f"manual_cells 第 {index + 1} 项无效：{exc}") from exc
-        out.add((row, col))
-    return out
-
-
 def _target_row(out: list[list[str]], template_rows: Sequence[Any], r: int) -> tuple[int | None, str | None]:
     """公式按模板行号登记；已保存数据可能插删过行 ⇒ 按项目名找行：同号同名优先，否则全表唯一同名行。"""
     want = label_key(_first_cell(template_rows[r])) if r < len(template_rows) else None
@@ -1274,8 +1246,8 @@ async def fill_by_formula(
     data = dict(record.data or {}) if record is not None and isinstance(record.data, dict) else {}
     headers = data.get("headers") or table.get("headers") or []
     rows = data.get("rows") if isinstance(data.get("rows"), list) and data.get("rows") else table.get("rows") or []
-    # V182：locked 行整体跳过；locked_cells 合并进 manual 保护集合
-    if record is not None and getattr(record, "cell_state", "auto") == "locked":
+    # V182：locked 行整体跳过；locked_cells 合并进保护集合
+    if record is not None and section_locked(record):
         return {
             "project_id": str(project_id),
             "year": breakdown["year"],
@@ -1319,13 +1291,11 @@ async def fill_by_formula(
             "is_stale": record.is_stale,
             "data": data,
         }
-    manual_set = _manual_cells(data)
-    # 把 locked_cells 列表中的坐标也加入保护集合
-    if record is not None:
-        for lc in getattr(record, "locked_cells", None) or []:
-            if isinstance(lc, dict) and "row_index" in lc and "col_index" in lc:
-                manual_set.add((int(lc["row_index"]), int(lc["col_index"])))
-    new_rows, summary = fill_rows(headers, rows, breakdown["cells"], manual_set, table.get("rows") or [])
+    try:
+        protected_set = protected_cells(record, data)
+    except ProtectionMetadataError as exc:
+        raise NoteFormulaError(str(exc), status=exc.status) from exc
+    new_rows, summary = fill_rows(headers, rows, breakdown["cells"], protected_set, table.get("rows") or [])
     data.update({"headers": headers, "rows": new_rows})
     # 写入来源标记：ConsolNoteTab 据此区分「🧮 公式计算」与「📋 明细映射」（后写覆盖先写）
     data["_last_write_source"] = "formula"
@@ -1347,7 +1317,7 @@ async def fill_by_formula(
 
     mode = compute_source_mode(
         "formula",
-        manual_cells=manual_set,
+        manual_cells=protected_set,
         written_cells={(r, c) for r, c, *_ in summary.get("filled", []) if isinstance(r, int)},
         previous_source=getattr(record, "source_mode", None),
     )

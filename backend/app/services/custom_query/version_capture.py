@@ -199,7 +199,7 @@ async def _count_pg(db: AsyncSession, table: sa.Table, where: str, params: dict[
 async def _aggregate_pg(db: AsyncSession, table: sa.Table, basis: str, where: str, params: dict[str, Any]) -> tuple[int, str | None, str | None]:
     latest = "max(t.updated_at)" if "updated_at" in table.c else "NULL"
     if basis == "content":
-        expression = "md5(coalesce(string_agg(md5((to_jsonb(t) - 'created_at')::text), '' ORDER BY t.id), ''))"
+        expression = "md5(coalesce(string_agg(md5((to_jsonb(t) - 'created_at' - 'updated_at')::text), '' ORDER BY t.id), ''))"
     elif basis == "row_version":
         expression = "md5(coalesce(string_agg(t.id::text || ':' || t.xmin::text, ',' ORDER BY t.id), ''))"
     else:

@@ -1534,6 +1534,7 @@ async def cell_writeback(
         NoteOwnershipMismatch,
         NoteRecordNotFound,
     )
+    from app.services.consol_note_protection import ProtectionMetadataError
 
     # 解析 X-File-Opened-At header
     opened_at_str = request.headers.get("X-File-Opened-At")
@@ -1647,6 +1648,12 @@ async def cell_writeback(
             status_code=500,
             detail={"error_code": e.error_code, "message": e.message},
         )
+    except ProtectionMetadataError as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": "PROTECTED_CELLS_INVALID", "message": str(e)},
+        ) from e
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1701,6 +1708,10 @@ async def cell_writeback(
         "addr_id": write_result.get("addr_id"),
         "column_metadata": write_result.get("column_metadata"),
     }
+    if "marked_manual" in write_result:
+        response["marked_manual"] = write_result["marked_manual"]
+    if "manual_skip_reason" in write_result:
+        response["manual_skip_reason"] = write_result["manual_skip_reason"]
     # 下游联动（file_version / prefill_stale / WORKPAPER_SAVED → cross_ref·stale·SSE）
     # 未触发时必须透传给调用方 —— 数据写回了但联动没跑，静默返回 success 会让用户
     # 以为一切正常，而其实别处的取数不会刷新。

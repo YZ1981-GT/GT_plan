@@ -821,6 +821,12 @@ import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
 import { useConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
 import { handleApiError } from '@/utils/errorHandler'
+import { parseApiError } from '@/composables/useApiError'
+import {
+  isConsolNoteConflict,
+  normalizeNoteDataDigest,
+  resolveConsolNoteConflict,
+} from '@/components/consolidation/composables/consolNoteSaveConflict'
 // deleteNoteRows 用：此前未导入 ⇒ ReferenceError 被「用户取消」的 catch 吞掉，删除行恒静默无效
 import { confirmBatch } from '@/utils/confirm'
 import { exportMultiSheetData, readSheetAoa, readWorkbookAoa } from '@/composables/useExcelIO'
@@ -1423,13 +1429,14 @@ function hasPersistedNoteContent(content: Record<string, unknown>): boolean {
   return Object.keys(content).length > 0
 }
 
-function applyPersistedNoteContent(section: any, content: Record<string, unknown>) {
+function applyPersistedNoteContent(section: any, content: Record<string, unknown>, dataDigest?: unknown) {
   const headers = Array.isArray(content.headers) && content.headers.length
     ? content.headers
     : section.headers
   const rows = Array.isArray(content.rows) ? content.rows : []
   section.headers = headers
   section.savedData = { ...content }
+  section.dataDigest = normalizeNoteDataDigest(dataDigest)
   section.editRows = toEditRows(headers, rows, content.manual_cells)
   section.baselineEditRows = clonePlain(section.editRows)
   clearNoteDirty()
@@ -1444,6 +1451,7 @@ function applyPersistedNoteContent(section: any, content: Record<string, unknown
  */
 async function reloadCurrentSectionAfterRefresh(
   expectedContext?: NoteContextSnapshot | null,
+  fallbackDataDigest?: unknown,
 ): Promise<NoteRefreshResult> {
   const context = expectedContext || currentRequestedNoteContext()
   if (!context) return noteRefreshResult('skipped', null, { reason: '当前没有可重读的附注章节' })
@@ -1475,13 +1483,17 @@ async function reloadCurrentSectionAfterRefresh(
     const content = saved.content && typeof saved.content === 'object'
       ? { ...saved.content }
       : {}
+    const dataDigest = Object.prototype.hasOwnProperty.call(saved, 'data_digest')
+      ? normalizeNoteDataDigest(saved.data_digest)
+      : normalizeNoteDataDigest(fallbackDataDigest)
     if (!hasPersistedNoteContent(content)) {
+      section.dataDigest = dataDigest
       return noteRefreshResult('skipped', context, {
         updatedAt: saved.updated_at || null,
         reason: '当前章节暂无持久化数据',
       })
     }
-    applyPersistedNoteContent(section, content)
+    applyPersistedNoteContent(section, content, dataDigest)
     return noteRefreshResult('done', context, {
       persisted: true,
       updatedAt: saved.updated_at || null,
@@ -2249,9 +2261,14 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
     fillDetails.value = fillDetailRows(result)
     if (fillDetails.value.length) showFillResultDialog.value = true
     if (result.blank?.length) ElMessage.warning(fillResultSummary.value)
+    const formulaDigestProvided = !!result && Object.prototype.hasOwnProperty.call(result, 'data_digest')
+    const formulaDigest = normalizeNoteDataDigest(result?.data_digest)
     // 公式接口响应只用于展示填入明细；必须再 GET 当前章节的持久化内容，
-    // 以保留后端实际保存的 manual_cells 和其他元数据。
-    const reloadResult = await reloadCurrentSectionAfterRefresh(context)
+    // 以保留后端实际保存的 manual_cells 和其他元数据。旧后端不返回摘要时才使用公式回执兜底。
+    const reloadResult = await reloadCurrentSectionAfterRefresh(
+      context,
+      formulaDigestProvided ? formulaDigest : undefined,
+    )
     if (reloadResult.status === 'done') {
       ElMessage.success(fillResultSummary.value)
     } else if (reloadResult.status === 'failed') {
@@ -2380,6 +2397,7 @@ async function performSaveNoteData(): Promise<boolean> {
   const data = notePayload(sec.savedData, sec.headers, sec.editRows)
   // template_variant 以加载时的变体为准（而非仅透传旧 savedData），确保落库标识正确
   data.template_variant = loaded.variant
+  const expectedDigest = normalizeNoteDataDigest(sec.dataDigest)
   const epochAtStart = noteDirtyEpoch.value
   try {
     const nk = currentNodeKey()
@@ -2388,7 +2406,7 @@ async function performSaveNoteData(): Promise<boolean> {
       : P_cn.data(props.projectId, props.year, sec.section_id)
     const result: any = await api.put(
       url,
-      { data },
+      { data, expected_digest: expectedDigest },
       { _silent: true } as any,
     )
     if (result?.ok === false) throw Object.assign(new Error(result.error || '保存失败'), { status: 500 })
@@ -2401,6 +2419,8 @@ async function performSaveNoteData(): Promise<boolean> {
     if (context.nodeKey && result?.node_key && String(result.node_key) !== context.nodeKey) {
       return false
     }
+    // 仅采用服务端回传摘要；旧后端缺失该字段时安全降为 null，后续保存不会误当成新令牌。
+    sec.dataDigest = normalizeNoteDataDigest(result?.data_digest)
     // 落库快照 = 发起时冻结的 data；PUT 期间的实时编辑保留在 editRows 中不被覆盖。
     sec.savedData = data
     sec.baselineEditRows = toEditRows(sec.headers, Array.isArray(data.rows) ? data.rows : [], data.manual_cells)
@@ -2417,6 +2437,17 @@ async function performSaveNoteData(): Promise<boolean> {
     // A-B-A：旧保存失败同样不能影响新上下文；仅当仍是同一上下文时才提示。
     const latest = currentRequestedNoteContext()
     if (!latest || !sameNoteContext(context, latest) || selectedNoteSection.value !== sec) {
+      return false
+    }
+    if (isConsolNoteConflict(err)) {
+      await resolveConsolNoteConflict(err, context, {
+        confirm: (message, title, options) => ElMessageBox.confirm(message, title, options),
+        isCurrent: () => {
+          const latest = currentRequestedNoteContext()
+          return !!latest && sameNoteContext(context, latest) && selectedNoteSection.value === sec
+        },
+        reload: (targetContext) => reloadCurrentSectionAfterRefresh(targetContext),
+      })
       return false
     }
     handleApiError(err, '保存')
@@ -2616,6 +2647,15 @@ async function batchExportAllTemplates() {
   finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
 }
 
+function noteBatchImportErrorMessage(error: unknown): string {
+  const message = parseApiError(error).message.trim()
+  return message && message !== '未知错误' ? message : '导入失败，请稍后重试'
+}
+
+function noteBatchImportFailureText(failure: { sheetName: string; sectionId: string; reason: string }): string {
+  return `Sheet「${failure.sheetName}」/章节「${failure.sectionId}」：${failure.reason}`
+}
+
 async function onNoteBatchImport(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !props.projectId) return
@@ -2627,6 +2667,8 @@ async function onNoteBatchImport(e: Event) {
     // 故用整簿读取：一次解析拿到所有 sheet 的 AOA，与原实现等价。
     const { sheetNames, sheets } = await readWorkbookAoa(file)
     if (noteSubOpGuard.isStale(ticket)) return
+    const failures: Array<{ sheetName: string; sectionId: string; reason: string }> = []
+    let imported = 0
     let matched = 0
     const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
@@ -2642,60 +2684,84 @@ async function onNoteBatchImport(e: Event) {
     for (const sheetName of sheetNames) {
       const sectionId = sectionMap[sheetName]
       if (!sectionId) continue
-      const json: any[][] = sheets[sheetName]
-      if (json.length < 2) continue
-      // 取该章节模板，把上传的数据行按模板槽位回填：保留模板前导类别行，数据行从 dataStart 起覆盖
-      const detail: any = await api.get(P_cn.detail(variant, sectionId), {
-        validateStatus: (s: number) => s < 600,
-        signal: ticket.signal,
-      })
-      if (noteSubOpGuard.isStale(ticket)) return
-      const tpl = detail?.data ?? detail
-      const headers: string[] = Array.isArray(tpl?.headers) ? tpl.headers.map((h: any) => String(h ?? '')) : json[0].map((c: any) => String(c || ''))
-      const width = headers.length
-      // 模板行作为基底（深拷贝），不足补空行
-      const baseRows: string[][] = (Array.isArray(tpl?.rows) ? tpl.rows : []).map((r: any[]) => {
-        const row: string[] = []
-        for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
-        return row
-      })
-      // 数据区起点 = 模板前导类别行数（仅第 0 列有文本）
-      let dataStart = 0
-      for (const r of baseRows) {
-        const col0 = String(r[0] ?? '').trim()
-        let restEmpty = true
-        for (let c = 1; c < width; c++) if (String(r[c] ?? '').trim() !== '') { restEmpty = false; break }
-        if (col0 !== '' && restEmpty) dataStart++
-        else break
-      }
-      // 上传数据行（跳过上传文件自身的表头行）
-      const uploaded = json.slice(1).map((r: any[]) => {
-        const row: string[] = []
-        for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
-        return row
-      })
-      const finalRows: string[][] = [...baseRows]
-      const manualCells: { row: number; col: number }[] = []
-      for (let i = 0; i < uploaded.length; i++) {
-        const target = dataStart + i
-        while (finalRows.length <= target) finalRows.push(Array.from({ length: width }, () => ''))
-        finalRows[target] = uploaded[i]
-        // Excel 导入属于人工录入：非空数值格（第 1 列起）标手工，按公式填入时保留
-        for (let c = 1; c < width; c++) if (uploaded[i][c] !== '') manualCells.push({ row: target, col: c })
-      }
-      const nk = currentNodeKey()
-      const importUrl = nk
-        ? `${P_cn.data(props.projectId, props.year, sectionId)}?node_key=${encodeURIComponent(nk)}`
-        : P_cn.data(props.projectId, props.year, sectionId)
-      await api.put(
-        importUrl,
-        { data: { headers, rows: finalRows, manual_cells: manualCells, template_variant: variant } },
-        { _silent: true } as any,
-      )
       matched++
+      try {
+        const json: any[][] = sheets[sheetName]
+        if (!Array.isArray(json) || json.length < 2) {
+          throw new Error('Sheet 中没有可导入的数据')
+        }
+        // 取该章节模板，把上传的数据行按模板槽位回填：保留模板前导类别行，数据行从 dataStart 起覆盖
+        const detail: any = await api.get(P_cn.detail(variant, sectionId), {
+          validateStatus: (s: number) => s < 600,
+          signal: ticket.signal,
+        })
+        if (noteSubOpGuard.isStale(ticket)) return
+        const tpl = detail?.data ?? detail
+        const headers: string[] = Array.isArray(tpl?.headers) ? tpl.headers.map((h: any) => String(h ?? '')) : json[0].map((c: any) => String(c || ''))
+        const width = headers.length
+        // 模板行作为基底（深拷贝），不足补空行
+        const baseRows: string[][] = (Array.isArray(tpl?.rows) ? tpl.rows : []).map((r: any[]) => {
+          const row: string[] = []
+          for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
+          return row
+        })
+        // 数据区起点 = 模板前导类别行数（仅第 0 列有文本）
+        let dataStart = 0
+        for (const r of baseRows) {
+          const col0 = String(r[0] ?? '').trim()
+          let restEmpty = true
+          for (let c = 1; c < width; c++) if (String(r[c] ?? '').trim() !== '') { restEmpty = false; break }
+          if (col0 !== '' && restEmpty) dataStart++
+          else break
+        }
+        // 上传数据行（跳过上传文件自身的表头行）
+        const uploaded = json.slice(1).map((r: any[]) => {
+          const row: string[] = []
+          for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
+          return row
+        })
+        const finalRows: string[][] = [...baseRows]
+        const manualCells: { row: number; col: number }[] = []
+        for (let i = 0; i < uploaded.length; i++) {
+          const target = dataStart + i
+          while (finalRows.length <= target) finalRows.push(Array.from({ length: width }, () => ''))
+          finalRows[target] = uploaded[i]
+          // Excel 导入属于人工录入：非空数值格（第 1 列起）标手工，按公式填入时保留
+          for (let c = 1; c < width; c++) if (uploaded[i][c] !== '') manualCells.push({ row: target, col: c })
+        }
+        const nk = currentNodeKey()
+        const importUrl = nk
+          ? `${P_cn.data(props.projectId, props.year, sectionId)}?node_key=${encodeURIComponent(nk)}`
+          : P_cn.data(props.projectId, props.year, sectionId)
+        const result: any = await api.put(
+          importUrl,
+          {
+            data: { headers, rows: finalRows, manual_cells: manualCells, template_variant: variant },
+            // Excel 批量导入是明确的整表覆盖动作，不参与章节编辑的摘要 CAS。
+            force_overwrite: true,
+          },
+          { _silent: true } as any,
+        )
+        if (result?.ok === false) {
+          throw new Error(String(result.error || '服务器未确认导入成功'))
+        }
+        imported++
+      } catch (error) {
+        if (noteSubOpGuard.isStale(ticket)) return
+        failures.push({ sheetName, sectionId, reason: noteBatchImportErrorMessage(error) })
+      }
     }
     if (noteSubOpGuard.isStale(ticket)) return
-    ElMessage.success(`已导入 ${matched} 个附注表格（共 ${sheetNames.length} 个 Sheet）`)
+    if (failures.length === 0 && imported > 0) {
+      ElMessage.success(`已导入 ${imported} 个附注表格（共 ${matched} 个匹配 Sheet）`)
+    } else if (imported > 0) {
+      ElMessage.success(`批量导入完成：成功 ${imported} 个，失败 ${failures.length} 个`)
+      ElMessage.warning(`导入失败项：${failures.map(noteBatchImportFailureText).join('；')}`)
+    } else if (failures.length > 0) {
+      ElMessage.error(`批量导入失败：成功 0 个，失败 ${failures.length} 个；${failures.map(noteBatchImportFailureText).join('；')}`)
+    } else {
+      ElMessage.warning('未匹配到可导入的附注章节')
+    }
   } catch (e: any) {
     if (noteSubOpGuard.isStale(ticket)) return
     handleApiError(e, '导入')
@@ -2708,6 +2774,7 @@ async function onNoteBatchImport(e: Event) {
     }
   }
 }
+
 
 // ─── 公式管理（Sprint 1.5.3 收敛） ───────────────────────────────────────────
 // ConsolNoteTab 不再自维护公式 dialog，统一走全局 FormulaManagerDialog
@@ -2840,6 +2907,7 @@ async function fillAllByFormula() {
       const sec = selectedNoteSection.value
       sec.headers = currentResult.data?.headers || sec.headers
       sec.savedData = { ...(currentResult.data || {}) }
+      sec.dataDigest = normalizeNoteDataDigest((currentResult as any).data_digest)
       sec.editRows = toEditRows(sec.headers, currentResult.data?.rows || [], currentResult.data?.manual_cells)
       clearNoteDirty()
       clearAutoSaveDraft()
@@ -3034,6 +3102,7 @@ async function onNoteNodeClick(
     let rows = Array.isArray(sec.rows) ? sec.rows : []
     let savedContent: Record<string, unknown> = {}
     let updatedAt: string | null = null
+    let dataDigest: string | null = null
     const saved: any = await api.get(noteDataUrl(context), {
       validateStatus: (s: number) => s < 600,
       signal: ticket.signal,
@@ -3046,6 +3115,7 @@ async function onNoteNodeClick(
     }
     if (saved?.content && typeof saved.content === 'object') savedContent = { ...saved.content }
     updatedAt = saved?.updated_at || null
+    dataDigest = normalizeNoteDataDigest(saved?.data_digest)
     if (Array.isArray(savedContent.rows)) rows = savedContent.rows
 
     const latest = currentRequestedNoteContext()
@@ -3080,6 +3150,7 @@ async function onNoteNodeClick(
       editRows,
       baselineEditRows: clonePlain(editRows),
       savedData: savedContent,
+      dataDigest,
       // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
       // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
       noteAddr: sourceNoteAddr(sec.section_id),

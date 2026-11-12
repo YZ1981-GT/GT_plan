@@ -67,7 +67,7 @@
 
 ### 0.6 迁移号
 
-磁盘、共享库 `schema_version`、远端分支三处最高都是 V251（gt-plan `migration_status` 现扫 249 个文件）。本 spec 的迁移号在任务 1 现取。
+**更新（2026-11-07）**：磁盘最高 V267（255 个 V 文件、202 个 R 文件，`check_migration_versions` exit 0）；共享库 `schema_version` 最高 V267（任务 1 证据：V267 已由迁移器应用）；远端分支 `spec/disclosure-note-doc-upload-and-batch-fill` HEAD 最高 V267（2026-11-06 任务 1 推送）。三处一致，本 spec 新迁移取 V267。旧记（2026-11-04 扫描时）为 V251，已由任务 1 现取 V267。
 
 ## §1 总体流程
 
@@ -352,6 +352,16 @@ RETURNING id, execution_count, last_executed_at
 ### 5.3 接线
 
 - `routers/custom_query.execute_query` 的主体移到 `services/custom_query/business_execute.execute_business_query(body, response, db, user, *, origin=None)`；路由函数名与签名不变（契约测试直接调用它）。`execute_template` 调同一个服务函数并传 `origin=("template", 模板编号)`。抽取前按任务 0 的清单保留测试里的 monkeypatch 点。
+
+**任务 0 monkeypatch 补丁点清单（2026-11-07 现算，抽取时必须保留）**
+
+| 补丁点 | 文件 | 说明 |
+|---|---|---|
+| `app.services.custom_query.query_orchestrator.read_acnr_target_values` | `tests/test_advanced_query_hardening_wave012.py:713` | 编排器内部 ACNR 钩子，抽取时保持字符串路径不变 |
+| `app.services.custom_query.query_export.acquire_export_slot` | `tests/advanced_query_linkage/test_aql_export_pg.py:169` | 导出名额守卫 spy |
+| `ExecuteCompatibilityAdapter.execute`（类方法级） | `tests/test_advanced_query_ddl_cross_lock.py:285` | 适配器执行替换（DDR 锁测试），适配器类本身不能改名 |
+| `ExecuteCompatibilityAdapter.execute`（类方法级） | `tests/test_advanced_query_hardening_properties_scope.py:177/193` | 范围属性测试临时替换，同上 |
+| `app.services.custom_query.ownership_guard.set_rls_context` | `tests/advanced_query_linkage/test_aqs_safety_closure.py:70` | RLS 上下文捕获，权限闭环测试 |
 - 服务函数顺序：编排器执行 → `query_runs.record(...)`（`db.begin_nested()` 内）→ `await db.commit()` → 响应加 `run` 键。登记出错只回滚 SAVEPOINT，`run = {"recorded": false, "reason": ...}`。
 - 构建器：读写缓存之后、成功审计之前登记并提交；`run` 不进缓存（同 `acnr_results` 的处理）。
 - 导出：采集向量后先在独立短事务里登记运行并提交，拿到运行编号（说明页要用）；`last_total` 取导出前的行数预检结果。证据记录在封存后另一个短事务里提交（§6.3）。

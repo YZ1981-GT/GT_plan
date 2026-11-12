@@ -324,7 +324,59 @@ class TestApplyProtection:
         await db.flush()
 
         result = await apply_detail_refresh(db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR)
-        assert result["kept_manual_count"] >= 1
+        assert result["kept_manual_count"] == 1
+        import sqlalchemy as sa
+        record = (await db.execute(sa.select(ConsolNoteData).where(
+            ConsolNoteData.project_id == consol_project.id,
+            ConsolNoteData.year == _YEAR,
+            ConsolNoteData.section_id == _SECTION,
+        ))).scalar_one()
+        assert record.data["rows"][0][1] == "999"
+
+    @pytest.mark.asyncio
+    async def test_invalid_protection_metadata_raises_apply_error_before_write(
+        self, db, user, consol_project, child_projects,
+    ):
+        """坏人工保护元数据必须在明细映射写格前转成规定的 ApplyError。"""
+        source = [["A费", "100", "50"]]
+        await _seed_disclosure(db, child_projects[0].id, source)
+        tmpl = await create_template(
+            db, template_type="soe", section_id=_SECTION,
+            rows=[{"canonical_name": "A费"}, {"canonical_name": "合计", "row_type": "total"}],
+            created_by=user.id,
+        )
+        tr = tmpl["latest_version"]["rows"]
+        vid = UUID(tmpl["latest_version"]["id"])
+        await bind_template_version(db, project_id=consol_project.id, section_id=_SECTION,
+                                    template_version_id=vid, bound_by=user.id)
+        h = compute_source_structure_hash(_SECTION, source)
+        await confirm_mapping(
+            db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR,
+            template_version_id=vid, source_structure_hash=h,
+            mappings=[{"source_label": "A费", "target_row_id": tr[0]["target_row_id"], "mapping_action": "map"}],
+            entity_node_keys=[{"node_key": "A:sub", "project_id": str(child_projects[0].id), "hash": h}],
+            confirmed_by=user.id,
+        )
+        original = {"rows": [["A费", "999", "888"]], "manual_cells": "坏了"}
+        db.add(ConsolNoteData(
+            project_id=consol_project.id, year=_YEAR, section_id=_SECTION,
+            data=original.copy(),
+        ))
+        await db.flush()
+
+        with pytest.raises(ApplyError) as exc:
+            await apply_detail_refresh(db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR)
+
+        assert exc.value.status == 422
+        assert exc.value.code == "PROTECTED_CELLS_INVALID"
+        assert "manual_cells" in exc.value.message
+        import sqlalchemy as sa
+        record = (await db.execute(sa.select(ConsolNoteData).where(
+            ConsolNoteData.project_id == consol_project.id,
+            ConsolNoteData.year == _YEAR,
+            ConsolNoteData.section_id == _SECTION,
+        ))).scalar_one()
+        assert record.data == original
 
     @pytest.mark.asyncio
     async def test_locked_record_skipped(self, db, user, consol_project, child_projects):

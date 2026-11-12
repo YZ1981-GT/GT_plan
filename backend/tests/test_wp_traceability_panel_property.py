@@ -131,65 +131,48 @@ class TestProperty2AttachmentLinkQueryable:
     """Property 2: 附件关联后，lineage 查询能返回该附件。
 
     **Validates: Requirements 3.2**
+
+    附件子源已收口到 ``AttachmentTraceService.for_object``（底稿读 EvidenceLink / 整稿关联 / reference，输出域读
+    AttachmentLineage，多条查询）；原用例模拟「一条 fetchall 查询」并在本模块打补丁检查迁移就绪，对新实现不再成立
+    （子源报错 ⇒ 附件为空，如 ``wp_cell`` / ``'0'``）。各来源的真实 SQL 由
+    ``tests/attachment_platform_closure/test_attachment_trace_service.py``（SQLite 真库）覆盖；本属性只验统一层：
+    任意对象类型与标识下，附件子源给出的附件原样出现在结果里，且按原参数调用、不标 partial。
     """
 
     @settings(max_examples=15, deadline=None)
     @given(
-        target_type=st.sampled_from(["wp_cell", "report_row", "note_section"]),
-        target_ref=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("L", "N", "P"))),
+        object_type=st.sampled_from(["wp_cell", "report_row", "note_cell", "tb_row", "adjustment"]),
+        object_id=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("L", "N", "P"))),
     )
     @pytest.mark.asyncio
-    async def test_linked_attachment_appears_in_lineage(self, target_type: str, target_ref: str):
+    async def test_linked_attachment_appears_in_lineage(self, object_type: str, object_id: str):
         """关联的附件必须出现在 lineage 查询的 attachments 中。"""
         project_id = uuid.uuid4()
-        attachment_id = uuid.uuid4()
+        attachment = {"id": str(uuid.uuid4()), "attachment_id": str(uuid.uuid4()), "target_type": object_type,
+                      "target_ref": object_id, "file_name": "evidence.pdf", "file_type": "pdf",
+                      "created_at": None, "source": "attachment_lineage"}
+        calls: list[tuple] = []
 
-        # 模拟 DB 返回关联附件
-        mock_row = MagicMock()
-        mock_row.id = uuid.uuid4()
-        mock_row.attachment_id = attachment_id
-        mock_row.target_type = target_type
-        mock_row.target_ref = target_ref
-        mock_row.file_name = "evidence.pdf"
-        mock_row.file_type = "pdf"
-        mock_row.created_at = None
+        async def fake_for_object(self, pid, otype, oid):
+            calls.append((pid, otype, oid))
+            return [attachment]
 
-        mock_db = _mock_db()  # 带 begin_nested 保存点（每个子源在独立 SAVEPOINT 里跑）
-        # execute 返回附件数据
-        mock_result = MagicMock()
-        mock_result.fetchall = MagicMock(return_value=[mock_row])
-        mock_db.execute = AsyncMock(return_value=mock_result)
-
-        svc = UnifiedLineageService(mock_db)
-
-        # 附件子源先查 attachment_lineage.project_id 列是否就绪（spec formula-hub-integrity-closure 需求 7.2 / V227）；
-        # mock 会话答不了 information_schema ⇒ 直接给「已就绪」，否则子源报错、附件为空
+        svc = UnifiedLineageService(_mock_db())
         with patch("app.services.unified_lineage_service.trace_upstream", return_value=MagicMock(items=[])), \
              patch("app.services.unified_lineage_service.trace_downstream", return_value=MagicMock(items=[])), \
              patch("app.services.unified_lineage_service.version_line_service") as mock_vl, \
-             patch("app.services.unified_lineage_service.lineage_project_column_ready",
-                   new=AsyncMock(return_value=True)), \
-             patch("app.services.unified_lineage_service.ReportTraceService") as mock_rts:
+             patch("app.services.unified_lineage_service.tb_row_upstream", new=AsyncMock(return_value=[])), \
+             patch("app.services.unified_lineage_service.ReportTraceService") as mock_rts, \
+             patch("app.services.attachment_trace_service.AttachmentTraceService.for_object", new=fake_for_object):
             mock_vl.query_lineage = AsyncMock(return_value=[])
-            # Mock report trace to return empty result (avoid DB interaction)
-            mock_rts_instance = MagicMock()
-            mock_rts_instance.trace_section = AsyncMock(return_value={
-                "section_number": "1", "note_data": None,
-                "workpaper_data": None, "top_ledger_entries": [],
-            })
-            mock_rts.return_value = mock_rts_instance
-
+            mock_rts.return_value.trace_section = AsyncMock(return_value={"note_data": None})
             result = await svc.query_lineage(
-                project_id=project_id,
-                object_type=target_type,
-                object_id=target_ref,
-                direction="both",
+                project_id=project_id, object_type=object_type, object_id=object_id, direction="both",
             )
 
-        # 附件必须出现在结果中
-        assert len(result["attachments"]) >= 1
-        att_ids = {a["attachment_id"] for a in result["attachments"]}
-        assert str(attachment_id) in att_ids
+        assert result["attachments"] == [attachment]
+        assert calls == [(project_id, object_type, object_id)]
+        assert not any(e["source"] == "attachments" for e in result["errors"]), result["errors"]
 
 
 # ─── Property 3: 节点跳转参数正确 ────────────────────────────────────────────

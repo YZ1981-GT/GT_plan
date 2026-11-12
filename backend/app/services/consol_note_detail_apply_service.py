@@ -26,11 +26,15 @@ from app.models.consol_note_mapping_models import (
     ConsolNoteMappingRule,
     ConsolNoteTemplateBinding,
 )
+from app.services.consol_note_protection import (
+    ProtectionMetadataError,
+    parse_locked_cells,
+    parse_manual_cells,
+    protected_cells,
+    section_locked,
+)
 
 logger = logging.getLogger(__name__)
-
-# 与 consol_note_formula_service 同口径的 manual_cells 解析
-CONSOL_NOTE_CELL_STATES_LOCKED = ("locked",)
 
 #: 写入来源标记（ConsolNoteTab 据此显示「📋 明细映射」）
 WRITE_SOURCE = "detail_mapping"
@@ -329,7 +333,7 @@ async def apply_detail_refresh(
     )
 
     # 手工保护 + locked 检查
-    if getattr(note_record, "cell_state", "auto") in CONSOL_NOTE_CELL_STATES_LOCKED:
+    if section_locked(note_record):
         return {
             "status": "skipped_locked",
             "reason": "整节被锁定（cell_state=locked），不覆盖",
@@ -337,7 +341,11 @@ async def apply_detail_refresh(
         }
 
     data = dict(note_record.data) if isinstance(note_record.data, dict) else {}
-    manual, locked = _parse_manual_cells(data), _parse_locked_cells(note_record)
+    try:
+        manual, locked = parse_manual_cells(data), parse_locked_cells(note_record)
+        protected = protected_cells(note_record, data)
+    except ProtectionMetadataError as exc:
+        raise ApplyError(422, "PROTECTED_CELLS_INVALID", str(exc)) from exc
     existing_rows = data.get("rows", [])
     if existing_rows and isinstance(existing_rows[0], (list, tuple)):
         width = max(width, len(existing_rows[0]))
@@ -350,7 +358,7 @@ async def apply_detail_refresh(
         [(tr.get("canonical_name", ""), tr.get("row_type")) for tr in template_rows],
         target_amounts,
         width=width,
-        protected=manual | locked,
+        protected=protected,
         existing_rows=existing_rows,
         placeholders=placeholder_rows(template_rows),
         table=consol_table if template_headers else None,  # 合计只加金额列、比例 / 损失率按本表派生（R2.4）
@@ -501,41 +509,6 @@ def _extract_amounts(row: Any, width: int) -> dict[int, Decimal]:
         if value is not None:
             amounts[col] = value
     return amounts
-
-
-def _parse_manual_cells(data: dict) -> set[tuple[int, int]]:
-    """解析 manual_cells 坐标集合。"""
-    raw = data.get("manual_cells")
-    if not isinstance(raw, list):
-        return set()
-    out: set[tuple[int, int]] = set()
-    for item in raw:
-        try:
-            if isinstance(item, dict):
-                out.add((int(item["row"]), int(item["col"])))
-            elif isinstance(item, (list, tuple)) and len(item) == 2:
-                out.add((int(item[0]), int(item[1])))
-            elif isinstance(item, str) and ":" in item:
-                r, c = item.split(":", 1)
-                out.add((int(r), int(c)))
-        except (KeyError, TypeError, ValueError):
-            pass
-    return out
-
-
-def _parse_locked_cells(record: Any) -> set[tuple[int, int]]:
-    """解析 locked_cells 坐标集合。"""
-    raw = getattr(record, "locked_cells", None)
-    if not isinstance(raw, list):
-        return set()
-    out: set[tuple[int, int]] = set()
-    for item in raw:
-        if isinstance(item, dict) and "row_index" in item and "col_index" in item:
-            try:
-                out.add((int(item["row_index"]), int(item["col_index"])))
-            except (TypeError, ValueError):
-                pass
-    return out
 
 
 async def _load_or_create_note_data(

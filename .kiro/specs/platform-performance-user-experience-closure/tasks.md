@@ -92,10 +92,24 @@
 
 - [x] 37. 后端/前端相关选集、迁移唯一性、行数门、构建预算和候选树自洽检查
   - 证据：后端本轮三组选集 43 + 145 + 125 passed；前端性能选集 128 passed；V/R 重号守卫 37 passed；正式候选构建、budget、SPA/API/WOPI smoke 通过。
-- [ ] 38. `127.0.0.1:3030` 浏览器走查首页、项目、Ledger、Univer、附注、SPA深链和动态块，console error为0
-  - 阻塞：本机 PostgreSQL/Docker 未运行，后端连接 `127.0.0.1:5432` 被拒；built artifact smoke 已通过，但不能冒充真实业务 Playwright。
-- [ ] 39. 复测 health、SQL p50/p95、容器、数据库尺寸、浏览器请求/长任务和保存回读，写入本文件
-  - 阻塞：同上，需真实 PG/Redis 和服务现场。
-- [ ] 40. 更新 INDEX/memory 的本轮摘要；只整理 owned files，不提交或推送他人改动
+- [x] 38. `127.0.0.1:3030` 浏览器走查首页、项目、Ledger、Univer、附注、SPA深链和动态块，console error为0
+  - 原阻塞：本机 PostgreSQL/Docker 未运行，后端连接 `127.0.0.1:5432` 被拒；built artifact smoke 已通过，但不能冒充真实业务 Playwright。
+  - ✅ 2026-11-11 联合浏览器验证（chrome-devtools，`127.0.0.1:3030` 开发前端 + 共享后端 9980，admin 登录）：
+    首页工作台、项目列表、序时账（和平药房_2025 科目余额表 402 行 / 序时账页签）、附注编辑页（【测试】公式同步甲_2025，199 节）、附注 SPA 深链 F5 刷新后仍在原页且登录态保持、底稿编辑器（A18-2 / H3 / I1）均正常渲染；console **error = 0**，页面无可见 `canceled`。
+    动态块：生产构建产物上 `heavy-univer` / `heavy-office` / `heavy-excel` 三个重块可单独动态加载、底稿 E1 编辑器正常（见 `frontend-prod-build-white-screen-closure` 任务 6）。
+    非 error 发现（不阻断）：项目列表 `GtStatusTag` 给 `ElTag` 传空串 `type` ⇒ 每个项目节点一对 Vue prop 警告（18 条，开发模式才有）；附注页一条 Element Plus `ElOnlyChild` 警告。
+  - 未覆盖：Univer **编辑模式**（本次只验证 heavy-univer 块加载与编辑器路由，不在 Univer 里改单元格）。
+- [x] 39. 复测 health、SQL p50/p95、容器、数据库尺寸、浏览器请求/长任务和保存回读，写入本文件
+  - 原阻塞：同上，需真实 PG/Redis 和服务现场。
+  - ✅ 2026-11-11 复测（数值见下；与 design §5 / §7 的 10-29~30 基线同口径）：
+    - health：`healthy`，postgres / redis ok，迁移 applied 258 / disk 256、pending 0、failures 0，schema drift 0，审计链未确认分叉 0；`/api/health` 12 次 p50 / p95 = 0.051 / 0.066 s。
+    - 序时账窗口（和平药房 2025 / 1002，普通账 116,260 行、首窗 200 行）：首窗 p50 0.338 s；第二组 12 次 0.300~0.374 s（p95≈0.37 s）；后窗 p50 / p95 = 0.034 / 0.056 s。辅助账（金融机构 YG0001）首窗 0.123~0.148 s。均与基线（普通首窗 0.295 / 0.345 s、辅助 0.141 / 0.158 s）一致。科目余额表 p50 / p95 = 0.024 / 0.033 s。
+      🔴 首组首窗 p95 = 5.13 s、辅助 p95 = 2.58 s 都是**单个冷请求**（12 个样本里只有第 1 个慢，第二组 24 次全部 ≤0.374 s）；pg_stat_statements 显示窗口的按月汇总 SQL 平均 293 ms、`raw_extra` 键扫描平均 191 ms，是首窗的主要成本，冷缓存下会放大。
+    - 容器：audit-postgres CPU 0.27% / 405 MiB、audit-redis 24 MiB、audit-onlyoffice 787 MiB、audit-vllm 3.58 GiB，6 个 audit-* 容器均 healthy。
+    - 数据库：`audit_platform` 30 GB，连接 19，`idle in transaction` 0，shared_buffers 8 GB（1048576×8 KB）。
+    - 浏览器长任务：首页 1 次 160 ms、项目列表 1 次 179 ms、附注页 1 次 234 ms；首页 DOMContentLoaded 600 ms。
+    - 保存回读：A18-2（【测试】甲）选「1. 舞弊 · 适用」→ 自动保存落库 `a182-matter1-applicability.remark='Y'` → F5 后仍选中；随后经同一 PUT 端点写回 null，回读 `conclusion/remark = null`。
+- [x] 40. 更新 INDEX/memory 的本轮摘要；只整理 owned files，不提交或推送他人改动
+  - 2026-11-11：INDEX 活跃表本行与 memory 本 spec 一行按现扫更新（42/42）；只改这两处本 spec 的文字块。
 
 > **2026-10-30 同步勘误（改号）**：本 spec 的 `V221__aux_ledger_active_account_prefix_index.sql` / `R221__rollback_aux_ledger_active_account_prefix_index.sql` 与远端已推送的 V221（`audit_chain_head_and_indexes`）撞号，同步时改为 **V226 / R226**（内容不改、checksum 不变；共享库 schema_version 的 221 行同步改登记为 226）。上文与 design 里的「V221」指现在的 V226；后续如需新迁移，按 `max(磁盘, 共享库) + 1` 取号（当前 ≥ V227）。

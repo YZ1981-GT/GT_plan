@@ -32,6 +32,7 @@
     "test:render-smoke": "playwright test --config=tests/render-smoke/playwright.config.ts"
   },
   "dependencies": {
+    "@babel/parser": "^8.1.0",
     "@element-plus/icons-vue": "^2.3.1",
     "@kenjiuno/msgreader": "1.28.0",
     "@tanstack/vue-query": "^5.100.6",
