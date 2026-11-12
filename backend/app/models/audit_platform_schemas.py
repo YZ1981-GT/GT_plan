@@ -116,6 +116,21 @@ class BasicInfoSchema(BaseModel):
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
 
+    @field_validator("company_code", "parent_company_code", "ultimate_company_code", mode="before")
+    @classmethod
+    def _normalize_uscc_codes(cls, value: Any) -> Any:
+        """三码入口统一规范化（R1.2/R2.2）：NFKC → strip → upper；空串归 None。
+
+        放在长度约束之前：带首尾空格 / 全角字符的 18 位代码先规范化再判长度，
+        不因空格被拒。None 与非字符串原样返回（None 由字段可空性处理；
+        非字符串交给长度约束报「Input should be a valid string」的既有行为）。
+        """
+        from app.services.uscc_validator import normalize_uscc_input
+
+        if value is None or not isinstance(value, str):
+            return value
+        return normalize_uscc_input(value)
+
     @field_validator("business_category", mode="before")
     @classmethod
     def _registered_category(cls, value: Any) -> str | None:

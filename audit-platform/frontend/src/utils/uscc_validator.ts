@@ -33,6 +33,19 @@ export interface USCCValidationResult {
 }
 
 /**
+ * 三码入口统一的规范化函数（spec consol-group-code-entry-consistency R1）。
+ *
+ * 与后端 normalize_uscc_input 同规则：NFKC（全角数字 / 字母 → 半角）→ 去首尾空白 → 转大写；
+ * 结果为空串返回 null。中间空格与 USCC 字符集外字符不做猜测修复，照常交给 validateUSCC 拒绝。
+ */
+export function normalizeUsccInput(value: string | null | undefined): string | null {
+  if (value == null) return null
+  // NFKC 归一：JS 原生 String.prototype.normalize('NFKC')
+  const text = value.normalize('NFKC').trim().toUpperCase()
+  return text || null
+}
+
+/**
  * 校验统一社会信用代码
  *
  * @param code 待校验的字符串

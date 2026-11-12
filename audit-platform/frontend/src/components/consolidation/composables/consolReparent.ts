@@ -22,6 +22,28 @@ export interface ReparentResult {
 
 const SCOPE_LABELS: Record<string, string> = { consolidated: '合并项目', standalone: '单户项目' }
 
+/**
+ * 判断拖拽改上级是否因改前上级已变化而发生 CAS 冲突。
+ *
+ * 该判断集中在组合式函数中，调用方才能把 CAS 冲突与其他 409（重复数据、业务冲突）
+ * 区分开，避免全局错误拦截器和页面通用错误处理重复提示，也避免误重试 PATCH。
+ */
+export function isParentCodeConflict(error: unknown): boolean {
+  const response = (error as { response?: { status?: unknown; data?: unknown } } | null)?.response
+  if (response?.status !== 409) return false
+
+  const data = response.data
+  const detail = data && typeof data === 'object' && !Array.isArray(data) && 'detail' in data
+    ? (data as { detail?: unknown }).detail
+    : data
+  return Boolean(
+    detail &&
+    typeof detail === 'object' &&
+    !Array.isArray(detail) &&
+    (detail as { error_code?: unknown }).error_code === 'PARENT_CODE_CONFLICT',
+  )
+}
+
 /** 「已同步 甲公司（单户项目）的上级企业代码、上级企业名称；甲公司（合并项目）的…。上级企业 X 本年度尚未建项…。」 */
 export function reparentSummary(result: ReparentResult | null | undefined): string {
   const changed = (result?.synced || []).filter((s) => Array.isArray(s.fields) && s.fields.length)

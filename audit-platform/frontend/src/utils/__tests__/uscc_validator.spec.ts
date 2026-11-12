@@ -6,7 +6,7 @@
  * 2. 非法：空字符串、长度错误、禁止字符、校验码错误
  */
 import { describe, it, expect } from 'vitest'
-import { validateUSCC, USCC_CHARSET } from '../uscc_validator'
+import { normalizeUsccInput, validateUSCC, USCC_CHARSET } from '../uscc_validator'
 
 /**
  * 辅助函数：根据 17 位前缀计算 USCC 校验码并返回完整 18 位编码
@@ -162,8 +162,16 @@ interface TestVector {
   expected_message: string | null
 }
 
+interface NormalizationVector {
+  case: string
+  input: string | null
+  expected: string | null
+  expected_valid: boolean
+  expected_message: string | null
+}
+
 describe('validateUSCC — golden file 一致性验证', () => {
-  it.each(testVectors as TestVector[])(
+  it.each((testVectors as unknown as { validate_vectors: TestVector[] }).validate_vectors)(
     'vector: $input → valid=$expected_valid',
     ({ input, expected_valid, expected_message }) => {
       const result = validateUSCC(input)
@@ -175,4 +183,29 @@ describe('validateUSCC — golden file 一致性验证', () => {
       }
     }
   )
+})
+
+describe('normalizeUsccInput — 规范化 golden file 一致性验证（与后端同源）', () => {
+  it.each(
+    (testVectors as unknown as { normalization: NormalizationVector[] }).normalization,
+  )('$case', ({ input, expected, expected_valid, expected_message }) => {
+    const got = normalizeUsccInput(input)
+    expect(got).toBe(expected)
+    // None 按空串校验，与后端 validate_uscc('') 同口径（可选字段由调用方跳过，不在此判定）
+    const result = validateUSCC(got ?? '')
+    expect(result.valid).toBe(expected_valid)
+    if (expected_valid) {
+      expect(result.message).toBeUndefined()
+    } else {
+      expect(result.message).toBe(expected_message)
+    }
+  })
+
+  it('空值与空白返回 null；全角 / 小写 / 首尾空格被规范化', () => {
+    expect(normalizeUsccInput(null)).toBeNull()
+    expect(normalizeUsccInput(undefined)).toBeNull()
+    expect(normalizeUsccInput('   ')).toBeNull()
+    expect(normalizeUsccInput('９１１１００００７１０９３０４５１Ｄ')).toBe('91110000710930451D')
+    expect(normalizeUsccInput(' 91110000710930451d ')).toBe('91110000710930451D')
+  })
 })

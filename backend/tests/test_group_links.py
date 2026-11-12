@@ -431,7 +431,9 @@ class TestUpdateStep:
             await svc.update_step(p.id, WizardStep.basic_info, {"client_name": "缺字段"}, db)
         assert exc.value.status_code == 422
         assert exc.value.detail.startswith("基本信息字段缺失或格式错误：")
-        assert "audit_year" in exc.value.detail
+        # R2.2（spec consol-group-code-entry-consistency）：已知字段以中文名列出，不再出现英文字段名
+        assert "审计年度" in exc.value.detail
+        assert "audit_year" not in exc.value.detail
 
     @pytest.mark.asyncio
     async def test_legacy_consolidation_type_key_ignored(self, db):

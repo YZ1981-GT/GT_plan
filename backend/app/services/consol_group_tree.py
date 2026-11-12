@@ -139,6 +139,7 @@ class Diagnostic:
     company_code: str | None = None
     node_key: str | None = None
     level: str = "warning"  # warning / info
+    project_ids: tuple[str, ...] = ()  # 关联诊断的项目 ID，供前端定位修改入口
 
     def to_dict(self) -> dict:
         return {
@@ -147,6 +148,7 @@ class Diagnostic:
             "company_code": self.company_code,
             "node_key": self.node_key,
             "level": self.level,
+            "project_ids": list(self.project_ids),
         }
 
 
@@ -237,6 +239,7 @@ def _make_entity(
                 "relation_conflict",
                 f"「{name}」的合并项目与单户项目集团关系不一致（上级代码、关系或控制方），企业树按{source}项目取值",
                 company_code=code,
+                project_ids=(str(standalone.id), str(consol.id)),
             ))
     if parent is not None and relation is None:
         relation = RELATION_SUBSIDIARY
@@ -309,6 +312,7 @@ def build_entity_graph(
                     "duplicate_project",
                     f"「{extra.client_name}」与「{rows[0].client_name}」企业代码、年度、报表类型都相同，只取后者进入企业树",
                     company_code=code,
+                    project_ids=(str(rows[0].id), str(extra.id)),
                 ))
         entities[code] = _make_entity(code, picked.get("consolidated"), picked.get("standalone"), diags)
 

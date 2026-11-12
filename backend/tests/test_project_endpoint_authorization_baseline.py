@@ -465,7 +465,8 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 2026-11-04 现算 148（远端头 33d1aa5a2 现算 154，已高出原基线 2）：spec voucher-workflow-linkage-lineage-closure
 #: R4.5 / R9 —— 抽样增强三端点（截止测试 / 账龄分析 / 月度明细）、报告复核溯源两端点（章节溯源 / 发现汇总）、
 #: 底稿序时账分析一端点补项目只读门，降 6；远端头那 2 个新增的仅登录端点不在本 spec 范围，仍计在 148 里。
-_IDENTITY_ONLY_BASELINE = 148
+#: 2026-11-12 现算 146（本 spec R2.6 向导保存与确认改挂项目级 edit 门，减少 2）。
+_IDENTITY_ONLY_BASELINE = 146
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -648,7 +649,8 @@ _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 #: spec project-pid-path-authz-coverage：项目段认 ``{pid}`` 后，HEAD 9791805c8 现算 235（截止测试 4 + 抽凭历史 / 对比 2
 #: 进视野，原先这 6 个只校验登录）；本 spec 把这 6 个改成项目级、R1.4 降 2 ⇒ 227。主工作树另含并发会话未入库的
 #: continuous_audit 1 + 调整分录锁 / 重分类 / 关联底稿 7 个改动，现算 219（随那些改动入库再下调）。
-_PREFIXED_IDENTITY_ONLY_BASELINE = 227
+#: 2026-11-12 现算 197；本 spec R2.6 的向导保存与确认已改挂 ``require_project_access("edit")``，基线按当前树现算值收紧。
+_PREFIXED_IDENTITY_ONLY_BASELINE = 197
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:

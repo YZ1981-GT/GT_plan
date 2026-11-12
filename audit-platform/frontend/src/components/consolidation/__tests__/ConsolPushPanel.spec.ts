@@ -2,16 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 
-const { api, message } = vi.hoisted(() => ({
+const { api, message, messageBox } = vi.hoisted(() => ({
   api: {
-    getConsolPushRuns: vi.fn(), getConsolPushStatus: vi.fn(), pushConsolidation: vi.fn(),
+    getConsolPushRuns: vi.fn(), getConsolPushStatus: vi.fn(), getWorksheetTree: vi.fn(), pushConsolidation: vi.fn(),
   } as Record<string, ReturnType<typeof vi.fn>>,
-  message: { success: vi.fn(), info: vi.fn() },
+  message: { success: vi.fn(), info: vi.fn(), warning: vi.fn() },
+  messageBox: { confirm: vi.fn() },
 }))
 vi.mock('@/services/consolidationApi', () => Object.fromEntries(
   Object.keys(api).map((key) => [key, (...args: any[]) => api[key](...args)]),
 ))
-vi.mock('element-plus', () => ({ ElMessage: message }))
+vi.mock('element-plus', () => ({ ElMessage: message, ElMessageBox: messageBox }))
 
 import ConsolPushPanel from '../ConsolPushPanel.vue'
 import {
@@ -86,6 +87,9 @@ describe('ConsolPushPanel', () => {
   beforeEach(() => {
     Object.values(api).forEach((fn) => fn.mockReset())
     Object.values(message).forEach((fn) => fn.mockReset())
+    messageBox.confirm.mockReset()
+    messageBox.confirm.mockResolvedValue('confirm')
+    api.getWorksheetTree.mockResolvedValue({ diagnostics: [{ code: 'duplicate_project', message: '企业树存在重复项目' }] })
     api.getConsolPushRuns.mockResolvedValue([RUN])
     api.getConsolPushStatus.mockResolvedValue({ last_run: RUN, is_stale: true, stale_rows: 3 })
     api.pushConsolidation.mockResolvedValue({ queued: true, message: '已开始推送，完成后自动刷新', project_id: 'p1', year: 2025 })
@@ -110,9 +114,30 @@ describe('ConsolPushPanel', () => {
     await wrapper.find('[data-testid="consol-push-now"]').trigger('click')
     await flushPromises()
     expect(api.pushConsolidation).toHaveBeenCalledWith('p1', 2025, 'manual')
+    expect(api.getWorksheetTree).toHaveBeenCalledWith('p1')
     expect(message.info).toHaveBeenCalledWith('已有推送在排队，本次请求已并入')
     expect(wrapper.emitted('queued')).toHaveLength(1)
     expect(api.getConsolPushRuns).toHaveBeenCalledTimes(2)
+  })
+
+  it('冲突确认取消时不发送手工推送，也不刷新运行记录', async () => {
+    messageBox.confirm.mockRejectedValueOnce(new Error('cancel'))
+    const wrapper = create()
+    await flushPromises()
+    await wrapper.find('[data-testid="consol-push-now"]').trigger('click')
+    await flushPromises()
+    expect(api.getWorksheetTree).toHaveBeenCalledWith('p1')
+    expect(api.pushConsolidation).not.toHaveBeenCalled()
+  })
+
+  it('企业树诊断读取失败时仍继续推送并提示未能检查', async () => {
+    api.getWorksheetTree.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = create()
+    await flushPromises()
+    await wrapper.find('[data-testid="consol-push-now"]').trigger('click')
+    await flushPromises()
+    expect(api.pushConsolidation).toHaveBeenCalledWith('p1', 2025, 'manual')
+    expect(message.warning).toHaveBeenCalledWith('未能检查企业树冲突，已继续推送')
   })
 
   it('项目或年度变化自动重载；无推送权限时点击不发请求', async () => {

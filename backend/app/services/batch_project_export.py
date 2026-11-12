@@ -21,6 +21,8 @@ from app.services.batch_project_types import (
 def _project_export_row(
     project: Project, *, action: str = "create", base_hash: str | None = None,
 ) -> list[Any]:
+    if action == "update" and not base_hash:
+        raise ValueError("更新集团关系导出必须提供 entity_group_fields_hash 基线")
     project_type = getattr(project.project_type, "value", project.project_type) or ""
     return [
         project.client_name,
@@ -35,8 +37,7 @@ def _project_export_row(
         workbook_io.RELATION_REVERSE.get(project.relation_to_parent or "", ""),
         workbook_io.ACTION_REVERSE.get(action, "新建"),
         str(project.id) if action == "update" else "",
-        workbook_io.group_fields_hash(project) if action == "update" and base_hash is None
-        else (base_hash or ""),
+        base_hash or "",
     ]
 
 

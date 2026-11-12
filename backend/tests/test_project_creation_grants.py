@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from sqlalchemy import func, select
 
 from app.models.base import PermissionLevel, ProjectUserRole, UserRole
@@ -705,3 +705,22 @@ async def test_grant_list_marks_unusable_manager_grants_suspended(db):
     manager.role = UserRole.auditor
     await db.commit()
     assert [item["status"] for item in await list_grants(db, manager_user_id=manager.id)] == ["suspended"]
+
+
+def test_normalize_company_code_keeps_empty_and_invalid_rejection():
+    """授权侧规范化（任务 1.1）：空值与非法值仍 422、文案不变；NFKC 等价写法按规范值判定。"""
+    from app.services.project_creation_grant_service import normalize_company_code
+
+    for raw in (None, "", "   ", "ABC", "91110000710930451"):
+        with pytest.raises(HTTPException) as rejected:
+            normalize_company_code(raw)
+        assert rejected.value.status_code == 422
+        assert rejected.value.detail == "统一社会信用代码必须为 18 位"
+    with pytest.raises(HTTPException) as charset:
+        normalize_company_code("91110000I109304510")
+    assert charset.value.detail == "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+    with pytest.raises(HTTPException) as checksum:
+        normalize_company_code("911100007109304510")
+    assert checksum.value.detail == "统一社会信用代码校验码错误"
+    assert normalize_company_code(" 91110000710930451d ") == "91110000710930451D"
+    assert normalize_company_code("９１１１００００７１０９３０４５１Ｄ") == "91110000710930451D"

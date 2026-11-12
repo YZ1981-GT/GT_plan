@@ -154,18 +154,27 @@ class TestEndpointAuth:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             for user in (outsider, reader):
                 current["u"] = user
-                resp = await c.patch(url, json={"parent_company_code": P})
+                resp = await c.patch(
+                    url,
+                    json={"parent_company_code": P, "expected_parent_company_code": X},
+                )
                 assert resp.status_code == 403, f"🔴 旧路由只要求登录：{resp.status_code}"
             current["u"] = outsider
             assert (await c.get(f"/api/projects/{ids['A_s']}/parent-code-history")).status_code == 403
             current["u"] = reader
             assert (await c.get(f"/api/projects/{ids['A_s']}/parent-code-history")).status_code == 200
             current["u"] = editor
-            ok = await c.patch(url, json={"parent_company_code": P})
+            ok = await c.patch(
+                url,
+                json={"parent_company_code": P, "expected_parent_company_code": X},
+            )
             assert ok.status_code == 200, ok.text
             body = ok.json()
             assert body["parent_company_name"] == "乙控股" and len(body["synced"]) == 2
             current["u"] = _U(UserRole.admin)
-            cycle = await c.patch(f"/api/projects/{ids['P_s']}/parent-code", json={"parent_company_code": A})
+            cycle = await c.patch(
+                f"/api/projects/{ids['P_s']}/parent-code",
+                json={"parent_company_code": A, "expected_parent_company_code": G},
+            )
             assert cycle.status_code == 400 and "循环" in cycle.json()["detail"]
         assert (await _fresh(db, ids["A_c"])).parent_company_name == "乙控股", "两口径同写"

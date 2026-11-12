@@ -22,7 +22,7 @@ from openpyxl.workbook.defined_name import DefinedName
 from pydantic import BaseModel
 
 from app.services.group_relation import effective_parent_code
-from app.services.uscc_validator import validate_uscc
+from app.services.uscc_validator import format_code_error, normalize_uscc_input, validate_uscc
 
 TEMPLATE_VERSION = "2"
 MAX_IMPORT_ROWS = 500
@@ -118,6 +118,21 @@ class LoadedWorkbook:
     file_sha256: str
 
 
+@dataclass(frozen=True)
+class _CodeCell:
+    """代码列的原始值与 Excel 类型错误（仅在导入解析阶段使用）。"""
+
+    raw: object
+    error: str
+
+
+_CODE_COLUMN_LABELS = {
+    1: "企业代码",
+    7: "上级企业代码",
+    8: "最终控制方代码",
+}
+
+
 def is_blank_row(row: tuple | list) -> bool:
     return not row or all(value is None or str(value).strip() == "" for value in row)
 
@@ -192,10 +207,61 @@ def load_data_sheet(file_bytes: bytes) -> LoadedWorkbook:
         raise HTTPException(status_code=413, detail=f"数据 sheet 超过允许范围（最多 {MAX_IMPORT_ROWS} 行）")
     rows: list[tuple] = []
     max_col = len(EXTENDED_COLUMNS)
-    for row in sheet.iter_rows(min_row=2, max_col=max_col, values_only=True):
+    raw_rows = list(sheet.iter_rows(min_row=2, max_col=max_col))
+    # 第二次只读加载只检查三码列。data_only=True 读到 None 时，只有确认原单元格确实是公式，
+    # 才报「公式没有计算结果」，普通空单元格仍按未填处理；其它列不需要读取公式文本。
+    formula_rows: list[dict[int, object]] = [dict() for _ in raw_rows]
+    if raw_rows:
+        formula_workbook = None
+        try:
+            formula_workbook = load_workbook(BytesIO(file_bytes), read_only=True, data_only=False)
+            formula_sheet = formula_workbook["数据"]
+            for column_index in _CODE_COLUMN_LABELS:
+                formula_cells = formula_sheet.iter_rows(
+                    min_row=2,
+                    max_row=len(raw_rows) + 1,
+                    min_col=column_index + 1,
+                    max_col=column_index + 1,
+                )
+                for row_index, (formula_cell,) in enumerate(formula_cells):
+                    formula_rows[row_index][column_index] = formula_cell
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="文件格式不正确，请使用标准建项模板") from exc
+        finally:
+            if formula_workbook is not None:
+                formula_workbook.close()
+
+    for row_index, cells in enumerate(raw_rows):
+        values = [cell.value for cell in cells]
+        formula_cells = formula_rows[row_index]
+        for column_index, label in _CODE_COLUMN_LABELS.items():
+            if column_index >= len(values):
+                continue
+            raw_value = values[column_index]
+            if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool):
+                values[column_index] = _CodeCell(
+                    raw=raw_value,
+                    error=(
+                        f"{label}：单元格被 Excel 识别为数字，请将该列设为文本后重新输入"
+                        f"（读到 {raw_value}）"
+                    ),
+                )
+                continue
+            formula_cell = formula_cells.get(column_index)
+            formula_value = getattr(formula_cell, "value", None)
+            formula_type = getattr(formula_cell, "data_type", None)
+            if (
+                raw_value is None
+                and (formula_type == "f" or (isinstance(formula_value, str) and formula_value.startswith("=")))
+            ):
+                values[column_index] = _CodeCell(
+                    raw=formula_value,
+                    error=f"{label}：公式没有计算结果，请在 Excel 中重新计算保存或粘贴为值",
+                )
+        row = tuple(values)
         if is_blank_row(row):
             continue
-        rows.append(tuple(row))
+        rows.append(row)
         if len(rows) > MAX_IMPORT_ROWS:
             raise HTTPException(status_code=413, detail=f"文件超过最大行数限制（{MAX_IMPORT_ROWS} 行）")
     version, template_mode, root_project_id = _read_meta(workbook)
@@ -216,7 +282,27 @@ def load_data_sheet(file_bytes: bytes) -> LoadedWorkbook:
 def _cell(row: tuple | list, index: int) -> str:
     if index >= len(row) or row[index] is None:
         return ""
-    return str(row[index]).strip()
+    value = row[index]
+    if isinstance(value, _CodeCell):
+        return str(value.raw).strip() if value.raw is not None else ""
+    return str(value).strip()
+
+
+def _code_cell(
+    row: tuple | list,
+    index: int,
+    label: str,
+    errors: list[str],
+) -> str:
+    """读取三码单元格并保留 Excel 类型错误的原值（R3.2/R3.4）。"""
+    if index >= len(row) or row[index] is None:
+        return ""
+    value = row[index]
+    if isinstance(value, _CodeCell):
+        errors.append(value.error)
+        # 错误明细仍需回写系统读到的原值，不能将它静默清空。
+        return str(value.raw).strip() if value.raw is not None else ""
+    return normalize_uscc_input(value) or ""
 
 
 def _parse_year(raw: object, errors: list[str]) -> int | None:
@@ -268,28 +354,39 @@ def parse_row(row: tuple | list, *, row_number: int = 0) -> tuple[ParsedRow, lis
         return ParsedRow(row_number=row_number, action=action, project_id=project_id, base_hash=base_hash), errors
 
     client_name = _cell(row, 0)
-    company_code = _cell(row, 1)
+    company_code = _code_cell(row, 1, "企业代码", errors)
     short_name = _cell(row, 2)
     project_type_cn = _cell(row, 4)
     standard_cn = _cell(row, 5)
     scope_cn = _cell(row, 6)
-    parent_code = _cell(row, 7)
-    ultimate_code = _cell(row, 8)
+    parent_code = _code_cell(row, 7, "上级企业代码", errors)
+    ultimate_code = _code_cell(row, 8, "最终控制方代码", errors)
     relation_cn = _cell(row, 9)
+
+    company_code_has_issue = isinstance(row[1], _CodeCell) if len(row) > 1 else False
+    parent_code_has_issue = isinstance(row[7], _CodeCell) if len(row) > 7 else False
+    ultimate_code_has_issue = isinstance(row[8], _CodeCell) if len(row) > 8 else False
 
     if not client_name:
         errors.append("客户名称为必填项")
     if not company_code:
         errors.append("企业代码为必填项")
-    elif not validate_uscc(company_code)[0]:
-        errors.append(validate_uscc(company_code)[1] or "企业代码格式错误")
+    elif not company_code_has_issue:
+        valid, reason = validate_uscc(company_code)
+        if not valid:
+            # R2.1：统一为 "{字段}：{原因}"
+            errors.append(format_code_error("企业代码", reason))
     if not short_name:
         errors.append("项目简称为必填项")
-    for label, code in (("上级企业代码", parent_code), ("最终控制方代码", ultimate_code)):
-        if code:
+    for label, code, has_issue in (
+        ("上级企业代码", parent_code, parent_code_has_issue),
+        ("最终控制方代码", ultimate_code, ultimate_code_has_issue),
+    ):
+        if code and not has_issue:
             valid, reason = validate_uscc(code)
             if not valid:
-                errors.append(f"{label}格式错误：{reason or 'USCC 格式不合规'}")
+                # R2.1：统一为 "{字段}：{原因}"（原 "{字段}格式错误：{原因}"）
+                errors.append(format_code_error(label, reason))
 
     relation = RELATION_MAP.get(relation_cn) if relation_cn else None
     if relation_cn and relation is None:
@@ -376,6 +473,18 @@ def _add_options_and_validations(workbook, data) -> None:
     options.sheet_state = "hidden"
 
 
+def _style_code_columns(sheet, *, min_row: int = 2, max_row: int | None = None) -> None:
+    """三码数据区强制文本格式，并把已有示例值写成字符串（R3.1）。"""
+    end_row = max_row or sheet.max_row or min_row
+    for row in sheet.iter_rows(min_row=min_row, max_row=end_row, min_col=1, max_col=len(EXTENDED_COLUMNS)):
+        for column in _CODE_COLUMN_LABELS:
+            cell = row[column]
+            cell.number_format = "@"
+            if cell.value is not None:
+                cell.value = str(cell.value)
+                cell.data_type = "s"
+
+
 def _style_data_sheet(sheet) -> None:
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = f"A1:M{MAX_IMPORT_ROWS + 1}"
@@ -394,6 +503,7 @@ def _style_data_sheet(sheet) -> None:
         row[12].protection = Protection(locked=True)
         for index in (1, 2, 3, 4, 5, 6):
             row[index - 1].fill = _REQUIRED_FILL
+    _style_code_columns(sheet, min_row=2, max_row=MAX_IMPORT_ROWS + 1)
     sheet.column_dimensions["L"].hidden = True
     sheet.column_dimensions["M"].hidden = True
     sheet.protection.sheet = True
@@ -414,6 +524,7 @@ def generate_template(*, mode: str = "project") -> BytesIO:
     examples.append(EXTENDED_COLUMNS)
     for row in EXAMPLE_ROWS:
         examples.append(row)
+    _style_code_columns(examples, min_row=2, max_row=examples.max_row)
     examples.freeze_panes = "A2"
     examples.sheet_properties.tabColor = "F4B183"
 
@@ -468,6 +579,7 @@ def generate_error_workbook(
     sheet.append(EXTENDED_COLUMNS + ["错误原因"])
     for row, errors in rows:
         _append_text_safe(sheet, parsed_to_excel_row(row) + ["；".join(errors)])
+    _style_code_columns(sheet, min_row=2, max_row=sheet.max_row)
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = f"A1:N{max(sheet.max_row, 2)}"
     sheet.column_dimensions["N"].width = 70
@@ -508,14 +620,6 @@ def entity_group_fields_hash(projects: list[object]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def group_fields_hash(project: object) -> str:
-    payload = "\x1f".join(
-        str(getattr(project, key, None) or "").strip()
-        for key in ("company_code", "audit_year", "report_scope", "parent_company_code", "ultimate_company_code", "relation_to_parent")
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
 def export_workbook(rows: list[list], *, mode: str, root_project_id: str | None = None) -> BytesIO:
     workbook = Workbook()
     data = workbook.active
@@ -552,7 +656,7 @@ __all__ = [
     "BASE_COLUMNS", "EXTENDED_COLUMNS", "LoadedWorkbook", "MAX_IMPORT_ROWS", "MAX_UPLOAD_BYTES",
     "ParsedRow", "PROJECT_TYPE_MAP", "PROJECT_TYPE_REVERSE", "RELATION_MAP", "RELATION_REVERSE",
     "REPORT_SCOPE_MAP", "REPORT_SCOPE_REVERSE", "TEMPLATE_VERSION", "export_workbook",
-    "generate_error_workbook", "generate_template", "group_fields_hash", "entity_group_fields_hash",
+    "generate_error_workbook", "generate_template", "entity_group_fields_hash",
     "is_blank_row", "load_data_sheet",
     "parse_row", "parsed_to_excel_row",
 ]

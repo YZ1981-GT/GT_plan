@@ -383,9 +383,12 @@ class UpdateParentCodeRequest(BaseModel):
 
     parent_company_code 为 None 或空串 → 脱挂到顶层（指向最终控制方根或独立）。
     parent_company_name：新上级本年度没有建项时用作上级企业名称（建了项以项目上的名称为准）。
+    expected_parent_company_code：调用方读取到的改前上级；缺字段与显式 null 不同，
+    用于拖拽 CAS（spec consol-group-code-entry-consistency R4）。
     """
     parent_company_code: str | None = None
     parent_company_name: str | None = None
+    expected_parent_company_code: str | None = None
 
 
 class UpdateParentCodeResponse(BaseModel):
@@ -415,14 +418,29 @@ async def update_parent_code(
     审计日志（app_audit_log，SAVEPOINT：写失败只回滚这一步）与提交。返回同步了哪些项目与字段。
     """
     from app.services.group_links import reparent_project
+    from app.services.uscc_validator import normalize_uscc_input
+
+    if "expected_parent_company_code" not in body.model_fields_set:
+        raise HTTPException(
+            status_code=428,
+            detail="请刷新企业树后重试（缺少改前上级）",
+        )
 
     project = await db.get(Project, project_id)
     if project is None or project.is_deleted:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     old_value = project.parent_company_code
-    new_value = (body.parent_company_code or "").strip() or None
-    result = await reparent_project(db, project, new_value, name_hint=body.parent_company_name)
+    # R1.2：入口统一规范化（NFKC → strip → upper；空 → None）
+    new_value = normalize_uscc_input(body.parent_company_code)
+    expected_parent_code = normalize_uscc_input(body.expected_parent_company_code)
+    result = await reparent_project(
+        db,
+        project,
+        new_value,
+        name_hint=body.parent_company_name,
+        expected_parent_code=expected_parent_code,
+    )
 
     # Task 16.1：写 app_audit_log（who/when/old/new）。失败不阻断主更新。
     try:
@@ -606,13 +624,17 @@ async def update_step(
     step: WizardStep,
     data: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> WizardStepSaveResponse:
     """更新指定步骤数据并持久化。
 
     Validates: Requirements 1.3, 1.4, 1.5
+    R2.6（spec consol-group-code-entry-consistency）：本项目 edit 级权限
+    （admin 直通）；操作者作为 actor 传入服务层，企业代码有变化时走建项授权。
     """
-    return await project_wizard_service.update_step(project_id, step, data, db)
+    return await project_wizard_service.update_step(
+        project_id, step, data, db, actor=current_user
+    )
 
 
 @router.post(
@@ -636,11 +658,13 @@ async def validate_step(
 async def confirm_project(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> ProjectCreateResponse:
     """确认创建项目，状态 created → planning。
 
     Validates: Requirements 1.7
+    R2.6（spec consol-group-code-entry-consistency）：本项目 edit 级权限（admin 直通），
+    原来只校登录 ⇒ 任何登录用户可确认任意项目。
     """
     project = await project_wizard_service.confirm_project(
         project_id, db, changed_by=current_user.id

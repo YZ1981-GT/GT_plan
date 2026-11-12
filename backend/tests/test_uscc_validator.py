@@ -11,6 +11,8 @@ from app.services.uscc_validator import (
     USCC_CHARSET,
     _CHAR_TO_VALUE,
     _WEIGHTS,
+    format_code_error,
+    normalize_uscc_input,
     validate_uscc,
 )
 
@@ -185,7 +187,9 @@ import json
 from pathlib import Path
 
 _VECTORS_PATH = Path(__file__).parent / "fixtures" / "uscc_test_vectors.json"
-_VECTORS = json.loads(_VECTORS_PATH.read_text(encoding="utf-8"))
+_VECTORS_DOC = json.loads(_VECTORS_PATH.read_text(encoding="utf-8"))
+_VECTORS = _VECTORS_DOC["validate_vectors"]
+_NORMALIZATION_VECTORS = _VECTORS_DOC["normalization"]
 
 
 @pytest.mark.parametrize(
@@ -207,3 +211,47 @@ def test_uscc_golden_vectors(vector: dict):
     assert error == expected_message, (
         f"input={code!r}: expected message={expected_message!r}, got {error!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 三码规范化单一来源（spec consol-group-code-entry-consistency R1.4）
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "vector",
+    _NORMALIZATION_VECTORS,
+    ids=[v["case"] for v in _NORMALIZATION_VECTORS],
+)
+def test_uscc_normalization_golden_vectors(vector: dict):
+    """规范化结果与 golden file 逐条一致；规范化值的校验结论与拒绝文案也逐条一致。
+
+    None（空值）按空串交给 validate_uscc，与 validate_uscc("") 同口径。
+    """
+    got = normalize_uscc_input(vector["input"])
+    assert got == vector["expected"], (
+        f"input={vector['input']!r}: expected normalized={vector['expected']!r}, got {got!r}"
+    )
+    is_valid, error = validate_uscc(got or "")
+    assert is_valid is vector["expected_valid"], (
+        f"input={vector['input']!r}: expected valid={vector['expected_valid']}, "
+        f"got {is_valid} (error={error})"
+    )
+    assert error == vector["expected_message"], (
+        f"input={vector['input']!r}: expected message={vector['expected_message']!r}, got {error!r}"
+    )
+
+
+def test_normalize_uscc_input_basics():
+    """规范化函数核心行为：NFKC / strip / upper / 空串→None。"""
+    assert normalize_uscc_input("９１１１００００７１０９３０４５１Ｄ") == "91110000710930451D"
+    assert normalize_uscc_input("  ab  ") == "AB"
+    assert normalize_uscc_input("") is None
+    assert normalize_uscc_input(None) is None
+    assert normalize_uscc_input("   ") is None
+    assert normalize_uscc_input(123) == "123"
+
+
+def test_format_code_error():
+    """统一报错文案："{字段}：{原因}"。"""
+    assert format_code_error("企业代码", "统一社会信用代码必须为 18 位") == "企业代码：统一社会信用代码必须为 18 位"
+    assert format_code_error("上级企业代码", None) == "上级企业代码：格式错误"

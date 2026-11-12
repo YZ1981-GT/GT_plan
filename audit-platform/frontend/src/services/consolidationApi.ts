@@ -747,6 +747,8 @@ export interface ConsolTreeDiagnostic {
   message: string
   company_code: string | null
   node_key: string | null
+  /** 涉及该诊断的项目 id；仅重复项目 / 关系冲突诊断返回。 */
+  project_ids?: string[]
   level: 'warning' | 'info'
 }
 

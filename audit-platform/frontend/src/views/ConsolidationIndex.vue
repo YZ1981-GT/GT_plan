@@ -638,6 +638,11 @@
       :state="workspaceGuard.state"
       @decide="workspaceGuard.decide"
     />
+    <ConsolTreeConflictDialog
+      v-model="treeConflictDialogVisible"
+      :diagnostics="treeConflictDialogDiagnostics"
+      @acknowledged="acknowledgeTreeConflicts"
+    />
 
   </div>
 </template>
@@ -697,8 +702,16 @@ import {
   standaloneEntityOf,
   viaLabel,
 } from '@/components/consolidation/composables/consolTreeView'
+import {
+  conflictSignature,
+  confirmPushDespiteConflicts,
+  rememberConflictSignature,
+  shouldShowTreeConflicts,
+  treeConflicts,
+} from '@/components/consolidation/composables/consolTreeConflicts'
 import { relationLabel } from '@/utils/groupRelation'
 import ConsolWorkspaceGuardDialog from '@/components/consolidation/ConsolWorkspaceGuardDialog.vue'
+import ConsolTreeConflictDialog from '@/components/consolidation/ConsolTreeConflictDialog.vue'
 import { provideConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
 import { useConsolWorkspaceAccess } from '@/components/consolidation/composables/useConsolWorkspaceAccess'
 import { useCellSelection } from '@/composables/useCellSelection'
@@ -852,6 +865,7 @@ async function queueConsolPush() {
   if (!(await workspaceGuard.confirmTransition('推送合并结果前，请先处理未保存修改。'))) return
   const pushYear = effectiveConsolYear()
   if (pushYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
+  if (!(await confirmPushDespiteConflicts(projectId.value))) return
   consolPushQueuing.value = true
   try {
     const ack = await pushConsolidation(projectId.value, pushYear, 'manual')
@@ -1077,6 +1091,9 @@ const treeMessage = ref('')
 const treeDiagnostics = ref<ConsolTreeDiagnostic[]>([])
 const diagnosticsDismissed = ref(false)
 const showAllDiagnostics = ref(false)
+const treeConflictDialogVisible = ref(false)
+const treeConflictDialogDiagnostics = ref<ConsolTreeDiagnostic[]>([])
+const treeConflictDialogSignature = ref('')
 const DIAG_PREVIEW = 5
 const consolModeLabel = computed(() => modeLabel(treeMode.value, treeModeLabel.value) || '自动识别')
 const treeWarnings = computed(() => treeDiagnostics.value.filter((d) => d.level !== 'info'))
@@ -1084,6 +1101,26 @@ const visibleDiagnostics = computed(() => {
   const sorted = sortDiagnostics(treeDiagnostics.value)
   return showAllDiagnostics.value ? sorted : sorted.slice(0, DIAG_PREVIEW)
 })
+
+function maybeShowTreeConflicts(): void {
+  const conflicts = treeConflicts(treeDiagnostics.value)
+  const treeConflictYear = treeYear.value ?? effectiveConsolYear()
+  if (!shouldShowTreeConflicts(projectId.value, treeConflictYear, conflicts)) return
+
+  treeConflictDialogDiagnostics.value = conflicts
+  treeConflictDialogSignature.value = conflictSignature(conflicts)
+  treeConflictDialogVisible.value = true
+}
+
+function acknowledgeTreeConflicts(): void {
+  if (!projectId.value || !treeConflictDialogSignature.value) return
+  rememberConflictSignature(
+    projectId.value,
+    treeYear.value ?? effectiveConsolYear(),
+    treeConflictDialogSignature.value,
+  )
+  treeConflictDialogVisible.value = false
+}
 
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
@@ -1510,6 +1547,7 @@ async function loadGroupTree(): Promise<boolean> {
     treeDiagnostics.value = Array.isArray(res?.diagnostics) ? res.diagnostics : []
     diagnosticsDismissed.value = false
     groupTreeLoaded.value = true
+    maybeShowTreeConflicts()
   } catch (e: any) {
     // GET 去重导致的 cancel（axios abort）不是真正的失败——静默忽略，
     // 后发的请求会带回正确数据（http.ts addPending GET 去重机制）。
