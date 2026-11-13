@@ -14,7 +14,8 @@
         "backend/app/schemas/**",
         "backend/app/security/**",
         "backend/app/permissions/**",
-        "backend/app/data/**"
+        "backend/app/data/**",
+        "backend/app/contracts/**"
       ],
       "may_depend_on": ["auth", "backend-routers", "backend-services", "events", "formula", "projects", "workpaper-rendering", "workpapers"]
     },
@@ -385,7 +386,8 @@
         "audit-platform/frontend/src/data/**",
         "audit-platform/frontend/src/components/common/**",
         "audit-platform/frontend/src/components/shared/**",
-        "audit-platform/frontend/src/components/layout/**"
+        "audit-platform/frontend/src/components/layout/**",
+        "audit-platform/frontend/src/api/**"
       ],
       "may_depend_on": ["auth", "evidence", "formula", "frontend-features", "frontend-shell", "projects", "workpaper-rendering", "workpapers"]
     },
