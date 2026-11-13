@@ -14,12 +14,6 @@
       "count": 1
     },
     {
-      "file": "backend/app/services/ai_chat/address_index_source.py",
-      "scope": "AddressCoordinateIndexSource._fetch_from_legacy",
-      "name": "get_registry",
-      "count": 1
-    },
-    {
       "file": "backend/app/services/ai_chat/address_mention.py",
       "scope": "_load_address_entry",
       "name": "address_registry",
