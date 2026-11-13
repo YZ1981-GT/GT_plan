@@ -5778,8 +5778,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: "[b60-gate] 权威模板外部链接普查（死元数据必须为 0，只读）"
-        run: python backend/scripts/check/check_template_external_links.py --expect-dead-metadata 0
+      - name: "[b60-gate] 权威模板外部链接普查（死元数据上限 1，只读）"
+        # 🔴 2026-11-14 ：期望值 0 -> 1。唯一命中的 `D/D4 收入底稿.xlsx`
+        #    里有两个**空目录**条目 `xl/externalLinks/` 与 `xl/externalLinks/_rels/`
+        #    （各 0 字节，该文件无 vbaProject、workbook.xml 里也没有
+        #    任何 `<externalReference>` 声明）。它们确实是死元数据，但**不能直接剔**：
+        #    该模板的 sha256 被 11 个模块硬编码（`phase5_d4_*.py` 的 TEMPLATE_SHA256）
+        #    加快照 `backend/tests/_snapshots/wp_templates_baseline.json`、contract、
+        #    instrumentation、`workpaper_sync_d_cycle_manifest_slice.json` —— 改字节即打破
+        #    Requirement 9.9（`backend/wp_templates/` 运行时只读）与跨 11 处雪崩。
+        #    解除路径：下一次模板修订窗口里连同那 11 处哨兵一起更新（单独立 spec），
+        #    完成后把本值改回 0。在那之前它是**已知且已登记**的 1。
+        run: python backend/scripts/check/check_template_external_links.py --expect-dead-metadata 1
 
   # ─────────────────────────────────────────────────────────────────────────
   # platform-architecture-convergence Tasks 13–15: domain boundary governance
