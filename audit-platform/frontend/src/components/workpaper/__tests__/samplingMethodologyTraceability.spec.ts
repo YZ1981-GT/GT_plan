@@ -299,8 +299,9 @@ describe('抽样方法学可追溯性（R6.2）', () => {
       expect(ENGINE_CODE).toMatch(
         /const\s+hasSessionSamples\s*=\s*computed\(\s*\(\)\s*=>\s*sampledVouchers\.value\.length\s*>\s*0\s*\)/,
       )
-      // 重新推断：禁用条件含 !hasSessionSamples
-      expect(ENGINE).toMatch(/:disabled="props\.readonly \|\| !hasSessionSamples"/)
+      // 重新推断：禁用条件含 !hasSessionSamples（只读真源 isReadonly 合并了底稿运行时只读，
+      // spec voucher-workflow-linkage-lineage-closure R4.1）
+      expect(ENGINE).toMatch(/:disabled="isReadonly \|\| !hasSessionSamples"/)
       // A13 推送：canPushProjected 里必须有该判据
       const m = /const\s+canPushProjected\s*=\s*computed\(\(\)\s*=>\s*\{([\s\S]*?)\n\}\)/.exec(
         ENGINE_CODE,

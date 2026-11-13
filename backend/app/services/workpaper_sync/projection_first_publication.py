@@ -704,6 +704,7 @@ async def publish_first_generation(
             else _static_structure_anchors(provider)  # 纯静态 entry
         ),
         reason="content_commit",
+        normalize_unmanaged_baseline=True,
     )
     return await mutation_service.commit(
         plan=commit_plan,

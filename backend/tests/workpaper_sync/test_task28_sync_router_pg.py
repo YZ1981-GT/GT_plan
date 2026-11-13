@@ -1325,9 +1325,9 @@ class TestUnifiedNotFoundOracle:
 
 
 class TestForbiddenIsDistinctFromNotFound:
-    def test_workflow_lock_refuses_writes_with_403(self, snap: dict[str, Any]) -> None:
+    def test_workflow_lock_refuses_writes_with_423(self, snap: dict[str, Any]) -> None:
         lock = snap["scenarios"]["workflow_lock"]
-        assert lock["write_status"] == 403
+        assert lock["write_status"] == 423
         assert "sync_workflow_locked" in lock["write_body"]
 
     def test_workflow_lock_still_allows_reads(self, snap: dict[str, Any]) -> None:
@@ -1384,10 +1384,10 @@ class TestMaterializeFromStoreEndpoint:
         assert observed["status"] == 404
         assert json.loads(observed["body"]) == json.loads(_unified_404_body())
 
-    def test_workflow_lock_refuses_with_403(self, snap: dict[str, Any]) -> None:
+    def test_workflow_lock_refuses_with_423(self, snap: dict[str, Any]) -> None:
         """归档 / 复核通过的底稿不得因「点了在线编辑」而被写入（写 action）。"""
         observed = snap["scenarios"]["materialize_from_store"]["locked"]
-        assert observed["status"] == 403 and "sync_workflow_locked" in observed["body"], observed
+        assert observed["status"] == 423 and "sync_workflow_locked" in observed["body"], observed
 
     def test_an_entry_without_an_adapter_fails_visible_with_zero_side_effects(
         self, snap: dict[str, Any]

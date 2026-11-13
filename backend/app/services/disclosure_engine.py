@@ -23,6 +23,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 import sqlalchemy as sa
+from sqlalchemy import orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
@@ -654,6 +655,8 @@ class RefillReport:
     records: list[CellRefillRecord] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     error_details: list[dict[str, str]] = field(default_factory=list)
+    #: 写入归属被拒的格（spec formula-writer-ownership-and-stale design §13）
+    blocked_writes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def recomputed_sections(self) -> list[str]:
@@ -666,6 +669,8 @@ class DisclosureEngine:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        #: 生成 / 报表更新合并时写入归属被拒的格（spec formula-writer-ownership-and-stale design §13）
+        self.blocked_writes: list[dict[str, Any]] = []
         self._wp_cache: dict = {}
         self._wp_account_cache: dict = {}
         self._tb_cache: dict = {}
@@ -908,8 +913,15 @@ class DisclosureEngine:
         return tb
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
+        # 🔴 只取 `wizard_state`（加主键），不做全列 ORM 投影：ORM 声明的列可以领先于库
+        #    （2026-11-01 实测共享库缺 `projects.amount_unit`、V250 未落库；11-03 他人迁库后已有，
+        #    机理仍在），全列 SELECT 会 `UndefinedColumnError` ⇒ 本函数整体失败，而调用方的 fail-open 只会把它变成
+        #    「静默退化 + 事务 aborted」。`load_only` 保留 ORM 实体，下面对 `wizard_state`
+        #    的回写与 flush 行为不变（UPDATE 只写该列）。
         result = await self.db.execute(
-            sa.select(Project).where(
+            sa.select(Project)
+            .options(orm.load_only(Project.wizard_state))
+            .where(
                 Project.id == project_id,
                 Project.is_deleted == sa.false(),
             )
@@ -1371,7 +1383,9 @@ class DisclosureEngine:
     # Sprint 1 Task 1.3 / 1.4 — binding 驱动的新路径
     # ------------------------------------------------------------------
     @staticmethod
-    def _backfill_totals(rows: list[dict], num_value_cols: int, table: dict | None = None) -> None:
+    def _backfill_totals(rows: list[dict], num_value_cols: int, table: dict | None = None, *,
+                         protected: set[tuple[int, int]] | None = None,
+                         held: list[tuple[int, int, float]] | None = None) -> None:
         """合计 / 小计行回填：按合计构成（``note_total_terms``，单体 / 合并 / 前端同一判定）只写判得准的合计行、
         金额列（标题行库判为比例 / 说明的列不加）、自动格；构成里的格全空不写。
 
@@ -1383,7 +1397,7 @@ class DisclosureEngine:
 
         info = dict(table) if isinstance(table, dict) else {}
         info["rows"] = rows
-        recalc_table_totals(info, value_columns=num_value_cols)
+        recalc_table_totals(info, value_columns=num_value_cols, protected=protected, held=held)
 
     async def _build_with_binding(
         self,
@@ -1734,10 +1748,14 @@ class DisclosureEngine:
 
         Validates: Requirements 4.2, 4.3, 4.8, 4.9, 21.3
         """
+        from app.services.note_formula_push_guard import PushOwnershipCache
+        from app.services.note_write_ownership import WriteGate, merge_holding_pushed_cells
+
         templates = await self._load_templates(project_id, template_type)
         if only_sections is not None:
             templates = [t for t in templates if t["note_section"] in only_sections]
         source_template = self._persist_source_template(template_type)
+        push_cache = PushOwnershipCache(self.db, project_id, year)
         results = []
 
         # ── 统一入口：公式灰度按项目解析一次传下游（避免逐格查库）──
@@ -1912,12 +1930,11 @@ class DisclosureEngine:
                     else:
                         from sqlalchemy.orm.attributes import flag_modified
 
-                        from app.services.note_cell_merge import (
-                            merge_table_data_preserving_cell_modes,
-                        )
-                        note.table_data = merge_table_data_preserving_cell_modes(
-                            note.table_data, table_data,
-                        )
+                        # 写入归属：推送写定的格归公式推送（design §13.4；刷新链路先推送后生成，原来生成把推送值改回绑定值）
+                        gate = WriteGate("generate_notes", template_type, note_section, note.table_data)
+                        owned = await push_cache.cells(note_section, note.table_data) if gate.governed else {}
+                        note.table_data = merge_holding_pushed_cells(note.table_data, table_data, owned, gate)
+                        self.blocked_writes.extend(gate.blocked_writes)
                         flag_modified(note, "table_data")
                 else:
                     note.table_data = table_data
@@ -2011,12 +2028,12 @@ class DisclosureEngine:
         """
         from sqlalchemy.orm.attributes import flag_modified
 
-        from app.services.note_cell_merge import (
-            merge_table_data_preserving_cell_modes,
-        )
+        from app.services.note_formula_push_guard import PushOwnershipCache
+        from app.services.note_write_ownership import WriteGate, merge_holding_pushed_cells
 
         template_type = await self._get_active_template_type(project_id)
         templates = await self._load_templates(project_id, template_type)
+        push_cache = PushOwnershipCache(self.db, project_id, year)
         updated = 0
 
         for tmpl in templates:
@@ -2060,7 +2077,11 @@ class DisclosureEngine:
                         # 不覆盖底稿同步的表格结构，但追加模板新增的子表
                         _append_missing_template_tables(old_td, new_td)
                     else:
-                        note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
+                        # 写入归属：推送写定的格归公式推送（design §13.4），其余照三态合并
+                        gate = WriteGate("update_note_values", template_type, note_section, old_td)
+                        owned = await push_cache.cells(note_section, old_td) if gate.governed else {}
+                        note.table_data = merge_holding_pushed_cells(old_td, new_td, owned, gate)
+                        self.blocked_writes.extend(gate.blocked_writes)
                 else:
                     note.table_data = new_td
                 # JSONB 字段需要显式标记，确保嵌套字段持久化
@@ -2101,7 +2122,14 @@ class DisclosureEngine:
             get_binding_for_section,
         )
 
+        from app.services.note_formula_push_guard import PushOwnershipCache
+        from app.services.note_write_ownership import (
+            ANY_TABLE, BINDING_WRITER, FIELD_ROWS, FIELD_SUB_TABLE, WriteGate,
+        )
+
         report = RefillReport()
+        template_type = await self._get_active_template_type(project_id)
+        push_cache = PushOwnershipCache(self.db, project_id, year)
 
         # 1. 预加载缓存
         self._wp_cache = {}
@@ -2150,14 +2178,14 @@ class DisclosureEngine:
                 report.text_only_sections.append(section)
                 continue
 
-            # 4a. 底稿同步来源（_source=workpaper/workpaper_html）的章节：
-            # 表格结构（sub_table_data 推送的 rows/headers）由底稿披露表拥有，
-            # 刷新不得覆盖其 cell 值——底稿是该章节表格数据的唯一真源。
-            # 但对有 binding sidecar（_cell_meta/semantic）的单元格仍允许重算
-            # （如合计行、试算表引用格），没有 sidecar 的行自然跳过。
-            # 同时标记来源以便 refill 循环中做更细粒度的保护。
-            _note_source = td.get("_source")
-            _is_workpaper_source = _note_source in ("workpaper", "workpaper_html")
+            # 4a. 写入归属（spec formula-writer-ownership-and-stale design §13）：交接章节里底稿披露容器生效 ⇒ 模板表格
+            # 已被投影遮住，不再写（原来照写隐藏的 _tables 并计入「已更新」）；推送写定的格归公式推送，模板绑定不改。
+            gate = WriteGate(BINDING_WRITER, template_type, section, td)
+            if gate.governed and gate.container == FIELD_SUB_TABLE:
+                gate.record(gate.check(table=ANY_TABLE, field=FIELD_ROWS), table=ANY_TABLE, field=FIELD_ROWS)
+                report.blocked_writes.extend(gate.blocked_writes)
+                continue
+            owned = await push_cache.cells(section, td) if gate.governed else {}
 
             # 4. 获取 binding + 计算待刷新的表清单
             sec_binding = get_binding_for_section(section)
@@ -2306,6 +2334,20 @@ class DisclosureEngine:
                             if not self._values_differ(old_val, new_val):
                                 continue
 
+                            # 写入归属：推送写定的格归公式推送（design §13.3 第 6 步），其余按基础条目
+                            owned_cell = owned.get((table_index, row_idx, col_idx))
+                            verdict = gate.check(
+                                table=owned_cell.table if owned_cell else ANY_TABLE, field=FIELD_ROWS,
+                                column=owned_cell.field if owned_cell else None, pushed=owned_cell is not None,
+                            )
+                            if not verdict.allowed:
+                                gate.record(
+                                    verdict, table=owned_cell.table if owned_cell else ANY_TABLE,
+                                    field=f"table.cell:{owned_cell.field}" if owned_cell else FIELD_ROWS,
+                                    row=label or None, incoming=new_val, kept=old_val,
+                                )
+                                continue
+
                             # 写回
                             values[col_idx] = new_val
                             # legacy 单元格重算后归一为 auto，使后续刷新走正常自动路径
@@ -2334,9 +2376,23 @@ class DisclosureEngine:
                     if section_had_error:
                         break
 
-                    # 重算合计行（逐表）
+                    # 重算合计行（逐表）；推送写定的合计格（兜底写入的科目合计等）归公式推送，不重算
                     if table_touched:
-                        self._backfill_totals(rows, num_value_cols, table_obj)
+                        pushed_totals = {
+                            (r_i, c_i): cell for (t_i, r_i, c_i), cell in owned.items() if t_i == table_index
+                            and not gate.check(table=cell.table, field=FIELD_ROWS, column=cell.field,
+                                               pushed=True).allowed
+                        }
+                        held_totals: list[tuple[int, int, float]] = []
+                        self._backfill_totals(rows, num_value_cols, table_obj,
+                                              protected=set(pushed_totals), held=held_totals)
+                        for r_i, c_i, new_total in held_totals:
+                            cell = pushed_totals[(r_i, c_i)]
+                            gate.record(
+                                gate.check(table=cell.table, field=FIELD_ROWS, column=cell.field, pushed=True),
+                                table=cell.table, field=f"table.cell:{cell.field}", row=cell.label,
+                                incoming=new_total, kept=rows[r_i]["values"][c_i],
+                            )
                         if table_index == 0:
                             table0_touched = True
 
@@ -2354,6 +2410,7 @@ class DisclosureEngine:
                         section, table_index, err,
                     )
 
+            report.blocked_writes.extend(gate.blocked_writes)
             if section_had_error:
                 if section not in report.failed_sections:
                     report.failed_sections.append(section)
@@ -2502,12 +2559,30 @@ class DisclosureEngine:
 
         fail-open 的理由：这是**读**侧过滤，失败时退回原行为（全量返回）不会丢数据；
         反过来若把异常当成「全部不适用」会让目录树整棵变空。
+
+        🔴 fail-open 必须连事务一起降级：PG 上一条语句失败后事务进入 aborted，
+        只吞异常不回滚到保存点的话，**同一请求后续每条语句都会
+        `InFailedSQLTransactionError`** —— 调用方看到的不是「降级后照常返回」，而是 500。
+        （实测形态：共享库缺 `projects.amount_unit` 时，附注目录树整条请求 500。）
+        所以这里把读取放进 `begin_nested()`，失败回滚到保存点再降级。
+
+        `begin_nested` 按能力取：本函数有若干调用方传的是只实现了 ``execute`` 的测试替身
+        （`SimpleNamespace`），它们背后没有事务、也就没有需要保护的东西；真实
+        ``AsyncSession`` 一定有这个方法。保存点真的起作用这件事由真库用例
+        ``test_aql_notes_tree_savepoint_pg.py`` 钉住（去掉保存点即打红）。
         """
+        begin_nested = getattr(self.db, "begin_nested", None)
+        savepoint = await begin_nested() if begin_nested is not None else None
         try:
             basic_info = await self._get_project_basic_info(project_id)
         except Exception as err:  # pragma: no cover - 读侧降级
+            if savepoint is not None:
+                await savepoint.rollback()
             logger.warning("notes tree: resolve project scope failed for %s: %s", project_id, err)
             return None, None
+        else:
+            if savepoint is not None:
+                await savepoint.commit()
         if not isinstance(basic_info, dict):
             return None, None
         template_type = basic_info.get("template_type")
@@ -2658,44 +2733,49 @@ class DisclosureEngine:
     ) -> DisclosureNote | None:
         """更新附注章节内容；有字段要改就盖「最近一次编辑」（``note_edit_stamp``，第 24 组）。
 
+        2026-11-06 起经 ``mutate_note_by_id`` 统一内核写入（C2 收口）：PG 下
+        ``pg_advisory_xact_lock`` + ``FOR UPDATE`` + ``deepcopy(table_data)`` +
+        按稳定 hash 判 changed，一处 flag_modified + 一次 UPDATE；外部签名、
+        pushed_row_violations 409 语义、note_edit_stamp 戳章行为完全不变。
+
         Validates: Requirements 4.10
         """
+        from app.services.disclosure.note_section_write_kernel import mutate_note_by_id
         from app.services.note_edit_stamp import stamp_note_edit
+        from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
 
-        result = await self.db.execute(
-            sa.select(DisclosureNote).where(
-                DisclosureNote.id == note_id,
-                DisclosureNote.is_deleted == sa.false(),
-            )
-        )
-        note = result.scalar_one_or_none()
-        if note is None:
+        captured: dict[str, DisclosureNote | None] = {"note": None}
+
+        def _mutator(note: DisclosureNote, workspace: dict[str, Any]) -> None:
+            captured["note"] = note
+            # 集团下推固定行保护：在**原 note.table_data** 与**传入 new table_data**
+            # 之间比较，和历史口径保持一致（workspace 是 note.table_data 的 deepcopy，
+            # 这里刻意**不**用 workspace 比，避免 mutator 本身的 deepcopy 隔离影响判定）。
+            if table_data is not None:
+                if bad := pushed_row_violations(note.table_data, table_data):
+                    raise HTTPException(status_code=409, detail={
+                        "error_code": PUSHED_ROW_PROTECTED, "rows": bad,
+                        "message": "集团下推的固定行不能删除、改名或去掉下推标记：" + "、".join(
+                            f"「{v['table']}」{v['row']}（{v['problem']}）" for v in bad[:5]) + (" 等" if len(bad) > 5 else "")})
+
+            if any(v is not None for v in (table_data, text_content, guidance_text, status)):
+                stamp_note_edit(note, user_id)
+
+            if table_data is not None:
+                # 内核按 workspace 的新旧 hash 比较；直接把 workspace 内容替换成 new table_data
+                workspace.clear()
+                workspace.update(table_data)
+            if text_content is not None:
+                note.text_content = text_content
+            if guidance_text is not None:
+                note.guidance_text = guidance_text
+            if status is not None:
+                note.status = status
+
+        result = await mutate_note_by_id(self.db, note_id=note_id, mutator=_mutator)
+        if result is None:
             return None
-        if table_data is not None:  # 集团下推的固定行不能删 / 改名 / 去标记（R13）
-            from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
-
-            if bad := pushed_row_violations(note.table_data, table_data):
-                raise HTTPException(status_code=409, detail={
-                    "error_code": PUSHED_ROW_PROTECTED, "rows": bad,
-                    "message": "集团下推的固定行不能删除、改名或去掉下推标记：" + "、".join(
-                        f"「{v['table']}」{v['row']}（{v['problem']}）" for v in bad[:5]) + (" 等" if len(bad) > 5 else "")})
-
-        if any(v is not None for v in (table_data, text_content, guidance_text, status)):
-            stamp_note_edit(note, user_id)
-        if table_data is not None:
-            note.table_data = table_data
-            # JSONB 字段需要显式标记为已修改，确保 _tables 等嵌套字段被持久化
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(note, "table_data")
-        if text_content is not None:
-            note.text_content = text_content
-        if guidance_text is not None:
-            note.guidance_text = guidance_text
-        if status is not None:
-            note.status = status
-
-        await self.db.flush()
-        return note
+        return captured["note"]
 
     # ------------------------------------------------------------------
     # 事件处理器

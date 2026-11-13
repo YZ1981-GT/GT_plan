@@ -269,3 +269,52 @@ async def test_scan_forks_ignores_independent_genesis_entries():
 
         async with async_session() as session:
             assert await scan_forks(session) == []
+
+
+@pytest.mark.asyncio
+async def test_fork_acks_multi_dead_on_pg():
+    """真 PG（链锁 + JSONB 过滤）：一条链上 3 个死端（其一侧枝 2 条）一次确认；写后恰好一个链尾、可续写、链校验无分叉 / 内容不符。
+
+    spec enterprise-embedding-rerank-closure R8（共享库 __global__ 10 个链尾、现有工具只接受恰 2 个链尾）。
+    """
+    from app.services.audit_chain.forks import _unconfirmed_tails, append_fork_acks, blocked_chains, scan_forks
+    from app.services.audit_chain.head import append_entry, read_head
+    from app.services.audit_chain.verify import verify_chain
+
+    async with _throwaway_engine() as eng:
+        async_session = sessionmaker(eng, class_=AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            a = _make_entry("genesis.action", GENESIS_HASH)
+            session.add(a)
+            await session.flush()
+            main = _make_entry("main", a.entry_hash)
+            x = _make_entry("dead.x", a.entry_hash)
+            y1 = _make_entry("dead.y1", a.entry_hash)
+            session.add_all([main, x, y1])
+            await session.flush()
+            y2 = _make_entry("dead.y2", y1.entry_hash)
+            z = _make_entry("dead.z", main.entry_hash)
+            main2 = _make_entry("main2", main.entry_hash)
+            session.add_all([y2, z, main2])
+            await session.commit()
+
+        async with async_session() as session:
+            assert await blocked_chains(session) == [("__global__", 7, 4)]
+            written = await append_fork_acks(
+                session, chain_key="__global__", survivor_entry_id=main2.id,
+                dead_entry_ids=[x.id, y2.id, z.id], operator_id=uuid.uuid4(), reason="真 PG 多死端",
+            )
+            await session.commit()
+        assert {w.payload["dead_entry_id"] for w in written} == {str(i) for i in (x.id, y1.id, y2.id, z.id)}
+
+        async with async_session() as session:
+            assert await _unconfirmed_tails(session, "__global__") == {written[-1].id}
+            head = await read_head(session, "__global__")
+            assert head is not None and head.tail_entry_id == written[-1].id
+            assert [f for f in await scan_forks(session) if len(f["survivors"]) > 1] == []
+            result = await verify_chain(session)
+            assert [p for p in result.problems if p["type"] in {"fork", "content_mismatch", "orphan"}] == []
+            nxt = await append_entry(session, "__global__", action_type="after.ack", object_type="test")
+            await session.commit()
+            assert nxt.prev_hash == written[-1].entry_hash
+            assert await blocked_chains(session) == []

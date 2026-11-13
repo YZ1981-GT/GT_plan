@@ -54,6 +54,8 @@ function snapshot(
     applicationErrorCode: null,
     applicationErrorStage: null,
     applicationErrorMessage: null,
+    roomLatestDurableApplicationId: null,
+    roomLatestDurableSequence: null,
     terminal: state === 'applied',
   }
 }

@@ -287,7 +287,10 @@ async def test_patch_parent_code_writes_both_scopes_and_relinks(db, client):
     a_c_id = (await svc.create_project(_info(A, "甲公司", "consolidated", parent_company_code=G), db)).id
     a_s_id = (await svc.create_project(_info(A, "甲公司", parent_company_code=G), db)).id
 
-    resp = await client.patch(f"/api/projects/{a_s_id}/parent-code", json={"parent_company_code": P})
+    resp = await client.patch(
+        f"/api/projects/{a_s_id}/parent-code",
+        json={"parent_company_code": P, "expected_parent_company_code": G},
+    )
     assert resp.status_code == 200, resp.text
     for pid in (a_s_id, a_c_id):
         row = await _fresh(db, pid)
@@ -303,10 +306,16 @@ async def test_patch_parent_code_writes_both_scopes_and_relinks(db, client):
 async def test_patch_parent_code_validation(db, client):
     await svc.create_project(_info(G, "某集团", "consolidated"), db)
     a_id = (await svc.create_project(_info(A, "甲公司", parent_company_code=G), db)).id
-    bad = await client.patch(f"/api/projects/{a_id}/parent-code", json={"parent_company_code": "91110000100000000Z"})
+    bad = await client.patch(
+        f"/api/projects/{a_id}/parent-code",
+        json={"parent_company_code": "91110000100000000Z", "expected_parent_company_code": G},
+    )
     assert bad.status_code == 422 and bad.json()["detail"].startswith("上级企业代码：")
     # 上级 = 本企业（需求 1.5）⇒ 接受，按顶层处理，关系清空
-    ok = await client.patch(f"/api/projects/{a_id}/parent-code", json={"parent_company_code": A})
+    ok = await client.patch(
+        f"/api/projects/{a_id}/parent-code",
+        json={"parent_company_code": A, "expected_parent_company_code": G},
+    )
     assert ok.status_code == 200, ok.text
     row = await _fresh(db, a_id)
     assert row.parent_company_code == A and row.relation_to_parent is None

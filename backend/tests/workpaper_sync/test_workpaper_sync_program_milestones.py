@@ -5,53 +5,42 @@ from __future__ import annotations
 import ast
 import copy
 import hashlib
-import importlib.util
 import json
 import re
-import sys
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 import pytest
 
-_REPO = Path(__file__).resolve().parents[3]
-_GENERATOR_PATH = (
-    _REPO / "backend" / "scripts" / "gen" / "generate_workpaper_sync_program_milestones.py"
-)
-_DEFINITIONS_PATH = (
-    _REPO / "backend" / "data" / "workpaper_sync_program_milestone_definitions.json"
-)
-_REGISTRY_PATH = _REPO / "backend" / "data" / "workpaper_sync_program_milestones.json"
-_WRITER_GATE_PATH = (
-    _REPO / "backend" / "scripts" / "check" / "check_workpaper_writer_revision_gate.py"
+from tests.workpaper_sync._test_workpaper_sync_program_milestones_criteria import (
+    _REPO,
+    _GENERATOR_PATH,
+    _DEFINITIONS_PATH,
+    _REGISTRY_PATH,
+    _WRITER_GATE_PATH,
+    _load_module,
+    _CORE,
+    _CORE_TASKS_REL,
+    _CORE_ACTIVE_TASKS,
+    _STATE_NAMES,
+    _independent_task_states,
+    _independent_state_counts,
+    _independent_graph,
+    _task_order,
+    _program_evidence,
+    build_source,
+    KNOWN_BLOCKED,
+    KNOWN_DIAGNOSTICS,
+    blocked_reason_codes,
+    named_set_drift,
 )
 
-
-def _load_module(name: str, path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+# 核心 spec 的独立现算口径（2026-11-01 重写成两级任务号后的 6 条判据改造缘由）见判据层模块。
 
 
 @pytest.fixture(scope="module")
 def source() -> dict[str, Any]:
-    generator = _load_module("workpaper_sync_program_milestone_generator_test", _GENERATOR_PATH)
-    definitions = generator.load_definitions()
-    registry = generator.build_program_registry()
-    on_disk = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
-    spec_inputs: dict[str, str] = {}
-    spec_facts = generator.collect_spec_facts(definitions, spec_inputs)
-    return {
-        "generator": generator,
-        "definitions": definitions,
-        "registry": registry,
-        "on_disk": on_disk,
-        "spec_facts": spec_facts,
-    }
+    return build_source()
 
 
 def test_generated_projection_is_current_and_self_digest_bound(source: dict[str, Any]) -> None:
@@ -100,15 +89,7 @@ def test_g0_1_work_package_declares_every_required_execution_field(
 
 
 def test_g0_2_work_package_declares_every_required_execution_field() -> None:
-    path = (
-        _REPO
-        / ".kiro"
-        / "specs"
-        / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-        / "evidence"
-        / "g0-2-denominator-discovery-state"
-        / "README.md"
-    )
+    path = _program_evidence("g0-2-denominator-discovery-state/README.md")
     text = path.read_text(encoding="utf-8")
     match = re.search(
         r"<!-- G0-2-WORK-PACKAGE-JSON:START -->\s*```json\s*(\{.*?\})\s*```\s*"
@@ -145,15 +126,7 @@ def test_g0_2_work_package_declares_every_required_execution_field() -> None:
 
 
 def test_g0_3_work_package_declares_every_required_execution_field() -> None:
-    path = (
-        _REPO
-        / ".kiro"
-        / "specs"
-        / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-        / "evidence"
-        / "g0-3-archive-writer-debt-dependency"
-        / "README.md"
-    )
+    path = _program_evidence("g0-3-archive-writer-debt-dependency/README.md")
     text = path.read_text(encoding="utf-8")
     match = re.search(
         r"<!-- G0-3-WORK-PACKAGE-JSON:START -->\s*```json\s*(\{.*?\})\s*```\s*"
@@ -195,8 +168,9 @@ def test_g0_3_work_package_declares_every_required_execution_field() -> None:
 def test_eight_spec_task_and_dependency_denominators_are_exact(source: dict[str, Any]) -> None:
     registry = source["registry"]
     definitions = source["definitions"]
-    expected_full = {
-        "workpaper-html-onlyoffice-bidirectional-writeback-closure": 77,
+    #: 另外 7 个 spec 的分母：tasks.md 已冻结，保留字面量作「生成器没读错」的锚。
+    #: 核心 spec 不在这张表里 —— 它的分母按 active tasks.md 独立现算（见文件头注释）。
+    frozen_full = {
         "published-representation-production-path-and-lane-adjudication": 43,
         "excel-structural-row-insertion-and-shift-aware-verification": 27,
         "excel-workbook-wide-row-change-propagation": 30,
@@ -205,6 +179,17 @@ def test_eight_spec_task_and_dependency_denominators_are_exact(source: dict[str,
         "workpaper-guidance-content-closure": 23,
         "workpaper-page-formula-toolbar-closure": 17,
     }
+    assert registry["specs"][_CORE]["path"] == _CORE_TASKS_REL, (
+        "核心 spec 必须读 active tasks.md —— 回退到归档快照会让里程碑追踪一份冻结文档"
+    )
+    core_states = _independent_task_states(_CORE_ACTIVE_TASKS)
+    core_wave_tasks = [
+        str(task) for wave in _independent_graph(_CORE_ACTIVE_TASKS)["waves"] for task in wave["tasks"]
+    ]
+    assert sorted(core_wave_tasks, key=_task_order) == sorted(core_states, key=_task_order), (
+        "任务行与依赖图 wave 的任务集合不一致 —— 加任务忘了进 wave，或 wave 里有已删任务"
+    )
+    expected_full = {**frozen_full, _CORE: len(core_states)}
     expected_main = {
         **expected_full,
         "published-representation-production-path-and-lane-adjudication": 28,
@@ -218,7 +203,20 @@ def test_eight_spec_task_and_dependency_denominators_are_exact(source: dict[str,
     assert set(registry["specs"]) == set(definitions["specs"]) == set(expected_full)
     assert registry["stats"]["spec_count"] == 8
     assert {name: spec["task_count"] for name, spec in registry["specs"].items()} == expected_full
-    assert registry["stats"]["task_count"] == sum(expected_full.values()) == 263
+    assert registry["stats"]["task_count"] == sum(expected_full.values())
+
+    # 逐 spec 独立重数状态：注册表里的 task_states / state_counts 必须与 tasks.md 逐条一致，
+    # 总分布必须是各 spec 之和。原先把总分布写成字面量（241/15/7/0），任何一个 spec 合法地
+    # 推进一条任务都会打红它 —— 「推进」本身由 projection-current 判据（输入 digest）捕获。
+    totals = {name: 0 for name in _STATE_NAMES.values()}
+    for spec_name, spec in registry["specs"].items():
+        states = _independent_task_states(_REPO / spec["path"])
+        assert spec["task_states"] == states, f"{spec_name}: 注册表任务状态与 tasks.md 不一致"
+        counts = _independent_state_counts(states)
+        assert spec["state_counts"] == counts, f"{spec_name}: state_counts 不是从任务行数出来的"
+        for name, value in counts.items():
+            totals[name] += value
+    assert registry["stats"]["task_state_counts"] == totals
 
     optional_ids_by_spec: dict[str, set[str]] = {}
     optional_re = re.compile(
@@ -247,33 +245,10 @@ def test_eight_spec_task_and_dependency_denominators_are_exact(source: dict[str,
         for task in expected_published_optional
     )
 
-    core = registry["specs"]["workpaper-html-onlyoffice-bidirectional-writeback-closure"]
-    assert {task: core["task_states"][task] for task in ("1", "2", "20", "60", "62", "64")} == {
-        "1": "~", "2": "~", "20": "~", "60": "~", "62": "~", "64": "~",
-    }
-    assert core["state_counts"] == {
-        "completed": 66,
-        "partial": 6,
-        "blocked": 5,
-        "pending": 0,
-    }
-    # 🔴 2026-09-28 更新（completed 240→241 / pending 1→0）：
-    #    `workpaper-page-formula-toolbar-closure` 已随 commit `f8ab1ebfd`
-    #    「Task 17 闭合并归档」移到 `.kiro/specs/_archive/05-business-features/`，
-    #    其 tasks.md 从 16/17（Task 17 pending）变成 17/17。
-    #    在此之前生成器硬拼活动路径、读不到归档后的文件 ⇒ **整体抛
-    #    `required input does not exist`**，committed 注册表因此冻在归档前的状态。
-    #    生成器已加归档回退（`_with_archive_fallback` / `_resolve_spec_tasks`），
-    #    重生成后**只有这一个 spec** 的计数变了（逐 spec 对照实测，其余 7 个一字未动）。
-    assert registry["stats"]["task_state_counts"] == {
-        "completed": 241,
-        "partial": 15,
-        "blocked": 7,
-        "pending": 0,
-    }
-
+    # 核心 spec 的概览必须写着现算的「已勾 / 总数」，且不得残留 Wave 6 的分母措辞。
+    core_done = sum(1 for value in core_states.values() if value == "x")
     overview_expectations = {
-        "workpaper-html-onlyoffice-bidirectional-writeback-closure": ("77 个主/全任务", "74 个任务"),
+        _CORE: (f"{core_done}/{len(core_states)}", "77 个主/全任务"),
         published_name: (None, "共 28 个任务"),
         "excel-structural-row-insertion-and-shift-aware-verification": (
             "22 个主任务 / 27 个全任务", "共 22 个任务"
@@ -326,53 +301,112 @@ def test_g0_3_archive_dependency_is_closed_and_mutation_reopens_debt(
         for task_id in spec["task_states"]
     }
 
+    definitions = source["definitions"]
     assert dag["acyclic"] is True
-    assert dag["node_count"] == 263
-    assert dag["internal_edge_count"] == 448
-    assert dag["cross_spec_edge_count"] == 120
     assert dag["node_count"] == len(nodes) == registry["stats"]["task_count"]
     assert all(edge["producer"] in nodes and edge["consumer"] in nodes for edge in dag["cross_spec_edges"])
 
-    core_name = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-    core = registry["specs"][core_name]
-    assert core["dependencies"]["72"] == ["67", "68", "69", "70", "71", "74"]
-    assert not any(
-        item["code"] == "archive_bypasses_writer_debt" for item in registry["diagnostics"]
-    )
+    # 边数独立现算（原先写死 448 / 120 —— 核心 spec 改任务图后恒红）：
+    # 内部边 = 各 spec 依赖图里去重后的引用数；跨 spec 边 = 每个 milestone 的
+    # producer 任务 × consumer 任务三元组（同一对端点经不同 milestone 各算一条）。
+    expected_internal = 0
+    for spec in registry["specs"].values():
+        graph = _independent_graph(_REPO / spec["path"])
+        raw = graph.get("dependencies")
+        if raw is None:
+            raw = graph.get("hard_dependencies") or {}
+        expected_internal += sum(len({str(ref) for ref in refs}) for refs in raw.values())
+    expected_cross = {
+        (f"{producer['spec']}:{p_task}", f"{consumer['spec']}:{c_task}", milestone["id"])
+        for milestone in definitions["milestones"]
+        for producer in milestone["producers"]
+        for p_task in producer["tasks"]
+        for consumer in milestone["consumers"]
+        for c_task in consumer["tasks"]
+    }
+    assert dag["internal_edge_count"] == expected_internal
+    assert dag["cross_spec_edge_count"] == len(expected_cross)
 
-    mutated_facts = copy.deepcopy(source["spec_facts"])
-    mutated_facts[core_name]["graph"]["dependencies"]["72"].remove("74")
-    mutated_dag, mutated_diagnostics = generator.validate_program_dag(
-        source["definitions"], mutated_facts
+    # 归档守卫按**语义**绑定，不写死任务号：归档任务 = 核心 spec 最后一个 wave 里唯一的任务；
+    # writer 债任务 = SYNC-MULTI-RESOLVER 在核心 spec 的 producer。
+    guards = {guard["code"]: guard for guard in definitions["archive_dependency_guards"]}
+    writer_guard = guards["archive_bypasses_writer_debt"]
+    core = registry["specs"][_CORE]
+    core_waves = source["spec_facts"][_CORE]["graph"]["waves"]
+    last_wave = max(core_waves, key=lambda item: item["wave"])
+    assert last_wave["tasks"] == [writer_guard["archive_task"]], (
+        f"守卫声明的归档任务 {writer_guard['archive_task']} 不是最后一个 wave 的唯一任务 "
+        f"{last_wave['tasks']} —— 任务改了编号却没改 definitions"
     )
-    assert mutated_dag["internal_edge_count"] == 447
-    assert mutated_dag["cross_spec_edge_count"] == 120
-    assert {
-        "code": "archive_bypasses_writer_debt",
-        "severity": "blocker",
-        "spec": core_name,
-        "task": "72",
-        "missing_dependency": "74",
-    } in mutated_diagnostics
+    multi_resolver = next(
+        item for item in definitions["milestones"] if item["id"] == "SYNC-MULTI-RESOLVER"
+    )
+    resolver_producers = sorted(
+        task
+        for producer in multi_resolver["producers"]
+        if producer["spec"] == _CORE
+        for task in producer["tasks"]
+    )
+    assert sorted(writer_guard["requires"]) == resolver_producers
+    assert set(writer_guard["requires"]) <= set(core["dependencies"][writer_guard["archive_task"]])
+    assert not any(
+        item["code"].startswith("archive_bypasses_") for item in registry["diagnostics"]
+    ), [item for item in registry["diagnostics"] if item["code"].startswith("archive_bypasses_")]
+
+    # 变异一：删掉归档对 writer 债的直接依赖 ⇒ 必须重新出 blocker，且只少一条内部边。
+    mutated_facts = copy.deepcopy(source["spec_facts"])
+    archive_task = writer_guard["archive_task"]
+    for required in writer_guard["requires"]:
+        mutated_facts[_CORE]["graph"]["dependencies"][archive_task].remove(required)
+    mutated_dag, mutated_diagnostics = generator.validate_program_dag(definitions, mutated_facts)
+    assert mutated_dag["internal_edge_count"] == dag["internal_edge_count"] - len(writer_guard["requires"])
+    assert mutated_dag["cross_spec_edge_count"] == dag["cross_spec_edge_count"]
+    for required in writer_guard["requires"]:
+        assert {
+            "code": "archive_bypasses_writer_debt",
+            "severity": "blocker",
+            "spec": _CORE,
+            "task": archive_task,
+            "missing_dependency": required,
+        } in mutated_diagnostics
+
+    # 变异二：守卫指向一个已不存在的任务号（原实现的 72 / 74 正是这样）⇒ 必须 fail closed，
+    # 不得退化成一条指向不存在任务的幻影诊断。
+    mutated_definitions = copy.deepcopy(definitions)
+    mutated_definitions["archive_dependency_guards"][0]["archive_task"] = "72"
+    with pytest.raises(generator.ProgramMilestoneError, match="no longer exist"):
+        generator.validate_program_dag(mutated_definitions, source["spec_facts"])
 
 
 def test_g0_3_wave_order_is_valid_and_same_wave_forward_dependency_is_rejected(
     source: dict[str, Any],
 ) -> None:
     generator = source["generator"]
-    core_name = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-    core_facts = source["spec_facts"][core_name]
+    core_facts = source["spec_facts"][_CORE]
     waves = {item["wave"]: item for item in core_facts["graph"]["waves"]}
 
-    assert sorted(waves) == list(range(9))
-    assert waves[7]["tasks"] == ["68", "69", "70", "71", "74"]
-    assert waves[8]["tasks"] == ["72"]
-    assert waves[8]["depends_on"] == [7]
+    # wave 编号从 0 连续，且与 tasks.md 里的依赖图逐个对应（原先写死 9 个 wave / 任务 68~74）。
+    assert sorted(waves) == list(range(len(waves)))
+    independent_waves = _independent_graph(_CORE_ACTIVE_TASKS)["waves"]
+    assert [item["wave"] for item in independent_waves] == sorted(waves)
+    assert all(
+        waves[item["wave"]]["tasks"] == [str(task) for task in item["tasks"]]
+        for item in independent_waves
+    )
+    writer_guard = next(
+        guard
+        for guard in source["definitions"]["archive_dependency_guards"]
+        if guard["code"] == "archive_bypasses_writer_debt"
+    )
+    wave_of_task = {task: wave for wave, item in waves.items() for task in item["tasks"]}
+    assert waves[max(waves)]["tasks"] == [writer_guard["archive_task"]], "归档任务必须独占最后一个 wave"
+    assert all(
+        wave_of_task[required] < max(waves) for required in writer_guard["requires"]
+    ), "writer 债任务必须排在归档之前的 wave"
     core_overview = (
         _REPO / core_facts["path"]
     ).read_text(encoding="utf-8").split("## Task Dependency Graph", maxsplit=1)[0]
-    assert "77 个主/全任务、9 个 Wave" in core_overview
-    assert "77 个主/全任务、8 个 Wave" not in core_overview
+    assert "77 个主/全任务" not in core_overview, "active 概览残留 Wave 6 的分母措辞"
 
     def task_order(value: str) -> tuple[int, ...]:
         return tuple(int(part) for part in value.split("."))
@@ -393,10 +427,21 @@ def test_g0_3_wave_order_is_valid_and_same_wave_forward_dependency_is_rejected(
                 for dependency in dependencies
             ), f"{spec_name}:{task} 存在同 Wave 非前序依赖"
 
+    # 变异：取一条「依赖的任务号比自己大」的真实依赖（现图里是 0.5 → 0.6），把依赖方挪进
+    # 被依赖方所在的 wave ⇒ 同 wave 里依赖了编号不更小的任务，必须被拒。按图现取而不写死，
+    # 免得任务重编号后变异空转。
+    backward = sorted(
+        (task, ref)
+        for task, refs in core_facts["graph"]["dependencies"].items()
+        for ref in refs
+        if _task_order(ref) > _task_order(task)
+    )
+    assert backward, "现图里没有「依赖编号更大任务」的依赖 ⇒ 下面的变异无从构造，判据会空转"
+    moved_task, its_dependency = backward[0]
     mutated_graph = copy.deepcopy(core_facts["graph"])
     mutated_waves = {item["wave"]: item for item in mutated_graph["waves"]}
-    mutated_waves[8]["tasks"].remove("72")
-    mutated_waves[7]["tasks"].append("72")
+    mutated_waves[wave_of_task[moved_task]]["tasks"].remove(moved_task)
+    mutated_waves[wave_of_task[its_dependency]]["tasks"].append(moved_task)
     synthetic_tasks = {task: {} for task in core_facts["task_states"]}
     with pytest.raises(generator.ProgramMilestoneError, match="same-wave non-earlier tasks"):
         generator.normalize_dependency_graph(
@@ -410,23 +455,30 @@ def test_g0_3_does_not_promote_tasks_milestones_or_g0_4(
     source: dict[str, Any],
 ) -> None:
     registry = source["registry"]
-    core_name = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+    core_name = _CORE
     core = registry["specs"][core_name]
-    assert core["task_states"]["72"] == core["task_states"]["74"] == "-"
-    # 🔴 2026-09-28 更新（completed 240→241 / pending 1→0）：
-    #    `workpaper-page-formula-toolbar-closure` 已随 commit `f8ab1ebfd`
-    #    「Task 17 闭合并归档」移到 `.kiro/specs/_archive/05-business-features/`，
-    #    其 tasks.md 从 16/17（Task 17 pending）变成 17/17。
-    #    在此之前生成器硬拼活动路径、读不到归档后的文件 ⇒ **整体抛
-    #    `required input does not exist`**，committed 注册表因此冻在归档前的状态。
-    #    生成器已加归档回退（`_with_archive_fallback` / `_resolve_spec_tasks`），
-    #    重生成后**只有这一个 spec** 的计数变了（逐 spec 对照实测，其余 7 个一字未动）。
-    assert registry["stats"]["task_state_counts"] == {
-        "completed": 241,
-        "partial": 15,
-        "blocked": 7,
-        "pending": 0,
-    }
+    # 原先写死「任务 72 / 74 都是 `-`」—— Wave 6 编号，重写后 KeyError。它要守的是
+    # 「本里程碑不得推进任务」，按语义改成两条可伪证的不变量：
+    #   ① writer 债任务在 writer gate 的 multi_resolver 清零前不得勾选；
+    #   ② 归档任务在它要求的前置全部勾选前不得勾选。
+    writer_guard = next(
+        guard
+        for guard in source["definitions"]["archive_dependency_guards"]
+        if guard["code"] == "archive_bypasses_writer_debt"
+    )
+    multi_resolver_issues = registry["writer_gate_facts"]["issue_counts"]["multi_resolver"]
+    for required in writer_guard["requires"]:
+        if multi_resolver_issues:
+            assert core["task_states"][required] != "x", (
+                f"writer gate 还有 {multi_resolver_issues} 条 multi_resolver，"
+                f"任务 {required} 却已勾选"
+            )
+    archive_prerequisites = core["dependencies"][writer_guard["archive_task"]]
+    if core["task_states"][writer_guard["archive_task"]] == "x":
+        open_prerequisites = [
+            task for task in archive_prerequisites if core["task_states"][task] != "x"
+        ]
+        assert not open_prerequisites, f"归档已勾选，前置仍未完成：{open_prerequisites}"
     # 🔴 2026-09-11 · G4-2 后判据改成**方向感知**（原先是把整个分布锁成字面量）。
     #
     # 本测试名字说的是「不得**推进**」。而 G4-2 物理删除 `/d2-sync/*` 之后，
@@ -445,19 +497,27 @@ def test_g0_3_does_not_promote_tasks_milestones_or_g0_4(
             f"{bucket} 由 {ceiling} 升到 {counts[bucket]} —— 本守卫禁止悄悄推进终态；"
             "要提升必须先有 producer task + 重算 evidence，并在此显式抬高上限"
         )
-    # 🔴 2026-09-28：BLOCKED 上限从 3 校准到 **5**（实测值），并写明为什么不是放宽。
-    #
-    #    这条是**反方向棘轮**（阻塞只许变少）。实测 HEAD 已提交的注册表里 BLOCKED = **6**
-    #    ⇒ 上限 3 早就失效、本条长期红，只是被上面那条 `task_state_counts` 先打红挡住了
-    #    （一个测试里两处过期期望，前者掩盖后者）。
-    #    本轮修好生成器的归档回退后重生成，BLOCKED **6 → 5**
-    #    （`SYNC-MULTI-RESOLVER` 由 BLOCKED 转 STALE，逐 milestone 对照实测只此一条变化）
-    #    ⇒ 把上限钉在 5 比 HEAD 的实际 6 **更紧**，仍能抓住「阻塞变多」。
-    #    🔴 不要因为「红了」就往上抬这个数 —— 抬之前必须先解释清楚新增的阻塞是什么。
-    _BLOCKED_CEILING = 5
-    assert counts["BLOCKED"] <= _BLOCKED_CEILING, (
-        f"BLOCKED 由 {_BLOCKED_CEILING} 升到 {counts['BLOCKED']} —— 先查新增阻塞的来源，"
-        "不要直接抬高上限"
+    # 阻塞逐条点名（原先是计数上限 ≤ 5；为什么改、名单在哪见判据层的 `KNOWN_BLOCKED`）。
+    blocked_now = blocked_reason_codes(registry)
+    assert counts["BLOCKED"] == len(blocked_now), "统计口径与逐条状态不一致"
+    unexplained, cleared = named_set_drift(blocked_now, KNOWN_BLOCKED)
+    assert not unexplained, (
+        f"新增阻塞 {{milestone: [未登记的 reason_code]}} = {unexplained} —— 先查来源，"
+        "确认属实再登记进 KNOWN_BLOCKED，不要只改名单"
+    )
+    assert not cleared, (
+        f"这些阻塞已解除 {{milestone: [已不再阻塞的 reason_code]}} = {cleared} —— 是进展，"
+        "把它们从 KNOWN_BLOCKED 删掉（名单只许删）"
+    )
+    # 两条推导链互证：writer 清册现算的 multi_resolver 非零 ⇔ 该 milestone 被它阻塞。
+    writer_facts = registry["writer_gate_facts"]
+    assert writer_facts["source_current"], writer_facts.get("source_reason")
+    multi_resolver_blocks = "writer_gate_multi_resolver_nonzero" in blocked_now.get(
+        "SYNC-MULTI-RESOLVER", frozenset()
+    )
+    assert multi_resolver_blocks == bool(writer_facts["issue_counts"]["multi_resolver"]), (
+        f"writer gate multi_resolver = {writer_facts['issue_counts']['multi_resolver']}，"
+        f"SYNC-MULTI-RESOLVER 的阻塞原因 = {sorted(blocked_now.get('SYNC-MULTI-RESOLVER', ()))}"
     )
     assert sum(counts.values()) == 16, f"milestone 总数应为 16，实为 {sum(counts.values())}"
     assert set(counts) == {
@@ -468,8 +528,20 @@ def test_g0_3_does_not_promote_tasks_milestones_or_g0_4(
         "REQUEST_PATH_VERIFIED",
         "STALE",
     }, f"状态词表漂移：{sorted(counts)}"
-    assert registry["stats"]["diagnostic_count"] == 5
-    assert registry["stats"]["blocking_diagnostic_count"] == 5
+    # 诊断同样逐条点名（`== 5` 惩罚进展、`<= 5` 挡不住互换；名单见判据层 `KNOWN_DIAGNOSTICS`）。
+    diagnostics_now = [(item["code"], item["milestone"]) for item in registry["diagnostics"]]
+    assert len(diagnostics_now) == len(set(diagnostics_now)), f"诊断重复：{diagnostics_now}"
+    assert not set(diagnostics_now) - KNOWN_DIAGNOSTICS, (
+        f"新增诊断 {sorted(set(diagnostics_now) - KNOWN_DIAGNOSTICS)} —— 先查来源再登记"
+    )
+    assert not KNOWN_DIAGNOSTICS - set(diagnostics_now), (
+        f"这些诊断已消失 {sorted(KNOWN_DIAGNOSTICS - set(diagnostics_now))} —— 是进展，"
+        "从 KNOWN_DIAGNOSTICS 删掉（名单只许删）"
+    )
+    assert registry["stats"]["diagnostic_count"] == len(registry["diagnostics"])
+    assert registry["stats"]["blocking_diagnostic_count"] == sum(
+        1 for item in registry["diagnostics"] if item["severity"] == "blocker"
+    )
 
     host = next(
         item for item in registry["milestones"] if item["id"] == "HOST-CONSUMES-UNIFIED-PATH"
@@ -486,7 +558,9 @@ def test_g0_3_does_not_promote_tasks_milestones_or_g0_4(
     # 解除 STALE 的唯一途径是按 §9.6 在 post-delete 源码上重跑四个 pilot 并重采
     # G0-4 evidence，届时把下面的允许集收回 `{"ONLYOFFICE_VERIFIED"}`。
     assert host["state"] in {"ONLYOFFICE_VERIFIED", "STALE"}, host["state"]
-    assert host["producers"] == [{"spec": core_name, "tasks": ["33"]}]
+    # producer 在 0.6 方案 A 里由 Wave 6 的 Task 33 重映射到 3.5（全宿主迁到共享 presentation 门）。
+    assert host["producers"] == [{"spec": core_name, "tasks": ["3.5"]}]
+    assert "3.5" in core["task_states"]
     entry_counts = host["entry_state_counts"]
     assert entry_counts["REQUEST_PATH_LEGACY"] == 0, (
         "有 entry 退回 REQUEST_PATH_LEGACY —— 宿主又走回 legacy 旁路，这是真回退"

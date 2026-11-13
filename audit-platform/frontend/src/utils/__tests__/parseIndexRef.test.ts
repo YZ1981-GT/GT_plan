@@ -105,19 +105,19 @@ describe('parseIndexRef - 宽松模式（底稿编码识别）', () => {
     expect(result).toEqual({ ns: 'wp', layer: 3, target: 'D2' })
   })
 
-  it('sheet 编码 D2-1 → sheet layer 2', () => {
+  it('底稿编码 D2-1 → wp layer 3（独立底稿，非同底稿 sheet 切换）', () => {
     const result = parseIndexRef('D2-1')
-    expect(result).toEqual({ ns: 'sheet', layer: 2, target: 'D2-1' })
+    expect(result).toEqual({ ns: 'wp', layer: 3, target: 'D2-1' })
   })
 
-  it('多级 sheet 编码 D2-1-1 → sheet layer 2', () => {
+  it('多级底稿编码 D2-1-1 → wp layer 3', () => {
     const result = parseIndexRef('D2-1-1')
-    expect(result).toEqual({ ns: 'sheet', layer: 2, target: 'D2-1-1' })
+    expect(result).toEqual({ ns: 'wp', layer: 3, target: 'D2-1-1' })
   })
 
-  it('字母后缀 D2A → sheet layer 2', () => {
+  it('字母后缀 D2A → wp layer 3', () => {
     const result = parseIndexRef('D2A')
-    expect(result).toEqual({ ns: 'sheet', layer: 2, target: 'D2A' })
+    expect(result).toEqual({ ns: 'wp', layer: 3, target: 'D2A' })
   })
 
   it('E 循环 E1 → wp layer 3', () => {
@@ -151,7 +151,7 @@ describe('parseIndexRef - 9 种边缘 case', () => {
   // Case 2: 空格处理
   it('前后空格 trim 后匹配', () => {
     const result = parseIndexRef('  D2-1  ')
-    expect(result).toEqual({ ns: 'sheet', layer: 2, target: 'D2-1' })
+    expect(result).toEqual({ ns: 'wp', layer: 3, target: 'D2-1' })
   })
 
   it('命名空间 target 前后空格 trim', () => {
@@ -162,7 +162,7 @@ describe('parseIndexRef - 9 种边缘 case', () => {
   // Case 3: 大小写归一化
   it('小写底稿编码归一化为大写', () => {
     const result = parseIndexRef('d2-1')
-    expect(result).toEqual({ ns: 'sheet', layer: 2, target: 'D2-1' })
+    expect(result).toEqual({ ns: 'wp', layer: 3, target: 'D2-1' })
   })
 
   it('命名空间大小写不敏感', () => {

@@ -43,8 +43,21 @@ def test_summarize_push_counts_per_note_section():
     ]
     result = RunResult(project_id=PID, year=2025, trigger="manual", items=items)
     per = svc.summarize_push(result, ["八、5"])
-    assert per == {"八、5": {"written": 1, "unchanged": 1, "kept": 1, "skipped": 2,
+    assert per == {"八、5": {"written": 1, "unchanged": 1, "kept": 1, "skipped": 2, "blocked": 0,
                             "reasons": ["附注表缺少「期末」列"]}}
+
+
+def test_summarize_push_counts_ownership_blocks_as_skipped_and_blocked():
+    """写入归属矩阵拒写（spec formula-writer-ownership-and-stale §13）：计入跳过并单列 blocked，原因进前几条。"""
+    reason = "写入归属矩阵没有这一格，按未登记拒写（公式推送只写矩阵声明的审定主表格）"
+    items = [
+        PushItem("D2.note.main", "note", "note", "note://八、5/（1）按账龄披露应收账款/合 计.end", "write"),
+        PushItem("D2.note.main", "note", "note", "note://八、5/（1）按账龄披露应收账款/1年以内.prior", "blocked",
+                 reason=reason),
+    ]
+    per = svc.summarize_push(RunResult(project_id=PID, year=2025, trigger="manual", items=items), ["八、5"])
+    assert per["八、5"]["written"] == 1 and per["八、5"]["skipped"] == 1 and per["八、5"]["blocked"] == 1
+    assert per["八、5"]["reasons"] == [reason]
 
 
 def test_manual_value_count_only_counts_filled_manual_cells():

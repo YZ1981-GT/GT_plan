@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
-import { projects as P_proj, reportConfig as P_rc } from '@/services/apiPaths'
+import { projects as P_proj, reportConfig as P_rc, disclosureNotes as P_dn } from '@/services/apiPaths'
 import {
   generateReports, getReport, getReportConsistencyCheck,
   type ReportRow, type ReportConsistencyCheck,
@@ -11,6 +11,8 @@ import {
 import { withLoading } from '@/composables/useLoading'
 import { handleApiError } from '@/utils/errorHandler'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { getReportBalancePresentation, type ReportBalanceResult } from '@/services/reportCheckPresentation'
+import { useReportRequestFence, type ReportRequest } from './useReportRequestFence'
 
 /**
  * 附注里有内容的章节编号（报表行「附注」列标就绪用；best-effort）。
@@ -20,10 +22,10 @@ import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 export async function fetchNoteSectionsWithData(projectId: string, year: number | null): Promise<Set<string> | null> {
   if (year == null) return null // 不拼 /null/ 路径
   try {
-    const { data } = await http.get(
-      `/api/disclosure-notes/${projectId}/${year}/notes-tree`,
-      { _silent: true } as any
-    )
+    // 附注目录端点是 GET /api/disclosure-notes/{pid}/{year}（每项带 note_section / has_data）。
+    // 原先拼的 …/{year}/notes-tree 后端没有，被章节详情路由当成章节号「notes-tree」⇒ 恒 404「附注章节不存在」，
+    // 报表「附注」列标与「金额为 0 但附注有内容」的行显示从未生效（2026-11-09 浏览器实测）。
+    const { data } = await http.get(P_dn.tree(projectId, year), { _silent: true } as any)
     const sections = data?.data || data || []
     const set = new Set<string>()
     for (const node of (Array.isArray(sections) ? sections : [])) {
@@ -58,14 +60,14 @@ export interface UseReportDataReturn {
   genLoading: Ref<boolean>
   checkLoading: Ref<boolean>
   syncLoading: Ref<boolean>
-  balanceCheckResult: Ref<{ status: string; message: string; checks: Array<{ name: string; passed: boolean; expected: string; actual: string; diff: string }> } | null>
+  balanceCheckResult: Ref<ReportBalanceResult | null>
   consistencyResult: Ref<ReportConsistencyCheck | null>
   tableMaxHeight: Ref<number>
 
   // Actions
   fetchReport: () => Promise<void>
   onGenerate: () => Promise<void>
-  onConsistencyCheck: () => Promise<void>
+  onConsistencyCheck: () => Promise<ReportCheckCompletion | null>
   runBalanceCheck: () => Promise<void>
   loadTemplateRows: () => Promise<void>
   ensureProjectYear: () => Promise<void>
@@ -83,6 +85,11 @@ export interface UseReportDataReturn {
 
   // Internal (for main file sync of projectYear)
   _fetchedAuditYear: Ref<number | null>
+}
+
+export interface ReportCheckCompletion {
+  result: ReportConsistencyCheck
+  isCurrent: () => boolean
 }
 
 // ─── Implementation ─────────────────────────────────────────────────────────
@@ -113,7 +120,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   const genLoading = ref(false)
   const checkLoading = ref(false)
   const syncLoading = ref(false)
-  const balanceCheckResult = ref<{ status: string; message: string; checks: Array<{ name: string; passed: boolean; expected: string; actual: string; diff: string }> } | null>(null)
+  const balanceCheckResult = ref<ReportBalanceResult | null>(null)
   const consistencyResult = ref<ReportConsistencyCheck | null>(null)
   const tableMaxHeight = ref(500)
 
@@ -124,6 +131,36 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   const isConsolidated = computed(() => reportScope.value === 'consolidated')
   /** Internal: fetched audit_year from project API (for main file to sync projectYear) */
   const _fetchedAuditYear = ref<number | null>(null)
+
+  function clearRows() {
+    rows.value = []
+    compareRows.value = []
+    equityCompareAudited.value = []
+    equityCompareUnadjusted.value = []
+  }
+  const reviewFence = useReportRequestFence(
+    () => [projectId.value, year.value, currentApplicableStandard.value],
+    () => { consistencyResult.value = null; balanceCheckResult.value = null; checkLoading.value = false },
+  )
+  const rowsFence = useReportRequestFence(
+    () => [projectId.value, year.value, currentApplicableStandard.value, activeTab.value, reportMode.value],
+    () => { clearRows(); loading.value = false },
+  )
+  const metadataFence = useReportRequestFence(() => [projectId.value], () => {
+    projectName.value = ''; reportScope.value = 'standalone'; templateType.value = ''; _fetchedAuditYear.value = null
+  })
+  let balanceRevision = 0
+  function applyBalance(result: ReportConsistencyCheck) {
+    const checks = Array.isArray(result.checks) ? result.checks : []
+    if (result.noResult && !checks.length) {
+      balanceRevision++
+      balanceCheckResult.value = null
+      return
+    }
+    if (!checks.length && balanceCheckResult.value?.checks.length) return
+    balanceRevision++
+    balanceCheckResult.value = getReportBalancePresentation(result)
+  }
 
   // ─── Derived ────────────────────────────────────────────────────────────────
   const activeTabLabel = computed(() => {
@@ -172,34 +209,42 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   // ─── Actions ────────────────────────────────────────────────────────────────
 
   async function runBalanceCheck() {
-    if (year.value == null) return
+    const y = year.value
+    if (y == null) return
+    const pid = projectId.value
+    const request = reviewFence.begin('summary')
+    const revision = balanceRevision
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/data-quality/check?checks=report_balance&year=${year.value}`)
+      const res = await api.get(`/api/projects/${pid}/data-quality/check?checks=report_balance&year=${y}`)
       const rb = res?.results?.report_balance
-      if (rb) {
-        balanceCheckResult.value = { status: rb.status, message: rb.message || '' }
-      }
+      // 摘要不含逐项证据；不能把其 passed/message 当作已验证，更不能覆盖完整明细。
+      if (!request.isCurrent() || revision !== balanceRevision || !rb || balanceCheckResult.value?.checks.length) return
+      balanceCheckResult.value = getReportBalancePresentation(null)
     } catch {
-      // 静默失败，不阻断
+      // 静默失败，不阻断，也不抹掉已取得的审核明细。
     }
   }
 
   async function ensureProjectYear() {
+    const pid = projectId.value
+    const request = metadataFence.begin()
     try {
       // 直接调用项目详情 + wizard 获取完整信息
-      const projRaw = await api.get(P_proj.detail(projectId.value), {
+      const projRaw = await api.get(P_proj.detail(pid), {
         validateStatus: (s: number) => s < 600,
       })
-      const proj = projRaw?.data ?? projRaw ?? projRaw
+      if (!request.isCurrent()) return
+      const proj = projRaw?.data ?? projRaw
       projectName.value = proj?.client_name || proj?.name || ''
       reportScope.value = proj?.report_scope || 'standalone'
       templateType.value = proj?.template_type || ''
       _fetchedAuditYear.value = Number(proj?.audit_year) || null
 
       // 从 wizard_state 补充 template_type
-      const wizRaw = await api.get(P_proj.wizard(projectId.value), {
+      const wizRaw = await api.get(P_proj.wizard(pid), {
         validateStatus: (s: number) => s < 600,
       })
+      if (!request.isCurrent()) return
       const ws = wizRaw?.data ?? wizRaw
       const bi = ws?.steps?.basic_info?.data
       if (bi?.template_type) templateType.value = bi.template_type
@@ -208,7 +253,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
 
       if (!templateType.value) templateType.value = 'soe'
     } catch {
-      _fetchedAuditYear.value = null
+      if (request.isCurrent()) _fetchedAuditYear.value = null
     }
   }
 
@@ -218,112 +263,101 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     'equity_statement', 'cash_flow_supplement', 'impairment_provision',
   ])
 
-  async function loadTemplateRows() {
-    // 非报表 tab（如 cross_check / multi_year_compare / report_analysis）不调后端
-    if (!VALID_REPORT_TYPES.has(activeTab.value)) return
-    // 从报表配置加载预设行次（显示空值的模板框架）
+  function captureRowsContext() {
+    return { pid: projectId.value, y: year.value, tab: activeTab.value, mode: reportMode.value, std: currentApplicableStandard.value }
+  }
+
+  async function loadTemplateFor(request: ReportRequest, context: ReturnType<typeof captureRowsContext>) {
     try {
-      const data = await api.get(P_rc.list, {
-        params: { report_type: activeTab.value, project_id: projectId.value, applicable_standard: currentApplicableStandard.value },
+      const configs = await api.get(P_rc.list, {
+        params: { report_type: context.tab, project_id: context.pid, applicable_standard: context.std },
       })
-      const configs = data
-      if (Array.isArray(configs) && configs.length > 0) {
-        rows.value = configs.map((r: any) => ({
-          row_code: r.row_code || '',
-          row_name: r.row_name || '',
-          current_period_amount: null as string | null,
-          prior_period_amount: null as string | null,
-          indent_level: r.indent_level || 0,
-          is_total_row: r.is_total || false,
-          formula_used: r.formula || null,
-          source_accounts: null as string[] | null,
-        }))
-      } else {
-        rows.value = []
-      }
+      if (!request.isCurrent()) return
+      rows.value = Array.isArray(configs) ? configs.map((r: any) => ({
+        row_code: r.row_code || '', row_name: r.row_name || '',
+        current_period_amount: null, prior_period_amount: null,
+        indent_level: r.indent_level || 0, is_total_row: r.is_total || false,
+        formula_used: r.formula || null, source_accounts: null,
+      })) : []
     } catch {
-      // 配置也没有，显示空
-      rows.value = []
+      if (request.isCurrent()) rows.value = []
     }
   }
 
-  const fetchReport = withLoading(loading, async () => {
-    // 非报表 tab 不调后端
-    if (!VALID_REPORT_TYPES.has(activeTab.value)) return
-    if (year.value == null) {
-      rows.value = []
-      compareRows.value = []
-      equityCompareAudited.value = []
-      equityCompareUnadjusted.value = []
+  async function loadTemplateRows() {
+    const request = rowsFence.begin('rows')
+    const context = captureRowsContext()
+    if (!VALID_REPORT_TYPES.has(context.tab)) {
+      clearRows()
+      loading.value = false
       return
     }
-    const std = currentApplicableStandard.value
-    try {
-      if (reportMode.value === 'compare') {
-        const [audited, unadjusted] = await Promise.all([
-          getReport(projectId.value, year.value, activeTab.value, false, std),
-          getReport(projectId.value, year.value, activeTab.value, true, std),
-        ])
-        if (activeTab.value === 'equity_statement') {
-          equityCompareAudited.value = audited
-          equityCompareUnadjusted.value = unadjusted
-          rows.value = audited
-          compareRows.value = []
-        } else {
-          equityCompareAudited.value = []
-          equityCompareUnadjusted.value = []
-          const uMap = new Map(unadjusted.map((r: any) => [r.row_code, r]))
-          compareRows.value = audited.map((r: any) => {
-            const u = uMap.get(r.row_code)
-            const uAmt = parseFloat(u?.current_period_amount || '0')
-            const aAmt = parseFloat(r.current_period_amount || '0')
-            return {
-              ...r,
-              unadjusted_amount: uAmt,
-              audited_amount: aAmt,
-              adjustment: Math.round((aAmt - uAmt) * 100) / 100,
-            }
-          })
-          rows.value = audited
-        }
-      } else {
-        rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted', std)
-        compareRows.value = []
-        equityCompareAudited.value = []
-        equityCompareUnadjusted.value = []
-      }
-    } catch (err: any) {
-      // 404 = 报表未生成，加载预设模板结构显示空表格框架
-      if (err?.response?.status === 404) {
-        await loadTemplateRows()
-      } else {
-        rows.value = []
-      }
-      compareRows.value = []
-      equityCompareAudited.value = []
-      equityCompareUnadjusted.value = []
-    }
+    loading.value = true
+    clearRows()
+    try { await loadTemplateFor(request, context) }
+    finally { if (request.isCurrent()) loading.value = false }
+  }
 
-    // ② 自动运行跨表校对（静默，不弹窗，只在有异常时显示 balanceCheckResult 横幅）
-    if (rows.value.length > 0) {
+  async function fetchReport() {
+    const request = rowsFence.begin('rows')
+    const context = captureRowsContext()
+    const { pid, y, tab, mode, std } = context
+    if (!VALID_REPORT_TYPES.has(tab) || y == null) {
+      clearRows()
+      loading.value = false
+      return
+    }
+    loading.value = true
+    try {
       try {
-        const result = await getReportConsistencyCheck(projectId.value, year.value)
-        // noResult（0 条可执行）不出「未通过」横幅：没查不等于查出了问题
-        if (result && !result.noResult && !result.consistent) {
-          const total = result.total || result.checks?.length || 0
-          const passed = (result.logic_check_passed || 0) + (result.reasonability_passed || 0)
-          const failCount = total - passed
-          balanceCheckResult.value = {
-            status: failCount > 0 ? 'warning' : 'passed',
-            message: `自动校对：${total} 项审核，${failCount} 项未通过`,
-            checks: result.checks || [],
+        if (mode === 'compare') {
+          const [audited, unadjusted] = await Promise.all([
+            getReport(pid, y, tab, false, std), getReport(pid, y, tab, true, std),
+          ])
+          if (!request.isCurrent()) return
+          if (tab === 'equity_statement') {
+            equityCompareAudited.value = audited
+            equityCompareUnadjusted.value = unadjusted
+            rows.value = audited
+            compareRows.value = []
+          } else {
+            equityCompareAudited.value = []
+            equityCompareUnadjusted.value = []
+            const uMap = new Map(unadjusted.map(r => [r.row_code, r]))
+            compareRows.value = audited.map(r => {
+              const u = uMap.get(r.row_code)
+              const uAmt = parseFloat(u?.current_period_amount || '0')
+              const aAmt = parseFloat(r.current_period_amount || '0')
+              return { ...r, unadjusted_amount: uAmt, audited_amount: aAmt,
+                adjustment: Math.round((aAmt - uAmt) * 100) / 100 }
+            })
+            rows.value = audited
           }
         } else {
-          balanceCheckResult.value = null
+          const fetched = await getReport(pid, y, tab, mode === 'unadjusted', std)
+          if (!request.isCurrent()) return
+          rows.value = fetched
+          compareRows.value = []
+          equityCompareAudited.value = []
+          equityCompareUnadjusted.value = []
         }
-      } catch { /* 静默失败 */ }
+      } catch (err: any) {
+        if (!request.isCurrent()) return
+        clearRows()
+        // 模板回退沿用同一请求票据及快照，不能覆盖切换后的报表。
+        if (err?.response?.status === 404) await loadTemplateFor(request, context)
+      }
+      if (!request.isCurrent() || !rows.value.length) return
+      // 静默校对只更新横幅；同上下文刷新/溯源不清除人工审核会话。
+      const detailRequest = reviewFence.begin('detail')
+      try {
+        const result = await getReportConsistencyCheck(pid, y)
+        if (request.isCurrent() && detailRequest.isCurrent() && result) applyBalance(result)
+      } catch { /* 静默失败不改写已有明细 */ }
+    } finally {
+      if (request.isCurrent()) loading.value = false
     }
-  })
+  }
 
 
   // F26: 前置条件错误处理——显示错误信息 + "去完成"跳转按钮
@@ -414,13 +448,18 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     })()
   }
 
-  async function onConsistencyCheck() {
+  async function onConsistencyCheck(): Promise<ReportCheckCompletion | null> {
+    // 在动态导入/确认弹窗之前冻结上下文；A→B→A 也不能沿用旧确认。
+    const request = reviewFence.begin('manual')
+    const pid = projectId.value
     const y = year.value
+    checkLoading.value = false
     if (y == null) {
       ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
-      return
+      return null
     }
     const { showGuide } = await import('@/composables/useWorkflowGuide')
+    if (!request.isCurrent()) return null
     const ok = await showGuide(
       'report_audit',
       '✅ 报表审核校验',
@@ -433,10 +472,22 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
       </div>`,
       '开始审核',
     )
-    if (!ok) return
-    await withLoading(checkLoading, async () => {
-      consistencyResult.value = await getReportConsistencyCheck(projectId.value, y)
-    })()
+    if (!ok || !request.isCurrent()) return null
+    const detailRequest = reviewFence.begin('detail')
+    checkLoading.value = true
+    try {
+      const result = await getReportConsistencyCheck(pid, y)
+      if (!request.isCurrent() || !result) return null
+      consistencyResult.value = result
+      if (detailRequest.isCurrent()) applyBalance(result)
+      const appliedResult = consistencyResult.value
+      return { result: appliedResult, isCurrent: () => request.isCurrent() && consistencyResult.value === appliedResult }
+    } catch (err) {
+      if (request.isCurrent()) handleApiError(err, '报表审核')
+      return null
+    } finally {
+      if (request.isCurrent()) checkLoading.value = false
+    }
   }
 
   async function reloadReportContext() {

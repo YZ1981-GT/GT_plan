@@ -118,6 +118,66 @@ describe('全局公式设置页', () => {
     w.unmount()
   })
 
+  // spec formula-management-repair-closure R5：按报表类型分组 + 每页 50；换条件回第一页，换数据清掉不存在的分组
+  it('分组筛选 + 分页（每页 50）', async () => {
+    const many = [
+      ...Array.from({ length: 70 }, (_, i) => ({ slot_key: `balance_sheet:BS-${i}`, label: `资产负债表 BS-${i}`, layer: 'global',
+        definition: { formula: `TB('${1000 + i}','期末余额')` }, version: 1, structure: null })),
+      ...Array.from({ length: 50 }, (_, i) => ({ slot_key: `income_statement:IS-${i}`, label: `利润表 IS-${i}`, layer: 'global',
+        definition: { formula: `TB('${6000 + i}','本期发生额')` }, version: 1, structure: null })),
+    ]
+    api.global.mockResolvedValue({ domain: 'report', scope: 'soe_standalone', can_edit: true, slots: many })
+    const w = mountPage()
+    await flushPromises()
+    const s = state(w)
+    expect(s.groupOptions).toEqual([
+      { value: 'balance_sheet', count: 70, label: '资产负债表' }, { value: 'income_statement', count: 50, label: '利润表' }])
+    expect(s.pagedSlots).toHaveLength(50)
+    s.page = 3
+    expect(s.pagedSlots).toHaveLength(20)
+    s.groupKey = 'balance_sheet'
+    await flushPromises()
+    expect(s.page).toBe(1)
+    expect(s.filteredSlots).toHaveLength(70)
+    expect(s.pagedSlots.every((r: any) => r.slot_key.startsWith('balance_sheet:'))).toBe(true)
+    s.page = 2
+    s.keyword = 'BS-6'
+    await flushPromises()
+    expect(s.page).toBe(1)
+    expect(s.filteredSlots.map((r: any) => r.slot_key)).toEqual(
+      ['balance_sheet:BS-6', ...Array.from({ length: 10 }, (_, i) => `balance_sheet:BS-6${i}`)])
+    api.global.mockResolvedValue({ domain: 'report', scope: 'soe_standalone', can_edit: true, slots: SLOTS.slice(0, 1) })
+    s.keyword = ''
+    await s.loadSlots()
+    await flushPromises()
+    expect(s.groupKey).toBe('balance_sheet')
+    api.global.mockResolvedValue({ domain: 'note', scope: 'soe', can_edit: true, slots: [
+      { slot_key: '五、1|t0:2:0', label: '货币资金', layer: 'global', definition: { formula: 'X' }, version: 1 }] })
+    await s.loadSlots()
+    await flushPromises()
+    expect(s.groupKey).toBe('')
+    w.unmount()
+  })
+
+  // spec formula-management-repair-closure R3.1：未接入计算的域原样显示后端说明
+  it('未接入计算的域显示后端 wired_reason，已接入的域不提示', async () => {
+    const reason = '试算表科目明细公式目前只保存、不参与计算：还没有任何计算读取这类公式'
+    api.domains.mockResolvedValue({ domains: [...DOMAINS, { key: 'tb_detail', label: '试算表科目明细公式',
+      scope_kind: 'standard', wired: false, wired_reason: reason, scopes: [{ value: 'soe_standalone', label: '国企单体' }],
+      exec_fields: ['formula'], desc_fields: [] }], is_admin: true })
+    route.query = { domain: 'tb_detail' }
+    // 标签页渲染默认插槽（提示在「全局公式」页内），其余组件仍浅渲染
+    const w = shallowMount(FormulaGlobalSettings, { global: { plugins: [ElementPlus], renderStubDefaultSlot: false,
+      stubs: { ElTabs: { template: '<div><slot /></div>' }, ElTabPane: { template: '<div><slot /></div>' } } } })
+    await flushPromises()
+    expect(w.find('[data-testid="fgs-not-wired"]').attributes('title')).toBe(reason)
+    const s = state(w)
+    s.domainKey = 'report'
+    await s.onDomainChange()
+    expect(w.find('[data-testid="fgs-not-wired"]').exists()).toBe(false)
+    w.unmount()
+  })
+
   it('切换公式域：放弃未发布的暂存并提示', async () => {
     const w = mountPage()
     await flushPromises()

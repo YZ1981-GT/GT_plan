@@ -8,7 +8,6 @@
  * Tasks: 3.1 ~ 3.9, 4.1
  */
 import { ref, computed, toRef, watch, provide, onMounted, onBeforeUnmount } from 'vue'
-import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useB22BFormData } from './composables/useB22BFormData'

@@ -13,7 +13,9 @@ from app.core.db_pool_metrics import (
     install_pool_metrics,
     pool_capacity_snapshot,
 )
+from app.services.capacity_slots import LLM_MAX_CONCURRENCY
 from app.services.platform_metrics import (
+    DURABLE_QUEUE_NAMES,
     PROMETHEUS_AVAILABLE,
     event_loop_snapshot,
     render_platform_metrics,
@@ -33,6 +35,12 @@ def test_root_metrics_payload_contains_all_capacity_families():
         "libreoffice_queue_depth",
         "platform_event_loop_lag_seconds",
         "db_pool_checked_out_connections",
+        # 任务 0.2：LLM / OCR 通道与耐久任务队列也必须在同一个暴露面上。
+        "platform_slot_queue_wait_seconds",
+        "platform_slot_run_seconds",
+        "platform_slot_active",
+        "platform_durable_queue_depth",
+        "platform_durable_queue_oldest_age_seconds",
     ):
         assert metric in text
 
@@ -96,8 +104,17 @@ def test_health_capacity_snapshot_is_read_only_and_complete():
         "event_loop",
         "libreoffice",
         "bulk_import",
+        "slots",
+        "durable_queues",
     }
     assert "capacity" in snapshot["db_pool"]
     assert "stale" in snapshot["event_loop"]
     assert "queue_limit" in snapshot["libreoffice"]
     assert "spool_budget_bytes" in snapshot["bulk_import"]
+    # LLM 有真实准入上限，OCR 没有：两者的 bounded 必须如实区分，不能都报成已限流。
+    assert snapshot["slots"]["llm"]["bounded"] is True
+    assert snapshot["slots"]["llm"]["concurrency_limit"] == LLM_MAX_CONCURRENCY
+    assert snapshot["slots"]["ocr"]["bounded"] is False
+    assert snapshot["slots"]["ocr"]["concurrency_limit"] is None
+    # 采样器没跑时必须看得见「未采样」，而不是静默消失或报 0 深度。
+    assert set(snapshot["durable_queues"]) == set(DURABLE_QUEUE_NAMES)

@@ -489,7 +489,7 @@ describe('useNoteRefresh', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useNoteTemplate', () => {
-  it('loadNoteMappingPreset generates rules from noteList', () => {
+  it('loadNoteMappingPreset generates rules from noteList', async () => {
     const noteList = ref([
       makeTreeItem({ id: '1', note_section: '五、1', section_title: '货币资金' }),
       makeTreeItem({ id: '2', note_section: '五、2', section_title: '应收账款' }),
@@ -498,7 +498,7 @@ describe('useNoteTemplate', () => {
       projectId: computed(() => 'proj-001'), templateType: ref('soe'),
       noteList, fetchTree: vi.fn(), onGenerate: vi.fn(),
     })
-    loadNoteMappingPreset()
+    await loadNoteMappingPreset()
     expect(noteMappingRules.value).toHaveLength(2)
     expect(noteMappingRules.value[0].soe_section).toContain('货币资金')
   })

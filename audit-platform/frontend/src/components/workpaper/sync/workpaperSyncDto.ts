@@ -662,6 +662,20 @@ export interface WorkpaperSyncOperationSnapshot {
   readonly authorityModelDefinitionSha256: string | null
   readonly durableAt: string | null
   readonly finishedAt: string | null
+  /**
+   * room 的最新耐久 application 指针 —— resolve fence 八项里的两项。
+   *
+   * 后端 `get_operation` 自 Task 32 起就在响应里投影它们（`_fold_observability_facts`
+   * 读 `working_paper_oo_room.latest_durable_application_id` / `latest_durable_sequence`
+   * 并随 `app_facts` 展开），但前端 DTO 一直没解析 ⇒ 冲突面板拿不到这两项，
+   * `buildResolveFence` 只能判「缺项」，于是**任何**冲突都提交不了裁决。
+   *
+   * 只在 operation 已绑定 application 且 room 存在时才有值；room 还没耐久过任何
+   * application 时为 `null` —— 那是真实的「尚无耐久记录」，必须保持 null 走缺项路径，
+   * 不能用 canonical application 顶替（服务端会照这个断言做 fence 裁决）。
+   */
+  readonly roomLatestDurableApplicationId: string | null
+  readonly roomLatestDurableSequence: number | null
   readonly terminal: boolean
 }
 
@@ -789,6 +803,14 @@ export function parseOperationSnapshot(payload: unknown): WorkpaperSyncOperation
         : null,
     durableAt: typeof wire.durable_at === 'string' ? wire.durable_at : null,
     finishedAt: typeof wire.finished_at === 'string' ? wire.finished_at : null,
+    // resolve fence 的 room 侧两项。用既有的 nullable 解析器：缺键 / null 都归 null，
+    // 这样「room 尚无耐久记录」与「后端没投影」都落在同一个可见的缺项路径上。
+    roomLatestDurableApplicationId: nullableOpaqueId(
+      wire,
+      'room_latest_durable_application_id',
+      'operations',
+    ),
+    roomLatestDurableSequence: nullableInt(wire, 'room_latest_durable_sequence', 'operations'),
     terminal: (WP_SYNC_OPERATION_TERMINAL_STATES as readonly string[]).includes(state),
   }
 }

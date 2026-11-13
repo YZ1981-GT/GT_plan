@@ -720,16 +720,34 @@ export interface ReportDrilldownData {
   }>
 }
 
+export interface ReportConsistencyCheckItem {
+  name: string
+  /** 自有字段即为权威；空值、未知值及运行态由展示层明确报错，不退回旧布尔口径。 */
+  status?: unknown
+  passed?: boolean
+  expected?: number | string | null
+  actual?: number | string | null
+  diff?: number | string | null
+  reason?: unknown
+  message?: unknown
+  severity?: unknown
+  category: string
+  category_label: string
+  formula: string | null
+  source: string
+}
+
 export interface ReportConsistencyCheck {
   /** null = 没有任何可执行的审核项（见 noResult），不是「全部通过」 */
   consistent: boolean | null
-  /** 0 条可执行：报表未生成且未配置审核公式 */
+  /** 0 条可执行：报表未生成且未配置审核公式；有真实明细时仍须展示明细 */
   noResult: boolean
-  checks: Array<{
-    name: string; passed: boolean; expected: string; actual: string; diff: string
-    category: string; category_label: string; formula: string | null; source: string
-  }>
+  checks: ReportConsistencyCheckItem[]
   total?: number
+  /** 失败数：未通过且严重度非 warning（ADR-CCN-05） */
+  failed_count?: number
+  /** 提示数：未通过但严重度为 warning / info，不计入失败 */
+  hint_count?: number
   logic_check_passed?: number
   logic_check_count?: number
   reasonability_passed?: number
@@ -767,28 +785,37 @@ export async function getReportDrilldown(projectId: string, year: number, report
 }
 
 /**
- * 报表「审核」结果映射。🔴 汇总计数与 category 必须透传：审核弹窗按 category 分页签、
- * 按 total / *_passed 出统计 —— 早先只映射 consistent / checks 五个字段，弹窗统计恒 0、
- * 两个分类页签恒空（spec formula-governance-coverage-closure R1.6）。
+ * 报表「审核」结果映射。保留自有 status（包括坏值）与真实数值，不能在传输层制造通过。
+ * 汇总计数与 category 继续透传；展示层按真实明细统计五态，不用摘要反推失败数。
  */
 export function mapReportConsistencyCheck(raw: any): ReportConsistencyCheck {
-  const checks = (raw?.checks || []).map((item: any) => ({
-    name: item.name ?? item.check_name ?? '',
-    passed: !!item.passed,
-    expected: item.expected ?? item.expected_value ?? '',
-    actual: item.actual ?? item.actual_value ?? '',
-    diff: item.diff ?? item.difference ?? '',
-    category: item.category ?? 'logic_check',
-    category_label: item.category_label ?? '',
-    formula: item.formula ?? null,
-    source: item.source ?? '',
-  }))
+  const checks: ReportConsistencyCheckItem[] = (Array.isArray(raw?.checks) ? raw.checks : []).map((value: any) => {
+    const item = value != null && typeof value === 'object' ? value : {}
+    const own = (key: string) => Object.prototype.hasOwnProperty.call(item, key)
+    return {
+      name: item.name ?? item.check_name ?? '',
+      ...(own('status') ? { status: item.status } : {}),
+      ...(typeof item.passed === 'boolean' ? { passed: item.passed } : {}),
+      expected: own('expected') ? item.expected : item.expected_value,
+      actual: own('actual') ? item.actual : item.actual_value,
+      diff: own('diff') ? item.diff : item.difference,
+      reason: item.reason,
+      message: item.message,
+      severity: item.severity,
+      category: item.category ?? 'logic_check',
+      category_label: item.category_label ?? '',
+      formula: item.formula ?? null,
+      source: item.source ?? '',
+    }
+  })
   const noResult = raw?.no_result ?? checks.length === 0
   return {
     consistent: noResult ? null : (raw?.consistent ?? raw?.all_passed ?? false),
     noResult,
     checks,
     total: raw?.total ?? checks.length,
+    failed_count: raw?.failed_count,
+    hint_count: raw?.hint_count,
     logic_check_count: raw?.logic_check_count,
     logic_check_passed: raw?.logic_check_passed,
     reasonability_count: raw?.reasonability_count,

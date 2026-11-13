@@ -419,6 +419,14 @@ export function subscribeProjectEvent(
         created.takeover = takeover
         _ensureConnection(projectId)
       },
+      // HTTP fallback 的 lease 冲突中失去领导权：立即关掉本标签页真实 SSE，
+      // 后续只收新的 leader 广播，保证最终单项目单连接。
+      onFollow: () => {
+        if (_byProject.get(projectId) !== created) return
+        created.conn?.close()
+        created.conn = null
+        created.takeover = true
+      },
       onMessage: (message) => _onShareMessage(projectId, message),
     })
   }

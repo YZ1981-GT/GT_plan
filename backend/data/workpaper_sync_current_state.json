@@ -1,5 +1,5 @@
 {
-  "adjudication_source_digest": "3382b0a961727e5826372683a2db995eff201a2535b886014d4d44f5eee6ae6e",
+  "adjudication_source_digest": "d51c5dfd2b3cdd806b8d179ea3ffe6cae6ef0707bc2f7e561e19d33d68b26c1b",
   "counts": {
     "capabilities": {
       "bidirectional": 67
@@ -4560,18 +4560,18 @@
       "static_registration_blocked_reason": "entry 尚未完成逐项 capability 裁决（capability=null，stage='step_4_blocked_by_step_3_result_exists'，target='bidirectional'，blockers=['BP-1', 'BP-12', 'BP-2', 'BP-3', 'BP-4', 'BP-5', 'BP-7', 'BP-8']）—— 未裁决入口不得注册 adapter（AC 1.3 / 12.1）"
     }
   ],
-  "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
-  "overlay_digest": "580e8b50d01236dccffa210a822d140c70726a4efbbf9e5b14d1576219f65e9d",
-  "report_digest": "b13dc6a857a1e5f5e719ced7d27a7186e29bd5cf9bd91a8ad715a90ddf8e6967",
+  "manifest_digest": "a45714deb833e624b43faa0eaa44785027c24148784a2156ffe0c25f22fa7be6",
+  "overlay_digest": "597951aa87483908148f7278779d5da0fdb3a31be9194442065e484d9ab81083",
+  "report_digest": "34bb4dcb162efbc29db5f6f78b4ba2eebbe060a3370aaf7c15004a35f379c853",
   "runtime_scope": {
     "database_queried": false,
     "meaning": "runtime_readiness/acceptance_state are unknown, not failed or passed",
     "onlyoffice_queried": false
   },
   "schema_version": "workpaper-sync-current-state:v1",
-  "snapshot_date": "2026-11-01",
-  "source_digest": "919d66ad00b6798dad516a3db1e5807eb1c0889d23ec2b1aa8495edda63962d9",
-  "source_review_ref": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/phase3-source-digest-review-2026-11-01-task35-final.json",
+  "snapshot_date": "2026-11-04",
+  "source_digest": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
+  "source_review_ref": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/phase3-source-digest-review-2026-11-04-rebase-cad390dcb.json",
   "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "wp_code_adjudication_digest": "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"
 }

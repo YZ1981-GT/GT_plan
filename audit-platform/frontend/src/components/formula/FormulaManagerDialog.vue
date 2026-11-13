@@ -120,7 +120,6 @@
               @changed="onFormulaSettingsChanged" />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
             <el-button size="small" @click="onExportFormulaTemplate">📤 导出模板</el-button>
-            <el-button size="small" @click="showFormulaImport = true">📥 Excel导入</el-button>
             <el-button v-if="isNoteDomainNodeKey(selectedNodeKey)" size="small" type="primary" plain
               data-testid="fm-note-edit" :disabled="!noteEditTarget"
               :title="noteEditTarget ? '' : '请先在左侧选择具体的附注章节'" @click="openNoteFormulaEditor()">✏️ 编辑本章节公式</el-button>
@@ -197,7 +196,7 @@
             <template #label>💡 提示合理性 ({{ categoryCounts.reasonability }})</template>
           </el-tab-pane>
           <el-tab-pane name="no_formula">
-            <template #label>⬜ 未配置 ({{ currentRows.filter(r => !r.formula && _rowNeedsFormula(r)).length }})</template>
+            <template #label>⬜ 未配置 ({{ missingFormulaCount }})</template>
           </el-tab-pane>
           <!-- E1 Sprint 2 Task 2.34: 用户自定义公式 Tab -->
           <el-tab-pane name="user_formulas">
@@ -300,6 +299,9 @@
 
         <!-- 公式表格（报表/附注/底稿） -->
         <el-alert v-if="wpFormulaError" :title="wpFormulaError" type="error" :closable="false" show-icon />
+        <!-- spec formula-management-repair-closure R3.1：试算表科目明细公式只保存、不参与计算，原样显示后端说明 -->
+        <el-alert v-if="selectedNodeKey === 'tb_detail' && tbDetailNotWired" :title="tbDetailNotWired" type="warning"
+          :closable="false" show-icon data-testid="fm-tb-detail-not-wired" />
         <el-alert v-if="wpSheetLocateMiss" :title="wpSheetLocateMiss" type="warning" :closable="false" show-icon />
         <el-table v-if="!isConsolFormulaNode && !isCrossCheckMode && !['user_formulas', 'history', 'formula_push'].includes(activeCategory)" v-loading="wpFormulaLoading" ref="formulaTableRef" class="gt-fm-main-table" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
           :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }"
@@ -382,7 +384,7 @@
           <el-table-column label="引用方" width="70" align="center">
             <template #default="{ row }">
               <el-badge v-if="row._ref_count > 0" :value="row._ref_count" :max="99" type="info"
-                style="cursor: pointer;" @click.native="depPanelRef.value?.load(`report:${selectedReportType.value}:${row.row_code || row.id}`)" title="点击查看依赖关系" />
+                style="cursor: pointer;" @click="depPanelRef?.load(`report:${activeReportType}:${row.row_code || row.id}`)" title="点击查看依赖关系" />
               <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">0</span>
             </template>
           </el-table-column>
@@ -403,7 +405,7 @@
         </el-table>
 
         <div v-if="!isConsolFormulaNode" class="gt-fm-footer">
-          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
+          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ configuredFormulaCount }} 个公式{{ computedFormulaCount ? `，${computedFormulaCount} 个已计算` : '' }}</span>
         </div>
 
         <FormulaDependencyPanel v-if="!isConsolFormulaNode" ref="depPanelRef" :project-id="props.projectId" />
@@ -467,17 +469,9 @@
       :project-id="props.projectId"
       :year="props.year"
       :wp-code="props.wpCode"
+      :scope="settingsDomain"
       @dirty-change="onFormulaDraftDirtyChange"
       @save="onFormulaEditSave"
-    />
-
-    <!-- 统一导入弹窗 -->
-    <UnifiedImportDialog
-      v-model="showFormulaImport"
-      import-type="formula"
-      :project-id="props.projectId"
-      :year="props.year"
-      @imported="onFormulaFileImported"
     />
 
     <!-- 全局公式总览弹窗（已拆出为独立组件 FormulaGlobalScopeDialog） -->
@@ -540,7 +534,6 @@ import { savedDefinitionVersion, wpFormulaBatchNotice, wpFormulaSaveNotice } fro
 import { useTbDetailFormulas } from './composables/useTbDetailFormulas'
 import { useCrossCheckRules } from './composables/useCrossCheckRules'
 import { issueRunForNode } from './formulaIssueHint'
-import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
@@ -652,6 +645,8 @@ const props = withDefaults(defineProps<{
   initialTemplateId?: string
   initialTemplateAction?: 'subscribe'
   initialTemplateDomain?: string
+  /** 每次活动打开请求递增；同 project/year 只变域或目标时也重新定位。 */
+  openRevision?: number
 }>(), {
   scope: 'report',
   readOnly: false,
@@ -792,9 +787,9 @@ const masterDiffApplying = ref(false)
  * 只看公式差异（默认开）。
  *
  * 🔴 后端 diff 比的是**全部行**：本项目只落了「带公式」的行（183 条），
- * 主模板另有大量无公式的结构行 ⇒ 实测 169 条差异里绝大多数是
-// masterDiff 筛选/标签/颜色已移到 FormulaGlobalScopeDialog 内部
-}
+ * 主模板另有大量无公式的结构行 ⇒ 实测 169 条差异里绝大多数是结构差异（筛选 / 标签 / 颜色在 FormulaGlobalScopeDialog 内部）。
+ * formula-hub-release-blockers R3.1：此前这段注释没有结尾，下面的 loadMasterDiff 整个落在注释里（「比对主模板」恒无响应）。
+ */
 
 async function loadMasterDiff() {
   if (!props.projectId) return
@@ -1727,7 +1722,6 @@ async function loadCrossCheckUserRules() { await cc.loadUserRules() }
 // ── 数据加载 ──
 const allRowsMap = ref<Record<string, any[]>>({})
 const loadingData = ref(false)
-const showFormulaImport = ref(false)
 
 type FormulaExecutionResult = {
   value: number | null
@@ -1865,6 +1859,7 @@ const tbDetailLoaded = tbDetail.loaded
 const tbDetailFallbackAccounts = tbDetail.fallbackAccounts
 const loadTbDetailFormulas = tbDetail.load
 const persistTbDetailFormulas = tbDetail.persist
+const tbDetailNotWired = tbDetail.notWired
 const wpFormulaLoading = ref(false)
 const wpFormulaError = ref('')
 /** 「调用页给了具体 sheet 但坐标目录里定位不到」的显式告警（≠ 加载失败，≠ 全册视图）。 */
@@ -2330,8 +2325,8 @@ async function applyConsolNoteTarget() {
   }
 }
 
-// 初始加载当前报表的数据
-watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
+// 打开 / 换上下文时的初始加载；监听注册在 <script setup> 末尾（见那里的说明）。
+async function onOpenContextChange([v]: readonly unknown[]) {
   ++dialogSession
   ++wpRequest
   wpFormulaLoading.value = false
@@ -2506,7 +2501,7 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     // 没有目标且停在报表节点时补加载当前报表（打开时已清报表行缓存）
     if (!(await applyTargetNode()) && activeReportType.value && !allRowsMap.value[activeReportType.value]) await loadRowsForNode(selectedNodeKey.value)
   }
-})
+}
 
 function onTreeNodeClick(data: any) {
   // 外链节点: 跳转到独立页面
@@ -2629,6 +2624,16 @@ const currentRows = computed(() => {
   }
   return []
 })
+
+const missingFormulaCount = computed<number>(() => currentRows.value.filter(
+  (row: { formula?: string | null }) => !row.formula && _rowNeedsFormula(row),
+).length)
+const configuredFormulaCount = computed<number>(() => currentRows.value.filter(
+  (row: { formula?: string | null }) => row.formula,
+).length)
+const computedFormulaCount = computed<number>(() => Object.values(formulaResults.value).filter(
+  (result: FormulaExecutionResult) => result.value != null,
+).length)
 
 // ── cross_check CRUD + 执行（委托 composable，原 ~311 行） ──
 const isCrossCheckMode = cc.isCrossCheckMode
@@ -3028,6 +3033,41 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       row.row_number = rows.length + 1
       rows.push(row)
 
+      // formula-hub-release-blockers R6.1：底稿域新增公式落库（此前只进列表、刷新即丢）
+      if (settingsDomain.value === 'wp') {
+        const targetLocation = gate.location
+        const cellRef = /^(?:(.+)!)?([A-Za-z]{1,3}\d{1,7})$/.exec(String(data.target_cell || row.target_cell || '').trim())
+        if (!targetLocation || !cellRef) {
+          ElMessage.warning(targetLocation ? '请先填写或点选目标单元格（如 B5）' : '缺少固定的底稿位置，无法保存底稿公式')
+          return
+        }
+        const sheet = cellRef[1] || row.sheet_name || targetLocation.display.sheetName || selectedWpSheetCode.value || ''
+        try {
+          const saved: any = await api.put(wpFormula.upsert(targetLocation.wpId), {
+            sheet_name: sheet, target_cell: cellRef[2].toUpperCase(), expression: data.formula || '',
+            year: targetLocation.fiscalYear, template_type: fmTemplateType.value,
+            category: data.category, description: data.description,
+            // 新建：不带版本；这一格已有公式时后端回 428，不静默覆盖（改已有公式走列表里的那一行）
+            expected_version: undefined,
+          })
+          Object.assign(row, { id: saved?.saved?.id ?? row.id, sheet_name: sheet, target_cell: cellRef[2].toUpperCase(),
+            definition_version: savedDefinitionVersion(saved) ?? row.definition_version, _isNew: false })
+          showFormulaEdit.value = false
+          const notice = wpFormulaSaveNotice(saved, row.target_cell)
+          ElMessage[notice.level]({ message: notice.text, duration: notice.level === 'warning' ? 8000 : 3000 })
+          emit('saved')
+          await propagateFormulaStale(targetLocation)
+          askWpApplyScope(saved)
+        } catch (e: any) {
+          if ((e?.response?.status || e?.status) === 428) {
+            ElMessage.warning(`${sheet ? `${sheet}!` : ''}${cellRef[2].toUpperCase()} 已有公式，请在列表里编辑那一行`)
+          } else {
+            showFormulaError(e, '底稿新公式保存失败')
+          }
+        }
+        return
+      }
+
       if (activeReportType.value) {
         const reportType = activeReportType.value
         try {
@@ -3111,6 +3151,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       ElMessage[notice.level]({ message: notice.text, duration: notice.level === 'warning' ? 8000 : 3000 })
       emit('saved')
       await propagateFormulaStale(targetLocation)
+      askWpApplyScope(saved)
     } catch (e) {
       handleApiError(e, '保存失败')
     }
@@ -3205,10 +3246,9 @@ async function onApplyFormulas() {
 
   applying.value = true
   try {
-    const formulas = formulaRows.map((r: any) => ({
-      row_code: r.row_code || r.id,
-      formula: r.formula,
-    }))
+    // 未配置公式的行也带上（公式为空）：后端按报表生成同口径记 0，供 ROW() 引用，不进结果
+    const formulas = [...formulaRows, ...currentRows.value.filter((r: any) => !r.formula)]
+      .map((r: any) => ({ row_code: r.row_code || r.id, formula: r.formula || '' }))
 
     const data = await api.post(P_rc.executeFormulasBatch, {
       project_id: props.projectId,
@@ -3253,11 +3293,6 @@ async function onApplyFormulas() {
   } finally {
     applying.value = false
   }
-}
-
-function onFormulaFileImported() {
-  showFormulaImport.value = false
-  loadRowsForNode(selectedNodeKey.value)
 }
 
 /**
@@ -3364,6 +3399,15 @@ async function onFormulaSettingsChanged(domain?: string) {
 /** 本项目保存成功后问应用范围：仅本项目（默认）/ 设为全局 / 应用到指定项目（R7.1） */
 function askApplyScope(slotKeys: string[]) {
   if (slotKeys.length) settingsToolbarRef.value?.askApplyScope('report', slotKeys)
+}
+
+/**
+ * 底稿公式保存后问应用范围（spec formula-management-repair-closure R4）：公式位用后端回执的 `changed_slot_keys`
+ * （`底稿编码|sheet|单元格`，与 /effective 同口径）；只改了说明等不影响计算的字段时后端不带 ⇒ 不弹。
+ */
+function askWpApplyScope(receipt?: { changed_slot_keys?: string[] } | null) {
+  const slots = receipt?.changed_slot_keys || []
+  if (slots.length) settingsToolbarRef.value?.askApplyScope?.('wp', slots)
 }
 
 /** 恢复为全局（R6.2）：删除本项目适配；来自订阅模板的回到模板定义 */
@@ -3499,9 +3543,9 @@ async function onSaveAllFormulas() {
  * `resolveSaveYear` 口径——缺可解析年份时跳过传播，**不** fallback 到系统当前年（需求 10.2）。
  */
 async function propagateFormulaStale(location?: CanonicalWorkpaperLocation) {
-  // S4 ADR-SDO-05：传播已由后端 outbox 投递完成，前端不再重复发送。
-  // 保留函数签名避免 8 处调用方改动，但不再发请求。
-  void location
+  // S4 ADR-SDO-05：传播已由后端 outbox 投递完成，前端不再重复发送；保存后只刷新顶栏的联动状态
+  // （spec formula-management-repair-closure R1.4：处理中 / 失败原因可见）。保留签名，8 处调用方不改。
+  void location; settingsToolbarRef.value?.refreshPropagation?.()
 }
 
 // ── 公式看板 ──
@@ -3876,6 +3920,12 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
   }
   emit('saved')
 }
+
+// 初始加载当前报表的数据（打开 / 换项目、年度、底稿、页 / 同上下文再开一次都重走 onOpenContextChange）。
+// 异步宿主可能在模块下载完成时已是打开态，必须 immediate，否则首次打开不会执行任何加载。
+// 注册必须在全部声明之后：immediate 首轮同步执行，放在中段会读到尚未初始化的 activeCategory 等 ref
+// （暂时性死区 ReferenceError，打开流程在第一处赋值就整段中断 —— 挂载即打开时什么都不加载）。
+watch([visible, () => props.openRevision, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], onOpenContextChange, { immediate: true })
 </script>
 
 <style scoped>

@@ -24,10 +24,9 @@ describe('WorkpaperEditor → GtWpRenderer 只读接线', () => {
     expect(readonlyExpr, 'GtWpRenderer 没有绑定 :readonly').not.toBe('')
   })
 
-  it('只读来自编辑锁冲突、项目归档与角色只读', () => {
-    // 模板里 editLock 是普通对象、forcedReadonly 是其中的 ref ⇒ 必须写 .value；isArchived 是顶层解构的 ref，模板自动解包
-    // canEdit 由 useAuditContext() 提供，review-level 用户为 false（Spec F FEAT-003 F6.2）
-    expect(readonlyExpr.split('||').map((s) => s.trim()).sort()).toEqual(['!canEdit', 'editLock.forcedReadonly.value', 'isArchived'])
+  it('只读统一来自 effectiveCanEdit，且包含权限、编辑锁、项目归档与底稿终态', () => {
+    expect(readonlyExpr).toBe('!effectiveCanEdit')
+    expect(script).toMatch(/const effectiveCanEdit = computed\([\s\S]*canEdit\.value[\s\S]*!editLock\.forcedReadonly\.value[\s\S]*!isArchived\.value[\s\S]*review_passed[\s\S]*archived/)
     expect(script).toMatch(/const \{[^}]*\bisArchived\b[^}]*\} = useAuditContext\(\)/)
     expect(script).toMatch(/const \{[^}]*\bcanEdit\b[^}]*\} = useAuditContext\(\)/)
   })

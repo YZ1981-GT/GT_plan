@@ -26,6 +26,7 @@ from app.deps import assert_project_permission, require_project_access, require_
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType, ReportGenerationRun
+from app.services.report_provenance import run_display_status
 from app.models.report_schemas import (
     ReportGenerateRequest,
     ReportProvenanceResponse,
@@ -163,19 +164,23 @@ async def consistency_check(
     0 条可执行时返回 ``no_result=true``、``consistent=null`` —— 不再把「什么都没查」报成「全部通过」。
     （spec formula-governance-coverage-closure R1.6）
     """
-    from app.services.report_audit_checks import run_report_audit
+    from app.services.report_audit_checks import run_report_audit, split_by_severity
 
     applicable_standard = await _resolve_applicable_standard(db, project_id)
     checks = await run_report_audit(db, project_id, year, applicable_standard)
 
     logic_checks = [c for c in checks if c["category"] == "logic_check"]
     reason_checks = [c for c in checks if c["category"] == "reasonability"]
-    all_passed = all(c["passed"] for c in checks) if checks else None
+    # ADR-CCN-05：warning 级未通过只计入「提示」，不让审核「失败」；其余未通过仍判不一致
+    failures, hints = split_by_severity(checks)
+    all_passed = (not failures) if checks else None
 
     return {
         "consistent": all_passed,
         "no_result": not checks,
         "total": len(checks),
+        "failed_count": len(failures),
+        "hint_count": len(hints),
         "logic_check_count": len(logic_checks),
         "logic_check_passed": len([c for c in logic_checks if c["passed"]]),
         "reasonability_count": len(reason_checks),
@@ -185,6 +190,7 @@ async def consistency_check(
                 "name": c["name"],
                 "category": c["category"],
                 "category_label": c["category_label"],
+                "severity": c.get("severity", "blocking"),
                 "passed": c["passed"],
                 "expected": c["expected"],
                 "actual": c["actual"],
@@ -249,7 +255,7 @@ async def get_report_row_provenance(
                 "triggered_by": str(run.triggered_by) if run.triggered_by else None,
                 "started_at": run.started_at.isoformat() if run.started_at else None,
                 "finished_at": run.finished_at.isoformat() if run.finished_at else None,
-                "status": run.status,
+                "status": run_display_status(run),
                 "changed_rows": run.changed_rows,
                 "recomputed_rows": run.recomputed_rows,
                 "failed_rows": run.failed_rows,

@@ -77,6 +77,19 @@ async def download_template(
     )
 
 
+#: 已下线的导入类型 → 原因（spec formula-management-repair-closure R3.2）。枚举保留：类型清单与模板下载不受影响。
+_RETIRED_IMPORTS: dict[ImportType, str] = {
+    # 旧实现调用的 cell_formula_evaluator.save_formula_batch 从未存在 ⇒ 每次导入都整批失败
+    ImportType.formula: "Excel 公式导入已下线，请改用公式管理顶栏的「公式包 → 导入公式包到本项目」",
+}
+
+
+def _reject_retired(import_type: ImportType) -> None:
+    reason = _RETIRED_IMPORTS.get(import_type)
+    if reason:
+        raise HTTPException(status_code=410, detail={"error_code": "IMPORT_TYPE_RETIRED", "message": reason})
+
+
 @router.post("/{import_type}/validate")
 async def validate_file(
     import_type: ImportType,
@@ -84,6 +97,7 @@ async def validate_file(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """上传 Excel 文件并校验格式（不入库）"""
+    _reject_retired(import_type)
     content = await _read_upload(file)
     result = validate_import_file(import_type, content, file.filename or "")
     return result.to_dict()
@@ -101,6 +115,7 @@ async def import_data(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """校验 + 导入数据到系统（调整分录逐笔保存点：一笔失败不影响其他笔）"""
+    _reject_retired(import_type)
     # 项目数据先校验本项目编辑权限（原先只校验登录 ⇒ 任意登录用户可往任意项目写）
     if project_id is not None and import_type != ImportType.staff:
         from app.deps import assert_project_permission
@@ -232,8 +247,6 @@ async def _dispatch_import(
         return await _import_disclosure_notes(rows, _require_project(), y, db)
     elif import_type == ImportType.workpaper:
         return await _import_workpapers(rows, _require_project(), y, user, db)
-    elif import_type == ImportType.formula:
-        return await _import_formulas(rows, _require_project(), y, sub_type, db)
     elif import_type == ImportType.staff:
         return await _import_staff(rows, user, db)
     elif import_type == ImportType.trial_balance:
@@ -380,28 +393,6 @@ async def _import_workpapers(
             failed += 1
             failed_rows.append({"row": i, "error": str(e)})
     return {"imported": imported, "skipped": 0, "failed": failed, "failed_rows": failed_rows}
-
-
-async def _import_formulas(
-    rows: list[dict], project_id: UUID, year: int, sub_type: str | None, db: AsyncSession,
-) -> dict:
-    from app.services.cell_formula_evaluator import save_formula_batch
-    formulas = []
-    for row in rows:
-        formulas.append({
-            "formula_id": str(row.get("公式编号", "") or ""),
-            "module": str(row.get("适用模块", "report") or "report"),
-            "report_type": str(row.get("报表类型", "") or sub_type or ""),
-            "line_or_section": str(row.get("行次/章节", "") or ""),
-            "column": str(row.get("列标识", "") or ""),
-            "expression": str(row.get("公式表达式", "") or ""),
-            "description": str(row.get("说明", "") or ""),
-        })
-    try:
-        count = await save_formula_batch(project_id, year, formulas, db)
-        return {"imported": count, "skipped": 0, "failed": 0, "failed_rows": []}
-    except Exception as e:
-        return {"imported": 0, "skipped": 0, "failed": len(formulas), "failed_rows": [{"row": 0, "error": str(e)}]}
 
 
 async def _import_staff(rows: list[dict], user: User, db: AsyncSession) -> dict:

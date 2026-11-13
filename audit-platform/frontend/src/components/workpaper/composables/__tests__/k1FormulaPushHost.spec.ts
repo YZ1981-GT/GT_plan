@@ -67,12 +67,8 @@ vi.mock('../../k1/core/K1TabAdjudication.vue', () => ({
 
 import GtK1OtherReceivables from '../../GtK1OtherReceivables.vue'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
-import {
-  isK1BackendOwnedKey,
-  k1AdjudicationSaveItemIds,
-  k1SaveItemIds,
-} from '../k1BackendOwnedKeys'
-import { k1PushNotice, k1PushedRows } from '../k1FormulaPushNotice'
+import { isK1BackendOwnedKey } from '../k1BackendOwnedKeys'
+import { k1PushNotice, k1PushedItemIds, k1PushedRows } from '../k1FormulaPushNotice'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -125,31 +121,27 @@ describe('K1 保存键集合', () => {
     expect(isK1BackendOwnedKey(id)).toBe(false)
   })
 
-  it('K1 保存集合保留用户键和公式推送键', () => {
-    const ids = [
-      'K1-2-detail-rows',
-      'K1-1-receivable-r0-remark',
-      'K1-1-receivable-r0-unadj',
-      'K1-1-audited-net',
-      'K1-1-fs-interest',
-    ]
-    expect(k1SaveItemIds(ids)).toEqual(ids)
+  it('不存在「保存集合过滤」的口径：独占键分类只给提示条用', async () => {
+    // 🔴 2026-11-05：原先这里是 `expect(k1SaveItemIds(ids)).toEqual(ids)`（外加审定表一条同形判据）。
+    //    那两个函数**按生成文件过滤掉独占键**，与 K1 的裁决（宿主保留完整保存集合）相反；它们当初能
+    //    通过，只因为生成文件里还没有 K1 键、过滤恰好是空操作。`formula-push-all-subjects-rollout`
+    //    把 K1 binding 接进生成文件后过滤真的生效，三条判据一起打红 —— 而它们**没有任何生产调用方**。
+    //    ⇒ 函数已删，判据翻面成「这个口径不许回来」：模块不得再导出保存集合过滤函数。
+    const mod: Record<string, unknown> = await import('../k1BackendOwnedKeys')
+    expect(Object.keys(mod).sort()).toEqual(['isK1BackendOwnedKey'])
   })
 
-  it('K1-1 审定表保存集合也保留完整输入集合', () => {
-    const ids = ['K1-1-receivable-r0-unadj', 'K1-1-audited-net', 'K1-1-audit-note']
-    expect(k1AdjudicationSaveItemIds(ids)).toEqual(ids)
-  })
-
-  it('完整保存集合进入真实 persistence 请求', async () => {
+  it('完整保存集合进入真实 persistence 请求（含后端独占键，一条都不过滤）', async () => {
     const itemIds = [
       'K1-1-fs-interest',
       'K1-1-receivable-r0-unadj',
       'K1-1-receivable-r0-remark',
       'K1-1-audited-net',
     ]
+    // 分母非空：这四条里确有后端独占键，所以「不过滤」这件事才可伪证
+    expect(itemIds.filter((id) => isK1BackendOwnedKey(id)).length).toBeGreaterThan(0)
     const persistence = useChecklistPersistence({ wpId: ref('wp-k1'), projectId: ref('project-k1') })
-    for (const itemId of k1SaveItemIds(itemIds)) {
+    for (const itemId of itemIds) {
       await persistence.save(itemId, { remark: '用户输入' })
     }
 
@@ -255,13 +247,39 @@ describe('K1 formula.pushed 提示条', () => {
     ]
     expect(k1PushedRows(server, ['K1-1-receivable-r0-begin'])).toEqual([server[0]])
   })
+
+  it('交给持久化层的 key 清单去重去空（宿主不再自己发请求后的对偶函数）', () => {
+    expect(k1PushedItemIds(['K1-1-audited-net', 'K1-1-audited-net', '', 'K1-1-fs-interest']))
+      .toEqual(['K1-1-audited-net', 'K1-1-fs-interest'])
+  })
+
+  it('reloadItems 只重载点名的 key，其余格（含未保存编辑）保持原值', async () => {
+    hostMocks.apiGet.mockResolvedValueOnce([
+      { item_id: 'K1-1-audited-net', remark: '后台新值', conclusion: null },
+      { item_id: 'K1-1-receivable-r0-remark', remark: '服务端旧备注', conclusion: null },
+    ])
+    const persistence = useChecklistPersistence({ wpId: ref('wp-k1'), projectId: ref('project-k1') })
+    persistence.hydrate([{ item_id: 'K1-1-audited-net', remark: '旧值', conclusion: null }])
+    // 用户正在编辑另一格、还没保存
+    persistence.saveDebounced('K1-1-receivable-r0-remark', { remark: '用户未保存的编辑' })
+
+    const reloaded = await persistence.reloadItems(['K1-1-audited-net'])
+
+    expect(reloaded).toEqual(['K1-1-audited-net'])
+    expect(persistence.responses.value.get('K1-1-audited-net')?.remark).toBe('后台新值')
+    expect(persistence.responses.value.get('K1-1-receivable-r0-remark')?.remark).toBe('用户未保存的编辑')
+    persistence.cancel()
+  })
 })
 
 describe('K1 宿主接线（源码级防回退）', () => {
-  const src = readFileSync(resolve(__dirname, '../../GtK1OtherReceivables.vue'), 'utf-8')
+  const raw = readFileSync(resolve(__dirname, '../../GtK1OtherReceivables.vue'), 'utf-8')
+  //: 🔴 剥注释再判：下面「宿主不得再出现 checklist-responses」这一条的对象是**代码**。
+  //   不剥的话，解释「原先这里自己发 …/checklist-responses」的那句注释自己就会把判据打红。
+  const src = raw.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|<!--[\s\S]*?-->/g, '')
 
   it('根宿主保存入口把原始 itemId 交给 persistence.save', () => {
-    expect(src).not.toContain("import { k1SaveItemIds } from './composables/k1BackendOwnedKeys'")
+    expect(src).not.toContain('k1SaveItemIds')
     expect(src).toContain('persistence.save(itemId, toChecklistPatch(value))')
     expect(src).not.toContain('if (!persistableItemId) return')
   })
@@ -271,6 +289,9 @@ describe('K1 宿主接线（源码级防回退）', () => {
     expect(src).toContain('_pushSub.close()')
     expect(src).toContain('后台已按公式推送更新')
     expect(src).toContain('载入最新数据')
-    expect(src).toContain('k1PushedRows(rows, notice.itemIds)')
+    // 🔴 读路径已收口到共享持久化层：宿主只说「重载这几个 key」，不得再自己发 checklist-responses
+    //    请求（那是 K 轮收敛掉的宿主层裸端点，守卫 test_k_foundation_p4 / p2 逐宿主数它）。
+    expect(src).toContain('persistence.reloadItems(k1PushedItemIds(notice.itemIds))')
+    expect(src).not.toContain('checklist-responses')
   })
 })

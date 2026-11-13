@@ -15,6 +15,8 @@ import { useD4InspectionWriteback } from '../../composables/useD4InspectionWrite
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus, Download } from '@element-plus/icons-vue'
@@ -64,10 +66,28 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 
 // ─── 双模式 sync bridge：统一 useD4SyncMode（治本收敛）── sheet_key=d4-15-managed。
 const D4_15_SHEET_KEY = 'd4-15-managed'
-const {
+/** 本 Tab 的 entry（D4 父 entry，同 D4_SYNC_ENTRY_ID）：门与 notice 共用。模板用绑定、不写静态 entry-id ——
+ *  静态字面量会被挂点发现器当作 L2 身份声明，overlay 的 L3 规则（sync_host_entry_rules[0]）随即零命中。 */
+const D4_TAB_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：「在线编辑」选项与模式开关的可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），经 `useD4SyncMode` 的 `entrySync` 生效，
+ * 不由本宿主的局部判断决定。entry 取 D4 父 entry（本 Tab 是它的 parent duplicate）。
+ *
+ * 🔴 必须声明在 `props` 之后、`useD4SyncMode` 之前：内部 `watch(..., { immediate: true })`
+ * 会在 setup 期立即读下面三个 getter，组合式也要在创建时拿到它。
+ */
+const d4EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => D4_TAB_ENTRY_ID,
+})
+const { showModeSwitch,
   syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
   busy: syncBusy, syncStateTag, syncHostRef,
 } = useD4SyncMode({
+  entrySync: d4EntrySync,
   sheetKey: D4_15_SHEET_KEY,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -219,7 +239,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
     <!-- ═══ 顶部工具条 ═══ -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="showModeSwitch" v-model="editorMode" :options="modeOptions" size="small" /><GtEntrySyncCapabilityNotice :entry-id="D4_TAB_ENTRY_ID" />
         <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
       </div>
       <div class="toolbar-right">

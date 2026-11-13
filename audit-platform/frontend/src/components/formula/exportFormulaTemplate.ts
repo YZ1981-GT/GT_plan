@@ -40,18 +40,19 @@ export async function exportFormulaTemplate(
       { header: '项目', width: 20 },
       { header: '说明', width: 80 },
     ]
+    // spec formula-management-repair-closure R3.2：Excel 公式导入已下线（导入接口 410），本文件只作核对参考
     wsGuide.addRows([
-      ['文件用途', '公式管理模板 — 在 Excel 中编辑公式后，通过公式管理中心的"Excel导入"按钮回导'],
+      ['文件用途', '公式清单（只读参考）— 列出当前节点的公式，供核对与线下讨论；本文件不能导回平台'],
       ['当前节点', selectedPath],
       ['报表类型', selectedNodeKey],
       ['导出时间', new Date().toLocaleString('zh-CN')],
       ['', ''],
       ['列说明', ''],
-      ['row_code', '行次编码（必填，不可修改已有行次的 code）— 系统识别用，如 BS-001、IS-001'],
-      ['row_name', '项目名称（选填）— 仅供参考，导入时不使用'],
-      ['formula', '公式表达式（必填）— 语法：TB(\'科目\', \'期末余额\') / ROW(\'行次\') / SUM_TB(...) / PREV(...) / WP(...)'],
-      ['formula_type', '公式类型（必填）— auto_calc(自动运算) / logic_check(逻辑审核) / reasonability(合理性提示)'],
-      ['description', '说明（选填）— 中文描述该公式的业务含义'],
+      ['row_code', '行次编码 — 如 BS-001、IS-001'],
+      ['row_name', '项目名称'],
+      ['formula', '公式表达式 — 语法：TB(\'科目\', \'期末余额\') / ROW(\'行次\') / SUM_TB(...) / PREV(...) / WP(...)'],
+      ['formula_type', '公式类型 — auto_calc(自动运算) / logic_check(逻辑审核) / reasonability(合理性提示)'],
+      ['description', '说明 — 中文描述该公式的业务含义'],
       ['', ''],
       ['公式语法参考', ''],
       ['TB(科目, 字段)', '从试算表取数。字段：期末余额/期初余额/发生额/变动额。示例：TB(\'1001\', \'期末余额\')'],
@@ -61,11 +62,9 @@ export async function exportFormulaTemplate(
       ['SUM_TB(科目范围)', '汇总多个科目。示例：SUM_TB(\'1001~1099\')'],
       ['', ''],
       ['注意事项', ''],
-      ['1', '每行一个公式，按 row_code 匹配写入（已有公式会被覆盖）'],
-      ['2', 'row_code 必须是系统中已存在的行次编码（如 BS-001~BS-129、IS-001~IS-034 等）'],
-      ['3', '删除 formula 列值 = 清空该行公式'],
-      ['4', '新增不存在的 row_code 行会被忽略'],
-      ['5', '可以只填部分行（空行跳过），不需要填满全部'],
+      ['1', 'Excel 公式导入已下线：改了本文件不会回到平台'],
+      ['2', '改单条公式：在公式管理中心选中节点，编辑该行'],
+      ['3', '整批迁移到其他项目：顶栏「公式包 → 导出本项目公式包」，在目标项目里「导入公式包到本项目」'],
     ])
     wsGuide.getRow(1).font = { bold: true }
 
@@ -97,9 +96,9 @@ export async function exportFormulaTemplate(
       wsData.addRow(['BS-027', '（示例）流动资产合计', "ROW('BS-002') + ROW('BS-005') + ...", 'auto_calc', '合计行 = 各明细行之和'])
       wsData.addRow(['IS-001', '（示例）营业收入', "TB('6001', '发生额')", 'auto_calc', '损益类取发生额'])
       wsData.addRow(['', '', '', '', ''])
-      wsData.addRow(['说明：', '请删除以上示例行，填入实际的 row_code 和公式', '', '', ''])
+      wsData.addRow(['说明：', '当前节点没有已加载的公式，以上为写法示例', '', '', ''])
       wsData.addRow(['', 'row_code 可从公式管理中心左侧选中报表节点后查看', '', '', ''])
-      wsData.addRow(['', '也可以先在节点中加载数据后再点"导出模板"获取含行次的版本', '', '', ''])
+      wsData.addRow(['', '先在节点中加载数据后再点"导出模板"，可得到含实际行次与公式的版本', '', '', ''])
     }
 
     wsData.getRow(1).font = { bold: true }
@@ -116,7 +115,7 @@ export async function exportFormulaTemplate(
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    ElMessage.success('公式模板已导出，编辑后可通过"Excel导入"回导')
+    ElMessage.success('公式清单已导出（只读参考，不能导回；批量迁移请用顶栏「公式包」）')
   } catch (e: any) {
     ElMessage.error('导出公式模板失败：' + (e?.message || '未知错误'))
   }

@@ -43,8 +43,10 @@ export interface TransferReconcileResult {
 
 async function resolveWpId(projectId: string, wpCode: string): Promise<string | null> {
   try {
-    const res = await api.get('/custom-query/wp-id-by-code', {
+    // 原先少 /api 前缀（拿到首页 HTML ⇒ 恒取不到对方底稿）；对方底稿不存在是正常情况（404），不弹错
+    const res = await api.get('/api/custom-query/wp-id-by-code', {
       params: { project_id: projectId, wp_code: wpCode },
+      _silent: true,
     })
     return res?.data?.wp_id || res?.wp_id || null
   } catch {

@@ -57,7 +57,6 @@ import {
 } from './workpaperSyncDto'
 import * as syncApi from './workpaperSyncApi'
 import type { WorkpaperSyncEntryScope } from './workpaperSyncApi'
-import { isFirstPublicationPending } from './entrySyncPresentation'
 import {
   migrateWorkpaperSyncMode,
   persistWorkpaperSyncMode,
@@ -152,6 +151,8 @@ export interface WorkpaperSyncBridgeOptions {
   readonly flushHtml: () => Promise<WorkpaperSyncFlushResult>
   /** 宿主的重载钩子：**必须**加载到不低于 `minimumRevision` 的内容（Property 14）。 */
   readonly reloadHtml: (minimumRevision: number) => Promise<void>
+  /** 首版发布成功后通知宿主刷新其运行时 readiness 展示；失败不影响已完成的发布。 */
+  readonly onFirstPublication?: () => void | Promise<void>
   /** 注入点：默认 `workpaperSyncApi`（测试注入 stub，不 mock 模块）。 */
   readonly api?: WorkpaperSyncApiSurface
   /** 注入点：localStorage（测试注入内存实现）。 */
@@ -463,19 +464,39 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         } catch (error) {
           return fail('readiness', error)
         }
-        // 尚无首版 ⇒ 放行：attempt 内 materialize 报 substrate_not_published 后由
-        // retryAfterFirstPublication 发首版并整链重走（只重走一次）。其余「未就绪」照旧拒绝。
-        if (
-          !isFirstPublicationPending(readiness)
-          && (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo'))
-        ) {
-          const reason = readiness.reason
-          refuse(
-            'bridge_runtime_not_ready',
-            reason
-              ? `${reason.message} ${reason.next_action}`
-              : '当前底稿未通过运行时双向回写校验',
-          )
+        if (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo')) {
+          const recoverableFirstPublication =
+            readiness.capability === 'bidirectional'
+            && readiness.reason?.code === 'REPRESENTATION_MISSING'
+            && typeof api.ensureFirstPublication === 'function'
+          if (!recoverableFirstPublication) {
+            const reason = readiness.reason
+            refuse(
+              'bridge_runtime_not_ready',
+              reason
+                ? `${reason.message} ${reason.next_action}`
+                : '当前底稿未通过运行时双向回写校验',
+            )
+          }
+          // 先把当前 HTML 防抖/在途保存落入 store，再发布首版。不能先发布旧 store，
+          // 也不能先读 store-projection：无 representation 时它尚无法绑定 target adapter。
+          try {
+            await flushPendingWrites()
+          } catch (error) {
+            return fail('flush', error)
+          }
+          try {
+            await api.ensureFirstPublication(scope())
+          } catch (error) {
+            return fail('first_publication', error)
+          }
+          try {
+            await options.onFirstPublication?.()
+          } catch {
+            // 展示刷新失败不撤销已成功的首版；下一次页面加载会重取 readiness。
+          }
+          // 首版推进 revision；用新 revision 重新读 store-projection 并创建唯一 mutation。
+          return attemptSwitchToOnlyOffice(false)
         }
       }
       return attemptSwitchToOnlyOffice(true)
@@ -667,6 +688,11 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       await ensureFirstPublication(scope())
     } catch (publishError) {
       return fail('first_publication', publishError)
+    }
+    try {
+      await options.onFirstPublication?.()
+    } catch {
+      // 展示刷新失败不撤销已成功的首版；下一次页面加载会重取 readiness。
     }
     return attemptSwitchToOnlyOffice(false)
   }
@@ -1061,13 +1087,17 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   }
 
   /**
-   * 提交冲突裁决。fence 六项由调用方（Task 34 的冲突面板）**完整**给出。
+   * 提交冲突裁决。fence 八项由调用方（Task 34 的冲突面板）**完整**给出。
    *
-   * 🔴 `room_latest_durable_application_id` / `room_latest_durable_sequence` 在当前
-   * 16 条用户路由里**没有**任何读取面（conflict preview 只给 `canonical_application_id`
-   * 与 `incoming_sequence`）。桥因此**拒绝**替调用方编这两项 —— 用 canonical application
-   * 顶替 room 的 latest durable 等于客户端断言了一个它观测不到的 room 事实，
-   * 而服务端会照着这个断言做 fence 裁决。这是一处已登记的上游缺口。
+   * 桥**拒绝**替调用方编任何一项 —— 用 canonical application 顶替 room 的 latest
+   * durable 等于客户端断言了一个它没观测到的 room 事实，而服务端会照着这个断言做
+   * fence 裁决。
+   *
+   * 🔴 room 侧两项的读取面：后端 `get_operation` 随 `app_facts` 返回
+   * `room_latest_durable_application_id` / `room_latest_durable_sequence`，面板经
+   * `roomDurableFenceFromOperation()` 从 `operation` 快照投影。此处原先的注释写着
+   * 「这两项没有任何读取面」—— 那条注释在 Task 32 补上投影后就已过期，却让冲突面板
+   * 一直按「拿不到」处理，于是**任何** entry 的冲突都提交不了裁决。
    */
   async function resolveConflicts(input: {
     readonly fence: WorkpaperSyncResolveFence

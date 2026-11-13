@@ -42,9 +42,11 @@ async def api(monkeypatch):
             await add_project_row(db, b, "BS-001", MINE, base_formula=OLD)
             await db.commit()
         events: list = []
+        sent = events  # 打桩函数的参数也叫 events，会遮蔽外层清单 —— 经别名写入
 
         async def fake_record_changes(db, *, domain="", events=(), source="", publish_id=None):
-            pass  # S4: record_changes 打桩，不实际入队
+            # 只记下「哪些项目的哪些公式位变了」（不入队）；🔴 S4 曾把桩写成 pass，断言 api["events"] 的用例恒得空清单
+            sent.extend(dict(ev) for ev in events)
 
         async def fake_publish_pending(db):
             return {"queued": 0}  # S4: publish_pending 打桩
@@ -100,6 +102,16 @@ async def test_domains_and_global_read_for_any_logged_in_user(api):
     assert g.status_code == 200 and g.json()["slots"][0]["definition"]["formula"] == OLD
     assert g.json()["can_edit"] is False
     assert (await api["c"].get("/api/formula-settings/nope/global", params={"scope": STD})).status_code == 404
+
+
+async def test_domains_not_wired_carry_plain_reason(api):
+    """未接入的域都带中文说明，已接入的不带（spec formula-management-repair-closure R3.1：三处界面原样显示）。"""
+    api["as"]("outsider")
+    domains = {d["key"]: d for d in (await api["c"].get("/api/formula-settings/domains")).json()["domains"]}
+    assert domains["tb_detail"]["wired"] is False
+    assert domains["tb_detail"]["wired_reason"].startswith("试算表科目明细公式目前只保存、不参与计算")
+    for key, d in domains.items():
+        assert ("wired_reason" in d) is (not d["wired"]), key
 
 
 @pytest.mark.parametrize("path", ["preview", "publish"])

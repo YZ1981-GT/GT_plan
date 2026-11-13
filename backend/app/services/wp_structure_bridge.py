@@ -68,6 +68,8 @@ def generate_structure_for_workpaper(
     project_id: str = "",
     year: int = 0,
     max_rows: int = 500,
+    *,
+    persist: bool = True,
 ) -> Optional[dict]:
     """将底稿 Excel 转为 structure.json
 
@@ -92,14 +94,15 @@ def generate_structure_for_workpaper(
     # 自动绑定公式
     structure = _auto_bind_formulas(structure, wp_code, project_id, year)
 
-    # 保存 structure.json 到底稿同目录
-    structure_path = fp.with_suffix(".structure.json")
-    try:
-        with open(structure_path, "w", encoding="utf-8") as f:
-            json.dump(structure, f, ensure_ascii=False, indent=2)
-        logger.info("structure.json saved: %s", structure_path)
-    except Exception as e:
-        logger.warning("save structure.json failed: %s", e)
+    # 保存 structure.json 到底稿同目录；GET 读取路径可要求只在内存生成。
+    if persist:
+        structure_path = fp.with_suffix(".structure.json")
+        try:
+            with open(structure_path, "w", encoding="utf-8") as f:
+                json.dump(structure, f, ensure_ascii=False, indent=2)
+            logger.info("structure.json saved: %s", structure_path)
+        except Exception as e:
+            logger.warning("save structure.json failed: %s", e)
 
     return structure
 
@@ -361,6 +364,8 @@ def get_workpaper_structure(
     project_id: str = "",
     year: int = 0,
     force_rebuild: bool = False,
+    *,
+    persist_generated: bool = True,
 ) -> Optional[dict]:
     """获取底稿的 structure.json
 
@@ -383,7 +388,7 @@ def get_workpaper_structure(
 
     # 重新生成
     return generate_structure_for_workpaper(
-        file_path, wp_code, project_id, year
+        file_path, wp_code, project_id, year, persist=persist_generated
     )
 
 
@@ -466,7 +471,9 @@ async def get_workpaper_addresses(
     """
     from app.services.address_registry import build_uri, build_jump_route
 
-    structure = get_workpaper_structure(file_path, wp_code, project_id, year)
+    structure = get_workpaper_structure(
+        file_path, wp_code, project_id, year, persist_generated=False
+    )
     if not structure:
         return []
 

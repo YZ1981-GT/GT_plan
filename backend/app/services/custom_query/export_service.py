@@ -602,6 +602,95 @@ class ExportService:
                     break
                 yield chunk
 
+    async def build_xlsx_file(
+        self,
+        result_iter: Any,
+        columns: list["ColumnMeta"],
+        *,
+        directory: str,
+        file_stem: str,
+        info_rows: Any = None,
+        sheet_title: str | None = None,
+        extra_sheets: Any = (),
+        chunk_rows: int = STREAM_CHUNK_ROWS,
+        memory_row_cap: int = STREAM_MEMORY_ROW_CAP,
+        row_hard_limit: int = EXPORT_ROW_HARD_LIMIT,
+    ) -> "BuiltXlsx":
+        """写出 xlsx 文件到指定目录，返回路径与行数；不流式（供查询证据封存使用，AQF §6.2）。
+
+        步骤与 ``stream_xlsx`` 相同，但以 ``os.replace`` 原子改名替代字节 yield。
+        ``file_stem`` 不含扩展名，实际文件名为 ``{file_stem}.xlsx``；
+        若传入以 ``.`` 开头的 stem（如 ``.{artifact_id}``），则先写 partial 再改名。
+        """
+        import asyncio
+        import os
+
+        from openpyxl import Workbook
+
+        columns = list(columns)
+        source_cols = [c for c in columns if getattr(c, "addr_id", None)]
+        total_cols = len(columns) + len(source_cols)
+
+        if total_cols > XLSX_MAX_COLS:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "EXPORT_CAPACITY",
+                    "message": f"结果集列数（{total_cols}）超出 Excel 原生上限 {XLSX_MAX_COLS:,} 列",
+                    "actual_cols": total_cols,
+                },
+            )
+
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet(title=safe_sheet_title(sheet_title))
+        try:
+            ws.append(self._header_cells(ws, columns, source_cols))
+            buffer: list[list[Any]] = []
+            cap = max(1, min(memory_row_cap, chunk_rows))
+            row_count = 0
+            async for row in self._aiter_rows(result_iter):
+                row_count += 1
+                if row_count > row_hard_limit or row_count > XLSX_MAX_ROWS:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error_code": "EXPORT_ROW_HARD_LIMIT", "message": "结果集超出导出硬上限"},
+                    )
+                buffer.append(_row_export_values(row, columns, source_cols, ws=ws))
+                if len(buffer) >= cap:
+                    for values in buffer:
+                        ws.append(values)
+                    buffer.clear()
+            for values in buffer:
+                ws.append(values)
+            if row_count == 0:
+                ws.append([_EMPTY_NOTICE])
+            if info_rows is not None:
+                items = info_rows(row_count) if callable(info_rows) else info_rows
+                if items:
+                    _append_info_sheet(wb, list(items))
+            for title, table_rows in extra_sheets:
+                extra = wb.create_sheet(title=safe_sheet_title(title))
+                for values in table_rows:
+                    extra.append([_text_safe_cell(extra, _excel_cell_value(v)) for v in values])
+            loop = asyncio.get_event_loop()
+            tmp_path = await loop.run_in_executor(None, self._save_to_tempfile, wb)
+        except BaseException:
+            self._safe_close_workbook(wb)
+            raise
+
+        final_path = os.path.join(directory, f"{file_stem}.xlsx")
+        os.replace(tmp_path, final_path)
+        return BuiltXlsx(path=final_path, row_count=row_count)
+
+
+class BuiltXlsx:
+    """``build_xlsx_file`` 的返回值（路径 + 实际写入行数）。"""
+    __slots__ = ("path", "row_count")
+
+    def __init__(self, *, path: str, row_count: int) -> None:
+        self.path = path
+        self.row_count = row_count
+
 
 # 模块级单例（与同包 addressing_service / ownership_guard / query_cache 一致）
 export_service = ExportService()

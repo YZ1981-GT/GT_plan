@@ -777,17 +777,17 @@ async function handleReverse(row: ConfirmationItem) {
   // 构建 ElMessageBox 内容：目标状态单选 + 原因输入
   const targetOptions = targets.map((s) => `<option value="${s}">${STATUS_CN[s] || s}</option>`).join('')
   const htmlContent = `
-    <div style="font-size:13px;">
+    <div style="font-size:var(--gt-display-font-size);">
       <div style="margin-bottom:12px;">
         <label style="display:block;margin-bottom:6px;color:#606266;">撤回至目标状态</label>
-        <select id="gt-reverse-target" style="width:100%;padding:6px 10px;border:1px solid #dcdfe6;border-radius:4px;font-size:13px;">
+        <select id="gt-reverse-target" style="width:100%;padding:6px 10px;border:1px solid #dcdfe6;border-radius:4px;font-size:var(--gt-display-font-size);">
           ${targetOptions}
         </select>
       </div>
       <div>
         <label style="display:block;margin-bottom:6px;color:#606266;">撤回原因（选填）</label>
         <textarea id="gt-reverse-reason" rows="3" placeholder="请输入撤回原因"
-          style="width:100%;padding:8px 10px;border:1px solid #dcdfe6;border-radius:4px;font-size:13px;resize:vertical;box-sizing:border-box;"
+          style="width:100%;padding:8px 10px;border:1px solid #dcdfe6;border-radius:4px;font-size:var(--gt-display-font-size);resize:vertical;box-sizing:border-box;"
         ></textarea>
       </div>
     </div>

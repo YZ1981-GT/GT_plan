@@ -799,6 +799,54 @@ def test_orthogonal_business_content_revision_does_not_exist_yet(inventory: dict
     assert not stale, f"允许清单里的入口已不存在（过期豁免）: {stale}"
 
 
+def test_another_aggregates_revision_counter_is_not_a_workpaper_version_write(
+    generator: ModuleType, source_scan: tuple[list[dict], dict[str, dict]]
+) -> None:
+    """**Validates: Requirements 2.1** —— 属性谓词不看接收者（谓词与 2026-11-03 调整分录误报实例见
+    ``backend/scripts/gen/writer_inventory_foreign_revision.py``）；修在发现谓词里（模块级事实），
+    不靠 overlay 标签豁免。四向用例，缺一个方向规则就可能变成「藏真写入」的后门。"""
+    foreign = generator._foreign_revision_models(generator._APP_ROOT)
+    # 分母从 models 源码现算：Adjustment 自带计数器，WorkingPaper 永远不在「外部」集合里
+    assert "content_revision" in foreign.get("Adjustment", frozenset()), sorted(foreign)
+    assert "WorkingPaper" not in foreign
+    # 只认映射类：pydantic 响应模型 `AdjustmentGroupResponse` 带同名字段，但不是持久化计数器
+    assert "AdjustmentGroupResponse" not in foreign, sorted(foreign)
+
+    def run(source: str) -> tuple[dict[str, str], dict]:
+        tree = ast.parse(source)
+        owners = generator._module_foreign_version_owners(tree, generator._module_import_targets(tree), foreign)
+        function = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
+        return owners, generator._collect_facts(function, foreign_version_owners=owners).as_dict()
+
+    body = "def bump(rows):\n    for row in rows:\n        row.content_revision = 2\n"
+    # ① 只导入外部模型、碰不到底稿 ⇒ 记成可见副作用，不是底稿版本写入
+    owners, facts = run("from app.models.audit_platform_models import Adjustment\n\n" + body)
+    assert owners == {"content_revision": "Adjustment"}
+    assert facts["version_fields_written"] == []
+    assert "<sets Adjustment.content_revision>" in facts["side_effects"]
+    # ② 模块里出现 WorkingPaper ⇒ 保守地照算（规则不能把真写入藏在一个无关 import 后面）
+    owners, facts = run(
+        "from app.models.audit_platform_models import Adjustment\n"
+        "from app.models.workpaper_models import WorkingPaper\n\n" + body
+    )
+    assert owners == {} and facts["version_fields_written"] == ["content_revision"]
+    # ③ 只在 SQL 字符串里提到 working_paper 也照算
+    owners, facts = run(
+        "from app.models.audit_platform_models import Adjustment\n"
+        "SQL = 'UPDATE working_paper SET content_revision = 1'\n\n" + body
+    )
+    assert owners == {} and facts["version_fields_written"] == ["content_revision"]
+    # ④ 没导入任何外部模型 ⇒ 照算（这是原谓词的默认行为）
+    owners, facts = run(body)
+    assert owners == {} and facts["version_fields_written"] == ["content_revision"]
+
+    # 真实源码：调整分录服务不再是写入行，它的计数器写入作为副作用留痕
+    rows, function_facts = source_scan
+    target = "app.services.adjustment_service::AdjustmentService.update_entry"
+    assert target not in {row["writer_id"] for row in rows}
+    assert "<sets Adjustment.content_revision>" in function_facts[target]["side_effects"]
+
+
 def test_status_and_staleness_fields_are_never_counted_as_business_content(
     inventory: dict,
 ) -> None:
@@ -1227,17 +1275,23 @@ def test_multi_resolver_stays_in_has_debt_even_when_other_criteria_cleared(
     # calling `find_template_file_any` directly, so that row dropped from two resolver
     # identities to one and no longer trips `multi_resolver`. Source convergence, not a
     # relaxed criterion -- the row is still in the denominator as a single-resolver row.
-    assert len(issues_real["multi_resolver"]) == 3, (
-        f"multi_resolver must have exactly 3 rows (all in wp_onlyoffice_router), "
-        f"got {len(issues_real['multi_resolver'])}"
+    #
+    # 2026-11-03 (inventory stale since 2026-09-24, recomputed): 4 rows = the three legacy OnlyOffice
+    # handlers (umbrella task 2.8) + `wp_generation_staging::_source_paths` (8ffdb1f7f). `== 3` would
+    # also go red the day 2.8 clears them ⇒ two-way ratchet over a named set (new row red, cleared
+    # row left here red -- shrink the set in the change that clears it).
+    multi_resolver_debt = {
+        "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+        "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
+        "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback",
+        "app.services.wp_generation_staging::_source_paths",
+    }
+    actual = set(issues_real["multi_resolver"])
+    assert not actual - multi_resolver_debt, f"new multi_resolver rows: {sorted(actual - multi_resolver_debt)}"
+    assert not multi_resolver_debt - actual, (
+        f"multi_resolver rows cleared but still listed here -- shrink the set: {sorted(multi_resolver_debt - actual)}"
     )
-    # And they must all be in wp_onlyoffice_router
-    assert all(
-        "wp_onlyoffice_router" in writer_id
-        for writer_id in issues_real["multi_resolver"]
-    ), "all multi_resolver rows must be in wp_onlyoffice_router"
-    # has_debt includes multi_resolver
-    assert any(issues_real.values()), "gate must be RED when multi_resolver > 0"
+    assert not actual or any(issues_real.values()), "has_debt includes multi_resolver: gate must be RED"
 
 
 def test_every_injection_on_every_migrated_writer_is_caught(

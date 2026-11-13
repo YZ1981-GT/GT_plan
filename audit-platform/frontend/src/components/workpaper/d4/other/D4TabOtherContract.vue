@@ -24,6 +24,7 @@ import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
@@ -87,7 +88,22 @@ registerPendingFlusher(flushPendingSave)
 onBeforeUnmount(flushPendingSave)
 
 // ─── D4-34 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
-const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag } = useD4SyncMode({
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：「在线编辑」选项与模式开关的可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），经 `useD4SyncMode` 的 `entrySync` 生效，
+ * 不由本宿主的局部判断决定。entry 取 D4 父 entry（本 Tab 是它的 parent duplicate）。
+ *
+ * 🔴 必须声明在 `props` 之后、`useD4SyncMode` 之前：内部 `watch(..., { immediate: true })`
+ * 会在 setup 期立即读下面三个 getter，组合式也要在创建时拿到它。
+ */
+const d4EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-d4-operating-revenue',
+})
+const { showModeSwitch, syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag } = useD4SyncMode({
+  entrySync: d4EntrySync,
   sheetKey: 'd434-managed',
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -185,7 +201,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 <template>
 <div class="d4-other-contract">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-34-contract')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-if="showModeSwitch" v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-34-contract')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 方法论折叠（审计目标+审计过程） -->

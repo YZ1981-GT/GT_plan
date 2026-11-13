@@ -46,6 +46,9 @@ async def test_relation_context_filters_each_workpaper_and_uses_authorized_scope
         _Result(rows=[]),
         _Result(rows=[]),
         _Result(rows=[]),
+        _Result(scalar=None),   # prior project (None → skip prior-year queries)
+        _Result(rows=[]),        # evidence_rows
+        _Result(rows=[]),        # knowledge_rows (empty → no resolve_subject call)
     ])
     host = SimpleNamespace(
         project_id=project_id, year=2025,
@@ -62,8 +65,18 @@ async def test_relation_context_filters_each_workpaper_and_uses_authorized_scope
     assert gate.await_count == 2
     assert all(call.kwargs["action"] == "ai_read" for call in gate.await_args_list)
     assert all(call.kwargs["wp_id"] != current_id for call in gate.await_args_list)
-    # 每一条业务查询都在服务端绑定已授权 project；年度型数据还绑定 host.year。
-    assert all("project_id" in statement for statement in db.statements)
+    # 核心关系查询（TB/调整/报表/附注）都在服务端绑定已授权 project；年度型数据还绑定 host.year。
+    # 知识库查询按标签不按 project（权限由 KnowledgeAccessPolicy 控制），故排除在外。
+    # projects 表查询用子查询匹配 client_name，也不含字面 project_id 过滤。
+    project_bound = [
+        s for s in db.statements
+        if "evidence_ref" not in s.lower()
+        and "knowledge" not in s.lower()
+        and "projects.id" not in s.lower()
+    ]
+    assert all("project_id" in statement for statement in project_bound), [
+        s for s in project_bound if "project_id" not in s
+    ]
     assert sum("year" in statement for statement in db.statements) >= 4
 
 

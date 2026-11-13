@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,14 +31,20 @@ async def trace_section(
     project_id: UUID, section_number: str,
     year: int | None = None,
     db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
+    """附注章节溯源（读项目的试算表与序时账：要求项目成员；原先只校验登录，spec voucher-workflow-linkage-lineage-closure R9.1）。"""
     svc = ReportTraceService()
     return await svc.trace_section(db, project_id, section_number, year=year)
 
 
 @router.get("/api/projects/{project_id}/findings-summary")
-async def findings_summary(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def findings_summary(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """项目发现汇总（要求项目成员；原先只校验登录，R9.1）。"""
     svc = ReportTraceService()
     return await svc.get_findings_summary(db, project_id)
 
@@ -256,6 +262,12 @@ current_user: User = Depends(get_current_user),
 
 @router.get("/api/consolidation/{project_id}/snapshots")
 async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_project_access("readonly"))):
+    """列出项目的合并快照（最近 20 条），附 v2 manifest 概要（批 7 任务 7.4）。
+
+    主工作台快照面板要展示的字段直接从 ``snapshot_data`` 读取，不触发还原/重算：
+    锁定状态、根 hash、manifest 是否 partial、失败分片、operation/version refs。
+    旧 v1 / 空壳快照缺这些键时安全降级（``locked`` 仍可读，其余为 None/空）。
+    """
     import sqlalchemy as sa
     from app.models.phase10_models import ConsolSnapshot
     stmt = (
@@ -263,13 +275,30 @@ async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), c
         .order_by(ConsolSnapshot.created_at.desc()).limit(20)
     )
     result = await db.execute(stmt)
-    return [
-        {
-            "id": str(s.id), "year": s.year, "trigger_reason": s.trigger_reason,
+    rows: list[dict[str, Any]] = []
+    for s in result.scalars().all():
+        data = s.snapshot_data or {}
+        manifest = data.get("_manifest") or {}
+        meta = data.get("_meta") or {}
+        rows.append({
+            "id": str(s.id),
+            "year": s.year,
+            "trigger_reason": s.trigger_reason,
             "created_at": s.created_at.isoformat() if s.created_at else None,
-        }
-        for s in result.scalars().all()
-    ]
+            "created_by": str(s.created_by) if s.created_by else None,
+            # manifest 概要（只读既存键，不解压还原）
+            "format": data.get("_format"),
+            "locked": bool(data.get("_locked", False)),
+            "root_hash": data.get("_hash"),
+            "manifest_version": manifest.get("manifest_version"),
+            "partial": bool(manifest.get("partial", meta.get("partial", False))),
+            "failed_sources": list(manifest.get("failed_sources", meta.get("failed_sources", []) or [])),
+            "captured_sources": list(manifest.get("captured_sources", meta.get("captured_sources", []) or [])),
+            "operation_ref": manifest.get("operation_ref") or {},
+            "version_ref": manifest.get("version_ref") or {},
+            "counts": manifest.get("counts", meta.get("counts", {}) or {}),
+        })
+    return rows
 
 
 @router.post("/api/consolidation/{project_id}/snapshots")
@@ -278,17 +307,100 @@ async def create_snapshot(
     db: AsyncSession = Depends(get_db),
 current_user: User = Depends(require_project_access("edit")),
 ):
-    """创建合并签字冻结快照（ADR-CONSOL-206 / 需求 8 / 5E.2+5E.4）。
+    """创建合并签字冻结快照（ADR-CONSOL-206 / 需求 8 / 5E.2+5E.4；批 7 任务 7.2+7.3）。
 
-    序列化签字时刻 consol_trial/worksheet/report/notes 全量结果 + 哈希
-    （base64+gzip 压缩），而非旧的 {created_at} 空壳。reason 为 sign/signed/lock
-    时快照锁定只读（签字冻结）。创建写审计留痕。
+    序列化签字时刻全量合并结果 + 分片/根 hash（base64+gzip 压缩），而非旧的
+    {created_at} 空壳。服务层只 flush（7.3 / ADR-CRW-007），本路由负责唯一的 commit。
+
+    manual 诊断快照允许 partial（单分片采集失败不阻断，回执列明 failed_sources），
+    只提交快照一项。
+
+    sign/signed/lock 快照（签字冻结）在**同一事务边界**内按序写齐四项：
+      ① v2 锁定快照（create_consol_snapshot）
+      ② 签字记录（SignatureRecord，object_type=consol_snapshot）
+      ③ operation terminal/sealed（最近成功 operation 的 result_refs.sealed 指回快照）
+      ④ 合并锁定（projects.consol_lock 三字段）+ consol.lock 审计留痕
+    然后单次 db.commit()。fail-closed（7.2 / R9.1）：required 分片 / readiness / artifact
+    任一未满足即以 409 拒绝；门拒绝或四项任一步失败都整体 rollback，四项零落库
+    （all-or-nothing）。
     """
-    from app.services.consol_snapshot_service import create_consol_snapshot
-    year = await require_project_audit_year(db, project_id, year)
-    return await create_consol_snapshot(
-        db, project_id, year, reason, user_id=current_user.id,
+    from app.services.consol_snapshot_service import (
+        ConsolSnapshotRejected,
+        _is_lock_reason,
+        create_consol_snapshot,
     )
+    year = await require_project_audit_year(db, project_id, year)
+    sign_lock = _is_lock_reason(reason, None)
+    try:
+        # 服务层只 flush（批 7 任务 7.3 / ADR-CRW-007）；commit 由本路由负责，
+        # 使 snapshot + 签字记录 + operation terminal + consol_lock 落在同一事务边界。
+        result = await create_consol_snapshot(
+            db, project_id, year, reason, user_id=current_user.id,
+        )
+
+        if sign_lock:
+            # 签字/锁定：一致事务边界内再写另外三项，任一失败整体回滚（all-or-nothing）。
+            from app.services.consol_audit_helper import log_consol_action
+            from app.services.consol_enhanced_service import ConsolLockService
+            from app.services.consol_operation_service import seal_operation_for_signoff
+            from app.services.sign_service import SignService
+
+            # ① 签字记录（复用 SignService，只 flush）
+            await SignService().sign_document(
+                db,
+                object_type="consol_snapshot",
+                object_id=UUID(result["id"]),
+                signer_id=current_user.id,
+                level="level1",
+                signature_data={
+                    "project_id": str(project_id),
+                    "year": year,
+                    "reason": reason,
+                    "snapshot_hash": result["hash"],
+                },
+            )
+
+            # ② operation terminal / sealed（复用 batch 2 result_refs 通道，只 flush）
+            await seal_operation_for_signoff(
+                db, project_id, year,
+                snapshot_id=result["id"],
+                snapshot_hash=result["hash"],
+                signed_by=current_user.id,
+            )
+
+            # ③ 合并锁定（复用 ConsolLockService，只 flush）
+            lock_before = await ConsolLockService().check_lock(db, project_id)
+            lock_result = await ConsolLockService().lock_project(db, project_id, current_user.id)
+            await log_consol_action(
+                db,
+                user_id=current_user.id,
+                project_id=project_id,
+                action="consol.lock",
+                resource_type="project",
+                resource_id=str(project_id),
+                before=lock_before,
+                after={**lock_result, "via": "consol.snapshot.sign", "snapshot_id": result["id"]},
+            )
+            result["locked_project"] = lock_result
+
+        # 单一提交：sign/lock 的全部四项或 manual 的单项，一起落库。
+        await db.commit()
+        return result
+    except ConsolSnapshotRejected as exc:
+        # 门拒绝（7.2）：回滚使 snapshot/签字/terminal/锁定零落库。
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "failures": exc.failures,
+            },
+        ) from exc
+    except Exception:
+        # 任一步失败：整体回滚，保证 all-or-nothing（四项同生同灭）。
+        await db.rollback()
+        raise
 
 
 async def _load_snapshot_or_404(db: AsyncSession, project_id: UUID, snapshot_id: UUID):
@@ -330,6 +442,47 @@ async def compare_snapshot(
     from app.services.consol_snapshot_service import compare_snapshot_to_current
     snap = await _load_snapshot_or_404(db, project_id, snapshot_id)
     return await compare_snapshot_to_current(db, snap)
+
+
+@router.get("/api/consolidation/{project_id}/snapshots/{snapshot_id}/download")
+async def download_snapshot(
+    project_id: UUID, snapshot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """下载签字快照的还原后 JSON（只读，批 7 任务 7.4）。
+
+    复用 :func:`restore_consol_snapshot`（解压 + SHA-256 校验），把还原后的全量
+    合并数据 + 完整性结果序列化成 UTF-8 JSON 附件返回。浏览器原生下载带不上
+    Bearer 头，故前端走 authed 下载助手（downloadFile）；此处只负责生成文件内容
+    与 Content-Disposition。不重建服务，不触发任何重算。
+    """
+    import json
+
+    from app.services.consol_snapshot_service import restore_consol_snapshot
+
+    snap = await _load_snapshot_or_404(db, project_id, snapshot_id)
+    restored = restore_consol_snapshot(snap)
+    payload = {
+        "snapshot_id": str(snap.id),
+        "project_id": str(project_id),
+        "year": snap.year,
+        "trigger_reason": snap.trigger_reason,
+        "created_at": snap.created_at.isoformat() if snap.created_at else None,
+        "hash": restored.get("hash"),
+        "hash_valid": restored.get("hash_valid", False),
+        "locked": restored.get("locked", False),
+        "manifest": restored.get("manifest"),
+        "shard_mismatches": restored.get("shard_mismatches"),
+        "data": restored.get("data"),
+    }
+    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    file_name = f"consol-snapshot-{snap.year}-{str(snap.id)[:8]}.json"
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
 
 
 # ── 底稿推荐 (Task 17.1) ─────────────────────────────────

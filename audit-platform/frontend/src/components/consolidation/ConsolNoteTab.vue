@@ -130,6 +130,21 @@
 
         <!-- 当前表格 -->
         <div v-if="selectedNoteSection.headers?.length" class="gt-note-table-wrap">
+          <div class="gt-consol-note-display-settings">
+            <GtTableDisplaySettings
+              :page-key="consolFixedPageKey"
+              :columns="consolFixedColumns"
+              :mandatory-keys="consolMandatoryKeys"
+              :disabled="selectedNoteSection.measureStatus !== 'matched'"
+              @change="onConsolFixedColumnsChange"
+            />
+          </div>
+          <el-alert
+            v-if="selectedNoteSection.measureStatus && selectedNoteSection.measureStatus !== 'matched'"
+            type="warning" :closable="false" show-icon
+            title="当前合并附注表的列语义尚未登记，数值按元口径原样显示，固定列暂不可用"
+            class="gt-consol-note-measure-warning"
+          />
           <el-table ref="noteTableRef" :data="noteEditMode ? selectedNoteSection.editRows : trimTrailingEmptyRows(selectedNoteSection.editRows || [])" border size="small"
             :max-height="noteFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 260px)'"
             style="width:100%" class="gt-note-compact-table"
@@ -146,11 +161,13 @@
             <template v-if="parsedMultiHeader">
               <template v-for="(col, ci) in parsedMultiHeader" :key="'mh-' + ci">
                 <!-- 叶子列（独立列，无 children）；:prop=原始叶子列下标，供 @cell-click 列身份与拖选映射 -->
-                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
+                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)"
+                  :column-key="consolColumnKey(col.colIndex)" :fixed="consolFixedFor(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
                     <ConsolNoteGridCell
                       :value="row[col.colIndex]" :label="col.label" :editable="noteEditMode" :manual="isManual(row, col.colIndex)"
                       :left="col.colIndex === 0"
+                      :measure-kind="consolMeasureKind(col.colIndex)" :ratio-scale="consolRatioScale(col.colIndex)"
                       :comment="col.colIndex > 0 ? cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, col.colIndex) : undefined"
                       @commit="onNoteCellCommit(row, col.colIndex, $event)"
                     />
@@ -160,10 +177,12 @@
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'mhc-' + ci + '-' + chi">
                     <!-- 二级叶子 -->
-                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
+                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)"
+                      :column-key="consolColumnKey(child.colIndex)" :fixed="consolFixedFor(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
                         <ConsolNoteGridCell
                           :value="row[child.colIndex]" :label="child.label" :editable="noteEditMode" :manual="isManual(row, child.colIndex)"
+                          :measure-kind="consolMeasureKind(child.colIndex)" :ratio-scale="consolRatioScale(child.colIndex)"
                           :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, child.colIndex)"
                           @commit="onNoteCellCommit(row, child.colIndex, $event)"
                         />
@@ -172,10 +191,12 @@
                     <!-- 三级嵌套（3 行表头场景） -->
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'mhl-' + ci + '-' + chi + '-' + li"
-                        :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
+                        :label="leaf.label" :prop="String(leaf.colIndex)"
+                        :column-key="consolColumnKey(leaf.colIndex)" :fixed="consolFixedFor(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
                           <ConsolNoteGridCell
                             :value="row[leaf.colIndex]" :label="leaf.label" :editable="noteEditMode" :manual="isManual(row, leaf.colIndex)"
+                            :measure-kind="consolMeasureKind(leaf.colIndex)" :ratio-scale="consolRatioScale(leaf.colIndex)"
                             :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, leaf.colIndex)"
                             @commit="onNoteCellCommit(row, leaf.colIndex, $event)"
                           />
@@ -188,10 +209,12 @@
             </template>
             <!-- 扁平表头（无 multi_header 的章节，走原逻辑） -->
             <template v-else>
-            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
+            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)"
+              :column-key="consolColumnKey(hi)" :fixed="consolFixedFor(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <ConsolNoteGridCell
                   :value="row[hi]" :label="h" :editable="noteEditMode" :manual="isManual(row, hi)" :left="hi === 0"
+                  :measure-kind="consolMeasureKind(hi)" :ratio-scale="consolRatioScale(hi)"
                   :comment="hi > 0 ? cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, hi) : undefined"
                   @commit="onNoteCellCommit(row, hi, $event)"
                 />
@@ -317,30 +340,36 @@
             <!-- 全屏模式：多行合并表头 -->
             <template v-if="parsedMultiHeader">
               <template v-for="(col, ci) in parsedMultiHeader" :key="'fs-mh-' + ci">
-                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
+                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)"
+                  :column-key="consolColumnKey(col.colIndex)" :fixed="consolFixedFor(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
                     <ConsolNoteGridCell
                       :value="row[col.colIndex]" :label="col.label" :editable="noteEditMode" :manual="isManual(row, col.colIndex)"
-                      :left="col.colIndex === 0" @commit="onNoteCellCommit(row, col.colIndex, $event)"
+                      :left="col.colIndex === 0"
+                      :measure-kind="consolMeasureKind(col.colIndex)" :ratio-scale="consolRatioScale(col.colIndex)" @commit="onNoteCellCommit(row, col.colIndex, $event)"
                     />
                   </template>
                 </el-table-column>
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'fs-mhc-' + ci + '-' + chi">
-                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
+                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)"
+                      :column-key="consolColumnKey(child.colIndex)" :fixed="consolFixedFor(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
                         <ConsolNoteGridCell
                           :value="row[child.colIndex]" :label="child.label" :editable="noteEditMode" :manual="isManual(row, child.colIndex)"
+                          :measure-kind="consolMeasureKind(child.colIndex)" :ratio-scale="consolRatioScale(child.colIndex)"
                           @commit="onNoteCellCommit(row, child.colIndex, $event)"
                         />
                       </template>
                     </el-table-column>
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'fs-mhl-' + ci + '-' + chi + '-' + li"
-                        :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
+                        :label="leaf.label" :prop="String(leaf.colIndex)"
+                        :column-key="consolColumnKey(leaf.colIndex)" :fixed="consolFixedFor(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
                           <ConsolNoteGridCell
                             :value="row[leaf.colIndex]" :label="leaf.label" :editable="noteEditMode" :manual="isManual(row, leaf.colIndex)"
+                            :measure-kind="consolMeasureKind(leaf.colIndex)" :ratio-scale="consolRatioScale(leaf.colIndex)"
                             @commit="onNoteCellCommit(row, leaf.colIndex, $event)"
                           />
                         </template>
@@ -352,10 +381,12 @@
             </template>
             <!-- 全屏模式：扁平表头 -->
             <template v-else>
-            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
+            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)"
+              :column-key="consolColumnKey(hi)" :fixed="consolFixedFor(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <ConsolNoteGridCell
                   :value="row[hi]" :label="h" :editable="noteEditMode" :manual="isManual(row, hi)" :left="hi === 0"
+                  :measure-kind="consolMeasureKind(hi)" :ratio-scale="consolRatioScale(hi)"
                   @commit="onNoteCellCommit(row, hi, $event)"
                 />
               </template>
@@ -723,10 +754,12 @@
 
 <script setup lang="ts">
 import { copyRichText, copyText } from '@/utils/clipboard'
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { waitForPlatformJob } from '@/services/platformJobs'
+import { newUuid } from '@/utils/uuid'
 import { consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
 import {
   fillConsolNoteByFormula,
@@ -773,6 +806,9 @@ import ConsolNoteTopnNotice from '@/components/consolidation/ConsolNoteTopnNotic
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import ConsolNoteGridCell from '@/components/consolidation/ConsolNoteGridCell.vue'
+import GtTableDisplaySettings from '@/components/common/GtTableDisplaySettings.vue'
+import { usePreferredFixedColumns } from '@/composables/usePreferredFixedColumns'
+import type { DisplayMeasureKind, RatioScale } from '@/types/displayMeasure'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useEditMode } from '@/composables/useEditMode'
@@ -785,6 +821,12 @@ import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
 import { useConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
 import { handleApiError } from '@/utils/errorHandler'
+import { parseApiError } from '@/composables/useApiError'
+import {
+  isConsolNoteConflict,
+  normalizeNoteDataDigest,
+  resolveConsolNoteConflict,
+} from '@/components/consolidation/composables/consolNoteSaveConflict'
 // deleteNoteRows 用：此前未导入 ⇒ ReferenceError 被「用户取消」的 catch 吞掉，删除行恒静默无效
 import { confirmBatch } from '@/utils/confirm'
 import { exportMultiSheetData, readSheetAoa, readWorkbookAoa } from '@/composables/useExcelIO'
@@ -854,6 +896,46 @@ async function jumpToNoteSection(sectionId?: string, title?: string) {
 // 当前请求目标章节独立于已渲染章节；切换章节后旧响应不得写入新章节。
 const requestedSectionId = ref('')
 const selectedNoteSection = ref<any>(null)
+
+const CONSOL_MEASURE_KINDS = new Set<DisplayMeasureKind>([
+  'amount', 'quantity', 'count', 'ratio', 'exchange_rate', 'unit_price', 'text',
+])
+const CONSOL_RATIO_SCALES = new Set<RatioScale>(['fraction', 'percent_points'])
+function consolMeasureKind(index: number): DisplayMeasureKind | null {
+  if (selectedNoteSection.value?.measureStatus !== 'matched') return null
+  const value = selectedNoteSection.value?.columnKinds?.[index]
+  return CONSOL_MEASURE_KINDS.has(value) ? value : null
+}
+function consolRatioScale(index: number): RatioScale | null {
+  if (consolMeasureKind(index) !== 'ratio') return null
+  const value = selectedNoteSection.value?.columnRatioScales?.[index]
+  return CONSOL_RATIO_SCALES.has(value) ? value : null
+}
+function consolColumnKey(index: number): string {
+  if (index === 0) return 'label'
+  return String(selectedNoteSection.value?.columnIds?.[index] || '')
+}
+const consolFixedPageKey = computed(() => (
+  selectedNoteSection.value?.measureStatus === 'matched' && selectedNoteSection.value?.tableId
+    ? `consolidation:note:${selectedNoteSection.value.tableId}`
+    : ''
+))
+const consolFixedColumns = computed(() => (selectedNoteSection.value?.headers || [])
+  .map((label: unknown, index: number) => ({ key: consolColumnKey(index), label: String(label || `第${index + 1}列`) }))
+  .filter((column: { key: string }) => !!column.key))
+const consolMandatoryKeys = computed(() => consolFixedColumns.value.length ? ['label'] : [])
+const consolFixed = usePreferredFixedColumns({
+  pageKey: consolFixedPageKey,
+  allowedColumns: () => consolFixedColumns.value.map((column: { key: string; label: string }) => column.key),
+  mandatoryColumns: consolMandatoryKeys,
+})
+function consolFixedFor(index: number): 'left' | false {
+  const key = consolColumnKey(index)
+  return key ? consolFixed.fixedFor(key) : false
+}
+function onConsolFixedColumnsChange(): void {
+  nextTick(() => noteTableRef.value?.doLayout?.())
+}
 
 // text_after_table 折叠控制
 const textAfterExpanded = ref(false)
@@ -1347,13 +1429,14 @@ function hasPersistedNoteContent(content: Record<string, unknown>): boolean {
   return Object.keys(content).length > 0
 }
 
-function applyPersistedNoteContent(section: any, content: Record<string, unknown>) {
+function applyPersistedNoteContent(section: any, content: Record<string, unknown>, dataDigest?: unknown) {
   const headers = Array.isArray(content.headers) && content.headers.length
     ? content.headers
     : section.headers
   const rows = Array.isArray(content.rows) ? content.rows : []
   section.headers = headers
   section.savedData = { ...content }
+  section.dataDigest = normalizeNoteDataDigest(dataDigest)
   section.editRows = toEditRows(headers, rows, content.manual_cells)
   section.baselineEditRows = clonePlain(section.editRows)
   clearNoteDirty()
@@ -1368,6 +1451,7 @@ function applyPersistedNoteContent(section: any, content: Record<string, unknown
  */
 async function reloadCurrentSectionAfterRefresh(
   expectedContext?: NoteContextSnapshot | null,
+  fallbackDataDigest?: unknown,
 ): Promise<NoteRefreshResult> {
   const context = expectedContext || currentRequestedNoteContext()
   if (!context) return noteRefreshResult('skipped', null, { reason: '当前没有可重读的附注章节' })
@@ -1399,13 +1483,17 @@ async function reloadCurrentSectionAfterRefresh(
     const content = saved.content && typeof saved.content === 'object'
       ? { ...saved.content }
       : {}
+    const dataDigest = Object.prototype.hasOwnProperty.call(saved, 'data_digest')
+      ? normalizeNoteDataDigest(saved.data_digest)
+      : normalizeNoteDataDigest(fallbackDataDigest)
     if (!hasPersistedNoteContent(content)) {
+      section.dataDigest = dataDigest
       return noteRefreshResult('skipped', context, {
         updatedAt: saved.updated_at || null,
         reason: '当前章节暂无持久化数据',
       })
     }
-    applyPersistedNoteContent(section, content)
+    applyPersistedNoteContent(section, content, dataDigest)
     return noteRefreshResult('done', context, {
       persisted: true,
       updatedAt: saved.updated_at || null,
@@ -2072,7 +2160,7 @@ async function executeAggregate() {
         mode: 'direct',
         standard: props.standard,
         node_key: currentNodeKey(),
-      }, { validateStatus: (s: number) => s < 600 })
+      }, { _silent: true } as any)
       applyCellAggregate(sec, c, data)
     } else {
       const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
@@ -2091,7 +2179,7 @@ async function executeAggregate() {
         note_sections: aggTarget.noteSections,
         standard: props.standard,
         node_key: currentNodeKey(),
-      }, { validateStatus: (s: number) => s < 600 })
+      }, { _silent: true } as any)
       applyCellAggregate(sec, c, data)
     }
     showAggregateDialog.value = false
@@ -2173,9 +2261,14 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
     fillDetails.value = fillDetailRows(result)
     if (fillDetails.value.length) showFillResultDialog.value = true
     if (result.blank?.length) ElMessage.warning(fillResultSummary.value)
+    const formulaDigestProvided = !!result && Object.prototype.hasOwnProperty.call(result, 'data_digest')
+    const formulaDigest = normalizeNoteDataDigest(result?.data_digest)
     // 公式接口响应只用于展示填入明细；必须再 GET 当前章节的持久化内容，
-    // 以保留后端实际保存的 manual_cells 和其他元数据。
-    const reloadResult = await reloadCurrentSectionAfterRefresh(context)
+    // 以保留后端实际保存的 manual_cells 和其他元数据。旧后端不返回摘要时才使用公式回执兜底。
+    const reloadResult = await reloadCurrentSectionAfterRefresh(
+      context,
+      formulaDigestProvided ? formulaDigest : undefined,
+    )
     if (reloadResult.status === 'done') {
       ElMessage.success(fillResultSummary.value)
     } else if (reloadResult.status === 'failed') {
@@ -2221,11 +2314,16 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
       node_key: context.nodeKey || null,
       standard: props.standard,
       template_type: props.standard,
+      operation_id: newUuid(),
     }
-    const result = (await api.post(
-      P_consol.notes.reaggregate(context.projectId, context.year),
+    const accepted: any = await api.post(
+      P_consol.notes.reaggregateAsync(context.projectId, context.year),
       body,
-    )) as Partial<ConsolNoteReaggregateResult> | null
+    )
+    if (!accepted?.accepted || !accepted?.job_id) throw new Error('重新汇总任务未返回 job_id')
+    const job = await waitForPlatformJob(context.projectId, String(accepted.job_id))
+    if (job.status !== 'succeeded') throw new Error(job.error_message || '重新汇总任务失败')
+    const result = (job.result_ref?.result ?? null) as Partial<ConsolNoteReaggregateResult> | null
     const summary = reaggregateSummary(result)
     // reaggregate 成功只说明服务端编排完成；当前章节仍必须通过独立 GET 证明已持久化。
     const reloadResult = await reloadCurrentSectionAfterRefresh(context)
@@ -2299,6 +2397,7 @@ async function performSaveNoteData(): Promise<boolean> {
   const data = notePayload(sec.savedData, sec.headers, sec.editRows)
   // template_variant 以加载时的变体为准（而非仅透传旧 savedData），确保落库标识正确
   data.template_variant = loaded.variant
+  const expectedDigest = normalizeNoteDataDigest(sec.dataDigest)
   const epochAtStart = noteDirtyEpoch.value
   try {
     const nk = currentNodeKey()
@@ -2307,8 +2406,8 @@ async function performSaveNoteData(): Promise<boolean> {
       : P_cn.data(props.projectId, props.year, sec.section_id)
     const result: any = await api.put(
       url,
-      { data },
-      { validateStatus: (s: number) => s < 600 },
+      { data, expected_digest: expectedDigest },
+      { _silent: true } as any,
     )
     if (result?.ok === false) throw Object.assign(new Error(result.error || '保存失败'), { status: 500 })
     // CP-05：A-B-A 保护——PUT 返回时若上下文已切换，旧保存结果既不能报成功也不能清 dirty。
@@ -2320,6 +2419,8 @@ async function performSaveNoteData(): Promise<boolean> {
     if (context.nodeKey && result?.node_key && String(result.node_key) !== context.nodeKey) {
       return false
     }
+    // 仅采用服务端回传摘要；旧后端缺失该字段时安全降为 null，后续保存不会误当成新令牌。
+    sec.dataDigest = normalizeNoteDataDigest(result?.data_digest)
     // 落库快照 = 发起时冻结的 data；PUT 期间的实时编辑保留在 editRows 中不被覆盖。
     sec.savedData = data
     sec.baselineEditRows = toEditRows(sec.headers, Array.isArray(data.rows) ? data.rows : [], data.manual_cells)
@@ -2336,6 +2437,17 @@ async function performSaveNoteData(): Promise<boolean> {
     // A-B-A：旧保存失败同样不能影响新上下文；仅当仍是同一上下文时才提示。
     const latest = currentRequestedNoteContext()
     if (!latest || !sameNoteContext(context, latest) || selectedNoteSection.value !== sec) {
+      return false
+    }
+    if (isConsolNoteConflict(err)) {
+      await resolveConsolNoteConflict(err, context, {
+        confirm: (message, title, options) => ElMessageBox.confirm(message, title, options),
+        isCurrent: () => {
+          const latest = currentRequestedNoteContext()
+          return !!latest && sameNoteContext(context, latest) && selectedNoteSection.value === sec
+        },
+        reload: (targetContext) => reloadCurrentSectionAfterRefresh(targetContext),
+      })
       return false
     }
     handleApiError(err, '保存')
@@ -2535,6 +2647,15 @@ async function batchExportAllTemplates() {
   finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
 }
 
+function noteBatchImportErrorMessage(error: unknown): string {
+  const message = parseApiError(error).message.trim()
+  return message && message !== '未知错误' ? message : '导入失败，请稍后重试'
+}
+
+function noteBatchImportFailureText(failure: { sheetName: string; sectionId: string; reason: string }): string {
+  return `Sheet「${failure.sheetName}」/章节「${failure.sectionId}」：${failure.reason}`
+}
+
 async function onNoteBatchImport(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !props.projectId) return
@@ -2546,6 +2667,8 @@ async function onNoteBatchImport(e: Event) {
     // 故用整簿读取：一次解析拿到所有 sheet 的 AOA，与原实现等价。
     const { sheetNames, sheets } = await readWorkbookAoa(file)
     if (noteSubOpGuard.isStale(ticket)) return
+    const failures: Array<{ sheetName: string; sectionId: string; reason: string }> = []
+    let imported = 0
     let matched = 0
     const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
@@ -2561,60 +2684,84 @@ async function onNoteBatchImport(e: Event) {
     for (const sheetName of sheetNames) {
       const sectionId = sectionMap[sheetName]
       if (!sectionId) continue
-      const json: any[][] = sheets[sheetName]
-      if (json.length < 2) continue
-      // 取该章节模板，把上传的数据行按模板槽位回填：保留模板前导类别行，数据行从 dataStart 起覆盖
-      const detail: any = await api.get(P_cn.detail(variant, sectionId), {
-        validateStatus: (s: number) => s < 600,
-        signal: ticket.signal,
-      })
-      if (noteSubOpGuard.isStale(ticket)) return
-      const tpl = detail?.data ?? detail
-      const headers: string[] = Array.isArray(tpl?.headers) ? tpl.headers.map((h: any) => String(h ?? '')) : json[0].map((c: any) => String(c || ''))
-      const width = headers.length
-      // 模板行作为基底（深拷贝），不足补空行
-      const baseRows: string[][] = (Array.isArray(tpl?.rows) ? tpl.rows : []).map((r: any[]) => {
-        const row: string[] = []
-        for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
-        return row
-      })
-      // 数据区起点 = 模板前导类别行数（仅第 0 列有文本）
-      let dataStart = 0
-      for (const r of baseRows) {
-        const col0 = String(r[0] ?? '').trim()
-        let restEmpty = true
-        for (let c = 1; c < width; c++) if (String(r[c] ?? '').trim() !== '') { restEmpty = false; break }
-        if (col0 !== '' && restEmpty) dataStart++
-        else break
-      }
-      // 上传数据行（跳过上传文件自身的表头行）
-      const uploaded = json.slice(1).map((r: any[]) => {
-        const row: string[] = []
-        for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
-        return row
-      })
-      const finalRows: string[][] = [...baseRows]
-      const manualCells: { row: number; col: number }[] = []
-      for (let i = 0; i < uploaded.length; i++) {
-        const target = dataStart + i
-        while (finalRows.length <= target) finalRows.push(Array.from({ length: width }, () => ''))
-        finalRows[target] = uploaded[i]
-        // Excel 导入属于人工录入：非空数值格（第 1 列起）标手工，按公式填入时保留
-        for (let c = 1; c < width; c++) if (uploaded[i][c] !== '') manualCells.push({ row: target, col: c })
-      }
-      const nk = currentNodeKey()
-      const importUrl = nk
-        ? `${P_cn.data(props.projectId, props.year, sectionId)}?node_key=${encodeURIComponent(nk)}`
-        : P_cn.data(props.projectId, props.year, sectionId)
-      await api.put(
-        importUrl,
-        { data: { headers, rows: finalRows, manual_cells: manualCells, template_variant: variant } },
-        { validateStatus: (s: number) => s < 600 },
-      )
       matched++
+      try {
+        const json: any[][] = sheets[sheetName]
+        if (!Array.isArray(json) || json.length < 2) {
+          throw new Error('Sheet 中没有可导入的数据')
+        }
+        // 取该章节模板，把上传的数据行按模板槽位回填：保留模板前导类别行，数据行从 dataStart 起覆盖
+        const detail: any = await api.get(P_cn.detail(variant, sectionId), {
+          validateStatus: (s: number) => s < 600,
+          signal: ticket.signal,
+        })
+        if (noteSubOpGuard.isStale(ticket)) return
+        const tpl = detail?.data ?? detail
+        const headers: string[] = Array.isArray(tpl?.headers) ? tpl.headers.map((h: any) => String(h ?? '')) : json[0].map((c: any) => String(c || ''))
+        const width = headers.length
+        // 模板行作为基底（深拷贝），不足补空行
+        const baseRows: string[][] = (Array.isArray(tpl?.rows) ? tpl.rows : []).map((r: any[]) => {
+          const row: string[] = []
+          for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
+          return row
+        })
+        // 数据区起点 = 模板前导类别行数（仅第 0 列有文本）
+        let dataStart = 0
+        for (const r of baseRows) {
+          const col0 = String(r[0] ?? '').trim()
+          let restEmpty = true
+          for (let c = 1; c < width; c++) if (String(r[c] ?? '').trim() !== '') { restEmpty = false; break }
+          if (col0 !== '' && restEmpty) dataStart++
+          else break
+        }
+        // 上传数据行（跳过上传文件自身的表头行）
+        const uploaded = json.slice(1).map((r: any[]) => {
+          const row: string[] = []
+          for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
+          return row
+        })
+        const finalRows: string[][] = [...baseRows]
+        const manualCells: { row: number; col: number }[] = []
+        for (let i = 0; i < uploaded.length; i++) {
+          const target = dataStart + i
+          while (finalRows.length <= target) finalRows.push(Array.from({ length: width }, () => ''))
+          finalRows[target] = uploaded[i]
+          // Excel 导入属于人工录入：非空数值格（第 1 列起）标手工，按公式填入时保留
+          for (let c = 1; c < width; c++) if (uploaded[i][c] !== '') manualCells.push({ row: target, col: c })
+        }
+        const nk = currentNodeKey()
+        const importUrl = nk
+          ? `${P_cn.data(props.projectId, props.year, sectionId)}?node_key=${encodeURIComponent(nk)}`
+          : P_cn.data(props.projectId, props.year, sectionId)
+        const result: any = await api.put(
+          importUrl,
+          {
+            data: { headers, rows: finalRows, manual_cells: manualCells, template_variant: variant },
+            // Excel 批量导入是明确的整表覆盖动作，不参与章节编辑的摘要 CAS。
+            force_overwrite: true,
+          },
+          { _silent: true } as any,
+        )
+        if (result?.ok === false) {
+          throw new Error(String(result.error || '服务器未确认导入成功'))
+        }
+        imported++
+      } catch (error) {
+        if (noteSubOpGuard.isStale(ticket)) return
+        failures.push({ sheetName, sectionId, reason: noteBatchImportErrorMessage(error) })
+      }
     }
     if (noteSubOpGuard.isStale(ticket)) return
-    ElMessage.success(`已导入 ${matched} 个附注表格（共 ${sheetNames.length} 个 Sheet）`)
+    if (failures.length === 0 && imported > 0) {
+      ElMessage.success(`已导入 ${imported} 个附注表格（共 ${matched} 个匹配 Sheet）`)
+    } else if (imported > 0) {
+      ElMessage.success(`批量导入完成：成功 ${imported} 个，失败 ${failures.length} 个`)
+      ElMessage.warning(`导入失败项：${failures.map(noteBatchImportFailureText).join('；')}`)
+    } else if (failures.length > 0) {
+      ElMessage.error(`批量导入失败：成功 0 个，失败 ${failures.length} 个；${failures.map(noteBatchImportFailureText).join('；')}`)
+    } else {
+      ElMessage.warning('未匹配到可导入的附注章节')
+    }
   } catch (e: any) {
     if (noteSubOpGuard.isStale(ticket)) return
     handleApiError(e, '导入')
@@ -2627,6 +2774,7 @@ async function onNoteBatchImport(e: Event) {
     }
   }
 }
+
 
 // ─── 公式管理（Sprint 1.5.3 收敛） ───────────────────────────────────────────
 // ConsolNoteTab 不再自维护公式 dialog，统一走全局 FormulaManagerDialog
@@ -2759,6 +2907,7 @@ async function fillAllByFormula() {
       const sec = selectedNoteSection.value
       sec.headers = currentResult.data?.headers || sec.headers
       sec.savedData = { ...(currentResult.data || {}) }
+      sec.dataDigest = normalizeNoteDataDigest((currentResult as any).data_digest)
       sec.editRows = toEditRows(sec.headers, currentResult.data?.rows || [], currentResult.data?.manual_cells)
       clearNoteDirty()
       clearAutoSaveDraft()
@@ -2789,7 +2938,7 @@ async function onNoteAuditAll(_e?: Event) {
       standard: props.standard,
       company_code: entityCode,
       node_key: currentNodeKey(),
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = result?.total_sections || 0
@@ -2844,7 +2993,7 @@ async function auditCurrentNote() {
       node_key: currentNodeKey(),
       headers: sec.headers,
       rows: currentRows,
-    }, { validateStatus: (s: number) => s < 600, signal: ticket.signal })
+    }, { _silent: true, signal: ticket.signal } as any)
     if (noteSubOpGuard.isStale(ticket)) return
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
@@ -2953,6 +3102,7 @@ async function onNoteNodeClick(
     let rows = Array.isArray(sec.rows) ? sec.rows : []
     let savedContent: Record<string, unknown> = {}
     let updatedAt: string | null = null
+    let dataDigest: string | null = null
     const saved: any = await api.get(noteDataUrl(context), {
       validateStatus: (s: number) => s < 600,
       signal: ticket.signal,
@@ -2965,6 +3115,7 @@ async function onNoteNodeClick(
     }
     if (saved?.content && typeof saved.content === 'object') savedContent = { ...saved.content }
     updatedAt = saved?.updated_at || null
+    dataDigest = normalizeNoteDataDigest(saved?.data_digest)
     if (Array.isArray(savedContent.rows)) rows = savedContent.rows
 
     const latest = currentRequestedNoteContext()
@@ -2988,12 +3139,18 @@ async function onNoteNodeClick(
       section_id: sec.section_id,
       title: sec.title,
       parent_section: sec.parent_section,
+      tableId: sec.table_id || sec.id || null,
+      columnIds: Array.isArray(sec.column_ids) ? [...sec.column_ids] : [],
+      columnKinds: Array.isArray(sec.column_kinds) ? [...sec.column_kinds] : [],
+      columnRatioScales: Array.isArray(sec.column_ratio_scales) ? [...sec.column_ratio_scales] : [],
+      measureStatus: sec.measure_status || 'unmatched',
       headers,
       multiHeader: sec.multi_header || null,
       columnGroups: sec._column_groups || null,
       editRows,
       baselineEditRows: clonePlain(editRows),
       savedData: savedContent,
+      dataDigest,
       // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
       // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
       noteAddr: sourceNoteAddr(sec.section_id),
@@ -3436,4 +3593,6 @@ defineExpose({
   font-size: var(--gt-font-size-xs, 12px);
   cursor: pointer;
 }
+.gt-consol-note-display-settings { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.gt-consol-note-measure-warning { margin-bottom: 8px; }
 </style>

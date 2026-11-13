@@ -58,6 +58,9 @@ async def run(stop_event: asyncio.Event) -> None:
     except Exception as exc:
         logger.warning("[export_cleanup] startup cleanup failed: %s", exc)
 
+    # 启动时跑一次证据与运行记录清理（AQF §6.6）
+    await _run_aqf_cleanup()
+
     while not stop_event.is_set():
         await write_heartbeat("export_cleanup_worker")
 
@@ -93,6 +96,9 @@ async def run(stop_event: asyncio.Event) -> None:
                 break
             except Exception as exc:
                 logger.warning("[export_cleanup] hourly cleanup error: %s", exc)
+
+            # 每小时一次证据与运行记录清理（AQF §6.6）
+            await _run_aqf_cleanup()
             loop_count = 0
 
         try:
@@ -102,3 +108,113 @@ async def run(stop_event: asyncio.Event) -> None:
             )
         except asyncio.TimeoutError:
             pass
+
+
+async def _run_aqf_cleanup() -> None:
+    """清理过期的查询证据文件与运行记录（AQF §6.6，R8.3）。
+
+    - 证据文件到期 → 删文件、status 改 purged（每批 500 条）
+    - 运行记录超期或每人超 500 条 → 删除（被未清理证据引用的跳过）
+    - 证据目录里超过 1 天的 .partial 残留一并清除
+    失败只记 WARNING，不阻断 worker。
+    """
+    from app.services.custom_query.query_evidence import query_evidence_available
+
+    try:
+        from app.core.database import async_session
+        async with async_session() as db:
+            async with db.begin():
+                if not await query_evidence_available(db):
+                    return
+
+        deleted_artifacts = 0
+        deleted_runs = 0
+
+        # ── 清理过期证据文件 ────────────────────────────────────────────────
+        from app.services.custom_query.query_artifacts import _artifact_root
+        from sqlalchemy import text
+
+        async with async_session() as db:
+            while True:
+                async with db.begin():
+                    rows = (await db.execute(text("""
+                        SELECT id, storage_key FROM query_artifacts
+                         WHERE status = 'ready' AND retention_until < now()
+                         LIMIT 500
+                    """))).fetchall()
+                if not rows:
+                    break
+                root = _artifact_root()
+                for row_id, sk in rows:
+                    try:
+                        fp = root / sk
+                        if fp.exists():
+                            fp.unlink()
+                    except OSError:
+                        pass
+                    async with async_session() as upd:
+                        async with upd.begin():
+                            await upd.execute(text("""
+                                UPDATE query_artifacts
+                                   SET status = 'purged', purged_at = now(), updated_at = now()
+                                 WHERE id = :id
+                            """), {"id": str(row_id)})
+                    deleted_artifacts += 1
+
+        # ── 清理 .partial 残留（超过 1 天）──────────────────────────────────
+        try:
+            import time
+            root = _artifact_root()
+            for year_dir in root.iterdir():
+                if not year_dir.is_dir():
+                    continue
+                for month_dir in year_dir.iterdir():
+                    if not month_dir.is_dir():
+                        continue
+                    for f in month_dir.glob(".*.partial"):
+                        age = time.time() - f.stat().st_mtime
+                        if age > 86400:
+                            try:
+                                f.unlink()
+                            except OSError:
+                                pass
+        except Exception:
+            pass
+
+        # ── 清理超期运行记录 ────────────────────────────────────────────────
+        from app.core.config import settings
+        keep = getattr(settings, "QUERY_RUN_KEEP_PER_USER", 500)
+        ret_days = getattr(settings, "QUERY_RUN_RETENTION_DAYS", 90)
+
+        async with async_session() as db:
+            while True:
+                async with db.begin():
+                    cnt = (await db.execute(text("""
+                        DELETE FROM query_runs
+                         WHERE id IN (
+                             SELECT qr.id FROM query_runs qr
+                              WHERE qr.last_executed_at < now() - interval '1 day' * :days
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM query_artifacts qa
+                                     WHERE qa.run_id = qr.id AND qa.status = 'ready'
+                                )
+                             UNION
+                             SELECT id FROM (
+                                 SELECT id,
+                                        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_executed_at DESC) AS rn
+                                   FROM query_runs
+                             ) t WHERE t.rn > :keep
+                             LIMIT 1000
+                         )
+                    """), {"days": ret_days, "keep": keep})).rowcount
+                    deleted_runs += cnt
+                if cnt == 0:
+                    break
+
+        if deleted_artifacts or deleted_runs:
+            logger.info(
+                "[export_cleanup] AQF cleanup: purged_artifacts=%d pruned_runs=%d",
+                deleted_artifacts, deleted_runs,
+            )
+    except Exception as exc:
+        logger.warning("[export_cleanup] AQF cleanup error: %s", exc)

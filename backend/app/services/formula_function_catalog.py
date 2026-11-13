@@ -106,9 +106,11 @@ FUNCTIONS: tuple[FunctionSpec, ...] = (
         description="底稿数据取值",
     ),
     FunctionSpec(
-        name="ADJ", arity_min=1, arity_max=2, engines=L1_ONLY,
+        # 调整类型必填：_handle_adj 对缺省 / 空类型报错（ADR-ADJ：禁止静默省略 aje / rje 过滤）。
+        # 原先登记最少 1 参 ⇒ 预检放行 ADJ('科目')、求值才报「调整类型为空」，两处口径不一
+        name="ADJ", arity_min=2, arity_max=2, engines=L1_ONLY,
         category="取数",
-        syntax="ADJ('科目编码'[,'aje_net|rje_net'])",
+        syntax="ADJ('科目编码','aje_net|rje_net')",
         description="调整额实时汇总（净额）",
     ),
 

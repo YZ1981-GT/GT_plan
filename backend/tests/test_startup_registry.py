@@ -326,11 +326,15 @@ async def test_health_includes_startup_report():
     clean_drift = AsyncMock(
         return_value={"count": 0, "critical_count": 0, "items": []}
     )
+    # 审计链同样声明干净：mock 会话跑不了分叉扫描，扫描失败按「未知」处理会 degraded
+    clean_chain = AsyncMock(return_value={
+        "unacknowledged_forks": 0, "quarantined_entries": 0, "dead_letter_entries": 0, "checked_at": "test",
+    })
 
     transport = ASGITransport(app=app)
     with patch("app.api.health._query_migration_status", new=clean_mig), patch(
         "app.api.health._query_schema_drift", new=clean_drift
-    ):
+    ), patch("app.api.health._query_audit_chain_health", new=clean_chain):
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/health")
     assert resp.status_code == 200

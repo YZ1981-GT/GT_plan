@@ -111,17 +111,19 @@ async def _debug_run(db: AsyncSession, project_id: uuid.UUID, body: FormulaDebug
 
     # ``FormulaResult.value`` 失败时是 ``None``。这里显式把 ``ok`` 与值绑定，
     # 防止将未来某个不完整结果误展示成可用数字（ADR-FGR-03）。
-    ok = result.ok and result.value is not None
-    errors = list(result.errors)
+    # 取数缺口（含「调整分录取数失败」这类取数异常）与中央执行合同同口径：有缺口就不是成功结果 ——
+    # 原先只并进 warnings，ADJ 取数失败时调试照样显示 ok + 0，与真实执行结论相反。
+    ok = result.ok and result.value is not None and not gaps
+    errors = list(dict.fromkeys([*result.errors, *gaps]))
     if not ok and not errors:
         errors.append(f"公式执行失败（{result.state}）")
     return FormulaDebugResponse(
         value=str(result.value) if ok else None,
         ok=ok,
-        state=result.state,
+        state=result.state if not result.ok else ("ok" if ok else "missing"),
         trace=result.trace,
         errors=errors,
-        warnings=formula_warnings.merge_into([*result.warnings, *gaps], collected),
+        warnings=formula_warnings.merge_into(list(result.warnings), collected),
         context_summary=summary,
     )
 

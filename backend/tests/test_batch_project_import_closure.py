@@ -260,7 +260,26 @@ async def test_group_export_edit_validate_apply_updates_relationship(engine):
         output, ids = await export_group_tree(root_project.id, session)
         assert root_project.id in ids
 
-    workbook = load_workbook(output)
+    from app.services.batch_project_workbook import entity_group_fields_hash
+    async with factory() as session:
+        exported_projects = list((await session.execute(select(Project).where(
+            Project.id.in_(ids),
+        ))).scalars().all())
+    expected_hash_by_code: dict[str, str] = {}
+    for company_code in {project.company_code for project in exported_projects}:
+        expected_hash_by_code[company_code] = entity_group_fields_hash([
+            project for project in exported_projects if project.company_code == company_code
+        ])
+    exported_workbook = load_workbook(output, data_only=False)
+    exported_rows = [
+        cells for cells in exported_workbook["数据"].iter_rows(min_row=2)
+        if cells[1].value not in (None, "")
+    ]
+    assert exported_rows
+    assert all(cells[10].value == "更新集团关系" for cells in exported_rows)
+    for cells in exported_rows:
+        assert cells[12].value == expected_hash_by_code[cells[1].value]
+    workbook = exported_workbook
     sheet = workbook["数据"]
     assert "说明事项" in workbook.sheetnames
     assert sheet.column_dimensions["L"].hidden is True
@@ -1081,7 +1100,9 @@ async def test_template_metadata_binds_mode_and_group_root_scope(db):
             blank_ultimate.getvalue(), db, current_user=admin(), mode="consolidation"
         )
     assert getattr(blank_scope_error.value, "status_code", None) == 400
-    assert "不属于模板来源集团" in str(getattr(blank_scope_error.value, "detail", ""))
+    assert "只能维护同一最终控制方和审计年度" in str(
+        getattr(blank_scope_error.value, "detail", "")
+    )
 
     outsider = await create_project(BasicInfoSchema(
         client_name="其他集团企业", audit_year=2049, project_type="annual",
@@ -1096,4 +1117,6 @@ async def test_template_metadata_binds_mode_and_group_root_scope(db):
     with pytest.raises(Exception) as scope_error:
         await analyze_batch(scoped.getvalue(), db, current_user=admin(), mode="consolidation")
     assert getattr(scope_error.value, "status_code", None) == 400
-    assert "不属于模板来源集团" in str(getattr(scope_error.value, "detail", ""))
+    assert "当前集团树模板不可用" in str(
+        getattr(scope_error.value, "detail", "")
+    )

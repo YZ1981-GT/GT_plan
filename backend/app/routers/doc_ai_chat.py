@@ -1340,6 +1340,7 @@ async def get_ai_capabilities(
     """
     from app.services.ai_chat.capability_endpoint import (
         CapabilityResponse,
+        embedding_route_health,
         get_capabilities,
     )
 
@@ -1350,5 +1351,6 @@ async def get_ai_capabilities(
         except (ValueError, TypeError):
             pass  # 无效 project_id → 按无项目处理（DSH gate 回落 native）
 
-    result = get_capabilities(project_id=parsed_project_id)
+    # 向量健康按平台实际向量路由判定（库里启用行，没有则 .env 兜底），不发请求
+    result = get_capabilities(project_id=parsed_project_id, embedding_health=await embedding_route_health())
     return result

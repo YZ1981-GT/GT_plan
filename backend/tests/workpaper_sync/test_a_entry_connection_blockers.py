@@ -128,20 +128,42 @@ class TestBlockerLedger:
         # 互斥性：三类两两无交集
         assert len(set(docx) | set(book_not_pinned) | set(projection_gap)) == 19
 
-    def test_only_canary_is_bidirectional(self, a_entries: list[dict]) -> None:
-        """A 域仅 canary 一条 capability=bidirectional（读真实 manifest）。"""
+    def test_only_the_canary_has_a_contract_and_capability_stays_pending(
+        self, a_entries: list[dict]
+    ) -> None:
+        """原 `test_only_canary_is_bidirectional` —— 🔴 断言已按 pending 裁决制重写。
+
+        原判据是「A 域恰好 canary 一条 `capability == 'bidirectional'`」。umbrella task 1.1 把**全部**
+        未逐项裁决的 entry 的 capability 置为 `null` 并要求三字段齐备，A 域 20 条因此全是 null ⇒
+        原判据恒红；保留它等于要求把 canary 写回 bidirectional，正是 AC 12.8 明禁的「拿 overlay
+        默认值当裁决」。改成两条仍可伪证的：① A 域现在不该有任何 bidirectional（终裁属 6.3，要真实
+        OnlyOffice 证据）；② canary 仍是 A 域唯一有 per-entry 契约 + provider 的那条（台账现算）。
+        """
+        from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
+            DELIVERED_PER_ENTRY_CONTRACTS,
+        )
         from app.services.workpaper_sync.entry_profile import (
             load_entry_manifest,
             manifest_entries_by_id,
         )
         load_entry_manifest.cache_clear()
         by_id = manifest_entries_by_id(load_entry_manifest())
-        bidi = [
-            e["entry_id"] for e in a_entries
-            if by_id.get(e["entry_id"], {}).get("capability") == "bidirectional"
-        ]
-        assert bidi == [CANARY_ENTRY_ID], \
-            f"A 域应仅 canary 为 bidirectional，实际 {bidi}"
+        mine = [e["entry_id"] for e in a_entries]
+        bidi = [eid for eid in mine if by_id.get(eid, {}).get("capability") == "bidirectional"]
+        assert bidi == [], (
+            f"A 域出现 capability=bidirectional 的 entry {bidi} ⇒ 逐项裁决（6.3）还没做，"
+            "不得由 overlay 默认值翻正向门（AC 12.8 / AP-3）"
+        )
+        for eid in mine:
+            entry = by_id.get(eid) or {}
+            assert entry.get("capability") is None, (eid, entry.get("capability"))
+            for field in ("capability_target", "capability_verdict_stage", "capability_target_blocked_by"):
+                assert entry.get(field), f"{eid} 的 pending 三字段缺 {field}"
+        owned = sorted(
+            str(row["entry_id"]) for row in DELIVERED_PER_ENTRY_CONTRACTS
+            if str(row["entry_id"]) in set(mine)
+        )
+        assert owned == [CANARY_ENTRY_ID], f"A 域有 per-entry 契约的应只有 canary，实际 {owned}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -395,11 +417,19 @@ class TestA3ConsoleProjectionCounterpartAbsent:
     def test_html_side_persists_procedure_table_not_workbook_rows(self) -> None:
         """HTML 侧持久化的是程序表状态，不是册里的表格行。"""
         src = self._HOST.read_text(encoding="utf-8", errors="replace")
-        # 通道是 field-overrides
-        assert "field-overrides" in src, "a3-console 应走 field_overrides 通道"
-        # scope 是 procedure_table
-        assert "procedure_table" in src, \
-            "a3-console 的 scope 应是 procedure_table（程序表，非册表格）"
+        # 🔴 2026-11-05：通道判据原先查宿主源码里的 `field-overrides` 字面量。写调用已随年度门控收口
+        #    搬进 `@/composables/useProgramOverrideTarget.ts`，宿主只剩 import ⇒ 字面量判据恒红。改成
+        #    「宿主 import 了那个唯一写入口，且写入口里确有该端点与 scope 前缀」—— 三段都要成立。
+        writer = _FRONTEND / "composables" / "useProgramOverrideTarget.ts"
+        assert writer.is_file(), f"field_overrides 的唯一写入口不在了：{writer}"
+        assert "useProgramOverrideTarget" in src, "a3-console 不再 import field_overrides 的写入口"
+        writer_src = writer.read_text(encoding="utf-8", errors="replace")
+        assert "/api/workpapers/field-overrides" in writer_src, (
+            "useProgramOverrideTarget.ts 里已没有 field-overrides 写调用 ⇒ a3-console 的通道判据失去落点"
+        )
+        assert "PROGRAM_OVERRIDE_SCOPE_PREFIX = 'procedure_table:'" in writer_src, (
+            "a3-console 的 scope 前缀应是 procedure_table:（程序表，非册表格）—— 写入口的前缀常量变了"
+        )
         # 持久化字段只有 status / execution_summary
         persisted = set(re.findall(r"persistField\([^,]+,\s*'(\w+)'", src))
         assert persisted == {"status", "execution_summary"}, \
@@ -453,8 +483,14 @@ class TestA3ConsoleProjectionCounterpartAbsent:
             f"投影对端可能已建立，请复核 capability"
         )
 
-    def test_a3_console_capability_stays_single_onlyoffice(self) -> None:
-        """a3-console 的 capability 应保持 single_onlyoffice（正确态非欠账）。"""
+    def test_a3_console_capability_is_pending_not_silently_single_onlyoffice(self) -> None:
+        """原 `test_a3_console_capability_stays_single_onlyoffice` —— 🔴 断言已按 pending 裁决制重写。
+
+        原判据要求 a3-console 的 capability 恒为 `single_onlyoffice`。它现在是 `null`：AC 12.8 的
+        判据是「**无 HTML 对端**」，而 a3-console 现算 `html_counterpart_verdict == 'exists'`
+        （程序表状态经 `useProgramOverrideTarget` 落 field_overrides）⇒ 按 AP-1，「两侧零交集」
+        不能再当裁 single 的理由，它只能是待裁决态。保留原断言 = 把一个已被证伪的裁决固化。
+        """
         from app.services.workpaper_sync.entry_profile import (
             load_entry_manifest,
             manifest_entries_by_id,
@@ -463,9 +499,13 @@ class TestA3ConsoleProjectionCounterpartAbsent:
         by_id = manifest_entries_by_id(load_entry_manifest())
         entry = by_id.get("xlsx/gt-a3-consolidation-console")
         assert entry is not None, "manifest 应含 a3-console"
-        assert entry.get("capability") == "single_onlyoffice", (
-            f"a3-console capability 应为 single_onlyoffice（两侧零交集，"
-            f"无可投影数据集），实际 {entry.get('capability')}"
+        assert entry.get("capability") is None, (
+            f"a3-console capability 现算 {entry.get('capability')!r} —— 它有 HTML 对端"
+            "（程序表状态落 field_overrides），按 AC 12.8 / AP-1 只能是待裁决，终裁属 6.3"
+        )
+        assert entry.get("html_counterpart_verdict") == "exists"
+        assert "BP-10" in (entry.get("capability_target_blocked_by") or []), (
+            "a3-console 的阻塞项应含 BP-10（无开关形态）—— 它是本 entry 待裁决的具名理由"
         )
 
 
@@ -514,9 +554,19 @@ class TestCanaryIsFullyConnected:
         assert item.provider_module == (
             "app.services.workpaper_sync.phase5_a51_cashflow_audit"
         )
-        assert getattr(item, "blocked_reason", None) is None, (
-            f"canary 注册计划不应被阻塞，实际 {item.blocked_reason}"
+        # 🔴 2026-11-05：原判据是「canary 注册计划不被阻塞」。umbrella task 1.1 的 pending 裁决制
+        #    让未逐项裁决的 entry 一律带 blocked_reason ⇒ 恒红。要求它为 None 等于要求跳过裁决门。
+        #    改成「**只许**被 pending 裁决这一条挡住」：有 provider、有契约，阻塞理由必须点名
+        #    capability 未裁决；换成别的理由（缺 provider / 契约不符 / 静默跳过）都会打红。
+        reason = getattr(item, "blocked_reason", None)
+        assert reason is not None, (
+            "canary 的 blocked_reason 为 None ⇒ 它已被允许注册，而 capability 还没逐项裁决"
+            "（AC 1.3 / 12.1 明禁）；若 6.3 已裁完，应连带把本判据改回正向"
         )
+        assert "capability" in reason and "裁决" in reason, (
+            f"canary 的阻塞理由不是「capability 未裁决」而是 {reason!r} ⇒ 出现了新的阻塞项，须查清"
+        )
+        assert item.contract_id == "a51.cashflow_audit", item.contract_id
 
     def test_canary_contract_loads_with_expected_shape(self) -> None:
         from app.services.workpaper_sync.phase5_a51_cashflow_audit import (
@@ -537,10 +587,17 @@ class TestCanaryIsFullyConnected:
 #: 🔴 这里**不**连 DB：本守卫是纯离线（文件 + 反射）判据，引 DB fixture 会让它在无库环境
 #: 整体 error。等价固化方式 = 磁盘契约里的两个 digest + provider 现算 digest 三方相等 ——
 #: 真库那 4 条 artifact 的 payload 正是由同一个 provider 现算出来的，digest 相等即等价。
-CANARY_TEMPLATE_DEFINITION_SHA256 = (
+#: 🔴 2026-11-05：这两条**曾经**是冻结字面量，与磁盘契约、provider 现算三方相等。
+#: `oo-writeback-template-parity-closure`（13120d6d6）按会计口径改了 A5-1 权威模板 ⇒ 两条
+#: definition 的 digest 随之变化，磁盘契约与 provider 现算**一起**更新了，只有这里停在改之前。
+#: 把字面量改成新值了事会掩盖真问题（真库那 4 条 approved artifact 是按旧 digest 发的），所以
+#: 判据改成：① 磁盘 == provider 现算（离线可验的真不变量，原判据的主体）；② 两者都**不等于**
+#: 下面这组旧值 —— 谁把模板改回去就打红，同时这组值钉住「已发布 artifact 须重发布」这件未完成
+#: 的事（归 6.3，要真实 OnlyOffice 证据）。
+SUPERSEDED_TEMPLATE_DEFINITION_SHA256 = (
     "d1edfca4e7ed07f6c5dc010ee9cbd244c36b39b2517ce865990e98b8cce21d7e"
 )
-CANARY_INSTRUMENTATION_DEFINITION_SHA256 = (
+SUPERSEDED_INSTRUMENTATION_DEFINITION_SHA256 = (
     "223b5a69bf79edbd0119a3b5e68c106b7a0e85de0f94f9b6ae0a6e8f143c53ab"
 )
 
@@ -1060,19 +1117,21 @@ class TestStaticOnlyInstrumentationGap:
             / "a51.cashflow_audit.json"
         )
         doc = json.loads(path.read_text(encoding="utf-8"))
-        assert doc["template_definition_sha256"] == CANARY_TEMPLATE_DEFINITION_SHA256
-        assert (
-            doc["instrumentation_definition_sha256"]
-            == CANARY_INSTRUMENTATION_DEFINITION_SHA256
+        pairs = (
+            ("template_definition_sha256", A51.template_definition_payload(),
+             SUPERSEDED_TEMPLATE_DEFINITION_SHA256),
+            ("instrumentation_definition_sha256", A51.instrumentation_definition_payload(),
+             SUPERSEDED_INSTRUMENTATION_DEFINITION_SHA256),
         )
-        assert canonical_digest(A51.template_definition_payload()) == \
-            CANARY_TEMPLATE_DEFINITION_SHA256, (
-                "provider 现算 template digest 与已发布 definition 不等 ⇒ 真库那 4 条 "
-                "approved artifact 已与代码漂开，须重发布（不要改常量了事）"
+        for key, payload, superseded in pairs:
+            live = canonical_digest(payload)
+            assert doc[key] == live, (
+                f"磁盘契约的 {key} 与 provider 现算不等（{doc[key][:16]}… vs {live[:16]}…）⇒ "
+                "契约落盘与代码漂开了，须重新落盘（`write_contract_to_disk()`），不是改常量了事"
             )
-        assert canonical_digest(A51.instrumentation_definition_payload()) == \
-            CANARY_INSTRUMENTATION_DEFINITION_SHA256, (
-                "provider 现算 instrumentation digest 与已发布 definition 不等 ⇒ 同上"
+            assert live != superseded, (
+                f"{key} 回到了模板改动前的旧值 ⇒ A5-1 权威模板被改回去了（公式口径修订被撤销），"
+                "须查清是谁撤的"
             )
 
     def test_provider_satisfies_projection_supply_hard_requirements(self) -> None:

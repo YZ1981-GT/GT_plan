@@ -266,6 +266,7 @@ class _FunctionFacts:
         #: Local names bound to a snapshot destination path. Populated before the main
         #: walk so an artifact write can be classified against it; never serialised.
         self.snapshot_path_names: set[str] = set()
+        self.sql_text_bindings: dict[str, list[str]] = {}  # ``text(name)`` 的候选 SQL；不序列化
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -312,13 +313,22 @@ def _iter_own_nodes(function: ast.AST):
         stack.extend(ast.iter_child_nodes(node))
 
 
-def _record_target(facts: _FunctionFacts, target: ast.AST) -> None:
+def _record_target(
+    facts: _FunctionFacts,
+    target: ast.AST,
+    foreign_version_owners: Mapping[str, str] | None = None,
+) -> None:
     if isinstance(target, (ast.Tuple, ast.List)):
         for element in target.elts:
-            _record_target(facts, element)
+            _record_target(facts, element, foreign_version_owners)
         return
     if isinstance(target, ast.Attribute):
-        if target.attr in _VERSION_ATTRS:
+        owner = (foreign_version_owners or {}).get(target.attr)
+        if owner is not None:
+            # Another aggregate's own revision counter (see `_module_foreign_version_owners`):
+            # recorded as a visible side effect, never as a workpaper version write.
+            facts.side_effects.add(f"<sets {owner}.{target.attr}>")
+        elif target.attr in _VERSION_ATTRS:
             facts.version_fields_written.add(target.attr)
         elif target.attr in _CONTENT_ATTRS:
             facts.content_fields_written.add(target.attr)
@@ -343,29 +353,62 @@ def _record_sql_text(facts: _FunctionFacts, call: ast.Call) -> None:
 
     ``wp_migration_service`` writes ``parsed_data`` and the F2/version-trail paths write
     ``checklist_responses`` through raw SQL, so an AST-only attribute scan would miss them.
-    The SQL string is still reached through the AST (the literal argument of a ``text()``
-    call), not through a whole-file text search.
+    The SQL string is still reached through the AST (the ``text()`` argument, or every literal
+    a local name passed to it was assigned -- ``writer_inventory_sql_bindings``), not by grep.
     """
     if dotted_name(call.func).rsplit(".", 1)[-1] != "text":
         return
     for argument in call.args:
-        literal = _constant_key(argument)
-        if literal is None:
-            continue
-        for table, columns in _CONTENT_STORES.items():
-            for body in _sql_update_re(table).findall(literal):
-                for column in _SQL_ASSIGN_RE.findall(body):
-                    lowered = column.lower()
-                    if lowered in columns:
-                        facts.sql_update_columns.add(f"{table}.{lowered}")
-                    elif lowered in _NON_CONTENT_ATTRS:
-                        facts.side_effects.add(f"<sets {table}.{lowered}>")
-            for body in _sql_insert_re(table).findall(literal):
-                for column in re.split(r"[,\s]+", body):
-                    if column.strip().lower() in columns:
-                        facts.sql_update_columns.add(f"{table}.{column.strip().lower()}")
-            if _sql_delete_re(table).search(literal):
-                facts.sql_update_columns.add(f"{table}.<delete>")
+        bound = facts.sql_text_bindings.get(argument.id) if isinstance(argument, ast.Name) else None
+        for literal in bound or [_sql_literal(argument)]:
+            if literal is None:
+                continue
+            for table, columns in _CONTENT_STORES.items():
+                for body in _sql_update_re(table).findall(literal):
+                    for column in _SQL_ASSIGN_RE.findall(body):
+                        lowered = column.lower()
+                        if lowered in columns:
+                            facts.sql_update_columns.add(f"{table}.{lowered}")
+                        elif lowered == _DYNAMIC_SQL_TOKEN:
+                            facts.sql_update_columns.add(f"{table}.<dynamic>")
+                        elif lowered in _NON_CONTENT_ATTRS:
+                            facts.side_effects.add(f"<sets {table}.{lowered}>")
+                for body in _sql_insert_re(table).findall(literal):
+                    for column in re.split(r"[,\s]+", body):
+                        lowered = column.strip().lower()
+                        if lowered in columns:
+                            facts.sql_update_columns.add(f"{table}.{lowered}")
+                        elif lowered == _DYNAMIC_SQL_TOKEN:
+                            facts.sql_update_columns.add(f"{table}.<dynamic>")
+                if _sql_delete_re(table).search(literal):
+                    facts.sql_update_columns.add(f"{table}.<delete>")
+
+
+#: f-string 插值在 SQL 模板里的占位符（只用于本模块内部匹配，不进任何产物）。
+_DYNAMIC_SQL_TOKEN = "__dynamic__"
+
+
+def _sql_literal(node: ast.AST) -> str | None:
+    """``text(...)`` 的 SQL 实参：字符串常量，或隐式拼接里夹了 f-string 的 ``JoinedStr``。
+
+    🔴 原实现只认 ``ast.Constant``。n2 导入（``n2_taxes_payable_service.import_data``）把列名
+       写成 ``{storage_field}`` 之后，整条 ``INSERT … ON CONFLICT DO UPDATE`` 在 AST 里是一个
+       ``JoinedStr`` ⇒ 一条整表覆盖 ``checklist_responses`` 的写入方从清册里消失，连带它的
+       路由入口（委派边的落点没了）也一起消失 —— 判的是「怎么拼字符串」，不是「写没写库」。
+       插值位置渲染成占位符；落在内容存储列位置时记为 ``<dynamic>``：列名在运行时才定，
+       判据无法证明它不是内容列，按写入方记账（与 ``parsed_data[<dynamic>]`` 同一口径）。
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        parts: list[str] = []
+        for value in node.values:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                parts.append(value.value)
+            else:
+                parts.append(_DYNAMIC_SQL_TOKEN)
+        return "".join(parts)
+    return None
 
 
 def _record_sql_update_values(facts: _FunctionFacts, call: ast.Call) -> None:
@@ -580,21 +623,48 @@ def _module_path_root_names(tree: ast.AST) -> dict[str, str]:
                         bound[name] = literal
     return bound
 
+
+# Another aggregate's own revision counter (``Adjustment.content_revision``) is not a workpaper
+# version; the two predicates live in the sibling module ``writer_inventory_foreign_revision.py``.
+# This script is also loaded by path (importlib, in the guards) ⇒ put its own directory on sys.path.
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+from writer_inventory_foreign_revision import (  # noqa: E402
+    foreign_revision_models,
+    module_foreign_version_owners as _module_foreign_version_owners,
+)
+from writer_inventory_sql_bindings import sql_text_bindings  # noqa: E402
+
+
+def _foreign_revision_models(app_root: Path) -> dict[str, frozenset[str]]:
+    """:func:`writer_inventory_foreign_revision.foreign_revision_models` over ``_VERSION_ATTRS``."""
+    return foreign_revision_models(app_root, _VERSION_ATTRS)
+
+
 def _collect_facts(
-    function: ast.AST, *, path_root_names: Mapping[str, str] | None = None
+    function: ast.AST,
+    *,
+    path_root_names: Mapping[str, str] | None = None,
+    foreign_version_owners: Mapping[str, str] | None = None,
 ) -> _FunctionFacts:
     facts = _FunctionFacts()
+    foreign = foreign_version_owners or {}
     # Destination bindings first: `_record_call` classifies each artifact write against
     # them, and the walk below does not visit statements in source order.
     facts.snapshot_path_names = _snapshot_bound_names(function)
+    facts.sql_text_bindings = sql_text_bindings(function, _iter_own_nodes, _sql_literal)
     for node in _iter_own_nodes(function):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                _record_target(facts, target)
+                _record_target(facts, target, foreign)
         elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
-            _record_target(facts, node.target)
+            _record_target(facts, node.target, foreign)
         elif isinstance(node, ast.Attribute):
-            if isinstance(node.ctx, ast.Load) and node.attr in _VERSION_ATTRS:
+            if (
+                isinstance(node.ctx, ast.Load)
+                and node.attr in _VERSION_ATTRS
+                and node.attr not in foreign
+            ):
                 facts.version_fields_read.add(node.attr)
         elif isinstance(node, ast.Subscript):
             if isinstance(node.ctx, ast.Load):
@@ -934,6 +1004,7 @@ def collect_source_facts() -> tuple[list[dict[str, Any]], dict[str, dict[str, An
     if not _APP_ROOT.is_dir():
         raise WriterInventoryError(f"application root does not exist: {_APP_ROOT}")
     test_index = discover_characterization_tests()
+    foreign_models = _foreign_revision_models(_APP_ROOT)
     functions: list[dict[str, Any]] = []
     scanned_files = 0
     for path in sorted(_APP_ROOT.rglob("*.py")):
@@ -951,6 +1022,9 @@ def collect_source_facts() -> tuple[list[dict[str, Any]], dict[str, dict[str, An
         relative = str(path.relative_to(_REPO)).replace("\\", "/")
         import_bindings = _module_import_targets(tree)
         path_root_names = _module_path_root_names(tree)
+        foreign_version_owners = _module_foreign_version_owners(
+            tree, import_bindings, foreign_models
+        )
         for qualname, function in _iter_functions(tree):
             functions.append(
                 {
@@ -961,7 +1035,9 @@ def collect_source_facts() -> tuple[list[dict[str, Any]], dict[str, dict[str, An
                     "line": function.lineno,
                     "is_async": isinstance(function, ast.AsyncFunctionDef),
                     "facts_obj": _collect_facts(
-                        function, path_root_names=path_root_names
+                        function,
+                        path_root_names=path_root_names,
+                        foreign_version_owners=foreign_version_owners,
                     ),
                     "import_bindings": import_bindings,
                 }

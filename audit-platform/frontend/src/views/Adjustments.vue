@@ -75,7 +75,7 @@
     <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
     <AiContentPendingBanner :project-id="projectId" />
 
-    <ClientBookingSuggestionBar :suggestions="bookingSuggestions" @review="openBookingSuggestion" />
+    <ClientBookingSuggestionBar :suggestions="bookingSuggestions" :can-edit="perms.writable && perms.edit" @review="openBookingSuggestion" />
 
     <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
     <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
@@ -353,6 +353,7 @@ import ClientBookingDialog from '@/components/adjustment/ClientBookingDialog.vue
 import AdjustmentTreatmentDialog from '@/components/adjustment/AdjustmentTreatmentDialog.vue'
 import AdjustmentEvidenceDialog from '@/components/adjustment/AdjustmentEvidenceDialog.vue'
 import ClientBookingSuggestionBar from '@/components/adjustment/ClientBookingSuggestionBar.vue'
+import { resolveSuggestionEntry } from '@/components/adjustment/clientBookingVoucher'
 import AdjustmentImpactPreview from '@/components/adjustment/AdjustmentImpactPreview.vue'
 import { parsePastedLines, type EditableLine, type EntrySavedPayload } from '@/components/adjustment/adjustmentLineRules'
 import {
@@ -887,12 +888,15 @@ function goMisstatements() {
   router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
 }
 
-function openBookingSuggestion(suggestion: AdjustmentBookingSuggestion): void {
-  const target = entries.value.find((entry: any) => entry.entry_group_id === suggestion.entry_group_id)
-  if (!target) {
-    ElMessage.info('对应调整分录不在当前可见列表，请刷新后重试')
-    return
-  }
+async function openBookingSuggestion(suggestion: AdjustmentBookingSuggestion): Promise<void> {
+  const pid = projectId.value
+  const requestedYear = year.value
+  if (!pid || requestedYear == null) return
+  // 不在当前页也能打开（R5.3）：按 focus 取本组所在页，每页 1 条即本组
+  const target = await resolveSuggestionEntry(suggestion.entry_group_id, entries.value as HallEntry[],
+    (groupId) => listAdjustments(pid, requestedYear, { page_size: 1, focus_entry_group_id: groupId }))
+  if (pid !== projectId.value || requestedYear !== year.value || target === undefined) return
+  if (target === null) { ElMessage.info('分录已删除或不在本年度'); return }
   bookingDialogRef.value?.open(target, suggestion.candidates, false)
 }
 

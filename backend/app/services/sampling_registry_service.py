@@ -329,50 +329,102 @@ async def register_sampling_batch(
     fail-open：异常时 warning 后返回 None，不影响回填主流程。
     """
     try:
-        criteria = log.extraction_criteria if isinstance(log.extraction_criteria, dict) else {}
-        fields = build_record_fields(
-            criteria=criteria,
-            total_matched=getattr(log, "total_matched", None),
-            filled_count=getattr(log, "filled_count", None),
-        )
-        batch_id = getattr(log, "batch_id", None)
+        async with db.begin_nested():  # R4：SAVEPOINT — 投影失败只回滚这一步，不污染主事务
+            criteria = log.extraction_criteria if isinstance(log.extraction_criteria, dict) else {}
+            fields = build_record_fields(
+                criteria=criteria,
+                total_matched=getattr(log, "total_matched", None),
+                filled_count=getattr(log, "filled_count", None),
+            )
+            batch_id = getattr(log, "batch_id", None)
 
-        existing = None
-        if batch_id is not None:
-            existing = (
-                await db.execute(
-                    sa.select(SamplingRecord).where(
-                        SamplingRecord.batch_id == batch_id,
-                        SamplingRecord.is_deleted == sa.false(),
+            existing = None
+            if batch_id is not None:
+                existing = (
+                    await db.execute(
+                        sa.select(SamplingRecord).where(
+                            SamplingRecord.batch_id == batch_id,
+                            SamplingRecord.is_deleted == sa.false(),
+                        )
                     )
-                )
-            ).scalar_one_or_none()
+                ).scalar_one_or_none()
 
-        if existing is not None:
-            for key, value in fields.items():
-                setattr(existing, key, value)
+            if existing is not None:
+                for key, value in fields.items():
+                    setattr(existing, key, value)
+                await db.flush()
+                return existing.id
+
+            record = SamplingRecord(
+                project_id=log.project_id,
+                working_paper_id=log.workpaper_id,
+                batch_id=batch_id,
+                created_by=created_by or getattr(log, "user_id", None),
+                **fields,
+            )
+            db.add(record)
             await db.flush()
-            return existing.id
-
-        record = SamplingRecord(
-            project_id=log.project_id,
-            working_paper_id=log.workpaper_id,
-            batch_id=batch_id,
-            created_by=created_by or getattr(log, "user_id", None),
-            **fields,
-        )
-        db.add(record)
-        await db.flush()
-        return record.id
-    except Exception:  # noqa: BLE001 — 投影失败不得阻断回填（但必须留 WARNING）
+            return record.id
+    except Exception as exc:  # noqa: BLE001 — 投影失败不得阻断回填（但必须留 WARNING）
         logger.warning(
             "抽样批次登记失败（sampling_records 投影未写入，权威留痕不受影响）"
-            " workpaper=%s batch=%s",
+            " workpaper=%s batch=%s error_type=%s error=%s",
             getattr(log, "workpaper_id", None),
             getattr(log, "batch_id", None),
+            type(exc).__name__, exc,
             exc_info=True,
         )
         return None
+
+
+#: 一次最多按多少个回填分录 id 回查序时账（批次样本量远小于此；超出只回查前这么多个）
+_MAX_UNIT_LOOKUP = 5000
+
+
+def _uuid_or_none(value: Any) -> UUID | None:
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+async def _filled_unit_lines(db: AsyncSession, log: Any, criteria: dict) -> dict[tuple, set[str]]:
+    """回填日志里的 ``filled_unit_ids``（被抽中的序时账分录 id）→ {(主体, 日期, 凭证字, 号): 分录科目集合}。
+
+    登记科目要写被抽中分录的科目：旧实现写筛选条件的第一个科目（E1 筛 1001 / 1002 / 1012 时一律写 1001，
+    共享库 30 行抽凭登记的分录实际全是 1002）。分录 id 查不到（辅助账样本、账套已删）时该凭证不在结果里。
+    回查失败只记 WARNING 并按查不到处理，不让登记整批失败。
+    """
+    ids = [u for u in (_uuid_or_none(v) for v in criteria.get("filled_unit_ids") or []) if u is not None]
+    if not ids:
+        return {}
+    from app.models.audit_platform_models import TbLedger
+
+    tbl = TbLedger.__table__
+    try:
+        async with db.begin_nested():
+            rows = (await db.execute(
+                sa.select(tbl.c.company_code, tbl.c.voucher_date, tbl.c.voucher_type, tbl.c.voucher_no,
+                          tbl.c.account_code)
+                .where(tbl.c.id.in_(ids[:_MAX_UNIT_LOOKUP]), tbl.c.project_id == log.project_id)
+            )).all()
+    except Exception as exc:  # noqa: BLE001 —— 保存点已回滚；登记照常进行，科目按查不到处理
+        logger.warning("回填分录回查失败，抽凭登记科目按未知处理 batch=%s error_type=%s error=%s",
+                       getattr(log, "batch_id", None), type(exc).__name__, exc)
+        return {}
+    out: dict[tuple, set[str]] = {}
+    for r in rows:
+        key = ((r.company_code or "").strip(), r.voucher_date, (r.voucher_type or "").strip(), (r.voucher_no or "").strip())
+        if r.account_code:
+            out.setdefault(key, set()).add(str(r.account_code))
+    return out
+
+
+def _registered_account(accounts: set[str] | None, filter_codes: list) -> str | None:
+    """登记科目：分录回查到唯一科目用它；回查到多个科目为空；没回查到时筛选条件只有一个科目才用它。"""
+    if accounts:
+        return next(iter(accounts)) if len(accounts) == 1 else None
+    return str(filter_codes[0]) if len(filter_codes) == 1 else None
 
 
 async def register_sampled_vouchers(
@@ -396,68 +448,79 @@ async def register_sampled_vouchers(
     fail-open：异常时 warning 后返回 0。
     """
     try:
-        criteria = log.extraction_criteria if isinstance(log.extraction_criteria, dict) else {}
-        keys = [
-            (k.company_code, k.date_value, k.voucher_type, k.voucher_no)
-            for k in parse_voucher_keys(criteria.get("filled_voucher_keys") or [])
-        ]
-        if not keys:  # 旧格式日志只有凭证号：主体 / 日期 / 凭证字为空，按号去重
-            nos = [str(v).strip() for v in criteria.get("filled_voucher_nos") or [] if str(v).strip()]
-            keys = [(None, None, None, no) for no in dict.fromkeys(nos)]
-        if not keys:
-            return 0
+        async with db.begin_nested():  # R4：SAVEPOINT — 投影失败只回滚这一步
+            criteria = log.extraction_criteria if isinstance(log.extraction_criteria, dict) else {}
+            keys = [
+                (k.company_code, k.date_value, k.voucher_type, k.voucher_no)
+                for k in parse_voucher_keys(criteria.get("filled_voucher_keys") or [])
+            ]
+            if not keys:  # 旧格式日志只有凭证号：主体 / 日期 / 凭证字为空，按号去重
+                nos = [str(v).strip() for v in criteria.get("filled_voucher_nos") or [] if str(v).strip()]
+                keys = [(None, None, None, no) for no in dict.fromkeys(nos)]
+            if not keys:
+                return 0
 
-        filters = criteria.get("filters") if isinstance(criteria.get("filters"), dict) else {}
-        codes = filters.get("account_codes") or []
-        account_code = str(codes[0]) if codes else None
-        batch_id = getattr(log, "batch_id", None)
-        phase = criteria.get("phase") if criteria.get("phase") in ("preliminary", "final") else None
-        note = build_sampling_purpose(criteria)
+            filters = criteria.get("filters") if isinstance(criteria.get("filters"), dict) else {}
+            codes = list(filters.get("account_codes") or [])
+            unit_lines = await _filled_unit_lines(db, log, criteria)
+            if unit_lines:
+                # 旧格式日志只有号：回填分录能唯一定到一张凭证时补上主体 / 日期 / 凭证字
+                by_no: dict[str, list[tuple]] = {}
+                for key in unit_lines:
+                    by_no.setdefault(key[3], []).append(key)
+                keys = [
+                    by_no[no][0] if vdate is None and len(by_no.get(no, ())) == 1 else (company, vdate, vtype, no)
+                    for company, vdate, vtype, no in keys
+                ]
+            batch_id = getattr(log, "batch_id", None)
+            phase = criteria.get("phase") if criteria.get("phase") in ("preliminary", "final") else None
+            note = build_sampling_purpose(criteria)
 
-        rows = [
-            {
-                "project_id": log.project_id,
-                "year": year,
-                "voucher_no": no,
-                "voucher_date": vdate,
-                "company_code": company,
-                "voucher_type": vtype,
-                "phase": phase,
-                "account_code": account_code,
-                "working_paper_id": log.workpaper_id,
-                "sampling_record_id": sampling_record_id,
-                "batch_id": batch_id,
-                "sampled_by": getattr(log, "user_id", None),
-                "note": note,
-            }
-            for company, vdate, vtype, no in keys
-        ]
+            rows = [
+                {
+                    "project_id": log.project_id,
+                    "year": year,
+                    "voucher_no": no,
+                    "voucher_date": vdate,
+                    "company_code": company,
+                    "voucher_type": vtype,
+                    "phase": phase,
+                    "account_code": _registered_account(unit_lines.get((company, vdate, vtype, no)), codes),
+                    "working_paper_id": log.workpaper_id,
+                    "sampling_record_id": sampling_record_id,
+                    "batch_id": batch_id,
+                    "sampled_by": getattr(log, "user_id", None),
+                    "note": note,
+                }
+                for company, vdate, vtype, no in keys
+            ]
 
-        stmt = pg_insert(SampledVoucher.__table__).values(rows)
-        # 🔴 目标须与 V210 的 uq_sampled_vouchers_batch 逐字一致（表达式列也是），否则 PG 推断不到
-        #    该索引，抛错后被下方 fail-open 吞成 WARNING，登记每次都静默失败。
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=[
-                "project_id",
-                "year",
-                "voucher_no",
-                sa.text("(COALESCE(voucher_date, DATE '1900-01-01'))"),
-                sa.text("(COALESCE(company_code, ''))"),
-                sa.text("(COALESCE(voucher_type, ''))"),
-                "working_paper_id",
-                "batch_id",
-            ],
-            index_where=sa.text("is_deleted = false"),
-        )
-        result = await db.execute(stmt)
-        await db.flush()
-        return int(result.rowcount or 0)
-    except Exception:  # noqa: BLE001
+            stmt = pg_insert(SampledVoucher.__table__).values(rows)
+            # 🔴 目标须与 V210 的 uq_sampled_vouchers_batch 逐字一致（表达式列也是），否则 PG 推断不到
+            #    该索引，抛错后被下方 fail-open 吞成 WARNING，登记每次都静默失败。
+            stmt = stmt.on_conflict_do_nothing(
+                index_elements=[
+                    "project_id",
+                    "year",
+                    "voucher_no",
+                    sa.text("(COALESCE(voucher_date, DATE '1900-01-01'))"),
+                    sa.text("(COALESCE(company_code, ''))"),
+                    sa.text("(COALESCE(voucher_type, ''))"),
+                    "working_paper_id",
+                    "batch_id",
+                ],
+                index_where=sa.text("is_deleted = false"),
+            )
+            result = await db.execute(stmt)
+            await db.flush()
+            return int(result.rowcount or 0)
+    except Exception as exc:  # noqa: BLE001
         logger.warning(
             "已抽凭证登记失败（sampled_vouchers 投影未写入，权威留痕不受影响）"
-            " workpaper=%s batch=%s",
+            " workpaper=%s batch=%s error_type=%s error=%s",
             getattr(log, "workpaper_id", None),
             getattr(log, "batch_id", None),
+            type(exc).__name__, exc,
             exc_info=True,
         )
         return 0
@@ -506,31 +569,33 @@ async def undo_sampling_registration(
         )
         return {"records": 0, "vouchers": 0}
     try:
-        rec_res = await db.execute(
-            sa.update(SamplingRecord.__table__)
-            .where(
-                SamplingRecord.batch_id == batch_id,
-                SamplingRecord.is_deleted == sa.false(),
+        async with db.begin_nested():  # R4：SAVEPOINT — 撤销投影失败不污染主事务
+            rec_res = await db.execute(
+                sa.update(SamplingRecord.__table__)
+                .where(
+                    SamplingRecord.batch_id == batch_id,
+                    SamplingRecord.is_deleted == sa.false(),
+                )
+                .values(is_deleted=True)
             )
-            .values(is_deleted=True)
-        )
-        vou_res = await db.execute(
-            sa.update(SampledVoucher.__table__)
-            .where(
-                SampledVoucher.batch_id == batch_id,
-                SampledVoucher.is_deleted == sa.false(),
+            vou_res = await db.execute(
+                sa.update(SampledVoucher.__table__)
+                .where(
+                    SampledVoucher.batch_id == batch_id,
+                    SampledVoucher.is_deleted == sa.false(),
+                )
+                .values(is_deleted=True)
             )
-            .values(is_deleted=True)
-        )
-        await db.flush()
-        return {
-            "records": int(rec_res.rowcount or 0),
-            "vouchers": int(vou_res.rowcount or 0),
-        }
-    except Exception:  # noqa: BLE001 — 投影撤销失败不得阻断审计师的撤销操作
+            await db.flush()
+            return {
+                "records": int(rec_res.rowcount or 0),
+                "vouchers": int(vou_res.rowcount or 0),
+            }
+    except Exception as exc:  # noqa: BLE001 — 投影撤销失败不得阻断审计师的撤销操作
         logger.warning(
-            "抽样登记投影撤销失败（两张投影表未软删，权威留痕已标记撤销）batch=%s",
-            batch_id,
+            "抽样登记投影撤销失败（两张投影表未软删，权威留痕已标记撤销）"
+            " batch=%s error_type=%s error=%s",
+            batch_id, type(exc).__name__, exc,
             exc_info=True,
         )
         return {"records": 0, "vouchers": 0}
@@ -549,31 +614,33 @@ async def update_sampling_record_evaluation(
     if batch_id is None:
         return False
     try:
-        record = (
-            await db.execute(
-                sa.select(SamplingRecord).where(
-                    SamplingRecord.batch_id == batch_id,
-                    SamplingRecord.is_deleted == sa.false(),
+        async with db.begin_nested():  # R4：SAVEPOINT — 评价投影失败不污染主事务
+            record = (
+                await db.execute(
+                    sa.select(SamplingRecord).where(
+                        SamplingRecord.batch_id == batch_id,
+                        SamplingRecord.is_deleted == sa.false(),
+                    )
                 )
-            )
-        ).scalar_one_or_none()
-        if record is None:
-            return False
-        record.deviations_found = _as_int(evaluation.get("deviation_count"))
-        record.misstatements_found = _as_decimal(evaluation.get("known_high_value"))
-        record.projected_misstatement = _as_decimal(evaluation.get("projected"))
-        record.upper_misstatement_limit = _as_decimal(evaluation.get("upper_limit"))
-        # 与 build_record_fields 走同一拼接：否则每次评价更新都会把三项结构化摘要抹掉，
-        # 而 `register_sampling_batch` 只在回填时跑一次 ⇒ 摘要永久丢失。
-        composed = _compose_conclusion(evaluation, {})
-        if composed:
-            record.conclusion = composed
-        await db.flush()
-        return True
-    except Exception:  # noqa: BLE001
+            ).scalar_one_or_none()
+            if record is None:
+                return False
+            record.deviations_found = _as_int(evaluation.get("deviation_count"))
+            record.misstatements_found = _as_decimal(evaluation.get("known_high_value"))
+            record.projected_misstatement = _as_decimal(evaluation.get("projected"))
+            record.upper_misstatement_limit = _as_decimal(evaluation.get("upper_limit"))
+            # 与 build_record_fields 走同一拼接：否则每次评价更新都会把三项结构化摘要抹掉，
+            # 而 `register_sampling_batch` 只在回填时跑一次 ⇒ 摘要永久丢失。
+            composed = _compose_conclusion(evaluation, {})
+            if composed:
+                record.conclusion = composed
+            await db.flush()
+            return True
+    except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "抽样评价投影失败（sampling_records 未更新，权威留痕不受影响）batch=%s",
-            batch_id,
+            "抽样评价投影失败（sampling_records 未更新，权威留痕不受影响）"
+            " batch=%s error_type=%s error=%s",
+            batch_id, type(exc).__name__, exc,
             exc_info=True,
         )
         return False

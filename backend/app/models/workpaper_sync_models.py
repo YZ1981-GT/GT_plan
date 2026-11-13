@@ -203,6 +203,11 @@ class WorkpaperContentVersion(Base):
     )
     actor_id: Mapped[uuid.UUID | None] = mapped_column(_UUID, ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=sa.func.now())
+    # V265：底稿内容版本的正式导出/数据交换单位证据。
+    export_surface_class: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
+    unit_policy_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    unit_policy_digest: Mapped[str | None] = mapped_column(_DIGEST, nullable=True)
+    source_storage_unit: Mapped[str | None] = mapped_column(sa.String(16), nullable=True)
 
 
 class WorkpaperContentRepresentation(Base):
@@ -946,6 +951,10 @@ class WorkpaperSyncConflict(Base):
     protection_policy: Mapped[str] = mapped_column(sa.String(40), nullable=False)
     suggested_action: Mapped[str] = mapped_column(sa.String(40), nullable=False)
     conflict_kind: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    #: `schema` 冲突的成因（`SchemaAnomalyKind` 的值）。非 schema 冲突恒 NULL。
+    #: V264 新增：它决定这条冲突能否靠「选一侧 / 输入合并值」收敛，此前列投影漏了它
+    #: ⇒ 成因在写库那一刻丢失，读侧只能把全部 schema 冲突一刀切判成不可裁决。
+    schema_anomaly: Mapped[str | None] = mapped_column(sa.String(60), nullable=True)
     base_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
     current_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
     incoming_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)

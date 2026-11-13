@@ -38,7 +38,7 @@ from app.services.parent_company_scope import (
     resolve_consolidated_sibling,
     resolve_parent_standalone_project,
 )
-from app.services.uscc_validator import validate_uscc
+from app.services.uscc_validator import format_code_error, normalize_uscc_input, validate_uscc
 
 # 集团关系字段（顺序即向导表单顺序）
 GROUP_FIELDS: tuple[str, ...] = (
@@ -48,6 +48,8 @@ GROUP_FIELDS: tuple[str, ...] = (
     "ultimate_company_name",
     "ultimate_company_code",
 )
+
+_UNCHECKED = object()
 
 _SCOPE_LABELS = {"consolidated": "合并", "standalone": "单户"}
 
@@ -84,9 +86,15 @@ def normalize_group_fields(data: Any) -> None:
         code = getattr(data, field)
         if code is None:
             continue
-        ok, err = validate_uscc(code)
+        # R1.2：先规范化（NFKC → strip → upper）再校验，入库写规范化值
+        normalized = normalize_uscc_input(code)
+        if normalized is None:
+            setattr(data, field, None)
+            continue
+        ok, err = validate_uscc(normalized)
         if not ok:
-            raise HTTPException(status_code=422, detail=f"{label}：{err}")
+            raise HTTPException(status_code=422, detail=format_code_error(label, err))
+        setattr(data, field, normalized)
 
     try:
         relation = normalize_relation(data.relation_to_parent)
@@ -397,7 +405,12 @@ async def _company_name_in_year(db: AsyncSession, code: str, year: int | None) -
 
 
 async def reparent_project(
-    db: AsyncSession, project: Project, new_code: str | None, *, name_hint: str | None = None,
+    db: AsyncSession,
+    project: Project,
+    new_code: str | None,
+    *,
+    name_hint: str | None = None,
+    expected_parent_code: str | None | object = _UNCHECKED,
 ) -> dict[str, Any]:
     """调整上级企业（「合并」总览页拖拽，ADR-CAL-005）：同企业同年度的合并项目与单户项目同写。
 
@@ -413,20 +426,33 @@ async def reparent_project(
     from app.services.group_relation import resolve_relation
     from app.services.project_audit_year import resolve_project_audit_year
 
-    new_value = _blank_to_none(new_code)
-    own_code = _blank_to_none(project.company_code)
+    # 服务层也统一规范化，避免绕过路由的调用方把小写、全角或首尾空白写入数据库。
+    new_value = normalize_uscc_input(new_code)
+    own_code = normalize_uscc_input(project.company_code)
     year = resolve_project_audit_year(project)
     from app.services.group_topology_lock import lock_topology_years
 
     await lock_topology_years(db, [year])
     await db.refresh(project)
+    if expected_parent_code is not _UNCHECKED:
+        current_parent_code = normalize_uscc_input(project.parent_company_code)
+        expected_code = normalize_uscc_input(expected_parent_code)
+        if current_parent_code != expected_code:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error_code": "PARENT_CODE_CONFLICT",
+                    "message": "企业树已被他人调整，已刷新为最新结构",
+                    "current_parent_company_code": current_parent_code,
+                },
+            )
     if resolve_project_audit_year(project) != year:
         raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
-    own_code = _blank_to_none(project.company_code)
+    own_code = normalize_uscc_input(project.company_code)
     if new_value is not None:
         ok, err = validate_uscc(new_value)
         if not ok:
-            raise HTTPException(status_code=422, detail=f"上级企业代码：{err}")
+            raise HTTPException(status_code=422, detail=format_code_error("上级企业代码", err))
         if own_code and year is not None and would_form_cycle(
             await load_year_records(db, year), year, own_code, new_value,
         ):

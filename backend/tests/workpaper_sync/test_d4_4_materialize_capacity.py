@@ -44,7 +44,6 @@ from app.services.workpaper_sync.projection_first_publication import (  # noqa: 
 from tests.workpaper_sync.d4_materialize_harness import (  # noqa: E402
     MaterializeCallCounter,
     _bundle,
-    _text_safe,
 )
 
 
@@ -185,7 +184,7 @@ def test_d44_materialize_expands_fifteen_rows_and_keeps_footer_and_identities(
 
     base = tmp_path / "d4-4-task17-base.xlsx"
     base.write_bytes(instrumented.instrumented_bytes)
-    baseline = _text_safe(adapter.extract(artifact=base, contract=contract))
+    baseline = adapter.extract(artifact=base, contract=contract)
     d44_projection = D44.build_store_projection_d44(
         _d44_rows(target_ids), contract=contract
     )

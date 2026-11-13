@@ -37,9 +37,9 @@ vi.mock('@/composables/useGroupTree', async () => {
 })
 
 import ConsolidationHub from '../ConsolidationHub.vue'
-import { reparentSummary } from '@/components/consolidation/composables/consolReparent'
+import { isParentCodeConflict, reparentSummary } from '@/components/consolidation/composables/consolReparent'
 
-const DRAG = { data: { id: 'p-a', companyName: '甲公司', label: '甲公司', companyCode: 'A', children: [] } }
+const DRAG = { data: { id: 'p-a', companyName: '甲公司', label: '甲公司', companyCode: 'A', parentCompanyCode: 'OLD', children: [] } }
 const DROP = { data: { id: 'p-n', companyName: '新上级公司', label: '新上级公司', companyCode: 'N', children: [] } }
 
 function mountHub() {
@@ -53,6 +53,21 @@ beforeEach(() => {
   confirm.mockReset().mockResolvedValue('confirm')
   handleApiError.mockReset()
   fetchTree.mockReset().mockResolvedValue(undefined)
+})
+
+describe('isParentCodeConflict', () => {
+  it('仅识别带 PARENT_CODE_CONFLICT 业务码的 409', () => {
+    expect(isParentCodeConflict({
+      response: { status: 409, data: { detail: { error_code: 'PARENT_CODE_CONFLICT' } } },
+    })).toBe(true)
+    expect(isParentCodeConflict({
+      response: { status: 409, data: { detail: { error_code: 'OTHER_CONFLICT' } } },
+    })).toBe(false)
+    expect(isParentCodeConflict({
+      response: { status: 422, data: { detail: { error_code: 'PARENT_CODE_CONFLICT' } } },
+    })).toBe(false)
+    expect(isParentCodeConflict({ response: { status: 409, data: { detail: '冲突' } } })).toBe(false)
+  })
 })
 
 describe('reparentSummary', () => {
@@ -82,11 +97,29 @@ describe('ConsolidationHub 拖拽改上级', () => {
     await (wrapper.vm as any).onNodeDrop(DRAG, DROP, 'inner')
     await flushPromises()
     expect(api.patch).toHaveBeenCalledWith('/api/projects/p-a/parent-code',
-      { parent_company_code: 'N', parent_company_name: '新上级公司' }, { _silent: true })
+      {
+        parent_company_code: 'N',
+        parent_company_name: '新上级公司',
+        expected_parent_company_code: 'OLD',
+      }, { _silent: true })
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({
       title: '层级调整成功', type: 'success', message: '已同步 甲公司（单户项目）的上级企业代码、上级企业名称。',
     }))
     expect(fetchTree).toHaveBeenCalledWith('consolidated')
+  })
+
+  it('缺少改前上级时把期望值显式传为 null', async () => {
+    api.patch.mockResolvedValueOnce({ synced: [], notices: [] })
+    const wrapper = mountHub()
+    await flushPromises()
+    await (wrapper.vm as any).onNodeDrop(
+      { data: { ...DRAG.data, parentCompanyCode: undefined } },
+      DROP,
+      'inner',
+    )
+    await flushPromises()
+    expect(api.patch).toHaveBeenCalledWith('/api/projects/p-a/parent-code',
+      expect.objectContaining({ expected_parent_company_code: null }), { _silent: true })
   })
 
   it('有后端说明 ⇒ 警告样式并带说明', async () => {
@@ -98,8 +131,13 @@ describe('ConsolidationHub 拖拽改上级', () => {
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'warning', message: expect.stringContaining('尚未建项') }))
   })
 
-  it('失败走统一错误处理（只提示一次）并重读树；取消确认不调接口', async () => {
-    const err = { response: { status: 400, data: { detail: '该调整会形成循环引用（项目成为自己的祖先）' } } }
+  it.each([
+    { status: 400, detail: '该调整会形成循环引用（项目成为自己的祖先）' },
+    { status: 422, detail: '上级企业代码格式错误' },
+    { status: 403, detail: '无权调整企业层级' },
+    { status: 409, detail: { error_code: 'OTHER_CONFLICT', message: '其他业务冲突' } },
+  ])('非 PARENT_CODE_CONFLICT 错误仍走统一错误处理并重读树（$status）', async ({ status, detail }) => {
+    const err = { response: { status, data: { detail } } }
     api.patch.mockRejectedValueOnce(err)
     const wrapper = mountHub()
     await flushPromises()
@@ -108,13 +146,51 @@ describe('ConsolidationHub 拖拽改上级', () => {
     await flushPromises()
     expect(handleApiError).toHaveBeenCalledWith(err, '层级调整')
     expect(notify).not.toHaveBeenCalled()
+    expect(api.patch).toHaveBeenCalledTimes(1)
     expect(fetchTree).toHaveBeenCalledTimes(1)
+  })
 
+  it('取消确认不调接口但重读树', async () => {
     confirm.mockRejectedValueOnce('cancel')
-    api.patch.mockClear()
+    const wrapper = mountHub()
+    await flushPromises()
+    fetchTree.mockClear()
     await (wrapper.vm as any).onNodeDrop(DRAG, DROP, 'inner')
     await flushPromises()
     expect(api.patch).not.toHaveBeenCalled()
-    expect(fetchTree).toHaveBeenCalledTimes(2)
+    expect(handleApiError).not.toHaveBeenCalled()
+    expect(fetchTree).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+describe('ConsolidationHub 拖拽 CAS 冲突', () => {
+  it('PARENT_CODE_CONFLICT 提示已刷新，不走通用错误处理且不重试', async () => {
+    const err = {
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            error_code: 'PARENT_CODE_CONFLICT',
+            message: '企业树已被他人调整，已刷新为最新结构',
+            current_parent_company_code: 'LATEST',
+          },
+        },
+      },
+    }
+    api.patch.mockRejectedValueOnce(err)
+    const wrapper = mountHub()
+    await flushPromises()
+    fetchTree.mockClear()
+    await (wrapper.vm as any).onNodeDrop(DRAG, DROP, 'inner')
+    await flushPromises()
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      title: '层级已被调整',
+      message: '企业树已被他人调整，已刷新为最新结构',
+      type: 'warning',
+    }))
+    expect(handleApiError).not.toHaveBeenCalled()
+    expect(api.patch).toHaveBeenCalledTimes(1)
+    expect(fetchTree).toHaveBeenCalledTimes(1)
   })
 })

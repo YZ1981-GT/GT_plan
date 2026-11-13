@@ -90,7 +90,9 @@ def _align_table_to_template(tbl: dict, tpl_tbl: dict, *, by_position: bool = Fa
             by_position and _values_width(tbl) != len(tpl_headers) - 1):
         return
 
-    # 1. 回填表名
+    # 1. 回填稳定表身份与表名
+    if tpl_tbl.get("table_id"):
+        tbl["table_id"] = str(tpl_tbl["table_id"])
     if tpl_name:
         tbl["name"] = tpl_name
 
@@ -299,3 +301,21 @@ def enrich_note_table_data(
         attach_display_layout(table_data, str(std) if std else None, section_number)
     except Exception:
         logger.warning("note_table_enrichment: period layout failed section=%s", section_number, exc_info=True)
+
+    # 4. 稳定列身份 + 七类显示度量元数据；找不到目录时显式 unmatched，绝不把未知数值猜成金额。
+    try:
+        from app.services.note_table_measure_catalog import attach_standalone_measure_metadata
+
+        attach_standalone_measure_metadata(table_data, source_template, section_number)
+    except Exception:
+        logger.warning("note_table_enrichment: measure catalog failed section=%s", section_number, exc_info=True)
+        tables = table_data.get("_tables") if isinstance(table_data.get("_tables"), list) else [table_data]
+        for table in tables:
+            if isinstance(table, dict):
+                width = len(table.get("headers") or [])
+                table.update(
+                    measure_status="invalid",
+                    column_ids=[None] * width,
+                    column_kinds=[None] * width,
+                    column_ratio_scales=[None] * width,
+                )

@@ -18,12 +18,42 @@ from app.services.ledger_penetration_service import _attach_extra_fields
 from app.services.ledger_window_service import (
     Kind,
     LedgerWindowService,
+    _is_browse_all,
     _order,
     _range_conditions,
     _scope_conditions,
+    _visible_condition,
 )
 
 _UNSET = object()
+
+# 单次导出行数上限：Excel 单表硬上限 1,048,576 行，且百万行级导出会长时间占用连接与磁盘。
+# 超过时明确拒绝（413），要求缩小范围，而不是静默截断。
+LEDGER_EXPORT_MAX_ROWS = 500_000
+
+
+async def _ensure_exportable(db, table, project_id, dataset_id, query, *, auxiliary: bool) -> None:
+    """导出前先数一遍命中行数，超过上限直接 413。"""
+    from fastapi import HTTPException
+
+    if db.bind.dialect.name == "postgresql":
+        # 容器 /dev/shm 默认 64MB：百万行并行计数会 DiskFullError，本事务内关闭并行
+        await db.execute(sa.text("SET LOCAL max_parallel_workers_per_gather = 0"))
+    count = (await db.execute(
+        sa.select(sa.func.count()).select_from(table).where(
+            *_scope_conditions(table, project_id, dataset_id, query, auxiliary=auxiliary),
+            *_range_conditions(table, query),
+            _visible_condition(table.c, query, auxiliary=auxiliary),
+        )
+    )).scalar_one()
+    if int(count) > LEDGER_EXPORT_MAX_ROWS:
+        raise HTTPException(status_code=413, detail={
+            "error_code": "LEDGER_EXPORT_TOO_LARGE",
+            "message": f"导出范围共 {int(count):,} 行，超过单次上限 {LEDGER_EXPORT_MAX_ROWS:,} 行；"
+                       "请按科目、日期范围或关键字缩小范围后再导出",
+            "row_count": int(count),
+            "max_rows": LEDGER_EXPORT_MAX_ROWS,
+        })
 
 
 def _visible(row: dict[str, Any], query: LedgerWindowQuery, *, auxiliary: bool) -> bool:
@@ -71,12 +101,11 @@ async def build_ledger_export(
     """
     auxiliary = kind == "aux_ledger"
     service = LedgerWindowService(db)
-    if auxiliary and not query.aux_type:
-        # Reuse the service's stable error contract.
-        await service.fetch(kind, project_id, "export", query)
-        raise AssertionError("unreachable")
     table = TbAuxLedger.__table__ if auxiliary else TbLedger.__table__
     dataset_id = await service._active_dataset(project_id, query.year)
+    # 浏览模式（未限定科目 / 辅助类型）：累计余额没有会计意义 ⇒ 导出不带期初行、余额列和月合计行
+    browse = _is_browse_all(query, auxiliary=auxiliary)
+    await _ensure_exportable(db, table, project_id, dataset_id, query, auxiliary=auxiliary)
     annual = await service._opening(project_id, dataset_id, query, auxiliary=auxiliary)
     opening = await service._range_opening(table, project_id, dataset_id, query, annual, auxiliary=auxiliary)
     extra_columns = await service._extra_columns(table, project_id, dataset_id, query, auxiliary=auxiliary)
@@ -98,16 +127,21 @@ async def build_ledger_export(
             .order_by(*_order(table.c)).execution_options(yield_per=1000))
 
     book = Workbook(write_only=True)
-    sheet = book.create_sheet(title=("辅助明细_" if auxiliary else "序时账_") + query.account_code.replace("*", "")[:20])
-    fixed_headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "余额方向"]
+    sheet = book.create_sheet(title=("辅助明细_" if auxiliary else "序时账_") + (query.account_code.replace("*", "") or "全部")[:20])
+    if browse:
+        # 浏览模式：多带「科目」列，便于看出每行属于哪个科目；没有余额列
+        fixed_headers = ["日期", "凭证号", "科目编码", "科目名称", "摘要", "借方", "贷方"]
+    else:
+        fixed_headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "余额方向"]
     if auxiliary:
         fixed_headers.extend(["辅助类型", "辅助编码", "辅助名称"])
     else:
         fixed_headers.append("对方科目")
     sheet.append([*fixed_headers, *extra_columns])
-    opening_row = [None, None, "范围期初余额", None, None, abs(opening), "贷" if opening < 0 else "借"]
-    opening_row.extend([None, None, None] if auxiliary else [None])
-    sheet.append([*opening_row, *([None] * len(extra_columns))])
+    if not browse:
+        opening_row = [None, None, "范围期初余额", None, None, abs(opening), "贷" if opening < 0 else "借"]
+        opening_row.extend([None, None, None] if auxiliary else [None])
+        sheet.append([*opening_row, *([None] * len(extra_columns))])
 
     running = opening
     current_month: str | None | object = _UNSET
@@ -116,7 +150,7 @@ async def build_ledger_export(
 
     def append_subtotal() -> None:
         nonlocal month_debit, month_credit, month_visible
-        if month_visible:
+        if month_visible and not browse:
             label = f"{current_month} 本月合计" if current_month else "未注明日期合计"
             row = [None, None, label, month_debit, month_credit, abs(running), "贷" if running < 0 else "借"]
             row.extend([None, None, None] if auxiliary else [None])
@@ -145,8 +179,12 @@ async def build_ledger_export(
             month_credit += credit
             month_visible += 1
             exported += 1
-            values = [row.get("voucher_date"), row.get("voucher_no"), row.get("summary"),
-                      debit or None, credit or None, abs(running), "贷" if running < 0 else "借"]
+            if browse:
+                values = [row.get("voucher_date"), row.get("voucher_no"), row.get("account_code"),
+                          row.get("account_name"), row.get("summary"), debit or None, credit or None]
+            else:
+                values = [row.get("voucher_date"), row.get("voucher_no"), row.get("summary"),
+                          debit or None, credit or None, abs(running), "贷" if running < 0 else "借"]
             if auxiliary:
                 values.extend([row.get("aux_type"), row.get("aux_code"), row.get("aux_name")])
             else:

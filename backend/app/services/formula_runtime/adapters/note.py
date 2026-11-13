@@ -144,6 +144,20 @@ def _set_cell_value(table_data: dict | None, row: str, column: str, value: Any) 
     return result
 
 
+def _cell_mode(table_data: dict | None, row: str, column: str) -> Any:
+    """目标格的单元格模式（与 ``_get_cell_value`` 同一找行口径；行上 ``_cell_modes`` 按列键取）；找不到返回 None。"""
+    rows = (table_data or {}).get("rows")
+    if isinstance(rows, list):
+        for idx, r in enumerate(rows):
+            if isinstance(r, dict) and row in (str(idx), str(r.get("key", r.get("id", "")))):
+                modes = r.get("_cell_modes")
+                return modes.get(str(column)) if isinstance(modes, dict) else None
+    elif isinstance(rows, dict) and isinstance(rows.get(row), dict):
+        modes = rows[row].get("_cell_modes")
+        return modes.get(str(column)) if isinstance(modes, dict) else None
+    return None
+
+
 def _group_by_section(
     targets: list[CanonicalFormulaTarget],
 ) -> dict[tuple[UUID, int, str], list[CanonicalFormulaTarget]]:
@@ -167,6 +181,14 @@ class NoteMutationAdapter:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        #: 写入归属被拒的目标（spec formula-writer-ownership-and-stale §13）：不写、不进已应用清单
+        self.blocked_writes: list[dict[str, Any]] = []
+
+    @staticmethod
+    def _gate(note: Any, section: str) -> Any:
+        from app.services.note_write_ownership import WriteGate, note_template_type
+
+        return WriteGate("formula_runtime_apply", note_template_type(note), section, note.table_data)
 
     # ------------------------------------------------------------------
     # prepare_many
@@ -281,6 +303,26 @@ class NoteMutationAdapter:
                         f"Note section not found: project={project_id}, "
                         f"year={year}, section={section}"
                     )
+                continue
+
+            # 写入归属：交接章节里公式运行不是所有者；locked / manual 格不写（原来不看格模式）
+            from app.services.note_write_ownership import FIELD_ROWS
+
+            gate = self._gate(note, section)
+            table_name = str((note.table_data or {}).get("name") or "*")
+            writable: list[FormulaMutation] = []
+            for m in group_mutations:
+                row_key, col_key = m.target.locator["row"], m.target.locator["column"]
+                verdict = gate.check(table=table_name, field=FIELD_ROWS,
+                                     cell_mode=_cell_mode(note.table_data, row_key, col_key))
+                if verdict.allowed:
+                    writable.append(m)
+                else:
+                    gate.record(verdict, table=table_name, field=FIELD_ROWS, row=str(row_key),
+                                incoming=m.after_value, addr_id=m.target.addr_id)
+            self.blocked_writes.extend(gate.blocked_writes)
+            group_mutations = writable
+            if not group_mutations:
                 continue
 
             for m in group_mutations:

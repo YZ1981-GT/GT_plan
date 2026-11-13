@@ -29,96 +29,96 @@
     <!-- 本年金额 — 动态列（三级表头：本年金额 > 分组 > 明细列） -->
     <el-table-column label="本年金额" header-align="center">
       <el-table-column prop="cy:paid_in_capital" label="实收资本(股本)" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'paid_in_capital', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'paid_in_capital', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'paid_in_capital', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'paid_in_capital', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column label="其他权益工具" header-align="center">
         <el-table-column prop="cy:other_equity_preferred" label="优先股" width="90" align="right" :resizable="true">
-          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_preferred', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'other_equity_preferred', 'current_year', v)" /></template>
+          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_preferred', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'other_equity_preferred', 'current_year', v)" /></template>
         </el-table-column>
         <el-table-column prop="cy:other_equity_perpetual" label="永续债" width="90" align="right" :resizable="true">
-          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_perpetual', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'other_equity_perpetual', 'current_year', v)" /></template>
+          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_perpetual', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'other_equity_perpetual', 'current_year', v)" /></template>
         </el-table-column>
         <el-table-column prop="cy:other_equity_other" label="其他" width="90" align="right" :resizable="true">
-          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_other', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'other_equity_other', 'current_year', v)" /></template>
+          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_other', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'other_equity_other', 'current_year', v)" /></template>
         </el-table-column>
       </el-table-column>
       <el-table-column prop="cy:capital_reserve" label="资本公积" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'capital_reserve', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'capital_reserve', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'capital_reserve', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'capital_reserve', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:treasury_stock" label="减：库存股" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'treasury_stock', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'treasury_stock', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'treasury_stock', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'treasury_stock', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:oci" label="其他综合收益" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'oci', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'oci', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'oci', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'oci', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:special_reserve" label="专项储备" width="100" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'special_reserve', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'special_reserve', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'special_reserve', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'special_reserve', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:surplus_reserve" label="盈余公积" width="100" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'surplus_reserve', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'surplus_reserve', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'surplus_reserve', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'surplus_reserve', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:general_risk" label="一般风险准备" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'general_risk', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'general_risk', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'general_risk', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'general_risk', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:retained_earnings" label="未分配利润" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'retained_earnings', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'retained_earnings', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'retained_earnings', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'retained_earnings', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column v-if="isConsolidated" prop="cy:subtotal" label="小计" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'subtotal', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'subtotal', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'subtotal', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'subtotal', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column v-if="isConsolidated" prop="cy:minority" label="少数股东权益" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'minority', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'minority', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'minority', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'minority', 'current_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="cy:total" label="所有者权益合计" width="120" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'total', 'current_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'total', 'current_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'total', 'current_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'total', 'current_year', v)" /></template>
       </el-table-column>
     </el-table-column>
 
     <!-- 上年金额 — 三级表头（与本年金额结构一致） -->
     <el-table-column label="上年金额" header-align="center">
       <el-table-column prop="py:paid_in_capital" label="实收资本(股本)" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'paid_in_capital', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'paid_in_capital', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'paid_in_capital', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'paid_in_capital', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column label="其他权益工具" header-align="center">
         <el-table-column prop="py:other_equity_preferred" label="优先股" width="90" align="right" :resizable="true">
-          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_preferred', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'other_equity_preferred', 'prior_year', v)" /></template>
+          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_preferred', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'other_equity_preferred', 'prior_year', v)" /></template>
         </el-table-column>
         <el-table-column prop="py:other_equity_perpetual" label="永续债" width="90" align="right" :resizable="true">
-          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_perpetual', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'other_equity_perpetual', 'prior_year', v)" /></template>
+          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_perpetual', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'other_equity_perpetual', 'prior_year', v)" /></template>
         </el-table-column>
         <el-table-column prop="py:other_equity_other" label="其他" width="90" align="right" :resizable="true">
-          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_other', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'other_equity_other', 'prior_year', v)" /></template>
+          <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'other_equity_other', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'other_equity_other', 'prior_year', v)" /></template>
         </el-table-column>
       </el-table-column>
       <el-table-column prop="py:capital_reserve" label="资本公积" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'capital_reserve', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'capital_reserve', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'capital_reserve', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'capital_reserve', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:treasury_stock" label="减：库存股" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'treasury_stock', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'treasury_stock', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'treasury_stock', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'treasury_stock', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:oci" label="其他综合收益" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'oci', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'oci', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'oci', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'oci', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:special_reserve" label="专项储备" width="100" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'special_reserve', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'special_reserve', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'special_reserve', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'special_reserve', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:surplus_reserve" label="盈余公积" width="100" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'surplus_reserve', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'surplus_reserve', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'surplus_reserve', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'surplus_reserve', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:general_risk" label="一般风险准备" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'general_risk', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'general_risk', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'general_risk', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'general_risk', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:retained_earnings" label="未分配利润" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'retained_earnings', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'retained_earnings', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'retained_earnings', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'retained_earnings', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column v-if="isConsolidated" prop="py:subtotal" label="小计" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'subtotal', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'subtotal', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'subtotal', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'subtotal', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column v-if="isConsolidated" prop="py:minority" label="少数股东权益" width="110" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'minority', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'minority', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'minority', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'minority', 'prior_year', v)" /></template>
       </el-table-column>
       <el-table-column prop="py:total" label="所有者权益合计" width="120" align="right" :resizable="true">
-        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'total', 'prior_year')" :editable="canEdit(row)" @commit="(v) => onCommit(row, 'total', 'prior_year', v)" /></template>
+        <template #default="{ row }"><ReportMatrixCell :value="shown(row, 'total', 'prior_year')" :editable="canEdit(row)" @commit="(v: number | null) => onCommit(row, 'total', 'prior_year', v)" /></template>
       </el-table-column>
     </el-table-column>
   </el-table>

@@ -15,12 +15,17 @@ import pytest_asyncio
 from sqlalchemy.schema import CreateTable
 
 import app.routers.wp_formula as wp_formula_router
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry
+from app.models.dataset_models import ImportEventOutbox
 from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex
 from tests.authz_world import TARGET_PROJECT_ID, WORLD_TABLE_NAMES, sqlite_world
 
 PID = TARGET_PROJECT_ID
 WP = uuid.UUID("7c2e9a41-3d5b-4f60-8e17-9b0a4c6d2f33")
-_EXTRA = (WpIndex.__table__, WorkingPaper.__table__, WpFormula.__table__)
+# 保存的两个同事务副作用都要有表：mandatory 审计（wp_formula_audit → 审计链：审计表 + 链尾表）、
+# 公式变更进耐久 outbox（formula_settings.outbox → import_event_outbox）
+_EXTRA = (WpIndex.__table__, WorkingPaper.__table__, WpFormula.__table__,
+          AuditLogEntry.__table__, AuditChainHead.__table__, ImportEventOutbox.__table__)
 _URL = f"/api/workpapers/{WP}/formulas"
 _ISSUE = [{"ref": "X", "uri": "x://", "status": "not_found", "reason": "not_found", "message": "桩：悬空"}]
 

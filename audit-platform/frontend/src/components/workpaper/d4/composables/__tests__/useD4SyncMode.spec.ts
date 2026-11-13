@@ -12,7 +12,7 @@
  * 对应用例即打红。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { effectScope, ref, nextTick } from 'vue'
+import { computed, effectScope, ref, nextTick, type Ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 
 // http mock：记录所有 GET，健康端点默认延迟返回 healthy=true（模拟 mount 期异步晚于点击）
@@ -266,5 +266,93 @@ describe('fetchOnlyOfficeHealthy 共享 TTL 缓存 + in-flight 去重', () => {
     const v2 = await p2
     expect(healthCallCount()).toBe(2) // 打了第二次
     expect(v2).toBe(false) // 拿到的是最新状态，不是旧缓存的 true
+  })
+})
+
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure · task 3.5 / AC 1.4）：
+ * 传了 `entrySync` 后，「在线编辑」选项与分段器可见性由单源决定，D4 宿主不再自判。
+ *
+ * 变异反证：`allowOnlineEdit` 不看 entrySync（恒 true）⇒ ①④ 红；去掉「已在 OO 时保留选项」⇒ ③ 红；
+ * `showModeSwitch` 不看视图数 ⇒ ② 红；switchMode 不复核 `allowOnlineEdit` ⇒ ④ 红。
+ */
+describe('useD4SyncMode × 同步能力单源（entrySync）', () => {
+  beforeEach(() => {
+    getCalls.length = 0
+    switchToOnlyOffice.mockClear()
+    bridgeMode.value = 'html'
+    bridgeState.value = 'html_idle'
+    bridgeDirty.value = false
+    __resetOoHealthCacheForTests()
+  })
+
+  function makeGated(show: Ref<boolean>, views = ['表格视图']) {
+    return useD4SyncMode({
+      sheetKey: 'd4xx-managed',
+      wpId: ref('wp'),
+      projectId: ref('p'),
+      isReadonly: ref(false),
+      views,
+      flushHtml: async () => ({ expectedRevision: 1, projection: { values: {}, row_keys: {} }, sheetKey: 'd4xx-managed' } as any),
+      reloadHtml: async () => {},
+      entrySync: { presentation: computed(() => ({ showModeSwitch: show.value })) },
+    })
+  }
+
+  it('① 单源说不显示 ⇒ 单视图不画分段器、选项里没有「在线编辑」；单源翻 true 后两者随之出现', () => {
+    const scope = effectScope()
+    scope.run(() => {
+      const show = ref(false)
+      const m = makeGated(show)
+      expect(m.showModeSwitch.value).toBe(false)
+      expect(m.modeOptions.value.map(o => o.value)).toEqual(['表格视图'])
+      show.value = true
+      expect(m.showModeSwitch.value).toBe(true)
+      expect(m.modeOptions.value.map(o => o.value)).toEqual(['表格视图', '在线编辑'])
+    })
+    scope.stop()
+  })
+
+  it('② 多视图宿主即使单源说不显示也保留分段器，只去掉「在线编辑」', () => {
+    const scope = effectScope()
+    scope.run(() => {
+      const m = makeGated(ref(false), ['卡片视图', '矩阵视图'])
+      expect(m.showModeSwitch.value).toBe(true)
+      expect(m.modeOptions.value.map(o => o.value)).toEqual(['卡片视图', '矩阵视图'])
+    })
+    scope.stop()
+  })
+
+  it('③ 已在 OO 里时单源为 false 仍保留「在线编辑」选项（不把编辑中的人留在选项之外）', () => {
+    const scope = effectScope()
+    scope.run(() => {
+      bridgeMode.value = 'oo'
+      const m = makeGated(ref(false))
+      expect(m.modeOptions.value.map(o => o.value)).toContain('在线编辑')
+      expect(m.editorMode.value).toBe('在线编辑')
+    })
+    scope.stop()
+  })
+
+  it('④ 选项被藏起时程序化切换（快捷键 / 旧状态恢复）不放行；单源为 true 时同一路径正常切', async () => {
+    const hidden = effectScope()
+    await hidden.run(async () => {
+      const m = makeGated(ref(false))
+      m.editorMode.value = '在线编辑'
+      healthResolver({ data: { data: { healthy: true } } })
+      await flushPromises()
+      expect(switchToOnlyOffice).not.toHaveBeenCalled()
+    })
+    hidden.stop()
+    // 对照：同一路径在单源放行时确实会切（否则上面的「不调用」可能只是健康没就绪）
+    const shown = effectScope()
+    await shown.run(async () => {
+      const m = makeGated(ref(true))
+      m.editorMode.value = '在线编辑'
+      healthResolver({ data: { data: { healthy: true } } })
+      await flushPromises()
+      expect(switchToOnlyOffice).toHaveBeenCalledTimes(1)
+    })
+    shown.stop()
   })
 })

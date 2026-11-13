@@ -192,6 +192,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadFile, UploadRequestOptions, UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { userScopedWorkpaperDraftKey } from '@/composables/workpaper/checklistDraftStorage'
 import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import AuditContextHeader from './dialogs/AuditContextHeader.vue'
 import { confirmLeave } from '@/utils/confirm'
@@ -261,7 +262,10 @@ const formRules: FormRules = {
 
 const sheetKey = computed(() => `stocktake_${props.stocktakeId || props.wpCode}`)
 const draftKey = computed(
-  () => `gt:stocktake-draft:${props.projectId}:${props.wpId}:${sheetKey.value}`
+  () => userScopedWorkpaperDraftKey(
+    'gt:stocktake-draft',
+    [props.projectId, props.wpId, sheetKey.value],
+  ),
 )
 
 
@@ -332,8 +336,10 @@ function onVideoUploadRemove(file: UploadFile) {
 }
 
 function loadDraft() {
+  const key = draftKey.value
+  if (!key) return null
   try {
-    const raw = localStorage.getItem(draftKey.value)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     return JSON.parse(raw)
   } catch {
@@ -341,15 +347,19 @@ function loadDraft() {
   }
 }
 function saveDraft() {
+  const key = draftKey.value
+  if (!key) return
   try {
-    localStorage.setItem(draftKey.value, JSON.stringify(form.value))
+    localStorage.setItem(key, JSON.stringify(form.value))
   } catch {
     /* localStorage quota exceeded — 静默 */
   }
 }
 function clearDraft() {
+  const key = draftKey.value
+  if (!key) return
   try {
-    localStorage.removeItem(draftKey.value)
+    localStorage.removeItem(key)
   } catch {
     /* 静默 */
   }

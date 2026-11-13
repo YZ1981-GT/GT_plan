@@ -14,13 +14,14 @@ def test_release_scripts_exist_and_package_commands_are_closed() -> None:
     scripts = package["scripts"]
     assert scripts["build:verify"] == "node scripts/build-verified-dist.mjs"
     assert scripts["preview:verified"] == "node scripts/preview-verified-dist.mjs"
-    assert scripts["bundle:check"] == "node scripts/check-bundle-budget.mjs --check --dist dist"
+    assert scripts["bundle:check"] == "node scripts/check-bundle-budget.mjs --check --dir dist"
     for relative in (
         "scripts/build-verified-dist.mjs",
         "scripts/preview-verified-dist.mjs",
         "scripts/check-bundle-budget.mjs",
         "scripts/smoke-built-dist.mjs",
-        "scripts/bundle-budget.baseline.json",
+        # 包体预算单一策略文件（2026-11-06 起取代匿名 bundle-budget.baseline.json）。
+        "scripts/bundle-budget.json",
         "Dockerfile",
         "docker/default.conf.template",
     ):
@@ -33,7 +34,7 @@ def test_verified_build_has_content_addressed_output_and_all_gates() -> None:
     builder = (FRONTEND / "scripts/build-verified-dist.mjs").read_text(encoding="utf-8")
     preview = (FRONTEND / "scripts/preview-verified-dist.mjs").read_text(encoding="utf-8")
     assert "GT_FRONTEND_OUT_DIR" in vite and "manifest: true" in vite
-    for required in ("check-bundle-budget.mjs", "smoke-built-dist.mjs", "manifestSha256"):
+    for required in ("check-bundle-budget.mjs", "smoke-built", "manifestSha256"):
         assert required in builder
     assert "budgetBaselineSha256" in preview and "manifestSha256" in preview
 

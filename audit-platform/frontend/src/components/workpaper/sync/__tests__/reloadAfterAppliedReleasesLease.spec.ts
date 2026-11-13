@@ -49,6 +49,8 @@ function applied(): WorkpaperSyncOperationSnapshot {
     applicationErrorCode: null,
     applicationErrorStage: null,
     applicationErrorMessage: null,
+    roomLatestDurableApplicationId: null,
+    roomLatestDurableSequence: null,
     terminal: true,
   }
 }

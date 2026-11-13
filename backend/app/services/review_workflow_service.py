@@ -1,4 +1,4 @@
-﻿"""复核流程服务
+"""复核流程服务
 
 A21~A25 作为复核对话的汇总视图：
 - 从 review_checklist_templates.json 加载检查要点模板

@@ -406,6 +406,45 @@ async def finish_failure(
     return True
 
 
+async def queue_snapshot(db: AsyncSession) -> dict[str, int | float]:
+    """跨 worker 的明细队列深度与最老排队时长（spec platform-heavy-jobs-and-capacity-closure 任务 0.2）。
+
+    明细行没有自己的入队时间，排队年龄按其所属 job 的 ``created_at`` 算（claim 的排序键
+    也是它），口径与本模块其余时间字段一致：应用侧 UTC。
+    """
+    counts = {
+        str(status): int(count)
+        for status, count in (
+            await db.execute(
+                sa.select(AiTaskItem.status, sa.func.count())
+                .where(AiTaskItem.status.not_in(tuple(TERMINAL_ITEM)))
+                .group_by(AiTaskItem.status)
+            )
+        ).all()
+    }
+    oldest = (
+        await db.execute(
+            sa.select(sa.func.min(AiTaskJob.created_at))
+            .join(AiTaskItem, AiTaskItem.job_id == AiTaskJob.id)
+            .where(AiTaskItem.status.in_(("queued", "retry_wait")))
+        )
+    ).scalar_one_or_none()
+    if isinstance(oldest, str):
+        oldest = datetime.fromisoformat(oldest)
+    if oldest is not None and oldest.tzinfo is None:
+        oldest = oldest.replace(tzinfo=timezone.utc)
+    return {
+        "queued": counts.get("queued", 0),
+        "retry_wait": counts.get("retry_wait", 0),
+        "running": counts.get("running", 0),
+        "oldest_queue_age_seconds": (
+            max(0.0, (datetime.now(timezone.utc) - oldest).total_seconds())
+            if oldest
+            else 0.0
+        ),
+    }
+
+
 async def aggregate_job(db: AsyncSession, job_id: UUID) -> None:
     stmt = sa.select(AiTaskJob).where(AiTaskJob.id == job_id)
     if db.get_bind().dialect.name == "postgresql":

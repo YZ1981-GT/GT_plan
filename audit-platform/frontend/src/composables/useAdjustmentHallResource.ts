@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { migrationPendingMessage } from '@/utils/migrationPending'
 
 export type AdjustmentResourceStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -51,7 +52,8 @@ export function useAdjustmentHallResource<T>(
         return false
       }
       status.value = 'error'
-      error.value = errorMessage
+      // 数据库结构未升级（迁移未执行）时用后端说明：「读取失败，请重试」会让人反复重试一件重试解决不了的事
+      error.value = migrationPendingMessage(cause) ?? errorMessage
       return false
     }
   }

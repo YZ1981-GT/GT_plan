@@ -30,8 +30,16 @@ from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, ProjectUser, User
 from app.models.workpaper_models import SampledVoucher, WorkingPaper, WpIndex, WpSourceType, WpStatus
 from app.services.voucher_identity import VoucherKey
+from tests._voucher_links_gates import allow_wp_gates
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+
+
+@pytest.fixture(autouse=True)
+def _allow_wp_gates(monkeypatch):
+    """底稿级读写门按放行处理（SQLite 世界没有委派数据）；门本身见 test_voucher_links_ownership.py。"""
+    allow_wp_gates(monkeypatch)
+
 
 REAL = json.loads((Path(__file__).parent / "fixtures" / "voucher_real_ledger_vectors.json").read_text(encoding="utf-8"))["vouchers"]
 FY, ZZ = REAL["fy0003_same_day_same_no"], REAL["zz0003_same_day_same_no"]

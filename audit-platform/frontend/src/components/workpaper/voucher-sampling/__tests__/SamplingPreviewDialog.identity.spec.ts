@@ -45,8 +45,17 @@ describe('勾选按行本身认', () => {
     const zz = v({ voucherType: 'ZZ', debitAmount: '200.00' })
     const fy2 = v({ voucherType: 'FY', lineFp: 'second' })
     const w = await mountDialog([fy, zz, fy2])
-    w.findComponent({ name: 'ElTable' }).vm.$emit('selection-change', [fy])
+    // 用户点勾选框，el-table 发 select(当前勾选, 被点的行)
+    w.findComponent({ name: 'ElTable' }).vm.$emit('select', [fy], fy)
     expect([fy.selected, zz.selected, fy2.selected]).toEqual([true, false, false])
+  })
+
+  it('selection-change 不回写（换数据 / 程序勾选也会发，先发一次空勾选）', async () => {
+    const fy = v({ selected: true })
+    const zz = v({ voucherType: 'ZZ', selected: true })
+    const w = await mountDialog([fy, zz])
+    w.findComponent({ name: 'ElTable' }).vm.$emit('selection-change', [])
+    expect([fy.selected, zz.selected]).toEqual([true, true])
   })
 })
 

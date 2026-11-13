@@ -85,7 +85,22 @@ class UnifiedOCRService:
         image_path: str,
         mode: OCREngine = OCREngine.AUTO,
     ) -> dict:
-        """统一OCR接口：本机优先、服务器兜底（ADR-ROUTE-009）。
+        """统一 OCR 入口；整段执行计入 OCR 容量计量（spec platform-heavy-jobs-and-capacity-closure 任务 0.2）。
+
+        OCR 没有准入队列（走事件循环默认线程池），所以这里量的是在飞数与执行时长
+        分布，**不是**排队时长；口径见 ``capacity_slots`` 模块文档。
+        """
+        from app.services.capacity_slots import OCR_SLOT
+
+        async with OCR_SLOT.use():
+            return await self._recognize_routed(image_path, mode)
+
+    async def _recognize_routed(
+        self,
+        image_path: str,
+        mode: OCREngine = OCREngine.AUTO,
+    ) -> dict:
+        """按能力槽路由识别：本机优先、服务器兜底（ADR-ROUTE-009）。
 
         候选按能力槽（文字识别 / 版面解析）取已启用模型，本机在前：本机行 = 进程内引擎链
         （PaddleOCR / Tesseract / MinerU）或旧 ``OCR_SERVICE_URL`` 容器，环回 PaddleX 也算本机；

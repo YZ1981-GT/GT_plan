@@ -127,7 +127,34 @@ describe('R10.3：只读态禁用配置与回填入口', () => {
 
   // 引擎表里只有本次抽出的样本（都是项目当前阶段）；「年审阶段预审行只读」改在宿主底稿行上做
   // （shared/voucherCheckFill 的 rowClass / guardPersist，voucher-identity-writeback-and-audit-phase 任务 9）
-  const CAN_EDIT_ROW = /function canEditRow\(_?row: SampledVoucher\): boolean \{\s*return !props\.readonly\s*\}/
+  //
+  // 只读真源是 `isReadonly`（prop 与底稿运行时上下文取或）：78 个宿主都不传 readonly prop，
+  // 归档 / 编辑锁 / 复核身份 / 后台合并的只读只在 WorkpaperRuntimeContext.readonly 上
+  // （spec voucher-workflow-linkage-lineage-closure R4.1）。只认 props.readonly 等于这些场景照样能改。
+  const IS_READONLY = /const isReadonly = computed\(\(\) => !!props\.readonly \|\| !!workpaperRuntime\?\.readonly\?\.value\)/
+  const CAN_EDIT_ROW = /function canEditRow\(_?row: SampledVoucher\): boolean \{\s*return !isReadonly\.value\s*\}/
+
+  /** 模板里包含 anchor 的那个开始标签（el-* 与子组件都算；属性值里的 `=>` 不截断） */
+  function tagContaining(src: string, anchor: string): string {
+    const tmpl = src.slice(src.indexOf('<template>'), src.lastIndexOf('</template>'))
+    const tags = tmpl.match(/<[A-Za-z][\w-]*(?:[^>"]|"[^"]*")*>/g) || []
+    return tags.find(t => t.includes(anchor)) || ''
+  }
+
+  const GATED_CONTROLS = [
+    'v-model="reconcileOverrideReason"',
+    'v-model="bookAmountInput"',
+    'v-model="reconcileThresholdPct"',
+    '@click="handleConfirmConclusion"',
+    '@click="handleInferMisstatement"',
+    '@click="handleOpenConfig"',
+  ]
+
+  it('只读真源合并 prop 与底稿运行时只读', () => {
+    expect(ENGINE).toMatch(IS_READONLY)
+    // inject 在 setup 顶层（写进函数体会静默拿不到）
+    expect(ENGINE).toMatch(/\nconst workpaperRuntime = inject\(WorkpaperRuntimeContextKey, null\)/)
+  })
 
   it('行可编辑判定合并只读态（canEditRow）', () => {
     expect(ENGINE).toMatch(CAN_EDIT_ROW)
@@ -139,24 +166,49 @@ describe('R10.3：只读态禁用配置与回填入口', () => {
     expect((tmpl.match(/canEditRow\(row\)/g) || []).length).toBeGreaterThan(5)
   })
 
-  it('关键录入与操作入口按 readonly 禁用', () => {
-    for (const anchor of [
-      'reconcileOverrideReason',
-      'bookAmountInput',
-      'reconcileThresholdPct',
-      'handleConfirmConclusion',
-      'handleInferMisstatement',
-    ]) {
-      const at = ENGINE.indexOf(anchor)
-      expect(at, `未找到 ${anchor}`).toBeGreaterThan(-1)
+  it('关键录入与操作入口按 isReadonly 禁用（逐个控件看自己的 disabled）', () => {
+    for (const anchor of GATED_CONTROLS) {
+      const tag = tagContaining(ENGINE, anchor)
+      expect(tag, `模板里未找到 ${anchor}`).not.toBe('')
+      expect(tag, `${anchor} 未按 isReadonly 禁用`).toMatch(/:disabled="isReadonly(?:\s*\|\||")/)
     }
-    // props.readonly 至少覆盖 5 个入口 + canEditRow 内部 1 处
-    expect((ENGINE.match(/props\.readonly/g) || []).length).toBeGreaterThanOrEqual(6)
+    // 模板不再直接读 props.readonly（只读一律走 isReadonly，否则运行时只读漏掉）
+    const tmpl = ENGINE.slice(ENGINE.indexOf('<template>'), ENGINE.lastIndexOf('</template>'))
+    expect(tmpl).not.toMatch(/props\.readonly/)
+  })
+
+  it('预览弹窗、撤销与确认回填同读 isReadonly', () => {
+    expect(tagContaining(ENGINE, ':confirming="confirming"')).toMatch(/:readonly="isReadonly"/)
+    expect(ENGINE).toMatch(/useEngineUndo\(\{[\s\S]{0,200}readonly: isReadonly/)
+    expect(ENGINE).toMatch(/async function handleConfirmFill\(\) \{\s*if \(confirming\.value \|\| isReadonly\.value\) return/)
+    // 单飞要真的置位：回填前置 true、结束（成功或失败）后复位；只有早退没有置位等于没挡
+    expect(ENGINE).toMatch(/confirming\.value = true\s*\n\s*const result = await confirmFill\(\)\.finally\(\(\) => \{ confirming\.value = false \}\)/)
+  })
+
+  it('记入错报汇总（A13 推送）是写操作：只读时不能推，并说明原因', () => {
+    const push = /const canPushProjected = computed\(\(\) => \{([\s\S]*?)\n\}\)/.exec(ENGINE)
+    expect(push, '未截到 canPushProjected').not.toBeNull()
+    expect(push![1]).toMatch(/^\s*if \(isReadonly\.value\) return false\n/)
+    const reason = /const pushProjectedDisabledReason = computed\(\(\) => \{([\s\S]*?)\n\}\)/.exec(ENGINE)
+    expect(reason, '未截到 pushProjectedDisabledReason').not.toBeNull()
+    expect(reason![1]).toMatch(/^\s*if \(isReadonly\.value\) return '底稿只读，不能记入错报汇总'\n/)
   })
 
   it('反向自检：canEditRow 若丢掉 readonly 判定即打红', () => {
-    const mutated = ENGINE.replace(/(function canEditRow\(_?row: SampledVoucher\): boolean \{\s*)return !props\.readonly/, '$1return true')
+    const mutated = ENGINE.replace(/(function canEditRow\(_?row: SampledVoucher\): boolean \{\s*)return !isReadonly\.value/, '$1return true')
     expect(mutated).not.toBe(ENGINE)
     expect(mutated).not.toMatch(CAN_EDIT_ROW)
+  })
+
+  it('反向自检：isReadonly 只认 prop（丢掉运行时只读）即打红', () => {
+    const mutated = ENGINE.replace(' || !!workpaperRuntime?.readonly?.value)', ')')
+    expect(mutated).not.toBe(ENGINE)
+    expect(mutated).not.toMatch(IS_READONLY)
+  })
+
+  it('反向自检：任一入口丢掉 disabled 即打红', () => {
+    const mutated = ENGINE.replace(':disabled="isReadonly" @click="handleOpenConfig"', '@click="handleOpenConfig"')
+    expect(mutated).not.toBe(ENGINE)
+    expect(tagContaining(mutated, '@click="handleOpenConfig"')).not.toMatch(/:disabled="isReadonly(?:\s*\|\||")/)
   })
 })

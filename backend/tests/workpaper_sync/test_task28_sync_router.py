@@ -7,7 +7,7 @@ Properties: **P10 / P11 / P45**
 ═══ 本文件与 `_pg.py` 的分工 ═══
 
 * 本文件 —— **形态**与**纯行为**判据：阶段链顺序、authorization-first 的 AST 形态、
-  404/403/409 的分型与唯一构造点、路由前缀与 opaque id 约束、以及用替身仓储驱动的
+  404/403/423/409 的分型与唯一构造点、路由前缀与 opaque id 约束、以及用替身仓储驱动的
   guard 行为（常量工作量、撤权重放在 cache 前被拦）。不连库。
 * `test_task28_sync_router_pg.py` —— 真库 + TestClient 的端到端：statusline、
   scope index 与业务行同事务、三实体计数、跨 scope 404 的 envelope 逐字节相同。
@@ -293,7 +293,7 @@ class TestGuardPhaseChain:
         assert G.http_status_for_refusal(G.ScopeIndexMissError("x")) == 404
         assert G.http_status_for_refusal(G.ScopeCrossBoundaryError("x")) == 404
         assert G.http_status_for_refusal(G.ScopeProjectNotVisibleError("x")) == 404
-        assert G.http_status_for_refusal(G.SyncWorkflowLockedError("x")) == 403
+        assert G.http_status_for_refusal(G.SyncWorkflowLockedError("x")) == 423
         assert G.http_status_for_refusal(G.ActionNotPermittedError("x")) == 403
         assert G.http_status_for_refusal(G.SyncEndpointUnauthenticatedError("x")) == 401
         assert G.http_status_for_refusal(G.VisibilityProbeFailedError("x")) == 503
@@ -315,7 +315,7 @@ class TestGuardPhaseChain:
 
 
 class TestGuardRefusals:
-    """六条 404、两条 403、一条 503 各自可独立证伪。"""
+    """六条 404、终态 423、权限 403 与探针 503 各自可独立证伪。"""
 
     @pytest.mark.asyncio
     async def test_unauthenticated_is_the_only_401(self) -> None:
@@ -457,7 +457,7 @@ class TestGuardRefusals:
         assert len(probe.calls) == 1, "visibility 判据必须真查，不得靠硬编码"
 
     @pytest.mark.asyncio
-    async def test_workflow_locked_is_403_for_write_actions(self) -> None:
+    async def test_workflow_locked_is_423_for_write_actions(self) -> None:
         room = uuid.uuid4()
         rows = {f"room/{room}": _ScopeRow(project_id=PROJECT, wp_id=WP, entry_id=ENTRY)}
         guard, _repo, _probe = _guard_with(

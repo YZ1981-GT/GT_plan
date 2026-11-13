@@ -95,6 +95,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import api from '@/services/apiProxy'
+import { formulaPush } from '@/services/apiPaths/formula'
 
 const props = defineProps<{
   show: boolean
@@ -127,12 +128,12 @@ watch(() => props.show, async (v) => {
   if (!v) return
   // 覆盖率（全局静态数据）
   if (!coverage.value) {
-    try { coverage.value = await api.get('/api/formula-push/coverage') as any } catch { /* 不阻断 */ }
+    try { coverage.value = await api.get(formulaPush.coverage()) as any } catch { /* 不阻断 */ }
   }
   // 最近推送运行 + 状态分布（需要项目上下文）
   if (props.projectId && props.year && !latestRun.value) {
     try {
-      const data = await api.get(`/api/projects/${props.projectId}/formula-push/latest`, {
+      const data = await api.get(formulaPush.latest(props.projectId), {
         params: { year: props.year },
       }) as any
       latestRun.value = data?.run || null

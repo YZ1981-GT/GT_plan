@@ -198,8 +198,8 @@ const tableRows = computed(() => {
   return [...automaticRows, ...manualRows]
 })
 
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
-const cellStyle = { padding: '4px 8px', fontSize: '12px' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '3px 0' }
+const cellStyle = { padding: '4px 8px', fontSize: 'var(--gt-display-font-size)' }
 
 function getSummary({ columns, data }: any) {
   const sums: string[] = []

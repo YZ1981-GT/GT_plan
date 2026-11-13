@@ -277,14 +277,14 @@ class RoleWorkbenchFacade:
         """资料缺口：PBC 未回收项。"""
         try:
             import sqlalchemy as sa
-            from app.models.collaboration_models import PBCItem
+            from app.models.collaboration_models import PBCChecklist
 
             stmt = (
-                sa.select(PBCItem)
+                sa.select(PBCChecklist)
                 .where(
-                    PBCItem.project_id == self.project_id,
-                    PBCItem.status.in_(["pending", "requested"]),
-                    PBCItem.is_deleted == sa.false(),
+                    PBCChecklist.project_id == self.project_id,
+                    PBCChecklist.status.in_(["pending", "requested"]),
+                    PBCChecklist.is_deleted == sa.false(),
                 )
                 .limit(10)
             )

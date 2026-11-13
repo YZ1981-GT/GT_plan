@@ -84,6 +84,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import api from '@/services/apiProxy'
+import { formulaPanels } from '@/services/apiPaths/formula'
 
 const props = defineProps<{ projectId?: string }>()
 
@@ -133,7 +134,7 @@ async function load(addrId: string) {
   loading.value = true
   visible.value = true
   try {
-    data.value = await api.get(`/api/projects/${props.projectId}/formula-settings/dependencies`, { params: { addr_id: addrId } }) as any
+    data.value = await api.get(formulaPanels.dependencies(props.projectId), { params: { addr_id: addrId } }) as any
   } catch { data.value = null }
   finally { loading.value = false }
 }

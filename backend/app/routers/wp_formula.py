@@ -28,6 +28,7 @@ from app.services.d_cycle_extraction.presets import (
     tier_a_semantic,
     tier_b_provenance,
 )
+from app.services.formula_settings import wp_changes
 from app.services.formula_management.sheet_identity_filter import (
     filter_items_by_sheet_uid,
 )
@@ -929,6 +930,7 @@ async def save_formula(
         )
     ).scalar_one_or_none()
     _old_formula = _existing_before.expression if _existing_before else ""
+    _old_def = wp_changes.exec_def(_existing_before)  # 普通值快照：save 会 refresh 同一 ORM 对象
     _audit_action = "update" if _existing_before else "create"
 
     try:
@@ -1157,10 +1159,18 @@ async def save_formula(
         ),
     )
 
+    # spec formula-management-repair-closure R2：有效定义变了 ⇒ 同事务登记到公式设置同步内核（标过期 + 入队）
+    changed_slots: list[str] = []
+    if wp_changes.changed(_old_def, wp_changes.exec_def(saved)):
+        changed_slots = await wp_changes.record_cells(db, project_id=wp.project_id, wp_code=wp_code,
+                                                      cells=[(saved.sheet_name, saved.target_cell)])
     await db.commit()
+    await wp_changes.publish(db)
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     payload: dict = {"saved": _formula_to_dict(saved)}
+    if changed_slots:  # R4：公式管理据此问「应用范围」（公式位与 /effective 同口径；没变就不带、不打扰）
+        payload["changed_slot_keys"] = changed_slots
     if saved.formula_type == "auto_calc":
         if eval_errors:
             # R1.4 / Property 3 + R6.3：求值有错（锚点与网格 cell 同口径）→ 只返回 eval_warnings，
@@ -1254,6 +1264,7 @@ async def save_formulas_batch(
     project_template_type = await _resolve_ref_template_type(db, wp.project_id, None)
 
     saved_rows: list[dict] = []
+    changed_cells: list[tuple[str, str]] = []
     try:
         for idx, item in enumerate(body.items):
             # 纵深防御：拒收非 wp kind / 只读投影伪标记（与单条端点同口径）。
@@ -1293,6 +1304,7 @@ async def save_formulas_batch(
                 )
             ).scalar_one_or_none()
             _old = _existing.expression if _existing else ""
+            _old_exec = wp_changes.exec_def(_existing)
             _act = "update" if _existing else "create"
 
             saved, issues = await wp_formula_service.save(
@@ -1345,6 +1357,8 @@ async def save_formulas_batch(
                 old_formula=_old,
                 new_formula=item.expression,
             )
+            if wp_changes.changed(_old_exec, wp_changes.exec_def(saved)):
+                changed_cells.append((saved.sheet_name, saved.target_cell))
             saved_rows.append(_formula_to_dict(saved))
     except FormulaVersionRequired as required:
         await db.rollback()
@@ -1372,8 +1386,10 @@ async def save_formulas_batch(
             },
         ) from conflict
 
-    # 全部成功 → router 统一 commit（原子）
+    # 全部成功 → 登记有效定义变了的格（R2）→ router 统一 commit（原子）→ 投递
+    await wp_changes.record_cells(db, project_id=wp.project_id, wp_code=wp_code, cells=changed_cells)
     await db.commit()
+    await wp_changes.publish(db)
     return {"saved_count": len(saved_rows), "saved": saved_rows}
 
 
@@ -1416,6 +1432,7 @@ async def delete_formula(
     _target_cell = existing.target_cell
     _sheet_name = existing.sheet_name
     _old_expression = existing.expression
+    _was_project_layer = wp_changes.is_project_layer(existing)
 
     # 🔴 2026-09-22 修复：必须传 project_id。`wp_formula_service.delete` 的第一道 ownership
     #    门是「project_id 为 None 即拒绝并 return False」（Req 10.6），此前这里不传 ⇒ 服务层
@@ -1445,7 +1462,11 @@ async def delete_formula(
         new_formula="",
     )
 
+    if _was_project_layer:  # R2：本项目层删了这一格 ⇒ 有效定义回到全局 / 预设，同事务登记
+        await wp_changes.record_cells(db, project_id=wp.project_id, wp_code=_del_wp_code,
+                                      cells=[(_sheet_name, _target_cell)])
     await db.commit()
+    await wp_changes.publish(db)
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     payload: dict = {"deleted": str(formula_id)}

@@ -88,7 +88,7 @@ _PARAM_SEG = re.compile(r"^\{.*\}$")
 #    前缀 / 48 条端点（16 × 3）**，其余口径一字未改 ⇒ 每个新值都能由
 #    「X-3 前的值 + 增量」复算，增量本身由 `X3_SHEET_SPECS` 的 16 张 sheet 派生。
 #    反向自检见 `TestBaselineRejectsStaleFigures`（改回任一旧值必打红）。
-_BASE_IE_MODULES = 100           # X-3 前: 99（+1 个 X-3 模块）/ 立项: 102
+_BASE_IE_MODULES = 101           # X-3 前: 99（+1 X-3 +1 D2-vc）/ 立项: 102
 _BASE_NO_DECORATOR_MODULES = 63  # X-3 不变（X-3 模块自带 `@router.`）/ 立项: 未记
 _BASE_FACTORY_PREFIXES = 62      # X-3 不变（X-3 不走 create_cycle_import_export_router）
 _BASE_THREE_STATE_ROUTES = 356   # X-3 前: 308（+48）/ 立项: 314
@@ -150,7 +150,7 @@ _TRULY_DEAD_FACTORY_PREFIXES = frozenset({"h9", "l7", "l8"})
 # ═══════════════════════════════════════════════════════════════════════════════
 _TASK25_PENDING_BASELINES: dict[str, object] = {
     # 常量名 → Task 25 施加后应下调到的值
-    "_BASE_IE_MODULES": 81,               # 100 − 19（父 spec 口径 99 → 80）
+    "_BASE_IE_MODULES": 82,               # 101 − 19（D2-vc 新增 +1）
     "_BASE_FACTORY_PREFIXES": 43,         # 62 − 19（与父 spec 一致）
     "IE_ADAPTER_REGISTRY": 94,            # 97 − 3（父 spec 口径 97 → 78，已被 X-3 改变）
     "_TRULY_DEAD_FACTORY_PREFIXES": frozenset(),  # 19 个模块删完 ⇒ 声明面清空

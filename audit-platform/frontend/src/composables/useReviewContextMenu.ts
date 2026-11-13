@@ -72,7 +72,7 @@ export function useReviewContextMenu(options: ReviewContextMenuOptions) {
     const item = document.createElement('div')
     item.textContent = '📝 发起复核对话'
     item.style.cssText = `
-      padding: 8px 16px; cursor: pointer; font-size: 13px; color: #303133;
+      padding: 8px 16px; cursor: pointer; font-size: var(--gt-display-font-size); color: #303133;
       transition: background 0.15s;
     `
     item.onmouseenter = () => { item.style.background = '#f5f7fa' }

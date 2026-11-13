@@ -64,6 +64,8 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         const structuralKeys = [
           'name', 'headers', 'multi_header', 'header_rows', '_column_groups', '_row_types',
           '_display_layout', 'guidance', 'text_after_table', 'auto_index',
+          // 度量目录元数据只来自服务端模板/catalog，不能被 raw 业务载荷覆盖。
+          'table_id', 'column_ids', 'column_kinds', 'column_ratio_scales', 'measure_status',
         ] as const
         for (const key of structuralKeys) {
           if (Object.prototype.hasOwnProperty.call(metadata, key)) merged[key] = metadata[key]
@@ -86,7 +88,14 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         const headers = (Array.isArray(td.headers) && td.headers.length > 0)
           ? td.headers
           : (deriveLegacyTableHeaders(td) || td.headers || [])
-        rawTables = [{ name: currentNote.value.section_title, headers, rows: td.rows }]
+        rawTables = [{
+          name: currentNote.value.section_title, headers, rows: td.rows,
+          table_id: td.table_id,
+          column_ids: td.column_ids,
+          column_kinds: td.column_kinds,
+          column_ratio_scales: td.column_ratio_scales,
+          measure_status: td.measure_status,
+        }]
       } else {
         return []
       }
@@ -165,6 +174,9 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         ? [...t._sourceTableKeys]
         : (t?._source_sub_table_key ? [t._source_sub_table_key] : []),
       headers: Array.isArray(t?.headers) ? [...t.headers] : t?.headers,
+      column_ids: Array.isArray(t?.column_ids) ? [...t.column_ids] : t?.column_ids,
+      column_kinds: Array.isArray(t?.column_kinds) ? [...t.column_kinds] : t?.column_kinds,
+      column_ratio_scales: Array.isArray(t?.column_ratio_scales) ? [...t.column_ratio_scales] : t?.column_ratio_scales,
       rows: Array.isArray(t?.rows)
         ? t.rows.map((r: any) => ({
             ...r,
@@ -182,6 +194,17 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         (nextHeaders[0] === prevHeaders[0] || nextHeaders[0] === '类别' || nextHeaders[0] === '名称'))
       const appendHeaders = skipFirst ? nextHeaders.slice(1) : nextHeaders
       prev.headers = [...prevHeaders, ...appendHeaders]
+      // 度量元数据与展示列同步横向合并；三个数组都含第 0 个标签列。
+      const metadataStart = skipFirst ? 1 : 0
+      for (const key of ['column_ids', 'column_kinds', 'column_ratio_scales'] as const) {
+        const left = Array.isArray(prev[key]) ? prev[key] : Array(prevHeaders.length).fill(null)
+        const right = Array.isArray(t[key]) ? t[key].slice(metadataStart) : Array(appendHeaders.length).fill(null)
+        prev[key] = [...left, ...right]
+      }
+      prev.measure_status = prev.measure_status === 'matched' && t.measure_status === 'matched'
+        ? 'matched'
+        : (prev.measure_status === 'invalid' || t.measure_status === 'invalid' ? 'invalid' : 'unmatched')
+      if (prev.table_id && t.table_id) prev.table_id = `${prev.table_id}+${t.table_id}`
 
       const prevRows: any[] = prev.rows || []
       const nextRows: any[] = t.rows || []

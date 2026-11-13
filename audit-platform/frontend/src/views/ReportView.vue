@@ -101,32 +101,8 @@
         @resolved="onConflictResolved"
       />
 
-      <!-- F29: 报表平衡检查结果（紧凑单行可展开） -->
-      <div v-if="balanceCheckResult" class="gt-rv-balance-bar" :class="'gt-rv-balance-bar--' + balanceCheckResult.status">
-        <span class="gt-rv-balance-bar__icon">{{ balanceCheckResult.status === 'passed' ? '✅' : '❌' }}</span>
-        <span class="gt-rv-balance-bar__text">
-          {{ balanceCheckResult.status === 'passed' ? '报表平衡检查通过（7/7）' : `报表平衡检查有 ${balanceCheckResult.checks?.filter(c => !c.passed).length || 0} 项差异` }}
-        </span>
-        <el-button v-if="balanceCheckResult.checks?.some(c => !c.passed)" text size="small" type="primary" @click="rvBalanceExpanded = !rvBalanceExpanded">
-          {{ rvBalanceExpanded ? '收起' : '展开明细' }}
-        </el-button>
-        <el-button text size="small" @click="balanceCheckResult = null" style="margin-left: auto; padding: 0;">✕</el-button>
-      </div>
-      <transition name="el-zoom-in-top">
-        <div v-if="balanceCheckResult && rvBalanceExpanded && balanceCheckResult.checks?.some(c => !c.passed)" class="gt-rv-balance-detail">
-          <div
-            v-for="(chk, idx) in balanceCheckResult.checks.filter(c => !c.passed)"
-            :key="idx"
-            class="gt-rv-balance-detail__row"
-            @click="scrollToReportRow(chk.name)"
-          >
-            <span style="color: var(--el-color-danger)">✗</span>
-            <span style="flex: 1">{{ chk.name }}</span>
-            <span style="color: var(--el-text-color-secondary); font-size: 12px">期望 {{ chk.expected }}，实际 {{ chk.actual }}，差 {{ chk.diff }}</span>
-            <el-button text size="small" type="primary" style="padding: 0">定位 →</el-button>
-          </div>
-        </div>
-      </transition>
+      <!-- F29: 五态审核明细；摘要不作通过证据 -->
+      <ReportBalanceBanner :result="balanceCheckResult" @close="balanceCheckResult = null" @locate="scrollToReportRow" />
 
       <!-- Sprint 4：StaleIndicator 统一组件 + 横幅（三条互斥：stale > staleRefresh > reportStale） -->
       <div v-if="stale.isStale.value" class="gt-stale-banner">
@@ -770,9 +746,12 @@
             <GtAmountCell :value="row.diff" />
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="80" align="center">
+        <el-table-column label="状态" width="130" align="center">
           <template #default="{ row }">
-            <span>{{ row.passed ? '✅' : '❌' }}</span>
+            <span v-if="crossCheckStatusOf(row) === 'passed'">✅ 通过</span>
+            <span v-else-if="crossCheckStatusOf(row) === 'hint'" data-testid="cross-check-hint"
+              style="color: var(--gt-color-wheat)">⚠️ 提示：差额 {{ row.diff ?? '—' }}</span>
+            <span v-else>❌ 未通过</span>
           </template>
         </el-table-column>
       </el-table>
@@ -802,7 +781,7 @@
     <!-- 公式管理弹窗（template-type 必传：否则恒按国企版加载 report_config） -->
     <FormulaManagerDialog
       v-if="formulaManagerMounted"
-      v-model="showFormulaManager"
+      v-model="showFormulaManager" :read-only="!canEdit"
       :rows="rows"
       :project-id="projectId"
       :year="year ?? undefined"
@@ -939,6 +918,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
 import ReportAnalysisPanel from '@/components/workpaper/ReportAnalysisPanel.vue'
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
+import ReportBalanceBanner from '@/components/report/ReportBalanceBanner.vue'
 import ReportImpairmentTable from '@/components/report/ReportImpairmentTable.vue'
 import ReportDialogs from '@/components/report/ReportDialogs.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
@@ -974,7 +954,7 @@ import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useReportColumns } from './composables/useReportColumns'
-import { useReportCrossCheck } from './composables/useReportCrossCheck'
+import { useReportCrossCheck, crossCheckStatusOf } from './composables/useReportCrossCheck'
 import { fetchNoteSectionsWithData, useReportData } from './composables/useReportData'
 import { useReportExport } from './composables/useReportExport'
 import { useReportMapping } from './composables/useReportMapping'
@@ -1106,7 +1086,8 @@ const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange(val: number) {
   selectedYear.value = val
   projectStore.changeYear(val)
-  fetchReport()
+  // 取数年度以路由 ?year 优先，只改 store 原地重取仍是旧年度 ⇒ 写路由（整页按新年度重挂），带上当前页签
+  router.push({ path: route.path, query: { year: String(val), tab: activeTab.value } })
 }
 
 // 模板类型切换
@@ -1234,13 +1215,17 @@ const rowNoteMapping = ref<Record<string, string>>({})
 /** 全局连续附注序号（跨报表类型连续编排：BS→IS→CFS→EQ→CFSS） */
 const rowNoteSeqMap = ref<Record<string, number>>({})
 
+let rowNoteMappingSeq = 0
 async function loadRowNoteMapping() {
+  const seq = ++rowNoteMappingSeq
   try {
     const standard = `${selectedTemplateType.value}_${reportScope.value}` || 'soe_standalone'
     const data = await api.get('/api/report-config/row-note-mapping', {
       params: { applicable_standard: standard },
       _silent: true,
+      _dedupe: false,
     } as any)
+    if (seq !== rowNoteMappingSeq) return // 口径已变，旧响应作废
     if (data && typeof data === 'object') {
       const mapped: Record<string, string> = {}
       const seqs: Record<string, number> = {}
@@ -1271,6 +1256,10 @@ watch(rows, (newRows) => {
     loadRowNoteMapping()
   }
 }, { immediate: true })
+// 准则 / 口径晚到或切换后按新口径重取附注编号（否则先到的国企默认口径映射一直留着：上市项目显示「八、x」）
+watch(() => `${selectedTemplateType.value}_${reportScope.value}`, () => {
+  if (rows.value.length > 0) loadRowNoteMapping()
+})
 
 /** 缓存资产负债表 tab 的实际附注序号数（供利润表接续用） */
 const bsNoteCount = ref(0)
@@ -1341,7 +1330,6 @@ const _reportModeLabel = computed(() => {
 const showFormulaManager = ref(false)
 const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
 const showRvGuide = ref(false)
-const rvBalanceExpanded = ref(false)
 const lastReportRefreshAt = ref<Date | null>(null)
 
 // P0-2: AI 对话提升为一级按钮，打开时注入当前报表数据 context
@@ -1458,16 +1446,16 @@ const {
 
 async function _ensureProjectYearWrapper() {
   try {
+    // 项目信息（名称 / 口径 / 准则）深链带 ?year 时也要取：原先直接 return ⇒ 上市项目按国企版取数、年度下拉显示「请选择」
+    await ensureProjectYear()
+    selectedTemplateType.value = templateType.value
     if (routeYear.value !== null) {
       projectYear.value = null
+      selectedYear.value = routeYear.value // 选择器显示路由给的年度（原先带 ?year= 打开时停在「请选择」）
       return
     }
-    // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
-    await ensureProjectYear()
-    // Sync main-file-owned state from composable results
     projectYear.value = reportData._fetchedAuditYear.value
     selectedYear.value = projectYear.value ?? null
-    selectedTemplateType.value = templateType.value
   } finally {
     yearResolved.value = true
   }
@@ -1491,8 +1479,8 @@ const _onSyncUnadjusted = withLoading(syncLoading, async () => {
 
 // Wrapper: composable's onConsistencyCheck + open dialog
 async function _onConsistencyCheckWrapper() {
-  await onConsistencyCheck()
-  if (consistencyResult.value) {
+  const completed = await onConsistencyCheck()
+  if (completed?.isCurrent() && consistencyResult.value === completed.result) {
     showAuditDialog.value = true
   }
 }
@@ -1876,58 +1864,6 @@ watch(rvFullscreen, (v) => { if (v) showRvGuide.value = false })
   border: 1px solid #dcdfe6;
   border-radius: 3px;
   box-shadow: 0 1px 0 #dcdfe6;
-}
-
-/* ─── 报表平衡检查紧凑条 ─── */
-.gt-rv-balance-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  margin-bottom: 6px;
-  border-radius: 6px;
-  font-size: 13px;
-  background: #f0f9eb;
-  border: 1px solid #e1f3d8;
-}
-.gt-rv-balance-bar--warning,
-.gt-rv-balance-bar--error {
-  background: #fdf6ec;
-  border-color: #faecd8;
-}
-.gt-rv-balance-bar--passed {
-  background: #f0f9eb;
-  border-color: #e1f3d8;
-}
-.gt-rv-balance-bar__icon {
-  font-size: 14px;
-}
-.gt-rv-balance-bar__text {
-  font-weight: 500;
-  color: var(--el-text-color-primary, #303133);
-}
-.gt-rv-balance-detail {
-  margin-bottom: 8px;
-  padding: 8px 16px;
-  background: #fffbf0;
-  border: 1px solid #faecd8;
-  border-radius: 6px;
-  font-size: 12px;
-}
-.gt-rv-balance-detail__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  cursor: pointer;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-}
-.gt-rv-balance-detail__row:last-child {
-  border-bottom: none;
-}
-.gt-rv-balance-detail__row:hover {
-  background: rgba(75, 45, 119, 0.04);
-  border-radius: 4px;
 }
 
 /* ─── 报表行分组视觉强化 ─── */

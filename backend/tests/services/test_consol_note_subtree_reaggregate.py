@@ -398,6 +398,34 @@ class TestProtectionAndSkips:
         assert trading["交易性金融负债"][0] == D("110.00") and trading["合计"][0] == D("130.00")
 
     @pytest.mark.asyncio
+    async def test_ratio_columns_follow_the_consolidated_header_not_the_children(self, db, user, group):
+        """子树汇总按合并模板表头认列（2de9f17aa「合并合计只加金额列」，被 03496b1f3 整文件回退后恢复）：
+
+        五-5-2「按坏账准备计提方法分类」合计只加金额列；比例 = 本行余额 ÷ 合计余额、预期信用损失率 = 坏账 ÷ 余额，
+        都按汇总后的金额重算，不是把下级填的比例相加（B 故意填了对不上的比例 55 / 45）。汇总不把合并表头传给
+        build_note_rows 时比例列会被当金额加总 —— build_note_rows 自己的用例测不到这条接线。"""
+        section = "五-5-2"
+        db.add_all([
+            ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=section, node_key="B:subsidiary", data={
+                "rows": [["按单项计提坏账准备", "200.00", "55.00", "20.00", "", "180.00"],
+                         ["按组合计提坏账准备", "300.00", "45.00", "15.00", "", "285.00"],
+                         ["合  计", "500.00", "100.00", "35.00", "", "465.00"]]}),
+            ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=section, node_key="A:parent", data={
+                "rows": [["按组合计提坏账准备", "500.00", "100.00", "25.00", "", "475.00"],
+                         ["合  计", "500.00", "100.00", "25.00", "", "475.00"]]}),
+        ])
+        await db.flush()
+        await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[section])
+
+        saved = (await _rec(db, group, "G:consol", section)).data["rows"]
+        rows = {str(r[0]).replace(" ", ""): r for r in saved}
+        keys = ("按单项计提坏账准备", "按组合计提坏账准备", "合计")
+        assert [rows[k][1] for k in keys] == ["200.00", "800.00", "1000.00"]
+        assert [rows[k][3] for k in keys] == ["20.00", "40.00", "60.00"]
+        assert [rows[k][2] for k in keys] == ["20.00", "80.00", "100.00"], "比例 = 本行 ÷ 合计 × 100，不是下级比例之和"
+        assert [rows[k][4] for k in keys] == ["10.00", "5.00", "6.00"], "预期信用损失率 = 坏账准备 ÷ 账面余额 × 100"
+
+    @pytest.mark.asyncio
     async def test_aggregate_does_not_write_template_placeholder_rows(self, db, user, group):
         """未绑定章节按合并模板行汇总：「……」占位行没有下级数就不写；已存的手工格跟着行名走（R15）。
 
@@ -439,6 +467,29 @@ class TestProtectionAndSkips:
         assert [(f["node_key"], "manual_cells" in f["error"]) for f in result["failures"]] == [("A:consol_elim", True)]
         assert await _rec(db, group, "A:consol") is None and await _rec(db, group, "G:consol") is None
         assert (await _rec(db, group, "B:subsidiary")).data["_last_write_source"] == "detail_mapping"
+    @pytest.mark.asyncio
+    async def test_invalid_protection_metadata_rolls_back_whole_section(self, db, user, group):
+        """汇总节点的坏保护元数据走章节 SAVEPOINT 失败通道，不保留同章先前写入。"""
+        await _setup(db, user, group)
+        original = {"rows": [], "manual_cells": "坏了"}
+        db.add(ConsolNoteData(
+            project_id=group["G"].id, year=_YEAR, section_id=_SECTION, node_key="G:consol",
+            data=original.copy(),
+        ))
+        await db.flush()
+
+        result = await reaggregate_subtree(
+            db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_SECTION],
+        )
+
+        assert result["status"] == "failed"
+        assert len(result["failures"]) == 1
+        failure = result["failures"][0]
+        assert failure["section_id"] == _SECTION and failure["node_key"] == "G:consol"
+        assert "manual_cells" in failure["error"]
+        assert await _rec(db, group, "A:parent") is None
+        assert await _rec(db, group, "A:consol_elim") is None
+        assert (await _rec(db, group, "G:consol")).data == original
 
 
 class TestSectionIsolation:
@@ -700,3 +751,37 @@ async def test_explicit_empty_section_ids_is_zero_work_not_all_sections(monkeypa
     assert result["sections_updated"] == 0
     assert result["results"] == []
     assert result["failures"] == []
+
+
+class TestDurableProgressBoundary:
+    @pytest.mark.asyncio
+    async def test_progress_reports_each_section_and_preserves_result(self, db, user, group):
+        """耐久 executor 的 callback 不改变同步 reaggregate 的业务结果。"""
+        await _setup(db, user, group)
+        calls: list[tuple[int, int, str]] = []
+
+        async def progress(current: int, total: int, message: str) -> bool:
+            calls.append((current, total, message))
+            return True
+
+        result = await reaggregate_subtree(
+            db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_SECTION], progress=progress,
+        )
+        assert result["sections_updated"] == 1
+        assert calls[0][0:2] == (0, 1)
+        assert calls[-1][0:2] == (1, 1)
+        assert _SECTION in calls[0][2] and _SECTION in calls[-1][2]
+
+    @pytest.mark.asyncio
+    async def test_progress_cancel_stops_before_next_section_and_does_not_write(self, db, user, group):
+        """progress=False 在章节边界取消：外层 durable session 可整体 rollback，未写任何章节。"""
+        await _setup(db, user, group)
+
+        async def cancelled(_current: int, _total: int, _message: str) -> bool:
+            return False
+
+        with pytest.raises(reaggregate_module.ReaggregateCancelled):
+            await reaggregate_subtree(
+                db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_SECTION], progress=cancelled,
+            )
+        assert await _rec(db, group, "G:consol") is None

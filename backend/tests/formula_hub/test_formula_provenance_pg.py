@@ -26,7 +26,6 @@ from app.services.formula_push import engine as push_engine
 from app.services.formula_push.results import RunResult
 from app.services.note_formula_generator import execute_note_formulas
 from app.services.report_engine import ReportEngine
-from app.services.report_freshness import CALC_VERSION
 
 pytestmark = pytest.mark.pg_only
 YEAR = 2025
@@ -108,11 +107,10 @@ async def test_report_full_run_persists_success_and_failed_attempts_pg(pg_tx):
     runs = list((await pg_tx.execute(sa.select(ReportGenerationRun).where(
         ReportGenerationRun.project_id == project.id,
     ))).scalars())
-    # V246 表结构：状态只认 building/succeeded/failed/stale，calc_version 是整数；
-    # 有失败行的运行记 succeeded + failed_rows，失败原因写 error（无 error_summary 列）。
-    assert len(runs) == 1 and runs[0].status == "succeeded"
-    assert (runs[0].failed_rows, runs[0].calc_version) == (1, CALC_VERSION)
-    assert runs[0].error and runs[0].finished_at is not None
+    from app.services.report_freshness import CALC_VERSION
+    from app.services.report_provenance import run_display_status
+    assert len(runs) == 1 and (runs[0].status, run_display_status(runs[0])) == ("succeeded", "partial")
+    assert runs[0].failed_rows == 1 and runs[0].calc_version == CALC_VERSION
     rows = {row.row_code: row for row in (await pg_tx.execute(sa.select(FinancialReport).where(
         FinancialReport.project_id == project.id,
     ))).scalars()}

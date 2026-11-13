@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     ATTACHMENT_PRIMARY_STORAGE: str = "paperless"
     ATTACHMENT_FALLBACK_TO_LOCAL: bool = True
     ATTACHMENT_LOCAL_STORAGE_ROOT: str = "./storage/attachments"
+    # 查询证据存储（AQF §6.1）：缺省 {STORAGE_ROOT}/query_artifacts，首次导出时自动创建
+    QUERY_ARTIFACT_ROOT: str = ""          # 空 = 自动从 STORAGE_ROOT 派生
+    QUERY_ARTIFACT_RETENTION_DAYS: int = 30    # 证据保留天数（D1）
+    QUERY_RUN_RETENTION_DAYS: int = 90         # 运行记录保留天数（D2）
+    QUERY_RUN_KEEP_PER_USER: int = 500         # 每人保留条数（D2）
     # 证据治理 —— 上传隔离/暂存区（durable quarantine，evidence-governance-hardening R1.2/§4.0/§5.1）
     # 必须位于任何 Storage_Boundary root（STORAGE_ROOT / ATTACHMENT_LOCAL_STORAGE_ROOT）之外，
     # 隔离内容绝不可经下载/预览/EvidenceRef/OCR/AI/FormalOutput/archive 任何边界路径读取。

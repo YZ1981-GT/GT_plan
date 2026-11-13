@@ -15,6 +15,38 @@ class ChecklistVersionItem(Protocol):
     if_match: str | None
 
 
+def checklist_response_version(value: object) -> str | None:
+    """checklist 行的 CAS 版本令牌：``updated_at.isoformat()``。
+
+    与 ``GET /checklist-responses`` 回执的 ``version``、``lock_and_check_versions`` 预检算出的服务端版本
+    同一写法 —— 三处一致，render 快照带出去的版本才能原样当 ``if_match`` 用。
+    驱动没把列解析成 datetime 时（SQLite 文本列）原样返回字符串。
+    """
+    if value is None:
+        return None
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        return isoformat()
+    return str(value) or None
+
+
+def checklist_snapshot_entry(row: object) -> dict[str, object]:
+    """render 快照里的一条 checklist 回显：``conclusion`` / ``remark``，库里有这一行时再带 ``version``。
+
+    K1~K13 与 D2 的宿主只用 render 快照建编辑基线（快照非空就不再 GET），保存走严格 CAS
+    （``require_if_match``）；快照不带版本 ⇒ 前端没有 ``if_match`` ⇒ 已有行一保存就 428。
+    调用方的查询必须同时选出 ``updated_at``。
+    """
+    entry: dict[str, object] = {
+        "conclusion": getattr(row, "conclusion", None) or "",
+        "remark": getattr(row, "remark", None) or "",
+    }
+    version = checklist_response_version(getattr(row, "updated_at", None))
+    if version:
+        entry["version"] = version
+    return entry
+
+
 def _uses_postgresql(db: AsyncSession) -> bool:
     """真实 PG 才使用 advisory lock；SQLite 与轻量测试桩显式降级为行锁路径。"""
     get_bind = getattr(db, "get_bind", None)

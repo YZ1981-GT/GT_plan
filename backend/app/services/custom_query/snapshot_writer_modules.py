@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.consol_note_protection import parse_manual_cells
 from app.services.custom_query.snapshot_writer_shared import (
     parse_cell_ref as _parse_cell_ref,
 )
@@ -190,20 +191,40 @@ async def write_note_cell(
             f"请求列 {col_idx}）"
         )
 
-    # dict 行和 list 行的取值方式不同；保留非目标 cell 和原行形状
+    # dict 行和 list 行的取值方式不同；保留非目标 cell 和原行形状。
+    # 数组行的第 1 列起是可由自定义查询人工回写的数值列，必须在改值前
+    # 严格解析已有 manual_cells，避免坏元数据被静默覆盖或随写入丢失。
     target_row = rows_arr[data_row_idx]
+    marked_manual = False
+    manual_skip_reason: str | None = None
     if isinstance(target_row, dict):
         old_value = target_row.get(col_name)
         target_row[col_name] = new_value
+        manual_skip_reason = "旧格式字典行没有格坐标"
     elif isinstance(target_row, list):
         if col_idx < len(target_row):
             old_value = target_row[col_idx]
-            target_row[col_idx] = new_value
         else:
             raise ValueError(
                 f"二维数组行列索引越界：{cell_ref}（该行长度 {len(target_row)}，"
                 f"请求列 {col_idx}）"
             )
+
+        if col_idx >= 1:
+            # 先解析、后改动。ProtectionMetadataError 会由 HTTP 层回滚事务。
+            existing_manual = parse_manual_cells(data)
+            coordinate = (data_row_idx, col_idx)
+            if coordinate not in existing_manual:
+                manual_cells = data.get("manual_cells")
+                if manual_cells is None:
+                    manual_cells = []
+                    data["manual_cells"] = manual_cells
+                manual_cells.append({"row": data_row_idx, "col": col_idx})
+            marked_manual = True
+        else:
+            manual_skip_reason = "项目名列不参与取数"
+
+        target_row[col_idx] = new_value
     else:
         raise ValueError(
             f"不支持的行数据形状：{type(target_row).__name__}（"
@@ -223,4 +244,12 @@ async def write_note_cell(
         {"new_data": json.dumps(data, ensure_ascii=False), "nid": nid_param, "now": now},
     )
 
-    return {"success": True, "updated_at": now.isoformat(), "old_value": old_value}
+    result_payload: dict[str, Any] = {
+        "success": True,
+        "updated_at": now.isoformat(),
+        "old_value": old_value,
+        "marked_manual": marked_manual,
+    }
+    if manual_skip_reason is not None:
+        result_payload["manual_skip_reason"] = manual_skip_reason
+    return result_payload

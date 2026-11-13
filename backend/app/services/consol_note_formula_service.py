@@ -60,6 +60,22 @@ from app.services.consol_report_values import (
 )
 from app.services.consol_tree_service import iter_nodes
 from app.services.note_table_header_library import ColumnKey, column_keys, load_vocabulary, movement_kind
+from app.services.consol_note_protection import (
+    ProtectionMetadataError,
+    protected_cells,
+    section_locked,
+)
+
+# 模板表结构工具（多级表头分组 / 列元数据 / 行类型 / 合计回填）在伴生模块（2026-11-04 抽出），原名保留给既有引用
+from app.services.consol_note_template_utils import (  # noqa: F401
+    _ensure_columns,
+    _ensure_row_types,
+    _infer_row_type,
+    _is_embedded_header_row,
+    _safe_float,
+    backfill_total_rows,
+    multi_header_to_column_groups,
+)
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 NOTE_ROW_TYPE = "consol_note"   # 不在 REPORT_TYPE_ORDER 里 ⇒ ordered_rows 排在全部报表行之后
@@ -107,171 +123,6 @@ def _load_json(path: Path) -> Any:
     data = json.loads(path.read_text(encoding="utf-8"))
     _JSON_CACHE[path] = (mtime, data)
     return data
-
-
-def multi_header_to_column_groups(
-    multi_header: list[list[str]] | None,
-) -> list[dict] | None:
-    """从 multi_header 推导 _column_groups（与单体附注模板同格式）。
-
-    算法：第一行的非空连续区间 = 一个分组（空字符串表示被同组合并）。
-    第一列（标签列）跳过。包含 span=1 的分组（与单体附注模板一致）。
-    无 multi_header 或只有一行 ⇒ 返回 None。
-
-    >>> multi_header_to_column_groups([
-    ...     ["账  龄", "期末数", "", "期初数", ""],
-    ...     ["", "账面余额", "坏账准备", "账面余额", "坏账准备"],
-    ... ])
-    [{'group': '期末数', 'start': 1, 'span': 2}, {'group': '期初数', 'start': 3, 'span': 2}]
-    """
-    if not multi_header or len(multi_header) < 2:
-        return None
-    row0 = multi_header[0]
-    groups: list[dict] = []
-    i = 1  # 跳过标签列（col 0）
-    while i < len(row0):
-        text = (row0[i] or "").strip()
-        if text:
-            span = 1
-            while i + span < len(row0) and not (row0[i + span] or "").strip():
-                span += 1
-            groups.append({"group": text, "start": i, "span": span})
-            i += span
-        else:
-            i += 1
-    return groups if groups else None
-
-
-def _infer_row_type(label: str) -> str:
-    """从行首列文本推导 row_type（data/total/subtotal）。
-
-    与单体 / 来源行同一口径（``note_total_terms.label_row_type``）：以「小计」结尾 = subtotal（先判；旧正则把「小计」
-    当合计 ⇒ 多段小计全按合计加总）、「合计」「总计」= total。
-    """
-    from app.services.note_total_terms import label_row_type
-
-    return label_row_type(label)
-
-
-def _ensure_columns(section: dict) -> None:
-    """自动从 headers 生成 columns 列元数据（如果缺失）。"""
-    if section.get("columns"):
-        return
-    headers = section.get("headers")
-    if not isinstance(headers, list) or not headers:
-        return
-    cols = []
-    for i, h in enumerate(headers):
-        col: dict = {"key": h, "label": h}
-        if i == 0:
-            col["is_label"] = True
-            col["flat"] = True
-        cols.append(col)
-    section["columns"] = cols
-
-
-def _is_embedded_header_row(row: list, headers: list) -> bool:
-    """检测 rows 中的一行是否是嵌入的子表头（而非数据行）。
-
-    判据：row[0] 与 headers[0] 文字相同（去空白和 HTML 标签后），
-    说明 rows 把 headers 列名重复了一遍作为子表头行。
-    """
-    if not isinstance(row, list) or not row or not headers:
-        return False
-    import re
-    clean = lambda s: re.sub(r"<br\s*/?>", "", re.sub(r"[\s\u3000]+", "", str(s or "")))
-    return clean(row[0]) == clean(headers[0]) and bool(clean(row[0]))
-
-
-def _ensure_row_types(section: dict) -> None:
-    """自动为 rows 中的每一行推导 _row_type（不改原数组结构，附加到 section）。
-
-    CP-04 扩展：检测 rows 前几行是否是嵌入的子表头（合并附注模板的常见形态），
-    标注为 ``header`` 类型，同时记录 ``_header_row_indexes`` 供前端分离渲染。
-    """
-    rows = section.get("rows")
-    if not isinstance(rows, list) or not rows:
-        return
-    # 如果已有 _row_types 则不覆盖
-    if section.get("_row_types"):
-        return
-    headers = section.get("headers", [])
-    row_types = []
-    header_row_indexes = []
-    for i, row in enumerate(rows):
-        if isinstance(row, list) and row:
-            # 只检查前 3 行，且必须从第 0 行连续开始
-            if i <= 2 and i == len(header_row_indexes) and _is_embedded_header_row(row, headers):
-                row_types.append("header")
-                header_row_indexes.append(i)
-            else:
-                row_types.append(_infer_row_type(str(row[0])))
-        else:
-            row_types.append("data")
-    section["_row_types"] = row_types
-    if header_row_indexes:
-        section["_header_row_indexes"] = header_row_indexes
-
-
-def _safe_float(val: Any) -> float | None:
-    """安全转 float，空串/非数字返 None。"""
-    if val is None:
-        return None
-    if isinstance(val, (int, float)):
-        return float(val)
-    s = str(val).strip().replace(",", "").replace("，", "")
-    if not s:
-        return None
-    try:
-        return float(s)
-    except (ValueError, TypeError):
-        return None
-
-
-def backfill_total_rows(
-    rows: list[list],
-    row_types: list[str] | None = None,
-) -> bool:
-    """保存时合计 / 小计空格回填：按合计构成（``note_total_terms``，与单体 / 拉数 / 汇总同一判定）只填判得准的合计行，
-    已有值的单元格不覆盖；构成里的格全空不填。
-
-    row_types 与 rows 等长，标识每行类型（未提供时从行首列文本推导）。返回是否有值被回填。旧算法「向上到上一个
-    合计 / 小计为止」把「小计 / 减：坏账准备 / 合计」的合计填成坏账准备、在「其中：」表上重复加明细。
-    """
-    from decimal import Decimal
-
-    from app.services.note_total_terms import sum_terms, total_order, total_terms
-
-    if not rows:
-        return False
-    if not row_types:
-        row_types = [_infer_row_type(str(r[0]) if r else "") for r in rows]
-    shaped = [
-        {"label": str(r[0]) if isinstance(r, (list, tuple)) and r else "",
-         "row_type": row_types[i] if i < len(row_types) else "data"}
-        for i, r in enumerate(rows)
-    ]
-    plans, _reasons = total_terms(shaped)
-
-    def cell(j: int, ci: int) -> Decimal | None:
-        dr = rows[j] if 0 <= j < len(rows) else None
-        v = _safe_float(dr[ci]) if isinstance(dr, (list, tuple)) and ci < len(dr) else None
-        return Decimal(str(v)) if v is not None else None
-
-    changed = False
-    for ri in total_order(shaped, plans):
-        row = rows[ri]
-        if not isinstance(row, list):
-            continue
-        for ci in range(1, len(row)):
-            if _safe_float(row[ci]) is not None:
-                continue  # 已有值，不覆盖
-            total = sum_terms(plans[ri], lambda j, ci=ci: cell(j, ci))
-            if total is None:
-                continue
-            row[ci] = str(int(total)) if total == total.to_integral_value() else str(total.normalize())
-            changed = True
-    return changed
 
 
 def consol_note_tables(template_type: str) -> list[dict]:
@@ -748,6 +599,51 @@ async def ensure_seeded(db: AsyncSession, template_type: str) -> SeedResult | No
     return result
 
 
+async def ensure_seeded_readonly(db: AsyncSession, template_type: str) -> SeedResult | None:
+    """只读路径（GET 列公式）的按需种子化：**只补齐库里缺失的种子行（create-only），从不更新 / 删除**已有行。
+
+    与 ``ensure_seeded`` 的区别 ——
+    * ``ensure_seeded``（求值 / 写上下文用）会按模板文件 mtime + 报表配置签名判断漂移，缺失则 create、规则
+      变了则 update、规则不再产出则 delete，是完整的"配置 → 种子"同步；
+    * 本函数（GET 只读用）只按**库内状态**判断：计划的种子位里凡库中没有活动记录、也没有被人工删除过的，才
+      在一个 SAVEPOINT 内 create 补齐；**绝不** update 或 delete 已有行。
+
+    这样既保持了"打开面板能看到齐全的种子公式"这一契约（测试 / 前端依赖），又消除了读路径因配置漂移而改写
+    模板级全局表的副作用（只读用户也能触发、违反 HTTP 语义），且判据是库内状态而非进程内 ``_SEEDED`` 缓存
+    （多 worker 下不可靠）。"配置漂移 ⇒ update/delete 种子"的职责仍由求值路径（``_view_context`` /
+    ``consol_note_subtree_reaggregate``，写上下文、调用方会提交）与显式 ``POST .../seed``（admin）承担。
+
+    库里种子已齐 ⇒ 返回 None（纯只读、不写、不提交）。
+    """
+    tt = _check_template(template_type)
+    rows = await load_report_rows(db, f"{tt}_consolidated")
+    plan = plan_seed(tt, consol_note_tables(tt), single_note_sections(tt), rows)
+    existing = (await db.execute(sa.select(ConsolNoteFormula).where(
+        ConsolNoteFormula.template_type == tt,
+    ))).scalars().all()
+    present = {(f.section_id, f.row_index, f.col_index) for f in existing}  # 含人工删除的软删行：不补回
+    missing = [c for c in plan.cells
+               if c.kind != KIND_SUB_TABLE_TOTAL  # 子表合计不落库（运行时 / 前端算），与 seed_note_formulas 一致
+               and (c.section_id, c.row_index, c.col_index) not in present]
+    if not missing:
+        return None
+    now = datetime.now(timezone.utc)
+    result = SeedResult(tt)
+    try:
+        async with db.begin_nested():
+            for cell in missing:
+                db.add(ConsolNoteFormula(
+                    template_type=tt, section_id=cell.section_id, row_index=cell.row_index,
+                    col_index=cell.col_index, formula=cell.formula, source="seed",
+                    description=cell.description, created_at=now, updated_at=now,
+                ))
+                result.created += 1
+            await db.flush()
+    except IntegrityError:
+        return None   # 并发种子化：另一请求已写入
+    return result
+
+
 # ─────────────────────────────── 公式增删改 ───────────────────────────────
 
 
@@ -803,8 +699,9 @@ def _check_cell(template_type: str, section_id: str, row_index: int, col_index: 
 
 
 async def list_note_formulas(db: AsyncSession, template_type: str, section_id: str | None = None) -> dict:
+    # GET 只读：仅库全空时自举一次，已有记录纯只读（不因配置变化在读路径写全局表 / commit）。
     tt = _check_template(template_type)
-    await ensure_seeded(db, tt)
+    await ensure_seeded_readonly(db, tt)
     stmt = sa.select(ConsolNoteFormula).where(
         ConsolNoteFormula.template_type == tt, ConsolNoteFormula.is_deleted == sa.false(),
     )
@@ -930,19 +827,70 @@ async def _project_template(db: AsyncSession, project_id: UUID, standard: str | 
     return await resolve_note_template_type(db, project_id, standard)
 
 
+async def _active_formulas_many(
+    db: AsyncSession,
+    template_type: str,
+    section_ids: Sequence[str],
+) -> dict[str, list[ConsolNoteFormula]]:
+    sections = list(dict.fromkeys(section_ids))
+    if not sections:
+        return {}
+    rows = (
+        await db.execute(
+            sa.select(ConsolNoteFormula)
+            .where(
+                ConsolNoteFormula.template_type == template_type,
+                ConsolNoteFormula.section_id.in_(sections),
+                ConsolNoteFormula.is_deleted == sa.false(),
+            )
+            .order_by(
+                ConsolNoteFormula.section_id,
+                ConsolNoteFormula.row_index,
+                ConsolNoteFormula.col_index,
+            )
+        )
+    ).scalars().all()
+    grouped: dict[str, list[ConsolNoteFormula]] = {
+        section: [] for section in sections
+    }
+    for row in rows:
+        grouped.setdefault(row.section_id, []).append(row)
+    return grouped
+
+
 async def _active_formulas(db: AsyncSession, template_type: str, section_id: str) -> list[ConsolNoteFormula]:
-    return list((await db.execute(sa.select(ConsolNoteFormula).where(
-        ConsolNoteFormula.template_type == template_type,
-        ConsolNoteFormula.section_id == section_id,
-        ConsolNoteFormula.is_deleted == sa.false(),
-    ).order_by(ConsolNoteFormula.row_index, ConsolNoteFormula.col_index))).scalars().all())
+    return (await _active_formulas_many(db, template_type, [section_id]))[section_id]
+
+
+async def section_formulas_many(
+    db: AsyncSession,
+    project_id: UUID,
+    template_type: str,
+    section_ids: Sequence[str],
+) -> dict[str, list[Any]]:
+    """多章节有效公式：全局和项目层各一次查询。"""
+    from app.services.formula_settings.consol_note_settings import (
+        effective_formulas_many,
+    )
+
+    global_by_section = await _active_formulas_many(
+        db,
+        template_type,
+        section_ids,
+    )
+    return await effective_formulas_many(db, project_id, global_by_section)
 
 
 async def section_formulas(db: AsyncSession, project_id: UUID, template_type: str, section_id: str) -> list[Any]:
     """某章节的有效单元格公式：全局（模板级）被本项目适配覆盖、本项目停用的剔除。"""
-    from app.services.formula_settings.consol_note_settings import effective_formulas
-
-    return await effective_formulas(db, project_id, section_id, await _active_formulas(db, template_type, section_id))
+    return (
+        await section_formulas_many(
+            db,
+            project_id,
+            template_type,
+            [section_id],
+        )
+    )[section_id]
 
 
 # ─────────────────────────────── 写入来源与公式值快照 ───────────────────────────────
@@ -1156,39 +1104,6 @@ async def note_breakdown(
 # ─────────────────────────────── 按公式填入 ───────────────────────────────
 
 
-def _manual_cells(data: dict) -> set[tuple[int, int]]:
-    """解析人工保护坐标；保护元数据损坏时必须让调用方可观察。"""
-    raw = data.get("manual_cells")
-    if raw is None:
-        return set()
-    if not isinstance(raw, list):
-        raise NoteFormulaError("manual_cells 必须是数组")
-
-    out: set[tuple[int, int]] = set()
-    for index, item in enumerate(raw):
-        try:
-            if isinstance(item, dict):
-                if "row" not in item or "col" not in item:
-                    raise ValueError("缺少 row 或 col")
-                row_value, col_value = item["row"], item["col"]
-            elif isinstance(item, (list, tuple)) and len(item) == 2:
-                row_value, col_value = item
-            elif isinstance(item, str) and item.count(":") == 1:
-                row_value, col_value = item.split(":", 1)
-            else:
-                raise ValueError("应为 {row, col}、[row, col] 或 row:col")
-
-            if isinstance(row_value, bool) or isinstance(col_value, bool):
-                raise ValueError("行列坐标不能是布尔值")
-            row, col = int(row_value), int(col_value)
-            if row < 0 or col < 0:
-                raise ValueError("行列坐标不能为负数")
-        except (KeyError, TypeError, ValueError) as exc:
-            raise NoteFormulaError(f"manual_cells 第 {index + 1} 项无效：{exc}") from exc
-        out.add((row, col))
-    return out
-
-
 def _target_row(out: list[list[str]], template_rows: Sequence[Any], r: int) -> tuple[int | None, str | None]:
     """公式按模板行号登记；已保存数据可能插删过行 ⇒ 按项目名找行：同号同名优先，否则全表唯一同名行。"""
     want = label_key(_first_cell(template_rows[r])) if r < len(template_rows) else None
@@ -1331,8 +1246,8 @@ async def fill_by_formula(
     data = dict(record.data or {}) if record is not None and isinstance(record.data, dict) else {}
     headers = data.get("headers") or table.get("headers") or []
     rows = data.get("rows") if isinstance(data.get("rows"), list) and data.get("rows") else table.get("rows") or []
-    # V182：locked 行整体跳过；locked_cells 合并进 manual 保护集合
-    if record is not None and getattr(record, "cell_state", "auto") == "locked":
+    # V182：locked 行整体跳过；locked_cells 合并进保护集合
+    if record is not None and section_locked(record):
         return {
             "project_id": str(project_id),
             "year": breakdown["year"],
@@ -1376,13 +1291,11 @@ async def fill_by_formula(
             "is_stale": record.is_stale,
             "data": data,
         }
-    manual_set = _manual_cells(data)
-    # 把 locked_cells 列表中的坐标也加入保护集合
-    if record is not None:
-        for lc in getattr(record, "locked_cells", None) or []:
-            if isinstance(lc, dict) and "row_index" in lc and "col_index" in lc:
-                manual_set.add((int(lc["row_index"]), int(lc["col_index"])))
-    new_rows, summary = fill_rows(headers, rows, breakdown["cells"], manual_set, table.get("rows") or [])
+    try:
+        protected_set = protected_cells(record, data)
+    except ProtectionMetadataError as exc:
+        raise NoteFormulaError(str(exc), status=exc.status) from exc
+    new_rows, summary = fill_rows(headers, rows, breakdown["cells"], protected_set, table.get("rows") or [])
     data.update({"headers": headers, "rows": new_rows})
     # 写入来源标记：ConsolNoteTab 据此区分「🧮 公式计算」与「📋 明细映射」（后写覆盖先写）
     data["_last_write_source"] = "formula"
@@ -1399,6 +1312,16 @@ async def fill_by_formula(
         record.is_stale = False
         record.updated_at = now
         record.last_formula_value = formula_values
+    # V243：来源投影
+    from app.services.consol_note_source_projection import compute_source_mode, source_digest, update_source_projection
+
+    mode = compute_source_mode(
+        "formula",
+        manual_cells=protected_set,
+        written_cells={(r, c) for r, c, *_ in summary.get("filled", []) if isinstance(r, int)},
+        previous_source=getattr(record, "source_mode", None),
+    )
+    update_source_projection(record, mode, digest=source_digest(data))
     await db.flush()
     return {
         "project_id": str(project_id),

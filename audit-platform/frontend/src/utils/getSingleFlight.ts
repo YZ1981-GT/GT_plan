@@ -152,13 +152,7 @@ export function canceledError(config?: AxiosRequestConfig): CanceledError<unknow
 export function copySharedData<T>(value: T): T {
   if (value instanceof ArrayBuffer) return value.slice(0) as unknown as T
   if (Array.isArray(value) || isPlainRecord(value)) {
-    if (typeof structuredClone === 'function') {
-      try {
-        return structuredClone(value)
-      } catch {
-        // Vue Proxy / 不可克隆宿主值回退到现有净化路径。
-      }
-    }
+    // clonePlain 先去响应式代理再克隆，Vue Proxy 也安全
     return clonePlain(value)
   }
   return value

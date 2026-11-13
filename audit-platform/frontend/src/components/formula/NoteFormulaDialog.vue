@@ -90,6 +90,17 @@
       <div style="margin-top: 12px; display: flex; gap: 8px">
         <el-button size="small" @click="addFormula">新增公式</el-button>
       </div>
+
+      <!-- S2 ADR-CCN-02：logic_check / reasonability 执行结果问题清单（不回填单元格，只展示） -->
+      <div v-if="lastCheckedAt" style="margin-top: 16px">
+        <GtFormulaIssuePanel
+          :issues="checkIssues"
+          :outcomes="checkOutcomes"
+          :last-computed-at="lastCheckedAt"
+          :loading="applying || regenerating"
+          :show-refresh="false"
+        />
+      </div>
     </template>
 
     <template #footer>
@@ -110,18 +121,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 // spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
 import { noteFormula } from '@/services/apiPaths/formula'
-import { useAddressRegistry } from '@/stores/addressRegistry'
+import { SINGLE_WP_REF, useAddressRegistry, type ValidateResult } from '@/stores/addressRegistry'
+import { acnr, addressRegistry } from '@/services/apiPaths/system'
+import { isAcnrRegistryFailure, parseAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
+import type { AcnrResolveResult } from '@/services/acnr/useAcnr'
 import { formatRefIssue } from '@/utils/formulaRefIssues'
 import { showFormulaError } from '@/composables/formula/useFormulaSettings'
 import FormulaRefPicker from './FormulaRefPicker.vue'
 import GtGridCell from '@/components/grid/GtGridCell.vue'
+import GtFormulaIssuePanel from './GtFormulaIssuePanel.vue'
+import { formulaOutcomeStatus, formulaCheckNumber, formulaCheckSeverity, type FormulaIssueItem, type FormulaCheckOutcome } from './formulaIssueHint'
+import { checkReasonOf } from '@/utils/consistencyCheckStatus'
 import { ElInput } from '@/components/grid/adapters'
 import {
   describeApplyResult, describeFormulaTarget, formulaKey, parseFormulaKey, type NoteFormulaTargetTable,
@@ -132,6 +149,8 @@ const props = defineProps<{
   currentNote: any
   projectId: string
   year: number
+  /** 未生成附注时的模板口径；缺省遵循接口的 soe，而不继承其他弹窗的共享绑定。 */
+  templateType?: string
 }>()
 
 const emit = defineEmits<{
@@ -141,22 +160,134 @@ const emit = defineEmits<{
   'saved': []
 }>()
 
+// 父组件回传关闭状态前，也不能被已经排队的 props watcher 重新建代。
+let locallyClosed = false
 const visible = computed({
   get: () => props.modelValue,
-  set: (v) => emit('update:modelValue', v),
+  set: (v) => {
+    if (!v) {
+      locallyClosed = true
+      invalidateContext()
+    }
+    emit('update:modelValue', v)
+  },
 })
 
 const activeCategory = ref('auto_calc')
 const applying = ref(false)
 const regenerating = ref(false)
+/** 上次「应用自动运算」返回的校对结果（logic_check / reasonability 类别公式，不回填单元格）。 */
+const lastChecks = ref<any[]>([])
+/** 上次执行时间（ISO UTC 串），用于面板显示"最近计算"。 */
+const lastCheckedAt = ref<string | null>(null)
+
+// 上下文身份不可变；CAS 和队列只在该代内推进，不能跨项目 / 年度 / 章节续用。
+type DialogContext = Readonly<{
+  generation: number
+  projectId: string
+  year: number
+  note: any
+  noteSection: string
+  modelValue: boolean
+  templateType: string
+  invalidated: Promise<void>
+  invalidate: () => void
+  state: {
+    rows: any[]
+    loaded: Record<string, string | null> | null
+    loadGeneration: number
+    persistTail: Promise<void>
+    pending: CellSave[]
+    active: CellSave[]
+    worker: Promise<void> | null
+  }
+}>
+let contextGeneration = 0
+let currentContext: DialogContext | null = null
+let disposed = false
+
+function isCurrent(context: DialogContext | null): context is DialogContext {
+  return !!context && !disposed && !locallyClosed && currentContext === context
+    && context.generation === contextGeneration && context.modelValue && props.modelValue
+    && context.projectId === props.projectId && context.year === props.year
+    && context.note === props.currentNote && context.noteSection === props.currentNote?.note_section
+    && context.templateType === (props.templateType || 'soe')
+}
+
+/** 只结束本代调用方的等待，不取消已经发往原目标的请求。 */
+function untilInvalidated<T>(context: DialogContext, pending: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([pending, context.invalidated.then(() => fallback)])
+}
+
+function invalidateContext() {
+  contextGeneration += 1
+  if (currentContext) {
+    currentContext.invalidate()
+    for (const edit of [...currentContext.state.pending.splice(0), ...currentContext.state.active]) {
+      edit.waiters.splice(0).forEach((resolve) => resolve(false))
+    }
+  }
+  currentContext = null
+  clearCheckResults()
+  formulas.value = []
+  loadedTokens.value = null
+  targetTables.value = []
+  loading.value = persisting.value = applying.value = regenerating.value = false
+  editingRow.value = null
+  showRefPicker.value = false
+  refPickerData.value = { reportRows: [], tbRows: [], noteRows: [] }
+}
+
+/** 复用统一五态与金额口径；缺少 / 未知状态不得被 passed 或标签冒充。 */
+const normalizedChecks = computed(() => lastChecks.value.map((c) => ({
+  ...c,
+  status: formulaOutcomeStatus(c),
+  reason: typeof c.reason === 'string' && c.reason.trim() ? c.reason : checkReasonOf(c),
+})))
+const checkIssues = computed<FormulaIssueItem[]>(() => normalizedChecks.value
+  .filter((c) => ['failed', 'not_executed', 'error'].includes(c.status))
+  .map((c) => ({
+    formula_id: String(c.rule_id || c.source || ''),
+    description: String(c.description || c.label || c.reason || '校对未完成'),
+    left_value: formulaCheckNumber(c.left) == null ? null : String(c.left),
+    right_value: formulaCheckNumber(c.right) == null ? null : String(c.right),
+    addr_id: c.source ? String(c.source) : null,
+    status: c.status,
+    reason: c.reason,
+    label: c.label,
+    severity: formulaCheckSeverity(c.severity),
+  })))
+
+const checkOutcomes = computed<FormulaCheckOutcome[]>(() => normalizedChecks.value.map((c) => ({
+  formula_id: String(c.rule_id || c.source || ''),
+  description: String(c.description || c.label || c.reason || ''),
+  expression: String(c.rule_id || ''),
+  passed: c.status === 'passed',
+  status: c.status,
+  reason: c.reason,
+  label: c.label,
+  severity: formulaCheckSeverity(c.severity),
+  left_value: formulaCheckNumber(c.left),
+  right_value: formulaCheckNumber(c.right),
+})))
+
+function clearCheckResults() {
+  lastChecks.value = []
+  lastCheckedAt.value = null
+}
+
+function applyCheckResults(result: any, context: DialogContext) {
+  if (!isCurrent(context)) return
+  lastChecks.value = result?.no_result === true || result?.status === 'no_result' ? []
+    : Array.isArray(result?.checks) ? result.checks.filter((c: any) => c && typeof c === 'object') : []
+  lastCheckedAt.value = new Date().toISOString()
+}
 const persisting = ref(false)
 const loading = ref(false)
 const showRefPicker = ref(false)
 const editingRow = ref<any>(null)
 
-// ACNR-backed 公式引用校验（Req 15.5 → Req 9）。
-// store.validate 优先走 ACNR resolveFormula（与后端 Req 9 同源），
-// 未命中/非 WP 域/infra 失败时 fail-open 回退 legacy 权威校验。
+// 地址库只供引用选择器使用；保存校验显式携带本代参数，不读取共享 store 的可变绑定。
 const addrStore = useAddressRegistry()
 
 // 引用选择器数据（懒加载）
@@ -165,25 +296,27 @@ const refPickerData = ref<{ reportRows: any[], tbRows: any[], noteRows: any[] }>
 })
 
 async function openRefPicker(row: any) {
+  const context = currentContext
+  if (!isCurrent(context) || !context.state.rows.includes(row)) return
   editingRow.value = row
-  // 加载引用数据
   try {
     if (!refPickerData.value.reportRows.length) {
       const [reportData, tbData] = await Promise.all([
-        api.get(`/api/reports/${props.projectId}/${props.year}/balance_sheet`).catch(() => []),
-        // 经试算表唯一入口（原先请求后端没有的 `/api/trial-balance/` ⇒ 404 被吞，试算表候选恒空）
-        fetchTrialBalanceRows(props.projectId, { year: props.year }).then((r) => r.rows).catch(() => []),
+        api.get(`/api/reports/${context.projectId}/${context.year}/balance_sheet`, { _silent: true, _dedupe: false } as any).catch(() => []),
+        fetchTrialBalanceRows(context.projectId, { year: context.year }).then((r) => r.rows).catch(() => []),
       ])
+      if (!isCurrent(context) || editingRow.value !== row || !context.state.rows.includes(row)) return
       refPickerData.value.reportRows = Array.isArray(reportData) ? reportData : (reportData || [])
       refPickerData.value.tbRows = Array.isArray(tbData) ? tbData : (tbData || [])
     }
   } catch { /* 静默 */ }
-  showRefPicker.value = true
+  if (isCurrent(context) && editingRow.value === row && context.state.rows.includes(row)) showRefPicker.value = true
 }
 
 function onInsertRef(formula: string, _label: string) {
+  const context = currentContext
   const row = editingRow.value
-  if (!row) return
+  if (!isCurrent(context) || !context.state.rows.includes(row)) return
   const before = String(row.formula || '')
   const value = before + formula
   row.formula = value
@@ -202,10 +335,13 @@ const loadedTokens = ref<Record<string, string | null> | null>(null)
 const targetTables = ref<NoteFormulaTargetTable[]>([])
 
 /** 列表 / 保存接口同形：`{formulas, loaded, targets}`；每条带层级标签（全局 / 本项目 / 系统预设 …）与可读目标。 */
-function applyListing(resp: any) {
+function applyListing(resp: any, context: DialogContext) {
+  if (!isCurrent(context)) return
   const list = resp?.formulas
   formulas.value = (Array.isArray(list) ? list : []).map((f: any) => ({ ...f }))
-  loadedTokens.value = resp?.loaded ?? {}
+  context.state.rows = formulas.value
+  context.state.loaded = resp?.loaded ?? {}
+  loadedTokens.value = context.state.loaded
   targetTables.value = Array.isArray(resp?.targets) ? resp.targets : []
 }
 
@@ -223,6 +359,7 @@ function tableOf(row: any): NoteFormulaTargetTable | undefined {
 }
 
 function setCell(row: any, cell: DraftCell) {
+  if (!isCurrent(currentContext) || !currentContext.state.rows.includes(row)) return
   row._cell = cell
   if (cell.table !== undefined && cell.row !== undefined && cell.col !== undefined) {
     row.target = formulaKey({ table: cell.table, row: cell.row, col: cell.col })
@@ -238,55 +375,76 @@ const filteredFormulas = computed(() => {
 })
 
 // ─── 加载当前公式集（Req 15.1） ───────────────────────────────
-async function loadFormulas() {
-  if (!props.currentNote || !props.projectId || !props.year) {
-    formulas.value = []
-    return
-  }
-  const noteSection = props.currentNote.note_section
+async function loadFormulas(context = currentContext): Promise<boolean> {
+  if (!isCurrent(context)) return false
+  const generation = ++context.state.loadGeneration
+  const ownsLoad = () => isCurrent(context) && generation === context.state.loadGeneration
   loading.value = true
   try {
-    // GET 返回 { formulas: [...] }（http 拦截器已解包 {code,data} 信封）
     const resp = await api.get(
-      noteFormula.list(props.projectId, props.year, noteSection)
+      noteFormula.list(context.projectId, context.year, context.noteSection), { _silent: true, _dedupe: false } as any,
     )
-    applyListing(resp)
+    if (!ownsLoad()) return false
+    applyListing(resp, context)
+    // 旧 GET 不得绑定选择器；保存校验不依赖此共享状态。
+    try { void Promise.resolve(addrStore.refresh(context.projectId, context.year, context.templateType)).catch(() => {}) } catch { /* 静默 */ }
+    return true
   } catch (e: any) {
-    formulas.value = []
-    loadedTokens.value = null
-    handleApiError(e, '加载公式失败')
+    if (ownsLoad()) {
+      formulas.value = []
+      context.state.rows = formulas.value
+      loadedTokens.value = context.state.loaded = null
+      targetTables.value = []
+      handleApiError(e, '加载公式失败')
+    }
+    return false
   } finally {
-    loading.value = false
+    if (ownsLoad()) loading.value = false
   }
-  // 设置校验上下文（供 validate 的 legacy 回退按项目/年度解析非 WP 域引用）。
-  // refresh 会同步写入 _projectId/_year，故无需 await 即可让后续 validate 生效。
-  try { addrStore.refresh(props.projectId, props.year) } catch { /* 静默 */ }
 }
 
-// 弹窗打开 / 切换附注章节时加载（Req 15.1）
-watch(() => props.modelValue, (val) => {
-  if (val) loadFormulas()
-})
-watch(() => props.currentNote, () => {
-  if (props.modelValue) loadFormulas()
-})
+// ─── 引用校验：每个请求显式冻结项目 / 年度 / 模板 ───
+async function validateFormula(formula: string, context: DialogContext): Promise<ValidateResult | null> {
+  if (!isCurrent(context)) return null
+  if (SINGLE_WP_REF.test(formula)) {
+    let result: AcnrResolveResult | null = null
+    try {
+      result = await api.get<AcnrResolveResult>(acnr.resolve, {
+        params: { formula_ref: formula, project_id: context.projectId }, _silent: true, _dedupe: false,
+      } as any)
+    } catch (error) {
+      result = parseAcnrRegistryFailure(error)
+    }
+    if (!isCurrent(context)) return null
+    if (result?.found) return { valid: true, issues: [], formula }
+    if (isAcnrRegistryFailure(result)) {
+      return { valid: false, issues: [{ ref: formula, message: result?.reason }], formula }
+    }
+  }
+  if (!isCurrent(context)) return null
+  try {
+    return await api.post<ValidateResult>(addressRegistry.validate, {
+      formula, project_id: context.projectId, year: context.year, template_type: context.templateType,
+    }, { _silent: true } as any)
+  } catch {
+    return { valid: false, issues: [{ ref: formula, message: '校验请求失败' }], formula }
+  }
+}
 
-// ─── 引用校验（Req 15.5 → Req 9，ACNR-backed，悬空引用不入库） ───
-async function collectDanglingRefs(list: any[]): Promise<string[]> {
+async function collectDanglingRefs(list: any[], context: DialogContext): Promise<string[]> {
   const dangling: string[] = []
   for (const row of list) {
+    if (!isCurrent(context)) break
     const expr = (row?.formula || '').trim()
     if (!expr) continue
     try {
-      const res = await addrStore.validate(expr)
+      const res = await validateFormula(expr, context)
+      if (!isCurrent(context)) break
       if (res && res.valid === false) {
-        // 「引用：原因」—— 原先只列引用，看不出是章节不存在、写成了标题还是行列对不上
-        for (const iss of (res.issues || [])) {
-          dangling.push(formatRefIssue(iss) || expr)
-        }
+        for (const iss of (res.issues || [])) dangling.push(formatRefIssue(iss) || expr)
       }
     } catch {
-      // infra 失败 fail-open：不因校验设施故障阻断保存（Req 9.3）
+      // 请求失败已明确返回 invalid；保留既有设施意外失败的 fail-open。
     }
   }
   return dangling
@@ -296,14 +454,14 @@ async function collectDanglingRefs(list: any[]): Promise<string[]> {
 // 整体 PUT 用户编辑集（"这套就是最新集"语义）；空行由后端过滤。
 // 保存前经 ACNR 校验，悬空引用提示且不入库（Req 15.5）。
 type PersistOptions = { skipNew?: boolean }
-let persistTail: Promise<void> = Promise.resolve()
 
-/** 保存回执只就地刷新服务端元数据；不替换 formulas，避免把保存途中新增或继续编辑的行抹掉。 */
-function applyPersistResult(resp: any) {
-  if (!resp?.loaded) return
-  loadedTokens.value = resp.loaded
+/** 保存回执只就地刷新同代元数据，不替换编辑值，也不把旧令牌带进新上下文。 */
+function applyPersistResult(resp: any, context: DialogContext) {
+  if (!isCurrent(context) || !resp?.loaded) return
+  context.state.loaded = resp.loaded
+  loadedTokens.value = context.state.loaded
   const fresh = new Map<string, any>((resp.formulas || []).map((f: any) => [f.target, f]))
-  for (const formula of formulas.value) {
+  for (const formula of context.state.rows) {
     const saved = fresh.get(formula.target)
     if (!saved) continue
     Object.assign(formula, {
@@ -318,13 +476,10 @@ function applyPersistResult(resp: any) {
   }
 }
 
-async function performPersist(options: PersistOptions): Promise<boolean> {
-  if (!props.currentNote || !props.projectId || !props.year) {
-    ElMessage.warning('请先选择附注章节')
-    return false
-  }
-  // 先冻结本次快照。保存期间继续编辑的值留给下一批，不会被本次旧回执覆盖。
-  const candidates = formulas.value
+async function performPersist(context: DialogContext, options: PersistOptions): Promise<boolean> {
+  if (!isCurrent(context)) return false
+  // 出队时冻结同代模型；CAS 仍取该代上一批的回执，而不是入队时的陈旧令牌。
+  const candidates = context.state.rows
     .filter((formula) => !options.skipNew || !formula._isNew)
     .map((formula) => ({ ...formula }))
   // 自动保存只提交既有行：尚未选完目标的新行留在本地，不能阻塞另一格的提交。
@@ -333,12 +488,12 @@ async function performPersist(options: PersistOptions): Promise<boolean> {
     ElMessage.warning(`有 ${untargeted.length} 条公式没有选择目标单元格（表 / 行 / 列），未保存`)
     return false
   }
-  const dangling = await collectDanglingRefs(candidates)
+  const dangling = await collectDanglingRefs(candidates, context)
+  if (!isCurrent(context)) return false
   if (dangling.length) {
     ElMessage.error(`公式引用无法解析，未保存：${[...new Set(dangling)].join('；')}`)
     return false
   }
-  const noteSection = props.currentNote.note_section
   // 剔除前端本地态字段（_isNew / _cell）与只读展示字段（层级 / 可读目标），只送持久化 shape。
   const payload = candidates
     .filter(f => (f?.formula || '').trim())
@@ -346,27 +501,30 @@ async function performPersist(options: PersistOptions): Promise<boolean> {
   persisting.value = true
   try {
     const resp = await api.put(
-      noteFormula.list(props.projectId, props.year, noteSection),
-      { formulas: payload, loaded: loadedTokens.value },
+      noteFormula.list(context.projectId, context.year, context.noteSection),
+      { formulas: payload, loaded: context.state.loaded },
       { _silent: true } as any,
     )
-    applyPersistResult(resp)
+    if (!isCurrent(context)) return false
+    applyPersistResult(resp, context)
     emit('saved')
     return true
   } catch (e: any) {
-    // 缺令牌 428 / 并发修改 409 / 无权 403 / 归档 423 / 悬空引用 422 均由统一公式错误处理写明原因。
-    showFormulaError(e, '保存失败')
+    // 仅当前代展示 428 / 409 / 403 / 423 / 422；失效不等于当前保存失败。
+    if (isCurrent(context)) showFormulaError(e, '保存失败')
     return false
   } finally {
-    persisting.value = false
+    if (isCurrent(context)) persisting.value = false
   }
 }
 
-/** 全部 PUT 共用一条 Promise 链，确保版本令牌严格按响应顺序更新。 */
-function persistFormulas(options: PersistOptions = {}): Promise<boolean> {
-  const result = persistTail.then(() => performPersist(options), () => performPersist(options))
-  persistTail = result.then(() => undefined, () => undefined)
-  return result
+/** 同代 PUT 串行续传 CAS；新上下文不等待旧上下文的在途请求。 */
+function persistFormulas(options: PersistOptions = {}, context = currentContext): Promise<boolean> {
+  if (!isCurrent(context)) return Promise.resolve(false)
+  const run = () => performPersist(context, options)
+  const result = context.state.persistTail.then(run, run)
+  context.state.persistTail = result.then(() => undefined, () => undefined)
+  return untilInvalidated(context, result, false)
 }
 
 type EditableFormulaField = 'formula' | 'description'
@@ -377,10 +535,6 @@ type CellSave = {
   value: string
   waiters: Array<(saved: boolean) => void>
 }
-const pendingCellSaves: CellSave[] = []
-let activeCellSaves: CellSave[] = []
-let cellSaveWorker: Promise<void> | null = null
-
 function sameCell(a: Pick<CellSave, 'row' | 'field'>, row: any, field: EditableFormulaField) {
   return a.row === row && a.field === field
 }
@@ -390,56 +544,68 @@ function sameCell(a: Pick<CellSave, 'row' | 'field'>, row: any, field: EditableF
  * 保存期间再次修改同一格时，下一批继承最近一次真正落库的基准。
  */
 function scheduleSave(row: any, field: EditableFormulaField, before: string, value: string): Promise<boolean> {
+  const context = currentContext
+  if (!isCurrent(context) || !context.state.rows.includes(row)) return Promise.resolve(false)
+  const state = context.state
   const result = new Promise<boolean>((resolve) => {
-    const queued = pendingCellSaves.find((item) => sameCell(item, row, field))
+    const queued = state.pending.find((item) => sameCell(item, row, field))
     if (queued) {
       queued.value = value
       queued.waiters.push(resolve)
       return
     }
-    const inflight = activeCellSaves.find((item) => sameCell(item, row, field))
-    pendingCellSaves.push({ row, field, before: inflight?.before ?? before, value, waiters: [resolve] })
+    const inflight = state.active.find((item) => sameCell(item, row, field))
+    state.pending.push({ row, field, before: inflight?.before ?? before, value, waiters: [resolve] })
   })
-  ensureCellSaveWorker()
+  ensureCellSaveWorker(context)
   return result
 }
 
-function ensureCellSaveWorker() {
-  if (cellSaveWorker) return
+function ensureCellSaveWorker(context: DialogContext) {
+  const state = context.state
+  if (state.worker || !isCurrent(context)) return
   // 延后一微任务：同一用户动作里相邻格的提交合成一次整体 PUT。
-  cellSaveWorker = Promise.resolve().then(runCellSaveQueue).finally(() => {
-    cellSaveWorker = null
-    // 前一轮最后一个 waiter 已唤醒、finally 尚未执行时可能又入队；不能让这一格永久挂起。
-    if (pendingCellSaves.length) ensureCellSaveWorker()
+  state.worker = Promise.resolve().then(() => runCellSaveQueue(context)).finally(() => {
+    state.worker = null
+    if (state.pending.length) ensureCellSaveWorker(context)
   })
 }
 
-async function runCellSaveQueue() {
-  while (pendingCellSaves.length) {
-    const batch = pendingCellSaves.splice(0)
-    activeCellSaves = batch
-    const saved = await persistFormulas({ skipNew: true })
+async function runCellSaveQueue(context: DialogContext) {
+  const state = context.state
+  while (state.pending.length && isCurrent(context)) {
+    const batch = state.pending.splice(0)
+    state.active = batch
+    const saved = await persistFormulas({ skipNew: true }, context)
+    const current = isCurrent(context)
     for (const edit of batch) {
-      const queued = pendingCellSaves.find((item) => sameCell(item, edit.row, edit.field))
-      if (saved) {
-        // 下一批失败时回到本批已落库的值，而不是更早的旧值。
+      const queued = state.pending.find((item) => sameCell(item, edit.row, edit.field))
+      if (current && saved) {
         if (queued) queued.before = edit.value
-      } else if (!queued && String(edit.row[edit.field] ?? '') === edit.value) {
+      } else if (current && !queued && String(edit.row[edit.field] ?? '') === edit.value) {
         edit.row[edit.field] = edit.before
       }
-      edit.waiters.forEach((resolve) => resolve(saved))
+      edit.waiters.forEach((resolve) => resolve(current && saved))
     }
-    activeCellSaves = []
-    if (saved) ElMessage.success('已保存')
+    state.active = []
+    if (current && saved) ElMessage.success('已保存')
   }
 }
 
-async function flushScheduledSaves() {
-  while (cellSaveWorker) await cellSaveWorker
+async function flushScheduledSaves(context = currentContext): Promise<boolean> {
+  if (!isCurrent(context)) return false
+  while (true) {
+    const tail = context.state.persistTail
+    const worker = context.state.worker
+    await untilInvalidated(context, Promise.all([worker, tail]).then(() => undefined), undefined)
+    if (!isCurrent(context)) return false
+    if (!context.state.worker && tail === context.state.persistTail) return true
+  }
 }
 
 /** 既有行格内提交即排队保存；新增行先选完目标，再点行尾「保存」。 */
 function onFormulaCellCommit(row: any, field: EditableFormulaField, value: string) {
+  if (!isCurrent(currentContext) || !currentContext.state.rows.includes(row)) return Promise.resolve(false)
   const before = String(row[field] ?? '')
   const next = String(value ?? '')
   if (before === next) return Promise.resolve(true)
@@ -450,13 +616,15 @@ function onFormulaCellCommit(row: any, field: EditableFormulaField, value: strin
 
 // 新增行「保存」：先清空格内自动保存队列，再校验并持久化完整集合。
 async function completeRow() {
-  await flushScheduledSaves()
-  const ok = await persistFormulas()
-  if (ok) ElMessage.success('已保存')
+  const context = currentContext
+  if (!isCurrent(context) || !await flushScheduledSaves(context)) return
+  const ok = await persistFormulas({}, context)
+  if (ok && isCurrent(context)) ElMessage.success('已保存')
 }
 
 // 新增公式：推入空行（Req 15.3，去掉硬编码 SUM 占位）；目标在行内选（表 / 行 / 列）
 function addFormula() {
+  if (!isCurrent(currentContext)) return
   formulas.value.push({
     target: '',
     target_label: '',
@@ -474,51 +642,88 @@ function addFormula() {
 // 注：后端暂无"执行任意用户公式"端点，apply-formulas 按 check_presets 计算并
 // 回填 auto 单元格；用户编辑集通过 PUT 持久化并在下次打开时重新加载（Req 15.2）。
 async function onApply() {
-  if (!props.projectId || !props.year || !props.currentNote) {
-    ElMessage.warning('请先选择附注章节')
+  const context = currentContext
+  if (!isCurrent(context)) {
+    if (!disposed && !locallyClosed && props.modelValue) ElMessage.warning('请先选择附注章节')
     return
   }
+  if (applying.value || regenerating.value) return
   applying.value = true
   try {
-    await flushScheduledSaves()
-    const saved = await persistFormulas()
-    if (!saved) return
-    const noteSection = props.currentNote.note_section
+    if (!await flushScheduledSaves(context) || !isCurrent(context)) return
+    const saved = await persistFormulas({}, context)
+    if (!saved || !isCurrent(context)) return
     const result = await api.post(
-      noteFormula.apply(props.projectId, props.year, noteSection)
+      noteFormula.apply(context.projectId, context.year, context.noteSection), undefined, { _silent: true } as any,
     )
+    if (!isCurrent(context)) return
+    applyCheckResults(result, context)
     ElMessage.success(describeApplyResult(result))
     emit('applied')
   } catch (e: any) {
-    handleApiError(e, '应用失败')
+    if (isCurrent(context)) handleApiError(e, '应用失败')
   } finally {
-    applying.value = false
+    if (isCurrent(context)) applying.value = false
   }
 }
 
 // ─── 重新生成（Req 15.4）：按每张表当前结构重新生成预设公式并计算 ─────
 // 独立于 onApply，不持久化用户编辑集；regenerate=true 让后端丢掉章节里存过的旧公式（按行号指格，增删行后会指错格）。
 async function onRegenerate() {
-  if (!props.projectId || !props.year || !props.currentNote) {
-    ElMessage.warning('请先选择附注章节')
+  const context = currentContext
+  if (!isCurrent(context)) {
+    if (!disposed && !locallyClosed && props.modelValue) ElMessage.warning('请先选择附注章节')
     return
   }
+  if (applying.value || regenerating.value) return
   regenerating.value = true
   try {
-    const noteSection = props.currentNote.note_section
     const result = await api.post(
-      noteFormula.apply(props.projectId, props.year, noteSection), null, { params: { regenerate: true } },
+      noteFormula.apply(context.projectId, context.year, context.noteSection), null,
+      { params: { regenerate: true }, _silent: true } as any,
     )
+    if (!isCurrent(context)) return
+    // 重新生成的 reload 也属于原代；等待期间切换，不再提示或通知宿主。
+    if (!await loadFormulas(context) || !isCurrent(context)) return
+    applyCheckResults(result, context)
     ElMessage.success(describeApplyResult(result, '已重新生成'))
-    // 重新生成后刷新列表，展示最新预设公式
-    await loadFormulas()
     emit('applied')
   } catch (e: any) {
-    handleApiError(e, '重新生成失败')
+    if (isCurrent(context)) handleApiError(e, '重新生成失败')
   } finally {
-    regenerating.value = false
+    if (isCurrent(context)) regenerating.value = false
   }
 }
+
+// 先同步失效，再合并本轮 props 变更加载一次；覆盖同对象 note_section 原地变化。
+watch(() => props.modelValue, () => { locallyClosed = false }, { flush: 'sync' })
+watch(
+  () => [props.modelValue, props.projectId, props.year, props.currentNote, props.currentNote?.note_section, props.templateType],
+  invalidateContext,
+  { flush: 'sync' },
+)
+watch(
+  () => [props.modelValue, props.projectId, props.year, props.currentNote, props.currentNote?.note_section, props.templateType],
+  () => {
+    if (disposed || locallyClosed || !props.modelValue || !props.projectId || !props.year || !props.currentNote?.note_section) return
+    let invalidate!: () => void
+    const invalidated = new Promise<void>((resolve) => { invalidate = resolve })
+    const context: DialogContext = Object.freeze({
+      generation: contextGeneration, projectId: props.projectId, year: props.year,
+      note: props.currentNote, noteSection: props.currentNote.note_section, modelValue: props.modelValue,
+      templateType: props.templateType || 'soe', invalidated, invalidate,
+      state: { rows: formulas.value, loaded: null, loadGeneration: 0, persistTail: Promise.resolve(),
+        pending: [], active: [], worker: null },
+    })
+    currentContext = context
+    void loadFormulas(context)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => {
+  disposed = true
+  invalidateContext()
+})
 </script>
 
 <style scoped>

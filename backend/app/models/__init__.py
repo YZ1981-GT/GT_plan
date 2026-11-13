@@ -95,6 +95,7 @@ from app.models.workpaper_lifecycle_models import WorkpaperLifecycleEvent
 from app.models.project_wp_sheet_override import ProjectWorkpaperSheetOverride
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
+from app.models.ai_task_job_models import AiTaskItem, AiTaskJob
 from app.models.archive_models import ArchiveJob
 from app.models.eqcr_models import (
     EqcrDisagreementResolution,
@@ -144,6 +145,7 @@ from app.models.report_generation_models import (  # noqa: F401
     ConsolArtifact,
     ReportGenerationRun,
 )
+from app.models.consol_workpaper_instance_models import ConsolWorkpaperInstance  # noqa: F401
 from app.models.batch_project_models import ProjectBatchImportPlan  # noqa: F401
 from app.models.wp_visibility_models import (  # noqa: F401
     WorkpaperDelegationHistory,
@@ -222,8 +224,12 @@ from app.models.workpaper_sync_models import (  # noqa: F401
     WorkpaperSyncScopeIndex,
     WorkpaperSyncTestRun,
 )
+# V241：跨领域不可变字节与显式桥接记录
+from app.models.asset_blob_models import AssetBlob, AiChatRunResource, KnowledgeEvidencePromotion  # noqa: F401
 # V250（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
 from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
+# V267（advanced-query-artifact-and-freshness 任务 1）：查询运行记录与查询证据
+from app.models.query_evidence_models import QueryArtifact, QueryRun  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -298,10 +304,15 @@ __all__ = [
     # --- attachment models ---
     "Attachment",
     "AttachmentWorkingPaper",
+    "AssetBlob",
+    "AiChatRunResource",
+    "KnowledgeEvidencePromotion",
     # --- ai enums/models ---
     "AIModelType",
     "AIProvider",
     "AIModelConfig",
+    "AiTaskJob",
+    "AiTaskItem",
     # --- workpaper enums ---
     "WpTemplateStatus",
     "RegionType",
@@ -389,6 +400,9 @@ __all__ = [
     "FormulaPushState",
     # --- 显示偏好 (platform-global-display-settings-closure / V250) ---
     "UserDisplayPreferences",
+    # --- 高级查询运行记录与证据 (advanced-query-artifact-and-freshness / V267) ---
+    "QueryRun",
+    "QueryArtifact",
 ]
 
 # 调整分录持久化复核、处理历史与客户已入账（迁移 V235）

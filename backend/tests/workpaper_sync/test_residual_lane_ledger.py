@@ -103,9 +103,39 @@ def test_check_mode_passes() -> None:
     assert "逐字节一致" in out, f"--check 没输出比对结论：{out[-300:]}"
 
 
+def _lf_sha256(path: pathlib.Path) -> str:
+    """按「提交里的内容」求摘要：先把换行归一成 LF，再算 sha256。
+
+    🔴 不能直接 `sha256(read_bytes())`：仓库 `core.autocrlf=true`，Windows 检出后这些 JSON
+    在磁盘上是 CRLF，而生成器（自 v1.0.103 起）记录的是 LF 归一后的摘要 ⇒ 原写法在
+    Windows 干净检出上恒红、在 Linux CI 上恒绿，判的是「这台机器怎么检出」而不是
+    「上游有没有变」。这里**独立**做归一而不 import 生成器的 `_sha256`：生成器若退回
+    按原始字节算，Windows 上两边就对不上 ⇒ 本条照样能抓到。
+    """
+    data = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+
 def test_input_digest_matches_disk(ledger: dict) -> None:
     """输入 digest 必须与磁盘文件一致——上游变了清册要重生成。"""
-    actual_cs = hashlib.sha256(CURRENT_STATE_PATH.read_bytes()).hexdigest()
-    assert ledger["input_digests"]["current_state"] == actual_cs
-    actual_m = hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest()
-    assert ledger["input_digests"]["manifest"] == actual_m
+    assert ledger["input_digests"]["current_state"] == _lf_sha256(CURRENT_STATE_PATH), (
+        "current-state 变了但清册没重生成 —— 重跑 generate_residual_lane_ledger.py --write"
+    )
+    assert ledger["input_digests"]["manifest"] == _lf_sha256(MANIFEST_PATH), (
+        "manifest 变了但清册没重生成 —— 重跑 generate_residual_lane_ledger.py --write"
+    )
+
+
+def test_lf_digest_is_line_ending_independent(tmp_path: pathlib.Path) -> None:
+    """`_lf_sha256` 自身可伪证：同一内容 LF / CRLF 两种落盘必须同摘要，内容变了必须不同。"""
+    lf = tmp_path / "lf.json"
+    crlf = tmp_path / "crlf.json"
+    lf.write_bytes(b'{\n  "a": 1\n}\n')
+    crlf.write_bytes(b'{\r\n  "a": 1\r\n}\r\n')
+    assert _lf_sha256(lf) == _lf_sha256(crlf)
+    assert _lf_sha256(lf) != hashlib.sha256(crlf.read_bytes()).hexdigest(), (
+        "归一没生效 ⇒ 本文件的摘要判据又会随检出方式变红变绿"
+    )
+    changed = tmp_path / "changed.json"
+    changed.write_bytes(b'{\n  "a": 2\n}\n')
+    assert _lf_sha256(changed) != _lf_sha256(lf)

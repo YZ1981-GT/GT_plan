@@ -386,6 +386,57 @@ async def test_snapshot_http_orm_create_restore_compare_and_project_isolation(ta
     }]
 
 
+@pytest.mark.asyncio
+async def test_sign_snapshot_route_rejects_with_409_and_structured_detail(task15_factory):
+    """批 7 任务 7.2：sign 快照在未就绪环境下经真实 HTTP 路由返回 409 + 结构化 detail，且零落库。
+
+    SQLite 环境无正式报表运行 / artifact / readiness ⇒ sign/lock 门 fail-closed；
+    路由把 ConsolSnapshotRejected 转成 409 {code, message, failures}。manual 则放行（对照）。
+    """
+    from app.models.phase10_models import ConsolSnapshot
+    from app.routers.report_trace import router
+
+    actor = _admin()
+    project = _project("签字拒绝")
+    await _persist_projects(task15_factory, project)
+    async with task15_factory() as db:
+        db.add(User(
+            id=actor.id, username=actor.username,
+            email=f"{actor.id.hex}@task15.local", hashed_password="x", role=UserRole.admin,
+        ))
+        await db.commit()
+
+    app = _app_for(task15_factory, router, user=actor)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        rejected = await client.post(
+            f"/api/consolidation/{project.id}/snapshots",
+            params={"year": Y, "reason": "sign"},
+        )
+        assert rejected.status_code == 409, rejected.text
+        detail = rejected.json()["detail"]
+        assert detail["code"] in (
+            "artifact_missing", "readiness_not_ready",
+            "required_source_missing", "sign_lock_gate_failed",
+        )
+        assert detail["message"]
+        assert isinstance(detail["failures"], list) and detail["failures"]
+
+        # manual 对照：同环境允许创建（partial 允许）
+        ok = await client.post(
+            f"/api/consolidation/{project.id}/snapshots",
+            params={"year": Y, "reason": "manual"},
+        )
+        assert ok.status_code == 200, ok.text
+
+    # 被拒的 sign 快照零落库；只有 manual 那条
+    async with task15_factory() as db:
+        rows = (await db.execute(
+            sa.select(ConsolSnapshot).where(ConsolSnapshot.project_id == project.id)
+        )).scalars().all()
+        assert len(rows) == 1
+        assert (rows[0].trigger_reason or "") == "manual"
+
+
 def test_snapshot_migration_declares_runtime_table():
     """V174/R174、ORM 与运行时表的列集、可空性和索引必须三层一致。"""
     from app.models.phase10_models import ConsolSnapshot
@@ -465,7 +516,7 @@ async def test_note_manual_save_respects_consol_lock(task15_factory):
     path = f"/api/consol-note-sections/data/{project.id}/{Y}/五-1-1"
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        saved = await client.put(path, json={"data": {"rows": [["库存现金", "1.00"]]}})
+        saved = await client.put(path, json={"data": {"rows": [["库存现金", "1.00"]]}, "force_overwrite": True})
         assert saved.status_code == 200, saved.text
 
         async with task15_factory() as db:
@@ -474,5 +525,63 @@ async def test_note_manual_save_respects_consol_lock(task15_factory):
             current.consol_lock = True
             await db.commit()
 
-        locked = await client.put(path, json={"data": {"rows": [["库存现金", "2.00"]]}})
+        locked = await client.put(path, json={"data": {"rows": [["库存现金", "2.00"]]}, "force_overwrite": True})
         assert locked.status_code == 423, locked.text
+        assert locked.json()["detail"] == "项目已被合并锁定，无法修改"
+
+
+@pytest.mark.asyncio
+async def test_note_manual_save_scope_error_keeps_status_and_message(task15_factory):
+    """保存路由仍把 NodeScopeError 映射为原有状态码和中文原因。"""
+    from app.routers.consol_note_sections import router
+
+    project = _project("附注作用域")
+    await _persist_projects(task15_factory, project)
+    app = _app_for(task15_factory, router)
+    path = f"/api/consol-note-sections/data/{project.id}/{Y - 1}/五-1-1"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.put(
+            path,
+            json={"data": {"rows": [["库存现金", "1.00"]]}, "force_overwrite": True},
+        )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == f"请求年度 {Y - 1} 与项目有效审计年度 {Y} 不一致"
+
+
+@pytest.mark.asyncio
+async def test_note_manual_save_unexpected_error_returns_sanitized_500(task15_factory, caplog):
+    """写库未知异常应回滚并返回结构化 500，不把原始错误泄露给客户端。"""
+    from app.routers import consol_note_sections as route_module
+
+    project = _project("附注异常")
+    await _persist_projects(task15_factory, project)
+    app = _app_for(task15_factory, route_module.router)
+    path = f"/api/consol-note-sections/data/{project.id}/{Y}/五-1-1"
+    raw_error = "secret database failure"
+
+    with patch.object(
+        route_module,
+        "_save_note_record",
+        new=AsyncMock(side_effect=RuntimeError(raw_error)),
+    ):
+        with caplog.at_level("ERROR", logger=route_module.logger.name):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.put(
+                    path,
+                    json={"data": {"rows": [["库存现金", "1.00"]]}, "force_overwrite": True},
+                )
+
+    assert response.status_code == 500, response.text
+    detail = response.json()["detail"]
+    assert detail == {
+        "error_code": "CONSOL_NOTE_SAVE_FAILED",
+        "message": "合并附注保存失败，请稍后重试",
+    }
+    assert raw_error not in response.text
+    assert str(project.id) in caplog.text
+    assert f"year={Y}" in caplog.text
+    assert "section_id=五-1-1" in caplog.text
+    assert "node_key=None" in caplog.text
+    assert raw_error in caplog.text

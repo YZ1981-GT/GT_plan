@@ -120,12 +120,26 @@ async def test_review_level_requires_role_and_designated_reviewer():
 async def test_central_content_guard_blocks_frozen_workpaper(status):
     from app.routers._wp_gate import raise_if_workpaper_frozen
 
-    result = MagicMock(); result.scalar_one_or_none.return_value = status
+    # 冻结判据在 PG / 无 bind 的替身会话上走 ``to_jsonb(working_paper)->>'status'`` + ``.first()``
+    # （workpaper_content_freeze.load_workpaper_status）；原替身只给 scalar_one_or_none ⇒ 读到 MagicMock、
+    # 判非终态放行，用例从未真正走到 423。按真实行形态 (status, is_deleted) 模拟。
+    result = MagicMock(); result.first.return_value = (status.value, "false")
     db = AsyncMock(); db.execute = AsyncMock(return_value=result)
     with pytest.raises(HTTPException) as caught:
         await raise_if_workpaper_frozen(db, uuid.uuid4())
     assert caught.value.status_code == 423
     assert "内容已冻结" in str(caught.value.detail)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("row", [("draft", "false"), ("review_passed", "true"), None])
+async def test_central_content_guard_allows_writable_or_deleted(row):
+    """反向：未冻结、已删除、不存在的底稿不报 423（防上一条用例因替身形态恒绿 / 恒红）。"""
+    from app.routers._wp_gate import raise_if_workpaper_frozen
+
+    result = MagicMock(); result.first.return_value = row
+    db = AsyncMock(); db.execute = AsyncMock(return_value=result)
+    await raise_if_workpaper_frozen(db, uuid.uuid4())
 
 
 def test_all_review_submission_routes_use_single_service_or_are_retired():

@@ -39,6 +39,7 @@ beforeEach(() => {
   mockGet.mockReset()
   mockPost.mockReset()
   mockPatch.mockReset()
+  sessionStorage.setItem('user', JSON.stringify({ id: 'user-1' }))
   // jsdom 自带 localStorage，但要确保每个测试隔离
   try {
     localStorage.clear()
@@ -202,4 +203,22 @@ describe('InventoryStocktakeDialog — 烟测', () => {
     // 不应触发 patch
     expect(mockPatch).not.toHaveBeenCalled()
   })
+})
+
+
+it('不同登录用户不能在打开监盘弹窗时恢复前一用户的本地草稿', async () => {
+  sessionStorage.setItem('user', JSON.stringify({ id: 'user-1' }))
+  localStorage.setItem(
+    'gt:stocktake-draft:user-1:proj-1:wp-1:stocktake_F2-21A',
+    JSON.stringify({ location: '前一用户仓库', conclusion: '前一用户结论' }),
+  )
+  sessionStorage.setItem('user', JSON.stringify({ id: 'user-2' }))
+  const wrapper = makeWrapper({ visible: false, wpCode: 'F2-21A' })
+
+  await wrapper.setProps({ visible: true })
+  await Promise.resolve()
+  await Promise.resolve()
+
+  expect((wrapper.vm as any).form.location).not.toBe('前一用户仓库')
+  expect(mockGet).toHaveBeenCalledOnce()
 })

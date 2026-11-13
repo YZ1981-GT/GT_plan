@@ -173,6 +173,7 @@ async def refresh_all_bindings(
         "stale_cleared": stale_cleared,
         "errors": report.errors,
         "error_details": report.error_details,
+        "blocked_writes": report.blocked_writes,
         "message": f"已刷新 {len(report.recomputed_sections)} 个章节，"
                    f"更新 {report.cells_updated} 个单元格，"
                    f"公式求值 {formula_evaluated} 个章节"

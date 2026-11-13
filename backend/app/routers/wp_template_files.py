@@ -77,7 +77,7 @@ async def _bind_file_path(db: AsyncSession, wp_id: UUID, path) -> None:
 async def get_workpaper_xlsx(
     project_id: str,
     wp_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """获取底稿 xlsx 文件（供 Univer importXLSX 加载）
 

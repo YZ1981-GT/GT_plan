@@ -1,0 +1,24 @@
+# 任务：生产构建白屏收口
+
+- [x] 1. 复现并定位：非压缩构建 + chunk 静态 import 图（R1）
+  - 假设成立。修复前 `vendor-core` 反向 import 入口 `index`：lodash、`@vueuse`、`@floating-ui`、`async-validator`、tinycolor、dayjs，以及 `getDefaultExportFromCjs` 等 CJS 辅助都落在 index（`onlyExplicitManualChunks` 不自动吸入传递依赖），index 又静态 import vendor-core。
+  - 修复前产物用静态服务托管，浏览器首屏 `Cannot access 'isClient' before initialization`，`#app` 无子节点（与原报 `Rt` 同类 TDZ，符号随压缩而异）。
+- [x] 2. `scripts/check-chunk-cycles.mjs` + `check-chunk-cycles.spec.mjs`（vitest 4 例）（R4）
+  - 默认 vendor-* 参与的环 exit 1，其余只警告；`--strict` 时任何环都失败。`build:verify` 现用 `--strict`。
+  - 在真实产物上验证：修复前 exit=1，修复后 exit=0。
+- [x] 3. 修 `heavyFeatureChunk`：传递依赖与 `commonjsHelpers` 归入 vendor-core（R2）
+  - 首版把整个 `@floating-ui/` 归入，结果 vendor-core 反向依赖 React（`@floating-ui/react-dom` 使用 `reactExports`），第二次构建仍有环；收窄为 `core|dom|utils|vue` 后 vendor-core 无外部 import。
+  - 修复后产物浏览器首屏：`#app` 有子节点、2 个输入框、console 无错误。
+  - 完整 `build:verify`：包体预算通过、2493 个块无环、built smoke 通过。
+- [x] 4. smoke 增加无头浏览器步骤，并做阴性对照：循环 fixture 必须失败（R3）
+  - `scripts/smoke-browser-mount.mjs`（Playwright chromium）接在 `smoke-built-artifact.mjs` 末尾，打开 `/login`：断言 `#app` 有子节点、无 `pageerror`、无 console error（假后端造成的 `Failed to load resource` 除外）。
+  - 显式跳过只认 `GT_SMOKE_SKIP_BROWSER=1` 并打印告警，默认不跳过。
+  - `smoke-browser-mount.spec.mjs` 4 例：正常通过、TDZ 循环白屏必须失败、无报错但根节点为空必须失败、资源 404 不算错误。
+  - 注意：该 spec 每例启动一次 chromium，约 33 秒；没有安装 chromium 的环境会失败。
+- [x] 5. 环检测接入 `build:verify`（位于 budget 之后、smoke 之前）；`build-pipeline-contract.spec.mjs` 7 例仍通过
+- [x] 6. 在 `.verified-dist` 上浏览器实测（2026-11-11，独立端口 3041 同源代理到共享后端 9980，只读走查【测试】公式同步甲有限公司_2025）
+  - 通过：登录、工作台、试算表、报表、附注编辑页、底稿列表、底稿 E1 编辑器（目录页与 E1-1 审定表页签）；console error 为 0（附注页有一条 Element Plus `ElOnlyChild` 警告，非产物缺陷）。`heavy-univer` / `heavy-office` / `heavy-excel` 三个重块可单独动态加载。
+  - 🔴 走查抓到第二个生产缺陷：首轮产物（任务 3 修复后）打开底稿编辑器路由报 `Cannot access 'Kp' before initialization`。原因是 `WorkpaperEditor ↔ heavy-univer` 懒加载环：Univer 的第三方依赖（rxjs / numfmt / unicode-regex / React 全家 / radix 等 60 余个包，应用源码不直接引用）落进 WorkpaperEditor 块，heavy-univer 反向 import 它 108 个名字。上一轮把该环当"不影响首屏"只警告，实际会让编辑器路由失败。
+  - 修复：这些包归入 `heavy-univer`；`build:verify` 的环检测升级为 `--strict`。修复后完整 `build:verify`：入口 gzip 565,934 字节（修复前 565,925，基本不变）、预算通过、2493 个块严格无环、浏览器 smoke 通过；编辑器路由复测正常。
+  - 未覆盖：Univer 编辑模式、OnlyOffice 在线编辑、OO→HTML 往返、复核、trio 交付（需要写入或上游 UAT）。
+- [x] 7. 回填 `platform-release-blocker-closure` Task 22 的生产构建证据（见该 spec design §9.6 追加说明）

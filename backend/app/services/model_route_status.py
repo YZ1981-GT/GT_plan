@@ -1,7 +1,7 @@
 """模型路由状态：每类「本机 → 服务器」候选的可用性与当前生效（ADR-ROUTE-010）。
 
 探测与生产走同一 transport、同一候选身份：探测成功会清除该候选的冷却记录、失败会写入冷却，
-所以「检测状态」也是让路由立刻重新尝试本机的入口。结果按候选缓存（对话 / 向量 / 本机 OCR
+所以「检测状态」也是让路由立刻重新尝试本机的入口。结果按候选缓存（对话 / 向量 / 重排 / 本机 OCR
 30 秒、远程 OCR 60 秒），``refresh=True`` 强刷。只读：不改启用状态、不写库。
 """
 
@@ -27,17 +27,28 @@ from app.services.llm_runtime import (
     _probe_chat_completion,
     build_runtime_client,
     embedding,
+    rerank,
     resolve_route,
 )
 
-KINDS: tuple[str, ...] = ("chat", "embedding", "ocr", "layout_parsing")
+KINDS: tuple[str, ...] = ("chat", "embedding", "rerank", "ocr", "layout_parsing")
 _LABELS = {
     "chat": "对话模型",
     "embedding": "向量模型",
+    "rerank": "重排模型",
     "ocr": "OCR 文字识别",
     "layout_parsing": "OCR 版面解析",
 }
-_POLICY = {"chat": "local_first", "embedding": "single", "ocr": "local_first", "layout_parsing": "local_first"}
+_POLICY = {
+    "chat": "local_first", "embedding": "single", "rerank": "local_first",
+    "ocr": "local_first", "layout_parsing": "local_first",
+}
+# 读库得到路由的三类 LLM（OCR 另走 resolve_ocr_route）
+_LLM_KINDS: tuple[tuple[str, AIModelType], ...] = (
+    ("chat", AIModelType.chat),
+    ("embedding", AIModelType.embedding),
+    ("rerank", AIModelType.rerank),
+)
 _TTL_SHORT = 30.0
 _TTL_REMOTE_OCR = 60.0
 
@@ -166,6 +177,15 @@ async def _probe_embedding(config: ResolvedLLMConfig) -> tuple[bool, str]:
     return True, "可用"
 
 
+async def _probe_rerank(config: ResolvedLLMConfig) -> tuple[bool, str]:
+    """重排同样真发一次 /rerank：网关 /models 列出模型名不代表它挂了重排接口。"""
+    try:
+        await rerank(config, "ping", ["ping"], timeout=10.0)
+    except LLMRuntimeError as exc:
+        return False, str(exc)
+    return True, "可用"
+
+
 async def _probe_ocr_local() -> tuple[bool, str]:
     from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -194,7 +214,8 @@ class _Slot:
 
 
 def _llm_slots(kind: str, route: list[Any]) -> list[_Slot]:
-    probe_fn = _probe_chat if kind == "chat" else _probe_embedding
+    # 调用时按名取（不在模块级缓存函数对象）：测试与运维替换 _probe_* 才能生效
+    probe_fn = {"chat": _probe_chat, "embedding": _probe_embedding, "rerank": _probe_rerank}[kind]
     slots: list[_Slot] = []
     for candidate in route:
         config = candidate.config
@@ -285,7 +306,7 @@ async def collect_route_status(
     probe_kinds: Iterable[str] = KINDS,
     include_endpoints: bool = True,
 ) -> dict[str, Any]:
-    """汇总四类路由。``probe_kinds`` 之外的类只读缓存与冷却记录，不发请求。"""
+    """汇总五类路由（对话 / 向量 / 重排 / OCR 两个能力槽）。``probe_kinds`` 之外的类只读缓存与冷却记录，不发请求。"""
     from app.services.remote_ocr_runtime import RemoteOCRRuntimeError, resolve_ocr_route
 
     probe_set = set(probe_kinds)
@@ -293,11 +314,21 @@ async def collect_route_status(
     slots_by_kind: dict[str, list[_Slot]] = {}
     errors: dict[str, str] = {}
     # AsyncSession 不支持并发：先顺序读库，再并行探测。
-    for kind, model_type in (("chat", AIModelType.chat), ("embedding", AIModelType.embedding)):
+    for kind, model_type in _LLM_KINDS:
         try:
-            slots_by_kind[kind] = _llm_slots(kind, await resolve_route(db, model_type))
+            if model_type == AIModelType.rerank:
+                # 枚举值来自 V261：库未迁移时这条查询会报错，放保存点里只让这一类显示错误。
+                async with db.begin_nested():
+                    route = await resolve_route(db, model_type)
+            else:
+                route = await resolve_route(db, model_type)
+            slots_by_kind[kind] = _llm_slots(kind, route)
         except LLMRuntimeError as exc:
             slots_by_kind[kind], errors[kind] = [], str(exc)
+        except Exception as exc:  # noqa: BLE001 — 只可能来自重排的保存点内查询
+            if model_type != AIModelType.rerank:
+                raise
+            slots_by_kind[kind], errors[kind] = [], f"读取重排配置失败（{type(exc).__name__}）"
     for kind in ("ocr", "layout_parsing"):
         try:
             slots_by_kind[kind] = _ocr_slots(kind, await resolve_ocr_route(kind, db=db))

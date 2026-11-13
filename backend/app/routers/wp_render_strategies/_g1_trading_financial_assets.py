@@ -37,6 +37,7 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.checklist_response_cas import checklist_snapshot_entry
 from app.services.four_table import (
     build_g_adjudication_prefill,
     LeafRow,
@@ -249,7 +250,7 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         result = await db.execute(
             sa.text(
-                "SELECT item_id, conclusion, remark "
+                "SELECT item_id, conclusion, remark, updated_at "
                 "FROM checklist_responses WHERE wp_id = :wp_id "
                 "AND item_id LIKE 'G1-%' "
                 "LIMIT 800"
@@ -257,10 +258,7 @@ async def render(ctx: RenderContext) -> dict | None:
             {"wp_id": str(wp_id)},
         )
         for row in result.fetchall():
-            responses_snapshot[row.item_id] = {
-                "conclusion": row.conclusion or "",
-                "remark": row.remark or "",
-            }
+            responses_snapshot[row.item_id] = checklist_snapshot_entry(row)
         # 审定值回读：EventBus substantive:adjudicated 落库的独立 item_id
         adjudicated_amount = responses_snapshot.get(_ADJUDICATED_ITEM_ID, {}).get(
             "conclusion", ""

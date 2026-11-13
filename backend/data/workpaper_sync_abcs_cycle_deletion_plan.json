@@ -16,9 +16,9 @@
    "production_edge_count": 3,
    "in_scope_edge_count": 3,
    "in_scope_edges": [
-    "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L223",
-    "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L166",
-    "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L301"
+    "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L230",
+    "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L173",
+    "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L308"
    ],
    "why": "全部生产边都在本 slice 内 ⇒ 46 条改线后成为零生产边 orphan，AC 1.7 要求删除（不得以豁免或 DEPRECATED 注释保留）",
    "blocked_by": [

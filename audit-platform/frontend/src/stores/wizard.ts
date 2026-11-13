@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import http from '@/utils/http'
+import http, { type GtRequestConfig } from '@/utils/http'
 import { invalidateProjectListQuery } from '@/services/projectListQuery'
 
 export interface BasicInfo {
@@ -286,16 +286,50 @@ export const useWizardStore = defineStore('wizard', {
       }
     },
 
-    /** Save step data via PUT /api/projects/{id}/wizard/{step} */
-    async saveStep(step: StepKey, stepData: Record<string, unknown>) {
-      if (!this.projectId) return
+    /** Save step data via PUT /api/projects/{id}/wizard/{step}
+     *
+     * ``onForbidden`` / ``onConflict``（R2.5 / R6.4，spec consol-group-code-entry-consistency）：
+     * 请求级处理授权 403 与 COMPANY_CODE_IN_USE 409——这两个错误带结构化 dict detail，
+     * 交给全局拦截器会把 dict 显示成笼统提示；传入回调时请求带 ``_silent``，
+     * 由调用方（ProjectWizard）弹结构化提示并保留表单。
+     */
+    async saveStep(
+      step: StepKey,
+      stepData: Record<string, unknown>,
+      handlers?: {
+        onForbidden?: (detail: { message?: string } | string) => void
+        onConflict?: (detail: { message?: string; impacts?: Array<{ label: string; count: number }> }) => void
+      },
+    ): Promise<boolean> {
+      if (!this.projectId) return false
       this.loading = true
       try {
-        const { data } = await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
+        const { data } = await http.put(
+          `/api/projects/${this.projectId}/wizard/${step}`,
+          stepData,
+          handlers ? ({ _silent: true } as GtRequestConfig) : undefined,
+        )
         invalidateProjectListQuery()
         const state = data as WizardState & { notices?: string[] }
         this.applyWizardState(state)
         this.lastNotices = Array.isArray(state?.notices) ? state.notices : []
+        return true
+      } catch (e: any) {
+        const status = e?.response?.status
+        const detail = e?.response?.data?.detail
+        if (handlers?.onForbidden && status === 403) {
+          handlers.onForbidden(detail)
+          return false
+        }
+        if (
+          handlers?.onConflict && status === 409
+          && (detail?.error_code === 'COMPANY_CODE_IN_USE'
+            || detail?.error_code === 'PROJECT_CREATION_GRANT_STALE')
+        ) {
+          handlers.onConflict(detail)
+          return false
+        }
+        throw e
       } finally {
         this.loading = false
       }

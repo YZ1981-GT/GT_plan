@@ -18,6 +18,23 @@
     </div>
 
     <el-alert v-if="error" type="error" :title="error" :closable="false" show-icon class="gt-fp-block" />
+    <PlatformJobProgress
+      v-if="activeJobId"
+      class="gt-fp-block"
+      :project-id="props.projectId"
+      :job-id="activeJobId"
+      title="公式推送"
+      @update:job-id="onPushJobId"
+      @completed="onPushCompleted"
+      @failed="onPushFailed"
+    />
+
+    <!-- 规则已不存在、格里还留着推送值的附注单元格（spec note-table-structure-formula-pull-closure R10）：
+         这类格既不再被推送维护，又挡着附注预设公式（按「推送拥有格」跳过）⇒ 数停在当年推的那个值。推送不自动清。 -->
+    <el-alert v-if="orphanStates > 0" type="warning" :closable="false" show-icon class="gt-fp-block"
+      data-testid="fp-orphan-states"
+      :title="`有 ${orphanStates} 个附注单元格的推送规则已不存在`"
+      description="这些格既不再被推送维护，也挡着附注预设公式重算。清理（会改数据）：python backend/scripts/fix/purge_orphan_push_states.py --apply --confirm" />
 
     <!-- 最近一次推送 -->
     <div class="gt-fp-block">
@@ -209,11 +226,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { formulaPush } from '@/services/apiPaths'
+import type { PlatformJobSnapshot } from '@/services/platformJobs'
+import { newUuid } from '@/utils/uuid'
 import { formulaSettingsApi } from '@/services/formulaSettingsApi'
 import { showFormulaError, type Definition } from '@/composables/formula/useFormulaSettings'
 import { fmtDateTime } from '@/utils/formatters'
 import FormulaDefinitionEditDialog from './settings/FormulaDefinitionEditDialog.vue'
 import FormulaPushVerifyPanel from './FormulaPushVerifyPanel.vue'
+import PlatformJobProgress from '@/components/common/PlatformJobProgress.vue'
 import {
   POLICY_LABELS, RUN_STATUS_LABELS, STAGE_LABELS, STATE_LABELS, TRIGGER_LABELS,
   actionable, isRuleDisabled, labelOf, layerTagType, pendingStates, ruleActions, ruleReadonlyText, ruleStatusText,
@@ -234,10 +254,13 @@ const props = withDefaults(defineProps<{
 const rules = ref<PushRuleView[]>([])
 const states = ref<PushStateView[]>([])
 const latest = ref<any>(null)
+/** 规则已不存在的附注推送状态行条数（R10：只提示，清理走修复脚本） */
+const orphanStates = ref(0)
 const dryRun = ref<any>(null)
 const warnings = ref<string[]>([])
 const loading = ref(false)
 const running = ref<'' | 'run' | 'dry' | 'all'>('')
+const activeJobId = ref('')
 const error = ref('')
 const selectedAddrs = ref<string[]>([])
 
@@ -249,7 +272,7 @@ const dryRunText = computed(() => {
   return `试跑结果：将写入 ${d.written_count ?? 0} 项，未变化 ${d.unchanged_count ?? 0} 项，`
     + `保留 ${d.kept_count ?? 0} 项，跳过 ${d.skipped_count ?? 0} 项（未写入任何数据）`
 })
-const canRun = computed(() => props.canEdit && !!props.projectId && !!props.year && !running.value)
+const canRun = computed(() => props.canEdit && !!props.projectId && !!props.year && !running.value && !activeJobId.value)
 
 function detailOf(e: any): string {
   const d = e?.response?.data?.detail ?? e?.response?.data?.message ?? e?.message
@@ -270,6 +293,7 @@ async function loadAll(): Promise<void> {
     latest.value = (l as any)?.run ?? null
     warnings.value = latest.value?.detail?.warnings ?? []
     states.value = (s as any)?.states ?? []
+    orphanStates.value = Number((l as any)?.orphan_push_states ?? 0) || 0
   } catch (e) {
     error.value = detailOf(e)
   } finally {
@@ -281,22 +305,42 @@ async function onRun(dry: boolean): Promise<void> {
   running.value = dry ? 'dry' : 'run'
   try {
     const res: any = await api.post(formulaPush.run(props.projectId), {
-      year: props.year, dry_run: dry,
+      year: props.year,
+      dry_run: dry,
       ...(props.wpCode ? { wp_codes: [props.wpCode] } : {}),
+      ...(!dry ? { operation_id: newUuid(), async_mode: true } : {}),
     })
     if (dry) {
       dryRun.value = res
       warnings.value = res?.warnings ?? []
       return
     }
+    if (!res?.accepted || !res?.job_id) throw new Error('公式推送任务未返回 job_id')
     dryRun.value = null
-    ElMessage.success(`推送完成：写入 ${res?.written_count ?? 0} 项，保留 ${res?.kept_count ?? 0} 项`)
-    await loadAll()
+    activeJobId.value = String(res.job_id)
+    ElMessage.info('公式推送已提交，正在后台执行')
   } catch (e) {
     ElMessage.error(detailOf(e))
   } finally {
     running.value = ''
   }
+}
+
+function onPushJobId(jobId: string): void {
+  activeJobId.value = jobId
+}
+
+async function onPushCompleted(job: PlatformJobSnapshot): Promise<void> {
+  const summary = (job.result_ref?.summary ?? {}) as any
+  activeJobId.value = ''
+  ElMessage.success(`推送完成：写入 ${summary.written_count ?? 0} 项，保留 ${summary.kept_count ?? 0} 项`)
+  await loadAll()
+}
+
+async function onPushFailed(job: PlatformJobSnapshot): Promise<void> {
+  activeJobId.value = ''
+  ElMessage.error(job.error_message || '公式推送失败，请重试')
+  await loadAll()
 }
 
 async function onRunAll(): Promise<void> {
@@ -312,9 +356,12 @@ async function onRunAll(): Promise<void> {
   }
   running.value = 'all'
   try {
-    const res: any = await api.post(formulaPush.run(props.projectId), { year: props.year, dry_run: false })
-    ElMessage.success(`全部推送完成：写入 ${res?.written_count ?? 0} 项，保留 ${res?.kept_count ?? 0} 项`)
-    await loadAll()
+    const res: any = await api.post(formulaPush.run(props.projectId), {
+      year: props.year, dry_run: false, operation_id: newUuid(), async_mode: true,
+    })
+    if (!res?.accepted || !res?.job_id) throw new Error('公式推送任务未返回 job_id')
+    activeJobId.value = String(res.job_id)
+    ElMessage.info('全部公式推送已提交，正在后台执行')
   } catch (e) {
     ElMessage.error(detailOf(e))
   } finally {

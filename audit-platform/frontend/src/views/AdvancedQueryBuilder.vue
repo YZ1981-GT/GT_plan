@@ -296,6 +296,7 @@
           <div class="gt-aqb-section-title">
             查询结果 <span v-if="result" class="gt-aqb-result-count">共 {{ result.total }} 行</span>
             <span v-if="resultScopeText" class="gt-aqb-scope-tag" data-testid="aqb-result-scope">{{ resultScopeText }}</span>
+            <el-button size="small" style="margin-left:8px" @click="evidenceDrawerVisible = true">🕘 历史与证据</el-button>
             <el-checkbox
               v-if="result && result.rows.length"
               v-model="showTechnicalColumns"
@@ -412,6 +413,11 @@
       </div>
     </div>
   </div>
+  <QueryEvidenceDrawer
+    v-model="evidenceDrawerVisible"
+    entry="builder"
+    :evidence="evidence"
+  />
 </template>
 
 <script setup lang="ts">
@@ -433,6 +439,8 @@ import {
   groupFieldsByTier,
 } from '@/components/query/queryFieldTiers'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
+import { useQueryRunEvidence } from '@/components/query/useQueryRunEvidence'
+import QueryEvidenceDrawer from '@/components/query/QueryEvidenceDrawer.vue'
 import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
 import {
   BUILDER_NO_PROJECT_HINT, buildBuilderPayload, isKnownYear, readBlobErrorBody,
@@ -590,6 +598,9 @@ const loadingExecute = ref(false)
 const loadingExport = ref(false)
 /** 当前页（offset = (page - 1) × 每页行数） */
 const page = ref(1)
+// AQF §8.2：服务端历史与证据
+const evidence = useQueryRunEvidence('builder')
+const evidenceDrawerVisible = ref(false)
 
 const dsl = reactive<{
   table: string
@@ -833,6 +844,7 @@ async function runQuery() {
     result.value = resp
     if (resp.count_token) countToken.value = resp.count_token
     sqlPreview.value = resp.sql
+    evidence.setFromExecuteResult(resp as Record<string, unknown>)
     void validateRefs()
   } catch (e: any) {
     if (generation !== queryGeneration) return

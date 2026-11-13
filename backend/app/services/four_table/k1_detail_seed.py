@@ -185,10 +185,14 @@ def seed_k1_bad_debt(responses_snapshot: dict, payload: dict | None) -> bool:
     if _has_manual_bad_debt(raw):
         return False
     try:
-        responses_snapshot[K1_BAD_DEBT_ITEM_ID] = {
+        entry = {
             "conclusion": existing.get("conclusion") or "",
             "remark": json.dumps(payload, ensure_ascii=False),
         }
+        # seed 只换显示内容，编辑基线仍是库里这一行：保留它的 CAS 版本，否则保存 428
+        if existing.get("version"):
+            entry["version"] = existing["version"]
+        responses_snapshot[K1_BAD_DEBT_ITEM_ID] = entry
     except Exception as e:  # noqa: BLE001 — fail-open
         logger.warning("K1-3 seed 写入失败: %s", e)
         return False

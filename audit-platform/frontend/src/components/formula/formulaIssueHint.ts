@@ -9,6 +9,24 @@
  * 取代原 `useFormulaIssueHint.ts`（自己再调一次接口、且提醒项按对象形状收，而接口给的是字符串）。
  */
 
+import { checkStatusOf, checkReasonOf, type GateCheckLike, type GateCheckStatus } from '@/utils/consistencyCheckStatus'
+
+/** 仅旧接口缺失 status 时兼容布尔；显式空/未知状态不得降级。 */
+export function formulaOutcomeStatus(check: GateCheckLike): GateCheckStatus {
+  if (check.status === undefined && typeof check.passed === 'boolean') return check.passed ? 'passed' : 'failed'
+  return checkStatusOf(check)
+}
+
+export function formulaCheckNumber(value: unknown): number | null {
+  if (value == null || (typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+export function formulaCheckSeverity(value: unknown): 'blocking' | 'warning' | 'info' {
+  return value === 'blocking' || value === 'info' ? value : 'warning'
+}
+
 /** 勾稽不通过项（与后端 `formula_logic_check._serialize` 的 issue_list 对齐；金额按字符串传，防精度丢失）。 */
 export interface FormulaIssueItem {
   formula_id: string
@@ -16,6 +34,11 @@ export interface FormulaIssueItem {
   description: string
   left_value: string | null
   right_value: string | null
+  /** 附注执行器五态；旧报表勾稽 issue 没有该字段。 */
+  status?: GateCheckStatus
+  reason?: string
+  label?: string
+  severity?: 'blocking' | 'warning' | 'info'
 }
 
 /** 逐条勾稽结论（含通过项）。 */
@@ -23,7 +46,15 @@ export interface FormulaCheckOutcome {
   formula_id: string
   description: string
   expression: string
+  /** 旧报表勾稽接口只返回 passed；附注执行器返回统一五态 status。 */
   passed: boolean
+  status?: GateCheckStatus
+  reason?: string
+  label?: string
+  severity?: 'blocking' | 'warning' | 'info'
+  left_value?: number | null
+  right_value?: number | null
+  diff?: number | null
 }
 
 export interface FormulaIssueRun {
@@ -59,16 +90,26 @@ export function issueHintFromRun(data: unknown): FormulaIssueRun {
   const body: Record<string, any> = isObj(data) && ('results' in data || 'issue_list' in data || 'status' in data)
     ? data
     : (isObj(data) && isObj(data.data) ? data.data : {})
-  const outcomes: FormulaCheckOutcome[] = (Array.isArray(body.results) ? body.results : [])
+  const noResult = body.no_result === true || body.status === 'no_result'
+  const outcomes: FormulaCheckOutcome[] = (noResult ? [] : Array.isArray(body.results) ? body.results : [])
     .filter(isObj)
-    .map((o: Record<string, any>) => ({
-      formula_id: String(o.formula_id ?? ''),
-      description: String(o.description ?? ''),
-      expression: String(o.expression ?? ''),
-      // 只认明确的 true；缺字段按「不通过」显示，宁可多一条待查也不冒充通过
-      passed: o.passed === true,
-    }))
-  const issues: FormulaIssueItem[] = (Array.isArray(body.issue_list) ? body.issue_list : [])
+    .map((o: Record<string, any>) => {
+      const status = formulaOutcomeStatus(o)
+      return {
+        formula_id: String(o.formula_id ?? ''),
+        description: String(o.description ?? ''),
+        expression: String(o.expression ?? ''),
+        passed: status === 'passed',
+        status,
+        reason: typeof o.reason === 'string' && o.reason.trim() ? o.reason : status === 'error' ? checkReasonOf(o) || '检查执行异常' : '',
+        label: typeof o.label === 'string' ? o.label : undefined,
+        severity: o.severity === undefined ? undefined : formulaCheckSeverity(o.severity),
+        ...(Object.prototype.hasOwnProperty.call(o, 'left_value') ? { left_value: formulaCheckNumber(o.left_value) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(o, 'right_value') ? { right_value: formulaCheckNumber(o.right_value) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(o, 'diff') ? { diff: formulaCheckNumber(o.diff) } : {}),
+      }
+    })
+  const issues: FormulaIssueItem[] = (noResult ? [] : Array.isArray(body.issue_list) ? body.issue_list : [])
     .filter(isObj)
     .map((i: Record<string, any>) => ({
       formula_id: String(i.formula_id ?? ''),
@@ -76,6 +117,10 @@ export function issueHintFromRun(data: unknown): FormulaIssueRun {
       description: String(i.description ?? ''),
       left_value: strOrNull(i.left_value),
       right_value: strOrNull(i.right_value),
+      status: i.status === undefined ? undefined : formulaOutcomeStatus(i),
+      reason: typeof i.reason === 'string' ? i.reason : undefined,
+      label: typeof i.label === 'string' ? i.label : undefined,
+      severity: formulaCheckSeverity(i.severity),
     }))
   const hints = (Array.isArray(body.hints) ? body.hints : [])
     .map((h: unknown) => (isObj(h) ? h.hint_text : h))

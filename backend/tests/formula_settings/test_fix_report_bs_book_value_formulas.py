@@ -153,6 +153,7 @@ async def test_row_name_drift_aborts_before_any_write(world):
     assert calls == []
 
 
+@pytest.mark.pg_only  # 真库只读；与其他 PG 用例同一开关（地址指向不可达的库时由 conftest 统一跳过 / GT_REQUIRE_PG 报错）
 def test_backup_keeps_row_to_json_originals_on_real_postgres(tmp_path):
     """留底只读：真库三个公式位在各准则 / 项目层的 report_config 原文 + 资产负债表 financial_report 原文。"""
     import asyncio

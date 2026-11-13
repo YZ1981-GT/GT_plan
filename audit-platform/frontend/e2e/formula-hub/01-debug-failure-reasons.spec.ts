@@ -1,49 +1,42 @@
 /**
  * 浏览器检查 ① — 中央调试 / 报表试算失败原因
  *
- * 验证：公式调试端点对非法公式返回可读的失败原因文案，
- * 而非空白或通用 500。
+ * 公式调试（`POST /api/formula/debug`）对算不出的公式要给可读原因、不给数；算得出的给值。
+ * 原用例打的是不存在的 `/api/projects/{pid}/formula-management/debug`，404 时只断言「不是 500」⇒ 恒绿。
  *
- * formula-e2e-ci-gate Task 2 / R3 第 1 项
+ * formula-e2e-ci-gate Task 2 / R3 第 1 项；spec formula-management-repair-closure R7 重写
  */
 import { test, expect } from '@playwright/test'
-import { loginAndInstall, standaloneProjectId } from './helpers'
-
-const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:9980'
+import { api, apiToken, loginAndInstall, seedYear, standaloneProjectId } from './helpers'
 
 test.describe('中央调试失败原因', () => {
-  test.beforeEach(async ({ page, request }) => {
+  let token = ''
+  test.beforeAll(async ({ request }) => { token = await apiToken(request) })
+
+  test('1/0：不给数，原因写明除数为 0', async ({ request }) => {
+    const r = await api(request, token, 'POST', '/api/formula/debug', {
+      data: { formula: '1/0', project_id: standaloneProjectId(), year: seedYear(), scope: 'report' },
+    })
+    expect(r.status).toBe(200)
+    expect(r.data.ok).toBe(false)
+    expect(r.data.value).toBeNull()
+    expect(r.data.errors.join('；')).toContain('除数为 0')
+  })
+
+  test('2*3：算得出就给值', async ({ request }) => {
+    const r = await api(request, token, 'POST', '/api/formula/debug', {
+      data: { formula: '2*3', project_id: standaloneProjectId(), year: seedYear(), scope: 'report' },
+    })
+    expect(r.status).toBe(200)
+    expect(r.data.ok).toBe(true)
+    expect(Number(r.data.value)).toBe(6)
+    expect(r.data.errors).toEqual([])
+  })
+
+  test('报表配置页可打开', async ({ page, request }) => {
     await loginAndInstall(page, request)
-  })
-
-  test('调试 1/0 返回除零错误文案', async ({ request }) => {
-    const projectId = standaloneProjectId()
-    const resp = await request.post(
-      `${BACKEND}/api/projects/${projectId}/formula-management/debug`,
-      {
-        data: { expression: '1/0', context: {} },
-        headers: { Authorization: `Bearer ${process.env.FH_E2E_TOKEN || ''}` },
-      },
-    )
-    // 端点应返回 200 + state=error + 可读原因，而非 500
-    if (resp.ok()) {
-      const body = await resp.json()
-      const data = body?.data ?? body
-      expect(data.state).toBe('error')
-      expect(data.message || data.reason || '').toContain('除')
-    } else {
-      // 端点不存在或未授权时跳过但不 skip（ADR-FEC-04）
-      // 报表试算端点可能路径不同，按实际路由调整
-      expect(resp.status()).not.toBe(500)
-    }
-  })
-
-  test('报表配置页可导航', async ({ page }) => {
-    const projectId = standaloneProjectId()
-    await page.goto(`/projects/${projectId}/report-config`)
-    // 页面加载不崩溃，标题或面板可见
-    await expect(
-      page.locator('text=报表配置').or(page.locator('.report-config')).first(),
-    ).toBeVisible({ timeout: 15_000 })
+    await page.goto(`/projects/${standaloneProjectId()}/report-config`)
+    await expect(page).not.toHaveURL(/\/login/)
+    await expect(page.getByText('报表配置', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
   })
 })

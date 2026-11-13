@@ -269,9 +269,20 @@ async def template_definitions(db: AsyncSession, tpl: FormulaTemplate) -> dict[s
     return {d: await template_rows(db, tpl.id, d) for d in (tpl.domains or []) if d in DOMAINS}
 
 
+#: 「全局已变」提示的分类（spec formula-management-repair-closure R6.1）
+HINT_FOLLOW = "follow"      # 模板没改过（模板 == 写入时的全局）：可一键同步到新全局
+HINT_SAME = "same"          # 模板与新全局一致：只需更新基线（保留模板），不用发新版本
+HINT_CONFLICT = "conflict"  # 模板改过、全局也改了且两者不同：同步 / 保留 / 移出三选一
+HINT_DELETED = "deleted"    # 写入时有全局、现在全局删了：保留模板 / 移出模板
+
+
 async def global_hints(db: AsyncSession, tpl: FormulaTemplate,
                        rows: Mapping[str, Mapping[str, FormulaSetting]]) -> list[dict[str, Any]]:
-    """模板写入后全局又变了的公式位（R13.6）：模板定义 / 模板写入时的全局 / 当前全局。"""
+    """模板写入后全局又变了的公式位（R13.6）：模板定义 / 模板写入时的全局（基线）/ 当前全局 + 分类。
+
+    ``base_version`` / ``global_version`` 是「保留模板」的并发校验依据（全局之后又变就要重新判断）。
+    原先全局删除的公式位不提示（``now is None`` 直接跳过），模板与新全局相同时也只能「并入」⇒ 发布报「没有任何改动」。
+    """
     out = []
     for domain, slots in rows.items():
         scope = global_scope(domain, tpl.applicable_scope)
@@ -280,12 +291,24 @@ async def global_hints(db: AsyncSession, tpl: FormulaTemplate,
         current = await get_store(domain).list_global(db, scope)
         for slot, row in sorted(slots.items()):
             now = current.get(slot)
-            if now is None or same_exec(domain, row.base_definition, now.definition):
+            if now is None:
+                if row.base_definition is None:
+                    continue  # 写入时就没有全局（模板独有的公式位），什么都没变
+                kind = HINT_DELETED
+            elif same_exec(domain, row.base_definition, now.definition):
                 continue
-            out.append({"domain": domain, "slot_key": slot, "label": row.slot_label or slot,
+            elif same_exec(domain, row.definition, now.definition):
+                kind = HINT_SAME
+            elif row.base_definition is not None and same_exec(domain, row.definition, row.base_definition):
+                kind = HINT_FOLLOW
+            else:
+                kind = HINT_CONFLICT
+            out.append({"domain": domain, "slot_key": slot, "label": row.slot_label or slot, "kind": kind,
                         "template_definition": _public(row.definition), "base_definition": row.base_definition,
-                        "global_definition": _public(now.definition), "global_version": now.version,
-                        "same_as_template": same_exec(domain, row.definition, now.definition)})
+                        "base_version": row.base_version,
+                        "global_definition": _public(now.definition) if now is not None else None,
+                        "global_version": now.version if now is not None else None,
+                        "same_as_template": kind == HINT_SAME})
     return out
 
 

@@ -653,11 +653,12 @@ async def voucher_coverage(
     同一凭证被多个循环重复抽取在项目层面完全发现不了。
 
     返回：
-    - `by_workpaper`：按底稿汇总批次数 / 样本数
+    - `by_workpaper`：按底稿汇总该年度的批次数 / 样本数（认不出年度的抽样记录算项目审计年度）
     - `duplicated`：被 ≥2 个底稿抽取的凭证（跨循环重复抽凭）
     """
     await assert_project_permission(db, current_user, pid, "readonly")
-    resolved_year = year if year is not None else await registry_resolve_project_year(db, pid)
+    project_year = await registry_resolve_project_year(db, pid)
+    resolved_year = year if year is not None else project_year
     if resolved_year is None:
         # 年度无法判定时如实返回空 + 原因，不猜年度（跨年归档会算错）
         return {
@@ -666,7 +667,7 @@ async def voucher_coverage(
             "duplicated": [],
             "note": "项目审计年度无法判定，无法统计已抽凭证登记",
         }
-    data = await project_sampling_coverage(db, pid, int(resolved_year))
+    data = await project_sampling_coverage(db, pid, int(resolved_year), project_year=project_year)
     return {"year": int(resolved_year), **data}
 
 

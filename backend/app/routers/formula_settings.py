@@ -200,9 +200,12 @@ async def list_domains(current_user: User = Depends(get_current_user)):
             "exec_fields": list(s.exec_fields),
             "desc_fields": list(s.desc_fields),
         }
-        # tb_detail 无读者时附中文说明（需求 15.4）
-        if s.key in READER_ENTRIES and not READER_ENTRIES[s.key]:
-            entry["wired_reason"] = "该域暂无生产消费方读取有效定义"
+        # 未接入的域附中文说明（需求 15.4）；公式管理节点 / 应用范围弹窗 / 全局设置页原样显示
+        # （spec formula-management-repair-closure R3.1）
+        if not entry["wired"]:
+            entry["wired_reason"] = (
+                f"{s.label}目前只保存、不参与计算：还没有任何计算读取这类公式" if not READER_ENTRIES.get(s.key)
+                else f"{s.label}目前只保存、不参与计算：读取入口已登记，但还没有计算调用它")
         domains_out.append(entry)
     return {"domains": domains_out, "is_admin": _is_admin(current_user)}
 
@@ -298,6 +301,21 @@ async def get_pending(project_id: uuid.UUID, domain: str | None = Query(None, ma
     return {"project_id": str(project_id), "count": len(items), "items": items}
 
 
+@project_router.get("/propagation")
+async def get_propagation(project_id: uuid.UUID, year: int | None = Query(None, ge=1900, le=9999),
+                          domain: str | None = Query(None, max_length=32),
+                          publish_token: str | None = Query(None, min_length=1, max_length=200),
+                          outbox_id: uuid.UUID | None = Query(None), db: AsyncSession = Depends(get_db),
+                          current_user: User = Depends(require_project_access("readonly"))):
+    """项目级只读：派发状态与业务回执分开，可按年度、域或耐久事件身份精确查询。"""
+    from app.services.formula_settings.propagation_status import propagation_status
+
+    if domain is not None:
+        _domain(domain)
+    return await propagation_status(db, project_id, year=year, domain=domain,
+                                    publish_token=publish_token, outbox_id=outbox_id)
+
+
 @project_router.post("/pending/resolve")
 async def resolve(project_id: uuid.UUID, body: ResolveBody, db: AsyncSession = Depends(get_db),
                   current_user: User = Depends(require_project_access("edit"))):
@@ -307,6 +325,10 @@ async def resolve(project_id: uuid.UUID, body: ResolveBody, db: AsyncSession = D
     events = result.get("events") or []
     for ev in events:
         await record_changes(db, events=[ev], domain=ev["domain"], source="project_resolve")
+    # formula-hub-release-blockers R1.1：必须提交事务并投递传播事件，与 save_overrides / restore_global / apply 一致。
+    # 缺少此步时 get_db 不自动提交，resolve_items 的全部写入会在请求结束时回滚。
+    await db.commit()
+    await publish_pending(db)
     # recalc_domains：有效定义真的变了、会重算的域（全选「保留本项目」时为空 ⇒ 前端不能说「会按新定义重算」）
     return {**{k: v for k, v in result.items() if k != "events"},
             "recalc_domains": sorted({ev["domain"] for ev in events})}

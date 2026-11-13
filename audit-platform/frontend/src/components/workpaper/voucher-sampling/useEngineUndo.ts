@@ -20,12 +20,16 @@ interface HistoryEntryLike {
 export const PRELIMINARY_BATCH_LOCKED_MESSAGE =
   '该批次是预审抽凭，年审阶段预审行只读，不能撤销；确需撤销请先由项目经理把审计阶段改回预审'
 
+export const READONLY_UNDO_MESSAGE = '底稿当前只读（归档、编辑锁、复核身份或后台合并中），不能撤销抽凭'
+
 export function useEngineUndo(opts: {
   instance: ComponentInternalInstance | null
   historyList: Readonly<Ref<readonly HistoryEntryLike[]>>
   projectPhase: Readonly<Ref<AuditPhase>>
   undoLastExtraction: (logId: string) => Promise<boolean>
   emitUndoRequest: (payload: UndoRequestPayload) => void
+  /** 底稿只读时不撤销（spec voucher-workflow-linkage-lineage-closure R4.1） */
+  readonly?: Readonly<Ref<boolean>>
 }) {
   /** 宿主是否接了 undo-request（模板里 @undo-request 编译成 vnode prop onUndoRequest） */
   function hostHandlesUndo(): boolean {
@@ -34,6 +38,10 @@ export function useEngineUndo(opts: {
   }
 
   async function handleUndo(logId: string): Promise<void> {
+    if (opts.readonly?.value) {
+      ElMessage.warning(READONLY_UNDO_MESSAGE)
+      return
+    }
     const entry = opts.historyList.value.find(e => e.id === logId)
     if (entry?.phase === 'preliminary' && opts.projectPhase.value === 'final') {
       ElMessage.warning(PRELIMINARY_BATCH_LOCKED_MESSAGE)

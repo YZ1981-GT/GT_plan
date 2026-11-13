@@ -11,13 +11,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, require_project_audit_year
+from app.deps import require_project_access, require_project_access_stream, require_project_audit_year
 from app.models.core import User
-from app.models.phase10_schemas import DownloadPackRequest, UploadWorkpaperRequest
+from app.models.phase10_schemas import DownloadPackRequest
 from app.services.wp_download_service import WpDownloadService, WpUploadService
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["wp-download"])
@@ -27,8 +27,8 @@ router = APIRouter(prefix="/api/projects/{project_id}", tags=["wp-download"])
 async def download_pack(
     project_id: UUID,
     body: DownloadPackRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """批量打包下载底稿为 ZIP"""
     import logging
@@ -68,8 +68,8 @@ async def download_pack(
 async def download_single(
     project_id: UUID,
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """单个底稿下载"""
     import logging
@@ -89,8 +89,8 @@ async def download_single(
         ascii_name = _fname.encode("ascii", "ignore").decode() or "workpaper.xlsx"
         utf8_name = quote(_fname, safe="")
         disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
-        return StreamingResponse(
-            open(file_path, "rb"),
+        return FileResponse(
+            path=str(file_path),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": disposition,

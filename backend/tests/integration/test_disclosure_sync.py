@@ -30,79 +30,14 @@ import string
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from hypothesis import HealthCheck, given, settings as h_settings
 from hypothesis import strategies as st
-from sqlalchemy.sql.elements import BinaryExpression, BindParameter, BooleanClauseList
 
 from app.models.core import User, UserRole
-from app.models.report_models import DisclosureNote
 from app.services.wp_disclosure_sync_service import sync_from_workpaper
-
-
-# ─── FakeDB: 内存版 AsyncSession 替身 ───────────────────────────────────────
-
-
-def _extract_filters(stmt: Any) -> dict[str, Any]:
-    """从 SQLAlchemy select stmt 的 WHERE 子句提取 BindParameter 值。
-
-    handles AND'd BinaryExpression chain 的常见情况
-    （DisclosureNote.project_id == X、year == Y、note_section == Z、is_deleted == false()）
-    """
-    filters: dict[str, Any] = {}
-    where = stmt.whereclause
-    if where is None:
-        return filters
-
-    if isinstance(where, BooleanClauseList):
-        children = list(where.clauses)
-    else:
-        children = [where]
-
-    for clause in children:
-        if not isinstance(clause, BinaryExpression):
-            continue
-        col_name = getattr(clause.left, "key", None) or getattr(clause.left, "name", None)
-        right = clause.right
-        if isinstance(right, BindParameter):
-            filters[col_name] = right.value
-    return filters
-
-
-class FakeDB:
-    """模拟 AsyncSession：以 (project_id, year, note_section) 为主键存储 DisclosureNote。"""
-
-    def __init__(self) -> None:
-        self.notes: dict[tuple, DisclosureNote] = {}
-        self.commit_count: int = 0
-        self.add_count: int = 0
-        self.rollback_count: int = 0
-
-    async def execute(self, stmt: Any) -> Any:
-        filters = _extract_filters(stmt)
-        key = (
-            filters.get("project_id"),
-            filters.get("year"),
-            filters.get("note_section"),
-        )
-        note = self.notes.get(key)
-        result = MagicMock()
-        result.scalar_one_or_none = MagicMock(return_value=note)
-        return result
-
-    def add(self, obj: Any) -> None:
-        self.add_count += 1
-        if isinstance(obj, DisclosureNote):
-            key = (obj.project_id, obj.year, obj.note_section)
-            self.notes[key] = obj
-
-    async def commit(self) -> None:
-        self.commit_count += 1
-
-    async def rollback(self) -> None:
-        self.rollback_count += 1
+from tests.integration._disclosure_sync_fakes import FakeDB
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────

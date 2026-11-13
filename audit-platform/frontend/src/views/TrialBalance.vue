@@ -627,7 +627,7 @@
             <el-descriptions-item label="年度">{{ existingDataSummary.year }}</el-descriptions-item>
             <el-descriptions-item label="科目数">{{ existingDataSummary.balance_count }} 个</el-descriptions-item>
             <el-descriptions-item label="序时账">{{ existingDataSummary.ledger_count?.toLocaleString() || 0 }} 条</el-descriptions-item>
-            <el-descriptions-item label="数据单位">{{ existingDataSummary.amount_unit || '元' }}</el-descriptions-item>
+            <el-descriptions-item label="数据单位">{{ datasetUnitLabel }}</el-descriptions-item>
           </el-descriptions>
           <div style="margin-top: 16px; text-align: center">
             <el-button type="primary" @click="onUseExistingData">
@@ -691,7 +691,8 @@
       @close="tbSearch.close()"
     />
 
-    <!-- 试算表主表（科目明细视图） -->
+    <!-- 试算表主表（科目明细视图）：固定列只属于 detail，不影响汇总/compare -->
+    <GtTableDisplaySettings v-if="tbViewMode === 'detail' && !comparisonActive" class="gt-tb-display-settings" page-key="trial-balance" :columns="tbFixedColumns" :mandatory-keys="['standard_account_code', 'account_name']" @change="onTbFixedColumnsChange" />
     <div v-if="tbViewMode === 'detail' && !comparisonActive && staleAccountCodes.size > 0" style="margin-bottom: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info); display: flex; align-items: center; gap: 6px">
       <span style="display: inline-block; width: 14px; height: 14px; background: var(--gt-bg-warning); border-left: 3px solid var(--gt-color-wheat); border-radius: 2px"></span>
       <span>黄底行 = 有新调整分录待重算</span>
@@ -712,7 +713,7 @@
       @cell-dblclick="onTbCellDblClick"
       @cell-contextmenu="onTbCellContextMenu"
     >
-      <el-table-column prop="standard_account_code" label="科目编码" width="130" class-name="gt-amt-col">
+      <el-table-column prop="standard_account_code" column-key="standard_account_code" :fixed="tbFixed.fixedFor('standard_account_code')" label="科目编码" width="130" class-name="gt-amt-col">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && getLinkedWp(row.standard_account_code)"
             class="clickable" @click="onOpenWorkpaper(row.standard_account_code)"
@@ -723,8 +724,8 @@
           <span v-else>{{ row.standard_account_code }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="account_name" label="科目名称" min-width="180" />
-      <el-table-column label="方向" width="80" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
+      <el-table-column prop="account_name" column-key="account_name" :fixed="tbFixed.fixedFor('account_name')" label="科目名称" min-width="180" />
+      <el-table-column column-key="direction" :fixed="tbFixed.fixedFor('direction')" label="方向" width="80" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
         <template #default="{ row }">
           <!-- 单击只选中；双击或右键「切换借贷方向」才改（spec excel-style-table-editing R8.4） -->
           <span
@@ -738,7 +739,7 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="未审数" width="160" align="right" class-name="gt-amt-col">
+      <el-table-column column-key="unadjusted_amount" :fixed="tbFixed.fixedFor('unadjusted_amount')" label="未审数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 2)">
           <GtAmountCell v-if="!row._isSubtotal && !row._isTotal"
@@ -756,7 +757,7 @@
           </CommentTooltip>
         </template>
       </el-table-column>
-      <el-table-column label="RJE调整" width="150" align="right" class-name="gt-amt-col">
+      <el-table-column column-key="rje_adjustment" :fixed="tbFixed.fixedFor('rje_adjustment')" label="RJE调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
           <GtAmountCell v-if="!row._isSubtotal && !row._isTotal && row.rje_adjustment !== '0'"
             :value="row.rje_adjustment"
@@ -765,7 +766,7 @@
           <GtAmountCell v-else :value="row.rje_adjustment" />
         </template>
       </el-table-column>
-      <el-table-column label="AJE调整" width="150" align="right" class-name="gt-amt-col">
+      <el-table-column column-key="aje_adjustment" :fixed="tbFixed.fixedFor('aje_adjustment')" label="AJE调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
           <GtAmountCell v-if="!row._isSubtotal && !row._isTotal && row.aje_adjustment !== '0'"
             :value="row.aje_adjustment"
@@ -774,7 +775,7 @@
           <GtAmountCell v-else :value="row.aje_adjustment" />
         </template>
       </el-table-column>
-      <el-table-column label="底稿调整" width="150" align="right" class-name="gt-amt-col">
+      <el-table-column column-key="wp_adjustment" :fixed="tbFixed.fixedFor('wp_adjustment')" label="底稿调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
           <GtAmountCell :value="row.wp_adjustment" />
         </template>
@@ -784,7 +785,7 @@
           <LinkageBadge v-if="row.row_code" :count="getAdjustments(row.row_code).length" type="adjustment" />
         </template>
       </el-table-column>
-      <el-table-column label="审定数" width="160" align="right" class-name="gt-amt-col">
+      <el-table-column column-key="audited_amount" :fixed="tbFixed.fixedFor('audited_amount')" label="审定数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 7)">
           <span
@@ -800,7 +801,7 @@
           </CommentTooltip>
         </template>
       </el-table-column>
-      <el-table-column label="底稿状态" width="120" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
+      <el-table-column column-key="wp_status" :fixed="tbFixed.fixedFor('wp_status')" label="底稿状态" width="120" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
         <template #default="{ row }">
           <el-tooltip v-if="row.wp_consistency?.status === 'consistent'" content="底稿审定数一致" placement="top">
             <span style="color: var(--gt-color-success); cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
@@ -1144,6 +1145,7 @@
       v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       scope="tb"
+      :read-only="!canEdit"
       :initial-report-type="tbViewMode === 'summary' ? tbSummaryType : undefined"
       :rows="rows"
       :project-id="projectId"
@@ -1212,7 +1214,7 @@
             <el-table-column prop="label" label="描述" min-width="200" />
             <el-table-column label="操作" width="80">
               <template #default="{ row }">
-                <el-button size="small" link type="primary" @click="onTbTraceLocate(row)">定位</el-button>
+                <el-button v-if="row.wp_code" size="small" link type="primary" @click="onTbTraceLocate(row)">定位</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -1223,7 +1225,7 @@
             <el-table-column prop="label" label="描述" min-width="200" />
             <el-table-column label="操作" width="80">
               <template #default="{ row }">
-                <el-button size="small" link type="primary" @click="onTbTraceLocate(row)">定位</el-button>
+                <el-button v-if="row.wp_code" size="small" link type="primary" @click="onTbTraceLocate(row)">定位</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -1344,10 +1346,11 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import { api } from '@/services/apiProxy'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
+import { resolveProjectLedgerYear } from '@/services/ledgerDefaultYear'
 import {
-  getTrialBalance, recalcTrialBalance, checkConsistency,
-  getProjectAuditYear, listAdjustments,
+  getTrialBalance, recalcTrialBalance, checkConsistency, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, listWorkpapers, type WpAccountMapping, type WorkpaperDetail } from '@/services/workpaperApi'
@@ -1362,6 +1365,9 @@ import StaleIndicator from '@/components/StaleIndicator.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtTableDisplaySettings from '@/components/common/GtTableDisplaySettings.vue'
+import { useTrialBalanceFixedColumns } from '@/views/composables/useTrialBalanceFixedColumns'
+import { useTrialBalanceDatasetUnit, type TrialBalanceDataSummary } from '@/views/composables/useTrialBalanceDatasetUnit'
 import GtGridCell from '@/components/grid/GtGridCell.vue'
 import { commitAllGridEdits } from '@/components/grid/GridKernel'
 import { isTextEntryTarget } from '@/utils/shortcuts'
@@ -1449,7 +1455,8 @@ function onYearChange(y: number) {
   })
 }
 
-const displayPrefs = useDisplayPrefsStore()
+const displayPrefs = useDisplayPrefsStore(), tbTableRef = ref<any>(null)
+const { columns: tbFixedColumns, fixed: tbFixed, onChange: onTbFixedColumnsChange } = useTrialBalanceFixedColumns(tbTableRef)
 /** 格式化金额（跟随全局单位设置） */
 const fmt = (v: any) => displayPrefs.fmt(v)
 
@@ -2230,12 +2237,9 @@ const showSetupGuide = computed(() => rows.value.length === 0)
 // 试算表数据源选择弹窗
 const tbImportVisible = ref(false)
 const checkingData = ref(false)
-const existingDataSummary = ref<{
-  year: number
-  balance_count: number
-  ledger_count: number
-  amount_unit: string
-} | null>(null)
+const existingDataSummary = ref<TrialBalanceDataSummary | null>(null)
+// ─── 数据集单位三态 presenter ──────────────────────────────────────────
+const { label: datasetUnitLabel } = useTrialBalanceDatasetUnit(existingDataSummary)
 
 // 打开弹窗时检查是否已有数据
 watch(tbImportVisible, async (visible) => {
@@ -2256,6 +2260,7 @@ watch(tbImportVisible, async (visible) => {
         balance_count: balanceRows.length,
         ledger_count: ds?.source_summary?.tb_ledger || 0,
         amount_unit: ds?.source_summary?.amount_unit || '元',
+        source_summary: ds?.source_summary ?? null,
       }
     }
   } catch { /* ignore */ }
@@ -2378,7 +2383,7 @@ async function ensureProjectYear() {
       return
     }
     try {
-      projectYear.value = await getProjectAuditYear(projectId.value)
+      projectYear.value = await resolveProjectLedgerYear(projectId.value) // 审计年度没数据而别的年度有 ⇒ 最近有数据的年度
     } catch {
       projectYear.value = null
     }
@@ -2969,7 +2974,7 @@ function onTbSumCtxFormula() {
   const detail = `【${row.row_code} ${row.row_name}】\n\n公式：${formula}\n\n未审数：${fmt(row.unadjusted)}\n审定数：${fmt(row.audited)}`
   ElMessageBox.alert(detail, '公式详情', {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)' },
   })
 }
 
@@ -2992,14 +2997,14 @@ function onTbSumCtxDetail() {
     detail += `\n━━━━━━━━━━━━━━━━\n合计 = ${fmt(row.unadjusted)}`
     ElMessageBox.alert(detail, '汇总明细', {
       confirmButtonText: '确定',
-      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)', maxHeight: '70vh', overflow: 'auto' },
     })
   } else {
     // 普通行：展示取数来源
     const detail = `【${row.row_code} ${row.row_name}】\n\n取数来源：通过映射规则从科目明细汇总\n未审数 = Σ 映射到该行次的所有科目余额\n\n当前值：${fmt(row.unadjusted)}`
     ElMessageBox.alert(detail, '取数明细', {
       confirmButtonText: '确定',
-      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px' },
+      customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)' },
     })
   }
 }
@@ -3025,7 +3030,7 @@ function onTbSumShowFormula(row: any) {
   const detail = `【${row.row_code} ${row.row_name}】\n\n公式：${formula}\n\n未审数：${fmt(row.unadjusted)}\n审定数：${fmt(row.audited)}`
   ElMessageBox.alert(detail, '公式详情', {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: 'var(--gt-display-font-size)' },
   })
 }
 
@@ -3119,7 +3124,6 @@ const penetrate = usePenetrate()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
 
 // ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
-const tbTableRef = ref<any>(null)
 
 // [R9 F10 Task 32] usePasteImport 接入：粘贴 AJE 到调整列
 usePasteImport({
@@ -3344,7 +3348,7 @@ function _showNetProfitDetail() {
 
   ElMessageBox.alert(detail, '净利润计算明细', {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)', maxHeight: '70vh', overflow: 'auto' },
   })
 }
 
@@ -3384,7 +3388,7 @@ function _showSubtotalDetail(row: any) {
 
   ElMessageBox.alert(detail, `${catLabel}类汇总明细`, {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)', maxHeight: '70vh', overflow: 'auto' },
   })
 }
 
@@ -3422,14 +3426,14 @@ async function onTbCtxCellTrace() {
   try {
     const data: any = await api.get(
       `/api/projects/${projectId.value}/lineage`,
-      { params: { object_type: 'tb_row', object_id: row.standard_account_code, direction: 'both' } },
+      { params: { object_type: 'tb_row', object_id: row.standard_account_code, direction: 'both', ...(year.value != null ? { year: year.value } : {}) } },
     )
     const upstream = data?.upstream || []
     const downstream = data?.downstream || []
     tbTraceResult.value = { upstream, downstream }
     if (!upstream.length && !downstream.length) {
       tbTraceDialogVisible.value = false
-      ElMessage.info('该数字暂无溯源信息')
+      ElMessage[data?.errors?.length ? 'warning' : 'info'](data?.errors?.[0]?.message || '该数字暂无溯源信息') // 子源失败如实说（R8.3）
     }
   } catch (e: any) {
     tbTraceDialogVisible.value = false
@@ -3439,15 +3443,11 @@ async function onTbCtxCellTrace() {
   }
 }
 
-function onTbTraceLocate(node: any) {
+// 本页没有底稿渲染器，定位事件无人接收：按编码取本项目底稿实例打开编辑器（deepLinkEntryGuard）；非底稿节点不出「定位」
+async function onTbTraceLocate(node: any) {
   tbTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
+  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+  if (reason) ElMessage.warning(reason)
 }
 
 function onTbCtxFormula() {
@@ -3505,7 +3505,7 @@ function onTbCtxFormula() {
 
   ElMessageBox.alert(formulaDesc, `公式详情`, {
     confirmButtonText: '确定',
-    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '13px' },
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: 'var(--gt-display-font-size)' },
   })
 }
 
@@ -3944,6 +3944,7 @@ async function onTbSumImportFile(e: Event) {
 </script>
 
 <style scoped>
+  .gt-tb-display-settings { display: flex; justify-content: flex-end; margin-bottom: 6px; }
   .gt-trial-balance { padding: var(--gt-space-5); }
 
   /* 期初/期末 胶囊分段控制器 */

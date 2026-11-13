@@ -1,5 +1,5 @@
 {
-  "adjudication_source_digest": "3382b0a961727e5826372683a2db995eff201a2535b886014d4d44f5eee6ae6e",
+  "adjudication_source_digest": "d51c5dfd2b3cdd806b8d179ea3ffe6cae6ef0707bc2f7e561e19d33d68b26c1b",
   "groups": {
     "abcs": {
       "counts": {
@@ -497,7 +497,7 @@
           "entry_id": "xlsx/gt-a177-independence-declaration",
           "host_path": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
           "html_counterpart_source_refs": [
-            "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L463",
+            "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L470",
             "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L101",
             "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L127"
           ],
@@ -605,7 +605,7 @@
           "entry_id": "xlsx/gt-a3-consolidation-console",
           "host_path": "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
           "html_counterpart_source_refs": [
-            "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L362",
+            "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L376",
             "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L212",
             "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L239"
           ],
@@ -907,7 +907,7 @@
           "entry_id": "xlsx/gt-b22-b-deficiency-evaluation",
           "host_path": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
           "html_counterpart_source_refs": [
-            "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L386",
+            "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L385",
             "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L106"
           ],
           "html_counterpart_verdict": "exists",
@@ -934,7 +934,7 @@
           "entry_id": "xlsx/gt-b22-c-design-effectiveness",
           "host_path": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
           "html_counterpart_source_refs": [
-            "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L198",
+            "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L197",
             "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L282"
           ],
           "html_counterpart_verdict": "exists",
@@ -1434,7 +1434,7 @@
         }
       ],
       "historical_slice": "backend/data/workpaper_sync_abcs_cycle_manifest_slice.json",
-      "projection_digest": "3058c6196d0d7e83620a6907fbdee0227ce6e43de47e5328bafc02c678bb09a5",
+      "projection_digest": "3c2a2f9ab356fd58a6fc47a6e39c142866551aa538f0fe74348348d7b08fc45c",
       "selection": "historical entry ownership first; wp_code cycle next; pattern-less/shared to abcs"
     },
     "d": {
@@ -3880,10 +3880,10 @@
     }
   },
   "independent_entry_count": 145,
-  "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
-  "projection_digest": "7f9d9032ec6910be145fe57a9f11c42434c101d04112a204ffe3b9b2934baccb",
+  "manifest_digest": "a45714deb833e624b43faa0eaa44785027c24148784a2156ffe0c25f22fa7be6",
+  "projection_digest": "0b9605d71468be2c775eb25a24e8921420ad498eb55563e6273641f1b2172f32",
   "schema_version": "workpaper-sync-cycle-current-projection:v1",
-  "snapshot_date": "2026-11-01",
-  "source_digest": "919d66ad00b6798dad516a3db1e5807eb1c0889d23ec2b1aa8495edda63962d9",
+  "snapshot_date": "2026-11-04",
+  "source_digest": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
   "wp_code_adjudication_digest": "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"
 }

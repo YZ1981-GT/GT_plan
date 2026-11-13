@@ -17,7 +17,7 @@ from app.services.project_creation_grant_service import (
     lock_actor_and_project_memberships,
 )
 from app.services.group_topology_lock import lock_topology_years
-from app.services.uscc_validator import validate_uscc
+from app.services.uscc_validator import format_code_error, normalize_uscc_input, validate_uscc
 
 
 async def create_project_for_actor(
@@ -26,15 +26,22 @@ async def create_project_for_actor(
     actor: Any,
 ) -> Project:
     """授权必须先于项目库存查询；创建与 creator 成员在同一事务提交。"""
-    for label, code in (
-        ("上级企业代码", data.parent_company_code),
-        ("最终控制方代码", data.ultimate_company_code),
+    # 单建协调器在授权和库存查询前先统一规范化、校验三码，保证后续所有调用方使用同一口径。
+    for field, label, required in (
+        ("company_code", "企业代码", True),
+        ("parent_company_code", "上级企业代码", False),
+        ("ultimate_company_code", "最终控制方代码", False),
     ):
-        if not code:
+        normalized = normalize_uscc_input(getattr(data, field, None))
+        setattr(data, field, normalized)
+        if normalized is None:
+            if required:
+                # create_project 负责保留「企业代码为必填项」的既有文案。
+                continue
             continue
-        valid, reason = validate_uscc(str(code).strip().upper())
+        valid, reason = validate_uscc(normalized)
         if not valid:
-            raise HTTPException(status_code=422, detail=f"{label}：{reason or '格式错误'}")
+            raise HTTPException(status_code=422, detail=format_code_error(label, reason))
     explicit_codes = [code for code in (
         data.company_code, data.parent_company_code, data.ultimate_company_code,
     ) if code]
@@ -95,7 +102,11 @@ async def create_project_for_actor(
     role = actor.role.value
     if role == "manager":
         # creation grant 只允许创建，不授予既有项目读写权；先查轻量 ID，再逐项目 edit。
-        company_codes = sorted({str(code).strip().upper() for code in final_codes})
+        company_codes = sorted({
+            normalized
+            for code in final_codes
+            if (normalized := normalize_uscc_input(code)) is not None
+        })
         existing_ids = list((await db.execute(sa.select(Project.id).where(
             Project.company_code.in_(company_codes),
             Project.audit_year == data.audit_year,

@@ -88,7 +88,7 @@
             <span v-if="refreshProgress.visible && refreshProgress.total" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin: 0 8px;">
               {{ refreshProgress.current }}/{{ refreshProgress.total }} {{ refreshProgress.step }}
             </span>
-            <el-button size="small" :loading="reaggregateLoading" @click="onReaggregateNotes">📝 重新汇总附注</el-button>
+            <el-button size="small" :loading="reaggregateLoading || !!reaggregateJobId" :disabled="!!reaggregateJobId" @click="onReaggregateNotes">📝 重新汇总附注</el-button>
           </template>
         </GtToolbar>
       </template>
@@ -97,6 +97,16 @@
     <ConsolReadinessBar ref="consolReadinessBarRef"
       :project-id="projectId" :year="effectiveConsolYear()"
       data-testid="consol-readiness-bar" />
+    <PlatformJobProgress
+      v-if="reaggregateJobId"
+      class="gt-consol-job-progress"
+      :project-id="reaggregateJobProjectId"
+      :job-id="reaggregateJobId"
+      title="合并附注重新汇总"
+      @update:job-id="onReaggregateJobId"
+      @completed="onReaggregateCompleted"
+      @failed="onReaggregateFailed"
+    />
 
     <!-- 合并页只保留布局中栏一棵企业树（spec consol-autotree-linkage-closure R7.1，原页内常驻侧栏已删）；
          节点相关的三页（试算 / 报表 / 附注）顶部显示当前节点与口径（R7.3） -->
@@ -440,6 +450,21 @@
           />
         </div>
       </el-tab-pane>
+
+      <!-- Tab 7: 签字锁定（批 7 任务 7.4：快照列表 / 完整性 / 对比 / 下载 + 签字锁定）-->
+      <el-tab-pane label="签字锁定" name="consol_snapshot">
+        <div class="gt-tab-content">
+          <ConsolSnapshotPanel
+            ref="consolSnapshotPanelRef"
+            :project-id="projectId"
+            :year="effectiveConsolYear()"
+            :readonly-reason="workspaceReadonlyReason"
+            data-testid="consol-snapshot-tab"
+            @locked="onSnapshotLocked"
+            @created="onSnapshotCreated"
+          />
+        </div>
+      </el-tab-pane>
     </el-tabs>
     </div><!-- .gt-consol-content -->
 
@@ -571,7 +596,7 @@
               <el-table-column prop="label" label="描述" min-width="200" />
               <el-table-column label="操作" width="80">
                 <template #default="{ row }">
-                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                  <el-button v-if="row.wp_code" size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -582,7 +607,7 @@
               <el-table-column prop="label" label="描述" min-width="200" />
               <el-table-column label="操作" width="80">
                 <template #default="{ row }">
-                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                  <el-button v-if="row.wp_code" size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -613,6 +638,11 @@
       :state="workspaceGuard.state"
       @decide="workspaceGuard.decide"
     />
+    <ConsolTreeConflictDialog
+      v-model="treeConflictDialogVisible"
+      :diagnostics="treeConflictDialogDiagnostics"
+      @acknowledged="acknowledgeTreeConflicts"
+    />
 
   </div>
 </template>
@@ -639,6 +669,9 @@ import {
   type CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { api } from '@/services/apiProxy'
+import type { PlatformJobSnapshot } from '@/services/platformJobs'
+import { newUuid } from '@/utils/uuid'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { projects as P_proj, reportConfig as P_rc, consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
@@ -647,6 +680,8 @@ import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
 import ConsolReportBreakdownView from '@/components/consolidation/ConsolReportBreakdownView.vue'
 import ConsolReadinessBar from '@/components/consolidation/ConsolReadinessBar.vue'
+import ConsolSnapshotPanel from '@/components/consolidation/ConsolSnapshotPanel.vue'
+import PlatformJobProgress from '@/components/common/PlatformJobProgress.vue'
 import OrgNode from '@/components/consolidation/OrgNode.vue'
 import ConsolElimNodePanel from '@/components/consolidation/ConsolElimNodePanel.vue'
 import ConsolNodeContextBar from '@/components/consolidation/ConsolNodeContextBar.vue'
@@ -667,8 +702,16 @@ import {
   standaloneEntityOf,
   viaLabel,
 } from '@/components/consolidation/composables/consolTreeView'
+import {
+  conflictSignature,
+  confirmPushDespiteConflicts,
+  rememberConflictSignature,
+  shouldShowTreeConflicts,
+  treeConflicts,
+} from '@/components/consolidation/composables/consolTreeConflicts'
 import { relationLabel } from '@/utils/groupRelation'
 import ConsolWorkspaceGuardDialog from '@/components/consolidation/ConsolWorkspaceGuardDialog.vue'
+import ConsolTreeConflictDialog from '@/components/consolidation/ConsolTreeConflictDialog.vue'
 import { provideConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
 import { useConsolWorkspaceAccess } from '@/components/consolidation/composables/useConsolWorkspaceAccess'
 import { useCellSelection } from '@/composables/useCellSelection'
@@ -730,6 +773,22 @@ const year = computed<number | null>(() => {
 const workspaceGuard = provideConsolWorkspaceGuard()
 const workspaceAccess = useConsolWorkspaceAccess(projectId)
 const workspaceReadonlyReason = workspaceAccess.readonlyReason
+
+// 批 7 任务 7.4：签字锁定 Tab（快照面板）与 readiness 栏引用
+const consolReadinessBarRef = ref<InstanceType<typeof ConsolReadinessBar> | null>(null)
+const consolSnapshotPanelRef = ref<InstanceType<typeof ConsolSnapshotPanel> | null>(null)
+
+/** 签字锁定成功：刷新项目锁状态（工作区立即转只读）+ 重算 readiness 栏 */
+function onSnapshotLocked() {
+  void workspaceAccess.refreshLockStatus()
+  eventBus.emit('consol-lock:detected')
+  consolReadinessBarRef.value?.load()
+}
+
+/** 创建任意快照后（含诊断）：readiness 的 lifecycle 域可能变化，刷新 readiness 栏 */
+function onSnapshotCreated() {
+  consolReadinessBarRef.value?.load()
+}
 
 function openProjectSettings() {
   router.push(`/projects/${projectId.value}/settings`)
@@ -806,6 +865,7 @@ async function queueConsolPush() {
   if (!(await workspaceGuard.confirmTransition('推送合并结果前，请先处理未保存修改。'))) return
   const pushYear = effectiveConsolYear()
   if (pushYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
+  if (!(await confirmPushDespiteConflicts(projectId.value))) return
   consolPushQueuing.value = true
   try {
     const ack = await pushConsolidation(projectId.value, pushYear, 'manual')
@@ -886,6 +946,9 @@ import {
 
 const refreshAllLoading = ref(false)
 const reaggregateLoading = ref(false)
+const reaggregateJobId = ref('')
+const reaggregateContext = ref<RefreshContext | null>(null)
+const reaggregateJobProjectId = computed(() => reaggregateContext.value?.projectId || projectId.value)
 
 const refreshTracking = useConsolRefreshTracking({
   reloadReportView: () => reloadConsolReportView(),
@@ -959,7 +1022,7 @@ async function onRefreshAll() {
  * 只有当前章节持久化 GET 返回 done 才清除 consolStale。
  */
 async function onReaggregateNotes() {
-  if (reaggregateLoading.value) return
+  if (reaggregateLoading.value || reaggregateJobId.value) return
   if (!(await workspaceGuard.confirmTransition('重新汇总附注前，请先处理未保存修改。'))) return
   const context = captureRefreshContext()
   if (!context) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
@@ -970,31 +1033,52 @@ async function onReaggregateNotes() {
       node_key: context.nodeKey || null,
       standard: consolNoteTemplateType.value,
       template_type: consolNoteTemplateType.value,
+      operation_id: newUuid(),
     }
-    const res: any = await api.post(P_consol.notes.reaggregate(context.projectId, context.year), body)
-    const updated = res?.sections_updated ?? res?.sections_processed ?? 0
-    const errCount = Array.isArray(res?.errors) ? res.errors.length : 0
-    if (errCount > 0) {
-      ElMessage.warning(`附注重新汇总完成（更新 ${updated} 个章节，${errCount} 个章节有告警）`)
-    } else {
-      ElMessage.success(`附注重新汇总完成（更新 ${updated} 个章节）`)
-    }
-    activeTab.value = 'consol_note'
-    await loadConsolNoteTree(true)
-    // 持久化重读当前章节作为完成证据
-    const noteResult = await reloadNoteForRefresh(context)
-    if (noteResult?.status === 'done') {
-      consolStale.value = false
-    } else {
-      // POST 成功但章节重读不是 done → 保持 stale
-      const reason = noteResult?.reason || '附注章节重读未完成'
-      ElMessage.warning(`重新汇总完成，但章节重读${noteResult?.status === 'failed' ? '失败' : '跳过'}：${reason}`)
-    }
+    const res: any = await api.post(P_consol.notes.reaggregateAsync(context.projectId, context.year), body)
+    if (!res?.accepted || !res?.job_id) throw new Error('重新汇总任务未返回 job_id')
+    reaggregateContext.value = context
+    reaggregateJobId.value = String(res.job_id)
+    ElMessage.info('附注重新汇总已提交，正在后台执行')
   } catch (e) {
     handleApiError(e, '重新汇总附注')
   } finally {
     reaggregateLoading.value = false
   }
+}
+
+function onReaggregateJobId(jobId: string): void {
+  reaggregateJobId.value = jobId
+}
+
+async function onReaggregateCompleted(job: PlatformJobSnapshot): Promise<void> {
+  const context = reaggregateContext.value
+  const result: any = job.result_ref?.result ?? {}
+  reaggregateJobId.value = ''
+  reaggregateContext.value = null
+  if (!context) return
+  const updated = result.sections_updated ?? result.sections_processed ?? 0
+  const errCount = Array.isArray(result.errors) ? result.errors.length : 0
+  if (errCount > 0) {
+    ElMessage.warning(`附注重新汇总完成（更新 ${updated} 个章节，${errCount} 个章节有告警）`)
+  } else {
+    ElMessage.success(`附注重新汇总完成（更新 ${updated} 个章节）`)
+  }
+  activeTab.value = 'consol_note'
+  await loadConsolNoteTree(true)
+  const noteResult = await reloadNoteForRefresh(context)
+  if (noteResult?.status === 'done') {
+    consolStale.value = false
+  } else {
+    const reason = noteResult?.reason || '附注章节重读未完成'
+    ElMessage.warning(`重新汇总完成，但章节重读${noteResult?.status === 'failed' ? '失败' : '跳过'}：${reason}`)
+  }
+}
+
+function onReaggregateFailed(job: PlatformJobSnapshot): void {
+  reaggregateJobId.value = ''
+  reaggregateContext.value = null
+  ElMessage.error(job.error_message || '附注重新汇总失败，请重试')
 }
 
 // ─── 合并方式与企业树诊断（consol-tree-three-code-autobuild 需求 4.4 / 9.4）────────────
@@ -1007,6 +1091,9 @@ const treeMessage = ref('')
 const treeDiagnostics = ref<ConsolTreeDiagnostic[]>([])
 const diagnosticsDismissed = ref(false)
 const showAllDiagnostics = ref(false)
+const treeConflictDialogVisible = ref(false)
+const treeConflictDialogDiagnostics = ref<ConsolTreeDiagnostic[]>([])
+const treeConflictDialogSignature = ref('')
 const DIAG_PREVIEW = 5
 const consolModeLabel = computed(() => modeLabel(treeMode.value, treeModeLabel.value) || '自动识别')
 const treeWarnings = computed(() => treeDiagnostics.value.filter((d) => d.level !== 'info'))
@@ -1014,6 +1101,26 @@ const visibleDiagnostics = computed(() => {
   const sorted = sortDiagnostics(treeDiagnostics.value)
   return showAllDiagnostics.value ? sorted : sorted.slice(0, DIAG_PREVIEW)
 })
+
+function maybeShowTreeConflicts(): void {
+  const conflicts = treeConflicts(treeDiagnostics.value)
+  const treeConflictYear = treeYear.value ?? effectiveConsolYear()
+  if (!shouldShowTreeConflicts(projectId.value, treeConflictYear, conflicts)) return
+
+  treeConflictDialogDiagnostics.value = conflicts
+  treeConflictDialogSignature.value = conflictSignature(conflicts)
+  treeConflictDialogVisible.value = true
+}
+
+function acknowledgeTreeConflicts(): void {
+  if (!projectId.value || !treeConflictDialogSignature.value) return
+  rememberConflictSignature(
+    projectId.value,
+    treeYear.value ?? effectiveConsolYear(),
+    treeConflictDialogSignature.value,
+  )
+  treeConflictDialogVisible.value = false
+}
 
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
@@ -1440,6 +1547,7 @@ async function loadGroupTree(): Promise<boolean> {
     treeDiagnostics.value = Array.isArray(res?.diagnostics) ? res.diagnostics : []
     diagnosticsDismissed.value = false
     groupTreeLoaded.value = true
+    maybeShowTreeConflicts()
   } catch (e: any) {
     // GET 去重导致的 cancel（axios abort）不是真正的失败——静默忽略，
     // 后发的请求会带回正确数据（http.ts addPending GET 去重机制）。
@@ -1892,14 +2000,14 @@ async function onConsolCtxCellTrace() {
   try {
     const data: any = await api.get(
       `/api/projects/${projectId.value}/lineage`,
-      { params: { object_type: objectType, object_id: objectId, direction: 'both' } },
+      { params: { object_type: objectType, object_id: objectId, direction: 'both', ...(objectType === 'tb_row' && year.value != null ? { year: year.value } : {}) } },
     )
     const upstream = data?.upstream || []
     const downstream = data?.downstream || []
     consolTraceResult.value = { upstream, downstream }
     if (!upstream.length && !downstream.length) {
       consolTraceDialogVisible.value = false
-      ElMessage.info('该数字暂无溯源信息')
+      ElMessage[data?.errors?.length ? 'warning' : 'info'](data?.errors?.[0]?.message || '该数字暂无溯源信息') // 子源失败如实说（R8.3）
     }
   } catch (e: any) {
     consolTraceDialogVisible.value = false
@@ -1909,15 +2017,11 @@ async function onConsolCtxCellTrace() {
   }
 }
 
-function onConsolTraceLocate(node: any) {
+// 本页没有底稿渲染器，定位事件无人接收：按编码取本项目底稿实例打开编辑器（deepLinkEntryGuard）；非底稿节点不出「定位」
+async function onConsolTraceLocate(node: any) {
   consolTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
+  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+  if (reason) ElMessage.warning(reason)
 }
 
 function onConsolCtxFormula() {

@@ -1,8 +1,8 @@
 <template>
   <div class="i1-adjudication">
-    <!-- 双模式切换 -->
+    <!-- 列布局切换（原先这里还有一个「结构化视图 / 在线编辑」开关：没有任何分支消费它，
+         点「在线编辑」毫无反应，是一个兑现不了的模式开关 ⇒ 已删除，AC 1.5 / 12.9） -->
     <div class="mode-switcher">
-      <el-segmented v-model="viewMode" :options="['结构化视图', '在线编辑']" />
       <el-segmented
         v-model="columnLayout"
         size="small"
@@ -1155,7 +1155,7 @@ onBeforeUnmount(() => {
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
-const viewMode = ref('结构化视图')
+// （原 `viewMode` 已随无效的「在线编辑」开关删除；保留本行使下方 `#L` 锚点不漂移）
 const columnLayout = ref<'movement' | 'excel6'>('movement')
 
 function toExcel6Row(row: I1AdjudicationRow) {

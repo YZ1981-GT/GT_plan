@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import User
 from app.services.sampling_enhanced_service import (
     AgingAnalysisService,
@@ -59,9 +59,13 @@ async def cutoff_test(
     project_id: UUID,
     req: CutoffTestRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """截止性测试 — 提取期末前后 N 天交易"""
+    """截止性测试 — 提取期末前后 N 天交易。
+
+    三个端点都读项目序时账：要求项目成员（原先只校验登录，任何登录用户都能读别的项目的分录，
+    spec voucher-workflow-linkage-lineage-closure R9 随抽样增强页一并收口）。
+    """
     svc = CutoffTestService()
     return await svc.run_cutoff_test(
         db, project_id, req.year, req.account_codes,
@@ -77,7 +81,7 @@ async def aging_analysis(
     project_id: UUID,
     req: AgingAnalysisRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """账龄分析 — FIFO 先进先出核销"""
     svc = AgingAnalysisService()
@@ -94,7 +98,7 @@ async def monthly_detail(
     project_id: UUID,
     req: MonthlyDetailRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """月度明细填充 — 按月汇总序时账"""
     svc = MonthlyDetailService()

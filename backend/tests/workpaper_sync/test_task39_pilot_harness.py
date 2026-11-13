@@ -28,6 +28,7 @@ Task 39 的绝大多数判据是**纯函数**：required set 推导、oracle 登
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import copy
 import os
 import re
@@ -63,7 +64,7 @@ from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     EntryProfile,
     RoomModel,
     ScenarioProfile,
-    capability_of,
+    effective_capability,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -415,18 +416,35 @@ class TestRequiredSetDerivationOnRealManifest:
             assert not missing, f"{entry_id}: 缺 close 场景 {sorted(missing)}"
 
     def test_unreachable_entry_yields_zero_scenarios_and_must_fail_closed(self) -> None:
-        """🔴 零场景不算通过。
+        """🔴 零场景不算通过：`assert_required_set_non_empty` 必须拒「0/0 全过」。
 
-        真 manifest 里恰有一个 `capability=unreachable` 的 entry，它的 required set 为空。
-        `assert_required_set_non_empty` 必须拒 —— 「0/0 全过」是本 spec 点名的假绿形态。
+        🔴 2026-11-04 改口径：原判据依赖「真 manifest 里恰有一个 `capability=unreachable`
+        的 entry」当样本。那个样本是 `xlsx/gt-g6-other-bond-ecl`，已由本 spec task 5.3
+        （AC 1.7，零入边的不可达旧桩）**物理删除**，于是 `assert empty` 恒失败 ——
+        判据的样本消失后它报的不再是「被测函数坏了」，而是「样本没了」。
+
+        改成两条并列，谁都不依赖「库里恰好有一条坏数据」：
+        1. **真 manifest 事实**：现在零场景的 entry 有几条就如实记几条（可以是 0），每一条都
+           必须被拒 —— 样本还在时判据照旧生效；
+        2. **合成样本**（恒有分母）：手造一个零场景的 required set，必须被拒且 kind 正确。
+           这一条与 manifest 内容无关，是被测函数本身的 fail-closed 判据。
         """
         derived = self._derived()
         empty = sorted(eid for eid, rs in derived.items() if not rs.scenarios)
-        assert empty, "manifest 里已经没有 unreachable entry 了 —— 这条判据的样本消失了"
         for entry_id in empty:
             with pytest.raises(PH.HarnessRejected) as err:
                 PH.assert_required_set_non_empty(derived[entry_id])
             assert err.value.kind is PH.HarnessRejection.empty_required_set
+        # 合成零场景集合：分母恒非空，manifest 怎么变都测得到 fail-closed
+        sample = next(iter(derived.values()))
+        synthetic = dataclasses.replace(sample, scenarios=())
+        assert not synthetic.scenarios, "合成样本没有真的清空 scenarios ⇒ 判据会空转"
+        with pytest.raises(PH.HarnessRejected) as err:
+            PH.assert_required_set_non_empty(synthetic)
+        assert err.value.kind is PH.HarnessRejection.empty_required_set
+        # 反向：非空集合必须放行（证明上面不是「对任何输入都拒」）
+        assert sample.scenarios, "真 manifest 的样本集合为空 ⇒ 反向对照失效"
+        PH.assert_required_set_non_empty(sample)
 
     def test_every_required_scenario_on_the_real_manifest_has_an_oracle(self) -> None:
         """真 manifest 上跑一遍：没有任何 entry 会撞上 `oracle_missing`。"""
@@ -1837,8 +1855,9 @@ class TestPilotClassCoverage:
 
         **不变量一个字都没变**：`capability=bidirectional` 这个旗标本身**不产生**
         verified —— 只有 `verified_entry_ids` 非空（= 服务端 evidence 重算真通过）才算。
-        因此 bidirectional 集合改成**活体双源派生**（测试侧直接用 `capability_of` 现读
-        manifest，与生产的 `assess_pilot_classes` 互为对照），牙齿落在
+        因此 bidirectional 集合改成**活体双源派生**（测试侧直接用 `effective_capability` 现读
+        manifest —— Task 1.1 起候选里有 pending entry，`capability_of` 会对它们抛 —— 与生产的
+        `assess_pilot_classes` 互为对照），牙齿落在
         `verified_entry_ids == ()` 这条真正的判据上：谁把 `status` 接到 capability 旗标
         上，这条立刻打红。
         """
@@ -1850,7 +1869,7 @@ class TestPilotClassCoverage:
             assert assessment.bidirectional_entry_ids == tuple(
                 eid
                 for eid in assessment.candidate_entry_ids
-                if capability_of(entries[eid]) is Capability.bidirectional
+                if effective_capability(entries[eid]) is Capability.bidirectional
             ), assessment
             # 🔴 真正的牙齿：一条都没通过服务端重算 ⇒ 四类必须全 UNVERIFIABLE
             assert assessment.verified_entry_ids == (), assessment

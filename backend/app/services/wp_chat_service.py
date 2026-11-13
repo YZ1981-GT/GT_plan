@@ -1,26 +1,85 @@
-"""底稿 LLM 对话服务 — Phase 10 Task 5.1-5.3
-
-对话式底稿填充、台账分析底稿生成、知识库双向关联。
-"""
-
+"""底稿 LLM 对话服务：请求内准备上下文，流式阶段不持有 AsyncSession。"""
 from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any, AsyncGenerator
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_models import TbLedger, TbBalance, TrialBalance
+from app.models.audit_platform_models import TbLedger
 from app.models.workpaper_models import WorkingPaper, WpIndex
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class PreparedWpChat:
+    """流开始前已完成所有 DB / 脱敏工作的不可变载荷。"""
+
+    project_id: UUID | None
+    messages: tuple[dict[str, str], ...]
+    message: str
+
+
 class WpChatService:
-    """底稿 LLM 对话服务"""
+    """底稿 LLM 对话服务。"""
+
+    async def prepare_chat(
+        self,
+        db: AsyncSession,
+        wp_id: UUID,
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> PreparedWpChat:
+        """在 HTTP handler 内加载/脱敏上下文；返回后可安全关闭 DB session。"""
+        from app.services.export_mask_service import export_mask_service
+
+        if context and "cell_context" in context:
+            safe_context = dict(context)
+            safe_context["cell_context"], _mapping = export_mask_service.mask_context(context["cell_context"])
+        elif context:
+            safe_context, _mapping = export_mask_service.mask_context(context)
+        else:
+            safe_context = None
+
+        wp_info = await self._load_wp_context(db, wp_id)
+        system_prompt = self._build_system_prompt(wp_info, safe_context)
+        raw_project_id = wp_info.get("project_id")
+        try:
+            project_id = UUID(str(raw_project_id)) if raw_project_id else None
+        except (TypeError, ValueError):
+            project_id = None
+        return PreparedWpChat(
+            project_id=project_id,
+            messages=(
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message},
+            ),
+            message=message,
+        )
+
+    async def stream_prepared(self, prepared: PreparedWpChat) -> AsyncGenerator[str, None]:
+        """纯 LLM SSE 流：绝不读取 ORM / AsyncSession。"""
+        try:
+            from app.services.llm_client import chat_completion
+
+            full_response = ""
+            async for text in await chat_completion(list(prepared.messages), stream=True, max_tokens=4096):
+                if text:
+                    full_response += text
+                    yield f"data: {json.dumps({'type': 'content', 'text': text}, ensure_ascii=False)}\n\n"
+            suggestion = self._extract_fill_suggestion(full_response)
+            if suggestion:
+                yield f"data: {json.dumps({'type': 'fill_suggestion', 'suggestions': suggestion}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        except Exception as exc:  # noqa: BLE001 - 对话降级不影响 SSE 帧完整性
+            logger.warning("wp_chat LLM 调用失败: %s, 使用 stub 回复", exc)
+            yield f"data: {json.dumps({'type': 'content', 'text': f'[LLM 暂不可用] 已收到您的问题：{prepared.message}'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     async def chat_stream(
         self,
@@ -29,41 +88,14 @@ class WpChatService:
         message: str,
         context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """SSE 流式对话 — 注入底稿上下文 + 四表数据 + 知识库"""
-        # 0. AI 脱敏前置过滤（R4 需求 2 验收 7）
-        from app.services.export_mask_service import export_mask_service
-        if context and "cell_context" in context:
-            context["cell_context"], _mapping = export_mask_service.mask_context(context["cell_context"])
-        elif context:
-            context, _mapping = export_mask_service.mask_context(context)
+        """兼容旧调用方。
 
-        # 1. 加载底稿信息
-        wp_info = await self._load_wp_context(db, wp_id)
-        # 2. 构建 system prompt
-        system_prompt = self._build_system_prompt(wp_info, context)
-        # 3. 调用 LLM（项目自研 chat_completion 流式，连本地 vLLM）
-        try:
-            from app.services.llm_client import chat_completion
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message},
-            ]
-            full_response = ""
-            async for text in await chat_completion(messages, stream=True, max_tokens=4096):
-                if text:
-                    full_response += text
-                    yield f"data: {json.dumps({'type': 'content', 'text': text}, ensure_ascii=False)}\n\n"
-
-            # 尝试提取 fill_suggestion
-            suggestion = self._extract_fill_suggestion(full_response)
-            if suggestion:
-                yield f"data: {json.dumps({'type': 'fill_suggestion', 'suggestions': suggestion}, ensure_ascii=False)}\n\n"
-
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        except Exception as e:
-            logger.warning("wp_chat LLM 调用失败: %s, 使用 stub 回复", e)
-            yield f"data: {json.dumps({'type': 'content', 'text': f'[LLM 暂不可用] 已收到您的问题：{message}'}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        新路由必须先调 :meth:`prepare_chat` 再调 :meth:`stream_prepared`，避免生成器持有 DB。
+        这个包装器只保留给已有服务级用例和历史调用点，不在 HTTP 流式端点使用。
+        """
+        prepared = await self.prepare_chat(db, wp_id, message, context)
+        async for chunk in self.stream_prepared(prepared):
+            yield chunk
 
     async def generate_ledger_analysis(
         self,
@@ -72,21 +104,17 @@ class WpChatService:
         account_codes: list[str] | None = None,
         year: int | None = None,
     ) -> dict[str, Any]:
-        """台账分析底稿生成 — LLM 分析序时账大额/异常/关联方交易"""
+        """台账分析底稿生成 — LLM 分析序时账大额/异常/关联方交易。"""
         from app.services.dataset_query import get_active_filter
 
-        # 查询序时账数据
         if year:
             conditions = [await get_active_filter(db, TbLedger.__table__, project_id, year)]
         else:
-            # year=None：查所有年度的 active data
             from app.models.dataset_models import LedgerDataset, DatasetStatus
+
             active_ds_subq = (
                 sa.select(LedgerDataset.id)
-                .where(
-                    LedgerDataset.project_id == project_id,
-                    LedgerDataset.status == DatasetStatus.active,
-                )
+                .where(LedgerDataset.project_id == project_id, LedgerDataset.status == DatasetStatus.active)
             )
             conditions = [
                 TbLedger.project_id == project_id,
@@ -104,42 +132,31 @@ class WpChatService:
         )
         result = await db.execute(stmt)
         ledger_rows = result.scalars().all()
-
         if not ledger_rows:
             return {"analysis": "无序时账数据", "entries_analyzed": 0, "findings": []}
 
-        # 汇总统计
-        total_debit = sum(float(r.debit_amount or 0) for r in ledger_rows)
-        total_credit = sum(float(r.credit_amount or 0) for r in ledger_rows)
+        total_debit = sum(float(row.debit_amount or 0) for row in ledger_rows)
+        total_credit = sum(float(row.credit_amount or 0) for row in ledger_rows)
         large_entries = [
-            r for r in ledger_rows
-            if (float(r.debit_amount or 0) > 100000 or float(r.credit_amount or 0) > 100000)
+            row for row in ledger_rows
+            if float(row.debit_amount or 0) > 100000 or float(row.credit_amount or 0) > 100000
         ]
-
         analysis_text = (
-            f"## 台账分析报告\n\n"
-            f"- 分析凭证数：{len(ledger_rows)}\n"
-            f"- 借方合计：{total_debit:,.2f}\n"
-            f"- 贷方合计：{total_credit:,.2f}\n"
+            f"## 台账分析报告\n\n- 分析凭证数：{len(ledger_rows)}\n"
+            f"- 借方合计：{total_debit:,.2f}\n- 贷方合计：{total_credit:,.2f}\n"
             f"- 大额交易（>10万）：{len(large_entries)} 笔\n\n"
         )
-
-        findings = []
-        for entry in large_entries[:20]:
-            findings.append({
-                "voucher_no": entry.voucher_no,
-                "date": entry.voucher_date.isoformat() if entry.voucher_date else None,
-                "account_code": entry.account_code,
-                "debit": float(entry.debit_amount or 0),
-                "credit": float(entry.credit_amount or 0),
-                "summary": entry.summary or "",
-            })
-
-        # 尝试 LLM 生成分析说明
+        findings = [{
+            "voucher_no": entry.voucher_no,
+            "date": entry.voucher_date.isoformat() if entry.voucher_date else None,
+            "account_code": entry.account_code,
+            "debit": float(entry.debit_amount or 0),
+            "credit": float(entry.credit_amount or 0),
+            "summary": entry.summary or "",
+        } for entry in large_entries[:20]]
         llm_analysis = await self._llm_analyze_ledger(ledger_rows[:200])
         if llm_analysis:
             analysis_text += f"\n### AI 分析\n{llm_analysis}\n"
-
         return {
             "analysis": analysis_text,
             "entries_analyzed": len(ledger_rows),
@@ -148,16 +165,16 @@ class WpChatService:
         }
 
     async def _load_wp_context(self, db: AsyncSession, wp_id: UUID) -> dict[str, Any]:
-        """加载底稿上下文"""
-        stmt = (
-            sa.select(WorkingPaper, WpIndex)
-            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(WorkingPaper.id == wp_id)
-        )
-        result = await db.execute(stmt)
-        row = result.first()
+        """加载底稿上下文；未找到时不泄露其他项目数据。"""
+        row = (
+            await db.execute(
+                sa.select(WorkingPaper, WpIndex)
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
+            )
+        ).first()
         if not row:
-            return {"wp_code": "unknown", "wp_name": "unknown"}
+            return {"wp_code": "unknown", "wp_name": "unknown", "project_id": None}
         wp, idx = row
         return {
             "wp_code": idx.wp_code,
@@ -167,8 +184,7 @@ class WpChatService:
             "project_id": str(wp.project_id),
         }
 
-    def _build_system_prompt(self, wp_info: dict, context: dict | None) -> str:
-        """构建 system prompt"""
+    def _build_system_prompt(self, wp_info: dict[str, Any], context: dict[str, Any] | None) -> str:
         prompt = (
             "你是审计底稿填写助手。当前底稿信息：\n"
             f"- 编号：{wp_info.get('wp_code', 'N/A')}\n"
@@ -184,32 +200,23 @@ class WpChatService:
             prompt += f"\n底稿已解析数据摘要：{json.dumps(parsed, ensure_ascii=False)[:2000]}\n"
         return prompt
 
-    def _extract_fill_suggestion(self, response: str) -> list[dict] | None:
-        """从 LLM 回复中提取填充建议 [FILL:B5=12345]"""
+    def _extract_fill_suggestion(self, response: str) -> list[dict[str, str]] | None:
         import re
-        pattern = r'\[FILL:([A-Z]+\d+)=([^\]]+)\]'
-        matches = re.findall(pattern, response)
-        if not matches:
-            return None
-        return [{"cell_ref": m[0], "value": m[1]} for m in matches]
 
-    async def _llm_analyze_ledger(self, entries: list) -> str | None:
-        """LLM 分析序时账"""
+        matches = re.findall(r'\[FILL:([A-Z]+\d+)=([^\]]+)\]', response)
+        return [{"cell_ref": item[0], "value": item[1]} for item in matches] or None
+
+    async def _llm_analyze_ledger(self, entries: list[Any]) -> str | None:
         try:
             from app.services.llm_client import chat_completion
-            summary_lines = []
-            for e in entries[:50]:
-                line = f"{e.voucher_date} {e.voucher_no} {e.account_code} D:{e.debit_amount} C:{e.credit_amount} {e.summary or ''}"
-                summary_lines.append(line)
-            prompt = (
-                "以下是部分序时账数据，请分析大额交易、异常交易和可能的关联方交易：\n\n"
-                + "\n".join(summary_lines)
-            )
-            resp = await chat_completion(
-                [{"role": "user", "content": prompt}],
-                max_tokens=2048,
-            )
-            return resp
-        except Exception as e:
-            logger.warning("LLM 台账分析失败: %s", e)
+
+            lines = [
+                f"{entry.voucher_date} {entry.voucher_no} {entry.account_code} "
+                f"D:{entry.debit_amount} C:{entry.credit_amount} {entry.summary or ''}"
+                for entry in entries[:50]
+            ]
+            prompt = "以下是部分序时账数据，请分析大额交易、异常交易和可能的关联方交易：\n\n" + "\n".join(lines)
+            return await chat_completion([{"role": "user", "content": prompt}], max_tokens=2048)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM 台账分析失败: %s", exc)
             return None

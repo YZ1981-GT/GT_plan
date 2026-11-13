@@ -119,6 +119,7 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.account_note_mapping import router as anm_router
     from app.routers.formula_audit_log import router as fal_router
     from app.routers.custom_query import router as cq_router
+    from app.routers.query_evidence import router as qev_router
     from app.routers.query_builder import router as qb_router
     from app.routers.consol_refresh import router as crf_router
     from app.routers.consol_push import router as cpush_router
@@ -129,22 +130,19 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.consol_scope_confirmation import router as csc_router
     from app.routers.share_change_events import router as sce_router
     from app.routers.consol_note_detail_templates import router as cndt_router
+    from app.routers.consol_workpaper import router as cwps_router
     # consol_note_mapping_templates（V202 规则模板库 / 值确认 / 结构锁）已退役（spec note-pull-followup-closure R16）
 
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
-              cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
+              cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qev_router, qb_router,
               crf_router, crb_router, cpush_router, cop_router, cpe_router, cready_router, cnf_router, csc_router, sce_router,
-              cndt_router]:
+              cndt_router, cwps_router]:
         app.include_router(r, tags=["合并报表"])
 
-    # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══
-    # 🔴 custom_query.py 只 re-export 了 writeback_preview / writeback_confirm 两个**函数**
-    #    （给契约测试直调与 monkeypatch 用），并未 include 伴生模块自己的 APIRouter。
-    #    结果 POST /api/custom-query/writeback-preview|writeback-confirm 从未挂上路由树，
-    #    `WritebackPreviewService`（30KB）+ `WritebackConfirmationGate` 对用户仍是 404 —— 
-    #    与该模块 docstring 自称的「本模块是其唯一生产入口」相矛盾。此处补注册。
-    #    tags 保留 router 自身声明的 ["custom-query"]（不套用「合并报表」）。
+    # ═══ §7.1 高级查询：退役写入口的 410 兼容桩 ═══
+    # 路由保留只为让旧客户端得到稳定、可诊断的 410；桩无数据库、认证或请求体依赖，
+    # 不会触达 SnapshotWriter、审计或 outbox。实际编辑统一进入来源业务页面。
     from app.routers.custom_query_writeback import router as cqw_router
     app.include_router(cqw_router)
 
@@ -249,6 +247,12 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §233. platform-global-display-settings-closure：账号级显示偏好 ═══
     from app.routers.user_display_preferences import router as display_prefs_router
     app.include_router(display_prefs_router, tags=["display-preferences"])
+
+    # ═══ §234. platform-heavy-jobs-and-capacity-closure B5：通用耐久任务状态 / 取消 / 重试 ═══
+    # 前端 platformJobs.ts 断线、刷新后从这里恢复。router 自带完整前缀；此前文件已入库却漏了
+    # 这一行，三个端点在应用里恒 404（test_router_modules_mounted 因此红）。
+    from app.routers.platform_jobs import router as platform_jobs_router
+    app.include_router(platform_jobs_router, tags=["platform-jobs"])
 
     # ═══ §53b. 项目级账龄配置（AgingConfigService 增强版） ═══
     from app.routers.aging_config import router as aging_config_router

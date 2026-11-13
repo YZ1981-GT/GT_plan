@@ -310,13 +310,113 @@ describe('CP05 pending mutations', () => {
     expect(exposed(w).noteDirty).toBe(true)
   })
 
-  it('mismatched loaded variant or section rejects save before PUT', async () => {
-    const w = await loaded(), s = state(w)
-    s.loadedNoteContext = { ...s.loadedNoteContext, variant: 'listed' }
+  it('409 保存冲突保留本地编辑、dirty 与自动保存草稿，并显示写入方和时间', async () => {
+    vi.useFakeTimers()
+    try {
+      const w = await loaded()
+      markDirty(w)
+      vi.advanceTimersByTime(30_000)
+      const draftKey = Object.keys(sessionStorage)[0]
+      const draftBefore = draftKey ? sessionStorage.getItem(draftKey) : null
+      expect(draftBefore).toBeTruthy()
+      const sec = exposed(w).selectedNoteSection
+      const localRows = JSON.parse(JSON.stringify(sec.editRows))
+      api.put.mockRejectedValue({
+        response: {
+          status: 409,
+          data: {
+            detail: {
+              error_code: 'CONSOL_NOTE_CONFLICT',
+              current_digest: 'b'.repeat(64),
+              updated_at: '2026-11-11T10:20:30+00:00',
+              last_write_source: 'subtree_aggregate',
+              message: '该章节已被其他人修改',
+            },
+          },
+        },
+      })
+      confirm.mockRejectedValue('cancel')
+
+      expect(await exposed(w).saveNoteData()).toBe(false)
+      expect(confirm).toHaveBeenCalledWith(
+        expect.stringContaining('最近写入方：子树汇总'),
+        '检测到合并附注保存冲突',
+        expect.objectContaining({ confirmButtonText: '重新加载', cancelButtonText: '保留本地修改' }),
+      )
+      expect(confirm.mock.calls[0][0]).toContain('写入时间：')
+      expect(sec.editRows).toEqual(localRows)
+      expect(exposed(w).noteDirty).toBe(true)
+      expect(draftKey ? sessionStorage.getItem(draftKey) : null).toBe(draftBefore)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('409 选择重新加载调用持久化重读并放弃本地编辑', async () => {
+    const w = await loaded()
+    const sec = exposed(w).selectedNoteSection
+    sec.editRows[2][1] = '本地修改'
+    markDirty(w)
+    const server = section('soe')
+    server.rows[2][1] = '先保存方内容'
+    api.put.mockRejectedValue({
+      response: { status: 409, data: { detail: {
+        error_code: 'CONSOL_NOTE_CONFLICT',
+        current_digest: 'c'.repeat(64),
+        updated_at: '2026-11-11T10:20:30+00:00',
+        last_write_source: 'manual',
+        message: '该章节已被其他人修改',
+      } } },
+    })
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return {
+        content: { headers: server.headers, rows: server.rows, template_variant: 'soe' },
+        data_digest: 'd'.repeat(64),
+        node_key: 'G:consol',
+      }
+      return section('soe')
+    })
+    confirm.mockResolvedValue('confirm')
+
     expect(await exposed(w).saveNoteData()).toBe(false)
-    s.loadedNoteContext = { ...s.loadedNoteContext, variant: 'soe', sectionId: '五-5-3' }
-    expect(await exposed(w).saveNoteData()).toBe(false)
-    expect(api.put).not.toHaveBeenCalled()
+    expect(api.get.mock.calls.some(([url]) => String(url).includes('/data/'))).toBe(true)
+    expect(sec.editRows[2][1]).toBe('先保存方内容')
+    expect(sec.dataDigest).toBe('d'.repeat(64))
+    expect(exposed(w).noteDirty).toBe(false)
+  })
+
+  it('保存冲突时中止单章按公式填入，不覆盖本地修改', async () => {
+    const w = await loaded()
+    const sec = exposed(w).selectedNoteSection
+    sec.editRows[2][1] = '本地修改'
+    markDirty(w)
+    api.put.mockRejectedValue({ response: { status: 409, data: { detail: {
+      error_code: 'CONSOL_NOTE_CONFLICT', current_digest: 'e'.repeat(64),
+      updated_at: '2026-11-11T10:20:30+00:00', last_write_source: 'formula', message: '内容已变化',
+    } } } })
+    confirm.mockRejectedValue('cancel')
+
+    const result = await exposed(w).fillCurrentByFormula()
+    expect(result.status).toBe('failed')
+    expect(service.fillConsolNoteByFormula).not.toHaveBeenCalled()
+    expect(sec.editRows[2][1]).toBe('本地修改')
+    expect(exposed(w).noteDirty).toBe(true)
+  })
+
+  it('保存冲突时中止全部按公式填入，不继续读取公式目录', async () => {
+    const w = await loaded()
+    markDirty(w)
+    api.put.mockRejectedValue({ response: { status: 409, data: { detail: {
+      error_code: 'CONSOL_NOTE_CONFLICT', current_digest: 'f'.repeat(64),
+      updated_at: '2026-11-11T10:20:30+00:00', last_write_source: 'manual', message: '内容已变化',
+    } } } })
+    confirm.mockRejectedValue('cancel')
+
+    await exposed(w).fillAllByFormula()
+    expect(service.listConsolNoteFormulas).not.toHaveBeenCalled()
+    expect(service.fillConsolNoteByFormula).not.toHaveBeenCalled()
+    expect(exposed(w).noteDirty).toBe(true)
   })
 
   it('late leave-edit confirmation cannot clear a newly loaded dirty note', async () => {
@@ -350,6 +450,107 @@ describe('CP05 pending mutations', () => {
     expect(original.editRows.some((r: any) => r[0] === '迟到业务行')).toBe(false)
     expect(exposed(w).noteDirty).toBe(false)
     expect(api.put).not.toHaveBeenCalled()
+  })
+})
+
+describe('R2 合并附注 CAS 摘要前端接线', () => {
+  it('加载摘要并在保存时发送期望摘要，采用保存回执摘要', async () => {
+    const cfg = section('soe')
+    const loadDigest = 'a'.repeat(64)
+    const saveDigest = 'b'.repeat(64)
+    const persisted = {
+      headers: cfg.headers,
+      rows: cfg.rows,
+      template_variant: 'soe',
+      manual_cells: [],
+    }
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return { content: persisted, data_digest: loadDigest, node_key: 'G:consol' }
+      return cfg
+    })
+
+    const w = await loaded()
+    const sec = exposed(w).selectedNoteSection
+    expect(sec.dataDigest).toBe(loadDigest)
+
+    markDirty(w)
+    api.put.mockResolvedValue({ ok: true, node_key: 'G:consol', data_digest: saveDigest })
+    expect(await exposed(w).saveNoteData()).toBe(true)
+    expect(api.put).toHaveBeenCalledWith(
+      expect.stringContaining('/api/consol-note-sections/data/fixture-project/2025/五-5-2'),
+      expect.objectContaining({ expected_digest: loadDigest }),
+      expect.objectContaining({ _silent: true }),
+    )
+    expect(sec.dataDigest).toBe(saveDigest)
+  })
+
+  it('单章按公式填入重读服务端数据并记录新摘要', async () => {
+    const cfg = section('soe')
+    const filledRows = cfg.rows.map((row: any[]) => [...row])
+    filledRows[2][1] = '公式回写'
+    const digest = 'c'.repeat(64)
+    let dataReads = 0
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) {
+        dataReads += 1
+        return dataReads === 1
+          ? { content: { headers: cfg.headers, rows: cfg.rows, template_variant: 'soe' }, data_digest: 'a'.repeat(64), node_key: 'G:consol' }
+          // 旧后端重读响应缺摘要时，组件应使用公式回执中的摘要兜底。
+          : { content: { headers: cfg.headers, rows: filledRows, template_variant: 'soe' }, node_key: 'G:consol' }
+      }
+      return cfg
+    })
+    service.fillConsolNoteByFormula.mockResolvedValue({
+      project_id: 'fixture-project', year: 2025, section_id: '五-5-2', template_type: 'soe',
+      filled: [{ row_index: 2, col_index: 1, target_row: 2, value: '公式回写' }],
+      kept_manual: [], blank: [], is_stale: false, data_digest: digest,
+      data: { headers: cfg.headers, rows: filledRows, manual_cells: [] },
+    })
+
+    const w = await loaded()
+    const result = await exposed(w).fillCurrentByFormula()
+    const sec = exposed(w).selectedNoteSection
+
+    expect(result.status).toBe('done')
+    expect(dataReads).toBe(2)
+    expect(service.fillConsolNoteByFormula).toHaveBeenCalledWith(
+      'fixture-project', 2025, '五-5-2', 'soe', 'G:consol',
+    )
+    expect(sec.dataDigest).toBe(digest)
+    expect(sec.editRows[2][1]).toBe('公式回写')
+  })
+
+  it('全部按公式填入采用当前章节回执中的摘要', async () => {
+    const cfg = section('soe')
+    const filledRows = cfg.rows.map((row: any[]) => [...row])
+    filledRows[2][1] = '批量公式回写'
+    const digest = 'd'.repeat(64)
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return { content: { headers: cfg.headers, rows: cfg.rows }, node_key: 'G:consol' }
+      return cfg
+    })
+    service.listConsolNoteFormulas.mockResolvedValue({
+      sections: [{ section_id: '五-5-2', formulas: [{ formula: '=fixture' }] }],
+    })
+    service.fillConsolNoteByFormula.mockResolvedValue({
+      project_id: 'fixture-project', year: 2025, section_id: '五-5-2', template_type: 'soe',
+      filled: [{ row_index: 2, col_index: 1, target_row: 2, value: '批量公式回写' }],
+      kept_manual: [], blank: [], is_stale: false, data_digest: digest,
+      data: { headers: cfg.headers, rows: filledRows, manual_cells: [] },
+    })
+
+    const w = await loaded()
+    await state(w).fillAllByFormula()
+    const sec = exposed(w).selectedNoteSection
+
+    expect(service.fillConsolNoteByFormula).toHaveBeenCalledWith(
+      'fixture-project', 2025, '五-5-2', 'soe', 'G:consol',
+    )
+    expect(sec.dataDigest).toBe(digest)
+    expect(sec.editRows[2][1]).toBe('批量公式回写')
   })
 })
 
@@ -445,6 +646,86 @@ describe('CP04 stored coordinates and asynchronous readers', () => {
     expect(data.manual_cells).toContainEqual({ row: 2, col: 5 })
     expect(data.manual_cells.every((c: any) => c.row >= 2)).toBe(true)
     expect(data.template_variant).toBe('listed')
+  })
+
+  it('批量导入逐章节继续执行，汇总一成功一失败并列出 Sheet、章节和原因', async () => {
+    const first = section('soe', '五-5-2')
+    const second = section('soe', '五-5-3')
+    const sheetNames = [first.title, second.title]
+    const sheets = Object.fromEntries(sheetNames.map((title) => [title, [
+      ['项目', '金额'],
+      ['人工录入', '100'],
+    ]]))
+    const w = await loaded()
+    excel.readWorkbookAoa.mockResolvedValue({ sheetNames, sheets })
+    api.get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/soe')) {
+        return [{ children: [
+          { title: first.title, section_id: first.section_id },
+          { title: second.title, section_id: second.section_id },
+        ] }]
+      }
+      if (url.includes(`/soe/${first.section_id}`)) return first
+      if (url.includes(`/soe/${second.section_id}`)) return second
+      return url.includes('/cell-comments/') ? [] : { content: {}, node_key: 'G:consol' }
+    })
+    api.put
+      .mockResolvedValueOnce({ ok: true, node_key: 'G:consol' })
+      .mockRejectedValueOnce({
+        response: {
+          status: 500,
+          data: { detail: { error_code: 'CONSOL_NOTE_SAVE_FAILED', message: '导入写库失败' } },
+        },
+      })
+
+    await state(w).onNoteBatchImport({ target: { files: [new File([''], 'partial.xlsx')] } })
+
+    expect(api.put).toHaveBeenCalledTimes(2)
+    expect(api.put.mock.calls[1][1].force_overwrite).toBe(true)
+    expect(message.success).toHaveBeenCalledWith('批量导入完成：成功 1 个，失败 1 个')
+    expect(message.warning).toHaveBeenCalledWith(
+      expect.stringContaining(`Sheet「${second.title}」/章节「${second.section_id}」：导入写库失败`),
+    )
+    expect(message.error).not.toHaveBeenCalled()
+  })
+
+  it('批量导入全部失败时只提示失败项，不弹成功提示', async () => {
+    const first = section('soe', '五-5-2')
+    const second = section('soe', '五-5-3')
+    const sheetNames = [first.title, second.title]
+    const sheets = Object.fromEntries(sheetNames.map((title) => [title, [
+      ['项目', '金额'],
+      ['人工录入', '100'],
+    ]]))
+    const w = await loaded()
+    excel.readWorkbookAoa.mockResolvedValue({ sheetNames, sheets })
+    api.get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/soe')) {
+        return [{ children: [
+          { title: first.title, section_id: first.section_id },
+          { title: second.title, section_id: second.section_id },
+        ] }]
+      }
+      if (url.includes(`/soe/${first.section_id}`)) return first
+      if (url.includes(`/soe/${second.section_id}`)) return second
+      return url.includes('/cell-comments/') ? [] : { content: {}, node_key: 'G:consol' }
+    })
+    api.put.mockRejectedValue({
+      response: {
+        status: 500,
+        data: { detail: { error_code: 'CONSOL_NOTE_SAVE_FAILED', message: '导入写库失败' } },
+      },
+    })
+
+    await state(w).onNoteBatchImport({ target: { files: [new File([''], 'all-failed.xlsx')] } })
+
+    expect(api.put).toHaveBeenCalledTimes(2)
+    expect(message.success).not.toHaveBeenCalled()
+    expect(message.warning).not.toHaveBeenCalled()
+    const failureMessage = message.error.mock.calls[0]?.[0] as string
+    expect(failureMessage).toContain('批量导入失败：成功 0 个，失败 2 个')
+    expect(failureMessage).toContain(`Sheet「${first.title}」/章节「${first.section_id}」：导入写库失败`)
+    expect(failureMessage).toContain(`Sheet「${second.title}」/章节「${second.section_id}」：导入写库失败`)
   })
 
   it('late breakdown response is cancelled and cannot reopen after template switch', async () => {

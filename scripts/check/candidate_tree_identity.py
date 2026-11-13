@@ -112,15 +112,18 @@ def cmd_build(args: argparse.Namespace) -> None:
     )
     os.close(fd)
 
-    try:
-        # 安全：私有 index 不能是 .git/index
-        git_dir = _resolve_git_dir(repo)
-        real_index = (git_dir / "index").resolve()
-        if Path(private_index).resolve() == real_index:
-            raise RuntimeError(
-                "Private index path resolved to .git/index — aborting"
-            )
+    # 安全：私有 index 不能是 .git/index。🔴 校验必须放在 try 之外：校验不过说明这条路径不是本工具建的
+    # 私有文件（mkstemp 被换掉 / 解析到了真实 index），这时进 finally 清理就是删掉真实 index。2026-11-04
+    # 全量回归实测：本工具的变异用例在跑它的 worktree 里删掉了真实 index（全部文件变成「已暂存删除」），
+    # 之后若 `git add <部分路径>` 再提交，提交树只剩这几个路径。
+    git_dir = _resolve_git_dir(repo)
+    real_index = (git_dir / "index").resolve()
+    if Path(private_index).resolve() == real_index:
+        raise RuntimeError(
+            "Private index path resolved to .git/index — aborting"
+        )
 
+    try:
         idx_env = {"GIT_INDEX_FILE": private_index}
 
         # ── 3. 从 HEAD 填充 ─────────────────────────────────────────────

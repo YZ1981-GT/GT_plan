@@ -78,7 +78,10 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
     vi.mocked(useEditorSave).mockReturnValue({
       saving: ref(false), submitting: ref(false), syncLoading: ref(false),
       prefillLoading: ref(false), exportingPdf: ref(false), markEdited: vi.fn(),
-      onSave: vi.fn().mockResolvedValue(true), onSubmitForReview: vi.fn(),
+      // onSave 必须就是 editorOnSave：用例靠 editorOnSave.mockResolvedValueOnce(false)
+      // 驱动「自动保存回调原样返回 false」。原先这里另建了一个 vi.fn ⇒ 两者没有关联，
+      // 回调恒返回 true，断言永远拿不到 false（判据失效）。
+      onSave: editorOnSave, onSubmitForReview: vi.fn(),
       onSyncStructure: vi.fn(), onRefreshPrefill: vi.fn(), onDownload: vi.fn(),
       onExportPdf: vi.fn(), onUpload: vi.fn(),
     } as any)

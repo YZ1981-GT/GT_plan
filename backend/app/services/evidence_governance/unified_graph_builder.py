@@ -359,7 +359,7 @@ class UnifiedGraphBuilder:
         """
         try:
             from app.services.workpaper_trace_stale_integration import (
-                get_registry_edges,
+                build_registry_edges as get_registry_edges,
             )
 
             raw_edges = get_registry_edges()

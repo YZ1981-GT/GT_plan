@@ -92,7 +92,13 @@ onMounted(async () => {
 
 <template>
   <div class="gt-a16-bundle" v-loading="loading">
-    <el-tabs v-model="active">
+    <!-- 本项目一张 A16 子底稿都没生成时，原先只剩空白页签区、看不出原因（residual 任务 28 实测） -->
+    <el-empty
+      v-if="!loading && visibleTabs.length === 0"
+      class="gt-a16-bundle__empty"
+      description="本项目还没有生成 A16 管理层声明书的子底稿（A16-1 ~ A16-7）。请到底稿列表按需生成后再编辑。"
+    />
+    <el-tabs v-else v-model="active">
       <el-tab-pane
         v-for="t in visibleTabs"
         :key="t.id"

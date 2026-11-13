@@ -183,3 +183,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §108. unified-formula-registry：公式目录 + 函数清单 ═══
     from app.routers.formula_catalog import router as fc_router
     app.include_router(fc_router, tags=["formula-catalog"])
+
+    # ═══ §109. note-disclosure-pull-regression-and-headless-backend：离屏披露手工触发（Node 执行器） ═══
+    from app.routers.note_headless_refresh import router as note_headless_router
+    app.include_router(note_headless_router, tags=["note-headless-refresh"])

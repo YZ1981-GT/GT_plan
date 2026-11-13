@@ -11,6 +11,7 @@ vi.mock('@/composables/useAgingConfig', () => ({ primeAgingConfig: h.prime }))
 vi.mock('element-plus', () => ({ ElMessage: Object.assign(h.msg, { success: h.msg, error: h.msg, warning: h.msg }), ElMessageBox: { confirm: h.box } }))
 
 import { defineHeadlessProvider, loadRenderConfig, postHeadlessSyncPayload } from '../headlessFramework'
+import { MANUAL_TAKEOVER_ADVICE } from '@/utils/noteWriteOwnership'
 
 const CTX = { projectId: 'p1', year: 2025, variant: 'soe' as const, wpId: 'wp1', wpCode: 'X1', applicableStandards: ['soe_standalone'] }
 const RESPONSES = [{ item_id: 'X1-a', remark: '5', conclusion: null }, { item_id: 'Y1-b', remark: '9', conclusion: null }]
@@ -109,6 +110,18 @@ describe('postHeadlessSyncPayload / loadRenderConfig', () => {
     expect((await postHeadlessSyncPayload('p1', { section_id: '八、5' })).skipped).toBe('附注 八、5 标记了整节人工覆盖，未写入')
     h.post.mockResolvedValueOnce({ data: { section_id: '八、5', rows_synced: 4, push_kept: [{}, {}] } })
     expect(await postHeadlessSyncPayload('p1', { section_id: '八、5' })).toEqual({ section: '八、5', rows: 4, kept: 2 })
+  })
+
+  it('写入归属 manual 策略：后端拒绝接管从未同步、已有人工填写的章节 ⇒ 跳过并写明（spec formula-writer-ownership-and-stale §13）', async () => {
+    h.post.mockResolvedValueOnce({ data: {
+      section_id: '八、5', skipped: true, reason: 'manual_values_never_synced', rows_synced: 0,
+      blocked_writes: [{ section: '八、5', table: '*', field: 'table.sub_table_data', writer_id: 'workpaper_sync',
+        owner_id: 'manual_editor', reason_code: 'manual_values_never_synced', reason: 'x' }],
+    } })
+    const res = await postHeadlessSyncPayload('p1', { section_id: '八、5' })
+    expect(res.rows).toBe(0)
+    expect(res.skipped).toContain('从未由底稿同步、已有人工填写')
+    expect(res.skipped).toContain(MANUAL_TAKEOVER_ADVICE)
   })
 
   it('渲染配置取不到回 null（provider 按 Tab 加载失败的同一兜底）', async () => {

@@ -109,11 +109,12 @@ def classify_deployment(*, endpoint_url: str | None, ocr_protocol: str | None = 
 
 
 def active_route_indexes() -> tuple[Index, ...]:
-    """启用唯一约束（与 V197 逐条一致）。
+    """启用唯一约束（前三条与 V197 逐条一致，rerank 一条与 V262 一致）。
 
     - chat：本机、服务器各最多一条启用；
     - embedding：只一条启用（向量必须同一模型，不跨模型兜底）；
-    - ocr：每个能力槽本机、服务器各最多一条启用。
+    - ocr：每个能力槽本机、服务器各最多一条启用；
+    - rerank：本机、服务器各最多一条启用（分数只在单次调用内比较，可以兜底）。
     """
     def _where(model_type: str) -> dict[str, object]:
         return {
@@ -137,5 +138,9 @@ def active_route_indexes() -> tuple[Index, ...]:
         Index(
             "uq_ai_model_config_active_ocr_route", "ocr_capability", "deployment",
             unique=True, **_where("ocr"),
+        ),
+        Index(
+            "uq_ai_model_config_active_rerank_route", "model_type", "deployment",
+            unique=True, **_where("rerank"),
         ),
     )

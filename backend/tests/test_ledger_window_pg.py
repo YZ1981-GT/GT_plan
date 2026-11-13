@@ -195,10 +195,12 @@ async def test_v2_credit_opening_is_converted_to_signed_basis(ledger_world) -> N
 async def test_auxiliary_window_requires_one_dimension_and_does_not_double_count(ledger_world) -> None:
     db, ids, _ = ledger_world
     service = LedgerWindowService(db)
-    with pytest.raises(HTTPException) as exc:
-        await service.fetch("aux_ledger", ids["project"], "user-a",
-                            LedgerWindowQuery(year=YEAR, account_code="1002", limit=10))
-    assert exc.value.detail["error_code"] == "AUX_TYPE_REQUIRED"
+    # 未选辅助类型 = 浏览模式：能返回各维度明细，但期初不加总、带提示，避免跨维度重复累计
+    browse = await service.fetch("aux_ledger", ids["project"], "user-a",
+                                 LedgerWindowQuery(year=YEAR, account_code="1002", limit=10))
+    assert browse.summary.annual_opening_signed == "0.00"
+    assert any("浏览模式" in w for w in browse.summary.warnings)
+    assert len({row["aux_type"] for row in browse.entries}) >= 1
 
     result = await service.fetch(
         "aux_ledger", ids["project"], "user-a",
@@ -209,6 +211,85 @@ async def test_auxiliary_window_requires_one_dimension_and_does_not_double_count
     assert result.summary.annual_opening_signed == "100.00"
     assert result.entries[-1]["running_balance_signed"] == "107.00"
     assert all(row["aux_type"] == "客户" for row in result.entries)
+
+
+@pytest.mark.asyncio
+async def test_all_accounts_browse_returns_rows_without_opening(ledger_world) -> None:
+    db, ids, _ = ledger_world
+    service = LedgerWindowService(db)
+    result = await service.fetch(
+        "ledger", ids["project"], "user-a",
+        LedgerWindowQuery(year=YEAR, account_code="*", limit=50),
+    )
+    assert result.summary.total > 0
+    assert result.summary.annual_opening_signed == "0.00"
+    assert len(result.entries) == result.summary.total or result.page.has_more
+
+
+@pytest.mark.asyncio
+async def test_browse_mode_filters_are_pushed_down_and_match_scoped_results(ledger_world) -> None:
+    """浏览模式（科目通配）的关键字 / 借贷方向筛选，总数与合计必须只统计命中行：
+    等于夹具里两个科目（1002、2202）各自指定科目结果之和，分录 id 集合也一致。"""
+    db, ids, _ = ledger_world
+    service = LedgerWindowService(db)
+    for extra in ({"keyword": "可见"}, {"amount_dir": "debit"}, {"amount_dir": "credit"}):
+        parts = [
+            await service.fetch("ledger", ids["project"], "u",
+                                LedgerWindowQuery(year=YEAR, account_code=code, limit=50, **extra))
+            for code in ("1002", "2202")
+        ]
+        browse = await service.fetch("ledger", ids["project"], "u",
+                                     LedgerWindowQuery(year=YEAR, account_code="*", limit=50, **extra))
+        assert browse.summary.total == sum(p.summary.total for p in parts), extra
+        assert Decimal(browse.summary.debit_total) == sum(Decimal(p.summary.debit_total) for p in parts), extra
+        assert Decimal(browse.summary.credit_total) == sum(Decimal(p.summary.credit_total) for p in parts), extra
+        assert {e["id"] for e in browse.entries} == {e["id"] for p in parts for e in p.entries}, extra
+    nothing = await service.fetch("ledger", ids["project"], "u",
+                                  LedgerWindowQuery(year=YEAR, account_code="*", keyword="绝不存在的词", limit=50))
+    assert nothing.summary.total == 0 and nothing.entries == []
+
+
+class _MemSummaryCache:
+    def __init__(self):
+        self.store: dict = {}
+
+    async def get(self, key):
+        return self.store.get(key)
+
+    async def set(self, key, value):
+        self.store[key] = value
+
+
+@pytest.mark.asyncio
+async def test_browse_summary_cache_is_shared_across_users_and_page_sizes(ledger_world, monkeypatch) -> None:
+    db, ids, _ = ledger_world
+    cache = _MemSummaryCache()
+    service = LedgerWindowService(db, summary_cache=cache)
+    calls = {"n": 0}
+    original = LedgerWindowService._summary
+
+    async def counting(self, *a, **kw):
+        calls["n"] += 1
+        return await original(self, *a, **kw)
+
+    monkeypatch.setattr(LedgerWindowService, "_summary", counting)
+
+    first = await service.fetch("ledger", ids["project"], "user-a",
+                                LedgerWindowQuery(year=YEAR, account_code="*", limit=10))
+    other = await service.fetch("ledger", ids["project"], "user-b",           # 另一个用户、另一个页大小
+                                LedgerWindowQuery(year=YEAR, account_code="*", limit=3))
+    assert calls["n"] == 1, "浏览模式摘要应只算一次并被复用"
+    assert other.summary.total == first.summary.total and len(other.entries) <= 3
+    assert other.page.next_cursor, "命中缓存时分页游标仍须正常签发"
+
+    await service.fetch("ledger", ids["project"], "user-a",
+                        LedgerWindowQuery(year=YEAR, account_code="*", limit=10, keyword="可见"))
+    assert calls["n"] == 2, "筛选条件不同必须重算"
+
+    # 指定科目（非浏览模式）不走长效缓存
+    await service.fetch("ledger", ids["project"], "user-a", LedgerWindowQuery(year=YEAR, account_code="1002", limit=10))
+    await service.fetch("ledger", ids["project"], "user-a", LedgerWindowQuery(year=YEAR, account_code="1002", limit=10))
+    assert calls["n"] == 4
 
 
 @pytest.mark.asyncio
@@ -296,3 +377,52 @@ async def test_no_active_dataset_fails_visible_instead_of_reading_all_versions(l
         )
     assert exc.value.status_code == 409
     assert exc.value.detail["error_code"] == "LEDGER_ACTIVE_DATASET_REQUIRED"
+
+
+async def _export_rows(db, kind, project, query):
+    chunks, _name, exported = await build_ledger_export(db, kind, project, query)
+    raw = bytearray()
+    async for chunk in chunks:
+        raw.extend(chunk)
+    sheet = load_workbook(io.BytesIO(bytes(raw)), read_only=True).worksheets[0]
+    return [list(r) for r in sheet.iter_rows(values_only=True)], exported
+
+
+@pytest.mark.asyncio
+async def test_aux_export_without_aux_type_does_not_crash_and_has_no_balance_columns(ledger_world) -> None:
+    """回归：去掉「必须先选辅助类型」后，导出曾因残留的 unreachable 分支返回 500。"""
+    db, ids, _ = ledger_world
+    rows, exported = await _export_rows(db, "aux_ledger", ids["project"],
+                                        LedgerWindowQuery(year=YEAR, account_code="*"))
+    header = rows[0]
+    assert "余额" not in header and "余额方向" not in header
+    assert header[:5] == ["日期", "凭证号", "科目编码", "科目名称", "摘要"]
+    assert "辅助类型" in header
+    assert exported == len(rows) - 1                      # 浏览模式没有期初行 / 月合计行
+    assert not any(str(r[4] or "").endswith("合计") for r in rows[1:])
+
+
+@pytest.mark.asyncio
+async def test_scoped_export_keeps_balance_columns_and_opening_row(ledger_world) -> None:
+    db, ids, _ = ledger_world
+    rows, _ = await _export_rows(db, "ledger", ids["project"],
+                                 LedgerWindowQuery(year=YEAR, account_code="1002"))
+    assert rows[0][:7] == ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "余额方向"]
+    assert rows[1][2] == "范围期初余额"
+
+
+@pytest.mark.asyncio
+async def test_export_over_row_cap_is_rejected_with_413(ledger_world, monkeypatch) -> None:
+    from app.services import ledger_window_export as export_mod
+
+    db, ids, _ = ledger_world
+    monkeypatch.setattr(export_mod, "LEDGER_EXPORT_MAX_ROWS", 2)
+    with pytest.raises(HTTPException) as exc:
+        await build_ledger_export(db, "ledger", ids["project"], LedgerWindowQuery(year=YEAR, account_code="*"))
+    assert exc.value.status_code == 413
+    assert exc.value.detail["error_code"] == "LEDGER_EXPORT_TOO_LARGE"
+    assert exc.value.detail["max_rows"] == 2 and exc.value.detail["row_count"] > 2
+    # 缩小到上限以内（按科目）可以导出
+    rows, exported = await _export_rows(db, "ledger", ids["project"],
+                                        LedgerWindowQuery(year=YEAR, account_code="2202"))
+    assert exported == 2

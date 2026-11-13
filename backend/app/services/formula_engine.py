@@ -71,6 +71,24 @@ class FormulaResult:
     warnings: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)  # 取数轨迹（审计用）
     blocked: bool = False  # 含非白名单函数/危险标识/外链（P0-项2）
+    failure_kind: str | None = None  # None / business / technical；不按展示文案分类
+    technical_error: Exception | None = field(default=None, repr=False, compare=False)
+
+    def record_error(self, error: Exception, message: str | None = None) -> None:
+        """保留异常对象与显式 cause 链；展示错误和重试分类相互独立。"""
+        self.value = None
+        self.errors.append(str(error) if message is None else message)
+        if formula_technical_error(error):
+            self.failure_kind = "technical"
+            if self.technical_error is None:
+                self.technical_error = error
+        elif self.failure_kind != "technical":
+            self.failure_kind = "business"
+
+    def raise_for_technical_error(self) -> None:
+        """strict 边界调用：重抛实际捕获对象，保留其 traceback / __cause__。"""
+        if self.technical_error is not None:
+            raise self.technical_error
 
     @property
     def ok(self) -> bool:
@@ -99,10 +117,10 @@ class FormulaContext:
     """
     # 科目编码 → {列名: 金额}（试算表 TB / SUM_TB，支持多列取数）
     tb_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
-    # 行次编码 → 已计算值（供 ROW/SUM_ROW/REPORT 引用）
-    row_cache: dict[str, Decimal] = field(default_factory=dict)
-    # 上期报表行次编码 → 金额（供 REPORT('行次','上期') 引用）
-    prior_row_cache: dict[str, Decimal] = field(default_factory=dict)
+    # 行次编码 → 来源快照（保留 NULL/原值，在实际引用时校验，不把缺数转成零）
+    row_cache: dict[str, Any] = field(default_factory=dict)
+    # 上期报表行次编码 → 来源快照（供 REPORT('行次','上期') 引用）
+    prior_row_cache: dict[str, Any] = field(default_factory=dict)
     # 上年科目数据（供 PREV 两参引用）
     prior_tb_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # PREV 三参（上年同底稿取数）预载值：(底稿, 表, 字段) → 值；取不到的原因另存，L1 据此报错、不按 0
@@ -133,6 +151,8 @@ class FormulaContext:
     ledger_count_data: dict[str, int] = field(default_factory=dict)
     # TB_AUX 汇总：key = "{account}:{aux_type}:{column}" → Decimal
     tb_aux_data: dict[str, Decimal] = field(default_factory=dict)
+    # 仅 execute(strict=True) 的复制快照启用；默认保持旧来源取值策略。
+    strict: bool = False
 
     # ── 便捷构造方法 ──
     @classmethod
@@ -167,7 +187,7 @@ class FormulaContext:
         prior_data = {}
         if prior_map:
             prior_data = {code: {"期末余额": val} for code, val in prior_map.items()}
-        rc = {k: Decimal(str(v)) for k, v in (row_cache or {}).items()}
+        rc = dict(row_cache or {})
         return cls(
             tb_data=tb_data,
             row_cache=rc,
@@ -242,6 +262,43 @@ class FormulaEvalError(Exception):
     与 :class:`FormulaColumnError` 同处捕获、记入 ``FormulaResult.errors``；失败结果的
     ``value`` 为 ``None``，调用方必须先判 ``ok``，不能把失败伪装成 0。
     """
+
+
+class FormulaBusinessError(FormulaEvalError):
+    """在已知校验边界产生的业务失败；其转换 cause 不是重试信号。"""
+
+
+def formula_technical_error(error: Exception) -> bool:
+    """只按类型和显式 cause 判定，绝不按中文文案或笼统 ValueError 分类。"""
+    seen: set[int] = set()
+    current: BaseException = error
+    while id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, FormulaBusinessError):
+            return False
+        if not isinstance(current, (FormulaParseError, FormulaColumnError, FormulaEvalError)):
+            return True
+        if current.__cause__ is None:
+            return False
+        current = current.__cause__
+    return True  # 损坏的循环 cause 链不能伪装成正常业务失败
+
+
+def formula_number(value: Any, source: str) -> Decimal:
+    """引用值必须是有限数值；NULL、空白、布尔值不等于合法的零。"""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise FormulaBusinessError(f"{source}：来源数值为空（NULL 或空白）")
+    if isinstance(value, bool):
+        raise FormulaBusinessError(f"{source}：布尔值不是金额")
+    # 对象自身的 __str__ 故障不是金额格式错误，必须保留给 strict 重试边界。
+    raw = value if isinstance(value, Decimal) else str(value)
+    try:
+        number = raw if isinstance(raw, Decimal) else Decimal(raw)
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise FormulaBusinessError(f"{source}：来源不是有效数值") from exc
+    if not number.is_finite():
+        raise FormulaBusinessError(f"{source}：来源不是有限数值")
+    return number
 
 
 def _resolve_tb_column(
@@ -319,273 +376,25 @@ class AddressValidator(Protocol):
         ...
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 递归下降 AST 解析层（Task 3：从 formula_parse_utils 并入）
-# ═══════════════════════════════════════════════════════════════════════════════
-# AST 节点定义 + 词法分析 + 递归下降 Parser
-# 对嵌套 PREV(TB(...)) / IF(TB>0, ROW, 0) 等比 regex 更严谨
-
-# ─── AST 节点 ────────────────────────────────────────────────────────────────
-
-@dataclass
-class ASTNumber:
-    """数字字面量"""
-    value: Decimal
-
-
-@dataclass
-class ASTString:
-    """字符串字面量"""
-    value: str
-
-
-@dataclass
-class ASTFuncCall:
-    """函数调用节点"""
-    name: str
-    args: list[Any]  # list of AST nodes
-
-
-@dataclass
-class ASTBinOp:
-    """二元运算节点"""
-    op: str  # +, -, *, /
-    left: Any
-    right: Any
-
-
-@dataclass
-class ASTUnary:
-    """一元运算节点"""
-    op: str  # -
-    operand: Any
-
-
-@dataclass
-class ASTRowRef:
-    """行引用节点：ROW('BS-002')"""
-    row_code: str
-
-
-@dataclass
-class ASTRangeSum:
-    """范围求和节点：SUM(CN-002:CN-010)"""
-    start_code: str
-    end_code: str
-
-
-@dataclass
-class ASTCompare:
-    """比较运算节点（用于 IF 条件）"""
-    op: str  # >, <, >=, <=, ==, !=
-    left: Any
-    right: Any
-
-
-# ─── 词法分析 ────────────────────────────────────────────────────────────────
-
-_AST_TOKEN_PATTERNS = [
-    ('NUMBER',   r'\d+\.?\d*'),
-    ('STRING',   r"'[^']*'"),
-    ('DSTRING',  r'"[^"]*"'),  # spec: formula-management-deep-optimization P2-8 双引号字符串
-    ('FUNC',     r'[A-Z_][A-Z_0-9]*(?=\s*\()'),
-    ('IDENT',    r'[A-Za-z_][A-Za-z_0-9\-]*'),
-    ('LPAREN',   r'\('),
-    ('RPAREN',   r'\)'),
-    ('COMMA',    r','),
-    ('COLON',    r':'),
-    ('GTE',      r'>='),
-    ('LTE',      r'<='),
-    ('NEQ',      r'!='),
-    ('EQ',       r'=='),
-    ('GT',       r'>'),
-    ('LT',       r'<'),
-    ('PLUS',     r'\+'),
-    ('MINUS',    r'-'),
-    ('STAR',     r'\*'),
-    ('SLASH',    r'/'),
-    ('WS',       r'\s+'),
-]
-
-_AST_TOKEN_RE = re.compile('|'.join(f'(?P<{name}>{pattern})' for name, pattern in _AST_TOKEN_PATTERNS))
-
-
-@dataclass
-class _Token:
-    type: str
-    value: str
-    pos: int
-
-
-def _tokenize(formula: str) -> list[_Token]:
-    """词法分析：将公式字符串拆分为 token 列表。"""
-    tokens: list[_Token] = []
-    for m in _AST_TOKEN_RE.finditer(formula):
-        kind = m.lastgroup
-        if kind == 'WS':
-            continue
-        tokens.append(_Token(type=kind, value=m.group(), pos=m.start()))
-    return tokens
-
-
-# ─── 语法分析（递归下降） ─────────────────────────────────────────────────────
-
-class FormulaParseError(Exception):
-    """公式解析错误"""
-    pass
-
-
-class FormulaBlockedError(Exception):
-    """公式含非白名单内容（未注册函数 / eval/exec / URL / 外链）——被拦截（P0-项2）。
-
-    与 ``FormulaParseError``（结构坏=damaged）区分：blocked 是**结构合法但语义越权/未授权**。
-    引擎据此把 ``FormulaResult.blocked`` 置 True（不静默返 0 冒充正常）。
-    """
-    pass
-
-
-class _RecursiveDescentParser:
-    """递归下降解析器：expression → comparison → term → factor → atom
-
-    相比旧 regex token 替换，能正确处理：
-    - 嵌套函数调用 PREV(TB('1002','期末余额'))
-    - IF 条件中的比较运算 IF(TB('1002','期末余额')>0, ...)
-    - 任意深度括号嵌套
-    """
-
-    def __init__(self, tokens: list[_Token]):
-        self.tokens = tokens
-        self.pos = 0
-
-    def peek(self) -> _Token | None:
-        return self.tokens[self.pos] if self.pos < len(self.tokens) else None
-
-    def consume(self, expected_type: str | None = None) -> _Token:
-        tok = self.peek()
-        if tok is None:
-            raise FormulaParseError("Unexpected end of formula")
-        if expected_type and tok.type != expected_type:
-            raise FormulaParseError(
-                f"Expected {expected_type}, got {tok.type} '{tok.value}' at pos {tok.pos}"
-            )
-        self.pos += 1
-        return tok
-
-    def parse(self) -> Any:
-        result = self.comparison()
-        if self.pos < len(self.tokens):
-            tok = self.tokens[self.pos]
-            raise FormulaParseError(f"Unexpected token '{tok.value}' at pos {tok.pos}")
-        return result
-
-    def comparison(self) -> Any:
-        """comparison = expression (('>' | '<' | '>=' | '<=' | '==' | '!=') expression)?"""
-        left = self.expression()
-        if self.peek() and self.peek().type in ('GT', 'LT', 'GTE', 'LTE', 'EQ', 'NEQ'):
-            op_tok = self.consume()
-            right = self.expression()
-            return ASTCompare(op=op_tok.value, left=left, right=right)
-        return left
-
-    def expression(self) -> Any:
-        """expression = term (('+' | '-') term)*"""
-        left = self.term()
-        while self.peek() and self.peek().type in ('PLUS', 'MINUS'):
-            op = self.consume().value
-            right = self.term()
-            left = ASTBinOp(op=op, left=left, right=right)
-        return left
-
-    def term(self) -> Any:
-        """term = factor (('*' | '/') factor)*"""
-        left = self.factor()
-        while self.peek() and self.peek().type in ('STAR', 'SLASH'):
-            op = self.consume().value
-            right = self.factor()
-            left = ASTBinOp(op=op, left=left, right=right)
-        return left
-
-    def factor(self) -> Any:
-        """factor = ['-'] atom"""
-        if self.peek() and self.peek().type == 'MINUS':
-            self.consume()
-            operand = self.atom()
-            return ASTUnary(op='-', operand=operand)
-        return self.atom()
-
-    def atom(self) -> Any:
-        """atom = NUMBER | STRING | func_call | '(' comparison ')' | IDENT"""
-        tok = self.peek()
-        if tok is None:
-            raise FormulaParseError("Unexpected end of formula")
-
-        if tok.type == 'NUMBER':
-            self.consume()
-            return ASTNumber(value=Decimal(tok.value))
-
-        if tok.type == 'STRING':
-            self.consume()
-            return ASTString(value=tok.value.strip("'"))
-
-        if tok.type == 'DSTRING':
-            self.consume()
-            return ASTString(value=tok.value.strip('"'))
-
-        if tok.type == 'FUNC':
-            return self._func_call()
-
-        if tok.type == 'LPAREN':
-            self.consume()
-            expr = self.comparison()
-            self.consume('RPAREN')
-            return expr
-
-        if tok.type == 'IDENT':
-            self.consume()
-            # 检查是否是范围引用 IDENT:IDENT（如 CN-002:CN-010）
-            if self.peek() and self.peek().type == 'COLON':
-                self.consume()
-                end_tok = self.consume('IDENT')
-                return ASTRangeSum(start_code=tok.value, end_code=end_tok.value)
-            return ASTRowRef(row_code=tok.value)
-
-        raise FormulaParseError(f"Unexpected token '{tok.value}' ({tok.type}) at pos {tok.pos}")
-
-    def _func_call(self) -> Any:
-        """func_call = FUNC '(' [arg (',' arg)*] ')'"""
-        name_tok = self.consume('FUNC')
-        self.consume('LPAREN')
-        args: list[Any] = []
-        if self.peek() and self.peek().type != 'RPAREN':
-            args.append(self.comparison())
-            while self.peek() and self.peek().type == 'COMMA':
-                self.consume()
-                args.append(self.comparison())
-        self.consume('RPAREN')
-
-        # 特殊处理 SUM(range)
-        if name_tok.value == 'SUM' and len(args) == 1 and isinstance(args[0], ASTRangeSum):
-            return args[0]
-
-        # 特殊处理 ROW('code')
-        if name_tok.value == 'ROW' and len(args) == 1 and isinstance(args[0], ASTString):
-            return ASTRowRef(row_code=args[0].value)
-
-        return ASTFuncCall(name=name_tok.value, args=args)
-
-
-@lru_cache(maxsize=2048)
-def parse_to_ast(formula: str) -> Any:
-    """解析公式字符串为 AST（内核 parse 层入口）。
-
-    解析结果可缓存（同公式不重复解析）。
-    AST 节点构造后从不修改字段，可安全共享。
-    """
-    tokens = _tokenize(formula)
-    if not tokens:
-        raise FormulaParseError("Empty formula")
-    parser = _RecursiveDescentParser(tokens)
-    return parser.parse()
+# 递归下降 AST 解析层已拆到 formula_ast_parse（行数门）；这里原样再导出，调用方不变。
+from app.services.formula_ast_parse import (  # noqa: E402,F401
+    ASTBinOp,
+    ASTCompare,
+    ASTFuncCall,
+    ASTNumber,
+    ASTRangeSum,
+    ASTRowRef,
+    ASTString,
+    ASTUnary,
+    FormulaBlockedError,
+    FormulaParseError,
+    _AST_TOKEN_PATTERNS,
+    _AST_TOKEN_RE,
+    _RecursiveDescentParser,
+    _Token,
+    _tokenize,
+    parse_to_ast,
+)
 
 
 @lru_cache(maxsize=2048)
@@ -602,9 +411,11 @@ def _eval_ast(node: Any, ctx: FormulaContext, trace: list[str]) -> Decimal:
     所有数据从 FormulaContext 取，与旧 regex 路径语义对齐。
     """
     if isinstance(node, ASTNumber):
-        return node.value
+        return formula_number(node.value, "数字字面量") if ctx.strict else node.value
 
     if isinstance(node, ASTString):
+        if ctx.strict:
+            return formula_number(node.value, "字符串字面量")
         # 字符串字面量尝试转 Decimal（兼容 formula_parser 行为）
         try:
             return Decimal(node.value)
@@ -654,10 +465,7 @@ def _eval_ast(node: Any, ctx: FormulaContext, trace: list[str]) -> Decimal:
         return val
 
     if isinstance(node, ASTRangeSum):
-        total = Decimal("0")
-        for code, rv in ctx.row_cache.items():
-            if node.start_code <= code <= node.end_code:
-                total += rv
+        total = _row_range_value(ctx, node.start_code, node.end_code)
         trace.append(f"SUM({node.start_code}:{node.end_code}) = {total}")
         return total
 
@@ -684,10 +492,18 @@ def _eval_func_node(node: ASTFuncCall, ctx: FormulaContext, trace: list[str]) ->
 
 
 def _row_value(ctx: FormulaContext, row_code: str) -> Decimal:
-    """ROW 取值（AST 两种节点与正则路径共用）：``row_cache`` 无此键 ⇒ :class:`FormulaEvalError`（原先按 0）。"""
+    """ROW 两种解析路径共用：缺行、NULL 和非法金额均明确失败。"""
     if row_code not in ctx.row_cache:
         raise FormulaEvalError(f"ROW('{row_code}')：引用的行次不存在或尚未计算")
-    return ctx.row_cache[row_code]
+    return formula_number(ctx.row_cache[row_code], f"ROW('{row_code}')")
+
+
+def _row_range_value(ctx: FormulaContext, start_code: str, end_code: str) -> Decimal:
+    """范围内每个现有来源都必须有效；空范围也不是有证据的零。"""
+    codes = [code for code in ctx.row_cache if start_code <= code <= end_code]
+    if not codes:
+        raise FormulaEvalError(f"SUM_ROW('{start_code}','{end_code}')：范围内无报表来源行")
+    return sum((_row_value(ctx, code) for code in codes), Decimal("0"))
 
 
 def _report_value(row_code: str, period_raw: str, ctx: FormulaContext) -> Decimal:
@@ -706,7 +522,7 @@ def _report_value(row_code: str, period_raw: str, ctx: FormulaContext) -> Decima
         raise FormulaEvalError(
             f"REPORT('{row_code}','{period_raw}')：报表行不存在或未生成：{row_code}"
         )
-    return cache[row_code]
+    return formula_number(cache[row_code], f"REPORT('{row_code}','{period_raw}')")
 
 
 def _extract_string_args(args: list[Any], ctx: FormulaContext, trace: list[str]) -> list[str]:
@@ -768,11 +584,17 @@ class FunctionRegistry:
             category: 分类（取数/引用/数学/逻辑/自定义）
         """
         self._handlers[name] = handler
+        # 内置函数的参数个数 / 写法以函数目录为单一真源（S1 ADR-FGR-01）；这里手写的值只用于目录外的自定义函数，
+        # 否则注册表与 FORMULA_ARITY / 求值期校验各说各话（如 TB 已支持单参，注册表仍写 2）。
+        from app.services.formula_function_catalog import FUNCTIONS
+
+        spec = next((f for f in FUNCTIONS if f.name == name and "l1" in f.engines), None)
         self._metadata[name] = {
             "name": name,
-            "arity": arity,
+            "arity": spec.arity_min if spec is not None else arity,
+            "arity_max": spec.arity_max if spec is not None else arity,
             "description": description,
-            "syntax": syntax,
+            "syntax": spec.syntax if spec is not None and spec.syntax else syntax,
             "category": category,
         }
 
@@ -860,6 +682,8 @@ def _handle_tb(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decima
         raise FormulaColumnError(
             f"TB('{code}','{col_name}')：列名「{col_name}」未注册，无法取值"
         )
+    if ctx.strict:
+        val = formula_number(val, f"TB('{code}','{col_name}')")
     trace.append(f"TB('{code}','{col_name}') = {val}")
     return val
 
@@ -904,7 +728,8 @@ def _sum_tb_value(ctx: FormulaContext, code_range: str, col_name: str, sink: lis
     """
     precomputed = ctx.tb_data.get(code_range)
     if precomputed is not None:
-        return _resolve_tb_column(precomputed, col_name, code=code_range, trace=sink)
+        value = _resolve_tb_column(precomputed, col_name, code=code_range, trace=sink)
+        return formula_number(value, f"SUM_TB('{code_range}','{col_name}')") if ctx.strict else value
     val = Decimal("0")
     parts = code_range.split("~")
     if len(parts) == 2:
@@ -912,7 +737,8 @@ def _sum_tb_value(ctx: FormulaContext, code_range: str, col_name: str, sink: lis
         prefix_len = len(start)
         for code, data in ctx.tb_data.items():
             if "~" not in code and start <= code[:prefix_len] <= end:
-                val += _resolve_tb_column(data, col_name, code=code, trace=sink)
+                value = _resolve_tb_column(data, col_name, code=code, trace=sink)
+                val += formula_number(value, f"TB('{code}','{col_name}')") if ctx.strict else value
     return val
 
 
@@ -930,10 +756,7 @@ def _handle_sum_row(args: list[Any], ctx: FormulaContext, trace: list[str]) -> D
     str_args = _extract_string_args(args, ctx, trace)
     start_code = str_args[0] if str_args else ''
     end_code = str_args[1] if len(str_args) > 1 else ''
-    val = Decimal("0")
-    for code, rv in ctx.row_cache.items():
-        if start_code <= code <= end_code:
-            val += rv
+    val = _row_range_value(ctx, start_code, end_code)
     trace.append(f"SUM_ROW('{start_code}','{end_code}') = {val}")
     return val
 
@@ -977,7 +800,12 @@ def _prev_value(str_args: list[str], ctx: FormulaContext, trace: list[str]) -> D
         col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
         if is_unregistered_column(col_name):
             raise FormulaColumnError(f"PREV('{code}','{col_name}')：列名「{col_name}」未注册，无法取值")
-        val = _resolve_tb_column(ctx.prior_tb_data.get(code, {}), col_name, code=code, trace=trace)
+        prior_data = ctx.prior_tb_data.get(code, {})
+        if ctx.strict and COLUMN_ALIASES[col_name] not in prior_data:
+            raise FormulaBusinessError(f"PREV({shown})：上年来源未预载")
+        val = _resolve_tb_column(prior_data, col_name, code=code, trace=trace)
+    if ctx.strict:
+        val = formula_number(val, f"PREV({shown})")
     trace.append(f"PREV({shown}) = {val}")
     return val
 
@@ -998,9 +826,13 @@ def _aux_value(str_args: list[str], ctx: FormulaContext) -> Decimal:
     account_data = ctx.aux_data.get(account, {})
     key = aux_ref_key(str_args)
     if key in account_data:
-        return account_data[key]
-    dimension = str_args[1] if len(str_args) > 1 else ''
-    return account_data.get(dimension, Decimal("0"))
+        val = account_data[key]
+    else:
+        dimension = str_args[1] if len(str_args) > 1 else ''
+        if ctx.strict and dimension not in account_data:
+            raise FormulaBusinessError(f"AUX({','.join(repr(a) for a in str_args)})：来源未预载")
+        val = account_data.get(dimension, Decimal("0"))
+    return formula_number(val, "AUX") if ctx.strict else val
 
 
 def _handle_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
@@ -1038,9 +870,13 @@ def _handle_adj(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decim
     try:
         norm_type = normalize_adj_type(raw_type)
     except ValueError as exc:
+        if ctx.strict:
+            raise FormulaBusinessError(f"ADJ('{code}','{raw_type}')：{exc}") from exc
         raise FormulaColumnError(f"ADJ('{code}','{raw_type}')：{exc}") from exc
 
     val = ctx.adj_data.get(code, {}).get(f"{norm_type}_net", Decimal("0"))
+    if ctx.strict:
+        val = formula_number(val, f"ADJ('{code}','{raw_type}')")
     trace.append(f"ADJ('{code}','{raw_type}') = {val}")
     return val
 
@@ -1062,7 +898,11 @@ def _handle_note(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Deci
     column = str_args[2] if len(str_args) > 2 else ''
     section_data = ctx.note_data.get(section, {})
     key = note_value_key(field_name, column)
+    if ctx.strict and key not in section_data and field_name not in section_data:
+        raise FormulaBusinessError(f"NOTE('{section}','{field_name}','{column}')：来源未预载")
     val = section_data[key] if key in section_data else section_data.get(field_name, Decimal("0"))
+    if ctx.strict:
+        val = formula_number(val, f"NOTE('{section}','{field_name}','{column}')")
     trace.append(f"NOTE('{section}','{field_name}','{column or ctx.default_column}') = {val}")
     return val
 
@@ -1076,14 +916,19 @@ def _handle_wp(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decima
         key = f"{str_args[1].strip()}!{str_args[2].strip()}"
         if key not in wp_data:
             raise FormulaColumnError(f"WP('{wp_code}','{str_args[1]}','{str_args[2]}')：锚点未对齐或底稿未录入，取不到数")
-        trace.append(f"WP('{wp_code}','{key}') = {wp_data[key]}")
-        return wp_data[key]
+        val = wp_data[key]
+        if ctx.strict:
+            val = formula_number(val, f"WP('{wp_code}','{key}')")
+        trace.append(f"WP('{wp_code}','{key}') = {val}")
+        return val
     col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
     col = (col_name or "").strip()
-    if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
-        val = wp_data.get(col.upper(), wp_data.get(col_name, Decimal("0")))
-    else:
-        val = wp_data.get(col_name, Decimal("0"))
+    key = col.upper() if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE) and col.upper() in wp_data else col_name
+    if ctx.strict and key not in wp_data:
+        raise FormulaBusinessError(f"WP('{wp_code}','{col_name}')：来源未预载")
+    val = wp_data.get(key, Decimal("0"))
+    if ctx.strict:
+        val = formula_number(val, f"WP('{wp_code}','{col_name}')")
     trace.append(f"WP('{wp_code}','{col_name}') = {val}")
     return val
 
@@ -1216,7 +1061,7 @@ def safe_eval_expr(expr: str) -> Decimal:
     try:
         tree = ast.parse(text, mode="eval")
     except (SyntaxError, ValueError, RecursionError) as exc:
-        raise FormulaEvalError(f"算术表达式语法错误：{text[:200]}") from exc
+        raise FormulaBusinessError(f"算术表达式语法错误：{text[:200]}") from exc
     if problem := ast_budget_problem(tree, ast.iter_child_nodes):
         raise FormulaEvalError(problem)
 
@@ -1292,7 +1137,7 @@ def execute_formula(
     return result.value
 
 
-def execute(formula: str | None, ctx: FormulaContext) -> FormulaResult:
+def execute(formula: str | None, ctx: FormulaContext, *, strict: bool = False) -> FormulaResult:
     """L1 内核唯一求值入口（Single Kernel Entry Point）。
 
     契约（需求 3.3/3.4 · 属性 Q2）：
@@ -1312,15 +1157,24 @@ def execute(formula: str | None, ctx: FormulaContext) -> FormulaResult:
         result.value = Decimal("0")
         return result
 
-    mode = _PARSE_MODE
-
-    if mode == "regex":
-        return _execute_regex(formula, ctx)
-    elif mode == "ast":
-        return _execute_ast(formula, ctx)
-    else:
-        # parallel 模式：并行跑 diff，一致后用 AST 结果
-        return _execute_parallel(formula, ctx)
+    # 不修改调用者快照；strict 只作用于本次求值。
+    if strict:
+        from dataclasses import replace
+        ctx = replace(ctx, strict=True)
+    try:
+        if _PARSE_MODE == "regex":
+            result = _execute_regex(formula, ctx)
+        elif _PARSE_MODE == "ast":
+            result = _execute_ast(formula, ctx)
+        else:
+            result = _execute_parallel(formula, ctx, strict=strict)
+    except Exception as exc:
+        if not strict:
+            raise  # 保留旧入口未捕获异常的行为
+        result.record_error(exc)
+    if strict:
+        result.raise_for_technical_error()
+    return result
 
 
 def _is_blocked_formula(formula: str | None) -> bool:
@@ -1347,6 +1201,16 @@ def _is_blocked_formula(formula: str | None) -> bool:
     return False
 
 
+def _blocked_reason(formula: str) -> str:
+    """被拦截的原因：点名第一个未注册函数；否则是危险内容 / 外链（与 ``_is_blocked_formula`` 同一判据）。"""
+    import re as _re
+    known = _REGISTRY.known_function_names()
+    for m in _re.finditer(r"([A-Za-z_][A-Za-z_0-9]*)\s*\(", formula.strip()):
+        if m.group(1) not in known:
+            return f"未注册的函数：{m.group(1)}()"
+    return "公式含非白名单内容（eval/exec/URL/外链），已拦截"
+
+
 def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
     """新 AST 递归下降求值路径。
 
@@ -1355,42 +1219,86 @@ def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
     失败结果保持 ``value=None``，成功求值才写入 Decimal 值。
     """
     result = FormulaResult()
-    # ── blocked 前置判定（结构合法但语义越权/未授权）──
+    # 保留非 strict 前置校验直接抛出的边界；strict 由 execute 捕获并原样上抛。
     if _is_blocked_formula(formula):
         result.blocked = True
-        result.errors.append(
+        result.record_error(FormulaBusinessError(
             f"公式含非白名单内容（未注册函数/eval/URL/外链），已拦截: {formula}"
-        )
+        ))
         result.trace.append(f"BLOCKED: {formula}")
         logger.warning("Formula blocked (non-whitelist/dangerous): %s", formula)
         return result
     try:
         ast_node = parse_to_ast(formula)
-        if problem := _ast_budget_problem(formula):  # 求值前报错（需求 12.3 末句）
+        if problem := _ast_budget_problem(formula):
             raise FormulaEvalError(problem)
         result.value = _eval_ast(ast_node, ctx, result.trace)
     except FormulaParseError as e:
-        result.errors.append(f"AST 解析失败: {e}")
+        result.record_error(e, f"AST 解析失败: {e}")
         logger.warning("AST parse error: %s (formula=%s)", e, formula)
     except (FormulaColumnError, FormulaEvalError) as e:
-        # 列名未注册（配置错）/ 求值失败（除零、ROW 缺行、未注册函数、参数不足、超预算）—— 必须与「求值崩溃」区分，
-        # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。失败结果保持 ``value=None``。
-        result.errors.append(str(e))
+        result.record_error(e)
         logger.warning("Formula fetch / eval error: %s (formula=%s)", e, formula)
     except Exception as e:
-        result.errors.append(f"AST 求值失败: {e}")
+        result.record_error(e, f"AST 求值失败: {e}")
         logger.warning("AST eval error: %s (formula=%s)", e, formula)
-    # PREV 无上年数据 warning（与旧路径一致）
     if "PREV" in formula:
-        _check_prev_warnings(formula, ctx, result)
+        try:
+            _check_prev_warnings(formula, ctx, result)
+        except Exception as exc:
+            if not ctx.strict:
+                raise
+            result.record_error(exc)
     return result
 
 
+def _formula_ast_expression(
+    node: Any, ctx: FormulaContext | None = None, trace: list[str] | None = None,
+    *, address: bool = False,
+) -> str:
+    """把已解析节点写成兼容表达式；降级路径按真实 IF 条件裁掉未执行分支。"""
+    def render(child: Any, *, literal: bool = False) -> str:
+        return _formula_ast_expression(child, ctx, trace, address=literal)
+
+    if isinstance(node, ASTNumber):
+        text = format(node.value, "f")
+        return repr(text) if address else text
+    if isinstance(node, ASTString):
+        return repr(node.value)
+    if isinstance(node, ASTRowRef):
+        return repr(node.row_code) if address else f"ROW({node.row_code!r})"
+    if isinstance(node, ASTRangeSum):
+        return f"SUM_ROW({node.start_code!r},{node.end_code!r})"
+    if isinstance(node, (ASTBinOp, ASTCompare)):
+        return f"({render(node.left)}{node.op}{render(node.right)})"
+    if isinstance(node, ASTUnary):
+        return f"({node.op}{render(node.operand)})"
+    if isinstance(node, ASTFuncCall):
+        if ctx is not None and node.name == "IF":
+            if problem := arity_problem(node.name, len(node.args)):
+                raise FormulaEvalError(problem)
+            condition = _eval_ast(node.args[0], ctx, trace if trace is not None else [])
+            return render(node.args[1] if condition != 0 else node.args[2])
+        literal = node.name not in {"ABS", "ROUND", "MAX", "MIN", "IF"}
+        args = ",".join(render(arg, literal=literal) for arg in node.args)
+        return f"{node.name}({args})"
+    raise FormulaEvalError(f"无法序列化公式节点：{type(node).__name__}")
+
+
 def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
-    """旧 regex token 替换求值路径（保留一个版本周期作降级）。"""
+    """兼容 token 替换路径；地址与条件结构复用同一 AST，不丢三参或短路。"""
     result = FormulaResult()
+    try:
+        if _is_blocked_formula(formula):
+            result.blocked = True
+            raise FormulaEvalError(_blocked_reason(formula))
+        if problem := _ast_budget_problem(formula):
+            raise FormulaEvalError(problem)
+        formula = _formula_ast_expression(parse_to_ast(formula), ctx, result.trace)
+    except (FormulaParseError, FormulaColumnError, FormulaEvalError) as exc:
+        result.record_error(exc)
+        return result
     expression = formula
-    col = ctx.default_column
 
     # ── 逐 token 替换 ──
     for token_name, pattern in _TOKEN_PATTERNS:
@@ -1413,19 +1321,21 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                 )
                 if is_unregistered_column(col_name):
                     # 与 AST 路径同口径：列名未注册 → 记 error，禁回退期末余额
-                    result.errors.append(
+                    result.record_error(FormulaColumnError(
                         f"TB('{code}','{col_name}')：列名「{col_name}」未注册，无法取值"
-                    )
+                    ))
+                elif ctx.strict:
+                    val = formula_number(val, f"TB('{code}','{col_name}')")
                 trace_msg = f"TB('{code}','{col_name}') = {val}"
 
             elif token_name == "SUM_TB":
                 code_range, col_name = match.group(1), match.group(2)
                 # 与 AST 路径同口径：按列名求和，未注册列名记 error 而非静默按期末余额
                 if is_unregistered_column(col_name):
-                    result.errors.append(
+                    result.record_error(FormulaColumnError(
                         f"SUM_TB('{code_range}','{col_name}')："
                         f"列名「{col_name}」未注册，无法取值"
-                    )
+                    ))
                 else:
                     sink: list[str] = []
                     val = _sum_tb_value(ctx, code_range, col_name, sink)
@@ -1442,14 +1352,15 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                 try:  # 与 AST 路径同一取值函数：缺行报错，不按 0
                     val = _row_value(ctx, row_code)
                 except FormulaEvalError as exc:
-                    result.errors.append(str(exc))
+                    result.record_error(exc)
                 trace_msg = f"ROW('{row_code}') = {val}"
 
             elif token_name == "SUM_ROW":
                 start_code, end_code = match.group(1), match.group(2)
-                for code, rv in ctx.row_cache.items():
-                    if start_code <= code <= end_code:
-                        val += rv
+                try:
+                    val = _row_range_value(ctx, start_code, end_code)
+                except FormulaEvalError as exc:
+                    result.record_error(exc)
                 trace_msg = f"SUM_ROW('{start_code}','{end_code}') = {val}"
 
             elif token_name == "REPORT":
@@ -1459,7 +1370,7 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                 try:
                     val = _report_value(row_code, period_raw, ctx)
                 except FormulaEvalError as exc:
-                    result.errors.append(str(exc))
+                    result.record_error(exc)
                 trace_msg = f"REPORT('{row_code}','{period_raw}') = {val}"
 
             elif token_name == "PREV":
@@ -1467,7 +1378,7 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                 try:
                     val = _prev_value([g for g in match.groups() if g is not None], ctx, result.trace)
                 except FormulaColumnError as exc:
-                    result.errors.append(str(exc))
+                    result.record_error(exc)
                 if val == 0 and match.group(3) is None:
                     result.warnings.append(f"PREV('{match.group(1)}'): 无上年数据")
 
@@ -1478,18 +1389,13 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                     # 与 AST 路径同一取值函数（预载键优先，旧口径兜底）
                     val = _aux_value([account, dimension, match.group(3)], ctx)
                     trace_msg = f"AUX('{account}','{dimension}') = {val}"
-                elif token_name == "NOTE":
-                    section = match.group(1)
-                    field_name = match.group(2)
-                    section_data = ctx.note_data.get(section, {})
-                    val = section_data.get(field_name, Decimal("0"))
-                    trace_msg = f"NOTE('{section}','{field_name}') = {val}"
-                elif token_name == "WP":
-                    wp_code = match.group(1)
-                    col_name = match.group(2)
-                    wp_data = ctx.wp_data.get(wp_code, {})
-                    val = wp_data.get(col_name, Decimal("0"))
-                    trace_msg = f"WP('{wp_code}','{col_name}') = {val}"
+                elif token_name in ("NOTE", "WP"):
+                    handler = _handle_note if token_name == "NOTE" else _handle_wp
+                    args = [ASTString(group) for group in match.groups() if group is not None]
+                    try:
+                        val = formula_number(handler(args, ctx, result.trace), token_name)
+                    except (FormulaColumnError, FormulaEvalError) as exc:
+                        result.record_error(exc)
 
             elif token_name == "ADJ":
                 # 🔴 本分支**必须存在**：`val` 初值是 0 且循环末尾无条件替换 ⇒
@@ -1504,7 +1410,7 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                         ctx, result.trace,
                     )
                 except FormulaColumnError as exc:
-                    result.errors.append(str(exc))
+                    result.record_error(exc)
 
             expression = expression.replace(match.group(0), str(val), 1)
             if trace_msg:
@@ -1514,7 +1420,7 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
     try:
         result.value = safe_eval_expr(expression)
     except Exception as e:
-        result.errors.append(f"算术求值失败: {e} (expr={expression})")
+        result.record_error(e, f"算术求值失败: {e} (expr={expression})")
         logger.warning("Formula eval error: %s (expr=%s, formula=%s)", e, expression, formula)
 
     # token 取数或最终算术任一路径失败时，禁止把部分替换结果作为成功值返回。
@@ -1523,13 +1429,16 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
     return result
 
 
-def _execute_parallel(formula: str, ctx: FormulaContext) -> FormulaResult:
-    """并行模式：同时跑 AST 和 regex 两路径，diff 一致用 AST 结果，不一致 warn 回退 regex。
-
-    需求 2.3：并行跑 diff（新 AST 求值 vs 旧 regex 求值）一致后才切换。
-    """
+def _execute_parallel(
+    formula: str, ctx: FormulaContext, *, strict: bool = False,
+) -> FormulaResult:
+    """默认保留对照回退；strict 中任一路径的技术故障不可被成功结果掩盖。"""
     regex_result = _execute_regex(formula, ctx)
+    if strict:
+        regex_result.raise_for_technical_error()
     ast_result = _execute_ast(formula, ctx)
+    if strict:
+        ast_result.raise_for_technical_error()
 
     # 如果 AST 解析/求值失败，直接回退 regex
     if not ast_result.ok:
@@ -1815,7 +1724,8 @@ class FormulaError(Exception):
 __all__ = [
     "FormulaResult", "FormulaContext", "execute", "execute_formula",
     "validate_formula", "safe_eval_expr", "get_formula_account_codes",
-    "FormulaEngine", "FormulaError", "FormulaEvalError",
+    "FormulaEngine", "FormulaError", "FormulaEvalError", "FormulaBusinessError",
+    "formula_technical_error", "formula_number",
     # Task 3: parse 层
     "parse_to_ast", "FormulaParseError", "_PARSE_MODE",
     "ASTNumber", "ASTString", "ASTFuncCall", "ASTBinOp", "ASTUnary",
@@ -1916,154 +1826,160 @@ class WPExecutor:
     async def _resolve_d23(
         db, project_id, wp_code: str, sheet_name: str, field: str | None
     ):
-        """D2-3 坏账准备明细表嵌套寻址：从 bad_debt_detail_rows 取汇总/父行值。
+        """精确定位 D2-3 来源；校验实际参与汇总的原始金额后复用既有汇总器。"""
+        import sqlalchemy as sa
 
-        - 合计级：field ∈ {本期计提合计/本期转回合计/核销合计/期末余额/13 列中文名} → Summary_Row 对应金额列
-        - 父行级：field = "{计提方法中文名}.{字段名}" → 匹配 provision_method 的父行对应金额列
+        from app.models.bad_debt_models import BadDebtDetailRow
+        from app.models.workpaper_models import WpIndex
+        from app.services.bad_debt_nested_table_service import NestedTableService
 
-        找不到对应底稿/字段/父行时返回 D("0")（与现有 WPExecutor 容错一致）。
+        source = f"WP('{wp_code}','{sheet_name}','{field or ''}')"
+        field_str = (field or "").strip()
+        parent_key, separator, sub_field = field_str.partition(".")
+        col = _D23_FIELD_TO_COLUMN.get(sub_field.strip() if separator else field_str)
+        if col is None:
+            raise FormulaEvalError(f"{source}：未知或缺少金额字段")
+        indexes = (await db.execute(
+            sa.select(WpIndex.id).where(
+                WpIndex.project_id == project_id, WpIndex.wp_code == wp_code,
+                WpIndex.is_deleted == sa.false(),
+            ).limit(2)
+        )).scalars().all()
+        if not indexes:
+            raise FormulaEvalError(f"{source}：底稿不存在或已删除")
+        if len(indexes) != 1:
+            raise FormulaEvalError(f"{source}：存在多个底稿来源，无法唯一定位")
+        wp_index_id = indexes[0]
+        raw_rows = (await db.execute(sa.select(BadDebtDetailRow).where(
+            BadDebtDetailRow.wp_index_id == wp_index_id))).scalars().all()
+        parents = [row for row in raw_rows if row.parent_row_id is None]
+        if not parents:
+            raise FormulaEvalError(f"{source}：未录入坏账准备父行")
+        children: dict[Any, list[Any]] = {}
+        parent_ids = {row.id for row in parents}
+        for row in raw_rows:
+            if row.parent_row_id is not None:
+                if row.parent_row_id not in parent_ids:
+                    raise FormulaEvalError(f"{source}：明细行缺少所属父行")
+                children.setdefault(row.parent_row_id, []).append(row)
+        tree = await NestedTableService(db).get_tree(wp_index_id)
+        targets = list(tree.parents)
+        if separator:
+            key = _normalize_provision_name(parent_key)
+            exact, fuzzy = [], []
+            for parent in targets:
+                labels = [_normalize_provision_name(text) for text in (
+                    parent.provision_method_label, parent.row_label) if text]
+                if key and key in labels:
+                    exact.append(parent)
+                elif key and any(key in label or label in key for label in labels if label):
+                    fuzzy.append(parent)
+            targets = exact or fuzzy
+            if len(targets) != 1:
+                reason = "父行匹配存在歧义" if targets else "未找到引用父行"
+                raise FormulaEvalError(f"{source}：{reason}")
+        if not targets:
+            raise FormulaEvalError(f"{source}：无可用坏账准备来源")
+        selected = {parent.id for parent in targets}
+        for parent in parents:
+            if parent.id in selected:
+                for row in children.get(parent.id) or [parent]:
+                    formula_number(getattr(row, col), f"{source} 明细行 {row.row_label}")
+        value = (getattr(targets[0].amounts, col) if separator
+                 else getattr(tree.summary.amounts, col))
+        return formula_number(value, source)
 
-        Requirements: 9.1, 9.2, 9.4
-        """
-        from decimal import Decimal as D
+    @staticmethod
+    async def _source_rows(db, project_id, wp_code: str):
+        """普通列与 A1 引用共用同一活跃、唯一底稿约束。"""
+        import sqlalchemy as sa
 
-        try:
-            import sqlalchemy as sa
+        from app.models.workpaper_models import WorkingPaper, WpIndex
 
-            from app.models.bad_debt_models import (
-                PROVISION_METHOD_LABELS,
-                BadDebtDetailRow,
-                ProvisionMethod,
-            )
-            from app.models.workpaper_models import WpIndex
-            from app.services.bad_debt_nested_table_service import NestedTableService
-
-            field_str = (field or "").strip()
-            if not field_str:
-                return D("0")
-
-            # 解析 wp_index_id：优先匹配 wp_code 一致的底稿，否则取项目内任意有坏账行的底稿
-            rows_q = await db.execute(
-                sa.select(BadDebtDetailRow.wp_index_id, WpIndex.wp_code)
-                .join(WpIndex, BadDebtDetailRow.wp_index_id == WpIndex.id)
-                .where(WpIndex.project_id == project_id)
-                .distinct()
-            )
-            candidates = list(rows_q.all())
-            if not candidates:
-                return D("0")
-            wp_index_id = None
-            for idx_id, code in candidates:
-                if code == wp_code:
-                    wp_index_id = idx_id
-                    break
-            if wp_index_id is None:
-                wp_index_id = candidates[0][0]
-
-            tree = await NestedTableService(db).get_tree(wp_index_id)
-
-            # 父行级引用："{计提方法}.{字段}"
-            if "." in field_str:
-                parent_key, _, sub_field = field_str.partition(".")
-                col = _D23_FIELD_TO_COLUMN.get(sub_field.strip())
-                if col is None:
-                    return D("0")
-                norm_key = _normalize_provision_name(parent_key)
-                for parent in tree.parents:
-                    label = _normalize_provision_name(parent.provision_method_label)
-                    row_label = _normalize_provision_name(parent.row_label)
-                    if norm_key and (
-                        norm_key == label
-                        or norm_key == row_label
-                        or norm_key in label
-                        or label in norm_key
-                        or norm_key in row_label
-                    ):
-                        val = getattr(parent.amounts, col, None)
-                        return D(str(val)) if val is not None else D("0")
-                return D("0")
-
-            # 合计级引用：Summary_Row 对应金额列
-            col = _D23_FIELD_TO_COLUMN.get(field_str)
-            if col is None:
-                return D("0")
-            val = getattr(tree.summary.amounts, col, None)
-            return D(str(val)) if val is not None else D("0")
-        except Exception:
-            return D("0")
+        rows = (await db.execute(
+            sa.select(WorkingPaper.id, WorkingPaper.parsed_data)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                WpIndex.project_id == project_id,
+                WpIndex.wp_code == wp_code,
+                WorkingPaper.is_deleted == sa.false(),
+                WpIndex.is_deleted == sa.false(),
+            ).limit(2)
+        )).all()
+        if not rows:
+            raise FormulaEvalError(f"底稿 {wp_code} 不存在或未找到")
+        if len(rows) != 1:
+            raise FormulaEvalError(f"底稿 {wp_code} 存在多个来源，无法唯一定位")
+        return rows
 
     @staticmethod
     async def read_sheet_cell(db, project_id, year, wp_code: str, sheet_text: str, cell: str):
-        """三参 A1 取值：委托 ``acnr.wp_cell_target.read_formula_cell``（目录按 effective_catalog 取），返回 TargetRead。"""
+        """三参 A1 委托 ACNR 判表与取数；对实际绑定的底稿补齐活跃、唯一约束。"""
         from app.services.acnr.wp_cell_target import effective_catalog, read_formula_cell
 
         index = await effective_catalog(db, project_id)
-        return await read_formula_cell(
+        target = await read_formula_cell(
             db, project_id=project_id, year=year, wp_code=wp_code, sheet_text=sheet_text, cell=cell, index=index)
+        if target.read.state == "ok":
+            await WPExecutor._source_rows(db, project_id, target.bound_wp_code or wp_code)
+        return target
 
     @staticmethod
     async def execute(
         db, project_id, wp_code: str, column: str = "审定数", field: str | None = None,
         *, year: int | None = None,
     ):
-        """Fetch value from workpaper parsed_data, or D2-3 nested table when applicable.
+        """按本次年度读取唯一底稿来源；缺数、歧义与非法金额均明确失败。
 
-        ADR-FGR-06（formula-grammar-resolver-unification Task 7）：两参与默认调用缺数抛
-        ``FormulaEvalError``（原因透传），不再返回 ``D('0')``。与 ``wp_ref_strict`` /
-        ``typed_eval`` 严格轨口径一致 ⇒ ``typed_eval_strictness`` 差异维度消除。
-        D2-3 与三参 A1 分支保持各自语义不变。
+        WorkingPaper/WpIndex 没有年度列，年度边界取项目的真实审计年度；
+        请求年度必须显式传入且与项目一致，不按自然年或其他项目兜底。
         """
-        from decimal import Decimal as D
-
-        # D2-3 嵌套寻址：第二参含「坏账准备明细表」标记时走 NestedTableService
-        if _D23_SHEET_MARKER in (column or ""):
-            return await WPExecutor._resolve_d23(db, project_id, wp_code, column, field)
-        if field and _A1_FIELD.match(field):  # 三参 A1：按目录 sheet 精确取值，取不到 None（acnr T13）
-            tr = await WPExecutor.read_sheet_cell(db, project_id, None, wp_code, column or "", field)
-            return tr.read.value if tr.read.state == "ok" else None
-
         try:
-            import sqlalchemy as sa
+            from app.services.project_audit_year import fetch_project_audit_year
 
-            from app.models.workpaper_models import WorkingPaper, WpIndex
+            if year is None:
+                raise FormulaEvalError(f"底稿 {wp_code}：缺少本次审计年度")
+            if isinstance(year, bool) or not isinstance(year, int):
+                raise FormulaEvalError(f"底稿 {wp_code}：本次审计年度无效")
+            project_year = await fetch_project_audit_year(db, project_id)
+            if project_year is None:
+                raise FormulaEvalError(f"底稿 {wp_code}：项目未设置审计年度")
+            if project_year != year:
+                raise FormulaEvalError(
+                    f"底稿年度与项目年度不符（项目 {project_year}，请求 {year}）")
+            if _D23_SHEET_MARKER in (column or ""):
+                return await WPExecutor._resolve_d23(db, project_id, wp_code, column, field)
+            if field is not None:
+                cell = field.strip().upper()
+                if not _A1_FIELD.fullmatch(cell):
+                    raise FormulaEvalError(f"底稿 {wp_code}：无法识别表内字段「{field}」")
+                target = await WPExecutor.read_sheet_cell(
+                    db, project_id, year, wp_code, column or "", cell)
+                if target.read.state != "ok":
+                    raise FormulaEvalError(target.read.reason or f"底稿 {wp_code} 单元格 {cell} 取不到数")
+                return formula_number(target.read.value, f"底稿 {wp_code} 单元格 {cell}")
 
-            result = await db.execute(
-                sa.select(WorkingPaper.parsed_data)
-                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-                .where(
-                    WorkingPaper.project_id == project_id,
-                    WpIndex.wp_code == wp_code,
-                    WorkingPaper.is_deleted == sa.false(),
-                )
-                .limit(1)
-            )
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise FormulaEvalError(f"底稿 {wp_code} 不存在或未找到")
-
-            parsed_data = row or {}
+            rows = await WPExecutor._source_rows(db, project_id, wp_code)
             col = (column or "").strip()
-
-            # 单元格地址（B5/C12）→ 共享读取函数（ADR-FHIC-06 第 2 点）
-            if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
+            if re.fullmatch(r"[A-Z]+\d+", col, re.IGNORECASE):
                 from app.services.wp_cell_reader import resolve_wp_cell
 
-                read = await resolve_wp_cell(db, project_id, year, wp_code, None, col)
+                read = await resolve_wp_cell(db, project_id, year, wp_code, None, col.upper())
+                if read.matches > 1:
+                    raise FormulaEvalError(f"底稿 {wp_code} 单元格 {col} 存在多个工作表来源，请指定工作表")
                 if read.state != "ok":
-                    raise FormulaEvalError(
-                        read.reason or f"底稿 {wp_code} 单元格 {col} 取不到数")
-                return read.value
-
+                    raise FormulaEvalError(read.reason or f"底稿 {wp_code} 单元格 {col} 取不到数")
+                return formula_number(read.value, f"底稿 {wp_code} 单元格 {col}")
+            parsed_data = rows[0][1]
+            if not isinstance(parsed_data, dict):
+                raise FormulaEvalError(f"底稿 {wp_code} 未录入有效的解析数据")
             key = WP_COLUMN_KEYS.get(col, col)
-            value = parsed_data.get(key)
-            if value is None or (isinstance(value, str) and not str(value).strip()):
-                raise FormulaEvalError(f"底稿 {wp_code} 无「{col}」的值")
-            return D(str(value))
+            return formula_number(parsed_data.get(key), f"底稿 {wp_code}「{col}」")
         except FormulaEvalError:
             raise
         except Exception as exc:
-            raise FormulaEvalError(
-                f"底稿 {wp_code} 取值异常：{exc}") from exc
+            raise FormulaEvalError(f"底稿 {wp_code} 取值异常：{exc}") from exc
 
 
 class REPORTExecutor:

@@ -1,0 +1,461 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "13A-1. 候选提交与锁定 worktree 工具（R10；design §17 G7、§18 H2：阶段 A 第一个任务，只依赖 git；1A、6A、11A、13A、各阶段 -V/-BK 与终验复用）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042097
+      },
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872052965
+      }
+    ],
+    "1A. 阶段 A 基线复算与 A 组迁移（R2、R4）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042180
+      },
+      {
+        "executionId": "d70751c5-7131-4616-b4ba-593fcafb7ef9",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872721848
+      }
+    ],
+    "2. 当前账号偏好 API、默认合同与并发隔离（R2、NFR 安全）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042239
+      },
+      {
+        "executionId": "caf4068b-2270-485e-b8f4-1623fa3f747c",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793873664890
+      },
+      {
+        "executionId": "c8acc046-76af-4f69-b3ee-d20f93c414b4",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793876710223
+      }
+    ],
+    "3. 项目正式单位五层一致、project store 时序与设置入口（R4）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042277
+      },
+      {
+        "executionId": "69137bf8-c202-4a04-9030-80cd11f80695",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793876796125
+      },
+      {
+        "executionId": "69137bf8-c202-4a04-9030-80cd11f80695",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793878018900
+      }
+    ],
+    "4. 前端账号加载、30 天 userId 缓存与 effective store（R2、R3）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042345
+      },
+      {
+        "executionId": "69137bf8-c202-4a04-9030-80cd11f80695",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793878028945
+      }
+    ],
+    "5. 独立显示设置路由、根 CSS、字体与固定列公共层（R1、R3、R5）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042374
+      },
+      {
+        "executionId": "2acd1ed0-bc2d-4f80-9650-e0a79c0c0458",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793891322815
+      }
+    ],
+    "6A. 跨层 measure kind、公共 formatter 与核心屏幕收敛（R5、R6；NoteWord 普通/clone 导出路径见 6C）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042428
+      },
+      {
+        "executionId": "f0faf1be-4849-4d9b-b852-7dbe6dc3d7f4",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793892243157
+      },
+      {
+        "executionId": "f0faf1be-4849-4d9b-b852-7dbe6dc3d7f4",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793892694858
+      },
+      {
+        "executionId": "8df7dca1-6e92-463e-9f72-1bb08e356538",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793892787936
+      },
+      {
+        "executionId": "8df7dca1-6e92-463e-9f72-1bb08e356538",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793892792798
+      },
+      {
+        "executionId": "8df7dca1-6e92-463e-9f72-1bb08e356538",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793893390238
+      }
+    ],
+    "7. 附注第二单位删除与数据集单位三态 presenter（R7）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042485
+      },
+      {
+        "executionId": "5101793d-bcae-4706-a7e1-3510cef63e35",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793893657012
+      },
+      {
+        "executionId": "4cb499c5-7a43-45b0-ad9e-c5f3acc3f2d8",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793893854128
+      },
+      {
+        "executionId": "4cb499c5-7a43-45b0-ad9e-c5f3acc3f2d8",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793895133934
+      }
+    ],
+    "11A. 唯一 fail-closed AST 守卫（前端屏幕金额）、可信 ledger、历史勘误与 CI 单一步骤（R6、R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042529
+      },
+      {
+        "executionId": "4cb499c5-7a43-45b0-ad9e-c5f3acc3f2d8",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793895143099
+      },
+      {
+        "executionId": "4cb499c5-7a43-45b0-ad9e-c5f3acc3f2d8",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793896295655
+      }
+    ],
+    "12A. 屏幕显示开发文档（R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042567
+      },
+      {
+        "executionId": "4cb499c5-7a43-45b0-ad9e-c5f3acc3f2d8",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793896307532
+      },
+      {
+        "executionId": "4cb499c5-7a43-45b0-ad9e-c5f3acc3f2d8",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793896840854
+      }
+    ],
+    "13A. 候选 tree 身份工具（R10；供各阶段冒烟与终验复用）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042604
+      },
+      {
+        "executionId": "ade748e3-ffc8-43ae-a9fb-1fda90d44851",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793896897652
+      }
+    ],
+    "A-V. 阶段 A 运行时冒烟/验证": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042668
+      },
+      {
+        "executionId": "aa175284-82ea-4494-80da-7d4533d51d66",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793918878781
+      }
+    ],
+    "A-BK. 阶段 A 备份 commit 对象": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042715
+      },
+      {
+        "executionId": "2e1eaa93-8e99-434a-bac9-d589eb6ecdcc",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793921129694
+      },
+      {
+        "executionId": "2e1eaa93-8e99-434a-bac9-d589eb6ecdcc",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793921202434
+      }
+    ],
+    "1B. 阶段 B 基线复算与 B 组迁移（R8）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042751
+      },
+      {
+        "executionId": "2e1eaa93-8e99-434a-bac9-d589eb6ecdcc",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793921213664
+      }
+    ],
+    "8. 服务端单位证据、账套入口闭集、staged 恢复与两引擎只换算一次（R8）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042801
+      },
+      {
+        "executionId": "220afa6a-14c6-4b11-96c5-57e3712625e5",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793921869306
+      },
+      {
+        "executionId": "225f4739-69e6-4bf9-ba60-031fc08e3044",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793921893522
+      }
+    ],
+    "9. 既有数据只读检查、未来 apply/rollback 双闸门与可逆证据（R8）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042836
+      },
+      {
+        "executionId": "74248a22-f7a8-4610-a59f-259f012f1d8f",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793922541378
+      },
+      {
+        "executionId": "74248a22-f7a8-4610-a59f-259f012f1d8f",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793922952705
+      }
+    ],
+    "11B. 账套读取面与入口闭集接入唯一守卫（R8、R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042896
+      },
+      {
+        "executionId": "74248a22-f7a8-4610-a59f-259f012f1d8f",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793922968371
+      }
+    ],
+    "12B. 账套导入单位开发文档（R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042934
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923242878
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923514163
+      }
+    ],
+    "B-V. 阶段 B 运行时冒烟/验证": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872042981
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923521085
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923655631
+      }
+    ],
+    "B-BK. 阶段 B 备份 commit 对象": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043034
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923662591
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923676006
+      }
+    ],
+    "1C. 阶段 C 基线复算与 C 组迁移（R9）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043080
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923698317
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923776348
+      }
+    ],
+    "10. 模板 authority、正式 Excel/Word/PDF、组合包与归档消费者收口（R9）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043120
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923782379
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923842250
+      }
+    ],
+    "6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043155
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923846888
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923869523
+      }
+    ],
+    "11C. 正式导出出口闭集接入唯一守卫（R9、R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043203
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923875238
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923937248
+      }
+    ],
+    "12C. 正式导出单位开发文档（R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043241
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923944187
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923953485
+      }
+    ],
+    "C-V. 阶段 C 运行时冒烟/验证": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043300
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923958496
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923981326
+      }
+    ],
+    "C-BK. 阶段 C 备份 commit 对象": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043349
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793923985959
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793924000667
+      }
+    ],
+    "13. 候选树验证、Playwright、独立评审与交付（R10）": [
+      {
+        "executionId": "b8a2f466-d422-4626-9865-a0cbb1c00b85",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793872043387
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793924005676
+      },
+      {
+        "executionId": "fe9a9a8a-7015-4c9d-9d9b-fc2dd5afcfbd",
+        "chatSessionId": "sess_92bb19fb-9301-4075-a32e-2d2f073e47c1",
+        "timestamp": 1793924070908
+      }
+    ]
+  }
+}

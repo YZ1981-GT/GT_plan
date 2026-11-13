@@ -244,7 +244,7 @@
 
     <!-- spec: formula-management-deep-optimization · R3 — 公式调试 -->
     <div v-if="showDebugPanel" style="padding: 0 16px 8px;">
-      <FormulaDebugPanel :formula="currentEditFormula" :project-id="resolveProjectId()" :year="resolveYear()" scope="report" />
+      <FormulaDebugPanel :formula="currentEditFormula" :project-id="resolveProjectId()" :year="resolveYear()" :scope="props.scope || 'report'" />
     </div>
 
     <template #footer>
@@ -469,6 +469,8 @@ const props = defineProps<{
   /** 当前底稿编码，供 WP 参数补全；报表编辑场景可不传。 */
   wpCode?: string
   wpContext?: WpFormulaContext
+  /** formula-hub-release-blockers R10.1：公式域（默认 report），传给调试面板使其按正确域求值。 */
+  scope?: string
 }>()
 
 // ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）。

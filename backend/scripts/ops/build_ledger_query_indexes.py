@@ -54,6 +54,32 @@ INDEXES = {
         ),
         purpose="ordinary Ledger exact-account window order",
     ),
+    "ledger-browse": IndexSpec(
+        name="idx_tb_ledger_active_browse",
+        table="tb_ledger",
+        definition=(
+            "CREATE INDEX CONCURRENTLY idx_tb_ledger_active_browse "
+            "ON public.tb_ledger "
+            "(project_id, year, dataset_id, "
+            "voucher_date ASC NULLS LAST, voucher_no ASC NULLS LAST, id ASC) "
+            "INCLUDE (debit_amount, credit_amount) "
+            "WHERE is_deleted = false"
+        ),
+        purpose="all-accounts browse: date/no/id keyset order + index-only monthly summary",
+    ),
+    "aux-browse": IndexSpec(
+        name="idx_tb_aux_ledger_active_browse",
+        table="tb_aux_ledger",
+        definition=(
+            "CREATE INDEX CONCURRENTLY idx_tb_aux_ledger_active_browse "
+            "ON public.tb_aux_ledger "
+            "(project_id, year, dataset_id, "
+            "voucher_date ASC NULLS LAST, voucher_no ASC NULLS LAST, id ASC) "
+            "INCLUDE (debit_amount, credit_amount) "
+            "WHERE is_deleted = false"
+        ),
+        purpose="all-accounts auxiliary browse: date/no/id keyset order + index-only monthly summary",
+    ),
     "aux-window": IndexSpec(
         name="idx_tb_aux_ledger_active_window",
         table="tb_aux_ledger",

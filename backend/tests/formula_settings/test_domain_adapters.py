@@ -255,8 +255,10 @@ async def test_note_list_save_materialize_and_cas():
         for nid in (n25, n24):  # 项目层不分年度
             td = (await _note(db, nid)).table_data
             assert [r["target"] for r in td["_user_formulas"]] == ["2:1", "3:1"] and td["_formulas"]
+        # 无载入快照：与现有公式完全相同的整表是空操作；真正改动已有公式位必须带载入版本。
+        changed = [{**r, "formula": r["formula"] + "+0"} if r["target"] == "2:1" else r for r in saved["formulas"]]
         with pytest.raises(VersionRequired):
-            await note_settings.save_section(db, pid, 2025, SECTION, saved["formulas"], loaded=None, user_id=user.id)
+            await note_settings.save_section(db, pid, 2025, SECTION, changed, loaded=None, user_id=user.id)
         with pytest.raises(VersionConflict):
             await note_settings.save_section(db, pid, 2025, SECTION, saved["formulas"],
                                              loaded={**saved["loaded"], f"{SECTION}|3:1": "L9"}, user_id=user.id)
@@ -276,7 +278,7 @@ async def test_note_global_publish_propagates_and_disable():
         assert out["events"] == [{"project_id": str(pid), "slot_keys": [f"{SECTION}|4:1"]}]
         propagation.set_session_factory(factory)
         try:
-            result = await propagation.propagate_note(pid, None, [f"{SECTION}|4:1"])
+            result = await propagation.propagate_note(pid, 2025, [f"{SECTION}|4:1"])
         finally:
             propagation.set_session_factory(None)
         assert result["materialized"] == 1 and result["marked"] == 1

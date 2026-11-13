@@ -8,7 +8,8 @@
 * 没载入过、本次也不在（别人在你载入之后加的）→ 不动。
 
 版本令牌 ``L{n}`` = 本项目适配修订号，``G{n}`` = 全局版本；与当前不一致 → 409，整批不写。
-已有生效条目却没带令牌 → 428（不能凭空整表覆盖别人的修改）。
+实际改写已有条目却没带对应载入键 → 428；预设可显式带 None，原样保留的条目不妨碍新增。
+未带载入快照却省略已有生效条目仍拒绝；有快照时只删除载入过的条目。
 """
 from __future__ import annotations
 
@@ -44,18 +45,19 @@ async def live_slots(db: AsyncSession, domain: str, project_id: uuid.UUID) -> di
 
 
 async def replace_set(db: AsyncSession, *, domain: str, project_id: uuid.UUID,
-                      desired: Mapping[str, Mapping[str, Any]], loaded: Mapping[str, str] | None,
+                      desired: Mapping[str, Mapping[str, Any]], loaded: Mapping[str, str | None] | None,
                       user_id: uuid.UUID | None, source: str, prefix: str = "") -> dict[str, Any]:
     """``desired`` = ``{slot_key: {"definition": {...}, "label": str}}``；只 flush。
 
     ``prefix``：只替换这一组公式位（如附注某章节 ``"五、1|"``）；组外的公式位不看、不动。
+    实际改写已有槽须有对应载入键（预设令牌可为 None）；未改旧定义不妨碍合法新增。
     """
     eff = {k: e for k, e in (await effective_slots(db, domain, project_id)).items() if k.startswith(prefix)}
     if prefix and any(not k.startswith(prefix) for k in [*desired, *(loaded or {})]):
         raise FormulaSettingError("公式位不属于本次保存的范围")
     live = {k for k, e in eff.items() if is_live(domain, e)}
     if loaded is None:
-        if live:
+        if live.difference(desired):  # 无载入快照时，仍拒绝整表移除已有生效条目
             raise VersionRequired("请刷新后再保存：缺少载入时的版本信息")
         loaded = {}
     problems = [{"slot_key": k, "loaded": v, "current": version_token(eff.get(k))}
@@ -70,6 +72,8 @@ async def replace_set(db: AsyncSession, *, domain: str, project_id: uuid.UUID,
         definition = dict(want["definition"])
         if e is not None and slot in live and normalize(domain, e.definition) == normalize(domain, definition):
             continue
+        if e is not None and slot not in loaded:
+            raise VersionRequired("请刷新后再保存：缺少公式位的载入版本信息", detail={"slot_key": slot})
         items.append({"slot_key": slot, "definition": definition, "label": str(want.get("label") or ""),
                       "expected_version": e.local.version if e is not None and e.local is not None else None})
     for slot in loaded:

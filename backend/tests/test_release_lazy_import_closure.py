@@ -37,6 +37,11 @@ async def test_formula_outbox_stale_propagation_uses_report_uris(monkeypatch):
 
     on_change = AsyncMock(return_value={"affected": [], "total": 0})
     monkeypatch.setattr(stale_engine, "on_change", on_change)
+    # 写入前核对项目审计年度（R4 冻结年度）；年度一致才进依赖图
+    monkeypatch.setattr(
+        "app.services.formula_settings.propagation._matches_project_year",
+        AsyncMock(return_value=True),
+    )
     monkeypatch.setattr(
         "app.services.formula_reverse_index.invalidate_reverse_index",
         lambda: None,
@@ -48,9 +53,45 @@ async def test_formula_outbox_stale_propagation_uses_report_uris(monkeypatch):
     )
 
     assert on_change.await_args_list == [
-        call("REPORT:BS-001::", project_id, 2025),
-        call("REPORT:BS-002::", project_id, 2025),
+        call("REPORT:BS-001::", project_id, 2025, strict=True),
+        call("REPORT:BS-002::", project_id, 2025, strict=True),
     ]
+
+
+@pytest.mark.asyncio
+async def test_formula_outbox_stale_propagation_rejects_changed_project_year(monkeypatch):
+    """项目年度已变化：不进依赖图，抛可重试的传播未完成。"""
+    from app.services.formula_settings.outbox import _stale_engine_for_formula_change
+    from app.services.formula_settings.propagation import PropagationIncomplete
+    from app.services.stale_propagation_engine import stale_engine
+
+    on_change = AsyncMock(return_value={"affected": [], "total": 0})
+    monkeypatch.setattr(stale_engine, "on_change", on_change)
+    monkeypatch.setattr("app.services.formula_reverse_index.invalidate_reverse_index", lambda: None)
+    monkeypatch.setattr(
+        "app.services.formula_settings.propagation._matches_project_year",
+        AsyncMock(return_value=False),
+    )
+    with pytest.raises(PropagationIncomplete):
+        await _stale_engine_for_formula_change(SimpleNamespace(), uuid4(), 2025, ["BS-001"])
+    on_change.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_formula_outbox_stale_propagation_degraded_result_is_incomplete(monkeypatch):
+    """依赖图返回 degraded / error：不当成功，抛传播未完成。"""
+    from app.services.formula_settings.outbox import _stale_engine_for_formula_change
+    from app.services.formula_settings.propagation import PropagationIncomplete
+    from app.services.stale_propagation_engine import stale_engine
+
+    monkeypatch.setattr(stale_engine, "on_change", AsyncMock(return_value={"degraded": True}))
+    monkeypatch.setattr("app.services.formula_reverse_index.invalidate_reverse_index", lambda: None)
+    monkeypatch.setattr(
+        "app.services.formula_settings.propagation._matches_project_year",
+        AsyncMock(return_value=True),
+    )
+    with pytest.raises(PropagationIncomplete):
+        await _stale_engine_for_formula_change(SimpleNamespace(), uuid4(), 2025, ["BS-001"])
 
 
 @pytest.mark.asyncio
@@ -68,6 +109,10 @@ async def test_formula_outbox_propagation_failure_is_retryable(monkeypatch):
         stale_engine,
         "on_change",
         AsyncMock(side_effect=RuntimeError("stale write failed")),
+    )
+    monkeypatch.setattr(
+        "app.services.formula_settings.propagation._matches_project_year",
+        AsyncMock(return_value=True),
     )
 
     with pytest.raises(RuntimeError, match="stale write failed"):

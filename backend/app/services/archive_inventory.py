@@ -214,13 +214,96 @@ async def _deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNa
     return out
 
 
+async def _consol_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
+    """合并项目归档清单项（spec consolidation-run-and-workpaper-lifecycle-closure 任务 6.5 / ADR-CRW-006）。
+
+    只对 ``report_scope='consolidated'`` 的项目生效；调 ``consol_archive_provider`` 把成功 operation、
+    正式报表运行、不可变 artifact、签字快照、附件证据和审计清单汇成的清单映射进通用 ``InventoryEntry``：
+
+    - ``missing`` ⇒ ``MISSING``（归档缺件，``build_archive_package`` 据此 fail-closed，不降级为成功）；
+    - ``report_excel`` / ``consol_workpaper`` 的 ``ready`` artifact ⇒ 真文件入包（解析合并存储根下的文件）；
+    - operation / report_run / sign_snapshot / attachments / audit_manifest / workpaper_shell 的 ``ready``
+      是数据/引用型 required source，记 ``SKIPPED`` 并写明（manifest 里保留，不作为文件入包）；
+    - ``not_applicable`` ⇒ ``SKIPPED``。
+
+    非合并项目返回空列表（口径不变，generic 清单照旧）。
+    """
+    from app.models.core import Project
+
+    row = (await db.execute(
+        sa.select(Project.report_scope, Project.audit_year).where(Project.id == project_id)
+    )).first()
+    if row is None or (row[0] or "").strip().lower() != "consolidated":
+        return []
+    year = int(row[1]) if row[1] is not None else 0
+
+    from app.services.consol_archive_provider import collect_consol_archive_items
+
+    items = await collect_consol_archive_items(db, project_id, year)
+    out: list[InventoryEntry] = []
+    for item in items:
+        kind = item.get("kind", "consol")
+        label = f"合并｜{item.get('label') or kind}"
+        base = dict(category="workpaper_data", source_id=f"consol:{kind}", label=label, wp_code="A3-CONSOL")
+        status = item.get("status")
+        if status == "missing":
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason=item.get("reason") or f"{label} 缺失"))
+            continue
+        if status == "ready" and kind in ("report_excel", "consol_workpaper") and item.get("storage_path"):
+            entry = _resolve_consol_artifact_entry(base, item, names)
+            out.append(entry)
+            continue
+        # 其余 ready / not_applicable 的 required source 以引用形式记录（不作为文件入包）
+        detail = item.get("reason") or _consol_ready_detail(item)
+        out.append(InventoryEntry(**base, arcname="", status=SKIPPED, reason=detail))
+    return out
+
+
+def _consol_ready_detail(item: dict) -> str:
+    """合并 ready 数据/引用项的 SKIPPED 说明（写进 manifest 的 skipped，便于追溯）。"""
+    kind = item.get("kind")
+    if kind == "consol_operation":
+        return f"已成功合并运行 {item.get('operation_id')}（rev {item.get('operation_revision')}）"
+    if kind == "report_run":
+        return f"正式报表运行 {item.get('report_run_id')}（digest {item.get('row_digest')}）"
+    if kind == "sign_snapshot":
+        return f"签字快照 {item.get('snapshot_id')}（hash {item.get('hash')}）"
+    if kind == "attachments":
+        return f"附件证据 {item.get('attachment_count', 0)} 项（随附件类目入包）"
+    if kind == "audit_manifest":
+        return f"审计留痕 {item.get('entry_count', 0)} 条（链尾 {item.get('tail_hash')}）"
+    if kind == "workpaper_shell":
+        return f"合并底稿壳 {item.get('working_paper_id')}"
+    return "合并产物引用（非文件）"
+
+
+def _resolve_consol_artifact_entry(base: dict, item: dict, names: _ArcNames) -> InventoryEntry:
+    """把 ready 的合并 artifact 映射成真文件入包项；文件读不到 ⇒ MISSING（fail-closed）。"""
+    from app.services.consol_artifact_service import ArtifactError, resolve_artifact_path
+
+    try:
+        path = resolve_artifact_path(item["storage_path"])
+    except ArtifactError:
+        return InventoryEntry(**base, arcname="", status=MISSING, reason=f"{base['label']} 存储路径不合法")
+    if not path.is_file():
+        return InventoryEntry(**base, arcname="", status=MISSING, reason=f"{base['label']} 文件不存在")
+    stem = safe_name(item.get("file_name") or base["label"])
+    arcname = names.take("12-合并产物", stem, path.suffix.lower() or ".xlsx")
+    return InventoryEntry(**base, arcname=arcname, status=OK, local_path=path)
+
+
 async def build_project_inventory(db: AsyncSession, project_id: UUID) -> ProjectInventory:
-    """底稿文件 + 现行附件 + 已确认交付件的清单（数据快照与章节在打包时生成，不在清单里）。"""
+    """底稿文件 + 现行附件 + 已确认交付件的清单（数据快照与章节在打包时生成，不在清单里）。
+
+    合并项目额外纳入合并产物清单（成功 operation/artifact/签字快照/附件/审计），缺件 fail-closed。
+    """
     names = _ArcNames()
     inv = ProjectInventory(project_id=project_id)
     inv.entries.extend(await _workpaper_entries(db, project_id, names))
     inv.entries.extend(await _attachment_entries(db, project_id, names))
     inv.entries.extend(await _deliverable_entries(db, project_id, names))
+    inv.entries.extend(await _consol_entries(db, project_id, names))
     return inv
 
 

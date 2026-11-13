@@ -130,6 +130,7 @@ RAW_EVENT_REPLAY_DEGRADED: frozenset[str] = frozenset({
     "export.failed",
     "export.progress",
     "formula.pushed",
+    "platform.job.updated",
     "note.synced",
     "procedure_task.event",
     "report.stale",

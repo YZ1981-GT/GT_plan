@@ -123,6 +123,7 @@ def edit_lock_scope(route_path: str | None) -> EditLockScope:
 NON_CONTENT_WRITES: dict[str, str] = {
     "/api/projects/{project_id}/workpapers/{wp_id}/export-with-metadata": "记导出快照 wp_export_snapshot（导入时冲突检测用）",
     "/api/workpapers/{wp_id}/ai-chat/history": "删本人在这张底稿上的 AI 对话记录",
+    "/api/workpapers/{wp_id}/ai/tsj-review": "追加 AI 复核结果记录，不改底稿业务正文",
 }
 
 #: 路径带 ``{wp_id}``、不经底稿门禁的写路由：(方法, 路由模板) → (是否校验编辑锁, 理由)。校验的由处理函数显式调用。
@@ -170,5 +171,5 @@ UNGATED_WRITE_DECISIONS: dict[tuple[str, str], tuple[bool, str]] = {
 BODY_CARRIED_CHECKED: tuple[tuple[str, str, str], ...] = (
     ("POST", "/api/h5/import-data", "H5 导入 xlsx（底稿 id 在表单里）"),
     ("POST", "/api/a17/independence/import-b3-periods", "A17-7 从 B3 导入独立性期间"),
-    ("POST", "/api/attachments/{attachment_id}/associate", "附件关联到底稿"),
+    ("POST", "/api/attachments/{attachment_id:uuid}/associate", "附件关联到底稿"),
 )

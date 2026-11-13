@@ -349,3 +349,379 @@ C 的发现途径值得记一笔：本 spec 的单区域 `tsconfig._aql-linkage.
   本 spec 对它 `git diff --numstat` 为 **4 增 4 删 = 净 0 行**（远端 3273 → 合并后 3273）。
   该文件的 cap 属它自己的瘦身预算，处置只有两条（都该由该文件的 owner 定）：继续瘦身到 3170 以内，
   或按棘轮提示把 cap 重定基为真实值 3273 作为只许变小的棘轮。本 spec **不动它的 cap**，如实登记。
+
+## 十六、阶段 0 第二轮（2026-11-01）：安全合入最新远端 + 可做的判据补齐 + 一处决定性现算
+
+本节只记**本轮现算**的结果与处置，不改前十五节的原文。候选树 = 最新远端
+`85af801a0`（v1.0.100）+ 本 spec，提交链见下。
+
+### 16.1 安全合入（用户 Phase 0 第 1 条）
+
+主工作树有并发会话的大量脏改动（现算 180+ 个已跟踪文件被改、含 `components.d.ts`
+这类生成物），**不在主工作树做合并**，也不 `git stash`（它写全仓共享的 `refs/stash`）。
+做法：在仓库根建锁定的临时 worktree `tmp_advanced_query_phase0/merge_wt`，起点取仓库里
+已有的、干净的安全合并提交 `589c14c4c`（父 = 远端 `919424f00` + 本地 `7fbd522c8`，已含本
+spec 候选 `79d07ccad`），再合最新远端 `85af801a0`。
+
+| 项 | 结果 |
+|---|---|
+| 合并冲突 | **0**（`git diff --diff-filter=U` 为空；仅 3 个文件进入暂存：INDEX.md、memory.md、新增的 INDEX 一致性守卫） |
+| 祖先核对 | `79d07ccad`（本 spec 候选）· `85af801a0`（远端头）· `7fbd522c8`（本地头）· `68458e2e3`（v1.0.98）· `a77026baf`（v1.0.95）**五个全部是候选的祖先** |
+| 迁移完整性 | 248 个 `V*.sql`、最高 **V251**、**重复版本号 0 组** |
+| 应用可导入 | `import app.main` 成功 |
+
+🔴 合并**暴露出一条两侧单独都不红的红**：远端 v1.0.100 新增的
+`backend/tests/test_spec_index_consistency.py` 要求每个活跃 spec 目录在 INDEX.md 里至少被
+一个**本地链接**（`](路径)`）指到；而 `workpaper-html-onlyoffice-bidirectional-writeback-closure`
+的目录由并发会话在本地分支重新置为活跃，INDEX 里有 **8 处纯反引号提及、0 个链接**。
+纯远端侧没有这个目录（守卫绿），纯本地侧没有这个守卫（也绿）⇒ 只有合并后才红。
+处置：**不往棘轮基线加条目**（那是只许减少的历史债棘轮，加一行就是把洞合法化），也**不代写
+它的完成度**（守卫 docstring 明确说「别人在建的 spec，不代写其状态」）；只把 INDEX 里已有的
+那句「未随本批归档（仍 active）：① …」的反引号名加上指向其 `tasks.md` 的链接 —— 1 行改动、
+不新增状态文案、表格 pipe 结构与总行数不变。改后该守卫 **16 passed**。
+
+### 16.2 三个写端点在最终运行栈为 410（用户 Phase 0 第 5 条）—— 已确认并补成常驻守卫
+
+现算（生产 `app.main`，TestClient 真发请求）：
+
+| 路径 | 首条命中端点 | 同路径候选 | 声明码 | 实发状态 | 错误码 | 依赖 |
+|---|---|---|---|---|---|---|
+| `/api/custom-query/cell-writeback` | `cell_writeback_gone` | 1 | 410 | **410** | `ADVANCED_QUERY_WRITEBACK_RETIRED` | 无 |
+| `/api/custom-query/writeback-preview` | `writeback_preview_gone` | 1 | 410 | **410** | 同上 | 无 |
+| `/api/custom-query/writeback-confirm` | `writeback_confirm_gone` | 1 | 410 | **410** | 同上 | 无 |
+
+阳性对照：`GET /api/health` 为 503（不是 410）⇒ 判据不是对所有路径空转。
+
+判据写成 `tests/advanced_query_linkage/test_aql_writeback_retired_runtime.py`（10 passed），
+分三层：**路由表层**（按 Starlette 首条命中语义解析，命中的必须是退役桩本身、同路径只许 1 条
+—— 只数「路径存在」会被同路径旧实现遮蔽或被重复注册的另一份接走，平台有过 13 条路由遮蔽的
+先例）·**响应层**（无登录态 + 畸形请求体仍 410 且错误码一致，即退役早于鉴权与请求体校验，
+否则旧客户端拿到的是 401 / 422，看不出「已下线」）·**实现层**（桩不依赖 `get_db`，不占连接池）。
+
+磁盘变异（每条改盘 → 跑守卫 → 逐字节恢复并核对 sha256，4/4 恢复一致）：
+
+| 变异 | 期望 | 实得 | 打红的那一条 |
+|---|---|---|---|
+| M1 `cell-writeback` 装饰器声明码 410 → 200 | RED | **RED** | 路由表层（1 failed）。🔴 注意**响应层仍是 410**：桩里 `raise` 的 410 压过装饰器声明，所以这条变异只能被「声明码」判据抓到 —— 我起初写的「两层都会红」不成立，按实测更正 |
+| M2 退役错误码改名 | RED | **RED** | 响应层错误码（3 failed） |
+| M3 给退役桩加 `Depends(get_db)` | RED | **RED** | 实现层「不占连接池」（1 failed） |
+| N1 阴性对照：只加一行注释 | GREEN | **GREEN** | — （证明守卫不是对任何改动都红） |
+
+### 16.3 决定性现算：`gold.py` 的 9 个固定项目 UUID **全部失效**（用户 Phase 0 第 3 条）
+
+前十五节把真 PG 基线里那批红归因为「`gold.py` 固定项目 UUID 失效导致的 403 / 空集」。本轮
+直接查库把它量化了：**9/9 个 UUID 在 `projects` 表里根本不存在**（不是「软删」，是查不到行）。
+
+| 代号 | 文件里的注释 | 现状 |
+|---|---|---|
+| HS / HP / YB / LN / MD / WL | 华氏 / 和平药房 / 宜宾临港店 / 辽宁卫生服务 / 医疗器械 / 和平物流 | **UUID 均不存在**；同名业务项目大多还在，但 id 已换（如华氏现为 `a7fc75e5…`、和平药房 2025 现为 `2aa00f57…`） |
+| UA / UB / UP | 【UAT】子公司A / 子公司B / 合成集团母公司 | **UUID 不存在，且现库没有任何以 UAT 命名的未删除项目**（唯一的 3 个【测试】项目是「公式同步甲 / 乙 / 集团」） |
+
+后果不是「少测了几条」，而是**那 15 个 `tests/advanced_query_linkage/*_pg.py` 文件现在证明不了
+任何东西**：要么在「前置」断言上红，要么拿 403 / 空集与空金标准互相印证而假绿。
+`code_file_counts` 现算：HS 11 文件 · UA 8 · YB 5 · HP 4 · WL 3 · UB 2 · LN 1 · UP 1 · **MD 0（导入即死码）**。
+
+本轮同时把每个代号承担的**数据能力**现在落在哪些活项目上查了出来，作为「按稳定业务条件动态
+选择」的判据素材（只列第一名）：
+
+| 能力（用例真正依赖的） | 现在的承载项目 | 现算量 |
+|---|---|---|
+| 序时账行数最多（HP 的大数据角色） | 和平药房_2025 `2aa00f57` | aux 363,891 行（aux 第一） |
+| 辅助余额次多（HS 的角色之一） | 华氏_2025 `a7fc75e5` | 132,575 |
+| 试算表行数最多 | 重药安徽_2025 `0ec33ac9` | 196 |
+| 六类报表齐全（HS 的报表角色） | 和平药房_2025 / 安徽 / 某测试集团_2098 | 各 6 类 |
+| 余额表方向列非空（**LN 的角色**） | 宜宾 `c8621493` / 安徽 `0ec33ac9` | 各 2,436 |
+| 有 tb_balance 但**无 active 数据集**（**WL 的角色**） | 和平药房_2025 `2aa00f57` | 367 |
+| 合并附注有数据（**UP 的角色**） | 某测试集团_2098 `80b4355b` | 3,514 |
+| 有 AJE 调整分录（HS 的调整角色） | 重药安徽_2025 `0ec33ac9` | 8 |
+
+⇒ 每个角色都**有**活项目能承担，但没有一个还是原来那个 id；且三个可写角色（UA/UB/UP 里的
+写入部分）已经没有同类【UAT】项目可用，只能在回滚事务里自建。
+
+**本轮未动这 15 个文件**，原因写明：改法有两种语义（按能力动态解析真实项目 / 在回滚事务里自建
+夹具），选哪种会改变这些判据的性质 —— 口径类断言（如「Σ审定 = 金标准」「2.7M 行下 COUNT 不
+截断」「方向列分布」）只有在**真实数据分布**上才有意义，合成夹具会把它们降级成「实现与实现
+自比」（这正是方法论铁律 ㉓ 点名的坑）；而「写入隔离」类判据反过来必须用自建夹具，不能依赖
+某个真实项目恰好存在。建议的分工与待确认点见 16.4。
+
+### 16.4 建议的改法（待用户确认后实施）
+
+- **只读口径类（HS / HP / YB / LN / WL 共 14 个文件）→ 按稳定业务条件动态解析**：新增
+  `tests/advanced_query_linkage/project_picks.py`，每个角色一个**能力判据**（例如
+  「未删除 + 有 active 数据集 + 余额表方向列非空行数最多」），用显式列的裸 SQL 查（**不可**
+  `db.get(Project, ...)` 全列投影 —— 共享库缺 `projects.amount_unit` 时会整体 500，这正是前十五
+  节那 5 处 500 的同一机理），按确定性排序取第一名，**取不到就 `pytest.fail` 并打印判据与实际
+  候选**（绝不跳过、绝不退化成空集）。角色名保留 HS / HP / … 作夹具名，15 个文件改为注入夹具。
+- **写入隔离类（UA / UB / UP 的写入部分）→ 回滚事务自建**：在 `pg_rollback_session` 里建名称带
+  【测试】的项目与必要行，事务结束整体回滚；合并角色（UP）自建 `report_scope='consolidated'`
+  的项目 + `consol_note_data` 行。
+- **死码**：`MD` 现算 0 个文件引用，直接删。
+- 待用户确认的两点：① 上面这条「只读用真实项目、写入用自建」的分工是否就按这么定；
+  ② 动态解析会让同一条用例在不同时间落到不同项目上（判据恒定、数据随库变），是否接受 ——
+  不接受就只能改成「每次手工更新 9 个 UUID」，那等于把本次的失效模式留在原地。
+
+### 16.5 本轮提交（候选 worktree `tmp_advanced_query_phase0/merge_wt`，未推送）
+
+| 提交 | 内容 |
+|---|---|
+| `a691f1eb6` | merge: 合并远端 `85af801a0`（v1.0.100） |
+| `b057d4555` | docs(specs): INDEX 给仍活跃的 writeback 总纲 spec 补本地链接（过远端新增的一致性守卫） |
+| `2ec262ace` | test(advanced-query): 三个写端点在最终运行栈为 410 的三层守卫 + 阳性对照 |
+
+本轮临时产物在仓库根 `tmp_advanced_query_phase0/`（`tmp_*` 已 gitignore）：`probes/` 四个探针
+（INDEX 链接修改、gold 用量普查、410 三层核验、410 守卫变异驱动）与现算输出。
+
+### 16.6 共享库迁移状态核实（用户 2026-11-01「以实际为准」）
+
+直接查共享库 + 按 `MigrationRunner` 同口径（文件名里的**数字**版本号）比对磁盘，现算结果：
+
+| 项 | 现算 |
+|---|---|
+| 共享库 `schema_version` | **234 行，最高 V234，1~234 无缺号**，最后一次应用 2026-11-01 06:38:25 |
+| 候选树磁盘 | **248 个 `V*.sql`，最高 V251，重复版本号 0 组**；缺号 200 / 201 / 240 |
+| **待执行** | **16 条**：V235~V239、V241~V251（V240 磁盘上不存在） |
+| 关键对象仍缺 | `projects.amount_unit` · `user_display_preferences` · `report_generation_run` · `adjustments.content_revision` 四项在共享库里**都不存在** |
+
+🔴 **更正**：§十二与任务 37 此前写「约 16~17 条」是估数，现算**恰为 16 条**，逐条列明如上。
+16 条**全部是他域 spec 的产物**（adjustment 复核 / ai_chat 快照 / ai 模型信任域 / ai 任务 /
+asset_blob / 附件血缘 / 平台耐久任务 / 合并运行 / 抵销工作表 / 报表生成运行 / 合并附注投影 /
+公式推送溯源 / 附注公式运行 / 显示偏好 / 公式溯源报表），**本 spec 零迁移**（本 spec 的 V214 早已应用）。
+
+两项顺带核实（都不是缺陷，登记备查）：
+- 缺号 200 / 201 是**已应用但文件按裁决移除**（`V200__consol_note_mapping_reuse_and_reference` /
+  `V201__partner_manager_edit_level_backfill`），与现有记录一致；
+- V189 在库里记的文件名是 `V189__deliverable_edit_and_writeback_integrity.sql`，磁盘上留的是
+  `V189__create_share_change_event_table.sql`（历史撞号残留，磁盘那份因版本号已登记而**永远不会执行**）。
+  查库确认两侧的产物**都在**（`share_change_event`、`deliverable_section_state`、
+  `word_export_task_versions` 三张表齐全）⇒ 无实际损害，不代改。
+
+### 16.7 真 PG 夹具改造（用户 2026-11-01「按你建议来」）—— 基础设施已落地并验证
+
+#### 改法定稿
+
+新增 `tests/advanced_query_linkage/project_picks.py`：**按数据能力解析项目**，而不是按项目代号。
+之所以不是「把 9 个 UUID 换成 9 个解析器」，是因为本轮现算证明**老的角色划分已经无解**：
+原 `HS` 同时被要求「有 AJE」「RJE 恰好 0 行」「有底稿」「有附注」「六类报表且过期与未过期都有」，
+而现库里华氏 `a7fc75e5` 的 adjustments 与底稿都是 0、重药安徽 `0ec33ac9` 有 8 条 AJE 但
+**RJE 有 2 条**（原用例断言 RJE == 0）——**没有任何一个活项目能同时满足**。
+
+三条实现纪律写进了模块说明：① 只用显式列的裸 SQL，**禁 `db.get(Project, ...)`**（共享库缺
+`projects.amount_unit` 时全列投影会整体 500，正是前十五节那 5 处 500 的同一机理）；
+② 取不到候选就**当场失败并打印库内度量前 8 名**，绝不 skip、绝不退化成「空集也算过」；
+③ 排序确定（`度量 DESC, id ASC`），同一个库必须选出同一个项目。
+
+#### 13 条能力的现算解析结果（共享库，2026-11-01）
+
+| 能力 | 判据要点 | 本次解析到 | 度量 |
+|---|---|---|---|
+| `tb_detail` | 审计年度的试算表有行 | 重药安徽_2025 | 196 |
+| `balance_direction_columns` | 余额表期末方向列有值 | 重药安徽_2025 | 2,436 |
+| `aux_balance_direction_columns` | 辅助余额期末方向列有值 | 陕西华氏_2025 | 132,575 |
+| `aux_multi_dimension` | 辅助维度 ≥ 2 个 | 重药安徽_2025 | 23 |
+| `ledger_over_fetch_cap` | 生效数据集序时账 > 5,000 行 | 陕西华氏_2025 | 2,532,279 |
+| `ledger_over_export_hard_limit` | 生效数据集序时账 > 1,000,000 行 | 陕西华氏_2025 | 2,532,279 |
+| `report_full_with_stale_mix` | 报表**既有过期又有未过期** | 重药安徽_2025 | 352 |
+| `report_absent` | 有试算表但**没有任何报表** | 和平物流_2025 | 174 |
+| `workpapers` | 有未删除底稿 | 宜宾临港店_2025 | 1,026 |
+| `disclosure_notes` | 有附注章节 | 【测试】公式同步甲_2025 | 199 |
+| `adjustments_aje` | 有 AJE 调整分录 | 重药安徽_2025 | 8 |
+| `balance_without_active_dataset` | 有余额表行但该年度无 active 数据集 | 和平药房_2025 | 367 |
+| `consolidated_with_notes` | 合并口径且有合并附注数据 | 某测试集团_2098 | 3,514 |
+
+自测 `test_aql_project_picks_pg.py`（**28 passed**，真库）钉三件事：每条能力都真能解析出项目 ·
+解析确定（另起一个解析器绕过缓存，两次必须同一个项目）· **一条故意不可满足的能力必须失败**
+（反向断言；若 `resolve` 在无候选时静默返回兜底值，上面那些「都能解析」会在数据消失后继续全绿）。
+🔴 写这条反向断言时踩到：`pytest.fail` 抛的 `Failed` 继承 **BaseException 而不是 Exception**，
+`pytest.raises(Exception)` 抓不到 —— 改用 `pytest.raises(pytest.fail.Exception)`。
+
+#### 首个转换文件与**归因证明**
+
+`test_aql_columns_pg.py`（HS + LN → `tb_detail` / `balance_direction_columns` /
+`aux_balance_direction_columns`，年度改取所选项目自己的 `audit_year`）：
+
+| 树 | 结果 |
+|---|---|
+| 转换前（`HEAD` 原文，临时同名探针跑真库） | **3 failed** —— 1 条 `FORBIDDEN_PROJECT`（403，正是写死 UUID 失效的那种形态）+ 2 条卡在「前置：辽宁卫生服务的方向列有值」 |
+| 转换后 | **3 passed** |
+
+即这次改动修的是**真的不工作的用例**，不是换个写法。`BusinessClient` 顺带支持直接传 `Pick`
+（项目与年度一起带出，年度不再默认常量 2025）；裸 UUID 的旧调用方行为不变。
+`ruff check` 本轮 6 个文件 **All checks passed**。
+
+#### 余下 14 个文件的逐文件能力映射（下一步按此转换）
+
+| 文件 | 原代号 | 对应能力 |
+|---|---|---|
+| `test_aql_fixtures.py` | WL、YB | `balance_without_active_dataset`、`tb_detail` |
+| `test_aql_dataset_predicate_pg.py` | WL、YB | 同上 |
+| `test_aql_cycle_scope_pg.py` | HS | `tb_detail` + `disclosure_notes`（复制源） |
+| `test_aql_disclosure_source_pg.py` | HS | `disclosure_notes` |
+| `test_aql_aux_source_pg.py` | HP、HS、UA | `aux_multi_dimension`、`report_full_with_stale_mix`、可写自建 |
+| `test_aql_business_view_pg.py` | HP、HS、WL、YB | `ledger_over_fetch_cap`、`tb_detail`、`workpapers`、`balance_without_active_dataset` |
+| `test_aql_builder_scope_pg.py` | HS、UA、YB | `tb_detail`、可写自建、`balance_direction_columns` |
+| `test_aql_builder_total_refs_pg.py` | HP、HS、YB | `ledger_over_fetch_cap`、`tb_detail` |
+| `test_aql_builder_sql_shape.py` | （无真实项目依赖，按现状复核） | — |
+| `test_aql_report_source_pg.py` | HS、UA、UB | `report_full_with_stale_mix`、`report_absent`、可写自建 |
+| `test_aql_adjustment_source_pg.py` | HS、UA | `adjustments_aje` + **RJE 断言改按金标准现算**（不再断言恒 0） |
+| `test_aql_join_cardinality_pg.py` | HS、UA | `tb_detail`、可写自建 |
+| `test_aql_export_pg.py` | HP、HS、UA | `ledger_over_export_hard_limit`、可写自建 |
+| `test_aql_templates_pg.py` | UA | 可写自建 |
+| `test_aql_writeback_isolation_pg.py` | UA、UB、UP | 可写自建（含 `report_scope='consolidated'` + `consol_note_data`） |
+
+另：`MD` 代号现算 **0 个文件引用**（导入即死码），随上述转换一并删除 `gold.py` 的 9 个常量。
+🔴 **`test_aql_adjustment_source_pg.py` 有一处判据必须改而不是换项目**：原来断言「RJE 行数 == 0」，
+那是华氏当年**恰好没有** RJE 的偶然事实，不是业务不变式 —— 改为与金标准现算的 RJE 行数相等
+（空与非空都对），否则这条用例会在任何有 RJE 的项目上红，而红的原因与被测行为无关。
+
+### 16.8 阶段 0 第三轮（2026-11-03 ~ 11-04）：剩余 11 个真 PG 文件改造完成 + 共享库迁移已由他人追平
+
+本节只记本轮现算结果，不改 16.1~16.7 的原文。候选 = 远端头 `8352d7b38`（v1.0.104）+ 本 spec 提交链，
+分离头 worktree `tmp_aq_phase0/wt`；归因基线 = 同一远端头的干净检出 `tmp_aq_phase0/base_wt`。
+
+#### 环境事实（现查）
+
+- 第二轮的候选与基线 worktree 所在的 `tmp_advanced_query_phase0/` 整个目录被并发会话清掉（`git worktree list`
+  仍登记、目录已不存在）。本轮在 `tmp_aq_phase0/` 按原提交链重建（cherry-pick，提交内容逐个核对）。
+- 共享库迁移已由他人分两批追平：2026-11-03 13:48:36 UTC 落 V235、V237~V239、V241~V247、V250、V251；
+  15:24:05 UTC 再落 V236、V248、V249。现查 `schema_version` **250 行、最高 V251**（V240 本就没有文件），
+  `projects.amount_unit` 已存在。⇒ 16.6 记的「候选栈启动会把共享库从 V234 推到 V251、需用户放行」**不再成立**，
+  本 spec 没有执行过任何迁移。
+- 共享终端被别的会话设了 `DATABASE_URL=…/gt_nonexistent_db_x`：跑测脚本原来用 `setdefault` 继承了它，一轮 PG
+  用例全部 `InvalidCatalogNameError`。脚本改为显式设定、换库只走命令行参数，不在共享终端里设环境变量。
+
+#### 改造结果
+
+| 项 | 结果（现算） |
+|---|---|
+| 能力目录 | **23 条**，每条至少被一条用例 `resolve`（AST 守卫 `test_every_capability_is_used_by_some_test`）；解析结果见下表 |
+| 自建夹具 | `new_project`（显式列裸 SQL）、`writable_project`、`no_active_dataset_project`、`insert_member`（用户 + 人员 + 可选成员行 + 可选委派）、`copy_project_rows`（列清单按 information_schema 现读） |
+| `gold.py` | 删除 9 个项目常量与 `WRITABLE_PROJECTS`；只留 `AUDIT_YEAR`、`active_sql`、`Gold`、`LIVE_PROJECTS_SQL`、`require_pg_only` |
+| `builder_client` | 删除按用户名读真实账号的 `real_user`（e2e_manager、u_011abb97dd2d4101 现库已不存在） |
+| 本目录真 PG（候选） | **924 passed / 0 failed / 0 skipped** |
+| 本目录真 PG（基线 `8352d7b38`） | 858 例：745 passed / 109 failed / 4 errors |
+| 逐节点归因 | **新增失败 0**、修复 88、改名 25（25 个旧节点在基线里**全是红**，没有绿用例被删）、新出现 91 |
+| 相关非 PG 选集（附注目录树 / 裁剪 / 审计报告，17 个文件 454 例，指向不存在的库） | 基线与候选同为 47 红（`test_audit_report` 25、`test_eqcr_state_machine_lock` 12、`test_workpaper_dataset_binding` 7、`test_note_standalone_consolidated_only_scope` 2、`test_disclosure_note_edit_stamp` 1，均为远端头预存）；提交前多出的 1 条是 `test_task23_zero_regression` 的「工作区 = HEAD」字节比对（当时注释改动未提交），提交后复跑见下 |
+
+能力解析结果（共享库，2026-11-03 现算；同一个库必须解析出同一个项目，`test_resolution_is_deterministic` 绕过缓存复查）：
+
+| 能力 | 解析到 | 度量 |
+|---|---|---|
+| `tb_detail` / `tb_with_cash_account` / `tb_and_notes_copy_source` / `account_chart_two_sources` | 重药控股安徽_2025 | 196 |
+| `tb_account_categories` | 重药控股安徽_2025 | 5 |
+| `adjustments_aje` | 重药控股安徽_2025 | 8 |
+| `balance_with_narrowing_active_dataset` | 重药控股安徽_2025 | 812 |
+| `report_rich` | 重药控股安徽_2025 | 6 |
+| `ledger_debit_over_1e8_within_page` | 重药控股安徽_2025 | 1 |
+| `balance_direction_columns` | 四川物流_2025 | 813 |
+| `ledger_over_fetch_cap` / `ledger_1002_over_fetch_cap` / `ledger_month_export` | 四川物流_2025 | 22,716 / 5,479 / 1,817 |
+| `ledger_over_max_offset` / `report_absent` | 和平物流_2025 | 118,259 / 174 |
+| `ledger_over_export_hard_limit` | 和平药房_2025 | 1,066,675 |
+| `aux_balance_direction_columns` / `aux_bank_account_1002` / `ledger_with_null_debit` / `workpapers` | 宜宾临港店_2025 | 304 / 1 / 1,940 / 1,026 |
+| `financial_report_rows` | 医疗器械_2025 | 152 |
+| `notes_multi_table_total` | 【测试】公式同步甲_2025 | 199 |
+| `consolidated_with_notes` | 某测试集团_2098 | 3,514 |
+
+#### 改造后才走到的断言里暴露的漂移（「整组前置红」会把后面断言一起藏住）
+
+1. `test_note_branch_follows_the_editor_catalog`：期望的「附注目录」叶子没有 `condition_fields`。指标树 v15（任务 40）
+   起每个叶子都带它，这条用例改造前恒在前置上红、从没走到这一行，所以没跟着更新。改期望，不改实现。
+2. 导出用例的按月金标准：我改造时把月份边界当字符串传给 `CAST(:d0 AS date)`，asyncpg 按目标类型绑定
+   ⇒ `DataError: 'str' object has no attribute 'toordinal'`。改为传 `date`（我的改造缺陷）。
+3. 构建器身份：第一版「按循环委派的受限成员」用了系统 auditor，被构建器角色门先挡成 `ROLE_FORBIDDEN`、根本走不到
+   作用域。改为系统经理 + 成员行审计员 + 审计员委派 D 循环（与 `test_aql_cycle_scope_pg` 同形）。
+4. 回写隔离的「试算行指纹前后一致」：原先取【UAT】子公司B，它不存在时指纹恒为 `(0, NULL)`，前后一致是空转。
+   现在按 `tb_detail` 取真实项目，并前置断言行数 > 0。
+5. JOIN 基数：原先在【UAT】子公司A 上造调整分录，靠它现成的「本年、同公司、同科目」试算行才匹配得上。自建项目上
+   必须显式补这一行，否则调整分录 → 试算表一行都匹配不上、守卫空转（用例里的 `matched > 0` 前置会打红）。
+6. 底稿排序金标准：按库排序规则（`en_US.utf8` 下 `A10` 排在 `A1-11` 前）用 SQL `ORDER BY` 现算，不用 Python `sorted()`。
+
+#### 磁盘变异（改生产代码一处 → 跑对应用例 → 逐字节还原并核对 sha256）
+
+| # | 变异 | 预期变红的用例 | 结果 |
+|---|---|---|---|
+| M1 | 调整分录 → 试算表的 ON 去掉年度 / 公司代码 | 多对一 `adjustments->trial_balance` | 红 1 / 14，其余绿 |
+| M2 | 试算表 → 科目表去掉「只认标准科目」 | 科目表两套行用例、自建 LEFT JOIN 无匹配用例 | 红 3（含多对一 `trial_balance->account_chart`） |
+| M3 | 构建器不排除对本人设有循环范围的项目 | 两种受限身份 | 红 2，主管身份绿 |
+| M4 | 项目归属守卫对普通用户恒放行 | 他项目 / 已删项目 403 且不执行 | 红 1；红在错误码：请求被下一层（循环范围）兜成 `CYCLE_SCOPED_PROJECT`，仍 403、未执行 —— 用例点名的正是失效的归属那一层 |
+| M5 | 报表源丢掉本项目独有行 | 项目独有行 / 覆盖行 | 红 1，真实项目报表对账绿 |
+| M6 | 报表行次对他项目副本行可见 | 只见本项目副本行 | 红 1 |
+| M7 | 按模板执行时年度取模板里存的值 | 年度 = 请求年度，否则项目审计年度 | 红 1 |
+| M8 | 回写取行不带请求项目 | 他项目底稿不读不锁（NOWAIT） | 红 1 |
+| M9 | 构建器四表不按生效数据集过滤 | 生效数据集口径 | 红 1，无数据集分支绿 |
+| M10 | 调整类型映射 `"rcl": "rje"` → `"RCL"` | 见下 | 红 1（`generic-RCL`） |
+| N1 | 阴性对照：只加一行注释 | 全部 34 例必须绿 | 全绿 |
+
+🔴 M10 第一轮判 FAIL：我把预期红写在「空项目 RJE 源 200 + 0 行」那条上，变异后它照样绿。原因是类型列按文本比较
+（未映射的值只是匹配不到），且 `adj_rje` / `adj_rcl` 两个源键的类型由 `fixed_filters` 固定为 `rje`、覆盖请求里的
+`RCL` ⇒ 这张映射表只有通用源 `adjustment` 带 `RCL` 时才用得到，唯一能钉住它的是 `generic-RCL` 那一格。已按实测
+改正预期并复跑（红 1 / 13），同时把那条用例与模块说明里「这里会 500」的说法改成它真正钉住的东西。
+
+#### 三个写端点在运行中的栈上（用户 Phase 0 第 5 条）
+
+运行中的 9980（主工作树的栈）上，不带登录态、请求体故意非法：`writeback-preview` / `writeback-confirm` /
+`cell-writeback` 三个都是 **410 `ADVANCED_QUERY_WRITEBACK_RETIRED`**（生产信封 `{"code": 410, "message": {...}}`）；
+阳性对照 `GET /api/custom-query/templates` 不带登录态 = **401**（证明请求真的到了后端鉴权层）。同一时刻该栈健康检查的
+迁移段：applied 250、pending 空。
+
+#### 范围外发现（登记，不改）
+
+- 本目录之外还有测试与脚本写死这批已不存在的项目 UUID：`tests/test_sampling_phase_pg.py`、`tests/test_voucher_links_pg.py`
+  （辽宁 `d9295a0c`）、`tests/test_voucher_sampling_exclusion_pg.py`、`tests/formula_hub/test_report_leaf_gold_pg.py`
+  （医疗器械 `5e193c68`）、`tests/test_stale_summary_full.py`、`tests/test_voucher_identity_real_ledger_pg.py`，以及
+  `scripts/seed/init_4_projects.py`、`scripts/e2e/e2e_business_flow_verify.py`、`scripts/e2e/procedure_e2e_live.py`、
+  `scripts/ops/canary_deploy_simulation.py`、`scripts/check/verify_data_quality_shaanxi.py`。归各自模块。
+- 本目录 4 个文件按**项目全名**定位真实项目（`test_aql_presets_pg` / `test_aql_conditions_pg` / `test_aql_entry_accounts_pg` /
+  `test_aql_consolidated_paths_pg`），都断言恰好命中一条、取不到当场失败，现全绿；不是固定 UUID，本轮不改。
+
+### 16.9 任务 37 浏览器验收（候选栈，2026-11-04）
+
+候选栈从 `tmp_aq_phase0/wt` 起：后端 9981（`--lifespan off`：不起后台 worker、不回放共享 outbox、不跑种子；
+`GT_BOOTSTRAP_DONE=1`；Redis 独占 db 9；共享库）+ 前端 3040（`.env.local` 把后端地址定死为 9981，结束即删）。
+起停脚本 `tmp_aq_phase0/probes/candidate_stack.py`；环境变量只设给子进程，主工作树 `.env` 只读值、不复制。
+请求经 3040 代理落到 9981 已在后端访问日志核对。
+
+#### 两个 e2e spec（11 例）
+
+首轮 5 / 11：`advanced-query-module-e2e.spec.ts` 6 例全部在登录步骤超时 —— 登录后落点现为「/」，用例等的是
+`/dashboard|/projects`。按姊妹 spec 同一口径改为「离开登录页即算登录成功」（测试侧过期，不是产品缺陷）后
+**11 / 11 通过**；修复下面的弹窗缺陷后整组复跑仍 **11 / 11**。只读核对（`SKIP_E2E_SEED=1`，不 seed）。
+
+#### design §10.5 写后读回走查（自写 Playwright 脚本，串行，证据 `walkthrough-evidence.json`）
+
+| # | 走查 | 读回 / 金标准 | 结果 |
+|---|---|---|---|
+| T1 | 页面版：四川物流_2025 序时账 → 保存公开模板（名称带【测试】）→ 列表读回 → 刷新后载入 → 执行 → 删除 → 回收站页「恢复」→ 读回 → 再删 → 回收站页「删除」（永久） | 页面「共 22716 条」= SQL 生效数据集行数 22,716；列表读回 scope = public；载入不自动执行；恢复后列表读回到；永久删除后列表与回收站都没有；库内 `custom_query_templates` 该名称 **0 行** | 通过（两轮各一次，均已清理） |
+| T2 | 同一查询「导出全部」（服务端） | openpyxl 读回数据行 22,716 = COUNT；「查询说明」七项齐全（行数 22,716） | 通过 |
+| T3 | W6：试算表 1002 右键「按此查询明细」 | 弹窗按 `ledger_entries` + `account_code=1002` 立即查询，「共 5479 行」= SQL 5,479 | **首轮失败 → 修复后通过**（见下） |
+| T5 | W6：报表货币资金右键「查看穿透」→「按此查询明细」（同一弹窗的第二个宿主，本页首次打开） | `tb_detail` + `report_row=balance_sheet:BS-002`，10 行 = SQL（公式 1001 / 1002 / 1012 的试算行）10 | 通过 |
+| T4 | W3：页面版「我的模板」 | 系统预置 **10 条**（名称与 W3 清单一致）；载入「周末分录」后条件进编辑器（1 行）、不自动执行、显示节假日说明 | 通过 |
+
+#### 🔴 验收抓到的真实缺陷：业务页入口首次打开弹窗只套上下文、不查询（已修，`fix(web-query)`）
+
+现象（T3 首轮）：弹窗打开，项目 / 年度 / 数据源与「试算表 1002 银行存款」上下文都对，结果区停在「选择项目和数据源后点击查询」，
+后端没有收到任何 execute 请求。控制台：`ReferenceError: Cannot access 'templateRun' before initialization`
+（`executeQuery` ← `useQueryEntry.applyEntry` ← `watch.immediate`），被 `void` 吞掉。
+
+根因：远端把 `CustomQueryDialog` 改成「首次打开才挂载」后，第一次点入口时弹窗**挂载即可见且带 entry**；「打开即套用入口并
+执行」的 immediate watch 写在 `templateRun` 等状态声明之前，注册当时同步执行 ⇒ 落进 TDZ。已挂载后的第二次打开不受影响，
+所以既有单测（先挂载再改 props）与「再点一次」都看不出来。四个 W6 宿主（试算表、报表穿透、附注、底稿工具栏）经同一事件打开
+同一个弹窗，机理相同；修复前的形态只在试算表上复现过，修复后在试算表与报表穿透两个宿主上实测通过。
+
+修法：把该 watch 挪到全部状态声明之后注册，逻辑不变。补两条单测（首次挂载即带入口照样查询一次且无未处理拒绝；已挂载后带入口
+打开同样只查一次）。修复前版本跑新用例打红，错误正是浏览器里那一条；阴性对照（只加注释）绿；查询相关前端 36 个文件 376 例通过；
+单区域 vue-tsc（`tsconfig._aql-linkage.json`）0 错，注入类型错误报 TS2322。
+
+#### 本轮没有走的 §10.5 项（如实登记）
+
+- 需要专门测试账号的：审计员作者在回收站看到「恢复」「删除」、模板三档对审计员可见、经理清 `sessionStorage` 后刷新回收站、
+  PM 身份构建器默认当前项目 / 只见可访问项目 —— 要在共享库建测试账号，本轮不建，待用户定。
+- W6 的附注右键与底稿工具栏两个宿主（与已验的两个宿主共用同一弹窗与同一修复）、附注编辑器页内切年后再点入口、A1 底稿
+  「没有登记对应科目」提示。
+- 序时账翻到第 100 页 + 借方降序 + 打开凭证、页面版「借方 > 1 亿」、复制引用粘到公式编辑器校验、模板库三个「📊 高级查询」
+  按钮、右键跳模板溯源、路由切项目后再开弹窗、错误态中文与追踪号、W3 大额预置的重要性提示与「另存为我的模板」。
+
+因此任务 37 记为**部分实测**：e2e 11 例与上表 5 项通过、抓到并修复 1 处缺陷；其余项未走，保持 `[ ]*`。
+
+#### 三个写端点在候选栈
+
+候选后端 9981 直连与经 3040 代理各核一次：三个都是 410 `ADVANCED_QUERY_WRITEBACK_RETIRED`，阳性对照 401。

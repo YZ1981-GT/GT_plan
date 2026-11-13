@@ -47,6 +47,11 @@ services:
       - "-c"
       - "max_connections=200"
 
+    # Docker 默认 /dev/shm 只有 64MB；并行查询 / 并行 hash 聚合用它做动态共享内存，
+    # 百万行级账簿查询会报 "could not resize shared memory segment ... No space left on device"。
+    # 需重建容器生效：docker compose up -d postgres（数据卷保留）
+    shm_size: "1gb"
+
     volumes:
 
       - pg_data:/var/lib/postgresql/data

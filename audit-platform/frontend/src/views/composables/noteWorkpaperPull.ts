@@ -26,7 +26,21 @@ export interface NotePullSection extends NotePullSectionState {
   unchanged: number
   kept: number
   skipped: number
+  /** 其中写入归属矩阵拒写的格（spec formula-writer-ownership-and-stale §13；也计入 skipped） */
+  blocked?: number
   reasons: string[]
+}
+
+/** 写入归属被拒的一格（后端 `note_write_ownership.WriteGate.record`） */
+export interface NoteBlockedWrite {
+  section: string
+  table: string
+  field: string
+  row?: string | null
+  writer_id: string
+  owner_id?: string | null
+  reason_code: string
+  reason: string
 }
 
 export type NotePullPhase = 'all' | 'prepare' | 'push'
@@ -45,8 +59,10 @@ export interface NotePullResult {
     written: number
     kept: number
     skipped: number
+    blocked?: number
     run_id: string | null
     warnings: string[]
+    blocked_writes?: NoteBlockedWrite[]
   }
   sections: NotePullSection[]
   /** 章节 → 状态（取数结果的章节行 + 全部刷新时其余已有章节；一张底稿可写多个章节，spec note-pull-followup-closure R1） */
@@ -112,6 +128,13 @@ export function describeWorkpaperPull(
         lines.push(`公式推送按审定数写入 ${p.written} 格（${touched.slice(0, 4).join('、')}${touched.length > 4 ? '等' : ''}）`)
       }
       if (p.kept > 0) lines.push(`保留人工 / 锁定 ${p.kept} 格`)
+      if ((p.blocked ?? 0) > 0) {
+        // 推送只会因为「写入归属矩阵没有这一格」被拒（原因全文在 blocked_writes），提示里只点名第一格
+        const first = p.blocked_writes?.[0]
+        const where = first ? `（如 ${first.section} ${first.table}${first.row ? `「${first.row}」` : ''}）` : ''
+        lines.push(`公式推送有 ${p.blocked} 格不在它负责的范围，未改${where}`)
+        warn = true
+      }
     }
   }
   const synced = headless.filter((h) => h.status === 'synced')

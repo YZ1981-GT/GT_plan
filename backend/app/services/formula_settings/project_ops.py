@@ -22,7 +22,7 @@ from app.services.formula_settings.errors import (
     VersionConflict,
     VersionRequired,
 )
-from app.services.formula_settings.pending import close_pending, find_pending
+from app.services.formula_settings.pending import close_pending, update_pending_local
 from app.services.formula_settings.projects import ProjectInfo, get_project
 from app.services.formula_settings.stores import DomainStore, SlotRecord, get_store
 from app.services.formula_settings.sync import Action, Resolution, resolve_pending
@@ -107,10 +107,8 @@ async def save_overrides(db: AsyncSession, *, domain: str, project_id: uuid.UUID
                                   base_version=base_ver, pinned=pinned, base_origin=origin, base_template_id=tpl,
                                   user_id=user_id, label=str(raw.get("label") or (up.label if up else "")),
                                   structure=dict(raw.get("structure") or {}) or None)
-        item = await find_pending(db, project_id, domain, slot)
-        if item is not None:
-            item.local_definition = {k: v for k, v in merged.items() if k != "_structure"}
-            item.updated_at = _now()
+        await update_pending_local(db, project_id=project_id, domain=domain, slot_key=slot,
+                                   local_definition=merged)
         saved.append(slot)
         if not same_exec(domain, before, merged):
             changed.append(slot)

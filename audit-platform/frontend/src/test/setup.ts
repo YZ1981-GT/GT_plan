@@ -70,22 +70,27 @@ afterAll(() => {
   console.warn(`[测试基座·网络] ${verdict.message}`)
 })
 
-// 重置之后再取模块实例，保证与本测试文件随后 import 到的是同一份
-// （静态 import 会先于上面的重置求值，拿到的是上一个文件留下的旧实例）。
-const { createPinia, setActivePinia } = await import('pinia')
-const { useDisplayPrefsStore } = await import('@/stores/displayPrefs')
-
 /**
  * 用例边界：
  * - 激活 Pinia（对话框/审定表依赖 useDisplayPrefsStore）
  * - 金额单位默认「元」、showZero=true，避免默认「万元」/零值隐藏导致断言漂移
+ *
+ * 🔴 模块在 beforeEach 里取，不在本文件顶层取：setup 顶层先于测试文件的 vi.mock 注册求值。v1.0.142 起
+ * displayPrefs 引用 stores/project，顶层 import 会把项目 store 连同 auditPlatformApi / apiProxy / utils/http
+ * 按真实模块缓存下来，测试文件之后对这些模块的 mock 一律够不着（DefaultLayout.year.spec 因此真实连网、
+ * 年度判成取失败）。beforeEach 时 mock 已注册，且 import 走同一模块缓存，与测试文件拿到的是同一份。
+ * pinia 本身不牵连业务模块，仍在顶层取（有测试整体 mock 掉 pinia、不导出 createPinia，在 beforeEach 里取会直接报错）。
  */
-beforeEach(() => {
+// 重置之后再取模块实例，保证与本测试文件随后 import 到的是同一份
+// （静态 import 会先于上面的重置求值，拿到的是上一个文件留下的旧实例）。
+const { createPinia, setActivePinia } = await import('pinia')
+beforeEach(async () => {
   try {
     localStorage.removeItem('gt_display_prefs')
   } catch { /* ignore */ }
   setActivePinia(createPinia())
   try {
+    const { useDisplayPrefsStore } = await import('@/stores/displayPrefs')
     const prefs = useDisplayPrefsStore()
     prefs.setUnit('yuan')
     prefs.setShowZero(true)

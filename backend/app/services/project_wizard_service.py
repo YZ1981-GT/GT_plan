@@ -4,9 +4,11 @@ Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 1.8
 """
 
 import logging
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,9 +23,10 @@ from app.models.audit_platform_schemas import (
     WizardStepData,
     WizardStepSaveResponse,
 )
+from app.services.note_section_catalog import normalize_report_scope
 from app.services.note_template_service import NoteTemplateService
 from app.services.project_classification import DEFAULT_SCENARIO
-from app.services.uscc_validator import validate_uscc
+from app.services.uscc_validator import format_code_error, normalize_uscc_input, validate_uscc
 from app.services.uniqueness_checker import check_uniqueness
 
 # 默认报表类型（与 batch_project_service.DEFAULT_REPORT_SCOPE 保持一致）
@@ -252,15 +255,18 @@ async def create_project(
     if not short_name:
         raise HTTPException(status_code=422, detail="项目简称为必填项")
 
-    # 2. company_code 非空
-    company_code = (data.company_code or "").strip() if data.company_code else ""
+    # 2. company_code 非空；规范化（R1.2：NFKC → strip → upper）后校验并写回，入库为规范值
+    company_code = normalize_uscc_input(data.company_code) or ""
     if not company_code:
         raise HTTPException(status_code=422, detail="企业代码为必填项")
+    data.company_code = company_code
 
-    # 3. USCC 格式校验
+    # 3. USCC 格式校验（R2.1：报错带字段名）
     uscc_valid, uscc_error = validate_uscc(company_code)
     if not uscc_valid:
-        raise HTTPException(status_code=422, detail=uscc_error)
+        raise HTTPException(
+            status_code=422, detail=format_code_error("企业代码", uscc_error)
+        )
 
     # 4. 唯一性校验。持久批量计划已一次性预取并锁定校验，可跳过重复 SELECT；
     # 数据库部分唯一索引仍处理并发竞争。
@@ -364,15 +370,50 @@ async def get_wizard_state(project_id: UUID, db: AsyncSession) -> WizardState:
 # ---------------------------------------------------------------------------
 
 
+# R2.2：向导保存基本信息 pydantic 校验失败的已知字段中文名表；未登记字段保留原名
+_BASIC_INFO_FIELD_LABELS: dict[str, str] = {
+    "client_name": "客户名称",
+    "audit_year": "审计年度",
+    "project_type": "项目类型",
+    "accounting_standard": "会计准则",
+    "company_code": "企业代码",
+    "parent_company_code": "上级企业代码",
+    "ultimate_company_code": "最终控制方代码",
+    "short_name": "项目简称",
+    "template_type": "附注模板类型",
+    "company_subtype": "报告模板类型",
+    "report_scope": "报表类型",
+    "relation_to_parent": "与上级关系",
+    "parent_company_name": "上级企业名称",
+    "ultimate_company_name": "最终控制方名称",
+    "manager_id": "项目经理",
+    "signing_partner_id": "签字合伙人",
+}
+
+
+def _validation_error_detail(exc: "ValidationError") -> str:
+    """pydantic 校验失败转中文 detail（R2.2）：已知字段用中文名，未登记字段保留原名。"""
+    fields = sorted({str(e["loc"][0]) for e in exc.errors() if e.get("loc")})
+    labels = [_BASIC_INFO_FIELD_LABELS.get(f, f) for f in fields]
+    return f"基本信息字段缺失或格式错误：{'、'.join(labels) or '未知字段'}"
+
+
 async def update_step(
     project_id: UUID,
     step: WizardStep,
     data: dict,
     db: AsyncSession,
+    *,
+    actor: Any | None = None,
 ) -> WizardStepSaveResponse:
     """更新指定步骤数据，持久化到 projects.wizard_state JSONB。
 
     Validates: Requirements 1.3, 1.4, 1.5
+
+    ``actor``：保存基本信息的操作者（R2.5）。企业代码有变化时必须提供——
+    admin / partner 照建项口径直通，manager 须持有新代码的有效建项授权，
+    其他角色不能修改企业代码；``actor is None`` 且代码有变化时拒绝（fail-closed），
+    避免内部调用绕开授权。
     """
     project = await _get_project_or_404(db, project_id)
 
@@ -433,12 +474,97 @@ async def update_step(
         try:
             parsed = BasicInfoSchema.model_validate(data)
         except ValidationError as exc:
-            # 端点收的是 dict，schema 校验失败须转 422（否则落成 500）
-            fields = sorted({str(e["loc"][0]) for e in exc.errors() if e.get("loc")})
+            # 端点收的是 dict，schema 校验失败须转 422（否则落成 500）；
+            # 已知字段以中文名列出（R2.2）
             raise HTTPException(
                 status_code=422,
-                detail=f"基本信息字段缺失或格式错误：{'、'.join(fields) or '未知字段'}",
+                detail=_validation_error_detail(exc),
             ) from exc
+        # ── 企业代码变化链（R2.5 / R2.3 / R6，design §3.4：全部先于库存查询 prepare_group_fields）──
+        # 基本信息步骤入口已对新旧年度加拓扑锁并 refresh（函数开头）。
+        normalized_new_code = normalize_uscc_input(parsed.company_code)
+        current_code = normalize_uscc_input(project.company_code)
+        scope_changed = (
+            normalize_report_scope(parsed.report_scope or DEFAULT_REPORT_SCOPE)
+            != normalize_report_scope(project.report_scope)
+        )
+        code_changed = normalized_new_code is not None and normalized_new_code != current_code
+        if code_changed:
+            # 企业代码变化先做格式校验，避免授权服务把非法代码的 422 误包装成授权 403。
+            ok, err = validate_uscc(normalized_new_code)
+            if not ok:
+                raise HTTPException(
+                    status_code=422, detail=format_code_error("企业代码", err)
+                )
+            # 1) 对新代码走建项授权（admin/partner 直通；manager 查有效授权；其他角色 403）
+            if actor is None:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error_code": "COMPANY_CREATION_NOT_AUTHORIZED",
+                        "message": "修改企业代码需要该代码的建项授权：内部调用未提供操作者，已拒绝",
+                    },
+                )
+            from app.services.project_creation_grant_service import (
+                ProjectCreationGrantStale,
+                authorize_creation_codes,
+                lock_and_revalidate_creation_codes,
+            )
+
+            try:
+                snapshots = await authorize_creation_codes(
+                    db, actor, [normalized_new_code], entrypoint="wizard_company_code",
+                )
+            except HTTPException as exc:
+                # 授权拒绝（403 dict）沿用授权服务形态，message 换成向导口径（R2.5）
+                detail = exc.detail
+                reason = detail.get("message") if isinstance(detail, dict) else str(detail)
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error_code": "COMPANY_CREATION_NOT_AUTHORIZED",
+                        "message": f"修改企业代码需要该代码的建项授权：{reason}",
+                    },
+                ) from exc
+            # 2) 年度锁已持有，锁后重验（授权在锁等待期间被撤销/过期 ⇒ 409）
+            try:
+                await lock_and_revalidate_creation_codes(
+                    db, actor, [normalized_new_code], expected_snapshots=snapshots,
+                )
+            except ProjectCreationGrantStale as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error_code": "PROJECT_CREATION_GRANT_STALE",
+                        "message": "建项授权已变化，请重新提交",
+                    },
+                ) from exc
+        # 3) 唯一性（R2.3：企业代码 / 年度 / 口径任一变化时；排除本项目自身）
+        if code_changed or (parsed.audit_year != project.audit_year) or scope_changed:
+            if normalized_new_code is not None:
+                ok, err = validate_uscc(normalized_new_code)
+                if not ok:
+                    raise HTTPException(
+                        status_code=422, detail=format_code_error("企业代码", err)
+                    )
+                is_unique, uniqueness_error = await check_uniqueness(
+                    normalized_new_code,
+                    parsed.audit_year,
+                    parsed.report_scope or DEFAULT_REPORT_SCOPE,
+                    db,
+                    exclude_project_id=project.id,
+                )
+                if not is_unique:
+                    raise HTTPException(status_code=409, detail=uniqueness_error)
+        # 4) 影响检查（R6：按旧代码、同年度；有引用 409 COMPANY_CODE_IN_USE）
+        if code_changed and current_code is not None:
+            from app.services.company_code_change_guard import (
+                code_change_impacts,
+                raise_if_code_in_use,
+            )
+
+            impacts = await code_change_impacts(db, project, current_code, project.audit_year)
+            raise_if_code_in_use(impacts)
         notices = await prepare_group_fields(
             db, parsed, project_id=project.id,
             report_scope=parsed.report_scope or DEFAULT_REPORT_SCOPE, inherit=False,

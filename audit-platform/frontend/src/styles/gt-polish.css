@@ -128,17 +128,29 @@
    2. 表格精修 — 更精致的行间距和对齐
    ═══════════════════════════════════════════════════════════════ */
 
-/* 表头更精致（padding 紧凑，中文表头不 uppercase） */
+/* 表头更精致（中文表头不 uppercase）。字号与 padding 读账号显示偏好的根变量
+   （spec platform-global-display-settings-closure R5：不得再以固定 12px 覆盖显示字号）。 */
 .el-table th.el-table__cell {
-  padding: 6px 8px !important;
-  font-size: 12px !important;
+  padding: var(--gt-table-cell-padding-y, 6px) var(--gt-table-cell-padding-x, 8px) !important;
+  font-size: var(--gt-display-font-size, 12px) !important;
   letter-spacing: 0.3px !important;
   color: var(--gt-color-primary-dark) !important;
 }
 
-/* 数据行紧凑：配合 13px 字号，padding 缩小让列宽留给内容 */
+/* 数据行：padding 随表格密度，字号随显示字号 */
 .el-table td.el-table__cell {
-  padding: 6px 8px !important;
+  padding: var(--gt-table-cell-padding-y, 6px) var(--gt-table-cell-padding-x, 8px) !important;
+  font-size: var(--gt-display-font-size, 12px);
+}
+
+/* 单元格文字、表内编辑控件与虚拟表格同读显示字号：局部固定的 cell-style 字号写在 td 上，
+   文字在 .cell 里，以这里为准 */
+.el-table .cell,
+.el-table .el-input__inner,
+.el-table .el-select__selected-item,
+.el-table-v2__header-cell,
+.el-table-v2__row-cell {
+  font-size: var(--gt-display-font-size, 12px);
 }
 
 /* 选中行 — 浅蓝而非深色 */

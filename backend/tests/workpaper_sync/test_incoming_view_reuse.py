@@ -45,7 +45,6 @@ from app.services.workpaper_sync.excel_extract import (
 from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
 from tests.workpaper_sync.d4_materialize_harness import (
     D4World,
-    _text_safe,
     build_world,
     force_chained_path,
 )
@@ -178,7 +177,7 @@ def runs(world: D4World) -> Runs:
     incoming = _incoming(world, "incoming-a.xlsx")
     raw: dict[str, Any] = {}
     with findings_forcing_baseline(), counted_extractions(raw) as extract_calls:
-        projection = _text_safe(adapter.extract(artifact=incoming, contract=world.contract))
+        projection = adapter.extract(artifact=incoming, contract=world.contract)
     views = adapter._baseline.get("incoming_views")
     assert views is not None, "OO→HTML 形态的 incoming 提取没有登记逐 binding 结果"
     views_before = copy.deepcopy(views.views)
@@ -315,7 +314,7 @@ def test_chained_fallback_reuses_only_the_trip_that_reads_the_incoming(world: D4
     siblings = world.adapter.sibling_bindings[:2]
     incoming = _incoming(world, "incoming-chain.xlsx")
     adapter = _oo_adapter(world, siblings=siblings)
-    projection = _text_safe(adapter.extract(artifact=incoming, contract=world.contract))
+    projection = adapter.extract(artifact=incoming, contract=world.contract)
     outputs = {}
     for label, subject in (("reuse", adapter), ("control", _oo_adapter(world, siblings=siblings))):
         with force_chained_path(), counted_extractions() as calls:
@@ -494,7 +493,7 @@ def test_extraction_does_not_read_the_runtime_binding_part(world: D4World, hollo
 def test_a_hollowed_incoming_still_reuses_through_the_reinjected_copy(world: D4World) -> None:
     incoming = _hollowed(world, "incoming-hollow-e2e.xlsx")
     adapter = _oo_adapter(world)
-    projection = _text_safe(adapter.extract(artifact=incoming, contract=world.contract))
+    projection = adapter.extract(artifact=incoming, contract=world.contract)
     with counted_extractions() as reuse_calls:
         adapter.materialize(
             substrate=incoming, projection=projection,

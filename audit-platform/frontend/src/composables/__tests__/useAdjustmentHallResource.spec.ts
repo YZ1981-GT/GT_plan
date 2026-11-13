@@ -56,6 +56,19 @@ describe('useAdjustmentHallResource', () => {
     vi.useRealTimers()
   })
 
+  it('数据库结构未升级（503 MIGRATION_PENDING）时错误文案用后端说明', async () => {
+    const resource = useAdjustmentHallResource(() => [] as string[], () => 'ctx')
+    const text = '数据库结构未升级：程序需要 V251，库里最高 V234，还有 17 个迁移未执行。请联系管理员重启后端（启动时会自动执行迁移）'
+    await resource.load(async () => {
+      throw { response: { status: 503, data: { message: { error_code: 'MIGRATION_PENDING', message: text } } } }
+    }, '读取客户已入账建议失败，请重试')
+    expect(resource.status.value).toBe('error')
+    expect(resource.error.value).toBe(text)
+    // 其他 503 仍用调用方给的文案
+    await resource.load(async () => { throw { response: { status: 503, data: { message: '维护中' } } } }, '读取失败')
+    expect(resource.error.value).toBe('读取失败')
+  })
+
   it('取消请求不伪装成读取失败；reset 使在途响应失效', async () => {
     const resource = useAdjustmentHallResource(() => ['initial'], () => 'ctx')
     await resource.load(async () => { throw { code: 'ERR_CANCELED' } }, '读取协作失败')

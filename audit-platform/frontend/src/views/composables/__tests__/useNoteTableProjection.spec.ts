@@ -334,3 +334,51 @@ describe('useNoteTableProjection — 期间层（期间并列 / 最上层期间�
     ])
   })
 })
+
+
+describe('useNoteTableProjection — 稳定列身份与 measure 元数据同列移动', () => {
+  const measuredMain = () => ({
+    ...mainTable(), table_id: 'main-id', measure_status: 'matched',
+    column_ids: ['label-id', 'ending-id'], column_kinds: ['text', 'amount'],
+    column_ratio_scales: [null, null],
+  })
+  const measuredContinuation = () => ({
+    ...contTable(), table_id: 'cont-id', measure_status: 'matched',
+    column_ids: ['cont-label-id', 'opening-id'], column_kinds: ['text', 'amount'],
+    column_ratio_scales: [null, null],
+  })
+
+  it('续表跳过重复标签列时，ID/kind/scale 同步跳过并合并', () => {
+    const { currentNoteTables } = mount({ table_data: { _tables: [measuredMain(), measuredContinuation()] } })
+    const table = currentNoteTables.value[0]
+    expect(table.headers).toEqual(['项目', '期末余额', '期初余额'])
+    expect(table.column_ids).toEqual(['label-id', 'ending-id', 'opening-id'])
+    expect(table.column_kinds).toEqual(['text', 'amount', 'amount'])
+    expect(table.column_ratio_scales).toEqual([null, null, null])
+    expect(table.measure_status).toBe('matched')
+    expect(table.table_id).toBe('main-id+cont-id')
+  })
+
+  it('任一来源未匹配，组合表不得伪装 matched', () => {
+    const bad = { ...measuredContinuation(), measure_status: 'unmatched', column_kinds: [null, null] }
+    const { currentNoteTables } = mount({ table_data: { _tables: [measuredMain(), bad] } })
+    expect(currentNoteTables.value[0].measure_status).toBe('unmatched')
+  })
+
+  it('workpaper raw 投影保留 raw 行，但 measure 元数据强制取服务端', () => {
+    const currentNote = ref<any>({
+      table_data: {
+        _source: 'workpaper', sub_table_data: {},
+        _tables: [measuredMain()],
+      },
+    })
+    const { currentNoteTables } = useNoteTableProjection({
+      currentNote,
+      projectSubTablesClient: () => [{ name: '按项目分类披露', headers: ['旧项目', '旧金额'], rows: [{ label: 'raw', values: [9] }] }],
+      deriveLegacyTableHeaders: () => null,
+    })
+    expect(currentNoteTables.value[0].rows[0].label).toBe('raw')
+    expect(currentNoteTables.value[0].column_ids).toEqual(['label-id', 'ending-id'])
+    expect(currentNoteTables.value[0].measure_status).toBe('matched')
+  })
+})

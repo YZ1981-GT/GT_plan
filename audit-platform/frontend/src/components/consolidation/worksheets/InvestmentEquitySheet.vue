@@ -188,7 +188,7 @@ const calcEnd = (r: Row) => n(r.open_amount)+n(r.add_cost)+n(r.add_income_adj)+n
 function fmtR(v: number) { return v ? `${v.toFixed(2)}%` : '--' }
 function calcCls(v: number) { return v === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
-const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '2px 0' }
 
 // ─── 小计行 ───────────────────────────────────────────────────────────────────
 const NUM_FIELDS: (keyof Row)[] = ['open_ratio','open_amount','open_impairment',
@@ -216,7 +216,7 @@ const tableData = computed(() => [...rows.value, summaryRow])
 function onSelChange(sel: any[]) { selectedRows.value = sel.filter((r: any) => !r._isSummary) }
 function rowClassName({ row }: any) { return row._isSummary ? 'ws-row-summary' : '' }
 function rowCellStyle({ row }: any) {
-  const base: any = { padding: '2px 4px', fontSize: '12px' }
+  const base: any = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
   if (row._isSummary) { base.background = '#f8f6fb'; base.fontWeight = '700'; base.color = '#4b2d77' }
   return base
 }

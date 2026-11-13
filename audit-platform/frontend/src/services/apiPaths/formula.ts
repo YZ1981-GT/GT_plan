@@ -175,6 +175,8 @@ export const formulaPush = {
   run: (projectId: string) => `${pushBase(projectId)}/run`,
   /** GET `?year=` — 最近一次运行 + 状态计数 */
   latest: (projectId: string) => `${pushBase(projectId)}/latest`,
+  /** GET — 推送覆盖率（全局静态数据，不带项目） */
+  coverage: () => `/api/formula-push/coverage`,
   /** GET `?year=&state=` — 目标级状态（当前值 / 公式值 / 差异） */
   states: (projectId: string) => `${pushBase(projectId)}/states`,
   /** POST `{year, addr_ids}` — 采用公式值 */
@@ -207,6 +209,14 @@ export const formulaTimeline = {
   list: (projectId: string, year: number | string) => `/api/formula-timeline/${projectId}/${year}`,
 } as const
 
+// ─── 公式依赖 / 表间审核执行历史（公式管理面板） ──────────────────────────────
+export const formulaPanels = {
+  /** GET `?addr_id=` — 某地址的公式依赖关系 */
+  dependencies: (projectId: string) => `/api/projects/${projectId}/formula-settings/dependencies`,
+  /** GET `?year=` — 表间审核执行历史 */
+  crossCheckHistory: (projectId: string) => `/api/projects/${projectId}/formula/cross-check-history`,
+} as const
+
 /** 公式域聚合（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */
 export const formulaApi = {
   wpFormula,
@@ -222,4 +232,5 @@ export const formulaApi = {
   formulaDebug,
   formulaPushVerify,
   formulaTimeline,
+  formulaPanels,
 } as const

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const FRONTEND_ROOT = resolve(SCRIPT_DIR, '..')
 const VITE_BIN = resolve(FRONTEND_ROOT, 'node_modules', 'vite', 'bin', 'vite.js')
+const BUNDLE_POLICY = resolve(SCRIPT_DIR, 'bundle-budget.json')
 
 function runNode(args) {
   return new Promise((resolveRun, reject) => {
@@ -27,7 +28,10 @@ async function main() {
   if (!existsSync(VITE_BIN)) throw new Error('缺少 Vite，请先在前端目录执行 npm ci')
   console.log('正在按当前源码生成真实生产产物…')
   await runNode(['--max-old-space-size=16384', VITE_BIN, 'build', '--mode', 'production'])
-  await runNode([resolve(SCRIPT_DIR, 'check-bundle-budget.mjs'), '--update', '--dir', 'dist'])
+  await runNode([
+    resolve(SCRIPT_DIR, 'check-bundle-budget.mjs'),
+    '--update', '--dir', 'dist', '--policy', BUNDLE_POLICY,
+  ])
 }
 
 main().catch((error) => {

@@ -22,6 +22,8 @@ from app.models.core import Project
 from app.services.consol_node_scope import (
     NodeScope,
     NodeScopeError,
+    NoteSaveConflict,
+    digest_of,
     load_scoped_note_record,
     resolve_node_scope,
     save_scoped_note_record,
@@ -398,4 +400,274 @@ async def test_unique_conflict_reloads_winner_and_outer_transaction_survives(
         assert stored_winner.id == injected_winner.id
         assert stored_winner.data["rows"][0]["value"] == 30
         assert stored_winner.updated_at == saved_time.replace(tzinfo=None)
+        assert stored_winner.source_mode == "manual"
+        assert stored_winner.source_digest == digest_of(stored_winner)
         assert stored_other.data["rows"][0]["value"] == 99
+
+
+
+def test_digest_of_uses_source_projection_algorithm_and_normalizes_non_objects():
+    payload = {"rows": [["项目", 1]], "meta": {"b": 2, "a": 1}}
+    reordered = {"meta": {"a": 1, "b": 2}, "rows": [["项目", 1]]}
+
+    assert digest_of(payload) == digest_of(reordered)
+    assert digest_of([]) == digest_of({})
+    assert digest_of(None) is None
+
+
+@pytest.mark.asyncio
+async def test_digest_conflict_reports_metadata_without_poisoning_transaction(db_session: AsyncSession):
+    root, _child, _other = await _seed_projects(db_session)
+    scope = await _root_scope(db_session, root)
+    saved_at = datetime(2025, 5, 6, 7, 8, 9, tzinfo=timezone.utc)
+    existing = ConsolNoteData(
+        project_id=root.id,
+        year=_YEAR,
+        section_id=_SECTION,
+        node_key=_ROOT_KEY,
+        data={"rows": [["原值", 10]], "_last_write_source": "subtree_aggregate"},
+        updated_at=saved_at,
+    )
+    db_session.add(existing)
+    await db_session.commit()
+
+    with pytest.raises(NoteSaveConflict) as exc_info:
+        await save_scoped_note_record(
+            db_session,
+            scope,
+            {"rows": [["新值", 20]]},
+            expected_digest=None,
+        )
+
+    conflict = exc_info.value
+    assert conflict.status == 409
+    assert conflict.current_digest == digest_of(existing)
+    assert conflict.updated_at == existing.updated_at
+    assert conflict.last_write_source == "subtree_aggregate"
+    assert db_session.in_transaction()
+
+    # 冲突只发生在应用层比较，不能把当前事务置于 PendingRollback 状态。
+    db_session.add(
+        ConsolNoteData(
+            project_id=root.id,
+            year=_YEAR,
+            section_id="五-9-9",
+            node_key=None,
+            data={"rows": [["冲突后仍可写", 1]]},
+        )
+    )
+    await db_session.commit()
+
+    async with _SESSION_FACTORY() as check:
+        stored = await _get_record(
+            check,
+            project_id=root.id,
+            year=_YEAR,
+            section_id=_SECTION,
+            node_key=_ROOT_KEY,
+        )
+        assert stored is not None
+        assert stored.data["rows"] == [["原值", 10]]
+
+
+@pytest.mark.asyncio
+async def test_first_save_none_digest_creates_manual_record(db_session: AsyncSession):
+    root, _child, _other = await _seed_projects(db_session)
+    scope = await _child_scope(db_session, root)
+    payload = {"rows": [["首次保存", 30]]}
+
+    saved = await save_scoped_note_record(
+        db_session,
+        scope,
+        payload,
+        expected_digest=None,
+    )
+
+    assert saved.data == payload
+    assert saved.source_mode == "manual"
+    assert saved.source_digest == digest_of(saved)
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_unique_winner_is_compared_again_before_overwrite(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    root, _child, _other = await _seed_projects(db_session)
+    scope = await _child_scope(db_session, root)
+
+    import app.services.consol_node_scope as node_scope_module
+
+    original_loader = node_scope_module._load_exact_note_record
+    calls = 0
+    injected_winner: ConsolNoteData | None = None
+
+    async def load_and_inject(*args, **kwargs):
+        nonlocal calls, injected_winner
+        result = await original_loader(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            injected_winner = ConsolNoteData(
+                project_id=root.id,
+                year=_YEAR,
+                section_id=_SECTION,
+                node_key=_CHILD_KEY,
+                data={"rows": [["先写入", 40]]},
+            )
+            db_session.add(injected_winner)
+            await db_session.flush()
+        return result
+
+    monkeypatch.setattr(node_scope_module, "_load_exact_note_record", load_and_inject)
+
+    with pytest.raises(NoteSaveConflict) as exc_info:
+        await save_scoped_note_record(
+            db_session,
+            scope,
+            {"rows": [["后写入", 50]]},
+            expected_digest=None,
+        )
+
+    assert injected_winner is not None
+    assert exc_info.value.current_digest == digest_of(injected_winner)
+    assert db_session.in_transaction()
+
+    await db_session.commit()
+    async with _SESSION_FACTORY() as check:
+        winner = await _get_record(
+            check,
+            project_id=root.id,
+            year=_YEAR,
+            section_id=_SECTION,
+            node_key=_CHILD_KEY,
+        )
+        assert winner is not None
+        assert winner.data["rows"] == [["先写入", 40]]
+
+
+@pytest.mark.asyncio
+async def test_matching_expected_digest_updates_existing_node(db_session: AsyncSession):
+    """内容摘要一致时允许覆盖，并返回写入后的新摘要。"""
+    root, _child, _other = await _seed_projects(db_session)
+    scope = await _root_scope(db_session, root)
+    original = {"rows": [["原值", 10]]}
+    existing = ConsolNoteData(
+        project_id=root.id,
+        year=_YEAR,
+        section_id=_SECTION,
+        node_key=_ROOT_KEY,
+        data=original,
+        updated_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+    )
+    db_session.add(existing)
+    await db_session.commit()
+    expected = digest_of(existing)
+
+    replacement = {"rows": [["新值", 20]]}
+    saved = await save_scoped_note_record(
+        db_session, scope, replacement, expected_digest=expected,
+    )
+
+    assert saved.data == replacement
+    assert digest_of(saved) == digest_of(replacement)
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_root_expected_digest_uses_legacy_row_as_save_baseline(db_session: AsyncSession):
+    """根节点首次保存以 legacy NULL 行为 CAS 基准，但新数据落节点专属行。"""
+    root, _child, _other = await _seed_projects(db_session)
+    legacy = ConsolNoteData(
+        project_id=root.id,
+        year=_YEAR,
+        section_id=_SECTION,
+        node_key=None,
+        data={"rows": [["legacy", 1]]},
+        is_stale=True,
+    )
+    db_session.add(legacy)
+    await db_session.commit()
+    scope = await _root_scope(db_session, root)
+    expected = digest_of(legacy)
+
+    saved = await save_scoped_note_record(
+        db_session,
+        scope,
+        {"rows": [["节点值", 2]]},
+        expected_digest=expected,
+    )
+    assert saved.node_key == _ROOT_KEY
+    assert saved.is_stale is True
+    await db_session.commit()
+
+    stored_legacy = await _get_record(
+        db_session,
+        project_id=root.id,
+        year=_YEAR,
+        section_id=_SECTION,
+        node_key=None,
+    )
+    assert stored_legacy is not None and stored_legacy.data == {"rows": [["legacy", 1]]}
+
+
+@pytest.mark.asyncio
+async def test_omitting_expected_digest_keeps_legacy_service_overwrite_semantics(
+    db_session: AsyncSession,
+):
+    """服务层未传 expected_digest 时保持旧的无 CAS 调用语义。"""
+    root, _child, _other = await _seed_projects(db_session)
+    scope = await _root_scope(db_session, root)
+    existing = ConsolNoteData(
+        project_id=root.id,
+        year=_YEAR,
+        section_id=_SECTION,
+        node_key=_ROOT_KEY,
+        data={"rows": [["旧值", 1]]},
+    )
+    db_session.add(existing)
+    await db_session.commit()
+
+    saved = await save_scoped_note_record(
+        db_session, scope, {"rows": [["覆盖值", 2]]},
+    )
+
+    assert saved.id == existing.id
+    assert saved.data == {"rows": [["覆盖值", 2]]}
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_metadata_only_changes_do_not_trigger_digest_conflict(db_session: AsyncSession):
+    """仅 stale、时间和来源投影变化不改变内容摘要，也不阻断保存。"""
+    from app.services.consol_note_source_projection import update_source_projection
+
+    root, _child, _other = await _seed_projects(db_session)
+    scope = await _root_scope(db_session, root)
+    existing = ConsolNoteData(
+        project_id=root.id,
+        year=_YEAR,
+        section_id=_SECTION,
+        node_key=_ROOT_KEY,
+        data={"rows": [["原值", 10]]},
+        is_stale=False,
+        updated_at=datetime(2025, 7, 1, tzinfo=timezone.utc),
+    )
+    db_session.add(existing)
+    await db_session.commit()
+    expected = digest_of(existing)
+
+    existing.is_stale = True
+    existing.updated_at = datetime(2025, 7, 2, tzinfo=timezone.utc)
+    update_source_projection(existing, "formula", digest=expected)
+    assert digest_of(existing) == expected
+    await db_session.flush()
+
+    saved = await save_scoped_note_record(
+        db_session,
+        scope,
+        {"rows": [["新值", 20]]},
+        expected_digest=expected,
+    )
+    assert saved.data == {"rows": [["新值", 20]]}
+    await db_session.commit()

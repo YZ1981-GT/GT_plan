@@ -47,7 +47,7 @@
         <div class="gt-ftl-content">
           <div class="gt-ftl-time">{{ fmtTime(evt.timestamp) }}</div>
           <div class="gt-ftl-summary">{{ evt.summary }}</div>
-          <div v-if="evt.user_id" class="gt-ftl-user">操作人: {{ evt.user_id }}</div>
+          <div v-if="evt.user_id" class="gt-ftl-user">操作人：{{ evt.user_name || '未知用户' }}</div>
           <!-- 展开详情 -->
           <div v-if="expandedIdx === i && evt.detail" class="gt-ftl-detail">
             <pre class="gt-ftl-json">{{ JSON.stringify(evt.detail, null, 2) }}</pre>

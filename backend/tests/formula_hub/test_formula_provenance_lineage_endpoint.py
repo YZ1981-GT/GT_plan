@@ -6,6 +6,8 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.models.audit_platform_models import TbLedger, TrialBalance
+from app.models.dataset_models import LedgerDataset
 from app.models.note_account_mapping import NoteAccountMapping
 from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType
 from app.routers import lineage
@@ -19,7 +21,9 @@ from tests.authz_world import sqlite_world
 async def lineage_world(monkeypatch: pytest.MonkeyPatch):
     async with sqlite_world(
         monkeypatch,
-        extra_tables=(WpIndex.__table__, WorkingPaper.__table__, NoteAccountMapping.__table__),
+        # 附注溯源（trace_section）映射到底稿后按科目取试算表与序时账（当前账套）：这三张表也要有
+        extra_tables=(WpIndex.__table__, WorkingPaper.__table__, NoteAccountMapping.__table__,
+                      TrialBalance.__table__, TbLedger.__table__, LedgerDataset.__table__),
     ) as world:
         world.target.template_type = "soe"
         await world.db.flush()

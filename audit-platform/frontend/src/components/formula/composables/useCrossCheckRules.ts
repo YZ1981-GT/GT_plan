@@ -1,251 +1,181 @@
-/**
- * 表间审核用户规则（加载 / 保存 / CRUD / 执行）—— 从 FormulaManagerDialog 拆出。
- *
- * spec formula-global-settings-sync Phase 4 / R10.2：用户规则存 formula_setting，
- * 全局 + 本项目两层，差量写入与 CAS（缺令牌 428、过期 409）；保存后弹应用范围（changed_slot_keys）。
- */
-import { computed, ref, type Ref } from 'vue'
+/** 用户规则保存保留 CAS 与应用范围；执行只消费同次服务端结论，不在前端另算。 */
+import { computed, ref, watch, onScopeDispose, type Ref } from 'vue'
 import type { CROSS_CHECK_NODE_KEYS as _Keys } from '../crossCheckKey'
-import { emptyIssueRun, failedIssueRun, issueHintFromRun, type FormulaIssueRun } from '../formulaIssueHint'
+import { emptyIssueRun, failedIssueRun, issueHintFromRun, formulaCheckNumber, formulaCheckSeverity, type FormulaIssueRun } from '../formulaIssueHint'
 import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
-
 export interface CrossCheckDeps {
-  projectId: Ref<string>
-  year: Ref<number | string | undefined>
-  selectedNodeKey: Ref<string>
-  currentProjectCacheKey: Ref<string>
-  cacheKeyMatches: (a: string | null, b: string) => boolean
-  shouldApplyResponse: (req: string, current: string) => boolean
-  api: any
-  projectFormula: { reportCrossCheck: (pid: string) => string; crossCheckRules: (pid: string) => string }
-  P_rc: { executeFormulasBatch: string }
-  guardFormulaMutation: () => boolean
-  showFormulaError: (e: any, fallback: string) => void
-  askApplyScope: (domain: string, slotKeys: string[]) => void
-  CROSS_CHECK_NODE_KEYS: typeof _Keys
+  projectId: Ref<string>; year: Ref<number | string | undefined>; selectedNodeKey: Ref<string>; currentProjectCacheKey: Ref<string>
+  cacheKeyMatches: (a: string | null, b: string) => boolean; shouldApplyResponse: (req: string, current: string) => boolean
+  api: any; projectFormula: { reportCrossCheck: (pid: string) => string; crossCheckRules: (pid: string) => string }; P_rc: { executeFormulasBatch: string }
+  guardFormulaMutation: () => boolean; showFormulaError: (e: any, fallback: string) => void; askApplyScope: (domain: string, slotKeys: string[]) => void; CROSS_CHECK_NODE_KEYS: typeof _Keys
 }
-
-// 原先这里有一组写死的「示例规则」（DEFAULT_SEEDS）作为规则表的初值：读接口返回「从未保存过 = 空集」时不覆盖
-// ⇒ 它们冒充本项目规则显示（面板的「尚无自定义规则」空态永远出不来），用户第一次保存任何规则时被整组写进库。
-// 而它们本身取不到数：NOTE 第一参写的是标题（应为章节编号，且国企 / 上市编号不同，写死不了）、CONSOL 不是可执行函数、
-// REPORT('BS-资本公积') 不是行次（spec formula-fetch-followup-defect-closure 7.2）。规则以服务端为准，空就是空。
-
 export function useCrossCheckRules(deps: CrossCheckDeps) {
-  // ── 执行结果（7 条内置 logic_check 勾稽 + 用户规则执行结果） ──
-  const execItems = ref<Record<string, any[]>>({ report_note: [], report_wp: [], note_wp: [] })
-  const execLoaded = ref(false)
-  const execCacheKey = ref<string | null>(null)
-  const execEmpty = ref(false)
-  // 同一次响应里的问题清单 / 提醒 / 计算时间（spec formula-governance-coverage-closure R4）
-  const execRun = ref<FormulaIssueRun>(emptyIssueRun())
-  const execLoading = ref(false)
-  let execSeq = 0
-
-  // ── 用户可编辑规则（按树节点 key 分组） ──
-  const rulesMap = ref<Record<string, any[]>>({})
-  const tokens = ref<Record<string, string>>({})
-
-  const isCrossCheckMode = computed(() => deps.selectedNodeKey.value.startsWith('cross_'))
-  const rulesForCurrent = computed(() => rulesMap.value[deps.selectedNodeKey.value] || [])
-
-  // ── 加载执行结果（7 条 logic_check + 用户规则的 passed/描述） ──
-  async function loadExecItems() {
-    if ((execLoaded.value && deps.cacheKeyMatches(execCacheKey.value, deps.currentProjectCacheKey.value))
-        || !deps.projectId.value) return
-    if (!(await fetchExecRun())) return
-    await loadUserRules()
+  const execItems = ref<Record<string, any[]>>({ report_note: [], report_wp: [], note_wp: [] }), execLoaded = ref(false), execCacheKey = ref<string | null>(null), execEmpty = ref(false), execRun = ref<FormulaIssueRun>(emptyIssueRun()), execLoading = ref(false)
+  const rulesMap = ref<Record<string, any[]>>({}), tokens = ref<Record<string, string | null>>({}), running = ref(false)
+  let loadedRules: Array<{ node: string; slot: string | undefined; ruleId: unknown; definition: string }> = []
+  const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key)
+  const record = (value: unknown): value is Record<string, any> => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const ruleFields = (r: any) => ({ label: r.label || '', left_ref: r.left_ref || '', operator: r.operator || '=', right_ref: r.right_ref || '', description: r.description || '', tolerance: r.tolerance, severity: formulaCheckSeverity(r.severity) })
+  function readRulesData(data: any, requireLoaded = false) {
+    const body = record(data) && own(data, 'rules') ? data : data?.data
+    if (!record(body) || !record(body.rules) || !Object.values(body.rules).every(rows => Array.isArray(rows) && rows.every(record))) throw new Error('响应未返回有效规则集合，请重试')
+    if ((requireLoaded || own(body, 'loaded')) && (!record(body.loaded) || !Object.values(body.loaded).every(token => token === null || typeof token === 'string'))) throw new Error('响应未返回有效载入令牌，请重新读取规则后重试')
+    return { rules: body.rules as Record<string, any[]>, loaded: (body.loaded ?? {}) as Record<string, string | null>, changed_slot_keys: Array.isArray(body.changed_slot_keys) ? body.changed_slot_keys.filter((key: unknown): key is string => typeof key === 'string') : [] }
   }
-
-  /** 重新执行内置勾稽（问题清单「刷新」）；只刷新勾稽结论，不重载用户规则（免得冲掉规则的执行结果）。 */
-  async function refreshExec() {
-    if (!deps.projectId.value) return
-    await fetchExecRun()
+  function validateLoadedChanges() {
+    const matched: Record<string, Set<number>> = {}
+    for (const original of loadedRules) {
+      const used = matched[original.node] ||= new Set<number>()
+      const unchanged = (rulesMap.value[original.node] || []).findIndex((r, index) => !used.has(index) && (r.slot_key ?? undefined) === original.slot && r.rule_id === original.ruleId && JSON.stringify(ruleFields(r)) === original.definition)
+      if (unchanged >= 0) { used.add(unchanged); continue }
+      // 检查原集合中的改写/删除槽；新增不在快照中，明确的 null 版本仍原样回传。
+      if (original.slot == null || !own(tokens.value, original.slot)) throw new Error('既有规则缺少载入令牌，请重新读取规则后重试')
+    }
   }
-
-  /**
-   * 调一次 report-cross-check：树上的 ✅/❌、问题清单、提醒都取自这一次响应。
-   * 失败如实记为失败（原先 `validateStatus < 600` 把 403 / 500 也当成「无结果」）。
-   * 返回 false = 响应已过期（换了项目 / 年度），调用方不再继续。
-   */
+  const saving = ref(false), unsaved = ref(false)
+  let pendingSave: Promise<boolean> | null = null
+  const isCrossCheckMode = computed(() => deps.selectedNodeKey.value.startsWith('cross_')), rulesForCurrent = computed(() => rulesMap.value[deps.selectedNodeKey.value] || [])
+  let epoch = 0, execSeq = 0, loadSeq = 0, saveSeq = 0, runSeq = 0, revision = 0, alive = true
+  const snapshot = () => ({ pid: deps.projectId.value, year: deps.year.value, key: deps.currentProjectCacheKey.value, epoch })
+  const current = (s: ReturnType<typeof snapshot>) => alive && s.epoch === epoch && s.pid === deps.projectId.value && s.year === deps.year.value && deps.shouldApplyResponse(s.key, deps.currentProjectCacheKey.value)
+  const expression = (r: any) => `${r.left_ref || ''} ${r.operator || '='} ${r.right_ref || ''}`.trim()
+  function clearRuleResults() {
+    for (const rows of Object.values(rulesMap.value)) for (const r of rows) {
+      r._checked = false; r._pass = false; r._status = undefined; r._reason = ''; r._severity = undefined; r._leftVal = null; r._rightVal = null; r._diff = null
+    }
+  }
+  function applyOutcomes(run: FormulaIssueRun) {
+    const all = Object.values(rulesMap.value).flat()
+    for (const r of all) {
+      // 旧执行接口仅有哈希 ID 与完整表达式：只接受全规则集唯一精确表达式，不按序号猜。
+      const expr = expression(r), matches = run.outcomes.filter((o) => o.formula_id.startsWith('user:') && o.expression === expr)
+      const o = all.filter((other) => expression(other) === expr).length === 1 && matches.length === 1 ? matches[0] : undefined
+      const issue = o && run.issues.find((i) => i.formula_id === o.formula_id)
+      r._status = run.failed ? 'error' : o?.status ?? 'not_executed'; r._reason = run.failed ? run.error : o?.reason || issue?.reason || (o ? '' : '本次后端未返回可唯一匹配的规则结论')
+      r._checked = !!o; r._pass = r._status === 'passed'; r._severity = formulaCheckSeverity(o?.severity ?? issue?.severity ?? r.severity)
+      r._leftVal = formulaCheckNumber(o?.left_value !== undefined ? o.left_value : issue?.left_value); r._rightVal = formulaCheckNumber(o?.right_value !== undefined ? o.right_value : issue?.right_value)
+      r._diff = o?.diff !== undefined ? formulaCheckNumber(o.diff) : r._leftVal !== null && r._rightVal !== null ? r._leftVal - r._rightVal : null
+    }
+  }
   async function fetchExecRun(): Promise<boolean> {
-    const reqKey = deps.currentProjectCacheKey.value
-    const seq = ++execSeq
-    // 换了项目 / 年度：先清掉上一个项目的结论，加载期间不显示别人的问题清单
-    if (!deps.cacheKeyMatches(execCacheKey.value, reqKey)) execRun.value = emptyIssueRun()
-    let run: FormulaIssueRun = emptyIssueRun()
-    let results: any[] = []
-    if (deps.year.value != null) {
-      execLoading.value = true
-      try {
-        const data = await deps.api.get(deps.projectFormula.reportCrossCheck(deps.projectId.value), {
-          params: { year: Number(deps.year.value) }, _silent: true,
-        } as any)
-        if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return false
-        run = issueHintFromRun(data)
-        results = Array.isArray(data?.results) ? data.results
-          : (Array.isArray(data?.data?.results) ? data.data.results : [])
-      } catch (e: any) {
-        if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return false
-        run = failedIssueRun(formulaErrorText(e, '报表勾稽执行失败'))
-      } finally {
-        if (seq === execSeq) execLoading.value = false
-      }
+    const start = snapshot()
+    if (pendingSave) await pendingSave
+    if (!current(start) || unsaved.value) {
+      if (current(start)) { clearRuleResults(); for (const rows of Object.values(rulesMap.value)) for (const r of rows) { r._status = 'not_executed'; r._reason = '规则尚未保存成功，请先重试保存'; r._severity = formulaCheckSeverity(r.severity) } }
+      return false
     }
-    if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return false
-    execRun.value = run
-    // 「无结果」只指真没有结论；请求失败另由 execRun.failed 呈现
-    execEmpty.value = !results.length && !run.failed
-    execItems.value = {
-      report_note: results.map((o: any) => ({
-        key: `cross_exec_${o.formula_id}`, label: o.description || o.formula_id,
-        icon: o.passed === true ? '✅' : o.passed === false ? '❌' : '📌',
-        _formulaId: o.formula_id, _passed: o.passed,
-      })),
-      report_wp: [], note_wp: [],
+    const s = snapshot(), seq = ++execSeq, rev = revision
+    const valid = () => current(s) && seq === execSeq && rev === revision
+    execRun.value = emptyIssueRun(); execItems.value = { report_note: [], report_wp: [], note_wp: [] }; execEmpty.value = false; clearRuleResults()
+    if (!s.pid || s.year == null) { execLoading.value = false; return false }
+    execLoading.value = true
+    let run = emptyIssueRun()
+    try {
+      const data = await deps.api.get(deps.projectFormula.reportCrossCheck(s.pid), { params: { year: Number(s.year) }, _silent: true })
+      if (!valid()) return false
+      run = issueHintFromRun(data)
+    } catch (e: any) {
+      if (!valid()) return false
+      const detail = e?.response?.data?.detail ?? e?.data?.detail
+      // 面板已有操作标题；原因字段保留后端原文，其他形状仍走统一中文兜底。
+      run = failedIssueRun(typeof detail === 'string' && detail.trim() ? detail : formulaErrorText(e, '报表勾稽执行失败'))
     }
-    execLoaded.value = true
-    execCacheKey.value = reqKey
+    finally { if (valid()) execLoading.value = false }
+    if (!valid()) return false
+    execRun.value = run; execEmpty.value = !run.executed && !run.failed; execLoaded.value = !run.failed; execCacheKey.value = s.key
+    const icons: Record<string, string> = { passed: '✅', failed: '❌', not_executed: '⏸', not_applicable: '➖', error: '⚠️' }
+    execItems.value = { report_note: run.outcomes.map((o) => ({ key: `cross_exec_${o.formula_id}`, label: o.description || o.formula_id, icon: icons[o.status!] || '⚠️', _formulaId: o.formula_id, _passed: o.passed, _status: o.status, _reason: o.reason, _severity: o.severity })), report_wp: [], note_wp: [] }
+    applyOutcomes(run)
     return true
   }
-
-  async function loadUserRules() {
-    if (!deps.projectId.value) return
-    try {
-      const data: any = await deps.api.get(deps.projectFormula.crossCheckRules(deps.projectId.value), {
-        _silent: true, validateStatus: (s: number) => s < 600,
-      } as any)
-      applyRulesData(data)
-    } catch { /* 读失败：保留已加载的规则（首次进入即为空，不再拿写死的示例冒充） */ }
+  async function loadExecItems() {
+    if ((execLoaded.value && deps.cacheKeyMatches(execCacheKey.value, deps.currentProjectCacheKey.value)) || !deps.projectId.value) return
+    const s = snapshot()
+    if (!await loadUserRules() || !current(s)) return
+    await fetchExecRun()
   }
-
+  async function refreshExec() { if (deps.projectId.value) await fetchExecRun() }
+  async function loadUserRules(): Promise<boolean> {
+    const s = snapshot(), seq = ++loadSeq, rev = revision
+    if (!s.pid || saving.value || unsaved.value) return false
+    try {
+      const data = await deps.api.get(deps.projectFormula.crossCheckRules(s.pid), { _silent: true })
+      if (!current(s) || seq !== loadSeq || rev !== revision || saving.value || unsaved.value) return false
+      applyRulesData(data); return true
+    } catch (e) { if (current(s) && seq === loadSeq) deps.showFormulaError(e, '表间审核规则读取失败'); return false }
+  }
+  function invalidateResults() {
+    ++revision; ++execSeq; execLoaded.value = false; execRun.value = emptyIssueRun(); execItems.value = { report_note: [], report_wp: [], note_wp: [] }; execLoading.value = false; clearRuleResults()
+  }
   function applyRulesData(data: any) {
-    const rules = data?.rules ?? data?.data?.rules ?? null
-    if (!rules || typeof rules !== 'object') return
-    tokens.value = data?.loaded ?? data?.data?.loaded ?? {}
-    // 读接口 / 保存接口返回的都是本项目生效的**全部**规则 ⇒ 整体替换；响应里没有的节点就是没有规则
-    const next: Record<string, any[]> = {}
-    for (const [nodeKey, nodeRules] of Object.entries(rules)) {
-      if (!Array.isArray(nodeRules)) continue
-      next[nodeKey] = (nodeRules as any[]).map((r) => ({
-        rule_id: r.rule_id || undefined, label: r.label || '', left_ref: r.left_ref || '',
-        operator: r.operator || '=', right_ref: r.right_ref || '', description: r.description || '',
-        layer: r.layer, pending: r.pending, _editing: false,
-      }))
-    }
-    rulesMap.value = next
+    const body = readRulesData(data), next: Record<string, any[]> = {}
+    for (const [key, rows] of Object.entries(body.rules)) next[key] = rows.map(r => ({ ...r, ...ruleFields(r), _editing: false }))
+    tokens.value = { ...body.loaded }
+    loadedRules = Object.entries(next).flatMap(([node, rows]) => rows.map(r => ({ node, slot: typeof r.slot_key === 'string' ? r.slot_key : undefined, ruleId: r.rule_id, definition: JSON.stringify(ruleFields(r)) })))
+    rulesMap.value = next; invalidateResults()
   }
-
-  async function persist() {
-    if (!deps.guardFormulaMutation()) return
-    if (!deps.projectId.value) return
-    const payload: Record<string, any[]> = {}
-    for (const [nodeKey, nodeRules] of Object.entries(rulesMap.value)) {
-      payload[nodeKey] = (nodeRules || []).map((r) => ({
-        rule_id: r.rule_id || undefined, label: r.label || '', left_ref: r.left_ref || '',
-        operator: r.operator || '=', right_ref: r.right_ref || '', description: r.description || '',
-      }))
-    }
-    try {
-      const ccRes: any = await deps.api.put(deps.projectFormula.crossCheckRules(deps.projectId.value),
-        { rules: payload, loaded: tokens.value })
-      applyRulesData(ccRes)
-      deps.askApplyScope('cross_check', ccRes?.changed_slot_keys || [])
-    } catch (e: any) {
-      deps.showFormulaError(e, '表间审核规则保存失败')
-    }
+  function persist(): Promise<boolean> {
+    if (!deps.guardFormulaMutation() || !deps.projectId.value) return Promise.resolve(false)
+    if (pendingSave) return pendingSave
+    const s = snapshot(), seq = ++saveSeq
+    saving.value = true; unsaved.value = true; ++loadSeq; invalidateResults()
+    const valid = () => current(s) && seq === saveSeq
+    try { validateLoadedChanges() }
+    catch (e) { saving.value = false; deps.showFormulaError(e, '表间审核规则保存失败'); return Promise.resolve(false) }
+    const pending = (async () => {
+      try {
+        const rev = revision, payload: Record<string, any[]> = {}
+        for (const [key, rows] of Object.entries(rulesMap.value)) payload[key] = rows.map((r) => ({ rule_id: r.rule_id || undefined, slot_key: r.slot_key, version_token: r.version_token, ...ruleFields(r) }))
+        const data = await deps.api.put(deps.projectFormula.crossCheckRules(s.pid), { rules: payload, loaded: { ...tokens.value } })
+        if (!valid()) return false
+        const body = readRulesData(data, true)
+        // UI 保存期间拒绝编辑；若外部仍替换了规则，不猜测新规则身份、不自动重发。
+        if (rev !== revision) throw new Error('保存期间规则已变化，请重新读取规则后重试')
+        applyRulesData(body); unsaved.value = false
+        deps.askApplyScope('cross_check', body.changed_slot_keys || [])
+        return true
+      } catch (e) { if (valid()) deps.showFormulaError(e, '表间审核规则保存失败'); return false }
+      finally { if (valid()) saving.value = false }
+    })()
+    pendingSave = pending
+    void pending.then(() => { if (pendingSave === pending) pendingSave = null })
+    return pending
   }
-
-  // ── 弹窗编辑 ──
-  const showDialog = ref(false)
-  const dialogTitle = ref('新增规则')
-  const editIndex = ref(-1)
-  const form = ref({ label: '', left_ref: '', operator: '=', right_ref: '', description: '' })
-
-  function onAdd() {
-    dialogTitle.value = '新增表间审核规则'
-    editIndex.value = -1
-    form.value = { label: '', left_ref: '', operator: '=', right_ref: '', description: '' }
-    showDialog.value = true
-  }
-
+  const showDialog = ref(false), dialogTitle = ref('新增规则'), editIndex = ref(-1)
+  const blankForm = () => ({ label: '', left_ref: '', operator: '=', right_ref: '', description: '', tolerance: null as number | string | null | undefined, severity: 'warning' as 'blocking' | 'warning' | 'info' })
+  const form = ref(blankForm())
+  let editNode = ''
+  function canEdit() { if (!saving.value) return true; deps.showFormulaError(new Error('规则正在保存，请稍后重试'), '规则正在保存'); return false }
+  function onAdd() { if (!canEdit()) return; editNode = deps.selectedNodeKey.value; dialogTitle.value = '新增表间审核规则'; editIndex.value = -1; form.value = blankForm(); showDialog.value = true }
   function onEdit(row: any, index: number) {
-    dialogTitle.value = '编辑表间审核规则'
-    editIndex.value = index
-    form.value = { label: row.label || '', left_ref: row.left_ref || '', operator: row.operator || '=',
-                   right_ref: row.right_ref || '', description: row.description || '' }
-    showDialog.value = true
+    if (!canEdit()) return
+    editNode = deps.selectedNodeKey.value; dialogTitle.value = '编辑表间审核规则'; editIndex.value = index
+    form.value = { label: row.label || '', left_ref: row.left_ref || '', operator: row.operator || '=', right_ref: row.right_ref || '', description: row.description || '', tolerance: row.tolerance, severity: formulaCheckSeverity(row.severity) }; showDialog.value = true
   }
-
   function onSave() {
-    if (!deps.guardFormulaMutation()) return
-    const key = deps.selectedNodeKey.value
-    if (!rulesMap.value[key]) rulesMap.value[key] = []
-    const data = { ...form.value, _editing: false }
-    if (editIndex.value >= 0) Object.assign(rulesMap.value[key][editIndex.value], data)
-    else rulesMap.value[key].push(data)
-    showDialog.value = false
-    void persist()
+    if (!canEdit() || !deps.guardFormulaMutation() || editNode !== deps.selectedNodeKey.value) return
+    const rows = rulesMap.value[editNode] ||= [], patch = { ...form.value, _editing: false }
+    if (editIndex.value >= 0) { if (!rows[editIndex.value]) return; Object.assign(rows[editIndex.value], patch) } else rows.push(patch)
+    unsaved.value = true; invalidateResults(); showDialog.value = false; void persist()
   }
-
-  function onRemove(index: number) {
-    if (!deps.guardFormulaMutation()) return
-    const key = deps.selectedNodeKey.value
-    rulesMap.value[key]?.splice(index, 1)
-    void persist()
-  }
-
-  // ── 执行校验 ──
-  const running = ref(false)
-
+  function onRemove(index: number) { if (!canEdit() || !deps.guardFormulaMutation()) return; rulesForCurrent.value.splice(index, 1); unsaved.value = true; invalidateResults(); void persist() }
   async function run() {
-    const rules = rulesForCurrent.value
-    if (!rules.length || !deps.projectId.value || !deps.year.value) return
+    if (!rulesForCurrent.value.length || !deps.projectId.value || deps.year.value == null) return
+    const seq = ++runSeq, s = snapshot(), node = deps.selectedNodeKey.value
     running.value = true
     try {
-      const allFormulas: { row_code: string; formula: string }[] = []
-      for (let i = 0; i < rules.length; i++) {
-        if (rules[i].left_ref) allFormulas.push({ row_code: `_ccL${i}`, formula: rules[i].left_ref })
-        if (rules[i].right_ref) allFormulas.push({ row_code: `_ccR${i}`, formula: rules[i].right_ref })
-      }
-      const data = await deps.api.post(deps.P_rc.executeFormulasBatch, {
-        project_id: deps.projectId.value, year: deps.year.value, formulas: allFormulas,
-      }, { _silent: true } as any)
-      const resultMap = new Map<string, number>()
-      for (const r of (data?.results || [])) {
-        if (r.row_code && r.value != null && r.error == null) resultMap.set(r.row_code, Number(r.value))
-      }
-      let passCount = 0, failCount = 0
-      for (let i = 0; i < rules.length; i++) {
-        const leftVal = resultMap.get(`_ccL${i}`) ?? null
-        const rightVal = resultMap.get(`_ccR${i}`) ?? null
-        rules[i]._leftVal = leftVal; rules[i]._rightVal = rightVal
-        rules[i]._checked = leftVal != null && rightVal != null
-        if (rules[i]._checked) {
-          const diff = (leftVal ?? 0) - (rightVal ?? 0)
-          rules[i]._diff = diff
-          const op = rules[i].operator || '='
-          rules[i]._pass = op === '=' ? Math.abs(diff) < 0.01 : op === '<=' ? diff <= 0.01 : op === '>=' ? diff >= -0.01 : Math.abs(diff) < 0.01
-          if (rules[i]._pass) passCount++; else failCount++
-        }
-      }
-      return { passCount, failCount }
-    } catch (e: any) {
-      // 写请求按状态码判成败（spec formula-writer-ownership-and-stale R4）：原先 `validateStatus: s<600`
-      // 把 5xx 当成功 ⇒ `data.results` 空、所有勾稽静默未校验。现非 2xx 抛出，显式报错。
-      deps.showFormulaError(e, '执行表间审核失败')
-    } finally { running.value = false }
+      if (!await fetchExecRun() || !current(s) || seq !== runSeq || node !== deps.selectedNodeKey.value) return
+      const rows = rulesMap.value[node] || []
+      return { passCount: rows.filter((r) => r._status === 'passed').length, failCount: rows.filter((r) => r._status === 'failed').length }
+    } finally { if (current(s) && seq === runSeq) running.value = false }
   }
-
   function resetCache() {
-    execLoaded.value = false; execCacheKey.value = null; execEmpty.value = false
-    execRun.value = emptyIssueRun()
+    ++epoch; ++execSeq; ++loadSeq; ++saveSeq; ++runSeq; ++revision
+    execLoaded.value = false; execCacheKey.value = null; execEmpty.value = false; execRun.value = emptyIssueRun(); execItems.value = { report_note: [], report_wp: [], note_wp: [] }
+    execLoading.value = false; running.value = false; saving.value = false; unsaved.value = false; pendingSave = null; rulesMap.value = {}; tokens.value = {}; loadedRules = []; showDialog.value = false
   }
-
-  return {
-    execItems, execLoaded, execEmpty, execRun, execLoading, isCrossCheckMode,
-    rulesMap, rulesForCurrent, tokens,
-    loadExecItems, refreshExec, loadUserRules, applyRulesData, persist, resetCache,
-    showDialog, dialogTitle, editIndex, form, onAdd, onEdit, onSave, onRemove,
-    running, run,
-  }
+  watch([deps.projectId, deps.year, deps.currentProjectCacheKey], resetCache, { flush: 'sync' })
+  watch(deps.selectedNodeKey, () => { ++execSeq; ++runSeq; execLoading.value = false; running.value = false; showDialog.value = false }, { flush: 'sync' })
+  onScopeDispose(() => { alive = false; resetCache() })
+  return { execItems, execLoaded, execEmpty, execRun, execLoading, isCrossCheckMode, rulesMap, rulesForCurrent, tokens, loadExecItems, refreshExec, loadUserRules, applyRulesData, persist, resetCache, showDialog, dialogTitle, editIndex, form, onAdd, onEdit, onSave, onRemove, saving, unsaved, running, run }
 }

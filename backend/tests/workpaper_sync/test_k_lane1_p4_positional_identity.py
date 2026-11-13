@@ -56,6 +56,7 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     remove_row_definitions,
     strip_comments,
 )
+from tests.workpaper_sync.sync_artifact_paths import spec_dir  # noqa: E402
 from tests.workpaper_sync.k_lane1_facts import (  # noqa: E402
     FRONTEND_SRC,
     LANE1_INDEXES,
@@ -433,9 +434,10 @@ class TestKAP38GrandfatherOldIds:
             assert not re.fullmatch(r"[a-zA-Z0-9\-]+-\d{13}-[0-9a-z]+", sample)
 
     def test_k1_shape_is_traceable_to_design(self) -> None:
+        # 🔴 lane1 spec 已归档到 `_archive/26-…` ⇒ 路径经 `spec_dir` 解析（活跃优先、归档兜底）。
+        #    写死活跃路径会把「来源随 spec 归档换了位置」报成 FileNotFoundError。
         design = (
-            DATA.parent.parent / ".kiro" / "specs"
-            / "k1-k7-inlined-iife-hosts-and-orphan-cleanup" / "tasks.md"
+            spec_dir("k1-k7-inlined-iife-hosts-and-orphan-cleanup") / "tasks.md"
         ).read_text(encoding="utf-8")
         assert "K1-2-r-" in design, "tasks.md 里找不到 K1 的真库形态 ⇒ 来源不可追溯"
 

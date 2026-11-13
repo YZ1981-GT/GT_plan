@@ -167,10 +167,22 @@ class TestSeedRules:
             (1, 1): "TB('1606','期末余额')",                                # 毛额行 ⇒ 账面余额
         }
 
-    def test_unexpandable_report_row_skips_measure_columns(self):
-        """报表行公式展开不到科目（引用排在后面的行）⇒ 分不出净额 / 毛额：分组表不种并说明，纯期间列照种。"""
+    def test_forward_report_row_is_expanded_by_topological_order(self):
+        """ADR-ISL-01：引用排在后面的行不再算「展开不到科目」；拓扑序先展开 BS-099，再展开 BS-028。"""
         rows = [ReportRow("balance_sheet", "BS-028", "固定资产", 1, "ROW('BS-099')"),
                 ReportRow("balance_sheet", "BS-099", "x", 2, "TB('1601','期末余额')")]
+        table = {**_BOOK, "section_id": "五-2-1", "parent_section": "固定资产", "title": "固定资产",
+                 "rows": [["合  计"] + [""] * 6]}
+        plan = plan_seed("soe", [table], [], rows)
+        assert [(c.row_index, c.col_index, c.formula) for c in plan.cells] == [(0, 1, "REPORT('BS-028')")]
+        assert plan.skipped == []
+        flat = {**table, "multi_header": None, "headers": ["项  目", "期末余额", "期初余额"], "rows": [["合  计", "", ""]]}
+        assert [(c.row_index, c.col_index) for c in plan_seed("soe", [flat], [], rows).cells] == [(0, 1)]
+
+    def test_cyclic_report_row_still_skips_measure_columns(self):
+        """真正的循环引用仍展开失败：分组表不种并说明，纯期间列照种。"""
+        rows = [ReportRow("balance_sheet", "BS-028", "固定资产", 1, "ROW('BS-099')"),
+                ReportRow("balance_sheet", "BS-099", "x", 2, "ROW('BS-028')")]
         table = {**_BOOK, "section_id": "五-2-1", "parent_section": "固定资产", "title": "固定资产",
                  "rows": [["合  计"] + [""] * 6]}
         plan = plan_seed("soe", [table], [], rows)
@@ -191,8 +203,13 @@ SEED_COUNTS = {
     # 2026-10-23 R7.6 国企章节号按 Word 重对齐（以上国企章节号为重对齐前的号）：表名与单体表对上，合计 52 → 54
     #   （长期待摊费用 五-30-1、所得税费用 五-78-1 新种），科目行 (1, 3) → (4, 6)（固定资产 五-22-1 / 在建工程 五-23-1 /
     #   交易性金融负债 五-34-1 首行按科目种）。
-    "soe": {"report_total": 54, "account_codes_tables": 4, "account_codes_cells": 6},
-    "listed": {"report_total": 46, "account_codes_tables": 5, "account_codes_cells": 7},
+    # 2026-10-25 07bbbc4e1（R8.4 批 9b-2）两版单体模板「交易性金融负债」主表按底稿 G10 披露表重建：父行「交易性金融负债」
+    #   = 其中三项之和（底稿 B8 = B9+B10+B11），不再标科目 2101（同批其余带科目码的行一行未变）⇒ 种子 (b) 类两版各少一格：
+    #   国企 五-34-1 (0, 1)、上市 五-34-1 (0, 4)；科目行 (4, 6) → (3, 5)、(5, 7) → (4, 6)；同表合计照种 REPORT('BS-042')。
+    #   以底稿披露表为准（2026-11-03 裁定）：父行按 2101 种，有「指定为…」金融负债时会把整个 2101 写进父行。
+    #   spec note-disclosure-pull-regression-and-headless-backend 任务 4（逐格现算见该 spec design）。
+    "soe": {"report_total": 54, "account_codes_tables": 3, "account_codes_cells": 5},
+    "listed": {"report_total": 46, "account_codes_tables": 4, "account_codes_cells": 6},
 }
 
 
@@ -216,6 +233,10 @@ def test_seed_counts_on_real_templates(tt):
         want["account_codes_tables"], want["account_codes_cells"])
     cells = {(c.section_id, c.row_index, c.col_index) for c in plan.cells}
     assert len(cells) == len(plan.cells), "同一单元格不重复种"
+    # 交易性金融负债父行是其中之和，不按科目种（SEED_COUNTS 2026-10-25 注）；合计照种报表行
+    account_rows = {(c.section_id, c.row_index) for c in plan.cells if c.kind == KIND_ACCOUNT_CODES}
+    totals = {c.section_id: c.formula for c in plan.cells if c.kind == KIND_REPORT_TOTAL}
+    assert ("五-34-1", 0) not in account_rows and totals["五-34-1"] == "REPORT('BS-042')"
     by = {(c.section_id, c.row_index): (c.col_index, c.formula) for c in plan.cells}
     if tt == "soe":
         assert by[("五-1-1", 4)] == (1, "REPORT('BS-002')") and by[("五-1-1", 0)] == (1, "TB('1001','期末余额')")

@@ -32,6 +32,7 @@ from app.core.config import settings
 from app.models.audit_platform_models import TrialBalance
 from app.services import formula_preloader
 from app.services.amount_resolver import TrialBalanceResolver
+from app.services.report_engine import ReportFormulaParser
 from app.services.formula_budget import (
     BATCH_TOO_LARGE_ERROR_CODE,
     CAUSE_DEADLINE,
@@ -88,18 +89,22 @@ def _post(client, path: str, pid, formulas: list[str]):
 def _patch_fetch(monkeypatch, before: Callable[[Any], Any]) -> None:
     """两条取数路径在真正取数前先 ``await before(db)``（中央 / debug：预载试算表；报表配置：试算表宽集合）。"""
     load_tb = formula_preloader._load_tb
-    prefix = TrialBalanceResolver._get_tb_rows_prefix
 
     async def slow_load_tb(db, *args, **kwargs):
         await before(db)
         return await load_tb(db, *args, **kwargs)
 
-    async def slow_prefix(self, account_code):
-        await before(self.db)
-        return await prefix(self, account_code)
-
     monkeypatch.setattr(formula_preloader, "_load_tb", slow_load_tb)
-    monkeypatch.setattr(TrialBalanceResolver, "_get_tb_rows_prefix", slow_prefix)
+    # 报表配置执行现走 ReportFormulaParser（report_engine，与报表生成同一取数）；旧的 TrialBalanceResolver 也一并换掉，
+    # 只换其中一个时另一条路径不经过注入点，用例就测不到超时（曾因此 200 带值返回）
+    for cls in (TrialBalanceResolver, ReportFormulaParser):
+        prefix = cls._get_tb_rows_prefix
+
+        async def slow_prefix(self, account_code, _prefix=prefix):
+            await before(self.db)
+            return await _prefix(self, account_code)
+
+        monkeypatch.setattr(cls, "_get_tb_rows_prefix", slow_prefix)
 
 
 def _sleeper(seconds: float):

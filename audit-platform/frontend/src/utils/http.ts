@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
 import { claimClientInstanceId, getClientInstanceId, isClientInstanceSettled } from './clientInstance'
 import { refIssueDetailText } from './formulaRefIssues'
+import { migrationPendingMessage } from './migrationPending'
 import {
   advanceGetShareBarrier,
   asAbortSignal,
@@ -611,8 +612,11 @@ http.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // 数据库结构未升级（503 MIGRATION_PENDING）：重试没有用，直接用后端说明提示
+    const pendingMigration = migrationPendingMessage(error)
+
     // 500/502/503 自动重试（最多 2 次）。写请求必须携带服务端幂等键或显式声明安全。
-    if (shouldRetry5xx(originalRequest, status) && (originalRequest._retryCount ?? 0) < 2) {
+    if (!pendingMigration && shouldRetry5xx(originalRequest, status) && (originalRequest._retryCount ?? 0) < 2) {
       originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
       _showRetryToast(originalRequest._retryCount)
       try {
@@ -637,7 +641,7 @@ http.interceptors.response.use(
       423: '',  // 423 锁定详情由下方专门处理
       500: '服务器内部错误，请稍后重试',
       502: '网关错误，请稍后重试',
-      503: '服务暂时不可用',
+      503: pendingMigration || '服务暂时不可用',
     }
     const msg = (status && msgMap[status]) || detail || fallback
 
@@ -678,7 +682,7 @@ http.interceptors.response.use(
       const { feedback } = await import('./feedback')
       feedback.notify({
         type: 'error',
-        title: '服务器错误',
+        title: pendingMigration ? '数据库结构未升级' : '服务器错误',
         message: displayMsg,
         duration: 8000,
       })

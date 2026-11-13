@@ -1807,13 +1807,23 @@ describe('[T69-SB3] DOM/network 顺序与五条立即失败判据（独立回归
     const harness = makeHarness()
     await driveOpen(harness)
 
-    // 真实网络：整趟只有三次调用，多打一次 config 会让等值判据立刻红
-    assertEndpointMultiset(netCalls(), ['create_pending_mutation', 'materialize', 'confirm_descriptor'])
-    // 反事实臂：合成一次多余的 config 请求，同一判据必须抛
+    // 真实网络：整趟恰为四次调用，多打一次 config 会让等值判据立刻红。
+    // 🔴 第四项 `read_entry_readiness` 是统一桥在第一个写请求之前的 readiness 复查
+    //    （spec workpaper-html-onlyoffice-bidirectional-writeback-closure，AC 1.4）—— 它由桥发，
+    //    不是 editor 自取 config。原先写「恰为三项」，桥接入 readiness 后这条恒红；改成四项，
+    //    并钉住 readiness 必须早于第一个写请求，否则「先写后查」也能凑出同一个多重集。
+    const expectedTrip = [
+      'read_entry_readiness', 'create_pending_mutation', 'materialize', 'confirm_descriptor',
+    ]
+    assertEndpointMultiset(netCalls(), expectedTrip)
+    const order = netCalls().map((call) => call.endpoint)
+    expect(order.indexOf('read_entry_readiness')).toBeLessThan(order.indexOf('create_pending_mutation'))
+    expect(order.filter((endpoint) => endpoint === 'read_entry_readiness')).toHaveLength(1)
+    // 反事实臂：合成一次多余的请求，同一判据必须抛
     expect(() =>
       assertEndpointMultiset(
         [...netCalls(), { ...netCalls()[1], endpoint: 'materialize' }],
-        ['create_pending_mutation', 'materialize', 'confirm_descriptor'],
+        expectedTrip,
       ),
     ).toThrow(/端点多重集/)
 
@@ -1822,10 +1832,13 @@ describe('[T69-SB3] DOM/network 顺序与五条立即失败判据（独立回归
     const source = descriptor.onlyofficeConfig as Record<string, unknown>
     const extra = Object.keys(config).filter((key) => !Object.prototype.hasOwnProperty.call(source, key))
     expect(extra.sort()).toEqual([...WP_SYNC_HOST_ADDED_CONFIG_KEYS].sort())
-    // descriptor 的每一段都**同一引用**传下去（宿主不得改写字段）
+    // descriptor 的每一段都原样传下去（宿主不得改写字段）。🔴 比内容不比引用：`buildDocEditorConfig`
+    // 有意把 descriptor JSON 深拷贝成可变纯对象（Vue Proxy 会吞掉 OO 对 `document.token` 的赋值 ⇒
+    // 编辑器 -20）。原先写「同一引用」，被上面那条三项多重集挡着一直没跑到；反向钉住 document 是新对象。
     for (const key of Object.keys(source)) {
-      expect(config[key]).toBe(source[key])
+      expect(config[key]).toEqual(source[key])
     }
+    expect(config.document).not.toBe(source.document)
     expect(config.token).toBeUndefined()
     expect((config.document as Record<string, unknown>).url).toBe(
       (source.document as Record<string, unknown>).url,

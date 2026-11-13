@@ -36,7 +36,6 @@ SYNC_DIR = WP_COMPONENTS / "sync"
 DATA = BACKEND / "data"
 
 KAM_HOST = "GtKamWorkpaper.vue"
-
 #: 13 条 entry 的 wp_code 序号
 K_INDEXES = tuple(range(1, 14))
 
@@ -529,9 +528,19 @@ CONTRACT_DIR = DATA / "workpaper_sync_contracts"
 # 🔴 原先 K 守卫写的是「K 循环生产契约数 == 0」「13 条 adapter_id 全 null」—— 那是**晋级前**
 #    的事实。晋级后若把这些判据直接删掉，就失去「谁晋级了、谁没有、为什么」的审计轨迹；
 #    若各文件各写一份清单，就是 N 个漂移面。⇒ 统一读这里，判据改成「恰好等于账本」。
-#: reviewed 生产契约（6 条：调整分录汇总六册）。entry 序号 → contract_id。
+#: reviewed 生产契约。entry 序号 → contract_id。
+#: 🔴 2026-11-05 补 K2~K7（`k1-k7-inlined-iife-hosts-and-orphan-cleanup` lane 晋级，commit
+#:    c7a93a630「K 真双向 adapter 晋级 6 册」）：契约目录现算 13 份 reviewed，manifest 里这 6 条
+#:    也已是 `capability=bidirectional` + 具名 `adapter_id`。账本停在 7 条 ⇒ 5 个文件的
+#:    「恰好等于账本」判据同时打红，报的是「有人绕过账本发了契约」这个**错结论**。
 K_REVIEWED_CONTRACTS: dict[int, str] = {
     1: "k1.baddebt_reversal_writeoff_check",
+    2: "k2.other_current_assets_adjustment",
+    3: "k3.other_payables_adjustment",
+    4: "k4.other_current_liabilities_adjustment",
+    5: "k5.provisions_adjustment",
+    6: "k6.held_for_sale_adjustment",
+    7: "k7.deferred_income_adjustment",
     8: "k8.selling_expenses_adjustment",
     9: "k9.admin_expenses_adjustment",
     10: "k10.other_income_adjustment",
@@ -539,8 +548,10 @@ K_REVIEWED_CONTRACTS: dict[int, str] = {
     12: "k12.non_operating_income_adjustment",
     13: "k13.non_operating_expense_adjustment",
 }
-#: 已发布首版 representation 且 manifest 翻成 bidirectional 的 entry（6 条：K1 + 5 条调整表）。
-K_BIDIRECTIONAL_ENTRIES: tuple[int, ...] = (1, 8, 9, 11, 12, 13)
+#: 已发布首版 representation 且 manifest 翻成 bidirectional 的 entry。
+#: 现算核对：manifest 里 `capability == "bidirectional"` 的 K entry 恰是这 12 条（K10 仍被
+#: OOXML 安全门拒，见 `K_PUBLISH_BLOCKED`）。
+K_BIDIRECTIONAL_ENTRIES: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13)
 #: 契约已 reviewed、但**首版发布被 OOXML 安全门拒绝**的 entry 及原因（不是代码缺陷，
 #: 是安全策略裁决：`workpaper_sync_limits.json` 的 `allow_embedded_objects=false`）。
 K_PUBLISH_BLOCKED: dict[int, str] = {

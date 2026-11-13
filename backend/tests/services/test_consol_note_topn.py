@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from app.models.consol_note_data_models import ConsolNoteData
 from app.models.report_models import DisclosureNote
 from app.services.consol_note_auto_mapping import auto_map_sections
-from app.services.consol_note_detail_apply_service import apply_detail_refresh
+from app.services.consol_note_detail_apply_service import ApplyError, apply_detail_refresh
 from app.services.consol_note_formula_service import consol_note_tables
 from app.services.consol_note_subtree_reaggregate import reaggregate_subtree
 from app.services.consol_note_topn import (
@@ -125,6 +125,50 @@ async def test_leaf_pull_needs_no_mapping_and_drops_group_units(db, group):
 
 
 @pytest.mark.asyncio
+async def test_leaf_topn_invalid_protection_metadata_raises_apply_error_before_write(db, group):
+    """前 N 名明细入口把保护元数据错误映射为 ApplyError 422，且不改原行。"""
+    await _seed(db, group)
+    original = {"rows": [["旧单位", "9.00", "", ""]], "manual_cells": "坏了"}
+    db.add(ConsolNoteData(
+        project_id=group["G"].id, year=_YEAR, section_id=_TOPN, node_key="A:parent",
+        data=original.copy(),
+    ))
+    await db.flush()
+
+    with pytest.raises(ApplyError) as exc:
+        await apply_detail_refresh(
+            db, project_id=group["G"].id, section_id=_TOPN, year=_YEAR, node_key="A:parent",
+        )
+
+    assert exc.value.status == 422
+    assert exc.value.code == "PROTECTED_CELLS_INVALID"
+    assert (await _rec(db, group, "A:parent")).data == original
+
+
+@pytest.mark.asyncio
+async def test_reaggregate_topn_invalid_protection_metadata_is_section_failure(db, group):
+    """前 N 名汇总节点坏保护元数据必须整章节回滚并回报失败。"""
+    await _seed(db, group)
+    original = {"rows": [], "manual_cells": "坏了"}
+    db.add(ConsolNoteData(
+        project_id=group["G"].id, year=_YEAR, section_id=_TOPN, node_key="G:consol",
+        data=original.copy(),
+    ))
+    await db.flush()
+
+    result = await reaggregate_subtree(
+        db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_TOPN],
+    )
+
+    assert result["status"] == "failed"
+    assert len(result["failures"]) == 1
+    failure = result["failures"][0]
+    assert failure["section_id"] == _TOPN and failure["node_key"] == "G:consol"
+    assert "manual_cells" in failure["error"]
+    assert (await _rec(db, group, "G:consol")).data == original
+
+
+@pytest.mark.asyncio
 async def test_reaggregate_reranks_children_top_n_and_marks_approximate(db, group):
     await _seed(db, group)
     result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_TOPN])
@@ -158,8 +202,9 @@ async def test_manual_cells_follow_the_unit_and_missing_denominator_is_reported(
         _row("壬公司", 900.0), _row("癸公司", 700.0), _row("合计", 1600.0, total=True)]}]}
     await db.flush()
 
-    await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_TOPN])
+    result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_TOPN])
     g = (await _rec(db, group, "G:consol")).data
+    assert result["results"][0]["kept_manual_count"] == 1
     names = [r[0] for r in g["rows"]]
     assert names == ["壬公司", "癸公司", "甲公司", "戊公司", "乙公司", "合  计"], "B 换了单位：丙公司掉出前 5"
     assert g["rows"][names.index("戊公司")][3] == "77.00", "手工格跟着单位走，不按位置"

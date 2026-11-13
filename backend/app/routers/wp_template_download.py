@@ -23,7 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import require_project_access, require_project_access_stream
 from app.models.core import User
 from app.services.wp_template_init_service import (
     find_template_file_any,
@@ -46,7 +46,7 @@ router = APIRouter(
 async def download_template_by_code(
     project_id: str,
     wp_code: str,
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """下载单个科目的模板文件（从 wp_templates/ 目录）
 
@@ -103,8 +103,8 @@ async def download_template_prefilled(
     wp_code: str,
     include_responses: bool = False,
     include_guidance: bool = False,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """下载预填充后的 docx 模板（替换公司名/年度/事务所等占位符）
 
@@ -601,7 +601,7 @@ async def list_all_templates(
 @router.get("/download-all")
 async def download_all_templates(
     project_id: str,
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """批量下载全部底稿模板（ZIP，按循环分目录）
 
@@ -659,8 +659,8 @@ from app.services.libreoffice_pool import (
 async def preview_template_as_pdf(
     project_id: str,
     wp_code: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """模板主文件转 PDF 在线预览。
 

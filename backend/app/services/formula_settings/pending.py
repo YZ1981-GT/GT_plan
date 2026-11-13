@@ -91,6 +91,20 @@ async def upsert_pending(db: AsyncSession, *, project_id: uuid.UUID, domain: str
     return result.scalars().one()
 
 
+async def update_pending_local(db: AsyncSession, *, project_id: uuid.UUID, domain: str,
+                               slot_key: str, local_definition: dict) -> FormulaSyncItem | None:
+    """本地保存使已有确认快照过期；不创建事项，也不改上游、基线或原因。"""
+    result = await db.execute(sa.update(FormulaSyncItem).where(
+        FormulaSyncItem.project_id == project_id,
+        FormulaSyncItem.domain == domain,
+        FormulaSyncItem.slot_key == slot_key,
+        FormulaSyncItem.status == "pending",
+    ).values(local_definition=_plain(local_definition), revision=FormulaSyncItem.revision + 1,
+             updated_at=_now()).returning(FormulaSyncItem),
+        execution_options={"populate_existing": True, "synchronize_session": False})
+    return result.scalars().one_or_none()
+
+
 async def close_pending(db: AsyncSession, project_id: uuid.UUID, domain: str, slot_keys: Iterable[str], *,
                         status: str = "superseded", resolution: str | None = None,
                         user_id: uuid.UUID | None = None) -> int:

@@ -8,7 +8,9 @@
  * - 按键缓存：查过的键（含查无记录的）不再查；一次最多 500 个键，超过分段顺序查（键里有主体名称，走请求体）。
  * - 挂凭成功后 `refresh(keys)` 只重查这几个键；切项目 / 年度清空。
  * - 竞态：每个键记「最近一次为它发起的请求」的序号，晚到的旧响应不覆盖新结果（不比时间戳，见 memory）。
- * - 查不到（网络 / 权限）只是不显示标记，不打断查账；失败的键不进缓存，下次再查。
+ * - 查不到（网络 / 权限）不打断查账：明细层不显示标记；凭证层显示「挂接状态未知」+ 重试（`linkStatusOf`，
+ *   spec voucher-workflow-linkage-lineage-closure R3.3 —— 原先失败被吞掉，凭证层显示成「尚未挂到底稿」）。
+ *   失败的键不进缓存，下次行列表变化或重试时再查。
  * - 凭证层（`linksOfKey`）另并入各可见底稿已取得的凭证证据（spec attachment-voucher-evidence-binding 需求 7，
  *   证据走凭证证据索引按需查）；明细层 📎（`flagOfRow` / `linksOfRow`）照旧只看登记。
  */
@@ -73,19 +75,32 @@ export function rowVoucherKey(row: Record<string, unknown> | null | undefined, y
   return year == null ? null : voucherKeyString(row, year)
 }
 
+/** 已挂查询状态：查询中 / 有结果（含「查过、没有记录」）/ 查询失败（不能当成「没挂」）/ 没查（合成行、没有年度） */
+export type VoucherLinkStatus = 'loading' | 'ready' | 'error' | 'idle'
+
 export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | null>) {
   /** 凭证键 → 已挂记录；查过但没有记录的键存空数组 */
   const links = shallowRef<Map<string, VoucherLink[]>>(new Map())
+  /** 最近一次查询失败的键（spec voucher-workflow-linkage-lineage-closure R3.3：失败显示「挂接状态未知」，不显示「尚未挂到底稿」） */
+  const failed = shallowRef<Set<string>>(new Set())
+  /** 查询中的键（响应式副本：`latest` 是普通 Map，界面读不到它的变化） */
+  const pending = shallowRef<Set<string>>(new Set())
   let seq = 0
   /** 每个键最近一次为它发起的请求序号：晚到的旧响应不覆盖 */
   const latest = new Map<string, number>()
 
   function clear(): void {
     links.value = new Map()
+    failed.value = new Set()
+    pending.value = new Set()
     latest.clear()
     seq += 1
   }
   watch([projectId, year], clear)
+
+  function syncPending(): void {
+    pending.value = new Set(latest.keys())
+  }
 
   async function fetchKeys(keys: string[]): Promise<void> {
     const pid = projectId.value
@@ -95,23 +110,38 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
       const chunk = keys.slice(i, i + VOUCHER_LINKS_MAX_KEYS)
       const mine = ++seq
       for (const k of chunk) latest.set(k, mine)
+      syncPending()
       let found: Record<string, VoucherLink[]>
       try {
         found = await queryVoucherLinks(pid, yr, chunk)
       } catch {
-        for (const k of chunk) if (latest.get(k) === mine) latest.delete(k)
+        if (pid !== projectId.value || yr !== year.value) return
+        const nextFailed = new Set(failed.value)
+        for (const k of chunk) {
+          if (latest.get(k) !== mine) continue
+          latest.delete(k)
+          nextFailed.add(k)
+        }
+        failed.value = nextFailed
+        syncPending()
         continue
       }
       if (pid !== projectId.value || yr !== year.value) return
       const next = new Map(links.value)
+      const nextFailed = new Set(failed.value)
       for (const k of chunk) {
-        if (latest.get(k) === mine) next.set(k, found[k] ?? [])
+        if (latest.get(k) !== mine) continue
+        next.set(k, found[k] ?? [])
+        nextFailed.delete(k)
+        latest.delete(k)
       }
       links.value = next
+      failed.value = nextFailed
+      syncPending()
     }
   }
 
-  /** 给一批行补标识（已查过的键跳过） */
+  /** 给一批行补标识（已查过的键跳过；失败过的键下次行列表变化时再查，查到前保持「失败」） */
   async function loadForRows(rows: ReadonlyArray<Record<string, unknown>>): Promise<void> {
     const keys = new Set<string>()
     for (const row of rows) {
@@ -119,6 +149,14 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
       if (k && !links.value.has(k) && !latest.has(k)) keys.add(k)
     }
     if (keys.size) await fetchKeys([...keys])
+  }
+
+  /** 凭证层：这张凭证的已挂查询状态 */
+  function linkStatusOf(key: string | null | undefined): VoucherLinkStatus {
+    if (!key) return 'idle'
+    if (pending.value.has(key)) return 'loading'
+    if (failed.value.has(key)) return 'error'
+    return links.value.has(key) ? 'ready' : 'idle'
   }
 
   /** 挂凭之后重查这几个键（不论缓存） */
@@ -162,6 +200,6 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
 
   return {
     links, loadForRows, refresh, clear, linksOfKey, linksOfRow, flagOfRow,
-    evidenceStatusOf, retryEvidence,
+    evidenceStatusOf, retryEvidence, linkStatusOf,
   }
 }

@@ -149,4 +149,26 @@ describe('报表试算：失败原因显示在计算值提示里，提示点名�
     expect(msg.warning).toHaveBeenCalledWith('执行完成：1 条成功，1 条失败（BS-128），失败原因见计算值提示')
     w.unmount()
   })
+
+  it('未配置公式的行以空公式一并发出（后端按报表生成同口径记 0，供 ROW 引用）', async () => {
+    const w = create()
+    await w.setProps({ modelValue: true })
+    for (let i = 0; i < 4; i++) await flushPromises()
+    const s = (w.vm as any).$.setupState
+    s.allRowsMap.balance_sheet = [
+      ...ROWS,
+      { id: 'r3', row_code: 'BS-127', row_name: '一年内到期的非流动资产', formula: null, formula_category: 'auto_calc' },
+    ]
+    s.selectedNodeKey = 'report_balance_sheet'
+    await flushPromises()
+    post.mockResolvedValue({ results: [], row_values: {} })
+    await s.onApplyFormulas()
+    await flushPromises()
+    expect(post.mock.calls[0][1].formulas).toEqual([
+      { row_code: 'BS-001', formula: "TB('1001','期末余额')" },
+      { row_code: 'BS-128', formula: "ROW('BS-127')" },
+      { row_code: 'BS-127', formula: '' },
+    ])
+    w.unmount()
+  })
 })

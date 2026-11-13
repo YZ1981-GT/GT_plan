@@ -36,6 +36,9 @@ import {
   conflictItemWire,
   conflictPreviewWire,
   driveTo,
+  harness,
+  openToWaitingApplication,
+  snapshot,
   stripComments,
   threeGroupPreview,
   type Harness,
@@ -645,3 +648,99 @@ describe('零消费方判决', () => {
 // 未使用的 import 守卫：`vi` 在 mockImplementation 场景里由 harness 提供，
 // 这里显式引用一次以避免 lint 误报「未使用」。
 void vi
+
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═════════════════════════════════════════════════════════════════════════
+// room 侧 fence 的读取面（spec wp-sync-conflict-adjudication-and-d4-32-modeling §2）
+//
+// 后端 get_operation 随 app_facts 返回 room_latest_durable_application_id /
+// _sequence，但前端 DTO 一直没解析、注释还写着「无读取面」⇒ buildResolveFence 永远
+// 判缺两项 ⇒ 任何 entry 的冲突都提交不了裁决。这里验面板真的接上了那条读取面。
+// ═════════════════════════════════════════════════════════════════════════
+
+/** 驱动到 conflict，并让 operation 快照带上（或不带）room 侧两项。 */
+async function conflictWithRoomFence(
+  over: {
+    readonly roomLatestDurableApplicationId?: string | null
+    readonly roomLatestDurableSequence?: number | null
+  } = {},
+): Promise<Harness> {
+  const h = harness()
+  await openToWaitingApplication(h)
+  h.bridge.ingestOperationSnapshot(
+    snapshot({
+      state: 'conflict',
+      shape: 'primary',
+      applicationId: UUID(50),
+      conflictCount: 4,
+      durableAt: '2026-08-16T00:00:10Z',
+      ...over,
+    }),
+  )
+  return h
+}
+
+describe('不传 roomDurableFence 时从桥的 operation 快照投影', () => {
+  it('桥快照带 room 两项 ⇒ fence 齐备（面板不再要求宿主显式传）', async () => {
+    const h = await conflictWithRoomFence({
+      roomLatestDurableApplicationId: UUID(41),
+      roomLatestDurableSequence: 6,
+    })
+    // 刻意不传 roomDurableFence：withDefaults 的缺省值是 null，投影须接管
+    const wrapper = mountDialog({ bridge: h.bridge, visible: true })
+    await flushPromises()
+    expect(panel(wrapper).attributes('data-fence-ready')).toBe('true')
+    expect(dialogApi(wrapper).getAdjudication().fenceMissing).toEqual([])
+  })
+
+  it('桥快照缺 room 两项 ⇒ 仍逐项阻断、零 HTTP（不拿 canonical 顶替）', async () => {
+    const h = await conflictWithRoomFence()
+    const wrapper = mountDialog({ bridge: h.bridge, visible: true })
+    await flushPromises()
+    expect(panel(wrapper).attributes('data-fence-ready')).toBe('false')
+    expect(dialogApi(wrapper).getAdjudication().fenceMissing).toEqual([
+      'room_latest_durable_application_id',
+      'room_latest_durable_sequence',
+    ])
+    expect(h.api.resolveConflicts).not.toHaveBeenCalled()
+  })
+
+  it('投影出的两项真的被发到服务端（不只是让按钮变亮）', async () => {
+    const h = await conflictWithRoomFence({
+      roomLatestDurableApplicationId: UUID(41),
+      roomLatestDurableSequence: 6,
+    })
+    const wrapper = mountDialog({ bridge: h.bridge, visible: true })
+    await flushPromises()
+    await wrapper.get(`[data-testid="wp-sync-choice-incoming-${UUID(61)}"]`).setValue(true)
+    await flushPromises()
+    await dialogApi(wrapper).submitAdjudication()
+    await flushPromises()
+    expect(h.api.resolveConflicts).toHaveBeenCalledTimes(1)
+    const sent = h.api.resolveConflicts.mock.calls[0][1] as Record<string, unknown>
+    expect(sent.roomLatestDurableApplicationId).toBe(UUID(41))
+    expect(sent.roomLatestDurableSequence).toBe(6)
+  })
+
+  it('宿主显式传的 prop 优先于桥快照（宿主可能持有更新的快照）', async () => {
+    const h = await conflictWithRoomFence({
+      roomLatestDurableApplicationId: UUID(41),
+      roomLatestDurableSequence: 6,
+    })
+    const wrapper = mountDialog({
+      bridge: h.bridge,
+      visible: true,
+      roomDurableFence: { applicationId: UUID(42), sequence: 11 },
+    })
+    await flushPromises()
+    await wrapper.get(`[data-testid="wp-sync-choice-incoming-${UUID(61)}"]`).setValue(true)
+    await flushPromises()
+    await dialogApi(wrapper).submitAdjudication()
+    await flushPromises()
+    expect(h.api.resolveConflicts).toHaveBeenCalledTimes(1)
+    const sent = h.api.resolveConflicts.mock.calls[0][1] as Record<string, unknown>
+    expect(sent.roomLatestDurableApplicationId).toBe(UUID(42))
+    expect(sent.roomLatestDurableSequence).toBe(11)
+  })
+})

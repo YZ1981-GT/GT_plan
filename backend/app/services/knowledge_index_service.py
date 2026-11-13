@@ -41,6 +41,15 @@ from app.services.knowledge_doc_search import (
     KnowledgeDocSearch,
     escape_like,
 )
+from app.services.knowledge_vector_support import (
+    INDEX_VECTOR_DIM,
+    chunk_vector_values,
+    has_foreign_signature,
+    recall_size,
+    rerank_hits,
+    resolve_rerank_route,
+    score_text_vector_chunks,
+)
 from app.services.vector_store import get_vector_store, PgTextStore
 
 logger = logging.getLogger(__name__)
@@ -226,6 +235,8 @@ class KnowledgeIndexService:
         self._ai_svc = AIService(db)
         # 文档正文词法检索（方案 A 权威层）；测试可替换
         self._doc_search = KnowledgeDocSearch(db)
+        # 最近一次向量召回的范围内是否有其他向量模型生成的分块（需重建 / 需词法兜底）
+        self._foreign_vectors = False
 
     # -------------------------------------------------------------------------
     # Helper methods
@@ -259,21 +270,22 @@ class KnowledgeIndexService:
         embedding: np.ndarray,
         chunk_index: int,
         doc_version: int | None = None,
+        embedding_model: str | None = None,
     ) -> None:
-        """Upsert single chunk (source_id + chunk_index unique).
-        
-        Dual-writes both:
-        - embedding_vector (TEXT, legacy) 
-        - embedding_vec (pgvector vector(1024), V119)
+        """Upsert single chunk（冲突目标 = V263 唯一索引 project_id + source_id + chunk_index）。
+
+        向量列见 ``chunk_vector_values``：文本列总写；``embedding_vec`` 只在列存在时写且只收
+        ``INDEX_VECTOR_DIM`` 维；``embedding_model`` 记录向量模型签名。
         """
-        embedding_str = self._vector_to_str(embedding)
-        # pgvector expects a list of floats
         embedding_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-        
+        vector_values = chunk_vector_values(
+            embedding_list,
+            pgvector_column=await self._pgvector_column_available(),
+            signature=embedding_model,
+        )
         values = {
             "content_text": content_text,
-            "embedding_vector": embedding_str,
-            "embedding_vec": embedding_list,
+            **vector_values,
             "is_deleted": False,
             "is_stale": False,
             "doc_version": doc_version,
@@ -287,12 +299,11 @@ class KnowledgeIndexService:
                 source_type=source_type,
                 source_id=source_id,
                 content_text=content_text,
-                embedding_vector=embedding_str,
-                embedding_vec=embedding_list,
                 chunk_index=chunk_index,
                 is_deleted=False,
                 is_stale=False,
                 doc_version=doc_version,
+                **vector_values,
             )
             .on_conflict_do_update(
                 index_elements=["project_id", "source_id", "chunk_index"],
@@ -406,7 +417,7 @@ class KnowledgeIndexService:
                     source_type=source_type,
                     source_id=source_id,
                     content_text=chunk_text,
-                    embedding=vec,
+                    embedding=vec, embedding_model=self._ai_svc.last_embedding_signature,
                     chunk_index=idx,
                 )
                 total_chunks += 1
@@ -438,7 +449,7 @@ class KnowledgeIndexService:
                 source_type=st,
                 source_id=source_id,
                 content_text=chunk_text,
-                embedding=vec,
+                embedding=vec, embedding_model=self._ai_svc.last_embedding_signature,
                 chunk_index=idx,
                 doc_version=doc_version,
             )
@@ -497,12 +508,16 @@ class KnowledgeIndexService:
         text_query = (query or "").strip()
         restrict = tuple(restrict_to or ())
         subject = await self._resolve_subject(user)
+        # 启用重排时各层多召回一些，权限过滤后由重排模型统一排序（spec enterprise-embedding-rerank-closure R6）
+        rerank_route = await resolve_rerank_route(self._db, self._ai_svc) if text_query else []
+        recall_k = recall_size(top_k, bool(rerank_route))
 
         vector_hits: list[dict[str, Any]] = []
         vector_ok = False
+        self._foreign_vectors = False
         if text_query:
             try:
-                vector_hits = await self._vector_search(project_id, text_query, top_k, scope)
+                vector_hits = await self._vector_search(project_id, text_query, recall_k, scope)
                 vector_ok = True
             except Exception as exc:  # noqa: BLE001 - 向量层是可选加速，失败即降级
                 logger.warning(
@@ -524,16 +539,19 @@ class KnowledgeIndexService:
                         mode=KnowledgeRetrievalMode.project,
                         subject=subject,
                         project_id=project_id,
-                        top_k=top_k,
+                        top_k=recall_k,
                         restrict_to=_coerce_uuid_tuple(restrict),
                         category=category,
                     )
                 )
             )
-        if not vector_ok and text_query and scope in ("project_data", "all"):
-            results.extend(await self._index_lexical_fallback(project_id, text_query, top_k))
+        # 向量不可用，或范围内还有其他向量模型的分块（尚未按当前模型重建）⇒ 业务数据补词法兜底
+        needs_fallback = not vector_ok or self._foreign_vectors
+        if needs_fallback and text_query and scope in ("project_data", "all"):
+            results.extend(await self._index_lexical_fallback(project_id, text_query, recall_k))
 
         results = _merge_hits(results)
+        results = await rerank_hits(self._ai_svc, rerank_route, text_query, results)
         # V119: 上下文相关性加权
         if wp_code or account_code or audit_area:
             results = _apply_context_boost(results, wp_code, account_code, audit_area)
@@ -568,9 +586,13 @@ class KnowledgeIndexService:
 
         if scope == "cross_year":
             scope = "all"
+        rerank_route = await resolve_rerank_route(self._db, self._ai_svc)
+        self._foreign_vectors = False
 
         try:
-            results = await self._vector_search(project_id, query, top_k, scope)
+            results = await self._vector_search(
+                project_id, query, recall_size(top_k, bool(rerank_route)), scope
+            )
         except Exception as exc:
             logger.warning(
                 "严格语义检索失败（不降级，向调用方抛 semantic_unavailable）: %s: %s",
@@ -579,9 +601,14 @@ class KnowledgeIndexService:
             raise EmbeddingUnavailableError(
                 f"语义检索不可用：{type(exc).__name__}"
             ) from exc
+        if not results and self._foreign_vectors:
+            # 零命中且只有其他向量模型的分块：不是「真的没有匹配」，如实报不可用
+            raise EmbeddingUnavailableError("语义检索不可用：知识库索引需按当前向量模型重建")
 
         results = await self._filter_by_permission(results, user, project_id=project_id)
-        return await self._enrich_results(results)
+        # 重排失败保持向量顺序：语义召回本身成功，不因重排把它报成不可用
+        results = await rerank_hits(self._ai_svc, rerank_route, query, results)
+        return await self._enrich_results(results[:top_k])
 
     async def search_global_knowledge(
         self,
@@ -726,7 +753,9 @@ class KnowledgeIndexService:
         """
         from app.services.indexing_pipeline import GLOBAL_KB_PROJECT_ID
 
+        self._foreign_vectors = False
         query_embedding = await self._ai_svc.embedding(query)
+        signature = self._ai_svc.last_embedding_signature
         query_vec = np.array(query_embedding)
         query_list = query_vec.tolist()
 
@@ -739,8 +768,12 @@ class KnowledgeIndexService:
             KnowledgeIndex.is_deleted == False,  # noqa: E712
         ]
         conditions.extend(_scope_conditions(scope))
+        if signature:
+            # 不同向量模型的向量不在同一空间：只比同签名分块，其余等重建（ADR-ER-4）
+            self._foreign_vectors = await has_foreign_signature(self._db, conditions, signature)
+            conditions.append(KnowledgeIndex.embedding_model == signature)
 
-        if await self._pgvector_column_available():
+        if len(query_list) == INDEX_VECTOR_DIM and await self._pgvector_column_available():
             try:
                 async with self._db.begin_nested():
                     distance = KnowledgeIndex.embedding_vec.cosine_distance(query_list)
@@ -748,12 +781,26 @@ class KnowledgeIndexService:
                         await self._db.execute(
                             select(KnowledgeIndex, (1 - distance).label("score"))
                             .options(defer(KnowledgeIndex.embedding_vec))
-                            .where(*conditions)
+                            .where(*conditions, KnowledgeIndex.embedding_vec.is_not(None))
                             .order_by(distance)
                             .limit(top_k)
                         )
                     ).all()
-                return [_chunk_hit(chunk, float(score), "vector") for chunk, score in rows]
+                # V263 加列前 / 列暂不可用时的同签名分块没有 embedding_vec，不能因 ANN 启用而静默消失。
+                async with self._db.begin_nested():
+                    text_only = (
+                        await self._db.execute(
+                            select(KnowledgeIndex)
+                            .options(defer(KnowledgeIndex.embedding_vec))
+                            .where(*conditions, KnowledgeIndex.embedding_vec.is_(None))
+                        )
+                    ).scalars().all()
+                scored = [(float(score), chunk) for chunk, score in rows]
+                scored.extend(score_text_vector_chunks(
+                    text_only, query_vec, parse_vector=self._str_to_vector, cosine_similarity=self._cosine_similarity,
+                ))
+                scored.sort(key=lambda item: item[0], reverse=True)
+                return [_chunk_hit(chunk, score, "vector") for score, chunk in scored[:top_k]]
             except Exception as pgvec_err:  # noqa: BLE001 - 退到内存计算
                 logger.warning("pgvector 检索失败，改用内存向量计算：%s", pgvec_err)
 
@@ -766,13 +813,10 @@ class KnowledgeIndexService:
                 )
             ).scalars().all()
 
-        scored = []
-        for chunk in chunks:
-            if not chunk.embedding_vector:
-                continue
-            chunk_vec = self._str_to_vector(chunk.embedding_vector)
-            scored.append((self._cosine_similarity(query_vec, chunk_vec), chunk))
-        scored.sort(key=lambda x: x[0], reverse=True)
+        scored = score_text_vector_chunks(
+            chunks, query_vec, parse_vector=self._str_to_vector, cosine_similarity=self._cosine_similarity,
+        )
+        scored.sort(key=lambda item: item[0], reverse=True)
         return [_chunk_hit(chunk, score, "vector") for score, chunk in scored[:top_k]]
 
     async def _lexical_doc_hits(self, req: DocSearchRequest) -> list[dict[str, Any]]:
@@ -1190,7 +1234,7 @@ class KnowledgeIndexService:
                 source_type=source_type,
                 source_id=source_id,
                 content_text=chunk_text,
-                embedding=vec,
+                embedding=vec, embedding_model=self._ai_svc.last_embedding_signature,
                 chunk_index=idx,
             )
             total_chunks += 1
@@ -1262,7 +1306,7 @@ class KnowledgeIndexService:
                 source_type=st,
                 source_id=new_source_id,
                 content_text=chunk_text,
-                embedding=vec,
+                embedding=vec, embedding_model=self._ai_svc.last_embedding_signature,
                 chunk_index=idx,
             )
             total_chunks += 1

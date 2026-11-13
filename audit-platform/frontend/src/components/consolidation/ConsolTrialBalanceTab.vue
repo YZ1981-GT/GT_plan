@@ -210,6 +210,7 @@ import {
   trialExportAoa,
   type TrialAuditResult,
 } from '@/components/consolidation/composables/consolTrialView'
+import { confirmPushDespiteConflicts } from '@/components/consolidation/composables/consolTreeConflicts'
 
 defineOptions({ name: 'ConsolTrialBalanceTab' })
 
@@ -332,6 +333,7 @@ const pushing = ref(false)
 
 async function push() {
   if (!props.year || pushing.value) return
+  if (!(await confirmPushDespiteConflicts(props.projectId))) return
   pushing.value = true
   try {
     const res = await pushConsolidation(props.projectId, props.year, 'manual')

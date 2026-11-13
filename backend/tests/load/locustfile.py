@@ -10,28 +10,27 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
 import threading
 import time
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from locust import HttpUser, LoadTestShape, between, events, task
 
 from tests.load.load_config import LoadConfig, load_config
+from tests.load.load_contract import LOAD_STAGES
+from tests.load.load_stage_stats import STAGE_STATS_ENV, StageRecorder, stage_timeline
 
 logger = logging.getLogger(__name__)
-
-LOAD_STAGES = [
-    {"users": 100, "spawn_rate": 20, "duration": 60},
-    {"users": 500, "spawn_rate": 50, "duration": 120},
-    {"users": 1000, "spawn_rate": 100, "duration": 120},
-    {"users": 3000, "spawn_rate": 200, "duration": 180},
-    {"users": 6000, "spawn_rate": 300, "duration": 300},
-]
 
 _CONFIG: LoadConfig | None = None
 _USER_SEQUENCE = itertools.count()
 _USER_SEQUENCE_LOCK = threading.Lock()
+# E5/E6 判定只读这里的稳态窗口直方图；history CSV 的分位列是 10 秒滚动窗口，不能拿来判 30 分钟稳态。
+_STAGE_RECORDER = StageRecorder()
+_ENVIRONMENT: Any = None
 
 
 def _unwrap(payload: Any) -> dict[str, Any]:
@@ -54,6 +53,14 @@ def _next_identity():
 
 @events.request.add_listener
 def on_request(request_type, name, response_time, response_length, exception, **kwargs):
+    runner = getattr(_ENVIRONMENT, "runner", None)
+    _STAGE_RECORDER.record(
+        name=name,
+        request_type=request_type,
+        response_time=response_time,
+        failed=exception is not None,
+        user_count=int(getattr(runner, "user_count", 0) or 0),
+    )
     if exception:
         logger.warning(
             "[FAILED] %s %s | response_time=%.0fms | exception=%s",
@@ -66,11 +73,19 @@ def on_request(request_type, name, response_time, response_length, exception, **
 
 @events.test_start.add_listener
 def on_test_start(environment, **kwargs):
-    global _CONFIG
+    global _CONFIG, _ENVIRONMENT
+    # 与 StepLoadShape.reset_time 同一时刻起算；先于启动校验，保证校验失败时也有空窗口文件可读。
+    _ENVIRONMENT = environment
+    _STAGE_RECORDER.start()
     try:
+        # 专用库硬闸门：无论用哪个 runner / 裸 locust 命令发起，写压测都必须指向
+        # 显式声明的可销毁库，否则在发任何请求之前就退出（R1.2）。
+        from tests.load.load_guard import require_safe_load_target
+
+        require_safe_load_target()
         _CONFIG = load_config()
     except Exception as exc:
-        logger.error("容量测试配置无效：%s", exc)
+        logger.error("容量测试启动校验失败：%s", exc)
         environment.process_exit_code = 2
         if environment.runner is not None:
             environment.runner.quit()
@@ -87,6 +102,15 @@ def on_test_start(environment, **kwargs):
 
 @events.test_stop.add_listener
 def on_test_stop(environment, **kwargs):
+    _STAGE_RECORDER.stop()
+    stage_stats_path = os.environ.get(STAGE_STATS_ENV)
+    if stage_stats_path:
+        try:
+            written = _STAGE_RECORDER.write(Path(stage_stats_path))
+            logger.info("稳态窗口统计已写出：%s", written)
+        except OSError as exc:
+            environment.process_exit_code = 2
+            logger.error("稳态窗口统计写出失败：%s", exc)
     stats = environment.runner.stats
     total = stats.total
     logger.info(
@@ -236,15 +260,13 @@ class AuditPlatformUser(HttpUser):
 
 
 class StepLoadShape(LoadTestShape):
-    """100 → 500 → 1000 → 3000 → 6000 用户梯度。"""
+    """E5 正式梯度：100 → 1000 → 3000 → 6000；6000 稳态 30 分钟。"""
+
+    timeline = stage_timeline()
 
     def tick(self):
         run_time = self.get_run_time()
-        elapsed = 0.0
-        for stage in LOAD_STAGES:
-            ramp_seconds = stage["users"] / stage["spawn_rate"]
-            stage_seconds = ramp_seconds + stage["duration"]
-            if run_time < elapsed + stage_seconds:
+        for stage in self.timeline:
+            if run_time < stage["end_s"]:
                 return stage["users"], stage["spawn_rate"]
-            elapsed += stage_seconds
         return None

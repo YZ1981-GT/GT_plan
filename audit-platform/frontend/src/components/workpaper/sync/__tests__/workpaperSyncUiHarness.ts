@@ -149,6 +149,10 @@ export function snapshot(
     authorityModelDefinitionSha256: null,
     durableAt: null,
     finishedAt: null,
+    // resolve fence 的 room 侧两项。缺省 null = 「room 还没耐久过任何 application」，
+    // 这样既有「fence 缺项 ⇒ 可见失败」的判据保持原语义；要测齐备路径的用例显式传。
+    roomLatestDurableApplicationId: null,
+    roomLatestDurableSequence: null,
     terminal: false,
     ...over,
   }

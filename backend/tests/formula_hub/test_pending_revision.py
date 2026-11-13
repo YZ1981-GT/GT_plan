@@ -185,8 +185,11 @@ async def test_three_origins_create_at_one_and_overwrite_to_two(origin: str) -> 
                 await template_sync.subscribe(db, project_id=target, tpl=tpl, domain=DOMAIN, decisions=None,
                                               user_id=admin.id)
             elif origin == "template":
-                await template_sync.publish_template(db, tpl, expected_version=1, user_id=admin.id, changes=[
-                    {"domain": DOMAIN, "slot_key": SLOT, "definition": definition}])
+                # 发布必须带本次预览的指纹（旧预览不能默默获得覆盖权）
+                changes = [{"domain": DOMAIN, "slot_key": SLOT, "definition": definition}]
+                preview = await template_sync.publish_preview(db, tpl, changes=changes, expected_version=1)
+                await template_sync.publish_template(db, tpl, expected_version=1, user_id=admin.id, changes=changes,
+                                                     preview_fingerprint=preview["preview_fingerprint"])
             else:
                 await push(db, scenario, scenario.src_a if step == 1 else scenario.src_b)
             await db.commit()
@@ -293,9 +296,11 @@ async def _rows_state(session, scenario: Scenario) -> dict[str, str]:
 
 @pytest.mark.pg_only
 def test_resolve_endpoint_revision_contract_pg(monkeypatch: pytest.MonkeyPatch) -> None:
-    _assert_stubbable(formula_settings_router, "publish_events")
-    events = ServiceStub(target="app.routers.formula_settings.publish_events", returns=0)
-    monkeypatch.setattr(formula_settings_router, "publish_events", events)
+    # S4 之后路由在事务内 record_changes（入队 + 标过期，真实运行、随用例事务回滚），提交后 publish_pending 交后台投递：
+    # 数投递调用次数（原先数已删除的 publish_events，该用例一直 AttributeError —— spec formula-management-repair-closure）
+    _assert_stubbable(formula_settings_router, "publish_pending")
+    events = ServiceStub(target="app.routers.formula_settings.publish_pending", returns={"queued": 0})
+    monkeypatch.setattr(formula_settings_router, "publish_pending", events)
     with _endpoint() as (client, session, api):
         def call(fn, *args):
             return client.portal.call(fn, session, *args)

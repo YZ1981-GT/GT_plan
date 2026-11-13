@@ -74,15 +74,15 @@ FAILURES = [  # (公式, ast 路径的原因片段, 正则降级路径的原因�
 def test_failure_categories_are_not_ok(parse_mode, formula, ast_needle, regex_needle):
     result = execute(formula, _ctx())
     _assert_failed(result, ast_needle if parse_mode == "ast" else regex_needle)
-    if parse_mode == "ast":
-        assert result.value == Decimal("0") and isinstance(result.value, Decimal)
+    # 内核契约（FormulaResult.record_error）：失败结果 value 为 None —— 既不伪造 0，也不给部分和
+    assert result.value is None, result
 
 
-def test_failure_value_is_zero_not_partial_sum():
-    """原先 ``TB + 1/(2-2)`` = 100（除零项按 0）、``ROW 存在 + ROW 缺行`` = 7：失败后不给部分和。"""
+def test_failure_value_is_none_not_partial_sum():
+    """原先 ``TB + 1/(2-2)`` = 100（除零项按 0）、``ROW 存在 + ROW 缺行`` = 7：失败后不给部分和，也不给 0。"""
     for formula in ("TB('1001','期末余额') + 1/(2-2)", "ROW('BS-001') + ROW('BS-999')", "BS-001 + BS-999"):
         result = execute(formula, _ctx())
-        assert (result.ok, result.value) == (False, Decimal("0")), (formula, result)
+        assert (result.ok, result.value) == (False, None), (formula, result)
 
 
 LOWER_BOUND_NAMES = sorted(name for name, (low, _high) in ARITY.items() if low >= 1)
@@ -101,7 +101,7 @@ def test_unknown_function_kernel_and_blocked_entry():
     with pytest.raises(FormulaEvalError, match=r"未注册的函数：NOPE\(\)"):
         fe._eval_ast(fe.ASTFuncCall(name="NOPE", args=[]), _ctx(), [])
     result = execute("EVIL(1) + 1", _ctx())
-    assert result.blocked and not result.ok and result.value == Decimal("0")
+    assert result.blocked and not result.ok and result.value is None
 
 
 SUCCESSES = [  # 失败语义只收紧失败情形，正常写法值不变
@@ -225,7 +225,7 @@ def test_ast_budget_checked_before_evaluation(formula):
     """超预算的公式里有缺行引用：只报预算、trace 为空 ⇒ 求值根本没开始。"""
     result = execute(formula, _ctx())
     assert len(result.errors) == 1 and "表达式超出求值预算" in result.errors[0], result.errors
-    assert result.trace == [] and result.value == Decimal("0")
+    assert result.trace == [] and result.value is None
 
 
 @pytest.mark.parametrize("expr", [_wide(MAX_AST_NODES), _nested(MAX_AST_DEPTH + 1)], ids=["wide", "deep"])

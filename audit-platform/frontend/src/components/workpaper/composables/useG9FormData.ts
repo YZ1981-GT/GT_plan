@@ -4,8 +4,17 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG9FormData — G9 其他非流动金融资产底稿数据层
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
-import type { AxiosRequestConfig } from 'axios'
-import { registerPendingFlusher, trackPendingWrite } from '../sync/pendingWrites'
+import {
+  createChecklistCasClient,
+  isChecklistDraftAccessDenied,
+  isNonRetryableChecklistSaveError,
+  makeChecklistDraft,
+  readChecklistDraft,
+} from '@/composables/workpaper/checklistCas'
+import { createChecklistWriteQueue } from '../sync/checklistWriteQueue'
+import { checklistDraftKey, checklistDraftPrefix } from '@/composables/workpaper/checklistDraftStorage'
+import { confirmChecklistDraftConflict } from '../sync/checklistDraftStore'
+import { registerPendingFlusher } from '../sync/pendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -15,8 +24,8 @@ import type { ChecklistResponse } from './useF1FormData'
 
 const DRAFT_PREFIX = 'g9-draft'
 
-function draftKey(wpId: string, itemId: string): string {
-  return `${DRAFT_PREFIX}:${wpId}:${itemId}`
+function draftKey(wpId: string, itemId: string): string | null {
+  return checklistDraftKey(DRAFT_PREFIX, wpId, itemId)
 }
 
 export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
@@ -27,30 +36,69 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const renderMeta = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const checklistCas = createChecklistCasClient()
+  const queue = createChecklistWriteQueue<ChecklistResponse>({
+    readLatest: (itemId) => allResponses.value.get(itemId),
+    persist: persistRows,
+    onPending: storeDrafts,
+    onSettled: clearDrafts,
+    onRecoveryRequired: (items) => storeDrafts(items, true),
+    blockOnError: isNonRetryableChecklistSaveError,
+    retry: { attempts: 3, initialDelayMs: 500 },
+  })
 
   function isG9ItemId(itemId: string): boolean {
     return itemId.startsWith('G9')
   }
 
-  function restoreDrafts(): void {
-    if (!opts.wpId.value) return
-    for (let i = 0; i < localStorage.length; i++) {
+  async function restoreDrafts(): Promise<void> {
+    const prefix = checklistDraftPrefix(DRAFT_PREFIX, opts.wpId.value)
+    if (!prefix) return
+    let restored = false
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
       const key = localStorage.key(i)
-      if (!key?.startsWith(`${DRAFT_PREFIX}:${opts.wpId.value}:`)) continue
+      if (!key?.startsWith(prefix)) continue
       try {
-        const itemId = key.slice(`${DRAFT_PREFIX}:${opts.wpId.value}:`.length)
-        // 丢弃历史 Excel 控件草稿（如 checkbox-3c2），避免 conclusion='0' 触发 422
+        const itemId = key.slice(prefix.length)
+        // 丢弃历史 Excel 控件草稿（如 checkbox-3c2），避免 conclusion='0' 触发 422。
         if (!itemId || !isG9ItemId(itemId)) {
           localStorage.removeItem(key)
           continue
         }
-        const updated = JSON.parse(localStorage.getItem(key) || '') as ChecklistResponse
-        if (updated?.item_id) {
-          allResponses.value.set(itemId, updated)
-          void trackPendingWrite(saveImmediate(itemId, updated, 1)).catch(() => undefined)
-          localStorage.removeItem(key)
+        const draft = readChecklistDraft<ChecklistResponse>(JSON.parse(localStorage.getItem(key) || ''))
+        if (!draft || draft.item.item_id !== itemId) continue
+        const hasServerValue = allResponses.value.has(itemId)
+        const serverVersion = checklistCas.version(itemId)
+        const requiresDecision = draft.requiresConfirmation === true
+          || queue.requiresRecoveryDecision(itemId)
+          || (draft.baseVersion
+            ? !hasServerValue || !serverVersion || draft.baseVersion !== serverVersion
+            : hasServerValue)
+        if (requiresDecision) {
+          queue.discard([itemId])
+          const decision = await confirmChecklistDraftConflict()
+          queue.resolveRecoveryDecision([itemId])
+          if (decision === 'keep') {
+            allResponses.value.set(itemId, draft.item)
+          } else {
+            clearDrafts([draft.item])
+          }
+          continue
         }
+        if (draft.baseVersion) {
+          checklistCas.remember([{ ...draft.item, version: draft.baseVersion }])
+        }
+        allResponses.value.set(itemId, draft.item)
+        queue.mark(itemId)
+        restored = true
       } catch { /* ignore */ }
+    }
+    if (restored) {
+      try {
+        await queue.flush()
+      } catch {
+        // 保留草稿和 pending，等待刷新或用户处理。
+      }
     }
   }
 
@@ -59,6 +107,8 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     try {
       const res = await api.get(`/api/workpapers/${opts.wpId.value}/checklist-responses`)
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      checklistCas.remember(responses)
+      queue.resetBlockedError()
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
         const id = r.item_id ?? ''
@@ -67,8 +117,13 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
         }
       }
       allResponses.value = map
-      restoreDrafts()
-    } catch {
+      await restoreDrafts()
+    } catch (error: unknown) {
+      if (isChecklistDraftAccessDenied(error)) {
+        ElMessage.warning('无权读取底稿数据，本地草稿未恢复')
+        return
+      }
+      await restoreDrafts()
       ElMessage.warning('G9数据加载失败，可手动填写')
     }
   }
@@ -105,35 +160,69 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     } catch { /* silent */ }
   }
 
+  function storeDrafts(
+    items: readonly ChecklistResponse[],
+    requiresConfirmation = false,
+  ): void {
+    try {
+      for (const item of items) {
+        const key = draftKey(opts.wpId.value, item.item_id)
+        if (!key) continue
+        localStorage.setItem(
+          key,
+          JSON.stringify(makeChecklistDraft(
+            item,
+            checklistCas.version(item.item_id),
+            requiresConfirmation,
+          )),
+        )
+      }
+    } catch { /* localStorage 不可用时仍保留队列 pending，避免伪装保存成功 */ }
+  }
+
+  function clearDrafts(items: readonly ChecklistResponse[]): void {
+    try {
+      for (const item of items) {
+        const key = draftKey(opts.wpId.value, item.item_id)
+        if (key) localStorage.removeItem(key)
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function persistRows(items: ChecklistResponse[]): Promise<void> {
+    if (!opts.wpId.value || items.length === 0) return
+    try {
+      await checklistCas.save({
+        wpId: opts.wpId.value,
+        projectId: opts.projectId.value,
+        items,
+      })
+      emitWorkpaperSaved()
+    } catch (error: unknown) {
+      ElMessage.warning(
+        isNonRetryableChecklistSaveError(error)
+          ? '保存被拒绝或版本已变化，本地草稿已保留，请刷新后重试'
+          : `G9 数据暂存本地（${items.length} 项），网络恢复后可重试`,
+      )
+      throw error
+    }
+  }
+
   async function saveImmediate(
     itemId: string,
     data: Partial<ChecklistResponse>,
-    retries = 3,
   ): Promise<void> {
     if (!isG9ItemId(itemId)) return
+    const timer = _debounceTimers.get(itemId)
+    if (timer) {
+      clearTimeout(timer)
+      _debounceTimers.delete(itemId)
+    }
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
-    for (let i = 0; i < retries; i++) {
-      try {
-        await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
-          project_id: opts.projectId.value,
-          items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
-        }, { _dedupe: false } as AxiosRequestConfig)
-        try {
-          localStorage.removeItem(draftKey(opts.wpId.value, itemId))
-        } catch { /* ignore */ }
-        emitWorkpaperSaved()
-        return
-      } catch {
-        if (i < retries - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i))
-      }
-    }
-    try {
-      localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
-    } catch { /* ignore */ }
-    // 草稿只是本地兜底，未落库必须让调用方与过渡屏障看见
-    throw new Error(`保存未落库，已暂存本地草稿：${itemId}`)
+    queue.mark(itemId)
+    await queue.flush()
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -141,11 +230,12 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
+    queue.mark(itemId)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
-      void trackPendingWrite(saveImmediate(itemId, updated)).catch(() => undefined)
+      void queue.flush().catch(() => undefined)
     }, 2000))
   }
 
@@ -179,17 +269,11 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
   // 回写已改由 useG9Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目由
   // tbResolvedCode 动态透传）承载，故移除此重复定义及其 return export。
 
-  /** 卸载前刷出未落盘的 debounce 保存（比照 F2/G7） */
+  /** 卸载前取消防抖并发送输入时已记录的最新 generation。 */
   async function flushPending(): Promise<void> {
-    const inFlight: Array<Promise<void>> = []
-    for (const [itemId, timer] of _debounceTimers.entries()) {
-      clearTimeout(timer)
-      const resp = allResponses.value.get(itemId)
-      if (resp) inFlight.push(saveImmediate(itemId, resp, 1))
-    }
+    for (const timer of _debounceTimers.values()) clearTimeout(timer)
     _debounceTimers.clear()
-    // 必须 await：fire-and-forget 会让 flushHtml 读到未落库的旧投影
-    await Promise.all(inFlight)
+    await queue.flush()
   }
 
   registerPendingFlusher(flushPending)

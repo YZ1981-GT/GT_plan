@@ -133,3 +133,86 @@ describe('wizard store 质控业务分类 / 专项场景（R4）', () => {
     expect([saved.business_category, saved.scenario]).toEqual([null, 'ipo'])
   })
 })
+
+
+describe('wizard store 基本信息授权与代码冲突回调（spec consol-group-code-entry-consistency R2.5/R6）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    post.mockReset(); get.mockReset(); put.mockReset()
+  })
+
+  it('403 由 onForbidden 消费，保存请求静默且保留项目状态', async () => {
+    const detail = {
+      error_code: 'COMPANY_CREATION_NOT_AUTHORIZED',
+      message: '修改企业代码需要该代码的建项授权：暂无授权',
+    }
+    put.mockRejectedValue({ response: { status: 403, data: { detail } } })
+    const forbidden = vi.fn()
+    const store = useWizardStore()
+    store.projectId = 'p1'
+
+    await expect(store.saveStep('basic_info', basicInfo() as unknown as Record<string, unknown>, {
+      onForbidden: forbidden,
+    })).resolves.toBe(false)
+    expect(forbidden).toHaveBeenCalledWith(detail)
+    expect(put.mock.calls[0][2]).toEqual({ _silent: true })
+    expect(store.projectId).toBe('p1')
+  })
+
+  it('COMPANY_CODE_IN_USE 409 由 onConflict 消费，不清理本地状态', async () => {
+    const detail = {
+      error_code: 'COMPANY_CODE_IN_USE',
+      message: '企业代码已被引用',
+      impacts: [{ label: '合并附注节点数据', count: 2 }],
+    }
+    put.mockRejectedValue({ response: { status: 409, data: { detail } } })
+    const conflict = vi.fn()
+    const store = useWizardStore()
+    store.projectId = 'p1'
+
+    await expect(store.saveStep('basic_info', basicInfo() as unknown as Record<string, unknown>, {
+      onConflict: conflict,
+    })).resolves.toBe(false)
+    expect(conflict).toHaveBeenCalledWith(detail)
+    expect(put.mock.calls[0][2]).toEqual({ _silent: true })
+    expect(store.projectId).toBe('p1')
+  })
+
+  it('正常保存时应用服务端状态并返回成功', async () => {
+    put.mockResolvedValue({ data: {
+      project_id: 'p1', current_step: 'basic_info', completed: true,
+      steps: { basic_info: { step: 'basic_info', data: { client_name: '保存后' }, completed: true } },
+      notices: ['已同步集团关系'],
+    } })
+    const store = useWizardStore()
+    store.projectId = 'p1'
+
+    await expect(store.saveStep('basic_info', { client_name: '保存前' }, {
+      onForbidden: vi.fn(),
+      onConflict: vi.fn(),
+    })).resolves.toBe(true)
+    expect(store.stepData.basic_info).toEqual({ client_name: '保存后' })
+    expect(store.lastNotices).toEqual(['已同步集团关系'])
+    expect(store.projectId).toBe('p1')
+  })
+
+  it('带回调时非目标 409 仍向上抛出，不被错误吞掉', async () => {
+    const error = { response: { status: 409, data: { detail: { error_code: 'OTHER_CONFLICT', message: '项目版本已变化' } } } }
+    put.mockRejectedValue(error)
+    const store = useWizardStore()
+    store.projectId = 'p1'
+
+    await expect(store.saveStep('basic_info', basicInfo() as unknown as Record<string, unknown>, {
+      onForbidden: vi.fn(),
+      onConflict: vi.fn(),
+    })).rejects.toBe(error)
+  })
+
+  it('未提供回调时保持原有异常传播行为', async () => {
+    const error = { response: { status: 500, data: { detail: '保存失败' } } }
+    put.mockRejectedValue(error)
+    const store = useWizardStore()
+    store.projectId = 'p1'
+    await expect(store.saveStep('basic_info', basicInfo() as unknown as Record<string, unknown>)).rejects.toBe(error)
+  })
+})

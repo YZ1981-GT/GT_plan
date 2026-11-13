@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 # ─── 快照目录路径 ─────────────────────────────────────────────────────────────
 _CATALOG_SNAPSHOTS_DIR = Path(__file__).resolve().parents[3] / "data" / "acnr" / "catalog_snapshots"
+# 与 catalog_contract / Project 模型的版本形态一致；GC 只管理这种明确属于 ACNR 的快照。
+# 目录里的说明 JSON、符号链接或临时文件一律不碰，避免名字排序挤占最近 N 份并越过删除边界。
+_SNAPSHOT_VERSION_RE = re.compile(r"^\d{14}$")
 
 
 def _get_snapshots_dir() -> Path:
@@ -36,7 +41,8 @@ def list_snapshot_versions(snapshots_dir: Path | None = None) -> list[str]:
     """列出快照目录下所有版本号（按字典序降序=最近优先）。
 
     版本号 = 文件名去掉 .json 后缀（如 "20260715120000"）。
-    仅包含 .json 文件（忽略 .gitkeep 等）。
+    只包含目录直属、非符号链接、文件名为 14 位时间戳的 .json；说明 JSON / 临时文件不是
+    GC 管辖的快照，既不计入最近 N 份，也绝不删除。
     """
     sd = snapshots_dir or _get_snapshots_dir()
     if not sd.exists():
@@ -44,7 +50,12 @@ def list_snapshot_versions(snapshots_dir: Path | None = None) -> list[str]:
 
     versions: list[str] = []
     for f in sd.iterdir():
-        if f.suffix == ".json" and f.stem:
+        if (
+            f.suffix == ".json"
+            and _SNAPSHOT_VERSION_RE.fullmatch(f.stem)
+            and not f.is_symlink()
+            and f.is_file()
+        ):
             versions.append(f.stem)
 
     # 降序排列（最新版本在前）
@@ -125,7 +136,10 @@ def cleanup_stale_snapshots(
             "total_snapshots": int,
             "keep_recent": int,
             "referenced_count": int,
-            "deleted": list[str],
+            "deleted": list[str],              # dry-run 时兼容表示 would-delete
+            "would_delete": list[str],           # 仅 dry-run 非空
+            "already_absent": list[str],
+            "failed": list[{version, error}],
             "skipped_referenced": list[str],
             "skipped_protected": list[str],
             "dry_run": bool,
@@ -146,6 +160,8 @@ def cleanup_stale_snapshots(
     actually_deleted: list[str] = []
     skipped_referenced: list[str] = []
     skipped_protected: list[str] = []
+    already_absent: list[str] = []
+    failed: list[dict[str, str]] = []
 
     for version in to_delete:
         if version in protected_versions:
@@ -160,14 +176,23 @@ def cleanup_stale_snapshots(
             skipped_referenced.append(version)
             continue
 
-        if not dry_run:
-            snapshot_path = sd / f"{version}.json"
-            if snapshot_path.exists():
-                snapshot_path.unlink()
-                logger.info("catalog_snapshot_gc: 已删除快照 version=%s", version)
-            actually_deleted.append(version)
+        if dry_run:
+            actually_deleted.append(version)  # 兼容既有报告：dry-run 的 deleted 表示 would-delete
+            continue
+
+        snapshot_path = sd / f"{version}.json"
+        try:
+            snapshot_path.unlink()
+        except FileNotFoundError:
+            # 另一进程已清理同一散落文件：不是失败，也不能谎报本进程删除成功。
+            already_absent.append(version)
+        except OSError as exc:
+            # 单文件失败不让后续候选失去清理机会；报告必须把失败逐项暴露，禁止部分完成却报全成功。
+            logger.error("catalog_snapshot_gc: 删除快照失败 version=%s error=%s", version, exc)
+            failed.append({"version": version, "error": f"{type(exc).__name__}: {exc}"})
         else:
             actually_deleted.append(version)
+            logger.info("catalog_snapshot_gc: 已删除快照 version=%s", version)
 
     if reference_status == "unverifiable":
         logger.warning(
@@ -182,6 +207,9 @@ def cleanup_stale_snapshots(
         "referenced_count": len(refs) if refs is not None else 0,
         "reference_status": reference_status,
         "deleted": actually_deleted,
+        "would_delete": list(actually_deleted) if dry_run else [],
+        "already_absent": already_absent,
+        "failed": failed,
         "skipped_referenced": skipped_referenced,
         "skipped_protected": skipped_protected,
         "dry_run": dry_run,
@@ -268,20 +296,26 @@ async def referenced_registry_versions(db: Any | None) -> set[str] | None:
     return versions
 
 
-async def _referenced_versions_with_own_session() -> set[str] | None:
-    """没传会话时自开一个短会话查引用集；开不出来就返回 None（调用方不删）。
+async def _referenced_versions_with_own_session(
+    operation: Callable[[Any], Awaitable[dict[str, Any]]] | None = None,
+) -> set[str] | None | dict[str, Any]:
+    """自开短会话，并让可选 ``operation`` 在同一会话生命周期内完成。
 
-    启动任务 `_task_acnr_catalog_snapshot_gc` 不带会话。如果这里不自开会话、直接按
-    「没有会话 = 不可验证」处理，那条启动任务就永远一个都不删 —— 等于摆设，散落快照会无限堆积。
-    开会话或查库失败一律返回 None（fail-closed），启动期数据库没就绪不会让启动任务变成删库动作。
+    无 ``operation`` 时只返回引用集（保留既有测试 / 诊断入口）。运行时 GC 会传入完整操作，确保
+    advisory xact lock 从「查项目引用」一直持有到「删除快照」结束；不能查完引用就先关闭会话，
+    否则归档事务可在两步之间写入新锁，形成 TOCTOU。
+
+    开会话、拿锁、查库或执行操作任一步失败都返回 None；调用方据此 fail-closed，一个文件都不删。
     """
     from app.core.database import async_session
 
     try:
         async with async_session() as db:
+            if operation is not None:
+                return await operation(db)
             return await referenced_registry_versions(db)
     except Exception as exc:  # noqa: BLE001 — 自开会话失败同样按「不可验证」处理
-        logger.warning("catalog_snapshot_gc: 自开短会话查引用集失败（%s）→ 不删除", exc)
+        logger.warning("catalog_snapshot_gc: 自开短会话执行 DB-aware GC 失败（%s）→ 不删除", exc)
         return None
 
 
@@ -291,33 +325,69 @@ async def run_db_aware_gc(
     keep_recent: int = 10,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """运行时快照清理入口：启动任务 `_task_acnr_catalog_snapshot_gc` 与 gc_snapshots.py 都走这里。
+    """运行时快照清理入口：启动任务与 CLI 共用。
 
-    两条保证（RV13.1-01，design §8.4）：
-    1. fail-closed：引用集只认数据库（referenced_registry_versions）；返回 None 或抛错 → 一个都不删。
-    2. 已提交进仓库的快照一律不删（committed_snapshot_versions）；判定不了哪些已提交 → 一个都不删。
-       已提交快照的保留与删除只经生成器发布流程（git 提交，同时改两份登记）处理。
-    其余（未提交的散落快照）在引用集已证实时按 keep_recent + 未被引用的规则清理。
+    三条保证（RV13.1-01 + Task 19 并发复核）：
+    1. 引用集只认数据库；查库或锁状态不可验证时 fail-closed，一个文件都不删。
+    2. 已提交进仓库的快照一律不删；git 状态判定不了也不删。
+    3. 归档写版本锁与本函数共用 PostgreSQL advisory xact lock，并在**同一会话生命周期**内完成
+       「取锁 → 查引用 → 判候选 → 删除」。因此不存在查完引用、关会话后才删文件的 TOCTOU。
     """
+    from app.services.acnr.snapshot_lifecycle_lock import try_acquire_snapshot_lifecycle_lock
+
     sd = _get_snapshots_dir()
+
+    def _fail_closed(lock_status: str) -> dict[str, Any]:
+        report = cleanup_stale_snapshots(
+            keep_recent=keep_recent,
+            snapshots_dir=sd,
+            referenced_versions=None,
+            dry_run=dry_run,
+        )
+        report["committed_status"] = "unverifiable"
+        report["lifecycle_lock_status"] = lock_status
+        return report
+
+    async def _within_session(db: Any) -> dict[str, Any]:
+        lock_status = await try_acquire_snapshot_lifecycle_lock(db)
+        if lock_status not in {"acquired", "not_required"}:
+            logger.warning(
+                "run_db_aware_gc: 快照生命周期锁状态=%s → fail-closed 不删除",
+                lock_status,
+            )
+            return _fail_closed(lock_status)
+
+        try:
+            refs = await referenced_registry_versions(db)
+        except Exception as exc:  # noqa: BLE001 — 查询失败不能退化成「已证实无引用」
+            logger.warning("run_db_aware_gc: 查库取引用集失败 → fail-closed 不删除: %s", exc)
+            refs = None
+
+        committed = committed_snapshot_versions(sd) if refs is not None else None
+        if committed is None:
+            report = cleanup_stale_snapshots(
+                keep_recent=keep_recent,
+                snapshots_dir=sd,
+                referenced_versions=None,
+                dry_run=dry_run,
+            )
+        else:
+            report = cleanup_stale_snapshots(
+                keep_recent=keep_recent,
+                snapshots_dir=sd,
+                referenced_versions=refs,
+                protected_versions=committed,
+                dry_run=dry_run,
+            )
+        report["committed_status"] = "verified" if committed is not None else "unverifiable"
+        report["lifecycle_lock_status"] = lock_status
+        return report
+
     try:
         if session is not None:
-            refs = await referenced_registry_versions(session)
-        else:
-            refs = await _referenced_versions_with_own_session()
-    except Exception as exc:  # noqa: BLE001 — 任何查库异常都按「不可验证」处理
-        logger.warning("run_db_aware_gc: 查库取引用集失败 → fail-closed 不删除: %s", exc)
-        refs = None
-
-    committed = committed_snapshot_versions(sd) if refs is not None else None
-    if committed is None:
-        report = cleanup_stale_snapshots(
-            keep_recent=keep_recent, snapshots_dir=sd, referenced_versions=None, dry_run=dry_run
-        )
-    else:
-        report = cleanup_stale_snapshots(
-            keep_recent=keep_recent, snapshots_dir=sd, referenced_versions=refs,
-            protected_versions=committed, dry_run=dry_run,
-        )
-    report["committed_status"] = "verified" if committed is not None else "unverifiable"
-    return report
+            return await _within_session(session)
+        result = await _referenced_versions_with_own_session(_within_session)
+        return result if isinstance(result, dict) else _fail_closed("unverifiable")
+    except Exception as exc:  # noqa: BLE001 — 任何生命周期异常都按「不可验证」处理
+        logger.warning("run_db_aware_gc: 生命周期检查失败 → fail-closed 不删除: %s", exc)
+        return _fail_closed("unverifiable")

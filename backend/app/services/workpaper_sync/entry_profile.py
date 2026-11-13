@@ -132,6 +132,7 @@ class EntryProfileDriftError(EntryProfileError):
     error_code = "entry_profile_drift"
 
 
+
 # ═══════════════════════════════════════════════════════════════════════════
 # profile 与事实
 # ═══════════════════════════════════════════════════════════════════════════
@@ -256,7 +257,46 @@ def extract_entry_profile(entry: Mapping[str, Any]) -> EntryProfile:
     )
 
 
+def is_pending_entry(entry: Mapping[str, Any]) -> bool:
+    """manifest 里 `capability=null` 的两种合法形态（Task 1.1 的 pending schema）。
+
+    * 独立 entry：`adjudication_state="pending"`；
+    * 父入口的重复挂载点：继承父级的 pending（`adjudication_state="inherited"` +
+      `capability_verdict_stage="inherited_parent_pending"`）。
+
+    `capability=null` 却不带这两种标记之一 ⇒ 不是 pending，是清册坏了（生成器对独立 entry
+    已经拒绝这种形态，这里不替它放宽）。
+    """
+    if entry.get("capability") is not None:
+        return False
+    state = entry.get("adjudication_state")
+    if state == "pending":
+        return True
+    return (
+        state == "inherited"
+        and entry.get("capability_verdict_stage") == "inherited_parent_pending"
+    )
+
+
+def effective_capability(entry: Mapping[str, Any]) -> Capability | None:
+    """生效能力：pending entry 返回 ``None``（= 任何能力都还没启用），其余同 :func:`capability_of`。
+
+    「这个 entry 现在是不是 bidirectional / 能不能注册」这类问题，对 pending 的正确答案是
+    「不是」而不是异常（registry 的 `build_report` / 注册计划一直是这么判的，本函数把那个
+    内联写法收成一处）。不带 pending 标记的 `capability=null` 照旧抛。
+    """
+    if is_pending_entry(entry):
+        return None
+    return capability_of(entry)
+
+
 def capability_of(entry: Mapping[str, Any]) -> Capability:
+    """已裁决 entry 的能力态；`capability=null` 一律抛（含 pending）。
+
+    只问「是否已启用某能力」时用 :func:`effective_capability`：pending 的答案是「还没有」，
+    不是异常。本函数对 pending 的报错文案保持原样，因为若干 Wave 6 报告把它逐字记进了
+    已提交的产物（改文案即让那些报告整体过期）。
+    """
     raw = entry.get("capability")
     try:
         return Capability(raw)
@@ -439,7 +479,7 @@ __all__ = [
     "Capability", "Editability", "RoomModel", "DescriptorMode",
     "EntryProfileError", "EntryProfileMissingError", "EntryProfileDriftError",
     "ScenarioProfile", "EntryProfile", "DescriptorFacts", "RoomFacts",
-    "extract_entry_profile", "capability_of",
+    "extract_entry_profile", "capability_of", "effective_capability", "is_pending_entry",
     "assert_profile_consistent_with_capability",
     "assert_profile_consistent_with_descriptor",
     "assert_profile_consistent_with_room",

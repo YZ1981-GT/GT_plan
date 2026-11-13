@@ -539,26 +539,66 @@ class TestKAP13NoticeMounted:
             f"组件名命中 {len(comp)}，期望 >= {NOTICE_COMPONENT_PLATFORM_BASELINE} + 13"
         )
 
-    def test_module_name_count_only_grows_for_composable_carriers(self) -> None:
-        """🔴 口径差异：模块名命中**只随 composable 载体增长**，宿主内联不增。
+    def test_module_name_hits_are_comments_not_imports(self) -> None:
+        """🔴 原判据的前提是假的：BP-6 宿主从来**没有 import** 过那个模块。
 
-        现算 9 = 2（design 基线：模块本体 + 组件本体）+ 6（BP-6 组宿主）+ 1（spec）。
-        lane 2 的 6 条走**专用 composable** 载体，其宿主里除组件标签外还引了
-        `workpaperEntrySyncNotice` 模块；本 lane 的 7 条是**内联 IIFE** 载体，
-        只挂组件标签不引模块 ⇒ 模块名命中**不涨**。
-        两个口径都对：组件名数「挂了多少处」，模块名数「引了多少处模块」。
+        原文写「lane 2 的 6 条…其宿主里除组件标签外还引了 `workpaperEntrySyncNotice`
+        模块」，据此要求模块名命中 >= 9 且 6 个 BP-6 宿主在命中集里。现读那 6 个宿主：
+        `workpaperEntrySyncNotice` **只出现在 HTML 注释里**（「文案真源在 …」），
+        没有任何 import 语句。判据之所以绿，是因为 `_platform_files_with` 数的是
+        **原始文本**（含注释）—— 与 ㉖「判断代码是否真做了 X 禁用文本匹配」同型的坑，
+        这次是注释把判据骗成了绿。
+
+        真相（现读）：该模块自 `eaa655686` 起生产侧 0 调用方，活路径是
+        `GtEntrySyncCapabilityNotice.vue` → `useEntrySyncReadiness` →
+        `deriveEntrySyncPresentation`；文案声明点也已随活路径搬到
+        `entrySyncPresentation.ts`（模块只做再导出）。16 个宿主注释原先指着那个死模块，
+        已一并改指活真源。
+
+        所以判据改成两条可伪证的：
+          ① 去注释后模块名在全平台命中 0 —— 与
+             `test_k_foundation_p7_gates_and_storage.py` 的
+             `test_component_symbol_is_the_only_caliber_with_production_surface`
+             同一结论、同一口径（谁要重新接线，两处一起红）；
+          ② 两个 lane 的载体差异用**真信号**表达：本 lane 7 条是内联 IIFE、
+             不 import 专用 composable；BP-6 那 6 条相反。
         """
-        mod = set(_platform_files_with(NOTICE_MODULE))
-        assert len(mod) >= 9, f"模块名命中 {len(mod)}（期望 >= 9）：{sorted(mod)}"
-        # 本 lane 的 7 宿主**不在**模块名命中集里（内联载体的形态特征）
+        mod_stripped = {
+            p.relative_to(FRONTEND_SRC).as_posix()
+            for p in FRONTEND_SRC.rglob("*")
+            if p.is_file() and p.suffix in (".ts", ".vue")
+            and "__tests__" not in p.as_posix()
+            and NOTICE_MODULE in strip_comments(cached_text(p))
+        }
+        assert mod_stripped == set(), (
+            f"模块名重新长出生产引用 {sorted(mod_stripped)} ⇒ 载体口径与 KC-14 选符号"
+            "的依据都须重新论证（不是放宽这条）"
+        )
+        # 生产文件里的原始命中必须全是注释（注释提及不算引用）。
+        # 🔴 测试文件另算：兼容模块**唯一**的消费方就是它自己的 spec，那是真 import、
+        # 也正是它还有覆盖的原因 ⇒ 排除 `__tests__` 之后再判，并反向断言那份 spec 在。
+        raw = set(_platform_files_with(NOTICE_MODULE))
+        own_spec = f"components/workpaper/sync/__tests__/{NOTICE_MODULE}.spec.ts"
+        assert own_spec in raw, (
+            f"{own_spec} 不再引用 {NOTICE_MODULE} ⇒ 兼容模块彻底没有覆盖了"
+        )
+        for rel in raw:
+            if "__tests__" in rel:
+                continue
+            src = cached_text(FRONTEND_SRC / rel)
+            assert NOTICE_MODULE not in strip_comments(src), (
+                f"{rel} 里的 {NOTICE_MODULE} 不在注释里 ⇒ 它成了真引用"
+            )
+        # 宿主注释已指向活真源（而不是那个 0 调用方的兼容模块）
         for n in LANE1_INDEXES:
             rel = host_path(n).relative_to(FRONTEND_SRC).as_posix()
-            assert rel not in mod, (
-                f"{rel} 出现在模块名命中集里 ⇒ 内联载体的口径结论须复核"
+            assert rel not in raw, f"{rel} 又提到了死模块 {NOTICE_MODULE}"
+        # 载体差异的真信号：本 lane 内联、BP-6 走专用 composable
+        for n in LANE1_INDEXES:
+            src = strip_comments(cached_text(host_path(n)))
+            assert INLINE_IIFE_RX.search(src), (
+                f"{LANE1_HOSTS[n]} 的内联 IIFE 不见了 ⇒ 载体对照的一端塌了"
             )
-        # BP-6 组的 6 宿主**在**集合里（对照的另一端）
-        bp6_in = [f for f in mod if re.search(r"GtK(?:8|9|1[0-3])", f)]
-        assert len(bp6_in) == 6, f"BP-6 组在模块名集里的宿主 {sorted(bp6_in)}"
 
     def test_module_name_is_narrower_than_component_name(self) -> None:
         """🔴 KC-14 的选符号依据：模块名口径远窄于组件名口径。"""

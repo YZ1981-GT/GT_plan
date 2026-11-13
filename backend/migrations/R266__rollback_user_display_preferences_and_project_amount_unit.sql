@@ -1,0 +1,6 @@
+-- R266: compatibility rollback for V266
+-- Spec: platform-global-display-settings-closure
+--
+-- V266 only verifies the canonical V250 schema.  The objects belong to
+-- V250/R250, so rolling back V266 must not drop or alter them.
+-- no-op: canonical display-settings objects remain owned by V250/R250.

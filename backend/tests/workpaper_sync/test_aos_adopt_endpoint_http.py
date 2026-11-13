@@ -127,7 +127,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
     from app.core.database import get_db
     from app.deps import get_current_user
     from app.middleware.response import ResponseWrapperMiddleware
-    from app.models.audit_log_models import AuditLogEntry
+    from app.models.audit_log_models import AuditChainHead, AuditLogEntry
     from app.routers import wp_sync_router as SR
     from app.services.workpaper_sync.adapters.registry import RegistryError
     from app.services.workpaper_sync.contracts import load_contract
@@ -179,6 +179,8 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 if stmt:
                     await conn.exec_driver_sql(stmt)
             await conn.run_sync(AuditLogEntry.__table__.create)
+            # 伴生表：审计哈希链链尾；digest_flow 正向路径写审计链需要它（原 STUB_DDL 漏建，首写惰性建行无需 seed）。
+            await conn.run_sync(AuditChainHead.__table__.create)
 
         project = uuid.uuid4()
         wp_index = uuid.uuid4()
@@ -440,7 +442,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             finally:
                 current["user"] = SimpleNamespace(id=user)
 
-            # ── 8.1 ② 403 workflow_locked（写 action 在锁定下被拒；与 404 分型）
+            # ── 8.1 ② 423 workflow_locked（写 action 在锁定下被拒；与 404/403 分型）
             try:
                 board.workflow_locked = True
                 await _run("workflow_locked", body={"dry_run": True})
@@ -696,13 +698,13 @@ class TestStatusCodeMapIsRecomputed:
         assert {codes[0] for _exc, codes in rows} == {409, 422, 500}, rows
 
     def test_reachable_status_codes_exceed_the_five_named_branches(self) -> None:
-        """🔴 现算偏差登记：任务书说「五个」，可达码实为 **7** 个，且 422 有**两个**产生点。"""
+        """🔴 现算偏差登记：可达码 **8** 个、422 两个产生点；Task 9 把 workflow_locked 映射 403→423 后 403 退为通用 SyncActionForbiddenError、落入 extra（详见 design §11）。"""
         reachable = reachable_statuses(router_ast())
-        named = {401, 403, 409, 422}  # 6.1~6.5 那五条 AC 只用到 4 个不同码（两条都是 409）
+        named = {401, 409, 422, 423}  # 6.1~6.5 那五条 AC 只用到 4 个不同码（两条都是 409；workflow_locked=423）
         assert named <= set(reachable), f"五条 AC 的状态码未全部可达：{sorted(reachable)}"
         extra = sorted(set(reachable) - named)
-        assert extra == [404, 500, 503], (
-            "可达状态码集合变了 —— 原现算值 {401,403,404,409,422,500,503}（7 个）。"
+        assert extra == [403, 404, 500, 503], (
+            "可达状态码集合变了 —— 原现算值 {401,403,404,409,422,423,500,503}（8 个）。"
             f"当前额外可达：{extra}；全表：{ {k: v for k, v in reachable.items()} }"
         )
         assert len(reachable[422]) >= 2, (
@@ -742,9 +744,9 @@ class TestFiveBranchesOverRealHttp:
         assert obs["status"] == 401, obs["body"]
         assert obs["store_writes"] == 0 and obs["commits"] == 0
 
-    def test_403_when_workflow_locked(self, snap: dict[str, Any]) -> None:
+    def test_423_when_workflow_locked(self, snap: dict[str, Any]) -> None:
         obs = snap["scenarios"]["workflow_locked"]
-        assert obs["status"] == 403, obs["body"]
+        assert obs["status"] == 423, obs["body"]
         assert error_code(obs["body"]) == "sync_workflow_locked", obs["body"]
 
     def test_409_when_expected_revision_does_not_match(self, snap: dict[str, Any]) -> None:
@@ -794,5 +796,5 @@ class TestFiveBranchesOverRealHttp:
                 "contract_required",
             )
         ]
-        assert codes == [401, 403, 409, 409, 422], codes
+        assert codes == [401, 423, 409, 409, 422], codes
         assert len(set(codes)) == 4, codes

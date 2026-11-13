@@ -99,14 +99,18 @@ async def _propagate(events: list[dict]) -> None:
     """与发布接口同一传播函数：按项目审计年度标报表过期并重算。"""
     import uuid
 
-    from app.services.formula_settings.propagation import propagate_report
+    from app.services.formula_settings.propagation import PropagationIncomplete, propagate_report
     from app.services.project_audit_year import fetch_project_audit_year_standalone
 
     for ev in events:
         pid = uuid.UUID(str(ev["project_id"]))
         # 与事件总线派发口补年度同一函数（event_bus._backfill_year）
         year = await fetch_project_audit_year_standalone(pid)
-        result = await propagate_report(pid, year, list(ev["slot_keys"]))
+        try:
+            result = await propagate_report(pid, year, list(ev["slot_keys"]))
+        except PropagationIncomplete as exc:  # 重算整体失败：过期标记已保留，逐项目报出后继续
+            print(f"  {pid} {year}: 标过期 {exc.detail.get('marked')} 行，重算失败：{exc}")
+            continue
         recalculated = result.get("recalculated") or {}
         print(f"  {pid} {year}: 标过期 {result.get('marked')} 行，重算 {recalculated.get('recalculated_count')} 行，"
               f"失败 {recalculated.get('failed_count')} 行"

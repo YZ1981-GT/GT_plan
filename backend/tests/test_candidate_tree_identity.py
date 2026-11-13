@@ -429,6 +429,7 @@ class TestMutationDefaultIndex:
             manifest_path,
         )
 
+        before = real_index.read_bytes()
         with mock.patch.object(tf, "mkstemp", side_effect=fake_mkstemp):
             with pytest.raises(RuntimeError, match="resolved to .git/index"):
                 ns = argparse.Namespace(
@@ -436,3 +437,7 @@ class TestMutationDefaultIndex:
                     output=str(output_path),
                 )
                 mod.cmd_build(ns)
+        # 拒绝之后真实 index 必须原样还在：原实现的校验在 try 里，finally 的清理把真实 index 删了
+        # （跑这条用例的 worktree 全部文件变成「已暂存删除」，2026-11-04 全量回归实测）
+        assert real_index.exists(), "拒绝私有 index 时把真实 index 删掉了"
+        assert real_index.read_bytes() == before, "拒绝私有 index 时改动了真实 index"

@@ -56,6 +56,7 @@ __all__ = [
     "WordSection",
     "WordTable",
     "ALLOWLIST_PATH",
+    "WORD_ALLOWLIST_CATEGORIES",
     "build_report",
     "cached_word_variant",
     "check_against_allowlist",
@@ -73,8 +74,10 @@ __all__ = [
 ]
 
 
-#: 白名单：``[{variant, kind, key, reason}]``，理由必填；只许放「与 Word 不同是有意为之」的条目
+#: 白名单：``[{variant, kind, key, category, evidence, reason}]``，类别与理由必填；类别与证据的含义见
+#: ``note_word_allowlist``（表格条目由 ``gen_note_word_table_allowlist.py`` 现算，章节树条目手工维护）
 ALLOWLIST_PATH = DATA_DIR / "note_template_word_alignment_allowlist.json"
+WORD_ALLOWLIST_CATEGORIES = ("workpaper_authority", "word_placeholder", "user_decision", "todo")
 
 
 
@@ -664,10 +667,12 @@ def build_report(seeds: dict[str, dict[str, Any]] | None = None,
 
 
 def check_against_allowlist(diffs: list[Diff], allowlist: list[dict[str, Any]]) -> tuple[list[Diff], list[dict]]:
-    """返回（白名单外差异, 已失效白名单条目）。条目缺理由直接报错。"""
+    """返回（白名单外差异, 已失效白名单条目）。条目缺理由 / 缺类别（或类别不认识）直接报错。"""
     for entry in allowlist:
         if not str(entry.get("reason") or "").strip():
             raise ValueError(f"白名单条目缺理由：{entry}")
+        if entry.get("category") not in WORD_ALLOWLIST_CATEGORIES:
+            raise ValueError(f"白名单条目缺类别或类别不在 {WORD_ALLOWLIST_CATEGORIES}：{entry}")
     allowed = {(e["variant"], e["kind"], e["key"]) for e in allowlist}
     present = {(d.variant, d.kind, d.key) for d in diffs}
     unexpected = [d for d in diffs if (d.variant, d.kind, d.key) not in allowed]

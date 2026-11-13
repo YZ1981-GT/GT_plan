@@ -1132,11 +1132,17 @@ class TestResolverMigrationMatrix:
         # range-split packages -- so it is a genuine path-resolution fork on the
         # xlsx template-library lane, not on the Word lane Task 58 migrated.
         # It is held to the same invariant as the other deferred helpers below.
+        #
+        # 2026-11-04: `_find_combined_workbook_declaring` is the seventh. It existed long before
+        # (601707554) but the matrix on disk was stale against the writer inventory; regenerating
+        # it from the recomputed inventory brought the row in (deferred, template_finder group,
+        # blocking 36 -- same xlsx template-library lane as `find_whole_workbook_templates`).
         assert set(rows) == {
             "find_template_file_any",
             "find_all_template_files",
             "find_template_file",
             "find_whole_workbook_templates",
+            "_find_combined_workbook_declaring",
             "_find_docx_by_index_or_disk",
             "_find_docx_on_disk",
         }, (
@@ -1179,6 +1185,7 @@ class TestResolverMigrationMatrix:
         for name in (
             "find_template_file",
             "find_whole_workbook_templates",
+            "_find_combined_workbook_declaring",
             "_find_docx_by_index_or_disk",
             "_find_docx_on_disk",
         ):

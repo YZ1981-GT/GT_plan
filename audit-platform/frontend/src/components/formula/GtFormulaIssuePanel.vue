@@ -6,12 +6,12 @@
         逻辑判断问题清单
         <el-tag
           v-if="!loading"
-          :type="issues.length ? 'danger' : 'success'"
+          :type="issues.length ? issueSummaryType : (allPassed ? 'success' : 'info')"
           size="small"
           effect="light"
           round
           class="gt-issue-panel__count"
-        >{{ issues.length ? `${issues.length} 项待处理` : '全部通过' }}</el-tag>
+        >{{ summaryText }}</el-tag>
       </span>
       <div class="gt-issue-panel__actions">
         <span v-if="lastComputedAt" class="gt-issue-panel__computed">最近计算：{{ computedAtText }}</span>
@@ -28,10 +28,19 @@
     <div v-loading="loading" class="gt-issue-panel__body">
       <!-- 问题项（勾稽不通过） -->
       <template v-if="issues.length">
-        <div v-for="(issue, i) in issues" :key="issue.formula_id || i" class="gt-issue-item">
+        <div v-for="(issue, i) in issues" :key="issue.formula_id || i" class="gt-issue-item"
+          :class="`gt-issue-item--${formulaCheckSeverity(issue.severity)}`">
           <el-icon class="gt-issue-item__icon"><WarningFilled /></el-icon>
           <div class="gt-issue-item__main">
-            <div class="gt-issue-item__desc">{{ issue.description }}</div>
+            <div class="gt-issue-item__desc">
+              <el-tag v-if="issue.status" :type="issueTagType(issue)" size="small" effect="plain">
+                {{ issueStatusLabel(issue.status) }}
+              </el-tag>
+              <el-tag :type="severityTagType(formulaCheckSeverity(issue.severity))" size="small" effect="plain">
+                {{ severityLabel(formulaCheckSeverity(issue.severity)) }}
+              </el-tag>
+              {{ issue.description }}
+            </div>
             <div v-if="hasValues(issue)" class="gt-issue-item__values">
               <span>左值：<b>{{ fmtValue(issue.left_value) }}</b></span>
               <span>右值：<b>{{ fmtValue(issue.right_value) }}</b></span>
@@ -39,6 +48,7 @@
                 差异：<b>{{ fmtValue(diffOf(issue)) }}</b>
               </span>
             </div>
+            <div v-if="issue.reason" class="gt-issue-item__addr">原因：{{ issue.reason }}</div>
             <div v-if="issue.addr_id" class="gt-issue-item__addr">来源：{{ issue.addr_id }}</div>
           </div>
         </div>
@@ -47,7 +57,7 @@
       <el-empty
         v-else-if="!loading"
         :image-size="64"
-        description="未发现逻辑判断问题，全部勾稽通过"
+        :description="emptyDescription"
       />
 
       <!-- 全部校验概览（含通过项，折叠） -->
@@ -55,12 +65,13 @@
         <el-collapse-item :title="`查看全部校验（${outcomes.length} 条）`" name="all">
           <div v-for="(o, i) in outcomes" :key="o.formula_id || i" class="gt-outcome-item">
             <el-tag
-              :type="o.passed ? 'success' : 'danger'"
+              :type="outcomeTagType(o)"
               size="small"
               effect="plain"
               round
-            >{{ o.passed ? '通过' : '不通过' }}</el-tag>
-            <span class="gt-outcome-item__desc">{{ o.description }}</span>
+            >{{ outcomeLabel(o) }}</el-tag>
+            <el-tag :type="severityTagType(formulaCheckSeverity(o.severity))" size="small" effect="plain">{{ severityLabel(formulaCheckSeverity(o.severity)) }}</el-tag>
+            <span class="gt-outcome-item__desc">{{ o.description }}<span v-if="o.reason">；原因：{{ o.reason }}</span></span>
             <code class="gt-outcome-item__expr">{{ o.expression }}</code>
           </div>
         </el-collapse-item>
@@ -84,7 +95,8 @@
 import { computed } from 'vue'
 import { Search, WarningFilled } from '@element-plus/icons-vue'
 import { fmtDateTime } from '@/utils/formatters'
-import type { FormulaIssueItem, FormulaCheckOutcome } from './formulaIssueHint'
+import { formulaOutcomeStatus, formulaCheckNumber, formulaCheckSeverity, type FormulaIssueItem, type FormulaCheckOutcome } from './formulaIssueHint'
+import { checkStatusLabel } from '@/utils/consistencyCheckStatus'
 
 const props = withDefaults(
   defineProps<{
@@ -111,6 +123,16 @@ const emit = defineEmits<{ refresh: [] }>()
 
 const issues = computed(() => props.issues ?? [])
 const outcomes = computed(() => props.outcomes ?? [])
+const issueSummaryType = computed(() => issues.value.some((issue) => formulaCheckSeverity(issue.severity) === 'blocking')
+  ? 'danger' : (issues.value.some((issue) => formulaCheckSeverity(issue.severity) === 'warning') ? 'warning' : 'info'))
+const allPassed = computed(() => outcomes.value.length > 0 && outcomes.value.every((o) => outcomeStatus(o) === 'passed'))
+const incompleteCount = computed(() => outcomes.value.filter((o) => outcomeStatus(o) !== 'passed' && outcomeStatus(o) !== 'not_applicable').length)
+const summaryText = computed(() => issues.value.length
+  ? `${issues.value.length} 项待处理`
+  : (allPassed.value ? '全部通过' : (outcomes.value.length ? (incompleteCount.value ? `${incompleteCount.value} 项需查看结论` : '本次检查不适用') : '无校验结果')))
+const emptyDescription = computed(() => allPassed.value
+  ? '未发现逻辑判断问题，全部勾稽通过'
+  : (outcomes.value.length ? '请查看各项校验状态与原因，非通过不等于失败' : '本次未返回校验结果'))
 
 const computedAtText = computed(() => {
   if (!props.lastComputedAt) return ''
@@ -122,21 +144,49 @@ function normalizeTimestamp(v: string): string {
   return hasTz ? v : `${v}Z`
 }
 
-function toNum(v: string | number | null): number | null {
-  if (v === null || v === undefined || v === '') return null
-  const n = typeof v === 'number' ? v : parseFloat(v)
-  return Number.isNaN(n) ? null : n
-}
+const toNum = formulaCheckNumber
 
 function hasValues(issue: FormulaIssueItem): boolean {
   return toNum(issue.left_value) !== null || toNum(issue.right_value) !== null
 }
 
 function diffOf(issue: FormulaIssueItem): number | null {
-  const l = toNum(issue.left_value)
-  const r = toNum(issue.right_value)
-  if (l === null || r === null) return null
-  return Math.round((l - r) * 100) / 100
+  const l = toNum(issue.left_value), r = toNum(issue.right_value)
+  return l === null || r === null ? null : l - r
+}
+
+const outcomeStatus = formulaOutcomeStatus
+function outcomeLabel(outcome: FormulaCheckOutcome): string {
+  return checkStatusLabel({ status: outcomeStatus(outcome) })
+}
+
+function outcomeTagType(outcome: FormulaCheckOutcome): 'success' | 'danger' | 'warning' | 'info' {
+  switch (outcomeStatus(outcome)) {
+    case 'passed': return 'success'
+    case 'failed': return severityTagType(formulaCheckSeverity(outcome.severity))
+    case 'error': return 'danger'
+    case 'not_executed': return 'warning'
+    case 'not_applicable': return 'info'
+  }
+}
+
+function issueStatusLabel(status: NonNullable<FormulaIssueItem['status']>): string {
+  return checkStatusLabel({ status: formulaOutcomeStatus({ status }) })
+}
+
+function severityTagType(severity: NonNullable<FormulaIssueItem['severity']>): 'danger' | 'warning' | 'info' {
+  return { blocking: 'danger', warning: 'warning', info: 'info' }[severity] as 'danger' | 'warning' | 'info'
+}
+
+function severityLabel(severity: NonNullable<FormulaIssueItem['severity']>): string {
+  return { blocking: '阻断', warning: '警告', info: '提示' }[severity]
+}
+
+function issueTagType(issue: FormulaIssueItem): 'danger' | 'warning' | 'info' {
+  if (issue.status === 'error') return 'danger'
+  if (issue.status === 'not_executed') return 'warning'
+  if (issue.status === 'not_applicable') return 'info'
+  return severityTagType(formulaCheckSeverity(issue.severity))
 }
 
 function fmtValue(v: string | number | null): string {
@@ -200,6 +250,16 @@ function fmtValue(v: string | number | null): string {
   color: #f56c6c;
   margin-top: 2px;
 }
+.gt-issue-item--warning {
+  background: #fdf6ec;
+  border-left-color: #e6a23c;
+}
+.gt-issue-item--info {
+  background: #f4f4f5;
+  border-left-color: #909399;
+}
+.gt-issue-item--warning .gt-issue-item__icon { color: #e6a23c; }
+.gt-issue-item--info .gt-issue-item__icon { color: #909399; }
 .gt-issue-item__main {
   flex: 1;
   min-width: 0;

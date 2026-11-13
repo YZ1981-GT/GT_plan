@@ -1,51 +1,40 @@
 /**
- * 浏览器检查 ④ — 回滚按钮只在可回滚条目
+ * 浏览器检查 ④ — 回滚按钮只给可回滚的历史条目
  *
- * 验证：公式历史端点对种子项目返回空或每条都标明 rollbackable，
- * 不可回滚的条目不应出现回滚入口。
- *
- * formula-e2e-ci-gate Task 2 / R3 第 4 项
+ * `GET /api/formula-audit-log/{pid}/{year}`：每条都有布尔 `rollbackable`；可回滚的必带当前修订号 `current_version`
+ * （回滚要带它做并发校验），不可回滚的必写原因 `rollback_blocked_reason`（界面据此禁用按钮并提示）。
+ * 先改一处本项目公式造出历史，判据不空转。原用例打不存在的 `/formula-management/history` 并把 404 当通过，
+ * 界面部分打开的是不存在的路由。
  */
 import { test, expect } from '@playwright/test'
-import { loginAndInstall, standaloneProjectId } from './helpers'
-
-const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:9980'
+import { api, apiToken, requireIsolatedDb, runTag, seedYear, standaloneProjectId } from './helpers'
 
 test.describe('回滚按钮条件', () => {
-  test.beforeEach(async ({ page, request }) => {
-    await loginAndInstall(page, request)
-  })
+  test('历史条目的可回滚标记与修订号 / 原因一致', async ({ request }) => {
+    const token = await apiToken(request)
+    await requireIsolatedDb(request, token)
+    const pid = standaloneProjectId()
+    const slot = `D2-1|E2E-${runTag()}|D7`
+    const adapted = await api(request, token, 'PUT', `/api/projects/${pid}/formula-settings/wp/overrides`, {
+      data: { items: [{ slot_key: slot, definition: { expression: "TB('1002','期末余额')", formula_type: 'auto_calc' } }] },
+    })
+    expect(adapted.status, JSON.stringify(adapted.error)).toBe(200)
 
-  test('历史列表每条 rollbackable 字段与按钮条件一致', async ({ request }) => {
-    const projectId = standaloneProjectId()
-    const resp = await request.get(
-      `${BACKEND}/api/projects/${projectId}/formula-management/history`,
-      {
-        headers: { Authorization: `Bearer ${process.env.FH_E2E_TOKEN || ''}` },
-        params: { page: '1', page_size: '20' },
-      },
-    )
-    if (resp.status() === 404) return // 端点不存在
-    expect(resp.ok(), `历史端点失败 ${resp.status()}`).toBeTruthy()
-    const body = await resp.json()
-    const items = body?.data?.items ?? body?.data ?? body?.items ?? []
-    // 种子项目没有执行过公式，history 应为空
-    // 如果非空，每条必须有 rollbackable 布尔字段
+    const r = await api(request, token, 'GET', `/api/formula-audit-log/${pid}/${seedYear()}`, { params: { limit: 200 } })
+    expect(r.status).toBe(200)
+    const items = r.data as any[]
+    expect(items.length, '刚改过一处公式，本年度历史不应为空').toBeGreaterThan(0)
     for (const item of items) {
-      expect(typeof item.rollbackable).toBe('boolean')
+      expect(typeof item.rollbackable, `条目 ${item.id}`).toBe('boolean')
+      if (item.rollbackable) {
+        expect(Number.isInteger(item.current_version), `可回滚条目 ${item.id} 缺当前修订号`).toBe(true)
+      } else {
+        expect(String(item.rollback_blocked_reason || '').length, `不可回滚条目 ${item.id} 缺原因`).toBeGreaterThan(0)
+      }
     }
-  })
-
-  test('公式管理页回滚按钮不在空状态显示', async ({ page }) => {
-    const projectId = standaloneProjectId()
-    await page.goto(`/projects/${projectId}/formula-management`)
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-    // 种子项目无执行记录，不应出现回滚按钮
-    const rollbackBtn = page.locator('button:has-text("回滚")').first()
-    // 给页面足够时间渲染
-    await page.waitForTimeout(2_000)
-    const isVisible = await rollbackBtn.isVisible().catch(() => false)
-    // 无数据时回滚按钮应隐藏
-    expect(isVisible, '种子项目无历史时回滚按钮不应可见').toBe(false)
+    const other = await api(request, token, 'GET', `/api/formula-audit-log/${pid}/${seedYear() - 1}`, { params: { limit: 200 } })
+    expect(other.status).toBe(200)
+    const thisYear = new Set(items.map((i) => i.id))
+    expect((other.data as any[]).filter((i) => thisYear.has(i.id)), '上一年度查不到本年度的修改').toEqual([])
   })
 })

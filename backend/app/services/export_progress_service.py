@@ -19,7 +19,7 @@ import logging
 import uuid
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -27,6 +27,15 @@ logger = logging.getLogger(__name__)
 
 # 导出目录：storage/exports/
 EXPORT_DIR = Path("storage") / "exports"
+
+# B3 切换到 platform_jobs 后，旧进程内任务只允许状态/下载兼容读取至本日期。
+# 新建任务的 public route 已永久走 durable job；到期后可删除本模块的 create/run 状态机。
+LEGACY_EXPORT_PROGRESS_READ_UNTIL = date(2027, 2, 5)
+
+
+def legacy_export_task_readable(today: date | None = None) -> bool:
+    """旧内存任务是否仍处于兼容读取窗口（到期后状态端点统一 404）。"""
+    return (today or date.today()) <= LEGACY_EXPORT_PROGRESS_READ_UNTIL
 
 
 @dataclass

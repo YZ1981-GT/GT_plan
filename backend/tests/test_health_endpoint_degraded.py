@@ -47,6 +47,15 @@ def _create_app(
     return test_app
 
 
+@pytest.fixture(autouse=True)
+def _clean_audit_chain():
+    """本文件只测迁移 / 漂移：审计链显式声明干净。mock 会话跑不了分叉扫描，扫描失败按「未知」
+    处理会让 status=degraded（spec enterprise-embedding-rerank-closure R15.2）。"""
+    clean = {"unacknowledged_forks": 0, "quarantined_entries": 0, "dead_letter_entries": 0, "checked_at": "test"}
+    with patch("app.api.health._query_audit_chain_health", new=AsyncMock(return_value=clean)):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------

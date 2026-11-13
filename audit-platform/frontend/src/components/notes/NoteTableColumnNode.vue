@@ -1,12 +1,19 @@
 <template>
   <!-- 分组：嵌套 el-table-column（任意层，spec note-pull-header-formula-closure R4）；单元格内容由宿主 #cell 插槽给出 -->
   <el-table-column v-if="node.children && node.children.length" :label="node.label" align="center">
-    <NoteTableColumnNode v-for="(child, i) in node.children" :key="`${i}-${child.label}`" :node="child">
+    <NoteTableColumnNode
+      v-for="(child, i) in node.children"
+      :key="`${i}-${child.label}`"
+      :node="child"
+      :column-key-for="columnKeyFor"
+      :fixed-for="fixedFor"
+    >
       <template #cell="scope"><slot name="cell" v-bind="scope" /></template>
     </NoteTableColumnNode>
   </el-table-column>
   <!-- column-key 带表头序号：期末 / 上年年末下同名的叶子（「应收账款」各一列）点击时按它定位，不按列名 -->
-  <el-table-column v-else :label="node.label" :column-key="`h${node.headerIdx ?? -1}`"
+  <el-table-column v-else :label="node.label" :column-key="columnKeyFor?.(node.headerIdx ?? -1) || `h${node.headerIdx ?? -1}`"
+                   :fixed="fixedFor?.(node.headerIdx ?? -1) || false"
                    :min-width="node.headerIdx === 0 ? 160 : 120"
                    :align="node.headerIdx === 0 ? 'left' : 'right'" resizable>
     <template #default="scope">
@@ -20,7 +27,11 @@
 import type { NoteColNode } from '@/views/composables/noteColumnTree'
 
 defineOptions({ name: 'NoteTableColumnNode' })
-defineProps<{ node: NoteColNode }>()
+defineProps<{
+  node: NoteColNode
+  columnKeyFor?: (headerIdx: number) => string
+  fixedFor?: (headerIdx: number) => 'left' | false
+}>()
 // 显式声明插槽类型：递归组件把子节点的 #cell 原样转给宿主，不声明时类型推断自引用（TS7022）
 defineSlots<{
   cell(props: { row: any; column: any; $index: number; headerIdx: number; label: string; [key: string]: any }): any

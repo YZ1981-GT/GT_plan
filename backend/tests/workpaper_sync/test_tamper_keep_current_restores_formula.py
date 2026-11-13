@@ -23,7 +23,7 @@ from app.services.workpaper_sync import parse_cache as PC
 from app.services.workpaper_sync.adapters import excel as AX
 from app.services.workpaper_sync.conflicts import ConflictKind
 from app.services.workpaper_sync.merge import FieldVerdict, merge_projections
-from tests.workpaper_sync.d4_materialize_harness import D4World, _text_safe, build_world
+from tests.workpaper_sync.d4_materialize_harness import D4World, build_world
 
 SHEET = "主营业务收入明细表D4-2"
 ROW = "GTROW-D42-0013"
@@ -97,7 +97,7 @@ def _adapter(world: D4World, baseline: Path) -> Any:
 
 def _keep_server(world: D4World, files: Mapping[str, Path], incoming: str) -> Any:
     adapter = _adapter(world, files["base"])
-    read = lambda name: _text_safe(adapter.extract(artifact=files[name], contract=world.contract))  # noqa: E731
+    read = lambda name: adapter.extract(artifact=files[name], contract=world.contract)  # noqa: E731
     base = read("base")
     outcome = merge_projections(base=base, current=base, incoming=read(incoming), contract=world.contract)
     records = [r for r in outcome.conflicts.records if r.locator.stable_field_key == TOTAL]
@@ -143,7 +143,7 @@ def test_html_to_oo_direction_is_unchanged(world: D4World, files, tmp_path: Path
         definitions=a.definitions, binding=a.binding, sibling_bindings=a.sibling_bindings,
         direction="html_to_oo",
     )
-    merged = _text_safe(adapter.extract(artifact=files["base"], contract=world.contract))
+    merged = adapter.extract(artifact=files["base"], contract=world.contract)
     with pytest.raises(Exception, match="没有公式"):
         adapter.materialize(
             substrate=files["literal"], projection=merged, output=tmp_path / "h2o.xlsx", contract=world.contract

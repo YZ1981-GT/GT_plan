@@ -626,7 +626,9 @@ class TestNoEgressEvidence:
             assert errors, f"{endpoint} 应被拒绝但通过了"
 
     def test_startup_health_rejects_cloud_embedding(self):
-        """cloud embedding endpoint 报 local_only_violation。"""
+        """实际向量路由指向 cloud endpoint 报 local_only_violation（按路由判定，见 test_task30 §5b）。"""
+        from tests.dsh_agent_panel.test_task30_capabilities import _patch_embedding_route
+
         mock_settings = MagicMock()
         mock_settings.LLM_BASE_URL = "http://localhost:8100/v1"
         mock_settings.LLM_EMBEDDING_BASE_URL = "https://api.deepseek.com/v1"
@@ -635,6 +637,7 @@ class TestNoEgressEvidence:
         mock_settings.PORT = 9980
 
         with patch("app.core.config.settings", mock_settings), \
+             _patch_embedding_route("https://api.deepseek.com/v1"), \
              patch("app.services.ai_chat.startup_health._audit_violations", new_callable=AsyncMock):
             from app.services.ai_chat.startup_health import run_ai_chat_startup_health_check
 

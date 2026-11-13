@@ -60,6 +60,8 @@ def test_worker_quarantine_and_health_are_live() -> None:
     }
     health_query = _function(health_path, "_query_audit_chain_health")
     assert "quarantine_count" in _calls(health_query)
+    assert "dead_letter_count" in _calls(health_query)
+    assert "blocked_chains" in _calls(health_query)
     health_check = _function(health_path, "health_check")
     assert any(
         isinstance(node, ast.Constant) and node.value == "quarantined_entries"

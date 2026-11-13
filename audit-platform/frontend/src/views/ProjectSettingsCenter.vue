@@ -73,6 +73,42 @@
                 </el-radio-group>
               </el-form-item>
             </el-form>
+            <div class="settings-config-card" data-testid="project-amount-unit-card">
+              <div class="settings-config-card__info">
+                <div class="settings-config-card__name">项目默认金额单位</div>
+                <div class="settings-config-card__desc">
+                  影响正式导出，以及选择跟随项目的成员的屏幕显示；其他成员在刷新或重新进入项目后生效。
+                </div>
+              </div>
+              <div class="project-amount-unit-control">
+                <el-select
+                  v-model="projectAmountUnit"
+                  data-testid="project-amount-unit-select"
+                  size="small"
+                  :disabled="!canEditProjectAmountUnit || isReadonly || projectAmountUnitLoading"
+                >
+                  <el-option
+                    v-for="option in projectAmountUnitOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </el-select>
+                <el-button
+                  data-testid="project-amount-unit-save"
+                  type="primary"
+                  size="small"
+                  :loading="projectAmountUnitSaving"
+                  :disabled="!canEditProjectAmountUnit || isReadonly || projectAmountUnitLoading"
+                  @click="saveProjectAmountUnit"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+            <p v-if="!canEditProjectAmountUnit" class="settings-panel__desc" style="margin-top: 8px;">
+              仅具有项目编辑权限的成员可修改项目默认金额单位。
+            </p>
             <ProjectAuditPhaseSection v-if="projectId" :project-id="projectId" :readonly="isReadonly" />
           </div>
         </el-tab-pane>
@@ -292,6 +328,8 @@ import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { api } from '@/services/apiProxy'
+import { projectConfig } from '@/services/apiPaths/project'
+import type { ProjectAmountUnit } from '@/services/auditPlatformApi'
 
 defineOptions({ name: 'ProjectSettingsCenter' })
 
@@ -309,6 +347,86 @@ const ctx = computed(() => projectStore.currentProjectContext)
 const yearOptions = computed(() => projectStore.yearOptions)
 
 const activeTab = ref((route.query.tab as string) || 'basic')
+
+type ProjectAmountUnitConfig = {
+  project_id: string
+  amount_unit: ProjectAmountUnit
+}
+
+const projectAmountUnit = ref<ProjectAmountUnit>('yuan')
+const projectAmountUnitLoading = ref(false)
+const projectAmountUnitSaving = ref(false)
+const projectAmountUnitOptions: Array<{ value: ProjectAmountUnit; label: string }> = [
+  { value: 'yuan', label: '元' },
+  { value: 'qian', label: '千元' },
+  { value: 'wan', label: '万元' },
+]
+const canEditProjectAmountUnit = computed(() => can('project:edit'))
+let projectAmountUnitRequestSeq = 0
+
+function isProjectAmountUnit(value: unknown): value is ProjectAmountUnit {
+  return value === 'yuan' || value === 'qian' || value === 'wan'
+}
+
+function isCurrentProject(targetProjectId: string): boolean {
+  return projectId.value === targetProjectId && projectStore.projectId === targetProjectId
+}
+
+async function loadProjectAmountUnit(targetProjectId = projectId.value) {
+  if (!targetProjectId) return
+  const requestSeq = ++projectAmountUnitRequestSeq
+  projectAmountUnitLoading.value = true
+  try {
+    const config = await api.get<ProjectAmountUnitConfig>(
+      projectConfig.get(targetProjectId),
+      { _silent: true } as any,
+    )
+    if (requestSeq !== projectAmountUnitRequestSeq || !isCurrentProject(targetProjectId)) return
+    if (config?.project_id !== targetProjectId || !isProjectAmountUnit(config.amount_unit)) {
+      projectAmountUnit.value = projectStore.projectAmountUnit ?? 'yuan'
+      return
+    }
+    projectAmountUnit.value = config.amount_unit
+    projectStore.applyProjectAmountUnit(config.project_id, config.amount_unit)
+  } catch {
+    if (requestSeq === projectAmountUnitRequestSeq && isCurrentProject(targetProjectId)) {
+      projectAmountUnit.value = projectStore.projectAmountUnit ?? 'yuan'
+    }
+  } finally {
+    if (requestSeq === projectAmountUnitRequestSeq) projectAmountUnitLoading.value = false
+  }
+}
+
+async function saveProjectAmountUnit() {
+  const targetProjectId = projectId.value
+  const requestedUnit = projectAmountUnit.value
+  if (!targetProjectId || !canEditProjectAmountUnit.value || isReadonly.value) return
+
+  projectAmountUnitSaving.value = true
+  try {
+    const config = await api.put<ProjectAmountUnitConfig>(
+      projectConfig.update(targetProjectId),
+      { amount_unit: requestedUnit },
+      { _silent: true } as any,
+    )
+    if (!isCurrentProject(targetProjectId)) return
+    if (config?.project_id !== targetProjectId || !isProjectAmountUnit(config.amount_unit)) {
+      ElMessage.error('项目默认金额单位保存失败：服务器返回无效配置')
+      return
+    }
+    // 请求期间用户已选了新值时，不让旧成功响应覆盖下一次明确选择。
+    if (projectAmountUnit.value !== requestedUnit) return
+    projectAmountUnit.value = config.amount_unit
+    projectStore.applyProjectAmountUnit(config.project_id, config.amount_unit)
+    ElMessage.success('项目默认金额单位已保存')
+  } catch {
+    if (isCurrentProject(targetProjectId)) {
+      ElMessage.error('项目默认金额单位保存失败，请稍后重试')
+    }
+  } finally {
+    projectAmountUnitSaving.value = false
+  }
+}
 
 // ─── 账龄段配置弹窗 ───
 const agingDialogVisible = ref(false)
@@ -501,8 +619,8 @@ const statusType = computed(() => {
 onMounted(async () => {
   if (!projectId.value) return
 
-  // 确保项目上下文已加载
-  if (!ctx.value.projectId) {
+  // 组件被复用到另一个项目时，旧上下文不能当作当前项目使用。
+  if (ctx.value.projectId !== projectId.value) {
     await projectStore.loadProjectContext(projectId.value)
   }
 
@@ -521,6 +639,7 @@ onMounted(async () => {
   }
 
   lockingInfo.value.readonlyMode = isReadonly.value
+  await loadProjectAmountUnit(projectId.value)
 
   // 加载成员列表
   await loadMembers()
@@ -592,6 +711,13 @@ async function loadMembers() {
 
 .settings-panel__table {
   width: 100%;
+}
+
+.project-amount-unit-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .settings-config-card {

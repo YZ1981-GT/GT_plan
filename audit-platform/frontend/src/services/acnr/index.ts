@@ -20,6 +20,7 @@ export {
 export {
   useAcnr,
   getCacheEpoch,
+  getProjectRegistryFailure,
   invalidateModuleCache,
   isSSEDegraded,
   subscribeInvalidation,

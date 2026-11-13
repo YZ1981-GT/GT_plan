@@ -182,3 +182,107 @@ async def test_endpoint_requires_login_and_serves_three_query_shapes(client):
     found = (await c.get(url, params={"q": "XR-01"})).json()["sources"]
     assert [(s["key"], s["matched"]) for s in found if s.get("matched")] == [("wp_cross_account", 1)]
     assert (await c.get(url, params={"source": "nope"})).status_code == 404
+
+# ── S2 执行元数据：只计 wired，项目历史与目录展示分离 ────────────────────────────
+
+
+async def test_s2_execution_metadata_and_project_history_boundaries(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    sources = (
+        CheckSource("wired", "已接入", "报表", "执行入口", "", lambda: [],
+                    executor_entry="test_only.executor", result_table="cross_check_results"),
+        CheckSource("display", "仅展示", "报表", "展示", "", lambda: []),
+        CheckSource("pseudo", "伪表达式", "底稿", "展示", "", lambda: [],
+                    unexecutable_reason="没有求值器", result_table="gate_decisions"),
+    )
+    statuses = {"wired": "wired", "display": "display_only", "pseudo": "not_executable"}
+    rules = {s.key: [cat._rule(f"{s.key}-{i}", "校对", "A=B")
+                     for i in range(2 if s.key == "wired" else 1)] for s in sources}
+
+    async def load_stub(_db, source):
+        return rules[source.key]
+
+    history = AsyncMock(return_value={"at": None, "status": "never_run", "counts": {}})
+    monkeypatch.setattr(cat, "SOURCES", sources)
+    monkeypatch.setattr(cat, "load_source", load_stub)
+    monkeypatch.setattr(cat, "_execution_status", lambda source: statuses[source.key])
+    monkeypatch.setattr(cat, "_last_run", history)
+    db, pid = object(), uuid.uuid4()
+    out = await build_check_catalog(db, project_id=pid)
+    assert (out["source_count"], out["wired_count"], out["wired_rule_count"], out["total"]) == (3, 1, 2, 4)
+    by_key = {s["key"]: s for s in out["sources"]}
+    assert {key: s["execution"] for key, s in by_key.items()} == statuses
+    assert by_key["wired"]["executor"] == "test_only.executor"
+    assert by_key["wired"]["result_table"] == "cross_check_results"
+    assert by_key["display"]["last_run"] is None
+    assert by_key["display"]["last_run_note"] == "本类结果不落库"
+    assert [(c.args[1].key, c.args[2], c.args[3]) for c in history.await_args_list] == [
+        ("wired", pid, None), ("pseudo", pid, None)]
+    history.reset_mock()
+    detail = await build_check_catalog(db, source="wired")
+    assert {r["execution"] for r in detail["sources"][0]["rules"]} == {"wired"}
+    assert detail["sources"][0]["last_run"] is None
+    assert detail["sources"][0]["last_run_note"] == "未指定项目，未查询执行结果"
+    history.assert_not_awaited()
+
+
+async def test_s2_history_failure_isolated_by_savepoint(monkeypatch):
+    from types import SimpleNamespace
+
+    trace = []
+
+    class Savepoint:
+        async def __aenter__(self):
+            trace.append("entered")
+
+        async def __aexit__(self, exc_type, _exc, _tb):
+            trace.append(exc_type)
+            return False
+
+    async def broken_history(_db, _source, _pid, _year=None):
+        raise RuntimeError("结果表不可用")
+
+    monkeypatch.setattr(cat, "_last_run_cross_check", broken_history)
+    db = SimpleNamespace(begin_nested=lambda: Savepoint())
+    source = CheckSource("broken", "不可读历史", "报表", "", "", lambda: [],
+                         result_table="cross_check_results")
+    result = await cat._last_run(db, source, uuid.uuid4())
+    assert result == {"at": None, "status": "unavailable", "counts": {}}
+    assert trace == ["entered", RuntimeError], "异常先离开保存点再降级，不能伪装通过"
+
+
+async def test_s2_project_history_endpoint_checks_permission_before_loading(client, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from fastapi import HTTPException
+    from app import deps
+
+    app, c = client
+    pid = uuid.uuid4()
+    user = type("U", (), {"id": uuid.uuid4(), "is_active": True, "role": type("R", (), {"value": "admin"})()})()
+    app.dependency_overrides[get_current_user] = lambda: user
+    trace = []
+
+    async def permission_stub(db, actor, project_id, level):
+        trace.append(("permission", actor, project_id, level))
+
+    async def catalog_stub(db, **kwargs):
+        trace.append(("catalog", kwargs))
+        return {"sources": [], "total": 0}
+
+    monkeypatch.setattr(deps, "assert_project_permission", permission_stub)
+    monkeypatch.setattr(cat, "build_check_catalog", catalog_stub)
+    response = await c.get("/api/formula-catalog/check-rules", params={"project_id": str(pid), "q": "勾稽", "year": 2025})
+    assert response.status_code == 200
+    # admin 跳过项目权限检查，直接到 catalog
+    catalog_calls = [t for t in trace if t[0] == "catalog"]
+    assert len(catalog_calls) == 1
+    assert catalog_calls[0][1]["project_id"] == pid
+    assert catalog_calls[0][1]["year"] == 2025
+    assert catalog_calls[0][1]["keyword"] == "勾稽"
+    trace.clear()
+    assert (await c.get("/api/formula-catalog/check-rules", params={"source": "report_builtin"})).status_code == 200
+    catalog_calls = [t for t in trace if t[0] == "catalog"]
+    assert len(catalog_calls) == 1
+    assert catalog_calls[0][1] == {"source": "report_builtin", "keyword": "", "project_id": None, "year": None}

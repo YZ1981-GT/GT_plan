@@ -159,14 +159,18 @@ def test_allowlist_reports_unexpected_stale_and_requires_reason(tmp_path):
     word = parse_word_docx(_listed_word(tmp_path), "listed", variant="listed_standalone")
     diffs = compare_variant(match_variant(word, load_seed(SEED), "listed_standalone"))
     allow = [
-        {"variant": "listed_standalone", "kind": "order", "key": "二、1", "reason": "测试"},
-        {"variant": "listed_standalone", "kind": "order", "key": "不存在", "reason": "测试"},
+        {"variant": "listed_standalone", "kind": "order", "key": "二、1", "category": "todo", "reason": "测试"},
+        {"variant": "listed_standalone", "kind": "order", "key": "不存在", "category": "todo", "reason": "测试"},
     ]
     unexpected, stale = check_against_allowlist(diffs, allow)
     assert ("order", "二、1") not in _keys(unexpected) and len(unexpected) == len(diffs) - 1
     assert [e["key"] for e in stale] == ["不存在"]
     with pytest.raises(ValueError, match="缺理由"):
-        check_against_allowlist(diffs, [{"variant": "v", "kind": "k", "key": "x", "reason": " "}])
+        check_against_allowlist(diffs, [{"variant": "v", "kind": "k", "key": "x", "category": "todo", "reason": " "}])
+    with pytest.raises(ValueError, match="缺类别"):
+        check_against_allowlist(diffs, [{"variant": "v", "kind": "k", "key": "x", "reason": "有理由没类别"}])
+    with pytest.raises(ValueError, match="缺类别"):
+        check_against_allowlist(diffs, [{"variant": "v", "kind": "k", "key": "x", "category": "ok", "reason": "类别不认识"}])
 
 
 def _real_check(kind_filter):
@@ -196,22 +200,45 @@ def test_seed_tables_match_four_word_templates():
     assert not unexpected, f"{len(unexpected)} 条白名单外表格差异，例：{unexpected[:5]}"
 
 
-def test_table_diffs_are_all_attributable_to_a_worksheet_consumer():
-    """每条表格差异都能归因到底稿 xlsx 消费方（种子节 ``_aligned_by`` / 父章 / 已登记类别）。
+#: Word 白名单里 todo 类条数（未经底稿核实：节没有登记底稿披露表 154、登记了但表没配上 42、上市 五、1 一节两条）。
+#: spec note-disclosure-pull-regression-and-headless-backend 任务 6（design §4.3）。只许减少：配上底稿 / 按 Word 改好一处，
+#: 生成器自动改判，把这个数下调；变多 ⇒ 新出现的表格差异没有底稿证据，先查清再登记。
+_WORD_TODO = 198
 
-    白名单只保证「这条差异被允许」，本用例保证「它被允许是因为该节确实由底稿消费方按 xlsx 对齐」。
-    新出现的、既不在 Word 也没有任何底稿消费方的表格漂移会在生成器里抛错 ⇒ 本用例红。
-    """
-    from scripts.gen.gen_note_word_table_allowlist import _table_entries
 
-    entries, unattributed = _table_entries()
-    assert not unattributed, f"{len(unattributed)} 条表格差异无底稿消费方归因：{unattributed[:5]}"
-    # 每条归因都带「消费方 = …」出处
-    assert all("消费方 = " in e["reason"] for e in entries)
+def _allowlist() -> list[dict]:
+    import json
+
+    return json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
+
+
+def test_word_allowlist_entries_carry_category_and_evidence():
+    """每条带类别、证据与理由；证据字段与类别相符；手工条目（章节树）的出处文档里查得到原话。"""
+    from app.services.note_word_allowlist import evidence_problems
+
+    need = {"workpaper_authority": ({"paired_with"}, {"paired_tables"}), "word_placeholder": ({"word_tables", "word_text"},),
+            "user_decision": ({"decided_on", "decision_ref", "quote"},), "todo": ()}
+    bad = []
+    for e in _allowlist():
+        ev = set(e.get("evidence") or {})
+        if e.get("category") not in need or not str(e.get("reason") or "").strip():
+            bad.append((e["variant"], e["key"], "类别 / 理由"))
+        elif need[e["category"]] and not any(req <= ev for req in need[e["category"]]):
+            bad.append((e["variant"], e["key"], f"证据缺字段：{sorted(ev)}"))
+        bad += [(e["variant"], e["key"], p) for p in evidence_problems(e)]
+    assert not bad, bad[:10]
+
+
+def test_word_allowlist_todo_only_shrinks():
+    todo = [e for e in _allowlist() if e["category"] == "todo"]
+    assert len(todo) == _WORD_TODO, (
+        f"Word 白名单 todo {len(todo)} 条 ≠ 登记的 {_WORD_TODO}：少了 ⇒ 把 _WORD_TODO 下调到 {len(todo)}；"
+        f"多了 ⇒ 新出现的表格差异没有底稿证据（节没登记底稿 / 表没配上），先查清")
 
 
 def test_table_allowlist_is_in_sync_with_generator():
-    """白名单表格条目必须由生成器产出（不手改）：磁盘内容 == 生成器渲染。"""
+    """白名单表格条目必须由生成器产出（不手改）：磁盘内容 == 生成器渲染（类别与证据现算：底稿配对、种子标记、Word
+    任何一侧变了就对不上）。"""
     from scripts.gen.gen_note_word_table_allowlist import render
 
     assert ALLOWLIST_PATH.read_text(encoding="utf-8") == render()

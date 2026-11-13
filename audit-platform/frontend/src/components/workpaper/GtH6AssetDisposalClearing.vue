@@ -563,6 +563,21 @@ const h6AEntrySync = useEntrySyncReadiness({
 </script>
 
 <style scoped>
+/* ═══ OnlyOffice 容器（必须给确定高度）═══
+ * 🔴 模板第 44 行早就写了 `class="oo-container"`，上一行注释也写明「必须有确定高度」，
+ * 但本文件**从来没有这条规则** —— scoped 下未定义的类名不带来任何高度。
+ * 文件里那句 `height: calc(100vh - 180px)` 在 `v-else-if` 分支的 legacy
+ * `GtOnlyOfficeSheet` 内联样式上，与同步宿主的容器无关（所以「全文件有没有 vh」
+ * 这种判据抓不到它）。`WorkpaperSyncEditorHost` 根元素是 `height:100%` + flex 列，
+ * 父级 auto 高度会把编辑区压扁 ⇒ OnlyOffice 只剩一条。
+ * 数值与同页 legacy 分支保持一致（同一工具栏占位）。
+ */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 180px);
+  overflow: hidden;
+}
+
 .h6-asset-disposal-clearing {
   width: 100%;
   min-height: 400px;

@@ -9,9 +9,16 @@
 
 <template>
   <div class="gt-a3-console">
-    <!-- BP-10 收口：a3-console 原是全 A 域唯一 no_switch_at_all，此处补模式开关 -->
+    <!-- BP-10 收口：a3-console 原是全 A 域唯一 no_switch_at_all，此处补模式开关。
+         开关可见性 / 可用性来自同步能力单源（useEntrySyncReadiness），不由宿主自行决定。
+         notice 必须写静态 entry-id：它是挂点发现器给本宿主同步载体定身份的唯一 L2 声明。 -->
     <div class="gt-a3-console__toolbar">
-      <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
+      <el-segmented
+        v-if="entrySync.presentation.value.showModeSwitch"
+        v-model="viewMode"
+        :options="modeOptions"
+        size="small"
+      />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a3-consolidation-console" />
       <el-tag :type="syncStateTag.type" size="small">{{ syncStateTag.text }}</el-tag>
     </div>
@@ -182,6 +189,7 @@ import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 
 const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
@@ -263,6 +271,12 @@ function flushPendingSave(): void {
 // ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
 const _ENTRY_ID = 'xlsx/gt-a3-consolidation-console'
 const _SHEET_KEY = 'a3consolidationconsole-managed'
+/** 开关与 notice 共用的同步能力单源（静态裁决 + 运行时 readiness）。 */
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(projectId.value ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => _ENTRY_ID,
+})
 const syncBridge = useWorkpaperSyncBridge({
   entryId: ref(_ENTRY_ID),
   wpId: toRef(props, 'wpId'),
@@ -291,7 +305,7 @@ const viewMode = computed<string>({
   get: () => syncBridge.mode.value === 'oo' ? '在线编辑' : '结构化视图',
   set: (target: string) => {
     if (target === '在线编辑') {
-      if (props.readonly) return
+      if (props.readonly || !entrySync.presentation.value.canSwitchToOnlyOffice) return
       void syncBridge.switchToOnlyOffice().catch(() => { /* 已记入 lastError */ })
     } else if (syncBridge.mode.value === 'oo') {
       void syncBridge.switchToHtml().catch(() => { /* 已记入 lastError */ })
@@ -301,7 +315,7 @@ const viewMode = computed<string>({
 const modeOptions = computed(() => ['结构化视图', '在线编辑'].map(v => ({
   label: v,
   value: v,
-  disabled: v === '在线编辑' && props.readonly,
+  disabled: v === '在线编辑' && (props.readonly || !entrySync.presentation.value.canSwitchToOnlyOffice),
 })))
 const syncStateTag = computed(() => {
   if (syncBridge.dirty?.value) return { text: '有未同步改动', type: 'warning' as const }

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.formula_setting_models import FormulaPublish
 from app.services.formula_settings.audit import audit_global, audit_project, change_entry
 from app.services.formula_settings.definitions import display_formula, get_spec
+from app.services.formula_settings.domain_stores import split_wp_slot
 from app.services.formula_settings.effective import effective_slots, upstream_records
 from app.services.formula_settings.engine import Decisions, decision_key, lock_domain, lock_project
 from app.services.formula_settings.errors import FormulaSettingError, NotFound
@@ -59,9 +60,17 @@ async def _push_plan(db: AsyncSession, domain: str, source_id: uuid.UUID, slot_k
     non_source_ids = [t for t in target_ids if t != source_id]
     targets = await list_projects(db, domain, ids=non_source_ids)
     plan = []
+    skipped: list[dict[str, Any]] = []
+    wp_codes = await _project_wp_codes(db, [t.id for t in targets]) if domain == "wp" else {}
     for t in targets:
         eff = await effective_slots(db, domain, t.id, scope=t.scope)
         for slot, src in source.items():
+            if domain == "wp" and (code := split_wp_slot(slot)[0]) not in wp_codes.get(t.id, ()):
+                # 底稿域的本项目层写在该项目这张底稿的公式行上：没有这张底稿就无处可写（写入方会静默跳过），
+                # 不能算进「已应用」（spec formula-management-repair-closure R4）
+                skipped.append({"project_id": str(t.id), "project_name": t.name, "slot_key": slot,
+                                "reason": f"该项目没有底稿 {code}，无处写入（建这张底稿时按全局 / 系统预设预填）"})
+                continue
             e = eff.get(slot)
             lo = e.local if e is not None else None
             category = classify_push(domain, source=src["definition"],
@@ -70,19 +79,40 @@ async def _push_plan(db: AsyncSession, domain: str, source_id: uuid.UUID, slot_k
             plan.append({"target": t, "slot_key": slot, "label": src["label"], "structure": src["structure"],
                          "source": src["definition"], "effective": e, "category": category})
     # 被域作用范围过滤的目标
-    skipped: list[dict[str, Any]] = []
     resolved_ids = {t.id for t in targets}
     missing_ids = [tid for tid in non_source_ids if tid not in resolved_ids]
     if missing_ids:
         from app.models.core import Project
-        existing = {row[0] for row in (await db.execute(
-            sa.select(Project.id).where(Project.id.in_(missing_ids), Project.is_deleted == sa.false())
-        )).all()}
+        existing = dict((await db.execute(
+            sa.select(Project.id, Project.name).where(Project.id.in_(missing_ids), Project.is_deleted == sa.false())
+        )).all())
+        reason = _not_applicable_reason(domain)
         for tid in missing_ids:
             if tid in existing:
-                skipped.append({"project_id": str(tid),
-                                "reason": "该项目不是合并项目，不适用合并附注公式"})
+                skipped.append({"project_id": str(tid), "project_name": existing[tid] or "", "reason": reason})
     return source, plan, skipped
+
+
+def _not_applicable_reason(domain: str) -> str:
+    """目标项目被该域作用范围过滤掉时的原因（按域生成；目前只有合并附注会过滤：单体项目不适用）。"""
+    spec = get_spec(domain)
+    if spec.scope_kind == "consolidated_template_type":
+        return f"该项目不是合并项目，不适用{spec.label}"
+    return f"该项目不适用{spec.label}"
+
+
+async def _project_wp_codes(db: AsyncSession, project_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+    """各项目现有（未删除）底稿的编码 —— 底稿域写入方只认 ``wp_index.wp_code``（与公式位同口径）。"""
+    if not project_ids:
+        return {}
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
+    out: dict[uuid.UUID, set[str]] = {}
+    for pid, code in (await db.execute(
+            sa.select(WorkingPaper.project_id, WpIndex.wp_code).join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+            .where(WorkingPaper.project_id.in_(project_ids), WorkingPaper.is_deleted == sa.false()))).all():
+        out.setdefault(pid, set()).add(code)
+    return out
 
 
 def _push_item_dict(domain: str, p: dict[str, Any]) -> dict[str, Any]:

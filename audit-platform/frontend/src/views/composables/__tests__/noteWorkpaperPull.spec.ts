@@ -52,6 +52,24 @@ describe('describeWorkpaperPull', () => {
     expect(warn).toBe(false)
   })
 
+  it('写入归属拒写的格单列一句并告警，点名第一格；没有明细时只写格数（spec formula-writer-ownership-and-stale §13）', () => {
+    const reason = '写入归属矩阵没有这一格，按未登记拒写（公式推送只写矩阵声明的审定主表格）'
+    const { lines, warn } = describeWorkpaperPull(pull({
+      written: 2, blocked: 3,
+      blocked_writes: [{
+        section: '八、5', table: '应收账款按账龄披露', field: 'table.cell:期末余额', row: '1年以内',
+        writer_id: 'formula_push', owner_id: null, reason_code: 'unknown_entry', reason,
+      }],
+    }, [{ section: '八、5', written: 2, blocked: 3 }]), null, [])
+    expect(lines).toEqual([
+      '公式推送按审定数写入 2 格（八、5）',
+      '公式推送有 3 格不在它负责的范围，未改（如 八、5 应收账款按账龄披露「1年以内」）',
+    ])
+    expect(warn).toBe(true)
+    expect(describeWorkpaperPull(pull({ blocked: 1 }), null, [])).toEqual({ lines: ['公式推送有 1 格不在它负责的范围，未改'], warn: true })
+    expect(describeWorkpaperPull(pull({ blocked: 0, blocked_writes: [] }), null, [])).toEqual({ lines: [], warn: false })
+  })
+
   it('推送被拒（审计年度不符）与请求失败都是告警', () => {
     expect(describeWorkpaperPull(pull({ ran: false, error: '只作用于项目审计年度' }), null, [])).toEqual({
       lines: ['公式推送未执行：只作用于项目审计年度'], warn: true,

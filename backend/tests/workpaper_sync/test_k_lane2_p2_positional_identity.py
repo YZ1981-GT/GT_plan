@@ -66,11 +66,13 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     positional_identity_hits,
     strip_comments,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    spec_dir,
+)
 
 SLICE_PATH = DATA / "workpaper_sync_k_cycle_manifest_slice.json"
 SPEC_DIR = (
-    ROOT / ".kiro" / "specs"
-    / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
 )
 
 #: 本 lane 的 5 条 entry 序号
@@ -768,10 +770,25 @@ class TestKBP28SingleFixOutlet:
         assert f"export function {ROW_IDENTITY_FACTORY}(" in src
 
     def test_factory_is_entropy_bearing_not_positional(self) -> None:
-        """🔴 工厂本身必须带熵且不含位置化 token（否则等于换个名字继续错）。"""
+        """🔴 工厂本身必须带熵且不含位置化 token（否则等于换个名字继续错）。
+
+        🔴 2026-11-05：随机熵判据原先只认 `randomUUID|Math.random()` 的**字面调用**。工厂已改成
+        委托平台唯一 UUID 出口 `@/utils/uuid` 的 `newUuid()` —— 那个出口存在的理由正是内网 HTTP
+        不是安全上下文、`crypto.randomUUID` 在那里是 undefined、直接调会抛 TypeError。继续要求
+        字面 `randomUUID` 等于把代码推回一个在内网必崩的写法 ⇒ 判据改成**跟着委托走**：工厂自己
+        调随机源，或者委托给平台出口、再去那个出口里验它真有随机源。
+        """
         src = strip_comments(cached_text(ROW_IDENTITY_MODULE))
         assert re.search(r"Date\.now\(\)", src), "工厂无时间戳熵"
-        assert re.search(r"randomUUID|Math\.random\(\)", src), "工厂无随机熵"
+        entropy = r"randomUUID|getRandomValues|Math\.random\(\)"
+        if not re.search(entropy, src):
+            m = re.search(r"""import\s*\{[^}]*\bnewUuid\b[^}]*\}\s*from\s*['"]([^'"]+)['"]""", src)
+            assert m, "工厂既不自己取随机源，也没有委托 `newUuid` ⇒ 无随机熵"
+            delegate = ROOT / "audit-platform" / "frontend" / "src" / (m.group(1).replace("@/", "") + ".ts")
+            assert delegate.is_file(), f"工厂委托的 UUID 出口不存在：{delegate}"
+            assert re.search(entropy, strip_comments(cached_text(delegate))), (
+                f"{delegate.name} 里没有随机源 ⇒ 委托链末端无熵，工厂的唯一性落空"
+            )
         assert re.search(r"\$\{\s*(?:i|idx|index)\s*\}", src) is None, (
             "工厂里出现位置化插值 ⇒ 修复无效"
         )

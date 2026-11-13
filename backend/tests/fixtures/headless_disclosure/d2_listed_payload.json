@@ -1,0 +1,563 @@
+{
+ "_meta": {
+  "source": "Node 离屏执行器 run.mjs probe 实跑产物：【测试】公式同步甲_2025（上市，项目 4c77f3e8）D2 底稿，写请求拦下未发出（2026-11-04）",
+  "parity": "与真实 Chromium 附注页同一底稿的载荷 canonical JSON 逐字节相同（任务 12：8135 字节，sha256 前 16 位 66d8bf802db4a9b4）",
+  "url": "POST /api/projects/{project_id}/disclosure-notes/sync-from-workpaper"
+ },
+ "body": {
+  "wp_id": "a544a961-e30f-4a56-a012-fd127fea42dc",
+  "sheet_name": "附注披露信息(上市公司)",
+  "section_id": "五、5",
+  "current_standard": "listed_standalone",
+  "sub_table_data": {
+   "按账龄披露": [
+    {
+     "label": "1年以内",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "1至2年",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "2至3年",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "3至4年",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "4至5年",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "5年以上",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "小 计",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "减：坏账准备",
+     "end_amount": 0,
+     "prior_amount": 0
+    },
+    {
+     "label": "合 计",
+     "end_amount": 0,
+     "prior_amount": 0,
+     "is_total": true
+    }
+   ],
+   "按坏账计提方法分类披露": [
+    {
+     "label": "按单项计提坏账准备",
+     "book_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0
+    },
+    {
+     "label": "按账龄组合计提坏账准备",
+     "book_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0
+    },
+    {
+     "label": "按客户类型组合计提坏账准备",
+     "book_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0
+    },
+    {
+     "label": "合 计",
+     "book_amount": 0,
+     "ratio": 100,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0,
+     "is_total": true
+    }
+   ],
+   "按坏账计提方法分类披露（续：上年年末余额）": [
+    {
+     "label": "按单项计提坏账准备",
+     "book_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0
+    },
+    {
+     "label": "按账龄组合计提坏账准备",
+     "book_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0
+    },
+    {
+     "label": "按客户类型组合计提坏账准备",
+     "book_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0
+    },
+    {
+     "label": "合 计",
+     "book_amount": 0,
+     "ratio": 100,
+     "provision": 0,
+     "loss_rate": 0,
+     "carrying_value": 0,
+     "is_total": true
+    }
+   ],
+   "按单项计提坏账准备的应收账款": [
+    {
+     "label": "合 计",
+     "book_amount": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "basis": "/",
+     "is_total": true
+    }
+   ],
+   "按单项计提坏账准备的应收账款（续：上年年末余额）": [
+    {
+     "label": "合 计",
+     "book_amount": 0,
+     "provision": 0,
+     "loss_rate": 0,
+     "basis": "/",
+     "is_total": true
+    }
+   ],
+   "本期计提、收回或转回的坏账准备情况": [
+    {
+     "label": "上年年末余额",
+     "amount": 0
+    },
+    {
+     "label": "本期计提",
+     "amount": 0
+    },
+    {
+     "label": "本期收回或转回",
+     "amount": 0
+    },
+    {
+     "label": "本期核销",
+     "amount": 0
+    },
+    {
+     "label": "本期转销",
+     "amount": 0
+    },
+    {
+     "label": "其他",
+     "amount": 0
+    },
+    {
+     "label": "期末余额",
+     "amount": 0,
+     "is_total": true
+    }
+   ],
+   "转回或收回金额重要的坏账准备": [
+    {
+     "label": "合 计",
+     "reversal_reason": "",
+     "recovery_method": "",
+     "original_basis": "",
+     "amount": 0,
+     "is_total": true
+    }
+   ],
+   "本期实际核销的应收账款情况": [
+    {
+     "label": "实际核销的应收账款",
+     "amount": 0
+    }
+   ],
+   "重要的应收账款核销情况（逐项披露）": [
+    {
+     "label": "合 计",
+     "nature": "",
+     "amount": 0,
+     "reason": "",
+     "procedure": "",
+     "related": "",
+     "is_total": true
+    }
+   ],
+   "按欠款方归集的应收账款和合同资产期末余额前五名单位情况": [
+    {
+     "label": "合 计",
+     "ar_amount": 0,
+     "contract_asset_amount": 0,
+     "total_amount": 0,
+     "ratio": 0,
+     "provision": 0,
+     "is_total": true
+    }
+   ],
+   "因金融资产转移而终止确认的应收账款情况": [
+    {
+     "label": "合 计",
+     "transfer_method": "",
+     "amount": 0,
+     "gain_loss": 0,
+     "is_total": true
+    }
+   ],
+   "转移应收账款且继续涉入形成的资产、负债的金额": [
+    {
+     "label": "合 计",
+     "transfer_method": "",
+     "asset_amount": 0,
+     "liability_amount": 0,
+     "is_total": true
+    }
+   ],
+   "_note_texts": [],
+   "_removed_table_keys": [
+    "按坏账计提方法分类披露（上年年末金额）",
+    "按单项计提坏账准备的应收账款（上年年末金额）",
+    "转移应收账款且继续涉入形成的资产、负债"
+   ]
+  },
+  "columns": {
+   "按账龄披露": [
+    {
+     "key": "label",
+     "label": "账 龄",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "end_amount",
+     "label": "期末余额",
+     "format": "amount"
+    },
+    {
+     "key": "prior_amount",
+     "label": "上年年末余额",
+     "format": "amount"
+    }
+   ],
+   "按坏账计提方法分类披露": [
+    {
+     "key": "label",
+     "label": "类 别",
+     "is_label": true
+    },
+    {
+     "key": "book_amount",
+     "label": "金额",
+     "format": "amount",
+     "group": "账面余额"
+    },
+    {
+     "key": "ratio",
+     "label": "比例(%)",
+     "format": "percent",
+     "group": "账面余额"
+    },
+    {
+     "key": "provision",
+     "label": "金额",
+     "format": "amount",
+     "group": "坏账准备"
+    },
+    {
+     "key": "loss_rate",
+     "label": "预期信用损失率(%)",
+     "format": "percent",
+     "group": "坏账准备"
+    },
+    {
+     "key": "carrying_value",
+     "label": "账面价值",
+     "format": "amount"
+    }
+   ],
+   "按坏账计提方法分类披露（续：上年年末余额）": [
+    {
+     "key": "label",
+     "label": "类 别",
+     "is_label": true
+    },
+    {
+     "key": "book_amount",
+     "label": "金额",
+     "format": "amount",
+     "group": "账面余额"
+    },
+    {
+     "key": "ratio",
+     "label": "比例(%)",
+     "format": "percent",
+     "group": "账面余额"
+    },
+    {
+     "key": "provision",
+     "label": "金额",
+     "format": "amount",
+     "group": "坏账准备"
+    },
+    {
+     "key": "loss_rate",
+     "label": "预期信用损失率(%)",
+     "format": "percent",
+     "group": "坏账准备"
+    },
+    {
+     "key": "carrying_value",
+     "label": "账面价值",
+     "format": "amount"
+    }
+   ],
+   "按单项计提坏账准备的应收账款": [
+    {
+     "key": "label",
+     "label": "名 称",
+     "is_label": true
+    },
+    {
+     "key": "book_amount",
+     "label": "账面余额",
+     "format": "amount",
+     "group": "期末余额"
+    },
+    {
+     "key": "provision",
+     "label": "坏账准备",
+     "format": "amount",
+     "group": "期末余额"
+    },
+    {
+     "key": "loss_rate",
+     "label": "预期信用损失率（%）",
+     "format": "percent",
+     "group": "期末余额"
+    },
+    {
+     "key": "basis",
+     "label": "计提依据",
+     "format": "text",
+     "group": "期末余额"
+    }
+   ],
+   "按单项计提坏账准备的应收账款（续：上年年末余额）": [
+    {
+     "key": "label",
+     "label": "名 称",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "book_amount",
+     "label": "账面余额",
+     "format": "amount"
+    },
+    {
+     "key": "provision",
+     "label": "坏账准备",
+     "format": "amount"
+    },
+    {
+     "key": "loss_rate",
+     "label": "预期信用损失率（%）",
+     "format": "percent"
+    },
+    {
+     "key": "basis",
+     "label": "计提依据",
+     "format": "text"
+    }
+   ],
+   "本期计提、收回或转回的坏账准备情况": [
+    {
+     "key": "label",
+     "label": "项 目",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "amount",
+     "label": "坏账准备金额",
+     "format": "amount"
+    }
+   ],
+   "转回或收回金额重要的坏账准备": [
+    {
+     "key": "label",
+     "label": "单位名称",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "reversal_reason",
+     "label": "转回原因",
+     "format": "text"
+    },
+    {
+     "key": "recovery_method",
+     "label": "收回方式",
+     "format": "text"
+    },
+    {
+     "key": "original_basis",
+     "label": "原确定坏账准备的依据",
+     "format": "text"
+    },
+    {
+     "key": "amount",
+     "label": "转回或收回金额",
+     "format": "amount"
+    }
+   ],
+   "本期实际核销的应收账款情况": [
+    {
+     "key": "label",
+     "label": "项  目",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "amount",
+     "label": "核销金额",
+     "format": "amount"
+    }
+   ],
+   "重要的应收账款核销情况（逐项披露）": [
+    {
+     "key": "label",
+     "label": "单位名称",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "nature",
+     "label": "应收账款性质",
+     "format": "text"
+    },
+    {
+     "key": "amount",
+     "label": "核销金额",
+     "format": "amount"
+    },
+    {
+     "key": "reason",
+     "label": "核销原因",
+     "format": "text"
+    },
+    {
+     "key": "procedure",
+     "label": "履行的核销程序",
+     "format": "text"
+    },
+    {
+     "key": "related",
+     "label": "款项是否由关联交易产生",
+     "format": "text"
+    }
+   ],
+   "按欠款方归集的应收账款和合同资产期末余额前五名单位情况": [
+    {
+     "key": "label",
+     "label": "单位名称",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "ar_amount",
+     "label": "应收账款期末余额",
+     "format": "amount"
+    },
+    {
+     "key": "contract_asset_amount",
+     "label": "合同资产期末余额",
+     "format": "amount"
+    },
+    {
+     "key": "total_amount",
+     "label": "应收账款和合同资产期末余额",
+     "format": "amount"
+    },
+    {
+     "key": "ratio",
+     "label": "占应收账款和合同资产期末余额合计数的比例%",
+     "format": "percent"
+    },
+    {
+     "key": "provision",
+     "label": "应收账款坏账准备和合同资产减值准备期末余额",
+     "format": "amount"
+    }
+   ],
+   "因金融资产转移而终止确认的应收账款情况": [
+    {
+     "key": "label",
+     "label": "项  目",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "transfer_method",
+     "label": "转移方式",
+     "format": "text"
+    },
+    {
+     "key": "amount",
+     "label": "终止确认金额",
+     "format": "amount"
+    },
+    {
+     "key": "gain_loss",
+     "label": "与终止确认相关的利得或损失",
+     "format": "amount"
+    }
+   ],
+   "转移应收账款且继续涉入形成的资产、负债的金额": [
+    {
+     "key": "label",
+     "label": "项  目",
+     "is_label": true,
+     "flat": true
+    },
+    {
+     "key": "transfer_method",
+     "label": "资产转移方式",
+     "format": "text"
+    },
+    {
+     "key": "asset_amount",
+     "label": "继续涉入形成的资产金额",
+     "format": "amount"
+    },
+    {
+     "key": "liability_amount",
+     "label": "继续涉入形成的负债金额",
+     "format": "amount"
+    }
+   ]
+  }
+ }
+}

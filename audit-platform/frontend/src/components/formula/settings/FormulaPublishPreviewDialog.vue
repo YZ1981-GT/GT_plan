@@ -12,6 +12,14 @@
     <div v-loading="loading" class="gt-fpp">
       <template v-if="preview">
         <el-alert v-if="hint" type="info" :closable="false" show-icon class="gt-fpp-gap" :title="hint" />
+        <!-- spec formula-management-repair-closure R4：不会写入的项目 / 公式位要说清（原先预览与回执都不显示） -->
+        <el-alert v-if="skipped.length" type="warning" :closable="false" show-icon class="gt-fpp-gap"
+          data-testid="fpp-skipped" :title="`${skipped.length} 处不会写入`">
+          <div v-for="(s, i) in skipped.slice(0, SKIPPED_SHOWN)" :key="i">
+            {{ s.project_name || s.project_id }}{{ s.slot_key ? `（${s.slot_key}）` : '' }}：{{ s.reason }}
+          </div>
+          <div v-if="skipped.length > SKIPPED_SHOWN">另有 {{ skipped.length - SKIPPED_SHOWN }} 处</div>
+        </el-alert>
         <el-alert v-if="versionProblems.length" type="error" :closable="false" show-icon class="gt-fpp-gap"
           :title="`${versionProblems.length} 个公式位已被他人修改或缺少版本号，请关闭后刷新再编辑`" />
 
@@ -100,7 +108,7 @@ import { computed, ref, watch } from 'vue'
 import FormulaConflictTable from './FormulaConflictTable.vue'
 import {
   CATEGORY_LABELS, CATEGORY_ORDER, definitionText,
-  type ConflictChoice, type Decisions, type ProjectChoice, type SyncPreview,
+  type ApplySkipped, type ConflictChoice, type Decisions, type ProjectChoice, type SyncPreview,
 } from '@/composables/formula/useFormulaSettings'
 
 defineOptions({ name: 'FormulaPublishPreviewDialog' })
@@ -165,6 +173,8 @@ watch(() => props.preview, () => {
   note.value = ''
 })
 
+const SKIPPED_SHOWN = 5
+const skipped = computed<ApplySkipped[]>(() => props.preview?.skipped || [])
 const changes = computed(() => props.preview?.changes || [])
 const hasSlotVersions = computed(() => changes.value.some((r: any) => r.old_version != null || r.new_version != null))
 const versionProblems = computed(() => props.preview?.version_problems || [])

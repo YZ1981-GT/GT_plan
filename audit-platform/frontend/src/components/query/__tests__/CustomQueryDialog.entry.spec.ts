@@ -117,6 +117,47 @@ describe('入口说明（R10.5，AQ-38）', () => {
   })
 })
 
+/** 试算表 1002 右键「按此查询明细」带来的入口（形状同 QueryDetailEntry.spec 的事件载荷） */
+const W6_ENTRY = {
+  kind: 'tb_row', projectId: 'p1', year: 2025, source: 'ledger_entries',
+  filters: { account_code: '1002' }, label: '试算表 1002 银行存款',
+  switches: [{ source: 'account_balance', label: '科目余额' }],
+}
+const executeCalls = () => apiMocks.post.mock.calls.filter(([url]) => url === '/api/custom-query/execute')
+
+describe('业务页入口（W6，ADR-AQL-20）：打开即套用并查询一次', () => {
+  it('首次挂载时已可见且带入口（布局首次打开才挂载本弹窗）：照样立即查询，不抛 TDZ', async () => {
+    // 2026-11-04 候选栈浏览器实测：immediate watch 注册在 templateRun 等声明之前 ⇒ 这里抛
+    // 「Cannot access 'templateRun' before initialization」、被 void 吞掉，只套了上下文、一次都没查。
+    const rejections: unknown[] = []
+    const onRejection = (reason: unknown) => { rejections.push(reason) }
+    process.on('unhandledRejection', onRejection)
+    try {
+      const w = await mountDialog({ entry: W6_ENTRY })
+      await flushPromises()
+      expect(rejections, String(rejections[0])).toEqual([])
+      const calls = executeCalls()
+      expect(calls).toHaveLength(1)
+      expect(calls[0][1]).toMatchObject({
+        project_id: 'p1', year: 2025, source: 'ledger_entries', filters: { account_code: '1002' },
+      })
+      expect(w.vm.hasQueried).toBe(true)
+      expect(w.vm.queryEntry.entry.value?.label).toBe('试算表 1002 银行存款')
+    } finally {
+      process.off('unhandledRejection', onRejection)
+    }
+  })
+
+  it('已挂载（关着）后再带入口打开：同样只查一次', async () => {
+    const w = await mountDialog({ modelValue: false })
+    expect(executeCalls()).toHaveLength(0)
+    await w.setProps({ modelValue: true, entry: W6_ENTRY })
+    await flushPromises()
+    expect(executeCalls()).toHaveLength(1)
+    expect(executeCalls()[0][1]).toMatchObject({ source: 'ledger_entries', filters: { account_code: '1002' } })
+  })
+})
+
 describe('查询定义变化使旧结果失效', () => {
   it('查询后换数据源但没重新查询：旧结果不可继续导出', async () => {
     const w = await mountDialog({ initialSource: 'report_income_statement' })

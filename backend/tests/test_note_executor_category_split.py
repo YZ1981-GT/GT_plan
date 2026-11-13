@@ -125,6 +125,30 @@ class TestLogicCheckDoesNotWrite:
         assert len(result.get("checks", [])) >= 1
         check = result["checks"][0]
         assert check["status"] == "failed"  # 100 vs 999, diff >> 0.005
+        assert check["label"] == "未通过"
+        assert check["severity"] == "warning"
+
+    @pytest.mark.asyncio
+    async def test_logic_check_empty_target_still_does_not_write(self):
+        """校对类公式即使目标格为空也只返回结果，不因空值走 auto_calc 回写。"""
+        rows = [
+            {"values": [40.0], "label": "子项1"},
+            {"values": [60.0], "label": "子项2"},
+            {"values": [None], "label": "待校对合计"},
+        ]
+        formulas = {
+            "2:0": {
+                "type": "vertical_sum",
+                "expression": "SUM(0:1, 0)",
+                "category": "logic_check",
+            },
+        }
+        note = _fake_note(rows, formulas)
+        result = await _run_executor(note)
+
+        assert note.table_data["rows"][2]["values"][0] is None
+        assert result["updated"] == 0
+        assert result["checks"][0]["status"] == "not_executed"
 
     @pytest.mark.asyncio
     async def test_reasonability_no_writeback(self):

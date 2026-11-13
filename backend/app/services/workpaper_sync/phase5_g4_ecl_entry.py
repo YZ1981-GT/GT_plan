@@ -270,3 +270,119 @@ def register_adapter(
     )
     registry.register(registration)
     return registration
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 已发布冻结身份（`resolve_published_frozen_definitions`）
+#
+# 🔴 补齐原因（2026-11-04）：本模块的交付台账条目（`g4.ecl_stage`）早已登记，但这个函数一直缺位
+#    ⇒ Task 75 的四条判据（真 await 共享观测器 / 真 digest 比对 / 不无条件 raise / 消费 contract）
+#    在本 entry 上**没有分母**，等于从未被看过。形态与同册主 entry（`phase5_g4_bond_investment`）逐字同构：
+#    九步由 `published_identity_observer` 独家承载，本模块只做「观测 + 契约 digest 比对」。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+async def resolve_published_frozen_definitions(
+    *, session: Any, representation: Any, contract: SyncContract
+) -> Any:
+    """读已发布 representation 的冻结定义，并与 provider source-locked 的契约 digest 比对。
+
+    九步（bundle 当前性 / 定义完整性 / 结构漂移 / 身份绑定 …）只在共享观测器里实现一次；
+    本函数不得自己抄，否则任一侧被短路都不改变行为（第二真源）。
+    """
+    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+    from app.services.workpaper_sync.published_identity_observer import (
+        observe_published_frozen_definitions,
+    )
+    from app.services.workpaper_sync.resolution import CanonicalResolutionService
+
+    observation = await observe_published_frozen_definitions(
+        session=session,
+        resolution=CanonicalResolutionService(
+            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+        ),
+        representation=representation,
+        correlation_id=f"{ADAPTER_ID}@{getattr(representation, 'id', None)}",
+    )
+    if observation.definitions.contract.canonical_sha256 != contract.canonical_sha256:
+        raise EntrySelectionError(
+            f"entry {ENTRY_ID}: 观测器读出的契约 digest "
+            f"{observation.definitions.contract.canonical_sha256} "
+            f"与本模块 source-locked 的 {contract.canonical_sha256} 不一致"
+        )
+    return observation
+
+
+async def attach_pilot_adapters(
+    registry: WorkpaperSyncAdapterRegistry, *, session: Any
+) -> tuple[str, ...]:
+    """发布链编排：attach 本 entry 的 adapter（与同册主 entry `phase5_g4_bond_investment` 同构）。
+
+    🔴 补齐原因（2026-11-04）：本模块交付了契约与 `build_registration` / `register_adapter`，
+    却一直没有 attach 入口 —— 台账把本 entry 记作 delivered per-entry contract，而注册器
+    （`register_from_manifest`）按 `provider.attach_pilot_adapters` 逐 entry attach，属性缺位
+    就是「交付了但永远接不上」。早退顺序与同族一致：已注册 → capability 未裁决 → 无 published
+    representation → 无 definition bundle，每个早退都返回空元组，由 registry 侧换算成显式原因。
+    本 entry 的 capability 当前仍是 null（台账 reason 已写明），因此第二道早退会生效 ——
+    行为不变，但接线从此是**真的**存在，capability 裁决后无需再改接线。
+    """
+    if ADAPTER_ID in {reg.adapter_id for reg in registry.registrations()}:
+        return ()
+    if not manifest_capability_enabled():
+        return ()
+    import sqlalchemy as sa
+    from app.models.workpaper_sync_models import WorkpaperContentRepresentation
+    from app.services.workpaper_sync import entry_source_facts as facts
+    from app.services.workpaper_sync.adapters.excel import build_excel_adapter
+    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+    from app.services.workpaper_sync.entry_profile import (
+        load_entry_manifest,
+        manifest_entries_by_id,
+    )
+    from app.services.workpaper_sync.projection_target_resolution import (
+        resolve_visible_current_representation_id,
+    )
+    from app.services.workpaper_sync.resolution import CanonicalResolutionService
+
+    representation_id = await resolve_visible_current_representation_id(
+        session, entry_id=ENTRY_ID
+    )
+    if representation_id is None:
+        return ()
+    representation = (
+        await session.execute(
+            sa.select(WorkpaperContentRepresentation).where(
+                WorkpaperContentRepresentation.id == representation_id
+            )
+        )
+    ).scalar_one_or_none()
+    if representation is None or representation.definition_bundle_id is None:
+        return ()
+    resolution = CanonicalResolutionService(
+        session, CanonicalArtifactRepository(_BACKEND_ROOT)
+    )
+    bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)
+    contract = assert_contract_file_matches_source()
+    entry = manifest_entries_by_id(load_entry_manifest())[ENTRY_ID]
+    descriptor = facts.observe_descriptor_facts(entry)
+    if descriptor is None:
+        raise EntrySelectionError(f"entry {ENTRY_ID} 的宿主实测不可达")
+    observation = await resolve_published_frozen_definitions(
+        session=session, representation=representation, contract=contract
+    )
+    register_adapter(
+        registry,
+        adapter=build_excel_adapter(
+            definitions=observation.definitions,
+            binding=observation.identity_binding,
+            direction="html_to_oo",
+        ),
+        bundle=bundle,
+        descriptor=descriptor,
+        room=facts.observe_room_facts(entry),
+        contract=contract,
+    )
+    return (ADAPTER_ID,)
+
+
+attach_adapters = attach_pilot_adapters

@@ -242,15 +242,15 @@ class TestVoucherUnitAndPhase:
 
 
 def _registered(name: str | None, *, wp: uuid.UUID | None, no: str | None = None, batch: bool = True,
-                deleted: bool = False) -> SampledVoucher:
+                deleted: bool = False, account: str | None = None) -> SampledVoucher:
     """登记行：name 给出时按凭证键（V210 起的写法）；name=None 时是只有凭证号的旧行（日期等为空）。"""
     if name is None:
-        return SampledVoucher(id=uuid.uuid4(), project_id=_PID, year=_YEAR, voucher_no=no,
+        return SampledVoucher(id=uuid.uuid4(), project_id=_PID, year=_YEAR, voucher_no=no, account_code=account,
                               working_paper_id=wp, batch_id=uuid.uuid4() if batch else None, is_deleted=deleted)
     vk = _vk(name)
     return SampledVoucher(
         id=uuid.uuid4(), project_id=_PID, year=_YEAR, voucher_no=vk.voucher_no, voucher_date=vk.date_value,
-        company_code=vk.company_code, voucher_type=vk.voucher_type, working_paper_id=wp,
+        company_code=vk.company_code, voucher_type=vk.voucher_type, working_paper_id=wp, account_code=account,
         batch_id=uuid.uuid4() if batch else None, is_deleted=deleted,
     )
 
@@ -311,6 +311,19 @@ class TestRegistryByVoucherKey:
         # 按号会把三张「0003」算成被 3 个底稿抽过；按凭证键只有 FY-0003 被两个底稿抽过
         assert [(d["voucher_key"], d["workpaper_count"], d["legacy"]) for d in dup] == [
             (_vk("FY-0003").to_str(), 2, False)]
+
+    async def test_coverage_duplicated_carries_an_account_for_ledger_link(self, db):
+        """抽样增强页「序时账」入口要科目（序时账凭证层地址必须带科目）：取组内一个登记科目；
+        都没登记科目时为 None，页面不给入口（spec voucher-workflow-linkage-lineage-closure R4.5）。"""
+        wp1, wp2 = uuid.uuid4(), uuid.uuid4()
+        db.add_all([
+            _registered("FY-0003", wp=wp1, account="1122.01"), _registered("FY-0003", wp=wp2, account="1122"),
+            _registered("ZZ-0003", wp=wp1), _registered("ZZ-0003", wp=wp2),
+        ])
+        await db.flush()
+        dup = {d["voucher_key"]: d for d in (await project_sampling_coverage(db, _PID, _YEAR))["duplicated"]}
+        assert dup[_vk("FY-0003").to_str()]["account_code"] == "1122"
+        assert dup[_vk("ZZ-0003").to_str()]["account_code"] is None
 
 
 # ─── 幂等键：按分录指纹 / 凭证键，旧日志与改造前逐字相同 ─────────────────────────

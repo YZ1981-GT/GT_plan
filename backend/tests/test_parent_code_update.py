@@ -26,7 +26,7 @@ from datetime import date
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -141,7 +141,7 @@ async def test_update_parent_code_success(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_B]}/parent-code",
-            json={"parent_company_code": ULTIMATE},
+            json={"parent_company_code": ULTIMATE, "expected_parent_company_code": CODE_A},
         )
 
     assert resp.status_code == 200, resp.text
@@ -164,13 +164,101 @@ async def test_update_parent_code_detach_to_top(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_B]}/parent-code",
-            json={"parent_company_code": ""},
+            json={"parent_company_code": "", "expected_parent_company_code": CODE_A},
         )
 
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["parent_company_code"] is None
     assert data["parent_project_id"] == str(ids[ULTIMATE])
+
+
+@pytest.mark.asyncio
+async def test_expected_parent_code_missing_returns_428_without_write(db_session: AsyncSession):
+    """CAS 期望值缺失必须拒绝，不能把缺失当成显式 null 或无校验。"""
+    ids = await _seed(db_session)
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.patch(
+            f"/api/projects/{ids[CODE_B]}/parent-code",
+            json={"parent_company_code": ULTIMATE},
+        )
+
+    assert resp.status_code == 428, resp.text
+    assert resp.json()["detail"] == "请刷新企业树后重试（缺少改前上级）"
+    db_session.expire_all()
+    assert (await db_session.get(Project, ids[CODE_B])).parent_company_code == CODE_A
+
+
+@pytest.mark.asyncio
+async def test_stale_expected_parent_returns_409_and_keeps_both_scopes(db_session: AsyncSession):
+    """锁后读到的当前上级与旧期望值不一致时，409 且两口径都不写。"""
+    ids = await _seed(db_session)
+    standalone_id = uuid.uuid4()
+    db_session.add(Project(
+        id=standalone_id,
+        name="子公司B_单户_2025",
+        client_name="子公司B",
+        company_code=CODE_B,
+        parent_company_code=CODE_A,
+        ultimate_company_code=ULTIMATE,
+        report_scope="standalone",
+        audit_year=2025,
+        audit_period_end=date(2025, 12, 31),
+    ))
+    await db_session.commit()
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.patch(
+            f"/api/projects/{ids[CODE_B]}/parent-code",
+            json={"parent_company_code": ULTIMATE, "expected_parent_company_code": ULTIMATE},
+        )
+
+    assert resp.status_code == 409, resp.text
+    detail = resp.json()["detail"]
+    assert detail == {
+        "error_code": "PARENT_CODE_CONFLICT",
+        "message": "企业树已被他人调整，已刷新为最新结构",
+        "current_parent_company_code": CODE_A,
+    }
+    db_session.expire_all()
+    assert (await db_session.get(Project, ids[CODE_B])).parent_company_code == CODE_A
+    assert (await db_session.get(Project, standalone_id)).parent_company_code == CODE_A
+
+
+@pytest.mark.asyncio
+async def test_expected_parent_code_normalizes_before_cas(db_session: AsyncSession):
+    """期望值比较与存储值使用同一规范化规则。"""
+    ids = await _seed(db_session)
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.patch(
+            f"/api/projects/{ids[CODE_B]}/parent-code",
+            json={
+                "parent_company_code": ULTIMATE,
+                "expected_parent_company_code": f"  {CODE_A.lower()}  ",
+            },
+        )
+
+    assert resp.status_code == 200, resp.text
+    db_session.expire_all()
+    assert (await db_session.get(Project, ids[CODE_B])).parent_company_code == ULTIMATE
+
+
+@pytest.mark.asyncio
+async def test_explicit_null_expected_parent_is_valid_for_unparented_project(db_session: AsyncSession):
+    """显式 null 表示调用方看到无上级，允许无上级项目继续提交。"""
+    ids = await _seed(db_session)
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.patch(
+            f"/api/projects/{ids[ULTIMATE]}/parent-code",
+            json={"parent_company_code": None, "expected_parent_company_code": None},
+        )
+
+    assert resp.status_code == 200, resp.text
+    db_session.expire_all()
+    assert (await db_session.get(Project, ids[ULTIMATE])).parent_company_code is None
 
 
 @pytest.mark.asyncio
@@ -181,7 +269,7 @@ async def test_self_parent_accepted_as_top(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_A]}/parent-code",
-            json={"parent_company_code": CODE_A},
+            json={"parent_company_code": CODE_A, "expected_parent_company_code": ULTIMATE},
         )
 
     assert resp.status_code == 200, resp.text
@@ -196,7 +284,7 @@ async def test_invalid_uscc_rejected(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_B]}/parent-code",
-            json={"parent_company_code": "9111000000000000AA"},
+            json={"parent_company_code": "9111000000000000AA", "expected_parent_company_code": CODE_A},
         )
 
     assert resp.status_code == 422, resp.text
@@ -215,7 +303,7 @@ async def test_cycle_rejected(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_A]}/parent-code",
-            json={"parent_company_code": CODE_B},
+            json={"parent_company_code": CODE_B, "expected_parent_company_code": ULTIMATE},
         )
 
     assert resp.status_code == 400, resp.text
@@ -231,7 +319,7 @@ async def test_parent_nonexistent_code_allowed(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_B]}/parent-code",
-            json={"parent_company_code": ghost_code},
+            json={"parent_company_code": ghost_code, "expected_parent_company_code": CODE_A},
         )
 
     assert resp.status_code == 200, resp.text
@@ -248,7 +336,47 @@ async def test_update_parent_code_project_not_found(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{uuid.uuid4()}/parent-code",
-            json={"parent_company_code": ULTIMATE},
+            json={"parent_company_code": ULTIMATE, "expected_parent_company_code": None},
         )
 
     assert resp.status_code == 404, resp.text
+
+
+@pytest.mark.asyncio
+async def test_expected_parent_code_is_checked_after_topology_lock_refresh(db_session, monkeypatch):
+    """确定性模拟并发改上级：锁内刷新后必须拒绝覆盖较新的上级。"""
+    ids = await _seed(db_session)
+    project = await db_session.get(Project, ids[CODE_B])
+    assert project is not None
+    observed = False
+
+    async def _interleaved_topology_update(db, years):
+        nonlocal observed
+        observed = True
+        latest = await db.get(Project, ids[CODE_B])
+        assert latest is not None
+        latest.parent_company_code = ULTIMATE
+        await db.flush()
+        return tuple(years)
+
+    from app.services import group_topology_lock
+    from app.services.group_links import reparent_project
+
+    monkeypatch.setattr(group_topology_lock, "lock_topology_years", _interleaved_topology_update)
+    with pytest.raises(HTTPException) as raised:
+        await reparent_project(
+            db_session,
+            project,
+            CODE_A,
+            expected_parent_code=CODE_A,
+        )
+
+    assert observed, "并发时序桩未执行，测试没有覆盖锁边界"
+    assert raised.value.status_code == 409
+    assert raised.value.detail == {
+        "error_code": "PARENT_CODE_CONFLICT",
+        "message": "企业树已被他人调整，已刷新为最新结构",
+        "current_parent_company_code": ULTIMATE,
+    }
+    await db_session.refresh(project)
+    assert project.parent_company_code == ULTIMATE, "CAS 冲突不得覆盖并发更新"

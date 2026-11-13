@@ -69,7 +69,9 @@ class QC19MandatoryTrimRule(GateRule):
             # 不向上抛（单规则失败不阻断整体评估），但必须留 traceback ——
             # 原实现正是靠丢弃它把「列不存在」静默成了「通过」。
             logger.error(f"[QC-19] check error: {e}", exc_info=True)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-20: conditional 裁剪无证据阻断 ──────────────────────────
@@ -112,7 +114,9 @@ class QC20ConditionalNoEvidenceRule(GateRule):
             )
         except Exception as e:
             logger.error(f"[QC-20] check error: {e}", exc_info=True)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-21: 关键结论缺少证据锚点 ───────────────────────────────
@@ -154,7 +158,9 @@ class QC21ConclusionWithoutEvidenceRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[QC-21] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-22: 低置信单点依赖 ──────────────────────────────────────
@@ -194,7 +200,9 @@ class QC22LowConfidenceSingleSourceRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[QC-22] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-23: LLM 关键内容未确认 ──────────────────────────────────
@@ -246,7 +254,9 @@ class QC23LLMPendingConfirmationRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[QC-23] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-24: LLM 采纳与裁剪冲突 ─────────────────────────────────
@@ -287,7 +297,9 @@ class QC24LLMTrimConflictRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[QC-24] check error: {e}", exc_info=True)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-25: 正文引用附注版本过期 ────────────────────────────────
@@ -316,7 +328,9 @@ class QC25ReportNoteVersionStaleRule(GateRule):
                 text("SELECT to_regclass('public.report_snapshot')")
             )).scalar()
             if exists is None:
-                return None
+                return self.not_applicable(
+                    "审计报告版本校验不适用：report_snapshot 表不存在（Phase 13 才创建）"
+                )
             result = await db.execute(stmt, {"project_id": str(project_id)})
             row = result.fetchone()
             if row:
@@ -331,8 +345,10 @@ class QC25ReportNoteVersionStaleRule(GateRule):
             return None
         except Exception as e:
             # report_snapshots 表可能不存在（Phase 13 才创建）
-            logger.debug(f"[QC-25] check skipped: {e}")
-            return None
+            logger.exception(f"[QC-25] check failed: {e}")
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── QC-26: 附注关键披露缺来源映射 ──────────────────────────────
@@ -356,10 +372,12 @@ class QC26NoteSourceMappingMissingRule(GateRule):
                   AND column_name IN ('is_key_disclosure', 'source_cells')
             """))).scalar() or 0
             if cols_exist < 2:
-                logger.debug(
-                    "[QC-26] check skipped: disclosure_notes 缺 is_key_disclosure/source_cells 列"
+                logger.warning(
+                    "[QC-26] check not applicable: disclosure_notes 缺 is_key_disclosure/source_cells 列"
                 )
-                return None
+                return self.not_applicable(
+                    "附注关键披露来源校验不适用：disclosure_notes 缺 is_key_disclosure / source_cells 列"
+                )
             # 检查附注关键披露是否缺少 source_cells 映射
             # 注：标题列真名 section_title（无 title 列）；上面列守卫使本查询当前不执行，
             # 但将来补上 is_key_disclosure/source_cells 后写错列名会立刻踩坑。
@@ -384,8 +402,10 @@ class QC26NoteSourceMappingMissingRule(GateRule):
             )
         except Exception as e:
             # disclosure_notes 表字段可能不完整
-            logger.debug(f"[QC-26] check skipped: {e}")
-            return None
+            logger.exception(f"[QC-26] check failed: {e}")
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── 规则注册 ───────────────────────────────────────────────────
@@ -405,6 +425,13 @@ class ConsistencyBlockingDiffRule(GateRule):
         try:
             from app.services.consistency_replay_engine import consistency_replay_engine
             result = await consistency_replay_engine.replay_consistency(db, project_id)
+            # 执行出错的层（如数据库不可用）⇒ 未执行，不能当成「无差异」放行；
+            # 尚未实现的层（报表→附注 / 附注→底稿 / 底稿→试算表）只在报告中标明，不阻断。
+            errored = [layer for layer in result.layers if getattr(layer, "errored", False)]
+            if errored:
+                return self.not_executed(
+                    "一致性复算未能执行：" + "；".join(layer.reason for layer in errored)[:200]
+                )
             if result.blocking_count > 0:
                 # 收集差异摘要
                 diff_summary = []
@@ -427,8 +454,10 @@ class ConsistencyBlockingDiffRule(GateRule):
                 )
             return None
         except Exception as e:
-            logger.debug(f"[CONSISTENCY-BLOCK] check skipped: {e}")
-            return None
+            logger.exception(f"[CONSISTENCY-BLOCK] check failed: {e}")
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 async def check_misstatement_exceeds_materiality(
@@ -512,7 +541,9 @@ class MisstatementExceedsMaterialityRule(GateRule):
             return None
         except Exception as e:
             logger.error(f"[GATE-MISSTATEMENT] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── R1-AJE-UNCONVERTED: rejected AJE 未转为错报（warning） ─────
@@ -600,8 +631,10 @@ class UnconvertedRejectedAJERule(GateRule):
                 ),
             )
         except Exception as e:
-            logger.debug(f"[R1-AJE-UNCONVERTED] check skipped: {e}")
-            return None
+            logger.exception(f"[R1-AJE-UNCONVERTED] check failed: {e}")
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── R1-EVENT-CASCADE: 事件级联消费健康（首次部署 warning，满月后 blocking） ─────
@@ -727,8 +760,10 @@ class EventCascadeHealthRule(GateRule):
             )
         except Exception as e:
             # 表不存在或 schema 差异时静默降级，避免把 gate 评估打爆
-            logger.debug(f"[R1-EVENT-CASCADE] check skipped: {e}")
-            return None
+            logger.exception(f"[R1-EVENT-CASCADE] check failed: {e}")
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 # ── R1-INDEPENDENCE: 独立性声明完整性检查（blocking） ─────────
@@ -858,8 +893,10 @@ class IndependenceDeclarationCompleteRule(GateRule):
                 suggested_action="请相关人员前往『独立性声明』页面填写并提交声明",
             )
         except Exception as e:
-            logger.debug(f"[R1-INDEPENDENCE] check skipped: {e}")
-            return None
+            logger.exception(f"[R1-INDEPENDENCE] check failed: {e}")
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
     @classmethod
     def _is_legacy_project(cls, created_at: Optional[datetime]) -> bool:

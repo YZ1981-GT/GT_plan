@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import random
 import uuid
+from dataclasses import replace
 
 import hypothesis.strategies as st
 import pytest
@@ -282,9 +283,20 @@ class TestExamples:
         result = derive_group_tree([g_c, g_s, h_c, a_s, a_c, b], g_c, Y)
         codes = {d.code for d in result.diagnostics}
         assert {"relation_conflict", "relation_defaulted"} <= codes
+        relation_conflict = next(d for d in result.diagnostics if d.code == "relation_conflict")
+        assert set(relation_conflict.project_ids) == {str(a_s.id), str(a_c.id)}
+        assert relation_conflict.to_dict()["project_ids"] == [str(a_s.id), str(a_c.id)]
         # 单户优先：A 在 G 下（且 A 有合并项目 ⇒ 三节点）
         assert find_node_by_key(result.root, "A:consol") in result.root.children
         assert "relation_defaulted" in find_node_by_key(result.root, "B:subsidiary").flags
+
+    def test_duplicate_project_diagnostic_contains_selected_and_duplicate_ids(self):
+        g_c, g_s = consol("G", "某集团"), rec("G", "某集团")
+        duplicate = replace(g_c, id=_id("G/consolidated/duplicate"), client_name="重复集团")
+        result = derive_group_tree([g_c, duplicate, g_s], g_c, Y)
+        duplicate_diag = next(d for d in result.diagnostics if d.code == "duplicate_project")
+        assert set(duplicate_diag.project_ids) == {str(g_c.id), str(duplicate.id)}
+        assert duplicate_diag.to_dict()["project_ids"] == [str(g_c.id), str(duplicate.id)]
 
     def test_root_not_consolidated_returns_lone_node(self):
         a = rec("A", "甲公司")

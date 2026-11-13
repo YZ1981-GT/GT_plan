@@ -61,6 +61,52 @@ def mock_settings():
     return settings
 
 
+def _route_for(endpoint: str, *, implicit: bool = True, client_data: bool | None = None,
+               model_name: str = "bge-m3"):
+    """构造一条向量路由（与 ``resolve_route`` / ``AIService.embedding_route`` 返回同形）。
+
+    向量健康改按平台实际向量路由判定（spec enterprise-embedding-rerank-closure R12），
+    用例不再靠替换 ``settings.LLM_EMBEDDING_BASE_URL``，而是注入路由加载结果。
+    """
+    from app.models.ai_model_options import classify_deployment
+    from app.models.ai_models import AIModelType, AIProvider
+    from app.services.llm_provider_registry import provider_profile
+    from app.services.llm_runtime import LLMRuntimeError, ResolvedLLMConfig, RouteCandidate
+
+    deployment = classify_deployment(endpoint_url=endpoint)
+    allowed_flag = (deployment == "local") if client_data is None else client_data
+    config = ResolvedLLMConfig(
+        model_name=model_name, model_type=AIModelType.embedding, provider=AIProvider.openai_compatible,
+        endpoint_url=endpoint, api_key=None, profile=provider_profile(AIProvider.openai_compatible),
+        source="environment" if implicit else "database", deployment=deployment,
+        trust_zone="local_device" if deployment == "local" else "firm_private", client_data_allowed=allowed_flag,
+    )
+    candidate = RouteCandidate(model_name, deployment, None, config, implicit=implicit)
+    allowed = [candidate] if allowed_flag else LLMRuntimeError(
+        "route_policy_denied", "没有允许处理客户数据的候选", kind="config"
+    )
+    return [candidate], allowed
+
+
+def _patch_embedding_route(endpoint: str, **kwargs):
+    return patch(
+        "app.services.ai_chat.capability_endpoint._load_embedding_routes",
+        AsyncMock(return_value=_route_for(endpoint, **kwargs)),
+    )
+
+
+#: 真实的路由加载函数（autouse 注入之前取引用；真实会话用例要用它）
+_REAL_LOAD_EMBEDDING_ROUTES = capability_endpoint._load_embedding_routes
+
+
+@pytest.fixture(autouse=True)
+def _embedding_route_is_local_env_by_default():
+    """本文件的启动自检用例默认注入本机 ``.env`` 向量路由：不连共享库（``asyncio.run`` 的临时事件循环
+    会把连接留在全局连接池里，毒化后续用例）。需要别的路由的用例在里面再套一层 ``_patch_embedding_route``。"""
+    with _patch_embedding_route("http://localhost:8101/v1"):
+        yield
+
+
 # ===========================================================================
 # 1. /capabilities 端点返回正确 engine + capabilities
 # ===========================================================================
@@ -265,10 +311,9 @@ class TestStartupLocalOnlyCheck:
 
     @pytest.mark.asyncio
     async def test_cloud_embedding_fails_local_only(self, mock_settings):
-        """cloud embedding endpoint → local_only_violation。"""
-        mock_settings.LLM_EMBEDDING_BASE_URL = "https://api.deepseek.com/v1"
-
+        """实际向量路由指向 cloud endpoint → local_only_violation。"""
         with patch("app.core.config.settings", mock_settings), \
+             _patch_embedding_route("https://api.deepseek.com/v1"), \
              patch("app.services.ai_chat.startup_health._audit_violations", new_callable=AsyncMock):
             from app.services.ai_chat.startup_health import run_ai_chat_startup_health_check
 
@@ -321,9 +366,8 @@ class TestSeparateHealthErrors:
     @pytest.mark.asyncio
     async def test_embedding_error_code_is_not_engine_unavailable(self, mock_settings):
         """embedding violation 用 local_only_violation，不用 engine_unavailable。"""
-        mock_settings.LLM_EMBEDDING_BASE_URL = "https://api.anthropic.com/v1"
-
         with patch("app.core.config.settings", mock_settings), \
+             _patch_embedding_route("https://api.anthropic.com/v1"), \
              patch("app.services.ai_chat.startup_health._audit_violations", new_callable=AsyncMock):
             from app.services.ai_chat.startup_health import run_ai_chat_startup_health_check
 
@@ -415,11 +459,19 @@ class TestCapabilityEndpointLocalOnly:
         assert h.error_code != "local_only_violation"
 
     def test_cloud_embedding_endpoint_reported_local_only_violation(self, mock_settings):
-        """embedding 侧同样要判 local-only（与 model 各自独立报告）。"""
-        mock_settings.LLM_EMBEDDING_BASE_URL = "https://api.deepseek.com/v1"
-        h = self._health(mock_settings, "embedding")
+        """embedding 侧同样要判 local-only（与 model 各自独立报告）：按实际向量路由。"""
+        from app.services.ai_chat.capability_endpoint import (
+            _collect_service_health,
+            embedding_route_health,
+        )
+
+        with _patch_embedding_route("https://api.deepseek.com/v1"):
+            embedding = asyncio.run(embedding_route_health())
+        with patch("app.core.config.settings", mock_settings):
+            h = _collect_service_health(embedding_health=embedding)["embedding"]
         assert h.available is False
         assert h.error_code == "local_only_violation"
+        assert "bge-m3" in h.message and ".env 默认" in h.message
 
     def test_capabilities_health_matches_startup_health_verdict(self, mock_settings):
         """两套 local-only 实现对同一 settings 必须给出**一致结论**。
@@ -451,6 +503,93 @@ class TestCapabilityEndpointLocalOnly:
                 f"({cap_health.available} vs {startup_check.ok})"
             )
             assert cap_health.error_code == startup_check.error_code
+
+
+class TestEmbeddingRouteHealth:
+    """向量健康按平台实际向量路由判定，而不是 ``.env`` 字符串（spec enterprise-embedding-rerank-closure R12）。"""
+
+    def test_database_preset_route_wins_over_env_string(self, mock_settings):
+        """库里启用了企业向量预设：即使 ``.env`` 写的是云端地址也按预设判定（受信端点 ⇒ 可用）。"""
+        from app.services.ai_chat.capability_endpoint import embedding_route_health
+
+        mock_settings.LLM_EMBEDDING_BASE_URL = "https://api.deepseek.com/v1"
+        with patch("app.core.config.settings", mock_settings), _patch_embedding_route(
+            "https://ai.gt-china.com.cn:10010/v1", implicit=False, client_data=True, model_name="wemm-embedding-4b",
+        ):
+            h = asyncio.run(embedding_route_health())
+        assert h.available is True and h.error_code is None
+        assert "wemm-embedding-4b" in h.message and "服务器" in h.message and ".env" not in h.message
+
+    def test_policy_denied_route_is_semantic_unavailable(self):
+        """受信端点但不允许处理客户数据：平台本就不会用它检索 ⇒ semantic_unavailable（不是违规）。"""
+        from app.services.ai_chat.capability_endpoint import embedding_route_health
+
+        with _patch_embedding_route("https://ai.gt-china.com.cn:10010/v1", implicit=False, client_data=False):
+            h = asyncio.run(embedding_route_health())
+        assert h.available is False and h.error_code == "semantic_unavailable"
+        assert "信任策略" in h.message
+
+    def test_route_load_failure_is_reported_without_details(self):
+        from app.services.ai_chat.capability_endpoint import embedding_route_health
+
+        with patch(
+            "app.services.ai_chat.capability_endpoint._load_embedding_routes",
+            AsyncMock(side_effect=ConnectionError("db at 10.0.0.5:5432 refused")),
+        ):
+            h = asyncio.run(embedding_route_health())
+        assert h.available is False and h.error_code == "semantic_unavailable"
+        assert "ConnectionError" in h.message and "10.0.0.5" not in h.message
+
+    def test_unchecked_embedding_is_not_reported_available(self, mock_settings):
+        from app.services.ai_chat.capability_endpoint import _collect_service_health
+
+        with patch("app.core.config.settings", mock_settings):
+            h = _collect_service_health()["embedding"]
+        assert h.available is False and "未检查" in h.message
+
+    def test_capabilities_and_startup_share_the_embedding_verdict(self, mock_settings):
+        from app.services.ai_chat.capability_endpoint import embedding_route_health
+        from app.services.ai_chat.startup_health import run_ai_chat_startup_health_check
+
+        for endpoint, expect_ok in (("http://localhost:8101/v1", True), ("https://api.openai.com/v1", False)):
+            with _patch_embedding_route(endpoint):
+                cap = asyncio.run(embedding_route_health())
+                with patch("app.core.config.settings", mock_settings), patch(
+                    "app.services.ai_chat.startup_health._audit_violations", new_callable=AsyncMock,
+                ):
+                    report = asyncio.run(run_ai_chat_startup_health_check())
+            startup = next(c for c in report.checks if c.service == "embedding")
+            assert cap.available is expect_ok and startup.ok is expect_ok, endpoint
+            assert cap.error_code == startup.error_code, endpoint
+
+    def test_real_session_reads_the_enabled_preset_row(self):
+        """真实会话：启用的企业向量预设行 → 可用（经 resolve_route + AIService.embedding_route）。"""
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+        from app.models.ai_models import AIModelConfig
+        from app.services.ai_chat.capability_endpoint import embedding_route_health
+        from app.services.ai_model_presets import GT_WEMM_EMBEDDING_4B
+
+        async def _run():
+            sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+            async with sqlite_engine.begin() as conn:
+                await conn.run_sync(AIModelConfig.__table__.create)
+            factory = async_sessionmaker(sqlite_engine, expire_on_commit=False)
+            async with factory() as db:
+                row = AIModelConfig(**GT_WEMM_EMBEDDING_4B.orm_values())
+                row.is_active, row.deployment = True, "server"
+                row.trust_zone, row.client_data_allowed, row.mask_policy = "firm_private", True, "strict"
+                db.add(row)
+                await db.commit()
+                health = await embedding_route_health(db)
+            await sqlite_engine.dispose()
+            return health
+
+        # 撤掉本文件 autouse 注入，走真实加载（resolve_route + AIService.embedding_route）
+        with patch("app.services.ai_chat.capability_endpoint._load_embedding_routes", _REAL_LOAD_EMBEDDING_ROUTES):
+            h = asyncio.run(_run())
+        assert h.available is True, h.message
+        assert "wemm-embedding-4b" in h.message and "服务器" in h.message
 
 
 # ===========================================================================
@@ -514,6 +653,7 @@ class TestStartupScriptNoDshWebUi:
         assert "bin.js web --port" not in content, \
             "start-dev.bat 仍在启动 DSH Web UI（应移除 iframe 依赖）"
 
-        # 应该有 SDK runtime 检查提示
-        assert "DshEngine" in content or "SDK runtime" in content or "vendor read-only" in content, \
-            "start-dev.bat 应包含 SDK runtime 检查信息"
+        # 后端启动步骤接管 DSH runtime：不再启动独立 Web UI。判当前真实的启动提示，
+        # 不把旧组件名（DshEngine）或旧文案（vendor read-only）当作契约。
+        assert "DSH Agent is managed by the backend runtime" in content, \
+            "start-dev.bat 应明确 DSH 由后端 runtime 管理"

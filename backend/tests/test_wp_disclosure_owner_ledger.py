@@ -255,6 +255,12 @@ def _no_push_states() -> MagicMock:
     return result
 
 
+def _stale_cleared() -> MagicMock:
+    result = MagicMock()
+    result.rowcount = 1
+    return result
+
+
 @pytest.mark.asyncio
 async def test_manual_override_does_not_advance_owner_ledger(monkeypatch):
     original = _table_data(owners={"G7:soe": _entry("旧表")})
@@ -291,7 +297,8 @@ async def test_sync_from_workpaper_applies_owner_replacement_to_persisted_note()
     )
     note.id = uuid.uuid4()
     db = MagicMock(spec=AsyncSession)
-    db.execute = AsyncMock(side_effect=[_project_row(), _scalar(note), _no_push_states()])
+    # 第 4 条：同步成功后经统一入口清过期（spec formula-writer-ownership-and-stale R2：stale_state.clear_note_stale 一条 UPDATE）
+    db.execute = AsyncMock(side_effect=[_project_row(), _scalar(note), _no_push_states(), _stale_cleared()])
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
 

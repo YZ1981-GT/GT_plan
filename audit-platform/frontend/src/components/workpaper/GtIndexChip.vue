@@ -81,7 +81,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
-import { useAcnr, type AcnrResolveResult } from '@/services/acnr'
+import { getProjectRegistryFailure, useAcnr, type AcnrResolveResult } from '@/services/acnr'
+import { isAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
 import { BUNDLE_SHEET_ALIASES } from './bundleSheetAliases'
 import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
@@ -174,7 +175,7 @@ const displayText = computed(() => {
 })
 
 const chipType = computed<'primary' | 'info' | 'success' | 'warning' | 'danger'>(() => {
-  if (props.disabled) return 'info'
+  if (props.disabled || registryFailure.value) return 'info'
   if (resolveStatus.value === 'exists') return 'primary'  // 默认色（element-plus v2 起 '' 已废弃）
   if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return 'info'
   if (resolveStatus.value === 'error') return 'danger'
@@ -187,8 +188,14 @@ const chipEffect = computed(() => {
 })
 
 /** Adj 是模块级业务引用，ACNR 暂无物理地址时仍可按编号进入调整大厅。 */
+const registryFailureResult = computed<AcnrResolveResult | null>(() => {
+  if (isAcnrRegistryFailure(acnrResult.value)) return acnrResult.value
+  return getProjectRegistryFailure(projectId.value || undefined)
+})
+const registryFailure = computed(() => isAcnrRegistryFailure(registryFailureResult.value))
+
 const isKeyboardNavigable = computed(() => {
-  if (!parsed.value || props.disabled || isCrossProject.value) return false
+  if (!parsed.value || props.disabled || isCrossProject.value || registryFailure.value) return false
   if (props.preventNavigate) return true
   if (resolveStatus.value === 'trimmed') return false
   return resolveStatus.value !== 'not_exists' || parsed.value.ns === 'Adj'
@@ -197,7 +204,7 @@ const isKeyboardNavigable = computed(() => {
 const chipClass = computed(() => {
   const classes = ['gt-index-chip']
   if (isKeyboardNavigable.value) classes.push('gt-index-chip--clickable')
-  if (props.disabled || isCrossProject.value
+  if (props.disabled || isCrossProject.value || registryFailure.value
     || (resolveStatus.value === 'trimmed')
     || (resolveStatus.value === 'not_exists' && parsed.value?.ns !== 'Adj')) {
     classes.push('gt-index-chip--disabled')
@@ -215,6 +222,10 @@ const tooltipContent = computed(() => {
 
   if (isCrossProject.value) {
     return '跨项目引用，不可跳转'
+  }
+
+  if (registryFailure.value) {
+    return registryFailureResult.value?.reason || '地址目录版本不可用，请联系管理员处理'
   }
 
   if (resolveStatus.value === 'not_exists') {
@@ -386,6 +397,9 @@ function handleClick() {
 }
 
 function handleMultiTargetSelect(target: string) {
+  // 多目标下拉、preventNavigate 内联弹窗与 Adj 的普通 miss 都曾绕开样式层的禁用判断。
+  // 目录治理错误是项目级终态，所有交互入口必须共用同一门禁。
+  if (registryFailure.value) return
   const ref = parseIndexRef(target)
   if (!ref) return
   if (isCrossProject.value) return
@@ -395,6 +409,7 @@ function handleMultiTargetSelect(target: string) {
 }
 
 function navigateToTarget(resolved: ResolvedIndexRef) {
+  if (registryFailure.value) return // 防御层：任何未来直接调用也不能绕过终态门禁
   const pid = projectId.value
   if (!pid) return
 

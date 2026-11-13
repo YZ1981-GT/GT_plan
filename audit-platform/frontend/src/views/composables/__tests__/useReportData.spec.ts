@@ -48,6 +48,7 @@ vi.mock('@/utils/errorHandler', () => ({
 import { ElMessage } from 'element-plus'
 import { generateReports, getReport, getReportConsistencyCheck } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { showGuide } from '@/composables/useWorkflowGuide'
 
 import { useReportData } from '../useReportData'
 
@@ -86,8 +87,9 @@ function makeFakeRows(n = 3): ReportRow[] {
 
 describe('useReportData — fetchReport', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockGetReportConsistencyCheck.mockResolvedValue({ consistent: true })
+    vi.resetAllMocks()
+    vi.mocked(showGuide).mockResolvedValue(true)
+    mockGetReportConsistencyCheck.mockResolvedValue({ consistent: null, noResult: true, checks: [] })
   })
 
   it('calls getReport with correct params and sets rows', async () => {
@@ -113,15 +115,31 @@ describe('useReportData — fetchReport', () => {
     expect(balanceCheckResult.value).toBeNull()
   })
 
-  it('审核有未通过项时出横幅并给出未通过数', async () => {
+  it('审核按真实明细显示通过及未通过数，不从汇总反推', async () => {
     mockGetReport.mockResolvedValue(makeFakeRows())
+    const base = { category: 'logic_check', category_label: '勾稽', formula: null, source: 'synthetic' }
     mockGetReportConsistencyCheck.mockResolvedValue({
-      consistent: false, noResult: false, checks: [], total: 3, logic_check_passed: 1, reasonability_passed: 0,
-    } as any)
+      consistent: false, noResult: false, total: 99, logic_check_passed: 98,
+      checks: [
+        { ...base, name: '通过项', status: 'passed' },
+        { ...base, name: '失败甲', status: 'failed' },
+        { ...base, name: '失败乙', status: 'failed' },
+      ],
+    })
     const { fetchReport, balanceCheckResult } = useReportData(createOptions())
     await fetchReport()
     expect(balanceCheckResult.value?.status).toBe('warning')
-    expect(balanceCheckResult.value?.message).toBe('自动校对：3 项审核，2 项未通过')
+    expect(balanceCheckResult.value?.counts).toEqual({ passed: 1, failed: 2, not_executed: 0, not_applicable: 0, error: 0 })
+    expect(balanceCheckResult.value?.message).toContain('审核明细 3 项')
+  })
+
+  it('只有 consistent/total 汇总而没有明细时显示未验证', async () => {
+    mockGetReport.mockResolvedValue(makeFakeRows())
+    mockGetReportConsistencyCheck.mockResolvedValue({ consistent: true, noResult: false, checks: [], total: 7 })
+    const { fetchReport, balanceCheckResult } = useReportData(createOptions())
+    await fetchReport()
+    expect(balanceCheckResult.value?.status).toBe('unverified')
+    expect(balanceCheckResult.value?.message).toContain('汇总信息不能证明检查通过')
   })
 
   it('in compare mode, calls getReport twice (audited + unadjusted) and sets compareRows', async () => {
@@ -171,8 +189,9 @@ describe('useReportData — fetchReport', () => {
 
 describe('useReportData — onGenerate', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockGetReportConsistencyCheck.mockResolvedValue({ consistent: true })
+    vi.resetAllMocks()
+    vi.mocked(showGuide).mockResolvedValue(true)
+    mockGetReportConsistencyCheck.mockResolvedValue({ consistent: null, noResult: true, checks: [] })
   })
 
   it('calls generateReports, shows ElMessage.success, then calls fetchReport', async () => {

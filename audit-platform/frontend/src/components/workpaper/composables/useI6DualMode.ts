@@ -13,7 +13,7 @@
  * Requirements: 1.1-1.10 (双模式)
  */
 import { ref, onMounted, type Ref } from 'vue'
-import http from '@/utils/http'
+import { fetchOnlyOfficeHealthy } from '../sync/onlyOfficeHealth'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,17 +70,14 @@ export function useI6DualMode(options: UseI6DualModeOptions) {
 
   // ─── OO 健康检查 ──────────────────────────────────────────────────────────
 
+  // 平台统一的 OnlyOffice 健康探针（sync/onlyOfficeHealth）。原先本地直调 `/workpapers/onlyoffice/health`
+  // （少 /api 前缀，拿到首页 HTML ⇒ 恒判不可用、在线编辑入口从不出现）。
   async function checkOOHealth(): Promise<boolean> {
     checking.value = true
     try {
-      const res = await http.get('/workpapers/onlyoffice/health', { _silent: true } as any)
-      const result = res.data
-      const healthy = result?.data?.healthy ?? result?.healthy ?? false
+      const healthy = await fetchOnlyOfficeHealthy()
       isOoAvailable.value = healthy
       return healthy
-    } catch {
-      isOoAvailable.value = false
-      return false
     } finally {
       checking.value = false
     }

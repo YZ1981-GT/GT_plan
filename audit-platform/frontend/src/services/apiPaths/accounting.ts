@@ -128,7 +128,13 @@ export const ledger = {
   voucherLinksQuery: (pid: string) => `/api/projects/${pid}/ledger/voucher-links/query`,
   // 凭证键 → 各可见底稿已取得的凭证证据（spec attachment-voucher-evidence-binding）
   voucherEvidenceQuery: (pid: string) => `/api/projects/${pid}/ledger/voucher-evidence/query`,
+  // 凭证键 → 各可见底稿凭证检查行的结论；本底稿手工挂凭里还没导入检查表的凭证（spec voucher-workflow-linkage-lineage-closure）
+  voucherConclusionsQuery: (pid: string) => `/api/projects/${pid}/ledger/voucher-conclusions/query`,
+  attachedVoucherStatus: (pid: string, wpId: string) =>
+    `/api/projects/${pid}/ledger/workpapers/${encodeURIComponent(wpId)}/attached-voucher-status`,
   years: (pid: string) => `/api/projects/${pid}/ledger/years`,
+  /** 余额表科目 → 对应底稿（审定表优先）；wp_id 为空 = 本项目尚未生成 */
+  accountWorkpapers: (pid: string) => `/api/projects/${pid}/ledger/account-workpapers`,
   validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
   smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,
   smartImport: (pid: string) => `/api/projects/${pid}/ledger/smart-import`,

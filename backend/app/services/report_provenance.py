@@ -12,7 +12,24 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from app.models.report_models import ReportGenerationRun
+from app.models.report_generation_models import ReportGenerationRun
+
+#: 单体报表运行与合并运行共用 ``report_generation_run``（V246 建表：status building / succeeded / failed / stale，
+#: calc_version 为整数；V251 的同名建表因 IF NOT EXISTS 不生效）。单体运行开始写 building、结束写 succeeded，
+#: 有失败行时 failed_rows > 0，对外显示为 partial（:func:`run_display_status`）。合并侧读取方都按 operation_id
+#: 关联，单体运行（operation_id 为空）不会被当成合并运行。
+RUN_BUILDING = "building"
+RUN_SUCCEEDED = "succeeded"
+
+
+def run_display_status(run: Any) -> str:
+    """运行状态的对外口径：running / succeeded / partial / failed / stale。"""
+    status = str(getattr(run, "status", "") or "")
+    if status == RUN_BUILDING:
+        return "running"
+    if status == RUN_SUCCEEDED and int(getattr(run, "failed_rows", 0) or 0) > 0:
+        return "partial"
+    return status
 
 
 @dataclass(frozen=True)
@@ -61,12 +78,7 @@ async def generation_context(
     db: Any, *, project_id: UUID, year: int, trigger: str,
     triggered_by: UUID | None, calc_version: str,
 ) -> AsyncIterator[ReportGenerationContext]:
-    """创建与本事务同生共死的 run，并在当前协程暴露其 fence。
-
-    表结构以 V246 为准（V251 的同名 CREATE TABLE IF NOT EXISTS 在已建表时被跳过）：
-    ``calc_version`` 列是整数、状态只认 building / succeeded / failed / stale。
-    ``calc_version`` 参数是写进来源信封的文字标签（如 ``report:2``），表里存整数版本号。
-    """
+    """创建与本事务同生共死的 run，并在当前协程暴露其 fence。"""
     from app.services.report_freshness import CALC_VERSION
 
     async with _lock(project_id, year):
@@ -74,7 +86,7 @@ async def generation_context(
         now = datetime.now(timezone.utc)
         run = ReportGenerationRun(
             project_id=project_id, year=year, trigger=trigger, triggered_by=triggered_by,
-            started_at=now, status="building", calc_version=CALC_VERSION,
+            started_at=now, status=RUN_BUILDING, calc_version=CALC_VERSION,  # 共享表列是整数；信封里的 calc_version 仍是 'report:N'
         )
         db.add(run)
         await db.flush()
@@ -95,10 +107,8 @@ async def finish_generation(db: Any, ctx: ReportGenerationContext, summary: Any)
     run.recomputed_rows = len(getattr(summary, "recomputed_rows", ()))
     run.failed_rows = len(getattr(summary, "failed_rows", ()))
     errors = [str(row.get("error") or "") for row in getattr(summary, "failed_rows", ())]
-    # 表里没有 error_summary 列（V246），失败原因写 error；有失败行时状态仍是 succeeded，
-    # 失败行数看 failed_rows（失败行保留旧值并记 calc_error，不算整次生成失败）。
     run.error = "；".join(error for error in errors if error)[:4000] or None
-    run.status = "succeeded"
+    run.status = RUN_SUCCEEDED  # 有失败行时 run_display_status 显示 partial
     run.finished_at = datetime.now(timezone.utc)
     await db.flush()
 

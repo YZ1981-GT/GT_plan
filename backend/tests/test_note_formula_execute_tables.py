@@ -97,11 +97,14 @@ async def test_every_table_gets_presets_written_to_tables(env):
     assert t0[2]["values"] == [1000.0, 600.0], "第 1 张表合计 = 明细之和（期初只有一行有数，照加）"
     assert td["rows"][2]["values"] == [1000.0, 600.0], "第 1 张表写进 _tables[0] 后顶层镜像跟着改"
     assert t1[5]["values"][0] == 1000.0 and t1[5]["values"][2] == 65.0, "第 2 张表合计：两个分类相加（其中明细不重复）"
-    assert t1[5]["values"][1] is None and t1[5]["values"][3] is None, "比例 / 损失率不加总"
+    # 比例 / 损失率不加总：合计行按本行派生（R2.1）—— 比例 100、损失率 = 65 ÷ 1000 × 100
+    assert t1[5]["values"][1] == 100.0 and t1[5]["values"][3] == 6.5, "比例 / 损失率按合计行派生，不是各行之和"
     assert [r["values"][4] for r in t1] == [80.0, 855.0, None, 570.0, 285.0, 935.0], "账面价值 = 余额 − 坏账准备"
+    assert t1[2]["values"][1] is None, "「其中：」标记行没有比例"
     assert {r["table_index"] for r in result["results"]} == {0, 1}
-    # 表一合计 2 格；表二合计 3 格（金额列 0 / 2 / 4）+ 明细行账面价值 4 格（「其中：」标记行不算）
-    assert result["updated"] == 2 + 3 + 4
+    # 表一合计 2 格；表二合计 3 格（金额列 0 / 2 / 4）+ 明细行账面价值 4 格（「其中：」标记行不算）+ 合计行比例 / 损失率 2 格
+    # （明细行比例 / 损失率与夹具值一致，不算更新）
+    assert result["updated"] == 2 + 3 + 4 + 2
 
 
 async def test_second_run_reports_no_update(env):
@@ -263,3 +266,20 @@ async def test_s5_editor_save_preserves_formula_provenance_sidecar(env):
     stored = await env["stored"]()
     assert stored["_formula_provenance"] == expected
     assert stored["_formula_provenance"]["note:八、5!2:0"]["applied_attempt"]["run_id"] == result["run_id"]
+
+async def test_ratio_with_blank_numerator_is_skipped_not_written_as_zero(env):
+    """比例 / 损失率：分子格为空 ⇒ 不算、不写 0，结果写明原因（R2.1，预设的 ``requires`` 在执行时生效）。
+
+    分母（合计行）有数时，严格求值也会把空分子按 0 算出 0% —— 没有这道判断，「按单项计提」没发生的表会被写满 0。
+    """
+    table = copy.deepcopy(BAD_DEBT)
+    table["rows"][0]["values"] = [None, None, None, None, None]  # 按单项计提：账面余额、坏账准备都没数
+    await env["add"](_td(AGING, table))
+    result = await env["run"]()
+    t1 = (await env["stored"]())["_tables"][1]["rows"]
+    assert t1[5]["values"][0] == 900.0, "合计照算（分母有数）"
+    assert t1[0]["values"][1] is None and t1[0]["values"][3] is None, "分子为空的比例 / 损失率留空，不写 0"
+    skipped = {r["cell"]: r.get("reason") for r in result["results"]
+               if r["table_index"] == 1 and r["status"] == "skipped"}
+    assert skipped.get("t1:0:1") == "本行金额为空，不算比例"
+

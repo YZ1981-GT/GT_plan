@@ -74,8 +74,15 @@ _SHEETS: dict[str, dict[str, Any]] = {
         "identity_key": "id", "first_data_row": 13, "last_data_row": 46, "footer_row": 48,
         # Frozen template A48 is「三、审计说明」without full-width colon.
         "managed_last_col": "I", "uuid_col": "J", "footer_marker": "三、审计说明", "formula_mask": (),
+        # 🔴 A 列**不入受管字段集**（spec wp-sync-conflict-adjudication-and-d4-32-modeling
+        #    ADR-D432-001）。权威模板 A11 逐字是「序号」，A13..A46 是模板自增序号（24 个整数）
+        #    与「……」排版占位；store 侧的 FlowRow 根本没有承载它的键。
+        #    此前声明成 `("group_label", "A", "editable", "text", "groupLabel", "分组")`，
+        #    同时造成两头错：OO→HTML 那 24 个整数在 text 下抛 ValueNormalizationError
+        #    ⇒ 每次保存恒产 24 条 type_normalization_failure（三侧同值本该判 kept_current）；
+        #    HTML→OO 投影恒 None ⇒ materialize 把 A 列序号写空。
+        #    与 D4-34「A 序号(模板自增,不入契约)」同一处置。
         "fields": (
-            ("group_label", "A", "editable", "text", "groupLabel", "分组"),
             ("name", "B", "editable", "text", "name", "单位名称/姓名"),
             ("amount", "C", "editable", "amount", "amount", "本期交易金额"),
             ("ratio", "D", "editable", "text", "ratio", "占同类交易比例"),
@@ -136,12 +143,57 @@ def _rows(code: str, payload: Any) -> list[tuple[str, Mapping[str, Any]]]:
         if not value:
             return []
         return [("singleton", value)]
+    if code == "D4-32": return _d4_32_rows(value)
     if code == "D4-30": value = value.get("customers", []) if isinstance(value, Mapping) else value
     if not isinstance(value, list): raise ValueError(f"{code} 必须是数组")
     out = []
     for row in value:
         if not isinstance(row, Mapping) or not str(row.get(s["identity_key"]) or "").strip(): raise ValueError(f"{code} 缺稳定身份")
         out.append((str(row[s["identity_key"]]).strip(), row))
+    return out
+
+
+#: D4-32 的 store 形态：`[{key, label?, rows: [FlowRow]}]` 六个声明组（+ 未知组）。
+#: 前端 `D4TabFundFlow.vue` 的 `GROUPS` 常量定义声明组，`groups.value` 原样 JSON 持久化。
+_D4_32_GROUP_KEYS: Final[tuple[str, ...]] = (
+    "supplier", "customer", "shareholder", "controller", "management", "related",
+)
+#: 未归属分组的 key。前端 `mapUnknownGroup` 据此给出「并入哪个已知组」的下拉；
+#: 模板里按 `group.key.startswith('__unknown__')` 判定，这里保持同一口径。
+_D4_32_UNKNOWN_KEY: Final[str] = "__unknown__"
+
+
+def _d4_32_rows(value: Any) -> list[tuple[str, Mapping[str, Any]]]:
+    """把 D4-32 的六段分组展平成逐行 `(id, row)`。
+
+    🔴 这里原先走通用扁平数组分支（spec wp-sync-conflict-adjudication-and-d4-32-modeling
+    ADR-D432-002）：真实 store 的元素是**分组对象**（`{key, rows}`，没有 `id`）⇒
+    `str(row.get("id") or "").strip()` 恒空 ⇒ 抛 `ValueError: D4-32 缺稳定身份` ⇒
+    整个 D4 entry 的 combined store-projection 打成 422，D4-2..36 全部进不了在线编辑。
+    之前没炸只因测试底稿的 D4-32 还是空表。
+
+    分组顺序即展平顺序（由 store 自身的数组序决定），这样 `row_keys` 的序与前端一致。
+    分组归属**不进** Excel 侧（ADR-D432-002 的已知限制：六组落在同一个连续受管区
+    13..46、单 table），由 `_merge_d4_32` 的对称回写保持。
+    """
+    if not isinstance(value, list):
+        raise ValueError("D4-32 必须是分组数组 [{key, rows}]")
+    out: list[tuple[str, Mapping[str, Any]]] = []
+    for group in value:
+        if not isinstance(group, Mapping):
+            raise ValueError("D4-32 分组必须是对象")
+        rows = group.get("rows")
+        if rows is None:
+            continue  # 分组存在但还没有 rows 键 —— 合法空组
+        if not isinstance(rows, list):
+            raise ValueError("D4-32 分组的 rows 必须是数组")
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise ValueError("D4-32 行必须是对象")
+            identity = str(row.get("id") or "").strip()
+            if not identity:
+                raise ValueError("D4-32 缺稳定身份")
+            out.append((identity, row))
     return out
 
 
@@ -188,8 +240,141 @@ def build_store_projection(code: str, payload: Any, *, contract: Any, limits: An
     return Projection(contract_id=contract.contract_id, semantic_version=contract.semantic_version, document_type=contract.document_type, values=values, row_keys={s["table_key"]: tuple(row_keys)})
 
 
-def merge_projection_into_store(code: str, *, projection: Any, base_payload: Any) -> Any:
+_SKELETON_BASELINE_CACHE: dict[Any, Any] = {}
+
+
+def template_skeleton_baseline() -> Any:
+    """IPO 三张受管区骨架行的模板原值基线（spec d2-online-edit-platform-closure R12 口径）。
+
+    OO→HTML 镜像用它区分「模板原样的骨架行」与「用户在模板空行里填了内容的骨架行」。
+    三个输入全取 D4 主 provider 的单一口径：权威模板字节 / instrumentation 声明 / 现算契约。
+    """
+    from app.services.workpaper_sync import phase5_d4_revenue_detail as _d4
+    from app.services.workpaper_sync.contracts import parse_contract
+    from app.services.workpaper_sync.template_skeleton_baseline import (
+        build_skeleton_baseline,
+    )
+
+    specs = tuple(instrumentation_spec(c) for c in codes())
+    key = (
+        _d4.TEMPLATE_SHA256,
+        tuple(
+            (s.template_id, s.managed_sheet, s.first_data_row, s.last_data_row, s.managed_last_col)
+            for s in specs
+        ),
+    )
+    cached = _SKELETON_BASELINE_CACHE.get(key)
+    if cached is None:
+        cached = build_skeleton_baseline(
+            template_bytes=_d4.read_authoritative_template(),
+            specs=specs,
+            contract=parse_contract(_d4.build_contract_payload(), adapter_id=_d4.ADAPTER_ID),
+        )
+        _SKELETON_BASELINE_CACHE[key] = cached
+    return cached
+
+
+def _d4_32_unknown_group_index(groups: list[dict[str, Any]]) -> int:
+    """未映射分组的下标；没有就追加一个（不占用六个声明组中的任何一个）。"""
+    for i, group in enumerate(groups):
+        if str(group.get("key") or "").startswith(_D4_32_UNKNOWN_KEY):
+            return i
+    groups.append({"key": _D4_32_UNKNOWN_KEY, "label": "未映射分组", "rows": []})
+    return len(groups) - 1
+
+
+def _merge_d4_32(projection: Any, base: Any, *, skeleton_baseline: Any | None = None) -> Any:
+    """D4-32 的对称回写：按行身份在**原分组内**原地更新，保留分组结构。
+
+    三条口径（spec wp-sync-conflict-adjudication-and-d4-32-modeling ADR-D432-002/003）：
+
+    1. **原地更新**：只改受管字段，行内未受管键（`groupLabel` 等）与分组的 `key`/`label`
+       原样保留。此前走通用扁平分支会把 `[{key, rows}]` 整个过滤空并返回扁平数组，
+       前端 `D4TabFundFlow.loadData` 的 `!Array.isArray(group.rows)` 判断会把六组全判空
+       ⇒ 镜像一次就清空 D4-32。
+    2. **骨架行分流**：OO 侧 extract 必然带回模板骨架行（`GTROW-D432-00xx`）。
+       不带用户内容的跳过（否则 `B19='主要客户'` 这类**组标题**会被当业务行写进 store，
+       且删了下次保存又回来）；带用户内容的照常进 store（不静默丢数据）。
+       判据复用平台的 `pure_template_skeleton_rows`，与三方合并同一份值规范化口径。
+    3. **未归属行落未映射组**：base 里没有的行身份落 `__unknown__` 组，由前端既有
+       `mapUnknownGroup` 人工认定 —— 不自动归「其他关联方」（上游
+       d4-ipo-fraud-writeback-formula-io R1.5 / R5.2 的既定裁决）。
+    """
+    from app.services.workpaper_sync.template_skeleton_baseline import (
+        pure_template_skeleton_rows,
+    )
+
+    code_s = _s("D4-32")
+    table_key = code_s["table_key"]
+    groups: list[dict[str, Any]] = []
+    for group in base if isinstance(base, list) else []:
+        if not isinstance(group, Mapping):
+            continue
+        rows = group.get("rows")
+        clone = dict(group)
+        clone["rows"] = (
+            [dict(r) for r in rows if isinstance(r, Mapping)] if isinstance(rows, list) else []
+        )
+        groups.append(clone)
+    if not groups:
+        # base 还没有任何分组（首次保存 / 空表）⇒ 按声明序建出六组空壳，
+        # 这样回写结果仍是前端认得的分组形态，而不是一个扁平数组。
+        groups = [{"key": k, "rows": []} for k in _D4_32_GROUP_KEYS]
+
+    locate: dict[str, tuple[int, int]] = {}
+    for gi, group in enumerate(groups):
+        for ri, row in enumerate(group["rows"]):
+            identity = str(row.get("id") or "").strip()
+            if identity and identity not in locate:
+                locate[identity] = (gi, ri)
+
+    template_rows = pure_template_skeleton_rows(
+        projection,
+        table_key=table_key,
+        base_identities=set(locate),
+        baseline=(
+            skeleton_baseline if skeleton_baseline is not None else template_skeleton_baseline
+        ),
+    )
+
+    prefix = table_key + "/"
+    for sk in projection.stable_keys():
+        if not str(sk).startswith(prefix):
+            continue
+        fv = projection.get(sk)
+        if fv is None or getattr(fv, "is_protected", False):
+            continue
+        identity = getattr(fv, "row_key", None)
+        if not identity:
+            continue
+        identity = str(identity)
+        if identity in template_rows:
+            continue  # 模板原样的骨架行：不进 store
+        field = str(sk).rsplit("/", 1)[-1]
+        spec = next((f for f in code_s["fields"] if f[0] == field), None)
+        if spec is None:
+            continue
+        where = locate.get(identity)
+        if where is None:
+            gi = _d4_32_unknown_group_index(groups)
+            groups[gi]["rows"].append({"id": identity})
+            where = (gi, len(groups[gi]["rows"]) - 1)
+            locate[identity] = where
+        target = groups[where[0]]["rows"][where[1]]
+        path = spec[4]
+        if "/" in path:
+            set_json_path(target, path, getattr(fv, "value", None))
+        else:
+            target[path] = getattr(fv, "value", None)
+    return groups
+
+
+def merge_projection_into_store(
+    code: str, *, projection: Any, base_payload: Any, skeleton_baseline: Any | None = None
+) -> Any:
     code_s = _s(code); base = _decode(base_payload)
+    if code == "D4-32":
+        return _merge_d4_32(projection, base, skeleton_baseline=skeleton_baseline)
     if code == "D4-31": rows = [("singleton", dict(base) if isinstance(base, Mapping) else {})]
     else:
         container = base if isinstance(base, list) else []

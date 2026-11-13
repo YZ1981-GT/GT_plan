@@ -27,7 +27,8 @@ describe('guidanceBar Property 5', () => {
         const shouldShow = Boolean(raw && raw.trim())
         expect(wrapper.find('.gt-guidance-bar').exists()).toBe(shouldShow)
         if (shouldShow) {
-          expect(wrapper.find('.gt-guidance-text').text()).toBe(raw)
+          // VTU 的 text() 会去掉首尾空白，原文带空白时按 trim 后比较（原写法遇到 " a" 之类输入随机失败）
+          expect(wrapper.find('.gt-guidance-text').text()).toBe(raw.trim())
           expect(wrapper.find('input, textarea, [contenteditable=true]').exists()).toBe(false)
         }
         wrapper.unmount()

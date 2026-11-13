@@ -271,11 +271,10 @@ import { fetchTrialBalanceRows, tbNumber } from '@/services/trialBalanceRows'
 import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, provide, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
-import { k1PushNotice, k1PushedRows, type K1PushNotice } from './composables/k1FormulaPushNotice'
+import { k1PushNotice, k1PushedItemIds, type K1PushNotice } from './composables/k1FormulaPushNotice'
 import { subscribeProjectEvent } from '@/services/sse/projectEventStream'
 import { autoSeedK1DetailFromAux } from './composables/useK1DetailAutoSeed'
 import {
@@ -411,14 +410,12 @@ async function reloadPushedItems(): Promise<void> {
   if (!notice || !props.wpId) return
   pushReloading.value = true
   try {
-    const response: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const rows = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
-    for (const row of k1PushedRows(rows, notice.itemIds)) {
-      allResponses.value.set(row.item_id, {
-        item_id: row.item_id,
-        conclusion: row.conclusion ?? null,
-        remark: row.remark ?? null,
-      })
+    // 🔴 读路径走共享持久化层的 `reloadItems`（只替换点名的那几条，不碰别处未保存的编辑）。
+    //    原先这里自己发 `GET /api/workpapers/{id}/checklist-responses` —— 那是 K 轮已收敛掉的
+    //    「宿主层裸端点」：同一张表两处读、CAS 版本与 committed 快照两处记账。
+    const reloaded = await persistence.reloadItems(k1PushedItemIds(notice.itemIds))
+    if (!reloaded.length) {
+      console.warn('[GtK1OtherReceivables] 公式推送提示的条目在服务端查不到：', notice.itemIds)
     }
     pushNotice.value = null
   } catch (error) {

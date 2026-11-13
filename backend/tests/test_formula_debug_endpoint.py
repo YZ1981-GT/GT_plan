@@ -65,8 +65,11 @@ class TestBuildContext:
 
 
 @pytest.mark.asyncio
-async def test_endpoint_returns_fetch_gaps_as_warnings(monkeypatch):
-    """端点级（权限世界真发请求）：取数缺口随响应的 warnings 返回 —— 否则调试结果是 0 却看不出为什么。"""
+async def test_endpoint_reports_fetch_gaps_as_failure(monkeypatch):
+    """端点级（权限世界真发请求）：取数缺口随响应返回，且与中央执行合同同口径 —— 有缺口就不是成功结果。
+
+    原先缺口只进 warnings、结果照样 ok：调整分录取数失败时调试显示 ok + 0，与真实执行结论相反。
+    """
     import app.routers.formula_debug as formula_debug
     from app.services.formula_engine import FormulaContext
     from tests.authz_world import TARGET_PROJECT_ID, sqlite_world
@@ -87,8 +90,34 @@ async def test_endpoint_returns_fetch_gaps_as_warnings(monkeypatch):
     assert resp.status_code == 200, resp.text
     body = resp.json()
     payload = body.get("data", body) if isinstance(body, dict) else body
-    assert "报表未生成（2025 年度），ROW 取不到" in payload["warnings"], payload
+    assert "报表未生成（2025 年度），ROW 取不到" in payload["errors"], payload
+    assert (payload["ok"], payload["value"]) == (False, None), payload
     assert seen == {"formula": "ROW('BS-001')", "gaps_is_list": True}
+
+
+@pytest.mark.asyncio
+async def test_endpoint_adj_fetch_failure_is_not_a_successful_zero(monkeypatch):
+    """取数本身能求出值（ADJ 按 0）但有取数缺口：也不能报成功 —— 正是「调整分录取数失败 ⇒ ok + 0」的形态。"""
+    import app.routers.formula_debug as formula_debug
+    from app.services.formula_engine import FormulaContext
+    from tests.authz_world import TARGET_PROJECT_ID, sqlite_world
+
+    async def _fake_context(db, project_id, year, scope, custom_context, formula="", gaps=None):
+        gaps.append("调整分录取数失败：no such table")
+        return FormulaContext()  # adj_data 为空 ⇒ L1 对 ADJ 求得 0、本身 ok
+
+    async with sqlite_world(monkeypatch) as world:
+        monkeypatch.setattr(formula_debug, "_build_context", _fake_context)
+        identity = await world.identity("readonly_member")
+        async with world.client(formula_debug.router, user=identity.user) as client:
+            resp = await client.request("POST", "/api/formula/debug", json={
+                "formula": "ADJ('1001','aje_net')", "project_id": str(TARGET_PROJECT_ID), "year": 2025,
+                "scope": "report"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    payload = body.get("data", body) if isinstance(body, dict) else body
+    assert (payload["ok"], payload["value"], payload["state"]) == (False, None, "missing"), payload
+    assert "调整分录取数失败：no such table" in payload["errors"], payload
 
 
 @pytest_asyncio.fixture

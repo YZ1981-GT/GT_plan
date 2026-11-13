@@ -17,10 +17,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import Adjustment, ReviewStatus, TrialBalance
+from app.models.core import Project
+from app.models.evidence_governance_models import EvidenceRef
+from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
 from app.models.report_models import DisclosureNote, FinancialReport
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.ai_chat.contracts import HostType
 from app.services.ai_chat.host_context import AuthorizedHostContext
+from app.services.knowledge_access_policy import KnowledgeAccessPolicy, KnowledgeResource
 
 
 @dataclass(frozen=True)
@@ -219,4 +223,117 @@ async def build_audit_relation_context(
                 ("[过期] " if row.is_stale else "") + (row.text_content or "[暂无正文]"),
                 version=str(row.updated_at or ""), jump_route=f"/disclosure-notes/{row.id}",
             ))
+
+    # ── 上年关系：按 client_name + year-1 找上年同项目，注入上年底稿/附注 ─────────────
+    prior_year = host.year - 1
+    prior_project_row = (await db.execute(
+        sa.select(Project.id).where(
+            Project.client_name == sa.select(Project.client_name).where(
+                Project.id == host.project_id
+            ).scalar_subquery(),
+            Project.audit_year == prior_year,
+            Project.is_deleted == sa.false(),
+        ).limit(1)
+    )).scalar_one_or_none()
+    if prior_project_row is not None:
+        prior_project_id = prior_project_row
+        # 上年同底稿
+        if current_wp_id is not None and mapping:
+            prior_wp_rows = (await db.execute(sa.select(
+                WorkingPaper.id, WpIndex.wp_code, WpIndex.wp_name,
+            ).join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id).where(
+                WorkingPaper.project_id == prior_project_id,
+                WorkingPaper.is_deleted == sa.false(),
+                WpIndex.wp_code == str(mapping.get("wp_code") or ""),
+            ).limit(3))).all()
+            for row in prior_wp_rows:
+                result.append(AuditRelationItem(
+                    "prior_workpaper", str(row.id),
+                    f"上年底稿 {row.wp_code} {row.wp_name or ''}".strip(),
+                    f"上年（{prior_year}）{row.wp_code} {row.wp_name or ''}",
+                    jump_route=f"/workpapers/{row.id}",
+                ))
+        # 上年同附注
+        if note_sections:
+            prior_notes = (await db.execute(sa.select(
+                DisclosureNote.id, DisclosureNote.note_section, DisclosureNote.section_title,
+            ).where(
+                DisclosureNote.project_id == prior_project_id,
+                DisclosureNote.year == prior_year,
+                DisclosureNote.note_section.in_(note_sections),
+                DisclosureNote.is_deleted == sa.false(),
+            ).order_by(DisclosureNote.note_section).limit(4))).all()
+            for row in prior_notes:
+                result.append(AuditRelationItem(
+                    "prior_note", str(row.id),
+                    f"上年附注 {row.note_section} {row.section_title or ''}".strip(),
+                    f"上年（{prior_year}）{row.note_section}",
+                    jump_route=f"/disclosure-notes/{row.id}",
+                ))
+
+    # ── 证据关系：EvidenceRef 关联的证据文件 ────────────────────────────────────────
+    resource_id_str = host.resource_id
+    evidence_rows = (await db.execute(sa.select(
+        EvidenceRef.id, EvidenceRef.label, EvidenceRef.evidence_type,
+        EvidenceRef.evidence_id, EvidenceRef.created_at,
+    ).where(
+        EvidenceRef.project_id == host.project_id,
+        EvidenceRef.source_id == resource_id_str,
+        EvidenceRef.status == "active",
+    ).order_by(EvidenceRef.created_at.desc()).limit(8))).all()
+    for row in evidence_rows:
+        result.append(AuditRelationItem(
+            "evidence", str(row.id),
+            f"关联证据 {row.label or row.evidence_type or ''}".strip(),
+            f"证据类型：{row.evidence_type or '通用'}；ID：{row.evidence_id or ''}",
+            version=str(row.created_at or ""),
+        ))
+
+    # ── 知识标签关系：按 template_file / 科目码找关联知识库文档 ─────────────────────
+    if mapping:
+        relation_tags: set[str] = set()
+        template_file = mapping.get("template_file")
+        template_type = mapping.get("template_type")
+        if template_file:
+            relation_tags.add(str(template_file))
+        if template_type:
+            relation_tags.add(str(template_type))
+        for code in list(account_codes)[:3]:
+            relation_tags.add(code)
+        if relation_tags:
+            tag_conditions = [
+                KnowledgeDocument.tags.contains([tag]) for tag in sorted(relation_tags)
+            ]
+            knowledge_rows = (await db.execute(sa.select(
+                KnowledgeDocument.id, KnowledgeDocument.name,
+                KnowledgeDocument.tags, KnowledgeDocument.access_level,
+                KnowledgeDocument.project_ids, KnowledgeDocument.created_by,
+                KnowledgeFolder.access_level, KnowledgeFolder.project_ids,
+                KnowledgeFolder.created_by,
+            ).join(
+                KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id,
+            ).where(
+                KnowledgeDocument.is_deleted == sa.false(),
+                KnowledgeFolder.is_deleted == sa.false(),
+                sa.or_(*tag_conditions),
+            ).limit(8))).all()
+            subject = await KnowledgeAccessPolicy.resolve_subject(db, user)
+            for row in knowledge_rows:
+                doc_resource = KnowledgeResource.of_row(
+                    row.access_level, row.project_ids, row.created_by
+                )
+                folder_resource = KnowledgeResource.of_row(
+                    row[6], row[7], row[8]
+                )
+                if not KnowledgeAccessPolicy.can_read_document(
+                    subject, doc_resource, folder_resource
+                ):
+                    continue
+                tags = row.tags if isinstance(row.tags, list) else []
+                result.append(AuditRelationItem(
+                    "knowledge_relation", str(row.id),
+                    f"关联知识 {row.name or '未命名文档'}",
+                    "标签关系：" + "、".join(str(tag) for tag in tags[:12]),
+                ))
+
     return result

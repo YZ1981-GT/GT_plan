@@ -1,4 +1,4 @@
-"""公式推送引擎存储三层一致：V169 + S5 V237 DDL == ORM == policy 常量。
+"""公式推送引擎存储三层一致：V169 + S5 V248 DDL == ORM == policy 常量。
 
 spec: chain-closure-phase2-formula-push-engine · 任务 4 · 需求 2.6 / 3.2
 
@@ -37,9 +37,9 @@ MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
 V169 = MIGRATIONS / "V169__formula_push_engine.sql"
 R169 = MIGRATIONS / "R169__rollback_formula_push_engine.sql"
 
-# V237：S5 来源信封迁移（V169 的 state/run 基线不回写历史迁移文件）
-V237 = MIGRATIONS / "V237__formula_push_provenance.sql"
-R237 = MIGRATIONS / "R237__rollback_formula_push_provenance.sql"
+# V248（原编号 V237，85caab386 撞号后改号）：S5 来源信封迁移（V169 的 state/run 基线不回写历史迁移文件）
+V248 = MIGRATIONS / "V248__formula_push_provenance.sql"
+R248 = MIGRATIONS / "R248__rollback_formula_push_provenance.sql"
 
 _CONSTRAINT_HEADS = {"constraint", "primary", "unique", "foreign", "check", "exclude", "key"}
 
@@ -79,7 +79,7 @@ def _segments(body: str) -> list[str]:
 
 
 def _ddl_columns(table: str) -> dict[str, bool]:
-    """列名 → 是否 NOT NULL（V169 基线 + S5 V237 增量列）。"""
+    """列名 → 是否 NOT NULL（V169 基线 + S5 V248 增量列）。"""
     cols: dict[str, bool] = {}
     for seg in _segments(_create_body(table)):
         head = re.match(r'"?([A-Za-z_][A-Za-z0-9_]*)"?', seg)
@@ -88,8 +88,8 @@ def _ddl_columns(table: str) -> dict[str, bool]:
         upper = seg.upper()
         cols[head.group(1)] = "NOT NULL" in upper or "PRIMARY KEY" in upper
     if table == "formula_push_state":
-        assert V237.is_file(), "V237 缺失：ORM provenance 列没有迁移"
-        if re.search(r"formula_push_state\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+provenance\s+JSONB\s+NULL", V237.read_text(encoding="utf-8"), re.IGNORECASE):
+        assert V248.is_file(), "V248 缺失：ORM provenance 列没有迁移"
+        if re.search(r"formula_push_state\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+provenance\s+JSONB\s+NULL", V248.read_text(encoding="utf-8"), re.IGNORECASE):
             cols["provenance"] = False
     return cols
 
@@ -238,8 +238,8 @@ def test_sqlite_orm_roundtrip():
     assert out["duplicate"] == "rejected", "(project, year, addr_id) 唯一约束未生效"
 
 
-def test_v237_r237_provenance_pair():
-    assert V237.is_file() and R237.is_file()
-    assert "formula_push_state" in V237.read_text(encoding="utf-8")
-    assert "provenance" in V237.read_text(encoding="utf-8")
-    assert "DROP COLUMN IF EXISTS provenance" in R237.read_text(encoding="utf-8")
+def test_v248_r248_provenance_pair():
+    assert V248.is_file() and R248.is_file()
+    assert "formula_push_state" in V248.read_text(encoding="utf-8")
+    assert "provenance" in V248.read_text(encoding="utf-8")
+    assert "DROP COLUMN IF EXISTS provenance" in R248.read_text(encoding="utf-8")

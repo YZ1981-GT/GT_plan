@@ -169,10 +169,12 @@ export function mergeNoteUserFormulaRows(
   const userRows: NoteFormulaRow[] = []
   let i = 0
   for (const u of byTarget.values()) {
+    // 后端给了「表名 · 行名 · 列名」就按目标单元格显示（同章节多条公式原先都只显示章节标题）
+    const targetLabel = typeof u.target_label === 'string' ? u.target_label.trim() : ''
     userRows.push({
       id: `note_user_${sectionId || sectionTitle || 'x'}_${i}`,
       row_code: sectionId || undefined,
-      row_name: sectionTitle || undefined,
+      row_name: targetLabel || sectionTitle || undefined,
       formula: typeof u.formula === 'string' ? u.formula.trim() : String(u.formula ?? ''),
       formula_category: (u.category as string) || 'auto_calc',
       formula_description: (u.description as string) || '',

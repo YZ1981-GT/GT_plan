@@ -114,12 +114,13 @@ async def _import_legacy(db: AsyncSession, project_id: uuid.UUID, notes: list[Di
     return imported
 
 
-async def materialize(db: AsyncSession, project_id: uuid.UUID, sections: Iterable[str] | None = None) -> int:
-    """把有效集合（全局 + 本项目适配，剔除停用）写进这些章节各年度附注的 ``_user_formulas``。返回改动的附注数。
+async def materialize(db: AsyncSession, project_id: uuid.UUID, sections: Iterable[str] | None = None,
+                      *, year: int | None = None) -> int:
+    """把有效集合写进目标附注的 ``_user_formulas``；耐久传播显式限定冻结年度。
 
-    系统路径：不写编辑人（不是人工编辑附注内容）。只 flush。
+    旧调用省略 year 时保留原有行为。系统路径不写编辑人，只 flush。
     """
-    notes = await _notes(db, project_id, sections)
+    notes = await _notes(db, project_id, sections, year)
     if not notes:
         return 0
     await _import_legacy(db, project_id, notes, None)

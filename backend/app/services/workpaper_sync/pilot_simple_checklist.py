@@ -118,7 +118,7 @@ from app.services.workpaper_sync.entry_profile import (
     Capability,
     DescriptorFacts,
     RoomFacts,
-    capability_of,
+    effective_capability,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -1001,10 +1001,15 @@ def assert_manifest_capability_enabled(
     entry = manifest_entries_by_id(
         manifest if manifest is not None else load_entry_manifest()
     )[PILOT_ENTRY_ID]
-    capability = capability_of(entry)
+    # 🔴 pending（Task 1.1 schema：`capability=null`）的回答是「还没启用」而不是异常：
+    #    原先直调 `capability_of()`，B60 转 pending 后它抛 `EntryProfileError`，
+    #    `manifest_capability_enabled()` 只认 `PilotSelectionError` ⇒ 每次冷注册都把
+    #    「今天不是我的回合」记成一次 pilot attach 失败（被 `_isolated_pilot_attach` 隔离吞下）。
+    capability = effective_capability(entry)
     if capability is not Capability.bidirectional:
+        shown = "pending" if capability is None else capability.value
         raise PilotSelectionError(
-            f"entry {PILOT_ENTRY_ID} 的 manifest capability={capability.value} —— "
+            f"entry {PILOT_ENTRY_ID} 的 manifest capability={shown} —— "
             "注册 bidirectional adapter 前必须先由 reviewed overlay 裁决为 bidirectional "
             "并重生成 manifest（RG-18 会以 FakeBidirectionalError 拒绝伪双向）"
         )

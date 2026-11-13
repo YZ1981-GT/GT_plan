@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import assert_project_permission, get_current_user, require_project_access
 from app.models.core import User
 
 router = APIRouter(tags=["formula-catalog"])
@@ -71,17 +71,23 @@ async def formula_catalog_stats(
 async def check_rules_catalog(
     source: str | None = Query(None, max_length=40, description="只看一个来源（返回其规则）"),
     q: str = Query("", max_length=100, description="跨来源检索：编号 / 名称 / 公式 / 适用范围"),
+    project_id: uuid.UUID | None = Query(None, description="带项目时每类来源附最近一次执行结果 last_run（需项目只读权限）"),
+    year: int | None = Query(None, description="审计年度（仅 cross-check 类来源按年度过滤历史）"),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """各处校对 / 勾稽 / 质控规则的只读目录（spec formula-governance-coverage-closure R3）。
 
     不带参数只返回来源清单与计数；``source`` 返回该来源的规则；``q`` 在全部来源里检索。
+    每类来源带执行状态 ``execution``（wired / display_only / not_executable）。
+    带 ``project_id`` 时再给 ``last_run``（只读，不新增落库；无落库的来源为 null）。
     """
     from app.services.formula_check_catalog import build_check_catalog
 
+    if project_id is not None:
+        await assert_project_permission(db, user, project_id, "readonly")
     try:
-        return await build_check_catalog(db, source=source or None, keyword=q)
+        return await build_check_catalog(db, source=source or None, keyword=q, project_id=project_id, year=year)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"校对规则来源不存在：{source}") from None
 

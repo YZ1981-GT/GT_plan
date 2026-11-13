@@ -8,7 +8,14 @@
 <template>
   <div class="gt-b1eval">
     <div class="gt-b1eval__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <!-- 模式开关可见性 / 可用性来自同步能力单源，不由宿主自行决定 -->
+      <el-segmented
+        v-if="entrySync.presentation.value.showModeSwitch"
+        v-model="mode"
+        :options="modeOptions"
+        size="small"
+      />
+      <GtEntrySyncCapabilityNotice :entry-id="B1_EVAL_ENTRY_ID" />
       <el-tag type="success" effect="plain" size="small">业务评价表（立项）</el-tag>
       <span class="gt-b1eval__spacer" />
       <span class="gt-b1eval__save-status">
@@ -227,6 +234,8 @@ const B1_EVAL_ENTRY_ID = 'xlsx/gt-b1-evaluation'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import GtReviewTrigger from './GtReviewTrigger.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -273,9 +282,20 @@ const b1Sync = useB1OrphanSyncMode({
   reloadHtml: async () => { await loadData() },
 })
 // sync ready（capability=bidirectional）时用 sync，否则降级 legacy
+/** 开关与 notice 共用的同步能力单源（静态裁决 + 运行时 readiness）。 */
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => B1_EVAL_ENTRY_ID,
+})
 const mode = computed<string>({
   get: () => (b1Sync.descriptorReady.value ? b1Sync.mode.value : legacyMode.value),
-  set: (v: string) => { if (b1Sync.descriptorReady.value) b1Sync.switchMode(v); else legacyMode.value = v },
+  set: (v: string) => {
+    // 单源不放行在线编辑时忽略切换（开关隐藏后仍可能被程序化地切过去）
+    if (v === '在线编辑' && !entrySync.presentation.value.canSwitchToOnlyOffice) return
+    if (b1Sync.descriptorReady.value) b1Sync.switchMode(v)
+    else legacyMode.value = v
+  },
 })
 const modeOptions = computed(() => (b1Sync.descriptorReady.value ? b1Sync.modeOptions.value.map(o => o.value) : legacyModeOptions.value))
 

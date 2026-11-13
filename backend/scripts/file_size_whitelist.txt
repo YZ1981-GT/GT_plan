@@ -442,11 +442,6 @@ backend/scripts/diagnose/mutate_task71_chaos_guards.py  878
 backend/scripts/diagnose/probe_oo94_excel_identity.py  1429
 backend/scripts/diagnose/probe_oo94_word_sdt.py  1980
 backend/scripts/diagnose/probe_task7_staged_artifact_boundaries.py  2345
-#   adjudicate_task74_writer_domains.py —— 2026-09-21 D4-13 rematerialize 修复 7 处
-#     provider（build_store_projection 未转换 value_type/mode 枚举）后，Task 74 逐行
-#     裁决规则表随 overlay 新裁决行增加而增长（净新增必要裁决记录，非无意义膨胀）；
-#     887 → 1030 按真实态登记。
-backend/scripts/gen/adjudicate_task74_writer_domains.py  1030
 backend/scripts/gen/generate_task60_f2_word_contracts.py  1388
 backend/scripts/gen/generate_task62_generic_docx_adjudication.py  1096
 backend/scripts/gen/generate_task64_dedicated_word_chain.py  1230
@@ -816,7 +811,19 @@ backend/app/routers/wp_render_strategies/_k1_import_export.py  1482
 #   其结构需与生成器的 AST/变异锚点保持同文件可见；拆分会破坏可复现投影和变异判据。
 #   spec: workpaper-page-formula-toolbar-closure Task 13/15
 backend/scripts/gen/generate_workpaper_sync_program_milestones.py  2744
-backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
+#   test_workpaper_sync_program_milestones.py —— 2026-11-04：HEAD 已 857 行（> 803 + 5%，触碰即红，
+#     非本次造成）。本次把 BLOCKED / 诊断两条计数上限改成逐条点名、补归档守卫的语义判据与
+#     multi_resolver ⇔ 阻塞互证后到 1051 行；解析层、点名名单与 fixture 已拆到同目录
+#     `_test_workpaper_sync_program_milestones_criteria.py`，剩下 931 行是用例与 `source` fixture。不再拆用例文件：
+#     CI（governance-checks.yml）与里程碑定义的 targeted_tests 都按本文件路径跑。下一步拆分轴 =
+#     数据库探针 5 条用例（`test_database_*`，约 150 行）整组移走，需同步改 CI 与 targeted_tests，
+#     并把 `source` fixture 改成进程内缓存（否则两个模块各建一次 registry、各做一次真库探测）。
+backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  931
+#   test_b_cycle_baseline.py —— 2026-11-04：HEAD 已 1988 行（> 800 且未登记，触碰即红，非本次造成）。
+#     本次只把 BC-12 由「notice ≤5」改成 10 条逐条点名（umbrella 3.5 之后 B 域宿主全挂 notice），+9 行。
+#     拆分方向：按 §-章节把判据类拆到同目录 `_test_b_cycle_baseline_*.py`，模块级 fixture 与
+#     `b_cycle_scanner` / task57 解析器的 import 留在本文件，各章节用例文件只 import fixture。
+backend/tests/workpaper_sync/test_b_cycle_baseline.py  1997
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: workpaper-page-formula-toolbar-closure（2026-09-13 入库，gc0 dup 修复同批）
@@ -1221,7 +1228,11 @@ backend/app/services/trial_balance_service.py  1243
 backend/app/routers/adjustments.py  1671
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
 # HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
-backend/app/routers/attachments.py  821
+# platform-release-blocker-closure：基线 821 早已 stale —— 本批改动前 HEAD 实测已 914 行
+# （前序提交把它从 821 长到 914 却未更新本表，pre-commit 只检查暂存文件故未触发）。本批 Task 9
+# 给 5 个 OCR/删除/回滚端点各加一行 assert_linked_workpapers_writable 终态预检（+8 行 = 922）；
+# 这 8 行无法消化已有的 52 行欠账，按「baseline 必须填当前真实行数」更新为 922。
+backend/app/routers/attachments.py  922
 
 # ledger-penetration 凭证穿透 / 挂凭链路 —— V166 凭证日期消歧
 # （spec voucher-sampling-account-scope-and-attach-closure）。
@@ -1246,7 +1257,10 @@ backend/app/services/ledger_penetration_service.py  942
 #   登记为待办：report_engine 的 ReportFormulaParser（取数缓存 + 列名映射）
 #   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
 #   formula-hub-integrity-closure（2026-10-30）：按实测下调 2693 → 2479（本 spec 净减），只许再降。
-backend/app/services/report_engine.py  2479
+#   formula-integrity-and-propagation-closure（2026-11-09）：审核 strict 五态贯通 +227 行，
+#     三入口加 strict/on_technical_failure + evaluate_formula_result 内 IF 仅实际分支 + ADJ 惰性加载。
+#     拆分方向不变：ReportFormulaParser（取数缓存+列名映射）与 evaluate_formula（L2 编排）分文件。
+backend/app/services/report_engine.py  2706
 backend/app/services/consol_report_service.py  1008
 
 # ── 2026-09-28 spec d1-sync-row-table-engine-and-d1-coverage · X2 ────────────
@@ -1361,12 +1375,31 @@ backend/tests/workpaper_sync/test_phase5_e1_sheet_specs.py  902
 backend/tests/test_event_bus.py 979
 backend/app/services/report_config_service.py 803
 backend/app/services/formula_push/engine.py 951
-audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 3263
+#   ConsolNoteTab.vue —— HEAD 已 3439 行（超基线 3263 +5% = 3426，是并发会话的增长）。2026-11-04
+#     note-disclosure-pull-regression-and-headless-backend 批 1 只把 6 处 validateStatus < 600 换回 _silent
+#     （被 03496b1f3 覆盖丢失；错误响应原先会被当成功），净 0 行；基线取当前真实行数。
+#     拆分方向：单元格汇总、批量导入、附注审核三块各抽成 composable。
+audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 3439
+#   consolidationApi.ts —— 历史大文件（HEAD 已 1627 行、超 1500 上限且未登记，任何改动都会被门禁拒）。
+#     2026-11-04 批 1 只恢复明细映射建议 / 来源状态 / 预览三个接口类型的字段（被 03496b1f3 覆盖丢失，+1 行）。
+#     拆分方向：合并附注明细映射的类型与请求函数抽成独立模块。
+#     2026-11-09 spec consolidation-run-and-workpaper-lifecycle-closure 加快照 v2 / 签字锁定 / readiness 角色视图 / 合并底稿实例接口（+134 行），用户确认登记白名单。
+#     拆分方向追加：快照与 readiness 的类型和请求函数抽成 consolSnapshotApi.ts（保留本文件的同名再导出）。
+audit-platform/frontend/src/services/consolidationApi.ts 1762
 audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
+#   ledger_import/pipeline.py —— 2026-11-05 `platform-heavy-jobs-and-capacity-closure` C4 骨架：
+#     把 `_perf` 字典平移进 `StagedProfiler.to_dict()`（伴生 `profiler_report.py`，不改原
+#     `_mark` / observe_phase_duration 链路），PipelineResult 增 profiler_report 字段，HEAD
+#     800 → 804。拆分方向：parse_write_streaming 的内部循环（~250 行）抽到
+#     `pipeline_streaming.py`，pipeline.py 只保留 execute_pipeline 编排骨架。
+backend/app/services/ledger_import/pipeline.py 804
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
-#     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。拆分方向：企业树侧栏连同搜索、收起状态与样式抽成独立组件。
-audit-platform/frontend/src/views/ConsolidationIndex.vue 2368
+#     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。2026-11-05 `platform-heavy-jobs-and-capacity-closure` B4/B5
+#     把合并附注重新汇总改走 durable job：新增 PlatformJobProgress 嵌入、`reaggregateJobId`、`onReaggregateCompleted`/`onReaggregateFailed`
+#     与同步 `handlePlatformJobRetry`，2368 → 2513。拆分方向：企业树侧栏（搜索 / 收起 / 样式）抽成独立组件；再把耐久任务提交 / 完成 / 失败
+#     接线挪进 `useConsolReaggregateJob.ts` composable，页面只留模板与事件绑定。
+audit-platform/frontend/src/views/ConsolidationIndex.vue 2513
 backend/tests/test_module_cell_resolver.py 115
 audit-platform/frontend/src/views/DisclosureEditor.vue 3281
 #   ConsolWorksheetTabs.vue —— 2026-10-23 同上：合并工作底稿新增只读「分录汇总表」页签（D-1，读 /api/consolidation/worksheet/entry-summary），
@@ -1896,3 +1929,36 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/useWorkpaperSync
 #   并把 `b22aReference.ts` 式的预置参考文本继续留在数据模块里。
 audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue  2746
 audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue  2826
+# platform-heavy-jobs-and-capacity-closure（2026-11-05）：ai_chat/native_engine.py —— 历史大文件。
+#   HEAD 已 834 行超 800；本轮 0.2 只把 _llm_semaphore 换成 capacity_slots.LLM_SLOT（净零行）。
+#   入册基线=当前真实行数，不虚高；拆分责任归 ai_chat 引擎 lane，届时连带删本条。
+backend/app/services/ai_chat/native_engine.py  834
+
+# 本轮（workpaper-html-onlyoffice-bidirectional-writeback-closure 收口）触到的一个
+# **HEAD 就已远超上限**的历史守卫（入册时 HEAD 1386 行，上限 800）：
+#   backend/tests/workpaper_sync/test_c_cycle_baseline.py  +29 行
+#   改动内容只有两处判据更正，都是**本 spec 自己的交付物**造成的事实变化：
+#     ① `test_notice_sync_zero` → `test_notice_sync_is_now_mounted_in_both_hosts`：
+#        task 3.5 把 AC-14 的 `GtEntrySyncCapabilityNotice` 接到全部宿主（含 C 域这 2 个），
+#        CC-12 冻结的「2 宿主都没挂」已被有意改掉 ⇒ 断言方向反转（保留 `== 0` 等于固化假事实）；
+#     ② `test_a_program_console_32_codes`：S 循环检查表组件接进渲染管线后 9 个码改派，
+#        32 这个下界不再成立 ⇒ 判据改成「横跨 ≥4 字母 + 仍是 pattern_less 里码数最多的」。
+#   🔴 这 1386 行不是本轮写出来的体量 —— C 轮 baseline 本来就是 14 维逐项对照 + 结构性零普查
+#   的普查型守卫。为它做结构拆分不属于本轮交付单元，也会把 C 轮 spec 的拆分责任转移过来；
+#   拆分还会改 test 节点 id（现算：KNOWN_FAILING 与 CI 工作流都没点名本文件的节点，所以**可以**
+#   拆，只是不该由本轮拆）。以真实行数登记，只许下调；bloat 门（baseline × 1.05）继续守着它。
+#   拆分方向（归 C 轮 lane）：`TestEntryContrast14Dims`（14 维逐项相反）与 `TestStructuralZeros`
+#   （两宿主结构性零）各自抽成 `test_c_cycle_contrast.py` / `test_c_cycle_structural_zeros.py`，
+#   公共 fixtures（`c_entries` / `host_files` / `overrides`）落到 `_test_c_cycle_facts.py`。
+backend/tests/workpaper_sync/test_c_cycle_baseline.py  1415
+
+# 工作台门面，拆分方向：按角色抽子 facade
+backend/app/services/role_workbench_facade.py  961
+# consol_snapshot_service.py —— spec consolidation-run-and-workpaper-lifecycle-closure 2026-11-09 用户确认登记白名单。
+#   HEAD 384 行，本 spec 加快照 v2 manifest、签字 / 锁定门、版本向量与故障注入路径后 1276 行。
+#   拆分方向：manifest 构建、签字锁定事务、快照读取三块各抽成独立模块，本文件保留同名导出薄壳。
+backend/app/services/consol_snapshot_service.py 1276
+# gate_rules_phase14.py —— spec check-contract-and-note-executor 收尾 2026-11-11 登记。HEAD 已 1139 行（超 800 未登记的历史大文件），
+#   本 spec 把 9 个规则的异常分支改为「检查异常，未执行」后 1176 行。
+#   拆分方向：IndependenceDeclarationCompleteRule（约 270 行）与 EventCascadeHealthRule（约 125 行）各抽独立模块，本文件保留注册与再导出。
+backend/app/services/gate_rules_phase14.py 1176

@@ -143,7 +143,11 @@ describe('建项向导：建项被拒', () => {
     const save = wrapper.findAll('button').find((b) => b.text() === '保存')!
     await save.trigger('click')
     await flushPromises()
-    expect(mocks.http.put).toHaveBeenCalledWith('/api/projects/p-1/wizard/basic_info', expect.objectContaining(FORM))
+    expect(mocks.http.put).toHaveBeenCalledWith(
+      '/api/projects/p-1/wizard/basic_info',
+      expect.objectContaining(FORM),
+      { _silent: true },
+    )
     expect(captured).toEqual([])
     expect(mocks.push).not.toHaveBeenCalled()
     expect(wrapper.find('.basic-info-stub').exists()).toBe(true)
@@ -190,5 +194,85 @@ describe('建项向导：新建分支恢复（R10）', () => {
     expect(urls).toContain('/api/projects')
     expect(urls).toContain('/api/projects/p-sub/wizard/confirm')
     expect(mocks.push).toHaveBeenCalledWith('/settings/formula-global?tab=templates')
+  })
+})
+
+
+describe('建项向导：已有项目改企业代码的结构化错误', () => {
+  it('403 授权提示保留表单，不导航', async () => {
+    mocks.query = { projectId: 'p-auth' }
+    mocks.http.get.mockResolvedValue({
+      status: 200,
+      data: {
+        project_id: 'p-auth', current_step: 'basic_info',
+        steps: { basic_info: { data: { ...FORM }, completed: true } },
+      },
+    })
+    mocks.http.put.mockRejectedValue({
+      response: {
+        status: 403,
+        data: { detail: { error_code: 'COMPANY_CREATION_NOT_AUTHORIZED', message: '修改企业代码需要该代码的建项授权：暂无授权' } },
+      },
+    })
+    const { wrapper } = mountWizard()
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text() === '保存')!.trigger('click')
+    await flushPromises()
+    expect(ElMessage.error).toHaveBeenCalledWith('修改企业代码需要该代码的建项授权：暂无授权')
+    expect(mocks.http.put).toHaveBeenCalledWith(
+      '/api/projects/p-auth/wizard/basic_info',
+      expect.objectContaining(FORM),
+      { _silent: true },
+    )
+    expect(mocks.http.put).toHaveBeenCalledTimes(1)
+    expect(mocks.push).not.toHaveBeenCalled()
+    expect(wrapper.find('.basic-info-stub').exists()).toBe(true)
+  })
+
+  it('COMPANY_CODE_IN_USE 409 弹出影响清单，保留表单且不重试', async () => {
+    mocks.query = { projectId: 'p-impact' }
+    mocks.http.get.mockResolvedValue({
+      status: 200,
+      data: {
+        project_id: 'p-impact', current_step: 'basic_info',
+        steps: { basic_info: { data: { ...FORM }, completed: true } },
+      },
+    })
+    mocks.http.put.mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            error_code: 'COMPANY_CODE_IN_USE',
+            message: '企业代码已被引用，不能直接修改',
+            impacts: [{ label: '合并附注节点数据', count: 3 }],
+          },
+        },
+      },
+    })
+    const alert = vi.spyOn(ElMessageBox, 'alert').mockResolvedValue('ok' as never)
+    const { wrapper } = mountWizard()
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text() === '保存')!.trigger('click')
+    await flushPromises()
+    expect(alert).toHaveBeenCalledWith(
+      expect.stringContaining('企业代码已被引用，不能直接修改'),
+      '企业代码无法修改',
+      expect.objectContaining({ type: 'warning' }),
+    )
+    expect(alert).toHaveBeenCalledWith(
+      expect.stringContaining('合并附注节点数据：3 条'),
+      '企业代码无法修改',
+      expect.objectContaining({ type: 'warning' }),
+    )
+    expect(mocks.http.put).toHaveBeenCalledWith(
+      '/api/projects/p-impact/wizard/basic_info',
+      expect.objectContaining(FORM),
+      { _silent: true },
+    )
+    expect(mocks.http.put).toHaveBeenCalledTimes(1)
+    expect(mocks.push).not.toHaveBeenCalled()
+    expect(wrapper.find('.basic-info-stub').exists()).toBe(true)
+    alert.mockRestore()
   })
 })

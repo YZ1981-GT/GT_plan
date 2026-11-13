@@ -64,6 +64,8 @@ export type SSEEventType =
   | 'export.progress'
   | 'export.complete'
   | 'export.failed'
+  // 通用耐久任务进度（状态 GET 是权威，SSE 仅唤醒重拉）
+  | 'platform.job.updated'
   // A13 错报聚合
   | 'a13_summary_updated'
   // 复核对话
