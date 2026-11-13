@@ -1,0 +1,30 @@
+{
+  "mode": "apply",
+  "repairOnly": true,
+  "filesChanged": 4,
+  "sectionsPromoted": 0,
+  "digestsRepaired": 4,
+  "files": [
+    {
+      "path": "backend/data/wp_guidance/_complexity.json",
+      "wp_code": null,
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/_questions.json",
+      "wp_code": null,
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/G13.json",
+      "wp_code": "G13",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/G14.json",
+      "wp_code": "G14",
+      "moves": []
+    }
+  ],
+  "policy": "no_invented_body_or_source_refs"
+}
