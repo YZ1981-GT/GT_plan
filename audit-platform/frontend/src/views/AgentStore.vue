@@ -111,7 +111,7 @@ const businessNavItems = [
   { key: 'branch', label: '分所业务', icon: Connection },
 ] as const
 const agents: Agent[] = [
-  { id: 'interview', name: '访谈 AI 助手', desc: '智能访谈记录整理、关键信息提取和洞察分析', icon: Microphone, category: 'audit', isNew: true, features: ['语音转文字', '关键信息提取', '访谈报告草稿'] },
+  { id: 'interview', name: '访谈 AI 助手', desc: '智能访谈记录整理、关键信息提取和洞察分析', icon: Microphone, category: 'audit', isNew: true, features: ['语音转文字', '关键信息提取', '访谈报告草稿'], url: 'http://www.gt.qccz.com.cn:31004' },
   { id: 'ocr', name: 'OCR 整理助手', desc: '文档图像识别、表格提取、票据扫描与结构化处理', icon: DocumentCopy, category: 'audit', features: ['多格式识别', '表格提取', '资料整理'], url: 'http://www.gt.qccz.com.cn:31003/' },
   { id: 'audit', name: '审计 AI 助手', desc: '辅助审计程序、风险线索整理和异常提示', icon: Management, category: 'audit', features: ['风险线索整理', '异常提示', '审计程序辅助'], url: 'http://www.gt.qccz.com.cn:31006/' },
   { id: 'proposal', name: '标书 AI 助手', desc: '标书智能撰写、条款审核、风险提示和格式规范检查', icon: Ticket, category: 'hq', features: ['标书草稿', '条款审核', '格式检查'], url: 'http://www.gt.qccz.com.cn:31001/' },
