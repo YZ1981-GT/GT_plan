@@ -94,15 +94,21 @@ function collectBackendPaths(): Set<string> {
     const raw = fs.readFileSync(f, 'utf-8')
     // router = APIRouter(prefix="/api/xxx")
     const prefixes: string[] = []
-    for (const m of raw.matchAll(/APIRouter\(([^)]*)\)/g)) {
-      const pm = /prefix\s*=\s*["']([^"']*)["']/.exec(m[1])
-      prefixes.push(pm ? pm[1] : '')
+    // 一个文件可挂多个 router（如 router / project_router / global_router，前缀各不相同）：
+    // 按变量名记各自前缀，装饰器按自己的 router 取；取不到时回退到文件内首个 /api 前缀。
+    const prefixByVar = new Map<string, string>()
+    for (const m of raw.matchAll(/(?:(\w+)\s*=\s*)?APIRouter\(([^)]*)\)/g)) {
+      const pm = /prefix\s*=\s*["']([^"']*)["']/.exec(m[2])
+      const pv = pm ? pm[1] : ''
+      prefixes.push(pv)
+      if (m[1]) prefixByVar.set(m[1], pv)
     }
-    const prefix = prefixes.find((p) => p.startsWith('/api')) ?? prefixes[0] ?? ''
+    const filePrefix = prefixes.find((p) => p.startsWith('/api')) ?? prefixes[0] ?? ''
     for (const m of raw.matchAll(
-      /@\w+\.(get|post|put|delete|patch)\(\s*["']([^"']*)["']/g,
+      /@(\w+)\.(get|post|put|delete|patch)\(\s*["']([^"']*)["']/g,
     )) {
-      const p = m[2]
+      const p = m[3]
+      const prefix = prefixByVar.get(m[1]) ?? filePrefix
       const full = p.startsWith('/api') ? p : `${prefix}${p}`
       if (!full.startsWith('/api')) continue
       out.add(normalizeUrl(full))

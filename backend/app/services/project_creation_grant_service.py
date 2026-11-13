@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import ProjectUser, User
 from app.models.project_creation_grant_models import ProjectCreationGrant
-from app.services.uscc_validator import validate_uscc
+from app.services.uscc_validator import normalize_uscc_input, validate_uscc
 
 GRANT_DENIED_CODE = "COMPANY_CREATION_NOT_AUTHORIZED"
 _ROLE_BYPASS = frozenset({"admin", "partner"})
@@ -34,7 +34,12 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 def normalize_company_code(value: object) -> str:
-    code = str(value or "").strip().upper()
+    """授权判断与入库值同口径（R1.3）：先经统一规范化（NFKC → strip → upper）再校验。
+
+    规范化为空（None / 空串 / 全空白）时仍以空串进入 ``validate_uscc``，报 422
+    「统一社会信用代码必须为 18 位」；不得直接返回 None，否则空值不再被拒绝。
+    """
+    code = normalize_uscc_input(value) or ""
     valid, reason = validate_uscc(code)
     if not valid:
         raise HTTPException(status_code=422, detail=reason or "统一社会信用代码格式错误")

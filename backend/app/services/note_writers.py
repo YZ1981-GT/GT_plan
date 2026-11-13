@@ -1,11 +1,39 @@
 """DisclosureNote 写入方登记表。
 
-当前阶段只冻结事实，不执行唯一写方拦截。D1 拍板后，所有权矩阵在本登记表上
-按 ``(template_type, note_section, table_key, field_key)`` 绑定 writer_id。
+R1a 冻结写入方事实；R1b（D1 2026-11-04 拍板后）在本登记表上按 ``(template_type, note_section, table_key, field_key)``
+绑定唯一自动写方：矩阵 ``backend/data/note_write_ownership_matrix.json``，判定 ``note_write_ownership.WriteGate``
+（spec formula-writer-ownership-and-stale design §13）。``role`` 决定写方受不受矩阵约束：
+
+- ``automatic``：受矩阵约束的自动写方，入口必须经 ``WriteGate`` 判定（守卫 AST 检查）；
+- ``manual``：手工入口，经附注编辑门禁放行，不受矩阵限制；
+- ``derived``：按表内其他格计算（附注公式、二次求值、读时修复），沿用现有只写 auto / kept_push 规则；
+- ``structural``：用户发起的整批结构操作（下发、导入、重对齐、准则切换、裁剪、公式物化、回滚等）；
+- ``stale``：过期状态机。
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+ROLES = frozenset({"automatic", "manual", "derived", "structural", "stale"})
+
+_ROLE_OF: dict[str, str] = {
+    **dict.fromkeys((
+        "formula_push", "workpaper_sync", "workpaper_html_sync", "binding_refill", "update_note_values",
+        "generate_notes", "report_sync", "formula_runtime_apply",
+    ), "automatic"),
+    **dict.fromkeys((
+        "manual_editor", "manual_editor_route", "ai_adopt", "ai_draft_apply", "ai_draft_undo", "excel_html",
+        "triple_format", "writeback_text", "cell_mode", "clear_formulas", "restore_auto",
+    ), "manual"),
+    **dict.fromkeys(("binding_formula_route", "formula_executor", "read_time_rebuild"), "derived"),
+    **dict.fromkeys((
+        "workpaper_pull_mark", "group_baseline", "group_template", "consol_template_push", "prior_year_import",
+        "prior_year_inherit", "offline_import", "text_batch", "cross_reference", "template_reflow", "project_realign",
+        "standard_conversion_restore", "standard_conversion_map", "auto_trim", "formula_settings_materialize",
+        "formula_runtime_restore",
+    ), "structural"),
+    **dict.fromkeys(("stale_mark", "stale_clear"), "stale"),
+}
 
 CANONICAL_FIELDS = frozenset({
     "table.rows.values",
@@ -29,6 +57,7 @@ class NoteWriterSpec:
     transaction: str = "caller"
     template_types: tuple[str, ...] = ("listed", "soe")
     status: str = "active"
+    role: str = ""
 
 
 def _w(
@@ -46,6 +75,7 @@ def _w(
         fields=fields,
         respects_cell_modes=respects_cell_modes,
         transaction=transaction,
+        role=_ROLE_OF.get(writer_id, ""),
     )
 
 
@@ -71,7 +101,8 @@ NOTE_WRITERS: tuple[NoteWriterSpec, ...] = (
     _w("formula_runtime_apply", "app.services.formula_runtime.adapters.note:NoteMutationAdapter.apply_many", "公式运行应用", ("table.rows.values",), True),
     _w("formula_runtime_restore", "app.services.formula_runtime.adapters.note:NoteMutationAdapter.restore_many", "公式运行回滚", ("table.rows.values",), True),
     _w("formula_settings_materialize", "app.services.formula_settings.note_settings:materialize", "公式设置物化", ("table.user_formulas",), True),
-    _w("formula_executor", "app.services.note_formula_generator:execute_note_formulas", "附注公式执行", ("table.rows.values", "table.formulas", "table.user_formulas"), True),
+    # 写入点在 _execute_note_formulas_body（execute_note_formulas 只包一层运行记录 / 来源信封）
+    _w("formula_executor", "app.services.note_formula_generator:_execute_note_formulas_body", "附注公式执行", ("table.rows.values", "table.formulas", "table.user_formulas"), True),
     _w("report_sync", "app.services.report_note_sync_service:ReportNoteSyncService._sync_real", "报表同步附注", ("table.rows.values",), True),
     _w("workpaper_sync", "app.services.wp_disclosure_sync_service:sync_from_workpaper", "底稿披露表同步", ("table.sub_table_data", "table._tables", "text_content"), True, "optional_commit"),
     _w("workpaper_html_sync", "app.services.wp_disclosure_sync_service:WpDisclosureSyncService.sync_from_html", "HTML 底稿披露同步", ("table.sub_table_data", "table._tables"), True, "own_commit"),
@@ -120,6 +151,10 @@ def writer_by_id(writer_id: str) -> NoteWriterSpec | None:
     return next((item for item in NOTE_WRITERS if item.writer_id == writer_id), None)
 
 
+def writers_with_role(role: str) -> tuple[NoteWriterSpec, ...]:
+    return tuple(item for item in NOTE_WRITERS if item.role == role)
+
+
 __all__ = [
     "CANONICAL_FIELDS",
     "FRONTEND_BUILDER_AUTHORITY",
@@ -127,5 +162,7 @@ __all__ = [
     "NOTE_WRITER_EXCLUSIONS",
     "NOTE_WRITER_SCAN_BLIND_SPOTS",
     "NoteWriterSpec",
+    "ROLES",
     "writer_by_id",
+    "writers_with_role",
 ]

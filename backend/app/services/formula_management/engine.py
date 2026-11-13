@@ -83,6 +83,8 @@ class IssueItem:
     description: str
     left_value: Optional[Decimal] = None
     right_value: Optional[Decimal] = None
+    #: 表间审核严重度（ADR-CCN-05）：warning = 只提示，不计入失败
+    severity: str = "warning"
 
 
 @dataclass

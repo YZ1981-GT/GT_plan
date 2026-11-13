@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
+import { execFileSync } from 'node:child_process'
+import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -62,8 +63,9 @@ export function heavyFeatureChunk(id: string, meta?: ChunkMeta): string | undefi
 
 function explicitChunk(id: string): string | undefined {
   const moduleId = id.replace(/\\/g, '/')
-  // dayjs 等 CJS 包依赖的 Rollup 虚拟模块；留在 index 会让 vendor-core 反向 import index
-  if (moduleId === '\0commonjsHelpers.js') return 'vendor-core'
+  // CJS 互操作辅助（getDefaultExportFromCjs 等，Rollup 虚拟模块 \0commonjsHelpers.js）被 vendor-core 里的
+  // CJS 依赖使用，留在入口会让 vendor-core 反向 import index。
+  if (moduleId.includes('commonjsHelpers')) return 'vendor-core'
   if (!moduleId.includes('/node_modules/')) return undefined
 
   // 先固定全站共享运行时。Vue 与 Element Plus 必须放在同一个 vendor-core；
@@ -79,6 +81,24 @@ function explicitChunk(id: string): string | undefined {
     || moduleId.includes('/node_modules/@element-plus/')
     || ELEMENT_PLUS_RUNTIME_DEPS.test(moduleId)) return 'vendor-core'
 
+  // element-plus 的传递依赖必须同属 vendor-core。onlyExplicitManualChunks 下它们不会被自动吸入，
+  // 会落进入口 index，而 vendor-core 又反向 import index、index 静态 import vendor-core，
+  // 形成循环 chunk，生产白屏 `Cannot access 'Rt' before initialization`
+  // （spec frontend-prod-build-white-screen-closure；由 scripts/check-chunk-cycles.mjs 守卫）。
+  if (/\/node_modules\/(?:lodash-es|lodash-unified|dayjs|async-validator|memoize-one|normalize-wheel-es|escape-html|vue-demi)\//.test(moduleId)
+    || moduleId.includes('/node_modules/@vueuse/')
+    || /\/node_modules\/@floating-ui\/(?:core|dom|utils|vue)\//.test(moduleId) // 不含 react-dom，否则 vendor-core 反向依赖 React
+    || moduleId.includes('/node_modules/@popperjs/')
+    || moduleId.includes('/node_modules/@ctrl/tinycolor/')
+    || moduleId.includes('/node_modules/@sxzz/')) return 'vendor-core'
+
+  // Univer 的第三方依赖（rxjs / numfmt / React 全家 / radix 等；应用源码不直接引用）。
+  // onlyExplicitManualChunks 下它们不会跟着 @univerjs 走，会落进 WorkpaperEditor 块，
+  // 而 heavy-univer 反向 import 该块（108 个名字），形成 WorkpaperEditor ↔ heavy-univer 环，
+  // 生产构建打开底稿编辑器报 `Cannot access 'Kp' before initialization`
+  // （spec frontend-prod-build-white-screen-closure 任务 6；由 check-chunk-cycles --strict 守卫）。
+  if (/\/node_modules\/(?:@wendellhu|@radix-ui|@flatten-js|@babel\/runtime|rxjs|numfmt|react|react-dom|scheduler|react-remove-scroll|react-remove-scroll-bar|react-style-singleton|react-transition-group|dom-helpers|use-callback-ref|use-sidecar|aria-hidden|get-nonce|ot-json1|ot-text-unicode|franc-min|async-lock|cjk-regex|collapse-white-space|fast-diff|kdbush|quickselect|rbush|n-gram|opentype\.js|regexp-util|trigram-utils|unicode-regex|unicount|clsx|class-variance-authority|tailwind-merge|localforage|sonner)\//.test(moduleId)
+    || /\/node_modules\/@floating-ui\/react-dom\//.test(moduleId)) return 'heavy-univer'
   if (moduleId.includes('/@univerjs/')) return 'heavy-univer'
   if (moduleId.includes('/@vue-office/') || moduleId.includes('/pdfjs-dist/') || moduleId.includes('/mammoth/')) {
     return 'heavy-office'
@@ -87,8 +107,65 @@ function explicitChunk(id: string): string | undefined {
   return undefined
 }
 
+export interface CandidateFrontendIdentity {
+  expected: string
+  actual: string
+}
+
+const TREE_OID = /^[0-9a-f]{40}$/
+
+/** 候选模式只在 defineConfig 回调内读 git；普通开发模式不调用 git。 */
+export function resolveCandidateFrontendIdentity(
+  env: Record<string, string | undefined> = process.env,
+  argv: string[] = process.argv.slice(2),
+  cwd = process.cwd(),
+): CandidateFrontendIdentity | null {
+  const expected = env.GT_EXPECTED_CANDIDATE_TREE_OID
+  if (!expected) return null
+  if (!TREE_OID.test(expected)) throw new Error('GT_EXPECTED_CANDIDATE_TREE_OID 必须是 40 位小写十六进制')
+  const devPort = Number(env.VITE_DEV_PORT)
+  if (!Number.isInteger(devPort) || devPort <= 0 || devPort === 3030) {
+    throw new Error('候选前端要求 VITE_DEV_PORT 为非 3030 的有效端口')
+  }
+  const apiBase = env.VITE_API_BASE_URL
+  if (!apiBase) throw new Error('候选前端要求显式设置 VITE_API_BASE_URL')
+  let apiPort: string
+  try {
+    const parsed = new URL(apiBase)
+    apiPort = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
+  } catch {
+    throw new Error('候选前端的 VITE_API_BASE_URL 不是有效 URL')
+  }
+  if (apiPort === '9980') throw new Error('候选前端不得代理到共享后端 9980')
+  const forbidden = argv.map((arg) => arg.split('=', 1)[0]).filter((arg) => arg === '--port' || arg === '--host')
+  if (forbidden.length) throw new Error(`候选前端端口/地址只经环境变量传入，不允许参数：${[...new Set(forbidden)].join('、')}`)
+  const actual = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd, encoding: 'utf8' }).trim()
+  if (!TREE_OID.test(actual)) throw new Error(`无法解析候选前端 HEAD^{tree}：${actual}`)
+  const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd, encoding: 'utf8' }).trim()
+  if (dirty) throw new Error(`候选前端 worktree 有受跟踪改动：\n${dirty}`)
+  if (actual !== expected) throw new Error(`候选前端树身份不符：期望 ${expected}，实际 ${actual}`)
+  return { expected, actual }
+}
+
+export function candidatePortGuard(expectedPort: number): Plugin {
+  return {
+    name: 'gt-candidate-port-guard',
+    configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const address = server.httpServer?.address()
+        const actual = typeof address === 'object' && address ? address.port : null
+        if (actual !== expectedPort || actual === 3030) {
+          console.error(`候选前端监听端口不符：期望 ${expectedPort}，实际 ${actual}`)
+          process.exit(1)
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const candidate = resolveCandidateFrontendIdentity({ ...env, ...process.env })
   // 用 127.0.0.1 而非 localhost：后端 uvicorn 仅监听 IPv4（0.0.0.0），
   // Windows 上 localhost 先解析 ::1 → 连接失败回退，每个代理请求固定 +2s
   const apiTarget = process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
@@ -122,19 +199,24 @@ export default defineConfig(({ mode }) => {
     cacheDir: '.vite',
     plugins: [
       vue(),
+      ...(candidate ? [candidatePortGuard(devPort)] : []),
       // 不在 AutoImport 中挂 ElementPlusResolver：
       // 与显式 `import { ElMessage } from 'element-plus'` 冲突时会生成不存在的 ElMessage2。
-      // ElMessage / ElMessageBox 由业务代码显式导入；样式已在 main.ts 全量引入。
+      // 候选 worktree 关闭 dts，避免开发服务器改写受跟踪的声明文件而破坏树身份。
       AutoImport({
         imports: ['vue', 'vue-router', 'pinia'],
-        dts: 'src/auto-imports.d.ts',
+        dts: candidate ? false : 'src/auto-imports.d.ts',
       }),
       Components({
         // 先于 ElementPlusResolver：第一个返回结果的解析器生效
         resolvers: [GridCellAdapterResolver(), ElementPlusResolver({ importStyle: false })],
-        dts: 'src/components.d.ts',
+        dts: candidate ? false : 'src/components.d.ts',
       }),
     ],
+    define: candidate ? {
+      __GT_CANDIDATE_TREE_EXPECTED__: JSON.stringify(candidate.expected),
+      __GT_CANDIDATE_TREE_ACTUAL__: JSON.stringify(candidate.actual),
+    } : {},
     build: {
       // manifest 是包体预算、built smoke 和 verified snapshot 的共同事实源。
       outDir,

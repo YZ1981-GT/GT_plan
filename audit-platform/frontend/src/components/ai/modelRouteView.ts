@@ -41,6 +41,9 @@ export function deactivateConsequence(model: AIModel, models: AIModel[]): string
   if (model.model_type === 'embedding') {
     return '停用后向量没有启用模型，将回落 .env 默认配置（LLM_EMBEDDING_BASE_URL / DEFAULT_EMBEDDING_MODEL）。'
   }
+  if (model.model_type === 'rerank') {
+    return '停用后知识检索不再重排，按向量 / 词法召回分数排序（重排没有 .env 兜底）。'
+  }
   if (model.ocr_capability === 'layout_parsing') return '停用后版面解析没有启用模型，调用会提示「未配置」。'
   return '停用后文字识别没有启用模型，将使用本机内置 OCR 引擎（本机未安装时识别会失败）。'
 }
@@ -97,7 +100,9 @@ export function statusText(candidate: AIRouteCandidate): string {
 }
 
 export function emptyText(route: AIRoute): string {
-  return route.kind === 'layout_parsing' ? '未启用版面解析模型，调用会提示「未配置」' : '未启用模型'
+  if (route.kind === 'layout_parsing') return '未启用版面解析模型，调用会提示「未配置」'
+  if (route.kind === 'rerank') return '未启用重排模型，知识检索按召回分数排序'
+  return '未启用模型'
 }
 
 export function effectiveText(route: AIRoute): string {
@@ -107,11 +112,18 @@ export function effectiveText(route: AIRoute): string {
     const fallback = first && !sameCandidate(first, effective) ? '（兜底）' : ''
     return `${DEPLOYMENT_LABELS[effective.deployment]}「${effective.model_name}」${fallback}`
   }
+  // 重排是可选增强：没有启用行不是故障（检索照常、按召回分数排序），不显示成红色「不可用」
+  if (isOptionalUnconfigured(route)) return '未启用（不重排）'
   if (route.candidates.some(item => item.status === 'unknown')) return '未检测，点击「检测状态」'
   return '不可用'
 }
 
 export function effectiveClass(route: AIRoute): 'ok' | 'unknown' | 'err' {
   if (route.effective) return 'ok'
+  if (isOptionalUnconfigured(route)) return 'unknown'
   return route.candidates.some(item => item.status === 'unknown') ? 'unknown' : 'err'
+}
+
+function isOptionalUnconfigured(route: AIRoute): boolean {
+  return route.kind === 'rerank' && !route.candidates.length && !route.error
 }

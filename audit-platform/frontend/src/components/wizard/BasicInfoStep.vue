@@ -21,7 +21,7 @@
           </el-form-item>
 
           <el-form-item label="企业代码" prop="company_code">
-            <el-input v-model="form.company_code" placeholder="统一社会信用代码" maxlength="18" />
+            <el-input v-model="form.company_code" placeholder="统一社会信用代码" maxlength="18" data-testid="company-code-input" @blur="normalizeCodeField('company_code')" />
           </el-form-item>
 
           <el-form-item prop="short_name">
@@ -244,6 +244,7 @@
               placeholder="直接上级的统一社会信用代码"
               maxlength="18"
               data-testid="parent-code-input"
+              @blur="normalizeCodeField('parent_company_code')"
             />
             <div v-if="selfKindHint" class="gt-self-ref-hint" data-testid="self-ref-hint">{{ selfKindHint }}</div>
           </el-form-item>
@@ -271,7 +272,7 @@
           </el-form-item>
 
           <el-form-item label="控制方代码" prop="ultimate_company_code">
-            <el-input v-model="form.ultimate_company_code" placeholder="最终控制方的统一社会信用代码" maxlength="18" />
+            <el-input v-model="form.ultimate_company_code" placeholder="最终控制方的统一社会信用代码" maxlength="18" data-testid="ultimate-code-input" @blur="normalizeCodeField('ultimate_company_code')" />
           </el-form-item>
 
           <div class="gt-group-hint" data-testid="group-hint">合并项目的下级企业按各项目的上级代码自动识别：子公司进入合并，分公司并入母公司汇总，无需在合并模块再次挂接。</div>
@@ -308,7 +309,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
-import { validateUSCC } from '@/utils/uscc_validator'
+import { normalizeUsccInput, validateUSCC } from '@/utils/uscc_validator'
 import {
   RELATION_OPTIONS,
   SELF_REFERENCE_CONFIRM,
@@ -552,15 +553,25 @@ function applySaved(saved: Partial<BasicInfo> & Record<string, unknown>) {
   }
 }
 
-/** 选填的统一社会信用代码校验（前后端同一规则，需求 1.4） */
+/** 选填的统一社会信用代码校验（前后端同一规则，需求 1.4；对规范化值校验 R1.4） */
 function optionalUsccValidator(_rule: unknown, value: string, callback: (err?: Error) => void) {
   const code = (value || '').trim()
   if (!code) {
     callback()
     return
   }
-  const result = validateUSCC(code)
+  const result = validateUSCC(normalizeUsccInput(code) ?? '')
   callback(result.valid ? undefined : new Error(result.message))
+}
+
+/**
+ * 三码输入框失焦写回规范化值（R1.4）：NFKC → 去首尾空白 → 转大写。
+ * 全角数字 / 字母、小写、首尾空格在提交前就地转成与后端入库一致的形态。
+ */
+function normalizeCodeField(field: 'company_code' | 'parent_company_code' | 'ultimate_company_code') {
+  const raw = form[field]
+  const normalized = normalizeUsccInput(raw)
+  form[field] = normalized ?? ''
 }
 
 const rules: FormRules = {
@@ -574,7 +585,8 @@ const rules: FormRules = {
           callback()
           return
         }
-        const result = validateUSCC(value)
+        // 校验对规范化值进行（R1.4）：全角 / 小写 / 首尾空格先转换再判
+        const result = validateUSCC(normalizeUsccInput(value) ?? '')
         if (!result.valid) {
           callback(new Error(result.message))
         } else {

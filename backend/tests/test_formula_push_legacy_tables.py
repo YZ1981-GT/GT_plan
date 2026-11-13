@@ -156,9 +156,22 @@ async def test_push_heals_a_mirror_written_by_the_old_fallback(env):
 async def test_push_writes_amount_columns_inside_period_groups(env):
     groups = [{"group": "期末数", "start": 1, "span": 2}, {"group": "期初数", "start": 3, "span": 2}]
     await env.add_note("五、1", _note(_table(["项目", "金额", "比例（%）", "金额", "比例（%）"], groups=groups)))
-    await env.push()
+    await env.push(skip_note_followup=True)  # 只验推送认列；提交后的附注公式见下一条
     values = _values((await env.note("五、1")).table_data)
     assert values["库存现金"] == [CASH[0], None, CASH[1], None], "比例列不该被写进期初数"
+
+
+@pytest.mark.asyncio
+async def test_push_then_note_formulas_fill_ratio_columns(env):
+    """R20：推送提交后对写入章节跑附注公式 —— 合计 = 明细之和，比例 = 本行 ÷ 合计 × 100（R2.1 比例预设）。"""
+    groups = [{"group": "期末数", "start": 1, "span": 2}, {"group": "期初数", "start": 3, "span": 2}]
+    await env.add_note("五、1", _note(_table(["项目", "金额", "比例（%）", "金额", "比例（%）"], groups=groups)))
+    await env.push()
+    values = _values((await env.note("五、1")).table_data)
+    end_total, prior_total = CASH[0] + BANK[0], CASH[1] + BANK[1]
+    assert values["合计"][0] == end_total and values["合计"][2] == prior_total
+    assert values["库存现金"][1] == round(CASH[0] / end_total * 100, 2)
+    assert values["银行存款"][3] == round(BANK[1] / prior_total * 100, 2)
 
 
 @pytest.mark.asyncio

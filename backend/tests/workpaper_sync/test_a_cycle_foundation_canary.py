@@ -918,10 +918,16 @@ class TestTemplateFormatDispatch:
         wb.close()
         assert fx_count == 0, f"data_only=True 应返回 0 公式格，实际 {fx_count}"
 
-    def test_sha256_canary_match(self) -> None:
+    def test_sha256_canary_match(self, manifest_slice: dict) -> None:
         """AF-P26: canary A5-1 sha256 一致性检查。
 
         🔴 此断言置于测试最前（概念上），失败即中止——说明模板被修改。
+
+        🔴 2026-11-05：原判据第二句是「文件大小落在 50K~100K」这个拍脑袋区间。模板被
+        `oo-writeback-template-parity-closure` 按会计口径改过公式后缩到 46,790 B ⇒ 恒红，而
+        「模板被改了没有」这件事本来就有单一真源 —— slice 的 `authoritative_templates`
+        逐册登记了 size 与 sha256。改成与它对账：模板真被改时报的是「与登记的册不一致、
+        要重新取证」，不是一个看不出含义的区间。
         """
         candidates = [f for f in _TEMPLATE_DIR.rglob("A5-1*")
                        if f.suffix.lower() == ".xlsx" and "~$" not in f.name]
@@ -930,9 +936,17 @@ class TestTemplateFormatDispatch:
         # 现算值锁定（不写死——用自洽性检验：再读一次应相等）
         digest2 = sha256_file(candidates[0])
         assert digest == digest2, "sha256 自洽性失败——文件可能在读取期间被修改"
-        # 文件大小合理性
-        size = candidates[0].stat().st_size
-        assert 50000 < size < 100000, f"A5-1 大小应在 50K~100K 范围，实际 {size}"
+        rel = candidates[0].relative_to(_TEMPLATE_DIR.parent).as_posix()
+        registered = next(
+            (f for f in manifest_slice["authoritative_templates"]["files"] if f["name"] == rel), None)
+        assert registered is not None, f"{rel} 不在 slice 的权威册清册里 ⇒ 册被换名或清册过期"
+        assert digest == registered["sha256"], (
+            f"{rel} 的 sha256 与 slice 登记的不一致 ⇒ 模板被改过，须重新取证（登记 "
+            f"{registered['sha256'][:16]}… / 现算 {digest[:16]}…）"
+        )
+        assert candidates[0].stat().st_size == registered["size"], (
+            f"{rel} 的大小与 slice 登记的 {registered['size']} 不一致"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

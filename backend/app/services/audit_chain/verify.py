@@ -200,10 +200,15 @@ async def verify_chain(
     db: "AsyncSession",
     *,
     project_id: str | None = None,
+    chain_key: str | None = None,
     from_time: str | None = None,
     to_time: str | None = None,
 ) -> VerifyResult:
-    """异步入口：查 DB 后调 verify_entries。"""
+    """异步入口：查 DB 后调 verify_entries。
+
+    ``project_id`` 保留审计查询端点的兼容接口；运维确认全局链时传 ``chain_key="__global__"``，
+    避免 ``project_id=None`` 被解释为「全表」而把其他项目链混进校验面。
+    """
     from datetime import datetime as dt
     from sqlalchemy import asc, select
     from app.models.audit_log_models import AuditLogEntry
@@ -216,7 +221,13 @@ async def verify_chain(
 
     stmt = select(AuditLogEntry).order_by(asc(AuditLogEntry.ts), asc(AuditLogEntry.id))
 
-    if project_id:
+    if project_id and chain_key:
+        raise ValueError("project_id 与 chain_key 不能同时指定")
+    if chain_key is not None:
+        from .head import _chain_filter
+
+        stmt = stmt.where(_chain_filter(db, chain_key))
+    elif project_id:
         if is_postgres:
             stmt = stmt.where(AuditLogEntry.payload["project_id"].astext == project_id)
         else:

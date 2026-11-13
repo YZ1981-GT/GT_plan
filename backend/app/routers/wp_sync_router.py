@@ -217,9 +217,9 @@ def _not_found() -> HTTPException:
 
 
 def _forbidden(exc: SyncActionForbiddenError) -> HTTPException:
-    """403 的唯一构造点。带 `error_code` 让前端能区分「工作流锁定」与「无权限」。"""
+    """可见资源的拒绝构造点：终态冻结 423，其余权限拒绝 403。"""
     return HTTPException(
-        status_code=403,
+        status_code=http_status_for_refusal(exc),
         detail={"error_code": exc.error_code, "message": str(exc)},
     )
 
@@ -312,11 +312,19 @@ class WpGateVisibilityProbe:
             return {"project_visible": False, "workflow_locked": False, "readonly": True}
         except RateLimited:
             raise
+        from app.models.workpaper_models import WpFileStatus
+        from app.services.workpaper_content_freeze import load_workpaper_status
+
+        status = await load_workpaper_status(self._db, wp_id, for_update=False)
+        workflow_locked = status in {
+            WpFileStatus.review_passed,
+            WpFileStatus.archived,
+        }
         return {
             "project_visible": True,
-            # 统一门的 `readonly`（归档 / 复核通过 / History_Only / reviewer）就是
-            # 同步域的 workflow lock：可见但不可写。
-            "workflow_locked": bool(getattr(ctx, "readonly", False)),
+            # 复核完成/归档是业务终态，必须与 reviewer/History_Only 的访问只读分开：
+            # 前者映射 423，后者仍按权限不足映射 403。
+            "workflow_locked": workflow_locked,
             "readonly": bool(getattr(ctx, "readonly", False)),
             "role": str(getattr(ctx, "role", "")),
             "access_kinds": sorted(str(k) for k in (getattr(ctx, "access_kinds", ()) or ())),
@@ -558,7 +566,8 @@ async def _guard(
         logger.info("sync guard 404 action=%s error_code=%s", action, exc.error_code)
         raise _not_found() from exc
     except SyncActionForbiddenError as exc:
-        logger.info("sync guard 403 action=%s error_code=%s", action, exc.error_code)
+        status = http_status_for_refusal(exc)
+        logger.info("sync guard %s action=%s error_code=%s", status, action, exc.error_code)
         raise _forbidden(exc) from exc
     except VisibilityProbeFailedError as exc:
         raise _domain_error(exc, status=http_status_for_refusal(exc)) from exc
@@ -574,10 +583,19 @@ async def _enforce_entry_edit_lock(svc: _SyncServices, request: Request, scope: 
     裁决 / 重试 / 恢复）不挡：会话只能从这些入口建立，挡了已开的会话收不了尾。排在 ``_guard`` 之后
     （``_guard`` 必须是每个 handler 的第一句 await）。
     """
-    from app.routers._wp_gate import client_instance_of, raise_if_edit_locked
+    from app.routers._wp_gate import (
+        client_instance_of,
+        raise_if_edit_locked,
+        raise_if_workpaper_frozen,
+    )
 
+    await raise_if_workpaper_frozen(svc.session, scope.wp_id, for_update=False)
     await raise_if_edit_locked(
-        svc.session, svc.user_id, client_instance_of(request), scope.wp_id, purpose="online_edit",
+        svc.session,
+        svc.user_id,
+        client_instance_of(request),
+        scope.wp_id,
+        purpose="online_edit",
     )
 
 

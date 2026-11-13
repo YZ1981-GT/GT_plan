@@ -207,13 +207,20 @@ def _no_push_states() -> MagicMock:
     return res
 
 
+def _stale_cleared() -> MagicMock:
+    """同步成功后经统一入口清过期（spec formula-writer-ownership-and-stale R2：stale_state.clear_note_stale 一条 UPDATE）。"""
+    res = MagicMock()
+    res.rowcount = 1
+    return res
+
+
 def _make_db(note: DisclosureNote) -> MagicMock:
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[_project_row(), _scalar_result(note), _no_push_states()])
+    db.execute = AsyncMock(side_effect=[_project_row(), _scalar_result(note), _no_push_states(), _stale_cleared()])
     return db
 
 

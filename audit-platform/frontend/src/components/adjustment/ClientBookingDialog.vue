@@ -1,8 +1,9 @@
 <template>
   <el-dialog v-model="visible" :title="revokeMode ? '撤销客户已入账标记' : '标记客户已入账'" width="760px"
     append-to-body :close-on-click-modal="false" style="max-width: calc(100vw - 32px)">
+    <!-- 与后端一致（adjustment_client_booking.effective_booked_group_ids：所选凭证全部在当前账套才生效），R5.4 -->
     <el-alert v-if="!revokeMode" type="info" :closable="false" show-icon
-      title="确认后，这笔 AJE 在当前账套已包含所选凭证时不再计入调整额；平台不会自动标记。" />
+      title="确认后：当前账套中找到全部所选凭证时，本组 AJE 不再计入试算表调整；账套重导后找不到这些凭证，本组 AJE 自动恢复计入。平台不会自动标记。" />
     <div class="gt-booking-entry">
       <strong>{{ row?.adjustment_no }}</strong>
       <span>{{ row?.description || '无摘要' }}</span>
@@ -25,16 +26,24 @@
     </template>
     <template v-else>
       <div class="gt-booking-title">选择客户入账凭证</div>
-      <el-radio-group v-if="candidates.length" v-model="selectedKey" class="gt-booking-candidates">
-        <el-radio v-for="candidate in candidates" :key="candidate.voucher_key" :value="candidate.voucher_key" border>
-          <div><strong>{{ candidate.label }}</strong> · {{ candidate.summary || '无摘要' }}</div>
-          <small>精确匹配 {{ candidate.matches.length }} 行，距调整提出 {{ candidate.distance_days }} 天</small>
-        </el-radio>
-      </el-radio-group>
-      <el-alert v-else type="warning" :closable="false" show-icon
-        title="当前账套没有自动匹配候选。可粘贴在账簿穿透中复制的完整凭证键，每行一张。" />
-      <el-input v-if="!candidates.length" v-model="manualKeys" type="textarea" :rows="3"
-        placeholder='例如：["2025","001","2025-12-31","记","0008"]' />
+      <template v-if="candidates.length && !manualPick">
+        <el-radio-group v-model="selectedKey" class="gt-booking-candidates">
+          <el-radio v-for="candidate in candidates" :key="candidate.voucher_key" :value="candidate.voucher_key" border>
+            <div><strong>{{ candidate.label }}</strong> · {{ candidate.summary || '无摘要' }}</div>
+            <small>精确匹配 {{ candidate.matches.length }} 行，距调整提出 {{ candidate.distance_days }} 天</small>
+          </el-radio>
+        </el-radio-group>
+        <el-button link type="primary" class="gt-booking-switch" @click="manualPick = true">都不是，按凭证号查找</el-button>
+      </template>
+      <template v-else>
+        <el-alert v-if="!candidates.length" type="info" :closable="false" show-icon class="gt-booking-hint"
+          title="当前账套没有自动匹配的候选：按凭证号查找客户入账的凭证，确认分录后加入，可加入多张。" />
+        <!-- 原先要粘贴凭证键 JSON，改成按凭证号查当前账套（spec voucher-workflow-linkage-lineage-closure R5.1） -->
+        <ClientBookingVoucherPicker v-model="pickedVouchers" :project-id="projectId" :year="year" />
+        <el-button v-if="candidates.length" link type="primary" class="gt-booking-switch" @click="manualPick = false">
+          返回自动匹配的候选
+        </el-button>
+      </template>
       <el-input v-model="note" type="textarea" :rows="2" maxlength="1000" show-word-limit
         placeholder="补充说明（可选）" style="margin-top: 10px" />
     </template>
@@ -56,6 +65,8 @@ import {
   type AdjustmentBookingCandidate,
 } from '@/services/auditPlatformApi'
 import { reportAdjustmentError, type HallEntry } from '@/composables/useAdjustmentHallActions'
+import ClientBookingVoucherPicker from './ClientBookingVoucherPicker.vue'
+import type { PickedBookingVoucher } from './clientBookingVoucher'
 
 const props = defineProps<{ projectId: string; year: number | null }>()
 const emit = defineEmits<{ updated: [] }>()
@@ -65,7 +76,9 @@ const revokeMode = ref(false)
 const row = ref<(HallEntry & { audit_phase?: string; client_booking?: any }) | null>(null)
 const candidates = ref<AdjustmentBookingCandidate[]>([])
 const selectedKey = ref('')
-const manualKeys = ref('')
+/** 自动匹配候选都不对时，改按凭证号查找 */
+const manualPick = ref(false)
+const pickedVouchers = ref<PickedBookingVoucher[]>([])
 const note = ref('')
 const reason = ref('')
 
@@ -74,14 +87,16 @@ function open(nextRow: HallEntry & { audit_phase?: string; client_booking?: any 
   candidates.value = nextCandidates
   revokeMode.value = revoke
   selectedKey.value = nextCandidates[0]?.voucher_key || ''
-  manualKeys.value = ''
+  manualPick.value = false
+  pickedVouchers.value = []
   note.value = ''
   reason.value = ''
   visible.value = true
 }
 
 async function submit() {
-  if (!row.value || props.year == null) return
+  if (!row.value) return
+  if (props.year == null) { ElMessage.warning('项目未填审计年度，请先在项目基本信息中填写'); return }
   saving.value = true
   try {
     if (revokeMode.value) {
@@ -91,10 +106,10 @@ async function submit() {
       })
       ElMessage.success('已撤销客户已入账标记，调整额已恢复')
     } else {
-      const voucherKeys = candidates.value.length
+      const voucherKeys = candidates.value.length && !manualPick.value
         ? [selectedKey.value].filter(Boolean)
-        : manualKeys.value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)
-      if (!voucherKeys.length) { ElMessage.warning('请至少选择或填写一张入账凭证'); return }
+        : pickedVouchers.value.map((voucher) => voucher.voucher_key)
+      if (!voucherKeys.length) { ElMessage.warning('请至少选择一张客户入账凭证'); return }
       await markAdjustmentClientBooked(props.projectId, row.value.entry_group_id, {
         year: props.year, voucher_keys: voucherKeys, note: note.value.trim() || undefined,
       })
@@ -118,4 +133,6 @@ defineExpose({ open })
 .gt-booking-candidates { display: grid; gap: 8px; width: 100%; }
 .gt-booking-candidates :deep(.el-radio) { width: 100%; height: auto; margin: 0; padding: 10px; }
 .gt-booking-candidates small { color: var(--gt-color-text-tertiary); }
+.gt-booking-switch { margin-top: 6px; }
+.gt-booking-hint { margin-bottom: 8px; }
 </style>

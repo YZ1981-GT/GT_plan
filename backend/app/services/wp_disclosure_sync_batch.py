@@ -73,7 +73,9 @@ async def run_sync_batch_from_workpaper(
                 if result.get("blocked_by_manual_override"):
                     raise ValueError(f"附注 {section_id} 被整节人工覆盖保护拦截")
                 if result.get("skipped"):
-                    reason = str(result.get("reason") or "章节不适用")
+                    # 写入归属拒绝接管时 reason 是代码，中文原因在 blocked_writes（spec formula-writer-ownership-and-stale §13）
+                    reason = next((str(b["reason"]) for b in result.get("blocked_writes") or [] if b.get("reason")),
+                                  None) or str(result.get("reason") or "章节不适用")
                     raise ValueError(f"附注 {section_id} 未同步：{reason}")
                 unresolved = [
                     str(name) for name in (result.get("row_scope_unresolved") or [])

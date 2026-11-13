@@ -176,11 +176,11 @@ class TestHealthQuarantineCount:
         _audit_chain_cache["data"] = None
         _audit_chain_cache["ts"] = 0.0
 
-        # _query_audit_chain_health 内部 lazy import redis_client 和 scan_forks
+        # _query_audit_chain_health 内部 lazy import redis_client 和 blocked_chains
         # patch 源模块让 lazy import 拿到 fake 实例
         mock_db = AsyncMock()
         with patch(
-            "app.services.audit_chain.forks.scan_forks",
+            "app.services.audit_chain.forks.blocked_chains",
             AsyncMock(return_value=[]),
         ), patch(
             "app.core.redis.redis_client",
@@ -208,7 +208,7 @@ class TestHealthQuarantineState:
         health_mod._audit_chain_cache.update(data=None, ts=0.0)
         monkeypatch.setattr("app.core.redis.redis_client", DownRedis())
         monkeypatch.setattr(
-            "app.services.audit_chain.forks.scan_forks",
+            "app.services.audit_chain.forks.blocked_chains",
             AsyncMock(return_value=[]),
         )
         result = await health_mod._query_audit_chain_health(AsyncMock())

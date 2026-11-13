@@ -35,6 +35,14 @@ def rdef(f: str) -> dict:
     return {"formula": f}
 
 
+async def _publish_previewed(db, tpl, **kwargs):
+    preview = await sync.publish_preview(db, tpl, changes=kwargs["changes"],
+                                         expected_version=kwargs["expected_version"])
+    fingerprint = preview["preview_fingerprint"]
+    assert len(fingerprint) == 64 and all(c in "0123456789abcdef" for c in fingerprint)
+    return await sync.publish_template(db, tpl, preview_fingerprint=fingerprint, **kwargs)
+
+
 async def _sub(db, project_id) -> FormulaTemplateSubscription | None:
     return (await db.execute(sa.select(FormulaTemplateSubscription).where(
         FormulaTemplateSubscription.project_id == project_id).order_by(
@@ -114,7 +122,8 @@ async def test_save_subscribe_publish_unsubscribe_end_to_end(world):
         {"domain": "report", "slot_key": SLOT2, "definition": rdef("ROW('BS-001')")}])
     assert preview["next_version"] == 2 and preview["summary"]["conflict_count"] == 1
     defer = Decisions(project_choices={str(w["deferrer"]): "defer"})
-    res = await sync.publish_template(db, tpl, expected_version=1, user_id=w["owner"].id, decisions=defer, changes=[
+    res = await sync.publish_template(db, tpl, expected_version=1, user_id=w["owner"].id, decisions=defer,
+                                      preview_fingerprint=preview["preview_fingerprint"], changes=[
         {"domain": "report", "slot_key": SLOT, "definition": rdef(V2)},
         {"domain": "report", "slot_key": SLOT2, "definition": rdef("ROW('BS-001')")}])
     assert res["version"] == 2 and tpl.version == 2
@@ -167,7 +176,7 @@ async def test_pending_and_deferred_template_slots_stay_template_layer(world):
     assert (item.upstream_origin, (await project_rows(db, w["keeper"]))["BS-001"].base_origin) == ("template",
                                                                                                     "template")
     await sync.subscribe(db, project_id=w["deferrer"], tpl=tpl, domain="report", decisions=None, user_id=None)
-    await sync.publish_template(db, tpl, expected_version=1, user_id=None,
+    await _publish_previewed(db, tpl, expected_version=1, user_id=None,
                                 decisions=Decisions.parse({"project_choices": {str(w["deferrer"]): "defer"}}),
                                 changes=[{"domain": "report", "slot_key": SLOT2, "definition": rdef("ROW('BS-001')")}])
     pinned = (await project_rows(db, w["deferrer"]))["BS-002"]
@@ -327,7 +336,7 @@ async def test_generic_domain_tb_detail_template_subscribe_and_publish():
         assert (await tb_detail.load(db, follower))["overrides"]["1001"]["formula"] == "TB('1001','期末余额')*2"
         assert (await tb_detail.load(db, follower))["overrides"]["1001"]["layer"] == "template"
         # 发布模板新版本 → 订阅项目（跟随）自动更新
-        await sync.publish_template(db, tpl, expected_version=1, user_id=admin.id, changes=[
+        await _publish_previewed(db, tpl, expected_version=1, user_id=admin.id, changes=[
             {"domain": "tb_detail", "slot_key": "1001",
              "definition": {"row_name": "库存现金", "formula": "TB('1001','期末余额')*3",
                             "formula_category": "auto_calc"}}])
@@ -341,14 +350,14 @@ async def test_template_diff_and_rollback_creates_new_version(world):
     await sync.subscribe(db, project_id=w["follower"], tpl=tpl, domain="report", decisions=None,
                          user_id=w["owner"].id)
 
-    await sync.publish_template(db, tpl, expected_version=1, user_id=w["owner"].id,
+    await _publish_previewed(db, tpl, expected_version=1, user_id=w["owner"].id,
                                 changes=[{"domain": "report", "slot_key": SLOT,
                                           "definition": rdef(V2)}])
     first_diff = await svc.template_diff(db, tpl, from_version=1, to_version=2)
     assert [(c["slot_key"], c["kind"], c["old"]["formula"], c["new"]["formula"])
             for c in first_diff["changes"]] == [(SLOT, "changed", MINE, V2)]
 
-    await sync.publish_template(db, tpl, expected_version=2, user_id=w["owner"].id,
+    await _publish_previewed(db, tpl, expected_version=2, user_id=w["owner"].id,
                                 changes=[{"domain": "report", "slot_key": SLOT2,
                                           "definition": rdef(G2)}])
     assert tpl.version == 3
@@ -361,8 +370,10 @@ async def test_template_diff_and_rollback_creates_new_version(world):
     assert rollback_by_slot[SLOT]["formula"] == MINE
     assert rollback_by_slot[SLOT2] is None
 
+    rollback_preview = await sync.publish_preview(db, tpl, changes=rollback, expected_version=3)
     replay = await sync.publish_template(
         db, tpl, changes=rollback, expected_version=3, user_id=w["owner"].id,
+        preview_fingerprint=rollback_preview["preview_fingerprint"],
         request_id="rollback-request-1", publish_source="template_rollback",
         item_action="template_rollback", audit_action="template_rollback",
         audit_details={"source_version": 1},
@@ -378,6 +389,7 @@ async def test_template_diff_and_rollback_creates_new_version(world):
 
     replay_again = await sync.publish_template(
         db, tpl, changes=rollback, expected_version=4, user_id=w["owner"].id,
+        preview_fingerprint=rollback_preview["preview_fingerprint"],
         request_id="rollback-request-1", publish_source="template_rollback",
         item_action="template_rollback", audit_action="template_rollback",
         audit_details={"source_version": 1},

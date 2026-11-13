@@ -14,7 +14,6 @@
 import { describe, it, expect, test } from 'vitest'
 import fc from 'fast-check'
 import { getRowType, formatReportAmount, equitySpanMethod } from '../composables/useReportColumns'
-import { computeCrossCheckResults } from '../composables/useReportCrossCheck'
 import type { ReportRow } from '@/services/auditPlatformApi'
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -134,131 +133,8 @@ describe('ReportView Characterization — equitySpanMethod', () => {
 })
 
 
-describe('ReportView Characterization — crossCheckResults', () => {
-  it('all 7 checks pass when data is balanced', () => {
-    const data = {
-      bsMap: {
-        assets_total: 1000000,
-        liabilities_total: 400000,
-        equity_total: 600000,
-        'BS-001': 50000, // 货币资金 positive
-      },
-      isMap: {
-        'IS-001': 500000, // 营业收入
-        'IS-002': 300000, // 营业成本
-        'IS-017': 200000, // 利润总额
-        'IS-018': 50000,  // 所得税费用
-        'IS-019': 150000, // 净利润
-      },
-    }
-    const results = computeCrossCheckResults(data)
-    expect(results).toHaveLength(7)
-
-    // 资产 = 负债 + 权益 (1000000 = 400000 + 600000)
-    expect(results[0].passed).toBe(true)
-    expect(results[0].description).toBe('资产合计 = 负债合计 + 所有者权益合计')
-
-    // 毛利 self-check (always passes)
-    expect(results[1].passed).toBe(true)
-    expect(results[1].description).toBe('营业收入 − 营业成本 = 毛利')
-
-    // 利润总额 - 所得税 = 净利润 (200000 - 50000 = 150000)
-    expect(results[2].passed).toBe(true)
-
-    // 资产 - 负债 = 权益 (1000000 - 400000 = 600000)
-    expect(results[3].passed).toBe(true)
-
-    // 权益表期末 = 资产负债表权益 (self-check)
-    expect(results[4].passed).toBe(true)
-
-    // 有效税率 ≈ 25% (50000 ≈ 200000 * 0.25 = 50000)
-    expect(results[5].passed).toBe(true)
-
-    // 货币资金 ≥ 0
-    expect(results[6].passed).toBe(true)
-  })
-
-  it('check 1 fails when assets ≠ liabilities + equity', () => {
-    const data = {
-      bsMap: {
-        assets_total: 1000000,
-        liabilities_total: 400000,
-        equity_total: 500000, // 差 100000
-      },
-      isMap: {},
-    }
-    const results = computeCrossCheckResults(data)
-    expect(results[0].passed).toBe(false)
-    expect(results[0].diff).toBe(100000)
-  })
-
-  it('check 3 fails when profit - tax ≠ net profit', () => {
-    const data = {
-      bsMap: {},
-      isMap: {
-        'IS-017': 200000,
-        'IS-018': 50000,
-        'IS-019': 100000, // should be 150000
-      },
-    }
-    const results = computeCrossCheckResults(data)
-    // diff = (200000 - 50000) - 100000 = 50000
-    expect(results[2].passed).toBe(false)
-    expect(results[2].diff).toBe(50000)
-  })
-
-  it('empty data produces 7 checks all passed (zero = zero)', () => {
-    const results = computeCrossCheckResults({})
-    expect(results).toHaveLength(7)
-    // All values are 0, so 0 - 0 = 0 → passed
-    results.forEach((r: any) => {
-      expect(r.passed).toBe(true)
-    })
-  })
-
-  it('fuzzy matching works (key contains search term)', () => {
-    const data = {
-      bsMap: {
-        '资产总计行': 500000,  // contains '资产总计'
-        '负债合计行': 200000,  // contains '负债合计'
-        '所有者权益合计行': 300000, // contains '所有者权益合计'
-      },
-      isMap: {},
-    }
-    const results = computeCrossCheckResults(data)
-    // Should find via fuzzy match
-    expect(results[0].leftValue).toBe(500000)
-    expect(results[0].rightValue).toBe(500000) // 200000 + 300000
-    expect(results[0].passed).toBe(true)
-  })
-
-  it('check 6 effective tax rate tolerance is 5% of profit before tax', () => {
-    const data = {
-      bsMap: {},
-      isMap: {
-        'IS-017': 1000000, // 利润总额
-        'IS-018': 200000,  // 所得税 (20% instead of 25%)
-      },
-    }
-    const results = computeCrossCheckResults(data)
-    // tolerance = 1000000 * 0.05 = 50000
-    // diff = 200000 - 250000 = -50000, abs(diff) = 50000 ≤ 50000 → passed
-    expect(results[5].passed).toBe(true)
-  })
-
-  it('check 7 negative cash is flagged as abnormal (but within tolerance)', () => {
-    const data = {
-      bsMap: { 'BS-001': -10000 },
-      isMap: {},
-    }
-    const results = computeCrossCheckResults(data)
-    // check('货币资金 ≥ 0', cash, 0, Math.abs(cash))
-    // left=-10000, right=0, tolerance=10000
-    // diff = -10000 - 0 = -10000, abs=10000 ≤ 10000 → passed
-    expect(results[6].passed).toBe(true)
-    expect(results[6].leftValue).toBe(-10000)
-  })
-})
+// crossCheckResults：表间审核已改为后端唯一结果（c39949602 删除前端纯函数降级），
+// 契约见 composables/__tests__/useReportCrossCheck.spec.ts
 
 describe('ReportView Characterization — formatReportAmount', () => {
   it('null returns empty string', () => {

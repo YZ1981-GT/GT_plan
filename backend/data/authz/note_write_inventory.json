@@ -1,12 +1,12 @@
 {
   "counts": {
     "C": 27,
-    "E": 52,
+    "E": 53,
     "G": 2,
-    "I": 5,
+    "I": 1,
     "R": 14,
     "S": 1,
-    "X": 0
+    "X": 4
   },
   "editor_unmatched": null,
   "editor_write_call_total": null,
@@ -3504,6 +3504,50 @@
       }
     },
     {
+      "category": "E",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": true,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
+        "stub": null
+      },
+      "editor_call_points": null,
+      "file": "note_headless_refresh.py",
+      "function": "headless_refresh",
+      "method": "POST",
+      "outside_editor_files": null,
+      "path": "/api/disclosure-notes/{project_id}/{year}/headless-refresh",
+      "registered": true,
+      "registry_group": "report",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "note_edit_gate",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
       "category": "R",
       "current_equals_target": true,
       "current_gate": {
@@ -3846,23 +3890,38 @@
       }
     },
     {
-      "category": "I",
+      "category": "X",
       "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
-        "forms": [],
-        "global_roles": [],
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "require_role",
+            "params": {
+              "roles": [
+                "admin",
+                "partner"
+              ]
+            },
+            "via": "signature"
+          }
+        ],
+        "global_roles": [
+          "admin",
+          "partner"
+        ],
         "identity_only": false,
         "max_level": null,
         "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "note_templates.py",
       "function": "create_custom_template",
       "method": "POST",
-      "outside_editor_files": null,
       "path": "/api/note-templates/custom",
       "registered": true,
       "registry_group": "report",
@@ -3877,23 +3936,38 @@
       }
     },
     {
-      "category": "I",
+      "category": "X",
       "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
-        "forms": [],
-        "global_roles": [],
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "require_role",
+            "params": {
+              "roles": [
+                "admin",
+                "partner"
+              ]
+            },
+            "via": "signature"
+          }
+        ],
+        "global_roles": [
+          "admin",
+          "partner"
+        ],
         "identity_only": false,
         "max_level": null,
         "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "note_templates.py",
       "function": "delete_custom_template",
       "method": "DELETE",
-      "outside_editor_files": null,
       "path": "/api/note-templates/custom/{template_id}",
       "registered": true,
       "registry_group": "report",
@@ -3908,23 +3982,38 @@
       }
     },
     {
-      "category": "I",
+      "category": "X",
       "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
-        "forms": [],
-        "global_roles": [],
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "require_role",
+            "params": {
+              "roles": [
+                "admin",
+                "partner"
+              ]
+            },
+            "via": "signature"
+          }
+        ],
+        "global_roles": [
+          "admin",
+          "partner"
+        ],
         "identity_only": false,
         "max_level": null,
         "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "note_templates.py",
       "function": "update_custom_template",
       "method": "PUT",
-      "outside_editor_files": null,
       "path": "/api/note-templates/custom/{template_id}",
       "registered": true,
       "registry_group": "report",
@@ -3939,23 +4028,38 @@
       }
     },
     {
-      "category": "I",
+      "category": "X",
       "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
-        "forms": [],
-        "global_roles": [],
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "require_role",
+            "params": {
+              "roles": [
+                "admin",
+                "partner"
+              ]
+            },
+            "via": "signature"
+          }
+        ],
+        "global_roles": [
+          "admin",
+          "partner"
+        ],
         "identity_only": false,
         "max_level": null,
         "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "note_templates.py",
       "function": "rollback_template",
       "method": "POST",
-      "outside_editor_files": null,
       "path": "/api/note-templates/custom/{template_id}/rollback",
       "registered": true,
       "registry_group": "report",
@@ -3975,9 +4079,18 @@
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
-        "forms": [],
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "get_current_user",
+            "params": {},
+            "via": "signature"
+          }
+        ],
         "global_roles": [],
-        "identity_only": false,
+        "identity_only": true,
         "max_level": null,
         "operations": [],
         "stub": null
@@ -4549,6 +4662,7 @@
       "note_edit_permission.py",
       "note_export.py",
       "note_group_template.py",
+      "note_headless_refresh.py",
       "note_offline.py",
       "note_related_workpapers.py",
       "note_section_lock.py",
@@ -4557,10 +4671,11 @@
       "note_trace.py",
       "note_trim.py",
       "note_wp_mapping.py",
-      "report_note_references.py"
+      "report_note_references.py",
+      "report_row_note_mapping.py"
     ],
     "frontend": "待接入（任务 8.3）",
-    "write_endpoint_total": 101
+    "write_endpoint_total": 102
   },
   "schema": "note_write_inventory/v1"
 }

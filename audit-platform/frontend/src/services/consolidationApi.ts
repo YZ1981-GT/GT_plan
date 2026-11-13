@@ -566,6 +566,7 @@ export interface ConsolNoteFormulaSection {
 
 export interface ConsolNoteFormulaList {
   template_type: ConsolNoteTemplateType
+  can_edit_global: boolean
   count: number
   sections: ConsolNoteFormulaSection[]
 }
@@ -623,6 +624,7 @@ export interface ConsolNoteFillResult {
   kept_manual: Array<{ row_index: number; col_index: number; target_row: number; current: string; formula_value: string | null }>
   blank: Array<{ row_index: number; col_index: number; target_row: number | null; reason: string }>
   is_stale: boolean
+  data_digest?: string | null
   data: { headers: any[]; rows: string[][]; manual_cells?: Array<{ row: number; col: number }>; [k: string]: any }
 }
 
@@ -745,6 +747,8 @@ export interface ConsolTreeDiagnostic {
   message: string
   company_code: string | null
   node_key: string | null
+  /** 涉及该诊断的项目 id；仅重复项目 / 关系冲突诊断返回。 */
+  project_ids?: string[]
   level: 'warning' | 'info'
 }
 
@@ -1595,10 +1599,11 @@ export interface MappingRule { id: string; project_id: string; section_id: strin
 export interface SourceGroup { hash: string; section_id: string; source_rows: Array<{ label: string; row_type: string; key: string; occurrence?: number; group?: string; group_occurrence?: number }>; entities: Array<{ node_key: string; project_id: string; company_name: string }>; has_rule: boolean; rule_id: string | null; all_confirmed: boolean }
 export interface StaleEntity { node_key: string; company_name: string; old_hash: string; new_hash: string; status: 'stale' }
 /** 明细映射建议：`auto_confirmable` = 下推行 / 精确 / 别名 / 通用别名 / 历史且有目标行（「⚡ 自动映射」只确认这类） */
-export interface MappingSuggestion { source_label: string; /** 同名行逐个建议时的出现序号（R11） */ source_occurrence?: number; /** 同名行所在分组、可读写法与组内序号（R3） */ source_group?: string; source_group_label?: string; source_group_occurrence?: number; suggested_target: { target_row_id: string; canonical_name: string } | null; confidence: number; match_type: 'exact_id' | 'exact' | 'alias' | 'global_alias' | 'previous_year' | 'history' | 'fuzzy' | 'position' | 'manual'; candidates: any[]; auto_confirmable?: boolean }
+export interface MappingSuggestion { source_label: string; /** 同名行逐个建议时的出现序号（R11） */ source_occurrence?: number; /** 同名行所在分组、可读写法与组内序号（R3） */ source_group?: string; source_group_label?: string; source_group_occurrence?: number; suggested_target: { target_row_id: string; canonical_name: string } | null; confidence: number; match_type: 'exact_id' | 'exact' | 'alias' | 'global_alias' | 'aging_bucket' | 'total_row' | 'total_ignored' | 'previous_year' | 'history' | 'fuzzy' | 'position' | 'manual'; candidates: any[]; auto_confirmable?: boolean; /** 建议忽略的行（模板没有的合计 / 小计行，total_ignored）带 ignore + 原因 */ mapping_action?: 'map' | 'ignore'; ignore_reason?: string }
 /** 一家企业单体附注的来源读取状态（found 已读到 / missing 未生成 / not_applicable 本期无此情形 / no_source 合并特有章节 / unreadable 读不出表） */
-export interface EntitySourceStatus { node_key: string; project_id: string; company_name: string; status: 'found' | 'missing' | 'not_applicable' | 'no_source' | 'unreadable'; reason: string | null; table_name?: string | null; row_count?: number; unmatched_columns?: string[]; ratio_columns?: string[] }
-export interface DetailRefreshPreview { preview_token: string; project_id: string; section_id: string; year: number; template_version_id: string | null; template_rows: DetailTemplateRow[]; groups: SourceGroup[]; stale_entities: StaleEntity[]; suggestions: MappingSuggestion[]; entity_count: number; group_count: number; stale_count: number; entity_sources?: EntitySourceStatus[]; missing_count?: number }
+export interface EntitySourceStatus { node_key: string; project_id: string; company_name: string; status: 'found' | 'missing' | 'not_applicable' | 'no_source' | 'unreadable'; reason: string | null; table_name?: string | null; row_count?: number; unmatched_columns?: string[]; ratio_columns?: string[]; /** 并进「合计」行的单体行（「小计」「减：坏账准备」） */ folded_rows?: string[] }
+/** `auto_confirmable_count` / `needs_review_count`：后端按 `is_auto_confirmable` 分的建议行数（R11 弹窗顶部显示比例；与前端 `suggestionStatus` 同口径，不等即口径漂移） */
+export interface DetailRefreshPreview { preview_token: string; project_id: string; section_id: string; year: number; template_version_id: string | null; template_rows: DetailTemplateRow[]; groups: SourceGroup[]; stale_entities: StaleEntity[]; suggestions: MappingSuggestion[]; entity_count: number; group_count: number; stale_count: number; entity_sources?: EntitySourceStatus[]; missing_count?: number; auto_confirmable_count?: number; needs_review_count?: number }
 export interface ConfirmMappingResult { action: 'confirmed'; rule_id: string; version_number: number; bound_count: number; excluded_count: number }
 export interface ApplyDetailResult { status: 'applied' | 'skipped_locked'; section_id: string; node_key?: string | null; applied_entity_count?: number; filled_count?: number; kept_manual_count?: number; reason?: string; skipped_entities?: Array<{ node_key: string; reason: string }>; unbound_entities?: Array<{ node_key: string; company_name: string }>; out_of_scope_count?: number }
 export interface SuggestTemplateResult { section_id: string; entity_count: number; group_count: number; suggested_rows: Array<DetailTemplateRow & { frequency: number; total_amount: number; entity_total: number; origin?: 'template' | 'source' }>; entity_sources?: EntitySourceStatus[] }
@@ -1625,3 +1630,136 @@ export interface AutoMapSection { section_id: string; status: 'mapped' | 'partia
 export interface AutoMapResult { template_type: string; sections: AutoMapSection[]; summary: { sections: number; mapped: number; partial: number; pending: number; skipped: number; failed: number; templates_created: number; confirmed_entities: number; pending_entities: number; confirmed_unique_entities?: number; pending_unique_entities?: number } }
 /** ⚡ 自动映射（调用方自管提示 ⇒ 静默）；`section_ids` 为空 = 全部有单体对应的章节 */
 export async function autoMapDetail(projectId: string, data: { year: number; section_ids?: string[] | null }): Promise<AutoMapResult> { return api.post(`/api/projects/${projectId}/consol-note-detail-refresh/auto-map`, data, { _silent: true } as any) }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 签字快照（批 7 任务 7.4）：列表 / 完整性还原 / 签字 vs 当前对比 / 下载
+// 后端 report_trace.py 已有列表 / restore / compare / download；此处只接线，不重建。
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 快照 operation 引用（最近一次成功 operation 摘要） */
+export interface ConsolSnapshotOperationRef {
+  operation_id?: string | null
+  revision?: number | null
+  status?: string | null
+  request_hash?: string | null
+}
+
+/** 快照 version 引用（最近一次成功 operation 的版本向量摘要） */
+export interface ConsolSnapshotVersionRef {
+  digest?: string | null
+  tree_fingerprint?: string | null
+  tree_revision?: number | null
+  tb_digest?: string | null
+  elimination_digest?: string | null
+  formula_digest?: string | null
+  note_mapping_digest?: string | null
+  template_digest?: string | null
+}
+
+/** 列表项：v2 manifest 概要（后端只读既存键，不解压还原） */
+export interface ConsolSnapshotListItem {
+  id: string
+  year: number
+  trigger_reason: string
+  created_at: string | null
+  created_by: string | null
+  /** gzip+base64（v1）/ manifest-v2（v2）/ null（旧空壳） */
+  format: string | null
+  /** 签字 / 锁定快照只读冻结 */
+  locked: boolean
+  /** 根 hash（v2）/ 整体 hash（v1） */
+  root_hash: string | null
+  manifest_version: number | null
+  /** 诊断快照允许 partial（有分片采集失败）；签字快照 fail-closed 不会 partial */
+  partial: boolean
+  failed_sources: string[]
+  captured_sources: string[]
+  operation_ref: ConsolSnapshotOperationRef
+  version_ref: ConsolSnapshotVersionRef
+  counts: Record<string, number>
+}
+
+/** 创建快照回执（manual 诊断或 sign/lock 签字） */
+export interface ConsolSnapshotCreateResult {
+  id: string
+  year: number
+  hash: string
+  locked: boolean
+  meta?: Record<string, unknown>
+  manifest?: Record<string, unknown>
+  locked_project?: Record<string, unknown>
+}
+
+/** sign/lock fail-closed 拒绝明细（后端 409 detail） */
+export interface ConsolSnapshotRejection {
+  code: string
+  message: string
+  failures: Array<{ category: string; code: string; message: string; detail?: Record<string, unknown> }>
+}
+
+/** 完整性还原结果（逐分片 + 根 hash 校验；只读，不写库） */
+export interface ConsolSnapshotRestoreResult {
+  hash_valid: boolean
+  hash: string | null
+  locked: boolean
+  root_valid?: boolean
+  shard_mismatches?: string[]
+  manifest?: Record<string, unknown>
+  meta?: Record<string, unknown>
+  legacy?: boolean
+  error?: string
+  data?: Record<string, unknown>
+}
+
+/** 签字时 vs 当前实时合并数逐科目对比 */
+export interface ConsolSnapshotCompareRow {
+  account_code: string
+  snapshot_amount: string
+  current_amount: string
+  changed: boolean
+}
+export interface ConsolSnapshotCompareResult {
+  by_account: ConsolSnapshotCompareRow[]
+  changed_count: number
+  hash_valid: boolean
+}
+
+/** 列表（最近 20 条）；调用方自管错误提示 */
+export async function listConsolSnapshots(projectId: string): Promise<ConsolSnapshotListItem[]> {
+  return api.get(P.snapshots(projectId), { _silent: true } as any)
+}
+
+/**
+ * 创建快照。reason=manual 为诊断快照（允许 partial，仅编辑权限）；
+ * reason∈{sign,signed,lock,...} 为签字锁定（fail-closed，被拒时抛 409，detail 为 ConsolSnapshotRejection）。
+ * 调用方自管错误提示（409 拒绝原因要逐条展示）。
+ */
+export async function createConsolSnapshot(
+  projectId: string, opts: { year?: number | null; reason?: string } = {},
+): Promise<ConsolSnapshotCreateResult> {
+  const params: Record<string, string | number> = { reason: opts.reason ?? 'manual' }
+  if (opts.year != null) params.year = opts.year
+  return api.post(P.snapshots(projectId), undefined, { params, _silent: true } as any)
+}
+
+/** 完整性校验（还原 + 逐分片/根 hash）；调用方自管错误提示 */
+export async function restoreConsolSnapshot(projectId: string, snapshotId: string): Promise<ConsolSnapshotRestoreResult> {
+  return api.get(P.snapshotRestore(projectId, snapshotId), { _silent: true } as any)
+}
+
+/** 签字时 vs 当前对比；调用方自管错误提示 */
+export async function compareConsolSnapshot(projectId: string, snapshotId: string): Promise<ConsolSnapshotCompareResult> {
+  return api.get(P.snapshotCompare(projectId, snapshotId), { _silent: true } as any)
+}
+
+/**
+ * 下载快照还原后 JSON。浏览器原生下载带不上 Bearer 头 ⇒ 走 authed 下载助手（downloadFile）。
+ * silent：404（快照不存在）等预期错误由调用方处理。
+ */
+export async function downloadConsolSnapshot(projectId: string, snapshotId: string, year: number): Promise<void> {
+  await downloadFile(P.snapshotDownload(projectId, snapshotId), {
+    method: 'get',
+    fileName: `consol-snapshot-${year}-${snapshotId.slice(0, 8)}.json`,
+    silent: true,
+  })
+}

@@ -34,7 +34,18 @@ async def _persist_progress(
             stage=stage,
         )
         await db.commit()
-        return updated
+    if updated:
+        from app.services.platform_job_events import broadcast_job_update
+
+        broadcast_job_update(
+            claim,
+            status="running",
+            current=current,
+            total=total,
+            stage=stage,
+            message=message,
+        )
+    return updated
 
 
 async def _heartbeat(claim: jobs.PlatformJobClaim, lost: asyncio.Event) -> None:
@@ -69,7 +80,7 @@ async def run_once() -> bool:
     executor = get_executor(claim.operation)
     if executor is None:
         async with async_session() as db:
-            await jobs.finish_failure(
+            settled = await jobs.finish_failure(
                 db,
                 claim,
                 error_code="executor_missing",
@@ -77,6 +88,15 @@ async def run_once() -> bool:
                 retryable=False,
             )
             await db.commit()
+        if settled:
+            from app.services.platform_job_events import broadcast_job_update
+
+            broadcast_job_update(
+                claim,
+                status="failed",
+                error_code="executor_missing",
+                message=f"未注册任务执行器：{claim.operation}",
+            )
         return True
 
     lost = asyncio.Event()
@@ -98,17 +118,27 @@ async def run_once() -> bool:
             return True
         async with async_session() as db:
             if await jobs.cancellation_requested(db, claim):
-                await jobs.finish_cancelled(db, claim)
+                settled = await jobs.finish_cancelled(db, claim)
+                terminal_status = "cancelled"
             elif lost.is_set():
                 await db.rollback()
                 return True
             else:
-                await jobs.finish_success(
+                settled = await jobs.finish_success(
                     db,
                     claim,
                     result_ref=outcome.result_ref,
                 )
-            await db.commit()
+                terminal_status = "succeeded"
+            if settled:
+                await db.commit()
+            else:
+                await db.rollback()
+        if settled:
+            from app.services.platform_job_events import broadcast_job_update
+
+            broadcast_job_update(claim, status=terminal_status)
+
     except asyncio.CancelledError:
         # 不写失败。租约到期后其他 worker 可安全接管。
         raise
@@ -130,6 +160,15 @@ async def run_once() -> bool:
                 )
                 terminal = not retryable or claim.attempt >= claim.max_attempts
             await db.commit()
+        if settled:
+            from app.services.platform_job_events import broadcast_job_update
+
+            broadcast_job_update(
+                claim,
+                status="cancelled" if cancelled else ("failed" if terminal else "retry_wait"),
+                error_code=None if cancelled else type(exc).__name__,
+                message="任务已取消" if cancelled else str(exc),
+            )
         cleanup_path = getattr(exc, "cleanup_path", None)
         if settled and terminal and cleanup_path is not None:
             from pathlib import Path
@@ -147,6 +186,9 @@ async def run(stop_event: asyncio.Event) -> None:
     """启动时自动消费 queued/过期 running；停机后租约负责恢复。"""
     # 延迟导入 executor 模块，避免 registry 与业务服务循环依赖。
     from app.services.bulk_tab import durable_job_executor  # noqa: F401
+    from app.services import export_pack_executor  # noqa: F401
+    from app.services.consol_note_reaggregate_executor import execute_consol_note_reaggregate  # noqa: F401
+    from app.services.formula_push import durable_job_executor as formula_push_durable_job_executor  # noqa: F401
 
     while not stop_event.is_set():
         try:

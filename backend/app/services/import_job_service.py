@@ -1,4 +1,4 @@
-﻿"""导入作业服务 — Durable Job 状态机
+"""导入作业服务 — Durable Job 状态机
 
 将导入任务从 asyncio.create_task 升级为持久化作业：
 - 作业状态持久化到数据库

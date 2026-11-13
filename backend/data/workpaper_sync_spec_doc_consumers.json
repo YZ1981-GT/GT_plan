@@ -10,8 +10,8 @@
   },
   "counts": {
     "total": 35,
-    "ok": 8,
-    "registered_unreviewed": 26,
+    "ok": 11,
+    "registered_unreviewed": 23,
     "retired": 1
   },
   "consumers": {
@@ -178,16 +178,6 @@
       "owner_task": "0.6",
       "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
     },
-    "backend/scripts/gen/generate_workpaper_sync_program_milestones.py": {
-      "docs": [
-        "tasks.md"
-      ],
-      "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
-    },
     "backend/scripts/gen/generate_workpaper_task63_subcode_adjudication.py": {
       "docs": [
         "requirements.md",
@@ -231,6 +221,38 @@
       "owner_task": "7.1",
       "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
     },
+    "backend/tests/workpaper_sync/_test_task20_writer_gate_criteria.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "2026-11-04 从 test_task20_writer_gate.py 拆出的判据层：Wave 6 文档派生判据按内容标记（_FROZEN_MARKERS）绑定冻结快照；当前 multi_resolver 归属改读 active 2.8 与里程碑登记，已现算验证"
+    },
+    "backend/tests/workpaper_sync/_test_task30_closure_gate_criteria.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "frozen_wave6",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "2026-11-04 从 test_task30_closure_gate.py 拆出的判据层：Wave 6 tasks.md 按内容标记（_FROZEN_TASKS_MARKERS）绑定冻结快照；当前 owner 改读里程碑定义，已现算验证"
+    },
+    "backend/tests/workpaper_sync/_test_workpaper_sync_program_milestones_criteria.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "uses_resolver": true,
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.6",
+      "note": "2026-11-04 从里程碑用例拆出的判据层：独立现算口径读 active tasks.md（两级任务号），G0-x 执行卡 evidence 经 resolve_spec_dir 取归档快照，已现算验证"
+    },
     "backend/tests/workpaper_sync/test_current_state_projection.py": {
       "docs": [
         "design.md",
@@ -266,28 +288,6 @@
     "backend/tests/workpaper_sync/test_task15_content_mutation.py": {
       "docs": [
         "design.md"
-      ],
-      "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
-    },
-    "backend/tests/workpaper_sync/test_task20_writer_gate.py": {
-      "docs": [
-        "design.md",
-        "requirements.md",
-        "tasks.md"
-      ],
-      "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
-    },
-    "backend/tests/workpaper_sync/test_task30_closure_gate.py": {
-      "docs": [
-        "tasks.md"
       ],
       "uses_resolver": false,
       "contract_kind": "unreviewed",
@@ -387,6 +387,15 @@
       "status": "registered_unreviewed",
       "owner_task": "7.1",
       "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+    }
+  },
+  "outside_discovery": {
+    "backend/scripts/gen/generate_workpaper_sync_program_milestones.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "why": "2026-11-04 起不再硬编码核心 spec 名（归档依赖守卫由 workpaper_sync_program_milestone_definitions.json 声明），AST 发现谓词看不见它；它仍按定义 JSON 里的 spec 清单解析各 spec 的 tasks.md",
+      "covered_by": "backend/tests/workpaper_sync/_test_workpaper_sync_program_milestones_criteria.py"
     }
   }
 }

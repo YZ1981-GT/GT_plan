@@ -79,7 +79,9 @@ class AllReportsGeneratedRule(GateRule):
             )
         except Exception as e:
             logger.error("[CHAIN-REPORTS] check error: %s", e)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class AllNotesGeneratedRule(GateRule):
@@ -129,7 +131,9 @@ class AllNotesGeneratedRule(GateRule):
             )
         except Exception as e:
             logger.error("[CHAIN-NOTES] check error: %s", e)
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class ConsistencyPassedRule(GateRule):
@@ -166,17 +170,9 @@ class ConsistencyPassedRule(GateRule):
             gate = ConsistencyGate(db)
             result = await gate.run_all_checks(project_id, year)
         except Exception as exc:
-            from app.core.config import settings
-
-            mode = getattr(settings, "CONSISTENCY_GATE_ENFORCEMENT", "observe")
-            sev = GateSeverity.blocking if mode == "enforce" else GateSeverity.warning
-            return GateRuleHit(
-                rule_code=self.rule_code,
-                error_code=self.error_code,
-                severity=sev,
-                message=f"一致性检查未能运行：{type(exc).__name__}：{str(exc)[:200]}",
-                location={"project_id": str(project_id)},
-                suggested_action="请联系管理员检查系统日志",
+            logger.error("[CHAIN-CONSISTENCY] check error: %s", exc)
+            return self.not_executed(
+                f"检查异常，未执行：{type(exc).__name__}：{str(exc)[:200]}"
             )
 
         decision = gate_decision(result, consumer="chain_rule")

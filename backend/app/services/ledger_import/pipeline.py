@@ -24,15 +24,11 @@ from uuid import UUID
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "PipelineResult",
-    "ProgressCallback",
-    "CancelChecker",
-    "PhaseMarker",
-    "ProgressState",
-    "execute_pipeline",
-    "_handle_cancel",
-    "_detect_memory_pressure",
+    "PipelineResult", "ProgressCallback", "CancelChecker", "PhaseMarker",
+    "ProgressState", "execute_pipeline", "_handle_cancel", "_detect_memory_pressure",
 ]
+# C4 伴生 `profiler_report.py`：pipeline `_perf` → StagedProfiler.to_dict()。
+from app.services.ledger_import.profiler_report import _build_profiler_report  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +96,8 @@ class PipelineResult:
     blocking_messages: list[str] = field(default_factory=list)
     append_report: dict[str, Any] | None = None
     voucher_diff_report: dict[str, Any] | None = None
+    # C4：StagedProfiler.to_dict()；详见 profiler_report.py。可塞 ImportJob.metadata。
+    profiler_report: dict[str, Any] | None = None
 
 
 # Callback types
@@ -267,7 +265,13 @@ async def execute_pipeline(
     from app.services.dataset_service import DatasetService
     from app.services.smart_import_engine import rebuild_aux_balance_summary
 
-    from .converter import convert_balance_rows, convert_balance_rows_v2, convert_ledger_rows, convert_ledger_rows_v2
+    from .converter import (
+        convert_balance_rows,
+        convert_balance_rows_v2,
+        convert_ledger_rows,
+        convert_ledger_rows_v2,
+        dedupe_balance_rows_across_sheets,
+    )
     from .detector import detect_file_from_path
     from .identifier import identify
     from .parsers.csv_parser import iter_csv_rows_from_path
@@ -471,6 +475,7 @@ async def execute_pipeline(
     all_findings: list[Any] = []
     total_rows_parsed = 0
     total_balance_written = 0
+    pending_balance_rows: list[dict] = []
     total_aux_balance_written = 0
     total_ledger_written = 0
     total_aux_ledger_written = 0
@@ -491,6 +496,10 @@ async def execute_pipeline(
         return (
             f"已处理 {progress_state.rows_processed:,}/{progress_state.total_rows_est:,} 行"
         )
+
+    has_main_ledger_sheet = any(
+        s.table_type == "ledger" for d in detections.values() for s in d.sheets
+    )
 
     for filename, filepath in file_sources:
         fd = detections[str(filepath)]
@@ -613,6 +622,10 @@ async def execute_pipeline(
                     aux_ledger = ledger_result_v2.aux_rows
                     # 合并 v2 warnings 到 all_findings
                     all_findings.extend(ledger_result_v2.warnings)
+                    if sheet.table_type == "aux_ledger" and has_main_ledger_sheet:
+                        # 本次导入已有序时账 sheet 提供主表：辅助明细 sheet 的每行同样会转出一条主表行，
+                        # 再写入会让 tb_ledger 同一分录出现两份（序时账查询重复），只写辅助表。
+                        ledger = []
                     _t_convert += _time.time() - _t
                     _t = _time.time()
                     await _insert(TbLedger, ledger)
@@ -660,12 +673,28 @@ async def execute_pipeline(
                     len(balance_cleaned_accumulated), len(bal), len(aux_bal),
                 )
                 _t = _time.time()
-                await _insert(TbBalance, bal)
+                # 主表行先缓存、全部 sheet 处理完再跨 sheet 去重后写入：
+                # 「科目余额表」sheet 与「辅助余额表」sheet 各自 convert，辅助 sheet 会为
+                # 同一科目再聚合出一条虚拟汇总行（_aggregated_from_aux），分 sheet 直接写入
+                # 就会让 tb_balance 同科目出现两行。
+                pending_balance_rows.extend(bal)
                 await _insert(TbAuxBalance, aux_bal)
                 _t_insert += _time.time() - _t
                 _n_inserts += 2
-                total_balance_written += len(bal)
                 total_aux_balance_written += len(aux_bal)
+
+    if pending_balance_rows:
+        _t = _time.time()
+        merged_bal = dedupe_balance_rows_across_sheets(pending_balance_rows)
+        if len(merged_bal) != len(pending_balance_rows):
+            logger.info(
+                "Pipeline %s 跨 sheet 主表去重: %d → %d",
+                job_id, len(pending_balance_rows), len(merged_bal),
+            )
+        await _insert(TbBalance, merged_bal)
+        _t_insert += _time.time() - _t
+        _n_inserts += 1
+        total_balance_written += len(merged_bal)
 
     logger.info(
         "Pipeline %s streaming done: %d+%d balance, %d+%d ledger",
@@ -799,6 +828,11 @@ async def execute_pipeline(
     logger.info("[perf] %s phases: %s | total=%.1fs",
                 job_id, " → ".join(lines[1:]), _time.time() - _perf_t0)
 
+    profiler = _build_profiler_report(
+        _perf, _perf_t0, staging_rows=total_rows_parsed,
+        rebuild_rows=total_balance_written + total_aux_balance_written,
+    )
+
     return PipelineResult(
         success=True,
         dataset_id=staging_dataset_id,
@@ -812,4 +846,5 @@ async def execute_pipeline(
         year=import_year,
         append_report=append_report,
         voucher_diff_report=voucher_diff_report,
+        profiler_report=profiler,
     )

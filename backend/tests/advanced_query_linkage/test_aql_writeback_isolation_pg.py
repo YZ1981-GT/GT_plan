@@ -1,19 +1,27 @@
 """回写隔离与预览门的真 PG 回归（advanced-query-linkage-closure 任务 14；R4.1、R4.2、R4.5；变异 #11、#21、B4-b、B4-d）。
 
 design §10.2 两行：
-- 「回写不锁他项目行」：目标 = 活项目中 updated_at 最早的一张已提交底稿、【UAT】合成集团母公司的一条 consol_note_data。
-  会话 A（回滚事务）以【UAT】子公司A 为请求项目直调写入方，分别得 ``WritebackTargetNotFound`` / ``NoteRecordNotFound``；
+- 「回写不锁他项目行」：目标 = 活项目中 updated_at 最早的一张已提交底稿、合并口径且有合并附注数据的项目（能力
+  ``consolidated_with_notes``）的一条 consol_note_data。会话 A（回滚事务）以自建【测试】项目为请求项目直调写入方，
+  分别得 ``WritebackTargetNotFound`` / ``NoteRecordNotFound``；
   A 的事务**未结束**时，会话 B 对目标行 ``SELECT … FOR UPDATE NOWAIT`` 必须成功（证明 A 既没读到也没锁住它）；
   两会话都回滚，目标行指纹（``md5(row_to_json(...))``）前后一致。先做 NOWAIT 再判异常类型：取行条件被改坏时红在
   「会话 A 锁住了他项目行（LockNotAvailable）」上，而不是只红在异常类型上。
 - 「回写预览门」：同一底稿目标经 writeback-preview ⇒ 条目 ``target_not_in_project``（不解析地址、不读旧值）、
   ``enter_confirmation=false`` + 提示；writeback-confirm ⇒ 409 ``WRITEBACK_CONFLICT``，写入方（在类上替换的下一层）零调用。
 
-另：cell-writeback module=tb ⇒ 422 且【UAT】子公司B 的试算行逐值不变（R4.1，design §10.2 的「UB 试算行不变」）；
-writeback-confirm 的写入方异常按 cell-writeback 同口径映射、整批回滚（design §3.7：任一目标失败，一个都不写）。
+另：cell-writeback（已退役）⇒ 410 且一个有试算行的真实项目（能力 ``tb_detail``）的试算行逐值不变（R4.1，design
+§10.2 的「``UB`` 试算行不变」）；writeback-confirm 的写入方异常按 cell-writeback 同口径映射、整批回滚（design §3.7：
+任一目标失败，一个都不写）。
 
 请求经 httpx ASGI 真发到生产注册的 custom_query / custom_query_writeback router，只替换 ``get_current_user``（系统 admin）
-与 ``get_db``（真库回滚事务会话）。真实项目只读（只读查询与 NOWAIT 加锁验证）；写入只在回滚事务里、只写【UAT】项目。
+与 ``get_db``（真库回滚事务会话）。真实项目只读（只读查询与 NOWAIT 加锁验证）；写入只在回滚事务里、只写自建
+【测试】项目。
+
+🔴 2026-11-03 阶段 0 改造：原先请求项目写死【UAT】子公司A（``UA``）、附注目标取【UAT】合成集团母公司（``UP``）、
+试算行指纹取【UAT】子公司B（``UB``），三个 UUID 现算都已不存在。附注用例因此在前置上红；更隐蔽的是试算行指纹 ——
+``UB`` 不存在时指纹恒为 ``(0, NULL)``，「前后一致」是空转。现在请求项目自建（与被测会话同一回滚事务），附注目标与
+试算行指纹按能力解析，且指纹前置要求行数 > 0。
 """
 from __future__ import annotations
 
@@ -43,7 +51,7 @@ from app.services.custom_query.snapshot_writer import (
     snapshot_writer,
 )
 from app.services.custom_query.snapshot_writer_modules import NoteRecordNotFound
-from tests.advanced_query_linkage.gold import UA, UB, UP
+from tests.advanced_query_linkage.project_picks import Pick
 from tests.authz_world import build_app, pg_engine
 
 pytestmark = pytest.mark.pg_only
@@ -80,25 +88,29 @@ def _singletons_have_no_instance_overrides():
     yield
 
 
-async def _foreign_workpaper(gold) -> tuple[uuid.UUID, str]:
-    """活项目里 updated_at 最早的一张已提交底稿（不属于请求项目【UAT】子公司A）。"""
+async def _foreign_workpaper(gold, request_project: Pick) -> tuple[uuid.UUID, str]:
+    """活项目里 updated_at 最早的一张已提交底稿（不属于请求项目）。"""
     rows = await gold.rows(
         "SELECT w.id, coalesce(i.wp_code, '') FROM working_paper w JOIN projects p ON p.id = w.project_id "
         "LEFT JOIN wp_index i ON i.id = w.wp_index_id "
-        "WHERE NOT p.is_deleted AND NOT w.is_deleted AND w.project_id <> :ua "
+        "WHERE NOT p.is_deleted AND NOT w.is_deleted AND w.project_id <> :request "
         "ORDER BY w.updated_at ASC NULLS LAST, w.id LIMIT 1",
-        ua=UA,
+        request=request_project.id,
     )
     assert rows, "前置：活项目里应有已提交底稿"
     return rows[0][0], rows[0][1]
 
 
-async def _foreign_note(gold) -> tuple[uuid.UUID, str, int, str | None]:
+async def _foreign_note(gold, picks, request_project: Pick) -> tuple[uuid.UUID, str, int, str | None]:
+    """合并口径且有合并附注数据的真实项目里最早的一条 consol_note_data（不属于请求项目）。"""
+    owner = await picks.resolve("consolidated_with_notes")
+    assert owner.id != request_project.id
     rows = await gold.rows(
-        "SELECT id, section_id, year, node_key FROM consol_note_data WHERE project_id = :up ORDER BY updated_at, id LIMIT 1",
-        up=UP,
+        "SELECT id, section_id, year, node_key FROM consol_note_data WHERE project_id = :owner "
+        "ORDER BY updated_at, id LIMIT 1",
+        owner=owner.id,
     )
-    assert rows, "前置：【UAT】合成集团母公司应有 consol_note_data"
+    assert rows, f"前置：{owner} 应有 consol_note_data"
     return rows[0]
 
 
@@ -144,37 +156,39 @@ async def client(pg_rollback_session, monkeypatch):
 # ─── 回写不锁他项目行（R4.2；变异 #11、B4-b）──────────────────────────────────
 
 
-async def test_workpaper_of_other_project_is_neither_read_nor_locked(pg_rollback_session, gold) -> None:
-    wp_id, _ = await _foreign_workpaper(gold)
+async def test_workpaper_of_other_project_is_neither_read_nor_locked(pg_rollback_session, gold,
+                                                                    writable_project) -> None:
+    wp_id, _ = await _foreign_workpaper(gold, writable_project)
     before = await gold.scalar(_WP_FINGERPRINT, id=wp_id)
     raised: BaseException | None = None
     try:
         await snapshot_writer.write_cell(
             db=pg_rollback_session, user=WRITER, wp_id=str(wp_id), sheet_name="审定表", cell_ref="B7", new_value=1,
-            opened_at=FUTURE, module="workpaper", project_id=str(UA),
+            opened_at=FUTURE, module="workpaper", project_id=str(writable_project.id),
         )
     except Exception as exc:  # 先验锁、再判类型（见模块说明）
         raised = exc
     await _nowait("working_paper", wp_id)  # 会话 A 的事务此刻仍未结束
-    assert isinstance(raised, WritebackTargetNotFound), f"以【UAT】子公司A 定位他项目底稿应查不到，实得 {raised!r}"
+    assert isinstance(raised, WritebackTargetNotFound), f"以自建请求项目定位他项目底稿应查不到，实得 {raised!r}"
     assert raised.message == "目标不存在或不属于本项目"
     assert await gold.scalar(_WP_FINGERPRINT, id=wp_id) == before
 
 
-async def test_note_record_of_other_project_is_neither_read_nor_locked(pg_rollback_session, gold) -> None:
-    note_id, section_id, year, node_key = await _foreign_note(gold)
+async def test_note_record_of_other_project_is_neither_read_nor_locked(pg_rollback_session, gold, picks,
+                                                                      writable_project) -> None:
+    note_id, section_id, year, node_key = await _foreign_note(gold, picks, writable_project)
     before = await gold.scalar(_NOTE_FINGERPRINT, id=note_id)
     raised: BaseException | None = None
     try:
         await snapshot_writer.write_cell(
             db=pg_rollback_session, user=WRITER, wp_id=str(note_id), sheet_name=f"note_{section_id}", cell_ref="C2",
             new_value=1, opened_at=FUTURE, module="note", note_record_id=str(note_id), note_section_id=section_id,
-            note_year=year, note_node_key=node_key, note_project_id=str(UA),
+            note_year=year, note_node_key=node_key, note_project_id=str(writable_project.id),
         )
     except Exception as exc:
         raised = exc
     await _nowait("consol_note_data", note_id)
-    assert isinstance(raised, NoteRecordNotFound), f"以【UAT】子公司A 定位合并集团的附注记录应查不到，实得 {raised!r}"
+    assert isinstance(raised, NoteRecordNotFound), f"以自建请求项目定位合并集团的附注记录应查不到，实得 {raised!r}"
     assert await gold.scalar(_NOTE_FINGERPRINT, id=note_id) == before
 
 
@@ -202,27 +216,30 @@ async def gate_spies(monkeypatch) -> dict[str, list]:
     return seen
 
 
-def _other_project_target(wp_id: uuid.UUID, wp_code: str) -> dict:
-    return {"project_id": str(UA), "targets": [{
+def _other_project_target(request_project: Pick, wp_id: uuid.UUID, wp_code: str) -> dict:
+    return {"project_id": str(request_project.id), "targets": [{
         "module": "workpaper", "wp_id": str(wp_id), "wp_code": wp_code or "C1-1", "sheet_name": "审定表",
         "cell_ref": "B7", "new_value": 1,
     }]}
 
 
-async def test_preview_endpoint_is_retired_without_touching_targets(client, gold, gate_spies) -> None:
-    wp_id, wp_code = await _foreign_workpaper(gold)
+async def test_preview_endpoint_is_retired_without_touching_targets(client, gold, gate_spies,
+                                                                   writable_project) -> None:
+    wp_id, wp_code = await _foreign_workpaper(gold, writable_project)
     before = await gold.scalar(_WP_FINGERPRINT, id=wp_id)
-    response = await client.post(f"{CQ}/writeback-preview", json=_other_project_target(wp_id, wp_code))
+    response = await client.post(f"{CQ}/writeback-preview",
+                                 json=_other_project_target(writable_project, wp_id, wp_code))
     assert response.status_code == 410, response.text[:800]
     assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
     assert gate_spies == {"resolved": [], "written": []}
     assert await gold.scalar(_WP_FINGERPRINT, id=wp_id) == before
 
 
-async def test_confirm_endpoint_is_retired_without_writing(client, gold, gate_spies) -> None:
-    wp_id, wp_code = await _foreign_workpaper(gold)
+async def test_confirm_endpoint_is_retired_without_writing(client, gold, gate_spies, writable_project) -> None:
+    wp_id, wp_code = await _foreign_workpaper(gold, writable_project)
     before = await gold.scalar(_WP_FINGERPRINT, id=wp_id)
-    response = await client.post(f"{CQ}/writeback-confirm", json=_other_project_target(wp_id, wp_code))
+    response = await client.post(f"{CQ}/writeback-confirm",
+                                 json=_other_project_target(writable_project, wp_id, wp_code))
     assert response.status_code == 410, response.text[:800]
     assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
     assert gate_spies == {"resolved": [], "written": []}
@@ -232,12 +249,14 @@ async def test_confirm_endpoint_is_retired_without_writing(client, gold, gate_sp
 # ─── 写入收窄（R4.1）：module=tb 422，试算行不变 ─────────────────────────────
 
 
-async def test_cell_writeback_endpoint_is_retired_and_trial_balance_rows_unchanged(client, gold) -> None:
-    before = await gold.rows(_TB_FINGERPRINT, pid=UB)
+async def test_cell_writeback_endpoint_is_retired_and_trial_balance_rows_unchanged(client, gold, picks) -> None:
+    project = await picks.resolve("tb_detail")
+    before = await gold.rows(_TB_FINGERPRINT, pid=project.id)
+    assert before[0][0] > 0 and before[0][1], f"前置：{project} 有试算行（否则指纹前后一致是空转）"
     response = await client.post(f"{CQ}/cell-writeback", json={"malformed": True})
     assert response.status_code == 410, response.text[:800]
     assert response.json()["detail"]["error_code"] == "ADVANCED_QUERY_WRITEBACK_RETIRED"
-    assert await gold.rows(_TB_FINGERPRINT, pid=UB) == before
+    assert await gold.rows(_TB_FINGERPRINT, pid=project.id) == before
 
 
 # ─── 退役桩不消费请求体 ────────────────────────────────────────────────────────

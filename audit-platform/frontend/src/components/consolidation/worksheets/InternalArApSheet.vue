@@ -424,8 +424,8 @@ const generatedEntries = computed(() => arapPreviewLines(rows))
 
 watch(() => rows, (v) => emitArap('rows-changed', v), { deep: true, immediate: true })
 
-const headerStyle = { background: '#f0edf5', fontSize: '10px', color: '#333', padding: '2px 0' }
-const cellStyle = { padding: '2px 3px', fontSize: '11px' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '2px 0' }
+const cellStyle = { padding: '2px 3px', fontSize: 'var(--gt-display-font-size)' }
 
 // ─── 导出模板 / 导入 ──────────────────────────────────────────────────────────
 const { exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()

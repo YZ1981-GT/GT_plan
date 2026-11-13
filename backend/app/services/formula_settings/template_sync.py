@@ -11,7 +11,12 @@
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import uuid
+from copy import deepcopy
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -26,6 +31,7 @@ from app.models.formula_setting_models import (
     FormulaTemplateSubscription,
     FormulaTemplateVersion,
 )
+from app.models.report_models import ReportConfig
 from app.services.formula_settings.audit import audit_global, audit_project, change_entry
 from app.services.formula_settings.definitions import exec_hash, get_spec, normalize, same_exec
 from app.services.formula_settings.domain_stores import validate_definition
@@ -302,9 +308,11 @@ async def _publish_plan(db: AsyncSession, tpl: FormulaTemplate, raw: list[Mappin
                 effective.setdefault(domain, {})[slot] = merged
             elif row is not None:
                 effective.setdefault(domain, {})[slot] = None
-    subs = (await db.execute(sa.select(FormulaTemplateSubscription).where(
+    subscriptions = sa.select(FormulaTemplateSubscription).where(
         FormulaTemplateSubscription.template_id == tpl.id, FormulaTemplateSubscription.is_active == sa.true(),
-        FormulaTemplateSubscription.domain.in_(list(effective) or [""])))).scalars().all()
+        FormulaTemplateSubscription.domain.in_(list(effective) or [""]),
+    ).execution_options(populate_existing=True)
+    subs = (await db.execute(subscriptions)).scalars().all()
     domain_items: dict[str, list[PlanItem]] = {}
     projects: dict[uuid.UUID, ProjectInfo] = {}
     for domain, domain_effective in effective.items():
@@ -368,21 +376,82 @@ def _check_version(tpl: FormulaTemplate, expected_version: int | None) -> None:
 async def publish_preview(db: AsyncSession, tpl: FormulaTemplate, *, changes: list[Mapping[str, Any]],
                           expected_version: int | None) -> dict[str, Any]:
     _check_version(tpl, expected_version)
-    effective, current, _, projects, domain_items = await _publish_plan(db, tpl, changes)
+    effective, current, subs, projects, domain_items = await _publish_plan(db, tpl, changes)
     return {"template_id": str(tpl.id), "version": tpl.version, "next_version": tpl.version + 1,
+            "preview_fingerprint": await _preview_fingerprint(db, tpl, effective, current, subs, projects, domain_items),
             "changes": _change_rows(effective, current), **_result(domain_items, projects)}
 
 
 def _change_rows(effective, current) -> list[dict[str, Any]]:
+    """冻结定义值，避免后续 ORM 写入或嵌套载荷修改污染审计快照。"""
     return [{"domain": d, "slot_key": s, "label": (current[d].get(s).slot_label if current[d].get(s) else None) or s,
-             "old": (current[d][s].definition if s in current[d] else None), "new": new, "deleted": new is None}
+             "old": deepcopy(current[d][s].definition) if s in current[d] else None,
+             "new": deepcopy(new), "deleted": new is None}
             for d, slots in effective.items() for s, new in sorted(slots.items())]
+
+
+def _publish_state(subs, projects, domain_items) -> dict:
+    """复制锁前状态；后续 ORM 刷新不能原地改变比较基线。"""
+    return {
+        "subscriptions": {str(s.id): (s.project_id, s.domain, s.template_version, s.pinned) for s in subs},
+        "projects": {str(p.id): asdict(p) for p in projects},
+        "items": {it.key: asdict(it) for items in domain_items.values() for it in items},
+    }
+
+
+async def _preview_fingerprint(db, tpl, effective, current, subs, projects, domain_items) -> str:
+    """绑定真实上游；模板仍拥有公式位或没有订阅者时，上游也会影响新基线。"""
+    upstream_state = {}
+    for domain, slots in effective.items():
+        scopes = {global_scope(domain, tpl.applicable_scope)} | {
+            it.project.scope for it in domain_items.get(domain, [])
+        }
+        scope_state = {}
+        for scope in sorted(s for s in scopes if s is not None):
+            upstream = await upstream_records(db, get_store(domain), scope)
+            scope_state[scope] = {
+                slot: asdict(upstream[slot]) if slot in upstream else None for slot in slots
+            }
+        upstream_state[domain] = scope_state
+    template_slots = {
+        domain: {slot: ({"version": row.version, "definition": row.definition,
+                         "base_definition": row.base_definition, "base_version": row.base_version,
+                         "base_origin": row.base_origin} if (row := current[domain].get(slot)) else None)
+                 for slot in slots}
+        for domain, slots in effective.items()
+    }
+    state = {"schema": 2, "template_id": str(tpl.id), "template_version": tpl.version,
+             "scope": tpl.applicable_scope, "changes": effective, "template_slots": template_slots,
+             "upstream": upstream_state, "plan": _publish_state(subs, projects, domain_items)}
+    encoded = json.dumps(state, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+                         default=str, allow_nan=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+async def _refresh_publish_inputs(db: AsyncSession, tpl: FormulaTemplate, projects, effective) -> None:
+    """取锁后定向刷新存储模型；无订阅者时也必须刷新模板写入所用的上游。"""
+    await db.flush()
+    ids = [p.id for p in projects]
+    domains = list(effective)
+    (await db.execute(sa.select(FormulaSetting).where(
+        FormulaSetting.domain.in_(domains), sa.or_(
+            FormulaSetting.layer == "global", FormulaSetting.template_id == tpl.id,
+            FormulaSetting.project_id.in_(ids),
+        ),
+    ).execution_options(populate_existing=True))).scalars().all()
+    if "report" in domains:
+        standards = ({f"project:{pid}" for pid in ids} | {p.scope for p in projects if p.scope}
+                     | {global_scope("report", tpl.applicable_scope)}) - {None}
+        (await db.execute(sa.select(ReportConfig).where(
+            ReportConfig.applicable_standard.in_(standards),
+        ).execution_options(populate_existing=True))).scalars().all()
 
 
 async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: list[Mapping[str, Any]],
                            expected_version: int | None, user_id: uuid.UUID | None,
                            decisions: Decisions | None = None, request_id: str | None = None,
-                           note: str | None = None, publish_source: str = "template_publish",
+                           note: str | None = None, preview_fingerprint: str | None = None,
+                           publish_source: str = "template_publish",
                            item_action: str = "template_sync",
                            audit_action: str = "formula.template_published",
                            audit_details: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -401,12 +470,22 @@ async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: l
     if not effective:
         raise FormulaSettingError("模板没有任何改动")
     decisions = decisions or Decisions()
-    for pid in sorted({it.project.id for its in domain_items.values() for it in its}, key=str):
-        for d in domain_items:
-            await lock_project(db, d, pid)
+    before = _publish_state(subs, projects, domain_items)
+    lock_keys = {(it.domain, it.project.id) for its in domain_items.values() for it in its}
+    for domain, pid in sorted(lock_keys, key=lambda key: (key[0], str(key[1]))):
+        await lock_project(db, domain, pid)
+    await _refresh_publish_inputs(db, tpl, projects, effective)
+    effective, current, subs, projects, domain_items = await _publish_plan(db, tpl, changes)
+    if before != _publish_state(subs, projects, domain_items):
+        raise VersionConflict("订阅项目公式或订阅状态已变化，请重新预览后发布")
+    if not preview_fingerprint:
+        raise VersionRequired("缺少模板预览证据，请重新预览后发布")
+    actual = await _preview_fingerprint(db, tpl, effective, current, subs, projects, domain_items)
+    if not hmac.compare_digest(actual, preview_fingerprint):
+        raise VersionConflict("模板预览已失效，项目、公式位或上游基线已变化，请重新预览后发布")
     new_version, publish_id = tpl.version + 1, uuid.uuid4()
-    rows = await _write_rows(db, tpl, effective, current, user_id)
     change_rows = _change_rows(effective, current)
+    rows = await _write_rows(db, tpl, effective, current, user_id)
     outcomes, events = await _apply(db, domain_items, decisions, publish_id=publish_id, user_id=user_id,
                                     action=item_action, source=publish_source)
     tpl.version, tpl.updated_by, tpl.updated_at = new_version, user_id, _now()
@@ -419,7 +498,11 @@ async def publish_template(db: AsyncSession, tpl: FormulaTemplate, *, changes: l
         if decisions.project(sub.project_id) is ProjectChoice.DEFER:
             sub.pinned = True  # 暂缓：固定在旧版本（读旧版本快照）
         elif not frozen:
-            sub.template_version, sub.pinned = new_version, False
+            if sub.pinned:
+                # 本次只改 B 时，A 的旧待确认仍有效；全部逐位结案后才能解除订阅固定。
+                await refresh_subscription(db, sub.project_id, sub.domain, tpl.id)
+            else:
+                sub.template_version = new_version
     summary = _result(domain_items, projects, outcomes)["summary"]
     summary_record = {**summary, "template_version": new_version}
     record_domain = next(iter(effective)) if len(effective) == 1 else "template"  # 列 32 字符：多域记 template
@@ -465,6 +548,65 @@ async def _write_rows(db: AsyncSession, tpl: FormulaTemplate, effective, current
     domains = sorted(set(tpl.domains or []) | set(effective))
     tpl.domains = domains
     return {d: await template_rows(db, tpl.id, d) for d in domains}
+
+
+async def keep_template_baseline(db: AsyncSession, tpl: FormulaTemplate, *, expected_version: int | None,
+                                 items: list[Mapping[str, Any]], user_id: uuid.UUID | None) -> dict[str, Any]:
+    """「保留模板」：模板定义不动，只把这些公式位的基线换成当前全局（spec formula-management-repair-closure R6.2）。
+
+    之后「全局已变」提示消失。不升模板版本、不写版本记录、不碰订阅项目（模板定义没变，订阅方的有效定义不变）。
+    并发：模板版本（``expected_version``）+ 每个公式位当时看到的全局版本（``expected_global_version``；全局已删为
+    ``None``）都要对上，否则 409 —— 全局在提示之后又改了，用户是对着旧的全局做的决定。全部或全不（只 flush）。
+    """
+    await _lock_template(db, tpl.id)
+    await db.refresh(tpl)
+    if expected_version is None:
+        raise VersionRequired("保留模板必须带模板当前版本号，请刷新后重试")
+    if int(expected_version) != tpl.version:
+        raise VersionConflict("模板已被他人修改，请刷新后重试",
+                              detail={"expected_version": expected_version, "current_version": tpl.version})
+    if not items:
+        raise FormulaSettingError("请选择要保留模板的公式位")
+    rows: dict[str, dict[str, FormulaSetting]] = {}
+    globs: dict[str, dict[str, SlotRecord]] = {}
+    checked: list[tuple[str, str, FormulaSetting, SlotRecord | None]] = []
+    for item in items:  # 先全部校验，任何一处对不上都不改任何行
+        domain, slot = str(item.get("domain") or ""), str(item.get("slot_key") or "")
+        if domain not in (tpl.domains or []):
+            raise FormulaSettingError(f"模板不含该公式域：{domain}")
+        if domain not in rows:
+            scope = global_scope(domain, tpl.applicable_scope)
+            if scope is None:
+                raise FormulaSettingError(f"模板的适用范围不适用该公式域：{domain}")
+            rows[domain] = await template_rows(db, tpl.id, domain)
+            globs[domain] = await get_store(domain).list_global(db, scope)
+        row = rows[domain].get(slot)
+        if row is None:
+            raise NotFound(f"模板里没有公式位 {slot}")
+        now = globs[domain].get(slot)
+        now_version = now.version if now is not None else None
+        if item.get("expected_global_version") != now_version:
+            raise VersionConflict(f"「{row.slot_label or slot}」的全局定义已再次变化，请刷新后重新确认",
+                                  detail={"slot_key": slot, "expected_global_version": item.get("expected_global_version"),
+                                          "current_global_version": now_version})
+        checked.append((domain, slot, row, now))
+    kept: list[dict[str, Any]] = []
+    for domain, slot, row, now in checked:
+        old_base, old_base_version = row.base_definition, row.base_version
+        row.base_definition = {k: v for k, v in now.definition.items() if k != "_structure"} if now else None
+        row.base_version, row.base_origin = (now.version, "global") if now else (None, None)
+        row.updated_by, row.updated_at = user_id, _now()
+        kept.append({"domain": domain, "slot_key": slot, "old_base": old_base, "old_base_version": old_base_version,
+                     "new_base": row.base_definition, "new_base_version": row.base_version})
+    await db.flush()
+    await audit_global(db, user_id=user_id, domain=",".join(sorted(rows)), scope=tpl.applicable_scope or "",
+                       action="formula.template_baseline_kept", resource_id=tpl.id,
+                       details={"template_id": str(tpl.id), "version": tpl.version,
+                                "changes": [change_entry(k["domain"], k["slot_key"], k["old_base"], k["new_base"])
+                                            for k in kept]})
+    return {"template_id": str(tpl.id), "version": tpl.version,
+            "kept": [{"domain": k["domain"], "slot_key": k["slot_key"], "base_version": k["new_base_version"]}
+                     for k in kept]}
 
 
 async def refresh_subscription(db: AsyncSession, project_id: uuid.UUID, domain: str,

@@ -121,7 +121,8 @@ async def test_template_publish_two_domains_same_slot_decide_separately() -> Non
         jia, yi = await add_project(db, "甲"), await add_project(db, "乙")
         tpl = await tpl_service.create_template(
             db, viewer=await Viewer.load(db, admin), name="两域同名", description=None, share_scope="firm",
-            owner_project_id=None, applicable_scope="", source="manual", domains=[TB, NOTE],
+            # 附注域按准则分作用范围：含附注的模板必须声明 soe / listed（通用模板对附注域无全局层，发版被拒）
+            owner_project_id=None, applicable_scope="soe", source="manual", domains=[TB, NOTE],
             items=[{"domain": d, "slot_key": SLOT, "definition": _def(d, "ROW(1)")} for d in (TB, NOTE)])
         for pid in (jia, yi):
             for domain in (TB, NOTE):
@@ -136,8 +137,9 @@ async def test_template_publish_two_domains_same_slot_decide_separately() -> Non
 
         decisions = Decisions.parse({"default_conflict": "keep", "conflict_choices": {
             decision_key(TB, jia, SLOT): "adopt", decision_key(NOTE, jia, SLOT): "ask", f"{yi}|{SLOT}": "adopt"}})
-        res = await template_sync.publish_template(db, tpl, changes=changes, expected_version=1, user_id=admin.id,
-                                                   decisions=decisions)
+        res = await template_sync.publish_template(
+            db, tpl, changes=changes, expected_version=1, user_id=admin.id,
+            decisions=decisions, preview_fingerprint=preview["preview_fingerprint"])
         await db.commit()
         assert [await _formula(db, jia, d) for d in (TB, NOTE)] == ["ROW(3)", "ROW(2)"], "甲：明细采用、附注交确认"
         assert [await _formula(db, yi, d) for d in (TB, NOTE)] == ["ROW(3)", "ROW(3)"], "乙：旧键对两个域都生效"

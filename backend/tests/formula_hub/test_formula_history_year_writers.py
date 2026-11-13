@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models.workpaper_models import WorkingPaper, WpFormula, WpSourceType
+from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex, WpSourceType
 from app.services.formula_settings import apply_ops, project_ops
 from app.services.formula_settings import template_service as tsvc
 from app.services.formula_settings import template_sync as tsync
@@ -294,7 +294,8 @@ async def test_wp_user_formula_save_and_restore_preset_record_project_year():
 
     cell = "审定表!B5"
     # trial_balance：保存时的取数校验要读（空表 ⇒ 校验按无数据处理）
-    async with make_db(extra_models=(WorkingPaper, WpFormula, TrialBalance)) as factory, factory() as db:
+    # wp_index：执行字段变了按底稿编码登记公式位（spec formula-management-repair-closure R2；无行 ⇒ 不登记）
+    async with make_db(extra_models=(WorkingPaper, WpFormula, TrialBalance, WpIndex)) as factory, factory() as db:
         admin = await add_user(db, "fhic_history_admin", "admin")
         pid = await add_project(db, "底稿用户公式")
         wp_id = await _working_paper(db, pid)

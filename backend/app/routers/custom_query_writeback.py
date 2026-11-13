@@ -137,7 +137,13 @@ def _writer_http_error(exc: Exception) -> HTTPException | None:
         WritebackTargetUnresolvable,
     )
     from app.services.custom_query.snapshot_writer_modules import NoteOwnershipMismatch, NoteRecordNotFound
+    from app.services.consol_note_protection import ProtectionMetadataError
 
+    if isinstance(exc, ProtectionMetadataError):
+        return HTTPException(
+            status_code=422,
+            detail={"error_code": "PROTECTED_CELLS_INVALID", "message": str(exc)},
+        )
     if isinstance(exc, WritebackTargetNotFound):
         return HTTPException(status_code=404, detail={"error_code": exc.error_code, "message": exc.message})
     if isinstance(exc, NoteRecordNotFound):

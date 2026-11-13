@@ -5,6 +5,11 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
+import { flushPromises } from '@vue/test-utils'
+
+const fs = vi.hoisted(() => ({ domains: vi.fn() }))
+vi.mock('@/services/formulaSettingsApi', () => ({ formulaSettingsApi: fs }))
+
 import { useTbDetailFormulas } from '../useTbDetailFormulas'
 
 function makeDeps(overrides: Record<string, any> = {}) {
@@ -70,5 +75,39 @@ describe('persist', () => {
     const { persist } = useTbDetailFormulas(deps)
     expect(await persist()).toBe(false)
     expect(deps.showFormulaError).toHaveBeenCalled()
+  })
+})
+
+// spec formula-management-repair-closure R3.1：试算表科目明细节点显示后端「未接入计算」说明
+describe('notWired', () => {
+  const ROWS = [{ standard_account_code: '1001', account_name: '库存现金' }]
+
+  it('加载时取 tb_detail 的 wired_reason；已接入则为空', async () => {
+    fs.domains.mockResolvedValueOnce({ domains: [
+      { key: 'report', wired: true },
+      { key: 'tb_detail', wired: false, wired_reason: '试算表科目明细公式目前只保存、不参与计算' },
+    ] })
+    const deps = makeDeps({ rows: ref(ROWS) })
+    const { notWired, load } = useTbDetailFormulas(deps)
+    await load()
+    await flushPromises()
+    expect(notWired.value).toBe('试算表科目明细公式目前只保存、不参与计算')
+
+    fs.domains.mockResolvedValueOnce({ domains: [{ key: 'tb_detail', wired: true }] })
+    const other = useTbDetailFormulas(makeDeps({ rows: ref(ROWS) }))
+    await other.load()
+    await flushPromises()
+    expect(other.notWired.value).toBe('')
+  })
+
+  it('域清单取不到：不提示，科目明细照常加载', async () => {
+    fs.domains.mockRejectedValueOnce(new Error('network'))
+    const deps = makeDeps({ rows: ref(ROWS) })
+    deps.api.get.mockResolvedValue({ overrides: { '1001': { formula: 'X' } } })
+    const { notWired, overrides, load } = useTbDetailFormulas(deps)
+    await load()
+    await flushPromises()
+    expect(notWired.value).toBe('')
+    expect(overrides.value).toEqual({ '1001': { formula: 'X' } })
   })
 })

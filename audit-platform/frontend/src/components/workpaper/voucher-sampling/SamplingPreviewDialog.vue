@@ -11,14 +11,15 @@
  * - el-table 列：勾选框 | 凭证号 | 日期 | 摘要 | 借方 | 贷方 | 科目 | 科目名称 | 对方科目 | 凭证类型 | 会计期间 | 核查结果(inline) | 备注(inline)
  * - 默认全部勾选
  * - 金额列格式化
- * - 超100行启用 max-height 虚拟滚动
+ * - 超过 100 行分页，勾选按页同步（翻页不丢别页的勾选）
+ * - 只读（readonly，随引擎）：只能查看，不能增删改样本、不能确认填充；确认进行中（confirming）按钮转圈不可再点
  * - truncated 时顶部黄色 el-alert
  * - "追加"按钮（搜索框弹出，从序时账搜索追加）— placeholder UI
  * - 底部：填充策略「追加 / 替换本阶段抽凭行」（合并进底稿由宿主的共享回填函数做，ADR-VK-07）+ "确认填充"按钮
  *
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 7.5
  */
-import { computed, nextTick, ref, toRaw, watch } from 'vue'
+import { computed, nextTick, reactive, ref, toRaw, watch } from 'vue'
 import { Search, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { amountString, normDate, normText, signedAmount } from '@/utils/voucherIdentity'
@@ -54,6 +55,10 @@ interface Props {
   reconcileOverrideReason?: string
   /** 预置放行理由列表 */
   reconcilePresets?: string[]
+  /** 底稿只读（随引擎，spec voucher-workflow-linkage-lineage-closure R4.3）：只能查看，不能改样本、不能确认填充 */
+  readonly?: boolean
+  /** 确认填充进行中（引擎单飞，R4.2）：按钮显示进行中、不能再点 */
+  confirming?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -62,6 +67,8 @@ const props = withDefaults(defineProps<Props>(), {
   reconcileIssue: null,
   reconcileOverrideReason: '',
   reconcilePresets: () => [],
+  readonly: false,
+  confirming: false,
 })
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
@@ -85,11 +92,15 @@ const dialogVisible = computed({
 
 const isTruncated = computed(() => props.vouchers.length >= 500)
 
-// ─── 超100行启用虚拟滚动（设置固定高度） ──────────────────────────────────────
+// ─── 超过 100 行分页（R4.3；原先一次渲染全部行，500 行时每行一套下拉 / 输入框）────────────
 
-const tableHeight = computed(() => {
-  return props.vouchers.length > 100 ? 500 : undefined
-})
+const PAGE_SIZE = 100
+const currentPage = ref(1)
+const pageCount = computed(() => Math.max(1, Math.ceil(props.vouchers.length / PAGE_SIZE)))
+// 🔴 必须是响应式数组：el-table 深度监听 data，每次行内改动（勾选、填核查结果、打备注）都重设 data；
+// 传普通数组时它判成「换了一份数据」并清空全部勾选（只有翻页 / 增删行才换实例）
+const pagedVouchers = computed(() => reactive(props.vouchers.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE)))
+watch(pageCount, (n) => { if (currentPage.value > n) currentPage.value = n })
 
 // ─── 凭证分录明细弹窗 ────────────────────────────────────────────────────────
 const entryDialogVisible = ref(false)
@@ -252,36 +263,36 @@ function handleRemoveRow(row: SampledVoucher) {
 // 样本默认全选（selected = true），但 el-table 的勾选框不读 selected：以前打开时勾选框全空、统计却是全选，
 // 不点就确认会填入全部，点一下又只剩这一行。打开 / 增补后按 selected 把表格勾上，同步期间不回写。
 const tableRef = ref<{ clearSelection: () => void; toggleRowSelection: (row: unknown, selected?: boolean) => void } | null>(null)
-let syncingSelection = false
 async function syncTableSelection() {
   await nextTick()
   const table = tableRef.value
   if (!table) return
-  const wanted = props.vouchers.filter(v => v.selected)
-  syncingSelection = true
-  try {
-    table.clearSelection()
-    for (const v of wanted) table.toggleRowSelection(v, true)
-  } finally {
-    syncingSelection = false
-  }
+  // 表格只渲染当前页：只勾当前页里已选的行（其余页的 selected 不动）。程序勾选只发 selection-change，
+  // 不发 select / select-all，所以这里不会回写 selected
+  table.clearSelection()
+  for (const v of pagedVouchers.value) if (v.selected) table.toggleRowSelection(v, true)
 }
-// 表格在 el-dialog 的内容里，弹窗打开后才渲染：等表格实例就位再勾（挂载时它还不在）
+// 表格在 el-dialog 的内容里，弹窗打开后才渲染：等表格实例就位再勾（挂载时它还不在）；
+// 翻页、增删行、换一批样本都会换当前页数组，el-table 随之清空勾选，换完按 selected 重新勾上
 watch(tableRef, (table) => { if (table) void syncTableSelection() })
-watch(() => props.vouchers, syncTableSelection)
+watch(pagedVouchers, syncTableSelection)
 
-function handleSelectionChange(selection: SampledVoucher[]) {
-  if (syncingSelection) return
-  // 按行本身认勾选（以前按凭证号：勾一笔会把同号的别的分录、别的凭证一起勾上）；比原始对象，不比响应式代理
-  const chosen = new Set(selection.map(v => toRaw(v)))
-  props.vouchers.forEach(v => {
-    v.selected = chosen.has(toRaw(v))
-  })
+/**
+ * 只认用户点的勾选（select / select-all）：selection-change 在换数据、程序勾选时也会发（换页时先发一次空勾选），
+ * 按它回写会把整页样本取消。按行本身认（以前按凭证号：勾一笔会把同号的别的分录、别的凭证一起勾上），比原始对象。
+ */
+function handleRowSelect(selection: SampledVoucher[], row: SampledVoucher) {
+  if (props.readonly) return
+  row.selected = selection.some(v => toRaw(v) === toRaw(row))
 }
 
 function handleSelectAll(selection: SampledVoucher[]) {
-  const allSelected = selection.length === props.vouchers.length
-  emit('toggle-select-all', allSelected)
+  if (props.readonly) return
+  // 表格只有当前页：表头勾选框只改当前页的行，其余页的勾选保持原样
+  const chosen = new Set(selection.map(v => toRaw(v)))
+  for (const v of pagedVouchers.value) v.selected = chosen.has(toRaw(v))
+  // 不分页时照旧通知引擎全选 / 全不选
+  if (pageCount.value <= 1) emit('toggle-select-all', selection.length === props.vouchers.length)
 }
 
 /**
@@ -319,9 +330,14 @@ const isConfirmBlocked = computed(
   () => !!(props.confirmBlockedReason && props.confirmBlockedReason.trim()),
 )
 
+/** 确认按钮的提示：只读优先于上游门控 */
+const confirmDisabledReason = computed(() =>
+  props.readonly ? '底稿当前只读（归档、编辑锁、复核身份或后台合并中），不能填充' : (props.confirmBlockedReason || ''),
+)
+
 function handleConfirm() {
-  // 双保险：即便调用方没传 confirmBlockedReason（旧调用点），命中门控也不 emit
-  if (isConfirmBlocked.value) return
+  // 双保险：即便调用方没传 confirmBlockedReason（旧调用点），命中门控也不 emit；只读 / 进行中同样不 emit
+  if (isConfirmBlocked.value || props.readonly || props.confirming) return
   emit('confirm')
 }
 </script>
@@ -381,8 +397,11 @@ function handleConfirm() {
       </div>
     </div>
 
+    <el-alert v-if="readonly" type="info" :closable="false" show-icon style="margin-bottom: 12px"
+      data-testid="sampling-preview-readonly" title="底稿当前只读：可查看抽样结果，不能修改样本或填充到底稿" />
+
     <!-- ═══ 操作按钮区 ═══ -->
-    <div class="action-bar">
+    <div v-if="!readonly" class="action-bar">
       <el-button size="small" type="primary" plain @click="handleOpenAppendSearch">
         + 追加凭证
       </el-button>
@@ -417,18 +436,17 @@ function handleConfirm() {
 
     <!-- ═══ 凭证表格 ═══ -->
     <el-table
-      :data="vouchers"
-      :height="tableHeight"
+      :data="pagedVouchers"
       :max-height="500"
       border
       size="small"
       ref="tableRef"
       class="voucher-table"
-      @selection-change="handleSelectionChange"
+      @select="handleRowSelect"
       @select-all="handleSelectAll"
     >
       <!-- 勾选框列 -->
-      <el-table-column type="selection" width="45" align="center" />
+      <el-table-column type="selection" width="45" align="center" :selectable="() => !readonly" />
 
       <!-- 凭证号 -->
       <el-table-column prop="voucherNo" label="凭证号" min-width="100" show-overflow-tooltip />
@@ -506,6 +524,7 @@ function handleConfirm() {
             size="small"
             placeholder="选择"
             clearable
+            :disabled="readonly"
             style="width: 80px"
           >
             <el-option
@@ -539,6 +558,7 @@ function handleConfirm() {
             filterable
             allow-create
             default-first-option
+            :disabled="readonly"
             style="width: 100%"
           >
             <el-option v-for="opt in REASON_PRESETS" :key="opt.value" :value="opt.value" :label="opt.label" />
@@ -554,12 +574,13 @@ function handleConfirm() {
             size="small"
             placeholder="输入备注"
             clearable
+            :disabled="readonly"
           />
         </template>
       </el-table-column>
 
-      <!-- 操作：人工删除（移出样本，R6.3） -->
-      <el-table-column label="操作" width="70" align="center">
+      <!-- 操作：人工删除（移出样本，R6.3）；只读不出 -->
+      <el-table-column v-if="!readonly" label="操作" width="70" align="center">
         <template #default="{ row }">
           <el-button
             type="danger"
@@ -572,6 +593,16 @@ function handleConfirm() {
         </template>
       </el-table-column>
     </el-table>
+    <el-pagination
+      v-if="pageCount > 1"
+      v-model:current-page="currentPage"
+      class="preview-pagination"
+      layout="total, prev, pager, next"
+      :page-size="PAGE_SIZE"
+      :total="vouchers.length"
+      small
+      data-testid="sampling-preview-pagination"
+    />
 
     <!-- ═══ 总体完整性校验——就地放行（R3.1）═══ -->
     <div v-if="reconcileIssue" class="reconcile-override-inline" data-testid="preview-reconcile-override">
@@ -587,9 +618,10 @@ function handleConfirm() {
         show-word-limit
         placeholder="如确有正当理由，请说明不少于 10 字后继续；该说明将随抽样评价留痕"
         data-testid="preview-reconcile-reason"
+        :disabled="readonly"
         @update:model-value="(v: string) => emit('update:reconcile-override-reason', v)"
       />
-      <div v-if="reconcilePresets.length > 0 && !(reconcileOverrideReason || '').trim()" class="reconcile-presets">
+      <div v-if="!readonly && reconcilePresets.length > 0 && !(reconcileOverrideReason || '').trim()" class="reconcile-presets">
         <el-button
           v-for="preset in reconcilePresets"
           :key="preset"
@@ -620,7 +652,7 @@ function handleConfirm() {
     <div class="dialog-footer">
       <div class="fill-mode-section">
         <span class="fill-mode-label">填充策略：</span>
-        <el-radio-group :model-value="fillMode === 'replace' ? 'replace' : 'append'" @change="handleFillModeChange">
+        <el-radio-group :model-value="fillMode === 'replace' ? 'replace' : 'append'" :disabled="readonly" @change="handleFillModeChange">
           <el-tooltip content="已在底稿里的分录不重复填入，保留原行的核对内容" placement="top">
             <el-radio value="append">追加</el-radio>
           </el-tooltip>
@@ -633,15 +665,16 @@ function handleConfirm() {
         </el-radio-group>
       </div>
       <el-tooltip
-        :disabled="!isConfirmBlocked"
-        :content="confirmBlockedReason || ''"
+        :disabled="!isConfirmBlocked && !readonly"
+        :content="confirmDisabledReason"
         placement="top"
       >
         <!-- disabled 按钮不触发鼠标事件 → 必须套一层 span 才有 tooltip 宿主 -->
         <span class="confirm-fill-wrap">
           <el-button
             type="primary"
-            :disabled="isConfirmBlocked"
+            :disabled="isConfirmBlocked || readonly"
+            :loading="confirming"
             data-testid="sampling-preview-confirm"
             @click="handleConfirm"
           >
@@ -830,6 +863,11 @@ function handleConfirm() {
 
 .voucher-table :deep(.el-table__header th) {
   font-size: var(--wp-font-size, 13px);
+}
+
+.preview-pagination {
+  margin-top: 8px;
+  justify-content: flex-end;
 }
 
 /* ── 总体完整性校验：就地放行（与引擎主界面同款视觉，scoped 样式不跨组件，须各写一份）── */

@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
+from app.models.workpaper_models import WpReviewStatus
 from app.services.working_paper_service import WorkingPaperService
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,12 @@ def _resolve_level(review_status: str) -> int | None:
     if m:
         return int(m.group(1) or m.group(2))
     return None
+
+
+# 兼容复核看板/守卫的公开契约；成员由同一解析器从 enum 现算，避免维护第二份名单。
+REVIEWABLE_REVIEW_STATUSES = frozenset(
+    status for status in WpReviewStatus if _resolve_level(status.value) is not None
+)
 
 
 @router.post("/batch-review", response_model=BatchReviewResult)

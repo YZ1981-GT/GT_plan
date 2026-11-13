@@ -75,10 +75,6 @@ import pytest
 _THIS = Path(__file__).resolve()
 ROOT = _THIS.parents[3]
 BACKEND = ROOT / "backend"
-SVC = BACKEND / "app" / "services" / "workpaper_sync"
-OBSERVER_PY = SVC / "published_identity_observer.py"
-GATE_PY = SVC / "excel_entry_gate.py"
-REGISTRY_PY = SVC / "adapters" / "registry.py"
 ROUTER_PY = BACKEND / "app" / "routers" / "wp_sync_router.py"
 MIGRATION = BACKEND / "migrations" / "V151__workpaper_sync_content_application_bundle_scope.sql"
 
@@ -181,15 +177,6 @@ def strip_py_comments(src: str) -> str:
     return "\n".join(out)
 
 
-def function_node(path: Path, name: str) -> ast.AST:
-    """按名字取顶层函数/方法的 AST 节点（**不**用字符窗口截函数体）。"""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
-            return node
-    raise AssertionError(f"{path.name} 里找不到函数 {name!r} ⇒ 判据无分母")
-
-
 def awaited_call_names(node: ast.AST) -> set[str]:
     """函数体里被 `await` 的调用名（`f(...)` 与 `x.f(...)` 都取末段名）。"""
     names: set[str] = set()
@@ -203,167 +190,23 @@ def awaited_call_names(node: ast.AST) -> set[str]:
             names.add(func.attr)
     return names
 
+from tests.workpaper_sync._test_task75_impl_lookup import (  # noqa: E402
+    SVC,
+    _own_node,
+    function_node,
+    implementing_node,
+    _captured_entry_ids,
+    _declared_pilot_class,
+    imported_module_paths,
+    referenced_names,
+    _own_code_only_segment,
+    except_handler_types,
+    literal_from_source,
+)
 
-# ════════════════════════════════════════════════════════════════════════════
-# 🔴 委托链解析（2026-09-27 补）
-#
-# 背景：本文件的四条 `TestDebtRemovedWithRealImpl` 判据写于「**每个 provider 自己**
-# 委托观测器」的 D 循环范式（provider 函数体内直接 `await
-# observe_published_frozen_definitions(...)` + 自己做 digest 比对 + 自己 raise）。
-#
-# H 循环起引入公共骨架 `phase5_h_cycle_common`（HC），provider 侧变成 3 行薄委托：
-#
-#     async def resolve_published_frozen_definitions(*, session, representation, contract):
-#         return await HC.resolve_published_frozen_definitions(
-#             IDENTITY, session=session, representation=representation, contract=contract)
-#
-# 于是四条单层 AST 判据对 **16 个** provider 全部假红（e1 + f2×3 + h×5 + i×6 + j1）——
-# 实测那些 provider 一条都没「抄九步」，恰恰是**收敛得更彻底**（一处转发 vs N 处重复）。
-#
-# 🔴 **修法不是放宽，是跟着委托链走**：识别薄委托后把判据**转移到骨架函数上执行**，
-# 骨架那层仍要满足全部四条（真 await 观测器 / 真 digest 比对 / 真 raise / 不返回空）。
-# 变异「删掉骨架里的 await 或 digest 比对」SHALL 让 16 个 provider 一起打红。
-#
-# 🔴 薄委托的定义**收得很紧**（`_is_thin_delegation`）：函数体除 docstring 外
-# 必须**只有一条** `return await <骨架>.<同名函数>(...)`。有人想借薄委托外壳偷偷
-# 塞逻辑（比如先改 contract 再转发）会因为「不止一条语句」被判为非薄委托，
-# 从而按 provider 自身的严格判据核 ⇒ 立刻打红。
-# ════════════════════════════════════════════════════════════════════════════
-
-#: 允许作为委托目标的公共骨架模块（**白名单**，不许委托到任意模块）。
-_DELEGATION_TARGETS: dict[str, str] = {
-    "HC": "app.services.workpaper_sync.phase5_h_cycle_common",
-    "phase5_h_cycle_common": "app.services.workpaper_sync.phase5_h_cycle_common",
-}
-
-
-def _is_thin_delegation(node: ast.AST, name: str) -> str | None:
-    """薄委托判定：函数体只有 `return await <别名>.<name>(...)` 时返回那个别名。
-
-    非薄委托（含自有逻辑、多条语句、转发到不同名函数）一律返回 ``None``。
-    """
-    body = [s for s in getattr(node, "body", []) if not _is_docstring_stmt(s)]
-    if len(body) != 1:
-        return None
-    stmt = body[0]
-    if not isinstance(stmt, ast.Return) or not isinstance(stmt.value, ast.Await):
-        return None
-    call = stmt.value.value
-    if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
-        return None
-    # 🔴 必须转发到**同名**函数：转发到别的名字就不是「同一件事的委托」
-    if call.func.attr != name:
-        return None
-    owner = call.func.value
-    if not isinstance(owner, ast.Name):
-        return None
-    return owner.id if owner.id in _DELEGATION_TARGETS else None
-
-
-def _is_docstring_stmt(stmt: ast.AST) -> bool:
-    return (
-        isinstance(stmt, ast.Expr)
-        and isinstance(stmt.value, ast.Constant)
-        and isinstance(stmt.value.value, str)
-    )
-
-
-def implementing_node(path: Path, name: str) -> tuple[ast.AST, Path, bool]:
-    """返回真正承载实现的 `(函数节点, 所在文件, 是否经委托)`。
-
-    provider 自己实现 → 原节点；薄委托到公共骨架 → 骨架里的同名函数节点。
-    """
-    node = function_node(path, name)
-    alias = _is_thin_delegation(node, name)
-    if alias is None:
-        return node, path, False
-    target_module = _DELEGATION_TARGETS[alias]
-    target_path = SVC / f"{target_module.rsplit('.', 1)[-1]}.py"
-    assert target_path.is_file(), f"委托目标文件不存在：{target_path}"
-    return function_node(target_path, name), target_path, True
-
-
-def imported_module_paths(path: Path) -> set[str]:
-    """源文件里**真正 import 的**模块路径（含函数内局部 import）。
-
-    🔴 用 AST 而不是子串：模块 docstring 里写「本模块不 import `adapters.registry`」时，
-    子串判据会把那句**说明**当违规 ⇒ 假红（实测踩到）。
-    """
-    out: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Import):
-            out.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            out.add(node.module)
-            out.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return out
-
-
-def referenced_names(path: Path) -> set[str]:
-    """源文件里被**代码**引用到的标识符（`Name` / `Attribute` 末段），不含注释与 docstring。"""
-    out: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Name):
-            out.add(node.id)
-        elif isinstance(node, ast.Attribute):
-            out.add(node.attr)
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            out.update(alias.asname or alias.name.rsplit(".", 1)[-1] for alias in node.names)
-    return out
-
-
-def code_only_segment(path: Path, function: str) -> str:
-    """函数体源码，**剔掉 docstring**。
-
-    🔴 判「pilot 侧有没有抄 loader 的九步」时必须剔 docstring：本轮的新 docstring 里正当地
-    提到了 `ExcelEntryDefinitionLoader.load()`（解释欠账从何而来），带着 docstring 比对会
-    把说明文字当违规 ⇒ 假红（实测踩到 4 条）。
-    """
-    source = path.read_text(encoding="utf-8")
-    node = function_node(path, function)
-    body = list(getattr(node, "body", []))
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(body[0].value, ast.Constant)
-        and isinstance(body[0].value.value, str)
-    ):
-        body = body[1:]
-    assert body, f"{path.name}::{function} 剔掉 docstring 后函数体为空 ⇒ 空壳"
-    return "\n".join((ast.get_source_segment(source, stmt) or "") for stmt in body)
-
-
-def except_handler_types(path: Path) -> list[str]:
-    """源文件里每个 `except` 子句捕获的类型名（裸 except 记 `<bare>`）。"""
-    out: list[str] = []
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if not isinstance(node, ast.ExceptHandler):
-            continue
-        if node.type is None:
-            out.append("<bare>")
-            continue
-        targets = node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
-        for target in targets:
-            if isinstance(target, ast.Name):
-                out.append(target.id)
-            elif isinstance(target, ast.Attribute):
-                out.append(target.attr)
-            else:
-                out.append(ast.dump(target))
-    return out
-
-
-def literal_from_source(path: Path, function: str, key: str) -> str:
-    """从某函数体里取 `"{key}": "<字面量>"` 的那个字面量（AST，不用正则）。"""
-    node = function_node(path, function)
-    for inner in ast.walk(node):
-        if not isinstance(inner, ast.Dict):
-            continue
-        for k, v in zip(inner.keys, inner.values):
-            if isinstance(k, ast.Constant) and k.value == key and isinstance(v, ast.Constant):
-                return str(v.value)
-    raise AssertionError(f"{path.name}::{function} 里取不到 {key!r} 的字面量 ⇒ 判据无分母")
-
+OBSERVER_PY = SVC / "published_identity_observer.py"
+GATE_PY = SVC / "excel_entry_gate.py"
+REGISTRY_PY = SVC / "adapters" / "registry.py"
 
 # ════════════════════════════════════════════════════════════════════════════
 # 0. 守卫自检
@@ -950,7 +793,7 @@ class TestDebtRemovedWithRealImpl:
         module = __import__(module_path, fromlist=["x"])
         path = Path(inspect.getsourcefile(module) or "")
         node, impl_path, delegated = implementing_node(
-            path, "resolve_published_frozen_definitions"
+            path, "resolve_published_frozen_definitions", module_path
         )
         awaited = awaited_call_names(node)
         assert "observe_published_frozen_definitions" in awaited, (
@@ -959,7 +802,7 @@ class TestDebtRemovedWithRealImpl:
         )
         # 不得自己抄 loader 的九步：**provider 自身**代码里不应出现 loader / gate 的判据调用
         # （这一条始终查 provider 自己 —— 委托型 provider 只有 3 行，天然不可能抄）
-        body = code_only_segment(path, "resolve_published_frozen_definitions")
+        body = _own_code_only_segment(path, "resolve_published_frozen_definitions")
         for copied in (
             "ExcelEntryDefinitionLoader",
             "assert_no_structure_drift",
@@ -981,7 +824,10 @@ class TestDebtRemovedWithRealImpl:
         path = Path(inspect.getsourcefile(module) or "")
         # 🔴 顶层 raise 这一条始终查 **provider 自己**（中间形态①的形态就是 provider 里
         #    留一句无条件 raise）；委托型 provider 只有 `return await ...`，天然无顶层 raise。
-        own = function_node(path, "resolve_published_frozen_definitions")
+        node, _impl_path, _delegated = implementing_node(
+            path, "resolve_published_frozen_definitions", module_path
+        )
+        own = _own_node(path, "resolve_published_frozen_definitions") or node
         top_level_raises = [s for s in own.body if isinstance(s, ast.Raise)]
         assert top_level_raises == [], (
             f"{module_path}.resolve_published_frozen_definitions 顶层仍有 raise ⇒ "
@@ -1017,10 +863,10 @@ class TestDebtRemovedWithRealImpl:
         module = __import__(module_path, fromlist=["x"])
         path = Path(inspect.getsourcefile(module) or "")
         # 🔴 静态部分查**两层**：provider 自己不得 `return None`，承载实现的那层也不得。
-        own = function_node(path, "resolve_published_frozen_definitions")
         node, impl_path, delegated = implementing_node(
-            path, "resolve_published_frozen_definitions"
+            path, "resolve_published_frozen_definitions", module_path
         )
+        own = _own_node(path, "resolve_published_frozen_definitions") or node
         for scope_node, scope_label in ((own, module_path), (node, impl_path.name)):
             for stmt in ast.walk(scope_node):
                 if not isinstance(stmt, ast.Return):
@@ -1050,7 +896,12 @@ class TestDebtRemovedWithRealImpl:
         path = Path(inspect.getsourcefile(module) or "")
         # 🔴 「入参被读」这一条始终查 provider 自己：委托型也必须真把 contract 传下去，
         #    只声明不转发（`contract` 从未出现在 Load 上下文）仍是摆设。
-        own = function_node(path, "resolve_published_frozen_definitions")
+        node, impl_path, delegated = implementing_node(
+            path, "resolve_published_frozen_definitions", module_path
+        )
+        # 🔴 「入参被读」优先查 provider 自己（委托型也必须真把 contract 传下去）；provider 侧
+        #    是转发赋值 / 工厂闭包时没有自有函数体可查 ⇒ 落到承载实现的那一层，强度不变。
+        own = _own_node(path, "resolve_published_frozen_definitions") or node
         used = {
             n.id
             for n in ast.walk(own)
@@ -1058,9 +909,6 @@ class TestDebtRemovedWithRealImpl:
         }
         assert "contract" in used, f"{module_path}: contract 入参从未被读 ⇒ 摆设"
         # 🔴 digest 比对查**承载实现的那一层**。
-        node, impl_path, delegated = implementing_node(
-            path, "resolve_published_frozen_definitions"
-        )
         compares = [
             n
             for n in ast.walk(node)
@@ -1106,16 +954,39 @@ class TestManifestRegistrar:
         plan = RG.build_production_registry().registration_plan
         with_provider = [item for item in plan if item.provider_module]
         blocked = [item for item in plan if item.blocked_reason]
-        assert len(with_provider) + len(blocked) == len(plan), (
-            "有 entry 既没 provider 也没原因 ⇒ 静默跳过"
-        )
+        # 🔴 判据就是任务正文那一句本身：**没有** entry 既没 provider 也没原因。
+        #    原先写成覆盖面等式 `len(with_provider) + len(blocked) == len(plan)`，那等价于
+        #    再附加一条「两个集合不相交」。而「交付了 provider」与「capability 尚未裁决」
+        #    本来就可以同时成立（本轮实测 24 条就是这种：契约已交付、capability=null、
+        #    阻塞原因如实写明），等式于是把**诚实披露**判成失败。改回点名式判据，并把
+        #    「相交是否正当」单独锁死（见下一条），比等式更强也更可读。
+        silent = [
+            item.entry_id
+            for item in plan
+            if not item.provider_module and not item.blocked_reason
+        ]
+        assert not silent, f"有 entry 既没 provider 也没原因 ⇒ 静默跳过：{silent[:5]}"
         assert len(with_provider) == len(RG.DELIVERED_PER_ENTRY_CONTRACTS), (
             f"有 provider 的 entry {len(with_provider)} 条 ≠ 交付登记表 "
             f"{len(RG.DELIVERED_PER_ENTRY_CONTRACTS)} 行"
         )
         for item in blocked:
             assert len(item.blocked_reason or "") >= 20, (item.entry_id, item.blocked_reason)
-        assert all(item.blocked_reason is None for item in with_provider)
+        # 🔴 「provider 已交付却仍被拦」唯一正当的理由是 capability 尚未裁决：别的理由
+        #    （没契约 / parent 重复 / 已裁 unreachable）与「有 provider」互相矛盾，出现即缺陷。
+        both = [item for item in plan if item.provider_module and item.blocked_reason]
+        for item in both:
+            assert item.capability is None, (
+                f"{item.entry_id}: 已有 provider 且 capability={item.capability} 却仍被拦 "
+                f"⇒ 阻塞理由与事实矛盾：{item.blocked_reason}"
+            )
+            assert "capability" in (item.blocked_reason or ""), (
+                f"{item.entry_id}: 已有 provider 的阻塞原因没点名 capability：{item.blocked_reason}"
+            )
+        # 反向：provider 已交付且 capability 已裁决的 entry 不得再被拦（否则是静默降级）。
+        for item in with_provider:
+            if item.capability is not None:
+                assert item.blocked_reason is None, (item.entry_id, item.blocked_reason)
         # 🔴 「长度 ≥ 20」不足以证明原因是**显式**的：原因文本是多行隐式拼接，抹掉其中
         #    一句仍然够长（变异 M20 实测 GREEN）。判据必须落在「原因点名了缺什么」上，
         #    且三类阻塞原因各自可分辨 —— 合成一条会让读者查不到撤销条件。
@@ -1123,6 +994,7 @@ class TestManifestRegistrar:
             "no_contract": "approved per-entry",
             "parent_duplicate": "parent 重复入口",
             "unreachable": "已裁决 unreachable",
+            "capability_pending": "capability 裁决",
         }
         unnamed = [
             item.entry_id
@@ -1199,14 +1071,43 @@ class TestManifestRegistrar:
             assert not any(bad in cid.lower() for cid in ids), (bad, ids)
 
     def test_registrar_delegates_to_each_entry_own_attach(self) -> None:
-        """AC 12.1：不得跨 entry 复用 contract/bundle —— 复用 attach 就是复用契约。"""
+        """AC 12.1：不得跨 entry 复用 contract/bundle —— 复用 attach 就是复用契约。
+
+        🔴 判据分两条，比原来的「`attach.__module__` 必须等于 provider 模块」更强：
+        1. **对象两两不同**：91 个 attach 必须是 91 个不同的可调用对象。真正的「复用别人的
+           接线」形态就是两条 entry 指向同一个对象，而 `__module__` 相等完全挡不住它
+           （同模块里两条 entry 共用一个 attach 照样通过）。
+        2. **绑的是本 entry**：要么函数定义在 provider 模块里，要么是工厂闭包且闭包里
+           捕获的 entry_id 就是本行的 entry_id。D2 / D3 / D5 / D6 / D7 与 M 循环 5 条用的是
+           `build_orchestration(...)` 为本 entry 造的闭包，`__module__` 自然是编排模块 ——
+           只看 `__module__` 会把「逐 entry 工厂闭包」误判成「复用别人的接线」（本轮实测）。
+        """
         assert len(RG._ALLOWED_PROVIDER_MODULES) == len(RG.DELIVERED_PER_ENTRY_CONTRACTS)
+        attaches: list[tuple[str, Any]] = []
         for row in RG.DELIVERED_PER_ENTRY_CONTRACTS:
-            module = __import__(str(row["provider_module"]), fromlist=["x"])
-            attach = module.attach_pilot_adapters
-            assert attach.__module__ == str(row["provider_module"]), (
-                f"{row['contract_id']} 的 attach 来自 {attach.__module__} ⇒ 复用了别人的接线"
+            module_path = str(row["provider_module"])
+            module = __import__(module_path, fromlist=["x"])
+            attach = getattr(module, "attach_pilot_adapters", None)
+            assert attach is not None and callable(attach), (
+                f"{row['contract_id']}: provider 模块没有 attach_pilot_adapters ⇒ "
+                "台账记作已交付，注册器却永远接不上它"
             )
+            attaches.append((str(row["entry_id"]), attach))
+            own = attach.__module__ == module_path
+            bound = str(row["entry_id"]) in _captured_entry_ids(attach)
+            assert own or bound, (
+                f"{row['contract_id']} 的 attach 来自 {attach.__module__}"
+                f"（qualname={getattr(attach, '__qualname__', '?')}），且闭包里没有捕获本 entry "
+                f"{row['entry_id']} ⇒ 复用了别人的接线"
+            )
+        # 两两不同：持住引用再比 id（`id()` 会在对象被回收后复用 —— 不持引用就是假判据）
+        by_id: dict[int, str] = {}
+        for entry_id, attach in attaches:
+            previous = by_id.setdefault(id(attach), entry_id)
+            assert previous == entry_id, (
+                f"entry {entry_id} 与 {previous} 共用同一个 attach 对象 ⇒ 复用了别人的接线"
+            )
+        assert len(by_id) == len(RG.DELIVERED_PER_ENTRY_CONTRACTS)
         plan_item = RG.ManifestRegistrationPlanItem(
             entry_id="x", capability=Capability.bidirectional, provider_module="app.nope"
         )
@@ -2108,10 +2009,15 @@ class TestProperties:
         另保留一条反向命中：任取一条**非** bidirectional entry，`assert_bidirectional_ready`
         必抛 `FakeBidirectionalError`（证明「capability 门」真的在拦，而不是恒不抛）。
         """
+        from app.services.workpaper_sync.entry_profile import effective_capability
+
         registry = RG.build_production_registry()
         entries = registry.manifest_entries
+        # Task 1.1 起 manifest 里有 pending entry（`capability=null`）：「是不是 bidirectional」
+        # 对它的答案是「不是」，`capability_of` 却会抛 ⇒ 用 effective_capability 判。
         bidirectional = [
-            eid for eid, e in entries.items() if RG.capability_of(e) is Capability.bidirectional
+            eid for eid, e in entries.items()
+            if effective_capability(e) is Capability.bidirectional
         ]
         assert bidirectional, "manifest 一条 bidirectional entry 都没有 ⇒ Property 3 分母为空"
         for eid in sorted(bidirectional):
@@ -2128,7 +2034,7 @@ class TestProperties:
         # 反向命中：非 bidirectional entry 必被 capability 门拦下（FakeBidirectionalError）。
         non_bi = next(
             eid for eid in sorted(entries)
-            if RG.capability_of(entries[eid]) is not Capability.bidirectional
+            if effective_capability(entries[eid]) is not Capability.bidirectional
         )
         with pytest.raises(RG.FakeBidirectionalError):
             registry.assert_bidirectional_ready(non_bi)
@@ -2195,16 +2101,51 @@ class TestProperties:
         assert all(c for c in classes), f"存在空 pilot_class：{classes}"
         assert len(set(classes)) == len(classes), "pilot_class 有重复"
         assert len(classes) == len(RG.DELIVERED_PER_ENTRY_CONTRACTS), "pilot_class 少于登记行数"
+        # 🔴 「无重复」挡不住占位值：本轮实测 25 行台账写的是通配的 `"phase5"`，而 provider
+        #    模块各自声明的是 `k8_adjustment_summary` / `l_cycle_bonds_payable` 这类真名 ——
+        #    台账与代码脱钩，而 pilot gate 的报告正是按台账的 pilot_class 打印的。单源判据：
+        #    台账这一列必须等于 provider 自己声明的那个值（契约载荷也是用它拼的）。
+        drift = [
+            (str(row["contract_id"]), str(row["pilot_class"]), _declared_pilot_class(row))
+            for row in RG.DELIVERED_PER_ENTRY_CONTRACTS
+            if str(row["pilot_class"]) != _declared_pilot_class(row)
+        ]
+        assert not drift, f"台账 pilot_class 与 provider 声明脱钩：{drift[:5]}"
         assert set(available_contract_ids()) == {
             str(r["contract_id"]) for r in RG.DELIVERED_PER_ENTRY_CONTRACTS
         }
-        # `adapter_registered` 必须与**真实库**注册结果一致（不是随手写的字面量）
-        real = _real_registration_ids()
+        # `adapter_registered` 与**真实库**注册结果对拍。两个方向分开写，因为只有方向①
+        # 与环境无关；方向②还取决于本库有没有供给（published representation + bundle）。
+        real, reasons = _real_registration_outcome()
         for row in RG.DELIVERED_PER_ENTRY_CONTRACTS:
-            assert bool(row["adapter_registered"]) == (str(row["contract_id"]) in real), (
-                f"{row['contract_id']}: 登记 adapter_registered={row['adapter_registered']}，"
-                f"真实注册结果={str(row['contract_id']) in real} ⇒ 登记表与现实脱钩"
+            contract_id = str(row["contract_id"])
+            entry_id = str(row["entry_id"])
+            claimed = bool(row["adapter_registered"])
+            registered_now = contract_id in real
+            # 方向①（与环境无关）：真注册了却登记 False ⇒ 登记表落后于现实，必须打红。
+            assert not (registered_now and not claimed), (
+                f"{contract_id}: 真实注册成功而登记 adapter_registered=False "
+                "⇒ 登记表落后于现实"
             )
+            # 方向②：登记 True 而此刻没注册，只能是「本库没有供给 / capability 未裁决」，
+            # 并且**必须有显式原因**。拿不到原因就是静默跳过 —— 那才是本判据要抓的。
+            if claimed and not registered_now:
+                reason = reasons.get(entry_id)
+                assert reason, (
+                    f"{contract_id}: 登记 adapter_registered=True，本库未注册，"
+                    "且注册结果里没有这条 entry 的原因 ⇒ 静默跳过"
+                )
+                assert any(
+                    tag in reason
+                    for tag in (
+                        "供给",
+                        "representation",
+                        "bundle",
+                        "capability",
+                        "artifact",
+                        "指针",
+                    )
+                ), f"{contract_id}: 未注册的原因没点名供给 / capability / 工件：{reason}"
 
     def test_property67_candidate_never_becomes_substrate(self) -> None:
         """Property 67 —— **Validates: Requirements 6.18**
@@ -2224,11 +2165,16 @@ class TestProperties:
         )
 
 
-def _real_registration_ids() -> set[str]:
-    """真实库上跑一次 manifest 驱动注册，返回真的注册成功的 adapter_id 集合。
+def _real_registration_outcome() -> tuple[set[str], dict[str, str]]:
+    """真实库上跑一次 manifest 驱动注册，返回 `(注册成功的 adapter_id 集合, 逐 entry 原因)`。
 
-    这不是「读登记表」——它真连库、真派发、真调 `register()`。供给为 0 时返回空集，
-    于是 `adapter_registered=False` 是**被现实锁死**的，而不是手写的字面量。
+    这不是「读登记表」——它真连库、真派发、真调 `register()`。供给为 0 时注册集合为空，
+    于是「登记 False 而现实在注册」这种落后会被现实锁死，而不是手写的字面量。
+
+    🔴 为什么要连原因一起返回：注册成不成还取决于**本库有没有供给**（published
+    representation + definition bundle）。只比「集合是否相等」会让判据随库里的数据变脸 ——
+    本轮实测这个共享库里注册集合为空，于是 5 条 `adapter_registered=True` 的登记行全被判成
+    「脱钩」，而它们实际上是「本库没有供给」。判据因此拆成两个方向（见调用点）。
     """
     import sqlalchemy as sa
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -2270,7 +2216,16 @@ def _real_registration_ids() -> set[str]:
                     f"≠ planned({len(outcome.planned_entry_ids)})"
                 )
                 assert pointer_rows >= 0
-                return set(outcome.registered_adapter_ids)
+                # 「显式说明」= 拒绝理由 ∪ 域异常失败。两者都是**点名**的说明；只认 reasons
+                # 会把 `failures` 里那些如实报告的失败（如 published artifact 指针指向的文件
+                # 在本检出里不存在 —— storage/ 不入库）误判成「静默跳过」（本轮实测 3 条）。
+                explanations = {
+                    str(entry_id): str(reason)
+                    for entry_id, reason in dict(outcome.reasons).items()
+                }
+                for entry_id, failure in dict(getattr(outcome, "failures", {}) or {}).items():
+                    explanations.setdefault(str(entry_id), str(failure))
+                return set(outcome.registered_adapter_ids), explanations
         finally:
             await engine.dispose()
 

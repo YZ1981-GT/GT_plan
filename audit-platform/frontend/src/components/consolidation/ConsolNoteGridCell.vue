@@ -9,6 +9,8 @@ import { computed } from 'vue'
 import type { CellComment } from '@/composables/useCellComments'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtGridCell from '@/components/grid/GtGridCell.vue'
+import GtMeasureCell from '@/components/common/GtMeasureCell.vue'
+import type { DisplayMeasureKind, RatioScale } from '@/types/displayMeasure'
 import { ElInput } from '@/components/grid/adapters'
 
 const props = withDefaults(defineProps<{
@@ -18,7 +20,9 @@ const props = withDefaults(defineProps<{
   manual?: boolean
   left?: boolean
   comment?: CellComment | null
-}>(), { manual: false, left: false, comment: undefined })
+  measureKind?: DisplayMeasureKind | null
+  ratioScale?: RatioScale | null
+}>(), { manual: false, left: false, comment: undefined, measureKind: null, ratioScale: null })
 
 const emit = defineEmits<{ commit: [value: string] }>()
 
@@ -35,7 +39,10 @@ const display = computed(() => text.value || '-')
           :class="{ 'gt-note-cell-editable': editable, 'gt-note-cell-manual': manual }"
           :title="manual ? '手工单元格：按公式填入时保留' : ''"
           :style="{ textAlign: left ? 'left' : 'right' }"
-        >{{ display }}</span>
+        >
+          <template v-if="left">{{ display }}</template>
+          <GtMeasureCell v-else :value="value" :kind="measureKind" :ratio-scale="ratioScale" />
+        </span>
       </template>
       <ElInput
         :model-value="text"

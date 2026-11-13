@@ -571,7 +571,7 @@ async def test_sync_with_edit_user_succeeds(world):
     # 服务没返回的反馈字段取默认值（2026-10-27 起响应模型声明了服务层的全部键，spec note-pull-followup-closure R3）
     assert body == {**fake_result, "texts_synced": 0, "revived": False, "blocked_by_manual_override": False,
                     "row_scoped_tables": [], "row_scope_unresolved": [], "row_scope_unresolved_reasons": {},
-                    "push_kept": [], "skipped": False, "reason": None}
+                    "push_kept": [], "skipped": False, "reason": None, "blocked_writes": []}
     ((args, kwargs),) = sync.calls
     assert args[1] == TARGET_PROJECT_ID
     assert (kwargs["wp_id"], kwargs["section_id"], kwargs["user"].id) == (WP_ID, "五-1-1 应收账款", identity.user.id)

@@ -224,8 +224,9 @@ describe('ConsolNoteTab 生产接线守卫', () => {
     }
   })
 
-  it('重新汇总走真实 consolidation 路由，回载事件传模板准则而非企业代码', () => {
-    expect(component).toContain('P_consol.notes.reaggregate(')
+  it('重新汇总走耐久 consolidation 路由，回载事件传模板准则而非企业代码', () => {
+    expect(component).toContain('P_consol.notes.reaggregateAsync(')
+    expect(component).toContain('waitForPlatformJob(')
     expect(component).not.toContain('/api/disclosure-notes/${props.projectId}/${props.year}/reaggregate')
     const body = component.slice(component.indexOf('async function handleReaggregate'), component.indexOf('function addNoteRow'))
     expect(body).toContain('standard: props.standard')
@@ -234,7 +235,7 @@ describe('ConsolNoteTab 生产接线守卫', () => {
     expect(body).toContain('reaggregateSummary(result)')
     expect(component).toContain('本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点')
     expect(component).not.toContain('按公式重算本节点合并附注')
-    expect(component).toContain("lastWrite === 'subtree_aggregate'")
+    expect(component).toContain("source === 'subtree_aggregate'")
   })
 
   it('单元格汇总两种模式都走同一提示（没有附注的下级点名）', () => {

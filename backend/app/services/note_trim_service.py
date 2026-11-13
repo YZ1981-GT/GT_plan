@@ -13,6 +13,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 import sqlalchemy as sa
+from sqlalchemy import orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
@@ -37,8 +38,12 @@ class NoteTrimService:
         self.db = db
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
+        # 只取 `wizard_state`（加主键）：全列 ORM 投影在「ORM 比库新一列」时会整体失败
+        # （2026-11-01 实测共享库缺 `projects.amount_unit`）。`load_only` 保留实体，下面的回写不变。
         result = await self.db.execute(
-            sa.select(Project).where(
+            sa.select(Project)
+            .options(orm.load_only(Project.wizard_state))
+            .where(
                 Project.id == project_id,
                 Project.is_deleted == False,  # noqa
             )

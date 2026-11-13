@@ -3,7 +3,7 @@
 为什么要落库：原先锁定只记在 `immutability._project_registry_versions`（进程内字典），
 进程一重启就全丢，归档项目在目录升级后会按**新**目录解析，归档时的底稿地址对不回去。
 段四审计据此把「resolver 支持版本锁定」与「归档项目已可复现」分开判：前者成立、后者不成立。
-本模块把锁写进 `projects.acnr_registry_version` / `acnr_registry_locked_at`（V214）。
+本模块把锁写进 `projects.acnr_registry_version` / `acnr_registry_locked_at`（V216）。
 
 三条口径：
 
@@ -32,6 +32,7 @@ import sqlalchemy as sa
 from app.services.acnr import reasons
 from app.services.acnr.catalog import CatalogLoadError, get_catalog
 from app.services.acnr.catalog_integrity import content_sha256
+from app.services.acnr.snapshot_lifecycle_lock import try_acquire_snapshot_lifecycle_lock
 
 logger = logging.getLogger(__name__)
 
@@ -152,8 +153,23 @@ async def lock_project_registry(
     - 已锁到别的版本 → 抛 `lock_failed`（换锁必须先解锁，避免静默改写历史锁）。
 
     只 flush 不 commit：由路由在同一事务里统一提交。
+
+    快照校验与项目锁写入前先取得 ACNR 快照生命周期 advisory xact lock。它持有到调用方事务结束，
+    与 DB-aware GC 的「查引用 → 删文件」串行，消除两步之间把刚锁定快照删除的 TOCTOU。
     """
     from app.models.core import Project
+
+    lifecycle_lock = await try_acquire_snapshot_lifecycle_lock(db)
+    if lifecycle_lock not in {"acquired", "not_required"}:
+        detail = (
+            "地址目录快照正在维护，请稍后重试"
+            if lifecycle_lock == "busy"
+            else "无法确认地址目录快照生命周期锁，请稍后重试"
+        )
+        raise RegistryLockError(
+            "lock_failed",
+            reasons.REGISTRY_LOCK_FAILED.format(detail=detail),
+        )
 
     target = (version or "").strip() or None
     if target is None:

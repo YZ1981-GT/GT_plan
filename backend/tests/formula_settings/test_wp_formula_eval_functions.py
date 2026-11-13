@@ -20,6 +20,7 @@ from app.models.audit_platform_models import (
     TbAuxBalance,
     TrialBalance,
 )
+from app.models.adjustment_review_models import AdjustmentClientBooking, AdjustmentTreatmentEvent
 from app.models.dataset_models import LedgerDataset
 from app.models.report_models import DisclosureNote, FinancialReport, FinancialReportType
 from app.services.formula_engine import execute
@@ -29,7 +30,10 @@ from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
 from ._env import BS, add_project, make_db
 
 IS = FinancialReportType.income_statement
-EXTRA = (TrialBalance, TbAuxBalance, LedgerDataset, DisclosureNote, Adjustment, AdjustmentEntry)
+# adj_net_batch 按分录组最新的财务处理事件与客户入账状态过滤（adjustment_treatment_events /
+# adjustment_client_bookings），两张表要建出来，否则取数失败、ADJ 恒 0
+EXTRA = (TrialBalance, TbAuxBalance, LedgerDataset, DisclosureNote, Adjustment, AdjustmentEntry,
+         AdjustmentTreatmentEvent, AdjustmentClientBooking)
 YEAR = 2025
 
 
@@ -271,4 +275,8 @@ async def test_preload_without_gaps_keeps_lenient_behaviour():
         pid = await add_project(db, "非严格")
         await db.commit()
         ctx = await preload(db, pid, YEAR, ["AUX('1122','客户','甲公司','期末余额') + ROW('BS-001')"])
-        assert execute("AUX('1122','客户','甲公司','期末余额') + ROW('BS-001')", ctx).value == Decimal("0")
+        # 非严格：辅助核算缺数按 0（兼容旧行为，不记缺口）
+        assert execute("AUX('1122','客户','甲公司','期末余额')", ctx).value == Decimal("0")
+        # 内核契约：引用的报表行不存在一律报错、值为 None（不随严格开关放宽，也不按 0 参与求和）
+        missing_row = execute("AUX('1122','客户','甲公司','期末余额') + ROW('BS-001')", ctx)
+        assert missing_row.value is None and any("ROW('BS-001')" in e for e in missing_row.errors), missing_row

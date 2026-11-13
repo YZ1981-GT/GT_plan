@@ -94,7 +94,16 @@ async function validateAndPersistCurrentStep(): Promise<Record<string, unknown> 
       onForbidden: (error) => ElMessage.error(creationDeniedMessage(error)),
     })
   } else {
-    await wizardStore.saveStep('basic_info', data)
+    const saved = await wizardStore.saveStep('basic_info', data, {
+      onForbidden: (detail) => {
+        const message = typeof detail === 'string' ? detail : detail?.message || '没有建项权限，请联系管理员'
+        ElMessage.error(message)
+      },
+      onConflict: (detail) => {
+        void showCompanyCodeConflict(detail)
+      },
+    })
+    if (!saved) return null
   }
   showGroupNotices()
   return data
@@ -111,6 +120,25 @@ async function persistKeepingForm(): Promise<Record<string, unknown> | null> {
     if (error?.isAxiosError || error?.response) return null
     throw error
   }
+}
+
+
+/** 向导改企业代码的结构化冲突提示（R6.4）：不清空表单、不自动重试。 */
+async function showCompanyCodeConflict(detail: {
+  error_code?: string
+  message?: string
+  impacts?: Array<{ label?: string; count?: number }>
+}) {
+  const impacts = (detail.impacts || [])
+    .map((item) => `• ${item.label || '关联数据'}：${item.count ?? 0} 条`)
+    .join('\n')
+  const message = impacts
+    ? `${detail.message || '企业代码已被其他数据引用，不能直接修改。'}\n\n${impacts}\n\n请先处理关联数据后再修改企业代码。`
+    : (detail.message || '建项授权已变化，请刷新后重试。')
+  await ElMessageBox.alert(message, '企业代码无法修改', {
+    confirmButtonText: '知道了',
+    type: 'warning',
+  })
 }
 
 /** 后端对集团关系做的补齐/同步要告诉用户（需求 1.8：说明同步了哪个项目） */

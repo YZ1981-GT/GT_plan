@@ -8,11 +8,11 @@
     （spec formula-hub-integrity-closure 需求 8.3）。
 -->
 <template>
-  <span v-if="projectId && count > 0" class="gt-fps-anchor">
-    <el-tooltip :content="`有 ${count} 处公式待确认`" placement="bottom">
+  <span v-if="projectId && (count > 0 || loadError)" class="gt-fps-anchor">
+    <el-tooltip :content="loadError ? '待确认事项加载失败，点击查看' : `有 ${count} 处公式待确认`" placement="bottom">
       <button type="button" class="gt-fps-badge" data-testid="formula-pending-badge"
-        :aria-label="`公式待确认 ${count} 处`" @click="openDialog">
-        <el-badge :value="count" :max="99" type="danger"><span class="gt-fps-icon">ƒx</span></el-badge>
+        :aria-label="loadError ? '待确认加载失败' : `公式待确认 ${count} 处`" @click="openDialog">
+        <el-badge :value="loadError ? '!' : count" :max="99" :type="loadError ? 'warning' : 'danger'"><span class="gt-fps-icon">ƒx</span></el-badge>
       </button>
     </el-tooltip>
   </span>
@@ -26,6 +26,9 @@
       <el-button size="small" data-testid="fps-all-adopt" @click="setAll('adopt')">全部采用新定义</el-button>
       <el-button size="small" data-testid="fps-all-keep" @click="setAll('keep')">全部保留本项目</el-button>
     </div>
+    <!-- formula-hub-release-blockers R1.3：加载失败显示错误而非隐藏角标 -->
+    <el-alert v-if="loadError && !loading" type="error" :closable="false" show-icon class="gt-fps-gap"
+      :title="loadError" />
     <!-- formula-management-ux-improvements D1：按域分组折叠展示 -->
     <div v-loading="loading" class="gt-fps-groups" style="max-height: 460px; overflow-y: auto;">
       <div v-for="group in groupedItems" :key="group.domain" class="gt-fps-group">
@@ -116,6 +119,8 @@ const items = ref<PendingItem[]>([])
 const visible = ref(false)
 const loading = ref(false)
 const submitting = ref(false)
+/** formula-hub-release-blockers R1.3：加载失败时显示错误，不静默置空 */
+const loadError = ref('')
 const choices = reactive<Record<string, ResolutionChoice | ''>>({})
 const custom = reactive<Record<string, Record<string, string>>>({})
 const domains = ref<Record<string, FormulaDomainInfo>>({})
@@ -191,6 +196,7 @@ async function reload(autoOpen = false) {
     const data = await formulaSettingsApi.pending(pid)
     if (seq !== loadSeq || pid !== props.projectId) return // 晚到：已切到别的项目
     items.value = data?.items || []
+    loadError.value = '' // 成功时清除错误态
     const alive = new Map(items.value.map((i) => [i.id, i.revision]))
     const outdated = (k: string) => !alive.has(k) || alive.get(k) !== revisions.get(k)
     for (const k of Object.keys(choices)) if (outdated(k)) delete choices[k]
@@ -201,8 +207,12 @@ async function reload(autoOpen = false) {
       markShown(pid)
       openDialog()
     }
-  } catch {
-    if (seq === loadSeq) items.value = [] // 拉取失败不打扰（角标不显示）
+  } catch (e: any) {
+    if (seq === loadSeq) {
+      items.value = []
+      // formula-hub-release-blockers R1.3：显示错误态而非静默隐藏角标
+      loadError.value = formulaErrorText(e, '待确认事项加载失败')
+    }
   } finally {
     if (seq === loadSeq) loading.value = false
   }

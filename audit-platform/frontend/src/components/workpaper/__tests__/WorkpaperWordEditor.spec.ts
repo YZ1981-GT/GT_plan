@@ -34,6 +34,29 @@ vi.mock('@/services/apiProxy', () => ({
   },
 }))
 
+// 🔴 2026-11-04：双模式开关的可见性 / 可切换性来自同步能力单源（useEntrySyncReadiness →
+//    workpaperSyncApi.readEntrySyncReadiness）。本文件的双模式用例测的是「单源放行时」的行为，
+//    默认给一份已验收的 bidirectional 结论；「单源不放行」由 single source gate 用例换成 pending。
+const readinessHoist = vi.hoisted(() => ({
+  current: null as unknown,
+  ready: {
+    entry_id: 'docx/workpaper-word-editor', effective_entry_id: 'docx/gt-a16-bundle',
+    capability: 'bidirectional', adjudication_state: 'terminal', allowed_modes: ['html', 'oo'],
+    can_claim_bidirectional: true,
+    runtime: {
+      ready: true, adapter_id: 'test', authority_model: null, definition_bundle_id: null,
+      definition_bundle_sha256: null, typed_slots_complete: true, typed_slots: [],
+      representation_id: null, representation_generation: null,
+    },
+    acceptance: { state: 'verified', stale: false, run_id: null, required_scenario_set_digest: null },
+    reason: null,
+  },
+}))
+vi.mock('../sync/workpaperSyncApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../sync/workpaperSyncApi')>()),
+  readEntrySyncReadiness: vi.fn(async () => readinessHoist.current ?? readinessHoist.ready),
+}))
+
 // Mock OnlyOfficeWordDialog
 vi.mock('../OnlyOfficeWordDialog.vue', () => ({
   default: { name: 'OnlyOfficeWordDialog', template: '<div class="mock-onlyoffice" />', props: ['visible', 'documentUrl', 'documentKey', 'title', 'mode', 'callbackUrl'] },
@@ -1600,6 +1623,33 @@ describe('WorkpaperWordEditor — dual-mode unit tests', () => {
       expect(executionOrder).toContain('initEditor')
 
       wrapper.unmount()
+    })
+  })
+
+  describe('single source gate', () => {
+    it('单源说未裁决（pending）⇒ 不画双模式开关，程序化切到「在线编辑」也被拒', async () => {
+      readinessHoist.current = {
+        ...(readinessHoist.ready as Record<string, unknown>),
+        capability: null,
+        adjudication_state: 'pending',
+        can_claim_bidirectional: false,
+        reason: { code: 'ENTRY_UNADJUDICATED', message: '该底稿尚未完成双向能力裁决。', next_action: '' },
+      }
+      try {
+        const wrapper = createDualModeWrapper()
+        await flushPromises()
+        expect(wrapper.find('.el-segmented-stub').exists(), '单源说不能切，开关不得出现').toBe(false)
+        const vm = wrapper.vm as any
+        mockApiGet.mockClear()
+        await vm.onModeSwitch('在线编辑')
+        await flushPromises()
+        expect(vm.genericViewMode).toBe('结构化视图')
+        const configCalls = mockApiGet.mock.calls.filter((c: any[]) => c[0]?.includes?.('/onlyoffice-config'))
+        expect(configCalls.length, '被拒的切换不得去拉 OnlyOffice 配置').toBe(0)
+        wrapper.unmount()
+      } finally {
+        readinessHoist.current = null
+      }
     })
   })
 

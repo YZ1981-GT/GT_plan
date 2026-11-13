@@ -53,7 +53,9 @@ class KamConfirmedRule(GateRule):
             )
         except Exception as e:
             logger.error(f"[R6-KAM] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class IndependenceConfirmedRule(GateRule):
@@ -93,7 +95,9 @@ class IndependenceConfirmedRule(GateRule):
             )
         except Exception as e:
             logger.error(f"[R6-INDEPENDENCE] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class SubsequentEventsReviewedRule(GateRule):
@@ -133,7 +137,9 @@ class SubsequentEventsReviewedRule(GateRule):
             )
         except Exception as e:
             logger.error(f"[R7-SUBSEQUENT] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class GoingConcernEvaluatedRule(GateRule):
@@ -173,7 +179,9 @@ class GoingConcernEvaluatedRule(GateRule):
             )
         except Exception as e:
             logger.error(f"[R7-GOING-CONCERN] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 class MgmtRepresentationRule(GateRule):
@@ -267,7 +275,9 @@ class MgmtRepresentationRule(GateRule):
             )
         except Exception as e:
             logger.error(f"[R7-MGMT-REP] check error: {e}")
-            return None
+            return self.not_executed(
+                f"检查异常，未执行：{type(e).__name__}：{str(e)[:200]}"
+            )
 
 
 def register_round6_rules():

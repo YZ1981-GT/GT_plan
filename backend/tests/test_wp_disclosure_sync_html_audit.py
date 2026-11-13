@@ -33,6 +33,10 @@ class FakeNote:
         self.last_sync_user_id = None
         self.updated_by = None
         self.is_deleted = False
+        # 真实 DisclosureNote 都有的两列：清过期按 year（spec formula-writer-ownership-and-stale R2）、
+        # 写入归属按 source_template 认准则（同 spec §13）
+        self.year = 2025
+        self.source_template = "listed"
 
 
 class FakeUser:

@@ -1655,7 +1655,7 @@
       "source_refs": [
         "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L67",
         "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L451",
-        "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue#L473",
+        "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue#L475",
         "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L436",
         "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
         "backend/app/routers/checklist_responses.py#L132"
@@ -2488,7 +2488,7 @@
       {
         "hop": 2,
         "what": "persist() 把主键与两个合计键写进 allResponses 并 emit('save', …)",
-        "source_ref": "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue#L473"
+        "source_ref": "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue#L475"
       },
       {
         "hop": 3,
@@ -2766,7 +2766,7 @@
           "audit-platform/frontend/src/components/workpaper/composables/useK7Check.ts#L124",
           "audit-platform/frontend/src/components/workpaper/k1/core/K1TabIndex.vue#L195",
           "audit-platform/frontend/src/components/workpaper/k10/core/K10TabIndex.vue#L193",
-          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabAdjustment.vue#L364",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabAdjustment.vue#L366",
           "audit-platform/frontend/src/components/workpaper/k11/core/K11TabIndex.vue#L196",
           "audit-platform/frontend/src/components/workpaper/k12/core/K12TabIndex.vue#L196",
           "audit-platform/frontend/src/components/workpaper/k13/core/K13TabIndex.vue#L191",
@@ -2782,9 +2782,9 @@
           "audit-platform/frontend/src/components/workpaper/k6/core/K6TabIndex.vue#L191",
           "audit-platform/frontend/src/components/workpaper/k7/core/K7TabAdjustment.vue#L282",
           "audit-platform/frontend/src/components/workpaper/k7/core/K7TabIndex.vue#L189",
-          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue#L259",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue#L261",
           "audit-platform/frontend/src/components/workpaper/k8/core/K8TabIndex.vue#L192",
-          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabAdjustment.vue#L333",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabAdjustment.vue#L335",
           "audit-platform/frontend/src/components/workpaper/k9/core/K9TabIndex.vue#L194"
         ]
       },

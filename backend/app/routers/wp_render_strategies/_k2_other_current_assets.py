@@ -44,6 +44,7 @@ import logging
 import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
+from app.services.checklist_response_cas import checklist_snapshot_entry
 from app.services.dataset_query import get_active_filter
 from app.services.four_table.leaf_aggregation import (
     LeafRow,
@@ -294,16 +295,14 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         result = await ctx.db.execute(
             sa.text(
-                "SELECT item_id, conclusion, remark FROM checklist_responses "
+                "SELECT item_id, conclusion, remark, updated_at FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT 2000"
             ),
             {"wp_id": str(ctx.wp_id), "pfx": "K2-%"},
         )
         for row in result.fetchall():
-            responses_snapshot[row.item_id] = {
-                "conclusion": row.conclusion or "",
-                "remark": row.remark or "",
-            }
+            # 带 CAS 版本：宿主只用快照建编辑基线，缺版本时已有行保存 428
+            responses_snapshot[row.item_id] = checklist_snapshot_entry(row)
     except Exception as e:  # noqa: BLE001
         logger.warning("K2 render responses load failed: %s", e)
 

@@ -29,6 +29,8 @@ export const formulaSettings = {
 export const projectFormulaSettings = {
   /** GET 本项目待确认事项 */
   pending: (pid: string) => `/api/projects/${pid}/formula-settings/pending`,
+  /** GET 本项目公式变更的联动（传播）状态：处理中 / 失败（含原因）/ 已完成、未处理死信数 */
+  propagation: (pid: string) => `/api/projects/${pid}/formula-settings/propagation`,
   /** POST 处理待确认（采用新上游 / 保留本项目 / 手工修改） */
   resolve: (pid: string) => `/api/projects/${pid}/formula-settings/pending/resolve`,
   /** GET `?domain=` 「应用到指定项目」可选目标 */
@@ -66,6 +68,8 @@ export const formulaTemplates = {
   promotePreview: (id: string) => `/api/formula-templates/${id}/promote-preview`,
   /** POST 设为全局（admin）/ 提交全局候选（其他人） */
   promote: (id: string) => `/api/formula-templates/${id}/promote`,
+  /** POST 保留模板：只把这些公式位的基线换成当前全局（不发新版本、不影响订阅项目；所有者 / admin） */
+  keepBaseline: (id: string) => `/api/formula-templates/${id}/global-hints/keep`,
 } as const
 
 /** 项目订阅公式模板（`/api/projects/{pid}/formula-templates`） */

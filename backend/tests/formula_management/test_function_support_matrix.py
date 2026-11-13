@@ -120,34 +120,30 @@ def test_unknown_function_fail_closed():
 # ─────────────────── 现状实证：矩阵锚定真实执行器源码 ───────────────────
 
 
-def test_report_path_source_still_zeros_prev_aux():
-    """锚点守卫：报表路径（``report_engine.evaluate_formula_result``）仍把 PREV/AUX 求值为 0。
+def test_report_path_rejects_prev_aux_explicitly():
+    """锚点守卫：报表路径（``report_engine.evaluate_formula_result``）对 PREV/AUX 明确拒绝，不取数也不置 0。
 
-    若 PREV/AUX 在 report 路径真取数了，矩阵须同步改 report_path=True；
-    此断言打红即提示矩阵与实现漂移（memory 铁律：坐标漂移不报错、只静默打错位置）。
-
-    原以注释「报表域默认置 0」为锚点：formula-fetch-followup-defect-closure 6.6 删掉 ``enable_prev`` /
-    ``enable_aux`` 两个半成品开关、改写注释后锚点失效（取数并没变）。改为按行为判定 —— 注释怎么写都不影响，
-    真改了取数才红。
+    矩阵登记 report_path=False（不支持）。spec formula-integrity-and-propagation-closure R1 起，报表域遇到
+    PREV/AUX 不再像旧实现那样替换成 0（「置 0 得部分和」会静默算错），而是整式失败、值为 None、原因写明不支持。
+    若 PREV/AUX 在 report 路径真取数了（结果是 101），矩阵须同步改 report_path=True；若退回置 0（结果是 1），
+    就是回到了静默算错 —— 两种都打红。按行为判定，注释怎么写都不影响。
     """
     import asyncio
     from decimal import Decimal
 
     import app.services.report_engine as re_mod
 
-    src = Path(re_mod.__file__).read_text(encoding="utf-8")
-    assert "_PREV_PATTERN" in src and "_AUX_PATTERN" in src, "report_engine 不再引用 PREV/AUX 正则"
-
-    class _Resolver:  # 试算表取数恒 100：PREV/AUX 若改成真取数，结果就不再是 1
+    class _Resolver:  # 试算表取数恒 100：PREV/AUX 若改成真取数，结果就是 101
         async def resolve_tb(self, *_args):
             return Decimal("100")
 
         async def resolve_sum(self, *_args):
             return Decimal("100")
 
-    for ref in ("PREV('1001','期末余额')", "AUX('1122','客户','期末余额')"):
+    for ref, fn in (("PREV('1001','期末余额')", "PREV"), ("AUX('1122','客户','期末余额')", "AUX")):
         result = asyncio.run(re_mod.evaluate_formula_result(f"{ref} + 1", resolver=_Resolver()))
-        assert result.value == Decimal("1"), f"report 路径对 {ref} 不再置 0（得 {result.value}）—— 矩阵须复核"
+        assert result.value is None and not result.ok, f"report 路径对 {ref} 没有拒绝（得 {result.value}）—— 矩阵须复核"
+        assert any(f"不支持 {fn}()" in e for e in result.errors), result.errors
 
 
 def test_wp_evaluator_support_is_backed_by_wiring():

@@ -19,6 +19,8 @@ import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import { d4_35Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
@@ -28,6 +30,7 @@ const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<s
 const EVIDENCE_SHEET = 'D4-35'
 const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const reloadWorkpaperData = inject<(() => Promise<void> | void) | null>('reloadWorkpaperData', null)
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface SamplingParams { testPopulation: string; specificItems: string; samplingPopulation: string; sampleSize: string; samplingMethod: string; samplingProcess: string }
@@ -116,10 +119,28 @@ async function handleOcrUpload(rowId: string, file: File) {
 // ─── D4-35 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
 // 🔴 迁移前该文件的 switchD435Mode 无竞态修复兜底（直接读 ooHealthy 静默 return，历史 bug②
 //    残留实例）；useD4SyncMode 内置 await checkOoHealth() 二次判定，迁移顺带修复。
-const {
+/** 本 Tab 的 entry（D4 父 entry，同 D4_SYNC_ENTRY_ID）：门与 notice 共用。模板用绑定、不写静态 entry-id ——
+ *  静态字面量会被挂点发现器当作 L2 身份声明，overlay 的 L3 规则（sync_host_entry_rules[0]）随即零命中。 */
+const D4_TAB_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：「在线编辑」选项与模式开关的可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），经 `useD4SyncMode` 的 `entrySync` 生效，
+ * 不由本宿主的局部判断决定。entry 取 D4 父 entry（本 Tab 是它的 parent duplicate）。
+ *
+ * 🔴 必须声明在 `props` 之后、`useD4SyncMode` 之前：内部 `watch(..., { immediate: true })`
+ * 会在 setup 期立即读下面三个 getter，组合式也要在创建时拿到它。
+ */
+const d4EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => D4_TAB_ENTRY_ID,
+})
+const { showModeSwitch,
   syncBridge: d435SyncBridge, descriptor: d435SyncOoDescriptor, editorMode, modeOptions,
   busy: d435SyncBusy, syncStateTag, switchMode: switchD435Mode, syncHostRef: d435SyncHostRef,
 } = useD4SyncMode({
+  entrySync: d4EntrySync,
   sheetKey: 'd435-managed',
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -130,7 +151,8 @@ const {
     const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd435-managed' }
   },
-  reloadHtml: async () => { window.dispatchEvent(new CustomEvent('d4:reload-responses')) },
+  // 原先派发 `d4:reload-responses`：全仓没有监听方 ⇒ 切回表单后仍是旧值（2026-11-04 改走父级重载）
+  reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
 })
 
 const aiAvailable = ref(false)
@@ -184,7 +206,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 <template>
 <div class="d4-other-check">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('在线编辑')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-if="showModeSwitch" v-model="editorMode" :options="modeOptions" size="small" /><GtEntrySyncCapabilityNotice :entry-id="D4_TAB_ENTRY_ID" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('在线编辑')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 审计目标 -->

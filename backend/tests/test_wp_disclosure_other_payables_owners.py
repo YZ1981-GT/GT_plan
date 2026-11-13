@@ -47,6 +47,12 @@ def _no_push_states() -> MagicMock:
     return result
 
 
+def _stale_cleared() -> MagicMock:
+    result = MagicMock()
+    result.rowcount = 1
+    return result
+
+
 def _db(note: DisclosureNote, variant: str) -> MagicMock:
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
@@ -57,6 +63,8 @@ def _db(note: DisclosureNote, variant: str) -> MagicMock:
         _project_row(variant),
         _scalar(note),
         _no_push_states(),
+        # 同步成功后经统一入口清过期（spec formula-writer-ownership-and-stale R2：stale_state.clear_note_stale 一条 UPDATE）
+        _stale_cleared(),
     ])
     return db
 

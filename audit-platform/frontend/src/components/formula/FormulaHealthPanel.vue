@@ -172,7 +172,7 @@ const overallScore = computed(() => {
     { v: pushSuccPct.value, w: 0.2 },
     { v: configPct.value, w: 0.2 },
     { v: pendingCount.value === 0 ? 100 : Math.max(0, 100 - pendingCount.value * 10), w: 0.1 },
-    { v: crossCheckPct.value || 100, w: 0.15 },
+    { v: data.value?.cross_check_pass_rate?.has_results ? (data.value.cross_check_pass_rate.pass_rate ?? 0) : 100, w: 0.15 },
     { v: 100 - stalePct.value, w: 0.15 },
   ]
   return Math.round(w.reduce((sum, i) => sum + i.v * i.w, 0))

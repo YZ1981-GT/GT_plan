@@ -282,6 +282,7 @@ import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { indexFirstBy } from '@/utils/indexFirstBy'
+import { newUuid } from '@/utils/uuid'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useProjectStore } from '@/stores/project'
@@ -660,12 +661,10 @@ async function onFormulaRefreshAll() {
   try {
     const res: any = await api.post(
       `/api/projects/${projectId.value}/formula-push/run`,
-      { year: currentYear.value, dry_run: false },
+      { year: currentYear.value, dry_run: false, operation_id: newUuid(), async_mode: true },
     )
-    const written = res?.written_count ?? 0
-    const kept = res?.kept_count ?? 0
-    const skipped = res?.skipped_count ?? 0
-    ElMessage.success(`公式推送完成：写入 ${written} 项，保留 ${kept} 项，跳过 ${skipped} 项`)
+    if (!res?.accepted || !res?.job_id) throw new Error('公式推送任务未返回 job_id')
+    ElMessage.info('公式推送已提交，请在公式管理中查看实时进度')
   } catch (e: any) {
     handleApiError(e, '刷新全部公式')
   } finally {

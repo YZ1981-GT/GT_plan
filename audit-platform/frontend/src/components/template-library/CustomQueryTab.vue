@@ -232,10 +232,11 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="all" data-testid="cqt-export-all">导出全部（共 {{ result.total }} 条）</el-dropdown-item>
-                  <el-dropdown-item command="page" data-testid="cqt-export-page">导出当前页</el-dropdown-item>
+                  <el-dropdown-item command="page" data-testid="cqt-export-page">导出当前页（不保存为证据）</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
+            <el-button size="small" @click="evidenceDrawerVisible = true">🕘 历史与证据</el-button>
           </div>
         </div>
 
@@ -360,6 +361,12 @@
     >
       <AdvancedQueryBuilder embedded :project-id="formCtx.project_id || undefined" :year="formCtx.year ?? undefined" />
     </el-dialog>
+  <QueryEvidenceDrawer
+    v-model="evidenceDrawerVisible"
+    entry="business"
+    :project-id="formCtx.project_id || undefined"
+    :evidence="evidence"
+  />
   </div>
 </template>
 
@@ -392,6 +399,8 @@ import {
   type ConditionField, type ConditionState,
 } from '@/components/query/queryConditions'
 import MyTemplatesDialog from '@/components/query/MyTemplatesDialog.vue'
+import { useQueryRunEvidence } from '@/components/query/useQueryRunEvidence'
+import QueryEvidenceDrawer from '@/components/query/QueryEvidenceDrawer.vue'
 import { restoreTemplateQuery, type QueryTemplateItem } from '@/components/query/queryTemplateRestore'
 import { describeQueryError, queryErrorToast, type QueryErrorText } from '@/components/query/queryErrorText'
 import { columnTypesOf, formatQueryCell, isAmountCell } from '@/components/query/queryCellFormat'
@@ -458,6 +467,9 @@ let queryGeneration = 0
 const exporting = ref(false)
 /** 0 行时的空态说明（含实际使用的年度，便于自查年度是否选错） */
 const emptyHint = ref('')
+// AQF §8.2：服务端历史与证据
+const evidence = useQueryRunEvidence('business')
+const evidenceDrawerVisible = ref(false)
 // 分页（R2.6）：total 是后端在分页前算的真实行数，可据此翻页
 const page = ref(1)
 const pageSize = ref(100)
@@ -738,6 +750,7 @@ async function onExecute(keepPage = false) {
       if (data.count_token) countToken.value = data.count_token
       // 导出全部 / 保存模板沿用的本次查询不含凭证（凭证只对翻页时的 COUNT 有意义）
       lastRun.value = { source, projectId: formCtx.value.project_id, year, payload: buildBusinessPayload(input, targets) }
+      evidence.setFromExecuteResult(data as Record<string, unknown>)
       void rowLinks.validateRefs(data.rows || [])
       if ((data.total ?? 0) === 0) {
         // 0 行必须可诊断：年度对不上是最常见原因（四表按年度分区存），

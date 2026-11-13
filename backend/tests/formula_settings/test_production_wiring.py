@@ -18,7 +18,7 @@ WIRED_FUNCTIONS: list[tuple[str, str]] = [
     ("formula_settings.cross_check_rules", "run_user_rules"),
     ("formula_settings.wp_effective", "init_prefill_overrides"),
     ("formula_settings.wp_effective", "overlay_prefill_formulas"),
-    ("formula_settings.consol_note_settings", "effective_formulas"),
+    ("formula_settings.consol_note_settings", "effective_formulas_many"),
     ("formula_settings.note_settings", "save_section"),
     ("formula_settings.note_settings", "materialize"),
     ("formula_settings.note_settings", "materialize_quietly"),

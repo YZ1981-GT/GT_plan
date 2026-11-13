@@ -238,6 +238,8 @@ class QueryRequest:
     condition_logic: str = "and"
     # 编排器为缓存身份解析循环范围时创建；取数层复用，避免同一请求重复查 4~5 次权限链。
     cycle_scope_cache: Any | None = field(default=None, repr=False, compare=False)
+    # 版本摘要由编排器在 step3 写入（AQF §4.4）；不进 cache_def()、不参与定义比较。
+    version_hash: str | None = field(default=None, repr=False, compare=False)
 
     def cache_def(self) -> dict:
         """稳定序列化的查询定义（用于缓存键，design Data Models §4）。
@@ -302,6 +304,8 @@ class QueryResult:
     meta: dict = field(default_factory=dict)
     #: acnr_targets 逐格取值块（acnr-foundation-defect-closure T15）：每次执行现读、不进缓存（不在 to_payload 里）
     acnr_results: Optional[dict] = None
+    #: 本次版本向量（AQF §4.4）：不进缓存（to_payload 不含此键）；缓存命中时用本次采集的向量。
+    version: dict = field(default_factory=dict, repr=False)
 
     def to_payload(self) -> dict:
         """转为 JSON 可序列化 dict（供 QueryCache 存储）。"""
@@ -424,6 +428,28 @@ class QueryOrchestrator:
 
         # ── step3: cache（键隔离 project_id + scope_sig R12.5）──
         scope_sig = await self._scope_signature(user, req, db)
+
+        # ── step3a: 版本向量采集（AQF §4.4）：先于取数，进缓存键但不进 cache_def() ──
+        # 采集在 scope_sig 之后（CycleScopeCache 已建），在取数之前（保证 current 不会是假的）。
+        # 失败不阻断查询：用空向量替代，req.version_hash 保持 None。
+        version_vector: "VersionVector | None" = None
+        try:
+            from app.services.custom_query.version_capture import capture_business_vector
+            from app.services.custom_query.version_registry import declarations_for_business
+            acnr_targets = bool(getattr(req, "targets", None))
+            declarations = declarations_for_business(req.source or "", acnr_targets=acnr_targets)
+            version_vector = await capture_business_vector(
+                db, req.source or "",
+                scope={"project_id": req.project_id, "year": req.year},
+                acnr_targets=acnr_targets,
+            )
+            req.version_hash = version_vector.hash
+        except Exception as _ve:
+            logger.debug("AQF 版本采集失败，降级为无版本查询: %s", _ve)
+
+        if req.version_hash:
+            scope_sig = f"{scope_sig}|v={req.version_hash}"
+
         key = self._cache.cache_key(req.cache_def(), str(req.project_id), scope_sig)
 
         executed = {"ran": False}
@@ -438,6 +464,9 @@ class QueryOrchestrator:
         # 单元格取值在缓存读取之后（无论命中）现读，不进缓存（acnr design §2.3）
         result.acnr_results = await read_acnr_target_values(
             resolved, project_id=req.project_id, year=req.year, db=db)
+        # 版本向量：缓存命中时也用本次采集的向量（ADR-AQF-03）
+        if version_vector is not None:
+            result.version = version_vector.as_dict()
         return result
 
     async def resolve_targets(self, req: QueryRequest, db: AsyncSession) -> list[ResolvedTarget]:

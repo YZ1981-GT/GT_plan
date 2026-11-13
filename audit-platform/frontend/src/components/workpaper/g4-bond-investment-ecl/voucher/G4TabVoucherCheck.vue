@@ -1000,7 +1000,7 @@ function renderOcrPreview(fields: Record<string, any>): string {
     .filter(([, v]) => v != null && String(v) !== '')
     .map(([k, v]) => `<div style="margin:4px 0"><b>${LABEL_MAP[k] || k}：</b>${v}</div>`)
   if (lines.length === 0) return '<div>未识别到可填充字段</div>'
-  return `<div style="font-size:14px">${lines.join('')}</div>`
+  return `<div style="font-size:var(--gt-display-font-size)>${lines.join('')}</div>`
 }
 
 /**

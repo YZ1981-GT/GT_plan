@@ -19,7 +19,7 @@
 import type { Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { readStoreProjection } from '../sync/workpaperSyncApi'
-import { useD4SyncMode } from '../d4/composables/useD4SyncMode'
+import { useD4SyncMode, type UseD4SyncModeOptions } from '../d4/composables/useD4SyncMode'
 
 export interface UseKAdjustmentSyncOptions {
   /** manifest entry_id，如 `xlsx/gt-k10-other-income`。 */
@@ -37,6 +37,8 @@ export interface UseKAdjustmentSyncOptions {
   readonly onReloaded: (remark: string | null) => void
   /** HTML 侧视图标签，默认 `['结构化视图']`。 */
   readonly views?: readonly string[]
+  /** 同步能力单源（task 3.5 / AC 1.4），原样转给 `useD4SyncMode`；不传保持改线前行为。 */
+  readonly entrySync?: UseD4SyncModeOptions['entrySync']
 }
 
 /** 本表 item 直写 store（与 K12/K13 FormData 同一端点同一 body 形态）。 */
@@ -58,6 +60,7 @@ async function readItemRemark(wpId: string, itemId: string): Promise<string | nu
 export function useKAdjustmentSync(options: UseKAdjustmentSyncOptions) {
   return useD4SyncMode({
     entryId: options.entryId,
+    entrySync: options.entrySync,
     sheetKey: options.sheetKey,
     wpId: options.wpId,
     projectId: options.projectId,

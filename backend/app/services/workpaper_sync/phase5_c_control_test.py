@@ -48,9 +48,12 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from app.services.workpaper_sync.models import SyncDomainError
+
+if TYPE_CHECKING:  # 只为类型标注；本模块的契约对象一律在函数体内 import（延迟导入纪律）
+    from app.services.workpaper_sync.contracts import SyncContract
 from dataclasses import dataclass
 from app.services.workpaper_sync.models import AuthorityModel
 from app.services.workpaper_sync.definitions import DefinitionKind
@@ -757,6 +760,42 @@ def build_registration(*, adapter, bundle, descriptor, room, contract=None):
     )
 
 
+async def resolve_published_frozen_definitions(
+    *, session: Any, representation: Any, contract: SyncContract
+) -> Any:
+    """读已发布 representation 的冻结定义，并与 provider source-locked 的契约 digest 比对。
+
+    🔴 2026-11-04 抽出原因：这段「观测 + digest 比对」原先内联在 `attach_adapters` 里，
+    于是本 entry 在 Task 75 的四条判据上没有分母（判据按函数名找实现），而同族 provider
+    （D/E/F/G/H/I/J/L/M）都把它收在这一个函数里。抽出后 `attach_adapters` 只 await 它一次，
+    digest 比对只有一处；九步仍只在 `published_identity_observer` 里实现。
+    """
+    from pathlib import Path
+
+    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+    from app.services.workpaper_sync.published_identity_observer import (
+        observe_published_frozen_definitions,
+    )
+    from app.services.workpaper_sync.resolution import CanonicalResolutionService
+
+    backend_root = Path(__file__).resolve().parents[3]
+    observation = await observe_published_frozen_definitions(
+        session=session,
+        resolution=CanonicalResolutionService(
+            session, CanonicalArtifactRepository(backend_root)
+        ),
+        representation=representation,
+        correlation_id=f"{ADAPTER_ID}@{getattr(representation, 'id', None)}",
+    )
+    if observation.definitions.contract.canonical_sha256 != contract.canonical_sha256:
+        raise EntrySelectionError(
+            f"entry {ENTRY_ID}: 观测器读出的契约 digest "
+            f"{observation.definitions.contract.canonical_sha256} "
+            f"与本模块 source-locked 的 {contract.canonical_sha256} 不一致"
+        )
+    return observation
+
+
 async def attach_adapters(registry, *, session) -> tuple[str, ...]:
     """逐 entry attach（白名单入口 `attach_pilot_adapters` 的实现）。
 
@@ -780,9 +819,6 @@ async def attach_adapters(registry, *, session) -> tuple[str, ...]:
     )
     from app.services.workpaper_sync.projection_target_resolution import (
         resolve_visible_current_representation_id,
-    )
-    from app.services.workpaper_sync.published_identity_observer import (
-        observe_published_frozen_definitions,
     )
     from app.services.workpaper_sync.resolution import CanonicalResolutionService
 
@@ -817,16 +853,9 @@ async def attach_adapters(registry, *, session) -> tuple[str, ...]:
         raise EntrySelectionError(
             f"entry {ENTRY_ID} 的宿主实测不可达（产不出 descriptor 事实）"
         )
-    observation = await observe_published_frozen_definitions(
-        session=session,
-        resolution=resolution,
-        representation=representation,
-        correlation_id=f"{ADAPTER_ID}@{getattr(representation, 'id', None)}",
+    observation = await resolve_published_frozen_definitions(
+        session=session, representation=representation, contract=contract
     )
-    if observation.definitions.contract.canonical_sha256 != contract.canonical_sha256:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID}: 观测器读出的契约 digest 与 source-locked 不一致"
-        )
     registration = build_registration(
         adapter=build_excel_adapter(
             definitions=observation.definitions,

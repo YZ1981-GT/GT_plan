@@ -34,7 +34,7 @@
       </div>
       <div class="ch-stat-item">
         <span class="ch-stat-num">{{ subsidiaryCount }}</span>
-        <span class="ch-stat-label">子公司</span>
+        <span class="ch-stat-label">下属企业</span>
       </div>
       <div class="ch-stat-item">
         <span class="ch-stat-num">{{ executingCount }}</span>
@@ -264,7 +264,7 @@ import { Connection, OfficeBuilding, Plus, Refresh, Search, Document, Upload, Cl
 import { useGroupTree, highlightSegments, consolMethodLabel, formatShareholding, countConsolMethods, type TreeNode, type GroupTree } from '@/composables/useGroupTree'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
-import { reparentSummary, type ReparentResult } from '@/components/consolidation/composables/consolReparent'
+import { reparentSummary, isParentCodeConflict, type ReparentResult } from '@/components/consolidation/composables/consolReparent'
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import { previewScopeConfirmation, type ScopeConfirmationPreview } from '@/services/consolScopeConfirmationApi'
@@ -331,8 +331,14 @@ const batchImportRoots = computed(() => trees.value
 
 /** 合并项目数 = 含合并根项目的集团树数量 */
 const consolidatedCount = computed(() => trees.value.filter((t) => t.rootProjectId).length)
-/** 子公司数 = 森林成员节点总数 */
-const subsidiaryCount = computed(() => totalTreeNodes.value)
+/**
+ * 下属企业数 = 森林成员节点总数 − 集团根节点数。
+ * 后端 group_forest 在集团本身有项目时把根企业放在 children[0]（其余企业挂在它下面），
+ * 直接用 totalTreeNodes 会把集团自己也算成一家下属企业（2026-11-09 实测：1 家下属显示 3）。
+ */
+const subsidiaryCount = computed(() =>
+  Math.max(0, totalTreeNodes.value - trees.value.filter((t) => t.rootProjectId).length),
+)
 const executingCount = computed(
   () => allTreeNodes.value.filter((n) => n.status === 'execution').length,
 )
@@ -493,6 +499,7 @@ async function onNodeDrop(
     const result = await api.patch<ReparentResult>(`/api/projects/${dragData.id}/parent-code`, {
       parent_company_code: newParentCode,
       parent_company_name: dropData.companyName || null,
+      expected_parent_company_code: dragData.parentCompanyCode ?? null,
     }, { _silent: true } as any)
     ElNotification({
       title: '层级调整成功',
@@ -502,6 +509,16 @@ async function onNodeDrop(
     })
     reload()
   } catch (e: any) {
+    if (isParentCodeConflict(e)) {
+      ElNotification({
+        title: '层级已被调整',
+        message: '企业树已被他人调整，已刷新为最新结构',
+        type: 'warning',
+        duration: 8000,
+      })
+      reload()
+      return
+    }
     // 400 成环 / 422 代码不合法 → 后端说明；403 无权；其余通用。无论如何重建树恢复原位
     handleApiError(e, '层级调整')
     reload()

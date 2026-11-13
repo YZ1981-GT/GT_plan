@@ -41,6 +41,7 @@ from app.services.note_shared_table_segments import (
     template_rows,
 )
 from app.services.note_sub_table_projector import normalize_sub_table_data
+from app.services.note_write_ownership import WriteGate, takeover_skip_result
 from app.services.wp_disclosure_derived_tables import (
     rebuild_other_payables_summary,
 )
@@ -826,16 +827,8 @@ async def sync_from_workpaper(
     Args:
         commit: 是否立即 commit。批量同步时应传 False，由调用方统一提交。
 
-    Returns:
-        {
-            "success": True,
-            "section_id": str,
-            "synced_at": ISO timestamp,
-            "rows_synced": int,
-            "created": bool,             # 本次是否新建（True=create，False=update）
-            "blocked_by_manual_override": bool,  # 是否被 manual_override 拦截（True=table_data 未更新）
-            "texts_synced": int,
-        }
+    Returns: 键与 ``routers.wp_disclosure_sync.SyncFromWorkpaperResponse`` 逐一对应（``test_wp_disclosure_sync`` 钉住）；
+    写入归属被拒的格见 ``blocked_writes``（spec formula-writer-ownership-and-stale design §13）。
     """
     if not section_id or not section_id.strip():
         raise ValueError("section_id 不能为空")
@@ -897,6 +890,10 @@ async def sync_from_workpaper(
     ).with_for_update()
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
+    # 写入归属（design §13）：治理域内从未由底稿同步、模板表格已有人工填写 ⇒ 整节不接管（与离屏同步同一判据）
+    gate = WriteGate("workpaper_sync", current_standard, section_id, note.table_data if note is not None else None)
+    if note is not None and not (takeover := gate.check_takeover(note.table_data)).allowed:
+        return takeover_skip_result(gate, takeover, section_id, now.isoformat(), clean_sub_table_data)
 
     # 🔴 口径守卫必须在「软删行复活」之前：没有活动行时，新建与复活都会让这一章
     # 出现在本项目附注里。守卫放在复活之后 ⇒ 存量清理软删的合并专属章节，
@@ -1056,7 +1053,7 @@ async def sync_from_workpaper(
 
         push_kept = await reapply_pushed_cells(
             db, project_id=project_id, year=target_year, section=section_id,
-            table_data=new_table_data, touched=set(clean_sub_table_data) | derived_tables,
+            table_data=new_table_data, touched=set(clean_sub_table_data) | derived_tables, gate=gate,
         )
 
     # ── 叙述段按 `section` 浅合并（原实现是整列表替换）──────────────────────
@@ -1243,6 +1240,7 @@ async def sync_from_workpaper(
         "row_scope_unresolved_reasons": row_scope_reasons,
         # additive：公式推送写过、本次同步来的值与之不同而保持推送值的格（以试算表审定数为准；R3）
         "push_kept": push_kept,
+        "blocked_writes": gate.blocked_writes,  # 写入归属被拒的格（design §13）
     }
 
 
@@ -1304,17 +1302,8 @@ class WpDisclosureSyncService:
         5. 审计日志
         6. SSE 通知
 
-        Args:
-            db: async DB session
-            wp_id: 底稿 ID
-            sheet_name: C 类附注 sheet 名
-            sub_table_data: 子表数据
-            project_id: 项目 ID
-            user: 当前用户
-            force: 强制覆盖（跳过冲突检测）
-
-        Returns:
-            同步结果 dict
+        ``force``：跳过冲突检测强制覆盖。返回键与 ``routers.wp_disclosure_sync.SyncFromHtmlResponse`` 逐一对应；
+        写入归属被拒的格见 ``blocked_writes``（spec formula-writer-ownership-and-stale design §13）。
 
         Raises:
             ConflictError: 附注侧有更新的手动编辑
@@ -1448,6 +1437,12 @@ class WpDisclosureSyncService:
                     note_updated=note.updated_at,
                     last_sync_at=last_sync_at,
                 )
+        # 写入归属（design §13）：与 sync_from_workpaper 同一写方、同一 manual 策略；章节没记准则时按项目准则
+        variant = resolve_template_variant((note.table_data or {}).get("_current_standard"), note.source_template) \
+            or (await _resolve_project_sync_facts(db, project_id))[2]
+        gate = WriteGate("workpaper_html_sync", variant, section_id, note.table_data)
+        if not (takeover := gate.check_takeover(note.table_data)).allowed:
+            return {**takeover_skip_result(gate, takeover, section_id, now.isoformat(), incoming_raw), "synced": False}
 
         # 4. 写入（原子操作）
         existing_table_data = dict(note.table_data) if note.table_data else {}
@@ -1515,7 +1510,7 @@ class WpDisclosureSyncService:
 
             html_push_kept = await reapply_pushed_cells(
                 db, project_id=project_id, year=target_year, section=section_id,
-                table_data=existing_table_data, touched=incoming_sub.keys(),
+                table_data=existing_table_data, touched=incoming_sub.keys(), gate=gate,
             )
 
         note.table_data = existing_table_data
@@ -1556,6 +1551,7 @@ class WpDisclosureSyncService:
             "row_scope_unresolved": html_row_scope_unresolved,
             "row_scope_unresolved_reasons": html_row_scope_reasons,
             "push_kept": html_push_kept,
+            "blocked_writes": gate.blocked_writes,
         }
 
     async def _get_section_mapping(

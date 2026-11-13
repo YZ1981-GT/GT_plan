@@ -43,11 +43,13 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     k_domain_files,
     strip_comments,
 )
+from tests.workpaper_sync.sync_artifact_paths import (  # noqa: E402
+    spec_dir,
+)
 
 CONTRACT_DIR = DATA / "workpaper_sync_contracts"
 SPEC_DIR = (
-    ROOT / ".kiro" / "specs"
-    / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
 )
 
 LANE2 = (8, 9, 11, 12, 13)
@@ -77,7 +79,7 @@ CANARY_CONTRACT_ID = "k10.other_income_adjustment"
 #:    草案本体作为 Task 18/22「草案阶段」的交付证据归档在 spec evidence 目录，本文件的
 #:    草案判据改读归档（历史事实不变）；生产契约的判据见 `test_k_cycle_reviewed_contracts.py`。
 DRAFT_ARCHIVE_DIR = (
-    ROOT / ".kiro" / "specs" / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    spec_dir("k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub")
     / "evidence" / "superseded-candidate-contracts"
 )
 
@@ -614,7 +616,7 @@ class TestKBP42SpecReferencesOnlyNeverRestates:
     @staticmethod
     def _foundation_kc_titles() -> dict[str, str]:
         fd = (
-            ROOT / ".kiro" / "specs" / "k-cycle-sync-foundation-and-first-canary"
+            spec_dir("k-cycle-sync-foundation-and-first-canary")
             / "design.md"
         ).read_text(encoding="utf-8")
         out: dict[str, str] = {}

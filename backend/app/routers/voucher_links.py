@@ -12,6 +12,12 @@ ledger_penetration.py，整体迁到这里（那个文件已到行数上限）�
   键里有主体名称，500 个键放进查询串会超过请求行长度上限，所以用请求体）
 - ``POST   /api/projects/{project_id}/ledger/voucher-evidence/query``：凭证键 → 各可见底稿已取得的凭证证据
   （spec attachment-voucher-evidence-binding 需求 2.1、7）
+- ``GET    /api/projects/{project_id}/ledger/workpapers/{wp_id}/attached-voucher-status``：本底稿手工挂凭里还没导入
+  凭证检查表的凭证（spec voucher-workflow-linkage-lineage-closure R3.6）
+- ``POST   /api/projects/{project_id}/ledger/voucher-conclusions/query``：凭证键 → 各可见底稿检查表里的结论（R6）
+
+挂凭写入（单张 / 批量 / 取消）要能编辑目标底稿（与保存凭证检查表同一授权动作），按底稿读要能读该底稿
+（spec voucher-workflow-linkage-lineage-closure R1）。
 
 挂凭的凭证按当前账套定位成一张凭证（凭证键 = 年度 + 主体 + 日期 + 凭证字 + 号）：只给号（或日期 + 号）
 却命中多张时 409 VOUCHER_KEY_AMBIGUOUS + 候选，找不到 404。手工侧去重键 = 凭证键 + 目标底稿，与 V210 的
@@ -37,9 +43,10 @@ from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.audit_platform_models import TbLedger
 from app.models.core import User
-from app.models.workpaper_models import SampledVoucher, WorkingPaper, WpIndex
+from app.models.workpaper_models import SampledVoucher, SamplingRecord, WorkingPaper, WpIndex
 from app.services.dataset_query import get_active_filter
 from app.services.project_audit_phase import project_phase
+from app.services.voucher_evidence import _visible_wp_ids
 from app.services.voucher_identity import (
     VoucherKey,
     company_code_condition,
@@ -49,6 +56,7 @@ from app.services.voucher_identity import (
     voucher_label,
     voucher_type_condition,
 )
+from app.services.wp_visibility.entry_integration import try_gate_wp
 
 from ._voucher_date import parse_iso_date
 
@@ -63,6 +71,29 @@ _NO_WP = UUID("00000000-0000-0000-0000-000000000000")
 #: 已挂查询单次最多这么多个凭证键（design §5）；批量挂凭单次最多这么多个（凭证 × 底稿）组合
 MAX_LINK_KEYS = 500
 MAX_BATCH_PAIRS = 500
+
+_WP_NOT_WRITABLE = "你不能编辑这张底稿：挂凭和取消挂凭只限底稿编制人与项目主管"
+
+
+async def _wp_writable(db: AsyncSession, user: User, wp_id: UUID) -> bool:
+    """底稿写权限：与保存凭证检查表同一授权矩阵动作（spec voucher-workflow-linkage-lineage-closure R1，ADR-VWL-01）。
+
+    挂凭改变的是底稿的抽样清单，受众与保存检查表相同；静默门，拒绝由调用方转成业务错误码。
+    """
+    ctx = await try_gate_wp(
+        db, user, entrypoint="workpaper.checklist_save", action="save_checklist", method="PUT",
+        wp_id=wp_id, entry_family="checklist",
+    )
+    return ctx is not None
+
+
+async def _wp_readable(db: AsyncSession, user: User, wp_id: UUID) -> bool:
+    """底稿读权限：与读取凭证检查表同一动作。"""
+    ctx = await try_gate_wp(
+        db, user, entrypoint="workpaper.checklist_read", action="read_checklist", method="GET",
+        wp_id=wp_id, entry_family="checklist",
+    )
+    return ctx is not None
 
 
 class _SampleVoucherRequest(BaseModel):
@@ -199,12 +230,40 @@ async def sample_voucher(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """抽中本凭证 / 挂凭到底稿：记录到抽样凭证清单（手工侧，batch_id 为空）。
+    """挂凭到底稿（单张）：记录到抽样凭证清单（手工侧，batch_id 为空）。必须指定底稿，且要能编辑该底稿。
 
     同一凭证（凭证键）挂同一底稿只有一条（再挂 = 复活 / 更新，幂等）；挂不同底稿各成一行（V166：
     同一张凭证可以既属 D2 应收账款检查、又属 E1 货币资金检查）；同日同号的不同凭证字各是一张凭证。
     只在手工侧查（抽凭引擎批次行不复用不改写），确定性取一行：未软删的优先，再按最近登记。
     """
+    # 必须指定底稿：没有底稿的挂凭没有落点（唯一的这类调用方「抽中本凭证」已删除，ADR-VWL-02）
+    if body.working_paper_id is None:
+        raise HTTPException(status_code=422, detail={
+            "error_code": "WP_REQUIRED",
+            "message": "请选择要挂到的底稿",
+        })
+    # 归属校验（与批量端点同口径）→ 底稿写权限
+    wps = await _project_workpapers(db, project_id, [body.working_paper_id])
+    if body.working_paper_id not in wps:
+        raise HTTPException(status_code=422, detail={
+            "error_code": "WP_NOT_IN_PROJECT",
+            "message": "目标底稿不在本项目（或已删除、未生成）",
+        })
+    if not await _wp_writable(db, current_user, body.working_paper_id):
+        raise HTTPException(status_code=403, detail={"error_code": "WP_NOT_WRITABLE", "message": _WP_NOT_WRITABLE})
+    if body.sampling_record_id is not None:
+        sr_exists = (await db.execute(
+            sa.select(sa.literal(1)).where(
+                SamplingRecord.id == body.sampling_record_id,
+                SamplingRecord.project_id == project_id,
+                SamplingRecord.is_deleted == sa.false(),
+            )
+        )).scalar_one_or_none()
+        if sr_exists is None:
+            raise HTTPException(status_code=422, detail={
+                "error_code": "SAMPLING_RECORD_NOT_IN_PROJECT",
+                "message": "抽样记录不在本项目（或已删除）",
+            })
     vk = await _resolve_voucher_key(db, project_id, body.year, body)
     phase = body.phase or await project_phase(db, project_id)  # 没给阶段按项目当前阶段（需求 6.2）
     row = await _manual_row(db, project_id, body.year, vk, body.working_paper_id)
@@ -272,12 +331,20 @@ async def list_sampled_vouchers(
         SampledVoucher.is_deleted == sa.false(),
     ]
     if working_paper_id is not None:
+        # 底稿自取：先判该底稿的读权限（只校项目级时可按底稿 id 读到看不见的底稿的抽样清单）
+        if not await _wp_readable(db, current_user, working_paper_id):
+            raise HTTPException(status_code=404, detail="底稿不存在或无权查看")
         conds.append(SampledVoucher.working_paper_id == working_paper_id)
     if manual_only:
         conds.append(SampledVoucher.batch_id.is_(None))
     rows = (await db.execute(
         sa.select(SampledVoucher).where(*conds).order_by(SampledVoucher.sampled_at.desc())
     )).scalars().all()
+    # 项目级概览按底稿可见性过滤（承接 voucher-runtime-integrity R3；指定底稿时上面已判读权限）
+    if working_paper_id is None:
+        all_wp_ids = {r.working_paper_id for r in rows if r.working_paper_id is not None}
+        visible = await _visible_wp_ids(db, current_user, all_wp_ids) if all_wp_ids else set()
+        rows = [r for r in rows if r.working_paper_id is None or r.working_paper_id in visible]
     return {"items": [_row_out(r) for r in rows], "total": len(rows)}
 
 
@@ -300,6 +367,9 @@ async def delete_sampled_voucher(
         SampledVoucher.id == sampled_id, SampledVoucher.project_id == project_id))).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="挂凭记录不存在")
+    # 有底稿的记录要能编辑该底稿；没有底稿的旧记录只校项目级编辑权限（R1.3）
+    if row.working_paper_id is not None and not await _wp_writable(db, current_user, row.working_paper_id):
+        raise HTTPException(status_code=403, detail={"error_code": "WP_NOT_WRITABLE", "message": _WP_NOT_WRITABLE})
     if not row.is_deleted:
         if row.batch_id is not None:
             raise HTTPException(status_code=409, detail={
@@ -390,7 +460,9 @@ async def attach_vouchers_batch(
             "message": f"一次最多挂 {MAX_BATCH_PAIRS} 个「凭证 × 底稿」组合，本次 {pairs} 个，请分批挂入",
         })
     phase = await project_phase(db, project_id)
-    wps = await _project_workpapers(db, project_id, wp_ids)
+    in_project = await _project_workpapers(db, project_id, wp_ids)
+    # 底稿写权限逐张判（R1.2）；不可写的底稿逐条失败，且不回编码名称（可能是当前用户看不见的底稿）
+    wps = {w: info for w, info in in_project.items() if await _wp_writable(db, current_user, w)}
     note = body.note or (f"source:{body.source}" if body.source else None)
     results: list[dict] = []
     for v in body.vouchers:
@@ -407,9 +479,12 @@ async def attach_vouchers_batch(
                 "voucher_key": vk.to_str()}
         for wp_id in wp_ids:
             item = {**base, "working_paper_id": str(wp_id), "wp_code": wps.get(wp_id, (None,))[0]}
-            if wp_id not in wps:
+            if wp_id not in in_project:
                 results.append({**item, "status": "failed", "error_code": "WP_NOT_IN_PROJECT",
                                 "reason": "目标底稿不在本项目（或已删除、未生成）"})
+                continue
+            if wp_id not in wps:
+                results.append({**item, "status": "failed", "error_code": "WP_NOT_WRITABLE", "reason": _WP_NOT_WRITABLE})
                 continue
             try:
                 async with db.begin_nested():
@@ -484,12 +559,197 @@ async def query_voucher_links(
                 "source": source, "phase": r.phase, "count": 0, "legacy": legacy,
             })
             entry["count"] += 1
+    # 按底稿可见性过滤（承接 voucher-runtime-integrity R2；与 voucher-evidence/query 同口径）
+    all_wp_ids = set()
+    for entries in grouped.values():
+        for entry in entries.values():
+            wp_id_str = entry.get("working_paper_id")
+            if wp_id_str is not None:
+                all_wp_ids.add(UUID(wp_id_str))
+    visible = await _visible_wp_ids(db, current_user, all_wp_ids) if all_wp_ids else set()
+    filtered: dict[str, dict[tuple, dict]] = {}
+    for key, entries in grouped.items():
+        kept = {}
+        for compound_key, entry in entries.items():
+            wp_id_str = entry.get("working_paper_id")
+            if wp_id_str is None or UUID(wp_id_str) in visible:
+                kept[compound_key] = entry
+        if kept:
+            filtered[key] = kept
+    await _fill_import_status(db, project_id, filtered)
     links = {
         key: sorted(entries.values(), key=lambda e: (e["wp_code"] is None, e["wp_code"] or "", e["source"],
                                                      e["phase"] or "", e["legacy"]))
-        for key, entries in grouped.items()
+        for key, entries in filtered.items()
     }
     return {"links": links}
+
+
+async def _fill_import_status(db: AsyncSession, project_id: UUID, grouped: dict[str, dict[tuple, dict]]) -> None:
+    """手工挂凭是否已导入该底稿的凭证检查表（spec voucher-workflow-linkage-lineage-closure R3.4）。
+
+    按检查行的凭证身份判（``voucher_row_index``：身份行按凭证键，旧行按「号|日期」）。只扫有手工挂凭条目的底稿；
+    引擎登记、底稿已删除的、扫描失败的为 None（判断不了，不显示）；扫描截断时没找到也记 None（不能断言「未导入」）。
+    """
+    from app.services.voucher_row_index import scan_voucher_rows
+
+    entries = [(key, e) for key, group in grouped.items() for e in group.values()]
+    for _, e in entries:
+        e["imported"] = None
+    manual = [(key, e) for key, e in entries if e["source"] == "manual" and e["working_paper_id"] and not e["wp_missing"]]
+    if not manual:
+        return
+    try:
+        async with db.begin_nested():
+            scan = await scan_voucher_rows(db, project_id, wp_ids={UUID(e["working_paper_id"]) for _, e in manual})
+    except Exception as exc:  # noqa: BLE001 —— 导入状态只是提示：读不了就不显示，已挂结果照常返回
+        logger.warning("挂凭导入状态判定失败 project=%s error_type=%s error=%s", project_id, type(exc).__name__, exc)
+        return
+    for key, e in manual:
+        try:
+            vk = VoucherKey.from_str(key)
+        except ValueError:
+            continue
+        hit = any(str(h.wp_id) == e["working_paper_id"] for h in scan.rows_for(vk))
+        e["imported"] = True if hit else (None if scan.truncated else False)
+
+
+#: 待导入清单最多列这么多张（张数照实报）
+MAX_PENDING_LIST = 200
+
+
+def _registration_imported(scan: Any, reg: SampledVoucher) -> bool:
+    """这条手工挂凭在（已限定本底稿的）检查表扫描结果里有没有行。
+
+    V210 前的旧登记没记主体或凭证字，凭证键拼不全：按「号|日期」认（与已挂查询把它标 legacy 同一思路）。
+    """
+    from app.services.voucher_row_index import legacy_key
+
+    if reg.company_code is None or reg.voucher_type is None:
+        lk = legacy_key(reg.voucher_no, reg.voucher_date)
+        return any(h.legacy == lk for h in scan.hits)
+    vk = VoucherKey.of(year=reg.year, company_code=reg.company_code, voucher_date=reg.voucher_date,
+                       voucher_type=reg.voucher_type, voucher_no=reg.voucher_no)
+    return bool(scan.rows_for(vk))
+
+
+@router.get("/workpapers/{wp_id}/attached-voucher-status")
+async def attached_voucher_status(
+    project_id: UUID,
+    wp_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """本底稿手工挂凭里还没导入凭证检查表的凭证（spec voucher-workflow-linkage-lineage-closure R3.6，design §5.6）。
+
+    底稿要能读（与读取凭证检查表同一授权动作），否则 404。``judged=false``：检查表读不了或扫描截断，说不清哪些没导入，
+    前端不显示提示（这是提示，不能因此挡住底稿）。``undetermined``：没记日期的旧登记，认不出是哪一张。
+    """
+    if wp_id not in await _project_workpapers(db, project_id, [wp_id]) or not await _wp_readable(db, current_user, wp_id):
+        raise HTTPException(status_code=404, detail="底稿不存在或无权查看")
+    regs = (await db.execute(
+        sa.select(SampledVoucher).where(
+            SampledVoucher.project_id == project_id, SampledVoucher.year == year,
+            SampledVoucher.working_paper_id == wp_id, SampledVoucher.batch_id.is_(None),
+            SampledVoucher.is_deleted == sa.false(),
+        ).order_by(SampledVoucher.voucher_date.nullslast(), SampledVoucher.voucher_no, SampledVoucher.id)
+    )).scalars().all()
+    out: dict[str, Any] = {"attached": len(regs), "pending": [], "pending_count": 0, "undetermined": 0, "judged": True}
+    if not regs:
+        return out
+    from app.services.voucher_row_index import scan_voucher_rows
+
+    try:
+        async with db.begin_nested():
+            scan = await scan_voucher_rows(db, project_id, wp_ids=[wp_id])
+    except Exception as exc:  # noqa: BLE001 —— 提示性信息：读不了就不判
+        logger.warning("待导入判定失败 project=%s wp=%s error_type=%s error=%s", project_id, wp_id, type(exc).__name__, exc)
+        out["judged"] = False
+        return out
+    if scan.truncated:
+        out["judged"] = False
+        return out
+    for reg in regs:
+        if reg.voucher_date is None:
+            out["undetermined"] += 1
+            continue
+        if _registration_imported(scan, reg):
+            continue
+        out["pending_count"] += 1
+        if len(out["pending"]) >= MAX_PENDING_LIST:
+            continue
+        full = reg.company_code is not None and reg.voucher_type is not None
+        vk = VoucherKey.of(year=reg.year, company_code=reg.company_code or "", voucher_date=reg.voucher_date,
+                           voucher_type=reg.voucher_type or "", voucher_no=reg.voucher_no)
+        out["pending"].append({
+            "id": str(reg.id),
+            "voucher_key": vk.to_str() if full else None,
+            "label": voucher_label(vk) if full else f"{reg.voucher_date.isoformat()} {reg.voucher_no}",
+            "voucher_no": reg.voucher_no,
+            "voucher_date": reg.voucher_date.isoformat(),
+            "account_code": reg.account_code,
+        })
+    return out
+
+
+@router.post("/voucher-conclusions/query")
+async def query_voucher_conclusions(
+    project_id: UUID,
+    body: _LinkQueryRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """凭证键 → 本项目各可见底稿检查表里这张凭证的结论（spec voucher-workflow-linkage-lineage-closure R6，design §8.3）。
+
+    每条：底稿 id / 编码 / 名称、结论（同一底稿任一行异常即 abnormal，否则任一行正常即 normal，否则 unknown）、
+    行数、``legacy``（有行没有凭证身份、按「号|日期」认出）。只列当前用户可见的底稿（与已挂查询同口径）；
+    本底稿也在结果里，由前端排除。扫描失败照常报错（前端显示「他稿结论加载失败」，不当成「无」）；
+    扫描截断时 ``truncated=true``（结果可能不全）。单次最多 500 个键。
+    """
+    from app.services.voucher_row_index import legacy_key_of_voucher, merge_verdicts, scan_voucher_rows
+
+    if len(body.keys) > MAX_LINK_KEYS:
+        raise HTTPException(status_code=422, detail={
+            "error_code": "TOO_MANY_VOUCHER_KEYS",
+            "message": f"一次最多查 {MAX_LINK_KEYS} 个凭证键，本次 {len(body.keys)} 个",
+        })
+    keys = [k for k in parse_voucher_keys(body.keys) if k.year == str(body.year)]
+    if not keys:
+        return {"conclusions": {}, "truncated": False}
+    scan = await scan_voucher_rows(db, project_id)
+    by_key, by_legacy = scan.by_key(), scan.by_legacy()
+    per_key: dict[str, dict[UUID, dict[str, Any]]] = {}
+    for vk in keys:
+        key = vk.to_str()
+        hits = [(h, False) for h in by_key.get(key, [])]
+        hits += [(h, True) for h in by_legacy.get(legacy_key_of_voucher(vk) or "", [])]
+        for hit, legacy in hits:
+            entry = per_key.setdefault(key, {}).setdefault(hit.wp_id, {"verdicts": [], "rows": 0, "legacy": False})
+            entry["verdicts"].append(hit.verdict)
+            entry["rows"] += 1
+            entry["legacy"] = entry["legacy"] or legacy
+    wp_ids = {wp_id for entries in per_key.values() for wp_id in entries}
+    visible = await _visible_wp_ids(db, current_user, wp_ids) if wp_ids else set()
+    names = {} if not visible else {
+        wp_id: (str(code or ""), str(name or ""))
+        for wp_id, code, name in (await db.execute(
+            sa.select(WorkingPaper.id, WpIndex.wp_code, WpIndex.wp_name)
+            .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+            .where(WorkingPaper.id.in_(visible), WorkingPaper.project_id == project_id)
+        )).all()
+    }
+    conclusions: dict[str, list[dict[str, Any]]] = {}
+    for key, entries in per_key.items():
+        items = [
+            {"working_paper_id": str(wp_id), "wp_code": names.get(wp_id, ("", ""))[0],
+             "wp_name": names.get(wp_id, ("", ""))[1], "verdict": merge_verdicts(e["verdicts"]),
+             "rows": e["rows"], "legacy": e["legacy"]}
+            for wp_id, e in entries.items() if wp_id in visible
+        ]
+        if items:
+            conclusions[key] = sorted(items, key=lambda i: (i["wp_code"], i["working_paper_id"]))
+    return {"conclusions": conclusions, "truncated": scan.truncated}
 
 
 @router.post("/voucher-evidence/query")

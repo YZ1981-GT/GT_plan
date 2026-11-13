@@ -25,7 +25,8 @@ READER_ENTRIES: dict[str, tuple[tuple[str, str], ...]] = {
         ("app.services.formula_settings.push_settings", "effective_push_rules"),
     ),
     "consol_note": (
-        ("app.services.formula_settings.consol_note_settings", "effective_formulas"),
+        # 多章节批量读取（全局与项目层各一次查询）；单章 effective_formulas 是它的薄包装
+        ("app.services.formula_settings.consol_note_settings", "effective_formulas_many"),
     ),
     "cross_check": (
         ("app.services.formula_settings.cross_check_rules", "run_user_rules"),

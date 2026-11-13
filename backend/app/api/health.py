@@ -17,7 +17,7 @@ Validates: Requirements 4.8, 4.9
 
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -46,6 +46,7 @@ def critical_schema_drift(info: dict) -> bool:
 @router.get("/health")
 async def health_check(
     ctx: ServiceContainer = Depends(get_container),
+    request: Request = None,  # type: ignore[assignment]  # FastAPI 注入；测试直接调用时为 None
 ) -> JSONResponse:
     """检查 PostgreSQL / Redis / 迁移状态 / schema 漂移。
 
@@ -121,8 +122,10 @@ async def health_check(
     elif (
         migration_blocks_readiness(migration_info)
         or critical_schema_drift(drift_info)
+        or audit_chain_info["unacknowledged_forks"] is None
         or audit_chain_info["unacknowledged_forks"] > 0
         or (audit_chain_info["quarantined_entries"] or 0) > 0
+        or (audit_chain_info.get("dead_letter_entries") or 0) > 0
         or reload_degraded
         or int(audit_state.get("failed_count") or 0) > 0
     ):
@@ -132,6 +135,7 @@ async def health_check(
         status = "healthy"
         status_code = 200
 
+    candidate_tree = _candidate_tree_info(request)
     return JSONResponse(
         status_code=status_code,
         content={
@@ -153,8 +157,32 @@ async def health_check(
             "gc": get_last_freeze_report(),
             # 热重载交接：本进程模式 + 最近一次重载结果（读父进程写的小文件；不参与 status 判定）
             "reload": reload_info,
+            # 候选树身份（platform-global-display-settings-closure 13A）：非候选模式为 null、不加 header
+            "candidate_tree": candidate_tree,
         },
+        headers=_candidate_tree_headers(candidate_tree),
     )
+
+
+def _candidate_tree_info(request: Request | None) -> dict[str, object] | None:
+    """候选模式下返回启动时缓存的身份 + 实际监听端口；非候选模式返回 None。"""
+    from app.core.candidate_identity import get_candidate_tree_info
+
+    info = get_candidate_tree_info()
+    if info is None:
+        return None
+    server = request.scope.get("server") if request is not None else None
+    info["server_port"] = server[1] if server else None
+    return info
+
+
+def _candidate_tree_headers(info: dict[str, object] | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    if info and info.get("expected"):
+        headers["X-GT-Candidate-Tree-Expected"] = str(info["expected"])
+    if info and info.get("actual"):
+        headers["X-GT-Candidate-Tree-Actual"] = str(info["actual"])
+    return headers
 
 
 def _capacity_snapshot() -> dict[str, object]:
@@ -162,14 +190,20 @@ def _capacity_snapshot() -> dict[str, object]:
     from app.core.database import engine
     from app.core.db_pool_metrics import pool_capacity_snapshot
     from app.services.bulk_tab.bulk_async_runner import get_import_capacity_snapshot
+    from app.services.capacity_slots import slot_snapshots
     from app.services.libreoffice_pool import get_capacity_snapshot
-    from app.services.platform_metrics import event_loop_snapshot
+    from app.services.platform_metrics import durable_queue_snapshot, event_loop_snapshot
 
+    now = time.monotonic()
     return {
         "db_pool": pool_capacity_snapshot(engine.sync_engine.pool),
-        "event_loop": event_loop_snapshot(time.monotonic()),
+        "event_loop": event_loop_snapshot(now),
         "libreoffice": get_capacity_snapshot(),
         "bulk_import": get_import_capacity_snapshot(),
+        # LLM / OCR 通道的排队与在飞数；OCR 无准入队列，快照自带 bounded=False 声明。
+        "slots": slot_snapshots(),
+        # 耐久任务队列由 capacity_queue_worker 周期采样；这里只读，不扫任务表。
+        "durable_queues": durable_queue_snapshot(now),
     }
 
 
@@ -179,7 +213,11 @@ _AUDIT_CHAIN_CACHE_TTL = 300  # 秒
 
 
 async def _query_audit_chain_health(db) -> dict:
-    """查询未确认分叉数（带进程级 300s 缓存）。"""
+    """查询写链会被拒的链数（带进程级 300s 缓存）。
+
+    必须和 ``head.read_head`` 的口径一致：未确认链尾数不是 1 就不能安全续写。扫描失败不是 0，
+    返回 null 并让健康状态 degraded，避免「健康检查坏了 = 审计链健康」的假绿。
+    """
     now = time.monotonic()
     if (
         _audit_chain_cache["data"] is not None
@@ -190,29 +228,36 @@ async def _query_audit_chain_health(db) -> dict:
     from datetime import datetime, timezone
 
     try:
-        from app.services.audit_chain.forks import scan_forks
+        from app.services.audit_chain.forks import blocked_chains
 
-        forks = await scan_forks(db)
-        unack = sum(1 for f in forks if len(f.get("survivors", [])) > 1)
-    except Exception:
-        unack = 0
+        # 字段名为历史 API 合约；值现在是「会拒绝写入的链数」，覆盖多创世根 / 成环等 scan_forks 看不到的状态。
+        unack: int | None = len(await blocked_chains(db))
+    except Exception:  # noqa: BLE001 - 不能把未知伪装为 0
+        unack = None
 
     try:
         from app.core.redis import redis_client
-        from app.services.audit_chain.worker import quarantine_count
+        from app.services.audit_chain.worker import dead_letter_count, quarantine_count
 
         quarantined: int | None = await quarantine_count(redis_client)
+        # 死信 = 条目本身不合法、永远写不进链的审计记录（不丢弃，但必须可见）
+        dead_letters: int | None = await dead_letter_count(redis_client)
     except Exception:
         # Redis 不可达时不能把未知说成 0；按 ADR-ALC-10 返回 null。
         quarantined = None
+        dead_letters = None
 
     result = {
         "unacknowledged_forks": unack,
         "quarantined_entries": quarantined,
+        "dead_letter_entries": dead_letters,
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    _audit_chain_cache["data"] = result
-    _audit_chain_cache["ts"] = now
+    # 未知（扫描失败 / Redis 不可达）不进缓存：否则一次瞬时失败会把 degraded 钉住 300 秒，
+    # 恢复后也要等缓存过期才转回 healthy。只缓存三项都读到的已知结果。
+    if unack is not None and quarantined is not None and dead_letters is not None:
+        _audit_chain_cache["data"] = result
+        _audit_chain_cache["ts"] = now
     return result
 
 
@@ -277,9 +322,9 @@ async def _query_migration_status() -> dict:
 async def _query_schema_drift() -> dict:
     """查询 schema_drift_log。
 
-    ``critical_count`` 只统计 ``CRITICAL_DRIFT_TYPES``（单一真源：orm_extra / enum_mismatch /
-    checksum_drift —— 会导致运行时 500 / 插入失败、或已应用迁移的编辑静默丢失），用于 health
-    degraded 判定；``count`` 是总数（含 INFO 级 db_extra），仅作可观测展示。
+    ``critical_count`` 只统计 ``CRITICAL_DRIFT_TYPES``（单一真源，成员与含义见
+    ``app.core.schema_drift_detector``：运行时 500 / 插入失败、已应用迁移的编辑静默丢失、扫描本身
+    失败），用于 health degraded 判定；``count`` 是总数（含 INFO 级 db_extra），仅作可观测展示。
     """
     from app.core.database import engine
     from app.core.schema_drift_detector import SchemaDriftDetector, count_critical

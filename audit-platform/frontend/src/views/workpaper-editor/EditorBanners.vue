@@ -2,6 +2,7 @@
   <!-- ═══ 阻断性横幅：常驻显眼不折叠 ═══ -->
   <ArchivedBanner />
   <ConsolLockedBanner />
+  <WorkpaperFrozenBanner :status="wpDetail?.status" />
   <el-alert
     v-if="editLock?.locked?.value && !editLock?.isMine?.value"
     type="warning"
@@ -88,6 +89,7 @@ import type { StaleAffectedItem } from '@/composables/useStaleImpact'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
+import WorkpaperFrozenBanner from './WorkpaperFrozenBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
 import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
 import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'

@@ -314,6 +314,7 @@ class NoteWpMappingService:
             "text_only_sections": report.text_only_sections,
             "errors": report.errors,
             "error_details": report.error_details,
+            "blocked_writes": report.blocked_writes,
             **formulas,
         }
 
@@ -347,6 +348,7 @@ class NoteWpMappingService:
             "text_only_sections": report.text_only_sections,
             "errors": report.errors,
             "error_details": report.error_details,
+            "blocked_writes": report.blocked_writes,
             **formulas,
         }
 

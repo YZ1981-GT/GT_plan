@@ -62,7 +62,6 @@ const SCRIPT_NAVIGATIONS: Entry[] = [
   { file: 'components/ai/ChatNoteSaveDialog.vue', expr: 'route', kind: 'frontend-route', why: '前面已校验以 / 开头的站内路径' },
   { file: 'components/ai/DshPanel.vue', expr: "`/ai-chat${query ? `?${query}` : ''}`", kind: 'frontend-route', why: '/ai-chat 页面' },
   { file: 'components/ai/KnowledgeBasePanel.vue', expr: 'result.url', kind: 'dormant', why: '零挂载组件（检索结果是写死的样例，无 url）' },
-  { file: 'components/ai/PlatformAiChatPanel.vue', expr: 'result.jumpRoute', count: 2, kind: 'frontend-route', why: '笔记页路由' },
   { file: 'components/common/GtPrintPreview.vue', expr: "''", kind: 'blank-window', why: '打印预览自己写入内容' },
   { file: 'components/ledger-import/DiagnosticPanel.vue', expr: 'route.href', kind: 'frontend-route', why: 'router.resolve 结果' },
   { file: 'components/ledger-import/ErrorDialog.vue', expr: 'route.href', kind: 'frontend-route', why: 'router.resolve 结果' },

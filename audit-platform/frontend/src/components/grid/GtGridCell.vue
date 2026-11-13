@@ -6,7 +6,7 @@
  *
  * ```vue
  * <GtGridCell :editable="canEdit" :value="row.amount">
- *   <template #display><GtAmountCell :value="row.amount" :unit="unit" /></template>
+ *   <template #display><GtAmountCell :value="row.amount" /></template>
  *   <el-input-number v-model="row.amount" :controls="false" @change="onChange" />
  * </GtGridCell>
  * ```

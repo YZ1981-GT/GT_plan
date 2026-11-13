@@ -837,54 +837,13 @@ def phase6_text_after_and_parent(
                     print(f"    P6-P {entry['section_id']}: parent '{ps[:40]}' → '{cleaned_ps[:40]}'")
 
     elif kind == "standalone":
-        # ── 单体附注：按 (section_num, table_idx) 匹配 ──
-        sections = json_data.get("sections", []) if isinstance(json_data, dict) else []
-        word_by_key: dict[tuple[int, int], dict] = {}
-        for wt in word_tables:
-            p = parse_tag(wt["tag"])
-            if not p or p.get("chapter") != note_ch or p.get("section") is None:
-                continue
-            word_by_key[(p["section"], p["table_idx"])] = wt
-
-        for s in sections:
-            sn = s.get("section_number", "")
-            m = re.match(rf"^{re.escape(note_ch)}、(\d+)", sn)
-            if not m:
-                continue
-            parent_seq = int(m.group(1))
-            word_idx = 0
-            tables_list = s.get("tables", [])
-            # 同 section 所有非续表 name 集合（用于去重）
-            all_names = {
-                t2.get("name", "").strip()
-                for t2 in tables_list
-                if t2.get("continuation_of_index") is None and t2.get("name")
-            }
-            for ti, t in enumerate(tables_list):
-                if t.get("continuation_of_index") is not None:
-                    continue
-                wt = word_by_key.get((parent_seq, word_idx))
-                word_idx += 1
-                if not wt:
-                    continue
-                raw = wt.get("text_after_raw", "")
-                cleaned = clean_text_after(raw) if raw else ""
-                # 去掉与同 section 兄弟表 name 重复的行（排除自身）
-                own_name = (t.get("name") or "").strip()
-                siblings = all_names - {own_name} if own_name else all_names
-                cleaned = _dedup_sibling_titles(cleaned, siblings)
-                existing = (t.get("text_after_table") or "").strip()
-                if cleaned != existing:
-                    if not dry_run:
-                        if cleaned:
-                            t["text_after_table"] = cleaned
-                        elif "text_after_table" in t:
-                            del t["text_after_table"]
-                    text_updated += 1
-                    if verbose:
-                        preview = cleaned[:50].replace("\n", "\\n") if cleaned else "(空)"
-                        print(f"    P6-T {sn} t[{ti}]: text_after → {preview}")
-
+        # 已退役（2026-11-04，spec note-disclosure-pull-regression-and-headless-backend 任务 5）：单体表按底稿披露表拆表
+        # （按期间拆续表、底稿多出的明细表），Word 往往只写一张表或只写「续：」，按 ``(节号, 表序)`` 位置对 Word 表
+        # 会从第一处拆表起整体错位 —— 实测两版各 81 / 116 张表的「表后文字」会被换成下一张表的表名、提示或清空。
+        # 与 Phase 5、单体 title 漂移检测同一原因、同样退役；单体表结构的权威是底稿（ADR-NPR-01），章节 / 标题 / 表序
+        # 由 ``check_note_template_word_tree.py --check`` 管。
+        if verbose:
+            print("    P6 单体 text_after 已退役：单体表按底稿拆表，按位置对 Word 会整体错位")
     return text_updated, parent_cleaned
 
 
@@ -963,6 +922,35 @@ def sort_consol_json(data: list[dict]) -> list[dict]:
     return sorted(data, key=sort_key)
 
 
+def _section_map(data) -> dict[str, str]:
+    """种子 → {章节键: 规范化 JSON}：合并种子按 section_id，单体模板按 section_number。"""
+    items = data.get("sections", []) if isinstance(data, dict) else data
+    out: dict[str, str] = {}
+    for item in items or []:
+        if isinstance(item, dict):
+            key = str(item.get("section_id") or item.get("section_number") or "?")
+            out[key] = json.dumps(item, ensure_ascii=False, sort_keys=True)
+    return out
+
+
+def report_changed_sections(path: Path, data, limit: int = 30) -> list[str]:
+    """--check / --dry-run：同步后会变的章节逐条点名（新增 / 删除 / 内容变化），返回变化的章节键。"""
+    if not path.exists():
+        return []
+    old, new = _section_map(json.loads(path.read_text(encoding="utf-8"))), _section_map(data)
+    changed = sorted(
+        [("新增", k) for k in new.keys() - old.keys()]
+        + [("删除", k) for k in old.keys() - new.keys()]
+        + [("变化", k) for k in old.keys() & new.keys() if old[k] != new[k]],
+        key=lambda kv: kv[1],
+    )
+    for kind, key in changed[:limit]:
+        print(f"    [{kind}] {path.name} {key}")
+    if len(changed) > limit:
+        print(f"    …… 另有 {len(changed) - limit} 个章节")
+    return [k for _kind, k in changed]
+
+
 def write_json(path: Path, data, dry_run: bool):
     """幂等写入 JSON。"""
     new_text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
@@ -992,6 +980,9 @@ def main():
     # --check 等价于 --dry-run 但会在有差异时 exit 2
     if args.check:
         args.dry_run = True
+    # 🔴 各 phase 一律改内存副本（数据是下面 json.loads 新读的），只有写盘受 --dry-run / --check 控制。原来把
+    # dry_run 传进 phase，phase 在 dry-run 下什么都不改 ⇒ write_json 比出「无变化」⇒ --check 恒绿（2026-11-01 实测：
+    # Phase 6 报单体 81 / 116 处更新，同时判「✅ --check 通过」）。现在 --check 比的是「真跑一遍会写出什么」。
 
     phases = [1, 2, 3, 4, 5, 6] if args.phase == "all" else [int(args.phase)]
     stds = ["soe", "listed"] if args.std == "all" else [args.std]
@@ -1026,7 +1017,7 @@ def main():
                 IDENTITY_MISMATCHES.append(f"[{std}] {key[1]} 登记为占位列按单体实例化 / 按逻辑列存，但种子里没有该条目，请核对登记")
 
             if 1 in phases:
-                struct_n, title_n = phase1_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
+                struct_n, title_n = phase1_consol(consol_word, consol_data, std, False, args.verbose)
                 parts = []
                 if struct_n:
                     parts.append(f"{struct_n} 结构更新")
@@ -1035,11 +1026,11 @@ def main():
                 print(f"  Phase 1 (列修复+mh+title): {', '.join(parts) if parts else '0 更新'}")
 
             if 2 in phases:
-                n = phase2_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
+                n = phase2_consol(consol_word, consol_data, std, False, args.verbose)
                 print(f"  Phase 2 (缺失表): {n} 新增")
 
             if 3 in phases:
-                added_n, title_n = phase3_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
+                added_n, title_n = phase3_consol(consol_word, consol_data, std, False, args.verbose)
                 parts = []
                 if added_n:
                     parts.append(f"{added_n} 新增")
@@ -1048,7 +1039,7 @@ def main():
                 print(f"  Phase 3 (非注释章): {', '.join(parts) if parts else '0'}")
 
             if 6 in phases:
-                txt_n, ps_n = phase6_text_after_and_parent(consol_word, consol_data, std, "consol", args.dry_run, args.verbose)
+                txt_n, ps_n = phase6_text_after_and_parent(consol_word, consol_data, std, "consol", False, args.verbose)
                 parts = []
                 if txt_n:
                     parts.append(f"{txt_n} text_after")
@@ -1069,6 +1060,8 @@ def main():
 
             # 排序并写入
             consol_data = sort_consol_json(consol_data)
+            if args.dry_run:
+                report_changed_sections(consol_json_path, consol_data)
             changed = write_json(consol_json_path, consol_data, args.dry_run)
             if changed:
                 total_drift += 1
@@ -1091,17 +1084,19 @@ def main():
             print(f"  JSON sections: {n_sections}, tables: {n_tables}")
 
             if 4 in phases:
-                n = phase4_standalone(standalone_word, standalone_data, std, args.dry_run, args.verbose)
+                n = phase4_standalone(standalone_word, standalone_data, std, False, args.verbose)
                 print(f"  Phase 4 (group补齐): {n} 更新")
 
             if 5 in phases:
-                n = phase5_standalone_title(standalone_word, standalone_data, std, args.dry_run, args.verbose)
+                n = phase5_standalone_title(standalone_word, standalone_data, std, False, args.verbose)
                 print(f"  Phase 5 (单体title，已退役): {n} 更新")
 
             if 6 in phases:
-                txt_n, _ = phase6_text_after_and_parent(standalone_word, standalone_data, std, "standalone", args.dry_run, args.verbose)
-                print(f"  Phase 6 (单体text_after): {txt_n} 更新")
+                txt_n, _ = phase6_text_after_and_parent(standalone_word, standalone_data, std, "standalone", False, args.verbose)
+                print(f"  Phase 6 (单体text_after，已退役): {txt_n} 更新")
 
+            if args.dry_run:
+                report_changed_sections(standalone_json_path, standalone_data)
             changed = write_json(standalone_json_path, standalone_data, args.dry_run)
             if changed:
                 total_drift += 1

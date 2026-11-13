@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -44,6 +46,7 @@ class RowOutcome:
     warnings: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
     inputs: list[Any] = field(default_factory=list)
+    substituted_expression: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -95,8 +98,71 @@ def build_row_cache(rows: Iterable[Any], *, current_version: int) -> dict[str, D
     }
 
 
+@dataclass
+class ReportEvaluationState:
+    """报表层同次求值状态；不向 L1 上下文塞异步加载器，也不改变旧 parser 的签名。"""
+
+    scope: RowScope | None = None
+    adj_zero: bool = False
+    result: Any | None = None
+    expression: str | None = None
+    row_refs: list[str] = field(default_factory=list)
+    tb_refs: list[tuple[str, str]] = field(default_factory=list)
+    not_ready: bool = False
+    cache: dict[str, Any] = field(default_factory=dict)
+
+    def visit_rows(self, start: str, end: str | None = None) -> None:
+        from app.services.formula_engine import FormulaBusinessError
+
+        if end is not None and (not start or not end or start > end):
+            raise FormulaBusinessError(f"SUM_ROW('{start}','{end}')：行次区间无效")
+        members = ([start] if end is None else sorted(
+            code for code in self.scope.codes if start <= code <= end
+        )) if self.scope is not None else [start]
+        self.row_refs.extend(code for code in members if code not in self.row_refs)
+        if self.scope is not None:
+            # 缓存只包含已就绪行；区间必须检查 scope 全集，不能只把已缓存的成员相加。
+            waiting = [code for code in members if code in self.scope.codes
+                       and code not in self.cache and code not in self.scope.formula_less]
+            if waiting:
+                self.not_ready = True
+                raise FormulaBusinessError(f"引用行未就绪：{'、'.join(waiting)}（过期或计算失败）")
+
+    def component_warnings(self) -> list[str]:
+        if self.scope is None:
+            return []
+        components = [code for code in self.row_refs if code in self.scope.formula_less]
+        manual = [code for code in components if code in self.scope.input_codes]
+        undefined = [code for code in components if code not in self.scope.input_codes]
+        return ([f"组成行 {'、'.join(manual)} 为手工输入行；重新生成会清零，请确认手工金额后再生成"] if manual else []) + (
+            [f"组成行 {'、'.join(undefined)} 未定义公式"] if undefined else [])
+
+
+_report_evaluation: ContextVar[ReportEvaluationState | None] = ContextVar("report_evaluation", default=None)
+
+
+def current_report_evaluation() -> ReportEvaluationState | None:
+    return _report_evaluation.get()
+
+
+@contextmanager
+def report_evaluation(*, scope: RowScope | None = None, adj_zero: bool | None = None):
+    prior = current_report_evaluation()
+    state = prior if prior is not None and scope is None else ReportEvaluationState(scope=scope)
+    previous_adj_zero = state.adj_zero
+    if adj_zero is not None:
+        state.adj_zero = adj_zero
+    token = _report_evaluation.set(state)
+    try:
+        yield state
+    finally:
+        state.adj_zero = previous_adj_zero
+        _report_evaluation.reset(token)
+
+
 async def compute_row(
     parser: Any, config: Any, row_cache: dict[str, Decimal], *, mode: str, scope: RowScope,
+    strict: bool = False, on_technical_failure: Callable[[RowOutcome], None] | None = None,
 ) -> RowOutcome:
     """算一行（三路共用）并同步依赖缓存：成功写入 ``row_cache``，失败从中删除（引用它的行随后报「引用行未就绪」）。
 
@@ -110,11 +176,31 @@ async def compute_row(
         row_cache.pop(config.row_code, None)
         return outcome
 
+    from app.services.formula_engine import formula_technical_error
     from app.services.formula_inputs import collect as collect_formula_inputs
 
-    with collect_formula_inputs() as inputs:
-        outcome = await _evaluate(parser, config.formula, row_cache, mode=mode, scope=scope)
-    outcome.inputs = list(inputs)
+    with report_evaluation(scope=scope) as evaluation, collect_formula_inputs() as inputs, collect_formula_warnings() as fetched:
+        try:
+            outcome = await _evaluate(parser, config.formula, row_cache, mode=mode, scope=scope, strict=strict)
+        except Exception as exc:
+            row_cache.pop(config.row_code, None)
+            if strict and formula_technical_error(exc) and on_technical_failure is not None:
+                result = evaluation.result
+                failure = RowOutcome(
+                    state="error", errors=list(getattr(result, "errors", ())) or [str(exc) or type(exc).__name__],
+                    warnings=_unique([*evaluation.component_warnings(), *getattr(result, "warnings", ()),
+                                      *formula_warning_messages(fetched)]),
+                    trace=list(getattr(result, "trace", ())), inputs=list(inputs),
+                    substituted_expression=evaluation.expression,
+                )
+                try:
+                    on_technical_failure(failure)
+                except Exception:
+                    # 写回执失败也不能把可重试的来源故障换成另一个异常。
+                    logger.exception("报表技术失败回执记录失败：%s", config.row_code)
+            raise
+        outcome.inputs = list(inputs)
+        outcome.substituted_expression = evaluation.expression
     if outcome.ok:
         row_cache[config.row_code] = outcome.value
     else:
@@ -124,34 +210,39 @@ async def compute_row(
 
 async def _evaluate(
     parser: Any, formula: str | None, row_cache: dict[str, Decimal], *, mode: str, scope: RowScope,
+    strict: bool = False,
 ) -> RowOutcome:
     if not (formula or "").strip():
         return RowOutcome(value=FORMULA_LESS_VALUE)
-    refs = list(dict.fromkeys(ROW_PATTERN.findall(formula)))
-    components = _formula_less_components(formula, refs, scope)
-    manual = [code for code in components if code in scope.input_codes]
-    undefined = [code for code in components if code not in scope.input_codes]
+    evaluation = current_report_evaluation()
     warnings: list[str] = []
-    if manual:
-        warnings.append(
-            f"组成行 {'、'.join(manual)} 为手工输入行；重新生成会清零，请确认手工金额后再生成"
-        )
-    if undefined:
-        warnings.append(f"组成行 {'、'.join(undefined)} 未定义公式")
-    waiting = _not_ready(formula, refs, row_cache, scope)
-    if waiting:
-        return RowOutcome(state="not_ready", errors=[f"引用行未就绪：{'、'.join(waiting)}（过期或计算失败）"],
-                          warnings=warnings)
+    result = None
     try:
         with collect_formula_warnings() as fetched:
-            result = await parser.execute_with_status(formula, row_cache)
-    except Exception as exc:  # noqa: BLE001 —— 本行失败，不中断其余行（与改动前三路一致）
+            if strict:
+                result = await parser.execute_with_status(formula, row_cache, strict=True)
+                result.raise_for_technical_error()
+            else:
+                result = await parser.execute_with_status(formula, row_cache)
+    except Exception as exc:  # 非 strict 保持逐行回执；strict 只上抛技术故障。
+        from app.services.formula_engine import formula_technical_error
+
+        if evaluation is not None and result is not None:
+            evaluation.result = result
+        if strict and formula_technical_error(exc):
+            raise
         logger.warning("报表行公式执行异常：%s", formula, exc_info=True)
+        warnings = _unique([*(evaluation.component_warnings() if evaluation else []),
+                            *formula_warning_messages(fetched)])
         return RowOutcome(state="error", errors=[str(exc) or type(exc).__name__], warnings=warnings)
+    if evaluation is not None:
+        evaluation.result = result
+        warnings.extend(evaluation.component_warnings())
     warnings = _unique([*warnings, *result.warnings, *formula_warning_messages(fetched)])
     if not result.ok:
         errors = list(result.errors) or ["公式被拦截" if result.blocked else "公式执行失败"]
-        return RowOutcome(state=result.state, errors=errors, warnings=warnings, trace=list(result.trace))
+        state = "not_ready" if evaluation is not None and evaluation.not_ready else result.state
+        return RowOutcome(state=state, errors=errors, warnings=warnings, trace=list(result.trace))
     if result.value is None:
         return RowOutcome(state="error", errors=["公式执行未返回数值"], warnings=warnings, trace=list(result.trace))
     trace = [*result.trace, *await _missing_account_notes(parser, formula)]
@@ -185,24 +276,37 @@ def _not_ready(formula: str, refs: list[str], row_cache: dict[str, Decimal], sco
 
 
 async def _missing_account_notes(parser: Any, formula: str) -> list[str]:
-    """缺科目（``TB`` 引用的科目在试算表没有本级也没有下级）按 0 取数、状态正常，trace 注明；注入了外部取数器时不判。"""
-    if getattr(parser, "resolver", None) is not None:
+    """仅依据本次实际访问的余额列与已加载宽集合说明缺科目；发生额不借用余额缓存。"""
+    from app.services.formula_engine import COLUMN_ALIASES
+
+    evaluation = current_report_evaluation()
+    if evaluation is None or getattr(parser, "resolver", None) is not None:
         return []
-    notes: list[str] = []
-    for code in dict.fromkeys(m.group(1) for m in TB_PATTERN.finditer(SUM_TB_PATTERN.sub("", formula))):
-        if not await parser._get_tb_rows_prefix(code):  # 已由取数缓存，不再查库
-            notes.append(f"TB('{code}')：试算表没有该科目（含下级），按 0 计")
-    return notes
+    cached = getattr(parser, "_tb_prefix_cache", {})
+    codes = dict.fromkeys(code for code, column in evaluation.tb_refs
+                         if COLUMN_ALIASES.get(column) not in {"本期借方", "本期贷方"})
+    return [f"TB('{code}')：试算表没有该科目（含下级），按 0 计"
+            for code in codes if code in cached and not cached[code]]
 
 
 async def _tb_balance_hint(parser: Any, formula: str, mode: str) -> tuple[str, Decimal] | None:
-    """结果为 0 时的核对提示：公式首个 ``TB`` 科目本级在试算表有非零余额（未审模式取未审数，否则取审定数）。"""
-    match = TB_PATTERN.search(formula)
-    tb_row = await parser._get_tb_row(match.group(1)) if match else None
-    if tb_row is None:
+    """只看本次实际访问且已缓存的首个余额列本级，不为提示另查库或访问 IF 未选分支。"""
+    from app.services.formula_engine import COLUMN_ALIASES
+
+    evaluation = current_report_evaluation()
+    if evaluation is None or getattr(parser, "resolver", None) is not None:
         return None
-    amount = tb_row.unadjusted_amount if mode == "unadjusted" else tb_row.audited_amount
-    return (match.group(1), amount) if amount else None
+    for code, column in evaluation.tb_refs:
+        if COLUMN_ALIASES.get(column) not in {"期末余额", "年初余额", "未审数"}:
+            continue
+        rows = getattr(parser, "_tb_prefix_cache", {}).get(code, ())
+        tb_row = next((row for row in rows if row.standard_account_code == code), None)
+        if tb_row is None:
+            return None
+        amount_of, _ = parser._tb_amount_reader(column)
+        amount = amount_of(tb_row)
+        return (code, amount) if amount != 0 else None
+    return None
 
 
 def write_row(

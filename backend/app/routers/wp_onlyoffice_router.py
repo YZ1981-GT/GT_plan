@@ -1409,6 +1409,21 @@ async def post_sheet_onlyoffice_callback(
             target = _oo_dir / f"{_save_stem}{_save_ext}"
 
         try:
+            from app.services.workpaper_content_freeze import (
+                WorkpaperContentFrozenError,
+                assert_workpaper_content_writable,
+            )
+
+            await assert_workpaper_content_writable(db, wp_id, for_update=True)
+        except WorkpaperContentFrozenError:
+            logger.warning(
+                "OnlyOffice callback 最终落盘被底稿终态拒绝 wp_id=%s sheet=%s",
+                wp_id,
+                sheet_name,
+            )
+            return {"error": 1}
+
+        try:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(file_bytes)
             # 文件生命周期版本（`file_version`）—— 本路径**自己**的所有者。

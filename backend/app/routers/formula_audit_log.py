@@ -278,7 +278,9 @@ async def rollback_formula(
     project_id: str, year: int,
     body: RollbackRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "partner", "manager"])),
+    # formula-hub-release-blockers R8.1：signing_partner 是 partner 的细分，理应有权回滚。
+    # 前端 ROLLBACK_ROLES 已包含 signing_partner，后端须同步。
+    current_user: User = Depends(require_role(["admin", "partner", "signing_partner", "manager"])),
 ):
     """一键回滚：把这条历史对应的公式位在**本项目**写回 ``target_formula``（spec formula-global-settings-sync R9.3）。
 

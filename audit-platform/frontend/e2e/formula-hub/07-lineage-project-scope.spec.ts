@@ -1,61 +1,41 @@
 /**
- * 浏览器检查 ⑦ — 附件溯源只见本项目
+ * 浏览器检查 ⑦ — 溯源与附件只见本项目
  *
- * 验证：附件溯源端点只返回当前项目的数据，
- * 不会泄露其他项目的附件信息。
- *
- * formula-e2e-ci-gate Task 2 / R3 第 7 项
+ * `GET /api/projects/{pid}/lineage`（统一溯源）：各子源都要跑通（`partial` 为假、没有子源错误），当前对象就是查询的底稿；
+ * 附件只列本项目的。种子没有附件（seed_formula_e2e.py 只建账号、项目、底稿），也没有非管理员账号 ⇒ 跨项目附件泄露这一条
+ * 显式跳过并写明原因（后端由 test_formula_hub_endpoint_authz.py 的 attachment-link / links 配方在 PG 上覆盖）。
+ * 原用例打不存在的 `/attachment-lineage`，404 即通过；界面部分打开的是不存在的路由。
  */
 import { test, expect } from '@playwright/test'
-import { loginAndInstall, standaloneProjectId, consolProjectId } from './helpers'
-import { loadManifest } from './manifest'
+import { api, apiToken, consolProjectId, seedYear, standaloneProjectId } from './helpers'
 
-const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:9980'
+test.describe('溯源项目隔离', () => {
+  let token = ''
+  test.beforeAll(async ({ request }) => { token = await apiToken(request) })
 
-test.describe('附件溯源项目隔离', () => {
-  test.beforeEach(async ({ page, request }) => {
-    await loginAndInstall(page, request)
-  })
+  for (const [label, pid] of [['单体', standaloneProjectId], ['合并', consolProjectId]] as const) {
+    test(`${label}项目：底稿溯源各子源跑通`, async ({ request }) => {
+      const r = await api(request, token, 'GET', `/api/projects/${pid()}/lineage`, {
+        params: { object_type: 'wp_cell', object_id: 'D2-1', year: seedYear() },
+      })
+      expect(r.status, JSON.stringify(r.error)).toBe(200)
+      expect(r.data.partial, `子源失败：${JSON.stringify(r.data.errors)}`).toBe(false)
+      expect(r.data.errors).toEqual([])
+      expect(Array.isArray(r.data.upstream) && Array.isArray(r.data.downstream)).toBe(true)
+      expect(Array.isArray(r.data.attachments)).toBe(true)
+    })
+  }
 
-  test('溯源端点只返回本项目数据', async ({ request }) => {
-    const projectA = standaloneProjectId()
-    const projectB = consolProjectId()
-
-    // 查询项目 A 的溯源
-    const respA = await request.get(
-      `${BACKEND}/api/projects/${projectA}/attachment-lineage`,
-      {
-        headers: { Authorization: `Bearer ${process.env.FH_E2E_TOKEN || ''}` },
-      },
-    )
-    if (respA.status() === 404) return // 端点不存在
-
-    if (respA.ok()) {
-      const bodyA = await respA.json()
-      const itemsA = bodyA?.data?.items ?? bodyA?.data ?? bodyA?.items ?? []
-      // 种子项目没有附件溯源记录，列表应为空
-      // 如果非空，每条 project_id 都应等于 projectA
-      if (Array.isArray(itemsA)) {
-        for (const item of itemsA) {
-          if (item.project_id) {
-            expect(item.project_id, '溯源泄露了其他项目数据').toBe(projectA)
-          }
-        }
-      }
-    }
-  })
-
-  test('底稿页面可导航', async ({ page }) => {
-    const projectId = standaloneProjectId()
-    const manifest = loadManifest()
-    const wpIds = manifest.standalone.wp_ids
-    const firstWpId = Object.values(wpIds)[0]
-    if (!firstWpId) return
-
-    await page.goto(`/projects/${projectId}/workpapers/${firstWpId}`)
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-    if (page.url().includes('/login')) return // token 未注入 SPA 路由守卫
-    const title = await page.title()
-    expect(title).toBeTruthy()
+  test('附件只列本项目的', async ({ request }) => {
+    const a = await api(request, token, 'GET', `/api/projects/${standaloneProjectId()}/lineage`, {
+      params: { object_type: 'wp_cell', object_id: 'D2-1', year: seedYear() },
+    })
+    test.skip((a.data?.attachments || []).length === 0,
+      '种子没有附件、五个账号都是管理员：跨项目附件泄露无法在 E2E 里构造（后端 PG 配方覆盖）')
+    const b = await api(request, token, 'GET', `/api/projects/${consolProjectId()}/lineage`, {
+      params: { object_type: 'wp_cell', object_id: 'D2-1', year: seedYear() },
+    })
+    const mine = new Set((a.data.attachments as any[]).map((x) => x.attachment_id))
+    expect((b.data.attachments as any[]).filter((x) => mine.has(x.attachment_id)), '合并项目看到了单体项目的附件').toEqual([])
   })
 })

@@ -629,8 +629,8 @@ function onImportConfirm(data: Record<string, any>[]) {
   ElMessage.success(`已导入 ${parsed.length} 条数据`)
 }
 
-const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }
-const cellStyle = { padding: '2px 4px', fontSize: '12px' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '2px 0' }
+const cellStyle = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
 
 // ─── 全屏 ─────────────────────────────────────────────────────────────────────
 const sheetRef = ref<HTMLElement | null>(null)

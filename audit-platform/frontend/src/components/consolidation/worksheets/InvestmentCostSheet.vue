@@ -204,7 +204,7 @@ const n = (v: any) => Number(v) || 0
 function fmtR(v: number) { return v ? `${v.toFixed(2)}%` : '--' }
 function calcCls(v: number) { return v === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
-const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '2px 0' }
 
 // ─── 小计行（数据行末尾，默认自动合计，支持编辑覆盖） ──────────────────────
 const NUM_FIELDS: (keyof InvestmentCostRow)[] = ['current_dividend','open_ratio','open_cost','open_impairment','open_fv',
@@ -238,7 +238,7 @@ function onSelChange(sel: any[]) { selectedRows.value = sel.filter((r: any) => !
 
 function rowClassName({ row }: any) { return row._isSummary ? 'ws-row-summary' : '' }
 function rowCellStyle({ row }: any) {
-  const base: any = { padding: '2px 4px', fontSize: '12px' }
+  const base: any = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
   if (row._isSummary) { base.background = '#f8f6fb'; base.fontWeight = '700'; base.color = '#4b2d77' }
   return base
 }

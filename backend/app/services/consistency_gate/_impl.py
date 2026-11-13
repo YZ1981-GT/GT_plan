@@ -448,132 +448,114 @@ class ConsistencyGate:
         - 重要性 1000 万 → 容差 = max(1.0, 10000) = 10000 元
         - 重要性 10 万 → 容差 = max(1.0, 100) = 100 元
         """
-        try:
-            from app.models.audit_platform_models import Materiality
+        # 取数失败原样上抛（规则级 except / @_guarded 记「检查异常」），不冒充「数据不完整」或默认容差
+        from app.models.audit_platform_models import Materiality
 
-            stmt = select(Materiality.overall_materiality).where(
-                Materiality.project_id == project_id,
-                Materiality.year == year,
-                Materiality.is_deleted == False,  # noqa: E712
-            ).order_by(Materiality.created_at.desc()).limit(1)
-            result = await self.db.execute(stmt)
-            mat_amount = result.scalar()
-            if mat_amount is None:
-                return Decimal("1.0")
-            dynamic = Decimal(str(mat_amount)) * Decimal("0.001")
-            return max(Decimal("1.0"), dynamic)
-        except Exception as e:
-            logger.warning("_get_dynamic_tolerance fallback to 1.0: %s", e)
+        stmt = select(Materiality.overall_materiality).where(
+            Materiality.project_id == project_id,
+            Materiality.year == year,
+            Materiality.is_deleted == False,  # noqa: E712
+        ).order_by(Materiality.created_at.desc()).limit(1)
+        result = await self.db.execute(stmt)
+        mat_amount = result.scalar()
+        if mat_amount is None:
             return Decimal("1.0")
+        dynamic = Decimal(str(mat_amount)) * Decimal("0.001")
+        return max(Decimal("1.0"), dynamic)
 
     async def _get_e1_audited_amount(self, project_id: UUID, year: int) -> Decimal | None:
         """从 financial_report 取货币资金审定数(BS 行)
 
         优先 row_name 包含"货币资金"的非合计行,期末审定数 ≈ 期末数。
         """
-        try:
-            stmt = select(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.report_type == FinancialReportType.balance_sheet,
-                FinancialReport.is_deleted == False,  # noqa: E712
-                FinancialReport.is_total_row == False,  # noqa: E712
-            )
-            result = await self.db.execute(stmt)
-            for row in result.scalars().all():
-                if "货币资金" in (row.row_name or ""):
-                    return Decimal(str(row.current_period_amount or 0))
-            return None
-        except Exception as e:
-            logger.warning("_get_e1_audited_amount failed: %s", e)
-            return None
+        # 取数失败原样上抛（规则级 except / @_guarded 记「检查异常」），不冒充「数据不完整」或默认容差
+        stmt = select(FinancialReport).where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
+            FinancialReport.report_type == FinancialReportType.balance_sheet,
+            FinancialReport.is_deleted == False,  # noqa: E712
+            FinancialReport.is_total_row == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        for row in result.scalars().all():
+            if "货币资金" in (row.row_name or ""):
+                return Decimal(str(row.current_period_amount or 0))
+        return None
 
     async def _get_cfs_ending_cash(self, project_id: UUID, year: int) -> Decimal | None:
         """从 financial_report 取 CFS 期末现金及现金等价物余额"""
-        try:
-            stmt = select(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.report_type == FinancialReportType.cash_flow_statement,
-                FinancialReport.is_deleted == False,  # noqa: E712
-            )
-            result = await self.db.execute(stmt)
-            for row in result.scalars().all():
-                name = (row.row_name or "").strip()
-                if ("期末" in name) and (
-                    "现金及现金等价物" in name
-                    or "现金等价物" in name
-                ):
-                    return Decimal(str(row.current_period_amount or 0))
-            return None
-        except Exception as e:
-            logger.warning("_get_cfs_ending_cash failed: %s", e)
-            return None
+        # 取数失败原样上抛（规则级 except / @_guarded 记「检查异常」），不冒充「数据不完整」或默认容差
+        stmt = select(FinancialReport).where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
+            FinancialReport.report_type == FinancialReportType.cash_flow_statement,
+            FinancialReport.is_deleted == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        for row in result.scalars().all():
+            name = (row.row_name or "").strip()
+            if ("期末" in name) and (
+                "现金及现金等价物" in name
+                or "现金等价物" in name
+            ):
+                return Decimal(str(row.current_period_amount or 0))
+        return None
 
     async def _get_cfs_net_change(self, project_id: UUID, year: int) -> Decimal | None:
         """从 financial_report 取 CFS 现金及现金等价物净增加额"""
-        try:
-            stmt = select(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.report_type == FinancialReportType.cash_flow_statement,
-                FinancialReport.is_deleted == False,  # noqa: E712
-            )
-            result = await self.db.execute(stmt)
-            for row in result.scalars().all():
-                name = (row.row_name or "").strip()
-                if ("现金及现金等价物" in name or "现金等价物" in name) and (
-                    "净增加" in name or "净变动" in name or "净流" in name
-                ):
-                    return Decimal(str(row.current_period_amount or 0))
-            return None
-        except Exception as e:
-            logger.warning("_get_cfs_net_change failed: %s", e)
-            return None
+        # 取数失败原样上抛（规则级 except / @_guarded 记「检查异常」），不冒充「数据不完整」或默认容差
+        stmt = select(FinancialReport).where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
+            FinancialReport.report_type == FinancialReportType.cash_flow_statement,
+            FinancialReport.is_deleted == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        for row in result.scalars().all():
+            name = (row.row_name or "").strip()
+            if ("现金及现金等价物" in name or "现金等价物" in name) and (
+                "净增加" in name or "净变动" in name or "净流" in name
+            ):
+                return Decimal(str(row.current_period_amount or 0))
+        return None
 
     async def _get_e1_period_change(
         self, project_id: UUID, year: int
     ) -> Decimal | None:
         """E1 期末审定数 - 期初余额 = 货币资金本期变动额(用于 CFS 净增加额勾稽)"""
-        try:
-            stmt = select(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.report_type == FinancialReportType.balance_sheet,
-                FinancialReport.is_deleted == False,  # noqa: E712
-                FinancialReport.is_total_row == False,  # noqa: E712
-            )
-            result = await self.db.execute(stmt)
-            for row in result.scalars().all():
-                if "货币资金" in (row.row_name or ""):
-                    cur = Decimal(str(row.current_period_amount or 0))
-                    prior = Decimal(str(row.prior_period_amount or 0))
-                    return cur - prior
-            return None
-        except Exception as e:
-            logger.warning("_get_e1_period_change failed: %s", e)
-            return None
+        # 取数失败原样上抛（规则级 except / @_guarded 记「检查异常」），不冒充「数据不完整」或默认容差
+        stmt = select(FinancialReport).where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
+            FinancialReport.report_type == FinancialReportType.balance_sheet,
+            FinancialReport.is_deleted == False,  # noqa: E712
+            FinancialReport.is_total_row == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        for row in result.scalars().all():
+            if "货币资金" in (row.row_name or ""):
+                cur = Decimal(str(row.current_period_amount or 0))
+                prior = Decimal(str(row.prior_period_amount or 0))
+                return cur - prior
+        return None
 
     async def _get_tb_cash_total(self, project_id: UUID, year: int) -> Decimal | None:
         """从 trial_balance 取 1001/1002/1012/1502 期末审定数合计"""
-        try:
-            from app.models.audit_platform_models import TrialBalance
+        # 取数失败原样上抛（规则级 except / @_guarded 记「检查异常」），不冒充「数据不完整」或默认容差
+        from app.models.audit_platform_models import TrialBalance
 
-            cash_codes = ("1001", "1002", "1012", "1502")
-            stmt = select(
-                func.sum(TrialBalance.audited_amount)
-            ).where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
-                TrialBalance.is_deleted == False,  # noqa: E712
-                TrialBalance.standard_account_code.in_(cash_codes),
-            )
-            result = await self.db.execute(stmt)
-            val = result.scalar()
-            return Decimal(str(val)) if val is not None else None
-        except Exception as e:
-            logger.warning("_get_tb_cash_total failed: %s", e)
-            return None
+        cash_codes = ("1001", "1002", "1012", "1502")
+        stmt = select(
+            func.sum(TrialBalance.audited_amount)
+        ).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.is_deleted == False,  # noqa: E712
+            TrialBalance.standard_account_code.in_(cash_codes),
+        )
+        result = await self.db.execute(stmt)
+        val = result.scalar()
+        return Decimal(str(val)) if val is not None else None
 
     @_guarded("e1_cfs_reconciliation")
     async def check_e1_cfs_reconciliation(
@@ -595,8 +577,10 @@ class ConsistencyGate:
 
         # 规则 1:E1 期末审定数 vs CFS 期末现金等价物
         try:
-            e1_end = await self._get_e1_audited_amount(project_id, year)
-            cfs_end = await self._get_cfs_ending_cash(project_id, year)
+            # 每条规则一个保存点：PG 上一条规则取数失败不连带后续规则
+            async with self.db.begin_nested():
+                e1_end = await self._get_e1_audited_amount(project_id, year)
+                cfs_end = await self._get_cfs_ending_cash(project_id, year)
             if e1_end is None or cfs_end is None:
                 checks.append(_not_executed('E1↔CFS:期末现金等价物勾稽', branch_id='e1_cfs_reconciliation.1.missing', reason=f"数据不完整(E1={e1_end}, CFS={cfs_end}),跳过检查", severity='warning'))
             else:
@@ -623,8 +607,10 @@ class ConsistencyGate:
 
         # 规则 2:E1 期末-期初 vs CFS 现金净增加额
         try:
-            e1_change = await self._get_e1_period_change(project_id, year)
-            cfs_change = await self._get_cfs_net_change(project_id, year)
+            # 每条规则一个保存点：PG 上一条规则取数失败不连带后续规则
+            async with self.db.begin_nested():
+                e1_change = await self._get_e1_period_change(project_id, year)
+                cfs_change = await self._get_cfs_net_change(project_id, year)
             if e1_change is None or cfs_change is None:
                 checks.append(_not_executed('E1↔CFS:本期现金净增加额勾稽', branch_id='e1_cfs_reconciliation.3.missing', reason=f"数据不完整(E1 变动={e1_change}, CFS 净增={cfs_change}),跳过", severity='warning'))
             else:
@@ -651,8 +637,10 @@ class ConsistencyGate:
 
         # 规则 3:E1-1 vs TB(1001+1002+1012+1502)
         try:
-            e1_total = await self._get_e1_audited_amount(project_id, year)
-            tb_total = await self._get_tb_cash_total(project_id, year)
+            # 每条规则一个保存点：PG 上一条规则取数失败不连带后续规则
+            async with self.db.begin_nested():
+                e1_total = await self._get_e1_audited_amount(project_id, year)
+                tb_total = await self._get_tb_cash_total(project_id, year)
             if e1_total is None or tb_total is None:
                 checks.append(_not_executed('E1↔TB:试算平衡表数勾稽', branch_id='e1_cfs_reconciliation.5.missing', reason=f"数据不完整(E1={e1_total}, TB={tb_total}),跳过", severity='warning'))
             else:
@@ -1994,28 +1982,24 @@ class ConsistencyGate:
         return checks
 
     async def _get_wp_parsed_data(self, project_id: UUID, wp_code: str) -> dict | None:
-        """获取指定底稿的 parsed_data"""
-        try:
-            from app.models.workpaper_models import WorkingPaper, WpIndex
+        """获取指定底稿的 parsed_data（取数失败原样上抛，由 @_guarded 记「检查异常」，不冒充「数据不完整」）"""
+        from app.models.workpaper_models import WorkingPaper, WpIndex
 
-            stmt = (
-                sa.select(WorkingPaper.parsed_data)
-                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-                .where(
-                    WpIndex.project_id == project_id,
-                    WpIndex.wp_code == wp_code,
-                    WpIndex.is_deleted == False,  # noqa: E712
-                    WorkingPaper.is_deleted == False,  # noqa: E712
-                )
-                .order_by(WorkingPaper.updated_at.desc())
-                .limit(1)
+        stmt = (
+            sa.select(WorkingPaper.parsed_data)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WpIndex.project_id == project_id,
+                WpIndex.wp_code == wp_code,
+                WpIndex.is_deleted == False,  # noqa: E712
+                WorkingPaper.is_deleted == False,  # noqa: E712
             )
-            result = await self.db.execute(stmt)
-            row = result.scalar_one_or_none()
-            return row if isinstance(row, dict) else None
-        except Exception as e:
-            logger.warning("_get_wp_parsed_data(%s) failed: %s", wp_code, e)
-            return None
+            .order_by(WorkingPaper.updated_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        row = result.scalar_one_or_none()
+        return row if isinstance(row, dict) else None
 
     @staticmethod
     def _extract_decimal(data: dict | None, key: str) -> Decimal | None:

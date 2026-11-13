@@ -9,6 +9,8 @@ import { computed } from 'vue'
 import VoucherRowMetaTag from './VoucherRowMetaTag.vue'
 import VoucherPairingCell from './VoucherPairingCell.vue'
 import VoucherEvidenceTag from './VoucherEvidenceTag.vue'
+import VoucherConclusionTag from './VoucherConclusionTag.vue'
+import VoucherDispositionButton from './VoucherDispositionButton.vue'
 import { metaOf, MULTI_ACCOUNT } from '../composables/shared/voucherCheckFill'
 
 const props = defineProps<{
@@ -41,6 +43,10 @@ const multi = computed(() => {
     />
     <!-- 凭证证据：本底稿份数、他稿提示与引用（spec attachment-voucher-evidence-binding 需求 3） -->
     <VoucherEvidenceTag :row="row" :project-id="projectId" :locked="locked" />
+    <!-- 他稿结论：同一凭证在其他可见底稿的检查结论（spec voucher-workflow-linkage-lineage-closure R6） -->
+    <VoucherConclusionTag :row="row" :project-id="projectId" />
+    <!-- 异常行处置：记入未更正错报 / 去调整分录（R7） -->
+    <VoucherDispositionButton :row="row" :project-id="projectId" :locked="locked" />
   </span>
 </template>
 

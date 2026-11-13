@@ -209,7 +209,7 @@
       </el-table-column>
 
       <!-- 📎 附件列 -->
-      <el-table-column label="📎" width="60" align="center">
+      <el-table-column label="📎" width="84" align="center">
         <template #default="{ row }">
           <el-upload
             v-if="!props.isReadonly"
@@ -220,6 +220,7 @@
           >
             <el-button size="small" link type="primary">📎</el-button>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowKey)" />
         </template>
       </el-table-column>
 
@@ -351,6 +352,8 @@ import { parseNum, calcSubtotal } from '../../composables/useK10FormulaEngine'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue')
@@ -371,6 +374,9 @@ const props = defineProps<{
   year?: number | null
   isReadonly: boolean
 }>()
+/** 行内识别的凭证挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（只读也能看） */
+const EVIDENCE_SHEET = 'K10-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -486,11 +492,15 @@ async function handleOCR(row: any, file: any): Promise<void> {
   if (!file?.raw) return
   const formData = new FormData()
   formData.append('file', file.raw)
+  rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowKey))
   try {
-    const res = await api.post('/d4/contract-ocr', formData, {
+    // 按底稿识别、附件挂到本行。原先 `/d4/contract-ocr` 少 /api 又没带底稿 id（后端没有这条路由，恒失败），
+    // 读的 text 字段也不存在 —— 识别全文在 ocr_text
+    const res: any = await api.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    const ocrText = res?.data?.text || res?.text || ''
+    rowEv.refresh()
+    const ocrText = String(res?.ocr_text ?? '').trim()
     if (ocrText) {
       await ElMessageBox.confirm(
         `OCR识别结果：\n${ocrText.slice(0, 200)}...\n\n是否填入备注？`,

@@ -662,7 +662,11 @@ describe('结构判据', () => {
       const line = 'const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()'
       expect(body, name).toContain(line)
       // 顶层 = 该行左侧没有缩进
-      expect(body.split('\n').some((row) => row === line), name).toBe(true)
+      // 🔴 必须按 `/\r?\n/` 切：仓库 `core.autocrlf=true`，Windows 工作区里这四个文件
+      // 全是 CRLF（现算各 431 / 801 / 640 / 618 处）⇒ 用 `split('\n')` 每行尾部都留一个
+      // `\r`，`row === line` 恒不成立。这条判据因此在 Windows 上恒红、在 LF 检出的 CI 上
+      // 恒绿 —— 「同一条判据两个平台两个结论」，比没有判据更糟。
+      expect(body.split(/\r?\n/).some((row) => row === line), name).toBe(true)
     }
   })
 

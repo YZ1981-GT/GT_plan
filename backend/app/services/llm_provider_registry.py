@@ -34,6 +34,9 @@ class ProviderProfile:
 
 
 _CHAT_EMBED = (AIModelType.chat, AIModelType.embedding)
+# 重排走 Cohere / Jina 形态的 POST {base}/rerank（vLLM、LiteLLM 网关都提供）；云厂商的
+# OpenAI 兼容端点没有统一的重排接口，只给本地 / 自定义网关开放。
+_CHAT_EMBED_RERANK = (AIModelType.chat, AIModelType.embedding, AIModelType.rerank)
 
 PROVIDER_PROFILES: dict[AIProvider, ProviderProfile] = {
     AIProvider.openai_compatible: ProviderProfile(
@@ -42,7 +45,7 @@ PROVIDER_PROFILES: dict[AIProvider, ProviderProfile] = {
         "http://localhost:8100/v1",
         False,
         "Authorization",
-        _CHAT_EMBED,
+        _CHAT_EMBED_RERANK,
         "本地 vLLM 或任意经安全策略放行的 OpenAI 兼容 API",
         allow_public_custom_host=True,
         allow_loopback=True,
@@ -74,7 +77,7 @@ PROVIDER_PROFILES: dict[AIProvider, ProviderProfile] = {
     ),
     AIProvider.custom: ProviderProfile(
         AIProvider.custom, "自定义 OpenAI 兼容服务", "", False,
-        "Authorization", _CHAT_EMBED, "公网 HTTPS 或服务端 allowlist 中的私有端点",
+        "Authorization", _CHAT_EMBED_RERANK, "公网 HTTPS 或服务端 allowlist 中的私有端点",
         allow_public_custom_host=True,
     ),
     AIProvider.ollama: ProviderProfile(

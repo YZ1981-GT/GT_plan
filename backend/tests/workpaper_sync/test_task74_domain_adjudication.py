@@ -4,14 +4,14 @@
 spec: workpaper-html-onlyoffice-bidirectional-writeback-closure / Wave 7 Task 74
 Requirements: 2.1, 2.2, 2.11, 2.12, 9.11, 12.6, 12.7, 13.4 · Property 4, Property 61
 
-Task 74 只有两条准则由「逐 domain 裁决」清零：`unadjudicated_writer`（236 → 0）与
-`unadjudicated_resolver`（34 → 0）。裁决是**人工判断写进 overlay**，所以它有两种典型的假绿形态，
-本文件逐条守：
+Task 74 只有两条准则由「逐 domain 裁决」清零：`unadjudicated_writer` 与 `unadjudicated_resolver`
+（Task 74 交付时分别是 236 与 34；这两个数只是历史记录，判据不读它们）。裁决是**人工判断写进
+overlay**，所以它有两种典型的假绿形态，本文件逐条守：
 
 * **形态 A：裁决顺手清掉了别的准则**（= 把 domain 标签当豁免用）。判据不是「读一遍门的源码看有没有
-  豁免列」——那是 grep 式判据；而是**行为级**：把本任务加的 270 条裁决摘掉、从源码重推清册、再量
-  门，差异必须**恰好**是那两条计数各自回到 236 / 34，其余 12 条逐条相等
-  （`test_adjudicating_clears_exactly_two_criteria`）。
+  豁免列」——那是 grep 式判据；而是**行为级**：把本任务（及之后按同一规则表补裁）的裁决摘掉、从
+  源码重推清册、再量门，差异必须**恰好**是那两条计数各自回到「被摘那批行按 kind 数出来的值」，
+  其余准则逐条相等（`test_adjudicating_clears_exactly_two_criteria`）。
 * **形态 B：注解是模板**（写了字但没有信息）。判据同样不是「注解非空」——生成器已经拒空了；而是
   **注解里引用的每一条事实都必须能在该行自己的 facts 里逐条重算**，且不许引用它没有的事实
   （`test_every_note_cites_exactly_the_facts_that_row_has`）。把 A 行的注解粘到 B 行，两侧同时打红。
@@ -26,6 +26,7 @@ import importlib.util
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -40,22 +41,36 @@ _GENERATOR_PATH = (
 _AUTHOR_PATH = _REPO / "backend" / "scripts" / "gen" / "adjudicate_task74_writer_domains.py"
 _INVENTORY_PATH = _REPO / "backend" / "data" / "workpaper_writer_inventory.json"
 _OVERLAY_PATH = _REPO / "backend" / "data" / "workpaper_writer_domain_overlay.json"
-_EVIDENCE = (
-    _REPO
-    / ".kiro"
-    / "specs"
-    / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-    / "evidence"
-    / "task74-domain-adjudication"
-)
 
-#: Task 20 冻结的红基线里这两条的实测值 —— Task 74 的第一半就是把它们清成 0。
-#: 数字不是手抄：`test_adjudicating_clears_exactly_two_criteria` 摘掉裁决后现场重量，两侧必须相等。
-#: 2026-09-20：239/39 -> 279/43。有界委派闭包（generator `_propagate_content_writers` 从单跳改为
-#: writer 图闭包）补回了 40 个 writer + 4 个 resolver 多跳入口（D2/D4 双向回写迁移把 import 函数
-#: 改成委派 writer 后，调用它们的适配器/端点原本掉出发现面）。摘掉全部 task74 裁决后未裁决基线
-#: 相应上升，两侧仍由 `test_adjudicating_clears_exactly_two_criteria` 现场重量比对，不是手抄。
-_UNADJUDICATED_BEFORE = {"unadjudicated_writer": 279, "unadjudicated_resolver": 43}
+
+def _evidence_dir() -> Path:
+    """Task 74 的 evidence（`overlay_before.json` 快照）所在目录。
+
+    🔴 原来硬拼 active 目录：本 spec 2026-10-03 归档、2026-11-01 又重建了 active 目录，active
+    下没有这份 evidence ⇒ 本文件 5 条判据在 fixture 里 FileNotFoundError（报的是「文件不存在」，
+    实际是「读错了地方」）。按文件本身定位：active 有就用 active，否则取归档快照（与 0.6 重绑
+    旧消费方同一实现）。
+    """
+    backend_root = str(_REPO / "backend")
+    if backend_root not in sys.path:
+        sys.path.insert(0, backend_root)
+    from app.core.spec_docs import resolve_spec_dir
+
+    rel = "evidence/task74-domain-adjudication/overlay_before.json"
+    spec_dir = resolve_spec_dir(
+        "workpaper-html-onlyoffice-bidirectional-writeback-closure", require_files=(rel,)
+    )
+    path = spec_dir / rel
+    assert path.is_file(), f"{rel} 在 active 与归档快照里都不存在"
+    return path.parent
+
+
+#: 本任务清零的两条准则。它们「摘掉裁决后应回到多少」**不再写成冻结常量**：
+#: 原先这里是 Task 20 冻结的 279 / 43（更早是 239 / 39），每次清册分母合法变化（委派闭包补回
+#: 多跳入口、新功能加 writer、旧 writer 退役）都要手改，且改的人只能照抄实测值 —— 那就不是
+#: 判据，是记录。现在期望值从**被摘掉的那批行自己的 kind** 独立推出（见
+#: `test_adjudicating_clears_exactly_two_criteria`），与门的计数逻辑是两条推导链。
+_CLEARED_CRITERIA = ("unadjudicated_writer", "unadjudicated_resolver")
 
 #: 本任务新加的两条 lane。加 lane 不是加豁免，两条判据在下面各守一面。
 _NEW_LANES = ("unified_commit_substrate", "read_only_evaluation")
@@ -122,7 +137,7 @@ def task74_rows(overlay: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     用快照做减法而不是「按注解形状猜」：形状式判别会把将来任何一条按同样风格写的裁决误算进来。
     """
-    before = json.loads((_EVIDENCE / "overlay_before.json").read_text(encoding="utf-8"))
+    before = json.loads((_evidence_dir() / "overlay_before.json").read_text(encoding="utf-8"))
     return {
         writer_id: value
         for writer_id, value in overlay["adjudications"].items()
@@ -157,18 +172,31 @@ def test_adjudicating_clears_exactly_two_criteria(
 ) -> None:
     """**Validates: Requirements 2.2, 2.12, 9.11** · Property 61
 
-    「域裁决不是豁免」的**行为级**判据。把本任务的 270 条裁决摘掉、从源码重推清册、再量门：
+    「域裁决不是豁免」的**行为级**判据。把本任务（及后续按同一规则表补裁）的裁决摘掉、从源码
+    重推清册、再量门：
 
-    * `unadjudicated_writer` / `unadjudicated_resolver` 必须回到 236 / 34（说明裁决真的在清它们）；
-    * 其余 12 条准则必须**逐条字节相等**（说明裁决没有顺手放掉任何一条）。
+    * `unadjudicated_writer` / `unadjudicated_resolver` 必须**恰好**回到被摘掉那批行按 kind
+      数出来的值（说明裁决真的在清它们，且清的就是这批）；
+    * 其余准则必须**逐条相等**（说明裁决没有顺手放掉任何一条）。
 
     这条判据比「门里有没有豁免列」强：即便有人把豁免写成 domain 的副作用（例如让某个 lane 免掉
     `bypasses_unified_commit`），这里也会红。
     """
     rows, function_facts = source_scan
-    assert len(task74_rows) == sum(_UNADJUDICATED_BEFORE.values()), (
-        f"本任务加的裁决 {len(task74_rows)} 条 ≠ 改造前未裁决行数 "
-        f"{sum(_UNADJUDICATED_BEFORE.values())}"
+    kind_of = {row["writer_id"]: row["kind"] for row in rows}
+    missing = sorted(set(task74_rows) - set(kind_of))
+    assert not missing, f"裁决指向的行不在源码发现集里：{missing[:5]}"
+    kinds = Counter(kind_of[writer_id] for writer_id in task74_rows)
+    expected = {
+        # 门的口径：writer_resolver 计入 writer 那一条（`check_workpaper_writer_revision_gate`）
+        "unadjudicated_writer": kinds["writer"] + kinds["writer_resolver"],
+        "unadjudicated_resolver": kinds["resolver"],
+    }
+    assert sum(expected.values()) == len(task74_rows), (
+        f"被摘掉的 {len(task74_rows)} 行里有 kind 不在三类之内：{dict(kinds)}"
+    )
+    assert all(expected.values()), (
+        f"两条准则里有一条的被摘集合为空 ⇒ 对它的判据会空跑：{expected}"
     )
 
     with_adjudication = generator.build_inventory(rows, overlay, function_facts)
@@ -180,17 +208,17 @@ def test_adjudicating_clears_exactly_two_criteria(
     after = {key: len(values) for key, values in gate.evaluate_gate(with_adjudication).items()}
     before = {key: len(values) for key, values in gate.evaluate_gate(without).items()}
 
-    for key, expected in _UNADJUDICATED_BEFORE.items():
+    for key in _CLEARED_CRITERIA:
         assert after[key] == 0, f"{key} 没有归零：{after[key]}"
-        assert before[key] == expected, (
-            f"摘掉裁决后 {key} 实测 {before[key]}，与 Task 20 冻结的 {expected} 不一致 —— "
-            "要么源码的 writer 集变了，要么本任务的裁决集不是那 270 行"
+        assert before[key] == expected[key], (
+            f"摘掉裁决后 {key} 实测 {before[key]}，按被摘行的 kind 应为 {expected[key]} —— "
+            "门数的不是这批行"
         )
 
     moved = {
         key: (before[key], after[key])
         for key in sorted(before)
-        if key not in _UNADJUDICATED_BEFORE and before[key] != after[key]
+        if key not in _CLEARED_CRITERIA and before[key] != after[key]
     }
     assert not moved, (
         f"域裁决动了本不该动的准则 {{key: (无裁决, 有裁决)}} = {moved} —— domain 标签变成了豁免"
@@ -287,7 +315,8 @@ def test_the_overlay_still_has_no_exemption_field(
 ) -> None:
     """**Validates: Requirements 2.2**
 
-    Task 3 的守卫只查「已裁决 writer」；本任务同时裁决了 34 个 resolver，所以这里把整批一起查。
+    Task 3 的守卫只查「已裁决 writer」；本任务同时裁决了 resolver（数量见 `task74_rows` 现算），
+    所以这里把整批一起查。
     """
     for writer_id, value in sorted(task74_rows.items()):
         assert set(value) == {"domain", "version_domain_note"}, (

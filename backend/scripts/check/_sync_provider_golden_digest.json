@@ -63,7 +63,7 @@
     {
       "label": "d4",
       "adapter_id": "d4.revenue_detail",
-      "contract_payload_sha256": "75fca57d9d2c9bf1bb3c54399c99520f5e26ca84365f76096212dd0fd99bd2b8",
+      "contract_payload_sha256": "645e0500d3942c82b809713ca028e80846213fa1e57a2e3ec29c7c7ba6d2217c",
       "sheet_digests": {
         "d42-managed": "3ced9318931e45eeb569a9bff362492b7bd39d0c3ff1df3e656c0e976c1fc1e2",
         "d43-managed": "fa2ead212aef425e8fb6a7e6ce7cb77bb0720ce3893376ce405c67fca43eeef7",
@@ -86,7 +86,7 @@
         "d4-16-managed": "67b53da2dfc6ef6ad03301522424b25328d8d4e5bea0ba4f2df31e4629fdd186",
         "d4-30-managed": "12ff18d8b511004b6d9ccfcbd6531025b0d387ba4e1606463785d653316d4a46",
         "d4-31-managed": "511a28977c03c8663b04f231ce5e2a499d41fda6a3b64b692a75dffe7a85762b",
-        "d4-32-managed": "1284d5233bc4ab5d9b6dd7b8b137dd2395c172de5ef3cf798d132ad5b3191e2c",
+        "d4-32-managed": "f4468809c37902849fc5b622f0b4ede1f7112612d354205a15fa56f2d552e06b",
         "d46-managed": "d18843611f64ea19c890a9f8ab467d1dcf9a480cefc4c6b5e244e55814312cb3",
         "d417-managed": "68ca8a73972efc7a17937e65270c08eab74bb5551c525ac27d061ba059e28299",
         "d418-managed": "c623b4302f7ea99f4c43d20b589a2b8662c62e2a644fc61c84df738267485c1b",

@@ -3,6 +3,7 @@
 Validates: Requirements 1.1-1.8
 """
 
+import inspect
 import uuid
 
 import pytest
@@ -15,9 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.models.base import Base, UserRole
-from app.models.core import Project
-from app.routers.project_wizard import router
+from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole, UserRole
+from app.models.core import Project, ProjectUser, User
+from app.routers.project_wizard import confirm_project, router, update_step as update_step_route
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -72,6 +73,63 @@ async def client(db_session: AsyncSession) -> AsyncClient:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+@pytest_asyncio.fixture
+async def authorized_wizard_client(db_session: AsyncSession):
+    """用真实项目成员门禁测试向导保存 / 确认，不覆盖 require_project_access 工厂。"""
+    app = FastAPI()
+    app.include_router(router)
+    state = {"user": "admin"}
+    identities = {
+        "admin": User(
+            id=uuid.uuid4(), username="wizard_admin", email="wizard_admin@test.com",
+            hashed_password="x", role=UserRole.admin,
+        ),
+        "member": User(
+            id=uuid.uuid4(), username="wizard_member", email="wizard_member@test.com",
+            hashed_password="x", role=UserRole.auditor,
+        ),
+        "outsider": User(
+            id=uuid.uuid4(), username="wizard_outsider", email="wizard_outsider@test.com",
+            hashed_password="x", role=UserRole.auditor,
+        ),
+    }
+    db_session.add_all(identities.values())
+    await db_session.commit()
+
+    async def _override_db():
+        yield db_session
+
+    async def _override_user():
+        return identities[state["user"]]
+
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_current_user] = _override_user
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        c.as_user = lambda name: state.update(user=name)  # type: ignore[attr-defined]
+        c.identities = identities  # type: ignore[attr-defined]
+        yield c
+
+
+async def _create_member_project(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> str:
+    response = await client.post("/api/projects", json=BASIC_INFO)
+    assert response.status_code == 200, response.text
+    project_id = response.json()["id"]
+    member = client.identities["member"]  # type: ignore[attr-defined]
+    db_session.add(
+        ProjectUser(
+            project_id=uuid.UUID(project_id),
+            user_id=member.id,
+            role=ProjectUserRole.auditor,
+            permission_level=PermissionLevel.edit,
+        )
+    )
+    await db_session.commit()
+    return project_id
 
 
 # company_code / short_name 自 project-creation-enhancement（2026-06-05）起为必填；原常量
@@ -229,14 +287,33 @@ class TestGroupFieldsEndpoints:
         assert detail["relation_to_parent"] == "subsidiary"
 
     @pytest.mark.asyncio
-    async def test_save_basic_info_malformed_payload_is_422(self, client: AsyncClient):
+    async def test_save_basic_info_malformed_payload_uses_chinese_field_labels(
+        self, client: AsyncClient
+    ):
         project_id = (await client.post("/api/projects", json=BASIC_INFO)).json()["id"]
         resp = await client.put(
             f"/api/projects/{project_id}/wizard/basic_info",
             json={"client_name": "只有名称"},
         )
         assert resp.status_code == 422
-        assert resp.json()["detail"].startswith("基本信息字段缺失或格式错误：")
+        detail = resp.json()["detail"]
+        assert detail == (
+            "基本信息字段缺失或格式错误：会计准则、审计年度、企业代码、项目类型、项目简称"
+        )
+        assert "audit_year" not in detail
+        assert "company_code" not in detail
+
+    @pytest.mark.asyncio
+    async def test_save_basic_info_invalid_company_code_uses_chinese_label(
+        self, client: AsyncClient
+    ):
+        project_id = (await client.post("/api/projects", json=BASIC_INFO)).json()["id"]
+        resp = await client.put(
+            f"/api/projects/{project_id}/wizard/basic_info",
+            json={**BASIC_INFO, "company_code": "too-short"},
+        )
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "基本信息字段缺失或格式错误：企业代码"
 
 
 # ===================================================================
@@ -420,3 +497,118 @@ class TestConfirmProject:
         second = await client.post(f"/api/projects/{project_id}/wizard/confirm")
         assert second.status_code == 400
         assert "planning" in second.text
+
+
+# ===================================================================
+# 向导保存 / 确认的真实项目级鉴权（consol-group-code-entry-consistency 任务 3.1）
+# ===================================================================
+
+
+@pytest.mark.parametrize("operation", ["update", "confirm"])
+@pytest.mark.asyncio
+async def test_wizard_write_routes_reject_non_member(
+    authorized_wizard_client: AsyncClient,
+    db_session: AsyncSession,
+    operation: str,
+):
+    """非成员不能通过登录依赖访问任意项目的向导写端点。"""
+    project_id = await _create_member_project(authorized_wizard_client, db_session)
+    authorized_wizard_client.as_user("outsider")  # type: ignore[attr-defined]
+
+    if operation == "update":
+        response = await authorized_wizard_client.put(
+            f"/api/projects/{project_id}/wizard/account_import",
+            json={"file_name": "chart.xlsx", "count": 50},
+        )
+    else:
+        response = await authorized_wizard_client.post(
+            f"/api/projects/{project_id}/wizard/confirm"
+        )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == "权限不足"
+    result = await db_session.execute(
+        select(Project).where(Project.id == uuid.UUID(project_id))
+    )
+    persisted = result.scalar_one()
+    assert persisted.status == ProjectStatus.created
+    if operation == "update":
+        assert "account_import" not in (persisted.wizard_state or {}).get("steps", {})
+
+
+@pytest.mark.parametrize("operation", ["update", "confirm"])
+@pytest.mark.asyncio
+async def test_wizard_write_routes_allow_edit_member(
+    authorized_wizard_client: AsyncClient,
+    db_session: AsyncSession,
+    operation: str,
+):
+    """真实 edit 成员可保存向导步骤并确认项目，且写入确实落库。"""
+    project_id = await _create_member_project(authorized_wizard_client, db_session)
+    authorized_wizard_client.as_user("member")  # type: ignore[attr-defined]
+
+    if operation == "update":
+        response = await authorized_wizard_client.put(
+            f"/api/projects/{project_id}/wizard/account_import",
+            json={"file_name": "chart.xlsx", "count": 50},
+        )
+    else:
+        response = await authorized_wizard_client.post(
+            f"/api/projects/{project_id}/wizard/confirm"
+        )
+
+    assert response.status_code == 200, response.text
+    result = await db_session.execute(
+        select(Project).where(Project.id == uuid.UUID(project_id))
+    )
+    persisted = result.scalar_one()
+    if operation == "update":
+        assert persisted.status == ProjectStatus.created
+        saved_step = (persisted.wizard_state or {}).get("steps", {}).get("account_import")
+        assert saved_step is not None
+        assert saved_step["completed"] is True
+        assert saved_step["data"] == {"file_name": "chart.xlsx", "count": 50}
+    else:
+        assert persisted.status == ProjectStatus.planning
+
+
+@pytest.mark.asyncio
+async def test_update_step_passes_authenticated_actor(
+    authorized_wizard_client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """向导路由把真实鉴权返回的用户传入服务 actor，而不是只校验登录。"""
+    from app.services import project_wizard_service
+
+    project_id = await _create_member_project(authorized_wizard_client, db_session)
+    authorized_wizard_client.as_user("member")  # type: ignore[attr-defined]
+    captured: dict[str, object] = {}
+
+    async def _fake_update_step(project_id, step, data, db, *, actor=None):
+        captured["actor"] = actor
+        return {
+            "project_id": project_id,
+            "current_step": step,
+            "steps": {},
+            "completed": False,
+            "notices": [],
+        }
+
+    monkeypatch.setattr(project_wizard_service, "update_step", _fake_update_step)
+    response = await authorized_wizard_client.put(
+        f"/api/projects/{project_id}/wizard/account_import",
+        json={"file_name": "chart.xlsx", "count": 50},
+    )
+
+    assert response.status_code == 200, response.text
+    assert captured["actor"] is authorized_wizard_client.identities["member"]  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("route", [update_step_route, confirm_project])
+def test_wizard_write_routes_use_edit_project_access(route):
+    """运行时依赖闭包必须捕获 edit，而非仅登录或 readonly。"""
+    dependency = inspect.signature(route).parameters["current_user"].default.dependency
+    freevars = dependency.__code__.co_freevars
+    assert "min_permission" in freevars
+    assert dependency.__closure__[freevars.index("min_permission")].cell_contents == "edit"

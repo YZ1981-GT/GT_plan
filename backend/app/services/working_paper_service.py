@@ -237,7 +237,7 @@ class WorkingPaperService:
         query = sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.is_deleted == sa.false(),
-        )
+        ).with_for_update()
         if project_id is not None:
             query = query.where(WorkingPaper.project_id == project_id)
         result = await db.execute(query)
@@ -308,7 +308,7 @@ class WorkingPaperService:
         query = sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.is_deleted == sa.false(),
-        )
+        ).with_for_update()
         if project_id is not None:
             query = query.where(WorkingPaper.project_id == project_id)
         result = await db.execute(query)
@@ -392,7 +392,7 @@ class WorkingPaperService:
         query = sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.is_deleted == sa.false(),
-        )
+        ).with_for_update()
         if project_id is not None:
             query = query.where(WorkingPaper.project_id == project_id)
         result = await db.execute(query)
@@ -523,7 +523,7 @@ class WorkingPaperService:
         query = sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.is_deleted == sa.false(),
-        )
+        ).with_for_update()
         if project_id is not None:
             query = query.where(WorkingPaper.project_id == project_id)
         result = await db.execute(query)

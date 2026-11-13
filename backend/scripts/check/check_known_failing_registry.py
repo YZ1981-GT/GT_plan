@@ -163,13 +163,9 @@ KNOWN_FAILING: dict[str, tuple[str, str, str]] = {
     # ── 冻结计数被别 lane 的提交改变 ───────────────────────────────────────
     #    （test_baseline_is_exactly_thirteen_with_owning_lanes 已出列：2026-10-28 G4 / G6 接通后
     #     KNOWN_UNWIRED 15 → 13，spec oo-writeback-template-parity-closure R3 批 B3）
-    "tests/workpaper_sync/test_task57_abcs_and_shared_migration.py"
-    "::TestFormDifferences::test_ad1_scope_arithmetic_closes": (
-        "abcs-cycle-sync-migration",
-        "5914e315b",
-        "全量 manifest 的 xlsx 独立 entry 现算 138 ≠ slice 冻结 136（manifest 于 "
-        "4750bde7d / 5cb7ebe70 / 5fbe5de29 / c0713ac80 多次变动）",
-    ),
+    #    （test_task57 …::test_ad1_scope_arithmetic_closes 已出列：2026-11-05 task57 的冻结 slice
+    #     判据统一改成棘轮 —— 漂移在 `_test_task57_slice_drift_ledger.py` 里逐条点名现算值，
+    #     xlsx 独立 entry 136 → 139 的机理也在那里登记，判据不再假红）
     "tests/workpaper_sync/test_task54_l_cycle_migration.py"
     "::TestLCycleFormDifferences::test_ld1_carrier_three_way_split_is_real_and_exclusive": (
         "l-cycle-sync-foundation-and-first-canary",

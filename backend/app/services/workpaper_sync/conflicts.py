@@ -520,7 +520,17 @@ class ConflictRecord:
         return payload
 
     def to_row(self) -> dict[str, Any]:
-        """`working_paper_sync_conflict` 的列投影（不含 operation/fence 侧列）。"""
+        """`working_paper_sync_conflict` 的列投影（不含 operation/fence 侧列）。
+
+        🔴 `schema_anomaly` 必须在这里 —— 它决定这条冲突能否靠「选一侧 / 输入合并值」收敛
+        （:meth:`adjudicable_by_value_choice` 就是读它）。它此前只出现在
+        :meth:`digest_payload` 里，列投影漏了它 ⇒ 成因在写库那一刻丢失，读侧再也拿不到，
+        于是只能一刀切地把**全部** schema 冲突判成不可裁决，`type_normalization_failure`
+        这类本可人工收敛的冲突成了死路（spec wp-sync-conflict-adjudication-and-d4-32-modeling
+        §1，V264 列由此而来）。
+
+        非 schema 冲突恒为 `None`：`__post_init__` 已保证只有 schema 冲突带成因。
+        """
         return {
             "stable_field_key": self.locator.stable_field_key,
             "business_label": self.locator.business_label,
@@ -533,6 +543,9 @@ class ConflictRecord:
             "protection_policy": self.locator.protection_policy.value,
             "suggested_action": self.suggested_action.value,
             "conflict_kind": self.kind.value,
+            "schema_anomaly": (
+                None if self.schema_anomaly is None else self.schema_anomaly.value
+            ),
             "base_value": self.base.to_jsonb(),
             "current_value": self.current.to_jsonb(),
             "incoming_value": self.incoming.to_jsonb(),

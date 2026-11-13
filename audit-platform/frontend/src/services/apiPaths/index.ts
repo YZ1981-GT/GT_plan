@@ -37,6 +37,7 @@ export {
 export {
   wpFormula, wpUserFormula, projectFormula, formulaScope,
   formulaPresets, reportConfigFormula, draftRefresh, noteFormula, formulaPush, formulaApi,
+  formulaHealth, formulaDebug, formulaPushVerify, formulaTimeline, formulaPanels,
 } from './formula'
 
 // 公式全局设置 / 本项目适配 / 公式模板（spec formula-global-settings-sync）

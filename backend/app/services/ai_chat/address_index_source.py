@@ -57,9 +57,8 @@ async def check_embedding_health(db: AsyncSession) -> bool:
     try:
         from app.services.ai_service import AIService
 
-        ai_svc = AIService()
-        # 尝试生成一个测试 embedding
-        result = await ai_svc.get_embedding("embedding health check")
+        # 🔴 旧实现 AIService() 不传 db、调用不存在的 get_embedding ⇒ 每次都抛错被吞，恒 False。
+        result = await AIService(db).embedding("embedding health check")
         if result is not None and len(result) > 0:
             return True
         logger.warning("embedding health check 返回空结果")
@@ -123,19 +122,16 @@ class AddressCoordinateIndexSource:
     ) -> list[tuple[str, str, str]]:
         """从 ACNR L3 RuntimeIndex 提取地址坐标文本。"""
         try:
-            from app.services.acnr.runtime import query_project_entries
+            from app.services.acnr.runtime import get_runtime_entries
         except ImportError:
             return []
 
-        entries = await query_project_entries(self._db, str(project_id))
-        if not entries:
+        entries_dict = get_runtime_entries(str(project_id))
+        if not entries_dict:
             return []
 
         results: list[tuple[str, str, str]] = []
-        for entry in entries:
-            addr_id = _extract_addr_id(entry)
-            if not addr_id:
-                continue
+        for addr_id, entry in entries_dict.items():
             text = _build_index_text(entry)
             if text:
                 results.append((self.source_type, addr_id, text))
@@ -146,26 +142,9 @@ class AddressCoordinateIndexSource:
         self, project_id: UUID
     ) -> list[tuple[str, str, str]]:
         """从 legacy address_registry 读取地址条目。"""
-        try:
-            from app.services.address_registry import (
-                get_registry,
-            )
-
-            registry = get_registry()
-            entries = registry.list_by_project(str(project_id))
-        except (ImportError, Exception):
-            return []
-
-        results: list[tuple[str, str, str]] = []
-        for entry in entries:
-            addr_id = getattr(entry, "addr_id", None) or getattr(entry, "uri", "")
-            if not addr_id:
-                continue
-            text = _build_legacy_index_text(entry)
-            if text:
-                results.append((self.source_type, str(addr_id), text))
-
-        return results
+        # legacy 注册表已被 ACNR 运行时索引取代，不再有 get_registry() 全局单例。
+        # 上方 _fetch_from_acnr 已提供完整功能，本方法保留为空兜底。
+        return []
 
 
 # ---------------------------------------------------------------------------

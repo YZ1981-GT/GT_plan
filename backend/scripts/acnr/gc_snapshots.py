@@ -31,13 +31,21 @@ async def _main() -> int:
     print(f"  total_snapshots   = {report['total_snapshots']}")
     print(f"  keep_recent       = {report['keep_recent']}")
     print(f"  reference_status  = {report['reference_status']}")
+    print(f"  lifecycle_lock    = {report.get('lifecycle_lock_status', 'unknown')}")
     print(f"  referenced_count  = {report['referenced_count']}")
     print(f"  deleted           = {len(report['deleted'])} {report['deleted']}")
+    if report.get("would_delete"):
+        print(f"  would_delete      = {len(report['would_delete'])} {report['would_delete']}")
+    print(f"  already_absent    = {len(report.get('already_absent', []))}")
+    print(f"  failed            = {len(report.get('failed', []))} {report.get('failed', [])}")
     print(f"  skipped_referenced= {len(report['skipped_referenced'])}")
     print(f"  skipped_committed = {len(report['skipped_protected'])}（已提交进仓库，运行时不删）")
     print(f"  dry_run           = {report['dry_run']}")
     if report["reference_status"] == "unverifiable":
-        print("  [WARN] 引用集不可验证 → fail-closed，未删除任何快照")
+        print("  [WARN] 引用集不可验证或生命周期锁忙 → fail-closed，未删除任何快照")
+    if report.get("failed"):
+        print("  [ERROR] 部分快照删除失败；已逐项列出，请处理占用 / 权限后重试")
+        return 1
     return 0
 
 

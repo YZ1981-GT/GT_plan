@@ -109,18 +109,21 @@ class AuditReportService:
     # 获取项目基本信息
     # ------------------------------------------------------------------
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
-        """从 project.wizard_state 读取 basic_info"""
+        """从 project.wizard_state 读取 basic_info
+
+        只取 `wizard_state` 一列：全列 ORM 投影在「ORM 声明的列领先于库」时会整体失败
+        （2026-11-01 实测共享库缺 `projects.amount_unit`、V250 未落库）。
+        """
         from app.models.core import Project
         result = await self.db.execute(
-            sa.select(Project).where(
+            sa.select(Project.wizard_state).where(
                 Project.id == project_id,
                 Project.is_deleted == sa.false(),
             )
         )
-        project = result.scalar_one_or_none()
-        if not project or not project.wizard_state:
+        state = result.scalar_one_or_none()
+        if not state:
             return {}
-        state = project.wizard_state
         return (
             state.get("steps", {}).get("basic_info", {}).get("data")
             or state.get("basic_info", {}).get("data")

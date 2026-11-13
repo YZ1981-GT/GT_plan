@@ -1,4 +1,4 @@
-﻿"""V244 三层契约、canonical request 与版本向量聚焦测试。"""
+"""V244 三层契约、canonical request 与版本向量聚焦测试。"""
 from __future__ import annotations
 
 import uuid

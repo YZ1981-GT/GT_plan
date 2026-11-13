@@ -16,13 +16,11 @@
     @jump-to-prereq="onJumpToPrereq"
     @update:show-stale-impact-panel="showStaleImpactPanel = $event"
   />
-
   <!-- useStaleRefresh：上游变更事件横幅 -->
   <div v-if="wpStaleRefresh.isStale.value" class="gt-stale-banner" style="margin: 4px 12px 8px">
     <span class="gt-stale-text">上游数据已变更，底稿取数可能过时</span>
-    <el-button size="small" type="primary" @click="wpStaleRefresh.refresh()">刷新数据</el-button>
+    <el-button size="small" type="primary" :disabled="!effectiveCanEdit" @click="wpStaleRefresh.refresh()">刷新数据</el-button>
   </div>
-
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
@@ -45,7 +43,7 @@
       <!-- 底稿标题栏（HTML 渲染器路径）。导出/导入移至各 sheet 内工具栏；
            底稿切换由 GtWpRenderer 内「🗂️ 切换底稿」树形弹窗承载，此处不再冗余。 -->
       <div v-if="useHtmlRenderer && wpDetail && projectYear != null" class="gt-wp-io-toolbar">
-        <el-button text @click="goBack">← 返回</el-button>
+        <el-button text data-testid="wp-editor-back" @click="goBack">{{ returnLabelOf(route.query.returnTo) }}</el-button>
         <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name">{{ displayWpName }}</span>
         <div class="gt-wp-io-toolbar__actions">
@@ -77,7 +75,7 @@
         v-if="useHtmlRenderer && projectYear != null"
         :wp-id="wpId"
         :audit-year="projectYear"
-        :readonly="editLock.forcedReadonly.value || isArchived || !canEdit"
+        :readonly="!effectiveCanEdit"
         :initial-sheet="initialSheetFromQuery"
         :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
         @save-success="onChildSaved"
@@ -95,7 +93,7 @@
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
-        <el-button text @click="goBack">← 返回</el-button>
+        <el-button text data-testid="wp-editor-back" @click="goBack">{{ returnLabelOf(route.query.returnTo) }}</el-button>
         <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name" v-if="wpDetail">{{ displayWpName }}</span>
         <el-tag v-if="wpDetail" :type="(statusTagType(wpDetail.status)) || undefined" size="small">
@@ -128,7 +126,7 @@
           button-type=""
           label="导出"
         />
-        <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
+        <el-button size="small" :disabled="!effectiveCanEdit" @click="showWpImportEnhanced = true">导入</el-button>
         <!-- 关键操作组：保存 / 一键填充 / 提交复核 — V3 Req 12.1.1 配置驱动 -->
         <el-button-group class="gt-wp-toolbar-primary">
           <el-tooltip
@@ -158,13 +156,13 @@
               <template v-for="item in toolbarDropdownItems" :key="item.key">
                 <el-dropdown-item
                   v-if="item.permission"
-                  :divided="item.divided"
+                  :divided="item.divided" :disabled="item.disabled"
                   v-permission="item.permission"
                   @click="handleToolbarAction(item.action)"
                 >{{ item.label }}</el-dropdown-item>
                 <el-dropdown-item
                   v-else
-                  :divided="item.divided"
+                  :divided="item.divided" :disabled="item.disabled"
                   @click="handleToolbarAction(item.action)"
                 >{{ item.label }}</el-dropdown-item>
               </template>
@@ -455,6 +453,7 @@ import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import QueryDetailEntry from '@/components/query/QueryDetailEntry.vue'
+import { returnLabelOf, safeReturnTo } from '@/utils/voucherLedgerRoute'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 import AuditYearMissingResult from '@/components/common/AuditYearMissingResult.vue'
@@ -691,9 +690,8 @@ const editLock = useEditingLock({
   enabled: canEdit, // 只读身份不取锁（取锁被拒会留拒绝记录、还可能把要编辑的人挤成只读，R2）
 })
 
-// 多窗口门禁（spec: multi-window-ledger-workbench Phase 3 Task 18）：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
-const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
-
+// 多窗口门禁 + 底稿终态：复核通过/归档后所有内容编辑入口统一只读。
+const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value && !isArchived.value && !['review_passed', 'archived'].includes(String(wpDetail.value?.status || '')))
 // ─── 前置状态横幅 ────────────────────────────────────────────────────────────
 // 按当前底稿编码请求：详情加载 / 换底稿后重取，没有前置环节的循环不请求（原先 setup 时取值 ⇒ 恒按 E1，R9）
 const prerequisiteStatus = usePrerequisiteStatus(() => projectId.value, () => prerequisiteWpCode(wpDetail.value?.wp_code))
@@ -1160,16 +1158,15 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 
-// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）；年度 = 本底稿所属项目的审计年度，没有就不带（查账窗口按项目审计年度取）
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）。
+// 不带年度：项目审计年度不一定有账套数据，由查账窗口自己取「审计年度有数据就用它，否则最近有数据的年度」。
 function onOpenLedgerWindow() {
-  openLedgerWindow(projectId.value, projectYear.value ?? undefined)
+  openLedgerWindow(projectId.value)
 }
 
+// 从序时账打开（带本站返回地址）时回原穿透现场（R3.5）；未保存确认只走 onBeforeRouteLeave（原先这里先弹原生 confirm，要确认两遍）
 function goBack() {
-  if (dirty.value) {
-    if (!confirm('有未保存的修改，确定离开？')) return
-  }
-  router.push({ name: 'WorkpaperList', params: { projectId: projectId.value } })
+  router.push(safeReturnTo(route.query.returnTo) ?? { name: 'WorkpaperList', params: { projectId: projectId.value } })
 }
 
 // ─── onBeforeRouteLeave dirty 检查 ──────────────────────────────────────────

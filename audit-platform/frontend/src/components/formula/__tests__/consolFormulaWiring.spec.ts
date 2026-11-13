@@ -7,6 +7,7 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8')
 const manager = read('components/formula/FormulaManagerDialog.vue')
 const layout = read('layouts/ThreeColumnLayout.vue')
 const index = read('views/ConsolidationIndex.vue')
+const formula = read('components/formula/ConsolFormulaManagementPanel.vue')
 const note = read('components/consolidation/ConsolNoteTab.vue')
 const worksheets = read('components/consolidation/worksheets/ConsolWorksheetTabs.vue')
 const sseTypes = read('types/sse.ts')
@@ -82,8 +83,16 @@ describe('合并推送 raw SSE 接线', () => {
     const queue = index.slice(index.indexOf('async function queueConsolPush'), index.indexOf('async function refreshCurrentAfterConsolPush'))
     // 年度未就绪提示后不发 push/{pid}/null
     expect(queue).toContain('if (pushYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }')
-    expect(queue).toContain("pushConsolidation(projectId.value, pushYear, 'manual')")
+    expect(queue).toContain('if (!(await confirmPushDespiteConflicts(projectId.value))) return')
+    expect(queue.indexOf('confirmPushDespiteConflicts(projectId.value)')).toBeLessThan(
+      queue.indexOf("pushConsolidation(projectId.value, pushYear, 'manual')"),
+    )
     expect(queue).not.toContain('consolPushStatus.value = null')
     expect(index).toContain('stopConsolPushEvents()')
+  })
+
+  it('公式变更自动推送不读取企业树冲突确认', () => {
+    expect(formula).toContain("pushConsolidation(props.projectId, props.year, 'formula_changed')")
+    expect(formula).not.toContain('confirmPushDespiteConflicts')
   })
 })

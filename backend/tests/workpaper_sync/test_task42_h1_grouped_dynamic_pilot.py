@@ -89,6 +89,7 @@ from app.services.workpaper_sync.contracts import (  # noqa: E402
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     Capability,
+    EntryProfileError,
     capability_of,
     load_entry_manifest,
     manifest_entries_by_id,
@@ -160,8 +161,20 @@ EXPECTED_DUPLICATE_LEAF_LABELS: Mapping[str, int] = {
     "金额": 2,
 }
 #: 本任务修掉的三条缺陷各自的影响面（`backend/wp_templates/` 工作簿里的命中数）。
-#: 这个数是**结论本身**，保持等式：形态命中多一个少一个都要打红。
-EXPECTED_LEGACY_WRITER_WORKBOOKS = 10
+#:
+#: 🔴 2026-11-04 改口径：原先写成等式 `== 10` 并注明「这个数是结论本身」。但本条要锁的
+#: 结论是「legacy writer 这个形态不是孤例，且本 pilot 的权威册属于它」——「恰好 10 本」
+#: 不是结论，而是 2026-09-06 的一次普查数。模板库合法增长后现算 **24**，等式于是每次
+#: 入库都打一次假红，而假红掩盖的正是它本该守住的那条真判据（与同文件 `MIN_TOTAL_WORKBOOKS`
+#: 当初改成下界的理由逐字相同 —— 那次只改了分母，漏了这个分子）。
+#: 改成：下界（冻结普查数）+ 本册必须在集合里 + 原文点名的两本样板仍在 + **真子集**
+#: （集合不得等于语料全体，否则检测器退化成「全都算」）。
+LEGACY_WRITER_WORKBOOK_FLOOR = 10
+#: 冻结时点点名的样板册：证明「不是孤例」靠的是它们，不是计数。
+LEGACY_WRITER_NAMED_EXEMPLARS = (
+    "B60-1 审计项目工时预算与控制表.xlsx",
+    "G7 长期股权投资.xlsx",
+)
 #: 语料总量只是「判据没在空集上跑」的自检，用**下界**：模板库会合法增长。
 #: 2026-09-06 冻结时 369；2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ 370。
 #: 写成等式时每次合法入库都打一次假红，而假红掩盖的正是上面那条真判据。
@@ -593,6 +606,26 @@ def store_rows(count: int, *, start: int = 0) -> list[dict[str, Any]]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+#: 2026-11-04（umbrella tasks.md 1.1）：Task 76 的 reviewed wp_code 裁决（真库 wp_index 证据）把本 entry 判为
+#: ['H1']，冻结 matcher 域 {H1F}（名字提取产物）随之失效，与 Task 40 的 B60 同一族，随 6.3 对 pilot matcher 域的
+#: 重判处理。真实 manifest 上的选型以 strict xfail 钉住（XPASS 即红 ⇒ 删标记）；测别的 fail-closed 分支的合成
+#: 用例先把 wp_code 对齐冻结域，免得被漂移检查抢先拦下（原先被 pending entry 的崩溃挡着，一直没跑到这一步）。
+_MATCHER_DRIFT = pytest.mark.xfail(strict=True, raises=P.PilotSelectionError, reason=(
+    "Task 76 reviewed wp_code 裁决把本 entry 判为 ['H1']，冻结 matcher 域 {H1F} 已失效（tasks.md 1.1 / 6.3）"))
+#: Task 40 的 checklist pilot entry（B60 bundle）现为 pending（capability=null），按设计 fail-closed。
+_B60_PENDING = pytest.mark.xfail(strict=True, raises=EntryProfileError, reason=(
+    "B60 bundle 现为 pending（capability=null），derive_for_manifest_entry 对它 fail-closed；随 6.3 终裁"))
+
+
+def _frozen_matcher_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    """把本 pilot entry 的 wp_code 对齐冻结 matcher 域（只给测别的分支的合成用例用）。"""
+    patched = json.loads(json.dumps(manifest))
+    for item in patched["entries"]:
+        if item["entry_id"] == P.PILOT_ENTRY_ID:
+            item["wp_match"]["wp_code_patterns"] = sorted(P.PILOT_WP_CODES)
+    return patched
+
+
 class TestFrozenEntrySelection:
     """**Validates: Requirements 12.1 / 12.2**
 
@@ -608,6 +641,7 @@ class TestFrozenEntrySelection:
        `wp_code in PILOT_WP_CODES` —— 那条在这里本就不该成立）。
     """
 
+    @_MATCHER_DRIFT
     def test_entry_is_frozen_from_the_source_backed_manifest(
         self, resolution: Any, manifest: dict[str, Any]
     ) -> None:
@@ -791,6 +825,7 @@ class TestFrozenEntrySelection:
         assert profile["mount_cardinality"] == "single"
         assert profile["host_reachable"] is True
 
+    @_B60_PENDING
     def test_required_set_digest_is_this_entry_own(self, entry: dict[str, Any]) -> None:
         """evidence 按本 entry 自己的 digest 记录（不复用 Task 40/41 的）。
 
@@ -936,7 +971,7 @@ class TestFrozenEntrySelection:
         with pytest.raises(P.PilotSelectionError, match="template_path"):
             P.assert_pilot_entry_selectable(
                 resolution=resolution,
-                manifest=manifest,
+                manifest=_frozen_matcher_manifest(manifest),
                 declared_template_path="backend/wp_templates/H/H6 固定资产清理.xlsx",
             )
 
@@ -2988,11 +3023,11 @@ class TestUpstreamRelsAndNamespaceDefectsAreFixed:
         assert not re.search(r'Id="[^"]+"[^>]*Target="[^"]+"', rels)
 
     def test_ten_of_the_authoritative_workbooks_share_this_shape(self) -> None:
-        """影响面实测：语料（≥369 个工作簿）里 **10 个**是这种顺序，且含 B60 与 G7。
+        """影响面实测：语料（≥369 个工作簿）里有一族是这种顺序，且含本册与 B60 / G7。
 
-        「10」是结论，保持等式；「369」是分母自检，用下界（理由见
-        :data:`MIN_TOTAL_WORKBOOKS`）。语料口径见 :data:`WORKBOOK_SUFFIXES`
-        —— 只数真工作簿，不数 `.preclean.bak` 这类同名备份。
+        四条并列（理由见 :data:`LEGACY_WRITER_WORKBOOK_FLOOR` 的注释）：族规模不低于冻结
+        普查数、本 pilot 的权威册在族里、原文点名的两本样板仍在族里、族是语料的**真子集**。
+        语料口径见 :data:`WORKBOOK_SUFFIXES` —— 只数真工作簿，不数 `.preclean.bak` 这类同名备份。
         """
         root = P.authoritative_template_path().parent.parent
         target_first: list[str] = []
@@ -3018,10 +3053,20 @@ class TestUpstreamRelsAndNamespaceDefectsAreFixed:
             f"语料只扫到 {total} 个工作簿，少于冻结下界 {MIN_TOTAL_WORKBOOKS} —— "
             "语料缩水或 glob 失配，两者都会让下面那条影响面判据在残缺集合上跑"
         )
-        assert len(target_first) == EXPECTED_LEGACY_WRITER_WORKBOOKS, target_first
+        assert len(target_first) >= LEGACY_WRITER_WORKBOOK_FLOOR, (
+            f"legacy writer 形态只命中 {len(target_first)} 本，低于冻结普查数 "
+            f"{LEGACY_WRITER_WORKBOOK_FLOOR} ⇒ 形态检测退化或语料缩水"
+        )
+        assert len(target_first) < total, (
+            f"legacy writer 命中 {len(target_first)} == 语料全体 {total} ⇒ "
+            "检测器把所有册子都算进来了，判据退化成恒真"
+        )
         assert P.authoritative_template_path().name in target_first
-        assert "B60-1 审计项目工时预算与控制表.xlsx" in target_first
-        assert "G7 长期股权投资.xlsx" in target_first
+        for exemplar in LEGACY_WRITER_NAMED_EXEMPLARS:
+            assert exemplar in target_first, (
+                f"冻结时点点名的样板册 {exemplar!r} 不再是这个形态 ⇒ "
+                "「不是孤例」这一结论的依据变了，必须重新取证而不是改数字"
+            )
 
     def test_sheet_part_resolution_is_attribute_order_independent(self) -> None:
         """缺陷 ① 已修：顺序无关地解析 sheet part。"""

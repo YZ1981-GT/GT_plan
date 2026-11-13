@@ -169,6 +169,10 @@ _CROSS_CHECK_SEEDS: list[dict[str, Any]] = [
 ]
 
 
+#: 内置 7 条勾稽的严重度（ADR-CCN-05 缺省 warning：不通过只作提示，不计入失败）
+BUILTIN_CROSS_CHECK_SEVERITY = "warning"
+
+
 def build_cross_check_formulas() -> list[FormulaRecord]:
     """把 7 条勾稽种子构建为 ``FormulaRecord``（logic_check 公式）。
 
@@ -301,6 +305,8 @@ class CrossCheckOutcome:
     description: str
     expression: str
     passed: bool
+    #: 表间审核严重度（ADR-CCN-05）：内置 7 条与用户规则缺省 warning（只提示）
+    severity: str = "warning"
 
 
 @dataclass
@@ -367,6 +373,7 @@ async def run_cross_checks(
                 description=formula.issue_description or "",
                 expression=formula.expression,
                 passed=passed,
+                severity=BUILTIN_CROSS_CHECK_SEVERITY,
             )
         )
         if result.last_computed_at is not None:
@@ -404,6 +411,7 @@ async def persist_cross_check_results(
     project_id: Any,
     year: int,
     result: CrossCheckResult,
+    strict: bool = False,
 ) -> int:
     """把勾稽执行结果 upsert 进 ``cross_check_results`` 表，返回写入行数。
 
@@ -419,8 +427,10 @@ async def persist_cross_check_results(
     ``idx_cross_check_project(project_id, year)``、**没有唯一约束** ⇒ 不能用
     ``on_conflict_do_update``，改为「先删同键旧行再插」（幂等且无需迁移加约束）。
 
-    **fail-open**：落库失败只记 WARNING 并返回 0，不阻断 GET 返回勾稽结果
-    —— 勾稽本身是只读计算，用户拿到 Issue_List 比拿到 500 更有价值。
+    ``strict=True`` 时落库失败（flush 异常 / 写入行数不符）必须向外抛出，
+    耐久传播链不得把持久化失败伪装成成功（CAS R4 七红修复）。
+
+    ``strict=False``（默认）保留 fail-open：只记 WARNING 并返回 0。
 
     字段映射（ORM 列 ← 执行结果）::
 
@@ -430,7 +440,7 @@ async def persist_cross_check_results(
         right_amount ← 同 formula_id 的 issue.right_value
         difference   ← left - right（两侧都有值时才算，否则 None —— 缺一侧时
                        算差额会把「取不到」伪装成「差额等于某个值」）
-        details      ← {description, expression, issue_description}
+        details      ← {description, expression, issue_description, source, severity, reason}
     """
     if not result.outcomes:
         return 0
@@ -441,45 +451,53 @@ async def persist_cross_check_results(
         issue_by_formula.setdefault(issue.formula_id, issue)
 
     try:
-        rule_ids = [o.formula_id for o in result.outcomes]
-        await db.execute(
-            sa.delete(CrossCheckResultRow).where(
-                CrossCheckResultRow.project_id == project_id,
-                CrossCheckResultRow.year == year,
-                CrossCheckResultRow.rule_id.in_(rule_ids),
-            )
-        )
-        written = 0
-        for outcome in result.outcomes:
-            issue = issue_by_formula.get(outcome.formula_id)
-            left = issue.left_value if issue else None
-            right = issue.right_value if issue else None
-            diff = (left - right) if (left is not None and right is not None) else None
-            db.add(
-                CrossCheckResultRow(
-                    project_id=project_id,
-                    year=year,
-                    rule_id=outcome.formula_id,
-                    left_amount=left,
-                    right_amount=right,
-                    difference=diff,
-                    status=(
-                        CROSS_CHECK_STATUS_PASSED
-                        if outcome.passed
-                        else CROSS_CHECK_STATUS_FAILED
-                    ),
-                    details={
-                        "description": outcome.description,
-                        "expression": outcome.expression,
-                        "issue_description": issue.description if issue else None,
-                        "source": "formula_management.logic_check",
-                    },
+        async with db.begin_nested():
+            rule_ids = [o.formula_id for o in result.outcomes]
+            await db.execute(
+                sa.delete(CrossCheckResultRow).where(
+                    CrossCheckResultRow.project_id == project_id,
+                    CrossCheckResultRow.year == year,
+                    CrossCheckResultRow.rule_id.in_(rule_ids),
                 )
             )
-            written += 1
-        await db.flush()
+            written = 0
+            for outcome in result.outcomes:
+                issue = issue_by_formula.get(outcome.formula_id)
+                left = issue.left_value if issue else None
+                right = issue.right_value if issue else None
+                diff = (left - right) if (left is not None and right is not None) else None
+                db.add(
+                    CrossCheckResultRow(
+                        project_id=project_id,
+                        year=year,
+                        rule_id=outcome.formula_id,
+                        left_amount=left,
+                        right_amount=right,
+                        difference=diff,
+                        status=(
+                            CROSS_CHECK_STATUS_PASSED
+                            if outcome.passed
+                            else CROSS_CHECK_STATUS_FAILED
+                        ),
+                        details={
+                            "description": outcome.description,
+                            "expression": outcome.expression,
+                            "issue_description": issue.description if issue else None,
+                            "severity": outcome.severity,
+                            "source": "formula_management.logic_check",
+                        },
+                    )
+                )
+                written += 1
+            await db.flush()
+        # strict 模式校验：写入行数必须等于 outcomes 数量
+        expected = len(result.outcomes)
+        if strict and written != expected:
+            raise RuntimeError(f"勾稽结论未完整持久化（写入 {written}/{expected}）")
         return written
-    except Exception as exc:  # noqa: BLE001 - fail-open：不阻断只读勾稽结果返回
+    except Exception as exc:  # noqa: BLE001 - fail-open 仅非 strict
+        if strict:
+            raise
         logger.warning(
             "cross_check_results 落库失败（project=%s year=%s）：%s",
             project_id,
@@ -495,6 +513,7 @@ async def execute_report_cross_checks(
     project_id: Any,
     year: int,
     persist: bool = True,
+    strict: bool = False,
 ) -> CrossCheckResult:
     """执行报表勾稽（logic_check）→ 返回 Issue_List，并落库勾稽结论。
 
@@ -505,6 +524,9 @@ async def execute_report_cross_checks(
     落库写的是「勾稽结论」这一新事实，不是被勾稽的数据。
 
     ``persist=False`` 供纯计算场景（单测 / 预览）跳过落库。
+
+    ``strict=True`` 时技术异常和持久化失败必须向外传播，耐久传播链不得
+    把技术失败伪装成业务通过（CAS R4 七红修复）。
 
     **本函数是 ``run_cross_checks`` 与 ``build_cross_check_formulas`` 的唯一
     外部入口**（两者是它的内部实现，非孤儿 —— requirements 缺陷 5 勘误已记）。
@@ -532,14 +554,20 @@ async def execute_report_cross_checks(
 
         async with db.begin_nested():
             user_outcomes, user_issues = await run_user_rules(
-                db, project_id=_uuid.UUID(str(project_id)), year=year
+                db, project_id=_uuid.UUID(str(project_id)), year=year,
+                strict=strict,
             )
         result.outcomes.extend(user_outcomes)
         result.issues.extend(user_issues)
-    except Exception as exc:  # noqa: BLE001 - 用户规则失败不阻断内置勾稽
+    except Exception as exc:  # noqa: BLE001 - strict 传播；非 strict 不阻断内置勾稽
+        if strict:
+            raise
         logger.warning("用户表间审核规则执行失败（project=%s year=%s）：%s", project_id, year, exc)
     if persist:
-        await persist_cross_check_results(
-            db, project_id=project_id, year=year, result=result
+        written = await persist_cross_check_results(
+            db, project_id=project_id, year=year, result=result,
+            strict=strict,
         )
+        if strict and result.outcomes and written != len(result.outcomes):
+            raise RuntimeError(f"勾稽结论未完整持久化（写入 {written}/{len(result.outcomes)}）")
     return result

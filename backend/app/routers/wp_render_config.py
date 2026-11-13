@@ -21,7 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_wp_edit_permission
+from app.deps import (
+    get_current_user,
+    get_current_user_stream,
+    require_wp_edit_permission,
+)
 from app.models.core import User
 from app.models.workpaper_models import (
     WpCrossRef,
@@ -548,10 +552,10 @@ async def generate_workpaper_from_index(
 @router.get("/{wp_id}/export-template")
 async def export_template(
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user_stream),
 ):
-    """导出底稿对应的原始 xlsx 模板文件"""
+    """导出底稿对应的原始 xlsx 模板文件 — 流式路径：响应体发送前已释放 DB 会话。"""
     from fastapi.responses import FileResponse
     from urllib.parse import quote
 

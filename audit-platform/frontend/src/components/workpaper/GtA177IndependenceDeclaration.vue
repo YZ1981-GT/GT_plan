@@ -7,7 +7,13 @@
   <div class="gt-a177">
     <!-- Toolbar -->
     <div class="gt-a177__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" @change="handleModeChange" />
+      <el-segmented
+        v-if="a177EntrySync.presentation.value.showModeSwitch"
+        v-model="mode"
+        :options="modeOptions"
+        size="small"
+        @change="handleModeChange"
+      />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a177-independence-declaration" />
       <span class="gt-a177__save-status">
         <template v-if="saveStatus === 'saving'"><el-icon class="is-loading"><Loading /></el-icon> 保存中...</template>
@@ -260,6 +266,7 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { Loading, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
@@ -378,7 +385,7 @@ async function handleMemberSign(index: number) {
         <p><strong>操作</strong>：签署独立性声明确认</p>
         <p><strong>签署人</strong>：${userName}</p>
         <p><strong>声明内容</strong>：本人已阅读并确认遵守上述独立性承诺事项</p>
-        <p style="color:#E6A23C;font-size:12px">⚠️ 此操作不可撤销</p>
+        <p style="color:#E6A23C;font-size:var(--gt-display-font-size)>⚠️ 此操作不可撤销</p>
       </div>`,
       '独立性声明签字确认',
       { confirmButtonText: '确认签字', cancelButtonText: '取消', type: 'warning', dangerouslyUseHTMLString: true },
@@ -402,7 +409,7 @@ async function handlePartnerSignConfirm(key: string) {
         <p><strong>操作</strong>：审查确认签字</p>
         <p><strong>角色</strong>：${role}</p>
         <p><strong>签字人</strong>：${userName}</p>
-        <p style="color:#E6A23C;font-size:12px">⚠️ 此操作不可撤销</p>
+        <p style="color:#E6A23C;font-size:var(--gt-display-font-size)>⚠️ 此操作不可撤销</p>
       </div>`,
       '审查确认签字',
       { confirmButtonText: '确认签字', cancelButtonText: '取消', type: 'warning', dangerouslyUseHTMLString: true },
@@ -528,6 +535,21 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: () => loadData(props.wpId) })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。task 3.5 收口时同批 A 宿主都接了，
+ * 唯独本宿主漏接（选项是中文标签「在线编辑」，棘轮只认英文枚举，没进分母）。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const a177EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-a177-independence-declaration',
+})
 </script>
 
 <style scoped>

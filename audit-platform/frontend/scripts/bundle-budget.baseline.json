@@ -1,1 +1,0 @@
-{"schemaVersion":2,"limits":{"growthRatio":1.05,"largeChunkGzipBytes":512000},"entry":{"rawBytes":1886424,"gzipBytes":541275},"total":{"rawBytes":63171265,"gzipBytes":20371308},"chunkCount":4153,"largeChunks":[{"rawBytes":2796665,"gzipBytes":738962}]}

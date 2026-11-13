@@ -1,4 +1,4 @@
-﻿"""Sprint C.0 — 附注离线导出/导入路由 (D15).
+"""Sprint C.0 — 附注离线导出/导入路由 (D15).
 
 端点：
 - POST /api/disclosure-notes/{project_id}/{year}/offline-export

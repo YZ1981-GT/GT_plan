@@ -11,9 +11,8 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
-import uuid
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -23,8 +22,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.consol_note_data_models import ConsolNoteData
 from app.models.core import Project
 from app.services.consol_group_tree import ROLE_CONSOL, build_group_tree
+from app.services.consol_note_source_projection import (
+    source_digest,
+    update_source_projection,
+)
 from app.services.consol_tree_service import TreeNode, find_node_by_key
 from app.services.project_audit_year import resolve_project_audit_year
+
+
+_UNCHECKED = object()
 
 
 class NodeScopeError(ValueError):
@@ -33,6 +39,40 @@ class NodeScopeError(ValueError):
     def __init__(self, message: str, *, status: int = 400):
         super().__init__(message)
         self.status = status
+
+
+class NoteSaveConflict(NodeScopeError):
+    """保存时客户端看到的附注内容已被其他写入方修改。"""
+
+    def __init__(
+        self,
+        current_digest: str | None,
+        updated_at: datetime | None,
+        last_write_source: str | None,
+        message: str = "附注内容已被其他写入方修改，请重新加载后重试",
+    ) -> None:
+        super().__init__(message, status=409)
+        self.current_digest = current_digest
+        self.updated_at = updated_at
+        self.last_write_source = last_write_source or "manual"
+
+
+def digest_of(record_or_data: ConsolNoteData | dict | None) -> str | None:
+    """计算附注内容摘要；无记录为 ``None``，非对象数据按空对象处理。"""
+    if record_or_data is None:
+        return None
+    if isinstance(record_or_data, dict):
+        data = record_or_data
+    else:
+        data = getattr(record_or_data, "data", None)
+    return source_digest(data if isinstance(data, dict) else {})
+
+
+def _last_write_source(record: ConsolNoteData | None) -> str:
+    """从数据快照读取冲突提示所需的最后写入方。"""
+    data = getattr(record, "data", None) if record is not None else None
+    source = data.get("_last_write_source") if isinstance(data, dict) else None
+    return source if isinstance(source, str) and source else "manual"
 
 
 @dataclass(frozen=True)
@@ -284,14 +324,16 @@ async def save_scoped_note_record(
     data: dict,
     *,
     now: datetime | None = None,
+    expected_digest: str | None | object = _UNCHECKED,
 ) -> ConsolNoteData:
-    """按作用域保存附注行，节点写入不更新 NULL legacy 行。
+    """按作用域保存附注行，并可按内容摘要执行 CAS。
 
-    PUT 的 ``data`` 是完整快照，因此保存时替换目标行的数据；无论是已有行还是
-    从 legacy 首次复制，都会深拷贝请求对象，避免嵌套 rows/单元格对象共享引用。
-    显式根节点首次保存会读取并锁定 legacy 行，仅继承其 ``is_stale`` 状态；
-    legacy 的数据、时间和身份始终不被修改。创建竞争由 V177 唯一约束裁决，
-    SAVEPOINT 回滚后重读赢家并应用本次快照，保持外层事务可继续。
+    ``load_scoped_note_record`` 是 GET 的唯一保存基准：根合并节点在没有节点专属
+    行时会锁住并读取 legacy 行，但写入仍创建节点专属行。
+
+    ``expected_digest`` 未传时保留服务层旧调用语义；显式传 ``None`` 表示调用方
+    读取时没有保存行。首次创建若撞唯一键，SAVEPOINT 回滚后重读赢家，带摘要的
+    调用会再次比较赢家内容，比较通过才覆盖，并确保赢家的来源投影为 ``manual``。
     """
     if not scope.section_id:
         raise NodeScopeError("保存附注行必须提供 section_id")
@@ -301,28 +343,40 @@ async def save_scoped_note_record(
     if now is None:
         now = datetime.now(timezone.utc)
 
-    # 先锁定精确目标。显式节点绝不把根 legacy fallback 当成写入目标。
-    record = await _load_exact_note_record(db, scope, for_update=True)
+    # 与 GET 完全相同的基准：精确节点优先，根节点缺少专属行时回退到
+    # legacy NULL 行。for_update 必须覆盖摘要比较之前的整个读取。
+    base = await load_scoped_note_record(
+        db,
+        scope,
+        allow_root_legacy_fallback=True,
+        for_update=True,
+    )
+    if expected_digest is not _UNCHECKED:
+        current_digest = digest_of(base)
+        if current_digest != expected_digest:
+            raise NoteSaveConflict(
+                current_digest,
+                base.updated_at if base is not None else None,
+                _last_write_source(base),
+            )
+
+    # 根节点的 legacy 回退行只是保存基准，不是节点写入目标；其他作用域中
+    # load_scoped_note_record 返回的行就是精确目标。
+    record = (
+        base
+        if base is not None and base.node_key == scope.node_key
+        else None
+    )
     if record is not None:
         record.data = copy.deepcopy(data)
         record.updated_at = now
-        # V243：手工保存 → source_mode=manual
-        from app.services.consol_note_source_projection import update_source_projection
-
-        update_source_projection(record, "manual")
+        update_source_projection(record, "manual", digest=digest_of(record))
         return record
 
     inherited_stale = bool(scope.node_key)
-    if scope.node_key is not None and scope.is_root_consol:
-        # 根节点首次写入：legacy 只作为基线读取，最终仍创建 node_key 专属行。
-        legacy_scope = NodeScope(
-            project_id=scope.project_id,
-            year=scope.year,
-            section_id=scope.section_id,
-        )
-        legacy = await _load_exact_note_record(db, legacy_scope, for_update=True)
-        if legacy is not None:
-            inherited_stale = bool(legacy.is_stale)
+    if scope.node_key is not None and base is not None:
+        # 只有根节点允许得到 legacy 基准；节点首次复制时沿用其 stale 状态。
+        inherited_stale = bool(base.is_stale)
 
     candidate = ConsolNoteData(
         project_id=scope.project_id,
@@ -336,6 +390,7 @@ async def save_scoped_note_record(
         is_stale=inherited_stale if scope.node_key is not None else False,
         updated_at=now,
     )
+    update_source_projection(candidate, "manual", digest=digest_of(candidate))
 
     try:
         # 必须在 SAVEPOINT 建立后 add，避免失败候选污染外层事务。
@@ -344,19 +399,32 @@ async def save_scoped_note_record(
             await db.flush()
     except IntegrityError as exc:
         # SAVEPOINT 已经退出并回滚；此时才能查询，不会触发 PendingRollbackError。
+        original = getattr(exc, "orig", exc)
+        text = str(original).lower()
+        pgcode = getattr(original, "pgcode", None)
+        is_unique = pgcode == "23505" or "unique constraint" in text or "duplicate key" in text
+        if not is_unique:
+            raise
+
         winner = await _load_exact_note_record(
             db, scope, populate_existing=True,
         )
         if winner is None:
-            original = getattr(exc, "orig", exc)
-            text = str(original).lower()
-            pgcode = getattr(original, "pgcode", None)
-            is_unique = pgcode == "23505" or "unique constraint" in text or "duplicate key" in text
-            if is_unique:
-                raise NodeScopeError("附注行并发冲突，请重试", status=409) from exc
-            raise
+            raise NodeScopeError("附注行并发冲突，请重试", status=409) from exc
+
+        if expected_digest is not _UNCHECKED:
+            winner_digest = digest_of(winner)
+            if winner_digest != expected_digest:
+                raise NoteSaveConflict(
+                    winner_digest,
+                    winner.updated_at,
+                    _last_write_source(winner),
+                )
+
         winner.data = copy.deepcopy(data)
         winner.updated_at = now
+        # 唯一键赢家不是本次 session 创建的对象，必须显式补齐手工来源投影。
+        update_source_projection(winner, "manual", digest=digest_of(winner))
         await db.flush()
         return winner
 
@@ -365,8 +433,10 @@ async def save_scoped_note_record(
 
 __all__ = [
     "NodeScopeError",
+    "NoteSaveConflict",
     "NodeScope",
     "LegacyScope",
+    "digest_of",
     "resolve_requested_node_key",
     "resolve_node_scope",
     "scope_for_tree_node",

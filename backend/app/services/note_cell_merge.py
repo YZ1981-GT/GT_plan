@@ -311,16 +311,49 @@ def _merge_rows(
     return merged
 
 
+#: 表结构字段：只认 new（模板权威）。old 独有时不带过来 —— 旧多表、新单表时带上旧 ``_tables``，编辑器优先读它，会显示旧表
+_STRUCTURE_KEYS = frozenset({"_tables", "rows", "headers", "name"})
+
+
+def _keep_old_only_keys(out: dict[str, Any], old: dict[str, Any]) -> None:
+    """old 有、new 没有的字段原样保留（``_validation_rules`` / ``_user_formulas`` / 来源信封等 sidecar）。
+
+    重生成只更新它算出来的部分，与行级合并「new 缺则用 old 兜底」同一规则。原先整张表从 new 起步，
+    这些字段每次重生成（如 REPORTS_UPDATED → ``update_note_values``）都被静默删掉。
+    """
+    for key, value in old.items():
+        if key not in out and key not in _STRUCTURE_KEYS:
+            out[key] = deepcopy(value)
+
+
+def _has_preserved_detail(rows: list[Any]) -> bool:
+    """明细行（非合计 / 小计）里有手工 / 锁定格 ⇒ 合并结果的明细与 new 算合计时用的明细不同。"""
+    for row in rows:
+        if not isinstance(row, dict) or row.get("is_total") or row.get("row_type") in ("total", "subtotal"):
+            continue
+        modes = _safe_dict(row.get("_cell_modes"))
+        if any(mode in (_MODE_MANUAL, _MODE_LOCKED) for mode in modes.values()):
+            return True
+    return False
+
+
 def _merge_single_table(
     old_table: dict[str, Any],
     new_table: dict[str, Any],
 ) -> dict[str, Any]:
     """合并单张表（{headers, rows, name, ...}）.
 
-    headers / name 等表级字段以 new 为权威；rows 走 _merge_rows.
+    headers / name 等表级字段以 new 为权威；rows 走 _merge_rows；old 独有的表级字段保留（``_keep_old_only_keys``）。
+    明细保留了手工 / 锁定值时，合计 / 小计行的自动格按合并后的明细重算：new 的合计是按模板明细（不含这些手工值）算的，
+    原样采用会让合计与明细对不上（真库实测：重算后手工明细 100 / 80 还在、合计被清空）。合计构成判不准、构成全空的格不写。
     """
     out: dict[str, Any] = deepcopy(new_table)
     out["rows"] = _merge_rows(old_table.get("rows"), new_table.get("rows"))
+    _keep_old_only_keys(out, old_table)
+    if _has_preserved_detail(out["rows"]):
+        from app.services.note_formula_tables import recalc_table_totals
+
+        recalc_table_totals(out)
     return out
 
 
@@ -380,6 +413,7 @@ def merge_table_data_preserving_cell_modes(
             out["rows"] = deepcopy(first.get("rows", []))
             if "name" in first:
                 out["name"] = first.get("name", "")
+        _keep_old_only_keys(out, old_safe)
         return out
 
     # 单表分支

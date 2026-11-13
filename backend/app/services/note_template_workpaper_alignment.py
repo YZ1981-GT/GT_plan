@@ -438,11 +438,13 @@ def load_templates() -> dict[str, dict[str, Any]]:
 
 def load_allowlist(path: Path = ALLOWLIST_PATH) -> dict[str, list[dict[str, Any]]]:
     """``corrections``：底稿笔误 / 提示，比之前先把底稿那段字换成模板的写法（表的其余部分照常逐列比）；
-    ``exceptions``：整张表不按底稿（底稿两表并排读成一张、模板实例化了占位列、批 9b-2 待改的结构差异）。"""
+    ``exceptions``：整张表不按底稿（底稿两表并排读成一张、模板实例化了占位列、批 9b-2 待改的结构差异）；
+    ``names``：表名与底稿不同的（带类别，见 ``check_names``）。"""
     if not path.exists():
-        return {"corrections": [], "exceptions": []}
+        return {"corrections": [], "exceptions": [], "names": []}
     doc = json.loads(path.read_text(encoding="utf-8"))
-    return {"corrections": list(doc.get("corrections") or []), "exceptions": list(doc.get("exceptions") or [])}
+    return {"corrections": list(doc.get("corrections") or []), "exceptions": list(doc.get("exceptions") or []),
+            "names": list(doc.get("names") or [])}
 
 
 def _entry_key(e: dict[str, Any]) -> tuple[str, str, int]:
@@ -525,3 +527,110 @@ def check_against_allowlist(mismatches: list[Mismatch], exceptions: list[dict[st
     live = {m.key for m in mismatches}
     return ([m for m in mismatches if m.key not in keys],
             [e for e in exceptions if any((*_entry_key(e), k) not in live for k in e["kinds"])])
+
+
+# ─── 表名（spec note-disclosure-pull-regression-and-headless-backend R3.4） ─────────────────────────────
+#
+# 已配上底稿的表：模板表名与底稿表上方的表名（任一候选）归一后相同，或登记在白名单 ``names``（带类别与理由）。
+# 归一 = 配对用的 ``base_name``（去【】与括号提示、行首序号、尾部冒号、续表 / 期间后缀）再去几处纯写法噪声；
+# 不改 ``name_key`` / ``base_name`` 本身（它们决定配对，改了会让配对结果一起变）。只比配对单元的首表（续表沿用首表名）。
+
+#: ``names`` 条目的类别（design §4.3）
+NAME_CATEGORIES = ("synonym", "workpaper_placeholder", "workpaper_typo", "workpaper_no_name", "todo")
+
+_NAME_YEAR = re.compile(r"\d{4}年")
+_NAME_DROP = re.compile(r"\((?:逐项披露|合并报表|母公司报表|说明:[^()]*)\)")
+_NAME_RUXIA = re.compile(r"(?:列示)?如下(?:表所示)?(?=\(|$)")
+_NAME_LEAD = re.compile(r"^(?:其中:?|[A-Z][、.])")
+_NAME_TAIL = re.compile(r"(?:附注披露信息|披露信息|附注|明细情况|明细|情况|列示|表)$")
+_NAME_COLON = re.compile(r":+$")
+_NAME_PERIOD = re.compile(r"^(?:上年年末|期末|期初|年末|年初|本期|上期)")
+#: 不是表名的写法：sheet 横幅、格式提示、行名
+_NAME_GENERIC = re.compile(r"^(?:附注披露信息.*|(?:分别|汇总|参考)?披露格式|项目|合计|小计)$")
+
+
+def table_name_key(name: Any) -> str:
+    """表名比较键（只用于表名判据）：``base_name`` 之后统一年份、去逗号、去「（逐项披露）（合并报表）（说明：…）」、
+    去「如下 / 如下表所示」、行首「其中」与「A、」、尾部「附注披露信息 / 情况 / 明细 / 列示 / 表」。"""
+    k = _NAME_YEAR.sub("Y年", base_name(name)).replace(",", "")
+    for _ in range(4):
+        prev = k
+        k = _NAME_DROP.sub("", k)
+        k = _NAME_RUXIA.sub("", k)
+        k = _NAME_LEAD.sub("", k)
+        k = _NAME_TAIL.sub("", k)
+        k = _NAME_COLON.sub("", k)
+        if k == prev:
+            break
+    return k
+
+
+def _comparable(key: str) -> bool:
+    """整段括号包住的是填写提示；横幅 / 格式提示 / 行名不是表名。"""
+    return bool(key) and not (key.startswith("(") and key.endswith(")")) and not _NAME_GENERIC.match(key)
+
+
+def same_table_name(template: str, workpaper: str) -> bool:
+    """两个比较键算同名：相同，或只有一边以期间词开头、去掉后相同（底稿「上年年末」一块下的表不再写期间）。"""
+    if template == workpaper:
+        return True
+    pt, pw = _NAME_PERIOD.match(template), _NAME_PERIOD.match(workpaper)
+    if bool(pt) == bool(pw):
+        return False
+    return (template[pt.end():] if pt else template) == (workpaper[pw.end():] if pw else workpaper)
+
+
+@dataclass(frozen=True, order=True)
+class NameMismatch:
+    std: str
+    section: str
+    table: int  # 模板表序（配对单元首表）
+    template: str = field(compare=False)
+    workpaper: tuple[str, ...] = field(compare=False)  # 底稿表上方可比的候选表名（原字）
+    why: str = field(compare=False)  # differ / template_generic
+    where: str = field(compare=False, default="")  # 底稿编码 + 表头行（报错用）
+
+
+def name_mismatches(results: list[SectionResult], templates: dict[str, dict[str, Any]]
+                    ) -> tuple[list[NameMismatch], int]:
+    """已配对单元首表的表名比对：（不一致, 比过的张数）。模板表名本身是通用占位（「项目」「参考披露格式」）的一律记
+    ``template_generic``；底稿那边没有可比表名的不比、不计数。"""
+    by_sec = {std: {s.get("section_number"): s for s in templates[std]["sections"]} for std in templates}
+    out: list[NameMismatch] = []
+    compared = 0
+    for res in results:
+        tables = by_sec[res.std][res.section].get("tables") or []
+        for p in res.pairs:
+            j, wp = p.tpl_idx[0], p.wp[0]
+            tn = str(tables[j].get("name") or "")
+            tk = table_name_key(tn)
+            cands = [c for c in (wp.title_candidates or [wp.title]) if c and _comparable(table_name_key(c))]
+            where = f"{p.wp_code} 第 {wp.header_rows[0]} 行"
+            if not _comparable(tk):
+                out.append(NameMismatch(res.std, res.section, j, tn, tuple(cands), "template_generic", where))
+                continue
+            if not cands:
+                continue
+            compared += 1
+            if not any(same_table_name(tk, table_name_key(c)) for c in cands):
+                out.append(NameMismatch(res.std, res.section, j, tn, tuple(cands), "differ", where))
+    return sorted(out), compared
+
+
+def check_names(mismatches: list[NameMismatch], entries: list[dict[str, Any]]
+                ) -> tuple[list[NameMismatch], list[dict[str, Any]]]:
+    """（白名单外的表名不一致, 失效条目）。条目须有 std / section / table / name / category / reason，category ∈
+    ``NAME_CATEGORIES``；``workpaper`` 是登记时底稿那边的表名原字，现算候选里没有它（底稿改了字）也算失效。"""
+    for e in entries:
+        if not str(e.get("reason") or "").strip():
+            raise ValueError(f"白名单 names 条目缺理由：{e}")
+        if e.get("category") not in NAME_CATEGORIES:
+            raise ValueError(f"白名单 names 条目类别不在 {NAME_CATEGORIES}：{e}")
+    live = {(m.std, m.section, m.table): m for m in mismatches}
+    keys = {_entry_key(e) for e in entries}
+    stale = []
+    for e in entries:
+        m = live.get(_entry_key(e))
+        if m is None or (m.why == "differ" and str(e.get("workpaper") or "") not in m.workpaper):
+            stale.append(e)
+    return [m for m in mismatches if (m.std, m.section, m.table) not in keys], stale

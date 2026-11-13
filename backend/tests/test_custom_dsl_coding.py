@@ -18,6 +18,9 @@ from app.models.base import Base, UserRole, ProjectStatus
 from app.models.core import User, Project
 from app.models.gt_coding_models import GTWpCoding, GT_CODING_SEED_DATA
 from app.models.audit_platform_models import TrialBalance, AccountCategory
+# 接口用例导入 app.main 后会注册附件版本表（外键指向 asset_blobs），而 asset_blobs 的模型模块没人导入 ⇒
+# 下一个用例的全量 create_all 报 NoReferencedTableError（HEAD 上接口类用例因此全部 setup 失败）
+import app.models.asset_blob_models  # noqa: E402, F401
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -340,6 +343,13 @@ async def client(db_session: AsyncSession, seeded_db):
         yield c
 
 
+def _error_code(resp) -> str | None:
+    """经 ``app.main`` 的错误信封是 ``{code, message: detail}``；裸 FastAPI 是 ``{detail}``。"""
+    body = resp.json()
+    detail = body.get("detail") if isinstance(body.get("detail"), dict) else body.get("message")
+    return detail.get("error_code") if isinstance(detail, dict) else None
+
+
 class TestFormulaDSLAPI:
 
     @pytest.mark.asyncio
@@ -351,51 +361,41 @@ class TestFormulaDSLAPI:
         assert "TB" in names
         assert "SUM_TB" in names
 
+    # spec formula-management-repair-closure R3.3：自定义函数只存进程内存（重启丢失、多进程不一致）、无界面入口 ⇒
+    # 写接口停用为 501，读接口保留；注册 / 注销的服务层行为由上方 TestFormulaEngine* 直接调用覆盖。
+    # （原 3 条 xfail 的理由「Router passes param_names…」早已由 formula-hub-integrity-closure 任务 33 修掉。）
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Router passes param_names to service which doesn't accept it - production code bug")
-    async def test_register_custom_function_api(self, client):
+    async def test_register_custom_function_api_is_retired(self, client):
+        from app.services.formula_custom_functions import get_custom_registry
+
         resp = await client.post("/api/formula/custom-functions", json={
             "name": "MY_NET",
             "expression": "TB('1001', '期末余额') - TB('1001', '年初余额')",
             "description": "净变动",
             "param_names": [],
         })
-        assert resp.status_code == 200
-        data = resp.json().get("data", resp.json())
-        assert data["name"] == "MY_NET"
+        assert resp.status_code == 501, resp.text
+        assert _error_code(resp) == "FORMULA_CUSTOM_FUNCTION_NOT_PERSISTED"
+        assert "MY_NET" not in get_custom_registry(), "停用后不得写进注册表"
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Router passes param_names to service which doesn't accept it - production code bug")
-    async def test_register_invalid_function_api(self, client):
-        resp = await client.post("/api/formula/custom-functions", json={
-            "name": "TB",
-            "expression": "TB('1001', '期末余额')",
-        })
-        assert resp.status_code == 400
-
-    @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Router passes param_names to service which doesn't accept it - production code bug")
-    async def test_list_custom_functions_api(self, client):
-        # Register one first
-        await client.post("/api/formula/custom-functions", json={
-            "name": "CUSTOM_A",
-            "expression": "TB('1001', '期末余额')",
-        })
+    async def test_list_custom_functions_api_still_works(self, client):
         resp = await client.get("/api/formula/custom-functions")
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_unregister_custom_function_api(self, client):
-        # Note: FormulaEngine is stateless per request in MVP,
-        # so register + unregister in same test won't work across requests.
-        # Test the 404 case for nonexistent function instead.
-        resp = await client.delete("/api/formula/custom-functions/NONEXISTENT")
-        assert resp.status_code == 404
+    async def test_unregister_custom_function_api_is_retired(self, client):
+        from app.services.formula_custom_functions import get_custom_registry, register_custom_function, \
+            unregister_custom_function
 
-    @pytest.mark.asyncio
-    async def test_unregister_nonexistent_api(self, client):
-        resp = await client.delete("/api/formula/custom-functions/NOPE")
-        assert resp.status_code == 404
+        register_custom_function(name="KEEP_ME", expression="1+1")  # 服务层注册（内部调用不受影响）
+        try:
+            resp = await client.delete("/api/formula/custom-functions/KEEP_ME")
+            assert resp.status_code == 501, resp.text
+            assert _error_code(resp) == "FORMULA_CUSTOM_FUNCTION_NOT_PERSISTED"
+            assert "KEEP_ME" in get_custom_registry(), "停用后接口不得删注册表"
+        finally:
+            unregister_custom_function("KEEP_ME")
 
 
 class TestCustomCodingAPI:

@@ -230,7 +230,7 @@ const heatmapRows = computed(() => [
 function heatmapCellStyle({ row, column }: { row: { ir: string }, column: { property: string } }): CSSProperties {
   const prop = column.property
   if (prop === 'label') {
-    return { background: '#f0edf5', fontWeight: '600', fontSize: '13px' }
+    return { background: '#f0edf5', fontWeight: '600', fontSize: 'var(--gt-display-font-size)' }
   }
   if (['high', 'medium', 'low'].includes(prop)) {
     return { backgroundColor: getHeatmapColor(row.ir, prop), color: '#fff' }

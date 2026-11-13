@@ -4,7 +4,8 @@ import { aiModels as P } from '@/services/apiPaths'
 
 const silent = (extra: Record<string, unknown> = {}) => ({ ...extra, _silent: true } as any)
 
-export type AIModelType = 'chat' | 'embedding' | 'ocr'
+/** rerank：知识检索结果重排（可选增强，未启用 = 不重排，无 .env 兜底） */
+export type AIModelType = 'chat' | 'embedding' | 'ocr' | 'rerank'
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh'
 export type OCRCapability = 'ocr' | 'layout_parsing'
 export type OCRProtocol = 'local' | 'paddlex_json'
@@ -13,7 +14,7 @@ export type AIAuthScheme = 'none' | 'bearer' | 'x_api_key' | 'api_key' | 'custom
 export type AIDeployment = 'local' | 'server'
 export type AITrustZone = 'local_device' | 'firm_private' | 'approved_provider' | 'restricted'
 export type AIMaskPolicy = 'none' | 'role_based' | 'strict'
-export type AIRouteKind = 'chat' | 'embedding' | 'ocr' | 'layout_parsing'
+export type AIRouteKind = 'chat' | 'embedding' | 'rerank' | 'ocr' | 'layout_parsing'
 export type AIRouteCandidateStatus = 'available' | 'unavailable' | 'unknown'
 export type AIProvider =
   | 'ollama'

@@ -198,23 +198,22 @@ def client_instance_of(request: Request) -> str | None:
     return (request.headers.get("x-client-instance") or "").strip() or None
 
 
-async def raise_if_workpaper_frozen(db: AsyncSession, wp_id: UUID) -> None:
+async def raise_if_workpaper_frozen(
+    db: AsyncSession,
+    wp_id: UUID,
+    *,
+    for_update: bool = True,
+) -> None:
     """末级复核通过或归档后，所有底稿内容写入统一返回 423。"""
-    import sqlalchemy as sa
-    from app.models.workpaper_models import WorkingPaper, WpFileStatus
+    from app.services.workpaper_content_freeze import (
+        WorkpaperContentFrozenError,
+        assert_workpaper_content_writable,
+    )
 
-    status = (await db.execute(
-        sa.select(WorkingPaper.status).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-    )).scalar_one_or_none()
-    if status in {WpFileStatus.review_passed, WpFileStatus.archived}:
-        label = "复核通过" if status == WpFileStatus.review_passed else "已归档"
-        raise HTTPException(
-            status_code=423,
-            detail=f"底稿{label}，内容已冻结。如需修改，请先按流程创建新修订。",
-        )
+    try:
+        await assert_workpaper_content_writable(db, wp_id, for_update=for_update)
+    except WorkpaperContentFrozenError as exc:
+        raise HTTPException(status_code=423, detail=exc.detail) from exc
 
 
 async def raise_if_edit_locked(
@@ -232,7 +231,13 @@ async def raise_if_edit_locked(
 
 
 async def enforce_edit_lock_for_content_write(
-    db: AsyncSession, current_user, request: Request, wp_id: UUID, *, purpose: EditLockPurpose = "save",
+    db: AsyncSession,
+    current_user,
+    request: Request,
+    wp_id: UUID,
+    *,
+    purpose: EditLockPurpose = "save",
+    lock_status: bool = True,
 ) -> None:
     """底稿内容写入前校验编辑锁：有效锁的持有人（用户 + 窗口）以外的请求 423，本次写入不落库。
 
@@ -240,7 +245,7 @@ async def enforce_edit_lock_for_content_write(
     （spec workpaper-multi-window-lock-gaps，2026-10-31 实测）。窗口编号取请求头 ``X-Client-Instance``。
     不经底稿门禁的写接口（版本回滚、在线编辑入口等）在处理函数里直接调本函数。
     """
-    await raise_if_workpaper_frozen(db, wp_id)
+    await raise_if_workpaper_frozen(db, wp_id, for_update=lock_status)
     await raise_if_edit_locked(db, current_user.id, client_instance_of(request), wp_id, purpose=purpose)
 
 
@@ -317,7 +322,12 @@ async def dedicated_wp_gate(
     if action != "dedicated_read" and not is_index_param:
         _WRITE_REQUESTER.set(_WriteRequester(current_user.id, client_instance_of(request), wp_uuid))
         if edit_lock_scope(route_name) is EditLockScope.CHECK:
-            await enforce_edit_lock_for_content_write(db, current_user, request, wp_uuid)
+            await enforce_edit_lock_for_content_write(
+                db,
+                current_user,
+                request,
+                wp_uuid,
+            )
 
 
 # ---------------------------------------------------------------------------

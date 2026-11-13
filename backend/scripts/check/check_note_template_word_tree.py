@@ -65,13 +65,22 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"[written] {args.json}")
     if args.check:
-        unexpected, stale = check_against_allowlist(diffs, _load_allowlist())
+        from app.services.note_word_allowlist import evidence_problems
+
+        allowlist = _load_allowlist()
+        unexpected, stale = check_against_allowlist(diffs, allowlist)
+        problems = [f"{e['variant']} {e['kind']} {e['key']}: {p}" for e in allowlist for p in evidence_problems(e)]
         for d in unexpected:
             print(f"[DIFF] {d.variant} {d.kind} {d.key} {d.detail}")
         for e in stale:
             print(f"[STALE] 白名单条目已不再出现：{e}")
-        if unexpected or stale:
-            print(f"🔴 --check 失败：白名单外差异 {len(unexpected)} 条，失效白名单 {len(stale)} 条")
+        for p in problems:
+            print(f"[EVIDENCE] {p}")
+        cats = Counter(e.get("category") for e in allowlist)
+        print("白名单类别：" + "  ".join(f"{k}={n}" for k, n in sorted(cats.items())))
+        if unexpected or stale or problems:
+            print(f"🔴 --check 失败：白名单外差异 {len(unexpected)} 条，失效白名单 {len(stale)} 条，"
+                  f"证据不成立 {len(problems)} 条")
             return 2
         print("✅ --check 通过：种子与四版 Word 一致（白名单除外）")
     return 0

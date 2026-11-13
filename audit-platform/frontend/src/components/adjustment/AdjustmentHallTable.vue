@@ -251,9 +251,11 @@ function moreItems(row: HallEntry & { origin?: string | null }) {
   const items: Array<{ action: string; label: string; divided?: boolean }> = []
   if (row.adjustment_type === 'aje' && row.review_status === S.APPROVED && props.perms.edit) {
     items.push({ action: 'treatment', label: '最终处理与历史' })
-    if (row.treatment?.status === 'client_booked' || row.client_booking?.status === 'booked') {
+    // 标记 / 撤销客户已入账是写操作：项目归档后不出（与建议条同一判定：可写 × 编辑）
+    const booked = row.treatment?.status === 'client_booked' || row.client_booking?.status === 'booked'
+    if (props.perms.writable && booked) {
       items.push({ action: 'client-booking-revoke', label: '撤销客户已入账' })
-    } else if (row.treatment?.status !== 'unadjusted_misstatement') {
+    } else if (props.perms.writable && !booked && row.treatment?.status !== 'unadjusted_misstatement') {
       items.push({ action: 'client-booking', label: '标记客户已入账' })
     }
   }

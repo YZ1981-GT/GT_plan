@@ -351,3 +351,36 @@ describe('把报表预设落入项目（替代 404 的自动生成）', () => {
     w.unmount()
   })
 })
+
+/**
+ * 异步宿主（ThreeColumnLayout 的 useMountOnFirstOpen + 异步组件）在模块下载完成时弹窗已是打开态：
+ * 打开流程必须在挂载时就跑（watch immediate）。原写法把 immediate 监听注册在 <script setup> 中段，
+ * 首轮同步执行读到尚未初始化的 activeCategory（暂时性死区）⇒ 打开流程整段中断、什么都不加载。
+ * 判据用只有打开流程才发的请求（报表类型列表），并要求挂载期间没有任何未处理错误。
+ */
+describe('挂载即打开：首次打开也完整加载（异步宿主模块晚到）', () => {
+  beforeEach(resetMocks)
+  const typeCalls = () => get.mock.calls.filter(([url]) => String(url) === '/api/report-config/types')
+
+  it('以打开态挂载：打开流程完整跑一次，没有未处理错误', async () => {
+    const errorHandler = vi.fn()
+    const w = shallowMount(FormulaManagerDialog, {
+      props: { modelValue: true, rows: [], scope: 'report', projectId: 'project-1', year: 2025, templateType: 'soe' },
+      global: { plugins: [ElementPlus], renderStubDefaultSlot: false, config: { errorHandler } },
+    })
+    await flushPromises()
+    expect(errorHandler).not.toHaveBeenCalled()
+    expect(typeCalls()).toHaveLength(1)
+    w.unmount()
+  })
+
+  it('以关闭态挂载不加载；之后打开走同一流程且只跑一次', async () => {
+    const w = create({ modelValue: false })
+    await flushPromises()
+    expect(typeCalls()).toHaveLength(0)
+    await w.setProps({ modelValue: true })
+    await flushPromises()
+    expect(typeCalls()).toHaveLength(1)
+    w.unmount()
+  })
+})

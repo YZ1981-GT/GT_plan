@@ -57,6 +57,22 @@ def _result_scalars(objs):
     return res
 
 
+def _rowcount(n: int):
+    """清过期走统一入口 ``stale_state.clear_note_stale``（一条 UPDATE；spec formula-writer-ownership-and-stale R2）。"""
+    res = MagicMock()
+    res.rowcount = n
+    return res
+
+
+def _cleared_sections(db) -> list[list[str]]:
+    """最后一次 execute 是清过期 UPDATE（is_stale=False、来源清空）⇒ 返回它清的章节。"""
+    stmt = db.execute.await_args_list[-1].args[0]
+    params = stmt.compile().params
+    assert str(stmt).startswith("UPDATE disclosure_notes")
+    assert params["is_stale"] is False and params["stale_source"] is None
+    return [list(v) for k, v in params.items() if k.startswith("note_section")]
+
+
 def _report_row(row_code, amount):
     r = MagicMock()
     r.row_code = row_code
@@ -213,6 +229,7 @@ class TestSyncRealStats:
         db.execute.side_effect = [
             _result_scalars([_report_row("BS-015", "500")]),
             _result_scalars([note]),
+            _rowcount(1),
         ]
         svc = ReportNoteSyncService(db)
         with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
@@ -224,7 +241,7 @@ class TestSyncRealStats:
         assert result["synced_sections"] == 1
         assert result["skipped_sections"] == 0
         assert result["validation_run"] is True
-        assert note.is_stale is False
+        assert _cleared_sections(db) == [[note.note_section]], "同步过的节经统一入口清过期"
 
     @pytest.mark.asyncio
     async def test_report_row_without_linkage_counts_skipped(self):
@@ -337,14 +354,15 @@ class TestSyncStubZeroRegression:
         db.execute.side_effect = [
             _result_scalars([_report_row("BS-015", "500")]),
             _result_scalars([note]),
+            _rowcount(1),
         ]
         svc = ReportNoteSyncService(db)
         with patch(_FLAG, new_callable=AsyncMock, return_value=False):
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
 
-        # 关闭时不写报表金额（table_data 不变）
+        # 关闭时不写报表金额（table_data 不变），只清过期（经统一入口）
         assert note.table_data == original_td
-        assert note.is_stale is False
+        assert _cleared_sections(db) == [[note.note_section]]
         # 3-key stub 返回，硬编码统计
         assert result == {
             "synced_sections": 1,
@@ -375,10 +393,12 @@ class TestSyncStubZeroRegression:
         db.execute.side_effect = [
             _result_scalars([_report_row("BS-015", "500")]),
             _result_scalars([note]),
+            _rowcount(1),
         ]
         svc = ReportNoteSyncService(db)
         with patch(_FLAG, new_callable=AsyncMock, return_value=False):
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
         assert note.table_data == original_td
+        assert _cleared_sections(db) == [[note.note_section]]
         assert "cells_updated" not in result
         assert result["validation_run"] is True

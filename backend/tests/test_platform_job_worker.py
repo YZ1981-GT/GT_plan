@@ -1,6 +1,7 @@
 """通用耐久 worker 的 claim、执行和围栏终态。"""
 from __future__ import annotations
 
+import asyncio
 import uuid
 from unittest.mock import AsyncMock, patch
 
@@ -84,3 +85,15 @@ async def test_missing_executor_is_terminal_not_infinite_retry(monkeypatch):
 
     assert finish.call_args.kwargs["retryable"] is False
     assert finish.call_args.kwargs["error_code"] == "executor_missing"
+
+
+@pytest.mark.asyncio
+async def test_worker_run_registers_all_builtin_durable_executors():
+    """startup worker 必须导入 B3/B4 executor，不能只在路由被访问后才注册。"""
+    from app.services.platform_job_registry import registered_operations
+
+    stop = asyncio.Event()
+    stop.set()
+    await worker.run(stop)
+    operations = set(registered_operations())
+    assert {'bulk_tab_import', 'workpaper_pack_export', 'formula_push', 'consol_note_reaggregate'} <= operations

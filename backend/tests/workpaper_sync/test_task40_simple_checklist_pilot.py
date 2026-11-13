@@ -54,7 +54,8 @@ from app.services.workpaper_sync.contracts import (  # noqa: E402
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     Capability,
-    capability_of,
+    effective_capability,
+    extract_entry_profile,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -98,6 +99,10 @@ def contract() -> Any:
 
 
 class TestFrozenEntrySelection:
+    @pytest.mark.xfail(strict=True, raises=P.PilotSelectionError, reason=(
+        "2026-11-01 起 reviewed wp_code 裁决（Task 76，真库 wp_index 证据）把 B60 bundle 判为 ['B60-1']，冻结 "
+        "matcher 域 {B60, B60B} 已失效；entry 现为 pending，随 6.3 对它的终裁重判（tasks.md 1.1）。XPASS 即红 ⇒ 删标记"
+    ))
     def test_entry_is_frozen_from_the_source_backed_manifest(
         self, manifest: dict[str, Any]
     ) -> None:
@@ -168,10 +173,15 @@ class TestFrozenEntrySelection:
     def test_selection_fails_closed_when_no_template_wp_code_matches(
         self, manifest: dict[str, Any]
     ) -> None:
-        """索引里没有该码 ⇒ 只能回退到父表 ⇒ 禁止发布契约。"""
+        """索引里没有该码 ⇒ 只能回退到父表 ⇒ 禁止发布契约。先把 wp_code 对齐冻结 matcher 域：本条判零回退
+        分支，不能被上游「wp_code 漂移」检查（另有用例守；真实 manifest 现就漂着，见 xfail）抢先拦下。"""
+        patched = json.loads(json.dumps(manifest))
+        for item in patched["entries"]:
+            if item["entry_id"] == P.PILOT_ENTRY_ID:
+                item["wp_match"]["wp_code_patterns"] = sorted(P.PILOT_WP_CODES)
         with pytest.raises(P.PilotSelectionError, match="回退到父级程序表"):
             P.assert_pilot_entry_selectable(
-                manifest=manifest, template_wp_codes=["ZZZ-NOPE"]
+                manifest=patched, template_wp_codes=["ZZZ-NOPE"]
             )
 
     def test_selection_fails_closed_on_parent_duplicate(
@@ -531,6 +541,30 @@ PROPERTY_ORACLE_LANDING: dict[str, tuple[str, ...]] = {
 }
 
 
+def _pilot_required_set(capability: Capability | None = None) -> Any:
+    """本 pilot 的 required scenario set。
+
+    🔴 2026-11-04：5.1 把 B60 的 `single_onlyoffice` 裁决退回 Task 1.1 schema 的 pending
+    （`capability=null`，`capability_target=single_onlyoffice`，阻断于 HTML 对照调查）。
+    manifest 不再给出已裁决的 capability，`derive_for_manifest_entry()` 对它 fail closed ——
+    生产上记为 unverified，口径正确。本节说的是**本 pilot 设计**的 oracle 落点，所以按
+    manifest 自己声明的 `capability_target` 推导（可用 ``capability`` 覆盖，用于证明换成
+    bidirectional 结论不变）。前提写成断言：B60 一旦不再 pending，这里先红，提醒改回
+    `derive_for_manifest_entry()`。
+    """
+    from app.services.workpaper_sync.evidence import derive_required_scenarios
+
+    entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
+    assert effective_capability(entry) is None, (
+        "B60 已不是 pending —— 本 helper 的前提变了，改回 derive_for_manifest_entry()"
+    )
+    return derive_required_scenarios(
+        profile=extract_entry_profile(entry),
+        capability=capability or Capability(entry["capability_target"]),
+        authority_model=P.AUTHORITY_MODEL,
+    )
+
+
 class TestPropertyOracleLanding:
     def test_every_property_lands_on_a_registered_oracle(self) -> None:
         """八条 Property 各有 oracle，**且**该 oracle 真的在本 entry 的 required set 里。
@@ -538,14 +572,7 @@ class TestPropertyOracleLanding:
         只查「oracle 登记表里有这个 id」不够：一条全平台登记、但本 pilot 的 required set
         里根本不包含的场景，等于这条 Property 在本 entry 上从未被跑到（分母不含它）。
         """
-        from app.services.workpaper_sync.evidence import derive_for_manifest_entry
-
-        entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
-        required = set(
-            derive_for_manifest_entry(
-                entry, authority_model=P.AUTHORITY_MODEL
-            ).scenario_ids
-        )
+        required = set(_pilot_required_set().scenario_ids)
         assert len(PROPERTY_ORACLE_LANDING) == 8, sorted(PROPERTY_ORACLE_LANDING)
         for prop, scenarios in sorted(PROPERTY_ORACLE_LANDING.items()):
             assert scenarios, prop
@@ -555,21 +582,17 @@ class TestPropertyOracleLanding:
 
     def test_field_level_properties_are_not_substituted_away(self) -> None:
         """`projection_contract` ⇒ AC 12.12 的字段级两场景**不得**被替换。"""
-        from app.services.workpaper_sync.evidence import derive_for_manifest_entry
-
-        entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
-        required = derive_for_manifest_entry(entry, authority_model=P.AUTHORITY_MODEL)
-        ids = set(required.scenario_ids)
+        ids = set(_pilot_required_set().scenario_ids)
         assert "different_field_merge" in ids
         assert "same_field_conflict_resolve" in ids
         assert "authoritative_revision_conflict" not in ids
         assert "no_silent_overwrite" not in ids
 
     def test_required_scenario_set_is_the_shared_editable_standard(self) -> None:
-        from app.services.workpaper_sync.evidence import derive_for_manifest_entry
-
-        entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
-        required = derive_for_manifest_entry(entry, authority_model=P.AUTHORITY_MODEL)
+        required = _pilot_required_set()
+        # `_pilot_required_set` 按 capability_target 推导的理由：editable + shared 的 profile
+        # 下 target 与 bidirectional 推出的集合相同 —— 这里实算，不靠 docstring 说。
+        assert required.scenario_ids == _pilot_required_set(Capability.bidirectional).scenario_ids
         assert required.editability.value == "editable"
         assert required.room_model.value == "shared"
         assert required.close_required is True
@@ -620,14 +643,21 @@ class TestOrderingGate:
         Task 75 已交付该 finalize 缺的公共观测器；今天挡住它的是**供给**（approved
         bundle / published representation / entry_state 三表实测 0 行，生产侧 provisioner
         是 Task 76 的交付）。所以
-        manifest capability 必须仍是 `single_onlyoffice` —— 提前改成 bidirectional
-        就是跳过顺序（manifest 宣称双向，registry 里一个 adapter 都没有）。
+        manifest capability 必须仍未启用 —— 提前改成 bidirectional 就是跳过顺序（manifest
+        宣称双向，registry 里一个 adapter 都没有）。
+
+        🔴 2026-11-04：B60 已由 `single_onlyoffice` 退回 pending（见 `_pilot_required_set`）。
+        「未启用」的不变式不变，pending 同样是未启用；而且必须以 `PilotSelectionError` 拒绝 ——
+        原实现直调 `capability_of()`，pending 让它抛「capability 未登记」，
+        `manifest_capability_enabled()` 只认窄类型，于是每次冷注册都记一次 pilot attach 失败。
         """
         entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
-        assert capability_of(entry) is Capability.single_onlyoffice
+        assert effective_capability(entry) is None
+        assert entry["capability_target"] == Capability.single_onlyoffice.value
         assert entry["adapter_id"] is None
-        with pytest.raises(P.PilotSelectionError, match="manifest capability"):
+        with pytest.raises(P.PilotSelectionError, match="manifest capability=pending"):
             P.assert_manifest_capability_enabled()
+        assert P.manifest_capability_enabled() is False
 
     def test_published_identity_observer_debt_is_cleared_by_task75(self) -> None:
         """Task 75 已交付公共观测器 ⇒ 本 pilot 的那条欠账登记必须**已删**且函数是真实现。
@@ -701,7 +731,30 @@ class TestOrderingGate:
 
         from app.services.workpaper_sync.entry_profile import EntryProfileDriftError
 
-        registry = RG.WorkpaperSyncAdapterRegistry(manifest=load_entry_manifest())
+        def attempt(manifest: Any) -> None:
+            registry = RG.WorkpaperSyncAdapterRegistry(manifest=manifest)
+            P.register_pilot_adapter(
+                registry,
+                adapter=_Adapter(),
+                bundle=object(),
+                descriptor=_descriptor_facts(),
+                room=_room_facts(),
+                contract=P.load_pilot_contract(),
+            )
+
+        # ① 今天的真实 manifest：B60 是 pending ⇒ 注册在 profile 判据之前就被拒，理由是
+        #    「未裁决」（与注册计划同一口径），而不是「capability 未登记」。
+        real = load_entry_manifest()
+        with pytest.raises(RG.RegistrationError, match="未裁决入口不得注册 adapter"):
+            attempt(real)
+        # ② 判定顺序（③ profile 先于 ④ 伪双向）仍须可测：把 capability 补回 Wave 6 当时的
+        #    `single_onlyoffice`，RG-16 必须先于 RG-18 打红。
+        patched = json.loads(json.dumps(real))
+        for item in patched["entries"]:
+            if item["entry_id"] == P.PILOT_ENTRY_ID:
+                item["capability"] = Capability.single_onlyoffice.value
+                item["adjudication_state"] = "terminal"
+        registry = RG.WorkpaperSyncAdapterRegistry(manifest=patched)
         with pytest.raises(EntryProfileDriftError, match="descriptor mode=bidirectional"):
             P.register_pilot_adapter(
                 registry,

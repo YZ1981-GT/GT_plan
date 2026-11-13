@@ -20,7 +20,7 @@ export const FUNCTIONS: readonly FunctionSpec[] = [
   { name: 'AUX', arityMin: 2, arityMax: 4, engines: ['l1'], category: '取数', syntax: 'AUX(\'科目\',\'维度\'[,\'辅助项\'],\'列名\')', description: '辅助核算取值' },
   { name: 'NOTE', arityMin: 2, arityMax: 3, engines: ['l1', 'note'], category: '取数', syntax: 'NOTE(\'章节\',\'行\'[,\'列\'])', description: '附注数据取值' },
   { name: 'WP', arityMin: 2, arityMax: 3, engines: ['l1', 'note'], category: '取数', syntax: 'WP(\'底稿编码\',\'列名|单元格\') / WP(\'底稿\',\'表\',\'锚点\')', description: '底稿数据取值' },
-  { name: 'ADJ', arityMin: 1, arityMax: 2, engines: ['l1'], category: '取数', syntax: 'ADJ(\'科目编码\'[,\'aje_net|rje_net\'])', description: '调整额实时汇总（净额）' },
+  { name: 'ADJ', arityMin: 2, arityMax: 2, engines: ['l1'], category: '取数', syntax: 'ADJ(\'科目编码\',\'aje_net|rje_net\')', description: '调整额实时汇总（净额）' },
   { name: 'ROW', arityMin: 1, arityMax: 1, engines: ['l1'], category: '引用', syntax: 'ROW(\'行次编码\')', description: '引用其他行次' },
   { name: 'SUM_ROW', arityMin: 2, arityMax: 2, engines: ['l1'], category: '引用', syntax: 'SUM_ROW(\'起始\',\'结束\')', description: '范围行次求和' },
   { name: 'REPORT', arityMin: 1, arityMax: 2, engines: ['l1', 'note'], category: '引用', syntax: 'REPORT(\'行次编码\'[,\'期间\'])', description: '跨报表引用' },
@@ -52,7 +52,7 @@ export const FUNCTION_NAMES_BY_ENGINE: Record<FormulaEngine, ReadonlySet<string>
 export const ARITY_BY_ENGINE: Record<FormulaEngine, Record<string, [number, number | null]>> = {
   l1: {
     ABS: [1, 1],
-    ADJ: [1, 2],
+    ADJ: [2, 2],
     AUX: [2, 4],
     COUNT_LEDGER: [1, 2],
     IF: [3, 3],
@@ -108,7 +108,7 @@ export const OPERATORS_BY_ENGINE: Record<FormulaEngine, ReadonlySet<string>> = {
 export const FUNCTION_HINTS_BY_ENGINE: Record<FormulaEngine, readonly { name: string; minArgs: number; maxArgs: number | null; description: string }[]> = {
   l1: [
     { name: 'ABS', minArgs: 1, maxArgs: 1, description: "ABS(值)" },
-    { name: 'ADJ', minArgs: 1, maxArgs: 2, description: "ADJ('科目编码'[,'aje_net|rje_net'])" },
+    { name: 'ADJ', minArgs: 2, maxArgs: 2, description: "ADJ('科目编码','aje_net|rje_net')" },
     { name: 'AUX', minArgs: 2, maxArgs: 4, description: "AUX('科目','维度'[,'辅助项'],'列名')" },
     { name: 'COUNT_LEDGER', minArgs: 1, maxArgs: 2, description: "COUNT_LEDGER('科目'[,'范围'])" },
     { name: 'IF', minArgs: 3, maxArgs: 3, description: "IF(条件, 真值, 假值)" },

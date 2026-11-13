@@ -1080,8 +1080,15 @@ class TestStructuralZerosPhase2:
     def test_sync_capability_notice_in_wired_entries(
         self, b_entries: list[dict]
     ) -> None:
-        """BC-12: GtEntrySyncCapabilityNotice 仅在已改线 entry 中。"""
-        hits = 0
+        """BC-12（2026-11-04 按 umbrella 3.5 改判）：B 域 10 个宿主都挂 notice。
+
+        原判据「notice 仅在已改线 entry 中（≤5）」写于只有 B22 四条改线时；之后 B23 / B50
+        先接了同步能力单源（基线即 6 条、本判据已红），umbrella
+        workpaper-html-onlyoffice-bidirectional-writeback-closure 3.5 再把 B1×3 / B14 的模式开关
+        接到同一单源。未改线 entry 的 notice 由单源如实显示「暂不支持双向」，不再是「声称已改线」，
+        所以改成逐条点名：10 条全挂，少一条即红（那条的模式开关又绕开了单源）。
+        """
+        with_notice: set[str] = set()
         for e in b_entries:
             hp = _host_path(e)
             if hp is None or not hp.exists():
@@ -1090,10 +1097,12 @@ class TestStructuralZerosPhase2:
                 encoding="utf-8", errors="replace"
             )
             if "GtEntrySyncCapabilityNotice" in text:
-                hits += 1
-        # 已改线的 entry（B22A/B22B-CM/B22B-DE/B22C）有 notice
-        # 未改线的（B50 + 其他 5 条）无 notice
-        assert hits <= 5, f"notice hits={hits}"
+                with_notice.add(e["entry_id"])
+        expected = {e["entry_id"] for e in b_entries}
+        assert len(expected) == 10, sorted(expected)
+        assert with_notice == expected, (
+            f"缺 notice：{sorted(expected - with_notice)}；多出：{sorted(with_notice - expected)}"
+        )
 
     def test_remove_row_nonzero(
         self, b_prod_files: list[Path]

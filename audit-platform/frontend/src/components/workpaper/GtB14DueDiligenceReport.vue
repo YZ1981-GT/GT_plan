@@ -9,8 +9,15 @@
   <div class="gt-b14">
     <!-- Toolbar -->
     <div class="gt-b14__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <!-- 模式开关可见性来自同步能力单源；变体切换（标准版/简化版）是业务开关，不受它约束 -->
+      <el-segmented
+        v-if="entrySync.presentation.value.showModeSwitch"
+        v-model="mode"
+        :options="modeOptions"
+        size="small"
+      />
       <el-segmented v-model="variantLabel" :options="variantOptions" size="small" class="gt-b14__variant" />
+      <GtEntrySyncCapabilityNotice :entry-id="B14_SYNC_ENTRY_ID" />
       <span class="gt-b14__save-status">
         <template v-if="saveStatus === 'saving'">
           <el-icon class="is-loading"><Loading /></el-icon> 保存中...
@@ -230,6 +237,8 @@ import { useB14Navigation } from './composables/useB14Navigation'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import GtReviewTrigger from './GtReviewTrigger.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
@@ -251,6 +260,14 @@ const mode = ref('结构化视图')
 const modeOptions = ref(['结构化视图', '在线编辑'])
 const variantOptions = ['标准版', '简化版']
 const variantLabel = ref('标准版')
+
+/** 本宿主的同步 entry 身份（开关与 notice 共用这一个常量）。 */
+const B14_SYNC_ENTRY_ID = 'xlsx/gt-b14-due-diligence-report'
+const entrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => B14_SYNC_ENTRY_ID,
+})
 
 // ─── Composable ───
 const {
@@ -484,6 +501,11 @@ async function loadCrossRefs() {
 
 // Flush before switching to OO
 watch(mode, async (newMode, oldMode) => {
+  // 单源不放行在线编辑时退回结构化视图（开关隐藏后仍可能被程序化地切过去）
+  if (newMode === '在线编辑' && !entrySync.presentation.value.canSwitchToOnlyOffice) {
+    mode.value = '结构化视图'
+    return
+  }
   if (oldMode === '结构化视图' && newMode === '在线编辑') {
     await flushPendingSaves()
   }

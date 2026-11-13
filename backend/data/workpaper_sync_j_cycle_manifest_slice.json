@@ -249,7 +249,7 @@
       "ui_toolbar_gate_note": "本宿主的工具栏门控是 `v-if=\"!isLoading && isHtmlSheet\"`（#L9，isHtmlSheet = currentSheet !== 'J1-index'，#L168）。🔴 工具栏内的 `el-segmented`（#L10）**没有二级门控** —— 与 I2 同型缺陷（其余 5 条 I entry 有 `v-if=\"dualMode.isOoAvailable.value\"`）：OO 探测失败时 `仅结构化视图` 的 el-tag 会出现（#L14），但切换器本身照旧可点。共享基类 switchMode 里有 `if (target === 'onlyoffice' && !ooAvailable.value) return`（#L48）做了运行时兜底，所以点了不会真切过去 —— 于是表现成「点了没反应」，比 AC 1.5 要求的「不显示不可兑现的切换按钮」更差（无声失败）。登记为 BP-10。",
       "ui_toolbar_gate_second_level": null,
       "extra_unrelated_segmented_sites": [
-        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L27",
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L28",
         "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L391"
       ],
       "extra_unrelated_segmented_note": "🔴 全 J 域 `el-segmented` 共 3 处，只有宿主 #L10 那处是模式切换器；J1TabGeneralCheck.vue#L27 与 J2TabAdjudication.vue#L386 是 Tab 内部的分段控件。全文件 grep 会把它们误判成第二个模式切换器 ⇒ 判据必须先按 ui_toolbar_gate 声明的锚点截出工具栏区块再看。",
@@ -275,8 +275,8 @@
           "J1-8-post-period"
         ],
         "own_transport_key_sources": [
-          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L335",
-          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L478"
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L339",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L503"
         ]
       }
     ]
@@ -450,7 +450,7 @@
           "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L250",
           "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureListed.vue#L292",
           "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureSoe.vue#L271",
-          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L480",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L505",
           "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabNonMonetaryCheck.vue#L259",
           "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabSeveranceCheck.vue#L319"
         ],
@@ -649,9 +649,9 @@
       "statement_position_consumers": 29,
       "statement_position_consumer_sites": [
         "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue#L52",
-        "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L29",
-        "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L32",
-        "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L24",
+        "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L28",
+        "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L31",
+        "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L23",
         "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue#L30",
         "audit-platform/frontend/src/components/workpaper/__tests__/b22bControlMatrix.spec.ts#L40",
         "audit-platform/frontend/src/components/workpaper/__tests__/useB22BControlMatrix.spec.ts#L32",
@@ -900,7 +900,7 @@
         "owner_module": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue",
         "owner_constant": "ITEM_ID",
         "owner_constant_value": "J1-8-voucher-check",
-        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L335",
+        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L339",
         "declaration_kind": "component_local_constant_plus_one_inline_literal",
         "derivation": "一个常量 + 一个内联字面量（#L467 'J1-8-post-period'）",
         "keys": [
@@ -911,7 +911,7 @@
         "identity_field": null,
         "identity_field_note": "凭证抽查行与期后事项行都不带独立身份字段（整表 JSON 数组按位置存），但**没有跨表引用**这些行 ⇒ 不构成 forbidden_identity_kinds 意义上的缺陷；登记在此以免后来者以为漏查。",
         "persisted_via": "组件自己的 http.put（JD-3 的第二写路径）",
-        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L480",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L505",
         "consumed_by": [
           "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L65"
         ],
@@ -1418,7 +1418,7 @@
         "row_identity": {
           "kind": "positional_array_order_no_identity_field",
           "identity_field": null,
-          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L475",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L500",
           "why_not_a_forbidden_kind": "整表 JSON 数组按位置存且**没有任何跨表引用**这些行（无 ref_index chip、无附注同步、无 TB 回写）⇒ 位置即语义、不存在「身份串行」的后果。写下来是为了让判据分得开：把它算成 forbidden 会逼出一个没有实际风险的假缺陷；不写下来则后来者会以为漏查。"
         }
       },
@@ -1432,7 +1432,7 @@
         "row_identity": {
           "kind": "positional_array_order_no_identity_field",
           "identity_field": null,
-          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L478",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L503",
           "why_not_a_forbidden_kind": "同 J1-8-voucher-check。"
         }
       }
@@ -1656,7 +1656,7 @@
         "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L213",
         "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue#L283",
         "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L95",
-        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L480"
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L505"
       ]
     },
     {

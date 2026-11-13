@@ -351,7 +351,7 @@ async function confirmUnreviewed(): Promise<boolean> {
   try {
     await ElMessageBox.confirm(
       // 弹窗挂在 body 下、不带本组件 scopeId：样式只能内联
-      h('div', { style: 'white-space: pre-line; font-size: 12px; line-height: 1.7' },
+      h('div', { style: 'white-space: pre-line; font-size: var(--gt-display-font-size); line-height: 1.7' },
         `${text.join('\n')}\n\n这些行按建议对应，还没有人工确认。按建议映射？`),
       `${rows.length} 行待确认`,
       { confirmButtonText: '按建议映射', cancelButtonText: '返回检查', type: 'warning' },

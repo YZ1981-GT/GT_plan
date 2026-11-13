@@ -468,6 +468,22 @@ function failHost(stage: string, error: unknown, reportToBridge: boolean): void 
 
 // ── 挂载 / 销毁
 
+/**
+ * 被服务端判定「身份已失效」的挂载身份（`mountKeyOf` 的值）。
+ *
+ * 🔴 2026-11-05 真实缺陷：confirm 回 409 `launch_descriptor_stale_identity` 之后桥把
+ * mode 打回 html、宿主销毁编辑器并把 `mountedKey` 清成 null，但 `props.descriptor`
+ * **还是那个陈旧 descriptor**（新的要等页面 materialize 出来才下发）。于是用户/页面
+ * 再次进入 OO 模式时，下面那个 watch 只比 `mountedKey === key`（已是 null）就又把
+ * **同一个已被拒的身份**挂了一次：白闪一个编辑器、多打一次必然再 409 的 confirm、
+ * 还给桥上报了一次 `notifyEditorMounted`（代际已死）。
+ *
+ * 身份失效是不可逆的 —— 同一 key 再挂一万次也只会再 409。所以记住它并拒绝重挂，
+ * 等页面 materialize 出新代际（key 变了）自然放行。判据用桥自己的
+ * `lastError.staleIdentity`（`classifySyncFailure` 的单一真源），宿主不自己认码。
+ */
+let rejectedMountKey: string | null = null
+
 function destroyEditor(): void {
   const instance = editorInstance
   editorInstance = null
@@ -564,6 +580,11 @@ watch(
     const key = mountKeyOf(descriptor)
     if (mountedKey === key) return
     destroyEditor()
+    if (key === rejectedMountKey) {
+      // 身份已被服务端拒过：不重挂（只会再 409）。等新代际的 descriptor 下发。
+      // 桥的 sticky error 仍在，状态条照旧把原因显示出来 ⇒ 不是静默什么都不做。
+      return
+    }
     void mountEditor(descriptor)
   },
   { immediate: true },
@@ -587,6 +608,10 @@ async function onDocumentReady(seq: number): Promise<void> {
   } catch (error) {
     // 桥已经把它记成 sticky error 并把 mode 打回 html —— 不再重复上报，
     // 但宿主必须自己也可见（AC 11.5「fail visible」）。
+    if (props.bridge.lastError.value?.staleIdentity === true) {
+      // 身份类失败不可逆：记住这个挂载身份，别在 mode 再回 oo 时重挂同一个。
+      rejectedMountKey = mountKeyOf(descriptor)
+    }
     failHost('confirm_descriptor', error, false)
   }
 }

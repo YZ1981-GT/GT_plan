@@ -5574,21 +5574,6 @@
           "fields": [
             {
               "cell": {
-                "column": "A",
-                "row_from": "row_identity"
-              },
-              "column_key": "group_label",
-              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!A11",
-              "header_text": "分组",
-              "json_pointer": "/rows/{row_uuid}/groupLabel",
-              "mode": "editable",
-              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!A13",
-              "stable_field_key": "d4_32_groups/{row_uuid}/group_label",
-              "store_item_id": "D4-32-groups",
-              "value_type": "text"
-            },
-            {
-              "cell": {
                 "column": "B",
                 "row_from": "row_identity"
               },

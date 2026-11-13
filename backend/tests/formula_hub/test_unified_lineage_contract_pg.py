@@ -65,51 +65,66 @@ async def test_heping_d2_upstream_equals_direct_trace_upstream(pg_tx):
     UnifiedLineageResponse.model_validate(result)
 
 
-async def test_tb_row_and_adjustment_have_no_trace_sources_but_keep_exact_attachment_type(pg_tx):
-    """两类对象不委托 wp/version 溯源；附件仍按请求 object_type 原值查询。"""
-    project_id = await make_project(pg_tx, "lineage_empty_sources")
+async def _seed_without_trace_sources(pg_tx, object_type: str, version_type: str):
+    """一个【测试】项目 + 按 object_type 原值登记的附件 + 同一引用的 wp_cell 附件与版本链反例。"""
+    project_id = await make_project(pg_tx, f"lineage_empty_{object_type}")
     attachment_id = await make_attachment(pg_tx, project_id)
-    cases = {
-        "tb_row": (uuid.uuid4(), "trial_balance"),
-        "adjustment": (uuid.uuid4(), "adjustment"),
-    }
-    expected_links: dict[str, uuid.UUID] = {}
-    for object_type, (object_id, version_type) in cases.items():
-        expected_links[object_type] = await insert_lineage(
-            pg_tx,
-            attachment_id=attachment_id,
-            target_type=object_type,
-            target_ref=str(object_id),
-            project_id=project_id,
-        )
-        await insert_lineage(
-            pg_tx,
-            attachment_id=attachment_id,
-            target_type="wp_cell",
-            target_ref=str(object_id),
-            project_id=project_id,
-        )
-        pg_tx.add(VersionLineStamp(
-            project_id=project_id,
-            object_type=version_type,
-            object_id=object_id,
-            version_no=1,
-            trace_id=f"fh-task27-{object_type}",
-        ))
+    object_id = uuid.uuid4()
+    expected_link = await insert_lineage(
+        pg_tx, attachment_id=attachment_id, target_type=object_type, target_ref=str(object_id), project_id=project_id,
+    )
+    await insert_lineage(
+        pg_tx, attachment_id=attachment_id, target_type="wp_cell", target_ref=str(object_id), project_id=project_id,
+    )
+    pg_tx.add(VersionLineStamp(
+        project_id=project_id, object_type=version_type, object_id=object_id, version_no=1,
+        trace_id=f"fh-task27-{object_type}",
+    ))
     await pg_tx.flush()
+    return project_id, str(object_id), expected_link
 
+
+def _assert_exact_attachments(result, object_type: str, expected_link) -> None:
+    assert {item["id"] for item in result["attachments"]} == {str(expected_link)}
+    assert {item["target_type"] for item in result["attachments"]} == {object_type}
+
+
+async def test_adjustment_has_no_trace_sources_but_keeps_exact_attachment_type(pg_tx):
+    """adjustment 不委托 wp/version 溯源；附件仍按请求 object_type 原值查询。"""
+    project_id, object_id, link = await _seed_without_trace_sources(pg_tx, "adjustment", "adjustment")
+    result = await UnifiedLineageService(pg_tx).query_lineage(project_id, "adjustment", object_id, direction="both")
+    assert result["upstream"] == []
+    assert result["downstream"] == [], "adjustment 不得读取已存在的版本链反例"
+    assert result["partial"] is False
+    assert result["errors"] == []
+    _assert_exact_attachments(result, "adjustment", link)
+    UnifiedLineageResponse.model_validate(result)
+
+
+async def test_tb_row_has_own_source_without_wp_trace_and_keeps_exact_attachment_type(pg_tx):
+    """tb_row 不委托 wp/version 溯源，另有试算表行子源（spec voucher-workflow-linkage-lineage-closure R8.1）：
+
+    - 项目没有审计年度：子源报 ``TB_LINEAGE_YEAR_REQUIRED``（partial），附件照常返回（R8.3）；
+    - 给了年度、本年度试算表没有这个科目：子源返回空、不报 partial。
+    """
+    project_id, object_id, link = await _seed_without_trace_sources(pg_tx, "tb_row", "trial_balance")
     service = UnifiedLineageService(pg_tx)
-    for object_type, (object_id, _version_type) in cases.items():
-        result = await service.query_lineage(
-            project_id, object_type, str(object_id), direction="both",
-        )
-        assert result["upstream"] == [], object_type
-        assert result["downstream"] == [], f"{object_type} 不得读取已存在的版本链反例"
-        assert result["partial"] is False, object_type
-        assert result["errors"] == [], object_type
-        assert {item["id"] for item in result["attachments"]} == {str(expected_links[object_type])}
-        assert {item["target_type"] for item in result["attachments"]} == {object_type}
-        UnifiedLineageResponse.model_validate(result)
+
+    no_year = await service.query_lineage(project_id, "tb_row", object_id, direction="both")
+    assert no_year["upstream"] == []
+    assert no_year["downstream"] == [], "tb_row 不得读取已存在的版本链反例"
+    assert no_year["partial"] is True
+    assert [(e["source"], e["error_code"]) for e in no_year["errors"]] == [("tb_row", "TB_LINEAGE_YEAR_REQUIRED")]
+    _assert_exact_attachments(no_year, "tb_row", link)
+    UnifiedLineageResponse.model_validate(no_year)
+
+    with_year = await service.query_lineage(project_id, "tb_row", object_id, direction="both", year=2025)
+    assert with_year["upstream"] == []
+    assert with_year["downstream"] == []
+    assert with_year["partial"] is False
+    assert with_year["errors"] == []
+    _assert_exact_attachments(with_year, "tb_row", link)
+    UnifiedLineageResponse.model_validate(with_year)
 
 
 async def test_missing_note_mapping_is_normal_not_found_and_does_not_poison_attachment_source(pg_tx):

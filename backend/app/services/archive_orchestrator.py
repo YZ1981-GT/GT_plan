@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.archive_models import ArchiveJob
+from app.services.acnr.project_registry_lock import RegistryLockError
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,11 @@ class ArchiveOrchestrator:
                     "status": "failed", "finished_at": job.finished_at.isoformat(), "problems": problems[:500],
                 })
                 await self.db.flush()
+                # 目录版本锁失败既要保留 durable job 的失败记录，也要让 HTTP 层走 ACNR 稳定 409，
+                # 不能和普通异步步骤失败一样变成「200 + failed job」。路由会先 commit 本失败记录
+                # 再重抛；advisory lock 探针本身在 SAVEPOINT 内，SQL 失败也不会污染外层事务。
+                if isinstance(exc, RegistryLockError):
+                    raise
                 return job
             job.last_succeeded_section = section_name  # 仅供界面展示；续跑以 section_progress 为准
             self._set_progress(job, section_name, {

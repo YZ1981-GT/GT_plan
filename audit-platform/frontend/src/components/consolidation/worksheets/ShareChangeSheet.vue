@@ -669,8 +669,8 @@ async function onFileSelected(e: Event) {
 }
 
 // ─── 样式函数 ────────────────────────────────────────────────────────────────
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '2px 0' }
-const cellStyle = { padding: '2px 4px', fontSize: '11px' }
+const headerStyle = { background: '#f0edf5', fontSize: 'var(--gt-display-font-size)', color: '#333', padding: '2px 0' }
+const cellStyle = { padding: '2px 4px', fontSize: 'var(--gt-display-font-size)' }
 function naRowClass({ row }: any) { return row.isHeader ? 'sc-row-header' : row.bold ? 'sc-row-bold' : '' }
 function simRowClass({ row }: any) {
   if (row.isSection) return 'sc-row-section'

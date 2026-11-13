@@ -91,6 +91,7 @@ import {
   stepStatusLabel,
   stepStatusType,
 } from '@/components/consolidation/composables/consolTrialView'
+import { confirmPushDespiteConflicts } from '@/components/consolidation/composables/consolTreeConflicts'
 defineOptions({ name: 'ConsolPushPanel' })
 
 const props = withDefaults(defineProps<{
@@ -136,6 +137,7 @@ async function load() {
 
 async function pushNow() {
   if (!props.canPush || !props.projectId || !props.year || pushing.value) return
+  if (!(await confirmPushDespiteConflicts(props.projectId))) return
   pushing.value = true
   try {
     const ack = await pushConsolidation(props.projectId, props.year, 'manual')

@@ -7,7 +7,6 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,22 +15,24 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.deps import require_role
 from app.models.ai_model_options import (
-    AIAuthScheme,
     AIDeployment,
     AIMaskPolicy,
     AITrustZone,
-    OCRCapability,
     OCRProtocol,
-    ReasoningEffort,
-    default_trust_zone,
 )
-from app.models.ai_models import AIModelConfig, AIModelType, AIProvider
+from app.models.ai_models import AIModelConfig, AIModelType
 from app.models.core import User
-from app.services.ai_model_secret_service import (
-    CredentialEncryptionUnavailable,
-    apply_api_key_update,
-    has_api_key,
+# 请求体与字段规范化在服务层（R11.5，行为不变）；测试按路由模块名引用 _trust_values 等
+from app.services.ai_model_admin_fields import (  # noqa: F401
+    ModelCreate,
+    ModelUpdate,
+    _apply_ocr_update,
+    _apply_secret_or_raise,
+    _ocr_values_for_create,
+    _trust_values,
+    _validated_endpoint,
 )
+from app.services.ai_model_secret_service import has_api_key
 from app.services.audit_log_helper import append_audit_log
 from app.services.ai_model_presets import (
     PRESET_BY_KEY,
@@ -40,11 +41,7 @@ from app.services.ai_model_presets import (
 )
 from app.services.ai_service import AIService, ModelNotFoundError, ModelValidationFailure
 from app.services.model_route_status import collect_route_status
-from app.services.llm_endpoint_policy import (
-    LLMEndpointPolicyError,
-    validate_endpoint_structure,
-)
-from app.services.llm_provider_registry import provider_profile, public_provider_list
+from app.services.llm_provider_registry import public_provider_list
 from app.services.llm_runtime import (
     LLMRuntimeError,
     classify_model_deployment,
@@ -111,198 +108,6 @@ async def _audit_model_change(
             "replaced_model_ids": replaced_model_ids or [],
         },
     })
-
-
-class ModelCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    model_name: str = Field(..., min_length=1, max_length=100)
-    model_type: AIModelType
-    provider: AIProvider
-    endpoint_url: str | None = Field(default=None, max_length=500)
-    api_key: str | None = Field(default=None, max_length=2000, repr=False)
-    reasoning_effort: ReasoningEffort | None = None
-    ocr_capability: OCRCapability | None = None
-    ocr_protocol: OCRProtocol | None = None
-    api_path: str | None = Field(default=None, max_length=128)
-    auth_scheme: AIAuthScheme | None = None
-    auth_header_name: str | None = Field(default=None, max_length=128)
-    request_timeout_seconds: int | None = Field(default=None, ge=1, le=600)
-    context_window: int | None = Field(default=None, ge=1)
-    performance_notes: str | None = Field(default=None, max_length=4000)
-    trust_zone: AITrustZone | None = None
-    client_data_allowed: bool | None = None
-    mask_policy: AIMaskPolicy | None = None
-
-
-class ModelUpdate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    model_name: str | None = Field(default=None, min_length=1, max_length=100)
-    provider: AIProvider | None = None
-    endpoint_url: str | None = Field(default=None, max_length=500)
-    api_key: str | None = Field(default=None, max_length=2000, repr=False)
-    clear_api_key: bool = False
-    reasoning_effort: ReasoningEffort | None = None
-    ocr_capability: OCRCapability | None = None
-    ocr_protocol: OCRProtocol | None = None
-    api_path: str | None = Field(default=None, max_length=128)
-    auth_scheme: AIAuthScheme | None = None
-    auth_header_name: str | None = Field(default=None, max_length=128)
-    request_timeout_seconds: int | None = Field(default=None, ge=1, le=600)
-    context_window: int | None = Field(default=None, ge=1)
-    performance_notes: str | None = Field(default=None, max_length=4000)
-    trust_zone: AITrustZone | None = None
-    client_data_allowed: bool | None = None
-    mask_policy: AIMaskPolicy | None = None
-
-
-def _validated_endpoint(
-    provider: AIProvider,
-    model_type: AIModelType,
-    endpoint_url: str | None,
-    *,
-    ocr_protocol: str | None = None,
-) -> str | None:
-    profile = provider_profile(provider)
-    if model_type not in profile.supported_types:
-        raise HTTPException(422, "所选提供商不支持该模型类型")
-    if model_type == AIModelType.ocr and ocr_protocol == OCRProtocol.local.value:
-        return None
-    try:
-        return validate_endpoint_structure(endpoint_url or profile.default_endpoint, profile)
-    except LLMEndpointPolicyError as exc:
-        raise HTTPException(422, str(exc)) from exc
-
-
-def _trust_values(
-    *,
-    deployment: str,
-    preset_key: str | None,
-    trust_zone: AITrustZone | None,
-    client_data_allowed: bool | None,
-    mask_policy: AIMaskPolicy | None,
-) -> dict[str, object]:
-    """规范化信任域。位置不能由表单伪造，信任域必须与客户数据政策一致。"""
-    zone = trust_zone.value if trust_zone else default_trust_zone(
-        deployment=deployment, preset_key=preset_key
-    )
-    if deployment == AIDeployment.local.value and zone != AITrustZone.local_device.value:
-        raise HTTPException(422, "本机端点的信任域必须是‘本机设备’")
-    if deployment != AIDeployment.local.value and zone == AITrustZone.local_device.value:
-        raise HTTPException(422, "服务器端点不能标记为‘本机设备’")
-
-    allowed = client_data_allowed
-    if allowed is None:
-        allowed = zone in {
-            AITrustZone.local_device.value,
-            AITrustZone.firm_private.value,
-        }
-    policy = mask_policy.value if mask_policy else (
-        AIMaskPolicy.role_based.value
-        if zone == AITrustZone.local_device.value
-        else AIMaskPolicy.strict.value
-    )
-    if zone == AITrustZone.restricted.value and allowed:
-        raise HTTPException(422, "受限端点禁止处理客户数据")
-    if zone == AITrustZone.approved_provider.value and allowed and policy != AIMaskPolicy.strict.value:
-        raise HTTPException(422, "经批准外部服务处理客户数据时必须使用严格脱敏")
-    return {
-        "trust_zone": zone,
-        "client_data_allowed": bool(allowed),
-        "mask_policy": policy,
-    }
-
-
-def _ocr_values_for_create(body: ModelCreate) -> dict[str, object | None]:
-    if body.model_type != AIModelType.ocr:
-        return {
-            "ocr_capability": None, "ocr_protocol": None, "api_path": None,
-            "auth_scheme": None, "auth_header_name": None,
-            "request_timeout_seconds": body.request_timeout_seconds,
-        }
-    if body.provider != AIProvider.paddleocr:
-        raise HTTPException(422, "OCR 模型当前仅支持 PaddleOCR provider")
-    capability = body.ocr_capability or OCRCapability.ocr
-    protocol = body.ocr_protocol or OCRProtocol.local
-    auth = body.auth_scheme or (
-        AIAuthScheme.bearer if protocol == OCRProtocol.paddlex_json else AIAuthScheme.none
-    )
-    expected_path = "/layout-parsing" if capability == OCRCapability.layout_parsing else "/ocr"
-    api_path = body.api_path or expected_path
-    if api_path != expected_path:
-        raise HTTPException(422, f"{capability.value} 的接口路径必须是 {expected_path}")
-    if auth == AIAuthScheme.custom_header and not body.auth_header_name:
-        raise HTTPException(422, "自定义认证方式必须填写 Header 名称")
-    if protocol == OCRProtocol.paddlex_json and auth != AIAuthScheme.none and not str(body.api_key or "").strip():
-        raise HTTPException(422, "远程 OCR 认证方式要求配置 API Key")
-    return {
-        "ocr_capability": capability.value,
-        "ocr_protocol": protocol.value,
-        "api_path": api_path if protocol == OCRProtocol.paddlex_json else None,
-        "auth_scheme": auth.value,
-        "auth_header_name": body.auth_header_name,
-        "request_timeout_seconds": body.request_timeout_seconds,
-    }
-
-
-def _apply_ocr_update(
-    model: AIModelConfig,
-    body: ModelUpdate,
-    changed: dict[str, object],
-) -> None:
-    ocr_fields = {
-        "ocr_capability", "ocr_protocol", "api_path", "auth_scheme",
-        "auth_header_name", "request_timeout_seconds",
-    }
-    if model.model_type != AIModelType.ocr:
-        if ocr_fields & set(changed):
-            raise HTTPException(422, "非 OCR 模型不能配置 OCR 专用字段")
-        return
-    if model.provider != AIProvider.paddleocr:
-        raise HTTPException(422, "OCR 模型当前仅支持 PaddleOCR provider")
-    if body.ocr_capability is not None:
-        model.ocr_capability = body.ocr_capability.value
-    if body.ocr_protocol is not None:
-        model.ocr_protocol = body.ocr_protocol.value
-    if body.auth_scheme is not None:
-        model.auth_scheme = body.auth_scheme.value
-    if "auth_header_name" in changed:
-        model.auth_header_name = body.auth_header_name
-    if "request_timeout_seconds" in changed:
-        model.request_timeout_seconds = body.request_timeout_seconds
-    capability = model.ocr_capability or OCRCapability.ocr.value
-    protocol = model.ocr_protocol or OCRProtocol.local.value
-    expected_path = "/layout-parsing" if capability == OCRCapability.layout_parsing.value else "/ocr"
-    if "api_path" in changed:
-        model.api_path = body.api_path
-    if protocol == OCRProtocol.local.value:
-        model.api_path = None
-        model.auth_scheme = AIAuthScheme.none.value
-        model.auth_header_name = None
-    else:
-        model.api_path = model.api_path or expected_path
-        if model.api_path != expected_path:
-            raise HTTPException(422, f"{capability} 的接口路径必须是 {expected_path}")
-        model.auth_scheme = model.auth_scheme or AIAuthScheme.bearer.value
-        if model.auth_scheme == AIAuthScheme.custom_header.value and not model.auth_header_name:
-            raise HTTPException(422, "自定义认证方式必须填写 Header 名称")
-
-
-def _apply_secret_or_raise(
-    model: AIModelConfig,
-    *,
-    api_key: str | None,
-    clear_api_key: bool,
-) -> bool:
-    try:
-        return apply_api_key_update(
-            model, api_key=api_key, clear_api_key=clear_api_key
-        )
-    except CredentialEncryptionUnavailable as exc:
-        raise HTTPException(503, str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
 
 
 @router.get("/providers")
@@ -513,13 +318,15 @@ async def update_model(
         clear_api_key=body.clear_api_key,
     )
 
+    # 预设表单每次都带 clear_api_key=false：没勾选「清除凭证」不算连接变更（否则只改信任策略也要重新验证）
+    connection_fields = set(changed) - (set() if body.clear_api_key else {"clear_api_key"})
     connection_changed = bool(
         {
             "model_name", "provider", "endpoint_url", "api_key", "clear_api_key",
             "reasoning_effort", "ocr_capability", "ocr_protocol", "api_path",
             "auth_scheme", "auth_header_name",
         }
-        & set(changed)
+        & connection_fields
     )
     new_deployment = classify_model_deployment(model)
     trust_fields_changed = bool(
@@ -677,6 +484,9 @@ async def activate_model(
 ):
     """启用模型参与路由：只替换同类型（OCR 同能力槽）同部署位置的那一条（ADR-ROUTE-002）。"""
     model = await _get_model(db, model_id)
+    if model.preset_key and not has_api_key(model):
+        # 企业预设都要 Key：网关不可达时会带警告启用，向量还会顶掉现有向量行，故先拦住
+        raise HTTPException(400, {"error_code": "api_key_required", "message": "企业预设需先录入 API Key 再启用"})
     before = _audit_model_snapshot(model)
     slot_conditions = [
         AIModelConfig.model_type == model.model_type,
@@ -755,11 +565,11 @@ _DEPLOYMENT_LABEL = {"local": "本机", "server": "服务器"}
 
 
 def _local_unavailable(model: AIModelConfig, failure: ModelValidationFailure | None) -> bool:
-    """本机模型仅因「当前不可用」验证失败：允许保存 / 启用并给出提示（R4.2）。"""
+    """本机模型 / 企业预设仅因「当前不可用」验证失败：允许保存并给出提示（与 ``AIService.switch_model`` 启用同口径）。"""
     return (
         failure is not None
         and failure.kind == "unavailable"
-        and model.deployment == "local"
+        and (model.deployment == "local" or model.preset_key is not None)
     )
 
 
@@ -781,7 +591,8 @@ async def _local_unavailable_warning(
         head = f"模型当前不可用（{failure.message}），已启用"
 
     if model.model_type == AIModelType.embedding:
-        return f"{head}；向量模型不跨模型兜底，本机恢复前向量检索不可用"
+        until = "本机服务恢复前" if is_local else "在此之前" if is_preset else "恢复前"
+        return f"{head}；向量模型不跨模型兜底，{until}语义检索不可用，知识检索改用词法召回"
     with db.no_autoflush:
         has_fallback = await AIService.route_slot_taken(
             db, model_type=model.model_type,
@@ -791,6 +602,9 @@ async def _local_unavailable_warning(
     if has_fallback:
         fallback_label = "服务器模型" if is_local else "本机模型"
         return f"{head}；调用时会自动使用已启用的{fallback_label}兜底"
+    if model.model_type == AIModelType.rerank:
+        # 重排失败按原召回排序返回（fail-open），不会让检索失败
+        return f"{head}；在此之前知识检索不重排，按召回分数排序"
     if is_preset:
         return f"{head}；该类型尚无其他候选，连上公司网络前 AI 调用会失败"
     return f"{head}；该类型尚未启用服务器模型，本机恢复前调用会失败"

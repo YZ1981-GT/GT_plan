@@ -230,12 +230,12 @@ def _push_blocking(result, again) -> list[str]:
 
 
 def _push_attention(result) -> dict | None:
-    """推送不到的目标（skipped / conflict）与非 succeeded 状态：不挡提交，但退出码 2，逐条进报告待人工处理。"""
+    """推送不到的目标（skipped / conflict / 写入归属拒写 blocked）与非 succeeded 状态：不挡提交，但退出码 2，逐条进报告待人工处理。"""
     from collections import Counter
 
-    from app.services.formula_push.results import CONFLICT, SKIPPED
+    from app.services.formula_push.results import BLOCKED, CONFLICT, SKIPPED
 
-    items = [i for i in result.items if i.action in (SKIPPED, CONFLICT)]
+    items = [i for i in result.items if i.action in (SKIPPED, CONFLICT, BLOCKED)]
     if not items and result.status == "succeeded":
         return None
     return {"status": result.status, "unresolved": len(items),

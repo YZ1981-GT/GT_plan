@@ -15,6 +15,7 @@ const stubs = {
   'el-button': { template: '<button><slot /></button>' },
   FormulaTemplateSaveDialog: true,
   FormulaTemplateSubscribeDialog: true,
+  FormulaPropagationStatus: true, // 联动状态自带请求，单测见 FormulaPropagationStatus.spec.ts
   // 捕获应用范围对话框拿到的 domain / slotKeys / visible
   FormulaApplyScopeDialog: {
     props: ['modelValue', 'projectId', 'domain', 'slotKeys', 'canEditGlobal'],
@@ -118,9 +119,20 @@ vi.mock('element-plus', async (importOriginal) => {
 describe('APPLY_SCOPE_DOMAINS 白名单（Task 34 / 需求 15.2）', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('恰好包含 report / tb_detail / cross_check 三个域', () => {
-    expect([...APPLY_SCOPE_DOMAINS].sort()).toEqual(['cross_check', 'report', 'tb_detail'])
-    expect(APPLY_SCOPE_DOMAINS.length).toBe(3)
+  it('恰好包含 report / tb_detail / cross_check / wp 四个域（spec formula-management-repair-closure R4 放开底稿）', () => {
+    expect([...APPLY_SCOPE_DOMAINS].sort()).toEqual(['cross_check', 'report', 'tb_detail', 'wp'])
+    expect(APPLY_SCOPE_DOMAINS.length).toBe(4)
+  })
+
+  it('底稿域：按公式位打开应用范围对话框', async () => {
+    const w = mountToolbar({ domain: 'wp' })
+    ;(w.vm as any).askApplyScope('wp', ['D2|审定表D2-1|B5'])
+    await w.vm.$nextTick()
+    expect(ElMessage.warning).not.toHaveBeenCalled()
+    const dlg = w.find('[data-testid="apply"]')
+    expect(dlg.attributes('data-visible')).toBe('true')
+    expect(dlg.attributes('data-domain')).toBe('wp')
+    expect(dlg.attributes('data-slots')).toBe('D2|审定表D2-1|B5')
   })
 
   it('域不在白名单时 askApplyScope 弹 warning 且不打开对话框', async () => {

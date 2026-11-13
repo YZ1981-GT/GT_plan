@@ -81,6 +81,7 @@ from app.models.core import Project  # noqa: E402
 from app.models.workpaper_models import (  # noqa: E402
     WorkingPaper,
     WpFormula,
+    WpIndex,
     WpSourceType,
 )
 from app.routers.wp_user_formulas import (  # noqa: E402
@@ -118,6 +119,11 @@ async def _make_session():
         # 不是可以绕开的细节：用户公式的权威存储已从 parsed_data 迁到此表。
         await conn.run_sync(
             lambda sc: WpFormula.__table__.create(sc, checkfirst=True)
+        )
+        # wp_index：执行字段变了按底稿编码登记公式位（spec formula-management-repair-closure R2）。
+        # 建表不插行 ⇒ 取不到编码 ⇒ 不登记；登记本身由 test_wp_write_endpoints_register_changes 覆盖。
+        await conn.run_sync(
+            lambda sc: WpIndex.__table__.create(sc, checkfirst=True)
         )
     factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     return factory, engine

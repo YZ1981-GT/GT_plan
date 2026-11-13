@@ -376,6 +376,18 @@ def _ref_is_k_domain(ref: str) -> bool:
     return bool(_K_FILE_RX.search(f) or _K_SUBDIR_RX.search(f))
 
 
+#: 2026-11-04：umbrella spec 3.5 审计整改给 6 张 K 子表的模式开关接同步能力单源并挂 notice
+#: （不是 K lane 1 的 BP-7）。逐个点名：多一个少一个都先查来源再改这里。
+UMBRELLA_35_K_SUBTAB_NOTICE_HOSTS = frozenset({
+    "k1/inspection/K1TabWriteoffCheck.vue",
+    "k8/core/K8TabAdjustment.vue",
+    "k9/core/K9TabAdjustment.vue",
+    "k11/core/K11TabAdjustment.vue",
+    "k12/core/K12TabAdjustment.vue",
+    "k13/core/K13TabAdjustment.vue",
+})
+
+
 @pytest.fixture(scope="module")
 def abcs_slice() -> dict:
     return json.loads(ABCS_SLICE_PATH.read_text(encoding="utf-8"))
@@ -427,11 +439,16 @@ class TestDownstreamAbcsCensusAttribution:
             assert f"k{n}-dual-mode:" in plan, f"k{n} 的 legacy 前缀未在 task66 清册登记"
 
     def test_k_owns_the_entire_notice_consumer_delta(self) -> None:
-        """🔴 13/13 全部归 K：非 K 侧现算恰等于切片声明 ⇒ 增量全是 BP-7。"""
+        """🔴 K lane 1 的 BP-7 恰 13；K 子表另有 umbrella 3.5 接入的 6 个（逐个点名）；非 K 侧不少于切片声明。"""
         prod, _ = statement_edges_to(NOTICE_VUE)
         k_edges = [r for r in prod if _ref_is_k_domain(r)]
         non_k = [r for r in prod if not _ref_is_k_domain(r)]
-        assert len(k_edges) == len(BP7_NOTICE_MOUNTED_ENTRIES) == 13, k_edges
+        subtab = [r for r in k_edges if _K_SUBDIR_RX.search(r.split("#")[0])]
+        bp7 = [r for r in k_edges if r not in subtab]
+        assert len(bp7) == len(BP7_NOTICE_MOUNTED_ENTRIES) == 13, bp7
+        assert {r.split("#")[0].split("/workpaper/", 1)[-1] for r in subtab} == (
+            UMBRELLA_35_K_SUBTAB_NOTICE_HOSTS
+        ), subtab
         assert len(non_k) >= ABCS_DECLARED_NOTICE_OUT_OF_SCOPE, (
             f"非 K 侧现算 {len(non_k)} < 切片声明 "
             f"{ABCS_DECLARED_NOTICE_OUT_OF_SCOPE} ⇒ 有人退了 notice"

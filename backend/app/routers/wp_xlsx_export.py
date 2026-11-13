@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user_stream
 from app.models.core import Project, User
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.wp_render_schema_service import WpRenderSchemaService
@@ -41,8 +41,8 @@ _schema_service = WpRenderSchemaService()
 @router.post("/{wp_id}/export-xlsx")
 async def export_xlsx(
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user_stream),
 ) -> StreamingResponse:
     """导出底稿 xlsx（致同模板填值还原）。
 

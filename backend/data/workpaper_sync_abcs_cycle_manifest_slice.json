@@ -370,9 +370,9 @@
     "module": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
     "production_edges": [
      "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue#L52",
-     "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L29",
-     "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L32",
-     "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L24",
+     "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L28",
+     "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L31",
+     "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L23",
      "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue#L30",
      "audit-platform/frontend/src/components/workpaper/composables/useD1EntryDualMode.ts#L6",
      "audit-platform/frontend/src/components/workpaper/composables/useD3EntryDualMode.ts#L6",
@@ -400,9 +400,9 @@
     "production_edge_count": 26,
     "in_scope_edges": [
      "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue#L52",
-     "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L29",
-     "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L32",
-     "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L24",
+     "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L28",
+     "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L31",
+     "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L23",
      "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue#L30"
     ],
     "in_scope_edge_count": 5,
@@ -430,16 +430,16 @@
    "useWpDualMode.ts": {
     "module": "audit-platform/frontend/src/components/workpaper/composables/useWpDualMode.ts",
     "production_edges": [
-     "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L223",
-     "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L166",
-     "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L301"
+     "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L230",
+     "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L173",
+     "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L308"
     ],
     "test_edge_count": 0,
     "production_edge_count": 3,
     "in_scope_edges": [
-     "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L223",
-     "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L166",
-     "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L301"
+     "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L230",
+     "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L173",
+     "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L308"
     ],
     "in_scope_edge_count": 3,
     "barrel_edges": [],
@@ -2147,7 +2147,7 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L463",
+    "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L470",
     "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L101",
     "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L127"
    ],
@@ -2174,7 +2174,7 @@
     },
     "auxiliary_endpoint_refs": {
      "a17_docx_sync": [
-      "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L463"
+      "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L470"
      ],
      "render_config_only": [
       "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L127"
@@ -2692,7 +2692,7 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L362",
+    "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L376",
     "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L212",
     "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L239"
    ],
@@ -2708,7 +2708,7 @@
     "write_source_ref": null,
     "channel_source_refs": {
      "field_overrides": [
-      "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L362",
+      "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L376",
       "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L239"
      ]
     },
@@ -2996,7 +2996,7 @@
     "resolver": "backend/app/services/wp_template_finder.py::find_template_file_any",
     "workbook": "A/A5-1 现金流量表审计.xlsx",
     "workbook_format": "xlsx",
-    "size": 60894,
+    "size": 46790,
     "sha256": "9999f5b6511c5230e52732c10bf2eef86ee1238b9e0678e498ed2fffda9f503d"
    },
    "mount_count": 1,
@@ -4195,7 +4195,7 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L386",
+    "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L385",
     "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L106"
    ],
    "html_counterpart": {
@@ -4222,11 +4222,11 @@
       "ref": "audit-platform/frontend/src/components/workpaper/composables/useB22AControlMatrix.ts#L909"
      }
     ],
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L386",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L385",
     "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L106",
     "channel_source_refs": {
      "checklist_responses": [
-      "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L386",
+      "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L385",
       "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L106",
       "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L52"
      ]
@@ -4343,7 +4343,7 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L198",
+    "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L197",
     "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L282"
    ],
    "html_counterpart": {
@@ -4354,11 +4354,11 @@
     "row_identity_key": "item_id",
     "owner_module": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
     "item_prefix_constants": [],
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L198",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L197",
     "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L282",
     "channel_source_refs": {
      "checklist_responses": [
-      "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L198",
+      "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L197",
       "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L282",
       "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L393"
      ]
@@ -11858,7 +11858,7 @@
    },
    {
     "entry_id": "xlsx/gt-b14-due-diligence-report",
-    "site": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L91",
+    "site": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L98",
     "v_for": "col in getTableColumns(ch.id)",
     "key_binding": "col.key",
     "label_binding": "col.label",
@@ -11868,7 +11868,7 @@
    },
    {
     "entry_id": "xlsx/gt-b14-due-diligence-report",
-    "site": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L146",
+    "site": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L153",
     "v_for": "col in getTableColumns(ch.id, sec.table_id)",
     "key_binding": "col.key",
     "label_binding": "col.label",
@@ -11954,9 +11954,9 @@
     "id": "P22-D2",
     "entry_id": "xlsx/gt-b14-due-diligence-report",
     "what": "B1-4 行业对标表把**对标公司列写死为 2 家**（`peer1` / `peer2`）。",
-    "site": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L347",
+    "site": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L364",
     "evidence": "`industry_comparison` 列声明现读为 `[{key:'indicator'},{key:'target',label:'目标公司'},{key:'peer1',label:'对标公司1'},{key:'peer2',label:'对标公司2'}]` —— 这是**按公司横向展开**的表，正是 AC 6.4 的适用对象。",
-    "column_source_ref": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L344",
+    "column_source_ref": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L361",
     "why_it_is_a_defect": "对标公司数由项目实际情况决定，写死 2 家 ⇒ 第 3 家无处填。key 形态 `peer1`/`peer2` 已经是 `{slot}{seq}`（key 与 label 解耦、label 可改而 key 不变，这一半是对的），缺的是「不写死列数」那一半 —— 应改成 `peer_{seq}` 动态展开。",
     "partially_compliant": "key/label 解耦成立；列数写死不成立",
     "registered_as": [
@@ -11997,12 +11997,12 @@
     "table_key": "b14_chapter_table_rows",
     "entry_id": "xlsx/gt-b14-due-diligence-report",
     "persistence_key": "checklist_responses.item_id（章节/表/列三元组，行按数组位置）",
-    "row_count_source": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L358",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L375",
     "row_identity": {
      "kind": "function_parameter_row_index_into_json_array",
      "identity_field": null,
-     "source_ref": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L371",
-     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L382",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L388",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue#L399",
      "stable_alternative_available": "章节表行可携 `id`（同宿主别处的 sections 已有 `sec.id`）",
      "violates_forbidden_identity_kind": "array_index"
     },

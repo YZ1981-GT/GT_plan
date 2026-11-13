@@ -19,6 +19,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { checklistDraftKey, checklistDraftPrefix } from '@/composables/workpaper/checklistDraftStorage'
 import type { ChecklistResponse } from './useF1FormData'
 import type { G7SameControlStoredRow } from '../g7-long-term-equity-subsidiary/initial/g7SameControlModel'
 import type { G7DisposalPackageRow } from '../g7-long-term-equity-subsidiary/disposal/g7DisposalPackageModel'
@@ -29,8 +30,8 @@ const DRAFT_PREFIX = 'g7-sub-draft'
 const MAX_RETRIES = 3
 const BASE_DELAY_MS = 500
 
-function draftKey(wpId: string, itemId: string): string {
-  return `${DRAFT_PREFIX}:${wpId}:${itemId}`
+function draftKey(wpId: string, itemId: string): string | null {
+  return checklistDraftKey(DRAFT_PREFIX, wpId, itemId)
 }
 
 // ─── Content Types ───────────────────────────────────────────────────────────
@@ -184,9 +185,9 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
 
   /** 恢复 localStorage 中暂存的草稿数据并尝试重新保存 */
   function restoreDrafts(): void {
-    if (!wpId.value) return
-    const prefix = `${DRAFT_PREFIX}:${wpId.value}:`
-    for (let i = 0; i < localStorage.length; i++) {
+    const prefix = checklistDraftPrefix(DRAFT_PREFIX, wpId.value)
+    if (!prefix) return
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
       const key = localStorage.key(i)
       if (!key?.startsWith(prefix)) continue
       try {
@@ -337,7 +338,8 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
         })
         // 成功 → 清除本地暂存
         try {
-          localStorage.removeItem(draftKey(wpId.value, itemId))
+          const key = draftKey(wpId.value, itemId)
+          if (key) localStorage.removeItem(key)
         } catch { /* ignore */ }
         savePhase.value = 'saved'
         try {
@@ -360,7 +362,8 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
     // 全部重试失败 → localStorage 暂存
     savePhase.value = 'error'
     try {
-      localStorage.setItem(draftKey(wpId.value, itemId), JSON.stringify(updated))
+      const key = draftKey(wpId.value, itemId)
+      if (key) localStorage.setItem(key, JSON.stringify(updated))
       ElMessage.warning(`G7(子公司) 数据暂存本地（${itemId}），网络恢复后将自动同步`)
     } catch { /* ignore quota exceeded */ }
   }
@@ -404,7 +407,10 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
         })
         // 成功 → 清除所有相关本地暂存
         for (const item of toSave) {
-          try { localStorage.removeItem(draftKey(wpId.value, item.item_id)) } catch { /* ignore */ }
+          try {
+            const key = draftKey(wpId.value, item.item_id)
+            if (key) localStorage.removeItem(key)
+          } catch { /* ignore */ }
         }
         try {
           const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
@@ -426,7 +432,8 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
     // 全部重试失败 → localStorage 逐项暂存
     for (const item of toSave) {
       try {
-        localStorage.setItem(draftKey(wpId.value, item.item_id), JSON.stringify(item))
+        const key = draftKey(wpId.value, item.item_id)
+        if (key) localStorage.setItem(key, JSON.stringify(item))
       } catch { /* ignore */ }
     }
     ElMessage.warning('G7(子公司) 数据暂存本地，网络恢复后将自动同步')
@@ -478,7 +485,8 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
     }
     // 全部失败 → localStorage 暂存整体 content
     try {
-      localStorage.setItem(`${DRAFT_PREFIX}:${wpId.value}:__content__`, JSON.stringify(content))
+      const key = draftKey(wpId.value, '__content__')
+      if (key) localStorage.setItem(key, JSON.stringify(content))
       ElMessage.warning('G7(子公司) 内容暂存本地，网络恢复后将自动同步')
     } catch { /* ignore */ }
   }

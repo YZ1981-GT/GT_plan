@@ -204,25 +204,14 @@ def _bindings(
     return primary, tuple(siblings)
 
 
-def _text_safe(projection: Any) -> Any:
-    """把 `text` 字段里反读出来的非字符串值转成字符串。
-
-    模板里有几个受管 text 格存的是数字（`d4_32_groups/*/group_label` 的 `1`），extract
-    如实返回 int，而 materialize 的 `text` 规范化拒绝 int（「不得把数字与其字符串形态
-    判等」）。那是**模板内容**与契约类型的既有不一致，与本 spec 无关；harness 在入口把它
-    规整掉，免得一条与写入趟数无关的 `EditableCellWriteError` 挡住基线判据。
-    """
-    values = {
-        key: (
-            dataclasses.replace(field, value=str(field.value))
-            if field.value_type is ValueType.text
-            and field.value is not None
-            and not isinstance(field.value, str)
-            else field
-        )
-        for key, field in projection.values.items()
-    }
-    return dataclasses.replace(projection, values=values)
+# 🔴 `_text_safe` 已退役（spec wp-sync-conflict-adjudication-and-d4-32-modeling
+#    Task 10）。它存在的**唯一**理由是 `d4_32_groups/*/group_label`：D4-32 的 A 列被错误
+#    声明成 `editable text`，而模板 A13..A46 存的是整数序号 ⇒ extract 如实返回 int ⇒
+#    materialize 的 text 规范化拒收（「不得把数字与其字符串形态判等」）⇒ 一条
+#    `EditableCellWriteError` 会挡住基线判据，于是 harness 在入口把 int 转成 str。
+#    那是**在测试辅助层补偿一个生产建模错误**：补偿一写上，契约与模板的不一致就从判据
+#    视野里消失了。ADR-D432-001 把 A 列移出受管字段集后，受管 text 格里不再有数字，
+#    补偿失去对象，必须一并删掉 —— 留着它就是留一个「以后再有同类错误也照样被吃掉」的口子。
 
 
 @dataclass(frozen=True)
@@ -270,9 +259,7 @@ def build_world(workdir: Path) -> D4World:
         sibling_bindings=frozen.siblings,
         direction="html_to_oo",
     )
-    projection = _text_safe(
-        adapter.extract(artifact=base, contract=frozen.contract)
-    )
+    projection = adapter.extract(artifact=base, contract=frozen.contract)
     return D4World(
         adapter=adapter,
         base=base,
@@ -308,9 +295,7 @@ def rebased_world(world: D4World, *, substrate_bytes: bytes, label: str) -> D4Wo
     base.write_bytes(substrate_bytes)
     staged_dir = root / AX.STAGING_NAMESPACE
     staged_dir.mkdir(parents=True, exist_ok=True)
-    projection = _text_safe(
-        world.adapter.extract(artifact=base, contract=world.contract)
-    )
+    projection = world.adapter.extract(artifact=base, contract=world.contract)
     return dataclasses.replace(
         world, base=base, staged_dir=staged_dir, projection=projection
     )

@@ -14,9 +14,12 @@ vi.mock('element-plus', () => ({ ElMessage: vi.fn() }))
 import {
   installPushKeptNotice,
   isDisclosureSyncUrl,
+  manualTakeoverMessage,
+  manualTakeoverSkippedSections,
   pushKeptGroups,
   pushKeptMessage,
 } from '../disclosureSyncPushNotice'
+import { MANUAL_TAKEOVER_ADVICE, MANUAL_TAKEOVER_REASON } from '../noteWriteOwnership'
 
 const CELL = { table: '货币资金', row: '库存现金', period: 'end', field: 'end_amount', kind: 'cell', pushed: 390, incoming: 999 }
 const TOTAL = { ...CELL, row: '合计', kind: 'total', pushed: 515, incoming: 1500 }
@@ -79,6 +82,26 @@ describe('拦截器', () => {
     expect(notify).toHaveBeenCalledTimes(1)
     uninstall()
     expect(http.interceptors.response.eject).toHaveBeenCalledWith(0)
+  })
+
+  it('写入归属 manual 策略没写入的章节逐个提示原因与处理建议；_silent / 别的跳过原因不提示（spec formula-writer-ownership-and-stale §13）', () => {
+    const skipped = { section_id: '八、5', success: true, rows_synced: 0, skipped: true, reason: MANUAL_TAKEOVER_REASON }
+    expect(manualTakeoverSkippedSections(skipped)).toEqual(['八、5'])
+    expect(manualTakeoverSkippedSections({ results: [skipped, { section_id: '八、6', rows_synced: 3 }] })).toEqual(['八、5'])
+    expect(manualTakeoverSkippedSections({ section_id: '九、1', skipped: true, reason: 'section_not_applicable_to_report_scope' }))
+      .toEqual([])
+    expect(manualTakeoverSkippedSections(null)).toEqual([])
+    expect(manualTakeoverMessage('八、5')).toBe(`附注 八、5：从未由底稿同步、已有人工填写，本次没有用底稿披露表覆盖（${MANUAL_TAKEOVER_ADVICE}）`)
+
+    const http = fakeHttp()
+    const notify = vi.fn()
+    installPushKeptNotice(http as any, notify)
+    const url = '/api/projects/p1/disclosure-notes/sync-from-workpaper'
+    http.respond(url, skipped)
+    expect(notify.mock.calls).toEqual([[manualTakeoverMessage('八、5')]])
+    http.respond(url, skipped, { _silent: true })
+    http.respond('/api/projects/p1/disclosure-notes/sync-batch-from-workpaper', { results: [skipped] })
+    expect(notify).toHaveBeenCalledTimes(2)
   })
 
   it('main.ts 装在全局 http 实例上', () => {

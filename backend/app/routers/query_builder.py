@@ -361,11 +361,27 @@ async def execute_query(
     # 缓存发生在白名单安全校验之后（_build_select 已完成白名单验证）
     from app.services.query_cache import compute_cache_key, get_cached_result, set_cached_result
 
+    # ─── 版本向量采集（AQF §4.4；_build_select 之后、缓存键构建之前）───────
+    _builder_version_hash: str | None = None
+    _builder_version: dict = {}
+    try:
+        from app.services.custom_query.version_capture import capture_builder_vector
+        _all_tables = [body.table] + [j.get("table") for j in body.joins if j.get("table")]
+        _bv = await capture_builder_vector(
+            db, _all_tables,
+            scope={"projects": [str(p) for p in (scope.project_ids or [])], "year": getattr(body, "year", None)},
+        )
+        _builder_version_hash = _bv.hash
+        _builder_version = _bv.as_dict()
+    except Exception as _bve:
+        logger.debug("AQF 构建器版本采集失败: %s", _bve)
+
     # 缓存键纳入作用域签名（R2.4）：改造前写死 "__query_builder__"，两个可访问
     # 项目集合不同的用户对同一 DSL 会命中同一条缓存 = 跨作用域泄漏。
+    _version_suffix = f"|v={_builder_version_hash}" if _builder_version_hash else ""
     cache_key = compute_cache_key(
         user_id=str(current_user.id),
-        project_id=f"__query_builder__:{scope_signature(scope)}",
+        project_id=f"__query_builder__:{scope_signature(scope)}{_version_suffix}",
         query_params=body.model_dump(exclude={"count_token"}),
     )
     cached = await get_cached_result(cache_key)
@@ -388,7 +404,7 @@ async def execute_query(
                 total = 1
             else:
                 count_stmt = build_count(stmt)
-                count_subject = f"{count_tokens.subject_of(current_user)}:{scope_signature(scope)}"
+                count_subject = f"{count_tokens.subject_of(current_user)}:{scope_signature(scope)}{_version_suffix}"
                 count_digest = count_tokens.statement_digest(count_stmt, db.get_bind(), subject=count_subject)
                 reused_total = count_tokens.reuse(body.count_token, digest=count_digest, subject=count_subject)
                 count_reused = reused_total is not None
@@ -441,10 +457,15 @@ async def execute_query(
         "formula_refs": _derive_formula_refs(body.table, rows_serialized),
     }
 
-    # 回写 Redis 缓存（短 TTL）；单元格取值每次现读，不进缓存
+    # 回写 Redis 缓存（短 TTL）；单元格取值每次现读，不进缓存；version 不进缓存
     await set_cached_result(cache_key, query_result)
 
     final = with_acnr_results(query_result, await acnr.results(db) if acnr else None)
+    # version 在 set_cached_result 之后追加，不污染缓存（ADR-AQF-03）
+    if _builder_version:
+        final["version"] = _builder_version
+    if _builder_version_hash:
+        final["_version_hash"] = _builder_version_hash
     await _audit_query_success(
         body, user=current_user, scope=scope, total=int(total), cache_hit=False, db=db
     )

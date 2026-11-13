@@ -1,6 +1,6 @@
 """公式模板（R13，design §16.4）。
 
-权限：列表 / 详情 / 版本 = 可见即可（不可见按不存在 404）；订阅者、改名、删除、发布新版本 = 所有者或 admin；
+权限：列表 / 详情 / 版本 = 可见即可（不可见按不存在 404）；订阅者、改名、删除、发布新版本、保留模板 = 所有者或 admin；
 创建事务所模板 = admin，项目组 / 集团模板 = 所属项目 edit；从项目保存 = 来源项目 readonly；
 设为全局 = admin（其他可见者 = 提交全局候选）；订阅 / 退订 = 目标项目 edit。
 服务层只 flush，这里 commit 之后才发变更事件。模板操作只写模板层与本项目层，绝不写全局行（全局只经发布）。
@@ -69,6 +69,7 @@ class TemplateChange(BaseModel):
 
 class PublishBody(BaseModel):
     expected_version: int | None = None
+    preview_fingerprint: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     changes: list[TemplateChange] = Field(min_length=1, max_length=5000)
     decisions: DecisionsIn = Field(default_factory=DecisionsIn)
     request_id: str | None = Field(None, max_length=64)
@@ -78,9 +79,22 @@ class PublishBody(BaseModel):
 class RollbackBody(BaseModel):
     target_version: int = Field(ge=1)
     expected_version: int | None = None
+    preview_fingerprint: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     decisions: DecisionsIn = Field(default_factory=DecisionsIn)
     request_id: str | None = Field(None, max_length=64)
     note: str | None = Field(None, max_length=2000)
+
+
+class KeepItem(BaseModel):
+    domain: str = Field(min_length=1, max_length=32)
+    slot_key: str = Field(min_length=1, max_length=300)
+    #: 提示里看到的当前全局版本（全局已删 = None）；之后全局又变 ⇒ 409
+    expected_global_version: int | None = None
+
+
+class KeepBody(BaseModel):
+    expected_version: int | None = None
+    items: list[KeepItem] = Field(min_length=1, max_length=5000)
 
 
 class PromoteBody(BaseModel):
@@ -291,6 +305,7 @@ async def rollback(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession 
     result = await _run(db, sync.publish_template(
         db, tpl, changes=changes, expected_version=body.expected_version, user_id=current_user.id,
         decisions=body.decisions.to_decisions(), request_id=body.request_id, note=body.note,
+        preview_fingerprint=body.preview_fingerprint,
         publish_source="template_rollback", item_action="template_rollback",
         audit_action="template_rollback",
         audit_details={"source_version": body.target_version},
@@ -305,8 +320,20 @@ async def publish(template_id: uuid.UUID, body: PublishBody, db: AsyncSession = 
     result = await _run(db, sync.publish_template(
         db, tpl, changes=[c.model_dump() for c in body.changes], expected_version=body.expected_version,
         user_id=current_user.id, decisions=body.decisions.to_decisions(), request_id=body.request_id,
-        note=body.note))
+        note=body.note, preview_fingerprint=body.preview_fingerprint))
     return await _emit(db, result, "template_publish")
+
+
+@router.post("/{template_id}/global-hints/keep")
+async def keep_baseline(template_id: uuid.UUID, body: KeepBody, db: AsyncSession = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
+    """「保留模板」：只把基线换成当前全局，提示消失；不发新版本、不影响订阅项目（所有者或 admin；R6.2）。"""
+    tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    result = await _run(db, sync.keep_template_baseline(
+        db, tpl, expected_version=body.expected_version, items=[i.model_dump() for i in body.items],
+        user_id=current_user.id))
+    await db.commit()
+    return result
 
 
 @router.post("/{template_id}/promote-preview")

@@ -39,7 +39,7 @@ export function buildNoteConsistencyMessage(consistency: NoteConsistency | null 
     parts.push(`<p style="color:#e6a23c;margin:6px 0 2px;font-weight:600;">底稿已更新、附注陈旧（${stale.length} 章）：</p>`)
     parts.push(stale.map(itemLine).join(''))
   }
-  parts.push('<p style="margin-top:10px;color:#666;font-size:12px;">附注数据由底稿披露表单项推送。请到底稿披露表重新同步这些章节；如确需带不一致导出，可选「仍要导出」。</p>')
+  parts.push('<p style="margin-top:10px;color:#666;font-size:var(--gt-display-font-size);">附注数据由底稿披露表单项推送。请到底稿披露表重新同步这些章节；如确需带不一致导出，可选「仍要导出」。</p>')
   return parts.join('')
 }
 

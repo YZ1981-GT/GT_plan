@@ -14,6 +14,8 @@ from uuid import UUID
 SKIPPED = "skipped"
 CONFLICT = "conflict"
 FALLBACK_TO_TOTAL = "fallback_to_total"  # spec: formula-push-note-row-matching · 需求 1.1
+#: 写入归属矩阵拒写（spec formula-writer-ownership-and-stale design §13）：该格不归公式推送，未写
+BLOCKED = "blocked"
 
 
 def _enum_value(value: Any) -> Any:
@@ -67,6 +69,8 @@ class RunResult:
     #: 有写入的底稿
     wp_ids: list[str] = field(default_factory=list)
     forced: list[str] = field(default_factory=list)
+    #: 写入归属矩阵拒写的附注格 ``[{section, table, field, writer_id, owner_id, reason_code, reason, row, ...}]``
+    blocked_writes: list[dict[str, Any]] = field(default_factory=list)
 
     def count(self, *actions: str) -> int:
         return sum(1 for i in self.items if i.action in actions)
@@ -85,7 +89,15 @@ class RunResult:
 
     @property
     def skipped_count(self) -> int:
-        return self.count(SKIPPED, CONFLICT)
+        """跳过（含归属拒写：该格没写，与跳过同计入运行记录）。"""
+        return self.count(SKIPPED, CONFLICT, BLOCKED)
+
+    @property
+    def blocked_count(self) -> int:
+        return self.count(BLOCKED)
+
+    def blocked_payload(self) -> list[dict[str, Any]]:
+        return [{k: _jsonable(v) for k, v in item.items()} for item in self.blocked_writes]
 
     @property
     def stages(self) -> list[str]:
@@ -109,11 +121,13 @@ class RunResult:
             "unchanged_count": self.unchanged_count,
             "kept_count": self.kept_count,
             "skipped_count": self.skipped_count,
+            "blocked_count": self.blocked_count,
             "stages": self.stages,
             "wp_ids": list(self.wp_ids),
             "changed_items": list(self.changed_items),
             "note_sections": list(self.note_sections),
             "warnings": list(self.warnings),
+            "blocked_writes": self.blocked_payload(),
         }
 
     def detail(self) -> dict[str, Any]:
@@ -126,4 +140,5 @@ class RunResult:
             "note_sections": list(self.note_sections),
             "stages": self.stages,
             "forced": list(self.forced),
+            "blocked_writes": self.blocked_payload(),
         }

@@ -10,7 +10,6 @@
  * - 复核入口（GtReviewTrigger + useWorkpaperReviewThreads + provide getThreadDot/getRowDot）
  */
 import { ref, computed, toRef, watch, provide, onMounted, onBeforeUnmount } from 'vue'
-import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { exportMultiSheetData } from '@/composables/useExcelIO'

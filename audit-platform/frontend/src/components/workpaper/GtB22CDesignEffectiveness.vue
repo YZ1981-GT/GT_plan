@@ -6,7 +6,6 @@
  * 按 5 个要素区块汇总各要素识别出的控制缺陷，判断是否构成值得关注的缺陷（CAS 1152）。
  */
 import { ref, computed, toRef, watch, provide, onMounted, onBeforeUnmount } from 'vue'
-import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'

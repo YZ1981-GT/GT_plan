@@ -78,6 +78,15 @@ async def _create(api, user: str, body: dict) -> str:
     return r.json()["id"]
 
 
+async def _previewed_body(client, tid, body, *, rollback=False):
+    action = "rollback-preview" if rollback else "publish-preview"
+    response = await client.post(f"/api/formula-templates/{tid}/{action}", json=body)
+    assert response.status_code == 200, response.text
+    fingerprint = response.json()["preview_fingerprint"]
+    assert len(fingerprint) == 64 and all(c in "0123456789abcdef" for c in fingerprint)
+    return {**body, "preview_fingerprint": fingerprint}
+
+
 async def _templates(api) -> dict[str, str]:
     p = api["p"]
     return {
@@ -152,6 +161,7 @@ async def test_manage_publish_subscribe_permissions(api):
     assert (await c.delete(f"/api/formula-templates/{ids['group']}", params={"expected_version": 1})).status_code == 409, "有订阅不能删"
     assert (await c.post(f"/api/formula-templates/{ids['group']}/publish", json={**body, "expected_version": None})
             ).status_code == 428
+    body = await _previewed_body(c, ids["group"], body)
     pub = await c.post(f"/api/formula-templates/{ids['group']}/publish", json=body)
     assert pub.status_code == 200 and pub.json()["version"] == 2
     subs = (await c.get(f"/api/formula-templates/{ids['group']}/subscribers")).json()["items"]
@@ -179,9 +189,8 @@ async def test_diff_rollback_preview_and_idempotent_publish(api):
                "definition": {"formula": "TB('1001','审定数')"}}
     same = await c.get(f"/api/formula-templates/{tid}/diff", params={"from": 1, "to": 1})
     assert same.status_code == 200 and same.json()["changes"] == []
-    published = await c.post(f"/api/formula-templates/{tid}/publish", json={
-        "expected_version": 1, "changes": [changed],
-    })
+    publish_body = await _previewed_body(c, tid, {"expected_version": 1, "changes": [changed]})
+    published = await c.post(f"/api/formula-templates/{tid}/publish", json=publish_body)
     assert published.status_code == 200 and published.json()["version"] == 2
     diff = await c.get(f"/api/formula-templates/{tid}/diff", params={"from": 1, "to": 2})
     assert diff.status_code == 200
@@ -196,7 +205,8 @@ async def test_diff_rollback_preview_and_idempotent_publish(api):
     after_preview = (await c.get(f"/api/formula-templates/{tid}/versions")).json()["items"]
     assert len(after_preview) == len(before), "rollback preview 不得写版本"
 
-    rollback_body = {"target_version": 1, "expected_version": 2, "request_id": "endpoint-rollback-1"}
+    rollback_body = {"target_version": 1, "expected_version": 2, "request_id": "endpoint-rollback-1",
+                     "preview_fingerprint": preview.json()["preview_fingerprint"]}
     rolled = await c.post(f"/api/formula-templates/{tid}/rollback", json=rollback_body)
     assert rolled.status_code == 200 and rolled.json()["version"] == 3
     replay = await c.post(f"/api/formula-templates/{tid}/rollback", json={
@@ -224,9 +234,10 @@ async def test_rollback_cas_precedes_empty_diff(api):
     tid = ids["group"]
     body = {"expected_version": 1, "changes": [{"domain": "report", "slot_key": SLOT,
                                                 "definition": {"formula": "TB('1001','审定数')"}}]}
+    body = await _previewed_body(c, tid, body)
     assert (await c.post(f"/api/formula-templates/{tid}/publish", json=body)).status_code == 200
-    rolled = await c.post(f"/api/formula-templates/{tid}/rollback",
-                          json={"target_version": 1, "expected_version": 2})
+    rollback_body = await _previewed_body(c, tid, {"target_version": 1, "expected_version": 2}, rollback=True)
+    rolled = await c.post(f"/api/formula-templates/{tid}/rollback", json=rollback_body)
     assert rolled.status_code == 200 and rolled.json()["version"] == 3
 
     # v3 与 v1 内容相同 ⇒ 差集为空。缺版本号必须 428、版本不符必须 409，都不得被 422 吞掉。

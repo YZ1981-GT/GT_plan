@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
@@ -96,10 +97,60 @@ async def test_invalid_project_override_is_explicit_error(monkeypatch):
         await resolve_section_workpapers(_Db(project), UUID(int=1), "八、4")
 
 
+#: S5 R2 换掉的旧写法（df64196e3 之前的 report_trace_service）：直接查旧表、取行上的 account_codes
+_LEGACY_REPORT_TRACE_SNIPPET = '''
+async def trace_section(db, project_id, section_number):
+    mapping_result = await db.execute(sa.text(
+        "SELECT wp_code, account_codes, note_title "
+        "FROM note_wp_mapping "
+        "WHERE project_id = :pid AND note_section = :sec "
+        "LIMIT 1"
+    ), {"pid": str(project_id), "sec": section_number})
+    mapping = mapping_result.fetchone()
+    return {"wp_code": mapping.wp_code, "account_codes": mapping.account_codes}
+'''
+
+
+def _legacy_mapping_hits(source: str) -> list[str]:
+    """旧映射表读法的命中（按 AST，不按文本）：任何字符串常量提到 ``note_wp_mapping``、SQL 字符串常量
+    （同时含 SELECT 与 FROM）里取 ``account_codes``、读行对象的 ``.account_codes`` 属性。
+
+    科目码本身是合法概念（spec voucher-workflow-linkage-lineage-closure R8.2：章节 → 底稿 → 底稿科目映射表的科目，
+    回执带 ``account_codes``），函数名、字典键里出现不算 —— 原判据按全文搜 ``account_codes`` 会把它误判成旧写法。
+    """
+    hits: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value
+            if "note_wp_mapping" in text:
+                hits.append(f"字符串提到 note_wp_mapping：{text[:60]!r}")
+            if re.search(r"\bSELECT\b[\s\S]*\bFROM\b", text, re.I) and "account_codes" in text:
+                hits.append(f"SQL 取 account_codes：{text[:60]!r}")
+        elif isinstance(node, ast.Attribute) and node.attr == "account_codes":
+            hits.append(f"读行属性 .account_codes（第 {node.lineno} 行）")
+    return hits
+
+
+def test_legacy_mapping_checker_flags_the_old_code():
+    """反向自检：判据对 S5 R2 之前的旧写法三类都报出，对合法的科目码命名不报，否则下一条是空转。"""
+    hits = _legacy_mapping_hits(_LEGACY_REPORT_TRACE_SNIPPET)
+    assert any("note_wp_mapping" in h for h in hits)
+    assert any("SQL 取 account_codes" in h for h in hits)
+    assert any(".account_codes" in h for h in hits)
+    assert _legacy_mapping_hits('x = sa.text("SELECT account_codes FROM other_table")')  # 单独一类也能报
+    legit = (
+        'def _section_account_codes(wp_codes):\n'
+        '    """章节对应底稿的科目（account_codes_for_wp_code）"""\n'
+        '    trace = {"account_codes": []}\n'
+        '    trace["account_codes"] = account_codes_for_wp_code(wp_codes[0])\n'
+    )
+    assert _legacy_mapping_hits(legit) == []
+
+
 def test_report_trace_source_has_no_legacy_mapping_table_sql():
     source = (ROOT / "app" / "services" / "report_trace_service.py").read_text(encoding="utf-8")
     assert "note_wp_mapping" not in source
-    assert "account_codes" not in source
+    assert _legacy_mapping_hits(source) == []
     tree = ast.parse(source)
     assert any(
         isinstance(node, ast.Call)
@@ -115,7 +166,19 @@ def test_report_provenance_migration_matches_model_surface():
     assert "CREATE TABLE IF NOT EXISTS report_generation_run" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS run_id" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS provenance" in migration
-    assert "DROP TABLE IF EXISTS report_generation_run" in rollback
+    # 共享表与两列由排在前面的 V246 建立（V251 的同名语句是空操作），归 R246 回滚；R251 只撤销 V251 实际新增的
+    # 三个对象，不能把 V246 的表 / 列一起删掉（spec formula-management-repair-closure R0.1）
+    for owned_by_v246 in ("DROP TABLE IF EXISTS report_generation_run", "DROP COLUMN IF EXISTS run_id",
+                          "DROP COLUMN IF EXISTS provenance"):
+        assert owned_by_v246 not in rollback, owned_by_v246
+    for added_by_v251 in ("idx_financial_report_project_year_run", "fk_financial_report_run",
+                          "idx_report_generation_run_project_year_started"):
+        assert added_by_v251 in migration and added_by_v251 in rollback, added_by_v251
+    v246 = (ROOT / "migrations" / "V246__report_generation_run_and_consol_artifact.sql").read_text(encoding="utf-8")
+    r246 = (ROOT / "migrations" / "R246__rollback_report_generation_run_and_consol_artifact.sql").read_text(
+        encoding="utf-8")
+    assert "CREATE TABLE IF NOT EXISTS report_generation_run" in v246
+    assert "DROP TABLE IF EXISTS report_generation_run" in r246
     push_migration = (ROOT / "migrations" / "V248__formula_push_provenance.sql").read_text(encoding="utf-8")
     push_rollback = (ROOT / "migrations" / "R248__rollback_formula_push_provenance.sql").read_text(encoding="utf-8")
     assert "formula_push_state ADD COLUMN IF NOT EXISTS provenance" in push_migration

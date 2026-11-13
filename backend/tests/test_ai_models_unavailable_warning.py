@@ -70,3 +70,48 @@ async def test_embedding_never_falls_back_across_models(fallback) -> None:
     text = await router._local_unavailable_warning(
         _Db(), _model(deployment="local", model_type=AIModelType.embedding), FAILURE)
     assert "向量模型不跨模型兜底" in text and fallback["asked"] == [], text
+
+
+# ── spec enterprise-embedding-rerank-closure R11.1 / R11.2：按类型与部署位置如实说明后果 ──────────────
+
+
+@pytest.mark.asyncio
+async def test_embedding_preset_names_its_own_recovery_condition(fallback) -> None:
+    text = await router._local_unavailable_warning(
+        _Db(), _model(deployment="server", preset_key="gt_wemm_embedding_4b", model_type=AIModelType.embedding),
+        FAILURE,
+    )
+    assert "连上公司网络后自动生效" in text and "在此之前语义检索不可用" in text and "词法召回" in text, text
+    assert "本机恢复前" not in text, "服务器端企业预设不该说「本机恢复前」"
+
+
+@pytest.mark.asyncio
+async def test_local_embedding_says_until_the_local_service_recovers(fallback) -> None:
+    text = await router._local_unavailable_warning(
+        _Db(), _model(deployment="local", model_type=AIModelType.embedding), FAILURE)
+    assert "本机服务恢复前语义检索不可用" in text, text
+
+
+@pytest.mark.asyncio
+async def test_rerank_without_fallback_is_fail_open_not_a_failed_call(fallback) -> None:
+    text = await router._local_unavailable_warning(
+        _Db(), _model(deployment="server", preset_key="gt_qwen3_reranker_4b", model_type=AIModelType.rerank), FAILURE)
+    assert "知识检索不重排" in text and "AI 调用会失败" not in text, text
+    assert fallback["asked"] == ["local"]
+
+
+@pytest.mark.asyncio
+async def test_rerank_with_fallback_names_the_fallback(fallback) -> None:
+    fallback["answer"] = True
+    text = await router._local_unavailable_warning(
+        _Db(), _model(deployment="server", preset_key="gt_qwen3_reranker_4b", model_type=AIModelType.rerank), FAILURE)
+    assert "本机模型兜底" in text, text
+
+
+def test_update_path_allows_unreachable_presets_like_activation() -> None:
+    preset = _model(deployment="server", preset_key="gt_wemm_embedding_4b", model_type=AIModelType.embedding)
+    custom_server = _model(deployment="server")
+    assert router._local_unavailable(preset, FAILURE) is True
+    assert router._local_unavailable(custom_server, FAILURE) is False
+    config_error = ModelValidationFailure(code="provider_auth_failed", message="401", kind="config")
+    assert router._local_unavailable(preset, config_error) is False

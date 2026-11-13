@@ -45,6 +45,8 @@ class RefreshResult:
     failed_sections: list[str] = field(default_factory=list)
     cleared_sections: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    #: 写入归属被拒的格（spec formula-writer-ownership-and-stale design §13）
+    blocked_writes: list[dict] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +259,7 @@ class NoteStaleService:
         refresh_result.failed_sections = list(report.failed_sections)
         refresh_result.cleared_sections = list(report.cleared_sections)
         refresh_result.errors = list(report.errors)
+        refresh_result.blocked_writes = list(report.blocked_writes)
 
         # 7. 只 flush 不 commit
         await self.db.flush()
@@ -365,6 +368,7 @@ class NoteStaleService:
         refresh_result.failed_sections = list(report.failed_sections)
         refresh_result.cleared_sections = list(report.cleared_sections)
         refresh_result.errors = list(report.errors)
+        refresh_result.blocked_writes = list(report.blocked_writes)
 
         # 5. 只 flush 不 commit
         await self.db.flush()

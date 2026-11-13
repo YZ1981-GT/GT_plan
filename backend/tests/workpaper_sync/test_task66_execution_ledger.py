@@ -210,10 +210,17 @@ def test_ledger_check_mode_passes_and_reports_counters() -> None:
 
 
 def test_frozen_plan_digest_matches_recorded(ledger: dict) -> None:
-    """账里记的冻结计划 digest 必须等于磁盘上那份 —— 这是「冻结产物真的没再变」的断言。"""
+    """账里记的冻结计划 digest 必须等于磁盘上那份 —— 这是「冻结产物真的没再变」的断言。
+
+    🔴 摘要按「提交里的内容」算（换行先归一成 LF），与生成器 `_sha256_bytes` 同口径。
+    原写法 `sha256(read_bytes())` 在 Windows 干净检出（`core.autocrlf=true` ⇒ 磁盘是 CRLF）
+    上恒红、在 Linux CI 上恒绿 —— 判的是检出方式，不是计划有没有变。归一在这里**独立**
+    写一遍而不 import 生成器：生成器若退回按原始字节算，Windows 上两边对不上，本条照样红。
+    """
     import hashlib
 
-    actual = hashlib.sha256(FROZEN_PLAN_PATH.read_bytes()).hexdigest()
+    canonical = FROZEN_PLAN_PATH.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    actual = hashlib.sha256(canonical).hexdigest()
     assert ledger["frozen_inputs"]["plan_digest"] == actual, (
         "冻结计划变了但执行账没重生成 —— 重跑 `--write` 并复核 diff"
     )

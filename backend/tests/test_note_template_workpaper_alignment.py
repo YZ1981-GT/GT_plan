@@ -246,7 +246,7 @@ def test_allowlist_entries_name_their_template_table(checked):
     allow, templates, _m, _r = checked
     by_sec = {std: {s["section_number"]: s.get("tables") or [] for s in templates[std]["sections"]} for std in W.STDS}
     bad = []
-    for e in [*allow["corrections"], *allow["exceptions"]]:
+    for e in [*allow["corrections"], *allow["exceptions"], *allow["names"]]:
         tables = by_sec[e["std"]].get(e["section"]) or []
         name = tables[int(e["table"])].get("name") if int(e["table"]) < len(tables) else None
         if name != e["name"] or not str(e.get("reason") or "").strip():
@@ -274,3 +274,98 @@ def test_column_groups_stay_flat():
                 bad += [(std, s["section_number"], j, c) for c in t.get("columns") or []
                         if isinstance(c, dict) and "/" in str(c.get("group") or "")]
     assert not bad, bad
+
+
+# ─── 表名（spec note-disclosure-pull-regression-and-headless-backend R3.4） ──────────────────────
+
+#: 比过表名的配对表张数（2026-11-04：412 张配上的表按配对单元取首表、去掉底稿那边没有可比表名的 = 381）。
+#: 配对退化 / 候选表名抽不到会让表名判据静默变绿 ⇒ 钉住；变化时核对多比 / 少比的是哪几张再改。
+_COMPARED_TABLE_NAMES = 381
+#: 白名单 names 里 todo 类条数（模板表名待改：上市 五、54 t0「参考披露格式」、五、69 t1 / 五、76 t0「项  目」）。只许减少：
+#: 改好一张就删条目并把这个数减一；新增 todo 须先说明为什么不能现在改。
+_NAME_TODO = 3
+
+
+@pytest.fixture(scope="module")
+def names_checked(checked):
+    allow, templates, _m, results = checked
+    mismatches, compared = A.name_mismatches(results, templates)
+    return allow, templates, results, mismatches, compared
+
+
+def test_table_names_match_workpaper_or_allowlist(names_checked):
+    allow, _t, _r, mismatches, _c = names_checked
+    outside, _stale = A.check_names(mismatches, allow["names"])
+    assert not outside, "单体模板表名与底稿披露表名不一致（白名单外）：\n" + "\n".join(
+        f"  {m.std} {m.section} t{m.table}「{m.template}」vs 底稿 {m.where}{list(m.workpaper)}（{m.why}）" for m in outside)
+
+
+def test_no_stale_name_entries(names_checked):
+    allow, _t, _r, mismatches, _c = names_checked
+    _outside, stale = A.check_names(mismatches, allow["names"])
+    assert not stale, f"白名单 names 已失效（表名已一致 / 底稿改了字 / 表序变了，删或改条目）：{stale}"
+
+
+def test_compared_table_names_are_pinned(names_checked):
+    *_rest, compared = names_checked
+    assert compared == _COMPARED_TABLE_NAMES, (
+        f"比过表名的配对表 {compared} 张 ≠ 登记的 {_COMPARED_TABLE_NAMES}：少了 = 配对退化或底稿候选表名抽不到"
+        f"（没比的表不报）；多了 = 核对新比上的表后改登记数")
+
+
+def test_name_todo_entries_only_shrink(names_checked):
+    allow, *_rest = names_checked
+    todo = [e for e in allow["names"] if e["category"] == "todo"]
+    assert len(todo) == _NAME_TODO, (
+        f"names 里 todo {len(todo)} 条 ≠ 登记的 {_NAME_TODO}：少了 ⇒ 把 _NAME_TODO 下调到 {len(todo)}；"
+        f"多了 ⇒ 新增的待改表名先说明为什么不能现在改")
+
+
+def test_name_entries_require_reason_and_known_category():
+    m = A.NameMismatch("listed", "五、1", 0, "货币资金", ("货币资金明细",), "differ")
+    base = {"std": "listed", "section": "五、1", "table": 0, "name": "货币资金", "workpaper": "货币资金明细"}
+    assert A.check_names([m], [dict(base, category="synonym", reason="同义")]) == ([], [])
+    with pytest.raises(ValueError, match="缺理由"):
+        A.check_names([m], [dict(base, category="synonym", reason=" ")])
+    with pytest.raises(ValueError, match="类别"):
+        A.check_names([m], [dict(base, reason="没写类别")])
+    with pytest.raises(ValueError, match="类别"):
+        A.check_names([m], [dict(base, category="looks_fine", reason="类别不在集合里")])
+    # 底稿改了字（登记的原字不在现算候选里）⇒ 失效
+    _out, stale = A.check_names([m], [dict(base, category="synonym", reason="同义", workpaper="旧字")])
+    assert stale and stale[0]["workpaper"] == "旧字"
+
+
+def test_table_name_key_strips_only_writing_noise():
+    k = A.table_name_key
+    assert k("其中，重要的应收票据核销情况如下（逐项披露）：") == k("重要的应收票据核销情况（逐项披露）")
+    assert k("对于…金融负债，2023年公允价值的变动情况如下表所示：") == k("对于…金融负债，2025年公允价值的变动情况")
+    assert k("A、已确认递延所得税资产") == k("已确认递延所得税资产")
+    assert k("应付账款附注披露信息：") == k("应付账款")
+    assert k("期末发行在外的优先股、永续债等其他金融工具变动情况表") == k("期末发行在外的优先股、永续债等其他金融工具变动")
+    assert k("销售费用(合并报表)") == k("销售费用")
+    assert k("期末，处于第一阶段的坏账准备：") == k("期末处于第一阶段的坏账准备")
+    # 真差异不归一
+    assert k("重要的应收账款核销情况") != k("重要的其他应收款核销情况")
+    assert k("组合计提项目：组合1") != k("组合计提项目：应收中央企业客户")
+    # 一边带期间词、另一边不带算同名；两边期间词不同不算
+    assert A.same_table_name(k("上年年末处于第一阶段的坏账准备"), k("处于第一阶段的坏账准备"))
+    assert not A.same_table_name(k("期末处于第一阶段的坏账准备"), k("期初处于第一阶段的坏账准备"))
+
+
+def test_renaming_a_paired_template_table_is_caught(names_checked):
+    """改一个已配上底稿的模板表名（配对不变）⇒ 表名判据报出这一张；模板表名是通用占位的也报。"""
+    allow, templates, results, _m, _c = names_checked
+    import copy
+
+    t2 = copy.deepcopy(templates)
+    sec = next(s for s in t2["listed"]["sections"] if s["section_number"] == "五、1")
+    assert sec["tables"][0]["name"] == "货币资金"
+    sec["tables"][0]["name"] = "受限制的货币资金"
+    mismatches, _compared = A.name_mismatches(results, t2)
+    outside, _stale = A.check_names(mismatches, allow["names"])
+    assert [(m.std, m.section, m.table, m.why) for m in outside] == [("listed", "五、1", 0, "differ")]
+    sec["tables"][0]["name"] = "项  目"
+    mismatches, _compared = A.name_mismatches(results, t2)
+    outside, _stale = A.check_names(mismatches, allow["names"])
+    assert [(m.section, m.why) for m in outside] == [("五、1", "template_generic")]

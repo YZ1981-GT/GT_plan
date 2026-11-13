@@ -157,7 +157,7 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     # 凭证定位
     "voucher_date": ["日期", "记账日期", "凭证日期", "制单日期", "业务日期"],
     "voucher_no": ["凭证号", "凭证字号", "凭证编号"],
-    "voucher_type": ["凭证类型", "凭证字", "字"],
+    "voucher_type": ["凭证类型", "凭证字", "字", "凭证类别", "凭证分类"],
     # 描述
     "summary": ["摘要", "凭证摘要", "摘要说明", "Description"],
     "preparer": ["制单人", "制单", "经办人"],
@@ -474,12 +474,16 @@ def _match_header(header: str) -> tuple[Optional[str], int, str]:
 
     # Fuzzy: Levenshtein
     max_d = MATCHING_CONFIG.get("levenshtein_max_distance", 2)
-    for std_field, aliases in HEADER_ALIASES.items():
-        for alias in aliases:
-            if len(alias) < min_lev or len(normalized) < min_lev:
-                continue
-            if _levenshtein_leq(normalized, alias, max_d=max_d):
-                return std_field, fuzzy_conf, "header_fuzzy"
+    if len(normalized) >= min_lev:
+        # 距离从小到大找：先看 d=0..max_d 里最近的别名，而不是字典序里第一个「距离≤max_d」的
+        # （例：「凭证类别」与「凭证类型」差 1、与「凭证日期」差 2，原先先遇到日期就误识别成 voucher_date）
+        for d in range(1, max_d + 1):
+            for std_field, aliases in HEADER_ALIASES.items():
+                for alias in aliases:
+                    if len(alias) < min_lev:
+                        continue
+                    if _levenshtein_leq(normalized, alias, max_d=d):
+                        return std_field, fuzzy_conf, "header_fuzzy"
 
     return None, 0, "header_fuzzy"
 
@@ -574,6 +578,25 @@ def _get_alternatives(table_type: TableType, key_col: str) -> list[str]:
     return _BUILTIN_ALTERNATIVES.get(key_col, [])
 
 
+_SINGLE_SOURCE_FIELDS: frozenset[str] = frozenset({"account_code", "account_name"})
+
+
+def _keep_leftmost_for_single_source_fields(
+    mappings: list[tuple[str, Optional[str], int, str]],
+) -> list[tuple[str, Optional[str], int, str]]:
+    """科目编码 / 科目名称只保留左侧第一列，其余同字段列置为未映射。"""
+    seen: set[str] = set()
+    result: list[tuple[str, Optional[str], int, str]] = []
+    for header, std, conf, source in mappings:
+        if std in _SINGLE_SOURCE_FIELDS:
+            if std in seen:
+                result.append((header, None, 0, source))
+                continue
+            seen.add(std)
+        result.append((header, std, conf, source))
+    return result
+
+
 def _detect_by_headers(
     header_cells: list[str],
     data_rows: list[list[str]] | None = None,
@@ -598,6 +621,10 @@ def _detect_by_headers(
     for header in header_cells or []:
         std, conf, source = _match_header(header)
         first_pass.append((header, std, conf, source))
+
+    # 单值字段只认最左一列：右侧同名字段列（如「SAP科目编码」「原始科目编码」「原始科目名称」）
+    # 是备选/对照列，不参与识别匹配，也不会被入库时「首列为空就用后列」补值。
+    first_pass = _keep_leftmost_for_single_source_fields(first_pass)
 
     already_mapped: set[str] = {std for (_h, std, _c, _s) in first_pass if std}
 

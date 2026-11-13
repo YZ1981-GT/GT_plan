@@ -73,6 +73,7 @@ async def build_timeline(
 
     # 截断
     events = events[:limit]
+    await _attach_user_names(db, events)
 
     return {
         "project_id": str(project_id),
@@ -82,6 +83,45 @@ async def build_timeline(
         "event_types": EVENT_TYPES,
         "unavailable_sources": unavailable_sources,
     }
+
+
+async def _attach_user_names(db: AsyncSession, events: list[dict[str, Any]]) -> None:
+    """给事件补 ``user_name``：人员档案姓名优先，其次登录名。
+
+    只读查询放保存点；失败时不补（前端显示「未知用户」，不展示用户 id）。
+    """
+    ids: set[uuid.UUID] = set()
+    for evt in events:
+        raw = evt.get("user_id")
+        if not raw:
+            continue
+        try:
+            ids.add(uuid.UUID(str(raw)))
+        except ValueError:
+            continue
+    if not ids:
+        return
+    names: dict[str, str] = {}
+    try:
+        async with db.begin_nested():
+            from app.models.core import User
+            from app.models.staff_models import StaffMember
+
+            rows = (await db.execute(
+                sa.select(User.id, User.username, StaffMember.name)
+                .outerjoin(StaffMember, sa.and_(
+                    StaffMember.user_id == User.id, StaffMember.is_deleted == sa.false()))
+                .where(User.id.in_(list(ids)))
+            )).all()
+        for uid, username, staff_name in rows:
+            names[str(uid)] = staff_name or username
+    except Exception:
+        logger.warning("时间轴操作人姓名解析失败", exc_info=True)
+        return
+    for evt in events:
+        name = names.get(str(evt.get("user_id") or ""))
+        if name:
+            evt["user_name"] = name
 
 
 async def _audit_log_events(
@@ -94,6 +134,10 @@ async def _audit_log_events(
         sa.select(AuditLogEntry).where(
             AuditLogEntry.action_type == "formula.changed",
             AuditLogEntry.payload["project_id"].astext == str(project_id),
+            # formula-hub-release-blockers R11.1：按年度过滤，使 /formula-timeline/{project}/{year}
+            # 只返回指定年度的公式变更。旧条目 payload 没有 year 字段 → astext 为 NULL，
+            # NULL == str(year) 在 SQL 里是 UNKNOWN，被排除，符合预期。
+            AuditLogEntry.payload["year"].astext == str(year),
         ).order_by(AuditLogEntry.ts.desc()).limit(limit)
     )).scalars().all()
 

@@ -26,6 +26,8 @@ export interface FormulaDomainInfo {
   scope_kind: string
   /** 消费方已改读有效定义（未接入的域只存不生效） */
   wired: boolean
+  /** 未接入时后端给的中文说明（已接入不带） */
+  wired_reason?: string
   scopes: DomainScopeOption[]
   exec_fields: string[]
   desc_fields: string[]
@@ -109,7 +111,16 @@ export interface SyncPreview {
   /** 「应用到指定项目」预览给的是平铺计数 */
   counts?: Record<string, number>
   conflict_count?: number
+  /** 「应用到指定项目」里不会写入的（项目 × 公式位）及原因：域不适用 / 底稿域该项目没有这张底稿 */
+  skipped?: ApplySkipped[]
   [extra: string]: any
+}
+export interface ApplySkipped {
+  project_id: string
+  project_name?: string
+  /** 只跳过某个公式位时给出（底稿域）；整个项目不适用时不给 */
+  slot_key?: string
+  reason: string
 }
 export interface Decisions {
   project_choices: Record<string, ProjectChoice>
@@ -140,6 +151,33 @@ export interface PendingItem {
   publish_id: string | null
   created_at: string | null
   updated_at: string | null
+}
+/** 公式变更联动失败明细（后端 propagation_status.recent_failures） */
+export interface PropagationFailure {
+  outbox_id: string
+  domain: string
+  domain_label: string
+  source: string
+  slot_count: number
+  attempt_count: number
+  /** 尝试次数已达上限：不再自动重试（之后进死信，需人工处理） */
+  gave_up: boolean
+  last_error: string
+  created_at: string | null
+}
+/** 本项目公式变更的联动（传播）状态（`GET /api/projects/{pid}/formula-settings/propagation`） */
+export interface PropagationStatus {
+  project_id: string
+  window: number
+  /** idle = 无待处理；running = 有处理中；failed = 有失败（含自动重试中） */
+  state: 'idle' | 'running' | 'failed'
+  counts: { pending: number; failed: number; published: number }
+  retrying: number
+  gave_up: number
+  dead_letter: number
+  max_attempts: number | null
+  last_published_at: string | null
+  recent_failures: PropagationFailure[]
 }
 export interface Resolution {
   item_id: string
@@ -211,6 +249,23 @@ export interface FormulaTemplateInfo {
   /** 列表接口附带：在用订阅数（模板列表按它排序） */
   subscriber_count?: number
 }
+/** 规则能力；wired 只表示入口可调用，不代表项目已经执行或通过。 */
+export type CheckExecutionStatus = 'wired' | 'display_only' | 'not_executable'
+/** 来源历史只读摘要：可能跨多次运行；QC / 门禁不按年度过滤。 */
+export interface CheckLastRun {
+  /** 汇总中最新记录的时间，不是整组规则同一次运行的时间。 */
+  at: string | null
+  status: string
+  counts: Record<string, number>
+  /** 仅 cross_check_results 提供；QC / 门禁没有年度能力。 */
+  year?: number
+}
+export interface CheckCatalogQuery {
+  source?: string
+  q?: string
+  project_id?: string
+  year?: number
+}
 /** 全平台校对规则目录的一条规则（后端 formula_check_catalog，spec formula-governance-coverage-closure R3） */
 export interface CheckRule {
   id: string
@@ -221,6 +276,8 @@ export interface CheckRule {
   scope: string
   /** 表间审核预置：原始字段（「从预置选用」填表用） */
   fields?: Record<string, any>
+  /** 所属来源的执行状态（与来源一致；带 source 或 q 查询时才有） */
+  execution?: CheckExecutionStatus
 }
 export interface CheckRuleSource {
   key: string
@@ -238,6 +295,17 @@ export interface CheckRuleSource {
   /** 带 source 或 q 查询时才有 */
   matched?: number
   rules?: CheckRule[]
+  /** 执行状态：wired 已接入 / display_only 仅展示 / not_executable 不可执行（后端按执行器登记判定） */
+  execution?: CheckExecutionStatus
+  /** 状态的一句话说明（目录页展示） */
+  execution_reason?: string
+  /** 执行器入口「模块.符号」；无执行器为 null */
+  executor?: string | null
+  /** 结果落库的表；null = 本类结果不落库 */
+  result_table?: string | null
+  /** 带 project_id 时才有：最近一次执行结果（只读；不落库的来源为 null） */
+  last_run?: CheckLastRun | null
+  last_run_note?: string
 }
 export interface TemplateSlot {
   slot_key: string
@@ -246,15 +314,27 @@ export interface TemplateSlot {
   structure: Record<string, any>
   version: number
 }
+/**
+ * 模板「全局已变」提示的分类（后端 template_service.global_hints，spec formula-management-repair-closure R6.1）：
+ * follow = 模板没改过、可一键同步；same = 模板已与新全局一致、只需更新基线；conflict = 真冲突；deleted = 全局删了该公式位。
+ */
+export type TemplateHintKind = 'follow' | 'same' | 'conflict' | 'deleted'
 export interface TemplateGlobalHint {
   domain: string
   slot_key: string
   label: string
+  kind: TemplateHintKind
   template_definition: Definition | null
+  /** 模板写入（或上次「保留模板」）时的全局定义 */
   base_definition: Definition | null
+  base_version: number | null
+  /** 当前全局；全局已删为 null */
   global_definition: Definition | null
   global_version: number | null
   same_as_template: boolean
+}
+export const TEMPLATE_HINT_LABELS: Record<TemplateHintKind, string> = {
+  follow: '模板未改，可直接同步', same: '模板已与新全局一致', conflict: '模板与新全局都改了', deleted: '全局已删除该公式位',
 }
 export interface TemplateDetail extends FormulaTemplateInfo {
   definitions: Record<string, TemplateSlot[]>
@@ -349,6 +429,43 @@ export const CATEGORY_LABELS: Record<string, string> = {
   pinned: '已暂缓（仍用旧定义）', frozen: '冻结（已归档，不改动）', template: '模板覆盖（不受影响）',
 }
 export const CATEGORY_ORDER = ['inherit', 'follow', 'same', 'conflict', 'pinned', 'frozen', 'template'] as const
+
+// ── 全局设置页的公式位分组（spec formula-management-repair-closure R5） ──────────────────────────
+
+/** 各域公式位里「分组段」后面的分隔符：报表 `报表类型:行次`、底稿 `编码|sheet|格`、附注 `章节|格`、表间审核 `节点#规则`、推送 `底稿.规则` */
+const SLOT_GROUP_SEPARATOR: Record<string, string> = {
+  report: ':', wp: '|', note: '|', consol_note: '|', cross_check: '#', push: '.',
+}
+const SLOT_GROUP_LABELS: Record<string, Record<string, string>> = {
+  report: {
+    balance_sheet: '资产负债表', income_statement: '利润表', cash_flow_statement: '现金流量表',
+    equity_statement: '所有者权益变动表', cash_flow_supplement: '现金流量表补充资料', impairment_provision: '资产减值准备表',
+  },
+  tb_detail: { 1: '资产类科目', 2: '负债类科目', 3: '共同类科目', 4: '所有者权益类科目', 5: '成本类科目', 6: '损益类科目',
+    added: '自定义科目' },
+}
+
+/** 公式位所在的分组键：报表类型 / 底稿编码 / 附注章节 / 表间审核节点 / 推送规则的底稿；试算表明细按科目大类（首位数字） */
+export function slotGroupKey(domain: string, slotKey: string): string {
+  if (domain === 'tb_detail') return slotKey.startsWith('added:') ? 'added' : (slotKey.trim()[0] || '')
+  const sep = SLOT_GROUP_SEPARATOR[domain]
+  const at = sep ? slotKey.indexOf(sep) : -1
+  return at > 0 ? slotKey.slice(0, at) : slotKey
+}
+
+/** 分组的中文名（报表类型、科目大类有名字；底稿编码 / 章节 / 节点原样显示） */
+export function slotGroupLabel(domain: string, groupKey: string): string {
+  return SLOT_GROUP_LABELS[domain]?.[groupKey] || groupKey || '其他'
+}
+
+/**
+ * 未接入计算的域的提示文字（spec formula-management-repair-closure R3.1）：用后端 `/domains` 的 `wired_reason`，
+ * 公式管理节点 / 应用范围弹窗 / 全局设置页同一来源；已接入或取不到域信息返回空串（不提示）。
+ */
+export function domainNotWiredText(info: Pick<FormulaDomainInfo, 'wired' | 'wired_reason'> | null | undefined): string {
+  if (!info || info.wired) return ''
+  return info.wired_reason || '该类公式目前只保存、不参与计算。'
+}
 
 export const isConflict = (item: Pick<PlanItem, 'category'>) => item.category === 'conflict'
 export const isPendingRecord = (r: Pick<PublishRecord, 'status'>) => r.status === 'pending'

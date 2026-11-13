@@ -91,9 +91,21 @@ describe('LedgerPenetration 窗口化接线', () => {
     expect(bodyCalls(functionBody('exportWindowQuery'), 'downloadLedgerWindow')).toBe(true)
   })
 
-  it('辅助 Tab 在选类型前不加载，避免跨维度重复累计', () => {
-    const body = functionBody('tabAuxQuery')?.getText(sf) || ''
-    expect(body).toContain('!tabAuxType.value')
-    expect(SOURCE).toContain('请继续选择一个辅助类型，避免跨维度重复累计')
+  it('序时账 / 辅助 Tab 默认展示全部（科目通配 *），未限定时不显示余额列', () => {
+    // 序时账：不选科目也要发请求，accountCode 回落到 ALL_ACCOUNTS
+    const ledgerQuery = functionBody('tabLedgerQuery')?.getText(sf) || ''
+    expect(ledgerQuery).toContain('ALL_ACCOUNTS')
+    expect(ledgerQuery).not.toContain('!tabLedgerAccount.value) return null')
+    // 辅助明细：科目 / 类型都可省略，类型缺省传 null；浏览模式的余额由 onlyBusinessRows 隐去
+    const auxQuery = functionBody('tabAuxQuery')?.getText(sf) || ''
+    expect(auxQuery).toContain('ALL_ACCOUNTS')
+    expect(auxQuery).not.toContain('!tabAuxType.value) return null')
+    expect(SOURCE).toContain('onlyBusinessRows(')
+  })
+
+  it('辅助明细行（带 aux_type）凭证字为空时不按空串去查凭证，交给后端按号+日期定位', () => {
+    const body = functionBody('rowVoucherType')?.getText(sf) || ''
+    expect(body).toContain("'aux_type' in row")
+    expect(body).toContain('return null')
   })
 })

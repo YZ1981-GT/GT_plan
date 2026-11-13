@@ -22,6 +22,7 @@ import logging
 import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
+from app.services.checklist_response_cas import checklist_snapshot_entry
 from app.services.dataset_query import get_active_filter
 
 from .leaf_aggregation import LeafRow, select_leaves, to_leaf_rows
@@ -208,21 +209,22 @@ async def load_project_context(ctx, *, label: str = "四表取数") -> dict:
 async def load_responses_snapshot(
     ctx, prefix: str, *, limit: int = 5000, label: str = "四表取数"
 ) -> dict:
-    """加载该底稿的 `checklist_responses` 快照（``item_id LIKE '{prefix}-%'``）。"""
+    """加载该底稿的 `checklist_responses` 快照（``item_id LIKE '{prefix}-%'``）。
+
+    每条带该行的 CAS 版本（`checklist_snapshot_entry`）：K 循环宿主只用快照建编辑基线，
+    缺版本时严格 CAS 保存对已有行返回 428。
+    """
     snapshot: dict = {}
     try:
         result = await ctx.db.execute(
             sa.text(
-                "SELECT item_id, conclusion, remark FROM checklist_responses "
+                "SELECT item_id, conclusion, remark, updated_at FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT :lim"
             ),
             {"wp_id": str(ctx.wp_id), "pfx": f"{prefix}-%", "lim": limit},
         )
         for row in result.fetchall():
-            snapshot[row.item_id] = {
-                "conclusion": row.conclusion or "",
-                "remark": row.remark or "",
-            }
+            snapshot[row.item_id] = checklist_snapshot_entry(row)
     except Exception as e:  # noqa: BLE001
         logger.warning("%s: checklist_responses 加载失败: %s", label, e)
     return snapshot

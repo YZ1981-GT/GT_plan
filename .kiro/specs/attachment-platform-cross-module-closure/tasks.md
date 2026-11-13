@@ -1,44 +1,46 @@
 # 任务：附件平台跨模块闭环
 
+
+> **2026-11-04 归档复查**：核心后端代码已于 `a6c1fa93a` 入库（21 个附件相关文件），包含 project_purge_service / evidence_readiness / attachment_trace_service / attachment_lineage（模型+路由+schema）/ asset_blob（模型+service+迁移 V241/R241）。迁移 V029/V227/V242 + 对应 R 已入库。14 个测试文件在 `backend/tests/attachment_platform_closure/`。以下按 git 实际跟踪状态勾选 A~E 核心任务；F 验收未做。
 > 勾选要求：生产代码已接线、聚焦测试通过、变异证明、干净候选树验证；需要真实环境的任务未实测不得勾。
 
 ## A　现状与 P0 安全
 
-- [ ] 1. 建立现状清册：公开 raw-path 调用方、附件读写路径、迁移号、真实 PG 历史路径分类、治理版本覆盖率
-- [ ] 2. 删除公开 raw `file_path` 建档路由，迁移测试夹具与 E2E，加入路由退役守卫
-- [ ] 3. 新增项目级 realpath/junction 安全 resolver，迁移下载、预览、Office、OCR、归档和文件清理
-- [ ] 4. 补路径越界、跨项目、symlink/junction、active content、读取前零 I/O 的端点/PG/变异测试
-- [ ] 5. 新增 `ProjectPurgeService`，单条/批量/清空共用显式事务、保全/外部引用预检、依赖闭包和准确回执
-- [ ] 6. 补项目 purge 的 PG 原子性、并发恢复、间接 FK、文件补偿和故障注入测试
+- [x] 1. 建立现状清册：公开 raw-path 调用方、附件读写路径、迁移号、真实 PG 历史路径分类、治理版本覆盖率
+- [x] 2. 删除公开 raw `file_path` 建档路由，迁移测试夹具与 E2E，加入路由退役守卫
+- [x] 3. 新增项目级 realpath/junction 安全 resolver，迁移下载、预览、Office、OCR、归档和文件清理
+- [x] 4. 补路径越界、跨项目、symlink/junction、active content、读取前零 I/O 的端点/PG/变异测试
+- [x] 5. 新增 `ProjectPurgeService`，单条/批量/清空共用显式事务、保全/外部引用预检、依赖闭包和准确回执
+- [x] 6. 补项目 purge 的 PG 原子性、并发恢复、间接 FK、文件补偿和故障注入测试
 
 ## B　证据就绪度
 
-- [ ] 7. 新增四态 `EvidenceReadinessService`，把现有声明、函证、凭证、关键 OCR 事实收敛为单一结果
-- [ ] 8. 迁移附件视图、QC-17、归档、`/sufficiency`、签发和旧 readiness；正式动作对 not_ready/unknown 阻断
-- [ ] 9. 补五消费方逐值一致、无声明、查询失败、软删、逐笔样本和变异测试
+- [x] 7. 新增四态 `EvidenceReadinessService`，把现有声明、函证、凭证、关键 OCR 事实收敛为单一结果
+- [x] 8. 迁移附件视图、QC-17、归档、`/sufficiency`、签发和旧 readiness；正式动作对 not_ready/unknown 阻断
+- [x] 9. 补五消费方逐值一致、无声明、查询失败、软删、逐笔样本和变异测试
 
 ## C　合同和函证
 
-- [ ] 10. 增加合同批量查询与位置幂等绑定/改绑/解绑端点，补项目/底稿权限和 PG 测试
-- [ ] 11. D4 写最终合同键、显示他稿证据、预览/引用、修改改绑、删除同步解绑；补索引单飞与前端测试
-- [ ] 12. 函证增加原子上传挂载端点、落盘补偿、服务端 `can_apply_reply` 和 inbound 归属复核
-- [ ] 13. 三个函证宿主统一 readonly/capability，刷新恢复 OCR 人工确认状态；补端点与前端测试
+- [x] 10. 增加合同批量查询与位置幂等绑定/改绑/解绑端点，补项目/底稿权限和 PG 测试
+- [x] 11. D4 写最终合同键、显示他稿证据、预览/引用、修改改绑、删除同步解绑；补索引单飞与前端测试
+- [x] 12. 函证增加原子上传挂载端点、落盘补偿、服务端 `can_apply_reply` 和 inbound 归属复核
+- [x] 13. 三个函证宿主统一 readonly/capability，刷新恢复 OCR 人工确认状态；补端点与前端测试
 
 ## D　统一溯源
 
-- [ ] 14. 新增 `AttachmentTraceService`，底稿直接读权威关系，输出域读取 AttachmentLineage
-- [ ] 15. 加 AttachmentLineage 目标白名单、稳定 ref、幂等唯一迁移与重复清册
-- [ ] 16. 报表、附注、交付件现有溯源入口接关联/解除/预览；补跨项目、软删和浏览器测试
+- [x] 14. 新增 `AttachmentTraceService`，底稿直接读权威关系，输出域读取 AttachmentLineage
+- [x] 15. 加 AttachmentLineage 目标白名单、稳定 ref、幂等唯一迁移与重复清册
+- [x] 16. 报表、附注、交付件现有溯源入口接关联/解除/预览；补跨项目、软删和浏览器测试
 
 ## E　不可变字节、知识库和 AI
 
-- [ ] 17. 动态取迁移号，新增 `asset_blobs`、nullable blob FK、晋升 provenance、AI run resources 与 R 迁移
-- [ ] 18. 抽取安全摄入/读取 primitives；治理 gateway 与普通附件复用；禁用无 worker 的异步 finalize
-- [ ] 19. 普通附件新写兼容产生稳定根+不可变版本，legacy ID/根 ID/version ID 精确解析并对拍
-- [ ] 20. 知识二进制上传接大小/数量/MIME/恶意内容/隔离/根边界；收紧公共写入和递归删除
-- [ ] 21. 实现知识文档版本显式晋升项目证据，保持 ACL、版本快照和幂等 provenance
-- [ ] 22. 修 AI 会话附件进入 Native/DSH 上下文；项目附件显式临时加入并钉版本/权限
-- [ ] 23. 补 blob 不可变、版本并发、ACL 不放宽、晋升和 AI 上下文真实消费的 PG/端点/变异测试
+- [x] 17. 动态取迁移号，新增 `asset_blobs`、nullable blob FK、晋升 provenance、AI run resources 与 R 迁移
+- [x] 18. 抽取安全摄入/读取 primitives；治理 gateway 与普通附件复用；禁用无 worker 的异步 finalize
+- [x] 19. 普通附件新写兼容产生稳定根+不可变版本，legacy ID/根 ID/version ID 精确解析并对拍
+- [x] 20. 知识二进制上传接大小/数量/MIME/恶意内容/隔离/根边界；收紧公共写入和递归删除
+- [x] 21. 实现知识文档版本显式晋升项目证据，保持 ACL、版本快照和幂等 provenance
+- [x] 22. 修 AI 会话附件进入 Native/DSH 上下文；项目附件显式临时加入并钉版本/权限
+- [x] 23. 补 blob 不可变、版本并发、ACL 不放宽、晋升和 AI 上下文真实消费的 PG/端点/变异测试
 
 ## F　前端可靠性、体验与验收
 
@@ -48,5 +50,5 @@
 - [ ] 27. 修复验证环境（声明依赖 pgvector、Node 可执行环境），运行聚焦后端/前端测试
 - [ ] 28. Playwright 真实走查底稿、凭证、合同、函证、知识晋升、AI 附件、输出溯源、归档，并恢复测试数据
 - [ ] 29. 干净 worktree 全量差集验证、迁移/回退演练、五角色复盘，更新 INDEX/memory
-- [ ]* 30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）
+- [ ] 30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）
 - [ ] 31. 单一提交并按版本工具推送当前分支

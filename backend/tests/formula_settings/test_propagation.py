@@ -5,6 +5,7 @@ import uuid
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
 import sqlalchemy as sa
 
 from app.models.base import ProjectStatus
@@ -141,7 +142,10 @@ async def test_recalc_failure_keeps_stale_marks_and_logs_degraded(monkeypatch):
     """R8.2：重算整体失败（抛异常）时，闭包行的过期标记仍落库可见；记降级日志；不发 REPORTS_UPDATED。
 
     修复前标过期与重算同一事务，重算一抛整笔回滚 ⇒ 过期标记一起消失，报表看起来「已是最新」。
+    spec formula-management-repair-closure R1.1：随后抛 ``PropagationIncomplete``（此前返回 error 字典，
+    投递照样标 published ⇒ 失败不重试也不可见）。
     """
+    from app.services.formula_settings.propagation import PropagationIncomplete
     from app.services.event_bus import event_bus
     from app.services.report_engine import ReportEngine
     import app.services.stale_degraded_logger as sdl
@@ -161,10 +165,12 @@ async def test_recalc_failure_keeps_stale_marks_and_logs_degraded(monkeypatch):
         pid = await _seed_one(factory)
         propagation.set_session_factory(factory)
         try:
-            out = await propagation.propagate_report(pid, 2025, ["balance_sheet:BS-001"])
+            with pytest.raises(PropagationIncomplete) as caught:
+                await propagation.propagate_report(pid, 2025, ["balance_sheet:BS-001"])
         finally:
             propagation.set_session_factory(None)
-        assert (out["marked"], out["recalculated"]) == (2, None) and "注入" in out["error"]
+        assert caught.value.domain == "report" and caught.value.detail["marked"] == 2
+        assert "注入" in str(caught.value) and "将自动重试" in str(caught.value)
         assert await _stale_flags(factory) == {"BS-001": True, "BS-002": True}
     assert published == []
     assert [d["source"] for d in degraded] == ["formula_settings:report_recalc"]
@@ -222,21 +228,35 @@ async def test_propagate_wp_marks_prefill_stale_only_for_that_code():
         assert (flags[d2], flags[e1], flags[a_d2]) == (True, False, False)
 
 
-async def test_event_without_year_is_backfilled_and_reaches_consol_note_refill(monkeypatch):
+async def test_event_without_year_is_backfilled_and_reaches_consol_note_operation(monkeypatch):
     """端到端：publish_events 不带 year → 事件总线按项目审计年度补齐（FORMULA_CONFIG_CHANGED 在
-    YEAR_SCOPED_EVENT_TYPES）→ 合并附注传播拿到年度并按章节重新填数（不是恒「no_year」跳过）。"""
+    YEAR_SCOPED_EVENT_TYPES）→ 合并附注传播拿到年度（不是恒「no_year」跳过），按合并运行统一入口排一次
+    push operation（含附注步）并唤醒 worker —— 公式变更与一键更新、审批推送共用持久 consol_operation
+    （consolidation-run-and-workpaper-lifecycle-closure R4.1），不在事件里旁路直接刷附注。"""
+    import inspect
+
     import app.core.database as database
     from app.models.audit_platform_schemas import EventType
     from app.services import consol_note_formula_service as cnfs
+    from app.services import consol_operation_service
     from app.services import event_bus as event_bus_module
+    from app.workers import consol_operation_worker
 
-    fills = []
+    requests, woken, fills = [], [], []
+    real_request = consol_operation_service.request_operation
 
-    async def fake_fill(db, project_id, year, sections):
-        fills.append((project_id, year, list(sections)))
-        return {"filled": len(sections)}
+    async def recording_request(db, **kwargs):
+        inspect.signature(real_request).bind(db, **kwargs)  # 参数与真实签名可绑定（不是只验接线）
+        requests.append(kwargs)
+        return SimpleNamespace(operation=SimpleNamespace(id=uuid.uuid4(), status="queued"), disposition="created")
 
-    monkeypatch.setattr(cnfs, "fill_note_sections", fake_fill)
+    async def bypass_fill(*_a, **_k):
+        fills.append(_a)
+        return {}
+
+    monkeypatch.setattr(consol_operation_service, "request_operation", recording_request)
+    monkeypatch.setattr(consol_operation_worker, "wake", lambda: woken.append(True))
+    monkeypatch.setattr(cnfs, "fill_note_sections", bypass_fill)
     async with make_db() as factory:
         async with factory() as db:
             pid = await add_project(db, "合并附注传播", report_scope="consolidated")  # audit_year=2025
@@ -255,4 +275,7 @@ async def test_event_without_year_is_backfilled_and_reaches_consol_note_refill(m
         finally:
             propagation.set_session_factory(None)
     assert sent == 1
-    assert fills == [(pid, 2025, ["五、1", "五、7"])]
+    assert [(r["project_id"], r["year"], r["operation_type"], r["trigger_source"], tuple(r["requested_actions"]))
+            for r in requests] == [(pid, 2025, "push", "formula_changed", ("notes",))]
+    assert woken == [True], "提交后唤醒 worker"
+    assert fills == [], "不再在事件处理里旁路直接刷附注"

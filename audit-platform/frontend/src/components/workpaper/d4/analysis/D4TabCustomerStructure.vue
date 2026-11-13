@@ -28,6 +28,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import { useEntrySyncReadiness } from '../../sync/useEntrySyncReadiness'
 import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 
 const props = defineProps<{
@@ -46,10 +47,25 @@ const reloadWorkpaperData = inject<(() => Promise<void> | void) | null>('reloadW
 // 与 D4-1 同架构 —— 不建独立 entry。flushHtml 先 flush 待存改动再 readStoreProjection
 // （防投影旧值）；capability 现算；fail-visible，能力未裁决 / OO 不健康时 fail-closed（Req 7.4）。
 const D4_9_SHEET_KEY = 'd49-managed'
-const {
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：「在线编辑」选项与模式开关的可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），经 `useD4SyncMode` 的 `entrySync` 生效，
+ * 不由本宿主的局部判断决定。entry 取 D4 父 entry（本 Tab 是它的 parent duplicate）。
+ *
+ * 🔴 必须声明在 `props` 之后、`useD4SyncMode` 之前：内部 `watch(..., { immediate: true })`
+ * 会在 setup 期立即读下面三个 getter，组合式也要在创建时拿到它。
+ */
+const d4EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-d4-operating-revenue',
+})
+const { showModeSwitch,
   syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
   busy: syncBusy, syncStateTag,
 } = useD4SyncMode({
+  entrySync: d4EntrySync,
   sheetKey: D4_9_SHEET_KEY,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -288,7 +304,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
     <!-- 双模式切换（结构化视图 ↔ 在线编辑，走统一双向 sync bridge） -->
     <div class="mode-bar">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <el-segmented v-if="showModeSwitch" v-model="editorMode" :options="modeOptions" size="small" />
       <div class="mode-bar-status">
         <el-tag :type="syncStateTag.type" size="small">{{ syncStateTag.text }}</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" />

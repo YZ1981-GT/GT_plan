@@ -39,10 +39,16 @@ DEFAULT_REVIEW_CONFIG = {
 # Allowed global roles for modification
 ALLOWED_ROLES = {"manager", "partner", "admin"}
 
-# Canonical project roles that may own a review level. Read-only members cannot review.
-REVIEW_LEVEL_ROLES = frozenset(
-    role.value for role in ProjectUserRole if role is not ProjectUserRole.readonly
-)
+# 可担任复核层级的项目角色：只放行底稿门（dedicated_wp_gate）按「主管」对待的角色。
+# 复核状态 PUT 经底稿门映射为 dedicated_write：主管（经理 / 合伙人 / 质控，EQCR 映射为合伙人）
+# 全权通过；审计员只有作为编制人（lead）才有写权 —— 那正是自复核。原先这里放行 auditor、只读成员以外全部
+# 角色，按此配置审计员复核必定 404（界面 ProjectSettingsCenter 也只提供这四个选项）。
+REVIEW_LEVEL_ROLES = frozenset({
+    ProjectUserRole.manager.value,
+    ProjectUserRole.partner.value,
+    ProjectUserRole.qc.value,
+    ProjectUserRole.eqcr.value,
+})
 
 # Statuses that indicate reviews are in progress
 IN_PROGRESS_STATUSES = {

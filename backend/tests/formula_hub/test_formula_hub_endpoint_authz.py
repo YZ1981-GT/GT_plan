@@ -326,7 +326,7 @@ _WF = "/api/projects/{project_id}/workflow"
 #: 配方涉及的路由模块里、不进配方表的路由 → 理由（每条须真实存在；改了权限 / 所有权 / 合同的任务把它移入配方表）
 #: 第 2 轮：design §10.3 其余 19 条已移入 ``test_formula_hub_endpoint_authz_r2.RECIPES_R2``（形态 / 对账两条用例合并两表）
 _UNCHANGED_ROUTES: dict[tuple[str, str], str] = {
-    # ── formula_settings（两个 router 共 16 条） ──
+    # ── formula_settings（两个 router 共 17 条） ──
     ("GET", f"{_FS}/domains"): "权限与响应结构不变（任务 36 只改 wired 的取值来源）",
     ("GET", f"{_FS}/{{domain}}/global"): _NOT_CHANGED,
     ("POST", f"{_FS}/{{domain}}/global/preview"): _NOT_CHANGED,
@@ -340,15 +340,21 @@ _UNCHANGED_ROUTES: dict[tuple[str, str], str] = {
     ("POST", f"{_PFS}/{{domain}}/apply-preview"): _NOT_CHANGED,
     ("POST", f"{_PFS}/{{domain}}/apply"): _VALIDATOR,
     ("GET", f"{_PFS}/dependencies"): _NOT_CHANGED,
+    ("GET", f"{_PFS}/propagation"): (
+        "新增只读端点（spec formula-management-repair-closure R1.3）：require_project_access('readonly')；"
+        "未登录 401 / 非成员 403 / 只读成员放行见 test_propagation_status.py"),
     # ── formula（公式中央 API） ──
-    ("DELETE", "/api/formula/custom-functions/{name}"): "admin only；权限不变",
+    ("DELETE", "/api/formula/custom-functions/{name}"): (
+        "admin only（权限不变）；管理员过门后 501、注册表不变：写接口停用（spec formula-management-repair-closure R3.3，"
+        "test_custom_dsl_coding.py 覆盖）"),
     ("GET", "/api/formula/custom-functions"): _NOT_CHANGED,
     ("GET", "/api/formula/functions"): _NOT_CHANGED,
     # ── formula_debug ──
     # ── report_config ──
     ("GET", f"{_RC}"): _NOT_CHANGED,
     ("GET", f"{_RC}/types"): _NOT_CHANGED,
-    ("GET", f"{_RC}/row-note-mapping"): _NOT_CHANGED,
+    # GET {_RC}/row-note-mapping 已迁出到 report_row_note_mapping.py（不在 design §10.3 的 14 个模块里；
+    # spec platform-performance-residual-findings-closure R2），条目随之删除
     ("GET", f"{_RC}/{{config_id}}"): _NOT_CHANGED,
     ("POST", f"{_RC}"): _VALIDATOR,
     ("POST", f"{_RC}/clone"): _NOT_CHANGED,
@@ -372,6 +378,15 @@ _UNCHANGED_ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/api/formula-templates/{template_id}/promote-preview"): _NOT_CHANGED,
     ("POST", "/api/formula-templates/{template_id}/publish"): _NOT_CHANGED,
     ("POST", "/api/formula-templates/{template_id}/publish-preview"): _NOT_CHANGED,
+    # 模板版本对比 / 回滚（S6 formula-template-dual-project-pilot 新增，原先漏登 —— 被上面 row-note-mapping 的失效条目先打红
+    # 遮住了；spec formula-management-repair-closure 补登）：对比 = get_visible（与 versions 同口径），回滚两条 = get_managed
+    # + 版本号先校验（缺 428 / 不符 409）；行为与他人 403 见 formula_settings/test_template_endpoints.py
+    ("GET", "/api/formula-templates/{template_id}/diff"): "get_current_user + get_visible（与 versions 同口径）",
+    ("POST", "/api/formula-templates/{template_id}/rollback-preview"): "get_current_user + get_managed + 版本号先校验",
+    ("POST", "/api/formula-templates/{template_id}/rollback"): "get_current_user + get_managed + 版本号先校验",
+    # spec formula-management-repair-closure R6.2 新增：保留模板（只改基线），他人 404 / 非管理者 403 见 test_template_hint_kinds.py
+    ("POST", "/api/formula-templates/{template_id}/global-hints/keep"): (
+        "get_current_user + get_managed（所有者或 admin）+ 模板版本与全局版本双重校验"),
     ("GET", "/api/projects/{project_id}/formula-templates/subscriptions"): _NOT_CHANGED,
     ("POST", "/api/projects/{project_id}/formula-templates/subscribe"): _NOT_CHANGED,
     ("POST", "/api/projects/{project_id}/formula-templates/subscribe-preview"): _NOT_CHANGED,
@@ -568,15 +583,25 @@ def _all_recipes() -> tuple[Any, ...]:
     return (*RECIPES, *RECIPES_R2)
 
 
+#: 停用的写接口（过了角色门也只回 501、不写任何东西）：只有管理员拿到 501，其余照常 401 / 403
+#: （spec formula-management-repair-closure R3.3：自定义函数只存进程内存，写接口停用）
+_RETIRED_STUB_RECIPES = frozenset({"custom-function"})
+
+
 def test_recipe_table_shape() -> None:
-    """每条配方把九种身份恰好分一次、拒绝码只有 401 / 403（底稿绑定路由另有 404）且未登录恒 401；（方法, 路由）不重复；门禁与表名合法。"""
+    """每条配方把九种身份恰好分一次、拒绝码只有 401 / 403（底稿绑定路由另有 404，停用的写接口管理员 501）且未登录恒 401；
+    （方法, 路由）不重复；门禁与表名合法。"""
     assert len(IDENTITY_SPECS) == 9 and pubfx.LOGGED_IN == LOGGED_IN and pubfx.A_MEMBERS == A_MEMBERS
     recipes = _all_recipes()
     keys = [(r.method, r.route) for r in recipes]
     assert len(keys) == len(set(keys)) and len({r.key for r in recipes}) == len(recipes), keys
+    assert _RETIRED_STUB_RECIPES <= {r.key for r in recipes}
     for recipe in recipes:
         assert recipe.allowed.isdisjoint(recipe.denied) and recipe.allowed | set(recipe.denied) == set(IDENTITIES), recipe.key
         codes = {401, 403} | ({404} if "{wp_id}" in recipe.route else set())  # 底稿绑定路由另有可见性门（404）
+        if recipe.key in _RETIRED_STUB_RECIPES:
+            assert not recipe.allowed and recipe.denied.get("admin") == 501, recipe.key
+            codes = codes | {501}
         assert set(recipe.denied.values()) <= codes and recipe.denied.get("anon") == 401, recipe.key
         assert recipe.gate is None or recipe.gate in TRACED_GATES, (recipe.key, recipe.gate)
         assert all(_TABLE_NAME.match(table) for table in recipe.tables), (recipe.key, recipe.tables)

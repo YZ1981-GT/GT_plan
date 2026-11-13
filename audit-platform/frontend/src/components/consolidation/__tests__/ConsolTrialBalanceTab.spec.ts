@@ -12,20 +12,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 
-const { api, message } = vi.hoisted(() => ({
+const { api, message, messageBox } = vi.hoisted(() => ({
   api: {
     getConsolReportTrial: vi.fn(),
     getConsolPushStatus: vi.fn(),
+    getWorksheetTree: vi.fn(),
     pushConsolidation: vi.fn(),
     drillConsolRowEntries: vi.fn(),
     drillConsolRowIndividual: vi.fn(),
   } as Record<string, ReturnType<typeof vi.fn>>,
   message: { success: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  messageBox: { confirm: vi.fn() },
 }))
 vi.mock('@/services/consolidationApi', () => Object.fromEntries(
   Object.keys(api).map((k) => [k, (...a: any[]) => api[k](...a)]),
 ))
-vi.mock('element-plus', () => ({ ElMessage: message }))
+vi.mock('element-plus', () => ({ ElMessage: message, ElMessageBox: messageBox }))
 vi.mock('@/composables/useExcelIO', () => ({ exportMultiSheetData: vi.fn() }))
 
 import ConsolTrialBalanceTab from '../ConsolTrialBalanceTab.vue'
@@ -145,6 +147,9 @@ describe('ConsolTrialBalanceTab', () => {
   beforeEach(() => {
     Object.values(api).forEach((f) => f.mockReset())
     Object.values(message).forEach((f) => f.mockClear())
+    messageBox.confirm.mockReset()
+    messageBox.confirm.mockResolvedValue('confirm')
+    api.getWorksheetTree.mockResolvedValue({ diagnostics: [{ code: 'duplicate_project', message: '企业树存在重复项目' }] })
     api.getConsolReportTrial.mockImplementation((_pid: string, opts: any) =>
       Promise.resolve(opts.nodeKey === 'A:consol' ? trialResponse('A:consol', 'A（合并）') : trialResponse()))
     api.getConsolPushStatus.mockResolvedValue({ last_run: null, is_stale: false, stale_rows: 0 })
@@ -224,7 +229,26 @@ describe('ConsolTrialBalanceTab', () => {
     await wrapper.find('[data-testid="ctb-push"]').trigger('click')
     await flushPromises()
     expect(api.pushConsolidation).toHaveBeenCalledWith('p-g', 2025, 'manual')
+    expect(api.getWorksheetTree).toHaveBeenCalledWith('p-g')
     expect(message.success).toHaveBeenCalledWith('已开始推送，完成后自动刷新')
+  })
+
+  it('冲突确认取消时不发送手工推送', async () => {
+    messageBox.confirm.mockRejectedValueOnce(new Error('cancel'))
+    const wrapper = await loaded()
+    await wrapper.find('[data-testid="ctb-push"]').trigger('click')
+    await flushPromises()
+    expect(api.getWorksheetTree).toHaveBeenCalledWith('p-g')
+    expect(api.pushConsolidation).not.toHaveBeenCalled()
+  })
+
+  it('企业树诊断读取失败时仍继续推送并提示未能检查', async () => {
+    api.getWorksheetTree.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = await loaded()
+    await wrapper.find('[data-testid="ctb-push"]').trigger('click')
+    await flushPromises()
+    expect(api.pushConsolidation).toHaveBeenCalledWith('p-g', 2025, 'manual')
+    expect(message.warning).toHaveBeenCalledWith('未能检查企业树冲突，已继续推送')
   })
 
   it('审核：交给父组件显示的是行恒等式核对结果', async () => {

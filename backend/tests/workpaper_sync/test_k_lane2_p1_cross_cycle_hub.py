@@ -36,6 +36,18 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
 )
 
 FROZEN_PATH = DATA / "workpaper_sync_k11_frozen_cross_cycle_keys.json"
+
+#: 🔴 冻结（`9c325aea4`，2026-09-27）之后新出现的 K 键来源 —— 逐源登记键数。
+#:
+#: 这两个文件在冻结提交上**都不存在**；冻结期那 15 个文件现算仍是 57（见
+#: `TestKBP18GlobalCounters.test_non_k_consuming_k_keys_count` 的断言）。
+#: 登记而不改冻结件，口径同 Task 57 的棘轮台账。
+POST_FREEZE_KEY_SOURCES: dict[str, int] = {
+    # 公式推送生成物（`*-tb-amount` / `*-audited-*` 等推送拥有键）
+    "generated/formulaPushOwnedKeys.ts": 27,
+    # CAS 渲染快照基线 —— 测试文件，落在 `__tests__` 目录**外**故未被 fixture 排除
+    "composables/workpaper/renderSnapshotCasBaseline.spec.ts": 3,
+}
 FULL_MANIFEST_PATH = DATA / "workpaper_sync_entry_manifest.json"
 CONTRACT_DIR = DATA / "workpaper_sync_contracts"
 
@@ -152,14 +164,63 @@ class TestKBP18GlobalCounters:
     def test_non_k_consuming_k_keys_count(
         self, non_k_frontend: list[pathlib.Path], frozen: dict
     ) -> None:
+        """🔴 冻结值 57 仍成立，冻结后的增量逐源登记（现算 87 = 57 + 27 + 3）。
+
+        口径矩阵先排除了「口径不同」这个解释：按 16 种排除组合（生成物 / 测试文件 /
+        stories 的全部组合）现算，**没有任何一种得到 57 或 design 里那个 70**
+        （最接近的是 55 与 60）⇒ 57 不是另一个口径，而是**冻结时点**的现算值。
+
+        回到冻结提交 `9c325aea4`（2026-09-27）逐文件重算，得数恰好 **57**；
+        增长全部来自那时**还不存在的两个文件**，且新增键与冻结键集合**不相交**
+        （并集 == 全量，见下面断言）：
+          · `generated/formulaPushOwnedKeys.ts` 27 键 —— 公式推送的生成物，
+            全是 `*-tb-amount` / `*-audited-*` 这类推送拥有键；
+          · `renderSnapshotCasBaseline.spec.ts` 3 键 —— CAS 基线**测试**文件。
+            🔴 它本是口径泄漏（`non_k_frontend` 只排 `__tests__` 目录，不排
+            目录外的 `*.spec.ts` / `*.test.ts`），但**不能**顺手收紧：冻结期的
+            `checklistPersistenceHelpers.test.ts` 也是这种文件、它那 2 个键
+            （`K1-1-main` / `K3-2-x`）就在 57 里头，一收紧 57 会变 55 ⇒ 等于
+            悄悄改冻结基线。按 Task 57 的处置口径：登记漂移，不改冻结件。
+
+        所以判据改成「冻结值 + 已登记增量」：任何**未登记**的增长都打红，而登记
+        项逐条写明文件与键数，看得出是谁加的。
+        """
         rx = re.compile(r"['\"`](K(?:1[0-3]|[1-9])-[A-Za-z0-9][A-Za-z0-9\-]*)['\"`]")
-        consumed: set[str] = set()
+        per_file: dict[str, set[str]] = {}
         for p in non_k_frontend:
             src = strip_comments(cached_text(p))
-            consumed |= {m.group(1) for m in rx.finditer(src)}
+            found = {m.group(1) for m in rx.finditer(src)}
+            if found:
+                per_file[p.relative_to(FRONTEND).as_posix()] = found
+
         declared = frozen["global_counters"]["non_k_files_consuming_k_keys"]
-        assert len(consumed) == declared, (
-            f"非 K 域消费 K 键：清单登记 {declared}，实得 {len(consumed)}"
+        assert declared == 57, f"冻结清单的值变了（{declared}）⇒ 本条登记须重算"
+
+        new_rows = {r: v for r, v in per_file.items() if r in POST_FREEZE_KEY_SOURCES}
+        assert set(new_rows) == set(POST_FREEZE_KEY_SOURCES), (
+            f"登记的增量来源对不上：多 {sorted(set(new_rows) - set(POST_FREEZE_KEY_SOURCES))}，"
+            f"缺 {sorted(set(POST_FREEZE_KEY_SOURCES) - set(new_rows))}"
+        )
+        for rel, expected in POST_FREEZE_KEY_SOURCES.items():
+            assert len(new_rows[rel]) == expected, (
+                f"{rel} 贡献 {len(new_rows[rel])} 键，登记 {expected}"
+            )
+
+        frozen_era = set().union(
+            *(v for r, v in per_file.items() if r not in POST_FREEZE_KEY_SOURCES)
+        )
+        new_keys = set().union(*new_rows.values())
+        # 🔴 不相交是「增量可加」的前提；若相交，57 + 增量 != 全量，加法就失真
+        assert new_keys & frozen_era == set(), (
+            f"增量键与冻结期键相交 {sorted(new_keys & frozen_era)} ⇒ 不能按加法登记"
+        )
+        assert len(frozen_era) == declared, (
+            f"冻结期文件现算 {len(frozen_era)}，冻结登记 {declared}"
+            " ⇒ 不是新增文件造成的漂移，须逐文件重算出处"
+        )
+        total = frozen_era | new_keys
+        assert len(total) == declared + sum(POST_FREEZE_KEY_SOURCES.values()) == 87, (
+            f"全量 {len(total)} != 57 + {sum(POST_FREEZE_KEY_SOURCES.values())}"
         )
 
     def test_reverse_direction_is_four_kinds(
@@ -402,12 +463,16 @@ class TestKBP21RiskParityWithHCycle:
 
     def test_the_guess_key_fallback_risk_shape_is_real_in_h_specs(self) -> None:
         """两侧都验：H 的 lane spec 里真有「猜键回退链」这个形态。"""
+        # 🔴 H 的 lane spec 已归档 ⇒ 活跃目录与 `_archive/*/` 一起枚举。只扫活跃目录会把
+        #    「对照对象随 spec 归档换了位置」报成「同型风险的对照对象不存在」。
         specs_dir = ROOT / ".kiro" / "specs"
-        h_specs = [
-            d for d in specs_dir.iterdir()
-            if d.is_dir() and d.name.startswith("h")
-        ]
-        assert h_specs, "找不到 H 循环的 spec 目录"
+        h_specs = sorted(
+            {
+                d for d in [*specs_dir.iterdir(), *specs_dir.glob("_archive/*/*")]
+                if d.is_dir() and d.name.startswith("h")
+            }
+        )
+        assert h_specs, "找不到 H 循环的 spec 目录（活跃与 _archive 都没有）"
         hits: list[str] = []
         for d in h_specs:
             for name in ("requirements.md", "design.md", "tasks.md"):

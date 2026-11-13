@@ -352,6 +352,8 @@ export const consolidation = {
   notes: {
     // 重新汇总：所选节点子树逐节点拉数（单体附注）/ 差额 / 自下而上汇总 → ReaggregateResponse
     reaggregate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate`,
+    // B4 耐久任务：提交即返回 job_id，状态走 /api/projects/{pid}/platform-jobs/{job_id}
+    reaggregateAsync: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate-async`,
     // 集团明细模板下推到子企业（预生成行骨架）→ PushTemplateResponse
     pushTemplate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/push-template`,
     // GET / PUT 试算表变动后自动按公式刷新合并附注的项目级开关（后端路由沿用 V2 时期名 consol-note-gray）
@@ -397,7 +399,11 @@ export const consolidation = {
   lock: (pid: string) => `/api/consolidation/${pid}/lock`,
   unlock: (pid: string) => `/api/consolidation/${pid}/unlock`,
   lockStatus: (pid: string) => `/api/consolidation/${pid}/lock-status`,
+  // 签字快照（批 7 任务 7.4）：列表 / 完整性还原 / 签字 vs 当前对比 / 下载（还原后 JSON 附件）
   snapshots: (pid: string) => `/api/consolidation/${pid}/snapshots`,
+  snapshotRestore: (pid: string, snapshotId: string) => `/api/consolidation/${pid}/snapshots/${snapshotId}/restore`,
+  snapshotCompare: (pid: string, snapshotId: string) => `/api/consolidation/${pid}/snapshots/${snapshotId}/compare`,
+  snapshotDownload: (pid: string, snapshotId: string) => `/api/consolidation/${pid}/snapshots/${snapshotId}/download`,
   // Phase 2 F3（A5 一键级联刷新）：refresh-all 入队后台 worker 返回 job_id；
   // refresh-status 为 SSE 断开时的兜底查询（EH6）。SSE 进度走既有 events/stream。
   refreshAll: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/refresh-all`,
@@ -409,6 +415,17 @@ export const consolidation = {
   // 七域五态 readiness（服务端只读，不执行重算；batch 5 / ADR-CRW-005 R7）
   readiness: (pid: string, year: number) =>
     `/api/consolidation/readiness/${pid}/${year}`,
+  // 角色视图：编制 / 审批 / 重大判断 / 质控四桶待办（服务端事实，不前端拼装；batch 6.4 / ADR-CRW-006 R8）
+  readinessRoleViews: (pid: string, year: number) =>
+    `/api/consolidation/readiness/${pid}/${year}/role-views`,
+  // 合并薄底稿壳（A3-CONSOL）：负责人 / 复核 / 回收站 / 证据坐标（batch 6 / ADR-CRW-006）
+  workpaperShell: (pid: string, year: number) =>
+    `/api/consolidation/${pid}/${year}/workpaper-shell`,
+  workpaperShellEnsure: (pid: string, year: number) =>
+    `/api/consolidation/${pid}/${year}/workpaper-shell/ensure`,
+  // 稳定证据坐标解析（node:/row:/col:；插删行不漂移，任务 6.3）。返回 wp_id 后走通用证据端点
+  evidenceTarget: (pid: string, year: number) =>
+    `/api/consolidation/${pid}/${year}/workpaper-shell/evidence-target`,
 } as const
 
 // ─── 合并工作底稿数据 ───────────────────────────────────────────────────────

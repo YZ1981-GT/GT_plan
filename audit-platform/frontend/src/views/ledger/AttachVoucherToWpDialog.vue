@@ -12,10 +12,15 @@
  *
  * ## 任务 14（spec voucher-identity-writeback-and-audit-phase，需求 5.1）
  * - 一张凭证挂多张底稿：底稿改多选，推荐底稿默认勾选；每张底稿只列一次（推荐的列在 ⭐ 组，不在循环组重复）
- * - 一次提交走批量接口，逐条返回新挂 / 已挂 / 失败原因；有失败时弹窗不关，列出哪张凭证挂哪张底稿没成、为什么
+ * - 一次提交走批量接口，逐条返回新挂 / 已挂 / 失败原因
+ *
+ * ## 结果视图（spec voucher-workflow-linkage-lineage-closure R3.2，design §5.2）
+ * - 提交后不论成败都切到结果视图：逐张底稿列新挂 / 已挂 / 失败条数与失败原因；有挂上的底稿给「打开底稿」
+ *   （宿主带返回地址与「来自挂凭」标记跳转，底稿顶部的待导入提示据此默认展开）
+ * - 「继续挂入」回到选择视图（保留已选底稿）；「完成」关闭
  */
 import { ref, computed, watch, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { listWorkpapersAll } from '@/services/workpaperApi'
 import {
   ATTACH_BATCH_MAX_PAIRS, ATTACH_STATUS, attachFailureReason, attachVouchersBatch, type AttachBatchResult,
@@ -96,9 +101,44 @@ const submitting = ref(false)
 const wpOptions = ref<WpOption[]>([])
 const selectedWpIds = ref<string[]>([])
 const note = ref('')
-/** 上次提交没挂上的条目（弹窗内列出）与汇总 */
-const failures = ref<AttachBatchResult[]>([])
+/** 选择视图 / 结果视图 */
+const step = ref<'select' | 'result'>('select')
+/** 上次提交的逐条结果、底稿与汇总（结果视图用） */
+const lastResults = ref<AttachBatchResult[]>([])
+const lastWpIds = ref<string[]>([])
 const lastSummary = ref<{ created: number; existed: number; failed: number } | null>(null)
+
+interface WpResultGroup {
+  workpaperId: string
+  wpCode: string | null
+  wpName: string | null
+  created: number
+  existed: number
+  failed: AttachBatchResult[]
+}
+
+/** 结果按底稿分组（顺序同提交时的底稿顺序） */
+const resultGroups = computed<WpResultGroup[]>(() => lastWpIds.value.map((id) => {
+  const rows = lastResults.value.filter(r => r.working_paper_id === id)
+  const opt = wpById(id)
+  return {
+    workpaperId: id,
+    // 结果里没给编码（不可编辑 / 不在本项目的不回）时用弹窗自己的候选清单补
+    wpCode: rows.find(r => r.wp_code)?.wp_code ?? opt?.wp_code ?? null,
+    wpName: opt?.wp_name ?? null,
+    created: rows.filter(r => r.status === ATTACH_STATUS.CREATED).length,
+    existed: rows.filter(r => r.status === ATTACH_STATUS.EXISTED).length,
+    failed: rows.filter(r => r.status === ATTACH_STATUS.FAILED),
+  }
+}))
+
+const summaryTitle = computed(() => {
+  const s = lastSummary.value
+  if (!s) return ''
+  const parts = [`新挂 ${s.created} 条`, `之前已挂 ${s.existed} 条`]
+  if (s.failed) parts.push(`${s.failed} 条没挂上`)
+  return `${voucherCount.value} 张凭证 × ${lastWpIds.value.length} 张底稿：${parts.join('，')}`
+})
 
 const visible = computed({
   get: () => props.modelValue,
@@ -220,11 +260,24 @@ watch(visible, (v) => {
   if (v) {
     selectedWpIds.value = []
     note.value = ''
-    failures.value = []
+    step.value = 'select'
+    lastResults.value = []
+    lastWpIds.value = []
     lastSummary.value = null
     void loadWorkpapers()
   }
 })
+
+/** 结果视图「继续挂入」：回到选择视图，保留已选底稿（已挂上的再提交只算「已挂」） */
+function backToSelect(): void {
+  step.value = 'select'
+}
+
+/** 结果视图「打开底稿」：先关弹窗，再交宿主跳转（宿主带返回地址） */
+function openWorkpaper(g: WpResultGroup): void {
+  visible.value = false
+  emit('navigateToWp', { workpaperId: g.workpaperId, wpCode: g.wpCode ?? '', wpName: g.wpName ?? '' })
+}
 
 function wpById(id: string): WpOption | undefined {
   return wpOptions.value.find(o => o.wp_id === id)
@@ -265,7 +318,8 @@ async function confirm(): Promise<void> {
       note: note.value || '序时账挂入',
       source: 'ledger',
     })
-    failures.value = res.results.filter(r => r.status === ATTACH_STATUS.FAILED)
+    lastResults.value = res.results
+    lastWpIds.value = wpIds
     lastSummary.value = { created: res.created, existed: res.existed, failed: res.failed }
     const ok = res.created + res.existed
     if (ok > 0) {
@@ -273,30 +327,8 @@ async function confirm(): Promise<void> {
         .map(r => r.voucher_key as string))]
       emit('attached', { count: res.created, existed: res.existed, workpaperId: wpIds[0], workpaperIds: wpIds, voucherKeys })
     }
-    if (failures.value.length > 0) {
-      // 有没挂上的：弹窗不关，下方列出明细（可改选底稿后再提交，已挂上的再提交只算「已挂」）
-      ElMessage.warning({ message: `${failures.value.length} 条没挂上，原因见弹窗下方`, duration: 5000, showClose: true })
-      return
-    }
-    visible.value = false
-    const existedText = res.existed > 0 ? `（其中 ${res.existed} 条之前已挂，未重复登记）` : ''
-    if (wpIds.length > 1) {
-      ElMessage.success(`已挂入 ${voucherCount.value} 张凭证 × ${wpIds.length} 张底稿${existedText}`)
-      return
-    }
-    const wp = wpById(wpIds[0])
-    const wpName = wp?.wp_name || wp?.wp_code || '底稿'
-    const wpCode = wp?.wp_code || ''
-    try {
-      await ElMessageBox.confirm(
-        `已挂入 ${voucherCount.value} 张凭证到「${wpCode} ${wpName}」${existedText}。\n是否立即跳转到该底稿查看？`,
-        '挂凭成功',
-        { confirmButtonText: '跳转到底稿', cancelButtonText: '留在当前页', type: 'success' },
-      )
-      emit('navigateToWp', { workpaperId: wpIds[0], wpCode, wpName })
-    } catch {
-      // 用户点了「留在当前页」或关闭，什么都不做
-    }
+    // 不论成败都进结果视图：逐张底稿看结果、从这里打开底稿（原先多底稿只有一条提示，看不出该去哪导入）
+    step.value = 'result'
   } catch (e) {
     // 整单失败（无编辑权限、组合超限、网络）：一条都没写
     ElMessage.error(`挂凭失败：${attachFailureReason(e)}`)
@@ -310,9 +342,9 @@ function voucherName(v: { voucherDate?: string | null; voucherType?: string | nu
   return `${v.voucherDate ? `${v.voucherDate} ` : ''}${voucherLabel(v.voucherType, v.voucherNo)}`
 }
 
-function failureTarget(f: AttachBatchResult): string {
-  if (f.wp_code) return f.wp_code
-  return wpById(f.working_paper_id)?.wp_code ?? '（底稿不在本项目）'
+function groupTitle(g: WpResultGroup): string {
+  if (!g.wpCode) return '无权编辑或不在本项目的底稿'
+  return g.wpName && g.wpName !== g.wpCode ? `${g.wpCode} ${g.wpName}` : g.wpCode
 }
 </script>
 
@@ -324,13 +356,44 @@ function failureTarget(f: AttachBatchResult): string {
     append-to-body
     destroy-on-close
   >
-    <div class="attach-body">
+    <div v-if="step === 'result' && lastSummary" class="attach-body" data-testid="attach-results">
+      <el-alert
+        :type="lastSummary.failed ? 'warning' : 'success'"
+        :closable="false"
+        show-icon
+        :title="summaryTitle"
+        description="打开底稿后，顶部会提示从序时账挂入、还没导入检查表的凭证；在凭证检查表点「从序时账挂入导入」带入检查行（每张底稿只导入本科目的分录）。"
+      />
+      <ul class="result-list">
+        <li v-for="g in resultGroups" :key="g.workpaperId" class="result-row" data-testid="attach-result-row">
+          <div class="result-head">
+            <span class="result-wp">{{ groupTitle(g) }}</span>
+            <span class="result-counts">新挂 {{ g.created }} · 已挂 {{ g.existed }} · 失败 {{ g.failed.length }}</span>
+            <el-button
+              v-if="g.created + g.existed > 0"
+              size="small"
+              type="primary"
+              link
+              data-testid="attach-result-open"
+              @click="openWorkpaper(g)"
+            >打开底稿</el-button>
+          </div>
+          <ul v-if="g.failed.length" class="failure-list">
+            <li v-for="(f, i) in g.failed" :key="i">
+              <span class="failure-voucher">{{ voucherName({ voucherDate: f.voucher_date, voucherType: f.voucher_type, voucherNo: f.voucher_no }) }}</span>：{{ f.reason || '挂凭失败' }}
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <div v-else class="attach-body">
       <el-alert
         type="info"
         :closable="false"
         show-icon
         title="将选中凭证挂入底稿的凭证检查表（可同时挂多张底稿）"
-        description="挂入后，可在目标底稿的凭证检查表点击「从序时账挂入导入」把这些凭证带入检查行；每张底稿只导入本科目的分录。"
+        description="挂入后，目标底稿顶部会提示还没导入的凭证；在凭证检查表点「从序时账挂入导入」带入检查行（每张底稿只导入本科目的分录）。"
       />
 
       <div class="attach-field">
@@ -411,30 +474,22 @@ function failureTarget(f: AttachBatchResult): string {
         />
       </div>
 
-      <div v-if="failures.length > 0 && lastSummary" class="attach-field" data-testid="attach-failures">
-        <el-alert
-          type="warning"
-          :closable="false"
-          show-icon
-          :title="`${failures.length} 条没挂上（新挂 ${lastSummary.created} 条、之前已挂 ${lastSummary.existed} 条已处理）`"
-        />
-        <ul class="failure-list">
-          <li v-for="(f, i) in failures" :key="i">
-            <span class="failure-voucher">{{ voucherName({ voucherDate: f.voucher_date, voucherType: f.voucher_type, voucherNo: f.voucher_no }) }}</span>
-            → {{ failureTarget(f) }}：{{ f.reason || '挂凭失败' }}
-          </li>
-        </ul>
-      </div>
     </div>
 
     <template #footer>
-      <el-button @click="visible = false">{{ failures.length > 0 ? '关闭' : '取消' }}</el-button>
-      <el-button
-        type="primary"
-        :loading="submitting"
-        :disabled="selectedWpIds.length === 0 || voucherCount === 0 || pairCount > ATTACH_BATCH_MAX_PAIRS"
-        @click="confirm"
-      >挂入底稿（{{ voucherCount }} 张 × {{ selectedWpIds.length }} 张底稿）</el-button>
+      <template v-if="step === 'result'">
+        <el-button data-testid="attach-continue" @click="backToSelect">继续挂入</el-button>
+        <el-button type="primary" data-testid="attach-done" @click="visible = false">完成</el-button>
+      </template>
+      <template v-else>
+        <el-button @click="visible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="submitting"
+          :disabled="selectedWpIds.length === 0 || voucherCount === 0 || pairCount > ATTACH_BATCH_MAX_PAIRS"
+          @click="confirm"
+        >挂入底稿（{{ voucherCount }} 张 × {{ selectedWpIds.length }} 张底稿）</el-button>
+      </template>
     </template>
   </el-dialog>
 </template>
@@ -497,5 +552,37 @@ function failureTarget(f: AttachBatchResult): string {
 }
 .failure-voucher {
   font-weight: 600;
+}
+.result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.result-row {
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.result-wp {
+  font-weight: 600;
+  color: var(--gt-color-text-primary);
+}
+.result-counts {
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-xs);
+}
+.result-row .failure-list {
+  margin-top: 4px;
 }
 </style>

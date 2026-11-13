@@ -268,6 +268,8 @@ class NoteTable:
     value_keys: list[str]  # F3 列序（去标签列）；F2 为空也可
     section_locked: bool   # 整节人工覆盖（_manual_override）
     column_note: str | None = None  # 旧格式表头认不出期末 / 期初列时的说明（拼进跳过原因）
+    ownership: Any = None  # 写入归属判定（``note_write_ownership.WriteGate``；design §13）；None = 不判（测试直调）
+    table_key: str | None = None  # 归属矩阵里的表名 = 推送规则表名
 
 
 def detect_manual_override(table_data: Any) -> bool:

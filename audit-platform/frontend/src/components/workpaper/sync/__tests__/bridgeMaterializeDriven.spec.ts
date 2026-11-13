@@ -30,6 +30,8 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { WORKPAPER_SYNC_MANIFEST } from '../workpaperSyncManifest.generated'
+
 const WP = resolve(__dirname, '..', '..')
 const COMPOSABLES = resolve(WP, 'composables')
 const SYNC = resolve(WP, 'sync')
@@ -210,7 +212,32 @@ function bridgeBuiltNotDriven(): string[] {
  * 清单清空后判据仍**双向锁死**：任何宿主只要**挂了 EditorHost / 建了 bridge** 却不驱动，
  * `extra` 立刻非空打红（下面「扫描器自检」证明扫描面非空，排除空集假绿）。
  */
-const KNOWN_HOLLOW: readonly string[] = Object.freeze([] as string[])
+//
+// 🔴 2026-11-03 重新登记（上面「清空」那段是 2026-10-01 的事实，之后又变了）：
+//    26e5ef994（2026-10-02「B/C/M/A 前端组件」）给 A 循环 14 个宿主挂上了
+//    `WorkpaperSyncEditorHost` 并建了 `useWorkpaperSyncBridge`，却没有任何代码调
+//    `switchToOnlyOffice()` ⇒ 本文件三条判据自那天起恒红（HEAD 实测，非本轮引入）。
+//    它们的 entry 现在全部 `capability=null`（pending），task 3.5 的共享 presentation 门会把
+//    模式开关藏起来 ⇒ 用户点不到「在线编辑」，空壳当下不可达。所以这里登记为**有 owner 的
+//    欠账**（umbrella task 4.7：A/B/C lane 真实接桥或删掉死桥），并用下面
+//    「登记的空壳必须不可达」判据把这个前提钉死：哪条 entry 一旦被裁成 bidirectional、
+//    或宿主丢了门控，判据立刻红 —— 这不是豁免，是把「为什么现在没坏」写成可伪证的条件。
+const KNOWN_HOLLOW: readonly string[] = Object.freeze([
+  'GtA101GovernanceCommunication.vue',
+  'GtA111SubsequentEventsInquiry.vue',
+  'GtA121LegalConfirmation.vue',
+  'GtA171AuditSummary.vue',
+  'GtA1721Kam.vue',
+  'GtA1731ConsultationExecution.vue',
+  'GtA173ConsultationRecord.vue',
+  'GtA174DisagreementRecord.vue',
+  'GtA176ClosingMeeting.vue',
+  'GtA177IndependenceDeclaration.vue',
+  'GtA182RegulatoryCommunication.vue',
+  'GtA271ItAuditMemo.vue',
+  'GtA81OtherInfoRepresentation.vue',
+  'GtA91DeficiencyLetter.vue',
+])
 
 /**
  * 🔴 「建了桥却没人驱动」的 append-only 欠账清单（**不是豁免名单**，修好必须删）。
@@ -219,7 +246,15 @@ const KNOWN_HOLLOW: readonly string[] = Object.freeze([] as string[])
  * （G 循环收口 + B60 + D4 子 Tab + K 六表二阶委派）。原登记的 A 循环宿主走 `GtOnlyOfficeSheet`
  * legacy 单 OO 路径、**不建 bridge**，不在本扫描面内（见 `KNOWN_HOLLOW` 的说明）。
  */
-const KNOWN_BUILT_NOT_DRIVEN: readonly string[] = Object.freeze([] as string[])
+//
+// 🔴 2026-11-03 重新登记：同一提交（26e5ef994）的 17 个 A 宿主 = 上面 14 个空壳 +
+//    A112 / A115 / A38（建了桥但连 EditorHost 都没挂）。owner 与不可达前提同 KNOWN_HOLLOW。
+const KNOWN_BUILT_NOT_DRIVEN: readonly string[] = Object.freeze([
+  ...KNOWN_HOLLOW,
+  'GtA112DualChecklist.vue',
+  'GtA115DisclosureChecklist.vue',
+  'GtA38GoodwillImpairment.vue',
+].sort())
 
 describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () => {
   const hollow = hollowHosts()
@@ -259,13 +294,38 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
     expect(fixed, `以下宿主已接真驱动，请从 KNOWN_HOLLOW 删掉：\n  ${fixed.join('\n  ')}`).toEqual([])
   })
 
-  it('🔴 当前分支空壳面为 0（挂了 EditorHost 的宿主无一例外都被驱动）', () => {
-    // 原来点名断言 A91/A101「是空壳」—— 它们在当前分支根本不挂 EditorHost（走
-    // GtOnlyOfficeSheet legacy 单 OO），该断言已对不上现实。改为：直接证明全仓空壳面为 0。
-    expect(hollow, `仍存在挂了 EditorHost 却不驱动的空壳：\n  ${hollow.join('\n  ')}`).toEqual([])
+  it('🔴 空壳面恰为登记的欠账（登记外为 0），且已接真桥的宿主不得退回空壳', () => {
+    // 原先断言「全仓空壳面为 0」：26e5ef994 之后恒红（见 KNOWN_HOLLOW 的说明）。现在空壳
+    // 面必须**逐条等于**登记清单 —— 双向差集由上面两条判据各守一边，这里再整体钉一次，
+    // 免得两条里任一条被删时清单悄悄失效。
+    expect(hollow).toEqual([...KNOWN_HOLLOW].sort())
     // 已接真桥的 G 宿主不得退回空壳（反向锚点，证明判据不是恒绿）。
     expect(hollow).not.toContain('GtG9OtherNoncurrentFinancial.vue')
     expect(hollow).not.toContain('GtG13FairValueChanges.vue')
+  })
+
+  it('🔴 登记的空壳必须不可达：entry 非 bidirectional，且宿主的模式开关接了共享 presentation 门', () => {
+    // 这是登记成立的前提：用户点不到「在线编辑」，空壳才不会把人卡在「正在打开…」。
+    // 两个条件缺一即红 —— entry 被裁成 bidirectional（开关会显示出来）或宿主丢了门控。
+    const byEntry = new Map(WORKPAPER_SYNC_MANIFEST.map((entry) => [entry.entryId, entry]))
+    const problems: string[] = []
+    for (const rel of KNOWN_BUILT_NOT_DRIVEN) {
+      const src = read(resolve(WP, rel))
+      const entryId = /<GtEntrySyncCapabilityNotice[^>]*\bentry-id="([^"]+)"/.exec(src)?.[1]
+      if (!entryId) {
+        problems.push(`${rel}: 没有能力披露组件，无法确认它的 entry`)
+        continue
+      }
+      const entry = byEntry.get(entryId)
+      if (!entry) problems.push(`${rel}: entry ${entryId} 不在 generated manifest 里`)
+      else if (entry.capability === 'bidirectional') {
+        problems.push(`${rel}: entry ${entryId} 已是 bidirectional —— 模式开关会显示，空壳变成可达`)
+      }
+      if (!/useEntrySyncReadiness/.test(src) || !/v-if="[^"]*showModeSwitch[^"]*"/.test(src)) {
+        problems.push(`${rel}: 模式开关没接共享 presentation 门（useEntrySyncReadiness + showModeSwitch）`)
+      }
+    }
+    expect(problems, problems.join('\n')).toEqual([])
   })
 
   it('🔴 变异反证：临时把一个真驱动 wrapper 从扫描结果剔除，对应宿主必被判空壳', () => {
@@ -328,8 +388,14 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
   })
 
   it('反例锚点：G2 与 H 循环包装是真驱动（证明判据能区分真假）', () => {
+    // 🔴 G2 在 task 3.5（078f0b1bb）改由共享切换器 `useGRenderModeSwitch` 驱动，宿主里已
+    //    没有直接的 `switchToOnlyOffice(` 调用 ⇒ 原断言「G2 源码里能看到驱动调用」自那天起
+    //    恒红。锚点要证明的是「G2 被真驱动」，所以改为：驱动包装被识别、G2 调用了它、且 G2
+    //    不在空壳面里 —— 三条缺一即红。
+    expect(drivingWrappers().has('useGRenderModeSwitch')).toBe(true)
     const g2 = stripComments(read(resolve(WP, 'GtG2InterestReceivable.vue')))
-    expect(DRIVE_RE.test(g2)).toBe(true)
+    expect(/\buseGRenderModeSwitch\s*\(/.test(g2)).toBe(true)
+    expect(hollowHosts()).not.toContain('GtG2InterestReceivable.vue')
     const h = stripComments(read(resolve(COMPOSABLES, 'useHSyncMode.ts')))
     expect(DRIVE_RE.test(h)).toBe(true)
   })

@@ -1,8 +1,13 @@
-"""金标准 SQL 助手与真库项目代号（advanced-query-linkage-closure design §10.2；实施计划 §0.13）。
+"""金标准 SQL 助手（advanced-query-linkage-closure design §10.2；实施计划 §0.13）。
 
 金标准一律在测试内用独立 SQL 现算，不调用被测代码；数值随真库变化，测试里不写死。
 
-- 项目代号：只读的真实项目（只做 SELECT 与 R4.2 的 NOWAIT 加锁验证）与可写入的【UAT】项目（只在回滚事务里写）。
+- 🔴 本模块**不再提供项目代号**。原先写死的 9 个项目 UUID（华氏 / 和平药房 / 宜宾 / 辽宁 / 医疗器械 / 和平物流与三个
+  【UAT】项目）2026-11-01 现算在 ``projects`` 表里全都查不到行，用例拿空集跟空金标准互相印证而假绿。真实分布判据改按
+  数据能力动态解析（``project_picks``，夹具 ``picks``），写入与结构分支改在回滚事务里自建【测试】项目
+  （``writable_projects``，夹具 ``new_project`` / ``writable_project`` / ``no_active_dataset_project``）。不要把代号加回来。
+- ``AUDIT_YEAR``：只剩两种用法 —— 不经真实项目的合成世界（``pg_world`` 等）的年度，以及按项目名称定位的旧用例的
+  年度；按能力解析出的项目一律用 ``Pick.audit_year``（不一定是 2025）。
 - ``active_sql(alias)``：四表（tb_balance / tb_ledger / tb_aux_balance / tb_aux_ledger）的生效数据集口径，
   与 ``dataset_query.get_active_filter`` 同口径：有 active 数据集时按其中 ``activated_at`` 最新（空值在后）、
   其次 ``created_at`` 最新的一条过滤；没有 active 数据集时只按未删。参数名默认 ``:pid`` / ``:year``。
@@ -11,7 +16,6 @@
 """
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping
 from typing import Any
 
@@ -19,20 +23,6 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-# ── 真实项目（只读）──
-HS = uuid.UUID("005a6f2d-cecd-4e30-bcbd-9fb01236c194")  # 华氏
-HP = uuid.UUID("5942c12e-65fb-4187-ace3-79d45a90cb53")  # 重庆和平药房连锁
-YB = uuid.UUID("14fb8c10-9462-45f6-8f56-d023f5b6df13")  # 宜宾临港店
-LN = uuid.UUID("d9295a0c-f347-4aa5-a1d1-faf7847d379b")  # 辽宁卫生服务（现行项目；旧 37814426 已软删）
-MD = uuid.UUID("5e193c68-f53c-4e95-8d03-5d9c996c402d")  # 医疗器械
-WL = uuid.UUID("94031b0e-b9d5-4f2d-ac25-2a13000cbaca")  # 和平物流（tb_balance 有行、没有 active 数据集）
-
-# ── 可写入（只在回滚事务里写）──
-UA = uuid.UUID("0c0f8b87-1cb6-4759-b589-413fa88ce215")  # 【UAT】子公司A
-UB = uuid.UUID("a3132905-2600-41c8-a590-0008aedd8a3b")  # 【UAT】子公司B
-UP = uuid.UUID("e07ff3df-0b3d-4e33-b3b7-467ad03938e1")  # 【UAT】合成集团母公司（consolidated）
-
-WRITABLE_PROJECTS: frozenset[uuid.UUID] = frozenset({UA, UB, UP})
 AUDIT_YEAR = 2025
 
 #: 未软删的项目（统计排除软删项目）

@@ -4,7 +4,16 @@
 1. 长度必须 18 位
 2. 字符集：0-9 + A-H, J-N, P-T, U-W, X（排除 I, O, Z, S, V）
 3. 模 31 校验码算法：Wi = 3^(i-1) mod 31（i=1..17），C18 = 31 - (Σ(Ci×Wi) mod 31)，余数 31 映射为 0
+
+三码（企业代码 / 上级企业代码 / 最终控制方代码）的全部写入口共用
+``normalize_uscc_input`` 做入口友好转换（spec consol-group-code-entry-consistency R1）：
+NFKC → 去首尾空白 → 转大写；结果为空串返回 None。中间空格与 USCC 字符集外字符
+不做猜测修复，照常交给 ``validate_uscc`` 拒绝。
 """
+
+from __future__ import annotations
+
+import unicodedata
 
 # USCC 允许字符集（不含 I、O、Z、S、V）
 USCC_CHARSET = "0123456789ABCDEFGHJKLMNPQRTUWXY"
@@ -14,6 +23,29 @@ _CHAR_TO_VALUE: dict[str, int] = {ch: idx for idx, ch in enumerate(USCC_CHARSET)
 
 # 权重因子 Wi = 3^(i-1) mod 31，i=1..17
 _WEIGHTS: list[int] = [pow(3, i, 31) for i in range(17)]
+
+# 与 ECMAScript String.prototype.trim() 同源（前端 normalizeUsccInput 用 JS trim），不用 str.strip()
+_JS_TRIM_CHARS = (
+    "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000\ufeff"
+)
+
+
+def normalize_uscc_input(value: object) -> str | None:
+    """三码入口统一的规范化函数（R1.1）。
+
+    Unicode NFKC（全角数字 / 字母 → 半角）→ 去首尾空白（``_JS_TRIM_CHARS``）→ 转大写；
+    结果为空串时返回 ``None``。非字符串输入按 ``str()`` 处理（与既有入口一致）。
+    """
+    text = unicodedata.normalize("NFKC", str(value if value is not None else ""))
+    text = text.strip(_JS_TRIM_CHARS).upper()
+    return text or None
+
+
+def format_code_error(label: str, reason: str | None) -> str:
+    """三码校验失败的统一报错文案（R2.1）：``"{字段}：{原因}"``。"""
+    return f"{label}：{reason or '格式错误'}"
 
 
 def validate_uscc(code: str) -> tuple[bool, str | None]:

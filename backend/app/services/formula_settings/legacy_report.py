@@ -128,8 +128,10 @@ async def delete_row(db: AsyncSession, row: ReportConfig, *, user_id: uuid.UUID 
                                       changes=[{"slot_key": slot, "definition": None,
                                                 "expected_version": expected_version}])
     else:
+        # formula-hub-release-blockers R5.1：调用方从路由拿到 expected_version，必须传入做 CAS。
+        # 原注释"同一事务内已做过 CAS"不成立——路由只做了读取和鉴权，没有版本比较。
         result = await restore_global(db, domain="report", project_id=pid, slot_keys=[slot], user_id=user_id,
-                                     expected_versions=None)  # 同一事务内已做过 CAS
+                                     expected_versions=[expected_version] if expected_version is not None else None)
     return {"events": result.get("events") or [], "publish_id": result.get("publish_id")}
 
 

@@ -145,26 +145,32 @@ export function mapSampledVoucher(voucher: SampledVoucher, seq: number): Voucher
  * 合并模式填充：按凭证编号去重，已有行保留 check1~check5
  *
  * 规则：
- * 1. 已存在的凭证（按 voucherNo 匹配）→ 保留原行的 check1~check5 不覆盖
- * 2. 新凭证 → 追加到末尾
- * 3. 总行数 = |existing| + |incoming 中 voucherNo 不在 existing 中的|
+ * 1. 已存在的凭证（按「凭证号 + 日期」匹配）→ 保留原行的 check1~check5 不覆盖
+ * 2. 新凭证 → 追加到末尾；导入行之间同号同日只取第一行；没有凭证号的行照加
+ * 3. 总行数 = |existing| + |incoming 中「号 + 日期」不在 existing、也没在前面导入行出现过的| + |incoming 中无号的|
  */
 export function mergeVoucherRows(
   existingRows: VoucherCheckRow[],
   incomingRows: VoucherCheckRow[]
 ): VoucherCheckRow[] {
-  const existingNos = new Set(existingRows.map(r => r.voucherNo).filter(Boolean))
+  // R5：联合键 voucherNo + voucherDate（同号不同日是不同凭证，真实库 813 个凭证号跨日期复用）
+  const existingKeys = new Set(
+    existingRows
+      .filter(r => r.voucherNo)
+      .map(r => `${r.voucherNo}|${r.voucherDate || ''}`)
+  )
   const result = [...existingRows]
 
   for (const incoming of incomingRows) {
-    if (!incoming.voucherNo || !existingNos.has(incoming.voucherNo)) {
+    const key = `${incoming.voucherNo}|${incoming.voucherDate || ''}`
+    if (!incoming.voucherNo || !existingKeys.has(key)) {
       // 新凭证，追加
       result.push({
         ...incoming,
         seq: result.length + 1,
       })
       if (incoming.voucherNo) {
-        existingNos.add(incoming.voucherNo)
+        existingKeys.add(key)
       }
     }
     // 已存在的凭证 → 保留原有 check1~check5，不覆盖

@@ -122,29 +122,57 @@ def _parse_json(body_bytes: bytes) -> object:
         return None
 
 
+_DISPLAY_PREFERENCE_AUDIT_FIELDS = frozenset({
+    "amount_unit_override",
+    "font_size",
+    "show_zero",
+    "decimals",
+    "negative_red",
+    "highlight_threshold",
+    "density",
+    "grid_edit_mode",
+    "fixed_columns",
+})
+
+
 def _redact_if_display_prefs(
     method: str,
     path: str,
     new_value: object,
     request: Request,
 ) -> object:
-    """显示偏好 PATCH 的审计载荷只保留修订号与变更字段名。
+    """显示偏好 PATCH 的审计载荷只保留 revision 与顶层字段名。
 
-    字号、金额单位、小数位、阈值、固定列和 pageKey 都是用户显示偏好，
-    不进入通用操作日志；``changed_fields`` 由路由在保存成功后写入 request.state。
+    这是实际注册的 :class:`AuditLogMiddleware` 的精确路由脱敏器。信封、
+    revision 或 ``request.state`` 形状异常时也绝不回退保存原响应，改记
+    ``redacted`` 标记，避免金额单位、字号、阈值、fixed pageKey 或列 key 泄漏。
     """
     if method.upper() != "PATCH" or path.rstrip("/") != "/api/users/me/display-preferences":
         return new_value
-    payload = new_value if isinstance(new_value, dict) else {}
-    body = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-    revision = body.get("revision") if isinstance(body, dict) else None
-    changed = getattr(request.state, "audit_changed_fields", [])
-    if not isinstance(changed, (list, tuple, set)):
-        changed = []
-    return {
-        "revision": revision,
-        "changed_fields": sorted({str(field) for field in changed if str(field).strip()}),
-    }
+
+    if not isinstance(new_value, dict):
+        return {"redacted": True, "changed_fields": []}
+    if "data" in new_value:
+        body = new_value["data"]
+        if not isinstance(body, dict):
+            return {"redacted": True, "changed_fields": []}
+    else:
+        body = new_value
+
+    revision = body.get("revision")
+    changed = getattr(request.state, "audit_changed_fields", None)
+    if (
+        isinstance(revision, bool)
+        or not isinstance(revision, int)
+        or revision < 0
+        or not isinstance(changed, (list, tuple, set))
+    ):
+        return {"redacted": True, "changed_fields": []}
+
+    normalized = {str(field) for field in changed}
+    if not normalized <= _DISPLAY_PREFERENCE_AUDIT_FIELDS:
+        return {"redacted": True, "changed_fields": []}
+    return {"revision": revision, "changed_fields": sorted(normalized)}
 
 
 async def _write_log(

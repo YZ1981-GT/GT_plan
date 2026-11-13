@@ -111,8 +111,8 @@ async def run_ai_chat_startup_health_check() -> StartupHealthReport:
         # 1. 模型 endpoint（Req 12.1 / 12.2）
         _check_model_local(settings, report)
 
-        # 2. Embedding endpoint（Req 12.1）
-        _check_embedding_local(settings, report)
+        # 2. Embedding：平台实际向量路由（Req 12.1「校验实际生效路由」；与 /capabilities 同一函数）
+        await _check_embedding_route(report)
 
         # 3. OCR 配置
         _check_ocr_config(settings, report)
@@ -190,41 +190,25 @@ def _check_model_local(settings: Any, report: StartupHealthReport) -> None:
         ))
 
 
-def _check_embedding_local(settings: Any, report: StartupHealthReport) -> None:
-    """验证 LLM_EMBEDDING_BASE_URL 在 loopback/内网范围（Req 12.1）。"""
-    from app.services.ai_chat.dsh_discovery import validate_model_route
+async def _check_embedding_route(report: StartupHealthReport) -> None:
+    """平台实际向量路由（库里启用行，没有则 ``.env`` 兜底）按 DSH 受信口径校验。
 
-    endpoint = getattr(settings, "LLM_EMBEDDING_BASE_URL", "") or ""
-    if not endpoint:
-        report.checks.append(ServiceCheckResult(
-            service="embedding",
-            ok=False,
-            endpoint="(未配置)",
-            error_code="semantic_unavailable",
-            message="LLM_EMBEDDING_BASE_URL 未配置",
-        ))
-        return
+    原实现只看 ``LLM_EMBEDDING_BASE_URL`` 字符串：库里启用了企业向量预设时仍报 ``.env`` 的结论
+    （spec enterprise-embedding-rerank-closure R12）。与 ``/capabilities`` 共用 ``embedding_route_health``。
+    """
+    from app.services.ai_chat.capability_endpoint import embedding_route_health
 
-    errors = validate_model_route(endpoint)
-    if errors:
-        report.checks.append(ServiceCheckResult(
-            service="embedding",
-            ok=False,
-            endpoint=endpoint,
-            error_code="local_only_violation",
-            message=errors[0],
-        ))
-        report.violations.append(f"embedding: {errors[0]}")
-        logger.warning(
-            "[ai-chat][local-only] embedding endpoint 不合规: %s", errors[0]
-        )
-    else:
-        report.checks.append(ServiceCheckResult(
-            service="embedding",
-            ok=True,
-            endpoint=endpoint,
-            message="本地 embedding endpoint 校验通过",
-        ))
+    health = await embedding_route_health()
+    report.checks.append(ServiceCheckResult(
+        service="embedding",
+        ok=health.available,
+        endpoint=health.endpoint,
+        error_code=health.error_code,
+        message=health.message,
+    ))
+    if health.error_code == "local_only_violation":
+        report.violations.append(f"embedding: {health.message}")
+        logger.warning("[ai-chat][local-only] 向量路由不合规: %s", health.message)
 
 
 def _check_ocr_config(settings: Any, report: StartupHealthReport) -> None:

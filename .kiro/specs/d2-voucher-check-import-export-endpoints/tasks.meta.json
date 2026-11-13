@@ -1,0 +1,122 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 常量与前后端对拍（design §2）": [
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789087213
+      },
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789217183
+      },
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789584253
+      },
+      {
+        "executionId": "84c16976-a1d4-4a57-9e08-1c6e2c2966dd",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789744941
+      },
+      {
+        "executionId": "84c16976-a1d4-4a57-9e08-1c6e2c2966dd",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789769189
+      },
+      {
+        "executionId": "84c16976-a1d4-4a57-9e08-1c6e2c2966dd",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793790943445
+      },
+      {
+        "executionId": "228f0dd4-fa44-4512-a3e0-64114e0cb421",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793805480930
+      },
+      {
+        "executionId": "228f0dd4-fa44-4512-a3e0-64114e0cb421",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793806358705
+      }
+    ],
+    "2. 导出模板与导出数据端点（R1、R2，design §3）": [
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789087311
+      },
+      {
+        "executionId": "59f7f162-f9e8-4b09-99eb-d625d36a8c91",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793791028019
+      },
+      {
+        "executionId": "59f7f162-f9e8-4b09-99eb-d625d36a8c91",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793791730976
+      }
+    ],
+    "3. 导入数据端点（R3，design §3）": [
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789087347
+      },
+      {
+        "executionId": "59f7f162-f9e8-4b09-99eb-d625d36a8c91",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793791743603
+      }
+    ],
+    "4. 前端提示（R4，design §4）": [
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789087389
+      },
+      {
+        "executionId": "6e775d4e-711b-4f25-9ebb-8658477f6da0",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793796792032
+      },
+      {
+        "executionId": "6e775d4e-711b-4f25-9ebb-8658477f6da0",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793798531542
+      }
+    ],
+    "5. 浏览器实测（design §5 最后一行）": [
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789087420
+      },
+      {
+        "executionId": "6e775d4e-711b-4f25-9ebb-8658477f6da0",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793798596864
+      },
+      {
+        "executionId": "228f0dd4-fa44-4512-a3e0-64114e0cb421",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793804210672
+      }
+    ],
+    "6. 登记与提交": [
+      {
+        "executionId": "fe5aca28-8c40-4b62-80d2-096594a73ba1",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793789087446
+      },
+      {
+        "executionId": "228f0dd4-fa44-4512-a3e0-64114e0cb421",
+        "chatSessionId": "sess_bfcda378-259f-4afd-a664-5e8eeea3a4b2",
+        "timestamp": 1793804216085
+      }
+    ]
+  }
+}

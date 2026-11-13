@@ -25,6 +25,8 @@ vi.mock('@/services/apiProxy', () => ({
     }),
   },
 }))
+vi.mock('@/utils/uuid', () => ({ newUuid: () => 'formula-operation-1' }))
+vi.mock('@/components/common/PlatformJobProgress.vue', () => ({ default: { template: '<div data-testid="job-progress" />' } }))
 
 import FormulaPushPanel from '../FormulaPushPanel.vue'
 import { actionable, pendingStates, runStatusTag, targetText, triggersText, valueText } from '../formulaPushView'
@@ -50,6 +52,7 @@ beforeEach(() => {
     state_counts: { pending_confirm: 1 },
   }
   responses['get states'] = { states: [PENDING, NOTE_KEPT, { ...PENDING, addr_id: 'E1/a', state: 'auto', differs: false }] }
+  responses['post formula-push/run'] = { accepted: true, job_id: 'job-1', status: 'queued' }
 })
 
 function mountPanel(props: Record<string, unknown> = {}) {
@@ -116,11 +119,13 @@ describe('面板（真挂载）', () => {
     // 四类计数与「最近一次推送」同口径（含未变化）；字段缺失按 0 显示而非 undefined
     expect(w.text()).toContain('试跑结果：将写入 26 项，未变化 9 项，保留 2 项，跳过 5 项（未写入任何数据）')
     calls.length = 0
-    responses['post formula-push/run'] = { written_count: 3, kept_count: 1 }
+    responses['post formula-push/run'] = { accepted: true, job_id: 'job-1', status: 'queued' }
     await w.findAll('button').find((b) => b.text().includes('立即推送'))!.trigger('click')
     await flushPromises()
-    expect(calls[0]).toEqual({ method: 'post', url: '/api/projects/p1/formula-push/run', body: { year: 2025, dry_run: false, wp_codes: ['E1'] } })
-    expect(calls.slice(1).every((c) => c.method === 'get')).toBe(true)
+    expect(calls[0]).toEqual({ method: 'post', url: '/api/projects/p1/formula-push/run', body: {
+      year: 2025, dry_run: false, wp_codes: ['E1'], operation_id: 'formula-operation-1', async_mode: true,
+    } })
+    expect(w.find('[data-testid="job-progress"]').exists()).toBe(true)
   })
 
   it('采用公式值（确认后）与锁定：地址与 year 正确', async () => {
@@ -207,7 +212,7 @@ describe('按科目隔离（Task 10）', () => {
     await w.findAll('button').find((b) => b.text().includes('立即推送'))!.trigger('click')
     await flushPromises()
     const runCall = calls.find((c) => c.method === 'post' && c.url.includes('/run'))
-    expect(runCall?.body).toEqual({ year: 2025, dry_run: false, wp_codes: ['E1'] })
+    expect(runCall?.body).toEqual({ year: 2025, dry_run: false, wp_codes: ['E1'], operation_id: 'formula-operation-1', async_mode: true })
   })
 
   it('全部推送按钮在多 binding 时可见', async () => {
@@ -242,6 +247,6 @@ describe('按科目隔离（Task 10）', () => {
     await allBtn.trigger('click')
     await flushPromises()
     const runCall = calls.find((c) => c.method === 'post' && c.url.includes('/run'))
-    expect(runCall?.body).toEqual({ year: 2025, dry_run: false })
+    expect(runCall?.body).toEqual({ year: 2025, dry_run: false, operation_id: 'formula-operation-1', async_mode: true })
   })
 })

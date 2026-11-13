@@ -3,9 +3,12 @@
 - 权限世界（``pg_world``：同一事务内的临时 schema，表按 ORM 建，结束整体回滚）：管理员公开的模板，系统角色为 auditor 的
   项目经理在列表里看得到、按模板执行得到本项目的行；他人的私有模板读取与执行都 403「无权访问该模板」（合伙人可访问
   全部项目也不例外）。
-- 真库回滚事务（``business``：系统管理员，``pg_rollback_session``）：在【UAT】子公司A 造两年度的试算行，按模板执行时
-  年度 = 请求年度，否则 = 项目审计年度（【UAT】子公司A 现库 ``audit_year`` 2025），都没有 ⇒ 422 平台统一文案；翻页由请求
-  决定。模板的作者取库里已有的管理员账号（只在回滚事务里引用，不改 users）。
+- 真库回滚事务（``business``：系统管理员，``pg_rollback_session``）：在自建【测试】项目（审计年度 2025）上造两年度的
+  试算行，按模板执行时年度 = 请求年度，否则 = 项目审计年度，都没有 ⇒ 422 平台统一文案；翻页由请求决定。模板的作者
+  取库里已有的管理员账号（只在回滚事务里引用，不改 users）。
+
+🔴 2026-11-03 阶段 0 改造：原先在【UAT】子公司A（``UA``）上造行、用 ORM 新建「无审计年度」项目；``UA`` 现算已不存在
+（造行即外键失败），ORM 建项目又依赖 ORM 与共享库列一致。两者都改为 ``writable_projects`` 的显式列裸 SQL 自建。
 """
 from __future__ import annotations
 
@@ -17,11 +20,10 @@ from sqlalchemy import select, text
 
 from app.models.audit_platform_models import AccountCategory, TrialBalance
 from app.models.base import UserRole
-from app.models.core import Project, ProjectStatus
 from app.models.custom_query_models import CustomQueryTemplate
 from app.models.workpaper_models import WpIndex
 from app.routers import custom_query
-from tests.advanced_query_linkage.gold import AUDIT_YEAR, UA
+from tests.advanced_query_linkage.gold import AUDIT_YEAR
 from tests.authz_world import OTHER_PROJECT_ID, TARGET_PROJECT_ID, pg_world
 
 pytestmark = pytest.mark.pg_only
@@ -90,31 +92,35 @@ async def test_private_template_of_another_user_is_403_to_read_and_execute(monke
     assert own.status_code == 200, own.text
 
 
-async def test_execute_year_comes_from_request_then_project_audit_year(business, gold):
+async def test_execute_year_comes_from_request_then_project_audit_year(business, gold, writable_project,
+                                                                       new_project):
     """R9.3：年度 = 请求年度，否则目标项目审计年度；翻页由请求决定（原先取模板里存的年度，没存时 year=0 直接 422）。"""
     session = business.session
-    assert await gold.scalar("SELECT audit_year FROM projects WHERE id = :pid", pid=str(UA)) == AUDIT_YEAR
+    project = writable_project
+    year = project.audit_year
+    # 自建行只在本事务里可见：前置核对必须走同一会话（金标准换连接读到的是 0 行）
+    stored_year = (await session.execute(text("SELECT audit_year FROM projects WHERE id = :pid"),
+                                         {"pid": project.id})).scalar_one()
+    assert stored_year == year == 2025, f"前置：{project} 的审计年度"
     admin_id = await gold.scalar("SELECT id FROM users WHERE username = 'admin'")
-    # 科目码用本用例专属值：【UAT】子公司A 现库已有 2025 年 1001 等行（试算表按项目、年度、公司、科目唯一）
-    rows = ((AUDIT_YEAR, f"{TAG} 本年 1", "AQLB8-1"), (AUDIT_YEAR, f"{TAG} 本年 2", "AQLB8-2"),
-            (AUDIT_YEAR - 1, f"{TAG} 上年", "AQLB8-3"))
-    for year, name, code in rows:
-        await _tb(session, UA, year, name, code)
+    # 科目码用本用例专属值（试算表按项目、年度、公司、科目唯一）
+    rows = ((year, f"{TAG} 本年 1", "AQLB8-1"), (year, f"{TAG} 本年 2", "AQLB8-2"),
+            (year - 1, f"{TAG} 上年", "AQLB8-3"))
+    for tb_year, name, code in rows:
+        await _tb(session, project.id, tb_year, name, code)
     tpl = CustomQueryTemplate(
         id=uuid.uuid4(), name=f"{TAG} 年度", data_source="tb_detail",
         config={"source": "tb_detail", "year": 2019, "filters": {"account_name": TAG}},  # 存的 2019 不应被采用
         scope="public", shared_project_ids=[], creator_id=admin_id, created_by=admin_id)
     session.add(tpl)
-    no_year = Project(id=uuid.uuid4(), name=f"{TAG} 无审计年度项目", client_name=TAG, status=ProjectStatus.execution,
-                      template_type="soe", report_scope="standalone", audit_year=None, scenario="normal")
-    session.add(no_year)
     await session.flush()
+    no_year = await new_project("无审计年度项目", audit_year=None, status="execution", template_type="soe")
     url = f"{CQ}/templates/{tpl.id}/execute"
 
-    default = await business.http.post(url, json={"project_id": str(UA)})
-    explicit = await business.http.post(url, json={"project_id": str(UA), "year": AUDIT_YEAR - 1})
-    first = await business.http.post(url, json={"project_id": str(UA), "limit": 1, "offset": 0})
-    second = await business.http.post(url, json={"project_id": str(UA), "limit": 1, "offset": 1})
+    default = await business.http.post(url, json={"project_id": str(project.id)})
+    explicit = await business.http.post(url, json={"project_id": str(project.id), "year": year - 1})
+    first = await business.http.post(url, json={"project_id": str(project.id), "limit": 1, "offset": 0})
+    second = await business.http.post(url, json={"project_id": str(project.id), "limit": 1, "offset": 1})
     missing = await business.http.post(url, json={"project_id": str(no_year.id)})
 
     assert default.status_code == 200, default.text

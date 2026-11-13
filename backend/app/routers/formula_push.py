@@ -16,7 +16,7 @@ spec: chain-closure-phase2-formula-push-engine · design §九 · 任务 12 · �
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -36,6 +36,10 @@ class RunBody(BaseModel):
     year: int = Field(..., ge=2000, le=2100)
     dry_run: bool = False
     wp_codes: list[str] | None = Field(None, max_length=50)
+    # 相同用户操作的网络重试需复用此 id；缺省时后端生成一次性 id，避免以后同选项导出旧运行。
+    operation_id: str | None = Field(None, max_length=100)
+    # 兼容旧 API 客户端的同步写入；平台 UI 写入路径固定传 true，走 durable worker。
+    async_mode: bool = False
 
 
 class AdoptBody(BaseModel):
@@ -71,6 +75,14 @@ def _rule_view(rule) -> dict[str, Any]:
 
 def _bad_request(exc: engine.PushActionError) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
+
+
+def _durable_operation_key(operation_id: str | None) -> str:
+    """有客户端 id 时重试同一 job；缺失时创建新用户操作，避免永久复用旧推送。"""
+    from app.services import platform_job_service as jobs
+
+    raw = (operation_id or "").strip() or uuid4().hex
+    return f"formula:{jobs.canonical_hash({'operation_id': raw})}"
 
 
 @router.get("/bindings")
@@ -122,20 +134,55 @@ async def run_push(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
+    """试跑同步返回明细；实际写入提交 durable job，避免公式推送占住 Web 请求。"""
     if body.wp_codes is not None:
-        cleaned = [c.strip() for c in body.wp_codes if c and c.strip()]
+        cleaned = list(dict.fromkeys(c.strip() for c in body.wp_codes if c and c.strip()))
         if not cleaned:
             raise HTTPException(status_code=400, detail="wp_codes 不能为空列表（省略该参数表示全量推送）")
         body.wp_codes = cleaned
+
+    # dry run 以及旧客户端同步写入：面板需要立刻展示逐项结果，保持兼容接口。
+    if body.dry_run or not body.async_mode:
+        try:
+            result = await engine.run_and_commit(
+                db, project_id=project_id, year=body.year, trigger=engine.MANUAL,
+                triggered_by=current_user.id, dry_run=body.dry_run,
+                codes=body.wp_codes,
+            )
+        except engine.PushActionError as exc:
+            raise _bad_request(exc) from exc
+        return {
+            **result.summary(),
+            "items": [i.as_dict() for i in result.items],
+            "orphan_push_states": await panel.orphan_state_count(
+                db, project_id=project_id, year=body.year,
+            ),
+        }
+
+    from app.services import platform_job_service as jobs
+    from app.services.formula_push.durable_job_executor import OPERATION
+
     try:
-        result = await engine.run_and_commit(
-            db, project_id=project_id, year=body.year, trigger=engine.MANUAL,
-            triggered_by=current_user.id, dry_run=body.dry_run,
-            codes=body.wp_codes,
+        job, _created = await jobs.create_or_get_job(
+            db,
+            operation=OPERATION,
+            project_id=project_id,
+            actor_id=current_user.id,
+            idempotency_key=_durable_operation_key(body.operation_id),
+            payload_ref={"year": body.year, "wp_codes": body.wp_codes},
+            progress_total=1,
         )
-    except engine.PushActionError as exc:
-        raise _bad_request(exc) from exc
-    return {**result.summary(), "items": [i.as_dict() for i in result.items]}
+        await db.commit()
+    except jobs.PlatformJobConflict as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {
+        "accepted": True,
+        "job_id": str(job.id),
+        "status": job.status,
+        "project_id": str(project_id),
+        "year": body.year,
+    }
 
 
 @router.get("/latest")
@@ -150,6 +197,8 @@ async def latest(
     return {
         "run": panel.run_view(run, wp_code=wp_code),
         "state_counts": await panel.state_counts(db, project_id=project_id, year=year, wp_code=wp_code),
+        # 规则已不存在、格里还留着推送值的附注单元格（R10）：只报数，清理走修复脚本
+        "orphan_push_states": await panel.orphan_state_count(db, project_id=project_id, year=year),
     }
 
 

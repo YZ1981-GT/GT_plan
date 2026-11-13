@@ -55,6 +55,8 @@
         >
           <div class="my-wp-code">{{ wp.wp_code }}</div>
           <div class="my-wp-name">{{ wp.wp_name }}</div>
+          <!-- 多个项目会有同编码同名底稿（如两个项目各有 A1），不标项目看起来像重复 -->
+          <div v-if="wp.project_name" class="my-wp-project" :title="wp.project_name">{{ wp.project_name }}</div>
           <el-tag :type="wp.status === WP_STATUS.DRAFT ? 'info' : 'warning'" size="small">
             {{ wp.status === WP_STATUS.DRAFT ? '编制中' : '待修改' }}
           </el-tag>
@@ -515,7 +517,11 @@ onMounted(async () => {
       const data: any = result.value
       const items = Array.isArray(data) ? data : data?.items || []
       for (const wp of items.slice(0, 3)) {
-        wpList.push({ ...wp, project_id: projects[index].project_id })
+        wpList.push({
+          ...wp,
+          project_id: projects[index].project_id,
+          project_name: projects[index].project_name || projects[index].client_name || '',
+        })
       }
     })
     myWorkpapers.value = wpList.slice(0, 6)
@@ -537,6 +543,7 @@ onMounted(async () => {
 .my-wp-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
 .my-wp-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); font-family: monospace; }
 .my-wp-name { font-size: var(--gt-font-size-sm); font-weight: 500; margin: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-wp-project { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin: -2px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── 欢迎语（banner row1 默认 slot 内，紧贴标题右侧填充空白）── */
 .gt-welcome-greet {

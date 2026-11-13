@@ -39,10 +39,11 @@ from app.models.base import Base, SoftDeleteMixin
 
 
 class AIModelType(str, enum.Enum):
-    """AI模型类型"""
+    """AI模型类型（rerank：检索结果重排，V261 加入 PG 枚举）"""
     chat = "chat"
     embedding = "embedding"
     ocr = "ocr"
+    rerank = "rerank"
 
 
 class AIProvider(str, enum.Enum):
@@ -557,9 +558,9 @@ class KnowledgeIndex(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id"), nullable=False
-    )
+    # 不建 projects 外键（V263 删除）：公共文档进全零 UUID 哨兵分区，它不是真实项目；
+    # 索引是可重建的派生层。
+    project_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     source_type: Mapped[KnowledgeSourceType] = mapped_column(
         sa.Enum(
             KnowledgeSourceType, name="knowledge_source_type_enum", create_type=False
@@ -568,8 +569,12 @@ class KnowledgeIndex(Base):
     )
     source_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding_vector: Mapped[str | None] = mapped_column(String(5000), nullable=True)
+    # 逗号串向量（pgvector 不可用时的检索来源；V263 起 TEXT，原 VARCHAR(5000) 写不下真实维度）
+    embedding_vector: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # pgvector 列（V119 / V263，扩展不可用时不存在；读取一律 defer）
     embedding_vec = mapped_column(Vector(1024), nullable=True)
+    # 生成该向量的模型签名「模型名@维度」（V263）：检索只与同签名分块比较
+    embedding_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
     chunk_index: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
@@ -585,6 +590,10 @@ class KnowledgeIndex(Base):
 
     __table_args__ = (
         Index("ix_knowledge_index_project_source", "project_id", "source_type"),
+        # 分块 upsert 的冲突目标（V263）；没有它 ON CONFLICT 在 PG 上必报错
+        Index(
+            "uq_knowledge_index_chunk", "project_id", "source_id", "chunk_index", unique=True
+        ),
     )
 
 

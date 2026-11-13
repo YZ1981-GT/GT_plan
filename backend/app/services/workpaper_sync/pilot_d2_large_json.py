@@ -853,6 +853,12 @@ UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY: Final[str] = (
     " required set，包括本 D2 pilot。"
     "修法需要把 contract 的 row_identity 声明喂进 required-set 推导"
     "（即「有 row_identity ⇒ 动态族可达」），但那是 evidence 引擎的改动。"
+    "owner = workpaper-html-onlyoffice-bidirectional-writeback-closure task 6.3"
+    "（逐 entry required scenarios 验收账本）；撤销条件 = "
+    "`evidence.derive_for_manifest_entry` 改成按 contract 的 row_identity 判动态族可达后，"
+    "本 entry 的 required set 里出现 `dynamic_row_add_delete_reorder_copy`"
+    "（届时 `assert_dynamic_family_is_gated_on_mount_cardinality` 会自己打红，"
+    "提示把 Property 27 的落点改到该场景上）。"
 )
 
 
@@ -1451,6 +1457,17 @@ register_pilot_adapter = _orch.register_adapter
 resolve_published_frozen_definitions = _orch.resolve_published_frozen_definitions
 manifest_capability_enabled = _orch.manifest_capability_enabled
 assert_manifest_capability_enabled = _orch.assert_manifest_capability_enabled
+# 🔴 错误身份（2026-11-04 登记）：上面这些 forwarded 入口抛的是编排闭包自己的
+#    `EntrySelectionError`（`build_orchestration.<locals>`，error_code 带本 entry 前缀
+#    `sync_pilot_d2_selection_invalid`），**不是**本模块自定义的 `PilotSelectionError`
+#    （error_code `sync_pilot_selection_invalid`，四个 pilot 共用、`test_task70_oo_scenario_gate`
+#    与 h1 变异脚本都按这个码取证）。调用方 `except PilotSelectionError` 捕不到顺序门抛出的
+#    异常 —— 本轮实测顺序门的三条判据因此全部失效。
+#    收敛成一个类会把 d2 的选型错误码与另外三个 pilot 分叉（上面点名的两处按旧码取证），
+#    所以这里**只补出口**：把编排闭包的类按自己的名字导出，调用方要么按名字各自捕获，
+#    要么统一 `except SyncDomainError`（两者都继承它）。判据见
+#    `test_task41_d2_large_json_pilot.TestOrderingGate`（显式断言两个类不同且同基类）。
+EntrySelectionError = _orch.EntrySelectionError
 load_pilot_contract = _orch.load_contract_from_disk
 assert_contract_file_matches_source = _orch.assert_contract_file_matches_source
 contract_file_path = _orch.contract_file_path

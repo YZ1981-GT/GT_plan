@@ -369,16 +369,12 @@ export const WP_SYNC_TRACE_GAPS: readonly WorkpaperSyncTraceGap[] = Object.freez
     label: 'room 打开时基线',
     reason: 'room 的 opened_base_version_id 未进 descriptor，也没有任何用户读取面',
   }),
-  Object.freeze({
-    id: 'room_latest_durable_application_id',
-    label: 'room 最新耐久 application',
-    reason: '无读取面：conflict 预览只给 canonical_application_id，桥拒绝替调用方编造',
-  }),
-  Object.freeze({
-    id: 'room_latest_durable_sequence',
-    label: 'room 最新耐久 sequence',
-    reason: '无读取面：同上，只能由调用方显式提供，缺失即不可提交裁决',
-  }),
+  // 🔴 `room_latest_durable_application_id` / `room_latest_durable_sequence` 曾登记在
+  // 这里（「无读取面」）。该登记已过期：后端 `get_operation` 自 Task 32 起就随
+  // `app_facts` 投影这两项，缺口实际在**前端没去读**。现由
+  // `roomDurableFenceFromOperation()` 从 operation 快照投影，故从本清单移除。
+  // 移除的判据在 `workpaperSyncPresentation.spec.ts`：这两个 id 不得再出现在
+  // WP_SYNC_TRACE_GAPS 里 —— 否则界面会把一个已有读取面的字段继续显示成缺口。
   Object.freeze({
     id: 'application_origin_request_sequence',
     label: 'application 原始 request 序号',
@@ -743,13 +739,34 @@ export interface WorkpaperSyncResolveFenceDraft {
 }
 
 /**
+ * 从 operation 快照投影 room 侧 fence —— **唯一**的投影点。
+ *
+ * 两项必须同时有效才给对象。任一为空就返回 `null`，让 {@link buildResolveFence} 走
+ * 可见的缺项路径：room 还没耐久过任何 application 时 `null` 是**正确**形态，
+ * 用 canonical application 顶替等于客户端断言了一个它没观测到的 room 事实，
+ * 而服务端会照着这个断言做 fence 裁决。
+ */
+export function roomDurableFenceFromOperation(
+  snapshot: {
+    readonly roomLatestDurableApplicationId: string | null
+    readonly roomLatestDurableSequence: number | null
+  } | null,
+): WorkpaperSyncRoomDurableFence | null {
+  if (snapshot === null) return null
+  const applicationId = snapshot.roomLatestDurableApplicationId
+  const sequence = snapshot.roomLatestDurableSequence
+  if (applicationId === null || !isOpaqueUuid(applicationId)) return null
+  if (sequence === null || !Number.isInteger(sequence) || sequence < 0) return null
+  return Object.freeze({ applicationId, sequence })
+}
+
+/**
  * 组装 resolve 的八项 fence。**缺项一律列出来，绝不补默认值。**
  *
- * 🔴 `room_latest_durable_application_id` / `room_latest_durable_sequence` 在当前
- * 用户路由里没有任何读取面（见 `WP_SYNC_TRACE_GAPS`）。桥明文拒绝替调用方编这两项，
- * 于是冲突面板必须由宿主显式提供；提供不了就只能**可见地失败**（提交按钮禁用 +
- * 阻断原因逐项列出），不得用 canonical application 顶替 room 的 latest durable ——
- * 服务端会照着这个断言做 fence 裁决。
+ * room 侧两项由 {@link roomDurableFenceFromOperation} 从 operation 快照投影而来
+ * （后端 `get_operation` 随 `app_facts` 返回）。投影不出来就只能**可见地失败**
+ * （提交按钮禁用 + 阻断原因逐项列出），不得用 canonical application 顶替 room 的
+ * latest durable —— 服务端会照着这个断言做 fence 裁决。
  */
 export function buildResolveFence(input: {
   readonly preview: WorkpaperSyncConflictPreview
@@ -794,9 +811,9 @@ export function buildResolveFence(input: {
 export const WP_SYNC_FENCE_MISSING_TEXT: Readonly<Record<string, string>> = Object.freeze({
   conflict_set_digest: '缺冲突集摘要（conflict_set_digest），无法做乐观锁比对',
   room_latest_durable_application_id:
-    '缺 room 最新耐久 application 标识：该字段无读取面，须由宿主显式提供',
+    '缺 room 最新耐久 application 标识：请重新打开冲突面板刷新同步状态后再裁决',
   room_latest_durable_sequence:
-    '缺 room 最新耐久 sequence：该字段无读取面，须由宿主显式提供',
+    '缺 room 最新耐久 sequence：请重新打开冲突面板刷新同步状态后再裁决',
   canonical_application_id: '缺规范 application 标识，冲突预览形态异常',
 })
 

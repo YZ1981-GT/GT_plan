@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 RECYCLE_LINEAGE_KEY = "_recycle_lineage"
 KIND_TRIM = "trim"
 KIND_STANDARD_CONVERSION = "standard_conversion"
+#: 合并薄底稿壳（A3-CONSOL）因合并工作区生命周期移入回收站。恢复只认同原因移入的（与程序裁剪 / 准则切换互不干扰）。
+KIND_CONSOL = "consol"
 ACTION_RECYCLED = "recycled"
 ACTION_RESTORED = "restored"
 

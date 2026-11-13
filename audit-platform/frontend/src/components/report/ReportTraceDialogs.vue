@@ -5,55 +5,44 @@
   -->
 
   <!-- 审核结果弹窗 -->
-  <el-dialog append-to-body :model-value="showAuditDialog" title="✅ 公式审核结果" width="95%" top="2vh" :close-on-click-modal="false" @update:model-value="$emit('update:showAuditDialog', $event)">
+  <el-dialog append-to-body :model-value="showAuditDialog" title="报表审核结果" width="95%" top="2vh" :close-on-click-modal="false" @update:model-value="$emit('update:showAuditDialog', $event)">
     <div v-if="consistencyResult" class="gt-rv-audit-dialog">
       <!-- 汇总统计 -->
       <div class="gt-rv-audit-summary">
         <div class="gt-rv-audit-stat">
-          <span class="gt-rv-audit-stat-num">{{ consistencyResult.total || 0 }}</span>
-          <span class="gt-rv-audit-stat-label">审核公式</span>
+          <span class="gt-rv-audit-stat-num">{{ auditPresentation.checks.length }}</span>
+          <span class="gt-rv-audit-stat-label">审核明细</span>
         </div>
-        <div class="gt-rv-audit-stat gt-rv-audit-stat-pass">
-          <span class="gt-rv-audit-stat-num">{{ (consistencyResult.logic_check_passed || 0) + (consistencyResult.reasonability_passed || 0) }}</span>
-          <span class="gt-rv-audit-stat-label">通过</span>
-        </div>
-        <div class="gt-rv-audit-stat gt-rv-audit-stat-fail">
-          <span class="gt-rv-audit-stat-num">{{ (consistencyResult.total || 0) - (consistencyResult.logic_check_passed || 0) - (consistencyResult.reasonability_passed || 0) }}</span>
-          <span class="gt-rv-audit-stat-label">未通过</span>
-        </div>
-        <div v-if="consistencyResult.noResult" class="gt-rv-audit-stat">
-          <span class="gt-rv-audit-stat-num">—</span>
-          <span class="gt-rv-audit-stat-label">暂无可执行的审核项</span>
-        </div>
-        <div v-else class="gt-rv-audit-stat" :class="consistencyResult.consistent ? 'gt-rv-audit-stat-pass' : 'gt-rv-audit-stat-fail'">
-          <span class="gt-rv-audit-stat-num">{{ consistencyResult.consistent ? '✓' : '✗' }}</span>
-          <span class="gt-rv-audit-stat-label">{{ consistencyResult.consistent ? '全部通过' : '存在异常' }}</span>
+        <div v-for="status in REPORT_CHECK_STATUSES" :key="status" class="gt-rv-audit-stat"
+          :class="status === 'passed' ? 'gt-rv-audit-stat-pass' : status === 'error' ? 'gt-rv-audit-stat-fail' : ''" :data-check-count="status">
+          <span class="gt-rv-audit-stat-num">{{ auditPresentation.counts[status] }}</span>
+          <span class="gt-rv-audit-stat-label">{{ REPORT_CHECK_LABELS[status] }}</span>
         </div>
       </div>
-      <el-alert v-if="consistencyResult.noResult" type="info" :closable="false" show-icon style="margin-top: 10px;"
-        title="本项目本年度没有可执行的审核项：报表尚未生成，且未在公式管理中配置勾稽 / 合理性公式。" />
+      <el-alert :type="auditAlertType" :closable="false" show-icon style="margin-top: 10px;" :title="auditPresentation.message" />
+      <p v-if="consistencyResult.failed_count != null || consistencyResult.hint_count != null" class="gt-rv-audit-counts">
+        后端汇总：失败 {{ consistencyResult.failed_count ?? '—' }} 项，提示 {{ consistencyResult.hint_count ?? '—' }} 项（提示不计入失败；业务五态按明细独立统计）
+      </p>
 
       <!-- 按类型分 Tab -->
       <el-tabs :model-value="auditTab" type="card" size="small" style="margin-top: 10px;" @update:model-value="$emit('update:auditTab', $event as string)">
         <el-tab-pane name="all">
-          <template #label>全部 ({{ consistencyResult.total || 0 }})</template>
+          <template #label>全部 ({{ auditPresentation.checks.length }})</template>
         </el-tab-pane>
         <el-tab-pane name="logic_check">
-          <template #label>🔍 逻辑审核 ({{ consistencyResult.logic_check_count || 0 }})</template>
+          <template #label>🔍 逻辑审核 ({{ auditPresentation.checks.filter(check => check.category === 'logic_check').length }})</template>
         </el-tab-pane>
         <el-tab-pane name="reasonability">
-          <template #label>💡 提示性审核 ({{ consistencyResult.reasonability_count || 0 }})</template>
+          <template #label>💡 提示性审核 ({{ auditPresentation.checks.filter(check => check.category === 'reasonability').length }})</template>
         </el-tab-pane>
       </el-tabs>
 
       <!-- 逐条审核明细 -->
-      <el-table :data="filteredAuditChecks" border size="small" style="width: 100%; font-size: 12px;"
-        max-height="calc(100vh - 300px)"
-        :row-class-name="({ row }: any) => row.passed ? '' : 'gt-rv-audit-fail-row'">
-        <el-table-column label="结果" width="80" align="center">
+      <el-table :data="auditDetails" border size="small" style="width: 100%; font-size: 12px;"
+        max-height="calc(100vh - 300px)" :row-class-name="auditRowClass">
+        <el-table-column label="结果" width="90" align="center">
           <template #default="{ row }">
-            <span v-if="row.passed" style="color: var(--gt-color-success); font-size: 12px;">✓</span>
-            <span v-else style="color: var(--gt-color-coral); font-size: 12px;">✗</span>
+            <span :data-check-status="row.presentation.status" :style="{ color: auditStatusColor(row.presentation) }">{{ row.presentation.label }}</span>
           </template>
         </el-table-column>
         <el-table-column label="审核项目" min-width="200">
@@ -63,18 +52,27 @@
         </el-table-column>
         <el-table-column label="期望值" width="120" align="right">
           <template #default="{ row }">
-            <GtAmountCell :value="row.expected" />
+            <GtAmountCell v-if="hasReportCheckValue(row.expected)" :value="row.expected" />
+            <span v-else>—</span>
           </template>
         </el-table-column>
         <el-table-column label="实际值" width="120" align="right">
           <template #default="{ row }">
-            <GtAmountCell :value="row.actual" />
+            <GtAmountCell v-if="hasReportCheckValue(row.actual)" :value="row.actual" />
+            <span v-else>—</span>
           </template>
         </el-table-column>
         <el-table-column label="差额" width="110" align="right">
           <template #default="{ row }">
-            <GtAmountCell :value="row.diff" />
+            <GtAmountCell v-if="hasReportCheckValue(row.diff)" :value="row.diff" />
+            <span v-else>—</span>
           </template>
+        </el-table-column>
+        <el-table-column label="原因" min-width="180">
+          <template #default="{ row }">{{ row.presentation.reason || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="严重度" width="110">
+          <template #default="{ row }">{{ row.presentation.severityLabel }}</template>
         </el-table-column>
         <el-table-column label="类型" width="100" align="center">
           <template #default="{ row }">
@@ -89,7 +87,7 @@
         </el-table-column>
         <el-table-column label="溯源定位" min-width="180">
           <template #default="{ row }">
-            <div v-if="row.source || row.formula" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+            <div v-if="parseTraceLocations(row).length" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
               <template v-for="loc in parseTraceLocations(row)" :key="loc.label">
                 <el-button size="small" link type="primary" @click="$emit('trace-jump', loc)" style="font-size: 12px;">
                   📍 {{ loc.label }}
@@ -180,13 +178,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { getReportBalanceDetails, getReportBalancePresentation, hasReportCheckValue, REPORT_CHECK_LABELS, REPORT_CHECK_STATUSES, type ReportCheckStatus } from '@/services/reportCheckPresentation'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import OutputAttachmentLinks from '@/components/attachment/OutputAttachmentLinks.vue'
 import type { ReportConsistencyCheck } from '@/services/auditPlatformApi'
 import type { TraceLocation } from '@/views/composables/useReportCellActions'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
-defineProps<{
+const props = defineProps<{
   // Audit check
   showAuditDialog: boolean
   consistencyResult: ReportConsistencyCheck | null
@@ -210,6 +210,23 @@ defineProps<{
   parseTraceLocations: (check: any) => TraceLocation[]
 }>()
 
+const auditPresentation = computed(() => getReportBalancePresentation(props.consistencyResult))
+const auditDetails = computed(() => getReportBalanceDetails(props.filteredAuditChecks))
+const auditAlertType = computed(() => {
+  const status = auditPresentation.value.status
+  return status === 'passed' ? 'success' : status === 'error' ? 'error' : status === 'warning' || status === 'hint' ? 'warning' : 'info'
+})
+function auditRowClass({ row }: { row: typeof auditDetails.value[number] }) {
+  const { status, isHint } = row.presentation
+  if (status === 'error' || (status === 'failed' && !isHint)) return 'gt-rv-audit-fail-row'
+  return status === 'failed' ? 'gt-rv-audit-hint-row' : ''
+}
+function auditStatusColor(presentation: { status: ReportCheckStatus; isHint: boolean }) {
+  if (presentation.status === 'passed') return 'var(--gt-color-success)'
+  if (presentation.status === 'error' || (presentation.status === 'failed' && !presentation.isHint)) return 'var(--gt-color-coral)'
+  return 'var(--gt-color-text-secondary)'
+}
+
 // ─── Emits ──────────────────────────────────────────────────────────────────
 defineEmits<{
   (e: 'update:showAuditDialog', val: boolean): void
@@ -228,6 +245,7 @@ defineEmits<{
 /* 公式审核结果弹窗 — 汇总统计卡片 */
 .gt-rv-audit-summary {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
   padding: 14px 16px;
@@ -275,6 +293,8 @@ defineEmits<{
 .gt-rv-audit-fail-row {
   background: rgba(245, 108, 108, 0.06) !important;
 }
+.gt-rv-audit-hint-row { background: var(--gt-bg-warning, #fdf6ec) !important; }
+.gt-rv-audit-counts { font-size: 12px; color: var(--gt-color-text-secondary); }
 
 /* 审核弹窗 Tab 美化 */
 .gt-rv-audit-dialog .el-tabs--card > .el-tabs__header .el-tabs__item {

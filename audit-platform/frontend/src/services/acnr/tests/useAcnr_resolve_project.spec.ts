@@ -7,7 +7,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockGet = vi.fn()
-vi.mock('@/utils/http', () => ({ default: { get: (...args: any[]) => mockGet(...args), post: vi.fn() } }))
+const mockPost = vi.fn()
+vi.mock('@/utils/http', () => ({ default: {
+  get: (...args: any[]) => mockGet(...args),
+  post: (...args: any[]) => mockPost(...args),
+} }))
 vi.mock('vue', async () => ({ ...(await vi.importActual<typeof import('vue')>('vue')), onUnmounted: vi.fn() }))
 ;(globalThis as any).EventSource = class { addEventListener() {} close() {} }
 
@@ -20,6 +24,7 @@ async function freshAcnr(projectId?: string) {
 describe('useAcnr resolve 带项目', () => {
   beforeEach(() => {
     mockGet.mockReset()
+    mockPost.mockReset()
     mockGet.mockResolvedValue({ data: { found: true, uri: 'tb://1001#期末余额' } })
   })
 
@@ -49,6 +54,68 @@ describe('useAcnr resolve 带项目', () => {
     expect(mockGet).toHaveBeenCalledTimes(2)
   })
 
+  it('项目级 409 驱逐同项目旧命中，但不清其他项目缓存', async () => {
+    const acnr = await freshAcnr()
+    mockGet.mockResolvedValueOnce({ data: { found: true, addr_id: 'E1/old', jump_route: '/old' } })
+    await acnr.resolveIndex('wp:E1', 'pid-a')
+    mockGet.mockResolvedValueOnce({ data: { found: true, addr_id: 'E1/other' } })
+    await acnr.resolveIndex('wp:E1', 'pid-b')
+
+    mockGet.mockRejectedValueOnce(Object.assign(new Error('409'), {
+      response: {
+        status: 409,
+        data: { code: 409, error_code: 'ACNR_REGISTRY_SNAPSHOT_INVALID', message: '锁定快照损坏' },
+      },
+    }))
+    await expect(acnr.resolveIndex('wp:D2', 'pid-a')).resolves.toMatchObject({
+      found: false, error: 'snapshot_invalid', reason: '锁定快照损坏',
+    })
+
+    mockGet.mockResolvedValueOnce({ data: { found: true, addr_id: 'E1/new', jump_route: '/new' } })
+    await expect(acnr.resolveIndex('wp:E1', 'pid-a')).resolves.toMatchObject({ addr_id: 'E1/new' })
+    await expect(acnr.resolveIndex('wp:E1', 'pid-b')).resolves.toMatchObject({ addr_id: 'E1/other' })
+    // pid-a 旧命中 + pid-b 命中 + 409 + pid-a 重取；pid-b 仍命中缓存。
+    expect(mockGet).toHaveBeenCalledTimes(4)
+  })
+
+  it('同项目旧单点成功晚于 409 到达时，不写缓存也不交给调用方恢复旧路由', async () => {
+    let releaseOld!: () => void
+    let markStarted!: () => void
+    const gate = new Promise<void>((resolve) => { releaseOld = resolve })
+    const started = new Promise<void>((resolve) => { markStarted = resolve })
+    const terminal = Object.assign(new Error('409'), {
+      response: {
+        status: 409,
+        data: { code: 409, error_code: 'ACNR_REGISTRY_SNAPSHOT_MISSING', message: '锁定快照缺失' },
+      },
+    })
+    mockGet.mockImplementation(async (_url: string, config: { params: { index_ref: string } }) => {
+      if (config.params.index_ref === 'wp:E1') {
+        markStarted()
+        await gate
+        return { data: { found: true, addr_id: 'E1/old', jump_route: '/old' } }
+      }
+      throw terminal
+    })
+
+    const acnr = await freshAcnr()
+    const oldRequest = acnr.resolveIndex('wp:E1', 'pid-a')
+    await started
+    await expect(acnr.resolveIndex('wp:D2', 'pid-a')).resolves.toEqual({
+      found: false, error: 'snapshot_missing', reason: '锁定快照缺失',
+    })
+    releaseOld()
+    await expect(oldRequest).resolves.toEqual({
+      found: false, error: 'snapshot_missing', reason: '锁定快照缺失',
+    })
+
+    // 终态恢复后新请求可重新探测；旧请求的成功不能被缓存命中。
+    mockGet.mockReset()
+    mockGet.mockResolvedValue({ data: { found: true, addr_id: 'E1/new', jump_route: '/new' } })
+    await expect(acnr.resolveIndex('wp:E1', 'pid-a')).resolves.toMatchObject({ addr_id: 'E1/new' })
+    expect(mockGet).toHaveBeenCalledTimes(1)
+  })
+
   it.each([
     ['ACNR_REGISTRY_SNAPSHOT_MISSING', 'snapshot_missing', '锁定快照缺失'],
     ['ACNR_REGISTRY_SNAPSHOT_INVALID', 'snapshot_invalid', '锁定快照损坏'],
@@ -67,5 +134,36 @@ describe('useAcnr resolve 带项目', () => {
     await expect(acnr.resolveIndex('wp:E1', 'pid-1')).resolves.toEqual({
       found: false, error, reason,
     })
+  })
+
+  it.each([
+    ['ACNR_REGISTRY_SNAPSHOT_MISSING', 'snapshot_missing', '锁定快照缺失'],
+    ['ACNR_REGISTRY_SNAPSHOT_INVALID', 'snapshot_invalid', '锁定快照损坏'],
+    ['ACNR_REGISTRY_LOCK_FAILED', 'lock_failed', '目录版本锁失败'],
+  ])('batchResolve：409 %s 给每一项保留终态，不抹成可重试批失败', async (wireCode, error, reason) => {
+    mockPost.mockRejectedValue(Object.assign(new Error('409'), {
+      response: { status: 409, data: { code: 409, error_code: wireCode, message: reason } },
+    }))
+    const acnr = await freshAcnr('pid-1')
+    const results = await acnr.batchResolve([{ index_ref: 'wp:E1' }, { index_ref: 'wp:D2' }])
+
+    expect(mockPost).toHaveBeenCalledWith('/api/acnr/resolve-batch', {
+      items: [{ index_ref: 'wp:E1' }, { index_ref: 'wp:D2' }],
+      project_id: 'pid-1',
+    })
+    expect(results).toEqual([
+      { found: false, error, reason },
+      { found: false, error, reason },
+    ])
+    expect(results[0]).not.toBe(results[1])
+  })
+
+  it('batchResolve：普通 5xx 仍返回等长 batch_resolve_failed', async () => {
+    mockPost.mockRejectedValue(Object.assign(new Error('500'), { response: { status: 500 } }))
+    const acnr = await freshAcnr('pid-1')
+    await expect(acnr.batchResolve([{ index_ref: 'wp:E1' }, { index_ref: 'wp:D2' }])).resolves.toEqual([
+      { found: false, error: 'batch_resolve_failed' },
+      { found: false, error: 'batch_resolve_failed' },
+    ])
   })
 })

@@ -268,7 +268,7 @@ function createMarkerComponent(
                 title: '复核意见（点击查看）',
               }),
             default: () =>
-              h('div', { style: 'font-size:13px;line-height:1.5' }, [
+              h('div', { style: 'font-size:var(--gt-display-font-size);line-height:1.5' }, [
                 h('div', { style: 'font-weight:600;margin-bottom:6px;color:#e6443e' }, [
                   h('span', '● '),
                   h('span', '复核意见'),
@@ -277,14 +277,14 @@ function createMarkerComponent(
                   'div',
                   {
                     style:
-                      'font-size:12px;color:#303133;margin-bottom:6px;' +
+                      'font-size:var(--gt-display-font-size);color:#303133;margin-bottom:6px;' +
                       'white-space:pre-wrap;max-height:180px;overflow-y:auto;',
                   },
                   review.comment_text,
                 ),
                 h(
                   'div',
-                  { style: 'font-size:11px;color:#909399;margin-bottom:6px' },
+                  { style: 'font-size:var(--gt-display-font-size);color:#909399;margin-bottom:6px' },
                   [
                     review.cell_reference
                       ? h('span', `单元格 ${review.cell_reference}`)
@@ -307,7 +307,7 @@ function createMarkerComponent(
                   },
                   ticket
                     ? [
-                        h('span', { style: 'font-size:11px;color:#909399' }, '关联工单:'),
+                        h('span', { style: 'font-size:var(--gt-display-font-size);color:#909399' }, '关联工单:'),
                         h(
                           ElTag,
                           { size: 'small', type: ticketStatusTagType(ticket.status) },
@@ -327,7 +327,7 @@ function createMarkerComponent(
                     : [
                         h(
                           'span',
-                          { style: 'font-size:11px;color:#c0c4cc' },
+                          { style: 'font-size:var(--gt-display-font-size);color:#c0c4cc' },
                           '（无关联工单）',
                         ),
                       ],

@@ -41,6 +41,27 @@ vi.mock('@/services/apiProxy', () => ({
   },
 }))
 
+// 🔴 2026-11-04：双模式开关还受同步能力单源门控（useEntrySyncReadiness）。本文件只测「载体」
+//    这一道门，故给单源一份已验收的 bidirectional 结论，让载体门成为唯一变量。
+const readinessHoist = vi.hoisted(() => ({
+  ready: {
+    entry_id: 'docx/workpaper-word-editor', effective_entry_id: 'docx/gt-a16-bundle',
+    capability: 'bidirectional', adjudication_state: 'terminal', allowed_modes: ['html', 'oo'],
+    can_claim_bidirectional: true,
+    runtime: {
+      ready: true, adapter_id: 'test', authority_model: null, definition_bundle_id: null,
+      definition_bundle_sha256: null, typed_slots_complete: true, typed_slots: [],
+      representation_id: null, representation_generation: null,
+    },
+    acceptance: { state: 'verified', stale: false, run_id: null, required_scenario_set_digest: null },
+    reason: null,
+  },
+}))
+vi.mock('../sync/workpaperSyncApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../sync/workpaperSyncApi')>()),
+  readEntrySyncReadiness: vi.fn(async () => readinessHoist.ready),
+}))
+
 vi.mock('../OnlyOfficeWordDialog.vue', () => ({
   default: { name: 'OnlyOfficeWordDialog', template: '<div class="mock-oo" />', props: ['visible', 'documentUrl', 'documentKey', 'title', 'mode', 'callbackUrl'] },
 }))

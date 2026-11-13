@@ -33,6 +33,7 @@ _CREDIT_DIR_TOKENS = frozenset(["贷", "贷方", "C", "c", "credit", "Credit", "
 
 __all__ = [
     "convert_balance_rows",
+    "dedupe_balance_rows_across_sheets",
     "convert_balance_rows_v2",
     "convert_ledger_rows",
     "convert_ledger_rows_v2",
@@ -280,16 +281,58 @@ def _apply_sign_convention(
 # ---------------------------------------------------------------------------
 
 
+_DEDUP_MEASURES = ("opening_balance", "closing_balance", "debit_amount", "credit_amount")
+_DEDUP_TOLERANCE = Decimal("0.01")
+
+
+def _pick_non_duplicated_view(
+    aux_base_rows: list[dict],
+    row_types: list[frozenset[str]] | None,
+) -> tuple[list[dict], str | None]:
+    """同一笔余额被源文件按多个辅助类型各列一遍时，只取其中一个类型的行，避免聚合翻倍。
+
+    判据：存在 ≥2 个辅助类型，且每个类型自己的四个度量（期初 / 期末 / 借方 / 贷方）汇总彼此相等
+    （容差 0.01）——这才是「同一余额的多个视图」；若各类型汇总不同，它们是互不重叠的划分，照旧全部相加。
+    返回 (参与聚合的行, 选中的辅助类型 | None)。
+    """
+    if not row_types or len(row_types) != len(aux_base_rows):
+        return aux_base_rows, None
+    all_types = sorted({t for ts in row_types for t in ts})
+    if len(all_types) < 2:
+        return aux_base_rows, None
+
+    def _sums(type_name: str) -> dict[str, Decimal]:
+        out = {m: Decimal(0) for m in _DEDUP_MEASURES}
+        for row, ts in zip(aux_base_rows, row_types):
+            if type_name in ts:
+                for m in _DEDUP_MEASURES:
+                    out[m] += row.get(m) or Decimal(0)
+        return out
+
+    sums = {t: _sums(t) for t in all_types}
+    first = sums[all_types[0]]
+    for t in all_types[1:]:
+        if any(abs(sums[t][m] - first[m]) > _DEDUP_TOLERANCE for m in _DEDUP_MEASURES):
+            return aux_base_rows, None  # 各类型汇总不同 ⇒ 互不重叠的划分，照旧相加
+
+    counts = {t: sum(1 for ts in row_types if t in ts) for t in all_types}
+    chosen = max(all_types, key=lambda t: (counts[t], t))
+    return [r for r, ts in zip(aux_base_rows, row_types) if chosen in ts], chosen
+
+
 def _aggregate_aux_to_summary(
     aux_base_rows: list[dict],
     account_code: str,
     company_code: str,
+    row_types: list[frozenset[str]] | None = None,
 ) -> dict:
     """将多条带辅助维度的余额行聚合成一条虚拟主表汇总行。
 
     用于 Excel 里只有明细行没有汇总行的场景（如 1122 应收账款 只导出 2 家客户明细）。
     所有金额字段求和，raw_extra 追加 _aggregated_from_aux 标记以便后续溯源。
+    若源文件把同一笔余额按多个辅助类型各列了一遍（各类型汇总相等），只取一个类型的行，不翻倍。
     """
+    aux_base_rows, dedup_type = _pick_non_duplicated_view(aux_base_rows, row_types)
     def _sum(field: str) -> Optional[Decimal]:
         vals = [r.get(field) for r in aux_base_rows if r.get(field) is not None]
         if not vals:
@@ -303,6 +346,8 @@ def _aggregate_aux_to_summary(
     raw_extra_base = dict(first.get("raw_extra") or {})
     raw_extra_base["_aggregated_from_aux"] = True
     raw_extra_base["_aux_row_count"] = len(aux_base_rows)
+    if dedup_type:
+        raw_extra_base["_aux_view_type"] = dedup_type  # 溯源：多类型重复视图只取了该类型
 
     # 方向继承：从子行中取第一个有方向的（同科目子行方向一致）
     open_src_dir = next((r.get("_opening_source_direction") for r in aux_base_rows if r.get("_opening_source_direction")), None)
@@ -329,6 +374,27 @@ def _aggregate_aux_to_summary(
         "_opening_source_mode": open_src_mode,
         "_closing_source_mode": close_src_mode,
     }
+
+
+def dedupe_balance_rows_across_sheets(rows: list[dict]) -> list[dict]:
+    """跨 sheet/文件合并后的主表行按 (company_code, account_code) 去重。
+
+    优先级：真实汇总行（raw_extra 无 _aggregated_from_aux）> 由辅助明细聚合的虚拟行；
+    同优先级保留先出现的一条。保持首次出现顺序，无重复时原样返回。
+    """
+    chosen: dict[tuple[str, str], dict] = {}
+    order: list[tuple[str, str]] = []
+    for r in rows:
+        key = (str(r.get("company_code") or ""), str(r.get("account_code") or ""))
+        if key not in chosen:
+            chosen[key] = r
+            order.append(key)
+            continue
+        old_virtual = bool((chosen[key].get("raw_extra") or {}).get("_aggregated_from_aux"))
+        new_virtual = bool((r.get("raw_extra") or {}).get("_aggregated_from_aux"))
+        if old_virtual and not new_virtual:
+            chosen[key] = r
+    return [chosen[k] for k in order]
 
 
 def convert_balance_rows(
@@ -482,8 +548,9 @@ def convert_balance_rows(
                     })
                 # 记录该组的带 aux base row，用于在无汇总行时聚合成虚拟汇总
                 key = (company_code, account_code)
-                g = groups.setdefault(key, {"summary": None, "aux_base_rows": []})
+                g = groups.setdefault(key, {"summary": None, "aux_base_rows": [], "aux_row_types": []})
                 g["aux_base_rows"].append(base_row)
+                g.setdefault("aux_row_types", []).append(frozenset(d["aux_type"] for d in valid_dims))
                 continue
 
         # 无辅助维度 → 作为该组的汇总行（若重复出现则用第一条）
@@ -505,6 +572,7 @@ def convert_balance_rows(
             # 场景 B：只有明细 → 聚合生成虚拟汇总行
             aggregated = _aggregate_aux_to_summary(
                 g["aux_base_rows"], account_code, company_code,
+                row_types=g.get("aux_row_types"),
             )
             aggregated["level"] = infer_level(account_code)
             balance_rows.append(aggregated)

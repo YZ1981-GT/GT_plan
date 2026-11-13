@@ -57,11 +57,12 @@
           <div v-if="row._leftVal != null" style="font-size: 10px; color: var(--gt-color-text-tertiary);">= {{ row._leftVal }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="关系" width="60" align="center">
+      <el-table-column label="结论 / 原因" min-width="180">
         <template #default="{ row }">
-          <span v-if="row._checked && row._pass" style="font-size: var(--gt-font-size-sm); color: var(--gt-color-success);">✅</span>
-          <span v-else-if="row._checked && !row._pass" style="font-size: var(--gt-font-size-sm); color: var(--gt-color-danger);">❌</span>
-          <span v-else style="font-size: var(--gt-font-size-sm);">=</span>
+          <el-tag v-if="row._status" size="small" :type="statusType(row)">{{ checkStatusLabel({ status: formulaOutcomeStatus({ status: row._status }) }) }}</el-tag>
+          <span v-else>尚未执行</span>
+          <el-tag size="small" effect="plain" :type="severityType(row)">{{ severityLabel(row) }}</el-tag>
+          <div v-if="row._reason" style="font-size: 12px; margin-top: 4px;">原因：{{ row._reason }}</div>
         </template>
       </el-table-column>
       <el-table-column label="右侧（目标）" min-width="180">
@@ -72,8 +73,8 @@
       </el-table-column>
       <el-table-column label="差额" width="100" align="right">
         <template #default="{ row }">
-          <span v-if="row._checked" :style="{ fontSize: '11px', fontWeight: 600, color: row._pass ? 'var(--gt-color-success)' : 'var(--gt-color-danger)' }">
-            {{ row._diff != null ? row._diff.toFixed(2) : '—' }}
+          <span v-if="row._status" style="font-size: 11px; font-weight: 600;">
+            {{ formulaCheckNumber(row._diff)?.toFixed(2) ?? '—' }}
           </span>
         </template>
       </el-table-column>
@@ -139,6 +140,16 @@
             <el-button size="small" @click="form.right_ref += &quot;PREV('','期末余额')&quot;">PREV</el-button>
           </div>
         </el-form-item>
+        <el-form-item label="容差（选填；留空采用后端默认值）">
+          <el-input v-model="form.tolerance" placeholder="如：0.01；实际比较由后端执行" />
+        </el-form-item>
+        <el-form-item label="严重度">
+          <el-select v-model="form.severity" style="width: 160px;">
+            <el-option label="警告" value="warning" />
+            <el-option label="提示" value="info" />
+            <el-option label="阻断" value="blocking" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="说明（选填）">
           <el-input v-model="form.description" type="textarea" :autosize="{ minRows: 2 }" placeholder="描述该规则的业务含义" />
         </el-form-item>
@@ -159,7 +170,7 @@
     </el-dialog>
 
     <el-dialog v-model="catalogVisible" title="全平台校对规则目录" width="1100px" append-to-body destroy-on-close>
-      <FormulaCheckCatalog v-if="catalogVisible" />
+      <FormulaCheckCatalog v-if="catalogVisible" :project-id="projectId" :year="year" />
     </el-dialog>
   </div>
 </template>
@@ -171,7 +182,12 @@ import { showFormulaError, type CheckRule } from '@/composables/formula/useFormu
 import CrossCheckHistoryPanel from './panels/CrossCheckHistoryPanel.vue'
 import FormulaCheckCatalog from './settings/FormulaCheckCatalog.vue'
 import GtFormulaIssuePanel from './GtFormulaIssuePanel.vue'
-import type { FormulaIssueRun } from './formulaIssueHint'
+import { formulaOutcomeStatus, formulaCheckNumber, formulaCheckSeverity, type FormulaIssueRun } from './formulaIssueHint'
+import { checkStatusLabel } from '@/utils/consistencyCheckStatus'
+const severityOf = (row: any) => formulaCheckSeverity(row._severity ?? row.severity)
+const severityType = (row: any) => severityOf(row) === 'blocking' ? 'danger' : severityOf(row) === 'info' ? 'info' : 'warning'
+const severityLabel = (row: any) => ({ blocking: '阻断', warning: '警告', info: '提示' })[severityOf(row)]
+function statusType(row: any) { const s = formulaOutcomeStatus({ status: row._status }); return s === 'passed' ? 'success' : s === 'error' ? 'danger' : s === 'not_applicable' ? 'info' : s === 'not_executed' ? 'warning' : severityType(row) }
 
 defineOptions({ name: 'FormulaCrossCheckPanel' })
 
@@ -182,7 +198,7 @@ const props = withDefaults(defineProps<{
   running: boolean
   showDialog: boolean
   dialogTitle: string
-  form: { label: string; left_ref: string; operator: string; right_ref: string; description: string }
+  form: { label: string; left_ref: string; operator: string; right_ref: string; description: string; tolerance?: number | string | null; severity?: 'blocking' | 'warning' | 'info' }
   projectId: string
   /** 审计年度；项目没填为 null / 未传 ⇒ 审核历史不加载 */
   year?: number | null
@@ -239,6 +255,7 @@ function applyPreset(id: string): void {
     label: String(f.label || ''), left_ref: String(f.left_ref || ''),
     operator: OPERATORS.includes(f.operator) ? f.operator : '=',
     right_ref: String(f.right_ref || ''), description: String(f.description || ''),
+    tolerance: f.tolerance, severity: formulaCheckSeverity(f.severity),
   })
   presetPick.value = ''
 }

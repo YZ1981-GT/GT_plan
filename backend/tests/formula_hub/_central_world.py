@@ -42,6 +42,7 @@ from app.models.audit_platform_models import (
     ReviewStatus,
     TrialBalance,
 )
+from app.models.adjustment_review_models import AdjustmentClientBooking, AdjustmentTreatmentEvent
 from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectType, ProjectUserRole, UserRole
 from app.models.core import Project, ProjectUser, User
 from app.models.report_models import FinancialReport
@@ -139,7 +140,10 @@ async def seed(session: AsyncSession, fixtures: Mapping[str, Iterable[Row]], *, 
     return World(session, user, {label: p.id for label, p in projects.items()})
 
 
-_MODELS = (User, Project, ProjectUser, TrialBalance, Adjustment, AdjustmentEntry, FinancialReport)
+# ADJ 取数（adj_net_batch）按分录组最新财务处理事件与客户入账状态过滤：两张表缺了 ⇒ 预载只记 warning、ADJ 恒 0，
+# XR-07（未审 + 调整 = 审定）在一致项目上会被误判为差异
+_MODELS = (User, Project, ProjectUser, TrialBalance, Adjustment, AdjustmentEntry, AdjustmentTreatmentEvent,
+           AdjustmentClientBooking, FinancialReport)
 
 
 @asynccontextmanager

@@ -1,33 +1,39 @@
 /**
- * 浏览器检查 ⑤ — 删除冲突提示
+ * 浏览器检查 ⑤ — 删除公式的并发校验与提示
  *
- * 验证：删除公式设置条目时，后端对不存在 / 冲突的条目
- * 返回合理错误码而非 500。
- *
- * formula-e2e-ci-gate Task 2 / R3 第 5 项
+ * 底稿公式删除强制带版本（ADR-FHIC-11）：不带 428、版本不对 409（中文提示）、对上了才删；删完再删 404。
+ * 原用例对不存在的 `DELETE /formula-settings/{id}` 接受 400/403/404/405/409/422 任一 ⇒ 恒绿。
  */
 import { test, expect } from '@playwright/test'
-import { loginAndInstall, standaloneProjectId } from './helpers'
-
-const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:9980'
+import { api, apiToken, requireIsolatedDb, runTag, seedYear } from './helpers'
+import { loadManifest } from './manifest'
 
 test.describe('删除冲突提示', () => {
-  test.beforeEach(async ({ page, request }) => {
-    await loginAndInstall(page, request)
-  })
+  test('不带版本 428、版本不对 409、对上才删、删完 404', async ({ request }) => {
+    const token = await apiToken(request)
+    await requireIsolatedDb(request, token)
+    const wpId = loadManifest().standalone.wp_ids['D2-1']
+    expect(wpId, '种子缺 D2-1 底稿').toBeTruthy()
+    const saved = await api(request, token, 'PUT', `/api/workpapers/${wpId}/formulas`, {
+      data: { sheet_name: `E2E-${runTag()}`, target_cell: 'C3', expression: '1+1', year: seedYear() },
+    })
+    expect(saved.status, JSON.stringify(saved.error)).toBe(200)
+    const { id, definition_version: version } = saved.data.saved
+    expect(Number.isInteger(version)).toBe(true)
+    const url = `/api/workpapers/${wpId}/formulas/${id}`
 
-  test('删除不存在的公式条目返回 404/409 而非 500', async ({ request }) => {
-    const projectId = standaloneProjectId()
-    const fakeId = '00000000-0000-0000-0000-000000000000'
-    const resp = await request.delete(
-      `${BACKEND}/api/projects/${projectId}/formula-settings/${fakeId}`,
-      {
-        headers: { Authorization: `Bearer ${process.env.FH_E2E_TOKEN || ''}` },
-      },
-    )
-    // 合理的响应：404（不存在）、409（冲突）、400、403、422
-    // 不应是 500
-    expect(resp.status(), '删除不存在条目不应返回 500').not.toBe(500)
-    expect([400, 403, 404, 405, 409, 422]).toContain(resp.status())
+    const noVersion = await api(request, token, 'DELETE', url)
+    expect(noVersion.status).toBe(428)
+    expect(noVersion.error.error_code).toBe('FORMULA_VERSION_REQUIRED')
+    const wrong = await api(request, token, 'DELETE', url, { params: { expected_version: version + 5 } })
+    expect(wrong.status).toBe(409)
+    expect(wrong.error.error_code).toBe('FORMULA_VERSION_CONFLICT')
+    expect(wrong.error.message).toContain('请刷新后重试')
+
+    const ok = await api(request, token, 'DELETE', url, { params: { expected_version: version } })
+    expect(ok.status, JSON.stringify(ok.error)).toBe(200)
+    expect(ok.data.deleted).toBe(id)
+    const gone = await api(request, token, 'DELETE', url, { params: { expected_version: version } })
+    expect(gone.status).toBe(404)
   })
 })

@@ -5848,3 +5848,12 @@ instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 
 - `formula-management-residual-closure` 6/6：附注/报表模板 12 个端点全部补登录，4 个全局写端点限 admin/partner；模板 actor 服务端绑定，文件 ID 只认 UUID，阻断路径穿越。
 - 修报表上游建议恒空；真实公式编辑器接 `FormulaInput`、初始语法校验和保存门；删除不可达行内 UI 与零调用 `FormulaParamPicker`；历史/TB 明细故障改显式错误；`fill_all_formulas` warnings 接通 API、种子面板、CLI；修 `ThreeColumnLayout` 重复 import 的构建阻断。
 - 验收：后端 10+12 passed、两个行为探针 PASS、ruff 0；前端 78 passed/3 skipped、vue-tsc HEAD 12→候选10（added 0）、行数门/Vite build/独立 Playwright 通过。共享库最高 V236、磁盘 V249，未启动主服务、未执行迁移或写库。
+## 2026-11-09 合并运行与底稿生命周期收口（批 6~8 + 8.6 收尾）
+
+- `consolidation-run-and-workpaper-lifecycle-closure` 58/58（其中 `[x]*` 2：8.4/8.5 外部依赖待授权实测，未假绿）。批 0~5 核心代码已于 `60f2fed79`（2026-11-01）入库；本批为批 6~8 与 8.6 收尾，随当前分支推送。
+- 批 6 薄 WorkingPaper：`consol_workpaper_instance`（V268/R268）、A3-CONSOL 幂等壳、sheet/row/cell identity、证据与复核状态、archive inventory/provider 纳入成功 operation/artifact/snapshot/附件/审计清单（缺件 fail-closed）。
+- 批 7 完整签字快照：snapshot v2 manifest（11 类分片、分片 hash、根 hash、operation/version refs）、manual partial、sign/lock 门禁（required source/readiness/artifact 任一失败即拒）、service 只 flush、签字路由一致事务写 snapshot+签字记录+operation terminal+consol_lock。
+- 批 8 性能/浏览器/真实数据/收尾：10/100/500 节点斜率基准、完整【测试】集团 Playwright、127.0.0.1 与内网 HTTP、SSE 断线/并发/超 6 分钟/worker 重启。
+- 🔴 语义复审抓出并修复 2 个真缺陷：① `consol_readiness_service.load_readiness_facts` 的 `has_snapshot` 恒 False（注释「snapshot v2 尚未实现」已过期，批 7 已实现 v2）→ 改真实 `ConsolSnapshot` 存在性查询（phase10_models）② `consol_archive_provider._audit_manifest_item` 查询缺 project 过滤（只按 `action_type.like("consol.%")` 扫全表，跨项目污染 fail-closed 归档门禁）→ 补 `_chain_filter(db, chain_key_of(str(project_id)))`。
+- 回归终验：`backend/tests/consol_operation/` 287 passed（含语义复审修复后）；snapshot 3 文件 76 passed；顶层合并测试候选树 7 failed/933 passed 全 ⊆ HEAD 55 failed（新增失败 0）；前端批 6~8 新测试 35/35 passed，既有合并测试集失败 ⊆ HEAD 且 head_wt 复跑逐值相同（新增失败 0）。
+- 迁移 V268/R268（consol_workpaper_instance）；共享库未落（本批不改共享 schema，经 `GT_BOOTSTRAP_DONE=1` 确认未执行）。

@@ -111,6 +111,7 @@ export const PRIMARY_TOOLBAR_BUTTONS: ToolbarButton[] = [
     type: 'primary',
     plain: true,
     group: 'primary',
+    requireEdit: true,
   },
   {
     key: 'submitReview',
@@ -127,6 +128,7 @@ export const PRIMARY_TOOLBAR_BUTTONS: ToolbarButton[] = [
     action: 'manualRefresh',
     plain: true,
     group: 'standalone',
+    requireEdit: true,
     staticTooltip: '重新执行预填充并触发受影响 sheet 刷新',
   },
   {
@@ -143,11 +145,11 @@ export const PRIMARY_TOOLBAR_BUTTONS: ToolbarButton[] = [
 
 /** 更多 ▾ 下拉菜单 */
 export const MORE_DROPDOWN_ITEMS: ToolbarButton[] = [
-  { key: 'syncFormula', label: '🔄 同步公式', action: 'syncStructure', group: 'more' },
+  { key: 'syncFormula', label: '🔄 同步公式', action: 'syncStructure', group: 'more', requireEdit: true },
   { key: 'versions', label: '📋 版本历史', action: 'showVersions', group: 'more' },
   { key: 'download', label: '📥 下载', action: 'download', group: 'more' },
   { key: 'exportPdf', label: '📄 导出 PDF', action: 'exportPdf', group: 'more', permission: 'workpaper:export' },
-  { key: 'upload', label: '📤 上传新版本', action: 'upload', group: 'more', divided: true },
+  { key: 'upload', label: '📤 上传新版本', action: 'upload', group: 'more', divided: true, requireEdit: true },
 ]
 
 /**
@@ -170,9 +172,14 @@ export function useEditorToolbar(
     formulaManager: actions.onFormulaManager,
   }
 
+  const contentWritable = computed(() => {
+    const status = ctx.wpStatus?.value ?? ''
+    return ctx.canEdit.value && !['review_passed', 'archived'].includes(status)
+  })
+
   /** 注入运行时态：loading / disabled / 动态 label / 动态 type / tooltip / title */
   function enrichButton(btn: ToolbarButton): EnrichedToolbarButton {
-    const archivedTitle = !ctx.canEdit.value ? '项目已归档,无法编辑' : ''
+    const readonlyTitle = !contentWritable.value ? '当前底稿为只读，无法编辑' : ''
     const dirty = ctx.dirty.value
     const failCount = ctx.fineCheckFailCount?.value ?? 0
     const hasPrefill = ctx.hasPrefillMapping?.value ?? true
@@ -180,25 +187,25 @@ export function useEditorToolbar(
     let dynamicLabel: string | undefined
     let dynamicType: ToolbarButton['type'] | undefined
     let loading = false
-    let disabled = false
+    let disabled = !!btn.requireEdit && !contentWritable.value
     let tooltip: string | null = btn.staticTooltip ?? null
     let title = ''
 
     switch (btn.action) {
       case 'save':
         loading = ctx.saving.value
-        disabled = !ctx.canEdit.value
-        title = archivedTitle
+        disabled = !contentWritable.value
+        title = readonlyTitle
         break
       case 'refreshPrefill':
         loading = !!ctx.prefillLoading?.value
-        disabled = !hasPrefill
+        disabled = !contentWritable.value || !hasPrefill
         tooltip = hasPrefill ? '从试算表重新取数填入底稿' : '当前底稿无预设公式配置'
         break
       case 'submitForReview':
         loading = !!ctx.submitting?.value
-        disabled = !ctx.canEdit.value || dirty
-        title = archivedTitle
+        disabled = !contentWritable.value || dirty
+        title = readonlyTitle
         if (failCount > 0) {
           dynamicLabel = `⚠️ 提交复核 (${failCount})`
           dynamicType = 'warning'
@@ -213,6 +220,7 @@ export function useEditorToolbar(
         break
     }
 
+    if (disabled && !title) title = readonlyTitle
     return { ...btn, dynamicLabel, dynamicType, loading, disabled, tooltip, title }
   }
 
@@ -221,7 +229,7 @@ export function useEditorToolbar(
     const status = ctx.wpStatus?.value ?? ''
     return PRIMARY_TOOLBAR_BUTTONS
       .filter((btn) => {
-        if (btn.requireEdit && !ctx.canEdit.value) return false
+        if (btn.requireEdit && !contentWritable.value) return false
         if (btn.visibleWhenStatuses && !btn.visibleWhenStatuses.includes(status)) return false
         return true
       })
@@ -235,6 +243,9 @@ export function useEditorToolbar(
 
   /** 统一 action 分发（未知 key 静默 no-op） */
   function handleAction(actionKey: string) {
+    const definition = [...PRIMARY_TOOLBAR_BUTTONS, ...MORE_DROPDOWN_ITEMS]
+      .find(item => item.action === actionKey)
+    if (definition?.requireEdit && !contentWritable.value) return
     const fn = actionMap[actionKey]
     if (fn) fn()
   }

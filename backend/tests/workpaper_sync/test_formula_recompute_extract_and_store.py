@@ -39,7 +39,7 @@ from app.services.workpaper_sync.template_skeleton_baseline import (
     SkeletonBaseline,
     pure_template_skeleton_rows,
 )
-from tests.workpaper_sync.d4_materialize_harness import D4World, _text_safe, build_world
+from tests.workpaper_sync.d4_materialize_harness import D4World, build_world
 
 
 @pytest.fixture(scope="module")
@@ -188,7 +188,7 @@ def d4_files(world: D4World) -> dict[str, Path]:
 
 def _merge(world: D4World, files: Mapping[str, Path], incoming: str, current: str = "base") -> Any:
     adapter = _clone(world, direction="oo_to_html", baseline=files["base"])
-    read = lambda name: _text_safe(adapter.extract(artifact=files[name], contract=world.contract))  # noqa: E731
+    read = lambda name: adapter.extract(artifact=files[name], contract=world.contract)  # noqa: E731
     base = read("base")
     return merge_projections(
         base=base, current=base if current == "base" else read(current),

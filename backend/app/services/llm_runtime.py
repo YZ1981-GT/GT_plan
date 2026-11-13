@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.ai_model_options import AIDeployment, classify_deployment
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider
+from app.services.ai_model_presets import PRESET_BY_KEY
 from app.services.ai_model_secret_service import decrypt_api_key
 from app.services.llm_endpoint_policy import (
     LLMEndpointPolicyError,
@@ -84,6 +85,8 @@ class ResolvedLLMConfig:
     trust_zone: str = "restricted"
     client_data_allowed: bool = False
     mask_policy: str = "strict"
+    # 向量模型要求网关输出的维度（企业预设声明；None = 不发 dimensions，用模型原生维度）
+    embedding_dimensions: int | None = None
 
     @property
     def identity(self) -> str:
@@ -146,6 +149,12 @@ def resolve_config_from_model(
         raise LLMRuntimeError("invalid_model_config", str(exc), kind="config") from exc
     if profile.requires_api_key and not api_key:
         raise LLMRuntimeError("api_key_required", "该提供商尚未配置 API Key", kind="config")
+    preset = PRESET_BY_KEY.get(getattr(model, "preset_key", None) or "")
+    dimensions = (
+        preset.embedding_dimensions
+        if preset is not None and model.model_type == AIModelType.embedding
+        else None
+    )
     return ResolvedLLMConfig(
         model_name=(requested_model or model.model_name).strip(),
         model_type=model.model_type,
@@ -160,6 +169,7 @@ def resolve_config_from_model(
         trust_zone=str(getattr(model, "trust_zone", "restricted") or "restricted"),
         client_data_allowed=bool(getattr(model, "client_data_allowed", False)),
         mask_policy=str(getattr(model, "mask_policy", "strict") or "strict"),
+        embedding_dimensions=dimensions,
     )
 
 
@@ -279,10 +289,15 @@ async def resolve_route(
     *,
     requested_model: str | None = None,
 ) -> list[RouteCandidate]:
-    """按「本机 → 服务器」排序的已启用候选；没有启用行时回落 `.env` 单候选。"""
+    """按「本机 → 服务器」排序的已启用候选；没有启用行时回落 `.env` 单候选。
+
+    重排没有 `.env` 兜底：它是可选增强，没有启用行 = 不重排（返回空路由）。
+    """
     rows = await enabled_model_rows(db, model_type)
     _assert_route_uniqueness(rows, model_type)
     if not rows:
+        if model_type == AIModelType.rerank:
+            return []
         config = _environment_config(model_type, requested_model)
         return [RouteCandidate(config.model_name, config.deployment, None, config, implicit=True)]
     candidates: list[RouteCandidate] = []
@@ -309,6 +324,8 @@ async def resolve_runtime_config(
     for candidate in route:
         if candidate.config is not None:
             return candidate.config
+    if not route:
+        raise LLMRuntimeError("no_model", "没有启用的模型配置", kind="config")
     raise route[0].error or LLMRuntimeError("no_model", "没有可用的模型配置", kind="config")
 
 
@@ -526,21 +543,97 @@ async def chat_stream(
         raise await _transport_error(config, exc) from exc
 
 
+def embedding_signature(model_name: str, dimensions: int) -> str:
+    """向量模型签名「模型名@维度」：不同签名的向量不在同一空间，不能比较相似度。"""
+    return f"{model_name}@{int(dimensions)}"
+
+
 async def embedding(config: ResolvedLLMConfig, text: str, *, timeout: float = 30.0) -> list[float]:
+    payload: dict[str, object] = {"model": config.model_name, "input": text}
+    if config.embedding_dimensions:
+        payload["dimensions"] = int(config.embedding_dimensions)
     try:
         async with await build_runtime_client(config, timeout=timeout, connect_timeout=5.0) as client:
-            response = await client.post("embeddings", json={"model": config.model_name, "input": text})
+            response = await client.post("embeddings", json=payload)
             _raise_for_status(response, config)
             body = _json_body(response)
             rows = body.get("data", []) if isinstance(body, dict) else []
             vector = rows[0].get("embedding", []) if rows and isinstance(rows[0], dict) else []
             if not isinstance(vector, list) or not vector:
                 raise LLMRuntimeError("empty_response", "Embedding 未返回有效向量", kind="output")
-            return vector
     except LLMRuntimeError:
         raise
     except (httpx.HTTPError, LLMEndpointPolicyError) as exc:
         raise await _transport_error(config, exc, subject="Embedding ") from exc
+    if config.embedding_dimensions and len(vector) != int(config.embedding_dimensions):
+        # 维度不符时写库会进错空间（或被 vector(1024) 列拒收）：按配置错误报出，不静默截断。
+        raise LLMRuntimeError(
+            "embedding_dimension_mismatch",
+            f"向量维度 {len(vector)} 与配置的 {config.embedding_dimensions} 不一致（网关可能不支持 dimensions 参数）",
+            kind="config",
+        )
+    return vector
+
+
+@dataclass(frozen=True)
+class RerankScore:
+    """重排结果：``index`` 指向请求里的第几篇文档，``score`` 为相关度（越大越相关）。"""
+
+    index: int
+    score: float
+
+
+def _parse_rerank_results(body: object, document_count: int) -> list[RerankScore]:
+    """解析 Cohere / Jina 形态 ``{"results": [{"index", "relevance_score"}]}``（兼容 ``score`` 键）。"""
+    results = body.get("results") if isinstance(body, dict) else None
+    if not isinstance(results, list):
+        raise LLMRuntimeError(
+            "invalid_response", "重排接口返回缺少 results，不是兼容的 rerank 格式", kind="config"
+        )
+    scores: list[RerankScore] = []
+    seen: set[int] = set()
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        index = item.get("index")
+        raw = item.get("relevance_score", item.get("score"))
+        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < document_count:
+            continue
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw != raw:
+            continue
+        if index in seen:
+            continue
+        seen.add(index)
+        scores.append(RerankScore(index, float(raw)))
+    if document_count and not scores:
+        raise LLMRuntimeError("empty_response", "重排接口未返回有效分数", kind="output")
+    return sorted(scores, key=lambda s: s.score, reverse=True)
+
+
+async def rerank(
+    config: ResolvedLLMConfig,
+    query: str,
+    documents: list[str],
+    *,
+    top_n: int | None = None,
+    timeout: float = 30.0,
+) -> list[RerankScore]:
+    """POST ``{base}/rerank``（vLLM / LiteLLM 网关的 Cohere 兼容接口）；按分数从高到低返回。"""
+    if not documents:
+        return []
+    payload: dict[str, object] = {"model": config.model_name, "query": query, "documents": documents}
+    if top_n:
+        payload["top_n"] = int(top_n)
+    try:
+        async with await build_runtime_client(config, timeout=timeout, connect_timeout=5.0) as client:
+            response = await client.post("rerank", json=payload)
+            _raise_for_status(response, config)
+            body = _json_body(response)
+    except LLMRuntimeError:
+        raise
+    except (httpx.HTTPError, LLMEndpointPolicyError) as exc:
+        raise await _transport_error(config, exc, subject="重排 ") from exc
+    return _parse_rerank_results(body, len(documents))
 
 
 # 连接测试的输出预算：只为证明协议可用，不追求完整答复。
@@ -581,6 +674,8 @@ async def test_runtime_config(config: ResolvedLLMConfig) -> None:
         await _probe_chat_completion(config)
     elif config.model_type == AIModelType.embedding:
         await embedding(config, "test", timeout=15.0)
+    elif config.model_type == AIModelType.rerank:
+        await rerank(config, "test", ["test"], timeout=15.0)
     else:
         raise LLMRuntimeError(
             "unsupported_model_type", "该模型类型不走 LLM HTTP 测试", kind="config"

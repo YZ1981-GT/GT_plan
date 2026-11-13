@@ -256,9 +256,11 @@ async def recalc_worksheet(
     current_user: User = Depends(require_project_access("edit")),
 ):
     """全量重算差额表"""
+    if body.project_id != project_id:
+        raise HTTPException(status_code=422, detail="请求体项目与校验项目不一致")
     from app.services.consol_worksheet_engine import recalc_full
 
-    result = await recalc_full(db, body.project_id, body.year)
+    result = await recalc_full(db, project_id, body.year)
     return {"message": "重算完成", **result}
 
 
@@ -334,10 +336,12 @@ async def pivot_query(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """透视查询"""
+    if body.project_id != project_id:
+        raise HTTPException(status_code=422, detail="请求体项目与校验项目不一致")
     from app.services.consol_pivot_service import execute_query
 
     data = await execute_query(
-        db, body.project_id, body.year,
+        db, project_id, body.year,
         body.row_dimension, body.col_dimension, body.value_field,
         body.filters, body.transpose, body.node_company_code, body.aggregation_mode,
     )
@@ -380,10 +384,12 @@ async def create_template(
     current_user: User = Depends(require_project_access("edit")),
 ):
     """保存查询模板"""
+    if body.project_id != project_id:
+        raise HTTPException(status_code=422, detail="请求体项目与校验项目不一致")
     from app.services.consol_pivot_service import save_template
 
     tpl = await save_template(
-        db, body.project_id, body.name,
+        db, project_id, body.name,
         body.row_dimension, body.col_dimension, body.value_field,
         body.filters, body.transpose, body.aggregation_mode,
     )

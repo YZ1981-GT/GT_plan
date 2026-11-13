@@ -261,6 +261,8 @@ async def generate_notes(
             "message": "附注生成成功",
             "note_count": len(results),
             "notes": results,
+            # 写入归属被拒的格：生成合并没有改写公式推送写定的格（spec formula-writer-ownership-and-stale §13）
+            "blocked_writes": engine.blocked_writes,
         }
 
     def _event(_response: dict[str, Any]) -> EventPayload:
@@ -1406,7 +1408,9 @@ async def apply_formulas(
 ):
     """执行附注表格中的自动运算公式（逐表），回填计算结果。
 
-    只更新 mode=auto 的单元格，manual / locked 单元格不受影响。预设公式按每张表当前结构现算（合计 = 明细之和、
+    只更新 mode=auto 的单元格，或没有模式且为空 / 仍等于本执行器上次写入值的单元格，
+    manual / locked 和来路不明的已有值不受影响。logic_check / reasonability 只计算并在
+    ``checks`` 返回统一五态校对结果，不写回目标单元格。预设公式按每张表当前结构现算（合计 = 明细之和、
     账面价值 = 余额 − 准备）；``regenerate=true`` 丢掉章节里存过的旧公式改用现算预设（公式弹窗「重新生成」）。
     """
     from app.services.formula_settings.note_settings import materialize_quietly
@@ -1419,10 +1423,13 @@ async def apply_formulas(
             await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                      user_id=current_user.id)
         await db.commit()
-        return {
+        response = {
             "message": f"公式已执行：{result['executed']} 个公式，更新 {result['updated']} 个单元格",
             **result,
         }
+        # 保持校对结果在端点响应的顶层，供附注公式面板直接展示五态 checks。
+        response["checks"] = result.get("checks", [])
+        return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"公式执行失败: {str(e)}")
 

@@ -76,6 +76,15 @@
         "frozen_canonical_sha256": "81f7ce00ee2aa19813faad7b9716d821353ea84325960fc615684d57846245a2",
         "canonical_recipe": "json.dumps(doc['paradigm'], ensure_ascii=False, indent=2, sort_keys=True) 的 UTF-8 sha256",
         "immutability": "字节冻结。守卫用硬编码 digest 双向锁死：改了 `paradigm` 而不改守卫 ⇒ 打红；改了守卫常量而不改 `paradigm` ⇒ 打红（本键的 digest 也要与守卫常量相等）。",
+        "errata": [
+          {
+            "date": "2026-11-03",
+            "steps": [4, 7],
+            "why_not_edited_in_place": "`/paradigm` 是字节冻结块：raw + canonical 双 digest 由 test_migration_paradigm_contract 与 test_task52/53/55/56/57/60 锁死，test_task46 依赖它恰 7 步。改它要同时动这些守卫常量；勘误登记在这里，读范式的人按本条取当前口径。",
+            "step_4": "原文让宿主改线到 `usePilotBridgeAdapter`。该空壳已在 task 5.4 物理删除（生产调用为 0），当前唯一合法目标是 `WorkpaperSyncEditorHost` + `useWorkpaperSyncBridge`，模式开关可见性走 `useEntrySyncReadiness`。",
+            "step_7": "原文要求跑 `usePilotBridgeAdapter.spec.ts`。该 spec 只测已删除模块的 API，已随 task 5.4 收尾删除；删除后回归改跑 `backend/tests/workpaper_sync/test_task45_pilot_legacy_deletion.py` 与 `audit-platform/frontend/src/components/workpaper/sync/__tests__/useWorkpaperSyncBridge.spec.ts`。"
+          }
+        ],
         "does_not_cover": [
           "逐 entry 读 backend/wp_templates/ 权威模板并冻结 size+sha256",
           "解析 HTML 对端并给出二值结论（none / exists）",

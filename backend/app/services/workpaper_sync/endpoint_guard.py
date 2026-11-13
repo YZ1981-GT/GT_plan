@@ -253,13 +253,14 @@ class VisibilityProbeFailedError(SyncEndpointGuardError):
 _REFUSAL_STATUS: Final[Mapping[type, int]] = {
     SyncEndpointUnauthenticatedError: 401,
     SyncScopeInvisibleError: 404,
+    SyncWorkflowLockedError: 423,
     SyncActionForbiddenError: 403,
     VisibilityProbeFailedError: 503,
 }
 
 
 def http_status_for_refusal(exc: BaseException) -> int:
-    """guard 拒绝 → HTTP status。**只**认登记的四支，其余一律抛。
+    """guard 拒绝 → HTTP status。**只**认登记的五支，其余一律抛。
 
     刻意不写 `return 500` 兜底：兜底会让「新增一个拒绝类型但忘了登记」表现为 500，
     而 500 在生产里被当作平台故障处理 —— 真正的原因（授权分型漏登记）永远不会被发现。
@@ -837,7 +838,7 @@ class SyncEndpointGuard:
             self.refused += 1
             raise SyncWorkflowLockedError(
                 f"wp {wp_id} 的 workflow 已锁定（复核锁定/归档）—— "
-                f"scope 可见但写 action={request.action!r} 不被允许（403，与 404 分型）；"
+                f"scope 可见但写 action={request.action!r} 不被允许（423 Locked，与 404 分型）；"
                 f"只读 action（{sorted(self._read_only_actions)}）仍放行，"
                 "否则归档底稿连冲突/timeline 都看不了"
             )

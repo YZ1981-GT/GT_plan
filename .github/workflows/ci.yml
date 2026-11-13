@@ -609,6 +609,13 @@ jobs:
           [ "$fail" -eq 0 ] || exit 1
         working-directory: audit-platform/frontend
 
+      - name: Amount display AST guard (display-core-violations-cleanup R3/R4)
+        # 扫描前端 src/ 中 el-table-v2 cellRenderer 固定像素字号 + GtAmountCell :unit prop 违规。
+        # 违规数由 --check 对照 amount-guard-baseline.json 确认；total_core_violations 必须为 0。
+        # baseline 已于 display-core-violations-cleanup 实施后归零，此步骤不带 continue-on-error。
+        run: python -m scripts.check.frontend_amount_guard.cli --check
+        working-directory: backend
+
       - name: Build production artifact
         run: npm run build
         working-directory: audit-platform/frontend

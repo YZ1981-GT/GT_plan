@@ -1,0 +1,147 @@
+{
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "owner_task": "3.5",
+  "purpose": "零能力损失复核：2026-11-04 审计整改把剩余未接单源的宿主（D4 子 Tab、K 子 Tab、GtA3、GtB1×3、GtB14、J1 通用检查、WorkpaperWordEditor、GtA177）接到同步能力单源（useEntrySyncReadiness + presentation 门 + GtEntrySyncCapabilityNotice），删除 I1 裁决 Tab 的死开关，删掉 B22B×2 / B22C 三个宿主里 task 3.5 批量接线重复插入的 notice import，并补齐 D4 子 Tab 的重载钩子；宿主源码变化使 discovery.sourceDigest 变更，不得改变任何 entry 的能力事实。",
+  "method": "按完整 manifest 现 build（overlay 副本里放行 digest 门，仅内存）与磁盘 manifest 逐 entry 比 ['capability', 'migration_state', 'adapter_id', 'html_store', 'canonical_resolver', 'independent_entry', 'html_counterpart_verdict', 'effective_entry_id', 'capability_verdict_stage', 'capability_target', 'document_type', 'parent_entry_id', 'host_path', 'adjudication_state']，并比 entry 集合、stats、per-entry mount 数，以及每个 entry 的挂点语义多重集合（file/component/condition/sheetExpression/documentType/runtimeCardinality/loop）。",
+  "digest": {
+    "disk_source": "919d66ad00b6798dad516a3db1e5807eb1c0889d23ec2b1aa8495edda63962d9",
+    "built_source": "8d0a8718df882c92e9cb1488e82ffecbf84f135012819354701c4c89cabea5ea",
+    "disk_manifest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
+    "built_manifest": "c534861e06dd874aa048da7dbb6b83ac7aaad7e66c0b1778e054619720dfb6d6",
+    "note": "built_manifest 是复核时在内存里只替换 approved_source_digest 后现 build 的结果；overlay 写入复核记录（approved_source_digest / review_basis / source_review_ref）后 overlay_digest 随之变化，落盘 manifest 的manifest_digest 以 generate_workpaper_sync_artifacts.py --write 的结果为准（written_manifest），entries 与 stats 不变。",
+    "written_manifest": "e7de789674ce5f094f5329328dbc1198c52c37da4ceba41bf06aa6484fd5d6c9"
+  },
+  "entry_set": {
+    "disk": 197,
+    "built": 197,
+    "only_disk": [],
+    "only_built": []
+  },
+  "stats_diff": {},
+  "changed_entries": {},
+  "mount_count_changes": {},
+  "mount_semantic_changes": {},
+  "mount_identity": {
+    "reidentified_mounts": 42,
+    "same_id_span_only_changes": 8,
+    "why": "mountId 的身份输入含 templateNodeOrdinal（模板元素先序序号）。notice 插在同步载体之前 ⇒ 载体序号后移 ⇒ 新 mountId；挂点语义多重集合逐 entry 相等（见 mount_semantic_changes 为空）。同 id 只变 sourceSpan 的 8 个：5 个是插入点在载体之后、行号后移；3 个是 B22B×2 / B22C 删掉 <script setup> 里重复的 import 行后行号前移 1。"
+  },
+  "discovery_layers": {
+    "before": {
+      "L1": 49,
+      "L2": 23,
+      "L3": 36
+    },
+    "after": {
+      "L1": 49,
+      "L2": 23,
+      "L3": 36
+    },
+    "sync_host_entry_rules_hits_unchanged": true,
+    "note": "D4 / K 子 Tab 的 notice 用 `:entry-id` 绑定本文件常量，不写静态字面量：静态 `entry-id` 会被发现器当作 L2 身份声明，把 36 个 L3 宿主推成 L2，overlay 的 7 条 sync_host_entry_rules 全部零命中（stale-rule 门 fail closed），且 L3 清空会让三层分解契约失锚（实测于本轮第一版接线）。GtA3 保持 HEAD 的静态字面量：它是该宿主唯一的 L2 身份声明（第一版改成绑定后其载体 documentType 解析为 null）。",
+    "after_b22_fix": {
+      "L1": 49,
+      "L2": 23,
+      "L3": 36
+    },
+    "after_d4_reload_fix": {
+      "L1": 49,
+      "L2": 23,
+      "L3": 36
+    }
+  },
+  "changed_hosts": [
+    "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
+    "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
+    "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
+    "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerStructure.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabIndicator.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductMargin.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductPrice.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjudication.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjustment.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCompleteness.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabContract.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffBackward.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffForward.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabDiscount.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabErpCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabExport.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabReturn.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInvoiceCompare.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabIpoIndicator.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabThirdParty.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherContract.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCutoff.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherMargin.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/d4/related/D4TabRelatedPrice.vue",
+    "audit-platform/frontend/src/components/workpaper/i1/core/I1TabAdjudication.vue",
+    "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue",
+    "audit-platform/frontend/src/components/workpaper/k11/core/K11TabAdjustment.vue",
+    "audit-platform/frontend/src/components/workpaper/k12/core/K12TabAdjustment.vue",
+    "audit-platform/frontend/src/components/workpaper/k13/core/K13TabAdjustment.vue",
+    "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue",
+    "audit-platform/frontend/src/components/workpaper/k9/core/K9TabAdjustment.vue"
+  ],
+  "verdict": "zero_capability_loss",
+  "schema_version": "workpaper-sync-source-review:v1",
+  "reviewed_at": "2026-11-04",
+  "reviewed_by": "workpaper-html-onlyoffice-bidirectional-writeback-closure:audit-fix-2026-11-04",
+  "generator": "backend/scripts/gen/generate_workpaper_sync_manifest.py::discover_source+build_manifest",
+  "approved_source_digest_before": "919d66ad00b6798dad516a3db1e5807eb1c0889d23ec2b1aa8495edda63962d9",
+  "approved_source_digest_after": "8d0a8718df882c92e9cb1488e82ffecbf84f135012819354701c4c89cabea5ea",
+  "decision": "approved",
+  "safety_checks": {
+    "authoritative_templates_modified_for_review": false,
+    "manual_manifest_edits_allowed": false,
+    "rebuilt_manifest_available": true,
+    "rebuild_error": null
+  },
+  "next_actions": [
+    "只通过 generate_workpaper_sync_artifacts.py --write 重建四件生成物",
+    "重建后跑 generate_workpaper_sync_program_milestones.py --apply / --check（overlay digest 复核让 PUBLISHED-ENTRY-READY / SYNC-ENTRY-NAMESPACE 从 STALE 回到已证状态）"
+  ],
+  "b22_duplicate_notice_import": {
+    "hosts": [
+      "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue",
+      "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
+      "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue"
+    ],
+    "defect": "task 3.5 批量接线（b337042ca）在三个宿主的 vue import 之后又插了一行 `import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'`，而这三个宿主原本就在 WorkpaperSyncEditorHost 之后 import 了同一组件 ⇒ babel 报 Identifier 'GtEntrySyncCapabilityNotice' has already been declared，三个组件编译失败（B22B 控制矩阵 / 缺陷评价、B22C 设计有效性三页打不开，vite build 失败）。全仓 .vue 语法守卫 src/__tests__/vueSfcSyntax.spec.ts 自此一直红（基线 8352d7b38 与远端头 59e1e3bca 均复现），组件层用例 b22bControlMatrix.spec.ts / useB22BControlMatrix.spec.ts 的 P10 只读封锁同样因挂载失败而红。",
+    "fix": "删掉 task 3.5 插入的那一行，保留原有 import；同一判据全仓现算 3 → 0。",
+    "anchors": "指向这三个文件的 15 个数据锚点按行对应平移（abcs / j 两份 slice 逐条核对行文字相同）。"
+  },
+  "d4_reload_hook": {
+    "hosts": [
+      "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjustment.vue",
+      "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabErpCheck.vue",
+      "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabExport.vue",
+      "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
+      "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue"
+    ],
+    "defect": "在线编辑落地（applied）后桥调 reloadHtml(revision) 让表单读回新值。D4-4 调整分录根本没传 reloadHtml ⇒ 桥里 await options.reloadHtml(revision) 抛 TypeError ⇒ 进 reload 失败态、participant lease 不释放、表单停在旧值；D4-5 / D4-13 / D4-16 / D4-35 在 reloadHtml 里派发 d4:reload-responses，全仓没有监听方 ⇒ 静默空操作。",
+    "fix": "五处都改走父级 GtD4OperatingRevenue 提供的 reloadWorkpaperData（与 D4-1 / D4-14 等兄弟 Tab 同一入口）。",
+    "anchors": "backend/data 里没有指向这五个文件的 #L 锚点（resync_data_line_anchors.py --check：均无需平移）。",
+    "guard": "audit-platform/frontend/src/components/workpaper/sync/__tests__/syncReloadWiringContract.spec.ts"
+  }
+}

@@ -25,13 +25,19 @@ import type { ChatMessage } from '@/composables/usePlatformAiChat'
 import type { AiHostRef } from '@/composables/useAiHostContext'
 import { readAiChatErrorResponse } from '@/composables/aiChatWireError'
 import { newUuid } from '@/utils/uuid'
+import { copyText } from '@/utils/clipboard'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** 笔记名称上限（与对话框输入框 maxlength 同源）。 */
-export const NOTE_NAME_MAX_LENGTH = 100
+/** 笔记名称上限（与对话框输入框 maxlength 同源）。
+ *
+ * 必须与后端 `NoteSaveRequestBody.name` 的 `max_length` 一致（`routers/doc_ai_chat.py`，现为 200）：
+ * 前端限得更小会把后端接受的名称在本地拦掉（用户输入 101~200 字时提示「不超过 100 字」却并非服务端规则）。
+ * 跨语言对账守卫见 `components/ai/__tests__/ChatAdoptNoteTarget.spec.ts`（解析后端 pydantic 源码逐字段比对）。
+ */
+export const NOTE_NAME_MAX_LENGTH = 200
 
 /**
  * 笔记保存位置（镜像后端 `NoteSaveRequestBody.target_project_id / target_folder_id`）。
@@ -237,28 +243,13 @@ export function useAiNoteCapture(options: UseAiNoteCaptureOptions) {
     // 按原始列表顺序拼接（messages 本身就是服务端顺序）
     const text = msgs.map((m) => m.text).join('\n\n---\n\n')
 
-    try {
-      await navigator.clipboard.writeText(text)
+    // 统一走 utils/clipboard（含非安全上下文的 textarea 回退）
+    if (await copyText(text)) {
       ElMessage.success(`已复制 ${msgs.length} 条 AI 回复`)
       return true
-    } catch {
-      // fallback: textarea copy
-      try {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-        ElMessage.success(`已复制 ${msgs.length} 条 AI 回复`)
-        return true
-      } catch {
-        ElMessage.error('复制失败，请手动选择文本复制')
-        return false
-      }
     }
+    ElMessage.error('复制失败，请手动选择文本复制')
+    return false
   }
 
   // ---------------------------------------------------------------------------

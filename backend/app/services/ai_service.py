@@ -21,19 +21,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import AIModelConfig, AIModelType, AIProvider
-from app.models.ai_model_options import AIDeployment
-from app.services.llm_route import filter_route_by_policy, route_chat_stream, route_chat_sync
+from app.models.ai_model_options import AIDeployment, AITrustZone
+from app.services.llm_route import (
+    filter_route_by_policy,
+    route_chat_stream,
+    route_chat_sync,
+    route_rerank,
+)
 from app.services.llm_runtime import (
     LLMRuntimeError,
+    RerankScore,
+    RouteCandidate,
     deployment_of,
     embedding as runtime_embedding,
+    embedding_signature,
     enabled_model_rows,
     merge_system_messages,
     resolve_config_from_model,
     resolve_route,
-    resolve_runtime_config,
     test_runtime_config,
 )
+
+# 向量 / 重排的输入是知识库正文与检索问题（可能含客户资料）：任何信任域都可，但必须允许客户数据。
+_ANY_TRUST_ZONE = frozenset(zone.value for zone in AITrustZone)
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +151,8 @@ class AIService:
         self.last_validation_error: ModelValidationFailure | None = None
         # 本机模型「当前不可用但已启用」时的提示（R4.2）。
         self.last_validation_warning: ModelValidationFailure | None = None
+        # 最近一次向量化所用模型的签名「模型名@维度」；知识库按它隔离不同模型的向量。
+        self.last_embedding_signature: str | None = None
 
     # -------------------------------------------------------------------------
     # 模型管理
@@ -400,17 +412,68 @@ class AIService:
     # Embedding 向量化
     # -------------------------------------------------------------------------
 
+    async def _client_data_route(
+        self, model_type: AIModelType, *, requested_model: str | None = None
+    ) -> list[RouteCandidate]:
+        """只保留允许处理客户数据的候选；没有启用行（重排）时为空，全被政策挡掉时抛出。"""
+        route = await resolve_route(self.db, model_type, requested_model=requested_model)
+        if not route:
+            return []
+        return filter_route_by_policy(route, allowed_trust_zones=_ANY_TRUST_ZONE, client_data=True)
+
     async def embedding(
         self,
         text: str,
         model: str | None = None,
     ) -> list[float]:
-        """使用 active embedding model 生成向量。"""
+        """使用启用的向量模型生成向量（单一模型、不跨模型兜底），并记录签名。"""
         try:
-            config = await resolve_runtime_config(
-                self.db, AIModelType.embedding, requested_model=model
-            )
-            return await runtime_embedding(config, text)
+            route = await self.embedding_route(requested_model=model)
+            config = next((c.config for c in route if c.config is not None), None)
+            if config is None:
+                raise (route[0].error if route and route[0].error else LLMRuntimeError(
+                    "no_model", "没有可用的向量模型配置", kind="config"
+                ))
+            vector = await runtime_embedding(config, text)
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
+        self.last_embedding_signature = embedding_signature(config.model_name, len(vector))
+        return vector
+
+    async def embedding_route(
+        self, *, requested_model: str | None = None
+    ) -> list[RouteCandidate]:
+        """与 :meth:`embedding` 同口径的向量候选（库里启用行，没有则 ``.env`` 兜底；只留允许客户数据的）；不发请求。"""
+        try:
+            return await self._client_data_route(AIModelType.embedding, requested_model=requested_model)
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
+
+    # -------------------------------------------------------------------------
+    # Rerank 重排（可选增强：未启用 = 不重排）
+    # -------------------------------------------------------------------------
+
+    async def rerank_route(self) -> list[RouteCandidate]:
+        """已启用且允许客户数据的重排候选（本机 → 服务器）；未启用重排时为空。"""
+        try:
+            return await self._client_data_route(AIModelType.rerank)
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
+
+    async def rerank(
+        self,
+        query: str,
+        documents: list[str],
+        *,
+        route: list[RouteCandidate] | None = None,
+        top_n: int | None = None,
+    ) -> list[RerankScore]:
+        """按重排路由给文档打分（分数从高到低）；未启用重排或全部候选失败时抛 AIServiceUnavailableError。"""
+        candidates = route if route is not None else await self.rerank_route()
+        if not candidates:
+            raise AIServiceUnavailableError("未启用重排模型")
+        try:
+            return await route_rerank(candidates, query, documents, top_n=top_n)
         except LLMRuntimeError as exc:
             raise AIServiceUnavailableError(str(exc)) from exc
 

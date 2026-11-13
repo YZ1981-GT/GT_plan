@@ -49,6 +49,8 @@ __all__ = [
     "CapabilityResponse",
     "CapabilityGate",
     "CAPABILITY_DISABLE_REASON_ZH",
+    "embedding_route_health",
+    "evaluate_embedding_route",
     "get_capabilities",
 ]
 
@@ -130,12 +132,14 @@ CapabilityResponse.model_rebuild()
 
 
 def get_capabilities(
-    *, project_id: UUID | None = None
+    *, project_id: UUID | None = None, embedding_health: "ServiceHealth | None" = None
 ) -> CapabilityResponse:
     """返回当前服务端配置下的引擎能力响应。
 
     参数:
         project_id: 可选的项目 ID（精确判断 DSH allowlist）。
+        embedding_health: 调用方先 ``await embedding_route_health()`` 得到的向量健康
+            （按平台实际向量路由判定；本函数是同步的，不读库也不读 ``.env`` 冒充结论）。
 
     返回:
         CapabilityResponse，前端据此禁用不支持的入口。
@@ -158,7 +162,9 @@ def get_capabilities(
         gate_reason_zh = ENGINE_GATE_REASON_ZH.get(gate_reason, gate_reason)
 
     # 收集健康状态
-    health = _collect_service_health(require_local_model=caps.local_only)
+    health = _collect_service_health(
+        require_local_model=caps.local_only, embedding_health=embedding_health
+    )
 
     return CapabilityResponse(
         engine=engine.value,
@@ -169,10 +175,13 @@ def get_capabilities(
     )
 
 
-def _collect_service_health(*, require_local_model: bool = True) -> dict[str, ServiceHealth]:
+def _collect_service_health(
+    *, require_local_model: bool = True, embedding_health: ServiceHealth | None = None
+) -> dict[str, ServiceHealth]:
     """收集 model/embedding/OCR/MCP 的健康状态。
 
-    各服务独立检查，错误码分离（Req 12.4）。
+    各服务独立检查，错误码分离（Req 12.4）。向量由调用方按实际路由先算好传入
+    （``embedding_route_health``）；没传时如实报「未检查」，不再拿 ``.env`` 字符串判定。
     """
     from app.core.config import settings
 
@@ -184,7 +193,7 @@ def _collect_service_health(*, require_local_model: bool = True) -> dict[str, Se
     )
 
     # Embedding health
-    health["embedding"] = _check_embedding_health(settings)
+    health["embedding"] = embedding_health or EMBEDDING_NOT_CHECKED
 
     # OCR health
     health["ocr"] = _check_ocr_health(settings)
@@ -233,37 +242,92 @@ def _check_model_health(settings: Any, *, require_local: bool = True) -> Service
     )
 
 
-def _check_embedding_health(settings: Any) -> ServiceHealth:
-    """检查 embedding endpoint 是否为本地（Req 12.1 / 12.4）。"""
-    from app.services.ai_chat.dsh_discovery import validate_model_route
+#: 同步调用方没有先查实际向量路由时的占位：如实说「未检查」，不拿 ``.env`` 字符串冒充结论。
+EMBEDDING_NOT_CHECKED = ServiceHealth(
+    available=False,
+    endpoint="(未检查)",
+    error_code="semantic_unavailable",
+    message="未检查向量路由。",
+)
 
-    endpoint = getattr(settings, "LLM_EMBEDDING_BASE_URL", "") or ""
-    if not endpoint:
+
+async def _load_embedding_routes(db: Any | None) -> tuple[list[Any], list[Any] | Exception]:
+    """(全部向量候选, 允许客户数据的候选或被拒原因)，与真实向量调用同一口径；db 为空时自开会话。
+
+    向量路由 = 库里启用的向量行，没有则 ``.env`` 兜底（``llm_runtime.resolve_route``）；
+    知识检索 / DSH ``kb_search`` 实际只用其中允许客户数据的候选（``AIService.embedding_route``）。
+    """
+    from app.models.ai_models import AIModelType
+    from app.services.ai_service import AIService
+    from app.services.llm_runtime import resolve_route
+
+    async def _load(session: Any) -> tuple[list[Any], list[Any] | Exception]:
+        raw = await resolve_route(session, AIModelType.embedding)
+        try:
+            allowed: list[Any] | Exception = await AIService(session).embedding_route()
+        except Exception as exc:  # noqa: BLE001 - 政策拒绝是结论的一部分
+            allowed = exc
+        return raw, allowed
+
+    if db is not None:
+        return await _load(db)
+    from app.core.database import async_session
+
+    async with async_session() as session:
+        return await _load(session)
+
+
+def evaluate_embedding_route(raw: list[Any], allowed: list[Any] | Exception) -> ServiceHealth:
+    """按 DSH 受信口径判定实际向量路由（纯函数，不发请求；spec enterprise-embedding-rerank-closure R12）。
+
+    先看端点：不在平台受信清单、也不是环回 / 内网 ⇒ ``local_only_violation``；
+    再看数据政策：不允许处理客户数据 ⇒ ``semantic_unavailable``（平台本就不会用它检索）。
+    """
+    from app.services.ai_chat.dsh_model_bridge import validate_dsh_upstream
+
+    candidate = next((c for c in raw if getattr(c, "config", None) is not None), None)
+    if candidate is None:
+        reason = next((str(c.error) for c in raw if getattr(c, "error", None)), "没有启用的向量模型")
         return ServiceHealth(
-            available=False,
-            endpoint="(未配置)",
-            error_code="semantic_unavailable",
-            message="Embedding 服务地址未配置。",
+            available=False, endpoint="(未配置)", error_code="semantic_unavailable",
+            message=f"向量模型不可用：{reason}。",
         )
-
-    errors = validate_model_route(endpoint)
+    config = candidate.config
+    where = "本机" if config.deployment == "local" else "服务器"
+    label = f"向量模型「{config.model_name}」（{where}{'，.env 默认' if candidate.implicit else ''}）"
+    endpoint = _mask_endpoint(config.endpoint_url)
+    errors = validate_dsh_upstream(config.endpoint_url)
     if errors:
-        logger.warning(
-            "[ai-chat] embedding endpoint local-only 校验失败: %s",
-            "; ".join(errors),
-        )
+        logger.warning("[ai-chat] 向量路由不在 DSH 允许范围: %s (endpoint=%s)", errors[0], endpoint)
         return ServiceHealth(
-            available=False,
-            endpoint=_mask_endpoint(endpoint),
-            error_code="local_only_violation",
-            message=f"Embedding 路由不合规: {errors[0]}",
+            available=False, endpoint=endpoint, error_code="local_only_violation",
+            message=f"{label}端点不合规: {errors[0]}",
         )
-
-    return ServiceHealth(
-        available=True,
-        endpoint=_mask_endpoint(endpoint),
-        message="本地 Embedding 服务可用。",
+    usable = not isinstance(allowed, Exception) and any(
+        getattr(c, "config", None) is not None for c in allowed
     )
+    if not usable:
+        why = str(allowed) if isinstance(allowed, Exception) else "不允许处理客户数据"
+        return ServiceHealth(
+            available=False, endpoint=endpoint, error_code="semantic_unavailable",
+            message=f"{label}按信任策略不能用于知识检索：{why}",
+        )
+    return ServiceHealth(available=True, endpoint=endpoint, message=f"{label}已配置（未检测连通性）。")
+
+
+async def embedding_route_health(db: Any | None = None) -> ServiceHealth:
+    """``/capabilities`` 与启动自检共用：平台实际向量路由（不是 ``.env`` 字符串）的健康判定。"""
+    try:
+        raw, allowed = await _load_embedding_routes(db)
+    except Exception as exc:  # noqa: BLE001 - 读路由失败如实报不可用（不外抛、不泄露连接细节）
+        from app.services.llm_runtime import LLMRuntimeError
+
+        detail = str(exc) if isinstance(exc, LLMRuntimeError) else f"读取向量模型配置失败（{type(exc).__name__}）"
+        return ServiceHealth(
+            available=False, endpoint="(未配置)", error_code="semantic_unavailable",
+            message=f"向量模型不可用：{detail}",
+        )
+    return evaluate_embedding_route(raw, allowed)
 
 
 def _check_ocr_health(settings: Any) -> ServiceHealth:

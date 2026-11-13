@@ -135,7 +135,9 @@ async def test_consistency_rule_exception_is_not_silent_pass(monkeypatch):
     from app.models.phase14_enums import GateSeverity
     hit = await _rule_hit(monkeypatch, "observe", raise_exc=True)
     assert hit is not None and hit.severity == GateSeverity.warning
-    assert "一致性检查未能运行" in hit.message
+    # 文案按 S2（ADR-CCN-07）统一为「检查异常，未执行：<异常类型>：<原因>」，并标记来源为未执行
+    assert "检查异常，未执行" in hit.message and "boom" in hit.message, hit.message
+    assert hit.location.get("via") == "not_executed", hit.location
 
 
 def test_startup_registers_consistency_gate_rule():

@@ -20,11 +20,16 @@ from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.audit_platform_models import TbBalance
+from app.models.dataset_models import LedgerDataset
 from tests.advanced_query_linkage.builder_client import BuilderClient, builder_client
 from tests.advanced_query_linkage.business_client import BusinessClient, business_client
 from tests.advanced_query_linkage.gold import Gold, require_pg_only
+from tests.advanced_query_linkage.project_picks import Pick, PickResolver
+from tests.advanced_query_linkage.writable_projects import insert_test_project
 from tests.authz_world import pg_engine
 
 
@@ -34,6 +39,21 @@ async def gold(request: pytest.FixtureRequest) -> AsyncIterator[Gold]:
     engine = pg_engine()
     try:
         yield Gold(engine)
+    finally:
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def picks(request: pytest.FixtureRequest) -> AsyncIterator[PickResolver]:
+    """按数据能力动态解析真库项目（见 ``project_picks``）。
+
+    取代 ``gold.py`` 里写死的 9 个项目 UUID —— 那 9 个 2026-11-01 现算在 ``projects``
+    表里全都查不到行，用例会拿 403 / 空集跟空金标准互相印证而假绿。
+    """
+    require_pg_only(request.node)
+    engine = pg_engine()
+    try:
+        yield PickResolver(engine)
     finally:
         await engine.dispose()
 
@@ -54,6 +74,112 @@ async def pg_rollback_session(request: pytest.FixtureRequest) -> AsyncIterator[A
                 await outer.rollback()
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def new_project(request: pytest.FixtureRequest, pg_rollback_session: AsyncSession):
+    """回滚事务里自建【测试】项目的工厂（取代 ``gold.py`` 的 UA / UB / UP 三个可写项目，它们现算已不存在）。
+
+    返回 ``async make(name_suffix, *, audit_year=2025, report_scope="standalone", template_type=None,
+    status="created") -> Pick``。插入走 ``writable_projects`` 的显式列裸 SQL（不经 ORM）；
+    行只在本事务里可见 —— 金标准要读它们必须用同一会话，换连接读到的是 0。
+    """
+    require_pg_only(request.node)
+
+    async def make(
+        name_suffix: str = "可写项目",
+        *,
+        audit_year: int | None = 2025,
+        report_scope: str | None = "standalone",
+        template_type: str | None = None,
+        status: str = "created",
+    ) -> Pick:
+        pid, name = await insert_test_project(
+            pg_rollback_session,
+            name_suffix=name_suffix,
+            audit_year=audit_year,
+            report_scope=report_scope,
+            template_type=template_type,
+            status=status,
+        )
+        return Pick(
+            id=pid,
+            name=name,
+            audit_year=audit_year,
+            report_scope=report_scope,
+            template_type=template_type,
+            capability="selfbuilt",
+            metric=0,
+        )
+
+    return make
+
+
+@pytest_asyncio.fixture
+async def writable_project(new_project) -> Pick:
+    """一个默认的自建【测试】项目（审计年度 2025、单体、无任何业务数据）。"""
+    return await new_project("可写项目")
+
+
+@pytest_asyncio.fixture
+async def no_active_dataset_project(request: pytest.FixtureRequest, pg_rollback_session: AsyncSession) -> Pick:
+    """回滚事务里自建「该年度没有 active 数据集」的【测试】项目（带几行余额表）。
+
+    为什么不从真库里挑：现算共享库里**没有任何活项目的审计年度是「没有 active 数据集」的**
+    （8 个有余额表行的项目全都有 active 数据集，见 `closure.md` §16.7）。
+    若退而求其次挑一个「生效口径恰好等于只按未删」的项目，断言照样绿，但走的是
+    「所有行都属于生效数据集」那条路 —— **分支覆盖会静默丢失**。
+
+    这是结构分支而非数据分布判据，自建夹具不会削弱它：行数与数据集归属由用例自己定，
+    比依赖共享库里恰好存在某种项目更确定。
+    """
+    require_pg_only(request.node)
+    session = pg_rollback_session
+    year = 2025
+    # 🔴 不用 `session.add(Project(...))`：ORM 声明的列可以领先于共享库（2026-11-01 缺 `amount_unit` 时
+    #    ORM 的 INSERT 当场 UndefinedColumnError），见 `writable_projects` 模块说明。
+    pid, name = await insert_test_project(session, name_suffix="无生效数据集", audit_year=year)
+    for index, code in enumerate(("1001", "1002", "1122")):
+        session.add(
+            TbBalance(
+                project_id=pid,
+                year=year,
+                company_code="AQL0",
+                account_code=code,
+                account_name=f"【测试】科目 {code}",
+                dataset_id=None,
+                is_deleted=False,
+            )
+        )
+        # 再放一行软删的，验「只按未删」这一半也真的在过滤
+        session.add(
+            TbBalance(
+                project_id=pid,
+                year=year,
+                company_code="AQL0",
+                account_code=f"{code}-deleted-{index}",
+                account_name="【测试】软删行",
+                dataset_id=None,
+                is_deleted=True,
+            )
+        )
+    await session.flush()
+    assert not (
+        await session.execute(
+            sa.select(sa.func.count())
+            .select_from(LedgerDataset.__table__)
+            .where(LedgerDataset.project_id == pid)
+        )
+    ).scalar_one(), "自建项目不应有任何数据集行（否则这条分支没被走到）"
+    return Pick(
+        id=pid,
+        name=name,
+        audit_year=year,
+        report_scope="standalone",
+        template_type=None,
+        capability="selfbuilt:no_active_dataset",
+        metric=3,
+    )
 
 
 @pytest_asyncio.fixture

@@ -133,4 +133,11 @@ class ExecuteCompatibilityAdapter:
     async def execute(self, body: Any, *, user: Any, db: Any) -> dict[str, Any]:
         request = self.to_orchestrator_request(body)
         result = await self._orchestrator.execute(request, user=user, db=db)
-        return self.to_legacy_response(result)
+        payload = self.to_legacy_response(result)
+        # 版本向量（AQF §4.4）：非空时作为可选键追加到响应，前端忽略不认识的键（N2）
+        if result.version:
+            payload["version"] = result.version
+        # 版本摘要（便于路由层登记运行记录）
+        if request.version_hash:
+            payload["_version_hash"] = request.version_hash
+        return payload

@@ -48,6 +48,8 @@ function snapshot(over: Partial<WorkpaperSyncOperationSnapshot> = {}): Workpaper
     applicationErrorMessage: null, acceptedAt: null, applicationBoundAt: null, operationFinishedAt: null,
     resultRevision: null, conflictCount: null, logicalResultCode: null, definitionBundleId: null,
     definitionBundleSha256: null, authorityModelDefinitionSha256: null, durableAt: null, finishedAt: null,
+    roomLatestDurableApplicationId: null,
+    roomLatestDurableSequence: null,
     terminal: false,
     ...over,
   }

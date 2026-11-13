@@ -253,13 +253,17 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
       const res = await http.post(
         `/api/workpapers/${wpId.value}/d2/vc-export-template`,
         null,
-        { responseType: 'blob' },
+        { responseType: 'blob', _silent: true },
       )
       const blob = new Blob([res.data], { type: XLSX_MIME })
       triggerBlobDownload(blob, 'D2-7_凭证检查表模板.xlsx')
       ElMessage.success('凭证检查表模板已导出')
     } catch (err: any) {
-      lastError.value = err?.response?.data?.message || err?.message || '导出模板失败'
+      const reason = err?.response?.data?.detail
+        || err?.response?.data?.message
+        || (typeof err?.response?.data === 'string' ? err.response.data : null)
+        || '导出模板失败，请检查网络后重试'
+      lastError.value = reason
       ElMessage.error(lastError.value!)
     }
   }
@@ -279,13 +283,34 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
           currentRows: serializeRowsToSheetData(currentRows.value),
           postRows: serializeRowsToSheetData(postRows.value),
         },
-        { responseType: 'blob' },
+        { responseType: 'blob', _silent: true },
       )
       const blob = new Blob([res.data], { type: XLSX_MIME })
       triggerBlobDownload(blob, 'D2-7_凭证检查表数据.xlsx')
       ElMessage.success('凭证检查表数据已导出')
     } catch (err: any) {
-      lastError.value = err?.response?.data?.message || err?.message || '导出数据失败'
+      let reason: string = '导出数据失败，请检查网络后重试'
+      const data = err?.response?.data
+      if (data instanceof Blob || (data != null && typeof data.slice === 'function' && typeof data.size === 'number')) {
+        // Blob 响应：用 FileReader 解析 JSON 错误体（兼容 jsdom/浏览器双环境）
+        try {
+          const text = await new Promise<string>((resolve, reject) => {
+            const fr = new FileReader()
+            fr.onload = () => resolve(fr.result as string)
+            fr.onerror = reject
+            fr.readAsText(data)
+          })
+          const parsed = JSON.parse(text)
+          reason = parsed?.message || parsed?.detail || reason
+        } catch {
+          // blob 解析失败，使用兜底文案
+        }
+      } else if (typeof data?.detail === 'string') {
+        reason = data.detail
+      } else if (typeof data?.message === 'string') {
+        reason = data.message
+      }
+      lastError.value = reason
       ElMessage.error(lastError.value!)
     }
   }
@@ -309,7 +334,7 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
       const res = await http.post(
         `/api/workpapers/${wpId.value}/d2/vc-import-data`,
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
+        { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true },
       )
 
       // 后端返回解析后的 sheet 数据
@@ -356,7 +381,12 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
 
       return result
     } catch (err: any) {
-      lastError.value = err?.response?.data?.message || err?.message || '导入数据失败'
+      const data = err?.response?.data
+      const reason = data?.detail?.message
+        || (typeof data?.detail === 'string' ? data.detail : null)
+        || data?.message
+        || '导入失败，请检查网络后重试'
+      lastError.value = reason
       ElMessage.error(lastError.value!)
       return null
     } finally {

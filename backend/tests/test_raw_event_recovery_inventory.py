@@ -32,6 +32,7 @@ _DYNAMIC_VALUES = {
     "consol.refresh.completed",
     "consol.refresh.error",
     "formula.pushed",
+    "platform.job.updated",
     "procedure_task.event",
     "consol.pushed",
     "consol.push_failed",

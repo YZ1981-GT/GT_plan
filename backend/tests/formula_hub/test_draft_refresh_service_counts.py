@@ -243,6 +243,47 @@ def _audits_added(session) -> list[DraftRefreshAudit]:
     return [o for o in session.added if isinstance(o, DraftRefreshAudit)]
 
 
+#: 运行时哈希审计（``append_audit_log``，mandatory）在 AsyncMock 会话下的记录：
+#: 假会话撑不起审计链 SQL（``audit_chain.head`` 同步调 ``get_bind``、读链尾），所以在被测服务调用的下一层记录；
+#: 真实链写入由 ``tests/audit_chain`` 覆盖。
+_HASH_AUDITS: list[dict] = []
+
+
+@pytest.fixture(autouse=True)
+def _record_hash_audits(monkeypatch):
+    from app.services import audit_log_helper
+
+    _HASH_AUDITS.clear()
+
+    async def _record(db, payload):
+        _HASH_AUDITS.append(payload)
+        return uuid.uuid4()
+
+    monkeypatch.setattr(audit_log_helper, "append_audit_log", _record)
+    yield
+
+
+@pytest.mark.asyncio
+async def test_runtime_apply_writes_one_mandatory_hash_audit(monkeypatch):
+    """成功的运行时写入恰写一条哈希审计；审计写失败 ⇒ 整次刷新失败（mandatory，不吞）。"""
+    svc, session = _RecalcSpy(), _runtime_session()
+    result = await _execute(svc, session, [_mutation("c1")], {"workpaper": _Adapter("workpaper")},
+                            transaction_mode="all_or_nothing")
+    assert result.status == "success"
+    assert [(a["action"], a["details"]["applied_count"]) for a in _HASH_AUDITS] == [("formula_runtime_executed", 1)]
+
+    from app.services import audit_log_helper
+
+    async def _broken(db, payload):
+        raise RuntimeError("audit chain down")
+
+    monkeypatch.setattr(audit_log_helper, "append_audit_log", _broken)
+    svc2, session2 = _RecalcSpy(), _runtime_session()
+    failed = await _execute(svc2, session2, [_mutation("c2")], {"workpaper": _Adapter("workpaper")},
+                            transaction_mode="all_or_nothing")
+    assert failed.status == "failed" and "audit chain down" in failed.failures[0]["error"]
+
+
 def _mutation(addr_id: str, domain: str = "workpaper") -> FormulaMutation:
     target = CanonicalFormulaTarget(domain=domain, project_id=PROJECT_ID, year=YEAR, addr_id=addr_id,
                                     locator={"wp_id": str(uuid.UUID(int=7)), "cell": "A1"})

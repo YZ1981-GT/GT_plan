@@ -1,5 +1,5 @@
 {
-  "adjudication_source_digest": "3382b0a961727e5826372683a2db995eff201a2535b886014d4d44f5eee6ae6e",
+  "adjudication_source_digest": "d51c5dfd2b3cdd806b8d179ea3ffe6cae6ef0707bc2f7e561e19d33d68b26c1b",
   "entries": [
     {
       "adapter_id": null,
@@ -94,9 +94,9 @@
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA10Bundle.vue#L106",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1107",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1112",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L371",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L375",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -223,9 +223,9 @@
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA12Bundle.vue#L104",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1107",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1112",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L371",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L375",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -345,9 +345,9 @@
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue#L103",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1107",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1112",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L371",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L375",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -474,9 +474,9 @@
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue#L699",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1107",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1112",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L371",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L375",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -568,9 +568,9 @@
           "sourceKind": "registry_ast",
           "sourceSpan": {
             "endColumn": 1,
-            "endLine": 201,
+            "endLine": 202,
             "startColumn": 1,
-            "startLine": 201
+            "startLine": 202
           },
           "templateNodeOrdinal": 0,
           "wpExpression": ":wp-id=\"wpId\""
@@ -586,9 +586,9 @@
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1107",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1112",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L371",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L375",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -729,17 +729,17 @@
           "importKind": "static",
           "localName": "OnlyOfficeWordDialog",
           "loop": null,
-          "mountId": "mount_85058a16d09cb2b31c49",
+          "mountId": "mount_730a710e1f3337e88b38",
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 7,
-            "endLine": 289,
+            "endLine": 291,
             "startColumn": 5,
-            "startLine": 280
+            "startLine": 282
           },
-          "templateNodeOrdinal": 90,
+          "templateNodeOrdinal": 91,
           "wpExpression": null
         }
       ],
@@ -754,8 +754,8 @@
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/OnlyOfficeWordDialog.vue#L72",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1107",
-          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1112",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
+          "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -1478,18 +1478,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_76cef655f911a41ed84a",
+          "mountId": "mount_dbf055bd91d2674de1fd",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 540,
+            "endLine": 560,
             "startColumn": 9,
-            "startLine": 540
+            "startLine": 560
           },
-          "templateNodeOrdinal": 108,
+          "templateNodeOrdinal": 109,
           "wpExpression": null
         }
       ],
@@ -1503,7 +1503,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -1609,9 +1609,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 112,
-            "endLine": 446,
+            "endLine": 462,
             "startColumn": 9,
-            "startLine": 446
+            "startLine": 462
           },
           "templateNodeOrdinal": 123,
           "wpExpression": null
@@ -1627,7 +1627,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -1733,18 +1733,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_ccc84743524c673a53d3",
+          "mountId": "mount_08490c47049eed336e2a",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 476,
+            "endLine": 496,
             "startColumn": 9,
-            "startLine": 476
+            "startLine": 496
           },
-          "templateNodeOrdinal": 68,
+          "templateNodeOrdinal": 69,
           "wpExpression": null
         }
       ],
@@ -1758,7 +1758,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -1882,7 +1882,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -1981,18 +1981,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_755a3086626a7c5ef6e6",
+          "mountId": "mount_f66e5fc8a60955bfb2c2",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 112,
-            "endLine": 776,
+            "endLine": 796,
             "startColumn": 9,
-            "startLine": 776
+            "startLine": 796
           },
-          "templateNodeOrdinal": 255,
+          "templateNodeOrdinal": 256,
           "wpExpression": null
         }
       ],
@@ -2006,7 +2006,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2112,18 +2112,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_7141950a74109a1481a1",
+          "mountId": "mount_bf2bbb90bf7665221ac5",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 408,
+            "endLine": 428,
             "startColumn": 9,
-            "startLine": 408
+            "startLine": 428
           },
-          "templateNodeOrdinal": 92,
+          "templateNodeOrdinal": 93,
           "wpExpression": null
         }
       ],
@@ -2137,7 +2137,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2236,18 +2236,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_4c3e6cc8242fef5b3ec3",
+          "mountId": "mount_aff4cbe99934101e8933",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 112,
-            "endLine": 701,
+            "endLine": 721,
             "startColumn": 9,
-            "startLine": 701
+            "startLine": 721
           },
-          "templateNodeOrdinal": 159,
+          "templateNodeOrdinal": 160,
           "wpExpression": null
         }
       ],
@@ -2261,7 +2261,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2367,18 +2367,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_a2796e9714a55ccc3228",
+          "mountId": "mount_9385a5be53340c76b7af",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 547,
+            "endLine": 572,
             "startColumn": 9,
-            "startLine": 542
+            "startLine": 567
           },
-          "templateNodeOrdinal": 104,
+          "templateNodeOrdinal": 105,
           "wpExpression": null
         }
       ],
@@ -2392,7 +2392,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2498,18 +2498,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_aa6bf6bab16fb71f0c15",
+          "mountId": "mount_f7f9566a3e9184ea41ea",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 479,
+            "endLine": 499,
             "startColumn": 9,
-            "startLine": 479
+            "startLine": 499
           },
-          "templateNodeOrdinal": 157,
+          "templateNodeOrdinal": 158,
           "wpExpression": null
         }
       ],
@@ -2523,7 +2523,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2622,18 +2622,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_6720b61787ff364ca7fc",
+          "mountId": "mount_514952e3f3c0dc44cf52",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 612,
+            "endLine": 632,
             "startColumn": 9,
-            "startLine": 608
+            "startLine": 628
           },
-          "templateNodeOrdinal": 85,
+          "templateNodeOrdinal": 86,
           "wpExpression": null
         }
       ],
@@ -2647,7 +2647,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2753,18 +2753,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_cf7e8b90152ff6c7dbfe",
+          "mountId": "mount_ce0da649f95ce55f36a4",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 154,
-            "endLine": 497,
+            "endLine": 517,
             "startColumn": 33,
-            "startLine": 497
+            "startLine": 517
           },
-          "templateNodeOrdinal": 131,
+          "templateNodeOrdinal": 132,
           "wpExpression": null
         }
       ],
@@ -2778,7 +2778,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -2884,18 +2884,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_740d3c71e354f1488479",
+          "mountId": "mount_339ce91d2bfc3a927dbf",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 154,
-            "endLine": 502,
+            "endLine": 522,
             "startColumn": 33,
-            "startLine": 502
+            "startLine": 522
           },
-          "templateNodeOrdinal": 131,
+          "templateNodeOrdinal": 132,
           "wpExpression": null
         }
       ],
@@ -2909,7 +2909,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3015,18 +3015,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_50dfff01063c64411b46",
+          "mountId": "mount_9f5232205a887717e2a5",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 154,
-            "endLine": 434,
+            "endLine": 454,
             "startColumn": 33,
-            "startLine": 434
+            "startLine": 454
           },
-          "templateNodeOrdinal": 135,
+          "templateNodeOrdinal": 136,
           "wpExpression": null
         }
       ],
@@ -3040,7 +3040,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3146,18 +3146,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_2b32e707fc7994493f8d",
+          "mountId": "mount_381a370a8679791310a7",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 288,
+            "endLine": 310,
             "startColumn": 9,
-            "startLine": 288
+            "startLine": 310
           },
-          "templateNodeOrdinal": 31,
+          "templateNodeOrdinal": 32,
           "wpExpression": null
         }
       ],
@@ -3171,7 +3171,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3277,18 +3277,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_db029fd3436f082adca5",
+          "mountId": "mount_f9e49e6e1baaa52c5f64",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 446,
+            "endLine": 468,
             "startColumn": 9,
-            "startLine": 446
+            "startLine": 468
           },
-          "templateNodeOrdinal": 125,
+          "templateNodeOrdinal": 126,
           "wpExpression": null
         }
       ],
@@ -3302,7 +3302,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3408,18 +3408,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_5f7dc48cb681dc9f33a0",
+          "mountId": "mount_0e0294008fb3b95ea7c9",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 154,
-            "endLine": 735,
+            "endLine": 755,
             "startColumn": 33,
-            "startLine": 735
+            "startLine": 755
           },
-          "templateNodeOrdinal": 287,
+          "templateNodeOrdinal": 288,
           "wpExpression": null
         }
       ],
@@ -3433,7 +3433,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3532,18 +3532,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_3003209ac11057c1d8b6",
+          "mountId": "mount_44d38c03565a1b6edbce",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 112,
-            "endLine": 764,
+            "endLine": 784,
             "startColumn": 9,
-            "startLine": 764
+            "startLine": 784
           },
-          "templateNodeOrdinal": 170,
+          "templateNodeOrdinal": 171,
           "wpExpression": null
         }
       ],
@@ -3557,7 +3557,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3663,18 +3663,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_ffe3dc0fca4289633587",
+          "mountId": "mount_164c787d1be3483c5f44",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 128,
-            "endLine": 221,
+            "endLine": 241,
             "startColumn": 7,
-            "startLine": 221
+            "startLine": 241
           },
-          "templateNodeOrdinal": 54,
+          "templateNodeOrdinal": 55,
           "wpExpression": null
         }
       ],
@@ -3688,7 +3688,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3787,18 +3787,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_0663ac58dfaa81699735",
+          "mountId": "mount_2ca8a1160634b2c0120d",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 186,
+            "endLine": 206,
             "startColumn": 31,
-            "startLine": 186
+            "startLine": 206
           },
-          "templateNodeOrdinal": 56,
+          "templateNodeOrdinal": 57,
           "wpExpression": null
         }
       ],
@@ -3812,7 +3812,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -3918,18 +3918,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_188efebc4348d8bdf377",
+          "mountId": "mount_6b2dabd9ab6e04d9bd28",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 128,
-            "endLine": 212,
+            "endLine": 232,
             "startColumn": 7,
-            "startLine": 212
+            "startLine": 232
           },
-          "templateNodeOrdinal": 63,
+          "templateNodeOrdinal": 64,
           "wpExpression": null
         }
       ],
@@ -3943,7 +3943,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4042,18 +4042,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_aa692975769e52eff316",
+          "mountId": "mount_2f1297b5b70b3d55a1f3",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 171,
-            "endLine": 226,
+            "endLine": 246,
             "startColumn": 66,
-            "startLine": 226
+            "startLine": 246
           },
-          "templateNodeOrdinal": 93,
+          "templateNodeOrdinal": 94,
           "wpExpression": null
         }
       ],
@@ -4067,7 +4067,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4166,18 +4166,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_74b8112dcfcb9b279400",
+          "mountId": "mount_689d9db8914f4ff1dc20",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 173,
-            "endLine": 382,
+            "endLine": 402,
             "startColumn": 68,
-            "startLine": 382
+            "startLine": 402
           },
-          "templateNodeOrdinal": 228,
+          "templateNodeOrdinal": 229,
           "wpExpression": null
         }
       ],
@@ -4191,7 +4191,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4297,18 +4297,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_5a4e5d0f52d002852edf",
+          "mountId": "mount_197b15602058a0a0fed4",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 154,
-            "endLine": 236,
+            "endLine": 256,
             "startColumn": 31,
-            "startLine": 236
+            "startLine": 256
           },
-          "templateNodeOrdinal": 45,
+          "templateNodeOrdinal": 46,
           "wpExpression": null
         }
       ],
@@ -4322,7 +4322,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4428,18 +4428,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_b8c6859b805f4db9abe1",
+          "mountId": "mount_eab246c14aa223d41ad1",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 326,
+            "endLine": 346,
             "startColumn": 9,
-            "startLine": 326
+            "startLine": 346
           },
-          "templateNodeOrdinal": 101,
+          "templateNodeOrdinal": 102,
           "wpExpression": null
         }
       ],
@@ -4453,7 +4453,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4559,18 +4559,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_cb71076f071b79fd4d26",
+          "mountId": "mount_5bc37c46374ce4188d34",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 453,
+            "endLine": 473,
             "startColumn": 9,
-            "startLine": 453
+            "startLine": 473
           },
-          "templateNodeOrdinal": 121,
+          "templateNodeOrdinal": 122,
           "wpExpression": null
         }
       ],
@@ -4584,7 +4584,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4690,18 +4690,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_bfa7745ab6076479b033",
+          "mountId": "mount_81163a94b25344da1bd3",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 128,
-            "endLine": 227,
+            "endLine": 247,
             "startColumn": 7,
-            "startLine": 227
+            "startLine": 247
           },
-          "templateNodeOrdinal": 56,
+          "templateNodeOrdinal": 57,
           "wpExpression": null
         }
       ],
@@ -4715,7 +4715,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4821,18 +4821,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_d2909aa44a8474806051",
+          "mountId": "mount_cdf04aa5be274f8b8aac",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 191,
-            "endLine": 278,
+            "endLine": 298,
             "startColumn": 70,
-            "startLine": 278
+            "startLine": 298
           },
-          "templateNodeOrdinal": 120,
+          "templateNodeOrdinal": 121,
           "wpExpression": null
         }
       ],
@@ -4846,7 +4846,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -4952,18 +4952,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_93c0a51c349c059b0a9c",
+          "mountId": "mount_0d0faf1540155b3dbff8",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 128,
-            "endLine": 216,
+            "endLine": 236,
             "startColumn": 7,
-            "startLine": 216
+            "startLine": 236
           },
-          "templateNodeOrdinal": 81,
+          "templateNodeOrdinal": 82,
           "wpExpression": null
         }
       ],
@@ -4977,7 +4977,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5083,18 +5083,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_a329a0e063c658cec3a5",
+          "mountId": "mount_265a2101344866330e47",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 203,
-            "endLine": 254,
+            "endLine": 276,
             "startColumn": 66,
-            "startLine": 254
+            "startLine": 276
           },
-          "templateNodeOrdinal": 134,
+          "templateNodeOrdinal": 135,
           "wpExpression": null
         }
       ],
@@ -5108,7 +5108,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5214,9 +5214,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 169,
-            "endLine": 273,
+            "endLine": 289,
             "startColumn": 66,
-            "startLine": 273
+            "startLine": 289
           },
           "templateNodeOrdinal": 164,
           "wpExpression": null
@@ -5232,7 +5232,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5338,9 +5338,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 169,
-            "endLine": 267,
+            "endLine": 283,
             "startColumn": 66,
-            "startLine": 267
+            "startLine": 283
           },
           "templateNodeOrdinal": 156,
           "wpExpression": null
@@ -5356,7 +5356,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5455,18 +5455,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_f8c2a9b6d35548d14ea2",
+          "mountId": "mount_766b096b0fb8f0c78eae",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 169,
-            "endLine": 293,
+            "endLine": 313,
             "startColumn": 66,
-            "startLine": 293
+            "startLine": 313
           },
-          "templateNodeOrdinal": 95,
+          "templateNodeOrdinal": 96,
           "wpExpression": null
         }
       ],
@@ -5480,7 +5480,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5586,18 +5586,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_dc907df7aea13ff75498",
+          "mountId": "mount_0ccfbeea64f30e94bc15",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 414,
+            "endLine": 436,
             "startColumn": 9,
-            "startLine": 409
+            "startLine": 431
           },
-          "templateNodeOrdinal": 104,
+          "templateNodeOrdinal": 105,
           "wpExpression": null
         }
       ],
@@ -5611,7 +5611,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5717,18 +5717,18 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_91ea37a0b78c4128b768",
+          "mountId": "mount_4a0756f84a48127bb7f6",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 130,
-            "endLine": 432,
+            "endLine": 452,
             "startColumn": 9,
-            "startLine": 432
+            "startLine": 452
           },
-          "templateNodeOrdinal": 144,
+          "templateNodeOrdinal": 145,
           "wpExpression": null
         }
       ],
@@ -5742,7 +5742,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -5877,7 +5877,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -6013,7 +6013,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -6466,7 +6466,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -6598,7 +6598,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -6735,7 +6735,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -6872,7 +6872,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7009,7 +7009,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7146,7 +7146,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7284,7 +7284,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7343,7 +7343,7 @@
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
       "html_counterpart_source_refs": [
-        "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L463",
+        "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue#L470",
         "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L101",
         "audit-platform/frontend/src/components/workpaper/composables/useA177IndependenceDeclaration.ts#L127"
       ],
@@ -7396,9 +7396,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 112,
-            "endLine": 253,
+            "endLine": 259,
             "startColumn": 9,
-            "startLine": 253
+            "startLine": 259
           },
           "templateNodeOrdinal": 197,
           "wpExpression": null
@@ -7415,7 +7415,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7551,7 +7551,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7687,7 +7687,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7822,7 +7822,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -7881,7 +7881,7 @@
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
       "html_counterpart_source_refs": [
-        "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L362",
+        "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L376",
         "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L212",
         "audit-platform/frontend/src/components/workpaper/composables/useA38Goodwill.ts#L239"
       ],
@@ -7941,9 +7941,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 26,
+            "endLine": 33,
             "startColumn": 7,
-            "startLine": 21
+            "startLine": 28
           },
           "templateNodeOrdinal": 7,
           "wpExpression": null
@@ -7959,7 +7959,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -8260,7 +8260,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -8397,7 +8397,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -8534,7 +8534,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -8655,17 +8655,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_2df2f4ead99d09b53755",
+          "mountId": "mount_ccfbae66fdb3e121ebf1",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"sourceSheet || '业务评价表B1-3'\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 7,
-            "endLine": 213,
+            "endLine": 220,
             "startColumn": 5,
-            "startLine": 207
+            "startLine": 214
           },
-          "templateNodeOrdinal": 95,
+          "templateNodeOrdinal": 96,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -8802,17 +8802,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_482b8c027ca7fb32a263",
+          "mountId": "mount_f0ff42e1d205f927028f",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"sourceSheet || ' B1-5 KAA检查表-业务承接'\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 7,
-            "endLine": 156,
+            "endLine": 163,
             "startColumn": 5,
-            "startLine": 150
+            "startLine": 157
           },
-          "templateNodeOrdinal": 65,
+          "templateNodeOrdinal": 66,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -8935,17 +8935,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_6995e06915f124405159",
+          "mountId": "mount_477fb6b71b51d3e74284",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 92,
-            "endLine": 265,
+            "endLine": 272,
             "startColumn": 7,
-            "startLine": 265
+            "startLine": 272
           },
-          "templateNodeOrdinal": 87,
+          "templateNodeOrdinal": 88,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -9082,17 +9082,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_4854a102a8562247e7ba",
+          "mountId": "mount_ea34fe2f847e885ab916",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"sourceSheet || '尽职调查报告B1-4'\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 165,
-            "endLine": 204,
+            "endLine": 211,
             "startColumn": 5,
-            "startLine": 204
+            "startLine": 211
           },
-          "templateNodeOrdinal": 88,
+          "templateNodeOrdinal": 89,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -9472,9 +9472,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 7,
-            "endLine": 265,
+            "endLine": 264,
             "startColumn": 5,
-            "startLine": 256
+            "startLine": 255
           },
           "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -9489,7 +9489,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L256",
+          "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L255",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
@@ -9556,7 +9556,7 @@
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
       "html_counterpart_source_refs": [
-        "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L386",
+        "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L385",
         "audit-platform/frontend/src/components/workpaper/composables/useB22AFormData.ts#L106"
       ],
       "html_counterpart_verdict": "exists",
@@ -9640,9 +9640,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 7,
-            "endLine": 480,
+            "endLine": 479,
             "startColumn": 5,
-            "startLine": 471
+            "startLine": 470
           },
           "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -9657,7 +9657,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L471",
+          "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L470",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
@@ -9724,7 +9724,7 @@
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
       "html_counterpart_source_refs": [
-        "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L198",
+        "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L197",
         "audit-platform/frontend/src/components/workpaper/composables/useB22CDesignEffectiveness.ts#L282"
       ],
       "html_counterpart_verdict": "exists",
@@ -9808,9 +9808,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 7,
-            "endLine": 305,
+            "endLine": 304,
             "startColumn": 5,
-            "startLine": 296
+            "startLine": 295
           },
           "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -9825,7 +9825,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L296",
+          "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L295",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
@@ -31809,17 +31809,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_12389c3dfc6e1404a58a",
+          "mountId": "mount_c560096be152660fe648",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"isWholeExcelTab ? wholeWorkbookSheetName : activeSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 248,
+            "endLine": 249,
             "startColumn": 7,
-            "startLine": 239
+            "startLine": 240
           },
-          "templateNodeOrdinal": 56,
+          "templateNodeOrdinal": 57,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -31834,7 +31834,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue#L239",
+          "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue#L240",
           "backend/app/routers/wp_onlyoffice_router.py#L743"
         ]
       },
@@ -32817,17 +32817,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_2f1f32ebf7dc93a3978c",
+          "mountId": "mount_cdf5a2aaef966b6a9a7b",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"检查表J1-8\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 99,
-            "endLine": 65,
+            "endLine": 67,
             "startColumn": 7,
-            "startLine": 65
+            "startLine": 67
           },
-          "templateNodeOrdinal": 45,
+          "templateNodeOrdinal": 46,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -32963,7 +32963,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33080,7 +33080,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33183,7 +33183,7 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_72eee77c851d3e06a858",
+          "mountId": "mount_5c66d3cfde60dbd702e4",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
@@ -33194,7 +33194,7 @@
             "startColumn": 9,
             "startLine": 15
           },
-          "templateNodeOrdinal": 7,
+          "templateNodeOrdinal": 8,
           "wpExpression": null
         }
       ],
@@ -33208,7 +33208,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33311,7 +33311,7 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_eb679190cf4f731a6e4b",
+          "mountId": "mount_bf5cc18059aa841c1e30",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
@@ -33322,7 +33322,7 @@
             "startColumn": 9,
             "startLine": 10
           },
-          "templateNodeOrdinal": 7,
+          "templateNodeOrdinal": 8,
           "wpExpression": null
         }
       ],
@@ -33336,7 +33336,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33439,7 +33439,7 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_e2c24570968a58d125f1",
+          "mountId": "mount_81ddde200e8fe54a4feb",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
@@ -33450,7 +33450,7 @@
             "startColumn": 9,
             "startLine": 10
           },
-          "templateNodeOrdinal": 7,
+          "templateNodeOrdinal": 8,
           "wpExpression": null
         }
       ],
@@ -33464,7 +33464,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33567,7 +33567,7 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_7b89c2d3230043cda9ad",
+          "mountId": "mount_c720f344f178a4a670ad",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
@@ -33578,7 +33578,7 @@
             "startColumn": 9,
             "startLine": 10
           },
-          "templateNodeOrdinal": 7,
+          "templateNodeOrdinal": 8,
           "wpExpression": null
         }
       ],
@@ -33592,7 +33592,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33695,7 +33695,7 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_ca52512d45ad0875b4c4",
+          "mountId": "mount_a93dd5dc574cfcef9834",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
@@ -33706,7 +33706,7 @@
             "startColumn": 9,
             "startLine": 10
           },
-          "templateNodeOrdinal": 7,
+          "templateNodeOrdinal": 8,
           "wpExpression": null
         }
       ],
@@ -33720,7 +33720,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -33823,7 +33823,7 @@
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_c63e1d316a1cbcba0cb8",
+          "mountId": "mount_6a1679b3df62b7bec4d1",
           "needsOverlayRule": true,
           "runtimeCardinality": "single",
           "sheetExpression": null,
@@ -33834,7 +33834,7 @@
             "startColumn": 9,
             "startLine": 10
           },
-          "templateNodeOrdinal": 7,
+          "templateNodeOrdinal": 8,
           "wpExpression": null
         }
       ],
@@ -33848,7 +33848,7 @@
         "room_model_fact": "room_identity_from_server_issued_descriptor",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L366",
-          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L487"
+          "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue#L503"
         ]
       },
       "room_model": "shared",
@@ -36778,11 +36778,11 @@
       }
     }
   ],
-  "manifest_digest": "363d8a75cb2380e97f88a5d73746e2caf2ca6223de4b1fe1eea8c17ab76d42d7",
-  "overlay_digest": "580e8b50d01236dccffa210a822d140c70726a4efbbf9e5b14d1576219f65e9d",
-  "profile_source_digest": "0308e3609b064f6547bfdc0448610c13c2036ca6857d73053df60e0d35f57f10",
+  "manifest_digest": "a45714deb833e624b43faa0eaa44785027c24148784a2156ffe0c25f22fa7be6",
+  "overlay_digest": "597951aa87483908148f7278779d5da0fdb3a31be9194442065e484d9ab81083",
+  "profile_source_digest": "0bf7e85901b6cb980766c771ada19abc28c77e66eb2eb19436a9bf3d7d360d9e",
   "schema_version": 1,
-  "source_digest": "919d66ad00b6798dad516a3db1e5807eb1c0889d23ec2b1aa8495edda63962d9",
+  "source_digest": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
   "stats": {
     "by_component": {
       "GtOnlyOfficeSheet": 224,

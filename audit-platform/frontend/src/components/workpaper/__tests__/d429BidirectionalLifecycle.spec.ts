@@ -3,11 +3,28 @@ import { defineComponent, h, ref } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import D4TabCustomerDetail from '../d4/ipo/D4TabCustomerDetail.vue'
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), read: vi.fn(), reload: vi.fn(), bridge: null as any }))
+const mocks = vi.hoisted(() => ({
+  save: vi.fn(), read: vi.fn(), reload: vi.fn(), bridge: null as any,
+  // 🔴 2026-11-04：D4 子 Tab 的「在线编辑」选项与分段器由同步能力单源放行（useD4SyncMode 的
+  //    entrySync）。本文件测的是放行后的生命周期，故给一份已验收的 bidirectional 就绪结论；
+  //    读不到 readiness 时分段器按设计 fail closed 不画（那条由 useD4SyncMode.spec.ts 守）。
+  readiness: vi.fn(async () => ({
+    entry_id: 'xlsx/gt-d4-operating-revenue', effective_entry_id: 'xlsx/gt-d4-operating-revenue',
+    capability: 'bidirectional', adjudication_state: 'terminal', allowed_modes: ['html', 'oo'],
+    can_claim_bidirectional: true,
+    runtime: {
+      ready: true, adapter_id: 'test', authority_model: null, definition_bundle_id: null,
+      definition_bundle_sha256: null, typed_slots_complete: true, typed_slots: [],
+      representation_id: null, representation_generation: null,
+    },
+    acceptance: { state: 'verified', stale: false, run_id: null, required_scenario_set_digest: null },
+    reason: null,
+  })),
+}))
 // 🔴 useD4SyncMode 在 mount 期会经 fetchOnlyOfficeHealthy() 探健康（读 data.healthy），
 //    switchMode('在线编辑') 靠这个健康门禁放行；必须返回 healthy:true 否则 oo 分支永远短路。
 vi.mock('@/utils/http', () => ({ default: { get: vi.fn(async () => ({ data: { healthy: true } })) } }))
-vi.mock('../sync/workpaperSyncApi', () => ({ readStoreProjection: mocks.read }))
+vi.mock('../sync/workpaperSyncApi', () => ({ readStoreProjection: mocks.read, readEntrySyncReadiness: mocks.readiness }))
 vi.mock('../sync/workpaperSyncCapability', () => ({ capabilityForEntry: () => 'bidirectional' }))
 vi.mock('../composables/useD4ImportExport', () => ({ useD4ImportExport: () => ({ exportTemplate: vi.fn(), exportData: vi.fn(), importData: vi.fn(), importing: ref(false) }) }))
 vi.mock('../d4/ipo/D4IpoFindingWriteback.vue', () => ({ default: defineComponent({ name: 'D4IpoFindingWriteback', render: () => h('span') }) }))

@@ -16,6 +16,7 @@ import logging
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.checklist_response_cas import checklist_snapshot_entry
 from app.services.d_cycle_extraction.d_account_resolver import (
     resolve_d_cycle_account_codes,
 )
@@ -47,7 +48,7 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         result = await db.execute(
             sa.text(
-                "SELECT item_id, conclusion, remark "
+                "SELECT item_id, conclusion, remark, updated_at "
                 "FROM checklist_responses WHERE wp_id = :wp_id "
                 "AND item_id LIKE 'D2-%' "
                 "LIMIT 1000"
@@ -55,10 +56,8 @@ async def render(ctx: RenderContext) -> dict | None:
             {"wp_id": str(wp_id)},
         )
         for row in result.fetchall():
-            responses_snapshot[row.item_id] = {
-                "conclusion": row.conclusion or "",
-                "remark": row.remark or "",
-            }
+            # 带 CAS 版本：GtD2AccountsReceivable 快照非空时不再 GET，缺版本时已有行保存 428
+            responses_snapshot[row.item_id] = checklist_snapshot_entry(row)
     except Exception as e:  # noqa: BLE001
         logger.warning("D2 render: checklist_responses 查询失败 wp_id=%s: %s", wp_id, e)
 

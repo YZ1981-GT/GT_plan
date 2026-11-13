@@ -8,11 +8,15 @@
  *
  * 本地运行：
  *   npx playwright test --config=playwright.formula-e2e.config.ts
+ *   会写公式数据的用例只在一次性库上跑（helpers.requireIsolatedDb）：本地另起一套指向一次性库的后端 / 前端，
+ *   用 PLAYWRIGHT_BACKEND_URL / PLAYWRIGHT_BASE_URL 指过去，不要对着共享开发服务（9980 / 3030）跑
  *
  * CI 运行：
  *   由 .github/workflows/formula-e2e.yml 调用
  */
 import { defineConfig, devices } from '@playwright/test'
+
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3030'
 
 export default defineConfig({
   testDir: './e2e/formula-hub',
@@ -24,7 +28,7 @@ export default defineConfig({
   timeout: 60_000, // 共享库后端偶尔响应慢，CI 一次性库上会更快
   reporter: process.env.CI ? [['github'], ['list']] : 'html',
   use: {
-    baseURL: 'http://127.0.0.1:3030',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -36,7 +40,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://127.0.0.1:3030',
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000, // CI 首次编译可能较慢
   },

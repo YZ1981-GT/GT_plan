@@ -247,7 +247,12 @@ async def test_health_exposes_reload_field(tmp_path, monkeypatch):
     app.dependency_overrides[get_redis] = _redis
     clean = AsyncMock(return_value={"applied_count": 0, "failures": []})
     drift = AsyncMock(return_value={"count": 0, "critical_count": 0, "items": []})
-    with patch("app.api.health._query_migration_status", new=clean), patch("app.api.health._query_schema_drift", new=drift):
+    # 审计链同样声明干净：mock 会话跑不了分叉扫描，扫描失败按「未知」处理会 degraded
+    chain = AsyncMock(return_value={
+        "unacknowledged_forks": 0, "quarantined_entries": 0, "dead_letter_entries": 0, "checked_at": "test",
+    })
+    with patch("app.api.health._query_migration_status", new=clean), patch("app.api.health._query_schema_drift", new=drift), \
+            patch("app.api.health._query_audit_chain_health", new=chain):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
             body = (await client.get("/api/health")).json()
             path.write_text(json.dumps({"result": "degraded", "phase": "primary_failed"}), encoding="utf-8")

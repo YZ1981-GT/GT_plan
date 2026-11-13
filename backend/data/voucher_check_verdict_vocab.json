@@ -1,0 +1,14 @@
+{
+  "_comment": "凭证检查行结论取值表（spec voucher-workflow-linkage-lineage-closure design §8.2）。只认这些字段与取值；不在表内的一律「未判定」。取值来自 63 个宿主映射文件的比较式与下拉选项。前端 audit-platform/frontend/src/utils/voucherVerdict.ts 有同值副本，契约测试逐值对拍。conclusion 字段不进白名单：它同时是程序表结论（Y / completed / 设计无效），在凭证行上含义不定。",
+  "fields": {
+    "isAbnormal": { "abnormal": ["是", "Y", "异常", true], "normal": ["否", "N", false] },
+    "abnormal": { "abnormal": ["是", "Y", "异常", true], "normal": ["否", "N", false] },
+    "checkResult": {
+      "abnormal": ["ERR", "不一致", "异常", "有异常", "×", "不符"],
+      "normal": ["OK", "一致", "无异常", "正常", "√", "相符"]
+    },
+    "checkConclusion": { "abnormal": ["不符", "有异常", "未取得权证"], "normal": ["相符", "无异常"] },
+    "auditConclusion": { "abnormal": ["需调整", "差异需调整"], "normal": ["无差异", "差异可接受", "无异常"] },
+    "isConsistent": { "abnormal": ["不一致", "否", false], "normal": ["一致", "是", true] }
+  }
+}
